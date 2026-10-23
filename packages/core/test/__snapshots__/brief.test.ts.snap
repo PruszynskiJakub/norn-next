@@ -1,0 +1,199 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`renderBrief (B3) first run of implement 1`] = `
+"# norn brief — gh-1/02 · implement #1
+
+## Where you are
+
+- Story: gh-1
+- Slice: gh-1/02
+- Step: implement (attempt 1)
+- Mode: auto
+
+## Your work
+
+Use the \`implement\` skill.
+
+## Inputs
+
+- Story spec: \`.agents/specs/gh-1-login/story.md\`
+- Slice: \`.agents/specs/gh-1-login/slices/02-form.md\`
+- Handoff: \`.agents/specs/gh-1-login/runs/02-form/handoff.md\`
+
+## Context
+
+No handoff yet — you are the first run of this unit.
+
+## Finish with exactly one of
+
+- \`norn done done --handoff "…"\` — every acceptance criterion (or rework point) has a passing test
+- \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
+- \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
+
+Then end your turn. Never edit \`runs/\`; never push.
+
+## Limits
+
+- Deadline: 60m (until 2026-10-23T11:00:00.000Z)
+- Nudges left: 2
+- Fresh-session retries left: 1
+- Port slot: 3 (PORT_BASE=4030)
+"
+`;
+
+exports[`renderBrief (B3) rework after a failing check shows the output tail and log 1`] = `
+"# norn brief — gh-1/02 · implement #2
+
+## Where you are
+
+- Story: gh-1
+- Slice: gh-1/02
+- Step: implement (attempt 2)
+- Mode: auto
+
+## Your work
+
+Use the \`implement\` skill.
+
+## Inputs
+
+- Story spec: \`.agents/specs/gh-1-login/story.md\`
+- Slice: \`.agents/specs/gh-1-login/slices/02-form.md\`
+- Handoff: \`.agents/specs/gh-1-login/runs/02-form/handoff.md\`
+
+## Rework
+
+You are here because of \`test.fail\`. Address every point below first.
+
+### Failing check (test)
+
+- Command: \`bun test\`
+- Exit code: 1
+- Full log: \`.agents/specs/gh-1-login/runs/02-form/logs/01JDDDDDDDDDDDDDDDDDDDDDDD.log\`
+
+\`\`\`text
+✓ a
+✗ login rejects empty password
+  expected 400, got 200
+\`\`\`
+
+## Context
+
+### Goal
+Login form
+
+### Progress
+- form renders
+
+## Finish with exactly one of
+
+- \`norn done done --handoff "…"\` — every acceptance criterion (or rework point) has a passing test
+- \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
+- \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
+
+Then end your turn. Never edit \`runs/\`; never push.
+
+## Limits
+
+- Deadline: 60m (until 2026-10-23T11:00:00.000Z)
+- Nudges left: 2
+- Fresh-session retries left: 1
+- Port slot: 3 (PORT_BASE=4030)
+"
+`;
+
+exports[`renderBrief (B3) rework after review findings lists them 1`] = `
+"# norn brief — gh-1/02 · implement #2
+
+## Where you are
+
+- Story: gh-1
+- Slice: gh-1/02
+- Step: implement (attempt 2)
+- Mode: auto
+
+## Your work
+
+Use the \`implement\` skill.
+
+## Inputs
+
+- Story spec: \`.agents/specs/gh-1-login/story.md\`
+- Slice: \`.agents/specs/gh-1-login/slices/02-form.md\`
+- Handoff: \`.agents/specs/gh-1-login/runs/02-form/handoff.md\`
+
+## Rework
+
+You are here because of \`review.changes_requested\`. Address every point below first.
+
+### Findings (review: changes_requested)
+
+1. **blocking** [B3] Password not validated — \`src/login.ts:12\`
+   Repro: POST /login with empty password
+2. **minor** Naming
+   rename x to email
+
+## Context
+
+No handoff yet — you are the first run of this unit.
+
+## Finish with exactly one of
+
+- \`norn done done --handoff "…"\` — every acceptance criterion (or rework point) has a passing test
+- \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
+- \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
+
+Then end your turn. Never edit \`runs/\`; never push.
+
+## Limits
+
+- Deadline: 60m (until 2026-10-23T11:00:00.000Z)
+- Nudges left: 2
+- Fresh-session retries left: 1
+- Port slot: 3 (PORT_BASE=4030)
+"
+`;
+
+exports[`renderBrief (B3) attended step with answers in context, manual downgrade, no deadline 1`] = `
+"# norn brief — gh-1 · refine #1
+
+## Where you are
+
+- Story: gh-1
+- Step: refine (attempt 1)
+- Mode: manual · attended: work with the person in this session
+- Run: 01JDDDDDDDDDDDDDDDDDDDDDDD
+
+## Your work
+
+Use the \`refine\` skill.
+
+## Inputs
+
+- Story spec: \`.agents/specs/gh-1-login/story.md\`
+- Handoff: \`.agents/specs/gh-1-login/runs/_story/handoff.md\`
+
+## Context
+
+Answers to your questions in this step:
+
+- Q: Email or username?
+  A: Email
+
+No handoff yet — you are the first run of this unit.
+
+## Finish with exactly one of
+
+- \`norn done done --handoff "…"\` — step finished with outcome done
+- \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
+- \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
+
+Then end your turn. Never edit \`runs/\`; never push.
+
+## Limits
+
+- Attended step: no deadline or nudges (MO4)
+- Fresh-session retries left: 1
+- Port slot: none
+"
+`;

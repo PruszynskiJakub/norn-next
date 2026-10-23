@@ -1,0 +1,5 @@
+{
+  "BeforeTool": { "session_id": "gem-1", "transcript_path": "/home/u/.gemini/tmp/h/chats/session-1.json", "cwd": "/repo/.worktrees/gh-12", "hook_event_name": "BeforeTool", "timestamp": "2026-10-23T10:00:00Z", "tool_name": "run_shell_command", "tool_input": { "command": "bun test" } },
+  "Notification": { "session_id": "gem-1", "transcript_path": "/home/u/.gemini/tmp/h/chats/session-1.json", "cwd": "/repo/.worktrees/gh-12", "hook_event_name": "Notification", "timestamp": "2026-10-23T10:00:01Z", "notification_type": "ToolPermission", "message": "Allow run_shell_command: git push?", "details": {} },
+  "AfterAgent": { "session_id": "gem-1", "transcript_path": "/home/u/.gemini/tmp/h/chats/session-1.json", "cwd": "/repo/.worktrees/gh-12", "hook_event_name": "AfterAgent", "timestamp": "2026-10-23T10:00:02Z", "prompt": "go", "prompt_response": "Finished.", "stop_hook_active": false }
+}

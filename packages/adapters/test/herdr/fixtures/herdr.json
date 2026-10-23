@@ -1,0 +1,277 @@
+{
+  "_note": "Recorded from herdr 0.9.5 in an isolated --session (paths scrubbed); pane_get_working/blocked, error_agent_blocked and pane_read_visible are derived from recorded shapes. Values are stdout, error_* are stderr (exit 1).",
+  "status_server": "status: running\nversion: 0.9.5\nendpoint_compatible: yes\n",
+  "workspace_list": {
+    "id": "cli:workspace:list",
+    "result": {
+      "type": "workspace_list",
+      "workspaces": [
+        {
+          "active_tab_id": "w3:t1",
+          "agent_status": "idle",
+          "focused": false,
+          "label": "ai-skills",
+          "number": 1,
+          "pane_count": 1,
+          "tab_count": 1,
+          "workspace_id": "w3"
+        },
+        {
+          "active_tab_id": "wA:t1",
+          "agent_status": "idle",
+          "focused": false,
+          "label": "gh-1-01",
+          "number": 2,
+          "pane_count": 1,
+          "tab_count": 1,
+          "workspace_id": "wA",
+          "worktree": {
+            "checkout_path": "/repo/.agents/worktrees/gh-1-01",
+            "is_linked_worktree": true,
+            "repo_key": "/repo/.git",
+            "repo_name": "repo",
+            "repo_root": "/repo"
+          }
+        }
+      ]
+    }
+  },
+  "workspace_list_empty": {
+    "id": "cli:workspace:list",
+    "result": {
+      "type": "workspace_list",
+      "workspaces": []
+    }
+  },
+  "workspace_create": {
+    "id": "cli:workspace:create",
+    "result": {
+      "root_pane": {
+        "agent_status": "unknown",
+        "cwd": "/repo/.agents/worktrees/gh-1-01",
+        "focused": true,
+        "foreground_cwd": "/repo/.agents/worktrees/gh-1-01",
+        "pane_id": "w1:p1",
+        "revision": 0,
+        "scroll": {
+          "max_offset_from_bottom": 0,
+          "offset_from_bottom": 0,
+          "viewport_rows": 40
+        },
+        "tab_id": "w1:t1",
+        "terminal_id": "term_65e82a9b06f371",
+        "workspace_id": "w1"
+      },
+      "tab": {
+        "agent_status": "unknown",
+        "focused": true,
+        "label": "1",
+        "number": 1,
+        "pane_count": 1,
+        "tab_id": "w1:t1",
+        "workspace_id": "w1"
+      },
+      "type": "workspace_created",
+      "workspace": {
+        "active_tab_id": "w1:t1",
+        "agent_status": "unknown",
+        "focused": true,
+        "label": "gh-1/01 implement",
+        "number": 1,
+        "pane_count": 1,
+        "tab_count": 1,
+        "workspace_id": "w1"
+      }
+    }
+  },
+  "tab_create": {
+    "id": "cli:tab:create",
+    "result": {
+      "root_pane": {
+        "agent_status": "unknown",
+        "cwd": "/repo/.agents/worktrees/gh-1-01",
+        "focused": false,
+        "foreground_cwd": "/repo/.agents/worktrees/gh-1-01",
+        "pane_id": "w1:p2",
+        "revision": 0,
+        "scroll": {
+          "max_offset_from_bottom": 0,
+          "offset_from_bottom": 0,
+          "viewport_rows": 40
+        },
+        "tab_id": "w1:t2",
+        "terminal_id": "term_65e82a9c0ff3b2",
+        "workspace_id": "w1"
+      },
+      "tab": {
+        "agent_status": "unknown",
+        "focused": false,
+        "label": "gh-1/02 x",
+        "number": 2,
+        "pane_count": 1,
+        "tab_id": "w1:t2",
+        "workspace_id": "w1"
+      },
+      "type": "tab_created"
+    }
+  },
+  "process_info_idle": {
+    "id": "cli:pane:process_info",
+    "result": {
+      "process_info": {
+        "foreground_process_group_id": 58949,
+        "foreground_processes": [
+          {
+            "argv": [
+              "/opt/anaconda3/bin/python",
+              "/opt/anaconda3/bin/conda",
+              "shell.posix",
+              "activate",
+              "base"
+            ],
+            "argv0": "python",
+            "cmdline": "/opt/anaconda3/bin/python /opt/anaconda3/bin/conda shell.posix activate base",
+            "cwd": "/repo/.agents/worktrees/gh-1-01",
+            "name": "python3.12",
+            "pid": 58967
+          },
+          {
+            "argv": [
+              "-zsh"
+            ],
+            "argv0": "zsh",
+            "cmdline": "-zsh",
+            "cwd": "/repo/.agents/worktrees/gh-1-01",
+            "name": "zsh",
+            "pid": 58966
+          },
+          {
+            "argv": [
+              "-zsh"
+            ],
+            "argv0": "zsh",
+            "cmdline": "-zsh",
+            "cwd": "/repo/.agents/worktrees/gh-1-01",
+            "name": "zsh",
+            "pid": 58949
+          }
+        ],
+        "pane_id": "w1:p1",
+        "shell_pid": 58949
+      },
+      "type": "pane_process_info"
+    }
+  },
+  "process_info_busy": {
+    "id": "cli:pane:process_info",
+    "result": {
+      "process_info": {
+        "foreground_process_group_id": 59610,
+        "foreground_processes": [
+          {
+            "argv": [
+              "cat"
+            ],
+            "argv0": "cat",
+            "cmdline": "cat",
+            "cwd": "/repo/.agents/worktrees/gh-1-01",
+            "name": "cat",
+            "pid": 59610
+          }
+        ],
+        "pane_id": "w1:p1",
+        "shell_pid": 58949
+      },
+      "type": "pane_process_info"
+    }
+  },
+  "pane_get_working": {
+    "id": "cli:pane:get",
+    "result": {
+      "pane": {
+        "agent_status": "working",
+        "cwd": "/repo/.agents/worktrees/gh-1-01",
+        "focused": true,
+        "foreground_cwd": "/repo/.agents/worktrees/gh-1-01",
+        "pane_id": "w1:p1",
+        "revision": 0,
+        "scroll": {
+          "max_offset_from_bottom": 0,
+          "offset_from_bottom": 0,
+          "viewport_rows": 40
+        },
+        "tab_id": "w1:t1",
+        "terminal_id": "term_65e82a9b06f371",
+        "workspace_id": "w1",
+        "agent": "claude"
+      },
+      "type": "pane_info"
+    }
+  },
+  "pane_get_blocked": {
+    "id": "cli:pane:get",
+    "result": {
+      "pane": {
+        "agent_status": "blocked",
+        "cwd": "/repo/.agents/worktrees/gh-1-01",
+        "focused": true,
+        "foreground_cwd": "/repo/.agents/worktrees/gh-1-01",
+        "pane_id": "w1:p1",
+        "revision": 0,
+        "scroll": {
+          "max_offset_from_bottom": 0,
+          "offset_from_bottom": 0,
+          "viewport_rows": 40
+        },
+        "tab_id": "w1:t1",
+        "terminal_id": "term_65e82a9b06f371",
+        "workspace_id": "w1",
+        "agent": "claude"
+      },
+      "type": "pane_info"
+    }
+  },
+  "pane_close": {
+    "id": "cli:pane:close",
+    "result": {
+      "type": "ok"
+    }
+  },
+  "error_pane_not_found": {
+    "error": {
+      "code": "pane_not_found",
+      "message": "pane w1:p1 not found"
+    },
+    "id": "cli:pane:get"
+  },
+  "error_agent_not_found": {
+    "error": {
+      "code": "agent_not_found",
+      "message": "agent target w1:p1 not found"
+    },
+    "id": "cli:agent:prompt"
+  },
+  "error_agent_blocked": {
+    "error": {
+      "code": "agent_blocked",
+      "message": "agent w1:p1 is blocked"
+    },
+    "id": "cli:agent:prompt"
+  },
+  "pane_read_visible": "Do you want to allow Bash(rm -rf build)?\n\u276f 1. Yes\n  2. No\n",
+  "pane_split": {
+    "id": "cli:pane:split",
+    "result": {
+      "type": "pane_info",
+      "pane": {
+        "pane_id": "w1:p3",
+        "workspace_id": "w1",
+        "tab_id": "w1:t1",
+        "focused": false,
+        "cwd": "/repo",
+        "agent": null,
+        "agent_status": "unknown"
+      }
+    }
+  }
+}

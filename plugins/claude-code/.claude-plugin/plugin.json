@@ -1,0 +1,7 @@
+{
+  "name": "norn",
+  "version": "0.0.0",
+  "description": "norn skills and the /norn command for Claude Code. A thin wrapper: all logic lives in the norn CLI, which must be on PATH.",
+  "author": { "name": "Jakub Pruszyński" },
+  "keywords": ["norn", "workflow", "agents", "delivery"]
+}

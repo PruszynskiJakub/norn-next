@@ -1,0 +1,45 @@
+/**
+ * Repository layout (§7). Every function returns an absolute path from a root
+ * (the main checkout or a story worktree — both hold the same relative layout).
+ */
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { STORY_UNIT_DIR, sliceDirName, storyDirName } from "@norn/schema";
+
+export const NORN_DIR = ".agents/norn";
+export const SPECS_DIR = ".agents/specs";
+
+export const nornDir = (root: string) => join(root, NORN_DIR);
+export const repoConfigPath = (root: string) => join(root, NORN_DIR, "config.yaml");
+export const workflowsDir = (root: string) => join(root, NORN_DIR, "workflows");
+export const traceDir = (root: string) => join(root, NORN_DIR, "trace");
+/** Local tick lock (H1); lives in the gitignored trace dir. */
+export const tickLockPath = (root: string) => join(traceDir(root), "tick.lock");
+
+export const specsDir = (root: string) => join(root, SPECS_DIR);
+export const storyDir = (root: string, story: string, slug: string) => join(specsDir(root), storyDirName(story, slug));
+export const storyFile = (specDir: string) => join(specDir, "story.md");
+export const slicesDir = (specDir: string) => join(specDir, "slices");
+export const sliceFile = (specDir: string, nn: string, slug: string) => join(slicesDir(specDir), `${sliceDirName(nn, slug)}.md`);
+
+/** `runs/<unit>/` where unit is `_story` or the slice dir name `<nn>-<slug>`. */
+export const unitDir = (specDir: string, unit: string) => join(specDir, "runs", unit);
+export const storyUnitDir = (specDir: string) => unitDir(specDir, STORY_UNIT_DIR);
+export const statePath = (ud: string) => join(ud, "state.json");
+export const pinnedWorkflowPath = (ud: string) => join(ud, "workflow.yaml");
+export const receiptsDir = (ud: string) => join(ud, "receipts");
+export const logsDir = (ud: string) => join(ud, "logs");
+export const logPath = (ud: string, runId: string) => join(ud, "logs", `${runId}.log`);
+export const evidenceDir = (ud: string, runId: string) => join(ud, "evidence", runId);
+export const handoffPath = (ud: string) => join(ud, "handoff.md");
+
+/** Worktree marker files (A3, K4). */
+export const unitMarkerPath = (worktree: string) => join(worktree, ".norn-unit");
+export const envNornPath = (worktree: string) => join(worktree, ".env.norn");
+
+/** `~/.norn`, overridable with NORN_HOME_DIR (tests) or an explicit argument. */
+export function nornHome(override?: string, env: Record<string, string | undefined> = process.env): string {
+  return override ?? env.NORN_HOME_DIR ?? join(homedir(), ".norn");
+}
+export const userConfigPath = (home: string) => join(home, "config.yaml");
+export const leasesDir = (home: string) => join(home, "leases");

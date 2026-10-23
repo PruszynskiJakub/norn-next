@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://norn.dev/schema/lease.json",
+  "title": "norn machine lease",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "version",
+    "kind",
+    "repo",
+    "story",
+    "slice",
+    "run_id",
+    "holder",
+    "created_at"
+  ],
+  "properties": {
+    "version": {
+      "const": 1,
+      "type": "number"
+    },
+    "kind": {
+      "anyOf": [
+        {
+          "const": "agent",
+          "type": "string"
+        },
+        {
+          "const": "check",
+          "type": "string"
+        },
+        {
+          "const": "slot",
+          "type": "string"
+        }
+      ]
+    },
+    "slot": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "repo": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "story": {
+      "pattern": "^(gh|gl)-[1-9][0-9]*$",
+      "description": "Story key, e.g. gh-123 or gl-45",
+      "type": "string"
+    },
+    "slice": {
+      "anyOf": [
+        {
+          "pattern": "^(gh|gl)-[1-9][0-9]*/[0-9]{2,3}$",
+          "description": "Slice key, e.g. gh-123/03",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "run_id": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "holder": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "pid",
+        "pid_start"
+      ],
+      "properties": {
+        "pid": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "pid_start": {
+          "minLength": 1,
+          "description": "Process start time as reported by the OS (opaque)",
+          "type": "string"
+        }
+      }
+    },
+    "created_at": {
+      "format": "date-time",
+      "description": "ISO-8601 timestamp, UTC",
+      "type": "string"
+    },
+    "worktree": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "port_base": {
+      "minimum": 1,
+      "type": "integer"
+    }
+  }
+}

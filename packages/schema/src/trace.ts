@@ -1,0 +1,127 @@
+import { type Static, Type } from "@sinclair/typebox";
+import { IsoTime, NonEmpty, NonNegInt, SliceKey, StoryKey, TaggedUnion, Ulid } from "./common.ts";
+
+/** Normalized agent lifecycle facts reported by hooks (A2). */
+export const HookEventKind = Type.Union([
+  Type.Literal("session_start"),
+  Type.Literal("turn_start"),
+  Type.Literal("tool_use"),
+  Type.Literal("waiting_input"),
+  Type.Literal("permission_prompt"),
+  Type.Literal("turn_end"),
+  Type.Literal("session_end"),
+]);
+export type HookEventKind = Static<typeof HookEventKind>;
+
+/** One normalized hook fact; the CLI's `norn hook` appends these to the trace. */
+export const HookFact = Type.Object(
+  {
+    event: HookEventKind,
+    at: IsoTime,
+    agent: NonEmpty,
+    /** native event name, e.g. Claude Code `Stop` */
+    native: NonEmpty,
+    cwd: NonEmpty,
+    story: Type.Optional(StoryKey),
+    slice: Type.Optional(SliceKey),
+    run_id: Type.Optional(Ulid),
+    agent_session_id: Type.Optional(NonEmpty),
+    transcript: Type.Optional(NonEmpty),
+    tool: Type.Optional(NonEmpty),
+    /** permission prompt / tool command */
+    command: Type.Optional(Type.String()),
+    message: Type.Optional(Type.String()),
+  },
+  { additionalProperties: false },
+);
+export type HookFact = Static<typeof HookFact>;
+
+/** Free-form action/result payloads; their shapes are `Action` / `ActionResult` in @norn/core. */
+const Payload = Type.Object({ kind: NonEmpty }, { additionalProperties: true });
+
+export const TickUnitRecord = Type.Object(
+  {
+    /** unit key: story key or slice key; `*` for repo-level actions (intake, sync) */
+    unit: NonEmpty,
+    rule: NonEmpty,
+    action: Payload,
+    result: Type.Object(
+      { ok: Type.Boolean(), error: Type.Optional(Type.String()), detail: Type.Optional(Type.Unknown()) },
+      { additionalProperties: false },
+    ),
+    /** trace-relative path of the stored briefing (B4) */
+    briefing: Type.Optional(NonEmpty),
+    /** trace-relative path of a transcript snapshot (C4) */
+    transcript: Type.Optional(NonEmpty),
+  },
+  { additionalProperties: false },
+);
+export type TickUnitRecord = Static<typeof TickUnitRecord>;
+
+export const TickTrace = Type.Object(
+  {
+    type: Type.Literal("tick"),
+    tick_id: Ulid,
+    at: IsoTime,
+    heartbeat_id: Type.Union([Ulid, Type.Null()]),
+    duration_ms: NonNegInt,
+    /** Facts snapshot (the `Facts` type of @norn/core); replayed by `norn why` (O5). */
+    facts: Type.Record(Type.String(), Type.Unknown()),
+    decisions: Type.Array(TickUnitRecord),
+  },
+  { additionalProperties: false },
+);
+export type TickTrace = Static<typeof TickTrace>;
+
+export const HookTrace = Type.Object(
+  {
+    type: Type.Literal("hook"),
+    id: Ulid,
+    fact: HookFact,
+    /** Whether `norn hook` blocked the event (A4) and why. */
+    blocked: Type.Optional(Type.Boolean()),
+    reason: Type.Optional(Type.String()),
+  },
+  { additionalProperties: false },
+);
+export type HookTrace = Static<typeof HookTrace>;
+
+/** Receipts refused at apply time (stale step/attempt, T9) or files failing validation. */
+export const RejectTrace = Type.Object(
+  {
+    type: Type.Literal("reject"),
+    id: Ulid,
+    at: IsoTime,
+    tick_id: Type.Optional(Ulid),
+    unit: NonEmpty,
+    source: NonEmpty,
+    reason: NonEmpty,
+    payload: Type.Optional(Type.Unknown()),
+  },
+  { additionalProperties: false },
+);
+export type RejectTrace = Static<typeof RejectTrace>;
+
+/** Links a run to the exact briefing `norn brief` stored for it (B4, O4); one per brief call. */
+export const BriefingTrace = Type.Object(
+  {
+    type: Type.Literal("briefing"),
+    id: Ulid,
+    at: IsoTime,
+    /** unit key: story key or slice key */
+    unit: NonEmpty,
+    run_id: Ulid,
+    step: NonEmpty,
+    attempt: NonNegInt,
+    /** trace-relative path of the stored briefing */
+    briefing: NonEmpty,
+  },
+  { additionalProperties: false },
+);
+export type BriefingTrace = Static<typeof BriefingTrace>;
+
+export const TraceEvent = TaggedUnion("type", [TickTrace, HookTrace, RejectTrace, BriefingTrace], {
+  $id: "https://norn.dev/schema/trace.json",
+  title: "norn trace event (one JSONL line)",
+});
+export type TraceEvent = Static<typeof TraceEvent>;

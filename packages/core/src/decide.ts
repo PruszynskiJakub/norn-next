@@ -1,0 +1,942 @@
+/**
+ * decide (H3): `(facts, repo workflows, config) → Decision[]`, pure and deterministic.
+ * At most one action per unit per tick; every decision records the rule that fired (O5).
+ * Ids come from `deriveUlid(facts.tick_id, i)` and times from `facts.now`, so `norn why`
+ * replays to identical output.
+ *
+ * Order per story: claim (T3–T6) → corrupt (S2) → remote lifecycle (GR6–GR8) → mailbox (T9),
+ * then per unit: receipts (C2: receipts always win over runner facts) → workflow drift (S7)
+ * → recovery commit → step semantics by type (§6, §10, W2). Ready steps are served in
+ * queue order (K1): oldest story by intake, then slice number.
+ */
+import {
+  type AgentStep,
+  type ClaimBlob,
+  deriveUlid,
+  type GitStep,
+  parseDuration,
+  type Receipt,
+  type ReceiptOf,
+  type ResolvedConfig,
+  type SliceFrontmatter,
+  sliceBranch,
+  sliceDirName,
+  slugify,
+  specDir,
+  type StoryFrontmatter,
+  storyBranch,
+  storyKey,
+  type UnitState,
+  type Workflow,
+} from "@norn/schema";
+import type { Action, AgentLaunch, BoundaryCommit, Decision, NewReceipt, SessionInput, UpdateStoryMirrorAction, WorktreeSpec } from "./actions.ts";
+import { type ApplyResult, applyReceipts, initialState } from "./apply.ts";
+import { AUTO_PROMPT, NUDGE_TEXT, sliceWorktreePath, storyWorktreePath } from "./commands.ts";
+import type { Facts, NumberedReceipt, SliceFileFacts, StoryFacts, UnitFacts, UnitRef } from "./facts.ts";
+import { sha256 } from "./hash.ts";
+import { bodyChangedItem, effectiveMode, storyFinished, unitInboxItem } from "./inbox.ts";
+import type { InboxItem, RemoteIssue, SessionRef } from "./ports.ts";
+import { epoch, iso } from "./time.ts";
+import { checkWorkflowLevel, stepOf, type UnitLevel, type WorkflowIssue } from "./workflow.ts";
+
+/** A repo workflow as loaded by the caller: parsed + validated (W5) with the exact file text. */
+export interface LoadedWorkflow {
+  name: string;
+  /** null when the file failed schema validation */
+  workflow: Workflow | null;
+  /** exact file text, pinned verbatim at unit start (S7) */
+  source: string;
+  /** validateWorkflowDefinition issues (incl. skills); non-empty = refused (W5) */
+  issues: WorkflowIssue[];
+}
+export type RepoWorkflows = Readonly<Record<string, LoadedWorkflow>>;
+
+const WF_LABEL = "norn:wf:";
+
+class Ctx {
+  readonly decisions: Decision[] = [];
+  private readonly taken = new Set<string>();
+  private ids = 0;
+  readonly nowIso: string;
+  readonly heartbeat: string;
+  agentsFree: number;
+  /** stories with an integrate this tick (K6) */
+  readonly integrating = new Set<string>();
+  checksFree: number;
+  private readonly slotsUsed: Set<number>;
+
+  constructor(
+    readonly facts: Facts,
+    readonly workflows: RepoWorkflows,
+    readonly config: ResolvedConfig,
+  ) {
+    this.nowIso = iso(facts.now);
+    this.heartbeat = facts.machine.heartbeat_id ?? facts.tick_id;
+    const leases = facts.machine.leases;
+    this.agentsFree = config.max_agents - leases.filter((l) => l.kind === "agent").length;
+    this.checksFree = config.max_checks - leases.filter((l) => l.kind === "check").length;
+    this.slotsUsed = new Set(leases.filter((l) => l.kind === "slot" && l.slot !== undefined).map((l) => l.slot as number));
+  }
+
+  id(): string {
+    return deriveUlid(this.facts.tick_id, this.ids++);
+  }
+  has(unit: string): boolean {
+    return this.taken.has(unit);
+  }
+  emit(action: Action): void {
+    const unit = action.unit?.key ?? "*";
+    if (action.unit) {
+      if (this.taken.has(unit)) throw new Error(`decide: second action for ${unit} (${action.rule})`);
+      this.taken.add(unit);
+    }
+    this.decisions.push({ unit, rule: action.rule, action });
+  }
+  noop(unit: UnitRef, rule: string, reason: string): void {
+    this.emit({ kind: "noop", unit, rule, reason });
+  }
+  /** Next free port slot (K4), or null when the range is exhausted. */
+  slot(): number | null {
+    for (let s = this.config.slots.min; s <= this.config.slots.max; s++)
+      if (!this.slotsUsed.has(s)) {
+        this.slotsUsed.add(s);
+        return s;
+      }
+    return null;
+  }
+  slotEnv(slot: number | null): Record<string, string> {
+    if (slot === null) return {};
+    const { port_base, ports_per_slot, env } = this.config.slots;
+    const base = port_base + slot * ports_per_slot;
+    const out: Record<string, string> = { NORN_SLOT: String(slot), PORT_BASE: String(base) };
+    for (const [k, v] of Object.entries(env ?? {})) out[k] = v.replaceAll("{slot}", String(slot)).replaceAll("{port_base}", String(base));
+    return out;
+  }
+}
+
+export function decide(facts: Facts, workflows: RepoWorkflows, config: ResolvedConfig): Decision[] {
+  const ctx = new Ctx(facts, workflows, config);
+  const deadFiles = facts.machine.dead_lease_files ?? [];
+  if (deadFiles.length) ctx.emit({ kind: "reclaim_leases", unit: null, rule: "leases.reclaim", files: [...deadFiles] });
+  for (const story of queueOrder(facts.stories)) decideStory(ctx, story);
+  intake(ctx);
+  return ctx.decisions;
+}
+
+/** K1: oldest story by intake first (unknown intake last), then key. */
+function queueOrder(stories: readonly StoryFacts[]): StoryFacts[] {
+  const at = (s: StoryFacts) => (s.frontmatter ? epoch(s.frontmatter.intake_at) : Number.POSITIVE_INFINITY);
+  return [...stories].sort((a, b) => at(a) - at(b) || a.key.localeCompare(b.key));
+}
+
+// ================================================================= repo level
+
+function intake(ctx: Ctx): void {
+  const { facts, config } = ctx;
+  if (!facts.remote.issues) return;
+  const known = new Set(facts.stories.map((s) => s.key));
+  for (const issue of facts.remote.issues) {
+    const provider = issue.provider;
+    const key = storyKey(provider, issue.number);
+    if (known.has(key) || issue.state !== "open") continue;
+    const slug = slugify(issue.title);
+    const branch = storyBranch(key, slug);
+    const path = storyWorktreePath(facts.repo.root, key, slug);
+    const labelled = issue.labels.find((l) => l.startsWith(WF_LABEL))?.slice(WF_LABEL.length);
+    const workflow = labelled && ctx.workflows[labelled] ? labelled : config.default_workflow;
+    const frontmatter: StoryFrontmatter = {
+      id: key,
+      slug,
+      provider,
+      number: issue.number,
+      url: issue.url,
+      title: issue.title,
+      assignee: issue.assignees[0] ?? null,
+      labels: [...issue.labels].sort(),
+      workflow,
+      status: "new",
+      intake_at: ctx.nowIso,
+      body_hash: sha256(issue.body),
+    };
+    const slot = ctx.slot();
+    ctx.emit({
+      kind: "intake_story",
+      unit: null,
+      rule: "remote.intake",
+      issue,
+      key,
+      slug,
+      worktree: { path, branch, from: facts.repo.default_branch, env: ctx.slotEnv(slot), slot },
+      story_file: `${specDir(key, slug)}/story.md`,
+      frontmatter,
+      body: issue.body,
+      commit: { cwd: path, branch, message: `norn: intake ${key} ${issue.title}`, trailers: { "Norn-Story": key, "Norn-Tick": facts.tick_id }, push: false },
+    });
+  }
+}
+
+// ================================================================= story level
+
+const storyRef = (s: StoryFacts): UnitRef => s.units.find((u) => u.unit.slice === null)?.unit ?? { story: s.key, slice: null, dir: "_story", key: s.key };
+
+function decideStory(ctx: Ctx, story: StoryFacts): void {
+  const ref = storyRef(story);
+  const storyUnit = story.units.find((u) => u.unit.slice === null) ?? null;
+  const claim = story.claim;
+  const { facts } = ctx;
+
+  // ---- claims (T1–T6, T10): act only on stories this heartbeat holds
+  if (claim.state === "other") return ctx.noop(ref, "claim.other", `held by ${claim.blob.holder} until ${claim.blob.expires_at}`);
+  if (claim.state === "corrupt") return ctx.noop(ref, "claim.corrupt", `claim ref ${claim.sha} is unreadable`);
+  if (claim.state === "none" || claim.state === "expired") {
+    const ours = claim.state === "expired" && claim.blob.heartbeat_id === ctx.heartbeat;
+    const fresh = claim.state === "none" && !storyUnit?.state && story.frontmatter?.status === "new";
+    // GR6: a finished story (workflow done, merged/recorded or dropped) needs no owner — never "unclaimed"
+    if (!ours && !fresh && storyFinished(story)) return ctx.noop(ref, "story.finished", `finished (${story.frontmatter?.status === "done" || story.frontmatter?.status === "dropped" ? story.frontmatter.status : "workflow done"}); nothing to take`);
+    if (!ours && !fresh) return ctx.noop(ref, "claim.unclaimed", `unclaimed — norn take ${story.key} (T10)`);
+    return ctx.emit({
+      kind: "claim",
+      unit: ref,
+      rule: fresh ? "claim.acquire.intake" : "claim.reacquire",
+      op: "acquire",
+      expected: claim.state === "expired" ? claim.sha : null,
+      blob: claimBlob(ctx, story.key, null),
+    });
+  }
+  const renewAt = epoch(claim.blob.renewed_at) + parseDuration(ctx.config.claim.renew);
+  if (facts.now >= renewAt)
+    ctx.emit({ kind: "claim", unit: ref, rule: "claim.renew", op: "renew", expected: claim.sha, blob: claimBlob(ctx, story.key, claim.blob) });
+
+  // ---- story file corrupt: never touch anything of the story (S2)
+  if (story.frontmatter_error || !story.frontmatter) {
+    const errors = story.frontmatter_error ? [story.frontmatter_error] : [{ file: `${story.spec_dir}/story.md`, errors: [{ path: "", message: "missing" }] }];
+    if (!ctx.has(ref.key)) ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "story.corrupt", errors, notify: null });
+    return;
+  }
+  const fm = story.frontmatter;
+  const halted = storyUnit?.state?.park?.kind === "remote";
+
+  if (!ctx.has(ref.key)) storyLifecycle(ctx, story, fm, storyUnit);
+  if (!ctx.has(ref.key) && story.mailbox?.length) importMailbox(ctx, story);
+
+  for (const uf of story.units) {
+    if (ctx.has(uf.unit.key)) continue;
+    decideUnit(ctx, story, uf, halted);
+  }
+}
+
+function claimBlob(ctx: Ctx, story: string, prev: ClaimBlob | null): ClaimBlob {
+  const expires = iso(ctx.facts.now + parseDuration(ctx.config.claim.lease));
+  return {
+    version: 1,
+    story,
+    holder: ctx.facts.machine.holder,
+    heartbeat_id: ctx.heartbeat,
+    acquired_at: prev?.acquired_at ?? ctx.nowIso,
+    renewed_at: ctx.nowIso,
+    expires_at: expires,
+    last_tick_id: ctx.facts.tick_id,
+  };
+}
+
+/** GR6 merged → cleanup; GR7 closed/unassigned/unlabelled → park "remote: …"; GR8 mirror + body change. */
+function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, storyUnit: UnitFacts | null): void {
+  const ref = storyRef(story);
+  if (story.pr?.state === "merged") {
+    if (fm.status === "done") return;
+    const slices = story.slices.filter((s) => s.frontmatter);
+    const sliceWts = story.units.filter((u) => u.unit.slice !== null && u.worktree?.exists).map((u) => (u.worktree as { path: string }).path);
+    const sliceBranches = slices.map((s) => sliceBranch(story.key, s.nn, s.slug));
+    return ctx.emit({
+      kind: "cleanup_merged_story",
+      unit: ref,
+      rule: "remote.pr_merged",
+      worktrees: [...(story.worktree?.exists ? [story.worktree.path] : []), ...sliceWts],
+      local_branches: [...sliceBranches, story.branch],
+      remote_branches: sliceBranches,
+      refs: [`refs/norn/claims/${story.key}`, ...(story.mailbox ?? []).map((m) => m.ref)],
+      story_status: "done",
+    });
+  }
+  const st = storyUnit?.state;
+  const reason = remoteProblem(story, ctx.config.remote.label);
+  if (reason && st && st.park?.kind !== "remote" && st.status !== "corrupt") {
+    const state: UnitState = { ...st, status: "stuck", park: { kind: "remote", reason, since: ctx.nowIso }, updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id };
+    return ctx.emit({
+      kind: "park",
+      unit: ref,
+      rule: "remote.park",
+      park: state.park as NonNullable<UnitState["park"]>,
+      notify: unitItem(ctx, story, storyUnit as UnitFacts, state),
+      receipts: [],
+      state,
+      commit: commitFor(ctx, story, storyUnit as UnitFacts, `norn: ${story.key} parked (${reason})`, st.step),
+    });
+  }
+  const refinedHash = story.issue ? sha256(story.issue.body) : fm.body_hash;
+  if (!fm.refined_body_hash && refinedHash && refineFinished(storyUnit)) {
+    // GR8: record the remote body as of refine finishing, so a later body change surfaces in the inbox
+    const fields: UpdateStoryMirrorAction["fields"] = { refined_body_hash: refinedHash };
+    if (refinedHash !== fm.body_hash) fields.body_hash = refinedHash;
+    return ctx.emit({
+      kind: "update_story_mirror",
+      unit: ref,
+      rule: "remote.mirror.refined",
+      fields,
+      notify: null,
+      commit: story.worktree?.exists
+        ? { cwd: story.worktree.path, branch: story.branch, message: `norn: ${story.key} refine finished (record body hash)`, trailers: { "Norn-Story": story.key, "Norn-Tick": ctx.facts.tick_id }, push: true }
+        : null,
+    });
+  }
+  if (story.issue) mirror(ctx, story, fm, story.issue);
+}
+
+/** GR8: the story unit has left a step whose skill is `refine` (cursor elsewhere, or re-entered later). */
+function refineFinished(uf: UnitFacts | null): boolean {
+  const st = uf?.state;
+  const wf = uf?.workflow;
+  if (!st || !wf) return false;
+  return Object.entries(wf.steps).some(([name, step]) => step.type === "agent" && step.skill === "refine" && ((st.visits[name] ?? 0) >= 2 || ((st.visits[name] ?? 0) >= 1 && st.step !== name)));
+}
+
+function remoteProblem(story: StoryFacts, label: string): string | null {
+  if (story.pr?.state === "closed") return "remote: PR closed unmerged";
+  const issue = story.issue;
+  if (issue === undefined) return null;
+  if (issue === null) return "remote: issue closed, unassigned or unlabelled";
+  if (issue.state === "closed") return "remote: issue closed";
+  if (!issue.labels.includes(label)) return `remote: label '${label}' removed`;
+  if (!issue.assignees.length) return "remote: issue unassigned";
+  return null;
+}
+
+function mirror(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, issue: RemoteIssue): void {
+  const fields: Partial<Pick<StoryFrontmatter, "title" | "assignee" | "url" | "labels" | "body_hash">> = {};
+  if (issue.title !== fm.title) fields.title = issue.title;
+  if (issue.url !== fm.url) fields.url = issue.url;
+  if (!(fm.assignee && issue.assignees.includes(fm.assignee))) {
+    const a = issue.assignees[0] ?? null;
+    if (a !== fm.assignee) fields.assignee = a;
+  }
+  const labels = [...issue.labels].sort();
+  if (fm.labels && JSON.stringify([...fm.labels].sort()) !== JSON.stringify(labels)) fields.labels = labels;
+  const bodyHash = sha256(issue.body);
+  if (bodyHash !== fm.body_hash) fields.body_hash = bodyHash;
+  if (!Object.keys(fields).length) return;
+  const changed = fields.body_hash ? bodyChangedItem({ ...story, frontmatter: { ...fm, body_hash: bodyHash } }) : null;
+  const ref = storyRef(story);
+  ctx.emit({
+    kind: "update_story_mirror",
+    unit: ref,
+    rule: changed ? "remote.mirror.body_changed" : "remote.mirror",
+    fields,
+    notify: changed,
+    commit: story.worktree?.exists
+      ? { cwd: story.worktree.path, branch: story.branch, message: `norn: mirror ${story.key} from the remote issue`, trailers: { "Norn-Story": story.key, "Norn-Tick": ctx.facts.tick_id }, push: true }
+      : null,
+  });
+}
+
+/** T9: copy one mailbox receipt into the unit whose cursor it matches, or reject it. */
+function importMailbox(ctx: Ctx, story: StoryFacts): void {
+  const item = (story.mailbox ?? [])[0];
+  if (!item) return;
+  const ref = storyRef(story);
+  const reject = (reason: string) => ctx.emit({ kind: "reject_receipt", unit: ref, rule: "mailbox.reject", source: { ref: item.ref, sha: item.sha }, reason, state: null });
+  if (!item.receipt) return reject(item.error ? `invalid receipt: ${item.error.errors.map((e) => e.message).join("; ")}` : "unreadable receipt");
+  const r = item.receipt;
+  const atCursor = (u: UnitFacts) => !!u.state && u.state.step === r.step && u.state.attempt === r.attempt && !u.errors.length;
+  let target: UnitFacts | undefined;
+  if (r.slice !== undefined) {
+    // routed by unit when the receipt names one (story unit = null)
+    const unit = story.units.find((u) => u.unit.slice === r.slice);
+    if (!unit) return reject(`no unit ${r.slice ?? story.key} in story ${story.key}`);
+    if (!atCursor(unit)) return reject(`stale: ${unit.unit.key} is not at ${r.step}#${r.attempt}`);
+    target = unit;
+  } else {
+    const matches = story.units.filter(atCursor);
+    target = matches.find((u) => u.state?.status === "parked" || u.state?.status === "stuck") ?? matches[0];
+  }
+  if (!target || ctx.has(target.unit.key)) return target ? undefined : reject(`no unit at ${r.step}#${r.attempt}`);
+  ctx.emit({
+    kind: "import_mailbox",
+    unit: target.unit,
+    rule: "mailbox.import",
+    refs: [{ ref: item.ref, sha: item.sha }],
+    receipts: [{ n: nextReceiptNumber(target), receipt: r }],
+    state: null,
+    commit: commitFor(ctx, story, target, `norn: ${target.unit.key} ${r.kind} from mailbox`, r.step),
+  });
+}
+
+// ================================================================= unit level
+
+const nextReceiptNumber = (uf: UnitFacts): number =>
+  Math.max(uf.state?.applied_through ?? 0, ...uf.unapplied.map((r) => r.n), uf.last_check?.n ?? 0, uf.last_findings?.n ?? 0) + 1;
+
+function unitWorktree(story: StoryFacts, uf: UnitFacts): string | null {
+  const wt = uf.worktree ?? (uf.unit.slice === null ? story.worktree : null);
+  return wt?.exists ? wt.path : null;
+}
+
+function unitBranch(story: StoryFacts, uf: UnitFacts): string {
+  if (uf.unit.slice === null) return story.branch;
+  const file = sliceFileOf(story, uf.unit.slice);
+  return uf.worktree?.status?.branch ?? (file ? sliceBranch(story.key, file.nn, file.slug) : `${story.key}/${uf.unit.dir}`);
+}
+
+const sliceFileOf = (story: StoryFacts, key: string): SliceFileFacts | undefined => story.slices.find((s) => s.key === key);
+
+function commitFor(ctx: Ctx, story: StoryFacts, uf: UnitFacts, message: string, step: string): BoundaryCommit | null {
+  const cwd = unitWorktree(story, uf);
+  if (!cwd) return null;
+  const trailers: Record<string, string> = { "Norn-Story": story.key };
+  if (uf.unit.slice) trailers["Norn-Slice"] = uf.unit.slice;
+  trailers["Norn-Step"] = step;
+  trailers["Norn-Tick"] = ctx.facts.tick_id;
+  return { cwd, branch: unitBranch(story, uf), message, trailers, push: true };
+}
+
+function unitItem(ctx: Ctx, story: StoryFacts, uf: UnitFacts, state: UnitState): InboxItem | null {
+  return unitInboxItem(story, { ...uf, state }, ctx.facts, ctx.config);
+}
+
+function applyCtx(ctx: Ctx, wf: Workflow) {
+  return { workflow: wf, now: ctx.nowIso, limits: ctx.config.limits, tick_id: ctx.facts.tick_id };
+}
+
+function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean): void {
+  const ref = uf.unit;
+  if (uf.errors.length) {
+    if (uf.state?.status === "corrupt") return ctx.noop(ref, "unit.corrupt", "corrupt; never touched (S2)");
+    const notify = unitItem(ctx, story, uf, uf.state as UnitState);
+    return ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "unit.corrupt", errors: uf.errors, notify });
+  }
+  const st = uf.state;
+  if (!st) {
+    if (ref.slice !== null) return ctx.noop(ref, "slice.not_started", "started by the story's slices step (W2)");
+    return startStoryUnit(ctx, story, uf);
+  }
+  if (st.status === "corrupt") return ctx.noop(ref, "unit.corrupt", "corrupt; never touched (S2)");
+  const wf = uf.workflow;
+  if (!wf) return ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "unit.workflow_missing", errors: [{ file: `runs/${ref.dir}/workflow.yaml`, errors: [{ path: "", message: "pinned workflow missing" }] }], notify: null });
+
+  // C2: receipts first — they always win over runner facts
+  if (uf.unapplied.length) return applyAction(ctx, story, uf, st, wf, uf.unapplied, "receipts.apply");
+
+  // S7: pinned workflow edited outside `norn workflow`, or cursor step gone
+  if (st.status !== "stuck" || st.park?.kind !== "workflow") {
+    const drift = uf.workflow_hash && uf.workflow_hash !== st.workflow_hash ? "pinned workflow.yaml changed outside norn workflow (S7)" : null;
+    const gone = st.step !== "$done" && !stepOf(wf, st.step) ? `step '${st.step}' no longer exists in workflow ${wf.name} (S7)` : null;
+    const reason = drift ?? gone;
+    if (reason) return park(ctx, story, uf, st, "workflow", reason, "workflow.drift");
+  }
+  if (uf.uncommitted) {
+    const commit = commitFor(ctx, story, uf, `norn: ${ref.key} ${st.step} (recovered commit)`, st.step);
+    if (commit) return ctx.emit({ kind: "commit_push", unit: ref, rule: "recover.commit", commit });
+  }
+
+  switch (st.status) {
+    case "done":
+      if (ref.slice !== null && sliceFileOf(story, ref.slice)?.frontmatter?.status !== "integrated") {
+        const wt = uf.worktree?.exists ? uf.worktree.path : null;
+        const file = sliceFileOf(story, ref.slice);
+        return ctx.emit({
+          kind: "mark_done",
+          unit: ref,
+          rule: "slice.done.cleanup",
+          cleanup: { worktree: wt, branch_local: file ? sliceBranch(story.key, file.nn, file.slug) : null, release_slot: true },
+          slice_status: "integrated",
+          receipts: [],
+          state: null,
+          commit: null,
+        });
+      }
+      return ctx.noop(ref, ref.slice ? "slice.done" : "story.wait_merge", ref.slice ? "integrated" : "workflow done; waiting for the PR merge (GR6)");
+    case "stuck":
+      return ctx.noop(ref, "unit.stuck", `stuck: ${st.park?.reason ?? "?"} — norn unstick ${ref.key}`);
+    case "parked":
+      // T6: parked keeps the claim; C3: a restart never answers
+      return ctx.noop(ref, `unit.parked.${st.park?.kind ?? "?"}`, st.park?.reason ?? "parked");
+  }
+
+  const step = stepOf(wf, st.step);
+  if (!step) return ctx.noop(ref, "unit.no_step", st.step);
+  if (halted && st.status === "ready") return ctx.noop(ref, "story.halted", "story parked on a remote change (GR7)");
+  switch (step.type) {
+    case "agent":
+      return st.status === "running" ? classifyRun(ctx, story, uf, st, wf, step) : startRun(ctx, story, uf, st, wf, step);
+    case "check":
+      return runCheck(ctx, story, uf, st, step.run, parseDuration(step.timeout));
+    case "git":
+      return runGit(ctx, story, uf, st, wf, step);
+    case "gate":
+      return ctx.noop(ref, "gate.wait", "waiting for approve / reject");
+    case "slices":
+      return slicesStep(ctx, story, uf, st, wf);
+  }
+}
+
+function applyAction(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, receipts: readonly NumberedReceipt[], rule: string): void {
+  const res = applyReceipts(st, receipts, applyCtx(ctx, wf));
+  let state = res.state;
+  let input: SessionInput | null = null;
+  let launch: AgentLaunch | null = null;
+  const extra: NewReceipt[] = [];
+  const run = res.state.run;
+  if (res.deliver && run?.session) {
+    // B2: type the answer into the same session while it lives and takes input. A headless session
+    // has no pane (and its process ends with the turn): continue the same agent session with
+    // `--resume <agent_session_id>` and the answer as the prompt. Without a resumable id, a fresh
+    // session for the step starts from the handoff.
+    const rf = uf.run?.run_id === run.run_id ? uf.run : null;
+    const gone = rf?.process_alive === false || rf?.pane?.alive === false;
+    if (run.session.runner !== "headless" && !gone) input = { run_id: run.run_id, session: sessionRef(run), text: res.deliver };
+    else {
+      const step = stepOf(wf, res.state.step);
+      const resumeId = run.agent_session_id ?? rf?.hooks.findLast((h) => h.agent_session_id)?.agent_session_id;
+      const cwd = unitWorktree(story, uf);
+      if (step?.type === "agent" && resumeId && cwd && ctx.facts.machine.runner) {
+        if (ctx.agentsFree <= 0) return ctx.noop(uf.unit, "answer.resume.queued", `answer waits: max_agents ${ctx.config.max_agents} in use (K1)`);
+        ctx.agentsFree--;
+        const n = nextReceiptNumber(uf);
+        const started = { ...startedReceipt(ctx, res.state, step, run.run_id, cwd, false), agent_session_id: resumeId, ...(run.agent ? { agent: run.agent } : {}) };
+        extra.push({ n, receipt: started });
+        state = applyReceipts(res.state, [{ n, file: "", receipt: started }], applyCtx(ctx, wf)).state;
+        launch = { ...launchFor(ctx, story, uf, res.state, step, run.run_id, cwd), prompt: res.deliver, resume: resumeId };
+        if (run.agent) launch.agent = run.agent;
+      } else state = { ...res.state, status: "ready", run: null };
+    }
+  }
+  // S7/O2: `workflow --to` / `unstick` re-enter a step: the old run's session must not keep working
+  const moved = res.applied.some((n) => {
+    const k = receipts.find((r) => r.n === n)?.receipt.kind;
+    return k === "workflow" || k === "unstick";
+  });
+  const kill = moved && st.run?.session && state.run?.run_id !== st.run.run_id ? sessionRef(st.run) : null;
+  const what = res.advance ? `${res.advance.from}.${res.advance.outcome} → ${res.advance.to}` : (res.log.at(-1) ?? "receipts");
+  ctx.emit({
+    kind: "apply_receipts",
+    unit: uf.unit,
+    rule: !res.applied.length ? "receipts.reject" : launch ? `${rule}.resume` : rule,
+    applied: res.applied,
+    rejected: res.rejected,
+    advance: res.advance,
+    input,
+    launch,
+    kill,
+    receipts: extra,
+    state,
+    commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${what}`, st.step),
+  });
+}
+
+function sessionRef(run: NonNullable<UnitState["run"]>): SessionRef {
+  const s = run.session as NonNullable<typeof run.session>;
+  const ref: SessionRef = { runner: s.runner, session_id: s.session_id };
+  if (s.pane_id) ref.pane_id = s.pane_id;
+  if (run.process) ref.process = run.process;
+  return ref;
+}
+
+function park(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, kind: "workflow" | "stuck", reason: string, rule: string): void {
+  const state: UnitState = { ...st, status: "stuck", park: { kind, reason, since: ctx.nowIso }, updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id };
+  ctx.emit({
+    kind: "park",
+    unit: uf.unit,
+    rule,
+    park: state.park as NonNullable<UnitState["park"]>,
+    notify: unitItem(ctx, story, uf, state),
+    receipts: [],
+    state,
+    commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} stuck (${reason})`, st.step),
+  });
+}
+
+// ---------------------------------------------------------------- start
+
+function startStoryUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts): void {
+  const fm = story.frontmatter as StoryFrontmatter;
+  const loaded = usableWorkflow(ctx, fm.workflow, "story");
+  if ("problem" in loaded) {
+    return ctx.emit({
+      kind: "notify",
+      unit: uf.unit,
+      rule: "start.workflow_invalid",
+      item: { id: `workflow:${story.key}:${fm.workflow}:${sha256(loaded.problem)}`, group: "unblock", story: story.key, slice: null, step: null, title: loaded.problem, command: `norn workflow ${story.key} <name>`, since: ctx.nowIso, url: fm.url },
+    });
+  }
+  const worktree = unitWorktree(story, uf);
+  if (!worktree) return ctx.noop(uf.unit, "start.no_worktree", "story worktree missing (GR2)");
+  const state = initialState({ unit: uf.unit, workflow: loaded.workflow, workflowName: fm.workflow, workflowHash: sha256(loaded.source), now: ctx.nowIso, mode: story.mode, tick_id: ctx.facts.tick_id });
+  ctx.emit({
+    kind: "start_unit",
+    unit: uf.unit,
+    rule: "story.start",
+    workflow: fm.workflow,
+    workflow_source: loaded.source,
+    worktree: null,
+    slice_status: null,
+    receipts: [],
+    state,
+    commit: commitFor(ctx, story, uf, `norn: start ${story.key} (${fm.workflow})`, state.step),
+  });
+}
+
+function usableWorkflow(ctx: Ctx, name: string, level: UnitLevel): { workflow: Workflow; source: string } | { problem: string } {
+  const lw = ctx.workflows[name];
+  if (!lw) return { problem: `workflow '${name}' not found` };
+  const issues = [...lw.issues, ...(lw.workflow ? checkWorkflowLevel(lw.workflow, level) : [])];
+  if (!lw.workflow || issues.length) return { problem: `workflow '${name}' is invalid: ${issues.map((i) => i.message).join("; ") || "schema"}` };
+  return { workflow: lw.workflow, source: lw.source };
+}
+
+// ---------------------------------------------------------------- agent steps
+
+function launchFor(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, step: AgentStep, run_id: string, cwd: string): AgentLaunch {
+  const agent = step.agent ?? ctx.config.default_agent;
+  const env: Record<string, string> = { NORN_STORY: story.key, NORN_RUN: run_id };
+  if (uf.unit.slice) env.NORN_SLICE = uf.unit.slice;
+  Object.assign(env, ctx.slotEnv(uf.worktree?.slot ?? null));
+  const launch: AgentLaunch = { run_id, agent, cwd, prompt: AUTO_PROMPT, env, title: `${uf.unit.key} ${st.step}` };
+  const model = step.model ?? ctx.config.agents[agent]?.model;
+  if (model) launch.model = model;
+  return launch;
+}
+
+function startedReceipt(ctx: Ctx, st: UnitState, step: AgentStep, run_id: string, worktree: string, retry: boolean): ReceiptOf<"started"> {
+  const agent = step.agent ?? ctx.config.default_agent;
+  const r: ReceiptOf<"started"> = {
+    kind: "started",
+    receipt_id: ctx.id(),
+    run_id,
+    step: st.step,
+    attempt: st.attempt,
+    at: ctx.nowIso,
+    by: "norn",
+    who: ctx.facts.machine.holder,
+    tick_id: ctx.facts.tick_id,
+    how: "auto",
+    agent,
+    worktree,
+  };
+  const model = step.model ?? ctx.config.agents[agent]?.model;
+  if (model) r.model = model;
+  if (retry) r.retry = true;
+  return r;
+}
+
+function startRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, step: AgentStep): void {
+  const ref = uf.unit;
+  const { mode, downgraded } = effectiveMode(story.mode, !!step.attended, ctx.facts.machine.runner);
+  if (mode === "manual")
+    return ctx.noop(ref, downgraded ? "agent.ready.manual.no_runner" : "agent.ready.manual", downgraded ? "auto requested, no runner; running manual (MO2)" : "ready: a person starts an agent and runs norn brief");
+  const cwd = unitWorktree(story, uf);
+  if (!cwd) return ctx.noop(ref, "agent.no_worktree", "unit worktree missing");
+  if (ctx.agentsFree <= 0) return ctx.noop(ref, "agent.queued", `queued: max_agents ${ctx.config.max_agents} in use (K1)`);
+  ctx.agentsFree--;
+  const run_id = ctx.id();
+  const receipt = startedReceipt(ctx, st, step, run_id, cwd, st.retries_used > 0);
+  const n = nextReceiptNumber(uf);
+  const res = applyReceipts(st, [{ n, file: "", receipt }], applyCtx(ctx, wf));
+  ctx.emit({
+    kind: "start_run",
+    unit: ref,
+    rule: st.retries_used > 0 ? "agent.start.retry" : "agent.start",
+    step: st.step,
+    launch: launchFor(ctx, story, uf, st, step, run_id, cwd),
+    receipts: [{ n, receipt }],
+    state: res.state,
+    commit: null,
+  });
+}
+
+/** §10 classification of a live agent run from facts (C1, C2, MO4). */
+function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, step: AgentStep): void {
+  const ref = uf.unit;
+  const run = st.run;
+  const rf = uf.run;
+  if (!run) return ctx.noop(ref, "agent.running.no_run", "running without a run record");
+  if (!rf || rf.run_id !== run.run_id) return ctx.noop(ref, "agent.running.unobserved", `no facts for run ${run.run_id}`);
+  const now = ctx.facts.now;
+  const touched = Math.max(epoch(run.started_at), epoch(st.updated_at));
+  const lastHook = rf.hooks.at(-1);
+  const hookAt = lastHook ? epoch(lastHook.at) : 0;
+
+  const died = rf.process_alive === false || rf.pane?.alive === false;
+  let outcome: string | null = null;
+  let rule = "";
+  let detail: string | undefined;
+  if (died) [outcome, rule, detail] = ["died", "agent.died", "process gone, no receipt"];
+  else if (!step.attended) {
+    const waiting = (rf.pane?.state === "waiting_input" && (rf.pane.since ?? touched + 1) > touched) || (lastHook && (lastHook.event === "waiting_input" || lastHook.event === "permission_prompt") && hookAt > touched);
+    const deadline = parseDuration(step.deadline ?? ctx.config.limits.deadline);
+    const stalledMs = parseDuration(ctx.config.limits.stalled);
+    const turnEnded =
+      (lastHook && (lastHook.event === "turn_end" || lastHook.event === "session_end") && hookAt > touched) ||
+      ((rf.pane?.state === "idle" || rf.pane?.state === "done") && (rf.pane.since ?? 0) > touched);
+    if (waiting) {
+      const question = rf.pane?.detail ?? lastHook?.message ?? "the agent is waiting for input (permission prompt?)";
+      return implicitAsk(ctx, story, uf, st, wf, question, lastHook?.command);
+    }
+    // the deadline runs from the run's start, not the last state write; after a timeout nudge the
+    // agent gets the stalled window before the next one (otherwise every tick would nudge again)
+    const started = epoch(run.started_at);
+    const lastTimeout = st.last_outcome?.outcome === "timeout" && st.last_outcome.step === st.step && epoch(st.last_outcome.at) >= started ? epoch(st.last_outcome.at) : null;
+    const overdue = now - started > deadline && (lastTimeout === null || now - lastTimeout > stalledMs);
+    if (overdue) [outcome, rule, detail] = ["timeout", "agent.timeout", `deadline ${step.deadline ?? ctx.config.limits.deadline} passed`];
+    else if (turnEnded) [outcome, rule, detail] = ["silent", "agent.silent", "turn ended without a receipt"];
+    else if (now - Math.max(rf.last_activity_at ?? 0, touched) > stalledMs) [outcome, rule, detail] = ["stalled", "agent.stalled", `no activity for ${ctx.config.limits.stalled}`];
+  }
+  if (!outcome) return ctx.noop(ref, step.attended ? "agent.attended.running" : "agent.running", `run ${run.run_id} in progress`);
+
+  const n = nextReceiptNumber(uf);
+  const receipt: ReceiptOf<"classify"> = {
+    kind: "classify",
+    receipt_id: ctx.id(),
+    run_id: run.run_id,
+    step: st.step,
+    attempt: st.attempt,
+    at: ctx.nowIso,
+    by: "norn",
+    who: ctx.facts.machine.holder,
+    tick_id: ctx.facts.tick_id,
+    outcome,
+    rule,
+    route: "park",
+  };
+  if (detail) receipt.detail = detail;
+  const res = applyReceipts(st, [{ n, file: "", receipt }], applyCtx(ctx, wf));
+  receipt.route = res.route ?? (res.advance?.to as Receipt["step"]) ?? (res.state.status === "stuck" ? "$stuck" : "park");
+  if (res.route === "nudge") receipt.counter = { name: "nudges", value: res.state.nudges_used, max: step.nudges ?? ctx.config.limits.nudges };
+  if (res.route === "retry") receipt.counter = { name: "retries", value: res.state.retries_used, max: step.retries ?? ctx.config.limits.retries };
+  const session = run.session ? sessionRef(run) : null;
+  const commit = commitFor(ctx, story, uf, `norn: ${ref.key} ${st.step} ${outcome} → ${receipt.route}`, st.step);
+  const snapshot = outcome === "silent" ? { transcript: rf.transcript, cwd: unitWorktree(story, uf) ?? "" } : null;
+  const receipts: NewReceipt[] = [{ n, receipt }];
+
+  if (res.route === "nudge") {
+    // C1 in manual effective mode (or when no session on this machine takes input): norn types
+    // into nobody's session. The silent/timeout/stalled outcome is still counted — so the
+    // C1 route to `$stuck` after max still holds — but instead of an undelivered nudge the unit
+    // shows an inbox item (unitInboxItem: "agent ended its turn without reporting — reopen the
+    // agent and run norn brief"), notified once per counted nudge (O3).
+    const { mode } = effectiveMode(story.mode, !!step.attended, ctx.facts.machine.runner);
+    const typable = !!session && mode === "auto" && session.runner === ctx.facts.machine.runner;
+    if (typable && session)
+      return ctx.emit({ kind: "nudge", unit: ref, rule: `${rule}.nudge`, input: { run_id: run.run_id, session, text: NUDGE_TEXT }, snapshot, receipts, state: res.state, commit });
+    return ctx.emit({ kind: "classify", unit: ref, rule: `${rule}.surface`, outcome, kill: null, snapshot, receipts, state: res.state, commit });
+  }
+  if (res.route === "retry") {
+    const { mode } = effectiveMode(story.mode, !!step.attended, ctx.facts.machine.runner);
+    const cwd = unitWorktree(story, uf);
+    let state = res.state;
+    let launch: AgentLaunch | null = null;
+    if (mode === "auto" && cwd && ctx.agentsFree > 0) {
+      ctx.agentsFree--;
+      const run_id = ctx.id();
+      const started = startedReceipt(ctx, state, step, run_id, cwd, true);
+      receipts.push({ n: n + 1, receipt: started });
+      state = applyReceipts(state, [{ n: n + 1, file: "", receipt: started }], applyCtx(ctx, wf)).state;
+      launch = launchFor(ctx, story, uf, state, step, run_id, cwd);
+    }
+    return ctx.emit({ kind: "retry_fresh", unit: ref, rule: `${rule}.retry`, kill: session, launch, receipts, state, commit });
+  }
+  const stuck = res.state.status === "stuck";
+  ctx.emit({
+    kind: "classify",
+    unit: ref,
+    rule: `${rule}.${res.route ?? (stuck ? "stuck" : "route")}`,
+    outcome,
+    kill: stuck && outcome !== "silent" && outcome !== "died" ? session : null,
+    snapshot,
+    receipts,
+    state: res.state,
+    commit,
+  });
+}
+
+function implicitAsk(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, question: string, command?: string): void {
+  const n = nextReceiptNumber(uf);
+  const receipt: ReceiptOf<"ask"> = {
+    kind: "ask",
+    receipt_id: ctx.id(),
+    run_id: st.run?.run_id ?? null,
+    step: st.step,
+    attempt: st.attempt,
+    at: ctx.nowIso,
+    by: "norn",
+    who: ctx.facts.machine.holder,
+    tick_id: ctx.facts.tick_id,
+    question,
+    implicit: true,
+  };
+  if (command) receipt.command = command;
+  const res = applyReceipts(st, [{ n, file: "", receipt }], applyCtx(ctx, wf));
+  const parkInfo = res.state.park ?? { kind: "ask" as const, reason: question, since: ctx.nowIso };
+  const notify = unitItem(ctx, story, uf, res.state);
+  ctx.emit({
+    kind: "park",
+    unit: uf.unit,
+    rule: "agent.ask.implicit",
+    park: parkInfo,
+    notify: notify && command ? { ...notify, detail: `pending command: ${command}` } : notify,
+    receipts: [{ n, receipt }],
+    state: res.state,
+    commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${st.step} waits for input`, st.step),
+  });
+}
+
+// ---------------------------------------------------------------- check / git
+
+function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, command: string, timeout_ms: number): void {
+  const ref = uf.unit;
+  if (uf.lease?.kind === "check") return ctx.noop(ref, "check.running", `check run ${uf.lease.run_id ?? "?"} in progress`);
+  const cwd = unitWorktree(story, uf);
+  if (!cwd) return ctx.noop(ref, "check.no_worktree", "unit worktree missing");
+  if (ctx.checksFree <= 0) return ctx.noop(ref, "check.queued", `queued: max_checks ${ctx.config.max_checks} in use (K1)`);
+  ctx.checksFree--;
+  const run_id = ctx.id();
+  const env: Record<string, string> = { NORN_STORY: story.key, NORN_RUN: run_id, ...ctx.slotEnv(uf.worktree?.slot ?? null) };
+  if (ref.slice) env.NORN_SLICE = ref.slice;
+  ctx.emit({
+    kind: "run_check",
+    unit: ref,
+    rule: "check.run",
+    step: st.step,
+    run_id,
+    command,
+    cwd,
+    timeout_ms,
+    env,
+    log_path: `${story.spec_dir}/runs/${ref.dir}/logs/${run_id}.log`,
+    receipts: [],
+    state: null,
+    commit: null,
+  });
+}
+
+function runGit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, step: GitStep): void {
+  const ref = uf.unit;
+  const cwd = unitWorktree(story, uf);
+  if (step.action === "open-pr" && story.pr && story.pr.state === "open")
+    return classifyNorn(ctx, story, uf, st, wf, "done", "git.open-pr.exists", `PR #${story.pr.number} already open`);
+  if (!cwd) return ctx.noop(ref, "git.no_worktree", "unit worktree missing");
+  if (step.action === "integrate") {
+    // K6: integration is serialized per story
+    if (ctx.integrating.has(story.key)) return ctx.noop(ref, "git.integrate.queued", "another slice integrates this tick (K6)");
+    ctx.integrating.add(story.key);
+  }
+  const fm = story.frontmatter as StoryFrontmatter;
+  ctx.emit({
+    kind: "run_git",
+    unit: ref,
+    rule: `git.${step.action}`,
+    step: st.step,
+    run_id: ctx.id(),
+    action: step.action,
+    cwd,
+    branch: unitBranch(story, uf),
+    onto: step.action === "integrate" ? story.branch : null,
+    pr: step.action === "open-pr" ? { base: ctx.facts.repo.default_branch, title: fm.title, body: `Closes ${fm.url}\n\nDelivered by norn (story ${story.key}).` } : null,
+    receipts: [],
+    state: null,
+    commit: null,
+  });
+}
+
+/** A norn-classified outcome for a non-agent step (git/slices), applied in the same tick. */
+function classifyNorn(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, outcome: string, rule: string, detail: string): void {
+  const n = nextReceiptNumber(uf);
+  const receipt: ReceiptOf<"classify"> = {
+    kind: "classify",
+    receipt_id: ctx.id(),
+    run_id: null,
+    step: st.step,
+    attempt: st.attempt,
+    at: ctx.nowIso,
+    by: "norn",
+    who: ctx.facts.machine.holder,
+    tick_id: ctx.facts.tick_id,
+    outcome,
+    rule,
+    detail,
+    route: "park",
+  };
+  const res: ApplyResult = applyReceipts(st, [{ n, file: "", receipt }], applyCtx(ctx, wf));
+  receipt.route = (res.advance?.to as Receipt["step"]) ?? (res.state.status === "stuck" ? "$stuck" : "park");
+  ctx.emit({
+    kind: "classify",
+    unit: uf.unit,
+    rule,
+    outcome,
+    kill: null,
+    snapshot: null,
+    receipts: [{ n, receipt }],
+    state: res.state,
+    commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${st.step} ${outcome} → ${receipt.route}`, st.step),
+  });
+}
+
+// ---------------------------------------------------------------- slices (W2)
+
+function slicesStep(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow): void {
+  const ref = uf.unit;
+  const unitOf = (key: string) => story.units.find((u) => u.unit.slice === key);
+  const files = story.slices.filter((s) => s.frontmatter?.status !== "dropped");
+  const broken = files.filter((s) => !s.frontmatter);
+  if (broken.length) return ctx.noop(ref, "slices.file_invalid", `slice file(s) failed validation: ${broken.map((s) => s.file).join(", ")}`);
+  if (!files.length) return classifyNorn(ctx, story, uf, st, wf, "stuck", "slices.none", "no slice files");
+  const integrated = (s: SliceFileFacts) => s.frontmatter?.status === "integrated" || unitOf(s.key)?.state?.status === "done";
+  const done = new Set(files.filter(integrated).map((s) => s.key));
+  if (done.size === files.length) return classifyNorn(ctx, story, uf, st, wf, "done", "slices.done", `${done.size} slice(s) integrated`);
+
+  const pending = files.filter((s) => !done.has(s.key) && !unitOf(s.key)?.state);
+  const startable = pending.filter((s) => (s.frontmatter as SliceFrontmatter).depends_on.every((d) => done.has(d)));
+  const starts = [];
+  for (const s of startable.sort((a, b) => a.nn.localeCompare(b.nn))) {
+    const fm = s.frontmatter as SliceFrontmatter;
+    const name = fm.workflow ?? ctx.config.default_slice_workflow;
+    const loaded = usableWorkflow(ctx, name, "slice");
+    if ("problem" in loaded) return park(ctx, story, uf, st, "workflow", `slice ${s.key}: ${loaded.problem}`, "slices.workflow_invalid");
+    const sliceRef: UnitRef = { story: story.key, slice: s.key, dir: sliceDirName(s.nn, s.slug), key: s.key };
+    const storyWt = story.worktree?.path ?? storyWorktreePath(ctx.facts.repo.root, story.key, story.slug);
+    const path = sliceWorktreePath(storyWt, s.nn, s.slug);
+    const branch = sliceBranch(story.key, s.nn, s.slug);
+    const slot = ctx.slot();
+    const worktree: WorktreeSpec = { path, branch, from: story.branch, env: ctx.slotEnv(slot), slot };
+    const state = initialState({ unit: sliceRef, workflow: loaded.workflow, workflowName: name, workflowHash: sha256(loaded.source), now: ctx.nowIso, tick_id: ctx.facts.tick_id });
+    starts.push({
+      kind: "start_unit" as const,
+      unit: sliceRef,
+      rule: "slice.start",
+      workflow: name,
+      workflow_source: loaded.source,
+      worktree,
+      slice_status: "active" as const,
+      receipts: [],
+      state,
+      commit: { cwd: path, branch, message: `norn: start ${s.key} (${name})`, trailers: { "Norn-Story": story.key, "Norn-Slice": s.key, "Norn-Step": state.step, "Norn-Tick": ctx.facts.tick_id }, push: true },
+    });
+  }
+  if (starts.length)
+    return ctx.emit({ kind: "start_slices", unit: ref, rule: "slices.start", starts, receipts: [], state: null, commit: null });
+  const activeUnits = files.filter((s) => !done.has(s.key) && unitOf(s.key)?.state);
+  const isStuck = (s: SliceFileFacts) => {
+    const status = unitOf(s.key)?.state?.status;
+    return status === "stuck" || status === "corrupt";
+  };
+  // §10: slices → stuck once no slice can move without a person unsticking one (running or parked slices still progress)
+  const stuckSlices = activeUnits.filter(isStuck);
+  if (stuckSlices.length && stuckSlices.length === activeUnits.length) {
+    const named = stuckSlices.map((s) => `slice ${s.key} stuck: ${unitOf(s.key)?.state?.park?.reason ?? "?"}`);
+    return classifyNorn(ctx, story, uf, st, wf, "stuck", "slices.slice_stuck", `${named.join("; ")} — norn unstick ${stuckSlices[0]?.key}`);
+  }
+  const active = activeUnits.length > 0;
+  if (!active) {
+    const blocked = pending.map((s) => `${s.key} waits for ${(s.frontmatter as SliceFrontmatter).depends_on.filter((d) => !done.has(d)).join(", ")}`);
+    return classifyNorn(ctx, story, uf, st, wf, "stuck", "slices.blocked", `no slice can start: ${blocked.join("; ")}`);
+  }
+  ctx.noop(ref, "slices.wait", `${done.size}/${files.length} slices integrated`);
+}
