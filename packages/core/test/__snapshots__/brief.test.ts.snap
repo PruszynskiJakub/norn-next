@@ -63,13 +63,13 @@ Use the \`implement\` skill.
 
 ## Rework
 
-You are here because of \`test.fail\`. Address every point below first.
+You are here because \`test.fail\` sent the work back (fix round test_loop 1/5). Address the points below first.
 
 ### Failing check (test)
 
 - Command: \`bun test\`
 - Exit code: 1
-- Full log: \`.agents/specs/gh-1-login/runs/02-form/logs/01JDDDDDDDDDDDDDDDDDDDDDDD.log\`
+- Full log: \`/r-worktrees/gh-1-login--02-form/.agents/specs/gh-1-login/runs/02-form/logs/01JDDDDDDDDDDDDDDDDDDDDDDD.log\`
 
 \`\`\`text
 ✓ a
@@ -124,9 +124,15 @@ Use the \`implement\` skill.
 
 ## Rework
 
-You are here because of \`review.changes_requested\`. Address every point below first.
+You are here because \`review.changes_requested\` sent the work back (fix round review_loop 1/3). Address the points below first.
+
+### review#1 reported \`changes_requested\`
+
+> h
 
 ### Findings (review: changes_requested)
+
+Fix every blocking and major finding; minor and nit ones are for you to weigh.
 
 1. **blocking** [B3] Password not validated — \`src/login.ts:12\`
    Repro: POST /login with empty password
@@ -195,5 +201,487 @@ Then end your turn. Never edit \`runs/\`; never push.
 - Attended step: no deadline or nudges (MO4)
 - Fresh-session retries left: 1
 - Port slot: none
+"
+`;
+
+exports[`Rework only when sent back (B3, B6, W4) qa.fail without findings: the handoff verbatim and the absolute evidence dir with its files 1`] = `
+"# norn brief — gh-1/02 · implement #2
+
+## Where you are
+
+- Story: gh-1
+- Slice: gh-1/02
+- Step: implement (attempt 2)
+- Mode: auto
+
+## Your work
+
+Use the \`implement\` skill.
+
+## Inputs
+
+- Slice: \`.agents/specs/gh-1-login/slices/02-form.md\`
+- Last failing check: \`none\`
+- Last findings: \`see Rework\`
+
+## Rework
+
+You are here because \`qa.fail\` sent the work back (fix round qa_loop 1/2). Address the points below first.
+
+### qa#1 reported \`fail\`
+
+> QA via curl: FAIL B12 'delete already-deleted -> 404': ids of deleted items are reused, so a retried DELETE removes a newer item. Repro in B12-repro.md.
+
+- Evidence: \`/r-worktrees/gh-1-login--02-form/.agents/specs/gh-1-login/runs/02-form/evidence/01JDDDDDDDDDDDDDDDDDDDDDDD/\`
+  - B12-repro.md
+  - report.md
+
+## Context
+
+No handoff yet — you are the first run of this unit.
+
+## Finish with exactly one of
+
+- \`norn done done --handoff "…"\` — every acceptance criterion (or rework point) has a passing test
+- \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
+- \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
+
+Then end your turn. Never edit \`runs/\`; never push.
+
+## Limits
+
+- Deadline: 60m (until 2026-10-23T11:00:00.000Z)
+- Nudges left: 2
+- Fresh-session retries left: 1
+- Port slot: 3 (PORT_BASE=4030)
+"
+`;
+
+exports[`Rework only when sent back (B3, B6, W4) qa.fail with findings: criterion and repro, then the evidence 1`] = `
+"# norn brief — gh-1/02 · implement #2
+
+## Where you are
+
+- Story: gh-1
+- Slice: gh-1/02
+- Step: implement (attempt 2)
+- Mode: auto
+
+## Your work
+
+Use the \`implement\` skill.
+
+## Inputs
+
+- Slice: \`.agents/specs/gh-1-login/slices/02-form.md\`
+- Last failing check: \`none\`
+- Last findings: \`see Rework\`
+
+## Rework
+
+You are here because \`qa.fail\` sent the work back (fix round qa_loop 1/2). Address the points below first.
+
+### qa#1 reported \`fail\`
+
+> QA via curl: FAIL B12 'delete already-deleted -> 404': ids of deleted items are reused, so a retried DELETE removes a newer item. Repro in B12-repro.md.
+
+### Findings (qa: fail)
+
+1. **blocking** [B12] Deleted ids are reused
+   Repro: DELETE /api/items/3 twice after creating a new item → 204, newer item gone
+
+- Evidence: \`/r-worktrees/gh-1-login--02-form/.agents/specs/gh-1-login/runs/02-form/evidence/01JDDDDDDDDDDDDDDDDDDDDDDD/\`
+  - B12-repro.md
+
+## Context
+
+No handoff yet — you are the first run of this unit.
+
+## Finish with exactly one of
+
+- \`norn done done --handoff "…"\` — every acceptance criterion (or rework point) has a passing test
+- \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
+- \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
+
+Then end your turn. Never edit \`runs/\`; never push.
+
+## Limits
+
+- Deadline: 60m (until 2026-10-23T11:00:00.000Z)
+- Nudges left: 2
+- Fresh-session retries left: 1
+- Port slot: 3 (PORT_BASE=4030)
+"
+`;
+
+exports[`Rework only when sent back (B3, B6, W4) gate reject with a comment: the comment verbatim and who; the judged receipt's evidence; an earlier approve's findings are not rework 1`] = `
+"# norn brief — gh-1/02 · implement #2
+
+## Where you are
+
+- Story: gh-1
+- Slice: gh-1/02
+- Step: implement (attempt 2)
+- Mode: auto
+
+## Your work
+
+Use the \`implement\` skill.
+
+## Inputs
+
+- Slice: \`.agents/specs/gh-1-login/slices/02-form.md\`
+- Last failing check: \`none\`
+- Last findings: \`see Rework\`
+
+## Rework
+
+You are here because \`human-qa.reject\` sent the work back (fix round qa_loop 1/2). Address the points below first.
+
+### Rejected at human-qa by jakub@mac
+
+> AC7: show 'Item not found' instead of the raw HTML page, with a test.
+
+What was judged: qa#1 reported \`partial\`:
+
+> AC7 needs a browser; steps in AC7.md
+
+- Evidence: \`/r-worktrees/gh-1-login--02-form/.agents/specs/gh-1-login/runs/02-form/evidence/01JDDDDDDDDDDDDDDDDDDDDDDD/\`
+  - AC7.md
+  - report.md
+
+## Context
+
+No handoff yet — you are the first run of this unit.
+
+## Finish with exactly one of
+
+- \`norn done done --handoff "…"\` — every acceptance criterion (or rework point) has a passing test
+- \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
+- \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
+
+Then end your turn. Never edit \`runs/\`; never push.
+
+## Limits
+
+- Deadline: 60m (until 2026-10-23T11:00:00.000Z)
+- Nudges left: 2
+- Fresh-session retries left: 1
+- Port slot: 3 (PORT_BASE=4030)
+"
+`;
+
+exports[`Rework only when sent back (B3, B6, W4) gate reject without a comment says so and points at the evidence 1`] = `
+"# norn brief — gh-1/02 · implement #2
+
+## Where you are
+
+- Story: gh-1
+- Slice: gh-1/02
+- Step: implement (attempt 2)
+- Mode: auto
+
+## Your work
+
+Use the \`implement\` skill.
+
+## Inputs
+
+- Slice: \`.agents/specs/gh-1-login/slices/02-form.md\`
+- Last failing check: \`none\`
+- Last findings: \`see Rework\`
+
+## Rework
+
+You are here because \`human-qa.reject\` sent the work back (fix round qa_loop 1/2). Address the points below first.
+
+### Rejected at human-qa
+
+(no comment given; ask the person or see the evidence)
+
+What was judged: qa#1 reported \`partial\`:
+
+> h
+
+- Evidence: \`/r-worktrees/gh-1-login--02-form/.agents/specs/gh-1-login/runs/02-form/evidence/01JDDDDDDDDDDDDDDDDDDDDDDD/\`
+  - report.md
+
+## Context
+
+No handoff yet — you are the first run of this unit.
+
+## Finish with exactly one of
+
+- \`norn done done --handoff "…"\` — every acceptance criterion (or rework point) has a passing test
+- \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
+- \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
+
+Then end your turn. Never edit \`runs/\`; never push.
+
+## Limits
+
+- Deadline: 60m (until 2026-10-23T11:00:00.000Z)
+- Nudges left: 2
+- Fresh-session retries left: 1
+- Port slot: 3 (PORT_BASE=4030)
+"
+`;
+
+exports[`Rework only when sent back (B3, B6, W4) review.approve → qa is forward: no Rework; non-blocking findings are neutral notes in Context 1`] = `
+"# norn brief — gh-1/02 · qa #1
+
+## Where you are
+
+- Story: gh-1
+- Slice: gh-1/02
+- Step: qa (attempt 1)
+- Mode: auto
+
+## Your work
+
+Use the \`qa\` skill.
+
+## Inputs
+
+- Story spec: \`.agents/specs/gh-1-login/story.md\`
+- Slice: \`.agents/specs/gh-1-login/slices/02-form.md\`
+- Handoff: \`.agents/specs/gh-1-login/runs/02-form/handoff.md\`
+
+## Context
+
+No handoff yet — you are the first run of this unit.
+
+### Notes from review (non-blocking)
+
+review reported \`approve\` with these notes, for information:
+
+1. **minor** Raw HTML shown as row error — \`src/views.ts:191\`
+
+## Finish with exactly one of
+
+- \`norn done pass --handoff "…"\` — every criterion verified with evidence
+- \`norn done fail --handoff "…"\` — a criterion fails; repro in the receipt
+- \`norn done partial --handoff "…"\` — criteria only a person can check are listed with prepared evidence
+- \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
+- \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
+
+Then end your turn. Never edit \`runs/\`; never push.
+
+## Limits
+
+- Deadline: 60m (until 2026-10-23T11:00:00.000Z)
+- Nudges left: 2
+- Fresh-session retries left: 1
+- Port slot: 3 (PORT_BASE=4030)
+"
+`;
+
+exports[`Rework only when sent back (B3, B6, W4) integrate conflict → merge: the conflicting files 1`] = `
+"# norn brief — gh-1/02 · merge #1
+
+## Where you are
+
+- Story: gh-1
+- Slice: gh-1/02
+- Step: merge (attempt 1)
+- Mode: auto
+
+## Your work
+
+Use the \`merge\` skill.
+
+## Inputs
+
+- Story spec: \`.agents/specs/gh-1-login/story.md\`
+- Slice: \`.agents/specs/gh-1-login/slices/02-form.md\`
+- Handoff: \`.agents/specs/gh-1-login/runs/02-form/handoff.md\`
+
+## Rework
+
+You are here because \`integrate.conflict\` sent the work back (fix round conflict_loop 1/2). Address the points below first.
+
+### integrate.conflict
+
+rebase onto gh-1-login conflicts in src/a.ts, src/b.ts
+
+## Context
+
+No handoff yet — you are the first run of this unit.
+
+## Finish with exactly one of
+
+- \`norn done done --handoff "…"\` — step finished with outcome done
+- \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
+- \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
+
+Then end your turn. Never edit \`runs/\`; never push.
+
+## Limits
+
+- Deadline: 60m (until 2026-10-23T11:00:00.000Z)
+- Nudges left: 2
+- Fresh-session retries left: 1
+- Port slot: 3 (PORT_BASE=4030)
+"
+`;
+
+exports[`golden replays (norn-sandbox-todoist) gh-1 story: qa.fail with handoff + evidence and no findings → implement#1 gets the failure (F22) 1`] = `
+"# norn brief — gh-1 · implement #1
+
+## Where you are
+
+- Story: gh-1
+- Step: implement (attempt 1)
+- Mode: manual
+
+## Your work
+
+Use the \`implement\` skill.
+
+## Inputs
+
+- Story spec: \`.agents/specs/gh-1-projects-and-items/story.md\`
+- Handoff: \`.agents/specs/gh-1-projects-and-items/runs/_story/handoff.md\`
+- Last failing check: \`none\`
+- Last findings: \`see Rework\`
+
+## Rework
+
+You are here because \`qa.fail\` sent the work back (fix round qa_loop 1/2). Address the points below first.
+
+### qa#1 reported \`fail\`
+
+> Story QA via curl on :4040: 31/32 Behaviour items + tests AC pass. FAIL B12/edge 'delete already-deleted -> 404': ids of deleted items/projects are reused (INTEGER PRIMARY KEY without AUTOINCREMENT in src/store.ts), so a stale/retried DELETE /api/items/N returns 204 and deletes an unrelated newer item. Repro in B12-repro.md. Browser-only parts (confirm dialog, checkbox auto-submit, strike-through, back/forward) listed in PERSON.md. report.md has the table.
+
+- Evidence: \`/w/norn-sandbox-todoist-worktrees/gh-1-projects-and-items/.agents/specs/gh-1-projects-and-items/runs/_story/evidence/01M5MTEB6T37MVRHZ5FADDAQTK/\`
+  - AC10-tests.md
+  - B1.md
+  - B10.md
+  - B11.md
+  - B12-repro.md
+  - B12-repro.raw.md
+  - B12.md
+  - B13.md
+  - B14.md
+  - B15.md
+  - B16.md
+  - B17.md
+  - B18.md
+  - B19.md
+  - B2.md
+  - B20.md
+  - B21.md
+  - B22.md
+  - B23.md
+  - B24.root.html
+  - B25.404.html
+  - B25.p2.html
+  - B26.p2c.html
+  - B27.md
+  - B28.md
+  - B29.md
+  - B3.md
+  - B30.md
+  - B31.md
+  - B32.md
+  - B4.md
+  - B5.md
+  - B6.md
+  - B7.md
+  - B8.md
+  - B9.md
+  - PERSON.md
+  - report.md
+  - server.log
+  - server2.log
+  - server3.log
+
+## Context
+
+No handoff yet — you are the first run of this unit.
+
+## Finish with exactly one of
+
+- \`norn done done --handoff "…"\` — every rework point has a passing test
+- \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
+- \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
+
+Then end your turn. Never edit \`runs/\`; never push.
+
+## Limits
+
+- Deadline: 60m (until 2026-10-23T17:49:03.542Z)
+- Nudges left: 2
+- Fresh-session retries left: 1
+- Port slot: 3 (PORT_BASE=4030)
+"
+`;
+
+exports[`golden replays (norn-sandbox-todoist) gh-2/03: human-qa.reject → implement#2 gets the comment, not review#1's approve findings (F31) 1`] = `
+"# norn brief — gh-2/03 · implement #2
+
+## Where you are
+
+- Story: gh-2
+- Slice: gh-2/03
+- Step: implement (attempt 2)
+- Mode: manual
+
+## Your work
+
+Use the \`implement\` skill.
+
+## Inputs
+
+- Slice: \`.agents/specs/gh-2-due-dates-with-today-and-upcoming-views/slices/03-due-dates-in-project-lists.md\`
+- Story spec: \`.agents/specs/gh-2-due-dates-with-today-and-upcoming-views/story.md\`
+- Handoff: \`.agents/specs/gh-2-due-dates-with-today-and-upcoming-views/runs/03-due-dates-in-project-lists/handoff.md\`
+- Last failing check: \`none\`
+- Last findings: \`see Rework\`
+
+## Rework
+
+You are here because \`human-qa.reject\` sent the work back (fix round qa_loop 1/2). Address the points below first.
+
+### Rejected at human-qa by jakubpruszynski@MacBook-Pro-Jakub-2
+
+> AC7: on 404/5xx the inline due-date editor shows the raw HTML error page as the row's error text (review F1, confirmed by QA). Show a short human message instead (e.g. 'Item not found' / 'Could not save the date'), with a test.
+
+What was judged: qa#1 reported \`partial\`:
+
+> qa#1 partial: AC1,AC2,AC4,AC5,AC6 pass via curl against real server :4050 (today 2026-10-23). AC3 person: confirm #c53727 overdue date vs #808080 (row itself unstyled). AC7 unchecked: no browser in unattended run; steps prepared in AC7.md. Review finding 1 confirmed server-side: 404 from POST /items/:id/due is full HTML page, so script would show raw HTML as row error (AC7 example path, server stopped, uses generic message).
+
+- Evidence: \`/w/norn-sandbox-todoist-worktrees/gh-2-due-dates-with-today-and-upcoming-views--03-due-dates-in-project-lists/.agents/specs/gh-2-due-dates-with-today-and-upcoming-views/runs/03-due-dates-in-project-lists/evidence/01M5MWWYVA3RSHY979ARH9HSAE/\`
+  - AC1.md
+  - AC2.md
+  - AC3.md
+  - AC4.md
+  - AC5.md
+  - AC6.md
+  - AC7.md
+  - page-completed.html
+  - page.headers
+  - page.html
+  - report.md
+  - server.log
+
+## Context
+
+No handoff yet — you are the first run of this unit.
+
+## Finish with exactly one of
+
+- \`norn done done --handoff "…"\` — every acceptance criterion (or rework point) has a passing test
+- \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
+- \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
+
+Then end your turn. Never edit \`runs/\`; never push.
+
+## Limits
+
+- Deadline: 60m (until 2026-10-23T18:29:55.205Z)
+- Nudges left: 2
+- Fresh-session retries left: 1
+- Port slot: 3 (PORT_BASE=4030)
 "
 `;

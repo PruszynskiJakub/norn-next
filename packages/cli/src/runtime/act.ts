@@ -74,6 +74,7 @@ import { leaseLiveness } from "./leases.ts";
 import { markStoryOnBase, type RecordResult } from "./record.ts";
 import { markNotified, type PendingRecord, readNotified, readPendingRecords, writePendingRecords } from "./local.ts";
 import type { Observed, StoryLoc, UnitLoc } from "./observe.ts";
+import { appendProgress, rejectProgress } from "./report.ts";
 import { runShell, tailLines } from "./shell.ts";
 
 export interface ActRecord {
@@ -205,6 +206,8 @@ export class Actor {
       case "import_mailbox": {
         const loc = this.unitLoc(a.unit);
         this.writeReceipts(loc.runsDir, a.receipts);
+        // a gate rejection is a milestone in handoff.md, as when it is written locally (O6)
+        for (const r of a.receipts) if (r.receipt.kind === "reject") appendProgress(loc.runsDir, rejectProgress(r.receipt));
         const committed = await this.commit(a.commit, a.unit, loc.state, `${a.rule}: ${a.receipts.map((r) => r.receipt.kind).join(", ")}`);
         const deleted: string[] = [];
         for (const r of a.refs) {

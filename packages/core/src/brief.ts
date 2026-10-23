@@ -9,6 +9,7 @@ import {
   type Finding,
   type Mode,
   type OutcomeSpec,
+  type Receipt,
   outcomeEdge,
   parseDuration,
   type StepInput,
@@ -18,7 +19,7 @@ import {
 import type { NumberedReceipt, UnitRef } from "./facts.ts";
 import { effectiveMode } from "./inbox.ts";
 import { epoch, iso } from "./time.ts";
-import { reportableOutcomes, stepOf } from "./workflow.ts";
+import { edgeOf, reportableOutcomes, stepOf } from "./workflow.ts";
 
 export interface BriefInput {
   unit: UnitRef;
@@ -40,6 +41,23 @@ export interface BriefInput {
   limits: { deadline: string; nudges: number; retries: number; slot: number | null; port_base: number | null };
   /** full log of a failing check (its receipt's `log` path and text), when the caller read it; used only if that check is the rework */
   check_log?: { log: string; text: string } | null;
+  /** files in each evidence folder, keyed by the receipt's `evidence` (e.g. `evidence/<run_id>`), when the caller listed them */
+  evidence_files?: Readonly<Record<string, readonly string[]>>;
+}
+
+/** An evidence folder, absolute, with the files it holds. */
+export interface BriefEvidence {
+  dir: string;
+  files: string[];
+}
+
+/** A `done` report as Rework shows it: the reason in its own words, and where its evidence is. */
+export interface BriefReport {
+  step: string;
+  attempt: number;
+  outcome: string;
+  handoff: string;
+  evidence: BriefEvidence | null;
 }
 
 export interface BriefJson {
@@ -47,12 +65,24 @@ export interface BriefJson {
   work: { skill: string; instructions: string | null; description: string | null };
   inputs: Array<{ kind: string; label: string; ref: string }>;
   rework: {
+    /** `<step>.<outcome>` that sent the work back */
     from: string;
+    /** the counted edge taken (W4): the fix round */
+    counter: { name: string; value: number; max: number } | null;
     check: { step: string; command: string; exit_code: number | null; reason: string | null; output_tail: string; log: string | null } | null;
+    /** a step that reported a failing outcome: its handoff and evidence */
+    report: BriefReport | null;
     findings: { step: string; outcome: string; items: Finding[] } | null;
+    /** a gate rejection: the person's comment verbatim and what they judged */
+    decision: { step: string; by: string | null; comment: string | null; judged: BriefReport | null } | null;
     detail: string | null;
   } | null;
-  context: { handoff: string | null; answers: Array<{ question: string; answer: string }> };
+  context: {
+    handoff: string | null;
+    answers: Array<{ question: string; answer: string }>;
+    /** findings of the previous step on a forward entry: for information, not rework */
+    notes: { step: string; outcome: string; items: Finding[] } | null;
+  };
   finish: Array<{ command: string; means: string }>;
   limits: { attended: boolean; deadline: string | null; deadline_at: string | null; nudges_left: number | null; retries_left: number | null; slot: number | null; port_base: number | null };
 }
@@ -63,6 +93,8 @@ export interface Briefing {
 }
 
 const TAIL_LINES = 60;
+/** evidence files listed by name in the markdown; the JSON lists them all */
+const MAX_FILES = 50;
 
 /** Shift markdown headings so the shallowest becomes level `min` (handoff nests under Context). */
 function demoteHeadings(md: string, min: number): string {
@@ -79,12 +111,13 @@ export function renderBrief(input: BriefInput): Briefing {
   const { state: st, workflow: wf } = input;
   const step = stepOf(wf, st.step);
   if (!step || step.type !== "agent") throw new Error(`norn brief: ${st.step} is not an agent step`);
+  const rw = rework(input, step);
   const json: BriefJson = {
     where: where(input, step),
     work: { skill: step.skill, instructions: step.instructions ?? null, description: step.description ?? null },
-    inputs: inputs(input, step),
-    rework: rework(input, step),
-    context: { handoff: input.handoff?.trim() ? demoteHeadings(input.handoff.trim(), 3) : null, answers: answers(input) },
+    inputs: inputs(input, step, rw),
+    rework: rw,
+    context: { handoff: input.handoff?.trim() ? demoteHeadings(input.handoff.trim(), 3) : null, answers: answers(input), notes: rw ? null : notes(input) },
     finish: finish(step),
     limits: limits(input, step),
   };
@@ -106,7 +139,7 @@ function where(input: BriefInput, step: AgentStep): BriefJson["where"] {
   };
 }
 
-function inputs(input: BriefInput, step: AgentStep): BriefJson["inputs"] {
+function inputs(input: BriefInput, step: AgentStep, rw: BriefJson["rework"]): BriefJson["inputs"] {
   const p = input.paths;
   return (step.inputs ?? defaultInputs(input.unit)).flatMap((i): BriefJson["inputs"] => {
     if (typeof i === "object") return [{ kind: "file", label: i.label ?? i.file, ref: `${p.spec_dir}/${i.file}` }];
@@ -121,55 +154,118 @@ function inputs(input: BriefInput, step: AgentStep): BriefJson["inputs"] {
         return input.diff_range ? [{ kind: i, label: "Diff", ref: `git diff ${input.diff_range}` }] : [];
       case "handoff":
         return [{ kind: i, label: "Handoff", ref: `${p.unit_dir}/handoff.md` }];
+      // B6: point at Rework only when it holds something for this input
       case "last_check":
+        return [{ kind: i, label: "Last failing check", ref: rw?.check ? "see Rework" : "none" }];
       case "last_findings":
-        return [{ kind: i, label: i === "last_check" ? "Last failing check" : "Last findings", ref: "see Rework" }];
+        return [{ kind: i, label: "Last findings", ref: rw && (rw.findings || rw.report || rw.decision) ? "see Rework" : "none" }];
     }
   });
 }
 
 const isFailingCheck = (r: NumberedReceipt): r is NumberedReceipt & { receipt: CheckReceipt } => r.receipt.kind === "check" && r.receipt.outcome === "fail";
-const hasFindings = (r: NumberedReceipt): r is NumberedReceipt & { receipt: DoneReceipt } => r.receipt.kind === "done" && !!r.receipt.findings?.length;
+const isDone = (r: NumberedReceipt): r is NumberedReceipt & { receipt: DoneReceipt } => r.receipt.kind === "done";
+/** Outcomes that move work forward when a workflow declares no counters to tell (fallback). */
+const FORWARD = new Set(["pass", "approve", "done", "partial"]);
 
 /**
- * Receipts that can still be rework for the current attempt (B6): those after both the last
- * passing check (which settles every earlier failure) and the last receipt of an earlier
- * attempt of this step (whose run already addressed what came before it). What remains is
- * the failure that sent the unit back here.
+ * A receipt that sends work back (W4): its outcome takes a counted edge, or — for edges without
+ * a counter — it is failure-shaped (failing check, gate reject, merge conflict, a `done` whose
+ * outcome is not a forward one).
  */
-function liveSince({ state: st, receipts }: BriefInput): readonly NumberedReceipt[] {
-  const cut = receipts.findLastIndex(
-    ({ receipt: r }) => (r.kind === "check" && r.outcome === "pass") || (r.step === st.step && r.attempt !== st.attempt),
-  );
+function sendsBack(wf: Workflow, r: Receipt): boolean {
+  const outcome = r.kind === "reject" ? "reject" : r.kind === "check" || r.kind === "done" || r.kind === "classify" ? r.outcome : null;
+  if (outcome === null) return false;
+  if (edgeOf(wf, r.step, outcome)?.counter) return true;
+  if (r.kind === "check") return r.outcome === "fail";
+  if (r.kind === "classify") return r.outcome === "conflict";
+  if (r.kind === "done") return !FORWARD.has(r.outcome);
+  return r.kind === "reject";
+}
+
+/**
+ * Receipts that can still be rework for the current attempt (B6): those after the last receipt
+ * of an earlier attempt of this step (whose run already addressed what came before it).
+ */
+function sincePreviousAttempt({ state: st, receipts }: BriefInput): readonly NumberedReceipt[] {
+  const cut = receipts.findLastIndex(({ receipt: r }) => r.step === st.step && r.attempt !== st.attempt);
   return receipts.slice(cut + 1);
 }
 
-/** B3 Rework: the receipt that sent the unit back here, plus declared `last_check` / `last_findings` that are still live (B6). */
-function rework(input: BriefInput, step: AgentStep): BriefJson["rework"] {
-  const { state: st, receipts } = input;
-  const declared = new Set((step.inputs ?? []).filter((i): i is "last_check" | "last_findings" => i === "last_check" || i === "last_findings"));
-  const entering = st.last_outcome && st.last_outcome.step !== st.step ? receipts.find((r) => r.receipt.receipt_id === st.last_outcome?.receipt_id) : undefined;
-  const fromFailure = entering && (isFailingCheck(entering) || hasFindings(entering) || (entering.receipt.kind === "classify" && entering.receipt.outcome === "conflict"));
-  if (!fromFailure && !declared.size) return null;
+/** Failures in `live` not settled later: a passing check settles earlier failing checks; a forward report of a step its earlier failures. */
+function unsettled(wf: Workflow, live: readonly NumberedReceipt[]) {
+  const settled = (i: number, same: (r: Receipt) => boolean) => live.slice(i + 1).some(({ receipt: r }) => same(r) && !sendsBack(wf, r));
+  const check = live.findLast((r, i) => isFailingCheck(r) && !settled(i, (x) => x.kind === "check" && x.step === r.receipt.step));
+  const done = live.findLast((r, i) => isDone(r) && sendsBack(wf, r.receipt) && !settled(i, (x) => x.kind === "done" && x.step === r.receipt.step));
+  return { check: check as (NumberedReceipt & { receipt: CheckReceipt }) | undefined, done: done as (NumberedReceipt & { receipt: DoneReceipt }) | undefined };
+}
 
-  const live = liveSince(input);
-  const check = (fromFailure && entering && isFailingCheck(entering) ? entering : declared.has("last_check") ? live.findLast(isFailingCheck) : undefined) ?? null;
-  const found = (fromFailure && entering && hasFindings(entering) ? entering : declared.has("last_findings") ? live.findLast(hasFindings) : undefined) ?? null;
-  const detail = fromFailure && entering?.receipt.kind === "classify" ? (entering.receipt.detail ?? `${entering.receipt.step}: ${entering.receipt.outcome}`) : null;
-  if (!check && !found && !detail) return null;
+function evidenceOf(input: BriefInput, rel: string | undefined): BriefEvidence | null {
+  if (!rel) return null;
+  return { dir: `${unitDirAbs(input)}/${rel}`, files: [...(input.evidence_files?.[rel] ?? [])] };
+}
+const unitDirAbs = ({ paths: p }: BriefInput) => (p.unit_dir.startsWith("/") ? p.unit_dir : `${p.worktree}/${p.unit_dir}`);
+
+function reportOf(input: BriefInput, r: DoneReceipt): BriefReport {
+  return { step: r.step, attempt: r.attempt, outcome: r.outcome, handoff: r.handoff, evidence: evidenceOf(input, r.evidence) };
+}
+
+/** The receipt that moved the cursor here from another step, if any. */
+function enteringReceipt({ state: st, receipts }: BriefInput): NumberedReceipt | undefined {
+  return st.last_outcome && st.last_outcome.step !== st.step ? receipts.find((r) => r.receipt.receipt_id === st.last_outcome?.receipt_id) : undefined;
+}
+
+/**
+ * B3 Rework, only when the work was sent back here (W4: the edge taken has a counter, or the
+ * entering receipt is failure-shaped). It shows what sent it back — the failing check, the failed
+ * report with its handoff, findings and evidence, the gate's comment, the conflict — plus declared
+ * `last_check` / `last_findings` failures still live for this attempt (B6).
+ */
+function rework(input: BriefInput, step: AgentStep): BriefJson["rework"] {
+  const { state: st, workflow: wf, receipts } = input;
+  const entering = enteringReceipt(input);
+  if (!entering || !st.last_outcome || !sendsBack(wf, entering.receipt)) return null;
+  const r = entering.receipt;
+  const declared = new Set((step.inputs ?? []).filter((i) => i === "last_check" || i === "last_findings"));
+  const live = unsettled(wf, sincePreviousAttempt(input));
+
+  const edge = edgeOf(wf, st.last_outcome.step, st.last_outcome.outcome);
+  const counter = edge?.counter ? { name: edge.counter, value: st.counters[edge.counter] ?? 0, max: wf.counters?.[edge.counter]?.max ?? 0 } : null;
+
+  const checkR = isFailingCheck(entering) ? entering : declared.has("last_check") ? live.check : undefined;
+  const doneR = isDone(entering) ? entering : declared.has("last_findings") ? live.done : undefined;
+  let decision: NonNullable<BriefJson["rework"]>["decision"] = null;
+  if (r.kind === "reject") {
+    const idx = receipts.indexOf(entering);
+    const judged = receipts.slice(0, idx).findLast(isDone);
+    decision = { step: r.step, by: r.who ?? null, comment: r.comment?.trim() || null, judged: judged ? reportOf(input, judged.receipt) : null };
+  }
+  const check = checkR?.receipt;
+  const done = doneR?.receipt;
   return {
-    from: st.last_outcome ? `${st.last_outcome.step}.${st.last_outcome.outcome}` : "previous runs",
-    check: check && {
-      step: check.receipt.step,
-      command: check.receipt.command,
-      exit_code: check.receipt.exit_code,
-      reason: check.receipt.reason ?? null,
-      output_tail: tail(input.check_log && input.check_log.log === check.receipt.log ? input.check_log.text : check.receipt.output_tail),
-      log: check.receipt.log ? `${input.paths.unit_dir}/${check.receipt.log}` : null,
-    },
-    findings: found && { step: found.receipt.step, outcome: found.receipt.outcome, items: found.receipt.findings ?? [] },
-    detail,
+    from: `${st.last_outcome.step}.${st.last_outcome.outcome}`,
+    counter,
+    check: check
+      ? {
+          step: check.step,
+          command: check.command,
+          exit_code: check.exit_code,
+          reason: check.reason ?? null,
+          output_tail: tail(input.check_log && input.check_log.log === check.log ? input.check_log.text : check.output_tail),
+          log: check.log ? `${unitDirAbs(input)}/${check.log}` : null,
+        }
+      : null,
+    report: done ? reportOf(input, done) : null,
+    findings: done?.findings?.length ? { step: done.step, outcome: done.outcome, items: done.findings } : null,
+    decision,
+    detail: r.kind === "classify" ? (r.detail ?? `${r.step}: ${r.outcome}`) : null,
   };
+}
+
+/** B3 Context on a forward entry: the previous step's findings, as information only. */
+function notes(input: BriefInput): BriefJson["context"]["notes"] {
+  const e = enteringReceipt(input);
+  return e && isDone(e) && e.receipt.findings?.length ? { step: e.receipt.step, outcome: e.receipt.outcome, items: e.receipt.findings } : null;
 }
 
 /** Questions asked in this attempt and their answers (B3 Context). */
@@ -215,6 +311,27 @@ function limits(input: BriefInput, step: AgentStep): BriefJson["limits"] {
 
 // ---------------------------------------------------------------- markdown
 
+const quote = (text: string) => text.trim().split("\n").map((l) => (l ? `> ${l}` : ">")).join("\n");
+
+function findingLines(out: string[], items: readonly Finding[]): void {
+  items.forEach((x, i) => {
+    const where = x.file ? ` — \`${x.file}${x.line ? `:${x.line}` : ""}\`` : "";
+    const crit = x.criterion ? ` [${x.criterion}]` : "";
+    out.push(`${i + 1}. **${x.severity}**${crit} ${x.title}${where}`);
+    if (x.detail) out.push(`   ${x.detail.replace(/\n/g, "\n   ")}`);
+    if (x.repro) out.push(`   Repro: ${x.repro}`);
+  });
+  out.push("");
+}
+
+function evidenceLines(out: string[], e: BriefEvidence | null): void {
+  if (!e) return;
+  out.push(`- Evidence: \`${e.dir}/\``);
+  for (const f of e.files.slice(0, MAX_FILES)) out.push(`  - ${f}`);
+  if (e.files.length > MAX_FILES) out.push(`  - … ${e.files.length - MAX_FILES} more`);
+  out.push("");
+}
+
 function markdown(b: BriefJson): string {
   const w = b.where;
   const out: string[] = [];
@@ -241,8 +358,19 @@ function markdown(b: BriefJson): string {
   out.push("");
 
   if (b.rework) {
-    out.push("## Rework", "", `You are here because of \`${b.rework.from}\`. Address every point below first.`, "");
-    const c = b.rework.check;
+    const rw = b.rework;
+    const round = rw.counter ? ` (fix round ${rw.counter.name} ${rw.counter.value}/${rw.counter.max})` : "";
+    out.push("## Rework", "", `You are here because \`${rw.from}\` sent the work back${round}. Address the points below first.`, "");
+    const d = rw.decision;
+    if (d) {
+      out.push(`### Rejected at ${d.step}${d.by ? ` by ${d.by}` : ""}`, "");
+      out.push(d.comment ? quote(d.comment) : "(no comment given; ask the person or see the evidence)", "");
+      if (d.judged) {
+        out.push(`What was judged: ${d.judged.step}#${d.judged.attempt} reported \`${d.judged.outcome}\`:`, "", quote(d.judged.handoff), "");
+        evidenceLines(out, d.judged.evidence);
+      }
+    }
+    const c = rw.check;
     if (c) {
       out.push(`### Failing check (${c.step})`, "");
       out.push(`- Command: \`${c.command}\``);
@@ -250,19 +378,18 @@ function markdown(b: BriefJson): string {
       if (c.log) out.push(`- Full log: \`${c.log}\``);
       out.push("", "```text", c.output_tail, "```", "");
     }
-    const f = b.rework.findings;
+    const r = rw.report;
+    if (r) {
+      out.push(`### ${r.step}#${r.attempt} reported \`${r.outcome}\``, "", quote(r.handoff), "");
+    }
+    const f = rw.findings;
     if (f) {
       out.push(`### Findings (${f.step}: ${f.outcome})`, "");
-      f.items.forEach((x, i) => {
-        const where = x.file ? ` — \`${x.file}${x.line ? `:${x.line}` : ""}\`` : "";
-        const crit = x.criterion ? ` [${x.criterion}]` : "";
-        out.push(`${i + 1}. **${x.severity}**${crit} ${x.title}${where}`);
-        if (x.detail) out.push(`   ${x.detail}`);
-        if (x.repro) out.push(`   Repro: ${x.repro}`);
-      });
-      out.push("");
+      if (f.items.some((x) => x.severity === "minor" || x.severity === "nit")) out.push("Fix every blocking and major finding; minor and nit ones are for you to weigh.", "");
+      findingLines(out, f.items);
     }
-    if (b.rework.detail) out.push(b.rework.detail, "");
+    if (r) evidenceLines(out, r.evidence);
+    if (rw.detail) out.push(`### ${rw.from}`, "", rw.detail, "");
   }
 
   out.push("## Context", "");
@@ -272,6 +399,11 @@ function markdown(b: BriefJson): string {
     out.push("");
   }
   out.push(b.context.handoff ? b.context.handoff : "No handoff yet — you are the first run of this unit.", "");
+  const n = b.context.notes;
+  if (n) {
+    out.push(`### Notes from ${n.step} (non-blocking)`, "", `${n.step} reported \`${n.outcome}\` with these notes, for information:`, "");
+    findingLines(out, n.items);
+  }
 
   out.push("## Finish with exactly one of", "");
   for (const f of b.finish) out.push(`- \`${f.command}\` — ${f.means}`);

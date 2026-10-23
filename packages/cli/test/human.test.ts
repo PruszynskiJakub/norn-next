@@ -241,6 +241,20 @@ describe("approve (gate)", () => {
     refused(await h.norn("approve", "gh-5"), "already_recorded");
     await tick();
     expect(h.state(runs5())).toMatchObject({ step: "work", attempt: 3, counters: { loop: 1 } });
+    // O6: the rejection is a milestone in handoff.md, so the next brief's Context carries it
+    expect(h.read(join(runs5(), "handoff.md"))).toContain("- review#1 reject by tester@box: needs tests");
+    expect(r.value).not.toHaveProperty("warning");
+
+    // B3: a rejection without a reason leaves the agent nothing to fix; it lands, with a warning
+    h.report(runs5(), "done", { outcome: "done", handoff: "with tests" });
+    await tick();
+    const bare = await h.norn("approve", "gh-5", "--reject");
+    expect(bare.exit).toBe(0);
+    expect(bare.value).toMatchObject({ warning: expect.stringContaining("--reason"), receipt: { kind: "reject", step: "review", attempt: 2 } });
+    expect((bare.value as Verb).receipt).not.toHaveProperty("comment");
+    expect(h.read(join(runs5(), "handoff.md"))).toContain("- review#2 reject by tester@box: (no comment given)");
+    await tick();
+    expect(h.state(runs5())).toMatchObject({ step: "work", attempt: 4, counters: { loop: 2 } });
 
     // T8: drop gh-6's claim everywhere; approve takes it for this heartbeat
     const hb = JSON.parse(h.read(join(h.root, ".agents/norn/trace/heartbeat.json"))).heartbeat_id;
@@ -274,7 +288,7 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
 
     h.report(runs5(), "done", { outcome: "done", handoff: "with tests" });
     await tick();
-    expect(h.state(runs5())).toMatchObject({ step: "review", attempt: 2, status: "parked" });
+    expect(h.state(runs5())).toMatchObject({ step: "review", attempt: 3, status: "parked" });
     const deps = { ...h.deps, cwd: bRoot, env: { ...h.deps.env, NORN_HOME_DIR: bHome, USER: "colleague", NORN_MACHINE: "laptop" } };
     b = (...argv) => runCli(argv, deps);
 
@@ -283,7 +297,7 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
     const v = r.value as Verb;
     expect(v.delivered).toMatchObject({ via: "mailbox", holder: "tester@box" });
     expect(v.delivered.ref).toMatch(/^refs\/norn\/inbox\/gh-5\/[0-9A-Z]{26}$/);
-    expect(v.receipt).toMatchObject({ kind: "approve", step: "review", attempt: 2, slice: null, who: "colleague@laptop", comment: "lgtm" });
+    expect(v.receipt).toMatchObject({ kind: "approve", step: "review", attempt: 3, slice: null, who: "colleague@laptop", comment: "lgtm" });
     expect(h.git(["ls-remote", "origin", "refs/norn/inbox/*"])).toContain("refs/norn/inbox/gh-5/");
     // the same decision twice is refused before it reaches the mailbox
     refused(await b("approve", "gh-5"), "already_recorded");

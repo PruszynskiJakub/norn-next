@@ -1,0 +1,16 @@
+{
+  "kind": "check",
+  "receipt_id": "01M5MWTSP736P5RAY2NW4RV2Z6",
+  "run_id": "01M5MWTQMVEYEC7C74JZ99T2P9",
+  "step": "test",
+  "attempt": 1,
+  "at": "2026-10-23T17:27:11.303Z",
+  "by": "norn",
+  "who": "jakubpruszynski@MacBook-Pro-Jakub-2",
+  "tick_id": "01M5MWTQMVPNYYDK8PC588Q7YM",
+  "outcome": "pass",
+  "command": "bun install --frozen-lockfile && bun test && bun run typecheck",
+  "exit_code": 0,
+  "duration_ms": 1289,
+  "output_tail": "bun install v1.3.13 (bf2e2cec)\n\nChecked 6 installs across 7 packages (no changes) [2.00ms]\nbun test v1.3.13 (bf2e2cec)\n\n 248 pass\n 0 fail\n 948 expect() calls\nRan 248 tests across 5 files. [561.00ms]\n$ tsc --noEmit"
+}

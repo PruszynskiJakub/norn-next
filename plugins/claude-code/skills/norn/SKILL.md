@@ -41,7 +41,7 @@ Update it at each milestone and always right before you report.
 Pick exactly one:
 
 - `norn done <outcome> --handoff "<short summary>" [--findings <file>] [--evidence <dir>]`
-  The outcome must be one listed under "Finish with". Pick the one whose meaning is true, not the one you hoped for. Pass the findings file or evidence directory your skill produced.
+  The outcome must be one listed under "Finish with". Pick the one whose meaning is true, not the one you hoped for. Pass every findings file and evidence directory your skill produced; an outcome that sends the work back needs `--findings` (what failed, with repro), or the next run has only your summary.
 - `norn ask "<question>" [--option "<a>" --option "<b>"]`
   You need a person's decision to continue. One self-contained question.
 - `norn stuck "<reason>"`

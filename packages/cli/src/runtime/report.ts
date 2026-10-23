@@ -49,6 +49,12 @@ export function writeReport(t: ReportTarget, receipt: Receipt) {
   return { n: r.n, file: relative(t.s.worktree, r.file) };
 }
 
+/** Progress line of a gate rejection (O6), e.g. `human-qa#1 reject: AC7 shows raw HTML`. */
+export function rejectProgress(r: Receipt): string {
+  const comment = r.kind === "reject" ? r.comment?.trim() : undefined;
+  return `${r.step}#${r.attempt} reject${r.who ? ` by ${r.who}` : ""}: ${comment || "(no comment given)"}`;
+}
+
 /** The agent's milestone (O6): one line appended to the Progress section of handoff.md. */
 export function appendProgress(runsDir: string, line: string): void {
   const cur = readHandoff(runsDir);

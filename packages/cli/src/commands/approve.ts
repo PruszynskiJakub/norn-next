@@ -8,6 +8,7 @@ import type { UnitState } from "@norn/schema";
 import { defineCommand, opt } from "../command.ts";
 import { refuse } from "../output.ts";
 import { at, humanReceipt, resolveTarget, runHumanVerb } from "../runtime/human.ts";
+import { appendProgress, rejectProgress } from "../runtime/report.ts";
 
 const atGate = (st: UnitState) => st.status === "parked" && st.park?.kind === "gate";
 
@@ -21,7 +22,7 @@ export const approveCommand = defineCommand({
     const kind = opt.bool(args, "reject") ? "reject" : "approve";
     const reason = opt.str(args, "reason")?.trim();
     const t = await resolveTarget(ctx, args.positionals[0] as string, atGate);
-    return runHumanVerb(ctx, t, {
+    const out = await runHumanVerb(ctx, t, {
       verb: "approve",
       mailbox: true,
       check(t, st) {
@@ -35,5 +36,11 @@ export const approveCommand = defineCommand({
       },
       build: (t, st) => humanReceipt(ctx, t, st, kind, reason ? { comment: reason } : {}),
     });
+    if (kind !== "reject") return out;
+    // the rejection is a milestone of the unit, like `done` (O6): the next brief's Context carries it;
+    // through the mailbox the holder's tick appends it when it imports the receipt (T9)
+    if (out.delivered.via === "local" && t.runsDir) appendProgress(t.runsDir, rejectProgress(out.receipt));
+    // B3: the agent sent back gets only what the comment says; without one it must ask
+    return reason ? out : { ...out, warning: "rejected without --reason: the agent sent back has nothing to fix but the evidence; pass --reason \"what failed\" next time" };
   },
 });

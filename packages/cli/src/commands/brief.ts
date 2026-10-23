@@ -4,6 +4,7 @@
  * a `started` receipt (run_id, session, PID) that the next tick applies. The exact briefing of
  * every run is stored in the trace (B4) and linked from it by a `briefing` event (O4).
  */
+import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { type NumberedReceipt, type ProcessPort, renderBrief } from "@norn/core";
 import { type AgentStep, type ProcessIdentity, type ReceiptOf, storyBranch, ulid } from "@norn/schema";
@@ -103,6 +104,20 @@ function checkLog(s: UnitSession): { log: string; text: string } | null {
   return log && text !== null ? { log, text } : null;
 }
 
+/** Files in each evidence folder of the unit's receipts, so Rework can list them (B3); renderBrief stays pure. */
+function evidenceFiles(s: UnitSession): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const { receipt: r } of s.receipts) {
+    if (r.kind !== "done" || !r.evidence || out[r.evidence]) continue;
+    try {
+      out[r.evidence] = readdirSync(join(s.runsDir, r.evidence)).sort();
+    } catch {
+      out[r.evidence] = [];
+    }
+  }
+  return out;
+}
+
 export const briefCommand = defineCommand({
   name: "brief",
   summary: "Brief the agent on the current step of this worktree's unit; starts the run in manual mode (B3, MO3)",
@@ -161,6 +176,7 @@ export const briefCommand = defineCommand({
         port_base: num(env.PORT_BASE),
       },
       check_log: checkLog(s),
+      evidence_files: evidenceFiles(s),
     });
     // B4: the exact briefing of every run, in the trace
     const id = ulid(ctx.clock.now());

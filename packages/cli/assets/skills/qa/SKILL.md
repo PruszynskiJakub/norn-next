@@ -33,6 +33,28 @@ Write evidence to a directory outside the repository (e.g. under `$TMPDIR`) unle
 | AC3 (B4) | person | AC3.md | needs a real card; instructions prepared |
 ```
 
+## Findings
+
+When any criterion is `fail`, also write the failures as JSON to a file next to the evidence (e.g. `findings.json`), one finding per failing criterion:
+
+```json
+{
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "blocking",
+      "criterion": "B12",
+      "title": "Deleting an already-deleted item deletes a newer one",
+      "repro": "Create item A, delete it, create item B, DELETE A's id again. Expected 404; actual 204 and B is gone.",
+      "detail": "Ids are reused after delete. Evidence: B12-repro.md."
+    }
+  ]
+}
+```
+
+- `severity` is `blocking` for a failed criterion; `criterion`, `title` and `repro` are required for a fail, `file` and `line` when you know them.
+- When you report, pass both the findings file and the evidence directory to the report command your instructions name. Whoever fixes it reads the findings first; the summary alone is not enough.
+
 ## Rules
 
 - **Never pass what you did not observe.** A test passing, or code that looks right, is not a check.
@@ -42,4 +64,4 @@ Write evidence to a directory outside the repository (e.g. under `$TMPDIR`) unle
 
 ## Finished when
 
-Every criterion has a verdict and evidence; every `fail` has a repro; every `person` item lists exactly what to check and where the prepared evidence is; `report.md` sums it up.
+Every criterion has a verdict and evidence; every `fail` has a repro and a finding in the findings file; every `person` item lists exactly what to check and where the prepared evidence is; `report.md` sums it up.
