@@ -142,7 +142,7 @@ describe("two clones hand a story over through git (§19.3, T5, T6)", () => {
     h.git(["push", "-q", "origin", "main"]);
     h.remote.issues = [issue(7, "Add login form", ["norn", "norn:wf:mini"])];
 
-    expect(kinds(await A.tick())).toEqual(["* intake_story"]);
+    expect(kinds(await A.tick())).toEqual(["gh-7 intake_story"]);
     step();
     expect(kinds(await A.tick())).toEqual(["gh-7 claim"]);
     step();

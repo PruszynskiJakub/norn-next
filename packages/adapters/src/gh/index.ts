@@ -21,7 +21,7 @@ export interface GhOptions {
 export const issueKey = (number: number): string => storyKey("gh", number);
 
 export const ISSUE_FIELDS = "number,url,title,body,state,assignees,labels,updatedAt";
-export const PR_FIELDS = "number,url,state,isDraft,headRefName,baseRefName,mergedAt";
+export const PR_FIELDS = "number,url,state,isDraft,headRefName,headRefOid,baseRefName,mergedAt,mergeCommit,mergedBy";
 
 interface GhIssue {
   number: number;
@@ -40,8 +40,11 @@ interface GhPr {
   state: string;
   isDraft?: boolean;
   headRefName: string;
+  headRefOid?: string;
   baseRefName: string;
   mergedAt?: string | null;
+  mergeCommit?: { oid?: string } | null;
+  mergedBy?: { login?: string } | null;
 }
 
 export function mapIssue(i: GhIssue): RemoteIssue {
@@ -64,10 +67,14 @@ export function mapPr(p: GhPr): RemotePullRequest {
     number: p.number,
     url: p.url,
     state: s === "MERGED" ? "merged" : s === "OPEN" ? "open" : "closed",
+    is_draft: p.isDraft ?? false,
+    head_sha: p.headRefOid ?? "",
+    ...(p.mergeCommit?.oid ? { merge_commit_sha: p.mergeCommit.oid } : {}),
+    ...(p.mergedBy?.login ? { merged_by: p.mergedBy.login } : {}),
+    merged_at: p.mergedAt ?? null,
     draft: p.isDraft ?? false,
     head: p.headRefName,
     base: p.baseRefName,
-    merged_at: p.mergedAt ?? null,
   };
 }
 

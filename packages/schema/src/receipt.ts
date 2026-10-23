@@ -82,7 +82,11 @@ export const AnswerReceipt = receipt("answer", {
   /** receipt_id of the ask being answered */
   ask_receipt_id: Type.Optional(Ulid),
 });
-export const ApproveReceipt = receipt("approve", { comment: Type.Optional(Type.String()) });
+export const ApproveReceipt = receipt("approve", {
+  comment: Type.Optional(Type.String()),
+  /** Story branch head at the moment of `approve` (story unit gates); observe's `ready_head_sha`. */
+  head_sha: Type.Optional(Type.String({ pattern: "^[0-9a-f]{40,64}$" })),
+});
 export const RejectReceipt = receipt("reject", { comment: Type.Optional(Type.String()) });
 export const UnstickReceipt = receipt("unstick", {
   to: Type.Optional(StepName),

@@ -69,7 +69,7 @@
    "--output",
    "json"
   ],
-  "stdout": "[{\"id\": 500, \"iid\": 5, \"project_id\": 7, \"title\": \"Add login page\", \"state\": \"closed\", \"draft\": false, \"work_in_progress\": false, \"source_branch\": \"gl-3-add-login-page\", \"target_branch\": \"main\", \"merged_at\": null, \"web_url\": \"https://gitlab.com/acme/app/-/merge_requests/5\"}, {\"id\": 500, \"iid\": 8, \"project_id\": 7, \"title\": \"Add login page\", \"state\": \"merged\", \"draft\": false, \"work_in_progress\": false, \"source_branch\": \"gl-3-add-login-page\", \"target_branch\": \"main\", \"merged_at\": \"2026-10-22T08:00:00.000Z\", \"web_url\": \"https://gitlab.com/acme/app/-/merge_requests/8\"}]"
+  "stdout": "[{\"id\": 500, \"iid\": 5, \"project_id\": 7, \"title\": \"Add login page\", \"state\": \"closed\", \"draft\": false, \"work_in_progress\": false, \"source_branch\": \"gl-3-add-login-page\", \"target_branch\": \"main\", \"merged_at\": null, \"web_url\": \"https://gitlab.com/acme/app/-/merge_requests/5\", \"sha\": \"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\"}, {\"id\": 500, \"iid\": 8, \"project_id\": 7, \"title\": \"Add login page\", \"state\": \"merged\", \"draft\": false, \"work_in_progress\": false, \"source_branch\": \"gl-3-add-login-page\", \"target_branch\": \"main\", \"merged_at\": \"2026-10-22T08:00:00.000Z\", \"web_url\": \"https://gitlab.com/acme/app/-/merge_requests/8\", \"sha\": \"dddddddddddddddddddddddddddddddddddddddd\", \"merge_commit_sha\": \"ffffffffffffffffffffffffffffffffffffffff\", \"merged_by\": {\"username\": \"jp\"}}]"
  },
  {
   "argv": [
@@ -113,6 +113,6 @@
    "--output",
    "json"
   ],
-  "stdout": "{\"id\": 501, \"iid\": 9, \"project_id\": 7, \"title\": \"Fix crash on save\", \"state\": \"opened\", \"draft\": true, \"work_in_progress\": true, \"source_branch\": \"gl-4-fix-crash-on-save\", \"target_branch\": \"main\", \"merged_at\": null, \"web_url\": \"https://gitlab.com/acme/app/-/merge_requests/9\"}"
+  "stdout": "{\"id\": 501, \"iid\": 9, \"project_id\": 7, \"title\": \"Fix crash on save\", \"state\": \"opened\", \"draft\": true, \"work_in_progress\": true, \"source_branch\": \"gl-4-fix-crash-on-save\", \"target_branch\": \"main\", \"merged_at\": null, \"web_url\": \"https://gitlab.com/acme/app/-/merge_requests/9\", \"sha\": \"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\"}"
  }
 ]

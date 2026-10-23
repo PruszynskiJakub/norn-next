@@ -85,7 +85,9 @@ class Ctx {
     return this.taken.has(unit);
   }
   emit(action: Action): void {
-    const unit = action.unit?.key ?? "*";
+    // O5 (F5): an intake is about one story — key it by that story so `norn why <story>` finds it;
+    // other repo-level actions (lease reclaim) stay `*`
+    const unit = action.unit?.key ?? (action.kind === "intake_story" ? action.key : "*");
     if (action.unit) {
       if (this.taken.has(unit)) throw new Error(`decide: second action for ${unit} (${action.rule})`);
       this.taken.add(unit);
@@ -242,7 +244,8 @@ function claimBlob(ctx: Ctx, story: string, prev: ClaimBlob | null): ClaimBlob {
 /** GR6 merged → cleanup; GR7 closed/unassigned/unlabelled → park "remote: …"; GR8 mirror + body change. */
 function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, storyUnit: UnitFacts | null): void {
   const ref = storyRef(story);
-  if (story.pr?.state === "merged") {
+  // P2 (F34): merged when the PR says so, or when its head is already on the fetched base
+  if (story.pr?.state === "merged" || story.merged_by_ancestry) {
     if (fm.status === "done") return;
     const slices = story.slices.filter((s) => s.frontmatter);
     const sliceWts = story.units.filter((u) => u.unit.slice !== null && u.worktree?.exists).map((u) => (u.worktree as { path: string }).path);

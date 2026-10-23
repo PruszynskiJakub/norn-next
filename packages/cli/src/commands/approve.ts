@@ -5,12 +5,31 @@
  */
 import { nextCommand, stepOf } from "@norn/core";
 import type { UnitState } from "@norn/schema";
+import { git as rawGit } from "@norn/store";
+import type { Context } from "../context.ts";
 import { defineCommand, opt } from "../command.ts";
 import { refuse } from "../output.ts";
-import { at, humanReceipt, resolveTarget, runHumanVerb } from "../runtime/human.ts";
+import { at, humanReceipt, resolveTarget, runHumanVerb, type Target } from "../runtime/human.ts";
 import { appendProgress, rejectProgress } from "../runtime/report.ts";
 
 const atGate = (st: UnitState) => st.status === "parked" && st.park?.kind === "gate";
+
+/**
+ * F35: the story branch head at `approve` — the story worktree's HEAD, else the local branch,
+ * else its remote-tracking ref. Recorded as the approve receipt's `head_sha` (observe: `ready_head_sha`).
+ */
+async function storyHead(ctx: Context, t: Target): Promise<string | null> {
+  const sf = t.story_facts;
+  const fromWt = sf?.worktree?.status?.head;
+  if (fromWt && /^[0-9a-f]{40,64}$/.test(fromWt)) return fromWt;
+  const branch = sf?.branch;
+  if (!branch) return null;
+  for (const ref of [`refs/heads/${branch}`, `refs/remotes/${ctx.config.remote.git_remote}/${branch}`]) {
+    const r = await rawGit(ctx.root, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]);
+    if (r.code === 0) return r.stdout.trim();
+  }
+  return null;
+}
 
 export const approveCommand = defineCommand({
   name: "approve",
@@ -22,6 +41,7 @@ export const approveCommand = defineCommand({
     const kind = opt.bool(args, "reject") ? "reject" : "approve";
     const reason = opt.str(args, "reason")?.trim();
     const t = await resolveTarget(ctx, args.positionals[0] as string, atGate);
+    const head = kind === "approve" && t.slice === null ? await storyHead(ctx, t).catch(() => null) : null;
     const out = await runHumanVerb(ctx, t, {
       verb: "approve",
       mailbox: true,
@@ -34,7 +54,7 @@ export const approveCommand = defineCommand({
             "not_at_gate",
           );
       },
-      build: (t, st) => humanReceipt(ctx, t, st, kind, reason ? { comment: reason } : {}),
+      build: (t, st) => humanReceipt(ctx, t, st, kind, { ...(reason ? { comment: reason } : {}), ...(head ? { head_sha: head } : {}) }),
     });
     if (kind !== "reject") return out;
     // the rejection is a milestone of the unit, like `done` (O6): the next brief's Context carries it;

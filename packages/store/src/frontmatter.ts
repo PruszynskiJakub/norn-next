@@ -23,6 +23,7 @@ export const STORY_CLI_FIELDS = [
   "labels",
   "body_hash",
   "refined_body_hash",
+  "merge",
 ] as const satisfies readonly (keyof StoryFrontmatter)[];
 export const SLICE_CLI_FIELDS = ["status", "workflow"] as const satisfies readonly (keyof SliceFrontmatter)[];
 

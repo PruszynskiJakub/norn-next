@@ -41,6 +41,12 @@ interface GlMr {
   source_branch: string;
   target_branch: string;
   merged_at?: string | null;
+  /** head commit of the source branch */
+  sha?: string | null;
+  merge_commit_sha?: string | null;
+  squash_commit_sha?: string | null;
+  merged_by?: { username?: string } | null;
+  merge_user?: { username?: string } | null;
 }
 
 export function mapIssue(i: GlIssue): RemoteIssue {
@@ -58,14 +64,20 @@ export function mapIssue(i: GlIssue): RemoteIssue {
 }
 
 export function mapMr(m: GlMr): RemotePullRequest {
+  const merge = m.merge_commit_sha ?? m.squash_commit_sha ?? null;
+  const by = m.merge_user?.username ?? m.merged_by?.username ?? null;
   return {
     number: m.iid,
     url: m.web_url,
     state: m.state === "merged" ? "merged" : m.state === "opened" ? "open" : "closed", // locked → closed
+    is_draft: m.draft ?? m.work_in_progress ?? false,
+    head_sha: m.sha ?? "",
+    ...(merge ? { merge_commit_sha: merge } : {}),
+    ...(by ? { merged_by: by } : {}),
+    merged_at: m.merged_at ?? null,
     draft: m.draft ?? m.work_in_progress ?? false,
     head: m.source_branch,
     base: m.target_branch,
-    merged_at: m.merged_at ?? null,
   };
 }
 

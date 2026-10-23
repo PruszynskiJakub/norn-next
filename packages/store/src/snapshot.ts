@@ -4,12 +4,15 @@
  * unapplied receipts and handoff. Data only — Facts composition happens in the CLI.
  *
  * Specs live in story worktrees (§7); pass them as `storyRoots`. Roots are scanned in
- * order (storyRoots, then repoRoot) and the first root holding a story wins.
+ * order — storyRoots, then the fetched base branch (`<remote>/<base>`, base.ts: the durable record
+ * once a worktree is gone, F36), then repoRoot (solo repos and unpushed stories) — and the first
+ * root holding a story wins. The main checkout's local `main` is never preferred over the fetched base.
  */
 import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { FileError, NumberedReceipt, SliceFileFacts, UnitRef } from "@norn/core";
 import { STORY_UNIT_DIR, type StoryFrontmatter, type UnitState, isStoryKey, sliceKey } from "@norn/schema";
+import { baseSpecsRoot, defaultBaseRef } from "./base.ts";
 import { type LoadedConfig, loadConfig, loadWorkflows, type WorkflowListing } from "./config.ts";
 import { readSliceFile, readStoryFile } from "./frontmatter.ts";
 import { isErrno } from "./fsx.ts";
@@ -47,6 +50,8 @@ export interface StorySnapshot {
   slices: SliceFileFacts[];
   /** story unit first, then slice units ascending by dir name */
   units: UnitSnapshot[];
+  /** read from the fetched base branch copy (no worktree, not in the main checkout): `root` is read-only */
+  from_base?: boolean;
 }
 
 export interface RepoSnapshot {
@@ -177,12 +182,20 @@ export function loadSnapshot(opts: {
   home?: string;
   env?: Record<string, string | undefined>;
   includeApplied?: boolean;
+  /**
+   * Remote-tracking ref of the base branch to read records from (`refs/remotes/origin/main`);
+   * null = none (solo); undefined = detect from the configured git remote (base.ts).
+   */
+  baseRef?: string | null;
 }): RepoSnapshot {
   const config = loadConfig({ repoRoot: opts.repoRoot, home: opts.home, env: opts.env });
   const workflows = loadWorkflows(opts.repoRoot);
+  const baseRef = opts.baseRef !== undefined ? opts.baseRef : defaultBaseRef(opts.repoRoot, config.ok ? config.config.remote.git_remote : "origin");
+  const baseRoot = baseRef ? baseSpecsRoot(opts.repoRoot, baseRef) : null;
   const seen = new Map<string, StorySnapshot>();
-  for (const root of [...(opts.storyRoots ?? []), opts.repoRoot]) {
-    for (const s of loadStories(root, { includeApplied: opts.includeApplied })) if (!seen.has(s.key)) seen.set(s.key, s);
+  for (const root of [...(opts.storyRoots ?? []), ...(baseRoot ? [baseRoot] : []), opts.repoRoot]) {
+    for (const s of loadStories(root, { includeApplied: opts.includeApplied }))
+      if (!seen.has(s.key)) seen.set(s.key, root === baseRoot ? { ...s, from_base: true } : s);
   }
   const stories = [...seen.values()].sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }));
   return { root: opts.repoRoot, home: config.home, config, workflows, stories };

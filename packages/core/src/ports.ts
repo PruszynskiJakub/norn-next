@@ -155,14 +155,29 @@ export interface RemoteIssue {
   updated_at: string;
 }
 
+/**
+ * The story PR/MR as the remote reports it (GR6). `is_draft`/`head_sha`/merge fields are the
+ * StoryFacts.pr contract; `draft`, `head` (branch name), `base` are the older names, still filled
+ * by the adapters. `merged_at` is null/absent until merged.
+ */
 export interface RemotePullRequest {
   number: number;
   url: string;
   state: "open" | "closed" | "merged";
-  draft: boolean;
-  head: string;
-  base: string;
-  merged_at: string | null;
+  is_draft: boolean;
+  /** commit the PR head points at ("" when the remote did not say) */
+  head_sha: string;
+  /** commit the merge produced on the base (merge, squash or rebase head) */
+  merge_commit_sha?: string;
+  /** login of whoever merged it */
+  merged_by?: string;
+  merged_at?: string | null;
+  /** @deprecated alias of is_draft */
+  draft?: boolean;
+  /** head branch name */
+  head?: string;
+  /** base branch name */
+  base?: string;
 }
 
 /** `gh` / `glab` for one repository. */
@@ -292,7 +307,7 @@ export interface AgentAdapter {
 
 // ============================================================= Notifier
 
-export type InboxGroup = "your_turn" | "answer" | "approve" | "unblock" | "unclaimed" | "running" | "recently_done";
+export type InboxGroup = "your_turn" | "answer" | "approve" | "unblock" | "check" | "unclaimed" | "running" | "recently_done";
 
 export interface InboxItem {
   /** stable id: one notification per id ever (O3) — receipt_id or a derived key */

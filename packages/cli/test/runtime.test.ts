@@ -54,7 +54,7 @@ describe("runtime", () => {
   afterAll(() => h.cleanup());
 
   test("remote calls are throttled (H5); `norn sync` forces one", async () => {
-    expect(acted(await h.tick())).toEqual(["* intake_story"]);
+    expect(acted(await h.tick())).toEqual(["gh-9 intake_story"]);
     const calls = h.remote.calls.length;
     h.clock.advance(10_000);
     const r = await h.tick();
@@ -136,7 +136,7 @@ describe("runtime", () => {
   });
 
   test("PR merged → worktree, branches, claim ref and slot removed (GR6)", async () => {
-    h.remote.prs = [{ number: 1, url: "u", state: "merged", draft: false, head: "gh-9-fix-the-bug", base: "main", merged_at: h.clock.iso() }];
+    h.remote.prs = [{ number: 1, url: "u", state: "merged", is_draft: false, head_sha: "", draft: false, head: "gh-9-fix-the-bug", base: "main", merged_at: h.clock.iso() }];
     h.clock.advance(10_000);
     const s = await h.norn("sync");
     expect(acted(s.value as TickReport)).toEqual(["gh-9 cleanup_merged_story"]);

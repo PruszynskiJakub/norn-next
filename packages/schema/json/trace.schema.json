@@ -112,6 +112,93 @@
               }
             }
           }
+        },
+        "inbox": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "event",
+              "id",
+              "group",
+              "story",
+              "slice",
+              "step",
+              "title",
+              "at"
+            ],
+            "properties": {
+              "event": {
+                "anyOf": [
+                  {
+                    "const": "appeared",
+                    "type": "string"
+                  },
+                  {
+                    "const": "resolved",
+                    "type": "string"
+                  }
+                ]
+              },
+              "id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "group": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "story": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "slice": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "step": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "title": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "command": {
+                "type": "string"
+              },
+              "detail": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "at": {
+                "format": "date-time",
+                "description": "ISO-8601 timestamp, UTC",
+                "type": "string"
+              },
+              "resolved_by": {
+                "minLength": 1,
+                "type": "string"
+              }
+            }
+          }
         }
       }
     },
@@ -330,6 +417,75 @@
         "briefing": {
           "minLength": 1,
           "type": "string"
+        }
+      }
+    },
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "at",
+        "unit",
+        "commits"
+      ],
+      "properties": {
+        "type": {
+          "const": "foreign_commits",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "description": "ISO-8601 timestamp, UTC",
+          "type": "string"
+        },
+        "tick_id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "unit": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "commits": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "sha",
+              "subject",
+              "author",
+              "at",
+              "branch"
+            ],
+            "properties": {
+              "sha": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "subject": {
+                "type": "string"
+              },
+              "author": {
+                "type": "string"
+              },
+              "at": {
+                "type": "string"
+              },
+              "branch": {
+                "minLength": 1,
+                "type": "string"
+              }
+            }
+          }
         }
       }
     }

@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Receipt, UnitState, Workflow } from "@norn/schema";
 import { applyReceipts } from "../src/apply.ts";
-import { type BriefInput, renderBrief } from "../src/brief.ts";
+import { type BriefInput, renderBrief, storyRulings } from "../src/brief.ts";
 import type { NumberedReceipt, UnitRef } from "../src/facts.ts";
 import { at, numbered, receipt, SLICE_WF, sliceUnit, STORY_WF, stateFor, storyUnit } from "./fixtures.ts";
 
@@ -326,5 +326,43 @@ describe("golden replays (norn-sandbox-todoist)", () => {
     const b = renderBrief({ ...input(st, receipts), unit, workflow: wf });
     expect(b.json.rework).toBeNull();
     expect(b.json.context.notes?.items).toHaveLength(3);
+  });
+});
+
+describe("Rulings (F28, O2): gate reasons as story-level notes", () => {
+  const SLICE1 = sliceUnit("gh-1", "01", "list");
+  const gateAt = (unit: UnitRef) => stateFor(unit, SLICE_WF, { step: "human-qa", attempt: 1 });
+  const ruling = (unit: UnitRef, kind: "approve" | "reject", comment: string | undefined, atMs: number) => ({
+    unit: unit.key,
+    receipts: [numbered(7, { ...receipt(gateAt(unit), kind, comment === undefined ? {} : { comment }, "human"), who: "jakub@mac", slice: unit.slice, at: new Date(atMs).toISOString() })],
+  });
+
+  test("storyRulings collects gate comments of every unit, oldest first, skipping empty and duplicate ones", () => {
+    const a = ruling(SLICE1, "approve", "AC6 wins over B6: keep the raw count", Date.parse("2026-10-23T11:00:00Z"));
+    const b = ruling(SLICE, "reject", "  ", Date.parse("2026-10-23T12:00:00Z"));
+    const c = ruling(storyUnit(), "approve", undefined, Date.parse("2026-10-23T13:00:00Z"));
+    const d = ruling(SLICE, "reject", "Item not found must be shown", Date.parse("2026-10-23T10:00:00Z"));
+    const out = storyRulings([a, b, c, d, a]);
+    expect(out.map((r) => `${r.unit} ${r.step}#${r.attempt} ${r.decision}: ${r.comment}`)).toEqual([
+      "gh-1/02 human-qa#1 reject: Item not found must be shown",
+      "gh-1/01 human-qa#1 approve: AC6 wins over B6: keep the raw count",
+    ]);
+  });
+
+  test("every later brief of the story carries the rulings, the one already in Rework excepted", () => {
+    const rulings = storyRulings([ruling(SLICE1, "approve", "AC6 wins over B6: keep the raw count", Date.parse("2026-10-23T11:00:00Z"))]);
+    const b = renderBrief(input(stateFor(SLICE, SLICE_WF), [], { rulings }));
+    expect(b.json.rulings).toEqual(rulings);
+    expect(b.markdown).toContain("## Rulings");
+    expect(b.markdown).toContain("- gh-1/01 human-qa#1 approve by jakub@mac (2026-10-23T11:00:00.000Z):\n  > AC6 wins over B6: keep the raw count");
+    expect(b.markdown.indexOf("## Rulings")).toBeLessThan(b.markdown.indexOf("## Context"));
+    expect(renderBrief(input(stateFor(SLICE, SLICE_WF), [])).markdown).not.toContain("## Rulings");
+
+    // a reject that sent this unit back shows in Rework; Rulings does not repeat it
+    const { st, rs } = history(stateFor(SLICE, SLICE_WF, { step: "human-qa", status: "parked", park: { kind: "gate", reason: "g", since: at() } }), SLICE_WF, (s) => ({ ...receipt(s, "reject", { comment: "Item not found must be shown" }, "human"), who: "jakub@mac" }));
+    const own = storyRulings([{ unit: SLICE.key, receipts: rs }]);
+    const back = renderBrief(input(st, rs, { rulings: [...rulings, ...own] }));
+    expect(back.json.rework?.decision?.comment).toBe("Item not found must be shown");
+    expect(back.json.rulings.map((r) => r.unit)).toEqual(["gh-1/01"]);
   });
 });

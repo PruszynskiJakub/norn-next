@@ -43,6 +43,39 @@ export interface BriefInput {
   check_log?: { log: string; text: string } | null;
   /** files in each evidence folder, keyed by the receipt's `evidence` (e.g. `evidence/<run_id>`), when the caller listed them */
   evidence_files?: Readonly<Record<string, readonly string[]>>;
+  /** F28/O2: the story's gate rulings (`storyRulings` over the receipts of every unit of the story), when the caller read them */
+  rulings?: readonly Ruling[];
+}
+
+/**
+ * A person's ruling at a gate (O2): `norn approve|--reject --reason "…"` on any unit of the story.
+ * The gate receipt is the record; every later brief of the story and its slices repeats it (F28).
+ */
+export interface Ruling {
+  /** unit the gate belonged to (story or slice key) */
+  unit: string;
+  step: string;
+  attempt: number;
+  decision: "approve" | "reject";
+  by: string | null;
+  at: string;
+  comment: string;
+  receipt_id: string;
+}
+
+/** Gate rulings with a reason across the story's units, oldest first, one per receipt (F28). */
+export function storyRulings(units: ReadonlyArray<{ unit: string; receipts: readonly NumberedReceipt[] }>): Ruling[] {
+  const seen = new Set<string>();
+  const out: Ruling[] = [];
+  for (const u of units)
+    for (const { receipt: r } of u.receipts) {
+      if ((r.kind !== "approve" && r.kind !== "reject") || seen.has(r.receipt_id)) continue;
+      const comment = r.comment?.trim();
+      if (!comment) continue;
+      seen.add(r.receipt_id);
+      out.push({ unit: u.unit, step: r.step, attempt: r.attempt, decision: r.kind, by: r.who ?? null, at: r.at, comment, receipt_id: r.receipt_id });
+    }
+  return out.sort((a, b) => epoch(a.at) - epoch(b.at) || a.receipt_id.localeCompare(b.receipt_id));
 }
 
 /** An evidence folder, absolute, with the files it holds. */
@@ -77,6 +110,8 @@ export interface BriefJson {
     decision: { step: string; by: string | null; comment: string | null; judged: BriefReport | null } | null;
     detail: string | null;
   } | null;
+  /** F28: gate rulings of the story, oldest first (the one shown under Rework excepted) */
+  rulings: Ruling[];
   context: {
     handoff: string | null;
     answers: Array<{ question: string; answer: string }>;
@@ -117,6 +152,7 @@ export function renderBrief(input: BriefInput): Briefing {
     work: { skill: step.skill, instructions: step.instructions ?? null, description: step.description ?? null },
     inputs: inputs(input, step, rw),
     rework: rw,
+    rulings: rulingsFor(input),
     context: { handoff: input.handoff?.trim() ? demoteHeadings(input.handoff.trim(), 3) : null, answers: answers(input), notes: rw ? null : notes(input) },
     finish: finish(step),
     limits: limits(input, step),
@@ -262,6 +298,12 @@ function rework(input: BriefInput, step: AgentStep): BriefJson["rework"] {
   };
 }
 
+/** The story's rulings, minus the rejection that sent this unit back (Rework quotes it already). */
+function rulingsFor(input: BriefInput): Ruling[] {
+  const entering = enteringReceipt(input)?.receipt;
+  return (input.rulings ?? []).filter((r) => !(entering?.kind === "reject" && r.receipt_id === entering.receipt_id));
+}
+
 /** B3 Context on a forward entry: the previous step's findings, as information only. */
 function notes(input: BriefInput): BriefJson["context"]["notes"] {
   const e = enteringReceipt(input);
@@ -390,6 +432,12 @@ function markdown(b: BriefJson): string {
     }
     if (r) evidenceLines(out, r.evidence);
     if (rw.detail) out.push(`### ${rw.from}`, "", rw.detail, "");
+  }
+
+  if (b.rulings.length) {
+    out.push("## Rulings", "", "A person ruled at a gate of this story. These rulings settle the questions they answer, even where the spec text still says otherwise; follow them and do not raise them again.", "");
+    for (const r of b.rulings) out.push(`- ${r.unit} ${r.step}#${r.attempt} ${r.decision}${r.by ? ` by ${r.by}` : ""} (${r.at}):`, quote(r.comment).replace(/^/gm, "  "));
+    out.push("");
   }
 
   out.push("## Context", "");

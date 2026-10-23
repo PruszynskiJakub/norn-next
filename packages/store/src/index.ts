@@ -3,6 +3,7 @@
  * Atomic writes (temp + fsync + rename), validated reads returning `corrupt` (S1, S2).
  * Persistence only: no business decisions.
  */
+export * from "./base.ts";
 export * from "./config.ts";
 export * from "./frontmatter.ts";
 export * from "./fsx.ts";

@@ -7,14 +7,19 @@ const MAX = 140;
 
 /** Collapse whitespace and cut to one short line. */
 export function oneLine(text: string, max = MAX): string {
+  return cut(text, max);
+}
+
+function cut(text: string, max: number): string {
   const s = text.replace(/\s+/g, " ").trim();
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
 
 const at = (r: Receipt) => `${r.step}#${r.attempt}`;
 
-/** One-line summary of a receipt. */
-export function receiptSummary(r: Receipt): string {
+/** One-line summary of a receipt (cut to `max` chars; `Infinity` keeps it whole). */
+export function receiptSummary(r: Receipt, max = MAX): string {
+  const oneLine = (t: string) => cut(t, max);
   switch (r.kind) {
     case "done": {
       const f = r.findings?.length ? ` (${r.findings.length} finding${r.findings.length === 1 ? "" : "s"})` : "";
@@ -56,7 +61,8 @@ export function receiptEntry(nr: NumberedReceipt): TimelineEntry {
 }
 
 /** Unit key a trace event belongs to, per decision for ticks (exact match, not prefix). */
-export function traceEntries(ev: TraceEvent, unit: string): TimelineEntry[] {
+export function traceEntries(ev: TraceEvent, unit: string, max = MAX): TimelineEntry[] {
+  const oneLine = (t: string) => cut(t, max);
   switch (ev.type) {
     case "tick":
       return ev.decisions
@@ -81,6 +87,11 @@ export function traceEntries(ev: TraceEvent, unit: string): TimelineEntry[] {
     case "briefing":
       if (ev.unit !== unit) return [];
       return [{ at: ev.at, source: "briefing", kind: "briefing", summary: oneLine(`briefing for run ${ev.run_id} at ${ev.step}#${ev.attempt}: ${ev.briefing}`), ref: ev.briefing }];
+    case "foreign_commits":
+      if (ev.unit !== unit) return [];
+      // Q6: commits on norn's branches that norn did not make (a hand merge, a conflict fix). Placed
+      // at the commit time; the tick that noticed them may be much later.
+      return ev.commits.map((c) => ({ at: c.at || ev.at, source: "foreign" as const, kind: "foreign_commit", summary: oneLine(`foreign commit on ${c.branch} (not made by norn): ${c.sha.slice(0, 12)} ${c.subject} (${c.author})`), ref: c.sha }));
   }
 }
 
@@ -95,6 +106,7 @@ export function traceUnits(ev: TraceEvent): string[] {
     }
     case "reject":
     case "briefing":
+    case "foreign_commits":
       return [ev.unit];
   }
 }

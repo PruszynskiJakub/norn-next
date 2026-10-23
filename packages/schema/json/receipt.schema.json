@@ -599,6 +599,10 @@
         },
         "comment": {
           "type": "string"
+        },
+        "head_sha": {
+          "pattern": "^[0-9a-f]{40,64}$",
+          "type": "string"
         }
       }
     },

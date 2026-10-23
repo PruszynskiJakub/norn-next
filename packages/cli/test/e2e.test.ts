@@ -119,7 +119,7 @@ describe("a story through the slice workflow", () => {
   test("tick 1: sync → intake (GR2): story branch, worktree, story.md, slot, marker", async () => {
     const r = await h.tick();
     expect(r.sync).toEqual({ ran: true, ok: true });
-    expect(kinds(r)).toEqual(["* intake_story"]);
+    expect(kinds(r)).toEqual(["gh-7 intake_story"]);
     expect(existsSync(join(storyWt(), spec, "story.md"))).toBe(true);
     const story = h.read(join(storyWt(), spec, "story.md"));
     expect(story).toContain("workflow: mini");

@@ -93,6 +93,11 @@ export interface UnitFacts {
   last_check: NumberedReceipt | null;
   /** latest done receipt carrying findings that routed back here (B3 Rework, B6) */
   last_findings: NumberedReceipt | null;
+  /**
+   * The done/check receipt of `state.last_outcome` (the report that moved the cursor here), e.g. the
+   * qa report a gate shows with its evidence (O1, F21). Absent/null = not read or none.
+   */
+  last_outcome_receipt?: NumberedReceipt | null;
   worktree: WorktreeFacts | null;
   run: RunFacts | null;
   /** this machine's lease for the unit's run, if any */
@@ -131,6 +136,18 @@ export interface MailboxItem {
   error: FileError | null;
 }
 
+/** A commit on a story/slice branch that norn did not make (Q6, out-of-band). */
+export interface ForeignCommit {
+  sha: string;
+  subject: string;
+  /** author name */
+  author: string;
+  /** author date, ISO */
+  at: string;
+  /** branch name it was found on */
+  branch: string;
+}
+
 export interface StoryFacts {
   key: string;
   slug: string;
@@ -145,8 +162,25 @@ export interface StoryFacts {
   mailbox: MailboxItem[] | undefined;
   /** the remote issue as seen now; null = not visible (closed/unassigned/unlabelled), undefined = not fetched */
   issue: RemoteIssue | null | undefined;
-  /** the story PR; null = none, undefined = not fetched */
-  pr: RemotePullRequest | null | undefined;
+  /**
+   * The story PR; null = none, undefined = not fetched. `number`, `url`, `state`, `is_draft`,
+   * `head_sha`, `merge_commit_sha?`, `merged_by?`, `merged_at?` (plus the older `draft`/`head`/`base`).
+   */
+  pr?: RemotePullRequest | null;
+  /**
+   * P2 (pull, don't trust): the story branch head is an ancestor of the fetched `<remote>/<base>`
+   * while the PR does not say merged (e.g. a remote glitch left it open). Decide treats it as
+   * merged (GR6). Absent = not observed or not merged by ancestry.
+   */
+  merged_by_ancestry?: boolean;
+  /**
+   * Commits on the story branch or a slice branch not created by norn (no `Norn-Tick` trailer)
+   * since the last norn commit on that branch, newest first; only for units without a live run
+   * (an agent's own commits mid-run are not foreign). Absent = none / not observed.
+   */
+  foreign_commits?: ForeignCommit[];
+  /** story branch head when the person gave `approve` at the `ready` gate (the approve receipt's `head_sha`) */
+  ready_head_sha?: string;
   /** units: the story unit first, then slices ascending by nn */
   units: UnitFacts[];
   slices: SliceFileFacts[];

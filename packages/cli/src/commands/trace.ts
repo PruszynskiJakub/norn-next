@@ -1,28 +1,47 @@
 /**
- * `norn trace <unit> [--text] [--limit N]` (O4): the unit's receipts and trace events merged in
- * time order (newest N with --limit), from @norn/view (X1). JSON unless `--text`.
+ * `norn trace <unit> [--text] [--full] [--events] [--all] [--story-only] [--limit N]` (O4): the
+ * unit's step timeline from @norn/view (X1) — one row per (step, attempt) with entry, exit,
+ * duration, outcome, who and the reason; a story shows its slices interleaved plus totals
+ * (wall-clock intake → $done → merge, time per step type, human wait). No-op ticks are hidden
+ * unless `--all`; `--events` attaches the remaining events to each row. JSON unless `--text`;
+ * `--full` keeps reasons whole in text (JSON is never cut). Paths are absolute.
  */
-import { formatTimeline } from "@norn/view";
+import { formatStepTimeline, loadTraceView } from "@norn/view";
 import { defineCommand, opt } from "../command.ts";
 import { refuse, textOutput, usageError } from "../output.ts";
-import { parseUnitKey, projectView } from "../runtime/human.ts";
+import { parseUnitKey } from "../runtime/human.ts";
 
 export const traceCommand = defineCommand({
   name: "trace",
-  summary: "Timeline of a unit: receipts, ticks, hooks, rejections (O4)",
-  usage: "norn trace <unit> [--text] [--limit N]",
-  options: { text: { type: "boolean" }, limit: { type: "string" } },
+  summary: "Step timeline of a unit: durations, outcomes, who, reasons; a story with its slices (O4)",
+  usage: "norn trace <unit> [--text] [--full] [--events] [--all] [--story-only] [--limit N]",
+  options: {
+    text: { type: "boolean" },
+    full: { type: "boolean" },
+    events: { type: "boolean" },
+    all: { type: "boolean" },
+    "story-only": { type: "boolean" },
+    limit: { type: "string" },
+  },
   positionals: { min: 1, max: 1 },
   async run(ctx, args) {
     const { key } = parseUnitKey(args.positionals[0] as string);
     const rawLimit = opt.str(args, "limit");
     const limit = rawLimit === undefined ? null : Number(rawLimit);
     if (limit !== null && !(Number.isInteger(limit) && limit > 0)) throw usageError(`bad --limit '${rawLimit}'`, `norn trace ${key} --limit 20`);
-    const view = await projectView(ctx);
-    const all = view.timeline[key];
-    if (!all) throw refuse(`unknown unit ${key}`, "norn status", "unknown_unit");
-    const entries = limit === null ? all : all.slice(-limit);
-    if (opt.bool(args, "text")) return textOutput(formatTimeline(entries));
-    return { unit: key, total: all.length, entries };
+    const view = loadTraceView({
+      repoRoot: ctx.root,
+      home: ctx.home,
+      env: ctx.env,
+      now: ctx.clock.now(),
+      key,
+      events: opt.bool(args, "events"),
+      all: opt.bool(args, "all"),
+      storyOnly: opt.bool(args, "story-only"),
+    });
+    if (!view) throw refuse(`unknown unit ${key}`, "norn status", "unknown_unit");
+    const out = { ...view, total: view.steps.length, steps: limit === null ? view.steps : view.steps.slice(-limit) };
+    if (opt.bool(args, "text")) return textOutput(formatStepTimeline(out, { full: opt.bool(args, "full") }));
+    return out;
   },
 });

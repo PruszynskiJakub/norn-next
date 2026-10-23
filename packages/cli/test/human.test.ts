@@ -323,15 +323,25 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
     refused(await h.norn("why", "gh-5", "--tick", "01ARZ3NDEKTSV4RRFFQ69G5FAV"), "no_tick");
   });
 
-  test("trace: merged timeline with every human receipt; --limit; --text", async () => {
-    const r = (await h.norn("trace", "gh-5")).value as { total: number; entries: Array<{ source: string; kind: string }> };
-    const kinds = r.entries.filter((e) => e.source === "receipt").map((e) => e.kind);
+  test("trace: step rows with who and reasons; --events with every human receipt; --limit; --text", async () => {
+    type Row = { step: string; attempt: number; who: Array<{ by: string; name: string }>; events?: Array<{ source: string; kind: string }> };
+    const r = (await h.norn("trace", "gh-5")).value as { total: number; steps: Row[]; hidden_events: number };
+    expect(r.total).toBe(r.steps.length);
+    expect(r.steps.every((s) => s.events === undefined)).toBe(true);
+    expect(r.steps.flatMap((s) => s.who).some((w) => w.by === "human" && w.name === "colleague@laptop")).toBe(true);
+    const ev = (await h.norn("trace", "gh-5", "--events")).value as { steps: Row[] };
+    const events = ev.steps.flatMap((s) => s.events ?? []);
+    const kinds = events.filter((e) => e.source === "receipt").map((e) => e.kind);
     for (const k of ["ask", "answer", "stuck", "unstick", "mode", "reject", "approve"]) expect(kinds).toContain(k);
-    expect(r.entries.some((e) => e.source === "tick")).toBe(true);
-    const last = (await h.norn("trace", "gh-5", "--limit", "3")).value as { total: number; entries: unknown[] };
-    expect(last.entries).toHaveLength(3);
+    expect(events.some((e) => e.source === "tick")).toBe(true);
+    expect(events.some((e) => e.kind === "noop")).toBe(false);
+    const last = (await h.norn("trace", "gh-5", "--limit", "2")).value as { total: number; steps: Row[] };
+    expect(last.steps).toHaveLength(2);
     expect(last.total).toBe(r.total);
-    expect((await h.norn("trace", "gh-5", "--text")).stdout).toContain("receipt");
+    expect(last.steps).toEqual(r.steps.slice(-2));
+    const text = (await h.norn("trace", "gh-5", "--text")).stdout;
+    expect(text).toContain("STEP");
+    expect(text).toContain("human wait");
     expect((await h.norn("trace", "gh-5", "--limit", "0")).exit).toBe(2);
     refused(await h.norn("trace", "gh-9"), "unknown_unit");
   });

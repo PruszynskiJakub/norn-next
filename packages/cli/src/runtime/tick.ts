@@ -9,6 +9,7 @@ import { acquireTickLock, appendTrace, parseWorkflowText, readTraceFile, writeTr
 import type { Context } from "../context.ts";
 import { busyError } from "../output.ts";
 import { type ActRecord, Actor } from "./act.ts";
+import { trackInbox } from "./inbox-history.ts";
 import { type Observed, observe, type SyncMode, type SyncReport } from "./observe.ts";
 
 export interface TickOptions {
@@ -106,9 +107,14 @@ export async function runTick(ctx: Context, opts: TickOptions = {}): Promise<Tic
     const recorded = await actor.retryRecords();
     // O3: notify from what is true after act (post-act local facts), so items resolved this tick
     // stay quiet and items created this tick are not a tick late
-    await actor.notifyInbox(actor.postActFacts());
+    const post = actor.postActFacts();
+    await actor.notifyInbox(post);
+    // O1 history: items needing a person that appeared or were resolved this tick, in the tick record
+    const inbox = trackInbox(ctx.root, post, obs.facts, decisions, obs.config);
     const record = traceRecord(obs, records, startedAt, performance.now() - t0);
+    if (inbox.changes.length) record.inbox = inbox.changes;
     const file = appendTrace(ctx.root, record);
+    inbox.commit();
     const lines = records.map(({ decision, result }) => ({
       unit: decision.unit,
       rule: decision.rule,

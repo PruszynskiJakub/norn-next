@@ -110,7 +110,7 @@ describe("audit: runtime", () => {
     expect(h.state(runs())).toMatchObject({ status: "done" });
     step();
     await h.tick(); // push the final state
-    h.remote.prs = [{ number: 1, url: "u", state: "merged", draft: false, head: "gh-4-audit-me", base: "main", merged_at: h.clock.iso() }];
+    h.remote.prs = [{ number: 1, url: "u", state: "merged", is_draft: false, head_sha: "", draft: false, head: "gh-4-audit-me", base: "main", merged_at: h.clock.iso() }];
     step();
     const s = await h.norn("sync");
     expect(acted(s.value as TickReport)).toEqual(["gh-4 cleanup_merged_story"]);

@@ -71,7 +71,7 @@ import {
 } from "@norn/store";
 import type { Context } from "../context.ts";
 import { leaseLiveness } from "./leases.ts";
-import { markStoryOnBase, type RecordResult } from "./record.ts";
+import { markStoryOnBase, mergeFacts, type RecordResult } from "./record.ts";
 import { markNotified, type PendingRecord, readNotified, readPendingRecords, writePendingRecords } from "./local.ts";
 import type { Observed, StoryLoc, UnitLoc } from "./observe.ts";
 import { appendProgress, rejectProgress } from "./report.ts";
@@ -485,7 +485,11 @@ export class Actor {
     let created = false;
     if (!existsSync(spec.path)) {
       const exists = await this.git.branchExists(this.root, spec.branch);
-      await this.git.worktreeAdd(this.root, spec.path, spec.branch, exists ? undefined : { from: spec.from });
+      // F33: a new story branch starts from the fetched base (`<remote>/<base>`), not a stale local `main`
+      const tracking = this.obs.remote && spec.from === this.obs.facts.repo.default_branch ? `refs/remotes/${this.obs.remote}/${spec.from}` : null;
+      // (by sha: a remote-tracking start point would make it the new branch's upstream)
+      const from = (tracking ? await this.git.readRef(this.root, tracking).catch(() => null) : null) ?? spec.from;
+      await this.git.worktreeAdd(this.root, spec.path, spec.branch, exists ? undefined : { from });
       created = true;
     }
     await this.ensureExcluded();
@@ -882,8 +886,13 @@ export class Actor {
     }
     // the record stays on the base branch (GR6): mark story.md done there (record.ts; never forced).
     // Deferred (merge not on the base yet) or failed → owed; later ticks retry it (retryRecords).
+    // GR6 done record: how the PR landed (merge commit, merged_by, merged_at; P2 ancestry) goes into
+    // story.md `merge:` on the base with the status (record.ts), and is kept in records.json while owed
     const story = this.storyLoc(a.unit.story);
-    detail.record = await this.record({ story: a.unit.story, spec_dir: story.spec_dir, status: a.story_status, attempted_at: 0, attempts: 0, reason: "" });
+    const facts = this.obs.facts.stories.find((s) => s.key === a.unit.story);
+    const merge = facts ? await mergeFacts({ root: this.root, remote: this.obs.remote, base: this.obs.facts.repo.default_branch, story: facts }).catch(() => undefined) : undefined;
+    if (merge) detail.merge = merge;
+    detail.record = await this.record({ story: a.unit.story, spec_dir: story.spec_dir, status: a.story_status, attempted_at: 0, attempts: 0, reason: "", ...(merge ? { merge } : {}) });
     return errors.length ? { ok: false, error: errors.join("; "), detail } : { ok: true, detail };
   }
 
@@ -898,6 +907,7 @@ export class Actor {
       story: p.story,
       status: p.status,
       trailers: { "Norn-Story": p.story, "Norn-Tick": this.tick },
+      ...(p.merge ? { merge: p.merge } : {}),
     }).catch((e: Error) => ({ state: "failed" as const, reason: e.message }));
     const rest = readPendingRecords(this.root).filter((r) => r.story !== p.story);
     if (res.state === "deferred" || res.state === "failed") rest.push({ ...p, attempted_at: this.ctx.clock.now(), attempts: p.attempts + 1, reason: res.reason });

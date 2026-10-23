@@ -38,6 +38,10 @@ describe("gh adapter", () => {
       number: 40,
       url: "https://github.com/acme/app/pull/40",
       state: "merged",
+      is_draft: false,
+      head_sha: "a".repeat(40),
+      merge_commit_sha: "b".repeat(40),
+      merged_by: "jpruszynski",
       draft: false,
       head: "gh-12-add-login-page",
       base: "main",
@@ -48,7 +52,7 @@ describe("gh adapter", () => {
 
   test("openDraftPullRequest", async () => {
     const pr = await gh.openDraftPullRequest({ head: "gh-15-fix-crash-on-save", base: "main", title: "Fix crash on save", body: "Closes #15" });
-    expect(pr).toMatchObject({ number: 41, state: "open", draft: true, head: "gh-15-fix-crash-on-save", base: "main", merged_at: null });
+    expect(pr).toMatchObject({ number: 41, state: "open", is_draft: true, head_sha: "c".repeat(40), draft: true, head: "gh-15-fix-crash-on-save", base: "main", merged_at: null });
   });
 
   test("failures are typed PortErrors", async () => {

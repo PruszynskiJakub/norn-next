@@ -12,6 +12,23 @@ export const StoryStatus = Type.Union([
 ]);
 export type StoryStatus = Static<typeof StoryStatus>;
 
+/** How the story PR landed (GR6, P2), recorded at cleanup. */
+export const StoryMerge = Type.Object(
+  {
+    pr: Type.Optional(PosInt),
+    url: Type.Optional(NonEmpty),
+    /** PR head when it merged (or the story branch head, merged by ancestry) */
+    head_sha: Type.Optional(Type.String({ pattern: "^[0-9a-f]{40,64}$" })),
+    merge_commit_sha: Type.Optional(Type.String({ pattern: "^[0-9a-f]{40,64}$" })),
+    merged_by: Type.Optional(NonEmpty),
+    merged_at: Type.Optional(IsoTime),
+    /** the PR did not say merged; the branch head was found on the base (P2) */
+    by_ancestry: Type.Optional(Type.Boolean()),
+  },
+  { additionalProperties: false },
+);
+export type StoryMerge = Static<typeof StoryMerge>;
+
 /**
  * Frontmatter of `.agents/specs/<id>-<slug>/story.md` (GR2, GR8).
  * Mirrored fields (title, url, assignee, labels, body_hash) are written by the CLI;
@@ -34,6 +51,8 @@ export const StoryFrontmatter = Type.Object(
     body_hash: Type.Optional(Type.String({ pattern: "^[0-9a-f]{64}$" })),
     /** Remote body hash recorded when refine finished, if it differs from body_hash later. */
     refined_body_hash: Type.Optional(Type.String({ pattern: "^[0-9a-f]{64}$" })),
+    /** GR6 done record: how the story PR landed, written with `status: done` on the base branch. */
+    merge: Type.Optional(StoryMerge),
   },
   { $id: "https://norn.dev/schema/story.json", title: "norn story frontmatter", additionalProperties: true },
 );

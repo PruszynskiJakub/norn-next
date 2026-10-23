@@ -95,7 +95,7 @@ export interface RunView {
   last_hook_at: string | null;
 }
 
-export type TimelineSource = "receipt" | "tick" | "hook" | "reject" | "briefing";
+export type TimelineSource = "receipt" | "tick" | "hook" | "reject" | "briefing" | "foreign";
 
 export interface TimelineEntry {
   at: string;
@@ -134,3 +134,95 @@ export interface ProjectView {
 }
 
 export type { Inbox, InboxEntry };
+
+/** Workflow step type of a timeline row; `unknown` when the pinned workflow is unreadable. */
+export type StepType = "agent" | "check" | "gate" | "git" | "slices" | "unknown";
+
+/** Who acted in a step: an agent run, a norn tick, or a person (`user@machine`). */
+export interface StepWho {
+  by: "agent" | "human" | "norn";
+  /** agent name, `tick`, or the person's `user@machine` */
+  name: string;
+  run_id: string | null;
+  tick_id: string | null;
+}
+
+/** One visit of a unit to a step: `norn trace` row (O4). Paths are absolute. */
+export interface StepRow {
+  unit: string;
+  slice: string | null;
+  step: string;
+  attempt: number;
+  type: StepType;
+  attended: boolean;
+  entered_at: string | null;
+  /** null while the unit is still in this step */
+  left_at: string | null;
+  /** left − entered; up to now while open */
+  duration_ms: number | null;
+  open: boolean;
+  outcome: string | null;
+  /** step (or `$done`) the unit moved to */
+  to: string | null;
+  /** W4 counter bumped by the edge taken */
+  counter: { name: string; value: number; max: number } | null;
+  who: StepWho[];
+  /** full reason text: handoff, check result, gate comment, classify detail */
+  reason: string | null;
+  /** time a person was waited on: the whole step for gates, ask → answer otherwise */
+  wait_ms: number;
+  paths: { receipts: string[]; evidence: string[]; logs: string[]; briefings: string[] };
+  /** the unit's events in this step (`--events`; no-op ticks only with `--all`) */
+  events?: TimelineEntry[];
+}
+
+export interface StepTotals {
+  /** intake → $done (or now while unfinished) */
+  wall_clock_ms: number | null;
+  /** $done → PR merged, when the merge was seen */
+  merge_wait_ms: number | null;
+  /** summed row durations per step type (this unit's own rows) */
+  by_type: Record<string, number>;
+  by_step: Record<string, number>;
+  /** gates + unanswered/answered asks; for a story, summed over its slices too */
+  human_wait_ms: number;
+}
+
+export interface UnitTraceSummary {
+  unit: string;
+  story: string;
+  slice: string | null;
+  title: string;
+  status: UnitStatus | "not_started";
+  step: string | null;
+  /** story intake (frontmatter) or first sign of the unit */
+  intake_at: string | null;
+  done_at: string | null;
+  merged_at: string | null;
+  totals: StepTotals;
+}
+
+/**
+ * Where a trace's record paths point (F36): a story worktree, the main checkout, or — for a
+ * story with no worktree whose records the checkout does not have — the cached copy of the
+ * base branch in the trace dir (replaced when `origin/<base>` moves; `ref` is the live source).
+ */
+export interface TraceRecords {
+  source: "worktree" | "checkout" | "base_cache";
+  root: string;
+  /** checkout records identical to the base branch copy */
+  same_as_base?: boolean;
+  /** base_cache: the remote-tracking ref the copy was taken from */
+  ref?: string;
+}
+
+/** `norn trace <unit>`: rows of the unit (and, for a story, its slices interleaved). */
+export interface TraceView extends UnitTraceSummary {
+  /** set by loadTraceView */
+  records?: TraceRecords;
+  steps: StepRow[];
+  /** the story first, then each slice shown */
+  units: UnitTraceSummary[];
+  /** no-op / claim-renew tick entries left out (0 with `--all`) */
+  hidden_events: number;
+}

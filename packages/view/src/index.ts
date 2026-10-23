@@ -5,5 +5,7 @@
  */
 export * from "./format.ts";
 export * from "./load.ts";
+export * from "./steps.ts";
 export * from "./timeline.ts";
+export * from "./trace-view.ts";
 export type * from "./types.ts";

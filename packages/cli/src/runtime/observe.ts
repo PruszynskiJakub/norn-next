@@ -15,7 +15,9 @@ import { claude } from "@norn/adapters";
 import {
   type ClaimState,
   type Facts,
+  edgeOf,
   type FileError,
+  type ForeignCommit,
   type MailboxItem,
   type NumberedReceipt,
   type Ports,
@@ -25,6 +27,7 @@ import {
   type RunFacts,
   type SliceFileFacts,
   type StoryFacts,
+  stepOf,
   storyWorktreePath,
   type UnitFacts,
   type UnitRef,
@@ -61,7 +64,7 @@ import {
 } from "@norn/store";
 import type { Context } from "../context.ts";
 import { leaseLiveness } from "./leases.ts";
-import { heartbeatId, readRemoteCache, writeRemoteCache } from "./local.ts";
+import { heartbeatId, readRemoteCache, traceForeignCommits, writeRemoteCache } from "./local.ts";
 import { knownSkills, repoWorkflows } from "./workflows.ts";
 
 export type SyncMode = "auto" | "force" | "never";
@@ -215,9 +218,6 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     else sliceWts.set(m.marker.slice, w.path);
   }
 
-  const snapshot = loadSnapshot({ repoRoot: root, storyRoots: [...storyWts.values()], home: ctx.home, env: ctx.env });
-  const workflows = repoWorkflows(snapshot.workflows, knownSkills(ports.agents, root, ctx.home, ctx.env));
-
   // ---- remote sync (GR1, H5): throttled; failures leave remote facts unobserved
   const cache = readRemoteCache(root);
   const mode = opts.sync ?? "auto";
@@ -230,6 +230,15 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     cache.default_branch = remote ? await git.defaultBranch(root, remote).catch(() => null) : null;
     cache.default_branch ??= (await git.status(root).catch(() => null))?.branch ?? "main";
   }
+  const base = cache.default_branch ?? "main";
+  // P2 / F33 / F36: the fetched base branch is the record and the merge reference — never the
+  // main checkout's local `main`, which norn does not move. Fetched with every remote sync.
+  if (due && ports.remote && remote) await rawGit(root, ["fetch", "--quiet", "--no-tags", remote, `+refs/heads/${base}:refs/remotes/${remote}/${base}`]).catch(() => undefined);
+  const baseRef = await trackingRef(root, remote, base);
+
+  const snapshot = loadSnapshot({ repoRoot: root, storyRoots: [...storyWts.values()], home: ctx.home, env: ctx.env, baseRef });
+  const workflows = repoWorkflows(snapshot.workflows, knownSkills(ports.agents, root, ctx.home, ctx.env));
+
   if (due && ports.remote) {
     sync.ran = true;
     cache.attempted_at = now;
@@ -256,6 +265,14 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     }
   }
   writeRemoteCache(root, cache);
+
+  // ---- P2 (F34): a PR not saying merged whose head is already on the fetched base is merged
+  const byAncestry = new Set<string>();
+  if (baseRef)
+    for (const s of snapshot.stories) {
+      const pr = storyPrs.get(s.key);
+      if (pr && pr.state !== "merged" && (await mergedByAncestry(root, remote, storyBranch(s.key, s.slug), pr, baseRef))) byAncestry.add(s.key);
+    }
 
   // ---- machine (K1, K3, MO2)
   const liveness = leaseLiveness((p) => ports.process.isAlive(p));
@@ -285,6 +302,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   const since = running.map((st) => st.run?.started_at ?? st.updated_at).sort()[0];
   const hooks = since ? readHookFacts(root, since) : [];
 
+  const refs = await refMap(root);
   const stories: StoryFacts[] = [];
   const storyLocs: Record<string, StoryLoc> = {};
   const unitLocs: Record<string, UnitLoc> = {};
@@ -300,6 +318,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     const mailbox: MailboxItem[] | undefined = await listMailbox(root, s.key).catch(() => undefined);
 
     const units: UnitFacts[] = [];
+    const foreign: ForeignCommit[] = [];
     for (const u of unitSnaps.get(s) ?? []) {
       const sliceFile = u.unit.slice ? s.slices.find((f) => f.key === u.unit.slice) : undefined;
       const ownWt = u.unit.slice ? (sliceWts.get(u.unit.slice) ?? null) : storyWt;
@@ -307,6 +326,8 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       const unitBranch = u.unit.slice ? (sliceFile ? sliceBranch(s.key, sliceFile.nn, sliceFile.slug) : (worktree?.status?.branch ?? `${s.key}/${u.unit.dir}`)) : branch;
       const uf = await unitFacts(ports, root, s, u, worktree, hooks, leases.live.map((e) => e.lease), now);
       units.push(uf);
+      // Q6: commits norn did not make; an agent's own commits mid-run are not foreign
+      if (u.state?.status !== "running") foreign.push(...(await foreignCommits(root, remote, unitBranch, baseRef, refs)));
       unitLocs[u.unit.key] = {
         unit: u.unit,
         story: s.key,
@@ -331,6 +352,9 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       mailbox,
       issue: storyIssues.has(s.key) ? storyIssues.get(s.key) : undefined,
       pr: storyPrs.has(s.key) ? storyPrs.get(s.key) : undefined,
+      ...(byAncestry.has(s.key) ? { merged_by_ancestry: true } : {}),
+      ...(foreign.length ? { foreign_commits: foreign } : {}),
+      ...readyHead(s, unitSnaps.get(s)?.[0]),
       units,
       slices: s.slices satisfies SliceFileFacts[],
       mode: units[0]?.state?.mode ?? config.default_mode,
@@ -343,6 +367,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   for (const [slice, path] of sliceWts) if (!known.has(slice.split("/")[0] as string)) orphanWts.push(path);
 
   const orphanBranches = await findOrphanBranches(git, root, wtList, stories);
+  traceForeignCommits(root, stories, opts.tick_id, now);
 
   const facts: Facts = {
     tick_id: opts.tick_id,
@@ -361,6 +386,105 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     orphans: { worktrees: orphanWts.sort(), branches: orphanBranches },
   };
   return { facts, workflows, config, ports, root, remote, heartbeat_id: hb, stories: storyLocs, units: unitLocs, sync };
+}
+
+/** `refs/remotes/<remote>/<base>` when it exists locally (fetched), else null (solo, never fetched). */
+async function trackingRef(root: string, remote: string | null, base: string): Promise<string | null> {
+  if (!remote) return null;
+  const ref = `refs/remotes/${remote}/${base}`;
+  return (await rawGit(root, ["rev-parse", "--verify", "--quiet", ref])).code === 0 ? ref : null;
+}
+
+async function commitOf(root: string, rev: string): Promise<string | null> {
+  if (!rev) return null;
+  const r = await rawGit(root, ["rev-parse", "--verify", "--quiet", "--end-of-options", `${rev}^{commit}`]);
+  return r.code === 0 ? r.stdout.trim() : null;
+}
+
+/**
+ * P2 (F34): is the PR head (or, when its sha is unknown here, the story branch head) an ancestor of
+ * the fetched base? Then the work is merged whatever the PR state says.
+ */
+export async function mergedByAncestry(root: string, remote: string | null, branch: string, pr: RemotePullRequest, baseRef: string): Promise<boolean> {
+  const head = (await commitOf(root, pr.head_sha)) ?? (await commitOf(root, `refs/heads/${branch}`)) ?? (remote ? await commitOf(root, `refs/remotes/${remote}/${branch}`) : null);
+  if (!head) return false;
+  return (await rawGit(root, ["merge-base", "--is-ancestor", head, baseRef])).code === 0;
+}
+
+/**
+ * Q6: commits on `branch` (first-parent, not on the base) made after the newest norn commit — one
+ * carrying a `Norn-Tick` trailer. A branch with no norn commit in that range reports none.
+ */
+export async function foreignCommits(root: string, remote: string | null, branch: string, baseRef: string | null, refs?: Map<string, string>): Promise<ForeignCommit[]> {
+  const local = `refs/heads/${branch}`;
+  const tracking = remote ? `refs/remotes/${remote}/${branch}` : null;
+  const ref = refs ? (refs.get(local) ?? (tracking ? refs.get(tracking) : undefined) ?? null) : ((await commitOf(root, local)) ?? (tracking ? await commitOf(root, tracking) : null));
+  if (!ref) return [];
+  const baseSha = baseRef ? (refs?.get(baseRef) ?? baseRef) : "";
+  // the answer only depends on (head, base): remembered for the process (watch, tests)
+  const memo = `${root}\0${branch}\0${ref}\0${baseSha}`;
+  const hit = FOREIGN_MEMO.get(memo);
+  if (hit) return hit;
+  const args = ["log", "--first-parent", "-n", "100", "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e", ref];
+  if (baseSha) args.push(`^${baseSha}`);
+  const r = await rawGit(root, [...args, "--"]);
+  if (r.code !== 0) return [];
+  let found: ForeignCommit[] = [];
+  const out: ForeignCommit[] = [];
+  for (const rec of r.stdout.split("\x1e")) {
+    const line = rec.replace(/^\n/, "");
+    if (!line) continue;
+    const [sha, subject, author, at, tick] = line.split("\x1f") as [string, string, string, string, string | undefined];
+    if (tick?.trim()) {
+      found = out;
+      break;
+    }
+    out.push({ sha, subject: subject ?? "", author: author ?? "", at: at ?? "", branch });
+  }
+  if (FOREIGN_MEMO.size > 500) FOREIGN_MEMO.clear();
+  FOREIGN_MEMO.set(memo, found);
+  return found;
+}
+
+const FOREIGN_MEMO = new Map<string, ForeignCommit[]>();
+
+/** Every branch and remote-tracking ref → sha, in one git call. */
+async function refMap(root: string): Promise<Map<string, string>> {
+  const r = await rawGit(root, ["for-each-ref", "--format=%(refname) %(objectname)", "refs/heads/", "refs/remotes/"]);
+  const m = new Map<string, string>();
+  if (r.code === 0)
+    for (const l of r.stdout.split("\n")) {
+      const i = l.indexOf(" ");
+      if (i > 0) m.set(l.slice(0, i), l.slice(i + 1));
+    }
+  return m;
+}
+
+/**
+ * F35: the story branch head when the person gave `approve` at the `ready` gate — the `head_sha` of the
+ * newest `approve` receipt at that gate (the `ready` step, or any gate whose `approve` goes to `$done`).
+ */
+function readyHead(story: StorySnapshot, u: UnitSnapshot | undefined): { ready_head_sha?: string } {
+  const wf = u?.workflow?.workflow;
+  if (!u || !wf) return {};
+  const isReady = (step: string) => step === "ready" || (stepOf(wf, step)?.type === "gate" && edgeOf(wf, step, "approve")?.to === "$done");
+  let names: string[];
+  try {
+    names = readdirSync(receiptsDir(u.path));
+  } catch {
+    return {};
+  }
+  const ns = names
+    .map(parseReceiptFileName)
+    .filter((p): p is { n: number; kind: string } => !!p && p.kind === "approve")
+    .map((p) => p.n)
+    .sort((a, b) => b - a);
+  for (const n of ns) {
+    const r = readReceipt(u.path, n, story.root);
+    if (!r || !("receipt" in r) || r.receipt.kind !== "approve" || !isReady(r.receipt.step)) continue;
+    return r.receipt.head_sha ? { ready_head_sha: r.receipt.head_sha } : {};
+  }
+  return {};
 }
 
 const STORY_BRANCH = /^((?:gh|gl)-\d+)-[a-z0-9][a-z0-9-]*$/;
@@ -487,6 +611,7 @@ async function unitFacts(
     unapplied: u.unapplied,
     last_check,
     last_findings,
+    last_outcome_receipt: lo,
     worktree,
     run,
     lease,

@@ -45,6 +45,10 @@ describe("glab adapter", () => {
       number: 8,
       url: "https://gitlab.com/acme/app/-/merge_requests/8",
       state: "merged",
+      is_draft: false,
+      head_sha: "d".repeat(40),
+      merge_commit_sha: "f".repeat(40),
+      merged_by: "jp",
       draft: false,
       head: "gl-3-add-login-page",
       base: "main",
@@ -55,7 +59,7 @@ describe("glab adapter", () => {
 
   test("openDraftPullRequest passes body on stdin", async () => {
     const mr = await glab.openDraftPullRequest({ head: "gl-4-fix-crash-on-save", base: "main", title: "Fix crash on save", body: "Closes #4" });
-    expect(mr).toMatchObject({ number: 9, state: "open", draft: true, head: "gl-4-fix-crash-on-save", merged_at: null });
+    expect(mr).toMatchObject({ number: 9, state: "open", is_draft: true, head_sha: "e".repeat(40), draft: true, head: "gl-4-fix-crash-on-save", merged_at: null });
     expect(stdins).toContain("Closes #4");
   });
 

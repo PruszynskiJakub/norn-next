@@ -140,13 +140,15 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     expect(v.markdown).toContain("Use the `implement` skill.");
     expect(v.markdown).toContain(`- Run: ${runId}`);
     expect(v.markdown).toContain('`norn done done --handoff "…"` — every criterion has a passing test');
-    expect(v.markdown).toContain("Diff: `git diff main...HEAD`");
+    expect(v.markdown).toContain("Diff: `git diff origin/main...HEAD`"); // F33: the fetched base, not local main
     expect(readTraceFile(h.root, v.briefing)).toBe(v.markdown);
     // O4: the trace links the run to its briefing, and `norn trace` shows it
     const linked = readTrace(h.root, { unit: "gh-9", types: ["briefing"] }).events;
     expect(linked.at(-1)).toMatchObject({ type: "briefing", unit: "gh-9", run_id: runId, step: "implement", attempt: 1, briefing: v.briefing });
-    const timeline = (await h.norn("trace", "gh-9")).value as { entries: Array<{ source: string; ref: string; summary: string }> };
-    expect(timeline.entries.find((e) => e.source === "briefing")).toMatchObject({ ref: v.briefing, summary: expect.stringContaining(runId) });
+    const timeline = (await h.norn("trace", "gh-9", "--events")).value as { steps: Array<{ step: string; paths: { briefings: string[] }; events: Array<{ source: string; ref: string; summary: string }> }> };
+    const row = timeline.steps.find((r) => r.step === "implement");
+    expect(row?.paths.briefings).toEqual([join(h.root, ".agents/norn/trace", v.briefing)]);
+    expect(row?.events.find((e) => e.source === "briefing")).toMatchObject({ ref: join(h.root, ".agents/norn/trace", v.briefing), summary: expect.stringContaining(runId) });
 
     const added = receipts(runs()).filter((f) => !before.includes(f));
     expect(added).toHaveLength(1);

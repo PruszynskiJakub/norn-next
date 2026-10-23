@@ -4,11 +4,14 @@
  *                     claim taken by one tick is "mine" for the next (T4)
  * - `remote.json`     remote sync cache: last sync time, default branch (H5 throttle)
  * - `notified.json`   inbox item ids already notified (O3: once per item, receipt-first)
- * - `records.json`    GR6 base-branch records still owed (retried by later ticks, throttled)
+ * - `records.json`    GR6 base-branch records still owed (retried by later ticks, throttled),
+ *                     each with the merge facts to write (`merge`, StoryMerge)
+ * - `foreign.json`    commit shas already traced as `foreign_commits` (Q6: once per sha)
  */
 import { join } from "node:path";
-import { ulid } from "@norn/schema";
-import { atomicWriteJson, readText, traceDir } from "@norn/store";
+import type { StoryFacts } from "@norn/core";
+import { type StoryMerge, ulid } from "@norn/schema";
+import { appendTrace, atomicWriteJson, readText, traceDir } from "@norn/store";
 
 function readJson<T>(path: string): T | null {
   const raw = readText(path);
@@ -74,6 +77,8 @@ export interface PendingRecord {
   attempted_at: number;
   attempts: number;
   reason: string;
+  /** how the PR landed (GR6 done record), written into story.md `merge:` with the status */
+  merge?: StoryMerge;
 }
 
 export function readPendingRecords(root: string): PendingRecord[] {
@@ -82,4 +87,26 @@ export function readPendingRecords(root: string): PendingRecord[] {
 
 export function writePendingRecords(root: string, records: PendingRecord[]): void {
   atomicWriteJson(recordsPath(root), { records });
+}
+
+const foreignPath = (root: string) => join(traceDir(root), "foreign.json");
+const KEEP_FOREIGN = 5000;
+
+/**
+ * Q6: one `foreign_commits` trace event per story for the commits not traced before (once per
+ * sha). The seen set is written first, so a crash never traces the same sha twice.
+ */
+export function traceForeignCommits(root: string, stories: StoryFacts[], tick_id: string, now: number): number {
+  const seen = new Set(readJson<{ shas?: string[] }>(foreignPath(root))?.shas ?? []);
+  const fresh: Array<{ story: string; commits: NonNullable<StoryFacts["foreign_commits"]> }> = [];
+  for (const s of stories) {
+    const commits = (s.foreign_commits ?? []).filter((c) => !seen.has(c.sha));
+    for (const c of commits) seen.add(c.sha);
+    if (commits.length) fresh.push({ story: s.key, commits });
+  }
+  if (!fresh.length) return 0;
+  atomicWriteJson(foreignPath(root), { shas: [...seen].slice(-KEEP_FOREIGN) });
+  const at = new Date(now).toISOString();
+  for (const f of fresh) appendTrace(root, { type: "foreign_commits", id: ulid(now), at, tick_id, unit: f.story, commits: f.commits });
+  return fresh.length;
 }

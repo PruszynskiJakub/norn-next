@@ -92,7 +92,7 @@ export function discoverStoryRoots(repoRoot: string): string[] {
 }
 
 /** The slice's worktree (`<story worktree>--<nn>-<slug>`, GR3) when it exists and its `.norn-unit` marker names that slice. */
-function markedSliceWorktree(storyWt: string, story: StorySnapshot, slice: string): string | null {
+export function markedSliceWorktree(storyWt: string, story: StorySnapshot, slice: string): string | null {
   const file = story.slices.find((s) => s.key === slice);
   const dir = story.units.find((u) => u.unit.slice === slice)?.unit.dir;
   const nn = file?.nn ?? dir?.split("-")[0];
@@ -252,6 +252,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
         unapplied: u.unapplied,
         last_check: null,
         last_findings: null,
+        last_outcome_receipt: (u.receipts ?? []).find((r) => !!u.state?.last_outcome && r.receipt.receipt_id === u.state.last_outcome.receipt_id) ?? null,
         worktree: worktreeFacts(wt),
         run,
         lease: (lease?.entry.lease as LeaseFile | undefined) ?? null,

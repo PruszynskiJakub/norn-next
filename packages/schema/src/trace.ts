@@ -58,6 +58,32 @@ export const TickUnitRecord = Type.Object(
 );
 export type TickUnitRecord = Static<typeof TickUnitRecord>;
 
+/**
+ * O1/O4 inbox history: an inbox item (needing a person) appeared in, or left, the inbox after this
+ * tick's act. `norn inbox --history` pairs them into appeared_at / resolved_at / resolved_by.
+ */
+export const InboxChange = Type.Object(
+  {
+    event: Type.Union([Type.Literal("appeared"), Type.Literal("resolved")]),
+    /** inbox item id (stable per item, O3) */
+    id: NonEmpty,
+    group: NonEmpty,
+    story: NonEmpty,
+    slice: Type.Union([NonEmpty, Type.Null()]),
+    step: Type.Union([NonEmpty, Type.Null()]),
+    title: NonEmpty,
+    command: Type.Optional(Type.String()),
+    detail: Type.Optional(Type.String()),
+    url: Type.Optional(Type.String()),
+    /** appeared: the item's own `since`; resolved: when (the resolving receipt's time, else the tick's) */
+    at: IsoTime,
+    /** resolved: what resolved it, e.g. `approve by jakub@mac (0008-approve.json)` or a decide rule */
+    resolved_by: Type.Optional(NonEmpty),
+  },
+  { additionalProperties: false },
+);
+export type InboxChange = Static<typeof InboxChange>;
+
 export const TickTrace = Type.Object(
   {
     type: Type.Literal("tick"),
@@ -68,6 +94,8 @@ export const TickTrace = Type.Object(
     /** Facts snapshot (the `Facts` type of @norn/core); replayed by `norn why` (O5). */
     facts: Type.Record(Type.String(), Type.Unknown()),
     decisions: Type.Array(TickUnitRecord),
+    /** inbox items that appeared or were resolved by this tick (O1 history); absent = none */
+    inbox: Type.Optional(Type.Array(InboxChange)),
   },
   { additionalProperties: false },
 );
@@ -120,7 +148,27 @@ export const BriefingTrace = Type.Object(
 );
 export type BriefingTrace = Static<typeof BriefingTrace>;
 
-export const TraceEvent = TaggedUnion("type", [TickTrace, HookTrace, RejectTrace, BriefingTrace], {
+/** Commits on a story/slice branch that norn did not make (Q6); one event per newly seen sha. */
+export const ForeignCommitsTrace = Type.Object(
+  {
+    type: Type.Literal("foreign_commits"),
+    id: Ulid,
+    at: IsoTime,
+    tick_id: Type.Optional(Ulid),
+    /** story key */
+    unit: NonEmpty,
+    commits: Type.Array(
+      Type.Object(
+        { sha: NonEmpty, subject: Type.String(), author: Type.String(), at: Type.String(), branch: NonEmpty },
+        { additionalProperties: false },
+      ),
+    ),
+  },
+  { additionalProperties: false },
+);
+export type ForeignCommitsTrace = Static<typeof ForeignCommitsTrace>;
+
+export const TraceEvent = TaggedUnion("type", [TickTrace, HookTrace, RejectTrace, BriefingTrace, ForeignCommitsTrace], {
   $id: "https://norn.dev/schema/trace.json",
   title: "norn trace event (one JSONL line)",
 });

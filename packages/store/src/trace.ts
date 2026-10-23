@@ -55,14 +55,25 @@ function unitMatches(candidate: string | undefined | null, unit: string): boolea
   return candidate === unit || candidate.startsWith(`${unit}/`);
 }
 
+/**
+ * The unit a recorded tick decision belongs to. Intake decisions are keyed by the new story (F5);
+ * ticks recorded before that carry unit `*`, with the story key in the action.
+ */
+export function decisionUnit(d: { unit: string; action: unknown }): string {
+  if (d.unit !== "*") return d.unit;
+  const a = d.action as { kind?: string; key?: unknown };
+  return a.kind === "intake_story" && typeof a.key === "string" ? a.key : d.unit;
+}
+
 export function eventMatchesUnit(ev: TraceEvent, unit: string): boolean {
   switch (ev.type) {
     case "tick":
-      return ev.decisions.some((d) => unitMatches(d.unit, unit));
+      return ev.decisions.some((d) => unitMatches(decisionUnit(d), unit));
     case "hook":
       return unitMatches(ev.fact.slice ?? ev.fact.story, unit) || ev.fact.story === unit;
     case "reject":
     case "briefing":
+    case "foreign_commits":
       return unitMatches(ev.unit, unit);
   }
 }

@@ -324,7 +324,7 @@ describe("formatters", () => {
       holder: "",
       runner: null,
       stories: [],
-      inbox: { at: "", pending: 0, groups: { your_turn: [], answer: [], approve: [], unblock: [], unclaimed: [], running: [], recently_done: [] } },
+      inbox: { at: "", pending: 0, groups: { your_turn: [], answer: [], approve: [], unblock: [], check: [], unclaimed: [], running: [], recently_done: [] } },
       runs: [],
       timeline: {},
       recently_done: [],

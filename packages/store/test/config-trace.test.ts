@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { type TraceEvent, ulid } from "@norn/schema";
 import {
   appendTrace,
+  decisionUnit,
   lastTickFor,
   loadConfig,
   loadWorkflow,
@@ -94,5 +95,13 @@ describe("trace (O4)", () => {
     expect(rel).toBe("briefings/R1/T1.md");
     expect(readTraceFile(repo, rel)).toBe("# brief");
     expect(() => readTraceFile(repo, "../../x")).toThrow();
+  });
+});
+
+describe("decisionUnit (F5)", () => {
+  test("intake decisions recorded as unit '*' by an older norn belong to the story in the action", () => {
+    expect(decisionUnit({ unit: "*", action: { kind: "intake_story", key: "gh-1" } })).toBe("gh-1");
+    expect(decisionUnit({ unit: "*", action: { kind: "noop" } })).toBe("*");
+    expect(decisionUnit({ unit: "gh-2/01", action: { kind: "noop" } })).toBe("gh-2/01");
   });
 });

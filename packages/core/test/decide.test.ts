@@ -184,7 +184,7 @@ describe("check, git, gate steps (W2)", () => {
   });
   test("open-pr runs git; an already open PR classifies done", () => {
     expect(only(facts([storyAt("open-pr")]))).toMatchObject({ kind: "run_git", action: "open-pr", pr: { base: "main", title: "Login form" } });
-    const withPr = storyAt("open-pr", { pr: { number: 7, url: "u", state: "open", draft: true, head: "gh-1-login", base: "main", merged_at: null } });
+    const withPr = storyAt("open-pr", { pr: { number: 7, url: "u", state: "open", is_draft: true, head_sha: "", draft: true, head: "gh-1-login", base: "main", merged_at: null } });
     expect(only(facts([withPr]))).toMatchObject({ kind: "classify", outcome: "done", state: { step: "ready", status: "parked", park: { kind: "gate", reason: "PR ready for review?" } } });
   });
   test("integrate is serialized per story (K6)", () => {
@@ -222,7 +222,7 @@ describe("slices step (W2)", () => {
 
 describe("story lifecycle (GR6–GR8)", () => {
   test("PR merged → cleanup", () => {
-    const f = storyAt("ready", { pr: { number: 7, url: "u", state: "merged", draft: false, head: "gh-1-login", base: "main", merged_at: at() } }, [{ nn: "01", status: "integrated" }]);
+    const f = storyAt("ready", { pr: { number: 7, url: "u", state: "merged", is_draft: false, head_sha: "", draft: false, head: "gh-1-login", base: "main", merged_at: at() } }, [{ nn: "01", status: "integrated" }]);
     expect(only(facts([f]))).toMatchObject({ kind: "cleanup_merged_story", local_branches: ["gh-1/01-s01", "gh-1-login"], remote_branches: ["gh-1/01-s01"], refs: ["refs/norn/claims/gh-1"], story_status: "done" });
   });
   test("issue closed / unlabelled / PR closed → park remote under Unblock, once", () => {
@@ -282,6 +282,13 @@ describe("intake and start (GR2, W8, W9)", () => {
       worktree: { path: "/r-worktrees/gh-5-fix-lodz-bug", branch: "gh-5-fix-lodz-bug", from: "main" },
       frontmatter: { workflow: "solo", status: "new", intake_at: at(), body_hash: sha256("b") },
     });
+  });
+  test("O5/F5: an intake decision is keyed by the new story, so `norn why gh-5` covers it", () => {
+    const f = facts([]);
+    f.remote.issues = [{ provider: "gh", number: 5, url: "u5", title: "Fix", body: "b", state: "open", assignees: ["jakub"], labels: ["norn"], updated_at: at() }];
+    const d = decide(f, WORKFLOWS, CONFIG).find((x) => x.action.kind === "intake_story");
+    expect(d?.unit).toBe("gh-5");
+    expect(d?.rule).toBe("remote.intake");
   });
   test("story unit starts with its pinned workflow; invalid workflows are refused", () => {
     const f = storyFacts("gh-1", [unitFacts(storyUnit(), null, null)]);

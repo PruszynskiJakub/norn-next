@@ -6,9 +6,9 @@
  */
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { type NumberedReceipt, type ProcessPort, renderBrief } from "@norn/core";
+import { type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, storyRulings, storyWorktreePath } from "@norn/core";
 import { type AgentStep, type ProcessIdentity, type ReceiptOf, storyBranch, ulid } from "@norn/schema";
-import { appendReceipt, appendTrace, readEnvNorn, readText, writeBriefing } from "@norn/store";
+import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readText, writeBriefing } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse } from "../output.ts";
@@ -118,6 +118,37 @@ function evidenceFiles(s: UnitSession): Record<string, string[]> {
   return out;
 }
 
+/**
+ * F28/O2: the story's gate rulings, from the receipts of every unit of the story this machine can
+ * see — this worktree, the story worktree and each slice worktree beside it (a slice still running
+ * keeps its live runs/ there, §7). The gate receipt is the record; renderBrief stays pure.
+ */
+function rulings(s: UnitSession): Ruling[] {
+  const slug = s.marker.spec_dir.split("/").at(-1)?.slice(s.unit.story.length + 1) ?? "";
+  const storyWt = storyWorktreePath(s.root, s.unit.story, slug);
+  const runsOf = (wt: string) => join(wt, s.marker.spec_dir, "runs");
+  const dirs = new Set<string>();
+  for (const wt of [s.worktree, storyWt])
+    try {
+      for (const d of readdirSync(runsOf(wt), { withFileTypes: true })) if (d.isDirectory()) dirs.add(d.name);
+    } catch {
+      /* no runs/ here */
+    }
+  const units: Array<{ unit: string; receipts: NumberedReceipt[] }> = [];
+  for (const dir of [...dirs].sort()) {
+    const unit = dir === "_story" ? s.unit.story : `${s.unit.story}/${dir.split("-")[0]}`;
+    for (const wt of new Set([s.worktree, storyWt, `${storyWt}--${dir}`])) units.push({ unit, receipts: listReceipts(join(runsOf(wt), dir)).receipts });
+  }
+  return storyRulings(units);
+}
+
+/** `<remote>/<base>` when the remote-tracking base exists, else the local base branch (solo). */
+export function storyDiffBase(ctx: Context, root: string): string {
+  const branch = readRemoteCache(root).default_branch ?? "main";
+  const ref = defaultBaseRef(root, ctx.config.remote.git_remote, branch);
+  return ref ? ref.slice("refs/remotes/".length) : branch;
+}
+
 export const briefCommand = defineCommand({
   name: "brief",
   summary: "Brief the agent on the current step of this worktree's unit; starts the run in manual mode (B3, MO3)",
@@ -150,7 +181,8 @@ export const briefCommand = defineCommand({
     const num = (v: string | undefined) => (v !== undefined && /^\d+$/.test(v) ? Number(v) : null);
     const slicePath = s.unit.slice ? `${s.marker.spec_dir}/slices/${s.unit.dir}.md` : null;
     const slug = s.marker.spec_dir.split("/").at(-1)?.slice(s.unit.story.length + 1) ?? "";
-    const base = s.unit.slice ? storyBranch(s.unit.story, slug) : (readRemoteCache(s.root).default_branch ?? "main");
+    // F33: a story diffs against the fetched base (`origin/main`), never the main checkout's stale local `main`
+    const base = s.unit.slice ? storyBranch(s.unit.story, slug) : storyDiffBase(ctx, s.root);
     const state = run.applied ? s.state : { ...s.state, run: { run_id: run.run_id, step: s.state.step, attempt: s.state.attempt, started_at: ctx.clock.iso(), how: "manual" as const } };
     const briefing = renderBrief({
       unit: s.unit,
@@ -177,6 +209,7 @@ export const briefCommand = defineCommand({
       },
       check_log: checkLog(s),
       evidence_files: evidenceFiles(s),
+      rulings: rulings(s),
     });
     // B4: the exact briefing of every run, in the trace
     const id = ulid(ctx.clock.now());
