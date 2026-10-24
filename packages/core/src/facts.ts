@@ -20,7 +20,7 @@ import type {
   UnitState,
   Workflow,
 } from "@norn/schema";
-import type { PaneState, RemoteIssue, RemotePullRequest, RunnerCapabilities, SessionRef, WorktreeStatus } from "./ports.ts";
+import type { GitInProgress, PaneState, RemoteIssue, RemotePullRequest, RunnerCapabilities, SessionRef, WorktreeStatus } from "./ports.ts";
 
 /** A file that failed to read or validate (S2). */
 export interface FileError {
@@ -52,6 +52,11 @@ export interface WorktreeFacts {
   last_file_change_at: number | null;
   /** slot from `.env.norn` (K4) */
   slot: number | null;
+  /**
+   * H1/BS5.1: the git operation in progress in the worktree (an agent's merge, a rebase, …) and its
+   * unmerged paths; absent = not observed. While one is, norn commits nothing there (H1).
+   */
+  in_progress?: GitInProgress;
 }
 
 export interface NumberedReceipt {
@@ -270,6 +275,8 @@ export interface StoryFacts {
   foreign_commits?: ForeignCommit[];
   /** story branch head when the person gave `approve` at the `ready` gate (the approve receipt's `head_sha`) */
   ready_head_sha?: string;
+  /** BS10.2: when that approval was given (the approve receipt's `at`); PRs seen before it are not compared */
+  ready_approved_at?: string;
   /**
    * C5: the known PR head, when every commit after `ready_head_sha` up to it is norn's own for this
    * story (`Norn-Tick` + `Norn-Story` trailers — the `ready.approve → $done` commit and later state

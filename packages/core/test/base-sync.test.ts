@@ -249,6 +249,29 @@ describe("base sync replay", () => {
     expect(buildInbox(s.facts(), CONFIG).groups.check).toEqual([]);
   });
 
+  test("BS10.1 (dogfood D1): no stale:* item for an ask in any step, nor while in update/resolve", () => {
+    const s = new Sim(NO_ROUTE_WF);
+    s.runUntil(at_("ready", "parked"));
+    s.base = base({ behind: 4, conflicts: ["a.ts"] });
+    const items = () => buildInbox(s.facts(), CONFIG).groups.check.filter((i) => i.id.startsWith("stale:")).map((i) => i.command);
+    expect(items()).toEqual(["norn update gh-1"]);
+    const gate = s.state;
+    const since = at(s.now);
+    // a permission prompt parks the unit (implicit ask) — in resolve, in test, anywhere: no item
+    for (const step of ["resolve", "test", "update"]) {
+      s.state = { ...gate, step, status: "parked", park: { kind: "ask", reason: "Allow git add?", since } };
+      expect(items()).toEqual([]);
+    }
+    // stuck in update or resolve: the base is what they are about — no item
+    for (const step of ["update", "resolve"]) {
+      s.state = { ...gate, step, status: "stuck", park: { kind: "exhausted", reason: "base_conflict_loop 2/2 at update.conflict", since } };
+      expect(items()).toEqual([]);
+    }
+    // stuck elsewhere: norn update is a way on
+    s.state = { ...gate, step: "test", status: "stuck", park: { kind: "stuck", reason: "tests fail", since } };
+    expect(items()).toEqual(["norn update gh-1"]);
+  });
+
   test("6 (core): an update receipt re-enters update from $done, a gate or stuck; refused while running", () => {
     const s = new Sim(BASE_WF);
     s.runUntil(at_("ready", "parked"));

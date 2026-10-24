@@ -288,20 +288,36 @@ function mergeItem(story: StoryFacts, st: UnitState, base: string): InboxItem | 
   };
 }
 
+/** BS10.1: steps that already bring the base in — `git: update` steps and the steps their `conflict` routes to (resolve). */
+function baseSyncSteps(wf: Workflow): Set<string> {
+  const out = new Set<string>();
+  for (const [name, step] of Object.entries(wf.steps)) {
+    if (step.type !== "git" || step.action !== "update") continue;
+    out.add(name);
+    const to = edgeOf(wf, name, "conflict")?.to;
+    if (to) out.add(to);
+  }
+  return out;
+}
+
 /**
- * BS10: the story waits for a person (parked or stuck) and the base moved under it (BS7), with no
- * gate `stale` route to send it back by itself (BS6) — a Check item with `norn update`.
+ * BS10: the story waits for a person and the base moved under it (BS7), with no gate `stale` route
+ * to send it back by itself (BS6) — a Check item with `norn update`. BS10.1 (dogfood D1): only where
+ * an update is the next thing to do — parked at a gate, or stuck outside the steps that sync the
+ * base; never for an ask (a permission prompt in any step) nor in update/resolve.
  */
 export function staleItem(story: StoryFacts, base: string): InboxItem | null {
   const b = story.base;
   const uf = story.units.find((u) => u.unit.slice === null);
   const st = uf?.state;
   const wf = uf?.workflow ?? null;
-  if (!b || !st || !wf || (st.status !== "parked" && st.status !== "stuck")) return null;
-  if (!isStale(wf, b)) return null;
-  // BS6: a gate with a `stale` route is classified by the tick, not shown
+  if (!b || !st || !wf || !isStale(wf, b)) return null;
   const step = stepOf(wf, st.step);
-  if (st.status === "parked" && st.park?.kind === "gate" && step?.type === "gate" && step.outcomes.stale !== undefined) return null;
+  const atGate = st.status === "parked" && st.park?.kind === "gate" && step?.type === "gate";
+  const stuck = st.status === "stuck" && !baseSyncSteps(wf).has(st.step);
+  if (!atGate && !stuck) return null;
+  // BS6: a gate with a `stale` route is classified by the tick, not shown
+  if (atGate && step?.type === "gate" && step.outcomes.stale !== undefined) return null;
   const title = b.conflicts.length ? `${story.key} conflicts with ${base} in ${b.conflicts.join(", ")} (${b.behind} behind)` : `${story.key} is ${b.behind} behind ${base}`;
   return {
     id: `stale:${story.key}:${b.sha}`,
@@ -443,11 +459,16 @@ export const RE_ENTRY_KINDS = ["update", "workflow"] as const;
  * unit's, at least of the kinds `approve` and RE_ENTRY_KINDS; order does not matter.
  */
 export function readyHeadSha(wf: Workflow, receipts: readonly NumberedReceipt[]): string | undefined {
+  return readyApproval(wf, receipts)?.sha;
+}
+
+/** F35 + BS10.2: the head the ready approval let through and when it was given (`readyHeadSha`). */
+export function readyApproval(wf: Workflow, receipts: readonly NumberedReceipt[]): { sha: string; at: string } | undefined {
   const isReady = (step: string) => step === "ready" || (stepOf(wf, step)?.type === "gate" && edgeOf(wf, step, "approve")?.to === "$done");
   const sorted = [...receipts].sort((a, b) => b.n - a.n);
   for (const { receipt: r } of sorted) {
     if ((RE_ENTRY_KINDS as readonly string[]).includes(r.kind)) return undefined;
-    if (r.kind === "approve" && isReady(r.step)) return r.head_sha || undefined;
+    if (r.kind === "approve" && isReady(r.step)) return r.head_sha ? { sha: r.head_sha, at: r.at } : undefined;
   }
   return undefined;
 }
@@ -458,6 +479,8 @@ export function headChangedItem(story: StoryFacts): InboxItem | null {
   const ready = story.ready_head_sha;
   // C5: norn's own commits after the approval (its `$done` state commit) leave the head the person let through as it was
   if (!pr || pr.state !== "open" || !ready || !pr.head_sha || pr.head_sha === ready || pr.head_sha === story.ready_head_norn) return null;
+  // BS10.2 (dogfood D6): a PR remembered from before the approval says nothing about what came after it
+  if (story.pr === undefined && story.pr_seen && story.ready_approved_at && story.pr_seen.observed_at < epoch(story.ready_approved_at)) return null;
   const st = story.units.find((u) => u.unit.slice === null)?.state;
   return {
     id: `head:${story.key}:${pr.head_sha}`,

@@ -5,7 +5,7 @@
  */
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import type { CommitSpec, ConflictMarker, GitFactory, GitInProgress, GitPort, MergeResult, PushResult, RefUpdate, WorktreeInfo, WorktreeStatus } from "@norn/core";
+import type { CommitSpec, ConflictMarker, GitFactory, GitInProgress, GitPort, MergeResult, OutgoingMarkers, PushResult, RefUpdate, WorktreeInfo, WorktreeStatus } from "@norn/core";
 import { bunExec, isAuthError, isNetworkError, okOrThrow, portError, type Exec, type ExecResult } from "./exec.ts";
 
 export { bunExec, fixtureExec, portError, type Exec, type ExecFixture, type ExecOptions, type ExecResult } from "./exec.ts";
@@ -325,6 +325,36 @@ export function createGit(opts: GitOptions = {}): GitPort {
       }
       return out;
     },
+    async outgoingConflictMarkers(cwd, remote, rev): Promise<OutgoingMarkers[]> {
+      // BS5.2: the files the unpublished commits change — first parent only, so a merge commit counts
+      // with everything it brought in (and what its author left unresolved)
+      const notPushed = [rev, "--not", `--remotes=${remote}`];
+      const ch = await run(cwd, ["-c", "core.quotePath=false", "log", "--format=", "--name-only", "-m", "--first-parent", ...notPushed, "--"]);
+      if (ch.code !== 0) return [];
+      const paths = [...new Set(lines(ch.stdout))];
+      if (!paths.length) return [];
+      // an opening and a closing marker with their label (`<<<<<<< HEAD`, `>>>>>>> main`); a lone
+      // `=======` is a setext heading, so it never counts
+      const g = await run(cwd, ["grep", "-n", "-I", "-z", "--no-color", "-E", "^(<{7}|>{7}) ", rev, "--", ...paths]);
+      if (g.code === 1) return [];
+      okOrThrow(g, "git grep", "git");
+      const seen = new Map<string, { open: boolean; close: boolean }>();
+      for (const l of lines(g.stdout)) {
+        const [where, , text] = l.split("\0");
+        if (!where || text === undefined) continue;
+        const path = where.startsWith(`${rev}:`) ? where.slice(rev.length + 1) : where;
+        const m = seen.get(path) ?? { open: false, close: false };
+        if (text.startsWith("<<<<<<< ")) m.open = true;
+        else if (text.startsWith(">>>>>>> ")) m.close = true;
+        seen.set(path, m);
+      }
+      const out: OutgoingMarkers[] = [];
+      for (const [path, m] of [...seen].sort(([a], [b]) => a.localeCompare(b))) {
+        if (!m.open || !m.close) continue;
+        out.push({ path, commit: await nullIfFail(cwd, ["log", "-1", "--format=%H", ...notPushed, "--", path]) });
+      }
+      return out;
+    },
     async baseMergeCommit(cwd, base, head) {
       // every commit on the ancestry path descends from base: the oldest merge on it brought base in
       const r = await run(cwd, ["rev-list", "--merges", "--ancestry-path", "--reverse", `${base}..${head}`, "--"]);
@@ -473,11 +503,53 @@ export type UpdateResult =
   | { outcome: "stuck"; reason: string };
 
 /**
+ * BS3.3a: how the local story branch took in `<remote>/<branch>` — `none` (no remote branch),
+ * `local` (nothing new on the remote), `adopted` (fast-forwarded to it), `merged` (a merge commit),
+ * or `conflict` (diverged and the merge was aborted, paths reported).
+ */
+export type RemoteSync =
+  | { outcome: "none" | "local"; remote_sha: string | null }
+  | { outcome: "adopted" | "merged"; remote_sha: string; head: string }
+  | { outcome: "conflict"; remote_sha: string; files: string[] };
+
+/**
+ * BS3.3a (dogfood D4): bring the remote story branch into the local one checked out in `cwd` —
+ * fetch it; fast-forward when the local branch is an ancestor of it (a person pressed "Update
+ * branch"); when they diverged (a person pushed while norn committed locally), merge it with
+ * `message` and `trailers` (never rebase: the branch is published, BS4). A conflicting merge is
+ * aborted and its paths reported. The caller holds the claim (T7) and pushes afterwards.
+ */
+export async function syncRemoteBranch(
+  git: GitPort,
+  opts: { cwd: string; branch: string; remote: string; message: string; trailers: Record<string, string> },
+): Promise<RemoteSync> {
+  const tracking = `refs/remotes/${opts.remote}/${opts.branch}`;
+  try {
+    await git.fetch(opts.cwd, opts.remote, [`+refs/heads/${opts.branch}:${tracking}`]);
+  } catch (e) {
+    // a story branch never pushed has nothing to take in; anything else is a failed effect (R4.3)
+    if (!/couldn't find remote ref|could not find remote ref/i.test((e as Error).message)) throw e;
+    return { outcome: "none", remote_sha: null };
+  }
+  const remoteSha = await git.readRef(opts.cwd, tracking);
+  const local = await git.revParse(opts.cwd, "HEAD");
+  if (!remoteSha || !local || remoteSha === local || (await git.isAncestor(opts.cwd, remoteSha, local))) return { outcome: "local", remote_sha: remoteSha };
+  if (await git.isAncestor(opts.cwd, local, remoteSha)) {
+    const ff = await git.fastForward(opts.cwd, remoteSha);
+    if (!ff.ok) throw portError("git_ff_failed", `cannot fast-forward ${opts.branch} to ${opts.remote}/${opts.branch}`);
+    return { outcome: "adopted", remote_sha: remoteSha, head: remoteSha };
+  }
+  const m = await git.merge(opts.cwd, remoteSha, { message: opts.message, trailers: opts.trailers });
+  return m.ok ? { outcome: "merged", remote_sha: remoteSha, head: m.head } : { outcome: "conflict", remote_sha: remoteSha, files: m.files };
+}
+
+/**
  * W2 `git: update` (BS3, BS4) in the story worktree `cwd`, whose branch is `branch`. The caller
  * holds the story's integrate lock (K6) and pushes afterwards (S8, T7).
  *  1. a dirty worktree → `stuck` (`worktree dirty`);
  *  3. the remote story branch ahead of the local one and descended from it (a person pressed
- *     "Update branch" on the host) → fast-forward to it first; diverged → `stuck`;
+ *     "Update branch" on the host) → fast-forward to it first; diverged → merge it (BS3.3a), and a
+ *     conflicting merge of it → `stuck`;
  *  4. nothing of `baseSha` missing → `done`, no commit;
  *  5. else `git merge --no-ff <baseSha>` with `message` and `trailers` (`Norn-Tick`, so Q6 does
  *     not report the merge as foreign) → `done`;
@@ -496,23 +568,10 @@ export async function update(
   if (st.branch !== opts.branch) return { outcome: "stuck", reason: `story worktree is on ${st.branch ?? "a detached HEAD"}, not ${opts.branch}` };
   let adopted: string | null = null;
   if (opts.remote) {
-    const tracking = `refs/remotes/${opts.remote}/${opts.branch}`;
-    let fetched = true;
-    try {
-      await git.fetch(opts.cwd, opts.remote, [`+refs/heads/${opts.branch}:${tracking}`]);
-    } catch (e) {
-      // a story branch never pushed has nothing to adopt; anything else is a failed effect (R4.3)
-      if (!/couldn't find remote ref|could not find remote ref/i.test((e as Error).message)) throw e;
-      fetched = false;
-    }
-    const remoteSha = fetched ? await git.readRef(opts.cwd, tracking) : null;
-    const local = st.head;
-    if (remoteSha && local && remoteSha !== local && !(await git.isAncestor(opts.cwd, remoteSha, local))) {
-      if (!(await git.isAncestor(opts.cwd, local, remoteSha))) return { outcome: "stuck", reason: `story branch diverged from ${opts.remote}/${opts.branch}` };
-      const ff = await git.fastForward(opts.cwd, remoteSha);
-      if (!ff.ok) throw portError("git_ff_failed", `cannot fast-forward ${opts.branch} to ${opts.remote}/${opts.branch}`);
-      adopted = remoteSha;
-    }
+    const where = `${opts.remote}/${opts.branch}`;
+    const r = await syncRemoteBranch(git, { cwd: opts.cwd, branch: opts.branch, remote: opts.remote, message: `Merge ${where} into ${opts.branch}`, trailers: opts.trailers });
+    if (r.outcome === "conflict") return { outcome: "stuck", reason: `story branch diverged from ${where}; merging it conflicts in ${r.files.join(", ") || "?"}` };
+    if (r.outcome === "adopted" || r.outcome === "merged") adopted = r.remote_sha;
   }
   const d = await git.divergence(opts.cwd, "HEAD", opts.baseSha);
   if (d.behind === 0) return { outcome: "done", head: (await git.revParse(opts.cwd, "HEAD")) as string, merged: false, adopted };

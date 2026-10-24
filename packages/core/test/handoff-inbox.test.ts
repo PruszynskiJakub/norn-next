@@ -174,6 +174,16 @@ describe("inbox: the person's last actions (F21, F25, F35, Q6)", () => {
     expect(buildInbox(facts([doneStory({ pr: pr(), ready_head_sha: "a".repeat(40) })]), CONFIG).groups.check).toEqual([]);
   });
 
+  test("BS10.2 (dogfood D6): a PR remembered from before the ready approval is no head change", () => {
+    const old = { pr: undefined, pr_seen: { pr: pr({ head_sha: "c".repeat(40) }), observed_at: T0 - 20_000 }, ready_head_sha: "a".repeat(40), ready_approved_at: at(T0 - 10_000) };
+    expect(buildInbox(facts([doneStory(old)]), CONFIG).groups.check).toEqual([]);
+    // seen after the approval (or fetched this tick): the head did change
+    const later = { ...old, pr_seen: { ...old.pr_seen, observed_at: T0 - 5_000 } };
+    expect(buildInbox(facts([doneStory(later)]), CONFIG).groups.check.map((i) => i.id)).toEqual([`head:gh-1:${"c".repeat(40)}`]);
+    const fetched = { ...old, pr: pr({ head_sha: "c".repeat(40) }) };
+    expect(buildInbox(facts([doneStory(fetched)]), CONFIG).groups.check.map((i) => i.id)).toEqual([`head:gh-1:${"c".repeat(40)}`]);
+  });
+
   test("commits outside norn: one Check item per branch, newest commit in the id", () => {
     const c = (sha: string, branch: string, subject: string, ms: number) => ({ sha: sha.repeat(40), subject, author: "Jakub", at: at(ms), branch });
     const s = doneStory({ pr: pr(), foreign_commits: [c("d", "gh-1-login", "resolve conflicts", T0 - 1000), c("e", "gh-1-login", "Merge origin/main", T0 - 5000), c("f", "gh-1/02-form", "tweak", T0 - 2000)] });

@@ -22,7 +22,7 @@ import {
   type NumberedReceipt,
   openNotes,
   RE_ENTRY_KINDS,
-  readyHeadSha,
+  readyApproval,
   type Ports,
   type RemoteIssue,
   type RemotePullRequest,
@@ -597,16 +597,17 @@ async function refMap(root: string): Promise<Map<string, string>> {
 }
 
 /**
- * F35/C5: `ready_head_sha` from the story unit's approve and re-entry receipts (`readyHeadSha`), and
+ * F35/C5: `ready_head_sha` from the story unit's approve and re-entry receipts (`readyApproval`, BS10.2: with its time), and
  * `ready_head_norn` when the known PR head moved past it by norn's own commits of the story only.
  */
-async function readyHead(root: string, story: StorySnapshot, u: UnitSnapshot | undefined, prHead: string | undefined): Promise<{ ready_head_sha?: string; ready_head_norn?: string }> {
+async function readyHead(root: string, story: StorySnapshot, u: UnitSnapshot | undefined, prHead: string | undefined): Promise<{ ready_head_sha?: string; ready_approved_at?: string; ready_head_norn?: string }> {
   const wf = u?.workflow?.workflow;
   if (!u || !wf) return {};
-  const sha = readyHeadSha(wf, receiptsOfKinds(story, u, ["approve", ...RE_ENTRY_KINDS]));
-  if (!sha) return {};
+  const ready = readyApproval(wf, receiptsOfKinds(story, u, ["approve", ...RE_ENTRY_KINDS]));
+  if (!ready) return {};
+  const sha = ready.sha;
   const norn = prHead && prHead !== sha && (await onlyNornCommitsSince(root, sha, prHead, story.key));
-  return { ready_head_sha: sha, ...(norn ? { ready_head_norn: prHead } : {}) };
+  return { ready_head_sha: sha, ready_approved_at: ready.at, ...(norn ? { ready_head_norn: prHead } : {}) };
 }
 
 /** Receipts of the given kinds in a unit's runs dir, ascending — read by file name, the others never opened. */
@@ -675,7 +676,9 @@ async function worktreeFacts(ports: Ports, path: string): Promise<WorktreeFacts 
   const changed = status ? [...status.staged, ...status.unstaged, ...status.untracked] : [];
   const slotRaw = readEnvNorn(path)?.NORN_SLOT;
   const slot = slotRaw !== undefined && /^\d+$/.test(slotRaw) ? Number(slotRaw) : null;
-  return { path, exists: true, marker, status, last_commit_at, last_file_change_at: newestMtime(path, changed), slot };
+  // H1/BS5.1: an agent's merge (or rebase) in progress defers norn's commits; decide must know it
+  const in_progress = await ports.git.inProgress(path).catch(() => null);
+  return { path, exists: true, marker, status, last_commit_at, last_file_change_at: newestMtime(path, changed), slot, ...(in_progress ? { in_progress } : {}) };
 }
 
 /** The receipt that produced `state.last_outcome`, scanning newest receipts first (B3 Rework). */
