@@ -806,6 +806,11 @@
             "max": {
               "minimum": 1,
               "type": "integer"
+            },
+            "reset_on": {
+              "pattern": "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$",
+              "description": "<step>.<outcome> whose edge resets the counter",
+              "type": "string"
             }
           }
         }

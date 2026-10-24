@@ -18,6 +18,7 @@ import {
   nextCommand,
   openNotes,
   RECENT_MS,
+  readyHeadSha,
   type RunFacts,
   sliceWorktreePath,
   startCommandFor,
@@ -34,6 +35,7 @@ import {
   cachedDefaultBranch,
   defaultBaseRef,
   readBaseFacts,
+  readPrFacts,
   lastTickAt,
   type LeaseEntry,
   type LeaseLiveness,
@@ -234,6 +236,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   const remoteName = config.remote.git_remote;
   const baseRef = defaultBaseRef(opts.repoRoot, remoteName, config.base_branch);
   const baseFacts = readBaseFacts(opts.repoRoot);
+  const prSeen = readPrFacts(opts.repoRoot);
   const unpushed = await Promise.all(
     snap.stories.map(async (read, i): Promise<UnpushedRuns[]> => {
       const c = classifyClaim(claims[i] ?? { state: "none" }, me, now);
@@ -314,6 +317,13 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       mailbox: undefined,
       issue: undefined,
       pr: undefined,
+      // C1: the PR as this checkout's last sync saw it — merge (BS10), retarget (BS11), head changed (F35)
+      ...(prSeen[story.key] && story.frontmatter?.status !== "done" && story.frontmatter?.status !== "dropped" ? { pr_seen: prSeen[story.key] } : {}),
+      // F35/C5: the ready approval's head, voided by a later re-entry
+      ...((wf, receipts) => {
+        const sha = wf && receipts ? readyHeadSha(wf, receipts) : undefined;
+        return sha ? { ready_head_sha: sha } : {};
+      })(story.units[0]?.workflow?.workflow, story.units[0]?.receipts),
       units,
       slices: story.slices,
       mode,

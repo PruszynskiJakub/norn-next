@@ -9,7 +9,7 @@
  */
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { StoryBase } from "@norn/core";
+import type { StoryBase, StoryPrSeen } from "@norn/core";
 import { atomicWrite, atomicWriteJson, readText } from "./fsx.ts";
 import { SPECS_DIR, traceDir } from "./paths.ts";
 
@@ -131,4 +131,29 @@ export function readBaseFacts(repoRoot: string): BaseFactsCache {
 
 export function writeBaseFacts(repoRoot: string, cache: BaseFactsCache): void {
   atomicWriteJson(baseFactsPath(repoRoot), { stories: cache });
+}
+
+const prFactsPath = (repoRoot: string) => join(traceDir(repoRoot), "pr.json");
+
+/**
+ * C1 (BS10, BS11, F35): story key → the story PR as the last remote sync of this checkout saw it
+ * (`trace/pr.json`, machine-local), with the observation time. PRs are fetched only on sync ticks;
+ * the ticks between and the read model (`norn inbox`/`status`) show the PR items from this.
+ */
+export type PrFactsCache = Record<string, StoryPrSeen>;
+
+export function readPrFacts(repoRoot: string): PrFactsCache {
+  try {
+    const v = (JSON.parse(readText(prFactsPath(repoRoot)) ?? "{}") as { stories?: PrFactsCache }).stories;
+    if (!v || typeof v !== "object") return {};
+    // a cache, not a record: entries of an unexpected shape are dropped (the next sync rewrites them)
+    const ok = (e: StoryPrSeen | undefined) => !!e && typeof e.observed_at === "number" && (e.pr === null || (typeof e.pr === "object" && typeof e.pr.number === "number" && typeof e.pr.state === "string"));
+    return Object.fromEntries(Object.entries(v).filter(([, e]) => ok(e)));
+  } catch {
+    return {};
+  }
+}
+
+export function writePrFacts(repoRoot: string, cache: PrFactsCache): void {
+  atomicWriteJson(prFactsPath(repoRoot), { stories: cache });
 }

@@ -12,6 +12,12 @@ export const AgentConfig = Type.Object(
     args: Type.Optional(Type.Array(Type.String())),
     model: Type.Optional(NonEmpty),
     env: Type.Optional(Type.Record(Type.String(), Type.String())),
+    /**
+     * QV5a: what a session of this agent can do to verify criteria (free strings matching criteria
+     * `needs`, e.g. `browser`); default none. `norn done` refuses a `pass` verdict for a criterion
+     * whose `needs` are not all here.
+     */
+    capabilities: Type.Optional(Type.Array(NonEmpty, { uniqueItems: true })),
   },
   { additionalProperties: false },
 );

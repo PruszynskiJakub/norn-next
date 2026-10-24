@@ -12,6 +12,8 @@ agents:
     # args: []
     # model: <model id>
     # env: { SOME_VAR: value }
+    # capabilities: []         # what its sessions can verify, matching criteria `needs` (e.g. [browser]);
+    #                          # norn done refuses a `pass` for a criterion it lacks the capability for (QV5a)
 # default_agent: claude
 
 # Who starts agents in auto mode. Leave unset (or null) to run every story manual (MO2).

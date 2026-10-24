@@ -231,3 +231,94 @@ describe("base_branch: develop (BS0, 7b)", () => {
     expect(h.remote.prs).toMatchObject([{ head: "gh-8-use-develop", base: "develop" }]);
   }, 60_000);
 });
+
+describe("PR items between syncs and in the read model (C1), ready approval voided by norn update (C5)", () => {
+  let h: Harness;
+  const wt = () => `${h.root}-worktrees/gh-9-pay-by-card`;
+  const runs = () => join(wt(), ".agents/specs/gh-9-pay-by-card/runs/_story");
+  type View = { groups: Record<string, Array<{ id: string; command: string; detail?: string }>> };
+  const view = async () => (await h.norn("inbox")).value as View;
+  const ids = (v: View, group: string) => (v.groups[group] ?? []).map((i) => i.id);
+  /** the tick-side open set (inbox history, O4) */
+  const open = () => Object.keys((JSON.parse(h.read(join(h.root, ".agents/norn/trace/inbox.json"))) as { open: Record<string, unknown> }).open);
+  const until = async (pred: () => boolean, label: string) => {
+    for (let i = 0; i < 20 && !pred(); i++) {
+      h.clock.advance(10_000);
+      await h.tick();
+    }
+    if (!pred()) throw new Error(`${label} not reached: ${JSON.stringify(h.state(runs()))}`);
+  };
+
+  beforeAll(async () => {
+    h = await createHarness();
+    h.write(join(h.root, ".agents/norn/config.yaml"), config());
+    h.write(join(h.root, ".agents/norn/workflows/based.yaml"), BASED);
+    writeFileSync(join(h.root, "a.txt"), "one\n");
+    h.git(["add", "-A"]);
+    h.git(["commit", "-q", "-m", "norn init"]);
+    h.git(["push", "-q", "origin", "main"]);
+    h.remote.issues = [issue(9, "Pay by card")];
+  });
+  afterAll(() => h.cleanup());
+
+  test("C1: a done story conflicting with its base keeps its Merge item (norn update) and a retarget item, in every tick and in norn inbox", async () => {
+    await h.tick();
+    h.clock.advance(10_000);
+    await h.tick("--sync");
+    await until(() => h.state(runs())?.step === "ready" && h.state(runs())?.status === "parked", "ready");
+    writeFileSync(join(wt(), "a.txt"), "story side\n");
+    h.git(["add", "-A"], wt());
+    h.git(["commit", "-q", "-m", "story edits a", "--trailer", "Norn-Tick: 01JBQ6ZK3E8Y4V5W6X7Y8Z9ABC"], wt());
+    expect((await h.norn("approve", "gh-9")).exit).toBe(0);
+    await until(() => h.state(runs())?.status === "done", "done");
+    siblingMerge(h, "a.txt", "base side\n");
+    const pr = h.remote.prs[0] as (typeof h.remote.prs)[number];
+    pr.base_branch = "release";
+    pr.base = "release";
+    h.clock.advance(10_000);
+    await h.tick("--sync");
+
+    const merge = `merge:gh-9:${pr.number}`;
+    const retarget = `retarget:gh-9:${pr.number}:release`;
+    // the read model: no remote calls, the last sync's PR
+    const v = await view();
+    expect(v.groups.your_turn?.find((i) => i.id === merge)).toMatchObject({ command: "norn update gh-9" });
+    expect(v.groups.your_turn?.find((i) => i.id === merge)?.detail).toContain("behind main by 1");
+    expect(ids(v, "check")).toContain(retarget);
+    expect(open()).toEqual(expect.arrayContaining([merge, retarget]));
+    // ticks between syncs: the items stay open (no appear/resolve flicker)
+    const calls = h.remote.calls.length;
+    for (let i = 0; i < 3; i++) {
+      h.clock.advance(1_000);
+      await h.tick();
+      expect(open()).toEqual(expect.arrayContaining([merge, retarget]));
+    }
+    expect(h.remote.calls.length).toBe(calls);
+    const history = (await h.norn("inbox", "--history")).value as { items: Array<{ id: string; resolved_at: string | null }> };
+    expect(history.items.filter((i) => i.id === merge || i.id === retarget).map((i) => i.resolved_at)).toEqual([null, null]);
+    pr.base_branch = "main";
+    pr.base = "main";
+  }, 60_000);
+
+  test("C5: after norn update from $done, the old ready approval no longer pins the head", async () => {
+    const pr = h.remote.prs[0] as (typeof h.remote.prs)[number];
+    const approved = h.git(["rev-parse", "HEAD"], wt());
+    pr.head_sha = "f".repeat(40);
+    h.clock.advance(10_000);
+    await h.tick("--sync");
+    // F35 still holds before the re-entry: the head moved after the approval
+    expect(ids(await view(), "check")).toContain(`head:gh-9:${"f".repeat(40)}`);
+    expect(open()).toContain(`head:gh-9:${"f".repeat(40)}`);
+    expect(approved).toMatch(/^[0-9a-f]{40}$/);
+
+    expect((await h.norn("update", "gh-9")).exit).toBe(0);
+    h.clock.advance(10_000);
+    await h.tick("--sync");
+    expect(h.state(runs())?.step).not.toBe("$done");
+    pr.head_sha = "e".repeat(40);
+    h.clock.advance(10_000);
+    await h.tick("--sync");
+    expect(ids(await view(), "check").filter((i) => i.startsWith("head:"))).toEqual([]);
+    expect(open().filter((i) => i.startsWith("head:"))).toEqual([]);
+  }, 60_000);
+});

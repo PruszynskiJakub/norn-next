@@ -596,7 +596,7 @@ export class Actor {
         : a.kill && prevRun
           ? await this.releaseRunLeases(a.unit, ["agent"], prevRun)
           : [];
-    const summary = a.advance ? `${a.advance.from}.${a.advance.outcome} → ${a.advance.to}` : `applied ${a.applied.join(", ") || "none"}`;
+    const summary = a.advance ? `${a.advance.from}.${a.advance.outcome} → ${a.advance.to}${a.advance.reset ? ` (reset ${a.advance.reset.join(", ")})` : ""}` : `applied ${a.applied.join(", ") || "none"}`;
     const committed = await this.commit(a.commit, a.unit, state, `${a.rule}: ${summary}`);
     let delivered: boolean | string = resumed ? "resumed" : keyed;
     if (resumed) this.effectsOk.add("resume");

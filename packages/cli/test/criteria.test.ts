@@ -169,6 +169,13 @@ describe("criteria reports and notes through norn done", () => {
     expect(await notes()).toHaveLength(1);
 
     const pass = report("pass", [PASS("AC1"), PASS("AC2"), PASS("AC3")]);
+    // QV5a (C2): AC2 needs a browser; claude declares no capabilities — the person's human-qa ruling does not make it pass
+    const refused = await inWt("done", "pass", "--handoff", "AC2 settled by the person's ruling", "--criteria", pass);
+    expect(refused.exit).toBe(3);
+    expect(refused.value).toMatchObject({ code: "pass_without_capability", details: { criteria: [{ id: "AC2", missing: ["browser"] }] }, do_instead: expect.stringContaining("norn done unverified") });
+    expect(readdirSync(join(runs(), "receipts")).filter((f) => f.endsWith("-done.json"))).toHaveLength(1);
+    // an agent configured with a browser may pass it
+    h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG.replace("claude: { adapter: claude }", "claude: { adapter: claude, capabilities: [browser] }"));
     expect((await inWt("done", "pass", "--handoff", "all observed", "--criteria", pass, "--note", "copy says 'Today', spec says 'today'")).exit).toBe(0);
     await tickUntil(at("ready", "parked"), "ready");
     expect((await notes()).map((i) => i.title)).toEqual(["qa note on gh-4 (AC1): kept whitespace inside backticks", "qa note on gh-4: copy says 'Today', spec says 'today'"]);

@@ -581,7 +581,7 @@ function applyAction(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
     return k === "workflow" || k === "unstick";
   });
   const kill = moved && st.run?.session && state.run?.run_id !== st.run.run_id ? sessionRef(st.run) : null;
-  const what = res.advance ? `${res.advance.from}.${res.advance.outcome} → ${res.advance.to}` : (res.log.at(-1) ?? "receipts");
+  const what = res.advance ? `${res.advance.from}.${res.advance.outcome} → ${res.advance.to}${res.advance.reset ? ` (reset ${res.advance.reset.join(", ")})` : ""}` : (res.log.at(-1) ?? "receipts");
   ctx.emit({
     kind: "apply_receipts",
     unit: uf.unit,

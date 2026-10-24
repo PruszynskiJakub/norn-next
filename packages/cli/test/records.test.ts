@@ -192,3 +192,44 @@ describe("records: PR merge facts from the remote", () => {
     expect(h.git(["log", "-1", "--format=%(trailers:key=Norn-Merged-By,valueonly)", "origin/main"])).toBe("octo");
   });
 });
+
+describe("C4: an agent's commit while its unit is parked on an ask is not foreign", () => {
+  let h: Harness;
+  const branch = "gh-6-ask-and-commit";
+  const wt = () => `${h.root}-worktrees/${branch}`;
+  const runs = () => join(wt(), `.agents/specs/${branch}`, "runs/_story");
+  /** commit in the story worktree with the given committer/author date (git's own clock otherwise) */
+  const commitAt = (file: string, message: string, date: string, name = "Agent") => {
+    h.write(join(wt(), file), `${message}\n`);
+    h.git(["add", file], wt());
+    const r = Bun.spawnSync(["git", "-c", `user.name=${name}`, "commit", "-q", "-m", message], { cwd: wt(), env: { ...process.env, GIT_COMMITTER_DATE: date, GIT_AUTHOR_DATE: date }, stdout: "pipe", stderr: "pipe" });
+    if (r.exitCode !== 0) throw new Error(r.stderr.toString());
+    return h.git(["rev-parse", "HEAD"], wt());
+  };
+
+  beforeAll(async () => {
+    h = await createHarness();
+    await bootTo(h, 6, "Ask and commit", runs);
+  });
+  afterAll(() => h.cleanup());
+
+  test("inside the run window: not foreign; a commit outside any run of the unit still is (Q6)", async () => {
+    h.report(runs(), "ask", { question: "May I run git commit?", options: ["yes", "no"] });
+    h.clock.advance(10_000);
+    await h.tick();
+    expect(h.state(runs())).toMatchObject({ status: "parked", park: { kind: "ask" } });
+    h.clock.advance(10_000);
+    await h.tick(); // settle the parked state's commit
+    // the agent's merge/commit lands while the unit waits on the person (permission prompt answered in the pane)
+    commitAt("agent.txt", "Merge main into gh-6: resolve", h.clock.iso());
+    h.clock.advance(10_000);
+    await h.tick();
+    expect(lastFacts(h, "gh-6")?.foreign_commits).toBeUndefined();
+    expect(readTrace(h.root, { types: ["foreign_commits"] }).events).toEqual([]);
+    // a person's commit dated before the unit ever ran is foreign
+    const sha = commitAt("person.txt", "by hand", "2025-12-01T09:00:00Z", "Person");
+    h.clock.advance(10_000);
+    await h.tick();
+    expect(lastFacts(h, "gh-6")?.foreign_commits).toEqual([{ sha, subject: "by hand", author: "Person", at: expect.any(String), branch }]);
+  });
+});

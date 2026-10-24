@@ -21,6 +21,8 @@ import {
   type MailboxItem,
   type NumberedReceipt,
   openNotes,
+  RE_ENTRY_KINDS,
+  readyHeadSha,
   type Ports,
   type RemoteIssue,
   type RemotePullRequest,
@@ -60,6 +62,8 @@ import {
   readActFailures,
   type BaseFactsCache,
   readBaseFacts,
+  readPrFacts,
+  type PrFactsCache,
   readLocalClaim,
   readReceipt,
   readUnitMarker,
@@ -72,6 +76,7 @@ import {
   unpushedRuns,
   withSliceWorktrees,
   writeBaseFacts,
+  writePrFacts,
 } from "@norn/store";
 import type { Context } from "../context.ts";
 import { leaseLiveness } from "./leases.ts";
@@ -279,6 +284,15 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     }
   }
   writeRemoteCache(root, cache);
+  // C1: the last PR seen per story, kept between syncs for the inbox (`pr_seen`); finished stories drop out
+  const prSeenIn = readPrFacts(root);
+  const prSeen: PrFactsCache = {};
+  for (const s of snapshot.stories) {
+    if (s.frontmatter?.status === "done" || s.frontmatter?.status === "dropped") continue;
+    const fresh = storyPrs.has(s.key) ? { pr: storyPrs.get(s.key) ?? null, observed_at: now } : prSeenIn[s.key];
+    if (fresh) prSeen[s.key] = fresh;
+  }
+  if (JSON.stringify(prSeen) !== JSON.stringify(prSeenIn)) writePrFacts(root, prSeen);
 
   // ---- P2 (F34): a PR not saying merged whose head is already on the fetched base is merged
   const byAncestry = new Set<string>();
@@ -355,7 +369,12 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       if (failure) uf.act_failure = failure;
       units.push(uf);
       // Q6: commits norn did not make; an agent's own commits mid-run are not foreign
-      if (u.state?.status !== "running") foreign.push(...(await foreignCommits(root, remote, unitBranch, baseRef, refs)));
+      // C4: …nor are commits made during any run of this unit (e.g. while it is parked on an ask)
+      if (u.state?.status !== "running") {
+        const found = await foreignCommits(root, remote, unitBranch, baseRef, refs);
+        const windows = found.length ? runWindows(s, u) : [];
+        foreign.push(...found.filter((c) => !duringRun(c, windows)).map(({ committed_at: _, ...c }) => c));
+      }
       if (ownWt && worktree?.exists) targets.push({ unit: u.unit.key, dir: u.unit.dir, cwd: ownWt, branch: unitBranch });
       unitLocs[u.unit.key] = {
         unit: u.unit,
@@ -386,6 +405,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       mailbox,
       issue: storyIssues.has(s.key) ? storyIssues.get(s.key) : undefined,
       pr: storyPrs.has(s.key) ? storyPrs.get(s.key) : undefined,
+      ...(prSeen[s.key] ? { pr_seen: prSeen[s.key] } : {}),
       ...(byAncestry.has(s.key) ? { merged_by_ancestry: true } : {}),
       ...(foreign.length ? { foreign_commits: foreign } : {}),
       ...readyHead(s, unitSnaps.get(s)?.[0]),
@@ -499,7 +519,10 @@ export async function mergedByAncestry(root: string, remote: string | null, bran
  * Q6: commits on `branch` (first-parent, not on the base) made after the newest norn commit — one
  * carrying a `Norn-Tick` trailer. A branch with no norn commit in that range reports none.
  */
-export async function foreignCommits(root: string, remote: string | null, branch: string, baseRef: string | null, refs?: Map<string, string>): Promise<ForeignCommit[]> {
+/** C4: a found commit with its committer date (ISO), compared with the unit's run windows; not part of the facts. */
+export type DatedCommit = ForeignCommit & { committed_at?: string };
+
+export async function foreignCommits(root: string, remote: string | null, branch: string, baseRef: string | null, refs?: Map<string, string>): Promise<DatedCommit[]> {
   const local = `refs/heads/${branch}`;
   const tracking = remote ? `refs/remotes/${remote}/${branch}` : null;
   const ref = refs ? (refs.get(local) ?? (tracking ? refs.get(tracking) : undefined) ?? null) : ((await commitOf(root, local)) ?? (tracking ? await commitOf(root, tracking) : null));
@@ -509,28 +532,56 @@ export async function foreignCommits(root: string, remote: string | null, branch
   const memo = `${root}\0${branch}\0${ref}\0${baseSha}`;
   const hit = FOREIGN_MEMO.get(memo);
   if (hit) return hit;
-  const args = ["log", "--first-parent", "-n", "100", "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e", ref];
+  const args = ["log", "--first-parent", "-n", "100", "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e", ref];
   if (baseSha) args.push(`^${baseSha}`);
   const r = await rawGit(root, [...args, "--"]);
   if (r.code !== 0) return [];
-  let found: ForeignCommit[] = [];
-  const out: ForeignCommit[] = [];
+  let found: DatedCommit[] = [];
+  const out: DatedCommit[] = [];
   for (const rec of r.stdout.split("\x1e")) {
     const line = rec.replace(/^\n/, "");
     if (!line) continue;
-    const [sha, subject, author, at, tick] = line.split("\x1f") as [string, string, string, string, string | undefined];
+    const [sha, subject, author, at, committed, tick] = line.split("\x1f") as [string, string, string, string, string, string | undefined];
     if (tick?.trim()) {
       found = out;
       break;
     }
-    out.push({ sha, subject: subject ?? "", author: author ?? "", at: at ?? "", branch });
+    out.push({ sha, subject: subject ?? "", author: author ?? "", at: at ?? "", ...(committed ? { committed_at: committed } : {}), branch });
   }
   if (FOREIGN_MEMO.size > 500) FOREIGN_MEMO.clear();
   FOREIGN_MEMO.set(memo, found);
   return found;
 }
 
-const FOREIGN_MEMO = new Map<string, ForeignCommit[]>();
+const FOREIGN_MEMO = new Map<string, DatedCommit[]>();
+
+/** Receipt kinds a run writes, from its start to its end (C4). */
+const RUN_KINDS = ["started", "done", "ask", "stuck", "classify", "answer"] as const;
+
+/**
+ * C4: the time spans (ms epoch) of every run of the unit — from its first to its last receipt, and
+ * open-ended for the run the unit is still in (running, or parked on an ask). An agent launched by
+ * norn commits only inside them; a person's commit outside them stays foreign (Q6).
+ */
+function runWindows(story: StorySnapshot, u: UnitSnapshot): Array<[number, number]> {
+  const spans = new Map<string, [number, number]>();
+  const widen = (run: string, t: number, end = t) => {
+    if (!Number.isFinite(t)) return;
+    const cur = spans.get(run);
+    spans.set(run, cur ? [Math.min(cur[0], t), Math.max(cur[1], end)] : [t, end]);
+  };
+  for (const { receipt: r } of receiptsOfKinds(story, u, RUN_KINDS)) if (r.run_id) widen(r.run_id, Date.parse(r.at));
+  // the agent of a run parked on an ask is still at work (a permission prompt answered in its pane)
+  const st = u.state;
+  if (st?.run) widen(st.run.run_id, Date.parse(st.run.started_at), st.status === "running" || (st.status === "parked" && st.park?.kind === "ask") ? Number.POSITIVE_INFINITY : Date.parse(st.run.started_at));
+  // commit dates have second precision
+  return [...spans.values()].map(([a, b]) => [Math.floor(a / 1000) * 1000, b]);
+}
+
+const duringRun = (c: DatedCommit, windows: ReadonlyArray<[number, number]>) => {
+  const t = Date.parse(c.committed_at ?? c.at);
+  return Number.isFinite(t) && windows.some(([a, b]) => t >= a && t <= b);
+};
 
 /** Every branch and remote-tracking ref → sha, in one git call. */
 async function refMap(root: string): Promise<Map<string, string>> {
@@ -544,31 +595,12 @@ async function refMap(root: string): Promise<Map<string, string>> {
   return m;
 }
 
-/**
- * F35: the story branch head when the person gave `approve` at the `ready` gate — the `head_sha` of the
- * newest `approve` receipt at that gate (the `ready` step, or any gate whose `approve` goes to `$done`).
- */
+/** F35/C5: `ready_head_sha` from the story unit's approve and re-entry receipts (`readyHeadSha`). */
 function readyHead(story: StorySnapshot, u: UnitSnapshot | undefined): { ready_head_sha?: string } {
   const wf = u?.workflow?.workflow;
   if (!u || !wf) return {};
-  const isReady = (step: string) => step === "ready" || (stepOf(wf, step)?.type === "gate" && edgeOf(wf, step, "approve")?.to === "$done");
-  let names: string[];
-  try {
-    names = readdirSync(receiptsDir(u.path));
-  } catch {
-    return {};
-  }
-  const ns = names
-    .map(parseReceiptFileName)
-    .filter((p): p is { n: number; kind: string } => !!p && p.kind === "approve")
-    .map((p) => p.n)
-    .sort((a, b) => b - a);
-  for (const n of ns) {
-    const r = readReceipt(u.path, n, story.root);
-    if (!r || !("receipt" in r) || r.receipt.kind !== "approve" || !isReady(r.receipt.step)) continue;
-    return r.receipt.head_sha ? { ready_head_sha: r.receipt.head_sha } : {};
-  }
-  return {};
+  const sha = readyHeadSha(wf, receiptsOfKinds(story, u, ["approve", ...RE_ENTRY_KINDS]));
+  return sha ? { ready_head_sha: sha } : {};
 }
 
 /** Receipts of the given kinds in a unit's runs dir, ascending — read by file name, the others never opened. */

@@ -332,6 +332,43 @@ describe("base sync replay", () => {
     expect(s.state.step).toBe("update");
   });
 
+  test("C3: base_conflict_loop with reset_on update.done — unrelated base moves never exhaust it; the reset is journaled", () => {
+    const run = (wf: Workflow) => {
+      const s = new Sim(wf);
+      s.git = "conflict";
+      s.runUntil(at_("ready", "parked"));
+      // three sibling merges, each conflicting once and resolved at the first attempt
+      for (const c of ["c", "d", "e"]) {
+        s.base = base({ behind: 2, conflicts: ["a.ts"], sha: SHA(c) });
+        expect(s.tick().rule).toBe("gate.stale");
+        s.runUntil((x) => at_("ready", "parked")(x) || x.state.status === "stuck", 40);
+        if (s.state.status === "stuck") break;
+      }
+      return s;
+    };
+    const plain = run(BASE_WF);
+    expect(plain.state.park).toMatchObject({ kind: "exhausted", reason: "base_conflict_loop 2/2 at update.conflict" });
+
+    const wf: Workflow = { ...BASE_WF, counters: { ...BASE_WF.counters, base_conflict_loop: { max: 2, reset_on: "update.done" } } };
+    expect(validateWorkflowDefinition(wf).issues).toEqual([]);
+    const s = run(wf);
+    expect(s.state).toMatchObject({ step: "ready", status: "parked", counters: { base_conflict_loop: 0, stale_loop: 3 } });
+    // journaled: every clean update after a conflict carries the reset in its advance (trace, commit, handoff line)
+    const res = applyReceipts({ ...s.state, step: "update", status: "running", counters: { base_conflict_loop: 1, stale_loop: 0 } }, [{ n: s.state.applied_through + 1, file: "", receipt: { kind: "classify", receipt_id: deriveUlid("01JGGGGGGGGGGGGGGGGGGGGGGG", 1), run_id: null, step: "update", attempt: s.state.attempt, at: at(), by: "norn", outcome: "done", rule: "git.update", route: "test" } }], { workflow: wf, now: at(), limits: CONFIG.limits });
+    expect(res.advance).toEqual({ from: "update", outcome: "done", to: "test", reset: ["base_conflict_loop"] });
+    expect(res.log.at(-1)).toContain("(reset base_conflict_loop)");
+    // a repeated conflict on one base move still exhausts it
+    const looping = new Sim(wf);
+    looping.base = base({ behind: 4, conflicts: ["a.ts"] });
+    looping.git = "conflict";
+    looping.moving = true;
+    looping.runUntil((x) => x.state.status === "stuck", 40);
+    expect(looping.state.park).toMatchObject({ kind: "exhausted", reason: "base_conflict_loop 2/2 at update.conflict" });
+    // W4: reset_on names a declared edge
+    const bad = validateWorkflowDefinition({ ...wf, counters: { ...wf.counters, stale_loop: { max: 3, reset_on: "update.merged" } } });
+    expect(bad.issues).toMatchObject([{ code: "unknown_reset", path: "/counters/stale_loop/reset_on" }]);
+  });
+
   test("no base observed → update waits", () => {
     const s = new Sim(BASE_WF);
     s.base = undefined;

@@ -140,7 +140,18 @@ export const Step = TaggedUnion("type", [AgentStep, CheckStep, GateStep, GitStep
 export type Step = Static<typeof Step>;
 export type StepType = Step["type"];
 
-export const CounterSpec = Type.Object({ max: PosInt }, { additionalProperties: false });
+export const CounterSpec = Type.Object(
+  {
+    max: PosInt,
+    /**
+     * W4 (C3): taking the edge `<step>.<outcome>` resets this counter to 0, journaled in the
+     * advance (trace, handoff line) and the classify receipt. E.g. `base_conflict_loop` resets on
+     * `update.done`: each base move is a fresh attempt, only repeated failures on one move count.
+     */
+    reset_on: Type.Optional(Type.String({ pattern: "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$", description: "<step>.<outcome> whose edge resets the counter" })),
+  },
+  { additionalProperties: false },
+);
 export type CounterSpec = Static<typeof CounterSpec>;
 
 /** BS7/BS9: when a waiting story counts as stale, and the step `norn update` re-enters. */

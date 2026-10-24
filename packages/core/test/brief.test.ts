@@ -354,6 +354,9 @@ describe("Rulings (F28, O2): gate reasons as story-level notes", () => {
     const b = renderBrief(input(stateFor(SLICE, SLICE_WF), [], { rulings }));
     expect(b.json.rulings).toEqual(rulings);
     expect(b.markdown).toContain("## Rulings");
+    // C2/QV5a: rulings answer questions; they never stand in for a criterion's verdict on new code
+    expect(b.markdown).toContain("A ruling never verifies an acceptance criterion");
+    expect(b.markdown).not.toContain("settle the questions");
     expect(b.markdown).toContain("- gh-1/01 human-qa#1 approve by jakub@mac (2026-10-23T11:00:00.000Z):\n  > AC6 wins over B6: keep the raw count");
     expect(b.markdown.indexOf("## Rulings")).toBeLessThan(b.markdown.indexOf("## Context"));
     expect(renderBrief(input(stateFor(SLICE, SLICE_WF), [])).markdown).not.toContain("## Rulings");

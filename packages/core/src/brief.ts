@@ -475,7 +475,7 @@ function markdown(b: BriefJson): string {
   }
 
   if (b.rulings.length) {
-    out.push("## Rulings", "", "A person ruled at a gate of this story. These rulings settle the questions they answer, even where the spec text still says otherwise; follow them and do not raise them again.", "");
+    out.push("## Rulings", "", "A person ruled at a gate of this story. These rulings answer the questions they address, even where the spec text still says otherwise; follow them and do not raise them again. A ruling never verifies an acceptance criterion: it judged the code as it was then, not the current code. Each criterion still gets its own verdict from what you observe now; one you cannot observe here is `unverified` (QV5a), never `pass`.", "");
     for (const r of b.rulings) out.push(`- ${r.unit} ${r.step}#${r.attempt} ${r.decision}${r.by ? ` by ${r.by}` : ""} (${r.at}):`, quote(r.comment).replace(/^/gm, "  "));
     out.push("");
   }
