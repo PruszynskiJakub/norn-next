@@ -9,3 +9,11 @@ Real run of auto mode, the headless and herdr runners, hook facts and six inject
 | [friction.md](friction.md) | Raw defect log A1–A21 |
 
 Raw evidence (snaps, traces, pane captures) stayed in the session scratchpad and is not committed.
+
+## Rerun on PR #6 (fixes for this audit)
+
+| File | What |
+|---|---|
+| [rerun/audit.md](rerun/audit.md) | Independent audit of the rerun: before/after per defect, regressions, bottom line |
+| [rerun/run-log.md](rerun/run-log.md) | Driver's timeline and verdicts |
+| [rerun/friction.md](rerun/friction.md) | New defects B1–B11 |
