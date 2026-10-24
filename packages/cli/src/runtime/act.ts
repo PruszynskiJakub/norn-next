@@ -17,6 +17,7 @@ import {
   applyReceipts,
   buildInbox,
   type BoundaryCommit,
+  isSideAction,
   type Decision,
   type Facts,
   type InboxItem,
@@ -87,6 +88,12 @@ const NOTIFY_GROUPS: readonly InboxGroup[] = ["your_turn", "answer", "approve", 
 
 class QueueFull extends Error {}
 
+/** R1.2: a claim write lost to another heartbeat (CAS stale/rejected, held) — not a network failure. */
+function claimLost(r: ActionResult): boolean {
+  const reason = (r.detail as { reason?: string } | undefined)?.reason;
+  return reason === "stale" || reason === "rejected" || reason === "held" || reason === "corrupt";
+}
+
 export class Actor {
   private readonly notified: Set<string>;
   readonly notifiedNow: string[] = [];
@@ -122,16 +129,25 @@ export class Actor {
 
   async run(decisions: Decision[]): Promise<ActRecord[]> {
     const out: ActRecord[] = [];
-    for (const d of decisions) {
+    // R1.2: a story's renewal runs before its other actions; once it loses the CAS, nothing else of
+    // that story is done this tick (R2.2: a checkout without the claim writes and pushes nothing)
+    const order = [...decisions.filter((d) => isSideAction(d.action)), ...decisions.filter((d) => !isSideAction(d.action))];
+    const lost = new Set<string>();
+    for (const d of order) {
+      const story = d.action.unit?.story;
       let result: ActionResult;
-      try {
-        result = await this.perform(d.action);
-      } catch (e) {
-        result = e instanceof QueueFull ? { ok: false, error: e.message, detail: { queued: true } } : { ok: false, error: (e as Error).message };
-      }
+      if (story && lost.has(story)) result = { ok: false, error: "skipped: claim lost", detail: { skipped: true } };
+      else
+        try {
+          result = await this.perform(d.action);
+        } catch (e) {
+          result = e instanceof QueueFull ? { ok: false, error: e.message, detail: { queued: true } } : { ok: false, error: (e as Error).message };
+        }
+      if (story && isSideAction(d.action) && !result.ok && claimLost(result)) lost.add(story);
       out.push({ decision: d, result });
     }
-    return out;
+    // the trace keeps decide's order
+    return decisions.map((d) => out.find((r) => r.decision === d) as ActRecord);
   }
 
   async perform(a: Action): Promise<ActionResult> {
@@ -582,7 +598,8 @@ export class Actor {
     const { session, lease } = await this.launchAfterReceipts(a.unit, loc.runsDir, a.receipts, a.launch);
     const state = a.state ? this.recordSession(a.unit, loc.runsDir, a.state, a.receipts, session) : null;
     if (state) this.writeUnitState(a.unit, loc.runsDir, state);
-    const committed = await this.commit(a.commit, a.unit, state, `${a.rule}: ${a.step} run ${a.launch.run_id}`);
+    // R2.1 (N6): commit and push the started receipts now — only runs/, never the agent's fresh work
+    const committed = await this.commit(a.commit, a.unit, state, `${a.rule}: ${a.step} run ${a.launch.run_id}`, a.commit ? [relative(a.commit.cwd, loc.runsDir)] : undefined);
     return { ok: true, detail: { session, lease, ...committed } };
   }
 
@@ -833,7 +850,44 @@ export class Actor {
     if (!a.blob) throw new Error("claim without blob");
     const r = a.op === "acquire" ? await acquireClaim(this.root, remote, a.blob, { now: this.obs.facts.now }) : await renewClaim(this.root, remote, a.blob, a.expected ?? "");
     if (r.ok) this.claimed.set(story, { blob: a.blob, sha: r.sha });
-    return r.ok ? { ok: true, detail: { sha: r.sha } } : { ok: false, error: r.message, detail: { reason: r.reason } };
+    if (r.ok) return { ok: true, detail: { sha: r.sha } };
+    const detail: Record<string, unknown> = { reason: r.reason };
+    // R3.1 (H6): the intake race is lost — undo what the intake made here, unless it holds work
+    if (a.rule === "claim.acquire.intake" && claimLost({ ok: false, detail })) detail.intake = await this.dropLostIntake(story).catch((e: Error) => ({ kept: `clean-up failed: ${e.message}` }));
+    return { ok: false, error: r.message, detail };
+  }
+
+  /**
+   * R3.1: after losing `claim.acquire.intake`, remove the story worktree, its local branch (and the spec
+   * folder in it) and its slot when the branch holds nothing beyond the intake commit and the worktree
+   * is clean. Otherwise keep everything; observe then reports the local work (R2.3).
+   */
+  private async dropLostIntake(story: string): Promise<{ removed: string[] } | { kept: string }> {
+    const loc = this.obs.stories[story];
+    if (!loc) return { kept: "story not checked out here" };
+    const base = this.obs.remote ? `refs/remotes/${this.obs.remote}/${this.obs.facts.repo.default_branch}` : `refs/heads/${this.obs.facts.repo.default_branch}`;
+    const log = await rawGit(this.root, ["log", "--format=%s", `refs/heads/${loc.branch}`, `^${base}`, "--"]);
+    if (log.code !== 0) return { kept: `cannot list ${loc.branch}: ${log.stderr.trim()}` };
+    const subjects = log.stdout.split("\n").filter(Boolean);
+    if (subjects.length > 1 || (subjects[0] !== undefined && !subjects[0].startsWith(`norn: intake ${story} `)))
+      return { kept: `${loc.branch} has ${subjects.length} commit(s) beyond the intake` };
+    const wt = loc.worktree;
+    if (wt && existsSync(wt)) {
+      const st = await this.git.status(wt).catch(() => null);
+      if (!st?.clean) return { kept: `${wt} has uncommitted changes` };
+    }
+    const removed: string[] = [];
+    if (wt && existsSync(wt)) {
+      await this.git.worktreeRemove(this.root, wt, { force: true });
+      removed.push(wt);
+    }
+    if (await this.git.branchExists(this.root, loc.branch)) {
+      await this.git.deleteBranch(this.root, loc.branch, { force: true });
+      removed.push(loc.branch);
+    }
+    const listing = await listLeases(this.ctx.home, () => true);
+    for (const e of listing.live) if (e.lease.repo === this.root && e.lease.story === story && releaseLease(this.ctx.home, e.file)) removed.push(e.file);
+    return { removed };
   }
 
   // ------------------------------------------------------------ remote lifecycle (GR2, GR6, GR8)

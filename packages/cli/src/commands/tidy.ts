@@ -6,12 +6,15 @@
  *     when their commits are kept elsewhere (story branch, default branch, or the remote copy)
  *   - dead or unreadable leases in `~/.norn/leases/` (K3)
  *   - leftover `.NNNN.reserve` receipt reservations (S6) older than a minute
+ *   - R2.3: runs/ work (receipts, state) of a story this checkout no longer holds that never reached
+ *     the record — moved to `runs/<unit>/orphaned/<holder>-<file>` and committed on the local branch
+ *     only, never pushed, so its receipt numbers are not reused
  * Nothing with unique work is removed; such items are listed under `kept` with the reason.
  */
 import { readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { ulid } from "@norn/schema";
-import { acquireTickLock, reclaimLeases, receiptsDir, safeUnlink, git as rawGit } from "@norn/store";
+import { acquireTickLock, copyToOrphaned, reclaimLeases, receiptsDir, safeUnlink, git as rawGit } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import { busyError } from "../output.ts";
 import { leaseLiveness } from "../runtime/leases.ts";
@@ -23,7 +26,7 @@ const RESERVE = /^\.\d{4,}\.reserve$/;
 
 export const tidyCommand = defineCommand({
   name: "tidy",
-  summary: "Report or clean orphan worktrees, branches, stale leases and receipt reservations (K5)",
+  summary: "Report or clean orphan worktrees, branches, stale leases, receipt reservations (K5) and runs/ work not in the record (R2.3)",
   usage: "norn tidy [--dry-run]",
   options: { "dry-run": { type: "boolean" } },
   async run(ctx, args) {
@@ -97,10 +100,46 @@ export const tidyCommand = defineCommand({
         }
       }
 
+      // ---- R2.3: runs/ work this checkout wrote for a story it no longer holds → orphaned/ (local only)
+      const orphaned: Array<{ story: string; unit: string; moved: Array<{ from: string; to: string }>; commit: string | null }> = [];
+      const holder = obs.facts.machine.holder;
+      for (const [story, units] of Object.entries(obs.unpushed)) {
+        for (const u of units) {
+          const unitDir = join(u.cwd, obs.stories[story]?.spec_dir ?? "", "runs", u.dir);
+          const moved: Array<{ from: string; to: string }> = [];
+          for (const f of u.files) {
+            const src = join(u.cwd, f);
+            if (dry) {
+              moved.push({ from: f, to: relative(u.cwd, join(unitDir, "orphaned", `${holder}-${f.split("/").at(-1)}`)) });
+              continue;
+            }
+            const dest = copyToOrphaned(unitDir, src, holder);
+            // back to the record's version of the path: the merge-base copy, or gone when it is new here
+            const inBase = (await rawGit(u.cwd, ["cat-file", "-e", `${u.base}:${f}`])).code === 0;
+            if (inBase) await rawGit(u.cwd, ["checkout", u.base, "--", f]);
+            else {
+              await rawGit(u.cwd, ["rm", "-q", "--cached", "--ignore-unmatch", "--", f]);
+              safeUnlink(src);
+            }
+            if (dest) moved.push({ from: f, to: relative(u.cwd, dest) });
+          }
+          // committed on the local branch only — never pushed (R2.2: this checkout does not hold the claim)
+          const commit = dry
+            ? null
+            : await git.commit(u.cwd, {
+                message: `norn: ${u.unit} work not in the record moved to orphaned/`,
+                trailers: { "Norn-Story": story, ...(u.unit !== story ? { "Norn-Slice": u.unit } : {}), "Norn-Tick": obs.facts.tick_id },
+                paths: [relative(u.cwd, unitDir)],
+              });
+          orphaned.push({ story, unit: u.unit, moved, commit });
+        }
+      }
+
       const verb = dry ? "would_remove" : "removed";
       return {
         dry_run: dry,
         [verb]: { worktrees, stale_worktree_records: prunable, branches, leases, reserve_files: reserves },
+        [dry ? "would_orphan" : "orphaned"]: orphaned,
         kept,
       };
     } finally {

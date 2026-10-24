@@ -204,6 +204,16 @@ describe("two clones hand a story over through git (§19.3, T5, T6)", () => {
     expect(readFileSync(join(sliceWt(B.root), ".env.norn"), "utf8")).toContain("NORN_SLOT=2");
     expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-7"])).not.toBe("");
 
+    // R10.1 (M8): the take is in the record — a pushed `take` receipt on the story unit and a trace event
+    const file = (r.value as { receipt: { file: string } }).receipt.file;
+    expect(file).toMatch(/^\d{4}-take\.json$/);
+    expect(r.value).toMatchObject({ receipt: { pushed: true } });
+    const rec = JSON.parse(readFileSync(join(storyRuns(B.root), "receipts", file), "utf8"));
+    expect(rec).toMatchObject({ kind: "take", by: "human", who: "bob@repo-b", previous_holder: null, previous_heartbeat_id: null, expired: false });
+    expect(h.git(["ls-remote", "origin", "refs/heads/gh-7-add-login-form"]).split("\t")[0]).toBe(sh(B.root, ["rev-parse", "gh-7-add-login-form"]));
+    const trace = await B.norn("trace", "gh-7", "--events");
+    expect(JSON.stringify(trace.value)).toContain("take by bob@repo-b (claim was free)");
+
     // clone A now sees the claim held elsewhere and does nothing to the story (T7)
     step();
     const a = await A.tick("--sync");
@@ -213,7 +223,8 @@ describe("two clones hand a story over through git (§19.3, T5, T6)", () => {
   test("clone B answers, briefs and continues the slice to its gate", async () => {
     expect((await B.norn("answer", "gh-7/01", "Blue.")).exit).toBe(0);
     step();
-    expect(kinds(await B.tick())).toEqual(["gh-7/01 apply_receipts"]);
+    // the story unit applies the take receipt (R10.1) alongside the slice's answer
+    expect(kinds(await B.tick())).toEqual(["gh-7 apply_receipts", "gh-7/01 apply_receipts"]);
     const brief = await B.at(sliceWt(B.root), "brief");
     expect(brief.exit).toBe(0);
     const text = JSON.stringify(brief.value);
@@ -248,6 +259,10 @@ describe("claim races (T3) and forced takes (T5)", () => {
     const winner = ra.exit === 0 ? "tester@box" : "carol@repo-c";
     expect((lost[0]?.value as { error: string }).error).toMatch(new RegExp(`^held by ${winner} since \\d{4}-`));
     expect((won[0]?.value as { taken_from: { holder: string; expired: boolean } }).taken_from).toMatchObject({ holder: "bob@repo-b", expired: true });
+    // R10.1: the winner's take receipt names the expired holder
+    const winRoot = ra.exit === 0 ? A.root : C.root;
+    const file = (won[0]?.value as { receipt: { file: string } }).receipt.file;
+    expect(JSON.parse(readFileSync(join(storyRuns(winRoot), "receipts", file), "utf8"))).toMatchObject({ kind: "take", previous_holder: "bob@repo-b", expired: true });
   });
 
   test("before expiry a take needs --force; the forced take is journaled in the claim and the handoff", async () => {

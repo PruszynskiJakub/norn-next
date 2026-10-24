@@ -488,6 +488,81 @@
           }
         }
       }
+    },
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "at",
+        "unit",
+        "holder",
+        "heartbeat_id",
+        "previous_holder",
+        "previous_heartbeat_id",
+        "expired",
+        "forced"
+      ],
+      "properties": {
+        "type": {
+          "const": "take",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "description": "ISO-8601 timestamp, UTC",
+          "type": "string"
+        },
+        "unit": {
+          "pattern": "^(gh|gl)-[1-9][0-9]*$",
+          "description": "Story key, e.g. gh-123 or gl-45",
+          "type": "string"
+        },
+        "holder": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "heartbeat_id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "previous_holder": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "previous_heartbeat_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "description": "ULID (ID2)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expired": {
+          "type": "boolean"
+        },
+        "forced": {
+          "type": "boolean"
+        }
+      }
     }
   ],
   "discriminator": {

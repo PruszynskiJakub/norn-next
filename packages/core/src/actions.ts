@@ -3,6 +3,10 @@
  *
  * Contract between decide and act:
  * - At most one Action per unit per tick; repo-level actions have `unit: null`.
+ * - Side action (R1.1): a story's `claim` renew (`op: "renew"`) does not occupy its unit's one
+ *   action. Decide emits it before every other action of the story; act performs it first and, if
+ *   its CAS loses (the claim is gone or held by another heartbeat), skips every other action of
+ *   that story this tick, reporting each as `skipped: claim lost` (R1.2). See decide's `isSideAction`.
  * - Decide is pure and replayable: it uses `facts.now` for every timestamp and
  *   `deriveUlid(facts.tick_id, i)` (from @norn/schema) for every new id (receipt_id, run_id).
  * - Every action is a plain JSON value (it is written to the trace verbatim).
@@ -258,7 +262,7 @@ export interface ImportMailboxAction extends UnitBase, Transition {
   refs: Array<{ ref: string; sha: string }>;
 }
 
-/** Claim ref CAS (T3, T4, T6). `expected` null = ref must not exist. */
+/** Claim ref CAS (T3, T4, T6). `expected` null = ref must not exist. `renew` is a side action (R1.1). */
 export interface ClaimAction extends UnitBase {
   kind: "claim";
   op: "acquire" | "renew" | "release";

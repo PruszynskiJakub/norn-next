@@ -95,7 +95,7 @@ export interface RunView {
   last_hook_at: string | null;
 }
 
-export type TimelineSource = "receipt" | "tick" | "hook" | "reject" | "briefing" | "foreign";
+export type TimelineSource = "receipt" | "tick" | "hook" | "reject" | "briefing" | "foreign" | "take";
 
 export interface TimelineEntry {
   at: string;

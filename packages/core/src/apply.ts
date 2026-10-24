@@ -137,7 +137,7 @@ export function applyReceipts(state: UnitState, receipts: readonly NumberedRecei
       continue;
     }
     out.applied.push(nr.n);
-    if (r.kind !== "mode") {
+    if (r.kind !== "mode" && r.kind !== "take") {
       out.route = res.route ?? null;
       out.deliver = res.deliver ?? null;
     }
@@ -157,6 +157,11 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
   if (r.kind === "mode") {
     // mode is story-level, not bound to a step (MO1)
     return { state: { ...st, mode: r.mode }, log: `mode ${r.previous} → ${r.mode}` };
+  }
+  if (r.kind === "take") {
+    // R10.1: a takeover is a record, not a cursor move — applied at any cursor, like mode
+    const from = r.previous_holder ? ` from ${r.previous_holder}${r.forced ? " (forced)" : r.expired ? " (expired)" : ""}` : "";
+    return { state: st, log: `taken by ${r.who ?? r.by}${from}` };
   }
   if (st.status === "corrupt") return { reject: "unit is corrupt (S2)" };
   if (r.slice !== undefined && r.slice !== st.slice) return { reject: `receipt for unit ${r.slice ?? st.story}, not ${st.slice ?? st.story}` };

@@ -22,11 +22,13 @@ import {
   stepOf,
   storyWorktreePath,
   type UnitFacts,
+  type UnpushedRuns,
   type WorktreeFacts,
 } from "@norn/core";
-import { DEFAULT_CONFIG, type HookFact, type LeaseFile, type Mode, type ResolvedConfig, storyBranch, type TraceEvent } from "@norn/schema";
+import { DEFAULT_CONFIG, type HookFact, type LeaseFile, type Mode, type ResolvedConfig, sliceBranch, storyBranch, type TraceEvent } from "@norn/schema";
 import {
   classifyClaim,
+  defaultBaseRef,
   type LeaseEntry,
   type LeaseLiveness,
   listLeases,
@@ -37,6 +39,8 @@ import {
   readUnitMarker,
   type StorySnapshot,
   type UnitSnapshot,
+  type UnpushedTarget,
+  unpushedRuns,
   withSliceWorktrees,
 } from "@norn/store";
 import { mergeTimeline, receiptEntry, traceEntries, traceUnits } from "./timeline.ts";
@@ -210,6 +214,26 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     for (const entry of list) if (entry.lease.run_id && entry.lease.kind !== "slot") leaseByRun.set(entry.lease.run_id, { entry, alive });
 
   const me = { heartbeat_id: opts.heartbeatId ?? null };
+
+  // R2.3: on a story not held here, local runs/ work that never reached the record (an inbox Check item)
+  const remoteName = config.remote.git_remote;
+  const baseRef = defaultBaseRef(opts.repoRoot, remoteName);
+  const unpushed = await Promise.all(
+    snap.stories.map(async (read, i): Promise<UnpushedRuns[]> => {
+      const c = classifyClaim(claims[i] ?? { state: "none" }, me, now);
+      if (c.state === "mine" || c.state === "corrupt" || ((c.state === "other" || c.state === "expired") && (c.blob.holder === holder || c.blob.heartbeat_id === me.heartbeat_id))) return [];
+      const storyWt = storyWorktreePath(opts.repoRoot, read.key, read.slug);
+      if (readUnitMarker(storyWt).marker?.story !== read.key) return [];
+      const targets: UnpushedTarget[] = [{ unit: read.key, dir: read.units[0]?.unit.dir ?? "_story", cwd: storyWt, branch: storyBranch(read.key, read.slug) }];
+      for (const u of read.units) {
+        const wt = u.unit.slice ? markedSliceWorktree(storyWt, read, u.unit.slice) : null;
+        const file = read.slices.find((f) => f.key === u.unit.slice);
+        if (wt && file) targets.push({ unit: u.unit.key, dir: u.unit.dir, cwd: wt, branch: sliceBranch(read.key, file.nn, file.slug) });
+      }
+      const found = await unpushedRuns(remoteName, baseRef, read.spec_dir, targets).catch(() => []);
+      return found.map((f) => ({ unit: f.unit, files: f.files }));
+    }),
+  );
   const runs: RunView[] = [];
   const timeline: Record<string, TimelineEntry[]> = {};
   const storyFacts: StoryFacts[] = [];
@@ -275,6 +299,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       units,
       slices: story.slices,
       mode,
+      ...(unpushed[i]?.length ? { unpushed_runs: unpushed[i] } : {}),
     };
     storyFacts.push(sf);
 

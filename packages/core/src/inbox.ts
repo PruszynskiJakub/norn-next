@@ -12,6 +12,7 @@ import type { Decision } from "./actions.ts";
 import { nextCommand, startAgentCommand } from "./commands.ts";
 import type { Facts, StoryFacts, UnitFacts } from "./facts.ts";
 import type { InboxGroup, InboxItem } from "./ports.ts";
+import { sha256 } from "./hash.ts";
 import { epoch, formatAge, iso } from "./time.ts";
 import { stepOf } from "./workflow.ts";
 
@@ -266,7 +267,37 @@ export function foreignCommitItems(story: StoryFacts): InboxItem[] {
   });
 }
 
-/** Build the whole inbox (O1). Stories held by another heartbeat are not shown. */
+/**
+ * R2.3 (H5, A18): local runs/ work on a checkout that does not hold the claim — it is not in the
+ * record and never will be (a non-holder never pushes, R2.2). One Check item per unit; `norn tidy`
+ * moves the files to `runs/<unit>/orphaned/` on the local branch.
+ */
+export function unpushedItems(story: StoryFacts, facts: Facts): InboxItem[] {
+  const c = story.claim;
+  const held = c.state === "other" || c.state === "expired" ? `the story is now held by ${c.blob.holder}${c.state === "expired" ? " (expired)" : ""}` : "the story is not claimed by this checkout";
+  const since = c.state === "other" ? c.blob.renewed_at : (story.frontmatter?.intake_at ?? iso(facts.now));
+  return (story.unpushed_runs ?? [])
+    .filter((u) => u.files.length)
+    .map((u) => {
+      const names = u.files.map((f) => f.split("/").at(-1) ?? f);
+      const receipts = u.files.filter((f) => f.includes("/receipts/")).map((f) => (f.split("/").at(-1) ?? f).replace(/\.json$/, ""));
+      const shown = (receipts.length ? receipts : names).slice(0, 3).join(", ") + ((receipts.length || names.length) > 3 ? ", …" : "");
+      return {
+        id: `unpushed:${u.unit}:${sha256(u.files.join("\n")).slice(0, 12)}`,
+        group: "check" as const,
+        story: story.key,
+        slice: u.unit === story.key ? null : u.unit,
+        step: null,
+        title: `local work on ${u.unit} is not in the record (${shown}) — ${held}`,
+        detail: u.files.join(" · "),
+        command: "norn tidy",
+        since,
+        ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
+      };
+    });
+}
+
+/** Build the whole inbox (O1). Stories held by another heartbeat are not shown (except R2.3 unpushed work). */
 export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   const groups = Object.fromEntries(INBOX_GROUPS.map((g) => [g, [] as InboxEntry[]])) as Record<InboxGroup, InboxEntry[]>;
   const add = (it: InboxItem | null) => {
@@ -274,6 +305,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   };
   for (const story of facts.stories) {
     const claim = story.claim.state;
+    for (const it of unpushedItems(story, facts)) add(it);
     if (claim === "other") continue;
     if ((claim === "none" || claim === "expired") && isStarted(story) && !storyFinished(story)) {
       const since = story.claim.state === "expired" ? story.claim.blob.expires_at : (story.frontmatter?.intake_at ?? iso(facts.now));
