@@ -30,7 +30,9 @@ import {
 import { DEFAULT_CONFIG, type HookFact, type LeaseFile, type Mode, type ResolvedConfig, sliceBranch, storyBranch, type TraceEvent } from "@norn/schema";
 import {
   classifyClaim,
+  cachedDefaultBranch,
   defaultBaseRef,
+  readBaseFacts,
   lastTickAt,
   type LeaseEntry,
   type LeaseLiveness,
@@ -229,7 +231,8 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
 
   // R2.3: on a story not held here, local runs/ work that never reached the record (an inbox Check item)
   const remoteName = config.remote.git_remote;
-  const baseRef = defaultBaseRef(opts.repoRoot, remoteName);
+  const baseRef = defaultBaseRef(opts.repoRoot, remoteName, config.base_branch);
+  const baseFacts = readBaseFacts(opts.repoRoot);
   const unpushed = await Promise.all(
     snap.stories.map(async (read, i): Promise<UnpushedRuns[]> => {
       const c = classifyClaim(claims[i] ?? { state: "none" }, me, now);
@@ -314,6 +317,8 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       slices: story.slices,
       mode,
       ...(unpushed[i]?.length ? { unpushed_runs: unpushed[i] } : {}),
+      // BS1: the last base measurement of this checkout's ticks (stale items, merge-item detail)
+      ...(baseFacts[story.key] && story.frontmatter?.status !== "done" && story.frontmatter?.status !== "dropped" ? { base: baseFacts[story.key] } : {}),
     };
     storyFacts.push(sf);
 
@@ -384,7 +389,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   const facts: Facts = {
     tick_id: "view",
     now,
-    repo: { root: opts.repoRoot, default_branch: "main", remote: config.remote.git_remote },
+    repo: { root: opts.repoRoot, default_branch: config.base_branch ?? cachedDefaultBranch(opts.repoRoot) ?? "main", remote: config.remote.git_remote },
     machine: {
       holder,
       heartbeat_id: opts.heartbeatId ?? null,

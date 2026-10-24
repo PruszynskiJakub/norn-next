@@ -114,6 +114,9 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
         });
     }
   }
+  // BS9: `base.step` names the step `norn update` re-enters
+  if (wf.base?.step !== undefined && !stepOf(wf, wf.base.step))
+    issues.push({ code: "unknown_target", path: "/base/step", message: `base.step '${wf.base.step}' does not exist` });
   for (const e of edgesOf(wf)) {
     const path = `/steps/${e.from}/outcomes/${e.outcome}`;
     if (!e.to.startsWith("$") && !stepOf(wf, e.to))
@@ -197,12 +200,12 @@ export function elementaryCycles(nodes: readonly string[], adj: ReadonlyMap<stri
 
 export type UnitLevel = "story" | "slice";
 
-/** W8: `slices` and `git: open-pr` only on a story; `git: integrate` only on a slice. Checked at unit start. */
+/** W8: `slices`, `git: open-pr` and `git: update` (BS3) only on a story; `git: integrate` only on a slice. Checked at unit start. */
 export function checkWorkflowLevel(wf: Workflow, level: UnitLevel): WorkflowIssue[] {
   const issues: WorkflowIssue[] = [];
   for (const [name, step] of Object.entries(wf.steps)) {
     const what = step.type === "git" ? `git: ${step.action}` : step.type;
-    const storyOnly = step.type === "slices" || (step.type === "git" && step.action === "open-pr");
+    const storyOnly = step.type === "slices" || (step.type === "git" && (step.action === "open-pr" || step.action === "update"));
     const sliceOnly = step.type === "git" && step.action === "integrate";
     if ((storyOnly && level !== "story") || (sliceOnly && level !== "slice"))
       issues.push({
@@ -212,6 +215,21 @@ export function checkWorkflowLevel(wf: Workflow, level: UnitLevel): WorkflowIssu
       });
   }
   return issues;
+}
+
+/** BS9: the step `norn update` re-enters — `base.step`, else the first step with `action: update`; null = none. */
+export function baseUpdateStep(wf: Workflow): string | null {
+  if (wf.base?.step) return stepOf(wf, wf.base.step) ? wf.base.step : null;
+  return Object.entries(wf.steps).find(([, s]) => s.type === "git" && s.action === "update")?.[0] ?? null;
+}
+
+/**
+ * BS7: is the story stale against its base under this workflow? `conflict` (default): a merge of
+ * the base would conflict; `behind`: the base has any commit the story lacks.
+ */
+export function isStale(wf: Workflow | null, base: { behind: number; conflicts: readonly string[] } | undefined): boolean {
+  if (!base) return false;
+  return (wf?.base?.stale ?? "conflict") === "behind" ? base.behind > 0 : base.conflicts.length > 0;
 }
 
 /** Outcomes the tick may classify for a step type (§10). */

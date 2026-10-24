@@ -1,0 +1,233 @@
+/**
+ * Base sync through the CLI runtime with real git (BS0–BS11, SPEC-base-sync-and-qa §7 cases 1, 2, 4,
+ * 6, 7b): a sibling merge into main is merged into the story branch by `git: update` with a
+ * `Norn-Tick` merge commit; a conflicting one goes to `resolve` and back; a story waiting at `ready`
+ * goes back through update when the base moves into a conflict; `norn update` re-enters a done story;
+ * a PR merged into another branch parks the story; `base_branch: develop` is used throughout.
+ */
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { runCli, type TickReport } from "../src/index.ts";
+import { createHarness, type Harness, issue, sh } from "./harness.ts";
+
+const BASED = `name: based
+start: update
+steps:
+  update:
+    type: git
+    action: update
+    outcomes: { done: test, conflict: { to: resolve, counter: base_conflict_loop } }
+  resolve:
+    type: agent
+    skill: merge
+    inputs: [spec, handoff]
+    outcomes: { done: { to: update, means: "base merged into the story branch, conflicts resolved and committed" } }
+  test:
+    type: check
+    run: "true"
+    timeout: 1m
+    outcomes: { pass: open-pr, fail: $stuck }
+  open-pr:
+    type: git
+    action: open-pr
+    outcomes: { done: ready }
+  ready:
+    type: gate
+    outcomes:
+      approve: $done
+      reject: $stuck
+      stale: { to: update, counter: stale_loop }
+counters: { base_conflict_loop: { max: 2 }, stale_loop: { max: 3 } }
+`;
+
+const config = (extra = "") => `agents:
+  claude: { adapter: claude }
+runner: { adapter: headless }
+remote: { provider: gh, label: norn }
+default_workflow: based
+default_mode: auto
+notifiers: []
+${extra}`;
+
+const kinds = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop" && d.rule !== "claim.renew").map((d) => `${d.unit} ${d.rule}${d.ok ? "" : ` FAILED ${d.error}`}`);
+
+/** commit `file` = `text` on `branch` of a fresh clone and push it — a sibling story merging into the base */
+function siblingMerge(h: Harness, file: string, text: string, branch = "main"): string {
+  const dir = join(h.dir, `sibling-${Math.random().toString(36).slice(2)}`);
+  sh(h.dir, ["clone", "-q", "-b", branch, h.remoteDir, dir]);
+  sh(dir, ["config", "user.email", "s@example.com"]);
+  sh(dir, ["config", "user.name", "Sibling"]);
+  writeFileSync(join(dir, file), text);
+  sh(dir, ["add", "-A"]);
+  sh(dir, ["commit", "-q", "-m", `sibling: ${file}`]);
+  sh(dir, ["push", "-q", "origin", branch]);
+  return sh(dir, ["rev-parse", "HEAD"]);
+}
+
+describe("base sync with real git", () => {
+  let h: Harness;
+  const wt = () => `${h.root}-worktrees/gh-7-add-login-form`;
+  const runs = () => join(wt(), ".agents/specs/gh-7-add-login-form/runs/_story");
+  const step = () => h.clock.advance(10_000);
+  const until = async (pred: () => boolean, label: string, max = 20) => {
+    const seen: string[] = [];
+    for (let i = 0; i < max && !pred(); i++) {
+      step();
+      seen.push(...kinds(await h.tick()));
+    }
+    if (!pred()) throw new Error(`${label} not reached: ${JSON.stringify(h.state(runs()))}\n${seen.join("\n")}`);
+    return seen;
+  };
+
+  beforeAll(async () => {
+    h = await createHarness();
+    h.write(join(h.root, ".agents/norn/config.yaml"), config());
+    h.write(join(h.root, ".agents/norn/workflows/based.yaml"), BASED);
+    writeFileSync(join(h.root, "a.txt"), "one\n");
+    h.git(["add", "-A"]);
+    h.git(["commit", "-q", "-m", "norn init"]);
+    h.git(["push", "-q", "origin", "main"]);
+    h.remote.issues = [issue(7, "Add login form")];
+  });
+  afterAll(() => h.cleanup());
+
+  test("1: a sibling merge without conflicts is merged by update — one Norn-Tick merge commit, no foreign item, → test", async () => {
+    expect(kinds(await h.tick())).toEqual(["gh-7 remote.intake"]);
+    const sibling = siblingMerge(h, "b.txt", "b\n");
+    step();
+    await h.tick("--sync"); // claim; the base is fetched with the sync (P2)
+    const seen = await until(() => h.state(runs())?.step === "test", "test");
+    expect(seen).toContain("gh-7 git.update");
+    expect(h.git(["log", "--merges", "--format=%H"], wt()).split("\n").filter(Boolean)).toHaveLength(1);
+    const log = h.git(["log", "--merges", "-1", "--format=%s%n%P%n%(trailers:key=Norn-Tick,valueonly)"], wt()).split("\n");
+    expect(log[0]).toBe(`Update gh-7 from main (${sibling.slice(0, 7)})`);
+    expect(log[1]).toContain(sibling);
+    expect(log[2]).toMatch(/^[0-9A-Z]{26}$/);
+    // pushed at the step boundary (S8)
+    expect(h.git(["ls-remote", "origin", "refs/heads/gh-7-add-login-form"]).split("\t")[0]).toBe(h.git(["rev-parse", "HEAD"], wt()));
+    const inbox = (await h.norn("inbox")).value as { groups: Record<string, Array<{ id: string }>> };
+    expect(inbox.groups.check?.filter((i) => i.id.startsWith("foreign:"))).toEqual([]);
+  }, 60_000);
+
+  test("4 + 2: waiting at ready, a conflicting sibling merge → stale → update → conflict → resolve (brief: base sha + paths) → done → update → test", async () => {
+    await until(() => h.state(runs())?.step === "ready" && h.state(runs())?.status === "parked", "ready");
+    expect(h.remote.prs).toMatchObject([{ base: "main" }]);
+    // the story changed a.txt (agent work, committed through norn)
+    writeFileSync(join(wt(), "a.txt"), "story side\n");
+    h.git(["add", "-A"], wt());
+    h.git(["commit", "-q", "-m", "story edits a", "--trailer", "Norn-Tick: 01JBQ6ZK3E8Y4V5W6X7Y8Z9ABC"], wt());
+    const sibling = siblingMerge(h, "a.txt", "base side\n");
+    step();
+    const r = kinds(await h.tick("--sync"));
+    expect(r).toContain("gh-7 gate.stale");
+    const st = h.state(runs());
+    expect(st).toMatchObject({ step: "update", counters: { stale_loop: 1 } });
+    const stale = JSON.parse(readFileSync(join(runs(), "receipts", (h.git(["ls-files", "--others", "--cached", "receipts"], runs()).split("\n").filter((f) => f.endsWith("-classify.json")).at(-1) as string).replace(/^receipts\//, "")), "utf8"));
+    expect(stale).toMatchObject({ outcome: "stale", rule: "base moved", route: "update", base: { sha: sibling, conflicts: ["a.txt"], behind: 1 } });
+
+    await until(() => h.state(runs())?.step === "resolve" && h.state(runs())?.status === "running", "resolve running");
+    expect(h.state(runs())?.counters.base_conflict_loop).toBe(1);
+    // the agent's brief, from the story worktree
+    const b = await runCli(["brief", "--json"], { ...h.deps, cwd: wt() });
+    const json = (b.value as { brief: { rework: { base?: { sha: string; conflicts: string[] } } | null } }).brief;
+    expect(json.rework?.base).toMatchObject({ sha: sibling, conflicts: ["a.txt"] });
+    expect(sh(wt(), ["status", "--porcelain"])).toBe("");
+
+    // the agent merges the base in the story worktree, resolves by intent, commits (BS5)
+    const merge = Bun.spawnSync(["git", "merge", "--no-ff", sibling], { cwd: wt() });
+    expect(merge.exitCode).not.toBe(0);
+    writeFileSync(join(wt(), "a.txt"), "story side\nbase side\n");
+    h.git(["add", "a.txt"], wt());
+    h.git(["commit", "-q", "--no-edit"], wt());
+    h.report(runs(), "done", { outcome: "done", handoff: "merged main, kept both lines in a.txt" });
+    const seen = await until(() => h.state(runs())?.step === "ready" && h.state(runs())?.status === "parked", "ready again");
+    expect(seen).toContain("gh-7 git.update");
+    expect(h.git(["merge-base", "--is-ancestor", sibling, "HEAD"], wt())).toBe("");
+    const last = h.git(["log", "-3", "--format=%s"], wt());
+    expect(last).not.toContain("Update gh-7 from main"); // the second update found it up to date: no merge commit
+  }, 60_000);
+
+  test("6: norn update re-enters a done, unmerged story; refused without the claim and once merged", async () => {
+    expect((await h.norn("approve", "gh-7")).exit).toBe(0);
+    await until(() => h.state(runs())?.status === "done", "done");
+    // not done-and-waiting refusal paths first: a slice key is a usage of the story
+    const ok = await h.norn("update", "gh-7");
+    expect(ok.exit).toBe(0);
+    expect(ok.value).toMatchObject({ unit: "gh-7", receipt: { kind: "update", from: "$done", to: "update", reason: "person", step: "$done" }, delivered: { via: "local" } });
+    const again = await h.norn("update", "gh-7");
+    expect(again.exit).toBe(3);
+    expect(again.value).toMatchObject({ code: "already_recorded" });
+    step();
+    expect(kinds(await h.tick())).toContain("gh-7 receipts.apply");
+    expect(h.state(runs())).toMatchObject({ step: "update", status: "ready" });
+    await until(() => h.state(runs())?.step === "ready" && h.state(runs())?.status === "parked", "ready (3rd)");
+    expect((await h.norn("approve", "gh-7")).exit).toBe(0);
+    await until(() => h.state(runs())?.status === "done", "done again");
+
+    // without the claim: refused
+    expect((await h.norn("release", "gh-7")).exit).toBe(0);
+    const noClaim = await h.norn("update", "gh-7");
+    expect(noClaim.exit).toBe(3);
+    expect(noClaim.value).toMatchObject({ code: "not_holder", do_instead: "norn take gh-7" });
+    expect((await h.norn("take", "gh-7")).exit).toBe(0);
+
+    // 7b: merged into another branch → parked, no cleanup
+    const pr = h.remote.prs[0] as (typeof h.remote.prs)[number];
+    pr.state = "merged";
+    pr.base_branch = "release";
+    pr.base = "release";
+    step();
+    expect(kinds(await h.tick("--sync"))).toContain("gh-7 remote.park");
+    expect(h.state(runs())?.park).toMatchObject({ kind: "remote", reason: "remote: PR merged into release, not main" });
+    expect(existsSync(wt())).toBe(true);
+
+    // merged into the base (the story branch lands on main) → cleanup and the done record; then update is refused
+    pr.base_branch = "main";
+    pr.base = "main";
+    const land = join(h.dir, "land");
+    sh(h.dir, ["clone", "-q", h.remoteDir, land]);
+    sh(land, ["-c", "user.email=s@example.com", "-c", "user.name=S", "merge", "-q", "--no-ff", "-m", "Merge PR #100", "origin/gh-7-add-login-form"]);
+    sh(land, ["push", "-q", "origin", "main"]);
+    step();
+    expect(kinds(await h.tick("--sync"))).toContain("gh-7 remote.pr_merged");
+    const merged = await h.norn("update", "gh-7");
+    expect(merged.exit).toBe(3);
+    expect(merged.value).toMatchObject({ code: "story_merged" });
+  }, 60_000);
+});
+
+describe("base_branch: develop (BS0, 7b)", () => {
+  let h: Harness;
+  beforeAll(async () => {
+    h = await createHarness();
+    h.write(join(h.root, ".agents/norn/config.yaml"), config("base_branch: develop\n"));
+    h.write(join(h.root, ".agents/norn/workflows/based.yaml"), BASED);
+    h.git(["add", "-A"]);
+    h.git(["commit", "-q", "-m", "norn init"]);
+    h.git(["push", "-q", "origin", "main"]);
+    h.git(["push", "-q", "origin", "main:develop"]);
+    h.git(["fetch", "-q", "origin"]);
+    h.git(["branch", "-q", "develop", "origin/develop"]);
+    h.remote.issues = [issue(8, "Use develop")];
+  });
+  afterAll(() => h.cleanup());
+
+  test("intake from develop, update merges develop, open-pr targets develop", async () => {
+    const wt = `${h.root}-worktrees/gh-8-use-develop`;
+    const runs = join(wt, ".agents/specs/gh-8-use-develop/runs/_story");
+    await h.tick();
+    const sibling = siblingMerge(h, "d.txt", "d\n", "develop");
+    siblingMerge(h, "m.txt", "m\n", "main"); // main moves too: never merged into the story
+    h.clock.advance(10_000);
+    await h.tick("--sync");
+    for (let i = 0; i < 12 && h.state(runs)?.step !== "ready"; i++) {
+      h.clock.advance(10_000);
+      await h.tick();
+    }
+    expect(h.state(runs)).toMatchObject({ step: "ready", status: "parked" });
+    expect(h.git(["log", "--format=%s"], wt)).toContain(`Update gh-8 from develop (${sibling.slice(0, 7)})`);
+    expect(existsSync(join(wt, "m.txt"))).toBe(false);
+    expect(h.remote.prs).toMatchObject([{ head: "gh-8-use-develop", base: "develop" }]);
+  }, 60_000);
+});

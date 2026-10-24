@@ -165,6 +165,8 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
   }
   if (st.status === "corrupt") return { reject: "unit is corrupt (S2)" };
   if (r.slice !== undefined && r.slice !== st.slice) return { reject: `receipt for unit ${r.slice ?? st.story}, not ${st.slice ?? st.story}` };
+  // BS9: `norn update` may re-enter a story unit that is done (PR unmerged), at a gate, or stuck
+  if (r.kind === "update") return updateFrom(st, r, ctx);
   if (st.step === "$done") return { reject: "unit is done" };
   if (r.step !== st.step || r.attempt !== st.attempt)
     return { reject: `stale: receipt for ${r.step}#${r.attempt}, cursor at ${st.step}#${st.attempt}` };
@@ -291,6 +293,20 @@ function unstick(st: UnitState, r: ReceiptOf<"unstick">, ctx: ApplyContext): Ste
   return { state: next, log: `unstick → ${to}${resets}`, advance: { from: st.step, outcome: "unstick", to } };
 }
 
+/**
+ * BS9: a person sends the story unit back to its base-update step — from `$done` (the PR is not
+ * merged), a gate, or stuck. Counters are unchanged; the ready gate is passed again later (F35).
+ */
+function updateFrom(st: UnitState, r: ReceiptOf<"update">, ctx: ApplyContext): Step1 {
+  if (st.slice !== null) return { reject: "norn update is for the story unit" };
+  if (r.step !== st.step || r.attempt !== st.attempt) return { reject: `stale: receipt for ${r.step}#${r.attempt}, cursor at ${st.step}#${st.attempt}` };
+  const waiting = st.status === "done" || st.status === "stuck" || (st.status === "parked" && st.park?.kind === "gate");
+  if (!waiting) return { reject: `unit is ${st.status}${st.park ? ` (${st.park.kind})` : ""}; update needs it done, at a gate or stuck` };
+  if (!stepOf(ctx.workflow, r.to)) return { reject: `no step '${r.to}' in workflow ${ctx.workflow.name}` };
+  const next = enterStep(st, ctx.workflow, r.to, ctx.now);
+  return { state: next, log: `update by ${r.who ?? r.by}: ${st.step} → ${r.to}`, advance: { from: st.step, outcome: "update", to: r.to } };
+}
+
 /** Take the declared edge for `outcome` at the cursor (W3), counting it (W4). */
 function take(st: UnitState, outcome: string, r: Receipt, ctx: ApplyContext, last: LastOutcome): Step1 {
   const wf = ctx.workflow;
@@ -337,8 +353,18 @@ function classify(st: UnitState, r: ReceiptOf<"classify">, step: NonNullable<Ret
     return { state: { ...stuckPark(st, "exhausted", reason, r.at, r.receipt_id), last_outcome: last }, log: `exhausted: ${reason}` };
   }
   if (step.type !== "agent") {
-    if (!(step.type === "check" ? ["pass", "fail"] : step.type === "gate" ? ["approve", "reject"] : step.type === "git" ? ["done", "conflict"] : ["done", "stuck"]).includes(o))
+    if (!(step.type === "check" ? ["pass", "fail"] : step.type === "gate" ? ["approve", "reject", "stale"] : step.type === "git" ? ["done", "conflict", "stuck"] : ["done", "stuck"]).includes(o))
       return { reject: `outcome '${o}' cannot be classified for a ${step.type} step` };
+    // BS3: a git step that cannot run (dirty worktree, diverged branch) parks under Unblock with the reason
+    if (step.type === "git" && o === "stuck") {
+      const reason = r.detail ?? `${st.step}: stuck`;
+      return { state: { ...stuckPark(st, "stuck", reason, r.at, r.receipt_id), last_outcome: last }, log: `${st.step} stuck: ${reason}` };
+    }
+    if (step.type === "gate") {
+      // BS6: only `stale` is tick-classified at a gate, and only through a declared route
+      if (o !== "stale" || st.park?.kind !== "gate" || !edgeOf(ctx.workflow, st.step, o)) return { reject: `outcome '${o}' cannot be classified at gate ${st.step}` };
+      return take({ ...st, park: null, status: "ready" }, o, r, ctx, last);
+    }
     return take(st, o, r, ctx, last);
   }
   if ((OVERRIDABLE_ROUTES as readonly string[]).includes(o) && edgeOf(ctx.workflow, st.step, o)) return take(st, o, r, ctx, last);

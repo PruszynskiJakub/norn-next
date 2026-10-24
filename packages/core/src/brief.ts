@@ -109,6 +109,11 @@ export interface BriefJson {
     /** a gate rejection: the person's comment verbatim and what they judged */
     decision: { step: string; by: string | null; comment: string | null; judged: BriefReport | null } | null;
     detail: string | null;
+    /**
+     * BS5 base mode: `git: update` stopped on conflicts — merge `sha` (the tip of `ref`) into the
+     * story branch in this worktree, resolve, commit the merge; never rebase. Absent otherwise.
+     */
+    base?: { ref: string; sha: string; conflicts: string[] };
   } | null;
   /** F28: gate rulings of the story, oldest first (the one shown under Rework excepted) */
   rulings: Ruling[];
@@ -295,6 +300,8 @@ function rework(input: BriefInput, step: AgentStep): BriefJson["rework"] {
     findings: done?.findings?.length ? { step: done.step, outcome: done.outcome, items: done.findings } : null,
     decision,
     detail: r.kind === "classify" ? (r.detail ?? `${r.step}: ${r.outcome}`) : null,
+    // BS5: the base the update could not merge, as data (never parsed from `detail`, P8)
+    ...(r.kind === "classify" && r.outcome === "conflict" && r.base ? { base: { ref: r.base.ref, sha: r.base.sha, conflicts: [...r.base.conflicts] } } : {}),
   };
 }
 
@@ -432,6 +439,15 @@ function markdown(b: BriefJson): string {
     }
     if (r) evidenceLines(out, r.evidence);
     if (rw.detail) out.push(`### ${rw.from}`, "", rw.detail, "");
+    const bs = rw.base;
+    if (bs) {
+      const branch = bs.ref.replace(/^refs\/(remotes|heads)\//, "");
+      out.push("### Base update (merge skill, base mode)", "");
+      out.push(`Merge \`${bs.sha}\` (${branch}) into the story branch in this worktree, resolve, commit the merge; never rebase:`, "");
+      out.push("```sh", `git merge --no-ff ${bs.sha}`, "```", "");
+      out.push(`Conflicting paths: ${bs.conflicts.length ? bs.conflicts.map((p) => `\`${p}\``).join(", ") : "(not reported)"}`, "");
+      out.push("Resolve each conflict by intent; resolve to existing behaviour only. When no resolution fits without new behaviour, run `git merge --abort` (the worktree stays clean) and report `norn stuck \"<why>\"`. Otherwise commit the merge, run the checks, and report done. Do not push.", "");
+    }
   }
 
   if (b.rulings.length) {

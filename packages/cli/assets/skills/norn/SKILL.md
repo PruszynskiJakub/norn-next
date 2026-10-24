@@ -34,7 +34,7 @@ The top block is generated: never edit it. Below it, keep three sections:
 - **Progress**: milestones done, decisions and why, what was tried and failed.
 - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
 
-Update it at each milestone and always right before you report.
+Refresh it at each milestone and always right before you report.
 
 ## 4. Report exactly once, then end your turn
 

@@ -5,7 +5,7 @@
  */
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import type { CommitSpec, GitFactory, GitPort, PushResult, RefUpdate, WorktreeInfo, WorktreeStatus } from "@norn/core";
+import type { CommitSpec, GitFactory, GitPort, MergeResult, PushResult, RefUpdate, WorktreeInfo, WorktreeStatus } from "@norn/core";
 import { bunExec, isAuthError, isNetworkError, okOrThrow, portError, type Exec, type ExecResult } from "./exec.ts";
 
 export { bunExec, fixtureExec, portError, type Exec, type ExecFixture, type ExecOptions, type ExecResult } from "./exec.ts";
@@ -28,6 +28,23 @@ export function parseTrailers(text: string): Record<string, string> {
     if (m) out[m[1] as string] = (m[2] as string).trim();
   }
   return out;
+}
+
+/** BS2: `git merge-tree --write-tree` (BS1 conflict detection) needs git ≥ 2.38. */
+export const MIN_GIT_VERSION = [2, 38] as const;
+
+/** `git version 2.50.1 (Apple Git-155)` → [2, 50, 1]; null when unreadable. */
+export function parseGitVersion(text: string): number[] | null {
+  const m = /git version (\d+)\.(\d+)(?:\.(\d+))?/.exec(text);
+  return m ? [Number(m[1]), Number(m[2]), Number(m[3] ?? 0)] : null;
+}
+
+/** BS2: is this git new enough for norn (≥ 2.38)? */
+export function gitVersionOk(text: string): boolean {
+  const v = parseGitVersion(text);
+  if (!v) return false;
+  const [maj, min] = v as [number, number];
+  return maj > MIN_GIT_VERSION[0] || (maj === MIN_GIT_VERSION[0] && min >= MIN_GIT_VERSION[1]);
 }
 
 export function classifyPush(res: ExecResult): PushResult {
@@ -251,6 +268,41 @@ export function createGit(opts: GitOptions = {}): GitPort {
       return false;
     },
 
+    async divergence(cwd, a, b) {
+      const counts = (await line(cwd, ["rev-list", "--left-right", "--count", `${a}...${b}`, "--"])).split(/\s+/);
+      const mb = await run(cwd, ["merge-base", a, b]);
+      if (mb.code !== 0 && mb.code !== 1) okOrThrow(mb, "git merge-base", "git");
+      return { merge_base: mb.code === 0 ? mb.stdout.trim() || null : null, ahead: Number(counts[0] ?? 0), behind: Number(counts[1] ?? 0) };
+    },
+    async mergeTree(cwd, ours, theirs) {
+      // BS1: exit 0 = clean (prints the tree), 1 = conflicts (tree, then one conflicted path per line)
+      const r = await run(cwd, ["merge-tree", "--write-tree", "--name-only", "--no-messages", ours, theirs]);
+      if (r.code === 0) return [];
+      if (r.code !== 1) okOrThrow(r, "git merge-tree", "git");
+      return [...new Set(lines(r.stdout).slice(1))].sort();
+    },
+    async merge(cwd, rev, spec): Promise<MergeResult> {
+      // BS3: merge without committing, so the merge commit carries the message and trailers (S4)
+      const r = await run(cwd, ["merge", "--no-ff", "--no-commit", "--no-edit", rev]);
+      const head = () => line(cwd, ["rev-parse", "HEAD"]);
+      const inMerge = async () => {
+        const p = await nullIfFail(cwd, ["rev-parse", "--git-path", "MERGE_HEAD"]);
+        return !!p && existsSync(resolve(cwd, p));
+      };
+      if (r.code !== 0) {
+        if (!(await inMerge())) okOrThrow(r, "git merge", "git"); // e.g. dirty tree: not a conflict
+        const files = lines((await run(cwd, ["diff", "--name-only", "--diff-filter=U"])).stdout);
+        const abort = await run(cwd, ["merge", "--abort"]);
+        if (abort.code !== 0) throw portError("git_merge_abort_failed", `git merge --abort failed: ${abort.stderr.trim()}`);
+        return { ok: false, conflict: true, files: [...new Set(files)].sort() };
+      }
+      if (!(await inMerge())) return { ok: true, head: await head() }; // already up to date
+      const args = ["commit", "--no-edit", "-F", "-", "--cleanup=strip"];
+      for (const [k, v] of Object.entries(spec.trailers)) args.push("--trailer", `${k}: ${v}`);
+      await must(cwd, args, spec.message);
+      return { ok: true, head: await head() };
+    },
+
     readRef: (cwd, ref) => nullIfFail(cwd, ["rev-parse", "--verify", "--quiet", "--end-of-options", ref]),
     async listRefs(cwd, prefix) {
       const out = await must(cwd, ["for-each-ref", "--format=%(refname) %(objectname)", prefix]);
@@ -319,6 +371,57 @@ export async function integrate(git: GitPort, opts: { sliceCwd: string; storyBra
   if (!(await git.isAncestor(opts.sliceCwd, old, rb.head)) || !(await git.updateRef(opts.sliceCwd, { ref: storyRef, sha: rb.head, expected: old })))
     throw portError("git_ff_failed", `cannot fast-forward ${opts.storyBranch} to ${rb.head}`, true);
   return { outcome: "done", head: rb.head };
+}
+
+export type UpdateResult =
+  | { outcome: "done"; head: string; merged: boolean; adopted: string | null }
+  | { outcome: "conflict"; files: string[]; adopted: string | null }
+  | { outcome: "stuck"; reason: string };
+
+/**
+ * W2 `git: update` (BS3, BS4) in the story worktree `cwd`, whose branch is `branch`. The caller
+ * holds the story's integrate lock (K6) and pushes afterwards (S8, T7).
+ *  1. a dirty worktree → `stuck` (`worktree dirty`);
+ *  3. the remote story branch ahead of the local one and descended from it (a person pressed
+ *     "Update branch" on the host) → fast-forward to it first; diverged → `stuck`;
+ *  4. nothing of `baseSha` missing → `done`, no commit;
+ *  5. else `git merge --no-ff <baseSha>` with `message` and `trailers` (`Norn-Tick`, so Q6 does
+ *     not report the merge as foreign) → `done`;
+ *  6. a conflicting merge is aborted → `conflict` with the paths.
+ * Merge, never rebase: the story branch is published (BS4).
+ */
+export async function update(
+  git: GitPort,
+  opts: { cwd: string; branch: string; baseSha: string; remote: string | null; message: string; trailers: Record<string, string> },
+): Promise<UpdateResult> {
+  const st = await git.status(opts.cwd);
+  if (!st.clean || st.rebase_in_progress) return { outcome: "stuck", reason: "worktree dirty" };
+  if (st.branch !== opts.branch) return { outcome: "stuck", reason: `story worktree is on ${st.branch ?? "a detached HEAD"}, not ${opts.branch}` };
+  let adopted: string | null = null;
+  if (opts.remote) {
+    const tracking = `refs/remotes/${opts.remote}/${opts.branch}`;
+    let fetched = true;
+    try {
+      await git.fetch(opts.cwd, opts.remote, [`+refs/heads/${opts.branch}:${tracking}`]);
+    } catch (e) {
+      // a story branch never pushed has nothing to adopt; anything else is a failed effect (R4.3)
+      if (!/couldn't find remote ref|could not find remote ref/i.test((e as Error).message)) throw e;
+      fetched = false;
+    }
+    const remoteSha = fetched ? await git.readRef(opts.cwd, tracking) : null;
+    const local = st.head;
+    if (remoteSha && local && remoteSha !== local && !(await git.isAncestor(opts.cwd, remoteSha, local))) {
+      if (!(await git.isAncestor(opts.cwd, local, remoteSha))) return { outcome: "stuck", reason: `story branch diverged from ${opts.remote}/${opts.branch}` };
+      const ff = await git.fastForward(opts.cwd, remoteSha);
+      if (!ff.ok) throw portError("git_ff_failed", `cannot fast-forward ${opts.branch} to ${opts.remote}/${opts.branch}`);
+      adopted = remoteSha;
+    }
+  }
+  const d = await git.divergence(opts.cwd, "HEAD", opts.baseSha);
+  if (d.behind === 0) return { outcome: "done", head: (await git.revParse(opts.cwd, "HEAD")) as string, merged: false, adopted };
+  const m = await git.merge(opts.cwd, opts.baseSha, { message: opts.message, trailers: opts.trailers });
+  if (!m.ok) return { outcome: "conflict", files: m.files, adopted };
+  return { outcome: "done", head: m.head, merged: true, adopted };
 }
 
 export const factory: GitFactory = () => createGit();

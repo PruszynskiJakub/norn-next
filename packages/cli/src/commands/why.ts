@@ -85,6 +85,8 @@ function reasonOf(r: Receipt): string | null {
       return `${r.how}${r.agent ? ` ${r.agent}` : ""}${r.retry ? " (retry)" : ""}`;
     case "take":
       return r.previous_holder ? `taken from ${r.previous_holder}${r.forced ? " (forced)" : r.expired ? " (expired claim)" : ""}` : "taken (claim was free)";
+    case "update":
+      return `update from ${r.from} to ${r.to} (${r.reason})`;
   }
 }
 

@@ -65,7 +65,7 @@
     "step": {
       "anyOf": [
         {
-          "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*$",
+          "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
           "type": "string"
         },
         {
@@ -81,7 +81,7 @@
     "visits": {
       "type": "object",
       "patternProperties": {
-        "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*$": {
+        "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$": {
           "minimum": 1,
           "type": "integer"
         }
@@ -272,7 +272,7 @@
               "type": "string"
             },
             "step": {
-              "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*$",
+              "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
               "type": "string"
             },
             "attempt": {
@@ -396,7 +396,7 @@
           ],
           "properties": {
             "step": {
-              "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*$",
+              "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
               "type": "string"
             },
             "outcome": {

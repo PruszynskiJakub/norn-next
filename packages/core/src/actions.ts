@@ -206,6 +206,11 @@ export interface RunGitAction extends UnitBase, Transition {
   onto: string | null;
   /** open-pr */
   pr: { base: string; title: string; body: string } | null;
+  /**
+   * update (BS3): merge `sha` (the tip of `ref`, BS0) into the story branch with `message` and
+   * `trailers` (`Norn-Tick`: Q6 never reports it as foreign). Absent on older traces.
+   */
+  update?: { ref: string; sha: string; branch: string; message: string; trailers: Record<string, string> } | null;
 }
 
 /** Story-level `slices` step: start every slice whose depends_on are done, within caps (W2). */

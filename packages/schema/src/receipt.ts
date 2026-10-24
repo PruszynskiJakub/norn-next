@@ -151,6 +151,21 @@ export const ClassifyReceipt = receipt("classify", {
   /** Route taken: a step, a reserved target, or `nudge` / `retry` / `park` for in-step routes. */
   route: Type.Union([Target, Type.Literal("nudge"), Type.Literal("retry"), Type.Literal("park")]),
   counter: Type.Optional(Type.Object({ name: NonEmpty, value: NonNegInt, max: PosInt }, { additionalProperties: false })),
+  /**
+   * BS3/BS8: the base the story was measured against — `git: update` conflicts and gate `stale`.
+   * Structured so the `resolve` brief carries the base sha and paths without parsing `detail` (P8).
+   */
+  base: Type.Optional(
+    Type.Object(
+      {
+        ref: NonEmpty,
+        sha: Type.String({ pattern: "^[0-9a-f]{40,64}$" }),
+        behind: Type.Optional(NonNegInt),
+        conflicts: Type.Array(NonEmpty),
+      },
+      { additionalProperties: false },
+    ),
+  ),
   /** C4 snapshot on silent: last assistant message, head commit, diff stat. */
   snapshot: Type.Optional(
     Type.Object(
@@ -177,6 +192,17 @@ export const TakeReceipt = receipt("take", {
   /** `take --force` over an unexpired or corrupt claim (T5) */
   forced: Type.Optional(Type.Boolean()),
 });
+/**
+ * BS9: `norn update <story>` — a person sends the story unit back to its base-update step (from a
+ * gate, from stuck, or from `$done` while the PR is unmerged). Written before the state change (P6).
+ */
+export const UpdateReceipt = receipt("update", {
+  /** the step left, or `$done` */
+  from: Type.Union([StepName, Type.Literal("$done"), Type.Literal("$stuck")]),
+  /** the step entered (the workflow's `base.step`) */
+  to: StepName,
+  reason: Type.Literal("person"),
+});
 /** Journaled workflow switch (`norn workflow <unit> <name> --to <step>`, S7). */
 export const WorkflowReceipt = receipt("workflow", {
   name: NonEmpty,
@@ -201,6 +227,7 @@ export const Receipt = TaggedUnion(
     ClassifyReceipt,
     WorkflowReceipt,
     TakeReceipt,
+    UpdateReceipt,
   ],
   { $id: "https://norn.dev/schema/receipt.json", title: "norn receipt" },
 );
@@ -220,6 +247,7 @@ export type StartedReceipt = ReceiptOf<"started">;
 export type ClassifyReceipt = ReceiptOf<"classify">;
 export type WorkflowReceipt = ReceiptOf<"workflow">;
 export type TakeReceipt = ReceiptOf<"take">;
+export type UpdateReceipt = ReceiptOf<"update">;
 
 export const RECEIPT_KINDS = [
   "done",
@@ -235,6 +263,7 @@ export const RECEIPT_KINDS = [
   "classify",
   "workflow",
   "take",
+  "update",
 ] as const satisfies readonly ReceiptKind[];
 
 /** Receipts a non-holder may push through the mailbox (T9). */

@@ -42,6 +42,7 @@ import {
 } from "@norn/schema";
 import {
   acquireClaim,
+  acquireIntegrateLock,
   acquireLease,
   acquireRunLease,
   appendHandoffHeartbeat,
@@ -62,6 +63,7 @@ import {
   sliceFile as sliceFilePath,
   slotEnv,
   storyFile,
+  traceDir,
   updateLease,
   writeActFailures,
   writeEnvNorn,
@@ -845,16 +847,65 @@ export class Actor {
     }
   }
 
-  /** W2 git steps (K6, open-pr); the outcome is a `classify` receipt written after the effect. */
+  /** W2 git steps (K6, open-pr, BS3 update); the outcome is a `classify` receipt written after the effect. */
   private async runGit(a: Extract<Action, { kind: "run_git" }>): Promise<ActionResult> {
+    if (a.action !== "integrate" && a.action !== "update") return this.runGitLocked(a);
+    // K6/BS3: slice integrations and base updates of one story never interleave, across processes too
+    mkdirSync(traceDir(this.root), { recursive: true });
+    const lock = await acquireIntegrateLock(this.root, a.unit.story, { now: () => this.nowIso(), note: `${a.unit.key} ${a.action}` });
+    if (!lock.ok) throw new QueueFull(`integrate lock of ${a.unit.story} is held (pid ${lock.holder.holder.pid}); retried next tick (K6)`);
+    try {
+      return await this.runGitLocked(a);
+    } finally {
+      lock.release();
+    }
+  }
+
+  /** BS3: push the updated story branch; a refused push is a failed effect (R4.3), the receipt still stands. */
+  private async pushUpdated(cwd: string, branch: string): Promise<{ ok: true } | { ok: false; message: string }> {
+    const r = await this.pushBranch(cwd, branch);
+    if (r.ok) this.effectsOk.add("push");
+    else this.effectErrors.push({ effect: "push", reason: `push of ${branch} failed: ${r.message}` });
+    return r;
+  }
+
+  private async runGitLocked(a: Extract<Action, { kind: "run_git" }>): Promise<ActionResult> {
     const loc = this.unitLoc(a.unit);
     const st = loc.state;
     const wf = loc.workflow;
     if (!st || !wf) throw new Error(`${a.unit.key} has no state or pinned workflow`);
-    let outcome: "done" | "conflict";
+    let outcome: "done" | "conflict" | "stuck";
     let detail: string;
+    let base: ReceiptOf<"classify">["base"];
     const extra: Record<string, unknown> = {};
     switch (a.action) {
+      case "update": {
+        const u = a.update;
+        if (!u) throw new Error("update without a base");
+        const res = await gitAdapter.update(this.git, { cwd: a.cwd, branch: a.branch, baseSha: u.sha, remote: this.obs.remote, message: u.message, trailers: u.trailers });
+        if (res.outcome === "stuck") {
+          // BS3 step 1/3: dirty worktree, diverged story branch → $stuck with the reason
+          outcome = "stuck";
+          detail = res.reason;
+          break;
+        }
+        if (res.adopted) extra.adopted = res.adopted;
+        if (res.outcome === "conflict") {
+          // BS3 step 6: the merge was aborted; the resolve step gets the base sha and the paths
+          outcome = "conflict";
+          base = { ref: u.ref, sha: u.sha, conflicts: res.files };
+          detail = `merging ${u.branch} (${u.sha.slice(0, 12)}) into ${a.branch} conflicts in ${res.files.join(", ") || "?"}`;
+          // an adopted fast-forward is still the record: publish it (S8)
+          if (res.adopted) extra.story_push = await this.pushUpdated(a.cwd, a.branch);
+          break;
+        }
+        outcome = "done";
+        base = { ref: u.ref, sha: u.sha, conflicts: [] };
+        detail = res.merged ? `merged ${u.branch} (${u.sha.slice(0, 12)}) into ${a.branch} at ${res.head.slice(0, 12)}` : `${a.branch} is up to date with ${u.branch} (${u.sha.slice(0, 12)})`;
+        // BS3 step 5: pushed at the step boundary (S8, T7), as integrate does
+        if (res.merged || res.adopted) extra.story_push = await this.pushUpdated(a.cwd, a.branch);
+        break;
+      }
       case "integrate": {
         if (!a.onto) throw new Error("integrate without a story branch");
         const res = await gitAdapter.integrate(this.git, { sliceCwd: a.cwd, storyBranch: a.onto });
@@ -903,6 +954,7 @@ export class Actor {
       rule: a.rule,
       detail,
       route: routeFor(wf, a.step, outcome) as ReceiptOf<"classify">["route"],
+      ...(base ? { base } : {}),
     };
     const written = appendReceipt(loc.runsDir, receipt);
     return { ok: true, detail: { outcome, detail, receipt: written.n, ...extra } };

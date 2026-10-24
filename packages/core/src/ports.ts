@@ -97,6 +97,16 @@ export type PushResult =
 
 export type RebaseResult = { ok: true; head: string } | { ok: false; conflict: true; files: string[] };
 
+/** BS3: a merge commit made, or a conflicting merge aborted with the conflicting paths. */
+export type MergeResult = { ok: true; head: string } | { ok: false; conflict: true; files: string[] };
+
+/** BS1: how two commits relate — `ahead` = commits only in `a`, `behind` = commits only in `b`. */
+export interface Divergence {
+  merge_base: string | null;
+  ahead: number;
+  behind: number;
+}
+
 /** Git, run in a given repo or worktree directory (`cwd`). */
 export interface GitPort {
   /** Top-level of the repo containing cwd (main checkout, not the worktree). */
@@ -134,6 +144,18 @@ export interface GitPort {
   rebase(cwd: string, onto: string): Promise<RebaseResult>;
   /** Is `ancestor` an ancestor of `descendant`? */
   isAncestor(cwd: string, ancestor: string, descendant: string): Promise<boolean>;
+  /** BS1: merge base of `a` and `b`, and the commits only in each (`rev-list --left-right --count a...b`). */
+  divergence(cwd: string, a: string, b: string): Promise<Divergence>;
+  /**
+   * BS1: paths a merge of `theirs` into `ours` would conflict in, without touching any worktree
+   * (`git merge-tree --write-tree --name-only --no-messages`, git ≥ 2.38); [] = a clean merge.
+   */
+  mergeTree(cwd: string, ours: string, theirs: string): Promise<string[]>;
+  /**
+   * BS3: `git merge --no-ff <rev>` in cwd, committed with `spec.message` and its trailers (S4). On a
+   * conflict the merge is aborted (`git merge --abort`) and the conflicting paths are reported.
+   */
+  merge(cwd: string, rev: string, spec: Pick<CommitSpec, "message" | "trailers">): Promise<MergeResult>;
 
   // --- refs and blobs (claims T2, mailbox T9)
   readRef(cwd: string, ref: string): Promise<string | null>;
@@ -182,8 +204,10 @@ export interface RemotePullRequest {
   draft?: boolean;
   /** head branch name */
   head?: string;
-  /** base branch name */
+  /** base branch name (older name of `base_branch`) */
   base?: string;
+  /** BS11: the branch the PR targets (merges into); GR6 cleanup only when it is the story's base branch */
+  base_branch?: string;
 }
 
 /** `gh` / `glab` for one repository. */
