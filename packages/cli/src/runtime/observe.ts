@@ -20,6 +20,7 @@ import {
   type ForeignCommit,
   type MailboxItem,
   type NumberedReceipt,
+  openNotes,
   type Ports,
   type RemoteIssue,
   type RemotePullRequest,
@@ -388,6 +389,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       ...(byAncestry.has(s.key) ? { merged_by_ancestry: true } : {}),
       ...(foreign.length ? { foreign_commits: foreign } : {}),
       ...readyHead(s, unitSnaps.get(s)?.[0]),
+      ...storyNotes(s, unitSnaps.get(s) ?? []),
       ...(s.base_status !== undefined ? { base_status: s.base_status } : {}),
       ...(lost.length ? { unpushed_runs: lost.map((l) => ({ unit: l.unit, files: l.files })) } : {}),
       ...(await storyBase(git, root, remote, base, branch, s.frontmatter?.status, refs, baseCacheIn, baseCache, s.key)),
@@ -567,6 +569,33 @@ function readyHead(story: StorySnapshot, u: UnitSnapshot | undefined): { ready_h
     return r.receipt.head_sha ? { ready_head_sha: r.receipt.head_sha } : {};
   }
   return {};
+}
+
+/** Receipts of the given kinds in a unit's runs dir, ascending — read by file name, the others never opened. */
+function receiptsOfKinds(story: StorySnapshot, u: UnitSnapshot, kinds: readonly string[]): NumberedReceipt[] {
+  let names: string[];
+  try {
+    names = readdirSync(receiptsDir(u.path));
+  } catch {
+    return [];
+  }
+  const out: NumberedReceipt[] = [];
+  const ns = names
+    .map(parseReceiptFileName)
+    .filter((p): p is { n: number; kind: string } => !!p && kinds.includes(p.kind))
+    .map((p) => p.n)
+    .sort((a, b) => a - b);
+  for (const n of ns) {
+    const r = readReceipt(u.path, n, story.root);
+    if (r && "receipt" in r) out.push(r);
+  }
+  return out;
+}
+
+/** NT2/NT3: the story's open notes — notes of `done` receipts of its units no `approve` acknowledged. */
+function storyNotes(story: StorySnapshot, units: UnitSnapshot[]): { notes?: StoryFacts["notes"] } {
+  const notes = openNotes(units.map((u) => ({ unit: u.unit.key, receipts: receiptsOfKinds(story, u, ["done", "approve"]) })));
+  return notes.length ? { notes } : {};
 }
 
 const STORY_BRANCH = /^((?:gh|gl)-\d+)-[a-z0-9][a-z0-9-]*$/;

@@ -171,6 +171,189 @@
         "evidence": {
           "minLength": 1,
           "type": "string"
+        },
+        "criteria": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "description": "observed working, with evidence",
+                "type": "object",
+                "required": [
+                  "id",
+                  "verdict",
+                  "evidence"
+                ],
+                "properties": {
+                  "id": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                    "description": "Acceptance criterion id, e.g. AC1",
+                    "type": "string"
+                  },
+                  "verdict": {
+                    "const": "pass",
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "repro": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "reason": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "how": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "additionalProperties": false,
+                "description": "observed not working; minimal repro",
+                "type": "object",
+                "required": [
+                  "id",
+                  "verdict",
+                  "repro"
+                ],
+                "properties": {
+                  "id": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                    "description": "Acceptance criterion id, e.g. AC1",
+                    "type": "string"
+                  },
+                  "verdict": {
+                    "const": "fail",
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "repro": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "reason": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "how": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "additionalProperties": false,
+                "description": "needs a person's judgement or access; how to check it",
+                "type": "object",
+                "required": [
+                  "id",
+                  "verdict",
+                  "how"
+                ],
+                "properties": {
+                  "id": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                    "description": "Acceptance criterion id, e.g. AC1",
+                    "type": "string"
+                  },
+                  "verdict": {
+                    "const": "person",
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "repro": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "reason": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "how": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "additionalProperties": false,
+                "description": "a machine could check it, this session could not",
+                "type": "object",
+                "required": [
+                  "id",
+                  "verdict",
+                  "reason",
+                  "how"
+                ],
+                "properties": {
+                  "id": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                    "description": "Acceptance criterion id, e.g. AC1",
+                    "type": "string"
+                  },
+                  "verdict": {
+                    "const": "unverified",
+                    "type": "string"
+                  },
+                  "evidence": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "repro": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "reason": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "how": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                }
+              }
+            ],
+            "discriminator": {
+              "propertyName": "verdict"
+            }
+          }
+        },
+        "notes": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "text"
+            ],
+            "properties": {
+              "text": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "criterion": {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                "description": "Acceptance criterion id, e.g. AC1",
+                "type": "string"
+              }
+            }
+          }
         }
       }
     },
@@ -627,6 +810,15 @@
         "head_sha": {
           "pattern": "^[0-9a-f]{40,64}$",
           "type": "string"
+        },
+        "acknowledged_notes": {
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "pattern": "^note:[0-9A-HJKMNP-TV-Z]{26}:[1-9][0-9]*$",
+            "description": "note:<receipt_id>:<n> (NT2)",
+            "type": "string"
+          }
         }
       }
     },

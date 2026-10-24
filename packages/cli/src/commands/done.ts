@@ -1,17 +1,20 @@
 /**
- * `norn done <outcome> --handoff "…" [--findings <file>] [--evidence <dir>]` (§9.3, §10): the
- * only way an agent step completes. The outcome must be declared at the pinned step (W3);
- * findings are copied into the receipt, evidence into runs/<unit>/evidence/<run_id>/.
+ * `norn done <outcome> --handoff "…" [--findings <file>] [--evidence <dir>] [--criteria <file>]
+ * [--note "…" [--note-criterion <id>]]…` (§9.3, §10): the only way an agent step completes. The
+ * outcome must be declared at the pinned step (W3); findings are copied into the receipt, evidence
+ * into runs/<unit>/evidence/<run_id>/. The criteria report (QV2) is validated against
+ * `CriteriaReport`, its coverage against the unit's frontmatter `criteria` (QV4) and the outcome
+ * against its worst verdict (QV5); notes (NT1) never block and never change the route.
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { isAbsolute, resolve } from "node:path";
-import { reportableOutcomes } from "@norn/core";
-import { type AgentStep, type Finding, type ReceiptOf, validate } from "@norn/schema";
-import { ensureEvidenceDir } from "@norn/store";
-import { defineCommand, opt } from "../command.ts";
+import { isAbsolute, join, resolve } from "node:path";
+import { checkReport, reportableOutcomes, unverifiedNeeds, verdictCounts } from "@norn/core";
+import { type AgentStep, type Criterion, type CriterionVerdict, type Finding, type Note, type ReceiptOf, ulid, validate } from "@norn/schema";
+import { appendTrace, ensureEvidenceDir, readSliceFile, readStoryFile } from "@norn/store";
+import { defineCommand, type ParsedArgs, opt } from "../command.ts";
 import type { Context } from "../context.ts";
-import { refuse, usageError } from "../output.ts";
-import { stepOfSession } from "../runtime/agent-unit.ts";
+import { corruptError, refuse, usageError } from "../output.ts";
+import { stepOfSession, type UnitSession } from "../runtime/agent-unit.ts";
 import { appendProgress, reported, reportHeader, reportTarget, writeReport } from "../runtime/report.ts";
 
 const SEVERITIES = new Set(["blocking", "major", "minor", "nit"]);
@@ -54,11 +57,60 @@ export function parseFindings(text: string, file: string): Finding[] {
 
 const abs = (ctx: Context, p: string) => (isAbsolute(p) ? p : resolve(ctx.cwd, p));
 
+/** QV2: read and validate a `--criteria` file (a JSON array, CriteriaReport). */
+export function parseCriteria(text: string, file: string): CriterionVerdict[] {
+  const how = "write the report as a JSON array: [{\"id\": \"AC1\", \"verdict\": \"pass\", \"evidence\": \"…\"}, …] — pass needs evidence, fail repro, person how, unverified reason and how — then report again";
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch (e) {
+    throw refuse(`criteria file ${file} is not valid JSON: ${(e as Error).message}`, how, "invalid_criteria");
+  }
+  const v = validate("criteria-report", raw);
+  if (!v.ok) throw refuse(`criteria file ${file} does not validate: ${v.errors.map((e) => `${e.path || "/"} ${e.message}`).join("; ")}`, how, "invalid_criteria", { errors: v.errors });
+  return v.value;
+}
+
+/** NT1: `--note` values in order; each `--note-criterion` belongs to the `--note` before it. */
+export function parseNotes(args: ParsedArgs): Note[] {
+  const notes: Note[] = [];
+  for (const o of args.order ?? []) {
+    if (o.name === "note") {
+      const text = typeof o.value === "string" ? o.value.trim() : "";
+      if (!text) throw usageError("--note needs a text", 'norn done <outcome> --handoff "…" --note "<question for a person>"');
+      notes.push({ text });
+    } else if (o.name === "note-criterion") {
+      const last = notes.at(-1);
+      const id = typeof o.value === "string" ? o.value.trim() : "";
+      if (!last || last.criterion !== undefined || !id)
+        throw usageError("--note-criterion <id> follows the --note it belongs to (one per note)", 'norn done <outcome> --handoff "…" --note "<text>" --note-criterion AC3');
+      last.criterion = id;
+    }
+  }
+  return notes;
+}
+
+/** QV1/QV4: the unit's frontmatter `criteria` — its slice file, or story.md for the story unit; null = none declared. */
+function unitCriteria(s: UnitSession): Criterion[] | null {
+  const file = s.unit.slice ? join(s.specPath, "slices", `${s.unit.dir}.md`) : join(s.specPath, "story.md");
+  const r = s.unit.slice ? readSliceFile(file, s.worktree) : readStoryFile(file, s.worktree);
+  if (r.ok) return r.value.frontmatter.criteria ?? null;
+  if (r.reason === "missing") return null;
+  throw corruptError(`${file} failed validation (S2): its criteria cannot be checked`, `stop and tell the person: norn why ${s.unit.key}`, r.error ? [r.error] : []);
+}
+
 export const doneCommand = defineCommand({
   name: "done",
   summary: "Report that the current step finished with a declared outcome (§9.3); then end your turn",
-  usage: 'norn done <outcome> --handoff "…" [--findings <file>] [--evidence <dir>]',
-  options: { handoff: { type: "string" }, findings: { type: "string" }, evidence: { type: "string" } },
+  usage: 'norn done <outcome> --handoff "…" [--findings <file>] [--evidence <dir>] [--criteria <file>] [--note "…" [--note-criterion <id>]]…',
+  options: {
+    handoff: { type: "string" },
+    findings: { type: "string" },
+    evidence: { type: "string" },
+    criteria: { type: "string" },
+    note: { type: "string", multiple: true },
+    "note-criterion": { type: "string", multiple: true },
+  },
   positionals: { min: 1, max: 1 },
   async run(ctx, args) {
     const outcome = args.positionals[0] as string;
@@ -83,15 +135,52 @@ export const doneCommand = defineCommand({
     if (evidencePath && !(existsSync(evidencePath) && statSync(evidencePath).isDirectory()))
       throw refuse(`evidence directory not found: ${evidenceSrc}`, "pass the directory your skill wrote evidence to, then report again", "bad_evidence");
 
+    // QV2–QV5, NT1: the report and notes, checked against the step and the unit's frontmatter criteria
+    const notes = parseNotes(args);
+    let report: CriterionVerdict[] | null = null;
+    const criteriaFile = opt.str(args, "criteria");
+    if (criteriaFile) {
+      const p = abs(ctx, criteriaFile);
+      if (!existsSync(p)) throw refuse(`criteria file not found: ${criteriaFile}`, "write the criteria report, then report again", "invalid_criteria");
+      report = parseCriteria(readFileSync(p, "utf8"), criteriaFile);
+    }
+    const declared = report || notes.some((n) => n.criterion !== undefined) || step.criteria === "required" ? unitCriteria(t.s) : null;
+    const verdicts = checkReport({ step, step_name: t.s.state.step, outcome, report, criteria: declared, notes });
+    if (!verdicts.ok) throw refuse(verdicts.refusal.error, verdicts.refusal.do_instead, verdicts.refusal.code, verdicts.refusal.details);
+
     const receipt: ReceiptOf<"done"> = { kind: "done", ...reportHeader(ctx, t), outcome, handoff };
     if (findings) receipt.findings = findings;
     if (evidencePath) receipt.evidence = `evidence/${t.run_id}`;
+    if (report) receipt.criteria = report;
+    if (notes.length) receipt.notes = notes;
     const check = validate("receipt", receipt);
     if (!check.ok) throw refuse(`receipt does not validate: ${check.errors.map((e) => `${e.path} ${e.message}`).join("; ")}`, "fix the arguments and report again", "invalid_receipt");
     // evidence sits beside the receipt it belongs to; copied before the receipt lands (P6)
     if (evidencePath) ensureEvidenceDir(t.s.runsDir, t.run_id, evidencePath);
     const written = writeReport(t, receipt);
     appendProgress(t.s.runsDir, `${t.s.state.step}#${t.s.state.attempt} ${outcome}: ${handoff}`);
-    return reported(t, "done", written, { outcome, ...(findings ? { findings: findings.length } : {}), ...(evidencePath ? { evidence: receipt.evidence } : {}) });
+    // QV4/QV8: the report counted in the trace — unverified per capability, unchecked coverage
+    if (report)
+      appendTrace(t.s.root, {
+        type: "criteria",
+        id: ulid(ctx.clock.now()),
+        at: receipt.at,
+        unit: t.s.unit.key,
+        run_id: t.run_id,
+        step: receipt.step,
+        attempt: receipt.attempt,
+        receipt_id: receipt.receipt_id,
+        outcome,
+        rule: verdicts.coverage === "checked" ? "criteria.checked" : "criteria.unchecked_coverage",
+        verdicts: verdictCounts(report),
+        unverified_needs: unverifiedNeeds(report, declared),
+      });
+    return reported(t, "done", written, {
+      outcome,
+      ...(findings ? { findings: findings.length } : {}),
+      ...(evidencePath ? { evidence: receipt.evidence } : {}),
+      ...(report ? { criteria: { worst: verdicts.worst, coverage: verdicts.coverage, ...verdictCounts(report) } } : {}),
+      ...(notes.length ? { notes: notes.length } : {}),
+    });
   },
 });

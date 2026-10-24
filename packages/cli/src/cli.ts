@@ -27,7 +27,7 @@ export function helpFor(c: Command) {
 export function parseCommandArgs(c: Command, argv: string[]): ParsedArgs {
   let parsed: ReturnType<typeof parseArgs>;
   try {
-    parsed = parseArgs({ args: argv, options: c.options ?? {}, allowPositionals: true, strict: true });
+    parsed = parseArgs({ args: argv, options: c.options ?? {}, allowPositionals: true, strict: true, tokens: true });
   } catch (e) {
     throw usageError((e as Error).message, `norn ${c.name} --help`);
   }
@@ -35,7 +35,8 @@ export function parseCommandArgs(c: Command, argv: string[]): ParsedArgs {
   const max = c.positionals?.max ?? 0;
   const n = parsed.positionals.length;
   if (n < min || n > max) throw usageError(`${c.name}: expected ${min === max ? min : `${min}–${max}`} argument(s), got ${n}`, c.usage);
-  return { values: parsed.values as ParsedArgs["values"], positionals: parsed.positionals };
+  const order = (parsed.tokens ?? []).flatMap((t) => (t.kind === "option" ? [{ name: t.name, value: t.value ?? true }] : []));
+  return { values: parsed.values as ParsedArgs["values"], positionals: parsed.positionals, order };
 }
 
 export async function runCli(argv: string[], deps: CliDeps = {}): Promise<CliResult> {

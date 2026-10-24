@@ -115,7 +115,7 @@ export interface HeartbeatView {
   down: boolean;
 }
 
-export type TimelineSource = "receipt" | "tick" | "hook" | "reject" | "briefing" | "foreign" | "take";
+export type TimelineSource = "receipt" | "tick" | "hook" | "reject" | "briefing" | "foreign" | "take" | "criteria";
 
 export interface TimelineEntry {
   at: string;
@@ -239,9 +239,21 @@ export interface TraceRecords {
 }
 
 /** `norn trace <unit>`: rows of the unit (and, for a story, its slices interleaved). */
+/** QV8: criteria reports of the units shown (`norn done --criteria`), counted from the trace. */
+export interface CriteriaSummary {
+  reports: number;
+  verdicts: { pass: number; fail: number; person: number; unverified: number };
+  /** `unverified` criteria per capability in their `needs`; `none` = no needs declared */
+  unverified_needs: Record<string, number>;
+  /** reports whose unit declared no frontmatter `criteria` (QV4: coverage not checked) */
+  unchecked_coverage: number;
+}
+
 export interface TraceView extends UnitTraceSummary {
   /** set by loadTraceView */
   records?: TraceRecords;
+  /** QV8: set by loadTraceView when the trace holds criteria reports for the units shown */
+  criteria?: CriteriaSummary;
   steps: StepRow[];
   /** the story first, then each slice shown */
   units: UnitTraceSummary[];

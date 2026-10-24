@@ -16,6 +16,8 @@ export interface ParsedArgs {
   /** option values by long name (strings, booleans, or arrays for `multiple`) */
   values: Record<string, string | boolean | Array<string | boolean> | undefined>;
   positionals: string[];
+  /** options in the order given (`--note a --note-criterion AC1 --note b` pairs by position, NT1) */
+  order?: Array<{ name: string; value: string | boolean }>;
 }
 
 export interface Command {

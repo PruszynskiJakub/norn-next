@@ -3,6 +3,7 @@ import { Ajv, type ErrorObject, type ValidateFunction } from "ajv";
 import addFormatsModule from "ajv-formats";
 import { ClaimBlob, LeaseFile } from "./claim.ts";
 import { CliError } from "./cli.ts";
+import { CriteriaReport } from "./criteria.ts";
 import { ConfigLayer, ResolvedConfig } from "./config.ts";
 import { SliceFrontmatter, StoryFrontmatter } from "./frontmatter.ts";
 import { Receipt } from "./receipt.ts";
@@ -24,6 +25,7 @@ export const SCHEMAS = {
   config: ConfigLayer,
   "resolved-config": ResolvedConfig,
   "cli-error": CliError,
+  "criteria-report": CriteriaReport,
 } as const;
 export type SchemaName = keyof typeof SCHEMAS;
 export type SchemaType<N extends SchemaName> = Static<(typeof SCHEMAS)[N]>;
@@ -107,6 +109,7 @@ export const validateClaim = (v: unknown) => validate("claim", v);
 export const validateLease = (v: unknown) => validate("lease", v);
 export const validateConfigLayer = (v: unknown) => validate("config", v);
 export const validateCliError = (v: unknown) => validate("cli-error", v);
+export const validateCriteriaReport = (v: unknown) => validate("criteria-report", v);
 
 /** Plain JSON Schema object (TypeBox symbols dropped) for publishing. */
 export function toJsonSchema(name: SchemaName): Record<string, unknown> {

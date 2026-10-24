@@ -22,6 +22,7 @@ export type WorkflowIssueCode =
   | "unknown_skill"
   | "cannot_reach_done"
   | "uncounted_cycle"
+  | "verdict"
   | "level";
 
 export interface WorkflowIssue {
@@ -123,6 +124,9 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
       issues.push({ code: "unknown_target", path, message: `${e.from}.${e.outcome} → unknown step '${e.to}'` });
     if (e.counter && !Object.hasOwn(counters, e.counter))
       issues.push({ code: "unknown_counter", path, message: `counter '${e.counter}' is not declared in counters` });
+    // QV5: a verdict gates what an agent reports with `norn done`; elsewhere nothing could check it
+    if (e.verdict !== undefined && (wf.steps[e.from]?.type !== "agent" || (OVERRIDABLE_ROUTES as readonly string[]).includes(e.outcome)))
+      issues.push({ code: "verdict", path, message: `${e.from}.${e.outcome} declares verdict '${e.verdict}', but only outcomes an agent reports with norn done can be gated by a verdict (QV5)` });
   }
 
   // every step can reach $done (W5): reverse search from $done

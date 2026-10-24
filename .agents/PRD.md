@@ -63,7 +63,10 @@ The CLI, docs, schemas and skills use these nouns. A lint test fails on the **ba
 | run | One attempt at a step; produces receipts. |
 | claim | A git-ref lease giving one heartbeat the right to drive a story. |
 
-**Support nouns**: receipt, outcome, counter, gate, check, handoff, brief, inbox, heartbeat (one pass = tick), mode, worktree, slot, trace, mailbox.
+**Support nouns**: receipt, outcome, counter, gate, check, handoff, brief, inbox, heartbeat (one pass = tick), mode, worktree, slot, trace, mailbox, verdict, note.
+
+- **verdict** — how one acceptance criterion fared in a criteria report: `pass`, `fail`, `person` or `unverified` (QV2). The worst verdict gates the outcome (QV5).
+- **note** — a non-blocking question for a person, left with a `norn done` report (NT1); it reaches the inbox and the story's last gate, and never changes the route.
 
 **Banned synonyms**
 
@@ -215,7 +218,7 @@ The story worktree is on the story branch and holds `.agents/specs/<id>-<slug>/`
 
 | Verb | Meaning |
 |---|---|
-| `norn done <outcome> --handoff "…" [--findings <file>] [--evidence <dir>]` | Step finished with a declared outcome. The only way a step completes. Findings and evidence are stored with the receipt. |
+| `norn done <outcome> --handoff "…" [--findings <file>] [--evidence <dir>] [--criteria <file>] [--note "…" [--note-criterion <id>]]…` | Step finished with a declared outcome. The only way a step completes. Findings, evidence, the criteria report (QV2) and notes (NT1) are stored with the receipt. Refusals: `invalid_criteria`, `outcome_contradicts_verdicts`, `criteria_required` (§10.1). |
 | `norn ask "<question>" [--option …]` | Needs a human answer to continue. |
 | `norn stuck "<reason>"` | Cannot continue. |
 
@@ -249,6 +252,21 @@ Three sources of outcomes:
 - C4 On `silent`, the tick snapshots the last assistant message (from the transcript), commits and diff into the trace and handoff.
 - C5 Every `check` run writes a check receipt `{run_id, command, exit_code, duration, output_tail}` (last ~200 lines); on `fail` the full output goes to `runs/<unit>/logs/<run_id>.log` and is committed.
 
+### 10.1 Criteria, verdicts and notes (QV1–QV8, NT1–NT4, `SPEC-base-sync-and-qa.md` Part B)
+
+- QV1 Slice frontmatter (and story frontmatter, for story-level QA) may list `criteria: [{ id, verifier: test | agent | person, needs?: [capability] }]`, written by the `slice` skill next to the prose Acceptance section. Decide never reads the prose (P8).
+- QV2 `norn done --criteria <file>` takes a JSON array validated against the `CriteriaReport` schema: one entry per criterion with a verdict — `pass` (`evidence` required), `fail` (`repro` required), `person` (`how` required), `unverified` (`reason` and `how` required: a machine could check it, this session could not). The report is stored in the `done` receipt (`criteria`).
+- QV3 An agent step with `criteria: required` refuses `norn done` without a report (`criteria_required`); so does an outcome gated by a `verdict`.
+- QV4 With frontmatter `criteria`, the report covers exactly those ids, once each; otherwise `invalid_criteria` (exit 3) with the expected ids in `do_instead`. Without frontmatter `criteria`, coverage is not checked and the trace records `criteria.unchecked_coverage`.
+- QV5 An outcome edge may declare `verdict: <v>` (agent steps only, W5). Order `fail` > `unverified` > `person` > `pass`; an outcome with `verdict: v` may be reported only when the worst verdict in the report is `v` — otherwise `outcome_contradicts_verdicts`, and `do_instead` names the outcome that matches.
+- QV6 Default `qa` steps (story and slice) declare `criteria: required` and `pass` (verdict pass), `fail` (fail, counted), `partial` (person → `human-qa`), `unverified` (unverified → `human-qa`). A workflow may route `unverified` to an agent step whose runner has the capability instead.
+- QV7 A gate's inbox item lists the `person` and `unverified` criteria of the report that led there, with `reason` and `how` (one line in `detail`, one per line in `full` / `inbox --details`); a rework brief after a rejection repeats the judged report's criteria not passed.
+- QV8 Each report is a `criteria` trace event (counts per verdict, `unverified` per capability in `needs`); `norn trace <unit>` sums them (`criteria.unverified_needs`).
+- NT1 Every `norn done` accepts `--note "<text>"` (repeatable), each optionally followed by `--note-criterion <id>`; stored in the `done` receipt (`notes`). Notes never block and never change the route.
+- NT2 Each open note is a Check item `note:<receipt_id>:<n>` (`qa note on gh-4/01 (AC3): …`, command `norn why gh-4/01 --receipt <id>`).
+- NT3 Every story-level gate lists the story's open notes in its inbox item. Approving it records them in the `approve` receipt (`acknowledged_notes`), and they leave the inbox; rejecting leaves them open.
+- NT4 The `qa` skill uses a note, not `person`, when a criterion passed as written but a person may read it differently.
+
 ## 11. Workflows
 
 - W1 Files in `.agents/norn/workflows/*.{yaml,json}`, validated against a published JSON Schema. No lifecycle is hard-coded; `init` copies `story`, `slice`, `bug` as **examples** with no implied mapping.
@@ -256,15 +274,15 @@ Three sources of outcomes:
 
 | Type | Purpose |
 |---|---|
-| `agent` | Run a skill in a fresh session; fields: `skill`, `instructions?`, `inputs`, `agent?`, `model?`, `attended?`, limits (`deadline`, `nudges`, `retries`), `outcomes`. |
+| `agent` | Run a skill in a fresh session; fields: `skill`, `instructions?`, `inputs`, `agent?`, `model?`, `attended?`, `criteria?: required` (QV3), limits (`deadline`, `nudges`, `retries`), `outcomes`. |
 | `check` | Run a shell command in the unit worktree with `.env.norn` loaded and a `timeout`; exit code decides `pass`/`fail`; writes a check receipt (C5). |
 | `gate` | Wait for a human `approve`/`reject` (or `answer`). |
 | `git` | Built-in actions: `integrate` (slice into story branch: rebase + fast-forward, serialized per story), `push`, `open-pr` (draft story PR into the base branch, BS0), `update` (merge the base into the story branch, BS3). |
 | `slices` | Story-level bridge: start each slice's workflow when its `depends_on` are done, within caps; `done` when all slices are integrated; picks up slice files added mid-flight. |
 
-- W3 Transitions are keyed on outcomes: `review.changes_requested → implement`. Conditions are expressed only as outcomes (e.g. `refine` reports `done` or `questions`); there is no `when:` guard in v1.
+- W3 Transitions are keyed on outcomes: `review.changes_requested → implement`. Conditions are expressed only as outcomes (e.g. `refine` reports `done` or `questions`); there is no `when:` guard in v1. An edge is `{ to, counter?, means?, verdict? }`; `verdict` (agent steps only) gates which outcome a criteria report allows (QV5).
 - W4 Every **elementary cycle** (a path back to its start visiting no step twice) must include at least one edge with a `counter`. Taking a counted edge increments it; if it would exceed `max`, the edge is not taken and the outcome becomes `exhausted` → `$stuck` with the reason (e.g. "review_loop 3/3 at review.changes_requested"). Counters are per unit and never reset by themselves; only `norn unstick --reset <counter>` resets one, journaled.
-- W5 Load-time validation: schema; every step can reach `$done`; every elementary cycle has a counter (the validator lists each uncounted cycle with its path); every referenced skill exists; no step uses a reserved name. Invalid workflows are refused before anything runs.
+- W5 Load-time validation: schema; every step can reach `$done`; every elementary cycle has a counter (the validator lists each uncounted cycle with its path); every referenced skill exists; no step uses a reserved name; `verdict` only on outcomes an agent reports (QV5). Invalid workflows are refused before anything runs.
 - W6 v1 has no `fork/join`; parallelism comes from independent slices.
 - W7 **Reserved targets** start with `$`: `$done` (unit finished) and `$stuck` (park in inbox under Unblock with the reason). `$stuck` is always an implicit target of `exhausted`, `stuck` reports and C1 routes. Step names may not start with `$` nor be a reserved word: `done`, `stuck`, `ask`, `exhausted`, `silent`, `died`, `timeout`, `stalled`, `stale`.
 - W8 **Workflows are not tied to a level.** Any workflow may run on a story or a slice; constraints are checked at unit start: `slices`, `git: open-pr` and `git: update` only on a story, `git: integrate` only on a slice. A story workflow without `slices` works directly in the story worktree.
@@ -294,10 +312,12 @@ steps:
   qa:
     type: agent
     skill: qa
+    criteria: required
     outcomes:
-      pass:    { to: integrate, means: "every criterion verified with evidence" }
-      fail:    { to: implement, counter: qa_loop, means: "a criterion fails; repro in the receipt" }
-      partial: { to: human-qa, means: "criteria only a person can check are listed with prepared evidence" }
+      pass:       { to: integrate, verdict: pass, means: "every criterion observed with evidence" }
+      fail:       { to: implement, counter: qa_loop, verdict: fail, means: "a criterion fails; repro in findings" }
+      partial:    { to: human-qa, verdict: person, means: "criteria only a person can judge, evidence prepared" }
+      unverified: { to: human-qa, verdict: unverified, means: "criteria this session could not check; how to check each one is in the report" }
   human-qa:
     type: gate
     outcomes: { approve: integrate, reject: { to: implement, counter: qa_loop } }
@@ -387,7 +407,7 @@ Example `bug` workflow: `reproduce (agent; reproduced → implement, cannot_repr
 - O2 `answer`, `approve`, `unstick`, `mode`, `workflow` write receipts; the next tick applies them and delivers answers into the same session or a fresh one from the handoff. Typing directly into an agent pane is also allowed.
 - O3 Notifiers are optional plugins (OS default; ntfy, webhook) and fire once per new inbox item, receipt-first.
 - O4 Trace: one JSONL record per tick with facts snapshot, rule fired, action, result, briefing and transcript pointers.
-- O5 `norn why <unit>` replays the pure decide function on the recorded snapshot and shows the rule that fired.
+- O5 `norn why <unit>` replays the pure decide function on the recorded snapshot and shows the rule that fired; `--receipt <id>` picks the decision that applied that receipt (the command of a note item, NT2).
 - O6 `handoff.md`: generated status header (S9); tool writes heartbeat lines (repeats collapsed, e.g. "(×3)"); agents write milestones.
 
 ## 16. Skills
@@ -401,10 +421,10 @@ Ten single-job skills, written fresh (ideas from ai-engine ported, files not cop
 | `refine` | Story → spec with numbered Behaviour items, edge checklist, out of scope, open questions. | done / questions |
 | `clarify` | Settle open questions with the person, fold answers into spec. | done |
 | `plan` | Seams, coverage table (Behaviour → seam), prefactoring, decisions. Reference: codebase-design. | done |
-| `slice` | Plan → slice files (`workflow`, `depends_on`, acceptance citing Behaviour numbers, check commands, verifier). | done |
+| `slice` | Plan → slice files (`workflow`, `depends_on`, acceptance citing Behaviour numbers, frontmatter `criteria` with verifier and `needs` (QV1), check commands). | done |
 | `implement` | Test-first build of one slice or story. On rework, the points from the brief's Rework section come first: each is a red test, a QA failure gives its repro. Reference: TDD, tests, mocking. | done |
 | `review` | Spec and Standards axes separately; smells list; findings as structured data. | approve / changes_requested |
-| `qa` | Check each acceptance criterion as a user, with evidence; never pass what wasn't checked; list what only a person can check. | pass / fail / partial |
+| `qa` | Check each acceptance criterion as a user, with evidence; one verdict per criterion in a criteria report (QV2); never pass what wasn't observed (`unverified` when this session cannot check it); notes when a passed criterion may be read differently (NT4). | pass / fail / partial / unverified |
 | `merge` | Resolve conflicts by intent of both sides; stop if new behaviour is needed. | done |
 
 - SK1 `norn init` installs skills into each configured agent's skill location with norn-owned markers; repo-local overrides win.

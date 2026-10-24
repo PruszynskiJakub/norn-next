@@ -16,6 +16,7 @@ import {
   formatAge,
   heartbeatDown,
   nextCommand,
+  openNotes,
   RECENT_MS,
   type RunFacts,
   sliceWorktreePath,
@@ -317,6 +318,8 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       slices: story.slices,
       mode,
       ...(unpushed[i]?.length ? { unpushed_runs: unpushed[i] } : {}),
+      // NT2/NT3: open notes of the story, same rule as observe
+      ...((notes) => (notes.length ? { notes } : {}))(openNotes(story.units.map((u) => ({ unit: u.unit.key, receipts: u.receipts ?? [] })))),
       // BS1: the last base measurement of this checkout's ticks (stale items, merge-item detail)
       ...(baseFacts[story.key] && story.frontmatter?.status !== "done" && story.frontmatter?.status !== "dropped" ? { base: baseFacts[story.key] } : {}),
     };
