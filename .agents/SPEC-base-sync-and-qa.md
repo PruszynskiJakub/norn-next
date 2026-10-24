@@ -15,7 +15,11 @@ Business backlog lives in a tracker outside norn (Jira); norn never talks to it.
 
 Therefore every rule below uses **git only** and must work with no host. The one host-dependent input is which ref is "the base":
 
-- BS0 The **base ref** of a story is `refs/remotes/<git_remote>/<default_branch>` when the git remote exists, otherwise `refs/heads/<default_branch>`. `default_branch` is discovered as today (`packages/store/src/base.ts`).
+- BS0 The **base branch** is config `base_branch` when set, otherwise `default_branch` discovered as today (`packages/store/src/base.ts`). It is never assumed to be `main` (old norn 0.6.0). The **base ref** of a story is `refs/remotes/<git_remote>/<base branch>` when the git remote exists, otherwise `refs/heads/<base branch>`. `open-pr` targets the base branch.
+
+### 2.1 Prior art: old norn
+
+The predecessor (`PruszynskiJakub/norn`) never brought a story branch up to date with its base: an agent merged the story branch into each slice right before merging that slice (`norn-merge` skill), and the owner dealt with drift from the base when merging the story PR. It always merged, never rebased or force-pushed, had no conflict detection and no limit on merge attempts. This spec keeps its merge-only rule and its conflict-resolution rules (BS5), adds what it lacked (detection, a CLI step, counters, re-entry), and keeps its post-incident guards (BS11, BS0). Slices meeting each other's changes is already covered: `integrate` rebases a slice onto the latest story branch under the K6 lock.
 
 Note: a host-less mode (stories created from local files instead of remote issues) does **not** exist today — story keys must be `gh-N`/`gl-N` and intake reads issues (GR1, GR2). It is a separate spec; nothing here may make it harder.
 
@@ -62,7 +66,11 @@ Non-goals (this spec):
   5. otherwise `git merge --no-ff --no-edit <base_sha>` with message `Update <story> from <base> (<short sha>)` and the `Norn-Tick` trailer (so Q6 does not report it as a foreign commit), then pushes at the step boundary (S8, T7);
   6. on conflict: `git merge --abort`, outcome `conflict`, with the conflicting paths and `base_sha` in the classify receipt `detail`.
 - BS4 **Merge, never rebase.** The story branch is published (draft PR, team handoff T5), slice branches are cut from it (GR3), and the ready gate pins its head (F35). Rebasing would rewrite all three. GR4 is unchanged: only the CLI integrates and pushes.
-- BS5 The `merge` skill gains a "base" mode: its brief carries the base sha, the conflicting paths and the instruction "merge `<base_sha>` into the story branch in this worktree, resolve, commit the merge; never rebase". On `done` the workflow returns to `update`, which now finds `behind == 0` (or a new, smaller gap if the base moved again).
+- BS5 The `merge` skill gains a "base" mode: its brief carries the base sha, the conflicting paths and the instruction "merge `<base_sha>` into the story branch in this worktree, resolve, commit the merge; never rebase". Its resolution rules come from old norn's `norn-merge` skill:
+  - **Resolve each conflict by intent.** For each hunk, find the sources on both sides: the commit messages, the story spec and slice acceptance criteria of this story, and the merged story that introduced the base change. Preserve both intents where possible. Where they are incompatible, follow this story's spec and note the trade-off in the merge commit message.
+  - **Resolve to existing behaviour only.** When no resolution fits without new behaviour, abort the merge and report `norn stuck "<why>"` — the unit parks under Unblock with the reason (W7). Otherwise always finish the merge.
+  - Run the slice/story check commands before reporting and fix what the merge broke; the `test` step after `update` re-checks anyway.
+  On `done` the workflow returns to `update`, which now finds `behind == 0` (or a new, smaller gap if the base moved again).
 
 ### 4.3 Re-entry when the base moves later
 
@@ -83,6 +91,8 @@ Non-goals (this spec):
 - BS10 Inbox:
   - Check group, one item per story that is stale (BS7) and not routed by BS6: `gh-3 conflicts with main in a.ts, b.ts (4 behind)`, command `norn update gh-3`, id `stale:<story>:<base_sha>`.
   - The existing "Merge PR #N" item gains detail `behind main by N` and, when conflicting, its command becomes `norn update <story>`.
+
+- BS11 **Merged means merged into the base.** GR6 cleanup fires only when the PR's base branch equals the story's base branch (BS0). A PR merged into any other branch parks the story with reason `remote: PR merged into <branch>, not <base>` (GR7) — the lesson from old norn 0.1.1, where a merge into the wrong base skipped story review. Retargeting a PR is reported as a Check item.
 
 ### 4.4 Default story workflow change
 
@@ -162,7 +172,8 @@ base: { stale: conflict }
 | Contract | Change |
 |---|---|
 | `Workflow` schema | git action `update`; edge field `verdict`; agent step field `criteria`; workflow field `base: {stale, step}`; classified outcome `stale`; reserved word `stale` (W7) |
-| `Facts` | `story.base` (BS1) |
+| `Facts` | `story.base` (BS1); `story.pr.base_branch` (BS11) |
+| Config | `base_branch` (BS0) |
 | `Receipt` | new kind `update` (13 kinds); `done.criteria`, `done.notes`; `approve.acknowledged_notes` |
 | Frontmatter | `criteria` on slice and story |
 | New schema | `CriteriaReport` |
@@ -183,6 +194,8 @@ Unit and replay tests (core, by replaying traces, X4):
 5. Gate without a `stale` route → no classification, Check item `stale:*` only.
 6. `norn update` on a done, unmerged story → `update` receipt, unit running at `update`; on a merged story → refused; without the claim → refused.
 7. Remote story branch fast-forwarded by a person → `update` adopts it; diverged → `$stuck`.
+7a. `resolve` agent reports `stuck` (no resolution without new behaviour) → `$stuck` with its reason, merge aborted, worktree clean.
+7b. PR merged into a branch other than the base → no cleanup, story parked `remote: PR merged into …`; config `base_branch: develop` → `update` and `open-pr` use `develop`.
 8. `norn done pass` with an `unverified` criterion → refused, `do_instead` names `unverified`; `norn done unverified` → `human-qa`, gate detail lists `how`.
 9. Report missing a frontmatter criterion id → `invalid_criteria`.
 10. `--note` on a pass → Check item; acknowledged by `ready.approve`; still open after `ready.reject`.
