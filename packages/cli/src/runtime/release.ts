@@ -1,12 +1,12 @@
 /**
  * Claim release (T6): push the story and slice branches first, then delete the claim ref by
- * CAS. Edited handoff.md files are committed first. Used by a clean `watch` exit and `norn release <story>`.
+ * CAS. Only by the heartbeat holding the claim, and only fast-forward pushes (R3.3). Edited handoff.md files are committed first. Used by a clean `watch` exit and `norn release <story>`.
  */
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { StoryFacts } from "@norn/core";
 import { ulid } from "@norn/schema";
-import { acquireTickLock, releaseClaim } from "@norn/store";
+import { acquireTickLock, git as rawGit, releaseClaim } from "@norn/store";
 import type { Context } from "../context.ts";
 import { busyError } from "../output.ts";
 import { type Observed, observe } from "./observe.ts";
@@ -48,21 +48,39 @@ export async function releaseStory(obs: Observed, story: StoryFacts): Promise<Re
   const pushed: string[] = [];
   await commitHandoffs(obs, story);
   if (obs.remote) {
-    const branches: Array<{ cwd: string; branch: string; force: boolean }> = [];
+    const remote = obs.remote;
+    const branches: Array<{ cwd: string; branch: string }> = [];
     const loc = obs.stories[story.key];
-    if (loc?.worktree) branches.push({ cwd: loc.worktree, branch: loc.branch, force: false });
+    if (loc?.worktree) branches.push({ cwd: loc.worktree, branch: loc.branch });
     for (const u of story.units) {
       const ul = obs.units[u.unit.key];
-      if (u.unit.slice && ul?.worktree && u.worktree?.exists) branches.push({ cwd: ul.worktree, branch: ul.branch, force: true });
+      if (u.unit.slice && ul?.worktree && u.worktree?.exists) branches.push({ cwd: ul.worktree, branch: ul.branch });
+    }
+    // R3.3 (H6, A21): push only fast-forwards of the remote branches — a stale local branch never
+    // replaces the record. Checked for every branch before anything is pushed or deleted.
+    for (const b of branches) {
+      const ff = await fastForwardOf(obs.root, remote, b.branch);
+      if (!ff.ok) return { story: story.key, ok: false, pushed, error: `${b.branch} is not a fast-forward of ${remote}/${b.branch} (${ff.reason}); nothing pushed or released` };
     }
     for (const b of branches) {
-      const r = await git.push(b.cwd, obs.remote, `${b.force ? "+" : ""}refs/heads/${b.branch}:refs/heads/${b.branch}`);
+      const r = await git.push(b.cwd, remote, `refs/heads/${b.branch}:refs/heads/${b.branch}`);
       if (!r.ok) return { story: story.key, ok: false, pushed, error: `push ${b.branch} failed: ${r.message}` };
       pushed.push(b.branch);
     }
   }
   const r = await releaseClaim(obs.root, obs.remote, story.key, sha);
   return r.ok ? { story: story.key, ok: true, pushed } : { story: story.key, ok: false, pushed, error: r.message };
+}
+
+/** R3.3: is local `branch` a fast-forward of the remote one (fetched now; absent remotely counts)? */
+async function fastForwardOf(root: string, remote: string, branch: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const tracking = `refs/remotes/${remote}/${branch}`;
+  const f = await rawGit(root, ["fetch", "--quiet", "--no-tags", remote, `+refs/heads/${branch}:${tracking}`]);
+  // a branch missing on the remote (never pushed) is fine; any other fetch failure decides nothing
+  if (f.code !== 0 && !/couldn't find remote ref/i.test(f.stderr)) return { ok: false, reason: `fetch failed: ${f.stderr.trim()}` };
+  if ((await rawGit(root, ["rev-parse", "--verify", "--quiet", tracking])).code !== 0) return { ok: true };
+  const anc = await rawGit(root, ["merge-base", "--is-ancestor", tracking, `refs/heads/${branch}`]);
+  return anc.code === 0 ? { ok: true } : { ok: false, reason: "the remote has commits this checkout does not" };
 }
 
 /** Release every claim this heartbeat holds (clean `watch` exit, T6). */

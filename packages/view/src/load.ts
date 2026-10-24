@@ -7,12 +7,14 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { hostname, userInfo } from "node:os";
 import { join } from "node:path";
 import {
+  actFailureItem,
   buildInbox,
   type ClaimState,
   effectiveMode,
   type Facts,
   type FileError,
   formatAge,
+  heartbeatDown,
   nextCommand,
   RECENT_MS,
   type RunFacts,
@@ -22,21 +24,27 @@ import {
   stepOf,
   storyWorktreePath,
   type UnitFacts,
+  type UnpushedRuns,
   type WorktreeFacts,
 } from "@norn/core";
-import { DEFAULT_CONFIG, type HookFact, type LeaseFile, type Mode, type ResolvedConfig, storyBranch, type TraceEvent } from "@norn/schema";
+import { DEFAULT_CONFIG, type HookFact, type LeaseFile, type Mode, type ResolvedConfig, sliceBranch, storyBranch, type TraceEvent } from "@norn/schema";
 import {
   classifyClaim,
+  defaultBaseRef,
+  lastTickAt,
   type LeaseEntry,
   type LeaseLiveness,
   listLeases,
   loadSnapshot,
   readEnvNorn,
+  readActFailures,
   readLocalClaim,
   readTrace,
   readUnitMarker,
   type StorySnapshot,
   type UnitSnapshot,
+  type UnpushedTarget,
+  unpushedRuns,
   withSliceWorktrees,
 } from "@norn/store";
 import { mergeTimeline, receiptEntry, traceEntries, traceUnits } from "./timeline.ts";
@@ -134,6 +142,8 @@ interface Ctx {
   now: number;
   config: ResolvedConfig;
   runner: string | null;
+  /** R5.5: the heartbeat is down — auto steps get no manual start hint */
+  heartbeatDown: boolean;
 }
 
 function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: UnitFacts, ctx: Ctx, title: string, workflow: string): UnitView {
@@ -142,7 +152,10 @@ function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: Uni
   const eff = effectiveMode(sf.mode, step?.type === "agent" && !!step.attended, ctx.runner);
   const corrupt = u.errors.length > 0 || st?.status === "corrupt";
   const since = st ? (st.park?.since ?? (st.status === "running" ? st.run?.started_at : null) ?? (st.status === "done" ? st.updated_at : st.step_entered_at)) : null;
-  const start = step?.type === "agent" ? startCommandFor(uf, sf, ctx.config) : undefined;
+  // R5.5 (A8): while the heartbeat is down an auto step waits for `norn watch`, not a person
+  const waitsForHeartbeat = ctx.heartbeatDown && step?.type === "agent" && eff.mode === "auto";
+  const start = step?.type === "agent" ? (waitsForHeartbeat ? "norn watch" : startCommandFor(uf, sf, ctx.config)) : undefined;
+  const failure = actFailureItem(sf, uf) ? uf.act_failure : undefined;
   return {
     key: u.unit.key,
     story: story.key,
@@ -165,6 +178,7 @@ function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: Uni
     next: corrupt ? `norn why ${u.unit.key}` : nextCommand(u.unit.key, st, start),
     updated_at: st?.updated_at ?? null,
     errors: u.errors,
+    act_failure: failure ? { effect: failure.effect, reason: failure.reason, at: failure.at, tick_id: failure.tick_id } : null,
   };
 }
 
@@ -186,7 +200,9 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   else errors.push(...snap.config.errors);
   errors.push(...snap.workflows.errors);
   const runner = config.runner?.adapter ?? null;
-  const ctx: Ctx = { now, config, runner };
+  const lastTick = lastTickAt(opts.repoRoot);
+  const failures = readActFailures(opts.repoRoot);
+  const ctx: Ctx = { now, config, runner, heartbeatDown: false };
 
   // Local reads in parallel: claim refs (no fetch) and machine leases.
   const [claims, leases, trace] = await Promise.all([
@@ -210,10 +226,31 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     for (const entry of list) if (entry.lease.run_id && entry.lease.kind !== "slot") leaseByRun.set(entry.lease.run_id, { entry, alive });
 
   const me = { heartbeat_id: opts.heartbeatId ?? null };
+
+  // R2.3: on a story not held here, local runs/ work that never reached the record (an inbox Check item)
+  const remoteName = config.remote.git_remote;
+  const baseRef = defaultBaseRef(opts.repoRoot, remoteName);
+  const unpushed = await Promise.all(
+    snap.stories.map(async (read, i): Promise<UnpushedRuns[]> => {
+      const c = classifyClaim(claims[i] ?? { state: "none" }, me, now);
+      if (c.state === "mine" || c.state === "corrupt" || ((c.state === "other" || c.state === "expired") && (c.blob.holder === holder || c.blob.heartbeat_id === me.heartbeat_id))) return [];
+      const storyWt = storyWorktreePath(opts.repoRoot, read.key, read.slug);
+      if (readUnitMarker(storyWt).marker?.story !== read.key) return [];
+      const targets: UnpushedTarget[] = [{ unit: read.key, dir: read.units[0]?.unit.dir ?? "_story", cwd: storyWt, branch: storyBranch(read.key, read.slug) }];
+      for (const u of read.units) {
+        const wt = u.unit.slice ? markedSliceWorktree(storyWt, read, u.unit.slice) : null;
+        const file = read.slices.find((f) => f.key === u.unit.slice);
+        if (wt && file) targets.push({ unit: u.unit.key, dir: u.unit.dir, cwd: wt, branch: sliceBranch(read.key, file.nn, file.slug) });
+      }
+      const found = await unpushedRuns(remoteName, baseRef, read.spec_dir, targets).catch(() => []);
+      return found.map((f) => ({ unit: f.unit, files: f.files }));
+    }),
+  );
   const runs: RunView[] = [];
   const timeline: Record<string, TimelineEntry[]> = {};
   const storyFacts: StoryFacts[] = [];
   const stories: StoryView[] = [];
+  const views: Array<() => void> = [];
 
   snap.stories.forEach((read, i) => {
     const storyWt = storyWorktreePath(opts.repoRoot, read.key, read.slug);
@@ -257,6 +294,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
         run,
         lease: (lease?.entry.lease as LeaseFile | undefined) ?? null,
         uncommitted: false,
+        ...(failures[u.unit.key] ? { act_failure: failures[u.unit.key] } : {}),
       };
     });
 
@@ -275,6 +313,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       units,
       slices: story.slices,
       mode,
+      ...(unpushed[i]?.length ? { unpushed_runs: unpushed[i] } : {}),
     };
     storyFacts.push(sf);
 
@@ -298,6 +337,12 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
           alive: lease ? lease.alive : null,
           lease: lease ? { kind: lease.entry.lease.kind, file: lease.entry.file, slot: lease.entry.lease.slot ?? null } : null,
           last_hook_at: uf.run?.last_hook_at ? new Date(uf.run.last_hook_at).toISOString() : null,
+          // R4.4: the tick's last classification of this run (until the cursor moves)
+          classified:
+            u.state?.status === "running" && u.state.last_outcome?.source === "classified" && u.state.last_outcome.step === r.step
+              ? { outcome: u.state.last_outcome.outcome, at: u.state.last_outcome.at }
+              : null,
+          machine: r.machine ?? null,
         });
       }
       const entries = (u.receipts ?? u.unapplied).map(receiptEntry);
@@ -305,32 +350,34 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       timeline[u.unit.key] = mergeTimeline(entries);
     });
 
-    // Unit views.
-    const storyTitle = story.frontmatter?.title ?? story.key;
-    const storyUnit = story.units[0] as UnitSnapshot;
-    const base = unitView(storyUnit, story, sf, units[0] as UnitFacts, ctx, storyTitle, story.frontmatter?.workflow ?? config.default_workflow);
-    const slices: SliceView[] = story.units.slice(1).map((u, k) => {
-      const file = story.slices.find((s) => s.key === u.unit.slice);
-      const fm = file?.frontmatter ?? null;
-      const v = unitView(u, story, sf, units[k + 1] as UnitFacts, ctx, fm?.title ?? u.unit.key, fm?.workflow ?? config.default_slice_workflow);
-      return {
-        ...v,
-        slice: u.unit.slice as string,
-        nn: file?.nn ?? u.unit.dir.split("-")[0] ?? "",
-        slice_status: fm?.status ?? null,
-        depends_on: fm?.depends_on ?? [],
-        integrated: fm?.status === "integrated",
-        errors: file?.error ? [file.error, ...v.errors] : v.errors,
-      };
-    });
-    stories.push({
-      ...base,
-      slice: null,
-      story_status: story.frontmatter?.status ?? null,
-      spec_dir: story.spec_dir,
-      root: story.root,
-      slices,
-      errors: story.frontmatter_error ? [story.frontmatter_error, ...base.errors] : base.errors,
+    // Unit views — built once the heartbeat state is known (R5.5), below.
+    views.push(() => {
+      const storyTitle = story.frontmatter?.title ?? story.key;
+      const storyUnit = story.units[0] as UnitSnapshot;
+      const base = unitView(storyUnit, story, sf, units[0] as UnitFacts, ctx, storyTitle, story.frontmatter?.workflow ?? config.default_workflow);
+      const slices: SliceView[] = story.units.slice(1).map((u, k) => {
+        const file = story.slices.find((s) => s.key === u.unit.slice);
+        const fm = file?.frontmatter ?? null;
+        const v = unitView(u, story, sf, units[k + 1] as UnitFacts, ctx, fm?.title ?? u.unit.key, fm?.workflow ?? config.default_slice_workflow);
+        return {
+          ...v,
+          slice: u.unit.slice as string,
+          nn: file?.nn ?? u.unit.dir.split("-")[0] ?? "",
+          slice_status: fm?.status ?? null,
+          depends_on: fm?.depends_on ?? [],
+          integrated: fm?.status === "integrated",
+          errors: file?.error ? [file.error, ...v.errors] : v.errors,
+        };
+      });
+      stories.push({
+        ...base,
+        slice: null,
+        story_status: story.frontmatter?.status ?? null,
+        spec_dir: story.spec_dir,
+        root: story.root,
+        slices,
+        errors: story.frontmatter_error ? [story.frontmatter_error, ...base.errors] : base.errors,
+      });
     });
   });
 
@@ -347,8 +394,14 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     },
     remote: { synced_at: null, issues: undefined },
     stories: storyFacts,
+    heartbeat: { last_tick_at: lastTick },
     orphans: { worktrees: [], branches: [] },
   };
+  // R5.5 (N3): is this checkout's heartbeat down while it holds auto work?
+  const down = heartbeatDown(facts, config);
+  ctx.heartbeatDown = !!down;
+  for (const build of views) build();
+  const heartbeat = { holder, last_tick_at: lastTick === null ? null : new Date(lastTick).toISOString(), age: lastTick === null ? null : formatAge(now - lastTick), down: !!down };
 
   const recently_done: RecentDone[] = stories
     .flatMap((s) => [s, ...s.slices])
@@ -363,6 +416,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     repo: opts.repoRoot,
     holder,
     runner,
+    heartbeat,
     stories,
     inbox: buildInbox(facts, config),
     runs,

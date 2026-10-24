@@ -488,6 +488,190 @@
           }
         }
       }
+    },
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "at",
+        "unit",
+        "holder",
+        "heartbeat_id",
+        "previous_holder",
+        "previous_heartbeat_id",
+        "expired",
+        "forced"
+      ],
+      "properties": {
+        "type": {
+          "const": "take",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "description": "ISO-8601 timestamp, UTC",
+          "type": "string"
+        },
+        "unit": {
+          "pattern": "^(gh|gl)-[1-9][0-9]*$",
+          "description": "Story key, e.g. gh-123 or gl-45",
+          "type": "string"
+        },
+        "holder": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "heartbeat_id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "previous_holder": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "previous_heartbeat_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "description": "ULID (ID2)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expired": {
+          "type": "boolean"
+        },
+        "forced": {
+          "type": "boolean"
+        }
+      }
+    },
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type",
+        "tick_id",
+        "at",
+        "heartbeat_id",
+        "decisions"
+      ],
+      "properties": {
+        "type": {
+          "const": "tick.start",
+          "type": "string"
+        },
+        "tick_id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "description": "ISO-8601 timestamp, UTC",
+          "type": "string"
+        },
+        "heartbeat_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "description": "ULID (ID2)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "decisions": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "unit",
+              "rule",
+              "action"
+            ],
+            "properties": {
+              "unit": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "rule": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "action": {
+                "additionalProperties": true,
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type",
+        "tick_id",
+        "at",
+        "duration_ms",
+        "failed"
+      ],
+      "properties": {
+        "type": {
+          "const": "tick.end",
+          "type": "string"
+        },
+        "tick_id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "description": "ISO-8601 timestamp, UTC",
+          "type": "string"
+        },
+        "duration_ms": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "failed": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      }
     }
   ],
   "discriminator": {

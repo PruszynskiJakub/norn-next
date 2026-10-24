@@ -26,6 +26,7 @@ import {
   type RepoWorkflows,
   type RunFacts,
   type SliceFileFacts,
+  type StepRunFacts,
   type StoryFacts,
   stepOf,
   storyWorktreePath,
@@ -39,6 +40,7 @@ import {
   type LeaseFile,
   parseDuration,
   parseReceiptFileName,
+  type ReceiptOf,
   type ResolvedConfig,
   sliceBranch,
   storyBranch,
@@ -53,6 +55,7 @@ import {
   listMailbox,
   loadSnapshot,
   readEnvNorn,
+  readActFailures,
   readLocalClaim,
   readReceipt,
   readUnitMarker,
@@ -60,6 +63,9 @@ import {
   type StorySnapshot,
   traceDir,
   type UnitSnapshot,
+  type UnpushedTarget,
+  type UnpushedUnit,
+  unpushedRuns,
   withSliceWorktrees,
 } from "@norn/store";
 import type { Context } from "../context.ts";
@@ -123,6 +129,8 @@ export interface Observed {
   stories: Record<string, StoryLoc>;
   units: Record<string, UnitLoc>;
   sync: SyncReport;
+  /** R2.3: per story not held here, local runs/ work not on the remote (facts carry `{unit, files}`) */
+  unpushed: Record<string, UnpushedUnit[]>;
 }
 
 export function machineHolder(env: Record<string, string | undefined>): string {
@@ -291,18 +299,26 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     return p;
   };
 
-  // hooks are read once, only when some run is live
-  const running: UnitState[] = [];
+  // hooks are read once: back to the oldest live run or launch-unknown run (R5.1), and always the
+  // stalled window (R5.3: hook activity of any run of a unit's cursor step)
+  const starts: string[] = [new Date(now - parseDuration(config.limits.stalled)).toISOString()];
   const unitSnaps = new Map<StorySnapshot, UnitSnapshot[]>();
   for (const s of snapshot.stories) {
     const units = withSliceWorktrees(s, (slice) => sliceWts.get(slice)).units;
     unitSnaps.set(s, units);
-    for (const u of units) if (liveRun(u.state)) running.push(u.state as UnitState);
+    for (const u of units) {
+      if (liveRun(u.state)) starts.push(u.state?.run?.started_at ?? (u.state as UnitState).updated_at);
+      const unknown = unknownLaunch(u.unapplied);
+      if (unknown) starts.push(unknown.receipt.at);
+    }
   }
-  const since = running.map((st) => st.run?.started_at ?? st.updated_at).sort()[0];
-  const hooks = since ? readHookFacts(root, since) : [];
+  const hooks = readHookFacts(root, starts.sort()[0] as string);
+  const failures = readActFailures(root);
+  const holder = machineHolder(ctx.env);
+  const local: LocalRunEnv = { holder, runner: ports.runner && runner ? ports.runner : null, stalledMs: parseDuration(config.limits.stalled), now };
 
   const refs = await refMap(root);
+  const unpushed: Record<string, UnpushedUnit[]> = {};
   const stories: StoryFacts[] = [];
   const storyLocs: Record<string, StoryLoc> = {};
   const unitLocs: Record<string, UnitLoc> = {};
@@ -319,15 +335,19 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
 
     const units: UnitFacts[] = [];
     const foreign: ForeignCommit[] = [];
+    const targets: UnpushedTarget[] = [];
     for (const u of unitSnaps.get(s) ?? []) {
       const sliceFile = u.unit.slice ? s.slices.find((f) => f.key === u.unit.slice) : undefined;
       const ownWt = u.unit.slice ? (sliceWts.get(u.unit.slice) ?? null) : storyWt;
       const worktree = await wtFacts(ownWt);
       const unitBranch = u.unit.slice ? (sliceFile ? sliceBranch(s.key, sliceFile.nn, sliceFile.slug) : (worktree?.status?.branch ?? `${s.key}/${u.unit.dir}`)) : branch;
-      const uf = await unitFacts(ports, root, s, u, worktree, hooks, leases.live.map((e) => e.lease), now);
+      const uf = await unitFacts(ports, root, s, u, worktree, hooks, leases.live.map((e) => e.lease), local);
+      const failure = failures[u.unit.key];
+      if (failure) uf.act_failure = failure;
       units.push(uf);
       // Q6: commits norn did not make; an agent's own commits mid-run are not foreign
       if (u.state?.status !== "running") foreign.push(...(await foreignCommits(root, remote, unitBranch, baseRef, refs)));
+      if (ownWt && worktree?.exists) targets.push({ unit: u.unit.key, dir: u.unit.dir, cwd: ownWt, branch: unitBranch });
       unitLocs[u.unit.key] = {
         unit: u.unit,
         story: s.key,
@@ -339,6 +359,11 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
         workflow: u.workflow?.workflow ?? null,
       };
     }
+
+    // R2.3: a checkout without the claim reports its local runs/ work that is not in the record
+    const heldHere = claim.state === "mine" || (claim.state === "expired" && claim.blob.heartbeat_id === hb);
+    const lost = remote && !heldHere && claim.state !== "corrupt" ? await unpushedRuns(remote, baseRef, s.spec_dir, targets) : [];
+    if (lost.length) unpushed[s.key] = lost;
 
     stories.push({
       key: s.key,
@@ -355,6 +380,8 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       ...(byAncestry.has(s.key) ? { merged_by_ancestry: true } : {}),
       ...(foreign.length ? { foreign_commits: foreign } : {}),
       ...readyHead(s, unitSnaps.get(s)?.[0]),
+      ...(s.base_status !== undefined ? { base_status: s.base_status } : {}),
+      ...(lost.length ? { unpushed_runs: lost.map((l) => ({ unit: l.unit, files: l.files })) } : {}),
       units,
       slices: s.slices satisfies SliceFileFacts[],
       mode: units[0]?.state?.mode ?? config.default_mode,
@@ -374,19 +401,23 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     now,
     repo: { root, default_branch: cache.default_branch ?? "main", remote: remoteName },
     machine: {
-      holder: machineHolder(ctx.env),
+      holder,
       heartbeat_id: hb,
       runner,
+      ...(runner && ports.runner ? { runner_capabilities: { ...ports.runner.capabilities } } : {}),
       leases: leases.live.map((e) => e.lease),
       dead_leases: leases.dead.map((e) => e.lease),
       dead_lease_files: [...leases.dead.map((e) => e.file), ...leases.errors.map((e) => e.file)],
     },
     remote: { synced_at: cache.synced_at, issues },
     stories,
+    // R5.5: this tick is the checkout's heartbeat
+    heartbeat: { last_tick_at: now },
     orphans: { worktrees: orphanWts.sort(), branches: orphanBranches },
   };
-  return { facts, workflows, config, ports, root, remote, heartbeat_id: hb, stories: storyLocs, units: unitLocs, sync };
+  return { facts, workflows, config, ports, root, remote, heartbeat_id: hb, stories: storyLocs, units: unitLocs, sync, unpushed };
 }
+
 
 /** `refs/remotes/<remote>/<base>` when it exists locally (fetched), else null (solo, never fetched). */
 async function trackingRef(root: string, remote: string | null, base: string): Promise<string | null> {
@@ -555,6 +586,62 @@ function lastOutcomeReceipt(runsDir: string, state: UnitState, root: string): Nu
 /** Run facts are observed for running units and for parked ones that keep their run (B2: is the session still there to answer into?). */
 const liveRun = (st: UnitState | null | undefined): boolean => !!st?.run && (st.status === "running" || st.status === "parked");
 
+/**
+ * R5.1: the unapplied `started` receipt (norn's own, auto) whose launch never reached `state.json`
+ * — no session recorded, and no later receipt of the run's agent showing it ran. Null when none.
+ */
+export function unknownLaunch(unapplied: readonly NumberedReceipt[]): (NumberedReceipt & { receipt: ReceiptOf<"started"> }) | null {
+  const last = unapplied.filter((r) => r.receipt.kind === "started" && r.receipt.how === "auto" && r.receipt.by === "norn").at(-1) as (NumberedReceipt & { receipt: ReceiptOf<"started"> }) | undefined;
+  if (!last || last.receipt.session) return null;
+  if (unapplied.some((r) => r.n > last.n && r.receipt.by === "agent")) return null;
+  return last;
+}
+
+interface LocalRunEnv {
+  /** this machine's `user@host` (R7.2) */
+  holder: string;
+  /** this machine's available runner */
+  runner: Ports["runner"];
+  stalledMs: number;
+  now: number;
+}
+
+/**
+ * R5.3 + R5.1: the unit's `started` / `classify` receipts at its cursor step/attempt (newest first,
+ * stopping at the first of another cursor), and every session id its `started` receipts recorded.
+ */
+function cursorRuns(runsDir: string, st: UnitState, root: string): { runs: Map<string, { died: boolean }>; sessions: Set<string> } {
+  const runs = new Map<string, { died: boolean }>();
+  const sessions = new Set<string>();
+  let names: string[];
+  try {
+    names = readdirSync(receiptsDir(runsDir));
+  } catch {
+    return { runs, sessions };
+  }
+  const ns = names
+    .map(parseReceiptFileName)
+    .filter((p): p is { n: number; kind: string } => !!p && (p.kind === "started" || p.kind === "classify"))
+    .sort((a, b) => b.n - a.n);
+  let atCursor = true;
+  for (const { n } of ns) {
+    const r = readReceipt(runsDir, n, root);
+    if (!r || !("receipt" in r)) continue;
+    const rc = r.receipt;
+    if (rc.kind === "started" && rc.session) sessions.add(rc.session.session_id);
+    if (!atCursor) continue;
+    if (rc.step !== st.step || rc.attempt !== st.attempt) {
+      atCursor = false;
+      continue;
+    }
+    if (!rc.run_id) continue;
+    const cur = runs.get(rc.run_id) ?? { died: false };
+    if (rc.kind === "classify" && (rc.outcome === "died" || rc.route === "retry")) cur.died = true;
+    runs.set(rc.run_id, cur);
+  }
+  return { runs, sessions };
+}
+
 async function unitFacts(
   ports: Ports,
   repoRoot: string,
@@ -563,8 +650,9 @@ async function unitFacts(
   worktree: WorktreeFacts | null,
   hooks: HookFact[],
   leases: LeaseFile[],
-  now: number,
+  env: LocalRunEnv,
 ): Promise<UnitFacts> {
+  const now = env.now;
   const st = u.state;
   const prefix = `${story.spec_dir}/runs/${u.unit.dir}/`;
   const dirty = worktree?.status ? [...worktree.status.staged, ...worktree.status.unstaged, ...worktree.status.untracked] : [];
@@ -574,12 +662,40 @@ async function unitFacts(
   const last_check = lo?.receipt.kind === "check" && lo.receipt.outcome === "fail" ? lo : null;
   const last_findings = lo?.receipt.kind === "done" && lo.receipt.findings?.length ? lo : null;
 
+  const cursor = st ? cursorRuns(u.path, st, worktree?.path ?? story.root) : null;
+  const unknown = st ? unknownLaunch(u.unapplied) : null;
   let run: RunFacts | null = null;
-  if (liveRun(st) && st?.run) {
+  if (unknown && st) {
+    // R5.1: look for the run: its hook facts, runner sessions in its worktree, processes with its NORN_RUN
+    const r = unknown.receipt;
+    const runId = r.run_id as string;
+    const mine = claude.withPendingCommands(hooks.filter((h) => h.run_id === runId));
+    const agentSession = mine.findLast((h) => h.agent_session_id)?.agent_session_id ?? null;
+    const foreign = !!r.machine && r.machine !== env.holder;
+    const candidates = !foreign && env.runner?.findSessions ? await env.runner.findSessions({ run_id: runId, cwd: r.worktree }).catch(() => []) : [];
+    // a pane another run of the unit already recorded is that run's, not this one
+    const fresh = candidates.filter((c) => !cursor?.sessions.has(c.session.session_id));
+    const chosen = fresh.find((c) => !!agentSession && c.agent_session_id === agentSession) ?? (fresh.length === 1 ? fresh[0] : undefined);
+    const last = mine.at(-1);
+    const last_hook_at = last ? Date.parse(last.at) : null;
+    run = {
+      run_id: runId,
+      session: chosen?.session ?? null,
+      process_alive: chosen?.session.process ? await ports.process.isAlive(chosen.session.process).catch(() => null) : null,
+      pane: null,
+      hooks: mine,
+      last_hook_at,
+      last_activity_at: last_hook_at,
+      transcript: [...mine].reverse().find((h) => h.transcript)?.transcript ?? null,
+      launch_unknown: { n: unknown.n, at: Date.parse(r.at), agent_session_id: agentSession ?? chosen?.agent_session_id ?? null },
+    };
+  } else if (liveRun(st) && st?.run) {
     const r = st.run;
     const session = r.session ? { runner: r.session.runner, session_id: r.session.session_id, ...(r.session.pane_id ? { pane_id: r.session.pane_id } : {}), ...(r.process ? { process: r.process } : {}) } : null;
-    const process_alive = r.process ? await ports.process.isAlive(r.process).catch(() => null) : null;
-    const pane = session && ports.runner && session.runner === ports.runner.name ? await ports.runner.paneState(session).catch(() => null) : null;
+    // R7.2 (N5): a pid or pane id from another machine means nothing in this machine's tables
+    const foreign = !!r.machine && r.machine !== env.holder;
+    const process_alive = r.process && !foreign ? await ports.process.isAlive(r.process).catch(() => null) : null;
+    const pane = session && !foreign && ports.runner && session.runner === ports.runner.name ? await ports.runner.paneState(session).catch(() => null) : null;
     // A2: a Claude permission prompt names no command; take it from the preceding PreToolUse
     // (other agents' facts pass through unchanged) so the implicit ask and inbox show it
     const mine = claude.withPendingCommands(hooks.filter((h) => (h.run_id ? h.run_id === r.run_id : !!worktree && h.cwd.startsWith(worktree.path) && h.at >= r.started_at)));
@@ -596,10 +712,25 @@ async function unitFacts(
       last_activity_at: acts.length ? Math.min(Math.max(...acts), now) : null,
       transcript: [...mine].reverse().find((h) => h.transcript)?.transcript ?? r.transcript ?? null,
     };
+    // B3: a gone process's first output lines (its run log) say why it never got going
+    if (session && (process_alive === false || pane?.alive === false) && ports.runner?.output && session.runner === ports.runner.name) {
+      const output = await ports.runner.output(session).catch(() => null);
+      if (output) run.output = output;
+    }
   }
 
   const mineLeases = leases.filter((l) => l.repo === repoRoot && l.story === u.unit.story && l.slice === u.unit.slice);
   const lease = mineLeases.find((l) => l.kind === "check") ?? mineLeases.find((l) => l.kind === "agent") ?? null;
+
+  // R5.3: runs of the cursor step and their hook activity
+  let step_runs: StepRunFacts[] | undefined;
+  if (cursor) {
+    step_runs = [...cursor.runs].map(([run_id, r]) => {
+      const own = hooks.filter((h) => h.run_id === run_id);
+      const last = own.at(-1);
+      return { run_id, last_hook_at: last ? Date.parse(last.at) : null, ended: r.died || last?.event === "session_end" };
+    });
+  }
 
   const errors: FileError[] = u.errors;
   return {
@@ -616,5 +747,6 @@ async function unitFacts(
     run,
     lease,
     uncommitted,
+    ...(step_runs ? { step_runs } : {}),
   };
 }

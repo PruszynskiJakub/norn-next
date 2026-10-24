@@ -3,6 +3,10 @@
  *
  * Contract between decide and act:
  * - At most one Action per unit per tick; repo-level actions have `unit: null`.
+ * - Side action (R1.1): a story's `claim` renew (`op: "renew"`) does not occupy its unit's one
+ *   action. Decide emits it before every other action of the story; act performs it first and, if
+ *   its CAS loses (the claim is gone or held by another heartbeat), skips every other action of
+ *   that story this tick, reporting each as `skipped: claim lost` (R1.2). See decide's `isSideAction`.
  * - Decide is pure and replayable: it uses `facts.now` for every timestamp and
  *   `deriveUlid(facts.tick_id, i)` (from @norn/schema) for every new id (receipt_id, run_id).
  * - Every action is a plain JSON value (it is written to the trace verbatim).
@@ -26,7 +30,7 @@ import type {
   UnitState,
 } from "@norn/schema";
 import type { FileError, UnitRef } from "./facts.ts";
-import type { InboxItem, RemoteIssue, SessionRef } from "./ports.ts";
+import type { InboxItem, PromptKey, RemoteIssue, SessionRef } from "./ports.ts";
 
 /** A receipt decide wants written, with its number (S6). */
 export interface NewReceipt {
@@ -83,6 +87,12 @@ export interface SessionInput {
   run_id: string;
   session: SessionRef;
   text: string;
+  /**
+   * R6.2: an answer to an implicit pane prompt goes in as these keystrokes (option number + enter,
+   * arrows + enter, or text + enter), never as a pasted prompt. Act delivers them before writing
+   * state: a failed delivery leaves the unit parked (R6.3).
+   */
+  keys?: PromptKey[];
 }
 
 export interface WorktreeSpec {
@@ -142,10 +152,20 @@ export interface StartRunAction extends UnitBase, Transition {
   launch: AgentLaunch;
 }
 
-/** Same-session nudge after silent/timeout/stalled (C1); counted in state.nudges_used. */
+/**
+ * Same-session nudge after silent/timeout/stalled (C1); counted in state.nudges_used. R4.2: delivered
+ * by `send` into the live session when the runner can type (`input`), else by resuming the agent
+ * session with the nudge text (`launch` with `resume`; `receipts` then also holds a `started`
+ * receipt for the same run, filled with the new session as for start_run) after killing `kill`.
+ */
 export interface NudgeAction extends UnitBase, Transition {
   kind: "nudge";
-  input: SessionInput;
+  /** `send` delivery; null when resumed */
+  input: SessionInput | null;
+  /** `resume` delivery: relaunch `--resume <agent_session_id>` with the nudge text as the prompt */
+  launch: AgentLaunch | null;
+  /** old session to terminate before the resume, if still present */
+  kill: SessionRef | null;
   /** C4 snapshot request on silent (see ClassifyAction) */
   snapshot: { transcript: string | null; cwd: string } | null;
 }
@@ -258,7 +278,7 @@ export interface ImportMailboxAction extends UnitBase, Transition {
   refs: Array<{ ref: string; sha: string }>;
 }
 
-/** Claim ref CAS (T3, T4, T6). `expected` null = ref must not exist. */
+/** Claim ref CAS (T3, T4, T6). `expected` null = ref must not exist. `renew` is a side action (R1.1). */
 export interface ClaimAction extends UnitBase {
   kind: "claim";
   op: "acquire" | "renew" | "release";
@@ -360,6 +380,7 @@ export interface Decision {
 
 /** What act reports per action (trace `result`). */
 export interface ActionResult {
+  /** R4.3: false whenever the action's effect failed (send, resume, launch, push), never "ok with a note" */
   ok: boolean;
   error?: string;
   detail?: unknown;

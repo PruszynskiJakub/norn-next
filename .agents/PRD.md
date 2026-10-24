@@ -171,18 +171,22 @@ The story worktree is on the story branch and holds `.agents/specs/<id>-<slug>/`
 - H4 **Act** performs actions, writing receipts first (P6); every action and its result is appended to the trace.
 - H5 `norn watch --interval 30s` runs ticks in a loop; cron/launchd may be used instead. Remote calls (sync, claim beats, mailbox fetch) are throttled and never block local reads.
 - H6 Performance: `tick`, `brief`, `status`, `inbox` complete in < 1 s on local state.
+- H7 Claim renewal is a **side action** (R1): decide emits it beside a story's one unit action; act renews first and, when the renewal's CAS is lost, skips the story's other actions this tick (`skipped: claim lost`), so merge cleanup and receipt application never starve.
+- H8 Act failures are never `ok: true` (R4.3): an action whose effect failed (send, resume, launch, push, answer delivery) reports `ok: false`; the unit's last failure is kept machine-local, shown in `status` and as an Unblock item until an effect of the same kind succeeds.
+- H9 Every tick writes `tick.start` before act and `tick.end` after (R5.4); `norn why` shows a tick with no end as "tick crashed during act".
+- H10 `heartbeat.json` records `last_tick_at` (R5.5). Older than 3 × watch interval while a held story has auto work → Unblock item "no heartbeat on <holder> for 7m — run `norn watch`", and auto steps lose their manual start hint.
 
 ## 9. Agent integration
 
 ### 9.1 Hooks
 
 - A1 `norn init` appends norn hooks into each configured agent tool's repo config (e.g. `.claude/settings.json`), marked as norn-owned; re-running updates them in place; `norn uninstall` removes them.
-- A2 Hooks call `norn hook <event>` and report lifecycle facts: turn start/end, tool use, waiting for input (incl. permission prompts), session end, transcript path.
+- A2 Hooks call `"${NORN_BIN:-norn}" hook <event>` (R8.1) and report lifecycle facts: turn start/end, tool use, waiting for input (incl. permission prompts), session end, transcript path.
 - A3 Hooks are no-ops outside worktrees containing `.norn-unit`.
 - A4 Where the agent supports blocking (e.g. Claude Code `Stop`), ending a turn without a receipt is refused with an instruction to report — in unattended steps only (MO4).
 - A5 Agents without hooks are a lower tier: runner, process and git facts only.
-- A6 When launching, norn sets `NORN_HOME`, `NORN_STORY`, `NORN_SLICE`, `NORN_RUN`.
-- A7 `norn doctor` (M4) runs a test turn per adapter and verifies hooks fire.
+- A6 When launching, norn sets `NORN_HOME`, `NORN_STORY`, `NORN_SLICE`, `NORN_RUN` and `NORN_BIN`. The launched command itself starts with `env PATH=<shim dir>:… NORN_BIN=<shim>`, where the shim `~/.norn/bin/norn` execs the launching norn, so `command -v norn` in a runner pane resolves to it even after a login shell resets `PATH` (R8.1).
+- A7 `norn doctor` (M4) runs a test turn per adapter and verifies hooks fire; it runs `command -v norn` in one throwaway runner session and fails when it resolves to another norn (R8.2), and warns when `NORN_MACHINE` overrides the machine name (R7.3).
 
 ### 9.2 Sessions and briefing
 
@@ -203,6 +207,9 @@ The story worktree is on the story branch and holds `.agents/specs/<id>-<slug>/`
 - B4 The exact briefing of every run is stored in the trace; briefings are snapshot-testable.
 - B5 In auto mode the first prompt is one line: "Use the norn skill, then run `norn brief`."
 - B6 Named input kinds `last_check` and `last_findings` may be declared in a step's `inputs`; the Rework section uses them automatically.
+- B7 **Launch unknown** (R5.1–R5.3): a `started` receipt without applied state (a crash between the two) is looked for before anything else is decided — hook facts with its `run_id`, runner sessions in the unit worktree, processes with `NORN_RUN=<run_id>`. Found → adopted as the running step; nothing after 2 watch intervals without hook activity → `died`. No run (start, retry, answer or nudge resume) starts beside a run of the same step with hook activity in the stalled window.
+- B8 **Launch prompt not received** (R9.1): a run with `SessionStart` but no turn start for 60 s gets its launch prompt typed again, once (not counted); 60 s later it is `silent` with rule "launch prompt not received" and the inbox names the pane.
+- B9 **Prompts the agent is blocked on** (R6): an implicit ask is resolved without a person when a later fact shows the agent moved on — its pane leaves `waiting_input`, a newer hook for the run arrives, or the agent reports — by an `answer` receipt `by: "agent"`. Agent reports are accepted while parked on an implicit ask; an explicit `norn ask` still refuses them. `norn answer` to a pane prompt types the keys it expects (the option number + Enter, arrows + Enter for unnumbered menus, else the text + Enter; options parsed by the runner adapter) before writing the receipt; a failed delivery writes no receipt, keeps the unit parked, and the Answer item's command becomes how to reach the pane.
 
 ### 9.3 Reporting verbs
 
@@ -224,20 +231,20 @@ Three sources of outcomes:
 
 | Step type | Classified outcomes | Rule |
 |---|---|---|
-| agent (unattended) | `silent` | turn ended / pane idle, no receipt |
+| agent (unattended) | `silent` | turn ended / pane idle, no receipt; or the launch prompt was never received (B8) |
 | agent | `died` | process gone, no receipt |
 | agent (unattended) | `timeout` | step deadline passed |
 | agent (unattended) | `stalled` | no hook, git or file activity for the configured window |
-| agent | `ask` (implicit) | pane/hook says waiting for input, no receipt (incl. permission prompts — inbox shows the command); unattended only |
+| agent | `ask` (implicit) | pane/hook says waiting for input, no receipt (incl. permission prompts — inbox shows the question block, the command's first line and the options; the full screen only with `inbox --details` and in `why`); unattended only |
 | check | `pass` / `fail` | exit code; timeout counts as `fail` with reason `timeout` |
 | gate | `approve` / `reject` | human receipt |
 | git | `done` / `conflict` | command result |
 | slices | `done` / `stuck` | aggregate of slices |
 | any | `exhausted` | a counter reached its max |
 
-- C1 Default routes: `silent` → nudge in same session (counted) → after max, `$stuck`; `died` → retry fresh session (counted) → `$stuck`; `timeout`/`stalled` → same as `silent`. Workflows may override any route.
+- C1 Default routes: `silent` → nudge in same session (counted) → after max, `$stuck`; `died` → retry fresh session (counted) → `$stuck`; `timeout`/`stalled` → same as `silent`. Workflows may override any route. A nudge is typed into the live session when the runner can `send`; else the agent session is resumed with the nudge text (`--resume`, after the old process is terminated) when the runner can `resume`; else the route falls through to a fresh-session retry, counted as a retry (R4.1, R4.2).
 - C2 Receipt presence always wins over runner facts. Runner "idle"/"done" alone never completes a step.
-- C3 A restart never counts as an answer; a unit parked on `ask` stays parked until a human answers.
+- C3 A restart never counts as an answer; a unit parked on `ask` stays parked until a human answers — except an implicit ask, which a later fact may resolve (B9).
 - C4 On `silent`, the tick snapshots the last assistant message (from the transcript), commits and diff into the trace and handoff.
 - C5 Every `check` run writes a check receipt `{run_id, command, exit_code, duration, output_tail}` (last ~200 lines); on `fail` the full output goes to `runs/<unit>/logs/<run_id>.log` and is committed.
 
@@ -325,9 +332,13 @@ Example `bug` workflow: `reproduce (agent; reproduced → implement, cannot_repr
 - T2 Claim ref `refs/norn/claims/<story-id>` holds a blob: holder (`user@machine`), `heartbeat_id`, `expires_at`, last `tick_id`.
 - T3 Acquire and renew via compare-and-swap: `git push --force-with-lease=<ref>:<expected>`. Losing the race fails with "held by X since Y".
 - T4 **Beat lease**: each live tick renews (e.g. 10 min lease, renewed ~3 min). Liveness is the beat, never the claim age.
-- T5 `norn take <story>` succeeds after expiry, pulls the story and slice branches and resumes from `runs/` + `handoff.md`. Before expiry it requires `--force` and is journaled.
+- T5 `norn take <story>` succeeds after expiry, pulls the story and slice branches and resumes from `runs/` + `handoff.md`. Before expiry it requires `--force`. Every take, forced or not, writes a `take` trace event and a `take` receipt `{previous_holder, previous_heartbeat_id, expired}` on the story unit before any other effect; `trace` and `why` show it (R10).
 - T6 **Parked is not released.** A story parked on `ask`, `stuck` or a gate keeps its claim and the heartbeat keeps renewing it. The claim is released only by `norn release <story>` (pushes branches and handoff first, then deletes the ref), a clean `watch` exit, or lease expiry.
-- T7 Only the claim holder pushes the story and slice branches.
+- T6a `release` (incl. a `watch` exit) pushes a story branch only while this heartbeat holds the claim and the push is a fast-forward; otherwise it deletes nothing and says why (R3.3).
+- T7 Only the claim holder pushes the story and slice branches, and writes receipts for the story (R2.2). The tick that applies a receipt commits and pushes in the same tick; `started` receipts are committed in the launch tick (R2.1).
+- T7a A non-holder checkout reports `runs/` work (receipts, state) that exists locally but not on the remote unit branch as a Check item "local work on gh-9 is not in the record (0035-done) — the story is now held by X"; `norn tidy` moves it to `runs/<unit>/orphaned/<holder>-<file>` on the local branch only, never pushed (R2.3).
+- T7b An intake that loses the claim CAS removes what it created on this checkout when it holds no further commits, else keeps it and raises T7a (R3.1). Decide never acquires a story whose record on the base ref says `done` or whose PR merged — the base record wins over any local spec (R3.2). A story's record is read only from its own worktree (`.norn-unit`) or the base ref (R3.4).
+- T7c Runs record `machine` (`user@host`) and `heartbeat_id` in their `started` receipts (R7.1). Process and pane liveness are checked only for runs of this machine; a run from another machine is judged by its hooks and the claim — after a `take`, no hook activity in the stalled window → `died` with rule `foreign run, holder changed` (R7.2). `NORN_MACHINE` overrides the machine name, as a test aid (R7.3).
 - T8 `approve`, `answer`, `unstick` acquire the claim for the local heartbeat when it is free.
 - T9 **Mailbox (M3).** A non-holder's `approve` / `answer` / `unstick` is pushed as a blob to `refs/norn/inbox/<story-id>/<ulid>`. The holder's tick fetches mailbox refs during sync, copies each into `runs/<unit>/receipts/` as the next numbered receipt, commits, pushes, and deletes the ref. A receipt whose `step`/`attempt` no longer matches is rejected into the trace. Before M3 the CLI refuses with `do_instead`.
 - T10 Stories are never picked up automatically except at intake; unclaimed stories show in `inbox`/`status` as "Unclaimed — `norn take <story>`".

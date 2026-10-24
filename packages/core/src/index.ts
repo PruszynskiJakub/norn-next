@@ -13,5 +13,6 @@ export * from "./decide.ts";
 export * from "./handoff.ts";
 export * from "./hash.ts";
 export * from "./inbox.ts";
+export * from "./prompt.ts";
 export * from "./time.ts";
 export * from "./workflow.ts";

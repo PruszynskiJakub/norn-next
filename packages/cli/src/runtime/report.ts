@@ -3,11 +3,11 @@
  * as an immutable receipt (P6, S6) that the next tick applies; the agent then ends its turn.
  */
 import { relative } from "node:path";
-import { type Receipt, ulid } from "@norn/schema";
+import { type Receipt, type ReceiptOf, ulid } from "@norn/schema";
 import { appendReceipt, readHandoff, writeHandoffBody } from "@norn/store";
 import type { Context } from "../context.ts";
 import { refuse } from "../output.ts";
-import { agentName, currentRun, loadUnitSession, refuseUnlessAgentWork, reportCommand, standingReport, type UnitSession } from "./agent-unit.ts";
+import { agentName, currentRun, implicitAskOpen, loadUnitSession, refuseUnlessAgentWork, reportCommand, standingReport, type UnitSession } from "./agent-unit.ts";
 
 export interface ReportTarget {
   s: UnitSession;
@@ -45,6 +45,25 @@ export function reportHeader(ctx: Context, t: ReportTarget) {
 }
 
 export function writeReport(t: ReportTarget, receipt: Receipt) {
+  // R6.1 (A14): a report while parked on an implicit ask is the agent moving on — an `answer`
+  // (`by: "agent"`) closes the ask first, so the tick applies the report at a running cursor
+  const ask = implicitAskOpen(t.s);
+  if (ask) {
+    const answer: ReceiptOf<"answer"> = {
+      kind: "answer",
+      receipt_id: ulid(Date.parse(receipt.at)),
+      run_id: receipt.run_id,
+      step: receipt.step,
+      attempt: receipt.attempt,
+      at: receipt.at,
+      by: "agent",
+      ...(receipt.who ? { who: receipt.who } : {}),
+      ...(receipt.slice !== undefined ? { slice: receipt.slice } : {}),
+      answer: `the agent moved on: reported ${reportCommand(receipt)}`,
+      ask_receipt_id: ask.receipt.receipt_id,
+    };
+    appendReceipt(t.s.runsDir, answer);
+  }
   const r = appendReceipt(t.s.runsDir, receipt);
   return { n: r.n, file: relative(t.s.worktree, r.file) };
 }

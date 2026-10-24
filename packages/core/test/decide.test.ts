@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { LeaseFile, UnitState } from "@norn/schema";
 import type { Action } from "../src/actions.ts";
 import { applyReceipts } from "../src/apply.ts";
-import { decide } from "../src/decide.ts";
+import { decide, isSideAction, unitDecision } from "../src/decide.ts";
 import type { RunFacts, StoryFacts } from "../src/facts.ts";
 import { sha256 } from "../src/hash.ts";
 import {
@@ -64,6 +64,36 @@ describe("claims (T1–T10)", () => {
     const a = decide(facts([solo()], {}, later), WORKFLOWS, CONFIG)[0]?.action;
     expect(a).toMatchObject({ kind: "claim", op: "renew", expected: "c1", blob: { renewed_at: at(later), acquired_at: at() } });
   });
+  test("R1.1/R1.3: renewal is a side action — a merged PR is cleaned up in the same tick", () => {
+    const later = T0 + 4 * 60_000;
+    const s = solo({}, null, { pr: { number: 9, url: "u", state: "merged", is_draft: false, head_sha: "abc" } });
+    expect(decide(facts([s], {}, later), WORKFLOWS, CONFIG).map((d) => `${d.unit} ${d.action.kind} ${d.rule}`)).toEqual(["gh-1 claim claim.renew", "gh-1 cleanup_merged_story remote.pr_merged"]);
+  });
+  test("R1.3: renewal due and a done receipt waiting → the receipt is applied in the same tick", () => {
+    const later = T0 + 4 * 60_000;
+    const s = solo(running());
+    const st = s.units[0]!.state!;
+    s.units[0]!.unapplied = [numbered(2, receipt(st, "done", { outcome: "done", handoff: "ok" }))];
+    const ds = decide(facts([s], {}, later), WORKFLOWS, CONFIG);
+    expect(ds.map((d) => `${d.unit} ${d.action.kind} ${d.rule}`)).toEqual(["gh-1 claim claim.renew", "gh-1 apply_receipts receipts.apply"]);
+    expect(isSideAction(ds[0]!.action)).toBe(true);
+    expect(unitDecision(ds, "gh-1")?.rule).toBe("receipts.apply");
+  });
+  test("R3.2: the base record wins — no acquire for a story the base records as done or whose PR merged", () => {
+    // a stale local intake (status new) of a story the base already records as done (A21)
+    const fresh = storyFacts("gh-1", [unitFacts(storyUnit(), null, null)], { claim: { state: "none" }, base_status: "done" });
+    fresh.frontmatter = { ...fresh.frontmatter!, status: "new" };
+    expect(kinds(facts([fresh]))).toEqual(["gh-1 noop story.finished"]);
+    expect(kinds(facts([{ ...fresh, base_status: null, pr: { number: 9, url: "u", state: "merged", is_draft: false, head_sha: "abc" } }]))).toEqual(["gh-1 noop story.finished"]);
+    // the same intake with the base not recording it acquires as before
+    expect(kinds(facts([{ ...fresh, base_status: null }]))).toEqual(["gh-1 claim claim.acquire.intake"]);
+    // an expired claim — even this heartbeat's own — is not re-acquired once the base says done
+    const blob = { version: 1 as const, story: "gh-1", holder: "jakub@mac", heartbeat_id: HB, acquired_at: at(), renewed_at: at(), expires_at: at(T0 - 1), last_tick_id: null };
+    expect(kinds(facts([solo({}, null, { claim: { state: "expired", sha: "c1", blob }, base_status: "done" })]))).toEqual(["gh-1 noop story.finished"]);
+    // another heartbeat's expired claim on a merged story is not re-acquired either
+    const theirs = { ...blob, heartbeat_id: "01JEEEEEEEEEEEEEEEEEEEEEEE", holder: "ann@pc" };
+    expect(kinds(facts([solo({}, null, { claim: { state: "expired", sha: "c1", blob: theirs }, merged_by_ancestry: true })]))).toEqual(["gh-1 noop story.finished"]);
+  });
 });
 
 describe("corrupt units (S2)", () => {
@@ -102,6 +132,8 @@ describe("agent steps: modes and caps (§6, MO2, K1)", () => {
     expect(a.launch).toMatchObject({ agent: "claude", cwd: "/r-worktrees/gh-1-login", prompt: "Use the norn skill, then run `norn brief`.", env: { NORN_STORY: "gh-1", NORN_RUN: a.launch.run_id, NORN_SLOT: "1", PORT_BASE: "4010" } });
     expect(a.receipts).toEqual([{ n: 1, receipt: expect.objectContaining({ kind: "started", how: "auto", run_id: a.launch.run_id, step: "implement", attempt: 1 }) }]);
     expect(a.state).toMatchObject({ status: "running", applied_through: 1, run: { run_id: a.launch.run_id, how: "auto" } });
+    // R2.1 (N6): the started receipts are committed and pushed in the launch tick
+    expect(a.commit).toMatchObject({ cwd: "/r-worktrees/gh-1-login", branch: "gh-1-login", push: true, trailers: { "Norn-Story": "gh-1", "Norn-Step": "implement" } });
   });
   test("manual mode, attended steps and missing runner wait for a person", () => {
     expect(kinds(facts([solo({}, null, { mode: "manual" })]))).toEqual(["gh-1 noop agent.ready.manual"]);
@@ -141,6 +173,16 @@ describe("classification (§10, C1, MO4)", () => {
     expect(a.kill).toEqual({ runner: "herdr", session_id: "s1" });
     expect(a.receipts.map((r) => [r.n, r.receipt.kind])).toEqual([[1, "classify"], [2, "started"]]);
     expect(a.state).toMatchObject({ retries_used: 1, status: "running", applied_through: 2, run: { run_id: a.launch?.run_id } });
+  });
+  test("died before it got going: what the session printed is in the classify detail (B3)", () => {
+    const output = "Error: Input must be provided either through stdin or as a prompt argument when using --print";
+    const a = only(facts([solo(running(), { process_alive: false, output })]));
+    expect(a.kind === "retry_fresh" && a.receipts[0]?.receipt).toMatchObject({ kind: "classify", outcome: "died", detail: `process gone, no receipt; it printed: ${output}` });
+    // a run that worked for a while (hooks, long ago) keeps the plain detail
+    const long = running({ run: { ...running().run!, started_at: at(T0 - 30 * 60_000) } });
+    const hooks = [{ event: "turn_start" as const, at: at(T0 - 29 * 60_000), agent: "claude", native: "UserPromptSubmit", cwd: "/w" }];
+    const b = only(facts([solo(long, { process_alive: false, output, hooks })]));
+    expect(b.kind === "retry_fresh" && b.receipts[0]?.receipt).toMatchObject({ kind: "classify", outcome: "died", detail: "process gone, no receipt" });
   });
   test("timeout after the deadline; stalled after no activity", () => {
     const old = running({ run: { ...running().run!, started_at: at(T0 - 61 * 60_000) }, updated_at: at(T0 - 61 * 60_000) });

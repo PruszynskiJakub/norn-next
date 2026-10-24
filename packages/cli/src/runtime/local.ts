@@ -1,7 +1,8 @@
 /**
  * Machine-local runtime files of one checkout, kept in the gitignored trace dir (§7.1):
  * - `heartbeat.json`  this checkout's heartbeat_id (ID2), stable across `tick` runs so a
- *                     claim taken by one tick is "mine" for the next (T4)
+ *                     claim taken by one tick is "mine" for the next (T4); `last_tick_at` (R5.5)
+ *                     (read and written through @norn/store's heartbeat.ts)
  * - `remote.json`     remote sync cache: last sync time, default branch (H5 throttle)
  * - `notified.json`   inbox item ids already notified (O3: once per item, receipt-first)
  * - `records.json`    GR6 base-branch records still owed (retried by later ticks, throttled),
@@ -11,7 +12,7 @@
 import { join } from "node:path";
 import type { StoryFacts } from "@norn/core";
 import { type StoryMerge, ulid } from "@norn/schema";
-import { appendTrace, atomicWriteJson, readText, traceDir } from "@norn/store";
+import { appendTrace, atomicWriteJson, readHeartbeatFile, readText, traceDir, writeHeartbeatFile } from "@norn/store";
 
 function readJson<T>(path: string): T | null {
   const raw = readText(path);
@@ -23,16 +24,15 @@ function readJson<T>(path: string): T | null {
   }
 }
 
-const heartbeatPath = (root: string) => join(traceDir(root), "heartbeat.json");
 const remotePath = (root: string) => join(traceDir(root), "remote.json");
 const notifiedPath = (root: string) => join(traceDir(root), "notified.json");
 
-/** This checkout's heartbeat_id; created on first use. */
+/** This checkout's heartbeat_id; created on first use (keeps `last_tick_at`, R5.5). */
 export function heartbeatId(root: string, now: number): string {
-  const cur = readJson<{ heartbeat_id?: string }>(heartbeatPath(root));
-  if (cur?.heartbeat_id && /^[0-9A-HJKMNP-TV-Z]{26}$/.test(cur.heartbeat_id)) return cur.heartbeat_id;
+  const cur = readHeartbeatFile(root);
+  if (cur.heartbeat_id && /^[0-9A-HJKMNP-TV-Z]{26}$/.test(cur.heartbeat_id)) return cur.heartbeat_id;
   const id = ulid(now);
-  atomicWriteJson(heartbeatPath(root), { heartbeat_id: id, created_at: new Date(now).toISOString() });
+  writeHeartbeatFile(root, { ...cur, heartbeat_id: id, created_at: new Date(now).toISOString() });
   return id;
 }
 

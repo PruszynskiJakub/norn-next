@@ -186,3 +186,27 @@ export function writeHandoffBody(unitDir: string, body: string): Handoff {
   atomicWrite(handoffPath(unitDir), raw);
   return { ...next, raw };
 }
+
+// ---------------------------------------------------------------- orphaned runs (R2.3)
+
+/**
+ * R2.3: keep a copy of a runs/ file this checkout wrote but never got into the record, as
+ * `runs/<unit>/orphaned/<holder>-<file name>` (a numeric suffix when taken). Receipt numbers under
+ * `receipts/` are thereby freed and never reused or pushed. Returns the new path, or null when the
+ * source file is gone.
+ */
+export function copyToOrphaned(unitDir: string, file: string, holder: string): string | null {
+  const text = readText(file);
+  if (text === null) return null;
+  const name = `${holder}-${file.split("/").at(-1) ?? "file"}`.replace(/[\s/]/g, "_");
+  for (let i = 0; i < 100; i++) {
+    const dest = `${unitDir}/orphaned/${i ? name.replace(/(\.[^.]*)?$/, (ext) => `-${i}${ext}`) : name}`;
+    const prev = readText(dest);
+    if (prev === text) return dest;
+    if (prev !== null) continue;
+    mkdirSync(`${unitDir}/orphaned`, { recursive: true });
+    atomicWrite(dest, text);
+    return dest;
+  }
+  throw new Error(`too many orphaned copies of ${name} in ${unitDir}/orphaned`);
+}

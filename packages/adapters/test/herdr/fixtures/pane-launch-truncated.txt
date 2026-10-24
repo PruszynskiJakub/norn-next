@@ -1,0 +1,3 @@
+Last login: Sat Oct 24 13:00:14 on ttys014
+(base) u@host gh-19-stats-endpoint % env 'PATH=/Users/u/.norn/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/anaconda3/bin:/opt/anaconda3/condabin:/Users
+quote>

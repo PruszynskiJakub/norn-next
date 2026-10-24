@@ -13,6 +13,7 @@ import {
   writeSliceFile,
   writeState,
   writeStoryFile,
+  writeUnitMarker,
 } from "../src/index.ts";
 import { AT, receipt, state, tmp, WORKFLOW_YAML } from "./helpers.ts";
 
@@ -68,10 +69,32 @@ describe("loadSnapshot", () => {
     const wt = tmp();
     seed(repo, "Old title");
     const spec = seed(wt, "Worktree title");
+    writeUnitMarker(wt, { repo, story: "gh-12", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-12-fix-login" });
     writeFileSync(join(unitDir(spec, "01-add-form"), "workflow.yaml"), `${WORKFLOW_YAML}# edited\n`);
     const s = loadSnapshot({ repoRoot: repo, storyRoots: [wt], home: tmp() });
     expect(s.stories[0]?.frontmatter?.title).toBe("Worktree title");
     expect(s.stories[0]?.root).toBe(wt);
     expect(s.stories[0]?.units[1]?.errors[0]?.errors[0]?.message).toMatch(/hash/);
+  });
+  test("R3.4 (N1): a story worktree supplies only its own story; others come from the base copy", () => {
+    const repo = tmp();
+    const own = tmp(); // gh-12's own worktree: its record says active
+    const other = tmp(); // gh-15's worktree, cut from a base that already records gh-12 as done
+    seed(own, "Own copy");
+    writeUnitMarker(own, { repo, story: "gh-12", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-12-fix-login" });
+    writeStoryFile(storyFile(storyDir(other, "gh-12", "fix-login")), { id: "gh-12", slug: "fix-login", provider: "gh", number: 12, url: "u", title: "Shadow copy", assignee: null, workflow: "story", status: "done", intake_at: AT }, "");
+    writeStoryFile(storyFile(storyDir(other, "gh-15", "other")), { id: "gh-15", slug: "other", provider: "gh", number: 15, url: "u", title: "Other", assignee: null, workflow: "story", status: "active", intake_at: AT }, "");
+    writeUnitMarker(other, { repo, story: "gh-15", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-15-other" });
+    // the shadowing worktree sorts first: before R3.4 it supplied gh-12's record
+    const s = loadSnapshot({ repoRoot: repo, storyRoots: [other, own], home: tmp(), baseRef: null });
+    expect(s.stories.map((x) => [x.key, x.root, x.frontmatter?.title])).toEqual([
+      ["gh-12", own, "Own copy"],
+      ["gh-15", other, "Other"],
+    ]);
+    // without its own worktree, gh-12 is not read from gh-15's worktree at all
+    const t = loadSnapshot({ repoRoot: repo, storyRoots: [other], home: tmp(), baseRef: null });
+    expect(t.stories.map((x) => x.key)).toEqual(["gh-15"]);
+    // a root without a story marker supplies nothing
+    expect(loadSnapshot({ repoRoot: repo, storyRoots: [tmp()], home: tmp(), baseRef: null }).stories).toEqual([]);
   });
 });

@@ -20,7 +20,7 @@ import type {
   UnitState,
   Workflow,
 } from "@norn/schema";
-import type { PaneState, RemoteIssue, RemotePullRequest, SessionRef, WorktreeStatus } from "./ports.ts";
+import type { PaneState, RemoteIssue, RemotePullRequest, RunnerCapabilities, SessionRef, WorktreeStatus } from "./ports.ts";
 
 /** A file that failed to read or validate (S2). */
 export interface FileError {
@@ -75,6 +75,49 @@ export interface RunFacts {
   /** max(last hook, last commit, last file change) — ms epoch */
   last_activity_at: number | null;
   transcript: string | null;
+  /** B3: the first lines the session printed, read only once its process is gone (RunnerPort.output) */
+  output?: string;
+  /**
+   * R5.1 (H2): the run's `started` receipt is not applied (a crash between the receipt and
+   * `state.json`), so norn does not know whether, or where, it was launched. `session` is then what
+   * observe found for it (runner session or process; null = nothing found), `hooks` its hook facts.
+   */
+  launch_unknown?: {
+    /** number of the unapplied `started` receipt */
+    n: number;
+    /** that receipt's time (ms epoch): the R5.2 grace runs from it */
+    at: number;
+    /** agent-tool session id seen for the run (hooks or the runner), for `--resume` */
+    agent_session_id: string | null;
+  };
+}
+
+/** R5.3: a run of the unit's cursor step/attempt (from its `started` receipts) and its hook activity. */
+export interface StepRunFacts {
+  run_id: string;
+  /** newest hook fact for the run (ms epoch), null = none in the window */
+  last_hook_at: number | null;
+  /** its newest hook is `session_end` — the agent process is gone */
+  ended: boolean;
+}
+
+/**
+ * R4.3: the last failed effect of an action for this unit on this checkout (send, resume, launch,
+ * push) — kept machine-local until an action of the same effect succeeds for the unit.
+ */
+export interface ActFailure {
+  /** effect that failed: `nudge`, `answer`, `launch`, `resume`, `push`, … */
+  effect: string;
+  rule: string;
+  reason: string;
+  /** ISO time of the failing tick */
+  at: string;
+  tick_id: string;
+  /** cursor when it failed: the item goes away when the cursor moves */
+  step: string;
+  attempt: number;
+  /** the session a failed delivery targeted, so the inbox can say how to reach it */
+  session?: { runner: string; session_id: string; pane_id?: string };
 }
 
 export interface UnitFacts {
@@ -104,6 +147,10 @@ export interface UnitFacts {
   lease: LeaseFile | null;
   /** runs/<unit>/ or handoff.md have uncommitted changes (crash between write and commit) */
   uncommitted: boolean;
+  /** R5.3: runs of the cursor step/attempt with their hook activity; absent = not observed */
+  step_runs?: StepRunFacts[];
+  /** R4.3: last failed act effect for the unit on this checkout; absent = none */
+  act_failure?: ActFailure;
 }
 
 export interface SliceFileFacts {
@@ -148,6 +195,14 @@ export interface ForeignCommit {
   branch: string;
 }
 
+/** R2.3: local runs/ work of one unit that is not in the record (the remote unit branch). */
+export interface UnpushedRuns {
+  /** unit key */
+  unit: string;
+  /** worktree-relative paths under `<spec_dir>/runs/<unit dir>/`, sorted */
+  files: string[];
+}
+
 export interface StoryFacts {
   key: string;
   slug: string;
@@ -181,6 +236,18 @@ export interface StoryFacts {
   foreign_commits?: ForeignCommit[];
   /** story branch head when the person gave `approve` at the `ready` gate (the approve receipt's `head_sha`) */
   ready_head_sha?: string;
+  /**
+   * R3.2: the story's `status` in its record on the fetched base ref (`<remote>/<base>`); null = the
+   * base has no record of it; absent = no base ref (solo) or not observed. The base record wins over
+   * any local spec when deciding to acquire a claim.
+   */
+  base_status?: StoryFrontmatter["status"] | null;
+  /**
+   * R2.3: on a checkout that does not hold the claim, runs/ files (receipts, state) changed locally
+   * but not on the remote unit branch, per unit; paths are relative to the unit's worktree. Absent =
+   * none, held here, or not observed.
+   */
+  unpushed_runs?: UnpushedRuns[];
   /** units: the story unit first, then slices ascending by nn */
   units: UnitFacts[];
   slices: SliceFileFacts[];
@@ -194,6 +261,8 @@ export interface MachineFacts {
   heartbeat_id: string | null;
   /** runner configured and available (MO2) */
   runner: string | null;
+  /** R4.1: what that runner can do with a session; absent = unknown (treated as send only, the pre-R4 behaviour) */
+  runner_capabilities?: RunnerCapabilities;
   /** all live leases on this machine across repos (K1, K3), dead ones excluded */
   leases: LeaseFile[];
   /** leases whose holder process is dead (to reclaim) */
@@ -215,6 +284,11 @@ export interface Facts {
     issues: RemoteIssue[] | undefined;
   };
   stories: StoryFacts[];
+  /**
+   * R5.5 (N3): this checkout's heartbeat — when a tick last ran here (ms epoch; null = never).
+   * A tick observes its own start; views read `heartbeat.json`. Absent = not observed.
+   */
+  heartbeat?: { last_tick_at: number | null };
   /** worktrees/branches with no matching unit (K5) */
   orphans: { worktrees: string[]; branches: string[] };
 }
