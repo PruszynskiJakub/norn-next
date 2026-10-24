@@ -133,7 +133,10 @@ async function nornThroughRunner(ctx: Context, runner: RunnerPort): Promise<{ ok
   const out = join(dir, "norn-path.txt");
   let session: SessionRef | null = null;
   try {
-    const argv = withNornOnPath(["sh", "-c", `command -v norn > ${proc.shellQuote(`${out}.tmp`)}; mv ${proc.shellQuote(`${out}.tmp`)} ${proc.shellQuote(out)}`], expected, ctx.env.PATH);
+    // B2: the session keeps a process in the foreground until doctor closes it — a runner reports a
+    // command that never took the foreground as a failed launch
+    const probe = `command -v norn > ${proc.shellQuote(`${out}.tmp`)}; mv ${proc.shellQuote(`${out}.tmp`)} ${proc.shellQuote(out)}; exec sleep 60`;
+    const argv = withNornOnPath(["sh", "-c", probe], expected, ctx.env.PATH);
     session = await runner.launch({ cwd: dir, argv: argv.argv, env: argv.env, title: "norn doctor", run_id: ulid(ctx.clock.now()) });
     const deadline = Date.now() + RUNNER_PATH_WAIT_MS;
     while (!existsSync(out) && Date.now() < deadline) await Bun.sleep(200);

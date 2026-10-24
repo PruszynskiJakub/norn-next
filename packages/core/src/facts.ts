@@ -75,6 +75,8 @@ export interface RunFacts {
   /** max(last hook, last commit, last file change) — ms epoch */
   last_activity_at: number | null;
   transcript: string | null;
+  /** B3: the first lines the session printed, read only once its process is gone (RunnerPort.output) */
+  output?: string;
   /**
    * R5.1 (H2): the run's `started` receipt is not applied (a crash between the receipt and
    * `state.json`), so norn does not know whether, or where, it was launched. `session` is then what

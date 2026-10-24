@@ -9,6 +9,7 @@
  *                  or `herdr workspace create --cwd C --label T --env K=V… --no-focus`
  *                `herdr pane run <pane> "<argv>"`             (A6 env comes from --env)
  *                `herdr pane process-info --pane <pane>`      (record the agent's pid + start time)
+ *                nothing in the foreground → `pane read` + `pane close`, launch_failed (R4.3, B2)
  * - send       → `herdr agent prompt <pane> <text>`          (submit; bracketed paste + enter)
  *                fallback when no agent is recognized: `pane send-text` + `pane send-keys enter`
  *                without submit: `herdr pane send-text <pane> <text>`
@@ -45,7 +46,7 @@ export interface HerdrRunnerOptions {
   reuseWorkspace?: boolean;
   exec?: Exec;
   process?: ProcessPort;
-  /** how long launch waits for the agent to take the pane's foreground (default 3000 ms) */
+  /** how long launch waits for the agent to take the pane's foreground (default 10000 ms) */
   startWaitMs?: number;
   sleep?: (ms: number) => Promise<void>;
 }
@@ -103,7 +104,7 @@ export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
   const exec = opts.exec ?? bunExec;
   const proc = opts.process ?? createProcessPort({ exec });
   const sleep = opts.sleep ?? ((ms: number) => Bun.sleep(ms));
-  const startWaitMs = opts.startWaitMs ?? 3000;
+  const startWaitMs = opts.startWaitMs ?? 10_000;
   const base = [opts.bin ?? "herdr", ...(opts.session ? ["--session", opts.session] : [])];
 
   const herdr = herdrCaller(exec, base);
@@ -165,9 +166,15 @@ export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
         await sleep(250);
       }
 
-      const ref: SessionRef = { runner: RUNNER_NAME, session_id: paneId, pane_id: paneId };
-      if (identity) ref.process = identity;
-      return ref;
+      if (!identity) {
+        // R4.3, B2: nothing took the pane's foreground — the command never ran (cut off while the
+        // pane's shell started) or exited at once. Not a launch: say what the pane shows, close it.
+        const screen = await herdr(["pane", "read", paneId, "--source", "visible", "--lines", "30"]).catch(() => null);
+        const shown = typeof screen === "string" ? lastLines(screen, 5) : "";
+        await herdr(["pane", "close", paneId]).catch(() => undefined);
+        throw portError("launch_failed", `the command never started in herdr pane ${paneId} (no process took the foreground within ${startWaitMs / 1000}s)${shown ? `; the pane showed: ${shown}` : ""}`);
+      }
+      return { runner: RUNNER_NAME, session_id: paneId, pane_id: paneId, process: identity };
     },
 
     async send(session, text, sendOpts) {
@@ -264,6 +271,16 @@ export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
       return found;
     },
   };
+}
+
+/** The last `n` non-empty lines of a pane screen, joined with ` | `. */
+function lastLines(screen: string, n: number): string {
+  return screen
+    .split("\n")
+    .map((l) => l.trimEnd())
+    .filter((l) => l.trim() !== "")
+    .slice(-n)
+    .join(" | ");
 }
 
 function paneOf(session: SessionRef): string {

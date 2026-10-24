@@ -82,11 +82,31 @@ describe("herdr runner", () => {
       ["--session norn workspace list", ok(fx.workspace_list_empty)],
       ["--session norn workspace create", ok(fx.workspace_create)],
       ["--session norn pane run", empty],
-      ["--session norn pane process-info", ok(fx.process_info_idle)],
+      ["--session norn pane process-info", () => ok(calls.filter((c) => c.includes("process-info")).length === 1 ? fx.process_info_idle : fx.process_info_busy)],
     ]);
     const ref = await createHerdrRunner({ exec, session: "norn", process: fakeProcess(), sleep: noSleep, startWaitMs: 500 }).launch(spec);
     expect(calls[1]!.slice(0, 5)).toEqual(["herdr", "--session", "norn", "workspace", "create"]);
-    expect(ref).toEqual({ runner: "herdr", session_id: "w1:p1", pane_id: "w1:p1" }); // agent never took the foreground
+    expect(ref).toMatchObject({ runner: "herdr", session_id: "w1:p1", pane_id: "w1:p1", process: { pid: 59610 } });
+  });
+
+  test("a command that never takes the pane's foreground is a failed launch: screen in the reason, pane closed (R4.3, B2)", async () => {
+    // B2: a launch line longer than the tty's MAX_CANON, typed while the pane's zsh still read its
+    // rc files, is cut off and never runs — the shell stays in the foreground (screen derived from
+    // the dogfood rerun's pane w15, paths scrubbed)
+    const screen = readFileSync(join(import.meta.dir, "fixtures", "pane-launch-truncated.txt"), "utf8");
+    const { exec, calls } = fakeExec([
+      ["workspace list", ok(fx.workspace_list_empty)],
+      ["workspace create", ok(fx.workspace_create)],
+      ["pane run", empty],
+      ["pane process-info", ok(fx.process_info_idle)],
+      ["pane read", ok(screen)],
+      ["pane close", ok(fx.pane_close)],
+    ]);
+    const err = await createHerdrRunner({ exec, process: fakeProcess(), sleep: noSleep, startWaitMs: 500 }).launch(spec).catch((e) => e);
+    expect(err).toMatchObject({ code: "launch_failed" });
+    expect(err.message).toContain("never started in herdr pane w1:p1");
+    expect(err.message).toContain("quote>");
+    expect(calls.at(-1)).toEqual(["herdr", "pane", "close", "w1:p1"]);
   });
 
   test("send with submit uses `agent prompt`; falls back to raw text + enter when no agent is recognized", async () => {

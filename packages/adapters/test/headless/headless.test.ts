@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHeadlessRunner, logPath } from "../../src/headless/index.ts";
@@ -49,6 +49,19 @@ describe("headless runner (real processes)", () => {
     expect(runner.capabilities).toEqual({ send: false, resume: true });
     expect(await runner.findSessions?.({ run_id: "01JRUN", cwd: "/w" })).toEqual([{ session: { runner: "headless", session_id: "01JRUN", process: { pid: 77, pid_start: "Fri Oct 23 10:00:00 2026" } } }]);
     expect(await runner.findSessions?.({ run_id: "01JOTHER", cwd: "/w" })).toEqual([]);
+  });
+
+  test("output: the head of the run's log; null without one (B3)", async () => {
+    // recorded: `claude -p --allowedTools Read "<prompt>"` — the variadic flag took the prompt
+    const dir = mkdtempSync(join(tmpdir(), "norn-headless-"));
+    const logDir = join(dir, "trace");
+    mkdirSync(logDir, { recursive: true });
+    copyFileSync(join(import.meta.dir, "fixtures", "claude-prompt-swallowed.log"), logPath(logDir, "01JRUN"));
+    const runner = createHeadlessRunner({ logDir });
+    expect(await runner.output?.({ runner: "headless", session_id: "01JRUN" })).toBe(
+      "Error: Input must be provided either through stdin or as a prompt argument when using --print",
+    );
+    expect(await runner.output?.({ runner: "headless", session_id: "01JNONE" })).toBeNull();
   });
 
   test("launch of a missing binary fails with launch_failed", async () => {

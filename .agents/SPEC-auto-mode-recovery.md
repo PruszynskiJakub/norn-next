@@ -64,7 +64,7 @@ This spec fixes the HIGH items and the MED items the team rerun depends on. LOW 
 
 ### R8 — Agents in runner panes run the right norn (M5, A1)
 
-- R8.1 In every runner-started agent, `command -v norn` resolves to the norn that launched it. Act puts a shim directory (`$NORN_HOME/bin/norn` → the current norn entry point) first on `PATH` **inside the launched command itself**, so a login shell in the pane cannot reset it, and exports `NORN_BIN` with the absolute path. Hooks installed by `init`/plugin use `NORN_BIN` when set.
+- R8.1 In every runner-started agent, `command -v norn` resolves to the norn that launched it. Act puts a shim directory (`$NORN_HOME/bin/norn` → the current norn entry point) first on `PATH` **inside the launched command itself**, so a login shell in the pane cannot reset it, and exports `NORN_BIN` with the absolute path. The command runs the agent through a launcher file (`$NORN_HOME/launch/<hash>.sh`) that sets both and execs it, so the typed command stays short whatever `PATH` is (B2: a pane truncates a line over the tty limit). Hooks installed by `init`/plugin use `NORN_BIN` when set.
 - R8.2 `norn doctor` runs `command -v norn` through the configured runner (one throwaway session) and fails when it resolves elsewhere.
 
 ### R9 — Launch prompt not received (M6, A11)

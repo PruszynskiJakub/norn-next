@@ -291,6 +291,11 @@ export interface RunnerPort {
    * caller decides which one (if any) is the run. Optional: runners without it find nothing.
    */
   findSessions?(q: { run_id: string; cwd: string }): Promise<RunnerSessionInfo[]>;
+  /**
+   * B3: the first lines the session printed (headless: its run log), for a run that died before it
+   * got going — the reason (bad args, a missing prompt) is usually there. Optional; null = nothing.
+   */
+  output?(session: SessionRef): Promise<string | null>;
 }
 
 // ============================================================= Agent adapter

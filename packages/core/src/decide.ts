@@ -757,7 +757,7 @@ function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
   let outcome: string | null = null;
   let rule = "";
   let detail: string | undefined;
-  if (died) [outcome, rule, detail] = ["died", "agent.died", "process gone, no receipt"];
+  if (died) [outcome, rule, detail] = ["died", "agent.died", diedDetail(rf, now - epoch(run.started_at))];
   else if (!step.attended) {
     const waiting = (rf.pane?.state === "waiting_input" && (rf.pane.since ?? touched + 1) > touched) || (lastHook && (lastHook.event === "waiting_input" || lastHook.event === "permission_prompt") && hookAt > touched);
     const deadline = parseDuration(step.deadline ?? ctx.config.limits.deadline);
@@ -782,6 +782,13 @@ function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
   }
   if (!outcome) return ctx.noop(ref, step.attended ? "agent.attended.running" : "agent.running", `run ${run.run_id} in progress`);
   routeOutcome(ctx, story, uf, st, wf, step, { outcome, rule, ...(detail ? { detail } : {}) }, []);
+}
+
+/** B3: a run that died before it got going (no hook yet, or within a minute) shows what it printed. */
+const EARLY_DEATH_MS = 60_000;
+function diedDetail(rf: RunFacts, sinceStart: number): string {
+  const early = rf.hooks.length === 0 || sinceStart <= EARLY_DEATH_MS;
+  return rf.output && early ? `process gone, no receipt; it printed: ${rf.output}` : "process gone, no receipt";
 }
 
 interface Classified {
