@@ -73,6 +73,20 @@ export const DoneReceipt = receipt("done", {
   criteria: Type.Optional(Type.Array(CriterionVerdict, { minItems: 1 })),
   /** NT1: notes for a person; never block, never change the route */
   notes: Type.Optional(Type.Array(Note, { minItems: 1 })),
+  /**
+   * BS5 (verified at `norn done` of a base-mode step): the base merged, the merge commit that brought
+   * it in (null = reached without a merge commit) and the story head reported.
+   */
+  base_merge: Type.Optional(
+    Type.Object(
+      {
+        sha: Type.String({ pattern: "^[0-9a-f]{40,64}$" }),
+        merge: Type.Union([Type.String({ pattern: "^[0-9a-f]{40,64}$" }), Type.Null()]),
+        head: Type.String({ pattern: "^[0-9a-f]{40,64}$" }),
+      },
+      { additionalProperties: false },
+    ),
+  ),
 });
 export const AskReceipt = receipt("ask", {
   question: NonEmpty,
@@ -99,12 +113,16 @@ export const AnswerReceipt = receipt("answer", {
 });
 export const ApproveReceipt = receipt("approve", {
   comment: Type.Optional(Type.String()),
-  /** Story branch head at the moment of `approve` (story unit gates); observe's `ready_head_sha`. */
+  /** The unit's branch head at the moment of `approve` (story unit: observe's `ready_head_sha`); the ruling's head (C2). */
   head_sha: Type.Optional(Type.String({ pattern: "^[0-9a-f]{40,64}$" })),
   /** NT3: open notes of the story listed at this story-level gate at `approve`; they leave the inbox */
   acknowledged_notes: Type.Optional(Type.Array(NoteId, { uniqueItems: true })),
 });
-export const RejectReceipt = receipt("reject", { comment: Type.Optional(Type.String()) });
+export const RejectReceipt = receipt("reject", {
+  comment: Type.Optional(Type.String()),
+  /** C2: the unit's branch head the person judged — a ruling is tied to it */
+  head_sha: Type.Optional(Type.String({ pattern: "^[0-9a-f]{40,64}$" })),
+});
 export const UnstickReceipt = receipt("unstick", {
   to: Type.Optional(StepName),
   reset: Type.Optional(Type.Array(CounterName, { uniqueItems: true })),
@@ -169,6 +187,10 @@ export const ClassifyReceipt = receipt("classify", {
         sha: Type.String({ pattern: "^[0-9a-f]{40,64}$" }),
         behind: Type.Optional(NonNegInt),
         conflicts: Type.Array(NonEmpty),
+        /** BS3: the story head after a `done` update — the `Norn-Tick` merge commit when one was made */
+        head: Type.Optional(Type.String({ pattern: "^[0-9a-f]{40,64}$" })),
+        /** BS3: a `done` update made a merge commit (false = already up to date) */
+        merged: Type.Optional(Type.Boolean()),
       },
       { additionalProperties: false },
     ),

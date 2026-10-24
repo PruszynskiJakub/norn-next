@@ -332,10 +332,11 @@ describe("golden replays (norn-sandbox-todoist)", () => {
 describe("Rulings (F28, O2): gate reasons as story-level notes", () => {
   const SLICE1 = sliceUnit("gh-1", "01", "list");
   const gateAt = (unit: UnitRef) => stateFor(unit, SLICE_WF, { step: "human-qa", attempt: 1 });
-  const ruling = (unit: UnitRef, kind: "approve" | "reject", comment: string | undefined, atMs: number) => ({
+  const ruling = (unit: UnitRef, kind: "approve" | "reject", comment: string | undefined, atMs: number, head?: string) => ({
     unit: unit.key,
-    receipts: [numbered(7, { ...receipt(gateAt(unit), kind, comment === undefined ? {} : { comment }, "human"), who: "jakub@mac", slice: unit.slice, at: new Date(atMs).toISOString() })],
+    receipts: [numbered(7, { ...receipt(gateAt(unit), kind, { ...(comment === undefined ? {} : { comment }), ...(head ? { head_sha: head } : {}) }, "human"), who: "jakub@mac", slice: unit.slice, at: new Date(atMs).toISOString() })],
   });
+  const HEAD = "818e9ed".padEnd(40, "0");
 
   test("storyRulings collects gate comments of every unit, oldest first, skipping empty and duplicate ones", () => {
     const a = ruling(SLICE1, "approve", "AC6 wins over B6: keep the raw count", Date.parse("2026-10-23T11:00:00Z"));
@@ -350,14 +351,19 @@ describe("Rulings (F28, O2): gate reasons as story-level notes", () => {
   });
 
   test("every later brief of the story carries the rulings, the one already in Rework excepted", () => {
-    const rulings = storyRulings([ruling(SLICE1, "approve", "AC6 wins over B6: keep the raw count", Date.parse("2026-10-23T11:00:00Z"))]);
+    const rulings = storyRulings([ruling(SLICE1, "approve", "AC6 wins over B6: keep the raw count", Date.parse("2026-10-23T11:00:00Z"), HEAD)]);
+    expect(rulings[0]?.head_sha).toBe(HEAD);
     const b = renderBrief(input(stateFor(SLICE, SLICE_WF), [], { rulings }));
     expect(b.json.rulings).toEqual(rulings);
     expect(b.markdown).toContain("## Rulings");
     // C2/QV5a: rulings answer questions; they never stand in for a criterion's verdict on new code
-    expect(b.markdown).toContain("A ruling never verifies an acceptance criterion");
+    expect(b.markdown).toContain("A ruling never turns a criterion into `pass`");
+    expect(b.markdown).toContain("At most a ruling informs a `person` verdict");
     expect(b.markdown).not.toContain("settle the questions");
-    expect(b.markdown).toContain("- gh-1/01 human-qa#1 approve by jakub@mac (2026-10-23T11:00:00.000Z):\n  > AC6 wins over B6: keep the raw count");
+    // each ruling is tied to the head it judged (C2)
+    expect(b.markdown).toContain(`- gh-1/01 human-qa#1 approve by jakub@mac (2026-10-23T11:00:00.000Z) at head \`${HEAD}\`:\n  > AC6 wins over B6: keep the raw count`);
+    const unheaded = renderBrief(input(stateFor(SLICE, SLICE_WF), [], { rulings: storyRulings([ruling(SLICE1, "reject", "older", Date.parse("2026-10-23T09:00:00Z"))]) }));
+    expect(unheaded.markdown).toContain("(2026-10-23T09:00:00.000Z) at head not recorded:");
     expect(b.markdown.indexOf("## Rulings")).toBeLessThan(b.markdown.indexOf("## Context"));
     expect(renderBrief(input(stateFor(SLICE, SLICE_WF), [])).markdown).not.toContain("## Rulings");
 

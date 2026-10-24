@@ -59,6 +59,17 @@ function heartbeatText(view: ProjectView): string | null {
 }
 
 /** `norn status` human mode: one block per story, slices indented, then runs and errors. */
+/** BS1/BS3: `base main: 17 behind · conflicts a.ts, b.ts · last update merge 1a2b3c4d5e6f (…)`; null when nothing is known. */
+function baseSyncText(s: StoryView): string | null {
+  const b = s.base_sync;
+  if (!b) return null;
+  const parts: string[] = [];
+  if (b.behind !== null) parts.push(b.behind === 0 ? "up to date" : `${b.behind} behind`);
+  if (b.conflicts.length) parts.push(`conflicts ${b.conflicts.join(", ")}`);
+  if (b.last_update) parts.push(`last update merge ${b.last_update.sha.slice(0, 12)} (${b.last_update.step}, ${b.last_update.at})`);
+  return parts.length ? `base ${b.branch}: ${parts.join(" · ")}` : null;
+}
+
 export function formatStatus(view: ProjectView): string {
   const out: string[] = [];
   if (!view.stories.length) out.push("No stories. Run `norn sync` to pick up labelled issues.");
@@ -67,6 +78,8 @@ export function formatStatus(view: ProjectView): string {
     out.push(`  ${s.workflow} · ${modeText(s)} · ${claimText(s)} · ${stateText(s)}`);
     if (s.next && s.status !== "running") out.push(`  → ${s.next}`);
     if (s.act_failure) out.push(`  ! ${s.act_failure.reason}`);
+    const bs = baseSyncText(s);
+    if (bs) out.push(`  ${bs}`);
     for (const sl of s.slices) out.push(sliceLine(sl));
     for (const e of [...s.errors, ...s.slices.flatMap((x) => x.errors)]) out.push(`  ! ${e.file}: ${e.errors[0]?.message ?? "invalid"}`);
     out.push("");

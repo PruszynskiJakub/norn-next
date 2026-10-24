@@ -3,7 +3,7 @@
  * ticks with simulated agent receipts → slice check fail/pass → gate → integrate → open-pr.
  * Real git (temp repo + bare remote); fake RemotePort, RunnerPort and notifier.
  */
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { TickTrace } from "@norn/schema";
@@ -11,6 +11,9 @@ import { readTrace } from "@norn/store";
 import { replayInputs, type TickReport } from "../src/index.ts";
 import { decide } from "@norn/core";
 import { createHarness, type Harness, issue } from "./harness.ts";
+
+// whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
+setDefaultTimeout(30_000);
 
 const MINI = `name: mini
 start: plan

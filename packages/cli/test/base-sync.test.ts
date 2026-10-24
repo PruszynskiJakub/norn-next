@@ -5,11 +5,15 @@
  * goes back through update when the base moves into a conflict; `norn update` re-enters a done story;
  * a PR merged into another branch parks the story; `base_branch: develop` is used throughout.
  */
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { herdr } from "@norn/adapters";
 import { runCli, type TickReport } from "../src/index.ts";
 import { createHarness, type Harness, issue, sh } from "./harness.ts";
+
+// whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
+setDefaultTimeout(30_000);
 
 const BASED = `name: based
 start: update
@@ -108,6 +112,11 @@ describe("base sync with real git", () => {
     expect(h.git(["ls-remote", "origin", "refs/heads/gh-7-add-login-form"]).split("\t")[0]).toBe(h.git(["rev-parse", "HEAD"], wt()));
     const inbox = (await h.norn("inbox")).value as { groups: Record<string, Array<{ id: string }>> };
     expect(inbox.groups.check?.filter((i) => i.id.startsWith("foreign:"))).toEqual([]);
+    // norn status shows the base sync state and the update's merge commit
+    const merge = h.git(["log", "--merges", "-1", "--format=%H"], wt());
+    const status = (await h.norn("status", "gh-7")).value as { base_sync: unknown };
+    expect(status.base_sync).toMatchObject({ branch: "main", conflicts: [], last_update: { sha: merge, base_sha: sibling, step: "update" } });
+    expect((await h.norn("status", "--text")).value).toContain(`base main: up to date · last update merge ${merge.slice(0, 12)} (update, `);
   }, 60_000);
 
   test("4 + 2: waiting at ready, a conflicting sibling merge → stale → update → conflict → resolve (brief: base sha + paths) → done → update → test", async () => {
@@ -286,6 +295,9 @@ describe("PR items between syncs and in the read model (C1), ready approval void
     expect(v.groups.your_turn?.find((i) => i.id === merge)?.detail).toContain("behind main by 1");
     expect(ids(v, "check")).toContain(retarget);
     expect(open()).toEqual(expect.arrayContaining([merge, retarget]));
+    // a done story behind a conflicting base says so in norn status
+    expect(((await h.norn("status", "gh-9")).value as { base_sync: unknown }).base_sync).toMatchObject({ branch: "main", behind: 1, conflicts: ["a.txt"] });
+    expect((await h.norn("status", "--text")).value).toContain("base main: 1 behind · conflicts a.txt");
     // ticks between syncs: the items stay open (no appear/resolve flicker)
     const calls = h.remote.calls.length;
     for (let i = 0; i < 3; i++) {
@@ -298,6 +310,28 @@ describe("PR items between syncs and in the read model (C1), ready approval void
     expect(history.items.filter((i) => i.id === merge || i.id === retarget).map((i) => i.resolved_at)).toEqual([null, null]);
     pr.base_branch = "main";
     pr.base = "main";
+  }, 60_000);
+
+  test("C5: norn's own commits after the ready approval (its $done commit) are no head change; anyone else's commit is", async () => {
+    const pr = h.remote.prs[0] as (typeof h.remote.prs)[number];
+    const approve = h.git(["log", "--format=%H", "-1", "--grep", "story edits a"], wt());
+    const head = h.git(["rev-parse", "HEAD"], wt());
+    expect(head).not.toBe(approve);
+    expect(h.git(["log", "--format=%(trailers:key=Norn-Story,valueonly)", `${approve}..${head}`], wt()).split("\n").filter(Boolean).every((s) => s === "gh-9")).toBe(true);
+    pr.head_sha = head;
+    h.clock.advance(10_000);
+    await h.tick("--sync");
+    expect(ids(await view(), "check").filter((i) => i.startsWith("head:"))).toEqual([]);
+    expect(open().filter((i) => i.startsWith("head:"))).toEqual([]);
+    // a person's commit on top: the head changed after the approval
+    writeFileSync(join(wt(), "late.txt"), "late\n");
+    h.git(["add", "-A"], wt());
+    h.git(["commit", "-q", "-m", "late fix"], wt());
+    pr.head_sha = h.git(["rev-parse", "HEAD"], wt());
+    h.clock.advance(10_000);
+    await h.tick("--sync");
+    expect(ids(await view(), "check")).toContain(`head:gh-9:${pr.head_sha}`);
+    expect(open()).toContain(`head:gh-9:${pr.head_sha}`);
   }, 60_000);
 
   test("C5: after norn update from $done, the old ready approval no longer pins the head", async () => {
@@ -320,5 +354,107 @@ describe("PR items between syncs and in the read model (C1), ready approval void
     await h.tick("--sync");
     expect(ids(await view(), "check").filter((i) => i.startsWith("head:"))).toEqual([]);
     expect(open().filter((i) => i.startsWith("head:"))).toEqual([]);
+  }, 60_000);
+});
+
+describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge; done is verified", () => {
+  let h: Harness;
+  const wt = () => `${h.root}-worktrees/gh-11-merge-safely`;
+  const runs = () => join(wt(), ".agents/specs/gh-11-merge-safely/runs/_story");
+  /** a Claude Code permission dialog in the agent's pane (as in prompts.test.ts) */
+  const SCREEN = [" Bash command", "", " │ python3 fix.py", "╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌", " Do you want to proceed?", " ❯ 1. Yes", "   2. No", "", " Esc to cancel · Tab to amend"].join("\n");
+  const inWt = (...argv: string[]) => runCli(argv, { ...h.deps, cwd: wt() });
+  const until = async (pred: () => boolean, label: string) => {
+    const seen: string[] = [];
+    for (let i = 0; i < 20 && !pred(); i++) {
+      h.clock.advance(10_000);
+      seen.push(...kinds(await h.tick()));
+    }
+    if (!pred()) throw new Error(`${label} not reached: ${JSON.stringify(h.state(runs()))}\n${seen.join("\n")}`);
+    return seen;
+  };
+
+  beforeAll(async () => {
+    h = await createHarness();
+    h.write(join(h.root, ".agents/norn/config.yaml"), config().replace("runner: { adapter: headless }", "runner: { adapter: herdr }"));
+    h.write(join(h.root, ".agents/norn/workflows/based.yaml"), BASED);
+    writeFileSync(join(h.root, "a.txt"), "one\n");
+    h.git(["add", "-A"]);
+    h.git(["commit", "-q", "-m", "norn init"]);
+    h.git(["push", "-q", "origin", "main"]);
+    h.remote.issues = [issue(11, "Merge safely")];
+  });
+  afterAll(() => h.cleanup());
+
+  test("park while the agent's merge is in progress: no commit, MERGE_HEAD kept, nothing pushed; done refused until the merge is concluded clean", async () => {
+    await h.tick();
+    writeFileSync(join(wt(), "a.txt"), "story side\n");
+    h.git(["add", "-A"], wt());
+    h.git(["commit", "-q", "-m", "story edits a", "--trailer", "Norn-Tick: 01JBQ6ZK3E8Y4V5W6X7Y8Z9ABC"], wt());
+    const sibling = siblingMerge(h, "a.txt", "base side\n");
+    h.clock.advance(10_000);
+    await h.tick("--sync");
+    await until(() => h.state(runs())?.step === "resolve" && h.state(runs())?.status === "running", "resolve running");
+
+    // the agent starts the merge; a permission prompt parks it with conflict markers in the work tree
+    expect(Bun.spawnSync(["git", "merge", "--no-ff", sibling], { cwd: wt() }).exitCode).not.toBe(0);
+    const before = h.git(["rev-parse", "HEAD"], wt());
+    const pushed = h.git(["ls-remote", "origin", "refs/heads/gh-11-merge-safely"]).split("\t")[0];
+    const prompt = herdr.parsePanePrompt(SCREEN);
+    h.runner.pane = { alive: true, state: "waiting_input", since: null, detail: SCREEN, ...(prompt ? { prompt } : {}) };
+    h.clock.advance(10_000);
+    const t = await h.tick();
+    expect(kinds(t)).toEqual(["gh-11 agent.ask.implicit"]);
+    expect(h.state(runs())).toMatchObject({ status: "parked", park: { kind: "ask" } });
+    // the trace records why the park commit waits
+    const traced = h.read(join(h.root, ".agents/norn/trace", t.trace));
+    expect(traced).toContain("merge in progress (unmerged: a.txt): nothing committed; the commit waits until it is concluded");
+    expect(h.git(["rev-parse", "HEAD"], wt())).toBe(before);
+    expect(existsSync(join(h.git(["rev-parse", "--absolute-git-dir"], wt()), "MERGE_HEAD"))).toBe(true);
+    expect(h.git(["ls-remote", "origin", "refs/heads/gh-11-merge-safely"]).split("\t")[0]).toBe(pushed);
+    expect(h.git(["log", "--format=%H", "--grep", "<<<<<<<", "--all"])).toBe("");
+
+    // done mid-merge → refused, nothing written
+    const mid = await inWt("done", "done", "--handoff", "merged main");
+    expect(mid.exit).toBe(3);
+    expect(mid.value).toMatchObject({ code: "merge_unfinished", error: expect.stringContaining("unmerged: a.txt") });
+    // concluded with the markers still in a.txt → refused
+    h.git(["add", "-A"], wt());
+    h.git(["commit", "-q", "--no-edit"], wt());
+    const marked = await inWt("done", "done", "--handoff", "merged main");
+    expect(marked.exit).toBe(3);
+    expect(marked.value).toMatchObject({ code: "merge_unfinished", details: { markers: ["a.txt:1", "a.txt:5"] } });
+    expect(String((marked.value as { error: unknown }).error)).toContain("conflict markers left after merging");
+    // fixed in a follow-up commit → accepted, the merge commit recorded
+    const merge = h.git(["rev-parse", "HEAD"], wt());
+    writeFileSync(join(wt(), "a.txt"), "story side\nbase side\n");
+    h.git(["commit", "-q", "-am", "resolve a.txt"], wt());
+    const head = h.git(["rev-parse", "HEAD"], wt());
+    const ok = await inWt("done", "done", "--handoff", "merged main, kept both lines");
+    expect(ok.exit).toBe(0);
+    expect(ok.value).toMatchObject({ base_merge: { sha: sibling, merge, head } });
+    expect(h.git(["log", "-1", "--format=%P", merge], wt()).split(" ")).toHaveLength(2);
+
+    h.runner.pane = { alive: true, state: "working", since: null };
+    await until(() => h.state(runs())?.step === "ready" && h.state(runs())?.status === "parked", "ready");
+    const why = (await h.norn("why", "gh-11", "--transition", "resolve.done")).stdout;
+    expect(why).toContain(`by merge commit ${merge}`);
+    // the agent's merge and fix-up, made during its run, are not foreign (C4)
+    const inbox = (await h.norn("inbox")).value as { groups: Record<string, Array<{ id: string }>> };
+    expect(inbox.groups.check?.filter((i) => i.id.startsWith("foreign:"))).toEqual([]);
+  }, 60_000);
+
+  test("a norn commit that would record conflict markers is refused: ok:false, an Unblock item, nothing pushed", async () => {
+    // an unresolved file left in the story worktree when the person approves
+    writeFileSync(join(wt(), "b.txt"), ["<<<<<<< HEAD", "ours", "=======", "theirs", ">>>>>>> main", ""].join("\n"));
+    const before = h.git(["rev-parse", "HEAD"], wt());
+    expect((await h.norn("approve", "gh-11")).exit).toBe(0);
+    h.clock.advance(10_000);
+    const t = await h.tick();
+    expect(kinds(t).find((k) => k.startsWith("gh-11 receipts.apply"))).toContain("FAILED commit on gh-11-merge-safely refused: conflict markers in b.txt");
+    expect(h.git(["rev-parse", "HEAD"], wt())).toBe(before);
+    expect(h.git(["ls-remote", "origin", "refs/heads/gh-11-merge-safely"]).split("\t")[0]).toBe(before);
+    const inbox = (await h.norn("inbox")).value as { groups: Record<string, Array<{ title: string }>> };
+    expect(inbox.groups.unblock?.map((i) => i.title)).toEqual([expect.stringContaining("conflict markers in b.txt")]);
   }, 60_000);
 });

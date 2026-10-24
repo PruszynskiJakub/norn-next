@@ -4,7 +4,7 @@
  * (T3: one wins, the other gets "held by X since Y"), `take --force` journaled, and `drop` (GR7).
  * Real git: two clones of one bare remote; each clone has its own ~/.norn and heartbeat.
  */
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { RunnerPort } from "@norn/core";
@@ -12,6 +12,9 @@ import { ulid } from "@norn/schema";
 import { appendReceipt, readState } from "@norn/store";
 import { type CliDeps, type CliResult, runCli, type TickReport } from "../src/index.ts";
 import { createHarness, FakeRunner, type Harness, issue, sh } from "./harness.ts";
+
+// whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
+setDefaultTimeout(30_000);
 
 const MINI = `name: mini
 start: plan

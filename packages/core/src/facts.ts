@@ -271,6 +271,12 @@ export interface StoryFacts {
   /** story branch head when the person gave `approve` at the `ready` gate (the approve receipt's `head_sha`) */
   ready_head_sha?: string;
   /**
+   * C5: the known PR head, when every commit after `ready_head_sha` up to it is norn's own for this
+   * story (`Norn-Tick` + `Norn-Story` trailers — the `ready.approve → $done` commit and later state
+   * commits); the head-changed item (F35) ignores that head. Absent = moved by someone else, or unknown.
+   */
+  ready_head_norn?: string;
+  /**
    * R3.2: the story's `status` in its record on the fetched base ref (`<remote>/<base>`); null = the
    * base has no record of it; absent = no base ref (solo) or not observed. The base record wins over
    * any local spec when deciding to acquire a claim.

@@ -24,7 +24,7 @@ Find out, as a user, whether the software does what the criteria say. Evidence o
 ## Choosing between `unverified`, `person` and a note
 
 - `unverified` is about this session: an agent with the right tools could check it. Use it when a criterion needs a capability you do not have here (its `needs` often says which). Never call it `person` to get past it, and never `pass` it.
-- A person's earlier ruling or approval answers questions; it never verifies a criterion. It judged the code as it was then, and the code may have changed since (a merge, a fix). A criterion needing a capability this session lacks (e.g. `browser`) is `unverified` with how to check it — even if a person accepted it before; a `pass` for it is refused.
+- A person's earlier ruling or approval answers questions; it never turns a criterion into `pass`. It judged the code at the head it was given at, and the code may have changed since (a merge, a fix). At most it informs a `person` verdict: cite it in that verdict's `how` so the person confirms it on the current head. A criterion needing a capability this session lacks (e.g. `browser`) is `unverified` with how to check it — even if a person accepted it before; a `pass` for it is refused.
 - `person` is about the criterion: only a person can judge it, whatever the tools.
 - A **note** is for a criterion that passed as written, where a person may still disagree with how you read it (e.g. the criterion says "trimmed" and you kept whitespace inside backticks). The verdict stays `pass`; the note carries the question so a person sees it without the work stopping. Notes never replace a verdict.
 

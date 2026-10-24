@@ -354,6 +354,36 @@
               }
             }
           }
+        },
+        "base_merge": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "sha",
+            "merge",
+            "head"
+          ],
+          "properties": {
+            "sha": {
+              "pattern": "^[0-9a-f]{40,64}$",
+              "type": "string"
+            },
+            "merge": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9a-f]{40,64}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "head": {
+              "pattern": "^[0-9a-f]{40,64}$",
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -919,6 +949,10 @@
           ]
         },
         "comment": {
+          "type": "string"
+        },
+        "head_sha": {
+          "pattern": "^[0-9a-f]{40,64}$",
           "type": "string"
         }
       }
@@ -1669,6 +1703,13 @@
                 "minLength": 1,
                 "type": "string"
               }
+            },
+            "head": {
+              "pattern": "^[0-9a-f]{40,64}$",
+              "type": "string"
+            },
+            "merged": {
+              "type": "boolean"
             }
           }
         },

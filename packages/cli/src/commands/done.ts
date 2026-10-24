@@ -10,7 +10,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { checkReport, reportableOutcomes, unverifiedNeeds, verdictCounts } from "@norn/core";
 import { type AgentStep, type Criterion, type CriterionVerdict, type Finding, type Note, type ReceiptOf, ulid, validate } from "@norn/schema";
-import { appendTrace, ensureEvidenceDir, readSliceFile, readStoryFile } from "@norn/store";
+import { appendTrace, ensureEvidenceDir, git as rawGit, readSliceFile, readStoryFile } from "@norn/store";
 import { defineCommand, type ParsedArgs, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { corruptError, refuse, usageError } from "../output.ts";
@@ -99,6 +99,43 @@ function unitCriteria(s: UnitSession): Criterion[] | null {
   throw corruptError(`${file} failed validation (S2): its criteria cannot be checked`, `stop and tell the person: norn why ${s.unit.key}`, r.error ? [r.error] : []);
 }
 
+/**
+ * BS5: the base a base-mode step (entered by a `git: update` conflict) must merge — the newest
+ * classify `conflict` receipt with a base routed to the current step; null for any other step.
+ */
+function baseToMerge(s: UnitSession): NonNullable<ReceiptOf<"classify">["base"]> | null {
+  const r = s.receipts.findLast(({ receipt: r }) => r.kind === "classify" && r.outcome === "conflict" && !!r.base && r.route === s.state.step)?.receipt;
+  return r?.kind === "classify" && r.base ? r.base : null;
+}
+
+/**
+ * BS5 (audit H1): before a base-mode step reports done, the merge is concluded — no merge or rebase in
+ * progress, no unmerged path, the base sha an ancestor of HEAD — and no conflict marker is left in the
+ * conflicting paths or the files changed since the merge. Returns what the done receipt records.
+ */
+async function verifyBaseMerge(ctx: Context, s: UnitSession, base: NonNullable<ReceiptOf<"classify">["base"]>): Promise<NonNullable<ReceiptOf<"done">["base_merge"]>> {
+  const git = ctx.git;
+  const cwd = s.worktree;
+  const short = base.sha.slice(0, 12);
+  const how = `conclude the merge of ${short}: resolve every conflict by intent, \`git add\` the files and \`git commit\` (never rebase), then report again; or \`git merge --abort\` and \`norn stuck "<why>"\``;
+  const busy = await git.inProgress(cwd);
+  if (busy.operation || busy.unmerged.length)
+    throw refuse(`the merge of ${short} is not concluded: ${busy.operation ?? "merge"} in progress${busy.unmerged.length ? `, unmerged: ${busy.unmerged.join(", ")}` : ""}`, how, "merge_unfinished", busy);
+  const head = await git.revParse(cwd, "HEAD");
+  if (!head || !(await git.isAncestor(cwd, base.sha, head)))
+    throw refuse(`${short} (the base) is not merged into the story branch: HEAD ${head?.slice(0, 12) ?? "?"} does not contain it`, `git merge --no-ff ${base.sha}, resolve, commit, then report again`, "merge_unfinished");
+  const merge = await git.baseMergeCommit(cwd, base.sha, head);
+  // the files the merge touched on the story side, and every fix-up after it
+  const changed = merge ? await rawGit(cwd, ["diff", "--name-only", "-z", `${merge}^1`, head, "--"]) : null;
+  const paths = [...new Set([...base.conflicts, ...(changed?.code === 0 ? changed.stdout.split("\0").filter(Boolean) : [])])].sort();
+  const markers = [...(await git.conflictMarkers(cwd, { paths, rev: "HEAD" })), ...(await git.conflictMarkers(cwd, { paths }))];
+  if (markers.length) {
+    const where = [...new Set(markers.map((m) => `${m.path}:${m.line}`))];
+    throw refuse(`conflict markers left after merging ${short}: ${where.join(", ")}`, how, "merge_unfinished", { markers: where });
+  }
+  return { sha: base.sha, merge, head };
+}
+
 export const doneCommand = defineCommand({
   name: "done",
   summary: "Report that the current step finished with a declared outcome (§9.3); then end your turn",
@@ -150,7 +187,12 @@ export const doneCommand = defineCommand({
     const verdicts = checkReport({ step, step_name: t.s.state.step, outcome, report, criteria: declared, notes, capabilities });
     if (!verdicts.ok) throw refuse(verdicts.refusal.error, verdicts.refusal.do_instead, verdicts.refusal.code, verdicts.refusal.details);
 
+    // BS5: a base-mode step reports done only with the base merged and nothing left unresolved
+    const base = baseToMerge(t.s);
+    const baseMerge = base ? await verifyBaseMerge(ctx, t.s, base) : null;
+
     const receipt: ReceiptOf<"done"> = { kind: "done", ...reportHeader(ctx, t), outcome, handoff };
+    if (baseMerge) receipt.base_merge = baseMerge;
     if (findings) receipt.findings = findings;
     if (evidencePath) receipt.evidence = `evidence/${t.run_id}`;
     if (report) receipt.criteria = report;
@@ -183,6 +225,7 @@ export const doneCommand = defineCommand({
       ...(evidencePath ? { evidence: receipt.evidence } : {}),
       ...(report ? { criteria: { worst: verdicts.worst, coverage: verdicts.coverage, ...verdictCounts(report) } } : {}),
       ...(notes.length ? { notes: notes.length } : {}),
+      ...(baseMerge ? { base_merge: baseMerge } : {}),
     });
   },
 });

@@ -5,13 +5,16 @@
  * landed, and a story stays in `status` after its worktree is gone even though the main checkout's
  * local `main` is stale (F36).
  */
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Facts, StoryFacts } from "@norn/core";
 import { readTrace } from "@norn/store";
 import type { TickReport } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
+
+// whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
+setDefaultTimeout(30_000);
 
 const READY = `name: ready
 start: implement
