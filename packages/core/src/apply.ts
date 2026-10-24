@@ -137,7 +137,7 @@ export function applyReceipts(state: UnitState, receipts: readonly NumberedRecei
       continue;
     }
     out.applied.push(nr.n);
-    if (r.kind !== "mode") {
+    if (r.kind !== "mode" && r.kind !== "take") {
       out.route = res.route ?? null;
       out.deliver = res.deliver ?? null;
     }
@@ -157,6 +157,11 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
   if (r.kind === "mode") {
     // mode is story-level, not bound to a step (MO1)
     return { state: { ...st, mode: r.mode }, log: `mode ${r.previous} → ${r.mode}` };
+  }
+  if (r.kind === "take") {
+    // R10.1: a takeover is a record, not a cursor move — applied at any cursor, like mode
+    const from = r.previous_holder ? ` from ${r.previous_holder}${r.forced ? " (forced)" : r.expired ? " (expired)" : ""}` : "";
+    return { state: st, log: `taken by ${r.who ?? r.by}${from}` };
   }
   if (st.status === "corrupt") return { reject: "unit is corrupt (S2)" };
   if (r.slice !== undefined && r.slice !== st.slice) return { reject: `receipt for unit ${r.slice ?? st.story}, not ${st.slice ?? st.story}` };
@@ -207,6 +212,13 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
       if (edgeOf(wf, st.step, "ask")) return take(st, "ask", r, ctx, lastOutcome("ask"));
       const parked = park(st, "ask", r.question, r.at, "parked", r.receipt_id);
       if (r.command && parked.park) parked.park.command = r.command;
+      if (r.implicit && parked.park) {
+        // R6.1/R6.2: what the tick needs to resolve the implicit ask or type an answer into the prompt
+        parked.park.implicit = r.choice || r.screen ? "pane" : "hook";
+        if (r.options?.length) parked.park.options = r.options;
+        if (r.choice) parked.park.choice = r.choice;
+        if (r.screen) parked.park.screen = r.screen;
+      }
       return {
         state: { ...parked, last_outcome: lastOutcome("ask") },
         log: `${st.step}#${st.attempt} asks: ${r.question}`,
@@ -225,6 +237,8 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
       if (st.status !== "parked" || st.park?.kind !== "ask")
         return { reject: st.park?.kind === "gate" ? "gate needs approve or reject" : "unit is not waiting for an answer" };
       const resumed: UnitState = { ...st, park: null };
+      // R6.1: the agent moved on by itself; R6.2: `norn answer` already typed it — nothing to deliver
+      if ((r.by === "agent" || r.delivered) && st.run) return { state: { ...resumed, status: "running" }, log: `answered: ${r.answer}` };
       // B2: same session while it lives; manual runs get the answer from the person; else fresh session from the handoff
       if (st.run?.session)
         return { state: { ...resumed, status: "running" }, log: `answered: ${r.answer}`, deliver: r.answer };
@@ -258,6 +272,8 @@ function runFrom(st: UnitState, r: ReceiptOf<"started">): NonNullable<UnitState[
   if (r.session) run.session = r.session;
   if (r.agent_session_id) run.agent_session_id = r.agent_session_id;
   if (r.process) run.process = r.process;
+  if (r.machine) run.machine = r.machine;
+  if (r.heartbeat_id) run.heartbeat_id = r.heartbeat_id;
   return run;
 }
 
@@ -336,6 +352,9 @@ function agentRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ct
     case "silent":
     case "timeout":
     case "stalled": {
+      // R4.2: no way to deliver a nudge (runner neither types nor resumes) — decide routed it to a
+      // fresh session, counted as a retry, not a nudge
+      if (r.route === "retry") return retryRoute(st, step, r, ctx, withLast, o);
       const max = step.nudges ?? ctx.limits.nudges;
       if (st.nudges_used < max)
         return {
@@ -346,17 +365,8 @@ function agentRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ct
       const reason = `${o}: nudges ${st.nudges_used}/${max} at ${st.step}`;
       return { state: withLast(stuckPark(st, "exhausted", reason, r.at, r.receipt_id)), log: `exhausted: ${reason}` };
     }
-    case "died": {
-      const max = step.retries ?? ctx.limits.retries;
-      if (st.retries_used < max)
-        return {
-          state: withLast({ ...st, retries_used: st.retries_used + 1, status: "ready", run: null }),
-          log: `died: retry ${st.retries_used + 1}/${max} in a fresh session`,
-          route: "retry",
-        };
-      const reason = `died: retries ${st.retries_used}/${max} at ${st.step}`;
-      return { state: withLast(stuckPark(st, "exhausted", reason, r.at, r.receipt_id)), log: `exhausted: ${reason}` };
-    }
+    case "died":
+      return retryRoute(st, step, r, ctx, withLast, o);
     case "ask": {
       const q = r.detail ?? "the agent is waiting for input";
       return { state: withLast(park(st, "ask", q, r.at, "parked", r.receipt_id)), log: `asks: ${q}` };
@@ -364,6 +374,19 @@ function agentRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ct
     default:
       return { reject: `outcome '${o}' cannot be classified for an agent step` };
   }
+}
+
+/** C1 retry: a fresh session for the same step while retries last, else exhausted. */
+function retryRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ctx: ApplyContext, withLast: (s: UnitState) => UnitState, o: string): Step1 {
+  const max = step.retries ?? ctx.limits.retries;
+  if (st.retries_used < max)
+    return {
+      state: withLast({ ...st, retries_used: st.retries_used + 1, status: "ready", run: null }),
+      log: `${o}: retry ${st.retries_used + 1}/${max} in a fresh session`,
+      route: "retry",
+    };
+  const reason = `${o}: retries ${st.retries_used}/${max} at ${st.step}`;
+  return { state: withLast(stuckPark(st, "exhausted", reason, r.at, r.receipt_id)), log: `exhausted: ${reason}` };
 }
 
 /** Helper for receipt writers (act, CLI): the route a classified outcome takes, for the receipt's `route` field. */

@@ -184,6 +184,46 @@
             "command": {
               "minLength": 1,
               "type": "string"
+            },
+            "implicit": {
+              "anyOf": [
+                {
+                  "const": "pane",
+                  "type": "string"
+                },
+                {
+                  "const": "hook",
+                  "type": "string"
+                }
+              ]
+            },
+            "options": {
+              "type": "array",
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "choice": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "numbered",
+                "cursor"
+              ],
+              "properties": {
+                "numbered": {
+                  "type": "boolean"
+                },
+                "cursor": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              }
+            },
+            "screen": {
+              "minLength": 1,
+              "type": "string"
             }
           }
         },
@@ -287,6 +327,10 @@
                 "pane_id": {
                   "minLength": 1,
                   "type": "string"
+                },
+                "reach": {
+                  "minLength": 1,
+                  "type": "string"
                 }
               }
             },
@@ -315,6 +359,20 @@
             },
             "transcript": {
               "minLength": 1,
+              "type": "string"
+            },
+            "machine": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "heartbeat_id": {
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "description": "ULID (ID2)",
+              "type": "string"
+            },
+            "prompt_resent_at": {
+              "format": "date-time",
+              "description": "ISO-8601 timestamp, UTC",
               "type": "string"
             }
           }

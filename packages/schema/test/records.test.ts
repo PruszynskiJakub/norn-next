@@ -28,6 +28,7 @@ const receipts: Record<(typeof RECEIPT_KINDS)[number], Receipt> = {
   stuck: { kind: "stuck", ...head, reason: "spec contradicts itself" },
   answer: { kind: "answer", ...head, by: "human", who: "jakub@mac", answer: "pg", ask_receipt_id: ID },
   approve: { kind: "approve", ...head, step: "human-qa", by: "human", comment: "ok" },
+  take: { kind: "take", ...head, by: "human", who: "bob@pc", previous_holder: "ann@mac", previous_heartbeat_id: ID, expired: true },
   reject: { kind: "reject", ...head, step: "human-qa", by: "human" },
   unstick: { kind: "unstick", ...head, by: "human", to: "implement", reset: ["review_loop"] },
   mode: { kind: "mode", ...head, run_id: null, step: "$done", by: "human", mode: "auto", previous: "manual" },

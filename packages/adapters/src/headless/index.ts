@@ -5,10 +5,12 @@
  *
  * There is no pane to type into: `send` throws PortError `unsupported`. Per B2 the caller then
  * continues the same agent session by launching `AgentAdapter.launchCommand({ resume })` through
- * this runner, or starts a fresh session from the handoff.
+ * this runner, or starts a fresh session from the handoff — capabilities `send: false, resume: true`
+ * (R4.1). `findSessions` looks for a run's process by its `NORN_RUN` env (R5.1). `output` is the head
+ * of the run's log (B3).
  */
 import { spawn } from "node:child_process";
-import { closeSync, mkdirSync, openSync } from "node:fs";
+import { closeSync, mkdirSync, openSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { AdapterContext, LaunchSpec, PaneState, ProcessPort, RunnerPort, SessionRef } from "@norn/core";
 import type { RunnerConfig } from "@norn/schema";
@@ -38,9 +40,16 @@ export function createHeadlessRunner(opts: HeadlessRunnerOptions): RunnerPort {
 
   return {
     name: RUNNER_NAME,
+    capabilities: { send: false, resume: true },
 
     async available() {
       return true;
+    },
+
+    async findSessions(q) {
+      // the run's process carries NORN_RUN (A6); its session id is the run id, as launch records it
+      const procs = proc.findByEnv ? await proc.findByEnv("NORN_RUN", q.run_id).catch(() => []) : [];
+      return procs.map((p) => ({ session: { runner: RUNNER_NAME, session_id: q.run_id, process: p } }));
     },
 
     async launch(spec: LaunchSpec): Promise<SessionRef> {
@@ -73,6 +82,15 @@ export function createHeadlessRunner(opts: HeadlessRunnerOptions): RunnerPort {
       return { runner: RUNNER_NAME, session_id: spec.run_id, process: identity };
     },
 
+    async output(session) {
+      // B3: the head of the run's log — why a run that exited at once never started
+      try {
+        return headOf(readFileSync(logPath(opts.logDir, session.session_id), "utf8"), OUTPUT_LINES);
+      } catch {
+        return null;
+      }
+    },
+
     async send() {
       throw portError("unsupported", "headless sessions take no input; resume via the agent's resume command (B2)");
     },
@@ -97,6 +115,21 @@ export function createHeadlessRunner(opts: HeadlessRunnerOptions): RunnerPort {
       if (await proc.isAlive(p)) signal(p.pid, "SIGKILL");
     },
   };
+}
+
+const OUTPUT_LINES = 5;
+const OUTPUT_CHARS = 600;
+
+/** The first `n` non-empty lines of a log, joined with ` | ` and capped; null when there are none. */
+function headOf(text: string, n: number): string | null {
+  const head = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l !== "")
+    .slice(0, n)
+    .join(" | ");
+  if (!head) return null;
+  return head.length > OUTPUT_CHARS ? `${head.slice(0, OUTPUT_CHARS - 1)}…` : head;
 }
 
 /** Signal the process group (detached leader), falling back to the pid alone. */

@@ -8,22 +8,26 @@
  *     synthetic payload from a throwaway unit worktree and must record a hook fact (A2, A3).
  *     Codex: project hooks only run once `.codex/` is trusted (`/hooks` in Codex) — noted.
  *   - remote: the provider CLI answers `whoami` (gh/glab auth)
- *   - runner: configured runner available (Herdr server reachable)
+ *   - runner: configured runner available (Herdr server reachable), and `command -v norn` in a
+ *     throwaway runner session resolves to this norn (R8.2)
+ *   - machine: the `user@host` runs are recorded with (R7.1); a warning when NORN_MACHINE overrides it (R7.3)
  * `--live` also runs one cheap headless test turn per agent in a throwaway repo with norn hooks
  * installed, and checks that the agent's own hooks reported to norn.
  * Exit 0 when every check passes, else 1 with the same report.
  */
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AgentAdapter } from "@norn/core";
-import { ExitCode } from "@norn/schema";
+import { proc } from "@norn/adapters";
+import type { AgentAdapter, RunnerPort, SessionRef } from "@norn/core";
+import { ExitCode, ulid } from "@norn/schema";
 import { writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { withExit } from "../output.ts";
-import { readHookFacts } from "../runtime/observe.ts";
-import { hookCommand } from "./init.ts";
+import { machineHolder, readHookFacts } from "../runtime/observe.ts";
+import { ensureShim, withNornOnPath } from "../runtime/shim.ts";
+import { hookBinary, hookCommand } from "./init.ts";
 
 interface RunOut {
   code: number | null;
@@ -79,7 +83,7 @@ function scratchUnit(): { dir: string; repo: string } {
 
 /** Invoke the installed hook command the way the agent tool would, and look for the recorded fact. */
 async function hookFires(ctx: Context, name: string, agent: AgentAdapter, command: string) {
-  const bin = command.trim().split(/\s+/)[0] ?? "";
+  const bin = hookBinary(command, ctx.env);
   if (!which(bin, ctx.env)) return { ok: false, command, error: `${bin} not found on PATH (the installed hooks call it)` };
   const { dir, repo } = scratchUnit();
   try {
@@ -117,6 +121,38 @@ async function liveTurn(ctx: Context, name: string, agent: AgentAdapter, command
     rmSync(dir, { recursive: true, force: true });
   }
 }
+
+/**
+ * R8.2 (M5, A1): `command -v norn` in one throwaway runner session, launched the way act launches
+ * agents (R8.1: shim first on PATH inside the command) — it must resolve to this norn's shim, not
+ * to whatever the pane's login shell finds first.
+ */
+async function nornThroughRunner(ctx: Context, runner: RunnerPort): Promise<{ ok: boolean; expected: string; resolved: string | null; error?: string }> {
+  const expected = ensureShim(ctx.home);
+  const dir = mkdtempSync(join(tmpdir(), "norn-doctor-path-"));
+  const out = join(dir, "norn-path.txt");
+  let session: SessionRef | null = null;
+  try {
+    // B2: the session keeps a process in the foreground until doctor closes it — a runner reports a
+    // command that never took the foreground as a failed launch
+    const probe = `command -v norn > ${proc.shellQuote(`${out}.tmp`)}; mv ${proc.shellQuote(`${out}.tmp`)} ${proc.shellQuote(out)}; exec sleep 60`;
+    const argv = withNornOnPath(["sh", "-c", probe], expected, ctx.env.PATH);
+    session = await runner.launch({ cwd: dir, argv: argv.argv, env: argv.env, title: "norn doctor", run_id: ulid(ctx.clock.now()) });
+    const deadline = Date.now() + RUNNER_PATH_WAIT_MS;
+    while (!existsSync(out) && Date.now() < deadline) await Bun.sleep(200);
+    const resolved = existsSync(out) ? readFileSync(out, "utf8").trim() || null : null;
+    if (resolved === null) return { ok: false, expected, resolved, error: `no answer from the ${runner.name} session within ${RUNNER_PATH_WAIT_MS / 1000}s` };
+    const ok = resolved === expected;
+    return { ok, expected, resolved, ...(ok ? {} : { error: `agents in ${runner.name} sessions would run ${resolved}, not this norn (${expected})` }) };
+  } catch (e) {
+    return { ok: false, expected, resolved: null, error: `could not start a ${runner.name} session: ${(e as Error).message}` };
+  } finally {
+    if (session) await runner.kill(session).catch(() => undefined);
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+const RUNNER_PATH_WAIT_MS = 15_000;
 
 export const doctorCommand = defineCommand({
   name: "doctor",
@@ -174,17 +210,26 @@ export const doctorCommand = defineCommand({
     let runner: Record<string, unknown> = { ok: true, configured: false, note: "manual mode only: a person starts agents (MO2)" };
     if (ports.runner) {
       const available = await ports.runner.available().catch(() => false);
+      const onPath = available ? await nornThroughRunner(ctx, ports.runner) : null;
       runner = {
-        ok: available,
+        ok: available && (onPath?.ok ?? true),
         configured: true,
         name: ports.runner.name,
         available,
+        ...(onPath ? { norn_on_path: onPath } : {}),
         ...(available ? {} : { error: ports.runner.name === "herdr" ? "herdr server not reachable (start herdr)" : `${ports.runner.name} runner not available` }),
       };
     }
 
+    // R7.3: NORN_MACHINE overrides the machine name — a test aid (single-host dogfood), never a
+    // setup for real teams: two checkouts claiming one machine name defeat R7.2's liveness rules
+    const machine = { holder: machineHolder(ctx.env), override: ctx.env.NORN_MACHINE ?? null };
+    const warnings: string[] = [];
+    if (machine.override !== null)
+      warnings.push(`NORN_MACHINE=${machine.override} overrides this machine's name (a test aid): runs are judged by pid only on the machine they were started on (R7.2), so two hosts must never share a name — unset it outside tests`);
+
     const ok = gitCheck.ok && agents.every((a) => a.ok) && remote.ok === true && runner.ok === true;
-    const report = { ok, live, hook_command: command, git: gitCheck, agents, remote, runner };
+    const report = { ok, live, hook_command: command, machine, git: gitCheck, agents, remote, runner, warnings };
     return ok ? report : withExit(report, ExitCode.error);
   },
 });

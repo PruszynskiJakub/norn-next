@@ -7,6 +7,9 @@
  * order — storyRoots, then the fetched base branch (`<remote>/<base>`, base.ts: the durable record
  * once a worktree is gone, F36), then repoRoot (solo repos and unpushed stories) — and the first
  * root holding a story wins. The main checkout's local `main` is never preferred over the fetched base.
+ * R3.4 (N1): a story worktree supplies only the story its `.norn-unit` marker names; a copy of
+ * another story's record in it (cut from a later base) is never read. Roots without a story marker
+ * supply nothing.
  */
 import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -16,6 +19,7 @@ import { baseSpecsRoot, defaultBaseRef } from "./base.ts";
 import { type LoadedConfig, loadConfig, loadWorkflows, type WorkflowListing } from "./config.ts";
 import { readSliceFile, readStoryFile } from "./frontmatter.ts";
 import { isErrno } from "./fsx.ts";
+import { readUnitMarker } from "./leases.ts";
 import { slicesDir, specsDir, storyFile, unitDir } from "./paths.ts";
 import { listReceipts } from "./receipts.ts";
 import { type Handoff, type PinnedWorkflow, readHandoff, readPinnedWorkflow, readState } from "./unit.ts";
@@ -52,6 +56,11 @@ export interface StorySnapshot {
   units: UnitSnapshot[];
   /** read from the fetched base branch copy (no worktree, not in the main checkout): `root` is read-only */
   from_base?: boolean;
+  /**
+   * R3.2: `status` of the story's record on the fetched base branch, whatever root it was read from;
+   * null = not on the base; absent = no base ref.
+   */
+  base_status?: StoryFrontmatter["status"] | null;
 }
 
 export interface RepoSnapshot {
@@ -165,10 +174,11 @@ export function loadStory(root: string, specPath: string, opts: { includeApplied
   };
 }
 
-/** Every story under `<root>/.agents/specs/`. */
-export function loadStories(root: string, opts: { includeApplied?: boolean } = {}): StorySnapshot[] {
+/** Every story under `<root>/.agents/specs/` (only `only`'s spec folder when given). */
+export function loadStories(root: string, opts: { includeApplied?: boolean; only?: string } = {}): StorySnapshot[] {
   const out: StorySnapshot[] = [];
   for (const d of dirs(specsDir(root))) {
+    if (opts.only !== undefined && SPEC_DIR.exec(d)?.[1] !== opts.only) continue;
     const s = loadStory(root, join(specsDir(root), d), opts);
     if (s) out.push(s);
   }
@@ -193,11 +203,19 @@ export function loadSnapshot(opts: {
   const baseRef = opts.baseRef !== undefined ? opts.baseRef : defaultBaseRef(opts.repoRoot, config.ok ? config.config.remote.git_remote : "origin");
   const baseRoot = baseRef ? baseSpecsRoot(opts.repoRoot, baseRef) : null;
   const seen = new Map<string, StorySnapshot>();
-  for (const root of [...(opts.storyRoots ?? []), ...(baseRoot ? [baseRoot] : []), opts.repoRoot]) {
-    for (const s of loadStories(root, { includeApplied: opts.includeApplied }))
-      if (!seen.has(s.key)) seen.set(s.key, root === baseRoot ? { ...s, from_base: true } : s);
+  // R3.4: a story worktree is read only for the story its marker names
+  for (const root of opts.storyRoots ?? []) {
+    const m = readUnitMarker(root).marker;
+    if (!m || m.slice !== null) continue;
+    for (const s of loadStories(root, { includeApplied: opts.includeApplied, only: m.story })) if (!seen.has(s.key)) seen.set(s.key, s);
   }
-  const stories = [...seen.values()].sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }));
+  const base = new Map<string, StorySnapshot>();
+  if (baseRoot) for (const s of loadStories(baseRoot, { includeApplied: opts.includeApplied })) base.set(s.key, s);
+  for (const [key, s] of base) if (!seen.has(key)) seen.set(key, { ...s, from_base: true });
+  for (const s of loadStories(opts.repoRoot, { includeApplied: opts.includeApplied })) if (!seen.has(s.key)) seen.set(s.key, s);
+  const stories = [...seen.values()]
+    .map((s) => (baseRoot ? { ...s, base_status: base.get(s.key)?.frontmatter?.status ?? null } : s))
+    .sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }));
   return { root: opts.repoRoot, home: config.home, config, workflows, stories };
 }
 

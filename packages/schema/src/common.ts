@@ -85,3 +85,7 @@ export function TaggedUnion<T extends import("@sinclair/typebox").TObject[]>(
     discriminator: { propertyName },
   });
 }
+
+/** R6.2: how a pane prompt takes a choice — the option's number, or arrow keys from `cursor` (0-based). */
+export const PromptChoice = Type.Object({ numbered: Type.Boolean(), cursor: NonNegInt }, { additionalProperties: false });
+export type PromptChoice = Static<typeof PromptChoice>;

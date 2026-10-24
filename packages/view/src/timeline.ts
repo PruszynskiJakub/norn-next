@@ -53,6 +53,8 @@ export function receiptSummary(r: Receipt, max = MAX): string {
     }
     case "workflow":
       return oneLine(`workflow switched to ${r.name} at ${r.to}`);
+    case "take":
+      return oneLine(`taken by ${r.who ?? r.by}${r.previous_holder ? ` from ${r.previous_holder}${r.forced ? " (forced)" : r.expired ? " (expired claim)" : ""}` : " (claim was free)"}`);
   }
 }
 
@@ -92,6 +94,14 @@ export function traceEntries(ev: TraceEvent, unit: string, max = MAX): TimelineE
       // Q6: commits on norn's branches that norn did not make (a hand merge, a conflict fix). Placed
       // at the commit time; the tick that noticed them may be much later.
       return ev.commits.map((c) => ({ at: c.at || ev.at, source: "foreign" as const, kind: "foreign_commit", summary: oneLine(`foreign commit on ${c.branch} (not made by norn): ${c.sha.slice(0, 12)} ${c.subject} (${c.author})`), ref: c.sha }));
+    case "take":
+      // R10.1: a takeover, forced or not, with the claim it replaced
+      if (ev.unit !== unit) return [];
+      return [{ at: ev.at, source: "take", kind: "take", summary: oneLine(`take by ${ev.holder}${ev.previous_holder ? ` from ${ev.previous_holder}${ev.forced ? " (forced)" : ev.expired ? " (expired claim)" : ""}` : " (claim was free)"}`), ref: ev.id }];
+    case "tick.start":
+    case "tick.end":
+      // R5.4: bracket records of a tick; its `tick` record carries the decisions (a crashed tick: `norn why`)
+      return [];
   }
 }
 
@@ -107,7 +117,11 @@ export function traceUnits(ev: TraceEvent): string[] {
     case "reject":
     case "briefing":
     case "foreign_commits":
+    case "take":
       return [ev.unit];
+    case "tick.start":
+    case "tick.end":
+      return [];
   }
 }
 
