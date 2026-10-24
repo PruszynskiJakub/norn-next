@@ -21,7 +21,7 @@
       "type": "string"
     },
     "start": {
-      "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*$",
+      "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
       "type": "string"
     },
     "steps": {
@@ -29,7 +29,7 @@
       "additionalProperties": false,
       "type": "object",
       "patternProperties": {
-        "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*$": {
+        "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$": {
           "type": "object",
           "oneOf": [
             {
@@ -148,7 +148,7 @@
                     "^[a-z][a-z0-9_-]*$": {
                       "anyOf": [
                         {
-                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*)$",
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
                           "type": "string"
                         },
                         {
@@ -159,7 +159,7 @@
                           ],
                           "properties": {
                             "to": {
-                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*)$",
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
                               "type": "string"
                             },
                             "counter": {
@@ -213,7 +213,7 @@
                     "pass": {
                       "anyOf": [
                         {
-                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*)$",
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
                           "type": "string"
                         },
                         {
@@ -224,7 +224,7 @@
                           ],
                           "properties": {
                             "to": {
-                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*)$",
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
                               "type": "string"
                             },
                             "counter": {
@@ -243,7 +243,7 @@
                     "fail": {
                       "anyOf": [
                         {
-                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*)$",
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
                           "type": "string"
                         },
                         {
@@ -254,7 +254,7 @@
                           ],
                           "properties": {
                             "to": {
-                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*)$",
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
                               "type": "string"
                             },
                             "counter": {
@@ -301,7 +301,7 @@
                     "approve": {
                       "anyOf": [
                         {
-                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*)$",
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
                           "type": "string"
                         },
                         {
@@ -312,7 +312,7 @@
                           ],
                           "properties": {
                             "to": {
-                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*)$",
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
                               "type": "string"
                             },
                             "counter": {
@@ -331,7 +331,7 @@
                     "reject": {
                       "anyOf": [
                         {
-                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*)$",
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
                           "type": "string"
                         },
                         {
@@ -342,7 +342,37 @@
                           ],
                           "properties": {
                             "to": {
-                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*)$",
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "means": {
+                              "minLength": 1,
+                              "description": "Shown to the agent in the brief (B3)",
+                              "type": "string"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "stale": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
                               "type": "string"
                             },
                             "counter": {
@@ -391,6 +421,10 @@
                     {
                       "const": "open-pr",
                       "type": "string"
+                    },
+                    {
+                      "const": "update",
+                      "type": "string"
                     }
                   ]
                 },
@@ -402,7 +436,7 @@
                     "done": {
                       "anyOf": [
                         {
-                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*)$",
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
                           "type": "string"
                         },
                         {
@@ -413,7 +447,7 @@
                           ],
                           "properties": {
                             "to": {
-                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*)$",
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
                               "type": "string"
                             },
                             "counter": {
@@ -432,7 +466,7 @@
                     "conflict": {
                       "anyOf": [
                         {
-                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*)$",
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
                           "type": "string"
                         },
                         {
@@ -443,7 +477,7 @@
                           ],
                           "properties": {
                             "to": {
-                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*)$",
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
                               "type": "string"
                             },
                             "counter": {
@@ -486,7 +520,7 @@
                     "done": {
                       "anyOf": [
                         {
-                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*)$",
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
                           "type": "string"
                         },
                         {
@@ -497,7 +531,7 @@
                           ],
                           "properties": {
                             "to": {
-                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*)$",
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
                               "type": "string"
                             },
                             "counter": {
@@ -516,7 +550,7 @@
                     "stuck": {
                       "anyOf": [
                         {
-                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*)$",
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
                           "type": "string"
                         },
                         {
@@ -527,7 +561,7 @@
                           ],
                           "properties": {
                             "to": {
-                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*)$",
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
                               "type": "string"
                             },
                             "counter": {
@@ -570,6 +604,28 @@
               "type": "integer"
             }
           }
+        }
+      }
+    },
+    "base": {
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "stale": {
+          "anyOf": [
+            {
+              "const": "conflict",
+              "type": "string"
+            },
+            {
+              "const": "behind",
+              "type": "string"
+            }
+          ]
+        },
+        "step": {
+          "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
+          "type": "string"
         }
       }
     }

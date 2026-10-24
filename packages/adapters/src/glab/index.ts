@@ -78,6 +78,7 @@ export function mapMr(m: GlMr): RemotePullRequest {
     draft: m.draft ?? m.work_in_progress ?? false,
     head: m.source_branch,
     base: m.target_branch,
+    base_branch: m.target_branch,
   };
 }
 

@@ -200,7 +200,7 @@ export function loadSnapshot(opts: {
 }): RepoSnapshot {
   const config = loadConfig({ repoRoot: opts.repoRoot, home: opts.home, env: opts.env });
   const workflows = loadWorkflows(opts.repoRoot);
-  const baseRef = opts.baseRef !== undefined ? opts.baseRef : defaultBaseRef(opts.repoRoot, config.ok ? config.config.remote.git_remote : "origin");
+  const baseRef = opts.baseRef !== undefined ? opts.baseRef : defaultBaseRef(opts.repoRoot, config.ok ? config.config.remote.git_remote : "origin", config.ok ? config.config.base_branch : null);
   const baseRoot = baseRef ? baseSpecsRoot(opts.repoRoot, baseRef) : null;
   const seen = new Map<string, StorySnapshot>();
   // R3.4: a story worktree is read only for the story its marker names

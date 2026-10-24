@@ -9,7 +9,8 @@
  */
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { atomicWrite, readText } from "./fsx.ts";
+import type { StoryBase } from "@norn/core";
+import { atomicWrite, atomicWriteJson, readText } from "./fsx.ts";
 import { SPECS_DIR, traceDir } from "./paths.ts";
 
 function gitSync(cwd: string, args: string[], input?: Uint8Array): { code: number; stdout: Buffer } {
@@ -31,14 +32,7 @@ const baseCacheDir = (repoRoot: string) => join(traceDir(repoRoot), "base");
  * remote-tracking ref does not exist (no remote, never fetched).
  */
 export function defaultBaseRef(repoRoot: string, remote: string, branch?: string | null): string | null {
-  let b = branch ?? null;
-  if (!b) {
-    try {
-      b = (JSON.parse(readText(join(traceDir(repoRoot), "remote.json")) ?? "{}") as { default_branch?: string | null }).default_branch ?? null;
-    } catch {
-      b = null;
-    }
-  }
+  let b = branch ?? cachedDefaultBranch(repoRoot);
   if (!b) {
     const r = gitSync(repoRoot, ["symbolic-ref", "--quiet", `refs/remotes/${remote}/HEAD`]);
     const ref = r.code === 0 ? r.stdout.toString().trim() : "";
@@ -46,6 +40,15 @@ export function defaultBaseRef(repoRoot: string, remote: string, branch?: string
   }
   const ref = `refs/remotes/${remote}/${b}`;
   return gitSync(repoRoot, ["rev-parse", "--verify", "--quiet", ref]).code === 0 ? ref : null;
+}
+
+/** The remote's default branch as the last sync discovered it (`trace/remote.json`), or null. */
+export function cachedDefaultBranch(repoRoot: string): string | null {
+  try {
+    return (JSON.parse(readText(join(traceDir(repoRoot), "remote.json")) ?? "{}") as { default_branch?: string | null }).default_branch ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -106,4 +109,26 @@ export function baseSpecsRoot(repoRoot: string, ref: string): string | null {
     /* another tick may be cleaning up too */
   }
   return dir;
+}
+
+const baseFactsPath = (repoRoot: string) => join(traceDir(repoRoot), "base.json");
+
+/**
+ * BS1: story key → the last `story.base` measured on this checkout (`trace/base.json`, machine-local).
+ * Observe reruns `git merge-tree` only when the pair (story head, base sha) differs from the cached
+ * one; views show the last measurement (stale inbox items, merge-item detail) without running git.
+ */
+export type BaseFactsCache = Record<string, StoryBase>;
+
+export function readBaseFacts(repoRoot: string): BaseFactsCache {
+  try {
+    const v = (JSON.parse(readText(baseFactsPath(repoRoot)) ?? "{}") as { stories?: BaseFactsCache }).stories;
+    return v && typeof v === "object" ? v : {};
+  } catch {
+    return {};
+  }
+}
+
+export function writeBaseFacts(repoRoot: string, cache: BaseFactsCache): void {
+  atomicWriteJson(baseFactsPath(repoRoot), { stories: cache });
 }

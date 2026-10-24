@@ -114,6 +114,17 @@
         }
       }
     },
+    "base_branch": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "default_workflow": {
       "pattern": "^[a-z][a-z0-9_-]*$",
       "type": "string"

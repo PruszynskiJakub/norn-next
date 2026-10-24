@@ -203,6 +203,26 @@ export interface UnpushedRuns {
   files: string[];
 }
 
+/**
+ * BS1: the story branch against its base (BS0) this tick. `conflicts` comes from `git merge-tree`
+ * (computed only when `behind > 0` and the pair (story head, base sha) changed, cached per checkout).
+ */
+export interface StoryBase {
+  /** BS0: `refs/remotes/<remote>/<base>`, or `refs/heads/<base>` without a git remote */
+  ref: string;
+  /** tip of the base ref this tick */
+  sha: string;
+  /** the story branch head measured (local `refs/heads/<story branch>`) */
+  head: string;
+  merge_base: string;
+  /** commits in the base not in the story */
+  behind: number;
+  /** commits in the story not in the base */
+  ahead: number;
+  /** paths a merge of the base would conflict in; [] = clean */
+  conflicts: string[];
+}
+
 export interface StoryFacts {
   key: string;
   slug: string;
@@ -248,6 +268,8 @@ export interface StoryFacts {
    * none, held here, or not observed.
    */
   unpushed_runs?: UnpushedRuns[];
+  /** BS1: the story branch against its base; absent = not observed (no story branch or base ref) */
+  base?: StoryBase;
   /** units: the story unit first, then slices ascending by nn */
   units: UnitFacts[];
   slices: SliceFileFacts[];
@@ -275,6 +297,10 @@ export interface Facts {
   tick_id: string;
   /** ms epoch at observe start; decide uses only this as "now" */
   now: number;
+  /**
+   * `default_branch` is the **base branch** (BS0): config `base_branch` when set, else the remote's
+   * default branch as discovered. Stories are cut from it, updated from it and PR'd into it.
+   */
   repo: { root: string; default_branch: string; remote: string };
   machine: MachineFacts;
   remote: {

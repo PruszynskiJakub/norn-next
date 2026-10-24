@@ -99,13 +99,15 @@ export const GateStep = Type.Object(
     type: Type.Literal("gate"),
     ...common,
     prompt: Type.Optional(Type.String({ description: "What the person decides; shown in inbox" })),
-    outcomes: fixedOutcomes(["approve", "reject"] as const),
+    /** `stale` (BS6): tick-classified on a story gate when the base moved under the story (BS7) */
+    outcomes: fixedOutcomes(["approve", "reject", "stale"] as const),
   },
   { additionalProperties: false },
 );
 export type GateStep = Static<typeof GateStep>;
 
-export const GitAction = Type.Union([Type.Literal("integrate"), Type.Literal("push"), Type.Literal("open-pr")]);
+/** W2: `update` (BS3) merges the base into the story branch; story units only (W8). */
+export const GitAction = Type.Union([Type.Literal("integrate"), Type.Literal("push"), Type.Literal("open-pr"), Type.Literal("update")]);
 export type GitAction = Static<typeof GitAction>;
 
 export const GitStep = Type.Object(
@@ -136,6 +138,18 @@ export type StepType = Step["type"];
 export const CounterSpec = Type.Object({ max: PosInt }, { additionalProperties: false });
 export type CounterSpec = Static<typeof CounterSpec>;
 
+/** BS7/BS9: when a waiting story counts as stale, and the step `norn update` re-enters. */
+export const BaseSync = Type.Object(
+  {
+    /** `conflict` (default): a merge of the base would conflict; `behind`: the base has any commit the story lacks */
+    stale: Type.Optional(Type.Union([Type.Literal("conflict"), Type.Literal("behind")])),
+    /** step `norn update` re-enters (BS9); default: the first step with `action: update` */
+    step: Type.Optional(StepName),
+  },
+  { additionalProperties: false },
+);
+export type BaseSync = Static<typeof BaseSync>;
+
 export const Workflow = Type.Object(
   {
     $schema: Type.Optional(Type.String()),
@@ -144,6 +158,7 @@ export const Workflow = Type.Object(
     start: StepName,
     steps: Type.Record(StepName, Step, { minProperties: 1, additionalProperties: false }),
     counters: Type.Optional(Type.Record(CounterName, CounterSpec, { additionalProperties: false })),
+    base: Type.Optional(BaseSync),
   },
   {
     $id: "https://norn.dev/schema/workflow.json",
@@ -157,8 +172,8 @@ export type Workflow = Static<typeof Workflow>;
 export const CLASSIFIED_OUTCOMES = {
   agent: ["silent", "died", "timeout", "stalled", "ask", "exhausted"],
   check: ["pass", "fail", "exhausted"],
-  gate: ["approve", "reject", "exhausted"],
-  git: ["done", "conflict", "exhausted"],
+  gate: ["approve", "reject", "stale", "exhausted"],
+  git: ["done", "conflict", "stuck", "exhausted"],
   slices: ["done", "stuck", "exhausted"],
 } as const satisfies Record<StepType, readonly string[]>;
 

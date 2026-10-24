@@ -52,6 +52,7 @@ describe("glab adapter", () => {
       draft: false,
       head: "gl-3-add-login-page",
       base: "main",
+      base_branch: "main",
       merged_at: "2026-10-22T08:00:00.000Z",
     });
     expect(await glab.findPullRequest("gl-99-none")).toBeNull();

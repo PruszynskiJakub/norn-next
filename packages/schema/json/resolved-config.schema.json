@@ -7,6 +7,7 @@
     "default_agent",
     "runner",
     "remote",
+    "base_branch",
     "default_workflow",
     "default_slice_workflow",
     "default_mode",
@@ -130,6 +131,17 @@
           "type": "string"
         }
       }
+    },
+    "base_branch": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "default_workflow": {
       "pattern": "^[a-z][a-z0-9_-]*$",

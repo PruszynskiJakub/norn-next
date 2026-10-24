@@ -27,6 +27,7 @@ import {
   type RunFacts,
   type SliceFileFacts,
   type StepRunFacts,
+  type StoryBase,
   type StoryFacts,
   stepOf,
   storyWorktreePath,
@@ -56,6 +57,8 @@ import {
   loadSnapshot,
   readEnvNorn,
   readActFailures,
+  type BaseFactsCache,
+  readBaseFacts,
   readLocalClaim,
   readReceipt,
   readUnitMarker,
@@ -67,6 +70,7 @@ import {
   type UnpushedUnit,
   unpushedRuns,
   withSliceWorktrees,
+  writeBaseFacts,
 } from "@norn/store";
 import type { Context } from "../context.ts";
 import { leaseLiveness } from "./leases.ts";
@@ -238,7 +242,8 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     cache.default_branch = remote ? await git.defaultBranch(root, remote).catch(() => null) : null;
     cache.default_branch ??= (await git.status(root).catch(() => null))?.branch ?? "main";
   }
-  const base = cache.default_branch ?? "main";
+  // BS0: the base branch is config `base_branch` when set, else the discovered default branch
+  const base = config.base_branch ?? cache.default_branch ?? "main";
   // P2 / F33 / F36: the fetched base branch is the record and the merge reference — never the
   // main checkout's local `main`, which norn does not move. Fetched with every remote sync.
   if (due && ports.remote && remote) await rawGit(root, ["fetch", "--quiet", "--no-tags", remote, `+refs/heads/${base}:refs/remotes/${remote}/${base}`]).catch(() => undefined);
@@ -318,6 +323,9 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   const local: LocalRunEnv = { holder, runner: ports.runner && runner ? ports.runner : null, stalledMs: parseDuration(config.limits.stalled), now };
 
   const refs = await refMap(root);
+  // BS1: last measurements; stories not seen this tick drop out of the cache
+  const baseCacheIn = readBaseFacts(root);
+  const baseCache: BaseFactsCache = {};
   const unpushed: Record<string, UnpushedUnit[]> = {};
   const stories: StoryFacts[] = [];
   const storyLocs: Record<string, StoryLoc> = {};
@@ -382,6 +390,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       ...readyHead(s, unitSnaps.get(s)?.[0]),
       ...(s.base_status !== undefined ? { base_status: s.base_status } : {}),
       ...(lost.length ? { unpushed_runs: lost.map((l) => ({ unit: l.unit, files: l.files })) } : {}),
+      ...(await storyBase(git, root, remote, base, branch, s.frontmatter?.status, refs, baseCacheIn, baseCache, s.key)),
       units,
       slices: s.slices satisfies SliceFileFacts[],
       mode: units[0]?.state?.mode ?? config.default_mode,
@@ -393,13 +402,14 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   for (const [story, path] of storyWts) if (!known.has(story)) orphanWts.push(path);
   for (const [slice, path] of sliceWts) if (!known.has(slice.split("/")[0] as string)) orphanWts.push(path);
 
+  if (JSON.stringify(baseCache) !== JSON.stringify(baseCacheIn)) writeBaseFacts(root, baseCache);
   const orphanBranches = await findOrphanBranches(git, root, wtList, stories);
   traceForeignCommits(root, stories, opts.tick_id, now);
 
   const facts: Facts = {
     tick_id: opts.tick_id,
     now,
-    repo: { root, default_branch: cache.default_branch ?? "main", remote: remoteName },
+    repo: { root, default_branch: base, remote: remoteName },
     machine: {
       holder,
       heartbeat_id: hb,
@@ -418,6 +428,47 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   return { facts, workflows, config, ports, root, remote, heartbeat_id: hb, stories: storyLocs, units: unitLocs, sync, unpushed };
 }
 
+
+/** BS0: the base ref of every story — the fetched `<remote>/<base>`, or the local base branch without a remote. */
+export const storyBaseRef = (remote: string | null, base: string) => (remote ? `refs/remotes/${remote}/${base}` : `refs/heads/${base}`);
+
+/**
+ * BS1: the story branch against its base ref. Measured (divergence, and `git merge-tree` when the
+ * story is behind) only when the pair (head, base sha) is not the cached one (`trace/base.json`).
+ * Absent when the story is finished, its branch or the base ref is missing, or git fails.
+ */
+async function storyBase(
+  git: Ports["git"],
+  root: string,
+  remote: string | null,
+  base: string,
+  branch: string,
+  status: string | undefined,
+  refs: Map<string, string>,
+  prev: BaseFactsCache,
+  next: BaseFactsCache,
+  key: string,
+): Promise<{ base?: StoryBase }> {
+  if (status === "done" || status === "dropped") return {};
+  const ref = storyBaseRef(remote, base);
+  const head = refs.get(`refs/heads/${branch}`);
+  const sha = refs.get(ref);
+  if (!head || !sha) return {};
+  const hit = prev[key];
+  if (hit && hit.head === head && hit.sha === sha && hit.ref === ref) {
+    next[key] = hit;
+    return { base: hit };
+  }
+  try {
+    const d = await git.divergence(root, head, sha);
+    const conflicts = d.behind > 0 ? await git.mergeTree(root, head, sha) : [];
+    const b: StoryBase = { ref, sha, head, merge_base: d.merge_base ?? "", behind: d.behind, ahead: d.ahead, conflicts };
+    next[key] = b;
+    return { base: b };
+  } catch {
+    return {};
+  }
+}
 
 /** `refs/remotes/<remote>/<base>` when it exists locally (fetched), else null (solo, never fetched). */
 async function trackingRef(root: string, remote: string | null, base: string): Promise<string | null> {

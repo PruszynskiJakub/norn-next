@@ -15,7 +15,7 @@ import type { InboxGroup, InboxItem } from "./ports.ts";
 import { sha256 } from "./hash.ts";
 import { optionsLine } from "./prompt.ts";
 import { epoch, formatAge, iso } from "./time.ts";
-import { stepOf } from "./workflow.ts";
+import { baseUpdateStep, isStale, stepOf } from "./workflow.ts";
 
 export const INBOX_GROUPS: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock", "check", "unclaimed", "running", "recently_done"];
 
@@ -207,13 +207,20 @@ function judgedDetail(story: StoryFacts, uf: UnitFacts): string | null {
  * GR6/F25: the story unit finished its workflow and its PR is open — merging it is the person's
  * last action, so it is an item (Your turn) with the PR URL, not "Recently done".
  */
-function mergeItem(story: StoryFacts, st: UnitState): InboxItem | null {
+function mergeItem(story: StoryFacts, st: UnitState, base: string): InboxItem | null {
   const pr = story.pr;
   // GR6: a branch already contained in origin/<base> (merged by ancestry, e.g. a merge commit
   // pushed by hand) needs no merge, even while the PR still reads `open`.
   if (!pr || pr.state !== "open" || story.merged_by_ancestry || story.frontmatter?.status === "done") return null;
   const draft = pr.is_draft;
   const cli = prCli(story);
+  const details = [pr.url];
+  if (draft) details.push(`draft: mark it ready first (${cli} ready ${pr.number})`);
+  // BS10: how far the base moved since; a conflicting base sends the story back through update first
+  const b = story.base;
+  if (b && b.behind > 0) details.push(`behind ${base} by ${b.behind}`);
+  const conflicting = !!b && b.conflicts.length > 0;
+  if (conflicting) details.push(`conflicts with ${base} in ${b.conflicts.join(", ")} — update the story first`);
   return {
     id: `merge:${story.key}:${pr.number}`,
     group: "your_turn",
@@ -221,9 +228,58 @@ function mergeItem(story: StoryFacts, st: UnitState): InboxItem | null {
     slice: null,
     step: null,
     title: `Merge PR #${pr.number}${draft ? " (still a draft)" : ""}`,
-    detail: draft ? `${pr.url} · draft: mark it ready first (${cli} ready ${pr.number})` : pr.url,
-    command: `${cli} merge ${pr.number}`,
+    detail: details.join(" · "),
+    command: conflicting ? `norn update ${story.key}` : `${cli} merge ${pr.number}`,
     since: st.updated_at,
+    url: pr.url,
+  };
+}
+
+/**
+ * BS10: the story waits for a person (parked or stuck) and the base moved under it (BS7), with no
+ * gate `stale` route to send it back by itself (BS6) — a Check item with `norn update`.
+ */
+export function staleItem(story: StoryFacts, base: string): InboxItem | null {
+  const b = story.base;
+  const uf = story.units.find((u) => u.unit.slice === null);
+  const st = uf?.state;
+  const wf = uf?.workflow ?? null;
+  if (!b || !st || !wf || (st.status !== "parked" && st.status !== "stuck")) return null;
+  if (!isStale(wf, b)) return null;
+  // BS6: a gate with a `stale` route is classified by the tick, not shown
+  const step = stepOf(wf, st.step);
+  if (st.status === "parked" && st.park?.kind === "gate" && step?.type === "gate" && step.outcomes.stale !== undefined) return null;
+  const title = b.conflicts.length ? `${story.key} conflicts with ${base} in ${b.conflicts.join(", ")} (${b.behind} behind)` : `${story.key} is ${b.behind} behind ${base}`;
+  return {
+    id: `stale:${story.key}:${b.sha}`,
+    group: "check",
+    story: story.key,
+    slice: null,
+    step: st.step,
+    title,
+    detail: `${base} at ${short(b.sha)}; the story head ${short(b.head)} has ${b.ahead} commit(s) of its own`,
+    command: baseUpdateStep(wf) ? `norn update ${story.key}` : `git log --oneline ${b.head}..${b.sha}`,
+    since: st.park?.since ?? st.updated_at,
+    ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
+  };
+}
+
+/** BS11: the story PR targets another branch than the story's base — merging it would skip the base. */
+export function retargetItem(story: StoryFacts, base: string): InboxItem | null {
+  const pr = story.pr;
+  const target = pr?.base_branch ?? pr?.base ?? null;
+  if (!pr || pr.state !== "open" || !target || target === base) return null;
+  const st = story.units.find((u) => u.unit.slice === null)?.state;
+  return {
+    id: `retarget:${story.key}:${pr.number}:${target}`,
+    group: "check",
+    story: story.key,
+    slice: null,
+    step: null,
+    title: `PR #${pr.number} targets ${target}, not ${base}`,
+    detail: "a merge there does not finish the story (BS11); retarget the PR to the base branch",
+    command: `${prCli(story)} edit ${pr.number} ${prCli(story) === "glab mr" ? "--target-branch" : "--base"} ${base}`,
+    since: st?.updated_at ?? story.frontmatter?.intake_at ?? "1970-01-01T00:00:00.000Z",
     url: pr.url,
   };
 }
@@ -284,7 +340,7 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
     }
     case "done": {
       if (uf.unit.slice === null) {
-        const merge = mergeItem(story, st);
+        const merge = mergeItem(story, st, facts.repo.default_branch);
         if (merge) return merge;
       }
       if (facts.now - epoch(st.updated_at) > RECENT_MS) return null;
@@ -427,6 +483,8 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
     }
     add(bodyChangedItem(story));
     add(headChangedItem(story));
+    add(staleItem(story, facts.repo.default_branch));
+    add(retargetItem(story, facts.repo.default_branch));
     for (const it of foreignCommitItems(story)) add(it);
     for (const uf of story.units) {
       add(unitInboxItem(story, uf, facts, config));

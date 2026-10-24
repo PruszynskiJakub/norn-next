@@ -88,6 +88,11 @@ export const ResolvedConfig = Type.Object(
     /** null: no runner on this machine → effective mode manual (MO2) */
     runner: Type.Union([RunnerConfig, Type.Null()]),
     remote: RemoteConfig,
+    /**
+     * BS0: the branch stories are cut from, updated from (`git: update`) and PR'd into. null =
+     * the remote's default branch, discovered as before. Never assumed to be `main`.
+     */
+    base_branch: Type.Union([NonEmpty, Type.Null()]),
     default_workflow: Name,
     default_slice_workflow: Name,
     default_mode: Mode,
@@ -112,6 +117,7 @@ export const ConfigLayer = Type.Object(
     default_agent: Type.Optional(Name),
     runner: Type.Optional(Type.Union([RunnerConfig, Type.Null()])),
     remote: Type.Optional(Type.Partial(RemoteConfig, { additionalProperties: false })),
+    base_branch: Type.Optional(Type.Union([NonEmpty, Type.Null()])),
     default_workflow: Type.Optional(Name),
     default_slice_workflow: Type.Optional(Name),
     default_mode: Type.Optional(Mode),
@@ -132,6 +138,7 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
   default_agent: "claude",
   runner: null,
   remote: { provider: "gh", label: "norn", git_remote: "origin", sync_interval: "5m" },
+  base_branch: null,
   default_workflow: "story",
   default_slice_workflow: "slice",
   default_mode: "manual",
@@ -152,6 +159,7 @@ function layer(base: ResolvedConfig, l: ConfigLayer): ResolvedConfig {
     default_agent: l.default_agent ?? base.default_agent,
     runner: l.runner === undefined ? base.runner : l.runner,
     remote: { ...base.remote, ...l.remote },
+    base_branch: l.base_branch === undefined ? base.base_branch : l.base_branch,
     default_workflow: l.default_workflow ?? base.default_workflow,
     default_slice_workflow: l.default_slice_workflow ?? base.default_slice_workflow,
     default_mode: l.default_mode ?? base.default_mode,

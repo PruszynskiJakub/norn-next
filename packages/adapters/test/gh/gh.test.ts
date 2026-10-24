@@ -45,6 +45,7 @@ describe("gh adapter", () => {
       draft: false,
       head: "gh-12-add-login-page",
       base: "main",
+      base_branch: "main",
       merged_at: "2026-10-22T08:00:00Z",
     });
     expect(await gh.findPullRequest("gh-99-none")).toBeNull();
