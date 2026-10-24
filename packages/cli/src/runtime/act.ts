@@ -415,19 +415,57 @@ export class Actor {
     }
     this.effectsOk.add("commit");
     if (!c.push || !this.obs.remote) return { sha, pushed: null };
-    const r = await this.pushBranch(c.cwd, c.branch);
+    const r = await this.pushBranch(c.cwd, c.branch, c.trailers);
     if (r.ok) this.effectsOk.add("push");
     // R4.3: committed but not pushed is a failed effect (the record is not on the remote, S8)
     else this.effectErrors.push({ effect: "push", reason: `push of ${c.branch} failed: ${r.message}` });
     return r.ok ? { sha, pushed: true } : { sha, pushed: false, push_error: r.message };
   }
 
-  /** Push a branch (T7: only the claim holder; decide acts only on held stories). Slice branches are rebased by integrate, so they force-push. */
-  private async pushBranch(cwd: string, branch: string): Promise<{ ok: true } | { ok: false; message: string }> {
-    if (!this.obs.remote) return { ok: true };
+  /**
+   * Push a branch (T7: only the claim holder; decide acts only on held stories). Slice branches are
+   * rebased by integrate, so they force-push. BS5.2: never publishes a commit that leaves conflict
+   * markers (an agent's merge included); BS3.3a: a story branch someone pushed to meanwhile is
+   * merged in (never rebased) and pushed again.
+   */
+  private async pushBranch(cwd: string, branch: string, trailers: Record<string, string> = {}): Promise<{ ok: true } | { ok: false; message: string }> {
+    const remote = this.obs.remote;
+    if (!remote) return { ok: true };
+    const held = await this.markersHeld(cwd, remote, branch);
+    if (held) return { ok: false, message: held };
     const force = branch.includes("/") ? "+" : "";
-    const r = await this.git.push(cwd, this.obs.remote, `${force}refs/heads/${branch}:refs/heads/${branch}`);
+    const push = () => this.git.push(cwd, remote, `${force}refs/heads/${branch}:refs/heads/${branch}`);
+    let r = await push();
+    if (!r.ok && r.reason === "rejected" && !force) {
+      const taken = await this.takeRemoteBranch(cwd, remote, branch, trailers);
+      if (taken !== true) return { ok: false, message: `${r.reason}: ${r.message}${taken ? `; ${taken}` : ""}` };
+      r = await push();
+    }
     return r.ok ? { ok: true } : { ok: false, message: `${r.reason}: ${r.message}` };
+  }
+
+  /** BS5.2 (dogfood D5): why the push of `branch` is held — its unpublished commits leave conflict markers — or null. */
+  private async markersHeld(cwd: string, remote: string, branch: string): Promise<string | null> {
+    const marked = await this.git.outgoingConflictMarkers(cwd, remote, `refs/heads/${branch}`);
+    if (!marked.length) return null;
+    const where = marked.map((m) => `${m.path}${m.commit ? ` (commit ${m.commit.slice(0, 12)})` : ""}`);
+    return `held: conflict markers in ${where.join(", ")}; nothing pushed — resolve them in a new commit (never rewrite the branch)`;
+  }
+
+  /**
+   * BS3.3a (dogfood D4): the push of the story branch was rejected — someone pushed to it. Take the
+   * remote branch in (fast-forward, else a merge commit with norn's trailers); true when the push may
+   * be retried, else why not (null = nothing new on the remote, e.g. a protected branch).
+   */
+  private async takeRemoteBranch(cwd: string, remote: string, branch: string, trailers: Record<string, string>): Promise<true | string | null> {
+    try {
+      if ((await this.git.status(cwd)).branch !== branch) return `${branch} is not checked out in ${cwd}`;
+      const r = await gitAdapter.syncRemoteBranch(this.git, { cwd, branch, remote, message: `Merge ${remote}/${branch} into ${branch}`, trailers: { ...trailers, "Norn-Tick": this.tick } });
+      if (r.outcome === "conflict") return `story branch diverged from ${remote}/${branch}; merging it conflicts in ${r.files.join(", ") || "?"} — merge it in ${cwd} by hand`;
+      return r.outcome === "adopted" || r.outcome === "merged" ? true : null;
+    } catch (e) {
+      return `taking in ${remote}/${branch} failed: ${(e as Error).message}`;
+    }
   }
 
   // ------------------------------------------------------------ notifications (O3)

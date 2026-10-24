@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { GitPort } from "@norn/core";
-import { addedConflictMarkers, bunExec, classifyPush, createGit, gitVersionOk, integrate, parseGitVersion, parseStatusV2, parseWorktreeList, update } from "../../src/git/index.ts";
+import { addedConflictMarkers, bunExec, classifyPush, createGit, gitVersionOk, integrate, parseGitVersion, parseStatusV2, parseWorktreeList, syncRemoteBranch, update } from "../../src/git/index.ts";
 
 const ENV = {
   GIT_CONFIG_GLOBAL: "/dev/null",
@@ -321,7 +321,76 @@ describe("git adapter: base sync (BS1, BS3)", () => {
     await sh(other, "add", "-A");
     await sh(other, "commit", "-q", "-m", "remote");
     await sh(other, "push", "-q", "origin", "gh-5-s");
-    expect(await run(wt, await baseMoves("c.txt", "c\n"))).toEqual({ outcome: "stuck", reason: "story branch diverged from origin/gh-5-s" });
+    // BS3.3a (dogfood D4): diverged without a conflict → the remote branch is merged in first (never rebased)
+    const remoteSha = await sh(other, "rev-parse", "HEAD");
+    const moved = await run(wt, await baseMoves("c.txt", "c\n"));
+    expect(moved).toMatchObject({ outcome: "done", merged: true, adopted: remoteSha });
+    const take = (await git.log(wt, "-3")).find((c) => c.subject === "Merge origin/gh-5-s into gh-5-s");
+    expect(take?.trailers["Norn-Tick"]).toBe(TRAILERS["Norn-Tick"]);
+    expect(await git.isAncestor(wt, remoteSha, (await git.revParse(wt, "HEAD")) as string)).toBe(true);
+
+    // diverged into a conflict → stuck naming the paths, the merge aborted and the worktree clean
+    await sh(wt, "push", "-q", "origin", "gh-5-s");
+    await sh(other, "pull", "-q", "--no-rebase", "origin", "gh-5-s");
+    writeFileSync(join(wt, "local.txt"), "local side\n");
+    await git.commit(wt, { message: "local again", trailers: {} });
+    writeFileSync(join(other, "local.txt"), "remote side\n");
+    await sh(other, "commit", "-q", "-am", "remote again");
+    await sh(other, "push", "-q", "origin", "gh-5-s");
+    expect(await run(wt, await baseMoves("d.txt", "d\n"))).toEqual({ outcome: "stuck", reason: "story branch diverged from origin/gh-5-s; merging it conflicts in local.txt" });
+    expect(await git.inProgress(wt)).toEqual({ operation: null, unmerged: [] });
+    expect((await git.status(wt)).clean).toBe(true);
+  });
+
+  test("BS3.3a: syncRemoteBranch — none, local, adopted, merged", async () => {
+    const wt = await story();
+    const sync = () => syncRemoteBranch(git, { cwd: wt, branch: "gh-5-s", remote: "origin", message: "Merge origin/gh-5-s into gh-5-s", trailers: TRAILERS });
+    expect(await sync()).toMatchObject({ outcome: "local" });
+    expect(await syncRemoteBranch(git, { cwd: wt, branch: "nope", remote: "origin", message: "m", trailers: {} })).toEqual({ outcome: "none", remote_sha: null });
+    const other = join(R.base, "other2");
+    await sh(R.base, "clone", "-q", "-b", "gh-5-s", R.remote, other);
+    writeFileSync(join(other, "p.txt"), "person\n");
+    await sh(other, "add", "-A");
+    await sh(other, "commit", "-q", "-m", "person");
+    await sh(other, "push", "-q", "origin", "gh-5-s");
+    const p1 = await sh(other, "rev-parse", "HEAD");
+    expect(await sync()).toEqual({ outcome: "adopted", remote_sha: p1, head: p1 });
+    writeFileSync(join(other, "q.txt"), "person 2\n");
+    await sh(other, "add", "-A");
+    await sh(other, "commit", "-q", "-m", "person 2");
+    await sh(other, "push", "-q", "origin", "gh-5-s");
+    writeFileSync(join(wt, "n.txt"), "norn\n");
+    await git.commit(wt, { message: "norn: state", trailers: TRAILERS });
+    const merged = await sync();
+    expect(merged).toMatchObject({ outcome: "merged", remote_sha: await sh(other, "rev-parse", "HEAD") });
+    expect((await sh(wt, "log", "-1", "--format=%P")).split(" ")).toHaveLength(2);
+  });
+
+  test("BS5.2 (dogfood D5): outgoingConflictMarkers finds markers an unpushed merge commit left, and only those", async () => {
+    const wt = await story();
+    expect(await git.outgoingConflictMarkers(wt, "origin", "refs/heads/gh-5-s")).toEqual([]);
+    // a pushed file with markers (say, a fixture) is not the outgoing commits' doing
+    writeFileSync(join(wt, "fixture.txt"), ["<<<<<<< HEAD", "a", "=======", "b", ">>>>>>> x", ""].join("\n"));
+    await sh(wt, "add", "-A");
+    await sh(wt, "commit", "-q", "-m", "fixture");
+    await sh(wt, "push", "-q", "origin", "gh-5-s");
+    // an agent concludes a conflicting merge with the markers still in a.txt, then adds a setext heading
+    writeFileSync(join(wt, "a.txt"), "story side\n");
+    await git.commit(wt, { message: "story edits a", trailers: {} });
+    await baseMoves("a.txt", "base side\n");
+    expect((await bunExec(["git", "merge", "--no-ff", "main"], { cwd: wt, env: ENV })).code).not.toBe(0);
+    await sh(wt, "add", "-A");
+    await sh(wt, "commit", "-q", "--no-edit");
+    const merge = await sh(wt, "rev-parse", "HEAD");
+    // log -p shows a merge no diff; the scan still finds it (first parent)
+    expect(await git.outgoingConflictMarkers(wt, "origin", "refs/heads/gh-5-s")).toEqual([{ path: "a.txt", commit: merge }]);
+    writeFileSync(join(wt, "doc.md"), "Title\n=======\n\n>>>>>>>no label\n");
+    await git.commit(wt, { message: "doc", trailers: {} });
+    expect((await git.outgoingConflictMarkers(wt, "origin", "refs/heads/gh-5-s")).map((m) => m.path)).toEqual(["a.txt"]);
+    // fixed in a follow-up commit: the head is clean, nothing held
+    writeFileSync(join(wt, "a.txt"), "story side\nbase side\n");
+    await git.commit(wt, { message: "resolve a", trailers: {} });
+    expect(await git.outgoingConflictMarkers(wt, "origin", "refs/heads/gh-5-s")).toEqual([]);
   });
 
   test("no remote (host-less, acceptance 11): merges the local base", async () => {

@@ -116,6 +116,16 @@ export interface ConflictMarker {
   line: number;
 }
 
+/**
+ * BS5.2 (dogfood D5): a file the outgoing commits of a branch changed whose content at the pushed
+ * head still holds both an opening (`<<<<<<< `) and a closing (`>>>>>>> `) conflict marker, and the
+ * newest outgoing commit that changed it.
+ */
+export interface OutgoingMarkers {
+  path: string;
+  commit: string | null;
+}
+
 /** PortError codes of `GitPort.commit` (H1): nothing is committed in either case. */
 export const GIT_IN_PROGRESS = "git_operation_in_progress";
 export const GIT_CONFLICT_MARKERS = "git_conflict_markers";
@@ -167,6 +177,11 @@ export interface GitPort {
    * `paths` when given ([] = none checked).
    */
   conflictMarkers(cwd: string, opts?: { paths?: string[]; rev?: string }): Promise<ConflictMarker[]>;
+  /**
+   * BS5.2: files changed by the commits of `rev` that are on no `remote` ref yet (merge commits
+   * against their first parent) which still hold conflict markers at `rev`; [] = safe to push.
+   */
+  outgoingConflictMarkers(cwd: string, remote: string, rev: string): Promise<OutgoingMarkers[]>;
   /**
    * BS5: the merge commit that brought `base` into `head` — the oldest merge on the ancestry path
    * `base..head` — or null when there is none (`base` not merged, or reached without a merge).

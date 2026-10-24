@@ -19,7 +19,7 @@ import {
   type NumberedReceipt,
   openNotes,
   RECENT_MS,
-  readyHeadSha,
+  readyApproval,
   type RunFacts,
   sliceWorktreePath,
   startCommandFor,
@@ -270,14 +270,15 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   );
   // F35/C5: the ready approval's head, voided by a later re-entry; and whether only norn moved the PR head since
   const readyHeads = await Promise.all(
-    snap.stories.map(async (story): Promise<{ ready_head_sha?: string; ready_head_norn?: string }> => {
+    snap.stories.map(async (story): Promise<{ ready_head_sha?: string; ready_approved_at?: string; ready_head_norn?: string }> => {
       const wf = story.units[0]?.workflow?.workflow;
       const receipts = story.units[0]?.receipts;
-      const sha = wf && receipts ? readyHeadSha(wf, receipts) : undefined;
-      if (!sha) return {};
+      const ready = wf && receipts ? readyApproval(wf, receipts) : undefined;
+      if (!ready) return {};
+      const sha = ready.sha;
       const prHead = prSeen[story.key]?.pr?.head_sha;
       const norn = !!prHead && prHead !== sha && (await onlyNornCommitsSince(opts.repoRoot, sha, prHead, story.key).catch(() => false));
-      return { ready_head_sha: sha, ...(norn ? { ready_head_norn: prHead } : {}) };
+      return { ready_head_sha: sha, ready_approved_at: ready.at, ...(norn ? { ready_head_norn: prHead } : {}) };
     }),
   );
   const runs: RunView[] = [];

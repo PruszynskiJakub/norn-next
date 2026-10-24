@@ -206,6 +206,47 @@ describe("base sync with real git", () => {
   }, 60_000);
 });
 
+describe("BS3.3a (dogfood D4): a person's push to the branch of a $done story", () => {
+  let h: Harness;
+  const wt = () => `${h.root}-worktrees/gh-13-take-person-pushes`;
+  const runs = () => join(wt(), ".agents/specs/gh-13-take-person-pushes/runs/_story");
+  const until = async (pred: () => boolean, label: string) => {
+    const seen: string[] = [];
+    for (let i = 0; i < 20 && !pred(); i++) {
+      h.clock.advance(10_000);
+      seen.push(...kinds(await h.tick()));
+    }
+    if (!pred()) throw new Error(`${label} not reached: ${JSON.stringify(h.state(runs()))}\n${seen.join("\n")}`);
+    return seen;
+  };
+
+  beforeAll(async () => {
+    h = await createHarness();
+    h.write(join(h.root, ".agents/norn/config.yaml"), config());
+    h.write(join(h.root, ".agents/norn/workflows/based.yaml"), BASED);
+    h.git(["add", "-A"]);
+    h.git(["commit", "-q", "-m", "norn init"]);
+    h.git(["push", "-q", "origin", "main"]);
+    h.remote.issues = [issue(13, "Take person pushes")];
+  });
+  afterAll(() => h.cleanup());
+
+  test("norn's next commit merges it in (never rebases) and pushes; norn update does not end stuck diverged", async () => {
+    await until(() => h.state(runs())?.step === "ready" && h.state(runs())?.status === "parked", "ready");
+    expect((await h.norn("approve", "gh-13")).exit).toBe(0);
+    await until(() => h.state(runs())?.status === "done", "done");
+    const person = siblingMerge(h, "README.md", "a line from a person\n", "gh-13-take-person-pushes");
+    expect((await h.norn("update", "gh-13")).exit).toBe(0);
+    const seen = await until(() => h.state(runs())?.step === "ready" && h.state(runs())?.status === "parked", "ready again");
+    expect(seen.filter((k) => k.includes("FAILED"))).toEqual([]);
+    const head = h.git(["rev-parse", "HEAD"], wt());
+    expect(h.git(["merge-base", "--is-ancestor", person, head], wt())).toBe("");
+    expect(h.git(["log", "--format=%s", "-n", "20"], wt())).toContain("Merge origin/gh-13-take-person-pushes into gh-13-take-person-pushes");
+    expect(h.git(["ls-remote", "origin", "refs/heads/gh-13-take-person-pushes"]).split("\t")[0]).toBe(head);
+    expect(readFileSync(join(wt(), "README.md"), "utf8")).toBe("a line from a person\n");
+  }, 60_000);
+});
+
 describe("base_branch: develop (BS0, 7b)", () => {
   let h: Harness;
   beforeAll(async () => {
@@ -414,6 +455,18 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
     expect(h.git(["ls-remote", "origin", "refs/heads/gh-11-merge-safely"]).split("\t")[0]).toBe(pushed);
     expect(h.git(["log", "--format=%H", "--grep", "<<<<<<<", "--all"])).toBe("");
 
+    // BS5.1 (dogfood D3): answered, the agent's next command mid-merge hits a second prompt — the
+    // deferred commit does not starve the unit: it parks on the new prompt (an Answer item again)
+    expect((await h.norn("answer", "gh-11", "1")).exit).toBe(0);
+    h.clock.advance(10_000);
+    expect(kinds(await h.tick())).toEqual(["gh-11 receipts.apply"]);
+    expect(h.state(runs())?.status).toBe("running");
+    h.clock.advance(10_000);
+    expect(kinds(await h.tick())).toEqual(["gh-11 agent.ask.implicit"]);
+    expect(h.state(runs())).toMatchObject({ status: "parked", park: { kind: "ask" } });
+    expect(((await h.norn("inbox")).value as { groups: Record<string, Array<{ id: string }>> }).groups.answer).toHaveLength(1);
+    expect(h.git(["rev-parse", "HEAD"], wt())).toBe(before);
+
     // done mid-merge → refused, nothing written
     const mid = await inWt("done", "done", "--handoff", "merged main");
     expect(mid.exit).toBe(3);
@@ -427,6 +480,18 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
     expect(String((marked.value as { error: unknown }).error)).toContain("conflict markers left after merging");
     // fixed in a follow-up commit → accepted, the merge commit recorded
     const merge = h.git(["rev-parse", "HEAD"], wt());
+    // BS5.2 (dogfood D5): norn's owed commit is clean, but pushing it would publish the agent's merge
+    // commit with markers — the push is held: ok:false, an Unblock item naming file and commit
+    expect((await h.norn("answer", "gh-11", "1")).exit).toBe(0);
+    h.runner.pane = { alive: true, state: "working", since: null };
+    h.clock.advance(10_000);
+    const held = await h.tick();
+    expect(kinds(held)).toEqual([expect.stringMatching(/^gh-11 receipts\.apply FAILED .*held: conflict markers in a\.txt \(commit [0-9a-f]{12}\)/)]);
+    expect(kinds(held)[0]).toContain(`(commit ${merge.slice(0, 12)})`);
+    expect(h.git(["rev-parse", "HEAD~1"], wt())).toBe(merge);
+    expect(h.git(["ls-remote", "origin", "refs/heads/gh-11-merge-safely"]).split("\t")[0]).toBe(pushed);
+    const unblock = ((await h.norn("inbox")).value as { groups: Record<string, Array<{ title: string }>> }).groups.unblock ?? [];
+    expect(unblock.map((i) => i.title)).toEqual([expect.stringContaining(`conflict markers in a.txt (commit ${merge.slice(0, 12)})`)]);
     writeFileSync(join(wt(), "a.txt"), "story side\nbase side\n");
     h.git(["commit", "-q", "-am", "resolve a.txt"], wt());
     const head = h.git(["rev-parse", "HEAD"], wt());

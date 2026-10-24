@@ -418,6 +418,9 @@ function importMailbox(ctx: Ctx, story: StoryFacts): void {
 const nextReceiptNumber = (uf: UnitFacts): number =>
   Math.max(uf.state?.applied_through ?? 0, ...uf.unapplied.map((r) => r.n), uf.last_check?.n ?? 0, uf.last_findings?.n ?? 0) + 1;
 
+/** H1: a merge, rebase, cherry-pick or revert (or unmerged paths) in progress in the unit's worktree. */
+const gitBusy = (uf: UnitFacts): boolean => !!uf.worktree?.in_progress && (!!uf.worktree.in_progress.operation || uf.worktree.in_progress.unmerged.length > 0);
+
 function unitWorktree(story: StoryFacts, uf: UnitFacts): string | null {
   const wt = uf.worktree ?? (uf.unit.slice === null ? story.worktree : null);
   return wt?.exists ? wt.path : null;
@@ -477,7 +480,10 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
     const reason = drift ?? gone;
     if (reason) return park(ctx, story, uf, st, "workflow", reason, "workflow.drift");
   }
-  if (uf.uncommitted) {
+  // BS5.1 (H1, dogfood D3): while a git operation is in progress in the worktree (an agent's merge)
+  // the owed commit cannot happen — act would only defer it — so it never takes the unit's action:
+  // liveness, implicit asks and deadlines are still decided below; the commit follows the merge
+  if (uf.uncommitted && !gitBusy(uf)) {
     const commit = commitFor(ctx, story, uf, `norn: ${ref.key} ${st.step} (recovered commit)`, st.step);
     if (commit) return ctx.emit({ kind: "commit_push", unit: ref, rule: "recover.commit", commit });
   }
