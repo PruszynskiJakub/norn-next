@@ -26,14 +26,27 @@ export function ensureGitignore(root: string): string[] {
   return missing;
 }
 
+/**
+ * R8.1: installed hooks run `$NORN_BIN` when set — the norn that launched the agent (act exports
+ * it) — else the `norn` on PATH. Hooks run through `sh -c`, which expands it.
+ */
+export const DEFAULT_HOOK_COMMAND = '"${NORN_BIN:-norn}" hook';
+
 export function hookCommand(ctx: Context, flag?: string): string {
-  return flag ?? ctx.env.NORN_HOOK_COMMAND ?? "norn hook";
+  return flag ?? ctx.env.NORN_HOOK_COMMAND ?? DEFAULT_HOOK_COMMAND;
+}
+
+/** The binary a hook command runs, as the shell would pick it (`"${NORN_BIN:-norn}"` → NORN_BIN or norn). */
+export function hookBinary(command: string, env: Record<string, string | undefined>): string {
+  const first = command.trim().split(/\s+/)[0] ?? "";
+  const m = /^"?\$\{NORN_BIN:-([^}]+)\}"?$/.exec(first);
+  return m ? env.NORN_BIN || (m[1] as string) : first;
 }
 
 export const initCommand = defineCommand({
   name: "init",
   summary: "Set up norn in this repository: config, workflows, skills, hooks (A1, SK1, W1)",
-  usage: "norn init [--hook-command 'norn hook'] [--skills repo|user]",
+  usage: "norn init [--hook-command <cmd>] [--skills repo|user]",
   options: { "hook-command": { type: "string" }, skills: { type: "string" } },
   async run(ctx, args) {
     const root = ctx.root;

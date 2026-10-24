@@ -221,6 +221,9 @@ describe("norn doctor (A7)", () => {
     expect(v.agents[0]).toMatchObject({ name: "claude", tier: "blocking", hooks_installed: true, binary: { command: "claude" }, hook_fires: { ok: true, recorded: 1 } });
     expect(v.remote).toEqual({ ok: true, provider: "gh", user: "tester" });
     expect(v.runner).toMatchObject({ ok: true, available: true });
+    // R8.2: `command -v norn` in a throwaway runner session resolves to this norn's shim
+    const shim = join(h.home, "bin", "norn");
+    expect(v.runner).toMatchObject({ norn_on_path: { ok: true, expected: shim, resolved: shim } });
     // R7.3: the harness names its machine with NORN_MACHINE — a test aid doctor warns about
     expect(r.value).toMatchObject({ machine: { holder: "tester@box", override: "box" }, warnings: [expect.stringContaining("NORN_MACHINE=box")] });
   });

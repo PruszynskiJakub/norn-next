@@ -212,6 +212,13 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
       if (edgeOf(wf, st.step, "ask")) return take(st, "ask", r, ctx, lastOutcome("ask"));
       const parked = park(st, "ask", r.question, r.at, "parked", r.receipt_id);
       if (r.command && parked.park) parked.park.command = r.command;
+      if (r.implicit && parked.park) {
+        // R6.1/R6.2: what the tick needs to resolve the implicit ask or type an answer into the prompt
+        parked.park.implicit = r.choice || r.screen ? "pane" : "hook";
+        if (r.options?.length) parked.park.options = r.options;
+        if (r.choice) parked.park.choice = r.choice;
+        if (r.screen) parked.park.screen = r.screen;
+      }
       return {
         state: { ...parked, last_outcome: lastOutcome("ask") },
         log: `${st.step}#${st.attempt} asks: ${r.question}`,
@@ -230,6 +237,8 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
       if (st.status !== "parked" || st.park?.kind !== "ask")
         return { reject: st.park?.kind === "gate" ? "gate needs approve or reject" : "unit is not waiting for an answer" };
       const resumed: UnitState = { ...st, park: null };
+      // R6.1: the agent moved on by itself; R6.2: `norn answer` already typed it — nothing to deliver
+      if ((r.by === "agent" || r.delivered) && st.run) return { state: { ...resumed, status: "running" }, log: `answered: ${r.answer}` };
       // B2: same session while it lives; manual runs get the answer from the person; else fresh session from the handoff
       if (st.run?.session)
         return { state: { ...resumed, status: "running" }, log: `answered: ${r.answer}`, deliver: r.answer };

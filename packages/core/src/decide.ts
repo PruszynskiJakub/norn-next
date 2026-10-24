@@ -36,6 +36,7 @@ import { AUTO_PROMPT, NUDGE_TEXT, sliceWorktreePath, storyWorktreePath } from ".
 import type { Facts, NumberedReceipt, RunFacts, SliceFileFacts, StoryFacts, UnitFacts, UnitRef } from "./facts.ts";
 import { sha256 } from "./hash.ts";
 import { bodyChangedItem, effectiveMode, storyFinished, unitInboxItem } from "./inbox.ts";
+import { promptKeys } from "./prompt.ts";
 import type { InboxItem, RemoteIssue, RunnerCapabilities, SessionRef } from "./ports.ts";
 import { epoch, iso } from "./time.ts";
 import { checkWorkflowLevel, stepOf, type UnitLevel, type WorkflowIssue } from "./workflow.ts";
@@ -483,9 +484,13 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
       return ctx.noop(ref, ref.slice ? "slice.done" : "story.wait_merge", ref.slice ? "integrated" : "workflow done; waiting for the PR merge (GR6)");
     case "stuck":
       return ctx.noop(ref, "unit.stuck", `stuck: ${st.park?.reason ?? "?"} — norn unstick ${ref.key}`);
-    case "parked":
+    case "parked": {
+      // R6.1 (H3, A14): an implicit ask a later fact shows the agent has moved past resolves itself
+      const moved = implicitAskResolved(st, uf);
+      if (moved) return resolveImplicitAsk(ctx, story, uf, st, wf, moved);
       // T6: parked keeps the claim; C3: a restart never answers
       return ctx.noop(ref, `unit.parked.${st.park?.kind ?? "?"}`, st.park?.reason ?? "parked");
+    }
   }
 
   const step = stepOf(wf, st.step);
@@ -523,7 +528,11 @@ function applyAction(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
     // lives there); R4.1: typing needs a runner that can `send`
     const foreign = foreignRun(ctx, run);
     const caps = runnerCaps(ctx);
-    if (!foreign && caps.send && run.session.runner !== "headless" && !gone) input = { run_id: run.run_id, session: sessionRef(run), text: res.deliver };
+    if (!foreign && caps.send && run.session.runner !== "headless" && !gone) {
+      input = { run_id: run.run_id, session: sessionRef(run), text: res.deliver };
+      // R6.2: an implicit pane prompt takes keystrokes (option number / arrows + enter), not a pasted prompt
+      if (st.park?.kind === "ask" && st.park.implicit === "pane") input.keys = promptKeys(st.park, res.deliver).keys;
+    }
     else {
       const step = stepOf(wf, res.state.step);
       const resumeId = foreign ? undefined : resumeIdOf(run, rf);
@@ -755,16 +764,19 @@ function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
     const turnEnded =
       (lastHook && (lastHook.event === "turn_end" || lastHook.event === "session_end") && hookAt > touched) ||
       ((rf.pane?.state === "idle" || rf.pane?.state === "done") && (rf.pane.since ?? 0) > touched);
-    if (waiting) {
-      const question = rf.pane?.detail ?? lastHook?.message ?? "the agent is waiting for input (permission prompt?)";
-      return implicitAsk(ctx, story, uf, st, wf, question, lastHook?.command);
-    }
+    if (waiting) return implicitAsk(ctx, story, uf, st, wf, rf, lastHook);
+    // R9.1 (M6, A11): the agent session started but never took its launch prompt
+    const launch = launchPromptCheck(ctx, story, uf, st, rf);
+    if (launch === "acted") return;
+    if (launch) [outcome, rule, detail] = launch;
     // the deadline runs from the run's start, not the last state write; after a timeout nudge the
     // agent gets the stalled window before the next one (otherwise every tick would nudge again)
     const started = epoch(run.started_at);
     const lastTimeout = st.last_outcome?.outcome === "timeout" && st.last_outcome.step === st.step && epoch(st.last_outcome.at) >= started ? epoch(st.last_outcome.at) : null;
     const overdue = now - started > deadline && (lastTimeout === null || now - lastTimeout > stalledMs);
-    if (overdue) [outcome, rule, detail] = ["timeout", "agent.timeout", `deadline ${step.deadline ?? ctx.config.limits.deadline} passed`];
+    if (outcome) {
+      // R9.1 classified it
+    } else if (overdue) [outcome, rule, detail] = ["timeout", "agent.timeout", `deadline ${step.deadline ?? ctx.config.limits.deadline} passed`];
     else if (turnEnded) [outcome, rule, detail] = ["silent", "agent.silent", "turn ended without a receipt"];
     else if (now - Math.max(rf.last_activity_at ?? 0, touched) > stalledMs) [outcome, rule, detail] = ["stalled", "agent.stalled", `no activity for ${ctx.config.limits.stalled}`];
   }
@@ -927,7 +939,16 @@ function launchUnknown(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState
   routeOutcome(ctx, story, uf, st, wf, step, { outcome: "died", rule: "agent.died.launch_unknown", detail: "launch unknown: no session, process or hook activity found for the run (R5.2)" }, uf.unapplied);
 }
 
-function implicitAsk(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, question: string, command?: string): void {
+/**
+ * §10 implicit ask: the agent waits on a prompt (pane `waiting_input`, or a permission hook). L1 (A7):
+ * the question is the prompt's question block and the command its first line; the full screen goes
+ * to `screen` (inbox --details, why). R6.2: the parsed options and how one is chosen go with it.
+ */
+function implicitAsk(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, rf: RunFacts, lastHook: RunFacts["hooks"][number] | undefined): void {
+  const pane = rf.pane?.state === "waiting_input" ? rf.pane : null;
+  const prompt = pane?.prompt;
+  const question = prompt?.question || (pane ? "the agent waits for input in its pane" : null) || lastHook?.message || "the agent is waiting for input (permission prompt?)";
+  const command = prompt?.command ?? firstLine(lastHook?.command);
   const n = nextReceiptNumber(uf);
   const receipt: ReceiptOf<"ask"> = {
     kind: "ask",
@@ -943,19 +964,116 @@ function implicitAsk(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
     implicit: true,
   };
   if (command) receipt.command = command;
+  if (prompt?.options.length) receipt.options = prompt.options;
+  if (prompt?.choice) receipt.choice = prompt.choice;
+  if (pane?.detail) receipt.screen = pane.detail;
   const res = applyReceipts(st, [{ n, file: "", receipt }], applyCtx(ctx, wf));
   const parkInfo = res.state.park ?? { kind: "ask" as const, reason: question, since: ctx.nowIso };
-  const notify = unitItem(ctx, story, uf, res.state);
   ctx.emit({
     kind: "park",
     unit: uf.unit,
     rule: "agent.ask.implicit",
     park: parkInfo,
-    notify: notify && command ? { ...notify, detail: `pending command: ${command}` } : notify,
+    notify: unitItem(ctx, story, uf, res.state),
     receipts: [{ n, receipt }],
     state: res.state,
     commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${st.step} waits for input`, st.step),
   });
+}
+
+const firstLine = (text: string | undefined): string | undefined => text?.split("\n").map((l) => l.trim()).find((l) => l !== "");
+
+/** Hook events that are the agent waiting, not moving on (R6.1). */
+const WAITING_EVENTS = new Set(["waiting_input", "permission_prompt"]);
+
+/**
+ * R6.1: why an implicit ask is over, or null: the pane that raised it no longer waits for input, a
+ * newer hook event for the run arrived (not another wait), or — handled by the agent verbs — the
+ * agent reported. Explicit asks (`norn ask`) are never resolved by facts.
+ */
+function implicitAskResolved(st: UnitState, uf: UnitFacts): string | null {
+  const park = st.park;
+  const rf = uf.run;
+  if (park?.kind !== "ask" || !park.implicit || !st.run || rf?.run_id !== st.run.run_id) return null;
+  const since = epoch(park.since);
+  const pane = rf.pane;
+  if (park.implicit === "pane" && pane?.alive && pane.state !== "waiting_input" && pane.state !== "unknown") return `the pane no longer waits for input (${pane.state})`;
+  const hook = rf.hooks.find((h) => epoch(h.at) > since && !WAITING_EVENTS.has(h.event));
+  return hook ? `hook ${hook.native} at ${hook.at}` : null;
+}
+
+/** R6.1: write the `answer` receipt (`by: "agent"`) that ends an implicit ask; the run goes on, nothing is typed. */
+function resolveImplicitAsk(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, why: string): void {
+  const run = st.run as NonNullable<UnitState["run"]>;
+  const n = nextReceiptNumber(uf);
+  const answer: ReceiptOf<"answer"> = {
+    kind: "answer",
+    receipt_id: ctx.id(),
+    run_id: run.run_id,
+    step: st.step,
+    attempt: st.attempt,
+    at: ctx.nowIso,
+    by: "agent",
+    who: run.agent ?? ctx.config.default_agent,
+    tick_id: ctx.facts.tick_id,
+    answer: `the agent moved on: ${why}`,
+  };
+  if (st.park?.receipt_id) answer.ask_receipt_id = st.park.receipt_id;
+  if (uf.unit.slice) answer.slice = uf.unit.slice;
+  const res = applyReceipts(st, [{ n, file: "", receipt: answer }], applyCtx(ctx, wf));
+  ctx.emit({
+    kind: "apply_receipts",
+    unit: uf.unit,
+    rule: "agent.ask.implicit.resolved",
+    applied: res.applied,
+    rejected: res.rejected,
+    advance: res.advance,
+    input: null,
+    launch: null,
+    kill: null,
+    receipts: [{ n, receipt: answer }],
+    state: res.state,
+    commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${st.step} moved on (${why})`, st.step),
+  });
+}
+
+/** R9.1: how long a started session may go without taking its launch prompt, before a re-send and again before `silent`. */
+export const LAUNCH_PROMPT_MS = 60_000;
+
+/**
+ * R9.1 (M6, A11): the run's newest `session_start` hook has no turn after it. After 60 s the launch
+ * prompt is typed again, once per run (a `nudge` that is not counted: it changes only
+ * `run.prompt_resent_at`); 60 s after that re-send the run is `silent` ("launch prompt not
+ * received"). Only for local sessions of a runner that can type (R4.1); otherwise the usual rules.
+ */
+function launchPromptCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, rf: RunFacts): "acted" | [string, string, string] | null {
+  const run = st.run as NonNullable<UnitState["run"]>;
+  const startIdx = rf.hooks.findLastIndex((h) => h.event === "session_start");
+  if (startIdx < 0 || rf.hooks.slice(startIdx + 1).some((h) => h.event !== "session_start")) return null;
+  if (!run.session || foreignRun(ctx, run) || run.session.runner !== ctx.facts.machine.runner || !runnerCaps(ctx).send) return null;
+  const startedAt = epoch((rf.hooks[startIdx] as RunFacts["hooks"][number]).at);
+  const now = ctx.facts.now;
+  if (!run.prompt_resent_at) {
+    if (now - startedAt < LAUNCH_PROMPT_MS) return null;
+    const state: UnitState = { ...st, run: { ...run, prompt_resent_at: ctx.nowIso }, last_tick_id: ctx.facts.tick_id };
+    ctx.emit({
+      kind: "nudge",
+      unit: uf.unit,
+      rule: "agent.launch_prompt.resend",
+      input: { run_id: run.run_id, session: sessionRef(run), text: AUTO_PROMPT },
+      launch: null,
+      kill: null,
+      snapshot: null,
+      receipts: [],
+      state,
+      commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${st.step} launch prompt re-sent (run ${run.run_id})`, st.step),
+    });
+    return "acted";
+  }
+  const resent = epoch(run.prompt_resent_at);
+  // measured from the re-send, or from the last classification (its nudge), so it fires once per 60 s
+  if (resent < startedAt || now - Math.max(resent, epoch(st.updated_at)) < LAUNCH_PROMPT_MS) return null;
+  return ["silent", "agent.silent.launch_prompt", "launch prompt not received"];
 }
 
 // ---------------------------------------------------------------- check / git

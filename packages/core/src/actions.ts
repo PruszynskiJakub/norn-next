@@ -30,7 +30,7 @@ import type {
   UnitState,
 } from "@norn/schema";
 import type { FileError, UnitRef } from "./facts.ts";
-import type { InboxItem, RemoteIssue, SessionRef } from "./ports.ts";
+import type { InboxItem, PromptKey, RemoteIssue, SessionRef } from "./ports.ts";
 
 /** A receipt decide wants written, with its number (S6). */
 export interface NewReceipt {
@@ -87,6 +87,12 @@ export interface SessionInput {
   run_id: string;
   session: SessionRef;
   text: string;
+  /**
+   * R6.2: an answer to an implicit pane prompt goes in as these keystrokes (option number + enter,
+   * arrows + enter, or text + enter), never as a pasted prompt. Act delivers them before writing
+   * state: a failed delivery leaves the unit parked (R6.3).
+   */
+  keys?: PromptKey[];
 }
 
 export interface WorktreeSpec {

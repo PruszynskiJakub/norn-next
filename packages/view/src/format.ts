@@ -94,8 +94,8 @@ export function formatStatus(view: ProjectView): string {
   return `${out.join("\n").trimEnd()}\n`;
 }
 
-/** `norn inbox` human mode: groups in O1 order, each item with reason, age and command. */
-export function formatInbox(view: ProjectView): string {
+/** `norn inbox` human mode: groups in O1 order, each item with reason, age and command; `details` adds full texts (L1). */
+export function formatInbox(view: ProjectView, opts: { details?: boolean } = {}): string {
   const out: string[] = [];
   for (const g of INBOX_GROUPS) {
     const items = view.inbox.groups[g];
@@ -105,6 +105,7 @@ export function formatInbox(view: ProjectView): string {
       const unit = it.slice ?? it.story;
       out.push(`  ${unit.padEnd(10)} ${it.step ? `${it.step}: ` : ""}${it.title} · ${it.age}`);
       if (it.detail) out.push(`      ${it.detail}`);
+      if (opts.details && it.full) out.push(...it.full.split("\n").map((l) => `      | ${l}`));
       out.push(`      $ ${it.command}`);
     }
     out.push("");

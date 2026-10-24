@@ -9,7 +9,7 @@ import { setDefaultTimeout } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import type { Clock, InboxItem, LaunchSpec, NotifierPort, PaneState, RemoteIssue, RemotePort, RemotePullRequest, RunnerCapabilities, RunnerPort, RunnerSessionInfo, SessionRef } from "@norn/core";
+import type { Clock, InboxItem, LaunchSpec, NotifierPort, PaneState, PromptKey, RemoteIssue, RemotePort, RemotePullRequest, RunnerCapabilities, RunnerPort, RunnerSessionInfo, SessionRef } from "@norn/core";
 import { type Receipt, type UnitState, ulid } from "@norn/schema";
 import { appendReceipt, readState } from "@norn/store";
 import { type CliDeps, type CliResult, runCli, type TickReport } from "../src/index.ts";
@@ -75,13 +75,25 @@ export class FakeRunner implements RunnerPort {
   async available() {
     return true;
   }
+  /** R6.2: keystrokes typed into prompts; `keysError` set → `sendKeys` throws it (R6.3) */
+  keyed: Array<{ session: SessionRef; keys: PromptKey[] }> = [];
+  keysError: Error | null = null;
   async launch(spec: LaunchSpec): Promise<SessionRef> {
-    this.launches.push(spec);
+    // R8.2: doctor's throwaway session really runs its command (a pane would)
+    if (spec.title === "norn doctor") Bun.spawnSync(spec.argv, { cwd: spec.cwd, env: { ...process.env, ...spec.env } });
+    else this.launches.push(spec);
     return { runner: this.name, session_id: `s-${this.launches.length}`, pane_id: `p-${this.launches.length}` };
   }
   async send(session: SessionRef, text: string) {
     if (this.sendError) throw this.sendError;
     this.sent.push({ session, text });
+  }
+  async sendKeys(session: SessionRef, keys: PromptKey[]) {
+    if (this.keysError) throw this.keysError;
+    this.keyed.push({ session, keys });
+  }
+  reach(session: SessionRef) {
+    return `fake attach ${session.pane_id ?? session.session_id}`;
   }
   async findSessions() {
     return this.found;

@@ -287,6 +287,27 @@
         },
         "command": {
           "type": "string"
+        },
+        "choice": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "numbered",
+            "cursor"
+          ],
+          "properties": {
+            "numbered": {
+              "type": "boolean"
+            },
+            "cursor": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        },
+        "screen": {
+          "minLength": 1,
+          "type": "string"
         }
       }
     },
@@ -498,6 +519,9 @@
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
           "description": "ULID (ID2)",
           "type": "string"
+        },
+        "delivered": {
+          "type": "boolean"
         }
       }
     },
@@ -1223,6 +1247,10 @@
               "type": "string"
             },
             "pane_id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "reach": {
               "minLength": 1,
               "type": "string"
             }

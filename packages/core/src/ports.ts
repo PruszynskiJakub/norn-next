@@ -12,6 +12,7 @@ import type {
   HookFact,
   NotifierConfig,
   ProcessIdentity,
+  PromptChoice,
   RemoteProvider,
   ResolvedConfig,
   RunnerConfig,
@@ -228,9 +229,26 @@ export interface PaneState {
   state: "working" | "idle" | "waiting_input" | "done" | "unknown";
   /** ms epoch of the last state change, if known */
   since: number | null;
-  /** e.g. visible permission prompt text */
+  /** e.g. visible permission prompt text (the full screen) */
   detail?: string;
+  /** R6.2 / L1: the prompt the agent waits on, as the runner parsed it from `detail`; absent = not recognized */
+  prompt?: PanePrompt;
 }
+
+/**
+ * R6.2, L1 (A4, A7): a prompt read off the pane — a permission or trust dialog. `question` is the
+ * question block alone (no code, no footer); `command` the first line of the pending command, if
+ * shown; `options` the choices in display order; `choice` how one is picked (number or arrows).
+ */
+export interface PanePrompt {
+  question: string;
+  command?: string;
+  options: string[];
+  choice: PromptChoice | null;
+}
+
+/** R6.2: keystrokes for a prompt: literal text, or a named key (`enter`, `down`, `up`, `esc`). */
+export type PromptKey = { text: string } | { key: "enter" | "down" | "up" | "esc" };
 
 /**
  * R4.1: what a runner can do with a session besides launching it. `send`: type into a live session
@@ -257,6 +275,13 @@ export interface RunnerPort {
   launch(spec: LaunchSpec): Promise<SessionRef>;
   /** Type text into the session; `submit` presses enter. */
   send(session: SessionRef, text: string, opts?: { submit?: boolean }): Promise<void>;
+  /**
+   * R6.2: press keys in the session as they are — for a prompt the agent is blocked on (a choice
+   * menu takes no pasted prompt). Optional: runners without it cannot answer pane prompts.
+   */
+  sendKeys?(session: SessionRef, keys: PromptKey[]): Promise<void>;
+  /** R6.3, R9.1: the command a person runs to reach the session (e.g. attach to the pane); absent = none */
+  reach?(session: SessionRef): string;
   paneState(session: SessionRef): Promise<PaneState>;
   isAlive(session: SessionRef): Promise<boolean>;
   kill(session: SessionRef): Promise<void>;
@@ -350,6 +375,8 @@ export interface InboxItem {
   detail?: string;
   /** exact command that resolves it, e.g. `norn answer gh-123/03 "..."` */
   command: string;
+  /** L1: long text behind the item (an implicit ask's full pane screen) — shown only on request (`inbox --details`) */
+  full?: string;
   since: string;
   url?: string;
 }

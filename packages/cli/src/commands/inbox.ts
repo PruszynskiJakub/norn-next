@@ -2,6 +2,7 @@
  * `norn inbox [--text]` (O1): what needs a person, grouped by action — Your turn, Answer,
  * Approve, Unblock, Check, Unclaimed, Running, Recently done — each item with its reason, age and
  * the exact command that resolves it. Read only via @norn/view (X1); JSON unless `--text`.
+ * `--details` adds each item's full text (L1: an implicit ask's whole pane screen).
  *
  * `norn inbox --history [--since <iso|duration>]` (O1, O4): every item that needed a person, with
  * appeared_at / resolved_at / resolved_by, paired from the inbox changes each tick records.
@@ -37,8 +38,8 @@ function formatHistory(items: readonly InboxHistoryItem[]): string {
 export const inboxCommand = defineCommand({
   name: "inbox",
   summary: "What needs you, grouped by action, with the command to resolve each item; --history for when items came and went (O1)",
-  usage: "norn inbox [--text] [--history [--since <iso|duration>]]",
-  options: { text: { type: "boolean" }, history: { type: "boolean" }, since: { type: "string" } },
+  usage: "norn inbox [--text] [--details] [--history [--since <iso|duration>]]",
+  options: { text: { type: "boolean" }, details: { type: "boolean" }, history: { type: "boolean" }, since: { type: "string" } },
   async run(ctx, args) {
     if (opt.bool(args, "history")) {
       const since = sinceOf(opt.str(args, "since"), ctx.clock.now());
@@ -48,7 +49,11 @@ export const inboxCommand = defineCommand({
     }
     if (opt.str(args, "since") !== undefined) throw usageError("--since goes with --history", "norn inbox --history --since 1d");
     const view = await projectView(ctx);
-    if (opt.bool(args, "text")) return textOutput(formatInbox(view));
-    return view.inbox;
+    const details = opt.bool(args, "details");
+    if (opt.bool(args, "text")) return textOutput(formatInbox(view, { details }));
+    if (details) return view.inbox;
+    // L1 (A7): an item's full text (an implicit ask's pane screen) only with --details
+    const groups = Object.fromEntries(Object.entries(view.inbox.groups).map(([g, items]) => [g, items.map(({ full: _full, ...it }) => it)]));
+    return { ...view.inbox, groups };
   },
 });

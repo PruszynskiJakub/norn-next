@@ -12,7 +12,10 @@
  * - send       → `herdr agent prompt <pane> <text>`          (submit; bracketed paste + enter)
  *                fallback when no agent is recognized: `pane send-text` + `pane send-keys enter`
  *                without submit: `herdr pane send-text <pane> <text>`
- * - paneState  → `herdr pane get <pane>` (+ `pane read --source visible` when blocked)
+ * - paneState  → `herdr pane get <pane>` (+ `pane read --source visible` when blocked; the prompt
+ *                parsed from it, R6.2)
+ * - sendKeys   → `herdr pane send-text <pane> <text>` / `herdr pane send-keys <pane> <key>…` (R6.2)
+ * - reach      → `herdr agent attach <pane>`                 (the command a person runs, R6.3)
  * - isAlive    → agent pid + start time if recorded, else `pane process-info` (foreground != shell)
  * - kill       → `herdr pane close <pane>` (pane_not_found = already gone)
  * - findSessions → `herdr pane list`                         (agent panes whose cwd is the worktree, R5.1)
@@ -29,6 +32,7 @@ import type { ProcessIdentity, RunnerConfig } from "@norn/schema";
 import { createProcessPort } from "../process/index.ts";
 import { portError } from "../process/error.ts";
 import { type Exec, bunExec, shellJoin } from "../process/exec.ts";
+import { parsePanePrompt } from "./prompt.ts";
 
 export const RUNNER_NAME = "herdr";
 
@@ -196,10 +200,39 @@ export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
       const state = STATE_MAP[info?.agent_status ?? "unknown"] ?? "unknown";
       const result: PaneState = { alive, state, since: null };
       if (state === "waiting_input") {
-        const screen = await herdr(["pane", "read", pane, "--source", "visible", "--lines", "15"]).catch(() => null);
-        if (typeof screen === "string" && screen.trim() !== "") result.detail = screen.trim();
+        const screen = await herdr(["pane", "read", pane, "--source", "visible", "--lines", "30"]).catch(() => null);
+        if (typeof screen === "string" && screen.trim() !== "") {
+          result.detail = screen.trim();
+          // R6.2, L1: the question, options and pending command, read off the screen
+          const prompt = parsePanePrompt(screen);
+          if (prompt) result.prompt = prompt;
+        }
       }
       return result;
+    },
+
+    async sendKeys(session, keys) {
+      // R6.2: raw keystrokes into the pane — a blocked agent takes no `agent prompt`; runs of named
+      // keys go in one `send-keys`
+      const pane = paneOf(session);
+      let named: string[] = [];
+      const flush = async () => {
+        if (named.length) await herdr(["pane", "send-keys", pane, ...named]);
+        named = [];
+      };
+      for (const k of keys) {
+        if ("key" in k) named.push(k.key);
+        else {
+          await flush();
+          await herdr(["pane", "send-text", pane, k.text]);
+        }
+      }
+      await flush();
+    },
+
+    reach(session) {
+      // R6.3, R9.1: what a person runs to look at (and type into) the agent's pane
+      return shellJoin([...base, "agent", "attach", paneOf(session)]);
     },
 
     async isAlive(session) {
@@ -289,3 +322,4 @@ export async function openStatusPane(cwd: string, opts: StatusPaneOptions = {}):
   await herdr(["pane", "run", paneId, shellJoin(argv)]);
   return { pane_id: paneId };
 }
+export { parsePanePrompt } from "./prompt.ts";
