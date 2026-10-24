@@ -9,6 +9,7 @@ import {
   TaggedUnion,
   Target,
 } from "./common.ts";
+import { Verdict } from "./criteria.ts";
 
 /** Full outcome edge: `{ to, counter?, means? }` (W3, W4). */
 export const OutcomeEdge = Type.Object(
@@ -16,6 +17,8 @@ export const OutcomeEdge = Type.Object(
     to: Target,
     counter: Type.Optional(CounterName),
     means: Type.Optional(Type.String({ minLength: 1, description: "Shown to the agent in the brief (B3)" })),
+    /** QV5: reportable only when the worst verdict of the `--criteria` report is this one (agent steps) */
+    verdict: Type.Optional(Verdict),
   },
   { additionalProperties: false },
 );
@@ -72,6 +75,8 @@ export const AgentStep = Type.Object(
     deadline: Type.Optional(Duration),
     nudges: Type.Optional(Type.Integer({ minimum: 0, description: "Max nudges in the same session (C1)" })),
     retries: Type.Optional(Type.Integer({ minimum: 0, description: "Max fresh-session retries after died (C1)" })),
+    /** QV3: `required` makes `norn done --criteria <file>` mandatory */
+    criteria: Type.Optional(Type.Literal("required")),
     /**
      * Declared outcomes. May also override classified routes by naming
      * `silent`, `died`, `timeout`, `stalled`, `ask`, `stuck` (C1).

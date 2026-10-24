@@ -5,6 +5,7 @@
 import {
   type AgentStep,
   type CheckReceipt,
+  type CriterionVerdict,
   type DoneReceipt,
   type Finding,
   type Mode,
@@ -91,6 +92,8 @@ export interface BriefReport {
   outcome: string;
   handoff: string;
   evidence: BriefEvidence | null;
+  /** QV2: the report's criteria that did not pass (fail with repro, person/unverified with how); absent = none */
+  criteria?: CriterionVerdict[];
 }
 
 export interface BriefJson {
@@ -123,7 +126,8 @@ export interface BriefJson {
     /** findings of the previous step on a forward entry: for information, not rework */
     notes: { step: string; outcome: string; items: Finding[] } | null;
   };
-  finish: Array<{ command: string; means: string }>;
+  /** `verdict`: QV5 — reportable only when the worst verdict of the criteria report is this one */
+  finish: Array<{ command: string; means: string; verdict?: string }>;
   limits: { attended: boolean; deadline: string | null; deadline_at: string | null; nudges_left: number | null; retries_left: number | null; slot: number | null; port_base: number | null };
 }
 
@@ -207,7 +211,7 @@ function inputs(input: BriefInput, step: AgentStep, rw: BriefJson["rework"]): Br
 const isFailingCheck = (r: NumberedReceipt): r is NumberedReceipt & { receipt: CheckReceipt } => r.receipt.kind === "check" && r.receipt.outcome === "fail";
 const isDone = (r: NumberedReceipt): r is NumberedReceipt & { receipt: DoneReceipt } => r.receipt.kind === "done";
 /** Outcomes that move work forward when a workflow declares no counters to tell (fallback). */
-const FORWARD = new Set(["pass", "approve", "done", "partial"]);
+const FORWARD = new Set(["pass", "approve", "done", "partial", "unverified"]);
 
 /**
  * A receipt that sends work back (W4): its outcome takes a counted edge, or — for edges without
@@ -248,7 +252,8 @@ function evidenceOf(input: BriefInput, rel: string | undefined): BriefEvidence |
 const unitDirAbs = ({ paths: p }: BriefInput) => (p.unit_dir.startsWith("/") ? p.unit_dir : `${p.worktree}/${p.unit_dir}`);
 
 function reportOf(input: BriefInput, r: DoneReceipt): BriefReport {
-  return { step: r.step, attempt: r.attempt, outcome: r.outcome, handoff: r.handoff, evidence: evidenceOf(input, r.evidence) };
+  const open = r.criteria?.filter((c) => c.verdict !== "pass") ?? [];
+  return { step: r.step, attempt: r.attempt, outcome: r.outcome, handoff: r.handoff, evidence: evidenceOf(input, r.evidence), ...(open.length ? { criteria: open } : {}) };
 }
 
 /** The receipt that moved the cursor here from another step, if any. */
@@ -334,10 +339,16 @@ function answers(input: BriefInput): BriefJson["context"]["answers"] {
 }
 
 function finish(step: AgentStep): BriefJson["finish"] {
-  const out = reportableOutcomes(step).map((o) => ({
-    command: `norn done ${o} --handoff "…"`,
-    means: outcomeEdge(step.outcomes[o] as OutcomeSpec).means ?? `step finished with outcome ${o}`,
-  }));
+  const out: BriefJson["finish"] = reportableOutcomes(step).map((o) => {
+    const edge = outcomeEdge(step.outcomes[o] as OutcomeSpec);
+    // QV3/QV5: a step requiring criteria, or an outcome gated by a verdict, takes the report file
+    const criteria = step.criteria === "required" || edge.verdict !== undefined;
+    return {
+      command: `norn done ${o}${criteria ? " --criteria <file>" : ""} --handoff "…"`,
+      means: edge.means ?? `step finished with outcome ${o}`,
+      ...(edge.verdict ? { verdict: edge.verdict } : {}),
+    };
+  });
   out.push({ command: `norn ask "<question>"`, means: "you need a person's answer to continue; the step parks until answered" });
   out.push({ command: `norn stuck "<reason>"`, means: "you cannot continue; a person unblocks the step" });
   return out;
@@ -370,6 +381,17 @@ function findingLines(out: string[], items: readonly Finding[]): void {
     if (x.detail) out.push(`   ${x.detail.replace(/\n/g, "\n   ")}`);
     if (x.repro) out.push(`   Repro: ${x.repro}`);
   });
+  out.push("");
+}
+
+/** QV2: criteria of a report that did not pass, each with its repro or how to check it. */
+function criteriaLines(out: string[], items: readonly CriterionVerdict[] | undefined): void {
+  if (!items?.length) return;
+  out.push("Criteria not passed:", "");
+  for (const c of items) {
+    const parts = [c.repro && `repro: ${c.repro}`, c.reason && `reason: ${c.reason}`, c.how && `how: ${c.how}`, c.evidence && `evidence: ${c.evidence}`].filter(Boolean);
+    out.push(`- **${c.id}** ${c.verdict}${parts.length ? ` — ${parts.join("; ")}` : ""}`);
+  }
   out.push("");
 }
 
@@ -416,6 +438,7 @@ function markdown(b: BriefJson): string {
       out.push(d.comment ? quote(d.comment) : "(no comment given; ask the person or see the evidence)", "");
       if (d.judged) {
         out.push(`What was judged: ${d.judged.step}#${d.judged.attempt} reported \`${d.judged.outcome}\`:`, "", quote(d.judged.handoff), "");
+        criteriaLines(out, d.judged.criteria);
         evidenceLines(out, d.judged.evidence);
       }
     }
@@ -430,6 +453,7 @@ function markdown(b: BriefJson): string {
     const r = rw.report;
     if (r) {
       out.push(`### ${r.step}#${r.attempt} reported \`${r.outcome}\``, "", quote(r.handoff), "");
+      criteriaLines(out, r.criteria);
     }
     const f = rw.findings;
     if (f) {
@@ -470,7 +494,13 @@ function markdown(b: BriefJson): string {
   }
 
   out.push("## Finish with exactly one of", "");
-  for (const f of b.finish) out.push(`- \`${f.command}\` — ${f.means}`);
+  for (const f of b.finish) out.push(`- \`${f.command}\` — ${f.means}${f.verdict ? ` (only when the worst verdict is \`${f.verdict}\`)` : ""}`);
+  if (b.finish.some((f) => f.command.includes("--criteria")))
+    out.push(
+      "",
+      "`--criteria <file>`: a JSON array with one verdict per acceptance criterion — `pass` (with `evidence`), `fail` (with `repro`), `person` (with `how`), `unverified` (with `reason` and `how`). Worst verdict: fail > unverified > person > pass.",
+      "Add `--note \"<text>\"` (and `--note-criterion <id>`) for a question a person should see without blocking the work.",
+    );
   out.push("", "Then end your turn. Never edit `runs/`; never push.", "");
 
   out.push("## Limits", "");

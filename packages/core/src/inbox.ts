@@ -10,6 +10,7 @@
 import { type InboxChange, type Mode, parseDuration, type ResolvedConfig, type UnitState } from "@norn/schema";
 import type { Decision } from "./actions.ts";
 import { nextCommand, startAgentCommand } from "./commands.ts";
+import { criterionLine, noteTitle, personCriteria, type StoryNote } from "./criteria.ts";
 import type { Facts, StoryFacts, UnitFacts } from "./facts.ts";
 import type { InboxGroup, InboxItem } from "./ports.ts";
 import { sha256 } from "./hash.ts";
@@ -203,6 +204,53 @@ function judgedDetail(story: StoryFacts, uf: UnitFacts): string | null {
   return parts.join(" · ");
 }
 
+const oneLine = (t: string) => t.replace(/\s*\n\s*/g, " ").trim();
+
+/**
+ * QV7, NT3: what a person checks at a gate, so they need not open a file — the `person` and
+ * `unverified` criteria of the report that led there (with `reason` and `how`), and on a story-level
+ * gate the story's open notes (approving acknowledges them). `detail` is one line; `full` (inbox
+ * `--details`) lists each on its own line.
+ */
+export function gateChecks(story: StoryFacts, uf: UnitFacts): { detail: string | null; full: string | null } {
+  const check = personCriteria(uf.last_outcome_receipt?.receipt);
+  const notes = uf.unit.slice === null ? (story.notes ?? []) : [];
+  const parts: string[] = [];
+  const lines: string[] = [];
+  if (check.length) {
+    parts.push(`check: ${check.map((c) => oneLine(criterionLine(c))).join("; ")}`);
+    lines.push("Criteria for a person to check:", ...check.map((c) => `- ${criterionLine(c)}`));
+  }
+  if (notes.length) {
+    const noteLine = (n: StoryNote) => `${n.unit} ${n.step}${n.criterion ? ` (${n.criterion})` : ""}: ${n.text}`;
+    parts.push(`open notes (approve acknowledges them): ${notes.map((n) => oneLine(noteLine(n))).join("; ")}`);
+    if (lines.length) lines.push("");
+    lines.push("Open notes (approve acknowledges them; reject leaves them open):", ...notes.map((n) => `- ${noteLine(n)} [${n.id}]`));
+  }
+  return { detail: parts.length ? parts.join(" · ") : null, full: lines.length ? lines.join("\n") : null };
+}
+
+/**
+ * NT2: one Check item per open note of the story — a non-blocking question a reporting agent left
+ * for a person. It leaves the inbox when a person gives `approve` at a story-level gate (NT3).
+ */
+export function noteItems(story: StoryFacts): InboxItem[] {
+  const status = story.frontmatter?.status;
+  if (status === "done" || status === "dropped") return [];
+  return (story.notes ?? []).map((n) => ({
+    id: n.id,
+    group: "check" as const,
+    story: story.key,
+    slice: n.unit === story.key ? null : n.unit,
+    step: n.step,
+    title: oneLine(noteTitle(n)),
+    ...(n.text.includes("\n") ? { full: n.text } : {}),
+    command: `norn why ${n.unit} --receipt ${n.receipt_id}`,
+    since: n.at,
+    ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
+  }));
+}
+
 /**
  * GR6/F25: the story unit finished its workflow and its PR is open — merging it is the person's
  * last action, so it is an item (Your turn) with the PR URL, not "Recently done".
@@ -311,7 +359,8 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       if (park?.kind === "gate") {
         const judged = judgedDetail(story, uf);
         const reject = `or reject: norn approve ${key} --reject --reason "…"`;
-        return item("approve", park.reason, `norn approve ${key}`, park.since, { detail: judged ? `${judged} · ${reject}` : reject });
+        const { detail, full } = gateChecks(story, uf);
+        return item("approve", park.reason, `norn approve ${key}`, park.since, { detail: [judged, detail, reject].filter(Boolean).join(" · "), ...(full ? { full } : {}) });
       }
       if (park?.kind === "attended") return item("your_turn", `${st.step}: attended step — work with the agent`, startCommandFor(uf, story, config), park.since);
       return item("unblock", park?.reason ?? "parked", `norn unstick ${key}`, park?.since ?? st.updated_at);
@@ -486,6 +535,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
     add(staleItem(story, facts.repo.default_branch));
     add(retargetItem(story, facts.repo.default_branch));
     for (const it of foreignCommitItems(story)) add(it);
+    for (const it of noteItems(story)) add(it);
     for (const uf of story.units) {
       add(unitInboxItem(story, uf, facts, config));
       add(actFailureItem(story, uf));

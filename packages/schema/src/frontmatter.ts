@@ -1,5 +1,9 @@
 import { type Static, Type } from "@sinclair/typebox";
 import { IsoTime, NonEmpty, PosInt, RemoteProvider, SliceKey, Slug, StoryKey } from "./common.ts";
+import { Criterion } from "./criteria.ts";
+
+/** QV1: acceptance criteria as data; ids unique (checked by `norn done`, QV4). */
+const Criteria = Type.Array(Criterion, { description: "Acceptance criteria as data (QV1); the prose Acceptance section stays the spec" });
 
 const WorkflowName = Type.String({ pattern: "^[a-z][a-z0-9_-]*$", description: "Name of a workflow file" });
 
@@ -53,6 +57,8 @@ export const StoryFrontmatter = Type.Object(
     refined_body_hash: Type.Optional(Type.String({ pattern: "^[0-9a-f]{64}$" })),
     /** GR6 done record: how the story PR landed, written with `status: done` on the base branch. */
     merge: Type.Optional(StoryMerge),
+    /** QV1: story-level acceptance criteria, checked by story-level QA */
+    criteria: Type.Optional(Criteria),
   },
   { $id: "https://norn.dev/schema/story.json", title: "norn story frontmatter", additionalProperties: true },
 );
@@ -78,6 +84,8 @@ export const SliceFrontmatter = Type.Object(
     depends_on: Type.Array(SliceKey, { uniqueItems: true }),
     status: SliceStatus,
     labels: Type.Optional(Type.Array(Type.String())),
+    /** QV1: the slice's acceptance criteria, written by the slice skill next to the Acceptance section */
+    criteria: Type.Optional(Criteria),
   },
   { $id: "https://norn.dev/schema/slice.json", title: "norn slice frontmatter", additionalProperties: true },
 );

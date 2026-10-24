@@ -16,6 +16,7 @@ import {
   Target,
   Ulid,
 } from "./common.ts";
+import { CriterionVerdict, Note, NoteId } from "./criteria.ts";
 
 /**
  * Receipts are immutable inputs at `runs/<unit>/receipts/NNNN-<kind>.json` (S6),
@@ -68,6 +69,10 @@ export const DoneReceipt = receipt("done", {
   findings: Type.Optional(Type.Array(Finding)),
   /** Evidence folder relative to the unit's runs dir, e.g. `evidence/<run_id>`. */
   evidence: Type.Optional(NonEmpty),
+  /** QV2: the `--criteria` report, one verdict per criterion */
+  criteria: Type.Optional(Type.Array(CriterionVerdict, { minItems: 1 })),
+  /** NT1: notes for a person; never block, never change the route */
+  notes: Type.Optional(Type.Array(Note, { minItems: 1 })),
 });
 export const AskReceipt = receipt("ask", {
   question: NonEmpty,
@@ -96,6 +101,8 @@ export const ApproveReceipt = receipt("approve", {
   comment: Type.Optional(Type.String()),
   /** Story branch head at the moment of `approve` (story unit gates); observe's `ready_head_sha`. */
   head_sha: Type.Optional(Type.String({ pattern: "^[0-9a-f]{40,64}$" })),
+  /** NT3: open notes of the story listed at this story-level gate at `approve`; they leave the inbox */
+  acknowledged_notes: Type.Optional(Type.Array(NoteId, { uniqueItems: true })),
 });
 export const RejectReceipt = receipt("reject", { comment: Type.Optional(Type.String()) });
 export const UnstickReceipt = receipt("unstick", {

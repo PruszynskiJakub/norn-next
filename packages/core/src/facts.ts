@@ -270,6 +270,11 @@ export interface StoryFacts {
   unpushed_runs?: UnpushedRuns[];
   /** BS1: the story branch against its base; absent = not observed (no story branch or base ref) */
   base?: StoryBase;
+  /**
+   * NT2/NT3: notes for a person from `done` receipts of any unit of the story that no story-level
+   * gate `approve` acknowledged yet, oldest first. Absent = none (or not observed).
+   */
+  notes?: import("./criteria.ts").StoryNote[];
   /** units: the story unit first, then slices ascending by nn */
   units: UnitFacts[];
   slices: SliceFileFacts[];

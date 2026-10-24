@@ -42,6 +42,8 @@ export const approveCommand = defineCommand({
     const reason = opt.str(args, "reason")?.trim();
     const t = await resolveTarget(ctx, args.positionals[0] as string, atGate);
     const head = kind === "approve" && t.slice === null ? await storyHead(ctx, t).catch(() => null) : null;
+    // NT3: approving a story-level gate acknowledges the story's open notes listed at it; reject leaves them open
+    const acknowledged = kind === "approve" && t.slice === null ? (t.story_facts?.notes ?? []).map((n) => n.id) : [];
     const out = await runHumanVerb(ctx, t, {
       verb: "approve",
       mailbox: true,
@@ -54,7 +56,8 @@ export const approveCommand = defineCommand({
             "not_at_gate",
           );
       },
-      build: (t, st) => humanReceipt(ctx, t, st, kind, { ...(reason ? { comment: reason } : {}), ...(head ? { head_sha: head } : {}) }),
+      build: (t, st) =>
+        humanReceipt(ctx, t, st, kind, { ...(reason ? { comment: reason } : {}), ...(head ? { head_sha: head } : {}), ...(acknowledged.length ? { acknowledged_notes: acknowledged } : {}) }),
     });
     if (kind !== "reject") return out;
     // the rejection is a milestone of the unit, like `done` (O6): the next brief's Context carries it;

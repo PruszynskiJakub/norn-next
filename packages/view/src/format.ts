@@ -171,6 +171,12 @@ export function formatStepTimeline(v: TraceView, opts: { full?: boolean } = {}):
   out.push(span.join(" · "));
   const types = Object.entries(v.totals.by_type).map(([k, ms]) => `${k} ${formatDuration(ms)}`);
   out.push(`time in ${v.units.length > 1 ? "story " : ""}steps: ${types.join(" · ") || "-"} · human wait ${formatDuration(v.totals.human_wait_ms)}`);
+  if (v.criteria) {
+    // QV8: unverified criteria per capability
+    const c = v.criteria;
+    const needs = Object.entries(c.unverified_needs).map(([k, n]) => `${k} ${n}`).join(", ");
+    out.push(`criteria: ${c.reports} report(s) · ${c.verdicts.pass} pass · ${c.verdicts.fail} fail · ${c.verdicts.person} person · ${c.verdicts.unverified} unverified${needs ? ` (needs: ${needs})` : ""}${c.unchecked_coverage ? ` · ${c.unchecked_coverage} without frontmatter criteria` : ""}`);
+  }
   if (v.hidden_events) out.push(`(${v.hidden_events} no-op/claim-renew tick events hidden — --all shows them)`);
   if (v.records?.source === "base_cache") {
     const ref = v.records.ref?.replace(/^refs\/remotes\//, "") ?? "the base branch";

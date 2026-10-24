@@ -140,6 +140,10 @@
                   "description": "Max fresh-session retries after died (C1)",
                   "type": "integer"
                 },
+                "criteria": {
+                  "const": "required",
+                  "type": "string"
+                },
                 "outcomes": {
                   "minProperties": 1,
                   "additionalProperties": false,
@@ -170,6 +174,26 @@
                               "minLength": 1,
                               "description": "Shown to the agent in the brief (B3)",
                               "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
                             }
                           }
                         }
@@ -235,6 +259,26 @@
                               "minLength": 1,
                               "description": "Shown to the agent in the brief (B3)",
                               "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
                             }
                           }
                         }
@@ -265,6 +309,26 @@
                               "minLength": 1,
                               "description": "Shown to the agent in the brief (B3)",
                               "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
                             }
                           }
                         }
@@ -323,6 +387,26 @@
                               "minLength": 1,
                               "description": "Shown to the agent in the brief (B3)",
                               "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
                             }
                           }
                         }
@@ -353,6 +437,26 @@
                               "minLength": 1,
                               "description": "Shown to the agent in the brief (B3)",
                               "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
                             }
                           }
                         }
@@ -383,6 +487,26 @@
                               "minLength": 1,
                               "description": "Shown to the agent in the brief (B3)",
                               "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
                             }
                           }
                         }
@@ -458,6 +582,26 @@
                               "minLength": 1,
                               "description": "Shown to the agent in the brief (B3)",
                               "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
                             }
                           }
                         }
@@ -488,6 +632,26 @@
                               "minLength": 1,
                               "description": "Shown to the agent in the brief (B3)",
                               "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
                             }
                           }
                         }
@@ -542,6 +706,26 @@
                               "minLength": 1,
                               "description": "Shown to the agent in the brief (B3)",
                               "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
                             }
                           }
                         }
@@ -572,6 +756,26 @@
                               "minLength": 1,
                               "description": "Shown to the agent in the brief (B3)",
                               "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
                             }
                           }
                         }

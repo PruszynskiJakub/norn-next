@@ -38,7 +38,7 @@ Dependencies point one way only: `schema ← core ← store ← adapters ← cli
 
 ## Where the contracts live
 
-- Persisted formats: `packages/schema/src/*.ts` — `Workflow`, `StoryFrontmatter`, `SliceFrontmatter`, `UnitState` (state.json), `Receipt` (14 kinds), `TraceEvent`, `HookFact`, `ClaimBlob`, `LeaseFile`, `ConfigLayer`/`ResolvedConfig`, `CliError`, `ExitCode`. Validate with `validate(name, value)` / `assertValid(name, value)`; never hand-roll checks of these shapes.
+- Persisted formats: `packages/schema/src/*.ts` — `Workflow`, `StoryFrontmatter`, `SliceFrontmatter`, `UnitState` (state.json), `Receipt` (14 kinds), `CriteriaReport` (`norn done --criteria`, QV2), `TraceEvent`, `HookFact`, `ClaimBlob`, `LeaseFile`, `ConfigLayer`/`ResolvedConfig`, `CliError`, `ExitCode`. Validate with `validate(name, value)` / `assertValid(name, value)`; never hand-roll checks of these shapes.
 - Ids and names: `packages/schema/src/ids.ts` — `ulid`, `deriveUlid` (deterministic ids for pure decide), story/slice keys, `slugify`, branch/dir/ref names, receipt file names, `parseDuration`.
 - Adapter ports: `packages/core/src/ports.ts`. Observe output: `packages/core/src/facts.ts` (`Facts`). Decide output: `packages/core/src/actions.ts` (`Action`, `Decision`, `ActionResult`) — its header defines the act ordering.
 

@@ -10,13 +10,15 @@
  * the unit; with `--step` / `--attempt` / `--transition` / `--rule` every decision that matches
  * (noops excluded unless `--rule` names them), newest explained, all listed under `matches`.
  * Intake decisions are keyed by the story (F5), so `norn why gh-1 --rule remote.intake` covers them.
+ * `--receipt <id>` (NT2: the command of a note's inbox item) picks the decision that applied that
+ * receipt; its reason text lists the report's criteria not passed and its notes.
  *
  * R5.4 (N2): a tick with a `tick.start` but no end died during act. `why` explains it from its
  * recorded decisions ("tick crashed during act") — `--tick <id>` resolves the tick a receipt cites,
  * and without `--tick` a crashed tick newer than the unit's last finished one is the one explained.
  */
-import { decide, type Decision, type NumberedReceipt, type StoryFacts, type UnitFacts, unitDecision } from "@norn/core";
-import { ExitCode, type Receipt, type TickStartTrace, type TickTrace, type TickUnitRecord } from "@norn/schema";
+import { criterionLine, decide, type Decision, type NumberedReceipt, type StoryFacts, type UnitFacts, unitDecision } from "@norn/core";
+import { ExitCode, type Receipt, type TickStartTrace, type TickTrace, type TickUnitRecord, ULID_PATTERN } from "@norn/schema";
 import { crashedTicksFor, decisionUnit, findCrashedTick, findTick, readTrace } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import { refuse, usageError, withExit } from "../output.ts";
@@ -30,6 +32,8 @@ interface Filter {
   attempt?: number;
   transition?: { step: string; outcome: string };
   rule?: string;
+  /** NT2: the decision that applied this receipt (the note item's command) */
+  receipt?: string;
 }
 
 /** What made a rule fire: a receipt (with its reason text) or a fact. */
@@ -54,7 +58,11 @@ function reasonOf(r: Receipt): string | null {
     case "done": {
       const findings = r.findings?.length ? `\n\nFindings:\n${r.findings.map((f, i) => `${i + 1}. [${f.severity}] ${f.title}${f.detail ? ` — ${f.detail}` : ""}`).join("\n")}` : "";
       const evidence = r.evidence ? `\n\nEvidence: ${r.evidence}` : "";
-      return `${r.handoff}${findings}${evidence}`;
+      // QV2, NT1: the verdicts not passed and the notes for a person
+      const open = r.criteria?.filter((c) => c.verdict !== "pass") ?? [];
+      const criteria = r.criteria ? `\n\nCriteria: ${r.criteria.length - open.length}/${r.criteria.length} pass${open.length ? `\n${open.map((c) => `- ${criterionLine(c)}${c.repro ? ` — repro: ${c.repro}` : ""}`).join("\n")}` : ""}` : "";
+      const notes = r.notes?.length ? `\n\nNotes for a person:\n${r.notes.map((n, i) => `${i + 1}. ${n.criterion ? `(${n.criterion}) ` : ""}${n.text}`).join("\n")}` : "";
+      return `${r.handoff}${findings}${evidence}${criteria}${notes}`;
     }
     case "check":
       return `${r.command} → ${r.reason === "timeout" ? "timeout" : `exit ${r.exit_code}`}${r.log ? ` (log ${r.log})` : ""}\n${r.output_tail.split("\n").slice(-40).join("\n")}`.trimEnd();
@@ -131,6 +139,7 @@ function unitIn(tick: TickTrace, story: string, key: string): { sf?: StoryFacts;
 
 function matches(d: TickUnitRecord, uf: UnitFacts | undefined, f: Filter): boolean {
   if (f.rule && !d.rule.startsWith(f.rule)) return false;
+  if (f.receipt && !receiptsOf(d, uf).some((r) => r.receipt.receipt_id === f.receipt)) return false;
   if (!f.rule && (d.action.kind === "noop" || d.rule === "claim.renew") && (f.step || f.attempt !== undefined || f.transition)) return false;
   const rs = receiptsOf(d, uf).map((r) => r.receipt);
   const st = uf?.state;
@@ -161,6 +170,11 @@ function parseFilter(args: Parameters<typeof opt.str>[0]): Filter {
   }
   const rule = opt.str(args, "rule");
   if (rule) f.rule = rule;
+  const receipt = opt.str(args, "receipt");
+  if (receipt !== undefined) {
+    if (!new RegExp(ULID_PATTERN).test(receipt)) throw usageError(`--receipt must be a receipt id (ULID), not '${receipt}'`, "norn inbox");
+    f.receipt = receipt;
+  }
   return f;
 }
 
@@ -191,8 +205,8 @@ function crashedExplanation(tick: TickStartTrace, key: string) {
 export const whyCommand = defineCommand({
   name: "why",
   summary: "Replay decide on a recorded tick and show the rule that fired for a unit and what triggered it (O5)",
-  usage: "norn why <unit> [--tick <tick_id>] [--step <step>] [--attempt <n>] [--transition <step>.<outcome>] [--rule <prefix>]",
-  options: { tick: { type: "string" }, step: { type: "string" }, attempt: { type: "string" }, transition: { type: "string" }, rule: { type: "string" } },
+  usage: "norn why <unit> [--tick <tick_id>] [--step <step>] [--attempt <n>] [--transition <step>.<outcome>] [--rule <prefix>] [--receipt <receipt_id>]",
+  options: { tick: { type: "string" }, step: { type: "string" }, attempt: { type: "string" }, transition: { type: "string" }, rule: { type: "string" }, receipt: { type: "string" } },
   positionals: { min: 1, max: 1 },
   async run(ctx, args) {
     const { key, story } = parseUnitKey(args.positionals[0] as string);
