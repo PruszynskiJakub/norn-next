@@ -186,3 +186,15 @@ describe("classified outcomes (C1)", () => {
     expect(run(integ, SLICE_WF, classify("silent")).rejected[0]?.reason).toBe("outcome 'silent' cannot be classified for a git step");
   });
 });
+
+describe("take receipts (R10.1)", () => {
+  test("applied at any cursor without moving it, even on a stuck unit", () => {
+    const stuck = stateFor(storyUnit(), SOLO_WF, { status: "stuck", park: { kind: "stuck", reason: "x", since: at() } });
+    const take = receipt(stuck, "take", { previous_holder: "ann@pc", previous_heartbeat_id: null, expired: true, who: "bob@mac" }, "human");
+    const r = applyReceipts(stuck, [numbered(1, take)], ctx(SOLO_WF));
+    expect(r.applied).toEqual([1]);
+    expect(r.state).toMatchObject({ status: "stuck", step: "implement", applied_through: 1 });
+    expect(r.log).toEqual(["taken by bob@mac from ann@pc (expired)"]);
+    expect(r.route).toBeNull();
+  });
+});

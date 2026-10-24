@@ -74,6 +74,7 @@ export function eventMatchesUnit(ev: TraceEvent, unit: string): boolean {
     case "reject":
     case "briefing":
     case "foreign_commits":
+    case "take":
       return unitMatches(ev.unit, unit);
   }
 }

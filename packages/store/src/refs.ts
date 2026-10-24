@@ -92,7 +92,8 @@ export async function acquireClaim(
   const held = heldBy(cur, blob, opts);
   if (held) return held;
   const r = await writeClaim(cwd, remote, blob, cur.state === "none" ? null : cur.sha);
-  if (r.ok || r.reason !== "stale") return r;
+  // a lost race shows as stale info, or as the remote refusing to lock a ref that just moved
+  if (r.ok || (r.reason !== "stale" && r.reason !== "rejected")) return r;
   const now = await readClaim(cwd, remote, blob.story);
   return heldBy(now, blob, { now: opts.now }) ?? r;
 }

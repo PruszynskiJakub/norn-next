@@ -148,6 +148,19 @@ export const ClassifyReceipt = receipt("classify", {
     ),
   ),
 });
+/**
+ * R10.1 (M8): a `norn take` of the story, forced or not, recorded on the story unit. Informational:
+ * applied at any cursor (like `mode`), it moves nothing; `norn trace` / `why` show it.
+ */
+export const TakeReceipt = receipt("take", {
+  /** `user@machine` of the claim taken over; null when the claim was free */
+  previous_holder: Type.Union([NonEmpty, Type.Null()]),
+  previous_heartbeat_id: Type.Union([Ulid, Type.Null()]),
+  /** the previous claim had expired (false when it was free or taken with --force) */
+  expired: Type.Boolean(),
+  /** `take --force` over an unexpired or corrupt claim (T5) */
+  forced: Type.Optional(Type.Boolean()),
+});
 /** Journaled workflow switch (`norn workflow <unit> <name> --to <step>`, S7). */
 export const WorkflowReceipt = receipt("workflow", {
   name: NonEmpty,
@@ -171,6 +184,7 @@ export const Receipt = TaggedUnion(
     StartedReceipt,
     ClassifyReceipt,
     WorkflowReceipt,
+    TakeReceipt,
   ],
   { $id: "https://norn.dev/schema/receipt.json", title: "norn receipt" },
 );
@@ -189,6 +203,7 @@ export type CheckReceipt = ReceiptOf<"check">;
 export type StartedReceipt = ReceiptOf<"started">;
 export type ClassifyReceipt = ReceiptOf<"classify">;
 export type WorkflowReceipt = ReceiptOf<"workflow">;
+export type TakeReceipt = ReceiptOf<"take">;
 
 export const RECEIPT_KINDS = [
   "done",
@@ -203,6 +218,7 @@ export const RECEIPT_KINDS = [
   "started",
   "classify",
   "workflow",
+  "take",
 ] as const satisfies readonly ReceiptKind[];
 
 /** Receipts a non-holder may push through the mailbox (T9). */

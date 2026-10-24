@@ -11,7 +11,7 @@
  * (noops excluded unless `--rule` names them), newest explained, all listed under `matches`.
  * Intake decisions are keyed by the story (F5), so `norn why gh-1 --rule remote.intake` covers them.
  */
-import { decide, type Decision, type NumberedReceipt, type StoryFacts, type UnitFacts } from "@norn/core";
+import { decide, type Decision, type NumberedReceipt, type StoryFacts, type UnitFacts, unitDecision } from "@norn/core";
 import { ExitCode, type Receipt, type TickTrace, type TickUnitRecord } from "@norn/schema";
 import { decisionUnit, findTick, readTrace } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
@@ -73,6 +73,8 @@ function reasonOf(r: Receipt): string | null {
       return `${r.name} at ${r.to}`;
     case "started":
       return `${r.how}${r.agent ? ` ${r.agent}` : ""}${r.retry ? " (retry)" : ""}`;
+    case "take":
+      return r.previous_holder ? `taken from ${r.previous_holder}${r.forced ? " (forced)" : r.expired ? " (expired claim)" : ""}` : "taken (claim was free)";
   }
 }
 
@@ -167,15 +169,18 @@ export const whyCommand = defineCommand({
     if (tickId) {
       const tick = findTick(ctx.root, tickId);
       if (!tick) throw refuse(`no tick ${tickId} in the trace`, `norn trace ${key}`, "no_tick");
-      const d = tick.decisions.find((x) => decisionUnit(x) === key);
+      const d = unitDecision(tick.decisions, key, decisionUnit);
       if (!d) throw refuse(`tick ${tick.tick_id} decided nothing for ${key}`, `norn trace ${key}`, "no_decision");
       found = [{ tick, d }];
     } else {
       const { events } = readTrace(ctx.root, { unit: key, types: ["tick"] });
       found = [];
       for (const ev of events as TickTrace[]) {
-        const d = ev.decisions.find((x) => decisionUnit(x) === key);
-        if (d && (!filtered || matches(d, unitIn(ev, story, key).uf, filter))) found.push({ tick: ev, d });
+        // R1.1: by default the unit's own action, not the claim renewal riding along; a filter may pick either
+        const d = filtered
+          ? ev.decisions.filter((x) => decisionUnit(x) === key).find((x) => matches(x, unitIn(ev, story, key).uf, filter))
+          : unitDecision(ev.decisions, key, decisionUnit);
+        if (d) found.push({ tick: ev, d });
       }
       if (!found.length)
         throw refuse(
@@ -194,7 +199,7 @@ export const whyCommand = defineCommand({
     } catch (e) {
       throw refuse(`replay of tick ${tick.tick_id} failed: ${(e as Error).message}`, `norn trace ${key}`, "replay_failed");
     }
-    const mine = replayed.find((d) => d.unit === key) ?? null;
+    const mine = replayed.find((d) => d.unit === key && d.rule === recorded.rule) ?? unitDecision(replayed, key);
     const same = !!mine && mine.rule === recorded.rule && canon(mine.action) === canon(recorded.action);
     const allMatch =
       replayed.length === tick.decisions.length &&

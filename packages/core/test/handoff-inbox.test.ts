@@ -229,3 +229,23 @@ describe("inbox history (O1, O4)", () => {
     expect(inboxChanges(open, buildInbox(post, CONFIG), pre, []).changes[0]).toMatchObject({ resolved_by: "no longer pending", at: at(T0 + 10_000) });
   });
 });
+
+describe("unpushed runs (R2.3)", () => {
+  test("a non-holder's local receipts are a Check item naming the holder, resolved by norn tidy", () => {
+    const s = storyFacts("gh-9", [unitFacts(storyUnit("gh-9"), STORY_WF, stateFor(storyUnit("gh-9"), STORY_WF))], {
+      claim: { state: "other", sha: "x", blob: { version: 1, story: "gh-9", holder: "ann@pc", heartbeat_id: "01JEEEEEEEEEEEEEEEEEEEEEEE", acquired_at: at(), renewed_at: at(), expires_at: at(T0 + 600_000), last_tick_id: null } },
+      unpushed_runs: [{ unit: "gh-9", files: [".agents/specs/gh-9-login/runs/_story/receipts/0035-done.json", ".agents/specs/gh-9-login/runs/_story/state.json"] }],
+    });
+    const inbox = buildInbox(facts([s]), CONFIG);
+    expect(inbox.groups.check).toHaveLength(1);
+    expect(inbox.groups.check[0]).toMatchObject({
+      id: expect.stringMatching(/^unpushed:gh-9:[0-9a-f]{12}$/),
+      story: "gh-9",
+      slice: null,
+      title: "local work on gh-9 is not in the record (0035-done) — the story is now held by ann@pc",
+      command: "norn tidy",
+    });
+    // nothing else of a story held elsewhere is shown
+    expect(inbox.pending).toBe(1);
+  });
+});

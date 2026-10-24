@@ -148,6 +148,14 @@ export interface ForeignCommit {
   branch: string;
 }
 
+/** R2.3: local runs/ work of one unit that is not in the record (the remote unit branch). */
+export interface UnpushedRuns {
+  /** unit key */
+  unit: string;
+  /** worktree-relative paths under `<spec_dir>/runs/<unit dir>/`, sorted */
+  files: string[];
+}
+
 export interface StoryFacts {
   key: string;
   slug: string;
@@ -181,6 +189,18 @@ export interface StoryFacts {
   foreign_commits?: ForeignCommit[];
   /** story branch head when the person gave `approve` at the `ready` gate (the approve receipt's `head_sha`) */
   ready_head_sha?: string;
+  /**
+   * R3.2: the story's `status` in its record on the fetched base ref (`<remote>/<base>`); null = the
+   * base has no record of it; absent = no base ref (solo) or not observed. The base record wins over
+   * any local spec when deciding to acquire a claim.
+   */
+  base_status?: StoryFrontmatter["status"] | null;
+  /**
+   * R2.3: on a checkout that does not hold the claim, runs/ files (receipts, state) changed locally
+   * but not on the remote unit branch, per unit; paths are relative to the unit's worktree. Absent =
+   * none, held here, or not observed.
+   */
+  unpushed_runs?: UnpushedRuns[];
   /** units: the story unit first, then slices ascending by nn */
   units: UnitFacts[];
   slices: SliceFileFacts[];

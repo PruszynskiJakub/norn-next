@@ -60,6 +60,9 @@ import {
   type StorySnapshot,
   traceDir,
   type UnitSnapshot,
+  type UnpushedTarget,
+  type UnpushedUnit,
+  unpushedRuns,
   withSliceWorktrees,
 } from "@norn/store";
 import type { Context } from "../context.ts";
@@ -123,6 +126,8 @@ export interface Observed {
   stories: Record<string, StoryLoc>;
   units: Record<string, UnitLoc>;
   sync: SyncReport;
+  /** R2.3: per story not held here, local runs/ work not on the remote (facts carry `{unit, files}`) */
+  unpushed: Record<string, UnpushedUnit[]>;
 }
 
 export function machineHolder(env: Record<string, string | undefined>): string {
@@ -303,6 +308,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   const hooks = since ? readHookFacts(root, since) : [];
 
   const refs = await refMap(root);
+  const unpushed: Record<string, UnpushedUnit[]> = {};
   const stories: StoryFacts[] = [];
   const storyLocs: Record<string, StoryLoc> = {};
   const unitLocs: Record<string, UnitLoc> = {};
@@ -319,6 +325,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
 
     const units: UnitFacts[] = [];
     const foreign: ForeignCommit[] = [];
+    const targets: UnpushedTarget[] = [];
     for (const u of unitSnaps.get(s) ?? []) {
       const sliceFile = u.unit.slice ? s.slices.find((f) => f.key === u.unit.slice) : undefined;
       const ownWt = u.unit.slice ? (sliceWts.get(u.unit.slice) ?? null) : storyWt;
@@ -328,6 +335,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       units.push(uf);
       // Q6: commits norn did not make; an agent's own commits mid-run are not foreign
       if (u.state?.status !== "running") foreign.push(...(await foreignCommits(root, remote, unitBranch, baseRef, refs)));
+      if (ownWt && worktree?.exists) targets.push({ unit: u.unit.key, dir: u.unit.dir, cwd: ownWt, branch: unitBranch });
       unitLocs[u.unit.key] = {
         unit: u.unit,
         story: s.key,
@@ -339,6 +347,11 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
         workflow: u.workflow?.workflow ?? null,
       };
     }
+
+    // R2.3: a checkout without the claim reports its local runs/ work that is not in the record
+    const heldHere = claim.state === "mine" || (claim.state === "expired" && claim.blob.heartbeat_id === hb);
+    const lost = remote && !heldHere && claim.state !== "corrupt" ? await unpushedRuns(remote, baseRef, s.spec_dir, targets) : [];
+    if (lost.length) unpushed[s.key] = lost;
 
     stories.push({
       key: s.key,
@@ -355,6 +368,8 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       ...(byAncestry.has(s.key) ? { merged_by_ancestry: true } : {}),
       ...(foreign.length ? { foreign_commits: foreign } : {}),
       ...readyHead(s, unitSnaps.get(s)?.[0]),
+      ...(s.base_status !== undefined ? { base_status: s.base_status } : {}),
+      ...(lost.length ? { unpushed_runs: lost.map((l) => ({ unit: l.unit, files: l.files })) } : {}),
       units,
       slices: s.slices satisfies SliceFileFacts[],
       mode: units[0]?.state?.mode ?? config.default_mode,
@@ -385,8 +400,9 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     stories,
     orphans: { worktrees: orphanWts.sort(), branches: orphanBranches },
   };
-  return { facts, workflows, config, ports, root, remote, heartbeat_id: hb, stories: storyLocs, units: unitLocs, sync };
+  return { facts, workflows, config, ports, root, remote, heartbeat_id: hb, stories: storyLocs, units: unitLocs, sync, unpushed };
 }
+
 
 /** `refs/remotes/<remote>/<base>` when it exists locally (fetched), else null (solo, never fetched). */
 async function trackingRef(root: string, remote: string | null, base: string): Promise<string | null> {

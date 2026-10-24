@@ -4,7 +4,8 @@
  * Ids come from `deriveUlid(facts.tick_id, i)` and times from `facts.now`, so `norn why`
  * replays to identical output.
  *
- * Order per story: claim (T3–T6) → corrupt (S2) → remote lifecycle (GR6–GR8) → mailbox (T9),
+ * Order per story: claim (T3–T6; a due renewal is a side action, R1.1) → corrupt (S2) → remote
+ * lifecycle (GR6–GR8) → mailbox (T9),
  * then per unit: receipts (C2: receipts always win over runner facts) → workflow drift (S7)
  * → recovery commit → step semantics by type (§6, §10, W2). Ready steps are served in
  * queue order (K1): oldest story by intake, then slice number.
@@ -53,6 +54,17 @@ export type RepoWorkflows = Readonly<Record<string, LoadedWorkflow>>;
 
 const WF_LABEL = "norn:wf:";
 
+/** R1.1: a side action rides along with its unit's one action this tick — only a claim renewal. */
+export function isSideAction(a: { kind: string; op?: unknown }): boolean {
+  return a.kind === "claim" && a.op === "renew";
+}
+
+/** The decision that is the unit's one action this tick (O5), else its side action, else null. */
+export function unitDecision<D extends { unit: string; action: { kind: string; op?: unknown } }>(decisions: readonly D[], unit: string, unitOf: (d: D) => string = (d) => d.unit): D | null {
+  const mine = decisions.filter((d) => unitOf(d) === unit);
+  return mine.find((d) => !isSideAction(d.action)) ?? mine[0] ?? null;
+}
+
 class Ctx {
   readonly decisions: Decision[] = [];
   private readonly taken = new Set<string>();
@@ -88,7 +100,8 @@ class Ctx {
     // O5 (F5): an intake is about one story — key it by that story so `norn why <story>` finds it;
     // other repo-level actions (lease reclaim) stay `*`
     const unit = action.unit?.key ?? (action.kind === "intake_story" ? action.key : "*");
-    if (action.unit) {
+    // R1.1: a claim renewal rides along; it does not take the unit's one action
+    if (action.unit && !isSideAction(action)) {
       if (this.taken.has(unit)) throw new Error(`decide: second action for ${unit} (${action.rule})`);
       this.taken.add(unit);
     }
@@ -193,6 +206,13 @@ function decideStory(ctx: Ctx, story: StoryFacts): void {
   if (claim.state === "none" || claim.state === "expired") {
     const ours = claim.state === "expired" && claim.blob.heartbeat_id === ctx.heartbeat;
     const fresh = claim.state === "none" && !storyUnit?.state && story.frontmatter?.status === "new";
+    // R3.2 (H6, A21): the base record wins over any local spec — a story the base records as done
+    // (or whose PR merged) is never acquired by a stale local intake or a returning checkout. Only this
+    // heartbeat's own expired claim (nobody took it since) is re-acquired for a merged PR whose record
+    // is not yet done, so GR6 cleanup and the base record still happen.
+    const baseDone = story.base_status === "done" || story.base_status === "dropped";
+    if (baseDone || ((story.pr?.state === "merged" || story.merged_by_ancestry) && !ours))
+      return ctx.noop(ref, "story.finished", baseDone ? `finished: ${ctx.facts.repo.default_branch} records it ${story.base_status} (R3.2); nothing to acquire` : "finished: PR merged (R3.2); nothing to acquire");
     // GR6: a finished story (workflow done, merged/recorded or dropped) needs no owner — never "unclaimed"
     if (!ours && !fresh && storyFinished(story)) return ctx.noop(ref, "story.finished", `finished (${story.frontmatter?.status === "done" || story.frontmatter?.status === "dropped" ? story.frontmatter.status : "workflow done"}); nothing to take`);
     if (!ours && !fresh) return ctx.noop(ref, "claim.unclaimed", `unclaimed — norn take ${story.key} (T10)`);
@@ -205,6 +225,8 @@ function decideStory(ctx: Ctx, story: StoryFacts): void {
       blob: claimBlob(ctx, story.key, null),
     });
   }
+  // T4 + R1.1: renewal is a side action — emitted first (act renews before the story's other
+  // actions, R1.2), it leaves the story's units their one action this tick (H4, A15)
   const renewAt = epoch(claim.blob.renewed_at) + parseDuration(ctx.config.claim.renew);
   if (facts.now >= renewAt)
     ctx.emit({ kind: "claim", unit: ref, rule: "claim.renew", op: "renew", expected: claim.sha, blob: claimBlob(ctx, story.key, claim.blob) });
@@ -651,7 +673,8 @@ function startRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf:
     launch: launchFor(ctx, story, uf, st, step, run_id, cwd),
     receipts: [{ n, receipt }],
     state: res.state,
-    commit: null,
+    // R2.1 (N6): the started receipts reach the record in the launch tick, not by a recover.commit
+    commit: commitFor(ctx, story, uf, `norn: ${ref.key} ${st.step} started (run ${run_id})`, st.step),
   });
 }
 

@@ -17,3 +17,4 @@ export * from "./refs.ts";
 export * from "./snapshot.ts";
 export * from "./trace.ts";
 export * from "./unit.ts";
+export * from "./unpushed.ts";

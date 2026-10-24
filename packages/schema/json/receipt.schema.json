@@ -1559,6 +1559,136 @@
           "type": "string"
         }
       }
+    },
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "kind",
+        "receipt_id",
+        "run_id",
+        "step",
+        "attempt",
+        "at",
+        "by",
+        "previous_holder",
+        "previous_heartbeat_id",
+        "expired"
+      ],
+      "properties": {
+        "kind": {
+          "const": "take",
+          "type": "string"
+        },
+        "receipt_id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "description": "ULID (ID2)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "step": {
+          "anyOf": [
+            {
+              "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled)$)[a-z][a-z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "const": "$done",
+              "type": "string"
+            },
+            {
+              "const": "$stuck",
+              "type": "string"
+            }
+          ]
+        },
+        "attempt": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "at": {
+          "format": "date-time",
+          "description": "ISO-8601 timestamp, UTC",
+          "type": "string"
+        },
+        "by": {
+          "anyOf": [
+            {
+              "const": "agent",
+              "type": "string"
+            },
+            {
+              "const": "human",
+              "type": "string"
+            },
+            {
+              "const": "norn",
+              "type": "string"
+            }
+          ]
+        },
+        "who": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "tick_id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "slice": {
+          "anyOf": [
+            {
+              "pattern": "^(gh|gl)-[1-9][0-9]*/[0-9]{2,3}$",
+              "description": "Slice key, e.g. gh-123/03",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "previous_holder": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "previous_heartbeat_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "description": "ULID (ID2)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expired": {
+          "type": "boolean"
+        },
+        "forced": {
+          "type": "boolean"
+        }
+      }
     }
   ],
   "discriminator": {

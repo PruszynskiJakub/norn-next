@@ -168,7 +168,26 @@ export const ForeignCommitsTrace = Type.Object(
 );
 export type ForeignCommitsTrace = Static<typeof ForeignCommitsTrace>;
 
-export const TraceEvent = TaggedUnion("type", [TickTrace, HookTrace, RejectTrace, BriefingTrace, ForeignCommitsTrace], {
+/** R10.1 (M8): a `norn take` of a story, forced or not, with the claim it replaced. */
+export const TakeTrace = Type.Object(
+  {
+    type: Type.Literal("take"),
+    id: Ulid,
+    at: IsoTime,
+    /** story key */
+    unit: StoryKey,
+    holder: NonEmpty,
+    heartbeat_id: Ulid,
+    previous_holder: Type.Union([NonEmpty, Type.Null()]),
+    previous_heartbeat_id: Type.Union([Ulid, Type.Null()]),
+    expired: Type.Boolean(),
+    forced: Type.Boolean(),
+  },
+  { additionalProperties: false },
+);
+export type TakeTrace = Static<typeof TakeTrace>;
+
+export const TraceEvent = TaggedUnion("type", [TickTrace, HookTrace, RejectTrace, BriefingTrace, ForeignCommitsTrace, TakeTrace], {
   $id: "https://norn.dev/schema/trace.json",
   title: "norn trace event (one JSONL line)",
 });
