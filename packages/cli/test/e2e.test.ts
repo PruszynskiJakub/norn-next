@@ -1,0 +1,278 @@
+/**
+ * End to end through the CLI runtime (H1, GR2, W2, S4–S9, C5, K4–K6, O3, O4): init → intake →
+ * ticks with simulated agent receipts → slice check fail/pass → gate → integrate → open-pr.
+ * Real git (temp repo + bare remote); fake RemotePort, RunnerPort and notifier.
+ */
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import type { TickTrace } from "@norn/schema";
+import { readTrace } from "@norn/store";
+import { replayInputs, type TickReport } from "../src/index.ts";
+import { decide } from "@norn/core";
+import { createHarness, type Harness, issue } from "./harness.ts";
+
+const MINI = `name: mini
+start: plan
+steps:
+  plan:
+    type: agent
+    skill: plan
+    outcomes: { done: { to: slices, means: "slice files written" } }
+  slices:
+    type: slices
+    outcomes: { done: open-pr, stuck: $stuck }
+  open-pr:
+    type: git
+    action: open-pr
+    outcomes: { done: $done }
+`;
+
+const SLICE = `name: slice
+start: implement
+steps:
+  implement:
+    type: agent
+    skill: implement
+    outcomes: { done: { to: test, means: "tests pass" } }
+  test:
+    type: check
+    run: test -f pass.flag && echo checked
+    timeout: 1m
+    outcomes: { pass: human-qa, fail: { to: implement, counter: test_loop } }
+  human-qa:
+    type: gate
+    prompt: "Try it"
+    outcomes: { approve: integrate, reject: { to: implement, counter: test_loop } }
+  integrate:
+    type: git
+    action: integrate
+    outcomes: { done: $done, conflict: { to: implement, counter: test_loop } }
+counters: { test_loop: { max: 3 } }
+`;
+
+const CONFIG = `agents:
+  claude: { adapter: claude }
+runner: { adapter: headless }
+remote: { provider: gh, label: norn }
+default_workflow: story
+default_mode: auto
+notifiers: []
+`;
+
+let h: Harness;
+const renewals: string[] = [];
+/** decisions that did something, minus claim renewals (T4, timing-dependent) */
+const kinds = (r: TickReport) => {
+  renewals.push(...r.decisions.filter((d) => d.rule === "claim.renew" && d.ok).map((d) => d.unit));
+  return r.decisions.filter((d) => d.kind !== "noop" && d.rule !== "claim.renew").map((d) => `${d.unit} ${d.kind}${d.ok ? "" : ` FAILED ${d.error}`}`);
+};
+
+beforeAll(async () => {
+  h = await createHarness();
+});
+afterAll(() => h.cleanup());
+
+describe("norn init", () => {
+  test("writes config, workflows, skills, hooks and .gitignore; idempotent", async () => {
+    const r = await h.norn("init");
+    expect(r.exit).toBe(0);
+    const v = r.value as { config: string; workflows: { created: string[] }; skills: Array<{ written: string[] }>; hooks: Array<{ changed: string[] }>; gitignore: string[] };
+    expect(v.config).toBe("created");
+    expect(v.workflows.created).toEqual(["bug.yaml", "slice.yaml", "story.yaml"]);
+    expect(v.skills[0]?.written).toContain("norn");
+    expect(v.hooks[0]?.changed).toEqual([join(h.root, ".claude", "settings.json")]);
+    expect(v.gitignore).toEqual([".agents/norn/trace/", ".env.norn", ".norn-unit"]);
+    expect(existsSync(join(h.root, ".claude/skills/implement/SKILL.md"))).toBe(true);
+    const again = (await h.norn("init")).value as typeof v;
+    expect(again.config).toBe("exists");
+    expect(again.gitignore).toEqual([]);
+    expect(again.hooks[0]?.changed).toEqual([]);
+  });
+
+  test("unknown commands and bad options are usage errors with do_instead", async () => {
+    const r = await h.norn("frobnicate");
+    expect(r.exit).toBe(2);
+    expect(r.value).toMatchObject({ code: "unknown_command", do_instead: expect.stringContaining("norn help") });
+    expect((await h.norn("tick", "--bogus")).exit).toBe(2);
+  });
+});
+
+describe("a story through the slice workflow", () => {
+  const storyWt = () => `${h.root}-worktrees/gh-7-add-login-form`;
+  const sliceWt = () => `${storyWt()}--01-form`;
+  const spec = ".agents/specs/gh-7-add-login-form";
+  const storyRuns = () => join(storyWt(), spec, "runs/_story");
+  const sliceRuns = () => join(sliceWt(), spec, "runs/01-form");
+  const step = (ms = 10_000) => h.clock.advance(ms);
+
+  test("setup: repo config and workflows committed on main", async () => {
+    h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
+    h.write(join(h.root, ".agents/norn/workflows/mini.yaml"), MINI);
+    h.write(join(h.root, ".agents/norn/workflows/slice.yaml"), SLICE);
+    h.git(["add", "-A"]);
+    h.git(["commit", "-q", "-m", "norn init"]);
+    h.git(["push", "-q", "origin", "main"]);
+    h.remote.issues = [issue(7, "Add login form", ["norn", "norn:wf:mini"])];
+  });
+
+  test("tick 1: sync → intake (GR2): story branch, worktree, story.md, slot, marker", async () => {
+    const r = await h.tick();
+    expect(r.sync).toEqual({ ran: true, ok: true });
+    expect(kinds(r)).toEqual(["gh-7 intake_story"]);
+    expect(existsSync(join(storyWt(), spec, "story.md"))).toBe(true);
+    const story = h.read(join(storyWt(), spec, "story.md"));
+    expect(story).toContain("workflow: mini");
+    expect(story).toContain("status: new");
+    expect(story).toContain("As a user I want to log in.");
+    expect(h.read(join(storyWt(), ".norn-unit"))).toContain("story=gh-7");
+    expect(h.read(join(storyWt(), ".env.norn"))).toContain("NORN_SLOT=1");
+    expect(h.git(["log", "-1", "--format=%s%n%(trailers:only)"], storyWt())).toContain("Norn-Story: gh-7");
+    expect(h.git(["status", "--porcelain"], storyWt())).toBe("");
+    expect(readdirSync(join(h.home, "leases"))).toEqual(["slot-1.json"]);
+  });
+
+  test("tick 2: claim acquired (T3); tick 3: story unit started with pinned workflow (S7)", async () => {
+    step();
+    expect(kinds(await h.tick())).toEqual(["gh-7 claim"]);
+    expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-7"])).toContain("refs/norn/claims/gh-7");
+    step();
+    expect(kinds(await h.tick())).toEqual(["gh-7 start_unit"]);
+    const st = h.state(storyRuns());
+    expect(st).toMatchObject({ step: "plan", status: "ready", mode: "auto", workflow: "mini" });
+    expect(h.read(join(storyRuns(), "workflow.yaml"))).toBe(MINI);
+    expect(h.read(join(storyRuns(), "handoff.md"))).toContain("Step: plan (attempt 1)");
+    expect(h.read(join(storyWt(), spec, "story.md"))).toContain("status: active");
+    expect(h.git(["ls-remote", "origin", "refs/heads/gh-7-add-login-form"])).not.toBe("");
+  });
+
+  test("tick 4: auto mode launches the agent via the runner with NORN_* env (A6, B5)", async () => {
+    step();
+    expect(kinds(await h.tick())).toEqual(["gh-7 start_run"]);
+    const launch = h.runner.launches[0];
+    expect(launch?.cwd).toBe(storyWt());
+    expect(launch?.env).toMatchObject({ NORN_STORY: "gh-7", NORN_HOME: h.root, NORN_SLOT: "1" });
+    expect(launch?.argv.join(" ")).toContain("Use the norn skill, then run `norn brief`.");
+    const st = h.state(storyRuns());
+    expect(st?.status).toBe("running");
+    expect(st?.run?.session).toEqual({ runner: "fake", session_id: "s-1", pane_id: "p-1" });
+    expect(readdirSync(join(storyRuns(), "receipts")).sort()).toEqual(["0001-started.json", "0002-started.json"]);
+    expect(readdirSync(join(h.home, "leases")).sort()).toEqual(["agent-1.json", "slot-1.json"]);
+    // a live run with nothing new: no action (recovery commit of runs/ first)
+    step();
+    expect(kinds(await h.tick())).toEqual(["gh-7 commit_push"]);
+    step();
+    expect(kinds(await h.tick())).toEqual([]);
+  });
+
+  test("plan done → slices step starts the slice: worktree from the story branch, slot 2, slice active (W2, K4)", async () => {
+    h.write(join(storyWt(), spec, "slices/01-form.md"), "---\nid: gh-7/01\ntitle: Login form\ndepends_on: []\nstatus: planned\n---\n\nAcceptance: the form renders.\n");
+    h.report(storyRuns(), "done", { outcome: "done", handoff: "planned one slice" });
+    step();
+    expect(kinds(await h.tick())).toEqual(["gh-7 apply_receipts"]);
+    expect(h.state(storyRuns())).toMatchObject({ step: "slices", status: "ready" });
+    const msg = h.git(["log", "-1", "--format=%B"], storyWt());
+    expect(msg).toContain("Norn-Story: gh-7");
+    expect(msg).toContain("Norn-Step: plan");
+    expect(msg).toMatch(/Norn-Tick: [0-9A-Z]{26}/);
+    expect(h.git(["show", "--stat", "--format=", "HEAD"], storyWt())).toContain("slices/01-form.md");
+    expect(readdirSync(join(h.home, "leases")).sort()).toEqual(["slot-1.json"]); // agent lease released
+    step();
+    expect(kinds(await h.tick())).toEqual(["gh-7 start_slices"]);
+    expect(existsSync(sliceWt())).toBe(true);
+    expect(h.read(join(sliceWt(), ".env.norn"))).toContain("NORN_SLOT=2");
+    expect(h.read(join(storyWt(), spec, "slices/01-form.md"))).toContain("status: active");
+    expect(h.state(sliceRuns())).toMatchObject({ story: "gh-7", slice: "gh-7/01", step: "implement", status: "ready" });
+    expect(h.git(["log", "-1", "--format=%(trailers:only)"], sliceWt())).toContain("Norn-Slice: gh-7/01");
+  });
+
+  test("slice implement runs; check fails (C5: receipt tail + committed log) and routes back counted (W4)", async () => {
+    step();
+    expect(kinds(await h.tick())).toEqual(["gh-7/01 start_run"]);
+    expect(h.runner.launches[1]?.env).toMatchObject({ NORN_SLICE: "gh-7/01", NORN_SLOT: "2" });
+    h.write(join(sliceWt(), "form.txt"), "form v1\n");
+    h.report(sliceRuns(), "done", { outcome: "done", handoff: "form added" });
+    step();
+    expect(kinds(await h.tick())).toEqual(["gh-7/01 apply_receipts"]);
+    expect(h.state(sliceRuns())).toMatchObject({ step: "test", status: "ready" });
+    step();
+    const r = await h.tick();
+    expect(kinds(r)).toEqual(["gh-7/01 run_check"]);
+    const files = readdirSync(join(sliceRuns(), "receipts"));
+    const checkFile = files.find((f) => f.endsWith("-check.json")) as string;
+    const check = JSON.parse(h.read(join(sliceRuns(), "receipts", checkFile)));
+    expect(check).toMatchObject({ kind: "check", outcome: "fail", exit_code: 1, command: "test -f pass.flag && echo checked", step: "test", attempt: 1 });
+    expect(check.log).toMatch(/^logs\/[0-9A-Z]{26}\.log$/);
+    expect(existsSync(join(sliceRuns(), check.log))).toBe(true);
+    step();
+    expect(kinds(await h.tick())).toEqual(["gh-7/01 apply_receipts"]);
+    expect(h.state(sliceRuns())).toMatchObject({ step: "implement", attempt: 2, counters: { test_loop: 1 } });
+    expect(h.git(["show", "--stat", "--format=", "HEAD"], sliceWt())).toContain(check.log.slice(5));
+  });
+
+  test("rework passes the check; gate parks and notifies once (O3); approve → integrate (K6)", async () => {
+    step();
+    expect(kinds(await h.tick())).toEqual(["gh-7/01 start_run"]);
+    h.write(join(sliceWt(), "pass.flag"), "ok\n");
+    h.report(sliceRuns(), "done", { outcome: "done", handoff: "fixed" });
+    step();
+    await h.tick();
+    step();
+    expect(kinds(await h.tick())).toEqual(["gh-7/01 run_check"]);
+    step();
+    // O3: notified in the tick that parked it (post-act facts), not one tick later
+    const parked = await h.tick();
+    expect(kinds(parked)).toEqual(["gh-7/01 apply_receipts"]);
+    expect(h.state(sliceRuns())).toMatchObject({ step: "human-qa", status: "parked", park: { kind: "gate", reason: "Try it" } });
+    expect(parked.notified).toEqual(["approve:gh-7/01:human-qa#1"]);
+    expect(h.notifier.items.map((i) => i.id)).toContain("approve:gh-7/01:human-qa#1");
+    step();
+    expect((await h.tick()).notified).toEqual([]);
+    h.report(sliceRuns(), "approve", {}, "human");
+    step();
+    expect(kinds(await h.tick())).toEqual(["gh-7/01 apply_receipts"]);
+    expect(h.state(sliceRuns())).toMatchObject({ step: "integrate", status: "ready" });
+    step();
+    expect(kinds(await h.tick())).toEqual(["gh-7/01 run_git"]);
+    expect(h.git(["log", "--format=%s", "gh-7-add-login-form"])).toContain("norn: gh-7/01 implement.done → test");
+    expect(existsSync(join(storyWt(), "pass.flag"))).toBe(true);
+  });
+
+  test("slice $done → cleanup (K5): final state on the story branch, worktree + branch removed, integrated", async () => {
+    step();
+    expect(kinds(await h.tick())).toEqual(["gh-7/01 apply_receipts"]);
+    expect(h.state(sliceRuns())).toMatchObject({ step: "$done", status: "done" });
+    step();
+    // the story's slices step sees the slice done in the same tick (W2)
+    expect(kinds(await h.tick())).toEqual(["gh-7 classify", "gh-7/01 mark_done"]);
+    expect(existsSync(sliceWt())).toBe(false);
+    expect(h.git(["branch", "--list", "gh-7/01-form"])).toBe("");
+    expect(h.read(join(storyWt(), spec, "slices/01-form.md"))).toContain("status: integrated");
+    expect(h.state(join(storyWt(), spec, "runs/01-form"))).toMatchObject({ step: "$done", status: "done" });
+    expect(readdirSync(join(h.home, "leases")).sort()).toEqual(["slot-1.json"]);
+  });
+
+  test("slices done → open-pr through the RemotePort → story $done; trace replays (O4, O5)", async () => {
+    expect(h.state(storyRuns())).toMatchObject({ step: "open-pr", status: "ready" });
+    step();
+    expect(kinds(await h.tick())).toEqual(["gh-7 run_git"]);
+    expect(h.remote.prs).toMatchObject([{ head: "gh-7-add-login-form", base: "main", draft: true }]);
+    step();
+    expect(kinds(await h.tick())).toEqual(["gh-7 apply_receipts"]);
+    expect(h.state(storyRuns())).toMatchObject({ step: "$done", status: "done" });
+    expect(h.git(["status", "--porcelain"], storyWt())).toBe("");
+    expect(h.git(["rev-parse", "gh-7-add-login-form"])).toBe(h.git(["ls-remote", "origin", "refs/heads/gh-7-add-login-form"]).split("\t")[0] as string);
+
+    expect(renewals).toContain("gh-7"); // T4: the beat renewed the claim along the way
+    const ticks = readTrace(h.root, { types: ["tick"] }).events as TickTrace[];
+    expect(Math.max(...ticks.map((t) => t.duration_ms))).toBeLessThan(5000);
+    expect(ticks.length).toBeGreaterThan(20);
+    for (const t of ticks.slice(-6)) {
+      const inputs = replayInputs(h.root, t);
+      expect(inputs).not.toBeNull();
+      const replayed = decide(inputs!.facts, inputs!.workflows, inputs!.config);
+      expect(replayed.map((d) => d.rule)).toEqual(t.decisions.map((d) => d.rule));
+      expect(JSON.parse(JSON.stringify(replayed.map((d) => d.action)))).toEqual(t.decisions.map((d) => d.action));
+    }
+  });
+});

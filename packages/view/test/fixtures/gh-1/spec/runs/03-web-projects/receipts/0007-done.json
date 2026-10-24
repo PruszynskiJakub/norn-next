@@ -1,0 +1,14 @@
+{
+  "kind": "done",
+  "receipt_id": "01M5MT1FPQ3P7DXNSVE74MD0XJ",
+  "run_id": "01M5MSXDF3ZHFXQKG87Z847PKB",
+  "step": "qa",
+  "attempt": 1,
+  "at": "2026-10-23T16:38:24.727Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-1/03",
+  "outcome": "partial",
+  "handoff": "QA#1 on real server (PORT 4050, fresh DB, curl): AC1-5, AC7-9 pass, 53 HTTP checks, 0 fail; AC4 also proves the item is gone (PATCH /api/items/:id → 404 after delete). AC6 (browser confirm/cancel) = person: no browser here. onsubmit=\"return confirm(...)\" is present and the confirmed POST → 303 / → Inbox was checked; 6-step manual check is in AC6.md. Not ACs: review F2 confirmed (crafted Inbox rename → 400 with no message); project ids are reused after delete (stale /projects/N links can open a different project).",
+  "evidence": "evidence/01M5MSXDF3ZHFXQKG87Z847PKB"
+}

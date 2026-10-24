@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M5MST72JH5MKCQ1MZ6688X8G",
+  "run_id": "01M5MSPS3H3SZXQHBCH031MQ6B",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-23T16:34:26.514Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-1/03",
+  "outcome": "done",
+  "handoff": "Added src/views.ts (pure rendering, escape() on all text+attributes, itemRow() hook for gh-1/04) and src/web.ts (GET /, /projects/:id, POST /projects, /projects/:id/rename, /projects/:id/delete; 303 PRG, 400 re-render with store message next to the form and input kept, 404 page linking to /); app.ts routes non-API paths to web; api.ts exports parseId. test/web.test.ts covers AC1-5, AC7-9 (28 tests, red before code). bun test 121 pass, typecheck clean. AC6 (browser confirm) is agent-verified: onsubmit confirm present; smoke-tested real server on port 4050 with curl, not in a browser. Create form carries hidden 'from' so a create error re-renders on the project being viewed."
+}

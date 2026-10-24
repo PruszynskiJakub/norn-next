@@ -1,0 +1,64 @@
+# norn repo config — .agents/norn/config.yaml
+# Same schema as the user layer ~/.norn/config.yaml; this file overrides it (K2),
+# except machine caps (max_agents, max_checks, slots.min/max), which a repo can only lower.
+# Every key is optional; commented values are the built-in defaults.
+# Schema: packages/schema/json/config.schema.json
+
+# Coding agents norn can brief or start. Key = name used by `default_agent` and a step's `agent:`.
+agents:
+  claude:
+    adapter: claude            # claude | codex | opencode | gemini | <package name>
+    # command: claude
+    # args: []
+    # model: <model id>
+    # env: { SOME_VAR: value }
+# default_agent: claude
+
+# Who starts agents in auto mode. Leave unset (or null) to run every story manual (MO2).
+# runner:
+#   adapter: herdr             # herdr | headless | <package name>
+#   options: {}
+
+# Where stories come from (GR1).
+remote:
+  provider: gh                 # gh (GitHub) | glab (GitLab)
+  label: norn                  # issues assigned to you with this label become stories
+  # git_remote: origin
+  # host: github.example.com   # GitHub Enterprise / self-hosted GitLab
+  # sync_interval: 5m
+
+# Workflows from .agents/norn/workflows/ (W9). A remote label norn:wf:<name> overrides per story.
+# default_workflow: story
+# default_slice_workflow: slice
+
+# Who starts unattended agent steps for new stories: manual (a person) | auto (the tick).
+# default_mode: manual
+
+# Machine caps (K1). Usually set in ~/.norn/config.yaml; here they can only be lowered.
+# max_agents: 2
+# max_checks: 2
+# slots:
+#   min: 1
+#   max: 9
+#   port_base: 4000
+#   ports_per_slot: 10
+#   env: { DATABASE_URL: "postgres://localhost/app_{slot}" }
+
+# Notifiers fire once per new inbox item (O3).
+# notifiers:
+#   - adapter: os              # os | ntfy | webhook | <package name>
+#   - adapter: ntfy
+#     options: { topic: my-norn }
+
+# Heartbeat and claims (H5, T4).
+# watch_interval: 30s
+# claim:
+#   lease: 10m
+#   renew: 3m
+
+# Defaults for agent steps that do not set their own limits (C1).
+# limits:
+#   deadline: 60m              # unattended step deadline → timeout
+#   nudges: 2                  # max nudges in the same session (silent / timeout / stalled)
+#   retries: 1                 # max fresh-session retries after died
+#   stalled: 15m               # no hook, git or file activity for this long → stalled

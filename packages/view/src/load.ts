@@ -1,0 +1,373 @@
+/**
+ * loadProjectView (X1): one read-only pass over local data — spec folders (main checkout
+ * and story worktrees), runs/, the trace window, local claim refs and ~/.norn leases.
+ * No network (no fetch, no ls-remote, no remote API) and no writes of any kind.
+ */
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { hostname, userInfo } from "node:os";
+import { join } from "node:path";
+import {
+  buildInbox,
+  type ClaimState,
+  effectiveMode,
+  type Facts,
+  type FileError,
+  formatAge,
+  nextCommand,
+  RECENT_MS,
+  type RunFacts,
+  sliceWorktreePath,
+  startCommandFor,
+  type StoryFacts,
+  stepOf,
+  storyWorktreePath,
+  type UnitFacts,
+  type WorktreeFacts,
+} from "@norn/core";
+import { DEFAULT_CONFIG, type HookFact, type LeaseFile, type Mode, type ResolvedConfig, storyBranch, type TraceEvent } from "@norn/schema";
+import {
+  classifyClaim,
+  type LeaseEntry,
+  type LeaseLiveness,
+  listLeases,
+  loadSnapshot,
+  readEnvNorn,
+  readLocalClaim,
+  readTrace,
+  readUnitMarker,
+  type StorySnapshot,
+  type UnitSnapshot,
+  withSliceWorktrees,
+} from "@norn/store";
+import { mergeTimeline, receiptEntry, traceEntries, traceUnits } from "./timeline.ts";
+import type { ClaimView, CounterView, ProjectView, RecentDone, RunView, SliceView, StoryView, TimelineEntry, UnitView } from "./types.ts";
+
+export interface LoadProjectViewOptions {
+  repoRoot: string;
+  /** norn home (default NORN_HOME_DIR or ~/.norn) */
+  home?: string;
+  /** ms epoch; default Date.now() */
+  now?: number;
+  env?: Record<string, string | undefined>;
+  /** `user@machine` whose claims count as `mine`; default this OS user and host */
+  holder?: string;
+  /** this machine's heartbeat id, also counted as `mine` */
+  heartbeatId?: string | null;
+  /** story worktrees to scan before repoRoot; default: every `<repoRoot>-worktrees/<story>` folder */
+  storyRoots?: string[];
+  /** trace window lower bound (ISO); default 14 days before now */
+  traceSince?: string;
+  /** lease liveness check (default: holder pid + start time) */
+  liveness?: LeaseLiveness;
+}
+
+const TRACE_WINDOW_MS = 14 * 86_400_000;
+const STORY_DIR = /^(?:gh|gl)-[1-9][0-9]*-[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+function push<T>(m: Map<string, T[]>, k: string, v: T): void {
+  const list = m.get(k);
+  if (list) list.push(v);
+  else m.set(k, [v]);
+}
+
+export function defaultHolder(): string {
+  let user = "user";
+  try {
+    user = userInfo().username || user;
+  } catch {}
+  return `${user}@${hostname()}`;
+}
+
+/** Story worktrees beside the repo (GR3): `<repo>-worktrees/<id>-<slug>`, slice worktrees (`--`) excluded. */
+export function discoverStoryRoots(repoRoot: string): string[] {
+  const base = `${repoRoot.replace(/\/+$/, "")}-worktrees`;
+  try {
+    return readdirSync(base)
+      .filter((n) => STORY_DIR.test(n) && !n.includes("--") && statSync(join(base, n)).isDirectory())
+      .sort()
+      .map((n) => join(base, n));
+  } catch {
+    return [];
+  }
+}
+
+/** The slice's worktree (`<story worktree>--<nn>-<slug>`, GR3) when it exists and its `.norn-unit` marker names that slice. */
+export function markedSliceWorktree(storyWt: string, story: StorySnapshot, slice: string): string | null {
+  const file = story.slices.find((s) => s.key === slice);
+  const dir = story.units.find((u) => u.unit.slice === slice)?.unit.dir;
+  const nn = file?.nn ?? dir?.split("-")[0];
+  const slug = file?.slug ?? dir?.replace(/^\d+-/, "");
+  if (!nn || !slug) return null;
+  const path = sliceWorktreePath(storyWt, nn, slug);
+  return readUnitMarker(path).marker?.slice === slice ? path : null;
+}
+
+function worktreeFacts(path: string): WorktreeFacts {
+  const exists = existsSync(path);
+  const slot = exists ? Number(readEnvNorn(path)?.NORN_SLOT ?? Number.NaN) : Number.NaN;
+  return {
+    path,
+    exists,
+    marker: exists && readUnitMarker(path).exists,
+    status: null,
+    last_commit_at: null,
+    last_file_change_at: null,
+    slot: Number.isFinite(slot) ? slot : null,
+  };
+}
+
+function claimView(c: ClaimState): ClaimView {
+  if (c.state === "none") return { state: "none", holder: null, expires_at: null, unclaimed: true };
+  if (c.state === "corrupt") return { state: "corrupt", holder: null, expires_at: null, unclaimed: false };
+  return { state: c.state, holder: c.blob.holder, expires_at: c.blob.expires_at, unclaimed: c.state === "expired" };
+}
+
+function counters(u: UnitSnapshot): CounterView[] {
+  const max = u.workflow?.workflow.counters ?? {};
+  const live = u.state?.counters ?? {};
+  return Object.keys({ ...max, ...live })
+    .sort()
+    .map((name) => ({ name, value: live[name] ?? 0, max: max[name]?.max ?? null }));
+}
+
+interface Ctx {
+  now: number;
+  config: ResolvedConfig;
+  runner: string | null;
+}
+
+function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: UnitFacts, ctx: Ctx, title: string, workflow: string): UnitView {
+  const st = u.state;
+  const step = st && u.workflow ? stepOf(u.workflow.workflow, st.step) : null;
+  const eff = effectiveMode(sf.mode, step?.type === "agent" && !!step.attended, ctx.runner);
+  const corrupt = u.errors.length > 0 || st?.status === "corrupt";
+  const since = st ? (st.park?.since ?? (st.status === "running" ? st.run?.started_at : null) ?? (st.status === "done" ? st.updated_at : st.step_entered_at)) : null;
+  const start = step?.type === "agent" ? startCommandFor(uf, sf, ctx.config) : undefined;
+  return {
+    key: u.unit.key,
+    story: story.key,
+    slice: u.unit.slice,
+    title,
+    url: story.frontmatter?.url ?? null,
+    workflow: st?.workflow ?? workflow,
+    mode: sf.mode,
+    effective_mode: eff.mode,
+    mode_downgraded: eff.downgraded,
+    claim: claimView(sf.claim),
+    status: corrupt ? "corrupt" : (st?.status ?? "not_started"),
+    step: st?.step ?? null,
+    attempt: st?.attempt ?? null,
+    counters: counters(u),
+    park: st?.park ? { kind: st.park.kind, reason: st.park.reason, since: st.park.since } : null,
+    since,
+    age: since ? formatAge(ctx.now - Date.parse(since)) : null,
+    last_outcome: st?.last_outcome ? { step: st.last_outcome.step, outcome: st.last_outcome.outcome, at: st.last_outcome.at } : null,
+    next: corrupt ? `norn why ${u.unit.key}` : nextCommand(u.unit.key, st, start),
+    updated_at: st?.updated_at ?? null,
+    errors: u.errors,
+  };
+}
+
+/** Build the read model. Async only because claim refs are read through local git. */
+export async function loadProjectView(opts: LoadProjectViewOptions): Promise<ProjectView> {
+  const now = opts.now ?? Date.now();
+  const holder = opts.holder ?? defaultHolder();
+  const errors: FileError[] = [];
+
+  const snap = loadSnapshot({
+    repoRoot: opts.repoRoot,
+    storyRoots: opts.storyRoots ?? discoverStoryRoots(opts.repoRoot),
+    home: opts.home,
+    env: opts.env,
+    includeApplied: true,
+  });
+  let config = DEFAULT_CONFIG;
+  if (snap.config.ok) config = snap.config.config;
+  else errors.push(...snap.config.errors);
+  errors.push(...snap.workflows.errors);
+  const runner = config.runner?.adapter ?? null;
+  const ctx: Ctx = { now, config, runner };
+
+  // Local reads in parallel: claim refs (no fetch) and machine leases.
+  const [claims, leases, trace] = await Promise.all([
+    Promise.all(snap.stories.map((s) => readLocalClaim(opts.repoRoot, s.key).catch(() => ({ state: "none" }) as const))),
+    listLeases(snap.home, opts.liveness).catch((e: unknown) => {
+      errors.push({ file: "leases", errors: [{ path: "", message: (e as Error).message }] });
+      return { live: [] as LeaseEntry[], dead: [] as LeaseEntry[], errors: [] as FileError[] };
+    }),
+    Promise.resolve(readTrace(opts.repoRoot, { since: opts.traceSince ?? new Date(now - TRACE_WINDOW_MS).toISOString() })),
+  ]);
+  errors.push(...leases.errors, ...trace.errors);
+
+  const traceByUnit = new Map<string, TraceEvent[]>();
+  const hooksByRun = new Map<string, HookFact[]>();
+  for (const ev of trace.events) {
+    for (const k of traceUnits(ev)) push(traceByUnit, k, ev);
+    if (ev.type === "hook" && ev.fact.run_id) push(hooksByRun, ev.fact.run_id, ev.fact);
+  }
+  const leaseByRun = new Map<string, { entry: LeaseEntry; alive: boolean }>();
+  for (const [list, alive] of [[leases.dead, false], [leases.live, true]] as const)
+    for (const entry of list) if (entry.lease.run_id && entry.lease.kind !== "slot") leaseByRun.set(entry.lease.run_id, { entry, alive });
+
+  const me = { heartbeat_id: opts.heartbeatId ?? null };
+  const runs: RunView[] = [];
+  const timeline: Record<string, TimelineEntry[]> = {};
+  const storyFacts: StoryFacts[] = [];
+  const stories: StoryView[] = [];
+
+  snap.stories.forEach((read, i) => {
+    const storyWt = storyWorktreePath(opts.repoRoot, read.key, read.slug);
+    // A slice running in its own worktree keeps its live runs/ there (§7); same rule as observe.
+    const story = withSliceWorktrees(read, (slice) => markedSliceWorktree(storyWt, read, slice), { includeApplied: true });
+    let claim = classifyClaim(claims[i] ?? { state: "none" }, me, now);
+    if (claim.state === "other" && claim.blob.holder === holder) claim = { ...claim, state: "mine" };
+    const storyState = story.units[0]?.state ?? null;
+    const mode: Mode = storyState?.mode ?? config.default_mode;
+
+    const units: UnitFacts[] = story.units.map((u) => {
+      const sl = u.unit.slice === null ? null : story.slices.find((s) => s.key === u.unit.slice);
+      const wt = u.unit.slice === null ? storyWt : sliceWorktreePath(storyWt, sl?.nn ?? u.unit.dir.split("-")[0] ?? "", sl?.slug ?? u.unit.dir.replace(/^\d+-/, ""));
+      const r = u.state?.run ?? null;
+      const lease = r ? leaseByRun.get(r.run_id) : undefined;
+      const hooks = r ? (hooksByRun.get(r.run_id) ?? []) : [];
+      const lastHook = hooks.length ? Math.max(...hooks.map((h) => Date.parse(h.at))) : null;
+      const run: RunFacts | null = r
+        ? {
+            run_id: r.run_id,
+            session: r.session ? { ...r.session, ...(r.process ? { process: r.process } : {}) } : null,
+            process_alive: lease ? lease.alive : null,
+            pane: null,
+            hooks,
+            last_hook_at: lastHook,
+            last_activity_at: lastHook,
+            transcript: r.transcript ?? null,
+          }
+        : null;
+      return {
+        unit: u.unit,
+        state: u.state,
+        workflow: u.workflow?.workflow ?? null,
+        workflow_hash: u.workflow?.hash ?? null,
+        errors: u.errors,
+        unapplied: u.unapplied,
+        last_check: null,
+        last_findings: null,
+        last_outcome_receipt: (u.receipts ?? []).find((r) => !!u.state?.last_outcome && r.receipt.receipt_id === u.state.last_outcome.receipt_id) ?? null,
+        worktree: worktreeFacts(wt),
+        run,
+        lease: (lease?.entry.lease as LeaseFile | undefined) ?? null,
+        uncommitted: false,
+      };
+    });
+
+    const sf: StoryFacts = {
+      key: story.key,
+      slug: story.slug,
+      spec_dir: story.spec_dir,
+      branch: storyBranch(story.key, story.slug),
+      frontmatter: story.frontmatter,
+      frontmatter_error: story.frontmatter_error,
+      worktree: units[0]?.worktree ?? null,
+      claim,
+      mailbox: undefined,
+      issue: undefined,
+      pr: undefined,
+      units,
+      slices: story.slices,
+      mode,
+    };
+    storyFacts.push(sf);
+
+    // Runs and timelines.
+    story.units.forEach((u, j) => {
+      const r = u.state?.run;
+      const uf = units[j] as UnitFacts;
+      if (r) {
+        const lease = leaseByRun.get(r.run_id);
+        runs.push({
+          unit: u.unit.key,
+          story: story.key,
+          slice: u.unit.slice,
+          run_id: r.run_id,
+          step: r.step,
+          attempt: r.attempt,
+          started_at: r.started_at,
+          how: r.how,
+          agent: r.agent ?? null,
+          session: r.session ?? null,
+          alive: lease ? lease.alive : null,
+          lease: lease ? { kind: lease.entry.lease.kind, file: lease.entry.file, slot: lease.entry.lease.slot ?? null } : null,
+          last_hook_at: uf.run?.last_hook_at ? new Date(uf.run.last_hook_at).toISOString() : null,
+        });
+      }
+      const entries = (u.receipts ?? u.unapplied).map(receiptEntry);
+      for (const ev of traceByUnit.get(u.unit.key) ?? []) entries.push(...traceEntries(ev, u.unit.key));
+      timeline[u.unit.key] = mergeTimeline(entries);
+    });
+
+    // Unit views.
+    const storyTitle = story.frontmatter?.title ?? story.key;
+    const storyUnit = story.units[0] as UnitSnapshot;
+    const base = unitView(storyUnit, story, sf, units[0] as UnitFacts, ctx, storyTitle, story.frontmatter?.workflow ?? config.default_workflow);
+    const slices: SliceView[] = story.units.slice(1).map((u, k) => {
+      const file = story.slices.find((s) => s.key === u.unit.slice);
+      const fm = file?.frontmatter ?? null;
+      const v = unitView(u, story, sf, units[k + 1] as UnitFacts, ctx, fm?.title ?? u.unit.key, fm?.workflow ?? config.default_slice_workflow);
+      return {
+        ...v,
+        slice: u.unit.slice as string,
+        nn: file?.nn ?? u.unit.dir.split("-")[0] ?? "",
+        slice_status: fm?.status ?? null,
+        depends_on: fm?.depends_on ?? [],
+        integrated: fm?.status === "integrated",
+        errors: file?.error ? [file.error, ...v.errors] : v.errors,
+      };
+    });
+    stories.push({
+      ...base,
+      slice: null,
+      story_status: story.frontmatter?.status ?? null,
+      spec_dir: story.spec_dir,
+      root: story.root,
+      slices,
+      errors: story.frontmatter_error ? [story.frontmatter_error, ...base.errors] : base.errors,
+    });
+  });
+
+  const facts: Facts = {
+    tick_id: "view",
+    now,
+    repo: { root: opts.repoRoot, default_branch: "main", remote: config.remote.git_remote },
+    machine: {
+      holder,
+      heartbeat_id: opts.heartbeatId ?? null,
+      runner,
+      leases: leases.live.map((e) => e.lease),
+      dead_leases: leases.dead.map((e) => e.lease),
+    },
+    remote: { synced_at: null, issues: undefined },
+    stories: storyFacts,
+    orphans: { worktrees: [], branches: [] },
+  };
+
+  const recently_done: RecentDone[] = stories
+    .flatMap((s) => [s, ...s.slices])
+    .filter((u) => u.status === "done" && u.updated_at && now - Date.parse(u.updated_at) <= RECENT_MS)
+    .map((u) => ({ unit: u.key, title: u.title, done_at: u.updated_at as string, age: formatAge(now - Date.parse(u.updated_at as string)) }))
+    .sort((a, b) => Date.parse(b.done_at) - Date.parse(a.done_at) || a.unit.localeCompare(b.unit));
+
+  runs.sort((a, b) => Date.parse(a.started_at) - Date.parse(b.started_at) || a.unit.localeCompare(b.unit));
+
+  return {
+    at: new Date(now).toISOString(),
+    repo: opts.repoRoot,
+    holder,
+    runner,
+    stories,
+    inbox: buildInbox(facts, config),
+    runs,
+    timeline,
+    recently_done,
+    errors,
+  };
+}

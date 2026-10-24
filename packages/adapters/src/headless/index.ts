@@ -1,0 +1,121 @@
+/**
+ * Headless runner (RunnerPort): starts the agent's non-interactive command as a detached
+ * background process in the unit worktree, env included (A6), stdout+stderr appended to a log
+ * file in the trace dir. Liveness is pid + start time (K3), so a reused pid never counts.
+ *
+ * There is no pane to type into: `send` throws PortError `unsupported`. Per B2 the caller then
+ * continues the same agent session by launching `AgentAdapter.launchCommand({ resume })` through
+ * this runner, or starts a fresh session from the handoff.
+ */
+import { spawn } from "node:child_process";
+import { closeSync, mkdirSync, openSync } from "node:fs";
+import { dirname, join } from "node:path";
+import type { AdapterContext, LaunchSpec, PaneState, ProcessPort, RunnerPort, SessionRef } from "@norn/core";
+import type { RunnerConfig } from "@norn/schema";
+import { portError } from "../process/error.ts";
+import { createProcessPort } from "../process/index.ts";
+
+export const RUNNER_NAME = "headless";
+
+export interface HeadlessRunnerOptions {
+  /** directory for `<run_id>.log` (the caller's trace dir) */
+  logDir: string;
+  process?: ProcessPort;
+  /** grace between SIGTERM and SIGKILL (default 3000 ms) */
+  killGraceMs?: number;
+  sleep?: (ms: number) => Promise<void>;
+}
+
+/** Log file for a run: `<logDir>/<run_id>.log`. */
+export function logPath(logDir: string, runId: string): string {
+  return join(logDir, `${runId}.log`);
+}
+
+export function createHeadlessRunner(opts: HeadlessRunnerOptions): RunnerPort {
+  const proc = opts.process ?? createProcessPort();
+  const sleep = opts.sleep ?? ((ms: number) => Bun.sleep(ms));
+  const grace = opts.killGraceMs ?? 3000;
+
+  return {
+    name: RUNNER_NAME,
+
+    async available() {
+      return true;
+    },
+
+    async launch(spec: LaunchSpec): Promise<SessionRef> {
+      const [cmd, ...args] = spec.argv;
+      if (!cmd) throw portError("launch_failed", "empty argv");
+      const log = logPath(opts.logDir, spec.run_id);
+      mkdirSync(dirname(log), { recursive: true });
+      const fd = openSync(log, "a");
+      let pid: number | undefined;
+      try {
+        const child = spawn(cmd, args, {
+          cwd: spec.cwd,
+          env: { ...process.env, ...spec.env },
+          detached: true, // own process group: survives the tick, killable as a group
+          stdio: ["ignore", fd, fd],
+        });
+        pid = await new Promise<number | undefined>((resolve, reject) => {
+          child.once("spawn", () => resolve(child.pid));
+          child.once("error", reject);
+        });
+        child.unref();
+      } catch (err) {
+        throw portError("launch_failed", `cannot start ${cmd}: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        closeSync(fd);
+      }
+      if (!pid) throw portError("launch_failed", `no pid for ${cmd}`);
+      const identity = await proc.identify(pid);
+      if (!identity) throw portError("launch_failed", `${cmd} exited immediately; see ${log}`);
+      return { runner: RUNNER_NAME, session_id: spec.run_id, process: identity };
+    },
+
+    async send() {
+      throw portError("unsupported", "headless sessions take no input; resume via the agent's resume command (B2)");
+    },
+
+    async paneState(session): Promise<PaneState> {
+      // No screen to read: report liveness only, never a completion signal (C2).
+      return { alive: await this.isAlive(session), state: "unknown", since: null };
+    },
+
+    async isAlive(session) {
+      return session.process ? proc.isAlive(session.process) : false;
+    },
+
+    async kill(session) {
+      const p = session.process;
+      if (!p || !(await proc.isAlive(p))) return; // gone, or pid reused by someone else
+      signal(p.pid, "SIGTERM");
+      for (let waited = 0; waited < grace; waited += 100) {
+        await sleep(100);
+        if (!(await proc.isAlive(p))) return;
+      }
+      if (await proc.isAlive(p)) signal(p.pid, "SIGKILL");
+    },
+  };
+}
+
+/** Signal the process group (detached leader), falling back to the pid alone. */
+function signal(pid: number, sig: NodeJS.Signals): void {
+  try {
+    process.kill(-pid, sig);
+  } catch {
+    try {
+      process.kill(pid, sig);
+    } catch {
+      /* already gone */
+    }
+  }
+}
+
+/** RunnerFactory: option `log_dir` (default `<repo>/.agents/norn/trace/runs`). */
+export const headlessFactory = (ctx: AdapterContext, config: RunnerConfig): RunnerPort => {
+  const dir = config.options?.log_dir;
+  return createHeadlessRunner({
+    logDir: typeof dir === "string" ? dir : join(ctx.repoRoot, ".agents", "norn", "trace", "runs"),
+  });
+};

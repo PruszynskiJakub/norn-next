@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M5MTMZHN65KY2P462S94VHJ5",
+  "run_id": "01M5MTEB6T37MVRHZ5FADDAQTK",
+  "step": "qa",
+  "attempt": 1,
+  "at": "2026-10-23T16:49:03.542Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "fail",
+  "handoff": "Story QA via curl on :4040: 31/32 Behaviour items + tests AC pass. FAIL B12/edge 'delete already-deleted -> 404': ids of deleted items/projects are reused (INTEGER PRIMARY KEY without AUTOINCREMENT in src/store.ts), so a stale/retried DELETE /api/items/N returns 204 and deletes an unrelated newer item. Repro in B12-repro.md. Browser-only parts (confirm dialog, checkbox auto-submit, strike-through, back/forward) listed in PERSON.md. report.md has the table.",
+  "evidence": "evidence/01M5MTEB6T37MVRHZ5FADDAQTK"
+}

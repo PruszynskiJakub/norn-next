@@ -1,0 +1,12 @@
+{
+  "kind": "done",
+  "receipt_id": "01M5MTVM3MMZWH6SHTZZ1NXZW5",
+  "run_id": "01M5MTPFRRM90Q144WTKA8T5PK",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-23T16:52:41.205Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "done",
+  "handoff": "QA B12 rework: ids of deleted items/projects were reused (INTEGER PRIMARY KEY without AUTOINCREMENT). Red tests first: 4 in test/store.test.ts ('ids of deleted records are never reused', incl. across reopen) + 2 in test/api.test.ts ('stale ids after delete (QA B12 repro)' — the exact curl repro at the HTTP seam). Fix: AUTOINCREMENT on projects.id and items.id in src/store.ts. bun test 157/157, typecheck clean. Note: existing DB files created with the old schema are not migrated (CREATE TABLE IF NOT EXISTS) — fresh DBs only."
+}

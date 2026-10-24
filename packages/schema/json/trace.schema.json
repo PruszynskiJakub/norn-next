@@ -1,0 +1,496 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://norn.dev/schema/trace.json",
+  "title": "norn trace event (one JSONL line)",
+  "type": "object",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type",
+        "tick_id",
+        "at",
+        "heartbeat_id",
+        "duration_ms",
+        "facts",
+        "decisions"
+      ],
+      "properties": {
+        "type": {
+          "const": "tick",
+          "type": "string"
+        },
+        "tick_id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "description": "ISO-8601 timestamp, UTC",
+          "type": "string"
+        },
+        "heartbeat_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "description": "ULID (ID2)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "duration_ms": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "facts": {
+          "type": "object",
+          "patternProperties": {
+            "^(.*)$": {}
+          }
+        },
+        "decisions": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "unit",
+              "rule",
+              "action",
+              "result"
+            ],
+            "properties": {
+              "unit": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "rule": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "action": {
+                "additionalProperties": true,
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                }
+              },
+              "result": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "ok"
+                ],
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  },
+                  "error": {
+                    "type": "string"
+                  },
+                  "detail": {}
+                }
+              },
+              "briefing": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "transcript": {
+                "minLength": 1,
+                "type": "string"
+              }
+            }
+          }
+        },
+        "inbox": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "event",
+              "id",
+              "group",
+              "story",
+              "slice",
+              "step",
+              "title",
+              "at"
+            ],
+            "properties": {
+              "event": {
+                "anyOf": [
+                  {
+                    "const": "appeared",
+                    "type": "string"
+                  },
+                  {
+                    "const": "resolved",
+                    "type": "string"
+                  }
+                ]
+              },
+              "id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "group": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "story": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "slice": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "step": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "title": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "command": {
+                "type": "string"
+              },
+              "detail": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "at": {
+                "format": "date-time",
+                "description": "ISO-8601 timestamp, UTC",
+                "type": "string"
+              },
+              "resolved_by": {
+                "minLength": 1,
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "fact"
+      ],
+      "properties": {
+        "type": {
+          "const": "hook",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "fact": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "event",
+            "at",
+            "agent",
+            "native",
+            "cwd"
+          ],
+          "properties": {
+            "event": {
+              "anyOf": [
+                {
+                  "const": "session_start",
+                  "type": "string"
+                },
+                {
+                  "const": "turn_start",
+                  "type": "string"
+                },
+                {
+                  "const": "tool_use",
+                  "type": "string"
+                },
+                {
+                  "const": "waiting_input",
+                  "type": "string"
+                },
+                {
+                  "const": "permission_prompt",
+                  "type": "string"
+                },
+                {
+                  "const": "turn_end",
+                  "type": "string"
+                },
+                {
+                  "const": "session_end",
+                  "type": "string"
+                }
+              ]
+            },
+            "at": {
+              "format": "date-time",
+              "description": "ISO-8601 timestamp, UTC",
+              "type": "string"
+            },
+            "agent": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "native": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "cwd": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "story": {
+              "pattern": "^(gh|gl)-[1-9][0-9]*$",
+              "description": "Story key, e.g. gh-123 or gl-45",
+              "type": "string"
+            },
+            "slice": {
+              "pattern": "^(gh|gl)-[1-9][0-9]*/[0-9]{2,3}$",
+              "description": "Slice key, e.g. gh-123/03",
+              "type": "string"
+            },
+            "run_id": {
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "description": "ULID (ID2)",
+              "type": "string"
+            },
+            "agent_session_id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "transcript": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "tool": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "command": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          }
+        },
+        "blocked": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "at",
+        "unit",
+        "source",
+        "reason"
+      ],
+      "properties": {
+        "type": {
+          "const": "reject",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "description": "ISO-8601 timestamp, UTC",
+          "type": "string"
+        },
+        "tick_id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "unit": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "source": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "payload": {}
+      }
+    },
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "at",
+        "unit",
+        "run_id",
+        "step",
+        "attempt",
+        "briefing"
+      ],
+      "properties": {
+        "type": {
+          "const": "briefing",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "description": "ISO-8601 timestamp, UTC",
+          "type": "string"
+        },
+        "unit": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "run_id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "step": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "attempt": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "briefing": {
+          "minLength": 1,
+          "type": "string"
+        }
+      }
+    },
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "at",
+        "unit",
+        "commits"
+      ],
+      "properties": {
+        "type": {
+          "const": "foreign_commits",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "description": "ISO-8601 timestamp, UTC",
+          "type": "string"
+        },
+        "tick_id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "unit": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "commits": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "sha",
+              "subject",
+              "author",
+              "at",
+              "branch"
+            ],
+            "properties": {
+              "sha": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "subject": {
+                "type": "string"
+              },
+              "author": {
+                "type": "string"
+              },
+              "at": {
+                "type": "string"
+              },
+              "branch": {
+                "minLength": 1,
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "discriminator": {
+    "propertyName": "type"
+  }
+}
