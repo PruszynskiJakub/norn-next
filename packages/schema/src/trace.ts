@@ -187,7 +187,39 @@ export const TakeTrace = Type.Object(
 );
 export type TakeTrace = Static<typeof TakeTrace>;
 
-export const TraceEvent = TaggedUnion("type", [TickTrace, HookTrace, RejectTrace, BriefingTrace, ForeignCommitsTrace, TakeTrace], {
+/**
+ * R5.4 (N2): written after decide, before act — so a tick that dies during act still leaves its
+ * decisions (and the receipts they number) in the trace. `norn why` reports a `tick.start` with no
+ * `tick.end` as "tick crashed during act". No facts snapshot: the full `tick` record carries those.
+ */
+export const TickStartTrace = Type.Object(
+  {
+    type: Type.Literal("tick.start"),
+    tick_id: Ulid,
+    at: IsoTime,
+    heartbeat_id: Type.Union([Ulid, Type.Null()]),
+    /** decide's output: unit, rule and action (no results yet) */
+    decisions: Type.Array(Type.Object({ unit: NonEmpty, rule: NonEmpty, action: Payload }, { additionalProperties: false })),
+  },
+  { additionalProperties: false },
+);
+export type TickStartTrace = Static<typeof TickStartTrace>;
+
+/** R5.4: written after the tick's `tick` record — the tick finished act. */
+export const TickEndTrace = Type.Object(
+  {
+    type: Type.Literal("tick.end"),
+    tick_id: Ulid,
+    at: IsoTime,
+    duration_ms: NonNegInt,
+    /** actions that ended `ok: false` */
+    failed: NonNegInt,
+  },
+  { additionalProperties: false },
+);
+export type TickEndTrace = Static<typeof TickEndTrace>;
+
+export const TraceEvent = TaggedUnion("type", [TickTrace, HookTrace, RejectTrace, BriefingTrace, ForeignCommitsTrace, TakeTrace, TickStartTrace, TickEndTrace], {
   $id: "https://norn.dev/schema/trace.json",
   title: "norn trace event (one JSONL line)",
 });

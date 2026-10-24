@@ -316,6 +316,15 @@
             "transcript": {
               "minLength": 1,
               "type": "string"
+            },
+            "machine": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "heartbeat_id": {
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "description": "ULID (ID2)",
+              "type": "string"
             }
           }
         },

@@ -10,10 +10,14 @@
  * the unit; with `--step` / `--attempt` / `--transition` / `--rule` every decision that matches
  * (noops excluded unless `--rule` names them), newest explained, all listed under `matches`.
  * Intake decisions are keyed by the story (F5), so `norn why gh-1 --rule remote.intake` covers them.
+ *
+ * R5.4 (N2): a tick with a `tick.start` but no end died during act. `why` explains it from its
+ * recorded decisions ("tick crashed during act") — `--tick <id>` resolves the tick a receipt cites,
+ * and without `--tick` a crashed tick newer than the unit's last finished one is the one explained.
  */
 import { decide, type Decision, type NumberedReceipt, type StoryFacts, type UnitFacts, unitDecision } from "@norn/core";
-import { ExitCode, type Receipt, type TickTrace, type TickUnitRecord } from "@norn/schema";
-import { decisionUnit, findTick, readTrace } from "@norn/store";
+import { ExitCode, type Receipt, type TickStartTrace, type TickTrace, type TickUnitRecord } from "@norn/schema";
+import { crashedTicksFor, decisionUnit, findCrashedTick, findTick, readTrace } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import { refuse, usageError, withExit } from "../output.ts";
 import { parseUnitKey } from "../runtime/human.ts";
@@ -152,6 +156,30 @@ function parseFilter(args: Parameters<typeof opt.str>[0]): Filter {
   return f;
 }
 
+/** R5.4: explain a tick that died during act from its `tick.start` decisions (no results, no replay). */
+function crashedExplanation(tick: TickStartTrace, key: string) {
+  const d = unitDecision(tick.decisions, key, decisionUnit);
+  if (!d) throw refuse(`tick ${tick.tick_id} decided nothing for ${key}`, `norn trace ${key}`, "no_decision");
+  const record: TickUnitRecord = { unit: d.unit, rule: d.rule, action: d.action, result: { ok: false } };
+  const a = d.action as { kind: string; reason?: string; receipts?: Array<{ n: number; receipt: Receipt }> };
+  return {
+    unit: key,
+    tick_id: tick.tick_id,
+    at: tick.at,
+    rule: d.rule,
+    action: a.kind,
+    ...(a.reason ? { reason: a.reason } : {}),
+    crashed: true,
+    explanation: "tick crashed during act: it decided this but never recorded a result (no tick.end); receipts it numbered may exist without the state that applies them",
+    trigger: triggerOf(record, undefined),
+    result: null,
+    // the receipts this decision numbered — the ones that cite this tick
+    receipts: (a.receipts ?? []).map((r) => ({ n: r.n, kind: r.receipt.kind, receipt_id: r.receipt.receipt_id, ...(r.receipt.run_id ? { run_id: r.receipt.run_id } : {}) })),
+    decision: d.action,
+    replay: null,
+  };
+}
+
 export const whyCommand = defineCommand({
   name: "why",
   summary: "Replay decide on a recorded tick and show the rule that fired for a unit and what triggered it (O5)",
@@ -168,7 +196,11 @@ export const whyCommand = defineCommand({
     let found: Array<{ tick: TickTrace; d: TickUnitRecord }>;
     if (tickId) {
       const tick = findTick(ctx.root, tickId);
-      if (!tick) throw refuse(`no tick ${tickId} in the trace`, `norn trace ${key}`, "no_tick");
+      if (!tick) {
+        const crashed = findCrashedTick(ctx.root, tickId);
+        if (crashed) return crashedExplanation(crashed, key);
+        throw refuse(`no tick ${tickId} in the trace`, `norn trace ${key}`, "no_tick");
+      }
       const d = unitDecision(tick.decisions, key, decisionUnit);
       if (!d) throw refuse(`tick ${tick.tick_id} decided nothing for ${key}`, `norn trace ${key}`, "no_decision");
       found = [{ tick, d }];
@@ -182,6 +214,9 @@ export const whyCommand = defineCommand({
           : unitDecision(ev.decisions, key, decisionUnit);
         if (d) found.push({ tick: ev, d });
       }
+      // R5.4: a newer tick that died during act is the one to explain
+      const crashed = filtered ? undefined : crashedTicksFor(ctx.root, key).at(-1);
+      if (crashed && (!found.length || crashed.at >= (found.at(-1) as { tick: TickTrace }).tick.at)) return crashedExplanation(crashed, key);
       if (!found.length)
         throw refuse(
           filtered ? `no tick in the trace matches ${JSON.stringify(filter)} for ${key}` : `no tick in the trace decided anything for ${key}`,

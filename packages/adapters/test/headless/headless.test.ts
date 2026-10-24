@@ -38,6 +38,19 @@ describe("headless runner (real processes)", () => {
     expect(err).toMatchObject({ code: "unsupported", retryable: false });
   });
 
+  test("capabilities: no send, resume (R4.1); findSessions by the run's NORN_RUN env (R5.1)", async () => {
+    const proc = {
+      identify: async () => null,
+      isAlive: async () => true,
+      self: () => ({ pid: 1, pid_start: "x" }),
+      findByEnv: async (name: string, value: string) => (name === "NORN_RUN" && value === "01JRUN" ? [{ pid: 77, pid_start: "Fri Oct 23 10:00:00 2026" }] : []),
+    };
+    const runner = createHeadlessRunner({ logDir: tmpdir(), process: proc });
+    expect(runner.capabilities).toEqual({ send: false, resume: true });
+    expect(await runner.findSessions?.({ run_id: "01JRUN", cwd: "/w" })).toEqual([{ session: { runner: "headless", session_id: "01JRUN", process: { pid: 77, pid_start: "Fri Oct 23 10:00:00 2026" } } }]);
+    expect(await runner.findSessions?.({ run_id: "01JOTHER", cwd: "/w" })).toEqual([]);
+  });
+
   test("launch of a missing binary fails with launch_failed", async () => {
     const runner = createHeadlessRunner({ logDir: mkdtempSync(join(tmpdir(), "norn-headless-")) });
     const err = await runner

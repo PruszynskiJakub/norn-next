@@ -41,6 +41,11 @@ export interface ProcessPort {
   /** true iff a process with this pid exists AND has the same start time. */
   isAlive(proc: ProcessIdentity): Promise<boolean>;
   self(): ProcessIdentity;
+  /**
+   * R5.1: live processes whose environment holds `name=value` (e.g. `NORN_RUN=<run_id>`), where the
+   * OS lets this user read it; [] when it does not. Optional: ports without it never find any.
+   */
+  findByEnv?(name: string, value: string): Promise<ProcessIdentity[]>;
 }
 
 // ============================================================= Git
@@ -227,8 +232,26 @@ export interface PaneState {
   detail?: string;
 }
 
+/**
+ * R4.1: what a runner can do with a session besides launching it. `send`: type into a live session
+ * (pane runners). `resume`: continue a finished agent session by its id (`--resume`, B2) — a new
+ * launch through this runner. Decide picks the nudge/answer delivery from these (R4.2).
+ */
+export interface RunnerCapabilities {
+  send: boolean;
+  resume: boolean;
+}
+
+/** R5.1: a session the runner sees in a unit worktree (a candidate for an unrecorded run). */
+export interface RunnerSessionInfo {
+  session: SessionRef;
+  /** agent-tool session id the runner reports for it (herdr `agent_session`), if any */
+  agent_session_id?: string;
+}
+
 export interface RunnerPort {
   readonly name: string;
+  readonly capabilities: RunnerCapabilities;
   /** Usable on this machine now (binary present, server reachable). */
   available(): Promise<boolean>;
   launch(spec: LaunchSpec): Promise<SessionRef>;
@@ -237,6 +260,12 @@ export interface RunnerPort {
   paneState(session: SessionRef): Promise<PaneState>;
   isAlive(session: SessionRef): Promise<boolean>;
   kill(session: SessionRef): Promise<void>;
+  /**
+   * R5.1: live agent sessions that could belong to run `run_id` working in `cwd` — panes whose
+   * checkout path is `cwd`, processes carrying `NORN_RUN=<run_id>`. Reports candidates only; the
+   * caller decides which one (if any) is the run. Optional: runners without it find nothing.
+   */
+  findSessions?(q: { run_id: string; cwd: string }): Promise<RunnerSessionInfo[]>;
 }
 
 // ============================================================= Agent adapter

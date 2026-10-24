@@ -8,7 +8,7 @@
 import { appendFileSync, mkdirSync, readdirSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
 import type { FileError } from "@norn/core";
-import { type TickTrace, type TraceEvent, assertValid, validate } from "@norn/schema";
+import { type TickStartTrace, type TickTrace, type TraceEvent, assertValid, validate } from "@norn/schema";
 import { atomicWrite, isErrno, readText } from "./fsx.ts";
 import { traceDir } from "./paths.ts";
 
@@ -68,7 +68,10 @@ export function decisionUnit(d: { unit: string; action: unknown }): string {
 export function eventMatchesUnit(ev: TraceEvent, unit: string): boolean {
   switch (ev.type) {
     case "tick":
+    case "tick.start":
       return ev.decisions.some((d) => unitMatches(decisionUnit(d), unit));
+    case "tick.end":
+      return false;
     case "hook":
       return unitMatches(ev.fact.slice ?? ev.fact.story, unit) || ev.fact.story === unit;
     case "reject":
@@ -132,6 +135,24 @@ export function lastTickFor(root: string, unit: string): TickTrace | null {
 export function findTick(root: string, tickId: string): TickTrace | null {
   const { events } = readTrace(root, { types: ["tick"] });
   return (events.find((e) => e.type === "tick" && e.tick_id === tickId) as TickTrace | undefined) ?? null;
+}
+
+/**
+ * R5.4 (N2): a tick that wrote `tick.start` but neither its `tick` record nor `tick.end` — it died
+ * during act. Null when the tick is unknown or finished.
+ */
+export function findCrashedTick(root: string, tickId: string): TickStartTrace | null {
+  const { events } = readTrace(root, { types: ["tick.start", "tick", "tick.end"] });
+  const mine = events.filter((e) => (e.type === "tick" || e.type === "tick.start" || e.type === "tick.end") && e.tick_id === tickId);
+  const start = mine.find((e) => e.type === "tick.start") as TickStartTrace | undefined;
+  return start && !mine.some((e) => e.type !== "tick.start") ? start : null;
+}
+
+/** R5.4: ticks that decided something for `unit` and died during act, oldest first. */
+export function crashedTicksFor(root: string, unit: string): TickStartTrace[] {
+  const { events } = readTrace(root, { types: ["tick.start", "tick", "tick.end"] });
+  const ended = new Set(events.filter((e) => e.type === "tick" || e.type === "tick.end").map((e) => (e as { tick_id: string }).tick_id));
+  return events.filter((e): e is TickStartTrace => e.type === "tick.start" && !ended.has(e.tick_id) && eventMatchesUnit(e, unit));
 }
 
 // ---------------------------------------------------------------- side files (B4, C4)

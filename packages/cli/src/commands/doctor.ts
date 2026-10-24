@@ -9,6 +9,7 @@
  *     Codex: project hooks only run once `.codex/` is trusted (`/hooks` in Codex) — noted.
  *   - remote: the provider CLI answers `whoami` (gh/glab auth)
  *   - runner: configured runner available (Herdr server reachable)
+ *   - machine: the `user@host` runs are recorded with (R7.1); a warning when NORN_MACHINE overrides it (R7.3)
  * `--live` also runs one cheap headless test turn per agent in a throwaway repo with norn hooks
  * installed, and checks that the agent's own hooks reported to norn.
  * Exit 0 when every check passes, else 1 with the same report.
@@ -22,7 +23,7 @@ import { writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { withExit } from "../output.ts";
-import { readHookFacts } from "../runtime/observe.ts";
+import { machineHolder, readHookFacts } from "../runtime/observe.ts";
 import { hookCommand } from "./init.ts";
 
 interface RunOut {
@@ -183,8 +184,15 @@ export const doctorCommand = defineCommand({
       };
     }
 
+    // R7.3: NORN_MACHINE overrides the machine name — a test aid (single-host dogfood), never a
+    // setup for real teams: two checkouts claiming one machine name defeat R7.2's liveness rules
+    const machine = { holder: machineHolder(ctx.env), override: ctx.env.NORN_MACHINE ?? null };
+    const warnings: string[] = [];
+    if (machine.override !== null)
+      warnings.push(`NORN_MACHINE=${machine.override} overrides this machine's name (a test aid): runs are judged by pid only on the machine they were started on (R7.2), so two hosts must never share a name — unset it outside tests`);
+
     const ok = gitCheck.ok && agents.every((a) => a.ok) && remote.ok === true && runner.ok === true;
-    const report = { ok, live, hook_command: command, git: gitCheck, agents, remote, runner };
+    const report = { ok, live, hook_command: command, machine, git: gitCheck, agents, remote, runner, warnings };
     return ok ? report : withExit(report, ExitCode.error);
   },
 });

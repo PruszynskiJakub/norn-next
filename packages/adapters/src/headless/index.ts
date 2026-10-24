@@ -5,7 +5,8 @@
  *
  * There is no pane to type into: `send` throws PortError `unsupported`. Per B2 the caller then
  * continues the same agent session by launching `AgentAdapter.launchCommand({ resume })` through
- * this runner, or starts a fresh session from the handoff.
+ * this runner, or starts a fresh session from the handoff — capabilities `send: false, resume: true`
+ * (R4.1). `findSessions` looks for a run's process by its `NORN_RUN` env (R5.1).
  */
 import { spawn } from "node:child_process";
 import { closeSync, mkdirSync, openSync } from "node:fs";
@@ -38,9 +39,16 @@ export function createHeadlessRunner(opts: HeadlessRunnerOptions): RunnerPort {
 
   return {
     name: RUNNER_NAME,
+    capabilities: { send: false, resume: true },
 
     async available() {
       return true;
+    },
+
+    async findSessions(q) {
+      // the run's process carries NORN_RUN (A6); its session id is the run id, as launch records it
+      const procs = proc.findByEnv ? await proc.findByEnv("NORN_RUN", q.run_id).catch(() => []) : [];
+      return procs.map((p) => ({ session: { runner: RUNNER_NAME, session_id: q.run_id, process: p } }));
     },
 
     async launch(spec: LaunchSpec): Promise<SessionRef> {
