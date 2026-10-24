@@ -65,6 +65,8 @@ export class FakeRunner implements RunnerPort {
   /** R4.1: a pane runner by default; tests flip these to model headless or capability-less runners */
   capabilities: RunnerCapabilities = { send: true, resume: true };
   launches: LaunchSpec[] = [];
+  /** R8.2: doctor's throwaway session process */
+  doctor: ReturnType<typeof Bun.spawn> | null = null;
   sent: Array<{ session: SessionRef; text: string }> = [];
   killed: SessionRef[] = [];
   pane: PaneState = { alive: true, state: "working", since: null };
@@ -79,9 +81,13 @@ export class FakeRunner implements RunnerPort {
   keyed: Array<{ session: SessionRef; keys: PromptKey[] }> = [];
   keysError: Error | null = null;
   async launch(spec: LaunchSpec): Promise<SessionRef> {
-    // R8.2: doctor's throwaway session really runs its command (a pane would)
-    if (spec.title === "norn doctor") Bun.spawnSync(spec.argv, { cwd: spec.cwd, env: { ...process.env, ...spec.env } });
-    else this.launches.push(spec);
+    // R8.2: doctor's throwaway session really runs its command (a pane would) — under a PATH a login
+    // shell reset (R8.1: the launcher puts this norn first again); it runs until doctor kills it
+    if (spec.title === "norn doctor") {
+      this.doctor = Bun.spawn(spec.argv, { cwd: spec.cwd, env: { ...process.env, ...spec.env, PATH: "/usr/bin:/bin" }, stdout: "ignore", stderr: "ignore" });
+      return { runner: this.name, session_id: "doctor" };
+    }
+    this.launches.push(spec);
     return { runner: this.name, session_id: `s-${this.launches.length}`, pane_id: `p-${this.launches.length}` };
   }
   async send(session: SessionRef, text: string) {
@@ -98,13 +104,19 @@ export class FakeRunner implements RunnerPort {
   async findSessions() {
     return this.found;
   }
+  /** runs once when observe reads the pane — models another writer acting mid-tick (B11) */
+  onPaneState: (() => Promise<void>) | null = null;
   async paneState() {
+    const hook = this.onPaneState;
+    this.onPaneState = null;
+    if (hook) await hook();
     return this.pane;
   }
   async isAlive() {
     return this.pane.alive;
   }
   async kill(session: SessionRef) {
+    if (session.session_id === "doctor") this.doctor?.kill();
     this.killed.push(session);
   }
 }

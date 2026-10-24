@@ -712,6 +712,11 @@ async function unitFacts(
       last_activity_at: acts.length ? Math.min(Math.max(...acts), now) : null,
       transcript: [...mine].reverse().find((h) => h.transcript)?.transcript ?? r.transcript ?? null,
     };
+    // B3: a gone process's first output lines (its run log) say why it never got going
+    if (session && (process_alive === false || pane?.alive === false) && ports.runner?.output && session.runner === ports.runner.name) {
+      const output = await ports.runner.output(session).catch(() => null);
+      if (output) run.output = output;
+    }
   }
 
   const mineLeases = leases.filter((l) => l.repo === repoRoot && l.story === u.unit.story && l.slice === u.unit.slice);

@@ -174,6 +174,16 @@ describe("classification (§10, C1, MO4)", () => {
     expect(a.receipts.map((r) => [r.n, r.receipt.kind])).toEqual([[1, "classify"], [2, "started"]]);
     expect(a.state).toMatchObject({ retries_used: 1, status: "running", applied_through: 2, run: { run_id: a.launch?.run_id } });
   });
+  test("died before it got going: what the session printed is in the classify detail (B3)", () => {
+    const output = "Error: Input must be provided either through stdin or as a prompt argument when using --print";
+    const a = only(facts([solo(running(), { process_alive: false, output })]));
+    expect(a.kind === "retry_fresh" && a.receipts[0]?.receipt).toMatchObject({ kind: "classify", outcome: "died", detail: `process gone, no receipt; it printed: ${output}` });
+    // a run that worked for a while (hooks, long ago) keeps the plain detail
+    const long = running({ run: { ...running().run!, started_at: at(T0 - 30 * 60_000) } });
+    const hooks = [{ event: "turn_start" as const, at: at(T0 - 29 * 60_000), agent: "claude", native: "UserPromptSubmit", cwd: "/w" }];
+    const b = only(facts([solo(long, { process_alive: false, output, hooks })]));
+    expect(b.kind === "retry_fresh" && b.receipts[0]?.receipt).toMatchObject({ kind: "classify", outcome: "died", detail: "process gone, no receipt" });
+  });
   test("timeout after the deadline; stalled after no activity", () => {
     const old = running({ run: { ...running().run!, started_at: at(T0 - 61 * 60_000) }, updated_at: at(T0 - 61 * 60_000) });
     expect(only(facts([solo(old, {})]))).toMatchObject({ kind: "nudge", rule: "agent.timeout.nudge" });

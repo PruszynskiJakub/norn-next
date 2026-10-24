@@ -124,22 +124,31 @@ export function refuseUnlessAgentWork(s: UnitSession, verb: string): void {
   if (step.type !== "agent")
     throw refuse(`${st.step} is a ${step.type} step: norn runs it, not an agent`, "end your turn; the heartbeat (norn tick / norn watch) runs it", "not_agent_step");
   // R6.1 (A14): an implicit ask (a prompt norn saw in the pane or a hook) does not hold the agent
-  // back — its report is the answer; an explicit `norn ask` waits for the person
+  // back — its report is the answer, also once a person's answer waits to be applied (B6: the
+  // answer let the agent's own `norn done` run); an explicit `norn ask` waits for the person
   if (st.status === "parked" && st.park?.kind === "ask") {
-    if (!implicitAskOpen(s)) throw refuse(`unit ${key} waits for an answer: ${st.park.reason}`, `end your turn; a person answers with: norn answer ${key} "…"`, "parked_ask");
+    if (!implicitAsk(s)) throw refuse(`unit ${key} waits for an answer: ${st.park.reason}`, `end your turn; a person answers with: norn answer ${key} "…"`, "parked_ask");
   } else if (st.status === "parked" && st.park?.kind !== "attended")
     throw refuse(`unit ${key} is parked (${st.park?.kind}): ${st.park?.reason ?? ""}`, `end your turn; a person resolves it: norn unstick ${key}`, "parked");
 }
 
-/** R6.1: the unit is parked on an implicit ask (park flag, or the ask receipt of older states) not answered yet. */
-export function implicitAskOpen(s: UnitSession): NumberedReceipt | null {
+/**
+ * R6.1: the implicit ask the unit is parked on (park flag, or the ask receipt of older states), and
+ * whether an answer to it (a person's, or the tick's) already waits to be applied. Null when the
+ * unit is not parked on an implicit ask.
+ */
+export function implicitAsk(s: UnitSession): { ask: NumberedReceipt; answered: boolean } | null {
   const park = s.state.status === "parked" && s.state.park?.kind === "ask" ? s.state.park : null;
   if (!park) return null;
   const ask = s.receipts.findLast((r) => r.receipt.kind === "ask" && atCursor(s, r.receipt) && (!park.receipt_id || r.receipt.receipt_id === park.receipt_id));
   if (!ask || !(park.implicit || (ask.receipt.kind === "ask" && ask.receipt.implicit))) return null;
-  // an answer already waiting to be applied (a person's, or the tick's) ends it
-  if (s.unapplied.some((r) => r.receipt.kind === "answer" && atCursor(s, r.receipt))) return null;
-  return ask;
+  return { ask, answered: s.unapplied.some((r) => r.receipt.kind === "answer" && atCursor(s, r.receipt)) };
+}
+
+/** R6.1: the implicit ask the unit is parked on, when no answer to it waits to be applied yet. */
+export function implicitAskOpen(s: UnitSession): NumberedReceipt | null {
+  const open = implicitAsk(s);
+  return open && !open.answered ? open.ask : null;
 }
 
 /** The story's mode (MO1): stored in the story unit's state, which lives in the story worktree. */

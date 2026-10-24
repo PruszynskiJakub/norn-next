@@ -91,6 +91,8 @@ export interface ActRecord {
 const NOTIFY_GROUPS: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock", "unclaimed"];
 
 class QueueFull extends Error {}
+/** S6: a receipt number another writer (an agent verb, a person) took since observe. */
+class ReceiptTaken extends Error {}
 
 /** R4.3: effects that reach an agent session; one succeeding clears a failed one of the unit. */
 const DELIVERY = new Set(["nudge", "answer", "resume", "launch"]);
@@ -348,7 +350,7 @@ export class Actor {
   private writeReceipts(runsDir: string, receipts: NewReceipt[]): void {
     for (const r of receipts) {
       const res = writeReceiptAt(runsDir, r.n, r.receipt);
-      if (!res.ok) throw new Error(`receipt number ${r.n} is taken by ${relative(this.root, res.file)} (S6)`);
+      if (!res.ok) throw new ReceiptTaken(`receipt number ${r.n} is taken by ${relative(this.root, res.file)} (S6)`);
     }
   }
 
@@ -556,7 +558,16 @@ export class Actor {
       // B2: resume the same agent session with the answer as the prompt (headless / session gone)
       ({ session: resumed } = await this.launchAfterReceipts(a.unit, loc.runsDir, a.receipts, a.launch));
       if (state) state = this.recordSession(a.unit, loc.runsDir, state, a.receipts, resumed);
-    } else this.writeReceipts(loc.runsDir, a.receipts);
+    } else
+      try {
+        this.writeReceipts(loc.runsDir, a.receipts);
+      } catch (e) {
+        // R6.1, B11: the tick resolving an implicit ask raced the agent's own report, whose `answer`
+        // (`by: "agent"`) took the number first. S6 keeps the first; the ask is closed either way, so
+        // this is not a failed action — nothing else is written, the next tick applies the report.
+        if (e instanceof ReceiptTaken && a.rule === "agent.ask.implicit.resolved") return { ok: true, detail: { superseded: e.message } };
+        throw e;
+      }
     for (const r of a.rejected) this.traceReject(a.unit.key, `receipt ${r.n}`, r.reason, { receipt_id: r.receipt_id });
     let keyed = false;
     const keys = a.input?.keys;
