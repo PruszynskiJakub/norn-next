@@ -32,6 +32,8 @@ export interface Advance {
   outcome: string;
   to: string;
   counter?: { name: string; value: number; max: number };
+  /** W4 (C3): counters reset to 0 by taking this edge (their `reset_on`), journaled with the advance */
+  reset?: string[];
 }
 
 export interface Rejection {
@@ -332,9 +334,14 @@ function take(st: UnitState, outcome: string, r: Receipt, ctx: ApplyContext, las
     counters = { ...st.counters, [edge.counter]: value + 1 };
     counter = { name: edge.counter, value: value + 1, max };
   }
-  const advance: Advance = { from, outcome, to: edge.to, ...(counter ? { counter } : {}) };
+  // W4 (C3): counters declaring `reset_on: <from>.<outcome>` start over (e.g. base_conflict_loop on update.done)
+  const reset = Object.entries(wf.counters ?? {})
+    .filter(([name, c]) => c.reset_on === `${from}.${outcome}` && (counters[name] ?? 0) > 0)
+    .map(([name]) => name);
+  if (reset.length) counters = { ...counters, ...Object.fromEntries(reset.map((c) => [c, 0])) };
+  const advance: Advance = { from, outcome, to: edge.to, ...(counter ? { counter } : {}), ...(reset.length ? { reset } : {}) };
   const counted = counter ? ` [${counter.name} ${counter.value}/${counter.max}]` : "";
-  const log = `${from}.${outcome} → ${edge.to}${counted}`;
+  const log = `${from}.${outcome} → ${edge.to}${counted}${reset.length ? ` (reset ${reset.join(", ")})` : ""}`;
   const base: UnitState = { ...st, counters, last_outcome: last };
   if (edge.to === "$done")
     return { state: { ...base, step: "$done", status: "done", run: null, park: null }, log, advance };

@@ -115,7 +115,7 @@ export interface ApplyReceiptsAction extends UnitBase, Transition {
   /** receipts refused (stale step/attempt T9, wrong kind for the step); act writes each to the trace as a `reject` event */
   rejected: Array<{ n: number; receipt_id: string; reason: string }>;
   /** edge taken, if the cursor moved */
-  advance: { from: string; outcome: string; to: string; counter?: { name: string; value: number; max: number } } | null;
+  advance: { from: string; outcome: string; to: string; counter?: { name: string; value: number; max: number }; reset?: string[] } | null;
   /** deliver into the live session after state is written (answer → same session) */
   input: SessionInput | null;
   /**

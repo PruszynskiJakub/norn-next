@@ -105,6 +105,8 @@ counters:
   test_loop: { max: 5 }
   qa_loop: { max: 2 }
   ready_loop: { max: 2 }
-  base_conflict_loop: { max: 2 }
-  stale_loop: { max: 3 }
+  # resets each time update merges cleanly: only repeated conflicts on one base move count (W4)
+  base_conflict_loop: { max: 2, reset_on: update.done }
+  # a stale re-entry is progress from outside (a sibling merged), bounded by the sibling merges
+  stale_loop: { max: 10 }
 base: { stale: conflict }

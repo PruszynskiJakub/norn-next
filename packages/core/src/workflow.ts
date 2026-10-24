@@ -19,6 +19,7 @@ export type WorkflowIssueCode =
   | "unknown_start"
   | "unknown_target"
   | "unknown_counter"
+  | "unknown_reset"
   | "unknown_skill"
   | "cannot_reach_done"
   | "uncounted_cycle"
@@ -114,6 +115,13 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
           message: "'exhausted' always routes to $stuck and cannot be declared (W7)",
         });
     }
+  }
+  // W4 (C3): `reset_on` names a declared edge `<step>.<outcome>`
+  for (const [name, c] of Object.entries(counters)) {
+    if (c.reset_on === undefined) continue;
+    const [from, outcome] = c.reset_on.split(".") as [string, string];
+    if (!edgeOf(wf, from, outcome))
+      issues.push({ code: "unknown_reset", path: `/counters/${name}/reset_on`, message: `counter '${name}' resets on '${c.reset_on}', but step '${from}' declares no outcome '${outcome}'` });
   }
   // BS9: `base.step` names the step `norn update` re-enters
   if (wf.base?.step !== undefined && !stepOf(wf, wf.base.step))

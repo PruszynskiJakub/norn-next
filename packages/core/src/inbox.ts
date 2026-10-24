@@ -7,16 +7,16 @@
  * changed outside norn — the PR head moved after the ready approval, commits norn did not make;
  * F35, Q6), Unclaimed, Running, Recently done.
  */
-import { type InboxChange, type Mode, parseDuration, type ResolvedConfig, type UnitState } from "@norn/schema";
+import { type InboxChange, type Mode, parseDuration, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
 import type { Decision } from "./actions.ts";
 import { nextCommand, startAgentCommand } from "./commands.ts";
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "./criteria.ts";
-import type { Facts, StoryFacts, UnitFacts } from "./facts.ts";
+import type { Facts, NumberedReceipt, StoryFacts, UnitFacts } from "./facts.ts";
 import type { InboxGroup, InboxItem } from "./ports.ts";
 import { sha256 } from "./hash.ts";
 import { optionsLine } from "./prompt.ts";
 import { epoch, formatAge, iso } from "./time.ts";
-import { baseUpdateStep, isStale, stepOf } from "./workflow.ts";
+import { baseUpdateStep, edgeOf, isStale, stepOf } from "./workflow.ts";
 
 export const INBOX_GROUPS: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock", "check", "unclaimed", "running", "recently_done"];
 
@@ -251,12 +251,15 @@ export function noteItems(story: StoryFacts): InboxItem[] {
   }));
 }
 
+/** C1: the PR fetched this tick, else the last one this checkout saw (`pr_seen`); null/undefined = none known. */
+export const knownPr = (story: StoryFacts): StoryFacts["pr"] => (story.pr !== undefined ? story.pr : story.pr_seen?.pr);
+
 /**
  * GR6/F25: the story unit finished its workflow and its PR is open — merging it is the person's
  * last action, so it is an item (Your turn) with the PR URL, not "Recently done".
  */
 function mergeItem(story: StoryFacts, st: UnitState, base: string): InboxItem | null {
-  const pr = story.pr;
+  const pr = knownPr(story);
   // GR6: a branch already contained in origin/<base> (merged by ancestry, e.g. a merge commit
   // pushed by hand) needs no merge, even while the PR still reads `open`.
   if (!pr || pr.state !== "open" || story.merged_by_ancestry || story.frontmatter?.status === "done") return null;
@@ -314,7 +317,7 @@ export function staleItem(story: StoryFacts, base: string): InboxItem | null {
 
 /** BS11: the story PR targets another branch than the story's base — merging it would skip the base. */
 export function retargetItem(story: StoryFacts, base: string): InboxItem | null {
-  const pr = story.pr;
+  const pr = knownPr(story);
   const target = pr?.base_branch ?? pr?.base ?? null;
   if (!pr || pr.state !== "open" || !target || target === base) return null;
   const st = story.units.find((u) => u.unit.slice === null)?.state;
@@ -394,7 +397,7 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       }
       if (facts.now - epoch(st.updated_at) > RECENT_MS) return null;
       // story.md says `done` once norn saw the merge (GR6) — the durable record when no PR was fetched
-      const waiting = uf.unit.slice === null && story.pr?.state !== "merged" && !story.merged_by_ancestry && story.frontmatter?.status !== "done";
+      const waiting = uf.unit.slice === null && knownPr(story)?.state !== "merged" && !story.merged_by_ancestry && story.frontmatter?.status !== "done";
       return item("recently_done", waiting ? "workflow done — waiting for the PR merge (GR6)" : "done", `norn trace ${key}`, st.updated_at);
     }
   }
@@ -427,9 +430,29 @@ export function bodyChangedItem(story: StoryFacts): InboxItem | null {
   };
 }
 
+/** C5: receipts that send a finished story unit back into its workflow — the head will change, the ready gate is passed again (BS9, S7). */
+export const RE_ENTRY_KINDS = ["update", "workflow"] as const;
+
+/**
+ * F35: the story branch head when the person gave `approve` at the `ready` gate — the `head_sha` of
+ * the newest `approve` receipt at that gate (the `ready` step, or any gate whose `approve` goes to
+ * `$done`). C5: only an approval newer than the unit's last re-entry (`norn update`, `norn workflow
+ * --to`) counts; a re-entry voids it until a new approve at the gate. `receipts` are the story
+ * unit's, at least of the kinds `approve` and RE_ENTRY_KINDS; order does not matter.
+ */
+export function readyHeadSha(wf: Workflow, receipts: readonly NumberedReceipt[]): string | undefined {
+  const isReady = (step: string) => step === "ready" || (stepOf(wf, step)?.type === "gate" && edgeOf(wf, step, "approve")?.to === "$done");
+  const sorted = [...receipts].sort((a, b) => b.n - a.n);
+  for (const { receipt: r } of sorted) {
+    if ((RE_ENTRY_KINDS as readonly string[]).includes(r.kind)) return undefined;
+    if (r.kind === "approve" && isReady(r.step)) return r.head_sha || undefined;
+  }
+  return undefined;
+}
+
 /** F35: the PR head moved after the `ready.approve` — what would merge is not what was reviewed. */
 export function headChangedItem(story: StoryFacts): InboxItem | null {
-  const pr = story.pr;
+  const pr = knownPr(story);
   const ready = story.ready_head_sha;
   if (!pr || pr.state !== "open" || !ready || !pr.head_sha || pr.head_sha === ready) return null;
   const st = story.units.find((u) => u.unit.slice === null)?.state;

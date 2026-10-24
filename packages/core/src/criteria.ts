@@ -18,7 +18,7 @@ export function worstVerdict(report: readonly CriterionVerdict[]): Verdict | nul
   return worst;
 }
 
-export type CriteriaRefusalCode = "criteria_required" | "invalid_criteria" | "outcome_contradicts_verdicts";
+export type CriteriaRefusalCode = "criteria_required" | "invalid_criteria" | "pass_without_capability" | "outcome_contradicts_verdicts";
 
 export interface CriteriaRefusal {
   code: CriteriaRefusalCode;
@@ -38,6 +38,8 @@ export interface CriteriaCheckInput {
   criteria: readonly Criterion[] | null;
   /** `--note` values (NT1) */
   notes: readonly Note[];
+  /** QV5a: capabilities of the agent reporting (config `agents.<name>.capabilities`; none declared = []) */
+  capabilities: readonly string[];
 }
 
 export type CriteriaCheck =
@@ -61,6 +63,7 @@ const doneCmd = (o: string, criteria: boolean) => `norn done ${o}${criteria ? " 
  * - QV3: `criteria: required` (or an outcome gated by `verdict`) needs a report;
  * - QV4: with frontmatter `criteria`, the report covers exactly those ids, once each; a note's
  *   `--note-criterion` names one of them;
+ * - QV5a: `pass` only for criteria whose `needs` the reporting agent's capabilities cover;
  * - QV5: an outcome with `verdict: v` only when the worst verdict in the report is `v`.
  */
 export function checkReport(input: CriteriaCheckInput): CriteriaCheck {
@@ -108,6 +111,23 @@ export function checkReport(input: CriteriaCheckInput): CriteriaCheck {
         unknown,
       });
     }
+  }
+
+  // QV5a (C2): `pass` means observed in this session — a criterion whose `needs` this agent lacks
+  // cannot be observed here, whatever a person ruled earlier on other code
+  const lacking = report.flatMap((c) => {
+    if (c.verdict !== "pass") return [];
+    const missing = (criteria?.find((x) => x.id === c.id)?.needs ?? []).filter((n) => !input.capabilities.includes(n));
+    return missing.length ? [{ id: c.id, missing }] : [];
+  });
+  if (lacking.length) {
+    const what = lacking.map((l) => `${l.id} (needs ${l.missing.join(", ")})`).join(", ");
+    return refuse(
+      "pass_without_capability",
+      `${what}: this agent has ${input.capabilities.length ? `only ${input.capabilities.join(", ")}` : "no declared capabilities"} (config agents.<name>.capabilities), so it cannot have observed ${lacking.length === 1 ? "it" : "them"} pass; a person's earlier ruling does not verify a criterion on the current code`,
+      `report ${lacking.map((l) => l.id).join(", ")} as {"verdict": "unverified", "reason": "no ${lacking[0]?.missing[0]} in this session", "how": "<the exact steps a person or an equipped agent follows to check it>"} and report the outcome matching the worst verdict (${doneCmd(reportableOutcomes(step).find((o) => edgeVerdict(step, o) === "unverified") ?? "unverified", true)})`,
+      { criteria: lacking, capabilities: [...input.capabilities] },
+    );
   }
 
   // QV5: the outcome must match the worst verdict when it is gated

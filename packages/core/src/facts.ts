@@ -223,6 +223,12 @@ export interface StoryBase {
   conflicts: string[];
 }
 
+/** C1: a story PR observation (`null` = the remote said there is none) and its time (ms epoch). */
+export interface StoryPrSeen {
+  pr: RemotePullRequest | null;
+  observed_at: number;
+}
+
 export interface StoryFacts {
   key: string;
   slug: string;
@@ -243,6 +249,13 @@ export interface StoryFacts {
    */
   pr?: RemotePullRequest | null;
   /**
+   * C1: the story PR as the last successful sync of this checkout saw it, with when (ms epoch).
+   * Inbox items about the PR (merge BS10, retarget BS11, head changed F35) use it when `pr` was not
+   * fetched this tick, so they stay put between syncs and show in the read model. Decide never acts
+   * on it (GR6/GR7 effects need a fresh `pr`). Absent = never seen here.
+   */
+  pr_seen?: StoryPrSeen;
+  /**
    * P2 (pull, don't trust): the story branch head is an ancestor of the fetched `<remote>/<base>`
    * while the PR does not say merged (e.g. a remote glitch left it open). Decide treats it as
    * merged (GR6). Absent = not observed or not merged by ancestry.
@@ -251,7 +264,8 @@ export interface StoryFacts {
   /**
    * Commits on the story branch or a slice branch not created by norn (no `Norn-Tick` trailer)
    * since the last norn commit on that branch, newest first; only for units without a live run
-   * (an agent's own commits mid-run are not foreign). Absent = none / not observed.
+   * (an agent's own commits mid-run are not foreign), and never one committed during a run of that
+   * unit — an agent's commit while its unit is parked on an ask (C4). Absent = none / not observed.
    */
   foreign_commits?: ForeignCommit[];
   /** story branch head when the person gave `approve` at the `ready` gate (the approve receipt's `head_sha`) */

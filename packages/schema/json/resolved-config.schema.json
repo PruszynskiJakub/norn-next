@@ -55,6 +55,14 @@
                   "type": "string"
                 }
               }
+            },
+            "capabilities": {
+              "uniqueItems": true,
+              "type": "array",
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              }
             }
           }
         }

@@ -71,6 +71,7 @@ Non-goals (this spec):
   - **Resolve to existing behaviour only.** When no resolution fits without new behaviour, abort the merge and report `norn stuck "<why>"` — the unit parks under Unblock with the reason (W7). Otherwise always finish the merge.
   - Run the slice/story check commands before reporting and fix what the merge broke; the `test` step after `update` re-checks anyway.
   On `done` the workflow returns to `update`, which now finds `behind == 0` (or a new, smaller gap if the base moved again).
+  The agent's merge commit is not a foreign commit (Q6): a commit made during a run of the unit (from its first to its last receipt, open-ended while the unit runs or is parked on an ask, e.g. a permission prompt) is the agent's (dogfood C4).
 
 ### 4.3 Re-entry when the base moves later
 
@@ -82,15 +83,16 @@ Non-goals (this spec):
 
   It is reserved (W7) and applies only if the gate declares a `stale` route; otherwise no classification happens and only the inbox item (BS10) appears.
 - BS7 A story is **stale** when `base.conflicts` is non-empty (default) or, with workflow field `base: { stale: behind }`, when `base.behind > 0`. `behind` suits repos whose host requires branches to be up to date before merge.
-- BS8 Taking a `stale` route writes a `classify` receipt `{outcome: stale, rule: "base moved", detail: "<n> behind, conflicts: …"}`. Like every cycle (W4), the edge back must carry a counter; the default uses `stale_loop: { max: 3 }`.
+- BS8 Taking a `stale` route writes a `classify` receipt `{outcome: stale, rule: "base moved", detail: "<n> behind, conflicts: …"}`. Like every cycle (W4), the edge back must carry a counter; the default uses `stale_loop: { max: 10 }`: a stale re-entry is progress from outside, bounded by the number of sibling merges (dogfood C3).
 - BS9 **After `$done`, before the merge.** The story unit is done but its PR is open (GR6 has not fired). A new verb `norn update <story>` re-enters the step named by the workflow field `base.step` (default: the first step with `action: update`):
   - allowed when the story unit is done with an unmerged PR, parked at a gate, or parked stuck, and this checkout holds the claim (T7); refused otherwise with `do_instead`;
   - writes a new receipt kind `update` `{from: <step or "$done">, to: <step>, reason: "person" }` before the state change (P6, S5);
-  - re-entering from `$done` sets the unit back to running at `to`; the ready gate must then be passed again (the head changes, F35).
+  - re-entering from `$done` sets the unit back to running at `to`; the ready gate must then be passed again (the head changes, F35). The old approval no longer pins the head: `ready_head_sha` comes only from an `approve` receipt newer than the unit's last re-entry (`update`, `workflow`) (dogfood C5).
   It is never triggered by the tick on a done unit — a done unit only moves when a person says so.
 - BS10 Inbox:
   - Check group, one item per story that is stale (BS7) and not routed by BS6: `gh-3 conflicts with main in a.ts, b.ts (4 behind)`, command `norn update gh-3`, id `stale:<story>:<base_sha>`.
   - The existing "Merge PR #N" item gains detail `behind main by N` and, when conflicting, its command becomes `norn update <story>`.
+  - PRs are fetched only on sync ticks. Each checkout keeps the last PR seen per story with its observation time (`.agents/norn/trace/pr.json`, fact `story.pr_seen`); the PR items (merge, BS11 retarget, F35 head changed) use it between syncs and in the read model (`norn inbox`, `status`), so they neither flicker nor go missing. Decide acts only on a PR fetched this tick (dogfood C1).
 
 - BS11 **Merged means merged into the base.** GR6 cleanup fires only when the PR's base branch equals the story's base branch (BS0). A PR merged into any other branch parks the story with reason `remote: PR merged into <branch>, not <base>` (GR7) — the lesson from old norn 0.1.1, where a merge into the wrong base skipped story review. Retargeting a PR is reported as a Check item.
 
@@ -107,11 +109,13 @@ Non-goals (this spec):
                                       stale: { to: update, counter: stale_loop } } }
   ready:    { type: gate, outcomes: { approve: $done, reject: { to: implement, counter: ready_loop },
                                       stale: { to: update, counter: stale_loop } } }
-counters: { …, base_conflict_loop: { max: 2 }, stale_loop: { max: 3 } }
+counters: { …, base_conflict_loop: { max: 2, reset_on: update.done }, stale_loop: { max: 10 } }
 base: { stale: conflict }
 ```
 
-`update` sits after `slices` and before `test`, so story tests and QA always run against the current base. Workflows without `slices` place it before their first check.
+`update` sits after `slices` and before `test`, so story tests and QA always run against the current base.
+
+**Amends W4: `reset_on`** (dogfood C3). A counter may declare `reset_on: <step>.<outcome>`; taking that edge resets it to 0, journaled with the advance (trace, commit message, handoff line). `base_conflict_loop` resets on `update.done`: it bounds attempts at one base move, so a long sprint of unrelated sibling merges never parks a healthy story, while a resolve that keeps failing on one move still exhausts it. `reset_on` must name a declared edge; validation still requires a counter on every cycle. Workflows without `slices` place it before their first check.
 
 ## 5. Part B — Honest QA
 
@@ -140,6 +144,7 @@ base: { stale: conflict }
 - QV3 An agent step declares `criteria: required` to make `--criteria` mandatory; the default `qa` steps do.
 - QV4 When the unit's frontmatter has `criteria`, the report must cover exactly those ids; a missing or unknown id is refused (`invalid_criteria`, exit 3) with the list in `do_instead`. Without frontmatter `criteria`, coverage is not checked and the trace records `criteria.unchecked_coverage`.
 - QV5 **Outcomes are gated by the worst verdict.** An outcome edge may declare `verdict: <v>`. Order: `fail` > `unverified` > `person` > `pass`. An outcome with `verdict: v` may be reported only when the worst verdict in the report is `v`; otherwise `norn done` refuses (`outcome_contradicts_verdicts`) and names the outcome that matches. This turns "never pass what you did not observe" into a rule the code enforces.
+- QV5a **`pass` needs the capability** (dogfood C2). Agents declare what their sessions can do in config: `agents.<name>.capabilities: [browser, …]` (default none). `norn done` refuses (`pass_without_capability`, exit 3) a `pass` verdict for a criterion whose `needs` are not all among the reporting agent's capabilities; `do_instead` says to report it `unverified` with `reason` and `how`. A person's earlier gate ruling (the brief's Rulings section) answers questions but never verifies a criterion: it judged the code as it was then, and a base merge or a fix may have changed it since.
 
 ### 5.3 The `unverified` outcome
 
@@ -171,13 +176,13 @@ base: { stale: conflict }
 
 | Contract | Change |
 |---|---|
-| `Workflow` schema | git action `update`; edge field `verdict`; agent step field `criteria`; workflow field `base: {stale, step}`; classified outcome `stale`; reserved word `stale` (W7) |
-| `Facts` | `story.base` (BS1); `story.pr.base_branch` (BS11) |
-| Config | `base_branch` (BS0) |
+| `Workflow` schema | counter field `reset_on` (W4 amended); git action `update`; edge field `verdict`; agent step field `criteria`; workflow field `base: {stale, step}`; classified outcome `stale`; reserved word `stale` (W7) |
+| `Facts` | `story.base` (BS1); `story.pr.base_branch` (BS11); `story.pr_seen` (BS10) |
+| Config | `base_branch` (BS0); `agents.<name>.capabilities` (QV5a) |
 | `Receipt` | new kind `update` (13 kinds); `done.criteria`, `done.notes`; `approve.acknowledged_notes` |
 | Frontmatter | `criteria` on slice and story |
 | New schema | `CriteriaReport` |
-| CLI | `norn update <story>`; `norn done --criteria --note --note-criterion`; refusals `invalid_criteria`, `outcome_contradicts_verdicts` |
+| CLI | `norn update <story>`; `norn done --criteria --note --note-criterion`; refusals `invalid_criteria`, `pass_without_capability`, `outcome_contradicts_verdicts` |
 | Inbox | items `stale:*`, `note:*`; merge item detail; gate details |
 | Skills | `merge` (base mode), `qa` (verdicts, report file, notes), `slice` (frontmatter `criteria`) |
 | PRD | §5 glossary adds **verdict** and **note**; §10 table adds `stale`; §11 W2/W7; §12 adds BS0–BS10 after GR8 |
