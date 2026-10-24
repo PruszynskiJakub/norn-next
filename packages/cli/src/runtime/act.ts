@@ -17,6 +17,8 @@ import {
   type AgentLaunch,
   applyReceipts,
   buildInbox,
+  GIT_CONFLICT_MARKERS,
+  GIT_IN_PROGRESS,
   type BoundaryCommit,
   isSideAction,
   type Decision,
@@ -383,7 +385,7 @@ export class Actor {
     state: UnitState | null,
     heartbeat: string | null,
     paths?: string[],
-  ): Promise<{ sha: string | null; pushed: boolean | null; push_error?: string } | null> {
+  ): Promise<{ sha: string | null; pushed: boolean | null; push_error?: string; deferred?: string; refused?: string } | null> {
     if (!c) return null;
     if (unit && state) {
       const loc = this.unitLoc(unit);
@@ -396,7 +398,22 @@ export class Actor {
         if (heartbeat) appendHandoffHeartbeat(loc.runsDir, `- ${heartbeat}`);
       }
     }
-    const sha = await this.git.commit(c.cwd, { message: c.message, trailers: c.trailers, ...(paths ? { paths } : {}) });
+    let sha: string | null;
+    try {
+      sha = await this.git.commit(c.cwd, { message: c.message, trailers: c.trailers, ...(paths ? { paths } : {}) });
+    } catch (e) {
+      const code = (e as { code?: string }).code;
+      // H1: an agent's merge or rebase is in progress in the worktree — norn's files wait there
+      // uncommitted (git cannot commit them without concluding it); the next commit after it carries them
+      if (code === GIT_IN_PROGRESS) return { sha: null, pushed: null, deferred: (e as Error).message };
+      // H1: never create (or push) a norn commit recording conflict markers: a failed effect, Unblock item (R4.3)
+      if (code === GIT_CONFLICT_MARKERS) {
+        this.effectErrors.push({ effect: "commit", reason: `commit on ${c.branch} refused: ${(e as Error).message}` });
+        return { sha: null, pushed: null, refused: (e as Error).message };
+      }
+      throw e;
+    }
+    this.effectsOk.add("commit");
     if (!c.push || !this.obs.remote) return { sha, pushed: null };
     const r = await this.pushBranch(c.cwd, c.branch);
     if (r.ok) this.effectsOk.add("push");
@@ -900,7 +917,8 @@ export class Actor {
           break;
         }
         outcome = "done";
-        base = { ref: u.ref, sha: u.sha, conflicts: [] };
+        // BS3: the merge commit (or the head found up to date) goes into the record, for status and why
+        base = { ref: u.ref, sha: u.sha, conflicts: [], head: res.head, merged: res.merged };
         detail = res.merged ? `merged ${u.branch} (${u.sha.slice(0, 12)}) into ${a.branch} at ${res.head.slice(0, 12)}` : `${a.branch} is up to date with ${u.branch} (${u.sha.slice(0, 12)})`;
         // BS3 step 5: pushed at the step boundary (S8, T7), as integrate does
         if (res.merged || res.adopted) extra.story_push = await this.pushUpdated(a.cwd, a.branch);

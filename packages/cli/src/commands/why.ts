@@ -62,7 +62,10 @@ function reasonOf(r: Receipt): string | null {
       const open = r.criteria?.filter((c) => c.verdict !== "pass") ?? [];
       const criteria = r.criteria ? `\n\nCriteria: ${r.criteria.length - open.length}/${r.criteria.length} pass${open.length ? `\n${open.map((c) => `- ${criterionLine(c)}${c.repro ? ` — repro: ${c.repro}` : ""}`).join("\n")}` : ""}` : "";
       const notes = r.notes?.length ? `\n\nNotes for a person:\n${r.notes.map((n, i) => `${i + 1}. ${n.criterion ? `(${n.criterion}) ` : ""}${n.text}`).join("\n")}` : "";
-      return `${r.handoff}${findings}${evidence}${criteria}${notes}`;
+      // BS5: the base merge norn verified at `norn done`
+      const bm = r.base_merge;
+      const merged = bm ? `\n\nBase merged: ${bm.sha}${bm.merge ? ` by merge commit ${bm.merge}` : ""}, head ${bm.head}` : "";
+      return `${r.handoff}${findings}${evidence}${criteria}${notes}${merged}`;
     }
     case "check":
       return `${r.command} → ${r.reason === "timeout" ? "timeout" : `exit ${r.exit_code}`}${r.log ? ` (log ${r.log})` : ""}\n${r.output_tail.split("\n").slice(-40).join("\n")}`.trimEnd();

@@ -3,7 +3,7 @@
  * silent → nudge into the same session (C1, B2), died → fresh session (C1), watch releasing
  * claims on a clean exit (T6), PR merged cleanup (GR6), uninstall, and check timeouts (C5).
  */
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdtempSync, readdirSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,6 +12,9 @@ import { ulid } from "@norn/schema";
 import { appendReceipt, appendTrace, readTrace } from "@norn/store";
 import { runCli, runShell, type TickReport } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
+
+// whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
+setDefaultTimeout(30_000);
 
 const SOLO = `name: solo
 start: implement

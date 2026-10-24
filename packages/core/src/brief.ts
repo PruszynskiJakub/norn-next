@@ -62,6 +62,8 @@ export interface Ruling {
   at: string;
   comment: string;
   receipt_id: string;
+  /** C2: the unit's branch head the ruling judged; null when the gate receipt did not record it */
+  head_sha: string | null;
 }
 
 /** Gate rulings with a reason across the story's units, oldest first, one per receipt (F28). */
@@ -74,7 +76,7 @@ export function storyRulings(units: ReadonlyArray<{ unit: string; receipts: read
       const comment = r.comment?.trim();
       if (!comment) continue;
       seen.add(r.receipt_id);
-      out.push({ unit: u.unit, step: r.step, attempt: r.attempt, decision: r.kind, by: r.who ?? null, at: r.at, comment, receipt_id: r.receipt_id });
+      out.push({ unit: u.unit, step: r.step, attempt: r.attempt, decision: r.kind, by: r.who ?? null, at: r.at, comment, receipt_id: r.receipt_id, head_sha: r.head_sha ?? null });
     }
   return out.sort((a, b) => epoch(a.at) - epoch(b.at) || a.receipt_id.localeCompare(b.receipt_id));
 }
@@ -475,8 +477,14 @@ function markdown(b: BriefJson): string {
   }
 
   if (b.rulings.length) {
-    out.push("## Rulings", "", "A person ruled at a gate of this story. These rulings answer the questions they address, even where the spec text still says otherwise; follow them and do not raise them again. A ruling never verifies an acceptance criterion: it judged the code as it was then, not the current code. Each criterion still gets its own verdict from what you observe now; one you cannot observe here is `unverified` (QV5a), never `pass`.", "");
-    for (const r of b.rulings) out.push(`- ${r.unit} ${r.step}#${r.attempt} ${r.decision}${r.by ? ` by ${r.by}` : ""} (${r.at}):`, quote(r.comment).replace(/^/gm, "  "));
+    out.push(
+      "## Rulings",
+      "",
+      "A person ruled at a gate of this story, each time at the head named below. These rulings answer the questions of reading and scope they address, even where the spec text still says otherwise; follow them and do not raise them again. A ruling never turns a criterion into `pass`: it judged the code at its head, not the current code. Each criterion still gets its own verdict from what you observe now; one you cannot observe here is `unverified` (QV5a). At most a ruling informs a `person` verdict — cite it in that verdict's `how` for the person to confirm on the current head.",
+      "",
+    );
+    for (const r of b.rulings)
+      out.push(`- ${r.unit} ${r.step}#${r.attempt} ${r.decision}${r.by ? ` by ${r.by}` : ""} (${r.at}) at head ${r.head_sha ? `\`${r.head_sha}\`` : "not recorded"}:`, quote(r.comment).replace(/^/gm, "  "));
     out.push("");
   }
 

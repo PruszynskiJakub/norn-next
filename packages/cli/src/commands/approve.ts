@@ -14,14 +14,21 @@ import { appendProgress, rejectProgress } from "../runtime/report.ts";
 
 const atGate = (st: UnitState) => st.status === "parked" && st.park?.kind === "gate";
 
+const SHA = /^[0-9a-f]{40,64}$/;
+
 /**
  * F35: the story branch head at `approve` — the story worktree's HEAD, else the local branch,
  * else its remote-tracking ref. Recorded as the approve receipt's `head_sha` (observe: `ready_head_sha`).
+ * C2: a slice gate's ruling records its slice worktree's HEAD. Every ruling names the head it judged.
  */
-async function storyHead(ctx: Context, t: Target): Promise<string | null> {
+async function unitHead(ctx: Context, t: Target): Promise<string | null> {
   const sf = t.story_facts;
+  if (t.slice !== null) {
+    const head = sf?.units.find((u) => u.unit.key === t.key)?.worktree?.status?.head;
+    return head && SHA.test(head) ? head : null;
+  }
   const fromWt = sf?.worktree?.status?.head;
-  if (fromWt && /^[0-9a-f]{40,64}$/.test(fromWt)) return fromWt;
+  if (fromWt && SHA.test(fromWt)) return fromWt;
   const branch = sf?.branch;
   if (!branch) return null;
   for (const ref of [`refs/heads/${branch}`, `refs/remotes/${ctx.config.remote.git_remote}/${branch}`]) {
@@ -41,7 +48,7 @@ export const approveCommand = defineCommand({
     const kind = opt.bool(args, "reject") ? "reject" : "approve";
     const reason = opt.str(args, "reason")?.trim();
     const t = await resolveTarget(ctx, args.positionals[0] as string, atGate);
-    const head = kind === "approve" && t.slice === null ? await storyHead(ctx, t).catch(() => null) : null;
+    const head = await unitHead(ctx, t).catch(() => null);
     // NT3: approving a story-level gate acknowledges the story's open notes listed at it; reject leaves them open
     const acknowledged = kind === "approve" && t.slice === null ? (t.story_facts?.notes ?? []).map((n) => n.id) : [];
     const out = await runHumanVerb(ctx, t, {

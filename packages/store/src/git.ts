@@ -98,3 +98,20 @@ export async function casRef(cwd: string, remote: string | null, ref: string, sh
 export async function fetchNornRefs(cwd: string, remote: string): Promise<void> {
   await gitOk(cwd, ["fetch", "--quiet", "--prune", "--no-tags", remote, "+refs/norn/*:refs/norn/*"]);
 }
+
+/**
+ * C5 (F35): is every commit in `from..to` norn's own for `story` — a `Norn-Tick` trailer and
+ * `Norn-Story: <story>` (e.g. the `ready.approve → $done` state commit) — with `from` an ancestor of
+ * `to`? False when either commit is unknown here, so a head nobody can vouch for still counts as moved.
+ */
+export async function onlyNornCommitsSince(cwd: string, from: string, to: string, story: string): Promise<boolean> {
+  if (from === to) return true;
+  if ((await git(cwd, ["merge-base", "--is-ancestor", from, to])).code !== 0) return false;
+  const r = await git(cwd, ["log", "--format=%H%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1f%(trailers:key=Norn-Story,valueonly,separator=%x2C)%x1e", `${from}..${to}`, "--"]);
+  if (r.code !== 0) return false;
+  const recs = r.stdout.split("\x1e").map((x) => x.replace(/^\n/, "")).filter(Boolean);
+  return recs.length > 0 && recs.every((rec) => {
+    const [, tick, owner] = rec.split("\x1f");
+    return !!tick?.trim() && owner?.trim() === story;
+  });
+}

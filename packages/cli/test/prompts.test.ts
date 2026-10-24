@@ -12,7 +12,7 @@
  *     through a launcher file, so the typed command stays short (B2)
  *   - R9.1: SessionStart without a turn start → one re-send, then `silent` "launch prompt not received"
  */
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -24,6 +24,9 @@ import type { TickReport } from "../src/index.ts";
 import { withNornOnPath } from "../src/runtime/shim.ts";
 import { runCli } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
+
+// whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
+setDefaultTimeout(30_000);
 
 const SOLO = `name: solo
 start: implement

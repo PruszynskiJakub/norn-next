@@ -6,12 +6,15 @@
  *   - R3.1: the loser of an intake race removes its local intake.
  *   - R3.3: release refuses a push that is not a fast-forward and keeps the claim.
  */
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Inbox, RunnerPort } from "@norn/core";
 import { type CliDeps, type CliResult, runCli, type TickReport } from "../src/index.ts";
 import { createHarness, FakeRunner, type Harness, issue, sh } from "./harness.ts";
+
+// whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
+setDefaultTimeout(30_000);
 
 const SOLO = `name: solo
 start: implement

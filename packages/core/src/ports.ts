@@ -100,6 +100,26 @@ export type RebaseResult = { ok: true; head: string } | { ok: false; conflict: t
 /** BS3: a merge commit made, or a conflicting merge aborted with the conflicting paths. */
 export type MergeResult = { ok: true; head: string } | { ok: false; conflict: true; files: string[] };
 
+/**
+ * H1 (S1, BS5): an operation git is in the middle of in a worktree — a merge (`MERGE_HEAD`), a
+ * rebase, a cherry-pick or a revert — and the unmerged paths. `operation: null` and `unmerged: []`
+ * = none: a commit there would not conclude anyone's merge.
+ */
+export interface GitInProgress {
+  operation: "merge" | "rebase" | "cherry-pick" | "revert" | null;
+  unmerged: string[];
+}
+
+/** H1: a line that looks like a conflict marker (`<<<<<<< `, `>>>>>>> `, `||||||| `). */
+export interface ConflictMarker {
+  path: string;
+  line: number;
+}
+
+/** PortError codes of `GitPort.commit` (H1): nothing is committed in either case. */
+export const GIT_IN_PROGRESS = "git_operation_in_progress";
+export const GIT_CONFLICT_MARKERS = "git_conflict_markers";
+
 /** BS1: how two commits relate — `ahead` = commits only in `a`, `behind` = commits only in `b`. */
 export interface Divergence {
   merge_base: string | null;
@@ -133,8 +153,25 @@ export interface GitPort {
   worktreeAdd(cwd: string, path: string, branch: string, opts?: { from?: string }): Promise<void>;
   worktreeRemove(cwd: string, path: string, opts?: { force?: boolean }): Promise<void>;
 
-  /** Commit; returns the new sha, or null when nothing to commit. */
+  /**
+   * Commit; returns the new sha, or null when nothing to commit. H1: never concludes an operation in
+   * progress — throws PortError `git_operation_in_progress` (nothing staged) while `inProgress` reports
+   * one, since git cannot commit some paths without concluding a merge; throws `git_conflict_markers`
+   * (nothing committed) when a staged file gains both `<<<<<<< ` and `>>>>>>> ` lines.
+   */
   commit(cwd: string, spec: CommitSpec): Promise<string | null>;
+  /** H1: the operation git is in the middle of in cwd's worktree, and its unmerged paths. */
+  inProgress(cwd: string): Promise<GitInProgress>;
+  /**
+   * H1/BS5: conflict-marker lines in tracked files — of the work tree, or of `rev` — limited to
+   * `paths` when given ([] = none checked).
+   */
+  conflictMarkers(cwd: string, opts?: { paths?: string[]; rev?: string }): Promise<ConflictMarker[]>;
+  /**
+   * BS5: the merge commit that brought `base` into `head` — the oldest merge on the ancestry path
+   * `base..head` — or null when there is none (`base` not merged, or reached without a merge).
+   */
+  baseMergeCommit(cwd: string, base: string, head: string): Promise<string | null>;
   /** Push a branch (`refspec` like `HEAD:refs/heads/x`), optional force-with-lease. */
   push(cwd: string, remote: string, refspec: string, opts?: { forceWithLease?: string; setUpstream?: boolean }): Promise<PushResult>;
   fetch(cwd: string, remote: string, refspecs: string[]): Promise<void>;

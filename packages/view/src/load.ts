@@ -16,6 +16,7 @@ import {
   formatAge,
   heartbeatDown,
   nextCommand,
+  type NumberedReceipt,
   openNotes,
   RECENT_MS,
   readyHeadSha,
@@ -35,6 +36,7 @@ import {
   cachedDefaultBranch,
   defaultBaseRef,
   readBaseFacts,
+  onlyNornCommitsSince,
   readPrFacts,
   lastTickAt,
   type LeaseEntry,
@@ -53,7 +55,7 @@ import {
   withSliceWorktrees,
 } from "@norn/store";
 import { mergeTimeline, receiptEntry, traceEntries, traceUnits } from "./timeline.ts";
-import type { ClaimView, CounterView, ProjectView, RecentDone, RunView, SliceView, StoryView, TimelineEntry, UnitView } from "./types.ts";
+import type { BaseSyncView, ClaimView, CounterView, ProjectView, RecentDone, RunView, SliceView, StoryView, TimelineEntry, UnitView } from "./types.ts";
 
 export interface LoadProjectViewOptions {
   repoRoot: string;
@@ -188,6 +190,19 @@ function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: Uni
 }
 
 /** Build the read model. Async only because claim refs are read through local git. */
+/** BS1/BS3: the last base measurement (`trace/base.json`) and the newest base merge in the story unit's receipts. */
+function baseSync(sf: StoryFacts, receipts: readonly NumberedReceipt[], branch: string): BaseSyncView | null {
+  let last: BaseSyncView["last_update"] = null;
+  for (const { receipt: r } of [...receipts].sort((a, b) => b.n - a.n)) {
+    if (r.kind === "classify" && r.outcome === "done" && r.base?.merged && r.base.head) last = { sha: r.base.head, base_sha: r.base.sha, at: r.at, step: r.step };
+    else if (r.kind === "done" && r.base_merge?.merge) last = { sha: r.base_merge.merge, base_sha: r.base_merge.sha, at: r.at, step: r.step };
+    if (last) break;
+  }
+  const b = sf.base;
+  if (!b && !last) return null;
+  return { branch: b ? b.ref.replace(/^refs\/(remotes\/[^/]+|heads)\//, "") : branch, behind: b?.behind ?? null, ahead: b?.ahead ?? null, conflicts: b?.conflicts ?? [], last_update: last };
+}
+
 export async function loadProjectView(opts: LoadProjectViewOptions): Promise<ProjectView> {
   const now = opts.now ?? Date.now();
   const holder = opts.holder ?? defaultHolder();
@@ -251,6 +266,18 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       }
       const found = await unpushedRuns(remoteName, baseRef, read.spec_dir, targets).catch(() => []);
       return found.map((f) => ({ unit: f.unit, files: f.files }));
+    }),
+  );
+  // F35/C5: the ready approval's head, voided by a later re-entry; and whether only norn moved the PR head since
+  const readyHeads = await Promise.all(
+    snap.stories.map(async (story): Promise<{ ready_head_sha?: string; ready_head_norn?: string }> => {
+      const wf = story.units[0]?.workflow?.workflow;
+      const receipts = story.units[0]?.receipts;
+      const sha = wf && receipts ? readyHeadSha(wf, receipts) : undefined;
+      if (!sha) return {};
+      const prHead = prSeen[story.key]?.pr?.head_sha;
+      const norn = !!prHead && prHead !== sha && (await onlyNornCommitsSince(opts.repoRoot, sha, prHead, story.key).catch(() => false));
+      return { ready_head_sha: sha, ...(norn ? { ready_head_norn: prHead } : {}) };
     }),
   );
   const runs: RunView[] = [];
@@ -319,11 +346,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       pr: undefined,
       // C1: the PR as this checkout's last sync saw it — merge (BS10), retarget (BS11), head changed (F35)
       ...(prSeen[story.key] && story.frontmatter?.status !== "done" && story.frontmatter?.status !== "dropped" ? { pr_seen: prSeen[story.key] } : {}),
-      // F35/C5: the ready approval's head, voided by a later re-entry
-      ...((wf, receipts) => {
-        const sha = wf && receipts ? readyHeadSha(wf, receipts) : undefined;
-        return sha ? { ready_head_sha: sha } : {};
-      })(story.units[0]?.workflow?.workflow, story.units[0]?.receipts),
+      ...readyHeads[i],
       units,
       slices: story.slices,
       mode,
@@ -390,6 +413,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       stories.push({
         ...base,
         slice: null,
+        base_sync: baseSync(sf, storyUnit.receipts ?? [], config.base_branch ?? cachedDefaultBranch(opts.repoRoot) ?? "main"),
         story_status: story.frontmatter?.status ?? null,
         spec_dir: story.spec_dir,
         root: story.root,

@@ -55,6 +55,7 @@ import {
   classifyClaim,
   fetchNornRefs,
   git as rawGit,
+  onlyNornCommitsSince,
   listLeases,
   listMailbox,
   loadSnapshot,
@@ -408,7 +409,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       ...(prSeen[s.key] ? { pr_seen: prSeen[s.key] } : {}),
       ...(byAncestry.has(s.key) ? { merged_by_ancestry: true } : {}),
       ...(foreign.length ? { foreign_commits: foreign } : {}),
-      ...readyHead(s, unitSnaps.get(s)?.[0]),
+      ...(await readyHead(root, s, unitSnaps.get(s)?.[0], (storyPrs.has(s.key) ? storyPrs.get(s.key) : prSeen[s.key]?.pr)?.head_sha)),
       ...storyNotes(s, unitSnaps.get(s) ?? []),
       ...(s.base_status !== undefined ? { base_status: s.base_status } : {}),
       ...(lost.length ? { unpushed_runs: lost.map((l) => ({ unit: l.unit, files: l.files })) } : {}),
@@ -595,12 +596,17 @@ async function refMap(root: string): Promise<Map<string, string>> {
   return m;
 }
 
-/** F35/C5: `ready_head_sha` from the story unit's approve and re-entry receipts (`readyHeadSha`). */
-function readyHead(story: StorySnapshot, u: UnitSnapshot | undefined): { ready_head_sha?: string } {
+/**
+ * F35/C5: `ready_head_sha` from the story unit's approve and re-entry receipts (`readyHeadSha`), and
+ * `ready_head_norn` when the known PR head moved past it by norn's own commits of the story only.
+ */
+async function readyHead(root: string, story: StorySnapshot, u: UnitSnapshot | undefined, prHead: string | undefined): Promise<{ ready_head_sha?: string; ready_head_norn?: string }> {
   const wf = u?.workflow?.workflow;
   if (!u || !wf) return {};
   const sha = readyHeadSha(wf, receiptsOfKinds(story, u, ["approve", ...RE_ENTRY_KINDS]));
-  return sha ? { ready_head_sha: sha } : {};
+  if (!sha) return {};
+  const norn = prHead && prHead !== sha && (await onlyNornCommitsSince(root, sha, prHead, story.key));
+  return { ready_head_sha: sha, ...(norn ? { ready_head_norn: prHead } : {}) };
 }
 
 /** Receipts of the given kinds in a unit's runs dir, ascending — read by file name, the others never opened. */

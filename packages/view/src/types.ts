@@ -68,8 +68,23 @@ export interface SliceView extends UnitView {
   integrated: boolean;
 }
 
+/** BS1/BS3: how the story branch stands against its base, and the last base merge on record. */
+export interface BaseSyncView {
+  /** base branch name (e.g. `main`) */
+  branch: string;
+  /** as the last tick of this checkout measured it; null = never measured here */
+  behind: number | null;
+  ahead: number | null;
+  /** paths a merge of the base would conflict in ([] = clean) */
+  conflicts: string[];
+  /** the last merge of the base into the story branch: norn's `update` merge commit, or a resolve's merge verified at `norn done` */
+  last_update: { sha: string; base_sha: string; at: string; step: string } | null;
+}
+
 export interface StoryView extends UnitView {
   slice: null;
+  /** BS1/BS3: base sync state; null = no measurement and no base merge on record */
+  base_sync: BaseSyncView | null;
   /** coarse frontmatter status; null if story.md is unreadable */
   story_status: StoryStatus | null;
   /** root-relative spec folder */

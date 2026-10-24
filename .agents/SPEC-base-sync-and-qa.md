@@ -72,6 +72,8 @@ Non-goals (this spec):
   - Run the slice/story check commands before reporting and fix what the merge broke; the `test` step after `update` re-checks anyway.
   On `done` the workflow returns to `update`, which now finds `behind == 0` (or a new, smaller gap if the base moved again).
   The agent's merge commit is not a foreign commit (Q6): a commit made during a run of the unit (from its first to its last receipt, open-ended while the unit runs or is parked on an ask, e.g. a permission prompt) is the agent's (dogfood C4).
+  `norn done` in base mode is refused (`merge_unfinished`) unless the merge is concluded: no merge or rebase in progress, no unmerged path, the base sha an ancestor of HEAD, and no conflict marker in the conflicting paths or the files changed since the merge commit. The done receipt records `base_merge {sha, merge, head}`; `norn why` and `norn status` show the merge commit (audit).
+  norn's own commits never conclude an agent's merge: while the worktree has `MERGE_HEAD`, a rebase, a cherry-pick or unmerged paths, norn commits nothing there (git cannot commit some paths mid-merge) and records why in the trace; its runs/ files go with the next commit after. A norn commit whose staged changes add conflict markers is refused (a failed `commit` effect, Unblock item), so nothing with markers is pushed (audit H1).
 
 ### 4.3 Re-entry when the base moves later
 

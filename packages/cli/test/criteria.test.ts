@@ -5,13 +5,16 @@
  * `unverified` report goes to human-qa, whose inbox item says how to check; notes become Check items
  * that a `ready` reject leaves open and a `ready` approve acknowledges.
  */
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { CriteriaTrace } from "@norn/schema";
 import { readTrace } from "@norn/store";
 import { type CliResult, runCli } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
+
+// whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
+setDefaultTimeout(30_000);
 
 const QAFLOW = `name: qaflow
 start: qa

@@ -5,7 +5,7 @@
  */
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import type { CommitSpec, GitFactory, GitPort, MergeResult, PushResult, RefUpdate, WorktreeInfo, WorktreeStatus } from "@norn/core";
+import type { CommitSpec, ConflictMarker, GitFactory, GitInProgress, GitPort, MergeResult, PushResult, RefUpdate, WorktreeInfo, WorktreeStatus } from "@norn/core";
 import { bunExec, isAuthError, isNetworkError, okOrThrow, portError, type Exec, type ExecResult } from "./exec.ts";
 
 export { bunExec, fixtureExec, portError, type Exec, type ExecFixture, type ExecOptions, type ExecResult } from "./exec.ts";
@@ -56,6 +56,39 @@ export function classifyPush(res: ExecResult): PushResult {
   if (isAuthError(msg)) return { ok: false, reason: "auth", message: msg };
   if (isNetworkError(msg)) return { ok: false, reason: "network", message: msg };
   return { ok: false, reason: "other", message: msg };
+}
+
+/** H1: a conflict-marker line (`<<<<<<< ours`, `>>>>>>> theirs`, diff3 `||||||| base`); `=======` alone is a setext heading too. */
+const MARKER = /^(<{7}|>{7}|\|{7})( |$)/;
+/** PortError codes of commit (H1); the same strings as `GIT_IN_PROGRESS` / `GIT_CONFLICT_MARKERS` in @norn/core. */
+const IN_PROGRESS = "git_operation_in_progress";
+const CONFLICT_MARKERS = "git_conflict_markers";
+
+/**
+ * H1: files whose added lines (`git diff -U0` output) hold both an opening (`<<<<<<< `) and a closing
+ * (`>>>>>>> `) conflict marker — a merge result committed unresolved.
+ */
+export function addedConflictMarkers(diff: string): string[] {
+  const out: string[] = [];
+  let file: string | null = null;
+  let open = false;
+  let close = false;
+  const flush = () => {
+    if (file && open && close) out.push(file);
+  };
+  for (const l of diff.split("\n")) {
+    if (l.startsWith("diff --git ")) {
+      flush();
+      file = null;
+      open = close = false;
+    } else if (l.startsWith("+++ ")) file = l.slice(4).replace(/^b\//, "");
+    else if (l.startsWith("+") && !l.startsWith("+++")) {
+      if (/^\+<{7}( |$)/.test(l)) open = true;
+      else if (/^\+>{7}( |$)/.test(l)) close = true;
+    }
+  }
+  flush();
+  return out;
 }
 
 /** Parse `git status --porcelain=v2 --branch -z` output. */
@@ -155,6 +188,26 @@ export function createGit(opts: GitOptions = {}): GitPort {
     return false;
   };
 
+  /** H1: MERGE_HEAD, a rebase, CHERRY_PICK_HEAD or REVERT_HEAD in cwd's worktree, and the unmerged paths. */
+  const inProgress = async (cwd: string): Promise<GitInProgress> => {
+    // one rev-parse for every marker git leaves while an operation waits to be concluded
+    const names = ["MERGE_HEAD", "rebase-merge", "rebase-apply", "REBASE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD"] as const;
+    const [paths, u] = await Promise.all([run(cwd, ["rev-parse", ...names.flatMap((n) => ["--git-path", n])]), run(cwd, ["diff", "--name-only", "--diff-filter=U", "-z"])]);
+    const found = paths.code === 0 ? lines(paths.stdout) : [];
+    const has = new Set(names.filter((_, i) => !!found[i] && existsSync(resolve(cwd, found[i] as string))));
+    const operation: GitInProgress["operation"] = has.has("MERGE_HEAD")
+      ? "merge"
+      : has.has("rebase-merge") || has.has("rebase-apply") || has.has("REBASE_HEAD")
+        ? "rebase"
+        : has.has("CHERRY_PICK_HEAD")
+          ? "cherry-pick"
+          : has.has("REVERT_HEAD")
+            ? "revert"
+            : null;
+    const unmerged = u.code === 0 ? [...new Set(u.stdout.split("\0").filter((p) => p.length > 0))].sort() : [];
+    return { operation, unmerged };
+  };
+
   const git: GitPort = {
     async repoRoot(cwd) {
       const common = await line(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
@@ -227,17 +280,55 @@ export function createGit(opts: GitOptions = {}): GitPort {
     },
 
     async commit(cwd, spec: CommitSpec) {
+      // H1: never stage or commit through someone's merge or rebase — any commit would conclude it
+      // (git refuses a partial commit mid-merge), with whatever the work tree holds, markers included
+      const busy = await inProgress(cwd);
+      if (busy.operation || busy.unmerged.length)
+        throw portError(
+          IN_PROGRESS,
+          `${busy.operation ?? "a merge"} in progress${busy.unmerged.length ? ` (unmerged: ${busy.unmerged.join(", ")})` : ""}: nothing committed; the commit waits until it is concluded`,
+        );
       const paths = spec.paths && spec.paths.length > 0 ? spec.paths : null;
       await must(cwd, paths ? ["add", "-A", "--", ...paths] : ["add", "-A"]);
       const diff = await run(cwd, ["diff", "--cached", "--quiet", ...(paths ? ["--", ...paths] : [])]);
       if (diff.code === 0 && !spec.allowEmpty) return null;
       if (diff.code !== 0 && diff.code !== 1) okOrThrow(diff, "git diff", "git");
+      if (diff.code === 1) {
+        // H1 last guard: a norn commit never records an unresolved merge
+        const added = await must(cwd, ["diff", "--cached", "-U0", "--no-color", "--no-ext-diff", ...(paths ? ["--", ...paths] : [])]);
+        const marked = addedConflictMarkers(added);
+        if (marked.length) throw portError(CONFLICT_MARKERS, `conflict markers in ${marked.join(", ")}: nothing committed; resolve them first`);
+      }
       const args = ["commit", "-F", "-", "--cleanup=strip"];
       if (spec.allowEmpty) args.push("--allow-empty");
       for (const [k, v] of Object.entries(spec.trailers)) args.push("--trailer", `${k}: ${v}`); // S4
       if (paths && diff.code === 1) args.push("--", ...paths);
       await must(cwd, args, spec.message);
       return line(cwd, ["rev-parse", "HEAD"]);
+    },
+    inProgress,
+    async conflictMarkers(cwd, o) {
+      if (o?.paths && o.paths.length === 0) return [];
+      const args = ["grep", "-n", "-I", "-z", "--no-color", "-E", "^(<{7}|>{7}|[|]{7})( |$)"];
+      if (o?.rev) args.push(o.rev);
+      args.push("--", ...(o?.paths ?? []));
+      const r = await run(cwd, args);
+      if (r.code === 1) return [];
+      okOrThrow(r, "git grep", "git");
+      const prefix = o?.rev ? `${o.rev}:` : "";
+      const out: ConflictMarker[] = [];
+      for (const l of lines(r.stdout)) {
+        // -z: <rev:>path NUL line NUL text
+        const [path, n, text] = l.split("\0");
+        if (!path || !n || !MARKER.test(text ?? "")) continue;
+        out.push({ path: path.startsWith(prefix) ? path.slice(prefix.length) : path, line: Number(n) });
+      }
+      return out;
+    },
+    async baseMergeCommit(cwd, base, head) {
+      // every commit on the ancestry path descends from base: the oldest merge on it brought base in
+      const r = await run(cwd, ["rev-list", "--merges", "--ancestry-path", "--reverse", `${base}..${head}`, "--"]);
+      return r.code === 0 ? (lines(r.stdout)[0] ?? null) : null;
     },
     async push(cwd, remote, refspec, o) {
       const args = ["push", "--porcelain"];
@@ -282,6 +373,9 @@ export function createGit(opts: GitOptions = {}): GitPort {
       return [...new Set(lines(r.stdout).slice(1))].sort();
     },
     async merge(cwd, rev, spec): Promise<MergeResult> {
+      // H1: a merge already in progress is someone's (a resolve agent's): never abort or conclude it
+      const busy = await inProgress(cwd);
+      if (busy.operation || busy.unmerged.length) throw portError(IN_PROGRESS, `${busy.operation ?? "a merge"} in progress in ${cwd}: not merging ${rev}`);
       // BS3: merge without committing, so the merge commit carries the message and trailers (S4)
       const r = await run(cwd, ["merge", "--no-ff", "--no-commit", "--no-edit", rev]);
       const head = () => line(cwd, ["rev-parse", "HEAD"]);
@@ -395,6 +489,9 @@ export async function update(
   opts: { cwd: string; branch: string; baseSha: string; remote: string | null; message: string; trailers: Record<string, string> },
 ): Promise<UpdateResult> {
   const st = await git.status(opts.cwd);
+  // H1: a merge or rebase left in progress (a resolve agent's) is never aborted or concluded here
+  const busy = await git.inProgress(opts.cwd);
+  if (busy.operation || busy.unmerged.length) return { outcome: "stuck", reason: `${busy.operation ?? "merge"} in progress in the story worktree` };
   if (!st.clean || st.rebase_in_progress) return { outcome: "stuck", reason: "worktree dirty" };
   if (st.branch !== opts.branch) return { outcome: "stuck", reason: `story worktree is on ${st.branch ?? "a detached HEAD"}, not ${opts.branch}` };
   let adopted: string | null = null;

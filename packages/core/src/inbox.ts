@@ -114,10 +114,12 @@ export function heartbeatItem(facts: Facts, config: ResolvedConfig): InboxItem |
 export function actFailureItem(story: StoryFacts, uf: UnitFacts): InboxItem | null {
   const f = uf.act_failure;
   const st = uf.state;
-  if (!f || !st || st.status === "done" || st.status === "corrupt" || f.step !== st.step || f.attempt !== st.attempt) return null;
+  // H1: a refused commit is owed even by a finished unit (its `$done` state is not on record yet)
+  if (!f || !st || (st.status === "done" && f.effect !== "commit") || st.status === "corrupt" || f.step !== st.step || f.attempt !== st.attempt) return null;
   // R6.3: an answer that did not reach its prompt is told on the Answer item itself (answerItem)
   if (f.effect === "answer" && st.status === "parked" && st.park?.kind === "ask") return null;
-  const delivery = f.effect !== "push";
+  // a refused push or commit (H1) stays until the effect succeeds or the cursor moves
+  const delivery = f.effect !== "push" && f.effect !== "commit";
   if (delivery && (uf.run?.last_activity_at ?? 0) > epoch(f.at)) return null;
   const key = uf.unit.key;
   return {
@@ -454,7 +456,8 @@ export function readyHeadSha(wf: Workflow, receipts: readonly NumberedReceipt[])
 export function headChangedItem(story: StoryFacts): InboxItem | null {
   const pr = knownPr(story);
   const ready = story.ready_head_sha;
-  if (!pr || pr.state !== "open" || !ready || !pr.head_sha || pr.head_sha === ready) return null;
+  // C5: norn's own commits after the approval (its `$done` state commit) leave the head the person let through as it was
+  if (!pr || pr.state !== "open" || !ready || !pr.head_sha || pr.head_sha === ready || pr.head_sha === story.ready_head_norn) return null;
   const st = story.units.find((u) => u.unit.slice === null)?.state;
   return {
     id: `head:${story.key}:${pr.head_sha}`,
