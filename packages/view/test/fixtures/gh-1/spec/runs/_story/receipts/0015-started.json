@@ -1,0 +1,17 @@
+{
+  "kind": "started",
+  "receipt_id": "01M5MTX194QH87EN6JTJ1XA8YG",
+  "run_id": "01M5MTX194QH87EN6JTJ1XA8YF",
+  "step": "qa",
+  "attempt": 2,
+  "at": "2026-10-23T16:53:27.464Z",
+  "by": "agent",
+  "who": "claude",
+  "how": "manual",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-sandbox-todoist-worktrees/gh-1-projects-and-items",
+  "process": {
+    "pid": 4345,
+    "pid_start": "Fri Oct 23 13:00:52 2026"
+  }
+}

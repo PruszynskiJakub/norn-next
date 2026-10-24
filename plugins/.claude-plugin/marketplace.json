@@ -1,0 +1,16 @@
+{
+  "name": "norn",
+  "owner": {
+    "name": "Jakub Pruszyński"
+  },
+  "metadata": {
+    "description": "The norn plugin for Claude Code."
+  },
+  "plugins": [
+    {
+      "name": "norn",
+      "source": "./claude-code",
+      "description": "norn skills and the /norn command for Claude Code."
+    }
+  ]
+}

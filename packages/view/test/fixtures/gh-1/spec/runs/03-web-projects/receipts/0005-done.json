@@ -1,0 +1,40 @@
+{
+  "kind": "done",
+  "receipt_id": "01M5MSW8NKFY6BJZ9NZ8A6P6KB",
+  "run_id": "01M5MSV23XS0GMRCD2K7MMY8XB",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-23T16:35:33.684Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-1/03",
+  "outcome": "approve",
+  "handoff": "review#1: approve. AC1-5, AC7-9 met with seam-level tests; 121 pass, typecheck clean; AC6 (browser confirm) left to QA per plan B27. 3 non-blocking findings: AC4 delete test doesn't prove items gone (F1), crafted Inbox rename 400 shows no message (F2), web.ts imports parseId from api.ts (F3).",
+  "findings": [
+    {
+      "severity": "minor",
+      "title": "Delete test does not actually prove the project's items are gone",
+      "id": "F1",
+      "file": "test/web.test.ts",
+      "line": 127,
+      "criterion": "AC4",
+      "detail": "The test checks `expect(() => store.listItems(work.id)).toThrow()`. That throws because the project no longer exists (findProject), so it says nothing about the items. The cascade is covered at S1 in store tests, so the behaviour is proven elsewhere, but this test does not prove the 'and its items are gone' part of AC4.\nAxis: spec\nSuggestion: Keep the created item's id and assert that PATCH/DELETE /api/items/:id returns 404 (or that the store's item lookup fails) after the delete."
+    },
+    {
+      "severity": "minor",
+      "title": "A crafted rename of the Inbox returns 400 with no visible error",
+      "id": "F2",
+      "file": "src/web.ts",
+      "line": 75,
+      "detail": "POST /projects/<inboxId>/rename reaches store.renameProject, which throws 'the Inbox cannot be renamed'. web.ts maps this to errors.rename, but projectControls() renders nothing for the Inbox, so the 400 page shows no message. Delete uses errors.action, which is shown. Only reachable through a crafted request, since the UI offers no Inbox rename form.\nAxis: standards\nSuggestion: When the selected project is the Inbox, route rename errors through errors.action as well, or always show errors.action for invalid errors that have no form to sit next to."
+    },
+    {
+      "severity": "nit",
+      "title": "web.ts imports parseId from api.ts",
+      "id": "F3",
+      "file": "src/web.ts",
+      "line": 1,
+      "detail": "The HTML layer now depends on the JSON API module just for an id parser, and api.ts had to export it.\nAxis: standards\nSuggestion: Optionally move parseId to a small shared module (e.g. src/ids.ts) when gh-1/04 touches this."
+    }
+  ]
+}

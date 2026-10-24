@@ -1,0 +1,5 @@
+{ "info": { "id": "ses_01" }, "messages": [
+  { "info": { "role": "user" }, "parts": [{ "type": "text", "text": "go" }] },
+  { "info": { "role": "assistant" }, "parts": [{ "type": "text", "text": "Implemented." }, { "type": "tool", "tool": "bash" }] },
+  { "info": { "role": "assistant" }, "parts": [{ "type": "step-finish" }] }
+] }

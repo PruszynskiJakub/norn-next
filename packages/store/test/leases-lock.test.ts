@@ -1,0 +1,108 @@
+import { describe, expect, test } from "bun:test";
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { DEFAULT_CONFIG, type ProcessIdentity } from "@norn/schema";
+import {
+  acquireLock,
+  acquireRunLease,
+  acquireSlotLease,
+  acquireTickLock,
+  leasesDir,
+  listLeases,
+  localProcess,
+  readEnvNorn,
+  readUnitMarker,
+  reclaimLeases,
+  releaseLease,
+  slotEnv,
+  writeEnvNorn,
+  writeUnitMarker,
+} from "../src/index.ts";
+import { tmp } from "./helpers.ts";
+
+const A: ProcessIdentity = { pid: 101, pid_start: "a" };
+const B: ProcessIdentity = { pid: 202, pid_start: "b" };
+const unit = { repo: "/r", story: "gh-12", slice: "gh-12/01" };
+
+describe("process liveness", () => {
+  test("self is alive; wrong start time is not", async () => {
+    const me = localProcess.self();
+    expect(await localProcess.isAlive(me)).toBe(true);
+    expect(await localProcess.isAlive({ ...me, pid_start: "nope" })).toBe(false);
+    expect(await localProcess.identify(999_999)).toBeNull();
+  });
+});
+
+describe("tick lock (H1)", () => {
+  test("exclusive while holder alive; reclaimed when dead; release", async () => {
+    const repo = tmp();
+    const alive = new Set([A.pid]);
+    const liveness = (p: ProcessIdentity) => alive.has(p.pid);
+    const a = await acquireTickLock(repo, { self: A, liveness });
+    expect(a.ok).toBe(true);
+    const b = await acquireTickLock(repo, { self: B, liveness });
+    expect(b).toMatchObject({ ok: false, holder: { holder: A } });
+    alive.delete(A.pid);
+    const b2 = await acquireTickLock(repo, { self: B, liveness });
+    expect(b2).toMatchObject({ ok: true, reclaimed: { holder: A } });
+    // A's stale release must not remove B's lock
+    expect(a.ok && a.release()).toBe(false);
+    expect(b2.ok && b2.release()).toBe(true);
+    expect(existsSync(b2.path)).toBe(false);
+  });
+  test("unreadable lock is reclaimed", async () => {
+    const p = join(tmp(), "x.lock");
+    writeFileSync(p, "garbage");
+    expect((await acquireLock(p, { self: A, liveness: () => true })).ok).toBe(true);
+  });
+});
+
+describe("leases (K1, K3, K4)", () => {
+  test("agent leases capped, idempotent per run, dead holders reclaimed", async () => {
+    const home = tmp();
+    const alive = new Set([A.pid, B.pid]);
+    const liveness = (l: { holder: ProcessIdentity }) => alive.has(l.holder.pid);
+    const r1 = await acquireRunLease(home, "agent", 2, { ...unit, run_id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB1", holder: A, liveness });
+    const again = await acquireRunLease(home, "agent", 2, { ...unit, run_id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB1", holder: A, liveness });
+    expect(again).toMatchObject({ ok: true, existed: true, entry: { file: "agent-1.json" } });
+    const r2 = await acquireRunLease(home, "agent", 2, { ...unit, run_id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB2", holder: B, liveness });
+    expect([r1.ok && r1.entry.file, r2.ok && r2.entry.file]).toEqual(["agent-1.json", "agent-2.json"]);
+    const full = await acquireRunLease(home, "agent", 2, { ...unit, run_id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB3", holder: B, liveness });
+    expect(full).toMatchObject({ ok: false, reason: "full" });
+    alive.delete(A.pid);
+    const l = await listLeases(home, liveness);
+    expect(l.dead.map((e) => e.file)).toEqual(["agent-1.json"]);
+    const r3 = await acquireRunLease(home, "agent", 2, { ...unit, run_id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB3", holder: B, liveness });
+    expect(r3).toMatchObject({ ok: true, entry: { file: "agent-1.json" }, reclaimed: [{ file: "agent-1.json" }] });
+    expect(releaseLease(home, "agent-2.json")).toBe(true);
+    expect(readdirSync(leasesDir(home))).toEqual(["agent-1.json"]);
+  });
+  test("slot leases: range, port base, worktree liveness by default, reclaim", async () => {
+    const home = tmp();
+    const wt = tmp();
+    const slots = { ...DEFAULT_CONFIG.slots, min: 3, max: 4 };
+    const s = await acquireSlotLease(home, slots, { ...unit, worktree: wt, holder: A });
+    expect(s).toMatchObject({ ok: true, entry: { n: 3, lease: { slot: 3, port_base: 4030, worktree: wt } } });
+    const same = await acquireSlotLease(home, slots, { ...unit, worktree: wt, holder: B });
+    expect(same).toMatchObject({ ok: true, existed: true });
+    rmSync(wt, { recursive: true });
+    const l = await listLeases(home);
+    expect(l.dead.map((e) => e.file)).toEqual(["slot-3.json"]);
+    expect(await reclaimLeases(home, ["slot-3.json"])).toEqual(["slot-3.json"]);
+    // corrupt lease files are reported and reclaimable
+    mkdirSync(leasesDir(home), { recursive: true });
+    writeFileSync(join(leasesDir(home), "slot-4.json"), "{}");
+    expect((await listLeases(home)).errors.map((e) => e.file)).toEqual(["slot-4.json"]);
+    expect(await reclaimLeases(home, ["slot-4.json"])).toEqual(["slot-4.json"]);
+  });
+  test(".env.norn and .norn-unit", () => {
+    const wt = tmp();
+    const env = slotEnv(2, { ...DEFAULT_CONFIG.slots, env: { DB_NAME: "app_{slot}", API: "http://localhost:{port_base}" } });
+    expect(env).toEqual({ NORN_SLOT: "2", PORT_BASE: "4020", DB_NAME: "app_2", API: "http://localhost:4020" });
+    writeEnvNorn(wt, { ...env, ODD: 'a "b" c' });
+    expect(readEnvNorn(wt)).toEqual({ ...env, ODD: 'a "b" c' });
+    writeUnitMarker(wt, { repo: "/r", story: "gh-12", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-12-x" });
+    expect(readUnitMarker(wt)).toEqual({ exists: true, marker: { repo: "/r", story: "gh-12", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-12-x" } });
+    expect(readUnitMarker(tmp())).toEqual({ exists: false, marker: null });
+  });
+});

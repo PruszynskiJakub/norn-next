@@ -1,0 +1,11 @@
+{"type":"summary","summary":"norn work","leafUuid":"u0"}
+{"parentUuid":null,"isSidechain":false,"type":"user","message":{"role":"user","content":"Use the norn skill, then run `norn brief`."},"uuid":"u1","sessionId":"abc123"}
+{"parentUuid":"u1","isSidechain":false,"type":"assistant","message":{"id":"msg_01","type":"message","role":"assistant","model":"claude-sonnet-4-5","content":[{"type":"text","text":"Reading the brief."}]},"uuid":"a1","sessionId":"abc123"}
+{"parentUuid":"a1","isSidechain":false,"type":"assistant","message":{"id":"msg_01","type":"message","role":"assistant","content":[{"type":"tool_use","id":"toolu_01","name":"Bash","input":{"command":"norn brief"}}]},"uuid":"a2","sessionId":"abc123"}
+{"parentUuid":"a2","isSidechain":false,"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_01","content":"{...}"}]},"uuid":"u2","sessionId":"abc123"}
+{"parentUuid":"u2","isSidechain":false,"type":"assistant","message":{"id":"msg_02","type":"message","role":"assistant","content":[{"type":"thinking","thinking":"hmm","signature":"x"}]},"uuid":"a3","sessionId":"abc123"}
+{"parentUuid":"a3","isSidechain":false,"type":"assistant","message":{"id":"msg_02","type":"message","role":"assistant","content":[{"type":"text","text":"Implemented the slice."}]},"uuid":"a4","sessionId":"abc123"}
+{"parentUuid":"a4","isSidechain":false,"type":"assistant","message":{"id":"msg_02","type":"message","role":"assistant","content":[{"type":"text","text":"Tests are green; reporting done."}]},"uuid":"a5","sessionId":"abc123"}
+{"parentUuid":"a5","isSidechain":true,"type":"assistant","message":{"id":"msg_sub","type":"message","role":"assistant","content":[{"type":"text","text":"subagent noise"}]},"uuid":"s1","sessionId":"abc123"}
+{"parentUuid":"a5","isSidechain":false,"type":"assistant","message":{"id":"msg_03","type":"message","role":"assistant","content":[{"type":"tool_use","id":"toolu_02","name":"Bash","input":{"command":"norn done done"}}]},"uuid":"a6","sessionId":"abc123"}
+{"parentUuid":"a6","isSidechain":false,"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_02","content":"ok"}]},"uuid":"u3"

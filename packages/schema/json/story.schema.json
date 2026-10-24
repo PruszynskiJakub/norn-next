@@ -1,0 +1,145 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://norn.dev/schema/story.json",
+  "title": "norn story frontmatter",
+  "additionalProperties": true,
+  "type": "object",
+  "required": [
+    "id",
+    "slug",
+    "provider",
+    "number",
+    "url",
+    "title",
+    "assignee",
+    "workflow",
+    "status",
+    "intake_at"
+  ],
+  "properties": {
+    "id": {
+      "pattern": "^(gh|gl)-[1-9][0-9]*$",
+      "description": "Story key, e.g. gh-123 or gl-45",
+      "type": "string"
+    },
+    "slug": {
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "maxLength": 48,
+      "type": "string"
+    },
+    "provider": {
+      "description": "Issue provider CLI: gh (GitHub) or glab (GitLab)",
+      "anyOf": [
+        {
+          "const": "gh",
+          "type": "string"
+        },
+        {
+          "const": "glab",
+          "type": "string"
+        }
+      ]
+    },
+    "number": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "url": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "title": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "assignee": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "labels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "workflow": {
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "Name of a workflow file",
+      "type": "string"
+    },
+    "status": {
+      "anyOf": [
+        {
+          "const": "new",
+          "type": "string"
+        },
+        {
+          "const": "active",
+          "type": "string"
+        },
+        {
+          "const": "done",
+          "type": "string"
+        },
+        {
+          "const": "dropped",
+          "type": "string"
+        }
+      ]
+    },
+    "intake_at": {
+      "format": "date-time",
+      "description": "ISO-8601 timestamp, UTC",
+      "type": "string"
+    },
+    "body_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "refined_body_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "merge": {
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "pr": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "url": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "head_sha": {
+          "pattern": "^[0-9a-f]{40,64}$",
+          "type": "string"
+        },
+        "merge_commit_sha": {
+          "pattern": "^[0-9a-f]{40,64}$",
+          "type": "string"
+        },
+        "merged_by": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "merged_at": {
+          "format": "date-time",
+          "description": "ISO-8601 timestamp, UTC",
+          "type": "string"
+        },
+        "by_ancestry": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
