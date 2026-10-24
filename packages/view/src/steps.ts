@@ -206,6 +206,7 @@ function reasonOf(receipts: NumberedReceipt[]): string | null {
         parts.push(receiptSummary(r));
         break;
       case "started":
+      case "take":
         break;
     }
   }
@@ -325,7 +326,8 @@ export function buildStepTimeline(input: StepTimelineInput, opts: StepTimelineOp
         entries.push({ e, seg: null });
       }
     // Foreign commits are always shown on their row: they change the branch behind norn's back.
-    const shown = opts.events || opts.all ? entries : entries.filter(({ e }) => e.source === "foreign");
+    // So are takeovers (R10.1): who holds the story changed.
+    const shown = opts.events || opts.all ? entries : entries.filter(({ e }) => e.source === "foreign" || e.source === "take" || (e.source === "receipt" && e.kind === "take"));
     {
       for (const { e, seg: s } of shown) {
         const t = ms(e.at);

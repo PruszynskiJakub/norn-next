@@ -1,11 +1,12 @@
 /**
- * One heartbeat pass (H1): local lock → observe → decide → act → log. The tick trace record
+ * One heartbeat pass (H1): local lock → observe → decide → `tick.start` → act → log → `tick.end`
+ * (R5.4) → `heartbeat.json` `last_tick_at` (R5.5). The tick trace record
  * holds the facts snapshot, the workflows and config decide used, each rule fired, action and
  * result (O4), so `norn why` replays decide on exactly the same inputs (O5) via `replayInputs`.
  */
 import { decide, type Facts, type LoadedWorkflow, type RepoWorkflows } from "@norn/core";
 import { type ResolvedConfig, type TickTrace, type TickUnitRecord, ulid } from "@norn/schema";
-import { acquireTickLock, appendTrace, parseWorkflowText, readTraceFile, writeTraceFile } from "@norn/store";
+import { acquireTickLock, appendTrace, markTick, parseWorkflowText, readTraceFile, writeTraceFile } from "@norn/store";
 import type { Context } from "../context.ts";
 import { busyError } from "../output.ts";
 import { type ActRecord, Actor } from "./act.ts";
@@ -102,6 +103,14 @@ export async function runTick(ctx: Context, opts: TickOptions = {}): Promise<Tic
     const tick_id = ulid(startedAt);
     const obs = await observe(ctx, { tick_id, ...(opts.sync ? { sync: opts.sync } : {}) });
     const decisions = decide(obs.facts, obs.workflows, obs.config);
+    // R5.4 (N2): the decisions reach the trace before act, so a tick that dies mid-act is explainable
+    appendTrace(ctx.root, {
+      type: "tick.start",
+      tick_id,
+      at: new Date(startedAt).toISOString(),
+      heartbeat_id: obs.heartbeat_id,
+      decisions: decisions.map((d) => ({ unit: d.unit, rule: d.rule, action: jsonSafe(d.action) as TickUnitRecord["action"] })),
+    });
     const actor = new Actor(ctx, obs);
     const records = await actor.run(decisions);
     const recorded = await actor.retryRecords();
@@ -114,6 +123,10 @@ export async function runTick(ctx: Context, opts: TickOptions = {}): Promise<Tic
     const record = traceRecord(obs, records, startedAt, performance.now() - t0);
     if (inbox.changes.length) record.inbox = inbox.changes;
     const file = appendTrace(ctx.root, record);
+    const failed = records.filter((r) => !r.result.ok).length;
+    appendTrace(ctx.root, { type: "tick.end", tick_id, at: new Date(ctx.clock.now()).toISOString(), duration_ms: record.duration_ms, failed });
+    // R5.5: the checkout's heartbeat is alive as of this tick
+    markTick(ctx.root, new Date(ctx.clock.now()).toISOString());
     inbox.commit();
     const lines = records.map(({ decision, result }) => ({
       unit: decision.unit,

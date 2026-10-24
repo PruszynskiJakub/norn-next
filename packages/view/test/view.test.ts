@@ -18,6 +18,7 @@ import {
   writeSliceFile,
   writeState,
   writeStoryFile,
+  writeUnitMarker,
 } from "@norn/store";
 import { formatInbox, formatStatus, formatTimeline, loadProjectView, receiptSummary } from "../src/index.ts";
 
@@ -230,6 +231,8 @@ describe("loadProjectView", () => {
         alive: true,
         lease: { kind: "agent", file: "agent-1.json", slot: null },
         last_hook_at: ago(20),
+        classified: null,
+        machine: null,
       },
     ]);
 
@@ -283,6 +286,7 @@ describe("loadProjectView", () => {
       { id: "gh-7", slug: "thing", provider: "gh", number: 7, url: "u", title: "Thing", assignee: null, workflow: "story", status: "new", intake_at: ago(5) },
       "",
     );
+    writeUnitMarker(wt, { repo, story: "gh-7", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-7-thing" });
     const v = await loadProjectView({ repoRoot: repo, home: tmp(), now: NOW, holder: "me@box", env: {} });
     expect(v.stories.map((s) => [s.key, s.status, s.root])).toEqual([["gh-7", "not_started", wt]]);
   });
@@ -323,6 +327,7 @@ describe("formatters", () => {
       repo: "",
       holder: "",
       runner: null,
+      heartbeat: { holder: "", last_tick_at: null, age: null, down: false },
       stories: [],
       inbox: { at: "", pending: 0, groups: { your_turn: [], answer: [], approve: [], unblock: [], check: [], unclaimed: [], running: [], recently_done: [] } },
       runs: [],

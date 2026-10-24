@@ -55,6 +55,8 @@ export interface UnitView {
   next: string | null;
   updated_at: string | null;
   errors: FileError[];
+  /** R4.3: the last act effect that failed for the unit on this checkout, while it still applies */
+  act_failure: { effect: string; reason: string; at: string; tick_id: string } | null;
 }
 
 export interface SliceView extends UnitView {
@@ -93,9 +95,27 @@ export interface RunView {
   lease: { kind: LeaseKind; file: string; slot: number | null } | null;
   /** newest hook fact for this run in the trace window */
   last_hook_at: string | null;
+  /**
+   * R4.4: the run's last classification at its step (`stalled`, `silent`, `timeout`, …), so a frozen
+   * agent is never shown as plain `alive`; null when the tick has not classified this run
+   */
+  classified: { outcome: string; at: string } | null;
+  /** R7.1: machine that launched the run, when recorded */
+  machine: string | null;
 }
 
-export type TimelineSource = "receipt" | "tick" | "hook" | "reject" | "briefing" | "foreign";
+/** R5.5 (N3): this checkout's heartbeat as `heartbeat.json` records it. */
+export interface HeartbeatView {
+  holder: string;
+  /** ISO time the last tick finished here; null = never */
+  last_tick_at: string | null;
+  /** compact age of last_tick_at */
+  age: string | null;
+  /** older than 3 × watch interval (or never) while a held story has a unit in auto mode */
+  down: boolean;
+}
+
+export type TimelineSource = "receipt" | "tick" | "hook" | "reject" | "briefing" | "foreign" | "take";
 
 export interface TimelineEntry {
   at: string;
@@ -121,6 +141,8 @@ export interface ProjectView {
   /** user@machine the view was built for (claim `mine`) */
   holder: string;
   runner: string | null;
+  /** R5.5: this checkout's heartbeat */
+  heartbeat: HeartbeatView;
   stories: StoryView[];
   inbox: Inbox;
   /** current run per unit, oldest first */

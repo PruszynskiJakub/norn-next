@@ -9,12 +9,19 @@
  *                  or `herdr workspace create --cwd C --label T --env K=V… --no-focus`
  *                `herdr pane run <pane> "<argv>"`             (A6 env comes from --env)
  *                `herdr pane process-info --pane <pane>`      (record the agent's pid + start time)
+ *                nothing in the foreground → `pane read` + `pane close`, launch_failed (R4.3, B2)
  * - send       → `herdr agent prompt <pane> <text>`          (submit; bracketed paste + enter)
  *                fallback when no agent is recognized: `pane send-text` + `pane send-keys enter`
  *                without submit: `herdr pane send-text <pane> <text>`
- * - paneState  → `herdr pane get <pane>` (+ `pane read --source visible` when blocked)
+ * - paneState  → `herdr pane get <pane>` (+ `pane read --source visible` when blocked; the prompt
+ *                parsed from it, R6.2)
+ * - sendKeys   → `herdr pane send-text <pane> <text>` / `herdr pane send-keys <pane> <key>…` (R6.2)
+ * - reach      → `herdr agent attach <pane>`                 (the command a person runs, R6.3)
  * - isAlive    → agent pid + start time if recorded, else `pane process-info` (foreground != shell)
  * - kill       → `herdr pane close <pane>` (pane_not_found = already gone)
+ * - findSessions → `herdr pane list`                         (agent panes whose cwd is the worktree, R5.1)
+ *                `herdr pane process-info --pane <pane>`      (their agent pid)
+ * - capabilities: send + resume (R4.1)
  *
  * - openStatusPane → `herdr pane split [--current] --direction down --ratio 0.3 --cwd C --no-focus`,
  *                `herdr pane rename <pane> norn`, `herdr pane run <pane> "norn pane"`   (O1 status pane)
@@ -26,6 +33,7 @@ import type { ProcessIdentity, RunnerConfig } from "@norn/schema";
 import { createProcessPort } from "../process/index.ts";
 import { portError } from "../process/error.ts";
 import { type Exec, bunExec, shellJoin } from "../process/exec.ts";
+import { parsePanePrompt } from "./prompt.ts";
 
 export const RUNNER_NAME = "herdr";
 
@@ -38,7 +46,7 @@ export interface HerdrRunnerOptions {
   reuseWorkspace?: boolean;
   exec?: Exec;
   process?: ProcessPort;
-  /** how long launch waits for the agent to take the pane's foreground (default 3000 ms) */
+  /** how long launch waits for the agent to take the pane's foreground (default 10000 ms) */
   startWaitMs?: number;
   sleep?: (ms: number) => Promise<void>;
 }
@@ -47,6 +55,9 @@ interface HerdrPane {
   pane_id: string;
   agent?: string | null;
   agent_status?: string;
+  cwd?: string;
+  foreground_cwd?: string;
+  agent_session?: { value?: string } | null;
 }
 
 interface ProcessInfo {
@@ -93,7 +104,7 @@ export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
   const exec = opts.exec ?? bunExec;
   const proc = opts.process ?? createProcessPort({ exec });
   const sleep = opts.sleep ?? ((ms: number) => Bun.sleep(ms));
-  const startWaitMs = opts.startWaitMs ?? 3000;
+  const startWaitMs = opts.startWaitMs ?? 10_000;
   const base = [opts.bin ?? "herdr", ...(opts.session ? ["--session", opts.session] : [])];
 
   const herdr = herdrCaller(exec, base);
@@ -116,6 +127,7 @@ export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
 
   return {
     name: RUNNER_NAME,
+    capabilities: { send: true, resume: true },
 
     async available() {
       const r = await exec([...base, "status", "server"]);
@@ -154,9 +166,15 @@ export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
         await sleep(250);
       }
 
-      const ref: SessionRef = { runner: RUNNER_NAME, session_id: paneId, pane_id: paneId };
-      if (identity) ref.process = identity;
-      return ref;
+      if (!identity) {
+        // R4.3, B2: nothing took the pane's foreground — the command never ran (cut off while the
+        // pane's shell started) or exited at once. Not a launch: say what the pane shows, close it.
+        const screen = await herdr(["pane", "read", paneId, "--source", "visible", "--lines", "30"]).catch(() => null);
+        const shown = typeof screen === "string" ? lastLines(screen, 5) : "";
+        await herdr(["pane", "close", paneId]).catch(() => undefined);
+        throw portError("launch_failed", `the command never started in herdr pane ${paneId} (no process took the foreground within ${startWaitMs / 1000}s)${shown ? `; the pane showed: ${shown}` : ""}`);
+      }
+      return { runner: RUNNER_NAME, session_id: paneId, pane_id: paneId, process: identity };
     },
 
     async send(session, text, sendOpts) {
@@ -189,10 +207,39 @@ export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
       const state = STATE_MAP[info?.agent_status ?? "unknown"] ?? "unknown";
       const result: PaneState = { alive, state, since: null };
       if (state === "waiting_input") {
-        const screen = await herdr(["pane", "read", pane, "--source", "visible", "--lines", "15"]).catch(() => null);
-        if (typeof screen === "string" && screen.trim() !== "") result.detail = screen.trim();
+        const screen = await herdr(["pane", "read", pane, "--source", "visible", "--lines", "30"]).catch(() => null);
+        if (typeof screen === "string" && screen.trim() !== "") {
+          result.detail = screen.trim();
+          // R6.2, L1: the question, options and pending command, read off the screen
+          const prompt = parsePanePrompt(screen);
+          if (prompt) result.prompt = prompt;
+        }
       }
       return result;
+    },
+
+    async sendKeys(session, keys) {
+      // R6.2: raw keystrokes into the pane — a blocked agent takes no `agent prompt`; runs of named
+      // keys go in one `send-keys`
+      const pane = paneOf(session);
+      let named: string[] = [];
+      const flush = async () => {
+        if (named.length) await herdr(["pane", "send-keys", pane, ...named]);
+        named = [];
+      };
+      for (const k of keys) {
+        if ("key" in k) named.push(k.key);
+        else {
+          await flush();
+          await herdr(["pane", "send-text", pane, k.text]);
+        }
+      }
+      await flush();
+    },
+
+    reach(session) {
+      // R6.3, R9.1: what a person runs to look at (and type into) the agent's pane
+      return shellJoin([...base, "agent", "attach", paneOf(session)]);
     },
 
     async isAlive(session) {
@@ -208,7 +255,32 @@ export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
         if ((err as { code?: string }).code !== "session_gone") throw err;
       }
     },
+
+    async findSessions(q) {
+      const out = (await herdr(["pane", "list"])) as { result?: { panes?: HerdrPane[] } } | null;
+      const panes = (out?.result?.panes ?? []).filter((p) => !!p.agent && (p.cwd === q.cwd || p.foreground_cwd === q.cwd));
+      const found = [];
+      for (const p of panes) {
+        const info = await processInfo(p.pane_id);
+        const pid = info ? foregroundPid(info) : null;
+        const identity = pid !== null ? await proc.identify(pid) : null;
+        const session: SessionRef = { runner: RUNNER_NAME, session_id: p.pane_id, pane_id: p.pane_id, ...(identity ? { process: identity } : {}) };
+        const agentSession = p.agent_session?.value;
+        found.push({ session, ...(agentSession ? { agent_session_id: agentSession } : {}) });
+      }
+      return found;
+    },
   };
+}
+
+/** The last `n` non-empty lines of a pane screen, joined with ` | `. */
+function lastLines(screen: string, n: number): string {
+  return screen
+    .split("\n")
+    .map((l) => l.trimEnd())
+    .filter((l) => l.trim() !== "")
+    .slice(-n)
+    .join(" | ");
 }
 
 function paneOf(session: SessionRef): string {
@@ -267,3 +339,4 @@ export async function openStatusPane(cwd: string, opts: StatusPaneOptions = {}):
   await herdr(["pane", "run", paneId, shellJoin(argv)]);
   return { pane_id: paneId };
 }
+export { parsePanePrompt } from "./prompt.ts";

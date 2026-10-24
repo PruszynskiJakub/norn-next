@@ -1,0 +1,30 @@
+ │ import sys
+ │ p=sys.argv[1]; s=open(p).read()
+ │ i=s.index("## Goal")
+ │ s=s[:i]+"""## Goal
+ │
+ │ Pressing `q` focuses `#quick-add` (not typed, skipped in text fields and with Ctrl/Meta/Alt), with a "Press q to focus" title hint, covered by tests.
+ │
+ │ ## Progress
+ │
+ │ - The `q` handler already existed in `QUICK_ADD_SCRIPT` (src/views.ts); only the `title` hint was missing. Added it to `quickAddBox()`.
+ │ - Added tests in test/web.test.ts ("quick-add `q` shortcut (gh-9)") that run the rendered page script against a fake DOM: title hint, focus + preventDefault, skip in input/textarea/select, skip with Ctrl/Meta/Alt. The title test was red first.
+ │ - `bun test`: 566 pass. `bun run typecheck` could not run (tsc not installed in this worktree).
+ │
+ │ ## Resume
+ │
+ │ Nothing left for implement; report done.
+ │ """
+ │ open(p,"w").write(s)
+ │ EOF
+ │ norn done done --handoff "Added title 'Press q to focus' to #quick-add; the q handler already existed. Added 4 tests for the hint and key handling; bun test 566 pass. Typecheck not run (tsc missing)."
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ This command requires approval
+
+ Do you want to proceed?
+ ❯ 1. Yes
+   2. Yes, and don’t ask again for: python3 - .agents/specs/gh-9-keyboard-shortcut-q-focuses-quick-add/runs/_story/handoff.md
+   3. Yes, and switch to auto mode · auto mode handles these prompts for you
+   4. No
+
+ Esc to cancel · Tab to amend

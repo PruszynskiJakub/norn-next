@@ -24,10 +24,32 @@ export function parseStart(stdout: string, code: number): string | null {
   return m[2]!.replace(/\s+/g, " ");
 }
 
+/**
+ * R5.1: every process with its environment appended to the command line. macOS (BSD ps) prints
+ * the environment with `-E`; procps (Linux) with the BSD-style `e` flag. Only processes this user
+ * may inspect show it — elsewhere the env is simply absent (no match, never an error).
+ */
+export function psEnvArgv(platform: string = process.platform): string[] {
+  return platform === "linux" ? ["ps", "axeww", "-o", "pid=,args="] : ["ps", "-A", "-E", "-ww", "-o", "pid=,command="];
+}
+
+/** Pids whose `ps` env listing holds the whole token `name=value`. */
+export function parseEnvMatches(stdout: string, name: string, value: string): number[] {
+  const token = `${name}=${value}`;
+  const out: number[] = [];
+  for (const line of stdout.split("\n")) {
+    const m = /^\s*(\d+)\s+(.*)$/.exec(line);
+    if (m && m[2]!.split(/\s+/).includes(token)) out.push(Number(m[1]));
+  }
+  return out;
+}
+
 export interface ProcessPortOptions {
   exec?: Exec;
   /** override for tests */
   selfPid?: number;
+  /** override for tests (default `process.platform`) */
+  platform?: string;
 }
 
 export function createProcessPort(opts: ProcessPortOptions = {}): ProcessPort {
@@ -43,6 +65,18 @@ export function createProcessPort(opts: ProcessPortOptions = {}): ProcessPort {
     async isAlive(proc) {
       const now = await this.identify(proc.pid);
       return now !== null && now.pid_start === proc.pid_start;
+    },
+    async findByEnv(name, value) {
+      const r = await exec(psEnvArgv(opts.platform), { env: PS_ENV });
+      if (r.code !== 0) return [];
+      const self = opts.selfPid ?? process.pid;
+      const found: ProcessIdentity[] = [];
+      for (const pid of parseEnvMatches(r.stdout, name, value)) {
+        if (pid === self) continue;
+        const id = await this.identify(pid);
+        if (id) found.push(id);
+      }
+      return found;
     },
     self() {
       if (selfIdentity) return selfIdentity;

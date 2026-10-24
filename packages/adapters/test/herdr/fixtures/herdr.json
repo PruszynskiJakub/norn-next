@@ -1,5 +1,5 @@
 {
-  "_note": "Recorded from herdr 0.9.5 in an isolated --session (paths scrubbed); pane_get_working/blocked, error_agent_blocked and pane_read_visible are derived from recorded shapes. Values are stdout, error_* are stderr (exit 1).",
+  "_note": "Recorded from herdr 0.9.5 in an isolated --session (paths scrubbed); pane_get_working/blocked, error_agent_blocked and pane_read_visible are derived from recorded shapes. Values are stdout, error_* are stderr (exit 1). pane_list is recorded from herdr 0.9.0 `pane list` (paths and ids scrubbed).",
   "status_server": "status: running\nversion: 0.9.5\nendpoint_compatible: yes\n",
   "workspace_list": {
     "id": "cli:workspace:list",
@@ -272,6 +272,77 @@
         "agent": null,
         "agent_status": "unknown"
       }
+    }
+  },
+  "pane_list": {
+    "id": "cli:pane:list",
+    "result": {
+      "panes": [
+        {
+          "agent": "claude",
+          "agent_session": {
+            "agent": "claude",
+            "kind": "id",
+            "source": "herdr:claude",
+            "value": "d0301e03-c5bd-4cb1-a7c8-835ff32ddeb5"
+          },
+          "agent_status": "idle",
+          "cwd": "/other/project",
+          "focused": false,
+          "foreground_cwd": "/other/project",
+          "pane_id": "w3:p1",
+          "revision": 0,
+          "scroll": {
+            "max_offset_from_bottom": 0,
+            "offset_from_bottom": 0,
+            "viewport_rows": 77
+          },
+          "tab_id": "w3:t1",
+          "terminal_id": "term_65d9e95f22eb03",
+          "workspace_id": "w3"
+        },
+        {
+          "agent": "claude",
+          "agent_session": {
+            "agent": "claude",
+            "kind": "id",
+            "source": "herdr:claude",
+            "value": "f90b97b5-4c27-4470-be49-002210dd3279"
+          },
+          "agent_status": "idle",
+          "cwd": "/repo/.agents/worktrees/gh-1-01",
+          "focused": false,
+          "foreground_cwd": "/repo/.agents/worktrees/gh-1-01",
+          "pane_id": "wA:p1",
+          "revision": 0,
+          "scroll": {
+            "max_offset_from_bottom": 0,
+            "offset_from_bottom": 0,
+            "viewport_rows": 77
+          },
+          "tab_id": "wA:t1",
+          "terminal_id": "term_65d9e95f22eb03",
+          "workspace_id": "wA"
+        },
+        {
+          "agent": null,
+          "agent_status": "unknown",
+          "cwd": "/repo/.agents/worktrees/gh-1-01",
+          "focused": false,
+          "foreground_cwd": "/repo/.agents/worktrees/gh-1-01",
+          "pane_id": "wA:p2",
+          "revision": 0,
+          "scroll": {
+            "max_offset_from_bottom": 0,
+            "offset_from_bottom": 0,
+            "viewport_rows": 77
+          },
+          "tab_id": "wA:t1",
+          "terminal_id": "term_65d9e95f22eb03",
+          "workspace_id": "wA"
+        }
+      ],
+      "type": "pane_list"
     }
   }
 }

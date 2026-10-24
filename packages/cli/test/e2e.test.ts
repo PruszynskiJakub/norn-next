@@ -155,12 +155,12 @@ describe("a story through the slice workflow", () => {
     expect(launch?.argv.join(" ")).toContain("Use the norn skill, then run `norn brief`.");
     const st = h.state(storyRuns());
     expect(st?.status).toBe("running");
-    expect(st?.run?.session).toEqual({ runner: "fake", session_id: "s-1", pane_id: "p-1" });
+    expect(st?.run?.session).toEqual({ runner: "fake", session_id: "s-1", pane_id: "p-1", reach: "fake attach p-1" });
     expect(readdirSync(join(storyRuns(), "receipts")).sort()).toEqual(["0001-started.json", "0002-started.json"]);
     expect(readdirSync(join(h.home, "leases")).sort()).toEqual(["agent-1.json", "slot-1.json"]);
-    // a live run with nothing new: no action (recovery commit of runs/ first)
-    step();
-    expect(kinds(await h.tick())).toEqual(["gh-7 commit_push"]);
+    // R2.1 (N6): the started receipts were committed and pushed in the launch tick
+    expect(h.git(["show", `origin/gh-7-add-login-form:${spec}/runs/_story/receipts/0002-started.json`])).toContain('"session"');
+    // a live run with nothing new: no action (no recover.commit)
     step();
     expect(kinds(await h.tick())).toEqual([]);
   });

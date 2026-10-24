@@ -9,6 +9,7 @@ import {
   OutcomeName,
   PosInt,
   ProcessIdentity,
+  PromptChoice,
   SliceKey,
   StepName,
   TaggedUnion,
@@ -75,12 +76,21 @@ export const AskReceipt = receipt("ask", {
   implicit: Type.Optional(Type.Boolean()),
   /** Permission prompt command shown in inbox (implicit asks). */
   command: Type.Optional(Type.String()),
+  /** R6.2: implicit asks from a pane prompt — how a choice is made (option number, or arrows from the cursor) */
+  choice: Type.Optional(PromptChoice),
+  /** L1 (A7): implicit asks — the full pane text; `question` holds only the question block */
+  screen: Type.Optional(NonEmpty),
 });
 export const StuckReceipt = receipt("stuck", { reason: NonEmpty });
 export const AnswerReceipt = receipt("answer", {
   answer: NonEmpty,
   /** receipt_id of the ask being answered */
   ask_receipt_id: Type.Optional(Ulid),
+  /**
+   * R6.2/R6.3: `norn answer` already typed the keystrokes into the agent's pane before writing this
+   * receipt, so the tick does not deliver it again. (`by: "agent"` answers, R6.1, are never delivered.)
+   */
+  delivered: Type.Optional(Type.Boolean()),
 });
 export const ApproveReceipt = receipt("approve", {
   comment: Type.Optional(Type.String()),
@@ -111,6 +121,8 @@ export const SessionInfo = Type.Object(
     runner: NonEmpty,
     session_id: NonEmpty,
     pane_id: Type.Optional(NonEmpty),
+    /** R6.3, R9.1: the command a person runs to reach the session (the runner's, e.g. `herdr agent attach <pane>`) */
+    reach: Type.Optional(NonEmpty),
   },
   { additionalProperties: false },
 );
@@ -126,6 +138,10 @@ export const StartedReceipt = receipt("started", {
   worktree: NonEmpty,
   /** true when this is a fresh-session retry of the same step (B2, C1) */
   retry: Type.Optional(Type.Boolean()),
+  /** R7.1 (M4): `user@host` that launched the run; process liveness is judged only there (R7.2) */
+  machine: Type.Optional(NonEmpty),
+  /** R7.1: heartbeat that launched the run */
+  heartbeat_id: Type.Optional(Ulid),
 });
 /** Tick classification (§10): the outcome decided from facts and the route taken. */
 export const ClassifyReceipt = receipt("classify", {
@@ -147,6 +163,19 @@ export const ClassifyReceipt = receipt("classify", {
       { additionalProperties: false },
     ),
   ),
+});
+/**
+ * R10.1 (M8): a `norn take` of the story, forced or not, recorded on the story unit. Informational:
+ * applied at any cursor (like `mode`), it moves nothing; `norn trace` / `why` show it.
+ */
+export const TakeReceipt = receipt("take", {
+  /** `user@machine` of the claim taken over; null when the claim was free */
+  previous_holder: Type.Union([NonEmpty, Type.Null()]),
+  previous_heartbeat_id: Type.Union([Ulid, Type.Null()]),
+  /** the previous claim had expired (false when it was free or taken with --force) */
+  expired: Type.Boolean(),
+  /** `take --force` over an unexpired or corrupt claim (T5) */
+  forced: Type.Optional(Type.Boolean()),
 });
 /** Journaled workflow switch (`norn workflow <unit> <name> --to <step>`, S7). */
 export const WorkflowReceipt = receipt("workflow", {
@@ -171,6 +200,7 @@ export const Receipt = TaggedUnion(
     StartedReceipt,
     ClassifyReceipt,
     WorkflowReceipt,
+    TakeReceipt,
   ],
   { $id: "https://norn.dev/schema/receipt.json", title: "norn receipt" },
 );
@@ -189,6 +219,7 @@ export type CheckReceipt = ReceiptOf<"check">;
 export type StartedReceipt = ReceiptOf<"started">;
 export type ClassifyReceipt = ReceiptOf<"classify">;
 export type WorkflowReceipt = ReceiptOf<"workflow">;
+export type TakeReceipt = ReceiptOf<"take">;
 
 export const RECEIPT_KINDS = [
   "done",
@@ -203,6 +234,7 @@ export const RECEIPT_KINDS = [
   "started",
   "classify",
   "workflow",
+  "take",
 ] as const satisfies readonly ReceiptKind[];
 
 /** Receipts a non-holder may push through the mailbox (T9). */

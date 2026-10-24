@@ -7,11 +7,13 @@
  * changed outside norn — the PR head moved after the ready approval, commits norn did not make;
  * F35, Q6), Unclaimed, Running, Recently done.
  */
-import type { InboxChange, Mode, ResolvedConfig, UnitState } from "@norn/schema";
+import { type InboxChange, type Mode, parseDuration, type ResolvedConfig, type UnitState } from "@norn/schema";
 import type { Decision } from "./actions.ts";
 import { nextCommand, startAgentCommand } from "./commands.ts";
 import type { Facts, StoryFacts, UnitFacts } from "./facts.ts";
 import type { InboxGroup, InboxItem } from "./ports.ts";
+import { sha256 } from "./hash.ts";
+import { optionsLine } from "./prompt.ts";
 import { epoch, formatAge, iso } from "./time.ts";
 import { stepOf } from "./workflow.ts";
 
@@ -66,6 +68,103 @@ function undeliveredNudge(story: StoryFacts, uf: UnitFacts, facts: Facts): { out
   const activity = uf.run?.run_id === st.run.run_id ? (uf.run.last_activity_at ?? 0) : 0;
   if (activity > epoch(last.at)) return null;
   return { outcome: last.outcome, at: last.at };
+}
+
+/**
+ * R5.5 (N3, A8): this checkout's heartbeat is down — its last tick is older than 3 × watch interval
+ * (or no tick ever ran) while a story it holds has a unit in auto mode. Null when it is up, when
+ * nothing here needs it, or when the heartbeat was not observed.
+ */
+export function heartbeatDown(facts: Facts, config: ResolvedConfig): { holder: string; since: string | null; for_ms: number | null } | null {
+  const hb = facts.heartbeat;
+  if (!hb) return null;
+  const limit = 3 * parseDuration(config.watch_interval);
+  if (hb.last_tick_at !== null && facts.now - hb.last_tick_at <= limit) return null;
+  const auto = (s: StoryFacts) => effectiveMode(s.mode, false, facts.machine.runner).mode === "auto";
+  const live = (u: UnitFacts) => !!u.state && u.state.status !== "done" && u.state.status !== "corrupt";
+  const needs = facts.stories.some((s) => s.claim.state === "mine" && auto(s) && !storyFinished(s) && s.units.some(live));
+  if (!needs) return null;
+  return { holder: facts.machine.holder, since: hb.last_tick_at === null ? null : iso(hb.last_tick_at), for_ms: hb.last_tick_at === null ? null : facts.now - hb.last_tick_at };
+}
+
+/** R5.5: the Unblock item for a heartbeat that is down. */
+export function heartbeatItem(facts: Facts, config: ResolvedConfig): InboxItem | null {
+  const down = heartbeatDown(facts, config);
+  if (!down) return null;
+  const story = facts.stories.find((s) => s.claim.state === "mine");
+  return {
+    id: `heartbeat:${down.holder}:${down.since ?? "never"}`,
+    group: "unblock",
+    story: story?.key ?? "*",
+    slice: null,
+    step: null,
+    title: down.for_ms === null ? `no heartbeat on ${down.holder} yet — run \`norn watch\`` : `no heartbeat on ${down.holder} for ${formatAge(down.for_ms)} — run \`norn watch\``,
+    detail: "auto steps start, and agents are classified, only while a heartbeat runs on the checkout that holds the story",
+    command: "norn watch",
+    since: down.since ?? iso(facts.now),
+  };
+}
+
+/**
+ * R4.3: an action's effect failed for the unit (a nudge or answer not delivered, a launch or resume
+ * that failed, a push refused) — an Unblock item until an effect of the same kind succeeds, the
+ * cursor moves, or (for deliveries) the agent shows activity again. R6.3 reuses it for prompts.
+ */
+export function actFailureItem(story: StoryFacts, uf: UnitFacts): InboxItem | null {
+  const f = uf.act_failure;
+  const st = uf.state;
+  if (!f || !st || st.status === "done" || st.status === "corrupt" || f.step !== st.step || f.attempt !== st.attempt) return null;
+  // R6.3: an answer that did not reach its prompt is told on the Answer item itself (answerItem)
+  if (f.effect === "answer" && st.status === "parked" && st.park?.kind === "ask") return null;
+  const delivery = f.effect !== "push";
+  if (delivery && (uf.run?.last_activity_at ?? 0) > epoch(f.at)) return null;
+  const key = uf.unit.key;
+  return {
+    id: `failed:${key}:${f.tick_id}`,
+    group: "unblock",
+    story: story.key,
+    slice: uf.unit.slice,
+    step: st.step,
+    title: f.reason.includes(key) ? f.reason : `${f.effect} for ${key} failed: ${f.reason}`,
+    detail: `tick ${f.tick_id} (${f.rule})${f.session ? ` · session ${f.session.runner} ${f.session.pane_id ?? f.session.session_id}` : ""}`,
+    command: `norn why ${key} --tick ${f.tick_id}`,
+    since: f.at,
+    ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
+  };
+}
+
+/**
+ * O1 Answer item. L1 (A7): an implicit ask shows the question block and the first command line,
+ * with the options; the full screen only in `full` (`inbox --details`, `why`). R6.3: when the
+ * typed answer did not reach the pane, the command is how to reach the pane instead.
+ */
+function answerItem(uf: UnitFacts, st: UnitState, park: NonNullable<UnitState["park"]>, item: (group: InboxGroup, title: string, command: string, since: string, extra?: Partial<InboxItem>) => InboxItem): InboxItem {
+  const key = uf.unit.key;
+  const details: string[] = [];
+  const f = uf.act_failure;
+  const failed = f?.effect === "answer" && f.step === st.step && f.attempt === st.attempt && epoch(f.at) >= epoch(park.since) ? f : null;
+  if (failed) details.push(`not delivered: ${failed.reason}`);
+  const cmd = park.command?.split("\n").map((l) => l.trim()).find((l) => l !== "");
+  if (cmd) details.push(`pending command: ${cmd}`);
+  if (park.options?.length) details.push(`options: ${optionsLine(park.options)} — answer with the number`);
+  const reach = failed ? (st.run?.session?.reach ?? null) : null;
+  if (failed && !reach && failed.session) details.push(`reach the agent in ${failed.session.runner} session ${failed.session.pane_id ?? failed.session.session_id}`);
+  return item("answer", park.reason, reach ?? (nextCommand(key, st) as string), park.since, {
+    ...(park.receipt_id ? { id: park.receipt_id } : {}),
+    ...(details.length ? { detail: details.join(" · ") } : {}),
+    ...(park.screen ? { full: park.screen } : {}),
+  });
+}
+
+/** R9.1: the run's session started, the prompt was re-sent, and still no turn 60 s later. */
+function launchPromptMissed(uf: UnitFacts, st: UnitState): { since: string; pane: string | null } | null {
+  const run = st.run;
+  const rf = uf.run;
+  if (!run?.prompt_resent_at || !rf || rf.run_id !== run.run_id) return null;
+  const i = rf.hooks.findLastIndex((h) => h.event === "session_start");
+  if (i < 0 || rf.hooks.slice(i + 1).some((h) => h.event !== "session_start")) return null;
+  if (st.last_outcome?.outcome !== "silent" || epoch(st.last_outcome.at) < epoch(run.prompt_resent_at)) return null;
+  return { since: run.prompt_resent_at, pane: run.session?.pane_id ?? run.session?.session_id ?? null };
 }
 
 /** The command a person runs to start the unit's step agent in its worktree. */
@@ -152,11 +251,7 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
   const park = st.park;
   switch (st.status) {
     case "parked":
-      if (park?.kind === "ask")
-        return item("answer", park.reason, nextCommand(key, st) as string, park.since, {
-          ...(park.receipt_id ? { id: park.receipt_id } : {}),
-          ...(park.command ? { detail: `pending command: ${park.command}` } : {}),
-        });
+      if (park?.kind === "ask") return answerItem(uf, st, park, item);
       if (park?.kind === "gate") {
         const judged = judgedDetail(story, uf);
         const reject = `or reject: norn approve ${key} --reject --reason "…"`;
@@ -167,8 +262,11 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
     case "stuck":
       return item("unblock", park?.reason ?? "stuck", `norn unstick ${key}`, park?.since ?? st.updated_at, park?.receipt_id ? { id: park.receipt_id } : {});
     case "running": {
+      // R9.1: the agent never took its launch prompt — a person looks at the pane
+      const unsent = launchPromptMissed(uf, st);
+      if (unsent) return item("unblock", `launch prompt not received by ${key} ${st.step}${unsent.pane ? ` — look at pane ${unsent.pane}` : ""}`, st.run?.session?.reach ?? `norn trace ${key}`, unsent.since, { id: `launch:${key}:${st.run?.run_id ?? st.step}`, detail: "the agent session started but never began a turn; the prompt was re-sent once (R9.1)" });
       const nudge = undeliveredNudge(story, uf, facts);
-      if (nudge) return item("your_turn", "agent ended its turn without reporting — reopen the agent and run norn brief", startCommandFor(uf, story, config), nudge.at, { id: `${nudge.outcome}:${key}:${st.step}#${st.attempt}:${st.nudges_used}` });
+      if (nudge && !heartbeatDown(facts, config)) return item("your_turn", "agent ended its turn without reporting — reopen the agent and run norn brief", startCommandFor(uf, story, config), nudge.at, { id: `${nudge.outcome}:${key}:${st.step}#${st.attempt}:${st.nudges_used}` });
     }
       return item("running", `${st.step} #${st.attempt}${st.run ? ` (${st.run.how})` : ""}`, `norn trace ${key}`, st.run?.started_at ?? st.step_entered_at);
     case "ready": {
@@ -180,6 +278,8 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
             ...(downgraded ? { detail: "auto requested, no runner; running manual (MO2)" } : {}),
           });
       }
+      // R5.5 (A8): an auto step waits for the heartbeat, not for a person — no manual start hint
+      if (step?.type === "agent" && heartbeatDown(facts, config)) return item("running", `${st.step} #${st.attempt} (waiting for the heartbeat — norn watch)`, "norn watch", st.step_entered_at);
       return item("running", `${st.step} #${st.attempt} (queued)`, `norn trace ${key}`, st.step_entered_at);
     }
     case "done": {
@@ -266,7 +366,37 @@ export function foreignCommitItems(story: StoryFacts): InboxItem[] {
   });
 }
 
-/** Build the whole inbox (O1). Stories held by another heartbeat are not shown. */
+/**
+ * R2.3 (H5, A18): local runs/ work on a checkout that does not hold the claim — it is not in the
+ * record and never will be (a non-holder never pushes, R2.2). One Check item per unit; `norn tidy`
+ * moves the files to `runs/<unit>/orphaned/` on the local branch.
+ */
+export function unpushedItems(story: StoryFacts, facts: Facts): InboxItem[] {
+  const c = story.claim;
+  const held = c.state === "other" || c.state === "expired" ? `the story is now held by ${c.blob.holder}${c.state === "expired" ? " (expired)" : ""}` : "the story is not claimed by this checkout";
+  const since = c.state === "other" ? c.blob.renewed_at : (story.frontmatter?.intake_at ?? iso(facts.now));
+  return (story.unpushed_runs ?? [])
+    .filter((u) => u.files.length)
+    .map((u) => {
+      const names = u.files.map((f) => f.split("/").at(-1) ?? f);
+      const receipts = u.files.filter((f) => f.includes("/receipts/")).map((f) => (f.split("/").at(-1) ?? f).replace(/\.json$/, ""));
+      const shown = (receipts.length ? receipts : names).slice(0, 3).join(", ") + ((receipts.length || names.length) > 3 ? ", …" : "");
+      return {
+        id: `unpushed:${u.unit}:${sha256(u.files.join("\n")).slice(0, 12)}`,
+        group: "check" as const,
+        story: story.key,
+        slice: u.unit === story.key ? null : u.unit,
+        step: null,
+        title: `local work on ${u.unit} is not in the record (${shown}) — ${held}`,
+        detail: u.files.join(" · "),
+        command: "norn tidy",
+        since,
+        ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
+      };
+    });
+}
+
+/** Build the whole inbox (O1). Stories held by another heartbeat are not shown (except R2.3 unpushed work). */
 export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   const groups = Object.fromEntries(INBOX_GROUPS.map((g) => [g, [] as InboxEntry[]])) as Record<InboxGroup, InboxEntry[]>;
   const add = (it: InboxItem | null) => {
@@ -274,6 +404,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   };
   for (const story of facts.stories) {
     const claim = story.claim.state;
+    for (const it of unpushedItems(story, facts)) add(it);
     if (claim === "other") continue;
     if ((claim === "none" || claim === "expired") && isStarted(story) && !storyFinished(story)) {
       const since = story.claim.state === "expired" ? story.claim.blob.expires_at : (story.frontmatter?.intake_at ?? iso(facts.now));
@@ -297,8 +428,12 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
     add(bodyChangedItem(story));
     add(headChangedItem(story));
     for (const it of foreignCommitItems(story)) add(it);
-    for (const uf of story.units) add(unitInboxItem(story, uf, facts, config));
+    for (const uf of story.units) {
+      add(unitInboxItem(story, uf, facts, config));
+      add(actFailureItem(story, uf));
+    }
   }
+  add(heartbeatItem(facts, config));
   for (const g of INBOX_GROUPS) groups[g].sort((a, b) => epoch(a.since) - epoch(b.since) || a.id.localeCompare(b.id));
   const pending = INBOX_GROUPS.filter((g) => g !== "running" && g !== "recently_done").reduce((n, g) => n + groups[g].length, 0);
   return { at: iso(facts.now), groups, pending };
