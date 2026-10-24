@@ -76,6 +76,10 @@ export const RunInfo = Type.Object(
     agent_session_id: Type.Optional(NonEmpty),
     process: Type.Optional(ProcessIdentity),
     transcript: Type.Optional(NonEmpty),
+    /** R7.1: `user@host` that launched the run (from its `started` receipt); absent = this machine (older runs) */
+    machine: Type.Optional(NonEmpty),
+    /** R7.1: heartbeat that launched the run */
+    heartbeat_id: Type.Optional(Ulid),
   },
   { additionalProperties: false },
 );

@@ -146,10 +146,20 @@ export interface StartRunAction extends UnitBase, Transition {
   launch: AgentLaunch;
 }
 
-/** Same-session nudge after silent/timeout/stalled (C1); counted in state.nudges_used. */
+/**
+ * Same-session nudge after silent/timeout/stalled (C1); counted in state.nudges_used. R4.2: delivered
+ * by `send` into the live session when the runner can type (`input`), else by resuming the agent
+ * session with the nudge text (`launch` with `resume`; `receipts` then also holds a `started`
+ * receipt for the same run, filled with the new session as for start_run) after killing `kill`.
+ */
 export interface NudgeAction extends UnitBase, Transition {
   kind: "nudge";
-  input: SessionInput;
+  /** `send` delivery; null when resumed */
+  input: SessionInput | null;
+  /** `resume` delivery: relaunch `--resume <agent_session_id>` with the nudge text as the prompt */
+  launch: AgentLaunch | null;
+  /** old session to terminate before the resume, if still present */
+  kill: SessionRef | null;
   /** C4 snapshot request on silent (see ClassifyAction) */
   snapshot: { transcript: string | null; cwd: string } | null;
 }
@@ -364,6 +374,7 @@ export interface Decision {
 
 /** What act reports per action (trace `result`). */
 export interface ActionResult {
+  /** R4.3: false whenever the action's effect failed (send, resume, launch, push), never "ok with a note" */
   ok: boolean;
   error?: string;
   detail?: unknown;

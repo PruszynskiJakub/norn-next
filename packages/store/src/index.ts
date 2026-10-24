@@ -8,6 +8,7 @@ export * from "./config.ts";
 export * from "./frontmatter.ts";
 export * from "./fsx.ts";
 export * from "./git.ts";
+export * from "./heartbeat.ts";
 export * from "./leases.ts";
 export * from "./lock.ts";
 export * from "./paths.ts";

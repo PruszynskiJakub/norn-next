@@ -39,11 +39,23 @@ function modeText(u: UnitView): string {
   return u.mode_downgraded ? `${u.mode}→${u.effective_mode}` : u.effective_mode;
 }
 
+/** R4.3: a failed act effect, shown under the unit. */
+function failureText(u: UnitView, indent: string): string {
+  return u.act_failure ? `\n${indent}! ${u.act_failure.reason}` : "";
+}
+
 function sliceLine(s: SliceView): string {
   const deps = s.depends_on.length ? ` after ${s.depends_on.map((d) => d.split("/").at(-1)).join(",")}` : "";
   const fm = s.integrated ? " integrated" : s.slice_status && s.slice_status !== "active" ? ` ${s.slice_status}` : "";
   const next = s.next && s.status !== "running" ? `\n      → ${s.next}` : "";
-  return `  ${s.key.padEnd(10)} ${s.title} — ${stateText(s)}${fm}${deps}${next}`;
+  return `  ${s.key.padEnd(10)} ${s.title} — ${stateText(s)}${fm}${deps}${next}${failureText(s, "      ")}`;
+}
+
+/** R5.5 (N3): this checkout's heartbeat, one line. */
+function heartbeatText(view: ProjectView): string | null {
+  const h = view.heartbeat;
+  if (h.down) return `! no heartbeat on ${h.holder}${h.age ? ` for ${h.age}` : " yet"} — run \`norn watch\` (auto steps wait for it)`;
+  return h.last_tick_at ? `heartbeat: last tick ${h.age} ago on ${h.holder}` : null;
 }
 
 /** `norn status` human mode: one block per story, slices indented, then runs and errors. */
@@ -54,6 +66,7 @@ export function formatStatus(view: ProjectView): string {
     out.push(`${s.key} ${s.title}`);
     out.push(`  ${s.workflow} · ${modeText(s)} · ${claimText(s)} · ${stateText(s)}`);
     if (s.next && s.status !== "running") out.push(`  → ${s.next}`);
+    if (s.act_failure) out.push(`  ! ${s.act_failure.reason}`);
     for (const sl of s.slices) out.push(sliceLine(sl));
     for (const e of [...s.errors, ...s.slices.flatMap((x) => x.errors)]) out.push(`  ! ${e.file}: ${e.errors[0]?.message ?? "invalid"}`);
     out.push("");
@@ -62,7 +75,10 @@ export function formatStatus(view: ProjectView): string {
     out.push("Runs");
     for (const r of view.runs) {
       const live = r.alive === null ? "" : r.alive ? " alive" : " dead";
-      out.push(`  ${r.unit.padEnd(10)} ${r.step}#${r.attempt} ${r.how}${r.agent ? ` ${r.agent}` : ""}${live} since ${r.started_at}`);
+      // R4.4: the last classification, so a frozen agent never reads as plain `alive`
+      const cls = r.classified ? ` — ${r.classified.outcome} since ${r.classified.at}` : "";
+      const machine = r.machine && r.machine !== view.holder ? ` on ${r.machine}` : "";
+      out.push(`  ${r.unit.padEnd(10)} ${r.step}#${r.attempt} ${r.how}${r.agent ? ` ${r.agent}` : ""}${machine}${live} since ${r.started_at}${cls}`);
     }
     out.push("");
   }
@@ -72,6 +88,8 @@ export function formatStatus(view: ProjectView): string {
     out.push("");
   }
   for (const e of view.errors) out.push(`! ${e.file}: ${e.errors[0]?.message ?? "invalid"}`);
+  const hb = heartbeatText(view);
+  if (hb) out.push(hb);
   out.push(`${view.inbox.pending} ${view.inbox.pending === 1 ? "item needs" : "items need"} you — norn inbox`);
   return `${out.join("\n").trimEnd()}\n`;
 }

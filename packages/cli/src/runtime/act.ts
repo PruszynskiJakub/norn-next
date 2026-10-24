@@ -12,6 +12,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import {
   type Action,
+  type ActFailure,
   type ActionResult,
   type AgentLaunch,
   applyReceipts,
@@ -53,6 +54,7 @@ import {
   patchStoryFile,
   pinWorkflow,
   readEnvNorn,
+  readActFailures,
   reclaimLeases,
   releaseClaim,
   releaseLease,
@@ -61,6 +63,7 @@ import {
   slotEnv,
   storyFile,
   updateLease,
+  writeActFailures,
   writeEnvNorn,
   writeHandoffHeader,
   writeLog,
@@ -88,6 +91,24 @@ const NOTIFY_GROUPS: readonly InboxGroup[] = ["your_turn", "answer", "approve", 
 
 class QueueFull extends Error {}
 
+/** R4.3: effects that reach an agent session; one succeeding clears a failed one of the unit. */
+const DELIVERY = new Set(["nudge", "answer", "resume", "launch"]);
+
+/** R4.3: the external effect an action performs, as named in an act failure. */
+function effectOf(a: Action): string {
+  switch (a.kind) {
+    case "nudge":
+      return a.launch ? "resume" : "nudge";
+    case "apply_receipts":
+      return a.launch ? "resume" : a.input ? "answer" : "apply";
+    case "start_run":
+    case "retry_fresh":
+      return "launch";
+    default:
+      return a.kind;
+  }
+}
+
 /** R1.2: a claim write lost to another heartbeat (CAS stale/rejected, held) — not a network failure. */
 function claimLost(r: ActionResult): boolean {
   const reason = (r.detail as { reason?: string } | undefined)?.reason;
@@ -101,12 +122,22 @@ export class Actor {
   private readonly written = new Map<string, UnitState>();
   private readonly claimed = new Map<string, { blob: ClaimBlob; sha: string }>();
   private readonly cleaned = new Set<string>();
+  /** R4.3: effects of the current action that failed after its state was written (push, typed delivery) */
+  private effectErrors: Array<{ effect: string; reason: string }> = [];
+  /** R4.3: effects of the current action that succeeded */
+  private effectsOk = new Set<string>();
+  /** R4.3: session a failed delivery targeted (for the inbox item; R6.3 reuses it) */
+  private failedSession: SessionRef | null = null;
+  /** R4.3: unit key → last failed effect (machine-local `failures.json`) */
+  private readonly failures: Record<string, ActFailure>;
+  private failuresChanged = false;
 
   constructor(
     readonly ctx: Context,
     readonly obs: Observed,
   ) {
     this.notified = readNotified(obs.root);
+    this.failures = readActFailures(obs.root);
   }
 
   get root() {
@@ -136,18 +167,56 @@ export class Actor {
     for (const d of order) {
       const story = d.action.unit?.story;
       let result: ActionResult;
-      if (story && lost.has(story)) result = { ok: false, error: "skipped: claim lost", detail: { skipped: true } };
-      else
+      this.effectErrors = [];
+      this.effectsOk = new Set();
+      this.failedSession = null;
+      let counted = true;
+      if (story && lost.has(story)) {
+        result = { ok: false, error: "skipped: claim lost", detail: { skipped: true } };
+        counted = false;
+      } else
         try {
           result = await this.perform(d.action);
+          // R4.3: an action whose effect failed is never ok, even when its state was written
+          if (result.ok && this.effectErrors.length) result = { ...result, ok: false, error: this.effectErrors.map((f) => f.reason).join("; ") };
         } catch (e) {
+          counted = !(e instanceof QueueFull);
           result = e instanceof QueueFull ? { ok: false, error: e.message, detail: { queued: true } } : { ok: false, error: (e as Error).message };
         }
       if (story && isSideAction(d.action) && !result.ok && claimLost(result)) lost.add(story);
+      if (counted) this.recordFailure(d, result);
       out.push({ decision: d, result });
     }
+    if (this.failuresChanged) writeActFailures(this.root, this.failures);
     // the trace keeps decide's order
     return decisions.map((d) => out.find((r) => r.decision === d) as ActRecord);
+  }
+
+  /**
+   * R4.3: remember a unit's failed effect (inbox Unblock item, status), or forget it once an effect of
+   * the same family succeeds for the unit. Claim and repo-level actions are not unit failures.
+   */
+  private recordFailure(d: Decision, result: ActionResult): void {
+    const a = d.action;
+    if (!a.unit || a.kind === "claim" || a.kind === "noop") return;
+    const key = a.unit.key;
+    const prev = this.failures[key];
+    if (!result.ok) {
+      const loc = this.obs.units[key];
+      const st = this.written.get(key) ?? loc?.state;
+      const effect = this.effectErrors[0]?.effect ?? effectOf(a);
+      const failure: ActFailure = { effect, rule: d.rule, reason: result.error ?? "failed", at: this.nowIso(), tick_id: this.tick, step: st?.step ?? "?", attempt: st?.attempt ?? 1 };
+      if (this.failedSession) failure.session = { runner: this.failedSession.runner, session_id: this.failedSession.session_id, ...(this.failedSession.pane_id ? { pane_id: this.failedSession.pane_id } : {}) };
+      this.failures[key] = failure;
+      this.failuresChanged = true;
+      return;
+    }
+    if (!prev) return;
+    const delivered = DELIVERY.has(prev.effect) && [...this.effectsOk].some((e) => DELIVERY.has(e));
+    if (delivered || this.effectsOk.has(prev.effect)) {
+      delete this.failures[key];
+      this.failuresChanged = true;
+    }
   }
 
   async perform(a: Action): Promise<ActionResult> {
@@ -325,6 +394,9 @@ export class Actor {
     const sha = await this.git.commit(c.cwd, { message: c.message, trailers: c.trailers, ...(paths ? { paths } : {}) });
     if (!c.push || !this.obs.remote) return { sha, pushed: null };
     const r = await this.pushBranch(c.cwd, c.branch);
+    if (r.ok) this.effectsOk.add("push");
+    // R4.3: committed but not pushed is a failed effect (the record is not on the remote, S8)
+    else this.effectErrors.push({ effect: "push", reason: `push of ${c.branch} failed: ${r.message}` });
     return r.ok ? { sha, pushed: true } : { sha, pushed: false, push_error: r.message };
   }
 
@@ -365,6 +437,10 @@ export class Actor {
       const c = this.claimed.get(s.key);
       if (c) s.claim = { state: "mine", blob: c.blob, sha: c.sha };
       for (const u of s.units) {
+        // R4.3: failures recorded or cleared this tick
+        const failure = this.failures[u.unit.key];
+        if (failure) u.act_failure = failure;
+        else delete u.act_failure;
         const st = this.written.get(u.unit.key);
         if (!st) continue;
         u.state = st;
@@ -482,6 +558,7 @@ export class Actor {
     const summary = a.advance ? `${a.advance.from}.${a.advance.outcome} → ${a.advance.to}` : `applied ${a.applied.join(", ") || "none"}`;
     const committed = await this.commit(a.commit, a.unit, state, `${a.rule}: ${summary}`);
     let delivered: boolean | string = resumed ? "resumed" : false;
+    if (resumed) this.effectsOk.add("resume");
     if (a.input) {
       // B2: the answer goes into the same session after state is written
       try {
@@ -489,8 +566,12 @@ export class Actor {
         if (!runner || runner.name !== a.input.session.runner) throw new Error("session's runner is not available here");
         await runner.send(a.input.session, a.input.text, { submit: true });
         delivered = true;
+        this.effectsOk.add("answer");
       } catch (e) {
         delivered = `not delivered: ${(e as Error).message}`;
+        // R4.3 (A4): the state is written, but the answer never reached the agent — not ok
+        this.effectErrors.push({ effect: "answer", reason: `answer to ${a.unit.key} not delivered: ${(e as Error).message}` });
+        this.failedSession = a.input.session;
       }
     }
     return { ok: true, detail: { ...committed, released, delivered, ...(a.kill ? { killed } : {}), ...(resumed ? { session: resumed } : {}) } };
@@ -596,6 +677,7 @@ export class Actor {
   private async startRun(a: Extract<Action, { kind: "start_run" }>): Promise<ActionResult> {
     const loc = this.unitLoc(a.unit);
     const { session, lease } = await this.launchAfterReceipts(a.unit, loc.runsDir, a.receipts, a.launch);
+    this.effectsOk.add("launch");
     const state = a.state ? this.recordSession(a.unit, loc.runsDir, a.state, a.receipts, session) : null;
     if (state) this.writeUnitState(a.unit, loc.runsDir, state);
     // R2.1 (N6): commit and push the started receipts now — only runs/, never the agent's fresh work
@@ -617,16 +699,49 @@ export class Actor {
     return this.launch(unit, launch);
   }
 
+  /**
+   * R4.2: deliver a counted nudge — typed into the live session (`input`), or by resuming the agent
+   * session with the nudge text (`launch`) after terminating the old process. R4.3: a failed delivery
+   * throws (ok: false; the classify receipt stays and is applied next tick, the nudge counted) and is
+   * kept as the unit's act failure for the inbox.
+   */
   private async nudge(a: Extract<Action, { kind: "nudge" }>): Promise<ActionResult> {
     const loc = this.unitLoc(a.unit);
-    this.writeReceipts(loc.runsDir, a.receipts);
-    const snapshot = await this.snapshot(a.unit, a.input.run_id, a.snapshot);
-    const runner = this.obs.ports.runner;
-    if (!runner || runner.name !== a.input.session.runner) throw new Error("the run's runner is not available on this machine");
-    await runner.send(a.input.session, a.input.text, { submit: true });
-    if (a.state) this.writeUnitState(a.unit, loc.runsDir, a.state);
-    const committed = await this.commit(a.commit, a.unit, a.state, `${a.rule}: nudged ${a.state?.nudges_used ?? "?"}`);
-    return { ok: true, detail: committed, ...(snapshot ? { transcript: snapshot } : {}) };
+    const runId = a.input?.run_id ?? a.launch?.run_id ?? "unknown";
+    let resumed: SessionRef | null = null;
+    if (a.launch) {
+      const launch = a.launch;
+      const kill = a.kill;
+      try {
+        ({ session: resumed } = await this.launchAfterReceipts(a.unit, loc.runsDir, a.receipts, launch, async () => {
+          await this.kill(kill);
+          // the old process held the run's agent lease; the resumed one takes it over (K1)
+          await this.releaseRunLeases(a.unit, ["agent"], launch.run_id);
+        }));
+      } catch (e) {
+        if (e instanceof QueueFull) throw e;
+        this.failedSession = kill;
+        throw new Error(`nudge to ${a.unit.key} not delivered: resume failed: ${(e as Error).message}`);
+      }
+      this.effectsOk.add("resume");
+    } else this.writeReceipts(loc.runsDir, a.receipts);
+    const snapshot = await this.snapshot(a.unit, runId, a.snapshot);
+    if (a.input) {
+      const runner = this.obs.ports.runner;
+      try {
+        if (!runner || runner.name !== a.input.session.runner) throw new Error("the run's runner is not available on this machine");
+        await runner.send(a.input.session, a.input.text, { submit: true });
+      } catch (e) {
+        this.failedSession = a.input.session;
+        throw new Error(`nudge to ${a.unit.key} not delivered: ${(e as Error).message}`);
+      }
+      this.effectsOk.add("nudge");
+    }
+    let state = a.state;
+    if (state && resumed) state = this.recordSession(a.unit, loc.runsDir, state, a.receipts, resumed);
+    if (state) this.writeUnitState(a.unit, loc.runsDir, state);
+    const committed = await this.commit(a.commit, a.unit, state, `${a.rule}: nudged ${state?.nudges_used ?? "?"}${resumed ? " (resumed)" : ""}`);
+    return { ok: true, detail: { ...committed, ...(resumed ? { session: resumed } : {}) }, ...(snapshot ? { transcript: snapshot } : {}) };
   }
 
   private async retryFresh(a: Extract<Action, { kind: "retry_fresh" }>): Promise<ActionResult> {
@@ -637,6 +752,7 @@ export class Actor {
     if (a.launch) {
       // receipts, kill the old session, then the fresh one (B2, C1)
       ({ session } = await this.launchAfterReceipts(a.unit, loc.runsDir, a.receipts, a.launch, () => this.kill(a.kill)));
+      this.effectsOk.add("launch");
       if (state) state = this.recordSession(a.unit, loc.runsDir, state, a.receipts, session);
     } else {
       this.writeReceipts(loc.runsDir, a.receipts);

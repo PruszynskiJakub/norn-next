@@ -263,6 +263,8 @@ function runFrom(st: UnitState, r: ReceiptOf<"started">): NonNullable<UnitState[
   if (r.session) run.session = r.session;
   if (r.agent_session_id) run.agent_session_id = r.agent_session_id;
   if (r.process) run.process = r.process;
+  if (r.machine) run.machine = r.machine;
+  if (r.heartbeat_id) run.heartbeat_id = r.heartbeat_id;
   return run;
 }
 
@@ -341,6 +343,9 @@ function agentRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ct
     case "silent":
     case "timeout":
     case "stalled": {
+      // R4.2: no way to deliver a nudge (runner neither types nor resumes) — decide routed it to a
+      // fresh session, counted as a retry, not a nudge
+      if (r.route === "retry") return retryRoute(st, step, r, ctx, withLast, o);
       const max = step.nudges ?? ctx.limits.nudges;
       if (st.nudges_used < max)
         return {
@@ -351,17 +356,8 @@ function agentRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ct
       const reason = `${o}: nudges ${st.nudges_used}/${max} at ${st.step}`;
       return { state: withLast(stuckPark(st, "exhausted", reason, r.at, r.receipt_id)), log: `exhausted: ${reason}` };
     }
-    case "died": {
-      const max = step.retries ?? ctx.limits.retries;
-      if (st.retries_used < max)
-        return {
-          state: withLast({ ...st, retries_used: st.retries_used + 1, status: "ready", run: null }),
-          log: `died: retry ${st.retries_used + 1}/${max} in a fresh session`,
-          route: "retry",
-        };
-      const reason = `died: retries ${st.retries_used}/${max} at ${st.step}`;
-      return { state: withLast(stuckPark(st, "exhausted", reason, r.at, r.receipt_id)), log: `exhausted: ${reason}` };
-    }
+    case "died":
+      return retryRoute(st, step, r, ctx, withLast, o);
     case "ask": {
       const q = r.detail ?? "the agent is waiting for input";
       return { state: withLast(park(st, "ask", q, r.at, "parked", r.receipt_id)), log: `asks: ${q}` };
@@ -369,6 +365,19 @@ function agentRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ct
     default:
       return { reject: `outcome '${o}' cannot be classified for an agent step` };
   }
+}
+
+/** C1 retry: a fresh session for the same step while retries last, else exhausted. */
+function retryRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ctx: ApplyContext, withLast: (s: UnitState) => UnitState, o: string): Step1 {
+  const max = step.retries ?? ctx.limits.retries;
+  if (st.retries_used < max)
+    return {
+      state: withLast({ ...st, retries_used: st.retries_used + 1, status: "ready", run: null }),
+      log: `${o}: retry ${st.retries_used + 1}/${max} in a fresh session`,
+      route: "retry",
+    };
+  const reason = `${o}: retries ${st.retries_used}/${max} at ${st.step}`;
+  return { state: withLast(stuckPark(st, "exhausted", reason, r.at, r.receipt_id)), log: `exhausted: ${reason}` };
 }
 
 /** Helper for receipt writers (act, CLI): the route a classified outcome takes, for the receipt's `route` field. */

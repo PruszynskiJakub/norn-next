@@ -98,6 +98,10 @@ export function traceEntries(ev: TraceEvent, unit: string, max = MAX): TimelineE
       // R10.1: a takeover, forced or not, with the claim it replaced
       if (ev.unit !== unit) return [];
       return [{ at: ev.at, source: "take", kind: "take", summary: oneLine(`take by ${ev.holder}${ev.previous_holder ? ` from ${ev.previous_holder}${ev.forced ? " (forced)" : ev.expired ? " (expired claim)" : ""}` : " (claim was free)"}`), ref: ev.id }];
+    case "tick.start":
+    case "tick.end":
+      // R5.4: bracket records of a tick; its `tick` record carries the decisions (a crashed tick: `norn why`)
+      return [];
   }
 }
 
@@ -115,6 +119,9 @@ export function traceUnits(ev: TraceEvent): string[] {
     case "foreign_commits":
     case "take":
       return [ev.unit];
+    case "tick.start":
+    case "tick.end":
+      return [];
   }
 }
 

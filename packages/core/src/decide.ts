@@ -33,10 +33,10 @@ import {
 import type { Action, AgentLaunch, BoundaryCommit, Decision, NewReceipt, SessionInput, UpdateStoryMirrorAction, WorktreeSpec } from "./actions.ts";
 import { type ApplyResult, applyReceipts, initialState } from "./apply.ts";
 import { AUTO_PROMPT, NUDGE_TEXT, sliceWorktreePath, storyWorktreePath } from "./commands.ts";
-import type { Facts, NumberedReceipt, SliceFileFacts, StoryFacts, UnitFacts, UnitRef } from "./facts.ts";
+import type { Facts, NumberedReceipt, RunFacts, SliceFileFacts, StoryFacts, UnitFacts, UnitRef } from "./facts.ts";
 import { sha256 } from "./hash.ts";
 import { bodyChangedItem, effectiveMode, storyFinished, unitInboxItem } from "./inbox.ts";
-import type { InboxItem, RemoteIssue, SessionRef } from "./ports.ts";
+import type { InboxItem, RemoteIssue, RunnerCapabilities, SessionRef } from "./ports.ts";
 import { epoch, iso } from "./time.ts";
 import { checkWorkflowLevel, stepOf, type UnitLevel, type WorkflowIssue } from "./workflow.ts";
 
@@ -447,6 +447,8 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
   const wf = uf.workflow;
   if (!wf) return ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "unit.workflow_missing", errors: [{ file: `runs/${ref.dir}/workflow.yaml`, errors: [{ path: "", message: "pinned workflow missing" }] }], notify: null });
 
+  // R5.1: a run whose launch is unknown is looked for before anything else is decided for the unit
+  if (uf.run?.launch_unknown) return launchUnknown(ctx, story, uf, st, wf);
   // C2: receipts first — they always win over runner facts
   if (uf.unapplied.length) return applyAction(ctx, story, uf, st, wf, uf.unapplied, "receipts.apply");
 
@@ -517,12 +519,19 @@ function applyAction(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
     // session for the step starts from the handoff.
     const rf = uf.run?.run_id === run.run_id ? uf.run : null;
     const gone = rf?.process_alive === false || rf?.pane?.alive === false;
-    if (run.session.runner !== "headless" && !gone) input = { run_id: run.run_id, session: sessionRef(run), text: res.deliver };
+    // R7.2: a session on another machine is neither typed into nor resumed here (its agent session
+    // lives there); R4.1: typing needs a runner that can `send`
+    const foreign = foreignRun(ctx, run);
+    const caps = runnerCaps(ctx);
+    if (!foreign && caps.send && run.session.runner !== "headless" && !gone) input = { run_id: run.run_id, session: sessionRef(run), text: res.deliver };
     else {
       const step = stepOf(wf, res.state.step);
-      const resumeId = run.agent_session_id ?? rf?.hooks.findLast((h) => h.agent_session_id)?.agent_session_id;
+      const resumeId = foreign ? undefined : resumeIdOf(run, rf);
       const cwd = unitWorktree(story, uf);
       if (step?.type === "agent" && resumeId && cwd && ctx.facts.machine.runner) {
+        // R5.3: the resumed run is the answered one; any other active run of the step blocks it
+        const active = activeRun(ctx, uf, run.run_id);
+        if (active) return ctx.noop(uf.unit, "answer.resume.wait_active", `run ${active} of ${res.state.step} still shows hook activity (R5.3)`);
         if (ctx.agentsFree <= 0) return ctx.noop(uf.unit, "answer.resume.queued", `answer waits: max_agents ${ctx.config.max_agents} in use (K1)`);
         ctx.agentsFree--;
         const n = nextReceiptNumber(uf);
@@ -645,6 +654,9 @@ function startedReceipt(ctx: Ctx, st: UnitState, step: AgentStep, run_id: string
     how: "auto",
     agent,
     worktree,
+    // R7.1: where and by whom the run was launched (liveness is judged on that machine only, R7.2)
+    machine: ctx.facts.machine.holder,
+    heartbeat_id: ctx.heartbeat,
   };
   const model = step.model ?? ctx.config.agents[agent]?.model;
   if (model) r.model = model;
@@ -659,6 +671,9 @@ function startRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf:
     return ctx.noop(ref, downgraded ? "agent.ready.manual.no_runner" : "agent.ready.manual", downgraded ? "auto requested, no runner; running manual (MO2)" : "ready: a person starts an agent and runs norn brief");
   const cwd = unitWorktree(story, uf);
   if (!cwd) return ctx.noop(ref, "agent.no_worktree", "unit worktree missing");
+  // R5.3 (A14b): never a second agent beside a run of this step that is still active
+  const active = activeRun(ctx, uf, null);
+  if (active) return ctx.noop(ref, "agent.start.wait_active", `run ${active} of ${st.step}#${st.attempt} still shows hook activity; no new run beside it (R5.3)`);
   if (ctx.agentsFree <= 0) return ctx.noop(ref, "agent.queued", `queued: max_agents ${ctx.config.max_agents} in use (K1)`);
   ctx.agentsFree--;
   const run_id = ctx.id();
@@ -678,6 +693,36 @@ function startRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf:
   });
 }
 
+/** R7.2 (M4, N5): a run launched on another machine — its pid, pane and session mean nothing here. */
+function foreignRun(ctx: Ctx, run: NonNullable<UnitState["run"]>): boolean {
+  return !!run.machine && run.machine !== ctx.facts.machine.holder;
+}
+
+/** R4.1: this machine's runner capabilities; unknown = send only (the behaviour before R4). */
+function runnerCaps(ctx: Ctx): RunnerCapabilities {
+  return ctx.facts.machine.runner_capabilities ?? { send: true, resume: false };
+}
+
+/**
+ * R5.3 (A14b): a run of the cursor step/attempt, other than `except`, with hook activity within the
+ * stalled window — no new run (start, retry, answer or nudge resume) starts beside it. Runs seen
+ * ending (`session_end`, classified `died`) or observed dead this tick do not count.
+ */
+function activeRun(ctx: Ctx, uf: UnitFacts, except: string | null): string | null {
+  const window = parseDuration(ctx.config.limits.stalled);
+  const dead = uf.run && (uf.run.process_alive === false || uf.run.pane?.alive === false) ? uf.run.run_id : null;
+  for (const r of uf.step_runs ?? []) {
+    if (r.run_id === except || r.run_id === dead || r.ended || r.last_hook_at === null) continue;
+    if (ctx.facts.now - r.last_hook_at <= window) return r.run_id;
+  }
+  return null;
+}
+
+/** Agent-tool session id to `--resume` a run with (B2): recorded in state, else the newest hook's. */
+function resumeIdOf(run: NonNullable<UnitState["run"]>, rf: UnitFacts["run"]): string | undefined {
+  return run.agent_session_id ?? (rf?.run_id === run.run_id ? rf.hooks.findLast((h) => h.agent_session_id)?.agent_session_id : undefined);
+}
+
 /** §10 classification of a live agent run from facts (C1, C2, MO4). */
 function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, step: AgentStep): void {
   const ref = uf.unit;
@@ -689,8 +734,17 @@ function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
   const touched = Math.max(epoch(run.started_at), epoch(st.updated_at));
   const lastHook = rf.hooks.at(-1);
   const hookAt = lastHook ? epoch(lastHook.at) : 0;
+  const stalledMs = parseDuration(ctx.config.limits.stalled);
 
-  const died = rf.process_alive === false || rf.pane?.alive === false;
+  // R7.2: process and pane liveness only for runs started on this machine
+  const foreign = foreignRun(ctx, run);
+  if (foreign && run.heartbeat_id !== ctx.heartbeat) {
+    // the story was taken from the heartbeat that launched it: judged by its hooks and the claim alone
+    const takenAt = story.claim.state === "mine" ? epoch(story.claim.blob.acquired_at) : 0;
+    if (now - Math.max(touched, hookAt, takenAt) > stalledMs) return routeOutcome(ctx, story, uf, st, wf, step, { outcome: "died", rule: "agent.died.foreign", detail: "foreign run, holder changed" }, []);
+    return ctx.noop(ref, "agent.running.foreign", `run ${run.run_id} started on ${run.machine}; no hook activity yet for ${ctx.config.limits.stalled} after the take (R7.2)`);
+  }
+  const died = !foreign && (rf.process_alive === false || rf.pane?.alive === false);
   let outcome: string | null = null;
   let rule = "";
   let detail: string | undefined;
@@ -698,7 +752,6 @@ function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
   else if (!step.attended) {
     const waiting = (rf.pane?.state === "waiting_input" && (rf.pane.since ?? touched + 1) > touched) || (lastHook && (lastHook.event === "waiting_input" || lastHook.event === "permission_prompt") && hookAt > touched);
     const deadline = parseDuration(step.deadline ?? ctx.config.limits.deadline);
-    const stalledMs = parseDuration(ctx.config.limits.stalled);
     const turnEnded =
       (lastHook && (lastHook.event === "turn_end" || lastHook.event === "session_end") && hookAt > touched) ||
       ((rf.pane?.state === "idle" || rf.pane?.state === "done") && (rf.pane.since ?? 0) > touched);
@@ -716,7 +769,27 @@ function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
     else if (now - Math.max(rf.last_activity_at ?? 0, touched) > stalledMs) [outcome, rule, detail] = ["stalled", "agent.stalled", `no activity for ${ctx.config.limits.stalled}`];
   }
   if (!outcome) return ctx.noop(ref, step.attended ? "agent.attended.running" : "agent.running", `run ${run.run_id} in progress`);
+  routeOutcome(ctx, story, uf, st, wf, step, { outcome, rule, ...(detail ? { detail } : {}) }, []);
+}
 
+interface Classified {
+  outcome: string;
+  /** decide rule id, recorded in the classify receipt */
+  rule: string;
+  detail?: string;
+}
+
+/**
+ * Write a classify receipt for the unit's run and take its route (C1): nudge (R4.2: `send`, else
+ * `resume`, else a counted retry), retry in a fresh session, park or `$stuck`. `prior` are unapplied
+ * receipts applied first (R5.2: the `started` receipt of a run whose launch is unknown).
+ */
+function routeOutcome(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st0: UnitState, wf: Workflow, step: AgentStep, c: Classified, prior: readonly NumberedReceipt[]): void {
+  const ref = uf.unit;
+  const { outcome, rule, detail } = c;
+  const st = prior.length ? applyReceipts(st0, prior, applyCtx(ctx, wf)).state : st0;
+  const run = st.run as NonNullable<UnitState["run"]>;
+  const rf = uf.run?.run_id === run.run_id ? uf.run : null;
   const n = nextReceiptNumber(uf);
   const receipt: ReceiptOf<"classify"> = {
     kind: "classify",
@@ -733,13 +806,27 @@ function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
     route: "park",
   };
   if (detail) receipt.detail = detail;
-  const res = applyReceipts(st, [{ n, file: "", receipt }], applyCtx(ctx, wf));
+  const applyWith = (r: ReceiptOf<"classify">) => applyReceipts(st0, [...prior, { n, file: "", receipt: r }], applyCtx(ctx, wf));
+  let res = applyWith(receipt);
+  const foreign = foreignRun(ctx, run);
+  // R7.2: a session on another machine is never typed into or killed from here
+  const session = run.session && !foreign ? sessionRef(run) : null;
+  const { mode } = effectiveMode(story.mode, !!step.attended, ctx.facts.machine.runner);
+  const cwd = unitWorktree(story, uf);
+  const caps = runnerCaps(ctx);
+  const local = !!session && session.runner === ctx.facts.machine.runner;
+  const resumeId = resumeIdOf(run, rf);
+  if (res.route === "nudge" && mode === "auto" && local && !caps.send && !(caps.resume && resumeId && cwd)) {
+    // R4.2: this runner can neither type into the session nor resume it — a fresh session instead,
+    // counted as a retry, not a nudge
+    receipt.route = "retry";
+    res = applyWith(receipt);
+  }
   receipt.route = res.route ?? (res.advance?.to as Receipt["step"]) ?? (res.state.status === "stuck" ? "$stuck" : "park");
   if (res.route === "nudge") receipt.counter = { name: "nudges", value: res.state.nudges_used, max: step.nudges ?? ctx.config.limits.nudges };
   if (res.route === "retry") receipt.counter = { name: "retries", value: res.state.retries_used, max: step.retries ?? ctx.config.limits.retries };
-  const session = run.session ? sessionRef(run) : null;
   const commit = commitFor(ctx, story, uf, `norn: ${ref.key} ${st.step} ${outcome} → ${receipt.route}`, st.step);
-  const snapshot = outcome === "silent" ? { transcript: rf.transcript, cwd: unitWorktree(story, uf) ?? "" } : null;
+  const snapshot = outcome === "silent" ? { transcript: rf?.transcript ?? null, cwd: cwd ?? "" } : null;
   const receipts: NewReceipt[] = [{ n, receipt }];
 
   if (res.route === "nudge") {
@@ -748,18 +835,27 @@ function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
     // C1 route to `$stuck` after max still holds — but instead of an undelivered nudge the unit
     // shows an inbox item (unitInboxItem: "agent ended its turn without reporting — reopen the
     // agent and run norn brief"), notified once per counted nudge (O3).
-    const { mode } = effectiveMode(story.mode, !!step.attended, ctx.facts.machine.runner);
-    const typable = !!session && mode === "auto" && session.runner === ctx.facts.machine.runner;
-    if (typable && session)
-      return ctx.emit({ kind: "nudge", unit: ref, rule: `${rule}.nudge`, input: { run_id: run.run_id, session, text: NUDGE_TEXT }, snapshot, receipts, state: res.state, commit });
+    if (mode === "auto" && local && session) {
+      // R4.2: type into the live session when the runner can …
+      if (caps.send) return ctx.emit({ kind: "nudge", unit: ref, rule: `${rule}.nudge`, input: { run_id: run.run_id, session, text: NUDGE_TEXT }, launch: null, kill: null, snapshot, receipts, state: res.state, commit });
+      // … else resume the agent session with the nudge text (the B2 answer path), the old process killed first
+      const ownLease = uf.lease?.kind === "agent" && uf.lease.run_id === run.run_id;
+      if (!ownLease && ctx.agentsFree <= 0) return ctx.noop(ref, "agent.nudge.queued", `nudge waits: max_agents ${ctx.config.max_agents} in use (K1)`);
+      if (!ownLease) ctx.agentsFree--;
+      const started: ReceiptOf<"started"> = { ...startedReceipt(ctx, res.state, step, run.run_id, cwd as string, false), agent_session_id: resumeId as string, ...(run.agent ? { agent: run.agent } : {}) };
+      receipts.push({ n: n + 1, receipt: started });
+      const state = applyReceipts(res.state, [{ n: n + 1, file: "", receipt: started }], applyCtx(ctx, wf)).state;
+      const launch: AgentLaunch = { ...launchFor(ctx, story, uf, res.state, step, run.run_id, cwd as string), prompt: NUDGE_TEXT, resume: resumeId as string };
+      if (run.agent) launch.agent = run.agent;
+      return ctx.emit({ kind: "nudge", unit: ref, rule: `${rule}.nudge.resume`, input: null, launch, kill: session, snapshot, receipts, state, commit });
+    }
     return ctx.emit({ kind: "classify", unit: ref, rule: `${rule}.surface`, outcome, kill: null, snapshot, receipts, state: res.state, commit });
   }
   if (res.route === "retry") {
-    const { mode } = effectiveMode(story.mode, !!step.attended, ctx.facts.machine.runner);
-    const cwd = unitWorktree(story, uf);
     let state = res.state;
     let launch: AgentLaunch | null = null;
-    if (mode === "auto" && cwd && ctx.agentsFree > 0) {
+    // R5.3: no fresh session while another run of the step shows hook activity (the next tick retries)
+    if (mode === "auto" && cwd && ctx.agentsFree > 0 && !activeRun(ctx, uf, run.run_id)) {
       ctx.agentsFree--;
       const run_id = ctx.id();
       const started = startedReceipt(ctx, state, step, run_id, cwd, true);
@@ -767,7 +863,8 @@ function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
       state = applyReceipts(state, [{ n: n + 1, file: "", receipt: started }], applyCtx(ctx, wf)).state;
       launch = launchFor(ctx, story, uf, state, step, run_id, cwd);
     }
-    return ctx.emit({ kind: "retry_fresh", unit: ref, rule: `${rule}.retry`, kill: session, launch, receipts, state, commit });
+    const retryRule = outcome === "died" ? `${rule}.retry` : `${rule}.retry.no_nudge`;
+    return ctx.emit({ kind: "retry_fresh", unit: ref, rule: retryRule, kill: session, launch, receipts, state, commit });
   }
   const stuck = res.state.status === "stuck";
   ctx.emit({
@@ -781,6 +878,53 @@ function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
     state: res.state,
     commit,
   });
+}
+
+/**
+ * R5.1/R5.2 (H2, A10): the run's `started` receipt is not applied — a crash between the receipt and
+ * `state.json`. Observe looked for the run (hook facts with its run_id, runner sessions in the unit
+ * worktree, processes with its NORN_RUN). Found → adopt: apply the receipt with what was found, and
+ * the run continues as a normal running step. Nothing found and no hook activity for 2 watch
+ * intervals → `died` (C1, counted). Before that, nothing else is decided for the unit.
+ */
+function launchUnknown(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow): void {
+  const ref = uf.unit;
+  const rf = uf.run as RunFacts;
+  const lu = rf.launch_unknown as NonNullable<RunFacts["launch_unknown"]>;
+  const startedNr = uf.unapplied.find((r) => r.n === lu.n);
+  if (!startedNr || startedNr.receipt.kind !== "started") return applyAction(ctx, story, uf, st, wf, uf.unapplied, "receipts.apply");
+  if (rf.session || rf.hooks.length) {
+    const n = nextReceiptNumber(uf);
+    const prev = startedNr.receipt;
+    const adopted: ReceiptOf<"started"> = { ...prev, receipt_id: ctx.id(), at: ctx.nowIso, tick_id: ctx.facts.tick_id };
+    if (rf.session) {
+      adopted.session = { runner: rf.session.runner, session_id: rf.session.session_id, ...(rf.session.pane_id ? { pane_id: rf.session.pane_id } : {}) };
+      if (rf.session.process) adopted.process = rf.session.process;
+    }
+    if (lu.agent_session_id) adopted.agent_session_id = lu.agent_session_id;
+    const res = applyReceipts(st, [...uf.unapplied, { n, file: "", receipt: adopted }], applyCtx(ctx, wf));
+    const found = rf.session ? `session ${rf.session.session_id}` : `${rf.hooks.length} hook fact(s)`;
+    return ctx.emit({
+      kind: "apply_receipts",
+      unit: ref,
+      rule: "run.adopt",
+      applied: res.applied,
+      rejected: res.rejected,
+      advance: res.advance,
+      input: null,
+      launch: null,
+      kill: null,
+      receipts: [{ n, receipt: adopted }],
+      state: res.state,
+      commit: commitFor(ctx, story, uf, `norn: ${ref.key} adopted run ${rf.run_id} (${found})`, st.step),
+    });
+  }
+  const grace = 2 * parseDuration(ctx.config.watch_interval);
+  if (ctx.facts.now - lu.at <= grace) return ctx.noop(ref, "run.launch_unknown.wait", `run ${rf.run_id} has a started receipt but no state; looking for it for 2 watch intervals (R5.1)`);
+  const applied = applyReceipts(st, uf.unapplied, applyCtx(ctx, wf));
+  const step = stepOf(wf, applied.state.step);
+  if (applied.state.run?.run_id !== rf.run_id || step?.type !== "agent") return applyAction(ctx, story, uf, st, wf, uf.unapplied, "receipts.apply");
+  routeOutcome(ctx, story, uf, st, wf, step, { outcome: "died", rule: "agent.died.launch_unknown", detail: "launch unknown: no session, process or hook activity found for the run (R5.2)" }, uf.unapplied);
 }
 
 function implicitAsk(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, question: string, command?: string): void {

@@ -231,6 +231,8 @@ describe("loadProjectView", () => {
         alive: true,
         lease: { kind: "agent", file: "agent-1.json", slot: null },
         last_hook_at: ago(20),
+        classified: null,
+        machine: null,
       },
     ]);
 
@@ -325,6 +327,7 @@ describe("formatters", () => {
       repo: "",
       holder: "",
       runner: null,
+      heartbeat: { holder: "", last_tick_at: null, age: null, down: false },
       stories: [],
       inbox: { at: "", pending: 0, groups: { your_turn: [], answer: [], approve: [], unblock: [], check: [], unclaimed: [], running: [], recently_done: [] } },
       runs: [],

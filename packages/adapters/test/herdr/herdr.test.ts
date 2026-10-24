@@ -105,6 +105,26 @@ describe("herdr runner", () => {
     expect(c.calls).toEqual([["herdr", "pane", "send-text", "w1:p1", "partial"]]);
   });
 
+  test("capabilities: send and resume (R4.1)", () => {
+    expect(createHerdrRunner({ exec: fakeExec([]).exec }).capabilities).toEqual({ send: true, resume: true });
+  });
+
+  test("findSessions: agent panes whose cwd is the worktree, with pid and agent session (R5.1)", async () => {
+    const { exec, calls } = fakeExec([
+      ["pane list", ok(fx.pane_list)],
+      ["pane process-info", ok(fx.process_info_busy)],
+    ]);
+    const found = await createHerdrRunner({ exec, process: fakeProcess() }).findSessions?.({ run_id: "01JRUN", cwd: WT });
+    expect(calls.map((c) => c.slice(1, 3).join(" "))).toEqual(["pane list", "pane process-info"]);
+    // the shell-only pane (no agent) in the same worktree and the pane elsewhere are not candidates
+    expect(found).toEqual([
+      {
+        session: { runner: "herdr", session_id: "wA:p1", pane_id: "wA:p1", process: { pid: 59610, pid_start: "Fri Oct 23 16:19:26 2026" } },
+        agent_session_id: "f90b97b5-4c27-4470-be49-002210dd3279",
+      },
+    ]);
+  });
+
   test("send never types into a blocked dialog: typed session_blocked error", async () => {
     const { exec } = fakeExec([["agent prompt", fail(fx.error_agent_blocked)]]);
     const err = await createHerdrRunner({ exec })

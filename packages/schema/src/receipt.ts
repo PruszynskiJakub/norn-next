@@ -126,6 +126,10 @@ export const StartedReceipt = receipt("started", {
   worktree: NonEmpty,
   /** true when this is a fresh-session retry of the same step (B2, C1) */
   retry: Type.Optional(Type.Boolean()),
+  /** R7.1 (M4): `user@host` that launched the run; process liveness is judged only there (R7.2) */
+  machine: Type.Optional(NonEmpty),
+  /** R7.1: heartbeat that launched the run */
+  heartbeat_id: Type.Optional(Ulid),
 });
 /** Tick classification (§10): the outcome decided from facts and the route taken. */
 export const ClassifyReceipt = receipt("classify", {

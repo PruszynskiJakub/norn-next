@@ -7,7 +7,7 @@
  * changed outside norn — the PR head moved after the ready approval, commits norn did not make;
  * F35, Q6), Unclaimed, Running, Recently done.
  */
-import type { InboxChange, Mode, ResolvedConfig, UnitState } from "@norn/schema";
+import { type InboxChange, type Mode, parseDuration, type ResolvedConfig, type UnitState } from "@norn/schema";
 import type { Decision } from "./actions.ts";
 import { nextCommand, startAgentCommand } from "./commands.ts";
 import type { Facts, StoryFacts, UnitFacts } from "./facts.ts";
@@ -67,6 +67,67 @@ function undeliveredNudge(story: StoryFacts, uf: UnitFacts, facts: Facts): { out
   const activity = uf.run?.run_id === st.run.run_id ? (uf.run.last_activity_at ?? 0) : 0;
   if (activity > epoch(last.at)) return null;
   return { outcome: last.outcome, at: last.at };
+}
+
+/**
+ * R5.5 (N3, A8): this checkout's heartbeat is down — its last tick is older than 3 × watch interval
+ * (or no tick ever ran) while a story it holds has a unit in auto mode. Null when it is up, when
+ * nothing here needs it, or when the heartbeat was not observed.
+ */
+export function heartbeatDown(facts: Facts, config: ResolvedConfig): { holder: string; since: string | null; for_ms: number | null } | null {
+  const hb = facts.heartbeat;
+  if (!hb) return null;
+  const limit = 3 * parseDuration(config.watch_interval);
+  if (hb.last_tick_at !== null && facts.now - hb.last_tick_at <= limit) return null;
+  const auto = (s: StoryFacts) => effectiveMode(s.mode, false, facts.machine.runner).mode === "auto";
+  const live = (u: UnitFacts) => !!u.state && u.state.status !== "done" && u.state.status !== "corrupt";
+  const needs = facts.stories.some((s) => s.claim.state === "mine" && auto(s) && !storyFinished(s) && s.units.some(live));
+  if (!needs) return null;
+  return { holder: facts.machine.holder, since: hb.last_tick_at === null ? null : iso(hb.last_tick_at), for_ms: hb.last_tick_at === null ? null : facts.now - hb.last_tick_at };
+}
+
+/** R5.5: the Unblock item for a heartbeat that is down. */
+export function heartbeatItem(facts: Facts, config: ResolvedConfig): InboxItem | null {
+  const down = heartbeatDown(facts, config);
+  if (!down) return null;
+  const story = facts.stories.find((s) => s.claim.state === "mine");
+  return {
+    id: `heartbeat:${down.holder}:${down.since ?? "never"}`,
+    group: "unblock",
+    story: story?.key ?? "*",
+    slice: null,
+    step: null,
+    title: down.for_ms === null ? `no heartbeat on ${down.holder} yet — run \`norn watch\`` : `no heartbeat on ${down.holder} for ${formatAge(down.for_ms)} — run \`norn watch\``,
+    detail: "auto steps start, and agents are classified, only while a heartbeat runs on the checkout that holds the story",
+    command: "norn watch",
+    since: down.since ?? iso(facts.now),
+  };
+}
+
+/**
+ * R4.3: an action's effect failed for the unit (a nudge or answer not delivered, a launch or resume
+ * that failed, a push refused) — an Unblock item until an effect of the same kind succeeds, the
+ * cursor moves, or (for deliveries) the agent shows activity again. R6.3 reuses it for prompts.
+ */
+export function actFailureItem(story: StoryFacts, uf: UnitFacts): InboxItem | null {
+  const f = uf.act_failure;
+  const st = uf.state;
+  if (!f || !st || st.status === "done" || st.status === "corrupt" || f.step !== st.step || f.attempt !== st.attempt) return null;
+  const delivery = f.effect !== "push";
+  if (delivery && (uf.run?.last_activity_at ?? 0) > epoch(f.at)) return null;
+  const key = uf.unit.key;
+  return {
+    id: `failed:${key}:${f.tick_id}`,
+    group: "unblock",
+    story: story.key,
+    slice: uf.unit.slice,
+    step: st.step,
+    title: f.reason.includes(key) ? f.reason : `${f.effect} for ${key} failed: ${f.reason}`,
+    detail: `tick ${f.tick_id} (${f.rule})${f.session ? ` · session ${f.session.runner} ${f.session.pane_id ?? f.session.session_id}` : ""}`,
+    command: `norn why ${key} --tick ${f.tick_id}`,
+    since: f.at,
+    ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
+  };
 }
 
 /** The command a person runs to start the unit's step agent in its worktree. */
@@ -169,7 +230,7 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       return item("unblock", park?.reason ?? "stuck", `norn unstick ${key}`, park?.since ?? st.updated_at, park?.receipt_id ? { id: park.receipt_id } : {});
     case "running": {
       const nudge = undeliveredNudge(story, uf, facts);
-      if (nudge) return item("your_turn", "agent ended its turn without reporting — reopen the agent and run norn brief", startCommandFor(uf, story, config), nudge.at, { id: `${nudge.outcome}:${key}:${st.step}#${st.attempt}:${st.nudges_used}` });
+      if (nudge && !heartbeatDown(facts, config)) return item("your_turn", "agent ended its turn without reporting — reopen the agent and run norn brief", startCommandFor(uf, story, config), nudge.at, { id: `${nudge.outcome}:${key}:${st.step}#${st.attempt}:${st.nudges_used}` });
     }
       return item("running", `${st.step} #${st.attempt}${st.run ? ` (${st.run.how})` : ""}`, `norn trace ${key}`, st.run?.started_at ?? st.step_entered_at);
     case "ready": {
@@ -181,6 +242,8 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
             ...(downgraded ? { detail: "auto requested, no runner; running manual (MO2)" } : {}),
           });
       }
+      // R5.5 (A8): an auto step waits for the heartbeat, not for a person — no manual start hint
+      if (step?.type === "agent" && heartbeatDown(facts, config)) return item("running", `${st.step} #${st.attempt} (waiting for the heartbeat — norn watch)`, "norn watch", st.step_entered_at);
       return item("running", `${st.step} #${st.attempt} (queued)`, `norn trace ${key}`, st.step_entered_at);
     }
     case "done": {
@@ -329,8 +392,12 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
     add(bodyChangedItem(story));
     add(headChangedItem(story));
     for (const it of foreignCommitItems(story)) add(it);
-    for (const uf of story.units) add(unitInboxItem(story, uf, facts, config));
+    for (const uf of story.units) {
+      add(unitInboxItem(story, uf, facts, config));
+      add(actFailureItem(story, uf));
+    }
   }
+  add(heartbeatItem(facts, config));
   for (const g of INBOX_GROUPS) groups[g].sort((a, b) => epoch(a.since) - epoch(b.since) || a.id.localeCompare(b.id));
   const pending = INBOX_GROUPS.filter((g) => g !== "running" && g !== "recently_done").reduce((n, g) => n + groups[g].length, 0);
   return { at: iso(facts.now), groups, pending };

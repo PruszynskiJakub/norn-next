@@ -15,6 +15,9 @@
  * - paneState  → `herdr pane get <pane>` (+ `pane read --source visible` when blocked)
  * - isAlive    → agent pid + start time if recorded, else `pane process-info` (foreground != shell)
  * - kill       → `herdr pane close <pane>` (pane_not_found = already gone)
+ * - findSessions → `herdr pane list`                         (agent panes whose cwd is the worktree, R5.1)
+ *                `herdr pane process-info --pane <pane>`      (their agent pid)
+ * - capabilities: send + resume (R4.1)
  *
  * - openStatusPane → `herdr pane split [--current] --direction down --ratio 0.3 --cwd C --no-focus`,
  *                `herdr pane rename <pane> norn`, `herdr pane run <pane> "norn pane"`   (O1 status pane)
@@ -47,6 +50,9 @@ interface HerdrPane {
   pane_id: string;
   agent?: string | null;
   agent_status?: string;
+  cwd?: string;
+  foreground_cwd?: string;
+  agent_session?: { value?: string } | null;
 }
 
 interface ProcessInfo {
@@ -116,6 +122,7 @@ export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
 
   return {
     name: RUNNER_NAME,
+    capabilities: { send: true, resume: true },
 
     async available() {
       const r = await exec([...base, "status", "server"]);
@@ -207,6 +214,21 @@ export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
       } catch (err) {
         if ((err as { code?: string }).code !== "session_gone") throw err;
       }
+    },
+
+    async findSessions(q) {
+      const out = (await herdr(["pane", "list"])) as { result?: { panes?: HerdrPane[] } } | null;
+      const panes = (out?.result?.panes ?? []).filter((p) => !!p.agent && (p.cwd === q.cwd || p.foreground_cwd === q.cwd));
+      const found = [];
+      for (const p of panes) {
+        const info = await processInfo(p.pane_id);
+        const pid = info ? foregroundPid(info) : null;
+        const identity = pid !== null ? await proc.identify(pid) : null;
+        const session: SessionRef = { runner: RUNNER_NAME, session_id: p.pane_id, pane_id: p.pane_id, ...(identity ? { process: identity } : {}) };
+        const agentSession = p.agent_session?.value;
+        found.push({ session, ...(agentSession ? { agent_session_id: agentSession } : {}) });
+      }
+      return found;
     },
   };
 }

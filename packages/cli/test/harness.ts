@@ -9,7 +9,7 @@ import { setDefaultTimeout } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import type { Clock, InboxItem, LaunchSpec, NotifierPort, PaneState, RemoteIssue, RemotePort, RemotePullRequest, RunnerPort, SessionRef } from "@norn/core";
+import type { Clock, InboxItem, LaunchSpec, NotifierPort, PaneState, RemoteIssue, RemotePort, RemotePullRequest, RunnerCapabilities, RunnerPort, RunnerSessionInfo, SessionRef } from "@norn/core";
 import { type Receipt, type UnitState, ulid } from "@norn/schema";
 import { appendReceipt, readState } from "@norn/store";
 import { type CliDeps, type CliResult, runCli, type TickReport } from "../src/index.ts";
@@ -62,10 +62,16 @@ export class FakeRemote implements RemotePort {
 
 export class FakeRunner implements RunnerPort {
   readonly name = "fake";
+  /** R4.1: a pane runner by default; tests flip these to model headless or capability-less runners */
+  capabilities: RunnerCapabilities = { send: true, resume: true };
   launches: LaunchSpec[] = [];
   sent: Array<{ session: SessionRef; text: string }> = [];
   killed: SessionRef[] = [];
   pane: PaneState = { alive: true, state: "working", since: null };
+  /** set → `send` throws it (R4.3) */
+  sendError: Error | null = null;
+  /** R5.1: sessions `findSessions` reports */
+  found: RunnerSessionInfo[] = [];
   async available() {
     return true;
   }
@@ -74,7 +80,11 @@ export class FakeRunner implements RunnerPort {
     return { runner: this.name, session_id: `s-${this.launches.length}`, pane_id: `p-${this.launches.length}` };
   }
   async send(session: SessionRef, text: string) {
+    if (this.sendError) throw this.sendError;
     this.sent.push({ session, text });
+  }
+  async findSessions() {
+    return this.found;
   }
   async paneState() {
     return this.pane;
