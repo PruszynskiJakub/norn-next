@@ -1,4 +1,8 @@
-# norn
+<p align="center">
+  <img src="docs/assets/norn.svg" alt="norn" width="96" height="96">
+</p>
+
+<h1 align="center">norn</h1>
 
 norn is a CLI that delivers software stories with coding agents (Claude Code, Codex, OpenCode, Gemini, …) and keeps every decision in deterministic code. It works with any of these agents. A stateless heartbeat, `norn tick`, reads the markdown specs, the JSON run state, git and the runner. A pure function then picks the next action, and norn tells an agent to do one bounded step. Workflows are JSON/YAML data. State lives in the repository and in git refs, so a team on GitHub or GitLab can hand a story over at any commit.
 
