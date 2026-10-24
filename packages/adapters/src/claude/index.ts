@@ -163,13 +163,17 @@ export function hookResponse(fact: HookFact, decision: HookDecision): HookRespon
   return { stdout: "", exit_code: 0 };
 }
 
-/** B5/B2: interactive `claude [opts] "<prompt>"`, headless `claude -p`, resume `--resume <id>`. */
+/**
+ * B5/B2: interactive `claude [opts] -- "<prompt>"`, headless `claude -p`, resume `--resume <id>`.
+ * B3: `--` ends the options, so a variadic flag in the configured args (`--allowedTools a b`) cannot
+ * take the prompt as one more value.
+ */
 export function launchCommand(req: AgentLaunchRequest): { argv: string[]; env: Record<string, string> } {
   const argv = [req.config.command ?? "claude"];
   if (req.headless) argv.push("-p");
   if (req.model) argv.push("--model", req.model);
   if (req.resume) argv.push("--resume", req.resume);
-  argv.push(...(req.config.args ?? []), req.prompt);
+  argv.push(...(req.config.args ?? []), "--", req.prompt);
   return { argv, env: launchEnv(req) };
 }
 

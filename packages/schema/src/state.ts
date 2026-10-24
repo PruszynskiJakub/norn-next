@@ -8,6 +8,7 @@ import {
   OutcomeName,
   PosInt,
   ProcessIdentity,
+  PromptChoice,
   SliceKey,
   StepName,
   StoryKey,
@@ -57,6 +58,18 @@ export const ParkInfo = Type.Object(
     receipt_id: Type.Optional(Ulid),
     /** ask park from a permission prompt: the pending command, e.g. `Bash(rm -rf build)` (§10, O1) */
     command: Type.Optional(NonEmpty),
+    /**
+     * R6.1 (A14): an implicit ask (classified from facts, not `norn ask`) and the fact that raised it:
+     * the pane (`waiting_input`) or a hook. A later fact showing the agent moved on resolves it, and
+     * agent reports are accepted while parked on it.
+     */
+    implicit: Type.Optional(Type.Union([Type.Literal("pane"), Type.Literal("hook")])),
+    /** R6.2: the prompt's choices as the runner parsed them from the pane, in display order */
+    options: Type.Optional(Type.Array(NonEmpty)),
+    /** R6.2: how a choice is made: by its number, or by arrow keys from the `cursor` option */
+    choice: Type.Optional(PromptChoice),
+    /** L1 (A7): the full pane text of the prompt — shown by `inbox --details` and `why`, not in titles */
+    screen: Type.Optional(NonEmpty),
   },
   { additionalProperties: false },
 );
@@ -76,6 +89,12 @@ export const RunInfo = Type.Object(
     agent_session_id: Type.Optional(NonEmpty),
     process: Type.Optional(ProcessIdentity),
     transcript: Type.Optional(NonEmpty),
+    /** R7.1: `user@host` that launched the run (from its `started` receipt); absent = this machine (older runs) */
+    machine: Type.Optional(NonEmpty),
+    /** R7.1: heartbeat that launched the run */
+    heartbeat_id: Type.Optional(Ulid),
+    /** R9.1 (A11): when the launch prompt was re-sent (once per run) after a SessionStart with no turn start */
+    prompt_resent_at: Type.Optional(IsoTime),
   },
   { additionalProperties: false },
 );

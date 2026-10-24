@@ -359,7 +359,14 @@ export async function deliver(ctx: Context, t: Target, route: Route, receipt: Re
 export async function runHumanVerb(
   ctx: Context,
   t: Target,
-  opts: { verb: string; mailbox: boolean; check: (t: Target, st: UnitState) => void; build: (t: Target, st: UnitState) => Receipt },
+  opts: {
+    verb: string;
+    mailbox: boolean;
+    check: (t: Target, st: UnitState) => void;
+    build: (t: Target, st: UnitState) => Receipt;
+    /** an effect that must succeed before the receipt is written (R6.3: typing an answer into a prompt); returns the receipt to write */
+    before?: (t: Target, st: UnitState, route: Route, receipt: Receipt) => Promise<Receipt>;
+  },
 ): Promise<{ unit: string; receipt: Receipt; delivered: Delivered; next: string }> {
   // T9: read the claim first — a non-holder's local copy may be stale, so when another heartbeat
   // holds the story the cursor comes from the pushed branch before any precondition is checked
@@ -377,6 +384,7 @@ export async function runHumanVerb(
     opts.check(target, started(target));
     receipt = opts.build(target, started(target));
   }
+  if (opts.before) receipt = await opts.before(target, started(target), route, receipt);
   const delivered = await deliver(ctx, target, route, receipt);
   const next = route.via === "local" ? "norn tick" : `${route.holder.holder}'s next tick imports it (T9)`;
   return { unit: target.key, receipt, delivered, next };

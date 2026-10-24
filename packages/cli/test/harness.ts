@@ -9,7 +9,7 @@ import { setDefaultTimeout } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import type { Clock, InboxItem, LaunchSpec, NotifierPort, PaneState, RemoteIssue, RemotePort, RemotePullRequest, RunnerPort, SessionRef } from "@norn/core";
+import type { Clock, InboxItem, LaunchSpec, NotifierPort, PaneState, PromptKey, RemoteIssue, RemotePort, RemotePullRequest, RunnerCapabilities, RunnerPort, RunnerSessionInfo, SessionRef } from "@norn/core";
 import { type Receipt, type UnitState, ulid } from "@norn/schema";
 import { appendReceipt, readState } from "@norn/store";
 import { type CliDeps, type CliResult, runCli, type TickReport } from "../src/index.ts";
@@ -62,27 +62,61 @@ export class FakeRemote implements RemotePort {
 
 export class FakeRunner implements RunnerPort {
   readonly name = "fake";
+  /** R4.1: a pane runner by default; tests flip these to model headless or capability-less runners */
+  capabilities: RunnerCapabilities = { send: true, resume: true };
   launches: LaunchSpec[] = [];
+  /** R8.2: doctor's throwaway session process */
+  doctor: ReturnType<typeof Bun.spawn> | null = null;
   sent: Array<{ session: SessionRef; text: string }> = [];
   killed: SessionRef[] = [];
   pane: PaneState = { alive: true, state: "working", since: null };
+  /** set → `send` throws it (R4.3) */
+  sendError: Error | null = null;
+  /** R5.1: sessions `findSessions` reports */
+  found: RunnerSessionInfo[] = [];
   async available() {
     return true;
   }
+  /** R6.2: keystrokes typed into prompts; `keysError` set → `sendKeys` throws it (R6.3) */
+  keyed: Array<{ session: SessionRef; keys: PromptKey[] }> = [];
+  keysError: Error | null = null;
   async launch(spec: LaunchSpec): Promise<SessionRef> {
+    // R8.2: doctor's throwaway session really runs its command (a pane would) — under a PATH a login
+    // shell reset (R8.1: the launcher puts this norn first again); it runs until doctor kills it
+    if (spec.title === "norn doctor") {
+      this.doctor = Bun.spawn(spec.argv, { cwd: spec.cwd, env: { ...process.env, ...spec.env, PATH: "/usr/bin:/bin" }, stdout: "ignore", stderr: "ignore" });
+      return { runner: this.name, session_id: "doctor" };
+    }
     this.launches.push(spec);
     return { runner: this.name, session_id: `s-${this.launches.length}`, pane_id: `p-${this.launches.length}` };
   }
   async send(session: SessionRef, text: string) {
+    if (this.sendError) throw this.sendError;
     this.sent.push({ session, text });
   }
+  async sendKeys(session: SessionRef, keys: PromptKey[]) {
+    if (this.keysError) throw this.keysError;
+    this.keyed.push({ session, keys });
+  }
+  reach(session: SessionRef) {
+    return `fake attach ${session.pane_id ?? session.session_id}`;
+  }
+  async findSessions() {
+    return this.found;
+  }
+  /** runs once when observe reads the pane — models another writer acting mid-tick (B11) */
+  onPaneState: (() => Promise<void>) | null = null;
   async paneState() {
+    const hook = this.onPaneState;
+    this.onPaneState = null;
+    if (hook) await hook();
     return this.pane;
   }
   async isAlive() {
     return this.pane.alive;
   }
   async kill(session: SessionRef) {
+    if (session.session_id === "doctor") this.doctor?.kill();
     this.killed.push(session);
   }
 }

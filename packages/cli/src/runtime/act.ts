@@ -12,11 +12,13 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import {
   type Action,
+  type ActFailure,
   type ActionResult,
   type AgentLaunch,
   applyReceipts,
   buildInbox,
   type BoundaryCommit,
+  isSideAction,
   type Decision,
   type Facts,
   type InboxItem,
@@ -52,6 +54,7 @@ import {
   patchStoryFile,
   pinWorkflow,
   readEnvNorn,
+  readActFailures,
   reclaimLeases,
   releaseClaim,
   releaseLease,
@@ -60,6 +63,7 @@ import {
   slotEnv,
   storyFile,
   updateLease,
+  writeActFailures,
   writeEnvNorn,
   writeHandoffHeader,
   writeLog,
@@ -76,6 +80,7 @@ import { markNotified, type PendingRecord, readNotified, readPendingRecords, wri
 import type { Observed, StoryLoc, UnitLoc } from "./observe.ts";
 import { appendProgress, rejectProgress } from "./report.ts";
 import { runShell, tailLines } from "./shell.ts";
+import { ensureShim, withNornOnPath } from "./shim.ts";
 
 export interface ActRecord {
   decision: Decision;
@@ -86,6 +91,32 @@ export interface ActRecord {
 const NOTIFY_GROUPS: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock", "unclaimed"];
 
 class QueueFull extends Error {}
+/** S6: a receipt number another writer (an agent verb, a person) took since observe. */
+class ReceiptTaken extends Error {}
+
+/** R4.3: effects that reach an agent session; one succeeding clears a failed one of the unit. */
+const DELIVERY = new Set(["nudge", "answer", "resume", "launch"]);
+
+/** R4.3: the external effect an action performs, as named in an act failure. */
+function effectOf(a: Action): string {
+  switch (a.kind) {
+    case "nudge":
+      return a.launch ? "resume" : "nudge";
+    case "apply_receipts":
+      return a.launch ? "resume" : a.input ? "answer" : "apply";
+    case "start_run":
+    case "retry_fresh":
+      return "launch";
+    default:
+      return a.kind;
+  }
+}
+
+/** R1.2: a claim write lost to another heartbeat (CAS stale/rejected, held) — not a network failure. */
+function claimLost(r: ActionResult): boolean {
+  const reason = (r.detail as { reason?: string } | undefined)?.reason;
+  return reason === "stale" || reason === "rejected" || reason === "held" || reason === "corrupt";
+}
 
 export class Actor {
   private readonly notified: Set<string>;
@@ -94,12 +125,22 @@ export class Actor {
   private readonly written = new Map<string, UnitState>();
   private readonly claimed = new Map<string, { blob: ClaimBlob; sha: string }>();
   private readonly cleaned = new Set<string>();
+  /** R4.3: effects of the current action that failed after its state was written (push, typed delivery) */
+  private effectErrors: Array<{ effect: string; reason: string }> = [];
+  /** R4.3: effects of the current action that succeeded */
+  private effectsOk = new Set<string>();
+  /** R4.3: session a failed delivery targeted (for the inbox item; R6.3 reuses it) */
+  private failedSession: SessionRef | null = null;
+  /** R4.3: unit key → last failed effect (machine-local `failures.json`) */
+  private readonly failures: Record<string, ActFailure>;
+  private failuresChanged = false;
 
   constructor(
     readonly ctx: Context,
     readonly obs: Observed,
   ) {
     this.notified = readNotified(obs.root);
+    this.failures = readActFailures(obs.root);
   }
 
   get root() {
@@ -122,16 +163,63 @@ export class Actor {
 
   async run(decisions: Decision[]): Promise<ActRecord[]> {
     const out: ActRecord[] = [];
-    for (const d of decisions) {
+    // R1.2: a story's renewal runs before its other actions; once it loses the CAS, nothing else of
+    // that story is done this tick (R2.2: a checkout without the claim writes and pushes nothing)
+    const order = [...decisions.filter((d) => isSideAction(d.action)), ...decisions.filter((d) => !isSideAction(d.action))];
+    const lost = new Set<string>();
+    for (const d of order) {
+      const story = d.action.unit?.story;
       let result: ActionResult;
-      try {
-        result = await this.perform(d.action);
-      } catch (e) {
-        result = e instanceof QueueFull ? { ok: false, error: e.message, detail: { queued: true } } : { ok: false, error: (e as Error).message };
-      }
+      this.effectErrors = [];
+      this.effectsOk = new Set();
+      this.failedSession = null;
+      let counted = true;
+      if (story && lost.has(story)) {
+        result = { ok: false, error: "skipped: claim lost", detail: { skipped: true } };
+        counted = false;
+      } else
+        try {
+          result = await this.perform(d.action);
+          // R4.3: an action whose effect failed is never ok, even when its state was written
+          if (result.ok && this.effectErrors.length) result = { ...result, ok: false, error: this.effectErrors.map((f) => f.reason).join("; ") };
+        } catch (e) {
+          counted = !(e instanceof QueueFull);
+          result = e instanceof QueueFull ? { ok: false, error: e.message, detail: { queued: true } } : { ok: false, error: (e as Error).message };
+        }
+      if (story && isSideAction(d.action) && !result.ok && claimLost(result)) lost.add(story);
+      if (counted) this.recordFailure(d, result);
       out.push({ decision: d, result });
     }
-    return out;
+    if (this.failuresChanged) writeActFailures(this.root, this.failures);
+    // the trace keeps decide's order
+    return decisions.map((d) => out.find((r) => r.decision === d) as ActRecord);
+  }
+
+  /**
+   * R4.3: remember a unit's failed effect (inbox Unblock item, status), or forget it once an effect of
+   * the same family succeeds for the unit. Claim and repo-level actions are not unit failures.
+   */
+  private recordFailure(d: Decision, result: ActionResult): void {
+    const a = d.action;
+    if (!a.unit || a.kind === "claim" || a.kind === "noop") return;
+    const key = a.unit.key;
+    const prev = this.failures[key];
+    if (!result.ok) {
+      const loc = this.obs.units[key];
+      const st = this.written.get(key) ?? loc?.state;
+      const effect = this.effectErrors[0]?.effect ?? effectOf(a);
+      const failure: ActFailure = { effect, rule: d.rule, reason: result.error ?? "failed", at: this.nowIso(), tick_id: this.tick, step: st?.step ?? "?", attempt: st?.attempt ?? 1 };
+      if (this.failedSession) failure.session = { runner: this.failedSession.runner, session_id: this.failedSession.session_id, ...(this.failedSession.pane_id ? { pane_id: this.failedSession.pane_id } : {}) };
+      this.failures[key] = failure;
+      this.failuresChanged = true;
+      return;
+    }
+    if (!prev) return;
+    const delivered = DELIVERY.has(prev.effect) && [...this.effectsOk].some((e) => DELIVERY.has(e));
+    if (delivered || this.effectsOk.has(prev.effect)) {
+      delete this.failures[key];
+      this.failuresChanged = true;
+    }
   }
 
   async perform(a: Action): Promise<ActionResult> {
@@ -262,7 +350,7 @@ export class Actor {
   private writeReceipts(runsDir: string, receipts: NewReceipt[]): void {
     for (const r of receipts) {
       const res = writeReceiptAt(runsDir, r.n, r.receipt);
-      if (!res.ok) throw new Error(`receipt number ${r.n} is taken by ${relative(this.root, res.file)} (S6)`);
+      if (!res.ok) throw new ReceiptTaken(`receipt number ${r.n} is taken by ${relative(this.root, res.file)} (S6)`);
     }
   }
 
@@ -309,6 +397,9 @@ export class Actor {
     const sha = await this.git.commit(c.cwd, { message: c.message, trailers: c.trailers, ...(paths ? { paths } : {}) });
     if (!c.push || !this.obs.remote) return { sha, pushed: null };
     const r = await this.pushBranch(c.cwd, c.branch);
+    if (r.ok) this.effectsOk.add("push");
+    // R4.3: committed but not pushed is a failed effect (the record is not on the remote, S8)
+    else this.effectErrors.push({ effect: "push", reason: `push of ${c.branch} failed: ${r.message}` });
     return r.ok ? { sha, pushed: true } : { sha, pushed: false, push_error: r.message };
   }
 
@@ -349,6 +440,10 @@ export class Actor {
       const c = this.claimed.get(s.key);
       if (c) s.claim = { state: "mine", blob: c.blob, sha: c.sha };
       for (const u of s.units) {
+        // R4.3: failures recorded or cleared this tick
+        const failure = this.failures[u.unit.key];
+        if (failure) u.act_failure = failure;
+        else delete u.act_failure;
         const st = this.written.get(u.unit.key);
         if (!st) continue;
         u.state = st;
@@ -403,7 +498,9 @@ export class Actor {
         ...(launch.model ? { model: launch.model } : {}),
         ...(launch.resume ? { resume: launch.resume } : {}),
       });
-      const session = await runner.launch({ cwd: launch.cwd, argv: cmd.argv, env: { ...env, ...cmd.env }, title: launch.title, run_id: launch.run_id });
+      // R8.1 (A1): the agent's `norn` is this norn — shim first on PATH inside the command itself
+      const onPath = withNornOnPath(cmd.argv, ensureShim(this.ctx.home), this.ctx.env.PATH);
+      const session = await runner.launch({ cwd: launch.cwd, argv: onPath.argv, env: { ...env, ...cmd.env, ...onPath.env }, title: launch.title, run_id: launch.run_id });
       // K1/K3: the lease must outlive this tick. With an agent process it follows that process; without
       // one (pane runners) it carries the worktree and stays live while the run is running (leases.ts).
       if (session.process) updateLease(this.ctx.home, lease.entry.file, { ...lease.entry.lease, holder: session.process });
@@ -428,13 +525,20 @@ export class Actor {
       ...started,
       receipt_id: ulid(this.ctx.clock.now()),
       at: this.nowIso(),
-      session: { runner: session.runner, session_id: session.session_id, ...(session.pane_id ? { pane_id: session.pane_id } : {}) },
+      session: { runner: session.runner, session_id: session.session_id, ...(session.pane_id ? { pane_id: session.pane_id } : {}), ...this.reachOf(session) },
       ...(session.process ? { process: session.process } : {}),
     };
     const n = Math.max(...receipts.map((x) => x.n)) + 1;
     const res = writeReceiptAt(runsDir, n, r);
     if (!res.ok) throw new Error(`receipt number ${n} is taken (S6)`);
     return applyReceipts(decided, [{ n, file: "", receipt: r }], { workflow: wf, now: this.nowIso(), limits: this.config.limits, tick_id: this.tick }).state;
+  }
+
+  /** R6.3, R9.1: how a person reaches the session, recorded with it for the inbox */
+  private reachOf(session: SessionRef): { reach?: string } {
+    const runner = this.obs.ports.runner;
+    const reach = runner?.reach && runner.name === session.runner ? runner.reach(session) : undefined;
+    return reach ? { reach } : {};
   }
 
   private unitWorkflow(unit: UnitRef): Workflow | null {
@@ -454,8 +558,35 @@ export class Actor {
       // B2: resume the same agent session with the answer as the prompt (headless / session gone)
       ({ session: resumed } = await this.launchAfterReceipts(a.unit, loc.runsDir, a.receipts, a.launch));
       if (state) state = this.recordSession(a.unit, loc.runsDir, state, a.receipts, resumed);
-    } else this.writeReceipts(loc.runsDir, a.receipts);
+    } else
+      try {
+        this.writeReceipts(loc.runsDir, a.receipts);
+      } catch (e) {
+        // R6.1, B11: the tick resolving an implicit ask raced the agent's own report, whose `answer`
+        // (`by: "agent"`) took the number first. S6 keeps the first; the ask is closed either way, so
+        // this is not a failed action — nothing else is written, the next tick applies the report.
+        if (e instanceof ReceiptTaken && a.rule === "agent.ask.implicit.resolved") return { ok: true, detail: { superseded: e.message } };
+        throw e;
+      }
     for (const r of a.rejected) this.traceReject(a.unit.key, `receipt ${r.n}`, r.reason, { receipt_id: r.receipt_id });
+    let keyed = false;
+    const keys = a.input?.keys;
+    if (a.input && keys) {
+      // R6.2/R6.3: an answer to a pane prompt is typed as its keystrokes before state is written —
+      // a failed delivery leaves the unit parked on the ask (the next tick tries again)
+      const input = a.input;
+      try {
+        const runner = this.obs.ports.runner;
+        if (!runner || runner.name !== input.session.runner) throw new Error("the session's runner is not available here");
+        if (!runner.sendKeys) throw new Error(`runner ${runner.name} cannot type into a prompt`);
+        await runner.sendKeys(input.session, keys);
+      } catch (e) {
+        this.failedSession = input.session;
+        throw new Error(`answer to ${a.unit.key} not delivered: ${(e as Error).message}`);
+      }
+      this.effectsOk.add("answer");
+      keyed = true;
+    }
     if (state) this.writeUnitState(a.unit, loc.runsDir, state);
     const released =
       state && state.status !== "running"
@@ -465,16 +596,21 @@ export class Actor {
           : [];
     const summary = a.advance ? `${a.advance.from}.${a.advance.outcome} → ${a.advance.to}` : `applied ${a.applied.join(", ") || "none"}`;
     const committed = await this.commit(a.commit, a.unit, state, `${a.rule}: ${summary}`);
-    let delivered: boolean | string = resumed ? "resumed" : false;
-    if (a.input) {
+    let delivered: boolean | string = resumed ? "resumed" : keyed;
+    if (resumed) this.effectsOk.add("resume");
+    if (a.input && !keyed) {
       // B2: the answer goes into the same session after state is written
       try {
         const runner = this.obs.ports.runner;
         if (!runner || runner.name !== a.input.session.runner) throw new Error("session's runner is not available here");
         await runner.send(a.input.session, a.input.text, { submit: true });
         delivered = true;
+        this.effectsOk.add("answer");
       } catch (e) {
         delivered = `not delivered: ${(e as Error).message}`;
+        // R4.3 (A4): the state is written, but the answer never reached the agent — not ok
+        this.effectErrors.push({ effect: "answer", reason: `answer to ${a.unit.key} not delivered: ${(e as Error).message}` });
+        this.failedSession = a.input.session;
       }
     }
     return { ok: true, detail: { ...committed, released, delivered, ...(a.kill ? { killed } : {}), ...(resumed ? { session: resumed } : {}) } };
@@ -580,9 +716,11 @@ export class Actor {
   private async startRun(a: Extract<Action, { kind: "start_run" }>): Promise<ActionResult> {
     const loc = this.unitLoc(a.unit);
     const { session, lease } = await this.launchAfterReceipts(a.unit, loc.runsDir, a.receipts, a.launch);
+    this.effectsOk.add("launch");
     const state = a.state ? this.recordSession(a.unit, loc.runsDir, a.state, a.receipts, session) : null;
     if (state) this.writeUnitState(a.unit, loc.runsDir, state);
-    const committed = await this.commit(a.commit, a.unit, state, `${a.rule}: ${a.step} run ${a.launch.run_id}`);
+    // R2.1 (N6): commit and push the started receipts now — only runs/, never the agent's fresh work
+    const committed = await this.commit(a.commit, a.unit, state, `${a.rule}: ${a.step} run ${a.launch.run_id}`, a.commit ? [relative(a.commit.cwd, loc.runsDir)] : undefined);
     return { ok: true, detail: { session, lease, ...committed } };
   }
 
@@ -600,16 +738,49 @@ export class Actor {
     return this.launch(unit, launch);
   }
 
+  /**
+   * R4.2: deliver a counted nudge — typed into the live session (`input`), or by resuming the agent
+   * session with the nudge text (`launch`) after terminating the old process. R4.3: a failed delivery
+   * throws (ok: false; the classify receipt stays and is applied next tick, the nudge counted) and is
+   * kept as the unit's act failure for the inbox.
+   */
   private async nudge(a: Extract<Action, { kind: "nudge" }>): Promise<ActionResult> {
     const loc = this.unitLoc(a.unit);
-    this.writeReceipts(loc.runsDir, a.receipts);
-    const snapshot = await this.snapshot(a.unit, a.input.run_id, a.snapshot);
-    const runner = this.obs.ports.runner;
-    if (!runner || runner.name !== a.input.session.runner) throw new Error("the run's runner is not available on this machine");
-    await runner.send(a.input.session, a.input.text, { submit: true });
-    if (a.state) this.writeUnitState(a.unit, loc.runsDir, a.state);
-    const committed = await this.commit(a.commit, a.unit, a.state, `${a.rule}: nudged ${a.state?.nudges_used ?? "?"}`);
-    return { ok: true, detail: committed, ...(snapshot ? { transcript: snapshot } : {}) };
+    const runId = a.input?.run_id ?? a.launch?.run_id ?? "unknown";
+    let resumed: SessionRef | null = null;
+    if (a.launch) {
+      const launch = a.launch;
+      const kill = a.kill;
+      try {
+        ({ session: resumed } = await this.launchAfterReceipts(a.unit, loc.runsDir, a.receipts, launch, async () => {
+          await this.kill(kill);
+          // the old process held the run's agent lease; the resumed one takes it over (K1)
+          await this.releaseRunLeases(a.unit, ["agent"], launch.run_id);
+        }));
+      } catch (e) {
+        if (e instanceof QueueFull) throw e;
+        this.failedSession = kill;
+        throw new Error(`nudge to ${a.unit.key} not delivered: resume failed: ${(e as Error).message}`);
+      }
+      this.effectsOk.add("resume");
+    } else this.writeReceipts(loc.runsDir, a.receipts);
+    const snapshot = await this.snapshot(a.unit, runId, a.snapshot);
+    if (a.input) {
+      const runner = this.obs.ports.runner;
+      try {
+        if (!runner || runner.name !== a.input.session.runner) throw new Error("the run's runner is not available on this machine");
+        await runner.send(a.input.session, a.input.text, { submit: true });
+      } catch (e) {
+        this.failedSession = a.input.session;
+        throw new Error(`nudge to ${a.unit.key} not delivered: ${(e as Error).message}`);
+      }
+      this.effectsOk.add("nudge");
+    }
+    let state = a.state;
+    if (state && resumed) state = this.recordSession(a.unit, loc.runsDir, state, a.receipts, resumed);
+    if (state) this.writeUnitState(a.unit, loc.runsDir, state);
+    const committed = await this.commit(a.commit, a.unit, state, `${a.rule}: nudged ${state?.nudges_used ?? "?"}${resumed ? " (resumed)" : ""}`);
+    return { ok: true, detail: { ...committed, ...(resumed ? { session: resumed } : {}) }, ...(snapshot ? { transcript: snapshot } : {}) };
   }
 
   private async retryFresh(a: Extract<Action, { kind: "retry_fresh" }>): Promise<ActionResult> {
@@ -620,6 +791,7 @@ export class Actor {
     if (a.launch) {
       // receipts, kill the old session, then the fresh one (B2, C1)
       ({ session } = await this.launchAfterReceipts(a.unit, loc.runsDir, a.receipts, a.launch, () => this.kill(a.kill)));
+      this.effectsOk.add("launch");
       if (state) state = this.recordSession(a.unit, loc.runsDir, state, a.receipts, session);
     } else {
       this.writeReceipts(loc.runsDir, a.receipts);
@@ -833,7 +1005,44 @@ export class Actor {
     if (!a.blob) throw new Error("claim without blob");
     const r = a.op === "acquire" ? await acquireClaim(this.root, remote, a.blob, { now: this.obs.facts.now }) : await renewClaim(this.root, remote, a.blob, a.expected ?? "");
     if (r.ok) this.claimed.set(story, { blob: a.blob, sha: r.sha });
-    return r.ok ? { ok: true, detail: { sha: r.sha } } : { ok: false, error: r.message, detail: { reason: r.reason } };
+    if (r.ok) return { ok: true, detail: { sha: r.sha } };
+    const detail: Record<string, unknown> = { reason: r.reason };
+    // R3.1 (H6): the intake race is lost — undo what the intake made here, unless it holds work
+    if (a.rule === "claim.acquire.intake" && claimLost({ ok: false, detail })) detail.intake = await this.dropLostIntake(story).catch((e: Error) => ({ kept: `clean-up failed: ${e.message}` }));
+    return { ok: false, error: r.message, detail };
+  }
+
+  /**
+   * R3.1: after losing `claim.acquire.intake`, remove the story worktree, its local branch (and the spec
+   * folder in it) and its slot when the branch holds nothing beyond the intake commit and the worktree
+   * is clean. Otherwise keep everything; observe then reports the local work (R2.3).
+   */
+  private async dropLostIntake(story: string): Promise<{ removed: string[] } | { kept: string }> {
+    const loc = this.obs.stories[story];
+    if (!loc) return { kept: "story not checked out here" };
+    const base = this.obs.remote ? `refs/remotes/${this.obs.remote}/${this.obs.facts.repo.default_branch}` : `refs/heads/${this.obs.facts.repo.default_branch}`;
+    const log = await rawGit(this.root, ["log", "--format=%s", `refs/heads/${loc.branch}`, `^${base}`, "--"]);
+    if (log.code !== 0) return { kept: `cannot list ${loc.branch}: ${log.stderr.trim()}` };
+    const subjects = log.stdout.split("\n").filter(Boolean);
+    if (subjects.length > 1 || (subjects[0] !== undefined && !subjects[0].startsWith(`norn: intake ${story} `)))
+      return { kept: `${loc.branch} has ${subjects.length} commit(s) beyond the intake` };
+    const wt = loc.worktree;
+    if (wt && existsSync(wt)) {
+      const st = await this.git.status(wt).catch(() => null);
+      if (!st?.clean) return { kept: `${wt} has uncommitted changes` };
+    }
+    const removed: string[] = [];
+    if (wt && existsSync(wt)) {
+      await this.git.worktreeRemove(this.root, wt, { force: true });
+      removed.push(wt);
+    }
+    if (await this.git.branchExists(this.root, loc.branch)) {
+      await this.git.deleteBranch(this.root, loc.branch, { force: true });
+      removed.push(loc.branch);
+    }
+    const listing = await listLeases(this.ctx.home, () => true);
+    for (const e of listing.live) if (e.lease.repo === this.root && e.lease.story === story && releaseLease(this.ctx.home, e.file)) removed.push(e.file);
+    return { removed };
   }
 
   // ------------------------------------------------------------ remote lifecycle (GR2, GR6, GR8)

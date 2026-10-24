@@ -191,14 +191,21 @@ describe("claude skills (SK1)", () => {
 describe("claude launchCommand (B2, B5)", () => {
   const base = { cwd: "/w", prompt: "Use the norn skill, then run `norn brief`.", env: { NORN_RUN: "r" }, config: {} };
   test("interactive, headless, resume, config overrides", () => {
-    expect(claudeAgent.launchCommand(base)).toEqual({ argv: ["claude", base.prompt], env: { NORN_RUN: "r" } });
-    expect(claudeAgent.launchCommand({ ...base, headless: true, model: "opus" }).argv).toEqual(["claude", "-p", "--model", "opus", base.prompt]);
+    expect(claudeAgent.launchCommand(base)).toEqual({ argv: ["claude", "--", base.prompt], env: { NORN_RUN: "r" } });
+    expect(claudeAgent.launchCommand({ ...base, headless: true, model: "opus" }).argv).toEqual(["claude", "-p", "--model", "opus", "--", base.prompt]);
     expect(
       claudeAgent.launchCommand({ ...base, resume: "abc123", config: { command: "/bin/claude", args: ["--permission-mode", "acceptEdits"], env: { A: "1", NORN_RUN: "x" } } }),
     ).toEqual({
-      argv: ["/bin/claude", "--resume", "abc123", "--permission-mode", "acceptEdits", base.prompt],
+      argv: ["/bin/claude", "--resume", "abc123", "--permission-mode", "acceptEdits", "--", base.prompt],
       env: { A: "1", NORN_RUN: "r" },
     });
+  });
+  test("a variadic flag in the configured args cannot swallow the prompt (B3)", () => {
+    // the dogfood config: `claude -p` read the prompt as one more allowed tool and exited at once
+    const args = ["--permission-mode", "acceptEdits", "--allowedTools", "Bash(norn:*)", "Bash(git:*)"];
+    const argv = claudeAgent.launchCommand({ ...base, headless: true, config: { args } }).argv;
+    expect(argv).toEqual(["claude", "-p", ...args, "--", base.prompt]);
+    expect(argv.indexOf("--")).toBe(argv.length - 2);
   });
 });
 

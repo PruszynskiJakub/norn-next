@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import type { ProcessPort, SessionRef } from "@norn/core";
 import type { ProcessIdentity } from "@norn/schema";
-import { createHerdrRunner, herdrFactory, openStatusPane } from "../../src/herdr/index.ts";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { createHerdrRunner, herdrFactory, openStatusPane, parsePanePrompt } from "../../src/herdr/index.ts";
 import type { Exec, ExecResult } from "../../src/process/exec.ts";
 import fx from "./fixtures/herdr.json";
 
@@ -80,11 +82,31 @@ describe("herdr runner", () => {
       ["--session norn workspace list", ok(fx.workspace_list_empty)],
       ["--session norn workspace create", ok(fx.workspace_create)],
       ["--session norn pane run", empty],
-      ["--session norn pane process-info", ok(fx.process_info_idle)],
+      ["--session norn pane process-info", () => ok(calls.filter((c) => c.includes("process-info")).length === 1 ? fx.process_info_idle : fx.process_info_busy)],
     ]);
     const ref = await createHerdrRunner({ exec, session: "norn", process: fakeProcess(), sleep: noSleep, startWaitMs: 500 }).launch(spec);
     expect(calls[1]!.slice(0, 5)).toEqual(["herdr", "--session", "norn", "workspace", "create"]);
-    expect(ref).toEqual({ runner: "herdr", session_id: "w1:p1", pane_id: "w1:p1" }); // agent never took the foreground
+    expect(ref).toMatchObject({ runner: "herdr", session_id: "w1:p1", pane_id: "w1:p1", process: { pid: 59610 } });
+  });
+
+  test("a command that never takes the pane's foreground is a failed launch: screen in the reason, pane closed (R4.3, B2)", async () => {
+    // B2: a launch line longer than the tty's MAX_CANON, typed while the pane's zsh still read its
+    // rc files, is cut off and never runs — the shell stays in the foreground (screen derived from
+    // the dogfood rerun's pane w15, paths scrubbed)
+    const screen = readFileSync(join(import.meta.dir, "fixtures", "pane-launch-truncated.txt"), "utf8");
+    const { exec, calls } = fakeExec([
+      ["workspace list", ok(fx.workspace_list_empty)],
+      ["workspace create", ok(fx.workspace_create)],
+      ["pane run", empty],
+      ["pane process-info", ok(fx.process_info_idle)],
+      ["pane read", ok(screen)],
+      ["pane close", ok(fx.pane_close)],
+    ]);
+    const err = await createHerdrRunner({ exec, process: fakeProcess(), sleep: noSleep, startWaitMs: 500 }).launch(spec).catch((e) => e);
+    expect(err).toMatchObject({ code: "launch_failed" });
+    expect(err.message).toContain("never started in herdr pane w1:p1");
+    expect(err.message).toContain("quote>");
+    expect(calls.at(-1)).toEqual(["herdr", "pane", "close", "w1:p1"]);
   });
 
   test("send with submit uses `agent prompt`; falls back to raw text + enter when no agent is recognized", async () => {
@@ -103,6 +125,26 @@ describe("herdr runner", () => {
     const c = fakeExec([["pane send-text", empty]]);
     await createHerdrRunner({ exec: c.exec }).send(session, "partial");
     expect(c.calls).toEqual([["herdr", "pane", "send-text", "w1:p1", "partial"]]);
+  });
+
+  test("capabilities: send and resume (R4.1)", () => {
+    expect(createHerdrRunner({ exec: fakeExec([]).exec }).capabilities).toEqual({ send: true, resume: true });
+  });
+
+  test("findSessions: agent panes whose cwd is the worktree, with pid and agent session (R5.1)", async () => {
+    const { exec, calls } = fakeExec([
+      ["pane list", ok(fx.pane_list)],
+      ["pane process-info", ok(fx.process_info_busy)],
+    ]);
+    const found = await createHerdrRunner({ exec, process: fakeProcess() }).findSessions?.({ run_id: "01JRUN", cwd: WT });
+    expect(calls.map((c) => c.slice(1, 3).join(" "))).toEqual(["pane list", "pane process-info"]);
+    // the shell-only pane (no agent) in the same worktree and the pane elsewhere are not candidates
+    expect(found).toEqual([
+      {
+        session: { runner: "herdr", session_id: "wA:p1", pane_id: "wA:p1", process: { pid: 59610, pid_start: "Fri Oct 23 16:19:26 2026" } },
+        agent_session_id: "f90b97b5-4c27-4470-be49-002210dd3279",
+      },
+    ]);
   });
 
   test("send never types into a blocked dialog: typed session_blocked error", async () => {
@@ -133,6 +175,41 @@ describe("herdr runner", () => {
 
     const gone = fakeExec([["pane get", fail(fx.error_pane_not_found)]]);
     expect(await createHerdrRunner({ exec: gone.exec }).paneState(session)).toEqual({ alive: false, state: "unknown", since: null });
+  });
+
+  test("paneState parses the prompt off a recorded permission dialog (R6.2, L1)", async () => {
+    const session: SessionRef = { runner: "herdr", session_id: "w1:p1", pane_id: "w1:p1" };
+    const screen = pane("pane-permission-prompt.txt");
+    const blocked = fakeExec([
+      ["pane get", ok(fx.pane_get_blocked)],
+      ["pane process-info", ok(fx.process_info_busy)],
+      ["pane read", ok(screen)],
+    ]);
+    const st = await createHerdrRunner({ exec: blocked.exec }).paneState(session);
+    expect(st.detail).toBe(screen.trim());
+    expect(st.prompt).toEqual({
+      question: "Contains brace with quote character (expansion obfuscation) Do you want to proceed?",
+      options: ["Yes", "Yes, and switch to auto mode · auto mode handles these prompts for you", "No"],
+      choice: { numbered: true, cursor: 0 },
+    });
+    expect(blocked.calls.at(-1)).toEqual(["herdr", "pane", "read", "w1:p1", "--source", "visible", "--lines", "30"]);
+  });
+
+  test("sendKeys types text and presses named keys in the pane; reach is the attach command (R6.2, R6.3)", async () => {
+    const session: SessionRef = { runner: "herdr", session_id: "w1:p1", pane_id: "w1:p1" };
+    const { exec, calls } = fakeExec([
+      ["--session norn pane send-text", empty],
+      ["--session norn pane send-keys", empty],
+    ]);
+    const runner = createHerdrRunner({ exec, session: "norn" });
+    await runner.sendKeys?.(session, [{ text: "2" }, { key: "enter" }]);
+    await runner.sendKeys?.(session, [{ key: "down" }, { key: "enter" }]);
+    expect(calls).toEqual([
+      ["herdr", "--session", "norn", "pane", "send-text", "w1:p1", "2"],
+      ["herdr", "--session", "norn", "pane", "send-keys", "w1:p1", "enter"],
+      ["herdr", "--session", "norn", "pane", "send-keys", "w1:p1", "down", "enter"],
+    ]);
+    expect(runner.reach?.(session)).toBe("herdr --session norn agent attach w1:p1");
   });
 
   test("isAlive: pid + start time when recorded, else foreground process ≠ shell", async () => {
@@ -186,5 +263,42 @@ describe("herdr openStatusPane (O1)", () => {
   test("a split without a pane id is a launch failure", async () => {
     const { exec } = fakeExec([["pane split", ok({ result: {} })]]);
     expect(await openStatusPane("/repo", { exec, env: {} }).catch((e) => e)).toMatchObject({ code: "launch_failed" });
+  });
+});
+
+const pane = (name: string) => readFileSync(join(import.meta.dir, "fixtures", name), "utf8");
+
+describe("parsePanePrompt (recorded Claude Code dialogs in herdr panes, A4, A7)", () => {
+  test("trust dialog: unnumbered menu, answered by arrows from the cursor", () => {
+    expect(parsePanePrompt(pane("pane-trust-dialog.txt"))).toEqual({
+      question:
+        "Accessing workspace: /Users/u/Projects/norn-sandbox-todoist-b-worktrees/gh-9-keyboard-shortcut-q-focuses-quick-add Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source project, or work from your team). If not, take a moment to review what's in this folder first. Claude Code'll be able to read, edit, and execute files here. Security guide",
+      options: ["No, exit", "Yes, I trust this folder"],
+      choice: { numbered: false, cursor: 0 },
+    });
+  });
+
+  test("permission prompt: numbered options, the question block without the command box", () => {
+    const p = parsePanePrompt(pane("pane-permission-dont-ask.txt"));
+    expect(p?.question).toBe("This command requires approval Do you want to proceed?");
+    expect(p?.options).toEqual([
+      "Yes",
+      "Yes, and don’t ask again for: python3 - .agents/specs/gh-9-keyboard-shortcut-q-focuses-quick-add/runs/_story/handoff.md",
+      "Yes, and switch to auto mode · auto mode handles these prompts for you",
+      "No",
+    ]);
+    expect(p?.choice).toEqual({ numbered: true, cursor: 0 });
+    // the command box's top is cut off the screen: no first command line is guessed
+    expect(p?.command).toBeUndefined();
+  });
+
+  test("the pending command is the first line of a box whose top is on screen", () => {
+    const screen = ["", " Bash command", "", " │ rm -rf build", " │ bun test", "╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌", " Do you want to proceed?", " ❯ 1. Yes", "   2. No", "", " Esc to cancel"].join("\n");
+    expect(parsePanePrompt(screen)).toEqual({ question: "Do you want to proceed?", command: "rm -rf build", options: ["Yes", "No"], choice: { numbered: true, cursor: 0 } });
+  });
+
+  test("no dialog (no footer or no cursor) → null", () => {
+    expect(parsePanePrompt(fx.pane_read_visible)).toBeNull();
+    expect(parsePanePrompt("working…\n  1. a list item\n Esc to cancel")).toBeNull();
   });
 });
