@@ -80,6 +80,7 @@ import { markNotified, type PendingRecord, readNotified, readPendingRecords, wri
 import type { Observed, StoryLoc, UnitLoc } from "./observe.ts";
 import { appendProgress, rejectProgress } from "./report.ts";
 import { runShell, tailLines } from "./shell.ts";
+import { ensureShim, withNornOnPath } from "./shim.ts";
 
 export interface ActRecord {
   decision: Decision;
@@ -495,7 +496,9 @@ export class Actor {
         ...(launch.model ? { model: launch.model } : {}),
         ...(launch.resume ? { resume: launch.resume } : {}),
       });
-      const session = await runner.launch({ cwd: launch.cwd, argv: cmd.argv, env: { ...env, ...cmd.env }, title: launch.title, run_id: launch.run_id });
+      // R8.1 (A1): the agent's `norn` is this norn — shim first on PATH inside the command itself
+      const onPath = withNornOnPath(cmd.argv, ensureShim(this.ctx.home), this.ctx.env.PATH);
+      const session = await runner.launch({ cwd: launch.cwd, argv: onPath.argv, env: { ...env, ...cmd.env, ...onPath.env }, title: launch.title, run_id: launch.run_id });
       // K1/K3: the lease must outlive this tick. With an agent process it follows that process; without
       // one (pane runners) it carries the worktree and stays live while the run is running (leases.ts).
       if (session.process) updateLease(this.ctx.home, lease.entry.file, { ...lease.entry.lease, holder: session.process });
@@ -520,13 +523,20 @@ export class Actor {
       ...started,
       receipt_id: ulid(this.ctx.clock.now()),
       at: this.nowIso(),
-      session: { runner: session.runner, session_id: session.session_id, ...(session.pane_id ? { pane_id: session.pane_id } : {}) },
+      session: { runner: session.runner, session_id: session.session_id, ...(session.pane_id ? { pane_id: session.pane_id } : {}), ...this.reachOf(session) },
       ...(session.process ? { process: session.process } : {}),
     };
     const n = Math.max(...receipts.map((x) => x.n)) + 1;
     const res = writeReceiptAt(runsDir, n, r);
     if (!res.ok) throw new Error(`receipt number ${n} is taken (S6)`);
     return applyReceipts(decided, [{ n, file: "", receipt: r }], { workflow: wf, now: this.nowIso(), limits: this.config.limits, tick_id: this.tick }).state;
+  }
+
+  /** R6.3, R9.1: how a person reaches the session, recorded with it for the inbox */
+  private reachOf(session: SessionRef): { reach?: string } {
+    const runner = this.obs.ports.runner;
+    const reach = runner?.reach && runner.name === session.runner ? runner.reach(session) : undefined;
+    return reach ? { reach } : {};
   }
 
   private unitWorkflow(unit: UnitRef): Workflow | null {
@@ -548,6 +558,24 @@ export class Actor {
       if (state) state = this.recordSession(a.unit, loc.runsDir, state, a.receipts, resumed);
     } else this.writeReceipts(loc.runsDir, a.receipts);
     for (const r of a.rejected) this.traceReject(a.unit.key, `receipt ${r.n}`, r.reason, { receipt_id: r.receipt_id });
+    let keyed = false;
+    const keys = a.input?.keys;
+    if (a.input && keys) {
+      // R6.2/R6.3: an answer to a pane prompt is typed as its keystrokes before state is written —
+      // a failed delivery leaves the unit parked on the ask (the next tick tries again)
+      const input = a.input;
+      try {
+        const runner = this.obs.ports.runner;
+        if (!runner || runner.name !== input.session.runner) throw new Error("the session's runner is not available here");
+        if (!runner.sendKeys) throw new Error(`runner ${runner.name} cannot type into a prompt`);
+        await runner.sendKeys(input.session, keys);
+      } catch (e) {
+        this.failedSession = input.session;
+        throw new Error(`answer to ${a.unit.key} not delivered: ${(e as Error).message}`);
+      }
+      this.effectsOk.add("answer");
+      keyed = true;
+    }
     if (state) this.writeUnitState(a.unit, loc.runsDir, state);
     const released =
       state && state.status !== "running"
@@ -557,9 +585,9 @@ export class Actor {
           : [];
     const summary = a.advance ? `${a.advance.from}.${a.advance.outcome} → ${a.advance.to}` : `applied ${a.applied.join(", ") || "none"}`;
     const committed = await this.commit(a.commit, a.unit, state, `${a.rule}: ${summary}`);
-    let delivered: boolean | string = resumed ? "resumed" : false;
+    let delivered: boolean | string = resumed ? "resumed" : keyed;
     if (resumed) this.effectsOk.add("resume");
-    if (a.input) {
+    if (a.input && !keyed) {
       // B2: the answer goes into the same session after state is written
       try {
         const runner = this.obs.ports.runner;

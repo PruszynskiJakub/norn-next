@@ -32,10 +32,10 @@ function fsyncDir(dir: string): void {
   }
 }
 
-function writeTemp(path: string, data: string | Uint8Array): string {
+function writeTemp(path: string, data: string | Uint8Array, mode = 0o644): string {
   mkdirSync(dirname(path), { recursive: true });
   const tmp = tmpName(path);
-  const fd = openSync(tmp, "wx", 0o644);
+  const fd = openSync(tmp, "wx", mode);
   try {
     const buf = typeof data === "string" ? Buffer.from(data, "utf8") : data;
     let off = 0;
@@ -47,9 +47,9 @@ function writeTemp(path: string, data: string | Uint8Array): string {
   return tmp;
 }
 
-/** Atomically replace `path` with `data` (S1). Creates parent dirs. */
-export function atomicWrite(path: string, data: string | Uint8Array): void {
-  const tmp = writeTemp(path, data);
+/** Atomically replace `path` with `data` (S1). Creates parent dirs; `mode` for executables (R8.1 shim). */
+export function atomicWrite(path: string, data: string | Uint8Array, mode?: number): void {
+  const tmp = writeTemp(path, data, mode);
   try {
     renameSync(tmp, path);
   } catch (e) {

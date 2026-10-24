@@ -13,6 +13,7 @@ import { nextCommand, startAgentCommand } from "./commands.ts";
 import type { Facts, StoryFacts, UnitFacts } from "./facts.ts";
 import type { InboxGroup, InboxItem } from "./ports.ts";
 import { sha256 } from "./hash.ts";
+import { optionsLine } from "./prompt.ts";
 import { epoch, formatAge, iso } from "./time.ts";
 import { stepOf } from "./workflow.ts";
 
@@ -113,6 +114,8 @@ export function actFailureItem(story: StoryFacts, uf: UnitFacts): InboxItem | nu
   const f = uf.act_failure;
   const st = uf.state;
   if (!f || !st || st.status === "done" || st.status === "corrupt" || f.step !== st.step || f.attempt !== st.attempt) return null;
+  // R6.3: an answer that did not reach its prompt is told on the Answer item itself (answerItem)
+  if (f.effect === "answer" && st.status === "parked" && st.park?.kind === "ask") return null;
   const delivery = f.effect !== "push";
   if (delivery && (uf.run?.last_activity_at ?? 0) > epoch(f.at)) return null;
   const key = uf.unit.key;
@@ -128,6 +131,40 @@ export function actFailureItem(story: StoryFacts, uf: UnitFacts): InboxItem | nu
     since: f.at,
     ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
   };
+}
+
+/**
+ * O1 Answer item. L1 (A7): an implicit ask shows the question block and the first command line,
+ * with the options; the full screen only in `full` (`inbox --details`, `why`). R6.3: when the
+ * typed answer did not reach the pane, the command is how to reach the pane instead.
+ */
+function answerItem(uf: UnitFacts, st: UnitState, park: NonNullable<UnitState["park"]>, item: (group: InboxGroup, title: string, command: string, since: string, extra?: Partial<InboxItem>) => InboxItem): InboxItem {
+  const key = uf.unit.key;
+  const details: string[] = [];
+  const f = uf.act_failure;
+  const failed = f?.effect === "answer" && f.step === st.step && f.attempt === st.attempt && epoch(f.at) >= epoch(park.since) ? f : null;
+  if (failed) details.push(`not delivered: ${failed.reason}`);
+  const cmd = park.command?.split("\n").map((l) => l.trim()).find((l) => l !== "");
+  if (cmd) details.push(`pending command: ${cmd}`);
+  if (park.options?.length) details.push(`options: ${optionsLine(park.options)} — answer with the number`);
+  const reach = failed ? (st.run?.session?.reach ?? null) : null;
+  if (failed && !reach && failed.session) details.push(`reach the agent in ${failed.session.runner} session ${failed.session.pane_id ?? failed.session.session_id}`);
+  return item("answer", park.reason, reach ?? (nextCommand(key, st) as string), park.since, {
+    ...(park.receipt_id ? { id: park.receipt_id } : {}),
+    ...(details.length ? { detail: details.join(" · ") } : {}),
+    ...(park.screen ? { full: park.screen } : {}),
+  });
+}
+
+/** R9.1: the run's session started, the prompt was re-sent, and still no turn 60 s later. */
+function launchPromptMissed(uf: UnitFacts, st: UnitState): { since: string; pane: string | null } | null {
+  const run = st.run;
+  const rf = uf.run;
+  if (!run?.prompt_resent_at || !rf || rf.run_id !== run.run_id) return null;
+  const i = rf.hooks.findLastIndex((h) => h.event === "session_start");
+  if (i < 0 || rf.hooks.slice(i + 1).some((h) => h.event !== "session_start")) return null;
+  if (st.last_outcome?.outcome !== "silent" || epoch(st.last_outcome.at) < epoch(run.prompt_resent_at)) return null;
+  return { since: run.prompt_resent_at, pane: run.session?.pane_id ?? run.session?.session_id ?? null };
 }
 
 /** The command a person runs to start the unit's step agent in its worktree. */
@@ -214,11 +251,7 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
   const park = st.park;
   switch (st.status) {
     case "parked":
-      if (park?.kind === "ask")
-        return item("answer", park.reason, nextCommand(key, st) as string, park.since, {
-          ...(park.receipt_id ? { id: park.receipt_id } : {}),
-          ...(park.command ? { detail: `pending command: ${park.command}` } : {}),
-        });
+      if (park?.kind === "ask") return answerItem(uf, st, park, item);
       if (park?.kind === "gate") {
         const judged = judgedDetail(story, uf);
         const reject = `or reject: norn approve ${key} --reject --reason "…"`;
@@ -229,6 +262,9 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
     case "stuck":
       return item("unblock", park?.reason ?? "stuck", `norn unstick ${key}`, park?.since ?? st.updated_at, park?.receipt_id ? { id: park.receipt_id } : {});
     case "running": {
+      // R9.1: the agent never took its launch prompt — a person looks at the pane
+      const unsent = launchPromptMissed(uf, st);
+      if (unsent) return item("unblock", `launch prompt not received by ${key} ${st.step}${unsent.pane ? ` — look at pane ${unsent.pane}` : ""}`, st.run?.session?.reach ?? `norn trace ${key}`, unsent.since, { id: `launch:${key}:${st.run?.run_id ?? st.step}`, detail: "the agent session started but never began a turn; the prompt was re-sent once (R9.1)" });
       const nudge = undeliveredNudge(story, uf, facts);
       if (nudge && !heartbeatDown(facts, config)) return item("your_turn", "agent ended its turn without reporting — reopen the agent and run norn brief", startCommandFor(uf, story, config), nudge.at, { id: `${nudge.outcome}:${key}:${st.step}#${st.attempt}:${st.nudges_used}` });
     }

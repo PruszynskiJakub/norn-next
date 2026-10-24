@@ -65,8 +65,14 @@ function reasonOf(r: Receipt): string | null {
       return r.comment?.trim() || null;
     case "answer":
       return r.answer;
-    case "ask":
-      return r.question;
+    case "ask": {
+      // L1 (A7): the full pane screen of an implicit ask is shown here, not in inbox titles
+      const parts = [r.question];
+      if (r.command) parts.push(`pending command: ${r.command}`);
+      if (r.options?.length) parts.push(`options: ${r.options.map((o, i) => `${i + 1}. ${o}`).join(" · ")}`);
+      if (r.screen) parts.push(`screen:\n${r.screen}`);
+      return parts.join("\n");
+    }
     case "stuck":
       return r.reason;
     case "unstick":

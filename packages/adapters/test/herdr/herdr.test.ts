@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import type { ProcessPort, SessionRef } from "@norn/core";
 import type { ProcessIdentity } from "@norn/schema";
-import { createHerdrRunner, herdrFactory, openStatusPane } from "../../src/herdr/index.ts";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { createHerdrRunner, herdrFactory, openStatusPane, parsePanePrompt } from "../../src/herdr/index.ts";
 import type { Exec, ExecResult } from "../../src/process/exec.ts";
 import fx from "./fixtures/herdr.json";
 
@@ -155,6 +157,41 @@ describe("herdr runner", () => {
     expect(await createHerdrRunner({ exec: gone.exec }).paneState(session)).toEqual({ alive: false, state: "unknown", since: null });
   });
 
+  test("paneState parses the prompt off a recorded permission dialog (R6.2, L1)", async () => {
+    const session: SessionRef = { runner: "herdr", session_id: "w1:p1", pane_id: "w1:p1" };
+    const screen = pane("pane-permission-prompt.txt");
+    const blocked = fakeExec([
+      ["pane get", ok(fx.pane_get_blocked)],
+      ["pane process-info", ok(fx.process_info_busy)],
+      ["pane read", ok(screen)],
+    ]);
+    const st = await createHerdrRunner({ exec: blocked.exec }).paneState(session);
+    expect(st.detail).toBe(screen.trim());
+    expect(st.prompt).toEqual({
+      question: "Contains brace with quote character (expansion obfuscation) Do you want to proceed?",
+      options: ["Yes", "Yes, and switch to auto mode · auto mode handles these prompts for you", "No"],
+      choice: { numbered: true, cursor: 0 },
+    });
+    expect(blocked.calls.at(-1)).toEqual(["herdr", "pane", "read", "w1:p1", "--source", "visible", "--lines", "30"]);
+  });
+
+  test("sendKeys types text and presses named keys in the pane; reach is the attach command (R6.2, R6.3)", async () => {
+    const session: SessionRef = { runner: "herdr", session_id: "w1:p1", pane_id: "w1:p1" };
+    const { exec, calls } = fakeExec([
+      ["--session norn pane send-text", empty],
+      ["--session norn pane send-keys", empty],
+    ]);
+    const runner = createHerdrRunner({ exec, session: "norn" });
+    await runner.sendKeys?.(session, [{ text: "2" }, { key: "enter" }]);
+    await runner.sendKeys?.(session, [{ key: "down" }, { key: "enter" }]);
+    expect(calls).toEqual([
+      ["herdr", "--session", "norn", "pane", "send-text", "w1:p1", "2"],
+      ["herdr", "--session", "norn", "pane", "send-keys", "w1:p1", "enter"],
+      ["herdr", "--session", "norn", "pane", "send-keys", "w1:p1", "down", "enter"],
+    ]);
+    expect(runner.reach?.(session)).toBe("herdr --session norn agent attach w1:p1");
+  });
+
   test("isAlive: pid + start time when recorded, else foreground process ≠ shell", async () => {
     const session: SessionRef = { runner: "herdr", session_id: "w1:p1", pane_id: "w1:p1" };
     expect(await createHerdrRunner({ exec: fakeExec([["pane process-info", ok(fx.process_info_busy)]]).exec }).isAlive(session)).toBe(true);
@@ -206,5 +243,42 @@ describe("herdr openStatusPane (O1)", () => {
   test("a split without a pane id is a launch failure", async () => {
     const { exec } = fakeExec([["pane split", ok({ result: {} })]]);
     expect(await openStatusPane("/repo", { exec, env: {} }).catch((e) => e)).toMatchObject({ code: "launch_failed" });
+  });
+});
+
+const pane = (name: string) => readFileSync(join(import.meta.dir, "fixtures", name), "utf8");
+
+describe("parsePanePrompt (recorded Claude Code dialogs in herdr panes, A4, A7)", () => {
+  test("trust dialog: unnumbered menu, answered by arrows from the cursor", () => {
+    expect(parsePanePrompt(pane("pane-trust-dialog.txt"))).toEqual({
+      question:
+        "Accessing workspace: /Users/u/Projects/norn-sandbox-todoist-b-worktrees/gh-9-keyboard-shortcut-q-focuses-quick-add Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source project, or work from your team). If not, take a moment to review what's in this folder first. Claude Code'll be able to read, edit, and execute files here. Security guide",
+      options: ["No, exit", "Yes, I trust this folder"],
+      choice: { numbered: false, cursor: 0 },
+    });
+  });
+
+  test("permission prompt: numbered options, the question block without the command box", () => {
+    const p = parsePanePrompt(pane("pane-permission-dont-ask.txt"));
+    expect(p?.question).toBe("This command requires approval Do you want to proceed?");
+    expect(p?.options).toEqual([
+      "Yes",
+      "Yes, and don’t ask again for: python3 - .agents/specs/gh-9-keyboard-shortcut-q-focuses-quick-add/runs/_story/handoff.md",
+      "Yes, and switch to auto mode · auto mode handles these prompts for you",
+      "No",
+    ]);
+    expect(p?.choice).toEqual({ numbered: true, cursor: 0 });
+    // the command box's top is cut off the screen: no first command line is guessed
+    expect(p?.command).toBeUndefined();
+  });
+
+  test("the pending command is the first line of a box whose top is on screen", () => {
+    const screen = ["", " Bash command", "", " │ rm -rf build", " │ bun test", "╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌", " Do you want to proceed?", " ❯ 1. Yes", "   2. No", "", " Esc to cancel"].join("\n");
+    expect(parsePanePrompt(screen)).toEqual({ question: "Do you want to proceed?", command: "rm -rf build", options: ["Yes", "No"], choice: { numbered: true, cursor: 0 } });
+  });
+
+  test("no dialog (no footer or no cursor) → null", () => {
+    expect(parsePanePrompt(fx.pane_read_visible)).toBeNull();
+    expect(parsePanePrompt("working…\n  1. a list item\n Esc to cancel")).toBeNull();
   });
 });
