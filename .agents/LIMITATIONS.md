@@ -30,6 +30,7 @@ Tested only against recorded fixtures or not at all:
 - **Agents report their own work.** A receipt records what the agent claimed. Gates and checks are only as strong as the commands you configure; a weak check config lets anything through.
 - **Decide never reads prose (P8).** Anything that lives only in a spec body, `handoff.md` or a review comment does not influence the next step unless an agent turns it into a typed outcome.
 - **Corrupt means stopped (S2).** A state file that fails validation marks the unit `corrupt`, by design. Hand edits to `.agents/` files or merge conflicts in them block the unit until a person repairs it.
+- **No host-less mode.** Story keys must be `gh-N`/`gl-N` and intake reads issues from GitHub or GitLab (GR1, GR2). A repo with only local files and branches cannot run norn today.
 - **GitHub/GitLab-style flows only.** norn assumes PRs, branches and git refs. Trunk-based work without PRs, many teams sharing one `.agents/`, and non-git VCS are out of scope.
 - **Coarse grain.** norn works per story and slice on a heartbeat. Wrong tool for quick interactive edits; the overhead is not worth it for tiny changes.
 - **Local environment must stay healthy.** Needs Bun, git worktrees (disk plus per-worktree setup) and an authenticated `gh`. Rate limits or a GitHub outage stop observation — a 502 once left a merged PR showing OPEN.
