@@ -21,7 +21,7 @@ start: qa
 steps:
   qa:
     type: agent
-    skill: qa
+    skill: norn-qa
     criteria: required
     outcomes:
       pass:       { to: ready, verdict: pass, means: "every criterion observed with evidence" }

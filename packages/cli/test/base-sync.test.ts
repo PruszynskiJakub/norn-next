@@ -10,7 +10,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { herdr } from "@norn/adapters";
 import { runCli, type TickReport } from "../src/index.ts";
-import { createHarness, type Harness, issue, sh } from "./harness.ts";
+import { createHarness, type Harness, installBundledSkills, issue, sh } from "./harness.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -24,7 +24,7 @@ steps:
     outcomes: { done: test, conflict: { to: resolve, counter: base_conflict_loop } }
   resolve:
     type: agent
-    skill: merge
+    skill: norn-merge
     inputs: [spec, handoff]
     outcomes: { done: { to: update, means: "base merged into the story branch, conflicts resolved and committed" } }
   test:
@@ -88,6 +88,7 @@ describe("base sync with real git", () => {
     h = await createHarness();
     h.write(join(h.root, ".agents/norn/config.yaml"), config());
     h.write(join(h.root, ".agents/norn/workflows/based.yaml"), BASED);
+    installBundledSkills(h.root);
     writeFileSync(join(h.root, "a.txt"), "one\n");
     h.git(["add", "-A"]);
     h.git(["commit", "-q", "-m", "norn init"]);
@@ -224,6 +225,7 @@ describe("BS3.3a (dogfood D4): a person's push to the branch of a $done story", 
     h = await createHarness();
     h.write(join(h.root, ".agents/norn/config.yaml"), config());
     h.write(join(h.root, ".agents/norn/workflows/based.yaml"), BASED);
+    installBundledSkills(h.root);
     h.git(["add", "-A"]);
     h.git(["commit", "-q", "-m", "norn init"]);
     h.git(["push", "-q", "origin", "main"]);
@@ -253,6 +255,7 @@ describe("base_branch: develop (BS0, 7b)", () => {
     h = await createHarness();
     h.write(join(h.root, ".agents/norn/config.yaml"), config("base_branch: develop\n"));
     h.write(join(h.root, ".agents/norn/workflows/based.yaml"), BASED);
+    installBundledSkills(h.root);
     h.git(["add", "-A"]);
     h.git(["commit", "-q", "-m", "norn init"]);
     h.git(["push", "-q", "origin", "main"]);
@@ -303,6 +306,7 @@ describe("PR items between syncs and in the read model (C1), ready approval void
     h = await createHarness();
     h.write(join(h.root, ".agents/norn/config.yaml"), config());
     h.write(join(h.root, ".agents/norn/workflows/based.yaml"), BASED);
+    installBundledSkills(h.root);
     writeFileSync(join(h.root, "a.txt"), "one\n");
     h.git(["add", "-A"]);
     h.git(["commit", "-q", "-m", "norn init"]);
@@ -419,6 +423,7 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
     h = await createHarness();
     h.write(join(h.root, ".agents/norn/config.yaml"), config().replace("runner: { adapter: headless }", "runner: { adapter: herdr }"));
     h.write(join(h.root, ".agents/norn/workflows/based.yaml"), BASED);
+    installBundledSkills(h.root);
     writeFileSync(join(h.root, "a.txt"), "one\n");
     h.git(["add", "-A"]);
     h.git(["commit", "-q", "-m", "norn init"]);

@@ -21,7 +21,7 @@ start: plan
 steps:
   plan:
     type: agent
-    skill: plan
+    skill: norn-plan
     outcomes: { done: { to: slices, means: "slice files written" } }
   slices:
     type: slices
@@ -37,7 +37,7 @@ start: implement
 steps:
   implement:
     type: agent
-    skill: implement
+    skill: norn-implement
     outcomes: { done: { to: test, means: "tests pass" } }
   test:
     type: check

@@ -119,9 +119,8 @@ export async function lastAssistantMessage(transcriptPath: string): Promise<stri
   return null;
 }
 
-/** OpenCode skills: `.opencode/skills` (repo), `~/.config/opencode/skills` (user). TODO(M4): confirm singular vs plural dir. */
-export const skillDir = (scope: "repo" | "user", repoRoot: string, home: string) =>
-  scope === "repo" ? join(repoRoot, ".opencode", "skills") : join(home, ".config", "opencode", "skills");
+/** OpenCode skills: `.opencode/skills`. TODO(M4): confirm singular vs plural dir. */
+export const skillDir = (repoRoot: string) => join(repoRoot, ".opencode", "skills");
 
 export const opencodeAgent: AgentAdapter = {
   name: NAME,

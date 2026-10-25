@@ -15,6 +15,7 @@ export * from "./paths.ts";
 export * from "./proc.ts";
 export * from "./receipts.ts";
 export * from "./refs.ts";
+export * from "./skills.ts";
 export * from "./snapshot.ts";
 export * from "./trace.ts";
 export * from "./unit.ts";

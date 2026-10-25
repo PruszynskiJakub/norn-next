@@ -14,38 +14,38 @@ start: refine
 steps:
   refine:
     type: agent
-    skill: refine
+    skill: norn-refine
     attended: true
     inputs: [spec, handoff]
     instructions: "Write the spec into the body of story.md; keep its frontmatter unchanged."
     outcomes:
-      done:      { to: plan, means: "spec complete: numbered Behaviour, edge checklist, out of scope; no open questions" }
+      done:      { to: plan, means: "spec complete: problem, solution, numbered Behaviour items with examples, out of scope; no open questions" }
       questions: { to: clarify, means: "spec written, but open questions are listed that need the person's answers" }
   clarify:
     type: agent
-    skill: clarify
+    skill: norn-clarify
     attended: true
     inputs: [spec, handoff]
     outcomes:
       done: { to: plan, means: "every open question is answered and folded into the spec" }
   plan:
     type: agent
-    skill: plan
+    skill: norn-plan
     attended: true
     inputs: [spec, handoff]
-    instructions: "Write the plan to plan.md in the spec folder."
+    instructions: "Write the Plan section of story.md."
     outcomes:
-      done: { to: slice, means: "plan.md has seams, a coverage table for every Behaviour item, prefactoring and decisions" }
+      done: { to: slice, means: "story.md's Plan section has seams, a coverage table for every Behaviour item, prefactoring, decisions and risks" }
   slice:
     type: agent
-    skill: slice
-    inputs: [spec, { file: plan.md, label: plan }, slices]
+    skill: norn-slice
+    inputs: [spec, slices]
     instructions: "Write slice files to slices/<nn>-<slug>.md in the spec folder."
     outcomes:
       done: { to: approve-plan, means: "slice files written; every Behaviour item is covered by some slice's acceptance" }
   approve-plan:
     type: gate
-    prompt: "Review plan.md and the slice files (edit them if needed). Approve to start the slices, or reject with what to change."
+    prompt: "Review the Plan section in story.md and the slice files (edit them if needed). Approve to start the slices, or reject with what to change."
     outcomes: { approve: slices, reject: { to: plan, counter: plan_loop } }
   slices:
     type: slices
@@ -56,7 +56,7 @@ steps:
     outcomes: { done: test, conflict: { to: resolve, counter: base_conflict_loop } }
   resolve:
     type: agent
-    skill: merge
+    skill: norn-merge
     inputs: [spec, handoff]
     instructions: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase."
     outcomes:
@@ -68,7 +68,7 @@ steps:
     outcomes: { pass: qa, fail: { to: implement, counter: test_loop } }
   qa:
     type: agent
-    skill: qa
+    skill: norn-qa
     inputs: [spec, slices, diff]
     criteria: required
     outcomes:
@@ -85,7 +85,7 @@ steps:
       stale:   { to: update, counter: stale_loop }
   implement:
     type: agent
-    skill: implement
+    skill: norn-implement
     inputs: [spec, handoff, last_check, last_findings]
     outcomes:
       done: { to: test, means: "every rework point has a passing test" }
