@@ -4,6 +4,10 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+### Changed
+
+- A gate item in `norn inbox` names the report that led there by step and receipt number (`step qa#1 reported partial (receipt 0009)`) instead of printing its absolute path on the item line. The receipt and evidence paths moved to the item's full text (`norn inbox --details`), and `--text` prints paths under your home as `~/…`.
+
 ## [0.2.1] - 2026-10-25
 
 ### Fixed

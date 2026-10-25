@@ -56,7 +56,7 @@ export const paneCommand = defineCommand({
       const started = ctx.clock.now();
       let body: string;
       try {
-        body = formatInbox(await projectView(ctx));
+        body = formatInbox(await projectView(ctx), { home: ctx.env.HOME });
       } catch (e) {
         body = `cannot read the inbox: ${(e as Error).message}\n`;
       }
