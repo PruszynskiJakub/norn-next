@@ -50,7 +50,7 @@ export const inboxCommand = defineCommand({
     if (opt.str(args, "since") !== undefined) throw usageError("--since goes with --history", "norn inbox --history --since 1d");
     const view = await projectView(ctx);
     const details = opt.bool(args, "details");
-    if (opt.bool(args, "text")) return textOutput(formatInbox(view, { details }));
+    if (opt.bool(args, "text")) return textOutput(formatInbox(view, { details, home: ctx.env.HOME }));
     if (details) return view.inbox;
     // L1 (A7): an item's full text (an implicit ask's pane screen) only with --details
     const groups = Object.fromEntries(Object.entries(view.inbox.groups).map(([g, items]) => [g, items.map(({ full: _full, ...it }) => it)]));
