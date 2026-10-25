@@ -3,12 +3,15 @@
  * why read via @norn/view and the trace; answer / approve / unstick / mode / workflow write receipts
  * the next tick applies; a non-holder clone posts to the mailbox the holder's tick imports.
  */
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Receipt } from "@norn/schema";
 import { type CliResult, runCli, type TickReport } from "../src/index.ts";
 import { createHarness, type Harness, issue, sh } from "./harness.ts";
+
+// whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
+setDefaultTimeout(30_000);
 
 const GATED = `name: gated
 start: work

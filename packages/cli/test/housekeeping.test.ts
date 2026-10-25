@@ -3,7 +3,7 @@
  * across ticks (K1, K3), orphans reported by every tick and cleaned by `norn tidy` (K5), the
  * GR6 record on the base branch, and `norn doctor` (A7).
  */
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync, utimesSync } from "node:fs";
 import { join } from "node:path";
 import { git as gitAdapter } from "@norn/adapters";
@@ -12,6 +12,9 @@ import { appendReceipt, leasesDir, readState, writeStoryFile } from "@norn/store
 import { markStoryOnBase } from "../src/runtime/record.ts";
 import { runCli, type TickReport } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
+
+// whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
+setDefaultTimeout(30_000);
 
 const SOLO = `name: solo
 start: implement

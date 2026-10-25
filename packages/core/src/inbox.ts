@@ -7,15 +7,16 @@
  * changed outside norn — the PR head moved after the ready approval, commits norn did not make;
  * F35, Q6), Unclaimed, Running, Recently done.
  */
-import { type InboxChange, type Mode, parseDuration, type ResolvedConfig, type UnitState } from "@norn/schema";
+import { type InboxChange, type Mode, parseDuration, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
 import type { Decision } from "./actions.ts";
 import { nextCommand, startAgentCommand } from "./commands.ts";
-import type { Facts, StoryFacts, UnitFacts } from "./facts.ts";
+import { criterionLine, noteTitle, personCriteria, type StoryNote } from "./criteria.ts";
+import type { Facts, NumberedReceipt, StoryFacts, UnitFacts } from "./facts.ts";
 import type { InboxGroup, InboxItem } from "./ports.ts";
 import { sha256 } from "./hash.ts";
 import { optionsLine } from "./prompt.ts";
 import { epoch, formatAge, iso } from "./time.ts";
-import { stepOf } from "./workflow.ts";
+import { baseUpdateStep, edgeOf, isStale, stepOf } from "./workflow.ts";
 
 export const INBOX_GROUPS: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock", "check", "unclaimed", "running", "recently_done"];
 
@@ -113,10 +114,12 @@ export function heartbeatItem(facts: Facts, config: ResolvedConfig): InboxItem |
 export function actFailureItem(story: StoryFacts, uf: UnitFacts): InboxItem | null {
   const f = uf.act_failure;
   const st = uf.state;
-  if (!f || !st || st.status === "done" || st.status === "corrupt" || f.step !== st.step || f.attempt !== st.attempt) return null;
+  // H1: a refused commit is owed even by a finished unit (its `$done` state is not on record yet)
+  if (!f || !st || (st.status === "done" && f.effect !== "commit") || st.status === "corrupt" || f.step !== st.step || f.attempt !== st.attempt) return null;
   // R6.3: an answer that did not reach its prompt is told on the Answer item itself (answerItem)
   if (f.effect === "answer" && st.status === "parked" && st.park?.kind === "ask") return null;
-  const delivery = f.effect !== "push";
+  // a refused push or commit (H1) stays until the effect succeeds or the cursor moves
+  const delivery = f.effect !== "push" && f.effect !== "commit";
   if (delivery && (uf.run?.last_activity_at ?? 0) > epoch(f.at)) return null;
   const key = uf.unit.key;
   return {
@@ -173,7 +176,7 @@ export function startCommandFor(uf: UnitFacts, story: StoryFacts, config: Resolv
   const name = (step?.type === "agent" && step.agent) || config.default_agent;
   const agent = config.agents[name];
   const worktree = uf.worktree?.path ?? (uf.unit.slice === null ? (story.worktree?.path ?? null) : null);
-  return startAgentCommand(worktree, agent?.command ?? agent?.adapter ?? name);
+  return startAgentCommand(worktree, agent?.command ?? agent?.adapter ?? name, agent?.args);
 }
 
 const short = (sha: string) => sha.slice(0, 7);
@@ -203,17 +206,74 @@ function judgedDetail(story: StoryFacts, uf: UnitFacts): string | null {
   return parts.join(" · ");
 }
 
+const oneLine = (t: string) => t.replace(/\s*\n\s*/g, " ").trim();
+
+/**
+ * QV7, NT3: what a person checks at a gate, so they need not open a file — the `person` and
+ * `unverified` criteria of the report that led there (with `reason` and `how`), and on a story-level
+ * gate the story's open notes (approving acknowledges them). `detail` is one line; `full` (inbox
+ * `--details`) lists each on its own line.
+ */
+export function gateChecks(story: StoryFacts, uf: UnitFacts): { detail: string | null; full: string | null } {
+  const check = personCriteria(uf.last_outcome_receipt?.receipt);
+  const notes = uf.unit.slice === null ? (story.notes ?? []) : [];
+  const parts: string[] = [];
+  const lines: string[] = [];
+  if (check.length) {
+    parts.push(`check: ${check.map((c) => oneLine(criterionLine(c))).join("; ")}`);
+    lines.push("Criteria for a person to check:", ...check.map((c) => `- ${criterionLine(c)}`));
+  }
+  if (notes.length) {
+    const noteLine = (n: StoryNote) => `${n.unit} ${n.step}${n.criterion ? ` (${n.criterion})` : ""}: ${n.text}`;
+    parts.push(`open notes (approve acknowledges them): ${notes.map((n) => oneLine(noteLine(n))).join("; ")}`);
+    if (lines.length) lines.push("");
+    lines.push("Open notes (approve acknowledges them; reject leaves them open):", ...notes.map((n) => `- ${noteLine(n)} [${n.id}]`));
+  }
+  return { detail: parts.length ? parts.join(" · ") : null, full: lines.length ? lines.join("\n") : null };
+}
+
+/**
+ * NT2: one Check item per open note of the story — a non-blocking question a reporting agent left
+ * for a person. It leaves the inbox when a person gives `approve` at a story-level gate (NT3).
+ */
+export function noteItems(story: StoryFacts): InboxItem[] {
+  const status = story.frontmatter?.status;
+  if (status === "done" || status === "dropped") return [];
+  return (story.notes ?? []).map((n) => ({
+    id: n.id,
+    group: "check" as const,
+    story: story.key,
+    slice: n.unit === story.key ? null : n.unit,
+    step: n.step,
+    title: oneLine(noteTitle(n)),
+    ...(n.text.includes("\n") ? { full: n.text } : {}),
+    command: `norn why ${n.unit} --receipt ${n.receipt_id}`,
+    since: n.at,
+    ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
+  }));
+}
+
+/** C1: the PR fetched this tick, else the last one this checkout saw (`pr_seen`); null/undefined = none known. */
+export const knownPr = (story: StoryFacts): StoryFacts["pr"] => (story.pr !== undefined ? story.pr : story.pr_seen?.pr);
+
 /**
  * GR6/F25: the story unit finished its workflow and its PR is open — merging it is the person's
  * last action, so it is an item (Your turn) with the PR URL, not "Recently done".
  */
-function mergeItem(story: StoryFacts, st: UnitState): InboxItem | null {
-  const pr = story.pr;
+function mergeItem(story: StoryFacts, st: UnitState, base: string): InboxItem | null {
+  const pr = knownPr(story);
   // GR6: a branch already contained in origin/<base> (merged by ancestry, e.g. a merge commit
   // pushed by hand) needs no merge, even while the PR still reads `open`.
   if (!pr || pr.state !== "open" || story.merged_by_ancestry || story.frontmatter?.status === "done") return null;
   const draft = pr.is_draft;
   const cli = prCli(story);
+  const details = [pr.url];
+  if (draft) details.push(`draft: mark it ready first (${cli} ready ${pr.number})`);
+  // BS10: how far the base moved since; a conflicting base sends the story back through update first
+  const b = story.base;
+  if (b && b.behind > 0) details.push(`behind ${base} by ${b.behind}`);
+  const conflicting = !!b && b.conflicts.length > 0;
+  if (conflicting) details.push(`conflicts with ${base} in ${b.conflicts.join(", ")} — update the story first`);
   return {
     id: `merge:${story.key}:${pr.number}`,
     group: "your_turn",
@@ -221,9 +281,74 @@ function mergeItem(story: StoryFacts, st: UnitState): InboxItem | null {
     slice: null,
     step: null,
     title: `Merge PR #${pr.number}${draft ? " (still a draft)" : ""}`,
-    detail: draft ? `${pr.url} · draft: mark it ready first (${cli} ready ${pr.number})` : pr.url,
-    command: `${cli} merge ${pr.number}`,
+    detail: details.join(" · "),
+    command: conflicting ? `norn update ${story.key}` : `${cli} merge ${pr.number}`,
     since: st.updated_at,
+    url: pr.url,
+  };
+}
+
+/** BS10.1: steps that already bring the base in — `git: update` steps and the steps their `conflict` routes to (resolve). */
+function baseSyncSteps(wf: Workflow): Set<string> {
+  const out = new Set<string>();
+  for (const [name, step] of Object.entries(wf.steps)) {
+    if (step.type !== "git" || step.action !== "update") continue;
+    out.add(name);
+    const to = edgeOf(wf, name, "conflict")?.to;
+    if (to) out.add(to);
+  }
+  return out;
+}
+
+/**
+ * BS10: the story waits for a person and the base moved under it (BS7), with no gate `stale` route
+ * to send it back by itself (BS6) — a Check item with `norn update`. BS10.1 (dogfood D1): only where
+ * an update is the next thing to do — parked at a gate, or stuck outside the steps that sync the
+ * base; never for an ask (a permission prompt in any step) nor in update/resolve.
+ */
+export function staleItem(story: StoryFacts, base: string): InboxItem | null {
+  const b = story.base;
+  const uf = story.units.find((u) => u.unit.slice === null);
+  const st = uf?.state;
+  const wf = uf?.workflow ?? null;
+  if (!b || !st || !wf || !isStale(wf, b)) return null;
+  const step = stepOf(wf, st.step);
+  const atGate = st.status === "parked" && st.park?.kind === "gate" && step?.type === "gate";
+  const stuck = st.status === "stuck" && !baseSyncSteps(wf).has(st.step);
+  if (!atGate && !stuck) return null;
+  // BS6: a gate with a `stale` route is classified by the tick, not shown
+  if (atGate && step?.type === "gate" && step.outcomes.stale !== undefined) return null;
+  const title = b.conflicts.length ? `${story.key} conflicts with ${base} in ${b.conflicts.join(", ")} (${b.behind} behind)` : `${story.key} is ${b.behind} behind ${base}`;
+  return {
+    id: `stale:${story.key}:${b.sha}`,
+    group: "check",
+    story: story.key,
+    slice: null,
+    step: st.step,
+    title,
+    detail: `${base} at ${short(b.sha)}; the story head ${short(b.head)} has ${b.ahead} commit(s) of its own`,
+    command: baseUpdateStep(wf) ? `norn update ${story.key}` : `git log --oneline ${b.head}..${b.sha}`,
+    since: st.park?.since ?? st.updated_at,
+    ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
+  };
+}
+
+/** BS11: the story PR targets another branch than the story's base — merging it would skip the base. */
+export function retargetItem(story: StoryFacts, base: string): InboxItem | null {
+  const pr = knownPr(story);
+  const target = pr?.base_branch ?? pr?.base ?? null;
+  if (!pr || pr.state !== "open" || !target || target === base) return null;
+  const st = story.units.find((u) => u.unit.slice === null)?.state;
+  return {
+    id: `retarget:${story.key}:${pr.number}:${target}`,
+    group: "check",
+    story: story.key,
+    slice: null,
+    step: null,
+    title: `PR #${pr.number} targets ${target}, not ${base}`,
+    detail: "a merge there does not finish the story (BS11); retarget the PR to the base branch",
+    command: `${prCli(story)} edit ${pr.number} ${prCli(story) === "glab mr" ? "--target-branch" : "--base"} ${base}`,
+    since: st?.updated_at ?? story.frontmatter?.intake_at ?? "1970-01-01T00:00:00.000Z",
     url: pr.url,
   };
 }
@@ -255,7 +380,8 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       if (park?.kind === "gate") {
         const judged = judgedDetail(story, uf);
         const reject = `or reject: norn approve ${key} --reject --reason "…"`;
-        return item("approve", park.reason, `norn approve ${key}`, park.since, { detail: judged ? `${judged} · ${reject}` : reject });
+        const { detail, full } = gateChecks(story, uf);
+        return item("approve", park.reason, `norn approve ${key}`, park.since, { detail: [judged, detail, reject].filter(Boolean).join(" · "), ...(full ? { full } : {}) });
       }
       if (park?.kind === "attended") return item("your_turn", `${st.step}: attended step — work with the agent`, startCommandFor(uf, story, config), park.since);
       return item("unblock", park?.reason ?? "parked", `norn unstick ${key}`, park?.since ?? st.updated_at);
@@ -284,12 +410,12 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
     }
     case "done": {
       if (uf.unit.slice === null) {
-        const merge = mergeItem(story, st);
+        const merge = mergeItem(story, st, facts.repo.default_branch);
         if (merge) return merge;
       }
       if (facts.now - epoch(st.updated_at) > RECENT_MS) return null;
       // story.md says `done` once norn saw the merge (GR6) — the durable record when no PR was fetched
-      const waiting = uf.unit.slice === null && story.pr?.state !== "merged" && !story.merged_by_ancestry && story.frontmatter?.status !== "done";
+      const waiting = uf.unit.slice === null && knownPr(story)?.state !== "merged" && !story.merged_by_ancestry && story.frontmatter?.status !== "done";
       return item("recently_done", waiting ? "workflow done — waiting for the PR merge (GR6)" : "done", `norn trace ${key}`, st.updated_at);
     }
   }
@@ -322,11 +448,39 @@ export function bodyChangedItem(story: StoryFacts): InboxItem | null {
   };
 }
 
+/** C5: receipts that send a finished story unit back into its workflow — the head will change, the ready gate is passed again (BS9, S7). */
+export const RE_ENTRY_KINDS = ["update", "workflow"] as const;
+
+/**
+ * F35: the story branch head when the person gave `approve` at the `ready` gate — the `head_sha` of
+ * the newest `approve` receipt at that gate (the `ready` step, or any gate whose `approve` goes to
+ * `$done`). C5: only an approval newer than the unit's last re-entry (`norn update`, `norn workflow
+ * --to`) counts; a re-entry voids it until a new approve at the gate. `receipts` are the story
+ * unit's, at least of the kinds `approve` and RE_ENTRY_KINDS; order does not matter.
+ */
+export function readyHeadSha(wf: Workflow, receipts: readonly NumberedReceipt[]): string | undefined {
+  return readyApproval(wf, receipts)?.sha;
+}
+
+/** F35 + BS10.2: the head the ready approval let through and when it was given (`readyHeadSha`). */
+export function readyApproval(wf: Workflow, receipts: readonly NumberedReceipt[]): { sha: string; at: string } | undefined {
+  const isReady = (step: string) => step === "ready" || (stepOf(wf, step)?.type === "gate" && edgeOf(wf, step, "approve")?.to === "$done");
+  const sorted = [...receipts].sort((a, b) => b.n - a.n);
+  for (const { receipt: r } of sorted) {
+    if ((RE_ENTRY_KINDS as readonly string[]).includes(r.kind)) return undefined;
+    if (r.kind === "approve" && isReady(r.step)) return r.head_sha ? { sha: r.head_sha, at: r.at } : undefined;
+  }
+  return undefined;
+}
+
 /** F35: the PR head moved after the `ready.approve` — what would merge is not what was reviewed. */
 export function headChangedItem(story: StoryFacts): InboxItem | null {
-  const pr = story.pr;
+  const pr = knownPr(story);
   const ready = story.ready_head_sha;
-  if (!pr || pr.state !== "open" || !ready || !pr.head_sha || pr.head_sha === ready) return null;
+  // C5: norn's own commits after the approval (its `$done` state commit) leave the head the person let through as it was
+  if (!pr || pr.state !== "open" || !ready || !pr.head_sha || pr.head_sha === ready || pr.head_sha === story.ready_head_norn) return null;
+  // BS10.2 (dogfood D6): a PR remembered from before the approval says nothing about what came after it
+  if (story.pr === undefined && story.pr_seen && story.ready_approved_at && story.pr_seen.observed_at < epoch(story.ready_approved_at)) return null;
   const st = story.units.find((u) => u.unit.slice === null)?.state;
   return {
     id: `head:${story.key}:${pr.head_sha}`,
@@ -427,7 +581,10 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
     }
     add(bodyChangedItem(story));
     add(headChangedItem(story));
+    add(staleItem(story, facts.repo.default_branch));
+    add(retargetItem(story, facts.repo.default_branch));
     for (const it of foreignCommitItems(story)) add(it);
+    for (const it of noteItems(story)) add(it);
     for (const uf of story.units) {
       add(unitInboxItem(story, uf, facts, config));
       add(actFailureItem(story, uf));

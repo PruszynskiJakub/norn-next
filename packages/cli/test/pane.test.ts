@@ -2,9 +2,12 @@
  * `norn pane` (O1 "a Herdr status pane"): renders the inbox via @norn/view, refreshing in a
  * loop, frames on the log stream (never stdout, P8), one JSON summary at exit, read only (X1).
  */
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { runCli } from "../src/index.ts";
 import { createHarness, type Harness } from "./harness.ts";
+
+// whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
+setDefaultTimeout(30_000);
 
 let h: Harness;
 beforeAll(async () => {

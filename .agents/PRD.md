@@ -63,7 +63,10 @@ The CLI, docs, schemas and skills use these nouns. A lint test fails on the **ba
 | run | One attempt at a step; produces receipts. |
 | claim | A git-ref lease giving one heartbeat the right to drive a story. |
 
-**Support nouns**: receipt, outcome, counter, gate, check, handoff, brief, inbox, heartbeat (one pass = tick), mode, worktree, slot, trace, mailbox.
+**Support nouns**: receipt, outcome, counter, gate, check, handoff, brief, inbox, heartbeat (one pass = tick), mode, worktree, slot, trace, mailbox, verdict, note.
+
+- **verdict** — how one acceptance criterion fared in a criteria report: `pass`, `fail`, `person` or `unverified` (QV2). The worst verdict gates the outcome (QV5).
+- **note** — a non-blocking question for a person, left with a `norn done` report (NT1); it reaches the inbox and the story's last gate, and never changes the route.
 
 **Banned synonyms**
 
@@ -215,7 +218,7 @@ The story worktree is on the story branch and holds `.agents/specs/<id>-<slug>/`
 
 | Verb | Meaning |
 |---|---|
-| `norn done <outcome> --handoff "…" [--findings <file>] [--evidence <dir>]` | Step finished with a declared outcome. The only way a step completes. Findings and evidence are stored with the receipt. |
+| `norn done <outcome> --handoff "…" [--findings <file>] [--evidence <dir>] [--criteria <file>] [--note "…" [--note-criterion <id>]]…` | Step finished with a declared outcome. The only way a step completes. Findings, evidence, the criteria report (QV2) and notes (NT1) are stored with the receipt. Refusals: `invalid_criteria`, `outcome_contradicts_verdicts`, `criteria_required` (§10.1). |
 | `norn ask "<question>" [--option …]` | Needs a human answer to continue. |
 | `norn stuck "<reason>"` | Cannot continue. |
 
@@ -238,7 +241,8 @@ Three sources of outcomes:
 | agent | `ask` (implicit) | pane/hook says waiting for input, no receipt (incl. permission prompts — inbox shows the question block, the command's first line and the options; the full screen only with `inbox --details` and in `why`); unattended only |
 | check | `pass` / `fail` | exit code; timeout counts as `fail` with reason `timeout` |
 | gate | `approve` / `reject` | human receipt |
-| git | `done` / `conflict` | command result |
+| gate (story unit) | `stale` | the unit waits at the gate and the story is stale against its base (BS7); only when the gate declares a `stale` route (BS6) |
+| git | `done` / `conflict` | command result (`update`: a dirty worktree or a diverged story branch parks the unit `$stuck` with the reason, BS3) |
 | slices | `done` / `stuck` | aggregate of slices |
 | any | `exhausted` | a counter reached its max |
 
@@ -248,6 +252,22 @@ Three sources of outcomes:
 - C4 On `silent`, the tick snapshots the last assistant message (from the transcript), commits and diff into the trace and handoff.
 - C5 Every `check` run writes a check receipt `{run_id, command, exit_code, duration, output_tail}` (last ~200 lines); on `fail` the full output goes to `runs/<unit>/logs/<run_id>.log` and is committed.
 
+### 10.1 Criteria, verdicts and notes (QV1–QV8, NT1–NT4, `SPEC-base-sync-and-qa.md` Part B)
+
+- QV1 Slice frontmatter (and story frontmatter, for story-level QA) may list `criteria: [{ id, verifier: test | agent | person, needs?: [capability] }]`, written by the `slice` skill next to the prose Acceptance section. Decide never reads the prose (P8).
+- QV2 `norn done --criteria <file>` takes a JSON array validated against the `CriteriaReport` schema: one entry per criterion with a verdict — `pass` (`evidence` required), `fail` (`repro` required), `person` (`how` required), `unverified` (`reason` and `how` required: a machine could check it, this session could not). The report is stored in the `done` receipt (`criteria`).
+- QV3 An agent step with `criteria: required` refuses `norn done` without a report (`criteria_required`); so does an outcome gated by a `verdict`.
+- QV4 With frontmatter `criteria`, the report covers exactly those ids, once each; otherwise `invalid_criteria` (exit 3) with the expected ids in `do_instead`. Without frontmatter `criteria`, coverage is not checked and the trace records `criteria.unchecked_coverage`.
+- QV5 An outcome edge may declare `verdict: <v>` (agent steps only, W5). Order `fail` > `unverified` > `person` > `pass`; an outcome with `verdict: v` may be reported only when the worst verdict in the report is `v` — otherwise `outcome_contradicts_verdicts`, and `do_instead` names the outcome that matches.
+- QV5a `pass` means observed in this session. Each agent declares what its sessions can do in config, `agents.<name>.capabilities: [browser, …]` (default none). `norn done` refuses (`pass_without_capability`, exit 3) a `pass` verdict for a criterion whose `needs` are not all among the reporting agent's capabilities; `do_instead` says to report it `unverified` with `reason` and `how`. A person's earlier gate ruling (the brief's Rulings) answers questions but never verifies a criterion on the current code (C2).
+- QV6 Default `qa` steps (story and slice) declare `criteria: required` and `pass` (verdict pass), `fail` (fail, counted), `partial` (person → `human-qa`), `unverified` (unverified → `human-qa`). A workflow may route `unverified` to an agent step whose runner has the capability instead.
+- QV7 A gate's inbox item lists the `person` and `unverified` criteria of the report that led there, with `reason` and `how` (one line in `detail`, one per line in `full` / `inbox --details`); a rework brief after a rejection repeats the judged report's criteria not passed.
+- QV8 Each report is a `criteria` trace event (counts per verdict, `unverified` per capability in `needs`); `norn trace <unit>` sums them (`criteria.unverified_needs`).
+- NT1 Every `norn done` accepts `--note "<text>"` (repeatable), each optionally followed by `--note-criterion <id>`; stored in the `done` receipt (`notes`). Notes never block and never change the route.
+- NT2 Each open note is a Check item `note:<receipt_id>:<n>` (`qa note on gh-4/01 (AC3): …`, command `norn why gh-4/01 --receipt <id>`).
+- NT3 Every story-level gate lists the story's open notes in its inbox item. Approving it records them in the `approve` receipt (`acknowledged_notes`), and they leave the inbox; rejecting leaves them open.
+- NT4 The `qa` skill uses a note, not `person`, when a criterion passed as written but a person may read it differently.
+
 ## 11. Workflows
 
 - W1 Files in `.agents/norn/workflows/*.{yaml,json}`, validated against a published JSON Schema. No lifecycle is hard-coded; `init` copies `story`, `slice`, `bug` as **examples** with no implied mapping.
@@ -255,18 +275,18 @@ Three sources of outcomes:
 
 | Type | Purpose |
 |---|---|
-| `agent` | Run a skill in a fresh session; fields: `skill`, `instructions?`, `inputs`, `agent?`, `model?`, `attended?`, limits (`deadline`, `nudges`, `retries`), `outcomes`. |
+| `agent` | Run a skill in a fresh session; fields: `skill`, `instructions?`, `inputs`, `agent?`, `model?`, `attended?`, `criteria?: required` (QV3), limits (`deadline`, `nudges`, `retries`), `outcomes`. |
 | `check` | Run a shell command in the unit worktree with `.env.norn` loaded and a `timeout`; exit code decides `pass`/`fail`; writes a check receipt (C5). |
 | `gate` | Wait for a human `approve`/`reject` (or `answer`). |
-| `git` | Built-in actions: `integrate` (slice into story branch: rebase + fast-forward, serialized per story), `push`, `open-pr` (draft story PR). |
+| `git` | Built-in actions: `integrate` (slice into story branch: rebase + fast-forward, serialized per story), `push`, `open-pr` (draft story PR into the base branch, BS0), `update` (merge the base into the story branch, BS3). |
 | `slices` | Story-level bridge: start each slice's workflow when its `depends_on` are done, within caps; `done` when all slices are integrated; picks up slice files added mid-flight. |
 
-- W3 Transitions are keyed on outcomes: `review.changes_requested → implement`. Conditions are expressed only as outcomes (e.g. `refine` reports `done` or `questions`); there is no `when:` guard in v1.
-- W4 Every **elementary cycle** (a path back to its start visiting no step twice) must include at least one edge with a `counter`. Taking a counted edge increments it; if it would exceed `max`, the edge is not taken and the outcome becomes `exhausted` → `$stuck` with the reason (e.g. "review_loop 3/3 at review.changes_requested"). Counters are per unit and never reset by themselves; only `norn unstick --reset <counter>` resets one, journaled.
-- W5 Load-time validation: schema; every step can reach `$done`; every elementary cycle has a counter (the validator lists each uncounted cycle with its path); every referenced skill exists; no step uses a reserved name. Invalid workflows are refused before anything runs.
+- W3 Transitions are keyed on outcomes: `review.changes_requested → implement`. Conditions are expressed only as outcomes (e.g. `refine` reports `done` or `questions`); there is no `when:` guard in v1. An edge is `{ to, counter?, means?, verdict? }`; `verdict` (agent steps only) gates which outcome a criteria report allows (QV5).
+- W4 Every **elementary cycle** (a path back to its start visiting no step twice) must include at least one edge with a `counter`. Taking a counted edge increments it; if it would exceed `max`, the edge is not taken and the outcome becomes `exhausted` → `$stuck` with the reason (e.g. "review_loop 3/3 at review.changes_requested"). Counters are per unit and never reset by themselves, except a counter declaring `reset_on: <step>.<outcome>`: taking that edge resets it to 0, journaled with the advance (trace, commit, handoff line) — e.g. `base_conflict_loop` resets on `update.done`, so only repeated conflicts on one base move count (C3). Otherwise only `norn unstick --reset <counter>` resets one, journaled. `reset_on` must name a declared edge (W5); it never exempts a cycle from needing a counter.
+- W5 Load-time validation: schema; every step can reach `$done`; every elementary cycle has a counter (the validator lists each uncounted cycle with its path); every referenced skill exists; no step uses a reserved name; `verdict` only on outcomes an agent reports (QV5). Invalid workflows are refused before anything runs.
 - W6 v1 has no `fork/join`; parallelism comes from independent slices.
-- W7 **Reserved targets** start with `$`: `$done` (unit finished) and `$stuck` (park in inbox under Unblock with the reason). `$stuck` is always an implicit target of `exhausted`, `stuck` reports and C1 routes. Step names may not start with `$` nor be a reserved word: `done`, `stuck`, `ask`, `exhausted`, `silent`, `died`, `timeout`, `stalled`.
-- W8 **Workflows are not tied to a level.** Any workflow may run on a story or a slice; constraints are checked at unit start: `slices` and `git: open-pr` only on a story, `git: integrate` only on a slice. A story workflow without `slices` works directly in the story worktree.
+- W7 **Reserved targets** start with `$`: `$done` (unit finished) and `$stuck` (park in inbox under Unblock with the reason). `$stuck` is always an implicit target of `exhausted`, `stuck` reports and C1 routes. Step names may not start with `$` nor be a reserved word: `done`, `stuck`, `ask`, `exhausted`, `silent`, `died`, `timeout`, `stalled`, `stale`.
+- W8 **Workflows are not tied to a level.** Any workflow may run on a story or a slice; constraints are checked at unit start: `slices`, `git: open-pr` and `git: update` only on a story, `git: integrate` only on a slice. A story workflow without `slices` works directly in the story worktree.
 - W9 **Workflow selection.** A story's workflow is `workflow:` in `story.md`, set at intake from a remote label `norn:wf:<name>` if present, else `config.default_workflow`; changeable before start with `norn workflow <story> <name>`, after start only with `--to <step>` (S7). A slice's workflow is `workflow:` in its frontmatter, proposed by the `slice` skill, editable at the plan gate, default `config.default_slice_workflow`.
 
 Example (slice):
@@ -293,10 +313,12 @@ steps:
   qa:
     type: agent
     skill: qa
+    criteria: required
     outcomes:
-      pass:    { to: integrate, means: "every criterion verified with evidence" }
-      fail:    { to: implement, counter: qa_loop, means: "a criterion fails; repro in the receipt" }
-      partial: { to: human-qa, means: "criteria only a person can check are listed with prepared evidence" }
+      pass:       { to: integrate, verdict: pass, means: "every criterion observed with evidence" }
+      fail:       { to: implement, counter: qa_loop, verdict: fail, means: "a criterion fails; repro in findings" }
+      partial:    { to: human-qa, verdict: person, means: "criteria only a person can judge, evidence prepared" }
+      unverified: { to: human-qa, verdict: unverified, means: "criteria this session could not check; how to check each one is in the report" }
   human-qa:
     type: gate
     outcomes: { approve: integrate, reject: { to: implement, counter: qa_loop } }
@@ -311,7 +333,7 @@ steps:
 counters: { test_loop: { max: 5 }, review_loop: { max: 3 }, qa_loop: { max: 2 }, conflict_loop: { max: 2 } }
 ```
 
-Default story workflow (sketch): `refine (attended; done → plan, questions → clarify) → clarify (attended) → plan (attended) → slice → approve-plan (gate) → slices → test (check) → qa → open-pr (git) → ready (gate) → $done`. Rework found by story `test`/`qa` goes to `implement` in the story worktree, counted. After `$done` the story waits for the observed PR merge (GR6) — a fact, not a gate.
+Default story workflow (sketch): `refine (attended; done → plan, questions → clarify) → clarify (attended) → plan (attended) → slice → approve-plan (gate) → slices → update (git; conflict → resolve, counted) → test (check) → qa → open-pr (git) → ready (gate) → $done`; `human-qa` and `ready` route `stale` back to `update` (counted, `stale_loop`), workflow field `base: { stale: conflict }` (BS6–BS8). Rework found by story `test`/`qa` goes to `implement` in the story worktree, counted. After `$done` the story waits for the observed PR merge (GR6) — a fact, not a gate.
 
 Example `bug` workflow: `reproduce (agent; reproduced → implement, cannot_reproduce → $stuck) → implement → test → review → integrate`.
 
@@ -324,7 +346,22 @@ Example `bug` workflow: `reproduce (agent; reproduced → implement, cannot_repr
 - GR5 A person merges the story PR.
 - GR6 **PR merged** → story `done`: remove story and slice worktrees, delete slice branches (local and remote) and the local story branch, delete claim and mailbox refs. The spec folder with `runs/` and `handoff.md` stays in the base branch as the record.
 - GR7 **PR closed unmerged, issue closed, unassigned or unlabelled** → the story parks with reason `remote: <what>` under Unblock. norn never deletes work on its own; `norn drop <story>` cleans up (pushing branches first, as `release` does); `norn unstick` resumes.
+- GR6a (BS11) **Merged means merged into the base.** GR6 cleanup fires only when the PR's base branch (`story.pr.base_branch`) is the story's base branch (BS0), or the story head is already on the fetched base (P2). A PR merged into any other branch parks the story with reason `remote: PR merged into <branch>, not <base>` (GR7); an open PR targeting another branch is a Check item (retarget).
 - GR8 **Issue edited** → mirrored frontmatter fields (title, assignee, URL) update; the spec body is never overwritten. If the remote body changes after `refine` finished, an inbox item "issue body changed since refine" appears; it does not block running slices.
+
+### 12.1 Base sync (BS0–BS10, `SPEC-base-sync-and-qa.md` Part A)
+
+- BS0 The **base branch** is config `base_branch` when set, otherwise the remote's default branch as discovered — never assumed to be `main`. A story's **base ref** is `refs/remotes/<git_remote>/<base>` when the git remote exists, else `refs/heads/<base>`. Intake cuts story branches from it; `open-pr` targets it.
+- BS1 Observe adds per story `story.base {ref, sha, head, merge_base, behind, ahead, conflicts}`. `conflicts` comes from `git merge-tree --write-tree --name-only --no-messages <story head> <base sha>`, computed only when the pair (story head, base sha) changed since the last measurement (cache `.agents/norn/trace/base.json`); the facts are in the trace, so `norn why` replays them.
+- BS2 `norn doctor` requires git ≥ 2.38 (`merge-tree --write-tree`); `norn watch` refuses to start a heartbeat otherwise.
+- BS3 `git: update` (story units only, W8), in the story worktree: a dirty worktree → `$stuck` (`worktree dirty`); takes the story's integrate lock (K6); adopts the remote story branch when it is a fast-forward of the local one (a person pressed "Update branch"), `$stuck` (`story branch diverged from <remote>`) when they diverged; `behind == 0` → `done`, no commit; else `git merge --no-ff <base sha>` with message `Update <story> from <base> (<short sha>)` and the `Norn-Tick` trailer (Q6), pushed at the step boundary (S8, T7) → `done`; a conflicting merge is aborted → `conflict`, with the base sha and the conflicting paths in the classify receipt (`base`).
+- BS4 **Merge, never rebase** the story branch: it is published (draft PR, T5), slice branches are cut from it (GR3) and the ready gate pins its head (F35). GR4 is unchanged.
+- BS5 The `resolve` step runs the `merge` skill on the base: its brief's Rework carries the base sha, the conflicting paths and "merge `<sha>` into the story branch in this worktree, resolve, commit the merge; never rebase". Conflicts are resolved by intent (both sides' commits, this story's spec and criteria, the base change); a resolution needing new behaviour aborts the merge and reports `norn stuck "<why>"`. On `done` the workflow returns to `update`. The agent's merge commit is never a foreign commit: commits made during a run of the unit — from its first to its last receipt, open-ended while it runs or is parked on an ask — are the agent's (Q6, C4).
+- BS6 Classified outcome `stale` at a story gate (§10), only through a declared `stale` route; otherwise only the BS10 inbox item.
+- BS7 A story is **stale** when `base.conflicts` is non-empty (default), or with workflow field `base: { stale: behind }` when `base.behind > 0`.
+- BS8 Taking a `stale` route writes a `classify` receipt `{outcome: stale, rule: "base moved", detail: "<n> behind, conflicts: …", base}`; the edge back carries a counter (W4; default `stale_loop: { max: 10 }` — a stale re-entry is progress from outside, bounded by the sibling merges). The default `base_conflict_loop: { max: 2, reset_on: update.done }` counts conflicts per base move, not per story (C3).
+- BS9 `norn update <story>` re-enters the step named by workflow field `base.step` (default: the first `git: update` step) when the story unit is done with an unmerged PR, parked at a gate, or stuck, and only while this checkout holds the claim (T7; never through the mailbox); refused otherwise with `do_instead`. It writes a receipt `update {from, to, reason: "person"}` before the state change (P6, S5). Re-entering from `$done` passes the ready gate again (F35): `ready_head_sha` comes only from an `approve` receipt newer than the unit's last re-entry (`update`, `workflow`), so the old approval raises no "head changed" item (C5). The tick never moves a done unit by itself.
+- BS10 Inbox: a Check item per stale story (BS7) waiting at a gate without a `stale` route or stuck — `gh-3 conflicts with main in a.ts, b.ts (4 behind)`, command `norn update gh-3`, id `stale:<story>:<base sha>`; the "Merge PR #N" item shows `behind <base> by N` and, when conflicting, its command is `norn update <story>`. PRs are fetched only on sync ticks, so each checkout keeps the last PR it saw per story with its observation time (`.agents/norn/trace/pr.json`, `story.pr_seen`); the PR items (merge, retarget GR6a, head changed F35) use it on the ticks between syncs and in `norn inbox`/`status`, and stay put instead of flickering. Decide acts only on a freshly fetched `pr` (C1).
 
 ## 13. Claims and team handoff
 
@@ -350,7 +387,7 @@ Example `bug` workflow: `reproduce (agent; reproduced → implement, cannot_repr
 - K3 Agent and port slots are lease files in `~/.norn/leases/`, created atomically (`O_EXCL`) with repo, unit, `run_id`, PID and start time. Dead holders are reclaimed by PID + start-time check. Leases are not committed; another machine allocates its own.
 - K4 Each worktree gets a slot (`NORN_SLOT`, `PORT_BASE`, optional extra per-slot resources from config) in `.env.norn`.
 - K5 The tick creates slice worktrees when a slice starts and removes them after integration. `norn tidy [--dry-run]` reports or cleans orphans; each tick reports them.
-- K6 Integration into the story branch is serialized per story; a non-clean rebase yields `conflict` and routes via the workflow.
+- K6 Integration into the story branch is serialized per story — slice `integrate` and the story's base `update` (BS3) take the same integrate lock (`.agents/norn/trace/integrate-<story>.lock`); a non-clean rebase or merge yields `conflict` and routes via the workflow.
 
 ## 15. Human interface and observability
 
@@ -362,7 +399,7 @@ Example `bug` workflow: `reproduce (agent; reproduced → implement, cannot_repr
 | Remote | `sync` |
 | Heartbeat | `tick`, `watch` |
 | Agent protocol | `brief`, `done`, `ask`, `stuck`, `hook` |
-| Human | `inbox`, `answer`, `approve [--reject]`, `unstick [--to <step>] [--reset <counter>]`, `mode`, `workflow` |
+| Human | `inbox`, `answer`, `approve [--reject]`, `unstick [--to <step>] [--reset <counter>]`, `update <story>` (BS9), `mode`, `workflow` |
 | Team | `take`, `release`, `drop` |
 | Views | `status`, `trace <unit>`, `why <unit>` |
 | Housekeeping | `tidy` |
@@ -371,7 +408,7 @@ Example `bug` workflow: `reproduce (agent; reproduced → implement, cannot_repr
 - O2 `answer`, `approve`, `unstick`, `mode`, `workflow` write receipts; the next tick applies them and delivers answers into the same session or a fresh one from the handoff. Typing directly into an agent pane is also allowed.
 - O3 Notifiers are optional plugins (OS default; ntfy, webhook) and fire once per new inbox item, receipt-first.
 - O4 Trace: one JSONL record per tick with facts snapshot, rule fired, action, result, briefing and transcript pointers.
-- O5 `norn why <unit>` replays the pure decide function on the recorded snapshot and shows the rule that fired.
+- O5 `norn why <unit>` replays the pure decide function on the recorded snapshot and shows the rule that fired; `--receipt <id>` picks the decision that applied that receipt (the command of a note item, NT2).
 - O6 `handoff.md`: generated status header (S9); tool writes heartbeat lines (repeats collapsed, e.g. "(×3)"); agents write milestones.
 
 ## 16. Skills
@@ -385,10 +422,10 @@ Ten single-job skills, written fresh (ideas from ai-engine ported, files not cop
 | `refine` | Story → spec with numbered Behaviour items, edge checklist, out of scope, open questions. | done / questions |
 | `clarify` | Settle open questions with the person, fold answers into spec. | done |
 | `plan` | Seams, coverage table (Behaviour → seam), prefactoring, decisions. Reference: codebase-design. | done |
-| `slice` | Plan → slice files (`workflow`, `depends_on`, acceptance citing Behaviour numbers, check commands, verifier). | done |
+| `slice` | Plan → slice files (`workflow`, `depends_on`, acceptance citing Behaviour numbers, frontmatter `criteria` with verifier and `needs` (QV1), check commands). | done |
 | `implement` | Test-first build of one slice or story. On rework, the points from the brief's Rework section come first: each is a red test, a QA failure gives its repro. Reference: TDD, tests, mocking. | done |
 | `review` | Spec and Standards axes separately; smells list; findings as structured data. | approve / changes_requested |
-| `qa` | Check each acceptance criterion as a user, with evidence; never pass what wasn't checked; list what only a person can check. | pass / fail / partial |
+| `qa` | Check each acceptance criterion as a user, with evidence; one verdict per criterion in a criteria report (QV2); never pass what wasn't observed (`unverified` when this session cannot check it); notes when a passed criterion may be read differently (NT4). | pass / fail / partial / unverified |
 | `merge` | Resolve conflicts by intent of both sides; stop if new behaviour is needed. | done |
 
 - SK1 `norn init` installs skills into each configured agent's skill location with norn-owned markers; repo-local overrides win.

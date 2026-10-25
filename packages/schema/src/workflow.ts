@@ -9,6 +9,7 @@ import {
   TaggedUnion,
   Target,
 } from "./common.ts";
+import { Verdict } from "./criteria.ts";
 
 /** Full outcome edge: `{ to, counter?, means? }` (W3, W4). */
 export const OutcomeEdge = Type.Object(
@@ -16,6 +17,8 @@ export const OutcomeEdge = Type.Object(
     to: Target,
     counter: Type.Optional(CounterName),
     means: Type.Optional(Type.String({ minLength: 1, description: "Shown to the agent in the brief (B3)" })),
+    /** QV5: reportable only when the worst verdict of the `--criteria` report is this one (agent steps) */
+    verdict: Type.Optional(Verdict),
   },
   { additionalProperties: false },
 );
@@ -72,6 +75,8 @@ export const AgentStep = Type.Object(
     deadline: Type.Optional(Duration),
     nudges: Type.Optional(Type.Integer({ minimum: 0, description: "Max nudges in the same session (C1)" })),
     retries: Type.Optional(Type.Integer({ minimum: 0, description: "Max fresh-session retries after died (C1)" })),
+    /** QV3: `required` makes `norn done --criteria <file>` mandatory */
+    criteria: Type.Optional(Type.Literal("required")),
     /**
      * Declared outcomes. May also override classified routes by naming
      * `silent`, `died`, `timeout`, `stalled`, `ask`, `stuck` (C1).
@@ -99,13 +104,15 @@ export const GateStep = Type.Object(
     type: Type.Literal("gate"),
     ...common,
     prompt: Type.Optional(Type.String({ description: "What the person decides; shown in inbox" })),
-    outcomes: fixedOutcomes(["approve", "reject"] as const),
+    /** `stale` (BS6): tick-classified on a story gate when the base moved under the story (BS7) */
+    outcomes: fixedOutcomes(["approve", "reject", "stale"] as const),
   },
   { additionalProperties: false },
 );
 export type GateStep = Static<typeof GateStep>;
 
-export const GitAction = Type.Union([Type.Literal("integrate"), Type.Literal("push"), Type.Literal("open-pr")]);
+/** W2: `update` (BS3) merges the base into the story branch; story units only (W8). */
+export const GitAction = Type.Union([Type.Literal("integrate"), Type.Literal("push"), Type.Literal("open-pr"), Type.Literal("update")]);
 export type GitAction = Static<typeof GitAction>;
 
 export const GitStep = Type.Object(
@@ -133,8 +140,31 @@ export const Step = TaggedUnion("type", [AgentStep, CheckStep, GateStep, GitStep
 export type Step = Static<typeof Step>;
 export type StepType = Step["type"];
 
-export const CounterSpec = Type.Object({ max: PosInt }, { additionalProperties: false });
+export const CounterSpec = Type.Object(
+  {
+    max: PosInt,
+    /**
+     * W4 (C3): taking the edge `<step>.<outcome>` resets this counter to 0, journaled in the
+     * advance (trace, handoff line) and the classify receipt. E.g. `base_conflict_loop` resets on
+     * `update.done`: each base move is a fresh attempt, only repeated failures on one move count.
+     */
+    reset_on: Type.Optional(Type.String({ pattern: "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$", description: "<step>.<outcome> whose edge resets the counter" })),
+  },
+  { additionalProperties: false },
+);
 export type CounterSpec = Static<typeof CounterSpec>;
+
+/** BS7/BS9: when a waiting story counts as stale, and the step `norn update` re-enters. */
+export const BaseSync = Type.Object(
+  {
+    /** `conflict` (default): a merge of the base would conflict; `behind`: the base has any commit the story lacks */
+    stale: Type.Optional(Type.Union([Type.Literal("conflict"), Type.Literal("behind")])),
+    /** step `norn update` re-enters (BS9); default: the first step with `action: update` */
+    step: Type.Optional(StepName),
+  },
+  { additionalProperties: false },
+);
+export type BaseSync = Static<typeof BaseSync>;
 
 export const Workflow = Type.Object(
   {
@@ -144,6 +174,7 @@ export const Workflow = Type.Object(
     start: StepName,
     steps: Type.Record(StepName, Step, { minProperties: 1, additionalProperties: false }),
     counters: Type.Optional(Type.Record(CounterName, CounterSpec, { additionalProperties: false })),
+    base: Type.Optional(BaseSync),
   },
   {
     $id: "https://norn.dev/schema/workflow.json",
@@ -157,8 +188,8 @@ export type Workflow = Static<typeof Workflow>;
 export const CLASSIFIED_OUTCOMES = {
   agent: ["silent", "died", "timeout", "stalled", "ask", "exhausted"],
   check: ["pass", "fail", "exhausted"],
-  gate: ["approve", "reject", "exhausted"],
-  git: ["done", "conflict", "exhausted"],
+  gate: ["approve", "reject", "stale", "exhausted"],
+  git: ["done", "conflict", "stuck", "exhausted"],
   slices: ["done", "stuck", "exhausted"],
 } as const satisfies Record<StepType, readonly string[]>;
 

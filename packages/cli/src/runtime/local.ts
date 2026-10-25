@@ -8,6 +8,7 @@
  * - `records.json`    GR6 base-branch records still owed (retried by later ticks, throttled),
  *                     each with the merge facts to write (`merge`, StoryMerge)
  * - `foreign.json`    commit shas already traced as `foreign_commits` (Q6: once per sha)
+ * - `base.json`       per story, the last `story.base` measured (BS1; store/base.ts)
  */
 import { join } from "node:path";
 import type { StoryFacts } from "@norn/core";
@@ -110,3 +111,4 @@ export function traceForeignCommits(root: string, stories: StoryFacts[], tick_id
   for (const f of fresh) appendTrace(root, { type: "foreign_commits", id: ulid(now), at, tick_id, unit: f.story, commits: f.commits });
   return fresh.length;
 }
+

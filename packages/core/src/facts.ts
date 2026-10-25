@@ -20,7 +20,7 @@ import type {
   UnitState,
   Workflow,
 } from "@norn/schema";
-import type { PaneState, RemoteIssue, RemotePullRequest, RunnerCapabilities, SessionRef, WorktreeStatus } from "./ports.ts";
+import type { GitInProgress, PaneState, RemoteIssue, RemotePullRequest, RunnerCapabilities, SessionRef, WorktreeStatus } from "./ports.ts";
 
 /** A file that failed to read or validate (S2). */
 export interface FileError {
@@ -52,6 +52,11 @@ export interface WorktreeFacts {
   last_file_change_at: number | null;
   /** slot from `.env.norn` (K4) */
   slot: number | null;
+  /**
+   * H1/BS5.1: the git operation in progress in the worktree (an agent's merge, a rebase, …) and its
+   * unmerged paths; absent = not observed. While one is, norn commits nothing there (H1).
+   */
+  in_progress?: GitInProgress;
 }
 
 export interface NumberedReceipt {
@@ -203,6 +208,32 @@ export interface UnpushedRuns {
   files: string[];
 }
 
+/**
+ * BS1: the story branch against its base (BS0) this tick. `conflicts` comes from `git merge-tree`
+ * (computed only when `behind > 0` and the pair (story head, base sha) changed, cached per checkout).
+ */
+export interface StoryBase {
+  /** BS0: `refs/remotes/<remote>/<base>`, or `refs/heads/<base>` without a git remote */
+  ref: string;
+  /** tip of the base ref this tick */
+  sha: string;
+  /** the story branch head measured (local `refs/heads/<story branch>`) */
+  head: string;
+  merge_base: string;
+  /** commits in the base not in the story */
+  behind: number;
+  /** commits in the story not in the base */
+  ahead: number;
+  /** paths a merge of the base would conflict in; [] = clean */
+  conflicts: string[];
+}
+
+/** C1: a story PR observation (`null` = the remote said there is none) and its time (ms epoch). */
+export interface StoryPrSeen {
+  pr: RemotePullRequest | null;
+  observed_at: number;
+}
+
 export interface StoryFacts {
   key: string;
   slug: string;
@@ -223,6 +254,13 @@ export interface StoryFacts {
    */
   pr?: RemotePullRequest | null;
   /**
+   * C1: the story PR as the last successful sync of this checkout saw it, with when (ms epoch).
+   * Inbox items about the PR (merge BS10, retarget BS11, head changed F35) use it when `pr` was not
+   * fetched this tick, so they stay put between syncs and show in the read model. Decide never acts
+   * on it (GR6/GR7 effects need a fresh `pr`). Absent = never seen here.
+   */
+  pr_seen?: StoryPrSeen;
+  /**
    * P2 (pull, don't trust): the story branch head is an ancestor of the fetched `<remote>/<base>`
    * while the PR does not say merged (e.g. a remote glitch left it open). Decide treats it as
    * merged (GR6). Absent = not observed or not merged by ancestry.
@@ -231,11 +269,20 @@ export interface StoryFacts {
   /**
    * Commits on the story branch or a slice branch not created by norn (no `Norn-Tick` trailer)
    * since the last norn commit on that branch, newest first; only for units without a live run
-   * (an agent's own commits mid-run are not foreign). Absent = none / not observed.
+   * (an agent's own commits mid-run are not foreign), and never one committed during a run of that
+   * unit — an agent's commit while its unit is parked on an ask (C4). Absent = none / not observed.
    */
   foreign_commits?: ForeignCommit[];
   /** story branch head when the person gave `approve` at the `ready` gate (the approve receipt's `head_sha`) */
   ready_head_sha?: string;
+  /** BS10.2: when that approval was given (the approve receipt's `at`); PRs seen before it are not compared */
+  ready_approved_at?: string;
+  /**
+   * C5: the known PR head, when every commit after `ready_head_sha` up to it is norn's own for this
+   * story (`Norn-Tick` + `Norn-Story` trailers — the `ready.approve → $done` commit and later state
+   * commits); the head-changed item (F35) ignores that head. Absent = moved by someone else, or unknown.
+   */
+  ready_head_norn?: string;
   /**
    * R3.2: the story's `status` in its record on the fetched base ref (`<remote>/<base>`); null = the
    * base has no record of it; absent = no base ref (solo) or not observed. The base record wins over
@@ -248,6 +295,13 @@ export interface StoryFacts {
    * none, held here, or not observed.
    */
   unpushed_runs?: UnpushedRuns[];
+  /** BS1: the story branch against its base; absent = not observed (no story branch or base ref) */
+  base?: StoryBase;
+  /**
+   * NT2/NT3: notes for a person from `done` receipts of any unit of the story that no story-level
+   * gate `approve` acknowledged yet, oldest first. Absent = none (or not observed).
+   */
+  notes?: import("./criteria.ts").StoryNote[];
   /** units: the story unit first, then slices ascending by nn */
   units: UnitFacts[];
   slices: SliceFileFacts[];
@@ -275,6 +329,10 @@ export interface Facts {
   tick_id: string;
   /** ms epoch at observe start; decide uses only this as "now" */
   now: number;
+  /**
+   * `default_branch` is the **base branch** (BS0): config `base_branch` when set, else the remote's
+   * default branch as discovered. Stories are cut from it, updated from it and PR'd into it.
+   */
   repo: { root: string; default_branch: string; remote: string };
   machine: MachineFacts;
   remote: {

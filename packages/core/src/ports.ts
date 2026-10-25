@@ -97,6 +97,46 @@ export type PushResult =
 
 export type RebaseResult = { ok: true; head: string } | { ok: false; conflict: true; files: string[] };
 
+/** BS3: a merge commit made, or a conflicting merge aborted with the conflicting paths. */
+export type MergeResult = { ok: true; head: string } | { ok: false; conflict: true; files: string[] };
+
+/**
+ * H1 (S1, BS5): an operation git is in the middle of in a worktree — a merge (`MERGE_HEAD`), a
+ * rebase, a cherry-pick or a revert — and the unmerged paths. `operation: null` and `unmerged: []`
+ * = none: a commit there would not conclude anyone's merge.
+ */
+export interface GitInProgress {
+  operation: "merge" | "rebase" | "cherry-pick" | "revert" | null;
+  unmerged: string[];
+}
+
+/** H1: a line that looks like a conflict marker (`<<<<<<< `, `>>>>>>> `, `||||||| `). */
+export interface ConflictMarker {
+  path: string;
+  line: number;
+}
+
+/**
+ * BS5.2 (dogfood D5): a file the outgoing commits of a branch changed whose content at the pushed
+ * head still holds both an opening (`<<<<<<< `) and a closing (`>>>>>>> `) conflict marker, and the
+ * newest outgoing commit that changed it.
+ */
+export interface OutgoingMarkers {
+  path: string;
+  commit: string | null;
+}
+
+/** PortError codes of `GitPort.commit` (H1): nothing is committed in either case. */
+export const GIT_IN_PROGRESS = "git_operation_in_progress";
+export const GIT_CONFLICT_MARKERS = "git_conflict_markers";
+
+/** BS1: how two commits relate — `ahead` = commits only in `a`, `behind` = commits only in `b`. */
+export interface Divergence {
+  merge_base: string | null;
+  ahead: number;
+  behind: number;
+}
+
 /** Git, run in a given repo or worktree directory (`cwd`). */
 export interface GitPort {
   /** Top-level of the repo containing cwd (main checkout, not the worktree). */
@@ -123,8 +163,30 @@ export interface GitPort {
   worktreeAdd(cwd: string, path: string, branch: string, opts?: { from?: string }): Promise<void>;
   worktreeRemove(cwd: string, path: string, opts?: { force?: boolean }): Promise<void>;
 
-  /** Commit; returns the new sha, or null when nothing to commit. */
+  /**
+   * Commit; returns the new sha, or null when nothing to commit. H1: never concludes an operation in
+   * progress — throws PortError `git_operation_in_progress` (nothing staged) while `inProgress` reports
+   * one, since git cannot commit some paths without concluding a merge; throws `git_conflict_markers`
+   * (nothing committed) when a staged file gains both `<<<<<<< ` and `>>>>>>> ` lines.
+   */
   commit(cwd: string, spec: CommitSpec): Promise<string | null>;
+  /** H1: the operation git is in the middle of in cwd's worktree, and its unmerged paths. */
+  inProgress(cwd: string): Promise<GitInProgress>;
+  /**
+   * H1/BS5: conflict-marker lines in tracked files — of the work tree, or of `rev` — limited to
+   * `paths` when given ([] = none checked).
+   */
+  conflictMarkers(cwd: string, opts?: { paths?: string[]; rev?: string }): Promise<ConflictMarker[]>;
+  /**
+   * BS5.2: files changed by the commits of `rev` that are on no `remote` ref yet (merge commits
+   * against their first parent) which still hold conflict markers at `rev`; [] = safe to push.
+   */
+  outgoingConflictMarkers(cwd: string, remote: string, rev: string): Promise<OutgoingMarkers[]>;
+  /**
+   * BS5: the merge commit that brought `base` into `head` — the oldest merge on the ancestry path
+   * `base..head` — or null when there is none (`base` not merged, or reached without a merge).
+   */
+  baseMergeCommit(cwd: string, base: string, head: string): Promise<string | null>;
   /** Push a branch (`refspec` like `HEAD:refs/heads/x`), optional force-with-lease. */
   push(cwd: string, remote: string, refspec: string, opts?: { forceWithLease?: string; setUpstream?: boolean }): Promise<PushResult>;
   fetch(cwd: string, remote: string, refspecs: string[]): Promise<void>;
@@ -134,6 +196,18 @@ export interface GitPort {
   rebase(cwd: string, onto: string): Promise<RebaseResult>;
   /** Is `ancestor` an ancestor of `descendant`? */
   isAncestor(cwd: string, ancestor: string, descendant: string): Promise<boolean>;
+  /** BS1: merge base of `a` and `b`, and the commits only in each (`rev-list --left-right --count a...b`). */
+  divergence(cwd: string, a: string, b: string): Promise<Divergence>;
+  /**
+   * BS1: paths a merge of `theirs` into `ours` would conflict in, without touching any worktree
+   * (`git merge-tree --write-tree --name-only --no-messages`, git ≥ 2.38); [] = a clean merge.
+   */
+  mergeTree(cwd: string, ours: string, theirs: string): Promise<string[]>;
+  /**
+   * BS3: `git merge --no-ff <rev>` in cwd, committed with `spec.message` and its trailers (S4). On a
+   * conflict the merge is aborted (`git merge --abort`) and the conflicting paths are reported.
+   */
+  merge(cwd: string, rev: string, spec: Pick<CommitSpec, "message" | "trailers">): Promise<MergeResult>;
 
   // --- refs and blobs (claims T2, mailbox T9)
   readRef(cwd: string, ref: string): Promise<string | null>;
@@ -182,8 +256,10 @@ export interface RemotePullRequest {
   draft?: boolean;
   /** head branch name */
   head?: string;
-  /** base branch name */
+  /** base branch name (older name of `base_branch`) */
   base?: string;
+  /** BS11: the branch the PR targets (merges into); GR6 cleanup only when it is the story's base branch */
+  base_branch?: string;
 }
 
 /** `gh` / `glab` for one repository. */

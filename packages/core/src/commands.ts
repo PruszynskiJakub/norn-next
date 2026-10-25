@@ -16,9 +16,13 @@ export const storyWorktreePath = (repoRoot: string, story: string, slug: string)
 export const sliceWorktreePath = (storyWorktree: string, nn: string, slug: string) =>
   `${storyWorktree.replace(/\/+$/, "")}--${sliceDirName(nn, slug)}`;
 
-/** Command that starts an agent in a worktree for a person (manual mode, attended steps). */
-export function startAgentCommand(worktree: string | null, agentCommand: string): string {
-  const run = `${agentCommand} ${q("Use the norn skill, then run `norn brief`.")}`;
+/**
+ * Command that starts an agent in a worktree for a person (manual mode, attended steps), with the
+ * agent's configured args. B3: `--` ends them, so a variadic flag cannot swallow the prompt.
+ */
+export function startAgentCommand(worktree: string | null, agentCommand: string, args: string[] = []): string {
+  const opts = args.length ? `${args.map(q).join(" ")} -- ` : "";
+  const run = `${agentCommand} ${opts}${q("Use the norn skill, then run `norn brief`.")}`;
   return worktree ? `cd ${q(worktree)} && ${run}` : run;
 }
 

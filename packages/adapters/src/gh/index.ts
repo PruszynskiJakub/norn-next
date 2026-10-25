@@ -75,6 +75,7 @@ export function mapPr(p: GhPr): RemotePullRequest {
     draft: p.isDraft ?? false,
     head: p.headRefName,
     base: p.baseRefName,
+    base_branch: p.baseRefName,
   };
 }
 

@@ -34,14 +34,15 @@ The top block is generated: never edit it. Below it, keep three sections:
 - **Progress**: milestones done, decisions and why, what was tried and failed.
 - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
 
-Update it at each milestone and always right before you report.
+Refresh it at each milestone and always right before you report.
 
 ## 4. Report exactly once, then end your turn
 
 Pick exactly one:
 
-- `norn done <outcome> --handoff "<short summary>" [--findings <file>] [--evidence <dir>]`
+- `norn done <outcome> --handoff "<short summary>" [--findings <file>] [--evidence <dir>] [--criteria <file>] [--note "<text>" [--note-criterion <id>]]`
   The outcome must be one listed under "Finish with". Pick the one whose meaning is true, not the one you hoped for. Pass every findings file and evidence directory your skill produced; an outcome that sends the work back needs `--findings` (what failed, with repro), or the next run has only your summary.
+  `--criteria` takes the verdict file your skill wrote (one verdict per criterion); when "Finish with" shows it, it is required and an outcome that contradicts the worst verdict is refused. `--note` leaves a question for a person without blocking (repeatable; `--note-criterion` ties it to one criterion).
 - `norn ask "<question>" [--option "<a>" --option "<b>"]`
   You need a person's decision to continue. One self-contained question.
 - `norn stuck "<reason>"`

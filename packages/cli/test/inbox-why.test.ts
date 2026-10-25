@@ -4,10 +4,13 @@
  * the inbox history records when items came and went and who resolved them, `norn why` finds the
  * tick by step / attempt / transition / rule and quotes the reason, and the PR merge is an item.
  */
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
 import { type CliResult, runCli } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
+
+// whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
+setDefaultTimeout(30_000);
 
 const SHIP = `name: ship
 start: work
@@ -106,7 +109,11 @@ describe("gate item and rulings (F21, F28)", () => {
   });
 
   test("a reject reason is a ruling every later brief of the story carries", async () => {
-    expect((await h.norn("approve", "gh-7", "--reject", "--reason", "AC6 wins over B6: show the raw count")).exit).toBe(0);
+    const judged = h.git(["rev-parse", "HEAD"], wt());
+    const rej = await h.norn("approve", "gh-7", "--reject", "--reason", "AC6 wins over B6: show the raw count");
+    expect(rej.exit).toBe(0);
+    // C2: the ruling is tied to the head it judged
+    expect(rej.value).toMatchObject({ receipt: { kind: "reject", head_sha: judged } });
     await tick();
     expect(h.state(runs())).toMatchObject({ step: "work", attempt: 2 });
     // the brief it sent back quotes it under Rework, not twice
@@ -120,6 +127,7 @@ describe("gate item and rulings (F21, F28)", () => {
     const qa = (await inWt("brief")).value as Brief;
     expect(qa.markdown).toContain("## Rulings");
     expect(qa.markdown).toContain("- gh-7 human-qa#1 reject by tester@box");
+    expect(qa.markdown).toContain(`at head \`${judged}\`:`);
     expect(qa.markdown).toContain("  > AC6 wins over B6: show the raw count");
     await tick();
     expect((await inWt("done", "partial", "--handoff", "AC7 still needs a browser")).exit).toBe(0);

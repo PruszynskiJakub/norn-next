@@ -16,6 +16,7 @@ import {
   Target,
   Ulid,
 } from "./common.ts";
+import { CriterionVerdict, Note, NoteId } from "./criteria.ts";
 
 /**
  * Receipts are immutable inputs at `runs/<unit>/receipts/NNNN-<kind>.json` (S6),
@@ -68,6 +69,24 @@ export const DoneReceipt = receipt("done", {
   findings: Type.Optional(Type.Array(Finding)),
   /** Evidence folder relative to the unit's runs dir, e.g. `evidence/<run_id>`. */
   evidence: Type.Optional(NonEmpty),
+  /** QV2: the `--criteria` report, one verdict per criterion */
+  criteria: Type.Optional(Type.Array(CriterionVerdict, { minItems: 1 })),
+  /** NT1: notes for a person; never block, never change the route */
+  notes: Type.Optional(Type.Array(Note, { minItems: 1 })),
+  /**
+   * BS5 (verified at `norn done` of a base-mode step): the base merged, the merge commit that brought
+   * it in (null = reached without a merge commit) and the story head reported.
+   */
+  base_merge: Type.Optional(
+    Type.Object(
+      {
+        sha: Type.String({ pattern: "^[0-9a-f]{40,64}$" }),
+        merge: Type.Union([Type.String({ pattern: "^[0-9a-f]{40,64}$" }), Type.Null()]),
+        head: Type.String({ pattern: "^[0-9a-f]{40,64}$" }),
+      },
+      { additionalProperties: false },
+    ),
+  ),
 });
 export const AskReceipt = receipt("ask", {
   question: NonEmpty,
@@ -94,10 +113,16 @@ export const AnswerReceipt = receipt("answer", {
 });
 export const ApproveReceipt = receipt("approve", {
   comment: Type.Optional(Type.String()),
-  /** Story branch head at the moment of `approve` (story unit gates); observe's `ready_head_sha`. */
+  /** The unit's branch head at the moment of `approve` (story unit: observe's `ready_head_sha`); the ruling's head (C2). */
+  head_sha: Type.Optional(Type.String({ pattern: "^[0-9a-f]{40,64}$" })),
+  /** NT3: open notes of the story listed at this story-level gate at `approve`; they leave the inbox */
+  acknowledged_notes: Type.Optional(Type.Array(NoteId, { uniqueItems: true })),
+});
+export const RejectReceipt = receipt("reject", {
+  comment: Type.Optional(Type.String()),
+  /** C2: the unit's branch head the person judged — a ruling is tied to it */
   head_sha: Type.Optional(Type.String({ pattern: "^[0-9a-f]{40,64}$" })),
 });
-export const RejectReceipt = receipt("reject", { comment: Type.Optional(Type.String()) });
 export const UnstickReceipt = receipt("unstick", {
   to: Type.Optional(StepName),
   reset: Type.Optional(Type.Array(CounterName, { uniqueItems: true })),
@@ -151,6 +176,25 @@ export const ClassifyReceipt = receipt("classify", {
   /** Route taken: a step, a reserved target, or `nudge` / `retry` / `park` for in-step routes. */
   route: Type.Union([Target, Type.Literal("nudge"), Type.Literal("retry"), Type.Literal("park")]),
   counter: Type.Optional(Type.Object({ name: NonEmpty, value: NonNegInt, max: PosInt }, { additionalProperties: false })),
+  /**
+   * BS3/BS8: the base the story was measured against — `git: update` conflicts and gate `stale`.
+   * Structured so the `resolve` brief carries the base sha and paths without parsing `detail` (P8).
+   */
+  base: Type.Optional(
+    Type.Object(
+      {
+        ref: NonEmpty,
+        sha: Type.String({ pattern: "^[0-9a-f]{40,64}$" }),
+        behind: Type.Optional(NonNegInt),
+        conflicts: Type.Array(NonEmpty),
+        /** BS3: the story head after a `done` update — the `Norn-Tick` merge commit when one was made */
+        head: Type.Optional(Type.String({ pattern: "^[0-9a-f]{40,64}$" })),
+        /** BS3: a `done` update made a merge commit (false = already up to date) */
+        merged: Type.Optional(Type.Boolean()),
+      },
+      { additionalProperties: false },
+    ),
+  ),
   /** C4 snapshot on silent: last assistant message, head commit, diff stat. */
   snapshot: Type.Optional(
     Type.Object(
@@ -177,6 +221,17 @@ export const TakeReceipt = receipt("take", {
   /** `take --force` over an unexpired or corrupt claim (T5) */
   forced: Type.Optional(Type.Boolean()),
 });
+/**
+ * BS9: `norn update <story>` — a person sends the story unit back to its base-update step (from a
+ * gate, from stuck, or from `$done` while the PR is unmerged). Written before the state change (P6).
+ */
+export const UpdateReceipt = receipt("update", {
+  /** the step left, or `$done` */
+  from: Type.Union([StepName, Type.Literal("$done"), Type.Literal("$stuck")]),
+  /** the step entered (the workflow's `base.step`) */
+  to: StepName,
+  reason: Type.Literal("person"),
+});
 /** Journaled workflow switch (`norn workflow <unit> <name> --to <step>`, S7). */
 export const WorkflowReceipt = receipt("workflow", {
   name: NonEmpty,
@@ -201,6 +256,7 @@ export const Receipt = TaggedUnion(
     ClassifyReceipt,
     WorkflowReceipt,
     TakeReceipt,
+    UpdateReceipt,
   ],
   { $id: "https://norn.dev/schema/receipt.json", title: "norn receipt" },
 );
@@ -220,6 +276,7 @@ export type StartedReceipt = ReceiptOf<"started">;
 export type ClassifyReceipt = ReceiptOf<"classify">;
 export type WorkflowReceipt = ReceiptOf<"workflow">;
 export type TakeReceipt = ReceiptOf<"take">;
+export type UpdateReceipt = ReceiptOf<"update">;
 
 export const RECEIPT_KINDS = [
   "done",
@@ -235,6 +292,7 @@ export const RECEIPT_KINDS = [
   "classify",
   "workflow",
   "take",
+  "update",
 ] as const satisfies readonly ReceiptKind[];
 
 /** Receipts a non-holder may push through the mailbox (T9). */

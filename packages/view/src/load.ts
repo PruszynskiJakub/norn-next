@@ -16,7 +16,10 @@ import {
   formatAge,
   heartbeatDown,
   nextCommand,
+  type NumberedReceipt,
+  openNotes,
   RECENT_MS,
+  readyApproval,
   type RunFacts,
   sliceWorktreePath,
   startCommandFor,
@@ -30,7 +33,11 @@ import {
 import { DEFAULT_CONFIG, type HookFact, type LeaseFile, type Mode, type ResolvedConfig, sliceBranch, storyBranch, type TraceEvent } from "@norn/schema";
 import {
   classifyClaim,
+  cachedDefaultBranch,
   defaultBaseRef,
+  readBaseFacts,
+  onlyNornCommitsSince,
+  readPrFacts,
   lastTickAt,
   type LeaseEntry,
   type LeaseLiveness,
@@ -48,7 +55,7 @@ import {
   withSliceWorktrees,
 } from "@norn/store";
 import { mergeTimeline, receiptEntry, traceEntries, traceUnits } from "./timeline.ts";
-import type { ClaimView, CounterView, ProjectView, RecentDone, RunView, SliceView, StoryView, TimelineEntry, UnitView } from "./types.ts";
+import type { BaseSyncView, ClaimView, CounterView, ProjectView, RecentDone, RunView, SliceView, StoryView, TimelineEntry, UnitView } from "./types.ts";
 
 export interface LoadProjectViewOptions {
   repoRoot: string;
@@ -183,6 +190,19 @@ function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: Uni
 }
 
 /** Build the read model. Async only because claim refs are read through local git. */
+/** BS1/BS3: the last base measurement (`trace/base.json`) and the newest base merge in the story unit's receipts. */
+function baseSync(sf: StoryFacts, receipts: readonly NumberedReceipt[], branch: string): BaseSyncView | null {
+  let last: BaseSyncView["last_update"] = null;
+  for (const { receipt: r } of [...receipts].sort((a, b) => b.n - a.n)) {
+    if (r.kind === "classify" && r.outcome === "done" && r.base?.merged && r.base.head) last = { sha: r.base.head, base_sha: r.base.sha, at: r.at, step: r.step };
+    else if (r.kind === "done" && r.base_merge?.merge) last = { sha: r.base_merge.merge, base_sha: r.base_merge.sha, at: r.at, step: r.step };
+    if (last) break;
+  }
+  const b = sf.base;
+  if (!b && !last) return null;
+  return { branch: b ? b.ref.replace(/^refs\/(remotes\/[^/]+|heads)\//, "") : branch, behind: b?.behind ?? null, ahead: b?.ahead ?? null, conflicts: b?.conflicts ?? [], last_update: last };
+}
+
 export async function loadProjectView(opts: LoadProjectViewOptions): Promise<ProjectView> {
   const now = opts.now ?? Date.now();
   const holder = opts.holder ?? defaultHolder();
@@ -229,7 +249,9 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
 
   // R2.3: on a story not held here, local runs/ work that never reached the record (an inbox Check item)
   const remoteName = config.remote.git_remote;
-  const baseRef = defaultBaseRef(opts.repoRoot, remoteName);
+  const baseRef = defaultBaseRef(opts.repoRoot, remoteName, config.base_branch);
+  const baseFacts = readBaseFacts(opts.repoRoot);
+  const prSeen = readPrFacts(opts.repoRoot);
   const unpushed = await Promise.all(
     snap.stories.map(async (read, i): Promise<UnpushedRuns[]> => {
       const c = classifyClaim(claims[i] ?? { state: "none" }, me, now);
@@ -244,6 +266,19 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       }
       const found = await unpushedRuns(remoteName, baseRef, read.spec_dir, targets).catch(() => []);
       return found.map((f) => ({ unit: f.unit, files: f.files }));
+    }),
+  );
+  // F35/C5: the ready approval's head, voided by a later re-entry; and whether only norn moved the PR head since
+  const readyHeads = await Promise.all(
+    snap.stories.map(async (story): Promise<{ ready_head_sha?: string; ready_approved_at?: string; ready_head_norn?: string }> => {
+      const wf = story.units[0]?.workflow?.workflow;
+      const receipts = story.units[0]?.receipts;
+      const ready = wf && receipts ? readyApproval(wf, receipts) : undefined;
+      if (!ready) return {};
+      const sha = ready.sha;
+      const prHead = prSeen[story.key]?.pr?.head_sha;
+      const norn = !!prHead && prHead !== sha && (await onlyNornCommitsSince(opts.repoRoot, sha, prHead, story.key).catch(() => false));
+      return { ready_head_sha: sha, ready_approved_at: ready.at, ...(norn ? { ready_head_norn: prHead } : {}) };
     }),
   );
   const runs: RunView[] = [];
@@ -310,10 +345,17 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       mailbox: undefined,
       issue: undefined,
       pr: undefined,
+      // C1: the PR as this checkout's last sync saw it — merge (BS10), retarget (BS11), head changed (F35)
+      ...(prSeen[story.key] && story.frontmatter?.status !== "done" && story.frontmatter?.status !== "dropped" ? { pr_seen: prSeen[story.key] } : {}),
+      ...readyHeads[i],
       units,
       slices: story.slices,
       mode,
       ...(unpushed[i]?.length ? { unpushed_runs: unpushed[i] } : {}),
+      // NT2/NT3: open notes of the story, same rule as observe
+      ...((notes) => (notes.length ? { notes } : {}))(openNotes(story.units.map((u) => ({ unit: u.unit.key, receipts: u.receipts ?? [] })))),
+      // BS1: the last base measurement of this checkout's ticks (stale items, merge-item detail)
+      ...(baseFacts[story.key] && story.frontmatter?.status !== "done" && story.frontmatter?.status !== "dropped" ? { base: baseFacts[story.key] } : {}),
     };
     storyFacts.push(sf);
 
@@ -372,6 +414,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       stories.push({
         ...base,
         slice: null,
+        base_sync: baseSync(sf, storyUnit.receipts ?? [], config.base_branch ?? cachedDefaultBranch(opts.repoRoot) ?? "main"),
         story_status: story.frontmatter?.status ?? null,
         spec_dir: story.spec_dir,
         root: story.root,
@@ -384,7 +427,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   const facts: Facts = {
     tick_id: "view",
     now,
-    repo: { root: opts.repoRoot, default_branch: "main", remote: config.remote.git_remote },
+    repo: { root: opts.repoRoot, default_branch: config.base_branch ?? cachedDefaultBranch(opts.repoRoot) ?? "main", remote: config.remote.git_remote },
     machine: {
       holder,
       heartbeat_id: opts.heartbeatId ?? null,

@@ -195,6 +195,26 @@ describe("classification (§10, C1, MO4)", () => {
     expect(a).toMatchObject({ kind: "park", rule: "agent.ask.implicit", park: { kind: "ask", reason: "Allow rm -rf?" }, notify: { group: "answer", detail: "pending command: rm -rf build" } });
     expect(a.kind === "park" && a.receipts[0]?.receipt).toMatchObject({ kind: "ask", implicit: true, command: "rm -rf build" });
   });
+  test("BS5.1 (dogfood D3): an owed commit deferred by an agent's merge never takes the unit's action", () => {
+    const midMerge = (s: StoryFacts, inProgress: { operation: "merge" | null; unmerged: string[] }) => {
+      const u = s.units[0]!;
+      u.uncommitted = true;
+      u.worktree = { ...u.worktree!, in_progress: inProgress };
+      return s;
+    };
+    const merging = { operation: "merge" as const, unmerged: ["a.ts"] };
+    // nothing in progress: the recovered commit comes first, as before
+    expect(only(facts([midMerge(solo(running(), {}), { operation: null, unmerged: [] })]))).toMatchObject({ kind: "commit_push", rule: "recover.commit" });
+    // a second permission prompt mid-merge (pane waiting after an answered ask) parks again as an implicit ask
+    const pane = { alive: true, state: "waiting_input" as const, since: null, detail: "Do you want to proceed?\n ❯ 1. Yes\n   2. No" };
+    expect(only(facts([midMerge(solo(running(), { pane }), merging)]))).toMatchObject({ kind: "park", rule: "agent.ask.implicit" });
+    // the deadline still fires, and a died agent is still retried
+    const old = running({ run: { ...running().run!, started_at: at(T0 - 61 * 60_000) }, updated_at: at(T0 - 61 * 60_000) });
+    expect(only(facts([midMerge(solo(old, {}), merging)]))).toMatchObject({ kind: "nudge", rule: "agent.timeout.nudge" });
+    expect(only(facts([midMerge(solo(running(), { process_alive: false }), merging)])).kind).toBe("retry_fresh");
+    // resolved but not concluded (no unmerged path, MERGE_HEAD still there) is still in progress
+    expect(only(facts([midMerge(solo(running(), {}), { operation: "merge", unmerged: [] })]))).toMatchObject({ kind: "noop", rule: "agent.running" });
+  });
   test("attended runs only classify died (MO4)", () => {
     const wf = { ...SOLO_WF, steps: { implement: { ...SOLO_WF.steps.implement!, attended: true } } } as typeof SOLO_WF;
     const s = solo(running(), { hooks: [{ event: "turn_end", at: at(T0 - 10), agent: "claude", native: "Stop", cwd: "/w" }] });

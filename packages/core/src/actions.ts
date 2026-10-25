@@ -115,7 +115,7 @@ export interface ApplyReceiptsAction extends UnitBase, Transition {
   /** receipts refused (stale step/attempt T9, wrong kind for the step); act writes each to the trace as a `reject` event */
   rejected: Array<{ n: number; receipt_id: string; reason: string }>;
   /** edge taken, if the cursor moved */
-  advance: { from: string; outcome: string; to: string; counter?: { name: string; value: number; max: number } } | null;
+  advance: { from: string; outcome: string; to: string; counter?: { name: string; value: number; max: number }; reset?: string[] } | null;
   /** deliver into the live session after state is written (answer → same session) */
   input: SessionInput | null;
   /**
@@ -206,6 +206,11 @@ export interface RunGitAction extends UnitBase, Transition {
   onto: string | null;
   /** open-pr */
   pr: { base: string; title: string; body: string } | null;
+  /**
+   * update (BS3): merge `sha` (the tip of `ref`, BS0) into the story branch with `message` and
+   * `trailers` (`Norn-Tick`: Q6 never reports it as foreign). Absent on older traces.
+   */
+  update?: { ref: string; sha: string; branch: string; message: string; trailers: Record<string, string> } | null;
 }
 
 /** Story-level `slices` step: start every slice whose depends_on are done, within caps (W2). */

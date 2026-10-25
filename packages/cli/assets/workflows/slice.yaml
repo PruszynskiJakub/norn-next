@@ -1,5 +1,7 @@
 # Slice workflow — example installed by `norn init`; edit freely (W1).
 # Runs on a slice: build test-first, check, review, QA, then integrate into the story branch.
+# QA reports a verdict per acceptance criterion (criteria: required); each outcome is allowed only
+# when the worst verdict matches it (verdict:) — `unverified` (could not check here) goes to a person.
 # Change `test.run` to your repo's test command.
 name: slice
 description: Build one slice test-first, verify it, and integrate it into the story branch.
@@ -26,13 +28,15 @@ steps:
     type: agent
     skill: qa
     inputs: [slice, spec, diff]
+    criteria: required
     outcomes:
-      pass:    { to: integrate, means: "every criterion verified with evidence" }
-      fail:    { to: implement, counter: qa_loop, means: "a criterion fails; repro in the receipt" }
-      partial: { to: human-qa, means: "criteria only a person can check are listed with prepared evidence" }
+      pass:       { to: integrate, verdict: pass, means: "every criterion observed with evidence" }
+      fail:       { to: implement, counter: qa_loop, verdict: fail, means: "a criterion fails; repro in findings" }
+      partial:    { to: human-qa, verdict: person, means: "criteria only a person can judge, evidence prepared" }
+      unverified: { to: human-qa, verdict: unverified, means: "criteria this session could not check; how to check each one is in the report" }
   human-qa:
     type: gate
-    prompt: "Check the criteria QA listed as person-only (evidence attached). Approve, or reject with what failed."
+    prompt: "Check the criteria QA could not settle (listed with how to check each). Approve, or reject with what failed."
     outcomes: { approve: integrate, reject: { to: implement, counter: qa_loop } }
   integrate:
     type: git

@@ -15,6 +15,8 @@ export const workflowsDir = (root: string) => join(root, NORN_DIR, "workflows");
 export const traceDir = (root: string) => join(root, NORN_DIR, "trace");
 /** Local tick lock (H1); lives in the gitignored trace dir. */
 export const tickLockPath = (root: string) => join(traceDir(root), "tick.lock");
+/** K6/BS3: a story's integrate lock — slice integrations and base updates of one story never interleave. */
+export const integrateLockPath = (root: string, story: string) => join(traceDir(root), `integrate-${story}.lock`);
 
 export const specsDir = (root: string) => join(root, SPECS_DIR);
 export const storyDir = (root: string, story: string, slug: string) => join(specsDir(root), storyDirName(story, slug));

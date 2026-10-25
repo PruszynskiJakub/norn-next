@@ -219,7 +219,35 @@ export const TickEndTrace = Type.Object(
 );
 export type TickEndTrace = Static<typeof TickEndTrace>;
 
-export const TraceEvent = TaggedUnion("type", [TickTrace, HookTrace, RejectTrace, BriefingTrace, ForeignCommitsTrace, TakeTrace, TickStartTrace, TickEndTrace], {
+/**
+ * QV2–QV4, QV8: a `norn done --criteria` report, counted — so "we keep failing to verify browser
+ * criteria" shows up as data (`norn trace` sums `unverified_needs`). `rule` is
+ * `criteria.unchecked_coverage` when the unit's frontmatter had no `criteria` to check coverage
+ * against (QV4), else `criteria.checked`.
+ */
+export const CriteriaTrace = Type.Object(
+  {
+    type: Type.Literal("criteria"),
+    id: Ulid,
+    at: IsoTime,
+    /** unit key: story key or slice key */
+    unit: NonEmpty,
+    run_id: Ulid,
+    step: NonEmpty,
+    attempt: NonNegInt,
+    receipt_id: Ulid,
+    outcome: NonEmpty,
+    rule: Type.Union([Type.Literal("criteria.checked"), Type.Literal("criteria.unchecked_coverage")]),
+    /** count per verdict */
+    verdicts: Type.Object({ pass: NonNegInt, fail: NonNegInt, person: NonNegInt, unverified: NonNegInt }, { additionalProperties: false }),
+    /** `unverified` criteria per capability in their frontmatter `needs` (QV8); `none` = no needs declared */
+    unverified_needs: Type.Record(Type.String(), NonNegInt),
+  },
+  { additionalProperties: false },
+);
+export type CriteriaTrace = Static<typeof CriteriaTrace>;
+
+export const TraceEvent = TaggedUnion("type", [TickTrace, HookTrace, RejectTrace, BriefingTrace, ForeignCommitsTrace, TakeTrace, TickStartTrace, TickEndTrace, CriteriaTrace], {
   $id: "https://norn.dev/schema/trace.json",
   title: "norn trace event (one JSONL line)",
 });

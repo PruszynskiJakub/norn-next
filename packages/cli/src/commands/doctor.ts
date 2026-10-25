@@ -2,7 +2,7 @@
  * `norn doctor [--live]` (A7, M4): is this machine ready to run norn here? JSON report.
  *
  * Static checks (default, no agent turns):
- *   - git present (version)
+ *   - git present, version ≥ 2.38 (BS2: `merge-tree --write-tree` for base conflict detection)
  *   - per configured agent: launch binary on PATH + `--version`, norn hooks installed (A1),
  *     and the hook path fires: the installed hook command (`norn hook …`) is invoked with a
  *     synthetic payload from a throwaway unit worktree and must record a hook fact (A2, A3).
@@ -18,7 +18,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { proc } from "@norn/adapters";
+import { git as gitAdapter, proc } from "@norn/adapters";
 import type { AgentAdapter, RunnerPort, SessionRef } from "@norn/core";
 import { ExitCode, ulid } from "@norn/schema";
 import { writeUnitMarker } from "@norn/store";
@@ -166,7 +166,14 @@ export const doctorCommand = defineCommand({
     const command = hookCommand(ctx);
 
     const g = await run(["git", "--version"], { timeoutMs: 10_000 });
-    const gitCheck = { ok: g.code === 0, version: firstLine(g.out) || null };
+    // BS2: base conflict detection (BS1) needs `git merge-tree --write-tree`, git ≥ 2.38
+    const gitVersion = firstLine(g.out) || null;
+    const gitNew = g.code === 0 && gitAdapter.gitVersionOk(gitVersion ?? "");
+    const gitCheck = {
+      ok: gitNew,
+      version: gitVersion,
+      ...(g.code === 0 && !gitNew ? { error: `git ≥ ${gitAdapter.MIN_GIT_VERSION.join(".")} is required (merge-tree --write-tree, BS2)`, do_instead: "upgrade git" } : {}),
+    };
 
     const agents = [];
     for (const [name, agent] of Object.entries(ports.agents)) {

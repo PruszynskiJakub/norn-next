@@ -144,7 +144,8 @@ function rulings(s: UnitSession): Ruling[] {
 
 /** `<remote>/<base>` when the remote-tracking base exists, else the local base branch (solo). */
 export function storyDiffBase(ctx: Context, root: string): string {
-  const branch = readRemoteCache(root).default_branch ?? "main";
+  // BS0: config `base_branch` when set, else the discovered default branch
+  const branch = ctx.config.base_branch ?? readRemoteCache(root).default_branch ?? "main";
   const ref = defaultBaseRef(root, ctx.config.remote.git_remote, branch);
   return ref ? ref.slice("refs/remotes/".length) : branch;
 }
