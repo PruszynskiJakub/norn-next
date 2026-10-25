@@ -26,7 +26,8 @@ import {
 
 describe("ulid", () => {
   test("format, time and monotonic order", () => {
-    const now = Date.UTC(2026, 9, 23);
+    // ahead of every id minted so far in this process: ulid() is monotonic, so an earlier time is clamped
+    const now = ulidTime(ulid()) + 1;
     const ids = Array.from({ length: 1000 }, () => ulid(now));
     expect(ids.every(isUlid)).toBe(true);
     expect([...ids].sort()).toEqual(ids);

@@ -167,7 +167,7 @@ describe("GR6 record on the base branch", () => {
     labels: ["norn"],
     workflow: "solo",
     status: "active",
-    intake_at: "2026-01-15T10:00:00.000Z",
+    intake_at: "2099-01-15T10:00:00.000Z",
     body_hash: "0".repeat(64),
   };
   const opts = (h: Harness) => ({ root: h.root, remote: "origin", git: gitAdapter.createGit(), base: "main", spec_dir: ".agents/specs/gh-5-merged", story: "gh-5", status: "done" as const, trailers: { "Norn-Story": "gh-5" } });
