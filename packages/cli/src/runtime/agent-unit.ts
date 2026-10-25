@@ -47,7 +47,7 @@ export function requireWorktree(ctx: Context, verb: string): { worktree: string;
   if (found) return found;
   throw refuse(
     `norn ${verb} runs only inside a unit worktree (a directory with a .norn-unit marker)`,
-    "stop: this session is not in a unit worktree. A person runs `norn open <unit>` (`norn inbox` names the unit), which opens an agent in the right worktree",
+    "stop: this session is not in a unit worktree. A person starts the agent from the unit's item in `norn inbox` (`norn open <unit>` opens or prints it)",
     "not_in_unit",
   );
 }
