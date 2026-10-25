@@ -4,6 +4,8 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-25
+
 ### Changed
 
 - The skills are norn v0.11.0's again, adapted to this norn: its skill files are the base, edited only where the contracts differ (the spec and slices are files, nothing pushes or writes to the remote, QA verdicts and findings are JSON, the person decides at gates when no one works with the agent). Refactoring is out of the red → green loop again, tests go only at the Plan's agreed seams, review keeps the Spec and Standards axes apart (a subagent per axis when the agent has them), and QA redacts secrets and takes a screenshot of every criterion checked in a browser.
@@ -15,7 +17,7 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ### Added
 
-- `norn init` marks `.agents/specs/*/runs/**` as generated in `.gitattributes` (`linguist-generated`, `gitlab-generated`), so GitHub and GitLab collapse receipts, state and logs in PR diffs. The files are still committed and pushed (S8). Run `norn init` again in an existing repo to add the line.
+- `norn init` marks `.agents/specs/*/runs/**` as generated in `.gitattributes` (`linguist-generated`, `gitlab-generated`), so GitHub and GitLab collapse receipts, state and logs in PR diffs. The files are still committed and pushed (S8, S10). Run `norn init` again in an existing repo to add the line.
 - `norn doctor` checks the skills: missing from `.agents/skills/` or not linked from an agent's folder fails the check, a skill that differs from the bundled version is a warning.
 
 ### Removed
@@ -45,5 +47,6 @@ The first release. norn v1 as specified in `.agents/PRD.md`.
 - The Claude Code plugin (`plugins/claude-code`): the norn skills and a `/norn` command.
 - Distribution: an npm package on GitHub Packages and single-file binaries for macOS and Linux (arm64, x64).
 
-[Unreleased]: https://github.com/PruszynskiJakub/norn-next/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/PruszynskiJakub/norn-next/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/PruszynskiJakub/norn-next/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/PruszynskiJakub/norn-next/releases/tag/v0.1.0
