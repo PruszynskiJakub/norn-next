@@ -1,0 +1,65 @@
+# Release on a version tag: `git tag v0.1.0 && git push origin v0.1.0`.
+# The tag must match packages/cli/package.json and have a `## [x.y.z]` section in CHANGELOG.md.
+# Publishes @pruszynskijakub/norn to GitHub Packages and a GitHub release with the binaries.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://npm.pkg.github.com
+          scope: "@pruszynskijakub"
+
+      - name: Check the tag against the package version and changelog
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          pkg=$(jq -r .version packages/cli/package.json)
+          [ "$version" = "$pkg" ] || { echo "tag $GITHUB_REF_NAME != packages/cli/package.json $pkg"; exit 1; }
+          awk -v v="$version" '$0 ~ "^## \\[" v "\\]" {f=1; next} /^## \[/ {f=0} f' CHANGELOG.md > notes.md
+          [ -s notes.md ] || { echo "CHANGELOG.md has no ## [$version] section"; exit 1; }
+
+      - run: bun install --frozen-lockfile
+
+      - name: Test
+        run: |
+          git config --global user.name "norn ci"
+          git config --global user.email "ci@norn.invalid"
+          git config --global init.defaultBranch main
+          bun test
+          bun run typecheck
+
+      - name: Build
+        run: |
+          bun scripts/build.ts --name @pruszynskijakub/norn --registry https://npm.pkg.github.com
+          bun scripts/build.ts --bin
+          (cd dist/bin && sha256sum norn-* > SHA256SUMS)
+
+      - name: Publish to GitHub Packages
+        working-directory: dist/npm
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create the GitHub release
+        run: gh release create "$GITHUB_REF_NAME" dist/bin/* --title "norn $GITHUB_REF_NAME" --notes-file notes.md --verify-tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

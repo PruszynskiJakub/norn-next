@@ -2,6 +2,9 @@
  * X3 distribution build.
  *
  *   bun scripts/build.ts                 → dist/npm/   npm-ready @norn/cli (bundle + assets + package.json)
+ *   bun scripts/build.ts --name @o/norn --registry <url>
+ *                                        → dist/npm/   same, published under another name / registry
+ *                                          (GitHub Packages needs the owner's scope: see .github/workflows/release.yml)
  *   bun scripts/build.ts --bin [target…] → dist/bin/   single-file binaries via `bun build --compile`
  *
  * Assets are found at run time by `packages/cli/src/runtime/assets.ts` (NORN_ASSETS_DIR →
@@ -78,8 +81,15 @@ function fail(logs: readonly unknown[]): never {
   process.exit(1);
 }
 
+export interface NpmOptions {
+  /** published package name; defaults to the cli package's own name */
+  name?: string;
+  /** `publishConfig.registry` of the published package */
+  registry?: string;
+}
+
 /** dist/npm: bundle (all @norn/* and third-party deps inlined), assets, publishable package.json. */
-export async function buildNpm(): Promise<string> {
+export async function buildNpm(opts: NpmOptions = {}): Promise<string> {
   const pkg = cliManifest();
   const out = join(DIST, "npm");
   rmSync(out, { recursive: true, force: true });
@@ -93,12 +103,15 @@ export async function buildNpm(): Promise<string> {
   cpSync(ASSETS, join(out, "assets"), { recursive: true });
   const keep = ["name", "version", "description", "keywords", "license", "author", "homepage", "repository", "bugs", "engines"];
   const manifest: Record<string, unknown> = Object.fromEntries(keep.filter((k) => k in pkg).map((k) => [k, pkg[k]]));
-  Object.assign(manifest, { type: "module", bin: { norn: "norn.js" }, files: ["norn.js", "assets"] });
+  Object.assign(manifest, { type: "module", bin: { norn: "norn.js" }, files: ["norn.js", "assets", "CHANGELOG.md"] });
+  if (opts.name) manifest.name = opts.name;
+  if (opts.registry) manifest.publishConfig = { registry: opts.registry };
   writeFileSync(join(out, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`);
-  const readme = join(ROOT, "README.md");
-  try {
-    cpSync(readme, join(out, "README.md"));
-  } catch {}
+  for (const doc of ["README.md", "CHANGELOG.md"]) {
+    try {
+      cpSync(join(ROOT, doc), join(out, doc));
+    } catch {}
+  }
   return out;
 }
 
@@ -136,6 +149,10 @@ if (import.meta.main) {
     }
     for (const f of await buildBins(wanted.length ? (wanted as BinTarget[]) : BIN_TARGETS)) console.error(`built ${relative(ROOT, f)}`);
   } else {
-    console.error(`built ${relative(ROOT, await buildNpm())}`);
+    const opt = (flag: string) => {
+      const i = args.indexOf(flag);
+      return i >= 0 ? args[i + 1] : undefined;
+    };
+    console.error(`built ${relative(ROOT, await buildNpm({ name: opt("--name"), registry: opt("--registry") }))}`);
   }
 }
