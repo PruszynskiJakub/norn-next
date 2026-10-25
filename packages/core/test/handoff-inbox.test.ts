@@ -81,12 +81,34 @@ describe("inbox (O1)", () => {
     expect(inbox.groups.answer[0]?.id).toBe("01JCCCCCCCCCCCCCCCCCCCCCCC");
   });
 
+  test("a runner that opens terminals for a person: Your turn shows norn open, the typed command in the detail (MO5)", () => {
+    const st = stateFor(storyUnit(), STORY_WF, { status: "parked", park: { kind: "attended", reason: "attended", since: at(T0) } });
+    const f = facts([storyFacts("gh-1", [unitFacts(storyUnit(), STORY_WF, st)])]);
+    f.machine.runner_capabilities = { send: true, resume: true, open: true };
+    expect(buildInbox(f, CONFIG).groups.your_turn).toMatchObject([
+      { command: "norn open gh-1", detail: `by hand: cd /r-worktrees/gh-1-login && claude --permission-mode auto -- 'Use the norn skill, then run \`norn brief\`.'` },
+    ]);
+  });
+
+  test("a story taken in but not started: Your turn (norn watch) while no heartbeat runs, else Running (GR2)", () => {
+    const fresh = storyFacts("gh-1", [unitFacts(storyUnit(), STORY_WF, null)]);
+    const down = buildInbox(facts([fresh]), CONFIG);
+    expect(down.groups.your_turn).toMatchObject([{ id: "not-started:gh-1", story: "gh-1", command: "norn watch" }]);
+    expect(down.pending).toBe(1);
+    const up = buildInbox(facts([fresh], { heartbeat: { last_tick_at: T0 - 10_000 } }), CONFIG);
+    expect(up.groups.your_turn).toEqual([]);
+    expect(up.groups.running).toMatchObject([{ id: "not-started:gh-1", title: "taken in — the next tick starts it" }]);
+    // released or held elsewhere: nothing for this checkout
+    expect(buildInbox(facts([{ ...fresh, claim: { state: "none" } }]), CONFIG).pending).toBe(0);
+  });
+
   test("manual ready step under Your turn notes the MO2 downgrade", () => {
     const st = stateFor(SLICE, SLICE_WF);
     const f = facts([storyFacts("gh-1", [unitFacts(SLICE, SLICE_WF, st)])]);
     f.machine.runner = null;
     const item = buildInbox(f, CONFIG).groups.your_turn[0];
     expect(item).toMatchObject({ title: "implement is ready (manual): start an agent in the worktree", detail: "auto requested, no runner; running manual (MO2)" });
+    expect(item?.command).toStartWith("cd ");
   });
 });
 
