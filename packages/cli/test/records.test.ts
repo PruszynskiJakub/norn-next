@@ -182,7 +182,7 @@ describe("records: PR merge facts from the remote", () => {
     await h.tick(); // push
     const head = h.git(["rev-parse", "HEAD"], wt());
     const merge = mergeOnRemote(h, branch);
-    h.remote.prs = [{ number: 8, url: "https://github.com/o/r/pull/8", state: "merged", is_draft: false, head_sha: head, merge_commit_sha: merge, merged_by: "octo", merged_at: "2026-01-15T11:00:00Z", draft: false, head: branch, base: "main" }];
+    h.remote.prs = [{ number: 8, url: "https://github.com/o/r/pull/8", state: "merged", is_draft: false, head_sha: head, merge_commit_sha: merge, merged_by: "octo", merged_at: "2099-01-15T11:00:00Z", draft: false, head: branch, base: "main" }];
     h.clock.advance(10_000);
     const s = await h.norn("sync");
     expect(acted(s.value as TickReport)).toEqual(["gh-6 cleanup_merged_story"]);
@@ -190,7 +190,7 @@ describe("records: PR merge facts from the remote", () => {
     expect(story).toContain("status: done");
     expect(story).toContain(`merge_commit_sha: ${merge}`);
     expect(story).toContain("merged_by: octo");
-    expect(story).toContain("merged_at: 2026-01-15T11:00:00.000Z");
+    expect(story).toContain("merged_at: 2099-01-15T11:00:00.000Z");
     expect(story).not.toContain("by_ancestry");
     expect(h.git(["log", "-1", "--format=%(trailers:key=Norn-Merged-By,valueonly)", "origin/main"])).toBe("octo");
   });
@@ -230,7 +230,7 @@ describe("C4: an agent's commit while its unit is parked on an ask is not foreig
     expect(lastFacts(h, "gh-6")?.foreign_commits).toBeUndefined();
     expect(readTrace(h.root, { types: ["foreign_commits"] }).events).toEqual([]);
     // a person's commit dated before the unit ever ran is foreign
-    const sha = commitAt("person.txt", "by hand", "2025-12-01T09:00:00Z", "Person");
+    const sha = commitAt("person.txt", "by hand", "2098-12-01T09:00:00Z", "Person");
     h.clock.advance(10_000);
     await h.tick();
     expect(lastFacts(h, "gh-6")?.foreign_commits).toEqual([{ sha, subject: "by hand", author: "Person", at: expect.any(String), branch }]);
