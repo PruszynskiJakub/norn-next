@@ -5,6 +5,7 @@
 import {
   type AgentStep,
   type CheckReceipt,
+  type Criterion,
   type CriterionVerdict,
   type DoneReceipt,
   type Finding,
@@ -34,7 +35,7 @@ export interface BriefInput {
   paths: { worktree: string; spec_dir: string; story_file: string; slice_file: string | null; unit_dir: string };
   /** range for the `diff` input, e.g. `gh-123-login...HEAD` */
   diff_range: string | null;
-  /** handoff.md text, if any */
+  /** the agent-written part of handoff.md (the caller drops its generated header and heartbeat blocks), if any */
   handoff: string | null;
   /** every receipt of the unit, ascending by n */
   receipts: readonly NumberedReceipt[];
@@ -46,6 +47,10 @@ export interface BriefInput {
   evidence_files?: Readonly<Record<string, readonly string[]>>;
   /** F28/O2: the story's gate rulings (`storyRulings` over the receipts of every unit of the story), when the caller read them */
   rulings?: readonly Ruling[];
+  /** QV1: the unit's frontmatter `criteria` (slice file, or story.md for the story unit), when the caller read them */
+  criteria?: readonly Criterion[] | null;
+  /** QV5a: what this run's agent can do to verify criteria (config `agents.<name>.capabilities`) */
+  capabilities?: readonly string[];
 }
 
 /**
@@ -100,6 +105,13 @@ export interface BriefReport {
 
 export interface BriefJson {
   where: { story: string; slice: string | null; step: string; attempt: number; mode: Mode; mode_note: string | null; attended: boolean; run_id: string | null };
+  /** why this run is not a first entry of the step; null when it is, or when Rework already says why */
+  history: {
+    /** B2/C1: a session of this attempt ended without reporting; this is a fresh one */
+    retry: { outcome: string; detail: string | null; at: string } | null;
+    /** C2: an earlier attempt of this step reported on older code, and the outcomes recorded since */
+    earlier: { attempt: number; outcome: string; since: string[] } | null;
+  } | null;
   work: { skill: string; instructions: string | null; description: string | null };
   inputs: Array<{ kind: string; label: string; ref: string }>;
   rework: {
@@ -124,12 +136,16 @@ export interface BriefJson {
   rulings: Ruling[];
   context: {
     handoff: string | null;
+    /** the report (`<step>#<attempt>`) whose handoff Resume was dropped: it was written for that step, not this one */
+    resume_dropped: string | null;
     answers: Array<{ question: string; answer: string }>;
     /** findings of the previous step on a forward entry: for information, not rework */
     notes: { step: string; outcome: string; items: Finding[] } | null;
   };
   /** `verdict`: QV5 — reportable only when the worst verdict of the criteria report is this one */
   finish: Array<{ command: string; means: string; verdict?: string }>;
+  /** QV1: the criteria the `--criteria` report must cover, when declared; `missing` = needs this agent cannot do (QV5a) */
+  criteria: Array<{ id: string; verifier: string; needs: string[]; missing: string[] }> | null;
   limits: { attended: boolean; deadline: string | null; deadline_at: string | null; nudges_left: number | null; retries_left: number | null; slot: number | null; port_base: number | null };
 }
 
@@ -158,14 +174,17 @@ export function renderBrief(input: BriefInput): Briefing {
   const step = stepOf(wf, st.step);
   if (!step || step.type !== "agent") throw new Error(`norn brief: ${st.step} is not an agent step`);
   const rw = rework(input, step);
+  const handoff = handoffFor(input);
   const json: BriefJson = {
     where: where(input, step),
+    history: history(input, rw),
     work: { skill: step.skill, instructions: step.instructions ?? null, description: step.description ?? null },
     inputs: inputs(input, step, rw),
     rework: rw,
     rulings: rulingsFor(input),
-    context: { handoff: input.handoff?.trim() ? demoteHeadings(input.handoff.trim(), 3) : null, answers: answers(input), notes: rw ? null : notes(input) },
+    context: { handoff: handoff.text, resume_dropped: handoff.resume_dropped, answers: answers(input), notes: rw ? null : notes(input) },
     finish: finish(step),
+    criteria: criteriaFor(input),
     limits: limits(input, step),
   };
   return { markdown: markdown(json), json };
@@ -258,9 +277,69 @@ function reportOf(input: BriefInput, r: DoneReceipt): BriefReport {
   return { step: r.step, attempt: r.attempt, outcome: r.outcome, handoff: r.handoff, evidence: evidenceOf(input, r.evidence), ...(open.length ? { criteria: open } : {}) };
 }
 
-/** The receipt that moved the cursor here from another step, if any. */
+const outcomeOf = (r: Receipt): string | null =>
+  r.kind === "reject" || r.kind === "approve" ? r.kind : r.kind === "check" || r.kind === "done" || r.kind === "classify" ? r.outcome : null;
+/** Classify routes that stay in the step (nudge, fresh session, park): not a move between steps. */
+const IN_STEP = new Set(["nudge", "retry", "park"]);
+
+/**
+ * The receipt that moved the cursor here from another step, if any. After an in-step outcome
+ * (`died`, `silent`, …) `last_outcome` names this step, so look back for the last outcome of
+ * another step: a fresh session keeps its Rework (B2).
+ */
 function enteringReceipt({ state: st, receipts }: BriefInput): NumberedReceipt | undefined {
-  return st.last_outcome && st.last_outcome.step !== st.step ? receipts.find((r) => r.receipt.receipt_id === st.last_outcome?.receipt_id) : undefined;
+  if (!st.last_outcome) return undefined;
+  if (st.last_outcome.step !== st.step) return receipts.find((r) => r.receipt.receipt_id === st.last_outcome?.receipt_id);
+  return receipts.findLast(({ receipt: r }) => r.step !== st.step && outcomeOf(r) !== null && !(r.kind === "classify" && IN_STEP.has(r.route)));
+}
+
+/** `<step>.<outcome>` of every move recorded after receipt `from` (index), oldest first. */
+function movesAfter(receipts: readonly NumberedReceipt[], from: number): string[] {
+  return receipts.slice(from + 1).flatMap(({ receipt: r }) => {
+    const o = outcomeOf(r);
+    return o === null || (r.kind === "classify" && IN_STEP.has(r.route)) ? [] : [`${r.step}.${o}`];
+  });
+}
+
+/** History (B2, C2) when this is not a first entry and Rework does not already explain it. */
+function history(input: BriefInput, rw: BriefJson["rework"]): BriefJson["history"] {
+  const { state: st, receipts } = input;
+  const died = st.retries_used > 0 ? receipts.findLast(({ receipt: r }) => r.kind === "classify" && r.route === "retry" && r.step === st.step && r.attempt === st.attempt)?.receipt : undefined;
+  const retry = died?.kind === "classify" ? { outcome: `${died.step}.${died.outcome}`, detail: died.detail ?? null, at: died.at } : null;
+  const idx = rw ? -1 : receipts.findLastIndex(({ receipt: r }) => r.kind === "done" && r.step === st.step && r.attempt !== st.attempt);
+  const prev = receipts[idx]?.receipt;
+  const earlier = prev?.kind === "done" ? { attempt: prev.attempt, outcome: prev.outcome, since: movesAfter(receipts, idx) } : null;
+  return retry || earlier ? { retry, earlier } : null;
+}
+
+/**
+ * The handoff body for Context. Its Resume is the next action of whoever reported last; when
+ * that was another step or attempt, it is dropped so it is not taken as this step's instruction.
+ */
+function handoffFor({ state: st, receipts, handoff }: BriefInput): { text: string | null; resume_dropped: string | null } {
+  const body = handoff?.trim();
+  if (!body) return { text: null, resume_dropped: null };
+  const last = receipts.findLast(({ receipt: r }) => r.kind === "done" || r.kind === "ask" || r.kind === "stuck")?.receipt;
+  const foreign = last && (last.step !== st.step || last.attempt !== st.attempt) ? `${last.step}#${last.attempt}` : null;
+  const text = foreign ? dropSection(body, "Resume", `_Resume omitted: ${foreign} wrote it for its own step; it does not apply to ${st.step}._`) : body;
+  return { text: demoteHeadings(text, 3), resume_dropped: foreign && text !== body ? foreign : null };
+}
+
+/** Replace the body of the markdown section titled `title` (any level, up to the next heading as high) with `note`. */
+function dropSection(md: string, title: string, note: string): string {
+  const lines = md.split("\n");
+  const start = lines.findIndex((l) => new RegExp(`^#{1,6}\\s+${title}\\s*$`, "i").test(l));
+  if (start < 0) return md;
+  const level = (lines[start]?.match(/^#+/)?.[0] ?? "#").length;
+  let end = lines.findIndex((l, i) => i > start && /^(#{1,6})\s/.test(l) && (l.match(/^#+/)?.[0] ?? "").length <= level);
+  if (end < 0) end = lines.length;
+  return [...lines.slice(0, start + 1), note, ...(end < lines.length ? [""] : []), ...lines.slice(end)].join("\n");
+}
+
+/** QV1/QV5a: the declared criteria, each with the needs this run's agent cannot do. */
+function criteriaFor({ criteria, capabilities = [] }: BriefInput): BriefJson["criteria"] {
+  if (!criteria?.length) return null;
+  return criteria.map((c) => ({ id: c.id, verifier: c.verifier, needs: [...(c.needs ?? [])], missing: (c.needs ?? []).filter((n) => !capabilities.includes(n)) }));
 }
 
 /**
@@ -272,12 +351,13 @@ function enteringReceipt({ state: st, receipts }: BriefInput): NumberedReceipt |
 function rework(input: BriefInput, step: AgentStep): BriefJson["rework"] {
   const { state: st, workflow: wf, receipts } = input;
   const entering = enteringReceipt(input);
-  if (!entering || !st.last_outcome || !sendsBack(wf, entering.receipt)) return null;
+  if (!entering || !sendsBack(wf, entering.receipt)) return null;
   const r = entering.receipt;
+  const from = { step: r.step, outcome: outcomeOf(r) as string };
   const declared = new Set((step.inputs ?? []).filter((i) => i === "last_check" || i === "last_findings"));
   const live = unsettled(wf, sincePreviousAttempt(input));
 
-  const edge = edgeOf(wf, st.last_outcome.step, st.last_outcome.outcome);
+  const edge = edgeOf(wf, from.step, from.outcome);
   const counter = edge?.counter ? { name: edge.counter, value: st.counters[edge.counter] ?? 0, max: wf.counters?.[edge.counter]?.max ?? 0 } : null;
 
   const checkR = isFailingCheck(entering) ? entering : declared.has("last_check") ? live.check : undefined;
@@ -291,7 +371,7 @@ function rework(input: BriefInput, step: AgentStep): BriefJson["rework"] {
   const check = checkR?.receipt;
   const done = doneR?.receipt;
   return {
-    from: `${st.last_outcome.step}.${st.last_outcome.outcome}`,
+    from: `${from.step}.${from.outcome}`,
     counter,
     check: check
       ? {
@@ -419,6 +499,23 @@ function markdown(b: BriefJson): string {
   if (w.run_id) out.push(`- Run: ${w.run_id}`);
   out.push("");
 
+  const h = b.history;
+  if (h) {
+    out.push("## Why this attempt", "");
+    if (h.retry)
+      out.push(
+        `A previous session of this attempt ended without reporting (\`${h.retry.outcome}\`${h.retry.detail ? `: ${h.retry.detail}` : ""}). This is a fresh session: nothing it did counts as reported. Look at \`git status\`, \`git log\` and the handoff's Progress for partial work, then finish the step.`,
+        "",
+      );
+    if (h.earlier) {
+      const since = h.earlier.since.length > 12 ? ["…", ...h.earlier.since.slice(-12)] : h.earlier.since;
+      out.push(
+        `${w.step}#${h.earlier.attempt} reported \`${h.earlier.outcome}\` on older code.${since.length ? ` Since then: ${since.join(" → ")}.` : ""} Do this step again in full on the current HEAD: what earlier attempts found or observed is history, not a result for this one.`,
+        "",
+      );
+    }
+  }
+
   out.push("## Your work", "");
   out.push(`Use the \`${b.work.skill}\` skill.`);
   if (b.work.description) out.push("", b.work.description);
@@ -503,12 +600,23 @@ function markdown(b: BriefJson): string {
 
   out.push("## Finish with exactly one of", "");
   for (const f of b.finish) out.push(`- \`${f.command}\` — ${f.means}${f.verdict ? ` (only when the worst verdict is \`${f.verdict}\`)` : ""}`);
-  if (b.finish.some((f) => f.command.includes("--criteria")))
+  if (b.finish.some((f) => f.command.includes("--criteria"))) {
     out.push(
       "",
-      "`--criteria <file>`: a JSON array with one verdict per acceptance criterion — `pass` (with `evidence`), `fail` (with `repro`), `person` (with `how`), `unverified` (with `reason` and `how`). Worst verdict: fail > unverified > person > pass.",
-      "Add `--note \"<text>\"` (and `--note-criterion <id>`) for a question a person should see without blocking the work.",
+      "`--criteria <file>`: a JSON array with one verdict per acceptance criterion — `pass` (with `evidence`), `fail` (with `repro`), `person` (with `how`), `unverified` (with `reason` and `how`). Worst verdict: fail > unverified > person > pass. Write the file outside the repository, next to your evidence (e.g. `$TMPDIR/criteria.json`); never under `runs/`.",
+      "",
     );
+    if (b.criteria) {
+      out.push("One entry for each of these criteria, and no other id:", "");
+      for (const c of b.criteria) {
+        const needs = c.needs.length ? `, needs ${c.needs.join(", ")}` : "";
+        const lacking = c.missing.length ? ` — this session lacks ${c.missing.join(", ")}: report it \`unverified\` with \`reason\` and \`how\`, never \`pass\`` : "";
+        out.push(`- \`${c.id}\` (verifier: ${c.verifier}${needs})${lacking}`);
+      }
+      out.push("", "```json", `[\n${b.criteria.map((c) => `  { "id": "${c.id}", "verdict": "…" }`).join(",\n")}\n]`, "```", "");
+    } else out.push("The story spec's Acceptance section names the criteria; use its ids.", "");
+    out.push("Add `--note \"<text>\"` (and `--note-criterion <id>`) for a question a person should see without blocking the work.");
+  }
   out.push("", "Then end your turn. Never edit `runs/`; never push.", "");
 
   out.push("## Limits", "");

@@ -685,3 +685,75 @@ Then end your turn. Never edit \`runs/\`; never push.
 - Port slot: 3 (PORT_BASE=4030)
 "
 `;
+
+exports[`Re-entry, fresh sessions, handoff and criteria (B2, C2, QV1) a second qa after the code changed: why this attempt, earlier qa is history, review's Resume dropped 1`] = `
+"# norn brief — gh-1/02 · qa #2
+
+## Where you are
+
+- Story: gh-1
+- Slice: gh-1/02
+- Step: qa (attempt 2)
+- Mode: auto
+
+## Why this attempt
+
+A previous session of this attempt ended without reporting (\`qa.died\`: launch_unknown). This is a fresh session: nothing it did counts as reported. Look at \`git status\`, \`git log\` and the handoff's Progress for partial work, then finish the step.
+
+qa#1 reported \`fail\` on older code. Since then: implement.done → test.pass → review.approve. Do this step again in full on the current HEAD: what earlier attempts found or observed is history, not a result for this one.
+
+## Your work
+
+Use the \`qa\` skill.
+
+## Inputs
+
+- Story spec: \`.agents/specs/gh-1-login/story.md\`
+- Slice: \`.agents/specs/gh-1-login/slices/02-form.md\`
+- Handoff: \`.agents/specs/gh-1-login/runs/02-form/handoff.md\`
+
+## Context
+
+### Goal
+Footer shows the total.
+
+### Progress
+- review#2 approve: no findings
+
+### Resume
+_Resume omitted: review#2 wrote it for its own step; it does not apply to qa._
+
+## Finish with exactly one of
+
+- \`norn done pass --criteria <file> --handoff "…"\` — every criterion verified with evidence
+- \`norn done fail --criteria <file> --handoff "…"\` — a criterion fails; repro in the receipt
+- \`norn done partial --criteria <file> --handoff "…"\` — criteria only a person can check are listed with prepared evidence
+- \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
+- \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
+
+\`--criteria <file>\`: a JSON array with one verdict per acceptance criterion — \`pass\` (with \`evidence\`), \`fail\` (with \`repro\`), \`person\` (with \`how\`), \`unverified\` (with \`reason\` and \`how\`). Worst verdict: fail > unverified > person > pass. Write the file outside the repository, next to your evidence (e.g. \`$TMPDIR/criteria.json\`); never under \`runs/\`.
+
+One entry for each of these criteria, and no other id:
+
+- \`AC1\` (verifier: agent)
+- \`AC2\` (verifier: agent, needs browser) — this session lacks browser: report it \`unverified\` with \`reason\` and \`how\`, never \`pass\`
+
+\`\`\`json
+[
+  { "id": "AC1", "verdict": "…" },
+  { "id": "AC2", "verdict": "…" }
+]
+\`\`\`
+
+Add \`--note "<text>"\` (and \`--note-criterion <id>\`) for a question a person should see without blocking the work.
+
+Then end your turn. Never edit \`runs/\`; never push.
+
+## Limits
+
+- Deadline: 60m (until 2026-10-23T11:00:00.000Z)
+- Nudges left: 2
+- Fresh-session retries left: 0
+- Port slot: 3 (PORT_BASE=4030)
+"
+`;

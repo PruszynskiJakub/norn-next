@@ -63,7 +63,7 @@ export function isWithExit(v: unknown): v is WithExit {
 
 const TEXT = Symbol("norn.text");
 
-/** Explicit human mode (`--text` of views): plain text on stdout instead of JSON. Never the default (P8). */
+/** Plain text on stdout instead of JSON: the explicit human mode of views (`--text`), and `norn brief`, whose reader is an agent. */
 export interface TextOutput {
   [TEXT]: true;
   text: string;

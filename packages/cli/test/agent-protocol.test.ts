@@ -136,10 +136,13 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     const before = receipts(runs());
     const r = await inWt(wt(), "brief");
     expect(r.exit).toBe(0);
-    const v = r.value as { run_id: string; started: boolean; step: string; markdown: string; briefing: string };
-    expect(v).toMatchObject({ unit: "gh-9", step: "implement", attempt: 1, started: true });
+    // the brief is for an agent to read: markdown on stdout, not a JSON string
+    expect(r.stdout.startsWith("# norn brief — gh-9 · implement #1\n")).toBe(true);
+    const briefing = readTrace(h.root, { unit: "gh-9", types: ["briefing"] }).events.at(-1) as { run_id: string; briefing: string };
+    const v = { run_id: briefing.run_id, briefing: briefing.briefing, markdown: r.stdout };
     runId = v.run_id;
-    expect(v.markdown).toContain("# norn brief — gh-9 · implement #1");
+    expect(v.markdown).not.toContain("norn:header");
+    expect(v.markdown).not.toContain("norn:heartbeat");
     expect(v.markdown).toContain("Use the `implement` skill.");
     expect(v.markdown).toContain(`- Run: ${runId}`);
     expect(v.markdown).toContain('`norn done done --handoff "…"` — every criterion has a passing test');
@@ -212,7 +215,7 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     h.clock.advance(10_000);
     await h.tick();
     expect(h.state(runs())).toMatchObject({ step: "review", status: "ready", attempt: 1, last_outcome: { step: "implement", outcome: "done", source: "reported" } });
-    const r = await inWt(wt(), "brief");
+    const r = await inWt(wt(), "brief", "--json");
     const v = r.value as { run_id: string; started: boolean; markdown: string };
     expect(v.started).toBe(true);
     expect(v.run_id).not.toBe(runId);
@@ -282,7 +285,7 @@ describe("attended steps never block (MO4)", () => {
   test("brief starts the attended run; Stop is allowed without a report; done completes it", async () => {
     await tickUntil(() => h.state(pairRuns())?.step === "refine");
     expect(h.state(pairRuns())).toMatchObject({ status: "parked", park: { kind: "attended" } });
-    const b = await inWt(pairWt(), "brief");
+    const b = await inWt(pairWt(), "brief", "--json");
     expect(b.value).toMatchObject({ unit: "gh-10", step: "refine", started: true });
     expect((b.value as { markdown: string }).markdown).toContain("Attended step: no deadline or nudges (MO4)");
     expect((await stop(pairWt())).value).toEqual({});
@@ -342,7 +345,7 @@ describe("norn hook robustness (A3)", () => {
     h.report(runs(), "unstick", { to: "implement" }, "human");
     h.clock.advance(10_000);
     await h.tick();
-    const b = (await inWt(wt(), "brief")).value as { run_id: string };
+    const b = (await inWt(wt(), "brief", "--json")).value as { run_id: string };
     const hookEvents = () => (readTrace(h.root, { types: ["hook"] }).events as HookTrace[]).filter((e) => e.fact.run_id === b.run_id);
     // an idle_prompt Notification is a turn end too (§10 silent), but Claude cannot refuse it:
     // never traced blocked, never counted toward MAX_STOP_BLOCKS (A4)

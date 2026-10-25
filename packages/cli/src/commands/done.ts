@@ -9,12 +9,12 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { checkReport, reportableOutcomes, unverifiedNeeds, verdictCounts } from "@norn/core";
-import { type AgentStep, type Criterion, type CriterionVerdict, type Finding, type Note, type ReceiptOf, ulid, validate } from "@norn/schema";
-import { appendTrace, ensureEvidenceDir, git as rawGit, readSliceFile, readStoryFile } from "@norn/store";
+import { type AgentStep, type CriterionVerdict, type Finding, type Note, type ReceiptOf, ulid, validate } from "@norn/schema";
+import { appendTrace, ensureEvidenceDir, git as rawGit } from "@norn/store";
 import { defineCommand, type ParsedArgs, opt } from "../command.ts";
 import type { Context } from "../context.ts";
-import { corruptError, refuse, usageError } from "../output.ts";
-import { stepOfSession, type UnitSession } from "../runtime/agent-unit.ts";
+import { refuse, usageError } from "../output.ts";
+import { stepOfSession, type UnitSession, unitCriteria } from "../runtime/agent-unit.ts";
 import { appendProgress, reported, reportHeader, reportTarget, writeReport } from "../runtime/report.ts";
 
 const SEVERITIES = new Set(["blocking", "major", "minor", "nit"]);
@@ -88,15 +88,6 @@ export function parseNotes(args: ParsedArgs): Note[] {
     }
   }
   return notes;
-}
-
-/** QV1/QV4: the unit's frontmatter `criteria` — its slice file, or story.md for the story unit; null = none declared. */
-function unitCriteria(s: UnitSession): Criterion[] | null {
-  const file = s.unit.slice ? join(s.specPath, "slices", `${s.unit.dir}.md`) : join(s.specPath, "story.md");
-  const r = s.unit.slice ? readSliceFile(file, s.worktree) : readStoryFile(file, s.worktree);
-  if (r.ok) return r.value.frontmatter.criteria ?? null;
-  if (r.reason === "missing") return null;
-  throw corruptError(`${file} failed validation (S2): its criteria cannot be checked`, `stop and tell the person: norn why ${s.unit.key}`, r.error ? [r.error] : []);
 }
 
 /**

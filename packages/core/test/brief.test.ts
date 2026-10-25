@@ -261,6 +261,65 @@ describe("Rework only when sent back (B3, B6, W4)", () => {
   });
 });
 
+describe("Re-entry, fresh sessions, handoff and criteria (B2, C2, QV1)", () => {
+  const died = (s: UnitState) => receipt(s, "classify", { outcome: "died", rule: "agent.died", route: "retry", detail: "launch_unknown" }, "norn");
+  const pass = (s: UnitState) => receipt(s, "check", { outcome: "pass", command: "bun test", exit_code: 0, duration_ms: 1, output_tail: "" }, "norn");
+  const QA_WF = (() => {
+    const wf = structuredClone(DECLARED);
+    (wf.steps.qa as { criteria?: unknown }).criteria = "required";
+    return wf;
+  })();
+  /** qa#1 fail → implement#2 → test → review#2 approve → qa#2, whose first session died */
+  const qa2 = () =>
+    history(at_("qa", { implement: 1, review: 1, qa: 1 }), QA_WF, started, done("fail", { findings: [{ severity: "blocking", title: "Count off by one" }] }), started, done("done"), pass, started, done("approve"), started, died);
+  const HANDOFF = "## Goal\nFooter shows the total.\n\n## Progress\n- review#2 approve: no findings\n\n## Resume\nNothing left; report done.\n";
+
+  test("a second qa after the code changed: why this attempt, earlier qa is history, review's Resume dropped", () => {
+    const { st, rs } = qa2();
+    expect(st).toMatchObject({ step: "qa", attempt: 2, retries_used: 1 });
+    const b = renderBrief(input(st, rs, { workflow: QA_WF, handoff: HANDOFF, criteria: [{ id: "AC1", verifier: "agent" }, { id: "AC2", verifier: "agent", needs: ["browser"] }], capabilities: [] }));
+    expect(b.json.rework).toBeNull();
+    expect(b.json.history).toEqual({
+      retry: { outcome: "qa.died", detail: "launch_unknown", at: at() },
+      earlier: { attempt: 1, outcome: "fail", since: ["implement.done", "test.pass", "review.approve"] },
+    });
+    expect(b.json.context.resume_dropped).toBe("review#2");
+    expect(b.markdown).not.toContain("Nothing left; report done.");
+    expect(b.markdown).toContain("Footer shows the total.");
+    expect(b.json.criteria).toEqual([
+      { id: "AC1", verifier: "agent", needs: [], missing: [] },
+      { id: "AC2", verifier: "agent", needs: ["browser"], missing: ["browser"] },
+    ]);
+    expect(b.markdown).toMatchSnapshot();
+  });
+
+  test("a fresh session of a rework step keeps its Rework (died is in-step, not the entry)", () => {
+    const { st, rs } = history(at_("qa", { implement: 1, review: 1, qa: 1 }), DECLARED, started, done("fail", { handoff: QA_FAIL }), started, died);
+    expect(st).toMatchObject({ step: "implement", attempt: 2, last_outcome: { step: "implement", outcome: "died" } });
+    const b = renderBrief(input(st, rs, { workflow: DECLARED }));
+    expect(b.json.rework).toMatchObject({ from: "qa.fail", counter: { name: "qa_loop", value: 1 }, report: { handoff: QA_FAIL } });
+    expect(b.json.history).toEqual({ retry: { outcome: "implement.died", detail: "launch_unknown", at: at() }, earlier: null });
+    expect(b.markdown).toContain("## Why this attempt");
+  });
+
+  test("the Resume of this step's own earlier report is kept; a first entry has no history", () => {
+    const { st, rs } = history(stateFor(SLICE, SLICE_WF), SLICE_WF, started, (s) => receipt(s, "ask", { question: "Email or username?" }), (s) => receipt(s, "answer", { answer: "Email" }, "human"));
+    const b = renderBrief(input(st, rs, { handoff: "## Resume\nWire the email field." }));
+    expect(b.json.history).toBeNull();
+    expect(b.json.context.resume_dropped).toBeNull();
+    expect(b.markdown).toContain("Wire the email field.");
+    expect(b.markdown).not.toContain("## Why this attempt");
+  });
+
+  test("without declared criteria the brief points at the spec's Acceptance section", () => {
+    const { st, rs } = history(at_("review", { implement: 1, review: 1 }), QA_WF, started, done("approve"));
+    const b = renderBrief(input(st, rs, { workflow: QA_WF }));
+    expect(b.json.criteria).toBeNull();
+    expect(b.markdown).toContain("The story spec's Acceptance section names the criteria; use its ids.");
+    expect(b.markdown).toContain("never under `runs/`");
+  });
+});
+
 // ------------------------------------------------------------------ golden replays of real runs
 
 const FIX = join(import.meta.dir, "fixtures", "sandbox");
