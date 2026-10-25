@@ -179,6 +179,25 @@ export function startCommandFor(uf: UnitFacts, story: StoryFacts, config: Resolv
   return startAgentCommand(worktree, agent?.command ?? agent?.adapter ?? name, agent?.args);
 }
 
+/** MO5: the one command that opens an agent on the unit's step for a person (`norn open`). */
+export const openCommand = (unitKey: string) => `norn open ${unitKey}`;
+
+const byHand = (uf: UnitFacts, story: StoryFacts, config: ResolvedConfig) => `by hand: ${startCommandFor(uf, story, config)}`;
+
+/**
+ * GR2, O1: a story taken in on this checkout that no tick has started yet (intake by `norn sync`
+ * creates the worktree; the tick starts the workflow). Running while the heartbeat is up — the next
+ * tick starts it — else Your turn with the command that ticks.
+ */
+export function notStartedItem(story: StoryFacts, facts: Facts, config: ResolvedConfig): InboxItem | null {
+  if (story.claim.state !== "mine" || isStarted(story) || storyFinished(story) || !story.frontmatter) return null;
+  const hb = facts.heartbeat;
+  const up = !!hb && hb.last_tick_at !== null && facts.now - hb.last_tick_at <= 3 * parseDuration(config.watch_interval);
+  const base = { id: `not-started:${story.key}`, story: story.key, slice: null, step: null, since: story.frontmatter.intake_at, url: story.frontmatter.url };
+  if (up) return { ...base, group: "running", title: "taken in — the next tick starts it", command: `norn status ${story.key}` };
+  return { ...base, group: "your_turn", title: `taken in, not started — ${story.frontmatter.title}`, detail: "a tick starts the story; then `norn open` starts its first step", command: "norn watch" };
+}
+
 const short = (sha: string) => sha.slice(0, 7);
 const prCli = (story: StoryFacts) => (story.frontmatter?.provider ?? story.key.slice(0, 2)) === "gl" ? "glab mr" : "gh pr";
 
@@ -383,7 +402,7 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
         const { detail, full } = gateChecks(story, uf);
         return item("approve", park.reason, `norn approve ${key}`, park.since, { detail: [judged, detail, reject].filter(Boolean).join(" · "), ...(full ? { full } : {}) });
       }
-      if (park?.kind === "attended") return item("your_turn", `${st.step}: attended step — work with the agent`, startCommandFor(uf, story, config), park.since);
+      if (park?.kind === "attended") return item("your_turn", `${st.step}: attended step — work with the agent`, openCommand(key), park.since, { detail: byHand(uf, story, config) });
       return item("unblock", park?.reason ?? "parked", `norn unstick ${key}`, park?.since ?? st.updated_at);
     case "stuck":
       return item("unblock", park?.reason ?? "stuck", `norn unstick ${key}`, park?.since ?? st.updated_at, park?.receipt_id ? { id: park.receipt_id } : {});
@@ -400,8 +419,8 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       if (step?.type === "agent") {
         const { mode, downgraded } = effectiveMode(story.mode, !!step.attended, facts.machine.runner);
         if (mode === "manual")
-          return item("your_turn", `${st.step} is ready (manual): start an agent in the worktree`, startCommandFor(uf, story, config), st.step_entered_at, {
-            ...(downgraded ? { detail: "auto requested, no runner; running manual (MO2)" } : {}),
+          return item("your_turn", `${st.step} is ready (manual): start an agent in the worktree`, openCommand(key), st.step_entered_at, {
+            detail: [downgraded ? "auto requested, no runner; running manual (MO2)" : null, byHand(uf, story, config)].filter(Boolean).join(" · "),
           });
       }
       // R5.5 (A8): an auto step waits for the heartbeat, not for a person — no manual start hint
@@ -579,6 +598,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
       add({ id: `corrupt:${story.key}:story.md`, group: "unblock", story: story.key, slice: null, step: null, title: `corrupt: ${story.frontmatter_error.file} failed validation (S2)`, command: `norn why ${story.key}`, since: iso(facts.now) });
       continue;
     }
+    add(notStartedItem(story, facts, config));
     add(bodyChangedItem(story));
     add(headChangedItem(story));
     add(staleItem(story, facts.repo.default_branch));

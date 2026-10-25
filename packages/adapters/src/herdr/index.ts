@@ -339,4 +339,34 @@ export async function openStatusPane(cwd: string, opts: StatusPaneOptions = {}):
   await herdr(["pane", "run", paneId, shellJoin(argv)]);
   return { pane_id: paneId };
 }
+export interface AgentTabOptions {
+  bin?: string;
+  session?: string;
+  exec?: Exec;
+  /** caller env; `HERDR_WORKSPACE_ID` set (running inside Herdr) → the tab goes to the caller's workspace */
+  env?: Record<string, string | undefined>;
+}
+
+/**
+ * MO5 (`norn open`): a focused tab for a person to work in — in the workspace whose worktree is
+ * `cwd`, else the caller's workspace, else a new workspace — running `command` (the start command a
+ * person would type). Unlike `launch` it records no session: the agent's own `norn brief` starts the run.
+ */
+export async function openAgentTab(cwd: string, title: string, command: string, opts: AgentTabOptions = {}): Promise<{ pane_id: string }> {
+  const herdr = herdrCaller(opts.exec ?? bunExec, [opts.bin ?? "herdr", ...(opts.session ? ["--session", opts.session] : [])]);
+  const env = opts.env ?? process.env;
+  const list = (await herdr(["workspace", "list"])) as {
+    result?: { workspaces?: Array<{ workspace_id: string; worktree?: { checkout_path?: string } }> };
+  } | null;
+  const workspaceId = list?.result?.workspaces?.find((w) => w.worktree?.checkout_path === cwd)?.workspace_id ?? env.HERDR_WORKSPACE_ID ?? null;
+  const common = ["--cwd", cwd, "--label", title];
+  const created = (await herdr(workspaceId ? ["tab", "create", "--workspace", workspaceId, ...common] : ["workspace", "create", ...common])) as {
+    result?: { root_pane?: HerdrPane };
+  } | null;
+  const paneId = created?.result?.root_pane?.pane_id;
+  if (!paneId) throw portError("launch_failed", "herdr did not return a root pane");
+  await herdr(["pane", "run", paneId, command]);
+  return { pane_id: paneId };
+}
+
 export { parsePanePrompt } from "./prompt.ts";

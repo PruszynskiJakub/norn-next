@@ -68,7 +68,7 @@ describe("inbox (O1)", () => {
     const inbox = buildInbox(facts([storyFacts("gh-1", units), released], {}, now), CONFIG);
     const view = Object.fromEntries(Object.entries(inbox.groups).map(([g, items]) => [g, items.map((i) => `${i.slice ?? i.story} | ${i.title} | ${i.age} | ${i.command}`)]));
     expect(view).toEqual({
-      your_turn: [`gh-1 | refine: attended step — work with the agent | 1h | cd /r-worktrees/gh-1-login && claude --permission-mode auto -- 'Use the norn skill, then run \`norn brief\`.'`],
+      your_turn: ["gh-1 | refine: attended step — work with the agent | 1h | norn open gh-1"],
       answer: ['gh-1/01 | Which DB? | 1h | norn answer gh-1/01 "…"'],
       approve: ["gh-1/02 | approve or reject human-qa | 1h | norn approve gh-1/02"],
       unblock: ["gh-1/03 | review_loop 3/3 at review.changes_requested | 1h | norn unstick gh-1/03"],
@@ -79,6 +79,20 @@ describe("inbox (O1)", () => {
     });
     expect(inbox.pending).toBe(5);
     expect(inbox.groups.answer[0]?.id).toBe("01JCCCCCCCCCCCCCCCCCCCCCCC");
+    // MO3: the start command a person types by hand stays in the detail
+    expect(inbox.groups.your_turn[0]?.detail).toBe(`by hand: cd /r-worktrees/gh-1-login && claude --permission-mode auto -- 'Use the norn skill, then run \`norn brief\`.'`);
+  });
+
+  test("a story taken in but not started: Your turn (norn watch) while no heartbeat runs, else Running (GR2)", () => {
+    const fresh = storyFacts("gh-1", [unitFacts(storyUnit(), STORY_WF, null)]);
+    const down = buildInbox(facts([fresh]), CONFIG);
+    expect(down.groups.your_turn).toMatchObject([{ id: "not-started:gh-1", story: "gh-1", command: "norn watch" }]);
+    expect(down.pending).toBe(1);
+    const up = buildInbox(facts([fresh], { heartbeat: { last_tick_at: T0 - 10_000 } }), CONFIG);
+    expect(up.groups.your_turn).toEqual([]);
+    expect(up.groups.running).toMatchObject([{ id: "not-started:gh-1", title: "taken in — the next tick starts it" }]);
+    // released or held elsewhere: nothing for this checkout
+    expect(buildInbox(facts([{ ...fresh, claim: { state: "none" } }]), CONFIG).pending).toBe(0);
   });
 
   test("manual ready step under Your turn notes the MO2 downgrade", () => {
@@ -86,7 +100,8 @@ describe("inbox (O1)", () => {
     const f = facts([storyFacts("gh-1", [unitFacts(SLICE, SLICE_WF, st)])]);
     f.machine.runner = null;
     const item = buildInbox(f, CONFIG).groups.your_turn[0];
-    expect(item).toMatchObject({ title: "implement is ready (manual): start an agent in the worktree", detail: "auto requested, no runner; running manual (MO2)" });
+    expect(item).toMatchObject({ title: "implement is ready (manual): start an agent in the worktree", command: "norn open gh-1/02" });
+    expect(item?.detail).toStartWith("auto requested, no runner; running manual (MO2) · by hand: cd ");
   });
 });
 
