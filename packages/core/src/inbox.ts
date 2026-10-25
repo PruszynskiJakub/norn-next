@@ -190,20 +190,22 @@ function absFile(file: string, story: StoryFacts, uf: UnitFacts): string {
 }
 
 /**
- * F21: what a gate judges — the report that led there (e.g. qa `partial`) and its evidence folder,
- * as absolute paths a person can open.
+ * F21: what a gate judges — the report that led there (e.g. qa `partial`). `detail` names it by
+ * receipt number; `full` (inbox `--details`, JSON) gives the receipt and its evidence folder as
+ * absolute paths a person can open: the receipt lives in the unit's worktree, not the checkout
+ * the inbox is read from.
  */
-function judgedDetail(story: StoryFacts, uf: UnitFacts): string | null {
+function judgedDetail(story: StoryFacts, uf: UnitFacts): { detail: string; full: string } | null {
   const nr = uf.last_outcome_receipt;
   if (!nr) return null;
   const r = nr.receipt;
   const file = absFile(nr.file, story, uf);
-  const parts = [`${r.step}#${r.attempt} reported ${"outcome" in r ? r.outcome : r.kind}: ${file}`];
+  const lines = [`Report: ${file}`];
   if (r.kind === "done" && r.evidence) {
     const runsDir = file.replace(/\/receipts\/[^/]+$/, "");
-    parts.push(`evidence: ${runsDir}/${r.evidence.replace(/\/+$/, "")}/`);
+    lines.push(`Evidence: ${runsDir}/${r.evidence.replace(/\/+$/, "")}/`);
   }
-  return parts.join(" · ");
+  return { detail: `step ${r.step}#${r.attempt} reported ${"outcome" in r ? r.outcome : r.kind} (receipt ${String(nr.n).padStart(4, "0")})`, full: lines.join("\n") };
 }
 
 const oneLine = (t: string) => t.replace(/\s*\n\s*/g, " ").trim();
@@ -381,7 +383,8 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
         const judged = judgedDetail(story, uf);
         const reject = `or reject: norn approve ${key} --reject --reason "…"`;
         const { detail, full } = gateChecks(story, uf);
-        return item("approve", park.reason, `norn approve ${key}`, park.since, { detail: [judged, detail, reject].filter(Boolean).join(" · "), ...(full ? { full } : {}) });
+        const fullText = [judged?.full, full].filter(Boolean).join("\n\n");
+        return item("approve", park.reason, `norn approve ${key}`, park.since, { detail: [judged?.detail, detail, reject].filter(Boolean).join(" · "), ...(fullText ? { full: fullText } : {}) });
       }
       if (park?.kind === "attended") return item("your_turn", `${st.step}: attended step — work with the agent`, startCommandFor(uf, story, config), park.since);
       return item("unblock", park?.reason ?? "parked", `norn unstick ${key}`, park?.since ?? st.updated_at);
