@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/PruszynskiJakub/norn-next/actions/workflows/ci.yml"><img src="https://github.com/PruszynskiJakub/norn-next/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/PruszynskiJakub/norn-next/releases"><img src="https://img.shields.io/badge/release-v0.1.0-blue" alt="Release v0.1.0"></a>
+  <a href="https://github.com/PruszynskiJakub/norn-next/releases"><img src="https://img.shields.io/badge/release-v0.2.0-blue" alt="Release v0.2.0"></a>
   <img src="https://img.shields.io/badge/bun-%3E%3D1.3-f9f1e1" alt="Bun 1.3 or later">
 </p>
 
@@ -72,7 +72,7 @@ You don't need the plugin to use norn with Claude Code: `norn init` puts the ski
 
 ```sh
 cd your-repo
-norn init          # .agents/norn/config.yaml, workflows/{story,slice,bug}.yaml, .agents/skills (linked per agent), hooks
+norn init          # .agents/norn/config.yaml, workflows/{story,slice,bug}.yaml, .agents/skills (linked per agent), hooks, .gitignore, .gitattributes
 # edit .agents/norn/config.yaml: remote.provider (gh | glab), remote.label (default: norn)
 norn sync          # issues assigned to you with the label become stories
 norn tick          # one heartbeat: observe, decide, act
@@ -81,6 +81,8 @@ norn inbox         # what needs you: Your turn, Answer, Approve, Unblock, Unclai
 ```
 
 Every inbox item shows the exact command that resolves it, for example `norn answer …`, `norn approve …` or `norn unstick …`.
+
+**What gets committed.** A story's run state lives in `.agents/specs/<id>-<slug>/runs/`: `state.json`, numbered receipts, the pinned workflow, logs of failed checks, QA evidence and `handoff.md`. norn commits it with the agent's work at each step boundary and pushes the branch, so anyone can take the story over from any commit. `norn init` marks `runs/` as generated in `.gitattributes`, so GitHub and GitLab collapse it in the PR diff and the review shows the code. Per-tick detail stays in `.agents/norn/trace/`, which is gitignored.
 
 **Manual and auto mode.** Each story has a mode. The repo default is `default_mode` in the config, and `norn mode <story> auto|manual` switches it.
 
