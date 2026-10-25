@@ -5,6 +5,7 @@
  */
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { gitTimeoutMs } from "@norn/store";
 import type { CommitSpec, ConflictMarker, GitFactory, GitInProgress, GitPort, MergeResult, OutgoingMarkers, PushResult, RefUpdate, WorktreeInfo, WorktreeStatus } from "@norn/core";
 import { bunExec, isAuthError, isNetworkError, okOrThrow, portError, type Exec, type ExecResult } from "./exec.ts";
 
@@ -168,8 +169,11 @@ export function createGit(opts: GitOptions = {}): GitPort {
   const exec = opts.exec ?? bunExec;
   const bin = opts.bin ?? "git";
   const env = { GIT_TERMINAL_PROMPT: "0", GIT_EDITOR: "true", ...(opts.env ?? {}) };
-  const run = (cwd: string, args: string[], stdin?: string) =>
-    exec([bin, ...args], stdin === undefined ? { cwd, env } : { cwd, env, stdin });
+  const run = (cwd: string, args: string[], stdin?: string) => {
+    // H11: a call that reaches the remote is bounded; local ones (hooks on commit) are not
+    const timeoutMs = gitTimeoutMs(args);
+    return exec([bin, ...args], { cwd, env, ...(stdin === undefined ? {} : { stdin }), ...(timeoutMs === undefined ? {} : { timeoutMs }) });
+  };
   const must = async (cwd: string, args: string[], stdin?: string) => okOrThrow(await run(cwd, args, stdin), `git ${args[0]}`, "git");
   const line = async (cwd: string, args: string[]) => (await must(cwd, args)).trim();
   const lines = (s: string) => s.split("\n").filter((l) => l.length > 0);

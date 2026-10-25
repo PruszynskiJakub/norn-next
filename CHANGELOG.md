@@ -4,6 +4,10 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+### Fixed
+
+- `norn watch` no longer hangs for good after the laptop sleeps (H11). A `git fetch` or `push` whose SSH connection died while the machine slept never returned, so the tick held its lock, claims expired and nothing was applied until the process was killed by hand. Every call that reaches a remote (`git fetch`/`push`/`ls-remote`/`pull`/`clone`, `gh`, `glab`) now times out after 2 minutes, killing its whole process group (git and its `ssh`), and fails as a retryable network error; the next tick carries on.
+
 ## [0.2.0] - 2026-10-25
 
 ### Changed
