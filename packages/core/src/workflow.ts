@@ -40,6 +40,11 @@ export type WorkflowCheck = { ok: true; workflow: Workflow; issues: [] } | { ok:
 export interface ValidateOptions {
   /** known skill names; omitted = skill existence not checked */
   skills?: Iterable<string>;
+  /**
+   * W5: skills each configured agent can see (its installed skill folder). A step's skill must be
+   * visible to the agent that runs it (`step.agent ?? default_agent`); an agent not listed is not checked.
+   */
+  agentSkills?: { default_agent: string; visible: Readonly<Record<string, Iterable<string>>> };
 }
 
 /** Outcomes an agent step may declare to override a classified route (C1). `exhausted` always goes to `$stuck` (W7). */
@@ -101,6 +106,9 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
   const steps = Object.keys(wf.steps);
   const counters = wf.counters ?? {};
   const skills = opts.skills ? new Set(opts.skills) : null;
+  const visible = opts.agentSkills
+    ? new Map(Object.entries(opts.agentSkills.visible).map(([agent, names]) => [agent, new Set(names)]))
+    : null;
 
   if (!stepOf(wf, wf.start)) issues.push({ code: "unknown_start", path: "/start", message: `start step '${wf.start}' does not exist` });
 
@@ -108,6 +116,14 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
     if (step.type === "agent") {
       if (skills && !skills.has(step.skill))
         issues.push({ code: "unknown_skill", path: `/steps/${name}/skill`, message: `skill '${step.skill}' is not installed` });
+      const agent = step.agent ?? opts.agentSkills?.default_agent;
+      const seen = agent === undefined ? undefined : visible?.get(agent);
+      if (seen && !seen.has(step.skill))
+        issues.push({
+          code: "unknown_skill",
+          path: `/steps/${name}/skill`,
+          message: `skill '${step.skill}' is not installed for agent '${agent}' (run norn init, or add it to that agent's skill folder)`,
+        });
       if ("exhausted" in step.outcomes)
         issues.push({
           code: "reserved_outcome",

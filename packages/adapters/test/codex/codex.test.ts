@@ -46,7 +46,7 @@ describe("codex adapter", () => {
     expect(codexAgent.launchCommand(req).argv).toEqual(["codex", "P"]);
     expect(codexAgent.launchCommand({ ...req, resume: "019a" }).argv).toEqual(["codex", "resume", "019a", "P"]);
     expect(codexAgent.launchCommand({ ...req, headless: true, model: "gpt-5" }).argv).toEqual(["codex", "exec", "--model", "gpt-5", "P"]);
-    expect(codexAgent.skillDir("repo", "/r", "/h")).toBe("/r/.agents/skills");
+    expect(codexAgent.skillDir("/r")).toBe("/r/.agents/skills");
   });
 
   test("last assistant message from rollout", async () => {

@@ -82,7 +82,7 @@ import {
 import type { Context } from "../context.ts";
 import { leaseLiveness } from "./leases.ts";
 import { heartbeatId, readRemoteCache, traceForeignCommits, writeRemoteCache } from "./local.ts";
-import { knownSkills, repoWorkflows } from "./workflows.ts";
+import { agentSkills, repoWorkflows } from "./workflows.ts";
 
 export type SyncMode = "auto" | "force" | "never";
 
@@ -257,7 +257,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   const baseRef = await trackingRef(root, remote, base);
 
   const snapshot = loadSnapshot({ repoRoot: root, storyRoots: [...storyWts.values()], home: ctx.home, env: ctx.env, baseRef });
-  const workflows = repoWorkflows(snapshot.workflows, knownSkills(ports.agents, root, ctx.home, ctx.env));
+  const workflows = repoWorkflows(snapshot.workflows, { default_agent: config.default_agent, visible: agentSkills(ports.agents, root) });
 
   if (due && ports.remote) {
     sync.ran = true;

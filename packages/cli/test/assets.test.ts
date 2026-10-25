@@ -11,8 +11,22 @@ const ASSETS = join(import.meta.dir, "..", "assets");
 const SKILLS_DIR = join(ASSETS, "skills");
 const WORKFLOWS_DIR = join(ASSETS, "workflows");
 
-/** The ten skills of §16. */
-const SKILLS = ["norn", "interview", "refine", "clarify", "plan", "slice", "implement", "review", "qa", "merge"];
+/** The skills of §16: the protocol skill, the step skills and their reference skills. */
+const SKILLS = [
+  "norn",
+  "norn-interview",
+  "norn-refine",
+  "norn-clarify",
+  "norn-plan",
+  "norn-slice",
+  "norn-implement",
+  "norn-review",
+  "norn-qa",
+  "norn-qa-person",
+  "norn-merge",
+  "norn-tdd",
+  "norn-codebase-design",
+];
 const CRAFT = SKILLS.filter((s) => s !== "norn");
 
 const readSkill = (name: string) => readFileSync(join(SKILLS_DIR, name, "SKILL.md"), "utf8");
@@ -144,7 +158,7 @@ describe("workflow templates", () => {
 });
 
 describe("skills", () => {
-  test("exactly the ten skills of §16 are shipped", () => {
+  test("exactly the skills of §16 are shipped", () => {
     expect(readdirSync(SKILLS_DIR).sort()).toEqual([...SKILLS].sort());
   });
 
@@ -174,9 +188,15 @@ describe("skills", () => {
   });
 
   test.each(CRAFT)("%s is unaware of norn (P7)", (name) => {
-    const text = readSkill(name);
+    // skill names carry the `norn-` prefix (SK1); any other mention of norn is a leak
+    const text = readSkill(name).replace(/\bnorn-[a-z-]+/g, "");
     expect(text).not.toMatch(/norn/i);
     expect(prose(text)).not.toMatch(/\b(workflows?|receipts?|outcomes?|steps?|brief)\b/i);
+  });
+
+  test.each(SKILLS)("%s links only to files that exist (whole skill folders, SK1)", (name) => {
+    const links = [...readSkill(name).matchAll(/\]\(([^)#\s]+\.md)\)/g)].map((m) => m[1] as string).filter((l) => !/^[a-z]+:/.test(l));
+    expect(links.filter((l) => !existsSync(join(SKILLS_DIR, name, l)))).toEqual([]);
   });
 
   /** Banned synonyms (§5), same set as test/repo.test.ts lints in sources. */

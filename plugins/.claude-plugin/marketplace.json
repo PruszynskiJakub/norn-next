@@ -10,7 +10,7 @@
     {
       "name": "norn",
       "source": "./claude-code",
-      "description": "norn skills and the /norn command for Claude Code."
+      "description": "The /norn command for Claude Code; the skills come from the repo (norn init)."
     }
   ]
 }

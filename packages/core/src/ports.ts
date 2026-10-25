@@ -432,8 +432,8 @@ export interface AgentAdapter {
   hookResponse(fact: HookFact, decision: HookDecision): HookResponse;
   /** Native hook event names → normalized kinds this adapter emits. */
   readonly hookEvents: Readonly<Record<string, HookEventKind>>;
-  /** SK1: where skills go; `repo` for repo-local install, `user` for global. */
-  skillDir(scope: "repo" | "user", repoRoot: string, home: string): string;
+  /** SK1: the repo folder this agent reads skills from; `norn init` links the bundled skills there. */
+  skillDir(repoRoot: string): string;
   /** argv + extra env to start (or resume) an agent session. */
   launchCommand(req: AgentLaunchRequest): { argv: string[]; env: Record<string, string> };
   /** C4: last assistant message from a transcript file; null if unreadable/none. */

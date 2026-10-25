@@ -13,7 +13,6 @@ import {
   buildFact,
   field,
   type HookSpec,
-  installSkill,
   isObject,
   type JsonObject,
   jsonHookInstaller,
@@ -26,7 +25,6 @@ import {
 } from "./shared.ts";
 
 export * as shared from "./shared.ts";
-export { installSkill };
 
 const NAME = "claude";
 
@@ -199,8 +197,7 @@ export async function lastAssistantMessage(transcriptPath: string): Promise<stri
   return null;
 }
 
-export const skillDir = (scope: "repo" | "user", repoRoot: string, home: string) =>
-  scope === "repo" ? join(repoRoot, ".claude", "skills") : join(home, ".claude", "skills");
+export const skillDir = (repoRoot: string) => join(repoRoot, ".claude", "skills");
 
 export const claudeAgent: AgentAdapter = {
   name: NAME,

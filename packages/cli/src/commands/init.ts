@@ -1,16 +1,14 @@
 /**
  * `norn init` (A1, SK1, W1): repo config from the template if absent, workflow examples if
- * absent, skills into each configured agent's skill location (norn-owned markers; local
- * overrides win), agent hooks (norn-owned, updated in place), and machine-local paths in
- * .gitignore. Idempotent: re-running updates norn-owned files only.
+ * absent, the bundled skills into `.agents/skills/` (whole folders, always the bundled version)
+ * linked from each configured agent's skill folder, agent hooks (norn-owned, updated in place),
+ * and machine-local paths in .gitignore. Idempotent: re-running updates norn-owned files only.
  */
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { claude } from "@norn/adapters";
-import { atomicWrite, readText, repoConfigPath, workflowsDir } from "@norn/store";
+import { atomicWrite, installSkills, linkSkills, readText, repoConfigPath, workflowsDir } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
-import { usageError } from "../output.ts";
 import { assetsDir } from "../runtime/assets.ts";
 import { bundledSkills } from "../runtime/workflows.ts";
 
@@ -46,12 +44,10 @@ export function hookBinary(command: string, env: Record<string, string | undefin
 export const initCommand = defineCommand({
   name: "init",
   summary: "Set up norn in this repository: config, workflows, skills, hooks (A1, SK1, W1)",
-  usage: "norn init [--hook-command <cmd>] [--skills repo|user]",
-  options: { "hook-command": { type: "string" }, skills: { type: "string" } },
+  usage: "norn init [--hook-command <cmd>]",
+  options: { "hook-command": { type: "string" } },
   async run(ctx, args) {
     const root = ctx.root;
-    const scope = opt.str(args, "skills") ?? "repo";
-    if (scope !== "repo" && scope !== "user") throw usageError(`--skills must be repo or user, got '${scope}'`, "norn init --skills repo");
 
     const assets = assetsDir(ctx.env);
     const configPath = repoConfigPath(root);
@@ -70,19 +66,17 @@ export const initCommand = defineCommand({
 
     ctx.reload();
     const ports = await ctx.ports(); // validates the config (exit 4 when invalid)
-    const skills: Array<{ agent: string; dir: string; written: string[]; unchanged: string[]; kept_local: string[] }> = [];
+    const names = bundledSkills(ctx.env);
+    const installed = installSkills(root, join(assets, "skills"), names);
+    const links: Array<{ agent: string; dir: string; linked: string[]; unchanged: string[]; kept: string[] }> = [];
     const seen = new Set<string>();
     for (const [name, agent] of Object.entries(ports.agents)) {
-      const dir = agent.skillDir(scope, root, ctx.home);
+      const dir = agent.skillDir(root);
       if (seen.has(dir)) continue;
       seen.add(dir);
-      const r = { agent: name, dir, written: [] as string[], unchanged: [] as string[], kept_local: [] as string[] };
-      for (const s of bundledSkills(ctx.env)) {
-        const res = claude.installSkill(dir, s, readFileSync(join(assets, "skills", s, "SKILL.md"), "utf8"));
-        r[res.result].push(s);
-      }
-      skills.push(r);
+      links.push({ agent: name, ...linkSkills(root, dir, names) });
     }
+    const skills = { ...installed, links };
 
     const command = hookCommand(ctx, opt.str(args, "hook-command"));
     const hooks: Array<{ agent: string; tier: string; changed: string[] }> = [];
