@@ -82,6 +82,8 @@ norn inbox         # what needs you: Your turn, Answer, Approve, Unblock, Unclai
 
 Every inbox item shows the exact command that resolves it, for example `norn answer …`, `norn approve …` or `norn unstick …`.
 
+**What gets committed.** A story's run state lives in `.agents/specs/<id>-<slug>/runs/`: `state.json`, numbered receipts, the pinned workflow, logs of failed checks, QA evidence and `handoff.md`. norn commits it with the agent's work at each step boundary and pushes the branch, so anyone can take the story over from any commit. `norn init` marks `runs/` as generated in `.gitattributes`, so GitHub and GitLab collapse it in the PR diff and the review shows the code. Per-tick detail stays in `.agents/norn/trace/`, which is gitignored.
+
 **Manual and auto mode.** Each story has a mode. The repo default is `default_mode` in the config, and `norn mode <story> auto|manual` switches it.
 
 - **manual** (the default): the tick marks unattended agent steps as ready. You open any agent in the unit's worktree and tell it: *"Use the norn skill, then run `norn brief`"* (or type `/norn` with the Claude Code plugin).

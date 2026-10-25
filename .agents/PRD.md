@@ -126,7 +126,7 @@ Three separate concepts decide where a human is involved:
   specs/<id>-<slug>/            # id is provider-prefixed: gh-123, gl-45
     story.md                    # frontmatter mirrors remote issue + workflow + spec body
     slices/<nn>-<slug>.md       # frontmatter: id, title, workflow, depends_on, status, labels?
-    runs/<unit>/                # <unit> = _story or a slice <nn>-<slug>
+    runs/<unit>/                # <unit> = _story or a slice <nn>-<slug>; committed, collapsed in PR diffs (S10)
       state.json                # commit point: cursor, attempt, counters, workflow_hash, applied_through
       workflow.yaml             # workflow copy pinned when the unit started
       receipts/NNNN-<kind>.json # immutable inputs: done / ask / stuck / answer / approve / reject / unstick / mode / check / started / classify
@@ -165,6 +165,7 @@ The story worktree is on the story branch and holds `.agents/specs/<id>-<slug>/`
 - S7 **Workflows are pinned per unit.** At unit start the workflow is copied to `runs/<unit>/workflow.yaml`. Editing the repo workflow affects new units only; a running unit adopts a change only through `norn workflow <unit> <name> --to <step>` (journaled). If the cursor's step no longer exists, the unit goes `stuck`.
 - S8 **Commit and push at step boundaries only**: when a receipt lands or a step is classified. The commit contains the agent's work, `runs/<unit>/` and `handoff.md`. The claim holder then pushes the unit's branch (story or slice). Per-tick details stay in `trace/`.
 - S9 **`handoff.md` is context, never state.** Its top block is rendered from `state.json` on every commit (story, slice, step, attempt, counters, last outcome, next command), marked "do not edit", and never parsed back. `brief` includes it; `take` prints it.
+- S10 **`runs/` is collapsed in PR diffs.** `norn init` adds `.agents/specs/*/runs/** linguist-generated=true gitlab-generated=true` to `.gitattributes` if missing, so GitHub and GitLab fold receipts, state, logs and evidence in a PR diff and the review shows the work. The files are still committed and pushed (S8).
 
 ## 8. Heartbeat
 
@@ -499,7 +500,7 @@ M2–M4 are developed as stories run by norn itself.
 | Hook APIs differ or change across agents | Adapter per agent, fixture tests, `doctor`; tiered support for agents without hooks. |
 | Herdr state is misleading (prior: `done` fired 3× while running) | Herdr is one fact among several; receipts win (C2). |
 | Claim ref push races / offline machines | CAS via `--force-with-lease`; lease expiry; explicit `take --force` journaled. |
-| Committed `runs/` noise in PR diff | Commits only at step boundaries; small JSON, one directory per unit; can be filtered in review tooling. |
+| Committed `runs/` noise in PR diff | Commits only at step boundaries; small JSON, one directory per unit; marked generated in `.gitattributes` so GitHub and GitLab collapse it (S10). |
 | Secrets in committed logs/evidence | Redaction deferred post-MVP (§20); until then, keep check output free of secrets. |
 | Workflow edited mid-flight | Workflows pinned per unit (S7); explicit switch only. |
 | Prompt rules ignored by models | Limits enforced in code; `norn` skill kept tiny. |
