@@ -234,9 +234,13 @@ describe("norn doctor (A7)", () => {
   test("prints the report for a person, with the same exit code as --json", async () => {
     const env = { ...h.deps.env, NORN_HOOK_COMMAND: `${process.execPath} ${main} hook` };
     const r = await runCli(["doctor"], { ...h.deps, env });
-    expect(r.exit).toBe(0);
-    expect(r.stdout).toStartWith("norn doctor: every check passes\n");
-    expect(r.stdout).toMatch(/ok {3}agent claude .* · hooks fire/);
+    const json = await runCli(["doctor", "--json"], { ...h.deps, env });
+    // whether every check passes depends on the machine (a CI runner has no `claude`), as above
+    const ok = (json.value as { ok: boolean }).ok;
+    expect(r.exit).toBe(json.exit);
+    expect(r.value).toEqual(json.value);
+    expect(r.stdout).toStartWith(ok ? "norn doctor: every check passes\n" : "norn doctor: ");
+    expect(r.stdout).toMatch(/(ok {3}|FAIL) agent claude .* · hooks fire/);
     expect(r.stdout).toMatch(/ok {3}remote +gh as tester/);
     expect(r.stdout).toContain("Warnings\n  ! NORN_MACHINE=box");
     expect(() => JSON.parse(r.stdout)).toThrow();
