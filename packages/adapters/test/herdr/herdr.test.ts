@@ -127,8 +127,8 @@ describe("herdr runner", () => {
     expect(c.calls).toEqual([["herdr", "pane", "send-text", "w1:p1", "partial"]]);
   });
 
-  test("capabilities: send and resume (R4.1)", () => {
-    expect(createHerdrRunner({ exec: fakeExec([]).exec }).capabilities).toEqual({ send: true, resume: true });
+  test("capabilities: send, resume and open (R4.1, MO5)", () => {
+    expect(createHerdrRunner({ exec: fakeExec([]).exec }).capabilities).toEqual({ send: true, resume: true, open: true });
   });
 
   test("findSessions: agent panes whose cwd is the worktree, with pid and agent session (R5.1)", async () => {
@@ -269,6 +269,30 @@ describe("herdr openStatusPane (O1)", () => {
   test("a split without a pane id is a launch failure", async () => {
     const { exec } = fakeExec([["pane split", ok({ result: {} })]]);
     expect(await openStatusPane("/repo", { exec, env: {} }).catch((e) => e)).toMatchObject({ code: "launch_failed" });
+  });
+});
+
+describe("herdr openForPerson (MO5, norn open)", () => {
+  const runner = (exec: Exec) => createHerdrRunner({ exec, process: fakeProcess() });
+
+  test("a focused tab in the workspace on the worktree, running the start command", async () => {
+    const { exec, calls } = fakeExec([["workspace list", ok(fx.workspace_list)], ["tab create", ok(fx.tab_create)], ["pane run", empty]]);
+    expect(runner(exec).capabilities.open).toBe(true);
+    const r = await runner(exec).openForPerson?.({ cwd: WT, title: "gh-1/01 implement", command: "claude 'go'", env: { HERDR_WORKSPACE_ID: "w3" } });
+    expect(r).toEqual({ pane_id: "w1:p2" });
+    expect(calls.slice(1)).toEqual([
+      ["herdr", "tab", "create", "--workspace", "wA", "--cwd", WT, "--label", "gh-1/01 implement"],
+      ["herdr", "pane", "run", "w1:p2", "claude 'go'"],
+    ]);
+  });
+
+  test("no workspace on the worktree: the caller's workspace inside herdr, else a new workspace", async () => {
+    const inside = fakeExec([["workspace list", ok(fx.workspace_list_empty)], ["tab create", ok(fx.tab_create)], ["pane run", empty]]);
+    await runner(inside.exec).openForPerson?.({ cwd: "/other", title: "t", command: "c", env: { HERDR_WORKSPACE_ID: "w3" } });
+    expect(inside.calls[1]).toEqual(["herdr", "tab", "create", "--workspace", "w3", "--cwd", "/other", "--label", "t"]);
+    const outside = fakeExec([["workspace list", ok(fx.workspace_list_empty)], ["workspace create", ok(fx.workspace_create)], ["pane run", empty]]);
+    expect(await runner(outside.exec).openForPerson?.({ cwd: "/other", title: "t", command: "c", env: {} })).toEqual({ pane_id: "w1:p1" });
+    expect(outside.calls[1]).toEqual(["herdr", "workspace", "create", "--cwd", "/other", "--label", "t"]);
   });
 });
 

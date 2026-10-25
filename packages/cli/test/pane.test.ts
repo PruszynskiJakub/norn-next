@@ -9,6 +9,7 @@ import type { herdr } from "@norn/adapters";
 import { ulid } from "@norn/schema";
 import { appendTrace } from "@norn/store";
 import { runCli } from "../src/index.ts";
+import { parseCockpitLine, planCockpit } from "../src/runtime/cockpit.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
@@ -141,5 +142,14 @@ describe("norn pane --interactive (HC4–HC8) and --next (HC10)", () => {
     await runCli(["pane", "--interactive", "--interval", "5s", "--max-frames", "1"], { ...c.deps, herdr: lab.cockpit, input: lines(), log: (l) => frames.push(l) });
     expect(frames[0]).toContain("refine: the agent is waiting for you");
     expect(lab.calls).toEqual(["label w9:p5 gh-5 · refine norn: your turn 15000"]);
+  });
+});
+
+describe("cockpit planner (HC5)", () => {
+  test("go on a manual start the runner can open runs `norn open` (MO5); with a run it goes to the agent", () => {
+    const base = { id: "i", group: "your_turn" as const, story: "gh-5", slice: null, step: "refine", title: "t", since: "2099-01-15T10:00:00.000Z", age: "1m" };
+    expect(planCockpit(parseCockpitLine("1"), [{ ...base, command: "norn open gh-5" }])).toEqual({ kind: "verb", argv: ["open", "gh-5"] });
+    const running = { ...base, command: "cd /wt", reach: { worktree: "/wt", agent_session_id: "s", pane_id: null } };
+    expect(planCockpit(parseCockpitLine("g 1"), [running])).toEqual({ kind: "go", item: running });
   });
 });

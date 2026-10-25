@@ -46,7 +46,7 @@ MO4 gains one sentence: *an attended run waiting for its person is shown as Your
 
   | Line | Does |
   |---|---|
-  | `<n>` or `g <n>` | go to the item: focus the agent pane of its run (HC6); for a manual start (`… is ready (manual)`, attended step not started) open a pane in the unit worktree and run the item's command there; otherwise show the command |
+  | `<n>` or `g <n>` | go to the item: focus the agent pane of its run (HC6); for a manual start (`… is ready (manual)`, attended step not started) run `norn open <unit>` when the item shows it (MO5), else open a pane beside the cockpit and run the item's command there; otherwise show the command |
   | `a <n> <text>` | `norn answer <unit> <text>` |
   | `y <n>` | `norn approve <unit>` |
   | `x <n> <reason>` | `norn approve <unit> --reject --reason <reason>` |

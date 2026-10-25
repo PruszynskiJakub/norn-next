@@ -21,7 +21,10 @@
  * - kill       → `herdr pane close <pane>` (pane_not_found = already gone)
  * - findSessions → `herdr pane list`                         (agent panes whose cwd is the worktree, R5.1)
  *                `herdr pane process-info --pane <pane>`      (their agent pid)
- * - capabilities: send + resume (R4.1)
+ * - openForPerson → `herdr workspace list`                  (the workspace on the worktree, else the caller's)
+ *                `herdr tab create --workspace W --cwd C --label T` or `herdr workspace create …` (focused)
+ *                `herdr pane run <pane> "<command>"`          (MO5, `norn open`)
+ * - capabilities: send + resume + open (R4.1, MO5)
  *
  * - openStatusPane → `herdr pane split [--current] --direction down --ratio 0.3 --cwd C --no-focus`,
  *                `herdr pane rename <pane> norn`, `herdr pane run <pane> "norn pane --interactive"`   (O1, HC10)
@@ -29,7 +32,7 @@
  *
  * Herdr's agent status is one fact among several (§21, C2): `idle`/`done` never completes a step.
  */
-import type { AdapterContext, LaunchSpec, PaneState, ProcessPort, RunnerPort, SessionRef } from "@norn/core";
+import type { AdapterContext, LaunchSpec, PaneState, PersonOpenSpec, ProcessPort, RunnerPort, SessionRef } from "@norn/core";
 import type { ProcessIdentity, RunnerConfig } from "@norn/schema";
 import { createProcessPort } from "../process/index.ts";
 import { portError } from "../process/error.ts";
@@ -128,11 +131,26 @@ export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
 
   return {
     name: RUNNER_NAME,
-    capabilities: { send: true, resume: true },
+    capabilities: { send: true, resume: true, open: true },
 
     async available() {
       const r = await exec([...base, "status", "server"]);
       return r.code === 0 && /status:\s*running/.test(r.stdout);
+    },
+
+    async openForPerson(spec: PersonOpenSpec): Promise<{ pane_id: string }> {
+      const list = (await herdr(["workspace", "list"])) as {
+        result?: { workspaces?: Array<{ workspace_id: string; worktree?: { checkout_path?: string } }> };
+      } | null;
+      const workspaceId = list?.result?.workspaces?.find((w) => w.worktree?.checkout_path === spec.cwd)?.workspace_id ?? spec.env.HERDR_WORKSPACE_ID ?? null;
+      const common = ["--cwd", spec.cwd, "--label", spec.title];
+      const created = (await herdr(workspaceId ? ["tab", "create", "--workspace", workspaceId, ...common] : ["workspace", "create", ...common])) as {
+        result?: { root_pane?: HerdrPane };
+      } | null;
+      const paneId = created?.result?.root_pane?.pane_id;
+      if (!paneId) throw portError("launch_failed", "herdr did not return a root pane");
+      await herdr(["pane", "run", paneId, spec.command]);
+      return { pane_id: paneId };
     },
 
     async launch(spec: LaunchSpec): Promise<SessionRef> {

@@ -102,6 +102,8 @@ export function planCockpit(cmd: CockpitCommand, items: readonly InboxEntry[]): 
   const wrong = (what: string) => ({ kind: "message" as const, text: `[${cmd.n}] is not ${what}` });
   switch (cmd.kind) {
     case "go":
+      // MO5: a manual start the runner can open itself — run that verb rather than splitting a pane here
+      if (item.group === "your_turn" && !item.reach && item.command.startsWith("norn open ")) return { kind: "verb", argv: ["open", unit] };
       return { kind: "go", item };
     case "view":
       return { kind: "verb", argv: ["trace", unit, "--text"] };
