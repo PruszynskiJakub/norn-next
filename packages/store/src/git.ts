@@ -1,4 +1,5 @@
 /** Minimal git plumbing for claim and mailbox refs (§13). Not a GitPort; adapters own that. */
+import { spawnBounded } from "./spawn.ts";
 
 export interface GitRun {
   code: number;
@@ -6,16 +7,30 @@ export interface GitRun {
   stderr: string;
 }
 
-export async function git(cwd: string, args: string[], input?: string): Promise<GitRun> {
-  const p = Bun.spawn(["git", ...args], {
+/** H11: how long a call that talks to a remote (git fetch/push, gh, glab) may take before it is killed. */
+export const NETWORK_TIMEOUT_MS = 120_000;
+
+const NETWORK_SUBCOMMANDS = new Set(["fetch", "push", "ls-remote", "pull", "clone"]);
+
+/**
+ * H11: the timeout for `git <args>` — set for subcommands that reach a remote, none for local
+ * ones (a commit runs hooks; a log on a big repo is slow but finite).
+ */
+export function gitTimeoutMs(args: readonly string[]): number | undefined {
+  let i = 0;
+  while (i < args.length && args[i] === "-c") i += 2;
+  return NETWORK_SUBCOMMANDS.has(args[i] ?? "") ? NETWORK_TIMEOUT_MS : undefined;
+}
+
+export async function git(cwd: string, args: string[], input?: string, opts: { timeoutMs?: number } = {}): Promise<GitRun> {
+  const timeoutMs = opts.timeoutMs ?? gitTimeoutMs(args);
+  const r = await spawnBounded(["git", ...args], {
     cwd,
-    stdin: input === undefined ? "ignore" : new Response(input),
-    stdout: "pipe",
-    stderr: "pipe",
     env: { ...process.env, GIT_TERMINAL_PROMPT: "0", LC_ALL: "C" },
+    ...(input === undefined ? {} : { stdin: input }),
+    ...(timeoutMs === undefined ? {} : { timeoutMs }),
   });
-  const [stdout, stderr, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
-  return { code, stdout, stderr };
+  return { code: r.code, stdout: r.stdout, stderr: r.stderr };
 }
 
 export async function gitOk(cwd: string, args: string[], input?: string): Promise<string> {

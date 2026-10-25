@@ -3,6 +3,7 @@
  * tested against recorded fixtures (X4). Never throws: a missing binary is exit code 127.
  */
 import type { PortError } from "@norn/core";
+import { spawnBounded } from "@norn/store";
 
 export interface ExecResult {
   code: number;
@@ -14,30 +15,22 @@ export interface ExecOptions {
   cwd?: string;
   stdin?: string;
   env?: Record<string, string>;
+  /** H11: kill the call (and its process group) after this long; a timeout is exit 124 */
+  timeoutMs?: number;
 }
 
 /** Run `argv` (argv[0] is the binary). Must not throw. */
 export type Exec = (argv: string[], opts?: ExecOptions) => Promise<ExecResult>;
 
-/** Default Exec on Bun.spawn. Inherits process.env, overlaid with opts.env. */
+/** Default Exec. Inherits process.env, overlaid with opts.env; never throws (H11: bounded). */
 export const bunExec: Exec = async (argv, opts = {}) => {
-  try {
-    const proc = Bun.spawn(argv, {
-      cwd: opts.cwd,
-      env: { ...process.env, ...(opts.env ?? {}) },
-      stdin: opts.stdin === undefined ? "ignore" : new TextEncoder().encode(opts.stdin),
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const [stdout, stderr, code] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-      proc.exited,
-    ]);
-    return { code, stdout, stderr };
-  } catch (e) {
-    return { code: 127, stdout: "", stderr: e instanceof Error ? e.message : String(e) };
-  }
+  const r = await spawnBounded(argv, {
+    env: { ...process.env, ...(opts.env ?? {}) },
+    ...(opts.cwd === undefined ? {} : { cwd: opts.cwd }),
+    ...(opts.stdin === undefined ? {} : { stdin: opts.stdin }),
+    ...(opts.timeoutMs === undefined ? {} : { timeoutMs: opts.timeoutMs }),
+  });
+  return { code: r.code, stdout: r.stdout, stderr: r.stderr };
 };
 
 class AdapterError extends Error implements PortError {

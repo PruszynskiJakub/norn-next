@@ -3,11 +3,14 @@ import { describe, expect, test } from "bun:test";
 import { fixtureExec, type Exec, type ExecFixture } from "../../src/git/exec.ts";
 import calls from "./fixtures/calls.json";
 import { createGlab, issueKey } from "../../src/glab/index.ts";
+import { NETWORK_TIMEOUT_MS } from "@norn/store";
 
 const stdins: Array<string | undefined> = [];
+const timeouts: Array<number | undefined> = [];
 const base = fixtureExec(calls as ExecFixture[]);
 const exec: Exec = (argv, opts) => {
   stdins.push(opts?.stdin);
+  timeouts.push(opts?.timeoutMs);
   return base(argv, opts);
 };
 const glab = createGlab({ cwd: "/repo", exec });
@@ -15,6 +18,12 @@ const glab = createGlab({ cwd: "/repo", exec });
 describe("glab adapter", () => {
   test("whoami", async () => {
     expect(await glab.whoami()).toBe("jpruszynski");
+  });
+
+  test("every glab call has the network timeout (H11)", async () => {
+    timeouts.length = 0;
+    await glab.whoami();
+    expect(timeouts).toEqual([NETWORK_TIMEOUT_MS]);
   });
 
   test("listAssignedIssues maps to RemoteIssue (GR1)", async () => {
