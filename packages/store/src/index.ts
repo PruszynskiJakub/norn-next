@@ -13,6 +13,7 @@ export * from "./leases.ts";
 export * from "./lock.ts";
 export * from "./paths.ts";
 export * from "./proc.ts";
+export * from "./spawn.ts";
 export * from "./receipts.ts";
 export * from "./refs.ts";
 export * from "./skills.ts";

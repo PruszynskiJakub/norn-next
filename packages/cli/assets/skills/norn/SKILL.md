@@ -9,7 +9,9 @@ You do exactly one step of a larger delivery and report how it ended. Code decid
 
 ## 1. Read the brief
 
-Run `norn brief` in this worktree. It prints the brief as markdown (`norn brief --json` for data). It gives:
+Run `norn brief` in this worktree. If it refuses because this is not a unit worktree (for example the repo's main checkout), stop and tell the person to start the agent from the unit's item in `norn inbox` (`norn open <unit>` opens or prints it). Never change directory to look for the work yourself.
+
+The brief prints as markdown (`norn brief --json` for data). It gives:
 
 - **Where you are**: story, slice, step, attempt, mode, whether a person works with you.
 - **Why this attempt**: when present, why the step runs again (a session that died, or an earlier attempt that judged older code).

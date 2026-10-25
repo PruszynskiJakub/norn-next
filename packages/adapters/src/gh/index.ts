@@ -4,6 +4,7 @@
  */
 import type { RemoteFactory, RemoteIssue, RemotePort, RemotePullRequest } from "@norn/core";
 import { storyKey } from "@norn/schema";
+import { NETWORK_TIMEOUT_MS } from "@norn/store";
 import { bunExec, okOrThrow, parseJson, portError, type Exec } from "../git/exec.ts";
 
 export interface GhOptions {
@@ -84,7 +85,8 @@ export function createGh(opts: GhOptions): RemotePort {
   const bin = opts.bin ?? "gh";
   const env = { GH_PROMPT_DISABLED: "1", NO_COLOR: "1", ...(opts.env ?? {}) };
   const repo = opts.repo ? ["-R", opts.repo] : [];
-  const run = (args: string[]) => exec([bin, ...args], { cwd: opts.cwd, env });
+  // H11: every gh call reaches the remote, so every one is bounded
+  const run = (args: string[]) => exec([bin, ...args], { cwd: opts.cwd, env, timeoutMs: NETWORK_TIMEOUT_MS });
   const json = async <T>(args: string[]): Promise<T> => parseJson<T>(okOrThrow(await run(args), `gh ${args[0]} ${args[1]}`, "gh"), `gh ${args[0]}`, "gh");
 
   return {

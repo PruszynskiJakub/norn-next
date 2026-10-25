@@ -102,8 +102,8 @@ Three separate concepts decide where a human is involved:
 
 | | manual | auto |
 |---|---|---|
-| Unattended agent steps | Marked ready; a human opens any agent in the unit worktree, which runs `norn brief` | Tick starts the agent via the runner |
-| Attended agent steps | Wait for a human ("Your turn") | Wait for a human ("Your turn") |
+| Unattended agent steps | Marked ready; a human opens any agent in the unit worktree (`norn open <unit>` where the runner opens terminals, MO5), which runs `norn brief` | Tick starts the agent via the runner |
+| Attended agent steps | Wait for a human ("Your turn", `norn open <unit>`) | Wait for a human ("Your turn", `norn open <unit>`) |
 | `check`, `git` steps | Run automatically | Run automatically |
 | `gate` steps | Wait for a human | Wait for a human |
 | Hooks, receipts, claims, trace | Same | Same |
@@ -113,6 +113,7 @@ Three separate concepts decide where a human is involved:
 - MO1 *(assumption, revisit)* Mode is stored in `runs/_story/state.json`, changed only by `norn mode` (which writes a `mode` receipt) and travels with the story on takeover.
 - MO2 *(assumption)* The **effective mode** is computed each tick: `manual` if the step is attended or this machine has no runner configured, otherwise the story's mode. A downgrade is shown in `status` and `inbox` ("auto requested, no runner; running manual").
 - MO3 *(assumption)* A run starts with the first `norn brief` in the worktree (manual) or the launch (auto); it creates the `run_id` and a `started` receipt recording session and PID. The tick never launches an agent for a step that has a live run. Switching auto → manual does not stop a running agent; only the next step waits.
+- MO5 `norn open <unit>` opens an agent on a step a person starts (an attended step, or a ready agent step in effective manual mode). When this machine's runner can open a terminal for a person (the optional `open` capability; Herdr: a focused tab in the unit worktree, in the workspace already on that worktree, else the caller's) it opens one running the start command; otherwise, or with `--print`, it prints that command. It records nothing: the agent's `norn brief` starts the run (MO3). Any other step is refused (`nothing_to_open`); a unit not started yet is refused with `norn tick`.
 - MO4 Attended steps relax the unattended machinery: no `silent`, nudges, deadline or `stalled`; the `Stop` hook does not block turn end. Only `died` and an explicit `done` / `stuck` count. The agent reports `done` once the person agrees.
 
 ## 7. Repository layout
@@ -179,6 +180,7 @@ The story worktree is on the story branch and holds `.agents/specs/<id>-<slug>/`
 - H8 Act failures are never `ok: true` (R4.3): an action whose effect failed (send, resume, launch, push, answer delivery) reports `ok: false`; the unit's last failure is kept machine-local, shown in `status` and as an Unblock item until an effect of the same kind succeeds.
 - H9 Every tick writes `tick.start` before act and `tick.end` after (R5.4); `norn why` shows a tick with no end as "tick crashed during act".
 - H10 `heartbeat.json` records `last_tick_at` (R5.5). Older than 3 × watch interval while a held story has auto work → Unblock item "no heartbeat on <holder> for 7m — run `norn watch`", and auto steps lose their manual start hint.
+- H11 Every call that reaches a remote (`git fetch`/`push`/`ls-remote`/`pull`/`clone`, every `gh` and `glab` call) has a timeout (2 min). On timeout its whole process group is killed (git and the `ssh` it started) and the call fails as a retryable network error, so a connection dropped while the machine slept never holds the tick lock (H1). Local git calls have no timeout: a commit runs hooks.
 
 ## 9. Agent integration
 
@@ -400,12 +402,12 @@ Example `bug` workflow: `reproduce (agent; reproduced → implement, cannot_repr
 | Remote | `sync` |
 | Heartbeat | `tick`, `watch` |
 | Agent protocol | `brief`, `done`, `ask`, `stuck`, `hook` |
-| Human | `inbox`, `answer`, `approve [--reject]`, `unstick [--to <step>] [--reset <counter>]`, `update <story>` (BS9), `mode`, `workflow` |
+| Human | `inbox`, `open` (MO5), `answer`, `approve [--reject]`, `unstick [--to <step>] [--reset <counter>]`, `update <story>` (BS9), `mode`, `workflow` |
 | Team | `take`, `release`, `drop` |
 | Views | `status`, `trace <unit>`, `why <unit>` |
 | Housekeeping | `tidy` |
 
-- O1 `norn inbox` (and a Herdr status pane) groups by action: **Your turn** (attended steps), **Answer**, **Approve**, **Unblock**, **Unclaimed**, **Running**, **Recently done**; each item shows question/reason, age and the exact command to resolve it.
+- O1 `norn inbox` (and a Herdr status pane) groups by action: **Your turn** (attended steps), **Answer**, **Approve**, **Unblock**, **Unclaimed**, **Running**, **Recently done**; each item shows question/reason, age and the exact command to resolve it. A person's start of an agent step (Your turn) shows `norn open <unit>` when the runner can open a terminal (MO5), with the start command to type by hand in the detail; otherwise the start command itself. A story taken in on this checkout that no tick has started yet is listed too: under Running while the heartbeat is up, else under Your turn with `norn watch`.
 - O2 `answer`, `approve`, `unstick`, `mode`, `workflow` write receipts; the next tick applies them and delivers answers into the same session or a fresh one from the handoff. Typing directly into an agent pane is also allowed.
 - O3 Notifiers are optional plugins (OS default; ntfy, webhook) and fire once per new inbox item, receipt-first.
 - O4 Trace: one JSONL record per tick with facts snapshot, rule fired, action, result, briefing and transcript pointers.

@@ -154,7 +154,8 @@ describe("the gate a person checks (QV6, QV7)", () => {
     const item = inbox.groups.approve.find((i) => i.story === "gh-1");
     expect(item?.detail).toContain("check: AC2 unverified (no browser in this session) — how: open /today, add 'buy milk p1', expect red flag; AC3 person — how: compare against Figma frame 12");
     expect(item?.detail).not.toContain("AC1");
-    expect(item?.full).toBe(["Criteria for a person to check:", "- AC2 unverified (no browser in this session) — how: open /today, add 'buy milk p1', expect red flag", "- AC3 person — how: compare against Figma frame 12"].join("\n"));
+    expect(item?.full).toMatch(/^Report: .*\n\nCriteria for a person to check:/);
+    expect(item?.full?.split("\n\n")[1]).toBe(["Criteria for a person to check:", "- AC2 unverified (no browser in this session) — how: open /today, add 'buy milk p1', expect red flag", "- AC3 person — how: compare against Figma frame 12"].join("\n"));
   });
 
   test("a report without person or unverified criteria adds nothing to a gate", () => {
@@ -162,7 +163,7 @@ describe("the gate a person checks (QV6, QV7)", () => {
     const item = inbox.groups.approve.find((i) => i.story === "gh-1");
     expect(item?.step).toBe("ready");
     expect(item?.detail).not.toContain("check:");
-    expect(item?.full).toBeUndefined();
+    expect(item?.full).toMatch(/^Report: [^\n]*$/);
   });
 
   test("QV7: a rework brief after a rejection repeats the judged report's criteria not passed", () => {
