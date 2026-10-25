@@ -113,7 +113,7 @@ Three separate concepts decide where a human is involved:
 - MO1 *(assumption, revisit)* Mode is stored in `runs/_story/state.json`, changed only by `norn mode` (which writes a `mode` receipt) and travels with the story on takeover.
 - MO2 *(assumption)* The **effective mode** is computed each tick: `manual` if the step is attended or this machine has no runner configured, otherwise the story's mode. A downgrade is shown in `status` and `inbox` ("auto requested, no runner; running manual").
 - MO3 *(assumption)* A run starts with the first `norn brief` in the worktree (manual) or the launch (auto); it creates the `run_id` and a `started` receipt recording session and PID. The tick never launches an agent for a step that has a live run. Switching auto → manual does not stop a running agent; only the next step waits.
-- MO4 Attended steps relax the unattended machinery: no `silent`, nudges, deadline or `stalled`; the `Stop` hook does not block turn end. Only `died` and an explicit `done` / `stuck` count. The agent reports `done` once the person agrees.
+- MO4 Attended steps relax the unattended machinery: no `silent`, nudges, deadline or `stalled`; the `Stop` hook does not block turn end. Only `died` and an explicit `done` / `stuck` count. The agent reports `done` once the person agrees. An attended run waiting for its person is shown as Your turn after `limits.attended_wait`; this records no outcome (SPEC-herdr-cockpit HC1–HC3).
 
 ## 7. Repository layout
 
@@ -406,9 +406,9 @@ Example `bug` workflow: `reproduce (agent; reproduced → implement, cannot_repr
 | Views | `status`, `trace <unit>`, `why <unit>` |
 | Housekeeping | `tidy` |
 
-- O1 `norn inbox` (and a Herdr status pane) groups by action: **Your turn** (attended steps), **Answer**, **Approve**, **Unblock**, **Unclaimed**, **Running**, **Recently done**; each item shows question/reason, age and the exact command to resolve it.
+- O1 `norn inbox` (and a Herdr status pane) groups by action: **Your turn** (attended steps), **Answer**, **Approve**, **Unblock**, **Unclaimed**, **Running**, **Recently done**; each item shows question/reason, age and the exact command to resolve it. `norn pane --interactive` acts on the items through CLI verbs (SPEC-herdr-cockpit HC4–HC8).
 - O2 `answer`, `approve`, `unstick`, `mode`, `workflow` write receipts; the next tick applies them and delivers answers into the same session or a fresh one from the handoff. Typing directly into an agent pane is also allowed.
-- O3 Notifiers are optional plugins (OS default; ntfy, webhook) and fire once per new inbox item, receipt-first.
+- O3 Notifiers are optional plugins (OS default; ntfy, webhook, herdr) and fire once per new inbox item, receipt-first.
 - O4 Trace: one JSONL record per tick with facts snapshot, rule fired, action, result, briefing and transcript pointers.
 - O5 `norn why <unit>` replays the pure decide function on the recorded snapshot and shows the rule that fired; `--receipt <id>` picks the decision that applied that receipt (the command of a note item, NT2).
 - O6 `handoff.md`: generated status header (S9); tool writes heartbeat lines (repeats collapsed, e.g. "(×3)"); agents write milestones.

@@ -260,6 +260,12 @@ describe("herdr openStatusPane (O1)", () => {
     expect(calls[2]).toEqual(["herdr", "--session", "s", "pane", "run", "w1:p3", "bunx norn pane --interval 10s"]);
   });
 
+  test("interactive runs the cockpit (HC10)", async () => {
+    const { exec, calls } = fakeExec([["pane split", ok(fx.pane_split)], ["pane rename", empty], ["pane run", empty]]);
+    await openStatusPane("/repo", { exec, env: {}, interactive: true, interval: "10s" });
+    expect(calls[2]).toEqual(["herdr", "pane", "run", "w1:p3", "norn pane --interactive --interval 10s"]);
+  });
+
   test("a split without a pane id is a launch failure", async () => {
     const { exec } = fakeExec([["pane split", ok({ result: {} })]]);
     expect(await openStatusPane("/repo", { exec, env: {} }).catch((e) => e)).toMatchObject({ code: "launch_failed" });
