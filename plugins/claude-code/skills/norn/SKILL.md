@@ -9,14 +9,15 @@ You do exactly one step of a larger delivery and report how it ended. Code decid
 
 ## 1. Read the brief
 
-Run `norn brief` in this worktree (`norn brief --json` for data). It gives:
+Run `norn brief` in this worktree. It prints the brief as markdown (`norn brief --json` for data). It gives:
 
 - **Where you are**: story, slice, step, attempt, mode, whether a person works with you.
+- **Why this attempt**: when present, why the step runs again (a session that died, or an earlier attempt that judged older code).
 - **The skill to use**: load it and follow it for the craft. Extra instructions add to it.
 - **Inputs**: spec, slice file, diff range. Read them before you change anything.
 - **Rework**: when present, these points come before anything else.
-- **Context**: handoff.md and any answer to an earlier question.
-- **Finish with**: the outcomes you may report and what each one means.
+- **Context**: the written part of handoff.md and any answer to an earlier question. A Resume written by another step is left out; it is not your instruction.
+- **Finish with**: the outcomes you may report and what each one means, and the criteria to give a verdict on when a report is required.
 - **Limits**: deadline, nudges left, port slot.
 
 ## 2. Work in scope
@@ -50,7 +51,7 @@ Pick exactly one:
 
 When a person works with you in the pane, report `done` only once they agree.
 
-Every command prints JSON. If it refuses (`{"error", "do_instead"}`), do exactly what `do_instead` says, then report again. Never work around a refusal.
+Every other command prints JSON. If one refuses (`{"error", "do_instead"}`), do exactly what `do_instead` says, then report again. Never work around a refusal.
 
 After a report succeeds, **end your turn**. Do not keep working and do not report twice. If you are resumed with an answer, continue the same step and report again at its end.
 
