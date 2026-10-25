@@ -4,6 +4,10 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+### Fixed
+
+- `norn doctor` suggests `herdr plugin link <checkout>/plugins/herdr` for the cockpit plugin, naming this checkout when norn runs from source, instead of `herdr plugin install`, which cannot clone the private repo. The README says the same.
+
 ## [0.3.0] - 2026-10-25
 
 ### Added
