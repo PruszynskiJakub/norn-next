@@ -5,6 +5,7 @@
 import {
   type AgentStep,
   type CheckReceipt,
+  type CriterionVerdict,
   type DoneReceipt,
   type Finding,
   type Mode,
@@ -61,6 +62,8 @@ export interface Ruling {
   at: string;
   comment: string;
   receipt_id: string;
+  /** C2: the unit's branch head the ruling judged; null when the gate receipt did not record it */
+  head_sha: string | null;
 }
 
 /** Gate rulings with a reason across the story's units, oldest first, one per receipt (F28). */
@@ -73,7 +76,7 @@ export function storyRulings(units: ReadonlyArray<{ unit: string; receipts: read
       const comment = r.comment?.trim();
       if (!comment) continue;
       seen.add(r.receipt_id);
-      out.push({ unit: u.unit, step: r.step, attempt: r.attempt, decision: r.kind, by: r.who ?? null, at: r.at, comment, receipt_id: r.receipt_id });
+      out.push({ unit: u.unit, step: r.step, attempt: r.attempt, decision: r.kind, by: r.who ?? null, at: r.at, comment, receipt_id: r.receipt_id, head_sha: r.head_sha ?? null });
     }
   return out.sort((a, b) => epoch(a.at) - epoch(b.at) || a.receipt_id.localeCompare(b.receipt_id));
 }
@@ -91,6 +94,8 @@ export interface BriefReport {
   outcome: string;
   handoff: string;
   evidence: BriefEvidence | null;
+  /** QV2: the report's criteria that did not pass (fail with repro, person/unverified with how); absent = none */
+  criteria?: CriterionVerdict[];
 }
 
 export interface BriefJson {
@@ -109,6 +114,11 @@ export interface BriefJson {
     /** a gate rejection: the person's comment verbatim and what they judged */
     decision: { step: string; by: string | null; comment: string | null; judged: BriefReport | null } | null;
     detail: string | null;
+    /**
+     * BS5 base mode: `git: update` stopped on conflicts — merge `sha` (the tip of `ref`) into the
+     * story branch in this worktree, resolve, commit the merge; never rebase. Absent otherwise.
+     */
+    base?: { ref: string; sha: string; conflicts: string[] };
   } | null;
   /** F28: gate rulings of the story, oldest first (the one shown under Rework excepted) */
   rulings: Ruling[];
@@ -118,7 +128,8 @@ export interface BriefJson {
     /** findings of the previous step on a forward entry: for information, not rework */
     notes: { step: string; outcome: string; items: Finding[] } | null;
   };
-  finish: Array<{ command: string; means: string }>;
+  /** `verdict`: QV5 — reportable only when the worst verdict of the criteria report is this one */
+  finish: Array<{ command: string; means: string; verdict?: string }>;
   limits: { attended: boolean; deadline: string | null; deadline_at: string | null; nudges_left: number | null; retries_left: number | null; slot: number | null; port_base: number | null };
 }
 
@@ -202,7 +213,7 @@ function inputs(input: BriefInput, step: AgentStep, rw: BriefJson["rework"]): Br
 const isFailingCheck = (r: NumberedReceipt): r is NumberedReceipt & { receipt: CheckReceipt } => r.receipt.kind === "check" && r.receipt.outcome === "fail";
 const isDone = (r: NumberedReceipt): r is NumberedReceipt & { receipt: DoneReceipt } => r.receipt.kind === "done";
 /** Outcomes that move work forward when a workflow declares no counters to tell (fallback). */
-const FORWARD = new Set(["pass", "approve", "done", "partial"]);
+const FORWARD = new Set(["pass", "approve", "done", "partial", "unverified"]);
 
 /**
  * A receipt that sends work back (W4): its outcome takes a counted edge, or — for edges without
@@ -243,7 +254,8 @@ function evidenceOf(input: BriefInput, rel: string | undefined): BriefEvidence |
 const unitDirAbs = ({ paths: p }: BriefInput) => (p.unit_dir.startsWith("/") ? p.unit_dir : `${p.worktree}/${p.unit_dir}`);
 
 function reportOf(input: BriefInput, r: DoneReceipt): BriefReport {
-  return { step: r.step, attempt: r.attempt, outcome: r.outcome, handoff: r.handoff, evidence: evidenceOf(input, r.evidence) };
+  const open = r.criteria?.filter((c) => c.verdict !== "pass") ?? [];
+  return { step: r.step, attempt: r.attempt, outcome: r.outcome, handoff: r.handoff, evidence: evidenceOf(input, r.evidence), ...(open.length ? { criteria: open } : {}) };
 }
 
 /** The receipt that moved the cursor here from another step, if any. */
@@ -295,6 +307,8 @@ function rework(input: BriefInput, step: AgentStep): BriefJson["rework"] {
     findings: done?.findings?.length ? { step: done.step, outcome: done.outcome, items: done.findings } : null,
     decision,
     detail: r.kind === "classify" ? (r.detail ?? `${r.step}: ${r.outcome}`) : null,
+    // BS5: the base the update could not merge, as data (never parsed from `detail`, P8)
+    ...(r.kind === "classify" && r.outcome === "conflict" && r.base ? { base: { ref: r.base.ref, sha: r.base.sha, conflicts: [...r.base.conflicts] } } : {}),
   };
 }
 
@@ -327,10 +341,16 @@ function answers(input: BriefInput): BriefJson["context"]["answers"] {
 }
 
 function finish(step: AgentStep): BriefJson["finish"] {
-  const out = reportableOutcomes(step).map((o) => ({
-    command: `norn done ${o} --handoff "…"`,
-    means: outcomeEdge(step.outcomes[o] as OutcomeSpec).means ?? `step finished with outcome ${o}`,
-  }));
+  const out: BriefJson["finish"] = reportableOutcomes(step).map((o) => {
+    const edge = outcomeEdge(step.outcomes[o] as OutcomeSpec);
+    // QV3/QV5: a step requiring criteria, or an outcome gated by a verdict, takes the report file
+    const criteria = step.criteria === "required" || edge.verdict !== undefined;
+    return {
+      command: `norn done ${o}${criteria ? " --criteria <file>" : ""} --handoff "…"`,
+      means: edge.means ?? `step finished with outcome ${o}`,
+      ...(edge.verdict ? { verdict: edge.verdict } : {}),
+    };
+  });
   out.push({ command: `norn ask "<question>"`, means: "you need a person's answer to continue; the step parks until answered" });
   out.push({ command: `norn stuck "<reason>"`, means: "you cannot continue; a person unblocks the step" });
   return out;
@@ -363,6 +383,17 @@ function findingLines(out: string[], items: readonly Finding[]): void {
     if (x.detail) out.push(`   ${x.detail.replace(/\n/g, "\n   ")}`);
     if (x.repro) out.push(`   Repro: ${x.repro}`);
   });
+  out.push("");
+}
+
+/** QV2: criteria of a report that did not pass, each with its repro or how to check it. */
+function criteriaLines(out: string[], items: readonly CriterionVerdict[] | undefined): void {
+  if (!items?.length) return;
+  out.push("Criteria not passed:", "");
+  for (const c of items) {
+    const parts = [c.repro && `repro: ${c.repro}`, c.reason && `reason: ${c.reason}`, c.how && `how: ${c.how}`, c.evidence && `evidence: ${c.evidence}`].filter(Boolean);
+    out.push(`- **${c.id}** ${c.verdict}${parts.length ? ` — ${parts.join("; ")}` : ""}`);
+  }
   out.push("");
 }
 
@@ -409,6 +440,7 @@ function markdown(b: BriefJson): string {
       out.push(d.comment ? quote(d.comment) : "(no comment given; ask the person or see the evidence)", "");
       if (d.judged) {
         out.push(`What was judged: ${d.judged.step}#${d.judged.attempt} reported \`${d.judged.outcome}\`:`, "", quote(d.judged.handoff), "");
+        criteriaLines(out, d.judged.criteria);
         evidenceLines(out, d.judged.evidence);
       }
     }
@@ -423,6 +455,7 @@ function markdown(b: BriefJson): string {
     const r = rw.report;
     if (r) {
       out.push(`### ${r.step}#${r.attempt} reported \`${r.outcome}\``, "", quote(r.handoff), "");
+      criteriaLines(out, r.criteria);
     }
     const f = rw.findings;
     if (f) {
@@ -432,11 +465,26 @@ function markdown(b: BriefJson): string {
     }
     if (r) evidenceLines(out, r.evidence);
     if (rw.detail) out.push(`### ${rw.from}`, "", rw.detail, "");
+    const bs = rw.base;
+    if (bs) {
+      const branch = bs.ref.replace(/^refs\/(remotes|heads)\//, "");
+      out.push("### Base update (merge skill, base mode)", "");
+      out.push(`Merge \`${bs.sha}\` (${branch}) into the story branch in this worktree, resolve, commit the merge; never rebase:`, "");
+      out.push("```sh", `git merge --no-ff ${bs.sha}`, "```", "");
+      out.push(`Conflicting paths: ${bs.conflicts.length ? bs.conflicts.map((p) => `\`${p}\``).join(", ") : "(not reported)"}`, "");
+      out.push("Resolve each conflict by intent; resolve to existing behaviour only. When no resolution fits without new behaviour, run `git merge --abort` (the worktree stays clean) and report `norn stuck \"<why>\"`. Otherwise commit the merge, run the checks, and report done. Do not push.", "");
+    }
   }
 
   if (b.rulings.length) {
-    out.push("## Rulings", "", "A person ruled at a gate of this story. These rulings settle the questions they answer, even where the spec text still says otherwise; follow them and do not raise them again.", "");
-    for (const r of b.rulings) out.push(`- ${r.unit} ${r.step}#${r.attempt} ${r.decision}${r.by ? ` by ${r.by}` : ""} (${r.at}):`, quote(r.comment).replace(/^/gm, "  "));
+    out.push(
+      "## Rulings",
+      "",
+      "A person ruled at a gate of this story, each time at the head named below. These rulings answer the questions of reading and scope they address, even where the spec text still says otherwise; follow them and do not raise them again. A ruling never turns a criterion into `pass`: it judged the code at its head, not the current code. Each criterion still gets its own verdict from what you observe now; one you cannot observe here is `unverified` (QV5a). At most a ruling informs a `person` verdict — cite it in that verdict's `how` for the person to confirm on the current head.",
+      "",
+    );
+    for (const r of b.rulings)
+      out.push(`- ${r.unit} ${r.step}#${r.attempt} ${r.decision}${r.by ? ` by ${r.by}` : ""} (${r.at}) at head ${r.head_sha ? `\`${r.head_sha}\`` : "not recorded"}:`, quote(r.comment).replace(/^/gm, "  "));
     out.push("");
   }
 
@@ -454,7 +502,13 @@ function markdown(b: BriefJson): string {
   }
 
   out.push("## Finish with exactly one of", "");
-  for (const f of b.finish) out.push(`- \`${f.command}\` — ${f.means}`);
+  for (const f of b.finish) out.push(`- \`${f.command}\` — ${f.means}${f.verdict ? ` (only when the worst verdict is \`${f.verdict}\`)` : ""}`);
+  if (b.finish.some((f) => f.command.includes("--criteria")))
+    out.push(
+      "",
+      "`--criteria <file>`: a JSON array with one verdict per acceptance criterion — `pass` (with `evidence`), `fail` (with `repro`), `person` (with `how`), `unverified` (with `reason` and `how`). Worst verdict: fail > unverified > person > pass.",
+      "Add `--note \"<text>\"` (and `--note-criterion <id>`) for a question a person should see without blocking the work.",
+    );
   out.push("", "Then end your turn. Never edit `runs/`; never push.", "");
 
   out.push("## Limits", "");

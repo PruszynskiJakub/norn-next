@@ -7,7 +7,7 @@ import { linkSync, renameSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { type ProcessIdentity, check, ProcessIdentity as ProcessIdentitySchema } from "@norn/schema";
 import { createExclusive, isErrno, json, readText, safeUnlink } from "./fsx.ts";
-import { tickLockPath } from "./paths.ts";
+import { integrateLockPath, tickLockPath } from "./paths.ts";
 import { defaultLiveness, type LivenessCheck, localProcess } from "./proc.ts";
 
 let seq = 0;
@@ -97,4 +97,9 @@ export async function acquireLock(path: string, opts: LockOptions = {}): Promise
 /** The local tick lock (H1) at `.agents/norn/trace/tick.lock`. */
 export function acquireTickLock(repoRoot: string, opts: LockOptions = {}): Promise<LockResult> {
   return acquireLock(tickLockPath(repoRoot), opts);
+}
+
+/** K6/BS3: the story's integrate lock at `.agents/norn/trace/integrate-<story>.lock`. */
+export function acquireIntegrateLock(repoRoot: string, story: string, opts: LockOptions = {}): Promise<LockResult> {
+  return acquireLock(integrateLockPath(repoRoot, story), opts);
 }

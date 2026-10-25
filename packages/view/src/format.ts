@@ -59,6 +59,17 @@ function heartbeatText(view: ProjectView): string | null {
 }
 
 /** `norn status` human mode: one block per story, slices indented, then runs and errors. */
+/** BS1/BS3: `base main: 17 behind · conflicts a.ts, b.ts · last update merge 1a2b3c4d5e6f (…)`; null when nothing is known. */
+function baseSyncText(s: StoryView): string | null {
+  const b = s.base_sync;
+  if (!b) return null;
+  const parts: string[] = [];
+  if (b.behind !== null) parts.push(b.behind === 0 ? "up to date" : `${b.behind} behind`);
+  if (b.conflicts.length) parts.push(`conflicts ${b.conflicts.join(", ")}`);
+  if (b.last_update) parts.push(`last update merge ${b.last_update.sha.slice(0, 12)} (${b.last_update.step}, ${b.last_update.at})`);
+  return parts.length ? `base ${b.branch}: ${parts.join(" · ")}` : null;
+}
+
 export function formatStatus(view: ProjectView): string {
   const out: string[] = [];
   if (!view.stories.length) out.push("No stories. Run `norn sync` to pick up labelled issues.");
@@ -67,6 +78,8 @@ export function formatStatus(view: ProjectView): string {
     out.push(`  ${s.workflow} · ${modeText(s)} · ${claimText(s)} · ${stateText(s)}`);
     if (s.next && s.status !== "running") out.push(`  → ${s.next}`);
     if (s.act_failure) out.push(`  ! ${s.act_failure.reason}`);
+    const bs = baseSyncText(s);
+    if (bs) out.push(`  ${bs}`);
     for (const sl of s.slices) out.push(sliceLine(sl));
     for (const e of [...s.errors, ...s.slices.flatMap((x) => x.errors)]) out.push(`  ! ${e.file}: ${e.errors[0]?.message ?? "invalid"}`);
     out.push("");
@@ -171,6 +184,12 @@ export function formatStepTimeline(v: TraceView, opts: { full?: boolean } = {}):
   out.push(span.join(" · "));
   const types = Object.entries(v.totals.by_type).map(([k, ms]) => `${k} ${formatDuration(ms)}`);
   out.push(`time in ${v.units.length > 1 ? "story " : ""}steps: ${types.join(" · ") || "-"} · human wait ${formatDuration(v.totals.human_wait_ms)}`);
+  if (v.criteria) {
+    // QV8: unverified criteria per capability
+    const c = v.criteria;
+    const needs = Object.entries(c.unverified_needs).map(([k, n]) => `${k} ${n}`).join(", ");
+    out.push(`criteria: ${c.reports} report(s) · ${c.verdicts.pass} pass · ${c.verdicts.fail} fail · ${c.verdicts.person} person · ${c.verdicts.unverified} unverified${needs ? ` (needs: ${needs})` : ""}${c.unchecked_coverage ? ` · ${c.unchecked_coverage} without frontmatter criteria` : ""}`);
+  }
   if (v.hidden_events) out.push(`(${v.hidden_events} no-op/claim-renew tick events hidden — --all shows them)`);
   if (v.records?.source === "base_cache") {
     const ref = v.records.ref?.replace(/^refs\/remotes\//, "") ?? "the base branch";

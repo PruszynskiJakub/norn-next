@@ -17,6 +17,8 @@ import {
   type AgentLaunch,
   applyReceipts,
   buildInbox,
+  GIT_CONFLICT_MARKERS,
+  GIT_IN_PROGRESS,
   type BoundaryCommit,
   isSideAction,
   type Decision,
@@ -42,6 +44,7 @@ import {
 } from "@norn/schema";
 import {
   acquireClaim,
+  acquireIntegrateLock,
   acquireLease,
   acquireRunLease,
   appendHandoffHeartbeat,
@@ -62,6 +65,7 @@ import {
   sliceFile as sliceFilePath,
   slotEnv,
   storyFile,
+  traceDir,
   updateLease,
   writeActFailures,
   writeEnvNorn,
@@ -381,7 +385,7 @@ export class Actor {
     state: UnitState | null,
     heartbeat: string | null,
     paths?: string[],
-  ): Promise<{ sha: string | null; pushed: boolean | null; push_error?: string } | null> {
+  ): Promise<{ sha: string | null; pushed: boolean | null; push_error?: string; deferred?: string; refused?: string } | null> {
     if (!c) return null;
     if (unit && state) {
       const loc = this.unitLoc(unit);
@@ -394,21 +398,74 @@ export class Actor {
         if (heartbeat) appendHandoffHeartbeat(loc.runsDir, `- ${heartbeat}`);
       }
     }
-    const sha = await this.git.commit(c.cwd, { message: c.message, trailers: c.trailers, ...(paths ? { paths } : {}) });
+    let sha: string | null;
+    try {
+      sha = await this.git.commit(c.cwd, { message: c.message, trailers: c.trailers, ...(paths ? { paths } : {}) });
+    } catch (e) {
+      const code = (e as { code?: string }).code;
+      // H1: an agent's merge or rebase is in progress in the worktree — norn's files wait there
+      // uncommitted (git cannot commit them without concluding it); the next commit after it carries them
+      if (code === GIT_IN_PROGRESS) return { sha: null, pushed: null, deferred: (e as Error).message };
+      // H1: never create (or push) a norn commit recording conflict markers: a failed effect, Unblock item (R4.3)
+      if (code === GIT_CONFLICT_MARKERS) {
+        this.effectErrors.push({ effect: "commit", reason: `commit on ${c.branch} refused: ${(e as Error).message}` });
+        return { sha: null, pushed: null, refused: (e as Error).message };
+      }
+      throw e;
+    }
+    this.effectsOk.add("commit");
     if (!c.push || !this.obs.remote) return { sha, pushed: null };
-    const r = await this.pushBranch(c.cwd, c.branch);
+    const r = await this.pushBranch(c.cwd, c.branch, c.trailers);
     if (r.ok) this.effectsOk.add("push");
     // R4.3: committed but not pushed is a failed effect (the record is not on the remote, S8)
     else this.effectErrors.push({ effect: "push", reason: `push of ${c.branch} failed: ${r.message}` });
     return r.ok ? { sha, pushed: true } : { sha, pushed: false, push_error: r.message };
   }
 
-  /** Push a branch (T7: only the claim holder; decide acts only on held stories). Slice branches are rebased by integrate, so they force-push. */
-  private async pushBranch(cwd: string, branch: string): Promise<{ ok: true } | { ok: false; message: string }> {
-    if (!this.obs.remote) return { ok: true };
+  /**
+   * Push a branch (T7: only the claim holder; decide acts only on held stories). Slice branches are
+   * rebased by integrate, so they force-push. BS5.2: never publishes a commit that leaves conflict
+   * markers (an agent's merge included); BS3.3a: a story branch someone pushed to meanwhile is
+   * merged in (never rebased) and pushed again.
+   */
+  private async pushBranch(cwd: string, branch: string, trailers: Record<string, string> = {}): Promise<{ ok: true } | { ok: false; message: string }> {
+    const remote = this.obs.remote;
+    if (!remote) return { ok: true };
+    const held = await this.markersHeld(cwd, remote, branch);
+    if (held) return { ok: false, message: held };
     const force = branch.includes("/") ? "+" : "";
-    const r = await this.git.push(cwd, this.obs.remote, `${force}refs/heads/${branch}:refs/heads/${branch}`);
+    const push = () => this.git.push(cwd, remote, `${force}refs/heads/${branch}:refs/heads/${branch}`);
+    let r = await push();
+    if (!r.ok && r.reason === "rejected" && !force) {
+      const taken = await this.takeRemoteBranch(cwd, remote, branch, trailers);
+      if (taken !== true) return { ok: false, message: `${r.reason}: ${r.message}${taken ? `; ${taken}` : ""}` };
+      r = await push();
+    }
     return r.ok ? { ok: true } : { ok: false, message: `${r.reason}: ${r.message}` };
+  }
+
+  /** BS5.2 (dogfood D5): why the push of `branch` is held — its unpublished commits leave conflict markers — or null. */
+  private async markersHeld(cwd: string, remote: string, branch: string): Promise<string | null> {
+    const marked = await this.git.outgoingConflictMarkers(cwd, remote, `refs/heads/${branch}`);
+    if (!marked.length) return null;
+    const where = marked.map((m) => `${m.path}${m.commit ? ` (commit ${m.commit.slice(0, 12)})` : ""}`);
+    return `held: conflict markers in ${where.join(", ")}; nothing pushed — resolve them in a new commit (never rewrite the branch)`;
+  }
+
+  /**
+   * BS3.3a (dogfood D4): the push of the story branch was rejected — someone pushed to it. Take the
+   * remote branch in (fast-forward, else a merge commit with norn's trailers); true when the push may
+   * be retried, else why not (null = nothing new on the remote, e.g. a protected branch).
+   */
+  private async takeRemoteBranch(cwd: string, remote: string, branch: string, trailers: Record<string, string>): Promise<true | string | null> {
+    try {
+      if ((await this.git.status(cwd)).branch !== branch) return `${branch} is not checked out in ${cwd}`;
+      const r = await gitAdapter.syncRemoteBranch(this.git, { cwd, branch, remote, message: `Merge ${remote}/${branch} into ${branch}`, trailers: { ...trailers, "Norn-Tick": this.tick } });
+      if (r.outcome === "conflict") return `story branch diverged from ${remote}/${branch}; merging it conflicts in ${r.files.join(", ") || "?"} — merge it in ${cwd} by hand`;
+      return r.outcome === "adopted" || r.outcome === "merged" ? true : null;
+    } catch (e) {
+      return `taking in ${remote}/${branch} failed: ${(e as Error).message}`;
+    }
   }
 
   // ------------------------------------------------------------ notifications (O3)
@@ -594,7 +651,7 @@ export class Actor {
         : a.kill && prevRun
           ? await this.releaseRunLeases(a.unit, ["agent"], prevRun)
           : [];
-    const summary = a.advance ? `${a.advance.from}.${a.advance.outcome} → ${a.advance.to}` : `applied ${a.applied.join(", ") || "none"}`;
+    const summary = a.advance ? `${a.advance.from}.${a.advance.outcome} → ${a.advance.to}${a.advance.reset ? ` (reset ${a.advance.reset.join(", ")})` : ""}` : `applied ${a.applied.join(", ") || "none"}`;
     const committed = await this.commit(a.commit, a.unit, state, `${a.rule}: ${summary}`);
     let delivered: boolean | string = resumed ? "resumed" : keyed;
     if (resumed) this.effectsOk.add("resume");
@@ -845,16 +902,66 @@ export class Actor {
     }
   }
 
-  /** W2 git steps (K6, open-pr); the outcome is a `classify` receipt written after the effect. */
+  /** W2 git steps (K6, open-pr, BS3 update); the outcome is a `classify` receipt written after the effect. */
   private async runGit(a: Extract<Action, { kind: "run_git" }>): Promise<ActionResult> {
+    if (a.action !== "integrate" && a.action !== "update") return this.runGitLocked(a);
+    // K6/BS3: slice integrations and base updates of one story never interleave, across processes too
+    mkdirSync(traceDir(this.root), { recursive: true });
+    const lock = await acquireIntegrateLock(this.root, a.unit.story, { now: () => this.nowIso(), note: `${a.unit.key} ${a.action}` });
+    if (!lock.ok) throw new QueueFull(`integrate lock of ${a.unit.story} is held (pid ${lock.holder.holder.pid}); retried next tick (K6)`);
+    try {
+      return await this.runGitLocked(a);
+    } finally {
+      lock.release();
+    }
+  }
+
+  /** BS3: push the updated story branch; a refused push is a failed effect (R4.3), the receipt still stands. */
+  private async pushUpdated(cwd: string, branch: string): Promise<{ ok: true } | { ok: false; message: string }> {
+    const r = await this.pushBranch(cwd, branch);
+    if (r.ok) this.effectsOk.add("push");
+    else this.effectErrors.push({ effect: "push", reason: `push of ${branch} failed: ${r.message}` });
+    return r;
+  }
+
+  private async runGitLocked(a: Extract<Action, { kind: "run_git" }>): Promise<ActionResult> {
     const loc = this.unitLoc(a.unit);
     const st = loc.state;
     const wf = loc.workflow;
     if (!st || !wf) throw new Error(`${a.unit.key} has no state or pinned workflow`);
-    let outcome: "done" | "conflict";
+    let outcome: "done" | "conflict" | "stuck";
     let detail: string;
+    let base: ReceiptOf<"classify">["base"];
     const extra: Record<string, unknown> = {};
     switch (a.action) {
+      case "update": {
+        const u = a.update;
+        if (!u) throw new Error("update without a base");
+        const res = await gitAdapter.update(this.git, { cwd: a.cwd, branch: a.branch, baseSha: u.sha, remote: this.obs.remote, message: u.message, trailers: u.trailers });
+        if (res.outcome === "stuck") {
+          // BS3 step 1/3: dirty worktree, diverged story branch → $stuck with the reason
+          outcome = "stuck";
+          detail = res.reason;
+          break;
+        }
+        if (res.adopted) extra.adopted = res.adopted;
+        if (res.outcome === "conflict") {
+          // BS3 step 6: the merge was aborted; the resolve step gets the base sha and the paths
+          outcome = "conflict";
+          base = { ref: u.ref, sha: u.sha, conflicts: res.files };
+          detail = `merging ${u.branch} (${u.sha.slice(0, 12)}) into ${a.branch} conflicts in ${res.files.join(", ") || "?"}`;
+          // an adopted fast-forward is still the record: publish it (S8)
+          if (res.adopted) extra.story_push = await this.pushUpdated(a.cwd, a.branch);
+          break;
+        }
+        outcome = "done";
+        // BS3: the merge commit (or the head found up to date) goes into the record, for status and why
+        base = { ref: u.ref, sha: u.sha, conflicts: [], head: res.head, merged: res.merged };
+        detail = res.merged ? `merged ${u.branch} (${u.sha.slice(0, 12)}) into ${a.branch} at ${res.head.slice(0, 12)}` : `${a.branch} is up to date with ${u.branch} (${u.sha.slice(0, 12)})`;
+        // BS3 step 5: pushed at the step boundary (S8, T7), as integrate does
+        if (res.merged || res.adopted) extra.story_push = await this.pushUpdated(a.cwd, a.branch);
+        break;
+      }
       case "integrate": {
         if (!a.onto) throw new Error("integrate without a story branch");
         const res = await gitAdapter.integrate(this.git, { sliceCwd: a.cwd, storyBranch: a.onto });
@@ -903,6 +1010,7 @@ export class Actor {
       rule: a.rule,
       detail,
       route: routeFor(wf, a.step, outcome) as ReceiptOf<"classify">["route"],
+      ...(base ? { base } : {}),
     };
     const written = appendReceipt(loc.runsDir, receipt);
     return { ok: true, detail: { outcome, detail, receipt: written.n, ...extra } };

@@ -3,9 +3,11 @@
  * Per-tick progress goes to stderr as JSON lines; stdout gets one summary at exit (P8).
  * A clean exit releases the claims this heartbeat holds (T6) unless `--keep-claims`.
  */
+import { git as gitAdapter } from "@norn/adapters";
 import { ExitCode, parseDuration } from "@norn/schema";
+import { git as rawGit } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
-import { CliFailure, usageError, withExit } from "../output.ts";
+import { CliFailure, refuse, usageError, withExit } from "../output.ts";
 import { releaseHeldClaims } from "../runtime/release.ts";
 import { runTick } from "../runtime/tick.ts";
 
@@ -38,6 +40,10 @@ export const watchCommand = defineCommand({
     const maxRaw = opt.str(args, "max-ticks");
     const max = maxRaw === undefined ? Number.POSITIVE_INFINITY : Number(maxRaw);
     if (!(max > 0)) throw usageError(`bad --max-ticks '${maxRaw}'`, "norn watch --max-ticks 10");
+    // BS2: no heartbeat without `git merge-tree --write-tree` (git ≥ 2.38) — base conflicts would go unseen
+    const v = await rawGit(ctx.root, ["--version"]);
+    if (v.code !== 0 || !gitAdapter.gitVersionOk(v.stdout))
+      throw refuse(`git ≥ ${gitAdapter.MIN_GIT_VERSION.join(".")} is required to run a heartbeat (found: ${v.stdout.trim() || "no git"}) (BS2)`, "upgrade git, then norn doctor", "git_too_old");
     const signal = ctx.deps.signal;
     let ticks = 0;
     let failed = 0;

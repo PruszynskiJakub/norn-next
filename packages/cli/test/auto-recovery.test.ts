@@ -8,7 +8,7 @@
  *   - R5.5: a stale `last_tick_at` with auto work is an inbox item and removes the manual hint
  *   - R7: a run started on another machine is never judged by this machine's pid or pane
  */
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Inbox, NUDGE_TEXT } from "@norn/core";
@@ -17,6 +17,9 @@ import { appendTrace, readTrace, writeState } from "@norn/store";
 import type { ProjectView } from "@norn/view";
 import type { TickReport } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
+
+// whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
+setDefaultTimeout(30_000);
 
 const SOLO = `name: solo
 start: implement

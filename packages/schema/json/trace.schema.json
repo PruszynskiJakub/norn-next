@@ -672,6 +672,115 @@
           "type": "integer"
         }
       }
+    },
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "at",
+        "unit",
+        "run_id",
+        "step",
+        "attempt",
+        "receipt_id",
+        "outcome",
+        "rule",
+        "verdicts",
+        "unverified_needs"
+      ],
+      "properties": {
+        "type": {
+          "const": "criteria",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "description": "ISO-8601 timestamp, UTC",
+          "type": "string"
+        },
+        "unit": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "run_id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "step": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "attempt": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "receipt_id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "outcome": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "rule": {
+          "anyOf": [
+            {
+              "const": "criteria.checked",
+              "type": "string"
+            },
+            {
+              "const": "criteria.unchecked_coverage",
+              "type": "string"
+            }
+          ]
+        },
+        "verdicts": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "pass",
+            "fail",
+            "person",
+            "unverified"
+          ],
+          "properties": {
+            "pass": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "fail": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "person": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "unverified": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        },
+        "unverified_needs": {
+          "type": "object",
+          "patternProperties": {
+            "^(.*)$": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        }
+      }
     }
   ],
   "discriminator": {

@@ -10,6 +10,7 @@ export const RESERVED_STEP_NAMES = [
   "died",
   "timeout",
   "stalled",
+  "stale",
 ] as const;
 
 /** Reserved workflow targets (W7). */

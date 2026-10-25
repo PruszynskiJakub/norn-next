@@ -3,13 +3,16 @@
  * session resume the agent session (B2), `unstick --to` kills the live run (S7/O2), and the GR6
  * base-branch record retried on later ticks until it lands.
  */
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ulid } from "@norn/schema";
 import { appendTrace } from "@norn/store";
 import type { TickReport } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
+
+// whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
+setDefaultTimeout(30_000);
 
 const SOLO = `name: solo
 start: implement

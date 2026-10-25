@@ -59,6 +59,49 @@
       "items": {
         "type": "string"
       }
+    },
+    "criteria": {
+      "description": "Acceptance criteria as data (QV1); the prose Acceptance section stays the spec",
+      "type": "array",
+      "items": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "verifier"
+        ],
+        "properties": {
+          "id": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "description": "Acceptance criterion id, e.g. AC1",
+            "type": "string"
+          },
+          "verifier": {
+            "anyOf": [
+              {
+                "const": "test",
+                "type": "string"
+              },
+              {
+                "const": "agent",
+                "type": "string"
+              },
+              {
+                "const": "person",
+                "type": "string"
+              }
+            ]
+          },
+          "needs": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        }
+      }
     }
   }
 }

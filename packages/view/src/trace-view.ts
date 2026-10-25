@@ -6,11 +6,24 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { storyWorktreePath } from "@norn/core";
-import { storyOf } from "@norn/schema";
+import { storyOf, type TraceEvent } from "@norn/schema";
 import { defaultBaseRef, loadSnapshot, readTrace, type StorySnapshot, traceDir, type UnitSnapshot, withSliceWorktrees } from "@norn/store";
 import { discoverStoryRoots, markedSliceWorktree } from "./load.ts";
 import { buildStepTimeline, mergeStoryTimeline } from "./steps.ts";
-import type { TraceRecords, TraceView } from "./types.ts";
+import type { CriteriaSummary, TraceRecords, TraceView } from "./types.ts";
+
+/** QV8: sum the `criteria` trace events of the given units — "we keep failing to verify browser criteria" as data. */
+export function criteriaSummary(events: readonly TraceEvent[], units: ReadonlySet<string>): CriteriaSummary | null {
+  const out: CriteriaSummary = { reports: 0, verdicts: { pass: 0, fail: 0, person: 0, unverified: 0 }, unverified_needs: {}, unchecked_coverage: 0 };
+  for (const ev of events) {
+    if (ev.type !== "criteria" || !units.has(ev.unit)) continue;
+    out.reports++;
+    for (const k of ["pass", "fail", "person", "unverified"] as const) out.verdicts[k] += ev.verdicts[k];
+    for (const [need, n] of Object.entries(ev.unverified_needs)) out.unverified_needs[need] = (out.unverified_needs[need] ?? 0) + n;
+    if (ev.rule === "criteria.unchecked_coverage") out.unchecked_coverage++;
+  }
+  return out.reports ? out : null;
+}
 
 function sameFile(a: string, b: string): boolean {
   try {
@@ -95,12 +108,16 @@ export function loadTraceView(opts: LoadTraceViewOptions): TraceView | null {
   const unit = story.units.find((u) => u.unit.key === opts.key);
   if (!unit) return null;
   const view = build(unit);
-  if (unit.unit.slice || opts.storyOnly) return { ...view, records };
+  const shown = unit.unit.slice || opts.storyOnly ? [unit] : story.units;
+  const summary = criteriaSummary(events, new Set(shown.map((u) => u.unit.key)));
+  const criteria = summary ? { criteria: summary } : {};
+  if (unit.unit.slice || opts.storyOnly) return { ...view, records, ...criteria };
   return {
     ...mergeStoryTimeline(
       view,
       story.units.filter((u) => u.unit.slice).map(build),
     ),
     records,
+    ...criteria,
   };
 }

@@ -6,9 +6,11 @@
 export type * from "./actions.ts";
 export type * from "./facts.ts";
 export type * from "./ports.ts";
+export { GIT_CONFLICT_MARKERS, GIT_IN_PROGRESS } from "./ports.ts";
 export * from "./apply.ts";
 export * from "./brief.ts";
 export * from "./commands.ts";
+export * from "./criteria.ts";
 export * from "./decide.ts";
 export * from "./handoff.ts";
 export * from "./hash.ts";

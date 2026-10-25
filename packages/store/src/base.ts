@@ -9,7 +9,8 @@
  */
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { atomicWrite, readText } from "./fsx.ts";
+import type { StoryBase, StoryPrSeen } from "@norn/core";
+import { atomicWrite, atomicWriteJson, readText } from "./fsx.ts";
 import { SPECS_DIR, traceDir } from "./paths.ts";
 
 function gitSync(cwd: string, args: string[], input?: Uint8Array): { code: number; stdout: Buffer } {
@@ -31,14 +32,7 @@ const baseCacheDir = (repoRoot: string) => join(traceDir(repoRoot), "base");
  * remote-tracking ref does not exist (no remote, never fetched).
  */
 export function defaultBaseRef(repoRoot: string, remote: string, branch?: string | null): string | null {
-  let b = branch ?? null;
-  if (!b) {
-    try {
-      b = (JSON.parse(readText(join(traceDir(repoRoot), "remote.json")) ?? "{}") as { default_branch?: string | null }).default_branch ?? null;
-    } catch {
-      b = null;
-    }
-  }
+  let b = branch ?? cachedDefaultBranch(repoRoot);
   if (!b) {
     const r = gitSync(repoRoot, ["symbolic-ref", "--quiet", `refs/remotes/${remote}/HEAD`]);
     const ref = r.code === 0 ? r.stdout.toString().trim() : "";
@@ -46,6 +40,15 @@ export function defaultBaseRef(repoRoot: string, remote: string, branch?: string
   }
   const ref = `refs/remotes/${remote}/${b}`;
   return gitSync(repoRoot, ["rev-parse", "--verify", "--quiet", ref]).code === 0 ? ref : null;
+}
+
+/** The remote's default branch as the last sync discovered it (`trace/remote.json`), or null. */
+export function cachedDefaultBranch(repoRoot: string): string | null {
+  try {
+    return (JSON.parse(readText(join(traceDir(repoRoot), "remote.json")) ?? "{}") as { default_branch?: string | null }).default_branch ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -106,4 +109,51 @@ export function baseSpecsRoot(repoRoot: string, ref: string): string | null {
     /* another tick may be cleaning up too */
   }
   return dir;
+}
+
+const baseFactsPath = (repoRoot: string) => join(traceDir(repoRoot), "base.json");
+
+/**
+ * BS1: story key → the last `story.base` measured on this checkout (`trace/base.json`, machine-local).
+ * Observe reruns `git merge-tree` only when the pair (story head, base sha) differs from the cached
+ * one; views show the last measurement (stale inbox items, merge-item detail) without running git.
+ */
+export type BaseFactsCache = Record<string, StoryBase>;
+
+export function readBaseFacts(repoRoot: string): BaseFactsCache {
+  try {
+    const v = (JSON.parse(readText(baseFactsPath(repoRoot)) ?? "{}") as { stories?: BaseFactsCache }).stories;
+    return v && typeof v === "object" ? v : {};
+  } catch {
+    return {};
+  }
+}
+
+export function writeBaseFacts(repoRoot: string, cache: BaseFactsCache): void {
+  atomicWriteJson(baseFactsPath(repoRoot), { stories: cache });
+}
+
+const prFactsPath = (repoRoot: string) => join(traceDir(repoRoot), "pr.json");
+
+/**
+ * C1 (BS10, BS11, F35): story key → the story PR as the last remote sync of this checkout saw it
+ * (`trace/pr.json`, machine-local), with the observation time. PRs are fetched only on sync ticks;
+ * the ticks between and the read model (`norn inbox`/`status`) show the PR items from this.
+ */
+export type PrFactsCache = Record<string, StoryPrSeen>;
+
+export function readPrFacts(repoRoot: string): PrFactsCache {
+  try {
+    const v = (JSON.parse(readText(prFactsPath(repoRoot)) ?? "{}") as { stories?: PrFactsCache }).stories;
+    if (!v || typeof v !== "object") return {};
+    // a cache, not a record: entries of an unexpected shape are dropped (the next sync rewrites them)
+    const ok = (e: StoryPrSeen | undefined) => !!e && typeof e.observed_at === "number" && (e.pr === null || (typeof e.pr === "object" && typeof e.pr.number === "number" && typeof e.pr.state === "string"));
+    return Object.fromEntries(Object.entries(v).filter(([, e]) => ok(e)));
+  } catch {
+    return {};
+  }
+}
+
+export function writePrFacts(repoRoot: string, cache: PrFactsCache): void {
+  atomicWriteJson(prFactsPath(repoRoot), { stories: cache });
 }

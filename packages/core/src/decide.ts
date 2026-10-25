@@ -30,7 +30,7 @@ import {
   type UnitState,
   type Workflow,
 } from "@norn/schema";
-import type { Action, AgentLaunch, BoundaryCommit, Decision, NewReceipt, SessionInput, UpdateStoryMirrorAction, WorktreeSpec } from "./actions.ts";
+import type { Action, AgentLaunch, BoundaryCommit, Decision, NewReceipt, RunGitAction, SessionInput, UpdateStoryMirrorAction, WorktreeSpec } from "./actions.ts";
 import { type ApplyResult, applyReceipts, initialState } from "./apply.ts";
 import { AUTO_PROMPT, NUDGE_TEXT, sliceWorktreePath, storyWorktreePath } from "./commands.ts";
 import type { Facts, NumberedReceipt, RunFacts, SliceFileFacts, StoryFacts, UnitFacts, UnitRef } from "./facts.ts";
@@ -39,7 +39,7 @@ import { bodyChangedItem, effectiveMode, storyFinished, unitInboxItem } from "./
 import { promptKeys } from "./prompt.ts";
 import type { InboxItem, RemoteIssue, RunnerCapabilities, SessionRef } from "./ports.ts";
 import { epoch, iso } from "./time.ts";
-import { checkWorkflowLevel, stepOf, type UnitLevel, type WorkflowIssue } from "./workflow.ts";
+import { checkWorkflowLevel, edgeOf, isStale, stepOf, type UnitLevel, type WorkflowIssue } from "./workflow.ts";
 
 /** A repo workflow as loaded by the caller: parsed + validated (W5) with the exact file text. */
 export interface LoadedWorkflow {
@@ -212,7 +212,7 @@ function decideStory(ctx: Ctx, story: StoryFacts): void {
     // heartbeat's own expired claim (nobody took it since) is re-acquired for a merged PR whose record
     // is not yet done, so GR6 cleanup and the base record still happen.
     const baseDone = story.base_status === "done" || story.base_status === "dropped";
-    if (baseDone || ((story.pr?.state === "merged" || story.merged_by_ancestry) && !ours))
+    if (baseDone || (mergedIntoBase(story, ctx.facts.repo.default_branch) && !ours))
       return ctx.noop(ref, "story.finished", baseDone ? `finished: ${ctx.facts.repo.default_branch} records it ${story.base_status} (R3.2); nothing to acquire` : "finished: PR merged (R3.2); nothing to acquire");
     // GR6: a finished story (workflow done, merged/recorded or dropped) needs no owner — never "unclaimed"
     if (!ours && !fresh && storyFinished(story)) return ctx.noop(ref, "story.finished", `finished (${story.frontmatter?.status === "done" || story.frontmatter?.status === "dropped" ? story.frontmatter.status : "workflow done"}); nothing to take`);
@@ -267,8 +267,9 @@ function claimBlob(ctx: Ctx, story: string, prev: ClaimBlob | null): ClaimBlob {
 /** GR6 merged → cleanup; GR7 closed/unassigned/unlabelled → park "remote: …"; GR8 mirror + body change. */
 function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, storyUnit: UnitFacts | null): void {
   const ref = storyRef(story);
-  // P2 (F34): merged when the PR says so, or when its head is already on the fetched base
-  if (story.pr?.state === "merged" || story.merged_by_ancestry) {
+  // P2 (F34): merged when the PR says so, or when its head is already on the fetched base;
+  // BS11: a PR merged into another branch than the base is not merged (parked below, GR7)
+  if (mergedIntoBase(story, ctx.facts.repo.default_branch)) {
     if (fm.status === "done") return;
     const slices = story.slices.filter((s) => s.frontmatter);
     const sliceWts = story.units.filter((u) => u.unit.slice !== null && u.worktree?.exists).map((u) => (u.worktree as { path: string }).path);
@@ -285,7 +286,7 @@ function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, story
     });
   }
   const st = storyUnit?.state;
-  const reason = remoteProblem(story, ctx.config.remote.label);
+  const reason = remoteProblem(story, ctx.config.remote.label, ctx.facts.repo.default_branch);
   if (reason && st && st.park?.kind !== "remote" && st.status !== "corrupt") {
     const state: UnitState = { ...st, status: "stuck", park: { kind: "remote", reason, since: ctx.nowIso }, updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id };
     return ctx.emit({
@@ -326,8 +327,24 @@ function refineFinished(uf: UnitFacts | null): boolean {
   return Object.entries(wf.steps).some(([name, step]) => step.type === "agent" && step.skill === "refine" && ((st.visits[name] ?? 0) >= 2 || ((st.visits[name] ?? 0) >= 1 && st.step !== name)));
 }
 
-function remoteProblem(story: StoryFacts, label: string): string | null {
+/** BS11: the PR's target branch, when the remote said (`base_branch`, older adapters `base`). */
+export const prBaseBranch = (pr: StoryFacts["pr"]): string | null => pr?.base_branch ?? pr?.base ?? null;
+
+/**
+ * GR6 + BS11: the story's work landed on its base — the PR merged into the base branch, or its head is
+ * already on the fetched base (P2). A PR merged into any other branch does not count.
+ */
+export function mergedIntoBase(story: StoryFacts, base: string): boolean {
+  if (story.merged_by_ancestry) return true;
+  if (story.pr?.state !== "merged") return false;
+  const target = prBaseBranch(story.pr);
+  return target === null || target === base;
+}
+
+function remoteProblem(story: StoryFacts, label: string, base: string): string | null {
   if (story.pr?.state === "closed") return "remote: PR closed unmerged";
+  // BS11 (old norn 0.1.1): a merge into the wrong base skipped story review — park, never clean up
+  if (story.pr?.state === "merged" && !mergedIntoBase(story, base)) return `remote: PR merged into ${prBaseBranch(story.pr)}, not ${base}`;
   const issue = story.issue;
   if (issue === undefined) return null;
   if (issue === null) return "remote: issue closed, unassigned or unlabelled";
@@ -401,6 +418,9 @@ function importMailbox(ctx: Ctx, story: StoryFacts): void {
 const nextReceiptNumber = (uf: UnitFacts): number =>
   Math.max(uf.state?.applied_through ?? 0, ...uf.unapplied.map((r) => r.n), uf.last_check?.n ?? 0, uf.last_findings?.n ?? 0) + 1;
 
+/** H1: a merge, rebase, cherry-pick or revert (or unmerged paths) in progress in the unit's worktree. */
+const gitBusy = (uf: UnitFacts): boolean => !!uf.worktree?.in_progress && (!!uf.worktree.in_progress.operation || uf.worktree.in_progress.unmerged.length > 0);
+
 function unitWorktree(story: StoryFacts, uf: UnitFacts): string | null {
   const wt = uf.worktree ?? (uf.unit.slice === null ? story.worktree : null);
   return wt?.exists ? wt.path : null;
@@ -460,7 +480,10 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
     const reason = drift ?? gone;
     if (reason) return park(ctx, story, uf, st, "workflow", reason, "workflow.drift");
   }
-  if (uf.uncommitted) {
+  // BS5.1 (H1, dogfood D3): while a git operation is in progress in the worktree (an agent's merge)
+  // the owed commit cannot happen — act would only defer it — so it never takes the unit's action:
+  // liveness, implicit asks and deadlines are still decided below; the commit follows the merge
+  if (uf.uncommitted && !gitBusy(uf)) {
     const commit = commitFor(ctx, story, uf, `norn: ${ref.key} ${st.step} (recovered commit)`, st.step);
     if (commit) return ctx.emit({ kind: "commit_push", unit: ref, rule: "recover.commit", commit });
   }
@@ -488,6 +511,12 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
       // R6.1 (H3, A14): an implicit ask a later fact shows the agent has moved past resolves itself
       const moved = implicitAskResolved(st, uf);
       if (moved) return resolveImplicitAsk(ctx, story, uf, st, wf, moved);
+      // BS6–BS8: a story waiting at a gate with a `stale` route goes back to update when the base moved under it
+      if (ref.slice === null && st.park?.kind === "gate" && story.base && edgeOf(wf, st.step, "stale") && isStale(wf, story.base)) {
+        const b = story.base;
+        const detail = `${b.behind} behind, conflicts: ${b.conflicts.length ? b.conflicts.join(", ") : "none"}`;
+        return classifyNorn(ctx, story, uf, st, wf, "stale", "gate.stale", detail, { receiptRule: "base moved", base: baseOf(b) });
+      }
       // T6: parked keeps the claim; C3: a restart never answers
       return ctx.noop(ref, `unit.parked.${st.park?.kind ?? "?"}`, st.park?.reason ?? "parked");
     }
@@ -558,7 +587,7 @@ function applyAction(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
     return k === "workflow" || k === "unstick";
   });
   const kill = moved && st.run?.session && state.run?.run_id !== st.run.run_id ? sessionRef(st.run) : null;
-  const what = res.advance ? `${res.advance.from}.${res.advance.outcome} → ${res.advance.to}` : (res.log.at(-1) ?? "receipts");
+  const what = res.advance ? `${res.advance.from}.${res.advance.outcome} → ${res.advance.to}${res.advance.reset ? ` (reset ${res.advance.reset.join(", ")})` : ""}` : (res.log.at(-1) ?? "receipts");
   ctx.emit({
     kind: "apply_receipts",
     unit: uf.unit,
@@ -1118,12 +1147,26 @@ function runGit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: W
   if (step.action === "open-pr" && story.pr && story.pr.state === "open")
     return classifyNorn(ctx, story, uf, st, wf, "done", "git.open-pr.exists", `PR #${story.pr.number} already open`);
   if (!cwd) return ctx.noop(ref, "git.no_worktree", "unit worktree missing");
-  if (step.action === "integrate") {
-    // K6: integration is serialized per story
-    if (ctx.integrating.has(story.key)) return ctx.noop(ref, "git.integrate.queued", "another slice integrates this tick (K6)");
+  if (step.action === "integrate" || step.action === "update") {
+    // K6: integration is serialized per story — a base update (BS3) takes the same lock
+    if (ctx.integrating.has(story.key)) return ctx.noop(ref, `git.${step.action}.queued`, "another integration of this story runs this tick (K6)");
     ctx.integrating.add(story.key);
   }
   const fm = story.frontmatter as StoryFrontmatter;
+  let update: RunGitAction["update"] = null;
+  if (step.action === "update") {
+    // BS1/BS3: the base is measured by observe; no base ref (never fetched, no base branch) → wait
+    const b = story.base;
+    if (!b) return ctx.noop(ref, "git.update.no_base", `base ${ctx.facts.repo.default_branch} not observed for ${story.branch}`);
+    const base = ctx.facts.repo.default_branch;
+    update = {
+      ref: b.ref,
+      sha: b.sha,
+      branch: base,
+      message: `Update ${story.key} from ${base} (${b.sha.slice(0, 7)})`,
+      trailers: { "Norn-Story": story.key, "Norn-Step": st.step, "Norn-Tick": ctx.facts.tick_id },
+    };
+  }
   ctx.emit({
     kind: "run_git",
     unit: ref,
@@ -1135,14 +1178,28 @@ function runGit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: W
     branch: unitBranch(story, uf),
     onto: step.action === "integrate" ? story.branch : null,
     pr: step.action === "open-pr" ? { base: ctx.facts.repo.default_branch, title: fm.title, body: `Closes ${fm.url}\n\nDelivered by norn (story ${story.key}).` } : null,
+    ...(update ? { update } : {}),
     receipts: [],
     state: null,
     commit: null,
   });
 }
 
-/** A norn-classified outcome for a non-agent step (git/slices), applied in the same tick. */
-function classifyNorn(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, outcome: string, rule: string, detail: string): void {
+/** BS8: the base a classify receipt records. */
+const baseOf = (b: NonNullable<StoryFacts["base"]>): NonNullable<ReceiptOf<"classify">["base"]> => ({ ref: b.ref, sha: b.sha, behind: b.behind, conflicts: [...b.conflicts] });
+
+/** A norn-classified outcome for a non-agent step (git/slices/gate), applied in the same tick. */
+function classifyNorn(
+  ctx: Ctx,
+  story: StoryFacts,
+  uf: UnitFacts,
+  st: UnitState,
+  wf: Workflow,
+  outcome: string,
+  rule: string,
+  detail: string,
+  extra: { receiptRule?: string; base?: NonNullable<ReceiptOf<"classify">["base"]> } = {},
+): void {
   const n = nextReceiptNumber(uf);
   const receipt: ReceiptOf<"classify"> = {
     kind: "classify",
@@ -1155,9 +1212,10 @@ function classifyNorn(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState,
     who: ctx.facts.machine.holder,
     tick_id: ctx.facts.tick_id,
     outcome,
-    rule,
+    rule: extra.receiptRule ?? rule,
     detail,
     route: "park",
+    ...(extra.base ? { base: extra.base } : {}),
   };
   const res: ApplyResult = applyReceipts(st, [{ n, file: "", receipt }], applyCtx(ctx, wf));
   receipt.route = (res.advance?.to as Receipt["step"]) ?? (res.state.status === "stuck" ? "$stuck" : "park");

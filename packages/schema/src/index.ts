@@ -2,6 +2,7 @@ export * from "./claim.ts";
 export * from "./cli.ts";
 export * from "./common.ts";
 export * from "./config.ts";
+export * from "./criteria.ts";
 export * from "./frontmatter.ts";
 export * from "./ids.ts";
 export * from "./receipt.ts";
