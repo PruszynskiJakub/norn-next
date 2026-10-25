@@ -140,7 +140,11 @@ export const ConfigLayer = Type.Object(
 export type ConfigLayer = Static<typeof ConfigLayer>;
 
 export const DEFAULT_CONFIG: ResolvedConfig = {
-  agents: { claude: { adapter: "claude" } },
+  /**
+   * Claude sessions run in Claude Code's `auto` permission mode (AGENTS.md decision; PRD §20 defers
+   * permission profiles). A layer that defines `agents.claude` replaces this entry, args included.
+   */
+  agents: { claude: { adapter: "claude", args: ["--permission-mode", "auto"] } },
   default_agent: "claude",
   runner: null,
   remote: { provider: "gh", label: "norn", git_remote: "origin", sync_interval: "5m" },

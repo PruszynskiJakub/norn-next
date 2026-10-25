@@ -176,7 +176,7 @@ export function startCommandFor(uf: UnitFacts, story: StoryFacts, config: Resolv
   const name = (step?.type === "agent" && step.agent) || config.default_agent;
   const agent = config.agents[name];
   const worktree = uf.worktree?.path ?? (uf.unit.slice === null ? (story.worktree?.path ?? null) : null);
-  return startAgentCommand(worktree, agent?.command ?? agent?.adapter ?? name);
+  return startAgentCommand(worktree, agent?.command ?? agent?.adapter ?? name, agent?.args);
 }
 
 const short = (sha: string) => sha.slice(0, 7);
