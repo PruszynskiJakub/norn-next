@@ -229,7 +229,7 @@ describe("inbox: the person's last actions (F21, F25, F35, Q6)", () => {
     expect(check[0]?.since).toBe(at(T0 - 5000));
   });
 
-  test("a gate item names the report and the evidence folder, absolute, from the receipt that led there", () => {
+  test("a gate item names the report by receipt number; its full text gives the report and evidence folder, absolute", () => {
     const unit = sliceUnit("gh-1", "02", "form");
     const st = stateFor(unit, SLICE_WF, {
       step: "human-qa",
@@ -241,7 +241,8 @@ describe("inbox: the person's last actions (F21, F25, F35, Q6)", () => {
     const uf = unitFacts(unit, SLICE_WF, st, { last_outcome_receipt: { ...qa, file: ".agents/specs/gh-1-login/runs/02-form/receipts/0009-done.json" } });
     const item = buildInbox(facts([storyFacts("gh-1", [uf])]), CONFIG).groups.approve[0];
     const dir = "/r-worktrees/gh-1-login--02-form/.agents/specs/gh-1-login/runs/02-form";
-    expect(item?.detail).toBe(`qa#1 reported partial: ${dir}/receipts/0009-done.json · evidence: ${dir}/evidence/01JDDDDDDDDDDDDDDDDDDDDDDD/ · or reject: norn approve gh-1/02 --reject --reason "…"`);
+    expect(item?.detail).toBe('step qa#1 reported partial (receipt 0009) · or reject: norn approve gh-1/02 --reject --reason "…"');
+    expect(item?.full).toBe(`Report: ${dir}/receipts/0009-done.json\nEvidence: ${dir}/evidence/01JDDDDDDDDDDDDDDDDDDDDDDD/`);
   });
 });
 

@@ -180,6 +180,7 @@ The story worktree is on the story branch and holds `.agents/specs/<id>-<slug>/`
 - H8 Act failures are never `ok: true` (R4.3): an action whose effect failed (send, resume, launch, push, answer delivery) reports `ok: false`; the unit's last failure is kept machine-local, shown in `status` and as an Unblock item until an effect of the same kind succeeds.
 - H9 Every tick writes `tick.start` before act and `tick.end` after (R5.4); `norn why` shows a tick with no end as "tick crashed during act".
 - H10 `heartbeat.json` records `last_tick_at` (R5.5). Older than 3 × watch interval while a held story has auto work → Unblock item "no heartbeat on <holder> for 7m — run `norn watch`", and auto steps lose their manual start hint.
+- H11 Every call that reaches a remote (`git fetch`/`push`/`ls-remote`/`pull`/`clone`, every `gh` and `glab` call) has a timeout (2 min). On timeout its whole process group is killed (git and the `ssh` it started) and the call fails as a retryable network error, so a connection dropped while the machine slept never holds the tick lock (H1). Local git calls have no timeout: a commit runs hooks.
 
 ## 9. Agent integration
 

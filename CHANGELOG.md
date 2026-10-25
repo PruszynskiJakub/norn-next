@@ -11,8 +11,15 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ### Changed
 
-- With such a runner, Your turn items for starting an agent show `norn open <unit>` as the command and the `cd … && <agent> …` line in the detail (`by hand: …`). Without one they show the `cd …` line as before.
-- `norn brief` outside a unit worktree tells the agent to stop and has the person run `norn open <unit>`; the `norn` skill says the same.
+- A gate item in `norn inbox` names the report that led there by step and receipt number (`step qa#1 reported partial (receipt 0009)`) instead of printing its absolute path on the item line. The receipt and evidence paths moved to the item's full text (`norn inbox --details`), and `--text` prints paths under your home as `~/…`.
+- With a runner that can open terminals, Your turn items for starting an agent show `norn open <unit>` as the command and the `cd … && <agent> …` line in the detail (`by hand: …`). Without one they show the `cd …` line as before.
+- `norn brief` outside a unit worktree tells the agent to stop and has the person start it from the unit's inbox item; the `norn` skill says the same.
+
+## [0.2.1] - 2026-10-25
+
+### Fixed
+
+- `norn watch` no longer hangs for good after the laptop sleeps (H11). A `git fetch` or `push` whose SSH connection died while the machine slept never returned, so the tick held its lock, claims expired and nothing was applied until the process was killed by hand. Every call that reaches a remote (`git fetch`/`push`/`ls-remote`/`pull`/`clone`, `gh`, `glab`) now times out after 2 minutes, killing its whole process group (git and its `ssh`), and fails as a retryable network error; the next tick carries on.
 
 ## [0.2.0] - 2026-10-25
 
@@ -57,6 +64,7 @@ The first release. norn v1 as specified in `.agents/PRD.md`.
 - The Claude Code plugin (`plugins/claude-code`): the norn skills and a `/norn` command.
 - Distribution: an npm package on GitHub Packages and single-file binaries for macOS and Linux (arm64, x64).
 
-[Unreleased]: https://github.com/PruszynskiJakub/norn-next/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/PruszynskiJakub/norn-next/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/PruszynskiJakub/norn-next/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/PruszynskiJakub/norn-next/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/PruszynskiJakub/norn-next/releases/tag/v0.1.0

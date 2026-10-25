@@ -321,6 +321,13 @@ describe("formatters", () => {
     expect(formatTimeline(v.timeline["gh-12/01"] ?? [])).toContain("check fail at test#1: bun test (exit 1, 2.3s)");
   });
 
+  test("formatInbox prints paths under home as ~/…", () => {
+    const item = { id: "approve:gh-1:qa#1", group: "approve", story: "gh-1", slice: null, step: "human-qa", title: "evidence attached", command: "norn approve gh-1", since: "", age: "1m", detail: "step qa#1 reported partial (receipt 0009)", full: "Report: /Users/me/wt/runs/_story/receipts/0009-done.json" };
+    const v = { inbox: { at: "", pending: 1, groups: { your_turn: [], answer: [], approve: [item], unblock: [], check: [], unclaimed: [], running: [], recently_done: [] } } } as unknown as Parameters<typeof formatInbox>[0];
+    expect(formatInbox(v, { details: true, home: "/Users/me/" })).toContain("      | Report: ~/wt/runs/_story/receipts/0009-done.json");
+    expect(formatInbox(v, { details: true })).toContain("      | Report: /Users/me/wt/runs/_story/receipts/0009-done.json");
+  });
+
   test("empty inbox and empty project", () => {
     const empty = {
       at: "",
