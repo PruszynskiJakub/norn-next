@@ -2,7 +2,7 @@
  * `norn init` (A1, SK1, W1): repo config from the template if absent, workflow examples if
  * absent, the bundled skills into `.agents/skills/` (whole folders, always the bundled version)
  * linked from each configured agent's skill folder, agent hooks (norn-owned, updated in place),
- * and machine-local paths in .gitignore. Idempotent: re-running updates norn-owned files only.
+ * machine-local paths in .gitignore, and `runs/` marked generated in .gitattributes. Idempotent: re-running updates norn-owned files only.
  */
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -21,6 +21,21 @@ export function ensureGitignore(root: string): string[] {
   const lines = text.split("\n").map((l) => l.trim());
   const missing = IGNORED.filter((p) => !lines.includes(p));
   if (missing.length) atomicWrite(path, `${text}${text && !text.endsWith("\n") ? "\n" : ""}# norn (machine-local)\n${missing.join("\n")}\n`);
+  return missing;
+}
+
+/**
+ * S10: `runs/` is committed machine state (§7.1, S8); marking it generated makes GitHub and GitLab
+ * collapse it in PR diffs, so a review shows the work, not the receipts.
+ */
+export const GENERATED = [".agents/specs/*/runs/** linguist-generated=true gitlab-generated=true"];
+
+export function ensureGitattributes(root: string): string[] {
+  const path = join(root, ".gitattributes");
+  const text = readText(path) ?? "";
+  const lines = text.split("\n").map((l) => l.trim());
+  const missing = GENERATED.filter((p) => !lines.includes(p));
+  if (missing.length) atomicWrite(path, `${text}${text && !text.endsWith("\n") ? "\n" : ""}# norn (machine state, collapsed in diffs)\n${missing.join("\n")}\n`);
   return missing;
 }
 
@@ -85,6 +100,6 @@ export const initCommand = defineCommand({
       hooks.push({ agent: name, tier: agent.tier, changed: r.changed });
     }
 
-    return { root, config, workflows, skills, hooks, hook_command: command, gitignore: ensureGitignore(root) };
+    return { root, config, workflows, skills, hooks, hook_command: command, gitignore: ensureGitignore(root), gitattributes: ensureGitattributes(root) };
   },
 });
