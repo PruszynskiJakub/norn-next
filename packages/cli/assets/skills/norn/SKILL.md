@@ -22,6 +22,8 @@ The brief prints as markdown (`norn brief --json` for data). It gives:
 - **Finish with**: the outcomes you may report and what each one means, and the criteria to give a verdict on when a report is required.
 - **Limits**: deadline, nudges left, port slot.
 
+The brief is complete. Do not read again what it already gives you (handoff.md, `.norn-unit`, `.env.norn`), and do not survey the repository, `.agents/`, `.claude/` or the machine to find your bearings. Read the inputs, then only the code and docs your work touches, when you need them.
+
 ## 2. Work in scope
 
 - Work only in this worktree, and only on what this step asks. Nothing that belongs to later work; no drive-by changes.

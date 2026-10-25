@@ -15,6 +15,7 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ### Changed
 
+- The brief says it is complete: the `norn` skill tells the agent not to read again what the brief gives (handoff.md, `.norn-unit`, `.env.norn`) nor survey the repository or the machine, `norn-implement` reads only the code and docs the criteria touch, and the brief's handoff input reads `Handoff (text under Context; update it here)`, since its text is already under Context.
 - Commands an agent or a person reads print markdown by default: `done`, `ask` and `stuck` (the reply says what was reported and to end the turn), `init`, `doctor`, `status`, `inbox` and `trace`, like `brief` already did. Their refusals print as markdown too, with the same exit codes. Every command takes `--json` and then prints the JSON it printed before; `--text` is still accepted and changes nothing.
 - `norn init` and `norn doctor` print a summary: one line per part or check, what changed or failed, and what to do. `doctor` still exits 1 when a check fails.
 - A gate item in `norn inbox` names the report that led there by step and receipt number (`step qa#1 reported partial (receipt 0009)`) instead of printing its absolute path on the item line. The receipt and evidence paths moved to the item's full text (`norn inbox --details`), and the text output prints paths under your home as `~/…`.
