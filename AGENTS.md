@@ -11,9 +11,9 @@ bun run typecheck   # tsc --noEmit over every package
 bun run schema:emit # regenerate packages/schema/json/*.schema.json after changing a schema
 ```
 
-To release: bump `version` in `packages/cli/package.json`, move `## [Unreleased]` entries in `CHANGELOG.md` under `## [X.Y.Z] - <date>`, merge, then `git tag vX.Y.Z && git push origin vX.Y.Z`.
+To release: bump `version` in `packages/cli/package.json` and the release badge in `README.md`, move `## [Unreleased]` entries in `CHANGELOG.md` under `## [X.Y.Z] - <date>`, merge, then `git tag vX.Y.Z && git push origin vX.Y.Z`.
 
-All three must pass before you hand work back. A test fails if the emitted JSON schemas are stale.
+All three must pass before you hand work back; CI (`.github/workflows/ci.yml`) runs them on every PR, then builds the npm package and a binary and runs `scripts/smoke.sh` on each. A test fails if the emitted JSON schemas are stale.
 
 ## Layout and dependency direction
 
