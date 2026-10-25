@@ -53,6 +53,12 @@ jobs:
           bun scripts/build.ts --bin
           (cd dist/bin && sha256sum norn-* > SHA256SUMS)
 
+      - name: Smoke-test what will be published
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          scripts/smoke.sh dist/bin/norn-linux-x64 "$version"
+          scripts/smoke.sh dist/npm/norn.js "$version"
+
       - name: Publish to GitHub Packages
         working-directory: dist/npm
         run: npm publish
