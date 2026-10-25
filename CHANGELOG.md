@@ -6,12 +6,12 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ### Added
 
-- `norn open <unit> [--print]` opens an agent on a step a person starts (an attended step such as refine or plan, or a ready step in manual mode). Inside Herdr, or with the herdr runner, it opens a focused tab in the unit's worktree with the agent started on the brief; otherwise it prints the command to run (MO5).
+- `norn open <unit> [--print]` opens an agent on a step a person starts (an attended step such as refine or plan, or a ready step in manual mode). With a runner that can open terminals (the new optional `open` capability and `openForPerson` on `RunnerPort`; Herdr has it) it opens one in the unit's worktree with the agent started on the brief, a focused Herdr tab; otherwise it prints the command to run (MO5).
 - `norn inbox` lists a story taken in on this checkout that no tick has started yet: under Running while the heartbeat is up, else under Your turn with `norn watch`.
 
 ### Changed
 
-- Your turn items for starting an agent show `norn open <unit>` as the command; the `cd … && <agent> …` line moved to the item's detail (`by hand: …`).
+- With such a runner, Your turn items for starting an agent show `norn open <unit>` as the command and the `cd … && <agent> …` line in the detail (`by hand: …`). Without one they show the `cd …` line as before.
 - `norn brief` outside a unit worktree tells the agent to stop and has the person run `norn open <unit>`; the `norn` skill says the same.
 
 ## [0.2.0] - 2026-10-25

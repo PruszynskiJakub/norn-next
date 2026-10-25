@@ -9,7 +9,7 @@ You do exactly one step of a larger delivery and report how it ended. Code decid
 
 ## 1. Read the brief
 
-Run `norn brief` in this worktree. If it refuses because this is not a unit worktree (for example the repo's main checkout), stop and tell the person to run `norn open <unit>`; `norn inbox` names the unit. Never change directory to look for the work yourself.
+Run `norn brief` in this worktree. If it refuses because this is not a unit worktree (for example the repo's main checkout), stop and tell the person to start the agent from the unit's item in `norn inbox` (`norn open <unit>` opens or prints it). Never change directory to look for the work yourself.
 
 The brief prints as markdown (`norn brief --json` for data). It gives:
 

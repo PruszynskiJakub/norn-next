@@ -1,11 +1,10 @@
 /**
- * `norn open <story|unit> [--print]` (MO5, MO3, O1): open an agent on the unit's step for a person — the
- * step a person starts (an attended step, or a ready agent step in manual mode). With Herdr (inside
- * it, or as the configured runner) it opens a focused tab in the unit's worktree running the start
- * command; otherwise, or with `--print`, it prints that command. The agent's `norn brief` starts the
- * run, as when a person types the command (MO3); open records nothing itself.
+ * `norn open <story|unit> [--print]` (MO5, O1): open an agent on the unit's step for a person — the
+ * step a person starts (an attended step, or a ready agent step in manual mode). When this machine's
+ * runner opens terminals for a person (`capabilities.open`, e.g. Herdr: a focused tab in the unit
+ * worktree) it does that; otherwise, or with `--print`, it prints the start command. The agent's
+ * `norn brief` starts the run, as when a person types the command (MO3); open records nothing itself.
  */
-import { herdr } from "@norn/adapters";
 import { effectiveMode, startCommandFor, stepOf } from "@norn/core";
 import { defineCommand, opt } from "../command.ts";
 import { refuse } from "../output.ts";
@@ -37,19 +36,13 @@ export const openCommand = defineCommand({
     if (!worktree) throw refuse(`${t.key} has no worktree on this checkout`, `norn tidy --dry-run`, "no_worktree");
     const command = startCommandFor(uf, sf, ctx.config);
     const out = { unit: t.key, step: st.step, worktree, command };
-    const runner = ctx.config.runner;
-    const useHerdr = !opt.bool(args, "print") && (ctx.env.HERDR_ENV === "1" || runner?.adapter === "herdr");
-    if (!useHerdr) return { ...out, opened: false };
-    const o = runner?.adapter === "herdr" ? (runner.options ?? {}) : {};
+    const runner = opt.bool(args, "print") ? null : (await ctx.ports()).runner;
+    if (!runner?.capabilities.open || !runner.openForPerson) return { ...out, opened: false };
     try {
-      const tab = await herdr.openAgentTab(worktree, `${t.key} ${st.step}`, command, {
-        env: ctx.env,
-        ...(typeof o.bin === "string" ? { bin: o.bin } : {}),
-        ...(typeof o.session === "string" ? { session: o.session } : {}),
-      });
-      return { ...out, opened: true, runner: "herdr", pane_id: tab.pane_id };
+      const opened = await runner.openForPerson({ cwd: worktree, title: `${t.key} ${st.step}`, command, env: ctx.env });
+      return { ...out, opened: true, runner: runner.name, pane_id: opened.pane_id };
     } catch (e) {
-      return { ...out, opened: false, reason: `herdr: ${(e as Error).message}` };
+      return { ...out, opened: false, reason: `${runner.name}: ${(e as Error).message}` };
     }
   },
 });

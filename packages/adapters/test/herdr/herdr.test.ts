@@ -3,7 +3,7 @@ import type { ProcessPort, SessionRef } from "@norn/core";
 import type { ProcessIdentity } from "@norn/schema";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { createHerdrRunner, herdrFactory, openAgentTab, openStatusPane, parsePanePrompt } from "../../src/herdr/index.ts";
+import { createHerdrRunner, herdrFactory, openStatusPane, parsePanePrompt } from "../../src/herdr/index.ts";
 import type { Exec, ExecResult } from "../../src/process/exec.ts";
 import fx from "./fixtures/herdr.json";
 
@@ -127,8 +127,8 @@ describe("herdr runner", () => {
     expect(c.calls).toEqual([["herdr", "pane", "send-text", "w1:p1", "partial"]]);
   });
 
-  test("capabilities: send and resume (R4.1)", () => {
-    expect(createHerdrRunner({ exec: fakeExec([]).exec }).capabilities).toEqual({ send: true, resume: true });
+  test("capabilities: send, resume and open (R4.1, MO5)", () => {
+    expect(createHerdrRunner({ exec: fakeExec([]).exec }).capabilities).toEqual({ send: true, resume: true, open: true });
   });
 
   test("findSessions: agent panes whose cwd is the worktree, with pid and agent session (R5.1)", async () => {
@@ -266,10 +266,13 @@ describe("herdr openStatusPane (O1)", () => {
   });
 });
 
-describe("herdr openAgentTab (MO3, norn open)", () => {
+describe("herdr openForPerson (MO5, norn open)", () => {
+  const runner = (exec: Exec) => createHerdrRunner({ exec, process: fakeProcess() });
+
   test("a focused tab in the workspace on the worktree, running the start command", async () => {
     const { exec, calls } = fakeExec([["workspace list", ok(fx.workspace_list)], ["tab create", ok(fx.tab_create)], ["pane run", empty]]);
-    const r = await openAgentTab(WT, "gh-1/01 implement", "claude 'go'", { exec, env: { HERDR_WORKSPACE_ID: "w3" } });
+    expect(runner(exec).capabilities.open).toBe(true);
+    const r = await runner(exec).openForPerson?.({ cwd: WT, title: "gh-1/01 implement", command: "claude 'go'", env: { HERDR_WORKSPACE_ID: "w3" } });
     expect(r).toEqual({ pane_id: "w1:p2" });
     expect(calls.slice(1)).toEqual([
       ["herdr", "tab", "create", "--workspace", "wA", "--cwd", WT, "--label", "gh-1/01 implement"],
@@ -279,10 +282,10 @@ describe("herdr openAgentTab (MO3, norn open)", () => {
 
   test("no workspace on the worktree: the caller's workspace inside herdr, else a new workspace", async () => {
     const inside = fakeExec([["workspace list", ok(fx.workspace_list_empty)], ["tab create", ok(fx.tab_create)], ["pane run", empty]]);
-    await openAgentTab("/other", "t", "c", { exec: inside.exec, env: { HERDR_WORKSPACE_ID: "w3" } });
+    await runner(inside.exec).openForPerson?.({ cwd: "/other", title: "t", command: "c", env: { HERDR_WORKSPACE_ID: "w3" } });
     expect(inside.calls[1]).toEqual(["herdr", "tab", "create", "--workspace", "w3", "--cwd", "/other", "--label", "t"]);
     const outside = fakeExec([["workspace list", ok(fx.workspace_list_empty)], ["workspace create", ok(fx.workspace_create)], ["pane run", empty]]);
-    expect(await openAgentTab("/other", "t", "c", { exec: outside.exec, env: {} })).toEqual({ pane_id: "w1:p1" });
+    expect(await runner(outside.exec).openForPerson?.({ cwd: "/other", title: "t", command: "c", env: {} })).toEqual({ pane_id: "w1:p1" });
     expect(outside.calls[1]).toEqual(["herdr", "workspace", "create", "--cwd", "/other", "--label", "t"]);
   });
 });
