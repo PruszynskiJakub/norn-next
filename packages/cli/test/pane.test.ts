@@ -100,8 +100,8 @@ describe("norn pane --interactive (HC4–HC8) and --next (HC10)", () => {
     });
     expect(r.exit).toBe(0);
     expect(r.value).toEqual({ frames: 5, interval: "1h", interactive: true, commands: 5 });
-    expect(frames[0]).toContain("[1]  gh-5");
-    expect(frames[0]).toContain("[2]  gh-6");
+    expect(frames[0]).toMatch(/ 1 {2}gh-5 /);
+    expect(frames[0]).toMatch(/ 2 {2}gh-6 /);
     expect(frames[1]).toContain("[1] is not a gate (Approve)");
     expect(frames[2]).toContain("no item 9 in this frame");
     expect(frames[3]).toContain("started an agent for gh-5 in w9:p1");
@@ -111,7 +111,7 @@ describe("norn pane --interactive (HC4–HC8) and --next (HC10)", () => {
 
   test("outside Herdr, go shows the command (HC8)", async () => {
     const frames: string[] = [];
-    await runCli(["pane", "--interactive", "--interval", "1h"], { ...c.deps, herdr: null, input: lines("2"), log: (l) => frames.push(l) });
+    await runCli(["pane", "--interactive", "--interval", "1h"], { ...c.deps, env: { ...c.deps.env, COLUMNS: "400" }, herdr: null, input: lines("2"), log: (l) => frames.push(l) });
     expect(frames[1]).toContain("$ cd ");
     expect(frames[1]).toContain("gh-6-export-report");
   });
@@ -140,7 +140,7 @@ describe("norn pane --interactive (HC4–HC8) and --next (HC10)", () => {
     const frames: string[] = [];
     const lab = fakeHerdr(agents);
     await runCli(["pane", "--interactive", "--interval", "5s", "--max-frames", "1"], { ...c.deps, herdr: lab.cockpit, input: lines(), log: (l) => frames.push(l) });
-    expect(frames[0]).toContain("refine: the agent is waiting for you");
+    expect(frames[0]).toMatch(/gh-5 {2}refine {2}the agent is waiting for you/);
     expect(lab.calls).toEqual(["label w9:p5 gh-5 · refine norn: your turn 15000"]);
   });
 });
