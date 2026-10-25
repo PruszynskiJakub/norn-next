@@ -15,6 +15,7 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ### Added
 
+- `norn init` marks `.agents/specs/*/runs/**` as generated in `.gitattributes` (`linguist-generated`, `gitlab-generated`), so GitHub and GitLab collapse receipts, state and logs in PR diffs. The files are still committed and pushed (S8). Run `norn init` again in an existing repo to add the line.
 - `norn doctor` checks the skills: missing from `.agents/skills/` or not linked from an agent's folder fails the check, a skill that differs from the bundled version is a warning.
 
 ### Removed

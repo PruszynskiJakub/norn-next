@@ -72,7 +72,7 @@ You don't need the plugin to use norn with Claude Code: `norn init` puts the ski
 
 ```sh
 cd your-repo
-norn init          # .agents/norn/config.yaml, workflows/{story,slice,bug}.yaml, .agents/skills (linked per agent), hooks
+norn init          # .agents/norn/config.yaml, workflows/{story,slice,bug}.yaml, .agents/skills (linked per agent), hooks, .gitignore, .gitattributes
 # edit .agents/norn/config.yaml: remote.provider (gh | glab), remote.label (default: norn)
 norn sync          # issues assigned to you with the label become stories
 norn tick          # one heartbeat: observe, decide, act
