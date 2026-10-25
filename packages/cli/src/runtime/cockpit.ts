@@ -5,6 +5,7 @@
  */
 import { herdr } from "@norn/adapters";
 import type { InboxEntry } from "@norn/view";
+import { itemDetails, type Tone } from "./cockpit-view.ts";
 
 type HerdrCockpit = herdr.HerdrCockpit;
 type PaneLabel = herdr.PaneLabel;
@@ -17,6 +18,7 @@ export type CockpitCommand =
   | { kind: "take"; n: number }
   | { kind: "unstick"; n: number }
   | { kind: "view"; n: number }
+  | { kind: "details"; n: number }
   | { kind: "next" }
   | { kind: "refresh" }
   | { kind: "help" }
@@ -27,11 +29,35 @@ export type CockpitStep =
   | { kind: "verb"; argv: string[] }
   | { kind: "go"; item: InboxEntry }
   | { kind: "message"; text: string }
+  | { kind: "output"; text: string }
   | { kind: "refresh" }
   | { kind: "quit" };
 
 export const COCKPIT_HELP =
-  "<n> go · a <n> <text> answer · y <n> approve · x <n> <reason> reject · t <n> take · u <n> unstick · v <n> trace · n next waiting · r refresh · q quit";
+  "<n> go to the item's agent · a <n> <text> answer · y <n> approve · x <n> <reason> reject · t <n> take · u <n> unstick · v <n> trace · d <n> full text · n next waiting agent · r refresh · q quit";
+
+/** `?`: every command, one per line. */
+export const HELP_TEXT = [
+  "Commands (<n> is an item number)",
+  "  <n> or g <n>        go to the item's agent pane (or start the agent it waits for)",
+  "  a <n> <text>        answer a question",
+  "  y <n>               approve a gate",
+  "  x <n> <reason>      reject a gate",
+  "  u <n>               unstick a stuck unit",
+  "  t <n>               take an unclaimed story",
+  "  v <n>               show the unit's trace",
+  "  d <n>               show the item's full text",
+  "  n                   go to the next agent waiting for you",
+  "  r or Enter          refresh",
+  "  q                   quit",
+].join("\n");
+
+/** HC7: how a result line reads — success, refusal, or plain information. */
+export function toneOf(text: string): Tone {
+  if (/^(ok|focused|started)\b/.test(text)) return "ok";
+  if (/^(refused|could not|herdr unreachable|unknown command|no item|no single|\[[0-9]+\] is not)/.test(text)) return "error";
+  return "info";
+}
 
 /** HC5: one input line → a command. Empty line = redraw. */
 export function parseCockpitLine(line: string): CockpitCommand {
@@ -61,6 +87,8 @@ export function parseCockpitLine(line: string): CockpitCommand {
       return { kind: "unstick", n };
     case "v":
       return { kind: "view", n };
+    case "d":
+      return { kind: "details", n };
     default:
       return { kind: "invalid", message: `unknown command: ${verb} — ? lists the commands` };
   }
@@ -86,7 +114,7 @@ export function planCockpit(cmd: CockpitCommand, items: readonly InboxEntry[]): 
     case "refresh":
       return { kind: "refresh" };
     case "help":
-      return { kind: "message", text: COCKPIT_HELP };
+      return { kind: "output", text: HELP_TEXT };
     case "invalid":
       return { kind: "message", text: cmd.message };
     case "next": {
@@ -105,6 +133,8 @@ export function planCockpit(cmd: CockpitCommand, items: readonly InboxEntry[]): 
       // MO5: a manual start the runner can open itself — run that verb rather than splitting a pane here
       if (item.group === "your_turn" && !item.reach && item.command.startsWith("norn open ")) return { kind: "verb", argv: ["open", unit] };
       return { kind: "go", item };
+    case "details":
+      return { kind: "output", text: itemDetails(item) };
     case "view":
       return { kind: "verb", argv: ["trace", unit] };
     case "answer":

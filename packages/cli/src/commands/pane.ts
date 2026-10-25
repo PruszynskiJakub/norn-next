@@ -17,7 +17,8 @@ import { formatInbox, inboxItemsInOrder, type ProjectView } from "@norn/view";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { usageError } from "../output.ts";
-import { COCKPIT_HELP, goTo, labelPanes, oldestYourTurn, parseCockpitLine, planCockpit, verbMessage } from "../runtime/cockpit.ts";
+import { goTo, labelPanes, oldestYourTurn, parseCockpitLine, planCockpit, toneOf, verbMessage } from "../runtime/cockpit.ts";
+import { renderFrame, type Tone } from "../runtime/cockpit-view.ts";
 import { projectView } from "../runtime/human.ts";
 
 const CLEAR = "\x1b[H\x1b[2J";
@@ -50,14 +51,22 @@ function inputLines(ctx: Context): AsyncIterator<string> {
   return src[Symbol.asyncIterator]();
 }
 
-async function numberedView(ctx: Context): Promise<{ view: ProjectView | null; body: string }> {
+async function cockpitView(ctx: Context): Promise<{ view: ProjectView | null; error: string | null }> {
   try {
-    const v = await projectView(ctx);
-    return { view: v, body: formatInbox(v, { numbered: true }) };
+    return { view: await projectView(ctx), error: null };
   } catch (e) {
-    return { view: null, body: `cannot read the inbox: ${(e as Error).message}\n` };
+    return { view: null, error: `cannot read the inbox: ${(e as Error).message}` };
   }
 }
+
+/** The frame's look: the pane's width, colour only on a terminal without NO_COLOR. */
+function frameLook(ctx: Context): { width: number; color: boolean } {
+  const cols = Number(ctx.env.COLUMNS) || process.stderr.columns || 100;
+  const color = !!process.stderr.isTTY && ctx.env.NO_COLOR === undefined && ctx.env.TERM !== "dumb";
+  return { width: cols, color };
+}
+
+const localClock = (ms: number) => new Date(ms).toTimeString().slice(0, 8);
 
 /** HC7: a verb in-process through the dispatcher (loaded lazily: the dispatcher imports this command). */
 async function runVerb(ctx: Context, argv: string[]): Promise<{ exit: number; value: unknown; stdout: string }> {
@@ -70,15 +79,19 @@ async function interactive(ctx: Context, raw: string, interval: number, max: num
   const cockpit = cockpitHerdr(ctx);
   const lines = inputLines(ctx);
   let pending: Promise<IteratorResult<string>> | null = null;
-  let message = cockpit ? COCKPIT_HELP : `${COCKPIT_HELP} · outside Herdr, go shows the command (HC8)`;
+  let message: { text: string; tone: Tone } | null = null;
   let output = "";
   let frames = 0;
   let commands = 0;
   while (frames < max && !signal?.aborted) {
-    const { view, body } = await numberedView(ctx);
+    const { view, error } = await cockpitView(ctx);
     const items = view ? inboxItemsInOrder(view) : [];
     if (cockpit && view) await labelPanes(cockpit, items, 3 * interval);
-    ctx.log(`${CLEAR}norn cockpit · ${ctx.clock.iso()} · every ${raw}\n\n${body.trimEnd()}${output ? `\n\n${output.trimEnd()}` : ""}\n\n${message}\n> `);
+    const look = frameLook(ctx);
+    const frame = view
+      ? renderFrame(view, items, { ...look, clock: localClock(ctx.clock.now()), interval: raw, message, output, herdr: !!cockpit })
+      : `${error}\n› `;
+    ctx.log(`${CLEAR}${frame}`);
     frames++;
     output = "";
     if (frames >= max) break;
@@ -90,14 +103,17 @@ async function interactive(ctx: Context, raw: string, interval: number, max: num
     commands++;
     const step = planCockpit(parseCockpitLine(got.value), items);
     if (step.kind === "quit") break;
-    if (step.kind === "refresh") message = COCKPIT_HELP;
-    else if (step.kind === "message") message = step.text;
-    else if (step.kind === "go") message = await goTo(cockpit, step.item, ctx.cwd).catch((e: Error) => `could not go there: ${e.message}`);
+    let text: string | null = null;
+    if (step.kind === "refresh") text = null;
+    else if (step.kind === "message") text = step.text;
+    else if (step.kind === "output") output = step.text;
+    else if (step.kind === "go") text = await goTo(cockpit, step.item, ctx.cwd).catch((e: Error) => `could not go there: ${e.message}`);
     else {
       const r = await runVerb(ctx, step.argv);
-      message = verbMessage(step.argv, r.exit, r.value);
+      text = verbMessage(step.argv, r.exit, r.value);
       if (step.argv[0] === "trace" && r.exit === 0) output = r.stdout;
     }
+    message = text === null ? null : { text, tone: toneOf(text) };
   }
   return { frames, interval: raw, interactive: true, commands };
 }

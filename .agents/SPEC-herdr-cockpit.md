@@ -41,7 +41,7 @@ MO4 gains one sentence: *an attended run waiting for its person is shown as Your
 
 ## 4. Part B — interactive cockpit (amends O1, X1)
 
-- HC4 `norn pane --interactive` draws the inbox like `norn pane`, numbering every item (needing a person first, then Running), and reads one command per line from stdin between redraws. The frame and messages go to stderr, the JSON summary to stdout at exit (P8), as today. It ends on `q`, end of input, SIGINT or SIGTERM.
+- HC4 `norn pane --interactive` draws its own frame of the inbox (not `formatInbox`): a header with the repo, how many items need you, the heartbeat and the time; the groups in O1 order, each item one row — number, unit, step, title (cut to the pane width, the step not repeated), age — with its command dimmed beneath; colour per group on a terminal (off with `NO_COLOR`, `TERM=dumb` or when stderr is not a terminal). It reads one command per line from stdin between redraws. The frame and messages go to stderr, the JSON summary to stdout at exit (P8), as today. It ends on `q`, end of input, SIGINT or SIGTERM.
 - HC5 Commands (`<n>` is an item number in the current frame):
 
   | Line | Does |
@@ -53,9 +53,10 @@ MO4 gains one sentence: *an attended run waiting for its person is shown as Your
   | `t <n>` | `norn take <story>` |
   | `u <n>` | `norn unstick <unit>` |
   | `v <n>` | `norn trace <unit>` (its markdown) into the frame |
+  | `d <n>` | the item's full text (title, detail, full screen, command, link), wrapped to the width |
   | `n` | go to the oldest Your turn item with a run (an agent waits there), else the oldest Your turn item |
   | `r` / empty | redraw now |
-  | `?` | list the commands |
+  | `?` | list every command, one per line |
   | `q` | quit |
 
   A command that does not fit the item (approving an Answer item, a number not in the frame) is refused with a message; nothing runs.
