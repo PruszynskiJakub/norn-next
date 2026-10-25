@@ -334,6 +334,18 @@ export type PromptKey = { text: string } | { key: "enter" | "down" | "up" | "esc
 export interface RunnerCapabilities {
   send: boolean;
   resume: boolean;
+  /** MO5: `openForPerson` opens a terminal a person works in; absent = false */
+  open?: boolean;
+}
+
+/** MO5: a terminal for a person in `cwd`, running `command` (the start command a person would type). */
+export interface PersonOpenSpec {
+  cwd: string;
+  /** tab or window label */
+  title: string;
+  command: string;
+  /** the caller's environment (e.g. `HERDR_WORKSPACE_ID`: open next to the caller) */
+  env: Record<string, string | undefined>;
 }
 
 /** R5.1: a session the runner sees in a unit worktree (a candidate for an unrecorded run). */
@@ -372,6 +384,11 @@ export interface RunnerPort {
    * got going — the reason (bad args, a missing prompt) is usually there. Optional; null = nothing.
    */
   output?(session: SessionRef): Promise<string | null>;
+  /**
+   * MO5 (`norn open`): open a focused terminal a person works in, running `spec.command`. Records
+   * no session: the agent's `norn brief` starts the run (MO3). Present iff `capabilities.open`.
+   */
+  openForPerson?(spec: PersonOpenSpec): Promise<{ pane_id: string | null }>;
 }
 
 // ============================================================= Agent adapter

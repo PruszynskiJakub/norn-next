@@ -64,7 +64,10 @@ function readHeartbeat(root: string): string | null {
 }
 
 /** The read model for this checkout and machine (no writes, no network). */
-export function projectView(ctx: Context): Promise<ProjectView> {
+export async function projectView(ctx: Context): Promise<ProjectView> {
+  // MO5: the runner's capabilities decide how Your turn says to start an agent; a config that
+  // cannot build ports still gets its view (the errors are in it)
+  const runner = await ctx.ports().then((p) => p.runner, () => null);
   return loadProjectView({
     repoRoot: ctx.root,
     home: ctx.home,
@@ -72,6 +75,7 @@ export function projectView(ctx: Context): Promise<ProjectView> {
     env: ctx.env,
     holder: machineHolder(ctx.env),
     heartbeatId: readHeartbeat(ctx.root),
+    ...(runner ? { runnerCapabilities: runner.capabilities } : {}),
   });
 }
 
