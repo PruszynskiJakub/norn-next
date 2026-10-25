@@ -158,8 +158,12 @@ export interface Harness {
   cleanup(): void;
 }
 
-/** Fake time starts in the past: `ulid()` is monotonic per process, and other test files mint ids from the real clock. */
-export const T0 = Date.parse("2026-01-15T10:00:00.000Z");
+/**
+ * Fake time starts in the future: `ulid()` is monotonic per process, so once another test file mints
+ * an id from the real clock, ids minted at an earlier fake time carry the real time instead — and
+ * anything keyed by an id's day (hook block counts) misses. Ahead of the real clock, fake time wins.
+ */
+export const T0 = Date.parse("2099-01-15T10:00:00.000Z");
 
 export async function createHarness(): Promise<Harness> {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "norn-cli-")));
