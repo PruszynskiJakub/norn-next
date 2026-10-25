@@ -4,6 +4,7 @@
  */
 import { parseArgs } from "node:util";
 import { ExitCode } from "@norn/schema";
+import { version } from "../package.json";
 import type { Command, ParsedArgs } from "./command.ts";
 import { COMMANDS, findCommand } from "./commands/index.ts";
 import { type CliDeps, Context } from "./context.ts";
@@ -42,6 +43,7 @@ export function parseCommandArgs(c: Command, argv: string[]): ParsedArgs {
 export async function runCli(argv: string[], deps: CliDeps = {}): Promise<CliResult> {
   const [name, ...rest] = argv;
   if (!name || name === "--help" || name === "-h") return done({ commands: COMMANDS.map(helpFor) });
+  if (name === "--version" || name === "-v") return done({ version });
   const command = findCommand(name);
   if (!command) return failed(usageError(`unknown command '${name}'`, `norn help — commands: ${COMMANDS.map((c) => c.name).join(", ")}`, "unknown_command"));
   if (rest.includes("--help") || rest.includes("-h")) return done(helpFor(command));
