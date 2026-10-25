@@ -25,7 +25,7 @@ export function ensureGitignore(root: string): string[] {
 }
 
 /**
- * §21: `runs/` is committed machine state (§7.1, S8); marking it generated makes GitHub and GitLab
+ * S10: `runs/` is committed machine state (§7.1, S8); marking it generated makes GitHub and GitLab
  * collapse it in PR diffs, so a review shows the work, not the receipts.
  */
 export const GENERATED = [".agents/specs/*/runs/** linguist-generated=true gitlab-generated=true"];
