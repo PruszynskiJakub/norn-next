@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { GitPort } from "@norn/core";
+import { NETWORK_TIMEOUT_MS } from "@norn/store";
 import { addedConflictMarkers, bunExec, classifyPush, createGit, gitVersionOk, integrate, parseGitVersion, parseStatusV2, parseWorktreeList, syncRemoteBranch, update } from "../../src/git/index.ts";
 
 const ENV = {
@@ -487,5 +488,21 @@ describe("git adapter: parsers", () => {
     expect(classifyPush({ code: 128, stdout: "", stderr: "fatal: unable to access 'https://x': Could not resolve host: x" }).ok).toBe(false);
     expect(classifyPush({ code: 128, stdout: "", stderr: "fatal: Authentication failed for 'https://x'" })).toMatchObject({ reason: "auth" });
     expect(classifyPush({ code: 128, stdout: "", stderr: "fatal: Could not resolve host: x" })).toMatchObject({ reason: "network" });
+  });
+});
+
+describe("git adapter: network timeouts (H11)", () => {
+  test("fetch, push and ls-remote have the network timeout; local calls have none", async () => {
+    const seen: Array<[string, number | undefined]> = [];
+    const timed = createGit({ exec: async (argv, opts) => (seen.push([argv[1] as string, opts?.timeoutMs]), { code: 0, stdout: "", stderr: "" }) });
+    await timed.fetch("/repo", "origin", ["+refs/heads/main:refs/remotes/origin/main"]);
+    await timed.push("/repo", "origin", "refs/heads/x:refs/heads/x");
+    await timed.branchExists("/repo", "x", "remote", "origin").catch(() => null);
+    await timed.branchExists("/repo", "x", "local").catch(() => null);
+    const by = new Map(seen);
+    expect(by.get("fetch")).toBe(NETWORK_TIMEOUT_MS);
+    expect(by.get("push")).toBe(NETWORK_TIMEOUT_MS);
+    expect(by.get("ls-remote")).toBe(NETWORK_TIMEOUT_MS);
+    expect(by.get("show-ref")).toBeUndefined();
   });
 });

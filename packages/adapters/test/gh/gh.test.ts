@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { fixtureExec, type ExecFixture } from "../../src/git/exec.ts";
 import calls from "./fixtures/calls.json";
 import { createGh, issueKey } from "../../src/gh/index.ts";
+import { NETWORK_TIMEOUT_MS } from "@norn/store";
 
 const gh = createGh({ cwd: "/repo", exec: fixtureExec(calls as ExecFixture[]) });
 
@@ -63,5 +64,12 @@ describe("gh adapter", () => {
     expect(await auth.listAssignedIssues({ label: "norn" }).catch((e) => e.code)).toBe("gh_auth");
     const junk = createGh({ cwd: "/repo", exec: async () => ({ code: 0, stdout: "not json", stderr: "" }) });
     expect(await junk.findPullRequest("x").catch((e) => e.code)).toBe("gh_bad_output");
+  });
+
+  test("every gh call has the network timeout (H11)", async () => {
+    const timeouts: Array<number | undefined> = [];
+    const timed = createGh({ cwd: "/repo", exec: async (_argv, opts) => (timeouts.push(opts?.timeoutMs), { code: 0, stdout: "me\n", stderr: "" }) });
+    await timed.whoami();
+    expect(timeouts).toEqual([NETWORK_TIMEOUT_MS]);
   });
 });
