@@ -21,6 +21,7 @@ import {
   RECENT_MS,
   readyApproval,
   type RunFacts,
+  type RunnerCapabilities,
   sliceWorktreePath,
   startCommandFor,
   type StoryFacts,
@@ -68,6 +69,8 @@ export interface LoadProjectViewOptions {
   holder?: string;
   /** this machine's heartbeat id, also counted as `mine` */
   heartbeatId?: string | null;
+  /** what the configured runner can do (R4.1); `open` makes Your turn show `norn open` (MO5) */
+  runnerCapabilities?: RunnerCapabilities;
   /** story worktrees to scan before repoRoot; default: every `<repoRoot>-worktrees/<story>` folder */
   storyRoots?: string[];
   /** trace window lower bound (ISO); default 14 days before now */
@@ -432,6 +435,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       holder,
       heartbeat_id: opts.heartbeatId ?? null,
       runner,
+      ...(runner && opts.runnerCapabilities ? { runner_capabilities: { ...opts.runnerCapabilities } } : {}),
       leases: leases.live.map((e) => e.lease),
       dead_leases: leases.dead.map((e) => e.lease),
     },

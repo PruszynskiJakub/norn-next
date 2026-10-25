@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/PruszynskiJakub/norn-next/actions/workflows/ci.yml"><img src="https://github.com/PruszynskiJakub/norn-next/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/PruszynskiJakub/norn-next/releases"><img src="https://img.shields.io/badge/release-v0.2.0-blue" alt="Release v0.2.0"></a>
+  <a href="https://github.com/PruszynskiJakub/norn-next/releases"><img src="https://img.shields.io/badge/release-v0.2.1-blue" alt="Release v0.2.1"></a>
   <img src="https://img.shields.io/badge/bun-%3E%3D1.3-f9f1e1" alt="Bun 1.3 or later">
 </p>
 
@@ -87,10 +87,10 @@ Every inbox item shows the exact command that resolves it, for example `norn ans
 
 **Manual and auto mode.** Each story has a mode. The repo default is `default_mode` in the config, and `norn mode <story> auto|manual` switches it.
 
-- **manual** (the default): the tick marks unattended agent steps as ready. You open any agent in the unit's worktree and tell it: *"Use the norn skill, then run `norn brief`"* (or type `/norn` with the Claude Code plugin).
+- **manual** (the default): the tick marks unattended agent steps as ready. With the `herdr` runner, `norn open <unit>` (the inbox shows it) opens a tab in the unit's worktree with the agent started on the brief. Otherwise the inbox shows the command to run: open any agent in the unit's worktree and tell it *"Use the norn skill, then run `norn brief`"* (or type `/norn` with the Claude Code plugin).
 - **auto**: the tick starts agents itself through the configured `runner` (`herdr` or `headless`). If a machine has no runner configured, its stories run in manual mode.
 
-In both modes, `check` and `git` steps run on their own. Attended steps (`attended: true`) and `gate` steps always wait for a person.
+In both modes, `check` and `git` steps run on their own. Attended steps (`attended: true`, e.g. refine and plan) and `gate` steps always wait for a person, even in auto mode: start an attended step from the command its inbox item shows.
 
 ## Commands
 
@@ -100,7 +100,7 @@ In both modes, `check` and `git` steps run on their own. Attended steps (`attend
 | Remote | `sync` |
 | Heartbeat | `tick`, `watch` |
 | Agent protocol | `brief`, `done`, `ask`, `stuck`, `hook` |
-| Human | `inbox`, `answer`, `approve [--reject]`, `unstick [--to <step>] [--reset <counter>]`, `mode`, `workflow` |
+| Human | `inbox`, `open`, `answer`, `approve [--reject]`, `unstick [--to <step>] [--reset <counter>]`, `mode`, `workflow` |
 | Team | `take`, `release`, `drop` |
 | Views | `status`, `trace <unit>`, `why <unit>` |
 | Housekeeping | `tidy` |

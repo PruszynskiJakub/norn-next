@@ -77,7 +77,7 @@ async function run(outcome: string, handoff: string, evidence = false): Promise<
   await tick();
   return b;
 }
-type Inbox = { groups: Record<string, Array<{ id: string; title: string; detail?: string; command: string; url?: string }>> };
+type Inbox = { groups: Record<string, Array<{ id: string; title: string; detail?: string; full?: string; command: string; url?: string }>> };
 type History = { items: Array<{ id: string; group: string; title: string; appeared_at: string | null; resolved_at: string | null; resolved_by: string | null; url: string | null }>; open: number };
 
 beforeAll(async () => {
@@ -97,15 +97,17 @@ afterAll(() => h.cleanup());
 describe("gate item and rulings (F21, F28)", () => {
   let qaRun: Brief;
 
-  test("the human-qa item names the qa report and its evidence folder, absolute", async () => {
+  test("the human-qa item names the qa report; --details gives it and its evidence folder, absolute", async () => {
     await run("done", "built");
     qaRun = await run("partial", "AC6 vs B6: spec conflict, counted raw", true);
     expect(h.state(runs())).toMatchObject({ step: "human-qa", status: "parked" });
     const item = ((await h.norn("inbox")).value as Inbox).groups.approve?.[0];
     expect(item?.title).toBe("evidence attached");
-    expect(item?.detail).toContain(`qa#1 reported partial: ${runs()}/receipts/`);
-    expect(item?.detail).toContain(`evidence: ${runs()}/evidence/${qaRun.run_id}/`);
+    expect(item?.detail).toMatch(/^step qa#1 reported partial \(receipt \d{4}\) · /);
     expect(item?.detail).toContain('or reject: norn approve gh-7 --reject --reason "…"');
+    const full = ((await h.norn("inbox", "--details")).value as Inbox).groups.approve?.[0]?.full;
+    expect(full).toContain(`Report: ${runs()}/receipts/`);
+    expect(full).toContain(`Evidence: ${runs()}/evidence/${qaRun.run_id}/`);
   });
 
   test("a reject reason is a ruling every later brief of the story carries", async () => {
