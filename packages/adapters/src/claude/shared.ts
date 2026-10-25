@@ -13,8 +13,6 @@ import type { AgentLaunchRequest, PortError } from "@norn/core";
 
 /** A1: every norn-installed hook command ends with this shell comment; it is the ownership marker. */
 export const NORN_HOOK_MARKER = "# norn-owned";
-/** SK1: a skill file norn may overwrite contains this marker; anything else is a repo-local override. */
-export const NORN_SKILL_MARKER = "<!-- norn-owned: managed by `norn init`; remove this line to keep local edits -->";
 
 export function portError(code: string, message: string, retryable = false): PortError {
   return Object.assign(new Error(message), { code, retryable });
@@ -168,31 +166,6 @@ export function jsonHookInstaller(adapterName: string, settingsPath: (repoRoot: 
       return hasNornHooks(readJsonObject(settingsPath(repoRoot)), specs);
     },
   };
-}
-
-// ------------------------------------------------------------------ skills (SK1)
-
-export type SkillInstallResult = "written" | "unchanged" | "kept_local";
-
-/**
- * Install `<skillsDir>/<name>/SKILL.md`. The marker is inserted after the frontmatter. A file
- * without the marker is a repo-local override and wins (SK1): it is never overwritten.
- */
-export function installSkill(skillsDir: string, name: string, content: string): { path: string; result: SkillInstallResult } {
-  const path = join(skillsDir, name, "SKILL.md");
-  const existing = readText(path);
-  if (existing !== null && !existing.includes(NORN_SKILL_MARKER)) return { path, result: "kept_local" };
-  const marked = withSkillMarker(content);
-  if (existing === marked) return { path, result: "unchanged" };
-  atomicWrite(path, marked);
-  return { path, result: "written" };
-}
-
-export function withSkillMarker(content: string): string {
-  if (content.includes(NORN_SKILL_MARKER)) return content;
-  const fm = /^---\r?\n[\s\S]*?\r?\n---\r?\n/.exec(content);
-  if (!fm) return `${NORN_SKILL_MARKER}\n${content}`;
-  return `${fm[0]}${NORN_SKILL_MARKER}\n${content.slice(fm[0].length)}`;
 }
 
 // ------------------------------------------------------------------ hook facts

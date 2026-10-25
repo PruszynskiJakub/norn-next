@@ -14,5 +14,5 @@ export { releaseHeldClaims, releaseStory } from "./runtime/release.ts";
 export { runShell, tailLines } from "./runtime/shell.ts";
 export { replayInputs, runTick, type TickOptions, type TickReport, traceRecord } from "./runtime/tick.ts";
 export { type AssetsSources, assetsDir, resolveAssetsDir } from "./runtime/assets.ts";
-export { bundledSkills, knownSkills, repoWorkflows } from "./runtime/workflows.ts";
+export { agentSkills, bundledSkills, repoWorkflows } from "./runtime/workflows.ts";
 export { buildPorts, defaultRegistry } from "./wiring.ts";

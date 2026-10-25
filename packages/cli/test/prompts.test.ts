@@ -33,7 +33,7 @@ start: implement
 steps:
   implement:
     type: agent
-    skill: implement
+    skill: norn-implement
     outcomes: { done: $done }
 `;
 const CONFIG = `agents:

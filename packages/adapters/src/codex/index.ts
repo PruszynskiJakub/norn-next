@@ -98,9 +98,8 @@ export async function lastAssistantMessage(transcriptPath: string): Promise<stri
   return null;
 }
 
-/** Codex discovers Agent Skills in `.agents/skills` (repo) and `~/.agents/skills` (user). TODO(M4): confirm vs `~/.codex/skills`. */
-export const skillDir = (scope: "repo" | "user", repoRoot: string, home: string) =>
-  scope === "repo" ? join(repoRoot, ".agents", "skills") : join(home, ".agents", "skills");
+/** Codex discovers Agent Skills in `.agents/skills`, where norn keeps them: no links needed. */
+export const skillDir = (repoRoot: string) => join(repoRoot, ".agents", "skills");
 
 export const codexAgent: AgentAdapter = {
   name: NAME,

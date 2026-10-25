@@ -62,6 +62,17 @@ describe("validateWorkflowDefinition (W5)", () => {
     expect(codes({ name: "x", start: "a", steps: { a: { type: "agent", skill: "s", outcomes: { ok: "$done", exhausted: "$done" } } } })).toEqual(["reserved_outcome"]);
   });
 
+  test("a step's skill must be installed for the agent that runs it (W5, SK1)", () => {
+    const wf = { name: "x", start: "a", steps: { a: { type: "agent", skill: "s", outcomes: { ok: "b" } }, b: { type: "agent", skill: "t", agent: "codex", outcomes: { ok: "$done" } } } };
+    const check = (visible: Record<string, string[]>) => validateWorkflowDefinition(wf, { agentSkills: { default_agent: "claude", visible } }).issues.map((i) => i.path);
+    expect(check({ claude: ["s"], codex: ["t"] })).toEqual([]);
+    expect(check({ claude: ["t"], codex: ["s"] })).toEqual(["/steps/a/skill", "/steps/b/skill"]);
+    expect(check({})).toEqual([]); // agents without a skill folder are not checked
+    expect(validateWorkflowDefinition(wf, { agentSkills: { default_agent: "claude", visible: { claude: [] } } }).issues[0]?.message).toBe(
+      "skill 's' is not installed for agent 'claude' (run norn init, or add it to that agent's skill folder)",
+    );
+  });
+
   test("schema errors are reported with paths", () => {
     const r = validateWorkflowDefinition({ name: "x", start: "a", steps: { a: { type: "check", outcomes: { pass: "$done" } } } });
     expect(r.ok).toBe(false);

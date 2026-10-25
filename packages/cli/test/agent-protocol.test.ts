@@ -22,12 +22,12 @@ start: implement
 steps:
   implement:
     type: agent
-    skill: implement
+    skill: norn-implement
     inputs: [spec, diff, handoff, last_findings]
     outcomes: { done: { to: review, means: "every criterion has a passing test" } }
   review:
     type: agent
-    skill: review
+    skill: norn-review
     outcomes:
       approve: { to: sign-off, means: "no blocking findings" }
       changes_requested: { to: implement, counter: review_loop, means: "blocking findings in the receipt" }
@@ -42,7 +42,7 @@ start: refine
 steps:
   refine:
     type: agent
-    skill: refine
+    skill: norn-refine
     attended: true
     outcomes: { done: { to: $done, means: "the person agrees the spec is ready" } }
 `;
@@ -143,7 +143,7 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     runId = v.run_id;
     expect(v.markdown).not.toContain("norn:header");
     expect(v.markdown).not.toContain("norn:heartbeat");
-    expect(v.markdown).toContain("Use the `implement` skill.");
+    expect(v.markdown).toContain("Use the `norn-implement` skill.");
     expect(v.markdown).toContain(`- Run: ${runId}`);
     expect(v.markdown).toContain('`norn done done --handoff "…"` — every criterion has a passing test');
     expect(v.markdown).toContain("Diff: `git diff origin/main...HEAD`"); // F33: the fetched base, not local main
