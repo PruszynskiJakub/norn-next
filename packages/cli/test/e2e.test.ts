@@ -99,6 +99,12 @@ describe("norn init", () => {
     expect(r.value).toMatchObject({ code: "unknown_command", do_instead: expect.stringContaining("norn help") });
     expect((await h.norn("tick", "--bogus")).exit).toBe(2);
   });
+
+  test("--version prints the cli package version", async () => {
+    const r = await h.norn("--version");
+    expect(r.exit).toBe(0);
+    expect(r.value).toEqual({ version: (await Bun.file(join(import.meta.dir, "../package.json")).json()).version });
+  });
 });
 
 describe("a story through the slice workflow", () => {

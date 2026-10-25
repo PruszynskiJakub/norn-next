@@ -18,15 +18,21 @@ The full spec is in [`.agents/PRD.md`](.agents/PRD.md).
 
 ## Install
 
-Via npm (the package is a Bun bundle, so it needs [Bun](https://bun.sh) ≥ 1.3 on `PATH`):
+Releases are listed in [`CHANGELOG.md`](CHANGELOG.md) and on the [releases page](https://github.com/PruszynskiJakub/norn-next/releases).
+
+**From GitHub Packages** (npm). The package is a Bun bundle, so it needs [Bun](https://bun.sh) ≥ 1.3 on `PATH`. GitHub's npm registry always asks for a token, even to install: create a personal access token (classic) with the `read:packages` scope, then:
 
 ```sh
-bun add -g @norn/cli      # or: npm install -g @norn/cli
+echo "@pruszynskijakub:registry=https://npm.pkg.github.com" >> ~/.npmrc
+echo "//npm.pkg.github.com/:_authToken=<your token>" >> ~/.npmrc
+bun add -g @pruszynskijakub/norn      # or: npm install -g @pruszynskijakub/norn
+norn --version
 ```
 
-As a single-file binary (no Bun needed). Pick `norn-darwin-arm64`, `norn-darwin-x64`, `norn-linux-x64` or `norn-linux-arm64`:
+**As a single-file binary** (no Bun needed). Each release carries `norn-darwin-arm64`, `norn-darwin-x64`, `norn-linux-x64`, `norn-linux-arm64` and `SHA256SUMS`:
 
 ```sh
+gh release download --repo PruszynskiJakub/norn-next --pattern 'norn-darwin-arm64'
 install -m 755 norn-darwin-arm64 /usr/local/bin/norn
 ```
 
