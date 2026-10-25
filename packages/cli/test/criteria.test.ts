@@ -110,7 +110,7 @@ afterAll(() => h.cleanup());
 describe("criteria reports and notes through norn done", () => {
   test("refusals: no report, an invalid file, a missing criterion (9), an unknown note criterion", async () => {
     await startQa();
-    expect((await inWt("brief")).value).toMatchObject({ markdown: expect.stringContaining('`norn done unverified --criteria <file> --handoff "…"`') });
+    expect((await inWt("brief", "--json")).value).toMatchObject({ markdown: expect.stringContaining('`norn done unverified --criteria <file> --handoff "…"`') });
 
     const none = await inWt("done", "pass", "--handoff", "all good");
     expect(none.exit).toBe(3);

@@ -1,5 +1,7 @@
 /**
  * `norn brief [--json]` (B3–B6, MO3): render the briefing of the cursor step from data only.
+ * It prints the briefing as markdown, the one command whose reader is an agent rather than a
+ * program; `--json` keeps the machine contract (P8) with the run, the markdown and the data.
  * In a unit worktree with no live run for the step, the first brief starts the run: it writes
  * a `started` receipt (run_id, session, PID) that the next tick applies. The exact briefing of
  * every run is stored in the trace (B4) and linked from it by a `briefing` event (O4).
@@ -8,10 +10,10 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, storyRulings, storyWorktreePath } from "@norn/core";
 import { type AgentStep, type ProcessIdentity, type ReceiptOf, storyBranch, ulid } from "@norn/schema";
-import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readText, writeBriefing } from "@norn/store";
+import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readText, writeBriefing } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
-import { refuse } from "../output.ts";
+import { refuse, textOutput } from "../output.ts";
 import {
   agentName,
   currentRun,
@@ -22,6 +24,7 @@ import {
   stepOfSession,
   storyMode,
   type UnitSession,
+  unitCriteria,
 } from "../runtime/agent-unit.ts";
 import { readRemoteCache } from "../runtime/local.ts";
 import { readHookFacts } from "../runtime/observe.ts";
@@ -199,7 +202,8 @@ export const briefCommand = defineCommand({
         unit_dir: `${s.marker.spec_dir}/runs/${s.unit.dir}`,
       },
       diff_range: `${base}...HEAD`,
-      handoff: readText(join(s.runsDir, "handoff.md")),
+      // S9: the agent-written part only; the generated header and heartbeat are not for the agent
+      handoff: readHandoff(s.runsDir)?.body ?? null,
       receipts: s.receipts,
       limits: {
         deadline: step.deadline ?? config.limits.deadline,
@@ -211,20 +215,16 @@ export const briefCommand = defineCommand({
       check_log: checkLog(s),
       evidence_files: evidenceFiles(s),
       rulings: rulings(s),
+      criteria: unitCriteria(s),
+      // QV5a: what this run's agent may `pass`
+      capabilities: config.agents[agentName(s, config)]?.capabilities ?? [],
     });
     // B4: the exact briefing of every run, in the trace
     const id = ulid(ctx.clock.now());
     const stored = writeBriefing(s.root, run.run_id, id, briefing.markdown);
     // O4: link the run to its briefing in the trace (`norn trace <unit>` shows it)
     appendTrace(s.root, { type: "briefing", id, at: ctx.clock.iso(), unit: key, run_id: run.run_id, step: s.state.step, attempt: s.state.attempt, briefing: stored });
-    return {
-      unit: key,
-      step: s.state.step,
-      attempt: s.state.attempt,
-      run_id: run.run_id,
-      started,
-      briefing: stored,
-      ...(opt.bool(args, "json") ? { brief: briefing.json } : { markdown: briefing.markdown }),
-    };
+    if (!opt.bool(args, "json")) return textOutput(briefing.markdown);
+    return { unit: key, step: s.state.step, attempt: s.state.attempt, run_id: run.run_id, started, briefing: stored, markdown: briefing.markdown, brief: briefing.json };
   },
 });
