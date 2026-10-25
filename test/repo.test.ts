@@ -1,6 +1,6 @@
 /** Repo-wide rules: dependency direction (§17) and banned glossary synonyms (§5). */
 import { describe, expect, test } from "bun:test";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const ROOT = join(import.meta.dir, "..");
@@ -81,7 +81,7 @@ const DOCS = [".md", ".yaml", ".yml", ".json"];
 const GLOSSARY_FILES = (): string[] => [
   ...files(PKGS).filter((p) => p.includes("/src/")),
   ...textFiles(join(PKGS, "cli", "assets"), DOCS),
-  ...textFiles(join(ROOT, "plugins"), DOCS),
+  ...textFiles(join(ROOT, "plugins"), [...DOCS, ".toml", ".sh"]),
   ...textFiles(join(PKGS, "schema", "json"), DOCS),
   join(ROOT, "README.md"),
   join(ROOT, "AGENTS.md"),
@@ -148,5 +148,21 @@ describe("release metadata", () => {
     const badges = [...readFileSync(join(ROOT, "README.md"), "utf8").matchAll(/badge\/release-v([0-9][^-]*)-/g)].map((m) => m[1]);
     expect(badges).toEqual([version]);
     expect(readFileSync(join(ROOT, "CHANGELOG.md"), "utf8")).toContain(`## [${version}]`);
+  });
+});
+
+describe("herdr plugin (HC9)", () => {
+  test("the manifest parses, has the cockpit pane and the open/next actions, and names only scripts that exist", () => {
+    const dir = join(ROOT, "plugins", "herdr");
+    const m = Bun.TOML.parse(readFileSync(join(dir, "herdr-plugin.toml"), "utf8")) as {
+      id: string;
+      panes: Array<{ id: string; command: string[] }>;
+      actions: Array<{ id: string; command: string[] }>;
+    };
+    expect(m.id).toBe("norn");
+    expect(m.panes.map((p) => p.id)).toEqual(["cockpit"]);
+    expect(m.actions.map((a) => a.id)).toEqual(["open", "next"]);
+    const scripts = [...m.panes, ...m.actions].map((e) => e.command.at(-1) as string);
+    expect(scripts.filter((s) => !existsSync(join(dir, s)))).toEqual([]);
   });
 });

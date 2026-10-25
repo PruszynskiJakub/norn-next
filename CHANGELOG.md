@@ -6,6 +6,10 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ### Added
 
+- An attended agent that waits for you shows under Your turn (HC1–HC3). Once the agent of an attended step (refine, clarify, plan) has ended its turn, or waits on a question or permission prompt, for `limits.attended_wait` (default `2m`), the inbox moves it from Running to Your turn as `<step>: the agent is waiting for you`, and the notifiers fire once per wait. Its command reaches the waiting session; it never starts a second agent. Inbox items of a unit with a run carry `reach` (worktree, agent session id, pane id).
+- `norn pane --interactive`, the cockpit (HC4–HC8): the inbox numbered, one command per line — go to an item's agent, answer, approve or reject, take, unstick, view the trace, jump to the next agent waiting for you. Every change runs through the CLI verbs. Inside Herdr it focuses agent panes and labels them in the sidebar (HC12). `norn pane --next` focuses the agent waiting for you once and exits, and `norn pane --open` opens the cockpit.
+- A Herdr plugin in `plugins/herdr` (HC9): the cockpit pane and the actions `norn.open` and `norn.next`. `norn doctor` says whether it is linked when Herdr is the runner.
+- Notifier `herdr`: inbox items as Herdr toasts (HC14).
 - `norn open <unit> [--print]` opens an agent on a step a person starts (an attended step such as refine or plan, or a ready step in manual mode). With a runner that can open terminals (the new optional `open` capability and `openForPerson` on `RunnerPort`; Herdr has it) it opens one in the unit's worktree with the agent started on the brief, a focused Herdr tab; otherwise it prints the command to run (MO5).
 - `norn inbox` lists a story taken in on this checkout that no tick has started yet: under Running while the heartbeat is up, else under Your turn with `norn watch`.
 

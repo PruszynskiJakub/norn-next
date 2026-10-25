@@ -477,6 +477,8 @@ export interface InboxItem {
   full?: string;
   since: string;
   url?: string;
+  /** HC3: where the unit's current run lives (nulls = unknown), for front ends that find its pane (HC6) */
+  reach?: { worktree: string | null; agent_session_id: string | null; pane_id: string | null };
 }
 
 export interface NotifierPort {

@@ -27,7 +27,8 @@
  * - capabilities: send + resume + open (R4.1, MO5)
  *
  * - openStatusPane → `herdr pane split [--current] --direction down --ratio 0.3 --cwd C --no-focus`,
- *                `herdr pane rename <pane> norn`, `herdr pane run <pane> "norn pane"`   (O1 status pane)
+ *                `herdr pane rename <pane> norn`, `herdr pane run <pane> "norn pane --interactive"`   (O1, HC10)
+ * - cockpit helpers (agent list, focus, labels, command panes): `./cockpit.ts` (HC6, HC12)
  *
  * Herdr's agent status is one fact among several (§21, C2): `idle`/`done` never completes a step.
  */
@@ -337,11 +338,14 @@ export interface StatusPaneOptions {
   /** refresh interval passed as `--interval` (default: `norn pane`'s own) */
   interval?: string;
   direction?: "down" | "right";
+  /** HC10: run the interactive cockpit (`norn pane --interactive`) rather than the read-only view */
+  interactive?: boolean;
 }
 
 /**
  * O1 "a Herdr status pane": split a pane next to the caller (focus stays put) and run
- * `norn pane` in it — a read-only inbox view that refreshes itself (X1). Returns the new pane.
+ * `norn pane` in it — an inbox view that refreshes itself, interactive with `interactive`
+ * (HC10; it still writes only through CLI verbs, X1). Returns the new pane.
  */
 export async function openStatusPane(cwd: string, opts: StatusPaneOptions = {}): Promise<{ pane_id: string }> {
   const herdr = herdrCaller(opts.exec ?? bunExec, [opts.bin ?? "herdr", ...(opts.session ? ["--session", opts.session] : [])]);
@@ -353,8 +357,9 @@ export async function openStatusPane(cwd: string, opts: StatusPaneOptions = {}):
   const paneId = out?.result?.pane?.pane_id;
   if (!paneId) throw portError("launch_failed", "herdr pane split did not return a pane");
   await herdr(["pane", "rename", paneId, "norn"]).catch(() => null); // the label is cosmetic
-  const argv = [...(opts.command ?? ["norn"]), "pane", ...(opts.interval ? ["--interval", opts.interval] : [])];
+  const argv = [...(opts.command ?? ["norn"]), "pane", ...(opts.interactive ? ["--interactive"] : []), ...(opts.interval ? ["--interval", opts.interval] : [])];
   await herdr(["pane", "run", paneId, shellJoin(argv)]);
   return { pane_id: paneId };
 }
 export { parsePanePrompt } from "./prompt.ts";
+export * from "./cockpit.ts";

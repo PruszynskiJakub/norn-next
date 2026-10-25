@@ -240,7 +240,7 @@ describe("norn doctor (A7)", () => {
     expect(r.exit).toBe(json.exit);
     expect(r.value).toEqual(json.value);
     expect(r.stdout).toStartWith(ok ? "norn doctor: every check passes\n" : "norn doctor: ");
-    expect(r.stdout).toMatch(/(ok {3}|FAIL) agent claude .* · hooks fire/);
+    expect(r.stdout).toMatch(/(ok {3}|FAIL )agent claude .* · hooks fire/);
     expect(r.stdout).toMatch(/ok {3}remote +gh as tester/);
     expect(r.stdout).toContain("Warnings\n  ! NORN_MACHINE=box");
     expect(() => JSON.parse(r.stdout)).toThrow();

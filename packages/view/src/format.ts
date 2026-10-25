@@ -4,7 +4,7 @@
  */
 import { INBOX_GROUPS, INBOX_TITLES } from "@norn/core";
 import { oneLine } from "./timeline.ts";
-import type { ProjectView, SliceView, StepRow, StepWho, StoryView, TimelineEntry, TraceView, UnitView } from "./types.ts";
+import type { InboxEntry, ProjectView, SliceView, StepRow, StepWho, StoryView, TimelineEntry, TraceView, UnitView } from "./types.ts";
 
 function counterText(u: UnitView): string {
   const used = u.counters.filter((c) => c.value > 0 || (c.max !== null && u.status !== "done"));
@@ -107,21 +107,29 @@ export function formatStatus(view: ProjectView): string {
   return `${out.join("\n").trimEnd()}\n`;
 }
 
+/** HC4: the inbox items in display order (O1 group order) — item `n` of the cockpit is `[n - 1]`. */
+export function inboxItemsInOrder(view: ProjectView): InboxEntry[] {
+  return INBOX_GROUPS.flatMap((g) => view.inbox.groups[g]);
+}
+
 /**
  * `norn inbox` human mode: groups in O1 order, each item with reason, age and command; `details` adds
  * full texts (L1). With `home`, paths under it print as `~/…` (the JSON keeps them absolute).
+ * `numbered` prefixes `[n]` for the cockpit (HC4).
  */
-export function formatInbox(view: ProjectView, opts: { details?: boolean; home?: string } = {}): string {
+export function formatInbox(view: ProjectView, opts: { details?: boolean; home?: string; numbered?: boolean } = {}): string {
   const home = opts.home?.replace(/\/+$/, "");
   const tilde = (t: string) => (home ? t.replaceAll(`${home}/`, "~/") : t);
   const out: string[] = [];
+  let n = 0;
   for (const g of INBOX_GROUPS) {
     const items = view.inbox.groups[g];
     if (!items.length) continue;
     out.push(`${INBOX_TITLES[g]} (${items.length})`);
     for (const it of items) {
       const unit = it.slice ?? it.story;
-      out.push(`  ${unit.padEnd(10)} ${it.step ? `${it.step}: ` : ""}${it.title} · ${it.age}`);
+      const num = opts.numbered ? `${`[${++n}]`.padEnd(5)}` : "";
+      out.push(`  ${num}${unit.padEnd(10)} ${it.step ? `${it.step}: ` : ""}${it.title} · ${it.age}`);
       if (it.detail) out.push(`      ${tilde(it.detail)}`);
       if (opts.details && it.full) out.push(...tilde(it.full).split("\n").map((l) => `      | ${l}`));
       out.push(`      $ ${it.command}`);

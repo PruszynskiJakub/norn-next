@@ -379,11 +379,56 @@ export function retargetItem(story: StoryFacts, base: string): InboxItem | null 
   };
 }
 
+/** Hook events after which an attended agent waits for its person (HC1). */
+const WAITING_HOOKS = new Set(["turn_end", "waiting_input", "permission_prompt"]);
+const WAITING_PANE = new Set(["idle", "done", "waiting_input"]);
+
+/**
+ * HC1: when the attended agent of the unit's current run started waiting for its person (ms epoch),
+ * or null while it works, is gone, or the step is not attended. The wait starts at the first of the
+ * run's trailing waiting hooks, so Claude's `idle_prompt` (~60 s after `Stop`) does not restart it;
+ * with no hook since the last activity, a pane that went idle afterwards starts it.
+ */
+export function attendedWaitSince(uf: UnitFacts): number | null {
+  const st = uf.state;
+  const rf = uf.run;
+  if (st?.status !== "running" || !st.run || rf?.run_id !== st.run.run_id) return null;
+  const step = uf.workflow ? stepOf(uf.workflow, st.step) : null;
+  if (step?.type !== "agent" || !step.attended) return null;
+  if (rf.process_alive === false || rf.pane?.alive === false) return null;
+  let since: number | null = null;
+  for (let i = rf.hooks.length - 1; i >= 0; i--) {
+    const h = rf.hooks[i];
+    if (!h || !WAITING_HOOKS.has(h.event)) {
+      if (h?.event === "session_end") return null;
+      break;
+    }
+    since = epoch(h.at);
+  }
+  if (since !== null) return since;
+  const pane = rf.pane;
+  if (pane && WAITING_PANE.has(pane.state) && pane.since !== null && pane.since > (rf.last_hook_at ?? 0)) return pane.since;
+  return null;
+}
+
+/** HC3: where the unit's current run lives, for front ends that look for its pane (HC6). */
+function reachOf(story: StoryFacts, uf: UnitFacts): InboxItem["reach"] | undefined {
+  const run = uf.state?.run;
+  if (!run) return undefined;
+  const live = uf.run?.run_id === run.run_id ? uf.run : null;
+  return {
+    worktree: uf.worktree?.path ?? (uf.unit.slice === null ? (story.worktree?.path ?? null) : null),
+    agent_session_id: run.agent_session_id ?? live?.launch_unknown?.agent_session_id ?? null,
+    pane_id: run.session?.pane_id ?? live?.session?.pane_id ?? null,
+  };
+}
+
 /** Inbox item for one unit's current state, or null when nothing is shown for it. */
 export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, config: ResolvedConfig): InboxItem | null {
   const st = uf.state;
   const key = uf.unit.key;
-  const base = { story: story.key, slice: uf.unit.slice, url: story.frontmatter?.url };
+  const reach = reachOf(story, uf);
+  const base = { story: story.key, slice: uf.unit.slice, url: story.frontmatter?.url, ...(reach ? { reach } : {}) };
   if (uf.errors.length || st?.status === "corrupt") {
     const files = uf.errors.map((e) => e.file).join(", ") || "state.json";
     return { ...base, id: `corrupt:${key}:${files}`, group: "unblock", step: st?.step ?? null, title: `corrupt: ${files} failed validation (S2)`, command: `norn why ${key}`, since: iso(facts.now) };
@@ -423,6 +468,17 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       if (unsent) return item("unblock", `launch prompt not received by ${key} ${st.step}${unsent.pane ? ` — look at pane ${unsent.pane}` : ""}`, st.run?.session?.reach ?? `norn trace ${key}`, unsent.since, { id: `launch:${key}:${st.run?.run_id ?? st.step}`, detail: "the agent session started but never began a turn; the prompt was re-sent once (R9.1)" });
       const nudge = undeliveredNudge(story, uf, facts);
       if (nudge && !heartbeatDown(facts, config)) return item("your_turn", "agent ended its turn without reporting — reopen the agent and run norn brief", startCommandFor(uf, story, config), nudge.at, { id: `${nudge.outcome}:${key}:${st.step}#${st.attempt}:${st.nudges_used}` });
+      // HC2: an attended agent waiting for its person past `attended_wait`; one item (and notification) per wait
+      const waiting = attendedWaitSince(uf);
+      if (waiting !== null && st.run && facts.now - waiting >= parseDuration(config.limits.attended_wait)) {
+        // HC3: reach the session that waits — never start a second agent for the step
+        const worktree = reach?.worktree ?? null;
+        const command = st.run.session?.reach ?? (worktree ? `cd ${worktree}` : `norn trace ${key}`);
+        return item("your_turn", `${st.step}: the agent is waiting for you`, command, iso(waiting), {
+          id: `attended:${key}:${st.run.run_id}:${iso(waiting)}`,
+          detail: "attended step: answer in the agent's pane; it reports when you agree (MO4)",
+        });
+      }
     }
       return item("running", `${st.step} #${st.attempt}${st.run ? ` (${st.run.how})` : ""}`, `norn trace ${key}`, st.run?.started_at ?? st.step_entered_at);
     case "ready": {

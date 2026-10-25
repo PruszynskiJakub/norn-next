@@ -64,6 +64,16 @@ claude plugin install norn@norn
 
 You don't need the plugin to use norn with Claude Code: `norn init` puts the skills where Claude finds them.
 
+### Herdr plugin
+
+`plugins/herdr` adds the norn cockpit to Herdr: a pane running `norn pane --interactive`, which numbers the inbox items and takes one command per line (`3` goes to item 3's agent, `a 2 Postgres` answers, `y 1` approves, `t 4` takes, `?` lists the rest). Every change goes through the same `norn` verbs you would type. While it runs, it labels the agent pane of each norn run in Herdr's sidebar (`gh-12 · refine`, `norn: your turn`).
+
+```sh
+herdr plugin install PruszynskiJakub/norn-next/plugins/herdr   # or: herdr plugin link ./plugins/herdr from a checkout
+```
+
+The plugin has two actions you can bind to keys in Herdr's `config.toml`: `norn.open` opens the cockpit below the focused pane, and `norn.next` jumps to the agent that waits for you. To get inbox notifications as Herdr toasts, add `{adapter: herdr}` to `notifiers` in the config.
+
 ### Skills
 
 `norn init` copies norn's skills, whole folders with their reference files, into `.agents/skills/` (`norn`, `norn-refine`, `norn-plan`, `norn-implement`, `norn-review`, `norn-qa`, …) and links them from each configured agent's skill folder: `.claude/skills/`, `.gemini/skills/`, `.opencode/skills/` (Codex reads `.agents/skills/` itself). Commit them. Each `norn init` replaces them with the bundled version and lists what it updated; `git diff .agents/skills/` shows the change. To change how a step is done, write your own skill under another name and name it in the step (`skill: my-review`). `norn doctor` reports skills that are missing, not linked or out of date. Links need a filesystem that supports them (on Windows, developer mode).
@@ -90,7 +100,7 @@ Every inbox item shows the exact command that resolves it, for example `norn ans
 - **manual** (the default): the tick marks unattended agent steps as ready. With the `herdr` runner, `norn open <unit>` (the inbox shows it) opens a tab in the unit's worktree with the agent started on the brief. Otherwise the inbox shows the command to run: open any agent in the unit's worktree and tell it *"Use the norn skill, then run `norn brief`"* (or type `/norn` with the Claude Code plugin).
 - **auto**: the tick starts agents itself through the configured `runner` (`herdr` or `headless`). If a machine has no runner configured, its stories run in manual mode.
 
-In both modes, `check` and `git` steps run on their own. Attended steps (`attended: true`, e.g. refine and plan) and `gate` steps always wait for a person, even in auto mode: start an attended step from the command its inbox item shows.
+In both modes, `check` and `git` steps run on their own. Attended steps (`attended: true`, e.g. refine and plan) and `gate` steps always wait for a person, even in auto mode: start an attended step from the command its inbox item shows. When the agent of an attended step has been waiting for you longer than `limits.attended_wait` (default 2 minutes), the inbox moves it from Running to Your turn and says where it waits.
 
 ## Commands
 
@@ -102,7 +112,7 @@ In both modes, `check` and `git` steps run on their own. Attended steps (`attend
 | Agent protocol | `brief`, `done`, `ask`, `stuck`, `hook` |
 | Human | `inbox`, `open`, `answer`, `approve [--reject]`, `unstick [--to <step>] [--reset <counter>]`, `mode`, `workflow` |
 | Team | `take`, `release`, `drop` |
-| Views | `status`, `trace <unit>`, `why <unit>` |
+| Views | `status`, `trace <unit>`, `why <unit>`, `pane [--interactive \| --next \| --open]` |
 | Housekeeping | `tidy` |
 
 This table is the v1 plan (PRD §15). Run `norn help` to see what your build has, or `norn help <command>` for one command's usage.
