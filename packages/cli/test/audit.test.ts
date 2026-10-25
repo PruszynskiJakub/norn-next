@@ -19,7 +19,7 @@ start: implement
 steps:
   implement:
     type: agent
-    skill: implement
+    skill: norn-implement
     nudges: 1
     retries: 1
     outcomes: { done: $done }

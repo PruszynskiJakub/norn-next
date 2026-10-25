@@ -8,7 +8,7 @@ start: reproduce
 steps:
   reproduce:
     type: agent
-    skill: qa
+    skill: norn-qa
     inputs: [slice, spec, handoff]
     instructions: "Reproduce the reported bug as a user. Record the exact repro and evidence; do not fix anything."
     outcomes:
@@ -16,7 +16,7 @@ steps:
       cannot_reproduce: { to: $stuck, means: "followed the report faithfully and the bug did not occur; what was tried is attached" }
   implement:
     type: agent
-    skill: implement
+    skill: norn-implement
     inputs: [slice, spec, handoff, last_check, last_findings]
     instructions: "Start from the repro: turn it into a failing test before changing any code."
     outcomes:
@@ -28,7 +28,7 @@ steps:
     outcomes: { pass: review, fail: { to: implement, counter: test_loop } }
   review:
     type: agent
-    skill: review
+    skill: norn-review
     inputs: [slice, spec, diff]
     outcomes:
       approve:           { to: integrate, means: "the fix addresses the cause, no blocking findings" }
@@ -39,7 +39,7 @@ steps:
     outcomes: { done: $done, conflict: { to: merge, counter: conflict_loop } }
   merge:
     type: agent
-    skill: merge
+    skill: norn-merge
     inputs: [slice, spec]
     outcomes: { done: { to: integrate, means: "conflicts resolved keeping the intent of both sides; tests pass" } }
 counters: { test_loop: { max: 5 }, review_loop: { max: 3 }, conflict_loop: { max: 2 } }

@@ -98,9 +98,8 @@ export async function lastAssistantMessage(transcriptPath: string): Promise<stri
   return null;
 }
 
-/** Gemini CLI Agent Skills: `.gemini/skills` (repo) and `~/.gemini/skills` (user). */
-export const skillDir = (scope: "repo" | "user", repoRoot: string, home: string) =>
-  scope === "repo" ? join(repoRoot, ".gemini", "skills") : join(home, ".gemini", "skills");
+/** Gemini CLI Agent Skills: `.gemini/skills`. */
+export const skillDir = (repoRoot: string) => join(repoRoot, ".gemini", "skills");
 
 export const geminiAgent: AgentAdapter = {
   name: NAME,

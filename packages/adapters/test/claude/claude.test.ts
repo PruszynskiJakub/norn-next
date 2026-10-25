@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { claudeAgent, installSkill, shared, withPendingCommands } from "../../src/claude/index.ts";
+import { claudeAgent, shared, withPendingCommands } from "../../src/claude/index.ts";
 import payloads from "./fixtures/hook-payloads.json";
 
 const FIX = join(import.meta.dir, "fixtures");
@@ -172,19 +172,8 @@ describe("claude hooks install (A1)", () => {
 });
 
 describe("claude skills (SK1)", () => {
-  test("installs with marker, updates norn-owned, keeps local overrides", () => {
-    const dir = claudeAgent.skillDir("repo", tmp(), "/home/u");
-    expect(dir.endsWith(join(".claude", "skills"))).toBe(true);
-    expect(claudeAgent.skillDir("user", "/r", "/home/u")).toBe("/home/u/.claude/skills");
-    const v1 = "---\nname: norn\ndescription: x\n---\n# norn v1\n";
-    const r1 = installSkill(dir, "norn", v1);
-    expect(r1.result).toBe("written");
-    expect(readFileSync(r1.path, "utf8")).toBe(`---\nname: norn\ndescription: x\n---\n${shared.NORN_SKILL_MARKER}\n# norn v1\n`);
-    expect(installSkill(dir, "norn", v1).result).toBe("unchanged");
-    expect(installSkill(dir, "norn", v1.replace("v1", "v2")).result).toBe("written");
-    writeFileSync(r1.path, "---\nname: norn\n---\nmy local version\n");
-    expect(installSkill(dir, "norn", v1).result).toBe("kept_local");
-    expect(readFileSync(r1.path, "utf8")).toBe("---\nname: norn\n---\nmy local version\n");
+  test("reads skills from the repo's .claude/skills", () => {
+    expect(claudeAgent.skillDir("/r")).toBe("/r/.claude/skills");
   });
 });
 

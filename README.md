@@ -42,20 +42,24 @@ norn also needs `git` and the remote CLI you use, `gh` or `glab`, signed in.
 
 ### Claude Code plugin
 
-`plugins/claude-code` contains the ten norn skills and a `/norn` command, which loads the norn skill and runs `norn brief`. The plugin has no logic of its own, so the `norn` CLI must still be on `PATH`.
+`plugins/claude-code` contains a `/norn` command, which loads the norn skill and runs `norn brief`. The plugin has no logic and no skills of its own: the skills come from your repo (`norn init`), and the `norn` CLI must still be on `PATH`.
 
 ```sh
 claude plugin marketplace add ./plugins     # from a checkout of this repo
 claude plugin install norn@norn
 ```
 
-`norn init` also installs the skills into `.claude/skills`, so you don't need the plugin to use norn with Claude Code.
+You don't need the plugin to use norn with Claude Code: `norn init` puts the skills where Claude finds them.
+
+### Skills
+
+`norn init` copies norn's skills, whole folders with their reference files, into `.agents/skills/` (`norn`, `norn-refine`, `norn-plan`, `norn-implement`, `norn-review`, `norn-qa`, …) and links them from each configured agent's skill folder: `.claude/skills/`, `.gemini/skills/`, `.opencode/skills/` (Codex reads `.agents/skills/` itself). Commit them. Each `norn init` replaces them with the bundled version and lists what it updated; `git diff .agents/skills/` shows the change. To change how a step is done, write your own skill under another name and name it in the step (`skill: my-review`). `norn doctor` reports skills that are missing, not linked or out of date. Links need a filesystem that supports them (on Windows, developer mode).
 
 ## Quickstart
 
 ```sh
 cd your-repo
-norn init          # .agents/norn/config.yaml, workflows/{story,slice,bug}.yaml, agent skills and hooks
+norn init          # .agents/norn/config.yaml, workflows/{story,slice,bug}.yaml, .agents/skills (linked per agent), hooks
 # edit .agents/norn/config.yaml: remote.provider (gh | glab), remote.label (default: norn)
 norn sync          # issues assigned to you with the label become stories
 norn tick          # one heartbeat: observe, decide, act
@@ -96,7 +100,7 @@ packages/store     @norn/store     .agents/ files, runs/ JSON, claim and mailbox
 packages/adapters  @norn/adapters  git, gh, glab, herdr, headless, claude, codex, opencode, gemini, notify
 packages/view      @norn/view      read model loadProjectView()
 packages/cli       @norn/cli       wiring and commands; assets/ holds skills, workflows, config template
-plugins/claude-code                Claude Code plugin (skills copied from packages/cli/assets/skills)
+plugins/claude-code                Claude Code plugin (the /norn command only)
 scripts/                           build and plugin sync
 ```
 
@@ -106,12 +110,16 @@ Contributor rules and the dependency direction are in [`AGENTS.md`](AGENTS.md). 
 
 ```sh
 bun install
-bun test               # all tests, including the check that the plugin skills are in sync
+bun test               # all tests, including the check that the plugin is in sync
 bun run typecheck
 bun run schema:emit    # after changing a schema
-bun run sync:plugin    # after changing packages/cli/assets/skills
+bun run sync:plugin    # after changing the @norn/cli version
 bun run build          # dist/npm/: bundled norn.js + assets/ + package.json, ready to pack
 bun run build:bin      # dist/bin/norn-{darwin-arm64,darwin-x64,linux-x64,linux-arm64}
 ```
 
 `bun run build:bin linux-x64` builds only the targets you name. To run from source, use `bun packages/cli/src/main.ts <command>`. Set `NORN_ASSETS_DIR` to use a different assets folder (skills, workflow templates, config template); otherwise norn uses the assets embedded in the binary, then `assets/` next to `norn.js`, then `packages/cli/assets`.
+
+## Credits
+
+The `norn-codebase-design` and `norn-tdd` skills and the approach of the step skills are adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT), by way of norn v0.11.0.

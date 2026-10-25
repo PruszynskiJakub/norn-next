@@ -1,12 +1,12 @@
 /**
  * Repo workflows for decide (W1, W5): every `.agents/norn/workflows/*` file parsed, schema- and
- * graph-validated (incl. that each referenced skill exists), with its exact text for pinning (S7).
+ * graph-validated (incl. that each referenced skill is installed for its agent), with its exact text for pinning (S7).
  */
 import { readdirSync } from "node:fs";
 import { basename, extname, join } from "node:path";
 import type { AgentAdapter, LoadedWorkflow, RepoWorkflows } from "@norn/core";
 import { validateWorkflowDefinition } from "@norn/core";
-import type { WorkflowListing } from "@norn/store";
+import { type WorkflowListing, visibleSkills } from "@norn/store";
 import { assetsDir } from "./assets.ts";
 
 /** Skills shipped with norn (§16), installed by `norn init` (SK1). */
@@ -25,33 +25,23 @@ function listDirs(dir: string): string[] {
   }
 }
 
-/** Known skill names: bundled ones plus any skill folder in each configured agent's skill dirs. */
-export function knownSkills(
-  agents: Record<string, AgentAdapter>,
-  root: string,
-  home: string,
-  env?: Record<string, string | undefined>,
-): Set<string> {
-  const out = new Set(bundledSkills(env));
-  for (const a of Object.values(agents)) {
-    for (const scope of ["repo", "user"] as const) {
-      let dir: string;
-      try {
-        dir = a.skillDir(scope, root, home);
-      } catch {
-        continue;
-      }
-      for (const s of listDirs(dir)) out.add(s);
+/** W5 (SK1): the skills each configured agent can see in its own skill folder, links followed. */
+export function agentSkills(agents: Record<string, AgentAdapter>, root: string): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const [name, a] of Object.entries(agents)) {
+    try {
+      out[name] = visibleSkills(a.skillDir(root));
+    } catch {
+      /* adapter without a skill folder: not checked */
     }
   }
   return out;
 }
 
-export function repoWorkflows(listing: WorkflowListing, skills: Iterable<string>): RepoWorkflows {
+export function repoWorkflows(listing: WorkflowListing, skills: { default_agent: string; visible: Record<string, string[]> }): RepoWorkflows {
   const out: Record<string, LoadedWorkflow> = {};
-  const skillSet = [...skills];
   for (const [name, wf] of Object.entries(listing.workflows)) {
-    const check = validateWorkflowDefinition(wf.workflow, { skills: skillSet });
+    const check = validateWorkflowDefinition(wf.workflow, { agentSkills: skills });
     out[name] = { name, workflow: wf.workflow, source: wf.source, issues: check.ok ? [] : check.issues };
   }
   for (const err of listing.errors) {

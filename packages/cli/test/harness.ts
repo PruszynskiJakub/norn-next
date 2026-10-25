@@ -11,8 +11,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { Clock, InboxItem, LaunchSpec, NotifierPort, PaneState, PromptKey, RemoteIssue, RemotePort, RemotePullRequest, RunnerCapabilities, RunnerPort, RunnerSessionInfo, SessionRef } from "@norn/core";
 import { type Receipt, type UnitState, ulid } from "@norn/schema";
-import { appendReceipt, readState } from "@norn/store";
-import { type CliDeps, type CliResult, runCli, type TickReport } from "../src/index.ts";
+import { appendReceipt, installSkills, linkSkills, readState } from "@norn/store";
+import { bundledSkills, type CliDeps, type CliResult, runCli, type TickReport } from "../src/index.ts";
+import { assetsDir } from "../src/runtime/assets.ts";
 
 // Every tick shells out to git (worktrees, status, refs) several times, so the multi-tick
 // integration tests take 2–3.5 s each on an idle laptop — too close to bun's 5 s default on a
@@ -229,6 +230,13 @@ export async function createHarness(): Promise<Harness> {
     cleanup: () => rmSync(dir, { recursive: true, force: true }),
   };
   return h;
+}
+
+/** What `norn init` does for skills (SK1), for setups that write their own config instead: `.agents/skills/` linked from Claude's folder. */
+export function installBundledSkills(root: string): void {
+  const names = bundledSkills();
+  installSkills(root, join(assetsDir(), "skills"), names);
+  linkSkills(root, join(root, ".claude", "skills"), names);
 }
 
 export function issue(n: number, title: string, labels: string[] = ["norn"], body = "As a user I want to log in."): RemoteIssue {

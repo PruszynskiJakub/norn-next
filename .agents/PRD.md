@@ -147,7 +147,7 @@ The story worktree is on the story branch and holds `.agents/specs/<id>-<slug>/`
 
 | Layer | Written by | Committed | Purpose |
 |---|---|---|---|
-| Frontmatter (story/slice) | humans, `refine`/`slice` skills; CLI changes only coarse `status`, `workflow` (via `norn workflow`) and mirrored remote fields | yes | intent |
+| Frontmatter (story/slice) | humans, `norn-refine`/`norn-slice` skills; CLI changes only coarse `status`, `workflow` (via `norn workflow`) and mirrored remote fields | yes | intent |
 | `runs/<unit>/` JSON, `workflow.yaml`, logs, evidence | CLI only | yes | machine state |
 | `handoff.md` | CLI writes the status header and heartbeat lines; agents and humans write Goal / Progress / Resume | yes | context for the next agent or person |
 | Claim and mailbox refs | CLI only | pushed refs | atomic ownership, remote receipts |
@@ -283,7 +283,7 @@ Three sources of outcomes:
 
 - W3 Transitions are keyed on outcomes: `review.changes_requested → implement`. Conditions are expressed only as outcomes (e.g. `refine` reports `done` or `questions`); there is no `when:` guard in v1. An edge is `{ to, counter?, means?, verdict? }`; `verdict` (agent steps only) gates which outcome a criteria report allows (QV5).
 - W4 Every **elementary cycle** (a path back to its start visiting no step twice) must include at least one edge with a `counter`. Taking a counted edge increments it; if it would exceed `max`, the edge is not taken and the outcome becomes `exhausted` → `$stuck` with the reason (e.g. "review_loop 3/3 at review.changes_requested"). Counters are per unit and never reset by themselves, except a counter declaring `reset_on: <step>.<outcome>`: taking that edge resets it to 0, journaled with the advance (trace, commit, handoff line) — e.g. `base_conflict_loop` resets on `update.done`, so only repeated conflicts on one base move count (C3). Otherwise only `norn unstick --reset <counter>` resets one, journaled. `reset_on` must name a declared edge (W5); it never exempts a cycle from needing a counter.
-- W5 Load-time validation: schema; every step can reach `$done`; every elementary cycle has a counter (the validator lists each uncounted cycle with its path); every referenced skill exists; no step uses a reserved name; `verdict` only on outcomes an agent reports (QV5). Invalid workflows are refused before anything runs.
+- W5 Load-time validation: schema; every step can reach `$done`; every elementary cycle has a counter (the validator lists each uncounted cycle with its path); every referenced skill is installed for the agent that runs the step (SK1); no step uses a reserved name; `verdict` only on outcomes an agent reports (QV5). Invalid workflows are refused before anything runs.
 - W6 v1 has no `fork/join`; parallelism comes from independent slices.
 - W7 **Reserved targets** start with `$`: `$done` (unit finished) and `$stuck` (park in inbox under Unblock with the reason). `$stuck` is always an implicit target of `exhausted`, `stuck` reports and C1 routes. Step names may not start with `$` nor be a reserved word: `done`, `stuck`, `ask`, `exhausted`, `silent`, `died`, `timeout`, `stalled`, `stale`.
 - W8 **Workflows are not tied to a level.** Any workflow may run on a story or a slice; constraints are checked at unit start: `slices`, `git: open-pr` and `git: update` only on a story, `git: integrate` only on a slice. A story workflow without `slices` works directly in the story worktree.
@@ -297,7 +297,7 @@ start: implement
 steps:
   implement:
     type: agent
-    skill: implement
+    skill: norn-implement
     outcomes: { done: { to: test, means: "every acceptance criterion (or rework point) has a passing test" } }
   test:
     type: check
@@ -306,13 +306,13 @@ steps:
     outcomes: { pass: review, fail: { to: implement, counter: test_loop } }
   review:
     type: agent
-    skill: review
+    skill: norn-review
     outcomes:
       approve:           { to: qa, means: "all criteria met, no blocking findings" }
       changes_requested: { to: implement, counter: review_loop, means: "blocking findings in the receipt" }
   qa:
     type: agent
-    skill: qa
+    skill: norn-qa
     criteria: required
     outcomes:
       pass:       { to: integrate, verdict: pass, means: "every criterion observed with evidence" }
@@ -328,7 +328,7 @@ steps:
     outcomes: { done: $done, conflict: { to: merge, counter: conflict_loop } }
   merge:
     type: agent
-    skill: merge
+    skill: norn-merge
     outcomes: { done: integrate }
 counters: { test_loop: { max: 5 }, review_loop: { max: 3 }, qa_loop: { max: 2 }, conflict_loop: { max: 2 } }
 ```
@@ -413,22 +413,25 @@ Example `bug` workflow: `reproduce (agent; reproduced → implement, cannot_repr
 
 ## 16. Skills
 
-Ten single-job skills, written fresh (ideas from ai-engine ported, files not copied). One skill = one job = one kind of step. Outcomes are declared only in workflows; the "Typical outcomes" column is a suggestion for template authors, not a contract.
+Single-job skills ported from ai-engine (norn v0.11.0): its skill files are the base, edited only where norn's contracts differ (files in the repo instead of issues and comments; no push, no remote writes; verdicts and findings as structured data; the person's say at gates when no person works with the agent). One skill = one job = one kind of step; reference skills hold the craft several step skills share. Outcomes are declared only in workflows; the "Typical outcomes" column is a suggestion for template authors, not a contract. Every name but `norn` carries the `norn-` prefix so the skills stay apart from a project's own.
 
 | Skill | Job | Typical outcomes |
 |---|---|---|
 | `norn` | One-step protocol: brief, work in scope, keep handoff, report once, end turn, follow refusals. Only skill aware of norn. | — |
-| `interview` | One question per turn until shared understanding. | done |
-| `refine` | Story → spec with numbered Behaviour items, edge checklist, out of scope, open questions. | done / questions |
-| `clarify` | Settle open questions with the person, fold answers into spec. | done |
-| `plan` | Seams, coverage table (Behaviour → seam), prefactoring, decisions. Reference: codebase-design. | done |
-| `slice` | Plan → slice files (`workflow`, `depends_on`, acceptance citing Behaviour numbers, frontmatter `criteria` with verifier and `needs` (QV1), check commands). | done |
-| `implement` | Test-first build of one slice or story. On rework, the points from the brief's Rework section come first: each is a red test, a QA failure gives its repro. Reference: TDD, tests, mocking. | done |
-| `review` | Spec and Standards axes separately; smells list; findings as structured data. | approve / changes_requested |
-| `qa` | Check each acceptance criterion as a user, with evidence; one verdict per criterion in a criteria report (QV2); never pass what wasn't observed (`unverified` when this session cannot check it); notes when a passed criterion may be read differently (NT4). | pass / fail / partial / unverified |
-| `merge` | Resolve conflicts by intent of both sides; stop if new behaviour is needed. | done |
+| `norn-interview` | One question per turn until shared understanding; only talks. | done |
+| `norn-refine` | Story → spec in `story.md`: Problem, Solution, numbered Behaviour items (`B1`…, each with an example; edges walked as items), Out of scope, Open questions. Owns the spec layout. | done / questions |
+| `norn-clarify` | Sort the open questions, settle them with the person, fold each answer into the section it changes. | done |
+| `norn-plan` | The `## Plan` section of `story.md`: seams, coverage table (Behaviour → seam), prefactoring, implementation and testing decisions, risks. Reference: `norn-codebase-design`. | done |
+| `norn-slice` | Plan → tracer-bullet slice files (`workflow`, `depends_on`, acceptance citing Behaviour numbers, frontmatter `criteria` with verifier and `needs` (QV1), check commands); expand–contract for wide refactors. | done |
+| `norn-implement` | Test-first build of one slice or story at the Plan's agreed seams, then a review pass. On rework, the points from the brief's Rework section come first: each is a red test, a QA failure gives its repro. Reference: `norn-tdd`. | done |
+| `norn-review` | Spec and Standards axes kept apart (a subagent per axis when the agent has them); smells baseline (`SMELLS.md`); findings as structured data. | approve / changes_requested |
+| `norn-qa` | Check each acceptance criterion as a user, with evidence (a screenshot for every `browser` criterion); one verdict per criterion in a criteria report (QV2); never pass what wasn't observed (`unverified` when this session cannot check it); notes when a passed criterion may be read differently (NT4); secrets redacted. | pass / fail / partial / unverified |
+| `norn-qa-person` | Walk a person through QA from the agent's evidence and their own remarks; a repro for every failure. Shipped for attended QA steps; the templates' `human-qa` is a gate. | pass / fail |
+| `norn-merge` | Resolve conflicts by intent of both sides; merge the base into a published branch, never rebase; abort and stop if new behaviour is needed. | done |
+| `norn-tdd` | Reference: red → green at agreed seams, good tests, mocking at boundaries (`tests.md`, `mocking.md`); refactoring stays out of the loop. | — |
+| `norn-codebase-design` | Reference: deep modules, interface, seam, adapter, depth (`DEEPENING.md`, `DESIGN-IT-TWICE.md`). | — |
 
-- SK1 `norn init` installs skills into each configured agent's skill location with norn-owned markers; repo-local overrides win.
+- SK1 `norn init` copies each bundled skill folder whole into `.agents/skills/` (committed; always the bundled version, the change visible in `git diff`) and links it from each configured agent's skill folder (`.claude/skills/`, `.gemini/skills/`, `.opencode/skills/`; codex reads `.agents/skills/` itself). A repo customizes a skill by writing its own under another name and naming it in its workflow (W1). `doctor` reports missing, unlinked and drifted skills; W5 checks each step's skill against the skills its agent can see.
 - SK2 The `norn` skill must stay under ~80 lines; it never contains workflow logic or step names.
 
 ## 17. Architecture and packaging
@@ -446,7 +449,7 @@ TypeScript on **Bun**, monorepo with one-way dependencies: `schema ← core ← 
 
 - X1 Front ends (web cockpit, Herdr pane, TUI) read only via `@norn/view` and write only via CLI verbs.
 - X2 Adapters are selected in config by package name; third-party adapters implement interfaces from `@norn/core`.
-- X3 Distribution: npm package plus `bun build --compile` single-file binaries. Agent plugins (Claude Code first) are thin wrappers bundling skills and a `/norn` command; no logic in plugins.
+- X3 Distribution: npm package plus `bun build --compile` single-file binaries. Agent plugins (Claude Code first) are thin wrappers with a `/norn` command; skills come from the repo (SK1), and no logic lives in plugins.
 - X4 Core is tested by replaying recorded traces as snapshots; adapters against recorded fixtures.
 
 ## 18. Milestones
@@ -486,7 +489,7 @@ M2–M4 are developed as stories run by norn itself.
 | `norn retro` | Deferred | Mines the trace and proposes allow-list, limit, briefing and workflow changes as diffs for human approval; can itself be a workflow with a `gate`. |
 | `fork/join` steps | Out of v1 | |
 | Web cockpit | Later | Built on `@norn/view` + CLI verbs. |
-| Additional skills (triage, human QA, resolve) | Later | |
+| Additional skills (triage, resolve with a person) | Later | |
 
 ## 21. Risks
 
@@ -504,6 +507,6 @@ M2–M4 are developed as stories run by norn itself.
 
 ## 22. Prior art
 
-- **ai-engine (norn v0.11.0):** kept — outcomes not states, refusals with `do_instead`, flows as validated data with reachability, claims as git refs with CAS, craft skills unaware of norn, attended steps, rework through `implement` with findings in the briefing, frozen slugs, banned-synonym glossary. Not repeated — LLM orchestrator (`norn-drive`/`norn-deliver`), labels/comments as store, liveness by claim age, prose output, a single fix-round cap set globally in config, slow `next` (11–18 s).
+- **ai-engine (norn v0.11.0):** kept — outcomes not states, refusals with `do_instead`, flows as validated data with reachability, claims as git refs with CAS, craft skills unaware of norn and their text (§16), `.agents/skills/` linked into each agent's skill folder, attended steps, rework through `implement` with findings in the briefing, frozen slugs, banned-synonym glossary. Not repeated — LLM orchestrator (`norn-drive`/`norn-deliver`), labels/comments as store, liveness by claim age, prose output, a single fix-round cap set globally in config, slow `next` (11–18 s).
 - **limen:** separate facts (turn end ≠ idle ≠ finished), explicit finish with handoff, idle snapshot of last message, receipts before send, hard limits in code, admission control, one commit-point file written last (atomic + fsync), liveness by PID + start time. Not repeated — LLM coordinator as loop driver, machine-local gitignored state.
 - **cezar:** native agent event streams normalised per adapter with fixture tests, named bounded continuation counters, handoff file (Goal/Progress/Resume), YAML workflow graph with `check` and loop counters, workflow definition copied per run, restart is never an answer. Not repeated — fragile text markers as the primary signal, long-lived stateful server, debounced saves, in-memory counters, restarting the walk when a step disappears, starting empty on a corrupt index, gitignored handoff.

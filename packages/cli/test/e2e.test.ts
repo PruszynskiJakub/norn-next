@@ -4,7 +4,7 @@
  * Real git (temp repo + bare remote); fake RemotePort, RunnerPort and notifier.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { TickTrace } from "@norn/schema";
 import { readTrace } from "@norn/store";
@@ -20,7 +20,7 @@ start: plan
 steps:
   plan:
     type: agent
-    skill: plan
+    skill: norn-plan
     outcomes: { done: { to: slices, means: "slice files written" } }
   slices:
     type: slices
@@ -36,7 +36,7 @@ start: implement
 steps:
   implement:
     type: agent
-    skill: implement
+    skill: norn-implement
     outcomes: { done: { to: test, means: "tests pass" } }
   test:
     type: check
@@ -80,17 +80,23 @@ describe("norn init", () => {
   test("writes config, workflows, skills, hooks and .gitignore; idempotent", async () => {
     const r = await h.norn("init");
     expect(r.exit).toBe(0);
-    const v = r.value as { config: string; workflows: { created: string[] }; skills: Array<{ written: string[] }>; hooks: Array<{ changed: string[] }>; gitignore: string[] };
+    const v = r.value as { config: string; workflows: { created: string[] }; skills: { updated: string[]; unchanged: string[]; links: Array<{ agent: string; linked: string[] }> }; hooks: Array<{ changed: string[] }>; gitignore: string[] };
     expect(v.config).toBe("created");
     expect(v.workflows.created).toEqual(["bug.yaml", "slice.yaml", "story.yaml"]);
-    expect(v.skills[0]?.written).toContain("norn");
+    expect(v.skills.updated).toContain("norn");
+    expect(v.skills.updated).toContain("norn-implement");
+    expect(v.skills.links[0]).toMatchObject({ agent: "claude", linked: v.skills.updated });
     expect(v.hooks[0]?.changed).toEqual([join(h.root, ".claude", "settings.json")]);
     expect(v.gitignore).toEqual([".agents/norn/trace/", ".env.norn", ".norn-unit"]);
-    expect(existsSync(join(h.root, ".claude/skills/implement/SKILL.md"))).toBe(true);
+    // SK1: one copy in .agents/skills (whole folders), linked from the agent's skill folder
+    expect(existsSync(join(h.root, ".agents/skills/norn-review/SMELLS.md"))).toBe(true);
+    expect(lstatSync(join(h.root, ".claude/skills/norn-implement")).isSymbolicLink()).toBe(true);
+    expect(existsSync(join(h.root, ".claude/skills/norn-implement/SKILL.md"))).toBe(true);
     const again = (await h.norn("init")).value as typeof v;
     expect(again.config).toBe("exists");
     expect(again.gitignore).toEqual([]);
     expect(again.hooks[0]?.changed).toEqual([]);
+    expect(again.skills.updated).toEqual([]);
   });
 
   test("unknown commands and bad options are usage errors with do_instead", async () => {

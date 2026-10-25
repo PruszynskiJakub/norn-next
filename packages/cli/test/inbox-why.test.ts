@@ -17,11 +17,11 @@ start: work
 steps:
   work:
     type: agent
-    skill: implement
+    skill: norn-implement
     outcomes: { done: { to: qa, means: "built" } }
   qa:
     type: agent
-    skill: qa
+    skill: norn-qa
     outcomes:
       pass: { to: open-pr, means: "verified" }
       partial: { to: human-qa, means: "a person must check some criteria; evidence prepared" }

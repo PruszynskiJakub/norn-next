@@ -21,7 +21,7 @@ start: implement
 steps:
   implement:
     type: agent
-    skill: implement
+    skill: norn-implement
     nudges: 1
     retries: 1
     outcomes: { done: $done }
@@ -152,8 +152,9 @@ describe("runtime", () => {
   test("uninstall removes norn-owned hooks and skills, keeps config", async () => {
     const r = await h.norn("uninstall");
     expect(r.exit).toBe(0);
-    expect((r.value as { skills_removed: string[] }).skills_removed.length).toBe(10);
-    expect(existsSync(join(h.root, ".claude/skills/norn/SKILL.md"))).toBe(false);
+    expect((r.value as { skills_removed: string[] }).skills_removed).toContain(join(h.root, ".agents/skills/norn-implement"));
+    expect(existsSync(join(h.root, ".claude/skills/norn"))).toBe(false);
+    expect(existsSync(join(h.root, ".agents/skills"))).toBe(false);
     expect(h.read(join(h.root, ".claude/settings.json"))).not.toContain("norn-owned");
     expect(existsSync(join(h.root, ".agents/norn/config.yaml"))).toBe(true);
   });

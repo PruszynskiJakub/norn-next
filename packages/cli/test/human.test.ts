@@ -18,7 +18,7 @@ start: work
 steps:
   work:
     type: agent
-    skill: implement
+    skill: norn-implement
     outcomes: { done: { to: review, means: "the change is ready to look at" } }
   review:
     type: gate
@@ -32,7 +32,7 @@ start: draft
 steps:
   draft:
     type: agent
-    skill: implement
+    skill: norn-implement
     outcomes: { done: { to: $done, means: "drafted" } }
 `;
 
@@ -41,7 +41,7 @@ start: plan
 steps:
   plan:
     type: agent
-    skill: plan
+    skill: norn-plan
     outcomes: { done: { to: slices, means: "slice files written" } }
   slices:
     type: slices

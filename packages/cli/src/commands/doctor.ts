@@ -11,6 +11,8 @@
  *   - runner: configured runner available (Herdr server reachable), and `command -v norn` in a
  *     throwaway runner session resolves to this norn (R8.2)
  *   - machine: the `user@host` runs are recorded with (R7.1); a warning when NORN_MACHINE overrides it (R7.3)
+ *   - skills (SK1): every bundled skill is in `.agents/skills/` and linked from each configured
+ *     agent's skill folder; one that differs from the bundled version is a warning (`norn init`)
  * `--live` also runs one cheap headless test turn per agent in a throwaway repo with norn hooks
  * installed, and checks that the agent's own hooks reported to norn.
  * Exit 0 when every check passes, else 1 with the same report.
@@ -21,12 +23,14 @@ import { join } from "node:path";
 import { git as gitAdapter, proc } from "@norn/adapters";
 import type { AgentAdapter, RunnerPort, SessionRef } from "@norn/core";
 import { ExitCode, ulid } from "@norn/schema";
-import { writeUnitMarker } from "@norn/store";
+import { skillsReport, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { withExit } from "../output.ts";
+import { assetsDir } from "../runtime/assets.ts";
 import { machineHolder, readHookFacts } from "../runtime/observe.ts";
 import { ensureShim, withNornOnPath } from "../runtime/shim.ts";
+import { bundledSkills } from "../runtime/workflows.ts";
 import { hookBinary, hookCommand } from "./init.ts";
 
 interface RunOut {
@@ -156,7 +160,7 @@ const RUNNER_PATH_WAIT_MS = 15_000;
 
 export const doctorCommand = defineCommand({
   name: "doctor",
-  summary: "Check agents, hooks, remote auth and runner on this machine (A7); --live runs one test turn per agent",
+  summary: "Check agents, hooks, skills, remote auth and runner on this machine (A7); --live runs one test turn per agent",
   usage: "norn doctor [--live]",
   options: { live: { type: "boolean" } },
   async run(ctx, args) {
@@ -228,6 +232,11 @@ export const doctorCommand = defineCommand({
       };
     }
 
+    const names = bundledSkills(ctx.env);
+    const sk = skillsReport(ctx.root, join(assetsDir(ctx.env), "skills"), names, Object.fromEntries(Object.entries(ports.agents).map(([n, a]) => [n, a.skillDir(ctx.root)])));
+    const skillsOk = sk.missing.length === 0 && Object.keys(sk.unlinked).length === 0;
+    const skills = { ok: skillsOk, ...sk, ...(skillsOk ? {} : { do_instead: "norn init" }) };
+
     // R7.3: NORN_MACHINE overrides the machine name — a test aid (single-host dogfood), never a
     // setup for real teams: two checkouts claiming one machine name defeat R7.2's liveness rules
     const machine = { holder: machineHolder(ctx.env), override: ctx.env.NORN_MACHINE ?? null };
@@ -235,8 +244,10 @@ export const doctorCommand = defineCommand({
     if (machine.override !== null)
       warnings.push(`NORN_MACHINE=${machine.override} overrides this machine's name (a test aid): runs are judged by pid only on the machine they were started on (R7.2), so two hosts must never share a name — unset it outside tests`);
 
-    const ok = gitCheck.ok && agents.every((a) => a.ok) && remote.ok === true && runner.ok === true;
-    const report = { ok, live, hook_command: command, machine, git: gitCheck, agents, remote, runner, warnings };
+    if (sk.drifted.length) warnings.push(`skills differ from this norn's bundled version: ${sk.drifted.join(", ")} — run norn init to update them (git diff .agents/skills/ shows the change)`);
+
+    const ok = gitCheck.ok && agents.every((a) => a.ok) && remote.ok === true && runner.ok === true && skillsOk;
+    const report = { ok, live, hook_command: command, machine, git: gitCheck, agents, remote, runner, skills, warnings };
     return ok ? report : withExit(report, ExitCode.error);
   },
 });
