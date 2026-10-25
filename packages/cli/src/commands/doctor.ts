@@ -20,7 +20,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { git as gitAdapter, proc } from "@norn/adapters";
+import { git as gitAdapter, herdr, proc } from "@norn/adapters";
 import type { AgentAdapter, RunnerPort, SessionRef } from "@norn/core";
 import { ExitCode, ulid } from "@norn/schema";
 import { skillsReport, writeUnitMarker } from "@norn/store";
@@ -158,6 +158,19 @@ async function nornThroughRunner(ctx: Context, runner: RunnerPort): Promise<{ ok
 
 const RUNNER_PATH_WAIT_MS = 15_000;
 
+/** HC11: where `herdr plugin install` finds norn's plugin (a checkout links `plugins/herdr` instead). */
+const COCKPIT_PLUGIN_SOURCE = "PruszynskiJakub/norn-next/plugins/herdr";
+
+/** HC11: whether norn's Herdr plugin is linked; a hint when it is not (never an error). */
+async function cockpitPlugin(ctx: Context): Promise<Record<string, unknown>> {
+  const o = ctx.config.runner?.options ?? {};
+  const cockpit = herdr.createHerdrCockpit({ env: ctx.env, ...(typeof o.bin === "string" ? { bin: o.bin } : {}), ...(typeof o.session === "string" ? { session: o.session } : {}) });
+  const linked = await cockpit.pluginLinked().catch(() => undefined);
+  if (linked === undefined) return { linked: null, note: "could not list Herdr plugins" };
+  if (!linked) return { linked: false, do_instead: `herdr plugin install ${COCKPIT_PLUGIN_SOURCE} (optional: the norn cockpit, HC9)` };
+  return { linked: true, enabled: linked.enabled, root: linked.root };
+}
+
 interface Check {
   ok: boolean;
   error?: string;
@@ -215,6 +228,9 @@ export function formatDoctor(r: {
   line(runner.ok === true, "runner", runner.configured === false ? `none — ${runner.note}` : `${runner.name}${runner.available ? " available" : " not available"}${onPath ? (onPath.ok ? " · sessions run this norn" : "") : ""}`);
   fix(runner);
   if (onPath && !onPath.ok) sub(`! ${onPath.error}`);
+  // HC11: informational, never a failed check
+  const plugin = runner.cockpit_plugin as { linked: boolean | null; do_instead?: string } | undefined;
+  if (plugin) sub(plugin.linked ? "· cockpit plugin linked" : `· cockpit plugin not linked${plugin.do_instead ? ` → ${plugin.do_instead}` : ""}`);
   const sk = r.skills;
   const unlinked = Object.entries(sk.unlinked);
   line(sk.ok, "skills", sk.ok ? "installed and linked" : [sk.missing.length ? `missing ${sk.missing.join(", ")}` : "", ...unlinked.map(([agent, names]) => `not linked for ${agent}: ${names.join(", ")}`)].filter(Boolean).join("; "));
@@ -299,6 +315,8 @@ export const doctorCommand = defineCommand({
         ...(onPath ? { norn_on_path: onPath } : {}),
         ...(available ? {} : { error: ports.runner.name === "herdr" ? "herdr server not reachable (start herdr)" : `${ports.runner.name} runner not available` }),
       };
+      // HC11: informational — the cockpit plugin is optional, so it never fails doctor
+      if (available && ports.runner.name === "herdr") runner.cockpit_plugin = await cockpitPlugin(ctx);
     }
 
     const names = bundledSkills(ctx.env);

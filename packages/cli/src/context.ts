@@ -7,6 +7,7 @@
  */
 import { existsSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
+import type { herdr } from "@norn/adapters";
 import type { AdapterContext, AdapterRegistry, Clock, GitPort, Ports } from "@norn/core";
 import { DEFAULT_CONFIG, type ResolvedConfig } from "@norn/schema";
 import { type LoadedConfig, loadConfig, nornHome, readUnitMarker, type UnitMarker } from "@norn/store";
@@ -29,6 +30,10 @@ export interface CliDeps {
   signal?: AbortSignal;
   /** stdin text for commands that read it (`norn hook`); else the process stdin */
   stdin?: string;
+  /** HC4: command lines for `norn pane --interactive`; else the process stdin, line by line */
+  input?: AsyncIterable<string>;
+  /** HC6/HC12: Herdr for the cockpit; null = none; absent = the real one when `HERDR_ENV=1` */
+  herdr?: herdr.HerdrCockpit | null;
 }
 
 export const systemClock: Clock = {

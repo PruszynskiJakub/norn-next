@@ -1,6 +1,6 @@
 /**
  * Notifiers (NotifierPort, O3): `os` (default; macOS osascript, Linux notify-send), `ntfy`
- * (JSON publish to a server/topic) and `webhook` (POST JSON). A notifier only sends: fire-once
+ * (JSON publish to a server/topic), `webhook` (POST JSON) and `herdr` (a toast in Herdr, HC14). A notifier only sends: fire-once
  * per inbox item is the caller's duty (receipt-first). `notify` resolves when delivered and
  * throws PortError `notify_failed` (retryable for network/5xx/429) or `config_invalid`.
  */
@@ -193,5 +193,52 @@ export const webhookFactory = (_ctx: AdapterContext, config: NotifierConfig): No
 
 export const osFactory = (_ctx: AdapterContext, _config: NotifierConfig): NotifierPort => createOsNotifier();
 
+// ------------------------------------------------------------------ herdr (HC14)
+
+/** Groups whose toast plays Herdr's `request` sound; the rest are silent. */
+const HERDR_REQUEST: ReadonlySet<InboxGroup> = new Set(["your_turn", "answer", "approve"]);
+
+export interface HerdrNotifierOptions {
+  bin?: string;
+  session?: string;
+  exec?: Exec;
+  env?: Record<string, string | undefined>;
+}
+
+/** argv for one Herdr toast. */
+export function herdrNotifyArgv(item: InboxItem, o: Pick<HerdrNotifierOptions, "bin" | "session"> = {}): string[] {
+  const { title, subtitle, body } = render(item);
+  return [
+    o.bin ?? "herdr",
+    ...(o.session ? ["--session", o.session] : []),
+    "notification", "show", `${title} · ${subtitle}`,
+    "--body", body,
+    "--sound", HERDR_REQUEST.has(item.group) ? "request" : "none",
+  ];
+}
+
+/** HC14: an inbox item as a Herdr toast; outside Herdr it is `unsupported` and the other notifiers still run. */
+export function createHerdrNotifier(o: HerdrNotifierOptions = {}): NotifierPort {
+  const exec = o.exec ?? bunExec;
+  const env = o.env ?? process.env;
+  return {
+    name: "herdr",
+    async notify(item) {
+      if (env.HERDR_ENV !== "1" && !o.session) throw portError("unsupported", "herdr notifier: not running inside Herdr (HERDR_ENV) and no session option");
+      const argv = herdrNotifyArgv(item, o);
+      const r = await exec(argv, { timeoutMs: 10_000 });
+      if (r.code === 127) throw portError("unsupported", `herdr not runnable: ${r.stderr.trim()}`);
+      if (r.code !== 0) throw portError("notify_failed", `herdr notification show exited ${r.code}: ${r.stderr.trim()}`, false);
+    },
+  };
+}
+
+export const herdrFactory = (ctx: AdapterContext, config: NotifierConfig): NotifierPort => {
+  const options = config.options ?? {};
+  const bin = str(options, "bin", "herdr");
+  const session = str(options, "session", "herdr");
+  return createHerdrNotifier({ env: ctx.env, ...(bin ? { bin } : {}), ...(session ? { session } : {}) });
+};
+
 /** Built-in notifier factories keyed by adapter id (NotifierConfig.adapter). */
-export const notifiers = { os: osFactory, ntfy: ntfyFactory, webhook: webhookFactory };
+export const notifiers = { os: osFactory, ntfy: ntfyFactory, webhook: webhookFactory, herdr: herdrFactory };

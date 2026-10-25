@@ -269,7 +269,8 @@
         "deadline",
         "nudges",
         "retries",
-        "stalled"
+        "stalled",
+        "attended_wait"
       ],
       "properties": {
         "deadline": {
@@ -286,6 +287,11 @@
           "type": "integer"
         },
         "stalled": {
+          "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+          "description": "Duration like 30s, 10m, 1h30m",
+          "type": "string"
+        },
+        "attended_wait": {
           "pattern": "^([0-9]+(ms|s|m|h|d))+$",
           "description": "Duration like 30s, 10m, 1h30m",
           "type": "string"
