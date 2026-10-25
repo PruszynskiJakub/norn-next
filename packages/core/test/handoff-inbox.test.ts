@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { HEARTBEAT_BEGIN, collapseHeartbeat, renderHandoff, renderHandoffStatus, STATUS_BEGIN, STATUS_END } from "../src/handoff.ts";
 import type { Decision } from "../src/actions.ts";
 import { buildInbox, inboxChanges } from "../src/inbox.ts";
+import { startAgentCommand } from "../src/commands.ts";
 import type { StoryFacts } from "../src/facts.ts";
 import type { RemotePullRequest } from "../src/ports.ts";
 import { at, CONFIG, facts, numbered, receipt, SLICE_WF, sliceUnit, STORY_WF, stateFor, storyFacts, storyUnit, T0, unitFacts } from "./fixtures.ts";
@@ -67,7 +68,7 @@ describe("inbox (O1)", () => {
     const inbox = buildInbox(facts([storyFacts("gh-1", units), released], {}, now), CONFIG);
     const view = Object.fromEntries(Object.entries(inbox.groups).map(([g, items]) => [g, items.map((i) => `${i.slice ?? i.story} | ${i.title} | ${i.age} | ${i.command}`)]));
     expect(view).toEqual({
-      your_turn: [`gh-1 | refine: attended step — work with the agent | 1h | cd /r-worktrees/gh-1-login && claude 'Use the norn skill, then run \`norn brief\`.'`],
+      your_turn: [`gh-1 | refine: attended step — work with the agent | 1h | cd /r-worktrees/gh-1-login && claude --permission-mode auto -- 'Use the norn skill, then run \`norn brief\`.'`],
       answer: ['gh-1/01 | Which DB? | 1h | norn answer gh-1/01 "…"'],
       approve: ["gh-1/02 | approve or reject human-qa | 1h | norn approve gh-1/02"],
       unblock: ["gh-1/03 | review_loop 3/3 at review.changes_requested | 1h | norn unstick gh-1/03"],
@@ -86,6 +87,17 @@ describe("inbox (O1)", () => {
     f.machine.runner = null;
     const item = buildInbox(f, CONFIG).groups.your_turn[0];
     expect(item).toMatchObject({ title: "implement is ready (manual): start an agent in the worktree", detail: "auto requested, no runner; running manual (MO2)" });
+  });
+});
+
+describe("start command for a person (MO2, B3)", () => {
+  test("carries the agent's configured args, ended by --", () => {
+    expect(startAgentCommand("/w", "claude", ["--allowedTools", "Bash(git:*)", "Read"])).toBe(
+      "cd /w && claude --allowedTools 'Bash(git:*)' Read -- 'Use the norn skill, then run `norn brief`.'",
+    );
+  });
+  test("no args, no --", () => {
+    expect(startAgentCommand(null, "codex")).toBe("codex 'Use the norn skill, then run `norn brief`.'");
   });
 });
 

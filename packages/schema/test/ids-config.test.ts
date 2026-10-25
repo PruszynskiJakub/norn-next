@@ -87,6 +87,10 @@ describe("config", () => {
     expect(validate("resolved-config", DEFAULT_CONFIG).ok).toBe(true);
     expect(resolveConfig()).toEqual(DEFAULT_CONFIG);
   });
+  test("claude runs in auto permission mode unless a layer replaces its entry", () => {
+    expect(resolveConfig().agents.claude?.args).toEqual(["--permission-mode", "auto"]);
+    expect(resolveConfig({ agents: { claude: { adapter: "claude" } } }).agents.claude?.args).toBeUndefined();
+  });
   test("layer schema", () => {
     expect(
       validate("config", {
