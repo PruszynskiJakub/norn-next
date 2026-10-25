@@ -141,3 +141,12 @@ describe("test layout (AGENTS.md)", () => {
     expect(missing).toEqual([]);
   });
 });
+
+describe("release metadata", () => {
+  test("the README release badge names the cli version, and CHANGELOG.md has its section", () => {
+    const { version } = JSON.parse(readFileSync(join(PKGS, "cli", "package.json"), "utf8")) as { version: string };
+    const badges = [...readFileSync(join(ROOT, "README.md"), "utf8").matchAll(/badge\/release-v([0-9][^-]*)-/g)].map((m) => m[1]);
+    expect(badges).toEqual([version]);
+    expect(readFileSync(join(ROOT, "CHANGELOG.md"), "utf8")).toContain(`## [${version}]`);
+  });
+});
