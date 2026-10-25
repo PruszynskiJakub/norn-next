@@ -1,22 +1,22 @@
 /**
- * `norn trace <unit> [--text] [--full] [--events] [--all] [--story-only] [--limit N]` (O4): the
+ * `norn trace <unit> [--json] [--full] [--events] [--all] [--story-only] [--limit N]` (O4): the
  * unit's step timeline from @norn/view (X1) — one row per (step, attempt) with entry, exit,
  * duration, outcome, who and the reason; a story shows its slices interleaved plus totals
  * (wall-clock intake → $done → merge, time per step type, human wait). No-op ticks are hidden
- * unless `--all`; `--events` attaches the remaining events to each row. JSON unless `--text`;
+ * unless `--all`; `--events` attaches the remaining events to each row. Text for a person, `--json` for data;
  * `--full` keeps reasons whole in text (JSON is never cut). Paths are absolute.
  */
 import { formatStepTimeline, loadTraceView } from "@norn/view";
 import { defineCommand, opt } from "../command.ts";
-import { refuse, textOutput, usageError } from "../output.ts";
+import { refuse, rendered, usageError } from "../output.ts";
 import { parseUnitKey } from "../runtime/human.ts";
 
 export const traceCommand = defineCommand({
   name: "trace",
   summary: "Step timeline of a unit: durations, outcomes, who, reasons; a story with its slices (O4)",
-  usage: "norn trace <unit> [--text] [--full] [--events] [--all] [--story-only] [--limit N]",
+  usage: "norn trace <unit> [--json] [--full] [--events] [--all] [--story-only] [--limit N]",
+  markdown: true,
   options: {
-    text: { type: "boolean" },
     full: { type: "boolean" },
     events: { type: "boolean" },
     all: { type: "boolean" },
@@ -41,7 +41,6 @@ export const traceCommand = defineCommand({
     });
     if (!view) throw refuse(`unknown unit ${key}`, "norn status", "unknown_unit");
     const out = { ...view, total: view.steps.length, steps: limit === null ? view.steps : view.steps.slice(-limit) };
-    if (opt.bool(args, "text")) return textOutput(formatStepTimeline(out, { full: opt.bool(args, "full") }));
-    return out;
+    return rendered(out, formatStepTimeline(out, { full: opt.bool(args, "full") }));
   },
 });

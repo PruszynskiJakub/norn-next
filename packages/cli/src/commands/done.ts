@@ -15,7 +15,7 @@ import { defineCommand, type ParsedArgs, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, usageError } from "../output.ts";
 import { stepOfSession, type UnitSession, unitCriteria } from "../runtime/agent-unit.ts";
-import { appendProgress, reported, reportHeader, reportTarget, writeReport } from "../runtime/report.ts";
+import { appendProgress, reported, reportedFor, reportHeader, reportTarget, writeReport } from "../runtime/report.ts";
 
 const SEVERITIES = new Set(["blocking", "major", "minor", "nit"]);
 const str = (v: unknown) => (typeof v === "string" && v.trim() ? v : undefined);
@@ -131,6 +131,7 @@ export const doneCommand = defineCommand({
   name: "done",
   summary: "Report that the current step finished with a declared outcome (§9.3); then end your turn",
   usage: 'norn done <outcome> --handoff "…" [--findings <file>] [--evidence <dir>] [--criteria <file>] [--note "…" [--note-criterion <id>]]…',
+  markdown: true,
   options: {
     handoff: { type: "string" },
     findings: { type: "string" },
@@ -210,13 +211,26 @@ export const doneCommand = defineCommand({
         verdicts: verdictCounts(report),
         unverified_needs: unverifiedNeeds(report, declared),
       });
-    return reported(t, "done", written, {
-      outcome,
-      ...(findings ? { findings: findings.length } : {}),
-      ...(evidencePath ? { evidence: receipt.evidence } : {}),
-      ...(report ? { criteria: { worst: verdicts.worst, coverage: verdicts.coverage, ...verdictCounts(report) } } : {}),
-      ...(notes.length ? { notes: notes.length } : {}),
-      ...(baseMerge ? { base_merge: baseMerge } : {}),
-    });
+    const plural = (n: number, what: string) => `${n} ${what}${n === 1 ? "" : "s"}`;
+    const parts = [
+      findings ? plural(findings.length, "finding") : "",
+      evidencePath ? `evidence in \`${receipt.evidence}\`` : "",
+      report ? `criteria: worst ${verdicts.worst}, coverage ${verdicts.coverage}` : "",
+      notes.length ? plural(notes.length, "note") : "",
+    ].filter(Boolean);
+    return reported(
+      t,
+      "done",
+      written,
+      {
+        outcome,
+        ...(findings ? { findings: findings.length } : {}),
+        ...(evidencePath ? { evidence: receipt.evidence } : {}),
+        ...(report ? { criteria: { worst: verdicts.worst, coverage: verdicts.coverage, ...verdictCounts(report) } } : {}),
+        ...(notes.length ? { notes: notes.length } : {}),
+        ...(baseMerge ? { base_merge: baseMerge } : {}),
+      },
+      [`Reported \`done ${outcome}\` (${reportedFor(t)})${parts.length ? `: ${parts.join("; ")}` : ""}.`],
+    );
   },
 });

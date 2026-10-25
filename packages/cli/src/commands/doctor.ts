@@ -1,5 +1,5 @@
 /**
- * `norn doctor [--live]` (A7, M4): is this machine ready to run norn here? JSON report.
+ * `norn doctor [--live] [--json]` (A7, M4): is this machine ready to run norn here? A report for a person; `--json` for data.
  *
  * Static checks (default, no agent turns):
  *   - git present, version ≥ 2.38 (BS2: `merge-tree --write-tree` for base conflict detection)
@@ -26,7 +26,7 @@ import { ExitCode, ulid } from "@norn/schema";
 import { skillsReport, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
-import { withExit } from "../output.ts";
+import { rendered, withExit } from "../output.ts";
 import { assetsDir } from "../runtime/assets.ts";
 import { machineHolder, readHookFacts } from "../runtime/observe.ts";
 import { ensureShim, withNornOnPath } from "../runtime/shim.ts";
@@ -158,10 +158,79 @@ async function nornThroughRunner(ctx: Context, runner: RunnerPort): Promise<{ ok
 
 const RUNNER_PATH_WAIT_MS = 15_000;
 
+interface Check {
+  ok: boolean;
+  error?: string;
+  do_instead?: string;
+}
+
+/** `norn doctor`: one line per check, then what failed and what to do. */
+export function formatDoctor(r: {
+  ok: boolean;
+  machine: { holder: string };
+  git: Check & { version: string | null };
+  agents: Array<{
+    name: string;
+    tier: string;
+    ok: boolean;
+    binary: { command: string; path: string | null; version: string | null };
+    hooks_installed: boolean | null;
+    hook_fires: (Check & { command: string }) | null;
+    test_turn?: (Check & { hook_events?: string[] }) | null;
+    notes: string[];
+  }>;
+  remote: Record<string, unknown>;
+  runner: Record<string, unknown>;
+  skills: Check & { dir: string; missing: string[]; drifted: string[]; unlinked: Record<string, string[]> };
+  warnings: string[];
+}): string {
+  const out: string[] = [];
+  const failed: string[] = [];
+  const line = (ok: boolean, label: string, text: string) => {
+    out.push(`  ${ok ? "ok  " : "FAIL"} ${label.padEnd(14)} ${text}`);
+    if (!ok) failed.push(label);
+  };
+  const sub = (text: string) => out.push(`       ${"".padEnd(14)} ${text}`);
+  const fix = (c: { error?: unknown; do_instead?: unknown }) => {
+    if (c.error) sub(`! ${String(c.error)}`);
+    if (c.do_instead) sub(`→ ${String(c.do_instead)}`);
+  };
+
+  line(r.git.ok, "git", r.git.version ?? "not found");
+  fix(r.git);
+  for (const a of r.agents) {
+    const bin = a.binary.path ? `${a.binary.path}${a.binary.version ? ` (${a.binary.version})` : ""}` : `${a.binary.command} not on PATH`;
+    const hooks = a.tier === "none" ? "no hooks" : a.hooks_installed === false ? "hooks missing" : a.hook_fires?.ok ? "hooks fire" : "hooks installed, not firing";
+    const turn = a.test_turn ? (a.test_turn.ok ? " · test turn ok" : " · test turn failed") : "";
+    line(a.ok, `agent ${a.name}`, `${bin} · ${hooks}${turn}`);
+    if (a.hook_fires && !a.hook_fires.ok) sub(`! hook: ${a.hook_fires.error}`);
+    if (a.test_turn && !a.test_turn.ok) sub(`! test turn: ${a.test_turn.error}`);
+    for (const n of a.notes) sub(`· ${n}`);
+  }
+  const remote = r.remote;
+  line(remote.ok === true, "remote", remote.configured === false ? `${remote.provider ?? "none"} (not configured)` : `${remote.provider}${remote.user ? ` as ${remote.user}` : ""}`);
+  fix(remote);
+  const runner = r.runner;
+  const onPath = runner.norn_on_path as (Check & { resolved: string | null }) | undefined;
+  line(runner.ok === true, "runner", runner.configured === false ? `none — ${runner.note}` : `${runner.name}${runner.available ? " available" : " not available"}${onPath ? (onPath.ok ? " · sessions run this norn" : "") : ""}`);
+  fix(runner);
+  if (onPath && !onPath.ok) sub(`! ${onPath.error}`);
+  const sk = r.skills;
+  const unlinked = Object.entries(sk.unlinked);
+  line(sk.ok, "skills", sk.ok ? "installed and linked" : [sk.missing.length ? `missing ${sk.missing.join(", ")}` : "", ...unlinked.map(([agent, names]) => `not linked for ${agent}: ${names.join(", ")}`)].filter(Boolean).join("; "));
+  if (!sk.ok) fix(sk);
+  out.push(`       ${"machine".padEnd(14)} ${r.machine.holder}`);
+
+  const head = r.ok ? "norn doctor: every check passes" : `norn doctor: ${failed.length} check${failed.length === 1 ? "" : "s"} failed (${failed.join(", ")})`;
+  const warnings = r.warnings.length ? ["", "Warnings", ...r.warnings.map((w) => `  ! ${w}`)] : [];
+  return [head, "", ...out, ...warnings].join("\n");
+}
+
 export const doctorCommand = defineCommand({
   name: "doctor",
   summary: "Check agents, hooks, skills, remote auth and runner on this machine (A7); --live runs one test turn per agent",
-  usage: "norn doctor [--live]",
+  usage: "norn doctor [--live] [--json]",
+  markdown: true,
   options: { live: { type: "boolean" } },
   async run(ctx, args) {
     const live = opt.bool(args, "live");
@@ -248,6 +317,7 @@ export const doctorCommand = defineCommand({
 
     const ok = gitCheck.ok && agents.every((a) => a.ok) && remote.ok === true && runner.ok === true && skillsOk;
     const report = { ok, live, hook_command: command, machine, git: gitCheck, agents, remote, runner, skills, warnings };
-    return ok ? report : withExit(report, ExitCode.error);
+    const out = rendered(report, formatDoctor(report));
+    return ok ? out : withExit(out, ExitCode.error);
   },
 });

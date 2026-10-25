@@ -202,7 +202,7 @@ describe("merge PR item and inbox history (F25, Q3)", () => {
     ]);
     for (const g of gates) expect(Date.parse(g.resolved_at as string)).toBeGreaterThanOrEqual(Date.parse(g.appeared_at as string));
     expect(hist.open).toBeGreaterThanOrEqual(1);
-    const text = (await h.norn("inbox", "--history", "--text")).stdout;
+    const text = (await h.norn("inbox", "--history")).stdout;
     expect(text).toContain("approve   human-qa: evidence attached (reject by tester@box");
     const later = (await h.norn("inbox", "--history", "--since", new Date(h.clock.now() + 60_000).toISOString())).value as History;
     expect(later.items).toEqual([]);

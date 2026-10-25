@@ -6,6 +6,8 @@
  * options and wrong positional counts are usage errors (exit 2). `run` gets the Context
  * (repo located first unless `repo: false`) and returns one JSON value, `withExit(value, code)`,
  * or throws a `CliFailure` (`refuse`, `usageError`, `corruptError`, `busyError`, `failure`).
+ * A command whose reader is an agent or a person sets `markdown: true` and returns
+ * `rendered(value, markdown)`; `--json` (accepted by every command) prints the value instead.
  */
 import type { ParseArgsConfig } from "node:util";
 import type { Context } from "./context.ts";
@@ -29,6 +31,8 @@ export interface Command {
   options?: OptionSpec;
   /** positional argument count bounds (default: none allowed) */
   positionals?: { min?: number; max?: number };
+  /** prints markdown unless `--json` (refusals too): its reader is an agent or a person, not a program */
+  markdown?: boolean;
   /** needs a git repository (default true): `ctx.locate()` runs before `run` */
   repo?: boolean;
   run(ctx: Context, args: ParsedArgs): Promise<unknown>;
