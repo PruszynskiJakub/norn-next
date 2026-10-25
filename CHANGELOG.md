@@ -4,6 +4,8 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-25
+
 ### Added
 
 - An attended agent that waits for you shows under Your turn (HC1–HC3). Once the agent of an attended step (refine, clarify, plan) has ended its turn, or waits on a question or permission prompt, for `limits.attended_wait` (default `2m`), the inbox moves it from Running to Your turn as `<step>: the agent is waiting for you`, and the notifiers fire once per wait. Its command reaches the waiting session; it never starts a second agent. Inbox items of a unit with a run carry `reach` (worktree, agent session id, pane id).
