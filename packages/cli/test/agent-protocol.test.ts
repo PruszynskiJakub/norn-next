@@ -120,6 +120,12 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     const r = await inWt(wt(), "done", "done", "--handoff", "x");
     expect(r.exit).toBe(3);
     expect(r.value).toMatchObject({ code: "no_run", do_instead: expect.stringContaining("norn brief") });
+    // the agent reads the refusal as markdown; the exit code and `--json` carry it for code
+    expect(r.stdout).toStartWith("**Refused (no_run):** ");
+    expect(r.stdout).toContain("\nDo instead: ");
+    const json = await inWt(wt(), "done", "done", "--handoff", "x", "--json");
+    expect(json.exit).toBe(3);
+    expect(JSON.parse(json.stdout)).toMatchObject({ code: "no_run", do_instead: expect.stringContaining("norn brief") });
   });
 
   test("hook in a ready step without a run never blocks; the fact lands in the trace (A2)", async () => {
@@ -199,6 +205,8 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     const r = await inWt(wt(), "done", "done", "--handoff", "form renders; tests added");
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ ok: true, unit: "gh-9", kind: "done", outcome: "done", run_id: runId, next: "end your turn" });
+    expect(r.stdout).toStartWith("Reported `done done` (gh-9, step implement #1).\nReceipt: `");
+    expect(r.stdout).toEndWith("**End your turn now.** Do not report again; norn routes the work from here.\n");
     const file = receipts(runs()).at(-1) as string;
     expect(readReceipt(runs(), file)).toMatchObject({ kind: "done", outcome: "done", handoff: "form renders; tests added", run_id: runId, by: "agent", who: "claude" });
     expect(h.read(join(runs(), "handoff.md"))).toMatch(/## Progress\n\n- implement#1 done: form renders; tests added\n\n## Resume/);
@@ -250,6 +258,8 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
   test("ask records the question and options; the parked unit refuses brief with norn answer", async () => {
     const r = await inWt(wt(), "ask", "Which expiry?", "--option", "24h", "--option", "7d");
     expect(r.value).toMatchObject({ ok: true, kind: "ask", question: "Which expiry?", options: ["24h", "7d"], answer_with: 'norn answer gh-9 "…"', next: "end your turn" });
+    expect(r.stdout).toContain("Options: 24h · 7d\nThey answer with `norn answer gh-9 \"…\"`");
+    expect(r.stdout).toContain("**End your turn now.**");
     expect((await inWt(wt(), "stuck", "nope")).value).toMatchObject({ code: "already_reported" });
     h.clock.advance(10_000);
     await h.tick();
@@ -382,7 +392,7 @@ describe("norn hook robustness (A3)", () => {
     expect(inbox.groups.answer).toContainEqual(
       expect.objectContaining({ story: "gh-9", title: "Claude needs your permission to use Bash", detail: "pending command: Bash(rm -rf build)", command: 'norn answer gh-9 "…"' }),
     );
-    const text = (await h.norn("inbox", "--text")).stdout;
+    const text = (await h.norn("inbox")).stdout;
     expect(text).toContain("pending command: Bash(rm -rf build)");
   });
 });

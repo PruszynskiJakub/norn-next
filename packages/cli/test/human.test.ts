@@ -133,7 +133,7 @@ describe("views (X1)", () => {
     expect(all.stories.map((s) => s.key)).toEqual(["gh-5", "gh-6"]);
     const one = await h.norn("status", "gh-5");
     expect(one.value).toMatchObject({ key: "gh-5", step: "work", status: "running", workflow: "gated", claim: { state: "mine" } });
-    const text = await h.norn("status", "--text", "gh-5");
+    const text = await h.norn("status", "gh-5");
     expect(text.stdout).toContain("gh-5 Pay invoices");
     expect(text.stdout).not.toContain("gh-6");
     refused(await h.norn("status", "gh-5/01"), "unknown_unit");
@@ -185,7 +185,7 @@ describe("answer (O2, B2)", () => {
     expect(st).toMatchObject({ status: "parked", park: { kind: "ask", reason: "Which currency?" } });
     const inbox = (await h.norn("inbox")).value as { groups: Record<string, Array<{ command: string }>> };
     expect(inbox.groups.answer?.[0]?.command).toBe('norn answer gh-5 "…"');
-    const text = await h.norn("inbox", "--text");
+    const text = await h.norn("inbox");
     expect(text.stdout).toContain("Answer (1)");
     expect(text.stdout).toContain('$ norn answer gh-5 "…"');
 
@@ -342,7 +342,7 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
     expect(last.steps).toHaveLength(2);
     expect(last.total).toBe(r.total);
     expect(last.steps).toEqual(r.steps.slice(-2));
-    const text = (await h.norn("trace", "gh-5", "--text")).stdout;
+    const text = (await h.norn("trace", "gh-5")).stdout;
     expect(text).toContain("STEP");
     expect(text).toContain("human wait");
     expect((await h.norn("trace", "gh-5", "--limit", "0")).exit).toBe(2);

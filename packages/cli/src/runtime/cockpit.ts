@@ -106,7 +106,7 @@ export function planCockpit(cmd: CockpitCommand, items: readonly InboxEntry[]): 
       if (item.group === "your_turn" && !item.reach && item.command.startsWith("norn open ")) return { kind: "verb", argv: ["open", unit] };
       return { kind: "go", item };
     case "view":
-      return { kind: "verb", argv: ["trace", unit, "--text"] };
+      return { kind: "verb", argv: ["trace", unit] };
     case "answer":
       return item.group === "answer" ? { kind: "verb", argv: ["answer", unit, cmd.text] } : wrong("a question (Answer)");
     case "approve":

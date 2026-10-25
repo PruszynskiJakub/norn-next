@@ -122,9 +122,9 @@ describe("R6.1: the agent's report while parked on an implicit ask (acceptance 9
     expect(inbox.groups.answer[0]).not.toHaveProperty("full");
     const details = (await h.norn("inbox", "--details")).value as Inbox;
     expect(details.groups.answer[0]?.full).toBe(SCREEN);
-    const text = (await h.norn("inbox", "--text")).value as string;
+    const text = (await h.norn("inbox")).stdout as string;
     expect(text).not.toContain("│ EOF");
-    expect((await h.norn("inbox", "--text", "--details")).value).toContain("      | ╌╌╌");
+    expect((await h.norn("inbox", "--details")).stdout).toContain("      | ╌╌╌");
   });
 
   test("`norn done` is accepted: an answer by the agent closes the ask, then the report applies", async () => {

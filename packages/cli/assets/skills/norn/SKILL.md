@@ -53,7 +53,7 @@ Pick exactly one:
 
 When a person works with you in the pane, report `done` only once they agree.
 
-Every other command prints JSON. If one refuses (`{"error", "do_instead"}`), do exactly what `do_instead` says, then report again. Never work around a refusal.
+Each report replies in markdown and tells you to end your turn. If a command refuses (`**Refused (…):** …` with "Do instead: …", and a non-zero exit code), do exactly what "Do instead" says, then report again. Never work around a refusal. Add `--json` to any command when you need its data.
 
 After a report succeeds, **end your turn**. Do not keep working and do not report twice. If you are resumed with an answer, continue the same step and report again at its end.
 
