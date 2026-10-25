@@ -20,6 +20,11 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 - A gate item in `norn inbox` names the report that led there by step and receipt number (`step qa#1 reported partial (receipt 0009)`) instead of printing its absolute path on the item line. The receipt and evidence paths moved to the item's full text (`norn inbox --details`), and the text output prints paths under your home as `~/…`.
 - With a runner that can open terminals, Your turn items for starting an agent show `norn open <unit>` as the command and the `cd … && <agent> …` line in the detail (`by hand: …`). Without one they show the `cd …` line as before.
 - `norn brief` outside a unit worktree tells the agent to stop and has the person start it from the unit's inbox item; the `norn` skill says the same.
+- The cockpit (`norn pane --interactive`) draws its own frame: a header with the repo, what needs you and the heartbeat; one aligned row per item cut to the pane width, with its command dimmed beneath; colour per group on a terminal (`NO_COLOR` turns it off). `d <n>` shows an item's full text, and `?` lists every command.
+
+### Fixed
+
+- The Herdr plugin's `norn.open` action opens the cockpit: it passed `--cwd`, so the pane started outside the plugin folder and closed at once, and `--workspace` with `--target-pane`, which Herdr refuses.
 
 ### Upgrading
 
