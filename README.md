@@ -12,7 +12,7 @@ norn is a CLI that delivers software stories with coding agents (Claude Code, Co
 - **Pull, don't trust.** Each tick observes the runner, git and the files again. Notifications are never treated as truth, and a restarted heartbeat behaves the same.
 - **Bounded everything.** Every retry, nudge and loop has a counter with a max. Going past it is a visible `stuck`.
 - **Receipts before effects.** Every externally visible action writes an immutable receipt first, so a repeated tick never repeats the action. Every action can be traced (`norn trace`) and explained (`norn why`).
-- **JSON + exit codes.** Every command prints one JSON value on stdout. Refusals print `{error, do_instead}` and exit with code 3.
+- **JSON + exit codes.** Every command prints one JSON value on stdout (`norn brief` prints markdown for the agent; `--json` for data). Refusals print `{error, do_instead}` and exit with code 3.
 
 The full spec is in [`.agents/PRD.md`](.agents/PRD.md).
 

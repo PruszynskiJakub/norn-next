@@ -65,7 +65,7 @@ const inWt = (...argv: string[]): Promise<CliResult> => runCli(argv, { ...h.deps
 type Brief = { markdown: string; run_id: string };
 /** an agent run of the cursor step: brief (starts the run), then report; the tick applies it */
 async function run(outcome: string, handoff: string, evidence = false): Promise<Brief> {
-  const b = (await inWt("brief")).value as Brief;
+  const b = (await inWt("brief", "--json")).value as Brief;
   await tick();
   const extra: string[] = [];
   if (evidence) {
@@ -117,14 +117,14 @@ describe("gate item and rulings (F21, F28)", () => {
     await tick();
     expect(h.state(runs())).toMatchObject({ step: "work", attempt: 2 });
     // the brief it sent back quotes it under Rework, not twice
-    const back = (await inWt("brief")).value as Brief;
+    const back = (await inWt("brief", "--json")).value as Brief;
     expect(back.markdown).toContain("## Rework");
     expect(back.markdown).not.toContain("## Rulings");
     await tick();
     expect((await inWt("done", "done", "--handoff", "raw count")).exit).toBe(0);
     await tick();
     // a later step's brief carries the ruling
-    const qa = (await inWt("brief")).value as Brief;
+    const qa = (await inWt("brief", "--json")).value as Brief;
     expect(qa.markdown).toContain("## Rulings");
     expect(qa.markdown).toContain("- gh-7 human-qa#1 reject by tester@box");
     expect(qa.markdown).toContain(`at head \`${judged}\`:`);

@@ -7,8 +7,8 @@ import { existsSync, realpathSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { NumberedReceipt, UnitRef } from "@norn/core";
 import { storyWorktreePath } from "@norn/core";
-import type { Mode, Receipt, ResolvedConfig, Step, UnitState, Workflow } from "@norn/schema";
-import { loadUnit, readState, type UnitMarker, unitDir } from "@norn/store";
+import type { Criterion, Mode, Receipt, ResolvedConfig, Step, UnitState, Workflow } from "@norn/schema";
+import { loadUnit, readSliceFile, readState, readStoryFile, type UnitMarker, unitDir } from "@norn/store";
 import { type Context, findUnitMarker } from "../context.ts";
 import { corruptError, refuse } from "../output.ts";
 
@@ -165,4 +165,13 @@ export function storyMode(ctx: Context, s: UnitSession, config: ResolvedConfig):
 export function agentName(s: UnitSession, config: ResolvedConfig): string {
   const step = stepOfSession(s);
   return s.state.run?.agent ?? (step?.type === "agent" ? step.agent : undefined) ?? config.default_agent;
+}
+
+/** QV1/QV4: the unit's frontmatter `criteria` — its slice file, or story.md for the story unit; null = none declared. */
+export function unitCriteria(s: UnitSession): Criterion[] | null {
+  const file = s.unit.slice ? join(s.specPath, "slices", `${s.unit.dir}.md`) : join(s.specPath, "story.md");
+  const r = s.unit.slice ? readSliceFile(file, s.worktree) : readStoryFile(file, s.worktree);
+  if (r.ok) return r.value.frontmatter.criteria ?? null;
+  if (r.reason === "missing") return null;
+  throw corruptError(`${file} failed validation (S2): its criteria cannot be checked`, `stop and tell the person: norn why ${s.unit.key}`, r.error ? [r.error] : []);
 }
