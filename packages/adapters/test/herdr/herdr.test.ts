@@ -3,7 +3,7 @@ import type { ProcessPort, SessionRef } from "@norn/core";
 import type { ProcessIdentity } from "@norn/schema";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { createHerdrRunner, herdrFactory, openStatusPane, parsePanePrompt } from "../../src/herdr/index.ts";
+import { createHerdrRunner, herdrFactory, openAgentTab, openStatusPane, parsePanePrompt } from "../../src/herdr/index.ts";
 import type { Exec, ExecResult } from "../../src/process/exec.ts";
 import fx from "./fixtures/herdr.json";
 
@@ -263,6 +263,27 @@ describe("herdr openStatusPane (O1)", () => {
   test("a split without a pane id is a launch failure", async () => {
     const { exec } = fakeExec([["pane split", ok({ result: {} })]]);
     expect(await openStatusPane("/repo", { exec, env: {} }).catch((e) => e)).toMatchObject({ code: "launch_failed" });
+  });
+});
+
+describe("herdr openAgentTab (MO3, norn open)", () => {
+  test("a focused tab in the workspace on the worktree, running the start command", async () => {
+    const { exec, calls } = fakeExec([["workspace list", ok(fx.workspace_list)], ["tab create", ok(fx.tab_create)], ["pane run", empty]]);
+    const r = await openAgentTab(WT, "gh-1/01 implement", "claude 'go'", { exec, env: { HERDR_WORKSPACE_ID: "w3" } });
+    expect(r).toEqual({ pane_id: "w1:p2" });
+    expect(calls.slice(1)).toEqual([
+      ["herdr", "tab", "create", "--workspace", "wA", "--cwd", WT, "--label", "gh-1/01 implement"],
+      ["herdr", "pane", "run", "w1:p2", "claude 'go'"],
+    ]);
+  });
+
+  test("no workspace on the worktree: the caller's workspace inside herdr, else a new workspace", async () => {
+    const inside = fakeExec([["workspace list", ok(fx.workspace_list_empty)], ["tab create", ok(fx.tab_create)], ["pane run", empty]]);
+    await openAgentTab("/other", "t", "c", { exec: inside.exec, env: { HERDR_WORKSPACE_ID: "w3" } });
+    expect(inside.calls[1]).toEqual(["herdr", "tab", "create", "--workspace", "w3", "--cwd", "/other", "--label", "t"]);
+    const outside = fakeExec([["workspace list", ok(fx.workspace_list_empty)], ["workspace create", ok(fx.workspace_create)], ["pane run", empty]]);
+    expect(await openAgentTab("/other", "t", "c", { exec: outside.exec, env: {} })).toEqual({ pane_id: "w1:p1" });
+    expect(outside.calls[1]).toEqual(["herdr", "workspace", "create", "--cwd", "/other", "--label", "t"]);
   });
 });
 

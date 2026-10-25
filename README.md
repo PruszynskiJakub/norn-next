@@ -86,10 +86,10 @@ Every inbox item shows the exact command that resolves it, for example `norn ans
 
 **Manual and auto mode.** Each story has a mode. The repo default is `default_mode` in the config, and `norn mode <story> auto|manual` switches it.
 
-- **manual** (the default): the tick marks unattended agent steps as ready. You open any agent in the unit's worktree and tell it: *"Use the norn skill, then run `norn brief`"* (or type `/norn` with the Claude Code plugin).
+- **manual** (the default): the tick marks unattended agent steps as ready. Run `norn open <unit>` (the inbox shows it): inside Herdr it opens a tab in the unit's worktree with the agent started on the brief; elsewhere it prints the command to run. By hand: open any agent in the unit's worktree and tell it *"Use the norn skill, then run `norn brief`"* (or type `/norn` with the Claude Code plugin).
 - **auto**: the tick starts agents itself through the configured `runner` (`herdr` or `headless`). If a machine has no runner configured, its stories run in manual mode.
 
-In both modes, `check` and `git` steps run on their own. Attended steps (`attended: true`) and `gate` steps always wait for a person.
+In both modes, `check` and `git` steps run on their own. Attended steps (`attended: true`, e.g. refine and plan) and `gate` steps always wait for a person, even in auto mode: start an attended step with `norn open <unit>`.
 
 ## Commands
 
@@ -99,7 +99,7 @@ In both modes, `check` and `git` steps run on their own. Attended steps (`attend
 | Remote | `sync` |
 | Heartbeat | `tick`, `watch` |
 | Agent protocol | `brief`, `done`, `ask`, `stuck`, `hook` |
-| Human | `inbox`, `answer`, `approve [--reject]`, `unstick [--to <step>] [--reset <counter>]`, `mode`, `workflow` |
+| Human | `inbox`, `open`, `answer`, `approve [--reject]`, `unstick [--to <step>] [--reset <counter>]`, `mode`, `workflow` |
 | Team | `take`, `release`, `drop` |
 | Views | `status`, `trace <unit>`, `why <unit>` |
 | Housekeeping | `tidy` |
