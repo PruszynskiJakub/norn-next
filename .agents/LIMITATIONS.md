@@ -1,39 +1,96 @@
 # norn — known limitations
 
-Where norn breaks or is not proven yet, as of v1 and the Todoist dogfood run (audit on branch `audit/todoist-dogfood`, `docs/audit-todoist-dogfood/`). Finding ids (F8, F10, …) refer to that audit. Read this next to [`PRD.md`](PRD.md) before relying on norn for anything beyond the proven envelope below.
+Where norn breaks or is not proven yet, as of v1.1: v1, plus auto-mode recovery (`SPEC-auto-mode-recovery.md`, PR #6) and base sync with honest QA (`SPEC-base-sync-and-qa.md`, PR #7). The evidence comes from the dogfood runs on the Todoist sandbox:
+
+- `docs/audit-todoist-dogfood/` — v1, finding ids F*.
+- `docs/audit-auto-mode/` — auto mode, ids H*/M*, with a rerun using ids B*.
+- `docs/audit-base-sync-qa/` — base sync and QA, ids C*, D* and the run-3 F1–F3.
+
+Read this next to [`PRD.md`](PRD.md) before relying on norn for anything beyond the proven envelope below.
 
 ## Proven envelope
 
-Trustworthy today: **one person, Claude agents, manual mode, GitHub, good checks configured.** Everything else below is either a known gap or unproven.
+Trustworthy today:
+- One person, Claude agents, GitHub, and a good check configuration.
+- Manual or auto mode.
+- herdr or headless runners on **one machine**.
+- Several stories in parallel on one base.
 
-## Gaps hit in real use
+Two-machine operation was only simulated on one Mac (`NORN_MACHINE`). Everything else below is either a known gap or unproven.
 
-1. **Stale story branches (F8).** No step or verb brings a story branch up to date with its base after sibling stories merge. In the dogfood run a person merged `main` by hand four times, and conflict resolution after `done` happened outside norn — invisible to the trace and receipts. Several parallel stories on one base means manual work.
-2. **`handoff.md` contradiction (F10).** The skill says keep it current; the rules forbid editing `runs/`. Every agent hit it. Fix: move handoff out of `runs/` or exempt its body.
-3. **Attended steps without a person (F14, F29).** "Report once the person agrees" cannot be expressed when nobody is in the pane, and the brief's "Mode: manual" is confused with attended. Unattended, such a step stalls or the agent guesses.
-4. **One action per unit per tick (F13).** Claim renewal consumes the unit's single action for that tick — 14 receipt applications were delayed by a tick. Long work moves slower than the tick interval suggests.
-5. **No honest "can't verify" outcome (F30, F37).** QA cannot say "I couldn't check this here" (e.g. a browser check without a browser) or "pass, with a note for a person". It is forced into pass or fail, so it may pass what nobody verified.
-6. **No backfill.** Foreign commits and inbox history exist only from the first tick that observes them. Adopting norn mid-project, or a heartbeat that was down, leaves gaps in the record.
-7. **Brief gaps (F3, F16).** Attempt 1 inputs say "see Rework"; per-worktree setup (`bun install`) and check config keys are missing from the brief.
+## Fixed since v1
+
+The rules each fix maps to are in its spec.
+
+- **Stale story branches (F8).** The `update` step merges the base into the story branch, never by rebasing.
+  - Conflicts are predicted and routed to a `resolve` agent step.
+  - Gates send a story back with `stale`, and `norn update <story>` re-enters the update step.
+  - `status` and `inbox` show how far behind each story is and which files conflict.
+  - In the dogfood, every story reached `ready` up to date with no manual merge.
+- **Conflict markers.** norn does not commit while a merge is open, and refuses a push whose head has markers in the outgoing files (BS5.2). A resolve agent's `norn done` is refused until its merge is concluded.
+- **A person's push to a story branch** is merged in by `update` or by a rejected push, and is never lost (BS3.3a).
+- **Honest QA (F30, F37).** QA reports a verdict per criterion: pass, fail, person or unverified.
+  - `unverified` goes to `human-qa` with how to check it.
+  - `--note` leaves a Check item for a person.
+  - `pass` is refused for a criterion that needs a capability the agent lacks, such as `browser`, and a person's earlier ruling never counts as verification.
+- **One action per unit per tick (F13).** Claim renewal is a side action and no longer delays a receipt or a cleanup (R1).
+- **Crash and hang recovery.** This is now proven live on herdr and headless:
+  - An agent killed mid-step or mid-merge is classified `died` and retried within seconds.
+  - A hung headless agent is nudged through `--resume`.
+  - A launch crash is adopted or classified (R4, R5).
+- **Prompts the agent is blocked on.** Permission prompts show up as implicit asks, including mid-merge. `norn answer` types the right keystroke, and the agent's own report is accepted afterwards (R6).
+- **Agents run the right norn.** A PATH shim and a launcher script do this (R8). Failed actions are reported `ok:false` and never as success (R4.3).
+
+## Gaps still open
+
+1. **Cross-machine handoff edges.**
+   - After a `take`, a foreign run parked on a prompt is never judged (B8).
+   - An approve followed by a merge within one tick leaves main's record at the gate (B7).
+   - A merged story stays offered for `take` on a checkout that once worked on it, and `norn tidy` does not remove leaked intake worktrees or slot leases (B10).
+2. **Hook paths are committed as absolute paths** (rerun D2). A `.claude/settings.json` written on one machine points at that machine's norn, so a second machine would get no hook facts. Without hook facts, `silent`, stalled, adoption and implicit asks are all lost.
+3. **Implicit asks flicker** (B9, F1). When an agent sends several tool calls at once, its Answer item can vanish for one tick and return with a new id. A notifier fires twice, and a `norn answer` sent in the gap is refused.
+   - After an accepted answer, `status` and `inbox` show the old question until the next tick, which takes 20–40 s (F2).
+   - If a runner kept reporting `waiting_input` from before the last answer, a second prompt would not be raised.
+4. **Agents' housekeeping.**
+   - An agent's `git add -A` can sweep norn's pending `runs/` files into its own merge commit (D2).
+   - QA agents commit evidence files at the repo root (F3).
+5. **Marker check covers the pushed head only.** A marker commit that a later commit fixed is still published, because norn never rewrites history.
+6. **Commits made outside norn are blurred in two cases.**
+   - A person's commit made while an agent run is active is not flagged as made outside norn (C4).
+   - A person's commit merged in by `update` no longer shows up as made outside norn; only the head-changed item reports it.
+7. **Nothing stops a person or tool typing into an agent's pane.** Answers typed there bypass norn's record, and in run-3 7 of 30 prompts on one checkout were answered in the pane.
+8. **Unchanged from v1:**
+   - `handoff.md` guidance (F10).
+   - Attended steps with nobody in the pane (F14, F29).
+   - No backfill of history from before norn first observed a repo.
+   - Brief gaps (F3, F16): per-worktree setup and check config keys.
+9. **Cost per story** is not tracked; it is postponed.
 
 ## Built but never run for real
 
-Tested only against recorded fixtures or not at all:
-
-- **Auto mode** — every dogfood story ran in manual mode.
-- **Herdr and headless runners, hook facts** — agents ran as subagents, so zero hook events fired, and all runs shared one pid, so `died` detection was never tested. **Treat crash and hang recovery as unproven.**
-- **Team handoff across machines** — claims and mailboxes are git refs with CAS, sound on paper, but no two people ever raced on them.
-- **codex, opencode, gemini, glab adapters** — fixture-tested only. Only claude, git and gh ran live.
+- **Two real machines.** Claims and mailboxes are git refs with compare-and-swap, which is sound on paper. They were exercised only as simulated machines on one Mac.
+- **These recovery paths:**
+  - a resolve that ends `stuck`;
+  - exhausting `base_conflict_loop`;
+  - an agent that dies with no retries left;
+  - killing a herdr pane mid-merge.
+- **An agent with the `browser` capability.** Nobody ever checked a browser criterion live; every such approval says so.
+- **The auto permission mode default** (`--permission-mode auto` for `agents.claude`). Every live run used configs that replace it.
+- **codex, opencode, gemini and glab adapters.** They are tested only against recorded fixtures. Only claude, git, gh, herdr and headless ran live.
 
 ## Limits of the design
 
-- **Agents report their own work.** A receipt records what the agent claimed. Gates and checks are only as strong as the commands you configure; a weak check config lets anything through.
+- **Agents report their own work.** A receipt records what the agent claimed. Gates and checks are only as strong as the commands you configure, and a weak check config lets anything through. Capability gating stops a QA agent from claiming what it cannot check, not from lying.
 - **Decide never reads prose (P8).** Anything that lives only in a spec body, `handoff.md` or a review comment does not influence the next step unless an agent turns it into a typed outcome.
 - **Corrupt means stopped (S2).** A state file that fails validation marks the unit `corrupt`, by design. Hand edits to `.agents/` files or merge conflicts in them block the unit until a person repairs it.
-- **No host-less mode.** Story keys must be `gh-N`/`gl-N` and intake reads issues from GitHub or GitLab (GR1, GR2). A repo with only local files and branches cannot run norn today.
+- **No host-less mode.** Story keys must be `gh-N`/`gl-N`, and intake reads issues from GitHub or GitLab (GR1, GR2). A repo with only local files and branches cannot run norn today. Business tracking in Jira stays outside norn by choice.
 - **GitHub/GitLab-style flows only.** norn assumes PRs, branches and git refs. Trunk-based work without PRs, many teams sharing one `.agents/`, and non-git VCS are out of scope.
-- **Coarse grain.** norn works per story and slice on a heartbeat. Wrong tool for quick interactive edits; the overhead is not worth it for tiny changes.
-- **Local environment must stay healthy.** Needs Bun, git worktrees (disk plus per-worktree setup) and an authenticated `gh`. Rate limits or a GitHub outage stop observation — a 502 once left a merged PR showing OPEN.
-- **Workflows are pinned per unit.** Editing a workflow does not affect units already in flight. Intended, but surprising.
-- **`heartbeat_id` per checkout, not per process** (deliberate divergence from ID2, see `AGENTS.md`). Two `watch` processes on one checkout would each think they own the same claim.
-- **Observability covers only what goes through norn.** `norn why` and `norn trace` replay norn's own decisions exactly; anything a person or agent does outside norn shows up only as later-observed facts (e.g. `foreign_commits`), without the reason.
+- **Merge, never rebase.** Story branches gain merge commits from the base. Teams that require linear history must squash on merge.
+- **Coarse grain.** norn works per story and slice on a heartbeat. It is the wrong tool for quick interactive edits, and the overhead is not worth it for tiny changes.
+- **Local environment must stay healthy.**
+  - It needs Bun, git ≥ 2.38 (for `merge-tree --write-tree`), git worktrees (disk plus per-worktree setup), an authenticated `gh`, and herdr for attended panes.
+  - Rate limits or a GitHub outage stop observation.
+  - A sleeping laptop pauses every watch, and claims expire. They are reacquired cleanly, but nothing moves in the meantime.
+- **Workflows are pinned per unit.** Editing a workflow does not affect units already in flight. This is intended, but surprising.
+- **`heartbeat_id` per checkout, not per process** (a deliberate divergence from ID2, see `AGENTS.md`). Two `watch` processes on one checkout would each think they own the same claim.
+- **Observability covers only what goes through norn.** `norn why` and `norn trace` replay norn's own decisions exactly. Anything a person or agent does outside norn, such as pane keystrokes or hand merges, shows up only as later-observed facts, without the reason.
