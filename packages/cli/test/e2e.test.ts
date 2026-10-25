@@ -101,11 +101,36 @@ describe("norn init", () => {
     expect(again.skills.updated).toEqual([]);
   });
 
+  test("prints a summary for a person; --json prints the data", async () => {
+    const r = await h.norn("init");
+    expect(r.exit).toBe(0);
+    expect(r.stdout).toStartWith(`norn init in ${h.root}\n`);
+    expect(r.stdout).toContain("config          .agents/norn/config.yaml kept (exists)");
+    expect(r.stdout).toContain("workflows       kept bug.yaml, slice.yaml, story.yaml");
+    expect(r.stdout).toMatch(/skills +\.agents\/skills: up to date \(\d+ skills\)/);
+    expect(r.stdout).toContain("claude → .claude/skills: all linked");
+    expect(r.stdout).toContain("hooks           claude: up to date");
+    expect(r.stdout).toContain("Nothing changed: norn is set up here.");
+    const json = await h.norn("init", "--json");
+    expect(JSON.parse(json.stdout)).toEqual(json.value);
+    expect(json.value).toMatchObject({ config: "exists", gitignore: [] });
+    // --text, the old opt-in, is still accepted
+    expect((await h.norn("init", "--text")).stdout).toBe(r.stdout);
+  });
+
   test("unknown commands and bad options are usage errors with do_instead", async () => {
     const r = await h.norn("frobnicate");
     expect(r.exit).toBe(2);
     expect(r.value).toMatchObject({ code: "unknown_command", do_instead: expect.stringContaining("norn help") });
     expect((await h.norn("tick", "--bogus")).exit).toBe(2);
+  });
+
+  test("every command accepts --json", async () => {
+    const a = await h.norn("status", "--json");
+    expect(JSON.parse(a.stdout)).toEqual(a.value);
+    const b = await h.norn("uninstall", "--json", "--dry-run");
+    expect(b.exit).not.toBe(0);
+    expect(JSON.parse(b.stdout)).toMatchObject({ code: "usage" });
   });
 
   test("--version prints the cli package version", async () => {

@@ -6,7 +6,7 @@ import { relative } from "node:path";
 import { type Receipt, type ReceiptOf, ulid } from "@norn/schema";
 import { appendReceipt, readHandoff, writeHandoffBody } from "@norn/store";
 import type { Context } from "../context.ts";
-import { refuse } from "../output.ts";
+import { refuse, rendered } from "../output.ts";
 import { agentName, currentRun, implicitAskOpen, loadUnitSession, refuseUnlessAgentWork, reportCommand, standingReport, type UnitSession } from "./agent-unit.ts";
 
 export interface ReportTarget {
@@ -98,8 +98,9 @@ export function appendProgress(runsDir: string, line: string): void {
 }
 
 /** What every successful report answers (§9.3): the receipt, then "end your turn". */
-export function reported(t: ReportTarget, kind: string, written: { n: number; file: string }, extra: Record<string, unknown> = {}) {
-  return {
+/** The reply to a report: the receipt as data, and markdown that tells the agent to end its turn. */
+export function reported(t: ReportTarget, kind: string, written: { n: number; file: string }, extra: Record<string, unknown>, summary: string[]) {
+  const value = {
     ok: true,
     unit: t.s.unit.key,
     step: t.s.state.step,
@@ -110,4 +111,9 @@ export function reported(t: ReportTarget, kind: string, written: { n: number; fi
     receipt: written.file,
     next: "end your turn",
   };
+  const markdown = [...summary, `Receipt: \`${written.file}\``, "", "**End your turn now.** Do not report again; norn routes the work from here."];
+  return rendered(value, markdown.join("\n"));
 }
+
+/** `unit gh-9/01, step implement #1` — which run a report belongs to. */
+export const reportedFor = (t: ReportTarget) => `${t.s.unit.key}, step ${t.s.state.step} #${t.s.state.attempt}`;

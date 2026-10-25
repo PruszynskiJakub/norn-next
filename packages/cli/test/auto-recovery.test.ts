@@ -96,7 +96,7 @@ describe("R4: nudges that can be delivered (acceptance 5)", () => {
     expect(h.notifier.items.filter((i) => i.id === `failed:gh-9:${r.tick_id}`)).toHaveLength(1);
     const status = (await h.norn("status", "gh-9")).value as ProjectView["stories"][number];
     expect(status.act_failure).toMatchObject({ effect: "nudge", tick_id: r.tick_id });
-    expect((await h.norn("status", "--text")).value).toContain("  ! nudge to gh-9 not delivered: agent p-1 is blocked by a dialog");
+    expect((await h.norn("status")).stdout).toContain("  ! nudge to gh-9 not delivered: agent p-1 is blocked by a dialog");
 
     // the classify receipt is applied next tick: the nudge is counted, the item stays
     h.clock.advance(10_000);
@@ -125,7 +125,7 @@ describe("R4: nudges that can be delivered (acceptance 5)", () => {
   });
 
   test("R4.4: status shows the run's last classification, not only liveness", async () => {
-    const text = (await h.norn("status", "--text")).value as string;
+    const text = (await h.norn("status")).stdout as string;
     expect(text).toMatch(/gh-9 +implement#1 auto claude .*— silent since /);
   });
 });
@@ -273,7 +273,7 @@ describe("R5.4 / R5.5: tick records and the heartbeat (acceptance 7, 8)", () => 
     const status = (await h.norn("status")).value as ProjectView;
     expect(status.heartbeat).toMatchObject({ holder: "tester@box", down: true, age: "7m" });
     expect(status.stories[0]?.next).toBe("norn watch");
-    expect((await h.norn("status", "--text")).value).toContain("! no heartbeat on tester@box for 7m — run `norn watch`");
+    expect((await h.norn("status")).stdout).toContain("! no heartbeat on tester@box for 7m — run `norn watch`");
     // the next tick is the heartbeat: the item goes away
     await h.tick();
     expect(((await h.norn("inbox")).value as Inbox).groups.unblock).toEqual([]);
