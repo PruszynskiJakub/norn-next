@@ -4,7 +4,7 @@
  */
 import { INBOX_GROUPS, INBOX_TITLES } from "@norn/core";
 import { oneLine } from "./timeline.ts";
-import type { ProjectView, SliceView, StepRow, StepWho, StoryView, TimelineEntry, TraceView, UnitView } from "./types.ts";
+import type { InboxEntry, ProjectView, SliceView, StepRow, StepWho, StoryView, TimelineEntry, TraceView, UnitView } from "./types.ts";
 
 function counterText(u: UnitView): string {
   const used = u.counters.filter((c) => c.value > 0 || (c.max !== null && u.status !== "done"));
@@ -108,15 +108,22 @@ export function formatStatus(view: ProjectView): string {
 }
 
 /** `norn inbox` human mode: groups in O1 order, each item with reason, age and command; `details` adds full texts (L1). */
-export function formatInbox(view: ProjectView, opts: { details?: boolean } = {}): string {
+/** HC4: the inbox items in display order (O1 group order) — item `n` of the cockpit is `[n - 1]`. */
+export function inboxItemsInOrder(view: ProjectView): InboxEntry[] {
+  return INBOX_GROUPS.flatMap((g) => view.inbox.groups[g]);
+}
+
+export function formatInbox(view: ProjectView, opts: { details?: boolean; numbered?: boolean } = {}): string {
   const out: string[] = [];
+  let n = 0;
   for (const g of INBOX_GROUPS) {
     const items = view.inbox.groups[g];
     if (!items.length) continue;
     out.push(`${INBOX_TITLES[g]} (${items.length})`);
     for (const it of items) {
       const unit = it.slice ?? it.story;
-      out.push(`  ${unit.padEnd(10)} ${it.step ? `${it.step}: ` : ""}${it.title} · ${it.age}`);
+      const num = opts.numbered ? `${`[${++n}]`.padEnd(5)}` : "";
+      out.push(`  ${num}${unit.padEnd(10)} ${it.step ? `${it.step}: ` : ""}${it.title} · ${it.age}`);
       if (it.detail) out.push(`      ${it.detail}`);
       if (opts.details && it.full) out.push(...it.full.split("\n").map((l) => `      | ${l}`));
       out.push(`      $ ${it.command}`);

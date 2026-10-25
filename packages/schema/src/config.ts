@@ -63,7 +63,7 @@ export type SlotConfig = Static<typeof SlotConfig>;
 
 export const NotifierConfig = Type.Object(
   {
-    /** `os`, `ntfy`, `webhook`, or a package name */
+    /** `os`, `ntfy`, `webhook`, `herdr` (HC14), or a package name */
     adapter: NonEmpty,
     options: Type.Optional(Options),
   },
@@ -81,6 +81,8 @@ export const LimitDefaults = Type.Object(
     retries: NonNegInt,
     /** no hook, git or file activity for this long → stalled */
     stalled: Duration,
+    /** HC2: an attended agent waiting this long for its person shows under Your turn (`0s` = at once) */
+    attended_wait: Duration,
   },
   { additionalProperties: false },
 );
@@ -158,7 +160,7 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
   notifiers: [{ adapter: "os" }],
   watch_interval: "30s",
   claim: { lease: "10m", renew: "3m" },
-  limits: { deadline: "60m", nudges: 2, retries: 1, stalled: "15m" },
+  limits: { deadline: "60m", nudges: 2, retries: 1, stalled: "15m", attended_wait: "2m" },
 };
 
 const minDefined = (a: number, b: number | undefined) => (b === undefined ? a : Math.min(a, b));
