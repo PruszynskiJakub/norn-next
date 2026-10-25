@@ -179,6 +179,30 @@ export function startCommandFor(uf: UnitFacts, story: StoryFacts, config: Resolv
   return startAgentCommand(worktree, agent?.command ?? agent?.adapter ?? name, agent?.args);
 }
 
+/**
+ * MO5: how a person starts the unit's step agent — `norn open <unit>` when this machine's runner
+ * opens terminals for a person (the hand-typed command then in the detail), else that command itself.
+ */
+export function personStart(uf: UnitFacts, story: StoryFacts, facts: Facts, config: ResolvedConfig): { command: string; detail?: string } {
+  const start = startCommandFor(uf, story, config);
+  if (!facts.machine.runner_capabilities?.open) return { command: start };
+  return { command: `norn open ${uf.unit.key}`, detail: `by hand: ${start}` };
+}
+
+/**
+ * GR2, O1: a story taken in on this checkout that no tick has started yet (intake by `norn sync`
+ * creates the worktree; the tick starts the workflow). Running while the heartbeat is up — the next
+ * tick starts it — else Your turn with the command that ticks.
+ */
+export function notStartedItem(story: StoryFacts, facts: Facts, config: ResolvedConfig): InboxItem | null {
+  if (story.claim.state !== "mine" || isStarted(story) || storyFinished(story) || !story.frontmatter) return null;
+  const hb = facts.heartbeat;
+  const up = !!hb && hb.last_tick_at !== null && facts.now - hb.last_tick_at <= 3 * parseDuration(config.watch_interval);
+  const base = { id: `not-started:${story.key}`, story: story.key, slice: null, step: null, since: story.frontmatter.intake_at, url: story.frontmatter.url };
+  if (up) return { ...base, group: "running", title: "taken in — the next tick starts it", command: `norn status ${story.key}` };
+  return { ...base, group: "your_turn", title: `taken in, not started — ${story.frontmatter.title}`, detail: "a tick starts the story; the inbox then shows how to start its first step", command: "norn watch" };
+}
+
 const short = (sha: string) => sha.slice(0, 7);
 const prCli = (story: StoryFacts) => (story.frontmatter?.provider ?? story.key.slice(0, 2)) === "gl" ? "glab mr" : "gh pr";
 
@@ -190,20 +214,22 @@ function absFile(file: string, story: StoryFacts, uf: UnitFacts): string {
 }
 
 /**
- * F21: what a gate judges — the report that led there (e.g. qa `partial`) and its evidence folder,
- * as absolute paths a person can open.
+ * F21: what a gate judges — the report that led there (e.g. qa `partial`). `detail` names it by
+ * receipt number; `full` (inbox `--details`, JSON) gives the receipt and its evidence folder as
+ * absolute paths a person can open: the receipt lives in the unit's worktree, not the checkout
+ * the inbox is read from.
  */
-function judgedDetail(story: StoryFacts, uf: UnitFacts): string | null {
+function judgedDetail(story: StoryFacts, uf: UnitFacts): { detail: string; full: string } | null {
   const nr = uf.last_outcome_receipt;
   if (!nr) return null;
   const r = nr.receipt;
   const file = absFile(nr.file, story, uf);
-  const parts = [`${r.step}#${r.attempt} reported ${"outcome" in r ? r.outcome : r.kind}: ${file}`];
+  const lines = [`Report: ${file}`];
   if (r.kind === "done" && r.evidence) {
     const runsDir = file.replace(/\/receipts\/[^/]+$/, "");
-    parts.push(`evidence: ${runsDir}/${r.evidence.replace(/\/+$/, "")}/`);
+    lines.push(`Evidence: ${runsDir}/${r.evidence.replace(/\/+$/, "")}/`);
   }
-  return parts.join(" · ");
+  return { detail: `step ${r.step}#${r.attempt} reported ${"outcome" in r ? r.outcome : r.kind} (receipt ${String(nr.n).padStart(4, "0")})`, full: lines.join("\n") };
 }
 
 const oneLine = (t: string) => t.replace(/\s*\n\s*/g, " ").trim();
@@ -426,9 +452,13 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
         const judged = judgedDetail(story, uf);
         const reject = `or reject: norn approve ${key} --reject --reason "…"`;
         const { detail, full } = gateChecks(story, uf);
-        return item("approve", park.reason, `norn approve ${key}`, park.since, { detail: [judged, detail, reject].filter(Boolean).join(" · "), ...(full ? { full } : {}) });
+        const fullText = [judged?.full, full].filter(Boolean).join("\n\n");
+        return item("approve", park.reason, `norn approve ${key}`, park.since, { detail: [judged?.detail, detail, reject].filter(Boolean).join(" · "), ...(fullText ? { full: fullText } : {}) });
       }
-      if (park?.kind === "attended") return item("your_turn", `${st.step}: attended step — work with the agent`, startCommandFor(uf, story, config), park.since);
+      if (park?.kind === "attended") {
+        const start = personStart(uf, story, facts, config);
+        return item("your_turn", `${st.step}: attended step — work with the agent`, start.command, park.since, start.detail ? { detail: start.detail } : {});
+      }
       return item("unblock", park?.reason ?? "parked", `norn unstick ${key}`, park?.since ?? st.updated_at);
     case "stuck":
       return item("unblock", park?.reason ?? "stuck", `norn unstick ${key}`, park?.since ?? st.updated_at, park?.receipt_id ? { id: park.receipt_id } : {});
@@ -455,10 +485,11 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       const step = uf.workflow ? stepOf(uf.workflow, st.step) : null;
       if (step?.type === "agent") {
         const { mode, downgraded } = effectiveMode(story.mode, !!step.attended, facts.machine.runner);
-        if (mode === "manual")
-          return item("your_turn", `${st.step} is ready (manual): start an agent in the worktree`, startCommandFor(uf, story, config), st.step_entered_at, {
-            ...(downgraded ? { detail: "auto requested, no runner; running manual (MO2)" } : {}),
-          });
+        if (mode === "manual") {
+          const start = personStart(uf, story, facts, config);
+          const detail = [downgraded ? "auto requested, no runner; running manual (MO2)" : null, start.detail].filter(Boolean).join(" · ");
+          return item("your_turn", `${st.step} is ready (manual): start an agent in the worktree`, start.command, st.step_entered_at, detail ? { detail } : {});
+        }
       }
       // R5.5 (A8): an auto step waits for the heartbeat, not for a person — no manual start hint
       if (step?.type === "agent" && heartbeatDown(facts, config)) return item("running", `${st.step} #${st.attempt} (waiting for the heartbeat — norn watch)`, "norn watch", st.step_entered_at);
@@ -635,6 +666,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
       add({ id: `corrupt:${story.key}:story.md`, group: "unblock", story: story.key, slice: null, step: null, title: `corrupt: ${story.frontmatter_error.file} failed validation (S2)`, command: `norn why ${story.key}`, since: iso(facts.now) });
       continue;
     }
+    add(notStartedItem(story, facts, config));
     add(bodyChangedItem(story));
     add(headChangedItem(story));
     add(staleItem(story, facts.repo.default_branch));

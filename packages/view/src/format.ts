@@ -107,13 +107,19 @@ export function formatStatus(view: ProjectView): string {
   return `${out.join("\n").trimEnd()}\n`;
 }
 
-/** `norn inbox` human mode: groups in O1 order, each item with reason, age and command; `details` adds full texts (L1). */
 /** HC4: the inbox items in display order (O1 group order) — item `n` of the cockpit is `[n - 1]`. */
 export function inboxItemsInOrder(view: ProjectView): InboxEntry[] {
   return INBOX_GROUPS.flatMap((g) => view.inbox.groups[g]);
 }
 
-export function formatInbox(view: ProjectView, opts: { details?: boolean; numbered?: boolean } = {}): string {
+/**
+ * `norn inbox` human mode: groups in O1 order, each item with reason, age and command; `details` adds
+ * full texts (L1). With `home`, paths under it print as `~/…` (the JSON keeps them absolute).
+ * `numbered` prefixes `[n]` for the cockpit (HC4).
+ */
+export function formatInbox(view: ProjectView, opts: { details?: boolean; home?: string; numbered?: boolean } = {}): string {
+  const home = opts.home?.replace(/\/+$/, "");
+  const tilde = (t: string) => (home ? t.replaceAll(`${home}/`, "~/") : t);
   const out: string[] = [];
   let n = 0;
   for (const g of INBOX_GROUPS) {
@@ -124,8 +130,8 @@ export function formatInbox(view: ProjectView, opts: { details?: boolean; number
       const unit = it.slice ?? it.story;
       const num = opts.numbered ? `${`[${++n}]`.padEnd(5)}` : "";
       out.push(`  ${num}${unit.padEnd(10)} ${it.step ? `${it.step}: ` : ""}${it.title} · ${it.age}`);
-      if (it.detail) out.push(`      ${it.detail}`);
-      if (opts.details && it.full) out.push(...it.full.split("\n").map((l) => `      | ${l}`));
+      if (it.detail) out.push(`      ${tilde(it.detail)}`);
+      if (opts.details && it.full) out.push(...tilde(it.full).split("\n").map((l) => `      | ${l}`));
       out.push(`      $ ${it.command}`);
     }
     out.push("");

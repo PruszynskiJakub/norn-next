@@ -10,6 +10,14 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 - `norn pane --interactive`, the cockpit (HC4–HC8): the inbox numbered, one command per line — go to an item's agent, answer, approve or reject, take, unstick, view the trace, jump to the next agent waiting for you. Every change runs through the CLI verbs. Inside Herdr it focuses agent panes and labels them in the sidebar (HC12). `norn pane --next` focuses the agent waiting for you once and exits, and `norn pane --open` opens the cockpit.
 - A Herdr plugin in `plugins/herdr` (HC9): the cockpit pane and the actions `norn.open` and `norn.next`. `norn doctor` says whether it is linked when Herdr is the runner.
 - Notifier `herdr`: inbox items as Herdr toasts (HC14).
+- `norn open <unit> [--print]` opens an agent on a step a person starts (an attended step such as refine or plan, or a ready step in manual mode). With a runner that can open terminals (the new optional `open` capability and `openForPerson` on `RunnerPort`; Herdr has it) it opens one in the unit's worktree with the agent started on the brief, a focused Herdr tab; otherwise it prints the command to run (MO5).
+- `norn inbox` lists a story taken in on this checkout that no tick has started yet: under Running while the heartbeat is up, else under Your turn with `norn watch`.
+
+### Changed
+
+- A gate item in `norn inbox` names the report that led there by step and receipt number (`step qa#1 reported partial (receipt 0009)`) instead of printing its absolute path on the item line. The receipt and evidence paths moved to the item's full text (`norn inbox --details`), and `--text` prints paths under your home as `~/…`.
+- With a runner that can open terminals, Your turn items for starting an agent show `norn open <unit>` as the command and the `cd … && <agent> …` line in the detail (`by hand: …`). Without one they show the `cd …` line as before.
+- `norn brief` outside a unit worktree tells the agent to stop and has the person start it from the unit's inbox item; the `norn` skill says the same.
 
 ## [0.2.1] - 2026-10-25
 
