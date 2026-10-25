@@ -16,13 +16,13 @@ echo "--version: $got"
 "$norn" --help | grep -q '"command":"init"' || { echo "--help does not list init"; exit 1; }
 
 set +e
-"$norn" status > status.json
+"$norn" status --json > status.json
 code=$?
 set -e
 [ "$code" = 3 ] && grep -q '"code":"not_in_repo"' status.json || { echo "status outside a repo: exit $code, $(cat status.json)"; exit 1; }
 
 mkdir repo && cd repo && git init -q
-"$norn" init > ../init.json
+"$norn" init --json > ../init.json
 for f in config.yaml workflows/story.yaml workflows/slice.yaml workflows/bug.yaml; do
   [ -s ".agents/norn/$f" ] || { echo "norn init did not write .agents/norn/$f"; cat ../init.json; exit 1; }
 done

@@ -1,26 +1,24 @@
 /**
- * `norn status [--text] [<story|unit>]` (§15, MO2): stories, slices, runs and recently done units
- * from @norn/view (X1). With a key: that story (or slice) only. JSON unless `--text`.
+ * `norn status [--json] [<story|unit>]` (§15, MO2): stories, slices, runs and recently done units
+ * from @norn/view (X1). With a key: that story (or slice) only. Text for a person; `--json` for data.
  */
 import { formatStatus, type ProjectView } from "@norn/view";
-import { defineCommand, opt } from "../command.ts";
-import { refuse, textOutput } from "../output.ts";
+import { defineCommand } from "../command.ts";
+import { refuse, rendered } from "../output.ts";
 import { parseUnitKey, projectView } from "../runtime/human.ts";
 
 export const statusCommand = defineCommand({
   name: "status",
   summary: "Stories, slices, runs and claims at a glance",
-  usage: "norn status [--text] [<story|unit>]",
-  options: { text: { type: "boolean" } },
+  usage: "norn status [--json] [<story|unit>]",
+  markdown: true,
   positionals: { max: 1 },
   async run(ctx, args) {
     const view = await projectView(ctx);
-    const text = opt.bool(args, "text");
     const raw = args.positionals[0];
     if (!raw) {
-      if (text) return textOutput(formatStatus(view));
       const { timeline: _timeline, ...rest } = view;
-      return rest;
+      return rendered(rest, formatStatus(view));
     }
     const key = parseUnitKey(raw);
     const story = view.stories.find((s) => s.key === key.story);
@@ -35,7 +33,6 @@ export const statusCommand = defineCommand({
       recently_done: view.recently_done.filter((d) => units.has(d.unit)),
       timeline: {},
     };
-    if (text) return textOutput(formatStatus(filtered));
-    return slice ?? story;
+    return rendered(slice ?? story, formatStatus(filtered));
   },
 });

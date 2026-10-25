@@ -25,7 +25,7 @@ norn is a CLI that delivers software stories with coding agents (Claude Code, Co
 - **Pull, don't trust.** Each tick observes the runner, git and the files again. Notifications are never treated as truth, and a restarted heartbeat behaves the same.
 - **Bounded everything.** Every retry, nudge and loop has a counter with a max. Going past it is a visible `stuck`.
 - **Receipts before effects.** Every externally visible action writes an immutable receipt first, so a repeated tick never repeats the action. Every action can be traced (`norn trace`) and explained (`norn why`).
-- **JSON + exit codes.** Every command prints one JSON value on stdout (`norn brief` prints markdown for the agent; `--json` for data). Refusals print `{error, do_instead}` and exit with code 3.
+- **Markdown to read, JSON for code, exit codes for both.** Commands an agent or a person reads print markdown: `brief`, `done`, `ask`, `stuck`, `init`, `doctor`, `status`, `inbox`, `trace`. Every command prints one JSON value with `--json`, and the rest always do. Refusals exit with code 3 and print `{error, do_instead}` (as markdown without `--json`).
 
 The full spec is in [`.agents/PRD.md`](.agents/PRD.md).
 
@@ -74,6 +74,7 @@ You don't need the plugin to use norn with Claude Code: `norn init` puts the ski
 cd your-repo
 norn init          # .agents/norn/config.yaml, workflows/{story,slice,bug}.yaml, .agents/skills (linked per agent), hooks, .gitignore, .gitattributes
 # edit .agents/norn/config.yaml: remote.provider (gh | glab), remote.label (default: norn)
+norn doctor        # agents, hooks, remote auth, runner and skills on this machine
 norn sync          # issues assigned to you with the label become stories
 norn tick          # one heartbeat: observe, decide, act
 norn watch         # keep ticking (Ctrl-C finishes the current tick and releases claims)
