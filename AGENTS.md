@@ -11,6 +11,8 @@ bun run typecheck   # tsc --noEmit over every package
 bun run schema:emit # regenerate packages/schema/json/*.schema.json after changing a schema
 ```
 
+To release: bump `version` in `packages/cli/package.json`, move `## [Unreleased]` entries in `CHANGELOG.md` under `## [X.Y.Z] - <date>`, merge, then `git tag vX.Y.Z && git push origin vX.Y.Z`.
+
 All three must pass before you hand work back. A test fails if the emitted JSON schemas are stale.
 
 ## Layout and dependency direction
@@ -31,6 +33,7 @@ Dependencies point one way only: `schema ← core ← store ← adapters ← cli
 ## Decisions (deliberate divergences from the PRD)
 
 - **One adapters package (§17).** See "Simplification vs PRD §17" above: one `@norn/adapters` package with a subfolder per adapter instead of separate `@norn/adapter-*` packages.
+- **Published as `@pruszynskijakub/norn` on GitHub Packages (X3, §17).** The workspace package stays `@norn/cli`; GitHub's npm registry only takes a package under its owner's scope, so the release build renames it (`bun scripts/build.ts --name … --registry …`). A tag `vX.Y.Z` runs `.github/workflows/release.yml`: it checks the tag against `packages/cli/package.json` and a `## [X.Y.Z]` section in `CHANGELOG.md`, tests, publishes the package and attaches the binaries to a GitHub release with that section as notes.
 - **`heartbeat_id` is per checkout, not per `watch` process (ID2).** ID2 says one `heartbeat_id` per `watch` process. We keep one per checkout in `.agents/norn/trace/heartbeat.json` (created on first use, `packages/cli/src/runtime/local.ts`), shared by `watch` and every `tick`. Reason: ticks run from cron (or by hand) are separate processes; with a per-process id each one would see the claim it renewed a minute ago as someone else's heartbeat. One id per checkout lets every tick recognise its own claim.
 
 - **Claude sessions run in `auto` permission mode by default (PRD §20).** The PRD defers permission management and surfaces every permission prompt as an implicit ask. The built-in config instead gives `agents.claude` `args: ["--permission-mode", "auto"]` (`DEFAULT_CONFIG`, `packages/schema/src/config.ts`), so unattended sessions in herdr or headless park far less often. A config layer that defines `agents.claude` replaces the entry, args included — set `args` there to keep or change the mode. The start command shown to a person (`startCommandFor`) carries the same args.
