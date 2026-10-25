@@ -52,7 +52,7 @@ MO4 gains one sentence: *an attended run waiting for its person is shown as Your
   | `x <n> <reason>` | `norn approve <unit> --reject --reason <reason>` |
   | `t <n>` | `norn take <story>` |
   | `u <n>` | `norn unstick <unit>` |
-  | `v <n>` | `norn trace <unit> --text` into the frame |
+  | `v <n>` | `norn trace <unit>` (its markdown) into the frame |
   | `n` | go to the oldest Your turn item with a run (an agent waits there), else the oldest Your turn item |
   | `r` / empty | redraw now |
   | `?` | list the commands |

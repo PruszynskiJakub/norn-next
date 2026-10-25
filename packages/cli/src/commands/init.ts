@@ -3,12 +3,14 @@
  * absent, the bundled skills into `.agents/skills/` (whole folders, always the bundled version)
  * linked from each configured agent's skill folder, agent hooks (norn-owned, updated in place),
  * machine-local paths in .gitignore, and `runs/` marked generated in .gitattributes. Idempotent: re-running updates norn-owned files only.
+ * Prints a summary for a person; `--json` for data.
  */
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { atomicWrite, installSkills, linkSkills, readText, repoConfigPath, workflowsDir } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
+import { rendered } from "../output.ts";
 import { assetsDir } from "../runtime/assets.ts";
 import { bundledSkills } from "../runtime/workflows.ts";
 
@@ -56,10 +58,45 @@ export function hookBinary(command: string, env: Record<string, string | undefin
   return m ? env.NORN_BIN || (m[1] as string) : first;
 }
 
+export interface InitReport {
+  root: string;
+  config: "exists" | "created";
+  workflows: { created: string[]; kept: string[] };
+  skills: { dir: string; updated: string[]; unchanged: string[]; links: Array<{ agent: string; dir: string; linked: string[]; unchanged: string[]; kept: string[] }> };
+  hooks: Array<{ agent: string; tier: string; changed: string[] }>;
+  hook_command: string;
+  gitignore: string[];
+  gitattributes: string[];
+}
+
+/** `norn init`: what changed, one line per part; names are listed only for what changed. */
+export function formatInit(r: InitReport): string {
+  const rel = (p: string) => relative(r.root, p) || ".";
+  const count = (n: number, what: string) => `${n} ${what}`;
+  const out = [`norn init in ${r.root}`, ""];
+  const row = (label: string, text: string) => out.push(`  ${label.padEnd(15)} ${text}`);
+  row("config", `.agents/norn/config.yaml ${r.config === "created" ? "created" : "kept (exists)"}`);
+  row("workflows", [r.workflows.created.length ? `created ${r.workflows.created.join(", ")}` : "", r.workflows.kept.length ? `kept ${r.workflows.kept.join(", ")}` : ""].filter(Boolean).join("; ") || "none");
+  const sk = r.skills;
+  row("skills", `${rel(sk.dir)}: ${sk.updated.length ? `updated ${sk.updated.join(", ")}` : "up to date"} (${count(sk.updated.length + sk.unchanged.length, "skills")})`);
+  for (const l of sk.links) {
+    const parts = [l.linked.length ? `linked ${l.linked.join(", ")}` : "", l.kept.length ? `not linked, a folder of yours is in the way: ${l.kept.join(", ")}` : ""].filter(Boolean);
+    row("", `${l.agent} → ${rel(l.dir)}: ${parts.join("; ") || "all linked"}`);
+  }
+  for (const h of r.hooks) row("hooks", `${h.agent}: ${h.tier === "none" ? "none (adapter has no hooks)" : h.changed.length ? `installed in ${h.changed.map(rel).join(", ")}` : "up to date"}`);
+  row("hook command", r.hook_command);
+  row(".gitignore", r.gitignore.length ? `added ${r.gitignore.join(", ")}` : "up to date");
+  row(".gitattributes", r.gitattributes.length ? `added ${r.gitattributes.join(", ")}` : "up to date");
+  const changed = r.config === "created" || r.workflows.created.length || sk.updated.length || sk.links.some((l) => l.linked.length) || r.hooks.some((h) => h.changed.length) || r.gitignore.length || r.gitattributes.length;
+  out.push("", changed ? "Commit .agents/ and the agents' skill folders; `git diff` shows what changed." : "Nothing changed: norn is set up here.");
+  return out.join("\n");
+}
+
 export const initCommand = defineCommand({
   name: "init",
   summary: "Set up norn in this repository: config, workflows, skills, hooks (A1, SK1, W1)",
-  usage: "norn init [--hook-command <cmd>]",
+  usage: "norn init [--json] [--hook-command <cmd>]",
+  markdown: true,
   options: { "hook-command": { type: "string" } },
   async run(ctx, args) {
     const root = ctx.root;
@@ -100,6 +137,7 @@ export const initCommand = defineCommand({
       hooks.push({ agent: name, tier: agent.tier, changed: r.changed });
     }
 
-    return { root, config, workflows, skills, hooks, hook_command: command, gitignore: ensureGitignore(root), gitattributes: ensureGitattributes(root) };
+    const report: InitReport = { root, config, workflows, skills, hooks, hook_command: command, gitignore: ensureGitignore(root), gitattributes: ensureGitattributes(root) };
+    return rendered(report, formatInit(report));
   },
 });

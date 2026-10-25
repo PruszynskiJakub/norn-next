@@ -15,9 +15,15 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ### Changed
 
-- A gate item in `norn inbox` names the report that led there by step and receipt number (`step qa#1 reported partial (receipt 0009)`) instead of printing its absolute path on the item line. The receipt and evidence paths moved to the item's full text (`norn inbox --details`), and `--text` prints paths under your home as `~/…`.
+- Commands an agent or a person reads print markdown by default: `done`, `ask` and `stuck` (the reply says what was reported and to end the turn), `init`, `doctor`, `status`, `inbox` and `trace`, like `brief` already did. Their refusals print as markdown too, with the same exit codes. Every command takes `--json` and then prints the JSON it printed before; `--text` is still accepted and changes nothing.
+- `norn init` and `norn doctor` print a summary: one line per part or check, what changed or failed, and what to do. `doctor` still exits 1 when a check fails.
+- A gate item in `norn inbox` names the report that led there by step and receipt number (`step qa#1 reported partial (receipt 0009)`) instead of printing its absolute path on the item line. The receipt and evidence paths moved to the item's full text (`norn inbox --details`), and the text output prints paths under your home as `~/…`.
 - With a runner that can open terminals, Your turn items for starting an agent show `norn open <unit>` as the command and the `cd … && <agent> …` line in the detail (`by hand: …`). Without one they show the `cd …` line as before.
 - `norn brief` outside a unit worktree tells the agent to stop and has the person start it from the unit's inbox item; the `norn` skill says the same.
+
+### Upgrading
+
+Scripts that parse the output of `done`, `ask`, `stuck`, `init`, `doctor`, `status`, `inbox` or `trace` must add `--json`.
 
 ## [0.2.1] - 2026-10-25
 

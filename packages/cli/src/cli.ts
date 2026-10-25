@@ -1,6 +1,8 @@
 /**
  * `runCli(argv, deps)`: parse → dispatch → one JSON value + exit code (P8). Never exits the
  * process and never prints; `main.ts` does both. Tests call this in-process with fakes.
+ * A command with `markdown: true` prints markdown (its `rendered` result, refusals too) unless
+ * `--json` is given; every command accepts `--json`. `value` is always the data.
  */
 import { parseArgs } from "node:util";
 import { ExitCode } from "@norn/schema";
@@ -8,11 +10,11 @@ import { version } from "../package.json";
 import type { Command, ParsedArgs } from "./command.ts";
 import { COMMANDS, findCommand } from "./commands/index.ts";
 import { type CliDeps, Context } from "./context.ts";
-import { CliFailure, isTextOutput, isWithExit, render, toFailure, usageError } from "./output.ts";
+import { CliFailure, failureMarkdown, isRendered, isWithExit, render, toFailure, usageError } from "./output.ts";
 
 export interface CliResult {
   exit: ExitCode;
-  /** the JSON value printed */
+  /** the JSON value printed with `--json` (the data, also when stdout is markdown) */
   value: unknown;
   /** exactly what goes to stdout */
   stdout: string;
@@ -47,14 +49,22 @@ export async function runCli(argv: string[], deps: CliDeps = {}): Promise<CliRes
   const command = findCommand(name);
   if (!command) return failed(usageError(`unknown command '${name}'`, `norn help — commands: ${COMMANDS.map((c) => c.name).join(", ")}`, "unknown_command"));
   if (rest.includes("--help") || rest.includes("-h")) return done(helpFor(command));
+  // `--json` is every command's; `--text` is the old opt-in for readable output, now the default
+  const end = rest.indexOf("--");
+  const flags = end < 0 ? rest : rest.slice(0, end);
+  const json = flags.includes("--json");
+  const markdown = command.markdown === true && !json;
+  const argvOwn = [...flags.filter((a) => a !== "--json" && (command.markdown !== true || a !== "--text")), ...(end < 0 ? [] : rest.slice(end))];
   try {
-    const args = parseCommandArgs(command, rest);
+    const args = parseCommandArgs(command, argvOwn);
     const ctx = new Context(deps);
     if (command.repo !== false) await ctx.locate();
     const out = await command.run(ctx, args);
-    if (isTextOutput(out)) return { exit: ExitCode.ok, value: out.text, stdout: out.text };
-    return isWithExit(out) ? done(out.value, out.exit) : done(out ?? { ok: true });
+    const [value, exit] = isWithExit(out) ? [out.value, out.exit] : [out ?? { ok: true }, ExitCode.ok];
+    if (isRendered(value)) return markdown ? { exit, value: value.value, stdout: value.markdown } : done(value.value, exit);
+    return done(value, exit);
   } catch (e) {
-    return failed(toFailure(e));
+    const f = toFailure(e);
+    return markdown ? { exit: f.exit, value: f.body, stdout: failureMarkdown(f) } : failed(f);
   }
 }
