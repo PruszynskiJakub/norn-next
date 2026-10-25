@@ -77,10 +77,10 @@ beforeAll(async () => {
 afterAll(() => h.cleanup());
 
 describe("norn init", () => {
-  test("writes config, workflows, skills, hooks and .gitignore; idempotent", async () => {
+  test("writes config, workflows, skills, hooks, .gitignore and .gitattributes; idempotent", async () => {
     const r = await h.norn("init");
     expect(r.exit).toBe(0);
-    const v = r.value as { config: string; workflows: { created: string[] }; skills: { updated: string[]; unchanged: string[]; links: Array<{ agent: string; linked: string[] }> }; hooks: Array<{ changed: string[] }>; gitignore: string[] };
+    const v = r.value as { config: string; workflows: { created: string[] }; skills: { updated: string[]; unchanged: string[]; links: Array<{ agent: string; linked: string[] }> }; hooks: Array<{ changed: string[] }>; gitignore: string[]; gitattributes: string[] };
     expect(v.config).toBe("created");
     expect(v.workflows.created).toEqual(["bug.yaml", "slice.yaml", "story.yaml"]);
     expect(v.skills.updated).toContain("norn");
@@ -88,6 +88,7 @@ describe("norn init", () => {
     expect(v.skills.links[0]).toMatchObject({ agent: "claude", linked: v.skills.updated });
     expect(v.hooks[0]?.changed).toEqual([join(h.root, ".claude", "settings.json")]);
     expect(v.gitignore).toEqual([".agents/norn/trace/", ".env.norn", ".norn-unit"]);
+    expect(v.gitattributes).toEqual([".agents/specs/*/runs/** linguist-generated=true gitlab-generated=true"]);
     // SK1: one copy in .agents/skills (whole folders), linked from the agent's skill folder
     expect(existsSync(join(h.root, ".agents/skills/norn-review/SMELLS.md"))).toBe(true);
     expect(lstatSync(join(h.root, ".claude/skills/norn-implement")).isSymbolicLink()).toBe(true);
@@ -95,6 +96,7 @@ describe("norn init", () => {
     const again = (await h.norn("init")).value as typeof v;
     expect(again.config).toBe("exists");
     expect(again.gitignore).toEqual([]);
+    expect(again.gitattributes).toEqual([]);
     expect(again.hooks[0]?.changed).toEqual([]);
     expect(again.skills.updated).toEqual([]);
   });
