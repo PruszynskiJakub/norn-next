@@ -61,20 +61,39 @@ export function isWithExit(v: unknown): v is WithExit {
   return typeof v === "object" && v !== null && (v as Partial<WithExit>)[EXIT] === true;
 }
 
-const TEXT = Symbol("norn.text");
+const RENDERED = Symbol("norn.rendered");
 
-/** Plain text on stdout instead of JSON: the explicit human mode of views (`--text`), and `norn brief`, whose reader is an agent. */
-export interface TextOutput {
-  [TEXT]: true;
-  text: string;
+/**
+ * A command's data together with its markdown for a reader (P8, see AGENTS.md "Decisions"): stdout
+ * gets the markdown unless the caller passes `--json`, which prints `value`. Exit codes are the same
+ * either way, so code branches on them and on `--json` data, never on the markdown.
+ */
+export interface Rendered {
+  [RENDERED]: true;
+  value: unknown;
+  markdown: string;
 }
 
-export function textOutput(text: string): TextOutput {
-  return { [TEXT]: true, text: text.endsWith("\n") ? text : `${text}\n` };
+export function rendered(value: unknown, markdown: string): Rendered {
+  return { [RENDERED]: true, value, markdown: markdown.endsWith("\n") ? markdown : `${markdown}\n` };
 }
 
-export function isTextOutput(v: unknown): v is TextOutput {
-  return typeof v === "object" && v !== null && (v as Partial<TextOutput>)[TEXT] === true;
+export function isRendered(v: unknown): v is Rendered {
+  return typeof v === "object" && v !== null && (v as Partial<Rendered>)[RENDERED] === true;
+}
+
+const FAILURE_TITLE: Partial<Record<ExitCode, string>> = {
+  [ExitCode.refused]: "Refused",
+  [ExitCode.usage]: "Usage error",
+  [ExitCode.corrupt]: "Corrupt state",
+  [ExitCode.busy]: "Busy",
+};
+
+/** A `CliError` as markdown, for commands that print markdown; the exit code still says which kind. */
+export function failureMarkdown(f: CliFailure): string {
+  const { error, do_instead, code } = f.body;
+  const title = FAILURE_TITLE[f.exit] ?? "Error";
+  return `**${title}${code ? ` (${code})` : ""}:** ${error}\n${do_instead ? `\nDo instead: ${do_instead}\n` : ""}`;
 }
 
 /** Normalize anything thrown into a CliFailure (never prose on stdout). */

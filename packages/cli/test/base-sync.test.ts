@@ -117,7 +117,7 @@ describe("base sync with real git", () => {
     const merge = h.git(["log", "--merges", "-1", "--format=%H"], wt());
     const status = (await h.norn("status", "gh-7")).value as { base_sync: unknown };
     expect(status.base_sync).toMatchObject({ branch: "main", conflicts: [], last_update: { sha: merge, base_sha: sibling, step: "update" } });
-    expect((await h.norn("status", "--text")).value).toContain(`base main: up to date · last update merge ${merge.slice(0, 12)} (update, `);
+    expect((await h.norn("status")).stdout).toContain(`base main: up to date · last update merge ${merge.slice(0, 12)} (update, `);
   }, 60_000);
 
   test("4 + 2: waiting at ready, a conflicting sibling merge → stale → update → conflict → resolve (brief: base sha + paths) → done → update → test", async () => {
@@ -342,7 +342,7 @@ describe("PR items between syncs and in the read model (C1), ready approval void
     expect(open()).toEqual(expect.arrayContaining([merge, retarget]));
     // a done story behind a conflicting base says so in norn status
     expect(((await h.norn("status", "gh-9")).value as { base_sync: unknown }).base_sync).toMatchObject({ branch: "main", behind: 1, conflicts: ["a.txt"] });
-    expect((await h.norn("status", "--text")).value).toContain("base main: 1 behind · conflicts a.txt");
+    expect((await h.norn("status")).stdout).toContain("base main: 1 behind · conflicts a.txt");
     // ticks between syncs: the items stay open (no appear/resolve flicker)
     const calls = h.remote.calls.length;
     for (let i = 0; i < 3; i++) {

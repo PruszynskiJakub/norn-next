@@ -231,6 +231,17 @@ describe("norn doctor (A7)", () => {
     expect(r.value).toMatchObject({ machine: { holder: "tester@box", override: "box" }, warnings: [expect.stringContaining("NORN_MACHINE=box")] });
   });
 
+  test("prints the report for a person, with the same exit code as --json", async () => {
+    const env = { ...h.deps.env, NORN_HOOK_COMMAND: `${process.execPath} ${main} hook` };
+    const r = await runCli(["doctor"], { ...h.deps, env });
+    expect(r.exit).toBe(0);
+    expect(r.stdout).toStartWith("norn doctor: every check passes\n");
+    expect(r.stdout).toMatch(/ok {3}agent claude .* · hooks fire/);
+    expect(r.stdout).toMatch(/ok {3}remote +gh as tester/);
+    expect(r.stdout).toContain("Warnings\n  ! NORN_MACHINE=box");
+    expect(() => JSON.parse(r.stdout)).toThrow();
+  });
+
   test("missing hooks and an unusable hook command fail the check with what to do", async () => {
     expect((await h.norn("uninstall")).exit).toBe(0);
     const r = await runCli(["doctor"], { ...h.deps, env: { ...h.deps.env, NORN_HOOK_COMMAND: "norn-missing-binary hook" } });
@@ -239,5 +250,10 @@ describe("norn doctor (A7)", () => {
       ok: false,
       agents: [{ name: "claude", ok: false, hooks_installed: false, hook_fires: { ok: false, error: expect.stringContaining("not found on PATH") }, notes: expect.arrayContaining(["run norn init to install hooks"]) }],
     });
+    const t = await runCli(["doctor"], { ...h.deps, env: { ...h.deps.env, NORN_HOOK_COMMAND: "norn-missing-binary hook" } });
+    expect(t.exit).toBe(1);
+    expect(t.stdout).toMatch(/^norn doctor: \d+ checks? failed \(.*agent claude.*\)/);
+    expect(t.stdout).toMatch(/FAIL agent claude .* · hooks missing/);
+    expect(t.stdout).toContain("· run norn init to install hooks");
   });
 });

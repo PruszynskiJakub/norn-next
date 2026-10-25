@@ -183,7 +183,7 @@ describe("skills", () => {
 
   test("the norn skill states the protocol and hard rules", () => {
     const text = readSkill("norn");
-    for (const s of ["norn brief", "norn done", "norn ask", "norn stuck", "--handoff", "do_instead", "handoff.md", "Goal", "Progress", "Resume", "git push", "runs/", "gh", "glab"])
+    for (const s of ["norn brief", "norn done", "norn ask", "norn stuck", "--handoff", "Do instead", "handoff.md", "Goal", "Progress", "Resume", "git push", "runs/", "gh", "glab"])
       expect(text).toContain(s);
   });
 

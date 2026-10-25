@@ -4,6 +4,15 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+### Changed
+
+- Commands an agent or a person reads print markdown by default: `done`, `ask` and `stuck` (the reply says what was reported and to end the turn), `init`, `doctor`, `status`, `inbox` and `trace`, like `brief` already did. Their refusals print as markdown too, with the same exit codes. Every command takes `--json` and then prints the JSON it printed before; `--text` is still accepted and changes nothing.
+- `norn init` and `norn doctor` print a summary: one line per part or check, what changed or failed, and what to do. `doctor` still exits 1 when a check fails.
+
+### Upgrading
+
+Scripts that parse the output of `done`, `ask`, `stuck`, `init`, `doctor`, `status`, `inbox` or `trace` must add `--json`.
+
 ## [0.2.0] - 2026-10-25
 
 ### Changed
