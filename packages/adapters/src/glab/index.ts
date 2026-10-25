@@ -5,6 +5,7 @@
  */
 import type { RemoteFactory, RemoteIssue, RemotePort, RemotePullRequest } from "@norn/core";
 import { storyKey } from "@norn/schema";
+import { NETWORK_TIMEOUT_MS } from "@norn/store";
 import { bunExec, okOrThrow, parseJson, portError, type Exec } from "../git/exec.ts";
 
 export interface GlabOptions {
@@ -87,7 +88,8 @@ export function createGlab(opts: GlabOptions): RemotePort {
   const bin = opts.bin ?? "glab";
   const env = { NO_PROMPT: "1", NO_COLOR: "1", GLAB_NO_PROMPT: "1", ...(opts.env ?? {}) };
   const repo = opts.repo ? ["-R", opts.repo] : [];
-  const run = (args: string[], stdin?: string) => exec([bin, ...args], stdin === undefined ? { cwd: opts.cwd, env } : { cwd: opts.cwd, env, stdin });
+  // H11: every glab call reaches the remote, so every one is bounded
+  const run = (args: string[], stdin?: string) => exec([bin, ...args], { cwd: opts.cwd, env, timeoutMs: NETWORK_TIMEOUT_MS, ...(stdin === undefined ? {} : { stdin }) });
   const json = async <T>(args: string[]): Promise<T> =>
     parseJson<T>(okOrThrow(await run(args), `glab ${args[0]} ${args[1]}`, "glab"), `glab ${args[0]}`, "glab");
   const notFound = (stderr: string) => /404|not found/i.test(stderr);
