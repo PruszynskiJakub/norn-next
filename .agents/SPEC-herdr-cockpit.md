@@ -24,7 +24,7 @@ Goals:
 
 Non-goals:
 - A full-screen TUI (raw-mode keys, mouse). The cockpit stays line-based, like the Herdr GitHub Issues plugin.
-- Linking the plugin from `norn init`. Installing it is one `herdr plugin link` (HC11).
+- Linking the plugin from `norn init`. Installing it is one `herdr plugin install` (HC11).
 - Changing what an attended step is: no `silent`, nudge, deadline or implicit `ask` for attended steps (MO4 stays).
 
 ## 3. Part A — attended wait (amends MO4, O1)
@@ -70,7 +70,7 @@ MO4 gains one sentence: *an attended run waiting for its person is shown as Your
 
 - HC9 norn ships a Herdr plugin at `plugins/herdr/` (id `norn`): a `cockpit` pane entrypoint running `norn pane --interactive`; an `open` action that opens it as a split below the focused pane without taking focus; a `next` action that focuses the agent pane of the oldest Your turn item with a run (`norn pane --next`) or shows a toast when there is none.
 - HC10 `norn pane --next` is a one-shot: it builds the view once, takes the oldest Your turn item **with a run** (manual starts are skipped: it never starts an agent), focuses its agent pane (HC6), prints `{focused: <pane_id> | null, item: <id> | null}` (plus the item's `command` when no pane was found) and exits 0 either way. `norn pane --open` opens the cockpit pane with `--interactive`.
-- HC11 The plugin's commands call `$NORN_BIN` when set, else `norn` from `PATH`, else the launch shim `~/.norn/bin/norn`. The plugin ships in the repo, not in the package or binary, and `herdr plugin install` cannot clone the private repo, so the README documents `herdr plugin link <checkout>/plugins/herdr`, and the actions `norn.open` and `norn.next`. `norn doctor` reports under `runner.cockpit_plugin`, informationally (never failing doctor), whether the plugin is linked when Herdr is the runner; when it is not, `do_instead` is that `herdr plugin link` command, naming this checkout's `plugins/herdr` when norn runs from source.
+- HC11 The plugin's commands call `$NORN_BIN` when set, else `norn` from `PATH`, else the launch shim `~/.norn/bin/norn`. The plugin ships in the repo, not in the package or binary, so the README documents `herdr plugin install PruszynskiJakub/norn-next/plugins/herdr` (or `herdr plugin link <checkout>/plugins/herdr` from a checkout), and the actions `norn.open` and `norn.next`. `norn doctor` reports under `runner.cockpit_plugin`, informationally (never failing doctor), whether the plugin is linked when Herdr is the runner; when it is not, `do_instead` is `herdr plugin link` with this checkout's `plugins/herdr` when norn runs from source, else `herdr plugin install`.
 
 ## 6. Part D — pane labels
 

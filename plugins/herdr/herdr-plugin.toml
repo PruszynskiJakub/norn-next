@@ -1,5 +1,6 @@
 # norn's Herdr plugin (HC9): the interactive cockpit pane and two actions.
-# Link it once:  herdr plugin link <norn checkout>/plugins/herdr
+# Install it once:  herdr plugin install PruszynskiJakub/norn-next/plugins/herdr
+# (from a norn checkout: herdr plugin link <checkout>/plugins/herdr)
 id = "norn"
 name = "norn"
 version = "0.1.0"

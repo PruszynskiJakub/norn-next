@@ -10,6 +10,8 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 - `norn init` writes the repository's test command into the `test` steps of the workflows it creates, read from its build files: `package.json` (installing first with npm, pnpm, yarn or bun, since a check runs in a fresh worktree), `Cargo.toml`, `go.mod`, Python project files, `mix.exs`, Gradle, Maven or a Makefile `test` target. When nothing names one, the templates keep `bun test` and the next steps say to set it.
 - `norn doctor` fails the remote check when the repository has no git remote named `remote.git_remote` (default `origin`), with `git remote add origin <url>` as the fix; before, it passed and the first tick failed. Its JSON gains `remote.git_remote`.
 - The cockpit jumps to Herdr workspaces (HC15): `w <n>` focuses the workspace of the item's run, found by its recorded pane or by a pane in the unit worktree, never by label. `g <n>` falls back to the workspace when the run has no agent pane to focus, such as an approval after the agent ended.
+- `norn inbox` in a repository with no stories says how to make the first one instead of only "nothing needs you".
+- The README installs the binary with `curl` from the latest release, with no `gh` sign-in, now that the repository is public.
 
 ### Changed
 
@@ -23,6 +25,7 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 ### Fixed
 
 - `norn inbox`, `norn pane` and `norn inbox --history` name an item's step once: `refine: attended step — work with the agent`, no longer `refine: refine: attended step …` (F4).
+- `norn doctor` suggests a command that works for the cockpit plugin: `herdr plugin link <this checkout>/plugins/herdr` when norn runs from source, else `herdr plugin install PruszynskiJakub/norn-next/plugins/herdr`, now that the repository is public. The README says the same.
 
 ## [0.3.1] - 2026-10-26
 
