@@ -69,7 +69,7 @@ You don't need the plugin to use norn with Claude Code: `norn init` puts the ski
 `plugins/herdr` adds the norn cockpit to Herdr: a pane running `norn pane --interactive`, which numbers the inbox items and takes one command per line (`3` goes to item 3's agent, `a 2 Postgres` answers, `y 1` approves, `t 4` takes, `?` lists the rest). Every change goes through the same `norn` verbs you would type. While it runs, it labels the agent pane of each norn run in Herdr's sidebar (`gh-12 · refine`, `norn: your turn`).
 
 ```sh
-herdr plugin install PruszynskiJakub/norn-next/plugins/herdr   # or: herdr plugin link ./plugins/herdr from a checkout
+herdr plugin link <norn-next checkout>/plugins/herdr   # update it with git pull in that checkout
 ```
 
 The plugin has two actions you can bind to keys in Herdr's `config.toml`: `norn.open` opens the cockpit below the focused pane, and `norn.next` jumps to the agent that waits for you. To get inbox notifications as Herdr toasts, add `{adapter: herdr}` to `notifiers` in the config.

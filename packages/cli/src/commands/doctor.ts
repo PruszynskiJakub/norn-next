@@ -19,7 +19,7 @@
  */
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { git as gitAdapter, herdr, proc } from "@norn/adapters";
 import type { AgentAdapter, RunnerPort, SessionRef } from "@norn/core";
 import { ExitCode, ulid } from "@norn/schema";
@@ -158,8 +158,16 @@ async function nornThroughRunner(ctx: Context, runner: RunnerPort): Promise<{ ok
 
 const RUNNER_PATH_WAIT_MS = 15_000;
 
-/** HC11: where `herdr plugin install` finds norn's plugin (a checkout links `plugins/herdr` instead). */
-const COCKPIT_PLUGIN_SOURCE = "PruszynskiJakub/norn-next/plugins/herdr";
+/**
+ * HC11: the `herdr plugin link` hint. The plugin ships in the repo, not in the package or binary
+ * (and `herdr plugin install` cannot clone the private repo), so it is linked from a checkout:
+ * this one when norn runs from source, else a placeholder.
+ */
+export function pluginLinkHint(assets: string): string {
+  const dir = join(assets, "..", "..", "..", "plugins", "herdr");
+  const path = existsSync(join(dir, "herdr-plugin.toml")) ? resolve(dir) : "<norn-next checkout>/plugins/herdr";
+  return `herdr plugin link ${path} (optional: the norn cockpit, HC9)`;
+}
 
 /** HC11: whether norn's Herdr plugin is linked; a hint when it is not (never an error). */
 async function cockpitPlugin(ctx: Context): Promise<Record<string, unknown>> {
@@ -167,7 +175,7 @@ async function cockpitPlugin(ctx: Context): Promise<Record<string, unknown>> {
   const cockpit = herdr.createHerdrCockpit({ env: ctx.env, ...(typeof o.bin === "string" ? { bin: o.bin } : {}), ...(typeof o.session === "string" ? { session: o.session } : {}) });
   const linked = await cockpit.pluginLinked().catch(() => undefined);
   if (linked === undefined) return { linked: null, note: "could not list Herdr plugins" };
-  if (!linked) return { linked: false, do_instead: `herdr plugin install ${COCKPIT_PLUGIN_SOURCE} (optional: the norn cockpit, HC9)` };
+  if (!linked) return { linked: false, do_instead: pluginLinkHint(assetsDir(ctx.env)) };
   return { linked: true, enabled: linked.enabled, root: linked.root };
 }
 
