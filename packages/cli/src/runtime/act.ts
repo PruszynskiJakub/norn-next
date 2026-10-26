@@ -877,7 +877,7 @@ export class Actor {
     try {
       const env = { ...process.env, ...this.ctx.env, ...(readEnvNorn(a.cwd) ?? {}), ...a.env, NORN_HOME: this.root };
       // K4.1: a server an agent left running from this worktree must not hold the slot's ports
-      const portBase = Number(env.PORT_BASE);
+      const portBase = Number((env as Record<string, string | undefined>).PORT_BASE);
       const stopped = Number.isInteger(portBase) && portBase > 0
         ? await stopStrayListeners(a.cwd, { from: portBase, to: portBase + this.config.slots.ports_per_slot - 1 })
         : [];
