@@ -13,7 +13,7 @@ got=$("$norn" --version)
 echo "--version: $got"
 [ "$got" = "{\"version\":\"$want\"}" ] || { echo "expected version $want"; exit 1; }
 
-"$norn" --help | grep -q '"command":"init"' || { echo "--help does not list init"; exit 1; }
+"$norn" --help --json | grep -q '"command":"init"' || { echo "--help does not list init"; exit 1; }
 
 set +e
 "$norn" status --json > status.json
