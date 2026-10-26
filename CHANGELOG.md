@@ -4,6 +4,8 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-26
+
 ### Fixed
 
 - The cockpit (`norn pane --interactive`) no longer wipes a half-typed command on each redraw. On a terminal the prompt is redrawn with what you have typed so far; before, the text vanished from view but stayed in the input and was glued onto the next command.
