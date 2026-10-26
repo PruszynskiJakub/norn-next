@@ -84,6 +84,7 @@ import { markNotified, type PendingRecord, readNotified, readPendingRecords, wri
 import type { Observed, StoryLoc, UnitLoc } from "./observe.ts";
 import { appendProgress, rejectProgress } from "./report.ts";
 import { runShell, tailLines } from "./shell.ts";
+import { stopStrayListeners } from "./strays.ts";
 import { ensureShim, withNornOnPath } from "./shim.ts";
 
 export interface ActRecord {
@@ -875,7 +876,13 @@ export class Actor {
     if (!lease.ok) throw new QueueFull(`queued: max_checks ${this.config.max_checks} in use (K1)`);
     try {
       const env = { ...process.env, ...this.ctx.env, ...(readEnvNorn(a.cwd) ?? {}), ...a.env, NORN_HOME: this.root };
+      // K4.1: a server an agent left running from this worktree must not hold the slot's ports
+      const portBase = Number(env.PORT_BASE);
+      const stopped = Number.isInteger(portBase) && portBase > 0
+        ? await stopStrayListeners(a.cwd, { from: portBase, to: portBase + this.config.slots.ports_per_slot - 1 })
+        : [];
       const res = await runShell(a.command, { cwd: a.cwd, env, timeoutMs: a.timeout_ms });
+      if (stopped.length) res.output = `${stopped.map((s) => `norn: stopped pid ${s.pid} (${s.command}) left listening on :${s.port} from this worktree (K4.1)`).join("\n")}\n${res.output}`;
       const pass = !res.timed_out && res.exit_code === 0;
       const receipt: ReceiptOf<"check"> = {
         kind: "check",
