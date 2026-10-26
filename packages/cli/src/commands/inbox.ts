@@ -1,6 +1,6 @@
 /**
  * `norn inbox [--json]` (O1): what needs a person, grouped by action — Your turn, Answer,
- * Approve, Unblock, Check, Unclaimed, Running, Recently done — each item with its reason, age and
+ * Approve, Unblock, Check, Unclaimed, Running, Notes, Recently done — each item with its reason, age and
  * the exact command that resolves it. Read only via @norn/view (X1); text for a person, `--json` for data.
  * `--details` adds each item's full text (L1: an implicit ask's whole pane screen).
  *

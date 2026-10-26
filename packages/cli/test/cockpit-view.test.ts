@@ -21,7 +21,7 @@ const LONG = entry({ id: "l", slice: "gh-1/01", step: "implement", title: `imple
 const items = [LONG, entry({}), entry({ id: "w", group: "your_turn", step: "refine", title: "refine: the agent is waiting for you", command: "cd /wt" })];
 
 function view(down = false): ProjectView {
-  const groups = { your_turn: [items[2]], answer: [], approve: [], unblock: [items[0], items[1]], check: [], unclaimed: [], running: [], recently_done: [] };
+  const groups = { your_turn: [items[2]], answer: [], approve: [], unblock: [items[0], items[1]], check: [], unclaimed: [], running: [], notes: [], recently_done: [] };
   return {
     at: "2026-10-25T12:51:00.000Z",
     repo: "/src/todoist-app",
@@ -76,6 +76,39 @@ describe("cockpit frame (HC4)", () => {
     expect(fit("a  b\nc", 10)).toBe("a b c");
     expect(fit("abcdefgh", 5)).toBe("abcd…");
     expect(wrap("    one two three four", 12)).toEqual(["    one two", "    three", "    four"]);
+  });
+});
+
+describe("group headers and styles (NT5)", () => {
+  const ESC = "\x1b[";
+  const running = entry({ id: "r", group: "running", slice: "gh-1/02", step: "implement", title: "implement #1 (auto)", command: "norn trace gh-1/02" });
+  const note = (id: string) => entry({ id, group: "notes", slice: "gh-1/01", step: "qa", title: "qa note on gh-1/01: title length", command: "norn why gh-1/01 --receipt r", cleared_by: "cleared by gh-1 human-qa approval" });
+  const done = entry({ id: "d", group: "recently_done", slice: "gh-1/01", step: "$done", title: "done", command: "norn trace gh-1/01" });
+  const rows = [running, note("n1"), note("n2"), done];
+  function frame(color: boolean) {
+    const v = view();
+    v.inbox.groups = { ...v.inbox.groups, your_turn: [], unblock: [], running: [running], notes: rows.slice(1, 3), recently_done: [done] };
+    return renderFrame(v, rows, { ...opts, color });
+  }
+
+  test("each header says what the group holds; NOTES, below RUNNING, says which approval clears it", () => {
+    const lines = frame(false).split("\n");
+    const header = (g: string) => lines.findIndex((l) => l.startsWith(g));
+    expect(lines[header("RUNNING")]).toBe("RUNNING 1  agents and checks at work");
+    expect(lines[header("NOTES")]).toBe("NOTES 2  agents' notes for you, no action needed · cleared by gh-1 human-qa approval");
+    expect(header("RUNNING")).toBeLessThan(header("NOTES"));
+    expect(header("NOTES")).toBeLessThan(header("RECENTLY DONE"));
+  });
+
+  test("RUNNING and NOTES rows are not dim; RECENTLY DONE rows are", () => {
+    const f = frame(true);
+    const row = (title: string) => f.split("\n").find((l) => l.includes(title)) ?? "";
+    expect(f).toContain(`${ESC}36mRUNNING${ESC}0m`);
+    expect(f).toContain(`${ESC}33mNOTES${ESC}0m`);
+    expect(row("implement #1 (auto)")).not.toContain(`${ESC}2mimplement #1`);
+    expect(row("implement #1 (auto)")).toContain(`${ESC}1mgh-1/02`);
+    expect(row("qa note on gh-1/01")).toContain(`${ESC}1mgh-1/01`);
+    expect(row(`${ESC}2mdone${ESC}0m`)).toContain(`${ESC}2mgh-1/01`);
   });
 });
 

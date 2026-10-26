@@ -31,7 +31,7 @@ The rules each fix maps to are in its spec.
 - **A person's push to a story branch** is merged in by `update` or by a rejected push, and is never lost (BS3.3a).
 - **Honest QA (F30, F37).** QA reports a verdict per criterion: pass, fail, person or unverified.
   - `unverified` goes to `human-qa` with how to check it.
-  - `--note` leaves a Check item for a person.
+  - `--note` leaves a Notes item for a person.
   - `pass` is refused for a criterion that needs a capability the agent lacks, such as `browser`, and a person's earlier ruling never counts as verification.
 - **One action per unit per tick (F13).** Claim renewal is a side action and no longer delays a receipt or a cleanup (R1).
 - **Crash and hang recovery.** This is now proven live on herdr and headless:

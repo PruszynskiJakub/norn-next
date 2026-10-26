@@ -459,7 +459,7 @@ export interface AgentAdapter {
 
 // ============================================================= Notifier
 
-export type InboxGroup = "your_turn" | "answer" | "approve" | "unblock" | "check" | "unclaimed" | "running" | "recently_done";
+export type InboxGroup = "your_turn" | "answer" | "approve" | "unblock" | "check" | "unclaimed" | "running" | "notes" | "recently_done";
 
 export interface InboxItem {
   /** stable id: one notification per id ever (O3) — receipt_id or a derived key */
@@ -479,6 +479,8 @@ export interface InboxItem {
   url?: string;
   /** HC3: where the unit's current run lives (nulls = unknown), for front ends that find its pane (HC6) */
   reach?: { worktree: string | null; agent_session_id: string | null; pane_id: string | null };
+  /** NT5: a Notes item's clearing hint, e.g. `cleared by gh-1 human-qa approval` */
+  cleared_by?: string;
 }
 
 export interface NotifierPort {

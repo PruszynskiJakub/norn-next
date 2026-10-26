@@ -5,7 +5,7 @@
  */
 import { basename } from "node:path";
 import { INBOX_GROUPS, INBOX_TITLES } from "@norn/core";
-import type { InboxEntry, ProjectView } from "@norn/view";
+import { groupAbout, type InboxEntry, type ProjectView } from "@norn/view";
 
 type InboxGroup = (typeof INBOX_GROUPS)[number];
 
@@ -41,7 +41,10 @@ const STYLE = {
 } as const;
 type Style = keyof typeof STYLE;
 
-/** What each group is drawn in: needing a person stands out, the rest recedes. */
+/**
+ * What each group is drawn in: needing a person stands out, work under way and notes stay readable
+ * in their own colour, only finished work recedes (dim reads as done on a dark theme).
+ */
 const GROUP_STYLE: Record<InboxGroup, Style[]> = {
   your_turn: ["bold", "green"],
   answer: ["bold", "yellow"],
@@ -49,7 +52,8 @@ const GROUP_STYLE: Record<InboxGroup, Style[]> = {
   unblock: ["bold", "red"],
   check: ["magenta"],
   unclaimed: ["blue"],
-  running: ["dim"],
+  running: ["cyan"],
+  notes: ["yellow"],
   recently_done: ["dim"],
 };
 
@@ -123,13 +127,13 @@ export function renderFrame(view: ProjectView, items: readonly InboxEntry[], o: 
   for (const g of INBOX_GROUPS) {
     const group = items.filter((i) => i.group === g);
     if (!group.length) continue;
-    out.push("", `${paint(INBOX_TITLES[g].toUpperCase(), GROUP_STYLE[g])} ${paint(String(group.length), ["dim"])}`);
+    out.push("", `${paint(INBOX_TITLES[g].toUpperCase(), GROUP_STYLE[g])} ${paint(String(group.length), ["dim"])}  ${paint(fit(groupAbout(g, group), width - INBOX_TITLES[g].length - String(group.length).length - 3), ["dim"])}`);
     for (const it of group) {
       n++;
       const age = it.age;
       const title = fit(titleOf(it), width - indent - age.length - 2);
       const pad = " ".repeat(Math.max(1, width - indent - title.length - age.length));
-      const fade = g === "running" || g === "recently_done";
+      const fade = g === "recently_done";
       out.push(
         `  ${paint(String(n).padStart(numW), ["bold", ...GROUP_STYLE[g].filter((s) => s !== "bold")])}  ${paint(fit(it.slice ?? it.story, unitW).padEnd(unitW), fade ? ["dim"] : ["bold"])}  ${paint(fit(it.step ?? "", stepW).padEnd(stepW), ["dim"])}  ${fade ? paint(title, ["dim"]) : title}${pad}${paint(age, ["dim"])}`,
         `${" ".repeat(indent)}${paint(`→ ${fit(it.command, width - indent - 2)}`, ["dim"])}`,
