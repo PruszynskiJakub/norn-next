@@ -4,6 +4,10 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+### Added
+
+- The cockpit jumps to Herdr workspaces (HC15): `w <n>` focuses the workspace of the item's run, found by its recorded pane or by a pane in the unit worktree, never by label. `g <n>` falls back to the workspace when the run has no agent pane to focus, such as an approval after the agent ended.
+
 ## [0.3.1] - 2026-10-26
 
 ### Fixed
