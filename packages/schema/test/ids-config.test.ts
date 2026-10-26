@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { JSON_DIR, renderSchema } from "../scripts/emit.ts";
 import {
   DEFAULT_CONFIG,
+  explainConfig,
   SCHEMAS,
   type SchemaName,
   isUlid,
@@ -119,6 +120,33 @@ describe("config", () => {
     expect(c.runner).toEqual({ adapter: "herdr" });
     expect(c.default_mode).toBe("auto");
     expect(resolveConfig({ runner: { adapter: "herdr" } }, { runner: null }).runner).toBeNull();
+  });
+});
+
+describe("explainConfig (norn config, K2)", () => {
+  const entry = (entries: ReturnType<typeof explainConfig>, key: string) => entries.find((e) => e.key === key);
+
+  test("each resolved setting once, credited to the last layer that set the value in effect", () => {
+    const e = explainConfig({ runner: { adapter: "herdr" }, default_mode: "auto", limits: { deadline: "30m" } }, { default_mode: "manual", remote: { label: "team" } });
+    expect(entry(e, "runner")).toEqual({ key: "runner", value: { adapter: "herdr" }, source: "user", group: "machine" });
+    expect(entry(e, "default_mode")).toMatchObject({ value: "manual", source: "repo", group: "person" });
+    expect(entry(e, "limits.deadline")).toMatchObject({ value: "30m", source: "user", group: "team" });
+    expect(entry(e, "limits.nudges")).toMatchObject({ value: 2, source: "built-in" });
+    expect(entry(e, "remote.label")).toMatchObject({ value: "team", source: "repo" });
+    expect(entry(e, "agents.claude")).toMatchObject({ source: "built-in", group: "person" });
+    expect(new Set(e.map((x) => x.key)).size).toBe(e.length);
+  });
+
+  test("a repo value a machine cap rule ignores is reported, not credited", () => {
+    const e = explainConfig({ max_agents: 3, slots: { min: 2 } }, { max_agents: 5, max_checks: 1, slots: { min: 1 } });
+    expect(entry(e, "max_agents")).toMatchObject({ value: 3, source: "user", repo_ignored: 5 });
+    expect(entry(e, "max_checks")).toMatchObject({ value: 1, source: "repo" });
+    expect(entry(e, "max_checks")?.repo_ignored).toBeUndefined();
+    expect(entry(e, "slots.min")).toMatchObject({ value: 2, source: "user", repo_ignored: 1 });
+  });
+
+  test("an explicit null is a value: a repo runner: null wins", () => {
+    expect(entry(explainConfig({ runner: { adapter: "herdr" } }, { runner: null }), "runner")).toMatchObject({ value: null, source: "repo" });
   });
 });
 
