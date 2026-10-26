@@ -506,6 +506,7 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
       }
       return ctx.noop(ref, ref.slice ? "slice.done" : "story.wait_merge", ref.slice ? "integrated" : "workflow done; waiting for the PR merge (GR6)");
     case "stuck":
+      if (slicesCanResume(story, uf, st, wf)) return resumeSlices(ctx, story, uf, st, wf);
       return ctx.noop(ref, "unit.stuck", `stuck: ${st.park?.reason ?? "?"} — norn unstick ${ref.key}`);
     case "parked": {
       // R6.1 (H3, A14): an implicit ask a later fact shows the agent has moved past resolves itself
@@ -1234,19 +1235,92 @@ function classifyNorn(
 
 // ---------------------------------------------------------------- slices (W2)
 
-function slicesStep(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow): void {
-  const ref = uf.unit;
+/**
+ * §10: the story is stuck because its slices step classified `stuck` (that receipt parked it), and
+ * a slice can move again now — a person unstuck it, or the slice files changed.
+ */
+function slicesCanResume(story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow): boolean {
+  if (uf.unit.slice !== null || stepOf(wf, st.step)?.type !== "slices") return false;
+  const parkedBySlices = st.park?.kind === "stuck" && st.park.receipt_id !== undefined
+    && st.last_outcome?.step === st.step && st.last_outcome.outcome === "stuck" && st.last_outcome.receipt_id === st.park.receipt_id;
+  return parkedBySlices && !sliceProgress(story).broken.length && slicesStuck(story) === null;
+}
+
+/** §10, O2: norn unsticks the story back into its slices step, as `norn unstick <story>` would. */
+function resumeSlices(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow): void {
+  const n = nextReceiptNumber(uf);
+  const unstick: ReceiptOf<"unstick"> = {
+    kind: "unstick",
+    receipt_id: ctx.id(),
+    run_id: null,
+    step: st.step,
+    attempt: st.attempt,
+    at: ctx.nowIso,
+    by: "norn",
+    who: ctx.facts.machine.holder,
+    tick_id: ctx.facts.tick_id,
+    comment: "a slice can move again",
+  };
+  const res = applyReceipts(st, [{ n, file: "", receipt: unstick }], applyCtx(ctx, wf));
+  ctx.emit({
+    kind: "apply_receipts",
+    unit: uf.unit,
+    rule: "slices.resume",
+    applied: res.applied,
+    rejected: res.rejected,
+    advance: res.advance,
+    input: null,
+    launch: null,
+    kill: null,
+    receipts: [{ n, receipt: unstick }],
+    state: res.state,
+    commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${st.step} resumed (a slice can move again)`, st.step),
+  });
+}
+
+/** The story's slice files (dropped ones aside) and how far each has come. */
+function sliceProgress(story: StoryFacts) {
   const unitOf = (key: string) => story.units.find((u) => u.unit.slice === key);
   const files = story.slices.filter((s) => s.frontmatter?.status !== "dropped");
   const broken = files.filter((s) => !s.frontmatter);
-  if (broken.length) return ctx.noop(ref, "slices.file_invalid", `slice file(s) failed validation: ${broken.map((s) => s.file).join(", ")}`);
-  if (!files.length) return classifyNorn(ctx, story, uf, st, wf, "stuck", "slices.none", "no slice files");
   const integrated = (s: SliceFileFacts) => s.frontmatter?.status === "integrated" || unitOf(s.key)?.state?.status === "done";
   const done = new Set(files.filter(integrated).map((s) => s.key));
-  if (done.size === files.length) return classifyNorn(ctx, story, uf, st, wf, "done", "slices.done", `${done.size} slice(s) integrated`);
-
   const pending = files.filter((s) => !done.has(s.key) && !unitOf(s.key)?.state);
   const startable = pending.filter((s) => (s.frontmatter as SliceFrontmatter).depends_on.every((d) => done.has(d)));
+  return { unitOf, files, broken, done, pending, startable };
+}
+
+/** §10: why no slice can move without a person (no slice files, every active slice stuck, none can start); null when one can. */
+function slicesStuck(story: StoryFacts): { rule: string; detail: string } | null {
+  const { unitOf, files, done, pending, startable } = sliceProgress(story);
+  if (!files.length) return { rule: "slices.none", detail: "no slice files" };
+  if (done.size === files.length || startable.length) return null;
+  const activeUnits = files.filter((s) => !done.has(s.key) && unitOf(s.key)?.state);
+  const isStuck = (s: SliceFileFacts) => {
+    const status = unitOf(s.key)?.state?.status;
+    return status === "stuck" || status === "corrupt";
+  };
+  // running or parked slices still progress
+  const stuckSlices = activeUnits.filter(isStuck);
+  if (stuckSlices.length && stuckSlices.length === activeUnits.length) {
+    const named = stuckSlices.map((s) => `slice ${s.key} stuck: ${unitOf(s.key)?.state?.park?.reason ?? "?"}`);
+    return { rule: "slices.slice_stuck", detail: `${named.join("; ")} — norn unstick ${stuckSlices[0]?.key}` };
+  }
+  if (!activeUnits.length) {
+    const blocked = pending.map((s) => `${s.key} waits for ${(s.frontmatter as SliceFrontmatter).depends_on.filter((d) => !done.has(d)).join(", ")}`);
+    return { rule: "slices.blocked", detail: `no slice can start: ${blocked.join("; ")}` };
+  }
+  return null;
+}
+
+function slicesStep(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow): void {
+  const ref = uf.unit;
+  const { files, broken, done, startable } = sliceProgress(story);
+  if (broken.length) return ctx.noop(ref, "slices.file_invalid", `slice file(s) failed validation: ${broken.map((s) => s.file).join(", ")}`);
+  const stuck = slicesStuck(story);
+  if (stuck) return classifyNorn(ctx, story, uf, st, wf, "stuck", stuck.rule, stuck.detail);
+  if (done.size === files.length) return classifyNorn(ctx, story, uf, st, wf, "done", "slices.done", `${done.size} slice(s) integrated`);
+
   const starts = [];
   for (const s of startable.sort((a, b) => a.nn.localeCompare(b.nn))) {
     const fm = s.frontmatter as SliceFrontmatter;
@@ -1275,21 +1349,5 @@ function slicesStep(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, w
   }
   if (starts.length)
     return ctx.emit({ kind: "start_slices", unit: ref, rule: "slices.start", starts, receipts: [], state: null, commit: null });
-  const activeUnits = files.filter((s) => !done.has(s.key) && unitOf(s.key)?.state);
-  const isStuck = (s: SliceFileFacts) => {
-    const status = unitOf(s.key)?.state?.status;
-    return status === "stuck" || status === "corrupt";
-  };
-  // §10: slices → stuck once no slice can move without a person unsticking one (running or parked slices still progress)
-  const stuckSlices = activeUnits.filter(isStuck);
-  if (stuckSlices.length && stuckSlices.length === activeUnits.length) {
-    const named = stuckSlices.map((s) => `slice ${s.key} stuck: ${unitOf(s.key)?.state?.park?.reason ?? "?"}`);
-    return classifyNorn(ctx, story, uf, st, wf, "stuck", "slices.slice_stuck", `${named.join("; ")} — norn unstick ${stuckSlices[0]?.key}`);
-  }
-  const active = activeUnits.length > 0;
-  if (!active) {
-    const blocked = pending.map((s) => `${s.key} waits for ${(s.frontmatter as SliceFrontmatter).depends_on.filter((d) => !done.has(d)).join(", ")}`);
-    return classifyNorn(ctx, story, uf, st, wf, "stuck", "slices.blocked", `no slice can start: ${blocked.join("; ")}`);
-  }
   ctx.noop(ref, "slices.wait", `${done.size}/${files.length} slices integrated`);
 }

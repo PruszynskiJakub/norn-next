@@ -246,7 +246,7 @@ Three sources of outcomes:
 | gate | `approve` / `reject` | human receipt |
 | gate (story unit) | `stale` | the unit waits at the gate and the story is stale against its base (BS7); only when the gate declares a `stale` route (BS6) |
 | git | `done` / `conflict` | command result (`update`: a dirty worktree or a diverged story branch parks the unit `$stuck` with the reason, BS3) |
-| slices | `done` / `stuck` | aggregate of slices |
+| slices | `done` / `stuck` | aggregate of slices; a story it parked `$stuck` is unstuck by norn back into the step once a slice can move again (a person unstuck one, or the slice files changed) |
 | any | `exhausted` | a counter reached its max |
 
 - C1 Default routes: `silent` → nudge in same session (counted) → after max, `$stuck`; `died` → retry fresh session (counted) → `$stuck`; `timeout`/`stalled` → same as `silent`. Workflows may override any route. A nudge is typed into the live session when the runner can `send`; else the agent session is resumed with the nudge text (`--resume`, after the old process is terminated) when the runner can `resume`; else the route falls through to a fresh-session retry, counted as a retry (R4.1, R4.2).
@@ -389,6 +389,7 @@ Example `bug` workflow: `reproduce (agent; reproduced → implement, cannot_repr
 - K2 Configuration has one schema in two layers: `~/.norn/config.yaml` (user) and `.agents/norn/config.yaml` (repo). The repo overrides the user layer, except that machine caps (`max_agents`, `max_checks`, slot range) can only be lowered by a repo.
 - K3 Agent and port slots are lease files in `~/.norn/leases/`, created atomically (`O_EXCL`) with repo, unit, `run_id`, PID and start time. Dead holders are reclaimed by PID + start-time check. Leases are not committed; another machine allocates its own.
 - K4 Each worktree gets a slot (`NORN_SLOT`, `PORT_BASE`, optional extra per-slot resources from config) in `.env.norn`.
+- K4.1 Before a check runs, every process listening on the worktree's slot ports (`PORT_BASE` … `PORT_BASE + ports_per_slot - 1`) whose working directory is inside that worktree is stopped (SIGTERM, then SIGKILL after 2 s) and named at the top of the check output: a server an agent left running must not fail the check with "address in use". Listeners started elsewhere are left alone; without `lsof` nothing is stopped.
 - K5 The tick creates slice worktrees when a slice starts and removes them after integration. `norn tidy [--dry-run]` reports or cleans orphans; each tick reports them.
 - K6 Integration into the story branch is serialized per story — slice `integrate` and the story's base `update` (BS3) take the same integrate lock (`.agents/norn/trace/integrate-<story>.lock`); a non-clean rebase or merge yields `conflict` and routes via the workflow.
 
