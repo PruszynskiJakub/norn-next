@@ -67,15 +67,17 @@ const RENDERED = Symbol("norn.rendered");
  * A command's data together with its markdown for a reader (P8, see AGENTS.md "Decisions"): stdout
  * gets the markdown unless the caller passes `--json`, which prints `value`. Exit codes are the same
  * either way, so code branches on them and on `--json` data, never on the markdown.
+ * `asked` marks text a JSON command prints because the caller asked for it (`watch --human`).
  */
 export interface Rendered {
   [RENDERED]: true;
   value: unknown;
   markdown: string;
+  asked?: boolean;
 }
 
-export function rendered(value: unknown, markdown: string): Rendered {
-  return { [RENDERED]: true, value, markdown: markdown.endsWith("\n") ? markdown : `${markdown}\n` };
+export function rendered(value: unknown, markdown: string, opts: { asked?: boolean } = {}): Rendered {
+  return { [RENDERED]: true, value, markdown: markdown.endsWith("\n") ? markdown : `${markdown}\n`, ...(opts.asked ? { asked: true } : {}) };
 }
 
 export function isRendered(v: unknown): v is Rendered {

@@ -2,7 +2,8 @@
  * `runCli(argv, deps)`: parse → dispatch → one JSON value + exit code (P8). Never exits the
  * process and never prints; `main.ts` does both. Tests call this in-process with fakes.
  * A command with `markdown: true` prints markdown (its `rendered` result, refusals too) unless
- * `--json` is given; every command accepts `--json`. `value` is always the data.
+ * `--json` is given; every command accepts `--json`. `value` is always the data. A JSON command
+ * may print text the caller asked for with its own flag (`rendered(…, { asked: true })`).
  */
 import { parseArgs } from "node:util";
 import { ExitCode } from "@norn/schema";
@@ -63,7 +64,7 @@ export async function runCli(argv: string[], deps: CliDeps = {}): Promise<CliRes
     if (command.repo !== false) await ctx.locate();
     const out = await command.run(ctx, args);
     const [value, exit] = isWithExit(out) ? [out.value, out.exit] : [out ?? { ok: true }, ExitCode.ok];
-    if (isRendered(value)) return markdown ? { exit, value: value.value, stdout: value.markdown } : done(value.value, exit);
+    if (isRendered(value)) return markdown || (value.asked && !json) ? { exit, value: value.value, stdout: value.markdown } : done(value.value, exit);
     return done(value, exit);
   } catch (e) {
     const f = toFailure(e);

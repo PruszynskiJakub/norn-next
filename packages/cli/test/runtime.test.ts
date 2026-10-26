@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { NUDGE_TEXT } from "@norn/core";
 import { ulid } from "@norn/schema";
 import { appendReceipt, appendTrace, readTrace } from "@norn/store";
+import { humanSummary, humanTickLines } from "../src/commands/watch.ts";
 import { runCli, runShell, type TickReport } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
 
@@ -179,6 +180,34 @@ describe("watch", () => {
     expect(r.value).toMatchObject({ ticks: 2, released: [{ story: "gh-11", ok: true, pushed: ["gh-11-watch-me"] }] });
     expect(lines).toHaveLength(2);
     expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-11"])).toBe("");
+  });
+
+  test("--human prints a line per action and a sentence at exit; --json wins", async () => {
+    expect((await h.norn("take", "gh-11")).exit).toBe(0); // the first test released it
+    expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-11"])).not.toBe("");
+    const lines: string[] = [];
+    const r = await runCli(["watch", "--interval", "1ms", "--max-ticks", "2", "--human"], { ...h.deps, log: (l) => lines.push(l) });
+    expect(r.exit).toBe(0);
+    expect(r.value).toMatchObject({ ticks: 2, released: [{ story: "gh-11", ok: true }] });
+    expect(r.stdout).toMatch(/^Stopped after 2 ticks \(0 failed actions\)\.\nReleased gh-11 \(pushed gh-11-watch-me\)\.\n$/);
+    expect(lines[0]).toContain("a tick every 1ms");
+    expect(lines.length).toBeGreaterThan(1);
+    for (const l of lines.slice(1)) expect(l).toMatch(/^\d\d:\d\d:\d\d {2}gh-11 {2}\S+ → \S+$/);
+    expect(lines.some((l) => l.startsWith("{"))).toBe(false);
+
+    const json = await runCli(["watch", "--interval", "1ms", "--max-ticks", "1", "--human", "--json", "--keep-claims"], { ...h.deps, log: () => {} });
+    expect(JSON.parse(json.stdout)).toMatchObject({ ticks: 1, released: [] });
+  });
+
+  test("humanSummary names failed releases and kept claims", () => {
+    const base = { ticks: 1, failed_actions: 1, skipped_busy: 2 };
+    expect(humanSummary({ ...base, released: [{ story: "gh-1", ok: false, pushed: [], error: "push rejected" }] }, false)).toBe(
+      "Stopped after 1 tick (1 failed action, 2 skipped while another tick ran).\nCould not release gh-1: push rejected.",
+    );
+    expect(humanSummary({ ...base, released: [] }, true)).toContain("Kept the claims");
+    expect(humanTickLines([{ unit: "gh-1/02", rule: "agent.start", kind: "start_run", ok: false, error: "no pane" }], "2026-10-26T10:00:00Z")[0]).toMatch(
+      /^\d\d:\d\d:\d\d {2}gh-1\/02 {2}agent\.start → start_run {2}FAILED: no pane$/,
+    );
   });
 
   test("bad --interval is a usage error", async () => {
