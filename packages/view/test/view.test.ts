@@ -338,6 +338,13 @@ describe("formatters", () => {
     const out = formatInbox(v).split("\n");
     expect(out.indexOf("Running (1) · agents and checks at work")).toBe(0);
     expect(out).toContain("Notes (3) · agents' notes for you, no action needed · cleared by gh-1 human-qa approval; cleared when the story is done");
+    // NT6: the header line alone, with the command that lists them; `notes` lists them
+    const at = out.indexOf("Notes (3) · agents' notes for you, no action needed · cleared by gh-1 human-qa approval; cleared when the story is done");
+    expect(out[at + 1]).toBe("      $ norn inbox --notes");
+    expect(out.some((l) => l.includes("qa note on"))).toBe(false);
+    const listed = formatInbox(v, { notes: true });
+    expect(listed).toContain("  gh-1       qa note on gh-1: x · 1m");
+    expect(listed).not.toContain("norn inbox --notes");
   });
 
   test("formatInbox prints paths under home as ~/…", () => {
