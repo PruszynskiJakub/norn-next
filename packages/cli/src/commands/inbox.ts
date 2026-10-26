@@ -8,7 +8,7 @@
  * appeared_at / resolved_at / resolved_by, paired from the inbox changes each tick records.
  */
 import { parseDuration } from "@norn/schema";
-import { formatInbox } from "@norn/view";
+import { formatInbox, stepTitle } from "@norn/view";
 import { defineCommand, opt } from "../command.ts";
 import { rendered, usageError } from "../output.ts";
 import { projectView } from "../runtime/human.ts";
@@ -30,7 +30,7 @@ function formatHistory(items: readonly InboxHistoryItem[]): string {
     const unit = i.slice ?? i.story;
     const when = `${i.appeared_at ?? "?"} → ${i.resolved_at ?? "open"}`;
     const by = i.resolved_by ? ` (${i.resolved_by})` : "";
-    return `${when}  ${unit.padEnd(10)} ${i.group.padEnd(9)} ${i.step ? `${i.step}: ` : ""}${i.title}${by}${i.url ? `\n      ${i.url}` : ""}`;
+    return `${when}  ${unit.padEnd(10)} ${i.group.padEnd(9)} ${stepTitle(i.step, i.title)}${by}${i.url ? `\n      ${i.url}` : ""}`;
   });
   return `${lines.join("\n")}\n`;
 }

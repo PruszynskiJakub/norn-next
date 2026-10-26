@@ -4,10 +4,10 @@
  * Real git (temp repo + bare remote); fake RemotePort, RunnerPort and notifier.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, lstatSync, readdirSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { TickTrace } from "@norn/schema";
-import { readTrace } from "@norn/store";
+import { loadWorkflows, readTrace } from "@norn/store";
 import { replayInputs, type TickReport } from "../src/index.ts";
 import { decide } from "@norn/core";
 import { createHarness, type Harness, issue } from "./harness.ts";
@@ -89,6 +89,11 @@ describe("norn init", () => {
     expect(v.hooks[0]?.changed).toEqual([join(h.root, ".claude", "settings.json")]);
     expect(v.gitignore).toEqual([".agents/norn/trace/", ".env.norn", ".norn-unit"]);
     expect(v.gitattributes).toEqual([".agents/specs/*/runs/** linguist-generated=true gitlab-generated=true"]);
+    // nothing in the repo names a test command: the templates keep theirs, and init says so
+    expect(r.value).toMatchObject({ remote: { provider: "gh", label: "norn", git_remote: "origin", url: h.remoteDir }, test_command: { command: "bun test", detected_from: null, set_in: ["bug.yaml", "slice.yaml", "story.yaml"] } });
+    expect(r.stdout).toContain("Next steps\n  1. Set your test command:");
+    expect(r.stdout).toContain('`git add .agents .claude .gitignore .gitattributes && git commit -m "Set up norn" && git push`');
+    expect(r.stdout).toContain("`gh issue create --label norn --assignee @me --title \"…\"`");
     // SK1: one copy in .agents/skills (whole folders), linked from the agent's skill folder
     expect(existsSync(join(h.root, ".agents/skills/norn-review/SMELLS.md"))).toBe(true);
     expect(lstatSync(join(h.root, ".claude/skills/norn-implement")).isSymbolicLink()).toBe(true);
@@ -111,11 +116,34 @@ describe("norn init", () => {
     expect(r.stdout).toContain("claude → .claude/skills: all linked");
     expect(r.stdout).toContain("hooks           claude: up to date");
     expect(r.stdout).toContain("Nothing changed: norn is set up here.");
+    expect(r.stdout).toContain(`remote          origin → ${h.remoteDir}`);
+    expect(r.stdout).toContain("Next steps\n  1. Check this machine: `norn doctor`.");
+    expect(r.stdout).not.toContain("git commit");
     const json = await h.norn("init", "--json");
     expect(JSON.parse(json.stdout)).toEqual(json.value);
     expect(json.value).toMatchObject({ config: "exists", gitignore: [] });
     // --text, the old opt-in, is still accepted
     expect((await h.norn("init", "--text")).stdout).toBe(r.stdout);
+  });
+
+  test("help prints the commands grouped for a person, Start here first; --json prints the list", async () => {
+    const r = await h.norn("help");
+    expect(r.exit).toBe(0);
+    expect(r.stdout).toStartWith("norn — deliver software stories");
+    expect(r.stdout).toMatch(/\nStart here\n  norn init +Set up norn in this repository: config, workflows, skills, hooks\n/);
+    expect(r.stdout).not.toMatch(/\((?:A1|§9\.3)/); // spec ids stay in the JSON
+    const list = (r.value as { commands: Array<{ command: string; summary: string }> }).commands;
+    for (const c of list) expect(r.stdout).toContain(`  norn ${c.command} `);
+    expect(list.find((c) => c.command === "init")?.summary).toContain("(A1, SK1, W1)");
+    expect(() => JSON.parse(r.stdout)).toThrow();
+    expect(JSON.parse((await h.norn("help", "--json")).stdout)).toEqual(r.value);
+    // `norn`, `norn --help` and `norn <command> --help` are `norn help`
+    expect((await h.norn()).stdout).toBe(r.stdout);
+    expect((await h.norn("--help")).stdout).toBe(r.stdout);
+    expect(JSON.parse((await h.norn("--help", "--json")).stdout)).toEqual(r.value);
+    const watch = await h.norn("watch", "--help");
+    expect(watch.stdout).toBe("norn watch — Run ticks in a loop; a clean exit releases held claims\n\n    norn watch [--interval 30s] [--max-ticks N] [--keep-claims]\n");
+    expect((await h.norn("watch", "--help", "--json")).value).toMatchObject({ command: "watch", usage: expect.stringContaining("--interval") });
   });
 
   test("unknown commands and bad options are usage errors with do_instead", async () => {
@@ -316,5 +344,31 @@ describe("a story through the slice workflow", () => {
       expect(replayed.map((d) => d.rule)).toEqual(t.decisions.map((d) => d.rule));
       expect(JSON.parse(JSON.stringify(replayed.map((d) => d.action)))).toEqual(t.decisions.map((d) => d.action));
     }
+  });
+});
+
+describe("norn init in a repository with a test command and no remote", () => {
+  let f: Harness;
+  beforeAll(async () => {
+    f = await createHarness();
+  });
+  afterAll(() => f.cleanup());
+
+  test("writes the detected test command into the workflows and puts adding the remote first", async () => {
+    writeFileSync(join(f.root, "package.json"), JSON.stringify({ name: "app", scripts: { test: "vitest run" } }));
+    writeFileSync(join(f.root, "package-lock.json"), "{}");
+    f.git(["remote", "remove", "origin"]);
+    const r = await f.norn("init");
+    expect(r.exit).toBe(0);
+    expect(r.value).toMatchObject({ remote: { url: null }, test_command: { command: "npm ci && npm test", detected_from: "package.json", set_in: ["bug.yaml", "slice.yaml", "story.yaml"] } });
+    const story = readFileSync(join(f.root, ".agents/norn/workflows/story.yaml"), "utf8");
+    expect(story).toContain('run: "npm ci && npm test"');
+    expect(story).not.toContain("run: bun test");
+    expect(r.stdout).toContain("remote          no git remote named origin");
+    expect(r.stdout).toContain("Next steps\n  1. Add the remote norn syncs issues from and pushes branches to: `git remote add origin <url>`.\n  2. Check the test command `npm ci && npm test`");
+    // the edited templates still validate (W5), with the command as the test check's run
+    const listing = loadWorkflows(f.root);
+    expect(listing.errors).toEqual([]);
+    expect(listing.workflows.story?.workflow.steps.test).toMatchObject({ type: "check", run: "npm ci && npm test" });
   });
 });

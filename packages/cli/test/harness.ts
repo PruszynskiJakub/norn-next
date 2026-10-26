@@ -75,8 +75,10 @@ export class FakeRunner implements RunnerPort {
   sendError: Error | null = null;
   /** R5.1: sessions `findSessions` reports */
   found: RunnerSessionInfo[] = [];
+  /** what `available` answers (doctor tests flip it) */
+  availableResult = true;
   async available() {
-    return true;
+    return this.availableResult;
   }
   /** R6.2: keystrokes typed into prompts; `keysError` set → `sendKeys` throws it (R6.3) */
   keyed: Array<{ session: SessionRef; keys: PromptKey[] }> = [];
