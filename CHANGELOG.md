@@ -4,6 +4,8 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-26
+
 ### Added
 
 - `norn tidy` closes what runs that reported done left in Herdr, when Herdr is the runner: the run's tab, or only its pane when the tab holds something else, and the workspace when nothing else is left. It only touches panes of done runs started on this machine that still work in the run's worktree, keeps one whose agent is still working, and lists them with `--dry-run` (K7).
