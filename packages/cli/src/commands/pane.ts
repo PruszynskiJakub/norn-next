@@ -17,7 +17,7 @@ import { formatInbox, inboxItemsInOrder, type ProjectView } from "@norn/view";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { usageError } from "../output.ts";
-import { goTo, labelPanes, oldestYourTurn, parseCockpitLine, planCockpit, toneOf, verbMessage } from "../runtime/cockpit.ts";
+import { goTo, goToWorkspace, labelPanes, oldestYourTurn, parseCockpitLine, planCockpit, toneOf, verbMessage } from "../runtime/cockpit.ts";
 import { renderFrame, type Tone } from "../runtime/cockpit-view.ts";
 import { projectView } from "../runtime/human.ts";
 
@@ -108,6 +108,7 @@ async function interactive(ctx: Context, raw: string, interval: number, max: num
     else if (step.kind === "message") text = step.text;
     else if (step.kind === "output") output = step.text;
     else if (step.kind === "go") text = await goTo(cockpit, step.item, ctx.cwd).catch((e: Error) => `could not go there: ${e.message}`);
+    else if (step.kind === "workspace") text = await goToWorkspace(cockpit, step.item).catch((e: Error) => `could not go there: ${e.message}`);
     else {
       const r = await runVerb(ctx, step.argv);
       text = verbMessage(step.argv, r.exit, r.value);

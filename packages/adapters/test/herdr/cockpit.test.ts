@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { createHerdrCockpit, findAgentPane, type HerdrAgent } from "../../src/herdr/cockpit.ts";
+import { createHerdrCockpit, findAgentPane, findWorkspace, type HerdrAgent } from "../../src/herdr/cockpit.ts";
 import { createHerdrNotifier, herdrNotifyArgv } from "../../src/notify/index.ts";
 import type { Exec, ExecResult } from "../../src/process/exec.ts";
 import agentList from "./fixtures/agent-list.json";
+import paneList from "./fixtures/pane-list.json";
+import workspaceList from "./fixtures/workspace-list.json";
 
 const ok = (v: unknown): ExecResult => ({ code: 0, stdout: typeof v === "string" ? v : JSON.stringify(v), stderr: "" });
 const empty: ExecResult = { code: 0, stdout: "", stderr: "" };
@@ -63,6 +65,31 @@ describe("herdr cockpit (HC6, HC12)", () => {
       ["pane", "run", "w2:p7", "cd /wt && claude 'go'"],
     ]);
   });
+});
+
+test("listWorkspaces pairs `herdr workspace list` with each pane's cwd; focusWorkspace argv (HC15)", async () => {
+  const { exec, calls } = fakeExec([
+    ["workspace list", ok(workspaceList)],
+    ["pane list", ok(paneList)],
+    ["workspace focus", empty],
+  ]);
+  const cockpit = createHerdrCockpit({ exec });
+  const ws = await cockpit.listWorkspaces();
+  expect(ws).toEqual([
+    { workspace_id: "w2", label: "repo", pane_ids: ["w2:p1", "w2:p2"], cwds: ["/repo", "/repo"] },
+    { workspace_id: "w3A", label: "gh-1/01 implement", pane_ids: ["w3A:p1"], cwds: ["/repo-worktrees/gh-1-01-login"] },
+    { workspace_id: "w4", label: "empty", pane_ids: [], cwds: [] },
+  ]);
+  await cockpit.focusWorkspace("w3A");
+  expect(calls.at(-1)?.slice(1)).toEqual(["workspace", "focus", "w3A"]);
+
+  const reach = (r: Partial<{ worktree: string; pane_id: string }>) => ({ worktree: null, agent_session_id: null, pane_id: null, ...r });
+  expect(findWorkspace(ws, reach({ pane_id: "w3A:p1", worktree: "/elsewhere" }))).toBe("w3A");
+  expect(findWorkspace(ws, reach({ pane_id: "w9:p9", worktree: "/repo-worktrees/gh-1-01-login/" }))).toBe("w3A");
+  // several workspaces work in /repo, none in an unknown worktree: no guess
+  expect(findWorkspace([...ws, { workspace_id: "w5", label: "x", pane_ids: [], cwds: ["/repo/sub"] }], reach({ worktree: "/repo" }))).toBeNull();
+  expect(findWorkspace(ws, reach({ worktree: "/nope" }))).toBeNull();
+  expect(findWorkspace(ws, undefined)).toBeNull();
 });
 
 test("pluginLinked reads `herdr plugin list --json` (HC11)", async () => {

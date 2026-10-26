@@ -1,11 +1,13 @@
 /**
  * Herdr side of the cockpit (`norn pane --interactive`, HC4–HC13): find the agent pane of a run,
- * focus it, label it in Herdr's sidebar, open a pane that runs a command. Presentation only — none
+ * focus it or its workspace, label it in Herdr's sidebar, open a pane that runs a command. Presentation only — none
  * of this is a fact for decide (HC13).
  *
  * Command mapping:
  * - listAgents  → `herdr agent list`                                  (pane, cwd, agent session id)
  * - focus       → `herdr agent focus <pane>`
+ * - listWorkspaces → `herdr workspace list`, `herdr pane list`         (each workspace with its panes' cwds)
+ * - focusWorkspace → `herdr workspace focus <workspace>`
  * - label       → `herdr pane report-metadata <pane> --source norn --title T --state-label S=L… --ttl-ms N`
  * - openCommand → `herdr pane split [--current] --direction right --cwd C --no-focus`, `herdr pane run <pane> <cmd>`
  * - pluginLinked → `herdr plugin list --json`                         (HC11: is norn's plugin linked and enabled)
@@ -22,6 +24,15 @@ export interface HerdrAgent {
   cwd: string | null;
   /** the agent tool's own session id (Claude's session uuid), when Herdr recognized it */
   agent_session_id: string | null;
+}
+
+/** HC15: a Herdr workspace with the panes in it. */
+export interface HerdrWorkspace {
+  workspace_id: string;
+  label: string;
+  pane_ids: string[];
+  /** foreground working directory of each pane, else the pane's */
+  cwds: string[];
 }
 
 /** HC3: where a run lives, as the inbox item carries it. */
@@ -41,6 +52,8 @@ export interface PaneLabel {
 export interface HerdrCockpit {
   listAgents(): Promise<HerdrAgent[]>;
   focus(paneId: string): Promise<void>;
+  listWorkspaces(): Promise<HerdrWorkspace[]>;
+  focusWorkspace(workspaceId: string): Promise<void>;
   label(paneId: string, label: PaneLabel): Promise<void>;
   /** split a pane beside the caller (focus stays put) and run `command` in it */
   openCommand(cwd: string, command: string, title?: string): Promise<{ pane_id: string }>;
@@ -71,7 +84,18 @@ interface ListedAgent {
   agent_session?: { value?: string } | null;
 }
 
+interface ListedPane {
+  pane_id?: string;
+  workspace_id?: string;
+  cwd?: string;
+  foreground_cwd?: string;
+}
+
 const trimSlash = (p: string) => p.replace(/\/+$/, "");
+const inside = (cwd: string, worktree: string) => {
+  const wt = trimSlash(worktree);
+  return trimSlash(cwd) === wt || cwd.startsWith(`${wt}/`);
+};
 
 /**
  * HC6: the agent pane of a run — its recorded pane id when Herdr still hosts an agent there, else the
@@ -87,9 +111,23 @@ export function findAgentPane(agents: readonly HerdrAgent[], reach: RunReach | u
     if (bySession.length > 1) return null;
   }
   if (!reach.worktree) return null;
-  const wt = trimSlash(reach.worktree);
-  const inWorktree = agents.filter((a) => a.cwd !== null && (trimSlash(a.cwd) === wt || a.cwd.startsWith(`${wt}/`)));
+  const wt = reach.worktree;
+  const inWorktree = agents.filter((a) => a.cwd !== null && inside(a.cwd, wt));
   return inWorktree.length === 1 ? (inWorktree[0]?.pane_id ?? null) : null;
+}
+
+/**
+ * HC15: the workspace of a run — the one holding its recorded pane, else the one workspace with a
+ * pane in the unit worktree. Several candidates → null, as for panes (HC6).
+ */
+export function findWorkspace(workspaces: readonly HerdrWorkspace[], reach: RunReach | undefined): string | null {
+  if (!reach) return null;
+  const byPane = reach.pane_id ? workspaces.find((w) => w.pane_ids.includes(reach.pane_id as string)) : undefined;
+  if (byPane) return byPane.workspace_id;
+  const wt = reach.worktree;
+  if (!wt) return null;
+  const inWorktree = workspaces.filter((w) => w.cwds.some((c) => inside(c, wt)));
+  return inWorktree.length === 1 ? (inWorktree[0]?.workspace_id ?? null) : null;
 }
 
 export function createHerdrCockpit(opts: HerdrCockpitOptions = {}): HerdrCockpit {
@@ -130,6 +168,29 @@ export function createHerdrCockpit(opts: HerdrCockpitOptions = {}): HerdrCockpit
     },
     async focus(paneId) {
       await herdr(["agent", "focus", paneId]);
+    },
+    async listWorkspaces() {
+      const ws = (await herdr(["workspace", "list"])) as { result?: { workspaces?: Array<{ workspace_id?: string; label?: string }> } } | null;
+      const ps = (await herdr(["pane", "list"])) as { result?: { panes?: ListedPane[] } } | null;
+      const panes = ps?.result?.panes ?? [];
+      return (ws?.result?.workspaces ?? []).flatMap((w) => {
+        if (!w.workspace_id) return [];
+        const mine = panes.filter((p) => p.workspace_id === w.workspace_id && p.pane_id);
+        return [
+          {
+            workspace_id: w.workspace_id,
+            label: w.label ?? "",
+            pane_ids: mine.map((p) => p.pane_id as string),
+            cwds: mine.flatMap((p) => {
+              const cwd = p.foreground_cwd ?? p.cwd;
+              return cwd ? [cwd] : [];
+            }),
+          },
+        ];
+      });
+    },
+    async focusWorkspace(workspaceId) {
+      await herdr(["workspace", "focus", workspaceId]);
     },
     async label(paneId, label) {
       const states = Object.entries(label.state_labels).flatMap(([state, text]) => ["--state-label", `${state}=${text}`]);
