@@ -5,9 +5,10 @@
  * the agent that waits for its person.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
+import { join } from "node:path";
 import type { herdr } from "@norn/adapters";
 import { ulid } from "@norn/schema";
-import { appendTrace } from "@norn/store";
+import { appendTrace, readCockpitFile } from "@norn/store";
 import { runCli } from "../src/index.ts";
 import { goTo, goToWorkspace, parseCockpitLine, planCockpit } from "../src/runtime/cockpit.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
@@ -69,6 +70,18 @@ function fakeHerdr(agents: herdr.HerdrAgent[] = [], workspaces: herdr.HerdrWorks
     },
     async pluginLinked() {
       return null;
+    },
+    async listPanes() {
+      return [];
+    },
+    async closePane(id) {
+      calls.push(`close pane ${id}`);
+    },
+    async closeTab(id) {
+      calls.push(`close tab ${id}`);
+    },
+    async closeWorkspace(id) {
+      calls.push(`close workspace ${id}`);
     },
   };
   return { cockpit, calls };
@@ -148,6 +161,51 @@ describe("norn pane --interactive (HC4–HC8) and --next (HC10)", () => {
     await runCli(["pane", "--interactive", "--interval", "5s", "--max-frames", "1"], { ...c.deps, herdr: lab.cockpit, input: lines(), log: (l) => frames.push(l) });
     expect(frames[0]).toMatch(/gh-5 {2}refine {2}the agent is waiting for you/);
     expect(lab.calls).toEqual(["label w9:p5 gh-5 · refine norn: your turn 15000"]);
+  });
+});
+
+describe("Notes in the cockpit (HC16)", () => {
+  let c: Harness;
+  beforeAll(async () => {
+    c = await createHarness();
+    expect((await c.norn("init")).exit).toBe(0);
+    c.git(["add", "-A"]);
+    c.git(["commit", "-q", "-m", "norn init"]);
+    c.git(["push", "-q", "origin", "main"]);
+    c.remote.issues = [issue(5, "Pay invoices")];
+    for (let i = 0; i < 3; i++) {
+      c.clock.advance(60_000);
+      await c.tick();
+    }
+    const wt = `${c.root}-worktrees/gh-5-pay-invoices`;
+    const brief = await runCli(["brief", "--json"], { ...c.deps, cwd: wt, env: { ...c.deps.env, NORN_AGENT_PID: String(process.pid) } });
+    expect(brief.exit).toBe(0);
+    c.clock.advance(1000);
+    c.report(join(wt, ".agents/specs/gh-5-pay-invoices/runs/_story"), "done", { outcome: "done", handoff: "spec written", notes: [{ text: "invoices are counted per month; confirm" }] });
+    c.clock.advance(1000);
+    await c.tick();
+  });
+  afterAll(() => c.cleanup());
+
+  const session = async (...input: string[]) => {
+    const frames: string[] = [];
+    const r = await runCli(["pane", "--interactive", "--interval", "1h"], { ...c.deps, env: { ...c.deps.env, COLUMNS: "200" }, herdr: null, input: lines(...input, "q"), log: (l) => frames.push(l) });
+    expect(r.exit).toBe(0);
+    return frames;
+  };
+
+  test("collapsed with the new count; o opens them and marks them seen on this checkout; the next session shows none new", async () => {
+    expect(readCockpitFile(c.root).notes_seen_at).toBeUndefined();
+    const [collapsed, open] = await session("o");
+    expect(collapsed).toContain("▸ NOTES 1 · 1 new");
+    expect(collapsed).not.toContain("invoices are counted per month");
+    expect(open).toContain("▾ NOTES 1");
+    expect(open).toContain("invoices are counted per month");
+    expect(readCockpitFile(c.root).notes_seen_at).toBeDefined();
+
+    const [again] = await session();
+    expect(again).toContain("▸ NOTES 1  ");
+    expect(again).not.toContain("new");
   });
 });
 

@@ -271,6 +271,7 @@ Three sources of outcomes:
 - NT3 Every story-level gate lists the story's open notes in its inbox item. Approving it records them in the `approve` receipt (`acknowledged_notes`), and they leave the inbox; rejecting leaves them open.
 - NT4 The `qa` skill uses a note, not `person`, when a criterion passed as written but a person may read it differently.
 - NT5 The Notes header says when its notes clear: `cleared by <story> <gate> approval`, naming the nearest story-level gate ahead of the story unit's step (its own when it waits at one), else `cleared when the story is done`. A slice gate's item lists that slice's open notes too; approving a slice gate does not acknowledge them.
+- NT6 `norn inbox` (and `norn pane` without `--interactive`) shows Notes as their header line only, with `norn inbox --notes` beneath; `--notes` lists them. The JSON always carries every note. The cockpit shows them as an accordion (SPEC-herdr-cockpit HC16).
 
 ## 11. Workflows
 
@@ -394,6 +395,7 @@ Example `bug` workflow: `reproduce (agent; reproduced → implement, cannot_repr
 - K4.1 Before a check runs, every process listening on the worktree's slot ports (`PORT_BASE` … `PORT_BASE + ports_per_slot - 1`) whose working directory is inside that worktree is stopped (SIGTERM, then SIGKILL after 2 s) and named at the top of the check output: a server an agent left running must not fail the check with "address in use". Listeners started elsewhere are left alone; without `lsof` nothing is stopped.
 - K5 The tick creates slice worktrees when a slice starts and removes them after integration. `norn tidy [--dry-run]` reports or cleans orphans; each tick reports them.
 - K6 Integration into the story branch is serialized per story — slice `integrate` and the story's base `update` (BS3) take the same integrate lock (`.agents/norn/trace/integrate-<story>.lock`); a non-clean rebase or merge yields `conflict` and routes via the workflow.
+- K7 With Herdr as the runner, `norn tidy` also closes what runs that reported `done` left in Herdr: the run's tab, or only its pane when the tab holds something else, and its workspace when nothing else is left in it. A run counts only when its `started` receipt recorded a Herdr pane on this machine; the pane is found by that id and must still work in the run's worktree, and one whose agent is still working is kept. Runs that ended any other way (ask, stuck, died) are left alone. `--dry-run` lists them; a Herdr that cannot be reached is reported under `kept`, and the rest of tidy still runs. Closing happens only in `tidy`, never after a run on its own.
 
 ## 15. Human interface and observability
 

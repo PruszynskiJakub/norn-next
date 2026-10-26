@@ -11,6 +11,8 @@
  * - label       → `herdr pane report-metadata <pane> --source norn --title T --state-label S=L… --ttl-ms N`
  * - openCommand → `herdr pane split [--current] --direction right --cwd C --no-focus`, `herdr pane run <pane> <cmd>`
  * - pluginLinked → `herdr plugin list --json`                         (HC11: is norn's plugin linked and enabled)
+ * - listPanes   → `herdr pane list`                                   (K7: each pane with its tab, workspace, cwd)
+ * - closePane / closeTab / closeWorkspace → `herdr pane|tab|workspace close <id>` (K7; not found = already gone)
  */
 import { portError } from "../process/error.ts";
 import { type Exec, bunExec } from "../process/exec.ts";
@@ -33,6 +35,17 @@ export interface HerdrWorkspace {
   pane_ids: string[];
   /** foreground working directory of each pane, else the pane's */
   cwds: string[];
+}
+
+/** K7: where a pane sits — its tab and workspace — with its working directory and agent status. */
+export interface HerdrPaneSpot {
+  pane_id: string;
+  tab_id: string;
+  workspace_id: string;
+  /** foreground working directory, else the pane's */
+  cwd: string | null;
+  /** Herdr's agent status (`working`, `idle`, `done`, …); `unknown` without an agent */
+  status: string;
 }
 
 /** HC3: where a run lives, as the inbox item carries it. */
@@ -59,6 +72,12 @@ export interface HerdrCockpit {
   openCommand(cwd: string, command: string, title?: string): Promise<{ pane_id: string }>;
   /** HC11: norn's plugin (`PLUGIN_ID`) is linked — enabled or not; null = not linked */
   pluginLinked(): Promise<{ enabled: boolean; root: string | null } | null>;
+  /** K7: every pane with its tab and workspace */
+  listPanes(): Promise<HerdrPaneSpot[]>;
+  /** K7: close one pane, tab or workspace; one that is already gone is not an error */
+  closePane(paneId: string): Promise<void>;
+  closeTab(tabId: string): Promise<void>;
+  closeWorkspace(workspaceId: string): Promise<void>;
 }
 
 export interface HerdrCockpitOptions {
@@ -86,13 +105,16 @@ interface ListedAgent {
 
 interface ListedPane {
   pane_id?: string;
+  tab_id?: string;
   workspace_id?: string;
+  agent_status?: string;
   cwd?: string;
   foreground_cwd?: string;
 }
 
 const trimSlash = (p: string) => p.replace(/\/+$/, "");
-const inside = (cwd: string, worktree: string) => {
+/** `cwd` is the worktree or a folder in it. */
+export const inside = (cwd: string, worktree: string) => {
   const wt = trimSlash(worktree);
   return trimSlash(cwd) === wt || cwd.startsWith(`${wt}/`);
 };
@@ -138,13 +160,25 @@ export function createHerdrCockpit(opts: HerdrCockpitOptions = {}): HerdrCockpit
   async function herdr(args: string[]): Promise<unknown> {
     const r = await exec([...base, ...args], { timeoutMs: 10_000 });
     if (r.code === 127) throw portError("runner_unavailable", `herdr not runnable: ${r.stderr.trim()}`);
-    if (r.code !== 0) throw portError("herdr_error", `herdr ${args.slice(0, 2).join(" ")}: ${r.stderr.trim() || `exit ${r.code}`}`);
+    if (r.code !== 0) {
+      const message = `herdr ${args.slice(0, 2).join(" ")}: ${r.stderr.trim() || `exit ${r.code}`}`;
+      throw portError(/"code"\s*:\s*"(pane|tab|workspace)_not_found"/.test(r.stderr) ? "session_gone" : "herdr_error", message);
+    }
     const text = r.stdout.trim();
     if (!text) return null;
     try {
       return JSON.parse(text);
     } catch {
       return text;
+    }
+  }
+
+  /** K7: close one thing; one already gone is not an error. */
+  async function close(kind: "pane" | "tab" | "workspace", id: string): Promise<void> {
+    try {
+      await herdr([kind, "close", id]);
+    } catch (err) {
+      if ((err as { code?: string }).code !== "session_gone") throw err;
     }
   }
 
@@ -210,5 +244,16 @@ export function createHerdrCockpit(opts: HerdrCockpitOptions = {}): HerdrCockpit
       const p = out?.result?.plugins?.find((x) => x.plugin_id === PLUGIN_ID);
       return p ? { enabled: p.enabled !== false, root: p.plugin_root ?? null } : null;
     },
+    async listPanes() {
+      const out = (await herdr(["pane", "list"])) as { result?: { panes?: ListedPane[] } } | null;
+      return (out?.result?.panes ?? []).flatMap((p) =>
+        p.pane_id && p.tab_id && p.workspace_id
+          ? [{ pane_id: p.pane_id, tab_id: p.tab_id, workspace_id: p.workspace_id, cwd: p.foreground_cwd ?? p.cwd ?? null, status: p.agent_status ?? "unknown" }]
+          : [],
+      );
+    },
+    closePane: (id) => close("pane", id),
+    closeTab: (id) => close("tab", id),
+    closeWorkspace: (id) => close("workspace", id),
   };
 }
