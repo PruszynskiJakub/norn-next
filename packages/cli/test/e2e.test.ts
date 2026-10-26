@@ -142,7 +142,7 @@ describe("norn init", () => {
     expect((await h.norn("--help")).stdout).toBe(r.stdout);
     expect(JSON.parse((await h.norn("--help", "--json")).stdout)).toEqual(r.value);
     const watch = await h.norn("watch", "--help");
-    expect(watch.stdout).toBe("norn watch — Run ticks in a loop; a clean exit releases held claims\n\n    norn watch [--interval 30s] [--max-ticks N] [--keep-claims]\n");
+    expect(watch.stdout).toBe("norn watch — Run ticks in a loop; a clean exit releases held claims\n\n    norn watch [--interval 30s] [--max-ticks N] [--keep-claims] [--human]\n");
     expect((await h.norn("watch", "--help", "--json")).value).toMatchObject({ command: "watch", usage: expect.stringContaining("--interval") });
   });
 
