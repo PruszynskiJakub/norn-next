@@ -111,7 +111,7 @@ describe("norn pane --interactive (HC4–HC8) and --next (HC10)", () => {
     expect(frames[1]).toContain("[1] is not a gate (Approve)");
     expect(frames[2]).toContain("no item 9 in this frame");
     expect(frames[3]).toContain("started an agent for gh-5 in w9:p1");
-    expect(h.calls).toEqual([`open ${c.root} cd ${wt5()} && claude 'Use the norn skill, then run \`norn brief\`.'`]);
+    expect(h.calls).toEqual([`open ${c.root} cd ${wt5()} && claude --permission-mode auto -- 'Use the norn skill, then run \`norn brief\`.'`]);
     expect(frames[4]).toContain("ok: norn trace gh-6");
   });
 

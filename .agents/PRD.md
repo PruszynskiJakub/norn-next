@@ -388,6 +388,7 @@ Example `bug` workflow: `reproduce (agent; reproduced → implement, cannot_repr
 
 - K1 `max_agents` (default 2) and `max_checks` are **per machine**, across all repositories and stories. Extra ready steps queue: oldest story (by intake time) first, then slice number.
 - K2 Configuration has one schema in two layers: `~/.norn/config.yaml` (user) and `.agents/norn/config.yaml` (repo). The repo overrides the user layer, except that machine caps (`max_agents`, `max_checks`, slot range) can only be lowered by a repo.
+- K2a `norn config [<key>]` prints the resolved configuration: each setting with its value, the layer it came from (built-in, user, repo), a repo value a machine cap ignores, and a note where the layering hides something (a repo setting a machine key, `default_mode: auto` with no runner, an agent's own permission mode). Read only.
 - K3 Agent and port slots are lease files in `~/.norn/leases/`, created atomically (`O_EXCL`) with repo, unit, `run_id`, PID and start time. Dead holders are reclaimed by PID + start-time check. Leases are not committed; another machine allocates its own.
 - K4 Each worktree gets a slot (`NORN_SLOT`, `PORT_BASE`, optional extra per-slot resources from config) in `.env.norn`.
 - K4.1 Before a check runs, every process listening on the worktree's slot ports (`PORT_BASE` … `PORT_BASE + ports_per_slot - 1`) whose working directory is inside that worktree is stopped (SIGTERM, then SIGKILL after 2 s) and named at the top of the check output: a server an agent left running must not fail the check with "address in use". Listeners started elsewhere are left alone; without `lsof` nothing is stopped.
@@ -406,7 +407,7 @@ Example `bug` workflow: `reproduce (agent; reproduced → implement, cannot_repr
 | Agent protocol | `brief`, `done`, `ask`, `stuck`, `hook` |
 | Human | `inbox`, `open` (MO5), `answer`, `approve [--reject]`, `unstick [--to <step>] [--reset <counter>]`, `update <story>` (BS9), `mode`, `workflow` |
 | Team | `take`, `release`, `drop` |
-| Views | `status`, `trace <unit>`, `why <unit>` |
+| Views | `status`, `config [<key>]` (K2a), `trace <unit>`, `why <unit>` |
 | Housekeeping | `tidy` |
 
 - O1 `norn inbox` (and a Herdr status pane) groups by action: **Your turn** (attended steps), **Answer**, **Approve**, **Unblock**, **Check**, **Unclaimed**, **Running**, **Notes** (NT2), **Recently done**; each group title carries a few words on what it holds, and each item shows question/reason, age and the exact command to resolve it. A person's start of an agent step (Your turn) shows `norn open <unit>` when the runner can open a terminal (MO5), with the start command to type by hand in the detail; otherwise the start command itself. A story taken in on this checkout that no tick has started yet is listed too: under Running while the heartbeat is up, else under Your turn with `norn watch`. `norn pane --interactive` acts on the items through CLI verbs (SPEC-herdr-cockpit HC4–HC8).
