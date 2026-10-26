@@ -438,6 +438,28 @@ describe("audit fixes", () => {
     expect(kinds(facts([g]))[0]).toBe("gh-1 noop slices.wait");
   });
 
+  test("the slices step resumes by itself once a stuck slice moves again (§10)", () => {
+    const stuckSlice = { status: "stuck" as const, park: { kind: "stuck" as const, reason: "cannot build", since: at() } };
+    const parkedBy = only(facts([storyAt("slices", {}, [{ nn: "01", state: stuckSlice }])]));
+    if (parkedBy.kind !== "classify" || !parkedBy.state) throw new Error("expected the slices step to classify stuck");
+    const storyStuck = parkedBy.state;
+    const withSlice = (slice: Partial<UnitState>) => {
+      const f = storyAt("slices", {}, [{ nn: "01", state: slice }]);
+      f.units[0]!.state = storyStuck;
+      return f;
+    };
+    // the slice is still stuck: the story waits for a person
+    expect(kinds(facts([withSlice(stuckSlice)]))[0]).toBe("gh-1 noop unit.stuck");
+    // a person unstuck the slice: norn unsticks the story back into its slices step
+    const a = only(facts([withSlice({ status: "running" })]));
+    expect(a).toMatchObject({ kind: "apply_receipts", rule: "slices.resume", state: { step: "slices", status: "ready", park: null } });
+    expect(a.kind === "apply_receipts" && a.receipts[0]?.receipt).toMatchObject({ kind: "unstick", by: "norn", step: "slices" });
+    // stuck for another reason at the slices step (a remote change): never resumed by norn
+    const remote = withSlice({ status: "running" });
+    remote.units[0]!.state = { ...storyStuck, park: { kind: "remote", reason: "remote: issue closed", since: at() } };
+    expect(kinds(facts([remote]))[0]).toBe("gh-1 noop unit.stuck");
+  });
+
   test("GR8: leaving the refine step records refined_body_hash once", () => {
     const f = storyAt("slices", {}, [{ nn: "01", state: { status: "running" } }]);
     f.units[0]!.state = { ...f.units[0]!.state!, visits: { refine: 1, slices: 1 } };

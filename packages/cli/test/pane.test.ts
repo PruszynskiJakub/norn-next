@@ -9,7 +9,7 @@ import type { herdr } from "@norn/adapters";
 import { ulid } from "@norn/schema";
 import { appendTrace } from "@norn/store";
 import { runCli } from "../src/index.ts";
-import { parseCockpitLine, planCockpit } from "../src/runtime/cockpit.ts";
+import { goTo, goToWorkspace, parseCockpitLine, planCockpit } from "../src/runtime/cockpit.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
@@ -45,7 +45,7 @@ describe("norn pane", () => {
 });
 
 /** A fake Herdr for the cockpit: fixed agents, every call recorded. */
-function fakeHerdr(agents: herdr.HerdrAgent[] = []) {
+function fakeHerdr(agents: herdr.HerdrAgent[] = [], workspaces: herdr.HerdrWorkspace[] = []) {
   const calls: string[] = [];
   const cockpit: herdr.HerdrCockpit = {
     async listAgents() {
@@ -53,6 +53,12 @@ function fakeHerdr(agents: herdr.HerdrAgent[] = []) {
     },
     async focus(pane) {
       calls.push(`focus ${pane}`);
+    },
+    async listWorkspaces() {
+      return workspaces;
+    },
+    async focusWorkspace(id) {
+      calls.push(`focus workspace ${id}`);
     },
     async label(pane, l) {
       calls.push(`label ${pane} ${l.title} ${l.state_labels.idle ?? "-"} ${l.ttl_ms}`);
@@ -151,5 +157,34 @@ describe("cockpit planner (HC5)", () => {
     expect(planCockpit(parseCockpitLine("1"), [{ ...base, command: "norn open gh-5" }])).toEqual({ kind: "verb", argv: ["open", "gh-5"] });
     const running = { ...base, command: "cd /wt", reach: { worktree: "/wt", agent_session_id: "s", pane_id: null } };
     expect(planCockpit(parseCockpitLine("g 1"), [running])).toEqual({ kind: "go", item: running });
+  });
+});
+
+describe("cockpit workspaces (HC15)", () => {
+  const base = { id: "i", group: "approve" as const, story: "gh-5", slice: "gh-5/01", step: "review", title: "t", command: "norn approve gh-5/01", since: "2099-01-15T10:00:00.000Z", age: "1m" };
+  const withRun = { ...base, reach: { worktree: "/wt/gh-5", agent_session_id: null, pane_id: null } };
+  const ws = (id: string, ...cwds: string[]): herdr.HerdrWorkspace => ({ workspace_id: id, label: id, pane_ids: cwds.map((_, i) => `${id}:p${i + 1}`), cwds });
+
+  test("w <n> plans a workspace jump for any item", () => {
+    expect(parseCockpitLine("w 2")).toEqual({ kind: "workspace", n: 2 });
+    expect(planCockpit(parseCockpitLine("w 1"), [withRun])).toEqual({ kind: "workspace", item: withRun });
+    expect(planCockpit(parseCockpitLine("w 3"), [withRun])).toEqual({ kind: "message", text: "no item 3 in this frame" });
+  });
+
+  test("w <n> focuses the one workspace with a pane in the unit worktree; never a guess", async () => {
+    const h = fakeHerdr([], [ws("w1", "/repo"), ws("w2", "/wt/gh-5/src")]);
+    expect(await goToWorkspace(h.cockpit, withRun)).toBe("focused workspace w2 (gh-5/01)");
+    expect(h.calls).toEqual(["focus workspace w2"]);
+    const two = fakeHerdr([], [ws("w2", "/wt/gh-5"), ws("w3", "/wt/gh-5")]);
+    expect(await goToWorkspace(two.cockpit, withRun)).toBe("no single workspace found for gh-5/01 — $ norn approve gh-5/01");
+    expect(await goToWorkspace(h.cockpit, base)).toBe("no workspace known for gh-5/01: it has no run — $ norn approve gh-5/01");
+    expect(await goToWorkspace(null, withRun)).toBe("$ norn approve gh-5/01");
+    expect(two.calls).toEqual([]);
+  });
+
+  test("go falls back to the workspace when no agent pane is found", async () => {
+    const h = fakeHerdr([], [ws("w2", "/wt/gh-5")]);
+    expect(await goTo(h.cockpit, withRun, "/repo")).toBe("focused workspace w2 (gh-5/01)");
+    expect(await goTo(fakeHerdr().cockpit, withRun, "/repo")).toBe("no single agent pane found for gh-5/01 — $ norn approve gh-5/01");
   });
 });
