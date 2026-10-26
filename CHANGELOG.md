@@ -4,6 +4,8 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-26
+
 ### Fixed
 
 - A story stuck at its slices step because every active slice was stuck resumes by itself once a slice can move again. Unsticking the slice is enough; `norn unstick <story>` is no longer needed as well (§10).
