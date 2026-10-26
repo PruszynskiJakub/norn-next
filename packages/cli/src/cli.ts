@@ -43,12 +43,14 @@ export function parseCommandArgs(c: Command, argv: string[]): ParsedArgs {
 }
 
 export async function runCli(argv: string[], deps: CliDeps = {}): Promise<CliResult> {
-  const [name, ...rest] = argv;
-  if (!name || name === "--help" || name === "-h") return done({ commands: COMMANDS.map(helpFor) });
+  const [first, ...more] = argv;
+  // `norn`, `norn --help` and `norn <command> --help` are `norn help`: markdown unless --json
+  if (!first || first === "--help" || first === "-h") return runCli(["help", ...more.filter((a) => a === "--json")], deps);
+  const [name, ...rest] = argv as [string, ...string[]];
   if (name === "--version" || name === "-v") return done({ version });
   const command = findCommand(name);
   if (!command) return failed(usageError(`unknown command '${name}'`, `norn help — commands: ${COMMANDS.map((c) => c.name).join(", ")}`, "unknown_command"));
-  if (rest.includes("--help") || rest.includes("-h")) return done(helpFor(command));
+  if (name !== "help" && (rest.includes("--help") || rest.includes("-h"))) return runCli(["help", name, ...rest.filter((a) => a === "--json")], deps);
   // `--json` is every command's; `--text` is the old opt-in for readable output, now the default
   const end = rest.indexOf("--");
   const flags = end < 0 ? rest : rest.slice(0, end);

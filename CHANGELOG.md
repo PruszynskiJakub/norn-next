@@ -4,8 +4,20 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+### Added
+
+- `norn init` ends with numbered next steps to a first story: add the git remote if there is none, check the test command, commit and push the setup, `norn doctor`, make a labelled issue assigned to you, `norn sync`. Its JSON gains `remote` (the git remote's URL, `null` when missing) and `test_command`.
+- `norn init` writes the repository's test command into the `test` steps of the workflows it creates, read from its build files: `package.json` (installing first with npm, pnpm, yarn or bun, since a check runs in a fresh worktree), `Cargo.toml`, `go.mod`, Python project files, `mix.exs`, Gradle, Maven or a Makefile `test` target. When nothing names one, the templates keep `bun test` and the next steps say to set it.
+- `norn doctor` fails the remote check when the repository has no git remote named `remote.git_remote` (default `origin`), with `git remote add origin <url>` as the fix; before, it passed and the first tick failed. Its JSON gains `remote.git_remote`.
+
+### Changed
+
+- `norn help`, `norn`, `norn --help` and `norn <command> --help` print markdown for a person: the commands grouped with "Start here" first, without spec ids. `--json` prints the JSON they printed before.
+- `norn doctor`: with `default_mode: manual`, a runner that is unavailable is a warning (`warn`), not a failed check, since only auto mode starts agents through it; the JSON says `runner.required`. Long errors are cut to one line in the report; `--json` keeps them whole.
+
 ### Fixed
 
+- `norn inbox`, `norn pane` and `norn inbox --history` name an item's step once: `refine: attended step — work with the agent`, no longer `refine: refine: attended step …` (F4).
 - `norn doctor` suggests `herdr plugin link <checkout>/plugins/herdr` for the cockpit plugin, naming this checkout when norn runs from source, instead of `herdr plugin install`, which cannot clone the private repo. The README says the same.
 
 ## [0.3.0] - 2026-10-25
