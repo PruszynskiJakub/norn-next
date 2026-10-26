@@ -4,6 +4,18 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+### Added
+
+- `norn config [<key>]` shows the resolved config: every setting with its value, the file it came from (built-in, `~/.norn/config.yaml` or `.agents/norn/config.yaml`) and one line on what it does, grouped by who it belongs to (this machine, you, the team). It notes a repo value a machine cap ignores, a machine setting the repo sets for everyone, `default_mode: auto` without a runner, and that an agent's `--permission-mode` is not norn's mode. `--json` for data.
+
+### Changed
+
+- The config template `norn init` writes groups its keys under The team, You and This machine, says which file each belongs in, and drops the spec ids.
+
+### Fixed
+
+- The config template no longer defines `agents.claude`, which replaced the built-in entry and dropped its `--permission-mode auto` args in every repo `norn init` set up. The entry is shown commented out, args included. A repo already set up keeps its file: remove its `agents:` block, or add the args to it.
+
 ## [0.4.0] - 2026-10-26
 
 ### Added

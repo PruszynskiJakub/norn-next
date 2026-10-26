@@ -3,7 +3,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type Workflow, outcomeEdge, validateConfigLayer, validateWorkflow } from "@norn/schema";
+import { DEFAULT_CONFIG, type Workflow, outcomeEdge, resolveConfig, validateConfigLayer, validateWorkflow } from "@norn/schema";
 import { parse } from "yaml";
 import { type AssetsSources, assetsDir, resolveAssetsDir } from "../src/runtime/assets.ts";
 
@@ -231,6 +231,11 @@ describe("config template", () => {
     const r = validateConfigLayer(value);
     expect(r.ok ? [] : r.errors).toEqual([]);
     expect(Object.keys(value)).toContain("limits");
+  });
+
+  test("as installed, keeps the built-in agent entries, args included", () => {
+    const value = parse(readFileSync(join(ASSETS, "config.yaml"), "utf8")) ?? {};
+    expect(resolveConfig({}, value).agents).toEqual(DEFAULT_CONFIG.agents);
   });
 });
 

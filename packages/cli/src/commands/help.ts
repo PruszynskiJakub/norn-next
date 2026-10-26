@@ -7,7 +7,7 @@ import { rendered } from "../output.ts";
 export const HELP_GROUPS: ReadonlyArray<{ title: string; commands: readonly string[] }> = [
   { title: "Start here", commands: ["init", "doctor", "sync", "watch", "inbox", "open"] },
   { title: "Answer what needs you", commands: ["answer", "approve", "unstick", "update", "mode", "workflow"] },
-  { title: "Look around", commands: ["status", "trace", "why", "pane", "tick"] },
+  { title: "Look around", commands: ["status", "trace", "why", "pane", "config", "tick"] },
   { title: "Agent protocol (run by the agent)", commands: ["brief", "done", "ask", "stuck", "hook"] },
   { title: "Team", commands: ["take", "release", "drop"] },
   { title: "Housekeeping", commands: ["tidy", "uninstall", "help"] },

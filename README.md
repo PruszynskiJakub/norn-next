@@ -177,7 +177,7 @@ A unit pins its workflow when it starts, so editing a file does not affect stori
 
 **Skills carry the craft.** `norn init` copies norn's skills (`norn`, `norn-refine`, `norn-plan`, `norn-implement`, `norn-review`, `norn-qa`, …) as whole folders into `.agents/skills/` and links them from each configured agent's skill folder: `.claude/skills/`, `.gemini/skills/`, `.opencode/skills/` (Codex reads `.agents/skills/` itself). Commit them. Each `norn init` replaces them with the bundled version and lists what it updated; `git diff .agents/skills/` shows the change. To change how a step is done, write your own skill under another name and name it in the step (`skill: my-review`). `norn doctor` reports skills that are missing, not linked or out of date. Links need a filesystem that supports them (on Windows, developer mode).
 
-**Config** lives in `.agents/norn/config.yaml`: agents and their args, runner, remote, default mode, limits and notifiers. The template `norn init` writes lists the keys with their defaults.
+**Config** lives in two files with the same keys: `.agents/norn/config.yaml` (committed, what the team agrees on: remote, workflows, limits) and `~/.norn/config.yaml` (yours: runner, machine caps, notifiers, default mode). The repo file wins, except that it can only lower machine caps. The template `norn init` writes groups the keys by who they belong to, with their defaults. `norn config` shows every setting in effect, the file it came from and what it does.
 
 ## Plugins
 
@@ -208,7 +208,7 @@ The plugin has two actions you can bind to keys in Herdr's `config.toml`: `norn.
 - **Pull, don't trust.** Each tick observes the runner, git and the files again. Notifications are never treated as truth, and a restarted heartbeat behaves the same.
 - **Bounded everything.** Every retry, nudge and loop has a counter with a max. Going past it is a visible `stuck`.
 - **Receipts before effects.** Every externally visible action writes an immutable receipt first, so a repeated tick never repeats the action. Every action can be traced (`norn trace`) and explained (`norn why`).
-- **Markdown to read, JSON for code, exit codes for both.** Commands an agent or a person reads print markdown: `brief`, `done`, `ask`, `stuck`, `help`, `init`, `doctor`, `status`, `inbox`, `trace`. Every command prints one JSON value with `--json`, and the rest always do. Refusals exit with code 3 and print `{error, do_instead}` (as markdown without `--json`).
+- **Markdown to read, JSON for code, exit codes for both.** Commands an agent or a person reads print markdown: `brief`, `done`, `ask`, `stuck`, `help`, `init`, `doctor`, `config`, `status`, `inbox`, `trace`. Every command prints one JSON value with `--json`, and the rest always do. Refusals exit with code 3 and print `{error, do_instead}` (as markdown without `--json`).
 
 The full spec is in [`.agents/PRD.md`](.agents/PRD.md); the files norn writes in a repo are described in PRD §7.
 
@@ -222,7 +222,7 @@ The full spec is in [`.agents/PRD.md`](.agents/PRD.md); the files norn writes in
 | Agent protocol | `brief`, `done`, `ask`, `stuck`, `hook` |
 | Human | `inbox`, `open`, `answer`, `approve [--reject]`, `unstick [--to <step>] [--reset <counter>]`, `update`, `mode`, `workflow` |
 | Team | `take`, `release`, `drop` |
-| Views | `status`, `trace <unit>`, `why <unit>`, `pane [--interactive \| --next \| --open]` |
+| Views | `status`, `config [<key>]`, `trace <unit>`, `why <unit>`, `pane [--interactive \| --next \| --open]` |
 | Housekeeping | `tidy` |
 
 ## Contributing
