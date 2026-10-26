@@ -204,3 +204,80 @@ export function resolveConfig(user: ConfigLayer = {}, repo: ConfigLayer = {}): R
     },
   };
 }
+
+/** Who a setting belongs to, for `norn config`: usually set in the user layer (machine, person) or the repo layer (team). */
+export type ConfigGroup = "machine" | "person" | "team";
+
+export interface ConfigEntry {
+  /** dotted path, e.g. `default_mode`, `limits.deadline`, `agents.claude` */
+  key: string;
+  value: unknown;
+  /** the layer whose value is in effect */
+  source: "built-in" | "user" | "repo";
+  group: ConfigGroup;
+  /** set when the repo layer sets this key but its value does not apply (machine caps, K2) */
+  repo_ignored?: unknown;
+}
+
+const GROUP: Record<keyof ResolvedConfig, ConfigGroup> = {
+  runner: "machine",
+  max_agents: "machine",
+  max_checks: "machine",
+  slots: "machine",
+  notifiers: "machine",
+  agents: "person",
+  default_agent: "person",
+  default_mode: "person",
+  remote: "team",
+  base_branch: "team",
+  default_workflow: "team",
+  default_slice_workflow: "team",
+  watch_interval: "team",
+  claim: "team",
+  limits: "team",
+};
+
+/** Keys whose layers merge key by key (`agents` per agent name), so each child is its own entry. */
+const MERGED = new Set<keyof ResolvedConfig>(["agents", "remote", "slots", "claim", "limits"]);
+
+function equal(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const ka = Object.keys(a);
+  const kb = Object.keys(b);
+  return ka.length === kb.length && ka.every((k) => equal((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
+}
+
+function at(layer: object, path: readonly string[]): unknown {
+  let v: unknown = layer;
+  for (const p of path) v = typeof v === "object" && v !== null ? (v as Record<string, unknown>)[p] : undefined;
+  return v;
+}
+
+/**
+ * Every resolved setting with the layer it came from (K2), for `norn config`. A key is
+ * credited to the last layer that sets it to the value in effect; a repo value that a
+ * machine cap rule ignores is reported as `repo_ignored`. Pure.
+ */
+export function explainConfig(user: ConfigLayer = {}, repo: ConfigLayer = {}): ConfigEntry[] {
+  const resolved = resolveConfig(user, repo);
+  const entries: ConfigEntry[] = [];
+  const add = (path: string[], group: ConfigGroup) => {
+    const value = at(resolved, path);
+    const r = at(repo, path);
+    const u = at(user, path);
+    const entry: ConfigEntry = { key: path.join("."), value, source: "built-in", group };
+    if (r !== undefined && equal(r, value)) entry.source = "repo";
+    else if (u !== undefined && equal(u, value)) entry.source = "user";
+    if (r !== undefined && !equal(r, value)) entry.repo_ignored = r;
+    entries.push(entry);
+  };
+  for (const key of Object.keys(resolved) as Array<keyof ResolvedConfig>) {
+    const value = resolved[key];
+    if (MERGED.has(key) && typeof value === "object" && value !== null) {
+      for (const child of Object.keys(value)) add([key, child], GROUP[key]);
+    } else add([key], GROUP[key]);
+  }
+  return entries;
+}
