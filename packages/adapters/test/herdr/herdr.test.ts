@@ -89,6 +89,27 @@ describe("herdr runner", () => {
     expect(ref).toMatchObject({ runner: "herdr", session_id: "w1:p1", pane_id: "w1:p1", process: { pid: 59610 } });
   });
 
+  test("a foreground group gone before it is identified is not a launch: keep waiting for the agent (R4.3)", async () => {
+    // the pane's zsh still reads its rc files: a subshell (conda activate) owns the foreground for a
+    // moment and exits before `ps` sees it — then the launched command takes the foreground
+    const rcSubshell = structuredClone(fx.process_info_idle);
+    rcSubshell.result.process_info.foreground_process_group_id = 58966;
+    let infoCalls = 0;
+    const { exec, calls } = fakeExec([
+      ["workspace list", ok(fx.workspace_list)],
+      ["tab create", ok({ ...fx.tab_create })],
+      ["pane run", empty],
+      ["pane process-info", () => ok(++infoCalls === 1 ? rcSubshell : fx.process_info_busy)],
+    ]);
+    const proc = fakeProcess();
+    const identify = proc.identify;
+    proc.identify = async (pid) => (pid === 58966 ? (proc.identified.push(pid), null) : identify(pid));
+    const ref = await createHerdrRunner({ exec, process: proc, sleep: noSleep, startWaitMs: 500 }).launch(spec);
+    expect(proc.identified).toEqual([58966, 59610]);
+    expect(ref).toMatchObject({ pane_id: "w1:p2", process: { pid: 59610 } });
+    expect(calls.some((c) => c.includes("close"))).toBe(false);
+  });
+
   test("a command that never takes the pane's foreground is a failed launch: screen in the reason, pane closed (R4.3, B2)", async () => {
     // B2: a launch line longer than the tty's MAX_CANON, typed while the pane's zsh still read its
     // rc files, is cut off and never runs — the shell stays in the foreground (screen derived from

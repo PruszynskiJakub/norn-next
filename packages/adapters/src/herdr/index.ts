@@ -177,10 +177,9 @@ export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
       for (let waited = 0; ; waited += 250) {
         const info = await processInfo(paneId);
         const pid = info ? foregroundPid(info) : null;
-        if (pid !== null) {
-          identity = await proc.identify(pid);
-          break;
-        }
+        // A group gone before `ps` sees it (a short-lived rc-file subshell) is not the agent: keep waiting.
+        identity = pid !== null ? await proc.identify(pid) : null;
+        if (identity) break;
         if (waited >= startWaitMs) break;
         await sleep(250);
       }
