@@ -20,6 +20,7 @@ Goals:
 - A Herdr plugin shipped with norn opens that pane and jumps to the oldest item waiting for you (HC9–HC11).
 - While the cockpit runs, agent panes of norn runs carry the unit and step in Herdr's sidebar (HC12–HC13).
 - Notifications can be Herdr toasts (HC14).
+- The cockpit jumps to the Herdr workspace of an item's run, even when no agent runs there (HC15).
 
 Non-goals:
 - A full-screen TUI (raw-mode keys, mouse). The cockpit stays line-based, like the Herdr GitHub Issues plugin.
@@ -46,7 +47,8 @@ MO4 gains one sentence: *an attended run waiting for its person is shown as Your
 
   | Line | Does |
   |---|---|
-  | `<n>` or `g <n>` | go to the item: focus the agent pane of its run (HC6); for a manual start (`… is ready (manual)`, attended step not started) run `norn open <unit>` when the item shows it (MO5), else open a pane beside the cockpit and run the item's command there; otherwise show the command |
+  | `<n>` or `g <n>` | go to the item: focus the agent pane of its run (HC6); for a manual start (`… is ready (manual)`, attended step not started) run `norn open <unit>` when the item shows it (MO5), else open a pane beside the cockpit and run the item's command there; else focus the workspace of its run (HC15); otherwise show the command |
+  | `w <n>` | focus the Herdr workspace of the item's run (HC15) |
   | `a <n> <text>` | `norn answer <unit> <text>` |
   | `y <n>` | `norn approve <unit>` |
   | `x <n> <reason>` | `norn approve <unit> --reject --reason <reason>` |
@@ -62,7 +64,7 @@ MO4 gains one sentence: *an attended run waiting for its person is shown as Your
   A command that does not fit the item (approving an Answer item, a number not in the frame) is refused with a message; nothing runs.
 - HC6 The agent pane of a run is found through the runner, never stored: the run's `session.pane_id` when the runner is Herdr; else the Herdr agent whose session id is the run's `agent_session_id`; else the one Herdr agent whose working directory is the unit worktree. Several candidates → none (the cockpit says so instead of guessing).
 - HC7 Verbs run in-process through the CLI dispatcher (`runCli`) with the cockpit's cwd and env. Their JSON outcome is shown as one message line: `ok` with the verb's main field, or the `CliError` `error` and `do_instead`. X1 holds: the cockpit reads through `@norn/view` and writes only through CLI verbs.
-- HC8 Without Herdr (no `HERDR_ENV=1`), `g` only shows the command, `n` jumps nowhere, and labels (HC12) are off; the other verbs work.
+- HC8 Without Herdr (no `HERDR_ENV=1`), `g` and `w` only show the command, `n` jumps nowhere, and labels (HC12) are off; the other verbs work.
 
 ## 5. Part C — Herdr plugin
 
@@ -79,17 +81,21 @@ MO4 gains one sentence: *an attended run waiting for its person is shown as Your
 
 - HC14 Notifier adapter `herdr` shows each new inbox item as `herdr notification show <title> --body <body>`, with sound `request` for Your turn, Answer and Approve and `none` otherwise. It needs `HERDR_ENV=1` or a reachable Herdr socket. Outside Herdr it fails with `unsupported`, and the other configured notifiers still run. Opt in with `notifiers: [{adapter: os}, {adapter: herdr}]`.
 
-## 8. Contract changes
+## 8. Part F — workspaces
+
+- HC15 The workspace of a run is found through Herdr, like its pane (HC6), never stored: the workspace holding the run's recorded pane, else the one workspace with a pane (foreground working directory, else the pane's) in the unit worktree. Several candidates → none, and the cockpit says so. `w <n>` focuses it with `herdr workspace focus`; an item without a run (an unclaimed story, a manual start) has no workspace to find, and `w` says so with the item's command. `g` uses it when the run has no agent pane to focus (an approval after the agent ended, a stuck unit), before falling back to the command. Workspace labels are not used: they change with the step and a person may rename them.
+
+## 9. Contract changes
 
 - `ResolvedConfig.limits.attended_wait` (Duration, default `2m`); schema re-emitted.
 - `InboxItem.reach?` (core ports); not part of `InboxChange` (trace).
 - `norn pane` gains `--interactive` and `--next`; `--open` opens the interactive cockpit.
-- `@norn/adapters` `herdr`: `listAgents`, `focusPane`, `labelPane`, `openCommandPane`; `notify`: `herdr` notifier.
+- `@norn/adapters` `herdr`: `listAgents`, `focusPane`, `labelPane`, `openCommandPane`, `listWorkspaces`, `focusWorkspace`, `findWorkspace`; `notify`: `herdr` notifier.
 - New `plugins/herdr/` (manifest and scripts), covered by `test/repo.test.ts`'s glossary lint like `plugins/`.
 
-## 9. Tests
+## 10. Tests
 
 - Core: HC1/HC2 waiting detection (trailing hooks, pane fallback, `idle_prompt` not restarting, the delay, a new turn making a new id), HC3 command and `reach`.
 - CLI: the cockpit command parser and argv for each verb (HC5); a scripted cockpit session against a fake view and fake Herdr (go, answer, refusal, quit); `--next` with and without a waiting item.
-- Adapters: recorded `herdr agent list` / `pane report-metadata` / `notification show` argv and outputs; pane lookup (HC6), including the ambiguous case.
+- Adapters: recorded `herdr agent list` / `workspace list` / `pane list` / `pane report-metadata` / `notification show` argv and outputs; pane and workspace lookup (HC6, HC15), including the ambiguous case.
 - Repo: the plugin manifest parses and names only scripts that exist.
