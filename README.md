@@ -63,8 +63,10 @@ The evidence is in the dogfood audits: [`docs/audit-todoist-dogfood/`](docs/audi
 **Not yet, or not at all:**
 - Quick interactive edits. norn works per story on a heartbeat, so the overhead is not worth it for a one-line fix.
 - Repos without GitHub or GitLab issues and PRs. Stories come from labelled issues, and there is no local-only mode.
-- Teams that require linear history. norn merges the base into story branches and never rebases.
+- GitLab, or an agent other than Claude Code. The `glab`, codex, opencode and gemini adapters exist but are tested only against recorded fixtures, never live.
+- Teams that require linear history on every branch. norn merges the base into story branches and never rebases; squash on merge keeps the base linear.
 - Two machines on one story. It is designed for that, but it has only been simulated on one Mac so far.
+- Relying on the herdr cockpit or the default `--permission-mode auto`. Both are tested against fixtures only; no real run has used them yet.
 
 Read [`.agents/LIMITATIONS.md`](.agents/LIMITATIONS.md) before you rely on it: it lists what is proven, what is open and what was never run for real.
 
@@ -119,7 +121,7 @@ norn watch     # keeps norn working; Ctrl-C finishes the current tick and releas
 norn inbox     # in another terminal: what needs you, with the command for each item
 ```
 
-The default `story` workflow starts with **refine**, an attended step. Run the command in the inbox (`norn open gh-N` with Herdr, otherwise a `cd … && claude …` line), then work out the spec with the agent. When you agree, the agent reports and norn moves on to plan, slices, test, QA and the draft PR. You come back when the inbox says so. Your last act is merging the PR.
+The default `story` workflow starts with **refine**, an attended step. Run the command in the inbox (`norn open gh-N` with Herdr, otherwise a `cd … && claude …` line), then work out the spec with the agent. When you agree, the agent reports and norn moves on to plan, slices, test, QA and the draft PR. You come back when the inbox says so. Your last act is merging the PR. Squash it if you want a linear base: the story branch carries merge commits from `update`, since norn never rebases.
 
 ## Everyday use
 
