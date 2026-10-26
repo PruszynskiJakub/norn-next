@@ -26,6 +26,8 @@ export interface FrameOptions {
   herdr: boolean;
   /** HC16: Notes as an accordion — open or not, and how many notes are new; absent = always listed */
   notes?: { open: boolean; fresh: number };
+  /** end with the `›` prompt (default); off when a line editor draws it */
+  prompt?: boolean;
 }
 
 export type Tone = "ok" | "error" | "info";
@@ -196,7 +198,12 @@ export function renderFrame(view: ProjectView, items: readonly InboxEntry[], o: 
   if (line) footer.push(line);
   out.push(...footer);
   if (!o.herdr) out.push(paint("outside Herdr: go shows the command (HC8)", ["dim"]));
-  return `${out.join("\n")}\n${paint("›", ["bold", "cyan"])} `;
+  return o.prompt === false ? out.join("\n") : `${out.join("\n")}\n${promptOf(o.color)}`;
+}
+
+/** The cockpit's input prompt. */
+export function promptOf(color: boolean): string {
+  return color ? `${ESC}1;36m›${ESC}0m ` : "› ";
 }
 
 /** `d <n>`: an item's full text — title, detail, full screen, command, link. */

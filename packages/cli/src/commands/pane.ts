@@ -10,7 +10,7 @@
  * panes (HC6) and labels them in the sidebar (HC12). `--next` (HC10) focuses the agent pane of the
  * oldest Your turn item once and exits. Notes start collapsed; `o` opens and closes them (HC16).
  */
-import { createInterface } from "node:readline";
+import { createInterface, type Interface } from "node:readline";
 import { herdr } from "@norn/adapters";
 import { parseDuration } from "@norn/schema";
 import { readCockpitFile, writeCockpitFile } from "@norn/store";
@@ -19,7 +19,7 @@ import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { usageError } from "../output.ts";
 import { goTo, goToWorkspace, labelPanes, oldestYourTurn, parseCockpitLine, planCockpit, toneOf, verbMessage } from "../runtime/cockpit.ts";
-import { frameItems, freshNotes, newestNote, renderFrame, type Tone } from "../runtime/cockpit-view.ts";
+import { frameItems, freshNotes, newestNote, promptOf, renderFrame, type Tone } from "../runtime/cockpit-view.ts";
 import { projectView } from "../runtime/human.ts";
 
 const CLEAR = "\x1b[H\x1b[2J";
@@ -46,10 +46,15 @@ function cockpitHerdr(ctx: Context): herdr.HerdrCockpit | null {
   return herdr.createHerdrCockpit({ env: ctx.env, ...(typeof o.bin === "string" ? { bin: o.bin } : {}), ...(typeof o.session === "string" ? { session: o.session } : {}) });
 }
 
-/** HC4: command lines from the injected input, else stdin. */
-function inputLines(ctx: Context): AsyncIterator<string> {
-  const src = ctx.deps.input ?? createInterface({ input: process.stdin, terminal: false });
-  return src[Symbol.asyncIterator]();
+/**
+ * HC4: command lines from the injected input, else stdin. On a terminal readline edits the line
+ * (`editor`), so a redraw can put back what the person has typed so far instead of wiping it.
+ */
+function inputLines(ctx: Context): { lines: AsyncIterator<string>; editor: Interface | null } {
+  if (ctx.deps.input) return { lines: ctx.deps.input[Symbol.asyncIterator](), editor: null };
+  if (!process.stdin.isTTY || !process.stderr.isTTY) return { lines: createInterface({ input: process.stdin, terminal: false })[Symbol.asyncIterator](), editor: null };
+  const editor = createInterface({ input: process.stdin, output: process.stderr, terminal: true });
+  return { lines: editor[Symbol.asyncIterator](), editor };
 }
 
 async function cockpitView(ctx: Context): Promise<{ view: ProjectView | null; error: string | null }> {
@@ -78,7 +83,7 @@ async function runVerb(ctx: Context, argv: string[]): Promise<{ exit: number; va
 async function interactive(ctx: Context, raw: string, interval: number, max: number) {
   const signal = ctx.deps.signal;
   const cockpit = cockpitHerdr(ctx);
-  const lines = inputLines(ctx);
+  const { lines, editor } = inputLines(ctx);
   let pending: Promise<IteratorResult<string>> | null = null;
   let message: { text: string; tone: Tone } | null = null;
   let output = "";
@@ -100,9 +105,14 @@ async function interactive(ctx: Context, raw: string, interval: number, max: num
     if (cockpit && view) await labelPanes(cockpit, items, 3 * interval);
     const look = frameLook(ctx);
     const frame = view
-      ? renderFrame(view, items, { ...look, clock: localClock(ctx.clock.now()), interval: raw, message, output, herdr: !!cockpit, notes: { open: notesOpen, fresh } })
-      : `${error}\n› `;
+      ? renderFrame(view, items, { ...look, clock: localClock(ctx.clock.now()), interval: raw, message, output, herdr: !!cockpit, notes: { open: notesOpen, fresh }, prompt: !editor })
+      : `${error}${editor ? "" : `\n${promptOf(look.color)}`}`;
     ctx.log(`${CLEAR}${frame}`);
+    if (editor) {
+      // the prompt and the line typed so far, redrawn by readline under the frame
+      editor.setPrompt(promptOf(look.color));
+      editor.prompt(true);
+    }
     frames++;
     output = "";
     if (frames >= max) break;
@@ -128,6 +138,7 @@ async function interactive(ctx: Context, raw: string, interval: number, max: num
     }
     message = text === null ? null : { text, tone: toneOf(text) };
   }
+  editor?.close();
   return { frames, interval: raw, interactive: true, commands };
 }
 
