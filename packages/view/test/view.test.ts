@@ -361,7 +361,8 @@ describe("formatters", () => {
       recently_done: [],
       errors: [],
     };
-    expect(formatInbox(empty)).toBe("Inbox empty — nothing needs you.\n");
+    expect(formatInbox(empty)).toBe("Inbox empty — no stories yet.\nLabel an issue `norn` (the config's `remote.label`) and assign it to yourself, then run `norn sync`.\n");
+    expect(formatInbox({ ...empty, stories: [{} as never] })).toBe("Inbox empty — nothing needs you.\n");
     expect(formatStatus(empty)).toContain("No stories.");
   });
 

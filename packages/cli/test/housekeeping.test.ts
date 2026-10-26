@@ -312,9 +312,9 @@ describe("norn doctor: a fresh repository", () => {
 });
 
 describe("norn doctor: the cockpit plugin hint (HC11)", () => {
-  test("links this checkout's plugins/herdr when norn runs from source, else names a checkout", () => {
+  test("links this checkout's plugins/herdr when norn runs from source, else installs it from GitHub", () => {
     const repo = join(import.meta.dir, "..", "..", "..");
     expect(pluginLinkHint(assetsDir())).toBe(`herdr plugin link ${join(repo, "plugins", "herdr")} (optional: the norn cockpit, HC9)`);
-    expect(pluginLinkHint("/nowhere/a/b/c")).toBe("herdr plugin link <norn-next checkout>/plugins/herdr (optional: the norn cockpit, HC9)");
+    expect(pluginLinkHint("/nowhere/a/b/c")).toBe("herdr plugin install PruszynskiJakub/norn-next/plugins/herdr (optional: the norn cockpit, HC9)");
   });
 });

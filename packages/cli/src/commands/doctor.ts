@@ -168,15 +168,17 @@ async function nornThroughRunner(ctx: Context, runner: RunnerPort): Promise<{ ok
 const RUNNER_PATH_WAIT_MS = 15_000;
 
 /**
- * HC11: the `herdr plugin link` hint. The plugin ships in the repo, not in the package or binary
- * (and `herdr plugin install` cannot clone the private repo), so it is linked from a checkout:
- * this one when norn runs from source, else a placeholder.
+ * HC11: how to add the cockpit plugin. It ships in the repo, not in the package or binary: when norn
+ * runs from source, link this checkout's copy (it follows `git pull`); otherwise install it from GitHub.
  */
 export function pluginLinkHint(assets: string): string {
   const dir = join(assets, "..", "..", "..", "plugins", "herdr");
-  const path = existsSync(join(dir, "herdr-plugin.toml")) ? resolve(dir) : "<norn-next checkout>/plugins/herdr";
-  return `herdr plugin link ${path} (optional: the norn cockpit, HC9)`;
+  const how = existsSync(join(dir, "herdr-plugin.toml")) ? `herdr plugin link ${resolve(dir)}` : `herdr plugin install ${HERDR_PLUGIN_SOURCE}`;
+  return `${how} (optional: the norn cockpit, HC9)`;
 }
+
+/** HC11: the plugin's GitHub source for `herdr plugin install`. */
+export const HERDR_PLUGIN_SOURCE = "PruszynskiJakub/norn-next/plugins/herdr";
 
 /** HC11: whether norn's Herdr plugin is linked; a hint when it is not (never an error). */
 async function cockpitPlugin(ctx: Context): Promise<Record<string, unknown>> {

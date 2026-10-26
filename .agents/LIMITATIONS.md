@@ -93,7 +93,7 @@ The rules each fix maps to are in its spec.
 - **The cockpit is line-based.** `norn pane --interactive` reads one command per line between redraws; it is not a full-screen TUI (no raw keys or mouse).
 - **Coarse grain.** norn works per story and slice on a heartbeat. It is the wrong tool for quick interactive edits, and the overhead is not worth it for tiny changes.
 - **Local environment must stay healthy.**
-  - It needs Bun, git ≥ 2.38 (for `merge-tree --write-tree`), git worktrees (disk plus per-worktree setup), an authenticated `gh`, and herdr for attended panes. The cockpit needs Herdr ≥ 0.9, and its plugin is installed by hand (`herdr plugin install`, HC11); `norn init` does not link it.
+  - It needs Bun, git ≥ 2.38 (for `merge-tree --write-tree`), git worktrees (disk plus per-worktree setup), an authenticated `gh`, and herdr for attended panes. The cockpit needs Herdr ≥ 0.9, and its plugin is installed by hand (`herdr plugin install PruszynskiJakub/norn-next/plugins/herdr`, HC11); `norn init` does not install it.
   - Rate limits or a GitHub outage stop observation. A remote call that hangs costs a tick up to 2 minutes before it fails (H11).
   - A sleeping laptop pauses every watch, and claims expire. They are reacquired cleanly after wake, but nothing moves in the meantime.
 - **Workflows are pinned per unit.** Editing a workflow does not affect units already in flight. This is intended, but surprising.
