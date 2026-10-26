@@ -129,7 +129,7 @@ Five commands cover most days:
 
 | Command | What it does |
 |---|---|
-| `norn watch` | keeps norn working: observe, decide, act, every 30 s |
+| `norn watch` | keeps norn working: observe, decide, act, every 30 s; prints a JSON line per tick, `--human` a line per action |
 | `norn inbox` | what needs you, grouped as Your turn, Answer, Approve, Unblock, Unclaimed, Running |
 | `norn open <story>` | starts an agent on a step that waits for you |
 | `norn answer` / `norn approve` / `norn unstick` | resolves an item; the inbox prints the exact line |
