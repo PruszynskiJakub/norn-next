@@ -4,6 +4,11 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+### Fixed
+
+- A story stuck at its slices step because every active slice was stuck resumes by itself once a slice can move again. Unsticking the slice is enough; `norn unstick <story>` is no longer needed as well (§10).
+- A check no longer fails with "address in use" because a server an agent started from the worktree is still listening on its slot's ports. Before each check, norn stops such listeners and names them at the top of the check output (K4.1).
+
 ## [0.3.0] - 2026-10-25
 
 ### Added
