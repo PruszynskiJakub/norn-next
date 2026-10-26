@@ -315,9 +315,9 @@ describe("formatters", () => {
     expect(status).toContain("1 item needs you");
 
     const inbox = formatInbox(v);
-    expect(inbox.split("\n").slice(0, 3)).toEqual(["Answer (1)", "  gh-12      implement: Which OAuth provider? · 40m", '      $ norn answer gh-12 "…"']);
-    expect(inbox).toContain("Running (1)");
-    expect(inbox).toContain("Recently done (1)");
+    expect(inbox.split("\n").slice(0, 3)).toEqual(["Answer (1) · agents waiting for your answer", "  gh-12      implement: Which OAuth provider? · 40m", '      $ norn answer gh-12 "…"']);
+    expect(inbox).toContain("Running (1) · agents and checks at work");
+    expect(inbox).toContain("Recently done (1) · finished in the last 24h");
     expect(formatTimeline(v.timeline["gh-12/01"] ?? [])).toContain("check fail at test#1: bun test (exit 1, 2.3s)");
   });
 
@@ -330,9 +330,19 @@ describe("formatters", () => {
     expect(stepTitle(null, "done")).toBe("done");
   });
 
+  test("formatInbox: Notes after Running, its header naming each story's clearing approval once (NT5)", () => {
+    const note = (id: string, story: string, cleared_by: string) => ({ id, group: "notes", story, slice: null, step: "qa", title: `qa note on ${story}: x`, command: `norn why ${story} --receipt r`, since: "", age: "1m", cleared_by });
+    const run = { id: "r", group: "running", story: "gh-3", slice: null, step: "qa", title: "qa #1 (auto)", command: "norn trace gh-3", since: "", age: "1m" };
+    const notes = [note("a", "gh-1", "cleared by gh-1 human-qa approval"), note("b", "gh-1", "cleared by gh-1 human-qa approval"), note("c", "gh-2", "cleared when the story is done")];
+    const v = { stories: [{}], inbox: { at: "", pending: 0, groups: { your_turn: [], answer: [], approve: [], unblock: [], check: [], unclaimed: [], running: [run], notes, recently_done: [] } } } as unknown as Parameters<typeof formatInbox>[0];
+    const out = formatInbox(v).split("\n");
+    expect(out.indexOf("Running (1) · agents and checks at work")).toBe(0);
+    expect(out).toContain("Notes (3) · agents' notes for you, no action needed · cleared by gh-1 human-qa approval; cleared when the story is done");
+  });
+
   test("formatInbox prints paths under home as ~/…", () => {
     const item = { id: "approve:gh-1:qa#1", group: "approve", story: "gh-1", slice: null, step: "human-qa", title: "evidence attached", command: "norn approve gh-1", since: "", age: "1m", detail: "step qa#1 reported partial (receipt 0009)", full: "Report: /Users/me/wt/runs/_story/receipts/0009-done.json" };
-    const v = { inbox: { at: "", pending: 1, groups: { your_turn: [], answer: [], approve: [item], unblock: [], check: [], unclaimed: [], running: [], recently_done: [] } } } as unknown as Parameters<typeof formatInbox>[0];
+    const v = { inbox: { at: "", pending: 1, groups: { your_turn: [], answer: [], approve: [item], unblock: [], check: [], unclaimed: [], running: [], notes: [], recently_done: [] } } } as unknown as Parameters<typeof formatInbox>[0];
     expect(formatInbox(v, { details: true, home: "/Users/me/" })).toContain("      | Report: ~/wt/runs/_story/receipts/0009-done.json");
     expect(formatInbox(v, { details: true })).toContain("      | Report: /Users/me/wt/runs/_story/receipts/0009-done.json");
   });
@@ -345,7 +355,7 @@ describe("formatters", () => {
       runner: null,
       heartbeat: { holder: "", last_tick_at: null, age: null, down: false },
       stories: [],
-      inbox: { at: "", pending: 0, groups: { your_turn: [], answer: [], approve: [], unblock: [], check: [], unclaimed: [], running: [], recently_done: [] } },
+      inbox: { at: "", pending: 0, groups: { your_turn: [], answer: [], approve: [], unblock: [], check: [], unclaimed: [], running: [], notes: [], recently_done: [] } },
       runs: [],
       timeline: {},
       recently_done: [],

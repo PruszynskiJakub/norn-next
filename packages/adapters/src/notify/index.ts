@@ -23,6 +23,7 @@ const GROUP_LABEL: Record<InboxGroup, string> = {
   check: "Check",
   unclaimed: "Unclaimed",
   running: "Running",
+  notes: "Notes",
   recently_done: "Recently done",
 };
 
