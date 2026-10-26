@@ -8,17 +8,18 @@
  * `--interactive` (HC4–HC8) numbers the items and reads one command per line between redraws; it
  * writes only through CLI verbs run by the dispatcher (HC7, X1). Inside Herdr it also focuses agent
  * panes (HC6) and labels them in the sidebar (HC12). `--next` (HC10) focuses the agent pane of the
- * oldest Your turn item once and exits.
+ * oldest Your turn item once and exits. Notes start collapsed; `o` opens and closes them (HC16).
  */
 import { createInterface } from "node:readline";
 import { herdr } from "@norn/adapters";
 import { parseDuration } from "@norn/schema";
+import { readCockpitFile, writeCockpitFile } from "@norn/store";
 import { formatInbox, inboxItemsInOrder, type ProjectView } from "@norn/view";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { usageError } from "../output.ts";
 import { goTo, goToWorkspace, labelPanes, oldestYourTurn, parseCockpitLine, planCockpit, toneOf, verbMessage } from "../runtime/cockpit.ts";
-import { renderFrame, type Tone } from "../runtime/cockpit-view.ts";
+import { frameItems, freshNotes, newestNote, renderFrame, type Tone } from "../runtime/cockpit-view.ts";
 import { projectView } from "../runtime/human.ts";
 
 const CLEAR = "\x1b[H\x1b[2J";
@@ -83,13 +84,23 @@ async function interactive(ctx: Context, raw: string, interval: number, max: num
   let output = "";
   let frames = 0;
   let commands = 0;
+  // HC16: Notes start collapsed; opening them marks every note shown as seen, on this machine
+  let notesOpen = false;
+  let seenAt = readCockpitFile(ctx.root).notes_seen_at;
   while (frames < max && !signal?.aborted) {
     const { view, error } = await cockpitView(ctx);
-    const items = view ? inboxItemsInOrder(view) : [];
+    const all = view ? inboxItemsInOrder(view) : [];
+    const fresh = freshNotes(all, seenAt);
+    const newest = newestNote(all);
+    if (notesOpen && fresh && newest) {
+      seenAt = newest;
+      writeCockpitFile(ctx.root, { ...readCockpitFile(ctx.root), notes_seen_at: seenAt });
+    }
+    const items = frameItems(all, notesOpen);
     if (cockpit && view) await labelPanes(cockpit, items, 3 * interval);
     const look = frameLook(ctx);
     const frame = view
-      ? renderFrame(view, items, { ...look, clock: localClock(ctx.clock.now()), interval: raw, message, output, herdr: !!cockpit })
+      ? renderFrame(view, items, { ...look, clock: localClock(ctx.clock.now()), interval: raw, message, output, herdr: !!cockpit, notes: { open: notesOpen, fresh } })
       : `${error}\n› `;
     ctx.log(`${CLEAR}${frame}`);
     frames++;
@@ -105,6 +116,7 @@ async function interactive(ctx: Context, raw: string, interval: number, max: num
     if (step.kind === "quit") break;
     let text: string | null = null;
     if (step.kind === "refresh") text = null;
+    else if (step.kind === "notes") notesOpen = !notesOpen;
     else if (step.kind === "message") text = step.text;
     else if (step.kind === "output") output = step.text;
     else if (step.kind === "go") text = await goTo(cockpit, step.item, ctx.cwd).catch((e: Error) => `could not go there: ${e.message}`);

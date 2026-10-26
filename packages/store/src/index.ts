@@ -4,6 +4,7 @@
  * Persistence only: no business decisions.
  */
 export * from "./base.ts";
+export * from "./cockpit.ts";
 export * from "./config.ts";
 export * from "./frontmatter.ts";
 export * from "./fsx.ts";

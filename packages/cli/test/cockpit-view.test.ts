@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import type { InboxEntry, ProjectView } from "@norn/view";
 import { parseCockpitLine, planCockpit, toneOf } from "../src/runtime/cockpit.ts";
-import { fit, itemDetails, renderFrame, wrap } from "../src/runtime/cockpit-view.ts";
+import { fit, frameItems, freshNotes, itemDetails, newestNote, renderFrame, wrap } from "../src/runtime/cockpit-view.ts";
 
 const entry = (p: Partial<InboxEntry>): InboxEntry => ({
   id: "i",
@@ -109,6 +109,49 @@ describe("group headers and styles (NT5)", () => {
     expect(row("implement #1 (auto)")).toContain(`${ESC}1mgh-1/02`);
     expect(row("qa note on gh-1/01")).toContain(`${ESC}1mgh-1/01`);
     expect(row(`${ESC}2mdone${ESC}0m`)).toContain(`${ESC}2mgh-1/01`);
+  });
+});
+
+describe("Notes as an accordion (HC16)", () => {
+  const running = entry({ id: "r", group: "running", slice: "gh-1/07", step: "implement", title: "implement #1 (auto)", command: "norn trace gh-1/07" });
+  const note = (id: string, slice: string, since: string) =>
+    entry({ id, group: "notes", slice, step: "qa", title: `qa note on ${slice}: ${id}`, command: `norn why ${slice} --receipt r`, since, cleared_by: "cleared by gh-1 human-qa approval" });
+  const n1 = note("n1", "gh-1/01", "2026-10-25T10:00:00.000Z");
+  const n2 = note("n2", "gh-1/05", "2026-10-25T11:00:00.000Z");
+  const n3 = note("n3", "gh-1/01", "2026-10-25T12:00:00.000Z");
+  const n4 = note("n4", "gh-1/05", "2026-10-25T11:30:00.000Z");
+  const done = entry({ id: "d", group: "recently_done", slice: "gh-1/05", step: "$done", title: "done", command: "norn trace gh-1/05" });
+  const all = [running, n1, n2, n3, n4, done];
+  function frame(open: boolean, fresh: number) {
+    const v = view();
+    v.inbox.groups = { ...v.inbox.groups, your_turn: [], unblock: [], running: [running], notes: [n1, n2, n3, n4], recently_done: [done] };
+    return renderFrame(v, frameItems(all, open), { ...opts, width: 120, notes: { open, fresh } }).split("\n");
+  }
+
+  test("collapsed: one header line with the count, the new ones and how to open; no rows, so nothing to number", () => {
+    expect(frameItems(all, false).map((i) => i.id)).toEqual(["r", "d"]);
+    const lines = frame(false, 2);
+    expect(lines).toContain("▸ NOTES 4 · 2 new  agents' notes for you, no action needed · cleared by gh-1 human-qa approval · o to open");
+    expect(lines.some((l) => l.includes("qa note on"))).toBe(false);
+    expect(lines.find((l) => l.includes("done") && l.includes("gh-1/05"))).toMatch(/^ {2}2 {2}/);
+  });
+
+  test("open: grouped by unit, the unit with the newest note first, each unit's notes in the order left", () => {
+    expect(frameItems(all, true).map((i) => i.id)).toEqual(["r", "n1", "n3", "n2", "n4", "d"]);
+    const lines = frame(true, 0);
+    expect(lines).toContain("▾ NOTES 4  agents' notes for you, no action needed · cleared by gh-1 human-qa approval · o to close");
+    expect(lines.find((l) => l.includes("qa note on gh-1/01: n1"))).toMatch(/^ {2}2 {2}gh-1\/01/);
+    expect(lines.find((l) => l.includes("qa note on gh-1/05: n4"))).toMatch(/^ {2}5 {2}gh-1\/05/);
+  });
+
+  test("new = left after the newest note seen; o toggles", () => {
+    expect(freshNotes(all, undefined)).toBe(4);
+    expect(freshNotes(all, "2026-10-25T11:00:00.000Z")).toBe(2);
+    expect(freshNotes(all, newestNote(all))).toBe(0);
+    expect(newestNote(all)).toBe("2026-10-25T12:00:00.000Z");
+    expect(newestNote([running])).toBeUndefined();
+    expect(planCockpit(parseCockpitLine("o"), all)).toEqual({ kind: "notes" });
+    expect(planCockpit(parseCockpitLine("?"), all)).toMatchObject({ text: expect.stringContaining("open or close Notes") });
   });
 });
 

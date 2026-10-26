@@ -21,6 +21,7 @@ export type CockpitCommand =
   | { kind: "view"; n: number }
   | { kind: "details"; n: number }
   | { kind: "next" }
+  | { kind: "notes" }
   | { kind: "refresh" }
   | { kind: "help" }
   | { kind: "quit" }
@@ -32,11 +33,12 @@ export type CockpitStep =
   | { kind: "workspace"; item: InboxEntry }
   | { kind: "message"; text: string }
   | { kind: "output"; text: string }
+  | { kind: "notes" }
   | { kind: "refresh" }
   | { kind: "quit" };
 
 export const COCKPIT_HELP =
-  "<n> go to the item's agent · w <n> its workspace · a <n> <text> answer · y <n> approve · x <n> <reason> reject · t <n> take · u <n> unstick · v <n> trace · d <n> full text · n next waiting agent · r refresh · q quit";
+  "<n> go to the item's agent · w <n> its workspace · a <n> <text> answer · y <n> approve · x <n> <reason> reject · t <n> take · u <n> unstick · v <n> trace · d <n> full text · o open/close notes · n next waiting agent · r refresh · q quit";
 
 /** `?`: every command, one per line. */
 export const HELP_TEXT = [
@@ -50,6 +52,7 @@ export const HELP_TEXT = [
   "  t <n>               take an unclaimed story",
   "  v <n>               show the unit's trace",
   "  d <n>               show the item's full text",
+  "  o                   open or close Notes (numbered only while open)",
   "  n                   go to the next agent waiting for you",
   "  r or Enter          refresh",
   "  q                   quit",
@@ -69,6 +72,7 @@ export function parseCockpitLine(line: string): CockpitCommand {
   if (s === "q") return { kind: "quit" };
   if (s === "?" || s === "h") return { kind: "help" };
   if (s === "n") return { kind: "next" };
+  if (s === "o") return { kind: "notes" };
   if (/^[0-9]+$/.test(s)) return { kind: "go", n: Number(s) };
   const m = /^([a-z])\s+([0-9]+)(?:\s+([\s\S]*))?$/.exec(s);
   if (!m) return { kind: "invalid", message: `unknown command: ${s} — ? lists the commands` };
@@ -122,6 +126,8 @@ export function planCockpit(cmd: CockpitCommand, items: readonly InboxEntry[]): 
       return { kind: "output", text: HELP_TEXT };
     case "invalid":
       return { kind: "message", text: cmd.message };
+    case "notes":
+      return { kind: "notes" };
     case "next": {
       const item = oldestYourTurn(items);
       return item ? { kind: "go", item } : { kind: "message", text: "nothing waits for you" };

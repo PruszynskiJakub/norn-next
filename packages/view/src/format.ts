@@ -122,11 +122,6 @@ export function inboxItemsInOrder(view: ProjectView): InboxEntry[] {
   return INBOX_GROUPS.flatMap((g) => view.inbox.groups[g]);
 }
 
-/**
- * `norn inbox` human mode: groups in O1 order, each item with reason, age and command; `details` adds
- * full texts (L1). With `home`, paths under it print as `~/…` (the JSON keeps them absolute).
- * `numbered` prefixes `[n]` for the cockpit (HC4).
- */
 /** An inbox item's line text: its step first, once — many titles already start with the step (F4). */
 export function stepTitle(step: string | null | undefined, title: string): string {
   if (!step) return title;
@@ -134,7 +129,13 @@ export function stepTitle(step: string | null | undefined, title: string): strin
   return named ? title : `${step}: ${title}`;
 }
 
-export function formatInbox(view: ProjectView, opts: { details?: boolean; home?: string; numbered?: boolean } = {}): string {
+/**
+ * `norn inbox` human mode: groups in O1 order, each item with reason, age and command; `details` adds
+ * full texts (L1). With `home`, paths under it print as `~/…` (the JSON keeps them absolute).
+ * `numbered` prefixes `[n]` for the cockpit (HC4). Notes show as their header line only, with the
+ * command that lists them, unless `notes` (NT6).
+ */
+export function formatInbox(view: ProjectView, opts: { details?: boolean; home?: string; numbered?: boolean; notes?: boolean } = {}): string {
   const home = opts.home?.replace(/\/+$/, "");
   const tilde = (t: string) => (home ? t.replaceAll(`${home}/`, "~/") : t);
   const out: string[] = [];
@@ -143,6 +144,10 @@ export function formatInbox(view: ProjectView, opts: { details?: boolean; home?:
     const items = view.inbox.groups[g];
     if (!items.length) continue;
     out.push(`${INBOX_TITLES[g]} (${items.length}) · ${groupAbout(g, items)}`);
+    if (g === "notes" && !opts.notes) {
+      out.push("      $ norn inbox --notes", "");
+      continue;
+    }
     for (const it of items) {
       const unit = it.slice ?? it.story;
       const num = opts.numbered ? `${`[${++n}]`.padEnd(5)}` : "";

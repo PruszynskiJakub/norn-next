@@ -9,24 +9,66 @@
  *   - R2.3: runs/ work (receipts, state) of a story this checkout no longer holds that never reached
  *     the record — moved to `runs/<unit>/orphaned/<holder>-<file>` and committed on the local branch
  *     only, never pushed, so its receipt numbers are not reused
+ *   - K7: with Herdr as the runner, the panes left by runs that reported done — the run's tab, or
+ *     only its pane when the tab holds something else, and the workspace when nothing else is left
  * Nothing with unique work is removed; such items are listed under `kept` with the reason.
  */
 import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { herdr } from "@norn/adapters";
 import { ulid } from "@norn/schema";
 import { acquireTickLock, copyToOrphaned, reclaimLeases, receiptsDir, safeUnlink, git as rawGit } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
+import type { Context } from "../context.ts";
 import { busyError } from "../output.ts";
 import { leaseLiveness } from "../runtime/leases.ts";
-import { observe } from "../runtime/observe.ts";
+import { type Observed, observe } from "../runtime/observe.ts";
+import { doneHerdrRuns, planHerdrTidy } from "../runtime/tidy-herdr.ts";
 
 /** A reservation lives only while a receipt is being written; older ones are crash leftovers. */
 const RESERVE_STALE_MS = 60_000;
 const RESERVE = /^\.\d{4,}\.reserve$/;
 
+/** K7: Herdr when it is the runner — injected, else the real one; null = another runner. */
+function tidyHerdr(ctx: Context): herdr.HerdrCockpit | null {
+  if (ctx.config.runner?.adapter !== herdr.RUNNER_NAME) return null;
+  if (ctx.deps.herdr !== undefined) return ctx.deps.herdr;
+  const o = ctx.config.runner.options ?? {};
+  return herdr.createHerdrCockpit({ env: ctx.env, ...(typeof o.bin === "string" ? { bin: o.bin } : {}), ...(typeof o.session === "string" ? { session: o.session } : {}) });
+}
+
+/** K7: close (or, dry, list) what runs that reported done left in Herdr; a Herdr that fails is kept, not fatal. */
+async function tidyHerdrPanes(cockpit: herdr.HerdrCockpit, obs: Observed, dry: boolean, kept: Array<{ item: string; reason: string }>) {
+  const closed = { workspaces: [] as string[], tabs: [] as string[], panes: [] as string[] };
+  const runs = doneHerdrRuns(
+    Object.entries(obs.units).map(([key, u]) => ({ key, runsDir: u.runsDir })),
+    obs.facts.machine.holder,
+  );
+  if (!runs.length) return closed;
+  try {
+    const plan = planHerdrTidy(runs, await cockpit.listPanes());
+    kept.push(...plan.kept);
+    for (const id of plan.workspaces) {
+      if (!dry) await cockpit.closeWorkspace(id);
+      closed.workspaces.push(id);
+    }
+    for (const id of plan.tabs) {
+      if (!dry) await cockpit.closeTab(id);
+      closed.tabs.push(id);
+    }
+    for (const id of plan.panes) {
+      if (!dry) await cockpit.closePane(id);
+      closed.panes.push(id);
+    }
+  } catch (e) {
+    kept.push({ item: "herdr", reason: `could not tidy Herdr: ${(e as Error).message}` });
+  }
+  return closed;
+}
+
 export const tidyCommand = defineCommand({
   name: "tidy",
-  summary: "Report or clean orphan worktrees, branches, stale leases, receipt reservations (K5) and runs/ work not in the record (R2.3)",
+  summary: "Report or clean orphan worktrees, branches, stale leases, receipt reservations (K5), runs/ work not in the record (R2.3) and Herdr panes of runs that reported done (K7)",
   usage: "norn tidy [--dry-run]",
   options: { "dry-run": { type: "boolean" } },
   async run(ctx, args) {
@@ -135,10 +177,14 @@ export const tidyCommand = defineCommand({
         }
       }
 
+      // ---- K7: Herdr panes of runs that reported done
+      const cockpit = tidyHerdr(ctx);
+      const herdrClosed = cockpit ? await tidyHerdrPanes(cockpit, obs, dry, kept) : null;
+
       const verb = dry ? "would_remove" : "removed";
       return {
         dry_run: dry,
-        [verb]: { worktrees, stale_worktree_records: prunable, branches, leases, reserve_files: reserves },
+        [verb]: { worktrees, stale_worktree_records: prunable, branches, leases, reserve_files: reserves, ...(herdrClosed ? { herdr: herdrClosed } : {}) },
         [dry ? "would_orphan" : "orphaned"]: orphaned,
         kept,
       };
