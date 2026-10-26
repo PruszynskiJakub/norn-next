@@ -1,6 +1,6 @@
 {
   "name": "@norn/cli",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "description": "Deliver software stories with coding agents under the control of deterministic code.",
   "keywords": ["norn", "cli", "agents", "claude-code", "codex", "workflow"],
