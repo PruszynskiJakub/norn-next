@@ -8,6 +8,7 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 - A story stuck at its slices step because every active slice was stuck resumes by itself once a slice can move again. Unsticking the slice is enough; `norn unstick <story>` is no longer needed as well (§10).
 - A check no longer fails with "address in use" because a server an agent started from the worktree is still listening on its slot's ports. Before each check, norn stops such listeners and names them at the top of the check output (K4.1).
+- `norn doctor` suggests `herdr plugin link <checkout>/plugins/herdr` for the cockpit plugin, naming this checkout when norn runs from source, instead of `herdr plugin install`, which cannot clone the private repo. The README says the same.
 
 ## [0.3.0] - 2026-10-25
 

@@ -9,6 +9,8 @@ import { join } from "node:path";
 import { git as gitAdapter } from "@norn/adapters";
 import type { StoryFrontmatter } from "@norn/schema";
 import { appendReceipt, leasesDir, readState, writeStoryFile } from "@norn/store";
+import { pluginLinkHint } from "../src/commands/doctor.ts";
+import { assetsDir } from "../src/runtime/assets.ts";
 import { markStoryOnBase } from "../src/runtime/record.ts";
 import { runCli, type TickReport } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
@@ -259,5 +261,13 @@ describe("norn doctor (A7)", () => {
     expect(t.stdout).toMatch(/^norn doctor: \d+ checks? failed \(.*agent claude.*\)/);
     expect(t.stdout).toMatch(/FAIL agent claude .* · hooks missing/);
     expect(t.stdout).toContain("· run norn init to install hooks");
+  });
+});
+
+describe("norn doctor: the cockpit plugin hint (HC11)", () => {
+  test("links this checkout's plugins/herdr when norn runs from source, else names a checkout", () => {
+    const repo = join(import.meta.dir, "..", "..", "..");
+    expect(pluginLinkHint(assetsDir())).toBe(`herdr plugin link ${join(repo, "plugins", "herdr")} (optional: the norn cockpit, HC9)`);
+    expect(pluginLinkHint("/nowhere/a/b/c")).toBe("herdr plugin link <norn-next checkout>/plugins/herdr (optional: the norn cockpit, HC9)");
   });
 });
