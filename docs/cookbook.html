@@ -514,7 +514,7 @@ norn approve gh-4/01 --reject --reason "AC3: export button is hidden on mobile"`
 
 { part: "agent", id: "ready", title: "Finish a story", tags: ["ready", "pr", "merge"],
   when: "<b>Approve</b> · <code>ready</code>: the draft PR is open.",
-  steps: ["Read the draft PR.", "Approve to mark the story finished, or reject with what to change.", "Merge the PR yourself. That is always a person's act."],
+  steps: ["Read the draft PR.", "Approve to mark the story finished, or reject with what to change.", "Merge the PR yourself. That is always a person's act. Squash it to keep the base linear: the story branch has merge commits from <code>update</code>, since norn never rebases."],
   code: `norn approve gh-17
 gh pr merge --squash      # or merge in the web UI`,
   norn: "When the merge is observed into the base branch, norn removes worktrees, slice branches, the local story branch and the claim. A rejection goes to <code>implement</code> in the story worktree, counted by <code>ready_loop</code>.",
