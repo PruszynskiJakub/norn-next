@@ -20,7 +20,7 @@ import {
   writeStoryFile,
   writeUnitMarker,
 } from "@norn/store";
-import { formatInbox, formatStatus, formatTimeline, loadProjectView, receiptSummary } from "../src/index.ts";
+import { formatInbox, formatStatus, formatTimeline, loadProjectView, receiptSummary, stepTitle } from "../src/index.ts";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -319,6 +319,15 @@ describe("formatters", () => {
     expect(inbox).toContain("Running (1)");
     expect(inbox).toContain("Recently done (1)");
     expect(formatTimeline(v.timeline["gh-12/01"] ?? [])).toContain("check fail at test#1: bun test (exit 1, 2.3s)");
+  });
+
+  test("an item line names its step once, also when the title already starts with it (F4)", () => {
+    expect(stepTitle("refine", "refine: attended step — work with the agent")).toBe("refine: attended step — work with the agent");
+    expect(stepTitle("implement", "implement #2 (queued)")).toBe("implement #2 (queued)");
+    expect(stepTitle("plan", "plan is ready (manual): start an agent in the worktree")).toBe("plan is ready (manual): start an agent in the worktree");
+    expect(stepTitle("implement", "Which OAuth provider?")).toBe("implement: Which OAuth provider?");
+    expect(stepTitle("qa", "quality check failed")).toBe("qa: quality check failed");
+    expect(stepTitle(null, "done")).toBe("done");
   });
 
   test("formatInbox prints paths under home as ~/…", () => {

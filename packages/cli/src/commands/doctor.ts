@@ -7,9 +7,11 @@
  *     and the hook path fires: the installed hook command (`norn hook …`) is invoked with a
  *     synthetic payload from a throwaway unit worktree and must record a hook fact (A2, A3).
  *     Codex: project hooks only run once `.codex/` is trusted (`/hooks` in Codex) — noted.
- *   - remote: the provider CLI answers `whoami` (gh/glab auth)
+ *   - remote: the configured git remote exists (sync and push need it) and the provider CLI
+ *     answers `whoami` (gh/glab auth)
  *   - runner: configured runner available (Herdr server reachable), and `command -v norn` in a
- *     throwaway runner session resolves to this norn (R8.2)
+ *     throwaway runner session resolves to this norn (R8.2); only auto mode needs a runner (MO2),
+ *     so with `default_mode: manual` a failing runner is a warning, not a failed check
  *   - machine: the `user@host` runs are recorded with (R7.1); a warning when NORN_MACHINE overrides it (R7.3)
  *   - skills (SK1): every bundled skill is in `.agents/skills/` and linked from each configured
  *     agent's skill folder; one that differs from the bundled version is a warning (`norn init`)
@@ -28,6 +30,7 @@ import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { rendered, withExit } from "../output.ts";
 import { assetsDir } from "../runtime/assets.ts";
+import { gitRemoteUrl } from "../runtime/detect.ts";
 import { machineHolder, readHookFacts } from "../runtime/observe.ts";
 import { ensureShim, withNornOnPath } from "../runtime/shim.ts";
 import { bundledSkills } from "../runtime/workflows.ts";
@@ -64,6 +67,12 @@ async function run(argv: string[], o: { cwd?: string; env?: Record<string, strin
 }
 
 const firstLine = (s: string) => s.split("\n")[0]?.trim() ?? "";
+const SHORT = 200;
+/** An error as one readable line for a person; `--json` keeps all of it. */
+const short = (s: string) => {
+  const one = s.replace(/\s+/g, " ").trim();
+  return one.length > SHORT ? `${one.slice(0, SHORT)}… (norn doctor --json has the rest)` : one;
+};
 const which = (cmd: string, env: Record<string, string | undefined>) => (cmd.includes("/") ? cmd : Bun.which(cmd, { PATH: env.PATH ?? process.env.PATH ?? "" }));
 
 /** A synthetic hook event this adapter recognizes: prefer session start (never blocks). */
@@ -207,13 +216,13 @@ export function formatDoctor(r: {
 }): string {
   const out: string[] = [];
   const failed: string[] = [];
-  const line = (ok: boolean, label: string, text: string) => {
-    out.push(`  ${ok ? "ok  " : "FAIL"} ${label.padEnd(14)} ${text}`);
-    if (!ok) failed.push(label);
+  const line = (ok: boolean, label: string, text: string, warn = false) => {
+    out.push(`  ${ok ? "ok  " : warn ? "warn" : "FAIL"} ${label.padEnd(14)} ${text}`);
+    if (!ok && !warn) failed.push(label);
   };
   const sub = (text: string) => out.push(`       ${"".padEnd(14)} ${text}`);
   const fix = (c: { error?: unknown; do_instead?: unknown }) => {
-    if (c.error) sub(`! ${String(c.error)}`);
+    if (c.error) sub(`! ${short(String(c.error))}`);
     if (c.do_instead) sub(`→ ${String(c.do_instead)}`);
   };
 
@@ -233,9 +242,10 @@ export function formatDoctor(r: {
   fix(remote);
   const runner = r.runner;
   const onPath = runner.norn_on_path as (Check & { resolved: string | null }) | undefined;
-  line(runner.ok === true, "runner", runner.configured === false ? `none — ${runner.note}` : `${runner.name}${runner.available ? " available" : " not available"}${onPath ? (onPath.ok ? " · sessions run this norn" : "") : ""}`);
+  line(runner.ok === true, "runner", runner.configured === false ? `none — ${runner.note}` : `${runner.name}${runner.available ? " available" : " not available"}${onPath ? (onPath.ok ? " · sessions run this norn" : "") : ""}`, runner.required === false);
   fix(runner);
-  if (onPath && !onPath.ok) sub(`! ${onPath.error}`);
+  if (onPath && !onPath.ok) sub(`! ${short(String(onPath.error))}`);
+  if (runner.ok !== true && runner.required === false) sub("· only auto mode needs a runner; in manual mode you start agents yourself");
   // HC11: informational, never a failed check
   const plugin = runner.cockpit_plugin as { linked: boolean | null; do_instead?: string } | undefined;
   if (plugin) sub(plugin.linked ? "· cockpit plugin linked" : `· cockpit plugin not linked${plugin.do_instead ? ` → ${plugin.do_instead}` : ""}`);
@@ -310,6 +320,11 @@ export const doctorCommand = defineCommand({
         remote = { ok: false, provider: ports.remote.provider, error: (e as Error).message, do_instead: `${config.remote.provider === "glab" ? "glab" : "gh"} auth login` };
       }
     }
+    // sync reads issues and every step pushes through this remote: without it nothing moves
+    const gitRemote = { name: config.remote.git_remote, url: gitRemoteUrl(ctx.root, config.remote.git_remote) };
+    remote.git_remote = gitRemote;
+    if (!gitRemote.url && remote.ok === true)
+      remote = { ...remote, ok: false, error: `this repository has no git remote named ${gitRemote.name}`, do_instead: `git remote add ${gitRemote.name} <url>` };
 
     let runner: Record<string, unknown> = { ok: true, configured: false, note: "manual mode only: a person starts agents (MO2)" };
     if (ports.runner) {
@@ -318,6 +333,8 @@ export const doctorCommand = defineCommand({
       runner = {
         ok: available && (onPath?.ok ?? true),
         configured: true,
+        // MO2: only auto mode starts agents through the runner
+        required: config.default_mode === "auto",
         name: ports.runner.name,
         available,
         ...(onPath ? { norn_on_path: onPath } : {}),
@@ -341,7 +358,7 @@ export const doctorCommand = defineCommand({
 
     if (sk.drifted.length) warnings.push(`skills differ from this norn's bundled version: ${sk.drifted.join(", ")} — run norn init to update them (git diff .agents/skills/ shows the change)`);
 
-    const ok = gitCheck.ok && agents.every((a) => a.ok) && remote.ok === true && runner.ok === true && skillsOk;
+    const ok = gitCheck.ok && agents.every((a) => a.ok) && remote.ok === true && (runner.ok === true || runner.required === false) && skillsOk;
     const report = { ok, live, hook_command: command, machine, git: gitCheck, agents, remote, runner, skills, warnings };
     const out = rendered(report, formatDoctor(report));
     return ok ? out : withExit(out, ExitCode.error);

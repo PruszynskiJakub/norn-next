@@ -117,6 +117,13 @@ export function inboxItemsInOrder(view: ProjectView): InboxEntry[] {
  * full texts (L1). With `home`, paths under it print as `~/…` (the JSON keeps them absolute).
  * `numbered` prefixes `[n]` for the cockpit (HC4).
  */
+/** An inbox item's line text: its step first, once — many titles already start with the step (F4). */
+export function stepTitle(step: string | null | undefined, title: string): string {
+  if (!step) return title;
+  const named = title.startsWith(step) && (title.length === step.length || /^[: #]/.test(title.slice(step.length)));
+  return named ? title : `${step}: ${title}`;
+}
+
 export function formatInbox(view: ProjectView, opts: { details?: boolean; home?: string; numbered?: boolean } = {}): string {
   const home = opts.home?.replace(/\/+$/, "");
   const tilde = (t: string) => (home ? t.replaceAll(`${home}/`, "~/") : t);
@@ -129,7 +136,7 @@ export function formatInbox(view: ProjectView, opts: { details?: boolean; home?:
     for (const it of items) {
       const unit = it.slice ?? it.story;
       const num = opts.numbered ? `${`[${++n}]`.padEnd(5)}` : "";
-      out.push(`  ${num}${unit.padEnd(10)} ${it.step ? `${it.step}: ` : ""}${it.title} · ${it.age}`);
+      out.push(`  ${num}${unit.padEnd(10)} ${stepTitle(it.step, it.title)} · ${it.age}`);
       if (it.detail) out.push(`      ${tilde(it.detail)}`);
       if (opts.details && it.full) out.push(...tilde(it.full).split("\n").map((l) => `      | ${l}`));
       out.push(`      $ ${it.command}`);

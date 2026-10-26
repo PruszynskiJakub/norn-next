@@ -216,7 +216,7 @@ describe("norn doctor (A7)", () => {
       live: boolean;
       git: { ok: boolean };
       agents: Array<{ name: string; tier: string; hooks_installed: boolean; hook_fires: { ok: boolean; recorded: number }; binary: { command: string } }>;
-      remote: { ok: boolean; provider: string; user: string };
+      remote: { ok: boolean; provider: string; user: string; git_remote: { name: string; url: string | null } };
       runner: { ok: boolean; available: boolean };
     };
     expect(r.exit).toBe(v.ok ? 0 : 1);
@@ -224,7 +224,7 @@ describe("norn doctor (A7)", () => {
     expect(v.git.ok).toBe(true);
     expect(v.agents).toHaveLength(1);
     expect(v.agents[0]).toMatchObject({ name: "claude", tier: "blocking", hooks_installed: true, binary: { command: "claude" }, hook_fires: { ok: true, recorded: 1 } });
-    expect(v.remote).toEqual({ ok: true, provider: "gh", user: "tester" });
+    expect(v.remote).toEqual({ ok: true, provider: "gh", user: "tester", git_remote: { name: "origin", url: h.remoteDir } });
     expect(v.runner).toMatchObject({ ok: true, available: true });
     // R8.2: `command -v norn` in a throwaway runner session resolves to this norn's shim
     const shim = join(h.home, "bin", "norn");
@@ -261,6 +261,53 @@ describe("norn doctor (A7)", () => {
     expect(t.stdout).toMatch(/^norn doctor: \d+ checks? failed \(.*agent claude.*\)/);
     expect(t.stdout).toMatch(/FAIL agent claude .* · hooks missing/);
     expect(t.stdout).toContain("· run norn init to install hooks");
+  });
+});
+
+describe("norn doctor: a fresh repository", () => {
+  let h: Harness;
+  const main = join(import.meta.dir, "../src/main.ts");
+  beforeAll(async () => {
+    h = await createHarness();
+    await boot(h);
+  });
+  afterAll(() => h.cleanup());
+
+  test("no git remote fails the remote check with the command that adds one", async () => {
+    h.git(["remote", "rename", "origin", "upstream"]);
+    try {
+      const env = { ...h.deps.env, NORN_HOOK_COMMAND: `${process.execPath} ${main} hook` };
+      const r = await runCli(["doctor"], { ...h.deps, env });
+      expect(r.exit).toBe(1);
+      expect(r.value).toMatchObject({ ok: false, remote: { ok: false, git_remote: { name: "origin", url: null }, do_instead: "git remote add origin <url>" } });
+      expect(r.stdout).toMatch(/FAIL remote +gh as tester/);
+      expect(r.stdout).toContain("! this repository has no git remote named origin");
+      expect(r.stdout).toContain("→ git remote add origin <url>");
+    } finally {
+      h.git(["remote", "rename", "upstream", "origin"]);
+    }
+  });
+
+  test("in manual mode an unavailable runner is a warning, not a failed check (MO2)", async () => {
+    h.runner.availableResult = false;
+    const env = { ...h.deps.env, NORN_HOOK_COMMAND: `${process.execPath} ${main} hook` };
+    try {
+      // auto mode starts agents through the runner: there it fails the check
+      const auto = await runCli(["doctor"], { ...h.deps, env });
+      expect(auto.exit).toBe(1);
+      expect(auto.value).toMatchObject({ ok: false, runner: { ok: false, required: true } });
+      expect(auto.stdout).toMatch(/FAIL runner +fake not available/);
+      h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG.replace("default_mode: auto", "default_mode: manual"));
+      const r = await runCli(["doctor"], { ...h.deps, env });
+      const v = r.value as { runner: Record<string, unknown>; agents: Array<{ ok: boolean }> };
+      expect(v.runner).toMatchObject({ ok: false, required: false, available: false });
+      expect(r.stdout).toMatch(/warn runner +fake not available/);
+      expect(r.stdout).toContain("only auto mode needs a runner");
+      expect(r.stdout).not.toMatch(/failed \(.*runner/);
+    } finally {
+      h.runner.availableResult = true;
+      h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
+    }
   });
 });
 
