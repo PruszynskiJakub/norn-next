@@ -4,6 +4,8 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-26
+
 ### Added
 
 - `norn config [<key>]` shows the resolved config: every setting with its value, the file it came from (built-in, `~/.norn/config.yaml` or `.agents/norn/config.yaml`) and one line on what it does, grouped by who it belongs to (this machine, you, the team). It notes a repo value a machine cap ignores, a machine setting the repo sets for everyone, `default_mode: auto` without a runner, and that an agent's `--permission-mode` is not norn's mode. `--json` for data.
@@ -127,7 +129,8 @@ The first release. norn v1 as specified in `.agents/PRD.md`.
 - The Claude Code plugin (`plugins/claude-code`): the norn skills and a `/norn` command.
 - Distribution: an npm package on GitHub Packages and single-file binaries for macOS and Linux (arm64, x64).
 
-[Unreleased]: https://github.com/PruszynskiJakub/norn-next/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/PruszynskiJakub/norn-next/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/PruszynskiJakub/norn-next/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/PruszynskiJakub/norn-next/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/PruszynskiJakub/norn-next/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/PruszynskiJakub/norn-next/compare/v0.2.1...v0.3.0
