@@ -92,6 +92,33 @@ test("listWorkspaces pairs `herdr workspace list` with each pane's cwd; focusWor
   expect(findWorkspace(ws, undefined)).toBeNull();
 });
 
+test("listPanes reads each pane's tab, workspace, cwd and status; close calls treat a missing target as gone (K7)", async () => {
+  const gone = (what: string): ExecResult => ({ code: 1, stdout: "", stderr: JSON.stringify({ error: { code: `${what}_not_found`, message: "not found" } }) });
+  const { exec, calls } = fakeExec([
+    ["pane list", ok(paneList)],
+    ["pane close w2:p2", empty],
+    ["tab close w9:t1", gone("tab")],
+    ["workspace close w3A", empty],
+    ["workspace close w7", { code: 1, stdout: "", stderr: "socket refused" }],
+  ]);
+  const cockpit = createHerdrCockpit({ exec });
+  expect(await cockpit.listPanes()).toEqual([
+    { pane_id: "w2:p1", tab_id: "w2:t1", workspace_id: "w2", cwd: "/repo", status: "idle" },
+    { pane_id: "w2:p2", tab_id: "w2:t1", workspace_id: "w2", cwd: "/repo", status: "unknown" },
+    { pane_id: "w3A:p1", tab_id: "w3A:t1", workspace_id: "w3A", cwd: "/repo-worktrees/gh-1-01-login", status: "idle" },
+  ]);
+  await cockpit.closePane("w2:p2");
+  await cockpit.closeTab("w9:t1");
+  await cockpit.closeWorkspace("w3A");
+  await expect(cockpit.closeWorkspace("w7")).rejects.toMatchObject({ code: "herdr_error" });
+  expect(calls.slice(1).map((a) => a.slice(1))).toEqual([
+    ["pane", "close", "w2:p2"],
+    ["tab", "close", "w9:t1"],
+    ["workspace", "close", "w3A"],
+    ["workspace", "close", "w7"],
+  ]);
+});
+
 test("pluginLinked reads `herdr plugin list --json` (HC11)", async () => {
   const list = (plugins: unknown[]) => fakeExec([["plugin list --json", ok({ id: "cli:plugin", result: { plugins } })]]).exec;
   expect(await createHerdrCockpit({ exec: list([{ plugin_id: "jpruszynski.github-issues", enabled: true }]) }).pluginLinked()).toBeNull();

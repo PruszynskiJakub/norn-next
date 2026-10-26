@@ -24,6 +24,8 @@ export interface FrameOptions {
   output?: string;
   /** Herdr reachable: `go` focuses panes (else it shows the command, HC8) */
   herdr: boolean;
+  /** HC16: Notes as an accordion — open or not, and how many notes are new; absent = always listed */
+  notes?: { open: boolean; fresh: number };
 }
 
 export type Tone = "ok" | "error" | "info";
@@ -57,6 +59,34 @@ const GROUP_STYLE: Record<InboxGroup, Style[]> = {
   recently_done: ["dim"],
 };
 
+/**
+ * HC16: the items a frame numbers — Notes left out while collapsed, else grouped by unit, the unit
+ * with the newest note first and each unit's notes in the order they were left.
+ */
+export function frameItems(items: readonly InboxEntry[], notesOpen: boolean): InboxEntry[] {
+  const notes = items.filter((i) => i.group === "notes");
+  if (!notesOpen || !notes.length) return items.filter((i) => i.group !== "notes");
+  const unit = (i: InboxEntry) => i.slice ?? i.story;
+  const newest = new Map<string, number>();
+  for (const n of notes) newest.set(unit(n), Math.max(newest.get(unit(n)) ?? Number.NEGATIVE_INFINITY, Date.parse(n.since) || 0));
+  const units = [...newest.keys()].sort((a, b) => (newest.get(b) ?? 0) - (newest.get(a) ?? 0));
+  // the items come in O1 group order, so the notes sit together
+  const at = items.findIndex((i) => i.group === "notes");
+  return [...items.slice(0, at), ...units.flatMap((u) => notes.filter((n) => unit(n) === u)), ...items.slice(at + notes.length)];
+}
+
+/** HC16: how many notes were left after `seenAt` (all of them when nothing was seen yet). */
+export function freshNotes(items: readonly InboxEntry[], seenAt: string | undefined): number {
+  const seen = seenAt ? Date.parse(seenAt) : Number.NEGATIVE_INFINITY;
+  return items.filter((i) => i.group === "notes" && Date.parse(i.since) > seen).length;
+}
+
+/** HC16: when the newest note was left; undefined = no notes. */
+export function newestNote(items: readonly InboxEntry[]): string | undefined {
+  const times = items.filter((i) => i.group === "notes").map((i) => Date.parse(i.since)).filter(Number.isFinite);
+  return times.length ? new Date(Math.max(...times)).toISOString() : undefined;
+}
+
 const TONE_STYLE: Record<Tone, Style[]> = { ok: ["green"], error: ["red"], info: ["dim"] };
 
 /** The commands, short enough for one footer line; `?` lists them in full. */
@@ -68,6 +98,7 @@ const KEYS: Array<[string, string]> = [
   ["t <n>", "take"],
   ["v <n>", "trace"],
   ["d <n>", "details"],
+  ["o", "notes"],
   ["n", "next"],
   ["?", "help"],
   ["q", "quit"],
@@ -125,9 +156,17 @@ export function renderFrame(view: ProjectView, items: readonly InboxEntry[], o: 
   const indent = 2 + numW + 2 + unitW + 2 + stepW + 2;
   let n = 0;
   for (const g of INBOX_GROUPS) {
-    const group = items.filter((i) => i.group === g);
-    if (!group.length) continue;
-    out.push("", `${paint(INBOX_TITLES[g].toUpperCase(), GROUP_STYLE[g])} ${paint(String(group.length), ["dim"])}  ${paint(fit(groupAbout(g, group), width - INBOX_TITLES[g].length - String(group.length).length - 3), ["dim"])}`);
+    // HC16: collapsed Notes keep their header (count, new ones, how to open) and drop their rows
+    const accordion = g === "notes" && o.notes ? o.notes : null;
+    const group = accordion && !accordion.open ? [] : items.filter((i) => i.group === g);
+    const all = accordion ? view.inbox.groups.notes : group;
+    if (!all.length) continue;
+    const marker = accordion ? `${accordion.open ? "▾" : "▸"} ` : "";
+    const fresh = accordion && !accordion.open && accordion.fresh ? ` · ${accordion.fresh} new` : "";
+    const about = [groupAbout(g, all), accordion ? `o to ${accordion.open ? "close" : "open"}` : ""].filter(Boolean).join(" · ");
+    const head = `${marker}${INBOX_TITLES[g].toUpperCase()}`;
+    const count = `${all.length}${fresh}`;
+    out.push("", `${paint(head, GROUP_STYLE[g])} ${paint(count, ["dim"])}  ${paint(fit(about, width - head.length - count.length - 3), ["dim"])}`);
     for (const it of group) {
       n++;
       const age = it.age;

@@ -56,6 +56,7 @@ MO4 gains one sentence: *an attended run waiting for its person is shown as Your
   | `u <n>` | `norn unstick <unit>` |
   | `v <n>` | `norn trace <unit>` (its markdown) into the frame |
   | `d <n>` | the item's full text (title, detail, full screen, command, link), wrapped to the width |
+  | `o` | open or close Notes (HC16) |
   | `n` | go to the oldest Your turn item with a run (an agent waits there), else the oldest Your turn item |
   | `r` / empty | redraw now |
   | `?` | list every command, one per line |
@@ -84,6 +85,10 @@ MO4 gains one sentence: *an attended run waiting for its person is shown as Your
 ## 8. Part F — workspaces
 
 - HC15 The workspace of a run is found through Herdr, like its pane (HC6), never stored: the workspace holding the run's recorded pane, else the one workspace with a pane (foreground working directory, else the pane's) in the unit worktree. Several candidates → none, and the cockpit says so. `w <n>` focuses it with `herdr workspace focus`; an item without a run (an unclaimed story, a manual start) has no workspace to find, and `w` says so with the item's command. `g` uses it when the run has no agent pane to focus (an approval after the agent ended, a stuck unit), before falling back to the command. Workspace labels are not used: they change with the step and a person may rename them.
+
+## 8a. Part G — Notes as an accordion
+
+- HC16 The cockpit draws Notes collapsed: one header line, `▸ NOTES <count> · <n> new  … · o to open`, and no rows, so notes take no numbers and the items below them keep low ones. `o` opens Notes (`▾ NOTES <count> … · o to close`) and closes them again. Open, the notes are numbered like any item (`d <n>` shows one in full) and grouped by unit: the unit with the newest note first, each unit's notes in the order they were left. A note is new when it was left after the newest note seen while Notes were open; that time is kept on this checkout in `.agents/norn/trace/cockpit.json` (`notes_seen_at`), never committed, so opening Notes marks every note shown as seen. Read only: notes cannot be cleared or answered here (NT3 still clears them).
 
 ## 9. Contract changes
 
