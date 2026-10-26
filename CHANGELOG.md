@@ -4,6 +4,10 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+### Fixed
+
+- A herdr launch is no longer reported as failed (an Unblock item, the pane closed, the run retried a minute later) when a short-lived process from the pane's shell startup, such as a `conda activate` subshell, holds the foreground and exits before norn identifies it. norn keeps waiting up to the start timeout for the agent to take the foreground.
+
 ## [0.6.0] - 2026-10-26
 
 ### Added
