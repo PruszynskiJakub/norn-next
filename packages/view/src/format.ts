@@ -2,7 +2,7 @@
  * Compact terminal text for `norn status` / `norn inbox` human mode. Pure: a ProjectView
  * in, a string out (no colour, no clock). The CLI's default output stays JSON (P8).
  */
-import { INBOX_GROUPS, INBOX_TITLES } from "@norn/core";
+import { INBOX_ABOUT, INBOX_GROUPS, INBOX_TITLES } from "@norn/core";
 import { oneLine } from "./timeline.ts";
 import type { InboxEntry, ProjectView, SliceView, StepRow, StepWho, StoryView, TimelineEntry, TraceView, UnitView } from "./types.ts";
 
@@ -107,6 +107,16 @@ export function formatStatus(view: ProjectView): string {
   return `${out.join("\n").trimEnd()}\n`;
 }
 
+/** NT5: the Notes header's clearing hint — each story's once, e.g. `cleared by gh-1 human-qa approval`. */
+export function notesHint(items: readonly InboxEntry[]): string {
+  return [...new Set(items.flatMap((i) => (i.cleared_by ? [i.cleared_by] : [])))].join("; ");
+}
+
+/** A group header's text after its title and count: what the group holds, then the notes' clearing hint. */
+export function groupAbout(g: keyof typeof INBOX_ABOUT, items: readonly InboxEntry[]): string {
+  return [INBOX_ABOUT[g], notesHint(items)].filter(Boolean).join(" · ");
+}
+
 /** HC4: the inbox items in display order (O1 group order) — item `n` of the cockpit is `[n - 1]`. */
 export function inboxItemsInOrder(view: ProjectView): InboxEntry[] {
   return INBOX_GROUPS.flatMap((g) => view.inbox.groups[g]);
@@ -132,7 +142,7 @@ export function formatInbox(view: ProjectView, opts: { details?: boolean; home?:
   for (const g of INBOX_GROUPS) {
     const items = view.inbox.groups[g];
     if (!items.length) continue;
-    out.push(`${INBOX_TITLES[g]} (${items.length})`);
+    out.push(`${INBOX_TITLES[g]} (${items.length}) · ${groupAbout(g, items)}`);
     for (const it of items) {
       const unit = it.slice ?? it.story;
       const num = opts.numbered ? `${`[${++n}]`.padEnd(5)}` : "";

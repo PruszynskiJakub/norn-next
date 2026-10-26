@@ -5,7 +5,8 @@
  * Groups (O1 order): Your turn (work only a person does: attended steps, manual starts, merging
  * the story PR — GR6, F25), Answer, Approve (gates), Unblock, Check (informational: something
  * changed outside norn — the PR head moved after the ready approval, commits norn did not make;
- * F35, Q6), Unclaimed, Running, Recently done.
+ * F35, Q6), Unclaimed, Running, Notes (agents' notes for a person, NT2: information, not an
+ * action), Recently done.
  */
 import { type InboxChange, type Mode, parseDuration, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
 import type { Decision } from "./actions.ts";
@@ -16,9 +17,9 @@ import type { InboxGroup, InboxItem } from "./ports.ts";
 import { sha256 } from "./hash.ts";
 import { optionsLine } from "./prompt.ts";
 import { epoch, formatAge, iso } from "./time.ts";
-import { baseUpdateStep, edgeOf, isStale, stepOf } from "./workflow.ts";
+import { baseUpdateStep, edgeOf, edgesOf, isStale, stepOf } from "./workflow.ts";
 
-export const INBOX_GROUPS: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock", "check", "unclaimed", "running", "recently_done"];
+export const INBOX_GROUPS: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock", "check", "unclaimed", "running", "notes", "recently_done"];
 
 export const INBOX_TITLES: Record<InboxGroup, string> = {
   your_turn: "Your turn",
@@ -28,7 +29,21 @@ export const INBOX_TITLES: Record<InboxGroup, string> = {
   check: "Check",
   unclaimed: "Unclaimed",
   running: "Running",
+  notes: "Notes",
   recently_done: "Recently done",
+};
+
+/** What each group holds, in a few words — shown next to its title (inbox, cockpit). */
+export const INBOX_ABOUT: Record<InboxGroup, string> = {
+  your_turn: "work only you can do",
+  answer: "agents waiting for your answer",
+  approve: "gates waiting for your decision",
+  unblock: "stuck or broken, needs you to unstick it",
+  check: "changed outside norn, worth a look",
+  unclaimed: "stories no checkout holds",
+  running: "agents and checks at work",
+  notes: "agents' notes for you, no action needed",
+  recently_done: "finished in the last 24h",
 };
 
 export interface InboxEntry extends InboxItem {
@@ -39,7 +54,7 @@ export interface InboxEntry extends InboxItem {
 export interface Inbox {
   at: string;
   groups: Record<InboxGroup, InboxEntry[]>;
-  /** items needing a person (everything except running and recently done) */
+  /** items needing a person (everything except running, notes and recently done) */
   pending: number;
 }
 
@@ -236,13 +251,14 @@ const oneLine = (t: string) => t.replace(/\s*\n\s*/g, " ").trim();
 
 /**
  * QV7, NT3: what a person checks at a gate, so they need not open a file — the `person` and
- * `unverified` criteria of the report that led there (with `reason` and `how`), and on a story-level
- * gate the story's open notes (approving acknowledges them). `detail` is one line; `full` (inbox
- * `--details`) lists each on its own line.
+ * `unverified` criteria of the report that led there (with `reason` and `how`), and the open notes:
+ * on a story-level gate the story's (approving acknowledges them), on a slice gate the slice's own
+ * (shown only; NT5). `detail` is one line; `full` (inbox `--details`) lists each on its own line.
  */
 export function gateChecks(story: StoryFacts, uf: UnitFacts): { detail: string | null; full: string | null } {
   const check = personCriteria(uf.last_outcome_receipt?.receipt);
-  const notes = uf.unit.slice === null ? (story.notes ?? []) : [];
+  const storyGate = uf.unit.slice === null;
+  const notes = (story.notes ?? []).filter((n) => storyGate || n.unit === uf.unit.key);
   const parts: string[] = [];
   const lines: string[] = [];
   if (check.length) {
@@ -251,23 +267,49 @@ export function gateChecks(story: StoryFacts, uf: UnitFacts): { detail: string |
   }
   if (notes.length) {
     const noteLine = (n: StoryNote) => `${n.unit} ${n.step}${n.criterion ? ` (${n.criterion})` : ""}: ${n.text}`;
-    parts.push(`open notes (approve acknowledges them): ${notes.map((n) => oneLine(noteLine(n))).join("; ")}`);
+    const [short, long] = storyGate
+      ? ["open notes (approve acknowledges them)", "Open notes (approve acknowledges them; reject leaves them open):"]
+      : [`open notes (${notesClearedBy(story)})`, `Open notes on this slice (${notesClearedBy(story)}; approving this gate leaves them open):`];
+    parts.push(`${short}: ${notes.map((n) => oneLine(noteLine(n))).join("; ")}`);
     if (lines.length) lines.push("");
-    lines.push("Open notes (approve acknowledges them; reject leaves them open):", ...notes.map((n) => `- ${noteLine(n)} [${n.id}]`));
+    lines.push(long, ...notes.map((n) => `- ${noteLine(n)} [${n.id}]`));
   }
   return { detail: parts.length ? parts.join(" · ") : null, full: lines.length ? lines.join("\n") : null };
 }
 
 /**
- * NT2: one Check item per open note of the story — a non-blocking question a reporting agent left
- * for a person. It leaves the inbox when a person gives `approve` at a story-level gate (NT3).
+ * NT5: when the story's open notes leave the inbox — at the nearest story-level gate ahead of the
+ * story unit's step (its own step when it waits at one; NT3), else when the story is done.
+ */
+export function notesClearedBy(story: StoryFacts): string {
+  const uf = story.units.find((u) => u.unit.slice === null);
+  const wf = uf?.workflow;
+  const from = uf?.state?.status === "done" ? null : uf?.state?.step;
+  if (!wf || !from) return "cleared when the story is done";
+  const edges = edgesOf(wf);
+  const seen = new Set([from]);
+  for (let ring = [from]; ring.length; ) {
+    const gate = ring.find((s) => stepOf(wf, s)?.type === "gate");
+    if (gate) return `cleared by ${story.key} ${gate} approval`;
+    ring = edges.filter((e) => ring.includes(e.from) && !seen.has(e.to) && stepOf(wf, e.to)).map((e) => e.to);
+    for (const s of ring) seen.add(s);
+  }
+  return "cleared when the story is done";
+}
+
+/**
+ * NT2: one Notes item per open note of the story — a non-blocking question a reporting agent left
+ * for a person; information, not an action. It leaves the inbox when a person gives `approve` at a
+ * story-level gate (NT3); `cleared_by` says which one (NT5).
  */
 export function noteItems(story: StoryFacts): InboxItem[] {
   const status = story.frontmatter?.status;
   if (status === "done" || status === "dropped") return [];
-  return (story.notes ?? []).map((n) => ({
+  const notes = story.notes ?? [];
+  const cleared_by = notes.length ? notesClearedBy(story) : "";
+  return notes.map((n) => ({
     id: n.id,
-    group: "check" as const,
+    group: "notes" as const,
     story: story.key,
     slice: n.unit === story.key ? null : n.unit,
     step: n.step,
@@ -275,6 +317,7 @@ export function noteItems(story: StoryFacts): InboxItem[] {
     ...(n.text.includes("\n") ? { full: n.text } : {}),
     command: `norn why ${n.unit} --receipt ${n.receipt_id}`,
     since: n.at,
+    cleared_by,
     ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
   }));
 }
@@ -680,14 +723,14 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   }
   add(heartbeatItem(facts, config));
   for (const g of INBOX_GROUPS) groups[g].sort((a, b) => epoch(a.since) - epoch(b.since) || a.id.localeCompare(b.id));
-  const pending = INBOX_GROUPS.filter((g) => g !== "running" && g !== "recently_done").reduce((n, g) => n + groups[g].length, 0);
+  const pending = INBOX_GROUPS.filter((g) => g !== "running" && g !== "notes" && g !== "recently_done").reduce((n, g) => n + groups[g].length, 0);
   return { at: iso(facts.now), groups, pending };
 }
 
 
 // ---------------------------------------------------------------- history (O1, O4)
 
-/** Groups whose items are tracked in the inbox history: the ones needing a person. */
+/** Groups whose items are tracked in the inbox history: the ones needing a person, and notes (NT2). */
 export const HISTORY_GROUPS: readonly InboxGroup[] = INBOX_GROUPS.filter((g) => g !== "running" && g !== "recently_done");
 
 /** What resolved an item: the last receipt applied to its unit this tick, else the rule that acted on it. */

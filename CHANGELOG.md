@@ -14,6 +14,10 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 ### Changed
 
 - `norn help`, `norn`, `norn --help` and `norn <command> --help` print markdown for a person: the commands grouped with "Start here" first, without spec ids. `--json` prints the JSON they printed before.
+- Agents' notes (`norn done --note`) get their own inbox group, Notes, below Running, instead of sitting under Check. Its header says which approval clears them (`cleared by gh-1 human-qa approval`, or `cleared when the story is done`), and they no longer count towards "needs you". In `norn inbox --json` they move from the `check` key to a new `notes` key; `check` keeps the other items (base moved, PR retarget, head changed, commits outside norn, local work not in the record).
+- A slice gate's inbox item lists that slice's open notes, so the person sees them while deciding; approving the slice gate leaves them open, as before.
+- Every inbox group title in `norn inbox` and the cockpit carries a few words on what the group holds.
+- The cockpit draws Running in cyan and Notes in yellow, both undimmed; only Recently done stays dim, so work under way no longer looks finished.
 - `norn doctor`: with `default_mode: manual`, a runner that is unavailable is a warning (`warn`), not a failed check, since only auto mode starts agents through it; the JSON says `runner.required`. Long errors are cut to one line in the report; `--json` keeps them whole.
 
 ### Fixed

@@ -61,7 +61,7 @@ const lastReceipt = (kind: string) => {
 };
 type Item = { id: string; title: string; detail?: string; full?: string; command: string; step: string | null };
 const inbox = async () => ((await h.norn("inbox")).value as { groups: Record<string, Item[]> }).groups;
-const notes = async () => (await inbox()).check?.filter((i) => i.id.startsWith("note:")) ?? [];
+const notes = async () => (await inbox()).notes?.filter((i) => i.id.startsWith("note:")) ?? [];
 
 async function tickUntil(pred: () => boolean, label: string, max = 12) {
   for (let i = 0; i < max && !pred(); i++) {
