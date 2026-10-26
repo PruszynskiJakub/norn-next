@@ -1,6 +1,6 @@
 # norn — known limitations
 
-Where norn breaks or is not proven yet, as of v1.2: v1, plus auto-mode recovery (`SPEC-auto-mode-recovery.md`, PR #6), base sync with honest QA (`SPEC-base-sync-and-qa.md`, PR #7) and the herdr cockpit (`SPEC-herdr-cockpit.md`, PR #23). Release 0.2.1 has everything but the cockpit, which is under `[Unreleased]` in `CHANGELOG.md`. The evidence comes from the dogfood runs on the Todoist sandbox:
+Where norn breaks or is not proven yet, as of release 0.5.0: v1, plus auto-mode recovery (`SPEC-auto-mode-recovery.md`, PR #6), base sync with honest QA (`SPEC-base-sync-and-qa.md`, PR #7) and the herdr cockpit (`SPEC-herdr-cockpit.md`, PR #23, released in 0.3.0, with workspace jumps (HC15) in 0.4.0). The evidence comes from the dogfood runs on the Todoist sandbox:
 
 - `docs/audit-todoist-dogfood/` — v1, finding ids F*.
 - `docs/audit-auto-mode/` — auto mode, ids H*/M*, with a rerun using ids B*.
@@ -78,7 +78,7 @@ The rules each fix maps to are in its spec.
   - an agent that dies with no retries left;
   - killing a herdr pane mid-merge.
 - **An agent with the `browser` capability.** Nobody ever checked a browser criterion live; every such approval says so.
-- **The herdr cockpit (HC1–HC14).** The attended wait, `norn pane --interactive`, the Herdr plugin (`plugins/herdr`), pane labels and the `herdr` notifier are tested against fixtures and a fake runner only. No dogfood run has used them yet.
+- **The herdr cockpit (HC1–HC15).** The attended wait, `norn pane --interactive`, the Herdr plugin (`plugins/herdr`), pane labels and the `herdr` notifier are tested against fixtures and a fake runner only. No dogfood run has used them yet.
 - **The auto permission mode default** (`--permission-mode auto` for `agents.claude`). Every live run used configs that replace it.
 - **codex, opencode, gemini and glab adapters.** They are tested only against recorded fixtures. Only claude, git, gh, herdr and headless ran live.
 
@@ -89,7 +89,7 @@ The rules each fix maps to are in its spec.
 - **Corrupt means stopped (S2).** A state file that fails validation marks the unit `corrupt`, by design. Hand edits to `.agents/` files or merge conflicts in them block the unit until a person repairs it.
 - **No host-less mode.** Story keys must be `gh-N`/`gl-N`, and intake reads issues from GitHub or GitLab (GR1, GR2). A repo with only local files and branches cannot run norn today. Business tracking in Jira stays outside norn by choice.
 - **GitHub/GitLab-style flows only.** norn assumes PRs, branches and git refs. Trunk-based work without PRs, many teams sharing one `.agents/`, and non-git VCS are out of scope.
-- **Merge, never rebase.** Story branches gain merge commits from the base. Teams that require linear history must squash on merge.
+- **Merge, never rebase.** Story branches gain merge commits from the base. Teams that require linear history must squash on merge; the base then stays linear.
 - **The cockpit is line-based.** `norn pane --interactive` reads one command per line between redraws; it is not a full-screen TUI (no raw keys or mouse).
 - **Coarse grain.** norn works per story and slice on a heartbeat. It is the wrong tool for quick interactive edits, and the overhead is not worth it for tiny changes.
 - **Local environment must stay healthy.**
