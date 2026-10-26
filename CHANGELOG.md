@@ -4,6 +4,8 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-26
+
 ### Added
 
 - `norn watch --human` prints for a person at the terminal: one line per action (`10:04:58  gh-1/06  agent.start → start_run`, failures marked `FAILED:`), nothing for a quiet tick, and a sentence on exit naming the claims it released. Without it `watch` prints JSON as before; `--json` wins over `--human`.
