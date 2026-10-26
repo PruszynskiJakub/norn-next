@@ -74,10 +74,10 @@ You need git ≥ 2.38, an agent CLI (Claude Code is the tested one), and `gh` or
 
 ### 1. Install
 
-**Single-file binary** (the quickest: no Bun, no token). Each release carries `norn-darwin-arm64`, `norn-darwin-x64`, `norn-linux-x64`, `norn-linux-arm64` and `SHA256SUMS`:
+**Single-file binary** (the quickest: no Bun, no token, no sign-in). Each release carries `norn-darwin-arm64`, `norn-darwin-x64`, `norn-linux-x64`, `norn-linux-arm64` and `SHA256SUMS`:
 
 ```sh
-gh release download --repo PruszynskiJakub/norn-next --pattern 'norn-darwin-arm64'
+curl -fsSLO https://github.com/PruszynskiJakub/norn-next/releases/latest/download/norn-darwin-arm64
 install -m 755 norn-darwin-arm64 /usr/local/bin/norn
 norn --version
 ```
@@ -135,6 +135,8 @@ Five commands cover most days:
 
 `norn help` lists every command, grouped, with the ones to start with first. `norn help <command>` shows one command's usage.
 
+For recipes by situation (a first story, an agent that asks or dies, a moved `main`, custom workflows, handing a story over), open [`docs/cookbook.html`](docs/cookbook.html) in a browser.
+
 **Manual and auto mode.** Each story has a mode. The repo default is `default_mode` in the config, and `norn mode <story> auto|manual` switches it.
 
 - **manual** (the default): when an agent step is ready, the inbox shows how to start it. With the `herdr` runner, `norn open <unit>` opens a tab in the unit's worktree with the agent started on the brief. Otherwise, open any agent in the unit's worktree and tell it *"Use the norn skill, then run `norn brief`"* (or type `/norn` with the Claude Code plugin).
@@ -150,6 +152,7 @@ In both modes, `check` and `git` steps run on their own. Attended steps (`attend
 |---|---|
 | **story** | a labelled issue assigned to you: one spec folder, one branch, one worktree, one draft PR |
 | **slice** | a piece of a story with its own branch and worktree, merged back into the story |
+| **unit** | a story or a slice: what commands like `answer`, `trace` and `why` take, written `gh-18` (a story) or `gh-18/02` (its second slice) |
 | **workflow** | the steps a story or slice goes through, as YAML in `.agents/norn/workflows/` |
 | **step** | one node of a workflow: an `agent` step, a `check` (a command), a `git` action, or a `gate` (a person approves) |
 | **outcome** | how an agent says a step ended: `norn done <outcome>`, `norn ask` or `norn stuck`; the workflow maps each outcome to the next step |
@@ -192,8 +195,10 @@ claude plugin install norn@norn
 `plugins/herdr` adds the norn cockpit to Herdr: a pane running `norn pane --interactive`, which numbers the inbox items and takes one command per line (`3` goes to item 3's agent, `w 3` to its Herdr workspace, `a 2 Postgres` answers, `y 1` approves, `t 4` takes, `?` lists the rest). Every change goes through the same `norn` commands you would type. While it runs, it labels the agent pane of each norn run in Herdr's sidebar (`gh-12 · refine`, `norn: your turn`).
 
 ```sh
-herdr plugin link <norn-next checkout>/plugins/herdr   # update it with git pull in that checkout
+herdr plugin install PruszynskiJakub/norn-next/plugins/herdr   # update it with herdr plugin update
 ```
+
+Working on norn itself? Link your checkout instead, so the plugin follows `git pull`: `herdr plugin link <checkout>/plugins/herdr`. `norn doctor` suggests whichever fits.
 
 The plugin has two actions you can bind to keys in Herdr's `config.toml`: `norn.open` opens the cockpit below the focused pane, and `norn.next` jumps to the agent that waits for you. To get inbox notifications as Herdr toasts, add `{adapter: herdr}` to `notifiers` in the config.
 
