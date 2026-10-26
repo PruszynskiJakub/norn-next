@@ -4,6 +4,8 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-26
+
 ### Added
 
 - `norn init` ends with numbered next steps to a first story: add the git remote if there is none, check the test command, commit and push the setup, `norn doctor`, make a labelled issue assigned to you, `norn sync`. Its JSON gains `remote` (the git remote's URL, `null` when missing) and `test_command`.
@@ -113,7 +115,10 @@ The first release. norn v1 as specified in `.agents/PRD.md`.
 - The Claude Code plugin (`plugins/claude-code`): the norn skills and a `/norn` command.
 - Distribution: an npm package on GitHub Packages and single-file binaries for macOS and Linux (arm64, x64).
 
-[Unreleased]: https://github.com/PruszynskiJakub/norn-next/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/PruszynskiJakub/norn-next/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/PruszynskiJakub/norn-next/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/PruszynskiJakub/norn-next/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/PruszynskiJakub/norn-next/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/PruszynskiJakub/norn-next/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/PruszynskiJakub/norn-next/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/PruszynskiJakub/norn-next/releases/tag/v0.1.0
