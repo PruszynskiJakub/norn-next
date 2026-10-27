@@ -12,6 +12,7 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 - An answer to a parked run on a runner that resumes sessions (headless) no longer waits as "max_agents in use" because of the run's own agent lease. The answered run already holds that lease, so, as a nudge resume already did, it does not count against `max_agents` (K1).
 - A git step whose outcome uses up its counter (an `integrate` conflict past `conflict_loop`'s max) records `$stuck` as the route in its classify receipt, where the unit actually goes, instead of the edge's target (`merge`). `norn why`, the trace and the boundary commit now name the real route (W4).
+- A tick or integrate lock, or a lease, whose holder is a zombie process is reclaimed. norn's own liveness check counted a zombie as alive (the process adapter already did not), so a crashed tick that left a zombie held the tick lock until the zombie was reaped. Both now read the same `ps` parser, where a zombie is dead (K3, H1).
 
 ## [0.7.1] - 2026-10-26
 

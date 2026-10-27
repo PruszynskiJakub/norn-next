@@ -22,9 +22,7 @@ import { runnerContract } from "./runner.ts";
 
 processContract("process adapter (createProcessPort)", () => createProcessPort());
 // store's own ProcessPort guards leases and the tick lock (K3, H1)
-processContract("store localProcess", () => localProcess, {
-  failing: { "a zombie is not alive (K3)": "BUG-3: processStart reads a zombie's start time, so a zombie counts as alive (fixed by 1.3)" },
-});
+processContract("store localProcess", () => localProcess);
 
 gitContract("git adapter (createGit)", () => createGit({ env: GIT_ENV }));
 
