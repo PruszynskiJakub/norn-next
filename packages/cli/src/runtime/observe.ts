@@ -486,7 +486,6 @@ async function storyBase(
   }
 }
 
-/** `refs/remotes/<remote>/<base>` when it exists locally (fetched), else null (solo, never fetched). */
 /**
  * R3.1: does the local story branch hold nothing beyond its intake commit — read off the commits'
  * trailers (`isIntakeCommit`), never their subjects. Not observed without the branch or the base ref.
@@ -498,6 +497,7 @@ async function intakeOnly(git: GitPort, root: string, baseRef: string | null, br
   return { intake_only: commits.length === 0 || (commits.length === 1 && isIntakeCommit((commits[0] as (typeof commits)[number]).trailers, story)) };
 }
 
+/** `refs/remotes/<remote>/<base>` when it exists locally (fetched), else null (solo, never fetched). */
 async function trackingRef(git: GitPort, root: string, remote: string | null, base: string): Promise<string | null> {
   if (!remote) return null;
   const ref = `refs/remotes/${remote}/${base}`;
