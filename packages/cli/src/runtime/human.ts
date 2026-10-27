@@ -11,7 +11,9 @@ import {
   type ClaimBlob,
   isStoryKey,
   parseDuration,
+  parseSpecDirName,
   type Receipt,
+  SPECS_DIR,
   STORY_UNIT_DIR,
   sliceKey,
   storyOf,
@@ -124,9 +126,9 @@ export async function remoteTarget(ctx: Context, key: string): Promise<Target | 
   const { story, slice } = parseUnitKey(key);
   const refs = (await rawGit(root, ["for-each-ref", "--format=%(refname)", `refs/remotes/${remote}/`])).stdout.split("\n").filter(Boolean);
   const prefix = `refs/remotes/${remote}/`;
-  const storyRef = refs.find((r) => new RegExp(`^${prefix}${story}-[a-z0-9]+(?:-[a-z0-9]+)*$`).test(r));
+  const storyRef = refs.find((r) => r.startsWith(prefix) && parseSpecDirName(r.slice(prefix.length))?.story === story);
   if (!storyRef) return null;
-  const spec = `.agents/specs/${storyRef.slice(prefix.length)}`;
+  const spec = `${SPECS_DIR}/${storyRef.slice(prefix.length)}`;
   const candidates: Array<{ ref: string; dir: string }> = [];
   if (slice) {
     const nn = slice.split("/")[1] as string;

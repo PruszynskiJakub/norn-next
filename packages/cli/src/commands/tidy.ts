@@ -17,7 +17,7 @@ import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { herdr } from "@norn/adapters";
 import { ulid } from "@norn/schema";
-import { acquireTickLock, copyToOrphaned, reclaimLeases, receiptsDir, safeUnlink, git as rawGit } from "@norn/store";
+import { acquireTickLock, copyToOrphaned, orphanedDir, reclaimLeases, receiptsDir, safeUnlink, git as rawGit } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { busyError } from "../output.ts";
@@ -152,7 +152,7 @@ export const tidyCommand = defineCommand({
           for (const f of u.files) {
             const src = join(u.cwd, f);
             if (dry) {
-              moved.push({ from: f, to: relative(u.cwd, join(unitDir, "orphaned", `${holder}-${f.split("/").at(-1)}`)) });
+              moved.push({ from: f, to: relative(u.cwd, join(orphanedDir(unitDir), `${holder}-${f.split("/").at(-1)}`)) });
               continue;
             }
             const dest = copyToOrphaned(unitDir, src, holder);

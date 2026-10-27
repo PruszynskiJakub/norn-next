@@ -31,7 +31,7 @@ import {
   type UnpushedRuns,
   type WorktreeFacts,
 } from "@norn/core";
-import { DEFAULT_CONFIG, type HookFact, type LeaseFile, type Mode, type ResolvedConfig, sliceBranch, storyBranch, type TraceEvent } from "@norn/schema";
+import { DEFAULT_CONFIG, type HookFact, type LeaseFile, type Mode, parseSpecDirName, type ResolvedConfig, sliceBranch, storyBranch, type TraceEvent } from "@norn/schema";
 import {
   classifyClaim,
   cachedDefaultBranch,
@@ -80,7 +80,6 @@ export interface LoadProjectViewOptions {
 }
 
 const TRACE_WINDOW_MS = 14 * 86_400_000;
-const STORY_DIR = /^(?:gh|gl)-[1-9][0-9]*-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function push<T>(m: Map<string, T[]>, k: string, v: T): void {
   const list = m.get(k);
@@ -101,7 +100,7 @@ export function discoverStoryRoots(repoRoot: string): string[] {
   const base = `${repoRoot.replace(/\/+$/, "")}-worktrees`;
   try {
     return readdirSync(base)
-      .filter((n) => STORY_DIR.test(n) && !n.includes("--") && statSync(join(base, n)).isDirectory())
+      .filter((n) => parseSpecDirName(n) !== null && !n.includes("--") && statSync(join(base, n)).isDirectory())
       .sort()
       .map((n) => join(base, n));
   } catch {

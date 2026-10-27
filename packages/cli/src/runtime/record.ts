@@ -16,7 +16,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { GitPort, StoryFacts } from "@norn/core";
-import type { StoryMerge, StoryStatus } from "@norn/schema";
+import { isGitSha, type StoryMerge, type StoryStatus } from "@norn/schema";
 import { git as rawGit, patchStoryFile, storyFile } from "@norn/store";
 
 export type RecordResult =
@@ -78,8 +78,6 @@ export async function markStoryOnBase(opts: {
   }
 }
 
-const SHA = /^[0-9a-f]{40,64}$/;
-
 async function revOf(root: string, rev: string): Promise<string | null> {
   if (!rev) return null;
   const r = await rawGit(root, ["rev-parse", "--verify", "--quiet", "--end-of-options", `${rev}^{commit}`]);
@@ -98,8 +96,8 @@ export async function mergeFacts(opts: { root: string; remote: string | null; ba
   if (pr) {
     out.pr = pr.number;
     if (pr.url) out.url = pr.url;
-    if (SHA.test(pr.head_sha)) out.head_sha = pr.head_sha;
-    if (pr.merge_commit_sha && SHA.test(pr.merge_commit_sha)) out.merge_commit_sha = pr.merge_commit_sha;
+    if (isGitSha(pr.head_sha)) out.head_sha = pr.head_sha;
+    if (isGitSha(pr.merge_commit_sha)) out.merge_commit_sha = pr.merge_commit_sha;
     if (pr.merged_by) out.merged_by = pr.merged_by;
     if (pr.merged_at && !Number.isNaN(Date.parse(pr.merged_at))) out.merged_at = new Date(pr.merged_at).toISOString();
   }

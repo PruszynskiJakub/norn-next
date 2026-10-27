@@ -4,10 +4,9 @@
  */
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { STORY_UNIT_DIR, sliceDirName, storyDirName } from "@norn/schema";
+import { SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName } from "@norn/schema";
 
 export const NORN_DIR = ".agents/norn";
-export const SPECS_DIR = ".agents/specs";
 
 export const nornDir = (root: string) => join(root, NORN_DIR);
 export const repoConfigPath = (root: string) => join(root, NORN_DIR, "config.yaml");
@@ -48,6 +47,8 @@ export const logsDir = (ud: string) => join(ud, "logs");
 export const logPath = (ud: string, runId: string) => join(ud, "logs", `${runId}.log`);
 export const evidenceDir = (ud: string, runId: string) => join(ud, "evidence", runId);
 export const handoffPath = (ud: string) => join(ud, "handoff.md");
+/** R2.3: copies of runs/ files this checkout wrote but never got into the record. */
+export const orphanedDir = (ud: string) => join(ud, "orphaned");
 
 /** Worktree marker files (A3, K4). */
 export const unitMarkerPath = (worktree: string) => join(worktree, ".norn-unit");
