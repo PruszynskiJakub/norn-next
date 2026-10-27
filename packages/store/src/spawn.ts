@@ -22,6 +22,37 @@ export interface BoundedResult {
   timed_out: boolean;
 }
 
+/** One child process norn is about to start: what an effect transcript records (refactor Phase 0.2). */
+export interface SpawnRecord {
+  argv: readonly string[];
+  cwd: string | undefined;
+}
+
+export type SpawnObserver = (spawned: SpawnRecord) => void;
+
+let observer: SpawnObserver | null = null;
+
+/**
+ * Test hook: call `fn` with each argv + cwd before it is spawned (`spawnBounded` and store's sync
+ * git calls). `null` (the default) turns it off. Returns the observer it replaced. The observer
+ * only watches; it cannot change or stop the spawn, and one that throws is ignored.
+ */
+export function setSpawnObserver(fn: SpawnObserver | null): SpawnObserver | null {
+  const prev = observer;
+  observer = fn;
+  return prev;
+}
+
+/** Tell the observer, if any, about a spawn. For store's own spawns that do not go through `spawnBounded`. */
+export function noteSpawn(argv: readonly string[], cwd: string | undefined): void {
+  if (!observer) return;
+  try {
+    observer({ argv: [...argv], cwd });
+  } catch {
+    // an observer never changes what norn does
+  }
+}
+
 /** After the group is killed, how long to wait for the pipes to close before giving up on them. */
 const KILL_GRACE_MS = 2_000;
 
@@ -33,6 +64,7 @@ export function spawnBounded(argv: string[], opts: BoundedOptions): Promise<Boun
     let timedOut = false;
     let settled = false;
     let grace: ReturnType<typeof setTimeout> | undefined;
+    noteSpawn(argv, opts.cwd);
     const child = spawn(argv[0] as string, argv.slice(1), {
       cwd: opts.cwd,
       env: (opts.env ?? process.env) as NodeJS.ProcessEnv,

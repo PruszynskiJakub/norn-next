@@ -12,8 +12,10 @@ import { dirname, join } from "node:path";
 import type { StoryBase, StoryPrSeen } from "@norn/core";
 import { atomicWrite, atomicWriteJson, readText } from "./fsx.ts";
 import { SPECS_DIR, traceDir } from "./paths.ts";
+import { noteSpawn } from "./spawn.ts";
 
 function gitSync(cwd: string, args: string[], input?: Uint8Array): { code: number; stdout: Buffer } {
+  noteSpawn(["git", ...args], cwd);
   const p = Bun.spawnSync(["git", ...args], {
     cwd,
     stdin: input ?? "ignore",

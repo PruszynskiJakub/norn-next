@@ -12,6 +12,7 @@ import { join } from "node:path";
 import type { Inbox, RunnerPort } from "@norn/core";
 import { type CliDeps, type CliResult, runCli, type TickReport } from "../src/index.ts";
 import { createHarness, FakeRunner, type Harness, issue, sh } from "./harness.ts";
+import { expectTranscript, recordTranscript, type Transcript } from "./transcript.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -40,12 +41,16 @@ interface Clone {
   tick(...flags: string[]): Promise<TickReport>;
 }
 
-function wrap(root: string, deps: CliDeps): Clone {
+/** set while a describe records its effect transcript (refactor Phase 0.2): every clone's commands go through it */
+let transcript: Transcript | null = null;
+
+function wrap(root: string, deps: CliDeps, name = "A"): Clone {
+  const run = <T>(label: string, fn: () => Promise<T>) => (transcript ? transcript.command(`[${name}] ${label}`, fn) : fn());
   return {
     root,
-    norn: (...argv) => runCli(argv, deps),
+    norn: (...argv) => run(`norn ${argv.join(" ")}`, () => runCli(argv, deps)),
     async tick(...flags) {
-      const r = await runCli(["tick", ...flags], deps);
+      const r = await run(["norn tick", ...flags].join(" "), () => runCli(["tick", ...flags], deps));
       if (r.exit !== 0) throw new Error(`tick failed: ${r.stdout}`);
       return r.value as TickReport;
     },
@@ -62,12 +67,13 @@ function cloneOf(h: Harness, name: string, user: string): Clone {
   mkdirSync(home);
   const runner = new FakeRunner();
   (runner as { name: string }).name = `fake-${name}`;
+  transcript?.watchClone(name, root, { runner });
   return wrap(root, {
     cwd: root,
     env: { ...process.env, NORN_HOME_DIR: home, USER: user, NORN_MACHINE: name, NORN_HOOK_COMMAND: "norn hook" },
     clock: h.clock,
     ports: { remote: h.remote, runner: runner as RunnerPort, notifiers: [] },
-  });
+  }, name);
 }
 
 /** Every decision with its result, renewals included (they are what R1 is about). */
@@ -95,6 +101,7 @@ describe("a claim lost mid-run (R1.2, R2.3)", () => {
 
   beforeAll(async () => {
     h = await createHarness();
+    transcript = recordTranscript(h);
     A = wrap(h.root, h.deps);
     await setup(h, 9, "Add search");
     for (const want of ["intake_story", "claim", "start_unit", "start_run"]) {
@@ -103,7 +110,11 @@ describe("a claim lost mid-run (R1.2, R2.3)", () => {
       step();
     }
   });
-  afterAll(() => h.cleanup());
+  afterAll(() => {
+    transcript?.stop();
+    transcript = null;
+    h.cleanup();
+  });
 
   test("R1.2: the renewal loses its CAS → the waiting done receipt is skipped, nothing is written or pushed", async () => {
     // the agent on A finishes; before A's next tick, B force-takes the story
@@ -140,6 +151,10 @@ describe("a claim lost mid-run (R1.2, R2.3)", () => {
     expect(remoteHead()).toBe(head);
     expect(sh(`${A.root}-worktrees/${BRANCH}`, ["status", "--porcelain"])).toBe("");
     expect(((await A.norn("inbox")).value as Inbox).groups.check).toEqual([]);
+  });
+
+  test("effect transcript: spawns, port calls and runs/ files of both clones (refactor Phase 0.2)", () => {
+    expectTranscript(transcript as Transcript, "recovery-claim-lost");
   });
 });
 
