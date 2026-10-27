@@ -7,10 +7,13 @@ import {
   explainConfig,
   SCHEMAS,
   type SchemaName,
+  isGitSha,
   isUlid,
   parseDuration,
   parseReceiptFileName,
+  parseSliceFileName,
   parseSliceKey,
+  parseSpecDirName,
   parseStoryKey,
   receiptFileName,
   resolveConfig,
@@ -75,6 +78,19 @@ describe("keys and names", () => {
     expect(receiptFileName(7, "done")).toBe("0007-done.json");
     expect(parseReceiptFileName("0007-done.json")).toEqual({ n: 7, kind: "done" });
     expect(parseReceiptFileName("7-done.json")).toBeNull();
+  });
+  test("spec folder and slice file names", () => {
+    expect(parseSpecDirName("gh-123-fix-login")).toEqual({ story: "gh-123", slug: "fix-login" });
+    expect(parseSpecDirName("gl-4-a")).toEqual({ story: "gl-4", slug: "a" });
+    for (const bad of ["gh-0-x", "gh-12", "gh-1--x", "gh-1/02-x", "xx-1-a", "gh-1-Fix"]) expect(parseSpecDirName(bad)).toBeNull();
+    expect(parseSliceFileName("03-add-form.md")).toEqual({ nn: "03", slug: "add-form" });
+    expect(parseSliceFileName("123-x.md")).toEqual({ nn: "123", slug: "x" });
+    for (const bad of ["3-x.md", "03-x.txt", "03-.md", "03-x"]) expect(parseSliceFileName(bad)).toBeNull();
+  });
+  test("git shas", () => {
+    expect(isGitSha("a".repeat(40))).toBe(true);
+    expect(isGitSha("0".repeat(64))).toBe(true);
+    for (const bad of ["a".repeat(39), "A".repeat(40), "g".repeat(40), null, undefined, 1]) expect(isGitSha(bad)).toBe(false);
   });
   test("durations", () => {
     expect(parseDuration("30s")).toBe(30_000);

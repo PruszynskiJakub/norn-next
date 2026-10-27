@@ -5,7 +5,7 @@
 import type { RemoteFactory, RemoteIssue, RemotePort, RemotePullRequest } from "@norn/core";
 import { storyKey } from "@norn/schema";
 import { NETWORK_TIMEOUT_MS } from "@norn/store";
-import { bunExec, okOrThrow, parseJson, portError, type Exec } from "../git/exec.ts";
+import { bunExec, okOrThrow, parseJson, portError, type Exec } from "../exec.ts";
 
 export interface GhOptions {
   /** repository checkout to run `gh` in */
@@ -21,8 +21,8 @@ export interface GhOptions {
 /** Story key of GitHub issue n: `gh-<n>`. */
 export const issueKey = (number: number): string => storyKey("gh", number);
 
-export const ISSUE_FIELDS = "number,url,title,body,state,assignees,labels,updatedAt";
-export const PR_FIELDS = "number,url,state,isDraft,headRefName,headRefOid,baseRefName,mergedAt,mergeCommit,mergedBy";
+const ISSUE_FIELDS = "number,url,title,body,state,assignees,labels,updatedAt";
+const PR_FIELDS = "number,url,state,isDraft,headRefName,headRefOid,baseRefName,mergedAt,mergeCommit,mergedBy";
 
 interface GhIssue {
   number: number;
@@ -62,7 +62,7 @@ export function mapIssue(i: GhIssue): RemoteIssue {
   };
 }
 
-export function mapPr(p: GhPr): RemotePullRequest {
+function mapPr(p: GhPr): RemotePullRequest {
   const s = p.state.toUpperCase();
   return {
     number: p.number,
@@ -73,9 +73,7 @@ export function mapPr(p: GhPr): RemotePullRequest {
     ...(p.mergeCommit?.oid ? { merge_commit_sha: p.mergeCommit.oid } : {}),
     ...(p.mergedBy?.login ? { merged_by: p.mergedBy.login } : {}),
     merged_at: p.mergedAt ?? null,
-    draft: p.isDraft ?? false,
     head: p.headRefName,
-    base: p.baseRefName,
     base_branch: p.baseRefName,
   };
 }

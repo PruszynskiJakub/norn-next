@@ -1,0 +1,275 @@
+{
+  "heartbeat": {
+    "last_tick_at": 4072154600000
+  },
+  "machine": {
+    "dead_lease_files": [],
+    "heartbeat_id": "<ulid:1>",
+    "holder": "tester@box",
+    "leases": [],
+    "runner": "fake",
+    "runner_capabilities": {
+      "resume": true,
+      "send": true
+    }
+  },
+  "now": 4072154600000,
+  "orphans": {
+    "branches": [],
+    "worktrees": []
+  },
+  "remote": {},
+  "repo": {
+    "default_branch": "main",
+    "remote": "origin",
+    "root": "<dir>/repo"
+  },
+  "stories": [
+    {
+      "base_status": "done",
+      "branch": "gh-7-add-login-form",
+      "claim": {
+        "state": "none"
+      },
+      "frontmatter": {
+        "assignee": "tester",
+        "body_hash": "c0246aeb7256a4338e22673c46f83939608564165a78d6d6e47ae30be59fc51c",
+        "id": "gh-7",
+        "intake_at": "<time>",
+        "labels": [
+          "norn",
+          "norn:wf:mini"
+        ],
+        "merge": {
+          "pr": 100,
+          "url": "https://github.com/o/r/pull/100"
+        },
+        "number": 7,
+        "provider": "gh",
+        "slug": "add-login-form",
+        "status": "done",
+        "title": "Add login form",
+        "url": "https://github.com/o/r/issues/7",
+        "workflow": "mini"
+      },
+      "frontmatter_error": null,
+      "key": "gh-7",
+      "mailbox": [],
+      "mode": "auto",
+      "slices": [
+        {
+          "error": null,
+          "file": ".agents/specs/gh-7-add-login-form/slices/01-form.md",
+          "frontmatter": {
+            "depends_on": [],
+            "id": "gh-7/01",
+            "status": "integrated",
+            "title": "Login form"
+          },
+          "key": "gh-7/01",
+          "nn": "01",
+          "slug": "form"
+        }
+      ],
+      "slug": "add-login-form",
+      "spec_dir": ".agents/specs/gh-7-add-login-form",
+      "units": [
+        {
+          "errors": [],
+          "last_check": null,
+          "last_findings": null,
+          "last_outcome_receipt": null,
+          "lease": null,
+          "run": null,
+          "state": {
+            "applied_through": 5,
+            "attempt": 1,
+            "counters": {},
+            "created_at": "<time>",
+            "last_outcome": {
+              "at": "<time>",
+              "outcome": "done",
+              "receipt_id": "<ulid:2>",
+              "source": "classified",
+              "step": "open-pr"
+            },
+            "last_tick_id": "<ulid:3>",
+            "mode": "auto",
+            "nudges_used": 0,
+            "park": null,
+            "retries_used": 0,
+            "run": null,
+            "slice": null,
+            "status": "done",
+            "step": "$done",
+            "step_entered_at": "<time>",
+            "story": "gh-7",
+            "unit_dir": "_story",
+            "updated_at": "<time>",
+            "version": 1,
+            "visits": {
+              "open-pr": 1,
+              "plan": 1,
+              "slices": 1
+            },
+            "workflow": "mini",
+            "workflow_hash": "acbccdf2a34a664138468f747c2f929076ba05cb88f312703c206a6fe42b57cd"
+          },
+          "step_runs": [],
+          "unapplied": [],
+          "uncommitted": false,
+          "unit": {
+            "dir": "_story",
+            "key": "gh-7",
+            "slice": null,
+            "story": "gh-7"
+          },
+          "workflow": {
+            "name": "mini",
+            "start": "plan",
+            "steps": {
+              "open-pr": {
+                "action": "open-pr",
+                "outcomes": {
+                  "done": "$done"
+                },
+                "type": "git"
+              },
+              "plan": {
+                "outcomes": {
+                  "done": {
+                    "means": "slice files written",
+                    "to": "slices"
+                  }
+                },
+                "skill": "norn-plan",
+                "type": "agent"
+              },
+              "slices": {
+                "outcomes": {
+                  "done": "open-pr",
+                  "stuck": "$stuck"
+                },
+                "type": "slices"
+              }
+            }
+          },
+          "workflow_hash": "acbccdf2a34a664138468f747c2f929076ba05cb88f312703c206a6fe42b57cd",
+          "worktree": null
+        },
+        {
+          "errors": [],
+          "last_check": null,
+          "last_findings": null,
+          "last_outcome_receipt": null,
+          "lease": null,
+          "run": null,
+          "state": {
+            "applied_through": 8,
+            "attempt": 1,
+            "counters": {
+              "test_loop": 0
+            },
+            "created_at": "<time>",
+            "last_outcome": {
+              "at": "<time>",
+              "outcome": "done",
+              "receipt_id": "<ulid:4>",
+              "source": "classified",
+              "step": "integrate"
+            },
+            "last_tick_id": "<ulid:5>",
+            "nudges_used": 0,
+            "park": null,
+            "retries_used": 0,
+            "run": null,
+            "slice": "gh-7/01",
+            "status": "done",
+            "step": "$done",
+            "step_entered_at": "<time>",
+            "story": "gh-7",
+            "unit_dir": "01-form",
+            "updated_at": "<time>",
+            "version": 1,
+            "visits": {
+              "human-qa": 1,
+              "implement": 1,
+              "integrate": 1,
+              "test": 1
+            },
+            "workflow": "slice",
+            "workflow_hash": "47f8698e52c6920a2b18cac3fbbf902cc8044f1ede2597fb32d6ce86e12d8a8a"
+          },
+          "step_runs": [],
+          "unapplied": [],
+          "uncommitted": false,
+          "unit": {
+            "dir": "01-form",
+            "key": "gh-7/01",
+            "slice": "gh-7/01",
+            "story": "gh-7"
+          },
+          "workflow": {
+            "counters": {
+              "test_loop": {
+                "max": 3
+              }
+            },
+            "name": "slice",
+            "start": "implement",
+            "steps": {
+              "human-qa": {
+                "outcomes": {
+                  "approve": "integrate",
+                  "reject": {
+                    "counter": "test_loop",
+                    "to": "implement"
+                  }
+                },
+                "prompt": "Try it",
+                "type": "gate"
+              },
+              "implement": {
+                "outcomes": {
+                  "done": {
+                    "means": "tests pass",
+                    "to": "test"
+                  }
+                },
+                "skill": "norn-implement",
+                "type": "agent"
+              },
+              "integrate": {
+                "action": "integrate",
+                "outcomes": {
+                  "conflict": {
+                    "counter": "test_loop",
+                    "to": "implement"
+                  },
+                  "done": "$done"
+                },
+                "type": "git"
+              },
+              "test": {
+                "outcomes": {
+                  "fail": {
+                    "counter": "test_loop",
+                    "to": "implement"
+                  },
+                  "pass": "human-qa"
+                },
+                "run": "test -f pass.flag && echo checked",
+                "timeout": "1m",
+                "type": "check"
+              }
+            }
+          },
+          "workflow_hash": "47f8698e52c6920a2b18cac3fbbf902cc8044f1ede2597fb32d6ce86e12d8a8a",
+          "worktree": null
+        }
+      ],
+      "worktree": null
+    }
+  ],
+  "tick_id": "<ulid:6>"
+}

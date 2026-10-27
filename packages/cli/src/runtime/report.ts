@@ -7,7 +7,8 @@ import { type Receipt, type ReceiptOf, ulid } from "@norn/schema";
 import { appendReceipt, readHandoff, writeHandoffBody } from "@norn/store";
 import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
-import { agentName, currentRun, implicitAskOpen, loadUnitSession, refuseUnlessAgentWork, reportCommand, standingReport, type UnitSession } from "./agent-unit.ts";
+import { currentRun, implicitAskOpen, standingReport } from "@norn/core";
+import { agentName, loadUnitSession, refuseUnlessAgentWork, reportCommand, type UnitSession } from "./agent-unit.ts";
 
 export interface ReportTarget {
   s: UnitSession;

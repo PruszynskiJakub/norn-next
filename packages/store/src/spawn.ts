@@ -12,6 +12,8 @@ export interface BoundedOptions {
   stdin?: string;
   /** kill the process group after this long; omitted = no limit */
   timeoutMs?: number;
+  /** true: do not tell the spawn observer (read-only pid probes whose argv differs on every run) */
+  unobserved?: boolean;
 }
 
 export interface BoundedResult {
@@ -20,6 +22,39 @@ export interface BoundedResult {
   stdout: string;
   stderr: string;
   timed_out: boolean;
+}
+
+/** One child process norn is about to start: what an effect transcript records (refactor Phase 0.2). */
+export interface SpawnRecord {
+  argv: readonly string[];
+  cwd: string | undefined;
+}
+
+export type SpawnObserver = (spawned: SpawnRecord) => void;
+
+let observer: SpawnObserver | null = null;
+
+/**
+ * Test hook: call `fn` with each argv + cwd before it is spawned (`spawnBounded`, store's sync git
+ * calls, and every other spawn that calls `noteSpawn`: check commands, `gitRemoteUrl`, adapters'
+ * `bunExec`, the headless launch, doctor's probes; the read-only `ps`/`lsof` pid probes are left
+ * out). `null` (the default) turns it off. Returns the observer it replaced. The observer
+ * only watches; it cannot change or stop the spawn, and one that throws is ignored.
+ */
+export function setSpawnObserver(fn: SpawnObserver | null): SpawnObserver | null {
+  const prev = observer;
+  observer = fn;
+  return prev;
+}
+
+/** Tell the observer, if any, about a spawn that does not go through `spawnBounded`. */
+export function noteSpawn(argv: readonly string[], cwd: string | undefined): void {
+  if (!observer) return;
+  try {
+    observer({ argv: [...argv], cwd });
+  } catch {
+    // an observer never changes what norn does
+  }
 }
 
 /** After the group is killed, how long to wait for the pipes to close before giving up on them. */
@@ -33,6 +68,7 @@ export function spawnBounded(argv: string[], opts: BoundedOptions): Promise<Boun
     let timedOut = false;
     let settled = false;
     let grace: ReturnType<typeof setTimeout> | undefined;
+    if (!opts.unobserved) noteSpawn(argv, opts.cwd);
     const child = spawn(argv[0] as string, argv.slice(1), {
       cwd: opts.cwd,
       env: (opts.env ?? process.env) as NodeJS.ProcessEnv,

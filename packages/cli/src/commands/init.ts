@@ -17,9 +17,9 @@ import { detectTestCommand, gitRemoteUrl, TEMPLATE_TEST_COMMAND, withTestCommand
 import { bundledSkills } from "../runtime/workflows.ts";
 
 /** Paths that must never be committed (§7.1). */
-export const IGNORED = [".agents/norn/trace/", ".env.norn", ".norn-unit"];
+const IGNORED = [".agents/norn/trace/", ".env.norn", ".norn-unit"];
 
-export function ensureGitignore(root: string): string[] {
+function ensureGitignore(root: string): string[] {
   const path = join(root, ".gitignore");
   const text = readText(path) ?? "";
   const lines = text.split("\n").map((l) => l.trim());
@@ -32,9 +32,9 @@ export function ensureGitignore(root: string): string[] {
  * S10: `runs/` is committed machine state (§7.1, S8); marking it generated makes GitHub and GitLab
  * collapse it in PR diffs, so a review shows the work, not the receipts.
  */
-export const GENERATED = [".agents/specs/*/runs/** linguist-generated=true gitlab-generated=true"];
+const GENERATED = [".agents/specs/*/runs/** linguist-generated=true gitlab-generated=true"];
 
-export function ensureGitattributes(root: string): string[] {
+function ensureGitattributes(root: string): string[] {
   const path = join(root, ".gitattributes");
   const text = readText(path) ?? "";
   const lines = text.split("\n").map((l) => l.trim());
@@ -47,7 +47,7 @@ export function ensureGitattributes(root: string): string[] {
  * R8.1: installed hooks run `$NORN_BIN` when set — the norn that launched the agent (act exports
  * it) — else the `norn` on PATH. Hooks run through `sh -c`, which expands it.
  */
-export const DEFAULT_HOOK_COMMAND = '"${NORN_BIN:-norn}" hook';
+const DEFAULT_HOOK_COMMAND = '"${NORN_BIN:-norn}" hook';
 
 export function hookCommand(ctx: Context, flag?: string): string {
   return flag ?? ctx.env.NORN_HOOK_COMMAND ?? DEFAULT_HOOK_COMMAND;
@@ -76,7 +76,7 @@ export interface InitReport {
 }
 
 /** `norn init`: what changed, one line per part; names are listed only for what changed. */
-export function formatInit(r: InitReport): string {
+function formatInit(r: InitReport): string {
   const rel = (p: string) => relative(r.root, p) || ".";
   const count = (n: number, what: string) => `${n} ${what}`;
   const out = [`norn init in ${r.root}`, ""];

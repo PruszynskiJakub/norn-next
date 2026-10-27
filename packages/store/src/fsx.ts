@@ -3,7 +3,7 @@
  * exclusive creates (temp → fsync → link, which fails with EEXIST atomically), and
  * validated reads that return a typed `corrupt` result instead of throwing (S2).
  */
-import { closeSync, fsyncSync, linkSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeSync } from "node:fs";
+import { closeSync, cpSync, existsSync, fsyncSync, linkSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, unlinkSync, writeSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import type { FileError } from "@norn/core";
 import { type SchemaError, type SchemaName, type SchemaType, validate } from "@norn/schema";
@@ -57,6 +57,80 @@ export function atomicWrite(path: string, data: string | Uint8Array, mode?: numb
     throw e;
   }
   fsyncDir(dirname(path));
+}
+
+/**
+ * Append `data` to `path` and fsync it before returning (R5.4: a `tick.start` line must survive
+ * a crash during act). Ordinary appends skip the fsync; this one is for lines that explain a crash.
+ */
+export function appendDurable(path: string, data: string): void {
+  mkdirSync(dirname(path), { recursive: true });
+  const created = !existsSync(path);
+  const fd = openSync(path, "a");
+  try {
+    const buf = Buffer.from(data, "utf8");
+    let off = 0;
+    while (off < buf.length) off += writeSync(fd, buf, off, buf.length - off);
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+  if (created) fsyncDir(dirname(path));
+}
+
+function fsyncTree(dir: string): void {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, e.name);
+    if (e.isDirectory()) fsyncTree(p);
+    else if (e.isFile()) {
+      const fd = openSync(p, "r");
+      try {
+        fsyncSync(fd);
+      } finally {
+        closeSync(fd);
+      }
+    }
+  }
+  fsyncDir(dir);
+}
+
+/**
+ * Copy directory `from` into `to` (merging over what `to` already holds) so that `to` is never
+ * seen half-copied (S1): the merge is built in a temp dir beside `to`, fsynced, then renamed into
+ * place. A copy that fails leaves `to` as it was and no temp dir behind.
+ */
+export function atomicCopyDir(from: string, to: string): void {
+  mkdirSync(dirname(to), { recursive: true });
+  const tmp = tmpName(to);
+  try {
+    if (existsSync(to)) cpSync(to, tmp, { recursive: true });
+    cpSync(from, tmp, { recursive: true, force: true });
+    fsyncTree(tmp);
+  } catch (e) {
+    rmSync(tmp, { recursive: true, force: true });
+    throw e;
+  }
+  if (!existsSync(to)) {
+    try {
+      renameSync(tmp, to);
+    } catch (e) {
+      rmSync(tmp, { recursive: true, force: true });
+      throw e;
+    }
+  } else {
+    // rename cannot replace a non-empty directory: move the old one aside, swap, then drop it
+    const old = `${tmp}.old`;
+    renameSync(to, old);
+    try {
+      renameSync(tmp, to);
+    } catch (e) {
+      renameSync(old, to);
+      rmSync(tmp, { recursive: true, force: true });
+      throw e;
+    }
+    rmSync(old, { recursive: true, force: true });
+  }
+  fsyncDir(dirname(to));
 }
 
 /**

@@ -4,17 +4,15 @@
  * (T8: acquired for this heartbeat when free) or through the mailbox when another heartbeat
  * holds it (T9). Views read through @norn/view only (X1).
  */
-import { isAbsolute, join, relative } from "node:path";
-import type { StoryFacts, UnitFacts } from "@norn/core";
+import { isAbsolute, relative } from "node:path";
+import { type ClaimState, type StoryFacts, storyUnit, type UnitFacts } from "@norn/core";
 import { loadProjectView, type ProjectView } from "@norn/view";
 import {
   type ClaimBlob,
-  isStoryKey,
-  parseDuration,
+  parseSpecDirName,
   type Receipt,
+  SPECS_DIR,
   STORY_UNIT_DIR,
-  sliceKey,
-  storyOf,
   ulid,
   type UnitState,
   validate,
@@ -23,45 +21,24 @@ import {
 import {
   acquireClaim,
   appendReceipt,
-  type ClaimRead,
+  type RemoteClaimRead,
+  classifyClaim,
   fetchNornRefs,
+  heartbeatId,
   listMailbox,
-  git as rawGit,
+  newClaimBlob,
   parseWorkflowText,
   postMailbox,
   readClaim,
-  readText,
-  traceDir,
+  recordedHeartbeatId,
+  machineHolder,
 } from "@norn/store";
 import type { Context } from "../context.ts";
 import { claimHeld, failure, refuse, usageError } from "../output.ts";
-import { heartbeatId } from "./local.ts";
-import { machineHolder, type Observed, observe } from "./observe.ts";
-
-// ------------------------------------------------------------------ addressing (ID1)
-
-/** Normalize a unit key: `gh-123`, `gh-123/03` (also `gh-123/3`). Usage error otherwise. */
-export function parseUnitKey(raw: string): { key: string; story: string; slice: string | null } {
-  const s = raw.trim();
-  if (isStoryKey(s)) return { key: s, story: s, slice: null };
-  const m = /^((?:gh|gl)-[1-9][0-9]*)\/([0-9]{1,3})$/.exec(s);
-  if (m) {
-    const key = sliceKey(m[1] as string, m[2] as string);
-    return { key, story: storyOf(key), slice: key };
-  }
-  throw usageError(`not a story or slice key: '${raw}' (use e.g. gh-123 or gh-123/03)`, "norn status");
-}
+import { parseUnitKey } from "./args.ts";
+import { gitRemote, type Observed, observe } from "./observe/index.ts";
 
 // ------------------------------------------------------------------ views (X1)
-
-function readHeartbeat(root: string): string | null {
-  try {
-    const v = JSON.parse(readText(join(traceDir(root), "heartbeat.json")) ?? "null") as { heartbeat_id?: string } | null;
-    return v?.heartbeat_id ?? null;
-  } catch {
-    return null;
-  }
-}
 
 /** The read model for this checkout and machine (no writes, no network). */
 export async function projectView(ctx: Context): Promise<ProjectView> {
@@ -74,7 +51,7 @@ export async function projectView(ctx: Context): Promise<ProjectView> {
     now: ctx.clock.now(),
     env: ctx.env,
     holder: machineHolder(ctx.env),
-    heartbeatId: readHeartbeat(ctx.root),
+    heartbeatId: recordedHeartbeatId(ctx.root),
     ...(runner ? { runnerCapabilities: runner.capabilities } : {}),
   });
 }
@@ -97,12 +74,6 @@ export interface Target {
   story_facts: StoryFacts | null;
 }
 
-export async function gitRemote(ctx: Context): Promise<string | null> {
-  const name = ctx.config.remote.git_remote;
-  const r = await rawGit(ctx.root, ["remote"]);
-  return r.code === 0 && r.stdout.split("\n").some((l) => l.trim() === name) ? name : null;
-}
-
 function localTarget(obs: Observed, story: StoryFacts, uf: UnitFacts): Target {
   return {
     key: uf.unit.key,
@@ -117,37 +88,33 @@ function localTarget(obs: Observed, story: StoryFacts, uf: UnitFacts): Target {
   };
 }
 
-async function show(root: string, spec: string): Promise<string | null> {
-  const r = await rawGit(root, ["show", spec]);
-  return r.code === 0 ? r.stdout : null;
-}
-
 /**
  * The unit's cursor from the pushed branches (T7: the holder pushes at step boundaries):
  * a slice reads its slice branch first, then the story branch; the story unit its story branch.
  */
-export async function remoteTarget(ctx: Context, key: string): Promise<Target | null> {
-  const remote = await gitRemote(ctx);
+async function remoteTarget(ctx: Context, key: string): Promise<Target | null> {
+  const remote = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
   if (!remote) return null;
   const root = ctx.root;
-  await rawGit(root, ["fetch", "--quiet", "--no-tags", remote]);
+  const git = ctx.git;
+  await git.fetch(root, remote, [], { quiet: true }).catch(() => undefined);
   const { story, slice } = parseUnitKey(key);
-  const refs = (await rawGit(root, ["for-each-ref", "--format=%(refname)", `refs/remotes/${remote}/`])).stdout.split("\n").filter(Boolean);
+  const refs = (await git.listRefs(root, `refs/remotes/${remote}/`).catch(() => [])).map((r) => r.ref);
   const prefix = `refs/remotes/${remote}/`;
-  const storyRef = refs.find((r) => new RegExp(`^${prefix}${story}-[a-z0-9]+(?:-[a-z0-9]+)*$`).test(r));
+  const storyRef = refs.find((r) => r.startsWith(prefix) && parseSpecDirName(r.slice(prefix.length))?.story === story);
   if (!storyRef) return null;
-  const spec = `.agents/specs/${storyRef.slice(prefix.length)}`;
+  const spec = `${SPECS_DIR}/${storyRef.slice(prefix.length)}`;
   const candidates: Array<{ ref: string; dir: string }> = [];
   if (slice) {
     const nn = slice.split("/")[1] as string;
     const sliceRef = refs.find((r) => r.startsWith(`${prefix}${story}/${nn}-`));
     if (sliceRef) candidates.push({ ref: sliceRef, dir: sliceRef.slice(`${prefix}${story}/`.length) });
-    const listed = (await rawGit(root, ["ls-tree", "--name-only", `${storyRef}:${spec}/runs/`])).stdout.split("\n");
+    const listed = (await git.lsTree(root, storyRef, `${spec}/runs/`)) ?? [];
     const dir = listed.find((d) => d.startsWith(`${nn}-`));
     if (dir) candidates.push({ ref: storyRef, dir });
   } else candidates.push({ ref: storyRef, dir: STORY_UNIT_DIR });
   for (const c of candidates) {
-    const raw = await show(root, `${c.ref}:${spec}/runs/${c.dir}/state.json`);
+    const raw = await git.show(root, c.ref, `${spec}/runs/${c.dir}/state.json`);
     if (raw === null) continue;
     let parsed: unknown;
     try {
@@ -157,7 +124,7 @@ export async function remoteTarget(ctx: Context, key: string): Promise<Target | 
     }
     const st = validate("state", parsed);
     if (!st.ok) continue;
-    const wfText = await show(root, `${c.ref}:${spec}/runs/${c.dir}/workflow.yaml`);
+    const wfText = await git.show(root, c.ref, `${spec}/runs/${c.dir}/workflow.yaml`);
     const wf = wfText === null ? null : parseWorkflowText(wfText, `${spec}/runs/${c.dir}/workflow.yaml`);
     return { key, story, slice, state: st.value, workflow: wf?.ok ? wf.value : null, runsDir: null, source: "remote", obs: null, story_facts: null };
   }
@@ -165,7 +132,7 @@ export async function remoteTarget(ctx: Context, key: string): Promise<Target | 
 }
 
 /** Observe this checkout without touching the network. */
-export function observeLocal(ctx: Context): Promise<Observed> {
+function observeLocal(ctx: Context): Promise<Observed> {
   return observe(ctx, { tick_id: ulid(ctx.clock.now()), sync: "never" });
 }
 
@@ -184,12 +151,12 @@ export async function resolveTarget(ctx: Context, raw: string, pick?: (st: UnitS
       if (uf) return localTarget(obs, sf, uf);
       throw refuse(`no slice ${slice} in story ${story}`, `norn status ${story}`, "unknown_unit");
     }
-    const storyUnit = sf.units.find((u) => u.unit.slice === null);
-    if (pick && storyUnit && !(storyUnit.state && pick(storyUnit.state))) {
+    const su = storyUnit(sf);
+    if (pick && su && !(su.state && pick(su.state))) {
       const matches = sf.units.filter((u) => u.unit.slice !== null && u.state && pick(u.state));
       if (matches.length === 1) return localTarget(obs, sf, matches[0] as UnitFacts);
     }
-    if (storyUnit) return localTarget(obs, sf, storyUnit);
+    if (su) return localTarget(obs, sf, su);
   }
   const remote = await remoteTarget(ctx, key);
   if (remote) return remote;
@@ -235,69 +202,79 @@ export function humanReceipt<K extends HumanKind>(ctx: Context, t: Target, st: U
 export type Route = { via: "local"; claim: "mine" | "acquired" } | { via: "mailbox"; holder: ClaimBlob };
 
 /**
+ * The story's claim as the remote has it now (T3), classified for this checkout's heartbeat (ID2)
+ * by store `classifyClaim` — the rule observe uses, so a verb and the tick judge a claim alike.
+ * Judged by the recorded heartbeat_id: reading a claim never creates one (a new one matches no claim).
+ * `remote` saves a caller that already knows the git remote looking it up again; `unreadable`
+ * builds the error thrown when the claim ref cannot be read (network).
+ */
+export async function claimFor(
+  ctx: Context,
+  story: string,
+  opts: { remote?: string | null; unreadable?: (e: Error) => Error } = {},
+): Promise<ClaimState> {
+  const unreadable = opts.unreadable ?? ((e: Error) => failure(`cannot read the claim of ${story}: ${e.message}`, "check the network and retry", "claim_unreadable"));
+  let read: RemoteClaimRead;
+  try {
+    read = await readClaim(ctx.root, opts.remote !== undefined ? opts.remote : await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote), story);
+  } catch (e) {
+    throw unreadable(e as Error);
+  }
+  if (read.state === "unreachable") throw unreadable(new Error(read.message));
+  return classifyClaim(read, { heartbeat_id: recordedHeartbeatId(ctx.root) }, ctx.clock.now());
+}
+
+/**
  * Who may write the receipt: this heartbeat when it holds the claim, or after acquiring a free
  * claim (T8); otherwise the mailbox (T9) — or a refusal when `mailbox` is false (mode, workflow).
  */
-export async function claimRoute(ctx: Context, t: Target, opts: { mailbox: boolean; verb: string; claim?: ClaimRead }): Promise<Route> {
-  const root = ctx.root;
-  const remote = await gitRemote(ctx);
-  const now = ctx.clock.now();
-  let cur = opts.claim ?? (await currentClaim(ctx, t.story));
-  if (cur.state === "corrupt") throw refuse(`claim ref of ${t.story} is corrupt`, `norn take ${t.story} --force`, "claim_corrupt", cur.error);
-  const hb = heartbeatId(root, now);
-  const live = cur.state === "present" && Date.parse(cur.blob.expires_at) > now;
-  if (cur.state === "present" && live && cur.blob.heartbeat_id === hb) {
+async function claimRoute(ctx: Context, t: Target, opts: { mailbox: boolean; verb: string; claim?: ClaimState }): Promise<Route> {
+  const remote = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
+  const c = opts.claim ?? (await claimFor(ctx, t.story));
+  if (c.state === "corrupt") throw refuse(`claim ref of ${t.story} is corrupt`, `norn take ${t.story} --force`, "claim_corrupt", c.error);
+  if (c.state === "mine") {
     if (!t.runsDir) throw refuse(`${t.key} is held here but its runs/ are not in this checkout`, "norn tick", "story_not_local");
     return { via: "local", claim: "mine" };
   }
-  if (!live) {
+  let holder: ClaimBlob;
+  if (c.state === "other") holder = c.blob;
+  else {
     if (!t.runsDir) throw refuse(`${t.story} is unclaimed and not in this checkout`, `norn take ${t.story}`, "story_not_local");
-    const blob: ClaimBlob = {
-      version: 1,
-      story: t.story,
-      holder: machineHolder(ctx.env),
-      heartbeat_id: hb,
-      acquired_at: ctx.clock.iso(),
-      renewed_at: ctx.clock.iso(),
-      expires_at: new Date(now + parseDuration(ctx.config.claim.lease)).toISOString(),
-      last_tick_id: null,
-    };
-    const r = await acquireClaim(root, remote, blob, { now });
+    const now = ctx.clock.now();
+    const blob = newClaimBlob({ story: t.story, holder: machineHolder(ctx.env), heartbeat_id: heartbeatId(ctx.root, now), now, at: ctx.clock.iso(), lease: ctx.config.claim.lease });
+    const r = await acquireClaim(ctx.root, remote, blob, { now });
     if (r.ok) return { via: "local", claim: "acquired" };
     if (r.reason !== "held") throw failure(`cannot acquire the claim of ${t.story}: ${r.message}`, `norn ${opts.verb} again`, "claim_failed");
-    cur = { state: "present", sha: r.sha, blob: r.holder };
+    holder = r.holder;
   }
-  const holder = (cur as Extract<ClaimRead, { state: "present" }>).blob;
   if (!opts.mailbox) throw claimHeld(holder, `ask ${holder.holder} to run it, or norn take ${t.story} --force`, `; ${opts.verb} cannot go through the mailbox (T9)`);
   return { via: "mailbox", holder };
 }
 
-/** The story's claim as the remote has it (T3). */
-async function currentClaim(ctx: Context, story: string): Promise<ClaimRead> {
-  try {
-    return await readClaim(ctx.root, await gitRemote(ctx), story);
-  } catch (e) {
-    throw failure(`cannot read the claim of ${story}: ${(e as Error).message}`, "check the network and retry", "claim_unreadable");
-  }
-}
-
 /**
- * Refuse a verb that needs the claim (mode, workflow) while another heartbeat holds it: this
+ * Refuse a verb that needs the claim (mode, open) while another heartbeat holds it: this
  * checkout's copy may be stale (T9), so no answer is computed from it — not even a no-op.
  */
-export async function refuseIfHeldElsewhere(ctx: Context, story: string, verb: string): Promise<ClaimRead> {
-  const claim = await currentClaim(ctx, story);
-  const holder = heldElsewhere(ctx, claim);
+export async function refuseIfHeldElsewhere(ctx: Context, story: string, verb: string): Promise<ClaimState> {
+  const claim = await claimFor(ctx, story);
+  const holder = heldElsewhere(claim);
   if (holder) throw claimHeld(holder, `ask ${holder.holder} to run it, or norn take ${story} --force`, `; ${verb} cannot go through the mailbox (T9)`);
   return claim;
 }
 
-/** A live claim of another heartbeat (T9: the verb goes through the mailbox), else null. */
-function heldElsewhere(ctx: Context, cur: ClaimRead): ClaimBlob | null {
-  const now = ctx.clock.now();
-  if (cur.state !== "present" || Date.parse(cur.blob.expires_at) <= now) return null;
-  return cur.blob.heartbeat_id === heartbeatId(ctx.root, now) ? null : cur.blob;
+/**
+ * T7: a verb only the claim holder runs (update) — refused unless this heartbeat holds the claim
+ * and the unit's runs/ are in this checkout; it never acquires a free claim nor uses the mailbox.
+ */
+function refuseUnlessHolder(claim: ClaimState, t: Target, verb: string, rule: string): Route {
+  if (claim.state === "mine" && t.runsDir) return { via: "local", claim: "mine" };
+  const live = claim.state === "mine" || claim.state === "other";
+  const who = live ? `held by ${claim.blob.holder}` : "not held by this checkout";
+  throw refuse(`${t.story}'s claim is ${who}; ${rule}`, live ? `ask ${claim.blob.holder} to run norn ${verb} ${t.story}, or norn take ${t.story} --force` : `norn take ${t.story}`, "not_holder");
 }
+
+/** A live claim of another heartbeat (T9: the verb goes through the mailbox), else null. */
+const heldElsewhere = (c: ClaimState): ClaimBlob | null => (c.state === "other" ? c.blob : null);
 
 /** What a human receipt decides; two receipts with the same purpose at one step attempt conflict. */
 const purpose = (r: Receipt): string => (r.kind === "reject" ? "approve" : r.kind);
@@ -307,16 +284,19 @@ const sameDecision = (a: Receipt, b: Receipt) =>
 /**
  * Refuse a second answer / gate decision / unstick for the step attempt one is already recorded
  * for and not yet applied (S6): the tick would apply the first and reject the second silently.
- * Looks at the unit's unapplied receipts and the story's mailbox (T9).
+ * Looks at the unit's unapplied receipts and, for a verb that may use it, the story's mailbox (T9).
  */
-async function refuseDuplicate(ctx: Context, t: Target, receipt: Receipt, holder: ClaimBlob | null): Promise<void> {
+async function refuseDuplicate(ctx: Context, t: Target, receipt: Receipt, holder: ClaimBlob | null, mailbox: boolean): Promise<void> {
   const unit = receipt.slice ?? t.story;
   const pending: Array<{ receipt: Receipt; where: string }> = [];
   const uf = t.story_facts?.units.find((u) => u.unit.key === unit);
   for (const r of uf?.unapplied ?? []) pending.push({ receipt: r.receipt, where: r.file });
-  const remote = await gitRemote(ctx);
-  if (remote) await fetchNornRefs(ctx.root, remote).catch(() => undefined);
-  for (const m of await listMailbox(ctx.root, t.story).catch(() => [])) if (m.receipt) pending.push({ receipt: m.receipt, where: m.ref });
+  // a verb that never goes through the mailbox has no receipt of its purpose there
+  if (mailbox) {
+    const remote = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
+    if (remote) await fetchNornRefs(ctx.root, remote).catch(() => undefined);
+    for (const m of await listMailbox(ctx.root, t.story).catch(() => [])) if (m.receipt) pending.push({ receipt: m.receipt, where: m.ref });
+  }
   const dup = pending.find((p) => sameDecision(p.receipt, receipt));
   if (!dup) return;
   const next = holder ? `wait for ${holder.holder}'s next tick to import it (T9)` : "norn tick";
@@ -340,7 +320,7 @@ export interface Delivered {
   holder?: string;
 }
 
-export async function deliver(ctx: Context, t: Target, route: Route, receipt: Receipt): Promise<Delivered> {
+async function deliver(ctx: Context, t: Target, route: Route, receipt: Receipt): Promise<Delivered> {
   if (route.via === "local") {
     const r = appendReceipt(t.runsDir as string, receipt);
     // repo-relative: the runs/ may live in a story or slice worktree, not under ctx.root
@@ -349,39 +329,71 @@ export async function deliver(ctx: Context, t: Target, route: Route, receipt: Re
     const file = rel.startsWith("..") || isAbsolute(rel) ? r.file : rel;
     return { via: "local", claim: route.claim, n: r.n, file };
   }
-  const remote = await gitRemote(ctx);
+  const remote = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
   const posted = await postMailbox(ctx.root, remote, t.story, receipt);
   if (!posted.ok) throw failure(`mailbox push failed: ${posted.message}`, `norn ${receipt.kind === "reject" ? "approve" : receipt.kind} again`, "mailbox_failed");
   return { via: "mailbox", ref: posted.ref, holder: route.holder.holder };
 }
 
+export interface HumanVerbOptions {
+  verb: string;
+  /**
+   * true: another heartbeat's claim sends the receipt through its mailbox (T9), and the claim is
+   * read before anything else. false: refused when another heartbeat holds the claim; the claim is
+   * read after `check` unless the caller passes the one it read first (`claim`: mode, T9).
+   */
+  mailbox: boolean;
+  /** the story's claim the caller already read (claimFor) */
+  claim?: ClaimState;
+  /**
+   * T7: only the claim holder runs the verb (update); the refusal states this rule. Checked after
+   * `check`; the claim is never acquired here and never goes through the mailbox.
+   */
+  requireHolder?: string;
+  /**
+   * false: no duplicate refusal (S6), e.g. mode, where every receipt applies (MO1). A function: the
+   * verb's own duplicate refusal (update: any unapplied update of the story), run in its place.
+   */
+  refuseDuplicate?: false | ((t: Target, receipt: Receipt) => void);
+  check: (t: Target, st: UnitState) => void;
+  /** true: nothing to record (mode already set); the verb returns null without touching the claim */
+  noop?: (t: Target, st: UnitState) => boolean;
+  build: (t: Target, st: UnitState) => Receipt;
+  /** an effect that must succeed before the receipt is written (R6.3: typing an answer into a prompt); returns the receipt to write */
+  before?: (t: Target, st: UnitState, route: Route, receipt: Receipt) => Promise<Receipt>;
+}
+
+export interface HumanVerbResult {
+  unit: string;
+  receipt: Receipt;
+  delivered: Delivered;
+  next: string;
+}
+
 /**
  * Validate → route → (for the mailbox, re-read the cursor from the pushed branch and re-validate)
  * → build and deliver. `check` refuses when the state does not allow the verb; `build` makes the
- * receipt from the (possibly refreshed) target.
+ * receipt from the (possibly refreshed) target. Null only when `noop` says there is nothing to record.
  */
-export async function runHumanVerb(
-  ctx: Context,
-  t: Target,
-  opts: {
-    verb: string;
-    mailbox: boolean;
-    check: (t: Target, st: UnitState) => void;
-    build: (t: Target, st: UnitState) => Receipt;
-    /** an effect that must succeed before the receipt is written (R6.3: typing an answer into a prompt); returns the receipt to write */
-    before?: (t: Target, st: UnitState, route: Route, receipt: Receipt) => Promise<Receipt>;
-  },
-): Promise<{ unit: string; receipt: Receipt; delivered: Delivered; next: string }> {
+export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptions & { noop?: undefined }): Promise<HumanVerbResult>;
+export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptions): Promise<HumanVerbResult | null>;
+export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptions): Promise<HumanVerbResult | null> {
   // T9: read the claim first — a non-holder's local copy may be stale, so when another heartbeat
   // holds the story the cursor comes from the pushed branch before any precondition is checked
-  const claim = await currentClaim(ctx, t.story);
-  const holder = heldElsewhere(ctx, claim);
+  let claim = opts.claim ?? (opts.mailbox ? await claimFor(ctx, t.story) : null);
   let target = t;
-  if (opts.mailbox && t.source === "local" && holder) target = (await remoteTarget(ctx, t.key)) ?? t;
+  if (opts.mailbox && t.source === "local" && claim && heldElsewhere(claim)) target = (await remoteTarget(ctx, t.key)) ?? t;
   opts.check(target, started(target));
+  if (opts.noop?.(target, started(target))) return null;
   let receipt = opts.build(target, started(target));
-  await refuseDuplicate(ctx, t, receipt, holder);
-  const route = await claimRoute(ctx, t, { mailbox: opts.mailbox, verb: opts.verb, claim });
+  let held: Route | null = null;
+  if (opts.requireHolder) {
+    claim ??= await claimFor(ctx, t.story);
+    held = refuseUnlessHolder(claim, t, opts.verb, opts.requireHolder);
+  }
+  if (typeof opts.refuseDuplicate === "function") opts.refuseDuplicate(t, receipt);
+  else if (opts.refuseDuplicate !== false) await refuseDuplicate(ctx, t, receipt, claim && heldElsewhere(claim), opts.mailbox);
+  const route = held ?? (await claimRoute(ctx, t, { mailbox: opts.mailbox, verb: opts.verb, ...(claim ? { claim } : {}) }));
   if (route.via === "local" && target !== t) {
     // the claim turned out free after all: write under it, against the local cursor
     target = t;

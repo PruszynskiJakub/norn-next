@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import type { LeaseFile, UnitState } from "@norn/schema";
-import type { Action } from "../src/actions.ts";
+import { type Action, legacyAction } from "../src/actions.ts";
 import { applyReceipts } from "../src/apply.ts";
-import { decide, isSideAction, unitDecision } from "../src/decide.ts";
-import type { RunFacts, StoryFacts } from "../src/facts.ts";
+import { decide, isSideAction, unitDecision } from "../src/decide/index.ts";
+import { isIntakeCommit, nornTrailers } from "../src/policy.ts";
+import type { RunFacts, StoryFacts, UnitFacts } from "../src/facts.ts";
+import type { WorktreeStatus } from "../src/ports.ts";
 import { sha256 } from "../src/hash.ts";
 import {
   at,
@@ -21,9 +23,13 @@ import {
   storyFacts,
   storyUnit,
   T0,
+  TICK,
   unitFacts,
   WORKFLOWS,
+  worktree as worktreeOf,
 } from "./fixtures.ts";
+
+const wtStatus = (path: string, branch: string): WorktreeStatus => ({ path, branch, head: "h", clean: true, staged: [], unstaged: [], untracked: [], ahead: 0, behind: 0, upstream: null, rebase_in_progress: false });
 
 const RUN = "01JDDDDDDDDDDDDDDDDDDDDDDD";
 const kinds = (f: Parameters<typeof decide>[0]) => decide(f, WORKFLOWS, CONFIG).map((d) => `${d.unit} ${d.action.kind} ${d.rule}`);
@@ -38,7 +44,7 @@ function solo(patch: Partial<UnitState> = {}, run: Partial<RunFacts> | null = nu
   const unit = storyUnit(key);
   const st = stateFor(unit, SOLO_WF, patch);
   const rf: RunFacts | null = run && { run_id: RUN, session: { runner: "herdr", session_id: "s1" }, process_alive: true, pane: null, hooks: [], last_hook_at: null, last_activity_at: T0, transcript: "/t.jsonl", ...run };
-  return storyFacts(key, [unitFacts(unit, SOLO_WF, st, { run: rf, worktree: { path: `/r-worktrees/${key}-login`, exists: true, marker: true, status: null, last_commit_at: null, last_file_change_at: null, slot: 1 } })], { ...story, frontmatter: { ...storyFacts(key, []).frontmatter!, workflow: "solo", intake_at: at(intake) } });
+  return storyFacts(key, [unitFacts(unit, SOLO_WF, st, { run: rf, worktree: { path: `/r-worktrees/${key}-login`, exists: true, status: null, last_commit_at: null, last_file_change_at: null, slot: 1 } })], { ...story, frontmatter: { ...storyFacts(key, []).frontmatter!, workflow: "solo", intake_at: at(intake) } });
 }
 const running = (p: Partial<UnitState> = {}): Partial<UnitState> => ({
   status: "running",
@@ -79,6 +85,22 @@ describe("claims (T1–T10)", () => {
     expect(isSideAction(ds[0]!.action)).toBe(true);
     expect(unitDecision(ds, "gh-1")?.rule).toBe("receipts.apply");
   });
+  test("R3.1: the intake claim carries what to remove if it is lost — from the intake_only fact, never decided without it", () => {
+    const fresh = (patch: Partial<StoryFacts>) => {
+      const s = storyFacts("gh-1", [unitFacts(storyUnit(), null, null)], { claim: { state: "none" }, ...patch });
+      s.frontmatter = { ...s.frontmatter!, status: "new" };
+      const a = only(facts([s]));
+      return a.kind === "claim" ? a : null;
+    };
+    expect(fresh({})).toMatchObject({ rule: "claim.acquire.intake" });
+    expect(fresh({})).not.toHaveProperty("lost_intake");
+    const clean = { ...worktreeOf("/r-worktrees/gh-1-login"), status: wtStatus("/r-worktrees/gh-1-login", "gh-1-login") };
+    expect(fresh({ intake_only: true, worktree: clean })?.lost_intake).toEqual({ drop: { worktree: "/r-worktrees/gh-1-login", branch: "gh-1-login" } });
+    expect(fresh({ intake_only: true, worktree: null })?.lost_intake).toEqual({ drop: { worktree: null, branch: "gh-1-login" } });
+    expect(fresh({ intake_only: false, worktree: clean })?.lost_intake).toEqual({ keep: "gh-1-login has commits beyond the intake" });
+    const dirty = { ...clean, status: { ...clean.status, clean: false, untracked: ["x"] } };
+    expect(fresh({ intake_only: true, worktree: dirty })?.lost_intake).toEqual({ keep: "/r-worktrees/gh-1-login has uncommitted changes" });
+  });
   test("R3.2: the base record wins — no acquire for a story the base records as done or whose PR merged", () => {
     // a stale local intake (status new) of a story the base already records as done (A21)
     const fresh = storyFacts("gh-1", [unitFacts(storyUnit(), null, null)], { claim: { state: "none" }, base_status: "done" });
@@ -97,6 +119,17 @@ describe("claims (T1–T10)", () => {
 });
 
 describe("corrupt units (S2)", () => {
+  test("decide says whether act writes corrupt into state: only the unit's own runs/ files, never a broken state.json or story.md", () => {
+    const corrupt = (file: string) => {
+      const s = solo();
+      s.units[0]!.errors = [{ file, errors: [{ path: "", message: "bad" }] }];
+      return only(facts([s]));
+    };
+    expect(corrupt(".agents/specs/gh-1-login/runs/_story/receipts/0001-done.json")).toMatchObject({ kind: "mark_corrupt", mark_state: true });
+    expect(corrupt(".agents/specs/gh-1-login/runs/_story/state.json")).toMatchObject({ kind: "mark_corrupt", mark_state: false });
+    const broken = solo({}, null, { frontmatter: null, frontmatter_error: { file: ".agents/specs/gh-1-login/story.md", errors: [{ path: "", message: "bad" }] } });
+    expect(only(facts([broken]))).toMatchObject({ kind: "mark_corrupt", rule: "story.corrupt", mark_state: false });
+  });
   test("never touched: mark once, then noop forever", () => {
     const s = solo();
     s.units[0]!.errors = [{ file: "runs/_story/state.json", errors: [{ path: "/step", message: "bad" }] }];
@@ -192,7 +225,7 @@ describe("classification (§10, C1, MO4)", () => {
   });
   test("waiting for input → implicit ask parks with the pending command", () => {
     const a = only(facts([solo(running(), { hooks: [{ event: "permission_prompt", at: at(T0 - 10), agent: "claude", native: "Notification", cwd: "/w", message: "Allow rm -rf?", command: "rm -rf build" }] })]));
-    expect(a).toMatchObject({ kind: "park", rule: "agent.ask.implicit", park: { kind: "ask", reason: "Allow rm -rf?" }, notify: { group: "answer", detail: "pending command: rm -rf build" } });
+    expect(a).toMatchObject({ kind: "park", rule: "agent.ask.implicit", state: { park: { kind: "ask", reason: "Allow rm -rf?" } }, notify: { group: "answer", detail: "pending command: rm -rf build" } });
     expect(a.kind === "park" && a.receipts[0]?.receipt).toMatchObject({ kind: "ask", implicit: true, command: "rm -rf build" });
   });
   test("BS5.1 (dogfood D3): an owed commit deferred by an agent's merge never takes the unit's action", () => {
@@ -238,7 +271,9 @@ function storyAt(step: string, extra: Partial<StoryFacts> = {}, slices: Array<{ 
 describe("check, git, gate steps (W2)", () => {
   test("check runs automatically, capped by max_checks; a live check lease waits", () => {
     const a = only(facts([storyAt("test")]));
-    expect(a).toMatchObject({ kind: "run_check", command: "bun test", timeout_ms: 300_000, cwd: "/r-worktrees/gh-1-login", state: null });
+    expect(a).toMatchObject({ kind: "run_check", command: "bun test", timeout_ms: 300_000, cwd: "/r-worktrees/gh-1-login" });
+    // a check carries no Transition: act writes its receipt after the effect
+    expect(a).not.toHaveProperty("state");
     expect(a.kind === "run_check" && a.log_path).toBe(`.agents/specs/gh-1-login/runs/_story/logs/${a.kind === "run_check" ? a.run_id : ""}.log`);
     const leased = storyAt("test");
     leased.units[0]!.lease = { version: 1, kind: "check", repo: "/r", story: "gh-1", slice: null, run_id: RUN, holder: { pid: 1, pid_start: "1" }, created_at: at() };
@@ -247,7 +282,7 @@ describe("check, git, gate steps (W2)", () => {
   test("open-pr runs git with the spec folder's pr.md as body file; an already open PR runs it too (GR9)", () => {
     const pr = { base: "main", title: "Login form", body_file: expect.stringMatching(/^\.agents\/specs\/gh-1-[^/]+\/pr\.md$/), body: expect.stringMatching(/^Closes /) };
     expect(only(facts([storyAt("open-pr")]))).toMatchObject({ kind: "run_git", action: "open-pr", pr });
-    const withPr = storyAt("open-pr", { pr: { number: 7, url: "u", state: "open", is_draft: true, head_sha: "", draft: true, head: "gh-1-login", base: "main", merged_at: null } });
+    const withPr = storyAt("open-pr", { pr: { number: 7, url: "u", state: "open", is_draft: true, head_sha: "", head: "gh-1-login", base_branch: "main", merged_at: null } });
     expect(only(facts([withPr]))).toMatchObject({ kind: "run_git", action: "open-pr", pr });
   });
   test("integrate is serialized per story (K6)", () => {
@@ -272,6 +307,8 @@ describe("slices step (W2)", () => {
       worktree: { path: "/r-worktrees/gh-1-login--02-s02", branch: "gh-1/02-s02", from: "gh-1-login", slot: 1 },
       state: { story: "gh-1", slice: "gh-1/02", unit_dir: "02-s02", step: "implement", workflow_hash: sha256(WORKFLOWS.slice!.source) },
     });
+    // S4: committed (commitFor) in the worktree the start creates, with the slice and its first step
+    expect(a.starts[0]?.commit).toEqual({ cwd: "/r-worktrees/gh-1-login--02-s02", branch: "gh-1/02-s02", message: "norn: start gh-1/02 (slice)", trailers: { "Norn-Story": "gh-1", "Norn-Slice": "gh-1/02", "Norn-Step": "implement", "Norn-Tick": TICK }, push: true });
   });
   test("done when every slice is integrated; stuck when none can ever start", () => {
     expect(only(facts([storyAt("slices", {}, [{ nn: "01", status: "integrated" }, { nn: "02", state: { step: "$done", status: "done" } }])]))).toMatchObject({ kind: "classify", outcome: "done", state: { step: "test" } });
@@ -279,31 +316,76 @@ describe("slices step (W2)", () => {
   });
   test("a finished slice releases its worktree and is marked integrated", () => {
     const f = storyAt("slices", {}, [{ nn: "01", state: { step: "$done", status: "done" } }, { nn: "02", deps: ["gh-1/01"] }]);
+    f.units[1]!.worktree!.status = wtStatus("/r-worktrees/gh-1-login--01-s01", "gh-1/01-s01");
     expect(decide(facts([f]), WORKFLOWS, CONFIG).find((d) => d.unit === "gh-1/01")?.action).toMatchObject({ kind: "mark_done", slice_status: "integrated", cleanup: { worktree: "/r-worktrees/gh-1-login--01-s01", branch_local: "gh-1/01-s01", release_slot: true } });
+  });
+  test("the cleanup deletes the slice branch only when decide knows it is in the story branch", () => {
+    const cleanup = (patch: Partial<UnitFacts>) => {
+      const f = storyAt("slices", {}, [{ nn: "01", state: { step: "$done", status: "done" } }]);
+      Object.assign(f.units[1]!, patch);
+      const a = decide(facts([f]), WORKFLOWS, CONFIG).find((d) => d.unit === "gh-1/01")?.action;
+      return a?.kind === "mark_done" ? a.cleanup : null;
+    };
+    // the worktree is on the slice branch: act integrates it first, so the branch is in the story branch
+    expect(cleanup({ worktree: { ...worktreeOf("/w"), status: wtStatus("/w", "gh-1/01-s01") } })).toEqual({ worktree: "/w", branch_local: "gh-1/01-s01", release_slot: true });
+    // no worktree: observe's `branch_in_story` decides
+    expect(cleanup({ worktree: null, branch_in_story: true })).toEqual({ worktree: null, branch_local: "gh-1/01-s01", release_slot: true });
+    expect(cleanup({ worktree: null, branch_in_story: false })).toEqual({ worktree: null, branch_local: null, branch_kept: "gh-1/01-s01 is not in the story branch", release_slot: true });
+    expect(cleanup({ worktree: null })).toEqual({ worktree: null, branch_local: null, branch_kept: "gh-1/01-s01 not observed in the story branch", release_slot: true });
+    // a worktree on another branch, with the branch not seen in the story branch, keeps it
+    expect(cleanup({ worktree: { ...worktreeOf("/w"), status: wtStatus("/w", "other") } })).toMatchObject({ branch_local: null, branch_kept: "/w is not on gh-1/01-s01" });
   });
 });
 
 describe("story lifecycle (GR6–GR8)", () => {
   test("PR merged → cleanup", () => {
-    const f = storyAt("ready", { pr: { number: 7, url: "u", state: "merged", is_draft: false, head_sha: "", draft: false, head: "gh-1-login", base: "main", merged_at: at() } }, [{ nn: "01", status: "integrated" }]);
+    const f = storyAt("ready", { pr: { number: 7, url: "u", state: "merged", is_draft: false, head_sha: "", head: "gh-1-login", base_branch: "main", merged_at: at() } }, [{ nn: "01", status: "integrated" }]);
     expect(only(facts([f]))).toMatchObject({ kind: "cleanup_merged_story", local_branches: ["gh-1/01-s01", "gh-1-login"], remote_branches: ["gh-1/01-s01"], refs: ["refs/norn/claims/gh-1"], story_status: "done" });
   });
   test("issue closed / unlabelled / PR closed → park remote under Unblock, once", () => {
     const closed = storyAt("test", { issue: null });
     const a = only(facts([closed]));
-    expect(a).toMatchObject({ kind: "park", park: { kind: "remote", reason: "remote: issue closed, unassigned or unlabelled" }, notify: { group: "unblock", command: "norn unstick gh-1" } });
+    expect(a).toMatchObject({ kind: "park", state: { park: { kind: "remote", reason: "remote: issue closed, unassigned or unlabelled" } }, notify: { group: "unblock", command: "norn unstick gh-1" } });
     const parked = storyAt("test", { issue: null });
     parked.units[0]!.state = { ...parked.units[0]!.state!, status: "stuck", park: { kind: "remote", reason: "x", since: at() } };
     expect(kinds(facts([parked]))).toEqual(["gh-1 noop unit.stuck"]);
     const unl = storyAt("test");
     unl.issue = { ...unl.issue!, labels: [] };
-    expect(only(facts([unl]))).toMatchObject({ park: { reason: "remote: label 'norn' removed" } });
+    expect(only(facts([unl]))).toMatchObject({ state: { park: { reason: "remote: label 'norn' removed" } } });
   });
   test("issue edited → mirror; body changed after refine → inbox item", () => {
     const f = storyAt("test");
     f.issue = { ...f.issue!, title: "Login v2", body: "new body" };
     f.frontmatter = { ...f.frontmatter!, refined_body_hash: sha256("body") };
     expect(only(facts([f]))).toMatchObject({ kind: "update_story_mirror", fields: { title: "Login v2", body_hash: sha256("new body") }, notify: { title: "issue body changed since refine", group: "your_turn" } });
+  });
+  test("S4: a mirror commit carries the story unit's step (commitFor); none before the story starts", () => {
+    const f = storyAt("test");
+    f.issue = { ...f.issue!, title: "Login v2" };
+    expect(only(facts([f]))).toMatchObject({
+      kind: "update_story_mirror",
+      commit: { cwd: "/r-worktrees/gh-1-login", branch: "gh-1-login", message: "norn: mirror gh-1 from the remote issue", trailers: { "Norn-Story": "gh-1", "Norn-Step": "test", "Norn-Tick": TICK }, push: true },
+    });
+    const refined = storyAt("slices", {}, [{ nn: "01", state: { status: "running" } }]);
+    refined.units[0]!.state = { ...refined.units[0]!.state!, visits: { refine: 1, slices: 1 } };
+    const r = only(facts([refined]));
+    expect(r.kind === "update_story_mirror" && r.commit?.trailers).toEqual({ "Norn-Story": "gh-1", "Norn-Step": "slices", "Norn-Tick": TICK });
+    // a story nobody started: the commit still goes to the story worktree, without Norn-Step
+    const fresh = storyFacts("gh-1", [], { issue: { ...f.issue! } });
+    const m = only(facts([fresh]));
+    expect(m.kind === "update_story_mirror" && m.commit).toEqual({ cwd: "/r-worktrees/gh-1-login", branch: "gh-1-login", message: "norn: mirror gh-1 from the remote issue", trailers: { "Norn-Story": "gh-1", "Norn-Tick": TICK }, push: true });
+    // no story worktree (observe gives the story unit the story's worktree): nothing to commit in
+    const gone = { ...f.worktree!, exists: false };
+    expect(only(facts([{ ...f, worktree: gone, units: [{ ...f.units[0]!, worktree: gone }] }]))).toMatchObject({ kind: "update_story_mirror", commit: null });
+  });
+  test("GR7: a remote park goes through park() — stuck, kind remote, the same commit as any stuck unit", () => {
+    const a = only(facts([storyAt("test", { issue: null })]));
+    expect(a).toMatchObject({
+      kind: "park",
+      rule: "remote.park",
+      state: { status: "stuck", park: { kind: "remote" } },
+      commit: { message: "norn: gh-1 stuck (remote: issue closed, unassigned or unlabelled)", trailers: { "Norn-Story": "gh-1", "Norn-Step": "test", "Norn-Tick": TICK }, push: true },
+    });
   });
 });
 
@@ -352,6 +434,9 @@ describe("intake and start (GR2, W8, W9)", () => {
     const d = decide(f, WORKFLOWS, CONFIG).find((x) => x.action.kind === "intake_story");
     expect(d?.unit).toBe("gh-5");
     expect(d?.rule).toBe("remote.intake");
+    // S4, T7: committed in the worktree intake creates, no step yet, not pushed before the claim
+    expect(d?.action).toMatchObject({ commit: { cwd: "/r-worktrees/gh-5-fix", branch: "gh-5-fix", message: "norn: intake gh-5 Fix", trailers: { "Norn-Story": "gh-5", "Norn-Tick": TICK }, push: false } });
+    expect(d?.action.kind === "intake_story" && Object.keys(d.action.commit.trailers)).toEqual(["Norn-Story", "Norn-Tick"]);
   });
   test("story unit starts with its pinned workflow; invalid workflows are refused", () => {
     const f = storyFacts("gh-1", [unitFacts(storyUnit(), null, null)]);
@@ -470,5 +555,34 @@ describe("audit fixes", () => {
     const atRefine = storyAt("refine");
     atRefine.units[0]!.state = { ...atRefine.units[0]!.state!, status: "parked", park: { kind: "attended", reason: "x", since: at() } };
     expect(kinds(facts([atRefine]))[0]).not.toContain("update_story_mirror");
+  });
+});
+
+describe("commit trailers (S4, R3.1)", () => {
+  test("nornTrailers builds them; isIntakeCommit reads an intake off them, never off a subject", () => {
+    expect(nornTrailers(TICK, "gh-1", null, null)).toEqual({ "Norn-Story": "gh-1", "Norn-Tick": TICK });
+    expect(nornTrailers(TICK, "gh-1", "gh-1/01", "$done")).toEqual({ "Norn-Story": "gh-1", "Norn-Slice": "gh-1/01", "Norn-Step": "$done", "Norn-Tick": TICK });
+    expect(isIntakeCommit(nornTrailers(TICK, "gh-1", null, null), "gh-1")).toBe(true);
+    expect(isIntakeCommit(nornTrailers(TICK, "gh-1", null, null), "gh-2")).toBe(false);
+    expect(isIntakeCommit(nornTrailers(TICK, "gh-1", null, "plan"), "gh-1")).toBe(false);
+    expect(isIntakeCommit(nornTrailers(TICK, "gh-1", "gh-1/01", null), "gh-1")).toBe(false);
+    // a person's commit (no Norn-Tick) is never the intake, whatever its subject says
+    expect(isIntakeCommit({ "Norn-Story": "gh-1" }, "gh-1")).toBe(false);
+    expect(isIntakeCommit({}, "gh-1")).toBe(false);
+  });
+});
+
+describe("trace compatibility (O5)", () => {
+  test("an action an older norn recorded reads as the action decide emits now", () => {
+    const check = only(facts([storyAt("test")]));
+    const park = only(facts([storyAt("test", { issue: null })]));
+    if (park.kind !== "park") throw new Error(park.kind);
+    // as an older norn wrote them: an empty Transition on run_check, a copy of state.park on park
+    expect(legacyAction({ ...check, receipts: [], state: null, commit: null })).toEqual(check);
+    expect(legacyAction({ ...park, park: park.state.park })).toEqual(park);
+    expect(legacyAction(check)).toBe(check);
+    // a non-empty transition on such a kind is a real difference, kept for the replay diff
+    const odd = { ...check, receipts: [], state: park.state, commit: null };
+    expect(legacyAction(odd)).toBe(odd);
   });
 });

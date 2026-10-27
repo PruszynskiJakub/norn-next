@@ -5,8 +5,9 @@
  */
 import { linkSync, renameSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { type ProcessIdentity, check, ProcessIdentity as ProcessIdentitySchema } from "@norn/schema";
+import type { ProcessIdentity } from "@norn/schema";
 import { createExclusive, isErrno, json, readText, safeUnlink } from "./fsx.ts";
+import { parseLocalJson } from "./local-json.ts";
 import { integrateLockPath, tickLockPath } from "./paths.ts";
 import { defaultLiveness, type LivenessCheck, localProcess } from "./proc.ts";
 
@@ -50,14 +51,11 @@ export type LockResult =
   | { ok: true; path: string; content: LockContent; release: () => boolean; reclaimed: LockContent | null }
   | { ok: false; path: string; holder: LockContent };
 
+/** S2: a lock of the wrong shape is unreadable (reclaimed); the raw text is kept for removeIfUnchanged. */
 function parseLock(raw: string | null): LockContent | null {
   if (raw === null) return null;
-  try {
-    const v = JSON.parse(raw) as LockContent;
-    return v && check(ProcessIdentitySchema, v.holder).ok && typeof v.acquired_at === "string" ? v : null;
-  } catch {
-    return null;
-  }
+  const r = parseLocalJson("local-lock", raw);
+  return r.ok ? r.value : null;
 }
 
 export interface LockOptions {

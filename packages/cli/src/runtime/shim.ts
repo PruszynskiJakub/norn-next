@@ -28,7 +28,7 @@ export function nornEntry(): string[] {
 }
 
 /** The shim's directory under norn's machine home (`~/.norn/bin`). */
-export const shimDir = (home: string) => join(home, "bin");
+const shimDir = (home: string) => join(home, "bin");
 
 /**
  * Write `<dir>/norn` → `entry` (atomic, S1; rewritten only when it changes). Returns its path. `dir`
@@ -55,7 +55,7 @@ export function withNornOnPath(argv: string[], shim: string, basePath: string | 
 }
 
 /** Write `<home>/launch/<hash>.sh` (atomic, S1; named by its content, so written once per PATH). Returns its path. */
-export function ensureLauncher(home: string, env: { PATH: string; NORN_BIN: string }): string {
+function ensureLauncher(home: string, env: { PATH: string; NORN_BIN: string }): string {
   const text = [
     "#!/bin/sh",
     "# norn-owned: runs an agent with the norn that launched it first on PATH (R8.1, B2)",

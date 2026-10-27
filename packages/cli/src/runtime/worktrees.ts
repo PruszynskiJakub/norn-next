@@ -3,11 +3,10 @@
  * machine and give it a slot (K3, K4) with `.env.norn` and the `.norn-unit` marker (A3) — the same
  * layout the tick creates at intake / slice start.
  */
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync } from "node:fs";
 import type { GitPort } from "@norn/core";
 import type { ResolvedConfig } from "@norn/schema";
-import { acquireLease, git as rawGit, type LeaseLiveness, writeEnvNorn, writeUnitMarker, slotEnv } from "@norn/store";
+import { acquireLease, ensureExcluded, type LeaseLiveness, slotEnv, writeEnvNorn, writeUnitMarker } from "@norn/store";
 
 export interface WorktreeTarget {
   path: string;
@@ -19,42 +18,39 @@ export interface WorktreeTarget {
   spec_dir: string;
 }
 
-/** `.env.norn` and `.norn-unit` are machine-local: excluded via the shared info/exclude. */
-export async function ensureExcluded(root: string): Promise<void> {
-  const r = await rawGit(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
-  if (r.code !== 0) return;
-  const path = join(r.stdout.trim(), "info", "exclude");
-  let text = "";
-  try {
-    text = readFileSync(path, "utf8");
-  } catch {
-    /* none yet */
-  }
-  const missing = [".env.norn", ".norn-unit"].filter((p) => !text.split("\n").includes(p));
-  if (!missing.length) return;
-  mkdirSync(dirname(path), { recursive: true });
-  appendFileSync(path, `${text && !text.endsWith("\n") ? "\n" : ""}# norn (machine-local worktree files)\n${missing.join("\n")}\n`);
+/** A slot to try first (K4): the one decide chose, with the `.env.norn` it computed for it. */
+export interface PreferredSlot {
+  slot: number;
+  env: Record<string, string>;
 }
 
-/** Slot lease + `.env.norn` + `.norn-unit` for an existing worktree (K4, A3). */
-export async function equipWorktree(opts: { root: string; home: string; config: ResolvedConfig; now: string; liveness: LeaseLiveness }, t: WorktreeTarget): Promise<number | null> {
+/**
+ * Slot lease + `.env.norn` + `.norn-unit` for an existing worktree (K4, A3), after excluding both
+ * files from commits. `preferredSlot` is tried first; any free slot in range otherwise.
+ */
+export async function equipWorktree(
+  opts: { root: string; home: string; config: ResolvedConfig; now: string; liveness: LeaseLiveness; preferredSlot?: PreferredSlot | null },
+  t: WorktreeTarget,
+): Promise<number | null> {
+  await ensureExcluded(opts.root);
   const slots = opts.config.slots;
-  const lease = await acquireLease(opts.home, {
-    kind: "slot",
-    range: { min: slots.min, max: slots.max },
+  const req = {
+    kind: "slot" as const,
     repo: opts.root,
     story: t.story,
     slice: t.slice,
     run_id: null,
     worktree: t.path,
-    portBase: (n) => slots.port_base + n * slots.ports_per_slot,
+    portBase: (n: number) => slots.port_base + n * slots.ports_per_slot,
     now: opts.now,
     liveness: opts.liveness,
-  });
+  };
+  const preferred = opts.preferredSlot ?? null;
+  let lease = preferred ? await acquireLease(opts.home, { ...req, range: { min: preferred.slot, max: preferred.slot } }) : null;
+  if (!lease?.ok) lease = await acquireLease(opts.home, { ...req, range: { min: slots.min, max: slots.max } });
   const slot = lease.ok ? lease.entry.n : null;
-  writeEnvNorn(t.path, slot === null ? {} : slotEnv(slot, slots));
+  writeEnvNorn(t.path, slot === null ? {} : slot === preferred?.slot ? preferred.env : slotEnv(slot, slots));
   writeUnitMarker(t.path, { repo: opts.root, story: t.story, slice: t.slice, unit: t.unit, spec_dir: t.spec_dir });
-  await ensureExcluded(opts.root);
   return slot;
 }
 

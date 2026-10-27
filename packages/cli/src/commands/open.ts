@@ -8,7 +8,8 @@
 import { effectiveMode, startCommandFor, stepOf } from "@norn/core";
 import { defineCommand, opt } from "../command.ts";
 import { refuse } from "../output.ts";
-import { parseUnitKey, refuseIfHeldElsewhere, resolveTarget, started } from "../runtime/human.ts";
+import { parseUnitKey } from "../runtime/args.ts";
+import { refuseIfHeldElsewhere, resolveTarget, started } from "../runtime/human.ts";
 
 export const openCommand = defineCommand({
   name: "open",

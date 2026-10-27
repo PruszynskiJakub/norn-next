@@ -6,10 +6,10 @@
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { gitTimeoutMs } from "@norn/store";
-import type { CommitSpec, ConflictMarker, GitFactory, GitInProgress, GitPort, MergeResult, OutgoingMarkers, PushResult, RefUpdate, WorktreeInfo, WorktreeStatus } from "@norn/core";
-import { bunExec, isAuthError, isNetworkError, okOrThrow, portError, type Exec, type ExecResult } from "./exec.ts";
+import type { CommitSpec, ConflictMarker, FirstParentCommit, GitFactory, GitInProgress, GitPort, MergeResult, OutgoingMarkers, PushResult, RefUpdate, WorktreeInfo, WorktreeStatus } from "@norn/core";
+import { bunExec, isAuthError, isNetworkError, okOrThrow, portError, type Exec, type ExecResult } from "../exec.ts";
 
-export { bunExec, fixtureExec, portError, type Exec, type ExecFixture, type ExecOptions, type ExecResult } from "./exec.ts";
+export { bunExec, fixtureExec, portError, type Exec, type ExecFixture, type ExecOptions, type ExecResult } from "../exec.ts";
 
 export interface GitOptions {
   exec?: Exec;
@@ -22,7 +22,7 @@ export interface GitOptions {
 const ZERO_OID = /^0+$/;
 
 /** Parse `Key: value` trailer lines (S4). */
-export function parseTrailers(text: string): Record<string, string> {
+function parseTrailers(text: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const line of text.split("\n")) {
     const m = /^([A-Za-z0-9-]+):\s*(.*)$/.exec(line.trim());
@@ -169,10 +169,10 @@ export function createGit(opts: GitOptions = {}): GitPort {
   const exec = opts.exec ?? bunExec;
   const bin = opts.bin ?? "git";
   const env = { GIT_TERMINAL_PROMPT: "0", GIT_EDITOR: "true", ...(opts.env ?? {}) };
-  const run = (cwd: string, args: string[], stdin?: string) => {
+  const run = (cwd: string, args: string[], stdin?: string, extraEnv?: Record<string, string>) => {
     // H11: a call that reaches the remote is bounded; local ones (hooks on commit) are not
     const timeoutMs = gitTimeoutMs(args);
-    return exec([bin, ...args], { cwd, env, ...(stdin === undefined ? {} : { stdin }), ...(timeoutMs === undefined ? {} : { timeoutMs }) });
+    return exec([bin, ...args], { cwd, env: extraEnv ? { ...env, ...extraEnv } : env, ...(stdin === undefined ? {} : { stdin }), ...(timeoutMs === undefined ? {} : { timeoutMs }) });
   };
   const must = async (cwd: string, args: string[], stdin?: string) => okOrThrow(await run(cwd, args, stdin), `git ${args[0]}`, "git");
   const line = async (cwd: string, args: string[]) => (await must(cwd, args)).trim();
@@ -182,14 +182,14 @@ export function createGit(opts: GitOptions = {}): GitPort {
     return r.code === 0 && r.stdout.trim() ? r.stdout.trim() : null;
   };
 
-  const worktreeRoot = (cwd: string) => line(cwd, ["rev-parse", "--show-toplevel"]);
+  const commonDir = (cwd: string) => line(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
 
+  // one rev-parse names both directories git keeps while a rebase waits
+  const REBASE_PATHS = ["--git-path", "rebase-merge", "--git-path", "rebase-apply"];
+  const rebaseIn = (cwd: string, paths: string[]) => paths.some((p) => existsSync(resolve(cwd, p)));
   const rebaseInProgress = async (cwd: string) => {
-    for (const d of ["rebase-merge", "rebase-apply"]) {
-      const p = await nullIfFail(cwd, ["rev-parse", "--git-path", d]);
-      if (p && existsSync(resolve(cwd, p))) return true;
-    }
-    return false;
+    const r = await run(cwd, ["rev-parse", ...REBASE_PATHS]);
+    return r.code === 0 && rebaseIn(cwd, lines(r.stdout));
   };
 
   /** H1: MERGE_HEAD, a rebase, CHERRY_PICK_HEAD or REVERT_HEAD in cwd's worktree, and the unmerged paths. */
@@ -214,14 +214,24 @@ export function createGit(opts: GitOptions = {}): GitPort {
 
   const git: GitPort = {
     async repoRoot(cwd) {
-      const common = await line(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+      const common = await commonDir(cwd);
       return common.endsWith("/.git") ? dirname(common) : common;
     },
-    worktreeRoot,
+    commonDir,
+    async remotes(cwd) {
+      return lines(await must(cwd, ["remote"]))
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0);
+    },
+    async version(cwd) {
+      const r = await run(cwd, ["--version"]).catch(() => null);
+      return r && r.code === 0 ? r.stdout.trim() : null;
+    },
     async status(cwd) {
-      const root = await worktreeRoot(cwd);
-      const out = await must(cwd, ["status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all"]);
-      return parseStatusV2(out, root, await rebaseInProgress(cwd));
+      // the worktree root and the rebase markers in one rev-parse, beside the status itself
+      const [paths, out] = await Promise.all([must(cwd, ["rev-parse", "--show-toplevel", ...REBASE_PATHS]), must(cwd, ["status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all"])]);
+      const [root, ...rebase] = lines(paths);
+      return parseStatusV2(out, (root as string).trim(), rebaseIn(cwd, rebase));
     },
     revParse: (cwd, rev) => nullIfFail(cwd, ["rev-parse", "--verify", "--quiet", "--end-of-options", rev]),
     async defaultBranch(cwd, remote) {
@@ -250,6 +260,46 @@ export function createGit(opts: GitOptions = {}): GitPort {
           const [sha, subject, at, trailers] = r.split("\x1f");
           return { sha: sha as string, subject: subject ?? "", at: Number(at) * 1000, trailers: parseTrailers(trailers ?? "") };
         });
+    },
+    async firstParentLog(cwd, rev, o): Promise<FirstParentCommit[]> {
+      const format = `--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=${o.trailer},valueonly,separator=%x2C)%x1e`;
+      const out = await must(cwd, ["log", "--first-parent", "-n", String(o.limit), format, rev, ...(o.exclude ? [`^${o.exclude}`] : []), "--"]);
+      const commits: FirstParentCommit[] = [];
+      for (const rec of out.split("\x1e")) {
+        const r = rec.replace(/^\n/, "");
+        if (!r) continue;
+        const [sha, subject, author, authored, committed, trailer] = r.split("\x1f");
+        commits.push({ sha: sha as string, subject: subject ?? "", author: author ?? "", authored_at: authored ?? "", committed_at: committed ?? "", trailer: (trailer ?? "").trim() });
+      }
+      return commits;
+    },
+    async revList(cwd, range, o) {
+      const args = ["rev-list"];
+      if (o?.ancestryPath) args.push("--ancestry-path");
+      if (o?.firstParent) args.push("--first-parent");
+      if (o?.limit !== undefined) args.push("-n", String(o.limit));
+      if (o?.reverse) args.push("--reverse");
+      return lines(await must(cwd, [...args, range]));
+    },
+    async show(cwd, rev, path) {
+      const r = await run(cwd, ["show", `${rev}:${path}`]);
+      return r.code === 0 ? r.stdout : null;
+    },
+    async hasPath(cwd, rev, path) {
+      return (await run(cwd, ["cat-file", "-e", `${rev}:${path}`])).code === 0;
+    },
+    async lsTree(cwd, rev, path) {
+      const r = await run(cwd, ["ls-tree", "--name-only", `${rev}:${path}`]);
+      return r.code === 0 ? lines(r.stdout) : null;
+    },
+    async changedPaths(cwd, from, to) {
+      return (await must(cwd, ["diff", "--name-only", "-z", from, to, "--"])).split("\0").filter(Boolean);
+    },
+    async checkoutPaths(cwd, rev, paths) {
+      await must(cwd, ["checkout", rev, "--", ...paths]);
+    },
+    async untrack(cwd, paths) {
+      await must(cwd, ["rm", "-q", "--cached", "--ignore-unmatch", "--", ...paths]);
     },
 
     async branchExists(cwd, branch, where = "local", remote = "origin") {
@@ -281,6 +331,12 @@ export function createGit(opts: GitOptions = {}): GitPort {
     },
     async worktreeRemove(cwd, path, o) {
       await must(cwd, ["worktree", "remove", ...(o?.force ? ["--force"] : []), path]);
+    },
+    async worktreeAddDetached(cwd, path, rev) {
+      await must(cwd, ["worktree", "add", "--detach", "--quiet", path, rev]);
+    },
+    async worktreePrune(cwd) {
+      await must(cwd, ["worktree", "prune"]);
     },
 
     async commit(cwd, spec: CommitSpec) {
@@ -370,8 +426,10 @@ export function createGit(opts: GitOptions = {}): GitPort {
       if (o?.setUpstream) args.push("--set-upstream");
       return classifyPush(await run(cwd, [...args, remote, refspec]));
     },
-    async fetch(cwd, remote, refspecs) {
-      await must(cwd, ["fetch", "--no-tags", remote, ...refspecs]);
+    async fetch(cwd, remote, refspecs, o) {
+      // LC_ALL=C: callers tell a missing remote branch apart by git's English message
+      const args = ["fetch", ...(o?.quiet ? ["--quiet"] : []), "--no-tags", remote, ...refspecs];
+      okOrThrow(await run(cwd, args, undefined, { LC_ALL: "C" }), "git fetch", "git");
     },
     async fastForward(cwd, onto) {
       return { ok: (await run(cwd, ["merge", "--ff-only", "--no-edit", onto])).code === 0 };
@@ -432,27 +490,24 @@ export function createGit(opts: GitOptions = {}): GitPort {
     },
 
     readRef: (cwd, ref) => nullIfFail(cwd, ["rev-parse", "--verify", "--quiet", "--end-of-options", ref]),
+    async hasRef(cwd, ref) {
+      return (await run(cwd, ["rev-parse", "--verify", "--quiet", ref])).code === 0;
+    },
     async listRefs(cwd, prefix) {
-      const out = await must(cwd, ["for-each-ref", "--format=%(refname) %(objectname)", prefix]);
+      const prefixes: readonly string[] = typeof prefix === "string" ? [prefix] : prefix;
+      const out = await must(cwd, ["for-each-ref", "--format=%(refname) %(objectname)", ...prefixes]);
       return lines(out)
         .map((l) => {
           const [ref, sha] = l.split(" ");
           return { ref: ref as string, sha: sha as string };
         })
-        .filter((r) => r.ref.startsWith(prefix));
+        .filter((r) => prefixes.some((p) => r.ref.startsWith(p)));
     },
-    async listRemoteRefs(cwd, remote, prefix) {
-      const out = okOrThrow(await run(cwd, ["ls-remote", "--refs", remote]), "git ls-remote", "git");
+    async remoteBranches(cwd, remote, pattern) {
+      const out = okOrThrow(await run(cwd, ["ls-remote", "--heads", remote, pattern]), "git ls-remote", "git");
       return lines(out)
-        .map((l) => {
-          const [sha, ref] = l.split("\t");
-          return { ref: ref as string, sha: sha as string };
-        })
-        .filter((r) => r.ref.startsWith(prefix));
-    },
-    readBlob: (cwd, sha) => must(cwd, ["cat-file", "blob", sha]),
-    async writeBlob(cwd, content) {
-      return (await must(cwd, ["hash-object", "-w", "--stdin"], content)).trim();
+        .map((l) => l.split("\t")[1]?.replace(/^refs\/heads\//, "") ?? "")
+        .filter((n) => n.length > 0);
     },
     async updateRef(cwd, u: RefUpdate) {
       const args = u.sha === null ? ["update-ref", "-d", u.ref] : ["update-ref", u.ref, u.sha];
@@ -472,116 +527,6 @@ export function createGit(opts: GitOptions = {}): GitPort {
     },
   };
   return git;
-}
-
-export type IntegrateResult = { outcome: "done"; head: string } | { outcome: "conflict"; files: string[] };
-
-/**
- * W2 `git: integrate`: rebase the slice branch (checked out in `sliceCwd`) onto the story
- * branch, then fast-forward the story branch to it. A conflicting rebase is aborted cleanly
- * and yields `conflict` (K6). The caller serializes integrations per story (K6).
- * If the story branch is checked out in a worktree it is fast-forwarded there (keeps that
- * checkout in sync); otherwise its ref is moved with a compare-and-swap.
- */
-export async function integrate(git: GitPort, opts: { sliceCwd: string; storyBranch: string; storyCwd?: string }): Promise<IntegrateResult> {
-  const rb = await git.rebase(opts.sliceCwd, opts.storyBranch);
-  if (!rb.ok) return { outcome: "conflict", files: rb.files };
-  const storyRef = `refs/heads/${opts.storyBranch}`;
-  let storyCwd = opts.storyCwd;
-  if (!storyCwd) storyCwd = (await git.worktreeList(opts.sliceCwd)).find((w) => w.branch === opts.storyBranch)?.path;
-  if (storyCwd) {
-    const ff = await git.fastForward(storyCwd, rb.head);
-    if (!ff.ok) throw portError("git_ff_failed", `cannot fast-forward ${opts.storyBranch} to ${rb.head} in ${storyCwd}`);
-    return { outcome: "done", head: rb.head };
-  }
-  const old = await git.readRef(opts.sliceCwd, storyRef);
-  if (old === null) throw portError("git_no_branch", `story branch ${opts.storyBranch} does not exist`);
-  if (!(await git.isAncestor(opts.sliceCwd, old, rb.head)) || !(await git.updateRef(opts.sliceCwd, { ref: storyRef, sha: rb.head, expected: old })))
-    throw portError("git_ff_failed", `cannot fast-forward ${opts.storyBranch} to ${rb.head}`, true);
-  return { outcome: "done", head: rb.head };
-}
-
-export type UpdateResult =
-  | { outcome: "done"; head: string; merged: boolean; adopted: string | null }
-  | { outcome: "conflict"; files: string[]; adopted: string | null }
-  | { outcome: "stuck"; reason: string };
-
-/**
- * BS3.3a: how the local story branch took in `<remote>/<branch>` — `none` (no remote branch),
- * `local` (nothing new on the remote), `adopted` (fast-forwarded to it), `merged` (a merge commit),
- * or `conflict` (diverged and the merge was aborted, paths reported).
- */
-export type RemoteSync =
-  | { outcome: "none" | "local"; remote_sha: string | null }
-  | { outcome: "adopted" | "merged"; remote_sha: string; head: string }
-  | { outcome: "conflict"; remote_sha: string; files: string[] };
-
-/**
- * BS3.3a (dogfood D4): bring the remote story branch into the local one checked out in `cwd` —
- * fetch it; fast-forward when the local branch is an ancestor of it (a person pressed "Update
- * branch"); when they diverged (a person pushed while norn committed locally), merge it with
- * `message` and `trailers` (never rebase: the branch is published, BS4). A conflicting merge is
- * aborted and its paths reported. The caller holds the claim (T7) and pushes afterwards.
- */
-export async function syncRemoteBranch(
-  git: GitPort,
-  opts: { cwd: string; branch: string; remote: string; message: string; trailers: Record<string, string> },
-): Promise<RemoteSync> {
-  const tracking = `refs/remotes/${opts.remote}/${opts.branch}`;
-  try {
-    await git.fetch(opts.cwd, opts.remote, [`+refs/heads/${opts.branch}:${tracking}`]);
-  } catch (e) {
-    // a story branch never pushed has nothing to take in; anything else is a failed effect (R4.3)
-    if (!/couldn't find remote ref|could not find remote ref/i.test((e as Error).message)) throw e;
-    return { outcome: "none", remote_sha: null };
-  }
-  const remoteSha = await git.readRef(opts.cwd, tracking);
-  const local = await git.revParse(opts.cwd, "HEAD");
-  if (!remoteSha || !local || remoteSha === local || (await git.isAncestor(opts.cwd, remoteSha, local))) return { outcome: "local", remote_sha: remoteSha };
-  if (await git.isAncestor(opts.cwd, local, remoteSha)) {
-    const ff = await git.fastForward(opts.cwd, remoteSha);
-    if (!ff.ok) throw portError("git_ff_failed", `cannot fast-forward ${opts.branch} to ${opts.remote}/${opts.branch}`);
-    return { outcome: "adopted", remote_sha: remoteSha, head: remoteSha };
-  }
-  const m = await git.merge(opts.cwd, remoteSha, { message: opts.message, trailers: opts.trailers });
-  return m.ok ? { outcome: "merged", remote_sha: remoteSha, head: m.head } : { outcome: "conflict", remote_sha: remoteSha, files: m.files };
-}
-
-/**
- * W2 `git: update` (BS3, BS4) in the story worktree `cwd`, whose branch is `branch`. The caller
- * holds the story's integrate lock (K6) and pushes afterwards (S8, T7).
- *  1. a dirty worktree → `stuck` (`worktree dirty`);
- *  3. the remote story branch ahead of the local one and descended from it (a person pressed
- *     "Update branch" on the host) → fast-forward to it first; diverged → merge it (BS3.3a), and a
- *     conflicting merge of it → `stuck`;
- *  4. nothing of `baseSha` missing → `done`, no commit;
- *  5. else `git merge --no-ff <baseSha>` with `message` and `trailers` (`Norn-Tick`, so Q6 does
- *     not report the merge as foreign) → `done`;
- *  6. a conflicting merge is aborted → `conflict` with the paths.
- * Merge, never rebase: the story branch is published (BS4).
- */
-export async function update(
-  git: GitPort,
-  opts: { cwd: string; branch: string; baseSha: string; remote: string | null; message: string; trailers: Record<string, string> },
-): Promise<UpdateResult> {
-  const st = await git.status(opts.cwd);
-  // H1: a merge or rebase left in progress (a resolve agent's) is never aborted or concluded here
-  const busy = await git.inProgress(opts.cwd);
-  if (busy.operation || busy.unmerged.length) return { outcome: "stuck", reason: `${busy.operation ?? "merge"} in progress in the story worktree` };
-  if (!st.clean || st.rebase_in_progress) return { outcome: "stuck", reason: "worktree dirty" };
-  if (st.branch !== opts.branch) return { outcome: "stuck", reason: `story worktree is on ${st.branch ?? "a detached HEAD"}, not ${opts.branch}` };
-  let adopted: string | null = null;
-  if (opts.remote) {
-    const where = `${opts.remote}/${opts.branch}`;
-    const r = await syncRemoteBranch(git, { cwd: opts.cwd, branch: opts.branch, remote: opts.remote, message: `Merge ${where} into ${opts.branch}`, trailers: opts.trailers });
-    if (r.outcome === "conflict") return { outcome: "stuck", reason: `story branch diverged from ${where}; merging it conflicts in ${r.files.join(", ") || "?"}` };
-    if (r.outcome === "adopted" || r.outcome === "merged") adopted = r.remote_sha;
-  }
-  const d = await git.divergence(opts.cwd, "HEAD", opts.baseSha);
-  if (d.behind === 0) return { outcome: "done", head: (await git.revParse(opts.cwd, "HEAD")) as string, merged: false, adopted };
-  const m = await git.merge(opts.cwd, opts.baseSha, { message: opts.message, trailers: opts.trailers });
-  if (!m.ok) return { outcome: "conflict", files: m.files, adopted };
-  return { outcome: "done", head: m.head, merged: true, adopted };
 }
 
 export const factory: GitFactory = () => createGit();

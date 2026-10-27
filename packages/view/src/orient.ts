@@ -132,7 +132,7 @@ export function orientReport(view: ProjectView, key: string, provider: RemotePro
 }
 
 /** One line for a unit: where it stands and how its last step ended. */
-export function unitStanding(u: OrientUnit): string {
+function unitStanding(u: OrientUnit): string {
   if (u.status === "not_started") return "not started";
   const where = u.status === "done" ? "done" : `${u.status}${u.step ? ` at ${u.step}` : ""}`;
   const last = u.last_outcome ? ` (last: ${u.last_outcome.step} → ${u.last_outcome.outcome})` : "";
@@ -140,7 +140,7 @@ export function unitStanding(u: OrientUnit): string {
 }
 
 /** One line for the PR, e.g. `#2 draft, open — https://…`. */
-export function prLine(pr: PrView | null): string {
+function prLine(pr: PrView | null): string {
   if (!pr) return "none seen yet";
   return `#${pr.number} ${pr.is_draft && pr.state === "open" ? "draft, open" : pr.state} — ${pr.url}`;
 }
@@ -163,7 +163,7 @@ const indent = (text: string, pad: string) => text.trim().split("\n").join(`\n${
  * The agent's part of the orient workspace: summarize, then answer; act only when told. It never
  * reports an outcome (`done`/`ask`/`stuck`): an orient session is no run (B3).
  */
-export const ORIENT_RULES = [
+const ORIENT_RULES = [
   "You sit with the person to help them get oriented on this story. Follow these rules:",
   "1. Open with a summary of at most 5 lines: what the story is, where it stands, and what waits for the person, with its command. Count the open notes; do not list them yet.",
   "2. Then answer their questions. Read the spec, the code and the commands below as needed.",

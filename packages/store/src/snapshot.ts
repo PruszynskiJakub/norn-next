@@ -14,15 +14,15 @@
 import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { FileError, NumberedReceipt, SliceFileFacts, UnitRef } from "@norn/core";
-import { STORY_UNIT_DIR, type StoryFrontmatter, type UnitState, isStoryKey, sliceKey } from "@norn/schema";
+import { STORY_UNIT_DIR, type StoryFrontmatter, type UnitState, parseSliceFileName, parseSpecDirName, sliceKey } from "@norn/schema";
 import { baseSpecsRoot, defaultBaseRef } from "./base.ts";
 import { type LoadedConfig, loadConfig, loadWorkflows, type WorkflowListing } from "./config.ts";
 import { readSliceFile, readStoryFile } from "./frontmatter.ts";
 import { isErrno } from "./fsx.ts";
-import { readUnitMarker } from "./leases.ts";
 import { slicesDir, specsDir, storyFile, unitDir } from "./paths.ts";
 import { listReceipts } from "./receipts.ts";
 import { type Handoff, type PinnedWorkflow, readHandoff, readPinnedWorkflow, readState } from "./unit.ts";
+import { readUnitMarker } from "./worktree.ts";
 
 export interface UnitSnapshot {
   unit: UnitRef;
@@ -70,9 +70,6 @@ export interface RepoSnapshot {
   workflows: WorkflowListing;
   stories: StorySnapshot[];
 }
-
-const SPEC_DIR = /^((?:gh|gl)-[1-9][0-9]*)-([a-z0-9]+(?:-[a-z0-9]+)*)$/;
-const SLICE_FILE = /^([0-9]{2,3})-([a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
 
 function dirs(path: string): string[] {
   try {
@@ -126,10 +123,9 @@ export function loadUnit(root: string, specPath: string, unit: UnitRef, opts: { 
 /** Read one spec folder (story.md, slices/, runs/). */
 export function loadStory(root: string, specPath: string, opts: { includeApplied?: boolean } = {}): StorySnapshot | null {
   const name = specPath.split("/").at(-1) ?? "";
-  const m = SPEC_DIR.exec(name);
-  if (!m || !isStoryKey(m[1])) return null;
-  const key = m[1] as string;
-  const slug = m[2] as string;
+  const m = parseSpecDirName(name);
+  if (!m) return null;
+  const { story: key, slug } = m;
   const story = readStoryFile(storyFile(specPath), root);
   let frontmatter_error: FileError | null = null;
   if (!story.ok)
@@ -140,16 +136,16 @@ export function loadStory(root: string, specPath: string, opts: { includeApplied
 
   const slices: SliceFileFacts[] = [];
   for (const f of files(slicesDir(specPath))) {
-    const sm = SLICE_FILE.exec(f);
+    const sm = parseSliceFileName(f);
     if (!sm) continue;
-    const nn = sm[1] as string;
+    const nn = sm.nn;
     const file = join(slicesDir(specPath), f);
     const sk = sliceKey(key, nn);
     const r = readSliceFile(file, root);
     let error: FileError | null = r.ok ? null : r.reason === "corrupt" ? r.error : null;
     if (r.ok && r.value.frontmatter.id !== sk)
       error = { file: relative(root, file), errors: [{ path: "/id", message: `must equal '${sk}' (from file name)` }] };
-    slices.push({ key: sk, file: relative(root, file), nn, slug: sm[2] as string, frontmatter: r.ok && !error ? r.value.frontmatter : null, error });
+    slices.push({ key: sk, file: relative(root, file), nn, slug: sm.slug, frontmatter: r.ok && !error ? r.value.frontmatter : null, error });
   }
 
   const units: UnitSnapshot[] = [loadUnit(root, specPath, { story: key, slice: null, dir: STORY_UNIT_DIR, key }, opts)];
@@ -175,10 +171,10 @@ export function loadStory(root: string, specPath: string, opts: { includeApplied
 }
 
 /** Every story under `<root>/.agents/specs/` (only `only`'s spec folder when given). */
-export function loadStories(root: string, opts: { includeApplied?: boolean; only?: string } = {}): StorySnapshot[] {
+function loadStories(root: string, opts: { includeApplied?: boolean; only?: string } = {}): StorySnapshot[] {
   const out: StorySnapshot[] = [];
   for (const d of dirs(specsDir(root))) {
-    if (opts.only !== undefined && SPEC_DIR.exec(d)?.[1] !== opts.only) continue;
+    if (opts.only !== undefined && parseSpecDirName(d)?.story !== opts.only) continue;
     const s = loadStory(root, join(specsDir(root), d), opts);
     if (s) out.push(s);
   }

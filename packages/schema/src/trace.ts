@@ -90,6 +90,8 @@ export const TickTrace = Type.Object(
     tick_id: Ulid,
     at: IsoTime,
     heartbeat_id: Type.Union([Ulid, Type.Null()]),
+    /** the norn that recorded this tick (`@norn/cli` version); `norn why` labels a replay by another version (O5). Absent on older traces. */
+    norn_version: Type.Optional(NonEmpty),
     duration_ms: NonNegInt,
     /** Facts snapshot (the `Facts` type of @norn/core); replayed by `norn why` (O5). */
     facts: Type.Record(Type.String(), Type.Unknown()),
@@ -247,7 +249,27 @@ export const CriteriaTrace = Type.Object(
 );
 export type CriteriaTrace = Static<typeof CriteriaTrace>;
 
-export const TraceEvent = TaggedUnion("type", [TickTrace, HookTrace, RejectTrace, BriefingTrace, ForeignCommitsTrace, TakeTrace, TickStartTrace, TickEndTrace, CriteriaTrace], {
+/**
+ * S2 (BUG-4): a machine-local file (a cache in the trace dir) was unreadable or of the wrong shape
+ * and read as empty. Logged once per process per file content; the next write replaces the file.
+ */
+export const LocalFileTrace = Type.Object(
+  {
+    type: Type.Literal("local_file"),
+    id: Ulid,
+    at: IsoTime,
+    /** path relative to the repo root, e.g. `.agents/norn/trace/remote.json` */
+    file: NonEmpty,
+    /** the local schema it failed, e.g. `local-remote` */
+    schema: NonEmpty,
+    reason: Type.Union([Type.Literal("unreadable"), Type.Literal("invalid_json"), Type.Literal("wrong_shape")]),
+    errors: Type.Array(Type.Object({ path: Type.String(), message: Type.String() }, { additionalProperties: false })),
+  },
+  { additionalProperties: false },
+);
+export type LocalFileTrace = Static<typeof LocalFileTrace>;
+
+export const TraceEvent = TaggedUnion("type", [TickTrace, HookTrace, RejectTrace, BriefingTrace, ForeignCommitsTrace, TakeTrace, TickStartTrace, TickEndTrace, CriteriaTrace, LocalFileTrace], {
   $id: "https://norn.dev/schema/trace.json",
   title: "norn trace event (one JSONL line)",
 });

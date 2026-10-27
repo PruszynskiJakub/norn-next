@@ -1,11 +1,10 @@
 /**
- * loadProjectView (X1): one read-only pass over local data — spec folders (main checkout
- * and story worktrees), runs/, the trace window, local claim refs and ~/.norn leases.
+ * loadProjectView (X1): one read-only pass over local data — the checkout's local facts as observe
+ * reads them (`loadLocalFacts`: spec folders in the main checkout and story worktrees, runs/, hook
+ * facts, caches, ~/.norn leases), the trace window for timelines, and local claim refs.
  * No network (no fetch, no ls-remote, no remote API) and no writes of any kind.
  */
-import { existsSync, readdirSync, statSync } from "node:fs";
-import { hostname, userInfo } from "node:os";
-import { join } from "node:path";
+import { existsSync } from "node:fs";
 import {
   actFailureItem,
   buildInbox,
@@ -17,43 +16,37 @@ import {
   heartbeatDown,
   nextCommand,
   type NumberedReceipt,
-  openNotes,
   RECENT_MS,
-  readyApproval,
   type RunFacts,
   type RunnerCapabilities,
-  sliceWorktreePath,
   startCommandFor,
   type StoryFacts,
   stepOf,
-  storyWorktreePath,
   type UnitFacts,
   type UnpushedRuns,
   type WorktreeFacts,
 } from "@norn/core";
-import { DEFAULT_CONFIG, type HookFact, type LeaseFile, type Mode, type ResolvedConfig, sliceBranch, storyBranch, type TraceEvent } from "@norn/schema";
+import { DEFAULT_CONFIG, type HookFact, type Mode, type ResolvedConfig, sliceBranch, storyBranch, type TraceEvent } from "@norn/schema";
 import {
-  classifyClaim,
   cachedDefaultBranch,
+  classifyClaim,
   defaultBaseRef,
-  readBaseFacts,
-  onlyNornCommitsSince,
-  readPrFacts,
   lastTickAt,
   type LeaseEntry,
   type LeaseLiveness,
-  listLeases,
-  loadSnapshot,
+  type LocalUnit,
+  loadLocalFacts,
+  machineHolder,
+  onlyNornCommitsSince,
   readEnvNorn,
-  readActFailures,
   readLocalClaim,
   readTrace,
-  readUnitMarker,
+  runHooks,
+  scanWorktrees,
   type StorySnapshot,
   type UnitSnapshot,
   type UnpushedTarget,
   unpushedRuns,
-  withSliceWorktrees,
 } from "@norn/store";
 import { mergeTimeline, receiptEntry, traceEntries, traceUnits } from "./timeline.ts";
 import type { BaseSyncView, ClaimView, CounterView, PrView, ProjectView, RecentDone, RunView, SliceView, StoryView, TimelineEntry, UnitView } from "./types.ts";
@@ -65,14 +58,12 @@ export interface LoadProjectViewOptions {
   /** ms epoch; default Date.now() */
   now?: number;
   env?: Record<string, string | undefined>;
-  /** `user@machine` whose claims count as `mine`; default this OS user and host */
+  /** `user@machine` whose claims count as `mine`; default this machine's (`machineHolder`, R7.2) */
   holder?: string;
   /** this machine's heartbeat id, also counted as `mine` */
   heartbeatId?: string | null;
   /** what the configured runner can do (R4.1); `open` makes Your turn show `norn open` (MO5) */
   runnerCapabilities?: RunnerCapabilities;
-  /** story worktrees to scan before repoRoot; default: every `<repoRoot>-worktrees/<story>` folder */
-  storyRoots?: string[];
   /** trace window lower bound (ISO); default 14 days before now */
   traceSince?: string;
   /** lease liveness check (default: holder pid + start time) */
@@ -80,7 +71,6 @@ export interface LoadProjectViewOptions {
 }
 
 const TRACE_WINDOW_MS = 14 * 86_400_000;
-const STORY_DIR = /^(?:gh|gl)-[1-9][0-9]*-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function push<T>(m: Map<string, T[]>, k: string, v: T): void {
   const list = m.get(k);
@@ -88,49 +78,17 @@ function push<T>(m: Map<string, T[]>, k: string, v: T): void {
   else m.set(k, [v]);
 }
 
-export function defaultHolder(): string {
-  let user = "user";
-  try {
-    user = userInfo().username || user;
-  } catch {}
-  return `${user}@${hostname()}`;
-}
-
-/** Story worktrees beside the repo (GR3): `<repo>-worktrees/<id>-<slug>`, slice worktrees (`--`) excluded. */
-export function discoverStoryRoots(repoRoot: string): string[] {
-  const base = `${repoRoot.replace(/\/+$/, "")}-worktrees`;
-  try {
-    return readdirSync(base)
-      .filter((n) => STORY_DIR.test(n) && !n.includes("--") && statSync(join(base, n)).isDirectory())
-      .sort()
-      .map((n) => join(base, n));
-  } catch {
-    return [];
-  }
-}
-
-/** The slice's worktree (`<story worktree>--<nn>-<slug>`, GR3) when it exists and its `.norn-unit` marker names that slice. */
-export function markedSliceWorktree(storyWt: string, story: StorySnapshot, slice: string): string | null {
-  const file = story.slices.find((s) => s.key === slice);
-  const dir = story.units.find((u) => u.unit.slice === slice)?.unit.dir;
-  const nn = file?.nn ?? dir?.split("-")[0];
-  const slug = file?.slug ?? dir?.replace(/^\d+-/, "");
-  if (!nn || !slug) return null;
-  const path = sliceWorktreePath(storyWt, nn, slug);
-  return readUnitMarker(path).marker?.slice === slice ? path : null;
-}
-
-function worktreeFacts(path: string): WorktreeFacts {
-  const exists = existsSync(path);
-  const slot = exists ? Number(readEnvNorn(path)?.NORN_SLOT ?? Number.NaN) : Number.NaN;
+/** A worktree as the view sees it: on disk and its slot; git status is not read (no git, X1). Null when absent, as observe. */
+function worktreeFacts(path: string | null): WorktreeFacts | null {
+  if (!path || !existsSync(path)) return null;
+  const slotRaw = readEnvNorn(path)?.NORN_SLOT;
   return {
     path,
-    exists,
-    marker: exists && readUnitMarker(path).exists,
+    exists: true,
     status: null,
     last_commit_at: null,
     last_file_change_at: null,
-    slot: Number.isFinite(slot) ? slot : null,
+    slot: slotRaw !== undefined && /^\d+$/.test(slotRaw) ? Number(slotRaw) : null,
   };
 }
 
@@ -192,7 +150,70 @@ function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: Uni
   };
 }
 
-/** Build the read model. Async only because claim refs are read through local git. */
+/**
+ * A unit's facts as the view has them: what loadLocalFacts read (B3, R5.1, R5.3), its worktree as
+ * on disk, and its run from the state record — hooks picked as observe picks them (`runHooks`), the
+ * process judged by its lease (the view has no process or runner port).
+ */
+function unitFacts(lu: LocalUnit, hooks: readonly HookFact[], leaseByRun: ReadonlyMap<string, { entry: LeaseEntry; alive: boolean }>): UnitFacts {
+  const u = lu.snapshot;
+  const st = u.state;
+  const worktree = worktreeFacts(lu.worktree);
+  let run: RunFacts | null = null;
+  const unknown = lu.unknown_launch;
+  if (unknown && st) {
+    // R5.1: a launch that never reached state.json — its hooks, and the agent session they name
+    const r = unknown.receipt;
+    const mine = hooks.filter((h) => h.run_id === r.run_id);
+    const last = mine.at(-1);
+    const last_hook_at = last ? Date.parse(last.at) : null;
+    run = {
+      run_id: r.run_id as string,
+      session: null,
+      process_alive: null,
+      pane: null,
+      hooks: mine,
+      last_hook_at,
+      last_activity_at: last_hook_at,
+      transcript: [...mine].reverse().find((h) => h.transcript)?.transcript ?? null,
+      launch_unknown: { n: unknown.n, at: Date.parse(r.at), agent_session_id: mine.findLast((h) => h.agent_session_id)?.agent_session_id ?? null },
+    };
+  } else if (st?.run) {
+    const r = st.run;
+    const lease = leaseByRun.get(r.run_id);
+    const mine = runHooks(hooks, r, worktree?.path ?? null);
+    const last = mine.at(-1);
+    const last_hook_at = last ? Date.parse(last.at) : null;
+    run = {
+      run_id: r.run_id,
+      session: r.session ? { ...r.session, ...(r.process ? { process: r.process } : {}) } : null,
+      process_alive: lease ? lease.alive : null,
+      pane: null,
+      hooks: mine,
+      last_hook_at,
+      last_activity_at: last_hook_at,
+      transcript: [...mine].reverse().find((h) => h.transcript)?.transcript ?? r.transcript ?? null,
+    };
+  }
+  return {
+    unit: u.unit,
+    state: st,
+    workflow: u.workflow?.workflow ?? null,
+    workflow_hash: u.workflow?.hash ?? null,
+    errors: u.errors,
+    unapplied: u.unapplied,
+    last_check: lu.last_check,
+    last_findings: lu.last_findings,
+    last_outcome_receipt: lu.last_outcome_receipt,
+    worktree,
+    run,
+    lease: lu.lease,
+    uncommitted: false,
+    ...(lu.step_runs ? { step_runs: lu.step_runs } : {}),
+    ...(lu.act_failure ? { act_failure: lu.act_failure } : {}),
+  };
+}
+
 /** BS1/BS3: the last base measurement (`trace/base.json`) and the newest base merge in the story unit's receipts. */
 function baseSync(sf: StoryFacts, receipts: readonly NumberedReceipt[], branch: string): BaseSyncView | null {
   let last: BaseSyncView["last_update"] = null;
@@ -213,42 +234,39 @@ function prView(seen: StoryFacts["pr_seen"]): PrView | null {
 
 export async function loadProjectView(opts: LoadProjectViewOptions): Promise<ProjectView> {
   const now = opts.now ?? Date.now();
-  const holder = opts.holder ?? defaultHolder();
+  const holder = opts.holder ?? machineHolder(opts.env ?? process.env);
   const errors: FileError[] = [];
 
-  const snap = loadSnapshot({
-    repoRoot: opts.repoRoot,
-    storyRoots: opts.storyRoots ?? discoverStoryRoots(opts.repoRoot),
+  // H2/X1: the local facts observe reads, from the worktrees found on disk (GR3, A3)
+  const wts = scanWorktrees(opts.repoRoot);
+  const local = await loadLocalFacts(opts.repoRoot, {
+    now,
     home: opts.home,
     env: opts.env,
+    storyWorktrees: wts.stories,
+    sliceWorktrees: wts.slices,
+    liveness: opts.liveness,
     includeApplied: true,
+    reportLeaseErrors: true,
   });
+  const snap = local.snapshot;
   let config = DEFAULT_CONFIG;
   if (snap.config.ok) config = snap.config.config;
   else errors.push(...snap.config.errors);
   errors.push(...snap.workflows.errors);
   const runner = config.runner?.adapter ?? null;
   const lastTick = lastTickAt(opts.repoRoot);
-  const failures = readActFailures(opts.repoRoot);
   const ctx: Ctx = { now, config, runner, heartbeatDown: false };
 
-  // Local reads in parallel: claim refs (no fetch) and machine leases.
-  const [claims, leases, trace] = await Promise.all([
-    Promise.all(snap.stories.map((s) => readLocalClaim(opts.repoRoot, s.key).catch(() => ({ state: "none" }) as const))),
-    listLeases(snap.home, opts.liveness).catch((e: unknown) => {
-      errors.push({ file: "leases", errors: [{ path: "", message: (e as Error).message }] });
-      return { live: [] as LeaseEntry[], dead: [] as LeaseEntry[], errors: [] as FileError[] };
-    }),
+  const leases = local.leases;
+  const [claims, trace] = await Promise.all([
+    Promise.all(local.stories.map((s) => readLocalClaim(opts.repoRoot, s.snapshot.key).catch(() => ({ state: "none" }) as const))),
     Promise.resolve(readTrace(opts.repoRoot, { since: opts.traceSince ?? new Date(now - TRACE_WINDOW_MS).toISOString() })),
   ]);
   errors.push(...leases.errors, ...trace.errors);
 
   const traceByUnit = new Map<string, TraceEvent[]>();
-  const hooksByRun = new Map<string, HookFact[]>();
-  for (const ev of trace.events) {
-    for (const k of traceUnits(ev)) push(traceByUnit, k, ev);
-    if (ev.type === "hook" && ev.fact.run_id) push(hooksByRun, ev.fact.run_id, ev.fact);
-  }
+  for (const ev of trace.events) for (const k of traceUnits(ev)) push(traceByUnit, k, ev);
   const leaseByRun = new Map<string, { entry: LeaseEntry; alive: boolean }>();
   for (const [list, alive] of [[leases.dead, false], [leases.live, true]] as const)
     for (const entry of list) if (entry.lease.run_id && entry.lease.kind !== "slot") leaseByRun.set(entry.lease.run_id, { entry, alive });
@@ -258,19 +276,18 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   // R2.3: on a story not held here, local runs/ work that never reached the record (an inbox Check item)
   const remoteName = config.remote.git_remote;
   const baseRef = defaultBaseRef(opts.repoRoot, remoteName, config.base_branch);
-  const baseFacts = readBaseFacts(opts.repoRoot);
-  const prSeen = readPrFacts(opts.repoRoot);
+  const prSeen = local.pr_seen;
   const unpushed = await Promise.all(
-    snap.stories.map(async (read, i): Promise<UnpushedRuns[]> => {
+    local.stories.map(async (ls, i): Promise<UnpushedRuns[]> => {
+      const read = ls.snapshot;
       const c = classifyClaim(claims[i] ?? { state: "none" }, me, now);
       if (c.state === "mine" || c.state === "corrupt" || ((c.state === "other" || c.state === "expired") && (c.blob.holder === holder || c.blob.heartbeat_id === me.heartbeat_id))) return [];
-      const storyWt = storyWorktreePath(opts.repoRoot, read.key, read.slug);
-      if (readUnitMarker(storyWt).marker?.story !== read.key) return [];
-      const targets: UnpushedTarget[] = [{ unit: read.key, dir: read.units[0]?.unit.dir ?? "_story", cwd: storyWt, branch: storyBranch(read.key, read.slug) }];
-      for (const u of read.units) {
-        const wt = u.unit.slice ? markedSliceWorktree(storyWt, read, u.unit.slice) : null;
+      if (!ls.worktree) return [];
+      const targets: UnpushedTarget[] = [{ unit: read.key, dir: read.units[0]?.unit.dir ?? "_story", cwd: ls.worktree, branch: storyBranch(read.key, read.slug) }];
+      for (const lu of ls.units) {
+        const u = lu.snapshot;
         const file = read.slices.find((f) => f.key === u.unit.slice);
-        if (wt && file) targets.push({ unit: u.unit.key, dir: u.unit.dir, cwd: wt, branch: sliceBranch(read.key, file.nn, file.slug) });
+        if (u.unit.slice && lu.worktree && file) targets.push({ unit: u.unit.key, dir: u.unit.dir, cwd: lu.worktree, branch: sliceBranch(read.key, file.nn, file.slug) });
       }
       const found = await unpushedRuns(remoteName, baseRef, read.spec_dir, targets).catch(() => []);
       return found.map((f) => ({ unit: f.unit, files: f.files }));
@@ -278,15 +295,12 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   );
   // F35/C5: the ready approval's head, voided by a later re-entry; and whether only norn moved the PR head since
   const readyHeads = await Promise.all(
-    snap.stories.map(async (story): Promise<{ ready_head_sha?: string; ready_approved_at?: string; ready_head_norn?: string }> => {
-      const wf = story.units[0]?.workflow?.workflow;
-      const receipts = story.units[0]?.receipts;
-      const ready = wf && receipts ? readyApproval(wf, receipts) : undefined;
-      if (!ready) return {};
-      const sha = ready.sha;
-      const prHead = prSeen[story.key]?.pr?.head_sha;
-      const norn = !!prHead && prHead !== sha && (await onlyNornCommitsSince(opts.repoRoot, sha, prHead, story.key).catch(() => false));
-      return { ready_head_sha: sha, ready_approved_at: ready.at, ...(norn ? { ready_head_norn: prHead } : {}) };
+    local.stories.map(async (ls): Promise<{ ready_head_sha?: string; ready_approved_at?: string; ready_head_norn?: string }> => {
+      if (!ls.ready) return {};
+      const sha = ls.ready.sha;
+      const prHead = prSeen[ls.snapshot.key]?.pr?.head_sha;
+      const norn = !!prHead && prHead !== sha && (await onlyNornCommitsSince(opts.repoRoot, sha, prHead, ls.snapshot.key).catch(() => false));
+      return { ready_head_sha: sha, ready_approved_at: ls.ready.at, ...(norn ? { ready_head_norn: prHead } : {}) };
     }),
   );
   const runs: RunView[] = [];
@@ -295,52 +309,15 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   const stories: StoryView[] = [];
   const views: Array<() => void> = [];
 
-  snap.stories.forEach((read, i) => {
-    const storyWt = storyWorktreePath(opts.repoRoot, read.key, read.slug);
-    // A slice running in its own worktree keeps its live runs/ there (§7); same rule as observe.
-    const story = withSliceWorktrees(read, (slice) => markedSliceWorktree(storyWt, read, slice), { includeApplied: true });
+  local.stories.forEach((ls, i) => {
+    const story = ls.snapshot;
     let claim = classifyClaim(claims[i] ?? { state: "none" }, me, now);
     if (claim.state === "other" && claim.blob.holder === holder) claim = { ...claim, state: "mine" };
     const storyState = story.units[0]?.state ?? null;
     const mode: Mode = storyState?.mode ?? config.default_mode;
+    const finished = story.frontmatter?.status === "done" || story.frontmatter?.status === "dropped";
 
-    const units: UnitFacts[] = story.units.map((u) => {
-      const sl = u.unit.slice === null ? null : story.slices.find((s) => s.key === u.unit.slice);
-      const wt = u.unit.slice === null ? storyWt : sliceWorktreePath(storyWt, sl?.nn ?? u.unit.dir.split("-")[0] ?? "", sl?.slug ?? u.unit.dir.replace(/^\d+-/, ""));
-      const r = u.state?.run ?? null;
-      const lease = r ? leaseByRun.get(r.run_id) : undefined;
-      const hooks = r ? (hooksByRun.get(r.run_id) ?? []) : [];
-      const lastHook = hooks.length ? Math.max(...hooks.map((h) => Date.parse(h.at))) : null;
-      const run: RunFacts | null = r
-        ? {
-            run_id: r.run_id,
-            session: r.session ? { ...r.session, ...(r.process ? { process: r.process } : {}) } : null,
-            process_alive: lease ? lease.alive : null,
-            pane: null,
-            hooks,
-            last_hook_at: lastHook,
-            last_activity_at: lastHook,
-            transcript: r.transcript ?? null,
-          }
-        : null;
-      return {
-        unit: u.unit,
-        state: u.state,
-        workflow: u.workflow?.workflow ?? null,
-        workflow_hash: u.workflow?.hash ?? null,
-        errors: u.errors,
-        unapplied: u.unapplied,
-        last_check: null,
-        last_findings: null,
-        last_outcome_receipt: (u.receipts ?? []).find((r) => !!u.state?.last_outcome && r.receipt.receipt_id === u.state.last_outcome.receipt_id) ?? null,
-        worktree: worktreeFacts(wt),
-        run,
-        lease: (lease?.entry.lease as LeaseFile | undefined) ?? null,
-        uncommitted: false,
-        ...(failures[u.unit.key] ? { act_failure: failures[u.unit.key] } : {}),
-      };
-    });
-
+    const units: UnitFacts[] = ls.units.map((lu) => unitFacts(lu, local.hooks, leaseByRun));
     const sf: StoryFacts = {
       key: story.key,
       slug: story.slug,
@@ -348,22 +325,22 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       branch: storyBranch(story.key, story.slug),
       frontmatter: story.frontmatter,
       frontmatter_error: story.frontmatter_error,
-      worktree: units[0]?.worktree ?? null,
+      worktree: worktreeFacts(ls.worktree),
       claim,
       mailbox: undefined,
       issue: undefined,
       pr: undefined,
       // C1: the PR as this checkout's last sync saw it — merge (BS10), retarget (BS11), head changed (F35)
-      ...(prSeen[story.key] && story.frontmatter?.status !== "done" && story.frontmatter?.status !== "dropped" ? { pr_seen: prSeen[story.key] } : {}),
+      ...(prSeen[story.key] && !finished ? { pr_seen: prSeen[story.key] } : {}),
       ...readyHeads[i],
       units,
       slices: story.slices,
       mode,
       ...(unpushed[i]?.length ? { unpushed_runs: unpushed[i] } : {}),
-      // NT2/NT3: open notes of the story, same rule as observe
-      ...((notes) => (notes.length ? { notes } : {}))(openNotes(story.units.map((u) => ({ unit: u.unit.key, receipts: u.receipts ?? [] })))),
+      // NT2/NT3: open notes of the story (loadLocalFacts, as observe)
+      ...(ls.notes ? { notes: ls.notes } : {}),
       // BS1: the last base measurement of this checkout's ticks (stale items, merge-item detail)
-      ...(baseFacts[story.key] && story.frontmatter?.status !== "done" && story.frontmatter?.status !== "dropped" ? { base: baseFacts[story.key] } : {}),
+      ...(local.base[story.key] && !finished ? { base: local.base[story.key] } : {}),
     };
     storyFacts.push(sf);
 
@@ -445,9 +422,8 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       runner,
       ...(runner && opts.runnerCapabilities ? { runner_capabilities: { ...opts.runnerCapabilities } } : {}),
       leases: leases.live.map((e) => e.lease),
-      dead_leases: leases.dead.map((e) => e.lease),
     },
-    remote: { synced_at: null, issues: undefined },
+    remote: { issues: undefined },
     stories: storyFacts,
     heartbeat: { last_tick_at: lastTick },
     orphans: { worktrees: [], branches: [] },

@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://norn.dev/schema/local-base.json",
+  "title": "norn measured story bases (trace/base.json)",
+  "type": "object",
+  "properties": {
+    "stories": {
+      "type": "object",
+      "patternProperties": {
+        "^(.*)$": {
+          "type": "object",
+          "required": [
+            "ref",
+            "sha",
+            "head",
+            "merge_base",
+            "behind",
+            "ahead",
+            "conflicts"
+          ],
+          "properties": {
+            "ref": {
+              "type": "string"
+            },
+            "sha": {
+              "type": "string"
+            },
+            "head": {
+              "type": "string"
+            },
+            "merge_base": {
+              "type": "string"
+            },
+            "behind": {
+              "type": "number"
+            },
+            "ahead": {
+              "type": "number"
+            },
+            "conflicts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -6,8 +6,7 @@
  */
 import type { AdapterContext, InboxGroup, InboxItem, NotifierPort } from "@norn/core";
 import type { NotifierConfig } from "@norn/schema";
-import { portError } from "../process/error.ts";
-import { type Exec, bunExec } from "../process/exec.ts";
+import { type Exec, bunExec, portError } from "../exec.ts";
 
 export type Fetch = (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<{
   ok: boolean;
@@ -104,7 +103,7 @@ export interface NtfyNotifierOptions {
 }
 
 /** ntfy JSON publish: POST to the server root with `{topic, title, message, …}`. */
-export function ntfyRequest(o: NtfyNotifierOptions, item: InboxItem): { url: string; headers: Record<string, string>; body: unknown } {
+function ntfyRequest(o: NtfyNotifierOptions, item: InboxItem): { url: string; headers: Record<string, string>; body: unknown } {
   const { title, subtitle, body } = render(item);
   const payload: Record<string, unknown> = { topic: o.topic, title: `${title} — ${subtitle}`, message: body, tags: ["norn", item.group] };
   if (item.url) payload.click = item.url;
@@ -134,7 +133,7 @@ export interface WebhookNotifierOptions {
 }
 
 /** Webhook body: the inbox item plus rendered text. */
-export function webhookBody(item: InboxItem): unknown {
+function webhookBody(item: InboxItem): unknown {
   return { type: "norn.inbox_item", item, text: render(item) };
 }
 
@@ -160,7 +159,7 @@ function str(options: Record<string, unknown>, key: string, adapter: string, req
 }
 
 /** `ntfy` options: `topic` + optional `server`, or `url` (`https://ntfy.sh/<topic>`); `token` or `token_env`; `priority`. */
-export const ntfyFactory = (ctx: AdapterContext, config: NotifierConfig): NotifierPort => {
+const ntfyFactory = (ctx: AdapterContext, config: NotifierConfig): NotifierPort => {
   const o = config.options ?? {};
   let server = str(o, "server", "ntfy");
   let topic = str(o, "topic", "ntfy");
@@ -181,7 +180,7 @@ export const ntfyFactory = (ctx: AdapterContext, config: NotifierConfig): Notifi
 };
 
 /** `webhook` options: `url`, optional `headers` (string map). */
-export const webhookFactory = (_ctx: AdapterContext, config: NotifierConfig): NotifierPort => {
+const webhookFactory = (_ctx: AdapterContext, config: NotifierConfig): NotifierPort => {
   const o = config.options ?? {};
   const url = str(o, "url", "webhook", true);
   const headers: Record<string, string> = {};
@@ -192,7 +191,7 @@ export const webhookFactory = (_ctx: AdapterContext, config: NotifierConfig): No
   return createWebhookNotifier({ url, headers });
 };
 
-export const osFactory = (_ctx: AdapterContext, _config: NotifierConfig): NotifierPort => createOsNotifier();
+const osFactory = (_ctx: AdapterContext, _config: NotifierConfig): NotifierPort => createOsNotifier();
 
 // ------------------------------------------------------------------ herdr (HC14)
 

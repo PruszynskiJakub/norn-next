@@ -29,14 +29,15 @@
  * - openCockpitPane → `herdr pane split [--current] --direction down --ratio 0.3 --cwd C --no-focus`,
  *                `herdr pane rename <pane> norn`, `herdr pane run <pane> "norn cockpit"`   (SPEC-cockpit CP10)
  * - cockpit helpers (agent list, focus, labels, command panes): `./cockpit.ts` (HC6, HC12)
+ * - every herdr command runs through `herdrCaller` (`./call.ts`), as do the cockpit's
  *
  * Herdr's agent status is one fact among several (§21, C2): `idle`/`done` never completes a step.
  */
 import type { AdapterContext, LaunchSpec, PaneState, PersonOpenSpec, ProcessPort, RunnerPort, SessionRef } from "@norn/core";
 import type { ProcessIdentity, RunnerConfig } from "@norn/schema";
 import { createProcessPort } from "../process/index.ts";
-import { portError } from "../process/error.ts";
-import { type Exec, bunExec, shellJoin } from "../process/exec.ts";
+import { type Exec, bunExec, portError, shellJoin } from "../exec.ts";
+import { herdrBase, herdrCaller, splitAndRun, workspaceFor } from "./call.ts";
 import { parsePanePrompt } from "./prompt.ts";
 
 export const RUNNER_NAME = "herdr";
@@ -77,41 +78,13 @@ const STATE_MAP: Record<string, PaneState["state"]> = {
   unknown: "unknown",
 };
 
-/** Herdr error codes that mean the pane (and so the session) no longer exists. */
-const GONE = new Set(["pane_not_found", "tab_not_found", "workspace_not_found"]);
-
-/** Run one herdr command; parse JSON stdout (empty stdout → null). Throws PortError on failure. */
-function herdrCaller(exec: Exec, base: string[]) {
-  return async function herdr(args: string[]): Promise<unknown> {
-    const r = await exec([...base, ...args]);
-    if (r.code === 127) throw portError("runner_unavailable", `herdr not runnable: ${r.stderr.trim()}`);
-    if (r.code !== 0) {
-      const err = parseError(r.stderr) ?? parseError(r.stdout);
-      const code = err?.code ?? "herdr_error";
-      const message = `herdr ${args.slice(0, 2).join(" ")}: ${err?.message ?? (r.stderr.trim() || `exit ${r.code}`)}`;
-      if (GONE.has(code)) throw portError("session_gone", message);
-      if (code === "agent_blocked") throw portError("session_blocked", message, true);
-      throw portError(code === "herdr_error" ? code : `herdr_${code}`, message, code === "timeout");
-    }
-    // Control commands answer JSON; `pane read` and input commands print plain text or nothing.
-    const text = r.stdout.trim();
-    if (text === "") return null;
-    try {
-      return JSON.parse(text);
-    } catch {
-      return r.stdout;
-    }
-  };
-}
-
 export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
   const exec = opts.exec ?? bunExec;
   const proc = opts.process ?? createProcessPort({ exec });
   const sleep = opts.sleep ?? ((ms: number) => Bun.sleep(ms));
   const startWaitMs = opts.startWaitMs ?? 10_000;
-  const base = [opts.bin ?? "herdr", ...(opts.session ? ["--session", opts.session] : [])];
-
-  const herdr = herdrCaller(exec, base);
+  const base = herdrBase(opts);
+  const herdr = herdrCaller(exec, opts);
 
   async function processInfo(paneId: string): Promise<ProcessInfo | null> {
     try {
@@ -139,10 +112,7 @@ export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
     },
 
     async openForPerson(spec: PersonOpenSpec): Promise<{ pane_id: string }> {
-      const list = (await herdr(["workspace", "list"])) as {
-        result?: { workspaces?: Array<{ workspace_id: string; worktree?: { checkout_path?: string } }> };
-      } | null;
-      const workspaceId = list?.result?.workspaces?.find((w) => w.worktree?.checkout_path === spec.cwd)?.workspace_id ?? spec.env.HERDR_WORKSPACE_ID ?? null;
+      const workspaceId = (await workspaceFor(herdr, spec.cwd)) ?? spec.env.HERDR_WORKSPACE_ID ?? null;
       const common = ["--cwd", spec.cwd, "--label", spec.title];
       const created = (await herdr(workspaceId ? ["tab", "create", "--workspace", workspaceId, ...common] : ["workspace", "create", ...common])) as {
         result?: { root_pane?: HerdrPane };
@@ -158,12 +128,7 @@ export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
       const common = ["--cwd", spec.cwd, "--label", spec.title, ...envFlags, "--no-focus"];
 
       let workspaceId: string | null = null;
-      if (opts.reuseWorkspace ?? true) {
-        const list = (await herdr(["workspace", "list"])) as {
-          result?: { workspaces?: Array<{ workspace_id: string; worktree?: { checkout_path?: string } }> };
-        };
-        workspaceId = list?.result?.workspaces?.find((w) => w.worktree?.checkout_path === spec.cwd)?.workspace_id ?? null;
-      }
+      if (opts.reuseWorkspace ?? true) workspaceId = await workspaceFor(herdr, spec.cwd);
       const created = (await herdr(
         workspaceId ? ["tab", "create", "--workspace", workspaceId, ...common] : ["workspace", "create", ...common],
       )) as { result?: { root_pane?: HerdrPane } };
@@ -307,15 +272,6 @@ function paneOf(session: SessionRef): string {
   return pane;
 }
 
-function parseError(text: string): { code?: string; message?: string } | null {
-  try {
-    const parsed = JSON.parse(text.trim()) as { error?: { code?: string; message?: string } };
-    return parsed?.error ?? null;
-  } catch {
-    return null;
-  }
-}
-
 /** RunnerFactory: options `bin`, `session`, `reuse_workspace` from RunnerConfig.options. */
 export const herdrFactory = (_ctx: AdapterContext, config: RunnerConfig): RunnerPort => {
   const o = config.options ?? {};
@@ -344,18 +300,10 @@ export interface CockpitPaneOptions {
  * `norn cockpit` in it (it writes only through CLI verbs, X1). Returns the new pane.
  */
 export async function openCockpitPane(cwd: string, opts: CockpitPaneOptions = {}): Promise<{ pane_id: string }> {
-  const herdr = herdrCaller(opts.exec ?? bunExec, [opts.bin ?? "herdr", ...(opts.session ? ["--session", opts.session] : [])]);
+  const herdr = herdrCaller(opts.exec ?? bunExec, opts);
   const env = opts.env ?? process.env;
-  const target = env.HERDR_PANE_ID ? ["--current"] : [];
-  const out = (await herdr(["pane", "split", ...target, "--direction", opts.direction ?? "down", "--ratio", "0.3", "--cwd", cwd, "--no-focus"])) as {
-    result?: { pane?: HerdrPane };
-  } | null;
-  const paneId = out?.result?.pane?.pane_id;
-  if (!paneId) throw portError("launch_failed", "herdr pane split did not return a pane");
-  await herdr(["pane", "rename", paneId, "norn"]).catch(() => null); // the label is cosmetic
   const argv = [...(opts.command ?? ["norn"]), "cockpit", ...(opts.interval ? ["--interval", opts.interval] : [])];
-  await herdr(["pane", "run", paneId, shellJoin(argv)]);
-  return { pane_id: paneId };
+  return splitAndRun(herdr, { cwd, direction: opts.direction ?? "down", ratio: "0.3", current: !!env.HERDR_PANE_ID, title: "norn", command: shellJoin(argv) });
 }
 export { parsePanePrompt } from "./prompt.ts";
 export * from "./cockpit.ts";

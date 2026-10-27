@@ -6,7 +6,7 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { FileError, NumberedReceipt } from "@norn/core";
 import { type Receipt, assertValid, parseReceiptFileName, receiptFileName } from "@norn/schema";
-import { createExclusive, isErrno, json, readJsonFile, readText, safeUnlink } from "./fsx.ts";
+import { createExclusive, displayPath, isErrno, json, readJsonFile, readText, safeUnlink } from "./fsx.ts";
 import { receiptsDir } from "./paths.ts";
 
 export interface ReceiptListing {
@@ -52,34 +52,32 @@ function entries(unitDir: string): { entries: Entry[]; errors: FileError[] } {
   return { entries: out, errors };
 }
 
-function rel(path: string, root?: string): string {
-  return root && path.startsWith(`${root}/`) ? path.slice(root.length + 1) : path;
-}
-
 /**
  * List receipts of a unit, ascending. `after` skips numbers ≤ after (unapplied ones:
  * `after = state.applied_through`). `root` makes paths in results repo-relative.
  */
 export function listReceipts(unitDir: string, opts: { after?: number; root?: string } = {}): ReceiptListing {
-  const { entries: es, errors } = entries(unitDir);
+  const listed = entries(unitDir);
+  const errors = listed.errors.map((x) => ({ ...x, file: displayPath(x.file, opts.root) }));
+  const es = listed.entries;
   const receipts: NumberedReceipt[] = [];
   for (const e of es) {
     if (opts.after !== undefined && e.n <= opts.after) continue;
     const r = readJsonFile("receipt", e.file, opts.root);
     if (r.ok) {
       if (r.value.kind !== e.kind)
-        errors.push({ file: rel(e.file, opts.root), errors: [{ path: "/kind", message: `kind '${r.value.kind}' does not match file name` }] });
-      else receipts.push({ n: e.n, file: rel(e.file, opts.root), receipt: r.value });
+        errors.push({ file: displayPath(e.file, opts.root), errors: [{ path: "/kind", message: `kind '${r.value.kind}' does not match file name` }] });
+      else receipts.push({ n: e.n, file: displayPath(e.file, opts.root), receipt: r.value });
     } else if (r.reason === "corrupt") errors.push(r.error);
   }
-  return { receipts, errors: errors.map((x) => ({ ...x, file: rel(x.file, opts.root) })) };
+  return { receipts, errors };
 }
 
 export function readReceipt(unitDir: string, n: number, root?: string): NumberedReceipt | FileError | null {
   const e = entries(unitDir).entries.find((x) => x.n === n);
   if (!e) return null;
   const r = readJsonFile("receipt", e.file, root);
-  if (r.ok) return { n, file: rel(e.file, root), receipt: r.value };
+  if (r.ok) return { n, file: displayPath(e.file, root), receipt: r.value };
   return r.reason === "corrupt" ? r.error : null;
 }
 

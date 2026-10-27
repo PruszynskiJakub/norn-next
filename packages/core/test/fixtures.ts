@@ -1,7 +1,7 @@
 /** Shared test fixtures: workflows, states, receipts and Facts builders. */
 import { DEFAULT_CONFIG, deriveUlid, type Receipt, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
 import { initialState } from "../src/apply.ts";
-import type { LoadedWorkflow, RepoWorkflows } from "../src/decide.ts";
+import type { LoadedWorkflow, RepoWorkflows } from "../src/decide/index.ts";
 import type { Facts, NumberedReceipt, SliceFileFacts, StoryFacts, UnitFacts, UnitRef, WorktreeFacts } from "../src/facts.ts";
 import { sha256 } from "../src/hash.ts";
 
@@ -83,7 +83,7 @@ export function receipt<K extends Receipt["kind"]>(st: Pick<UnitState, "step" | 
 }
 export const numbered = (n: number, r: Receipt): NumberedReceipt => ({ n, file: `${String(n).padStart(4, "0")}-${r.kind}.json`, receipt: r });
 
-export const worktree = (path: string, slot: number | null = 1): WorktreeFacts => ({ path, exists: true, marker: true, status: null, last_commit_at: null, last_file_change_at: null, slot });
+export const worktree = (path: string, slot: number | null = 1): WorktreeFacts => ({ path, exists: true, status: null, last_commit_at: null, last_file_change_at: null, slot });
 
 export function unitFacts(unit: UnitRef, wf: Workflow | null, state: UnitState | null, patch: Partial<UnitFacts> = {}): UnitFacts {
   return {
@@ -153,8 +153,8 @@ export function facts(stories: StoryFacts[], patch: Partial<Facts> = {}, now = T
     tick_id: TICK,
     now,
     repo: { root: "/r", default_branch: "main", remote: "origin" },
-    machine: { holder: "jakub@mac", heartbeat_id: HB, runner: "herdr", leases: [], dead_leases: [] },
-    remote: { synced_at: now, issues: undefined },
+    machine: { holder: "jakub@mac", heartbeat_id: HB, runner: "herdr", leases: [] },
+    remote: { issues: undefined },
     stories,
     orphans: { worktrees: [], branches: [] },
     ...patch,

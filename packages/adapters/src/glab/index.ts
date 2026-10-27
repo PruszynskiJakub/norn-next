@@ -6,7 +6,7 @@
 import type { RemoteFactory, RemoteIssue, RemotePort, RemotePullRequest } from "@norn/core";
 import { storyKey } from "@norn/schema";
 import { NETWORK_TIMEOUT_MS } from "@norn/store";
-import { bunExec, okOrThrow, parseJson, portError, type Exec } from "../git/exec.ts";
+import { bunExec, okOrThrow, parseJson, portError, type Exec } from "../exec.ts";
 
 export interface GlabOptions {
   /** repository checkout to run `glab` in */
@@ -64,7 +64,7 @@ export function mapIssue(i: GlIssue): RemoteIssue {
   };
 }
 
-export function mapMr(m: GlMr): RemotePullRequest {
+function mapMr(m: GlMr): RemotePullRequest {
   const merge = m.merge_commit_sha ?? m.squash_commit_sha ?? null;
   const by = m.merge_user?.username ?? m.merged_by?.username ?? null;
   return {
@@ -76,9 +76,7 @@ export function mapMr(m: GlMr): RemotePullRequest {
     ...(merge ? { merge_commit_sha: merge } : {}),
     ...(by ? { merged_by: by } : {}),
     merged_at: m.merged_at ?? null,
-    draft: m.draft ?? m.work_in_progress ?? false,
     head: m.source_branch,
-    base: m.target_branch,
     base_branch: m.target_branch,
   };
 }

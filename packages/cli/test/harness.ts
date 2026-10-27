@@ -14,6 +14,7 @@ import { type Receipt, type UnitState, ulid } from "@norn/schema";
 import { appendReceipt, installSkills, linkSkills, readState } from "@norn/store";
 import { bundledSkills, type CliDeps, type CliResult, runCli, type TickReport } from "../src/index.ts";
 import { assetsDir } from "../src/runtime/assets.ts";
+import { harvestGolden } from "./golden-harvest.ts";
 
 // Every tick shells out to git (worktrees, status, refs) several times, so the multi-tick
 // integration tests take 2–3.5 s each on an idle laptop — too close to bun's 5 s default on a
@@ -57,7 +58,7 @@ export class FakeRemote implements RemotePort {
   }
   async openDraftPullRequest(o: { head: string; base: string; title: string; body: string }) {
     this.calls.push(`pr+ ${o.head}`);
-    const pr: RemotePullRequest = { number: 100 + this.prs.length, url: `https://github.com/o/r/pull/${100 + this.prs.length}`, state: "open", is_draft: true, head_sha: "", draft: true, head: o.head, base: o.base, base_branch: o.base, merged_at: null };
+    const pr: RemotePullRequest = { number: 100 + this.prs.length, url: `https://github.com/o/r/pull/${100 + this.prs.length}`, state: "open", is_draft: true, head_sha: "", head: o.head, base_branch: o.base, merged_at: null };
     this.prs.push(pr);
     this.bodies.set(pr.number, o.body);
     return pr;
@@ -236,7 +237,12 @@ export async function createHarness(): Promise<Harness> {
       const receipt = { kind, receipt_id: ulid(clock.now()), run_id: st.run?.run_id ?? null, step: st.step, attempt: st.attempt, at: clock.iso(), by, who: by === "agent" ? "claude" : "tester@box", ...body } as Receipt;
       return appendReceipt(runsDir, receipt).n;
     },
-    cleanup: () => rmSync(dir, { recursive: true, force: true }),
+    cleanup() {
+      // Phase 0.1: `scripts/golden.ts` sets NORN_GOLDEN_OUT to collect this repo's ticks as golden decide cases
+      const out = process.env.NORN_GOLDEN_OUT;
+      if (out) harvestGolden(dir, root, out, process.env.NORN_GOLDEN_SOURCE ?? "harness");
+      rmSync(dir, { recursive: true, force: true });
+    },
   };
   return h;
 }

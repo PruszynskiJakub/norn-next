@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createProcessPort, parseEnvMatches, parseStart, psEnvArgv, psStartArgv } from "../../src/process/index.ts";
-import { shellJoin } from "../../src/process/exec.ts";
+import { shellJoin } from "../../src/exec.ts";
 
 describe("process port", () => {
   test("parses `ps -o stat= -o lstart=`; gone or zombie → null", () => {

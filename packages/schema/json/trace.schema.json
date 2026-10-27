@@ -43,6 +43,10 @@
             }
           ]
         },
+        "norn_version": {
+          "minLength": 1,
+          "type": "string"
+        },
         "duration_ms": {
           "minimum": 0,
           "type": "integer"
@@ -777,6 +781,78 @@
             "^(.*)$": {
               "minimum": 0,
               "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type",
+        "id",
+        "at",
+        "file",
+        "schema",
+        "reason",
+        "errors"
+      ],
+      "properties": {
+        "type": {
+          "const": "local_file",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "at": {
+          "format": "date-time",
+          "description": "ISO-8601 timestamp, UTC",
+          "type": "string"
+        },
+        "file": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "schema": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "const": "unreadable",
+              "type": "string"
+            },
+            {
+              "const": "invalid_json",
+              "type": "string"
+            },
+            {
+              "const": "wrong_shape",
+              "type": "string"
+            }
+          ]
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "path",
+              "message"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
             }
           }
         }

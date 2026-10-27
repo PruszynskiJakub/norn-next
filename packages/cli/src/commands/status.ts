@@ -13,7 +13,8 @@ import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, rendered, usageError } from "../output.ts";
 import { cockpitHerdr } from "../runtime/cockpit.ts";
-import { parseUnitKey, projectView } from "../runtime/human.ts";
+import { parseUnitKey } from "../runtime/args.ts";
+import { projectView } from "../runtime/human.ts";
 import { isOrientWorkspace, planWorkspaceMoves, segmentLine, storyToken } from "../runtime/segment.ts";
 
 /** The orient workspaces' tokens and order; failures are ignored (presentation, HC13). */
