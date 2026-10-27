@@ -1,28 +1,17 @@
 /**
- * ProcessPort (ports.ts): liveness by PID + start time (K3, MO3). The start time is what
- * `ps -o lstart= -p <pid>` prints (macOS and Linux), kept opaque — only compared for equality,
- * so a reused PID never looks like the original process.
+ * ProcessPort (ports.ts): liveness by PID + start time (K3, MO3). The start time and the zombie
+ * rule come from store's one `ps -o stat= -o lstart=` parser (`parseStart`), shared with the
+ * leases and locks, so both agree: a zombie is dead. The start time is kept opaque — only
+ * compared for equality, so a reused PID never looks like the original process.
  */
 import type { AdapterContext, ProcessPort } from "@norn/core";
 import type { ProcessIdentity } from "@norn/schema";
+import { PS_ENV, parseStart, processStart, psStartArgv, selfIdentity } from "@norn/store";
 import { type Exec, unobservedExec } from "./exec.ts";
 
 export { AdapterError, isPortError, portError } from "./error.ts";
 export { type Exec, type ExecOptions, type ExecResult, bunExec, shellJoin, shellQuote } from "./exec.ts";
-
-/** Stable `ps` output regardless of the user's locale. */
-const PS_ENV = { ...process.env, LC_ALL: "C", LANG: "C" };
-
-export function psStartArgv(pid: number): string[] {
-  return ["ps", "-o", "stat=", "-o", "lstart=", "-p", String(pid)];
-}
-
-/** Parse `ps -o stat= -o lstart=` output; null when the pid is gone or a zombie. */
-export function parseStart(stdout: string, code: number): string | null {
-  const m = /^\s*(\S+)\s+(.+?)\s*$/.exec(stdout);
-  if (code !== 0 || !m || m[1]!.startsWith("Z")) return null;
-  return m[2]!.replace(/\s+/g, " ");
-}
+export { parseStart, psStartArgv } from "@norn/store";
 
 /**
  * R5.1: every process with its environment appended to the command line. macOS (BSD ps) prints
@@ -54,7 +43,7 @@ export interface ProcessPortOptions {
 
 export function createProcessPort(opts: ProcessPortOptions = {}): ProcessPort {
   const exec = opts.exec ?? unobservedExec;
-  let selfIdentity: ProcessIdentity | null = null;
+  let selfId: ProcessIdentity | null = null;
   return {
     async identify(pid) {
       if (!Number.isInteger(pid) || pid <= 0) return null;
@@ -79,13 +68,10 @@ export function createProcessPort(opts: ProcessPortOptions = {}): ProcessPort {
       return found;
     },
     self() {
-      if (selfIdentity) return selfIdentity;
+      if (selfId) return selfId;
       const pid = opts.selfPid ?? process.pid;
-      const r = Bun.spawnSync(psStartArgv(pid), { env: PS_ENV });
-      const start = parseStart(r.stdout.toString(), r.exitCode ?? 1);
-      // ps always sees its own parent; fall back to a value that never matches a real start time.
-      selfIdentity = { pid, pid_start: start ?? `unknown-${pid}` };
-      return selfIdentity;
+      selfId = selfIdentity(pid, processStart(pid));
+      return selfId;
     },
   };
 }
