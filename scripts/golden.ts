@@ -16,14 +16,15 @@
  *     paths normalised. Existing cases are never touched. A harvested case is added, smallest
  *     `stableKey` first, only when it brings a rule that fewer than `N` (default 2) cases fire —
  *     counting the existing corpus — and its `stableKey` is not in the corpus yet. Cases are named by
- *     `stableKey`, so a rerun with nothing new to cover adds nothing.
+ *     the `stableKey` of decide's inputs (not its decisions), so a rerun with nothing new to cover adds
+ *     nothing and `--update` never makes a name stale.
  *
  * A structural refactor uses neither: it leaves the corpus as it is and the golden test green.
  */
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, relative } from "node:path";
-import { stableKey } from "../packages/cli/test/golden-harvest.ts";
+import { caseInputs, stableKey } from "../packages/cli/test/golden-harvest.ts";
 import { decide, type RepoWorkflows } from "../packages/core/src/decide/index.ts";
 import type { Facts } from "../packages/core/src/facts.ts";
 
@@ -46,9 +47,9 @@ export interface GoldenCase {
   decisions: RecordedDecision[];
 }
 
-/** The text a case's `stableKey` is taken from: what the harvest names it by (decide's inputs and decisions). */
-export function caseBody(c: Pick<GoldenCase, "facts" | "workflows" | "config" | "decisions">): string {
-  return JSON.stringify({ facts: c.facts, workflows: c.workflows, config: c.config, decisions: c.decisions });
+/** The text a case's `stableKey` is taken from: what the harvest names it by (decide's inputs, not its decisions). */
+export function caseBody(c: Pick<GoldenCase, "facts" | "workflows" | "config">): string {
+  return caseInputs(c);
 }
 
 /** Rule ids a case's decisions fire, once each. */
