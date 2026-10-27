@@ -4,6 +4,8 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-10-27
+
 ### Changed
 
 - The cockpit's preview is easier to read.
