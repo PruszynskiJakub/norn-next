@@ -176,12 +176,16 @@ function launchPromptMissed(uf: UnitFacts, st: UnitState): { since: string; pane
   return { since: run.prompt_resent_at, pane: run.session?.pane_id ?? run.session?.session_id ?? null };
 }
 
-/** The command a person runs to start the unit's step agent in its worktree. */
+/**
+ * The command a person runs to start the unit's step agent in its worktree. It `cd`s only into a
+ * worktree observed on disk — the check decide makes before it starts a run there (O1) — never
+ * into a recorded path that is gone.
+ */
 export function startCommandFor(uf: UnitFacts, story: StoryFacts, config: ResolvedConfig): string {
   const step = uf.workflow && uf.state ? stepOf(uf.workflow, uf.state.step) : null;
   const name = (step?.type === "agent" && step.agent) || config.default_agent;
   const agent = config.agents[name];
-  const worktree = unitWorktree(story, uf, { mustExist: false });
+  const worktree = unitWorktree(story, uf);
   return startAgentCommand(worktree, agent?.command ?? agent?.adapter ?? name, agent?.args);
 }
 
@@ -211,10 +215,13 @@ export function notStartedItem(story: StoryFacts, facts: Facts, config: Resolved
 const short = (sha: string) => sha.slice(0, 7);
 const prCli = (story: StoryFacts) => (story.frontmatter?.provider ?? story.key.slice(0, 2)) === "gl" ? "glab mr" : "gh pr";
 
-/** Absolute path of a receipt file as observed (repo-relative to the unit's worktree, or absolute). */
+/**
+ * Absolute path of a receipt file as observed (repo-relative to the unit's worktree, or absolute).
+ * Only a worktree on disk holds the unit's runs/: a slice without its own reads them from the story's.
+ */
 function absFile(file: string, story: StoryFacts, uf: UnitFacts): string {
   if (file.startsWith("/")) return file;
-  const wt = uf.worktree?.path ?? story.worktree?.path ?? "";
+  const wt = (uf.worktree?.exists ? uf.worktree.path : null) ?? (story.worktree?.exists ? story.worktree.path : null) ?? "";
   return wt ? `${wt.replace(/\/+$/, "")}/${file}` : file;
 }
 
@@ -444,13 +451,13 @@ export function attendedWaitSince(uf: UnitFacts): number | null {
   return null;
 }
 
-/** HC3: where the unit's current run lives, for front ends that look for its pane (HC6). */
+/** HC3: where the unit's current run lives (a worktree on disk, as decide requires), for front ends that look for its pane (HC6). */
 function reachOf(story: StoryFacts, uf: UnitFacts): InboxItem["reach"] | undefined {
   const run = uf.state?.run;
   if (!run) return undefined;
   const live = uf.run?.run_id === run.run_id ? uf.run : null;
   return {
-    worktree: unitWorktree(story, uf, { mustExist: false }),
+    worktree: unitWorktree(story, uf),
     agent_session_id: run.agent_session_id ?? live?.launch_unknown?.agent_session_id ?? null,
     pane_id: run.session?.pane_id ?? live?.session?.pane_id ?? null,
   };

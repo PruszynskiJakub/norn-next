@@ -213,6 +213,8 @@ describe("loadProjectView", () => {
 
     expect(v.inbox.groups.answer.map((i) => i.id)).toEqual([ASK]);
     expect(v.inbox.groups.running.map((i) => i.slice)).toEqual(["gh-12/01"]);
+    // refactor 3.4: no worktree on disk → the inbox reaches none (observe reports none either)
+    expect(v.inbox.groups.running[0]?.reach?.worktree).toBeNull();
     expect(v.inbox.groups.recently_done.map((i) => i.slice)).toEqual(["gh-12/02"]);
     expect(v.inbox.pending).toBe(1);
 
