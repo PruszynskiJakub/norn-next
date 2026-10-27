@@ -15,7 +15,7 @@ export type CommandFor = "person" | "agent" | "hooks";
 export const HELP_GROUPS: ReadonlyArray<{ title: string; for: CommandFor; commands: readonly string[] }> = [
   { title: "Start here", for: "person", commands: ["init", "doctor", "sync", "watch", "inbox", "open"] },
   { title: "Answer what needs you", for: "person", commands: ["answer", "approve", "unstick", "update", "mode", "workflow"] },
-  { title: "Look around", for: "person", commands: ["status", "orient", "pick", "trace", "why", "pane", "config", "tick"] },
+  { title: "Look around", for: "person", commands: ["cockpit", "status", "orient", "trace", "why", "config", "tick"] },
   { title: "Team", for: "person", commands: ["take", "release", "drop"] },
   { title: "Housekeeping", for: "person", commands: ["tidy", "uninstall", "help"] },
   { title: "Agent protocol: the only commands an agent runs", for: "agent", commands: ["brief", "done", "ask", "stuck"] },

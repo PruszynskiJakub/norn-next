@@ -102,11 +102,12 @@ Non-goals:
   - `norn.open` and pane `cockpit` show it as a split below the focused pane;
   - `norn.pick` and pane `pick` show it as a popup over it;
   - `norn.next` runs `norn cockpit --next`.
+- CP13 The cockpit opens on any workspace. When its directory is in no repository, or in one norn was never set up in (no `.agents/norn/`), it shows the repository the last `norn cockpit` ran in on this machine. That path is kept in `<norn home>/cockpit.json` (`last_repo`), written by every `norn cockpit`; it is presentation state, never a fact. With no such repository it refuses as any command outside a repository does.
 - CP12 Removed:
   - the `norn pane` and `norn pick` commands (CP10);
   - the line commands (HC5's table) and their parser (`parseCockpitLine`, `planCockpit`);
   - `pickKey`'s own action rules;
-  - the Notes accordion and its `cockpit.json` marker (HC16): notes live in the preview (CP3), with no "new" count.
+  - the Notes accordion and its per-checkout `trace/cockpit.json` marker (HC16): notes live in the preview (CP3), with no "new" count.
 
 ## 6. Orient (shipped in 0.8.0)
 
@@ -153,7 +154,8 @@ Nothing in the model is terminal-specific: keys are defaults a web panel may sho
 
 - `@norn/view`: `cockpitModel`, types `CockpitModel`, `CockpitRow`, `CockpitAction`, `CockpitEffect`.
 - `norn cockpit [--interval 5s] [--json] [--next] [--open]` (new); `norn cockpit --json` is P8 data.
-- Removed: `norn pane` (all its modes) and `norn pick`; `cockpit.json`'s `notes_seen_at` (no longer read or written).
+- Removed: `norn pane` (all its modes) and `norn pick`; `trace/cockpit.json` (`notes_seen_at`).
+- New: `<norn home>/cockpit.json` (`last_repo`, CP13).
 - The Herdr plugin's entries run `norn cockpit`.
 
 ## 10. Tests
@@ -167,5 +169,6 @@ Nothing in the model is terminal-specific: keys are defaults a web panel may sho
   - a scripted session against the harness covering: filter, approve, answer with input, a refused key, trace shown, quit;
   - `--json` printing the model;
   - `--next` and `--open`;
+  - outside a repository, and in one without norn, it shows the last repository (CP13);
   - `norn pane` and `norn pick` are unknown commands.
 - Repo: the plugin manifest's entries name existing scripts that run `norn cockpit`.

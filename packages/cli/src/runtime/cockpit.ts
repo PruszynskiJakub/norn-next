@@ -1,14 +1,26 @@
 /**
- * The interactive cockpit behind `norn pane --interactive` (HC4–HC8, HC12, HC15): one line per command,
- * planned against the numbered inbox frame. Planning is pure; verbs run through the CLI dispatcher
- * (HC7, X1) and Herdr only focuses, opens and labels panes (presentation, HC13).
+ * Herdr side of `norn cockpit` (SPEC-cockpit CP8–CP10, HC6, HC12, HC15): which Herdr the cockpit talks
+ * to, going to an agent's pane, labelling agent panes, and the oldest Your turn item for `--next`.
+ * Presentation only — none of this is a fact for decide (HC13). Verbs run through the CLI dispatcher.
  */
 import { herdr } from "@norn/adapters";
+import type { InboxGroup, InboxItem } from "@norn/core";
 import type { InboxEntry } from "@norn/view";
 import type { Context } from "../context.ts";
-import { itemDetails, type Tone } from "./cockpit-view.ts";
 
 type HerdrCockpit = herdr.HerdrCockpit;
+type PaneLabel = herdr.PaneLabel;
+
+/** One mark per inbox group, shared by the cockpit rows and the tab bar segment. */
+export const GROUP_MARK: Partial<Record<InboxGroup, string>> = {
+  your_turn: "▶",
+  answer: "◆",
+  approve: "●",
+  unblock: "✖",
+  check: "◇",
+  unclaimed: "○",
+  running: "◐",
+};
 
 /** HC6/HC8: the Herdr the cockpit talks to — injected, or the real one inside Herdr, else none. */
 export function cockpitHerdr(ctx: Context): herdr.HerdrCockpit | null {
@@ -18,103 +30,6 @@ export function cockpitHerdr(ctx: Context): herdr.HerdrCockpit | null {
   const o = ctx.config.runner?.adapter === "herdr" ? (ctx.config.runner.options ?? {}) : {};
   return herdr.createHerdrCockpit({ env: ctx.env, ...(typeof o.bin === "string" ? { bin: o.bin } : {}), ...(typeof o.session === "string" ? { session: o.session } : {}) });
 }
-
-type PaneLabel = herdr.PaneLabel;
-
-export type CockpitCommand =
-  | { kind: "go"; n: number }
-  | { kind: "workspace"; n: number }
-  | { kind: "answer"; n: number; text: string }
-  | { kind: "approve"; n: number }
-  | { kind: "reject"; n: number; reason: string }
-  | { kind: "take"; n: number }
-  | { kind: "unstick"; n: number }
-  | { kind: "view"; n: number }
-  | { kind: "details"; n: number }
-  | { kind: "next" }
-  | { kind: "notes" }
-  | { kind: "refresh" }
-  | { kind: "help" }
-  | { kind: "quit" }
-  | { kind: "invalid"; message: string };
-
-export type CockpitStep =
-  | { kind: "verb"; argv: string[] }
-  | { kind: "go"; item: InboxEntry }
-  | { kind: "workspace"; item: InboxEntry }
-  | { kind: "message"; text: string }
-  | { kind: "output"; text: string }
-  | { kind: "notes" }
-  | { kind: "refresh" }
-  | { kind: "quit" };
-
-export const COCKPIT_HELP =
-  "<n> go to the item's agent · w <n> its workspace · a <n> <text> answer · y <n> approve · x <n> <reason> reject · t <n> take · u <n> unstick · v <n> trace · d <n> full text · o open/close notes · n next waiting agent · r refresh · q quit";
-
-/** `?`: every command, one per line. */
-export const HELP_TEXT = [
-  "Commands (<n> is an item number)",
-  "  <n> or g <n>        go to the item's agent pane (or start the agent it waits for, or its workspace)",
-  "  w <n>               go to the item's Herdr workspace",
-  "  a <n> <text>        answer a question",
-  "  y <n>               approve a gate",
-  "  x <n> <reason>      reject a gate",
-  "  u <n>               unstick a stuck unit",
-  "  t <n>               take an unclaimed story",
-  "  v <n>               show the unit's trace",
-  "  d <n>               show the item's full text",
-  "  o                   open or close Notes (numbered only while open)",
-  "  n                   go to the next agent waiting for you",
-  "  r or Enter          refresh",
-  "  q                   quit",
-].join("\n");
-
-/** HC7: how a result line reads — success, refusal, or plain information. */
-export function toneOf(text: string): Tone {
-  if (/^(ok|focused|started)\b/.test(text)) return "ok";
-  if (/^(refused|could not|herdr unreachable|unknown command|no item|no single|no workspace|\[[0-9]+\] is not)/.test(text)) return "error";
-  return "info";
-}
-
-/** HC5: one input line → a command. Empty line = redraw. */
-export function parseCockpitLine(line: string): CockpitCommand {
-  const s = line.trim();
-  if (s === "" || s === "r") return { kind: "refresh" };
-  if (s === "q") return { kind: "quit" };
-  if (s === "?" || s === "h") return { kind: "help" };
-  if (s === "n") return { kind: "next" };
-  if (s === "o") return { kind: "notes" };
-  if (/^[0-9]+$/.test(s)) return { kind: "go", n: Number(s) };
-  const m = /^([a-z])\s+([0-9]+)(?:\s+([\s\S]*))?$/.exec(s);
-  if (!m) return { kind: "invalid", message: `unknown command: ${s} — ? lists the commands` };
-  const [, verb, num, rest = ""] = m;
-  const n = Number(num);
-  const text = rest.trim();
-  switch (verb) {
-    case "g":
-      return { kind: "go", n };
-    case "w":
-      return { kind: "workspace", n };
-    case "a":
-      return text ? { kind: "answer", n, text } : { kind: "invalid", message: "a <n> <text>: the answer is missing" };
-    case "y":
-      return { kind: "approve", n };
-    case "x":
-      return text ? { kind: "reject", n, reason: text } : { kind: "invalid", message: "x <n> <reason>: the reason is missing" };
-    case "t":
-      return { kind: "take", n };
-    case "u":
-      return { kind: "unstick", n };
-    case "v":
-      return { kind: "view", n };
-    case "d":
-      return { kind: "details", n };
-    default:
-      return { kind: "invalid", message: `unknown command: ${verb} — ? lists the commands` };
-  }
-}
-
-const unitOf = (it: InboxEntry) => it.slice ?? it.story;
 
 /**
  * HC10: the Your turn item to go to next — the oldest one with a run (an agent waits there), else,
@@ -126,60 +41,7 @@ export function oldestYourTurn(items: readonly InboxEntry[], agentsOnly = false)
   return oldest(mine.filter((i) => i.reach)) ?? (agentsOnly ? null : oldest(mine));
 }
 
-/** HC5: a command against the current frame → what to do. A command that does not fit its item runs nothing. */
-export function planCockpit(cmd: CockpitCommand, items: readonly InboxEntry[]): CockpitStep {
-  switch (cmd.kind) {
-    case "quit":
-      return { kind: "quit" };
-    case "refresh":
-      return { kind: "refresh" };
-    case "help":
-      return { kind: "output", text: HELP_TEXT };
-    case "invalid":
-      return { kind: "message", text: cmd.message };
-    case "notes":
-      return { kind: "notes" };
-    case "next": {
-      const item = oldestYourTurn(items);
-      return item ? { kind: "go", item } : { kind: "message", text: "nothing waits for you" };
-    }
-    default:
-      break;
-  }
-  const item = items[cmd.n - 1];
-  if (!item) return { kind: "message", text: `no item ${cmd.n} in this frame` };
-  const unit = unitOf(item);
-  const wrong = (what: string) => ({ kind: "message" as const, text: `[${cmd.n}] is not ${what}` });
-  switch (cmd.kind) {
-    case "go":
-      // MO5: a manual start the runner can open itself — run that verb rather than splitting a pane here
-      if (item.group === "your_turn" && !item.reach && item.command.startsWith("norn open ")) return { kind: "verb", argv: ["open", unit] };
-      return { kind: "go", item };
-    case "workspace":
-      return { kind: "workspace", item };
-    case "details":
-      return { kind: "output", text: itemDetails(item) };
-    case "view":
-      return { kind: "verb", argv: ["trace", unit] };
-    case "answer":
-      return item.group === "answer" ? { kind: "verb", argv: ["answer", unit, cmd.text] } : wrong("a question (Answer)");
-    case "approve":
-      return item.group === "approve" ? { kind: "verb", argv: ["approve", unit] } : wrong("a gate (Approve)");
-    case "reject":
-      return item.group === "approve" ? { kind: "verb", argv: ["approve", unit, "--reject", "--reason", cmd.reason] } : wrong("a gate (Approve)");
-    case "take":
-      return item.group === "unclaimed" ? { kind: "verb", argv: ["take", item.story] } : wrong("an unclaimed story");
-    case "unstick":
-      return item.command.startsWith("norn unstick ") ? { kind: "verb", argv: ["unstick", unit] } : wrong("a stuck unit (norn unstick)");
-  }
-}
-
-/** A manual start (B3): no run yet, the item's command starts an agent in the worktree. */
-export function isManualStart(item: InboxEntry): boolean {
-  return item.group === "your_turn" && !item.reach && item.command.includes("norn brief");
-}
-
-/** HC7: one message line for a verb's JSON outcome. */
+/** HC7: one line for a verb's JSON outcome. */
 export function verbMessage(argv: readonly string[], exit: number, value: unknown): string {
   const what = `norn ${argv.slice(0, 2).join(" ")}`;
   if (exit === 0) return `ok: ${what}`;
@@ -187,9 +49,28 @@ export function verbMessage(argv: readonly string[], exit: number, value: unknow
   return `refused: ${what} — ${v?.error ?? `exit ${exit}`}${v?.do_instead ? ` (${v.do_instead})` : ""}`;
 }
 
+/**
+ * CP4 place `agent` (HC6, HC15): focus the agent pane of the run, else the workspace of the run; a
+ * line saying where it went or why not. Several candidates are no candidate (never a guess).
+ */
+export async function placeAgent(cockpit: HerdrCockpit, reach: InboxItem["reach"], unit: string): Promise<string> {
+  const agents = await cockpit.listAgents().catch(() => null);
+  if (agents === null) return "herdr unreachable";
+  const pane = herdr.findAgentPane(agents, reach);
+  if (pane) {
+    await cockpit.focus(pane);
+    return `focused ${pane} (${unit})`;
+  }
+  const workspaces = await cockpit.listWorkspaces().catch(() => []);
+  const ws = herdr.findWorkspace(workspaces, reach);
+  if (!ws) return `no single agent pane or workspace found for ${unit}`;
+  await cockpit.focusWorkspace(ws);
+  return `focused workspace ${ws} (${unit})`;
+}
+
 /** HC12: the label for an item's agent pane; null = none. */
 export function labelFor(item: InboxEntry, ttlMs: number): PaneLabel | null {
-  const title = `${unitOf(item)}${item.step ? ` · ${item.step}` : ""}`;
+  const title = `${item.slice ?? item.story}${item.step ? ` · ${item.step}` : ""}`;
   const all = (text: string) => ({ idle: text, done: text, blocked: text, working: text, unknown: text });
   switch (item.group) {
     case "your_turn":
@@ -217,46 +98,4 @@ export async function labelPanes(cockpit: HerdrCockpit, items: readonly InboxEnt
     await cockpit.label(pane, label).catch(() => null);
   }
   return done.size;
-}
-
-/**
- * HC5/HC6/HC15: go to an item — focus its agent pane, start a manual agent beside the cockpit, focus the
- * workspace of its run, or show its command.
- */
-export async function goTo(cockpit: HerdrCockpit | null, item: InboxEntry, cwd: string): Promise<string> {
-  if (!cockpit) return `$ ${item.command}`;
-  const agents = await cockpit.listAgents().catch(() => null);
-  if (agents === null) return `herdr unreachable — $ ${item.command}`;
-  const pane = herdr.findAgentPane(agents, item.reach);
-  if (pane) {
-    await cockpit.focus(pane);
-    return `focused ${pane} (${unitOf(item)})`;
-  }
-  if (isManualStart(item)) {
-    const opened = await cockpit.openCommand(cwd, item.command, `${unitOf(item)}${item.step ? ` ${item.step}` : ""}`);
-    return `started an agent for ${unitOf(item)} in ${opened.pane_id}`;
-  }
-  if (!item.reach) return `$ ${item.command}`;
-  const workspace = await focusWorkspaceOf(cockpit, item).catch(() => null);
-  return workspace ?? `no single agent pane found for ${unitOf(item)} — $ ${item.command}`;
-}
-
-/** HC15: focus the Herdr workspace of an item's run; null = none found (or several). */
-async function focusWorkspaceOf(cockpit: HerdrCockpit, item: InboxEntry): Promise<string | null> {
-  const id = herdr.findWorkspace(await cockpit.listWorkspaces(), item.reach);
-  if (!id) return null;
-  await cockpit.focusWorkspace(id);
-  return `focused workspace ${id} (${unitOf(item)})`;
-}
-
-/** HC15: `w <n>` — go to the item's workspace, or say why not. */
-export async function goToWorkspace(cockpit: HerdrCockpit | null, item: InboxEntry): Promise<string> {
-  if (!cockpit) return `$ ${item.command}`;
-  if (!item.reach) return `no workspace known for ${unitOf(item)}: it has no run — $ ${item.command}`;
-  const listed = await cockpit.listWorkspaces().catch(() => null);
-  if (listed === null) return `herdr unreachable — $ ${item.command}`;
-  const id = herdr.findWorkspace(listed, item.reach);
-  if (!id) return `no single workspace found for ${unitOf(item)} — $ ${item.command}`;
-  await cockpit.focusWorkspace(id);
-  return `focused workspace ${id} (${unitOf(item)})`;
 }
