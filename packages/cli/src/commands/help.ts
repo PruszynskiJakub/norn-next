@@ -28,7 +28,7 @@ export type SkillFor = "protocol" | "step" | "attended" | "reference";
 /** Skill groups in print order; a skill missing here lands in "Other skills" (a step skill). */
 export const SKILL_GROUPS: ReadonlyArray<{ title: string; for: SkillFor; skills: readonly string[] }> = [
   { title: "the protocol, loaded first in every step", for: "protocol", skills: ["norn"] },
-  { title: "step skills, the agent works alone", for: "step", skills: ["norn-implement", "norn-review", "norn-qa", "norn-merge", "norn-slice"] },
+  { title: "step skills, the agent works alone", for: "step", skills: ["norn-implement", "norn-review", "norn-qa", "norn-merge", "norn-slice", "norn-pr"] },
   { title: "step skills, a person works with the agent", for: "attended", skills: ["norn-refine", "norn-clarify", "norn-plan", "norn-interview", "norn-qa-person"] },
   { title: "references other skills read, never a step", for: "reference", skills: ["norn-tdd", "norn-codebase-design"] },
 ];

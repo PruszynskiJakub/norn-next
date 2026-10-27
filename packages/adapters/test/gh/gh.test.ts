@@ -57,6 +57,11 @@ describe("gh adapter", () => {
     expect(pr).toMatchObject({ number: 41, state: "open", is_draft: true, head_sha: "c".repeat(40), draft: true, head: "gh-15-fix-crash-on-save", base: "main", merged_at: null });
   });
 
+  test("editPullRequestBody replaces the body (GR9)", async () => {
+    await gh.editPullRequestBody(41, "## Summary\n\nSaves no longer crash.\n\nCloses #15");
+    expect(await gh.editPullRequestBody(42, "x").catch((e) => e.code)).toBe("gh_failed");
+  });
+
   test("failures are typed PortErrors", async () => {
     const missing = createGh({ cwd: "/repo", exec: async () => ({ code: 127, stdout: "", stderr: "ENOENT" }) });
     expect(await missing.whoami().catch((e) => e.code)).toBe("gh_missing");
