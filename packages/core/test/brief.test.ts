@@ -51,6 +51,24 @@ describe("renderBrief (B3)", () => {
     expect(b.markdown).toMatchSnapshot();
   });
 
+  test("the step's description and instructions follow the skill under Your work, instructions trimmed", () => {
+    const wf = structuredClone(SLICE_WF);
+    Object.assign(wf.steps.implement as object, {
+      description: "Build the slice test-first.",
+      instructions: "Base mode: merge the base commit named in Rework; never rebase.\n",
+    });
+    const b = renderBrief(input(stateFor(SLICE, wf), [], { workflow: wf }));
+    expect(b.json.work).toEqual({
+      skill: "implement",
+      description: "Build the slice test-first.",
+      instructions: "Base mode: merge the base commit named in Rework; never rebase.\n",
+    });
+    expect(b.markdown).toContain(
+      "## Your work\n\nUse the `implement` skill.\n\nBuild the slice test-first.\n\nBase mode: merge the base commit named in Rework; never rebase.\n\n## Inputs",
+    );
+    expect(b.markdown).toMatchSnapshot();
+  });
+
   test("rework after a failing check shows the output tail and log", () => {
     const { st, rs } = history(stateFor(SLICE, SLICE_WF), SLICE_WF, started, done("done"), (s) =>
       receipt(s, "check", { outcome: "fail", command: "bun test", exit_code: 1, duration_ms: 900, output_tail: "✓ a\n✗ login rejects empty password\n  expected 400, got 200", log: `logs/${RUN}.log` }, "norn"),
