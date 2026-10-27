@@ -52,7 +52,7 @@ describe("norn orient", () => {
     const h = fakeHerdr();
     const opened = await runCli(["orient", "gh-5", "--open", "--json"], { ...c.deps, herdr: h.cockpit });
     expect(opened.value).toMatchObject({ story: "gh-5", opened: true, created: true, workspace_id: "w9" });
-    expect(h.calls).toEqual([`open workspace ${wt()} gh-5 orient focus NORN_ORIENT=1 claude --permission-mode auto -- 'Run \`norn orient gh-5\` and follow it.'`]);
+    expect(h.calls).toEqual([expect.stringMatching(new RegExp(`^open workspace ${wt()} gh-5 orient focus ${c.home}/launch/[0-9a-f]{16}\\.sh env NORN_ORIENT=1 claude --permission-mode auto -- 'Run \`norn orient gh-5\` and follow it\\.'$`))]);
 
     const again = fakeHerdr([], [{ workspace_id: "w4", label: "gh-5 orient", pane_ids: ["w4:p1"], cwds: [wt()] }]);
     const focused = await runCli(["orient", "gh-5", "--open", "--json"], { ...c.deps, herdr: again.cockpit });
