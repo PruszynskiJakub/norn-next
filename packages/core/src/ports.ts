@@ -296,7 +296,7 @@ export interface RemotePullRequest {
   head?: string;
   /**
    * @deprecated older name of `base_branch`; no adapter writes it any more, but a PR cached
-   * (`pr.json`) by an older norn may carry only this. Read through `prBaseBranch`; dropped in 0.12.0.
+   * (`pr.json`) by an older norn may carry only this. Read through `prBaseBranch`; dropped in 0.11.0.
    */
   base?: string;
   /** BS11: the branch the PR targets (merges into); GR6 cleanup only when it is the story's base branch */

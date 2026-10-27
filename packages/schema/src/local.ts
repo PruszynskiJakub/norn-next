@@ -136,7 +136,7 @@ export const PullRequestEntry = Type.Object({
   merged_by: Type.Optional(Type.String()),
   merged_at: Type.Optional(Nullable(Type.String())),
   head: Type.Optional(Type.String()),
-  /** older name of `base_branch`, read from a cache an older norn wrote; nothing writes it (dropped in 0.12.0) */
+  /** older name of `base_branch`, read from a cache an older norn wrote; nothing writes it (dropped in 0.11.0) */
   base: Type.Optional(Type.String()),
   base_branch: Type.Optional(Type.String()),
 });

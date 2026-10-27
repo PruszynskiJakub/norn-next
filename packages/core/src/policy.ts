@@ -22,7 +22,7 @@ export function storyFinished(story: StoryFacts): boolean {
   return storyUnit(story)?.state?.status === "done";
 }
 
-/** BS11: the PR's target branch, when the remote said (`base_branch`; `base` in a `pr.json` an older norn cached, read until 0.12.0). */
+/** BS11: the PR's target branch, when the remote said (`base_branch`; `base` in a `pr.json` an older norn cached, read until 0.11.0). */
 export const prBaseBranch = (pr: StoryFacts["pr"]): string | null => pr?.base_branch ?? pr?.base ?? null;
 
 /**
