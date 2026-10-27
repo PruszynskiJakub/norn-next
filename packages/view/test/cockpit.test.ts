@@ -96,7 +96,8 @@ describe("cockpitModel", () => {
   test("rows: what needs you in O1 order, then every story; running, notes and unclaimed are no rows", () => {
     const m = cockpitModel(view(), { places: true, provider: "gh" });
     expect(m.rows.map((r) => r.id)).toEqual(["your_turn:gh-1", "attended:gh-2", "answer:gh-3", "approve:gh-4", "unblock:gh-5", "check:gh-4", "story:gh-1", "story:gh-2", "story:gh-3", "story:gh-4", "story:gh-5", "story:gh-6"]);
-    expect(m.header).toEqual({ repo: "/repo", pending: 7, heartbeat: view().heartbeat });
+    // the header counts the needs-you rows (6), not the inbox's pending items (7: unclaimed gh-6 too)
+    expect(m.header).toEqual({ repo: "/repo", pending: 6, heartbeat: view().heartbeat });
     // stable: a rebuild gives the same ids
     expect(cockpitModel(view(), { places: true, provider: "gh" }).rows.map((r) => r.id)).toEqual(m.rows.map((r) => r.id));
   });

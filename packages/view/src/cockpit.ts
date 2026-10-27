@@ -48,6 +48,7 @@ export interface CockpitRow {
 
 export interface CockpitModel {
   at: string;
+  /** `pending`: how many rows the needs-you section holds */
   header: { repo: string; pending: number; heartbeat: HeartbeatView };
   rows: CockpitRow[];
 }
@@ -144,7 +145,8 @@ export function cockpitModel(view: ProjectView, o: CockpitOptions): CockpitModel
     preview: { report: report(s.key), item: null },
     actions: storyActions(s, s.key, o, true),
   }));
-  return { at: view.at, header: { repo: view.repo, pending: view.inbox.pending, heartbeat: view.heartbeat }, rows: [...items, ...storyRows] };
+  // the header counts the rows that need you, so it matches what is listed under them
+  return { at: view.at, header: { repo: view.repo, pending: items.length, heartbeat: view.heartbeat }, rows: [...items, ...storyRows] };
 }
 
 /** Fill `{input}` in a verb's argv. */
