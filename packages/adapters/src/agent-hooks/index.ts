@@ -7,13 +7,13 @@
  */
 import { readFile } from "node:fs/promises";
 import type { HookFact, HookEventKind } from "@norn/schema";
-import { SLICE_KEY_PATTERN, STORY_KEY_PATTERN, ULID_PATTERN, validateHookFact } from "@norn/schema";
+import { SLICE_KEY_PATTERN, STORY_KEY_PATTERN, ULID_PATTERN, validate } from "@norn/schema";
 import type { AgentLaunchRequest } from "@norn/core";
 import { atomicWrite, readText } from "@norn/store";
 import { portError } from "../exec.ts";
 
 /** A1: every norn-installed hook command ends with this shell comment; it is the ownership marker. */
-export const NORN_HOOK_MARKER = "# norn-owned";
+const NORN_HOOK_MARKER = "# norn-owned";
 
 // ------------------------------------------------------------------ files
 
@@ -57,7 +57,7 @@ export interface HookSpec {
 }
 
 /** `<hookCommand> <arg> --agent <agent> # norn-owned`; agent names are `[a-z][a-z0-9_-]*` (config schema), shell-safe. */
-export const hookCommandFor = (hookCommand: string, arg: string, agent: string) => `${hookCommand} ${arg} --agent ${agent} ${NORN_HOOK_MARKER}`;
+const hookCommandFor = (hookCommand: string, arg: string, agent: string) => `${hookCommand} ${arg} --agent ${agent} ${NORN_HOOK_MARKER}`;
 
 const isNornHook = (h: unknown) => isObject(h) && typeof h.command === "string" && h.command.endsWith(NORN_HOOK_MARKER);
 
@@ -175,7 +175,7 @@ export function buildFact(
     message: parts.message,
   };
   for (const [k, v] of Object.entries(opt)) if (v !== undefined) fact[k] = v;
-  const r = validateHookFact(fact);
+  const r = validate("hook", fact);
   return r.ok ? r.value : null;
 }
 

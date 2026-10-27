@@ -123,19 +123,6 @@ export function assertValid<N extends SchemaName>(name: N, value: unknown): Sche
   return r.value;
 }
 
-export const validateWorkflow = (v: unknown) => validate("workflow", v);
-export const validateStoryFrontmatter = (v: unknown) => validate("story", v);
-export const validateSliceFrontmatter = (v: unknown) => validate("slice", v);
-export const validateState = (v: unknown) => validate("state", v);
-export const validateReceipt = (v: unknown) => validate("receipt", v);
-export const validateTraceEvent = (v: unknown) => validate("trace", v);
-export const validateHookFact = (v: unknown) => validate("hook", v);
-export const validateClaim = (v: unknown) => validate("claim", v);
-export const validateLease = (v: unknown) => validate("lease", v);
-export const validateConfigLayer = (v: unknown) => validate("config", v);
-export const validateCliError = (v: unknown) => validate("cli-error", v);
-export const validateCriteriaReport = (v: unknown) => validate("criteria-report", v);
-
 /** Plain JSON Schema object (TypeBox symbols dropped) for publishing. */
 export function toJsonSchema(name: SchemaName): Record<string, unknown> {
   return {

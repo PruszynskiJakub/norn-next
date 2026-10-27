@@ -10,7 +10,7 @@ import { iso } from "../time.ts";
 import { type Inbox, INBOX_GROUPS } from "./items.ts";
 
 /** Groups whose items are tracked in the inbox history: the ones needing a person, and notes (NT2). */
-export const HISTORY_GROUPS: readonly InboxGroup[] = INBOX_GROUPS.filter((g) => g !== "running" && g !== "recently_done");
+const HISTORY_GROUPS: readonly InboxGroup[] = INBOX_GROUPS.filter((g) => g !== "running" && g !== "recently_done");
 
 /** What resolved an item: the last receipt applied to its unit this tick, else the rule that acted on it. */
 function resolvedBy(item: InboxItem, facts: Facts, decisions: readonly Decision[], nowIso: string): { by: string; at: string } {

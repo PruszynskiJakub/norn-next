@@ -69,7 +69,7 @@ export async function placeAgent(cockpit: HerdrCockpit, reach: InboxItem["reach"
 }
 
 /** HC12: the label for an item's agent pane; null = none. */
-export function labelFor(item: InboxEntry, ttlMs: number): PaneLabel | null {
+function labelFor(item: InboxEntry, ttlMs: number): PaneLabel | null {
   const title = `${item.slice ?? item.story}${item.step ? ` · ${item.step}` : ""}`;
   const all = (text: string) => ({ idle: text, done: text, blocked: text, working: text, unknown: text });
   switch (item.group) {

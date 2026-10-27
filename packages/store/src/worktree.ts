@@ -11,7 +11,7 @@ import { git } from "./git.ts";
 import { envNornPath, unitMarkerPath } from "./paths.ts";
 
 /** Worktree files norn writes per machine; never committed. */
-export const WORKTREE_LOCAL_FILES = [".env.norn", ".norn-unit"] as const;
+const WORKTREE_LOCAL_FILES = [".env.norn", ".norn-unit"] as const;
 
 /**
  * `.env.norn` and `.norn-unit` are machine-local: add them to the repo's shared `info/exclude`
@@ -53,7 +53,7 @@ export function writeEnvNorn(worktree: string, env: Record<string, string>): voi
   atomicWrite(envNornPath(worktree), `${lines.join("\n")}\n`);
 }
 
-export function parseEnvText(text: string): Record<string, string> {
+function parseEnvText(text: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const line of text.split("\n")) {
     const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);

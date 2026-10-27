@@ -22,7 +22,7 @@ export interface GitOptions {
 const ZERO_OID = /^0+$/;
 
 /** Parse `Key: value` trailer lines (S4). */
-export function parseTrailers(text: string): Record<string, string> {
+function parseTrailers(text: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const line of text.split("\n")) {
     const m = /^([A-Za-z0-9-]+):\s*(.*)$/.exec(line.trim());

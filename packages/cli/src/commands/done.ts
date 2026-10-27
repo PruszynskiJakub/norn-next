@@ -9,8 +9,8 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { checkReport, cursorStep, enteringReceipt, reportableOutcomes, unverifiedNeeds, verdictCounts } from "@norn/core";
-import { type AgentStep, type CriterionVerdict, type Finding, type Note, type ReceiptOf, ulid, validate } from "@norn/schema";
-import { appendTrace, ensureEvidenceDir } from "@norn/store";
+import { type AgentStep, type CriterionVerdict, type Finding, type Note, type ReceiptOf, validate } from "@norn/schema";
+import { appendTrace, ensureEvidenceDir, traceEvent } from "@norn/store";
 import { defineCommand, type ParsedArgs, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, usageError } from "../output.ts";
@@ -58,7 +58,7 @@ export function parseFindings(text: string, file: string): Finding[] {
 const abs = (ctx: Context, p: string) => (isAbsolute(p) ? p : resolve(ctx.cwd, p));
 
 /** QV2: read and validate a `--criteria` file (a JSON array, CriteriaReport). */
-export function parseCriteria(text: string, file: string): CriterionVerdict[] {
+function parseCriteria(text: string, file: string): CriterionVerdict[] {
   const how = "write the report as a JSON array: [{\"id\": \"AC1\", \"verdict\": \"pass\", \"evidence\": \"…\"}, …] — pass needs evidence, fail repro, person how, unverified reason and how — then report again";
   let raw: unknown;
   try {
@@ -72,7 +72,7 @@ export function parseCriteria(text: string, file: string): CriterionVerdict[] {
 }
 
 /** NT1: `--note` values in order; each `--note-criterion` belongs to the `--note` before it. */
-export function parseNotes(args: ParsedArgs): Note[] {
+function parseNotes(args: ParsedArgs): Note[] {
   const notes: Note[] = [];
   for (const o of args.order ?? []) {
     if (o.name === "note") {
@@ -200,20 +200,21 @@ export const doneCommand = defineCommand({
     appendProgress(t.s.runsDir, `${t.s.state.step}#${t.s.state.attempt} ${outcome}: ${handoff}`);
     // QV4/QV8: the report counted in the trace — unverified per capability, unchecked coverage
     if (report)
-      appendTrace(t.s.root, {
-        type: "criteria",
-        id: ulid(ctx.clock.now()),
-        at: receipt.at,
-        unit: t.s.unit.key,
-        run_id: t.run_id,
-        step: receipt.step,
-        attempt: receipt.attempt,
-        receipt_id: receipt.receipt_id,
-        outcome,
-        rule: verdicts.coverage === "checked" ? "criteria.checked" : "criteria.unchecked_coverage",
-        verdicts: verdictCounts(report),
-        unverified_needs: unverifiedNeeds(report, declared),
-      });
+      appendTrace(
+        t.s.root,
+        traceEvent("criteria", ctx.clock.now(), {
+          at: receipt.at,
+          unit: t.s.unit.key,
+          run_id: t.run_id,
+          step: receipt.step,
+          attempt: receipt.attempt,
+          receipt_id: receipt.receipt_id,
+          outcome,
+          rule: verdicts.coverage === "checked" ? "criteria.checked" : "criteria.unchecked_coverage",
+          verdicts: verdictCounts(report),
+          unverified_needs: unverifiedNeeds(report, declared),
+        }),
+      );
     const plural = (n: number, what: string) => `${n} ${what}${n === 1 ? "" : "s"}`;
     const parts = [
       findings ? plural(findings.length, "finding") : "",

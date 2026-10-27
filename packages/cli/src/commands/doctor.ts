@@ -178,7 +178,7 @@ export function pluginLinkHint(assets: string): string {
 }
 
 /** HC11: the plugin's GitHub source for `herdr plugin install`. */
-export const HERDR_PLUGIN_SOURCE = "PruszynskiJakub/norn-next/plugins/herdr";
+const HERDR_PLUGIN_SOURCE = "PruszynskiJakub/norn-next/plugins/herdr";
 
 /** HC11: whether norn's Herdr plugin is linked; a hint when it is not (never an error). */
 async function cockpitPlugin(ctx: Context): Promise<Record<string, unknown>> {
@@ -197,7 +197,7 @@ interface Check {
 }
 
 /** `norn doctor`: one line per check, then what failed and what to do. */
-export function formatDoctor(r: {
+function formatDoctor(r: {
   ok: boolean;
   machine: { holder: string };
   git: Check & { version: string | null };

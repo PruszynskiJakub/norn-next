@@ -6,9 +6,9 @@
  * write replaces the file, so a bad cache heals itself.
  */
 import { relative } from "node:path";
-import { type LocalSchemaName, type SchemaError, type SchemaType, ulid, validate } from "@norn/schema";
+import { type LocalSchemaName, type SchemaError, type SchemaType, validate } from "@norn/schema";
 import { readText } from "./fsx.ts";
-import { appendTrace } from "./trace.ts";
+import { appendTrace, traceEvent } from "./trace.ts";
 
 export type LocalParse<N extends LocalSchemaName> =
   | { ok: true; value: SchemaType<N> }
@@ -34,8 +34,7 @@ function traceBad(root: string, path: string, name: LocalSchemaName, reason: "un
   if (traced.has(key)) return;
   traced.add(key);
   try {
-    const now = Date.now();
-    appendTrace(root, { type: "local_file", id: ulid(now), at: new Date(now).toISOString(), file: relative(root, path) || path, schema: name, reason, errors });
+    appendTrace(root, traceEvent("local_file", Date.now(), { file: relative(root, path) || path, schema: name, reason, errors }));
   } catch {
     // diagnostic only: a read never fails because its trace line could not be written
   }

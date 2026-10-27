@@ -24,7 +24,7 @@ export function heldHere(obs: Observed, story: StoryFacts): boolean {
 }
 
 /** Commit edits to each unit's handoff.md (agents and people write Goal/Progress/Resume, S9) before a handoff point. */
-export async function commitHandoffs(obs: Observed, story: StoryFacts): Promise<string[]> {
+async function commitHandoffs(obs: Observed, story: StoryFacts): Promise<string[]> {
   const out: string[] = [];
   for (const u of story.units) {
     const ul = obs.units[u.unit.key];

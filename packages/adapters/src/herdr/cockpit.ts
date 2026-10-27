@@ -115,7 +115,7 @@ export function herdrSocketPath(env: Record<string, string | undefined>, session
 }
 
 /** The real socket call: one connection per request, closed after the first reply line. */
-export function unixSocketCall(path: string, timeoutMs = 5_000): HerdrSocketCall {
+function unixSocketCall(path: string, timeoutMs = 5_000): HerdrSocketCall {
   return (request) =>
     new Promise((resolve, reject) => {
       let buf = "";
@@ -152,9 +152,9 @@ export function unixSocketCall(path: string, timeoutMs = 5_000): HerdrSocketCall
 }
 
 /** Metadata source id norn's labels are written under (HC12). */
-export const LABEL_SOURCE = "norn";
+const LABEL_SOURCE = "norn";
 /** Id of norn's Herdr plugin (`plugins/herdr/herdr-plugin.toml`, HC9). */
-export const PLUGIN_ID = "norn";
+const PLUGIN_ID = "norn";
 
 interface ListedAgent {
   pane_id?: string;

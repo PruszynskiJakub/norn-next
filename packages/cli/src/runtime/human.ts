@@ -92,7 +92,7 @@ function localTarget(obs: Observed, story: StoryFacts, uf: UnitFacts): Target {
  * The unit's cursor from the pushed branches (T7: the holder pushes at step boundaries):
  * a slice reads its slice branch first, then the story branch; the story unit its story branch.
  */
-export async function remoteTarget(ctx: Context, key: string): Promise<Target | null> {
+async function remoteTarget(ctx: Context, key: string): Promise<Target | null> {
   const remote = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
   if (!remote) return null;
   const root = ctx.root;
@@ -132,7 +132,7 @@ export async function remoteTarget(ctx: Context, key: string): Promise<Target | 
 }
 
 /** Observe this checkout without touching the network. */
-export function observeLocal(ctx: Context): Promise<Observed> {
+function observeLocal(ctx: Context): Promise<Observed> {
   return observe(ctx, { tick_id: ulid(ctx.clock.now()), sync: "never" });
 }
 

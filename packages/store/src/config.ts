@@ -12,7 +12,7 @@ import { nornHome, repoConfigPath, userConfigPath, workflowsDir } from "./paths.
 import { type PinnedWorkflow, parseWorkflowText, sha256 } from "./unit.ts";
 
 /** Read one config layer; a missing file is an empty layer. */
-export function readConfigLayer(path: string, root?: string): ReadResult<ConfigLayer> {
+function readConfigLayer(path: string, root?: string): ReadResult<ConfigLayer> {
   const raw = readText(path);
   if (raw === null) return { ok: true, value: {}, raw: "" };
   let value: unknown;
@@ -59,7 +59,7 @@ export interface WorkflowListing {
 }
 
 /** Workflow files in `.agents/norn/workflows/`, name → absolute path (first by extension order). */
-export function listWorkflowFiles(root: string): Array<{ name: string; file: string }> {
+function listWorkflowFiles(root: string): Array<{ name: string; file: string }> {
   let names: string[];
   try {
     names = readdirSync(workflowsDir(root));

@@ -171,7 +171,7 @@ export function loadStory(root: string, specPath: string, opts: { includeApplied
 }
 
 /** Every story under `<root>/.agents/specs/` (only `only`'s spec folder when given). */
-export function loadStories(root: string, opts: { includeApplied?: boolean; only?: string } = {}): StorySnapshot[] {
+function loadStories(root: string, opts: { includeApplied?: boolean; only?: string } = {}): StorySnapshot[] {
   const out: StorySnapshot[] = [];
   for (const d of dirs(specsDir(root))) {
     if (opts.only !== undefined && parseSpecDirName(d)?.story !== opts.only) continue;

@@ -74,7 +74,7 @@ export async function gitOk(cwd: string, args: string[], input?: string): Promis
   return r.stdout;
 }
 
-export const ZERO_SHA = "0000000000000000000000000000000000000000";
+const ZERO_SHA = "0000000000000000000000000000000000000000";
 
 export async function writeBlob(cwd: string, content: string): Promise<string> {
   return (await gitOk(cwd, ["hash-object", "-w", "--stdin"], content)).trim();

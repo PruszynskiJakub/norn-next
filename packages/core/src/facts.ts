@@ -357,12 +357,3 @@ export interface Facts {
   orphans: { worktrees: string[]; branches: string[] };
 }
 
-/**
- * Pure decide signature (H3). Pinned unit workflows are inside Facts; `workflows` are the
- * repo workflows (for starting units, S7), recorded with the facts so `why` can replay (O5).
- */
-export type DecideFn = (
-  facts: Facts,
-  workflows: import("./decide/index.ts").RepoWorkflows,
-  config: ResolvedConfig,
-) => import("./actions.ts").Decision[];

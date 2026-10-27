@@ -295,6 +295,8 @@ export const RECEIPT_KINDS = [
   "take",
   "update",
 ] as const satisfies readonly ReceiptKind[];
+// RECEIPT_KINDS lists every kind: a kind added to `Receipt` but not here fails typecheck.
+const _allReceiptKinds: [Exclude<ReceiptKind, (typeof RECEIPT_KINDS)[number]>] extends [never] ? true : never = true;
 
 /** Receipts a non-holder may push through the mailbox (T9). */
 export const MAILBOX_KINDS = ["answer", "approve", "reject", "unstick"] as const satisfies readonly ReceiptKind[];

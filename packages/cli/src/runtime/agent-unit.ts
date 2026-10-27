@@ -23,10 +23,10 @@ export interface UnitSession extends AgentUnit {
   runsDir: string;
 }
 
-export const unitRefOf = (m: UnitMarker): UnitRef => ({ story: m.story, slice: m.slice, dir: m.unit, key: m.slice ?? m.story });
+const unitRefOf = (m: UnitMarker): UnitRef => ({ story: m.story, slice: m.slice, dir: m.unit, key: m.slice ?? m.story });
 
 /** A3: the verbs work only inside a unit worktree. */
-export function requireWorktree(ctx: Context, verb: string): { worktree: string; marker: UnitMarker } {
+function requireWorktree(ctx: Context, verb: string): { worktree: string; marker: UnitMarker } {
   if (ctx.worktree && ctx.unit) return { worktree: ctx.worktree, marker: ctx.unit };
   const found = findUnitMarker(safeRealpath(ctx.cwd));
   if (found) return found;

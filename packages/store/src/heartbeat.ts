@@ -24,7 +24,7 @@ export function readHeartbeatFile(root: string): HeartbeatFile {
   return readLocalJson("local-heartbeat", heartbeatFilePath(root), {}, root);
 }
 
-export function writeHeartbeatFile(root: string, hb: HeartbeatFile): void {
+function writeHeartbeatFile(root: string, hb: HeartbeatFile): void {
   atomicWriteJson(heartbeatFilePath(root), hb);
 }
 

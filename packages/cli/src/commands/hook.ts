@@ -72,7 +72,7 @@ function pickAdapter(ctx: Context, root: string, config: ResolvedConfig, flag: s
  * `AfterAgent`). A turn end derived from another event (Claude's `Notification` idle_prompt)
  * cannot be refused, so it is never traced `blocked` nor counted toward MAX_STOP_BLOCKS.
  */
-export const refusableTurnEnd = (adapter: AgentAdapter, fact: HookFact): boolean =>
+const refusableTurnEnd = (adapter: AgentAdapter, fact: HookFact): boolean =>
   adapter.tier === "blocking" && fact.event === "turn_end" && fact.agent === adapter.name && Object.hasOwn(adapter.hookEvents, fact.native) && adapter.hookEvents[fact.native] === "turn_end";
 
 /** A4 / MO4: block turn end only in an unattended agent step whose live run has not reported. */

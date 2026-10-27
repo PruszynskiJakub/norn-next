@@ -6,9 +6,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName } from "@norn/schema";
 
-export const NORN_DIR = ".agents/norn";
+const NORN_DIR = ".agents/norn";
 
-export const nornDir = (root: string) => join(root, NORN_DIR);
 export const repoConfigPath = (root: string) => join(root, NORN_DIR, "config.yaml");
 export const workflowsDir = (root: string) => join(root, NORN_DIR, "workflows");
 export const traceDir = (root: string) => join(root, NORN_DIR, "trace");
@@ -42,7 +41,6 @@ export const storyUnitDir = (specDir: string) => unitDir(specDir, STORY_UNIT_DIR
 export const statePath = (ud: string) => join(ud, "state.json");
 export const pinnedWorkflowPath = (ud: string) => join(ud, "workflow.yaml");
 export const receiptsDir = (ud: string) => join(ud, "receipts");
-export const logsDir = (ud: string) => join(ud, "logs");
 export const logPath = (ud: string, runId: string) => join(ud, "logs", `${runId}.log`);
 export const evidenceDir = (ud: string, runId: string) => join(ud, "evidence", runId);
 export const handoffPath = (ud: string) => join(ud, "handoff.md");

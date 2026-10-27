@@ -6,7 +6,6 @@ import {
   assertValid,
   SchemaValidationError,
   validate,
-  validateReceipt,
 } from "../src/index.ts";
 
 const ID = "01JBQ6ZK3E8Y4V5W6X7Y8Z9ABC";
@@ -72,7 +71,7 @@ const receipts: Record<(typeof RECEIPT_KINDS)[number], Receipt> = {
 
 describe("receipt schema", () => {
   test.each(Object.entries(receipts))("valid %s receipt", (_k, r) => {
-    const res = validateReceipt(r);
+    const res = validate("receipt", r);
     if (!res.ok) console.error(res.errors);
     expect(res.ok).toBe(true);
   });
@@ -94,7 +93,7 @@ describe("receipt schema", () => {
     ["finding with bad severity", { ...receipts.done, findings: [{ severity: "huge", title: "x" }] }],
     ["unknown actor", { ...receipts.stuck, by: "robot" }],
   ])("rejects %s", (_name, r) => {
-    expect(validateReceipt(r).ok).toBe(false);
+    expect(validate("receipt", r).ok).toBe(false);
   });
 });
 
