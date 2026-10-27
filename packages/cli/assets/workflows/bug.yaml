@@ -13,7 +13,7 @@ steps:
     instructions: >-
       First follow the report as a user, through the real interface (the UI, the command, the request),
       and record what you saw. Then build a loop that goes red on that exact symptom, minimise it and
-      confirm the cause. Do not fix anything. In the handoff, give the loop command, the minimised repro,
+      confirm the cause. Do not fix anything. Under Progress in the handoff (the next agent does not see your Resume), give the loop command, the minimised repro,
       the confirmed cause (or the ranked hypotheses left) and the seam for a regression test; attach the
       user-side evidence and the loop's red output.
     outcomes:
