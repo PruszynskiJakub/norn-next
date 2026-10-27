@@ -52,8 +52,14 @@ export function requireWorktree(ctx: Context, verb: string): { worktree: string;
   );
 }
 
+/** Set in the environment of an orient agent (`norn orient --open`): its hooks are not facts of any run. */
+export const ORIENT_ENV = "NORN_ORIENT";
+
 /** Load the unit of the current worktree; refuses when not started, corrupt (S2) or workflow missing. */
 export function loadUnitSession(ctx: Context, verb: string, at?: { worktree: string; marker: UnitMarker }): UnitSession {
+  // orient: the agent beside a person is no run of the unit, so it cannot start or report one
+  if (ctx.env[ORIENT_ENV] === "1" && verb !== "hook")
+    throw refuse(`norn ${verb} is not for an orient session: it is no run of the unit`, "tell the person what you found; they run the step's agent with `norn open` or the cockpit", "orient_session");
   const { worktree, marker } = at ?? requireWorktree(ctx, verb);
   const unit = unitRefOf(marker);
   const specPath = join(worktree, marker.spec_dir);

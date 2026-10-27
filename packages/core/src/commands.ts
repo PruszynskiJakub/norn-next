@@ -19,10 +19,11 @@ export const sliceWorktreePath = (storyWorktree: string, nn: string, slug: strin
 /**
  * Command that starts an agent in a worktree for a person (manual mode, attended steps), with the
  * agent's configured args. B3: `--` ends them, so a variadic flag cannot swallow the prompt.
+ * `prompt` is the first prompt (default: start the step).
  */
-export function startAgentCommand(worktree: string | null, agentCommand: string, args: string[] = []): string {
+export function startAgentCommand(worktree: string | null, agentCommand: string, args: string[] = [], prompt = "Use the norn skill, then run `norn brief`."): string {
   const opts = args.length ? `${args.map(q).join(" ")} -- ` : "";
-  const run = `${agentCommand} ${opts}${q("Use the norn skill, then run `norn brief`.")}`;
+  const run = `${agentCommand} ${opts}${q(prompt)}`;
   return worktree ? `cd ${q(worktree)} && ${run}` : run;
 }
 

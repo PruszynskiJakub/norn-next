@@ -18,9 +18,10 @@ import {
   writeSliceFile,
   writeState,
   writeStoryFile,
+  writePrFacts,
   writeUnitMarker,
 } from "@norn/store";
-import { formatInbox, formatStatus, formatTimeline, loadProjectView, receiptSummary, stepTitle } from "../src/index.ts";
+import { formatInbox, formatOrient, formatStatus, formatTimeline, loadProjectView, orientReport, prCommand, receiptSummary, stepTitle } from "../src/index.ts";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -298,6 +299,55 @@ describe("loadProjectView", () => {
     await loadProjectView({ repoRoot: repo, home, now: NOW, holder: "me@box", env: {} });
     expect(performance.now() - t0).toBeLessThan(1000);
     expect([...tree(repo), ...tree(home)]).toEqual(before);
+  });
+});
+
+describe("orient", () => {
+  /** seed + a done report with notes on slice 02, and the story PR as a sync saw it */
+  async function seedOrient() {
+    const seeded = await seed();
+    const u2 = unitDir(storyDir(seeded.repo, "gh-12", "fix-login"), "02-wire-api");
+    appendReceipt(u2, receipt({ kind: "done", outcome: "done", handoff: "wired", at: ago(70), notes: [{ text: "retries are capped at 3; confirm" }, { text: "renamed fetchUser\nto loadUser", criterion: "AC2" }] }));
+    writePrFacts(seeded.repo, { "gh-12": { pr: { number: 7, url: "https://x/pull/7", state: "open", is_draft: true, head_sha: "" }, observed_at: NOW - 3_600_000 } });
+    return loadProjectView({ repoRoot: seeded.repo, home: seeded.home, now: NOW, holder: "me@box", liveness: () => true, env: {} });
+  }
+
+  test("StoryView carries the branch, the PR last seen and the open notes", async () => {
+    const v = await seedOrient();
+    const s = v.stories[0];
+    expect(s?.branch).toBe("gh-12-fix-login");
+    expect(s?.pr).toEqual({ number: 7, url: "https://x/pull/7", state: "open", is_draft: true, seen_at: ago(60) });
+    expect(s?.notes.map((n) => [n.unit, n.text])).toEqual([
+      ["gh-12/02", "retries are capped at 3; confirm"],
+      ["gh-12/02", "renamed fetchUser\nto loadUser"],
+    ]);
+  });
+
+  test("orientReport: slices, PR command per provider, waiting items, notes by unit; formatOrient renders it", async () => {
+    const v = await seedOrient();
+    expect(orientReport(v, "gh-99", "gh")).toBeNull();
+    const r = orientReport(v, "gh-12/02", "glab");
+    if (!r) throw new Error("unreachable");
+    expect(r).toMatchObject({ key: "gh-12/02", story: "gh-12", title: "Fix login", claim: "held here", branch: "gh-12-fix-login", pr_command: "glab mr view gh-12-fix-login", note_count: 2 });
+    expect(r.slices.map((s) => [s.key, s.status, s.integrated])).toEqual([
+      ["gh-12/01", "running", false],
+      ["gh-12/02", "done", true],
+      ["gh-12/03", "not_started", false],
+    ]);
+    expect(r.waiting.map((w) => [w.group, w.unit, w.command])).toEqual([["answer", "gh-12", 'norn answer gh-12 "…"']]);
+    expect(r.running.map((w) => w.unit)).toEqual(["gh-12/01"]);
+    expect(r.notes.map((g) => [g.unit, g.notes.length])).toEqual([["gh-12/02", 2]]);
+    expect(r.look).toEqual({ spec: `${r.root}/.agents/specs/gh-12-fix-login`, trace: "norn trace gh-12/02", why: "norn why gh-12/02", status: "norn status gh-12/02" });
+    expect(prCommand("gh", "b", true)).toBe("gh pr view b --web");
+
+    const md = formatOrient(r, NOW);
+    expect(md).toStartWith("# Orient: gh-12 — Fix login\n");
+    expect(md).toContain("> 4. Never edit code, commit, or report an outcome");
+    expect(md).toContain("- gh-12/02 Wire API — done, integrated");
+    expect(md).toContain("- #7 draft, open — https://x/pull/7 (seen 1h ago)");
+    expect(md).toContain("**Answer** gh-12 (implement), 40m: Which OAuth provider?\n  - `norn answer gh-12 \"…\"`");
+    expect(md).toContain("## Open notes (2)");
+    expect(md).toContain("### gh-12/02 (2)\n\n- [implement] retries are capped at 3; confirm\n- [implement · AC2] renamed fetchUser\n  to loadUser\n");
   });
 });
 
