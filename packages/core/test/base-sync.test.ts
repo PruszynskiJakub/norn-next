@@ -325,6 +325,7 @@ describe("base sync replay", () => {
     s.pr = { number: 7, url: "u", state: "merged", is_draft: false, head_sha: SHA("h"), base_branch: "release" };
     const d = s.tick();
     expect(d.rule).toBe("remote.park");
+    expect(d.action).toMatchObject({ kind: "park", commit: { message: "norn: gh-1 stuck (remote: PR merged into release, not main)" } });
     expect(s.state.park).toMatchObject({ kind: "remote", reason: "remote: PR merged into release, not main" });
     expect(mergedIntoBase(s.facts().stories[0] as StoryFacts, "main")).toBe(false);
     expect(mergedIntoBase({ ...(s.facts().stories[0] as StoryFacts), pr: { ...s.pr, base_branch: "main" } }, "main")).toBe(true);
