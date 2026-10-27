@@ -22,7 +22,7 @@ import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { busyError } from "../output.ts";
 import { leaseLiveness } from "../runtime/leases.ts";
-import { type Observed, observe } from "../runtime/observe.ts";
+import { type Observed, observe } from "../runtime/observe/index.ts";
 import { doneHerdrRuns, planHerdrTidy } from "../runtime/tidy-herdr.ts";
 
 /** A reservation lives only while a receipt is being written; older ones are crash leftovers. */

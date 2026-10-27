@@ -8,7 +8,7 @@ import { acquireTickLock } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
 import { busyError, claimHeld, failure, refuse } from "../output.ts";
-import { type Observed, observe } from "../runtime/observe.ts";
+import { type Observed, observe } from "../runtime/observe/index.ts";
 import { heldHere, releaseStory } from "../runtime/release.ts";
 import { storyArg } from "../runtime/args.ts";
 

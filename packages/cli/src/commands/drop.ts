@@ -13,7 +13,7 @@ import type { StoryFacts } from "@norn/core";
 import { acquireClaim, listLeases, newClaimBlob, patchStoryFile, releaseClaim, releaseLease, storyFile } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import { claimHeld, failure, refuse } from "../output.ts";
-import type { Observed } from "../runtime/observe.ts";
+import type { Observed } from "../runtime/observe/index.ts";
 import { heldHere } from "../runtime/release.ts";
 import { withStory } from "./release.ts";
 import { storyArg } from "../runtime/args.ts";

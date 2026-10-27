@@ -29,7 +29,7 @@ import {
 import type { Context } from "../../context.ts";
 import { syncRemoteBranch } from "../integrate.ts";
 import { leaseLiveness } from "../leases.ts";
-import type { Observed, StoryLoc, UnitLoc } from "../observe.ts";
+import type { Observed, StoryLoc, UnitLoc } from "../observe/index.ts";
 
 export class QueueFull extends Error {}
 /** S6: a receipt number another writer (an agent verb, a person) took since observe. */

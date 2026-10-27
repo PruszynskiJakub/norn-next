@@ -9,7 +9,7 @@ import { ulid } from "@norn/schema";
 import { acquireTickLock, releaseClaim, writtenHere } from "@norn/store";
 import type { Context } from "../context.ts";
 import { busyError } from "../output.ts";
-import { type Observed, observe } from "./observe.ts";
+import { type Observed, observe } from "./observe/index.ts";
 
 export interface ReleaseResult {
   story: string;

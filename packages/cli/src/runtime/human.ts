@@ -36,7 +36,7 @@ import {
 import type { Context } from "../context.ts";
 import { claimHeld, failure, refuse, usageError } from "../output.ts";
 import { parseUnitKey } from "./args.ts";
-import { gitRemote, type Observed, observe } from "./observe.ts";
+import { gitRemote, type Observed, observe } from "./observe/index.ts";
 
 // ------------------------------------------------------------------ views (X1)
 
