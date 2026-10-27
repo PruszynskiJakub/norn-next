@@ -2,7 +2,7 @@
  * Scripted `gh` and `glab` CLIs for the RemotePort contract: an in-memory remote answering exactly
  * the commands the adapters run, in each CLI's JSON shapes (as the recorded fixtures in
  * test/gh and test/glab show them). Filters follow the flags the adapter passed, so a dropped
- * `--assignee`/`--label`/`--state` shows up as a contract failure. An unknown command throws.
+ * `--assignee`/`--label`/`--state`/`--draft` shows up as a contract failure. An unknown command throws.
  */
 import type { Exec, ExecResult } from "../../src/git/exec.ts";
 import type { SeedIssue } from "./remote.ts";
@@ -12,6 +12,7 @@ interface Pr {
   head: string;
   base: string;
   title: string;
+  draft: boolean;
 }
 
 const ok = (v: unknown): ExecResult => ({ code: 0, stdout: typeof v === "string" ? v : JSON.stringify(v), stderr: "" });
@@ -43,7 +44,7 @@ export function scriptedGh(login = "octocat"): ScriptedRemote {
     labels: i.labels.map((l) => ({ id: `L_${l}`, name: l, description: "", color: "ededed" })),
     updatedAt: AT,
   });
-  const prJson = (p: Pr) => ({ number: p.number, url: `https://github.com/acme/app/pull/${p.number}`, state: "OPEN", isDraft: true, headRefName: p.head, headRefOid: SHA, baseRefName: p.base, mergedAt: null, mergeCommit: null, mergedBy: null });
+  const prJson = (p: Pr) => ({ number: p.number, url: `https://github.com/acme/app/pull/${p.number}`, state: "OPEN", isDraft: p.draft, headRefName: p.head, headRefOid: SHA, baseRefName: p.base, mergedAt: null, mergeCommit: null, mergedBy: null });
   const exec: Exec = async (argv) => {
     const [bin, a, b] = argv;
     if (bin !== "gh") throw new Error(`scripted gh: not a gh call: ${argv.join(" ")}`);
@@ -64,9 +65,9 @@ export function scriptedGh(login = "octocat"): ScriptedRemote {
       return ok(rows.slice(0, Number(flag(argv, "--limit") ?? 30)).map(prJson));
     }
     if (a === "pr" && b === "create") {
-      const p: Pr = { number: 40 + prs.length, head: flag(argv, "--head")!, base: flag(argv, "--base")!, title: flag(argv, "--title")! };
+      const p: Pr = { number: 40 + prs.length, head: flag(argv, "--head")!, base: flag(argv, "--base")!, title: flag(argv, "--title")!, draft: argv.includes("--draft") };
       prs.push(p);
-      return ok(`Creating draft pull request for ${p.head} into ${p.base}\n\nhttps://github.com/acme/app/pull/${p.number}\n`);
+      return ok(`Creating ${p.draft ? "draft " : ""}pull request for ${p.head} into ${p.base}\n\nhttps://github.com/acme/app/pull/${p.number}\n`);
     }
     if (a === "pr" && b === "view") {
       const p = prs.find((x) => argv[3] === `https://github.com/acme/app/pull/${x.number}`);
@@ -90,7 +91,7 @@ export function scriptedGlab(login = "tanuki"): ScriptedRemote {
     labels: i.labels,
     updated_at: AT,
   });
-  const mrJson = (m: Pr) => ({ iid: m.number, web_url: `https://gitlab.com/acme/app/-/merge_requests/${m.number}`, state: "opened", draft: true, source_branch: m.head, target_branch: m.base, merged_at: null, sha: SHA, merge_commit_sha: null, squash_commit_sha: null, merged_by: null, merge_user: null });
+  const mrJson = (m: Pr) => ({ iid: m.number, web_url: `https://gitlab.com/acme/app/-/merge_requests/${m.number}`, state: "opened", draft: m.draft, source_branch: m.head, target_branch: m.base, merged_at: null, sha: SHA, merge_commit_sha: null, squash_commit_sha: null, merged_by: null, merge_user: null });
   const exec: Exec = async (argv) => {
     const [bin, a, b] = argv;
     if (bin !== "glab") throw new Error(`scripted glab: not a glab call: ${argv.join(" ")}`);
@@ -110,9 +111,9 @@ export function scriptedGlab(login = "tanuki"): ScriptedRemote {
       return ok(mrs.filter((m) => m.head === head).map(mrJson)); // glab's order is not the adapter's to trust
     }
     if (a === "mr" && b === "create") {
-      const m: Pr = { number: 7 + mrs.length, head: flag(argv, "--source-branch")!, base: flag(argv, "--target-branch")!, title: flag(argv, "--title")! };
+      const m: Pr = { number: 7 + mrs.length, head: flag(argv, "--source-branch")!, base: flag(argv, "--target-branch")!, title: flag(argv, "--title")!, draft: argv.includes("--draft") };
       mrs.push(m);
-      return ok(`Creating draft merge request for ${m.head} into ${m.base} in acme/app\n\n!${m.number} ${m.title} (${m.head})\n https://gitlab.com/acme/app/-/merge_requests/${m.number}\n`);
+      return ok(`Creating ${m.draft ? "draft " : ""}merge request for ${m.head} into ${m.base} in acme/app\n\n!${m.number} ${m.title} (${m.head})\n https://gitlab.com/acme/app/-/merge_requests/${m.number}\n`);
     }
     if (a === "mr" && b === "view") {
       const m = mrs.find((x) => x.number === Number(argv[3]));

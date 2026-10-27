@@ -2,7 +2,9 @@
  * GitPort contract (ports.ts), the subset norn's cli, store and view call today: roots and status,
  * revParse, commit with trailers (S4) and its H1 refusal, branches, worktrees, ref CAS (T2/T3),
  * push and its stale result, ancestry and divergence (BS1), merge and merge-tree (BS1/BS3),
- * conflict markers (H1) and fast-forward. Run against real temp repos with a bare remote.
+ * conflict markers (H1), outgoing conflict markers (BS5.2), the base merge commit (BS5), diffStat
+ * and fast-forward. Run against real temp repos with a bare remote. Not covered: rebase, log ranges
+ * beyond the last commit, and the port methods only the runtime's own wiring reaches.
  */
 import { afterAll, describe, expect } from "bun:test";
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
@@ -23,6 +25,9 @@ export type GitContractTest =
   | "ancestry and divergence (BS1)"
   | "merge: clean merges commit, conflicts abort and name the paths; mergeTree agrees (BS1, BS3)"
   | "conflictMarkers finds marker lines (H1)"
+  | "outgoingConflictMarkers names marked files changed by commits not on the remote (BS5.2)"
+  | "baseMergeCommit is the merge that brought base into head, or null (BS5)"
+  | "diffStat summarises the files a range changes"
   | "fastForward moves only when it can";
 
 /** Deterministic git for the suite's own setup and for the port under test. */
@@ -221,6 +226,62 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       ]);
       expect(await git.conflictMarkers(root, { paths: [] })).toEqual([]);
       expect(await git.conflictMarkers(root, { rev: "HEAD" })).toEqual([]);
+    });
+
+    t("outgoingConflictMarkers names marked files changed by commits not on the remote (BS5.2)", async () => {
+      const { root, git } = repo();
+      const marked = "<<<<<<< HEAD\none\n=======\ntwo\n>>>>>>> main\n";
+      // a pushed file with markers is not outgoing
+      commitFile(root, "pushed.txt", marked);
+      sh(root, "push", "-q", "origin", "main");
+      expect(await git.outgoingConflictMarkers(root, "origin", "HEAD")).toEqual([]);
+      // an unpushed commit leaving markers is; a lone `=======` (setext heading) is not a marker
+      const bad = commitFile(root, "b.txt", marked);
+      commitFile(root, "c.md", "Title\n=======\n");
+      expect(await git.outgoingConflictMarkers(root, "origin", "HEAD")).toEqual([{ path: "b.txt", commit: bad }]);
+      // resolved before the push: nothing to report
+      commitFile(root, "b.txt", "resolved\n");
+      expect(await git.outgoingConflictMarkers(root, "origin", "HEAD")).toEqual([]);
+      sh(root, "push", "-q", "origin", "main");
+      expect(await git.outgoingConflictMarkers(root, "origin", "HEAD")).toEqual([]);
+    });
+
+    t("baseMergeCommit is the merge that brought base into head, or null (BS5)", async () => {
+      const { root, git } = repo();
+      sh(root, "checkout", "-q", "-b", "feature");
+      commitFile(root, "b.txt", "b\n");
+      // base not merged into head yet
+      sh(root, "checkout", "-q", "main");
+      commitFile(root, "c.txt", "c\n");
+      expect(await git.baseMergeCommit(root, "main", "feature")).toBeNull();
+      // head merges base in, then moves on and merges base again: the first merge is the one
+      sh(root, "checkout", "-q", "feature");
+      sh(root, "merge", "-q", "--no-ff", "--no-edit", "main");
+      const first = sh(root, "rev-parse", "HEAD");
+      commitFile(root, "d.txt", "d\n");
+      sh(root, "checkout", "-q", "main");
+      commitFile(root, "e.txt", "e\n");
+      const baseTip = sh(root, "rev-parse", "HEAD");
+      sh(root, "checkout", "-q", "feature");
+      sh(root, "merge", "-q", "--no-ff", "--no-edit", "main");
+      expect(await git.baseMergeCommit(root, baseTip, "feature")).toBe(sh(root, "rev-parse", "HEAD"));
+      expect(await git.baseMergeCommit(root, sh(root, "rev-parse", "main~1"), "feature")).toBe(first);
+      // reached without a merge (a fast-forward descendant): null
+      sh(root, "checkout", "-q", "-b", "linear", "main");
+      commitFile(root, "f.txt", "f\n");
+      expect(await git.baseMergeCommit(root, "main", "linear")).toBeNull();
+    });
+
+    t("diffStat summarises the files a range changes", async () => {
+      const { root, git } = repo();
+      const init = sh(root, "rev-parse", "HEAD");
+      commitFile(root, "a.txt", "one\ntwo\n");
+      commitFile(root, "b.txt", "b\n");
+      const stat = await git.diffStat(root, `${init}..HEAD`);
+      expect(stat).toContain("a.txt");
+      expect(stat).toContain("b.txt");
+      expect(stat).toContain("2 files changed");
+      expect((await git.diffStat(root, "HEAD..HEAD")).trim()).toBe("");
     });
 
     t("fastForward moves only when it can", async () => {
