@@ -14,8 +14,7 @@
  * - listPanes   → `herdr pane list`                                   (K7: each pane with its tab, workspace, cwd)
  * - closePane / closeTab / closeWorkspace → `herdr pane|tab|workspace close <id>` (K7; not found = already gone)
  */
-import { portError } from "../process/error.ts";
-import { type Exec, bunExec } from "../process/exec.ts";
+import { type Exec, bunExec, portError } from "../exec.ts";
 
 export interface HerdrAgent {
   pane_id: string;

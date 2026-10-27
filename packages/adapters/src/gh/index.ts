@@ -5,7 +5,7 @@
 import type { RemoteFactory, RemoteIssue, RemotePort, RemotePullRequest } from "@norn/core";
 import { storyKey } from "@norn/schema";
 import { NETWORK_TIMEOUT_MS } from "@norn/store";
-import { bunExec, okOrThrow, parseJson, portError, type Exec } from "../git/exec.ts";
+import { bunExec, okOrThrow, parseJson, portError, type Exec } from "../exec.ts";
 
 export interface GhOptions {
   /** repository checkout to run `gh` in */

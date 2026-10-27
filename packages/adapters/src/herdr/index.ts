@@ -35,8 +35,7 @@
 import type { AdapterContext, LaunchSpec, PaneState, PersonOpenSpec, ProcessPort, RunnerPort, SessionRef } from "@norn/core";
 import type { ProcessIdentity, RunnerConfig } from "@norn/schema";
 import { createProcessPort } from "../process/index.ts";
-import { portError } from "../process/error.ts";
-import { type Exec, bunExec, shellJoin } from "../process/exec.ts";
+import { type Exec, bunExec, portError, shellJoin } from "../exec.ts";
 import { parsePanePrompt } from "./prompt.ts";
 
 export const RUNNER_NAME = "herdr";

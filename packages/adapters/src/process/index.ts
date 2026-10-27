@@ -7,10 +7,9 @@
 import type { AdapterContext, ProcessPort } from "@norn/core";
 import type { ProcessIdentity } from "@norn/schema";
 import { PS_ENV, parseStart, processStart, psStartArgv, selfIdentity } from "@norn/store";
-import { type Exec, unobservedExec } from "./exec.ts";
+import { type Exec, unobservedExec } from "../exec.ts";
 
-export { portError } from "./error.ts";
-export { type Exec, type ExecOptions, type ExecResult, bunExec, shellJoin, shellQuote } from "./exec.ts";
+export { type Exec, type ExecOptions, type ExecResult, bunExec, portError, shellJoin, shellQuote } from "../exec.ts";
 export { parseStart, psStartArgv } from "@norn/store";
 
 /**

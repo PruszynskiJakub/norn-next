@@ -31,7 +31,7 @@ All three must pass before you hand work back; CI (`.github/workflows/ci.yml`) r
 packages/schema    @norn/schema    JSON Schemas (TypeBox) + types + ajv validators, ids, config merge
 packages/core      @norn/core      pure logic: ports (adapter interfaces), Facts, Action, decide, briefing — no IO
 packages/store     @norn/store     .agents/ files, runs/ JSON, claim + mailbox refs, ~/.norn leases
-packages/adapters  @norn/adapters  src/{git,gh,glab,herdr,headless,claude,codex,opencode,gemini,notify}
+packages/adapters  @norn/adapters  src/{git,gh,glab,herdr,headless,claude,codex,opencode,gemini,notify,process} + src/exec.ts (one Exec on spawnBounded, one portError)
 packages/view      @norn/view      read model loadProjectView()
 packages/cli       @norn/cli       wiring + commands; bin `norn` → src/main.ts
 ```

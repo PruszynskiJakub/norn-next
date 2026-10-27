@@ -4,7 +4,7 @@ import type { ProcessIdentity } from "@norn/schema";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createHerdrRunner, herdrFactory, openStatusPane, parsePanePrompt } from "../../src/herdr/index.ts";
-import type { Exec, ExecResult } from "../../src/process/exec.ts";
+import type { Exec, ExecResult } from "../../src/exec.ts";
 import fx from "./fixtures/herdr.json";
 
 const WT = "/repo/.agents/worktrees/gh-1-01";

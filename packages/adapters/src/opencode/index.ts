@@ -9,6 +9,7 @@ import { join } from "node:path";
 import type { AgentAdapter, AgentFactory, AgentLaunchRequest, HookDecision, HookResponse } from "@norn/core";
 import type { HookEventKind, HookFact } from "@norn/schema";
 import { shared } from "../claude/index.ts";
+import { portError } from "../exec.ts";
 
 const { atomicWrite, buildFact, field, isObject, launchEnv, readJsonFile, textOf } = shared;
 const NAME = "opencode";
@@ -130,7 +131,7 @@ export const opencodeAgent: AgentAdapter = {
     const path = pluginPath(repoRoot);
     const existing = readPlugin(repoRoot);
     if (existing !== null && !existing.startsWith(PLUGIN_MARKER)) {
-      throw Object.assign(new Error(`${path} exists and is not norn-owned`), { code: "not_norn_owned", retryable: false });
+      throw portError("not_norn_owned", `${path} exists and is not norn-owned`);
     }
     const src = pluginSource(hookCommand, agent);
     if (existing === src) return { changed: [] };

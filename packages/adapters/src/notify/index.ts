@@ -6,8 +6,7 @@
  */
 import type { AdapterContext, InboxGroup, InboxItem, NotifierPort } from "@norn/core";
 import type { NotifierConfig } from "@norn/schema";
-import { portError } from "../process/error.ts";
-import { type Exec, bunExec } from "../process/exec.ts";
+import { type Exec, bunExec, portError } from "../exec.ts";
 
 export type Fetch = (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<{
   ok: boolean;

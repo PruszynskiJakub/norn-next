@@ -1,52 +1,65 @@
 /**
- * Command execution seam shared by the git, gh and glab adapters. Injectable so adapters are
- * tested against recorded fixtures (X4). Never throws: a missing binary is exit code 127.
+ * The one command execution seam of the adapters, and their one `PortError` (ports.ts). Adapters
+ * build argv and hand it to an injectable `Exec`, so they are tested against recorded fixtures
+ * (X4); production runs `bunExec` on store's `spawnBounded` (H11: bounded, a timeout is exit 124).
+ * Never throws: a missing binary is exit code 127.
  */
 import type { PortError } from "@norn/core";
 import { spawnBounded } from "@norn/store";
 
+export interface ExecOptions {
+  cwd?: string;
+  /** overlaid on the inherited process.env (a key set to undefined keeps the inherited value) */
+  env?: Record<string, string | undefined>;
+  stdin?: string;
+  /** H11: kill the call (and its process group) after this long; a timeout is exit 124 */
+  timeoutMs?: number;
+}
+
 export interface ExecResult {
+  /** exit code; 124 when killed by the timeout, 127 when the executable could not be started */
   code: number;
   stdout: string;
   stderr: string;
 }
 
-export interface ExecOptions {
-  cwd?: string;
-  stdin?: string;
-  env?: Record<string, string>;
-  /** H11: kill the call (and its process group) after this long; a timeout is exit 124 */
-  timeoutMs?: number;
-}
-
 /** Run `argv` (argv[0] is the binary). Must not throw. */
 export type Exec = (argv: string[], opts?: ExecOptions) => Promise<ExecResult>;
 
-/** Default Exec. Inherits process.env, overlaid with opts.env; never throws (H11: bounded). */
-export const bunExec: Exec = async (argv, opts = {}) => {
+async function run(argv: string[], opts: ExecOptions, unobserved: boolean): Promise<ExecResult> {
   const r = await spawnBounded(argv, {
     env: { ...process.env, ...(opts.env ?? {}) },
     ...(opts.cwd === undefined ? {} : { cwd: opts.cwd }),
     ...(opts.stdin === undefined ? {} : { stdin: opts.stdin }),
     ...(opts.timeoutMs === undefined ? {} : { timeoutMs: opts.timeoutMs }),
+    ...(unobserved ? { unobserved: true } : {}),
   });
   return { code: r.code, stdout: r.stdout, stderr: r.stderr };
-};
+}
+
+/** Default Exec: inherits process.env overlaid with opts.env; tells store's spawn observer (effect transcripts). */
+export const bunExec: Exec = (argv, opts = {}) => run(argv, opts, false);
+
+/**
+ * `bunExec` without telling the spawn observer: for the process adapter's read-only `ps` probes,
+ * whose argv carries live pids (an effect transcript would differ on every run).
+ */
+export const unobservedExec: Exec = (argv, opts = {}) => run(argv, opts, true);
 
 class AdapterError extends Error implements PortError {
-  constructor(
-    message: string,
-    public code: string,
-    public retryable: boolean,
-  ) {
+  readonly code: string;
+  readonly retryable: boolean;
+  constructor(code: string, message: string, retryable: boolean) {
     super(message);
     this.name = "PortError";
+    this.code = code;
+    this.retryable = retryable;
   }
 }
 
-/** Typed failure for port methods (ports.ts: "throw PortError"). */
+/** Typed failure for port methods (ports.ts: "throw PortError"): stable `code`, `retryable` for transient failures. */
 export function portError(code: string, message: string, retryable = false): PortError {
-  return new AdapterError(message, code, retryable);
+  return new AdapterError(code, message, retryable);
 }
 
 /** Classify common transport failures from a CLI's stderr. */
@@ -98,4 +111,15 @@ export function fixtureExec(fixtures: ExecFixture[], calls: string[][] = []): Ex
     if (!hit) return { code: 1, stdout: "", stderr: `no fixture for: ${argv.join(" ")}` };
     return { code: hit.code ?? 0, stdout: hit.stdout ?? "", stderr: hit.stderr ?? "" };
   };
+}
+
+/** POSIX-shell quote one word. */
+export function shellQuote(word: string): string {
+  if (word !== "" && /^[A-Za-z0-9_@%+=:,./-]+$/.test(word)) return word;
+  return `'${word.replace(/'/g, `'\\''`)}'`;
+}
+
+/** Join argv into one POSIX command line. */
+export function shellJoin(argv: string[]): string {
+  return argv.map(shellQuote).join(" ");
 }
