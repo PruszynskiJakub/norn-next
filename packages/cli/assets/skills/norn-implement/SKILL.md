@@ -13,6 +13,8 @@ Make every acceptance criterion true, each proven by a test that failed before t
    - review finding: write the test that exposes the problem;
    - QA failure: turn its repro into a test that fails the same way.
 
+   When a failing check or a QA repro does not fail for you on the first try (flaky, CI-only, timing), invoke the `norn-diagnose` skill and build a loop that goes red on it before you write the red test; never fix a failure you have not seen fail.
+
    Then go on with any criteria not yet covered.
 3. **Build test-first.** Invoke the `norn-tdd` skill and work red → green, one tracer bullet at a time. The seams in the Plan were agreed during planning: they are the pre-agreed seams the `norn-tdd` skill asks for. When a behaviour cannot be observed at any of them, use the highest existing seam that observes it and say so when you hand back. Never write code for a behaviour that has no failing test yet.
 4. Run the type check and the test file you are in often, and the whole suite before each commit.

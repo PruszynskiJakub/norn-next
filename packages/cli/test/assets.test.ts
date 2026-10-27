@@ -23,6 +23,7 @@ const SKILLS = [
   "norn-review",
   "norn-qa",
   "norn-qa-person",
+  "norn-diagnose",
   "norn-merge",
   "norn-pr",
   "norn-tdd",
