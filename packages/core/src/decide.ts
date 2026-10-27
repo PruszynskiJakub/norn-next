@@ -1305,8 +1305,9 @@ function sliceProgress(story: StoryFacts) {
   const broken = files.filter((s) => !s.frontmatter);
   const integrated = (s: SliceFileFacts) => s.frontmatter?.status === "integrated" || unitOf(s.key)?.state?.status === "done";
   const done = new Set(files.filter(integrated).map((s) => s.key));
-  const pending = files.filter((s) => !done.has(s.key) && !unitOf(s.key)?.state);
-  const startable = pending.filter((s) => (s.frontmatter as SliceFrontmatter).depends_on.every((d) => done.has(d)));
+  // a broken file (null frontmatter) is never pending: decide notes `slices.file_invalid` first (S2)
+  const pending = files.filter((s): s is SliceFileFacts & { frontmatter: SliceFrontmatter } => !!s.frontmatter && !done.has(s.key) && !unitOf(s.key)?.state);
+  const startable = pending.filter((s) => s.frontmatter.depends_on.every((d) => done.has(d)));
   return { unitOf, files, broken, done, pending, startable };
 }
 
@@ -1327,7 +1328,7 @@ function slicesStuck(story: StoryFacts): { rule: string; detail: string } | null
     return { rule: "slices.slice_stuck", detail: `${named.join("; ")} — norn unstick ${stuckSlices[0]?.key}` };
   }
   if (!activeUnits.length) {
-    const blocked = pending.map((s) => `${s.key} waits for ${(s.frontmatter as SliceFrontmatter).depends_on.filter((d) => !done.has(d)).join(", ")}`);
+    const blocked = pending.map((s) => `${s.key} waits for ${s.frontmatter.depends_on.filter((d) => !done.has(d)).join(", ")}`);
     return { rule: "slices.blocked", detail: `no slice can start: ${blocked.join("; ")}` };
   }
   return null;
@@ -1343,7 +1344,7 @@ function slicesStep(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, w
 
   const starts = [];
   for (const s of startable.sort((a, b) => a.nn.localeCompare(b.nn))) {
-    const fm = s.frontmatter as SliceFrontmatter;
+    const fm = s.frontmatter;
     const name = fm.workflow ?? ctx.config.default_slice_workflow;
     const loaded = usableWorkflow(ctx, name, "slice");
     if ("problem" in loaded) return park(ctx, story, uf, st, "workflow", `slice ${s.key}: ${loaded.problem}`, "slices.workflow_invalid");
