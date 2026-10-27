@@ -3,9 +3,9 @@
  * `norn.pick`). Rows: the inbox items that need you, then one per story; type to filter, ↑↓ to move,
  * the right side previews the story. enter → `norn orient <story> --open`; ⌃o opens the PR in the
  * browser (`gh pr view <branch> --web` / `glab mr view <branch> --web`); ⌃y approves a gate; ⌃g goes
- * to the item's agent pane; ⌃t takes an unclaimed story; ⌃r refreshes; esc quits. Navigating keys exit,
- * so the popup closes; approve and take stay. Writes only through CLI verbs (X1). Frames go to
- * stderr, one JSON summary to stdout at exit (P8).
+ * to the item's agent pane; ⌃t takes an unclaimed story; ⌃r refreshes; esc quits. Every action keeps
+ * the picker open with its outcome on the last line; only esc closes it. Writes only through CLI
+ * verbs (X1). Frames go to stderr, one JSON summary (the last action) to stdout at exit (P8).
  */
 import { parseDuration } from "@norn/schema";
 import type { ProjectView } from "@norn/view";
@@ -88,40 +88,35 @@ export const pickCommand = defineCommand({
     async function act(effect: PickEffect): Promise<boolean> {
       switch (effect.kind) {
         case "quit":
-          picked = { action: "quit", ok: true };
           return true;
         case "refresh":
           view = null;
           return false;
         case "orient": {
           const r = await runVerb(ctx, ["orient", effect.story, "--open"]);
-          if (r.exit === 0) {
-            picked = { action: "orient", story: effect.story, ok: true };
-            return true;
-          }
-          state = { ...state, message: verbMessage(["orient", effect.story], r.exit, r.value) };
+          const opened = r.value as { created?: boolean; workspace_id?: string } | null;
+          picked = { action: "orient", story: effect.story, ok: r.exit === 0 };
+          state = {
+            ...state,
+            message: r.exit !== 0 ? verbMessage(["orient", effect.story], r.exit, r.value) : opened?.workspace_id ? `${opened.created ? "opened" : "focused"} ${effect.story} orient (${opened.workspace_id})` : `$ ${(r.value as { command?: string }).command ?? ""}`,
+          };
           return false;
         }
         case "pr": {
           const r = await (ctx.deps.shell ?? spawnShell)(effect.argv, ctx.root);
-          if (r.code === 0) {
-            picked = { action: "pr", story: effect.story, ok: true };
-            return true;
-          }
-          state = { ...state, message: `could not open the PR: ${effect.argv.join(" ")} — ${r.stderr.trim().split("\n")[0] || `exit ${r.code}`}` };
+          picked = { action: "pr", story: effect.story, ok: r.code === 0 };
+          state = { ...state, message: r.code === 0 ? `opened the PR of ${effect.story} in the browser` : `could not open the PR: ${effect.argv.join(" ")} — ${r.stderr.trim().split("\n")[0] || `exit ${r.code}`}` };
           return false;
         }
         case "go": {
           const text = await goTo(cockpit, effect.item, ctx.cwd).catch((e: Error) => `could not go there: ${e.message}`);
-          if (/^(focused|started)\b/.test(text)) {
-            picked = { action: "go", story: effect.item.story, ok: true };
-            return true;
-          }
+          picked = { action: "go", story: effect.item.story, ok: /^(focused|started)\b/.test(text) };
           state = { ...state, message: text };
           return false;
         }
         case "verb": {
           const r = await runVerb(ctx, effect.argv);
+          picked = { action: effect.argv[0] as string, story: effect.argv[1], ok: r.exit === 0 };
           state = { ...state, message: verbMessage(effect.argv, r.exit, r.value) };
           view = null; // the verb changed what needs you
           return false;

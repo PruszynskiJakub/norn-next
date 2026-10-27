@@ -99,22 +99,25 @@ describe("norn pick", () => {
     expect(frame).toContain("PR: none seen yet");
   });
 
-  test("⌃o opens the PR in the browser and exits; enter orients through Herdr and exits; esc quits", async () => {
+  test("⌃o opens the PR in the browser, enter orients through Herdr; the picker stays open with the outcome until esc", async () => {
     const shell: string[][] = [];
     const frames: string[] = [];
-    const pr = await runCli(["pick"], { ...c.deps, herdr: null, input: keys("\x1b[B", "\x0f"), shell: async (argv) => (shell.push(argv), { code: 0, stderr: "" }), log: (l) => frames.push(l) });
-    expect(pr.value).toEqual({ frames: 2, action: "pr", story: "gh-5", ok: true });
+    const pr = await runCli(["pick"], { ...c.deps, herdr: null, input: keys("\x1b[B", "\x0f", "\x1b"), shell: async (argv) => (shell.push(argv), { code: 0, stderr: "" }), log: (l) => frames.push(l) });
+    expect(pr.value).toEqual({ frames: 3, action: "pr", story: "gh-5", ok: true });
     expect(shell).toEqual([["gh", "pr", "view", "gh-5-pay-invoices", "--web"]]);
     expect(frames[1]).toContain("▸ gh-5");
+    expect(frames[2]).toContain("opened the PR of gh-5 in the browser");
 
     const h = fakeHerdr();
-    const orient = await runCli(["pick"], { ...c.deps, herdr: h.cockpit, input: keys("\r") });
-    expect(orient.value).toEqual({ frames: 1, action: "orient", story: "gh-5", ok: true });
+    const shown: string[] = [];
+    const orient = await runCli(["pick"], { ...c.deps, herdr: h.cockpit, input: keys("\r", "\x1b"), log: (l) => shown.push(l) });
+    expect(orient.value).toEqual({ frames: 2, action: "orient", story: "gh-5", ok: true });
+    expect(shown[1]).toContain("opened gh-5 orient (w9)");
     expect(h.calls).toEqual([expect.stringMatching(new RegExp(`^open workspace ${wt()} gh-5 orient focus ${c.home}/orient/launch/[0-9a-f]{16}\\.sh env NORN_ORIENT=1 claude --permission-mode auto -- 'Run \`norn orient gh-5\` and follow it\\.'$`))]);
 
     const refused: string[] = [];
     const quit = await runCli(["pick"], { ...c.deps, herdr: null, input: keys("\x19", "\x1b"), log: (l) => refused.push(l) });
-    expect(quit.value).toEqual({ frames: 2, action: "quit", ok: true });
+    expect(quit.value).toEqual({ frames: 2, action: "none", ok: true });
     expect(refused[1]).toContain("⌃y approves a gate");
   });
 });

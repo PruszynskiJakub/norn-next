@@ -26,7 +26,7 @@ What it gives you:
 | ⌃r | refresh |
 | esc | close |
 
-Enter, ⌃o and ⌃g close the popup; approve and take stay, so you can do the next one.
+Every action leaves the popup open with its outcome on the bottom line, so you can do the next one; Esc closes it.
 
 ## Config snippet
 
