@@ -4,7 +4,10 @@
  * snapshot, workflows and config recorded in the trace, showing the rule that fired, what
  * triggered it — the receipt applied (with its reason text: handoff, comment, check output) or the
  * fact the rule read — and verifying the replay equals the recorded decision. A mismatch exits 1
- * (decide was not pure, or the trace was edited).
+ * (decide was not pure, or the trace was edited). A tick recorded by another norn version
+ * (`norn_version` on the trace) is still replayed and diffed with this one's decide, and the replay
+ * is labelled `recorded by norn <X>` — a mismatch there may just be a rule that changed between
+ * versions; the exit code is the same either way.
  *
  * Without `--tick` the matching ticks are found automatically: by default the latest decision for
  * the unit; with `--step` / `--attempt` / `--transition` / `--rule` every decision that matches
@@ -24,6 +27,7 @@ import { defineCommand, opt } from "../command.ts";
 import { refuse, usageError, withExit } from "../output.ts";
 import { parseUnitKey } from "../runtime/human.ts";
 import { replayInputs } from "../runtime/tick.ts";
+import { NORN_VERSION } from "../version.ts";
 
 const canon = (v: unknown) => JSON.stringify(JSON.parse(JSON.stringify(v ?? null)));
 
@@ -294,6 +298,8 @@ export const whyCommand = defineCommand({
         all_match: allMatch,
         rule: mine?.rule ?? null,
         ...(same ? {} : { action: mine?.action ?? null }),
+        // O5: decide may have changed since; say whose decision the replay is compared with
+        ...(tick.norn_version && tick.norn_version !== NORN_VERSION ? { label: `recorded by norn ${tick.norn_version}, replayed by norn ${NORN_VERSION}` } : {}),
       },
       ...(filtered && !tickId
         ? {
