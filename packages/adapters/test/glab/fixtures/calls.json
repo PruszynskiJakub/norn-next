@@ -114,5 +114,17 @@
    "json"
   ],
   "stdout": "{\"id\": 501, \"iid\": 9, \"project_id\": 7, \"title\": \"Fix crash on save\", \"state\": \"opened\", \"draft\": true, \"work_in_progress\": true, \"source_branch\": \"gl-4-fix-crash-on-save\", \"target_branch\": \"main\", \"merged_at\": null, \"web_url\": \"https://gitlab.com/acme/app/-/merge_requests/9\", \"sha\": \"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\"}"
+ },
+ {
+  "argv": [
+   "glab",
+   "mr",
+   "update",
+   "9",
+   "--description-file",
+   "-",
+   "--yes"
+  ],
+  "stdout": "- Updating merge request !9\n✓ updated description\n!9 Fix crash on save (gl-4-fix-crash-on-save)\n https://gitlab.com/acme/app/-/merge_requests/9\n"
  }
 ]

@@ -16,6 +16,7 @@ import {
   deriveUlid,
   type GitStep,
   parseDuration,
+  PR_BODY_FILE,
   type Receipt,
   type ReceiptOf,
   type ResolvedConfig,
@@ -1145,8 +1146,6 @@ function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, com
 function runGit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, step: GitStep): void {
   const ref = uf.unit;
   const cwd = unitWorktree(story, uf);
-  if (step.action === "open-pr" && story.pr && story.pr.state === "open")
-    return classifyNorn(ctx, story, uf, st, wf, "done", "git.open-pr.exists", `PR #${story.pr.number} already open`);
   if (!cwd) return ctx.noop(ref, "git.no_worktree", "unit worktree missing");
   if (step.action === "integrate" || step.action === "update") {
     // K6: integration is serialized per story — a base update (BS3) takes the same lock
@@ -1178,7 +1177,10 @@ function runGit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: W
     cwd,
     branch: unitBranch(story, uf),
     onto: step.action === "integrate" ? story.branch : null,
-    pr: step.action === "open-pr" ? { base: ctx.facts.repo.default_branch, title: fm.title, body: `Closes ${fm.url}\n\nDelivered by norn (story ${story.key}).` } : null,
+    pr:
+      step.action === "open-pr"
+        ? { base: ctx.facts.repo.default_branch, title: fm.title, body: `Closes ${fm.url}\n\nDelivered by norn (story ${story.key}).`, body_file: `${story.spec_dir}/${PR_BODY_FILE}` }
+        : null,
     ...(update ? { update } : {}),
     receipts: [],
     state: null,

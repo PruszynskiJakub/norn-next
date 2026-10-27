@@ -37,6 +37,8 @@ export class FakeRemote implements RemotePort {
   readonly provider = "gh" as const;
   issues: RemoteIssue[] = [];
   prs: RemotePullRequest[] = [];
+  /** PR number → body as last written (GR9) */
+  bodies = new Map<number, string>();
   calls: string[] = [];
   async whoami() {
     return "tester";
@@ -57,7 +59,12 @@ export class FakeRemote implements RemotePort {
     this.calls.push(`pr+ ${o.head}`);
     const pr: RemotePullRequest = { number: 100 + this.prs.length, url: `https://github.com/o/r/pull/${100 + this.prs.length}`, state: "open", is_draft: true, head_sha: "", draft: true, head: o.head, base: o.base, base_branch: o.base, merged_at: null };
     this.prs.push(pr);
+    this.bodies.set(pr.number, o.body);
     return pr;
+  }
+  async editPullRequestBody(n: number, body: string) {
+    this.calls.push(`pr~ ${n}`);
+    this.bodies.set(n, body);
   }
 }
 

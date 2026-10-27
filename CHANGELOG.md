@@ -4,9 +4,14 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+### Added
+
+- The story PR gets a real description. A new `describe` step in the `story` template, after QA, runs the new `norn-pr` skill: it writes `pr.md` in the spec folder with a summary picture of the change, before/after evidence from QA's criteria reports and evidence, and the merge danger (one-way or two-way door, blast radius). `open-pr` uses that file as the PR body, with the issue link under it; without the file the body is the issue link alone, as before (GR9). Existing repos get the step from `norn init` only if they take the new template; add it to your own `story.yaml` to use it.
+
 ### Changed
 
 - `norn help` says up front that an agent doing a step runs only `brief`, `done`, `ask` and `stuck`, and that every other command is the person's, for an agent to run only when the person asks it to. `norn help <command>` says so for a person's command, `--json` gives each command a `for` (`person`, `agent`, `hooks`), and a new Skills section (`skills` in `--json`) marks each bundled skill as the protocol, a step the agent works alone, a step a person works with the agent, or a reference. The `norn` skill gains the same rule: a refusal, the brief or the inbox naming a command is not the person asking.
+- `open-pr` on a story whose PR is already open now rewrites that PR's body instead of finishing at once, so after a `ready` reject and rework the PR describes the branch as it is (GR9). Both remote adapters gained `editPullRequestBody` (`gh pr edit --body`, `glab mr update --description-file -`).
 
 ## [0.7.1] - 2026-10-26
 
