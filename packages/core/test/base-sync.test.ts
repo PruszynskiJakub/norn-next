@@ -330,7 +330,7 @@ describe("base sync replay", () => {
     expect(s.state.park).toMatchObject({ kind: "remote", reason: "remote: PR merged into release, not main" });
     expect(mergedIntoBase(s.facts().stories[0] as StoryFacts, "main")).toBe(false);
     expect(mergedIntoBase({ ...(s.facts().stories[0] as StoryFacts), pr: { ...s.pr, base_branch: "main" } }, "main")).toBe(true);
-    // a PR cached by an older norn names its target only as `base`: still read (until 0.12.0)
+    // a PR cached by an older norn names its target only as `base`: still read (until 0.11.0)
     const legacy = (target: string): StoryFacts["pr"] => ({ number: 7, url: "u", state: "merged", is_draft: false, head_sha: SHA("h"), base: target });
     expect(mergedIntoBase({ ...(s.facts().stories[0] as StoryFacts), pr: legacy("release") }, "main")).toBe(false);
     expect(mergedIntoBase({ ...(s.facts().stories[0] as StoryFacts), pr: legacy("main") }, "main")).toBe(true);
