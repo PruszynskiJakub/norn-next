@@ -20,6 +20,8 @@ export interface ParsedArgs {
   positionals: string[];
   /** options in the order given (`--note a --note-criterion AC1 --note b` pairs by position, NT1) */
   order?: Array<{ name: string; value: string | boolean }>;
+  /** `--json` was given (the dispatcher takes it out of `values`); a command that draws a screen prints data instead */
+  json?: boolean;
 }
 
 export interface Command {
