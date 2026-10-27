@@ -4,6 +4,17 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+### Changed
+
+- The cockpit's preview is easier to read.
+  - It is laid out in sections: the story, SLICES, LINKS, the selected item, what else waits or runs, and NOTES.
+  - Each slice takes one line, with a coloured mark (✓ done, ◐ running, ● parked, ✖ stuck).
+  - The PR fits on one line, with its URL beneath it.
+  - Notes are bullets with a hanging indent, under each unit.
+  - A gate's detail and full text no longer repeat the open notes.
+  - The list takes about 40% of the width, so the preview gets more of it.
+  - ⌃d and ⌃u scroll the preview when it does not fit.
+
 ## [0.9.0] - 2026-10-27
 
 ### Added

@@ -77,13 +77,14 @@ Non-goals:
 
 ## 4. The terminal cockpit (replaces HC4, HC5, HC8, HC16)
 
-- CP6 `norn cockpit [--interval 5s]` draws the model full screen: the header, a filter line, the rows on the left (the needs-you section, then stories), the selected row's preview on the right (below the rows when the pane is narrower than 100 columns), and a footer. The footer lists the selected row's actions by key, then `/ filter · r refresh · ? help · q quit`.
+- CP6 `norn cockpit [--interval 5s]` draws the model full screen: the header, a filter line, the rows on the left (about 40% of the width; the needs-you section, then stories), the selected row's preview on the right (below the rows when the pane is narrower than 100 columns), and a footer. The footer lists the selected row's actions by key, then `/ filter · r refresh · ? help · q quit`.
   - It reads raw keys (a terminal in raw mode, restored on exit).
   - It redraws on every key and every interval, with a fresh view on the interval and after each action.
   - Frames go to stderr, one JSON summary (the last action taken) to stdout at exit (P8).
   - It ends on `q`, Esc with no filter and no prompt open, end of input, SIGINT or SIGTERM.
 - CP7 Keys:
   - ↑↓ or `k`/`j` move; PgUp/PgDn move a page.
+  - ⌃d / ⌃u scroll the preview by half a screen, within what it holds; moving to another row scrolls back to its top. The footer offers them when the preview does not fit.
   - `/` opens the filter: typing narrows the rows to those where every word appears; Enter keeps the filter, Esc clears it.
   - An action's key runs it on the selected row. A key the row does not offer shows `no <action> here`; nothing runs.
   - An action with `input` opens a one-line prompt in the footer, labelled with its `prompt`. Enter submits; Esc cancels. Empty text is refused when `required`.
