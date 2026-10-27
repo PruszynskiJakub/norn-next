@@ -9,7 +9,7 @@ import { appendFileSync, mkdirSync, readdirSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
 import type { FileError } from "@norn/core";
 import { type TickStartTrace, type TickTrace, type TraceEvent, assertValid, validate } from "@norn/schema";
-import { atomicWrite, isErrno, readText } from "./fsx.ts";
+import { appendDurable, atomicWrite, isErrno, readText } from "./fsx.ts";
 import { traceDir } from "./paths.ts";
 
 export function eventTime(ev: TraceEvent): string {
@@ -23,13 +23,21 @@ export function traceFileName(at: string): string {
   return `${d.toISOString().slice(0, 10)}.jsonl`;
 }
 
-/** Validate and append one event as a single line (O_APPEND, one write). Returns the trace-relative file. */
+/**
+ * Validate and append one event as a single line (O_APPEND, one write). Returns the trace-relative file.
+ * Only `tick.start` is fsynced (R5.4): it is the line that explains a tick that died during act, so it
+ * must reach disk before act starts. Every other event is diagnostic and skips the fsync.
+ */
 export function appendTrace(root: string, event: TraceEvent): string {
   assertValid("trace", event);
   const name = traceFileName(eventTime(event));
   const path = join(traceDir(root), name);
-  mkdirSync(dirname(path), { recursive: true });
-  appendFileSync(path, `${JSON.stringify(event)}\n`);
+  const line = `${JSON.stringify(event)}\n`;
+  if (event.type === "tick.start") appendDurable(path, line);
+  else {
+    mkdirSync(dirname(path), { recursive: true });
+    appendFileSync(path, line);
+  }
   return name;
 }
 

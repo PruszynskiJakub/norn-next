@@ -2,12 +2,12 @@
  * One unit's `runs/<unit>/` folder (§7, S3): state.json (commit point, S5), the pinned
  * workflow (S7), logs (C5), evidence and handoff.md (S9).
  */
-import { cpSync, mkdirSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { UnitState, Workflow } from "@norn/schema";
 import { assertValid } from "@norn/schema";
 import { parse as parseYaml } from "yaml";
-import { atomicWrite, atomicWriteJson, createExclusive, fileError, readJsonFile, readText, type ReadResult, validated } from "./fsx.ts";
+import { atomicCopyDir, atomicWrite, atomicWriteJson, createExclusive, fileError, readJsonFile, readText, type ReadResult, validated } from "./fsx.ts";
 import { evidenceDir, handoffPath, logPath, orphanedDir, pinnedWorkflowPath, statePath } from "./paths.ts";
 
 // ---------------------------------------------------------------- state.json
@@ -89,11 +89,15 @@ export function readLog(unitDir: string, runId: string): string | null {
   return readText(logPath(unitDir, runId));
 }
 
-/** Create (if needed) `evidence/<run_id>/`; optionally copy a directory into it. Returns the unit-relative path. */
+/**
+ * Create (if needed) `evidence/<run_id>/`; optionally copy a directory into it. The copy lands via
+ * temp + rename (S1), so the evidence a `done` receipt names is never half-copied (P6).
+ * Returns the unit-relative path.
+ */
 export function ensureEvidenceDir(unitDir: string, runId: string, copyFrom?: string): string {
   const dir = evidenceDir(unitDir, runId);
-  mkdirSync(dir, { recursive: true });
-  if (copyFrom) cpSync(copyFrom, dir, { recursive: true, force: true });
+  if (copyFrom) atomicCopyDir(copyFrom, dir);
+  else mkdirSync(dir, { recursive: true });
   return `evidence/${runId}`;
 }
 
