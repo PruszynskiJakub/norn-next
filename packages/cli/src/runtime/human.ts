@@ -353,8 +353,11 @@ export interface HumanVerbOptions {
    * `check`; the claim is never acquired here and never goes through the mailbox.
    */
   requireHolder?: string;
-  /** false: no duplicate refusal (S6), e.g. mode, where every receipt applies (MO1) */
-  refuseDuplicate?: boolean;
+  /**
+   * false: no duplicate refusal (S6), e.g. mode, where every receipt applies (MO1). A function: the
+   * verb's own duplicate refusal (update: any unapplied update of the story), run in its place.
+   */
+  refuseDuplicate?: false | ((t: Target, receipt: Receipt) => void);
   check: (t: Target, st: UnitState) => void;
   /** true: nothing to record (mode already set); the verb returns null without touching the claim */
   noop?: (t: Target, st: UnitState) => boolean;
@@ -391,7 +394,8 @@ export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptio
     claim ??= await claimFor(ctx, t.story);
     held = refuseUnlessHolder(claim, t, opts.verb, opts.requireHolder);
   }
-  if (opts.refuseDuplicate !== false) await refuseDuplicate(ctx, t, receipt, claim && heldElsewhere(claim), opts.mailbox);
+  if (typeof opts.refuseDuplicate === "function") opts.refuseDuplicate(t, receipt);
+  else if (opts.refuseDuplicate !== false) await refuseDuplicate(ctx, t, receipt, claim && heldElsewhere(claim), opts.mailbox);
   const route = held ?? (await claimRoute(ctx, t, { mailbox: opts.mailbox, verb: opts.verb, ...(claim ? { claim } : {}) }));
   if (route.via === "local" && target !== t) {
     // the claim turned out free after all: write under it, against the local cursor
