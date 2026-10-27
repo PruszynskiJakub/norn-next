@@ -341,7 +341,7 @@ counters: { test_loop: { max: 5 }, review_loop: { max: 3 }, qa_loop: { max: 2 },
 
 Default story workflow (sketch): `refine (attended; done → plan, questions → clarify) → clarify (attended) → plan (attended) → slice → approve-plan (gate) → slices → update (git; conflict → resolve, counted) → test (check) → qa → describe (writes pr.md, GR9) → open-pr (git) → ready (gate) → $done`; `human-qa` approve also goes to `describe`; `human-qa` and `ready` route `stale` back to `update` (counted, `stale_loop`), workflow field `base: { stale: conflict }` (BS6–BS8). Rework found by story `test`/`qa` goes to `implement` in the story worktree, counted. After `$done` the story waits for the observed PR merge (GR6) — a fact, not a gate.
 
-Example `bug` workflow: `reproduce (agent; reproduced → implement, cannot_reproduce → $stuck) → implement → test → review → integrate`.
+Example `bug` workflow: `reproduce (agent, norn-diagnose: seen as a user, then a red loop and the cause, no fix; reproduced → implement, cannot_reproduce → $stuck) → implement (the loop becomes the red test) → test → review → integrate`.
 
 ## 12. Remote and git
 
@@ -438,6 +438,7 @@ Single-job skills ported from ai-engine (norn v0.11.0): its skill files are the 
 | `norn-qa` | Check each acceptance criterion as a user, with evidence (a screenshot for every `browser` criterion); one verdict per criterion in a criteria report (QV2); never pass what wasn't observed (`unverified` when this session cannot check it); notes when a passed criterion may be read differently (NT4); secrets redacted. | pass / fail / partial / unverified |
 | `norn-qa-person` | Walk a person through QA from the agent's evidence and their own remarks; a repro for every failure. Shipped for attended QA steps; the templates' `human-qa` is a gate. | pass / fail |
 | `norn-pr` | Pull request body from the spec, the diff and QA's criteria reports and evidence: Summary (the smallest picture: pseudocode, call tree, file tree, Mermaid or shape diff), Evidence (before/after per criterion; never claims what was not observed), Merge danger (one-way or two-way door, blast radius). Adapted from mattpocock/skills `pr` (itself after Humanlayer's show-me). | done |
+| `norn-diagnose` | Hard bugs, flaky tests, performance regressions: a tight, deterministic loop that goes red on the reported symptom first (no hypothesis before it has gone red), then minimise, ranked falsifiable hypotheses, instrument, bisect; fix behind a regression test at a correct seam, or hand the loop and cause back when told not to fix. HITL loop template (`scripts/hitl-loop.template.sh`); secrets redacted. Runs the `bug` template's `reproduce`; `norn-implement` turns to it when a rework failure does not reproduce on the first try. | reproduced / cannot_reproduce |
 | `norn-merge` | Resolve conflicts by intent of both sides; merge the base into a published branch, never rebase; abort and stop if new behaviour is needed. | done |
 | `norn-tdd` | Reference: red → green at agreed seams, good tests, mocking at boundaries (`tests.md`, `mocking.md`); refactoring stays out of the loop. | — |
 | `norn-codebase-design` | Reference: deep modules, interface, seam, adapter, depth (`DEEPENING.md`, `DESIGN-IT-TWICE.md`). | — |

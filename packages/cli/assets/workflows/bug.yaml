@@ -1,24 +1,29 @@
 # Bug workflow — example installed by `norn init`; edit freely (W1).
-# Reproduce first, then fix test-first, check, review and integrate.
+# Reproduce and diagnose first, then fix test-first, check, review and integrate.
 # Ends in `integrate`, so it runs on a slice (W8).
 # Change `test.run` to your repo's test command.
 name: bug
-description: Reproduce a bug, fix it test-first, review it, integrate it into the story branch.
+description: Reproduce a bug and find its cause, fix it test-first, review it, integrate it into the story branch.
 start: reproduce
 steps:
   reproduce:
     type: agent
-    skill: norn-qa
+    skill: norn-diagnose
     inputs: [slice, spec, handoff]
-    instructions: "Reproduce the reported bug as a user. Record the exact repro and evidence; do not fix anything."
+    instructions: >-
+      First follow the report as a user, through the real interface (the UI, the command, the request),
+      and record what you saw. Then build a loop that goes red on that exact symptom, minimise it and
+      confirm the cause. Do not fix anything. Under Progress in the handoff (the next agent does not see your Resume), give the loop command, the minimised repro,
+      the confirmed cause (or the ranked hypotheses left) and the seam for a regression test; attach the
+      user-side evidence and the loop's red output.
     outcomes:
-      reproduced:       { to: implement, means: "the bug was observed; repro and evidence attached" }
-      cannot_reproduce: { to: $stuck, means: "followed the report faithfully and the bug did not occur; what was tried is attached" }
+      reproduced:       { to: implement, means: "the bug was observed as a user and a loop goes red on it; repro, loop and cause in the handoff, evidence attached" }
+      cannot_reproduce: { to: $stuck, means: "followed the report faithfully and the bug did not occur, nor in any loop tried; what was tried is attached" }
   implement:
     type: agent
     skill: norn-implement
     inputs: [slice, spec, handoff, last_check, last_findings]
-    instructions: "Start from the repro: turn it into a failing test before changing any code."
+    instructions: "Start from the loop and minimised repro in the handoff: turn them into a failing test at the seam named there before changing any code, then fix the cause."
     outcomes:
       done: { to: test, means: "the repro (and each rework point) is a passing test" }
   test:
