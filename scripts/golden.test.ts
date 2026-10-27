@@ -19,6 +19,15 @@ test("stableKey ignores what differs between two runs of one tick and keeps whic
   expect(stableKey(same)).not.toBe(stableKey(a));
 });
 
+test("a case is named by decide's inputs, so new decisions (golden.ts --update) keep its name", () => {
+  const first = readdirSync(GOLDEN).filter((n) => n.endsWith(".json")).sort()[0] as string;
+  const c = JSON.parse(readFileSync(join(GOLDEN, first), "utf8")) as GoldenCase;
+  const redecided: GoldenCase = { ...c, decisions: [{ unit: "u", rule: "r.other", action: { kind: "noop" } }] };
+  expect(caseName(c.source, caseBody(redecided))).toBe(first);
+  const otherInputs: GoldenCase = { ...c, facts: { ...c.facts, now: c.facts.now + 1 } };
+  expect(caseName(c.source, caseBody(otherInputs))).not.toBe(first);
+});
+
 test("every committed golden case is named by its stable key", () => {
   const wrong = readdirSync(GOLDEN)
     .filter((n) => n.endsWith(".json"))
