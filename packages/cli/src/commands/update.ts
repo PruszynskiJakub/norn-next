@@ -5,7 +5,7 @@
  * that holds the claim (T7); never through the mailbox. Writes an `update` receipt (P6); the tick
  * applies it (S5). The tick never moves a done unit by itself — only a person does, with this verb.
  */
-import { baseUpdateStep } from "@norn/core";
+import { baseUpdateStep, storyUnit } from "@norn/core";
 import type { UnitState } from "@norn/schema";
 import { defineCommand } from "../command.ts";
 import { refuse } from "../output.ts";
@@ -46,6 +46,11 @@ export const updateCommand = defineCommand({
         const step = baseUpdateStep(wf);
         if (!step) throw refuse(`workflow ${wf.name} of ${t.story} has no base update step (no \`git: update\` step, no base.step)`, `norn workflow ${t.story} <name> --to <step>`, "no_update_step");
         to = step;
+      },
+      // any unapplied update of the story, whatever step it was recorded at
+      refuseDuplicate(t) {
+        const pending = (t.story_facts ? storyUnit(t.story_facts) : null)?.unapplied.find((r) => r.receipt.kind === "update");
+        if (pending) throw refuse(`an update of ${t.story} is already recorded (${pending.file}) and not applied yet`, "norn tick", "already_recorded");
       },
       // P6: the receipt first; the tick applies it and writes state.json last (S5)
       build: (t, st) => humanReceipt(ctx, t, st, "update", { from: st.step, to, reason: "person" }),

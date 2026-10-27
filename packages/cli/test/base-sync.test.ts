@@ -173,7 +173,9 @@ describe("base sync with real git", () => {
     expect(ok.value).toMatchObject({ unit: "gh-7", receipt: { kind: "update", from: "$done", to: "update", reason: "person", step: "$done" }, delivered: { via: "local" } });
     const again = await h.norn("update", "gh-7");
     expect(again.exit).toBe(3);
-    expect(again.value).toMatchObject({ code: "already_recorded" });
+    expect(again.value).toMatchObject({ code: "already_recorded", do_instead: "norn tick" });
+    expect((again.value as { error: string }).error).toMatch(/^an update of gh-7 is already recorded \(.*-update\.json\) and not applied yet$/);
+    expect(again.value).not.toHaveProperty("details");
     step();
     expect(kinds(await h.tick())).toContain("gh-7 receipts.apply");
     expect(h.state(runs())).toMatchObject({ step: "update", status: "ready" });
