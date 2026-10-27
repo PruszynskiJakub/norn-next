@@ -1,15 +1,13 @@
 /**
  * Confirmed defects, reproduced. Each `test.failing` passes while the defect stands; the fix flips it
  * to `test` in the same commit (refactor plan Phase 1).
- *   - BUG-2 (1.2): `routeFor` ignores counter exhaustion, so the route act records in a classify
- *     receipt disagrees with where `applyReceipts` sends the unit.
  *   - BUG-5 (found by 0.1's rule coverage): a slice file that failed validation, of a slice not
  *     started yet, makes decide throw (`sliceProgress` reads its null frontmatter's `depends_on`),
  *     so the whole tick fails instead of the `slices.file_invalid` noop.
  */
 import { describe, expect, test } from "bun:test";
 import type { LeaseFile, UnitState } from "@norn/schema";
-import { applyReceipts, routeFor } from "../src/apply.ts";
+import { applyReceipts, routeOf } from "../src/apply.ts";
 import { decide } from "../src/decide.ts";
 import type { Facts, RunFacts, StoryFacts, UnitFacts } from "../src/facts.ts";
 import { at, CONFIG, facts, numbered, receipt, SLICE_WF, SOLO_WF, STORY_WF, sliceFile, sliceUnit, stateFor, storyFacts, storyUnit, T0, unitFacts, WORKFLOWS } from "./fixtures.ts";
@@ -59,16 +57,15 @@ describe("BUG-1: a resumed run's own agent lease and max_agents (K1)", () => {
 });
 
 describe("BUG-2: the route recorded for a git step's classify receipt", () => {
-  test.failing("an exhausted counter routes to $stuck, as applyReceipts does", () => {
+  test("an exhausted counter routes to $stuck, as applyReceipts does", () => {
     const unit = sliceUnit("gh-1", "01", "s01");
     // integrate.conflict is counted by conflict_loop (max 2); 2 used, so this conflict exhausts it
     const st = stateFor(unit, SLICE_WF, { step: "integrate", attempt: 1, counters: { test_loop: 0, review_loop: 0, qa_loop: 0, conflict_loop: 2 } });
-    const route = routeFor(SLICE_WF, "integrate", "conflict"); // what act writes into the classify receipt
-    const r = receipt(st, "classify", { outcome: "conflict", rule: "git.integrate", detail: "conflict", route }, "norn");
+    const r = receipt(st, "classify", { outcome: "conflict", rule: "git.integrate", detail: "conflict", route: "$stuck" }, "norn");
     const res = applyReceipts(st, [numbered(1, r)], { workflow: SLICE_WF } as never);
     expect({ step: res.state.step, status: res.state.status }).toEqual({ step: "integrate", status: "stuck" });
-    // today: "merge" — the transition target, as if the counter had room
-    expect(route).toBe("$stuck");
+    // what act writes into the classify receipt; was "merge", the edge's target, as if the counter had room
+    expect(routeOf(res)).toBe("$stuck");
   });
 });
 

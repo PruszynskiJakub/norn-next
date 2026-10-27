@@ -27,7 +27,7 @@ import {
   type InboxGroup,
   type NewReceipt,
   renderHandoffStatus,
-  routeFor,
+  routeOf,
   type SessionRef,
   type UnitRef,
   type WorktreeSpec,
@@ -1016,9 +1016,14 @@ export class Actor {
       outcome,
       rule: a.rule,
       detail,
-      route: routeFor(wf, a.step, outcome) as ReceiptOf<"classify">["route"],
+      route: "$stuck", // set below from the in-memory apply
       ...(base ? { base } : {}),
     };
+    // §10, W4: the route is where applying this receipt sends the unit — an exhausted counter
+    // (e.g. integrate.conflict past conflict_loop's max) records `$stuck`, not the edge's target.
+    // A receipt apply would refuse moves nothing; it keeps `$stuck`.
+    const applied = applyReceipts(st, [{ n: st.applied_through + 1, file: "", receipt }], { workflow: wf, now: receipt.at, limits: this.config.limits, tick_id: this.tick });
+    receipt.route = routeOf(applied) ?? "$stuck";
     const written = appendReceipt(loc.runsDir, receipt);
     return { ok: true, detail: { outcome, detail, receipt: written.n, ...extra } };
   }

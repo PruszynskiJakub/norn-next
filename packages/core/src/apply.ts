@@ -422,12 +422,18 @@ function retryRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ct
   return { state: withLast(stuckPark(st, "exhausted", reason, r.at, r.receipt_id)), log: `exhausted: ${reason}` };
 }
 
-/** Helper for receipt writers (act, CLI): the route a classified outcome takes, for the receipt's `route` field. */
-export function routeFor(wf: Workflow, stepName: string, outcome: string): string {
-  const edge = edgeOf(wf, stepName, outcome);
-  if (edge) return edge.to;
-  if (["silent", "timeout", "stalled"].includes(outcome)) return "nudge";
-  if (outcome === "died") return "retry";
-  if (outcome === "ask") return "park";
-  return "$stuck";
+/**
+ * The route a classify receipt records (§10, C1, W4), read from what applying it actually did:
+ * the in-step route (`nudge` / `retry`) when there is one, else the edge taken, else `$stuck` when
+ * the unit stopped (an exhausted counter, nudges or retries included), else `park` for an ask.
+ * Receipt writers apply the receipt in memory first and record this, so the route never disagrees
+ * with where the next tick's apply sends the unit. `null` when the receipt was not applied.
+ */
+export function routeOf(res: ApplyResult): ReceiptOf<"classify">["route"] | null {
+  if (!res.applied.length) return null;
+  if (res.route) return res.route;
+  if (res.advance) return res.advance.to as ReceiptOf<"classify">["route"];
+  if (res.state.status === "stuck") return "$stuck";
+  if (res.state.status === "parked" && res.state.park?.kind === "ask") return "park";
+  return null;
 }
