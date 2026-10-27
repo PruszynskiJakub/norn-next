@@ -8,13 +8,14 @@
  * F35, Q6), Unclaimed, Running, Notes (agents' notes for a person, NT2: information, not an
  * action), Recently done.
  */
-import { type InboxChange, type Mode, parseDuration, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
+import { type InboxChange, parseDuration, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
 import type { Decision } from "./actions.ts";
 import { nextCommand, startAgentCommand } from "./commands.ts";
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "./criteria.ts";
 import type { Facts, NumberedReceipt, StoryFacts, UnitFacts } from "./facts.ts";
 import type { InboxGroup, InboxItem } from "./ports.ts";
 import { sha256 } from "./hash.ts";
+import { effectiveMode, firstLine, heartbeatUp, prBaseBranch, sessionStartedNoTurn, storyFinished, storyUnit, unitWorktree } from "./policy.ts";
 import { optionsLine } from "./prompt.ts";
 import { epoch, formatAge, iso } from "./time.ts";
 import { baseUpdateStep, edgeOf, edgesOf, isStale, stepOf } from "./workflow.ts";
@@ -61,13 +62,6 @@ export interface Inbox {
 /** How long a finished unit stays under "Recently done". */
 export const RECENT_MS = 24 * 3_600_000;
 
-/** MO2: manual if the step is attended or no runner is configured; else the story's mode. */
-export function effectiveMode(story: Mode, attended: boolean, runner: string | null): { mode: Mode; downgraded: boolean } {
-  if (attended) return { mode: "manual", downgraded: false };
-  if (!runner) return { mode: "manual", downgraded: story === "auto" };
-  return { mode: story, downgraded: false };
-}
-
 /**
  * C1 (decide `agent.*.surface`): a counted nudge norn could not type — manual effective mode, or
  * no session on this machine's runner. Shown until the agent shows activity again.
@@ -93,9 +87,7 @@ function undeliveredNudge(story: StoryFacts, uf: UnitFacts, facts: Facts): { out
  */
 export function heartbeatDown(facts: Facts, config: ResolvedConfig): { holder: string; since: string | null; for_ms: number | null } | null {
   const hb = facts.heartbeat;
-  if (!hb) return null;
-  const limit = 3 * parseDuration(config.watch_interval);
-  if (hb.last_tick_at !== null && facts.now - hb.last_tick_at <= limit) return null;
+  if (!hb || heartbeatUp(facts, config)) return null;
   const auto = (s: StoryFacts) => effectiveMode(s.mode, false, facts.machine.runner).mode === "auto";
   const live = (u: UnitFacts) => !!u.state && u.state.status !== "done" && u.state.status !== "corrupt";
   const needs = facts.stories.some((s) => s.claim.state === "mine" && auto(s) && !storyFinished(s) && s.units.some(live));
@@ -162,7 +154,7 @@ function answerItem(uf: UnitFacts, st: UnitState, park: NonNullable<UnitState["p
   const f = uf.act_failure;
   const failed = f?.effect === "answer" && f.step === st.step && f.attempt === st.attempt && epoch(f.at) >= epoch(park.since) ? f : null;
   if (failed) details.push(`not delivered: ${failed.reason}`);
-  const cmd = park.command?.split("\n").map((l) => l.trim()).find((l) => l !== "");
+  const cmd = firstLine(park.command);
   if (cmd) details.push(`pending command: ${cmd}`);
   if (park.options?.length) details.push(`options: ${optionsLine(park.options)} — answer with the number`);
   const reach = failed ? (st.run?.session?.reach ?? null) : null;
@@ -179,8 +171,7 @@ function launchPromptMissed(uf: UnitFacts, st: UnitState): { since: string; pane
   const run = st.run;
   const rf = uf.run;
   if (!run?.prompt_resent_at || !rf || rf.run_id !== run.run_id) return null;
-  const i = rf.hooks.findLastIndex((h) => h.event === "session_start");
-  if (i < 0 || rf.hooks.slice(i + 1).some((h) => h.event !== "session_start")) return null;
+  if (!sessionStartedNoTurn(rf)) return null;
   if (st.last_outcome?.outcome !== "silent" || epoch(st.last_outcome.at) < epoch(run.prompt_resent_at)) return null;
   return { since: run.prompt_resent_at, pane: run.session?.pane_id ?? run.session?.session_id ?? null };
 }
@@ -190,7 +181,7 @@ export function startCommandFor(uf: UnitFacts, story: StoryFacts, config: Resolv
   const step = uf.workflow && uf.state ? stepOf(uf.workflow, uf.state.step) : null;
   const name = (step?.type === "agent" && step.agent) || config.default_agent;
   const agent = config.agents[name];
-  const worktree = uf.worktree?.path ?? (uf.unit.slice === null ? (story.worktree?.path ?? null) : null);
+  const worktree = unitWorktree(story, uf, { mustExist: false });
   return startAgentCommand(worktree, agent?.command ?? agent?.adapter ?? name, agent?.args);
 }
 
@@ -211,8 +202,7 @@ export function personStart(uf: UnitFacts, story: StoryFacts, facts: Facts, conf
  */
 export function notStartedItem(story: StoryFacts, facts: Facts, config: ResolvedConfig): InboxItem | null {
   if (story.claim.state !== "mine" || isStarted(story) || storyFinished(story) || !story.frontmatter) return null;
-  const hb = facts.heartbeat;
-  const up = !!hb && hb.last_tick_at !== null && facts.now - hb.last_tick_at <= 3 * parseDuration(config.watch_interval);
+  const up = heartbeatUp(facts, config);
   const base = { id: `not-started:${story.key}`, story: story.key, slice: null, step: null, since: story.frontmatter.intake_at, url: story.frontmatter.url };
   if (up) return { ...base, group: "running", title: "taken in — the next tick starts it", command: `norn status ${story.key}` };
   return { ...base, group: "your_turn", title: `taken in, not started — ${story.frontmatter.title}`, detail: "a tick starts the story; the inbox then shows how to start its first step", command: "norn watch" };
@@ -282,7 +272,7 @@ export function gateChecks(story: StoryFacts, uf: UnitFacts): { detail: string |
  * story unit's step (its own step when it waits at one; NT3), else when the story is done.
  */
 export function notesClearedBy(story: StoryFacts): string {
-  const uf = story.units.find((u) => u.unit.slice === null);
+  const uf = storyUnit(story);
   const wf = uf?.workflow;
   const from = uf?.state?.status === "done" ? null : uf?.state?.step;
   if (!wf || !from) return "cleared when the story is done";
@@ -377,7 +367,7 @@ function baseSyncSteps(wf: Workflow): Set<string> {
  */
 export function staleItem(story: StoryFacts, base: string): InboxItem | null {
   const b = story.base;
-  const uf = story.units.find((u) => u.unit.slice === null);
+  const uf = storyUnit(story);
   const st = uf?.state;
   const wf = uf?.workflow ?? null;
   if (!b || !st || !wf || !isStale(wf, b)) return null;
@@ -405,9 +395,9 @@ export function staleItem(story: StoryFacts, base: string): InboxItem | null {
 /** BS11: the story PR targets another branch than the story's base — merging it would skip the base. */
 export function retargetItem(story: StoryFacts, base: string): InboxItem | null {
   const pr = knownPr(story);
-  const target = pr?.base_branch ?? pr?.base ?? null;
+  const target = prBaseBranch(pr);
   if (!pr || pr.state !== "open" || !target || target === base) return null;
-  const st = story.units.find((u) => u.unit.slice === null)?.state;
+  const st = storyUnit(story)?.state;
   return {
     id: `retarget:${story.key}:${pr.number}:${target}`,
     group: "check",
@@ -460,7 +450,7 @@ function reachOf(story: StoryFacts, uf: UnitFacts): InboxItem["reach"] | undefin
   if (!run) return undefined;
   const live = uf.run?.run_id === run.run_id ? uf.run : null;
   return {
-    worktree: uf.worktree?.path ?? (uf.unit.slice === null ? (story.worktree?.path ?? null) : null),
+    worktree: unitWorktree(story, uf, { mustExist: false }),
     agent_session_id: run.agent_session_id ?? live?.launch_unknown?.agent_session_id ?? null,
     pane_id: run.session?.pane_id ?? live?.session?.pane_id ?? null,
   };
@@ -553,13 +543,6 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
 
 const isStarted = (s: StoryFacts) => s.units.some((u) => u.state !== null);
 
-/** GR6: the story unit reached `$done`, or story.md says done/dropped — finished, never "unclaimed". */
-export function storyFinished(story: StoryFacts): boolean {
-  const status = story.frontmatter?.status;
-  if (status === "done" || status === "dropped") return true;
-  return story.units.find((u) => u.unit.slice === null)?.state?.status === "done";
-}
-
 /** GR8: the remote body changed after refine finished. */
 export function bodyChangedItem(story: StoryFacts): InboxItem | null {
   const fm = story.frontmatter;
@@ -611,7 +594,7 @@ export function headChangedItem(story: StoryFacts): InboxItem | null {
   if (!pr || pr.state !== "open" || !ready || !pr.head_sha || pr.head_sha === ready || pr.head_sha === story.ready_head_norn) return null;
   // BS10.2 (dogfood D6): a PR remembered from before the approval says nothing about what came after it
   if (story.pr === undefined && story.pr_seen && story.ready_approved_at && story.pr_seen.observed_at < epoch(story.ready_approved_at)) return null;
-  const st = story.units.find((u) => u.unit.slice === null)?.state;
+  const st = storyUnit(story)?.state;
   return {
     id: `head:${story.key}:${pr.head_sha}`,
     group: "check",

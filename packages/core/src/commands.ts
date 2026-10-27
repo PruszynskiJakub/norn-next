@@ -22,7 +22,7 @@ export const sliceWorktreePath = (storyWorktree: string, nn: string, slug: strin
  */
 export function startAgentCommand(worktree: string | null, agentCommand: string, args: string[] = []): string {
   const opts = args.length ? `${args.map(q).join(" ")} -- ` : "";
-  const run = `${agentCommand} ${opts}${q("Use the norn skill, then run `norn brief`.")}`;
+  const run = `${agentCommand} ${opts}${q(AUTO_PROMPT)}`;
   return worktree ? `cd ${q(worktree)} && ${run}` : run;
 }
 

@@ -4,15 +4,16 @@
  * skipped, so re-applying after a crash is idempotent. Receipts whose step/attempt do not
  * match the cursor are rejected (T9), never applied.
  */
-import type {
-  AgentStep,
-  LastOutcome,
-  ParkInfo,
-  ParkKind,
-  Receipt,
-  ReceiptOf,
-  UnitState,
-  Workflow,
+import {
+  type AgentStep,
+  CLASSIFIED_OUTCOMES,
+  type LastOutcome,
+  type ParkInfo,
+  type ParkKind,
+  type Receipt,
+  type ReceiptOf,
+  type UnitState,
+  type Workflow,
 } from "@norn/schema";
 import type { NumberedReceipt, UnitRef } from "./facts.ts";
 import { edgeOf, OVERRIDABLE_ROUTES, stepOf } from "./workflow.ts";
@@ -360,7 +361,7 @@ function classify(st: UnitState, r: ReceiptOf<"classify">, step: NonNullable<Ret
     return { state: { ...stuckPark(st, "exhausted", reason, r.at, r.receipt_id), last_outcome: last }, log: `exhausted: ${reason}` };
   }
   if (step.type !== "agent") {
-    if (!(step.type === "check" ? ["pass", "fail"] : step.type === "gate" ? ["approve", "reject", "stale"] : step.type === "git" ? ["done", "conflict", "stuck"] : ["done", "stuck"]).includes(o))
+    if (!(CLASSIFIED_OUTCOMES[step.type] as readonly string[]).includes(o))
       return { reject: `outcome '${o}' cannot be classified for a ${step.type} step` };
     // BS3: a git step that cannot run (dirty worktree, diverged branch) parks under Unblock with the reason
     if (step.type === "git" && o === "stuck") {

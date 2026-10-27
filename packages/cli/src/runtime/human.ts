@@ -5,7 +5,7 @@
  * holds it (T9). Views read through @norn/view only (X1).
  */
 import { isAbsolute, relative } from "node:path";
-import type { StoryFacts, UnitFacts } from "@norn/core";
+import { type StoryFacts, storyUnit, type UnitFacts } from "@norn/core";
 import { loadProjectView, type ProjectView } from "@norn/view";
 import {
   type ClaimBlob,
@@ -176,12 +176,12 @@ export async function resolveTarget(ctx: Context, raw: string, pick?: (st: UnitS
       if (uf) return localTarget(obs, sf, uf);
       throw refuse(`no slice ${slice} in story ${story}`, `norn status ${story}`, "unknown_unit");
     }
-    const storyUnit = sf.units.find((u) => u.unit.slice === null);
-    if (pick && storyUnit && !(storyUnit.state && pick(storyUnit.state))) {
+    const su = storyUnit(sf);
+    if (pick && su && !(su.state && pick(su.state))) {
       const matches = sf.units.filter((u) => u.unit.slice !== null && u.state && pick(u.state));
       if (matches.length === 1) return localTarget(obs, sf, matches[0] as UnitFacts);
     }
-    if (storyUnit) return localTarget(obs, sf, storyUnit);
+    if (su) return localTarget(obs, sf, su);
   }
   const remote = await remoteTarget(ctx, key);
   if (remote) return remote;
