@@ -10,7 +10,7 @@ import { acquireTickLock, appendTrace, markTick, parseWorkflowText, readTraceFil
 import type { Context } from "../context.ts";
 import { busyError } from "../output.ts";
 import { NORN_VERSION } from "../version.ts";
-import { type ActRecord, Actor } from "./act.ts";
+import { type ActRecord, Actor } from "./act/index.ts";
 import { type Observed, observe, type SyncMode, type SyncReport } from "./observe.ts";
 
 export interface TickOptions {

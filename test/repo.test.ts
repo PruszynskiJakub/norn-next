@@ -279,6 +279,15 @@ function decideText(): string {
     .join("\n");
 }
 
+/** act sources: act.ts before 6.3, an act/ folder after. */
+function actText(): string {
+  const runtime = join(PKGS, "cli", "src", "runtime");
+  const dir = join(runtime, "act");
+  const parts = existsSync(dir) ? files(dir) : [];
+  if (existsSync(join(runtime, "act.ts"))) parts.push(join(runtime, "act.ts"));
+  return parts.map((p) => readFileSync(p, "utf8")).join("\n");
+}
+
 /** (f) kinds act handles that decide never emits: dead branches, kept only until their removal item. */
 const ACT_ONLY_KINDS: string[] = [];
 
@@ -314,7 +323,7 @@ describe("ratchet lints", () => {
   test("(f) act handles exactly the action kinds decide emits", () => {
     const kinds = literalKinds(readFileSync(join(PKGS, "core", "src", "actions.ts"), "utf8"));
     const emitted = [...literalKinds(decideText())].filter((k) => kinds.has(k));
-    const handled = [...switchedKinds(readFileSync(join(PKGS, "cli", "src", "runtime", "act.ts"), "utf8"))];
+    const handled = [...switchedKinds(actText())];
     expect({
       unhandled: emitted.filter((k) => !handled.includes(k)).sort(),
       notAnAction: handled.filter((k) => !kinds.has(k)).sort(),
