@@ -8,80 +8,56 @@
  * (`remote.sync_interval`, or `sync: "force"`), and a failing remote leaves remote facts
  * `undefined` ("not observed") so decide does not act on them.
  */
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { hostname, userInfo } from "node:os";
 import { join } from "node:path";
 import {
   type AgentAdapter,
   type ClaimState,
   type Facts,
-  edgeOf,
   type FileError,
   type ForeignCommit,
   type GitPort,
   isIntakeCommit,
   type MailboxItem,
-  type NumberedReceipt,
-  openNotes,
-  RE_ENTRY_KINDS,
-  readyApproval,
   type Ports,
   type RemoteIssue,
   type RemotePullRequest,
   type RepoWorkflows,
   type RunFacts,
   type SliceFileFacts,
-  type StepRunFacts,
   type StoryBase,
   type StoryFacts,
-  stepOf,
-  storyWorktreePath,
   type UnitFacts,
   type UnitRef,
   type WorktreeFacts,
   type WorktreeStatus,
 } from "@norn/core";
+import { type HookFact, parseDuration, type ResolvedConfig, sliceBranch, storyBranch, type UnitState, type Workflow } from "@norn/schema";
 import {
-  type HookFact,
-  type LeaseFile,
-  parseDuration,
-  parseReceiptFileName,
-  type ReceiptOf,
-  type ResolvedConfig,
-  sliceBranch,
-  storyBranch,
-  type UnitState,
-  type Workflow,
-} from "@norn/schema";
-import {
+  type BaseFactsCache,
   classifyClaim,
   fetchNornRefs,
-  onlyNornCommitsSince,
-  listLeases,
+  heartbeatId,
+  type LocalUnit,
   listMailbox,
-  loadSnapshot,
-  readEnvNorn,
-  readActFailures,
-  type BaseFactsCache,
-  readBaseFacts,
-  readPrFacts,
+  liveRun,
+  loadLocalFacts,
+  onlyNornCommitsSince,
   type PrFactsCache,
-  readHookFacts,
+  readEnvNorn,
   readLocalClaim,
-  readReceipt,
+  readRemoteCache,
   readUnitMarker,
-  receiptsDir,
+  receiptsOfKinds,
   type StorySnapshot,
+  traceForeignCommits,
   type UnitSnapshot,
   type UnpushedTarget,
   type UnpushedUnit,
   unpushedRuns,
-  withSliceWorktrees,
   writeBaseFacts,
   writePrFacts,
-  heartbeatId,
-  readRemoteCache,
-  traceForeignCommits,
   writeRemoteCache,
 } from "@norn/store";
 import type { Context } from "../context.ts";
@@ -240,7 +216,10 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   if (due && ports.remote && remote) await git.fetch(root, remote, [`+refs/heads/${base}:refs/remotes/${remote}/${base}`], { quiet: true }).catch(() => undefined);
   const baseRef = await trackingRef(git, root, remote, base);
 
-  const snapshot = loadSnapshot({ repoRoot: root, storyRoots: [...storyWts.values()], home: ctx.home, env: ctx.env, baseRef });
+  // ---- local facts (H2): the snapshot, leases (K1, K3), hook facts, caches, what the receipts say
+  const liveness = leaseLiveness((p) => ports.process.isAlive(p));
+  const local = await loadLocalFacts(root, { now, home: ctx.home, env: ctx.env, storyWorktrees: storyWts, sliceWorktrees: sliceWts, baseRef, liveness, stalledMs: parseDuration(config.limits.stalled) });
+  const snapshot = local.snapshot;
   const workflows = repoWorkflows(snapshot.workflows, { default_agent: config.default_agent, visible: agentSkills(ports.agents, root) });
 
   if (due && ports.remote) {
@@ -270,7 +249,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   }
   writeRemoteCache(root, cache);
   // C1: the last PR seen per story, kept between syncs for the inbox (`pr_seen`); finished stories drop out
-  const prSeenIn = readPrFacts(root);
+  const prSeenIn = local.pr_seen;
   const prSeen: PrFactsCache = {};
   for (const s of snapshot.stories) {
     if (s.frontmatter?.status === "done" || s.frontmatter?.status === "dropped") continue;
@@ -288,8 +267,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     }
 
   // ---- machine (K1, K3, MO2)
-  const liveness = leaseLiveness((p) => ports.process.isAlive(p));
-  const leases = await listLeases(ctx.home, liveness);
+  const leases = local.leases;
   const runner = ports.runner && (await ports.runner.available().catch(() => false)) ? ports.runner.name : null;
 
   // ---- per-worktree facts, cached by path
@@ -304,36 +282,21 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     return p;
   };
 
-  // hooks are read once: back to the oldest live run or launch-unknown run (R5.1), and always the
-  // stalled window (R5.3: hook activity of any run of a unit's cursor step)
-  const starts: string[] = [new Date(now - parseDuration(config.limits.stalled)).toISOString()];
-  const unitSnaps = new Map<StorySnapshot, UnitSnapshot[]>();
-  for (const s of snapshot.stories) {
-    const units = withSliceWorktrees(s, (slice) => sliceWts.get(slice)).units;
-    unitSnaps.set(s, units);
-    for (const u of units) {
-      if (liveRun(u.state)) starts.push(u.state?.run?.started_at ?? (u.state as UnitState).updated_at);
-      const unknown = unknownLaunch(u.unapplied);
-      if (unknown) starts.push(unknown.receipt.at);
-    }
-  }
-  const hooks = readHookFacts(root, starts.sort()[0] as string);
-  const failures = readActFailures(root);
   const holder = machineHolder(ctx.env);
-  const local: LocalRunEnv = { holder, runner: ports.runner && runner ? ports.runner : null, stalledMs: parseDuration(config.limits.stalled), now };
+  const runEnv: LocalRunEnv = { holder, runner: ports.runner && runner ? ports.runner : null, now };
 
   const refs = await refMap(git, root);
   // BS1: last measurements; stories not seen this tick drop out of the cache
-  const baseCacheIn = readBaseFacts(root);
+  const baseCacheIn = local.base;
   const baseCache: BaseFactsCache = {};
   const unpushed: Record<string, UnpushedUnit[]> = {};
   const stories: StoryFacts[] = [];
   const storyLocs: Record<string, StoryLoc> = {};
   const unitLocs: Record<string, UnitLoc> = {};
-  for (const s of snapshot.stories) {
+  for (const ls of local.stories) {
+    const s = ls.snapshot;
     const branch = storyBranch(s.key, s.slug);
-    const conventional = storyWorktreePath(root, s.key, s.slug);
-    const storyWt = storyWts.get(s.key) ?? (existsSync(conventional) && readUnitMarker(conventional).marker ? conventional : null);
+    const storyWt = ls.worktree;
     const storyWorktree = await wtFacts(storyWt);
     storyLocs[s.key] = { key: s.key, slug: s.slug, root: s.root, specPath: s.path, spec_dir: s.spec_dir, worktree: storyWt, branch };
 
@@ -344,14 +307,14 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     const units: UnitFacts[] = [];
     const foreign: ForeignCommit[] = [];
     const targets: UnpushedTarget[] = [];
-    for (const u of unitSnaps.get(s) ?? []) {
+    for (const lu of ls.units) {
+      const u = lu.snapshot;
       const sliceFile = u.unit.slice ? s.slices.find((f) => f.key === u.unit.slice) : undefined;
-      const ownWt = u.unit.slice ? (sliceWts.get(u.unit.slice) ?? null) : storyWt;
+      const ownWt = lu.worktree;
       const worktree = await wtFacts(ownWt);
       const unitBranch = u.unit.slice ? (sliceFile ? sliceBranch(s.key, sliceFile.nn, sliceFile.slug) : (worktree?.status?.branch ?? `${s.key}/${u.unit.dir}`)) : branch;
-      const uf = await unitFacts(ports, root, s, u, worktree, hooks, leases.live.map((e) => e.lease), local);
-      const failure = failures[u.unit.key];
-      if (failure) uf.act_failure = failure;
+      const uf = await unitFacts(ports, s, lu, worktree, local.hooks, runEnv);
+      if (lu.act_failure) uf.act_failure = lu.act_failure;
       // a done slice not yet integrated: is its branch in the story branch (the slice cleanup's delete)
       if (sliceFile && u.state?.status === "done" && sliceFile.frontmatter?.status !== "integrated") {
         const head = refs.get(`refs/heads/${unitBranch}`);
@@ -401,8 +364,8 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       ...(prSeen[s.key] ? { pr_seen: prSeen[s.key] } : {}),
       ...(byAncestry.has(s.key) ? { merged_by_ancestry: true } : {}),
       ...(foreign.length ? { foreign_commits: foreign } : {}),
-      ...(await readyHead(root, s, unitSnaps.get(s)?.[0], (storyPrs.has(s.key) ? storyPrs.get(s.key) : prSeen[s.key]?.pr)?.head_sha)),
-      ...storyNotes(s, unitSnaps.get(s) ?? []),
+      ...(await readyHead(root, s.key, ls.ready, (storyPrs.has(s.key) ? storyPrs.get(s.key) : prSeen[s.key]?.pr)?.head_sha)),
+      ...(ls.notes ? { notes: ls.notes } : {}),
       ...(s.base_status !== undefined ? { base_status: s.base_status } : {}),
       ...(lost.length ? { unpushed_runs: lost.map((l) => ({ unit: l.unit, files: l.files })) } : {}),
       ...(claim.state === "none" && s.frontmatter?.status === "new" ? await intakeOnly(git, root, remote ? baseRef : `refs/heads/${base}`, branch, s.key, refs) : {}),
@@ -588,45 +551,12 @@ async function refMap(git: GitPort, root: string): Promise<Map<string, string>> 
   return new Map(refs.map((r) => [r.ref, r.sha]));
 }
 
-/**
- * F35/C5: `ready_head_sha` from the story unit's approve and re-entry receipts (`readyApproval`, BS10.2: with its time), and
- * `ready_head_norn` when the known PR head moved past it by norn's own commits of the story only.
- */
-async function readyHead(root: string, story: StorySnapshot, u: UnitSnapshot | undefined, prHead: string | undefined): Promise<{ ready_head_sha?: string; ready_approved_at?: string; ready_head_norn?: string }> {
-  const wf = u?.workflow?.workflow;
-  if (!u || !wf) return {};
-  const ready = readyApproval(wf, receiptsOfKinds(story, u, ["approve", ...RE_ENTRY_KINDS]));
+/** F35/C5: the story's ready approval (store), and `ready_head_norn` when the known PR head moved past it by norn's own commits of the story only. */
+async function readyHead(root: string, story: string, ready: { sha: string; at: string } | undefined, prHead: string | undefined): Promise<{ ready_head_sha?: string; ready_approved_at?: string; ready_head_norn?: string }> {
   if (!ready) return {};
   const sha = ready.sha;
-  const norn = prHead && prHead !== sha && (await onlyNornCommitsSince(root, sha, prHead, story.key));
+  const norn = prHead && prHead !== sha && (await onlyNornCommitsSince(root, sha, prHead, story));
   return { ready_head_sha: sha, ready_approved_at: ready.at, ...(norn ? { ready_head_norn: prHead } : {}) };
-}
-
-/** Receipts of the given kinds in a unit's runs dir, ascending — read by file name, the others never opened. */
-function receiptsOfKinds(story: StorySnapshot, u: UnitSnapshot, kinds: readonly string[]): NumberedReceipt[] {
-  let names: string[];
-  try {
-    names = readdirSync(receiptsDir(u.path));
-  } catch {
-    return [];
-  }
-  const out: NumberedReceipt[] = [];
-  const ns = names
-    .map(parseReceiptFileName)
-    .filter((p): p is { n: number; kind: string } => !!p && kinds.includes(p.kind))
-    .map((p) => p.n)
-    .sort((a, b) => a - b);
-  for (const n of ns) {
-    const r = readReceipt(u.path, n, story.root);
-    if (r && "receipt" in r) out.push(r);
-  }
-  return out;
-}
-
-/** NT2/NT3: the story's open notes — notes of `done` receipts of its units no `approve` acknowledged. */
-function storyNotes(story: StorySnapshot, units: UnitSnapshot[]): { notes?: StoryFacts["notes"] } {
-  const notes = openNotes(units.map((u) => ({ unit: u.unit.key, receipts: receiptsOfKinds(story, u, ["done", "approve"]) })));
-  return notes.length ? { notes } : {};
 }
 
 const STORY_BRANCH = /^((?:gh|gl)-\d+)-[a-z0-9][a-z0-9-]*$/;
@@ -673,110 +603,25 @@ async function worktreeFacts(ports: Ports, path: string): Promise<WorktreeFacts 
   return { path, exists: true, marker, status, last_commit_at, last_file_change_at: newestMtime(path, changed), slot, ...(in_progress ? { in_progress } : {}) };
 }
 
-/** The receipt that produced `state.last_outcome`, scanning newest receipts first (B3 Rework). */
-function lastOutcomeReceipt(runsDir: string, state: UnitState, root: string): NumberedReceipt | null {
-  const id = state.last_outcome?.receipt_id;
-  if (!id) return null;
-  let names: string[];
-  try {
-    names = readdirSync(receiptsDir(runsDir));
-  } catch {
-    return null;
-  }
-  const ns = names
-    .map(parseReceiptFileName)
-    .filter((p): p is { n: number; kind: string } => !!p && (p.kind === "check" || p.kind === "done"))
-    .map((p) => p.n)
-    .sort((a, b) => b - a)
-    .slice(0, 50);
-  for (const n of ns) {
-    const r = readReceipt(runsDir, n, root);
-    if (r && "receipt" in r && r.receipt.receipt_id === id) return r;
-  }
-  return null;
-}
-
-/** Run facts are observed for running units and for parked ones that keep their run (B2: is the session still there to answer into?). */
-const liveRun = (st: UnitState | null | undefined): boolean => !!st?.run && (st.status === "running" || st.status === "parked");
-
-/**
- * R5.1: the unapplied `started` receipt (norn's own, auto) whose launch never reached `state.json`
- * — no session recorded, and no later receipt of the run's agent showing it ran. Null when none.
- */
-export function unknownLaunch(unapplied: readonly NumberedReceipt[]): (NumberedReceipt & { receipt: ReceiptOf<"started"> }) | null {
-  const last = unapplied.filter((r) => r.receipt.kind === "started" && r.receipt.how === "auto" && r.receipt.by === "norn").at(-1) as (NumberedReceipt & { receipt: ReceiptOf<"started"> }) | undefined;
-  if (!last || last.receipt.session) return null;
-  if (unapplied.some((r) => r.n > last.n && r.receipt.by === "agent")) return null;
-  return last;
-}
-
 interface LocalRunEnv {
   /** this machine's `user@host` (R7.2) */
   holder: string;
   /** this machine's available runner */
   runner: Ports["runner"];
-  stalledMs: number;
   now: number;
 }
 
-/**
- * R5.3 + R5.1: the unit's `started` / `classify` receipts at its cursor step/attempt (newest first,
- * stopping at the first of another cursor), and every session id its `started` receipts recorded.
- */
-function cursorRuns(runsDir: string, st: UnitState, root: string): { runs: Map<string, { died: boolean }>; sessions: Set<string> } {
-  const runs = new Map<string, { died: boolean }>();
-  const sessions = new Set<string>();
-  let names: string[];
-  try {
-    names = readdirSync(receiptsDir(runsDir));
-  } catch {
-    return { runs, sessions };
-  }
-  const ns = names
-    .map(parseReceiptFileName)
-    .filter((p): p is { n: number; kind: string } => !!p && (p.kind === "started" || p.kind === "classify"))
-    .sort((a, b) => b.n - a.n);
-  let atCursor = true;
-  for (const { n } of ns) {
-    const r = readReceipt(runsDir, n, root);
-    if (!r || !("receipt" in r)) continue;
-    const rc = r.receipt;
-    if (rc.kind === "started" && rc.session) sessions.add(rc.session.session_id);
-    if (!atCursor) continue;
-    if (rc.step !== st.step || rc.attempt !== st.attempt) {
-      atCursor = false;
-      continue;
-    }
-    if (!rc.run_id) continue;
-    const cur = runs.get(rc.run_id) ?? { died: false };
-    if (rc.kind === "classify" && (rc.outcome === "died" || rc.route === "retry")) cur.died = true;
-    runs.set(rc.run_id, cur);
-  }
-  return { runs, sessions };
-}
-
-async function unitFacts(
-  ports: Ports,
-  repoRoot: string,
-  story: StorySnapshot,
-  u: UnitSnapshot,
-  worktree: WorktreeFacts | null,
-  hooks: HookFact[],
-  leases: LeaseFile[],
-  env: LocalRunEnv,
-): Promise<UnitFacts> {
+/** The unit's facts: what store read from its receipts (`LocalUnit`), extended with its worktree and run (R5.1, R5.3, B3). */
+async function unitFacts(ports: Ports, story: StorySnapshot, lu: LocalUnit, worktree: WorktreeFacts | null, hooks: HookFact[], env: LocalRunEnv): Promise<UnitFacts> {
   const now = env.now;
+  const u = lu.snapshot;
   const st = u.state;
   const prefix = `${story.spec_dir}/runs/${u.unit.dir}/`;
   const dirty = worktree?.status ? [...worktree.status.staged, ...worktree.status.unstaged, ...worktree.status.untracked] : [];
   const uncommitted = dirty.some((p) => p.startsWith(prefix));
 
-  const lo = st ? lastOutcomeReceipt(u.path, st, worktree?.path ?? story.root) : null;
-  const last_check = lo?.receipt.kind === "check" && lo.receipt.outcome === "fail" ? lo : null;
-  const last_findings = lo?.receipt.kind === "done" && lo.receipt.findings?.length ? lo : null;
-
-  const cursor = st ? cursorRuns(u.path, st, worktree?.path ?? story.root) : null;
-  const unknown = st ? unknownLaunch(u.unapplied) : null;
+  const cursor = lu.cursor;
+  const unknown = lu.unknown_launch;
   let run: RunFacts | null = null;
   if (unknown && st) {
     // R5.1: look for the run: its hook facts, runner sessions in its worktree, processes with its NORN_RUN
@@ -832,19 +677,6 @@ async function unitFacts(
     }
   }
 
-  const mineLeases = leases.filter((l) => l.repo === repoRoot && l.story === u.unit.story && l.slice === u.unit.slice);
-  const lease = mineLeases.find((l) => l.kind === "check") ?? mineLeases.find((l) => l.kind === "agent") ?? null;
-
-  // R5.3: runs of the cursor step and their hook activity
-  let step_runs: StepRunFacts[] | undefined;
-  if (cursor) {
-    step_runs = [...cursor.runs].map(([run_id, r]) => {
-      const own = hooks.filter((h) => h.run_id === run_id);
-      const last = own.at(-1);
-      return { run_id, last_hook_at: last ? Date.parse(last.at) : null, ended: r.died || last?.event === "session_end" };
-    });
-  }
-
   const errors: FileError[] = u.errors;
   return {
     unit: u.unit,
@@ -853,13 +685,13 @@ async function unitFacts(
     workflow_hash: u.workflow?.hash ?? null,
     errors,
     unapplied: u.unapplied,
-    last_check,
-    last_findings,
-    last_outcome_receipt: lo,
+    last_check: lu.last_check,
+    last_findings: lu.last_findings,
+    last_outcome_receipt: lu.last_outcome_receipt,
     worktree,
     run,
-    lease,
+    lease: lu.lease,
     uncommitted,
-    ...(step_runs ? { step_runs } : {}),
+    ...(lu.step_runs ? { step_runs: lu.step_runs } : {}),
   };
 }

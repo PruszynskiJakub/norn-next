@@ -14,6 +14,7 @@ export * from "./heartbeat.ts";
 export * from "./inbox-history.ts";
 export * from "./leases.ts";
 export * from "./local.ts";
+export * from "./local-facts.ts";
 export * from "./local-json.ts";
 export * from "./lock.ts";
 export * from "./paths.ts";
