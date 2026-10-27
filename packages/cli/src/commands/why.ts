@@ -23,7 +23,6 @@
 import { criterionLine, decide, type Decision, type NumberedReceipt, type StoryFacts, type UnitFacts, unitDecision } from "@norn/core";
 import { ExitCode, type Receipt, type TickStartTrace, type TickTrace, type TickUnitRecord, ULID_PATTERN } from "@norn/schema";
 import { crashedTicksFor, decisionUnit, findCrashedTick, findTick, readTrace } from "@norn/store";
-import { receiptSummary } from "@norn/view";
 import { defineCommand, opt } from "../command.ts";
 import { refuse, usageError, withExit } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
@@ -93,12 +92,14 @@ function reasonOf(r: Receipt): string | null {
       return r.reason;
     case "unstick":
       return r.comment ?? (r.to ? `to ${r.to}` : null);
-    // no text of their own beyond what happened: the timeline's line for them, uncut (O4)
     case "mode":
+      return `${r.previous} → ${r.mode}`;
     case "workflow":
+      return `${r.name} at ${r.to}`;
     case "started":
+      return `${r.how}${r.agent ? ` ${r.agent}` : ""}${r.retry ? " (retry)" : ""}`;
     case "take":
-      return receiptSummary(r, Number.POSITIVE_INFINITY);
+      return r.previous_holder ? `taken from ${r.previous_holder}${r.forced ? " (forced)" : r.expired ? " (expired claim)" : ""}` : "taken (claim was free)";
     case "update":
       return `update from ${r.from} to ${r.to} (${r.reason})`;
   }

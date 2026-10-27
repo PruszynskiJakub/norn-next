@@ -154,8 +154,8 @@ export function findWorkspace(workspaces: readonly HerdrWorkspace[], reach: RunR
 
 export function createHerdrCockpit(opts: HerdrCockpitOptions = {}): HerdrCockpit {
   const env = opts.env ?? process.env;
-  // the cockpit answers keystrokes: a hung herdr must not hang it (H11)
-  const herdr = herdrCaller(opts.exec ?? bunExec, { ...opts, timeoutMs: 10_000 });
+  // the cockpit answers keystrokes: a hung herdr must not hang it (H11); its errors keep the raw stderr
+  const herdr = herdrCaller(opts.exec ?? bunExec, { ...opts, timeoutMs: 10_000, errors: "raw" });
 
   /** K7: close one thing; one already gone is not an error. */
   async function close(kind: "pane" | "tab" | "workspace", id: string): Promise<void> {

@@ -14,6 +14,13 @@ export interface HerdrCallOptions {
   session?: string;
   /** H11: bound each call (a timeout is exit 124); default unbounded */
   timeoutMs?: number;
+  /**
+   * How a failure maps to a PortError. `parsed` (default, runner and status pane): herdr's JSON
+   * error code (`session_gone`, `session_blocked`, `herdr_<code>`) and message. `raw` (cockpit):
+   * `session_gone` when stderr names a not-found pane/tab/workspace, else `herdr_error`, with the
+   * raw stderr as message; plain-text stdout comes back trimmed.
+   */
+  errors?: "parsed" | "raw";
 }
 
 /** Herdr error codes that mean the pane (and so the session) no longer exists. */
@@ -28,9 +35,14 @@ export function herdrBase(opts: Pick<HerdrCallOptions, "bin" | "session">): stri
 export function herdrCaller(exec: Exec, opts: HerdrCallOptions = {}): HerdrCall {
   const base = herdrBase(opts);
   const execOpts = opts.timeoutMs === undefined ? undefined : { timeoutMs: opts.timeoutMs };
+  const raw = opts.errors === "raw";
   return async function herdr(args: string[]): Promise<unknown> {
     const r = execOpts ? await exec([...base, ...args], execOpts) : await exec([...base, ...args]);
     if (r.code === 127) throw portError("runner_unavailable", `herdr not runnable: ${r.stderr.trim()}`);
+    if (r.code !== 0 && raw) {
+      const message = `herdr ${args.slice(0, 2).join(" ")}: ${r.stderr.trim() || `exit ${r.code}`}`;
+      throw portError(/"code"\s*:\s*"(pane|tab|workspace)_not_found"/.test(r.stderr) ? "session_gone" : "herdr_error", message);
+    }
     if (r.code !== 0) {
       const err = parseError(r.stderr) ?? parseError(r.stdout);
       const code = err?.code ?? "herdr_error";
@@ -45,7 +57,7 @@ export function herdrCaller(exec: Exec, opts: HerdrCallOptions = {}): HerdrCall 
     try {
       return JSON.parse(text);
     } catch {
-      return r.stdout;
+      return raw ? text : r.stdout;
     }
   };
 }
