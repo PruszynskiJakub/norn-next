@@ -34,6 +34,8 @@ export interface CliDeps {
   input?: AsyncIterable<string>;
   /** HC6/HC12: Herdr for the cockpit; null = none; absent = the real one when `HERDR_ENV=1` */
   herdr?: herdr.HerdrCockpit | null;
+  /** an outside command a front end starts for the person (`norn pick` opens the PR with gh/glab); default Bun.spawn */
+  shell?: (argv: string[], cwd: string) => Promise<{ code: number; stderr: string }>;
 }
 
 export const systemClock: Clock = {

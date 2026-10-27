@@ -2,7 +2,7 @@
  * ProjectView: the read model front ends consume (X1). Plain JSON — no functions,
  * Dates or Maps — so `norn status --json`, a web cockpit and a Herdr pane share it.
  */
-import type { FileError, Inbox, InboxEntry } from "@norn/core";
+import type { FileError, Inbox, InboxEntry, StoryNote } from "@norn/core";
 import type { LeaseKind, Mode, ParkKind, SliceStatus, StoryStatus, UnitStatus } from "@norn/schema";
 
 export interface CounterView {
@@ -81,8 +81,24 @@ export interface BaseSyncView {
   last_update: { sha: string; base_sha: string; at: string; step: string } | null;
 }
 
+/** C1: the story PR as this checkout's last remote sync saw it (`trace/pr.json`). */
+export interface PrView {
+  number: number;
+  url: string;
+  state: "open" | "closed" | "merged";
+  is_draft: boolean;
+  /** ISO time of that sync */
+  seen_at: string;
+}
+
 export interface StoryView extends UnitView {
   slice: null;
+  /** story branch (GR3) */
+  branch: string;
+  /** the story PR as last seen here; null = none seen (or no sync yet) */
+  pr: PrView | null;
+  /** NT2: open notes of the story and its slices, in the order they were left */
+  notes: StoryNote[];
   /** BS1/BS3: base sync state; null = no measurement and no base merge on record */
   base_sync: BaseSyncView | null;
   /** coarse frontmatter status; null if story.md is unreadable */

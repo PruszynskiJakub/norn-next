@@ -56,7 +56,7 @@ import {
   withSliceWorktrees,
 } from "@norn/store";
 import { mergeTimeline, receiptEntry, traceEntries, traceUnits } from "./timeline.ts";
-import type { BaseSyncView, ClaimView, CounterView, ProjectView, RecentDone, RunView, SliceView, StoryView, TimelineEntry, UnitView } from "./types.ts";
+import type { BaseSyncView, ClaimView, CounterView, PrView, ProjectView, RecentDone, RunView, SliceView, StoryView, TimelineEntry, UnitView } from "./types.ts";
 
 export interface LoadProjectViewOptions {
   repoRoot: string;
@@ -204,6 +204,11 @@ function baseSync(sf: StoryFacts, receipts: readonly NumberedReceipt[], branch: 
   const b = sf.base;
   if (!b && !last) return null;
   return { branch: b ? b.ref.replace(/^refs\/(remotes\/[^/]+|heads)\//, "") : branch, behind: b?.behind ?? null, ahead: b?.ahead ?? null, conflicts: b?.conflicts ?? [], last_update: last };
+}
+
+function prView(seen: StoryFacts["pr_seen"]): PrView | null {
+  const pr = seen?.pr;
+  return pr ? { number: pr.number, url: pr.url, state: pr.state, is_draft: pr.is_draft, seen_at: new Date(seen.observed_at).toISOString() } : null;
 }
 
 export async function loadProjectView(opts: LoadProjectViewOptions): Promise<ProjectView> {
@@ -417,6 +422,9 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       stories.push({
         ...base,
         slice: null,
+        branch: sf.branch,
+        pr: prView(prSeen[story.key]),
+        notes: sf.notes ?? [],
         base_sync: baseSync(sf, storyUnit.receipts ?? [], config.base_branch ?? cachedDefaultBranch(opts.repoRoot) ?? "main"),
         story_status: story.frontmatter?.status ?? null,
         spec_dir: story.spec_dir,
