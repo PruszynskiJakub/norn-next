@@ -6,6 +6,7 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ### Changed
 
+- `@norn/store` exports `loadLocalFacts(root, opts)`: the facts of a checkout read from its own files (snapshot, leases, hook facts, act failures, PR and base caches, and per unit its last outcome receipt, cursor runs and unknown launch). `observe` now builds on it; its facts are unchanged (H2).
 - **Breaking for third-party git adapters (X2).** `GitPort` (`packages/core/src/ports.ts`) is now every git call norn's commands and runtime make, so none of them run git around it. It gains `remotes`, `commonDir`, `show`, `lsTree`, `hasRef`, `hasPath`, `firstParentLog`, `revList`, `worktreeAddDetached`, `worktreePrune`, `version`, `remoteBranches`, `changedPaths`, `checkoutPaths` and `untrack`, `fetch` takes a `quiet` option and `listRefs` several prefixes; it drops `worktreeRoot`, `listRemoteRefs`, `readBlob` and `writeBlob`, which nothing called. `@norn/store` no longer exports its raw git plumbing (`git`, `gitSync`, `gitOk`, the blob and ref helpers); claim and mailbox refs stay behind its claim and mailbox functions.
 
 ### Fixed
