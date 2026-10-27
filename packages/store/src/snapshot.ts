@@ -19,10 +19,10 @@ import { baseSpecsRoot, defaultBaseRef } from "./base.ts";
 import { type LoadedConfig, loadConfig, loadWorkflows, type WorkflowListing } from "./config.ts";
 import { readSliceFile, readStoryFile } from "./frontmatter.ts";
 import { isErrno } from "./fsx.ts";
-import { readUnitMarker } from "./leases.ts";
 import { slicesDir, specsDir, storyFile, unitDir } from "./paths.ts";
 import { listReceipts } from "./receipts.ts";
 import { type Handoff, type PinnedWorkflow, readHandoff, readPinnedWorkflow, readState } from "./unit.ts";
+import { readUnitMarker } from "./worktree.ts";
 
 export interface UnitSnapshot {
   unit: UnitRef;

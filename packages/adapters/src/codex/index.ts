@@ -8,7 +8,7 @@
 import { join } from "node:path";
 import type { AgentAdapter, AgentFactory, AgentLaunchRequest, HookDecision, HookResponse } from "@norn/core";
 import type { HookEventKind, HookFact } from "@norn/schema";
-import { shared } from "../claude/index.ts";
+import * as shared from "../agent-hooks/index.ts";
 
 const { buildFact, field, isObject, jsonHookInstaller, kebab, launchEnv, nativeEvent, objField, readJsonl, textOf } = shared;
 const NAME = "codex";

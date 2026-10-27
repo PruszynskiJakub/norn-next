@@ -22,9 +22,7 @@ import {
   objField,
   readJsonl,
   textOf,
-} from "./shared.ts";
-
-export * as shared from "./shared.ts";
+} from "../agent-hooks/index.ts";
 
 const NAME = "claude";
 

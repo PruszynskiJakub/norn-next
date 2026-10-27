@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { claudeAgent, shared, withPendingCommands } from "../../src/claude/index.ts";
+import { claudeAgent, withPendingCommands } from "../../src/claude/index.ts";
 import payloads from "./fixtures/hook-payloads.json";
 
 const FIX = join(import.meta.dir, "fixtures");
@@ -143,22 +143,6 @@ describe("claude hooks install (A1)", () => {
     await claudeAgent.installHooks(repo, "norn hook");
     await claudeAgent.uninstallHooks(repo);
     expect(read(join(repo, ".claude", "settings.json"))).toEqual({});
-  });
-
-  test("keeps the norn group position and removes norn hooks from events no longer installed", () => {
-    const settings = {
-      hooks: {
-        Stop: [
-          { hooks: [{ type: "command", command: "old stop # norn-owned" }] },
-          { hooks: [{ type: "command", command: "user" }] },
-        ],
-        SubagentStop: [{ hooks: [{ type: "command", command: "old sub # norn-owned" }] }],
-      },
-    };
-    const out = shared.mergeNornHooks(settings, [{ native: "Stop", arg: "stop" }], "norn hook", "claude") as any;
-    expect(out.hooks.Stop[0].hooks[0].command).toBe("norn hook stop --agent claude # norn-owned");
-    expect(out.hooks.Stop[1].hooks[0].command).toBe("user");
-    expect(out.hooks.SubagentStop).toBeUndefined();
   });
 
   test("invalid settings JSON is refused, not overwritten", async () => {

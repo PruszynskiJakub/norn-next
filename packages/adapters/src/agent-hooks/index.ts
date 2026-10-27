@@ -2,43 +2,20 @@
  * Helpers shared by the agent adapters (claude, codex, gemini, opencode). Claude Code, Codex and
  * Gemini CLI all use the same hook config shape:
  *   { "hooks": { "<Event>": [ { "matcher"?: "...", "hooks": [ { "type": "command", "command": "..." } ] } ] } }
- * so one merge/unmerge implementation serves all three (A1).
+ * so one merge/unmerge implementation serves all three (A1). Settings files are written through
+ * store's atomicWrite (S1).
  */
-import { closeSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, writeSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
 import type { HookFact, HookEventKind } from "@norn/schema";
 import { SLICE_KEY_PATTERN, STORY_KEY_PATTERN, ULID_PATTERN, validateHookFact } from "@norn/schema";
 import type { AgentLaunchRequest } from "@norn/core";
+import { atomicWrite, readText } from "@norn/store";
 import { portError } from "../exec.ts";
 
 /** A1: every norn-installed hook command ends with this shell comment; it is the ownership marker. */
 export const NORN_HOOK_MARKER = "# norn-owned";
 
 // ------------------------------------------------------------------ files
-
-/** S1: temp file in the same dir → fsync → rename. (Store has no generic helper yet.) */
-export function atomicWrite(path: string, content: string): void {
-  mkdirSync(dirname(path), { recursive: true });
-  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
-  const fd = openSync(tmp, "w");
-  try {
-    writeSync(fd, content);
-    fsyncSync(fd);
-  } finally {
-    closeSync(fd);
-  }
-  renameSync(tmp, path);
-}
-
-function readText(path: string): string | null {
-  try {
-    return readFileSync(path, "utf8");
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ENOENT") return null;
-    throw e;
-  }
-}
 
 export type JsonObject = Record<string, unknown>;
 
@@ -58,7 +35,7 @@ export function readJsonObject(path: string): JsonObject {
   return v;
 }
 
-/** Write `next` if its serialization differs from the file; returns true when written. */
+/** Write `next` if its serialization differs from the file (atomically, S1); returns true when written. */
 export function writeJsonIfChanged(path: string, next: JsonObject): boolean {
   const text = `${JSON.stringify(next, null, 2)}\n`;
   if (readText(path) === text) return false;
