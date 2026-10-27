@@ -132,9 +132,20 @@ describe("norn init", () => {
     expect(r.stdout).toStartWith("norn — deliver software stories");
     expect(r.stdout).toMatch(/\nStart here\n  norn init +Set up norn in this repository: config, workflows, skills, hooks\n/);
     expect(r.stdout).not.toMatch(/\((?:A1|§9\.3)/); // spec ids stay in the JSON
+    // an agent that runs help reads first which commands are its own; each command and skill says who it is for
+    expect(r.stdout.split("\n")[2]).toStartWith("Agent doing a norn step? Run only `norn brief`");
+    expect(r.stdout).toMatch(/\nAgent protocol: the only commands an agent runs\n  norn brief /);
+    expect(r.stdout).toMatch(/\n  step skills, a person works with the agent: norn-refine, /);
     const list = (r.value as { commands: Array<{ command: string; summary: string }> }).commands;
     for (const c of list) expect(r.stdout).toContain(`  norn ${c.command} `);
     expect(list.find((c) => c.command === "init")?.summary).toContain("(A1, SK1, W1)");
+    const by = (f: string) => list.filter((c) => (c as { for?: string }).for === f).map((c) => c.command);
+    expect(by("agent")).toEqual(["brief", "done", "ask", "stuck"]);
+    expect(by("hooks")).toEqual(["hook"]);
+    const skills = (r.value as { skills: Array<{ skill: string; for: string }> }).skills;
+    expect(skills.find((s) => s.skill === "norn")?.for).toBe("protocol");
+    expect(skills.find((s) => s.skill === "norn-qa-person")?.for).toBe("attended");
+    for (const s of skills) expect(r.stdout).toContain(s.skill);
     expect(() => JSON.parse(r.stdout)).toThrow();
     expect(JSON.parse((await h.norn("help", "--json")).stdout)).toEqual(r.value);
     // `norn`, `norn --help` and `norn <command> --help` are `norn help`
@@ -142,7 +153,7 @@ describe("norn init", () => {
     expect((await h.norn("--help")).stdout).toBe(r.stdout);
     expect(JSON.parse((await h.norn("--help", "--json")).stdout)).toEqual(r.value);
     const watch = await h.norn("watch", "--help");
-    expect(watch.stdout).toBe("norn watch — Run ticks in a loop; a clean exit releases held claims\n\n    norn watch [--interval 30s] [--max-ticks N] [--keep-claims] [--human]\n");
+    expect(watch.stdout).toBe("norn watch — Run ticks in a loop; a clean exit releases held claims\n\n    norn watch [--interval 30s] [--max-ticks N] [--keep-claims] [--human]\n\nFor the person; an agent runs it only when the person asks it to.\n");
     expect((await h.norn("watch", "--help", "--json")).value).toMatchObject({ command: "watch", usage: expect.stringContaining("--interval") });
   });
 

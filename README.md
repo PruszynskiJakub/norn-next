@@ -135,7 +135,7 @@ Five commands cover most days:
 | `norn answer` / `norn approve` / `norn unstick` | resolves an item; the inbox prints the exact line |
 | `norn status` | every story, slice, run and claim at a glance |
 
-`norn help` lists every command, grouped, with the ones to start with first. `norn help <command>` shows one command's usage.
+`norn help` lists every command, grouped, with the ones to start with first, and says who runs each: an agent doing a step runs only `brief`, `done`, `ask` and `stuck`; the rest are yours, and an agent runs one only when you ask it to. It also sorts the bundled skills into the protocol, steps an agent works alone, steps a person works with the agent, and references. `norn help <command>` shows one command's usage.
 
 For recipes by situation (a first story, an agent that asks or dies, a moved `main`, custom workflows, handing a story over), open [`docs/cookbook.html`](docs/cookbook.html) in a browser.
 
