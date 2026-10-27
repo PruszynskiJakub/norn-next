@@ -6,7 +6,7 @@ import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { StoryFacts } from "@norn/core";
 import { ulid } from "@norn/schema";
-import { acquireTickLock, git as rawGit, releaseClaim } from "@norn/store";
+import { acquireTickLock, git as rawGit, releaseClaim, writtenHere } from "@norn/store";
 import type { Context } from "../context.ts";
 import { busyError } from "../output.ts";
 import { type Observed, observe } from "./observe.ts";
@@ -20,8 +20,7 @@ export interface ReleaseResult {
 
 /** A claim this heartbeat may release: held now, or expired but last written by this heartbeat. */
 export function heldHere(obs: Observed, story: StoryFacts): boolean {
-  const c = story.claim;
-  return c.state === "mine" || (c.state === "expired" && c.blob.heartbeat_id === obs.heartbeat_id);
+  return writtenHere(story.claim, obs.heartbeat_id);
 }
 
 /** Commit edits to each unit's handoff.md (agents and people write Goal/Progress/Resume, S9) before a handoff point. */

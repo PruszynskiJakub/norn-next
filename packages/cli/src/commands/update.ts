@@ -7,10 +7,9 @@
  */
 import { baseUpdateStep, storyUnit } from "@norn/core";
 import type { UnitState } from "@norn/schema";
-import { readClaim, heartbeatId } from "@norn/store";
 import { defineCommand } from "../command.ts";
-import { failure, refuse } from "../output.ts";
-import { at, deliver, gitRemote, humanReceipt, resolveTarget, started } from "../runtime/human.ts";
+import { refuse } from "../output.ts";
+import { at, claimFor, deliver, humanReceipt, resolveTarget, started } from "../runtime/human.ts";
 import { storyArg } from "./take.ts";
 
 /** BS9: done (PR unmerged), at a gate, or stuck. */
@@ -42,17 +41,11 @@ export const updateCommand = defineCommand({
     if (!to) throw refuse(`workflow ${wf.name} of ${t.story} has no base update step (no \`git: update\` step, no base.step)`, `norn workflow ${t.story} <name> --to <step>`, "no_update_step");
 
     // T7: only the claim holder writes receipts for the story; never through the mailbox
-    let claim;
-    try {
-      claim = await readClaim(ctx.root, await gitRemote(ctx), t.story);
-    } catch (e) {
-      throw failure(`cannot read the claim of ${t.story}: ${(e as Error).message}`, "check the network and retry", "claim_unreadable");
-    }
-    const now = ctx.clock.now();
-    const mine = claim.state === "present" && Date.parse(claim.blob.expires_at) > now && claim.blob.heartbeat_id === heartbeatId(ctx.root, now);
-    if (!mine || !t.runsDir) {
-      const who = claim.state === "present" && Date.parse(claim.blob.expires_at) > now ? `held by ${claim.blob.holder}` : "not held by this checkout";
-      throw refuse(`${t.story}'s claim is ${who}; only the holder updates a story (T7)`, claim.state === "present" && Date.parse(claim.blob.expires_at) > now ? `ask ${claim.blob.holder} to run norn update ${t.story}, or norn take ${t.story} --force` : `norn take ${t.story}`, "not_holder");
+    const claim = await claimFor(ctx, t.story);
+    if (claim.state !== "mine" || !t.runsDir) {
+      const live = claim.state === "mine" || claim.state === "other";
+      const who = live ? `held by ${claim.blob.holder}` : "not held by this checkout";
+      throw refuse(`${t.story}'s claim is ${who}; only the holder updates a story (T7)`, live ? `ask ${claim.blob.holder} to run norn update ${t.story}, or norn take ${t.story} --force` : `norn take ${t.story}`, "not_holder");
     }
     const pending = (sf ? storyUnit(sf) : null)?.unapplied.find((r) => r.receipt.kind === "update");
     if (pending) throw refuse(`an update of ${t.story} is already recorded (${pending.file}) and not applied yet`, "norn tick", "already_recorded");

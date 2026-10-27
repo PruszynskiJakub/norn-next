@@ -12,7 +12,7 @@
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { sliceWorktreePath, storyWorktreePath } from "@norn/core";
-import { type ClaimBlob, ExitCode, isStoryKey, parseSliceKey, parseDuration, type ReceiptOf, sliceBranch, specDir, STORY_UNIT_DIR, ulid } from "@norn/schema";
+import { ExitCode, isStoryKey, parseSliceKey, type ReceiptOf, sliceBranch, specDir, STORY_UNIT_DIR, ulid } from "@norn/schema";
 import {
   acquireClaim,
   acquireTickLock,
@@ -22,14 +22,16 @@ import {
   git as rawGit,
   handoffPath,
   loadStory,
-  readClaim,
+  newClaimBlob,
   readState,
   readText,
   heartbeatId,
+  writtenHere,
 } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { busyError, claimHeld, corruptError, failure, refuse, usageError, withExit } from "../output.ts";
+import { claimFor } from "../runtime/human.ts";
 import { leaseLiveness } from "../runtime/leases.ts";
 import { machineHolder } from "../runtime/observe.ts";
 import { equipWorktree, syncLocalBranch, type WorktreeTarget } from "../runtime/worktrees.ts";
@@ -138,27 +140,23 @@ async function take(ctx: Context, key: string, force: boolean) {
   // ---- 1. claim (T3, T5)
   const hb = heartbeatId(root, now);
   const holder = machineHolder(ctx.env);
-  const cur = await readClaim(root, remote, key).catch((e: Error) => {
-    throw failure(`cannot read the claim: ${e.message}`, "check the network, then retry", "network");
-  });
+  const cur = await claimFor(ctx, key, { remote, unreadable: (e) => failure(`cannot read the claim: ${e.message}`, "check the network, then retry", "network") });
   if (cur.state === "corrupt" && !force) throw corruptError(`claim ref of ${key} is unreadable`, `norn take ${key} --force`, cur.error);
-  const live = cur.state === "present" && Date.parse(cur.blob.expires_at) > now;
-  const mine = cur.state === "present" && cur.blob.heartbeat_id === hb;
-  if (live && !mine && !force)
+  if (cur.state === "other" && !force)
     throw claimHeld(cur.blob, `wait until ${cur.blob.expires_at}, ask ${cur.blob.holder} to run norn release ${key}, or norn take ${key} --force`);
-  const forced = force && ((live && !mine) || cur.state === "corrupt");
-  const prev = cur.state === "present" ? cur.blob : null;
-  const blob: ClaimBlob = {
-    version: 1,
+  const mine = writtenHere(cur, hb);
+  const forced = force && (cur.state === "other" || cur.state === "corrupt");
+  const prev = cur.state === "none" || cur.state === "corrupt" ? null : cur.blob;
+  const blob = newClaimBlob({
     story: key,
     holder,
     heartbeat_id: hb,
-    acquired_at: mine && prev ? prev.acquired_at : nowIso,
-    renewed_at: nowIso,
-    expires_at: new Date(now + parseDuration(config.claim.lease)).toISOString(),
-    last_tick_id: null,
+    now,
+    at: nowIso,
+    lease: config.claim.lease,
+    ...(mine && prev ? { acquired_at: prev.acquired_at } : {}),
     ...(forced ? { forced_from: prev ? `${prev.holder} (heartbeat ${prev.heartbeat_id}, expires ${prev.expires_at})` : "corrupt claim" } : {}),
-  };
+  });
   const claimed = await acquireClaim(root, remote, blob, { now, force: forced });
   if (!claimed.ok) {
     if (claimed.reason === "held") throw claimHeld(claimed.holder, `wait until ${claimed.holder.expires_at} or norn take ${key} --force`);
@@ -166,7 +164,7 @@ async function take(ctx: Context, key: string, force: boolean) {
   }
   // R10.1 (M8, A17): every take is in the record — the trace event first; the `take` receipt on the
   // story unit as soon as the story branch is checked out (it lives on that branch), before anything else
-  const expired = !!prev && !forced && Date.parse(prev.expires_at) <= now;
+  const expired = cur.state === "expired";
   const takeFacts = { previous_holder: prev?.holder ?? null, previous_heartbeat_id: prev?.heartbeat_id ?? null, expired, forced };
   appendTrace(root, { type: "take", id: ulid(now), at: nowIso, unit: key, holder, heartbeat_id: hb, ...takeFacts });
 

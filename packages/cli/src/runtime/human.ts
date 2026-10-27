@@ -5,12 +5,11 @@
  * holds it (T9). Views read through @norn/view only (X1).
  */
 import { isAbsolute, relative } from "node:path";
-import { type StoryFacts, storyUnit, type UnitFacts } from "@norn/core";
+import { type ClaimState, type StoryFacts, storyUnit, type UnitFacts } from "@norn/core";
 import { loadProjectView, type ProjectView } from "@norn/view";
 import {
   type ClaimBlob,
   isStoryKey,
-  parseDuration,
   parseSpecDirName,
   type Receipt,
   SPECS_DIR,
@@ -26,9 +25,11 @@ import {
   acquireClaim,
   appendReceipt,
   type ClaimRead,
+  classifyClaim,
   fetchNornRefs,
   heartbeatId,
   listMailbox,
+  newClaimBlob,
   git as rawGit,
   parseWorkflowText,
   postMailbox,
@@ -227,69 +228,67 @@ export function humanReceipt<K extends HumanKind>(ctx: Context, t: Target, st: U
 export type Route = { via: "local"; claim: "mine" | "acquired" } | { via: "mailbox"; holder: ClaimBlob };
 
 /**
+ * The story's claim as the remote has it now (T3), classified for this checkout's heartbeat (ID2)
+ * by store `classifyClaim` — the rule observe uses, so a verb and the tick judge a claim alike.
+ * Judged by the recorded heartbeat_id: reading a claim never creates one (a new one matches no claim).
+ * `remote` saves a caller that already knows the git remote looking it up again; `unreadable`
+ * builds the error thrown when the claim ref cannot be read (network).
+ */
+export async function claimFor(
+  ctx: Context,
+  story: string,
+  opts: { remote?: string | null; unreadable?: (e: Error) => Error } = {},
+): Promise<ClaimState> {
+  const unreadable = opts.unreadable ?? ((e: Error) => failure(`cannot read the claim of ${story}: ${e.message}`, "check the network and retry", "claim_unreadable"));
+  let read: ClaimRead;
+  try {
+    read = await readClaim(ctx.root, opts.remote !== undefined ? opts.remote : await gitRemote(ctx), story);
+  } catch (e) {
+    throw unreadable(e as Error);
+  }
+  return classifyClaim(read, { heartbeat_id: recordedHeartbeatId(ctx.root) }, ctx.clock.now());
+}
+
+/**
  * Who may write the receipt: this heartbeat when it holds the claim, or after acquiring a free
  * claim (T8); otherwise the mailbox (T9) — or a refusal when `mailbox` is false (mode, workflow).
  */
-export async function claimRoute(ctx: Context, t: Target, opts: { mailbox: boolean; verb: string; claim?: ClaimRead }): Promise<Route> {
-  const root = ctx.root;
+export async function claimRoute(ctx: Context, t: Target, opts: { mailbox: boolean; verb: string; claim?: ClaimState }): Promise<Route> {
   const remote = await gitRemote(ctx);
-  const now = ctx.clock.now();
-  let cur = opts.claim ?? (await currentClaim(ctx, t.story));
-  if (cur.state === "corrupt") throw refuse(`claim ref of ${t.story} is corrupt`, `norn take ${t.story} --force`, "claim_corrupt", cur.error);
-  const hb = heartbeatId(root, now);
-  const live = cur.state === "present" && Date.parse(cur.blob.expires_at) > now;
-  if (cur.state === "present" && live && cur.blob.heartbeat_id === hb) {
+  const c = opts.claim ?? (await claimFor(ctx, t.story));
+  if (c.state === "corrupt") throw refuse(`claim ref of ${t.story} is corrupt`, `norn take ${t.story} --force`, "claim_corrupt", c.error);
+  if (c.state === "mine") {
     if (!t.runsDir) throw refuse(`${t.key} is held here but its runs/ are not in this checkout`, "norn tick", "story_not_local");
     return { via: "local", claim: "mine" };
   }
-  if (!live) {
+  let holder: ClaimBlob;
+  if (c.state === "other") holder = c.blob;
+  else {
     if (!t.runsDir) throw refuse(`${t.story} is unclaimed and not in this checkout`, `norn take ${t.story}`, "story_not_local");
-    const blob: ClaimBlob = {
-      version: 1,
-      story: t.story,
-      holder: machineHolder(ctx.env),
-      heartbeat_id: hb,
-      acquired_at: ctx.clock.iso(),
-      renewed_at: ctx.clock.iso(),
-      expires_at: new Date(now + parseDuration(ctx.config.claim.lease)).toISOString(),
-      last_tick_id: null,
-    };
-    const r = await acquireClaim(root, remote, blob, { now });
+    const now = ctx.clock.now();
+    const blob = newClaimBlob({ story: t.story, holder: machineHolder(ctx.env), heartbeat_id: heartbeatId(ctx.root, now), now, at: ctx.clock.iso(), lease: ctx.config.claim.lease });
+    const r = await acquireClaim(ctx.root, remote, blob, { now });
     if (r.ok) return { via: "local", claim: "acquired" };
     if (r.reason !== "held") throw failure(`cannot acquire the claim of ${t.story}: ${r.message}`, `norn ${opts.verb} again`, "claim_failed");
-    cur = { state: "present", sha: r.sha, blob: r.holder };
+    holder = r.holder;
   }
-  const holder = (cur as Extract<ClaimRead, { state: "present" }>).blob;
   if (!opts.mailbox) throw claimHeld(holder, `ask ${holder.holder} to run it, or norn take ${t.story} --force`, `; ${opts.verb} cannot go through the mailbox (T9)`);
   return { via: "mailbox", holder };
-}
-
-/** The story's claim as the remote has it (T3). */
-async function currentClaim(ctx: Context, story: string): Promise<ClaimRead> {
-  try {
-    return await readClaim(ctx.root, await gitRemote(ctx), story);
-  } catch (e) {
-    throw failure(`cannot read the claim of ${story}: ${(e as Error).message}`, "check the network and retry", "claim_unreadable");
-  }
 }
 
 /**
  * Refuse a verb that needs the claim (mode, workflow) while another heartbeat holds it: this
  * checkout's copy may be stale (T9), so no answer is computed from it — not even a no-op.
  */
-export async function refuseIfHeldElsewhere(ctx: Context, story: string, verb: string): Promise<ClaimRead> {
-  const claim = await currentClaim(ctx, story);
-  const holder = heldElsewhere(ctx, claim);
+export async function refuseIfHeldElsewhere(ctx: Context, story: string, verb: string): Promise<ClaimState> {
+  const claim = await claimFor(ctx, story);
+  const holder = heldElsewhere(claim);
   if (holder) throw claimHeld(holder, `ask ${holder.holder} to run it, or norn take ${story} --force`, `; ${verb} cannot go through the mailbox (T9)`);
   return claim;
 }
 
 /** A live claim of another heartbeat (T9: the verb goes through the mailbox), else null. */
-function heldElsewhere(ctx: Context, cur: ClaimRead): ClaimBlob | null {
-  const now = ctx.clock.now();
-  if (cur.state !== "present" || Date.parse(cur.blob.expires_at) <= now) return null;
-  return cur.blob.heartbeat_id === heartbeatId(ctx.root, now) ? null : cur.blob;
-}
+const heldElsewhere = (c: ClaimState): ClaimBlob | null => (c.state === "other" ? c.blob : null);
 
 /** What a human receipt decides; two receipts with the same purpose at one step attempt conflict. */
 const purpose = (r: Receipt): string => (r.kind === "reject" ? "approve" : r.kind);
@@ -366,8 +365,8 @@ export async function runHumanVerb(
 ): Promise<{ unit: string; receipt: Receipt; delivered: Delivered; next: string }> {
   // T9: read the claim first — a non-holder's local copy may be stale, so when another heartbeat
   // holds the story the cursor comes from the pushed branch before any precondition is checked
-  const claim = await currentClaim(ctx, t.story);
-  const holder = heldElsewhere(ctx, claim);
+  const claim = await claimFor(ctx, t.story);
+  const holder = heldElsewhere(claim);
   let target = t;
   if (opts.mailbox && t.source === "local" && holder) target = (await remoteTarget(ctx, t.key)) ?? t;
   opts.check(target, started(target));
