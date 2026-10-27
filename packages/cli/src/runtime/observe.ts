@@ -9,7 +9,6 @@
  * `undefined` ("not observed") so decide does not act on them.
  */
 import { existsSync, statSync } from "node:fs";
-import { hostname, userInfo } from "node:os";
 import { join } from "node:path";
 import {
   type AgentAdapter,
@@ -43,6 +42,7 @@ import {
   listMailbox,
   liveRun,
   loadLocalFacts,
+  machineHolder,
   onlyNornCommitsSince,
   type PrFactsCache,
   readEnvNorn,
@@ -50,6 +50,7 @@ import {
   readRemoteCache,
   readUnitMarker,
   receiptsOfKinds,
+  runHooks,
   type StorySnapshot,
   traceForeignCommits,
   type UnitSnapshot,
@@ -122,19 +123,6 @@ export interface Observed {
   sync: SyncReport;
   /** R2.3: per story not held here, local runs/ work not on the remote (facts carry `{unit, files}`) */
   unpushed: Record<string, UnpushedUnit[]>;
-}
-
-export function machineHolder(env: Record<string, string | undefined>): string {
-  let user = env.USER ?? env.LOGNAME;
-  if (!user) {
-    try {
-      user = userInfo().username;
-    } catch {
-      user = "norn";
-    }
-  }
-  const host = (env.NORN_MACHINE ?? hostname().split(".")[0] ?? "machine") || "machine";
-  return `${user.replace(/[@\s]/g, "_")}@${host.replace(/[@\s]/g, "_")}`;
 }
 
 /** `name` when this repository has a git remote by that name, else null. */
@@ -656,7 +644,7 @@ async function unitFacts(ports: Ports, story: StorySnapshot, lu: LocalUnit, work
     const pane = session && !foreign && ports.runner && session.runner === ports.runner.name ? await ports.runner.paneState(session).catch(() => null) : null;
     // A2: a Claude permission prompt names no command; its adapter takes it from the preceding
     // PreToolUse (other agents' facts pass through unchanged) so the implicit ask and inbox show it
-    const mine = refineHooks(ports.agents, hooks.filter((h) => (h.run_id ? h.run_id === r.run_id : !!worktree && h.cwd.startsWith(worktree.path) && h.at >= r.started_at)));
+    const mine = refineHooks(ports.agents, runHooks(hooks, r, worktree?.path ?? null));
     const last = mine.at(-1);
     const last_hook_at = last ? Date.parse(last.at) : null;
     const acts = [last_hook_at, worktree?.last_commit_at ?? null, worktree?.last_file_change_at ?? null].filter((x): x is number => x !== null);

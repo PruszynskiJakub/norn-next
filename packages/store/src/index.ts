@@ -17,6 +17,7 @@ export * from "./local.ts";
 export * from "./local-facts.ts";
 export * from "./local-json.ts";
 export * from "./lock.ts";
+export * from "./machine.ts";
 export * from "./paths.ts";
 export * from "./proc.ts";
 export * from "./spawn.ts";

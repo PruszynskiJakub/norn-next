@@ -9,7 +9,7 @@ export { type CliDeps, Context, findUnitMarker, type Located, locateRepo, system
 export { busyError, CliFailure, corruptError, failure, isRendered, isWithExit, refuse, render, rendered, toFailure, usageError, withExit } from "./output.ts";
 export { type ActRecord, Actor } from "./runtime/act.ts";
 export { heartbeatId, markNotified, readNotified, readRemoteCache } from "@norn/store";
-export { machineHolder, type Observed, observe, type ObserveOptions, type StoryLoc, type SyncMode, type UnitLoc } from "./runtime/observe.ts";
+export { type Observed, observe, type ObserveOptions, type StoryLoc, type SyncMode, type UnitLoc } from "./runtime/observe.ts";
 export { releaseHeldClaims, releaseStory } from "./runtime/release.ts";
 export { runShell, tailLines } from "./runtime/shell.ts";
 export { replayInputs, runTick, type TickOptions, type TickReport, traceRecord } from "./runtime/tick.ts";

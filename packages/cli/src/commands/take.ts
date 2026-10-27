@@ -26,6 +26,7 @@ import {
   readText,
   heartbeatId,
   writtenHere,
+  machineHolder,
 } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
@@ -33,7 +34,7 @@ import { busyError, claimHeld, corruptError, failure, refuse, withExit } from ".
 import { storyArg } from "../runtime/args.ts";
 import { claimFor } from "../runtime/human.ts";
 import { leaseLiveness } from "../runtime/leases.ts";
-import { gitRemote, machineHolder } from "../runtime/observe.ts";
+import { gitRemote } from "../runtime/observe.ts";
 import { equipWorktree, syncLocalBranch, type WorktreeTarget } from "../runtime/worktrees.ts";
 
 const storyBranchRe = (key: string) => new RegExp(`^${key}-[a-z0-9][a-z0-9-]*$`);

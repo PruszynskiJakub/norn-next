@@ -31,11 +31,12 @@ import {
   postMailbox,
   readClaim,
   recordedHeartbeatId,
+  machineHolder,
 } from "@norn/store";
 import type { Context } from "../context.ts";
 import { claimHeld, failure, refuse, usageError } from "../output.ts";
 import { parseUnitKey } from "./args.ts";
-import { gitRemote, machineHolder, type Observed, observe } from "./observe.ts";
+import { gitRemote, type Observed, observe } from "./observe.ts";
 
 // ------------------------------------------------------------------ views (X1)
 
