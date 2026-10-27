@@ -11,7 +11,7 @@ const ASSETS = join(import.meta.dir, "..", "assets");
 const SKILLS_DIR = join(ASSETS, "skills");
 const WORKFLOWS_DIR = join(ASSETS, "workflows");
 
-/** The skills of §16: the protocol skill, the step skills and their reference skills. */
+/** The skills of §16: the protocol skill, the step skills, their reference skills and the retro a person runs. */
 const SKILLS = [
   "norn",
   "norn-interview",
@@ -29,6 +29,7 @@ const SKILLS = [
   "norn-tdd",
   "norn-codebase-design",
   "norn-prototype",
+  "norn-retro",
 ];
 const CRAFT = SKILLS.filter((s) => s !== "norn");
 
