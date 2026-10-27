@@ -9,10 +9,11 @@ bun install
 bun test            # all tests (packages/*/test, test/)
 bun run typecheck   # tsc --noEmit over every package
 bun run schema:emit # regenerate packages/schema/json/*.schema.json after changing a schema
-bun run golden      # regenerate packages/core/test/golden/*.json from the cli integration tests' ticks
+bun run golden -- --update  # behaviour change: re-decide every golden case, rewrite only its decisions
+bun run golden      # add golden cases harvested from the cli integration tests' ticks for under-covered rules
 ```
 
-`packages/core/test/golden.test.ts` replays every golden case through `decide` and wants exactly the decisions the tick recorded, and checks that every rule id decide can emit fires in a golden case or a hand-built one (`packages/core/test/rule-cases.ts`). A change that keeps behaviour leaves the corpus alone; regenerate it (`scripts/golden.ts`, which runs the harness tests with `NORN_GOLDEN_OUT` set) only for an intended change in what decide decides, and review the diff.
+`packages/core/test/golden.test.ts` replays every golden case through `decide` and wants exactly the decisions the tick recorded, and checks that every rule id decide can emit fires in a golden case or a hand-built one (`packages/core/test/rule-cases.ts`). A change that keeps behaviour leaves the corpus alone. For an intended change in what decide decides, run `bun run golden -- --update`: it decides each existing case again and rewrites only its `decisions` (names, facts, workflows and config stay), printing the decisions that went and came per case, so the diff is exactly the behaviour change; review it. `bun run golden` alone only adds cases: it runs the harness tests with `NORN_GOLDEN_OUT` set and adds, never replaces, harvested cases that bring a rule fewer than two cases fire. Cases are named by a hash of their content with run-specific values (ulids, shas, pids, wall-clock times) normalised, so a rerun with nothing new to cover changes nothing.
 
 Effect transcripts pin what three harness flows do to the world: every child process norn spawns (store's `setSpawnObserver` hook, off by default), every call on the fake ports, and every file under `runs/` that appears, changes or goes away, normalised (temp dirs, ulids, shas, timestamps). The recorder is `packages/cli/test/transcript.ts`; the flows are the last test of `e2e.test.ts` (slice workflow), `base-sync.test.ts` (base sync) and `recovery.test.ts` (claim lost), against `packages/cli/test/transcripts/*.txt`. A change that keeps behaviour leaves them alone; for an intended change, rewrite them with `NORN_TRANSCRIPT_UPDATE=1 bun test <file>` and review the diff.
 
