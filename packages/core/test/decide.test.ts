@@ -44,7 +44,7 @@ function solo(patch: Partial<UnitState> = {}, run: Partial<RunFacts> | null = nu
   const unit = storyUnit(key);
   const st = stateFor(unit, SOLO_WF, patch);
   const rf: RunFacts | null = run && { run_id: RUN, session: { runner: "herdr", session_id: "s1" }, process_alive: true, pane: null, hooks: [], last_hook_at: null, last_activity_at: T0, transcript: "/t.jsonl", ...run };
-  return storyFacts(key, [unitFacts(unit, SOLO_WF, st, { run: rf, worktree: { path: `/r-worktrees/${key}-login`, exists: true, marker: true, status: null, last_commit_at: null, last_file_change_at: null, slot: 1 } })], { ...story, frontmatter: { ...storyFacts(key, []).frontmatter!, workflow: "solo", intake_at: at(intake) } });
+  return storyFacts(key, [unitFacts(unit, SOLO_WF, st, { run: rf, worktree: { path: `/r-worktrees/${key}-login`, exists: true, status: null, last_commit_at: null, last_file_change_at: null, slot: 1 } })], { ...story, frontmatter: { ...storyFacts(key, []).frontmatter!, workflow: "solo", intake_at: at(intake) } });
 }
 const running = (p: Partial<UnitState> = {}): Partial<UnitState> => ({
   status: "running",
@@ -282,7 +282,7 @@ describe("check, git, gate steps (W2)", () => {
   test("open-pr runs git with the spec folder's pr.md as body file; an already open PR runs it too (GR9)", () => {
     const pr = { base: "main", title: "Login form", body_file: expect.stringMatching(/^\.agents\/specs\/gh-1-[^/]+\/pr\.md$/), body: expect.stringMatching(/^Closes /) };
     expect(only(facts([storyAt("open-pr")]))).toMatchObject({ kind: "run_git", action: "open-pr", pr });
-    const withPr = storyAt("open-pr", { pr: { number: 7, url: "u", state: "open", is_draft: true, head_sha: "", draft: true, head: "gh-1-login", base: "main", merged_at: null } });
+    const withPr = storyAt("open-pr", { pr: { number: 7, url: "u", state: "open", is_draft: true, head_sha: "", head: "gh-1-login", base_branch: "main", merged_at: null } });
     expect(only(facts([withPr]))).toMatchObject({ kind: "run_git", action: "open-pr", pr });
   });
   test("integrate is serialized per story (K6)", () => {
@@ -339,7 +339,7 @@ describe("slices step (W2)", () => {
 
 describe("story lifecycle (GR6–GR8)", () => {
   test("PR merged → cleanup", () => {
-    const f = storyAt("ready", { pr: { number: 7, url: "u", state: "merged", is_draft: false, head_sha: "", draft: false, head: "gh-1-login", base: "main", merged_at: at() } }, [{ nn: "01", status: "integrated" }]);
+    const f = storyAt("ready", { pr: { number: 7, url: "u", state: "merged", is_draft: false, head_sha: "", head: "gh-1-login", base_branch: "main", merged_at: at() } }, [{ nn: "01", status: "integrated" }]);
     expect(only(facts([f]))).toMatchObject({ kind: "cleanup_merged_story", local_branches: ["gh-1/01-s01", "gh-1-login"], remote_branches: ["gh-1/01-s01"], refs: ["refs/norn/claims/gh-1"], story_status: "done" });
   });
   test("issue closed / unlabelled / PR closed → park remote under Unblock, once", () => {

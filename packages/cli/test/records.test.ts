@@ -130,7 +130,7 @@ describe("records: ready head, foreign commits, merged by ancestry, durable stat
 
   test("P2 (F34): a PR left open whose head is on origin/main is merged by ancestry and cleaned up", async () => {
     const head = h.git(["rev-parse", "HEAD"], wt());
-    h.remote.prs = [{ number: 7, url: "https://github.com/o/r/pull/7", state: "open", is_draft: false, head_sha: head, draft: false, head: branch, base: "main", merged_at: null }];
+    h.remote.prs = [{ number: 7, url: "https://github.com/o/r/pull/7", state: "open", is_draft: false, head_sha: head, head: branch, base_branch: "main", merged_at: null }];
     const merge = mergeOnRemote(h, branch);
     step();
     const s = await h.norn("sync");
@@ -182,7 +182,7 @@ describe("records: PR merge facts from the remote", () => {
     await h.tick(); // push
     const head = h.git(["rev-parse", "HEAD"], wt());
     const merge = mergeOnRemote(h, branch);
-    h.remote.prs = [{ number: 8, url: "https://github.com/o/r/pull/8", state: "merged", is_draft: false, head_sha: head, merge_commit_sha: merge, merged_by: "octo", merged_at: "2099-01-15T11:00:00Z", draft: false, head: branch, base: "main" }];
+    h.remote.prs = [{ number: 8, url: "https://github.com/o/r/pull/8", state: "merged", is_draft: false, head_sha: head, merge_commit_sha: merge, merged_by: "octo", merged_at: "2099-01-15T11:00:00Z", head: branch, base_branch: "main" }];
     h.clock.advance(10_000);
     const s = await h.norn("sync");
     expect(acted(s.value as TickReport)).toEqual(["gh-6 cleanup_merged_story"]);

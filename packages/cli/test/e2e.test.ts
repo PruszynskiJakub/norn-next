@@ -343,7 +343,7 @@ describe("a story through the slice workflow", () => {
     expect(h.state(storyRuns())).toMatchObject({ step: "open-pr", status: "ready" });
     step();
     expect(kinds(await h.tick())).toEqual(["gh-7 run_git"]);
-    expect(h.remote.prs).toMatchObject([{ head: "gh-7-add-login-form", base: "main", draft: true }]);
+    expect(h.remote.prs).toMatchObject([{ head: "gh-7-add-login-form", base_branch: "main", is_draft: true }]);
     step();
     expect(kinds(await h.tick())).toEqual(["gh-7 apply_receipts"]);
     expect(h.state(storyRuns())).toMatchObject({ step: "$done", status: "done" });

@@ -76,9 +76,7 @@ export function mapMr(m: GlMr): RemotePullRequest {
     ...(merge ? { merge_commit_sha: merge } : {}),
     ...(by ? { merged_by: by } : {}),
     merged_at: m.merged_at ?? null,
-    draft: m.draft ?? m.work_in_progress ?? false,
     head: m.source_branch,
-    base: m.target_branch,
     base_branch: m.target_branch,
   };
 }

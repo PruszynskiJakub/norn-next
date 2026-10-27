@@ -278,8 +278,7 @@ export interface RemoteIssue {
 
 /**
  * The story PR/MR as the remote reports it (GR6). `is_draft`/`head_sha`/merge fields are the
- * StoryFacts.pr contract; `draft`, `head` (branch name), `base` are the older names, still filled
- * by the adapters. `merged_at` is null/absent until merged.
+ * StoryFacts.pr contract. `merged_at` is null/absent until merged.
  */
 export interface RemotePullRequest {
   number: number;
@@ -293,11 +292,12 @@ export interface RemotePullRequest {
   /** login of whoever merged it */
   merged_by?: string;
   merged_at?: string | null;
-  /** @deprecated alias of is_draft */
-  draft?: boolean;
   /** head branch name */
   head?: string;
-  /** base branch name (older name of `base_branch`) */
+  /**
+   * @deprecated older name of `base_branch`; no adapter writes it any more, but a PR cached
+   * (`pr.json`) by an older norn may carry only this. Read through `prBaseBranch`; dropped in 0.12.0.
+   */
   base?: string;
   /** BS11: the branch the PR targets (merges into); GR6 cleanup only when it is the story's base branch */
   base_branch?: string;

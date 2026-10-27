@@ -58,7 +58,7 @@ export class FakeRemote implements RemotePort {
   }
   async openDraftPullRequest(o: { head: string; base: string; title: string; body: string }) {
     this.calls.push(`pr+ ${o.head}`);
-    const pr: RemotePullRequest = { number: 100 + this.prs.length, url: `https://github.com/o/r/pull/${100 + this.prs.length}`, state: "open", is_draft: true, head_sha: "", draft: true, head: o.head, base: o.base, base_branch: o.base, merged_at: null };
+    const pr: RemotePullRequest = { number: 100 + this.prs.length, url: `https://github.com/o/r/pull/${100 + this.prs.length}`, state: "open", is_draft: true, head_sha: "", head: o.head, base_branch: o.base, merged_at: null };
     this.prs.push(pr);
     this.bodies.set(pr.number, o.body);
     return pr;

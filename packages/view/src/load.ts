@@ -41,7 +41,6 @@ import {
   readEnvNorn,
   readLocalClaim,
   readTrace,
-  readUnitMarker,
   runHooks,
   scanWorktrees,
   type StorySnapshot,
@@ -79,14 +78,13 @@ function push<T>(m: Map<string, T[]>, k: string, v: T): void {
   else m.set(k, [v]);
 }
 
-/** A worktree as the view sees it: on disk, its marker and slot; git status is not read (no git, X1). Null when absent, as observe. */
+/** A worktree as the view sees it: on disk and its slot; git status is not read (no git, X1). Null when absent, as observe. */
 function worktreeFacts(path: string | null): WorktreeFacts | null {
   if (!path || !existsSync(path)) return null;
   const slotRaw = readEnvNorn(path)?.NORN_SLOT;
   return {
     path,
     exists: true,
-    marker: readUnitMarker(path).exists,
     status: null,
     last_commit_at: null,
     last_file_change_at: null,
@@ -424,9 +422,8 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       runner,
       ...(runner && opts.runnerCapabilities ? { runner_capabilities: { ...opts.runnerCapabilities } } : {}),
       leases: leases.live.map((e) => e.lease),
-      dead_leases: leases.dead.map((e) => e.lease),
     },
-    remote: { synced_at: null, issues: undefined },
+    remote: { issues: undefined },
     stories: storyFacts,
     heartbeat: { last_tick_at: lastTick },
     orphans: { worktrees: [], branches: [] },
