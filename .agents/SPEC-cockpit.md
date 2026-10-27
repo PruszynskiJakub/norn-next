@@ -31,7 +31,7 @@ Non-goals:
   - `capabilities` says what the front end can do: `{ places: boolean }`. It is true when the front end can focus an agent's pane and open an orient workspace (the terminal inside Herdr).
   - The model is plain JSON, like `ProjectView`.
 - CP2 `CockpitModel` holds:
-  - `header`: the repo, how many items need the person (`inbox.pending`) and the heartbeat (`view.heartbeat`).
+  - `header`: the repo, how many rows the needs-you section holds (so the count matches what is listed; the inbox's `pending` also counts unclaimed stories, which are story rows here) and the heartbeat (`view.heartbeat`).
   - `rows`, in two sections:
     - **needs you**: one row per inbox item of `your_turn`, `answer`, `approve`, `unblock` and `check`, in O1 order;
     - **stories**: one row per story.
