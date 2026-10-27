@@ -7,16 +7,13 @@
 import { join } from "node:path";
 import { buildInbox, type Decision, type Facts, type InboxItem, inboxChanges } from "@norn/core";
 import { type InboxChange, type ResolvedConfig, type TickTrace } from "@norn/schema";
-import { atomicWriteJson, readText, readTrace, traceDir } from "@norn/store";
+import { atomicWriteJson, readLocalJson, readTrace, traceDir } from "@norn/store";
 
 const openPath = (root: string) => join(traceDir(root), "inbox.json");
 
 function readOpen(root: string): Record<string, InboxItem> {
-  try {
-    return (JSON.parse(readText(openPath(root)) ?? "{}") as { open?: Record<string, InboxItem> }).open ?? {};
-  } catch {
-    return {};
-  }
+  // S2: an unreadable or wrong-shaped open set reads as empty (every current item appears again)
+  return readLocalJson("local-inbox", openPath(root), {}, root).open ?? {};
 }
 
 /** This tick's inbox changes; `commit()` persists the new open set once the trace record is written. */

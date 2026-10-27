@@ -256,9 +256,7 @@ const JSON_PARSE_ALLOW: Record<string, [number, string]> = {
   "packages/cli/src/commands/hook.ts": [2, "tool output: hook payload on stdin, hook command stdout"],
   "packages/cli/src/commands/why.ts": [1, "clone: canonical JSON for the replay diff"],
   "packages/cli/src/runtime/detect.ts": [1, "file another tool owns: the repo's package.json"],
-  "packages/cli/src/runtime/human.ts": [2, "norn files: heartbeat.json (unvalidated), state.json from git show"],
-  "packages/cli/src/runtime/inbox-history.ts": [1, "norn file read unvalidated (1.4)"],
-  "packages/cli/src/runtime/local.ts": [1, "norn files read unvalidated: remote/records/… caches (BUG-4, 1.4)"],
+  "packages/cli/src/runtime/human.ts": [1, "norn file: state.json from git show"],
   "packages/cli/src/runtime/observe.ts": [1, "norn file: hook lines of the trace jsonl"],
   "packages/cli/src/runtime/tick.ts": [1, "clone: trace-safe copy of facts"],
 };

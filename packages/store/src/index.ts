@@ -11,6 +11,7 @@ export * from "./fsx.ts";
 export * from "./git.ts";
 export * from "./heartbeat.ts";
 export * from "./leases.ts";
+export * from "./local-json.ts";
 export * from "./lock.ts";
 export * from "./paths.ts";
 export * from "./proc.ts";

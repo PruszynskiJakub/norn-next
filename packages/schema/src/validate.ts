@@ -6,6 +6,19 @@ import { CliError } from "./cli.ts";
 import { CriteriaReport } from "./criteria.ts";
 import { ConfigLayer, ResolvedConfig } from "./config.ts";
 import { SliceFrontmatter, StoryFrontmatter } from "./frontmatter.ts";
+import {
+  LocalBaseFile,
+  LocalCockpitFile,
+  LocalFailuresFile,
+  LocalForeignFile,
+  LocalHeartbeatFile,
+  LocalInboxFile,
+  LocalLockFile,
+  LocalNotifiedFile,
+  LocalPrFile,
+  LocalRecordsFile,
+  LocalRemoteFile,
+} from "./local.ts";
 import { Receipt } from "./receipt.ts";
 import { UnitState } from "./state.ts";
 import { HookFact, TraceEvent } from "./trace.ts";
@@ -26,6 +39,18 @@ export const SCHEMAS = {
   "resolved-config": ResolvedConfig,
   "cli-error": CliError,
   "criteria-report": CriteriaReport,
+  // machine-local files of one checkout (trace dir), read through store readLocalJson (S2, BUG-4)
+  "local-remote": LocalRemoteFile,
+  "local-notified": LocalNotifiedFile,
+  "local-records": LocalRecordsFile,
+  "local-foreign": LocalForeignFile,
+  "local-inbox": LocalInboxFile,
+  "local-heartbeat": LocalHeartbeatFile,
+  "local-failures": LocalFailuresFile,
+  "local-base": LocalBaseFile,
+  "local-pr": LocalPrFile,
+  "local-cockpit": LocalCockpitFile,
+  "local-lock": LocalLockFile,
 } as const;
 export type SchemaName = keyof typeof SCHEMAS;
 export type SchemaType<N extends SchemaName> = Static<(typeof SCHEMAS)[N]>;

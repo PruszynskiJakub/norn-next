@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://norn.dev/schema/local-pr.json",
+  "title": "norn story PRs seen (trace/pr.json)",
+  "type": "object",
+  "properties": {
+    "stories": {
+      "type": "object",
+      "patternProperties": {
+        "^(.*)$": {
+          "type": "object",
+          "required": [
+            "pr",
+            "observed_at"
+          ],
+          "properties": {
+            "pr": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "number",
+                    "url",
+                    "state",
+                    "is_draft",
+                    "head_sha"
+                  ],
+                  "properties": {
+                    "number": {
+                      "type": "number"
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "anyOf": [
+                        {
+                          "const": "open",
+                          "type": "string"
+                        },
+                        {
+                          "const": "closed",
+                          "type": "string"
+                        },
+                        {
+                          "const": "merged",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "is_draft": {
+                      "type": "boolean"
+                    },
+                    "head_sha": {
+                      "type": "string"
+                    },
+                    "merge_commit_sha": {
+                      "type": "string"
+                    },
+                    "merged_by": {
+                      "type": "string"
+                    },
+                    "merged_at": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "draft": {
+                      "type": "boolean"
+                    },
+                    "head": {
+                      "type": "string"
+                    },
+                    "base": {
+                      "type": "string"
+                    },
+                    "base_branch": {
+                      "type": "string"
+                    }
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "observed_at": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    }
+  }
+}

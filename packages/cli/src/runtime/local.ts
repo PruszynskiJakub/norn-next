@@ -9,21 +9,13 @@
  *                     each with the merge facts to write (`merge`, StoryMerge)
  * - `foreign.json`    commit shas already traced as `foreign_commits` (Q6: once per sha)
  * - `base.json`       per story, the last `story.base` measured (BS1; store/base.ts)
+ * Every read is validated (S2, BUG-4): a file that is unreadable or of the wrong shape reads as
+ * empty through store `readLocalJson`, never as a cast of what was there.
  */
 import { join } from "node:path";
 import type { StoryFacts } from "@norn/core";
 import { type StoryMerge, ulid } from "@norn/schema";
-import { appendTrace, atomicWriteJson, readHeartbeatFile, readText, traceDir, writeHeartbeatFile } from "@norn/store";
-
-function readJson<T>(path: string): T | null {
-  const raw = readText(path);
-  if (raw === null) return null;
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
-}
+import { appendTrace, atomicWriteJson, readHeartbeatFile, readLocalJson, traceDir, writeHeartbeatFile } from "@norn/store";
 
 const remotePath = (root: string) => join(traceDir(root), "remote.json");
 const notifiedPath = (root: string) => join(traceDir(root), "notified.json");
@@ -47,7 +39,7 @@ export interface RemoteCache {
 }
 
 export function readRemoteCache(root: string): RemoteCache {
-  const c = readJson<Partial<RemoteCache>>(remotePath(root)) ?? {};
+  const c = readLocalJson("local-remote", remotePath(root), {}, root);
   return { synced_at: c.synced_at ?? null, attempted_at: c.attempted_at ?? null, last_error: c.last_error ?? null, default_branch: c.default_branch ?? null };
 }
 
@@ -58,7 +50,7 @@ export function writeRemoteCache(root: string, c: RemoteCache): void {
 const KEEP_NOTIFIED = 2000;
 
 export function readNotified(root: string): Set<string> {
-  return new Set(readJson<{ ids?: string[] }>(notifiedPath(root))?.ids ?? []);
+  return new Set(readLocalJson("local-notified", notifiedPath(root), {}, root).ids ?? []);
 }
 
 /** Persist a newly notified id before the notification is sent (receipt-first, O3). */
@@ -83,7 +75,7 @@ export interface PendingRecord {
 }
 
 export function readPendingRecords(root: string): PendingRecord[] {
-  return readJson<{ records?: PendingRecord[] }>(recordsPath(root))?.records ?? [];
+  return readLocalJson("local-records", recordsPath(root), {}, root).records ?? [];
 }
 
 export function writePendingRecords(root: string, records: PendingRecord[]): void {
@@ -98,7 +90,7 @@ const KEEP_FOREIGN = 5000;
  * sha). The seen set is written first, so a crash never traces the same sha twice.
  */
 export function traceForeignCommits(root: string, stories: StoryFacts[], tick_id: string, now: number): number {
-  const seen = new Set(readJson<{ shas?: string[] }>(foreignPath(root))?.shas ?? []);
+  const seen = new Set(readLocalJson("local-foreign", foreignPath(root), {}, root).shas ?? []);
   const fresh: Array<{ story: string; commits: NonNullable<StoryFacts["foreign_commits"]> }> = [];
   for (const s of stories) {
     const commits = (s.foreign_commits ?? []).filter((c) => !seen.has(c.sha));
