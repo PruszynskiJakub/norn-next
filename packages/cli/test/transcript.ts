@@ -59,6 +59,7 @@ const REMOTE_CALLS: Record<string, (...a: never[]) => string> = {
   getIssue: (n: number) => `getIssue ${n}`,
   findPullRequest: (branch: string) => `findPullRequest ${branch}`,
   openDraftPullRequest: (o: { head: string; base: string; title: string }) => `openDraftPullRequest ${o.head} → ${o.base} ${JSON.stringify(o.title)}`,
+  editPullRequestBody: (n: number) => `editPullRequestBody ${n}`,
 };
 const NOTIFIER_CALLS: Record<string, (...a: never[]) => string> = {
   notify: (item: { id: string }) => `notify ${item.id}`,

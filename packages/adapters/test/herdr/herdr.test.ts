@@ -3,7 +3,7 @@ import type { ProcessPort, SessionRef } from "@norn/core";
 import type { ProcessIdentity } from "@norn/schema";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { createHerdrRunner, herdrFactory, openStatusPane, parsePanePrompt } from "../../src/herdr/index.ts";
+import { createHerdrRunner, herdrFactory, openCockpitPane, parsePanePrompt } from "../../src/herdr/index.ts";
 import type { Exec, ExecResult } from "../../src/exec.ts";
 import fx from "./fixtures/herdr.json";
 
@@ -262,34 +262,28 @@ describe("herdr runner", () => {
   });
 });
 
-describe("herdr openStatusPane (O1)", () => {
-  test("splits the calling pane without focus, names it, runs `norn pane` read-only", async () => {
+describe("herdr openCockpitPane (SPEC-cockpit CP10)", () => {
+  test("splits the calling pane without focus, names it, runs `norn cockpit`", async () => {
     const { exec, calls } = fakeExec([["pane split", ok(fx.pane_split)], ["pane rename", empty], ["pane run", empty]]);
-    const r = await openStatusPane("/repo", { exec, env: { HERDR_PANE_ID: "w1:p1" } });
+    const r = await openCockpitPane("/repo", { exec, env: { HERDR_PANE_ID: "w1:p1" } });
     expect(r).toEqual({ pane_id: "w1:p3" });
     expect(calls).toEqual([
       ["herdr", "pane", "split", "--current", "--direction", "down", "--ratio", "0.3", "--cwd", "/repo", "--no-focus"],
       ["herdr", "pane", "rename", "w1:p3", "norn"],
-      ["herdr", "pane", "run", "w1:p3", "norn pane"],
+      ["herdr", "pane", "run", "w1:p3", "norn cockpit"],
     ]);
   });
 
   test("outside herdr splits the focused pane; custom command, session and interval", async () => {
     const { exec, calls } = fakeExec([["--session s pane split", ok(fx.pane_split)], ["--session s pane rename", fail(fx.error_pane_not_found)], ["--session s pane run", empty]]);
-    await openStatusPane("/repo", { exec, env: {}, session: "s", command: ["bunx", "norn"], interval: "10s", direction: "right" });
+    await openCockpitPane("/repo", { exec, env: {}, session: "s", command: ["bunx", "norn"], interval: "10s", direction: "right" });
     expect(calls[0]).toEqual(["herdr", "--session", "s", "pane", "split", "--direction", "right", "--ratio", "0.3", "--cwd", "/repo", "--no-focus"]);
-    expect(calls[2]).toEqual(["herdr", "--session", "s", "pane", "run", "w1:p3", "bunx norn pane --interval 10s"]);
-  });
-
-  test("interactive runs the cockpit (HC10)", async () => {
-    const { exec, calls } = fakeExec([["pane split", ok(fx.pane_split)], ["pane rename", empty], ["pane run", empty]]);
-    await openStatusPane("/repo", { exec, env: {}, interactive: true, interval: "10s" });
-    expect(calls[2]).toEqual(["herdr", "pane", "run", "w1:p3", "norn pane --interactive --interval 10s"]);
+    expect(calls[2]).toEqual(["herdr", "--session", "s", "pane", "run", "w1:p3", "bunx norn cockpit --interval 10s"]);
   });
 
   test("a split without a pane id is a launch failure", async () => {
     const { exec } = fakeExec([["pane split", ok({ result: {} })]]);
-    expect(await openStatusPane("/repo", { exec, env: {} }).catch((e) => e)).toMatchObject({ code: "launch_failed" });
+    expect(await openCockpitPane("/repo", { exec, env: {} }).catch((e) => e)).toMatchObject({ code: "launch_failed" });
   });
 });
 

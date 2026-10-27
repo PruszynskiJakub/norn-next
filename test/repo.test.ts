@@ -152,7 +152,7 @@ describe("release metadata", () => {
 });
 
 describe("herdr plugin (HC9)", () => {
-  test("the manifest parses, has the cockpit pane and the open/next actions, and names only scripts that exist", () => {
+  test("the manifest parses, has the cockpit and pick panes and the open/next/pick actions, and names only scripts that exist", () => {
     const dir = join(ROOT, "plugins", "herdr");
     const m = Bun.TOML.parse(readFileSync(join(dir, "herdr-plugin.toml"), "utf8")) as {
       id: string;
@@ -160,8 +160,8 @@ describe("herdr plugin (HC9)", () => {
       actions: Array<{ id: string; command: string[] }>;
     };
     expect(m.id).toBe("norn");
-    expect(m.panes.map((p) => p.id)).toEqual(["cockpit"]);
-    expect(m.actions.map((a) => a.id)).toEqual(["open", "next"]);
+    expect(m.panes.map((p) => p.id)).toEqual(["cockpit", "pick"]);
+    expect(m.actions.map((a) => a.id)).toEqual(["open", "next", "pick"]);
     const scripts = [...m.panes, ...m.actions].map((e) => e.command.at(-1) as string);
     expect(scripts.filter((s) => !existsSync(join(dir, s)))).toEqual([]);
   });
@@ -236,6 +236,8 @@ const JSON_PARSE_ALLOW: Record<string, [number, string]> = {
   "packages/adapters/src/agent-hooks/index.ts": [3, "files claude owns: settings.json, transcript jsonl"],
   "packages/adapters/src/exec.ts": [1, "tool output: gh/glab --json stdout"],
   "packages/adapters/src/herdr/call.ts": [2, "tool output: herdr stdout and error stderr"],
+  // added by main 0.9.x (orient workspace order): one reply line from herdr's socket API
+  "packages/adapters/src/herdr/cockpit.ts": [1, "tool output: herdr socket API reply line"],
   "packages/cli/src/commands/done.ts": [2, "agent-written findings / criteria files (validated after)"],
   "packages/cli/src/commands/hook.ts": [2, "tool output: hook payload on stdin, hook command stdout"],
   "packages/cli/src/commands/why.ts": [1, "clone: canonical JSON for the replay diff"],

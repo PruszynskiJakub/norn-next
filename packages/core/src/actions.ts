@@ -204,8 +204,11 @@ export interface RunGitAction extends UnitBase, Transition {
   branch: string;
   /** integrate: the story branch to rebase onto and fast-forward */
   onto: string | null;
-  /** open-pr */
-  pr: { base: string; title: string; body: string } | null;
+  /**
+   * open-pr. GR9: act reads `body_file` (worktree-relative, prose decide never reads, P8) and puts
+   * `body` (the issue link) under it; no file → `body` alone. An open PR gets the new body.
+   */
+  pr: { base: string; title: string; body: string; body_file?: string } | null;
   /**
    * update (BS3): merge `sha` (the tip of `ref`, BS0) into the story branch with `message` and
    * `trailers` (`Norn-Tick`: Q6 never reports it as foreign). Absent on older traces.

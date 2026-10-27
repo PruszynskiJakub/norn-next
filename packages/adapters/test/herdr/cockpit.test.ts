@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { createHerdrCockpit, findAgentPane, findWorkspace, type HerdrAgent } from "../../src/herdr/cockpit.ts";
+import { createHerdrCockpit, findAgentPane, findWorkspace, type HerdrAgent, type HerdrSocketCall, herdrSocketPath } from "../../src/herdr/cockpit.ts";
+import herdrFixtures from "./fixtures/herdr.json";
 import { createHerdrNotifier, herdrNotifyArgv } from "../../src/notify/index.ts";
 import type { Exec, ExecResult } from "../../src/exec.ts";
 import agentList from "./fixtures/agent-list.json";
@@ -131,6 +132,36 @@ test("cockpit errors keep the raw stderr: herdr_error with stderr as message, se
   await expect(cockpit.focusWorkspace("w1")).rejects.toMatchObject({ code: "herdr_error", message: `herdr workspace focus: ${jsonErr("server_unavailable")}` });
   await expect(cockpit.focusWorkspace("w2")).rejects.toMatchObject({ code: "herdr_error", message: `herdr workspace focus: ${jsonErr("agent_blocked")}` });
   await cockpit.closePane("w3:p1");
+});
+
+test("openWorkspace, reportWorkspace argv; moveWorkspace over the socket API", async () => {
+  const { exec, calls } = fakeExec([
+    ["workspace create", ok(herdrFixtures.workspace_create)],
+    ["pane run", empty],
+    ["workspace report-metadata", empty],
+  ]);
+  const requests: unknown[] = [];
+  const socket: HerdrSocketCall = async (req) => {
+    requests.push(req);
+    return req.params.workspace_id === "gone" ? { id: req.id, error: { code: "workspace_not_found", message: "workspace gone not found" } } : { id: req.id, result: { type: "ok" } };
+  };
+  const cockpit = createHerdrCockpit({ exec, socket });
+  expect(await cockpit.openWorkspace("/wt", "gh-1 orient", "claude -- 'Run `norn orient gh-1` and follow it.'")).toEqual({ workspace_id: "w1", pane_id: "w1:p1" });
+  await cockpit.reportWorkspace("w1", { norn: "● approve" }, 15_000);
+  await cockpit.moveWorkspace("w1", 0);
+  await expect(cockpit.moveWorkspace("gone", 0)).rejects.toMatchObject({ code: "session_gone" });
+  expect(calls.map((a) => a.slice(1))).toEqual([
+    ["workspace", "create", "--cwd", "/wt", "--label", "gh-1 orient", "--focus"],
+    ["pane", "run", "w1:p1", "claude -- 'Run `norn orient gh-1` and follow it.'"],
+    ["workspace", "report-metadata", "w1", "--source", "norn", "--token", "norn=● approve", "--ttl-ms", "15000"],
+  ]);
+  expect(requests).toEqual([
+    { id: "norn:workspace.move:1", method: "workspace.move", params: { workspace_id: "w1", insert_index: 0 } },
+    { id: "norn:workspace.move:2", method: "workspace.move", params: { workspace_id: "gone", insert_index: 0 } },
+  ]);
+  expect(herdrSocketPath({ HERDR_SOCKET_PATH: "/s/herdr.sock", HOME: "/h" })).toBe("/s/herdr.sock");
+  expect(herdrSocketPath({ HERDR_SOCKET_PATH: "/s/herdr.sock", HOME: "/h" }, "work")).toBe("/h/.config/herdr/sessions/work/herdr.sock");
+  expect(herdrSocketPath({ HOME: "/h" })).toBe("/h/.config/herdr/herdr.sock");
 });
 
 test("pluginLinked reads `herdr plugin list --json` (HC11)", async () => {

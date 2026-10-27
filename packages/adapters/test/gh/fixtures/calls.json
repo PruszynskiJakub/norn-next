@@ -121,5 +121,16 @@
    "number,url,state,isDraft,headRefName,headRefOid,baseRefName,mergedAt,mergeCommit,mergedBy"
   ],
   "stdout": "{\"baseRefName\": \"main\", \"headRefName\": \"gh-15-fix-crash-on-save\", \"isDraft\": true, \"mergedAt\": null, \"number\": 41, \"state\": \"OPEN\", \"url\": \"https://github.com/acme/app/pull/41\", \"headRefOid\": \"cccccccccccccccccccccccccccccccccccccccc\", \"mergeCommit\": null, \"mergedBy\": null}"
+ },
+ {
+  "argv": [
+   "gh",
+   "pr",
+   "edit",
+   "41",
+   "--body",
+   "## Summary\n\nSaves no longer crash.\n\nCloses #15"
+  ],
+  "stdout": "https://github.com/acme/app/pull/41\n"
  }
 ]

@@ -200,7 +200,7 @@ function cases(): RuleCase[] {
   // ---- gates and git steps
   out.push(c("a ready unit at a gate step", "gate.wait", facts([story(STORY_WF, ready("ready"))])));
   out.push(c("a git step with no worktree", "git.no_worktree", facts([story(STORY_WF, ready("open-pr"), null, { worktree: null, pr: null }, noWorktree)])));
-  out.push(c("open-pr with a PR already open", "git.open-pr.exists", facts([story(STORY_WF, ready("open-pr"), null, { pr: { number: 7, url: "u", state: "open", is_draft: true, head_sha: "h" } })])));
+  out.push(c("open-pr with a PR already open runs again: the body is updated (GR9, main 0.9.x)", "git.open-pr", facts([story(STORY_WF, ready("open-pr"), null, { pr: { number: 7, url: "u", state: "open", is_draft: true, head_sha: "h" } })])));
   out.push(c("a push step", "git.push", facts([story(GIT_WF, ready("push"))])));
   out.push(c("an update step with no base observed", "git.update.no_base", facts([story(GIT_WF, ready("update"))])));
   {

@@ -213,6 +213,8 @@ export function sliceBranch(story: string, nn: string, slug: string): string {
 export function specDir(story: string, slug: string): string {
   return `${SPECS_DIR}/${storyDirName(story, slug)}`;
 }
+/** GR9: the story PR body an agent writes, in the spec folder. */
+export const PR_BODY_FILE = "pr.md";
 export function claimRef(story: string): string {
   return `refs/norn/claims/${story}`;
 }

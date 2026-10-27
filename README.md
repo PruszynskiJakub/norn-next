@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/PruszynskiJakub/norn-next/actions/workflows/ci.yml"><img src="https://github.com/PruszynskiJakub/norn-next/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/PruszynskiJakub/norn-next/releases"><img src="https://img.shields.io/badge/release-v0.7.1-blue" alt="Release v0.7.1"></a>
+  <a href="https://github.com/PruszynskiJakub/norn-next/releases"><img src="https://img.shields.io/badge/release-v0.9.1-blue" alt="Release v0.9.1"></a>
   <img src="https://img.shields.io/badge/bun-%3E%3D1.3-f9f1e1" alt="Bun 1.3 or later">
 </p>
 
@@ -177,7 +177,7 @@ The full glossary is in [PRD §5](.agents/PRD.md#5-glossary).
 
 A unit pins its workflow when it starts, so editing a file does not affect stories already in flight.
 
-**Skills carry the craft.** `norn init` copies norn's skills (`norn`, `norn-refine`, `norn-plan`, `norn-implement`, `norn-review`, `norn-qa`, …) as whole folders into `.agents/skills/` and links them from each configured agent's skill folder: `.claude/skills/`, `.gemini/skills/`, `.opencode/skills/` (Codex reads `.agents/skills/` itself). Commit them. Each `norn init` replaces them with the bundled version and lists what it updated; `git diff .agents/skills/` shows the change. To change how a step is done, write your own skill under another name and name it in the step (`skill: my-review`). `norn doctor` reports skills that are missing, not linked or out of date. Links need a filesystem that supports them (on Windows, developer mode).
+**Skills carry the craft.** `norn init` copies norn's skills (`norn`, `norn-refine`, `norn-plan`, `norn-implement`, `norn-review`, `norn-qa`, …) as whole folders into `.agents/skills/` and links them from each configured agent's skill folder: `.claude/skills/`, `.gemini/skills/`, `.opencode/skills/` (Codex reads `.agents/skills/` itself). Commit them. Each `norn init` replaces them with the bundled version and lists what it updated; `git diff .agents/skills/` shows the change. To change how a step is done, write your own skill under another name and name it in the step (`skill: my-review`). `norn doctor` reports skills that are missing, not linked or out of date. After a story's PR merges, ask an agent to use `norn-retro` on it: it reads the story's `runs/` and suggests one change per friction it found, each citing its receipt, without changing any file. Links need a filesystem that supports them (on Windows, developer mode).
 
 **Config** lives in two files with the same keys: `.agents/norn/config.yaml` (committed, what the team agrees on: remote, workflows, limits) and `~/.norn/config.yaml` (yours: runner, machine caps, notifiers, default mode). The repo file wins, except that it can only lower machine caps. The template `norn init` writes groups the keys by who they belong to, with their defaults. `norn config` shows every setting in effect, the file it came from and what it does.
 
@@ -194,7 +194,7 @@ claude plugin install norn@norn
 
 ### Herdr
 
-`plugins/herdr` adds the norn cockpit to Herdr: a pane running `norn pane --interactive`, which numbers the inbox items and takes one command per line (`3` goes to item 3's agent, `w 3` to its Herdr workspace, `a 2 Postgres` answers, `y 1` approves, `t 4` takes, `?` lists the rest). Every change goes through the same `norn` commands you would type. While it runs, it labels the agent pane of each norn run in Herdr's sidebar (`gh-12 · refine`, `norn: your turn`).
+`plugins/herdr` adds the norn cockpit to Herdr: `norn cockpit` lists what needs you and every story, previews the selected one, and acts on it with one key (`y` approves, `a` answers, `t` takes, Enter opens an orient workspace with an agent that walks you through the story, `?` lists the rest). Every change goes through the same `norn` commands you would type. While it runs, it labels the agent pane of each norn run in Herdr's sidebar (`gh-12 · refine`, `norn: your turn`).
 
 ```sh
 herdr plugin install PruszynskiJakub/norn-next/plugins/herdr   # update it with herdr plugin update
@@ -202,7 +202,7 @@ herdr plugin install PruszynskiJakub/norn-next/plugins/herdr   # update it with 
 
 Working on norn itself? Link your checkout instead, so the plugin follows `git pull`: `herdr plugin link <checkout>/plugins/herdr`. `norn doctor` suggests whichever fits.
 
-The plugin has two actions you can bind to keys in Herdr's `config.toml`: `norn.open` opens the cockpit below the focused pane, and `norn.next` jumps to the agent that waits for you. To get inbox notifications as Herdr toasts, add `{adapter: herdr}` to `notifiers` in the config.
+The plugin has three actions you can bind to keys in Herdr's `config.toml`: `norn.pick` opens the cockpit as a popup on any workspace, `norn.open` opens it below the focused pane, and `norn.next` jumps to the agent that waits for you. `plugins/herdr/README.md` has the keys and the config for a tab bar segment (`norn status --segment`) and sidebar row. To get inbox notifications as Herdr toasts, add `{adapter: herdr}` to `notifiers` in the config.
 
 ## How it works
 
@@ -256,4 +256,4 @@ bun run build:bin      # dist/bin/norn-{darwin-arm64,darwin-x64,linux-x64,linux-
 
 ## Credits
 
-The `norn-codebase-design` and `norn-tdd` skills and the approach of the step skills are adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT), by way of norn v0.11.0.
+The `norn-codebase-design` and `norn-tdd` skills and the approach of the step skills are adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT), by way of norn v0.11.0; `norn-pr`, `norn-diagnose`, `norn-prototype` and `norn-retro` are adapted from its `pr`, `diagnosing-bugs`, `prototype` and `retro` skills directly.

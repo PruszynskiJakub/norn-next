@@ -33,9 +33,11 @@ While interviewing, hold the language and the claims to account:
 - **Invent scenarios.** Stress the boundaries with specific cases: the empty list, the second run, two people at once, the item deleted halfway through.
 - **Cross-check with the code.** When the person says how something works today, check it. "The code closes the whole order, but you said partial closing is possible. Which is right?"
 
+When a decision turns on how something looks or feels, or on a state model that is hard to judge on paper, offer the person a prototype (the `norn-prototype` skill) before they decide. Its verdict is the decision.
+
 A decision that needs someone not present becomes an open question naming who can answer it, and its branch closes. A branch is not closed by your assumption: an assumption the person has not confirmed is an open question too.
 
-When no person is with you, do not interview and do not decide: settle what the code and the docs can settle, and write every decision that is left as an open question.
+When no person is with you, do not interview and do not decide: settle what the code and the docs can settle, and write every decision that is left as an open question. Build no prototype: where one would settle a question, suggest it in that question's options.
 
 ### Edge checklist
 
@@ -81,7 +83,7 @@ Read the spec once more as the planner will.
 - Every Behaviour item has an example and is observable without reading the code.
 - The edge checklist is reflected: each item covered by a Behaviour item, out of scope, or an open question.
 - Problem and Solution are told from the user's side, in the project's terms.
-- No file paths, function names or code snippets.
+- No file paths, function names or code snippets (a prototype's line may name its path).
 
 Done when the person has confirmed the interview summary (every branch settled, or parked as an open question) and agrees the spec says what they meant; with no person present, when every decision left is an open question. The spec is what you hand back, with Open questions empty or not.
 

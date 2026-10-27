@@ -126,6 +126,10 @@ export function createGlab(opts: GlabOptions): RemotePort {
       if (!m) throw portError("glab_bad_output", `glab mr create: no merge request URL in output: ${out.slice(0, 200)}`);
       return mapMr(await json<GlMr>(["mr", "view", m[1] as string, ...repo, "--output", "json"]));
     },
+    async editPullRequestBody(number, body) {
+      // GR9
+      okOrThrow(await run(["mr", "update", String(number), ...repo, "--description-file", "-", "--yes"], body), "glab mr update", "glab");
+    },
   };
 }
 

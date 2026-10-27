@@ -1,5 +1,5 @@
 /**
- * Herdr side of the cockpit (`norn pane --interactive`, HC4–HC13): find the agent pane of a run,
+ * Herdr side of the cockpit (`norn cockpit`, HC6–HC15, SPEC-cockpit): find the agent pane of a run,
  * focus it or its workspace, label it in Herdr's sidebar, open a pane that runs a command. Presentation only — none
  * of this is a fact for decide (HC13).
  *
@@ -13,8 +13,13 @@
  * - pluginLinked → `herdr plugin list --json`                         (HC11: is norn's plugin linked and enabled)
  * - listPanes   → `herdr pane list`                                   (K7: each pane with its tab, workspace, cwd)
  * - closePane / closeTab / closeWorkspace → `herdr pane|tab|workspace close <id>` (K7; not found = already gone)
+ * - openWorkspace → `herdr workspace create --cwd C --label L --focus|--no-focus`, `herdr pane run <root pane> <cmd>` (orient)
+ * - reportWorkspace → `herdr workspace report-metadata <w> --source norn --token name=value… --ttl-ms N` (sidebar `$name` rows)
+ * - moveWorkspace → socket API `workspace.move {workspace_id, insert_index}` (no CLI verb reorders workspaces)
  */
-import { type Exec, bunExec } from "../exec.ts";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { type Exec, bunExec, portError } from "../exec.ts";
 import { herdrCaller, splitAndRun } from "./call.ts";
 
 export interface HerdrAgent {
@@ -78,7 +83,16 @@ export interface HerdrCockpit {
   closePane(paneId: string): Promise<void>;
   closeTab(tabId: string): Promise<void>;
   closeWorkspace(workspaceId: string): Promise<void>;
+  /** a new workspace in `cwd` running `command` in its root pane; focused unless `focus` is false */
+  openWorkspace(cwd: string, label: string, command: string, focus?: boolean): Promise<{ workspace_id: string; pane_id: string }>;
+  /** sidebar tokens of a workspace (`$name` in `[ui.sidebar.spaces] rows`), gone after `ttlMs` */
+  reportWorkspace(workspaceId: string, tokens: Record<string, string>, ttlMs: number): Promise<void>;
+  /** move a workspace to `index` (0 = first) in the sidebar */
+  moveWorkspace(workspaceId: string, index: number): Promise<void>;
 }
+
+/** One request over Herdr's socket API: a JSON line out, a JSON line back. */
+export type HerdrSocketCall = (request: { id: string; method: string; params: Record<string, unknown> }) => Promise<unknown>;
 
 export interface HerdrCockpitOptions {
   bin?: string;
@@ -86,6 +100,55 @@ export interface HerdrCockpitOptions {
   exec?: Exec;
   /** caller env; `HERDR_PANE_ID` set → split the calling pane (`--current`) */
   env?: Record<string, string | undefined>;
+  /** socket API caller (tests); default: a unix socket connection to the session's `herdr.sock` */
+  socket?: HerdrSocketCall;
+}
+
+/**
+ * The session's socket: `$HERDR_SOCKET_PATH` (inside Herdr), else `sessions/<session>/herdr.sock` for a
+ * named session, else the default `herdr.sock`, under `$XDG_CONFIG_HOME/herdr` (default `~/.config/herdr`).
+ */
+export function herdrSocketPath(env: Record<string, string | undefined>, session?: string): string {
+  if (!session && env.HERDR_SOCKET_PATH) return env.HERDR_SOCKET_PATH;
+  const dir = join(env.XDG_CONFIG_HOME ?? join(env.HOME ?? homedir(), ".config"), "herdr");
+  return session ? join(dir, "sessions", session, "herdr.sock") : join(dir, "herdr.sock");
+}
+
+/** The real socket call: one connection per request, closed after the first reply line. */
+export function unixSocketCall(path: string, timeoutMs = 5_000): HerdrSocketCall {
+  return (request) =>
+    new Promise((resolve, reject) => {
+      let buf = "";
+      const timer = setTimeout(() => reject(portError("herdr_error", `herdr socket ${path}: no reply in ${timeoutMs} ms`)), timeoutMs);
+      const finish = (s: { end(): void } | null) => {
+        clearTimeout(timer);
+        s?.end();
+        const line = buf.split("\n")[0] ?? "";
+        try {
+          resolve(JSON.parse(line));
+        } catch {
+          reject(portError("herdr_error", `herdr socket ${path}: unreadable reply`));
+        }
+      };
+      Bun.connect({
+        unix: path,
+        socket: {
+          open: (s) => void s.write(`${JSON.stringify(request)}\n`),
+          data: (s, d) => {
+            buf += new TextDecoder().decode(d);
+            if (buf.includes("\n")) finish(s);
+          },
+          close: () => (buf ? finish(null) : undefined),
+          error: (_s, e) => {
+            clearTimeout(timer);
+            reject(portError("herdr_error", `herdr socket ${path}: ${e.message}`));
+          },
+        },
+      }).catch((e: Error) => {
+        clearTimeout(timer);
+        reject(portError("runner_unavailable", `herdr socket ${path}: ${e.message}`));
+      });
+    });
 }
 
 /** Metadata source id norn's labels are written under (HC12). */
@@ -156,6 +219,8 @@ export function createHerdrCockpit(opts: HerdrCockpitOptions = {}): HerdrCockpit
   const env = opts.env ?? process.env;
   // the cockpit answers keystrokes: a hung herdr must not hang it (H11); its errors keep the raw stderr
   const herdr = herdrCaller(opts.exec ?? bunExec, { ...opts, timeoutMs: 10_000, errors: "raw" });
+  const socket = opts.socket ?? unixSocketCall(herdrSocketPath(env, opts.session));
+  let requests = 0;
 
   /** K7: close one thing; one already gone is not an error. */
   async function close(kind: "pane" | "tab" | "workspace", id: string): Promise<void> {
@@ -233,5 +298,24 @@ export function createHerdrCockpit(opts: HerdrCockpitOptions = {}): HerdrCockpit
     closePane: (id) => close("pane", id),
     closeTab: (id) => close("tab", id),
     closeWorkspace: (id) => close("workspace", id),
+    async openWorkspace(cwd, label, command, focus = true) {
+      const out = (await herdr(["workspace", "create", "--cwd", cwd, "--label", label, focus ? "--focus" : "--no-focus"])) as {
+        result?: { root_pane?: { pane_id?: string; workspace_id?: string } };
+      } | null;
+      const pane = out?.result?.root_pane;
+      if (!pane?.pane_id || !pane.workspace_id) throw portError("launch_failed", "herdr workspace create did not return a root pane");
+      await herdr(["pane", "run", pane.pane_id, command]);
+      return { workspace_id: pane.workspace_id, pane_id: pane.pane_id };
+    },
+    async reportWorkspace(workspaceId, tokens, ttlMs) {
+      const flags = Object.entries(tokens).flatMap(([name, value]) => ["--token", `${name}=${value}`]);
+      await herdr(["workspace", "report-metadata", workspaceId, "--source", LABEL_SOURCE, ...flags, "--ttl-ms", String(Math.max(1, Math.round(ttlMs)))]);
+    },
+    async moveWorkspace(workspaceId, index) {
+      const reply = (await socket({ id: `norn:workspace.move:${++requests}`, method: "workspace.move", params: { workspace_id: workspaceId, insert_index: index } })) as {
+        error?: { code?: string; message?: string };
+      } | null;
+      if (reply?.error) throw portError(reply.error.code === "workspace_not_found" ? "session_gone" : "herdr_error", `herdr workspace.move: ${reply.error.message ?? reply.error.code ?? "error"}`);
+    },
   };
 }
