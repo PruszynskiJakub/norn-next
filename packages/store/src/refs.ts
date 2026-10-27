@@ -14,6 +14,9 @@ export type ClaimRead =
   | { state: "present"; sha: string; blob: ClaimBlob }
   | { state: "corrupt"; sha: string; error: FileError };
 
+/** A claim read from the remote: what it holds, or `unreachable` when `ls-remote` or the fetch of its blob failed. */
+export type RemoteClaimRead = ClaimRead | { state: "unreachable"; reason: "network"; message: string };
+
 function parseBlob<N extends "claim" | "receipt">(name: N, ref: string, raw: string | null) {
   if (raw === null) return { ok: false as const, error: { file: ref, errors: [{ path: "", message: "object missing" }] } };
   let v: unknown;
@@ -41,20 +44,37 @@ export async function readLocalClaim(cwd: string, story: string): Promise<ClaimR
 /**
  * Claim as on the remote now: `ls-remote`, then fetch the blob into the local ref
  * (or delete the local ref when gone). With `remote` null, the local ref.
+ * A failed `ls-remote` or fetch is reported, not thrown: `{ state: "unreachable", reason: "network" }`
+ * with git's message; the caller says what an unreadable claim means for it (T3).
  */
-export async function readClaim(cwd: string, remote: string | null, story: string): Promise<ClaimRead> {
+export async function readClaim(cwd: string, remote: string | null, story: string): Promise<RemoteClaimRead> {
   const ref = claimRef(story);
   if (remote === null) return readLocalClaim(cwd, story);
-  const remoteSha = (await listRemoteRefs(cwd, remote, ref)).find((r) => r.ref === ref)?.sha ?? null;
+  let refs: Array<{ ref: string; sha: string }>;
+  try {
+    refs = await listRemoteRefs(cwd, remote, ref);
+  } catch (e) {
+    return unreachable((e as Error).message);
+  }
+  const remoteSha = refs.find((r) => r.ref === ref)?.sha ?? null;
   if (remoteSha === null) {
     await git(cwd, ["update-ref", "-d", ref]);
     return { state: "none" };
   }
   if ((await readLocalRef(cwd, ref)) !== remoteSha) {
     const f = await git(cwd, ["fetch", "--quiet", "--no-tags", remote, `+${ref}:${ref}`]);
-    if (f.code !== 0) throw new Error(`fetch ${ref} failed: ${f.stderr.trim()}`);
+    if (f.code !== 0) return unreachable(`fetch ${ref} failed: ${f.stderr.trim()}`);
   }
   return claimAt(cwd, ref, remoteSha);
+}
+
+const unreachable = (message: string): RemoteClaimRead => ({ state: "unreachable", reason: "network", message });
+
+/** The claim on the remote, or a throw carrying git's message when it cannot be read (acquire needs the current sha). */
+async function readClaimOrThrow(cwd: string, remote: string | null, story: string): Promise<ClaimRead> {
+  const r = await readClaim(cwd, remote, story);
+  if (r.state === "unreachable") throw new Error(r.message);
+  return r;
 }
 
 /** Facts view of a claim (core ClaimState): mine / other / expired by heartbeat_id and now. */
@@ -122,13 +142,13 @@ export async function acquireClaim(
   opts: { now: number; force?: boolean },
 ): Promise<ClaimWriteResult> {
   assertValid("claim", blob);
-  const cur = await readClaim(cwd, remote, blob.story);
+  const cur = await readClaimOrThrow(cwd, remote, blob.story);
   const held = heldBy(cur, blob, opts);
   if (held) return held;
   const r = await writeClaim(cwd, remote, blob, cur.state === "none" ? null : cur.sha);
   // a lost race shows as stale info, or as the remote refusing to lock a ref that just moved
   if (r.ok || (r.reason !== "stale" && r.reason !== "rejected")) return r;
-  const now = await readClaim(cwd, remote, blob.story);
+  const now = await readClaimOrThrow(cwd, remote, blob.story);
   return heldBy(now, blob, { now: opts.now }) ?? r;
 }
 

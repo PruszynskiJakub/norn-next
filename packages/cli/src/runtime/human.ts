@@ -21,7 +21,7 @@ import {
 import {
   acquireClaim,
   appendReceipt,
-  type ClaimRead,
+  type RemoteClaimRead,
   classifyClaim,
   fetchNornRefs,
   heartbeatId,
@@ -213,12 +213,13 @@ export async function claimFor(
   opts: { remote?: string | null; unreadable?: (e: Error) => Error } = {},
 ): Promise<ClaimState> {
   const unreadable = opts.unreadable ?? ((e: Error) => failure(`cannot read the claim of ${story}: ${e.message}`, "check the network and retry", "claim_unreadable"));
-  let read: ClaimRead;
+  let read: RemoteClaimRead;
   try {
     read = await readClaim(ctx.root, opts.remote !== undefined ? opts.remote : await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote), story);
   } catch (e) {
     throw unreadable(e as Error);
   }
+  if (read.state === "unreachable") throw unreadable(new Error(read.message));
   return classifyClaim(read, { heartbeat_id: recordedHeartbeatId(ctx.root) }, ctx.clock.now());
 }
 

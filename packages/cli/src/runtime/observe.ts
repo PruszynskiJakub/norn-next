@@ -8,11 +8,11 @@
  * (`remote.sync_interval`, or `sync: "force"`), and a failing remote leaves remote facts
  * `undefined` ("not observed") so decide does not act on them.
  */
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { hostname, userInfo } from "node:os";
 import { join } from "node:path";
-import { claude } from "@norn/adapters";
 import {
+  type AgentAdapter,
   type ClaimState,
   type Facts,
   edgeOf,
@@ -66,12 +66,12 @@ import {
   readBaseFacts,
   readPrFacts,
   type PrFactsCache,
+  readHookFacts,
   readLocalClaim,
   readReceipt,
   readUnitMarker,
   receiptsDir,
   type StorySnapshot,
-  traceDir,
   type UnitSnapshot,
   type UnpushedTarget,
   type UnpushedUnit,
@@ -181,37 +181,16 @@ function newestMtime(dir: string, paths: string[]): number | null {
   return max === null ? null : Math.floor(max);
 }
 
-// ------------------------------------------------------------ hooks (A2) from the trace
-
-/** Hook facts appended by `norn hook`, read from trace day files since `since` (fast scan). */
-export function readHookFacts(root: string, since: string): HookFact[] {
-  let names: string[];
-  try {
-    names = readdirSync(traceDir(root)).filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n));
-  } catch {
-    return [];
+/** A2: each agent adapter's own pass over a run's hook facts (`refineHooks`), once per adapter name. */
+function refineHooks(agents: Record<string, AgentAdapter>, hooks: HookFact[]): HookFact[] {
+  const seen = new Set<string>();
+  let out = hooks;
+  for (const a of Object.values(agents)) {
+    if (!a.refineHooks || seen.has(a.name)) continue;
+    seen.add(a.name);
+    out = a.refineHooks(out);
   }
-  const day = since.slice(0, 10);
-  const out: HookFact[] = [];
-  for (const name of names.sort()) {
-    if (name.slice(0, 10) < day) continue;
-    let text: string;
-    try {
-      text = readFileSync(join(traceDir(root), name), "utf8");
-    } catch {
-      continue;
-    }
-    for (const line of text.split("\n")) {
-      if (!line.startsWith('{"type":"hook"')) continue;
-      try {
-        const ev = JSON.parse(line) as { fact?: HookFact };
-        if (ev.fact && ev.fact.at >= since) out.push(ev.fact);
-      } catch {
-        /* diagnostic file; bad lines are skipped */
-      }
-    }
-  }
-  return out.sort((a, b) => a.at.localeCompare(b.at));
+  return out;
 }
 
 // ------------------------------------------------------------ observe
@@ -803,7 +782,7 @@ async function unitFacts(
     // R5.1: look for the run: its hook facts, runner sessions in its worktree, processes with its NORN_RUN
     const r = unknown.receipt;
     const runId = r.run_id as string;
-    const mine = claude.withPendingCommands(hooks.filter((h) => h.run_id === runId));
+    const mine = refineHooks(ports.agents, hooks.filter((h) => h.run_id === runId));
     const agentSession = mine.findLast((h) => h.agent_session_id)?.agent_session_id ?? null;
     const foreign = !!r.machine && r.machine !== env.holder;
     const candidates = !foreign && env.runner?.findSessions ? await env.runner.findSessions({ run_id: runId, cwd: r.worktree }).catch(() => []) : [];
@@ -830,9 +809,9 @@ async function unitFacts(
     const foreign = !!r.machine && r.machine !== env.holder;
     const process_alive = r.process && !foreign ? await ports.process.isAlive(r.process).catch(() => null) : null;
     const pane = session && !foreign && ports.runner && session.runner === ports.runner.name ? await ports.runner.paneState(session).catch(() => null) : null;
-    // A2: a Claude permission prompt names no command; take it from the preceding PreToolUse
-    // (other agents' facts pass through unchanged) so the implicit ask and inbox show it
-    const mine = claude.withPendingCommands(hooks.filter((h) => (h.run_id ? h.run_id === r.run_id : !!worktree && h.cwd.startsWith(worktree.path) && h.at >= r.started_at)));
+    // A2: a Claude permission prompt names no command; its adapter takes it from the preceding
+    // PreToolUse (other agents' facts pass through unchanged) so the implicit ask and inbox show it
+    const mine = refineHooks(ports.agents, hooks.filter((h) => (h.run_id ? h.run_id === r.run_id : !!worktree && h.cwd.startsWith(worktree.path) && h.at >= r.started_at)));
     const last = mine.at(-1);
     const last_hook_at = last ? Date.parse(last.at) : null;
     const acts = [last_hook_at, worktree?.last_commit_at ?? null, worktree?.last_file_change_at ?? null].filter((x): x is number => x !== null);
