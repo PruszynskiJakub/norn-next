@@ -10,13 +10,8 @@ import {
   leasesDir,
   listLeases,
   localProcess,
-  readEnvNorn,
-  readUnitMarker,
   reclaimLeases,
   releaseLease,
-  slotEnv,
-  writeEnvNorn,
-  writeUnitMarker,
 } from "../src/index.ts";
 import { tmp } from "./helpers.ts";
 
@@ -94,15 +89,5 @@ describe("leases (K1, K3, K4)", () => {
     writeFileSync(join(leasesDir(home), "slot-4.json"), "{}");
     expect((await listLeases(home)).errors.map((e) => e.file)).toEqual(["slot-4.json"]);
     expect(await reclaimLeases(home, ["slot-4.json"])).toEqual(["slot-4.json"]);
-  });
-  test(".env.norn and .norn-unit", () => {
-    const wt = tmp();
-    const env = slotEnv(2, { ...DEFAULT_CONFIG.slots, env: { DB_NAME: "app_{slot}", API: "http://localhost:{port_base}" } });
-    expect(env).toEqual({ NORN_SLOT: "2", PORT_BASE: "4020", DB_NAME: "app_2", API: "http://localhost:4020" });
-    writeEnvNorn(wt, { ...env, ODD: 'a "b" c' });
-    expect(readEnvNorn(wt)).toEqual({ ...env, ODD: 'a "b" c' });
-    writeUnitMarker(wt, { repo: "/r", story: "gh-12", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-12-x" });
-    expect(readUnitMarker(wt)).toEqual({ exists: true, marker: { repo: "/r", story: "gh-12", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-12-x" } });
-    expect(readUnitMarker(tmp())).toEqual({ exists: false, marker: null });
   });
 });

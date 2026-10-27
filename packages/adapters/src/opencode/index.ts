@@ -8,10 +8,11 @@ import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { AgentAdapter, AgentFactory, AgentLaunchRequest, HookDecision, HookResponse } from "@norn/core";
 import type { HookEventKind, HookFact } from "@norn/schema";
-import { shared } from "../claude/index.ts";
+import { atomicWrite } from "@norn/store";
+import * as shared from "../agent-hooks/index.ts";
 import { portError } from "../exec.ts";
 
-const { atomicWrite, buildFact, field, isObject, launchEnv, readJsonFile, textOf } = shared;
+const { buildFact, field, isObject, launchEnv, readJsonFile, textOf } = shared;
 const NAME = "opencode";
 const PLUGIN_MARKER = "// norn-owned plugin";
 

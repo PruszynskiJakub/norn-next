@@ -221,10 +221,7 @@ const FS_WRITE = /\b(?:writeFileSync|appendFileSync|renameSync|cpSync|copyFileSy
 
 /** (a) S1: every file norn writes goes through store (atomic temp → fsync → rename). */
 const FS_WRITE_ALLOW: Counts = {
-  "packages/adapters/src/claude/shared.ts": 1, // agent settings files (2.3 moves them onto store atomicWrite)
-  "packages/cli/src/runtime/act.ts": 1,
   "packages/cli/src/runtime/assets.ts": 2,
-  "packages/cli/src/runtime/worktrees.ts": 1,
 };
 
 /** (b) raw git from store in cli: commands and runtime go through GitPort (4.1, 4.2). */
@@ -234,12 +231,11 @@ const RAW_GIT_ALLOW: Counts = {
   "packages/cli/src/commands/take.ts": 4,
   "packages/cli/src/commands/tidy.ts": 4,
   "packages/cli/src/commands/watch.ts": 1,
-  "packages/cli/src/runtime/act.ts": 2,
+  "packages/cli/src/runtime/act.ts": 1,
   "packages/cli/src/runtime/human.ts": 5,
   "packages/cli/src/runtime/observe.ts": 7,
   "packages/cli/src/runtime/record.ts": 10,
   "packages/cli/src/runtime/release.ts": 3,
-  "packages/cli/src/runtime/worktrees.ts": 1,
 };
 
 /**
@@ -248,7 +244,7 @@ const RAW_GIT_ALLOW: Counts = {
  * a file another tool owns, or a clone (stringify round-trip, not a read).
  */
 const JSON_PARSE_ALLOW: Record<string, [number, string]> = {
-  "packages/adapters/src/claude/shared.ts": [3, "files claude owns: settings.json, transcript jsonl"],
+  "packages/adapters/src/agent-hooks/index.ts": [3, "files claude owns: settings.json, transcript jsonl"],
   "packages/adapters/src/exec.ts": [1, "tool output: gh/glab --json stdout"],
   "packages/adapters/src/herdr/cockpit.ts": [1, "tool output: herdr stdout"],
   "packages/adapters/src/herdr/index.ts": [2, "tool output: herdr stdout and error stderr"],

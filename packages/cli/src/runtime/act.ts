@@ -8,7 +8,7 @@
  * next tick applies it. A failing effect stops the action before state is written; the next
  * tick re-decides. Every action is reported as an `ActionResult` for the trace (O4).
  */
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import {
   type Action,
@@ -45,7 +45,6 @@ import {
 import {
   acquireClaim,
   acquireIntegrateLock,
-  acquireLease,
   acquireRunLease,
   appendHandoffHeartbeat,
   appendReceipt,
@@ -63,19 +62,16 @@ import {
   releaseLease,
   renewClaim,
   sliceFile as sliceFilePath,
-  slotEnv,
   storyFile,
   traceDir,
   updateLease,
   writeActFailures,
-  writeEnvNorn,
   writeHandoffHeader,
   writeLog,
   writeReceiptAt,
   writeState,
   writeStoryFile,
   writeTranscriptSnapshot,
-  writeUnitMarker,
 } from "@norn/store";
 import type { Context } from "../context.ts";
 import { leaseLiveness } from "./leases.ts";
@@ -86,6 +82,7 @@ import { appendProgress, rejectProgress } from "./report.ts";
 import { runShell, tailLines } from "./shell.ts";
 import { stopStrayListeners } from "./strays.ts";
 import { ensureShim, withNornOnPath } from "./shim.ts";
+import { equipWorktree } from "./worktrees.ts";
 
 export interface ActRecord {
   decision: Decision;
@@ -679,43 +676,11 @@ export class Actor {
       await this.git.worktreeAdd(this.root, spec.path, spec.branch, exists ? undefined : { from });
       created = true;
     }
-    await this.ensureExcluded();
-    const slots = this.config.slots;
-    const req = {
-      kind: "slot" as const,
-      repo: this.root,
-      story: unit.story,
-      slice: unit.slice,
-      run_id: null,
-      worktree: spec.path,
-      portBase: (n: number) => slots.port_base + n * slots.ports_per_slot,
-      now: this.nowIso(),
-      liveness: this.liveness(),
-    };
-    let lease = spec.slot !== null ? await acquireLease(this.ctx.home, { ...req, range: { min: spec.slot, max: spec.slot } }) : null;
-    if (!lease?.ok) lease = await acquireLease(this.ctx.home, { ...req, range: { min: slots.min, max: slots.max } });
-    const slot = lease.ok ? lease.entry.n : null;
-    const env = slot === null ? {} : slot === spec.slot ? spec.env : slotEnv(slot, slots);
-    writeEnvNorn(spec.path, env);
-    writeUnitMarker(spec.path, { repo: this.root, story: unit.story, slice: unit.slice, unit: unit.dir, spec_dir });
+    const slot = await equipWorktree(
+      { root: this.root, home: this.ctx.home, config: this.config, now: this.nowIso(), liveness: this.liveness(), preferredSlot: spec.slot !== null ? { slot: spec.slot, env: spec.env } : null },
+      { path: spec.path, branch: spec.branch, story: unit.story, slice: unit.slice, unit: unit.dir, spec_dir },
+    );
     return { created, slot };
-  }
-
-  /** `.env.norn` and `.norn-unit` are machine-local: never committed (shared info/exclude). */
-  private async ensureExcluded(): Promise<void> {
-    const r = await rawGit(this.root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
-    if (r.code !== 0) return;
-    const path = join(r.stdout.trim(), "info", "exclude");
-    let text = "";
-    try {
-      text = readFileSync(path, "utf8");
-    } catch {
-      /* none yet */
-    }
-    const missing = [".env.norn", ".norn-unit"].filter((p) => !text.split("\n").includes(p));
-    if (!missing.length) return;
-    mkdirSync(dirname(path), { recursive: true });
-    appendFileSync(path, `${text && !text.endsWith("\n") ? "\n" : ""}# norn (machine-local worktree files)\n${missing.join("\n")}\n`);
   }
 
   private async startUnit(a: Extract<Action, { kind: "start_unit" }>): Promise<ActionResult> {
