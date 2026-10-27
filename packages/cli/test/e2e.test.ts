@@ -145,6 +145,7 @@ describe("norn init", () => {
     const skills = (r.value as { skills: Array<{ skill: string; for: string }> }).skills;
     expect(skills.find((s) => s.skill === "norn")?.for).toBe("protocol");
     expect(skills.find((s) => s.skill === "norn-qa-person")?.for).toBe("attended");
+    expect(skills.find((s) => s.skill === "norn-retro")?.for).toBe("person");
     for (const s of skills) expect(r.stdout).toContain(s.skill);
     expect(() => JSON.parse(r.stdout)).toThrow();
     expect(JSON.parse((await h.norn("help", "--json")).stdout)).toEqual(r.value);
