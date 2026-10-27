@@ -140,7 +140,7 @@ describe("runtime", () => {
   });
 
   test("PR merged → worktree, branches, claim ref and slot removed (GR6)", async () => {
-    h.remote.prs = [{ number: 1, url: "u", state: "merged", is_draft: false, head_sha: "", draft: false, head: "gh-9-fix-the-bug", base: "main", merged_at: h.clock.iso() }];
+    h.remote.prs = [{ number: 1, url: "u", state: "merged", is_draft: false, head_sha: "", head: "gh-9-fix-the-bug", base_branch: "main", merged_at: h.clock.iso() }];
     h.clock.advance(10_000);
     const s = await h.norn("sync");
     expect(acted(s.value as TickReport)).toEqual(["gh-9 cleanup_merged_story"]);

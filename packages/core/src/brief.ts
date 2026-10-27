@@ -19,7 +19,7 @@ import {
   type Workflow,
 } from "@norn/schema";
 import type { NumberedReceipt, UnitRef } from "./facts.ts";
-import { effectiveMode } from "./inbox.ts";
+import { effectiveMode } from "./policy.ts";
 import { epoch, iso } from "./time.ts";
 import { edgeOf, reportableOutcomes, stepOf } from "./workflow.ts";
 
@@ -286,9 +286,11 @@ const IN_STEP = new Set(["nudge", "retry", "park"]);
 /**
  * The receipt that moved the cursor here from another step, if any. After an in-step outcome
  * (`died`, `silent`, …) `last_outcome` names this step, so look back for the last outcome of
- * another step: a fresh session keeps its Rework (B2).
+ * another step: a fresh session keeps its Rework (B2). An `unstick` keeps `last_outcome`, so a
+ * unit stuck by an exhausted counter and unstuck `--to` a step still enters it from that receipt.
+ * Exported for `norn done` (BS5): the base it verifies is the one this brief told the agent to merge.
  */
-function enteringReceipt({ state: st, receipts }: BriefInput): NumberedReceipt | undefined {
+export function enteringReceipt({ state: st, receipts }: Pick<BriefInput, "state" | "receipts">): NumberedReceipt | undefined {
   if (!st.last_outcome) return undefined;
   if (st.last_outcome.step !== st.step) return receipts.find((r) => r.receipt.receipt_id === st.last_outcome?.receipt_id);
   return receipts.findLast(({ receipt: r }) => r.step !== st.step && outcomeOf(r) !== null && !(r.kind === "classify" && IN_STEP.has(r.route)));

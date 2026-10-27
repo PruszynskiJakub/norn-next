@@ -11,15 +11,13 @@
  * `--agent` (a configured agent name or an adapter name; `norn init` always installs it), else
  * NORN_AGENT, else the first configured adapter (claude first) that recognizes the event.
  */
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import { type AgentAdapter, type HookDecision, type HookResponse, reportableOutcomes } from "@norn/core";
-import { DEFAULT_CONFIG, type ExitCode, type HookFact, type ResolvedConfig, ulid, ulidTime } from "@norn/schema";
-import { appendTrace, loadConfig, traceDir } from "@norn/store";
+import { type AgentAdapter, currentRun, cursorStep, type HookDecision, type HookResponse, reportableOutcomes, standingReport } from "@norn/core";
+import { DEFAULT_CONFIG, type ExitCode, type HookFact, type ResolvedConfig, ulid } from "@norn/schema";
+import { appendTrace, blockedHookCount, loadConfig } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
-import { type Context, findUnitMarker } from "../context.ts";
+import { type Context, findUnitMarker, safeRealpath } from "../context.ts";
 import { withExit } from "../output.ts";
-import { currentRun, loadUnitSession, ORIENT_ENV, safeRealpath, standingReport, stepOfSession, type UnitSession } from "../runtime/agent-unit.ts";
+import { loadUnitSession, ORIENT_ENV, type UnitSession } from "../runtime/agent-unit.ts";
 
 /** P5: turn ends refused per run before norn lets the tick classify `silent` and nudge instead. */
 export const MAX_STOP_BLOCKS = 3;
@@ -68,44 +66,25 @@ function pickAdapter(ctx: Context, root: string, config: ResolvedConfig, flag: s
   return null;
 }
 
-/** Hook events of `run_id` that norn blocked, from the trace day files since the run began. */
-function blocksFor(root: string, runId: string): number {
-  let names: string[];
-  try {
-    names = readdirSync(traceDir(root)).filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n));
-  } catch {
-    return 0;
-  }
-  const day = new Date(ulidTime(runId)).toISOString().slice(0, 10);
-  const needle = `"run_id":"${runId}"`;
-  let n = 0;
-  for (const name of names) {
-    if (name.slice(0, 10) < day) continue;
-    for (const line of readFileSync(join(traceDir(root), name), "utf8").split("\n"))
-      if (line.startsWith('{"type":"hook"') && line.includes('"blocked":true') && line.includes(needle)) n++;
-  }
-  return n;
-}
-
 /**
  * A4: a fact the adapter can refuse is a turn end raised by the adapter's own turn-end hook —
  * its native event maps to `turn_end` in `adapter.hookEvents` (Claude/Codex `Stop`, Gemini
  * `AfterAgent`). A turn end derived from another event (Claude's `Notification` idle_prompt)
  * cannot be refused, so it is never traced `blocked` nor counted toward MAX_STOP_BLOCKS.
  */
-export const refusableTurnEnd = (adapter: AgentAdapter, fact: HookFact): boolean =>
+const refusableTurnEnd = (adapter: AgentAdapter, fact: HookFact): boolean =>
   adapter.tier === "blocking" && fact.event === "turn_end" && fact.agent === adapter.name && Object.hasOwn(adapter.hookEvents, fact.native) && adapter.hookEvents[fact.native] === "turn_end";
 
 /** A4 / MO4: block turn end only in an unattended agent step whose live run has not reported. */
 function decideBlock(root: string, s: UnitSession | null, fact: HookFact, adapter: AgentAdapter): HookDecision {
   if (!refusableTurnEnd(adapter, fact) || !s) return { block: false };
-  const step = stepOfSession(s);
+  const step = cursorStep(s);
   if (!step || step.type !== "agent" || step.attended) return { block: false };
   if (s.state.status !== "running" && s.state.status !== "ready") return { block: false };
   const run = currentRun(s);
   if (!run || (fact.run_id && fact.run_id !== run.run_id)) return { block: false };
   if (standingReport(s, run.run_id)) return { block: false };
-  if (blocksFor(root, run.run_id) >= MAX_STOP_BLOCKS) return { block: false };
+  if (blockedHookCount(root, run.run_id) >= MAX_STOP_BLOCKS) return { block: false };
   const outcomes = reportableOutcomes(step);
   return {
     block: true,

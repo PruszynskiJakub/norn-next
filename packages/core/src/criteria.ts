@@ -9,7 +9,7 @@ import { epoch } from "./time.ts";
 import { reportableOutcomes } from "./workflow.ts";
 
 /** QV5: `fail` > `unverified` > `person` > `pass`. */
-export const VERDICT_RANK: Readonly<Record<Verdict, number>> = { pass: 0, person: 1, unverified: 2, fail: 3 };
+const VERDICT_RANK: Readonly<Record<Verdict, number>> = { pass: 0, person: 1, unverified: 2, fail: 3 };
 
 /** QV5: the worst verdict in a report; null for an empty one. */
 export function worstVerdict(report: readonly CriterionVerdict[]): Verdict | null {

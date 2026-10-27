@@ -11,6 +11,7 @@ import { loadWorkflows, readTrace } from "@norn/store";
 import { replayInputs, type TickReport } from "../src/index.ts";
 import { decide } from "@norn/core";
 import { createHarness, type Harness, issue } from "./harness.ts";
+import { expectTranscript, recordTranscript, type Transcript } from "./transcript.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -186,6 +187,11 @@ describe("a story through the slice workflow", () => {
   const storyRuns = () => join(storyWt(), spec, "runs/_story");
   const sliceRuns = () => join(sliceWt(), spec, "runs/01-form");
   const step = (ms = 10_000) => h.clock.advance(ms);
+  let transcript: Transcript;
+  beforeAll(() => {
+    transcript = recordTranscript(h);
+  });
+  afterAll(() => transcript.stop());
 
   test("setup: repo config and workflows committed on main", async () => {
     h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
@@ -337,7 +343,7 @@ describe("a story through the slice workflow", () => {
     expect(h.state(storyRuns())).toMatchObject({ step: "open-pr", status: "ready" });
     step();
     expect(kinds(await h.tick())).toEqual(["gh-7 run_git"]);
-    expect(h.remote.prs).toMatchObject([{ head: "gh-7-add-login-form", base: "main", draft: true }]);
+    expect(h.remote.prs).toMatchObject([{ head: "gh-7-add-login-form", base_branch: "main", is_draft: true }]);
     step();
     expect(kinds(await h.tick())).toEqual(["gh-7 apply_receipts"]);
     expect(h.state(storyRuns())).toMatchObject({ step: "$done", status: "done" });
@@ -355,6 +361,10 @@ describe("a story through the slice workflow", () => {
       expect(replayed.map((d) => d.rule)).toEqual(t.decisions.map((d) => d.rule));
       expect(JSON.parse(JSON.stringify(replayed.map((d) => d.action)))).toEqual(t.decisions.map((d) => d.action));
     }
+  });
+
+  test("effect transcript: spawns, port calls and runs/ files of the whole flow (refactor Phase 0.2)", () => {
+    expectTranscript(transcript, "e2e-slice-workflow");
   });
 });
 

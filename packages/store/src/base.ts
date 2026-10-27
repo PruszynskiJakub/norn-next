@@ -10,21 +10,11 @@
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { StoryBase, StoryPrSeen } from "@norn/core";
-import { atomicWrite, atomicWriteJson, readText } from "./fsx.ts";
-import { SPECS_DIR, traceDir } from "./paths.ts";
-
-function gitSync(cwd: string, args: string[], input?: Uint8Array): { code: number; stdout: Buffer } {
-  const p = Bun.spawnSync(["git", ...args], {
-    cwd,
-    stdin: input ?? "ignore",
-    stdout: "pipe",
-    stderr: "pipe",
-    env: { ...process.env, GIT_TERMINAL_PROMPT: "0", LC_ALL: "C" },
-  });
-  return { code: p.exitCode ?? 1, stdout: Buffer.from(p.stdout ?? new Uint8Array()) };
-}
-
-const baseCacheDir = (repoRoot: string) => join(traceDir(repoRoot), "base");
+import { SPECS_DIR } from "@norn/schema";
+import { atomicWrite, atomicWriteJson } from "./fsx.ts";
+import { readLocalJson } from "./local-json.ts";
+import { baseCacheDir, baseFactsPath, prFactsPath, remoteCachePath } from "./paths.ts";
+import { gitSync } from "./git.ts";
 
 /**
  * The base ref to read records from: `refs/remotes/<remote>/<branch>`, the branch being the
@@ -44,11 +34,7 @@ export function defaultBaseRef(repoRoot: string, remote: string, branch?: string
 
 /** The remote's default branch as the last sync discovered it (`trace/remote.json`), or null. */
 export function cachedDefaultBranch(repoRoot: string): string | null {
-  try {
-    return (JSON.parse(readText(join(traceDir(repoRoot), "remote.json")) ?? "{}") as { default_branch?: string | null }).default_branch ?? null;
-  } catch {
-    return null;
-  }
+  return readLocalJson("local-remote", remoteCachePath(repoRoot), {}, repoRoot).default_branch ?? null;
 }
 
 /**
@@ -111,8 +97,6 @@ export function baseSpecsRoot(repoRoot: string, ref: string): string | null {
   return dir;
 }
 
-const baseFactsPath = (repoRoot: string) => join(traceDir(repoRoot), "base.json");
-
 /**
  * BS1: story key → the last `story.base` measured on this checkout (`trace/base.json`, machine-local).
  * Observe reruns `git merge-tree` only when the pair (story head, base sha) differs from the cached
@@ -121,19 +105,12 @@ const baseFactsPath = (repoRoot: string) => join(traceDir(repoRoot), "base.json"
 export type BaseFactsCache = Record<string, StoryBase>;
 
 export function readBaseFacts(repoRoot: string): BaseFactsCache {
-  try {
-    const v = (JSON.parse(readText(baseFactsPath(repoRoot)) ?? "{}") as { stories?: BaseFactsCache }).stories;
-    return v && typeof v === "object" ? v : {};
-  } catch {
-    return {};
-  }
+  return readLocalJson("local-base", baseFactsPath(repoRoot), {}, repoRoot).stories ?? {};
 }
 
 export function writeBaseFacts(repoRoot: string, cache: BaseFactsCache): void {
   atomicWriteJson(baseFactsPath(repoRoot), { stories: cache });
 }
-
-const prFactsPath = (repoRoot: string) => join(traceDir(repoRoot), "pr.json");
 
 /**
  * C1 (BS10, BS11, F35): story key → the story PR as the last remote sync of this checkout saw it
@@ -143,15 +120,8 @@ const prFactsPath = (repoRoot: string) => join(traceDir(repoRoot), "pr.json");
 export type PrFactsCache = Record<string, StoryPrSeen>;
 
 export function readPrFacts(repoRoot: string): PrFactsCache {
-  try {
-    const v = (JSON.parse(readText(prFactsPath(repoRoot)) ?? "{}") as { stories?: PrFactsCache }).stories;
-    if (!v || typeof v !== "object") return {};
-    // a cache, not a record: entries of an unexpected shape are dropped (the next sync rewrites them)
-    const ok = (e: StoryPrSeen | undefined) => !!e && typeof e.observed_at === "number" && (e.pr === null || (typeof e.pr === "object" && typeof e.pr.number === "number" && typeof e.pr.state === "string"));
-    return Object.fromEntries(Object.entries(v).filter(([, e]) => ok(e)));
-  } catch {
-    return {};
-  }
+  // a cache, not a record: a file of an unexpected shape reads as empty (the next sync rewrites it)
+  return readLocalJson("local-pr", prFactsPath(repoRoot), {}, repoRoot).stories ?? {};
 }
 
 export function writePrFacts(repoRoot: string, cache: PrFactsCache): void {

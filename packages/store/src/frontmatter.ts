@@ -14,7 +14,7 @@ export interface MarkdownDoc<T> {
 }
 
 /** Fields the CLI may change (§7.1); everything else belongs to humans and skills. */
-export const STORY_CLI_FIELDS = [
+const STORY_CLI_FIELDS = [
   "status",
   "workflow",
   "title",
@@ -25,7 +25,7 @@ export const STORY_CLI_FIELDS = [
   "refined_body_hash",
   "merge",
 ] as const satisfies readonly (keyof StoryFrontmatter)[];
-export const SLICE_CLI_FIELDS = ["status", "workflow"] as const satisfies readonly (keyof SliceFrontmatter)[];
+const SLICE_CLI_FIELDS = ["status", "workflow"] as const satisfies readonly (keyof SliceFrontmatter)[];
 
 export type StoryPatch = { [K in (typeof STORY_CLI_FIELDS)[number]]?: StoryFrontmatter[K] | undefined };
 export type SlicePatch = { [K in (typeof SLICE_CLI_FIELDS)[number]]?: SliceFrontmatter[K] | undefined };
@@ -40,7 +40,7 @@ interface Split {
 const OPEN = /^---[ \t]*\r?\n/;
 const CLOSE = /^---[ \t]*(\r?\n|$)/m;
 
-export function splitFrontmatter(text: string): Split | null {
+function splitFrontmatter(text: string): Split | null {
   const open = OPEN.exec(text);
   if (!open) return null;
   const rest = text.slice(open[0].length);
@@ -80,7 +80,7 @@ export const readStoryFile = (path: string, root?: string) => readMarkdown("stor
 export const readSliceFile = (path: string, root?: string) => readMarkdown("slice", path, root);
 
 /** Render a new markdown file (intake, tests). Body is appended verbatim. */
-export function renderMarkdown(frontmatter: object, body: string): string {
+function renderMarkdown(frontmatter: object, body: string): string {
   return `---\n${stringify(frontmatter, { lineWidth: 0 })}---\n${body}`;
 }
 

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { createHerdrCockpit, findAgentPane, findWorkspace, type HerdrAgent, type HerdrSocketCall, herdrSocketPath } from "../../src/herdr/cockpit.ts";
 import herdrFixtures from "./fixtures/herdr.json";
 import { createHerdrNotifier, herdrNotifyArgv } from "../../src/notify/index.ts";
-import type { Exec, ExecResult } from "../../src/process/exec.ts";
+import type { Exec, ExecResult } from "../../src/exec.ts";
 import agentList from "./fixtures/agent-list.json";
 import paneList from "./fixtures/pane-list.json";
 import workspaceList from "./fixtures/workspace-list.json";
@@ -118,6 +118,20 @@ test("listPanes reads each pane's tab, workspace, cwd and status; close calls tr
     ["workspace", "close", "w3A"],
     ["workspace", "close", "w7"],
   ]);
+});
+
+test("cockpit errors keep the raw stderr: herdr_error with stderr as message, session_gone on a not-found anywhere in stderr", async () => {
+  const fail = (stderr: string): ExecResult => ({ code: 1, stdout: "", stderr });
+  const jsonErr = (code: string) => JSON.stringify({ error: { code, message: "parsed message" } });
+  const { exec } = fakeExec([
+    ["workspace focus w1", fail(jsonErr("server_unavailable"))],
+    ["workspace focus w2", fail(jsonErr("agent_blocked"))],
+    ["pane close w3:p1", fail(`warning: stale socket\n${jsonErr("pane_not_found")}`)],
+  ]);
+  const cockpit = createHerdrCockpit({ exec });
+  await expect(cockpit.focusWorkspace("w1")).rejects.toMatchObject({ code: "herdr_error", message: `herdr workspace focus: ${jsonErr("server_unavailable")}` });
+  await expect(cockpit.focusWorkspace("w2")).rejects.toMatchObject({ code: "herdr_error", message: `herdr workspace focus: ${jsonErr("agent_blocked")}` });
+  await cockpit.closePane("w3:p1");
 });
 
 test("openWorkspace, reportWorkspace argv; moveWorkspace over the socket API", async () => {

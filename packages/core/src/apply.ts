@@ -4,15 +4,16 @@
  * skipped, so re-applying after a crash is idempotent. Receipts whose step/attempt do not
  * match the cursor are rejected (T9), never applied.
  */
-import type {
-  AgentStep,
-  LastOutcome,
-  ParkInfo,
-  ParkKind,
-  Receipt,
-  ReceiptOf,
-  UnitState,
-  Workflow,
+import {
+  type AgentStep,
+  CLASSIFIED_OUTCOMES,
+  type LastOutcome,
+  type ParkInfo,
+  type ParkKind,
+  type Receipt,
+  type ReceiptOf,
+  type UnitState,
+  type Workflow,
 } from "@norn/schema";
 import type { NumberedReceipt, UnitRef } from "./facts.ts";
 import { edgeOf, OVERRIDABLE_ROUTES, stepOf } from "./workflow.ts";
@@ -99,7 +100,7 @@ export function initialState(args: {
 }
 
 /** Enter `name`: new attempt, within-step limits reset, status by step type (gate/attended park). */
-export function enterStep(prev: UnitState, wf: Workflow, name: string, now: string): UnitState {
+function enterStep(prev: UnitState, wf: Workflow, name: string, now: string): UnitState {
   const st: UnitState = { ...prev, visits: { ...prev.visits } };
   const step = stepOf(wf, name);
   st.visits[name] = (st.visits[name] ?? 0) + 1;
@@ -360,7 +361,7 @@ function classify(st: UnitState, r: ReceiptOf<"classify">, step: NonNullable<Ret
     return { state: { ...stuckPark(st, "exhausted", reason, r.at, r.receipt_id), last_outcome: last }, log: `exhausted: ${reason}` };
   }
   if (step.type !== "agent") {
-    if (!(step.type === "check" ? ["pass", "fail"] : step.type === "gate" ? ["approve", "reject", "stale"] : step.type === "git" ? ["done", "conflict", "stuck"] : ["done", "stuck"]).includes(o))
+    if (!(CLASSIFIED_OUTCOMES[step.type] as readonly string[]).includes(o))
       return { reject: `outcome '${o}' cannot be classified for a ${step.type} step` };
     // BS3: a git step that cannot run (dirty worktree, diverged branch) parks under Unblock with the reason
     if (step.type === "git" && o === "stuck") {
@@ -422,12 +423,18 @@ function retryRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ct
   return { state: withLast(stuckPark(st, "exhausted", reason, r.at, r.receipt_id)), log: `exhausted: ${reason}` };
 }
 
-/** Helper for receipt writers (act, CLI): the route a classified outcome takes, for the receipt's `route` field. */
-export function routeFor(wf: Workflow, stepName: string, outcome: string): string {
-  const edge = edgeOf(wf, stepName, outcome);
-  if (edge) return edge.to;
-  if (["silent", "timeout", "stalled"].includes(outcome)) return "nudge";
-  if (outcome === "died") return "retry";
-  if (outcome === "ask") return "park";
-  return "$stuck";
+/**
+ * The route a classify receipt records (§10, C1, W4), read from what applying it actually did:
+ * the in-step route (`nudge` / `retry`) when there is one, else the edge taken, else `$stuck` when
+ * the unit stopped (an exhausted counter, nudges or retries included), else `park` for an ask.
+ * Receipt writers apply the receipt in memory first and record this, so the route never disagrees
+ * with where the next tick's apply sends the unit. `null` when the receipt was not applied.
+ */
+export function routeOf(res: ApplyResult): ReceiptOf<"classify">["route"] | null {
+  if (!res.applied.length) return null;
+  if (res.route) return res.route;
+  if (res.advance) return res.advance.to as ReceiptOf<"classify">["route"];
+  if (res.state.status === "stuck") return "$stuck";
+  if (res.state.status === "parked" && res.state.park?.kind === "ask") return "park";
+  return null;
 }

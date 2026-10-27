@@ -4,12 +4,10 @@
  */
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { STORY_UNIT_DIR, sliceDirName, storyDirName } from "@norn/schema";
+import { SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName } from "@norn/schema";
 
-export const NORN_DIR = ".agents/norn";
-export const SPECS_DIR = ".agents/specs";
+const NORN_DIR = ".agents/norn";
 
-export const nornDir = (root: string) => join(root, NORN_DIR);
 export const repoConfigPath = (root: string) => join(root, NORN_DIR, "config.yaml");
 export const workflowsDir = (root: string) => join(root, NORN_DIR, "workflows");
 export const traceDir = (root: string) => join(root, NORN_DIR, "trace");
@@ -17,6 +15,19 @@ export const traceDir = (root: string) => join(root, NORN_DIR, "trace");
 export const tickLockPath = (root: string) => join(traceDir(root), "tick.lock");
 /** K6/BS3: a story's integrate lock — slice integrations and base updates of one story never interleave. */
 export const integrateLockPath = (root: string, story: string) => join(traceDir(root), `integrate-${story}.lock`);
+
+/** Machine-local runtime files of one checkout, in the gitignored trace dir (§7.1). */
+export const heartbeatFilePath = (root: string) => join(traceDir(root), "heartbeat.json");
+export const actFailuresPath = (root: string) => join(traceDir(root), "failures.json");
+export const remoteCachePath = (root: string) => join(traceDir(root), "remote.json");
+export const notifiedPath = (root: string) => join(traceDir(root), "notified.json");
+export const pendingRecordsPath = (root: string) => join(traceDir(root), "records.json");
+export const foreignCommitsPath = (root: string) => join(traceDir(root), "foreign.json");
+export const inboxOpenPath = (root: string) => join(traceDir(root), "inbox.json");
+export const baseFactsPath = (root: string) => join(traceDir(root), "base.json");
+export const prFactsPath = (root: string) => join(traceDir(root), "pr.json");
+/** GR6: the base branch's `.agents/specs/` materialized per tree id (store/base.ts). */
+export const baseCacheDir = (root: string) => join(traceDir(root), "base");
 
 export const specsDir = (root: string) => join(root, SPECS_DIR);
 export const storyDir = (root: string, story: string, slug: string) => join(specsDir(root), storyDirName(story, slug));
@@ -30,10 +41,11 @@ export const storyUnitDir = (specDir: string) => unitDir(specDir, STORY_UNIT_DIR
 export const statePath = (ud: string) => join(ud, "state.json");
 export const pinnedWorkflowPath = (ud: string) => join(ud, "workflow.yaml");
 export const receiptsDir = (ud: string) => join(ud, "receipts");
-export const logsDir = (ud: string) => join(ud, "logs");
 export const logPath = (ud: string, runId: string) => join(ud, "logs", `${runId}.log`);
 export const evidenceDir = (ud: string, runId: string) => join(ud, "evidence", runId);
 export const handoffPath = (ud: string) => join(ud, "handoff.md");
+/** R2.3: copies of runs/ files this checkout wrote but never got into the record. */
+export const orphanedDir = (ud: string) => join(ud, "orphaned");
 
 /** Worktree marker files (A3, K4). */
 export const unitMarkerPath = (worktree: string) => join(worktree, ".norn-unit");

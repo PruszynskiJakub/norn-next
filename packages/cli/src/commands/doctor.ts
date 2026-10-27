@@ -25,13 +25,12 @@ import { join, resolve } from "node:path";
 import { git as gitAdapter, herdr, proc } from "@norn/adapters";
 import type { AgentAdapter, RunnerPort, SessionRef } from "@norn/core";
 import { ExitCode, ulid } from "@norn/schema";
-import { skillsReport, writeUnitMarker } from "@norn/store";
+import { machineHolder, noteSpawn, readHookFacts, skillsReport, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { rendered, withExit } from "../output.ts";
 import { assetsDir } from "../runtime/assets.ts";
 import { gitRemoteUrl } from "../runtime/detect.ts";
-import { machineHolder, readHookFacts } from "../runtime/observe.ts";
 import { ensureShim, withNornOnPath } from "../runtime/shim.ts";
 import { bundledSkills } from "../runtime/workflows.ts";
 import { hookBinary, hookCommand } from "./init.ts";
@@ -45,6 +44,7 @@ interface RunOut {
 
 async function run(argv: string[], o: { cwd?: string; env?: Record<string, string | undefined>; input?: string; timeoutMs: number }): Promise<RunOut> {
   try {
+    noteSpawn(argv, o.cwd);
     const p = Bun.spawn(argv, {
       cwd: o.cwd,
       env: (o.env ?? process.env) as Record<string, string>,
@@ -178,7 +178,7 @@ export function pluginLinkHint(assets: string): string {
 }
 
 /** HC11: the plugin's GitHub source for `herdr plugin install`. */
-export const HERDR_PLUGIN_SOURCE = "PruszynskiJakub/norn-next/plugins/herdr";
+const HERDR_PLUGIN_SOURCE = "PruszynskiJakub/norn-next/plugins/herdr";
 
 /** HC11: whether norn's Herdr plugin is linked; a hint when it is not (never an error). */
 async function cockpitPlugin(ctx: Context): Promise<Record<string, unknown>> {
@@ -197,7 +197,7 @@ interface Check {
 }
 
 /** `norn doctor`: one line per check, then what failed and what to do. */
-export function formatDoctor(r: {
+function formatDoctor(r: {
   ok: boolean;
   machine: { holder: string };
   git: Check & { version: string | null };

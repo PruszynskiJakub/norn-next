@@ -5,7 +5,7 @@
  * Classification helpers report facts only; whether to take/renew is decide's call.
  */
 import type { ClaimState, FileError, MailboxItem } from "@norn/core";
-import { type ClaimBlob, MAILBOX_KINDS, type Receipt, assertValid, claimRef, isUlid, mailboxPrefix, mailboxRef, validate } from "@norn/schema";
+import { type ClaimBlob, MAILBOX_KINDS, type Receipt, assertValid, claimRef, isUlid, mailboxPrefix, mailboxRef, parseDuration, validate } from "@norn/schema";
 import { json } from "./fsx.ts";
 import { type CasResult, casRef, git, listLocalRefs, listRemoteRefs, readBlob, readLocalRef, writeBlob } from "./git.ts";
 
@@ -13,6 +13,9 @@ export type ClaimRead =
   | { state: "none" }
   | { state: "present"; sha: string; blob: ClaimBlob }
   | { state: "corrupt"; sha: string; error: FileError };
+
+/** A claim read from the remote: what it holds, or `unreachable` when `ls-remote` or the fetch of its blob failed. */
+export type RemoteClaimRead = ClaimRead | { state: "unreachable"; reason: "network"; message: string };
 
 function parseBlob<N extends "claim" | "receipt">(name: N, ref: string, raw: string | null) {
   if (raw === null) return { ok: false as const, error: { file: ref, errors: [{ path: "", message: "object missing" }] } };
@@ -41,20 +44,37 @@ export async function readLocalClaim(cwd: string, story: string): Promise<ClaimR
 /**
  * Claim as on the remote now: `ls-remote`, then fetch the blob into the local ref
  * (or delete the local ref when gone). With `remote` null, the local ref.
+ * A failed `ls-remote` or fetch is reported, not thrown: `{ state: "unreachable", reason: "network" }`
+ * with git's message; the caller says what an unreadable claim means for it (T3).
  */
-export async function readClaim(cwd: string, remote: string | null, story: string): Promise<ClaimRead> {
+export async function readClaim(cwd: string, remote: string | null, story: string): Promise<RemoteClaimRead> {
   const ref = claimRef(story);
   if (remote === null) return readLocalClaim(cwd, story);
-  const remoteSha = (await listRemoteRefs(cwd, remote, ref)).find((r) => r.ref === ref)?.sha ?? null;
+  let refs: Array<{ ref: string; sha: string }>;
+  try {
+    refs = await listRemoteRefs(cwd, remote, ref);
+  } catch (e) {
+    return unreachable((e as Error).message);
+  }
+  const remoteSha = refs.find((r) => r.ref === ref)?.sha ?? null;
   if (remoteSha === null) {
     await git(cwd, ["update-ref", "-d", ref]);
     return { state: "none" };
   }
   if ((await readLocalRef(cwd, ref)) !== remoteSha) {
     const f = await git(cwd, ["fetch", "--quiet", "--no-tags", remote, `+${ref}:${ref}`]);
-    if (f.code !== 0) throw new Error(`fetch ${ref} failed: ${f.stderr.trim()}`);
+    if (f.code !== 0) return unreachable(`fetch ${ref} failed: ${f.stderr.trim()}`);
   }
   return claimAt(cwd, ref, remoteSha);
+}
+
+const unreachable = (message: string): RemoteClaimRead => ({ state: "unreachable", reason: "network", message });
+
+/** The claim on the remote, or a throw carrying git's message when it cannot be read (acquire needs the current sha). */
+async function readClaimOrThrow(cwd: string, remote: string | null, story: string): Promise<ClaimRead> {
+  const r = await readClaim(cwd, remote, story);
+  if (r.state === "unreachable") throw new Error(r.message);
+  return r;
 }
 
 /** Facts view of a claim (core ClaimState): mine / other / expired by heartbeat_id and now. */
@@ -63,6 +83,40 @@ export function classifyClaim(read: ClaimRead, me: { heartbeat_id: string | null
   if (read.state === "corrupt") return { state: "corrupt", sha: read.sha, error: read.error };
   if (Date.parse(read.blob.expires_at) <= now) return { state: "expired", blob: read.blob, sha: read.sha };
   return { state: me.heartbeat_id !== null && read.blob.heartbeat_id === me.heartbeat_id ? "mine" : "other", blob: read.blob, sha: read.sha };
+}
+
+/** Last written by this heartbeat: held now, or expired but not taken by another since (T5, T6). */
+export function writtenHere(c: ClaimState, heartbeat_id: string): boolean {
+  return c.state === "mine" || (c.state === "expired" && c.blob.heartbeat_id === heartbeat_id);
+}
+
+/**
+ * A claim blob this heartbeat writes when it acquires a story (T3, T5): held for `lease` from
+ * `now`. `at` is the ISO time written as renewed_at (and acquired_at unless one is kept); it
+ * defaults to `now`. `forced_from` is set only by `take --force` (T8).
+ */
+export function newClaimBlob(o: {
+  story: string;
+  holder: string;
+  heartbeat_id: string;
+  now: number;
+  lease: string;
+  at?: string;
+  acquired_at?: string;
+  forced_from?: string;
+}): ClaimBlob {
+  const at = o.at ?? new Date(o.now).toISOString();
+  return {
+    version: 1,
+    story: o.story,
+    holder: o.holder,
+    heartbeat_id: o.heartbeat_id,
+    acquired_at: o.acquired_at ?? at,
+    renewed_at: at,
+    expires_at: new Date(o.now + parseDuration(o.lease)).toISOString(),
+    last_tick_id: null,
+    ...(o.forced_from !== undefined ? { forced_from: o.forced_from } : {}),
+  };
 }
 
 export type ClaimWriteResult =
@@ -88,13 +142,13 @@ export async function acquireClaim(
   opts: { now: number; force?: boolean },
 ): Promise<ClaimWriteResult> {
   assertValid("claim", blob);
-  const cur = await readClaim(cwd, remote, blob.story);
+  const cur = await readClaimOrThrow(cwd, remote, blob.story);
   const held = heldBy(cur, blob, opts);
   if (held) return held;
   const r = await writeClaim(cwd, remote, blob, cur.state === "none" ? null : cur.sha);
   // a lost race shows as stale info, or as the remote refusing to lock a ref that just moved
   if (r.ok || (r.reason !== "stale" && r.reason !== "rejected")) return r;
-  const now = await readClaim(cwd, remote, blob.story);
+  const now = await readClaimOrThrow(cwd, remote, blob.story);
   return heldBy(now, blob, { now: opts.now }) ?? r;
 }
 

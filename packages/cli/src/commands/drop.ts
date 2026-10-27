@@ -10,14 +10,13 @@
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { StoryFacts } from "@norn/core";
-import { type ClaimBlob, parseDuration } from "@norn/schema";
-import { acquireClaim, listLeases, patchStoryFile, releaseClaim, releaseLease, storyFile } from "@norn/store";
+import { acquireClaim, listLeases, newClaimBlob, patchStoryFile, releaseClaim, releaseLease, storyFile } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import { claimHeld, failure, refuse } from "../output.ts";
-import type { Observed } from "../runtime/observe.ts";
+import type { Observed } from "../runtime/observe/index.ts";
 import { heldHere } from "../runtime/release.ts";
 import { withStory } from "./release.ts";
-import { storyArg } from "./take.ts";
+import { storyArg } from "../runtime/args.ts";
 
 async function claimIfFree(obs: Observed, story: StoryFacts): Promise<string> {
   const c = story.claim;
@@ -25,17 +24,7 @@ async function claimIfFree(obs: Observed, story: StoryFacts): Promise<string> {
   if (c.state === "other") throw claimHeld(c.blob, `the holder drops it, or norn take ${story.key} --force first`);
   if (c.state === "corrupt") throw refuse(`claim ref of ${story.key} is unreadable`, `norn take ${story.key} --force`, "claim_corrupt");
   const now = obs.facts.now;
-  const nowIso = new Date(now).toISOString();
-  const blob: ClaimBlob = {
-    version: 1,
-    story: story.key,
-    holder: obs.facts.machine.holder,
-    heartbeat_id: obs.heartbeat_id,
-    acquired_at: nowIso,
-    renewed_at: nowIso,
-    expires_at: new Date(now + parseDuration(obs.config.claim.lease)).toISOString(),
-    last_tick_id: null,
-  };
+  const blob = newClaimBlob({ story: story.key, holder: obs.facts.machine.holder, heartbeat_id: obs.heartbeat_id, now, lease: obs.config.claim.lease });
   const r = await acquireClaim(obs.root, obs.remote, blob, { now });
   if (!r.ok) {
     if (r.reason === "held") throw claimHeld(r.holder, `the holder drops it, or norn take ${story.key} --force first`);

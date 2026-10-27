@@ -6,7 +6,6 @@ import {
   classifyClaim,
   deleteMailbox,
   fetchNornRefs,
-  gitOk,
   listMailbox,
   postMailbox,
   readClaim,
@@ -14,6 +13,7 @@ import {
   releaseClaim,
   renewClaim,
 } from "../src/index.ts";
+import { gitOk } from "../src/git.ts";
 import { AT, tmp } from "./helpers.ts";
 
 async function setup() {
@@ -47,6 +47,7 @@ describe("claims (T2–T6)", () => {
     expect(!rb.ok && rb.message).toContain("held by jakub@mac since");
 
     const seen = await readClaim(b, "origin", "gh-12");
+    if (seen.state === "unreachable") throw new Error(seen.message);
     expect(classifyClaim(seen, { heartbeat_id: hbB }, NOW)).toMatchObject({ state: "other" });
     expect(classifyClaim(seen, { heartbeat_id: hbA }, NOW)).toMatchObject({ state: "mine" });
     expect(classifyClaim(seen, { heartbeat_id: hbB }, NOW + 700_000)).toMatchObject({ state: "expired" });
@@ -72,6 +73,16 @@ describe("claims (T2–T6)", () => {
     expect((await releaseClaim(a, "origin", "gh-12", forced.sha)).ok).toBe(true);
     expect(await readClaim(b, "origin", "gh-12")).toEqual({ state: "none" });
     expect(await readLocalClaim(a, "gh-12")).toEqual({ state: "none" });
+  });
+
+  test("an unreachable remote reads as network, not a throw; acquire still rejects with git's message", async () => {
+    const { a } = await setup();
+    await gitOk(a, ["remote", "set-url", "origin", join(a, "..", "gone.git")]);
+    const r = await readClaim(a, "origin", "gh-12");
+    if (r.state !== "unreachable") throw new Error(`expected unreachable, got ${r.state}`);
+    expect(r.reason).toBe("network");
+    expect(r.message).toStartWith("git ls-remote origin refs/norn/claims/gh-12 failed (128): ");
+    await expect(acquireClaim(a, "origin", blob("jakub@mac", ulid()), { now: NOW })).rejects.toThrow(r.message);
   });
 
   test("racing acquirers: exactly one wins", async () => {

@@ -5,32 +5,56 @@
  * filter by unit while reading. Briefings and transcript snapshots are separate files
  * under `briefings/<run_id>/` and `transcripts/<run_id>/`, referenced by trace-relative path.
  */
-import { appendFileSync, mkdirSync, readdirSync } from "node:fs";
+import { appendFileSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
 import type { FileError } from "@norn/core";
-import { type TickStartTrace, type TickTrace, type TraceEvent, assertValid, validate } from "@norn/schema";
-import { atomicWrite, isErrno, readText } from "./fsx.ts";
+import { type HookFact, type TickStartTrace, type TickTrace, type TraceEvent, assertValid, ulid, ulidTime, validate } from "@norn/schema";
+import { appendDurable, atomicWrite, isErrno, readText } from "./fsx.ts";
 import { traceDir } from "./paths.ts";
 
-export function eventTime(ev: TraceEvent): string {
+function eventTime(ev: TraceEvent): string {
   return ev.type === "hook" ? ev.fact.at : ev.at;
 }
 
 /** Day file name for an ISO time: `2026-10-23.jsonl` (UTC). */
-export function traceFileName(at: string): string {
+function traceFileName(at: string): string {
   const d = new Date(at);
   if (Number.isNaN(d.getTime())) throw new Error(`bad trace time: ${at}`);
   return `${d.toISOString().slice(0, 10)}.jsonl`;
 }
 
-/** Validate and append one event as a single line (O_APPEND, one write). Returns the trace-relative file. */
+/**
+ * Validate and append one event as a single line (O_APPEND, one write). Returns the trace-relative file.
+ * Only `tick.start` is fsynced (R5.4): it is the line that explains a tick that died during act, so it
+ * must reach disk before act starts. Every other event is diagnostic and skips the fsync.
+ */
 export function appendTrace(root: string, event: TraceEvent): string {
   assertValid("trace", event);
   const name = traceFileName(eventTime(event));
   const path = join(traceDir(root), name);
-  mkdirSync(dirname(path), { recursive: true });
-  appendFileSync(path, `${JSON.stringify(event)}\n`);
+  const line = `${JSON.stringify(event)}\n`;
+  if (event.type === "tick.start") appendDurable(path, line);
+  else {
+    mkdirSync(dirname(path), { recursive: true });
+    appendFileSync(path, line);
+  }
   return name;
+}
+
+/** A trace event stamped with its own `id` and `at`: every type but tick, tick.start, tick.end and hook. */
+type StampedTrace = Extract<TraceEvent, { id: string; at: string }>;
+type StampedOf<T extends StampedTrace["type"]> = Extract<StampedTrace, { type: T }>;
+
+/**
+ * One stamped trace event of `type`: `id` is a ulid of `now`, `at` is `now` as ISO time, unless
+ * `fields` gives either (a briefing reuses its id; a criteria event takes its receipt's time).
+ */
+export function traceEvent<T extends StampedTrace["type"]>(
+  type: T,
+  now: number,
+  fields: Omit<StampedOf<T>, "type" | "id" | "at"> & { id?: string; at?: string },
+): StampedOf<T> {
+  return { type, id: ulid(now), at: new Date(now).toISOString(), ...fields } as StampedOf<T>;
 }
 
 export interface TraceQuery {
@@ -65,12 +89,13 @@ export function decisionUnit(d: { unit: string; action: unknown }): string {
   return a.kind === "intake_story" && typeof a.key === "string" ? a.key : d.unit;
 }
 
-export function eventMatchesUnit(ev: TraceEvent, unit: string): boolean {
+function eventMatchesUnit(ev: TraceEvent, unit: string): boolean {
   switch (ev.type) {
     case "tick":
     case "tick.start":
       return ev.decisions.some((d) => unitMatches(decisionUnit(d), unit));
     case "tick.end":
+    case "local_file":
       return false;
     case "hook":
       return unitMatches(ev.fact.slice ?? ev.fact.story, unit) || ev.fact.story === unit;
@@ -156,10 +181,67 @@ export function crashedTicksFor(root: string, unit: string): TickStartTrace[] {
   return events.filter((e): e is TickStartTrace => e.type === "tick.start" && !ended.has(e.tick_id) && eventMatchesUnit(e, unit));
 }
 
+// ---------------------------------------------------------------- hook lines (A2, A4): fast scans
+
+/** Day files of the trace, unsorted; none when the trace dir cannot be listed (diagnostic, never fatal). */
+function hookDayFiles(root: string): string[] | null {
+  try {
+    return readdirSync(traceDir(root)).filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Hook facts appended by `norn hook` (A2), read from trace day files since `since`, oldest first.
+ * A fast scan: only lines starting `{"type":"hook"` are parsed, and neither they nor the facts are
+ * schema-checked (the trace is diagnostic: an unreadable file or a bad line is skipped).
+ */
+export function readHookFacts(root: string, since: string): HookFact[] {
+  const names = hookDayFiles(root);
+  if (!names) return [];
+  const day = since.slice(0, 10);
+  const out: HookFact[] = [];
+  for (const name of names.sort()) {
+    if (name.slice(0, 10) < day) continue;
+    let text: string;
+    try {
+      text = readFileSync(join(traceDir(root), name), "utf8");
+    } catch {
+      continue;
+    }
+    for (const line of text.split("\n")) {
+      if (!line.startsWith('{"type":"hook"')) continue;
+      try {
+        const ev = JSON.parse(line) as { fact?: HookFact };
+        if (ev.fact && ev.fact.at >= since) out.push(ev.fact);
+      } catch {
+        /* diagnostic file; bad lines are skipped */
+      }
+    }
+  }
+  return out.sort((a, b) => a.at.localeCompare(b.at));
+}
+
+/** A4: hook events of `runId` that norn blocked, counted in the trace day files since the run began (text match, no parse). */
+export function blockedHookCount(root: string, runId: string): number {
+  const names = hookDayFiles(root);
+  if (!names) return 0;
+  const day = new Date(ulidTime(runId)).toISOString().slice(0, 10);
+  const needle = `"run_id":"${runId}"`;
+  let n = 0;
+  for (const name of names) {
+    if (name.slice(0, 10) < day) continue;
+    for (const line of readFileSync(join(traceDir(root), name), "utf8").split("\n"))
+      if (line.startsWith('{"type":"hook"') && line.includes('"blocked":true') && line.includes(needle)) n++;
+  }
+  return n;
+}
+
 // ---------------------------------------------------------------- side files (B4, C4)
 
-export const briefingRelPath = (runId: string, id: string) => `briefings/${runId}/${id}.md`;
-export const transcriptRelPath = (runId: string, id: string) => `transcripts/${runId}/${id}.txt`;
+const briefingRelPath = (runId: string, id: string) => `briefings/${runId}/${id}.md`;
+const transcriptRelPath = (runId: string, id: string) => `transcripts/${runId}/${id}.txt`;
 
 function safeRel(rel: string): string {
   const n = normalize(rel);

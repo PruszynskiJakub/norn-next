@@ -4,8 +4,7 @@
  * elsewhere: posted to the mailbox (T9).
  */
 import { nextCommand, stepOf } from "@norn/core";
-import type { UnitState } from "@norn/schema";
-import { git as rawGit } from "@norn/store";
+import { isGitSha, type UnitState } from "@norn/schema";
 import type { Context } from "../context.ts";
 import { defineCommand, opt } from "../command.ts";
 import { refuse } from "../output.ts";
@@ -13,8 +12,6 @@ import { at, humanReceipt, resolveTarget, runHumanVerb, type Target } from "../r
 import { appendProgress, rejectProgress } from "../runtime/report.ts";
 
 const atGate = (st: UnitState) => st.status === "parked" && st.park?.kind === "gate";
-
-const SHA = /^[0-9a-f]{40,64}$/;
 
 /**
  * F35: the story branch head at `approve` — the story worktree's HEAD, else the local branch,
@@ -25,15 +22,15 @@ async function unitHead(ctx: Context, t: Target): Promise<string | null> {
   const sf = t.story_facts;
   if (t.slice !== null) {
     const head = sf?.units.find((u) => u.unit.key === t.key)?.worktree?.status?.head;
-    return head && SHA.test(head) ? head : null;
+    return isGitSha(head) ? head : null;
   }
   const fromWt = sf?.worktree?.status?.head;
-  if (fromWt && SHA.test(fromWt)) return fromWt;
+  if (isGitSha(fromWt)) return fromWt;
   const branch = sf?.branch;
   if (!branch) return null;
   for (const ref of [`refs/heads/${branch}`, `refs/remotes/${ctx.config.remote.git_remote}/${branch}`]) {
-    const r = await rawGit(ctx.root, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]);
-    if (r.code === 0) return r.stdout.trim();
+    const sha = await ctx.git.revParse(ctx.root, `${ref}^{commit}`);
+    if (sha) return sha;
   }
   return null;
 }

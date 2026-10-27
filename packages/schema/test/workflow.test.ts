@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { parse } from "yaml";
-import { outcomeEdge, validateWorkflow } from "../src/index.ts";
+import { outcomeEdge, validate } from "../src/index.ts";
 
 /** PRD §11 slice workflow example, verbatim. */
 export const SLICE_EXAMPLE = `
@@ -45,13 +45,13 @@ counters: { test_loop: { max: 5 }, review_loop: { max: 3 }, qa_loop: { max: 2 },
 
 const example = () => parse(SLICE_EXAMPLE) as Record<string, any>;
 const errorsOf = (v: unknown) => {
-  const r = validateWorkflow(v);
+  const r = validate("workflow", v);
   return r.ok ? [] : r.errors;
 };
 
 describe("workflow schema", () => {
   test("PRD §11 slice example validates", () => {
-    const r = validateWorkflow(example());
+    const r = validate("workflow", example());
     if (!r.ok) console.error(r.errors);
     expect(r.ok).toBe(true);
   });

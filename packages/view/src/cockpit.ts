@@ -11,7 +11,7 @@ import { type OrientReport, orientReport } from "./orient.ts";
 import type { HeartbeatView, InboxEntry, ProjectView, StoryView } from "./types.ts";
 
 /** CP2: inbox groups that are rows, in O1 order; running, notes and recently done live in the preview. */
-export const COCKPIT_GROUPS: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock", "check"];
+const COCKPIT_GROUPS: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock", "check"];
 
 export type CockpitActionId = "orient" | "agent" | "start" | "answer" | "approve" | "reject" | "unstick" | "take" | "trace" | "pr" | "issue";
 

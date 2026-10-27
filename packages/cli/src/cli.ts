@@ -7,11 +7,11 @@
  */
 import { parseArgs } from "node:util";
 import { ExitCode } from "@norn/schema";
-import { version } from "../package.json";
 import type { Command, ParsedArgs } from "./command.ts";
 import { COMMANDS, findCommand } from "./commands/index.ts";
 import { type CliDeps, Context } from "./context.ts";
 import { CliFailure, failureMarkdown, isRendered, isWithExit, render, toFailure, usageError } from "./output.ts";
+import { NORN_VERSION } from "./version.ts";
 
 export interface CliResult {
   exit: ExitCode;
@@ -48,7 +48,7 @@ export async function runCli(argv: string[], deps: CliDeps = {}): Promise<CliRes
   // `norn`, `norn --help` and `norn <command> --help` are `norn help`: markdown unless --json
   if (!first || first === "--help" || first === "-h") return runCli(["help", ...more.filter((a) => a === "--json")], deps);
   const [name, ...rest] = argv as [string, ...string[]];
-  if (name === "--version" || name === "-v") return done({ version });
+  if (name === "--version" || name === "-v") return done({ version: NORN_VERSION });
   const command = findCommand(name);
   if (!command) return failed(usageError(`unknown command '${name}'`, `norn help — commands: ${COMMANDS.map((c) => c.name).join(", ")}`, "unknown_command"));
   if (name !== "help" && (rest.includes("--help") || rest.includes("-h"))) return runCli(["help", name, ...rest.filter((a) => a === "--json")], deps);

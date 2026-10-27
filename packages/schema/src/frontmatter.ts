@@ -1,5 +1,5 @@
 import { type Static, Type } from "@sinclair/typebox";
-import { IsoTime, NonEmpty, PosInt, RemoteProvider, SliceKey, Slug, StoryKey } from "./common.ts";
+import { GitSha, IsoTime, NonEmpty, PosInt, RemoteProvider, SliceKey, Slug, StoryKey } from "./common.ts";
 import { Criterion } from "./criteria.ts";
 
 /** QV1: acceptance criteria as data; ids unique (checked by `norn done`, QV4). */
@@ -22,8 +22,8 @@ export const StoryMerge = Type.Object(
     pr: Type.Optional(PosInt),
     url: Type.Optional(NonEmpty),
     /** PR head when it merged (or the story branch head, merged by ancestry) */
-    head_sha: Type.Optional(Type.String({ pattern: "^[0-9a-f]{40,64}$" })),
-    merge_commit_sha: Type.Optional(Type.String({ pattern: "^[0-9a-f]{40,64}$" })),
+    head_sha: Type.Optional(GitSha),
+    merge_commit_sha: Type.Optional(GitSha),
     merged_by: Type.Optional(NonEmpty),
     merged_at: Type.Optional(IsoTime),
     /** the PR did not say merged; the branch head was found on the base (P2) */
