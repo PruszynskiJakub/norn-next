@@ -12,7 +12,7 @@ import type { HookFact, UnitState } from "@norn/schema";
 import type { Action } from "../src/actions.ts";
 import { applyReceipts } from "../src/apply.ts";
 import { AUTO_PROMPT, NUDGE_TEXT } from "../src/commands.ts";
-import { decide } from "../src/decide.ts";
+import { decide } from "../src/decide/index.ts";
 import type { Facts, RunFacts, StoryFacts, UnitFacts } from "../src/facts.ts";
 import { buildInbox } from "../src/inbox.ts";
 import type { PanePrompt } from "../src/ports.ts";

@@ -1,7 +1,7 @@
 /** Shared test fixtures: workflows, states, receipts and Facts builders. */
 import { DEFAULT_CONFIG, deriveUlid, type Receipt, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
 import { initialState } from "../src/apply.ts";
-import type { LoadedWorkflow, RepoWorkflows } from "../src/decide.ts";
+import type { LoadedWorkflow, RepoWorkflows } from "../src/decide/index.ts";
 import type { Facts, NumberedReceipt, SliceFileFacts, StoryFacts, UnitFacts, UnitRef, WorktreeFacts } from "../src/facts.ts";
 import { sha256 } from "../src/hash.ts";
 

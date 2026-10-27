@@ -14,7 +14,7 @@ import { join } from "node:path";
 import type { ResolvedConfig } from "@norn/schema";
 import { GitAction, ParkKind } from "@norn/schema";
 import type { Decision } from "../src/actions.ts";
-import { decide, type RepoWorkflows } from "../src/decide.ts";
+import { decide, type RepoWorkflows } from "../src/decide/index.ts";
 import type { Facts } from "../src/facts.ts";
 import { RULE_CASES } from "./rule-cases.ts";
 
@@ -49,9 +49,15 @@ describe("golden decisions", () => {
 
 // ---------------------------------------------------------------- rule coverage
 
-const DECIDE_SRC = readFileSync(join(import.meta.dir, "..", "src", "decide.ts"), "utf8");
+const DECIDE_DIR = join(import.meta.dir, "..", "src", "decide");
+/** decide's sources (`src/decide/*.ts`), concatenated: rule ids are read from all of them. */
+const DECIDE_SRC = readdirSync(DECIDE_DIR)
+  .filter((f) => f.endsWith(".ts"))
+  .sort()
+  .map((f) => readFileSync(join(DECIDE_DIR, f), "utf8"))
+  .join("\n");
 
-/** Every dotted double-quoted literal in decide.ts — in decide.ts these are all rule ids. */
+/** Every dotted double-quoted literal in decide/ — in decide these are all rule ids. */
 const LITERALS = [...new Set([...DECIDE_SRC.matchAll(/"([a-z_]+(?:\.[a-z_-]+)+)"/g)].map((m) => m[1] as string))].sort();
 
 /**
@@ -68,7 +74,7 @@ const GIT_ACTIONS = GitAction.anyOf.map((s) => s.const as string);
 const SERIALIZED_GIT = ["integrate", "update"];
 
 /**
- * The template literals decide.ts builds rule ids from. A new one fails this test until it is
+ * The template literals decide/ builds rule ids from. A new one fails this test until it is
  * listed here and its ids are added to `expected` below.
  */
 const TEMPLATES = ["${rule}.${res.route ?? (stuck ? \"stuck\" : \"route\")}", "${rule}.nudge", "${rule}.nudge.resume", "${rule}.resume", "${rule}.retry", "${rule}.retry.no_nudge", "${rule}.surface", "git.${step.action}", "git.${step.action}.queued", "unit.parked.${st.park?.kind ?? \"?\"}"];
@@ -79,7 +85,7 @@ const TEMPLATES = ["${rule}.${res.route ?? (stuck ? \"stuck\" : \"route\")}", "$
  */
 const UNREACHABLE: Record<string, string> = {};
 
-/** Template literals on decide.ts lines that set a rule (`rule`, `noop(`) whose fixed text is rule-like. */
+/** Template literals on decide/ lines that set a rule (`rule`, `noop(`) whose fixed text is rule-like. */
 function templatesInSource(): string[] {
   const out = new Set<string>();
   for (const line of DECIDE_SRC.split("\n")) {
@@ -121,11 +127,11 @@ function firedRules(): Set<string> {
 }
 
 describe("rule coverage", () => {
-  test("decide.ts builds rule ids from exactly the known templates", () => {
+  test("decide/ builds rule ids from exactly the known templates", () => {
     expect(templatesInSource()).toEqual([...TEMPLATES].sort());
   });
 
-  test("every routed base is a literal in decide.ts and parked kinds are park kinds", () => {
+  test("every routed base is a literal in decide/ and parked kinds are park kinds", () => {
     for (const b of ROUTED) expect(LITERALS).toContain(b);
     const kinds = ParkKind.anyOf.map((s) => s.const as string);
     for (const k of PARKED_KINDS) expect(kinds).toContain(k);

@@ -12,7 +12,7 @@ export * from "./apply.ts";
 export * from "./brief.ts";
 export * from "./commands.ts";
 export * from "./criteria.ts";
-export * from "./decide.ts";
+export * from "./decide/index.ts";
 export * from "./handoff.ts";
 export * from "./hash.ts";
 export * from "./inbox.ts";

@@ -24,7 +24,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { basename, join, relative } from "node:path";
 import { stableKey } from "../packages/cli/test/golden-harvest.ts";
-import { decide, type RepoWorkflows } from "../packages/core/src/decide.ts";
+import { decide, type RepoWorkflows } from "../packages/core/src/decide/index.ts";
 import type { Facts } from "../packages/core/src/facts.ts";
 
 const ROOT = join(import.meta.dir, "..");

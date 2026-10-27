@@ -4,7 +4,7 @@
  * toward rule coverage. Built from `fixtures.ts`.
  */
 import type { LeaseFile, ResolvedConfig, UnitState, Workflow } from "@norn/schema";
-import type { RepoWorkflows } from "../src/decide.ts";
+import type { RepoWorkflows } from "../src/decide/index.ts";
 import type { Facts, RunFacts, StoryFacts, UnitFacts } from "../src/facts.ts";
 import { sha256 } from "../src/hash.ts";
 import { at, CONFIG, facts, loaded, numbered, receipt, SLICE_WF, sliceFile, sliceUnit, SOLO_WF, STORY_WF, stateFor, storyFacts, storyUnit, T0, unitFacts, WORKFLOWS, worktree } from "./fixtures.ts";
