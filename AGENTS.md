@@ -9,7 +9,10 @@ bun install
 bun test            # all tests (packages/*/test, test/)
 bun run typecheck   # tsc --noEmit over every package
 bun run schema:emit # regenerate packages/schema/json/*.schema.json after changing a schema
+bun run golden      # regenerate packages/core/test/golden/*.json from the cli integration tests' ticks
 ```
+
+`packages/core/test/golden.test.ts` replays every golden case through `decide` and wants exactly the decisions the tick recorded, and checks that every rule id decide can emit fires in a golden case or a hand-built one (`packages/core/test/rule-cases.ts`). A change that keeps behaviour leaves the corpus alone; regenerate it (`scripts/golden.ts`, which runs the harness tests with `NORN_GOLDEN_OUT` set) only for an intended change in what decide decides, and review the diff.
 
 To release: bump `version` in `packages/cli/package.json` and the release badge in `README.md`, run `bun run sync:plugin` (the Claude Code plugin carries the same version), move `## [Unreleased]` entries in `CHANGELOG.md` under `## [X.Y.Z] - <date>`, merge, then `git tag vX.Y.Z && git push origin vX.Y.Z`.
 

@@ -7,6 +7,7 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p scripts/tsconfig.json",
     "schema:emit": "bun packages/schema/scripts/emit.ts",
+    "golden": "bun scripts/golden.ts",
     "build": "bun scripts/build.ts",
     "build:bin": "bun scripts/build.ts --bin",
     "sync:plugin": "bun scripts/sync-plugin.ts",
