@@ -10,8 +10,22 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ### Changed
 
-- `norn help` says up front that an agent doing a step runs only `brief`, `done`, `ask` and `stuck`, and that every other command is the person's, for an agent to run only when the person asks it to. `norn help <command>` says so for a person's command, `--json` gives each command a `for` (`person`, `agent`, `hooks`), and a new Skills section (`skills` in `--json`) marks each bundled skill as the protocol, a step the agent works alone, a step a person works with the agent, or a reference. The `norn` skill gains the same rule: a refusal, the brief or the inbox naming a command is not the person asking.
 - `open-pr` on a story whose PR is already open now rewrites that PR's body instead of finishing at once, so after a `ready` reject and rework the PR describes the branch as it is (GR9). Both remote adapters gained `editPullRequestBody` (`gh pr edit --body`, `glab mr update --description-file -`).
+
+## [0.8.0] - 2026-10-27
+
+### Added
+
+- `norn orient <story|unit>` shows one story at a glance: what it is, each slice's outcome, the PR (link and the `gh pr view` / `glab mr view` command), the open notes grouped by unit, what waits for you with the exact commands, and where to look. Read only: no receipt, run or claim. Markdown by default, `--json` for data.
+- `norn orient <story> --open` gives the story a Herdr workspace labelled `<story> orient` in its worktree, or focuses the one it has. The agent there opens with a short summary and answers your questions; it runs norn commands only when you say so and never edits code or reports an outcome (`NORN_ORIENT=1`: its hooks record nothing, and `brief`, `done`, `ask` and `stuck` refuse it). Outside Herdr it prints the command.
+- `norn pick`: a picker for a Herdr popup. It lists what needs you, then every story; type to filter, the right side previews the story. Enter orients, ⌃o opens the PR in the browser, ⌃y approves a gate, ⌃g goes to the agent pane, ⌃t takes an unclaimed story; it stays open until esc.
+- `norn status --segment` prints one line for Herdr's tab bar (`norn·todoist-app ● 1 approve ◐ 2 running`), or an empty one outside a repository. Inside Herdr it also shows on each orient workspace what its story needs (sidebar token `$norn`) and moves the orient workspaces that need you ahead of the others; no other workspace moves.
+- The Herdr plugin has a `pick` popup and a `norn.pick` action. `plugins/herdr/README.md` has the config snippet for the key bindings, the tab bar segment and the sidebar row.
+- `norn status` shows each story's branch, last-seen PR and open notes in `--json` (`branch`, `pr`, `notes`).
+
+### Changed
+
+- `norn help` says up front that an agent doing a step runs only `brief`, `done`, `ask` and `stuck`, and that every other command is the person's, for an agent to run only when the person asks it to. `norn help <command>` says so for a person's command, `--json` gives each command a `for` (`person`, `agent`, `hooks`), and a new Skills section (`skills` in `--json`) marks each bundled skill as the protocol, a step the agent works alone, a step a person works with the agent, or a reference. The `norn` skill gains the same rule: a refusal, the brief or the inbox naming a command is not the person asking.
 
 ## [0.7.1] - 2026-10-26
 

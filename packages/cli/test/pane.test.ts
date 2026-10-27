@@ -11,6 +11,7 @@ import { ulid } from "@norn/schema";
 import { appendTrace, readCockpitFile } from "@norn/store";
 import { runCli } from "../src/index.ts";
 import { goTo, goToWorkspace, parseCockpitLine, planCockpit } from "../src/runtime/cockpit.ts";
+import { fakeHerdr } from "./fake-herdr.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
@@ -44,48 +45,6 @@ describe("norn pane", () => {
     expect((await h.norn("pane", "--max-frames", "0")).exit).toBe(2);
   });
 });
-
-/** A fake Herdr for the cockpit: fixed agents, every call recorded. */
-function fakeHerdr(agents: herdr.HerdrAgent[] = [], workspaces: herdr.HerdrWorkspace[] = []) {
-  const calls: string[] = [];
-  const cockpit: herdr.HerdrCockpit = {
-    async listAgents() {
-      return agents;
-    },
-    async focus(pane) {
-      calls.push(`focus ${pane}`);
-    },
-    async listWorkspaces() {
-      return workspaces;
-    },
-    async focusWorkspace(id) {
-      calls.push(`focus workspace ${id}`);
-    },
-    async label(pane, l) {
-      calls.push(`label ${pane} ${l.title} ${l.state_labels.idle ?? "-"} ${l.ttl_ms}`);
-    },
-    async openCommand(cwd, command) {
-      calls.push(`open ${cwd} ${command}`);
-      return { pane_id: "w9:p1" };
-    },
-    async pluginLinked() {
-      return null;
-    },
-    async listPanes() {
-      return [];
-    },
-    async closePane(id) {
-      calls.push(`close pane ${id}`);
-    },
-    async closeTab(id) {
-      calls.push(`close tab ${id}`);
-    },
-    async closeWorkspace(id) {
-      calls.push(`close workspace ${id}`);
-    },
-  };
-  return { cockpit, calls };
-}
 
 async function* lines(...ls: string[]) {
   for (const l of ls) yield l;
