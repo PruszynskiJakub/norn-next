@@ -83,7 +83,7 @@ Read the spec once more as the planner will.
 - Every Behaviour item has an example and is observable without reading the code.
 - The edge checklist is reflected: each item covered by a Behaviour item, out of scope, or an open question.
 - Problem and Solution are told from the user's side, in the project's terms.
-- No file paths, function names or code snippets (a prototype's line may name its branch).
+- No file paths, function names or code snippets (a prototype's line may name its path).
 
 Done when the person has confirmed the interview summary (every branch settled, or parked as an open question) and agrees the spec says what they meant; with no person present, when every decision left is an open question. The spec is what you hand back, with Open questions empty or not.
 

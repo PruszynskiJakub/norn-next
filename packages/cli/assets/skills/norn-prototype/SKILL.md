@@ -1,11 +1,11 @@
 ---
 name: norn-prototype
-description: Build a throwaway prototype with a person to settle one design question — a state model they can click through in a single HTML file, or several radically different UI variants on one route — then keep it on a throwaway branch and record the verdict in the spec. Use when a decision depends on how something looks or feels, or on a state model that is hard to judge on paper.
+description: Build a throwaway prototype with a person to settle one design question — a state model they can click through in a single HTML file, or several radically different UI variants on one route — then commit it on the branch you work on and record the verdict in the spec next to it. Use when a decision depends on how something looks or feels, or on a state model that is hard to judge on paper.
 ---
 
 # Prototype
 
-A prototype is **throwaway code that answers one question** for a person. The question decides its shape; the person's verdict is the only thing that survives into the spec. The prototype code never reaches the branch you work on.
+A prototype is **throwaway code that answers one question** for a person. The question decides its shape; the person's verdict goes into the spec. The prototype stays on the branch you work on as the record of how the decision was reached, never as code the product runs.
 
 Build one only with a person present: they drive it and give the verdict. With no person, do not build it. Name the question and the shape you would build, and leave that as a suggestion for whoever can answer it.
 
@@ -20,6 +20,7 @@ The two shapes produce very different things, so a wrong pick wastes the whole p
 
 ## 2. Build it
 
+- **Real files start clean.** Before editing a real file for the prototype (mounting variants on a page), check it has no uncommitted changes; if it has, ask the person to commit or set them aside.
 - **Marked as throwaway.** Put it next to the module or page it is for, and name it so a casual reader sees it is a prototype (`prototype` in the file or route name). Follow the project's routing and file conventions; invent no new top-level structure.
 - **Trivial to run.** A logic prototype opens by double-click. A UI prototype starts with one command from the project's own runner. Tell the person exactly what to open or run.
 - **No persistence.** State lives in memory. If the question is about persistence itself, use a scratch database or file named so it is obviously disposable.
@@ -30,33 +31,29 @@ The two shapes produce very different things, so a wrong pick wastes the whole p
 
 Hand it over and let the person drive. The useful moments are "wait, that should not be possible" and "I want the header from B with the list from C": those are the real decisions. Change the prototype as they ask; it is meant to move. Stop when the question has a verdict the person states in their own words. A new question that comes up is a new prototype or an open question, not scope creep in this one.
 
-## 4. Keep the prototype off the branch
+## 4. Keep the prototype on the branch
 
-The prototype is a primary source: keep it, but never on the branch you work on. Commit it to a throwaway branch without switching to it, then remove it from the working tree:
+The prototype is a primary source: keep it on the branch you are on, so whoever picks the work up can reopen it. Never create or switch branches for it.
+
+- **Only prototype-named files stay.** A logic prototype is one HTML file: keep it where you built it. For a UI prototype, keep the variants and the switcher in their own `prototype` files; put every real file it edited (the page that mounted the variants, a route table) back as it was, so the product runs exactly as before. Say at the top of the switcher file which page mounts it, so it can be mounted again.
+- **Nothing reachable in production.** No route, import or flag on the branch leads to the prototype.
+- **Commit it** once the spec records the verdict (section 5), with the spec change, in one commit whose message names the question.
 
 ```sh
-git branch --show-current           # note the branch you are on; you stay on it
-tmp=$(git rev-parse --git-path prototype.index); rm -f "$tmp"   # a scratch index; the real one is untouched
-GIT_INDEX_FILE=$tmp git read-tree HEAD
-GIT_INDEX_FILE=$tmp git add <every prototype file, and any real file it edited>
-c=$(git commit-tree $(GIT_INDEX_FILE=$tmp git write-tree) -p HEAD -m "Prototype: <question>")
-git branch prototype/<short-name> "$c"
-rm "$tmp"
-git restore --source=HEAD --staged --worktree -- <real files it edited>
-rm -r <new prototype files>
-git status                          # nothing of the prototype is left
+git restore --source=HEAD --staged --worktree -- <real files the prototype edited>
+git status                          # only prototype files and the spec are changed
+git add <prototype files> <spec>
+git commit -m "Prototype: <question>"
 ```
-
-Never switch branches, never push the throwaway branch (pushing it is the person's call), and never merge it. Nothing of the prototype lands on the branch you are on: not in a commit, not left in the working tree.
 
 ## 5. Record the verdict in the spec
 
 Fold the decision into the spec as a decision, in prose, where it belongs: a Behaviour item or the Solution when it is about what the user meets, an implementation decision when it is about how it is built. Right under it, add one line that links the prototype:
 
 ```markdown
-Prototype: `prototype/<short-name>` (<short sha>). Question: <the question>. Verdict: <the answer, and why>.
+Prototype: `<path to the prototype file or folder>`. Question: <the question>. Verdict: <the answer, and why>.
 ```
 
 Do not copy prototype code into the real code: it was written without tests or error handling, and whoever builds the decision writes it properly. One exception: a logic prototype's pure module, or a type or schema shape it settled, may be quoted in the plan when it states the decision more precisely than prose.
 
-Done when the person has stated the verdict, the prototype is committed on its throwaway branch, the working tree holds none of it, and the spec records the question, the verdict and the branch next to the decision.
+Done when the person has stated the verdict, the prototype files and the spec are committed together on the branch you are on, no real file still carries a prototype edit, and the spec records the question, the verdict and the prototype's path next to the decision.
