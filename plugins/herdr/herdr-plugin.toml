@@ -1,9 +1,10 @@
-# norn's Herdr plugin (HC9): the interactive cockpit pane and two actions.
+# norn's Herdr plugin (HC9): the interactive cockpit pane, the picker popup and three actions.
+# Config snippet (tab bar segment, sidebar tokens, key bindings): README.md beside this file.
 # Install it once:  herdr plugin install PruszynskiJakub/norn-next/plugins/herdr
 # (from a norn checkout: herdr plugin link <checkout>/plugins/herdr)
 id = "norn"
 name = "norn"
-version = "0.1.0"
+version = "0.2.0"
 min_herdr_version = "0.9.0"
 description = "norn cockpit: act on the inbox and jump to the agent that waits for you"
 platforms = ["linux", "macos"]
@@ -14,6 +15,13 @@ id = "cockpit"
 title = "norn"
 placement = "split"
 command = ["sh", "cockpit.sh"]
+
+# `norn pick` in the repo of the pane it was opened from, as a popup over it.
+[[panes]]
+id = "pick"
+title = "norn pick"
+placement = "overlay"
+command = ["sh", "pick.sh"]
 
 # Opens the cockpit below the focused pane without taking focus. Bind it to a key:
 #   [[keys.command]]
@@ -36,3 +44,14 @@ id = "next"
 title = "Go to the agent waiting for you"
 contexts = ["workspace"]
 command = ["sh", "next.sh"]
+
+# Opens the picker as a popup: the items that need you and every story; enter orients.
+#   [[keys.command]]
+#   key = "prefix+p"
+#   type = "plugin_action"
+#   command = "norn.pick"
+[[actions]]
+id = "pick"
+title = "Pick a story or what needs you"
+contexts = ["workspace"]
+command = ["sh", "pick-open.sh"]
