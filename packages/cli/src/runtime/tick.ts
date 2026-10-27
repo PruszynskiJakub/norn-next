@@ -9,6 +9,7 @@ import { type ResolvedConfig, type TickTrace, type TickUnitRecord, ulid } from "
 import { acquireTickLock, appendTrace, markTick, parseWorkflowText, readTraceFile, writeTraceFile } from "@norn/store";
 import type { Context } from "../context.ts";
 import { busyError } from "../output.ts";
+import { NORN_VERSION } from "../version.ts";
 import { type ActRecord, Actor } from "./act.ts";
 import { trackInbox } from "./inbox-history.ts";
 import { type Observed, observe, type SyncMode, type SyncReport } from "./observe.ts";
@@ -88,6 +89,8 @@ export function traceRecord(obs: Observed, records: ActRecord[], startedAt: numb
     tick_id: obs.facts.tick_id,
     at: new Date(startedAt).toISOString(),
     heartbeat_id: obs.heartbeat_id,
+    // O5: `norn why` labels a replay of a tick another norn recorded
+    norn_version: NORN_VERSION,
     duration_ms: Math.max(0, Math.round(duration)),
     facts: jsonSafe({ ...obs.facts, replay }) as Record<string, unknown>,
     decisions,

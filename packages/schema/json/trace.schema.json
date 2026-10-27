@@ -43,6 +43,10 @@
             }
           ]
         },
+        "norn_version": {
+          "minLength": 1,
+          "type": "string"
+        },
         "duration_ms": {
           "minimum": 0,
           "type": "integer"

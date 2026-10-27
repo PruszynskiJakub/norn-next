@@ -90,6 +90,8 @@ export const TickTrace = Type.Object(
     tick_id: Ulid,
     at: IsoTime,
     heartbeat_id: Type.Union([Ulid, Type.Null()]),
+    /** the norn that recorded this tick (`@norn/cli` version); `norn why` labels a replay by another version (O5). Absent on older traces. */
+    norn_version: Type.Optional(NonEmpty),
     duration_ms: NonNegInt,
     /** Facts snapshot (the `Facts` type of @norn/core); replayed by `norn why` (O5). */
     facts: Type.Record(Type.String(), Type.Unknown()),
