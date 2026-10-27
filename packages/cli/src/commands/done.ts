@@ -8,7 +8,7 @@
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
-import { checkReport, reportableOutcomes, unverifiedNeeds, verdictCounts } from "@norn/core";
+import { checkReport, enteringReceipt, reportableOutcomes, unverifiedNeeds, verdictCounts } from "@norn/core";
 import { type AgentStep, type CriterionVerdict, type Finding, type Note, type ReceiptOf, ulid, validate } from "@norn/schema";
 import { appendTrace, ensureEvidenceDir, git as rawGit } from "@norn/store";
 import { defineCommand, type ParsedArgs, opt } from "../command.ts";
@@ -91,12 +91,15 @@ export function parseNotes(args: ParsedArgs): Note[] {
 }
 
 /**
- * BS5: the base a base-mode step (entered by a `git: update` conflict) must merge — the newest
- * classify `conflict` receipt with a base routed to the current step; null for any other step.
+ * BS5: the base a base-mode step (entered by a `git: update` conflict) must merge — the base of the
+ * classify `conflict` receipt that entered the current step, the same receipt whose base the brief's
+ * Rework shows (`enteringReceipt`); null for any other step. Never keyed on the receipt's `route`: a
+ * conflict that exhausted its counter records `$stuck`, and `norn unstick --to <step>` still enters
+ * the step from it (BUG-2 follow-up).
  */
 function baseToMerge(s: UnitSession): NonNullable<ReceiptOf<"classify">["base"]> | null {
-  const r = s.receipts.findLast(({ receipt: r }) => r.kind === "classify" && r.outcome === "conflict" && !!r.base && r.route === s.state.step)?.receipt;
-  return r?.kind === "classify" && r.base ? r.base : null;
+  const r = enteringReceipt({ state: s.state, receipts: s.receipts })?.receipt;
+  return r?.kind === "classify" && r.outcome === "conflict" && r.base ? r.base : null;
 }
 
 /**

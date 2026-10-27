@@ -15,9 +15,12 @@
  *   - applying all receipts in one batch equals applying them one at a time (S6)
  *   - applying the same receipts twice — or a prefix, then all of them (crash replay) — changes nothing (S6)
  *   - decide emits at most one action per unit per tick (O5), over Facts built from random states
- *   - the route a receipt writer records in a classify receipt (`routeOf` of the receipt applied in
- *     memory, as act and decide do) matches where `applyReceipts` sends the unit, limits included
- *     (BUG-2, refactor plan 1.2)
+ *   - `routeOf` agrees with `applyReceipts` on generated states, limits included (BUG-2, refactor
+ *     plan 1.2): applying a classify receipt in a batch sends the unit where the route recorded by
+ *     the in-memory apply says. `whereSent` reads the result the way `routeOf` does, so this only
+ *     shows the in-memory apply and the replayed one agree; that act records it is covered by
+ *     packages/cli/test/base-sync.test.ts ("BUG-2: …"), that `routeOf` maps exhaustion to `$stuck`
+ *     by defects.test.ts
  */
 import { describe, expect, test } from "bun:test";
 import {
@@ -429,6 +432,9 @@ describe("applyReceipts properties (S6, W4, C1)", () => {
   // BUG-2 (refactor plan 1.2): the route used to be read from the edge alone, so an outcome whose
   // counted edge, nudges or retries were used up was recorded as the edge's target / `nudge` /
   // `retry` while apply parked the unit exhausted → `$stuck`. `routeOf(res)` reads the apply result.
+  // Not an independent oracle: `whereSent` has `routeOf`'s body, so this checks that routeOf agrees
+  // with apply on generated states (exhausted ones included), not that act records it — see the cli
+  // test "BUG-2: an update conflict that exhausts base_conflict_loop…" for that.
   test("the recorded route matches where applyReceipts sends the unit, limits included (BUG-2)", () => {
     let limited = 0;
     forSeeds(5, (rng, seed) => {
