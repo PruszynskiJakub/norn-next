@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { LeaseFile, UnitState } from "@norn/schema";
-import type { Action } from "../src/actions.ts";
+import { type Action, legacyAction } from "../src/actions.ts";
 import { applyReceipts } from "../src/apply.ts";
 import { decide, isSideAction, unitDecision } from "../src/decide/index.ts";
 import { isIntakeCommit, nornTrailers } from "../src/policy.ts";
@@ -225,7 +225,7 @@ describe("classification (§10, C1, MO4)", () => {
   });
   test("waiting for input → implicit ask parks with the pending command", () => {
     const a = only(facts([solo(running(), { hooks: [{ event: "permission_prompt", at: at(T0 - 10), agent: "claude", native: "Notification", cwd: "/w", message: "Allow rm -rf?", command: "rm -rf build" }] })]));
-    expect(a).toMatchObject({ kind: "park", rule: "agent.ask.implicit", park: { kind: "ask", reason: "Allow rm -rf?" }, notify: { group: "answer", detail: "pending command: rm -rf build" } });
+    expect(a).toMatchObject({ kind: "park", rule: "agent.ask.implicit", state: { park: { kind: "ask", reason: "Allow rm -rf?" } }, notify: { group: "answer", detail: "pending command: rm -rf build" } });
     expect(a.kind === "park" && a.receipts[0]?.receipt).toMatchObject({ kind: "ask", implicit: true, command: "rm -rf build" });
   });
   test("BS5.1 (dogfood D3): an owed commit deferred by an agent's merge never takes the unit's action", () => {
@@ -271,7 +271,9 @@ function storyAt(step: string, extra: Partial<StoryFacts> = {}, slices: Array<{ 
 describe("check, git, gate steps (W2)", () => {
   test("check runs automatically, capped by max_checks; a live check lease waits", () => {
     const a = only(facts([storyAt("test")]));
-    expect(a).toMatchObject({ kind: "run_check", command: "bun test", timeout_ms: 300_000, cwd: "/r-worktrees/gh-1-login", state: null });
+    expect(a).toMatchObject({ kind: "run_check", command: "bun test", timeout_ms: 300_000, cwd: "/r-worktrees/gh-1-login" });
+    // a check carries no Transition: act writes its receipt after the effect
+    expect(a).not.toHaveProperty("state");
     expect(a.kind === "run_check" && a.log_path).toBe(`.agents/specs/gh-1-login/runs/_story/logs/${a.kind === "run_check" ? a.run_id : ""}.log`);
     const leased = storyAt("test");
     leased.units[0]!.lease = { version: 1, kind: "check", repo: "/r", story: "gh-1", slice: null, run_id: RUN, holder: { pid: 1, pid_start: "1" }, created_at: at() };
@@ -343,13 +345,13 @@ describe("story lifecycle (GR6–GR8)", () => {
   test("issue closed / unlabelled / PR closed → park remote under Unblock, once", () => {
     const closed = storyAt("test", { issue: null });
     const a = only(facts([closed]));
-    expect(a).toMatchObject({ kind: "park", park: { kind: "remote", reason: "remote: issue closed, unassigned or unlabelled" }, notify: { group: "unblock", command: "norn unstick gh-1" } });
+    expect(a).toMatchObject({ kind: "park", state: { park: { kind: "remote", reason: "remote: issue closed, unassigned or unlabelled" } }, notify: { group: "unblock", command: "norn unstick gh-1" } });
     const parked = storyAt("test", { issue: null });
     parked.units[0]!.state = { ...parked.units[0]!.state!, status: "stuck", park: { kind: "remote", reason: "x", since: at() } };
     expect(kinds(facts([parked]))).toEqual(["gh-1 noop unit.stuck"]);
     const unl = storyAt("test");
     unl.issue = { ...unl.issue!, labels: [] };
-    expect(only(facts([unl]))).toMatchObject({ park: { reason: "remote: label 'norn' removed" } });
+    expect(only(facts([unl]))).toMatchObject({ state: { park: { reason: "remote: label 'norn' removed" } } });
   });
   test("issue edited → mirror; body changed after refine → inbox item", () => {
     const f = storyAt("test");
@@ -567,5 +569,20 @@ describe("commit trailers (S4, R3.1)", () => {
     // a person's commit (no Norn-Tick) is never the intake, whatever its subject says
     expect(isIntakeCommit({ "Norn-Story": "gh-1" }, "gh-1")).toBe(false);
     expect(isIntakeCommit({}, "gh-1")).toBe(false);
+  });
+});
+
+describe("trace compatibility (O5)", () => {
+  test("an action an older norn recorded reads as the action decide emits now", () => {
+    const check = only(facts([storyAt("test")]));
+    const park = only(facts([storyAt("test", { issue: null })]));
+    if (park.kind !== "park") throw new Error(park.kind);
+    // as an older norn wrote them: an empty Transition on run_check, a copy of state.park on park
+    expect(legacyAction({ ...check, receipts: [], state: null, commit: null })).toEqual(check);
+    expect(legacyAction({ ...park, park: park.state.park })).toEqual(park);
+    expect(legacyAction(check)).toBe(check);
+    // a non-empty transition on such a kind is a real difference, kept for the replay diff
+    const odd = { ...check, receipts: [], state: park.state, commit: null };
+    expect(legacyAction(odd)).toBe(odd);
   });
 });

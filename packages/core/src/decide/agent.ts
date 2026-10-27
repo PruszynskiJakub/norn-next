@@ -395,12 +395,10 @@ function parkOnImplicitAsk(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitS
   if (prompt?.choice) receipt.choice = prompt.choice;
   if (pane?.detail) receipt.screen = pane.detail;
   const { nr, res } = synth(ctx, st, wf, nextReceiptNumber(uf), receipt);
-  const parkInfo = res.state.park ?? { kind: "ask" as const, reason: question, since: ctx.nowIso };
   ctx.emit({
     kind: "park",
     unit: uf.unit,
     rule: "agent.ask.implicit",
-    park: parkInfo,
     notify: unitItem(ctx, story, uf, res.state),
     receipts: [nr],
     state: res.state,

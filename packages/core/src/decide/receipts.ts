@@ -11,12 +11,12 @@ import {
   type UnitState,
   type Workflow,
 } from "@norn/schema";
-import type { Action, AgentLaunch, BoundaryCommit, Decision, NewReceipt, SessionInput } from "../actions.ts";
+import type { Action, BoundaryCommit, Decision, Delivery, NewReceipt } from "../actions.ts";
 import { type ApplyResult, applyReceipts } from "../apply.ts";
 import type { Facts, NumberedReceipt, SliceFileFacts, StoryFacts, UnitFacts, UnitRef } from "../facts.ts";
 import { unitInboxItem } from "../inbox/items.ts";
 import { nornTrailers, unitWorktree } from "../policy.ts";
-import type { InboxItem, SessionRef } from "../ports.ts";
+import type { InboxItem } from "../ports.ts";
 import { iso } from "../time.ts";
 import type { RepoWorkflows } from "./index.ts";
 
@@ -184,7 +184,7 @@ export function emitApplied(
   res: ApplyResult,
   receipts: NewReceipt[],
   commit: { message: string; step: string },
-  o: { input?: SessionInput | null; launch?: AgentLaunch | null; kill?: SessionRef | null; state?: UnitState } = {},
+  o: Partial<Delivery> & { state?: UnitState } = {},
 ): void {
   ctx.emit({
     kind: "apply_receipts",
@@ -208,7 +208,6 @@ export function park(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
     kind: "park",
     unit: uf.unit,
     rule,
-    park: state.park as NonNullable<UnitState["park"]>,
     notify: unitItem(ctx, story, uf, state),
     receipts: [],
     state,

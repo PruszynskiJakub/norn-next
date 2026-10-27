@@ -4,6 +4,7 @@
  * and inbox rendering.
  */
 export type * from "./actions.ts";
+export { legacyAction } from "./actions.ts";
 export type * from "./facts.ts";
 export type * from "./ports.ts";
 export { GIT_CONFLICT_MARKERS, GIT_IN_PROGRESS } from "./ports.ts";
