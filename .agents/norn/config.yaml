@@ -1,0 +1,89 @@
+# norn repo config: .agents/norn/config.yaml
+#
+# Run `norn config` to see every setting in effect, which file set it and what it does.
+#
+# Two files take these same keys:
+#   .agents/norn/config.yaml   this file, committed: what the team agrees on
+#   ~/.norn/config.yaml        yours, never committed: your machine and your preferences
+# This file wins over yours, except the machine caps (max_agents, max_checks, slots),
+# which it can only lower.
+#
+# Every key is optional. A commented value is the built-in default.
+# Schema: packages/schema/json/config.schema.json
+
+# ---------------------------------------------------------------- The team
+
+# Where stories come from.
+remote:
+  provider: gh                 # gh (GitHub) | glab (GitLab)
+  label: norn                  # issues assigned to you with this label become stories
+  # git_remote: origin
+  # host: github.example.com   # GitHub Enterprise or self-hosted GitLab
+  # sync_interval: 5m          # how often norn watch looks for new issues
+
+# The branch stories are cut from and PR'd into. Unset: the remote's default branch.
+# base_branch: main
+
+# Workflows in .agents/norn/workflows/. An issue label norn:wf:<name> picks another one per story.
+# Every story starts in triage unless its issue names a workflow; a person switches it from the
+# triage gate with `norn workflow <story> <name> --to <step>` (W9, S7).
+default_workflow: triage
+# default_slice_workflow: slice
+
+# Limits for agent steps that do not set their own.
+# limits:
+#   deadline: 60m              # an unattended step runs this long, then times out
+#   nudges: 2                  # nudges into the same session (silent, timeout, stalled)
+#   retries: 1                 # fresh sessions after an agent died
+#   stalled: 15m               # no hook, git or file activity this long counts as stalled
+#   attended_wait: 2m          # an attended run idle this long shows as Your turn
+
+# Heartbeat and claims.
+# watch_interval: 30s          # time between ticks of norn watch
+# claim:
+#   lease: 10m                 # a claim not renewed this long is free to take
+#   renew: 3m                  # how often the holder renews it
+
+# ---------------------------------------------------------------- You
+# Usually set in ~/.norn/config.yaml. Set one here only to make it the same for everyone.
+
+# Who starts the unattended agent steps of a story: manual (you, with norn open) or auto
+# (the tick, through the runner). A story follows this until `norn mode <story> auto|manual`
+# gives it a mode of its own. Gates and attended steps always wait for a person.
+# default_mode: manual
+
+# Coding agents norn can brief or start. The key is the name a step's `agent:` uses.
+# Defining an agent replaces its built-in entry, args included: keep the args below.
+# agents:
+#   claude:
+#     adapter: claude          # claude | codex | opencode | gemini | <package name>
+#     args: ["--permission-mode", "auto"]   # Claude Code's own permission mode, not norn's mode
+#     # command: claude
+#     # model: <model id>
+#     # env: { SOME_VAR: value }
+#     # capabilities: []       # what its sessions can verify, matching criteria `needs` (e.g. [browser])
+# default_agent: claude
+
+# ---------------------------------------------------------------- This machine
+# Belongs in ~/.norn/config.yaml: set here, it applies to every teammate's machine.
+
+# What starts agents for a story in auto mode. Unset or null: every story runs manual here.
+# runner:
+#   adapter: herdr             # herdr | headless | <package name>
+#   options: {}
+
+# Machine caps, across every repo on the machine. This file can only lower them.
+# max_agents: 2
+# max_checks: 2
+# slots:
+#   min: 1
+#   max: 9
+#   port_base: 4000
+#   ports_per_slot: 10
+#   env: { DATABASE_URL: "postgres://localhost/app_{slot}" }
+
+# How you hear about new inbox items.
+# notifiers:
+#   - adapter: os              # os | ntfy | webhook | <package name>
+#   - adapter: ntfy
+#     options: { topic: my-norn }

@@ -1,0 +1,50 @@
+# Bug workflow — example installed by `norn init`; edit freely (W1).
+# Reproduce and diagnose first, then fix test-first, check, review and integrate.
+# Ends in `integrate`, so it runs on a slice (W8).
+# Change `test.run` to your repo's test command.
+name: bug
+description: Reproduce a bug and find its cause, fix it test-first, review it, integrate it into the story branch.
+start: reproduce
+steps:
+  reproduce:
+    type: agent
+    skill: norn-diagnose
+    inputs: [slice, spec, handoff]
+    instructions: >-
+      First follow the report as a user, through the real interface (the UI, the command, the request),
+      and record what you saw. Then build a loop that goes red on that exact symptom, minimise it and
+      confirm the cause. Do not fix anything. Under Progress in the handoff (the next agent does not see your Resume), give the loop command, the minimised repro,
+      the confirmed cause (or the ranked hypotheses left) and the seam for a regression test; attach the
+      user-side evidence and the loop's red output.
+    outcomes:
+      reproduced:       { to: implement, means: "the bug was observed as a user and a loop goes red on it; repro, loop and cause in the handoff, evidence attached" }
+      cannot_reproduce: { to: $stuck, means: "followed the report faithfully and the bug did not occur, nor in any loop tried; what was tried is attached" }
+  implement:
+    type: agent
+    skill: norn-implement
+    inputs: [slice, spec, handoff, last_check, last_findings]
+    instructions: "Start from the loop and minimised repro in the handoff: turn them into a failing test at the seam named there before changing any code, then fix the cause."
+    outcomes:
+      done: { to: test, means: "the repro (and each rework point) is a passing test" }
+  test:
+    type: check
+    run: "bun install --frozen-lockfile && bun run test && bun run typecheck"
+    timeout: 10m
+    outcomes: { pass: review, fail: { to: implement, counter: test_loop } }
+  review:
+    type: agent
+    skill: norn-review
+    inputs: [slice, spec, diff]
+    outcomes:
+      approve:           { to: integrate, means: "the fix addresses the cause, no blocking findings" }
+      changes_requested: { to: implement, counter: review_loop, means: "blocking findings in the receipt" }
+  integrate:
+    type: git
+    action: integrate
+    outcomes: { done: $done, conflict: { to: merge, counter: conflict_loop } }
+  merge:
+    type: agent
+    skill: norn-merge
+    inputs: [slice, spec]
+    outcomes: { done: { to: integrate, means: "conflicts resolved keeping the intent of both sides; tests pass" } }
+counters: { test_loop: { max: 5 }, review_loop: { max: 3 }, conflict_loop: { max: 2 } }

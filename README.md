@@ -229,7 +229,7 @@ The full spec is in [`.agents/PRD.md`](.agents/PRD.md); the files norn writes in
 
 ## Contributing
 
-Contributor rules and the dependency direction are in [`AGENTS.md`](AGENTS.md).
+norn is built with norn: how to propose a change, the workflows and the labels are in [`CONTRIBUTING.md`](CONTRIBUTING.md). Code rules and the dependency direction are in [`AGENTS.md`](AGENTS.md).
 
 ```
 packages/schema    @norn/schema    JSON Schemas, types, validators, ids, config merge

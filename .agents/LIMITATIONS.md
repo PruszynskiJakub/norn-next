@@ -88,6 +88,7 @@ The rules each fix maps to are in its spec.
 - **Decide never reads prose (P8).** Anything that lives only in a spec body, `handoff.md` or a review comment does not influence the next step unless an agent turns it into a typed outcome.
 - **Corrupt means stopped (S2).** A state file that fails validation marks the unit `corrupt`, by design. Hand edits to `.agents/` files or merge conflicts in them block the unit until a person repairs it.
 - **No host-less mode.** Story keys must be `gh-N`/`gl-N`, and intake reads issues from GitHub or GitLab (GR1, GR2). A repo with only local files and branches cannot run norn today. Business tracking in Jira stays outside norn by choice.
+- **No fork contributions.** norn works only for collaborators with write access to the repo: it needs to push story branches and claim refs to the remote. A PR from a fork cannot run through a workflow; in norn's own repo it is read as input to an issue, never merged as is.
 - **GitHub/GitLab-style flows only.** norn assumes PRs, branches and git refs. Trunk-based work without PRs, many teams sharing one `.agents/`, and non-git VCS are out of scope.
 - **Merge, never rebase.** Story branches gain merge commits from the base. Teams that require linear history must squash on merge; the base then stays linear.
 - **The cockpit takes keys, not the mouse.** `norn cockpit` is full screen with raw keys; there is no mouse support and no web panel yet (SPEC-cockpit §8 says how one would plug in).
