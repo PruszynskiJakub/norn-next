@@ -24,6 +24,7 @@ const SKILLS = [
   "norn-qa",
   "norn-qa-person",
   "norn-merge",
+  "norn-pr",
   "norn-tdd",
   "norn-codebase-design",
 ];

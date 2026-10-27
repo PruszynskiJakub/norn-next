@@ -244,10 +244,11 @@ describe("check, git, gate steps (W2)", () => {
     leased.units[0]!.lease = { version: 1, kind: "check", repo: "/r", story: "gh-1", slice: null, run_id: RUN, holder: { pid: 1, pid_start: "1" }, created_at: at() };
     expect(kinds(facts([leased]))).toEqual(["gh-1 noop check.running"]);
   });
-  test("open-pr runs git; an already open PR classifies done", () => {
-    expect(only(facts([storyAt("open-pr")]))).toMatchObject({ kind: "run_git", action: "open-pr", pr: { base: "main", title: "Login form" } });
+  test("open-pr runs git with the spec folder's pr.md as body file; an already open PR runs it too (GR9)", () => {
+    const pr = { base: "main", title: "Login form", body_file: expect.stringMatching(/^\.agents\/specs\/gh-1-[^/]+\/pr\.md$/), body: expect.stringMatching(/^Closes /) };
+    expect(only(facts([storyAt("open-pr")]))).toMatchObject({ kind: "run_git", action: "open-pr", pr });
     const withPr = storyAt("open-pr", { pr: { number: 7, url: "u", state: "open", is_draft: true, head_sha: "", draft: true, head: "gh-1-login", base: "main", merged_at: null } });
-    expect(only(facts([withPr]))).toMatchObject({ kind: "classify", outcome: "done", state: { step: "ready", status: "parked", park: { kind: "gate", reason: "PR ready for review?" } } });
+    expect(only(facts([withPr]))).toMatchObject({ kind: "run_git", action: "open-pr", pr });
   });
   test("integrate is serialized per story (K6)", () => {
     const f = storyAt("slices", {}, [

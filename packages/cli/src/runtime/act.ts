@@ -117,6 +117,13 @@ function effectOf(a: Action): string {
   }
 }
 
+/** GR9: the agent's PR body file, if written, with the issue link under it; otherwise the link alone. */
+function prBody(cwd: string, pr: NonNullable<Extract<Action, { kind: "run_git" }>["pr"]>): string {
+  const path = pr.body_file ? join(cwd, pr.body_file) : null;
+  const text = path && existsSync(path) ? readFileSync(path, "utf8").trim() : "";
+  return text ? `${text}\n\n---\n\n${pr.body}` : pr.body;
+}
+
 /** R1.2: a claim write lost to another heartbeat (CAS stale/rejected, held) — not a network failure. */
 function claimLost(r: ActionResult): boolean {
   const reason = (r.detail as { reason?: string } | undefined)?.reason;
@@ -995,10 +1002,17 @@ export class Actor {
         if (!a.pr) throw new Error("open-pr without PR details");
         const pushed = await this.pushBranch(a.cwd, a.branch);
         if (!pushed.ok) throw new Error(`push failed: ${pushed.message}`);
+        const body = prBody(a.cwd, a.pr);
         let pr = await remote.findPullRequest(a.branch);
-        if (!pr || pr.state !== "open") pr = await remote.openDraftPullRequest({ head: a.branch, base: a.pr.base, title: a.pr.title, body: a.pr.body });
+        if (pr && pr.state === "open") {
+          // GR9: the open PR describes the branch as it is now
+          await remote.editPullRequestBody(pr.number, body);
+          detail = `PR #${pr.number} body updated ${pr.url}`;
+        } else {
+          pr = await remote.openDraftPullRequest({ head: a.branch, base: a.pr.base, title: a.pr.title, body });
+          detail = `draft PR #${pr.number} ${pr.url}`;
+        }
         outcome = "done";
-        detail = `draft PR #${pr.number} ${pr.url}`;
         extra.pr = pr;
         break;
       }

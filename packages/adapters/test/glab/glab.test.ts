@@ -73,6 +73,11 @@ describe("glab adapter", () => {
     expect(stdins).toContain("Closes #4");
   });
 
+  test("editPullRequestBody passes the body on stdin (GR9)", async () => {
+    await glab.editPullRequestBody(9, "## Summary\n\nSaves no longer crash.\n\nCloses #4");
+    expect(stdins).toContain("## Summary\n\nSaves no longer crash.\n\nCloses #4");
+  });
+
   test("failures are typed PortErrors", async () => {
     const missing = createGlab({ cwd: "/repo", exec: async () => ({ code: 127, stdout: "", stderr: "ENOENT" }) });
     expect(await missing.whoami().catch((e) => e.code)).toBe("glab_missing");
