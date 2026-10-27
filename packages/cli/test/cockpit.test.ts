@@ -13,7 +13,7 @@ import { appendTrace, readCockpitFile } from "@norn/store";
 import type { CockpitModel } from "@norn/view";
 import { runCli } from "../src/index.ts";
 import { placeAgent } from "../src/runtime/cockpit.ts";
-import { handleKey, initialState, parseKeys, renderCockpit, type TuiState } from "../src/runtime/cockpit-tui.ts";
+import { clampScroll, handleKey, initialState, parseKeys, previewLines, renderCockpit, type TuiState, withoutNotes } from "../src/runtime/cockpit-tui.ts";
 import { fakeHerdr } from "./fake-herdr.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
 
@@ -65,7 +65,7 @@ describe("norn cockpit --json (CP5)", () => {
 
 describe("keys (CP7)", () => {
   test("parseKeys: arrows, pages, enter, esc, backspace, letters, ⌃c", () => {
-    expect(parseKeys("j\x1b[A\x1b[B\x1b[5~\x1b[6~\r\x7f\x15\x1b\x03")).toEqual([
+    expect(parseKeys("j\x1b[A\x1b[B\x1b[5~\x1b[6~\r\x7f\x15\x04\x1b\x03")).toEqual([
       { kind: "char", char: "j" },
       { kind: "up" },
       { kind: "down" },
@@ -74,6 +74,7 @@ describe("keys (CP7)", () => {
       { kind: "enter" },
       { kind: "backspace" },
       { kind: "clear" },
+      { kind: "scroll-down" },
       { kind: "esc" },
       { kind: "quit" },
     ]);
@@ -118,6 +119,49 @@ describe("keys (CP7)", () => {
   });
 });
 
+describe("the preview (CP3)", () => {
+  test("sections, one line per slice, every line within the column; a gate's notes only under NOTES", async () => {
+    const m = await model();
+    const row = m.rows[1] as CockpitModel["rows"][number];
+    const lines = previewLines(row, c.clock.now(), 50);
+    expect(lines[0]).toBe("gh-6 — Export report");
+    expect(lines).toContain("LINKS");
+    expect(lines.some((l) => l.startsWith("NOTES "))).toBe(true);
+    expect(lines.every((l) => l.length <= 50)).toBe(true);
+    expect(withoutNotes("step open-pr#1 reported done (receipt 0048) · open notes (approve acknowledges them): gh-1/01 …")).toBe("step open-pr#1 reported done (receipt 0048)");
+    expect(withoutNotes("Report:\n/path\n\nOpen notes (approve acknowledges them):\n- a")).toBe("Report:\n/path");
+    expect(withoutNotes("no notes here")).toBe("no notes here");
+  });
+
+  test("⌃d / ⌃u scroll the preview, kept within what it holds; moving resets it", async () => {
+    const m = await model();
+    const look = { width: 140, height: 12, color: false, now: c.clock.now(), clock: "12:00" };
+    let s = initialState();
+    for (let i = 0; i < 20; i++) s = clampScroll(m, handleKey(s, { kind: "scroll-down" }, m).state, look);
+    expect(s.scroll).toBeGreaterThan(0);
+    expect(clampScroll(m, handleKey(s, { kind: "scroll-down" }, m).state, look).scroll).toBe(s.scroll);
+    expect(handleKey(s, { kind: "clear" }, m).state.scroll).toBe(Math.max(0, s.scroll - 10));
+    expect(handleKey(s, { kind: "down" }, m).state.scroll).toBe(0);
+    expect(renderCockpit(m, s, look)).toContain("⌃d/⌃u scroll");
+  });
+
+  test("the mouse wheel: over the preview it scrolls, over the list it moves the selection; other buttons do nothing", async () => {
+    const m = await model();
+    const look = { width: 140, height: 12, color: false, now: c.clock.now(), clock: "12:00" };
+    expect(parseKeys("\x1b[<65;100;5M\x1b[<64;10;5M\x1b[<0;10;5M\x1b[<0;10;5mj")).toEqual([
+      { kind: "wheel", dir: "down", x: 100 },
+      { kind: "wheel", dir: "up", x: 10 },
+      { kind: "char", char: "j" },
+    ]);
+    const down = handleKey(initialState(), { kind: "wheel", dir: "down", x: 100 }, m, look).state;
+    expect(down.scroll).toBe(3);
+    expect(handleKey(down, { kind: "wheel", dir: "up", x: 100 }, m, look).state.scroll).toBe(0);
+    const moved = handleKey(initialState(), { kind: "wheel", dir: "down", x: 10 }, m, look).state;
+    expect(moved.selected).toBe(m.rows[1]?.id as string);
+    expect(moved.scroll).toBe(0);
+  });
+});
+
 describe("norn cockpit (CP6–CP8)", () => {
   test("a session: trace shown, answer typed and sent, a refused key, quit; stays open after each action", async () => {
     const frames: string[] = [];
@@ -130,6 +174,18 @@ describe("norn cockpit (CP6–CP8)", () => {
     expect(frames[6]).toContain("ok: norn answer gh-6");
     await c.tick(); // the answer receipt is applied by the tick (S5)
     expect(c.state(runs(6))?.park).toBeNull();
+  });
+
+  test("SIGINT/SIGTERM end it (CP6): the abort signal stops the loop while it waits", async () => {
+    const abort = new AbortController();
+    async function* waiting() {
+      await new Promise(() => {}); // the person types nothing
+      yield "";
+    }
+    setTimeout(() => abort.abort(), 50);
+    const r = await runCli(["cockpit", "--interval", "1h"], { ...c.deps, herdr: null, signal: abort.signal, input: waiting(), log: () => {} });
+    expect(r.exit).toBe(0);
+    expect(r.value).toEqual({ frames: 1, last: null });
   });
 
   test("enter orients through Herdr; o and i open links with the platform opener", async () => {
