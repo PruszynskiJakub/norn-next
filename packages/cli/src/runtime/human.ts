@@ -253,7 +253,7 @@ export async function claimFor(
  * Who may write the receipt: this heartbeat when it holds the claim, or after acquiring a free
  * claim (T8); otherwise the mailbox (T9) — or a refusal when `mailbox` is false (mode, workflow).
  */
-export async function claimRoute(ctx: Context, t: Target, opts: { mailbox: boolean; verb: string; claim?: ClaimState }): Promise<Route> {
+async function claimRoute(ctx: Context, t: Target, opts: { mailbox: boolean; verb: string; claim?: ClaimState }): Promise<Route> {
   const remote = await gitRemote(ctx);
   const c = opts.claim ?? (await claimFor(ctx, t.story));
   if (c.state === "corrupt") throw refuse(`claim ref of ${t.story} is corrupt`, `norn take ${t.story} --force`, "claim_corrupt", c.error);
@@ -277,7 +277,7 @@ export async function claimRoute(ctx: Context, t: Target, opts: { mailbox: boole
 }
 
 /**
- * Refuse a verb that needs the claim (mode, workflow) while another heartbeat holds it: this
+ * Refuse a verb that needs the claim (mode, open) while another heartbeat holds it: this
  * checkout's copy may be stale (T9), so no answer is computed from it — not even a no-op.
  */
 export async function refuseIfHeldElsewhere(ctx: Context, story: string, verb: string): Promise<ClaimState> {
@@ -285,6 +285,17 @@ export async function refuseIfHeldElsewhere(ctx: Context, story: string, verb: s
   const holder = heldElsewhere(claim);
   if (holder) throw claimHeld(holder, `ask ${holder.holder} to run it, or norn take ${story} --force`, `; ${verb} cannot go through the mailbox (T9)`);
   return claim;
+}
+
+/**
+ * T7: a verb only the claim holder runs (update) — refused unless this heartbeat holds the claim
+ * and the unit's runs/ are in this checkout; it never acquires a free claim nor uses the mailbox.
+ */
+function refuseUnlessHolder(claim: ClaimState, t: Target, verb: string, rule: string): Route {
+  if (claim.state === "mine" && t.runsDir) return { via: "local", claim: "mine" };
+  const live = claim.state === "mine" || claim.state === "other";
+  const who = live ? `held by ${claim.blob.holder}` : "not held by this checkout";
+  throw refuse(`${t.story}'s claim is ${who}; ${rule}`, live ? `ask ${claim.blob.holder} to run norn ${verb} ${t.story}, or norn take ${t.story} --force` : `norn take ${t.story}`, "not_holder");
 }
 
 /** A live claim of another heartbeat (T9: the verb goes through the mailbox), else null. */
@@ -298,16 +309,19 @@ const sameDecision = (a: Receipt, b: Receipt) =>
 /**
  * Refuse a second answer / gate decision / unstick for the step attempt one is already recorded
  * for and not yet applied (S6): the tick would apply the first and reject the second silently.
- * Looks at the unit's unapplied receipts and the story's mailbox (T9).
+ * Looks at the unit's unapplied receipts and, for a verb that may use it, the story's mailbox (T9).
  */
-async function refuseDuplicate(ctx: Context, t: Target, receipt: Receipt, holder: ClaimBlob | null): Promise<void> {
+async function refuseDuplicate(ctx: Context, t: Target, receipt: Receipt, holder: ClaimBlob | null, mailbox: boolean): Promise<void> {
   const unit = receipt.slice ?? t.story;
   const pending: Array<{ receipt: Receipt; where: string }> = [];
   const uf = t.story_facts?.units.find((u) => u.unit.key === unit);
   for (const r of uf?.unapplied ?? []) pending.push({ receipt: r.receipt, where: r.file });
-  const remote = await gitRemote(ctx);
-  if (remote) await fetchNornRefs(ctx.root, remote).catch(() => undefined);
-  for (const m of await listMailbox(ctx.root, t.story).catch(() => [])) if (m.receipt) pending.push({ receipt: m.receipt, where: m.ref });
+  // a verb that never goes through the mailbox has no receipt of its purpose there
+  if (mailbox) {
+    const remote = await gitRemote(ctx);
+    if (remote) await fetchNornRefs(ctx.root, remote).catch(() => undefined);
+    for (const m of await listMailbox(ctx.root, t.story).catch(() => [])) if (m.receipt) pending.push({ receipt: m.receipt, where: m.ref });
+  }
   const dup = pending.find((p) => sameDecision(p.receipt, receipt));
   if (!dup) return;
   const next = holder ? `wait for ${holder.holder}'s next tick to import it (T9)` : "norn tick";
@@ -331,7 +345,7 @@ export interface Delivered {
   holder?: string;
 }
 
-export async function deliver(ctx: Context, t: Target, route: Route, receipt: Receipt): Promise<Delivered> {
+async function deliver(ctx: Context, t: Target, route: Route, receipt: Receipt): Promise<Delivered> {
   if (route.via === "local") {
     const r = appendReceipt(t.runsDir as string, receipt);
     // repo-relative: the runs/ may live in a story or slice worktree, not under ctx.root
@@ -346,33 +360,61 @@ export async function deliver(ctx: Context, t: Target, route: Route, receipt: Re
   return { via: "mailbox", ref: posted.ref, holder: route.holder.holder };
 }
 
+export interface HumanVerbOptions {
+  verb: string;
+  /**
+   * true: another heartbeat's claim sends the receipt through its mailbox (T9), and the claim is
+   * read before anything else. false: refused when another heartbeat holds the claim; the claim is
+   * read after `check` unless the caller passes the one it read first (`claim`: mode, T9).
+   */
+  mailbox: boolean;
+  /** the story's claim the caller already read (claimFor) */
+  claim?: ClaimState;
+  /**
+   * T7: only the claim holder runs the verb (update); the refusal states this rule. Checked after
+   * `check`; the claim is never acquired here and never goes through the mailbox.
+   */
+  requireHolder?: string;
+  /** false: no duplicate refusal (S6), e.g. mode, where every receipt applies (MO1) */
+  refuseDuplicate?: boolean;
+  check: (t: Target, st: UnitState) => void;
+  /** true: nothing to record (mode already set); the verb returns null without touching the claim */
+  noop?: (t: Target, st: UnitState) => boolean;
+  build: (t: Target, st: UnitState) => Receipt;
+  /** an effect that must succeed before the receipt is written (R6.3: typing an answer into a prompt); returns the receipt to write */
+  before?: (t: Target, st: UnitState, route: Route, receipt: Receipt) => Promise<Receipt>;
+}
+
+export interface HumanVerbResult {
+  unit: string;
+  receipt: Receipt;
+  delivered: Delivered;
+  next: string;
+}
+
 /**
  * Validate → route → (for the mailbox, re-read the cursor from the pushed branch and re-validate)
  * → build and deliver. `check` refuses when the state does not allow the verb; `build` makes the
- * receipt from the (possibly refreshed) target.
+ * receipt from the (possibly refreshed) target. Null only when `noop` says there is nothing to record.
  */
-export async function runHumanVerb(
-  ctx: Context,
-  t: Target,
-  opts: {
-    verb: string;
-    mailbox: boolean;
-    check: (t: Target, st: UnitState) => void;
-    build: (t: Target, st: UnitState) => Receipt;
-    /** an effect that must succeed before the receipt is written (R6.3: typing an answer into a prompt); returns the receipt to write */
-    before?: (t: Target, st: UnitState, route: Route, receipt: Receipt) => Promise<Receipt>;
-  },
-): Promise<{ unit: string; receipt: Receipt; delivered: Delivered; next: string }> {
+export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptions & { noop?: undefined }): Promise<HumanVerbResult>;
+export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptions): Promise<HumanVerbResult | null>;
+export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptions): Promise<HumanVerbResult | null> {
   // T9: read the claim first — a non-holder's local copy may be stale, so when another heartbeat
   // holds the story the cursor comes from the pushed branch before any precondition is checked
-  const claim = await claimFor(ctx, t.story);
-  const holder = heldElsewhere(claim);
+  let claim = opts.claim ?? (opts.mailbox ? await claimFor(ctx, t.story) : null);
   let target = t;
-  if (opts.mailbox && t.source === "local" && holder) target = (await remoteTarget(ctx, t.key)) ?? t;
+  if (opts.mailbox && t.source === "local" && claim && heldElsewhere(claim)) target = (await remoteTarget(ctx, t.key)) ?? t;
   opts.check(target, started(target));
+  if (opts.noop?.(target, started(target))) return null;
   let receipt = opts.build(target, started(target));
-  await refuseDuplicate(ctx, t, receipt, holder);
-  const route = await claimRoute(ctx, t, { mailbox: opts.mailbox, verb: opts.verb, claim });
+  let held: Route | null = null;
+  if (opts.requireHolder) {
+    claim ??= await claimFor(ctx, t.story);
+    held = refuseUnlessHolder(claim, t, opts.verb, opts.requireHolder);
+  }
+  if (opts.refuseDuplicate !== false) await refuseDuplicate(ctx, t, receipt, claim && heldElsewhere(claim), opts.mailbox);
+  const route = held ?? (await claimRoute(ctx, t, { mailbox: opts.mailbox, verb: opts.verb, ...(claim ? { claim } : {}) }));
   if (route.via === "local" && target !== t) {
     // the claim turned out free after all: write under it, against the local cursor
     target = t;
