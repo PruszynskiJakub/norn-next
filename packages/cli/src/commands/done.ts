@@ -8,13 +8,13 @@
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
-import { checkReport, enteringReceipt, reportableOutcomes, unverifiedNeeds, verdictCounts } from "@norn/core";
+import { checkReport, cursorStep, enteringReceipt, reportableOutcomes, unverifiedNeeds, verdictCounts } from "@norn/core";
 import { type AgentStep, type CriterionVerdict, type Finding, type Note, type ReceiptOf, ulid, validate } from "@norn/schema";
 import { appendTrace, ensureEvidenceDir, git as rawGit } from "@norn/store";
 import { defineCommand, type ParsedArgs, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, usageError } from "../output.ts";
-import { stepOfSession, type UnitSession, unitCriteria } from "../runtime/agent-unit.ts";
+import { type UnitSession, unitCriteria } from "../runtime/agent-unit.ts";
 import { appendProgress, reported, reportedFor, reportHeader, reportTarget, writeReport } from "../runtime/report.ts";
 
 const SEVERITIES = new Set(["blocking", "major", "minor", "nit"]);
@@ -149,7 +149,7 @@ export const doneCommand = defineCommand({
     const handoff = opt.str(args, "handoff")?.trim();
     if (!handoff) throw usageError("norn done needs --handoff \"<short summary of what was done>\"", `norn done ${outcome} --handoff "…"`);
     const t = reportTarget(ctx, "done");
-    const step = stepOfSession(t.s) as AgentStep;
+    const step = cursorStep(t.s) as AgentStep;
     const valid = reportableOutcomes(step);
     if (outcome === "ask" || outcome === "stuck") throw refuse(`'${outcome}' is reported with its own verb`, outcome === "ask" ? 'norn ask "<question>"' : 'norn stuck "<reason>"', "use_verb");
     if (!valid.includes(outcome))
