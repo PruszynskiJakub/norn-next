@@ -26,8 +26,9 @@ import { clampScroll, handleKey, initialState, parseKeys, renderCockpit, type Tu
 import { projectView } from "../runtime/human.ts";
 
 const CLEAR = "\x1b[H\x1b[2J";
-const HIDE_CURSOR = "\x1b[?25l";
-const SHOW_CURSOR = "\x1b[?25h";
+/** The alternate screen (frames leave no scrollback), no cursor, SGR mouse reporting for the wheel. */
+const SCREEN_ON = "\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1006h";
+const SCREEN_OFF = "\x1b[?1006l\x1b[?1000l\x1b[?25h\x1b[?1049l";
 
 /** Raw key chunks: the injected input, else stdin in raw mode (restored on `close`). */
 function keyChunks(ctx: Context): { chunks: AsyncIterator<string>; close: () => void } {
@@ -36,12 +37,12 @@ function keyChunks(ctx: Context): { chunks: AsyncIterator<string>; close: () => 
   const raw = !!stdin.isTTY;
   if (raw) stdin.setRawMode(true);
   stdin.setEncoding("utf8");
-  if (process.stderr.isTTY) process.stderr.write(HIDE_CURSOR);
+  if (process.stderr.isTTY) process.stderr.write(SCREEN_ON);
   return {
     chunks: (stdin as AsyncIterable<string>)[Symbol.asyncIterator](),
     close: () => {
       if (raw) stdin.setRawMode(false);
-      if (process.stderr.isTTY) process.stderr.write(SHOW_CURSOR);
+      if (process.stderr.isTTY) process.stderr.write(SCREEN_OFF);
       stdin.pause();
     },
   };
@@ -66,10 +67,18 @@ async function runVerb(ctx: Context, argv: string[], json: boolean): Promise<{ e
   return runCli(json ? [...argv, "--json"] : argv, { ...ctx.deps, cwd: ctx.cwd, env: ctx.env, log: () => {} });
 }
 
-function sleep(ms: number): Promise<null> {
+/** Resolves after `ms`, or at once when `signal` aborts (SIGINT/SIGTERM end the cockpit, CP6). */
+function sleep(ms: number, signal?: AbortSignal): Promise<null> {
   return new Promise((r) => {
-    const t = setTimeout(() => r(null), ms);
+    if (signal?.aborted) return r(null);
+    const t = setTimeout(done, ms);
     (t as { unref?: () => void }).unref?.();
+    function done() {
+      clearTimeout(t);
+      signal?.removeEventListener("abort", done);
+      r(null);
+    }
+    signal?.addEventListener("abort", done, { once: true });
   });
 }
 
@@ -147,8 +156,9 @@ async function interactive(ctx: Context, interval: number) {
     return false;
   }
 
+  const signal = ctx.deps.signal;
   try {
-    for (;;) {
+    while (!signal?.aborted) {
       if (!view) {
         try {
           view = await projectView(ctx);
@@ -161,7 +171,8 @@ async function interactive(ctx: Context, interval: number) {
       if (model) ctx.log(`${CLEAR}${renderCockpit(model, state, look())}`);
       frames++;
       pending ??= chunks.next();
-      const got = await Promise.race([pending, sleep(interval)]);
+      const got = await Promise.race([pending, sleep(interval, signal)]);
+      if (signal?.aborted) break;
       if (got === null) {
         view = null; // fresh data on the interval; the read stays pending
         continue;
@@ -170,7 +181,7 @@ async function interactive(ctx: Context, interval: number) {
       if (got.done || !model) break;
       let quit = false;
       for (const key of parseKeys(got.value)) {
-        const step = handleKey(state, key, model);
+        const step = handleKey(state, key, model, look());
         state = clampScroll(model, step.state, look());
         if (step.effect && (await act(step.effect))) {
           quit = true;

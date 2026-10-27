@@ -11,7 +11,9 @@ import { GROUP_MARK } from "./cockpit.ts";
 
 export type Key =
   | { kind: "char"; char: string }
-  | { kind: "up" | "down" | "pgup" | "pgdn" | "home" | "end" | "enter" | "esc" | "backspace" | "clear" | "scroll-down" | "quit" };
+  | { kind: "up" | "down" | "pgup" | "pgdn" | "home" | "end" | "enter" | "esc" | "backspace" | "clear" | "scroll-down" | "quit" }
+  /** the mouse wheel (SGR mouse reporting): `x` is the 1-based column under the pointer */
+  | { kind: "wheel"; dir: "up" | "down"; x: number };
 
 export type Tone = "ok" | "error" | "info";
 
@@ -38,6 +40,14 @@ export const initialState = (): TuiState => ({ selected: null, filter: "", filte
 export function parseKeys(chunk: string): Key[] {
   const keys: Key[] = [];
   for (let i = 0; i < chunk.length; ) {
+    // SGR mouse: `ESC [ < button ; x ; y M|m`; 64/65 are the wheel, other buttons are ignored
+    const mouse = /^\x1b\[<(\d+);(\d+);(\d+)[Mm]/.exec(chunk.slice(i));
+    if (mouse) {
+      const button = Number(mouse[1]) & ~(4 | 8 | 16); // without shift/alt/ctrl
+      if (button === 64 || button === 65) keys.push({ kind: "wheel", dir: button === 64 ? "up" : "down", x: Number(mouse[2]) });
+      i += mouse[0].length;
+      continue;
+    }
     const seq = /^\x1b(?:\[[0-9;]*[A-Za-z~]|O[A-Za-z])/.exec(chunk.slice(i))?.[0];
     if (seq) {
       const named: Record<string, Key["kind"]> = { A: "up", B: "down", H: "home", F: "end", "5~": "pgup", "6~": "pgdn", "1~": "home", "4~": "end" };
@@ -83,7 +93,7 @@ export function selectedRow(model: CockpitModel, s: TuiState): CockpitRow | null
 export const HELP = [
   "Keys",
   "  ↑ ↓  j k        move (PgUp PgDn a page)",
-  "  ⌃d ⌃u           scroll the preview",
+  "  ⌃d ⌃u, wheel    scroll the preview (the wheel over the list moves the selection)",
   "  /               filter: type words, enter keeps it, esc clears it",
   "  enter           orient: the story's workspace with an agent (or its report)",
   "  g               go to the agent's pane",
@@ -102,8 +112,21 @@ export const HELP = [
 const PAGE = 10;
 
 /** One key → the next state and what to do. Pure. */
-export function handleKey(s: TuiState, key: Key, model: CockpitModel): { state: TuiState; effect?: TuiEffect } {
+/** Preview lines one wheel notch scrolls. */
+const WHEEL_LINES = 3;
+
+/**
+ * One key → the next state and what to do. Pure. `look` places the mouse: the wheel over the preview
+ * scrolls it, over the list it moves the selection (without `look`, it always scrolls the preview).
+ */
+export function handleKey(s: TuiState, key: Key, model: CockpitModel, look?: Look): { state: TuiState; effect?: TuiEffect } {
   if (key.kind === "quit") return { state: s, effect: { kind: "quit" } };
+  if (key.kind === "wheel") {
+    const overList = look ? layout(look).wide && key.x <= layout(look).listW + 1 : false;
+    if (!overList) return { state: { ...s, scroll: Math.max(0, s.scroll + (key.dir === "down" ? WHEEL_LINES : -WHEEL_LINES)) } };
+    if (s.prompt || s.filtering) return { state: s };
+    return handleKey(s, { kind: key.dir }, model, look);
+  }
   const row = selectedRow(model, s);
   // CP7: the prompt of an action that takes text
   if (s.prompt) {

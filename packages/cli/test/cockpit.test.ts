@@ -144,6 +144,22 @@ describe("the preview (CP3)", () => {
     expect(handleKey(s, { kind: "down" }, m).state.scroll).toBe(0);
     expect(renderCockpit(m, s, look)).toContain("⌃d/⌃u scroll");
   });
+
+  test("the mouse wheel: over the preview it scrolls, over the list it moves the selection; other buttons do nothing", async () => {
+    const m = await model();
+    const look = { width: 140, height: 12, color: false, now: c.clock.now(), clock: "12:00" };
+    expect(parseKeys("\x1b[<65;100;5M\x1b[<64;10;5M\x1b[<0;10;5M\x1b[<0;10;5mj")).toEqual([
+      { kind: "wheel", dir: "down", x: 100 },
+      { kind: "wheel", dir: "up", x: 10 },
+      { kind: "char", char: "j" },
+    ]);
+    const down = handleKey(initialState(), { kind: "wheel", dir: "down", x: 100 }, m, look).state;
+    expect(down.scroll).toBe(3);
+    expect(handleKey(down, { kind: "wheel", dir: "up", x: 100 }, m, look).state.scroll).toBe(0);
+    const moved = handleKey(initialState(), { kind: "wheel", dir: "down", x: 10 }, m, look).state;
+    expect(moved.selected).toBe(m.rows[1]?.id as string);
+    expect(moved.scroll).toBe(0);
+  });
 });
 
 describe("norn cockpit (CP6–CP8)", () => {
@@ -158,6 +174,18 @@ describe("norn cockpit (CP6–CP8)", () => {
     expect(frames[6]).toContain("ok: norn answer gh-6");
     await c.tick(); // the answer receipt is applied by the tick (S5)
     expect(c.state(runs(6))?.park).toBeNull();
+  });
+
+  test("SIGINT/SIGTERM end it (CP6): the abort signal stops the loop while it waits", async () => {
+    const abort = new AbortController();
+    async function* waiting() {
+      await new Promise(() => {}); // the person types nothing
+      yield "";
+    }
+    setTimeout(() => abort.abort(), 50);
+    const r = await runCli(["cockpit", "--interval", "1h"], { ...c.deps, herdr: null, signal: abort.signal, input: waiting(), log: () => {} });
+    expect(r.exit).toBe(0);
+    expect(r.value).toEqual({ frames: 1, last: null });
   });
 
   test("enter orients through Herdr; o and i open links with the platform opener", async () => {
