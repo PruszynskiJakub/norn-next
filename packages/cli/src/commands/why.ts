@@ -20,7 +20,7 @@
  * recorded decisions ("tick crashed during act") — `--tick <id>` resolves the tick a receipt cites,
  * and without `--tick` a crashed tick newer than the unit's last finished one is the one explained.
  */
-import { criterionLine, decide, type Decision, type NumberedReceipt, type StoryFacts, type UnitFacts, unitDecision } from "@norn/core";
+import { criterionLine, decide, type Decision, legacyAction, type NumberedReceipt, type StoryFacts, type UnitFacts, unitDecision } from "@norn/core";
 import { ExitCode, type Receipt, type TickStartTrace, type TickTrace, type TickUnitRecord, ULID_PATTERN } from "@norn/schema";
 import { crashedTicksFor, decisionUnit, findCrashedTick, findTick, readTrace } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
@@ -29,7 +29,8 @@ import { parseUnitKey } from "../runtime/args.ts";
 import { replayInputs } from "../runtime/tick.ts";
 import { NORN_VERSION } from "../version.ts";
 
-const canon = (v: unknown) => JSON.stringify(JSON.parse(JSON.stringify(v ?? null)));
+/** An action as compared with its replay; one an older norn recorded drops the fields since removed (O5). */
+const canon = (v: unknown) => JSON.stringify(JSON.parse(JSON.stringify(legacyAction(v ?? null))));
 
 interface Filter {
   step?: string;

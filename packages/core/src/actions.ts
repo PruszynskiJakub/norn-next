@@ -17,18 +17,22 @@
  *     3. write `state` (atomic, last),
  *     4. `commit` and push if set.
  *   If step 2 fails, act still writes nothing past the receipts; the next tick re-decides.
- * - Exception: `run_check` and `run_git` produce their result receipt (`check` /
- *   `classify`) after the effect; act numbers it as the next free receipt number and the
- *   next tick applies it. Re-running an interrupted check/git step is safe.
+ * - Exception: `run_check` and `run_git` carry no `Transition`: they produce their result receipt
+ *   (`check` / `classify`) after the effect; act numbers it as the next free receipt number and the
+ *   next tick applies it. Re-running an interrupted check/git step is safe. `start_slices` carries
+ *   its transitions in its `starts`.
+ * - Traces written by an older norn carry `receipts: []`, `state: null`, `commit: null` on those three
+ *   kinds and a `park` copy of `state.park` on `park`; `legacyAction` drops them so `norn why` still
+ *   compares an old recorded decision with its replay.
  */
 import type {
   ClaimBlob,
   GitAction,
-  ParkInfo,
   Receipt,
   StoryFrontmatter,
   UnitState,
 } from "@norn/schema";
+import type { Rejection } from "./apply.ts";
 import type { FileError, UnitRef } from "./facts.ts";
 import type { InboxItem, PromptKey, RemoteIssue, SessionRef } from "./ports.ts";
 
@@ -105,27 +109,37 @@ export interface WorktreeSpec {
   slot: number | null;
 }
 
+/**
+ * How an action reaches an agent session (B2, R4.2): type `input` into the live session, or
+ * `launch` a resumed (or fresh) one, after killing `kill` when it is still around.
+ */
+export interface Delivery {
+  /** `send` delivery into the live session after state is written */
+  input: SessionInput | null;
+  /** relaunch: `--resume <agent_session_id>` (or a fresh session) with the text as the prompt */
+  launch: AgentLaunch | null;
+  /** session to terminate first, if still present */
+  kill: SessionRef | null;
+}
+
 // ------------------------------------------------------------------ unit actions
 
 /** Apply receipts above applied_through and move the cursor/park/resume (S6, W3, W4). */
-export interface ApplyReceiptsAction extends UnitBase, Transition {
+/**
+ * Delivery: `input` types an answer into the live session; `launch` (B2: the session cannot take
+ * typed input — headless, or gone — but the agent session can be resumed) relaunches
+ * `--resume <agent_session_id>` with the answer as the prompt, `receipts` then holding a `started`
+ * receipt for the same run (act fills the session as for start_run); `kill` (S7/O2: a `workflow` /
+ * `unstick` receipt moved the cursor off a live run) is killed (runner kill + lease release).
+ */
+export interface ApplyReceiptsAction extends UnitBase, Transition, Delivery {
   kind: "apply_receipts";
   /** receipt numbers applied (ascending); state.applied_through = last applied or rejected */
   applied: number[];
   /** receipts refused (stale step/attempt T9, wrong kind for the step); act writes each to the trace as a `reject` event */
-  rejected: Array<{ n: number; receipt_id: string; reason: string }>;
+  rejected: Rejection[];
   /** edge taken, if the cursor moved */
   advance: { from: string; outcome: string; to: string; counter?: { name: string; value: number; max: number }; reset?: string[] } | null;
-  /** deliver into the live session after state is written (answer → same session) */
-  input: SessionInput | null;
-  /**
-   * B2: the session cannot take typed input (headless, or gone) but the agent session can be
-   * resumed: relaunch `--resume <agent_session_id>` with the answer as the prompt. `receipts`
-   * then holds a `started` receipt for the same run (act fills the session as for start_run).
-   */
-  launch: AgentLaunch | null;
-  /** S7/O2: a `workflow` / `unstick` receipt moved the cursor off a live run — kill it (runner kill + lease release) */
-  kill: SessionRef | null;
 }
 
 /** Start a unit: pin its workflow (S7), create the worktree, write the first state. */
@@ -158,30 +172,24 @@ export interface StartRunAction extends UnitBase, Transition {
  * session with the nudge text (`launch` with `resume`; `receipts` then also holds a `started`
  * receipt for the same run, filled with the new session as for start_run) after killing `kill`.
  */
-export interface NudgeAction extends UnitBase, Transition {
+export interface NudgeAction extends UnitBase, Transition, Delivery {
   kind: "nudge";
-  /** `send` delivery; null when resumed */
-  input: SessionInput | null;
-  /** `resume` delivery: relaunch `--resume <agent_session_id>` with the nudge text as the prompt */
-  launch: AgentLaunch | null;
-  /** old session to terminate before the resume, if still present */
-  kill: SessionRef | null;
   /** C4 snapshot request on silent (see ClassifyAction) */
   snapshot: { transcript: string | null; cwd: string } | null;
 }
 
 /** Fresh session for the same step after died (C1, B2); counted in state.retries_used. */
-export interface RetryFreshAction extends UnitBase, Transition {
+/**
+ * `kill`: the previous session, if still around. `launch` is null in manual mode or when no agent
+ * slot is free: the step is just marked ready again. When set, `receipts` holds the classify receipt
+ * then the new run's `started` receipt (act fills the session as for start_run).
+ */
+export interface RetryFreshAction extends UnitBase, Transition, Pick<Delivery, "kill" | "launch"> {
   kind: "retry_fresh";
-  /** previous session to kill first, if still around */
-  kill: SessionRef | null;
-  /** null in manual mode or when no agent slot is free: the step is just marked ready again.
-   *  When set, `receipts` holds the classify receipt then the new run's `started` receipt (act fills the session as for start_run). */
-  launch: AgentLaunch | null;
 }
 
 /** Run a check step command (W2). Act writes the `check` receipt with the result (C5). */
-export interface RunCheckAction extends UnitBase, Transition {
+export interface RunCheckAction extends UnitBase {
   kind: "run_check";
   step: string;
   run_id: string;
@@ -195,7 +203,7 @@ export interface RunCheckAction extends UnitBase, Transition {
 }
 
 /** Run a git step (W2, K6). Act writes a `classify` receipt with `done` or `conflict`. */
-export interface RunGitAction extends UnitBase, Transition {
+export interface RunGitAction extends UnitBase {
   kind: "run_git";
   step: string;
   run_id: string;
@@ -217,7 +225,7 @@ export interface RunGitAction extends UnitBase, Transition {
 }
 
 /** Story-level `slices` step: start every slice whose depends_on are done, within caps (W2). */
-export interface StartSlicesAction extends UnitBase, Transition {
+export interface StartSlicesAction extends UnitBase {
   kind: "start_slices";
   starts: StartUnitAction[];
 }
@@ -235,10 +243,13 @@ export interface ClassifyAction extends UnitBase, Transition {
   snapshot: { transcript: string | null; cwd: string } | null;
 }
 
-/** Park or mark stuck (ask, gate, attended, stuck, exhausted, remote) and notify once (O3). */
+/**
+ * Park or mark stuck (ask, gate, attended, stuck, exhausted, remote) and notify once (O3). The park
+ * is `state.park`; an implicit ask whose workflow takes an `ask` edge leaves it null (the cursor moved).
+ */
 export interface ParkAction extends UnitBase, Transition {
   kind: "park";
-  park: ParkInfo;
+  state: UnitState;
   notify: InboxItem | null;
 }
 
@@ -393,6 +404,30 @@ export interface Decision {
   unit: string;
   rule: string;
   action: Action;
+}
+
+const NO_TRANSITION: ReadonlySet<string> = new Set(["run_check", "run_git", "start_slices"]);
+
+/**
+ * A decision's action as this norn writes it, from one a trace recorded (O5): an older norn gave
+ * `run_check` / `run_git` / `start_slices` an empty `Transition` (`receipts: []`, `state: null`,
+ * `commit: null`) and `park` a `park` copy of its state's park. The empty transition is dropped
+ * only when it is exactly that, so a real difference still shows in a replay diff.
+ */
+export function legacyAction(action: unknown): unknown {
+  if (!action || typeof action !== "object") return action;
+  const a = action as Record<string, unknown>;
+  if (typeof a.kind === "string" && NO_TRANSITION.has(a.kind)) {
+    const empty = Array.isArray(a.receipts) && a.receipts.length === 0 && a.state === null && a.commit === null;
+    if (!empty) return action;
+    const { receipts: _r, state: _s, commit: _c, ...rest } = a;
+    return rest;
+  }
+  if (a.kind === "park" && "park" in a) {
+    const { park: _p, ...rest } = a;
+    return rest;
+  }
+  return action;
 }
 
 /** What act reports per action (trace `result`). */

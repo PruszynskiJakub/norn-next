@@ -53,6 +53,17 @@ function effectOf(a: Action): string {
   }
 }
 
+/**
+ * O6: the handoff heartbeat for a park — the state's park, or, when an implicit ask took the
+ * workflow's `ask` edge (no park in state), the ask itself.
+ */
+function parkLine(a: Extract<Action, { kind: "park" }>): string {
+  const p = a.state.park;
+  if (p) return `${p.kind} — ${p.reason}`;
+  const ask = a.receipts.findLast((r) => r.receipt.kind === "ask")?.receipt;
+  return `ask — ${ask?.kind === "ask" ? ask.question : "?"}`;
+}
+
 export class Actor extends ActEnv {
   // ------------------------------------------------------------ dispatch
 
@@ -153,7 +164,7 @@ export class Actor extends ActEnv {
         this.writeReceipts(loc.runsDir, a.receipts);
         if (a.state) this.writeUnitState(a.unit, loc.runsDir, a.state);
         await this.notify(a.notify);
-        const committed = await this.commit(a.commit, a.unit, a.state, `${a.rule}: ${a.park.kind} — ${a.park.reason}`);
+        const committed = await this.commit(a.commit, a.unit, a.state, `${a.rule}: ${parkLine(a)}`);
         return { ok: true, detail: committed };
       }
       case "mark_done":

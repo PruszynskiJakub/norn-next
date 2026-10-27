@@ -80,9 +80,6 @@ export function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitSta
     timeout_ms,
     env,
     log_path: `${story.spec_dir}/runs/${ref.dir}/logs/${run_id}.log`,
-    receipts: [],
-    state: null,
-    commit: null,
   });
 }
 
@@ -125,9 +122,6 @@ export function runGit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState
         ? { base: ctx.facts.repo.default_branch, title: fm.title, body: `Closes ${fm.url}\n\nDelivered by norn (story ${story.key}).`, body_file: `${story.spec_dir}/${PR_BODY_FILE}` }
         : null,
     ...(update ? { update } : {}),
-    receipts: [],
-    state: null,
-    commit: null,
   });
 }
 
@@ -254,6 +248,6 @@ export function slicesStep(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitS
     });
   }
   if (starts.length)
-    return ctx.emit({ kind: "start_slices", unit: ref, rule: "slices.start", starts, receipts: [], state: null, commit: null });
+    return ctx.emit({ kind: "start_slices", unit: ref, rule: "slices.start", starts });
   ctx.noop(ref, "slices.wait", `${done.size}/${files.length} slices integrated`);
 }
