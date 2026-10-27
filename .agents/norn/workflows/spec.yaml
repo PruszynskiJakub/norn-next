@@ -1,0 +1,98 @@
+# Spec workflow — repo-local, for a design decision or a change to the rules (W1, W9: label
+# norn:wf:spec). No code. A story workflow without `slices` (W8): every step works in the story
+# worktree. Refine the design with a person, amend .agents/PRD.md directly (the PRD is the single
+# source of rules; no new SPEC-*.md files), review it, let a person approve the amendment, bring the
+# story up to date with its base, describe it, open the draft PR and wait for a person at `ready`;
+# the person merges the PR. A design too large for one change lists follow-ups in story.md; they
+# become issues labelled `norn` only after approve-spec, in describe (no orphans from a rejected design).
+# A story waiting at ready goes back through update when the base moved under it in a way
+# that conflicts (BS6–BS8, base.stale: conflict).
+name: spec
+description: Refine a design with a person and amend the PRD; no code; open the draft PR.
+start: refine
+steps:
+  refine:
+    type: agent
+    skill: norn-refine
+    attended: true
+    inputs: [spec, handoff]
+    instructions: >-
+      The deliverable is an amendment to .agents/PRD.md, not a spec in story.md: write the agreed
+      rules into the PRD sections they belong to, with new ids for new rules and changed text under
+      existing ids (never reuse a retired id). Keep story.md's frontmatter unchanged; its body holds the
+      problem, the decision and the list of PRD ids added or changed. Change no code, no other docs, and
+      never create a SPEC-*.md file. When the design is too large for one change, list the proposed
+      follow-ups under `## Follow-ups` in story.md, one per piece of work with a title and the PRD ids it
+      builds; do not create issues (that happens after approve-spec).
+    outcomes:
+      done:      { to: review, means: "PRD amended and story.md lists the ids; no open questions; follow-ups listed if the design is large" }
+      questions: { to: clarify, means: "PRD amended as far as agreed, but open questions are listed in story.md that need the person's answers" }
+  clarify:
+    type: agent
+    skill: norn-clarify
+    attended: true
+    inputs: [spec, handoff]
+    instructions: "Fold each answer into .agents/PRD.md under the ids it affects, and into story.md's list of ids."
+    outcomes:
+      done: { to: review, means: "every open question is answered and folded into the PRD" }
+  review:
+    type: agent
+    skill: norn-review
+    inputs: [spec, diff]
+    instructions: >-
+      The change is the PRD diff. Spec axis: it says what story.md decided, and nothing else. Standards
+      axis: ids unique and cited consistently, glossary of PRD §5 kept, no contradiction with other
+      sections, no code or other docs changed, no SPEC-*.md file added.
+    outcomes:
+      approve:           { to: approve-spec, means: "the PRD amendment matches the decision, no blocking findings" }
+      changes_requested: { to: refine, counter: review_loop, means: "blocking findings in the receipt" }
+  approve-spec:
+    type: gate
+    prompt: "Read the PRD diff in the story worktree and story.md (proposed follow-ups under ## Follow-ups; approving creates them as issues). Approve to open the PR, or reject with what to change."
+    outcomes:
+      approve: update
+      reject:  { to: refine, counter: spec_loop }
+  update:
+    type: git
+    action: update
+    outcomes: { done: describe, conflict: { to: resolve, counter: base_conflict_loop } }
+  resolve:
+    type: agent
+    skill: norn-merge
+    inputs: [spec, handoff]
+    instructions: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase."
+    outcomes:
+      done: { to: update, means: "base merged into the story branch, conflicts resolved and committed" }
+  describe:
+    type: agent
+    skill: norn-pr
+    inputs: [spec, diff]
+    instructions: >-
+      First, for each entry under `## Follow-ups` in story.md that has no issue link yet, create the issue:
+      `gh issue create --label norn --assignee @me --title "<title>" --body "<what, PRD ids, link to this story's issue>"`.
+      This is the one remote write this step allows, an exception to the norn skill's rule. Record each
+      created issue's link next to its entry in story.md; never create one twice (a re-entry after update
+      finds the links). Then write the PR body to pr.md in the spec folder; norn puts the issue link under
+      it. Name the PRD ids added or changed and link the follow-up issues.
+    outcomes:
+      done: { to: open-pr, means: "follow-up issues created and linked in story.md; pr.md describes the branch as it is now: summary, ids changed, merge danger" }
+  open-pr:
+    type: git
+    action: open-pr
+    outcomes: { done: ready }
+  ready:
+    type: gate
+    prompt: "Read the draft PR. Approve to mark the story finished (a person still merges the PR), or reject with what to change."
+    outcomes:
+      approve: $done
+      reject:  { to: refine, counter: ready_loop }
+      stale:   { to: update, counter: stale_loop }
+counters:
+  review_loop: { max: 3 }
+  spec_loop: { max: 3 }
+  ready_loop: { max: 2 }
+  # resets each time update merges cleanly: only repeated conflicts on one base move count (W4)
+  base_conflict_loop: { max: 2, reset_on: update.done }
+  # a stale re-entry is progress from outside (a sibling merged), bounded by the sibling merges
+  stale_loop: { max: 10 }
+base: { stale: conflict }
