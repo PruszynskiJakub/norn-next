@@ -47,15 +47,21 @@ export function storyToken(view: ProjectView, story: string): { text: string; ne
   return { text: s?.status === "done" ? "✓ done" : "· quiet", needs: false };
 }
 
-/** A story's orient workspace: labelled `<story> orient`, with no pane outside the story's checkout or worktree. */
+/**
+ * A story's orient workspace: labelled `<story> orient` with a pane in the story's checkout or worktree
+ * (another repo's story of the same key has none). Other panes may sit elsewhere: the picker's popup
+ * runs from the plugin folder inside the workspace it covers.
+ */
 export function isOrientWorkspace(w: herdr.HerdrWorkspace, story: string, root: string): boolean {
-  return w.label === `${story} orient` && w.cwds.every((c) => herdr.inside(c, root));
+  return w.label === `${story} orient` && (w.cwds.length === 0 || w.cwds.some((c) => herdr.inside(c, root)));
 }
 
 /**
  * Moves that put our workspaces in needs-you-first order inside the slots they already hold, moving
  * only ours: every other workspace ends where it was. Applied in order with `workspace.move
- * {workspace_id, insert_index}` (the index after the workspace is taken out); none when the order holds.
+ * {workspace_id, insert_index}`; none when the order holds. Herdr's `insert_index` is a gap in the
+ * order as it stands, the moved workspace still in it (verified on herdr 0.9.5: moving index 5 to 7
+ * lands at 6), so each move's index is that gap.
  */
 export function planWorkspaceMoves(order: readonly string[], ours: readonly string[], needs: ReadonlySet<string>): Array<{ workspace_id: string; index: number }> {
   const mine = new Set(ours);
@@ -68,9 +74,12 @@ export function planWorkspaceMoves(order: readonly string[], ours: readonly stri
   });
   if (target.every((id, i) => id === order[i])) return [];
   // ours to the end in the wanted order, then each into its slot: the slots before it are already final
-  const moves: Array<{ workspace_id: string; index: number }> = [
-    ...wanted.map((id) => ({ workspace_id: id, index: order.length - 1 })),
-    ...slots.map((slot, k) => ({ workspace_id: wanted[k] as string, index: slot })),
-  ];
-  return moves;
+  const finals = [...wanted.map((id) => ({ id, at: order.length - 1 })), ...slots.map((slot, k) => ({ id: wanted[k] as string, at: slot }))];
+  const now = [...order];
+  return finals.map(({ id, at }) => {
+    const from = now.indexOf(id);
+    now.splice(from, 1);
+    now.splice(at, 0, id);
+    return { workspace_id: id, index: at > from ? at + 1 : at };
+  });
 }

@@ -110,7 +110,7 @@ describe("norn pick", () => {
     const h = fakeHerdr();
     const orient = await runCli(["pick"], { ...c.deps, herdr: h.cockpit, input: keys("\r") });
     expect(orient.value).toEqual({ frames: 1, action: "orient", story: "gh-5", ok: true });
-    expect(h.calls).toEqual([expect.stringMatching(new RegExp(`^open workspace ${wt()} gh-5 orient focus ${c.home}/launch/[0-9a-f]{16}\\.sh env NORN_ORIENT=1 claude --permission-mode auto -- 'Run \`norn orient gh-5\` and follow it\\.'$`))]);
+    expect(h.calls).toEqual([expect.stringMatching(new RegExp(`^open workspace ${wt()} gh-5 orient focus ${c.home}/orient/launch/[0-9a-f]{16}\\.sh env NORN_ORIENT=1 claude --permission-mode auto -- 'Run \`norn orient gh-5\` and follow it\\.'$`))]);
 
     const refused: string[] = [];
     const quit = await runCli(["pick"], { ...c.deps, herdr: null, input: keys("\x19", "\x1b"), log: (l) => refused.push(l) });

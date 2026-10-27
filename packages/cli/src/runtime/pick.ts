@@ -197,7 +197,8 @@ export function renderPick(view: ProjectView, rows: readonly PickRow[], state: P
   const cursor = clamp(state.cursor, shown.length);
   const leftW = width >= 100 ? Math.floor(width * 0.55) : width;
   const rightW = width - leftW - 3;
-  const bodyH = height - 5;
+  // header 3, rules and keys 2, and the newline the log adds after the frame
+  const bodyH = height - 6;
 
   const needs = rows.filter((r) => r.kind === "item").length;
   const head = `${paint("norn pick", "1")}  ${needs ? paint(`${needs} need${needs === 1 ? "s" : ""} you`, "1;33") : paint("nothing needs you", "32")}`;

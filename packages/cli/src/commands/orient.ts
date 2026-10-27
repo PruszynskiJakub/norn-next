@@ -9,6 +9,7 @@
  * of a run and `brief`/`done`/`ask`/`stuck` refuse it; like a launched agent (R8.1) it runs the norn
  * that opened it, first on PATH. Outside Herdr it prints the command.
  */
+import { join } from "node:path";
 import { startAgentCommand } from "@norn/core";
 import type { ResolvedConfig } from "@norn/schema";
 import { formatOrient, orientReport } from "@norn/view";
@@ -17,7 +18,7 @@ import { refuse, rendered } from "../output.ts";
 import { ORIENT_ENV } from "../runtime/agent-unit.ts";
 import { cockpitHerdr } from "../runtime/cockpit.ts";
 import { parseUnitKey, projectView } from "../runtime/human.ts";
-import { ensureShim, withNornOnPath } from "../runtime/shim.ts";
+import { ensureShim, nornEntry, withNornOnPath } from "../runtime/shim.ts";
 import { isOrientWorkspace } from "../runtime/segment.ts";
 
 /** The orient agent: the default agent with its configured args, its first prompt `norn orient <key>`. */
@@ -52,8 +53,10 @@ export const orientCommand = defineCommand({
       await cockpit.focusWorkspace(existing.workspace_id);
       return rendered({ story, opened: true, created: false, workspace_id: existing.workspace_id }, `Focused workspace ${label}.`);
     }
-    // R8.1: the agent's `norn` is this norn (its `norn orient` must exist), set inside the command
-    const launcher = withNornOnPath([], ensureShim(ctx.home), ctx.env.PATH).argv[0] as string;
+    // R8.1: the agent's `norn` is this norn (its `norn orient` must exist), set inside the command —
+    // through a shim of its own, not the launch shim launched agents' hooks share
+    const shim = ensureShim(ctx.home, nornEntry(), join(ctx.home, "orient", "bin"));
+    const launcher = withNornOnPath([], shim, ctx.env.PATH).argv[0] as string;
     const ws = await cockpit.openWorkspace(report.root, label, `${launcher} env ${command}`);
     return rendered({ story, opened: true, created: true, workspace_id: ws.workspace_id, pane_id: ws.pane_id, command }, `Opened workspace ${label} with an orient agent.`);
   },
