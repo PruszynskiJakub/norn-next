@@ -7,11 +7,10 @@
  */
 import { baseUpdateStep } from "@norn/core";
 import type { UnitState } from "@norn/schema";
-import { readClaim } from "@norn/store";
+import { readClaim, heartbeatId } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import { failure, refuse } from "../output.ts";
 import { at, deliver, gitRemote, humanReceipt, resolveTarget, started } from "../runtime/human.ts";
-import { heartbeatId } from "../runtime/local.ts";
 import { storyArg } from "./take.ts";
 
 /** BS9: done (PR unmerged), at a gate, or stuck. */

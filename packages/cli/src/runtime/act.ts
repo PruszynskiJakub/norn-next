@@ -72,11 +72,15 @@ import {
   writeState,
   writeStoryFile,
   writeTranscriptSnapshot,
+  markNotified,
+  type PendingRecord,
+  readNotified,
+  readPendingRecords,
+  writePendingRecords,
 } from "@norn/store";
 import type { Context } from "../context.ts";
 import { leaseLiveness } from "./leases.ts";
 import { markStoryOnBase, mergeFacts, type RecordResult } from "./record.ts";
-import { markNotified, type PendingRecord, readNotified, readPendingRecords, writePendingRecords } from "./local.ts";
 import type { Observed, StoryLoc, UnitLoc } from "./observe.ts";
 import { appendProgress, rejectProgress } from "./report.ts";
 import { runShell, tailLines } from "./shell.ts";

@@ -18,6 +18,20 @@ export const tickLockPath = (root: string) => join(traceDir(root), "tick.lock");
 /** K6/BS3: a story's integrate lock — slice integrations and base updates of one story never interleave. */
 export const integrateLockPath = (root: string, story: string) => join(traceDir(root), `integrate-${story}.lock`);
 
+/** Machine-local runtime files of one checkout, in the gitignored trace dir (§7.1). */
+export const heartbeatFilePath = (root: string) => join(traceDir(root), "heartbeat.json");
+export const actFailuresPath = (root: string) => join(traceDir(root), "failures.json");
+export const remoteCachePath = (root: string) => join(traceDir(root), "remote.json");
+export const notifiedPath = (root: string) => join(traceDir(root), "notified.json");
+export const pendingRecordsPath = (root: string) => join(traceDir(root), "records.json");
+export const foreignCommitsPath = (root: string) => join(traceDir(root), "foreign.json");
+export const inboxOpenPath = (root: string) => join(traceDir(root), "inbox.json");
+export const baseFactsPath = (root: string) => join(traceDir(root), "base.json");
+export const prFactsPath = (root: string) => join(traceDir(root), "pr.json");
+export const cockpitPath = (root: string) => join(traceDir(root), "cockpit.json");
+/** GR6: the base branch's `.agents/specs/` materialized per tree id (store/base.ts). */
+export const baseCacheDir = (root: string) => join(traceDir(root), "base");
+
 export const specsDir = (root: string) => join(root, SPECS_DIR);
 export const storyDir = (root: string, story: string, slug: string) => join(specsDir(root), storyDirName(story, slug));
 export const storyFile = (specDir: string) => join(specDir, "story.md");

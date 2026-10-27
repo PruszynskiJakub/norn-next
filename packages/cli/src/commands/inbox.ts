@@ -9,11 +9,11 @@
  * appeared_at / resolved_at / resolved_by, paired from the inbox changes each tick records.
  */
 import { parseDuration } from "@norn/schema";
+import { type InboxHistoryItem, inboxHistory } from "@norn/store";
 import { formatInbox, stepTitle } from "@norn/view";
 import { defineCommand, opt } from "../command.ts";
 import { rendered, usageError } from "../output.ts";
 import { projectView } from "../runtime/human.ts";
-import { type InboxHistoryItem, inboxHistory } from "../runtime/inbox-history.ts";
 
 function sinceOf(raw: string | undefined, now: number): string | undefined {
   if (raw === undefined) return undefined;

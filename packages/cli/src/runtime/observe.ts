@@ -78,10 +78,13 @@ import {
   withSliceWorktrees,
   writeBaseFacts,
   writePrFacts,
+  heartbeatId,
+  readRemoteCache,
+  traceForeignCommits,
+  writeRemoteCache,
 } from "@norn/store";
 import type { Context } from "../context.ts";
 import { leaseLiveness } from "./leases.ts";
-import { heartbeatId, readRemoteCache, traceForeignCommits, writeRemoteCache } from "./local.ts";
 import { agentSkills, repoWorkflows } from "./workflows.ts";
 
 export type SyncMode = "auto" | "force" | "never";

@@ -7,11 +7,11 @@
  * Both are diagnostic local state, never committed; an unreadable file, or one of the wrong shape,
  * reads as empty (S2, readLocalJson).
  */
-import { join } from "node:path";
 import type { ActFailure } from "@norn/core";
+import { ulid } from "@norn/schema";
 import { atomicWriteJson } from "./fsx.ts";
 import { readLocalJson } from "./local-json.ts";
-import { traceDir } from "./paths.ts";
+import { actFailuresPath, heartbeatFilePath } from "./paths.ts";
 
 export interface HeartbeatFile {
   heartbeat_id?: string;
@@ -20,15 +20,26 @@ export interface HeartbeatFile {
   last_tick_at?: string;
 }
 
-export const heartbeatFilePath = (root: string) => join(traceDir(root), "heartbeat.json");
-const failuresPath = (root: string) => join(traceDir(root), "failures.json");
-
 export function readHeartbeatFile(root: string): HeartbeatFile {
   return readLocalJson("local-heartbeat", heartbeatFilePath(root), {}, root);
 }
 
 export function writeHeartbeatFile(root: string, hb: HeartbeatFile): void {
   atomicWriteJson(heartbeatFilePath(root), hb);
+}
+
+/** This checkout's heartbeat_id; created on first use (keeps `last_tick_at`, R5.5). */
+export function heartbeatId(root: string, now: number): string {
+  const cur = readHeartbeatFile(root);
+  if (cur.heartbeat_id && /^[0-9A-HJKMNP-TV-Z]{26}$/.test(cur.heartbeat_id)) return cur.heartbeat_id;
+  const id = ulid(now);
+  writeHeartbeatFile(root, { ...cur, heartbeat_id: id, created_at: new Date(now).toISOString() });
+  return id;
+}
+
+/** This checkout's heartbeat_id as recorded (S2: validated), null when none yet; never creates one. */
+export function recordedHeartbeatId(root: string): string | null {
+  return readHeartbeatFile(root).heartbeat_id ?? null;
 }
 
 /** R5.5: record that a tick finished now (keeps the heartbeat_id). */
@@ -45,9 +56,9 @@ export function lastTickAt(root: string): number | null {
 
 /** R4.3: unit key → last failed act effect. */
 export function readActFailures(root: string): Record<string, ActFailure> {
-  return readLocalJson("local-failures", failuresPath(root), {}, root).units ?? {};
+  return readLocalJson("local-failures", actFailuresPath(root), {}, root).units ?? {};
 }
 
 export function writeActFailures(root: string, units: Record<string, ActFailure>): void {
-  atomicWriteJson(failuresPath(root), { units });
+  atomicWriteJson(actFailuresPath(root), { units });
 }

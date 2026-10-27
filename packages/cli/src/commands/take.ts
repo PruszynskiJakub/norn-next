@@ -25,12 +25,12 @@ import {
   readClaim,
   readState,
   readText,
+  heartbeatId,
 } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { busyError, claimHeld, corruptError, failure, refuse, usageError, withExit } from "../output.ts";
 import { leaseLiveness } from "../runtime/leases.ts";
-import { heartbeatId } from "../runtime/local.ts";
 import { machineHolder } from "../runtime/observe.ts";
 import { equipWorktree, syncLocalBranch, type WorktreeTarget } from "../runtime/worktrees.ts";
 
