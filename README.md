@@ -256,4 +256,4 @@ bun run build:bin      # dist/bin/norn-{darwin-arm64,darwin-x64,linux-x64,linux-
 
 ## Credits
 
-The `norn-codebase-design`, `norn-tdd` and `norn-pr` skills and the approach of the step skills are adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT), by way of norn v0.11.0.
+The `norn-codebase-design` and `norn-tdd` skills and the approach of the step skills are adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT), by way of norn v0.11.0; `norn-pr` and `norn-diagnose` are adapted from its `pr` and `diagnosing-bugs` skills directly.
