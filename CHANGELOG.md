@@ -4,6 +4,8 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-27
+
 ### Added
 
 - `norn orient <story|unit>` shows one story at a glance: what it is, each slice's outcome, the PR (link and the `gh pr view` / `glab mr view` command), the open notes grouped by unit, what waits for you with the exact commands, and where to look. Read only: no receipt, run or claim. Markdown by default, `--json` for data.
