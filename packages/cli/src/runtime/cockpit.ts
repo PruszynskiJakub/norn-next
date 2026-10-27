@@ -5,9 +5,19 @@
  */
 import { herdr } from "@norn/adapters";
 import type { InboxEntry } from "@norn/view";
+import type { Context } from "../context.ts";
 import { itemDetails, type Tone } from "./cockpit-view.ts";
 
 type HerdrCockpit = herdr.HerdrCockpit;
+
+/** HC6/HC8: the Herdr the cockpit talks to — injected, or the real one inside Herdr, else none. */
+export function cockpitHerdr(ctx: Context): herdr.HerdrCockpit | null {
+  if (ctx.deps.herdr !== undefined) return ctx.deps.herdr;
+  if (ctx.env.HERDR_ENV !== "1") return null;
+  const o = ctx.config.runner?.adapter === "herdr" ? (ctx.config.runner.options ?? {}) : {};
+  return herdr.createHerdrCockpit({ env: ctx.env, ...(typeof o.bin === "string" ? { bin: o.bin } : {}), ...(typeof o.session === "string" ? { session: o.session } : {}) });
+}
+
 type PaneLabel = herdr.PaneLabel;
 
 export type CockpitCommand =
