@@ -5,13 +5,16 @@
  *     nudge resume exempts it.
  *   - BUG-2 (1.2): `routeFor` ignores counter exhaustion, so the route act records in a classify
  *     receipt disagrees with where `applyReceipts` sends the unit.
+ *   - BUG-5 (found by 0.1's rule coverage): a slice file that failed validation, of a slice not
+ *     started yet, makes decide throw (`sliceProgress` reads its null frontmatter's `depends_on`),
+ *     so the whole tick fails instead of the `slices.file_invalid` noop.
  */
 import { describe, expect, test } from "bun:test";
 import type { LeaseFile, UnitState } from "@norn/schema";
 import { applyReceipts, routeFor } from "../src/apply.ts";
 import { decide } from "../src/decide.ts";
 import type { Facts, RunFacts, StoryFacts, UnitFacts } from "../src/facts.ts";
-import { at, CONFIG, facts, numbered, receipt, SLICE_WF, SOLO_WF, sliceUnit, stateFor, storyFacts, storyUnit, T0, unitFacts, WORKFLOWS } from "./fixtures.ts";
+import { at, CONFIG, facts, numbered, receipt, SLICE_WF, SOLO_WF, STORY_WF, sliceFile, sliceUnit, stateFor, storyFacts, storyUnit, T0, unitFacts, WORKFLOWS } from "./fixtures.ts";
 
 const RUN = "01JDDDDDDDDDDDDDDDDDDDDDDD";
 const HEADLESS = { runner: "headless", session_id: RUN };
@@ -69,5 +72,18 @@ describe("BUG-2: the route recorded for a git step's classify receipt", () => {
     expect({ step: res.state.step, status: res.state.status }).toEqual({ step: "integrate", status: "stuck" });
     // today: "merge" — the transition target, as if the counter had room
     expect(route).toBe("$stuck");
+  });
+});
+
+describe("BUG-5: a broken slice file of a slice not started yet", () => {
+  test.failing("decide notes slices.file_invalid instead of throwing", () => {
+    const unit = storyUnit();
+    const st = stateFor(unit, STORY_WF, { status: "ready", park: null, step: "slices" });
+    const s = storyFacts("gh-1", [unitFacts(unit, STORY_WF, st)], {
+      frontmatter: { ...storyFacts("gh-1", []).frontmatter!, refined_body_hash: storyFacts("gh-1", []).frontmatter!.body_hash },
+      slices: [{ ...sliceFile("gh-1", "01", "form"), frontmatter: null, error: { file: ".agents/specs/gh-1-login/slices/01-form.md", errors: [{ path: "/id", message: "bad" }] } }],
+    });
+    // today: TypeError: null is not an object (evaluating 's.frontmatter.depends_on')
+    expect(decide(facts([s]), WORKFLOWS, CONFIG).map((d) => d.rule)).toEqual(["slices.file_invalid"]);
   });
 });
