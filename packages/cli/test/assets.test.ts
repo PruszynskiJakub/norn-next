@@ -28,6 +28,7 @@ const SKILLS = [
   "norn-pr",
   "norn-tdd",
   "norn-codebase-design",
+  "norn-prototype",
 ];
 const CRAFT = SKILLS.filter((s) => s !== "norn");
 
