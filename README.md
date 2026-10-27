@@ -202,7 +202,7 @@ herdr plugin install PruszynskiJakub/norn-next/plugins/herdr   # update it with 
 
 Working on norn itself? Link your checkout instead, so the plugin follows `git pull`: `herdr plugin link <checkout>/plugins/herdr`. `norn doctor` suggests whichever fits.
 
-The plugin has two actions you can bind to keys in Herdr's `config.toml`: `norn.open` opens the cockpit below the focused pane, and `norn.next` jumps to the agent that waits for you. To get inbox notifications as Herdr toasts, add `{adapter: herdr}` to `notifiers` in the config.
+The plugin has three actions you can bind to keys in Herdr's `config.toml`: `norn.open` opens the cockpit below the focused pane, `norn.next` jumps to the agent that waits for you, and `norn.pick` opens a popup listing what needs you and every story; Enter there gives the story an orient workspace with an agent that walks you through it (`norn orient <story> --open`). `plugins/herdr/README.md` has the keys and the config for a tab bar segment (`norn status --segment`) and sidebar row. To get inbox notifications as Herdr toasts, add `{adapter: herdr}` to `notifiers` in the config.
 
 ## How it works
 
