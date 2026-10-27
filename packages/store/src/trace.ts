@@ -5,10 +5,10 @@
  * filter by unit while reading. Briefings and transcript snapshots are separate files
  * under `briefings/<run_id>/` and `transcripts/<run_id>/`, referenced by trace-relative path.
  */
-import { appendFileSync, mkdirSync, readdirSync } from "node:fs";
+import { appendFileSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
 import type { FileError } from "@norn/core";
-import { type TickStartTrace, type TickTrace, type TraceEvent, assertValid, validate } from "@norn/schema";
+import { type HookFact, type TickStartTrace, type TickTrace, type TraceEvent, assertValid, ulidTime, validate } from "@norn/schema";
 import { appendDurable, atomicWrite, isErrno, readText } from "./fsx.ts";
 import { traceDir } from "./paths.ts";
 
@@ -163,6 +163,63 @@ export function crashedTicksFor(root: string, unit: string): TickStartTrace[] {
   const { events } = readTrace(root, { types: ["tick.start", "tick", "tick.end"] });
   const ended = new Set(events.filter((e) => e.type === "tick" || e.type === "tick.end").map((e) => (e as { tick_id: string }).tick_id));
   return events.filter((e): e is TickStartTrace => e.type === "tick.start" && !ended.has(e.tick_id) && eventMatchesUnit(e, unit));
+}
+
+// ---------------------------------------------------------------- hook lines (A2, A4): fast scans
+
+/** Day files of the trace, unsorted; none when the trace dir cannot be listed (diagnostic, never fatal). */
+function hookDayFiles(root: string): string[] | null {
+  try {
+    return readdirSync(traceDir(root)).filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Hook facts appended by `norn hook` (A2), read from trace day files since `since`, oldest first.
+ * A fast scan: only lines starting `{"type":"hook"` are parsed, and neither they nor the facts are
+ * schema-checked (the trace is diagnostic: an unreadable file or a bad line is skipped).
+ */
+export function readHookFacts(root: string, since: string): HookFact[] {
+  const names = hookDayFiles(root);
+  if (!names) return [];
+  const day = since.slice(0, 10);
+  const out: HookFact[] = [];
+  for (const name of names.sort()) {
+    if (name.slice(0, 10) < day) continue;
+    let text: string;
+    try {
+      text = readFileSync(join(traceDir(root), name), "utf8");
+    } catch {
+      continue;
+    }
+    for (const line of text.split("\n")) {
+      if (!line.startsWith('{"type":"hook"')) continue;
+      try {
+        const ev = JSON.parse(line) as { fact?: HookFact };
+        if (ev.fact && ev.fact.at >= since) out.push(ev.fact);
+      } catch {
+        /* diagnostic file; bad lines are skipped */
+      }
+    }
+  }
+  return out.sort((a, b) => a.at.localeCompare(b.at));
+}
+
+/** A4: hook events of `runId` that norn blocked, counted in the trace day files since the run began (text match, no parse). */
+export function blockedHookCount(root: string, runId: string): number {
+  const names = hookDayFiles(root);
+  if (!names) return 0;
+  const day = new Date(ulidTime(runId)).toISOString().slice(0, 10);
+  const needle = `"run_id":"${runId}"`;
+  let n = 0;
+  for (const name of names) {
+    if (name.slice(0, 10) < day) continue;
+    for (const line of readFileSync(join(traceDir(root), name), "utf8").split("\n"))
+      if (line.startsWith('{"type":"hook"') && line.includes('"blocked":true') && line.includes(needle)) n++;
+  }
+  return n;
 }
 
 // ---------------------------------------------------------------- side files (B4, C4)

@@ -486,6 +486,13 @@ export interface AgentAdapter {
    * `payload` is parsed stdin JSON (or null); `env` is the hook process env. Null = ignore.
    */
   parseHookEvent(event: string, payload: unknown, env: Record<string, string | undefined>, at: string): HookFact | null;
+  /**
+   * Optional pure pass over one run's hook facts (trace order) that fills in what a single hook
+   * payload cannot carry: Claude's permission prompt takes its pending command from the preceding
+   * PreToolUse (A2, §10). Returns the same facts in the same order; only facts whose `agent` is
+   * this adapter's `name` may change.
+   */
+  refineHooks?(hooks: readonly HookFact[]): HookFact[];
   /** Encode a decision in the agent tool's hook protocol. */
   hookResponse(fact: HookFact, decision: HookDecision): HookResponse;
   /** Native hook event names → normalized kinds this adapter emits. */

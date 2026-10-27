@@ -10,12 +10,11 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { currentRun, cursorStep, type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, standingReport, storyRulings, storyWorktreePath } from "@norn/core";
 import { type AgentStep, type ProcessIdentity, type ReceiptOf, storyBranch, ulid } from "@norn/schema";
-import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readText, writeBriefing, readRemoteCache } from "@norn/store";
+import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readHookFacts, readText, writeBriefing, readRemoteCache } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
 import { agentName, loadUnitSession, refuseUnlessAgentWork, reportCommand, storyMode, type UnitSession, unitCriteria } from "../runtime/agent-unit.ts";
-import { readHookFacts } from "../runtime/observe.ts";
 
 /** Wrappers between the agent and `norn` that exit right after it (never the run's process). */
 const WRAPPERS = /^-?(sh|bash|zsh|dash|fish|ksh|tcsh|csh|env|bun|bunx|npx|pnpm|timeout|sudo|nice|nohup|xargs|script|login)$/;

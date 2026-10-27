@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { claudeAgent, withPendingCommands } from "../../src/claude/index.ts";
+import { claudeAgent } from "../../src/claude/index.ts";
 import payloads from "./fixtures/hook-payloads.json";
 
 const FIX = join(import.meta.dir, "fixtures");
@@ -24,7 +24,7 @@ describe("claude parseHookEvent", () => {
     expect(f("post-tool-use", payloads.PostToolUse)).toMatchObject({ event: "tool_use", tool: "Edit" });
     const perm = f("notification", payloads.NotificationPermission);
     expect(perm).toMatchObject({ event: "permission_prompt", message: "Claude needs your permission to use Bash" });
-    expect(perm?.command).toBeUndefined(); // filled from the PreToolUse by withPendingCommands
+    expect(perm?.command).toBeUndefined(); // filled from the PreToolUse by refineHooks
     // idle_prompt fires ~60 s after the turn ended: a turn end, not a question (A2, §10 silent → nudge)
     expect(f("notification", payloads.NotificationIdle)).toMatchObject({ event: "turn_end", native: "Notification" });
     expect(f("stop", payloads.Stop)).toMatchObject({ event: "turn_end", native: "Stop", message: "All tests pass." });
@@ -60,8 +60,9 @@ describe("claude Notification types (A2)", () => {
   });
 });
 
-describe("claude withPendingCommands (§10 implicit ask shows the command)", () => {
+describe("claude refineHooks (§10 implicit ask shows the command)", () => {
   const f = (arg: string, p: unknown) => claudeAgent.parseHookEvent(arg, p, ENV, AT)!;
+  const refine = (hooks: Parameters<NonNullable<typeof claudeAgent.refineHooks>>[0]) => claudeAgent.refineHooks!(hooks);
   const pre = f("pre-tool-use", payloads.PreToolUse);
   const perm = f("notification", payloads.NotificationPermission);
   test("tool facts carry a summary of the tool input", () => {
@@ -69,19 +70,19 @@ describe("claude withPendingCommands (§10 implicit ask shows the command)", () 
     expect(f("post-tool-use", payloads.PostToolUse).command).toBe("/repo/a.ts");
   });
   test("a permission prompt takes tool and command from the latest PreToolUse of its session", () => {
-    const out = withPendingCommands([f("session-start", payloads.SessionStart), pre, perm]);
+    const out = refine([f("session-start", payloads.SessionStart), pre, perm]);
     expect(out[2]).toMatchObject({ event: "permission_prompt", tool: "Bash", command: "Bash(bun test)", message: "Claude needs your permission to use Bash" });
     expect(out.slice(0, 2)).toEqual([f("session-start", payloads.SessionStart), pre]);
   });
   test("no pending tool when the latest tool fact is a PostToolUse or another session's", () => {
     const post = f("post-tool-use", payloads.PostToolUse);
-    expect(withPendingCommands([pre, post, perm])[2]).toEqual(perm);
+    expect(refine([pre, post, perm])[2]).toEqual(perm);
     const other = { ...pre, agent_session_id: "zzz" };
-    expect(withPendingCommands([other, perm])[1]).toEqual(perm);
+    expect(refine([other, perm])[1]).toEqual(perm);
   });
   test("other agents' facts are untouched", () => {
     const codexPerm = { ...perm, agent: "codex" };
-    expect(withPendingCommands([pre, codexPerm])[1]).toEqual(codexPerm);
+    expect(refine([pre, codexPerm])[1]).toEqual(codexPerm);
   });
 });
 
