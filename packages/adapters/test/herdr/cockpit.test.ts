@@ -119,6 +119,20 @@ test("listPanes reads each pane's tab, workspace, cwd and status; close calls tr
   ]);
 });
 
+test("cockpit errors keep the raw stderr: herdr_error with stderr as message, session_gone on a not-found anywhere in stderr", async () => {
+  const fail = (stderr: string): ExecResult => ({ code: 1, stdout: "", stderr });
+  const jsonErr = (code: string) => JSON.stringify({ error: { code, message: "parsed message" } });
+  const { exec } = fakeExec([
+    ["workspace focus w1", fail(jsonErr("server_unavailable"))],
+    ["workspace focus w2", fail(jsonErr("agent_blocked"))],
+    ["pane close w3:p1", fail(`warning: stale socket\n${jsonErr("pane_not_found")}`)],
+  ]);
+  const cockpit = createHerdrCockpit({ exec });
+  await expect(cockpit.focusWorkspace("w1")).rejects.toMatchObject({ code: "herdr_error", message: `herdr workspace focus: ${jsonErr("server_unavailable")}` });
+  await expect(cockpit.focusWorkspace("w2")).rejects.toMatchObject({ code: "herdr_error", message: `herdr workspace focus: ${jsonErr("agent_blocked")}` });
+  await cockpit.closePane("w3:p1");
+});
+
 test("pluginLinked reads `herdr plugin list --json` (HC11)", async () => {
   const list = (plugins: unknown[]) => fakeExec([["plugin list --json", ok({ id: "cli:plugin", result: { plugins } })]]).exec;
   expect(await createHerdrCockpit({ exec: list([{ plugin_id: "jpruszynski.github-issues", enabled: true }]) }).pluginLinked()).toBeNull();
