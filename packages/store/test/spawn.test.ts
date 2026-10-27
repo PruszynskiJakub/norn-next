@@ -3,7 +3,8 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { NETWORK_TIMEOUT_MS, git, gitSync, gitTimeoutMs, type SpawnRecord, setSpawnObserver, spawnBounded } from "../src/index.ts";
+import { git, gitSync } from "../src/git.ts";
+import { NETWORK_TIMEOUT_MS, gitTimeoutMs, type SpawnRecord, setSpawnObserver, spawnBounded } from "../src/index.ts";
 
 const alive = (pid: number) => {
   try {

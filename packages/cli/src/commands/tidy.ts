@@ -17,7 +17,7 @@ import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { herdr } from "@norn/adapters";
 import { ulid } from "@norn/schema";
-import { acquireTickLock, copyToOrphaned, orphanedDir, reclaimLeases, receiptsDir, safeUnlink, git as rawGit } from "@norn/store";
+import { acquireTickLock, copyToOrphaned, orphanedDir, reclaimLeases, receiptsDir, safeUnlink } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { busyError } from "../output.ts";
@@ -93,7 +93,7 @@ export const tidyCommand = defineCommand({
         worktrees.push(path);
       }
       const prunable = (await git.worktreeList(root)).filter((w) => w.prunable).map((w) => w.path);
-      if (!dry && prunable.length) await rawGit(root, ["worktree", "prune"]);
+      if (!dry && prunable.length) await git.worktreePrune(root).catch(() => undefined);
 
       // ---- branches: delete only when their commits are contained elsewhere
       const branches: string[] = [];
@@ -157,10 +157,10 @@ export const tidyCommand = defineCommand({
             }
             const dest = copyToOrphaned(unitDir, src, holder);
             // back to the record's version of the path: the merge-base copy, or gone when it is new here
-            const inBase = (await rawGit(u.cwd, ["cat-file", "-e", `${u.base}:${f}`])).code === 0;
-            if (inBase) await rawGit(u.cwd, ["checkout", u.base, "--", f]);
+            const inBase = await git.hasPath(u.cwd, u.base, f);
+            if (inBase) await git.checkoutPaths(u.cwd, u.base, [f]).catch(() => undefined);
             else {
-              await rawGit(u.cwd, ["rm", "-q", "--cached", "--ignore-unmatch", "--", f]);
+              await git.untrack(u.cwd, [f]).catch(() => undefined);
               safeUnlink(src);
             }
             if (dest) moved.push({ from: f, to: relative(u.cwd, dest) });

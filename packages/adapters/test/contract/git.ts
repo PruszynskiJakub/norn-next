@@ -5,11 +5,12 @@
  * conflict markers (H1), outgoing conflict markers (BS5.2), the base merge commit (BS5), diffStat
  * and fast-forward, and the reads the runtime makes (4.1): remotes, commonDir, hasRef, hasPath,
  * show, lsTree, listRefs over several prefixes, firstParentLog, revList, quiet fetch, detached
- * worktrees and prune. Run against real temp repos with a bare remote. Not covered: rebase, log ranges
+ * worktrees and prune, and what the commands call (4.2): version, remoteBranches, changedPaths,
+ * checkoutPaths and untrack. Run against real temp repos with a bare remote. Not covered: rebase, log ranges
  * beyond the last commit, and the port methods only the runtime's own wiring reaches.
  */
 import { afterAll, describe, expect } from "bun:test";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { GitPort } from "@norn/core";
@@ -37,7 +38,9 @@ export type GitContractTest =
   | "firstParentLog: first-parent commits with dates and one trailer (Q6, C4)"
   | "revList: first-parent and ancestry-path walks, limited and reversed"
   | "fetch: quiet or not; a missing remote branch fails and says so"
-  | "worktreeAddDetached checks out a detached HEAD; worktreePrune forgets removed directories";
+  | "worktreeAddDetached checks out a detached HEAD; worktreePrune forgets removed directories"
+  | "version names git; remoteBranches lists the remote's branches matching a pattern"
+  | "changedPaths lists what two revisions change; checkoutPaths and untrack put paths back";
 
 /** Deterministic git for the suite's own setup and for the port under test. */
 export const GIT_ENV = {
@@ -87,7 +90,7 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
     t("a clone: roots, status, revParse, default branch, last commit time", async () => {
       const { root, git } = repo();
       expect(await git.repoRoot(root)).toBe(root);
-      expect(await git.worktreeRoot(root)).toBe(root);
+      expect(await git.commonDir(root)).toBe(join(root, ".git"));
       expect(await git.status(root)).toMatchObject({ path: root, branch: "main", clean: true, staged: [], unstaged: [], untracked: [], upstream: "origin/main", ahead: 0, behind: 0, rebase_in_progress: false });
       expect(await git.revParse(root, "HEAD")).toBe(sh(root, "rev-parse", "HEAD"));
       expect(await git.revParse(root, "no-such-branch")).toBeNull();
@@ -142,7 +145,7 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       const { base, root, git } = repo();
       const wt = join(base, "wt");
       await git.worktreeAdd(root, wt, "gh-1-wt", { from: "main" });
-      expect(await git.worktreeRoot(wt)).toBe(wt);
+      expect(await git.status(wt)).toMatchObject({ path: wt, branch: "gh-1-wt" });
       expect(await git.repoRoot(wt)).toBe(root);
       expect((await git.worktreeList(root)).find((w) => w.path === wt)).toMatchObject({ branch: "gh-1-wt", head: sh(root, "rev-parse", "main"), locked: false, prunable: false });
       await git.worktreeRemove(root, wt);
@@ -412,6 +415,29 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       expect((await git.worktreeList(root)).find((w) => w.path === wt)?.prunable).toBe(true);
       await git.worktreePrune(root);
       expect((await git.worktreeList(root)).map((w) => w.path)).toEqual([root]);
+    });
+
+    t("version names git; remoteBranches lists the remote's branches matching a pattern", async () => {
+      const { base, root, git } = repo();
+      expect(await git.version(root)).toMatch(/^git version \d+\.\d+/);
+      sh(root, "push", "-q", "origin", "main:refs/heads/gh-4-one", "main:refs/heads/gh-4/01-a", "main:refs/heads/gh-40-x");
+      expect(await git.remoteBranches(root, "origin", "refs/heads/gh-4-*")).toEqual(["gh-4-one"]);
+      expect(await git.remoteBranches(root, "origin", "refs/heads/gh-5-*")).toEqual([]);
+      const err = await git.remoteBranches(root, join(base, "nowhere.git"), "refs/heads/*").then(() => null, (e: unknown) => e as Error);
+      expect(err?.message).toMatch(/ls-remote/);
+    });
+
+    t("changedPaths lists what two revisions change; checkoutPaths and untrack put paths back", async () => {
+      const { root, git } = repo();
+      const from = sh(root, "rev-parse", "HEAD");
+      writeFileSync(join(root, "new file.txt"), "x\n");
+      commitFile(root, "a.txt", "changed\n", "two");
+      expect((await git.changedPaths(root, from, "HEAD")).sort()).toEqual(["a.txt", "new file.txt"]);
+      await git.checkoutPaths(root, from, ["a.txt"]);
+      expect(readFileSync(join(root, "a.txt"), "utf8")).toBe("one\n");
+      await git.untrack(root, ["new file.txt", "not-tracked.txt"]);
+      expect(sh(root, "ls-files", "--", "new file.txt")).toBe("");
+      expect(readFileSync(join(root, "new file.txt"), "utf8")).toBe("x\n");
     });
   });
 }

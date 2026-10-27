@@ -10,7 +10,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { checkReport, cursorStep, enteringReceipt, reportableOutcomes, unverifiedNeeds, verdictCounts } from "@norn/core";
 import { type AgentStep, type CriterionVerdict, type Finding, type Note, type ReceiptOf, ulid, validate } from "@norn/schema";
-import { appendTrace, ensureEvidenceDir, git as rawGit } from "@norn/store";
+import { appendTrace, ensureEvidenceDir } from "@norn/store";
 import { defineCommand, type ParsedArgs, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, usageError } from "../output.ts";
@@ -120,8 +120,8 @@ async function verifyBaseMerge(ctx: Context, s: UnitSession, base: NonNullable<R
     throw refuse(`${short} (the base) is not merged into the story branch: HEAD ${head?.slice(0, 12) ?? "?"} does not contain it`, `git merge --no-ff ${base.sha}, resolve, commit, then report again`, "merge_unfinished");
   const merge = await git.baseMergeCommit(cwd, base.sha, head);
   // the files the merge touched on the story side, and every fix-up after it
-  const changed = merge ? await rawGit(cwd, ["diff", "--name-only", "-z", `${merge}^1`, head, "--"]) : null;
-  const paths = [...new Set([...base.conflicts, ...(changed?.code === 0 ? changed.stdout.split("\0").filter(Boolean) : [])])].sort();
+  const changed = merge ? await git.changedPaths(cwd, `${merge}^1`, head).catch(() => []) : [];
+  const paths = [...new Set([...base.conflicts, ...changed])].sort();
   const markers = [...(await git.conflictMarkers(cwd, { paths, rev: "HEAD" })), ...(await git.conflictMarkers(cwd, { paths }))];
   if (markers.length) {
     const where = [...new Set(markers.map((m) => `${m.path}:${m.line}`))];
