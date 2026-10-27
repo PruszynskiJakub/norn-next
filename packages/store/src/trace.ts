@@ -71,6 +71,7 @@ export function eventMatchesUnit(ev: TraceEvent, unit: string): boolean {
     case "tick.start":
       return ev.decisions.some((d) => unitMatches(decisionUnit(d), unit));
     case "tick.end":
+    case "local_file":
       return false;
     case "hook":
       return unitMatches(ev.fact.slice ?? ev.fact.story, unit) || ev.fact.story === unit;

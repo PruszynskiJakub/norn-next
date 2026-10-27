@@ -13,6 +13,7 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 - An answer to a parked run on a runner that resumes sessions (headless) no longer waits as "max_agents in use" because of the run's own agent lease. The answered run already holds that lease, so, as a nudge resume already did, it does not count against `max_agents` (K1).
 - A git step whose outcome uses up its counter (an `integrate` conflict past `conflict_loop`'s max) records `$stuck` as the route in its classify receipt, where the unit actually goes, instead of the edge's target (`merge`). `norn why`, the trace and the boundary commit now name the real route (W4).
 - A tick or integrate lock, or a lease, whose holder is a zombie process is reclaimed. norn's own liveness check counted a zombie as alive (the process adapter already did not), so a crashed tick that left a zombie held the tick lock until the zombie was reaped. Both now read the same `ps` parser, where a zombie is dead (K3, H1).
+- norn's machine-local files in `.agents/norn/trace/` (`remote.json`, `records.json`, `notified.json`, `foreign.json`, `inbox.json`, `heartbeat.json`, `failures.json`, `base.json`, `pr.json`, `cockpit.json` and the lock files) are validated when read. A file of the wrong shape reads as empty and leaves a `local_file` trace event naming it, and the next write replaces it; before, it was used as it was, so a string `attempted_at` in `remote.json` stopped remote syncs for good. Their schemas are published as `local-*.schema.json` (S2).
 
 ## [0.7.1] - 2026-10-26
 

@@ -4,7 +4,7 @@
  * (T8: acquired for this heartbeat when free) or through the mailbox when another heartbeat
  * holds it (T9). Views read through @norn/view only (X1).
  */
-import { isAbsolute, join, relative } from "node:path";
+import { isAbsolute, relative } from "node:path";
 import type { StoryFacts, UnitFacts } from "@norn/core";
 import { loadProjectView, type ProjectView } from "@norn/view";
 import {
@@ -30,8 +30,7 @@ import {
   parseWorkflowText,
   postMailbox,
   readClaim,
-  readText,
-  traceDir,
+  readHeartbeatFile,
 } from "@norn/store";
 import type { Context } from "../context.ts";
 import { claimHeld, failure, refuse, usageError } from "../output.ts";
@@ -54,13 +53,9 @@ export function parseUnitKey(raw: string): { key: string; story: string; slice: 
 
 // ------------------------------------------------------------------ views (X1)
 
+/** This checkout's heartbeat_id as recorded (S2: validated through store), null when none yet. */
 function readHeartbeat(root: string): string | null {
-  try {
-    const v = JSON.parse(readText(join(traceDir(root), "heartbeat.json")) ?? "null") as { heartbeat_id?: string } | null;
-    return v?.heartbeat_id ?? null;
-  } catch {
-    return null;
-  }
+  return readHeartbeatFile(root).heartbeat_id ?? null;
 }
 
 /** The read model for this checkout and machine (no writes, no network). */
