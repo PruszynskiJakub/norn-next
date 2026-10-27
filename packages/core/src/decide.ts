@@ -31,7 +31,7 @@ import {
   type Workflow,
 } from "@norn/schema";
 import type { Action, AgentLaunch, BoundaryCommit, Decision, NewReceipt, RunGitAction, SessionInput, UpdateStoryMirrorAction, WorktreeSpec } from "./actions.ts";
-import { type ApplyResult, applyReceipts, initialState } from "./apply.ts";
+import { type ApplyResult, applyReceipts, initialState, routeOf } from "./apply.ts";
 import { AUTO_PROMPT, NUDGE_TEXT, sliceWorktreePath, storyWorktreePath } from "./commands.ts";
 import type { Facts, NumberedReceipt, RunFacts, SliceFileFacts, StoryFacts, UnitFacts, UnitRef } from "./facts.ts";
 import { sha256 } from "./hash.ts";
@@ -452,6 +452,69 @@ function applyCtx(ctx: Ctx, wf: Workflow) {
   return { workflow: wf, now: ctx.nowIso, limits: ctx.config.limits, tick_id: ctx.facts.tick_id };
 }
 
+/** The receipt header fields `nornReceipt` fills in; `run_id`, `by` and `who` may be overridden. */
+type ReceiptHeader = "kind" | "receipt_id" | "run_id" | "step" | "attempt" | "at" | "by" | "who" | "tick_id";
+
+/**
+ * A receipt norn writes this tick at the unit's cursor (P6): its id derived from the tick
+ * (`ctx.id()`, so `norn why` replays it), at `facts.now`, by norn on this machine, no run unless
+ * `fields` names one. `fields` may also set `by`/`who` (R6.1: an answer recorded for the agent).
+ */
+function nornReceipt<K extends Receipt["kind"]>(
+  ctx: Ctx,
+  st: UnitState,
+  kind: K,
+  fields: Omit<ReceiptOf<K>, ReceiptHeader> & Partial<Pick<Receipt, "run_id" | "by" | "who">>,
+): ReceiptOf<K> {
+  return {
+    kind,
+    receipt_id: ctx.id(),
+    run_id: null,
+    step: st.step,
+    attempt: st.attempt,
+    at: ctx.nowIso,
+    by: "norn",
+    who: ctx.facts.machine.holder,
+    tick_id: ctx.facts.tick_id,
+    ...fields,
+  } as ReceiptOf<K>;
+}
+
+/**
+ * S6: apply `receipt`, numbered `n`, in memory after `prior` (unapplied receipts, R5.2) — the
+ * state the act commits once the receipt is written. `nr` is the receipt as the action carries it.
+ */
+function synth(ctx: Ctx, st: UnitState, wf: Workflow, n: number, receipt: Receipt, prior: readonly NumberedReceipt[] = []): { nr: NewReceipt; res: ApplyResult } {
+  return { nr: { n, receipt }, res: applyReceipts(st, [...prior, { n, file: "", receipt }], applyCtx(ctx, wf)) };
+}
+
+/** An `apply_receipts` action for `res` (C2, S5): the receipts written this tick, the state, the boundary commit. */
+function emitApplied(
+  ctx: Ctx,
+  story: StoryFacts,
+  uf: UnitFacts,
+  rule: string,
+  res: ApplyResult,
+  receipts: NewReceipt[],
+  commit: { message: string; step: string },
+  o: { input?: SessionInput | null; launch?: AgentLaunch | null; kill?: SessionRef | null; state?: UnitState } = {},
+): void {
+  ctx.emit({
+    kind: "apply_receipts",
+    unit: uf.unit,
+    rule,
+    applied: res.applied,
+    rejected: res.rejected,
+    advance: res.advance,
+    input: o.input ?? null,
+    launch: o.launch ?? null,
+    kill: o.kill ?? null,
+    receipts,
+    state: o.state ?? res.state,
+    commit: commitFor(ctx, story, uf, commit.message, commit.step),
+  });
+}
+
 function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean): void {
   const ref = uf.unit;
   if (uf.errors.length) {
@@ -585,20 +648,8 @@ function applyAction(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
   });
   const kill = moved && st.run?.session && state.run?.run_id !== st.run.run_id ? sessionRef(st.run) : null;
   const what = res.advance ? `${res.advance.from}.${res.advance.outcome} → ${res.advance.to}${res.advance.reset ? ` (reset ${res.advance.reset.join(", ")})` : ""}` : (res.log.at(-1) ?? "receipts");
-  ctx.emit({
-    kind: "apply_receipts",
-    unit: uf.unit,
-    rule: !res.applied.length ? "receipts.reject" : launch ? `${rule}.resume` : rule,
-    applied: res.applied,
-    rejected: res.rejected,
-    advance: res.advance,
-    input,
-    launch,
-    kill,
-    receipts: extra,
-    state,
-    commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${what}`, st.step),
-  });
+  const applied = !res.applied.length ? "receipts.reject" : launch ? `${rule}.resume` : rule;
+  emitApplied(ctx, story, uf, applied, res, extra, { message: `norn: ${uf.unit.key} ${what}`, step: st.step }, { input, launch, kill, state });
 }
 
 function sessionRef(run: NonNullable<UnitState["run"]>): SessionRef {
@@ -676,23 +727,15 @@ function launchFor(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, st
 
 function startedReceipt(ctx: Ctx, st: UnitState, step: AgentStep, run_id: string, worktree: string, retry: boolean): ReceiptOf<"started"> {
   const agent = step.agent ?? ctx.config.default_agent;
-  const r: ReceiptOf<"started"> = {
-    kind: "started",
-    receipt_id: ctx.id(),
+  const r = nornReceipt(ctx, st, "started", {
     run_id,
-    step: st.step,
-    attempt: st.attempt,
-    at: ctx.nowIso,
-    by: "norn",
-    who: ctx.facts.machine.holder,
-    tick_id: ctx.facts.tick_id,
     how: "auto",
     agent,
     worktree,
     // R7.1: where and by whom the run was launched (liveness is judged on that machine only, R7.2)
     machine: ctx.facts.machine.holder,
     heartbeat_id: ctx.heartbeat,
-  };
+  });
   const model = step.model ?? ctx.config.agents[agent]?.model;
   if (model) r.model = model;
   if (retry) r.retry = true;
@@ -713,15 +756,14 @@ function startRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf:
   ctx.agentsFree--;
   const run_id = ctx.id();
   const receipt = startedReceipt(ctx, st, step, run_id, cwd, st.retries_used > 0);
-  const n = nextReceiptNumber(uf);
-  const res = applyReceipts(st, [{ n, file: "", receipt }], applyCtx(ctx, wf));
+  const { nr, res } = synth(ctx, st, wf, nextReceiptNumber(uf), receipt);
   ctx.emit({
     kind: "start_run",
     unit: ref,
     rule: st.retries_used > 0 ? "agent.start.retry" : "agent.start",
     step: st.step,
     launch: launchFor(ctx, story, uf, st, step, run_id, cwd),
-    receipts: [{ n, receipt }],
+    receipts: [nr],
     state: res.state,
     // R2.1 (N6): the started receipts reach the record in the launch tick, not by a recover.commit
     commit: commitFor(ctx, story, uf, `norn: ${ref.key} ${st.step} started (run ${run_id})`, st.step),
@@ -781,10 +823,10 @@ function resumeLaunch(
     ctx.agentsFree--;
   }
   const started: ReceiptOf<"started"> = { ...startedReceipt(ctx, st, step, run.run_id, o.cwd, false), agent_session_id: o.resumeId, ...(run.agent ? { agent: run.agent } : {}) };
-  const state = applyReceipts(st, [{ n: o.n, file: "", receipt: started }], applyCtx(ctx, wf)).state;
+  const { nr, res } = synth(ctx, st, wf, o.n, started);
   const launch: AgentLaunch = { ...launchFor(ctx, story, uf, st, step, run.run_id, o.cwd), prompt: o.prompt, resume: o.resumeId };
   if (run.agent) launch.agent = run.agent;
-  return { receipt: { n: o.n, receipt: started }, state, launch };
+  return { receipt: nr, state: res.state, launch };
 }
 
 /** §10 classification of a live agent run from facts (C1, C2, MO4). */
@@ -865,22 +907,9 @@ function routeOutcome(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st0: UnitState
   const run = st.run as NonNullable<UnitState["run"]>;
   const rf = uf.run?.run_id === run.run_id ? uf.run : null;
   const n = nextReceiptNumber(uf);
-  const receipt: ReceiptOf<"classify"> = {
-    kind: "classify",
-    receipt_id: ctx.id(),
-    run_id: run.run_id,
-    step: st.step,
-    attempt: st.attempt,
-    at: ctx.nowIso,
-    by: "norn",
-    who: ctx.facts.machine.holder,
-    tick_id: ctx.facts.tick_id,
-    outcome,
-    rule,
-    route: "park",
-  };
+  const receipt = nornReceipt(ctx, st, "classify", { run_id: run.run_id, outcome, rule, route: "park" });
   if (detail) receipt.detail = detail;
-  const applyWith = (r: ReceiptOf<"classify">) => applyReceipts(st0, [...prior, { n, file: "", receipt: r }], applyCtx(ctx, wf));
+  const applyWith = (r: ReceiptOf<"classify">) => synth(ctx, st0, wf, n, r, prior).res;
   let res = applyWith(receipt);
   const foreign = foreignRun(ctx, run);
   // R7.2: a session on another machine is never typed into or killed from here
@@ -896,7 +925,8 @@ function routeOutcome(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st0: UnitState
     receipt.route = "retry";
     res = applyWith(receipt);
   }
-  receipt.route = res.route ?? (res.advance?.to as Receipt["step"]) ?? (res.state.status === "stuck" ? "$stuck" : "park");
+  // §10, W4: the route is where applying the receipt sent the unit (an exhausted counter → $stuck)
+  receipt.route = routeOf(res) ?? "park";
   if (res.route === "nudge") receipt.counter = { name: "nudges", value: res.state.nudges_used, max: step.nudges ?? ctx.config.limits.nudges };
   if (res.route === "retry") receipt.counter = { name: "retries", value: res.state.retries_used, max: step.retries ?? ctx.config.limits.retries };
   const commit = commitFor(ctx, story, uf, `norn: ${ref.key} ${st.step} ${outcome} → ${receipt.route}`, st.step);
@@ -929,7 +959,7 @@ function routeOutcome(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st0: UnitState
       const run_id = ctx.id();
       const started = startedReceipt(ctx, state, step, run_id, cwd, true);
       receipts.push({ n: n + 1, receipt: started });
-      state = applyReceipts(state, [{ n: n + 1, file: "", receipt: started }], applyCtx(ctx, wf)).state;
+      state = synth(ctx, state, wf, n + 1, started).res.state;
       launch = launchFor(ctx, story, uf, state, step, run_id, cwd);
     }
     const retryRule = outcome === "died" ? `${rule}.retry` : `${rule}.retry.no_nudge`;
@@ -971,22 +1001,9 @@ function launchUnknown(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState
       if (rf.session.process) adopted.process = rf.session.process;
     }
     if (lu.agent_session_id) adopted.agent_session_id = lu.agent_session_id;
-    const res = applyReceipts(st, [...uf.unapplied, { n, file: "", receipt: adopted }], applyCtx(ctx, wf));
+    const { nr, res } = synth(ctx, st, wf, n, adopted, uf.unapplied);
     const found = rf.session ? `session ${rf.session.session_id}` : `${rf.hooks.length} hook fact(s)`;
-    return ctx.emit({
-      kind: "apply_receipts",
-      unit: ref,
-      rule: "run.adopt",
-      applied: res.applied,
-      rejected: res.rejected,
-      advance: res.advance,
-      input: null,
-      launch: null,
-      kill: null,
-      receipts: [{ n, receipt: adopted }],
-      state: res.state,
-      commit: commitFor(ctx, story, uf, `norn: ${ref.key} adopted run ${rf.run_id} (${found})`, st.step),
-    });
+    return emitApplied(ctx, story, uf, "run.adopt", res, [nr], { message: `norn: ${ref.key} adopted run ${rf.run_id} (${found})`, step: st.step });
   }
   const grace = 2 * parseDuration(ctx.config.watch_interval);
   if (ctx.facts.now - lu.at <= grace) return ctx.noop(ref, "run.launch_unknown.wait", `run ${rf.run_id} has a started receipt but no state; looking for it for 2 watch intervals (R5.1)`);
@@ -1006,25 +1023,12 @@ function implicitAsk(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
   const prompt = pane?.prompt;
   const question = prompt?.question || (pane ? "the agent waits for input in its pane" : null) || lastHook?.message || "the agent is waiting for input (permission prompt?)";
   const command = prompt?.command ?? firstLine(lastHook?.command);
-  const n = nextReceiptNumber(uf);
-  const receipt: ReceiptOf<"ask"> = {
-    kind: "ask",
-    receipt_id: ctx.id(),
-    run_id: st.run?.run_id ?? null,
-    step: st.step,
-    attempt: st.attempt,
-    at: ctx.nowIso,
-    by: "norn",
-    who: ctx.facts.machine.holder,
-    tick_id: ctx.facts.tick_id,
-    question,
-    implicit: true,
-  };
+  const receipt = nornReceipt(ctx, st, "ask", { run_id: st.run?.run_id ?? null, question, implicit: true });
   if (command) receipt.command = command;
   if (prompt?.options.length) receipt.options = prompt.options;
   if (prompt?.choice) receipt.choice = prompt.choice;
   if (pane?.detail) receipt.screen = pane.detail;
-  const res = applyReceipts(st, [{ n, file: "", receipt }], applyCtx(ctx, wf));
+  const { nr, res } = synth(ctx, st, wf, nextReceiptNumber(uf), receipt);
   const parkInfo = res.state.park ?? { kind: "ask" as const, reason: question, since: ctx.nowIso };
   ctx.emit({
     kind: "park",
@@ -1032,7 +1036,7 @@ function implicitAsk(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
     rule: "agent.ask.implicit",
     park: parkInfo,
     notify: unitItem(ctx, story, uf, res.state),
-    receipts: [{ n, receipt }],
+    receipts: [nr],
     state: res.state,
     commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${st.step} waits for input`, st.step),
   });
@@ -1062,36 +1066,11 @@ function implicitAskResolved(st: UnitState, uf: UnitFacts): string | null {
 /** R6.1: write the `answer` receipt (`by: "agent"`) that ends an implicit ask; the run goes on, nothing is typed. */
 function resolveImplicitAsk(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, why: string): void {
   const run = st.run as NonNullable<UnitState["run"]>;
-  const n = nextReceiptNumber(uf);
-  const answer: ReceiptOf<"answer"> = {
-    kind: "answer",
-    receipt_id: ctx.id(),
-    run_id: run.run_id,
-    step: st.step,
-    attempt: st.attempt,
-    at: ctx.nowIso,
-    by: "agent",
-    who: run.agent ?? ctx.config.default_agent,
-    tick_id: ctx.facts.tick_id,
-    answer: `the agent moved on: ${why}`,
-  };
+  const answer = nornReceipt(ctx, st, "answer", { run_id: run.run_id, by: "agent", who: run.agent ?? ctx.config.default_agent, answer: `the agent moved on: ${why}` });
   if (st.park?.receipt_id) answer.ask_receipt_id = st.park.receipt_id;
   if (uf.unit.slice) answer.slice = uf.unit.slice;
-  const res = applyReceipts(st, [{ n, file: "", receipt: answer }], applyCtx(ctx, wf));
-  ctx.emit({
-    kind: "apply_receipts",
-    unit: uf.unit,
-    rule: "agent.ask.implicit.resolved",
-    applied: res.applied,
-    rejected: res.rejected,
-    advance: res.advance,
-    input: null,
-    launch: null,
-    kill: null,
-    receipts: [{ n, receipt: answer }],
-    state: res.state,
-    commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${st.step} moved on (${why})`, st.step),
-  });
+  const { nr, res } = synth(ctx, st, wf, nextReceiptNumber(uf), answer);
+  emitApplied(ctx, story, uf, "agent.ask.implicit.resolved", res, [nr], { message: `norn: ${uf.unit.key} ${st.step} moved on (${why})`, step: st.step });
 }
 
 /** R9.1: how long a started session may go without taking its launch prompt, before a re-send and again before `silent`. */
@@ -1221,25 +1200,10 @@ function classifyNorn(
   detail: string,
   extra: { receiptRule?: string; base?: NonNullable<ReceiptOf<"classify">["base"]> } = {},
 ): void {
-  const n = nextReceiptNumber(uf);
-  const receipt: ReceiptOf<"classify"> = {
-    kind: "classify",
-    receipt_id: ctx.id(),
-    run_id: null,
-    step: st.step,
-    attempt: st.attempt,
-    at: ctx.nowIso,
-    by: "norn",
-    who: ctx.facts.machine.holder,
-    tick_id: ctx.facts.tick_id,
-    outcome,
-    rule: extra.receiptRule ?? rule,
-    detail,
-    route: "park",
-    ...(extra.base ? { base: extra.base } : {}),
-  };
-  const res: ApplyResult = applyReceipts(st, [{ n, file: "", receipt }], applyCtx(ctx, wf));
-  receipt.route = (res.advance?.to as Receipt["step"]) ?? (res.state.status === "stuck" ? "$stuck" : "park");
+  const receipt = nornReceipt(ctx, st, "classify", { outcome, rule: extra.receiptRule ?? rule, detail, route: "park", ...(extra.base ? { base: extra.base } : {}) });
+  const { nr, res } = synth(ctx, st, wf, nextReceiptNumber(uf), receipt);
+  // §10, W4: the route is where applying the receipt sent the unit
+  receipt.route = routeOf(res) ?? "park";
   ctx.emit({
     kind: "classify",
     unit: uf.unit,
@@ -1247,7 +1211,7 @@ function classifyNorn(
     outcome,
     kill: null,
     snapshot: null,
-    receipts: [{ n, receipt }],
+    receipts: [nr],
     state: res.state,
     commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${st.step} ${outcome} → ${receipt.route}`, st.step),
   });
@@ -1268,34 +1232,9 @@ function slicesCanResume(story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Wo
 
 /** §10, O2: norn unsticks the story back into its slices step, as `norn unstick <story>` would. */
 function resumeSlices(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow): void {
-  const n = nextReceiptNumber(uf);
-  const unstick: ReceiptOf<"unstick"> = {
-    kind: "unstick",
-    receipt_id: ctx.id(),
-    run_id: null,
-    step: st.step,
-    attempt: st.attempt,
-    at: ctx.nowIso,
-    by: "norn",
-    who: ctx.facts.machine.holder,
-    tick_id: ctx.facts.tick_id,
-    comment: "a slice can move again",
-  };
-  const res = applyReceipts(st, [{ n, file: "", receipt: unstick }], applyCtx(ctx, wf));
-  ctx.emit({
-    kind: "apply_receipts",
-    unit: uf.unit,
-    rule: "slices.resume",
-    applied: res.applied,
-    rejected: res.rejected,
-    advance: res.advance,
-    input: null,
-    launch: null,
-    kill: null,
-    receipts: [{ n, receipt: unstick }],
-    state: res.state,
-    commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${st.step} resumed (a slice can move again)`, st.step),
-  });
+  const unstick = nornReceipt(ctx, st, "unstick", { comment: "a slice can move again" });
+  const { nr, res } = synth(ctx, st, wf, nextReceiptNumber(uf), unstick);
+  emitApplied(ctx, story, uf, "slices.resume", res, [nr], { message: `norn: ${uf.unit.key} ${st.step} resumed (a slice can move again)`, step: st.step });
 }
 
 /** The story's slice files (dropped ones aside) and how far each has come. */
