@@ -14,12 +14,13 @@ import { createHarness, type Harness, issue } from "./harness.ts";
 
 setDefaultTimeout(30_000);
 
-/** Apply moves the way Herdr's `workspace.move` does: take the workspace out, insert it at the index. */
+/** Apply moves the way Herdr's `workspace.move` does: `index` is a gap in the order with the workspace still in it. */
 function apply(order: string[], moves: Array<{ workspace_id: string; index: number }>): string[] {
   const now = [...order];
   for (const m of moves) {
-    now.splice(now.indexOf(m.workspace_id), 1);
-    now.splice(m.index, 0, m.workspace_id);
+    const from = now.indexOf(m.workspace_id);
+    now.splice(from, 1);
+    now.splice(m.index > from ? m.index - 1 : m.index, 0, m.workspace_id);
   }
   return now;
 }
@@ -32,6 +33,8 @@ describe("planWorkspaceMoves", () => {
     expect(moves.every((m) => m.workspace_id.startsWith("o"))).toBe(true);
     expect(planWorkspaceMoves(apply(order, moves), ["o1", "o2", "o3"], new Set(["o3"]))).toEqual([]);
     expect(planWorkspaceMoves(order, [], new Set())).toEqual([]);
+    // as recorded on herdr 0.9.5: [w5X w5Y w5Z], w5Z needs you → moves to the front of the three
+    expect(apply(["w5X", "w5Y", "w5Z"], planWorkspaceMoves(["w5X", "w5Y", "w5Z"], ["w5X", "w5Y", "w5Z"], new Set(["w5Z"])))).toEqual(["w5Z", "w5X", "w5Y"]);
   });
 
   test("holds for any order (random)", () => {

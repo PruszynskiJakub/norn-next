@@ -30,9 +30,13 @@ export function nornEntry(): string[] {
 /** The shim's directory under norn's machine home (`~/.norn/bin`). */
 export const shimDir = (home: string) => join(home, "bin");
 
-/** Write `<home>/bin/norn` → `entry` (atomic, S1; rewritten only when it changes). Returns its path. */
-export function ensureShim(home: string, entry: string[] = nornEntry()): string {
-  const path = join(shimDir(home), "norn");
+/**
+ * Write `<dir>/norn` → `entry` (atomic, S1; rewritten only when it changes). Returns its path. `dir`
+ * defaults to the launch shim's `<home>/bin`; orient agents get their own, so opening one never
+ * changes the norn that launched agents' hooks call.
+ */
+export function ensureShim(home: string, entry: string[] = nornEntry(), dir: string = shimDir(home)): string {
+  const path = join(dir, "norn");
   const text = `#!/bin/sh\n# norn-owned: runs the norn that launched this agent (R8.1)\nexec ${proc.shellJoin(entry)} "$@"\n`;
   if (!existsSync(path) || readFileSync(path, "utf8") !== text) atomicWrite(path, text, 0o755);
   return path;

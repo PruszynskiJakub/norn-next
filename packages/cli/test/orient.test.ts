@@ -3,6 +3,7 @@
  * the story's orient workspace in Herdr; the orient agent (`NORN_ORIENT=1`) is no run of the unit.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { readTrace } from "@norn/store";
 import type { OrientReport } from "@norn/view";
@@ -52,9 +53,17 @@ describe("norn orient", () => {
     const h = fakeHerdr();
     const opened = await runCli(["orient", "gh-5", "--open", "--json"], { ...c.deps, herdr: h.cockpit });
     expect(opened.value).toMatchObject({ story: "gh-5", opened: true, created: true, workspace_id: "w9" });
-    expect(h.calls).toEqual([expect.stringMatching(new RegExp(`^open workspace ${wt()} gh-5 orient focus ${c.home}/launch/[0-9a-f]{16}\\.sh env NORN_ORIENT=1 claude --permission-mode auto -- 'Run \`norn orient gh-5\` and follow it\\.'$`))]);
+    expect(h.calls).toEqual([expect.stringMatching(new RegExp(`^open workspace ${wt()} gh-5 orient focus ${c.home}/orient/launch/[0-9a-f]{16}\\.sh env NORN_ORIENT=1 claude --permission-mode auto -- 'Run \`norn orient gh-5\` and follow it\\.'$`))]);
 
-    const again = fakeHerdr([], [{ workspace_id: "w4", label: "gh-5 orient", pane_ids: ["w4:p1"], cwds: [wt()] }]);
+    // the picker's popup sits in the workspace it covers, its cwd the plugin folder; another repo's gh-5 is not ours
+    // its own shim: the launch shim the launched agents' hooks share is untouched
+    expect(existsSync(join(c.home, "orient", "bin", "norn"))).toBe(true);
+    expect(existsSync(join(c.home, "bin", "norn"))).toBe(false);
+
+    const again = fakeHerdr([], [
+      { workspace_id: "w3", label: "gh-5 orient", pane_ids: ["w3:p1"], cwds: ["/other-worktrees/gh-5-x"] },
+      { workspace_id: "w4", label: "gh-5 orient", pane_ids: ["w4:p1", "w4:p2"], cwds: [wt(), "/plugins/herdr"] },
+    ]);
     const focused = await runCli(["orient", "gh-5", "--open", "--json"], { ...c.deps, herdr: again.cockpit });
     expect(focused.value).toEqual({ story: "gh-5", opened: true, created: false, workspace_id: "w4" });
     expect(again.calls).toEqual(["focus workspace w4"]);
