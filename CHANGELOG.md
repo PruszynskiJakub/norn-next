@@ -13,7 +13,8 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
   - Notes are bullets with a hanging indent, under each unit.
   - A gate's detail and full text no longer repeat the open notes.
   - The list takes about 40% of the width, so the preview gets more of it.
-  - ⌃d and ⌃u scroll the preview when it does not fit.
+  - ⌃d and ⌃u scroll the preview when it does not fit, and so does the mouse wheel over it. Over the list, the wheel moves the selection.
+- The cockpit draws on the terminal's alternate screen, so its frames no longer fill the pane's scrollback. The terminal is restored when it ends, SIGINT and SIGTERM included.
 
 ## [0.9.0] - 2026-10-27
 
