@@ -156,8 +156,8 @@ export interface GitPort {
   commonDir(cwd: string): Promise<string>;
   /** Names of the repo's remotes (`git remote`). */
   remotes(cwd: string): Promise<string[]>;
-  /** Top-level of the worktree containing cwd. */
-  worktreeRoot(cwd: string): Promise<string>;
+  /** The `git --version` line (`git version 2.50.1`); null when git cannot be run. */
+  version(cwd: string): Promise<string | null>;
   status(cwd: string): Promise<WorktreeStatus>;
   revParse(cwd: string, rev: string): Promise<string | null>;
   defaultBranch(cwd: string, remote: string): Promise<string>;
@@ -181,6 +181,12 @@ export interface GitPort {
   hasPath(cwd: string, rev: string, path: string): Promise<boolean>;
   /** Entry names of the directory `path` in `rev` (`git ls-tree --name-only`); null when it is not a directory there. */
   lsTree(cwd: string, rev: string, path: string): Promise<string[] | null>;
+  /** Paths that differ between `from` and `to` (`git diff --name-only -z <from> <to> --`). */
+  changedPaths(cwd: string, from: string, to: string): Promise<string[]>;
+  /** Put `paths` in the work tree and index back to their version in `rev` (`git checkout <rev> -- <paths>`). */
+  checkoutPaths(cwd: string, rev: string, paths: string[]): Promise<void>;
+  /** Stop tracking `paths`, leaving the files (`git rm -q --cached --ignore-unmatch -- <paths>`). */
+  untrack(cwd: string, paths: string[]): Promise<void>;
 
   branchExists(cwd: string, branch: string, where?: "local" | "remote", remote?: string): Promise<boolean>;
   createBranch(cwd: string, branch: string, from: string): Promise<void>;
@@ -249,10 +255,8 @@ export interface GitPort {
   hasRef(cwd: string, ref: string): Promise<boolean>;
   /** Refs under any of the prefixes (one `git for-each-ref`). */
   listRefs(cwd: string, prefix: string | readonly string[]): Promise<Array<{ ref: string; sha: string }>>;
-  /** Remote refs under prefix (`git ls-remote`). */
-  listRemoteRefs(cwd: string, remote: string, prefix: string): Promise<Array<{ ref: string; sha: string }>>;
-  readBlob(cwd: string, sha: string): Promise<string>;
-  writeBlob(cwd: string, content: string): Promise<string>;
+  /** Names of the branches on `remote` whose ref matches `pattern` (`git ls-remote --heads <remote> <pattern>`, e.g. `refs/heads/gh-7-*`). */
+  remoteBranches(cwd: string, remote: string, pattern: string): Promise<string[]>;
   updateRef(cwd: string, update: RefUpdate): Promise<boolean>;
   /** Push one ref with CAS (`--force-with-lease=<ref>:<expected>`, T3); sha null deletes. */
   pushRef(cwd: string, remote: string, update: RefUpdate): Promise<PushResult>;

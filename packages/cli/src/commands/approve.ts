@@ -5,7 +5,6 @@
  */
 import { nextCommand, stepOf } from "@norn/core";
 import { isGitSha, type UnitState } from "@norn/schema";
-import { git as rawGit } from "@norn/store";
 import type { Context } from "../context.ts";
 import { defineCommand, opt } from "../command.ts";
 import { refuse } from "../output.ts";
@@ -30,8 +29,8 @@ async function unitHead(ctx: Context, t: Target): Promise<string | null> {
   const branch = sf?.branch;
   if (!branch) return null;
   for (const ref of [`refs/heads/${branch}`, `refs/remotes/${ctx.config.remote.git_remote}/${branch}`]) {
-    const r = await rawGit(ctx.root, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]);
-    if (r.code === 0) return r.stdout.trim();
+    const sha = await ctx.git.revParse(ctx.root, `${ref}^{commit}`);
+    if (sha) return sha;
   }
   return null;
 }

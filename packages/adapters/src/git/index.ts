@@ -224,7 +224,10 @@ export function createGit(opts: GitOptions = {}): GitPort {
         .map((l) => l.trim())
         .filter((l) => l.length > 0);
     },
-    worktreeRoot,
+    async version(cwd) {
+      const r = await run(cwd, ["--version"]).catch(() => null);
+      return r && r.code === 0 ? r.stdout.trim() : null;
+    },
     async status(cwd) {
       const root = await worktreeRoot(cwd);
       const out = await must(cwd, ["status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all"]);
@@ -288,6 +291,15 @@ export function createGit(opts: GitOptions = {}): GitPort {
     async lsTree(cwd, rev, path) {
       const r = await run(cwd, ["ls-tree", "--name-only", `${rev}:${path}`]);
       return r.code === 0 ? lines(r.stdout) : null;
+    },
+    async changedPaths(cwd, from, to) {
+      return (await must(cwd, ["diff", "--name-only", "-z", from, to, "--"])).split("\0").filter(Boolean);
+    },
+    async checkoutPaths(cwd, rev, paths) {
+      await must(cwd, ["checkout", rev, "--", ...paths]);
+    },
+    async untrack(cwd, paths) {
+      await must(cwd, ["rm", "-q", "--cached", "--ignore-unmatch", "--", ...paths]);
     },
 
     async branchExists(cwd, branch, where = "local", remote = "origin") {
@@ -491,18 +503,11 @@ export function createGit(opts: GitOptions = {}): GitPort {
         })
         .filter((r) => prefixes.some((p) => r.ref.startsWith(p)));
     },
-    async listRemoteRefs(cwd, remote, prefix) {
-      const out = okOrThrow(await run(cwd, ["ls-remote", "--refs", remote]), "git ls-remote", "git");
+    async remoteBranches(cwd, remote, pattern) {
+      const out = okOrThrow(await run(cwd, ["ls-remote", "--heads", remote, pattern]), "git ls-remote", "git");
       return lines(out)
-        .map((l) => {
-          const [sha, ref] = l.split("\t");
-          return { ref: ref as string, sha: sha as string };
-        })
-        .filter((r) => r.ref.startsWith(prefix));
-    },
-    readBlob: (cwd, sha) => must(cwd, ["cat-file", "blob", sha]),
-    async writeBlob(cwd, content) {
-      return (await must(cwd, ["hash-object", "-w", "--stdin"], content)).trim();
+        .map((l) => l.split("\t")[1]?.replace(/^refs\/heads\//, "") ?? "")
+        .filter((n) => n.length > 0);
     },
     async updateRef(cwd, u: RefUpdate) {
       const args = u.sha === null ? ["update-ref", "-d", u.ref] : ["update-ref", u.ref, u.sha];

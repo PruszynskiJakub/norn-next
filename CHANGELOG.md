@@ -6,6 +6,8 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ### Changed
 
+- **Breaking for third-party git adapters (X2).** `GitPort` (`packages/core/src/ports.ts`) is now every git call norn's commands and runtime make, so none of them run git around it. It gains `remotes`, `commonDir`, `show`, `lsTree`, `hasRef`, `hasPath`, `firstParentLog`, `revList`, `worktreeAddDetached`, `worktreePrune`, `version`, `remoteBranches`, `changedPaths`, `checkoutPaths` and `untrack`, `fetch` takes a `quiet` option and `listRefs` several prefixes; it drops `worktreeRoot`, `listRemoteRefs`, `readBlob` and `writeBlob`, which nothing called. `@norn/store` no longer exports its raw git plumbing (`git`, `gitSync`, `gitOk`, the blob and ref helpers); claim and mailbox refs stay behind its claim and mailbox functions.
+
 - `norn help` says up front that an agent doing a step runs only `brief`, `done`, `ask` and `stuck`, and that every other command is the person's, for an agent to run only when the person asks it to. `norn help <command>` says so for a person's command, `--json` gives each command a `for` (`person`, `agent`, `hooks`), and a new Skills section (`skills` in `--json`) marks each bundled skill as the protocol, a step the agent works alone, a step a person works with the agent, or a reference. The `norn` skill gains the same rule: a refusal, the brief or the inbox naming a command is not the person asking.
 
 ### Fixed

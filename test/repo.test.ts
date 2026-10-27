@@ -199,7 +199,7 @@ function countHits(re: RegExp, keep: (file: string) => boolean): Counts {
   return out;
 }
 
-/** Calls, in cli/src, of the raw `git` that @norn/store exports (imported as `rawGit` or `git`). */
+/** Imports and calls, in cli/src, of store's raw `git` (as `rawGit` or `git`). Store no longer exports it (4.2): the allowlist is empty and stays so. */
 function rawGitCalls(): Counts {
   const out: Counts = {};
   for (const f of SRC().filter((p) => p.startsWith("packages/cli/src/"))) {
@@ -225,13 +225,7 @@ const FS_WRITE_ALLOW: Counts = {
 };
 
 /** (b) raw git from store in cli: commands and runtime go through GitPort (4.1, 4.2). */
-const RAW_GIT_ALLOW: Counts = {
-  "packages/cli/src/commands/approve.ts": 1,
-  "packages/cli/src/commands/done.ts": 1,
-  "packages/cli/src/commands/take.ts": 3,
-  "packages/cli/src/commands/tidy.ts": 4,
-  "packages/cli/src/commands/watch.ts": 1,
-};
+const RAW_GIT_ALLOW: Counts = {};
 
 /**
  * (c) S2: every JSON read is validated against @norn/schema, through store. Each entry says what it

@@ -7,7 +7,6 @@ import {
   acquireClaim,
   appendReceipt,
   appendTrace,
-  gitOk,
   leasesDir,
   pinWorkflow,
   sha256,
@@ -87,7 +86,7 @@ const ASK = ulid(NOW - 40 * 60_000);
 async function seed() {
   const repo = tmp();
   const home = tmp();
-  await gitOk(repo, ["init", "-q", repo]);
+  Bun.spawnSync(["git", "init", "-q", repo], { cwd: repo });
   const spec = storyDir(repo, "gh-12", "fix-login");
   writeStoryFile(
     storyFile(spec),

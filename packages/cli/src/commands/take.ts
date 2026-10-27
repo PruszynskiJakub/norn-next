@@ -19,7 +19,6 @@ import {
   appendHandoffHeartbeat,
   appendReceipt,
   appendTrace,
-  git as rawGit,
   handoffPath,
   loadStory,
   newClaimBlob,
@@ -43,12 +42,9 @@ const storyBranchRe = (key: string) => new RegExp(`^${key}-[a-z0-9][a-z0-9-]*$`)
 async function findStoryBranch(ctx: Context, key: string, remote: string | null): Promise<string | null> {
   const re = storyBranchRe(key);
   if (remote) {
-    const r = await rawGit(ctx.root, ["ls-remote", "--heads", remote, `refs/heads/${key}-*`]);
-    if (r.code !== 0) throw failure(`cannot list ${remote} branches: ${r.stderr.trim()}`, "check the network and git credentials, then retry", "network");
-    const names = r.stdout
-      .split("\n")
-      .map((l) => l.split("\t")[1]?.replace(/^refs\/heads\//, "") ?? "")
-      .filter((n) => re.test(n));
+    const listed = await ctx.git.remoteBranches(ctx.root, remote, `refs/heads/${key}-*`).catch((e: unknown) => e as Error);
+    if (listed instanceof Error) throw failure(`cannot list ${remote} branches: ${listed.message}`, "check the network and git credentials, then retry", "network");
+    const names = listed.filter((n) => re.test(n));
     if (names.length) return names.sort()[0] as string;
   }
   const local = (await (await ctx.ports()).git.listRefs(ctx.root, "refs/heads/")).map((r) => r.ref.slice("refs/heads/".length)).filter((n) => re.test(n));
@@ -159,8 +155,10 @@ async function take(ctx: Context, key: string, force: boolean) {
   // ---- 2. branches → worktrees (T5, K4)
   const problems: string[] = [];
   if (remote) {
-    const f = await rawGit(root, ["fetch", "--quiet", "--no-tags", remote, `+refs/heads/${branch}:refs/remotes/${remote}/${branch}`, `+refs/heads/${key}/*:refs/remotes/${remote}/${key}/*`]);
-    if (f.code !== 0) throw failure(`fetch failed: ${f.stderr.trim()}`, `retry: norn take ${key} (the claim is held by you now)`, "network");
+    const f = await git
+      .fetch(root, remote, [`+refs/heads/${branch}:refs/remotes/${remote}/${branch}`, `+refs/heads/${key}/*:refs/remotes/${remote}/${key}/*`], { quiet: true })
+      .catch((e: unknown) => e as Error);
+    if (f instanceof Error) throw failure(`fetch failed: ${f.message}`, `retry: norn take ${key} (the claim is held by you now)`, "network");
   }
   const wtByBranch = new Map((await git.worktreeList(root)).filter((w) => w.branch).map((w) => [w.branch as string, w.path]));
   const equip = { root, home: ctx.home, config, now: nowIso, liveness: leaseLiveness((p) => ports.process.isAlive(p)) };
@@ -176,7 +174,7 @@ async function take(ctx: Context, key: string, force: boolean) {
     }
     let created = false;
     if (!existsSync(path)) {
-      if (existing) await rawGit(root, ["worktree", "prune"]);
+      if (existing) await git.worktreePrune(root).catch(() => undefined);
       await git.worktreeAdd(root, path, t.branch);
       created = true;
     }

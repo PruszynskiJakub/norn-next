@@ -58,7 +58,8 @@ beforeEach(async () => {
 describe("git adapter: repo and status", () => {
   test("roots, status, revParse, default branch, lastCommitTime", async () => {
     expect(await git.repoRoot(R.root)).toBe(R.root);
-    expect(await git.worktreeRoot(R.root)).toBe(R.root);
+    expect(await git.version(R.root)).toMatch(/^git version \d/);
+    expect(await createGit({ env: ENV, bin: join(R.base, "no-git") }).version(R.root)).toBeNull();
     const st = await git.status(R.root);
     expect(st).toMatchObject({ branch: "main", clean: true, upstream: "origin/main", ahead: 0, behind: 0, rebase_in_progress: false });
     writeFileSync(join(R.root, "a.txt"), "two\n");
@@ -76,7 +77,7 @@ describe("git adapter: repo and status", () => {
   });
 
   test("missing cwd yields a typed PortError", async () => {
-    const err = await git.worktreeRoot(join(R.base, "missing")).catch((e) => e);
+    const err = await git.commonDir(join(R.base, "missing")).catch((e) => e);
     expect(err.code).toMatch(/^git_/);
     expect(typeof err.retryable).toBe("boolean");
   });
@@ -93,7 +94,7 @@ describe("git adapter: branches, worktrees, commits", () => {
       [wt, "gh-1-story"],
     ]);
     expect(await git.repoRoot(wt)).toBe(R.root);
-    expect(await git.worktreeRoot(wt)).toBe(wt);
+    expect(await git.status(wt)).toMatchObject({ path: wt, branch: "gh-1-story" });
     await git.worktreeRemove(R.root, wt);
     expect((await git.worktreeList(R.root)).length).toBe(1);
     await git.createBranch(R.root, "gh-1/01-x", "main");
@@ -156,26 +157,27 @@ describe("git adapter: remote", () => {
 
   test("refs, blobs and CAS push (T2, T3)", async () => {
     const ref = "refs/norn/claims/gh-3";
-    const b1 = await git.writeBlob(R.root, '{"holder":"a"}');
-    expect(await git.readBlob(R.root, b1)).toBe('{"holder":"a"}');
+    const blob = async (content: string) => (await bunExec(["git", "hash-object", "-w", "--stdin"], { cwd: R.root, env: ENV, stdin: content })).stdout.trim();
+    const remoteRefs = async () => (await sh(R.root, "ls-remote", "--refs", "origin", "refs/norn/*")).split("\n").filter(Boolean).map((l) => l.split("\t")[1]);
+    const b1 = await blob('{"holder":"a"}');
     expect(await git.readRef(R.root, ref)).toBeNull();
     expect(await git.updateRef(R.root, { ref, sha: b1, expected: null })).toBe(true);
     expect(await git.updateRef(R.root, { ref, sha: b1, expected: null })).toBe(false); // must not exist
     expect(await git.listRefs(R.root, "refs/norn/claims/")).toEqual([{ ref, sha: b1 }]);
     // acquire on remote: must not exist
     expect(await git.pushRef(R.root, "origin", { ref, sha: b1, expected: null })).toEqual({ ok: true });
-    const other = await git.writeBlob(R.root, '{"holder":"b"}');
+    const other = await blob('{"holder":"b"}');
     const lost = await git.pushRef(R.root, "origin", { ref, sha: other, expected: null });
     expect(lost.ok === false && lost.reason).toBe("stale");
-    expect(await git.listRemoteRefs(R.root, "origin", "refs/norn/")).toEqual([{ ref, sha: b1 }]);
+    expect(await remoteRefs()).toEqual([ref]);
     // renew with CAS
-    const b2 = await git.writeBlob(R.root, '{"holder":"a","n":2}');
+    const b2 = await blob('{"holder":"a","n":2}');
     expect(await git.pushRef(R.root, "origin", { ref, sha: b2, expected: b1 })).toEqual({ ok: true });
     const stale = await git.pushRef(R.root, "origin", { ref, sha: other, expected: b1 });
     expect(stale.ok === false && stale.reason).toBe("stale");
     // unconditional and CAS delete
     expect(await git.pushRef(R.root, "origin", { ref, sha: null, expected: b2 })).toEqual({ ok: true });
-    expect(await git.listRemoteRefs(R.root, "origin", "refs/norn/")).toEqual([]);
+    expect(await remoteRefs()).toEqual([]);
     expect(await git.pushRef(R.root, "origin", { ref, sha: b1 })).toEqual({ ok: true });
     expect(await git.pushRef(R.root, "origin", { ref, sha: null })).toEqual({ ok: true });
     expect(await git.updateRef(R.root, { ref, sha: null, expected: b1 })).toBe(true);

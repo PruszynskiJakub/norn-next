@@ -6,7 +6,6 @@ import {
   classifyClaim,
   deleteMailbox,
   fetchNornRefs,
-  gitOk,
   listMailbox,
   postMailbox,
   readClaim,
@@ -14,6 +13,7 @@ import {
   releaseClaim,
   renewClaim,
 } from "../src/index.ts";
+import { gitOk } from "../src/git.ts";
 import { AT, tmp } from "./helpers.ts";
 
 async function setup() {
