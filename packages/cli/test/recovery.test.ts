@@ -186,6 +186,31 @@ describe("intake race and release (R3.1, R3.3)", () => {
     expect(readdirSync(join(h.dir, "home-repo-b", "leases"))).toEqual([]);
   });
 
+  test("R3.1: an intake commit is read off its trailers — a person's commit that only looks like one keeps the intake", async () => {
+    // B's intake is replaced by a person's commit with the same subject and no Norn-* trailers
+    const h2 = await createHarness();
+    try {
+      const A2 = wrap(h2.root, h2.deps);
+      await setup(h2, 11, "Add sorting");
+      const B2 = cloneOf(h2, "repo-b", "bob");
+      const branch = "gh-11-add-sorting";
+      expect(all(await A2.tick())).toEqual(["gh-11 remote.intake"]);
+      expect(all(await B2.tick())).toEqual(["gh-11 remote.intake"]);
+      const wt = `${B2.root}-worktrees/${branch}`;
+      const subject = sh(wt, ["log", "-1", "--format=%s"]);
+      expect(subject).toStartWith("norn: intake gh-11 ");
+      sh(wt, ["-c", "user.email=b@example.com", "-c", "user.name=B", "commit", "-q", "--amend", "--allow-empty", "-m", subject]);
+      h2.clock.advance(10_000);
+      expect(all(await A2.tick())).toEqual(["gh-11 claim.acquire.intake"]);
+      const r = await B2.tick();
+      expect(all(r)[0]).toMatch(/^gh-11 claim\.acquire\.intake FAILED held by tester@box/);
+      expect(existsSync(wt)).toBe(true);
+      expect(sh(B2.root, ["branch", "--list", branch])).toContain(branch);
+    } finally {
+      h2.cleanup();
+    }
+  });
+
   test("R3.3: release refuses a push that is not a fast-forward; the claim and the remote branch stay", async () => {
     step();
     expect(all(await A.tick())).toEqual(["gh-10 story.start"]);

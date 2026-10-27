@@ -26,6 +26,7 @@ import {
   type InboxItem,
   type InboxGroup,
   type NewReceipt,
+  nornTrailers,
   renderHandoffStatus,
   routeOf,
   type SessionRef,
@@ -277,11 +278,9 @@ export class Actor {
         return this.rejectReceipt(a);
       case "mark_corrupt": {
         const loc = this.obs.units[a.unit.key];
-        // only a unit's own runs/ files mark its state corrupt; a broken story.md is surfaced, never written into state (S2)
-        const ownFiles = a.errors.length > 0 && a.errors.every((e) => e.file.includes(`/runs/${a.unit.dir}/`));
-        const stateBroken = a.errors.some((e) => e.file.endsWith("state.json"));
+        // S2: decide says whether the state is marked (`mark_state`); a broken story.md never is
         let marked = false;
-        if (loc?.state && loc.state.status !== "corrupt" && ownFiles && !stateBroken) {
+        if (a.mark_state && loc?.state) {
           const reason = `corrupt: ${a.errors.map((e) => e.file).join(", ")} failed validation (S2)`;
           writeState(loc.runsDir, { ...loc.state, status: "corrupt", park: { kind: "corrupt", reason, since: this.nowIso() }, updated_at: this.nowIso(), last_tick_id: this.tick });
           marked = true;
@@ -1035,7 +1034,7 @@ export class Actor {
       const r = patchSliceFile(file, { status: a.slice_status }, storyWt);
       if (!r.ok) throw new Error(`cannot set ${relative(storyWt, file)} status: ${r.reason}`);
       detail.commit = await this.commit(
-        { cwd: storyWt, branch: story.branch, message: `norn: ${a.unit.key} ${a.slice_status}`, trailers: { "Norn-Story": a.unit.story, "Norn-Slice": a.unit.slice, "Norn-Step": "$done", "Norn-Tick": this.tick }, push: true },
+        { cwd: storyWt, branch: story.branch, message: `norn: ${a.unit.key} ${a.slice_status}`, trailers: nornTrailers(this.tick, a.unit.story, a.unit.slice, "$done"), push: true },
         null,
         null,
         null,
@@ -1047,13 +1046,12 @@ export class Actor {
       detail.worktree_removed = wt;
     }
     if (a.cleanup.release_slot) detail.released = await this.releaseRunLeases(a.unit, ["slot", "agent", "check"]);
+    // decide names the branch only when it is in the story branch (or the integration above put it there)
     const b = a.cleanup.branch_local;
     if (b && (await this.git.branchExists(this.root, b))) {
-      if (await this.git.isAncestor(this.root, `refs/heads/${b}`, `refs/heads/${story.branch}`)) {
-        await this.git.deleteBranch(this.root, b, { force: true });
-        detail.branch_deleted = b;
-      } else detail.branch_kept = `${b} is not in ${story.branch}`;
-    }
+      await this.git.deleteBranch(this.root, b, { force: true });
+      detail.branch_deleted = b;
+    } else if (a.cleanup.branch_kept) detail.branch_kept = a.cleanup.branch_kept;
     if (a.commit) detail.unit_commit = await this.commit(a.commit, a.unit, a.state, `${a.rule}`);
     return { ok: true, detail };
   }
@@ -1089,40 +1087,27 @@ export class Actor {
     if (r.ok) return { ok: true, detail: { sha: r.sha } };
     const detail: Record<string, unknown> = { reason: r.reason };
     // R3.1 (H6): the intake race is lost — undo what the intake made here, unless it holds work
-    if (a.rule === "claim.acquire.intake" && claimLost({ ok: false, detail })) detail.intake = await this.dropLostIntake(story).catch((e: Error) => ({ kept: `clean-up failed: ${e.message}` }));
+    if (a.rule === "claim.acquire.intake" && claimLost({ ok: false, detail })) detail.intake = await this.dropLostIntake(story, a.lost_intake).catch((e: Error) => ({ kept: `clean-up failed: ${e.message}` }));
     return { ok: false, error: r.message, detail };
   }
 
   /**
-   * R3.1: after losing `claim.acquire.intake`, remove the story worktree, its local branch (and the spec
-   * folder in it) and its slot when the branch holds nothing beyond the intake commit and the worktree
-   * is clean. Otherwise keep everything; observe then reports the local work (R2.3).
+   * R3.1: after losing `claim.acquire.intake`, remove what decide said holds nothing beyond the
+   * intake (`lost_intake.drop`): the story worktree, its local branch (and the spec folder in it) and
+   * its slot. Otherwise keep everything; observe then reports the local work (R2.3).
    */
-  private async dropLostIntake(story: string): Promise<{ removed: string[] } | { kept: string }> {
-    const loc = this.obs.stories[story];
-    if (!loc) return { kept: "story not checked out here" };
-    const base = this.obs.remote ? `refs/remotes/${this.obs.remote}/${this.obs.facts.repo.default_branch}` : `refs/heads/${this.obs.facts.repo.default_branch}`;
-    const log = await this.git.log(this.root, `${base}..refs/heads/${loc.branch}`).then(
-      (commits) => ({ ok: true as const, commits }),
-      (e: unknown) => ({ ok: false as const, message: e instanceof Error ? e.message : String(e) }),
-    );
-    if (!log.ok) return { kept: `cannot list ${loc.branch}: ${log.message}` };
-    const subjects = log.commits.map((c) => c.subject).filter(Boolean);
-    if (subjects.length > 1 || (subjects[0] !== undefined && !subjects[0].startsWith(`norn: intake ${story} `)))
-      return { kept: `${loc.branch} has ${subjects.length} commit(s) beyond the intake` };
-    const wt = loc.worktree;
-    if (wt && existsSync(wt)) {
-      const st = await this.git.status(wt).catch(() => null);
-      if (!st?.clean) return { kept: `${wt} has uncommitted changes` };
-    }
+  private async dropLostIntake(story: string, lost: Extract<Action, { kind: "claim" }>["lost_intake"]): Promise<{ removed: string[] } | { kept: string }> {
+    if (!lost) return { kept: "not decided: the intake branch was not observed" };
+    if ("keep" in lost) return { kept: lost.keep };
+    const wt = lost.drop.worktree;
     const removed: string[] = [];
     if (wt && existsSync(wt)) {
       await this.git.worktreeRemove(this.root, wt, { force: true });
       removed.push(wt);
     }
-    if (await this.git.branchExists(this.root, loc.branch)) {
-      await this.git.deleteBranch(this.root, loc.branch, { force: true });
-      removed.push(loc.branch);
+    if (await this.git.branchExists(this.root, lost.drop.branch)) {
+      await this.git.deleteBranch(this.root, lost.drop.branch, { force: true });
+      removed.push(lost.drop.branch);
     }
     const listing = await listLeases(this.ctx.home, () => true);
     for (const e of listing.live) if (e.lease.repo === this.root && e.lease.story === story && releaseLease(this.ctx.home, e.file)) removed.push(e.file);

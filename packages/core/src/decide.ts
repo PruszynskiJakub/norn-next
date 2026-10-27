@@ -30,13 +30,13 @@ import {
   type UnitState,
   type Workflow,
 } from "@norn/schema";
-import type { Action, AgentLaunch, BoundaryCommit, Decision, NewReceipt, RunGitAction, SessionInput, UpdateStoryMirrorAction, WorktreeSpec } from "./actions.ts";
+import type { Action, AgentLaunch, BoundaryCommit, ClaimAction, Decision, NewReceipt, RunGitAction, SessionInput, UpdateStoryMirrorAction, WorktreeSpec } from "./actions.ts";
 import { type ApplyResult, applyReceipts, initialState, routeOf } from "./apply.ts";
 import { AUTO_PROMPT, NUDGE_TEXT, sliceWorktreePath, storyWorktreePath } from "./commands.ts";
 import type { Facts, NumberedReceipt, RunFacts, SliceFileFacts, StoryFacts, UnitFacts, UnitRef } from "./facts.ts";
 import { sha256 } from "./hash.ts";
 import { bodyChangedItem, unitInboxItem } from "./inbox.ts";
-import { effectiveMode, firstLine, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, storyFinished, storyUnit, unitWorktree } from "./policy.ts";
+import { effectiveMode, firstLine, mergedIntoBase, nornTrailers, prBaseBranch, sessionStartedNoTurn, storyFinished, storyUnit, unitWorktree } from "./policy.ts";
 import { promptKeys } from "./prompt.ts";
 import type { InboxItem, RemoteIssue, RunnerCapabilities, SessionRef } from "./ports.ts";
 import { epoch, iso } from "./time.ts";
@@ -194,6 +194,31 @@ function intake(ctx: Ctx): void {
 
 // ================================================================= story level
 
+/**
+ * R3.1 (H6): what the loser of an intake race removes — the story worktree and local branch, when
+ * the branch holds nothing beyond the intake commit (`intake_only`, from trailers) and the worktree
+ * is clean. Undefined when not observed: act then keeps everything.
+ */
+function lostIntake(story: StoryFacts): NonNullable<ClaimAction["lost_intake"]> | undefined {
+  if (story.intake_only === undefined) return undefined;
+  if (!story.intake_only) return { keep: `${story.branch} has commits beyond the intake` };
+  const wt = story.worktree?.exists ? story.worktree : null;
+  if (wt && !wt.status?.clean) return { keep: `${wt.path} has uncommitted changes` };
+  return { drop: { worktree: wt?.path ?? null, branch: story.branch } };
+}
+
+/**
+ * The slice cleanup deletes the slice branch only when it is in the story branch: its worktree is
+ * on it and is integrated first (a conflict stops the cleanup before the delete), or observe saw it
+ * there (`branch_in_story`). Returns why it is kept, null to delete it.
+ */
+function branchKept(uf: UnitFacts, branch: string): string | null {
+  if (uf.worktree?.exists && uf.worktree.status?.branch === branch) return null;
+  if (uf.branch_in_story === true) return null;
+  if (uf.branch_in_story === false) return `${branch} is not in the story branch`;
+  return uf.worktree?.exists ? `${uf.worktree.path} is not on ${branch}` : `${branch} not observed in the story branch`;
+}
+
 const storyRef = (s: StoryFacts): UnitRef => storyUnit(s)?.unit ?? { story: s.key, slice: null, dir: "_story", key: s.key };
 
 function decideStory(ctx: Ctx, story: StoryFacts): void {
@@ -218,6 +243,7 @@ function decideStory(ctx: Ctx, story: StoryFacts): void {
     // GR6: a finished story (workflow done, merged/recorded or dropped) needs no owner — never "unclaimed"
     if (!ours && !fresh && storyFinished(story)) return ctx.noop(ref, "story.finished", `finished (${story.frontmatter?.status === "done" || story.frontmatter?.status === "dropped" ? story.frontmatter.status : "workflow done"}); nothing to take`);
     if (!ours && !fresh) return ctx.noop(ref, "claim.unclaimed", `unclaimed — norn take ${story.key} (T10)`);
+    const lost = fresh ? lostIntake(story) : undefined;
     return ctx.emit({
       kind: "claim",
       unit: ref,
@@ -225,6 +251,7 @@ function decideStory(ctx: Ctx, story: StoryFacts): void {
       op: "acquire",
       expected: claim.state === "expired" ? claim.sha : null,
       blob: claimBlob(ctx, story.key, null),
+      ...(lost ? { lost_intake: lost } : {}),
     });
   }
   // T4 + R1.1: renewal is a side action — emitted first (act renews before the story's other
@@ -236,7 +263,8 @@ function decideStory(ctx: Ctx, story: StoryFacts): void {
   // ---- story file corrupt: never touch anything of the story (S2)
   if (story.frontmatter_error || !story.frontmatter) {
     const errors = story.frontmatter_error ? [story.frontmatter_error] : [{ file: `${story.spec_dir}/story.md`, errors: [{ path: "", message: "missing" }] }];
-    if (!ctx.has(ref.key)) ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "story.corrupt", errors, notify: null });
+    // S2: a broken story.md is surfaced, never written into the unit's state
+    if (!ctx.has(ref.key)) ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "story.corrupt", errors, mark_state: false, notify: null });
     return;
   }
   const fm = story.frontmatter;
@@ -401,17 +429,8 @@ function unitBranch(story: StoryFacts, uf: UnitFacts | null): string {
 
 const sliceFileOf = (story: StoryFacts, key: string): SliceFileFacts | undefined => story.slices.find((s) => s.key === key);
 
-/**
- * S4: the trailers of every commit norn makes for a unit — Norn-Story, Norn-Slice for a slice,
- * Norn-Step when the unit has a cursor (none before the story unit starts), Norn-Tick.
- */
-function trailersFor(ctx: Ctx, story: string, slice: string | null, step: string | null): Record<string, string> {
-  const trailers: Record<string, string> = { "Norn-Story": story };
-  if (slice) trailers["Norn-Slice"] = slice;
-  if (step !== null) trailers["Norn-Step"] = step;
-  trailers["Norn-Tick"] = ctx.facts.tick_id;
-  return trailers;
-}
+/** S4: the trailers of a commit norn makes for a unit this tick (`nornTrailers`). */
+const trailersFor = (ctx: Ctx, story: string, slice: string | null, step: string | null): Record<string, string> => nornTrailers(ctx.facts.tick_id, story, slice, step);
 
 /** A worktree act creates this tick (intake, slice start): the commit goes there, not to an observed one. */
 interface NewWorktree {
@@ -514,7 +533,10 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
   if (uf.errors.length) {
     if (uf.state?.status === "corrupt") return ctx.noop(ref, "unit.corrupt", "corrupt; never touched (S2)");
     const notify = unitItem(ctx, story, uf, uf.state as UnitState);
-    return ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "unit.corrupt", errors: uf.errors, notify });
+    // S2: only the unit's own runs/ files mark its state corrupt, and only a state.json that reads
+    const own = uf.errors.every((e) => e.file.includes(`/runs/${ref.dir}/`));
+    const mark_state = uf.state !== null && own && !uf.errors.some((e) => /(^|\/)state\.json$/.test(e.file));
+    return ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "unit.corrupt", errors: uf.errors, mark_state, notify });
   }
   const st = uf.state;
   if (!st) {
@@ -523,7 +545,8 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
   }
   if (st.status === "corrupt") return ctx.noop(ref, "unit.corrupt", "corrupt; never touched (S2)");
   const wf = uf.workflow;
-  if (!wf) return ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "unit.workflow_missing", errors: [{ file: `runs/${ref.dir}/workflow.yaml`, errors: [{ path: "", message: "pinned workflow missing" }] }], notify: null });
+  // S2: a missing pinned workflow is surfaced; the state stays as it is (no file failed validation)
+  if (!wf) return ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "unit.workflow_missing", errors: [{ file: `runs/${ref.dir}/workflow.yaml`, errors: [{ path: "", message: "pinned workflow missing" }] }], mark_state: false, notify: null });
 
   // R5.1: a run whose launch is unknown is looked for before anything else is decided for the unit
   if (uf.run?.launch_unknown) return launchUnknown(ctx, story, uf, st, wf);
@@ -550,11 +573,13 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
       if (ref.slice !== null && sliceFileOf(story, ref.slice)?.frontmatter?.status !== "integrated") {
         const wt = uf.worktree?.exists ? uf.worktree.path : null;
         const file = sliceFileOf(story, ref.slice);
+        const branch = file ? sliceBranch(story.key, file.nn, file.slug) : null;
+        const kept = branch ? branchKept(uf, branch) : null;
         return ctx.emit({
           kind: "mark_done",
           unit: ref,
           rule: "slice.done.cleanup",
-          cleanup: { worktree: wt, branch_local: file ? sliceBranch(story.key, file.nn, file.slug) : null, release_slot: true },
+          cleanup: { worktree: wt, branch_local: kept === null ? branch : null, ...(kept ? { branch_kept: kept } : {}), release_slot: true },
           slice_status: "integrated",
           receipts: [],
           state: null,
