@@ -1,12 +1,12 @@
 ---
 name: norn-retro
-description: Run a retrospective over one finished story from its committed delivery record (per-unit state, numbered reports, check logs, handoffs) and this machine's local trace when present. Finds the friction, most severe first, and proposes one concrete change per finding (to a skill, a delivery definition, the config, the contributor docs or the spec template), each citing its evidence, in a retro.md a person reviews. Changes nothing else. Use when a person asks for a retro or retrospective on a story, usually after its pull request merges.
+description: Run a retrospective over one finished story from its committed delivery record (per-unit state, numbered reports, check logs, handoffs) and this machine's local trace when present. Finds the friction, most severe first, and proposes one concrete change per finding (to a skill, a delivery definition, the config, the contributor docs or the spec template), each citing its evidence, as suggestions in your reply. Writes and changes no file. Use when a person asks for a retro or retrospective on a story, usually after its pull request merges.
 disable-model-invocation: true
 ---
 
 # Retro
 
-A person asks for this after a story's pull request merges. You read what the delivery left behind, find where it cost time, and suggest how to make the next story cheaper. You suggest; the person decides what to apply. You write one file, the report, and change nothing else.
+A person asks for this after a story's pull request merges. You read what the delivery left behind, find where it cost time, and suggest how to make the next story cheaper. You suggest; the person decides what to apply. You write no file and change nothing: the suggestions are your reply.
 
 ## 1. Read the record
 
@@ -73,9 +73,9 @@ Choose where the change belongs:
 
 Never suggest a change without evidence in the record, and never two changes for one finding: pick the one that removes the cause.
 
-## 4. Write the report
+## 4. Give the suggestions
 
-Write `retro.md` in the story's folder, `.agents/specs/<key>-<slug>/retro.md`, next to the spec and record it cites. If one exists, ask before replacing it. Quote evidence briefly and write `<REDACTED>` for any secret.
+Answer the person in this shape. Do not write it to a file, and do not apply any change, even one that looks obvious: they decide what to apply, and may ask you to afterwards. Cite evidence by its path under the story's folder `.agents/specs/<key>-<slug>/`. Quote evidence briefly and write `<REDACTED>` for any secret.
 
 ```markdown
 # Retro: <key> <title>
@@ -102,4 +102,4 @@ Read: `runs/_story/` and <n> slices. Trace: <present, dates | not on this machin
 <One or two lines, or leave the section out.>
 ```
 
-Done when every unit's record is read, every finding has its evidence and one change with its file, and `retro.md` is written. Tell the person its path and the top three changes; they decide which to apply.
+Done when every unit's record is read and every finding in your reply has its evidence and one change with its file, and the working tree is exactly as you found it.

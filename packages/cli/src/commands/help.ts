@@ -22,11 +22,8 @@ export const HELP_GROUPS: ReadonlyArray<{ title: string; for: CommandFor; comman
   { title: "Called by the agent's hooks, not by hand", for: "hooks", commands: ["hook"] },
 ];
 
-/**
- * How a bundled skill is used (§16): only an agent loads skills; some steps also need a person with it,
- * and `person` skills are never a step: a person asks an agent for one (the retro after a story merges).
- */
-export type SkillFor = "protocol" | "step" | "attended" | "reference" | "person";
+/** How a bundled skill is used (§16): only an agent loads skills; some steps also need a person with it. */
+export type SkillFor = "protocol" | "step" | "attended" | "reference";
 
 /** Skill groups in print order; a skill missing here lands in "Other skills" (a step skill). */
 export const SKILL_GROUPS: ReadonlyArray<{ title: string; for: SkillFor; skills: readonly string[] }> = [
@@ -34,7 +31,6 @@ export const SKILL_GROUPS: ReadonlyArray<{ title: string; for: SkillFor; skills:
   { title: "step skills, the agent works alone", for: "step", skills: ["norn-implement", "norn-review", "norn-qa", "norn-merge", "norn-slice", "norn-pr", "norn-diagnose"] },
   { title: "step skills, a person works with the agent", for: "attended", skills: ["norn-refine", "norn-clarify", "norn-plan", "norn-interview", "norn-qa-person", "norn-prototype"] },
   { title: "references other skills read, never a step", for: "reference", skills: ["norn-tdd", "norn-codebase-design"] },
-  { title: "a person asks an agent for it, never a step", for: "person", skills: ["norn-retro"] },
 ];
 
 /** Printed right under the title: an agent that runs `norn help` must not take the person's commands for its own. */
@@ -65,7 +61,7 @@ export function formatHelp(commands: readonly Command[], skills: readonly string
   if (skills.length) {
     const listed = new Set(SKILL_GROUPS.flatMap((g) => g.skills));
     const sgroups = [...SKILL_GROUPS, { title: "other skills", skills: skills.filter((s) => !listed.has(s)) }];
-    out.push("Skills (in .agents/skills/; only an agent loads one: the one its brief names, or one a person asks for)");
+    out.push("Skills (in .agents/skills/; only an agent loads one, the one its brief names)");
     for (const g of sgroups) {
       const names = g.skills.filter((s) => skills.includes(s));
       if (names.length) out.push(`  ${g.title}: ${names.join(", ")}`);
