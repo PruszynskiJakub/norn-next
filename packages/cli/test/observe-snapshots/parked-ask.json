@@ -4,7 +4,6 @@
   },
   "machine": {
     "dead_lease_files": [],
-    "dead_leases": [],
     "heartbeat_id": "<ulid:1>",
     "holder": "tester@box",
     "leases": [
@@ -52,9 +51,7 @@
     "branches": [],
     "worktrees": []
   },
-  "remote": {
-    "synced_at": 4072154400000
-  },
+  "remote": {},
   "repo": {
     "default_branch": "main",
     "remote": "origin",
@@ -228,7 +225,6 @@
             },
             "last_commit_at": "<wall-ms>",
             "last_file_change_at": null,
-            "marker": true,
             "path": "<dir>/repo-worktrees/gh-7-add-login-form",
             "slot": 1,
             "status": {
@@ -402,7 +398,6 @@
             },
             "last_commit_at": "<wall-ms>",
             "last_file_change_at": null,
-            "marker": true,
             "path": "<dir>/repo-worktrees/gh-7-add-login-form--01-form",
             "slot": 2,
             "status": {
@@ -429,7 +424,6 @@
         },
         "last_commit_at": "<wall-ms>",
         "last_file_change_at": null,
-        "marker": true,
         "path": "<dir>/repo-worktrees/gh-7-add-login-form",
         "slot": 1,
         "status": {

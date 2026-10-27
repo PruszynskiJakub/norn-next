@@ -341,10 +341,9 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       runner,
       ...(runner && ports.runner ? { runner_capabilities: { ...ports.runner.capabilities } } : {}),
       leases: leases.live.map((e) => e.lease),
-      dead_leases: leases.dead.map((e) => e.lease),
       dead_lease_files: [...leases.dead.map((e) => e.file), ...leases.errors.map((e) => e.file)],
     },
-    remote: { synced_at: cache.synced_at, issues },
+    remote: { issues },
     stories,
     // R5.5: this tick is the checkout's heartbeat
     heartbeat: { last_tick_at: now },

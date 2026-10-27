@@ -2,7 +2,7 @@
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { type ForeignCommit, type GitPort, isIntakeCommit, type Ports, type StoryBase, type StoryFacts, type WorktreeFacts, type WorktreeStatus } from "@norn/core";
-import { type BaseFactsCache, readEnvNorn, readUnitMarker } from "@norn/store";
+import { type BaseFactsCache, readEnvNorn } from "@norn/store";
 
 /** Newest mtime of the given worktree-relative paths (ms), or null. */
 function newestMtime(dir: string, paths: string[]): number | null {
@@ -149,7 +149,6 @@ export async function findOrphanBranches(git: Ports["git"], root: string, worktr
 
 export async function worktreeFacts(ports: Ports, path: string): Promise<WorktreeFacts | null> {
   if (!existsSync(path)) return null;
-  const marker = readUnitMarker(path).exists;
   const status: WorktreeStatus | null = await ports.git.status(path).catch(() => null);
   const last_commit_at = await ports.git.lastCommitTime(path).catch(() => null);
   const changed = status ? [...status.staged, ...status.unstaged, ...status.untracked] : [];
@@ -157,5 +156,5 @@ export async function worktreeFacts(ports: Ports, path: string): Promise<Worktre
   const slot = slotRaw !== undefined && /^\d+$/.test(slotRaw) ? Number(slotRaw) : null;
   // H1/BS5.1: an agent's merge (or rebase) in progress defers norn's commits; decide must know it
   const in_progress = await ports.git.inProgress(path).catch(() => null);
-  return { path, exists: true, marker, status, last_commit_at, last_file_change_at: newestMtime(path, changed), slot, ...(in_progress ? { in_progress } : {}) };
+  return { path, exists: true, status, last_commit_at, last_file_change_at: newestMtime(path, changed), slot, ...(in_progress ? { in_progress } : {}) };
 }

@@ -128,7 +128,7 @@ describe("base sync with real git", () => {
 
   test("4 + 2: waiting at ready, a conflicting sibling merge → stale → update → conflict → resolve (brief: base sha + paths) → done → update → test", async () => {
     await until(() => h.state(runs())?.step === "ready" && h.state(runs())?.status === "parked", "ready");
-    expect(h.remote.prs).toMatchObject([{ base: "main" }]);
+    expect(h.remote.prs).toMatchObject([{ base_branch: "main" }]);
     // the story changed a.txt (agent work, committed through norn)
     writeFileSync(join(wt(), "a.txt"), "story side\n");
     h.git(["add", "-A"], wt());
@@ -194,7 +194,6 @@ describe("base sync with real git", () => {
     const pr = h.remote.prs[0] as (typeof h.remote.prs)[number];
     pr.state = "merged";
     pr.base_branch = "release";
-    pr.base = "release";
     step();
     expect(kinds(await h.tick("--sync"))).toContain("gh-7 remote.park");
     expect(h.state(runs())?.park).toMatchObject({ kind: "remote", reason: "remote: PR merged into release, not main" });
@@ -202,7 +201,6 @@ describe("base sync with real git", () => {
 
     // merged into the base (the story branch lands on main) → cleanup and the done record; then update is refused
     pr.base_branch = "main";
-    pr.base = "main";
     const land = join(h.dir, "land");
     sh(h.dir, ["clone", "-q", h.remoteDir, land]);
     sh(land, ["-c", "user.email=s@example.com", "-c", "user.name=S", "merge", "-q", "--no-ff", "-m", "Merge PR #100", "origin/gh-7-add-login-form"]);
@@ -293,7 +291,7 @@ describe("base_branch: develop (BS0, 7b)", () => {
     expect(h.state(runs)).toMatchObject({ step: "ready", status: "parked" });
     expect(h.git(["log", "--format=%s"], wt)).toContain(`Update gh-8 from develop (${sibling.slice(0, 7)})`);
     expect(existsSync(join(wt, "m.txt"))).toBe(false);
-    expect(h.remote.prs).toMatchObject([{ head: "gh-8-use-develop", base: "develop" }]);
+    expect(h.remote.prs).toMatchObject([{ head: "gh-8-use-develop", base_branch: "develop" }]);
   }, 60_000);
 });
 
@@ -340,7 +338,6 @@ describe("PR items between syncs and in the read model (C1), ready approval void
     siblingMerge(h, "a.txt", "base side\n");
     const pr = h.remote.prs[0] as (typeof h.remote.prs)[number];
     pr.base_branch = "release";
-    pr.base = "release";
     h.clock.advance(10_000);
     await h.tick("--sync");
 
@@ -366,7 +363,6 @@ describe("PR items between syncs and in the read model (C1), ready approval void
     const history = (await h.norn("inbox", "--history")).value as { items: Array<{ id: string; resolved_at: string | null }> };
     expect(history.items.filter((i) => i.id === merge || i.id === retarget).map((i) => i.resolved_at)).toEqual([null, null]);
     pr.base_branch = "main";
-    pr.base = "main";
   }, 60_000);
 
   test("C5: norn's own commits after the ready approval (its $done commit) are no head change; anyone else's commit is", async () => {

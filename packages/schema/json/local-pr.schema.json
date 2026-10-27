@@ -70,9 +70,6 @@
                         }
                       ]
                     },
-                    "draft": {
-                      "type": "boolean"
-                    },
                     "head": {
                       "type": "string"
                     },

@@ -43,8 +43,6 @@ export interface UnitRef {
 export interface WorktreeFacts {
   path: string;
   exists: boolean;
-  /** `.norn-unit` marker present (A3) */
-  marker: boolean;
   status: WorktreeStatus | null;
   /** ms epoch; null if no commits */
   last_commit_at: number | null;
@@ -256,7 +254,7 @@ export interface StoryFacts {
   issue: RemoteIssue | null | undefined;
   /**
    * The story PR; null = none, undefined = not fetched. `number`, `url`, `state`, `is_draft`,
-   * `head_sha`, `merge_commit_sha?`, `merged_by?`, `merged_at?` (plus the older `draft`/`head`/`base`).
+   * `head_sha`, `merge_commit_sha?`, `merged_by?`, `merged_at?`, `head?`, `base_branch?`.
    */
   pr?: RemotePullRequest | null;
   /**
@@ -331,9 +329,7 @@ export interface MachineFacts {
   runner_capabilities?: RunnerCapabilities;
   /** all live leases on this machine across repos (K1, K3), dead ones excluded */
   leases: LeaseFile[];
-  /** leases whose holder process is dead (to reclaim) */
-  dead_leases: LeaseFile[];
-  /** file names (in ~/.norn/leases/) of `dead_leases` plus unreadable lease files, for ReclaimLeasesAction */
+  /** file names (in ~/.norn/leases/) of leases whose holder process is dead, plus unreadable lease files, for ReclaimLeasesAction */
   dead_lease_files?: string[];
 }
 
@@ -348,8 +344,6 @@ export interface Facts {
   repo: { root: string; default_branch: string; remote: string };
   machine: MachineFacts;
   remote: {
-    /** ms epoch of last successful sync, null = never */
-    synced_at: number | null;
     /** issues from the last sync (GR1); undefined = not fetched this tick */
     issues: RemoteIssue[] | undefined;
   };

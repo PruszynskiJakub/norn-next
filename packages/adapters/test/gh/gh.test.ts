@@ -43,9 +43,7 @@ describe("gh adapter", () => {
       head_sha: "a".repeat(40),
       merge_commit_sha: "b".repeat(40),
       merged_by: "jpruszynski",
-      draft: false,
       head: "gh-12-add-login-page",
-      base: "main",
       base_branch: "main",
       merged_at: "2026-10-22T08:00:00Z",
     });
@@ -54,7 +52,7 @@ describe("gh adapter", () => {
 
   test("openDraftPullRequest", async () => {
     const pr = await gh.openDraftPullRequest({ head: "gh-15-fix-crash-on-save", base: "main", title: "Fix crash on save", body: "Closes #15" });
-    expect(pr).toMatchObject({ number: 41, state: "open", is_draft: true, head_sha: "c".repeat(40), draft: true, head: "gh-15-fix-crash-on-save", base: "main", merged_at: null });
+    expect(pr).toMatchObject({ number: 41, state: "open", is_draft: true, head_sha: "c".repeat(40), head: "gh-15-fix-crash-on-save", base_branch: "main", merged_at: null });
   });
 
   test("editPullRequestBody replaces the body (GR9)", async () => {

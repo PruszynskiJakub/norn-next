@@ -4,7 +4,6 @@
   },
   "machine": {
     "dead_lease_files": [],
-    "dead_leases": [],
     "heartbeat_id": "<ulid:1>",
     "holder": "tester@box",
     "leases": [],
@@ -19,9 +18,7 @@
     "branches": [],
     "worktrees": []
   },
-  "remote": {
-    "synced_at": 4072154590000
-  },
+  "remote": {},
   "repo": {
     "default_branch": "main",
     "remote": "origin",

@@ -73,9 +73,7 @@ export function mapPr(p: GhPr): RemotePullRequest {
     ...(p.mergeCommit?.oid ? { merge_commit_sha: p.mergeCommit.oid } : {}),
     ...(p.mergedBy?.login ? { merged_by: p.mergedBy.login } : {}),
     merged_at: p.mergedAt ?? null,
-    draft: p.isDraft ?? false,
     head: p.headRefName,
-    base: p.baseRefName,
     base_branch: p.baseRefName,
   };
 }
