@@ -216,7 +216,13 @@ function cases(): RuleCase[] {
 
   // ---- slices (W2)
   out.push(c("no slice files", "slices.none", facts([atSlices([])])));
-  // the broken file's slice has started: a broken file of a slice not started yet throws (BUG-5, defects.test.ts)
+  out.push(
+    c(
+      "a not-started slice's file failed validation",
+      "slices.file_invalid",
+      facts([atSlices([{ ...sliceFile("gh-1", "01", "form"), frontmatter: null, error: { file: "x", errors: [{ path: "", message: "bad" }] } }])]),
+    ),
+  );
   out.push(
     c(
       "a started slice's file failed validation",
