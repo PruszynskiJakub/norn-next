@@ -433,7 +433,7 @@ function commitFor(ctx: Ctx, story: StoryFacts | string, uf: UnitFacts | null, m
   const key = typeof story === "string" ? story : story.key;
   if (fresh) return { cwd: fresh.path, branch: fresh.branch, message, trailers: trailersFor(ctx, key, fresh.slice, step), push: fresh.push };
   if (typeof story === "string") return null;
-  const cwd = unitWorktree(story, uf, { mustExist: true });
+  const cwd = unitWorktree(story, uf);
   if (!cwd) return null;
   return { cwd, branch: unitBranch(story, uf), message, trailers: trailersFor(ctx, key, uf?.unit.slice ?? null, step), push: true };
 }
@@ -623,7 +623,7 @@ function applyAction(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
     else {
       const step = stepOf(wf, res.state.step);
       const resumeId = foreign ? undefined : resumeIdOf(run, rf);
-      const cwd = unitWorktree(story, uf, { mustExist: true });
+      const cwd = unitWorktree(story, uf);
       if (step?.type === "agent" && resumeId && cwd && ctx.facts.machine.runner) {
         // R5.3: the resumed run is the answered one; any other active run of the step blocks it
         const active = activeRun(ctx, uf, run.run_id);
@@ -681,7 +681,7 @@ function startStoryUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts): void {
       item: { id: `workflow:${story.key}:${fm.workflow}:${sha256(loaded.problem)}`, group: "unblock", story: story.key, slice: null, step: null, title: loaded.problem, command: `norn workflow ${story.key} <name>`, since: ctx.nowIso, url: fm.url },
     });
   }
-  const worktree = unitWorktree(story, uf, { mustExist: true });
+  const worktree = unitWorktree(story, uf);
   if (!worktree) return ctx.noop(uf.unit, "start.no_worktree", "story worktree missing (GR2)");
   const state = initialState({ unit: uf.unit, workflow: loaded.workflow, workflowName: fm.workflow, workflowHash: sha256(loaded.source), now: ctx.nowIso, mode: story.mode, tick_id: ctx.facts.tick_id });
   ctx.emit({
@@ -741,7 +741,7 @@ function startRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf:
   const { mode, downgraded } = effectiveMode(story.mode, !!step.attended, ctx.facts.machine.runner);
   if (mode === "manual")
     return ctx.noop(ref, downgraded ? "agent.ready.manual.no_runner" : "agent.ready.manual", downgraded ? "auto requested, no runner; running manual (MO2)" : "ready: a person starts an agent and runs norn brief");
-  const cwd = unitWorktree(story, uf, { mustExist: true });
+  const cwd = unitWorktree(story, uf);
   if (!cwd) return ctx.noop(ref, "agent.no_worktree", "unit worktree missing");
   // R5.3 (A14b): never a second agent beside a run of this step that is still active
   const active = activeRun(ctx, uf, null);
@@ -909,7 +909,7 @@ function routeOutcome(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st0: UnitState
   // R7.2: a session on another machine is never typed into or killed from here
   const session = run.session && !foreign ? sessionRef(run) : null;
   const { mode } = effectiveMode(story.mode, !!step.attended, ctx.facts.machine.runner);
-  const cwd = unitWorktree(story, uf, { mustExist: true });
+  const cwd = unitWorktree(story, uf);
   const caps = runnerCaps(ctx);
   const local = !!session && session.runner === ctx.facts.machine.runner;
   const resumeId = resumeIdOf(run, rf);
@@ -1109,7 +1109,7 @@ function launchPromptCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitS
 function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, command: string, timeout_ms: number): void {
   const ref = uf.unit;
   if (uf.lease?.kind === "check") return ctx.noop(ref, "check.running", `check run ${uf.lease.run_id ?? "?"} in progress`);
-  const cwd = unitWorktree(story, uf, { mustExist: true });
+  const cwd = unitWorktree(story, uf);
   if (!cwd) return ctx.noop(ref, "check.no_worktree", "unit worktree missing");
   if (ctx.checksFree <= 0) return ctx.noop(ref, "check.queued", `queued: max_checks ${ctx.config.max_checks} in use (K1)`);
   ctx.checksFree--;
@@ -1135,7 +1135,7 @@ function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, com
 
 function runGit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, step: GitStep): void {
   const ref = uf.unit;
-  const cwd = unitWorktree(story, uf, { mustExist: true });
+  const cwd = unitWorktree(story, uf);
   if (step.action === "open-pr" && story.pr && story.pr.state === "open")
     return classifyNorn(ctx, story, uf, st, wf, "done", "git.open-pr.exists", `PR #${story.pr.number} already open`);
   if (!cwd) return ctx.noop(ref, "git.no_worktree", "unit worktree missing");

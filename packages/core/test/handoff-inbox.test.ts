@@ -113,6 +113,36 @@ describe("inbox (O1)", () => {
   });
 });
 
+describe("the inbox points only at a worktree on disk, as decide does (refactor 3.4)", () => {
+  // The view (`norn inbox`) records the conventional worktree path with `exists: false` when it
+  // is gone; observe (the tick's notifier) reports no worktree. Both must give the same inbox.
+  const gone = (uf: ReturnType<typeof unitFacts>) => ({ ...uf, worktree: uf.worktree && { ...uf.worktree, exists: false } });
+  const absent = (uf: ReturnType<typeof unitFacts>) => ({ ...uf, worktree: null });
+  const manual = (uf: ReturnType<typeof unitFacts>) => {
+    const f = facts([storyFacts("gh-1", [uf], { worktree: null })]);
+    f.machine.runner = null;
+    return buildInbox(f, CONFIG);
+  };
+
+  test("a manual ready step whose worktree is gone: start command without cd, same as no worktree", () => {
+    const uf = unitFacts(SLICE, SLICE_WF, stateFor(SLICE, SLICE_WF));
+    const view = manual(gone(uf)).groups.your_turn[0];
+    expect(view?.command).toBe("claude --permission-mode auto -- 'Use the norn skill, then run `norn brief`.'");
+    expect(view).toEqual(manual(absent(uf)).groups.your_turn[0]);
+    // on disk: the person is told to cd into it
+    expect(manual(uf).groups.your_turn[0]?.command).toStartWith("cd /r-worktrees/gh-1-login--02-form && ");
+  });
+
+  test("a running unit whose worktree is gone reaches no worktree (HC3)", () => {
+    const st = stateFor(SLICE, SLICE_WF, { status: "running", run: { run_id: "01JDDDDDDDDDDDDDDDDDDDDDDD", step: "implement", attempt: 1, started_at: at(), how: "auto" } });
+    const uf = unitFacts(SLICE, SLICE_WF, st);
+    const running = (u: ReturnType<typeof unitFacts>) => buildInbox(facts([storyFacts("gh-1", [u])]), CONFIG).groups.running;
+    expect(running(gone(uf))[0]?.reach?.worktree).toBeNull();
+    expect(running(gone(uf))).toEqual(running(absent(uf)));
+    expect(running(uf)[0]?.reach?.worktree).toBe("/r-worktrees/gh-1-login--02-form");
+  });
+});
+
 describe("start command for a person (MO2, B3)", () => {
   test("carries the agent's configured args, ended by --", () => {
     expect(startAgentCommand("/w", "claude", ["--allowedTools", "Bash(git:*)", "Read"])).toBe(

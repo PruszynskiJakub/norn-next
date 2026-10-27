@@ -54,11 +54,10 @@ export const firstLine = (text: string | undefined): string | undefined => text?
 
 /**
  * The unit's worktree path — its own, or the story's for the story unit (or a story with no unit
- * yet). `mustExist`: only a worktree observed on disk (where decide may act); else the recorded
- * path whether or not it exists (what a person is told to `cd` into).
+ * yet) — only when observed on disk. Decide acts only there, and the inbox points a person only
+ * there (never at a recorded path that is gone).
  */
-export function unitWorktree(story: StoryFacts, uf: UnitFacts | null, opts: { mustExist: boolean }): string | null {
+export function unitWorktree(story: StoryFacts, uf: UnitFacts | null): string | null {
   const wt = uf?.worktree ?? (!uf || uf.unit.slice === null ? story.worktree : null);
-  if (!wt) return null;
-  return !opts.mustExist || wt.exists ? wt.path : null;
+  return wt?.exists ? wt.path : null;
 }
