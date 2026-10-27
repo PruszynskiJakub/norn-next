@@ -15,7 +15,6 @@ export const RESERVED_STEP_NAMES = [
 
 /** Reserved workflow targets (W7). */
 export const RESERVED_TARGETS = ["$done", "$stuck"] as const;
-export type ReservedTarget = (typeof RESERVED_TARGETS)[number];
 
 export const ULID_PATTERN = "^[0-9A-HJKMNP-TV-Z]{26}$";
 export const STORY_KEY_PATTERN = "^(gh|gl)-[1-9][0-9]*$";

@@ -27,6 +27,7 @@ import {
   heartbeatId,
   writtenHere,
   machineHolder,
+  traceEvent,
 } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
@@ -151,7 +152,7 @@ async function take(ctx: Context, key: string, force: boolean) {
   // story unit as soon as the story branch is checked out (it lives on that branch), before anything else
   const expired = cur.state === "expired";
   const takeFacts = { previous_holder: prev?.holder ?? null, previous_heartbeat_id: prev?.heartbeat_id ?? null, expired, forced };
-  appendTrace(root, { type: "take", id: ulid(now), at: nowIso, unit: key, holder, heartbeat_id: hb, ...takeFacts });
+  appendTrace(root, traceEvent("take", now, { at: nowIso, unit: key, holder, heartbeat_id: hb, ...takeFacts }));
 
   // ---- 2. branches → worktrees (T5, K4)
   const problems: string[] = [];

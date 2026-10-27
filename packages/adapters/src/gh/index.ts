@@ -21,8 +21,8 @@ export interface GhOptions {
 /** Story key of GitHub issue n: `gh-<n>`. */
 export const issueKey = (number: number): string => storyKey("gh", number);
 
-export const ISSUE_FIELDS = "number,url,title,body,state,assignees,labels,updatedAt";
-export const PR_FIELDS = "number,url,state,isDraft,headRefName,headRefOid,baseRefName,mergedAt,mergeCommit,mergedBy";
+const ISSUE_FIELDS = "number,url,title,body,state,assignees,labels,updatedAt";
+const PR_FIELDS = "number,url,state,isDraft,headRefName,headRefOid,baseRefName,mergedAt,mergeCommit,mergedBy";
 
 interface GhIssue {
   number: number;
@@ -62,7 +62,7 @@ export function mapIssue(i: GhIssue): RemoteIssue {
   };
 }
 
-export function mapPr(p: GhPr): RemotePullRequest {
+function mapPr(p: GhPr): RemotePullRequest {
   const s = p.state.toUpperCase();
   return {
     number: p.number,

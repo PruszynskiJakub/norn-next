@@ -47,7 +47,7 @@ const TOOL_EVENTS = new Set(["PreToolUse", "PostToolUse"]);
  *   needs Enter really wait on a person → `permission_prompt` / `waiting_input` (§10 implicit ask).
  * - the rest are informational. Unknown future types are ignored rather than parking a unit.
  */
-export const NOTIFICATION_EVENTS: Record<string, HookEventKind | null> = {
+const NOTIFICATION_EVENTS: Record<string, HookEventKind | null> = {
   permission_prompt: "permission_prompt",
   idle_prompt: "turn_end",
   elicitation_dialog: "waiting_input",
@@ -71,7 +71,7 @@ function untypedNotification(message: string | undefined): HookEventKind {
 }
 
 /** One-line summary of a tool call's input: the shell command, else the path/url/pattern, else compact JSON. */
-export function summarizeToolInput(input: JsonObject | undefined): string | undefined {
+function summarizeToolInput(input: JsonObject | undefined): string | undefined {
   if (!input) return undefined;
   for (const k of ["command", "file_path", "notebook_path", "url", "pattern", "query", "path"]) {
     const v = input[k];

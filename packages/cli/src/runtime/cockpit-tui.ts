@@ -79,18 +79,18 @@ function rowText(r: CockpitRow): string {
 }
 
 /** CP7: every word of the filter appears in the row. */
-export function visibleRows(model: CockpitModel, filter: string): CockpitRow[] {
+function visibleRows(model: CockpitModel, filter: string): CockpitRow[] {
   const words = filter.toLowerCase().split(/\s+/).filter(Boolean);
   return model.rows.filter((r) => words.every((w) => rowText(r).includes(w)));
 }
 
 /** The selected row: the one with the state's id among the visible rows, else the first. */
-export function selectedRow(model: CockpitModel, s: TuiState): CockpitRow | null {
+function selectedRow(model: CockpitModel, s: TuiState): CockpitRow | null {
   const rows = visibleRows(model, s.filter);
   return rows.find((r) => r.id === s.selected) ?? rows[0] ?? null;
 }
 
-export const HELP = [
+const HELP = [
   "Keys",
   "  ↑ ↓  j k        move (PgUp PgDn a page)",
   "  ⌃d ⌃u, wheel    scroll the preview (the wheel over the list moves the selection)",

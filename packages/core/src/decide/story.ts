@@ -244,7 +244,7 @@ function importMailbox(ctx: Ctx, story: StoryFacts): void {
 
 // ================================================================= unit level
 
-export function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean): void {
+function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean): void {
   const ref = uf.unit;
   if (uf.errors.length) {
     if (uf.state?.status === "corrupt") return ctx.noop(ref, "unit.corrupt", "corrupt; never touched (S2)");

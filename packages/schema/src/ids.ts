@@ -8,7 +8,6 @@ import {
   type RemoteProvider,
   SLICE_KEY_PATTERN,
   SLICE_NN_PATTERN,
-  SLUG_PATTERN,
   STORY_KEY_PATTERN,
   ULID_PATTERN,
 } from "./common.ts";
@@ -78,8 +77,8 @@ export function ulidTime(id: string): number {
 // ---------------------------------------------------------------- keys
 
 export type KeyPrefix = "gh" | "gl";
-export const PROVIDER_PREFIX: Record<RemoteProvider, KeyPrefix> = { gh: "gh", glab: "gl" };
-export const PREFIX_PROVIDER: Record<KeyPrefix, RemoteProvider> = { gh: "gh", gl: "glab" };
+const PROVIDER_PREFIX: Record<RemoteProvider, KeyPrefix> = { gh: "gh", glab: "gl" };
+const PREFIX_PROVIDER: Record<KeyPrefix, RemoteProvider> = { gh: "gh", gl: "glab" };
 
 export interface StoryKeyParts {
   prefix: KeyPrefix;
@@ -110,7 +109,7 @@ export function parseStoryKey(key: string): StoryKeyParts | null {
 }
 
 /** Pad a slice number to two digits: 3 → "03". */
-export function sliceNn(n: number | string): string {
+function sliceNn(n: number | string): string {
   const s = String(n).padStart(2, "0");
   if (!SLICE_NN_RE.test(s)) throw new RangeError(`bad slice number: ${n}`);
   return s;
@@ -146,8 +145,7 @@ export function isGitSha(s: unknown): s is string {
 
 // ---------------------------------------------------------------- slugs
 
-const SLUG_RE = new RegExp(SLUG_PATTERN);
-export const SLUG_MAX = 40;
+const SLUG_MAX = 40;
 const TRANSLIT: Record<string, string> = { ł: "l", Ł: "l", ß: "ss", æ: "ae", ø: "o", đ: "d", þ: "th" };
 
 /**
@@ -172,9 +170,6 @@ export function slugify(title: string, max = SLUG_MAX): string {
     out = next;
   }
   return out || "untitled";
-}
-export function isSlug(s: unknown): s is string {
-  return typeof s === "string" && SLUG_RE.test(s) && s.length <= 48;
 }
 
 // ---------------------------------------------------------------- naming (§7, GR3)

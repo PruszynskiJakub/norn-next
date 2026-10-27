@@ -396,7 +396,6 @@ export type UnitAction =
 export type RepoAction = IntakeStoryAction | ReclaimLeasesAction;
 
 export type Action = UnitAction | RepoAction;
-export type ActionKind = Action["kind"];
 
 /** One decide output: the rule that fired and its action (trace `decisions[]`). */
 export interface Decision {

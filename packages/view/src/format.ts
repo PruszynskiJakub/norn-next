@@ -108,12 +108,12 @@ export function formatStatus(view: ProjectView): string {
 }
 
 /** NT5: the Notes header's clearing hint — each story's once, e.g. `cleared by gh-1 human-qa approval`. */
-export function notesHint(items: readonly InboxEntry[]): string {
+function notesHint(items: readonly InboxEntry[]): string {
   return [...new Set(items.flatMap((i) => (i.cleared_by ? [i.cleared_by] : [])))].join("; ");
 }
 
 /** A group header's text after its title and count: what the group holds, then the notes' clearing hint. */
-export function groupAbout(g: keyof typeof INBOX_ABOUT, items: readonly InboxEntry[]): string {
+function groupAbout(g: keyof typeof INBOX_ABOUT, items: readonly InboxEntry[]): string {
   return [INBOX_ABOUT[g], notesHint(items)].filter(Boolean).join(" · ");
 }
 
@@ -127,11 +127,6 @@ export function stepTitle(step: string | null | undefined, title: string): strin
   if (!step) return title;
   const named = title.startsWith(step) && (title.length === step.length || /^[: #]/.test(title.slice(step.length)));
   return named ? title : `${step}: ${title}`;
-}
-
-/** An inbox item's title without a leading `<step>: `, for a view that shows the step in its own column. */
-export function stripStep(step: string | null | undefined, title: string): string {
-  return step && title.startsWith(`${step}: `) ? title.slice(step.length + 2) : title;
 }
 
 /**

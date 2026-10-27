@@ -8,16 +8,16 @@
 import { appendFileSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
 import type { FileError } from "@norn/core";
-import { type HookFact, type TickStartTrace, type TickTrace, type TraceEvent, assertValid, ulidTime, validate } from "@norn/schema";
+import { type HookFact, type TickStartTrace, type TickTrace, type TraceEvent, assertValid, ulid, ulidTime, validate } from "@norn/schema";
 import { appendDurable, atomicWrite, isErrno, readText } from "./fsx.ts";
 import { traceDir } from "./paths.ts";
 
-export function eventTime(ev: TraceEvent): string {
+function eventTime(ev: TraceEvent): string {
   return ev.type === "hook" ? ev.fact.at : ev.at;
 }
 
 /** Day file name for an ISO time: `2026-10-23.jsonl` (UTC). */
-export function traceFileName(at: string): string {
+function traceFileName(at: string): string {
   const d = new Date(at);
   if (Number.isNaN(d.getTime())) throw new Error(`bad trace time: ${at}`);
   return `${d.toISOString().slice(0, 10)}.jsonl`;
@@ -39,6 +39,22 @@ export function appendTrace(root: string, event: TraceEvent): string {
     appendFileSync(path, line);
   }
   return name;
+}
+
+/** A trace event stamped with its own `id` and `at`: every type but tick, tick.start, tick.end and hook. */
+type StampedTrace = Extract<TraceEvent, { id: string; at: string }>;
+type StampedOf<T extends StampedTrace["type"]> = Extract<StampedTrace, { type: T }>;
+
+/**
+ * One stamped trace event of `type`: `id` is a ulid of `now`, `at` is `now` as ISO time, unless
+ * `fields` gives either (a briefing reuses its id; a criteria event takes its receipt's time).
+ */
+export function traceEvent<T extends StampedTrace["type"]>(
+  type: T,
+  now: number,
+  fields: Omit<StampedOf<T>, "type" | "id" | "at"> & { id?: string; at?: string },
+): StampedOf<T> {
+  return { type, id: ulid(now), at: new Date(now).toISOString(), ...fields } as StampedOf<T>;
 }
 
 export interface TraceQuery {
@@ -73,7 +89,7 @@ export function decisionUnit(d: { unit: string; action: unknown }): string {
   return a.kind === "intake_story" && typeof a.key === "string" ? a.key : d.unit;
 }
 
-export function eventMatchesUnit(ev: TraceEvent, unit: string): boolean {
+function eventMatchesUnit(ev: TraceEvent, unit: string): boolean {
   switch (ev.type) {
     case "tick":
     case "tick.start":
@@ -224,8 +240,8 @@ export function blockedHookCount(root: string, runId: string): number {
 
 // ---------------------------------------------------------------- side files (B4, C4)
 
-export const briefingRelPath = (runId: string, id: string) => `briefings/${runId}/${id}.md`;
-export const transcriptRelPath = (runId: string, id: string) => `transcripts/${runId}/${id}.txt`;
+const briefingRelPath = (runId: string, id: string) => `briefings/${runId}/${id}.md`;
+const transcriptRelPath = (runId: string, id: string) => `transcripts/${runId}/${id}.txt`;
 
 function safeRel(rel: string): string {
   const n = normalize(rel);

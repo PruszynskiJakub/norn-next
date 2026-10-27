@@ -95,7 +95,7 @@ export function heartbeatDown(facts: Facts, config: ResolvedConfig): { holder: s
 }
 
 /** R5.5: the Unblock item for a heartbeat that is down. */
-export function heartbeatItem(facts: Facts, config: ResolvedConfig): InboxItem | null {
+function heartbeatItem(facts: Facts, config: ResolvedConfig): InboxItem | null {
   const down = heartbeatDown(facts, config);
   if (!down) return null;
   const story = facts.stories.find((s) => s.claim.state === "mine");
@@ -192,7 +192,7 @@ export function startCommandFor(uf: UnitFacts, story: StoryFacts, config: Resolv
  * MO5: how a person starts the unit's step agent — `norn open <unit>` when this machine's runner
  * opens terminals for a person (the hand-typed command then in the detail), else that command itself.
  */
-export function personStart(uf: UnitFacts, story: StoryFacts, facts: Facts, config: ResolvedConfig): { command: string; detail?: string } {
+function personStart(uf: UnitFacts, story: StoryFacts, facts: Facts, config: ResolvedConfig): { command: string; detail?: string } {
   const start = startCommandFor(uf, story, config);
   if (!facts.machine.runner_capabilities?.open) return { command: start };
   return { command: `norn open ${uf.unit.key}`, detail: `by hand: ${start}` };
@@ -203,7 +203,7 @@ export function personStart(uf: UnitFacts, story: StoryFacts, facts: Facts, conf
  * creates the worktree; the tick starts the workflow). Running while the heartbeat is up — the next
  * tick starts it — else Your turn with the command that ticks.
  */
-export function notStartedItem(story: StoryFacts, facts: Facts, config: ResolvedConfig): InboxItem | null {
+function notStartedItem(story: StoryFacts, facts: Facts, config: ResolvedConfig): InboxItem | null {
   if (story.claim.state !== "mine" || isStarted(story) || storyFinished(story) || !story.frontmatter) return null;
   const up = heartbeatUp(facts, config);
   const base = { id: `not-started:${story.key}`, story: story.key, slice: null, step: null, since: story.frontmatter.intake_at, url: story.frontmatter.url };
@@ -251,7 +251,7 @@ const oneLine = (t: string) => t.replace(/\s*\n\s*/g, " ").trim();
  * on a story-level gate the story's (approving acknowledges them), on a slice gate the slice's own
  * (shown only; NT5). `detail` is one line; `full` (inbox `--details`) lists each on its own line.
  */
-export function gateChecks(story: StoryFacts, uf: UnitFacts): { detail: string | null; full: string | null } {
+function gateChecks(story: StoryFacts, uf: UnitFacts): { detail: string | null; full: string | null } {
   const check = personCriteria(uf.last_outcome_receipt?.receipt);
   const storyGate = uf.unit.slice === null;
   const notes = (story.notes ?? []).filter((n) => storyGate || n.unit === uf.unit.key);
@@ -277,7 +277,7 @@ export function gateChecks(story: StoryFacts, uf: UnitFacts): { detail: string |
  * NT5: when the story's open notes leave the inbox — at the nearest story-level gate ahead of the
  * story unit's step (its own step when it waits at one; NT3), else when the story is done.
  */
-export function notesClearedBy(story: StoryFacts): string {
+function notesClearedBy(story: StoryFacts): string {
   const uf = storyUnit(story);
   const wf = uf?.workflow;
   const from = uf?.state?.status === "done" ? null : uf?.state?.step;
@@ -298,7 +298,7 @@ export function notesClearedBy(story: StoryFacts): string {
  * for a person; information, not an action. It leaves the inbox when a person gives `approve` at a
  * story-level gate (NT3); `cleared_by` says which one (NT5).
  */
-export function noteItems(story: StoryFacts): InboxItem[] {
+function noteItems(story: StoryFacts): InboxItem[] {
   const status = story.frontmatter?.status;
   if (status === "done" || status === "dropped") return [];
   const notes = story.notes ?? [];
@@ -319,7 +319,7 @@ export function noteItems(story: StoryFacts): InboxItem[] {
 }
 
 /** C1: the PR fetched this tick, else the last one this checkout saw (`pr_seen`); null/undefined = none known. */
-export const knownPr = (story: StoryFacts): StoryFacts["pr"] => (story.pr !== undefined ? story.pr : story.pr_seen?.pr);
+const knownPr = (story: StoryFacts): StoryFacts["pr"] => (story.pr !== undefined ? story.pr : story.pr_seen?.pr);
 
 /**
  * GR6/F25: the story unit finished its workflow and its PR is open — merging it is the person's
@@ -371,7 +371,7 @@ function baseSyncSteps(wf: Workflow): Set<string> {
  * an update is the next thing to do — parked at a gate, or stuck outside the steps that sync the
  * base; never for an ask (a permission prompt in any step) nor in update/resolve.
  */
-export function staleItem(story: StoryFacts, base: string): InboxItem | null {
+function staleItem(story: StoryFacts, base: string): InboxItem | null {
   const b = story.base;
   const uf = storyUnit(story);
   const st = uf?.state;
@@ -399,7 +399,7 @@ export function staleItem(story: StoryFacts, base: string): InboxItem | null {
 }
 
 /** BS11: the story PR targets another branch than the story's base — merging it would skip the base. */
-export function retargetItem(story: StoryFacts, base: string): InboxItem | null {
+function retargetItem(story: StoryFacts, base: string): InboxItem | null {
   const pr = knownPr(story);
   const target = prBaseBranch(pr);
   if (!pr || pr.state !== "open" || !target || target === base) return null;
@@ -577,7 +577,7 @@ export const RE_ENTRY_KINDS = ["update", "workflow"] as const;
  * --to`) counts; a re-entry voids it until a new approve at the gate. `receipts` are the story
  * unit's, at least of the kinds `approve` and RE_ENTRY_KINDS; order does not matter.
  */
-export function readyHeadSha(wf: Workflow, receipts: readonly NumberedReceipt[]): string | undefined {
+function readyHeadSha(wf: Workflow, receipts: readonly NumberedReceipt[]): string | undefined {
   return readyApproval(wf, receipts)?.sha;
 }
 
@@ -593,7 +593,7 @@ export function readyApproval(wf: Workflow, receipts: readonly NumberedReceipt[]
 }
 
 /** F35: the PR head moved after the `ready.approve` — what would merge is not what was reviewed. */
-export function headChangedItem(story: StoryFacts): InboxItem | null {
+function headChangedItem(story: StoryFacts): InboxItem | null {
   const pr = knownPr(story);
   const ready = story.ready_head_sha;
   // C5: norn's own commits after the approval (its `$done` state commit) leave the head the person let through as it was
@@ -616,7 +616,7 @@ export function headChangedItem(story: StoryFacts): InboxItem | null {
 }
 
 /** Q6: commits norn did not make, one informational item per branch (newest commit in the id). */
-export function foreignCommitItems(story: StoryFacts): InboxItem[] {
+function foreignCommitItems(story: StoryFacts): InboxItem[] {
   const byBranch = new Map<string, NonNullable<StoryFacts["foreign_commits"]>>();
   for (const c of story.foreign_commits ?? []) byBranch.set(c.branch, [...(byBranch.get(c.branch) ?? []), c]);
   return [...byBranch].map(([branch, cs]) => {
@@ -644,7 +644,7 @@ export function foreignCommitItems(story: StoryFacts): InboxItem[] {
  * record and never will be (a non-holder never pushes, R2.2). One Check item per unit; `norn tidy`
  * moves the files to `runs/<unit>/orphaned/` on the local branch.
  */
-export function unpushedItems(story: StoryFacts, facts: Facts): InboxItem[] {
+function unpushedItems(story: StoryFacts, facts: Facts): InboxItem[] {
   const c = story.claim;
   const held = c.state === "other" || c.state === "expired" ? `the story is now held by ${c.blob.holder}${c.state === "expired" ? " (expired)" : ""}` : "the story is not claimed by this checkout";
   const since = c.state === "other" ? c.blob.renewed_at : (story.frontmatter?.intake_at ?? iso(facts.now));

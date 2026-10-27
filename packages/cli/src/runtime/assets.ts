@@ -25,7 +25,7 @@ export interface AssetsSources {
   cacheDir?: string;
 }
 
-export function defaultAssetsSources(env: Record<string, string | undefined> = process.env): AssetsSources {
+function defaultAssetsSources(env: Record<string, string | undefined> = process.env): AssetsSources {
   return {
     env,
     embedded: EMBEDDED_ASSETS,

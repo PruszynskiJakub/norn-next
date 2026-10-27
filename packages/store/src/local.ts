@@ -13,11 +13,11 @@
  * empty through `readLocalJson`, never as a cast of what was there. Paths are in paths.ts.
  */
 import type { StoryFacts } from "@norn/core";
-import { type StoryMerge, ulid } from "@norn/schema";
+import type { StoryMerge } from "@norn/schema";
 import { atomicWriteJson } from "./fsx.ts";
 import { readLocalJson } from "./local-json.ts";
 import { foreignCommitsPath, notifiedPath, pendingRecordsPath, remoteCachePath } from "./paths.ts";
-import { appendTrace } from "./trace.ts";
+import { appendTrace, traceEvent } from "./trace.ts";
 
 export interface RemoteCache {
   /** ms epoch of the last successful sync (GR1) */
@@ -86,8 +86,7 @@ export function traceForeignCommits(root: string, stories: StoryFacts[], tick_id
   }
   if (!fresh.length) return 0;
   atomicWriteJson(foreignCommitsPath(root), { shas: [...seen].slice(-KEEP_FOREIGN) });
-  const at = new Date(now).toISOString();
-  for (const f of fresh) appendTrace(root, { type: "foreign_commits", id: ulid(now), at, tick_id, unit: f.story, commits: f.commits });
+  for (const f of fresh) appendTrace(root, traceEvent("foreign_commits", now, { tick_id, unit: f.story, commits: f.commits }));
   return fresh.length;
 }
 

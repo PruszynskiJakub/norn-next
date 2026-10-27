@@ -26,7 +26,7 @@ export function defaultLeaseLiveness(proc: LivenessCheck = defaultLiveness): Lea
   return (lease) => (lease.kind === "slot" && lease.worktree ? existsSync(lease.worktree) : proc(lease.holder));
 }
 
-export const leaseFileName = (kind: LeaseKind, n: number) => `${kind}-${n}.json`;
+const leaseFileName = (kind: LeaseKind, n: number) => `${kind}-${n}.json`;
 const LEASE_NAME = /^(agent|check|slot)-(\d+)\.json$/;
 
 export interface LeaseEntry {

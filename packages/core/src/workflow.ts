@@ -3,12 +3,11 @@
  * Graph helpers here are reused by apply/decide (`stepOf`, `edgeOf`).
  */
 import {
-  CLASSIFIED_OUTCOMES,
   type OutcomeEdge,
   outcomeEdge,
   RESERVED_STEP_NAMES,
   type Step,
-  validateWorkflow as schemaCheck,
+  validate,
   type Workflow,
 } from "@norn/schema";
 
@@ -88,7 +87,7 @@ export function validateWorkflowDefinition(input: unknown, opts: ValidateOptions
       if (isReservedStep(name))
         issues.push({ code: "reserved_name", path: `/steps/${name}`, message: `step name '${name}' is reserved (W7)` });
 
-  const schema = schemaCheck(input);
+  const schema = validate("workflow", input);
   if (!schema.ok) {
     const reservedPaths = new Set(issues.map((i) => i.path));
     for (const e of schema.errors)
@@ -259,9 +258,6 @@ export function isStale(wf: Workflow | null, base: { behind: number; conflicts: 
   if (!base) return false;
   return (wf?.base?.stale ?? "conflict") === "behind" ? base.behind > 0 : base.conflicts.length > 0;
 }
-
-/** Outcomes the tick may classify for a step type (§10). */
-export const classifiedOutcomes = (step: Step): readonly string[] => CLASSIFIED_OUTCOMES[step.type];
 
 /** Outcomes an agent can report with `norn done` (declared, minus route overrides). */
 export function reportableOutcomes(step: Step): string[] {

@@ -64,7 +64,7 @@ export function mapIssue(i: GlIssue): RemoteIssue {
   };
 }
 
-export function mapMr(m: GlMr): RemotePullRequest {
+function mapMr(m: GlMr): RemotePullRequest {
   const merge = m.merge_commit_sha ?? m.squash_commit_sha ?? null;
   const by = m.merge_user?.username ?? m.merged_by?.username ?? null;
   return {

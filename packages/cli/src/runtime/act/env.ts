@@ -13,7 +13,7 @@ import {
   type SessionRef,
   type UnitRef,
 } from "@norn/core";
-import { type ClaimBlob, type UnitState, ulid } from "@norn/schema";
+import type { ClaimBlob, UnitState } from "@norn/schema";
 import {
   appendHandoffHeartbeat,
   appendTrace,
@@ -25,6 +25,7 @@ import {
   writeState,
   markNotified,
   readNotified,
+  traceEvent,
 } from "@norn/store";
 import type { Context } from "../../context.ts";
 import { syncRemoteBranch } from "../integrate.ts";
@@ -240,6 +241,6 @@ export class ActEnv {
   }
 
   traceReject(unit: string, source: string, reason: string, payload?: unknown): void {
-    appendTrace(this.root, { type: "reject", id: ulid(this.ctx.clock.now()), at: this.nowIso(), tick_id: this.tick, unit, source, reason, ...(payload === undefined ? {} : { payload }) });
+    appendTrace(this.root, traceEvent("reject", this.ctx.clock.now(), { tick_id: this.tick, unit, source, reason, ...(payload === undefined ? {} : { payload }) }));
   }
 }

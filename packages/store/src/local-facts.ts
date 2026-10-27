@@ -180,7 +180,7 @@ export const liveRun = (st: UnitState | null | undefined): boolean => !!st?.run 
  * R5.1: the unapplied `started` receipt (norn's own, auto) whose launch never reached `state.json`
  * — no session recorded, and no later receipt of the run's agent showing it ran. Null when none.
  */
-export function unknownLaunch(unapplied: readonly NumberedReceipt[]): (NumberedReceipt & { receipt: ReceiptOf<"started"> }) | null {
+function unknownLaunch(unapplied: readonly NumberedReceipt[]): (NumberedReceipt & { receipt: ReceiptOf<"started"> }) | null {
   const last = unapplied.filter((r) => r.receipt.kind === "started" && r.receipt.how === "auto" && r.receipt.by === "norn").at(-1) as (NumberedReceipt & { receipt: ReceiptOf<"started"> }) | undefined;
   if (!last || last.receipt.session) return null;
   if (unapplied.some((r) => r.n > last.n && r.receipt.by === "agent")) return null;

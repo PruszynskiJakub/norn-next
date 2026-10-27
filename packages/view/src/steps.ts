@@ -40,7 +40,7 @@ export interface StepTimelineOptions {
 }
 
 /** Ticks that changed nothing for the unit: `noop` decisions and claim renewals. */
-export function isNoiseEntry(e: TimelineEntry): boolean {
+function isNoiseEntry(e: TimelineEntry): boolean {
   return e.source === "tick" && (e.kind === "noop" || e.summary.startsWith("tick claim.renew "));
 }
 

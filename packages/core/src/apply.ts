@@ -100,7 +100,7 @@ export function initialState(args: {
 }
 
 /** Enter `name`: new attempt, within-step limits reset, status by step type (gate/attended park). */
-export function enterStep(prev: UnitState, wf: Workflow, name: string, now: string): UnitState {
+function enterStep(prev: UnitState, wf: Workflow, name: string, now: string): UnitState {
   const st: UnitState = { ...prev, visits: { ...prev.visits } };
   const step = stepOf(wf, name);
   st.visits[name] = (st.visits[name] ?? 0) + 1;
