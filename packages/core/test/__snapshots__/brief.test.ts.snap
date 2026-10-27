@@ -757,3 +757,48 @@ Then end your turn. Never edit \`runs/\`; never push.
 - Port slot: 3 (PORT_BASE=4030)
 "
 `;
+
+exports[`renderBrief (B3) the step's description and instructions follow the skill under Your work, instructions trimmed 1`] = `
+"# norn brief — gh-1/02 · implement #1
+
+## Where you are
+
+- Story: gh-1
+- Slice: gh-1/02
+- Step: implement (attempt 1)
+- Mode: auto
+
+## Your work
+
+Use the \`implement\` skill.
+
+Build the slice test-first.
+
+Base mode: merge the base commit named in Rework; never rebase.
+
+## Inputs
+
+- Story spec: \`.agents/specs/gh-1-login/story.md\`
+- Slice: \`.agents/specs/gh-1-login/slices/02-form.md\`
+- Handoff (text under Context; update it here): \`.agents/specs/gh-1-login/runs/02-form/handoff.md\`
+
+## Context
+
+No handoff yet — you are the first run of this unit.
+
+## Finish with exactly one of
+
+- \`norn done done --handoff "…"\` — every acceptance criterion (or rework point) has a passing test
+- \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
+- \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
+
+Then end your turn. Never edit \`runs/\`; never push.
+
+## Limits
+
+- Deadline: 60m (until 2026-10-23T11:00:00.000Z)
+- Nudges left: 2
+- Fresh-session retries left: 1
+- Port slot: 3 (PORT_BASE=4030)
+"
+`;
