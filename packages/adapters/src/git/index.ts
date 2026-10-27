@@ -6,7 +6,7 @@
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { gitTimeoutMs } from "@norn/store";
-import type { CommitSpec, ConflictMarker, GitFactory, GitInProgress, GitPort, MergeResult, OutgoingMarkers, PushResult, RefUpdate, WorktreeInfo, WorktreeStatus } from "@norn/core";
+import type { CommitSpec, ConflictMarker, FirstParentCommit, GitFactory, GitInProgress, GitPort, MergeResult, OutgoingMarkers, PushResult, RefUpdate, WorktreeInfo, WorktreeStatus } from "@norn/core";
 import { bunExec, isAuthError, isNetworkError, okOrThrow, portError, type Exec, type ExecResult } from "../exec.ts";
 
 export { bunExec, fixtureExec, portError, type Exec, type ExecFixture, type ExecOptions, type ExecResult } from "../exec.ts";
@@ -169,10 +169,10 @@ export function createGit(opts: GitOptions = {}): GitPort {
   const exec = opts.exec ?? bunExec;
   const bin = opts.bin ?? "git";
   const env = { GIT_TERMINAL_PROMPT: "0", GIT_EDITOR: "true", ...(opts.env ?? {}) };
-  const run = (cwd: string, args: string[], stdin?: string) => {
+  const run = (cwd: string, args: string[], stdin?: string, extraEnv?: Record<string, string>) => {
     // H11: a call that reaches the remote is bounded; local ones (hooks on commit) are not
     const timeoutMs = gitTimeoutMs(args);
-    return exec([bin, ...args], { cwd, env, ...(stdin === undefined ? {} : { stdin }), ...(timeoutMs === undefined ? {} : { timeoutMs }) });
+    return exec([bin, ...args], { cwd, env: extraEnv ? { ...env, ...extraEnv } : env, ...(stdin === undefined ? {} : { stdin }), ...(timeoutMs === undefined ? {} : { timeoutMs }) });
   };
   const must = async (cwd: string, args: string[], stdin?: string) => okOrThrow(await run(cwd, args, stdin), `git ${args[0]}`, "git");
   const line = async (cwd: string, args: string[]) => (await must(cwd, args)).trim();
@@ -183,6 +183,7 @@ export function createGit(opts: GitOptions = {}): GitPort {
   };
 
   const worktreeRoot = (cwd: string) => line(cwd, ["rev-parse", "--show-toplevel"]);
+  const commonDir = (cwd: string) => line(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
 
   const rebaseInProgress = async (cwd: string) => {
     for (const d of ["rebase-merge", "rebase-apply"]) {
@@ -214,8 +215,14 @@ export function createGit(opts: GitOptions = {}): GitPort {
 
   const git: GitPort = {
     async repoRoot(cwd) {
-      const common = await line(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+      const common = await commonDir(cwd);
       return common.endsWith("/.git") ? dirname(common) : common;
+    },
+    commonDir,
+    async remotes(cwd) {
+      return lines(await must(cwd, ["remote"]))
+        .map((l) => l.trim())
+        .filter((l) => l.length > 0);
     },
     worktreeRoot,
     async status(cwd) {
@@ -251,6 +258,37 @@ export function createGit(opts: GitOptions = {}): GitPort {
           return { sha: sha as string, subject: subject ?? "", at: Number(at) * 1000, trailers: parseTrailers(trailers ?? "") };
         });
     },
+    async firstParentLog(cwd, rev, o): Promise<FirstParentCommit[]> {
+      const format = `--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=${o.trailer},valueonly,separator=%x2C)%x1e`;
+      const out = await must(cwd, ["log", "--first-parent", "-n", String(o.limit), format, rev, ...(o.exclude ? [`^${o.exclude}`] : []), "--"]);
+      const commits: FirstParentCommit[] = [];
+      for (const rec of out.split("\x1e")) {
+        const r = rec.replace(/^\n/, "");
+        if (!r) continue;
+        const [sha, subject, author, authored, committed, trailer] = r.split("\x1f");
+        commits.push({ sha: sha as string, subject: subject ?? "", author: author ?? "", authored_at: authored ?? "", committed_at: committed ?? "", trailer: (trailer ?? "").trim() });
+      }
+      return commits;
+    },
+    async revList(cwd, range, o) {
+      const args = ["rev-list"];
+      if (o?.ancestryPath) args.push("--ancestry-path");
+      if (o?.firstParent) args.push("--first-parent");
+      if (o?.limit !== undefined) args.push("-n", String(o.limit));
+      if (o?.reverse) args.push("--reverse");
+      return lines(await must(cwd, [...args, range]));
+    },
+    async show(cwd, rev, path) {
+      const r = await run(cwd, ["show", `${rev}:${path}`]);
+      return r.code === 0 ? r.stdout : null;
+    },
+    async hasPath(cwd, rev, path) {
+      return (await run(cwd, ["cat-file", "-e", `${rev}:${path}`])).code === 0;
+    },
+    async lsTree(cwd, rev, path) {
+      const r = await run(cwd, ["ls-tree", "--name-only", `${rev}:${path}`]);
+      return r.code === 0 ? lines(r.stdout) : null;
+    },
 
     async branchExists(cwd, branch, where = "local", remote = "origin") {
       if (where === "local") return (await run(cwd, ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`])).code === 0;
@@ -281,6 +319,12 @@ export function createGit(opts: GitOptions = {}): GitPort {
     },
     async worktreeRemove(cwd, path, o) {
       await must(cwd, ["worktree", "remove", ...(o?.force ? ["--force"] : []), path]);
+    },
+    async worktreeAddDetached(cwd, path, rev) {
+      await must(cwd, ["worktree", "add", "--detach", "--quiet", path, rev]);
+    },
+    async worktreePrune(cwd) {
+      await must(cwd, ["worktree", "prune"]);
     },
 
     async commit(cwd, spec: CommitSpec) {
@@ -370,8 +414,10 @@ export function createGit(opts: GitOptions = {}): GitPort {
       if (o?.setUpstream) args.push("--set-upstream");
       return classifyPush(await run(cwd, [...args, remote, refspec]));
     },
-    async fetch(cwd, remote, refspecs) {
-      await must(cwd, ["fetch", "--no-tags", remote, ...refspecs]);
+    async fetch(cwd, remote, refspecs, o) {
+      // LC_ALL=C: callers tell a missing remote branch apart by git's English message
+      const args = ["fetch", ...(o?.quiet ? ["--quiet"] : []), "--no-tags", remote, ...refspecs];
+      okOrThrow(await run(cwd, args, undefined, { LC_ALL: "C" }), "git fetch", "git");
     },
     async fastForward(cwd, onto) {
       return { ok: (await run(cwd, ["merge", "--ff-only", "--no-edit", onto])).code === 0 };
@@ -432,14 +478,18 @@ export function createGit(opts: GitOptions = {}): GitPort {
     },
 
     readRef: (cwd, ref) => nullIfFail(cwd, ["rev-parse", "--verify", "--quiet", "--end-of-options", ref]),
+    async hasRef(cwd, ref) {
+      return (await run(cwd, ["rev-parse", "--verify", "--quiet", ref])).code === 0;
+    },
     async listRefs(cwd, prefix) {
-      const out = await must(cwd, ["for-each-ref", "--format=%(refname) %(objectname)", prefix]);
+      const prefixes: readonly string[] = typeof prefix === "string" ? [prefix] : prefix;
+      const out = await must(cwd, ["for-each-ref", "--format=%(refname) %(objectname)", ...prefixes]);
       return lines(out)
         .map((l) => {
           const [ref, sha] = l.split(" ");
           return { ref: ref as string, sha: sha as string };
         })
-        .filter((r) => r.ref.startsWith(prefix));
+        .filter((r) => prefixes.some((p) => r.ref.startsWith(p)));
     },
     async listRemoteRefs(cwd, remote, prefix) {
       const out = okOrThrow(await run(cwd, ["ls-remote", "--refs", remote]), "git ls-remote", "git");

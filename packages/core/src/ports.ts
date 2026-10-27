@@ -137,10 +137,25 @@ export interface Divergence {
   behind: number;
 }
 
+/** A commit of `GitPort.firstParentLog`; dates are ISO 8601 as git prints them. */
+export interface FirstParentCommit {
+  sha: string;
+  subject: string;
+  author: string;
+  authored_at: string;
+  committed_at: string;
+  /** value of the requested trailer, "" when the commit has none */
+  trailer: string;
+}
+
 /** Git, run in a given repo or worktree directory (`cwd`). */
 export interface GitPort {
   /** Top-level of the repo containing cwd (main checkout, not the worktree). */
   repoRoot(cwd: string): Promise<string>;
+  /** Absolute path of the git directory shared by every worktree of the repo (`git rev-parse --git-common-dir`). */
+  commonDir(cwd: string): Promise<string>;
+  /** Names of the repo's remotes (`git remote`). */
+  remotes(cwd: string): Promise<string[]>;
   /** Top-level of the worktree containing cwd. */
   worktreeRoot(cwd: string): Promise<string>;
   status(cwd: string): Promise<WorktreeStatus>;
@@ -152,6 +167,20 @@ export interface GitPort {
   diffStat(cwd: string, range: string): Promise<string>;
   /** commits in range, newest first */
   log(cwd: string, range: string, limit?: number): Promise<Array<{ sha: string; subject: string; at: number; trailers: Record<string, string> }>>;
+  /**
+   * Q6/C4: the first-parent line of `rev` (not reachable from `exclude`), newest first, at most
+   * `limit` commits, each with its author, ISO author and committer dates and the value of the
+   * `trailer` trailer ("" when absent).
+   */
+  firstParentLog(cwd: string, rev: string, opts: { exclude?: string; limit: number; trailer: string }): Promise<FirstParentCommit[]>;
+  /** `git rev-list` of `range`: shas, newest first unless `reverse`. */
+  revList(cwd: string, range: string, opts?: { ancestryPath?: boolean; firstParent?: boolean; limit?: number; reverse?: boolean }): Promise<string[]>;
+  /** The file at `path` in `rev` (`git show <rev>:<path>`); null when there is none. */
+  show(cwd: string, rev: string, path: string): Promise<string | null>;
+  /** Does `rev` hold `path` (`git cat-file -e <rev>:<path>`)? */
+  hasPath(cwd: string, rev: string, path: string): Promise<boolean>;
+  /** Entry names of the directory `path` in `rev` (`git ls-tree --name-only`); null when it is not a directory there. */
+  lsTree(cwd: string, rev: string, path: string): Promise<string[] | null>;
 
   branchExists(cwd: string, branch: string, where?: "local" | "remote", remote?: string): Promise<boolean>;
   createBranch(cwd: string, branch: string, from: string): Promise<void>;
@@ -162,6 +191,10 @@ export interface GitPort {
   /** Add a worktree at path on branch; create the branch from `from` if given. */
   worktreeAdd(cwd: string, path: string, branch: string, opts?: { from?: string }): Promise<void>;
   worktreeRemove(cwd: string, path: string, opts?: { force?: boolean }): Promise<void>;
+  /** Add a worktree at path with a detached HEAD at `rev` (GR6: the throwaway record worktree). */
+  worktreeAddDetached(cwd: string, path: string, rev: string): Promise<void>;
+  /** Forget worktrees whose directory is gone (`git worktree prune`). */
+  worktreePrune(cwd: string): Promise<void>;
 
   /**
    * Commit; returns the new sha, or null when nothing to commit. H1: never concludes an operation in
@@ -189,7 +222,8 @@ export interface GitPort {
   baseMergeCommit(cwd: string, base: string, head: string): Promise<string | null>;
   /** Push a branch (`refspec` like `HEAD:refs/heads/x`), optional force-with-lease. */
   push(cwd: string, remote: string, refspec: string, opts?: { forceWithLease?: string; setUpstream?: boolean }): Promise<PushResult>;
-  fetch(cwd: string, remote: string, refspecs: string[]): Promise<void>;
+  /** Fetch `refspecs` (none: the remote's configured ones), no tags; `quiet` drops progress output. */
+  fetch(cwd: string, remote: string, refspecs: string[], opts?: { quiet?: boolean }): Promise<void>;
   /** `git pull --ff-only` equivalent for the current branch. */
   fastForward(cwd: string, onto: string): Promise<{ ok: boolean }>;
   /** Rebase current branch of cwd onto `onto`; aborts and reports files on conflict. */
@@ -211,7 +245,10 @@ export interface GitPort {
 
   // --- refs and blobs (claims T2, mailbox T9)
   readRef(cwd: string, ref: string): Promise<string | null>;
-  listRefs(cwd: string, prefix: string): Promise<Array<{ ref: string; sha: string }>>;
+  /** Does `ref` (or any revision) resolve here (`git rev-parse --verify --quiet`)? */
+  hasRef(cwd: string, ref: string): Promise<boolean>;
+  /** Refs under any of the prefixes (one `git for-each-ref`). */
+  listRefs(cwd: string, prefix: string | readonly string[]): Promise<Array<{ ref: string; sha: string }>>;
   /** Remote refs under prefix (`git ls-remote`). */
   listRemoteRefs(cwd: string, remote: string, prefix: string): Promise<Array<{ ref: string; sha: string }>>;
   readBlob(cwd: string, sha: string): Promise<string>;

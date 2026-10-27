@@ -18,6 +18,7 @@ import {
   edgeOf,
   type FileError,
   type ForeignCommit,
+  type GitPort,
   type MailboxItem,
   type NumberedReceipt,
   openNotes,
@@ -54,7 +55,6 @@ import {
 import {
   classifyClaim,
   fetchNornRefs,
-  git as rawGit,
   onlyNornCommitsSince,
   listLeases,
   listMailbox,
@@ -161,9 +161,9 @@ export function machineHolder(env: Record<string, string | undefined>): string {
 }
 
 /** `name` when this repository has a git remote by that name, else null. */
-export async function gitRemote(root: string, name: string): Promise<string | null> {
-  const r = await rawGit(root, ["remote"]);
-  return r.code === 0 && r.stdout.split("\n").some((l) => l.trim() === name) ? name : null;
+export async function gitRemote(git: GitPort, root: string, name: string): Promise<string | null> {
+  const names: string[] = await git.remotes(root).catch(() => []);
+  return names.includes(name) ? name : null;
 }
 
 /** Newest mtime of the given worktree-relative paths (ms), or null. */
@@ -223,7 +223,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   const git = ports.git;
   const hb = heartbeatId(root, now);
   const remoteName = config.remote.git_remote;
-  const remote = await gitRemote(root, remoteName);
+  const remote = await gitRemote(git, root, remoteName);
 
   // ---- worktrees (A3 markers tell story and slice worktrees apart)
   const storyWts = new Map<string, string>();
@@ -257,8 +257,8 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   const base = config.base_branch ?? cache.default_branch ?? "main";
   // P2 / F33 / F36: the fetched base branch is the record and the merge reference — never the
   // main checkout's local `main`, which norn does not move. Fetched with every remote sync.
-  if (due && ports.remote && remote) await rawGit(root, ["fetch", "--quiet", "--no-tags", remote, `+refs/heads/${base}:refs/remotes/${remote}/${base}`]).catch(() => undefined);
-  const baseRef = await trackingRef(root, remote, base);
+  if (due && ports.remote && remote) await git.fetch(root, remote, [`+refs/heads/${base}:refs/remotes/${remote}/${base}`], { quiet: true }).catch(() => undefined);
+  const baseRef = await trackingRef(git, root, remote, base);
 
   const snapshot = loadSnapshot({ repoRoot: root, storyRoots: [...storyWts.values()], home: ctx.home, env: ctx.env, baseRef });
   const workflows = repoWorkflows(snapshot.workflows, { default_agent: config.default_agent, visible: agentSkills(ports.agents, root) });
@@ -304,7 +304,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   if (baseRef)
     for (const s of snapshot.stories) {
       const pr = storyPrs.get(s.key);
-      if (pr && pr.state !== "merged" && (await mergedByAncestry(root, remote, storyBranch(s.key, s.slug), pr, baseRef))) byAncestry.add(s.key);
+      if (pr && pr.state !== "merged" && (await mergedByAncestry(git, root, remote, storyBranch(s.key, s.slug), pr, baseRef))) byAncestry.add(s.key);
     }
 
   // ---- machine (K1, K3, MO2)
@@ -342,7 +342,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   const holder = machineHolder(ctx.env);
   const local: LocalRunEnv = { holder, runner: ports.runner && runner ? ports.runner : null, stalledMs: parseDuration(config.limits.stalled), now };
 
-  const refs = await refMap(root);
+  const refs = await refMap(git, root);
   // BS1: last measurements; stories not seen this tick drop out of the cache
   const baseCacheIn = readBaseFacts(root);
   const baseCache: BaseFactsCache = {};
@@ -376,7 +376,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       // Q6: commits norn did not make; an agent's own commits mid-run are not foreign
       // C4: …nor are commits made during any run of this unit (e.g. while it is parked on an ask)
       if (u.state?.status !== "running") {
-        const found = await foreignCommits(root, remote, unitBranch, baseRef, refs);
+        const found = await foreignCommits(git, root, remote, unitBranch, baseRef, refs);
         const windows = found.length ? runWindows(s, u) : [];
         foreign.push(...found.filter((c) => !duringRun(c, windows)).map(({ committed_at: _, ...c }) => c));
       }
@@ -498,26 +498,25 @@ async function storyBase(
 }
 
 /** `refs/remotes/<remote>/<base>` when it exists locally (fetched), else null (solo, never fetched). */
-async function trackingRef(root: string, remote: string | null, base: string): Promise<string | null> {
+async function trackingRef(git: GitPort, root: string, remote: string | null, base: string): Promise<string | null> {
   if (!remote) return null;
   const ref = `refs/remotes/${remote}/${base}`;
-  return (await rawGit(root, ["rev-parse", "--verify", "--quiet", ref])).code === 0 ? ref : null;
+  return (await git.hasRef(root, ref)) ? ref : null;
 }
 
-async function commitOf(root: string, rev: string): Promise<string | null> {
+async function commitOf(git: GitPort, root: string, rev: string): Promise<string | null> {
   if (!rev) return null;
-  const r = await rawGit(root, ["rev-parse", "--verify", "--quiet", "--end-of-options", `${rev}^{commit}`]);
-  return r.code === 0 ? r.stdout.trim() : null;
+  return git.revParse(root, `${rev}^{commit}`);
 }
 
 /**
  * P2 (F34): is the PR head (or, when its sha is unknown here, the story branch head) an ancestor of
  * the fetched base? Then the work is merged whatever the PR state says.
  */
-export async function mergedByAncestry(root: string, remote: string | null, branch: string, pr: RemotePullRequest, baseRef: string): Promise<boolean> {
-  const head = (await commitOf(root, pr.head_sha)) ?? (await commitOf(root, `refs/heads/${branch}`)) ?? (remote ? await commitOf(root, `refs/remotes/${remote}/${branch}`) : null);
+export async function mergedByAncestry(git: GitPort, root: string, remote: string | null, branch: string, pr: RemotePullRequest, baseRef: string): Promise<boolean> {
+  const head = (await commitOf(git, root, pr.head_sha)) ?? (await commitOf(git, root, `refs/heads/${branch}`)) ?? (remote ? await commitOf(git, root, `refs/remotes/${remote}/${branch}`) : null);
   if (!head) return false;
-  return (await rawGit(root, ["merge-base", "--is-ancestor", head, baseRef])).code === 0;
+  return git.isAncestor(root, head, baseRef).catch(() => false);
 }
 
 /**
@@ -527,31 +526,26 @@ export async function mergedByAncestry(root: string, remote: string | null, bran
 /** C4: a found commit with its committer date (ISO), compared with the unit's run windows; not part of the facts. */
 export type DatedCommit = ForeignCommit & { committed_at?: string };
 
-export async function foreignCommits(root: string, remote: string | null, branch: string, baseRef: string | null, refs?: Map<string, string>): Promise<DatedCommit[]> {
+export async function foreignCommits(git: GitPort, root: string, remote: string | null, branch: string, baseRef: string | null, refs?: Map<string, string>): Promise<DatedCommit[]> {
   const local = `refs/heads/${branch}`;
   const tracking = remote ? `refs/remotes/${remote}/${branch}` : null;
-  const ref = refs ? (refs.get(local) ?? (tracking ? refs.get(tracking) : undefined) ?? null) : ((await commitOf(root, local)) ?? (tracking ? await commitOf(root, tracking) : null));
+  const ref = refs ? (refs.get(local) ?? (tracking ? refs.get(tracking) : undefined) ?? null) : ((await commitOf(git, root, local)) ?? (tracking ? await commitOf(git, root, tracking) : null));
   if (!ref) return [];
   const baseSha = baseRef ? (refs?.get(baseRef) ?? baseRef) : "";
   // the answer only depends on (head, base): remembered for the process (watch, tests)
   const memo = `${root}\0${branch}\0${ref}\0${baseSha}`;
   const hit = FOREIGN_MEMO.get(memo);
   if (hit) return hit;
-  const args = ["log", "--first-parent", "-n", "100", "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e", ref];
-  if (baseSha) args.push(`^${baseSha}`);
-  const r = await rawGit(root, [...args, "--"]);
-  if (r.code !== 0) return [];
+  const log = await git.firstParentLog(root, ref, { limit: 100, trailer: "Norn-Tick", ...(baseSha ? { exclude: baseSha } : {}) }).catch(() => null);
+  if (!log) return [];
   let found: DatedCommit[] = [];
   const out: DatedCommit[] = [];
-  for (const rec of r.stdout.split("\x1e")) {
-    const line = rec.replace(/^\n/, "");
-    if (!line) continue;
-    const [sha, subject, author, at, committed, tick] = line.split("\x1f") as [string, string, string, string, string, string | undefined];
-    if (tick?.trim()) {
+  for (const c of log) {
+    if (c.trailer) {
       found = out;
       break;
     }
-    out.push({ sha, subject: subject ?? "", author: author ?? "", at: at ?? "", ...(committed ? { committed_at: committed } : {}), branch });
+    out.push({ sha: c.sha, subject: c.subject, author: c.author, at: c.authored_at, ...(c.committed_at ? { committed_at: c.committed_at } : {}), branch });
   }
   if (FOREIGN_MEMO.size > 500) FOREIGN_MEMO.clear();
   FOREIGN_MEMO.set(memo, found);
@@ -589,15 +583,9 @@ const duringRun = (c: DatedCommit, windows: ReadonlyArray<[number, number]>) => 
 };
 
 /** Every branch and remote-tracking ref → sha, in one git call. */
-async function refMap(root: string): Promise<Map<string, string>> {
-  const r = await rawGit(root, ["for-each-ref", "--format=%(refname) %(objectname)", "refs/heads/", "refs/remotes/"]);
-  const m = new Map<string, string>();
-  if (r.code === 0)
-    for (const l of r.stdout.split("\n")) {
-      const i = l.indexOf(" ");
-      if (i > 0) m.set(l.slice(0, i), l.slice(i + 1));
-    }
-  return m;
+async function refMap(git: GitPort, root: string): Promise<Map<string, string>> {
+  const refs = await git.listRefs(root, ["refs/heads/", "refs/remotes/"]).catch(() => []);
+  return new Map(refs.map((r) => [r.ref, r.sha]));
 }
 
 /**

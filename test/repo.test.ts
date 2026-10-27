@@ -231,11 +231,6 @@ const RAW_GIT_ALLOW: Counts = {
   "packages/cli/src/commands/take.ts": 3,
   "packages/cli/src/commands/tidy.ts": 4,
   "packages/cli/src/commands/watch.ts": 1,
-  "packages/cli/src/runtime/act.ts": 1,
-  "packages/cli/src/runtime/human.ts": 4,
-  "packages/cli/src/runtime/observe.ts": 7,
-  "packages/cli/src/runtime/record.ts": 10,
-  "packages/cli/src/runtime/release.ts": 3,
 };
 
 /**

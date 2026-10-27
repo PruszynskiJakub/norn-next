@@ -50,7 +50,6 @@ import {
   appendReceipt,
   appendTrace,
   deleteMailbox,
-  git as rawGit,
   listLeases,
   patchSliceFile,
   patchStoryFile,
@@ -1103,9 +1102,12 @@ export class Actor {
     const loc = this.obs.stories[story];
     if (!loc) return { kept: "story not checked out here" };
     const base = this.obs.remote ? `refs/remotes/${this.obs.remote}/${this.obs.facts.repo.default_branch}` : `refs/heads/${this.obs.facts.repo.default_branch}`;
-    const log = await rawGit(this.root, ["log", "--format=%s", `refs/heads/${loc.branch}`, `^${base}`, "--"]);
-    if (log.code !== 0) return { kept: `cannot list ${loc.branch}: ${log.stderr.trim()}` };
-    const subjects = log.stdout.split("\n").filter(Boolean);
+    const log = await this.git.log(this.root, `${base}..refs/heads/${loc.branch}`).then(
+      (commits) => ({ ok: true as const, commits }),
+      (e: unknown) => ({ ok: false as const, message: e instanceof Error ? e.message : String(e) }),
+    );
+    if (!log.ok) return { kept: `cannot list ${loc.branch}: ${log.message}` };
+    const subjects = log.commits.map((c) => c.subject).filter(Boolean);
     if (subjects.length > 1 || (subjects[0] !== undefined && !subjects[0].startsWith(`norn: intake ${story} `)))
       return { kept: `${loc.branch} has ${subjects.length} commit(s) beyond the intake` };
     const wt = loc.worktree;
@@ -1181,7 +1183,7 @@ export class Actor {
     // story.md `merge:` on the base with the status (record.ts), and is kept in records.json while owed
     const story = this.storyLoc(a.unit.story);
     const facts = this.obs.facts.stories.find((s) => s.key === a.unit.story);
-    const merge = facts ? await mergeFacts({ root: this.root, remote: this.obs.remote, base: this.obs.facts.repo.default_branch, story: facts }).catch(() => undefined) : undefined;
+    const merge = facts ? await mergeFacts({ root: this.root, remote: this.obs.remote, git: this.git, base: this.obs.facts.repo.default_branch, story: facts }).catch(() => undefined) : undefined;
     if (merge) detail.merge = merge;
     detail.record = await this.record({ story: a.unit.story, spec_dir: story.spec_dir, status: a.story_status, attempted_at: 0, attempts: 0, reason: "", ...(merge ? { merge } : {}) });
     return errors.length ? { ok: false, error: errors.join("; "), detail } : { ok: true, detail };
