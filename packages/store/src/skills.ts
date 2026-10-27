@@ -8,7 +8,7 @@ import { join, relative, resolve } from "node:path";
 import { atomicWrite, safeUnlink } from "./fsx.ts";
 
 export const SKILLS_DIR = ".agents/skills";
-export const skillsDir = (root: string) => join(root, SKILLS_DIR);
+const skillsDir = (root: string) => join(root, SKILLS_DIR);
 
 /** The marker norn 0.1.0 put into each skill copy it installed; such copies are norn's to replace or remove. */
 export const LEGACY_SKILL_MARKER = "<!-- norn-owned: managed by `norn init`; remove this line to keep local edits -->";
@@ -96,7 +96,7 @@ export interface SkillLinks {
 const linkTarget = (root: string, agentDir: string, name: string) => relative(agentDir, join(skillsDir(root), name));
 
 /** True when `<agentDir>/<name>` is a link to `.agents/skills/<name>`. */
-export function isSkillLinked(root: string, agentDir: string, name: string): boolean {
+function isSkillLinked(root: string, agentDir: string, name: string): boolean {
   const path = join(agentDir, name);
   if (!isLink(path)) return false;
   return resolve(agentDir, readlinkSync(path)) === resolve(skillsDir(root), name);

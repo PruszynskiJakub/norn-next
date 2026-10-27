@@ -5,12 +5,13 @@ import type { TimelineEntry } from "./types.ts";
 
 const MAX = 140;
 
-/** Collapse whitespace and cut to one short line. */
+/** Collapse whitespace and cut to one line of at most `max` chars, ending in `…` when cut (`max` ≤ 0 → empty). */
 export function oneLine(text: string, max = MAX): string {
   return cut(text, max);
 }
 
 function cut(text: string, max: number): string {
+  if (max <= 0) return "";
   const s = text.replace(/\s+/g, " ").trim();
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
@@ -112,6 +113,9 @@ export function traceEntries(ev: TraceEvent, unit: string, max = MAX): TimelineE
     case "tick.end":
       // R5.4: bracket records of a tick; its `tick` record carries the decisions (a crashed tick: `norn why`)
       return [];
+    case "local_file":
+      // S2: a machine-local cache read as empty; belongs to no unit
+      return [];
   }
 }
 
@@ -132,6 +136,7 @@ export function traceUnits(ev: TraceEvent): string[] {
       return [ev.unit];
     case "tick.start":
     case "tick.end":
+    case "local_file":
       return [];
   }
 }

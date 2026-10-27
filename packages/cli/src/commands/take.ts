@@ -12,40 +12,31 @@
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { sliceWorktreePath, storyWorktreePath } from "@norn/core";
-import { type ClaimBlob, ExitCode, isStoryKey, parseSliceKey, parseDuration, type ReceiptOf, sliceBranch, specDir, STORY_UNIT_DIR, ulid } from "@norn/schema";
+import { ExitCode, type ReceiptOf, sliceBranch, specDir, STORY_UNIT_DIR, ulid } from "@norn/schema";
 import {
   acquireClaim,
   acquireTickLock,
   appendHandoffHeartbeat,
   appendReceipt,
   appendTrace,
-  git as rawGit,
   handoffPath,
   loadStory,
-  readClaim,
+  newClaimBlob,
   readState,
   readText,
+  heartbeatId,
+  writtenHere,
+  machineHolder,
+  traceEvent,
 } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
-import { busyError, claimHeld, corruptError, failure, refuse, usageError, withExit } from "../output.ts";
+import { busyError, claimHeld, corruptError, failure, refuse, withExit } from "../output.ts";
+import { storyArg } from "../runtime/args.ts";
+import { claimFor } from "../runtime/human.ts";
 import { leaseLiveness } from "../runtime/leases.ts";
-import { heartbeatId } from "../runtime/local.ts";
-import { machineHolder } from "../runtime/observe.ts";
+import { gitRemote } from "../runtime/observe/index.ts";
 import { equipWorktree, syncLocalBranch, type WorktreeTarget } from "../runtime/worktrees.ts";
-
-/** Story key from `gh-7` or a unit key `gh-7/01` (claims are per story, T1). */
-export function storyArg(raw: string, command: string): string {
-  const key = parseSliceKey(raw)?.story ?? raw;
-  if (!isStoryKey(key)) throw usageError(`not a story key: '${raw}' (expected e.g. gh-123)`, `norn ${command} <story>`);
-  return key;
-}
-
-export async function gitRemote(ctx: Context): Promise<string | null> {
-  const name = ctx.config.remote.git_remote;
-  const r = await rawGit(ctx.root, ["remote"]);
-  return r.code === 0 && r.stdout.split("\n").some((l) => l.trim() === name) ? name : null;
-}
 
 const storyBranchRe = (key: string) => new RegExp(`^${key}-[a-z0-9][a-z0-9-]*$`);
 
@@ -53,12 +44,9 @@ const storyBranchRe = (key: string) => new RegExp(`^${key}-[a-z0-9][a-z0-9-]*$`)
 async function findStoryBranch(ctx: Context, key: string, remote: string | null): Promise<string | null> {
   const re = storyBranchRe(key);
   if (remote) {
-    const r = await rawGit(ctx.root, ["ls-remote", "--heads", remote, `refs/heads/${key}-*`]);
-    if (r.code !== 0) throw failure(`cannot list ${remote} branches: ${r.stderr.trim()}`, "check the network and git credentials, then retry", "network");
-    const names = r.stdout
-      .split("\n")
-      .map((l) => l.split("\t")[1]?.replace(/^refs\/heads\//, "") ?? "")
-      .filter((n) => re.test(n));
+    const listed = await ctx.git.remoteBranches(ctx.root, remote, `refs/heads/${key}-*`).catch((e: unknown) => e as Error);
+    if (listed instanceof Error) throw failure(`cannot list ${remote} branches: ${listed.message}`, "check the network and git credentials, then retry", "network");
+    const names = listed.filter((n) => re.test(n));
     if (names.length) return names.sort()[0] as string;
   }
   const local = (await (await ctx.ports()).git.listRefs(ctx.root, "refs/heads/")).map((r) => r.ref.slice("refs/heads/".length)).filter((n) => re.test(n));
@@ -128,7 +116,7 @@ async function take(ctx: Context, key: string, force: boolean) {
   const git = ports.git;
   const now = ctx.clock.now();
   const nowIso = ctx.clock.iso();
-  const remote = await gitRemote(ctx);
+  const remote = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
 
   const branch = await findStoryBranch(ctx, key, remote);
   if (!branch) throw refuse(`no story branch for ${key}${remote ? ` on ${remote}` : ""}`, "norn sync (intake creates it) or check the story key", "unknown_story");
@@ -138,27 +126,23 @@ async function take(ctx: Context, key: string, force: boolean) {
   // ---- 1. claim (T3, T5)
   const hb = heartbeatId(root, now);
   const holder = machineHolder(ctx.env);
-  const cur = await readClaim(root, remote, key).catch((e: Error) => {
-    throw failure(`cannot read the claim: ${e.message}`, "check the network, then retry", "network");
-  });
+  const cur = await claimFor(ctx, key, { remote, unreadable: (e) => failure(`cannot read the claim: ${e.message}`, "check the network, then retry", "network") });
   if (cur.state === "corrupt" && !force) throw corruptError(`claim ref of ${key} is unreadable`, `norn take ${key} --force`, cur.error);
-  const live = cur.state === "present" && Date.parse(cur.blob.expires_at) > now;
-  const mine = cur.state === "present" && cur.blob.heartbeat_id === hb;
-  if (live && !mine && !force)
+  if (cur.state === "other" && !force)
     throw claimHeld(cur.blob, `wait until ${cur.blob.expires_at}, ask ${cur.blob.holder} to run norn release ${key}, or norn take ${key} --force`);
-  const forced = force && ((live && !mine) || cur.state === "corrupt");
-  const prev = cur.state === "present" ? cur.blob : null;
-  const blob: ClaimBlob = {
-    version: 1,
+  const mine = writtenHere(cur, hb);
+  const forced = force && (cur.state === "other" || cur.state === "corrupt");
+  const prev = cur.state === "none" || cur.state === "corrupt" ? null : cur.blob;
+  const blob = newClaimBlob({
     story: key,
     holder,
     heartbeat_id: hb,
-    acquired_at: mine && prev ? prev.acquired_at : nowIso,
-    renewed_at: nowIso,
-    expires_at: new Date(now + parseDuration(config.claim.lease)).toISOString(),
-    last_tick_id: null,
+    now,
+    at: nowIso,
+    lease: config.claim.lease,
+    ...(mine && prev ? { acquired_at: prev.acquired_at } : {}),
     ...(forced ? { forced_from: prev ? `${prev.holder} (heartbeat ${prev.heartbeat_id}, expires ${prev.expires_at})` : "corrupt claim" } : {}),
-  };
+  });
   const claimed = await acquireClaim(root, remote, blob, { now, force: forced });
   if (!claimed.ok) {
     if (claimed.reason === "held") throw claimHeld(claimed.holder, `wait until ${claimed.holder.expires_at} or norn take ${key} --force`);
@@ -166,15 +150,17 @@ async function take(ctx: Context, key: string, force: boolean) {
   }
   // R10.1 (M8, A17): every take is in the record — the trace event first; the `take` receipt on the
   // story unit as soon as the story branch is checked out (it lives on that branch), before anything else
-  const expired = !!prev && !forced && Date.parse(prev.expires_at) <= now;
+  const expired = cur.state === "expired";
   const takeFacts = { previous_holder: prev?.holder ?? null, previous_heartbeat_id: prev?.heartbeat_id ?? null, expired, forced };
-  appendTrace(root, { type: "take", id: ulid(now), at: nowIso, unit: key, holder, heartbeat_id: hb, ...takeFacts });
+  appendTrace(root, traceEvent("take", now, { at: nowIso, unit: key, holder, heartbeat_id: hb, ...takeFacts }));
 
   // ---- 2. branches → worktrees (T5, K4)
   const problems: string[] = [];
   if (remote) {
-    const f = await rawGit(root, ["fetch", "--quiet", "--no-tags", remote, `+refs/heads/${branch}:refs/remotes/${remote}/${branch}`, `+refs/heads/${key}/*:refs/remotes/${remote}/${key}/*`]);
-    if (f.code !== 0) throw failure(`fetch failed: ${f.stderr.trim()}`, `retry: norn take ${key} (the claim is held by you now)`, "network");
+    const f = await git
+      .fetch(root, remote, [`+refs/heads/${branch}:refs/remotes/${remote}/${branch}`, `+refs/heads/${key}/*:refs/remotes/${remote}/${key}/*`], { quiet: true })
+      .catch((e: unknown) => e as Error);
+    if (f instanceof Error) throw failure(`fetch failed: ${f.message}`, `retry: norn take ${key} (the claim is held by you now)`, "network");
   }
   const wtByBranch = new Map((await git.worktreeList(root)).filter((w) => w.branch).map((w) => [w.branch as string, w.path]));
   const equip = { root, home: ctx.home, config, now: nowIso, liveness: leaseLiveness((p) => ports.process.isAlive(p)) };
@@ -190,7 +176,7 @@ async function take(ctx: Context, key: string, force: boolean) {
     }
     let created = false;
     if (!existsSync(path)) {
-      if (existing) await rawGit(root, ["worktree", "prune"]);
+      if (existing) await git.worktreePrune(root).catch(() => undefined);
       await git.worktreeAdd(root, path, t.branch);
       created = true;
     }

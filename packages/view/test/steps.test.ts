@@ -31,7 +31,7 @@ function seed(opts: { trace?: boolean } = {}): string {
 }
 
 function load(repo: string, key: string, o: { all?: boolean; events?: boolean; storyOnly?: boolean } = {}): TraceView {
-  const v = loadTraceView({ repoRoot: repo, home: join(repo, ".home"), env: {}, storyRoots: [], key, now: NOW, ...o });
+  const v = loadTraceView({ repoRoot: repo, home: join(repo, ".home"), env: {}, key, now: NOW, ...o });
   if (!v) throw new Error(`no view for ${key}`);
   return v;
 }

@@ -9,7 +9,8 @@ import { checkWorkflowLevel, sha256, stepOf } from "@norn/core";
 import { acquireTickLock, patchSliceFile, patchStoryFile, pinWorkflow, storyFile } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import { busyError, claimHeld, failure, refuse } from "../output.ts";
-import { claimRoute, deliver, humanReceipt, parseUnitKey, resolveTarget, started } from "../runtime/human.ts";
+import { parseUnitKey } from "../runtime/args.ts";
+import { humanReceipt, resolveTarget, runHumanVerb } from "../runtime/human.ts";
 
 export const workflowCommand = defineCommand({
   name: "workflow",
@@ -56,20 +57,25 @@ export const workflowCommand = defineCommand({
         return { unit: t.key, workflow: name, previous, started: false, changed: previous !== name, file };
       }
 
-      const st = started(t);
-      if (st.status === "done") throw refuse(`${t.key} is done`, `norn status ${t.story}`, "unit_done");
       const steps = Object.keys(wf.steps);
-      if (to === undefined)
-        throw refuse(`${t.key} already runs workflow ${st.workflow}; switching a started unit needs --to <step> (S7)`, `norn workflow ${t.key} ${name} --to <${steps.join("|")}>`, "needs_to");
-      if (!stepOf(wf, to)) throw refuse(`no step '${to}' in workflow ${name}`, `norn workflow ${t.key} ${name} --to <${steps.join("|")}>`, "unknown_step");
-      const route = await claimRoute(ctx, t, { mailbox: false, verb: "workflow" });
       const toHash = sha256(loaded.source);
-      const receipt = humanReceipt(ctx, t, st, "workflow", { name, from_hash: st.workflow_hash, to_hash: toHash, to });
-      // P6: the journal entry first, then the re-pin; state.json moves on the next tick (S5)
-      const delivered = await deliver(ctx, t, route, receipt);
+      const out = await runHumanVerb(ctx, t, {
+        verb: "workflow",
+        mailbox: false,
+        // as before: a second switch before the tick is written, not refused as a duplicate (S6)
+        refuseDuplicate: false,
+        check(t, st) {
+          if (st.status === "done") throw refuse(`${t.key} is done`, `norn status ${t.story}`, "unit_done");
+          if (to === undefined)
+            throw refuse(`${t.key} already runs workflow ${st.workflow}; switching a started unit needs --to <step> (S7)`, `norn workflow ${t.key} ${name} --to <${steps.join("|")}>`, "needs_to");
+          if (!stepOf(wf, to)) throw refuse(`no step '${to}' in workflow ${name}`, `norn workflow ${t.key} ${name} --to <${steps.join("|")}>`, "unknown_step");
+        },
+        // P6: the journal entry first, then the re-pin; state.json moves on the next tick (S5)
+        build: (t, st) => humanReceipt(ctx, t, st, "workflow", { name, from_hash: st.workflow_hash, to_hash: toHash, to: to as string }),
+      });
       pinWorkflow(t.runsDir as string, loaded.source, { replace: true });
       const file = patchFm();
-      return { unit: t.key, workflow: name, previous: st.workflow, started: true, to, receipt, delivered, file, next: "norn tick" };
+      return { unit: t.key, workflow: name, previous: t.state.workflow, started: true, to, receipt: out.receipt, delivered: out.delivered, file, next: out.next };
     } finally {
       lock.release();
     }

@@ -8,26 +8,13 @@
  */
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, storyRulings, storyWorktreePath } from "@norn/core";
+import { currentRun, cursorStep, type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, standingReport, storyRulings, storyWorktreePath } from "@norn/core";
 import { type AgentStep, type ProcessIdentity, type ReceiptOf, storyBranch, ulid } from "@norn/schema";
-import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readText, writeBriefing } from "@norn/store";
+import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readHookFacts, readText, writeBriefing, readRemoteCache, traceEvent } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
-import {
-  agentName,
-  currentRun,
-  loadUnitSession,
-  refuseUnlessAgentWork,
-  reportCommand,
-  standingReport,
-  stepOfSession,
-  storyMode,
-  type UnitSession,
-  unitCriteria,
-} from "../runtime/agent-unit.ts";
-import { readRemoteCache } from "../runtime/local.ts";
-import { readHookFacts } from "../runtime/observe.ts";
+import { agentName, loadUnitSession, refuseUnlessAgentWork, reportCommand, storyMode, type UnitSession, unitCriteria } from "../runtime/agent-unit.ts";
 
 /** Wrappers between the agent and `norn` that exit right after it (never the run's process). */
 const WRAPPERS = /^-?(sh|bash|zsh|dash|fish|ksh|tcsh|csh|env|bun|bunx|npx|pnpm|timeout|sudo|nice|nohup|xargs|script|login)$/;
@@ -146,7 +133,7 @@ function rulings(s: UnitSession): Ruling[] {
 }
 
 /** `<remote>/<base>` when the remote-tracking base exists, else the local base branch (solo). */
-export function storyDiffBase(ctx: Context, root: string): string {
+function storyDiffBase(ctx: Context, root: string): string {
   // BS0: config `base_branch` when set, else the discovered default branch
   const branch = ctx.config.base_branch ?? readRemoteCache(root).default_branch ?? "main";
   const ref = defaultBaseRef(root, ctx.config.remote.git_remote, branch);
@@ -172,7 +159,7 @@ export const briefCommand = defineCommand({
     const pending = s.unapplied.filter((r) => r.receipt.kind !== "started" && r.receipt.kind !== "mode");
     if (pending.length) throw refuse(`unit ${key} has receipts the heartbeat has not applied yet (${pending.map((r) => r.receipt.kind).join(", ")})`, "norn tick, then run norn brief again", "pending_receipts");
     refuseUnlessAgentWork(s, "brief");
-    const step = stepOfSession(s) as AgentStep;
+    const step = cursorStep(s) as AgentStep;
 
     let started = false;
     if (!run) {
@@ -223,7 +210,7 @@ export const briefCommand = defineCommand({
     const id = ulid(ctx.clock.now());
     const stored = writeBriefing(s.root, run.run_id, id, briefing.markdown);
     // O4: link the run to its briefing in the trace (`norn trace <unit>` shows it)
-    appendTrace(s.root, { type: "briefing", id, at: ctx.clock.iso(), unit: key, run_id: run.run_id, step: s.state.step, attempt: s.state.attempt, briefing: stored });
+    appendTrace(s.root, traceEvent("briefing", ctx.clock.now(), { id, unit: key, run_id: run.run_id, step: s.state.step, attempt: s.state.attempt, briefing: stored }));
     return rendered({ unit: key, step: s.state.step, attempt: s.state.attempt, run_id: run.run_id, started, briefing: stored, markdown: briefing.markdown, brief: briefing.json }, briefing.markdown);
   },
 });

@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://norn.dev/schema/local-cockpit.json",
+  "title": "norn cockpit memory (<norn home>/cockpit.json)",
+  "type": "object",
+  "properties": {
+    "last_repo": {
+      "type": "string"
+    }
+  }
+}

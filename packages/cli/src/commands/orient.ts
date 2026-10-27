@@ -17,12 +17,13 @@ import { defineCommand, opt } from "../command.ts";
 import { refuse, rendered } from "../output.ts";
 import { ORIENT_ENV } from "../runtime/agent-unit.ts";
 import { cockpitHerdr } from "../runtime/cockpit.ts";
-import { parseUnitKey, projectView } from "../runtime/human.ts";
+import { parseUnitKey } from "../runtime/args.ts";
+import { projectView } from "../runtime/human.ts";
 import { ensureShim, nornEntry, withNornOnPath } from "../runtime/shim.ts";
 import { isOrientWorkspace } from "../runtime/segment.ts";
 
 /** The orient agent: the default agent with its configured args, its first prompt `norn orient <key>`. */
-export function orientAgentCommand(config: ResolvedConfig, key: string): string {
+function orientAgentCommand(config: ResolvedConfig, key: string): string {
   const name = config.default_agent;
   const agent = config.agents[name];
   return `${ORIENT_ENV}=1 ${startAgentCommand(null, agent?.command ?? agent?.adapter ?? name, agent?.args, `Run \`norn orient ${key}\` and follow it.`)}`;

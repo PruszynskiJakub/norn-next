@@ -16,7 +16,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { herdr } from "@norn/adapters";
 import { parseDuration } from "@norn/schema";
-import { readCockpitFile, writeCockpitFile } from "@norn/store";
+import { readCockpitFile, spawnBounded, writeCockpitFile } from "@norn/store";
 import { type CockpitModel, cockpitModel, inboxItemsInOrder, type ProjectView, withInput } from "@norn/view";
 import { defineCommand, opt } from "../command.ts";
 import { Context } from "../context.ts";
@@ -52,13 +52,9 @@ function keyChunks(ctx: Context): { chunks: AsyncIterator<string>; close: () => 
 async function openLink(ctx: Context, url: string): Promise<{ code: number; stderr: string }> {
   const argv = [process.platform === "darwin" ? "open" : "xdg-open", url];
   if (ctx.deps.shell) return ctx.deps.shell(argv, ctx.root);
-  try {
-    const child = Bun.spawn(argv, { stdin: "ignore", stdout: "ignore", stderr: "pipe" });
-    const [stderr, code] = await Promise.all([new Response(child.stderr).text(), child.exited]);
-    return { code, stderr };
-  } catch (e) {
-    return { code: 127, stderr: (e as Error).message };
-  }
+  // H11 seam: store's bounded spawn (a missing opener is exit 127, never a throw)
+  const r = await spawnBounded(argv, {});
+  return { code: r.code, stderr: r.stderr };
 }
 
 /** HC7: a verb in-process through the dispatcher (loaded lazily: the dispatcher imports this command). */

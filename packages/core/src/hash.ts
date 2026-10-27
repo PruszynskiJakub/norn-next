@@ -1,7 +1,7 @@
 import type { Workflow } from "@norn/schema";
 
 /** JSON with object keys sorted recursively; `undefined` members dropped. Stable across key order. */
-export function canonicalJson(value: unknown): string {
+function canonicalJson(value: unknown): string {
   return JSON.stringify(sortKeys(value));
 }
 

@@ -43,8 +43,6 @@ export interface UnitRef {
 export interface WorktreeFacts {
   path: string;
   exists: boolean;
-  /** `.norn-unit` marker present (A3) */
-  marker: boolean;
   status: WorktreeStatus | null;
   /** ms epoch; null if no commits */
   last_commit_at: number | null;
@@ -156,6 +154,12 @@ export interface UnitFacts {
   step_runs?: StepRunFacts[];
   /** R4.3: last failed act effect for the unit on this checkout; absent = none */
   act_failure?: ActFailure;
+  /**
+   * A done slice: its local branch is in the story branch (its head an ancestor of the story
+   * branch head), so the slice cleanup may delete it. Absent = not observed (no local branch, not a
+   * done slice) — decide then keeps the branch unless the cleanup integrates its worktree first.
+   */
+  branch_in_story?: boolean;
 }
 
 export interface SliceFileFacts {
@@ -250,7 +254,7 @@ export interface StoryFacts {
   issue: RemoteIssue | null | undefined;
   /**
    * The story PR; null = none, undefined = not fetched. `number`, `url`, `state`, `is_draft`,
-   * `head_sha`, `merge_commit_sha?`, `merged_by?`, `merged_at?` (plus the older `draft`/`head`/`base`).
+   * `head_sha`, `merge_commit_sha?`, `merged_by?`, `merged_at?`, `head?`, `base_branch?`.
    */
   pr?: RemotePullRequest | null;
   /**
@@ -295,6 +299,12 @@ export interface StoryFacts {
    * none, held here, or not observed.
    */
   unpushed_runs?: UnpushedRuns[];
+  /**
+   * R3.1: an unclaimed new story — its local branch holds nothing beyond the intake commit: no
+   * commit past the base ref, or one whose trailers are the story's intake (`isIntakeCommit`, never
+   * its subject). Absent = not observed (claimed, not new, or the branch could not be listed).
+   */
+  intake_only?: boolean;
   /** BS1: the story branch against its base; absent = not observed (no story branch or base ref) */
   base?: StoryBase;
   /**
@@ -319,9 +329,7 @@ export interface MachineFacts {
   runner_capabilities?: RunnerCapabilities;
   /** all live leases on this machine across repos (K1, K3), dead ones excluded */
   leases: LeaseFile[];
-  /** leases whose holder process is dead (to reclaim) */
-  dead_leases: LeaseFile[];
-  /** file names (in ~/.norn/leases/) of `dead_leases` plus unreadable lease files, for ReclaimLeasesAction */
+  /** file names (in ~/.norn/leases/) of leases whose holder process is dead, plus unreadable lease files, for ReclaimLeasesAction */
   dead_lease_files?: string[];
 }
 
@@ -336,8 +344,6 @@ export interface Facts {
   repo: { root: string; default_branch: string; remote: string };
   machine: MachineFacts;
   remote: {
-    /** ms epoch of last successful sync, null = never */
-    synced_at: number | null;
     /** issues from the last sync (GR1); undefined = not fetched this tick */
     issues: RemoteIssue[] | undefined;
   };
@@ -351,12 +357,3 @@ export interface Facts {
   orphans: { worktrees: string[]; branches: string[] };
 }
 
-/**
- * Pure decide signature (H3). Pinned unit workflows are inside Facts; `workflows` are the
- * repo workflows (for starting units, S7), recorded with the facts so `why` can replay (O5).
- */
-export type DecideFn = (
-  facts: Facts,
-  workflows: import("./decide.ts").RepoWorkflows,
-  config: ResolvedConfig,
-) => import("./actions.ts").Decision[];

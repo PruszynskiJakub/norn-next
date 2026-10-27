@@ -4,7 +4,10 @@
  * snapshot, workflows and config recorded in the trace, showing the rule that fired, what
  * triggered it — the receipt applied (with its reason text: handoff, comment, check output) or the
  * fact the rule read — and verifying the replay equals the recorded decision. A mismatch exits 1
- * (decide was not pure, or the trace was edited).
+ * (decide was not pure, or the trace was edited). A tick recorded by another norn version
+ * (`norn_version` on the trace) is still replayed and diffed with this one's decide, and the replay
+ * is labelled `recorded by norn <X>` — a mismatch there may just be a rule that changed between
+ * versions; the exit code is the same either way.
  *
  * Without `--tick` the matching ticks are found automatically: by default the latest decision for
  * the unit; with `--step` / `--attempt` / `--transition` / `--rule` every decision that matches
@@ -17,15 +20,17 @@
  * recorded decisions ("tick crashed during act") — `--tick <id>` resolves the tick a receipt cites,
  * and without `--tick` a crashed tick newer than the unit's last finished one is the one explained.
  */
-import { criterionLine, decide, type Decision, type NumberedReceipt, type StoryFacts, type UnitFacts, unitDecision } from "@norn/core";
+import { criterionLine, decide, type Decision, legacyAction, type NumberedReceipt, type StoryFacts, type UnitFacts, unitDecision } from "@norn/core";
 import { ExitCode, type Receipt, type TickStartTrace, type TickTrace, type TickUnitRecord, ULID_PATTERN } from "@norn/schema";
 import { crashedTicksFor, decisionUnit, findCrashedTick, findTick, readTrace } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import { refuse, usageError, withExit } from "../output.ts";
-import { parseUnitKey } from "../runtime/human.ts";
+import { parseUnitKey } from "../runtime/args.ts";
 import { replayInputs } from "../runtime/tick.ts";
+import { NORN_VERSION } from "../version.ts";
 
-const canon = (v: unknown) => JSON.stringify(JSON.parse(JSON.stringify(v ?? null)));
+/** An action as compared with its replay; one an older norn recorded drops the fields since removed (O5). */
+const canon = (v: unknown) => JSON.stringify(JSON.parse(JSON.stringify(legacyAction(v ?? null))));
 
 interface Filter {
   step?: string;
@@ -294,6 +299,8 @@ export const whyCommand = defineCommand({
         all_match: allMatch,
         rule: mine?.rule ?? null,
         ...(same ? {} : { action: mine?.action ?? null }),
+        // O5: decide may have changed since; say whose decision the replay is compared with
+        ...(tick.norn_version && tick.norn_version !== NORN_VERSION ? { label: `recorded by norn ${tick.norn_version}, replayed by norn ${NORN_VERSION}` } : {}),
       },
       ...(filtered && !tickId
         ? {

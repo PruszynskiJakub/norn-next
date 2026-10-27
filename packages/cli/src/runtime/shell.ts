@@ -3,6 +3,7 @@
  * killed as a process group on timeout (a timeout is a `fail` with reason `timeout`).
  */
 import { spawn } from "node:child_process";
+import { noteSpawn } from "@norn/store";
 
 export interface ShellResult {
   /** null when killed by timeout */
@@ -20,6 +21,7 @@ export function runShell(command: string, opts: { cwd: string; env: Record<strin
   return new Promise((resolve) => {
     let out = "";
     let timedOut = false;
+    noteSpawn(["sh", "-c", command], opts.cwd); // effect transcripts (refactor Phase 0.2)
     const child = spawn("sh", ["-c", `exec 2>&1\n${command}`], {
       cwd: opts.cwd,
       env: opts.env as NodeJS.ProcessEnv,

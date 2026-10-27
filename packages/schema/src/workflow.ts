@@ -193,9 +193,6 @@ export const CLASSIFIED_OUTCOMES = {
   slices: ["done", "stuck", "exhausted"],
 } as const satisfies Record<StepType, readonly string[]>;
 
-/** Universal reports available to every agent step (§10). */
-export const UNIVERSAL_REPORTS = ["ask", "stuck"] as const;
-
 /** Normalize a bare target string to a full edge. */
 export function outcomeEdge(spec: OutcomeSpec): OutcomeEdge {
   return typeof spec === "string" ? { to: spec } : spec;

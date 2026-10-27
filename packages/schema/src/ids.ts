@@ -4,10 +4,10 @@
  */
 import {
   DURATION_PATTERN,
+  GIT_SHA_PATTERN,
   type RemoteProvider,
   SLICE_KEY_PATTERN,
   SLICE_NN_PATTERN,
-  SLUG_PATTERN,
   STORY_KEY_PATTERN,
   ULID_PATTERN,
 } from "./common.ts";
@@ -77,8 +77,8 @@ export function ulidTime(id: string): number {
 // ---------------------------------------------------------------- keys
 
 export type KeyPrefix = "gh" | "gl";
-export const PROVIDER_PREFIX: Record<RemoteProvider, KeyPrefix> = { gh: "gh", glab: "gl" };
-export const PREFIX_PROVIDER: Record<KeyPrefix, RemoteProvider> = { gh: "gh", gl: "glab" };
+const PROVIDER_PREFIX: Record<RemoteProvider, KeyPrefix> = { gh: "gh", glab: "gl" };
+const PREFIX_PROVIDER: Record<KeyPrefix, RemoteProvider> = { gh: "gh", gl: "glab" };
 
 export interface StoryKeyParts {
   prefix: KeyPrefix;
@@ -109,7 +109,7 @@ export function parseStoryKey(key: string): StoryKeyParts | null {
 }
 
 /** Pad a slice number to two digits: 3 → "03". */
-export function sliceNn(n: number | string): string {
+function sliceNn(n: number | string): string {
   const s = String(n).padStart(2, "0");
   if (!SLICE_NN_RE.test(s)) throw new RangeError(`bad slice number: ${n}`);
   return s;
@@ -135,10 +135,17 @@ export function storyOf(unitKey: string): string {
   throw new Error(`not a story or slice key: ${unitKey}`);
 }
 
+// ---------------------------------------------------------------- git
+
+const GIT_SHA_RE = new RegExp(GIT_SHA_PATTERN);
+/** A full git commit id (`GitSha`). */
+export function isGitSha(s: unknown): s is string {
+  return typeof s === "string" && GIT_SHA_RE.test(s);
+}
+
 // ---------------------------------------------------------------- slugs
 
-const SLUG_RE = new RegExp(SLUG_PATTERN);
-export const SLUG_MAX = 40;
+const SLUG_MAX = 40;
 const TRANSLIT: Record<string, string> = { ł: "l", Ł: "l", ß: "ss", æ: "ae", ø: "o", đ: "d", þ: "th" };
 
 /**
@@ -164,13 +171,26 @@ export function slugify(title: string, max = SLUG_MAX): string {
   }
   return out || "untitled";
 }
-export function isSlug(s: unknown): s is string {
-  return typeof s === "string" && SLUG_RE.test(s) && s.length <= 48;
-}
 
 // ---------------------------------------------------------------- naming (§7, GR3)
 
 export const STORY_UNIT_DIR = "_story";
+/** Repo-relative folder holding every story's spec folder (§7). */
+export const SPECS_DIR = ".agents/specs";
+
+const SPEC_DIR_RE = /^((?:gh|gl)-[1-9][0-9]*)-([a-z0-9]+(?:-[a-z0-9]+)*)$/;
+const SLICE_FILE_RE = /^([0-9]{2,3})-([a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
+
+/** Spec folder name (and story branch) `gh-123-fix-login` → `{ story: "gh-123", slug: "fix-login" }`. */
+export function parseSpecDirName(name: string): { story: string; slug: string } | null {
+  const m = SPEC_DIR_RE.exec(name);
+  return m && isStoryKey(m[1]) ? { story: m[1] as string, slug: m[2] as string } : null;
+}
+/** Slice file name `03-add-form.md` → `{ nn: "03", slug: "add-form" }`. */
+export function parseSliceFileName(name: string): { nn: string; slug: string } | null {
+  const m = SLICE_FILE_RE.exec(name);
+  return m ? { nn: m[1] as string, slug: m[2] as string } : null;
+}
 
 /** Spec folder name and story branch: `gh-123-fix-login`. */
 export function storyDirName(story: string, slug: string): string {
@@ -186,7 +206,7 @@ export function sliceBranch(story: string, nn: string, slug: string): string {
   return `${story}/${sliceDirName(nn, slug)}`;
 }
 export function specDir(story: string, slug: string): string {
-  return `.agents/specs/${storyDirName(story, slug)}`;
+  return `${SPECS_DIR}/${storyDirName(story, slug)}`;
 }
 /** GR9: the story PR body an agent writes, in the spec folder. */
 export const PR_BODY_FILE = "pr.md";

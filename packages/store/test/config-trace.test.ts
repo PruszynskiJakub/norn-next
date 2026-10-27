@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
+import * as fs from "node:fs";
 import { mkdirSync, writeFileSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { type TraceEvent, ulid } from "@norn/schema";
@@ -88,6 +89,20 @@ describe("trace (O4)", () => {
     expect(lastTickFor(repo, "gh-12")?.decisions[0]?.unit).toBe("gh-12/01");
     expect(lastTickFor(repo, "gh-99")).toBeNull();
     expect(() => appendTrace(repo, { type: "tick" } as never)).toThrow();
+  });
+  test("R5.4: only tick.start lines are fsynced before act", () => {
+    const repo = tmp();
+    const sync = spyOn(fs, "fsyncSync");
+    try {
+      appendTrace(repo, tick("gh-12", AT));
+      appendTrace(repo, { type: "tick.end", tick_id: ulid(), at: AT, duration_ms: 3, failed: 0 });
+      expect(sync).not.toHaveBeenCalled();
+      appendTrace(repo, { type: "tick.start", tick_id: ulid(), at: AT, heartbeat_id: null, decisions: [{ unit: "gh-12", rule: "noop.idle", action: { kind: "noop" } }] });
+      expect(sync).toHaveBeenCalled();
+    } finally {
+      sync.mockRestore();
+    }
+    expect(readTrace(repo).events.map((e) => e.type)).toEqual(["tick", "tick.end", "tick.start"]);
   });
   test("briefings stored by trace-relative path (B4)", () => {
     const repo = tmp();

@@ -4,17 +4,21 @@
  * and inbox rendering.
  */
 export type * from "./actions.ts";
+export { legacyAction } from "./actions.ts";
 export type * from "./facts.ts";
 export type * from "./ports.ts";
 export { GIT_CONFLICT_MARKERS, GIT_IN_PROGRESS } from "./ports.ts";
+export * from "./agent-unit.ts";
 export * from "./apply.ts";
 export * from "./brief.ts";
 export * from "./commands.ts";
 export * from "./criteria.ts";
-export * from "./decide.ts";
+export * from "./decide/index.ts";
 export * from "./handoff.ts";
 export * from "./hash.ts";
-export * from "./inbox.ts";
+export * from "./inbox/history.ts";
+export * from "./inbox/items.ts";
+export * from "./policy.ts";
 export * from "./prompt.ts";
 export * from "./time.ts";
 export * from "./workflow.ts";

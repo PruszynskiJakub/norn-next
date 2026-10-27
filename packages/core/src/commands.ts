@@ -21,7 +21,7 @@ export const sliceWorktreePath = (storyWorktree: string, nn: string, slug: strin
  * agent's configured args. B3: `--` ends them, so a variadic flag cannot swallow the prompt.
  * `prompt` is the first prompt (default: start the step).
  */
-export function startAgentCommand(worktree: string | null, agentCommand: string, args: string[] = [], prompt = "Use the norn skill, then run `norn brief`."): string {
+export function startAgentCommand(worktree: string | null, agentCommand: string, args: string[] = [], prompt = AUTO_PROMPT): string {
   const opts = args.length ? `${args.map(q).join(" ")} -- ` : "";
   const run = `${agentCommand} ${opts}${q(prompt)}`;
   return worktree ? `cd ${q(worktree)} && ${run}` : run;

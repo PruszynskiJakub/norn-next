@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { StoryFrontmatter } from "@norn/schema";
 import {
@@ -120,6 +120,40 @@ describe("unit files", () => {
     writeFileSync(join(src, "shots/a.png"), "x");
     expect(ensureEvidenceDir(u, "R1", src)).toBe("evidence/R1");
     expect(existsSync(join(u, "evidence/R1/shots/a.png"))).toBe(true);
+    // a second copy merges over what is there
+    const more = tmp();
+    writeFileSync(join(more, "b.txt"), "y");
+    ensureEvidenceDir(u, "R1", more);
+    expect(readdirSync(join(u, "evidence/R1")).sort()).toEqual(["b.txt", "shots"]);
+    expect(ensureEvidenceDir(u, "R2")).toBe("evidence/R2");
+    expect(existsSync(join(u, "evidence/R2"))).toBe(true);
+  });
+  test("evidence copy is temp + rename (S1): a failed copy leaves no partial dir and no temp", () => {
+    if (process.getuid?.() === 0) return; // root reads mode-000 files
+    const u = tmp();
+    const src = tmp();
+    writeFileSync(join(src, "a.txt"), "x");
+    writeFileSync(join(src, "z-unreadable.txt"), "secret");
+    chmodSync(join(src, "z-unreadable.txt"), 0o000);
+    try {
+      expect(() => ensureEvidenceDir(u, "R1", src)).toThrow();
+    } finally {
+      chmodSync(join(src, "z-unreadable.txt"), 0o644);
+    }
+    expect(existsSync(join(u, "evidence/R1"))).toBe(false);
+    expect(readdirSync(join(u, "evidence"))).toEqual([]);
+    // an existing evidence dir is left as it was
+    const ok = tmp();
+    writeFileSync(join(ok, "keep.txt"), "k");
+    ensureEvidenceDir(u, "R1", ok);
+    chmodSync(join(src, "z-unreadable.txt"), 0o000);
+    try {
+      expect(() => ensureEvidenceDir(u, "R1", src)).toThrow();
+    } finally {
+      chmodSync(join(src, "z-unreadable.txt"), 0o644);
+    }
+    expect(readdirSync(join(u, "evidence/R1"))).toEqual(["keep.txt"]);
+    expect(readdirSync(join(u, "evidence"))).toEqual(["R1"]);
   });
   test("handoff: header replaced, agent sections preserved, heartbeat collapses", () => {
     const u = tmp();

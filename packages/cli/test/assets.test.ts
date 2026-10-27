@@ -3,7 +3,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DEFAULT_CONFIG, type Workflow, outcomeEdge, resolveConfig, validateConfigLayer, validateWorkflow } from "@norn/schema";
+import { DEFAULT_CONFIG, type Workflow, outcomeEdge, resolveConfig, validate } from "@norn/schema";
 import { parse } from "yaml";
 import { type AssetsSources, assetsDir, resolveAssetsDir } from "../src/runtime/assets.ts";
 
@@ -107,7 +107,7 @@ describe("workflow templates", () => {
     const wf = loadWorkflow(file);
 
     test("validates against the workflow schema", () => {
-      const r = validateWorkflow(wf);
+      const r = validate("workflow", wf);
       expect(r.ok ? [] : r.errors).toEqual([]);
     });
 
@@ -223,7 +223,7 @@ describe("skills", () => {
 describe("config template", () => {
   test("validates as a config layer (K2)", () => {
     const value = parse(readFileSync(join(ASSETS, "config.yaml"), "utf8")) ?? {};
-    const r = validateConfigLayer(value);
+    const r = validate("config", value);
     expect(r.ok ? [] : r.errors).toEqual([]);
   });
 
@@ -232,7 +232,7 @@ describe("config template", () => {
     // Uncomment lines that hold a lowercase YAML key or list item (`# key:`, `#   - key:`); prose comments start uppercase.
     const uncommented = text.replace(/^(\s*)# ( *(?:- )?[a-z_]+:)/gm, "$1$2");
     const value = parse(uncommented) as Record<string, unknown>;
-    const r = validateConfigLayer(value);
+    const r = validate("config", value);
     expect(r.ok ? [] : r.errors).toEqual([]);
     expect(Object.keys(value)).toContain("limits");
   });

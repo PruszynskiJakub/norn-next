@@ -7,9 +7,9 @@ export { type Command, defineCommand, opt, type OptionSpec, type ParsedArgs } fr
 export { COMMANDS, findCommand } from "./commands/index.ts";
 export { type CliDeps, Context, findUnitMarker, type Located, locateRepo, systemClock } from "./context.ts";
 export { busyError, CliFailure, corruptError, failure, isRendered, isWithExit, refuse, render, rendered, toFailure, usageError, withExit } from "./output.ts";
-export { type ActRecord, Actor } from "./runtime/act.ts";
-export { heartbeatId, markNotified, readNotified, readRemoteCache } from "./runtime/local.ts";
-export { machineHolder, type Observed, observe, type ObserveOptions, readHookFacts, type StoryLoc, type SyncMode, type UnitLoc } from "./runtime/observe.ts";
+export { type ActRecord, Actor } from "./runtime/act/index.ts";
+export { heartbeatId, markNotified, readNotified, readRemoteCache } from "@norn/store";
+export { type Observed, observe, type ObserveOptions, type StoryLoc, type SyncMode, type UnitLoc } from "./runtime/observe/index.ts";
 export { releaseHeldClaims, releaseStory } from "./runtime/release.ts";
 export { runShell, tailLines } from "./runtime/shell.ts";
 export { replayInputs, runTick, type TickOptions, type TickReport, traceRecord } from "./runtime/tick.ts";

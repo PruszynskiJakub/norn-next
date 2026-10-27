@@ -14,7 +14,8 @@ import { closeSync, mkdirSync, openSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { AdapterContext, LaunchSpec, PaneState, ProcessPort, RunnerPort, SessionRef } from "@norn/core";
 import type { RunnerConfig } from "@norn/schema";
-import { portError } from "../process/error.ts";
+import { noteSpawn } from "@norn/store";
+import { portError } from "../exec.ts";
 import { createProcessPort } from "../process/index.ts";
 
 export const RUNNER_NAME = "headless";
@@ -60,6 +61,7 @@ export function createHeadlessRunner(opts: HeadlessRunnerOptions): RunnerPort {
       const fd = openSync(log, "a");
       let pid: number | undefined;
       try {
+        noteSpawn(spec.argv, spec.cwd);
         const child = spawn(cmd, args, {
           cwd: spec.cwd,
           env: { ...process.env, ...spec.env },

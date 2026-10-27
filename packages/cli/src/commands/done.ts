@@ -8,13 +8,13 @@
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
-import { checkReport, reportableOutcomes, unverifiedNeeds, verdictCounts } from "@norn/core";
-import { type AgentStep, type CriterionVerdict, type Finding, type Note, type ReceiptOf, ulid, validate } from "@norn/schema";
-import { appendTrace, ensureEvidenceDir, git as rawGit } from "@norn/store";
+import { checkReport, cursorStep, enteringReceipt, reportableOutcomes, unverifiedNeeds, verdictCounts } from "@norn/core";
+import { type AgentStep, type CriterionVerdict, type Finding, type Note, type ReceiptOf, validate } from "@norn/schema";
+import { appendTrace, ensureEvidenceDir, traceEvent } from "@norn/store";
 import { defineCommand, type ParsedArgs, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, usageError } from "../output.ts";
-import { stepOfSession, type UnitSession, unitCriteria } from "../runtime/agent-unit.ts";
+import { type UnitSession, unitCriteria } from "../runtime/agent-unit.ts";
 import { appendProgress, reported, reportedFor, reportHeader, reportTarget, writeReport } from "../runtime/report.ts";
 
 const SEVERITIES = new Set(["blocking", "major", "minor", "nit"]);
@@ -58,7 +58,7 @@ export function parseFindings(text: string, file: string): Finding[] {
 const abs = (ctx: Context, p: string) => (isAbsolute(p) ? p : resolve(ctx.cwd, p));
 
 /** QV2: read and validate a `--criteria` file (a JSON array, CriteriaReport). */
-export function parseCriteria(text: string, file: string): CriterionVerdict[] {
+function parseCriteria(text: string, file: string): CriterionVerdict[] {
   const how = "write the report as a JSON array: [{\"id\": \"AC1\", \"verdict\": \"pass\", \"evidence\": \"…\"}, …] — pass needs evidence, fail repro, person how, unverified reason and how — then report again";
   let raw: unknown;
   try {
@@ -72,7 +72,7 @@ export function parseCriteria(text: string, file: string): CriterionVerdict[] {
 }
 
 /** NT1: `--note` values in order; each `--note-criterion` belongs to the `--note` before it. */
-export function parseNotes(args: ParsedArgs): Note[] {
+function parseNotes(args: ParsedArgs): Note[] {
   const notes: Note[] = [];
   for (const o of args.order ?? []) {
     if (o.name === "note") {
@@ -91,12 +91,15 @@ export function parseNotes(args: ParsedArgs): Note[] {
 }
 
 /**
- * BS5: the base a base-mode step (entered by a `git: update` conflict) must merge — the newest
- * classify `conflict` receipt with a base routed to the current step; null for any other step.
+ * BS5: the base a base-mode step (entered by a `git: update` conflict) must merge — the base of the
+ * classify `conflict` receipt that entered the current step, the same receipt whose base the brief's
+ * Rework shows (`enteringReceipt`); null for any other step. Never keyed on the receipt's `route`: a
+ * conflict that exhausted its counter records `$stuck`, and `norn unstick --to <step>` still enters
+ * the step from it (BUG-2 follow-up).
  */
 function baseToMerge(s: UnitSession): NonNullable<ReceiptOf<"classify">["base"]> | null {
-  const r = s.receipts.findLast(({ receipt: r }) => r.kind === "classify" && r.outcome === "conflict" && !!r.base && r.route === s.state.step)?.receipt;
-  return r?.kind === "classify" && r.base ? r.base : null;
+  const r = enteringReceipt({ state: s.state, receipts: s.receipts })?.receipt;
+  return r?.kind === "classify" && r.outcome === "conflict" && r.base ? r.base : null;
 }
 
 /**
@@ -117,8 +120,8 @@ async function verifyBaseMerge(ctx: Context, s: UnitSession, base: NonNullable<R
     throw refuse(`${short} (the base) is not merged into the story branch: HEAD ${head?.slice(0, 12) ?? "?"} does not contain it`, `git merge --no-ff ${base.sha}, resolve, commit, then report again`, "merge_unfinished");
   const merge = await git.baseMergeCommit(cwd, base.sha, head);
   // the files the merge touched on the story side, and every fix-up after it
-  const changed = merge ? await rawGit(cwd, ["diff", "--name-only", "-z", `${merge}^1`, head, "--"]) : null;
-  const paths = [...new Set([...base.conflicts, ...(changed?.code === 0 ? changed.stdout.split("\0").filter(Boolean) : [])])].sort();
+  const changed = merge ? await git.changedPaths(cwd, `${merge}^1`, head).catch(() => []) : [];
+  const paths = [...new Set([...base.conflicts, ...changed])].sort();
   const markers = [...(await git.conflictMarkers(cwd, { paths, rev: "HEAD" })), ...(await git.conflictMarkers(cwd, { paths }))];
   if (markers.length) {
     const where = [...new Set(markers.map((m) => `${m.path}:${m.line}`))];
@@ -146,7 +149,7 @@ export const doneCommand = defineCommand({
     const handoff = opt.str(args, "handoff")?.trim();
     if (!handoff) throw usageError("norn done needs --handoff \"<short summary of what was done>\"", `norn done ${outcome} --handoff "…"`);
     const t = reportTarget(ctx, "done");
-    const step = stepOfSession(t.s) as AgentStep;
+    const step = cursorStep(t.s) as AgentStep;
     const valid = reportableOutcomes(step);
     if (outcome === "ask" || outcome === "stuck") throw refuse(`'${outcome}' is reported with its own verb`, outcome === "ask" ? 'norn ask "<question>"' : 'norn stuck "<reason>"', "use_verb");
     if (!valid.includes(outcome))
@@ -197,20 +200,21 @@ export const doneCommand = defineCommand({
     appendProgress(t.s.runsDir, `${t.s.state.step}#${t.s.state.attempt} ${outcome}: ${handoff}`);
     // QV4/QV8: the report counted in the trace — unverified per capability, unchecked coverage
     if (report)
-      appendTrace(t.s.root, {
-        type: "criteria",
-        id: ulid(ctx.clock.now()),
-        at: receipt.at,
-        unit: t.s.unit.key,
-        run_id: t.run_id,
-        step: receipt.step,
-        attempt: receipt.attempt,
-        receipt_id: receipt.receipt_id,
-        outcome,
-        rule: verdicts.coverage === "checked" ? "criteria.checked" : "criteria.unchecked_coverage",
-        verdicts: verdictCounts(report),
-        unverified_needs: unverifiedNeeds(report, declared),
-      });
+      appendTrace(
+        t.s.root,
+        traceEvent("criteria", ctx.clock.now(), {
+          at: receipt.at,
+          unit: t.s.unit.key,
+          run_id: t.run_id,
+          step: receipt.step,
+          attempt: receipt.attempt,
+          receipt_id: receipt.receipt_id,
+          outcome,
+          rule: verdicts.coverage === "checked" ? "criteria.checked" : "criteria.unchecked_coverage",
+          verdicts: verdictCounts(report),
+          unverified_needs: unverifiedNeeds(report, declared),
+        }),
+      );
     const plural = (n: number, what: string) => `${n} ${what}${n === 1 ? "" : "s"}`;
     const parts = [
       findings ? plural(findings.length, "finding") : "",

@@ -7,7 +7,6 @@ import {
   acquireClaim,
   appendReceipt,
   appendTrace,
-  gitOk,
   leasesDir,
   pinWorkflow,
   sha256,
@@ -88,7 +87,7 @@ const ASK = ulid(NOW - 40 * 60_000);
 async function seed() {
   const repo = tmp();
   const home = tmp();
-  await gitOk(repo, ["init", "-q", repo]);
+  Bun.spawnSync(["git", "init", "-q", repo], { cwd: repo });
   const spec = storyDir(repo, "gh-12", "fix-login");
   writeStoryFile(
     storyFile(spec),
@@ -214,6 +213,8 @@ describe("loadProjectView", () => {
 
     expect(v.inbox.groups.answer.map((i) => i.id)).toEqual([ASK]);
     expect(v.inbox.groups.running.map((i) => i.slice)).toEqual(["gh-12/01"]);
+    // refactor 3.4: no worktree on disk → the inbox reaches none (observe reports none either)
+    expect(v.inbox.groups.running[0]?.reach?.worktree).toBeNull();
     expect(v.inbox.groups.recently_done.map((i) => i.slice)).toEqual(["gh-12/02"]);
     expect(v.inbox.pending).toBe(1);
 
@@ -290,6 +291,39 @@ describe("loadProjectView", () => {
     writeUnitMarker(wt, { repo, story: "gh-7", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-7-thing" });
     const v = await loadProjectView({ repoRoot: repo, home: tmp(), now: NOW, holder: "me@box", env: {} });
     expect(v.stories.map((s) => [s.key, s.status, s.root])).toEqual([["gh-7", "not_started", wt]]);
+  });
+
+  test("worktrees are found by folder shape and marker (refactor 5.2): a slice's own, a mislabelled story folder skipped", async () => {
+    const parent = tmp();
+    const repo = join(parent, "app");
+    mkdirSync(repo);
+    const fm = (n: number, slug: string) => ({ id: `gh-${n}`, slug, provider: "gh", number: n, url: "u", title: `T${n}`, assignee: null, workflow: "story", status: "active", intake_at: ago(5) }) as const;
+    const wt = join(parent, "app-worktrees", "gh-7-thing");
+    const spec = storyDir(wt, "gh-7", "thing");
+    writeStoryFile(storyFile(spec), fm(7, "thing"), "");
+    writeSliceFile(join(spec, "slices/01-login-form.md"), { id: "gh-7/01", title: "Form", depends_on: [], status: "active" }, "");
+    writeUnitMarker(wt, { repo, story: "gh-7", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-7-thing" });
+    // the slice's worktree folder keeps the slug it was cut with; its marker names the slice
+    const sliceWt = `${wt}--01-form`;
+    const u1 = unitDir(storyDir(sliceWt, "gh-7", "thing"), "01-login-form");
+    pinWorkflow(u1, WF);
+    writeState(u1, state({ story: "gh-7", slice: "gh-7/01", unit_dir: "01-login-form", status: "parked", park: { kind: "stuck", reason: "blocked", since: ago(3), receipt_id: ASK } }));
+    writeUnitMarker(sliceWt, { repo, story: "gh-7", slice: "gh-7/01", unit: "01-login-form", spec_dir: ".agents/specs/gh-7-thing" });
+    // a story-shaped folder whose marker names another story is not that story's worktree
+    const wrong = join(parent, "app-worktrees", "gh-8-other");
+    writeStoryFile(storyFile(storyDir(wrong, "gh-9", "else")), fm(9, "else"), "");
+    writeUnitMarker(wrong, { repo, story: "gh-9", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-9-else" });
+
+    const v = await loadProjectView({ repoRoot: repo, home: tmp(), now: NOW, holder: "me@box", env: {} });
+    expect(v.stories.map((s) => s.key)).toEqual(["gh-7"]);
+    expect(v.stories[0]?.slices.map((s) => [s.key, s.status, s.park?.reason])).toEqual([["gh-7/01", "parked", "blocked"]]);
+  });
+
+  test("the default holder is this machine's (machineHolder, R7.2): its claims are mine", async () => {
+    const { repo, home } = await seed();
+    const v = await loadProjectView({ repoRoot: repo, home, now: NOW, liveness: () => true, env: { USER: "me", NORN_MACHINE: "box" } });
+    expect(v.holder).toBe("me@box");
+    expect(v.stories[0]?.claim.state).toBe("mine");
   });
 
   test("never writes and stays fast", async () => {

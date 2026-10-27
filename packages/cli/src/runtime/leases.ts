@@ -11,7 +11,7 @@ import { defaultLeaseLiveness, type LeaseLiveness, readState, readUnitMarker } f
 import type { ProcessIdentity } from "@norn/schema";
 
 /** true while the unit run named by an agent lease is still `running` in its worktree. */
-export function leaseRunActive(lease: LeaseFile): boolean {
+function leaseRunActive(lease: LeaseFile): boolean {
   if (lease.kind !== "agent" || !lease.worktree || !lease.run_id) return false;
   const m = readUnitMarker(lease.worktree).marker;
   if (!m || m.story !== lease.story || m.slice !== lease.slice) return false;

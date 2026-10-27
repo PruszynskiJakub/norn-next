@@ -8,7 +8,7 @@ import {
   notifiers,
   osNotifyArgv,
 } from "../../src/notify/index.ts";
-import type { Exec } from "../../src/process/exec.ts";
+import type { Exec } from "../../src/exec.ts";
 
 const item: InboxItem = {
   id: "01JRECEIPT",
