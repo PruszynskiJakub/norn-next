@@ -14,7 +14,7 @@ import {
 import type { Action, AgentLaunch, BoundaryCommit, Decision, NewReceipt, SessionInput } from "../actions.ts";
 import { type ApplyResult, applyReceipts } from "../apply.ts";
 import type { Facts, NumberedReceipt, SliceFileFacts, StoryFacts, UnitFacts, UnitRef } from "../facts.ts";
-import { unitInboxItem } from "../inbox.ts";
+import { unitInboxItem } from "../inbox/items.ts";
 import { nornTrailers, unitWorktree } from "../policy.ts";
 import type { InboxItem, SessionRef } from "../ports.ts";
 import { iso } from "../time.ts";

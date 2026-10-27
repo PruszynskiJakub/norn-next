@@ -12,7 +12,7 @@ import {
 import type { ClaimAction, UpdateStoryMirrorAction } from "../actions.ts";
 import type { StoryFacts, UnitFacts, UnitRef } from "../facts.ts";
 import { sha256 } from "../hash.ts";
-import { bodyChangedItem } from "../inbox.ts";
+import { bodyChangedItem } from "../inbox/items.ts";
 import { mergedIntoBase, prBaseBranch, storyFinished, storyUnit } from "../policy.ts";
 import type { RemoteIssue } from "../ports.ts";
 import { epoch, iso } from "../time.ts";

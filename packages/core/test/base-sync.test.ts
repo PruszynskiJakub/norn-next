@@ -11,7 +11,7 @@ import { renderBrief } from "../src/brief.ts";
 import { decide } from "../src/decide/index.ts";
 import { mergedIntoBase } from "../src/policy.ts";
 import type { NumberedReceipt, StoryBase, StoryFacts } from "../src/facts.ts";
-import { buildInbox } from "../src/inbox.ts";
+import { buildInbox } from "../src/inbox/items.ts";
 import { baseUpdateStep, checkWorkflowLevel, isStale, validateWorkflowDefinition } from "../src/workflow.ts";
 import { at, CONFIG, facts, HB, loaded, stateFor, storyFacts, storyUnit, T0, unitFacts } from "./fixtures.ts";
 
