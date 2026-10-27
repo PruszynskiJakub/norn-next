@@ -26,8 +26,8 @@
  *                `herdr pane run <pane> "<command>"`          (MO5, `norn open`)
  * - capabilities: send + resume + open (R4.1, MO5)
  *
- * - openStatusPane → `herdr pane split [--current] --direction down --ratio 0.3 --cwd C --no-focus`,
- *                `herdr pane rename <pane> norn`, `herdr pane run <pane> "norn pane --interactive"`   (O1, HC10)
+ * - openCockpitPane → `herdr pane split [--current] --direction down --ratio 0.3 --cwd C --no-focus`,
+ *                `herdr pane rename <pane> norn`, `herdr pane run <pane> "norn cockpit"`   (SPEC-cockpit CP10)
  * - cockpit helpers (agent list, focus, labels, command panes): `./cockpit.ts` (HC6, HC12)
  * - every herdr command runs through `herdrCaller` (`./call.ts`), as do the cockpit's
  *
@@ -282,30 +282,27 @@ export const herdrFactory = (_ctx: AdapterContext, config: RunnerConfig): Runner
   return createHerdrRunner(opts);
 };
 
-export interface StatusPaneOptions {
+export interface CockpitPaneOptions {
   bin?: string;
   session?: string;
   exec?: Exec;
   /** caller env; `HERDR_PANE_ID` set (running inside Herdr) → split the calling pane (`--current`) */
   env?: Record<string, string | undefined>;
-  /** argv that runs norn (default `["norn"]`); `pane` is appended */
+  /** argv that runs norn (default `["norn"]`); `cockpit` is appended */
   command?: string[];
-  /** refresh interval passed as `--interval` (default: `norn pane`'s own) */
+  /** refresh interval passed as `--interval` (default: the cockpit's own) */
   interval?: string;
   direction?: "down" | "right";
-  /** HC10: run the interactive cockpit (`norn pane --interactive`) rather than the read-only view */
-  interactive?: boolean;
 }
 
 /**
- * O1 "a Herdr status pane": split a pane next to the caller (focus stays put) and run
- * `norn pane` in it — an inbox view that refreshes itself, interactive with `interactive`
- * (HC10; it still writes only through CLI verbs, X1). Returns the new pane.
+ * SPEC-cockpit CP10 (`norn cockpit --open`): split a pane next to the caller (focus stays put) and run
+ * `norn cockpit` in it (it writes only through CLI verbs, X1). Returns the new pane.
  */
-export async function openStatusPane(cwd: string, opts: StatusPaneOptions = {}): Promise<{ pane_id: string }> {
+export async function openCockpitPane(cwd: string, opts: CockpitPaneOptions = {}): Promise<{ pane_id: string }> {
   const herdr = herdrCaller(opts.exec ?? bunExec, opts);
   const env = opts.env ?? process.env;
-  const argv = [...(opts.command ?? ["norn"]), "pane", ...(opts.interactive ? ["--interactive"] : []), ...(opts.interval ? ["--interval", opts.interval] : [])];
+  const argv = [...(opts.command ?? ["norn"]), "cockpit", ...(opts.interval ? ["--interval", opts.interval] : [])];
   return splitAndRun(herdr, { cwd, direction: opts.direction ?? "down", ratio: "0.3", current: !!env.HERDR_PANE_ID, title: "norn", command: shellJoin(argv) });
 }
 export { parsePanePrompt } from "./prompt.ts";

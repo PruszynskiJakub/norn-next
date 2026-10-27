@@ -315,6 +315,8 @@ export interface RemotePort {
   /** latest PR/MR whose head is `branch`, any state; null if none */
   findPullRequest(branch: string): Promise<RemotePullRequest | null>;
   openDraftPullRequest(opts: { head: string; base: string; title: string; body: string }): Promise<RemotePullRequest>;
+  /** GR9: replace the body of an open PR/MR */
+  editPullRequestBody(number: number, body: string): Promise<void>;
 }
 
 // ============================================================= Runner

@@ -3,8 +3,10 @@
  * inbox, runs, timeline, recently done; plus pure terminal formatters. Local reads only,
  * never writes. Front ends read through here and write only through CLI verbs.
  */
+export * from "./cockpit.ts";
 export * from "./format.ts";
 export * from "./load.ts";
+export * from "./orient.ts";
 export * from "./steps.ts";
 export * from "./timeline.ts";
 export * from "./trace-view.ts";

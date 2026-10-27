@@ -15,7 +15,7 @@ export type CommandFor = "person" | "agent" | "hooks";
 export const HELP_GROUPS: ReadonlyArray<{ title: string; for: CommandFor; commands: readonly string[] }> = [
   { title: "Start here", for: "person", commands: ["init", "doctor", "sync", "watch", "inbox", "open"] },
   { title: "Answer what needs you", for: "person", commands: ["answer", "approve", "unstick", "update", "mode", "workflow"] },
-  { title: "Look around", for: "person", commands: ["status", "trace", "why", "pane", "config", "tick"] },
+  { title: "Look around", for: "person", commands: ["cockpit", "status", "orient", "trace", "why", "config", "tick"] },
   { title: "Team", for: "person", commands: ["take", "release", "drop"] },
   { title: "Housekeeping", for: "person", commands: ["tidy", "uninstall", "help"] },
   { title: "Agent protocol: the only commands an agent runs", for: "agent", commands: ["brief", "done", "ask", "stuck"] },
@@ -28,8 +28,8 @@ export type SkillFor = "protocol" | "step" | "attended" | "reference";
 /** Skill groups in print order; a skill missing here lands in "Other skills" (a step skill). */
 export const SKILL_GROUPS: ReadonlyArray<{ title: string; for: SkillFor; skills: readonly string[] }> = [
   { title: "the protocol, loaded first in every step", for: "protocol", skills: ["norn"] },
-  { title: "step skills, the agent works alone", for: "step", skills: ["norn-implement", "norn-review", "norn-qa", "norn-merge", "norn-slice"] },
-  { title: "step skills, a person works with the agent", for: "attended", skills: ["norn-refine", "norn-clarify", "norn-plan", "norn-interview", "norn-qa-person"] },
+  { title: "step skills, the agent works alone", for: "step", skills: ["norn-implement", "norn-review", "norn-qa", "norn-merge", "norn-slice", "norn-pr", "norn-diagnose"] },
+  { title: "step skills, a person works with the agent", for: "attended", skills: ["norn-refine", "norn-clarify", "norn-plan", "norn-interview", "norn-qa-person", "norn-prototype"] },
   { title: "references other skills read, never a step", for: "reference", skills: ["norn-tdd", "norn-codebase-design"] },
 ];
 

@@ -17,7 +17,7 @@ import { appendTrace, blockedHookCount, loadConfig } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import { type Context, findUnitMarker, safeRealpath } from "../context.ts";
 import { withExit } from "../output.ts";
-import { loadUnitSession, type UnitSession } from "../runtime/agent-unit.ts";
+import { loadUnitSession, ORIENT_ENV, type UnitSession } from "../runtime/agent-unit.ts";
 
 /** P5: turn ends refused per run before norn lets the tick classify `silent` and nudge instead. */
 export const MAX_STOP_BLOCKS = 3;
@@ -116,6 +116,7 @@ export const hookEventCommand = defineCommand({
   repo: false,
   async run(ctx, args) {
     try {
+      if (ctx.env[ORIENT_ENV] === "1") return {}; // an orient agent sits in the worktree but is no run of it
       const payload = parsePayload(await readStdin(ctx));
       const event = args.positionals[0] ?? field(payload, "hook_event_name") ?? "";
       const cwd = field(payload, "cwd") ?? ctx.cwd;

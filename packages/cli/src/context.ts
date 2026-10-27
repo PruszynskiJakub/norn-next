@@ -30,10 +30,12 @@ export interface CliDeps {
   signal?: AbortSignal;
   /** stdin text for commands that read it (`norn hook`); else the process stdin */
   stdin?: string;
-  /** HC4: command lines for `norn pane --interactive`; else the process stdin, line by line */
+  /** SPEC-cockpit CP6: raw key chunks for `norn cockpit`; else the process stdin in raw mode */
   input?: AsyncIterable<string>;
   /** HC6/HC12: Herdr for the cockpit; null = none; absent = the real one when `HERDR_ENV=1` */
   herdr?: herdr.HerdrCockpit | null;
+  /** an outside command a front end starts for the person (`norn cockpit` opens a PR or issue link); default Bun.spawn */
+  shell?: (argv: string[], cwd: string) => Promise<{ code: number; stderr: string }>;
 }
 
 export const systemClock: Clock = {

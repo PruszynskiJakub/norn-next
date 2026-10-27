@@ -127,6 +127,7 @@ Three separate concepts decide where a human is involved:
   specs/<id>-<slug>/            # id is provider-prefixed: gh-123, gl-45
     story.md                    # frontmatter mirrors remote issue + workflow + spec body
     slices/<nn>-<slug>.md       # frontmatter: id, title, workflow, depends_on, status, labels?
+    pr.md                       # story PR body, written by an agent (GR9); prose, never read by decide
     runs/<unit>/                # <unit> = _story or a slice <nn>-<slug>; committed, collapsed in PR diffs (S10)
       state.json                # commit point: cursor, attempt, counters, workflow_hash, applied_through
       workflow.yaml             # workflow copy pinned when the unit started
@@ -271,7 +272,7 @@ Three sources of outcomes:
 - NT3 Every story-level gate lists the story's open notes in its inbox item. Approving it records them in the `approve` receipt (`acknowledged_notes`), and they leave the inbox; rejecting leaves them open.
 - NT4 The `qa` skill uses a note, not `person`, when a criterion passed as written but a person may read it differently.
 - NT5 The Notes header says when its notes clear: `cleared by <story> <gate> approval`, naming the nearest story-level gate ahead of the story unit's step (its own when it waits at one), else `cleared when the story is done`. A slice gate's item lists that slice's open notes too; approving a slice gate does not acknowledge them.
-- NT6 `norn inbox` (and `norn pane` without `--interactive`) shows Notes as their header line only, with `norn inbox --notes` beneath; `--notes` lists them. The JSON always carries every note. The cockpit shows them as an accordion (SPEC-herdr-cockpit HC16).
+- NT6 `norn inbox` shows Notes as their header line only, with `norn inbox --notes` beneath; `--notes` lists them. The JSON always carries every note. The cockpit shows them as an accordion (SPEC-herdr-cockpit HC16).
 
 ## 11. Workflows
 
@@ -283,7 +284,7 @@ Three sources of outcomes:
 | `agent` | Run a skill in a fresh session; fields: `skill`, `instructions?`, `inputs`, `agent?`, `model?`, `attended?`, `criteria?: required` (QV3), limits (`deadline`, `nudges`, `retries`), `outcomes`. |
 | `check` | Run a shell command in the unit worktree with `.env.norn` loaded and a `timeout`; exit code decides `pass`/`fail`; writes a check receipt (C5). |
 | `gate` | Wait for a human `approve`/`reject` (or `answer`). |
-| `git` | Built-in actions: `integrate` (slice into story branch: rebase + fast-forward, serialized per story), `push`, `open-pr` (draft story PR into the base branch, BS0), `update` (merge the base into the story branch, BS3). |
+| `git` | Built-in actions: `integrate` (slice into story branch: rebase + fast-forward, serialized per story), `push`, `open-pr` (draft story PR into the base branch, BS0; body per GR9, and an open PR gets the new body), `update` (merge the base into the story branch, BS3). |
 | `slices` | Story-level bridge: start each slice's workflow when its `depends_on` are done, within caps; `done` when all slices are integrated; picks up slice files added mid-flight. |
 
 - W3 Transitions are keyed on outcomes: `review.changes_requested → implement`. Conditions are expressed only as outcomes (e.g. `refine` reports `done` or `questions`); there is no `when:` guard in v1. An edge is `{ to, counter?, means?, verdict? }`; `verdict` (agent steps only) gates which outcome a criteria report allows (QV5).
@@ -338,9 +339,9 @@ steps:
 counters: { test_loop: { max: 5 }, review_loop: { max: 3 }, qa_loop: { max: 2 }, conflict_loop: { max: 2 } }
 ```
 
-Default story workflow (sketch): `refine (attended; done → plan, questions → clarify) → clarify (attended) → plan (attended) → slice → approve-plan (gate) → slices → update (git; conflict → resolve, counted) → test (check) → qa → open-pr (git) → ready (gate) → $done`; `human-qa` and `ready` route `stale` back to `update` (counted, `stale_loop`), workflow field `base: { stale: conflict }` (BS6–BS8). Rework found by story `test`/`qa` goes to `implement` in the story worktree, counted. After `$done` the story waits for the observed PR merge (GR6) — a fact, not a gate.
+Default story workflow (sketch): `refine (attended; done → plan, questions → clarify) → clarify (attended) → plan (attended) → slice → approve-plan (gate) → slices → update (git; conflict → resolve, counted) → test (check) → qa → describe (writes pr.md, GR9) → open-pr (git) → ready (gate) → $done`; `human-qa` approve also goes to `describe`; `human-qa` and `ready` route `stale` back to `update` (counted, `stale_loop`), workflow field `base: { stale: conflict }` (BS6–BS8). Rework found by story `test`/`qa` goes to `implement` in the story worktree, counted. After `$done` the story waits for the observed PR merge (GR6) — a fact, not a gate.
 
-Example `bug` workflow: `reproduce (agent; reproduced → implement, cannot_reproduce → $stuck) → implement → test → review → integrate`.
+Example `bug` workflow: `reproduce (agent, norn-diagnose: seen as a user, then a red loop and the cause, no fix; reproduced → implement, cannot_reproduce → $stuck) → implement (the loop becomes the red test) → test → review → integrate`.
 
 ## 12. Remote and git
 
@@ -353,6 +354,7 @@ Example `bug` workflow: `reproduce (agent; reproduced → implement, cannot_repr
 - GR7 **PR closed unmerged, issue closed, unassigned or unlabelled** → the story parks with reason `remote: <what>` under Unblock. norn never deletes work on its own; `norn drop <story>` cleans up (pushing branches first, as `release` does); `norn unstick` resumes.
 - GR6a (BS11) **Merged means merged into the base.** GR6 cleanup fires only when the PR's base branch (`story.pr.base_branch`) is the story's base branch (BS0), or the story head is already on the fetched base (P2). A PR merged into any other branch parks the story with reason `remote: PR merged into <branch>, not <base>` (GR7); an open PR targeting another branch is a Check item (retarget).
 - GR8 **Issue edited** → mirrored frontmatter fields (title, assignee, URL) update; the spec body is never overwritten. If the remote body changes after `refine` finished, an inbox item "issue body changed since refine" appears; it does not block running slices.
+- GR9 **PR body.** An agent step (the template's `describe`, skill `norn-pr`) writes the body to `<spec_dir>/pr.md`: a summary picture, before/after evidence from QA, merge danger. `open-pr` reads the file as opaque text in act — decide only names it (P8) — and puts the issue link (`Closes <url>`) under it; with no file the body is the link alone. When the story's PR is already open, `open-pr` replaces its body instead of opening another, so after rework the PR describes the branch as it is now. A body edited by hand on the remote is overwritten: edit `pr.md`, or reject at `ready` with what to change.
 
 ### 12.1 Base sync (BS0–BS10, `SPEC-base-sync-and-qa.md` Part A)
 
@@ -412,7 +414,7 @@ Example `bug` workflow: `reproduce (agent; reproduced → implement, cannot_repr
 | Views | `status`, `config [<key>]` (K2a), `trace <unit>`, `why <unit>` |
 | Housekeeping | `tidy` |
 
-- O1 `norn inbox` (and a Herdr status pane) groups by action: **Your turn** (attended steps), **Answer**, **Approve**, **Unblock**, **Check**, **Unclaimed**, **Running**, **Notes** (NT2), **Recently done**; each group title carries a few words on what it holds, and each item shows question/reason, age and the exact command to resolve it. A person's start of an agent step (Your turn) shows `norn open <unit>` when the runner can open a terminal (MO5), with the start command to type by hand in the detail; otherwise the start command itself. A story taken in on this checkout that no tick has started yet is listed too: under Running while the heartbeat is up, else under Your turn with `norn watch`. `norn pane --interactive` acts on the items through CLI verbs (SPEC-herdr-cockpit HC4–HC8).
+- O1 `norn inbox` (and the cockpit, `norn cockpit`) groups by action: **Your turn** (attended steps), **Answer**, **Approve**, **Unblock**, **Check**, **Unclaimed**, **Running**, **Notes** (NT2), **Recently done**; each group title carries a few words on what it holds, and each item shows question/reason, age and the exact command to resolve it. A person's start of an agent step (Your turn) shows `norn open <unit>` when the runner can open a terminal (MO5), with the start command to type by hand in the detail; otherwise the start command itself. A story taken in on this checkout that no tick has started yet is listed too: under Running while the heartbeat is up, else under Your turn with `norn watch`. `norn pane --interactive` acts on the items through CLI verbs (SPEC-herdr-cockpit HC4–HC8).
 - O2 `answer`, `approve`, `unstick`, `mode`, `workflow` write receipts; the next tick applies them and delivers answers into the same session or a fresh one from the handoff. Typing directly into an agent pane is also allowed.
 - O3 Notifiers are optional plugins (OS default; ntfy, webhook, herdr) and fire once per new inbox item, receipt-first.
 - O4 Trace: one JSONL record per tick with facts snapshot, rule fired, action, result, briefing and transcript pointers.
@@ -435,9 +437,13 @@ Single-job skills ported from ai-engine (norn v0.11.0): its skill files are the 
 | `norn-review` | Spec and Standards axes kept apart (a subagent per axis when the agent has them); smells baseline (`SMELLS.md`); findings as structured data. | approve / changes_requested |
 | `norn-qa` | Check each acceptance criterion as a user, with evidence (a screenshot for every `browser` criterion); one verdict per criterion in a criteria report (QV2); never pass what wasn't observed (`unverified` when this session cannot check it); notes when a passed criterion may be read differently (NT4); secrets redacted. | pass / fail / partial / unverified |
 | `norn-qa-person` | Walk a person through QA from the agent's evidence and their own remarks; a repro for every failure. Shipped for attended QA steps; the templates' `human-qa` is a gate. | pass / fail |
+| `norn-pr` | Pull request body from the spec, the diff and QA's criteria reports and evidence: Summary (the smallest picture: pseudocode, call tree, file tree, Mermaid or shape diff), Evidence (before/after per criterion; never claims what was not observed), Merge danger (one-way or two-way door, blast radius). Adapted from mattpocock/skills `pr` (itself after Humanlayer's show-me). | done |
+| `norn-diagnose` | Hard bugs, flaky tests, performance regressions: a tight, deterministic loop that goes red on the reported symptom first (no hypothesis before it has gone red), then minimise, ranked falsifiable hypotheses, instrument, bisect; fix behind a regression test at a correct seam, or hand the loop and cause back when told not to fix. HITL loop template (`scripts/hitl-loop.template.sh`); secrets redacted. Runs the `bug` template's `reproduce`; `norn-implement` turns to it when a rework failure does not reproduce on the first try. | reproduced / cannot_reproduce |
 | `norn-merge` | Resolve conflicts by intent of both sides; merge the base into a published branch, never rebase; abort and stop if new behaviour is needed. | done |
+| `norn-prototype` | Throwaway prototype that settles one design question with a person: a state model as one shareable HTML file (`LOGIC.md`), or radically different UI variants on one route switched by `?variant=` (`UI.md`). Committed on the branch being worked on, in prototype-named files that nothing in the product reaches (real files it edited go back as they were); the spec links its path next to the decision it settled, with the question and the verdict. Not a step: `norn-refine` and `norn-plan` offer it when a decision turns on look and feel or a state model hard to judge on paper, and only suggest it when no person is present. | — |
 | `norn-tdd` | Reference: red → green at agreed seams, good tests, mocking at boundaries (`tests.md`, `mocking.md`); refactoring stays out of the loop. | — |
 | `norn-codebase-design` | Reference: deep modules, interface, seam, adapter, depth (`DEEPENING.md`, `DESIGN-IT-TWICE.md`). | — |
+| `norn-retro` | Retrospective over one finished story, run by a person with an agent after its PR merges, never a step: reads the committed `runs/` of the story and each slice (counters, receipts, check logs, handoffs) and the local `trace/` if present; ranks the friction (exhausted or high counters, repeated rejects, asks, stuck and lost sessions, `unverified`/`person` verdicts, environment check failures, recurring findings) and proposes one change per finding to a skill, workflow, config, contributor docs or the spec template, citing the receipt. Suggests only: answers in the session and writes or changes no file. | — |
 
 - SK1 `norn init` copies each bundled skill folder whole into `.agents/skills/` (committed; always the bundled version, the change visible in `git diff`) and links it from each configured agent's skill folder (`.claude/skills/`, `.gemini/skills/`, `.opencode/skills/`; codex reads `.agents/skills/` itself). A repo customizes a skill by writing its own under another name and naming it in its workflow (W1). `doctor` reports missing, unlinked and drifted skills; W5 checks each step's skill against the skills its agent can see.
 - SK2 The `norn` skill must stay under ~80 lines; it never contains workflow logic or step names.

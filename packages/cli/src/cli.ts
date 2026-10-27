@@ -59,7 +59,7 @@ export async function runCli(argv: string[], deps: CliDeps = {}): Promise<CliRes
   const markdown = command.markdown === true && !json;
   const argvOwn = [...flags.filter((a) => a !== "--json" && (command.markdown !== true || a !== "--text")), ...(end < 0 ? [] : rest.slice(end))];
   try {
-    const args = parseCommandArgs(command, argvOwn);
+    const args = { ...parseCommandArgs(command, argvOwn), json };
     const ctx = new Context(deps);
     if (command.repo !== false) await ctx.locate();
     const out = await command.run(ctx, args);

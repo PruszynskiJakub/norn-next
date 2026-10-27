@@ -8,15 +8,65 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 - **Breaking for third-party git adapters (X2).** `GitPort` (`packages/core/src/ports.ts`) is now every git call norn's commands and runtime make, so none of them run git around it. It gains `remotes`, `commonDir`, `show`, `lsTree`, `hasRef`, `hasPath`, `firstParentLog`, `revList`, `worktreeAddDetached`, `worktreePrune`, `version`, `remoteBranches`, `changedPaths`, `checkoutPaths` and `untrack`, `fetch` takes a `quiet` option and `listRefs` several prefixes; it drops `worktreeRoot`, `listRemoteRefs`, `readBlob` and `writeBlob`, which nothing called. `@norn/store` no longer exports its raw git plumbing (`git`, `gitSync`, `gitOk`, the blob and ref helpers); claim and mailbox refs stay behind its claim and mailbox functions.
 
-- `norn help` says up front that an agent doing a step runs only `brief`, `done`, `ask` and `stuck`, and that every other command is the person's, for an agent to run only when the person asks it to. `norn help <command>` says so for a person's command, `--json` gives each command a `for` (`person`, `agent`, `hooks`), and a new Skills section (`skills` in `--json`) marks each bundled skill as the protocol, a step the agent works alone, a step a person works with the agent, or a reference. The `norn` skill gains the same rule: a refusal, the brief or the inbox naming a command is not the person asking.
-
 ### Fixed
 
 - An answer to a parked run on a runner that resumes sessions (headless) no longer waits as "max_agents in use" because of the run's own agent lease. The answered run already holds that lease, so, as a nudge resume already did, it does not count against `max_agents` (K1).
 - A git step whose outcome uses up its counter (an `integrate` conflict past `conflict_loop`'s max) records `$stuck` as the route in its classify receipt, where the unit actually goes, instead of the edge's target (`merge`). `norn why`, the trace and the boundary commit now name the real route (W4).
 - A tick or integrate lock, or a lease, whose holder is a zombie process is reclaimed. norn's own liveness check counted a zombie as alive (the process adapter already did not), so a crashed tick that left a zombie held the tick lock until the zombie was reaped. Both now read the same `ps` parser, where a zombie is dead (K3, H1).
-- norn's machine-local files in `.agents/norn/trace/` (`remote.json`, `records.json`, `notified.json`, `foreign.json`, `inbox.json`, `heartbeat.json`, `failures.json`, `base.json`, `pr.json`, `cockpit.json` and the lock files) are validated when read. A file of the wrong shape reads as empty and leaves a `local_file` trace event naming it, and the next write replaces it; before, it was used as it was, so a string `attempted_at` in `remote.json` stopped remote syncs for good. Their schemas are published as `local-*.schema.json` (S2).
+- norn's machine-local files in `.agents/norn/trace/` (`remote.json`, `records.json`, `notified.json`, `foreign.json`, `inbox.json`, `heartbeat.json`, `failures.json`, `base.json`, `pr.json` and the lock files), and the cockpit's `cockpit.json` in norn's home, are validated when read. A file of the wrong shape reads as empty and (in the trace dir) leaves a `local_file` trace event naming it, and the next write replaces it; before, it was used as it was, so a string `attempted_at` in `remote.json` stopped remote syncs for good. Their schemas are published as `local-*.schema.json` (S2).
 - A slice file that fails validation, of a slice that has not started yet, no longer makes every tick fail with a TypeError. The story waits on its slices step and `norn why` names the broken file (`slices.file_invalid`), as it already did for a slice that had started (S2).
+
+## [0.9.1] - 2026-10-27
+
+### Changed
+
+- The cockpit's preview is easier to read.
+  - It is laid out in sections: the story, SLICES, LINKS, the selected item, what else waits or runs, and NOTES.
+  - Each slice takes one line, with a coloured mark (✓ done, ◐ running, ● parked, ✖ stuck).
+  - The PR fits on one line, with its URL beneath it.
+  - Notes are bullets with a hanging indent, under each unit.
+  - A gate's detail and full text no longer repeat the open notes.
+  - The list takes about 40% of the width, so the preview gets more of it.
+  - ⌃d and ⌃u scroll the preview when it does not fit, and so does the mouse wheel over it. Over the list, the wheel moves the selection.
+- The cockpit draws on the terminal's alternate screen, so its frames no longer fill the pane's scrollback. The terminal is restored when it ends, SIGINT and SIGTERM included.
+
+## [0.9.0] - 2026-10-27
+
+### Added
+
+- `norn cockpit`: one cockpit for the terminal and Herdr. It lists what needs you (your turn, answer, approve, stuck, check), then every story, with the selected row's story previewed beside the list: slices, PR, what waits, what runs, the open notes. One key acts on the selected row: `enter` orients, `g` goes to the agent's pane, `s` starts a manual step, `a` answers and `x` rejects (both prompt for the text in the footer), `y` approves, `u` unsticks, `t` takes, `v` shows the trace, `o` and `i` open the PR and the issue. `/` filters. Only the keys the row offers work, and the footer lists them. Every action leaves the cockpit open with its outcome on the footer line. `--next` jumps to the agent waiting for you, `--open` opens it in a Herdr split.
+- `norn cockpit --json` prints the cockpit model: the rows, their previews and the actions each offers, with the norn command behind each one. `cockpitModel` in `@norn/view` builds it, so a web panel can render the same cockpit later.
+- The cockpit opens on any Herdr workspace. Outside a norn repository it shows the repository the last cockpit ran in on this machine (`~/.norn/cockpit.json`).
+- The story PR gets a real description. A new `describe` step in the `story` template, after QA, runs the new `norn-pr` skill: it writes `pr.md` in the spec folder with a summary picture of the change, before/after evidence from QA's criteria reports and evidence, and the merge danger (one-way or two-way door, blast radius). `open-pr` uses that file as the PR body, with the issue link under it; without the file the body is the issue link alone, as before (GR9). Existing repos get the step from `norn init` only if they take the new template; add it to your own `story.yaml` to use it.
+- A `norn-diagnose` skill for hard bugs, flaky tests and performance regressions, adapted from mattpocock/skills' `diagnosing-bugs`. It builds a tight, deterministic loop that goes red on the reported symptom before anything else, and allows no hypothesis until that loop has gone red; then it minimises the repro, ranks falsifiable hypotheses, instruments and bisects to the cause, and fixes behind a regression test, or hands the loop and cause back when told not to fix. It ships a template script for loops a person must click through, and redacts secrets.
+- A `norn-prototype` skill, adapted from mattpocock/skills: it builds a throwaway prototype with a person to settle one design question, either a state model as one HTML file a non-developer can click through, or several radically different UI variants on one route switched by `?variant=`. The prototype is committed on the branch being worked on, in prototype-named files nothing in the product reaches; the spec links its path next to the decision it settled, with the question and the verdict. It is not a step of any workflow: `norn-refine` and `norn-plan` offer it when a decision turns on how something looks or feels, or on a state model hard to judge on paper, and with no person present only suggest it. `norn help` lists it with the skills a person works with the agent.
+- A `norn-retro` skill, for a person to run with an agent after a story's PR merges. It reads the story's committed `runs/` (counters, receipts, check logs, handoffs) and the local trace when this machine has it, ranks the friction (counters that ran out, repeated rejects, asks, lost sessions, `unverified` criteria, checks that failed for the environment, findings that recur across slices) and suggests one change per finding to a skill, workflow, the config, the contributor docs or the spec template, each citing the receipt it comes from. It only suggests: it answers in the session and writes or changes no file.
+
+### Changed
+
+- `open-pr` on a story whose PR is already open now rewrites that PR's body instead of finishing at once, so after a `ready` reject and rework the PR describes the branch as it is (GR9). Both remote adapters gained `editPullRequestBody` (`gh pr edit --body`, `glab mr update --description-file -`).
+- The `bug` workflow's `reproduce` step runs `norn-diagnose` instead of `norn-qa`: it still follows the report as a user first, then builds a loop that goes red on that symptom and finds the cause without fixing it, and leaves the loop, the minimised repro and the cause in the handoff for `implement`, which turns them into the red test. `norn init` installs the new template; a repo that already has `bug.yaml` keeps its own.
+- `norn-implement` switches to `norn-diagnose` when a failing check or a QA repro does not fail on the first try (flaky, CI-only, timing), and builds a loop that goes red before writing the red test.
+- The Herdr plugin (0.3.0) runs `norn cockpit` everywhere. `norn.pick` opens it as a popup, `norn.open` as a split, and `norn.next` runs `norn cockpit --next`.
+
+### Removed
+
+- `norn pane` and `norn pick`. `norn cockpit` replaces both, with no aliases. `norn pane --next` is now `norn cockpit --next`, and `norn pane --open` is `norn cockpit --open`. The plain redrawn inbox (`norn pane` without flags) is gone; use `norn inbox` or the cockpit. The cockpit's numbered line commands (`y 3`, `a 2 …`) and the Notes accordion are gone too: notes show in the story preview.
+
+## [0.8.0] - 2026-10-27
+
+### Added
+
+- `norn orient <story|unit>` shows one story at a glance: what it is, each slice's outcome, the PR (link and the `gh pr view` / `glab mr view` command), the open notes grouped by unit, what waits for you with the exact commands, and where to look. Read only: no receipt, run or claim. Markdown by default, `--json` for data.
+- `norn orient <story> --open` gives the story a Herdr workspace labelled `<story> orient` in its worktree, or focuses the one it has. The agent there opens with a short summary and answers your questions; it runs norn commands only when you say so and never edits code or reports an outcome (`NORN_ORIENT=1`: its hooks record nothing, and `brief`, `done`, `ask` and `stuck` refuse it). Outside Herdr it prints the command.
+- `norn pick`: a picker for a Herdr popup. It lists what needs you, then every story; type to filter, the right side previews the story. Enter orients, ⌃o opens the PR in the browser, ⌃y approves a gate, ⌃g goes to the agent pane, ⌃t takes an unclaimed story; it stays open until esc.
+- `norn status --segment` prints one line for Herdr's tab bar (`norn·todoist-app ● 1 approve ◐ 2 running`), or an empty one outside a repository. Inside Herdr it also shows on each orient workspace what its story needs (sidebar token `$norn`) and moves the orient workspaces that need you ahead of the others; no other workspace moves.
+- The Herdr plugin has a `pick` popup and a `norn.pick` action. `plugins/herdr/README.md` has the config snippet for the key bindings, the tab bar segment and the sidebar row.
+- `norn status` shows each story's branch, last-seen PR and open notes in `--json` (`branch`, `pr`, `notes`).
+
+### Changed
+
+- `norn help` says up front that an agent doing a step runs only `brief`, `done`, `ask` and `stuck`, and that every other command is the person's, for an agent to run only when the person asks it to. `norn help <command>` says so for a person's command, `--json` gives each command a `for` (`person`, `agent`, `hooks`), and a new Skills section (`skills` in `--json`) marks each bundled skill as the protocol, a step the agent works alone, a step a person works with the agent, or a reference. The `norn` skill gains the same rule: a refusal, the brief or the inbox naming a command is not the person asking.
 
 ## [0.7.1] - 2026-10-26
 

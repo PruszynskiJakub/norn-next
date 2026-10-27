@@ -27,7 +27,6 @@ export const foreignCommitsPath = (root: string) => join(traceDir(root), "foreig
 export const inboxOpenPath = (root: string) => join(traceDir(root), "inbox.json");
 export const baseFactsPath = (root: string) => join(traceDir(root), "base.json");
 export const prFactsPath = (root: string) => join(traceDir(root), "pr.json");
-export const cockpitPath = (root: string) => join(traceDir(root), "cockpit.json");
 /** GR6: the base branch's `.agents/specs/` materialized per tree id (store/base.ts). */
 export const baseCacheDir = (root: string) => join(traceDir(root), "base");
 

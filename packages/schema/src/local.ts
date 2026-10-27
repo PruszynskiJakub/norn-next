@@ -148,8 +148,8 @@ export const LocalPrFile = Type.Object(
 );
 export type LocalPrFile = Static<typeof LocalPrFile>;
 
-/** `cockpit.json`: HC16 `notes_seen_at`. */
-export const LocalCockpitFile = Type.Object({ notes_seen_at: Type.Optional(Type.String()) }, id("local-cockpit", "norn cockpit memory (trace/cockpit.json)"));
+/** `<norn home>/cockpit.json`: CP13 `last_repo`, the main checkout the last cockpit ran in. */
+export const LocalCockpitFile = Type.Object({ last_repo: Type.Optional(Type.String()) }, id("local-cockpit", "norn cockpit memory (<norn home>/cockpit.json)"));
 export type LocalCockpitFile = Static<typeof LocalCockpitFile>;
 
 /** A lock file (H1 tick lock, K6 integrate lock): the holder process and when it took the lock. */

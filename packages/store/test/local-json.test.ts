@@ -50,25 +50,32 @@ describe("readLocalJson (S2, BUG-4)", () => {
 
   test("unknown properties are kept (a newer norn's file still reads)", () => {
     const r = repo();
-    put(r, "cockpit.json", { notes_seen_at: "2026-10-23T12:00:00.000Z", later: 1 });
-    expect(readCockpitFile(r).notes_seen_at).toBe("2026-10-23T12:00:00.000Z");
+    put(r, "cockpit.json", { last_repo: "/repo", later: 1 });
+    expect(readCockpitFile(traceDir(r)).last_repo).toBe("/repo");
   });
 
-  test("store readers: wrong-shaped heartbeat, failures, cockpit, base, pr and remote read as empty", () => {
+  test("the cockpit memory in the norn home: a wrong shape reads as empty, untraced (no repository)", () => {
+    const r = repo();
+    put(r, "cockpit.json", { last_repo: 7 });
+    expect(readCockpitFile(traceDir(r))).toEqual({});
+    put(r, "cockpit.json", ["junk"]);
+    expect(readCockpitFile(traceDir(r))).toEqual({});
+    expect(localEvents(r)).toEqual([]);
+  });
+
+  test("store readers: wrong-shaped heartbeat, failures, base, pr and remote read as empty", () => {
     const r = repo();
     put(r, "heartbeat.json", { heartbeat_id: 7 });
     put(r, "failures.json", { units: { "gh-1": { effect: "nudge" } } });
-    put(r, "cockpit.json", ["junk"]);
     put(r, "base.json", { stories: { "gh-1": { ref: "x", behind: "many" } } });
     put(r, "pr.json", { stories: { "gh-1": { pr: { number: "1" }, observed_at: 1 } } });
     put(r, "remote.json", { default_branch: 3 });
     expect(readHeartbeatFile(r)).toEqual({});
     expect(readActFailures(r)).toEqual({});
-    expect(readCockpitFile(r)).toEqual({});
     expect(readBaseFacts(r)).toEqual({});
     expect(readPrFacts(r)).toEqual({});
     expect(cachedDefaultBranch(r)).toBeNull();
-    expect(localEvents(r)).toHaveLength(6);
+    expect(localEvents(r)).toHaveLength(5);
   });
 
   test("a lock of the wrong shape is reclaimed as unreadable", async () => {

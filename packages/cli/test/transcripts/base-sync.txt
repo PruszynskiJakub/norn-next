@@ -611,8 +611,9 @@
   spawn repo-worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
   spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
   A.remote.findPullRequest gh-7-add-login-form
+  A.remote.editPullRequestBody 100
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/receipts/0011-classify.json
-      {"kind":"classify","receipt_id":"<ulid:36>","run_id":"<ulid:37>","step":"open-pr","attempt":2,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:38>","outcome":"done","rule":"git.open-pr","detail":"draft PR #100 https://github.com/o/r/pull/100","route":"ready"}
+      {"kind":"classify","receipt_id":"<ulid:36>","run_id":"<ulid:37>","step":"open-pr","attempt":2,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:38>","outcome":"done","rule":"git.open-pr","detail":"PR #100 body updated https://github.com/o/r/pull/100","route":"ready"}
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -920,8 +921,9 @@
   spawn repo-worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
   spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
   A.remote.findPullRequest gh-7-add-login-form
+  A.remote.editPullRequestBody 100
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/receipts/0016-classify.json
-      {"kind":"classify","receipt_id":"<ulid:52>","run_id":"<ulid:53>","step":"open-pr","attempt":3,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:54>","outcome":"done","rule":"git.open-pr","detail":"draft PR #100 https://github.com/o/r/pull/100","route":"ready"}
+      {"kind":"classify","receipt_id":"<ulid:52>","run_id":"<ulid:53>","step":"open-pr","attempt":3,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:54>","outcome":"done","rule":"git.open-pr","detail":"PR #100 body updated https://github.com/o/r/pull/100","route":"ready"}
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
