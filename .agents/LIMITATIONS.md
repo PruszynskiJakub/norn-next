@@ -78,7 +78,7 @@ The rules each fix maps to are in its spec.
   - an agent that dies with no retries left;
   - killing a herdr pane mid-merge.
 - **An agent with the `browser` capability.** Nobody ever checked a browser criterion live; every such approval says so.
-- **The herdr cockpit (HC1–HC15).** The attended wait, `norn pane --interactive`, the Herdr plugin (`plugins/herdr`), pane labels and the `herdr` notifier are tested against fixtures and a fake runner only. No dogfood run has used them yet.
+- **The herdr cockpit (HC1–HC15).** The attended wait, the cockpit (`norn cockpit`, SPEC-cockpit), the Herdr plugin (`plugins/herdr`), pane labels and the `herdr` notifier are tested against fixtures and a fake runner only. No dogfood run has used them yet.
 - **The auto permission mode default** (`--permission-mode auto` for `agents.claude`). Every live run used configs that replace it.
 - **codex, opencode, gemini and glab adapters.** They are tested only against recorded fixtures. Only claude, git, gh, herdr and headless ran live.
 
@@ -90,7 +90,7 @@ The rules each fix maps to are in its spec.
 - **No host-less mode.** Story keys must be `gh-N`/`gl-N`, and intake reads issues from GitHub or GitLab (GR1, GR2). A repo with only local files and branches cannot run norn today. Business tracking in Jira stays outside norn by choice.
 - **GitHub/GitLab-style flows only.** norn assumes PRs, branches and git refs. Trunk-based work without PRs, many teams sharing one `.agents/`, and non-git VCS are out of scope.
 - **Merge, never rebase.** Story branches gain merge commits from the base. Teams that require linear history must squash on merge; the base then stays linear.
-- **The cockpit is line-based.** `norn pane --interactive` reads one command per line between redraws; it is not a full-screen TUI (no raw keys or mouse).
+- **The cockpit takes keys, not the mouse.** `norn cockpit` is full screen with raw keys; there is no mouse support and no web panel yet (SPEC-cockpit §8 says how one would plug in).
 - **Coarse grain.** norn works per story and slice on a heartbeat. It is the wrong tool for quick interactive edits, and the overhead is not worth it for tiny changes.
 - **Local environment must stay healthy.**
   - It needs Bun, git ≥ 2.38 (for `merge-tree --write-tree`), git worktrees (disk plus per-worktree setup), an authenticated `gh`, and herdr for attended panes. The cockpit needs Herdr ≥ 0.9, and its plugin is installed by hand (`herdr plugin install PruszynskiJakub/norn-next/plugins/herdr`, HC11); `norn init` does not install it.

@@ -272,7 +272,7 @@ Three sources of outcomes:
 - NT3 Every story-level gate lists the story's open notes in its inbox item. Approving it records them in the `approve` receipt (`acknowledged_notes`), and they leave the inbox; rejecting leaves them open.
 - NT4 The `qa` skill uses a note, not `person`, when a criterion passed as written but a person may read it differently.
 - NT5 The Notes header says when its notes clear: `cleared by <story> <gate> approval`, naming the nearest story-level gate ahead of the story unit's step (its own when it waits at one), else `cleared when the story is done`. A slice gate's item lists that slice's open notes too; approving a slice gate does not acknowledge them.
-- NT6 `norn inbox` (and `norn pane` without `--interactive`) shows Notes as their header line only, with `norn inbox --notes` beneath; `--notes` lists them. The JSON always carries every note. The cockpit shows them as an accordion (SPEC-herdr-cockpit HC16).
+- NT6 `norn inbox` shows Notes as their header line only, with `norn inbox --notes` beneath; `--notes` lists them. The JSON always carries every note. The cockpit shows them as an accordion (SPEC-herdr-cockpit HC16).
 
 ## 11. Workflows
 
@@ -414,7 +414,7 @@ Example `bug` workflow: `reproduce (agent, norn-diagnose: seen as a user, then a
 | Views | `status`, `config [<key>]` (K2a), `trace <unit>`, `why <unit>` |
 | Housekeeping | `tidy` |
 
-- O1 `norn inbox` (and a Herdr status pane) groups by action: **Your turn** (attended steps), **Answer**, **Approve**, **Unblock**, **Check**, **Unclaimed**, **Running**, **Notes** (NT2), **Recently done**; each group title carries a few words on what it holds, and each item shows question/reason, age and the exact command to resolve it. A person's start of an agent step (Your turn) shows `norn open <unit>` when the runner can open a terminal (MO5), with the start command to type by hand in the detail; otherwise the start command itself. A story taken in on this checkout that no tick has started yet is listed too: under Running while the heartbeat is up, else under Your turn with `norn watch`. `norn pane --interactive` acts on the items through CLI verbs (SPEC-herdr-cockpit HC4–HC8).
+- O1 `norn inbox` (and the cockpit, `norn cockpit`) groups by action: **Your turn** (attended steps), **Answer**, **Approve**, **Unblock**, **Check**, **Unclaimed**, **Running**, **Notes** (NT2), **Recently done**; each group title carries a few words on what it holds, and each item shows question/reason, age and the exact command to resolve it. A person's start of an agent step (Your turn) shows `norn open <unit>` when the runner can open a terminal (MO5), with the start command to type by hand in the detail; otherwise the start command itself. A story taken in on this checkout that no tick has started yet is listed too: under Running while the heartbeat is up, else under Your turn with `norn watch`. `norn pane --interactive` acts on the items through CLI verbs (SPEC-herdr-cockpit HC4–HC8).
 - O2 `answer`, `approve`, `unstick`, `mode`, `workflow` write receipts; the next tick applies them and delivers answers into the same session or a fresh one from the handoff. Typing directly into an agent pane is also allowed.
 - O3 Notifiers are optional plugins (OS default; ntfy, webhook, herdr) and fire once per new inbox item, receipt-first.
 - O4 Trace: one JSONL record per tick with facts snapshot, rule fired, action, result, briefing and transcript pointers.
