@@ -33,8 +33,10 @@ export type SpawnObserver = (spawned: SpawnRecord) => void;
 let observer: SpawnObserver | null = null;
 
 /**
- * Test hook: call `fn` with each argv + cwd before it is spawned (`spawnBounded` and store's sync
- * git calls). `null` (the default) turns it off. Returns the observer it replaced. The observer
+ * Test hook: call `fn` with each argv + cwd before it is spawned (`spawnBounded`, store's sync git
+ * calls, and every other spawn that calls `noteSpawn`: check commands, `gitRemoteUrl`, adapters'
+ * `bunExec`, the headless launch, doctor's probes; the read-only `ps`/`lsof` pid probes are left
+ * out). `null` (the default) turns it off. Returns the observer it replaced. The observer
  * only watches; it cannot change or stop the spawn, and one that throws is ignored.
  */
 export function setSpawnObserver(fn: SpawnObserver | null): SpawnObserver | null {
@@ -43,7 +45,7 @@ export function setSpawnObserver(fn: SpawnObserver | null): SpawnObserver | null
   return prev;
 }
 
-/** Tell the observer, if any, about a spawn. For store's own spawns that do not go through `spawnBounded`. */
+/** Tell the observer, if any, about a spawn that does not go through `spawnBounded`. */
 export function noteSpawn(argv: readonly string[], cwd: string | undefined): void {
   if (!observer) return;
   try {

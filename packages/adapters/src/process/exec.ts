@@ -2,6 +2,8 @@
  * Injectable command runner. Adapters build argv and hand it to an `Exec`; tests pass a
  * fake that replays recorded fixtures (X4), production uses `bunExec`.
  */
+import { noteSpawn } from "@norn/store";
+
 export interface ExecOptions {
   cwd?: string;
   /** full environment for the child; omitted = inherit */
@@ -19,8 +21,17 @@ export interface ExecResult {
 
 export type Exec = (argv: string[], opts?: ExecOptions) => Promise<ExecResult>;
 
-/** Run argv with Bun.spawn and collect output. Never throws for a missing binary (code 127). */
-export const bunExec: Exec = async (argv, opts = {}) => {
+/** Run argv with Bun.spawn and collect output, telling store's spawn observer (effect transcripts, refactor Phase 0.2). Never throws for a missing binary (code 127). */
+export const bunExec: Exec = (argv, opts = {}) => {
+  noteSpawn(argv, opts.cwd);
+  return unobservedExec(argv, opts);
+};
+
+/**
+ * `bunExec` without telling the spawn observer: for the process adapter's read-only `ps` probes,
+ * whose argv carries live pids (an effect transcript would differ on every run).
+ */
+export const unobservedExec: Exec = async (argv, opts = {}) => {
   let child: ReturnType<typeof Bun.spawn>;
   try {
     child = Bun.spawn(argv, {

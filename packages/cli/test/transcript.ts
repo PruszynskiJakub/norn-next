@@ -1,10 +1,16 @@
 /**
  * Effect transcripts (refactor Phase 0.2): what a harness scenario did to the world, in order, so a
  * structure-only refactor can show it changed nothing. Per command run through the harness:
- *   - every child process norn spawned (argv + cwd, via store's `setSpawnObserver`),
+ *   - the child processes norn spawned (argv + cwd, via store's `setSpawnObserver`): store's
+ *     `spawnBounded` and sync git calls, check commands (`runShell`), `gitRemoteUrl`, adapters'
+ *     `bunExec`, the headless runner's launch and doctor's probes. Not observed: the pid probes
+ *     (`ps` in store/proc.ts, the process adapter and brief, `lsof` in strays): read-only, and their
+ *     argv carries live pids. In the harness the runner/remote ports are fakes, so their spawns never
+ *     happen; their calls are recorded below instead.
  *   - every call on the fake ports (RunnerPort, RemotePort, notifiers), in call order,
  *   - the files under any `runs/` dir that appeared, changed or went away (sorted by path, so
- *     numbered receipts read in order).
+ *     numbered receipts read in order), each added or changed one with its content: JSON (receipts,
+ *     state.json) as one normalised line, other text as a hash of its normalised text.
  * Machine- and time-specific text is normalised: the harness temp dir → `<dir>`, norn's own temp dirs
  * → `<tmp>/<prefix>-<rand>`, ulids → `<ulid:N>`,
  * full and short git shas → `<sha:N>` / `<short:N>`, 16-hex content hashes → `<hash:N>` (numbered by
@@ -16,6 +22,7 @@
  * `NORN_TRANSCRIPT_UPDATE=1 bun test <file>` rewrites `test/transcripts/<name>.txt`.
  */
 import { expect } from "bun:test";
+import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
@@ -139,6 +146,26 @@ export function recordTranscript(h: Harness): Transcript {
   const lines: string[] = [];
   const norm = textNormaliser(h.dir);
   const log = (line: string) => lines.push(norm(line));
+  /**
+   * A runs/ file that appeared or changed, with what it now holds, so a change in a receipt's or
+   * state.json's fields shows up in the diff and not only a change in their names: JSON as one
+   * normalised line, other text (handoff.md, workflow.yaml, logs) as a hash of its normalised text.
+   */
+  const logFile = (mark: "+" | "~", p: string, content: string) => {
+    log(`  ${mark} ${p}`);
+    if (p.endsWith(".json")) {
+      let compact: string;
+      try {
+        compact = JSON.stringify(JSON.parse(content));
+      } catch {
+        compact = content.replace(/\s+/g, " ");
+      }
+      log(`      ${compact}`);
+    } else {
+      const text = norm(content);
+      lines.push(`      text ${text.split("\n").length} lines, normalised sha256 ${createHash("sha256").update(text).digest("hex").slice(0, 12)}`);
+    }
+  };
 
   let stopped = false;
   let inCommand = false;
@@ -191,9 +218,9 @@ export function recordTranscript(h: Harness): Transcript {
       for (const p of [...new Set([...before.keys(), ...after.keys()])].sort()) {
         const was = before.get(p);
         const now = after.get(p);
-        if (was === undefined) log(`  + ${p}`);
+        if (was === undefined) logFile("+", p, now as string);
         else if (now === undefined) log(`  - ${p}`);
-        else if (was !== now) log(`  ~ ${p}`);
+        else if (was !== now) logFile("~", p, now);
       }
     }
   };
