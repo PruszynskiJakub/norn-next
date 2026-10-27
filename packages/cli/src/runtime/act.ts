@@ -32,7 +32,6 @@ import {
   type UnitRef,
   type WorktreeSpec,
 } from "@norn/core";
-import { git as gitAdapter } from "@norn/adapters";
 import {
   type ClaimBlob,
   parseDuration,
@@ -78,6 +77,7 @@ import {
   writePendingRecords,
 } from "@norn/store";
 import type { Context } from "../context.ts";
+import { integrate, syncRemoteBranch, update as updateStory } from "./integrate.ts";
 import { leaseLiveness } from "./leases.ts";
 import { markStoryOnBase, mergeFacts, type RecordResult } from "./record.ts";
 import type { Observed, StoryLoc, UnitLoc } from "./observe.ts";
@@ -454,7 +454,7 @@ export class Actor {
   private async takeRemoteBranch(cwd: string, remote: string, branch: string, trailers: Record<string, string>): Promise<true | string | null> {
     try {
       if ((await this.git.status(cwd)).branch !== branch) return `${branch} is not checked out in ${cwd}`;
-      const r = await gitAdapter.syncRemoteBranch(this.git, { cwd, branch, remote, message: `Merge ${remote}/${branch} into ${branch}`, trailers: { ...trailers, "Norn-Tick": this.tick } });
+      const r = await syncRemoteBranch(this.git, { cwd, branch, remote, message: `Merge ${remote}/${branch} into ${branch}`, trailers: { ...trailers, "Norn-Tick": this.tick } });
       if (r.outcome === "conflict") return `story branch diverged from ${remote}/${branch}; merging it conflicts in ${r.files.join(", ") || "?"} — merge it in ${cwd} by hand`;
       return r.outcome === "adopted" || r.outcome === "merged" ? true : null;
     } catch (e) {
@@ -905,7 +905,7 @@ export class Actor {
       case "update": {
         const u = a.update;
         if (!u) throw new Error("update without a base");
-        const res = await gitAdapter.update(this.git, { cwd: a.cwd, branch: a.branch, baseSha: u.sha, remote: this.obs.remote, message: u.message, trailers: u.trailers });
+        const res = await updateStory(this.git, { cwd: a.cwd, branch: a.branch, baseSha: u.sha, remote: this.obs.remote, message: u.message, trailers: u.trailers });
         if (res.outcome === "stuck") {
           // BS3 step 1/3: dirty worktree, diverged story branch → $stuck with the reason
           outcome = "stuck";
@@ -932,7 +932,7 @@ export class Actor {
       }
       case "integrate": {
         if (!a.onto) throw new Error("integrate without a story branch");
-        const res = await gitAdapter.integrate(this.git, { sliceCwd: a.cwd, storyBranch: a.onto });
+        const res = await integrate(this.git, { sliceCwd: a.cwd, storyBranch: a.onto });
         if (res.outcome === "conflict") {
           outcome = "conflict";
           detail = `rebase onto ${a.onto} conflicts in ${res.files.join(", ") || "?"}`;
@@ -1026,7 +1026,7 @@ export class Actor {
     const wt = a.cleanup.worktree;
     if (wt && existsSync(wt) && a.unit.slice) {
       // the slice's final state commit ($done) lands after integration: bring it into the story branch
-      const res = await gitAdapter.integrate(this.git, { sliceCwd: wt, storyBranch: story.branch, ...(storyWt ? { storyCwd: storyWt } : {}) });
+      const res = await integrate(this.git, { sliceCwd: wt, storyBranch: story.branch, ...(storyWt ? { storyCwd: storyWt } : {}) });
       if (res.outcome === "conflict") throw new Error(`cannot bring ${a.unit.key}'s final state into ${story.branch}: conflict in ${res.files.join(", ")}`);
     }
     if (a.slice_status && a.unit.slice && storyWt) {
