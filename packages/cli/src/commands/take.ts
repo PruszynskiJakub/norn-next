@@ -12,7 +12,7 @@
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { sliceWorktreePath, storyWorktreePath } from "@norn/core";
-import { ExitCode, isStoryKey, parseSliceKey, type ReceiptOf, sliceBranch, specDir, STORY_UNIT_DIR, ulid } from "@norn/schema";
+import { ExitCode, type ReceiptOf, sliceBranch, specDir, STORY_UNIT_DIR, ulid } from "@norn/schema";
 import {
   acquireClaim,
   acquireTickLock,
@@ -30,24 +30,12 @@ import {
 } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
-import { busyError, claimHeld, corruptError, failure, refuse, usageError, withExit } from "../output.ts";
+import { busyError, claimHeld, corruptError, failure, refuse, withExit } from "../output.ts";
+import { storyArg } from "../runtime/args.ts";
 import { claimFor } from "../runtime/human.ts";
 import { leaseLiveness } from "../runtime/leases.ts";
-import { machineHolder } from "../runtime/observe.ts";
+import { gitRemote, machineHolder } from "../runtime/observe.ts";
 import { equipWorktree, syncLocalBranch, type WorktreeTarget } from "../runtime/worktrees.ts";
-
-/** Story key from `gh-7` or a unit key `gh-7/01` (claims are per story, T1). */
-export function storyArg(raw: string, command: string): string {
-  const key = parseSliceKey(raw)?.story ?? raw;
-  if (!isStoryKey(key)) throw usageError(`not a story key: '${raw}' (expected e.g. gh-123)`, `norn ${command} <story>`);
-  return key;
-}
-
-export async function gitRemote(ctx: Context): Promise<string | null> {
-  const name = ctx.config.remote.git_remote;
-  const r = await rawGit(ctx.root, ["remote"]);
-  return r.code === 0 && r.stdout.split("\n").some((l) => l.trim() === name) ? name : null;
-}
 
 const storyBranchRe = (key: string) => new RegExp(`^${key}-[a-z0-9][a-z0-9-]*$`);
 
@@ -130,7 +118,7 @@ async function take(ctx: Context, key: string, force: boolean) {
   const git = ports.git;
   const now = ctx.clock.now();
   const nowIso = ctx.clock.iso();
-  const remote = await gitRemote(ctx);
+  const remote = await gitRemote(ctx.root, ctx.config.remote.git_remote);
 
   const branch = await findStoryBranch(ctx, key, remote);
   if (!branch) throw refuse(`no story branch for ${key}${remote ? ` on ${remote}` : ""}`, "norn sync (intake creates it) or check the story key", "unknown_story");

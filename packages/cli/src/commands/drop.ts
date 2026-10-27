@@ -16,7 +16,7 @@ import { claimHeld, failure, refuse } from "../output.ts";
 import type { Observed } from "../runtime/observe.ts";
 import { heldHere } from "../runtime/release.ts";
 import { withStory } from "./release.ts";
-import { storyArg } from "./take.ts";
+import { storyArg } from "../runtime/args.ts";
 
 async function claimIfFree(obs: Observed, story: StoryFacts): Promise<string> {
   const c = story.claim;

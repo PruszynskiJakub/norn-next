@@ -10,7 +10,7 @@ import type { UnitState } from "@norn/schema";
 import { defineCommand } from "../command.ts";
 import { refuse } from "../output.ts";
 import { at, humanReceipt, resolveTarget, runHumanVerb } from "../runtime/human.ts";
-import { storyArg } from "./take.ts";
+import { storyArg } from "../runtime/args.ts";
 
 /** BS9: done (PR unmerged), at a gate, or stuck. */
 const waiting = (st: UnitState) => st.status === "done" || st.status === "stuck" || (st.status === "parked" && st.park?.kind === "gate");

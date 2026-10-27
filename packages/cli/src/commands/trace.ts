@@ -9,7 +9,7 @@
 import { formatStepTimeline, loadTraceView } from "@norn/view";
 import { defineCommand, opt } from "../command.ts";
 import { refuse, rendered, usageError } from "../output.ts";
-import { parseUnitKey } from "../runtime/human.ts";
+import { parseUnitKey } from "../runtime/args.ts";
 
 export const traceCommand = defineCommand({
   name: "trace",

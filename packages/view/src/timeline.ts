@@ -5,12 +5,13 @@ import type { TimelineEntry } from "./types.ts";
 
 const MAX = 140;
 
-/** Collapse whitespace and cut to one short line. */
+/** Collapse whitespace and cut to one line of at most `max` chars, ending in `…` when cut (`max` ≤ 0 → empty). */
 export function oneLine(text: string, max = MAX): string {
   return cut(text, max);
 }
 
 function cut(text: string, max: number): string {
+  if (max <= 0) return "";
   const s = text.replace(/\s+/g, " ").trim();
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }

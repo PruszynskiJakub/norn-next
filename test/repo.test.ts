@@ -228,11 +228,11 @@ const FS_WRITE_ALLOW: Counts = {
 const RAW_GIT_ALLOW: Counts = {
   "packages/cli/src/commands/approve.ts": 1,
   "packages/cli/src/commands/done.ts": 1,
-  "packages/cli/src/commands/take.ts": 4,
+  "packages/cli/src/commands/take.ts": 3,
   "packages/cli/src/commands/tidy.ts": 4,
   "packages/cli/src/commands/watch.ts": 1,
   "packages/cli/src/runtime/act.ts": 1,
-  "packages/cli/src/runtime/human.ts": 5,
+  "packages/cli/src/runtime/human.ts": 4,
   "packages/cli/src/runtime/observe.ts": 7,
   "packages/cli/src/runtime/record.ts": 10,
   "packages/cli/src/runtime/release.ts": 3,
@@ -246,8 +246,7 @@ const RAW_GIT_ALLOW: Counts = {
 const JSON_PARSE_ALLOW: Record<string, [number, string]> = {
   "packages/adapters/src/agent-hooks/index.ts": [3, "files claude owns: settings.json, transcript jsonl"],
   "packages/adapters/src/exec.ts": [1, "tool output: gh/glab --json stdout"],
-  "packages/adapters/src/herdr/cockpit.ts": [1, "tool output: herdr stdout"],
-  "packages/adapters/src/herdr/index.ts": [2, "tool output: herdr stdout and error stderr"],
+  "packages/adapters/src/herdr/call.ts": [2, "tool output: herdr stdout and error stderr"],
   "packages/cli/src/commands/done.ts": [2, "agent-written findings / criteria files (validated after)"],
   "packages/cli/src/commands/hook.ts": [2, "tool output: hook payload on stdin, hook command stdout"],
   "packages/cli/src/commands/why.ts": [1, "clone: canonical JSON for the replay diff"],

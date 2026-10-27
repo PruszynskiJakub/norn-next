@@ -160,9 +160,10 @@ export function machineHolder(env: Record<string, string | undefined>): string {
   return `${user.replace(/[@\s]/g, "_")}@${host.replace(/[@\s]/g, "_")}`;
 }
 
-async function gitRemoteExists(root: string, name: string): Promise<boolean> {
+/** `name` when this repository has a git remote by that name, else null. */
+export async function gitRemote(root: string, name: string): Promise<string | null> {
   const r = await rawGit(root, ["remote"]);
-  return r.code === 0 && r.stdout.split("\n").some((l) => l.trim() === name);
+  return r.code === 0 && r.stdout.split("\n").some((l) => l.trim() === name) ? name : null;
 }
 
 /** Newest mtime of the given worktree-relative paths (ms), or null. */
@@ -222,7 +223,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   const git = ports.git;
   const hb = heartbeatId(root, now);
   const remoteName = config.remote.git_remote;
-  const remote = (await gitRemoteExists(root, remoteName)) ? remoteName : null;
+  const remote = await gitRemote(root, remoteName);
 
   // ---- worktrees (A3 markers tell story and slice worktrees apart)
   const storyWts = new Map<string, string>();

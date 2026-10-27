@@ -1,8 +1,8 @@
 /** The cockpit frame (HC4): aligned rows cut to the width, colour only when asked, full text on `d <n>`. */
 import { describe, expect, test } from "bun:test";
-import type { InboxEntry, ProjectView } from "@norn/view";
+import { type InboxEntry, oneLine, type ProjectView, stripStep } from "@norn/view";
 import { parseCockpitLine, planCockpit, toneOf } from "../src/runtime/cockpit.ts";
-import { fit, frameItems, freshNotes, itemDetails, newestNote, renderFrame, wrap } from "../src/runtime/cockpit-view.ts";
+import { frameItems, freshNotes, itemDetails, newestNote, renderFrame, wrap } from "../src/runtime/cockpit-view.ts";
 
 const entry = (p: Partial<InboxEntry>): InboxEntry => ({
   id: "i",
@@ -72,9 +72,14 @@ describe("cockpit frame (HC4)", () => {
     for (const l of f.split("\n")) expect(l.length).toBeLessThanOrEqual(90);
   });
 
-  test("fit and wrap", () => {
-    expect(fit("a  b\nc", 10)).toBe("a b c");
-    expect(fit("abcdefgh", 5)).toBe("abcd…");
+  test("oneLine, stripStep and wrap", () => {
+    expect(oneLine("a  b\nc", 10)).toBe("a b c");
+    expect(oneLine("abcdefgh", 5)).toBe("abcd…");
+    expect(oneLine("abcdefgh", 1)).toBe("…");
+    expect(oneLine("abcdefgh", 0)).toBe("");
+    expect(stripStep("qa", "qa: title")).toBe("title");
+    expect(stripStep("qa", "qa #2 title")).toBe("qa #2 title");
+    expect(stripStep(null, "qa: title")).toBe("qa: title");
     expect(wrap("    one two three four", 12)).toEqual(["    one two", "    three", "    four"]);
   });
 });

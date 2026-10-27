@@ -129,6 +129,11 @@ export function stepTitle(step: string | null | undefined, title: string): strin
   return named ? title : `${step}: ${title}`;
 }
 
+/** An inbox item's title without a leading `<step>: `, for a view that shows the step in its own column. */
+export function stripStep(step: string | null | undefined, title: string): string {
+  return step && title.startsWith(`${step}: `) ? title.slice(step.length + 2) : title;
+}
+
 /**
  * `norn inbox` human mode: groups in O1 order, each item with reason, age and command; `details` adds
  * full texts (L1). With `home`, paths under it print as `~/…` (the JSON keeps them absolute).

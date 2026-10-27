@@ -75,7 +75,8 @@ export async function locateRepo(cwd: string, git: GitPort): Promise<Located> {
   return { root: safeRealpath(root), worktree: null, unit: null };
 }
 
-function safeRealpath(p: string): string {
+/** The real path of `p`, or `p` itself when it cannot be resolved (missing, no access). */
+export function safeRealpath(p: string): string {
   try {
     return realpathSync(p);
   } catch {

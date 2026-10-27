@@ -5,7 +5,8 @@
 import { formatStatus, type ProjectView } from "@norn/view";
 import { defineCommand } from "../command.ts";
 import { refuse, rendered } from "../output.ts";
-import { parseUnitKey, projectView } from "../runtime/human.ts";
+import { parseUnitKey } from "../runtime/args.ts";
+import { projectView } from "../runtime/human.ts";
 
 export const statusCommand = defineCommand({
   name: "status",

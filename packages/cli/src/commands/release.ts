@@ -10,7 +10,7 @@ import type { Context } from "../context.ts";
 import { busyError, claimHeld, failure, refuse } from "../output.ts";
 import { type Observed, observe } from "../runtime/observe.ts";
 import { heldHere, releaseStory } from "../runtime/release.ts";
-import { storyArg } from "./take.ts";
+import { storyArg } from "../runtime/args.ts";
 
 /** Observe under the tick lock (no remote sync) and find the story, or refuse. */
 export async function withStory<T>(ctx: Context, key: string, note: string, f: (obs: Observed, story: Observed["facts"]["stories"][number]) => Promise<T>): Promise<T> {
