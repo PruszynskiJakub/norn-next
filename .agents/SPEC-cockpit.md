@@ -67,10 +67,10 @@ Non-goals:
   | approve | y | Approve | verb `approve <unit>` |
   | reject | x | Approve | input "What to change" → verb `approve <unit> --reject --reason {input}` |
   | unstick | u | an item whose command is `norn unstick …` | verb `unstick <unit>` |
-  | take | t | a story nobody holds (claim `unclaimed`) | verb `take <story>` |
+  | take | t | the story row of a story nobody holds (claim `unclaimed`) | verb `take <story>` |
   | trace | v | every row | verb `trace <unit>`, shown |
-  | pr | o | a story whose PR is known (`StoryView.pr`) | link to the PR URL |
-  | issue | i | a story with an issue URL | link to the issue URL |
+  | pr | o | every row of a story whose PR is known (`StoryView.pr`) | link to the PR URL |
+  | issue | i | every row of a story with an issue URL | link to the issue URL |
 
   The model alone decides which rows offer which action: a renderer never infers it from groups or commands. An action a row does not offer is absent, not disabled.
 - CP5 `norn cockpit --json` prints the model once and exits (P8), so a front end outside TypeScript can read it. Running an action needs no extra entry point: its `argv` is a norn command (`norn <argv…> --json`).
