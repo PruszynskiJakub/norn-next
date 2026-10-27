@@ -10,7 +10,7 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, storyRulings, storyWorktreePath } from "@norn/core";
 import { type AgentStep, type ProcessIdentity, type ReceiptOf, storyBranch, ulid } from "@norn/schema";
-import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readText, writeBriefing } from "@norn/store";
+import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readText, writeBriefing, readRemoteCache } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
@@ -26,7 +26,6 @@ import {
   type UnitSession,
   unitCriteria,
 } from "../runtime/agent-unit.ts";
-import { readRemoteCache } from "../runtime/local.ts";
 import { readHookFacts } from "../runtime/observe.ts";
 
 /** Wrappers between the agent and `norn` that exit right after it (never the run's process). */

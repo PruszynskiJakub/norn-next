@@ -1,6 +1,6 @@
 /**
  * Fixed defect, kept as a regression test (refactor plan BUG-4, fixed by 1.4):
- *   - BUG-4: the machine-local readers in runtime/local.ts cast parsed JSON instead of validating it
+ *   - BUG-4: the machine-local readers (now store/src/local.ts) cast parsed JSON instead of validating it
  *     (S2), so a file of the wrong shape leaked through: a string `attempted_at` in remote.json made
  *     `now - attempted_at` NaN (observe never found a sync due again); junk records.json entries were
  *     returned as records. Every local reader now goes through store `readLocalJson`.
@@ -9,8 +9,7 @@ import { expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { traceDir } from "@norn/store";
-import { readPendingRecords, readRemoteCache } from "../src/runtime/local.ts";
+import { traceDir, readPendingRecords, readRemoteCache } from "@norn/store";
 
 function root(): string {
   const r = mkdtempSync(join(tmpdir(), "norn-local-json-"));

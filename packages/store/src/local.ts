@@ -2,32 +2,22 @@
  * Machine-local runtime files of one checkout, kept in the gitignored trace dir (§7.1):
  * - `heartbeat.json`  this checkout's heartbeat_id (ID2), stable across `tick` runs so a
  *                     claim taken by one tick is "mine" for the next (T4); `last_tick_at` (R5.5)
- *                     (read and written through @norn/store's heartbeat.ts)
+ *                     (heartbeat.ts)
  * - `remote.json`     remote sync cache: last sync time, default branch (H5 throttle)
  * - `notified.json`   inbox item ids already notified (O3: once per item, receipt-first)
  * - `records.json`    GR6 base-branch records still owed (retried by later ticks, throttled),
  *                     each with the merge facts to write (`merge`, StoryMerge)
  * - `foreign.json`    commit shas already traced as `foreign_commits` (Q6: once per sha)
- * - `base.json`       per story, the last `story.base` measured (BS1; store/base.ts)
+ * - `base.json`       per story, the last `story.base` measured (BS1; base.ts)
  * Every read is validated (S2, BUG-4): a file that is unreadable or of the wrong shape reads as
- * empty through store `readLocalJson`, never as a cast of what was there.
+ * empty through `readLocalJson`, never as a cast of what was there. Paths are in paths.ts.
  */
-import { join } from "node:path";
 import type { StoryFacts } from "@norn/core";
 import { type StoryMerge, ulid } from "@norn/schema";
-import { appendTrace, atomicWriteJson, readHeartbeatFile, readLocalJson, traceDir, writeHeartbeatFile } from "@norn/store";
-
-const remotePath = (root: string) => join(traceDir(root), "remote.json");
-const notifiedPath = (root: string) => join(traceDir(root), "notified.json");
-
-/** This checkout's heartbeat_id; created on first use (keeps `last_tick_at`, R5.5). */
-export function heartbeatId(root: string, now: number): string {
-  const cur = readHeartbeatFile(root);
-  if (cur.heartbeat_id && /^[0-9A-HJKMNP-TV-Z]{26}$/.test(cur.heartbeat_id)) return cur.heartbeat_id;
-  const id = ulid(now);
-  writeHeartbeatFile(root, { ...cur, heartbeat_id: id, created_at: new Date(now).toISOString() });
-  return id;
-}
+import { atomicWriteJson } from "./fsx.ts";
+import { readLocalJson } from "./local-json.ts";
+import { foreignCommitsPath, notifiedPath, pendingRecordsPath, remoteCachePath } from "./paths.ts";
+import { appendTrace } from "./trace.ts";
 
 export interface RemoteCache {
   /** ms epoch of the last successful sync (GR1) */
@@ -39,12 +29,12 @@ export interface RemoteCache {
 }
 
 export function readRemoteCache(root: string): RemoteCache {
-  const c = readLocalJson("local-remote", remotePath(root), {}, root);
+  const c = readLocalJson("local-remote", remoteCachePath(root), {}, root);
   return { synced_at: c.synced_at ?? null, attempted_at: c.attempted_at ?? null, last_error: c.last_error ?? null, default_branch: c.default_branch ?? null };
 }
 
 export function writeRemoteCache(root: string, c: RemoteCache): void {
-  atomicWriteJson(remotePath(root), c);
+  atomicWriteJson(remoteCachePath(root), c);
 }
 
 const KEEP_NOTIFIED = 2000;
@@ -58,8 +48,6 @@ export function markNotified(root: string, ids: Set<string>, id: string): void {
   ids.add(id);
   atomicWriteJson(notifiedPath(root), { ids: [...ids].slice(-KEEP_NOTIFIED) });
 }
-
-const recordsPath = (root: string) => join(traceDir(root), "records.json");
 
 /** GR6: a merged story whose `status: done` record on the base branch is still owed (deferred or failed). */
 export interface PendingRecord {
@@ -75,14 +63,13 @@ export interface PendingRecord {
 }
 
 export function readPendingRecords(root: string): PendingRecord[] {
-  return readLocalJson("local-records", recordsPath(root), {}, root).records ?? [];
+  return readLocalJson("local-records", pendingRecordsPath(root), {}, root).records ?? [];
 }
 
 export function writePendingRecords(root: string, records: PendingRecord[]): void {
-  atomicWriteJson(recordsPath(root), { records });
+  atomicWriteJson(pendingRecordsPath(root), { records });
 }
 
-const foreignPath = (root: string) => join(traceDir(root), "foreign.json");
 const KEEP_FOREIGN = 5000;
 
 /**
@@ -90,7 +77,7 @@ const KEEP_FOREIGN = 5000;
  * sha). The seen set is written first, so a crash never traces the same sha twice.
  */
 export function traceForeignCommits(root: string, stories: StoryFacts[], tick_id: string, now: number): number {
-  const seen = new Set(readLocalJson("local-foreign", foreignPath(root), {}, root).shas ?? []);
+  const seen = new Set(readLocalJson("local-foreign", foreignCommitsPath(root), {}, root).shas ?? []);
   const fresh: Array<{ story: string; commits: NonNullable<StoryFacts["foreign_commits"]> }> = [];
   for (const s of stories) {
     const commits = (s.foreign_commits ?? []).filter((c) => !seen.has(c.sha));
@@ -98,7 +85,7 @@ export function traceForeignCommits(root: string, stories: StoryFacts[], tick_id
     if (commits.length) fresh.push({ story: s.key, commits });
   }
   if (!fresh.length) return 0;
-  atomicWriteJson(foreignPath(root), { shas: [...seen].slice(-KEEP_FOREIGN) });
+  atomicWriteJson(foreignCommitsPath(root), { shas: [...seen].slice(-KEEP_FOREIGN) });
   const at = new Date(now).toISOString();
   for (const f of fresh) appendTrace(root, { type: "foreign_commits", id: ulid(now), at, tick_id, unit: f.story, commits: f.commits });
   return fresh.length;

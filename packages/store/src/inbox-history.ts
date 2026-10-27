@@ -4,22 +4,22 @@
  * them. The open set lives machine-locally in the gitignored trace dir (`inbox.json`), like
  * `notified.json`; when it is missing every current item appears again (harmless for pairing).
  */
-import { join } from "node:path";
 import { buildInbox, type Decision, type Facts, type InboxItem, inboxChanges } from "@norn/core";
-import { type InboxChange, type ResolvedConfig, type TickTrace } from "@norn/schema";
-import { atomicWriteJson, readLocalJson, readTrace, traceDir } from "@norn/store";
-
-const openPath = (root: string) => join(traceDir(root), "inbox.json");
+import type { InboxChange, ResolvedConfig, TickTrace } from "@norn/schema";
+import { atomicWriteJson } from "./fsx.ts";
+import { readLocalJson } from "./local-json.ts";
+import { inboxOpenPath } from "./paths.ts";
+import { readTrace } from "./trace.ts";
 
 function readOpen(root: string): Record<string, InboxItem> {
   // S2: an unreadable or wrong-shaped open set reads as empty (every current item appears again)
-  return readLocalJson("local-inbox", openPath(root), {}, root).open ?? {};
+  return readLocalJson("local-inbox", inboxOpenPath(root), {}, root).open ?? {};
 }
 
 /** This tick's inbox changes; `commit()` persists the new open set once the trace record is written. */
 export function trackInbox(root: string, post: Facts, pre: Facts, decisions: readonly Decision[], config: ResolvedConfig): { changes: InboxChange[]; commit: () => void } {
   const r = inboxChanges(readOpen(root), buildInbox(post, config), pre, decisions);
-  return { changes: r.changes, commit: () => atomicWriteJson(openPath(root), { open: r.open }) };
+  return { changes: r.changes, commit: () => atomicWriteJson(inboxOpenPath(root), { open: r.open }) };
 }
 
 export interface InboxHistoryItem {

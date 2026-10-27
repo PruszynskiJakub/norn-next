@@ -25,16 +25,16 @@ import {
   appendReceipt,
   type ClaimRead,
   fetchNornRefs,
+  heartbeatId,
   listMailbox,
   git as rawGit,
   parseWorkflowText,
   postMailbox,
   readClaim,
-  readHeartbeatFile,
+  recordedHeartbeatId,
 } from "@norn/store";
 import type { Context } from "../context.ts";
 import { claimHeld, failure, refuse, usageError } from "../output.ts";
-import { heartbeatId } from "./local.ts";
 import { machineHolder, type Observed, observe } from "./observe.ts";
 
 // ------------------------------------------------------------------ addressing (ID1)
@@ -53,11 +53,6 @@ export function parseUnitKey(raw: string): { key: string; story: string; slice: 
 
 // ------------------------------------------------------------------ views (X1)
 
-/** This checkout's heartbeat_id as recorded (S2: validated through store), null when none yet. */
-function readHeartbeat(root: string): string | null {
-  return readHeartbeatFile(root).heartbeat_id ?? null;
-}
-
 /** The read model for this checkout and machine (no writes, no network). */
 export async function projectView(ctx: Context): Promise<ProjectView> {
   // MO5: the runner's capabilities decide how Your turn says to start an agent; a config that
@@ -69,7 +64,7 @@ export async function projectView(ctx: Context): Promise<ProjectView> {
     now: ctx.clock.now(),
     env: ctx.env,
     holder: machineHolder(ctx.env),
-    heartbeatId: readHeartbeat(ctx.root),
+    heartbeatId: recordedHeartbeatId(ctx.root),
     ...(runner ? { runnerCapabilities: runner.capabilities } : {}),
   });
 }

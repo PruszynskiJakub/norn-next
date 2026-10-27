@@ -12,10 +12,8 @@ import { dirname, join } from "node:path";
 import type { StoryBase, StoryPrSeen } from "@norn/core";
 import { atomicWrite, atomicWriteJson } from "./fsx.ts";
 import { readLocalJson } from "./local-json.ts";
-import { SPECS_DIR, traceDir } from "./paths.ts";
+import { baseCacheDir, baseFactsPath, prFactsPath, remoteCachePath, SPECS_DIR } from "./paths.ts";
 import { gitSync } from "./git.ts";
-
-const baseCacheDir = (repoRoot: string) => join(traceDir(repoRoot), "base");
 
 /**
  * The base ref to read records from: `refs/remotes/<remote>/<branch>`, the branch being the
@@ -35,7 +33,7 @@ export function defaultBaseRef(repoRoot: string, remote: string, branch?: string
 
 /** The remote's default branch as the last sync discovered it (`trace/remote.json`), or null. */
 export function cachedDefaultBranch(repoRoot: string): string | null {
-  return readLocalJson("local-remote", join(traceDir(repoRoot), "remote.json"), {}, repoRoot).default_branch ?? null;
+  return readLocalJson("local-remote", remoteCachePath(repoRoot), {}, repoRoot).default_branch ?? null;
 }
 
 /**
@@ -98,8 +96,6 @@ export function baseSpecsRoot(repoRoot: string, ref: string): string | null {
   return dir;
 }
 
-const baseFactsPath = (repoRoot: string) => join(traceDir(repoRoot), "base.json");
-
 /**
  * BS1: story key → the last `story.base` measured on this checkout (`trace/base.json`, machine-local).
  * Observe reruns `git merge-tree` only when the pair (story head, base sha) differs from the cached
@@ -114,8 +110,6 @@ export function readBaseFacts(repoRoot: string): BaseFactsCache {
 export function writeBaseFacts(repoRoot: string, cache: BaseFactsCache): void {
   atomicWriteJson(baseFactsPath(repoRoot), { stories: cache });
 }
-
-const prFactsPath = (repoRoot: string) => join(traceDir(repoRoot), "pr.json");
 
 /**
  * C1 (BS10, BS11, F35): story key → the story PR as the last remote sync of this checkout saw it
