@@ -1,6 +1,6 @@
 {
   "name": "norn",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "The /norn command for Claude Code. A thin wrapper: the skills come from the repo (norn init) and all logic lives in the norn CLI, which must be on PATH.",
   "author": {
     "name": "Jakub Pruszyński"
