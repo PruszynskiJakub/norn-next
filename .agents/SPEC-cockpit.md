@@ -1,6 +1,6 @@
 # Spec: one cockpit (norn v0.9)
 
-Status: draft for review · Amends `.agents/SPEC-herdr-cockpit.md` (HC4, HC5, HC8, HC9, HC16) and PRD O1, X1 · Branch `cockpit-unify`
+Status: draft for review · Amends `.agents/SPEC-herdr-cockpit.md` (HC4, HC5, HC8, HC9, HC10, HC16) and PRD O1, X1 · Branch `cockpit-unify`
 
 ## 1. Why
 
@@ -17,7 +17,7 @@ This spec also gives ids to what 0.8.0 shipped without them: `norn orient` (OR1�
 ## 2. Goals and non-goals
 
 Goals:
-- One cockpit, `norn cockpit`, with the picker's look and the old cockpit's reach (answer, reject, unstick, trace) (CP4–CP9).
+- One cockpit command, `norn cockpit`, with the picker's look and the old cockpit's reach (answer, reject, unstick, trace) (CP4–CP9).
 - A front-end-neutral cockpit model that a web panel can render without norn logic of its own (CP1–CP3).
 
 Non-goals:
@@ -94,14 +94,16 @@ Non-goals:
 
 ## 5. Names, plugin and what goes away (amends HC9, HC10)
 
-- CP10 `norn cockpit` is the command. Two aliases run it unchanged: `norn pane --interactive`, and `norn pick` (shipped in 0.8.0).
-  - `norn pane` without `--interactive` keeps the plain redrawn inbox (O1).
-  - `norn pane --next` (HC10) and `norn pane --open` keep working; `--open` opens `norn cockpit`.
+- CP10 `norn cockpit` is the only cockpit command; `norn pane` and `norn pick` are removed, with no aliases (pre-1.0, a minor version may change the machine contract). What `norn pane` also did moves:
+  - `norn cockpit --next` focuses the agent pane of the oldest Your turn item with a run, as `norn pane --next` did (HC10).
+  - `norn cockpit --open` opens the cockpit in a Herdr split below the caller, as `norn pane --open` did.
+  - The plain redrawn inbox (`norn pane` without flags, O1 "a Herdr status pane") is dropped: `norn inbox` prints it and the cockpit replaces the pane.
 - CP11 The Herdr plugin keeps its ids, and every entry runs `norn cockpit`:
   - `norn.open` and pane `cockpit` show it as a split below the focused pane;
   - `norn.pick` and pane `pick` show it as a popup over it;
-  - `norn.next` is unchanged.
+  - `norn.next` runs `norn cockpit --next`.
 - CP12 Removed:
+  - the `norn pane` and `norn pick` commands (CP10);
   - the line commands (HC5's table) and their parser (`parseCockpitLine`, `planCockpit`);
   - `pickKey`'s own action rules;
   - the Notes accordion and its `cockpit.json` marker (HC16): notes live in the preview (CP3), with no "new" count.
@@ -150,8 +152,8 @@ Nothing in the model is terminal-specific: keys are defaults a web panel may sho
 ## 9. Contract changes
 
 - `@norn/view`: `cockpitModel`, types `CockpitModel`, `CockpitRow`, `CockpitAction`, `CockpitEffect`.
-- `norn cockpit` (new); `norn pick` and `norn pane --interactive` become aliases of it. `norn cockpit --json` is P8 data.
-- Removed: the line command syntax of `norn pane --interactive`, and `cockpit.json`'s `notes_seen_at` (no longer read or written).
+- `norn cockpit [--interval 5s] [--json] [--next] [--open]` (new); `norn cockpit --json` is P8 data.
+- Removed: `norn pane` (all its modes) and `norn pick`; `cockpit.json`'s `notes_seen_at` (no longer read or written).
 - The Herdr plugin's entries run `norn cockpit`.
 
 ## 10. Tests
@@ -164,5 +166,6 @@ Nothing in the model is terminal-specific: keys are defaults a web panel may sho
   - key parsing (letters, `/`, arrows, the prompt);
   - a scripted session against the harness covering: filter, approve, answer with input, a refused key, trace shown, quit;
   - `--json` printing the model;
-  - the aliases.
+  - `--next` and `--open`;
+  - `norn pane` and `norn pick` are unknown commands.
 - Repo: the plugin manifest's entries name existing scripts that run `norn cockpit`.
