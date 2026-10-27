@@ -4,6 +4,8 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-27
+
 ### Added
 
 - `norn cockpit`: one cockpit for the terminal and Herdr. It lists what needs you (your turn, answer, approve, stuck, check), then every story, with the selected row's story previewed beside the list: slices, PR, what waits, what runs, the open notes. One key acts on the selected row: `enter` orients, `g` goes to the agent's pane, `s` starts a manual step, `a` answers and `x` rejects (both prompt for the text in the footer), `y` approves, `u` unsticks, `t` takes, `v` shows the trace, `o` and `i` open the PR and the issue. `/` filters. Only the keys the row offers work, and the footer lists them. Every action leaves the cockpit open with its outcome on the footer line. `--next` jumps to the agent waiting for you, `--open` opens it in a Herdr split.
