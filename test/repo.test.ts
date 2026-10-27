@@ -84,6 +84,7 @@ const GLOSSARY_FILES = (): string[] => [
   ...textFiles(join(ROOT, "plugins"), [...DOCS, ".toml", ".sh"]),
   ...textFiles(join(PKGS, "schema", "json"), DOCS),
   join(ROOT, "README.md"),
+  join(ROOT, "CONTRIBUTING.md"),
   join(ROOT, "AGENTS.md"),
 ];
 

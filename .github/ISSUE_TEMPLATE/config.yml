@@ -1,0 +1,7 @@
+# Every change to norn starts as an issue. A collaborator adds the `norn` label and assigns the
+# issue to themselves when norn should pick it up (GR1); the templates leave labels to them.
+blank_issues_enabled: true
+contact_links:
+  - name: How to contribute
+    url: https://github.com/PruszynskiJakub/norn-next/blob/main/CONTRIBUTING.md
+    about: How a change reaches norn, and what happens to a pull request from a fork.

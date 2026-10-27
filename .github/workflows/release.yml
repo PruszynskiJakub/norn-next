@@ -1,22 +1,116 @@
-# Release on a version tag: `git tag v0.1.0 && git push origin v0.1.0`.
-# The tag must match packages/cli/package.json and have a `## [x.y.z]` section in CHANGELOG.md.
-# build → smoke (every binary on its own OS) → publish @pruszynskijakub/norn to GitHub Packages
-# and a GitHub release with the binaries. A PR that touches the release machinery, or a run by
-# hand (workflow_dispatch), builds and smokes without publishing.
+# Release when a release PR merges: a push to main whose commit changes the version in
+# packages/cli/package.json (against its first parent) and has no tag vX.Y.Z yet. Any other push
+# to main releases nothing, so a failed release run never ships under a later, unrelated merge.
+# One run does it all, because a tag pushed with GITHUB_TOKEN starts no workflow:
+# plan → build (check the version against CHANGELOG.md's `## [X.Y.Z]` section, test, build, smoke)
+# → smoke (every binary on its own OS) → publish (push tag vX.Y.Z, publish @pruszynskijakub/norn to
+# GitHub Packages, create the GitHub release with the binaries and that section as notes).
+#
+# Other ways in:
+# - a pushed tag vX.Y.Z (by hand) releases that tag, as before;
+# - workflow_dispatch builds and smokes; with `publish: true` it releases the ref it runs on, which
+#   must be a commit on main or a v* tag. Recovery when the release run failed or was replaced in
+#   the queue: run it on main while the release commit is still main's tip, or on tag vX.Y.Z once
+#   that was pushed. After a later merge, push tag vX.Y.Z at the release commit by hand instead
+#   (the tag push releases it), so no unrelated change ships under that version;
+# - a PR that touches the release machinery builds and smokes without publishing.
+#
+# Idempotent: the tag is pushed first and pins the commit of the version; every publish step skips
+# what already exists (tag at this commit, package version, GitHub release and each of its assets:
+# published binaries are never replaced), so re-running a failed run finishes the release instead
+# of publishing twice. A tag on another commit stops the run.
 name: release
 
 on:
   push:
+    branches: [main]
     tags: ["v*"]
   pull_request:
     paths: [".github/workflows/release.yml", "scripts/build.ts", "scripts/smoke.sh"]
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Tag (if needed) and publish the version of the selected ref"
+        type: boolean
+        default: false
+
+# One publishing run at a time, never cancelled half way; PRs only cancel their own older runs.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('release-pr-{0}', github.ref) || 'release-publish' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      build: ${{ steps.plan.outputs.build }}
+      publish: ${{ steps.plan.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Decide whether this run releases
+        id: plan
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISH_INPUT: ${{ inputs.publish }}
+        run: |
+          version=$(jq -r .version packages/cli/package.json)
+          tag="v$version"
+          tag_sha=$(git rev-list -n 1 "refs/tags/$tag" 2>/dev/null || true)
+          # the version before this commit: a push to main releases only the commit that bumps it
+          prev=$(git show HEAD^1:packages/cli/package.json 2>/dev/null | jq -r .version 2>/dev/null || true)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          build=true publish=false
+          case "$GITHUB_EVENT_NAME" in
+            pull_request) ;;
+            workflow_dispatch)
+              if [ "$PUBLISH_INPUT" = true ]; then
+                if [ "$GITHUB_REF_TYPE" = tag ] || git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+                  publish=true   # a v* tag (its name is checked below) or a commit on main
+                else
+                  echo "::error::publish: true releases only a commit on main or a v* tag; $GITHUB_REF_NAME is neither. Run it on main or on $tag."; exit 1
+                fi
+              fi ;;
+            push)
+              if [ "$GITHUB_REF_TYPE" = tag ]; then
+                publish=true
+              elif [ "$prev" = "$version" ]; then
+                build=false    # this commit does not bump the version: nothing to release
+              elif [ -z "$tag_sha" ] || { [ "$tag_sha" = "$GITHUB_SHA" ] && ! gh release view "$tag" >/dev/null 2>&1; }; then
+                publish=true   # the release PR's merge, or a re-run of it after the tag was pushed
+              else
+                build=false
+                echo "::warning::$tag already exists at $tag_sha; nothing to release"
+              fi ;;
+          esac
+          if [ "$publish" = true ]; then
+            if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$tag" ]; then
+              echo "::error::tag $GITHUB_REF_NAME != packages/cli/package.json $version"; exit 1
+            fi
+            if [ -n "$tag_sha" ] && [ "$tag_sha" != "$GITHUB_SHA" ]; then
+              echo "::error::$tag points at $tag_sha, this run is $GITHUB_SHA; run on $tag instead"; exit 1
+            fi
+            if [ -z "$tag_sha" ]; then
+              latest=$(git tag --list 'v*' --sort=-v:refname | head -n 1)
+              if [ -n "$latest" ] && [ "$(printf '%s\n%s\n' "${latest#v}" "$version" | sort -V | tail -n 1)" != "$version" ]; then
+                echo "::error::packages/cli/package.json $version is older than the latest tag $latest"; exit 1
+              fi
+            fi
+          fi
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "version $version, tag $tag ${tag_sha:-absent}: build=$build publish=$publish" >> "$GITHUB_STEP_SUMMARY"
+
   build:
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
@@ -28,13 +122,10 @@ jobs:
         with:
           bun-version: 1.3.13
 
-      - name: Check the tag against the package version and changelog
+      - name: Check the version against the changelog
         id: version
         run: |
-          version=$(jq -r .version packages/cli/package.json)
-          if [ "$GITHUB_REF_TYPE" = tag ]; then
-            [ "${GITHUB_REF_NAME#v}" = "$version" ] || { echo "tag $GITHUB_REF_NAME != packages/cli/package.json $version"; exit 1; }
-          fi
+          version=${{ needs.plan.outputs.version }}
           mkdir -p dist
           awk -v v="$version" '$0 ~ "^## \\[" v "\\]" {f=1; next} /^## \[/ {f=0} f' CHANGELOG.md > dist/notes.md
           [ -s dist/notes.md ] || { echo "CHANGELOG.md has no ## [$version] section"; exit 1; }
@@ -94,13 +185,16 @@ jobs:
           scripts/smoke.sh dist/bin/norn-${{ matrix.target }} "${{ needs.build.outputs.version }}"
 
   publish:
-    needs: [build, smoke]
-    if: github.ref_type == 'tag'
+    needs: [plan, build, smoke]
+    if: needs.plan.outputs.publish == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
       packages: write
+    env:
+      TAG: v${{ needs.plan.outputs.version }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -115,15 +209,47 @@ jobs:
           registry-url: https://npm.pkg.github.com
           scope: "@pruszynskijakub"
 
+      # First: the tag pins the commit of this version, so a later push to main cannot release it again.
+      - name: Push the tag
+        run: |
+          refs=$(git ls-remote --tags origin "refs/tags/$TAG")
+          # an annotated tag lists its commit on the ^{} line; a lightweight tag only has one line
+          remote=$(echo "$refs" | awk '/\^\{\}$/ {print $1}')
+          [ -n "$remote" ] || remote=$(echo "$refs" | awk 'NR==1 {print $1}')
+          if [ -z "$remote" ]; then
+            git tag "$TAG" "$GITHUB_SHA"
+            git push origin "refs/tags/$TAG"
+          elif [ "$remote" != "$GITHUB_SHA" ]; then
+            echo "::error::$TAG points at $remote, this run built $GITHUB_SHA"; exit 1
+          else
+            echo "$TAG already points at $GITHUB_SHA"
+          fi
+
       - name: Publish to GitHub Packages
         working-directory: dist/npm
-        run: npm publish
+        run: |
+          name=$(jq -r .name package.json)
+          if [ "$(npm view "$name@${TAG#v}" version 2>/dev/null)" = "${TAG#v}" ]; then
+            echo "$name@${TAG#v} is already published"
+          else
+            npm publish
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create the GitHub release
         run: |
           chmod +x dist/bin/norn-*
-          gh release create "$GITHUB_REF_NAME" dist/bin/* --title "norn $GITHUB_REF_NAME" --notes-file dist/notes.md --verify-tag
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # a re-run builds new binaries: upload only the ones the release lacks, never replace one
+            have=$(gh release view "$TAG" --json assets -q '.assets[].name')
+            for f in dist/bin/*; do
+              if printf '%s\n' "$have" | grep -qxF "$(basename "$f")"; then
+                echo "::warning::$TAG already has $(basename "$f"); kept the published one"
+              else
+                gh release upload "$TAG" "$f"
+              fi
+            done
+          else
+            gh release create "$TAG" dist/bin/* --title "norn $TAG" --notes-file dist/notes.md --verify-tag
+          fi
