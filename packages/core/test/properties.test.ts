@@ -15,9 +15,9 @@
  *   - applying all receipts in one batch equals applying them one at a time (S6)
  *   - applying the same receipts twice — or a prefix, then all of them (crash replay) — changes nothing (S6)
  *   - decide emits at most one action per unit per tick (O5), over Facts built from random states
- *   - the route `routeFor` records in a classify receipt matches where `applyReceipts` sends the
- *     unit: holds while the outcome's counter / nudges / retries have room; `test.failing` overall
- *     until BUG-2 (refactor plan 1.2) — `routeFor` ignores exhaustion
+ *   - the route a receipt writer records in a classify receipt (`routeOf` of the receipt applied in
+ *     memory, as act and decide do) matches where `applyReceipts` sends the unit, limits included
+ *     (BUG-2, refactor plan 1.2)
  */
 import { describe, expect, test } from "bun:test";
 import {
@@ -32,7 +32,7 @@ import {
   validate,
   type Workflow,
 } from "@norn/schema";
-import { type ApplyContext, type ApplyResult, applyReceipts, routeFor } from "../src/apply.ts";
+import { type ApplyContext, type ApplyResult, applyReceipts, routeOf } from "../src/apply.ts";
 import { decide, isSideAction, type RepoWorkflows } from "../src/decide.ts";
 import type { Facts, NumberedReceipt, RunFacts, StoryFacts, UnitFacts, UnitRef } from "../src/facts.ts";
 import { checkWorkflowLevel, OVERRIDABLE_ROUTES, reportableOutcomes, stepOf, validateWorkflowDefinition } from "../src/workflow.ts";
@@ -170,8 +170,12 @@ function randomReceipt(g: Gen, st: UnitState, wf: Workflow): Receipt {
 function pickReceipt(g: Gen, st: UnitState, wf: Workflow, head: (by: "agent" | "human" | "norn") => Record<string, unknown>): Receipt {
   const { rng } = g;
   const make = (kind: Receipt["kind"], by: "agent" | "human" | "norn", body: Record<string, unknown>) => ({ kind, ...head(by), ...body }) as unknown as Receipt;
-  const classify = (outcome: string) =>
-    make("classify", "norn", { outcome, rule: `prop.${outcome}`, detail: outcome, route: routeFor(wf, st.step, outcome) }); // as act writes it
+  // as act / decide write it: apply in memory with a placeholder route, record where it went
+  const classify = (outcome: string) => {
+    const r = make("classify", "norn", { outcome, rule: `prop.${outcome}`, detail: outcome, route: "park" }) as Receipt & { route: string };
+    r.route = routeOf(applyReceipts(st, [numbered(st.applied_through + 1, r)], ctxFor(wf))) ?? "$stuck";
+    return r;
+  };
   const unstick = () => {
     const body: Record<string, unknown> = {};
     if (rng.chance(0.5)) body.to = rng.pick(Object.keys(wf.steps));
@@ -412,7 +416,7 @@ describe("applyReceipts properties (S6, W4, C1)", () => {
     });
   });
 
-  test("routeFor matches where applyReceipts sends the unit while the outcome has room (no limit hit)", () => {
+  test("the recorded route matches where applyReceipts sends the unit while the outcome has room (no limit hit)", () => {
     let compared = 0;
     forSeeds(5, (rng, seed) => {
       const ep = episode(rng, seed);
@@ -422,13 +426,17 @@ describe("applyReceipts properties (S6, W4, C1)", () => {
     expect(compared).toBeGreaterThan(100);
   });
 
-  // BUG-2 (refactor plan 1.2): `routeFor` reads only the edge, so an outcome whose counted edge,
-  // nudges or retries are used up is recorded as the edge's target / `nudge` / `retry` while apply
-  // parks the unit exhausted → `$stuck`. Flip to `test` with the fix (`routeOf(res)`).
-  test.failing("routeFor matches where applyReceipts sends the unit, limits included (BUG-2)", () => {
+  // BUG-2 (refactor plan 1.2): the route used to be read from the edge alone, so an outcome whose
+  // counted edge, nudges or retries were used up was recorded as the edge's target / `nudge` /
+  // `retry` while apply parked the unit exhausted → `$stuck`. `routeOf(res)` reads the apply result.
+  test("the recorded route matches where applyReceipts sends the unit, limits included (BUG-2)", () => {
+    let limited = 0;
     forSeeds(5, (rng, seed) => {
-      expect(routeMismatches(episode(rng, seed), () => true)).toEqual([]);
+      const ep = episode(rng, seed);
+      limited += ep.steps.filter(({ nr, res }) => nr.receipt.kind === "classify" && res.applied.length && exhausted(res)).length;
+      expect(routeMismatches(ep, () => true)).toEqual([]);
     });
+    expect(limited).toBeGreaterThan(0);
   });
 });
 
