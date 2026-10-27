@@ -1,0 +1,468 @@
+{
+  "heartbeat": {
+    "last_tick_at": 4072154470000
+  },
+  "machine": {
+    "dead_lease_files": [],
+    "dead_leases": [],
+    "heartbeat_id": "<ulid:1>",
+    "holder": "tester@box",
+    "leases": [
+      {
+        "created_at": "<time>",
+        "holder": {
+          "pid": "<pid>",
+          "pid_start": "<pid_start>"
+        },
+        "kind": "agent",
+        "repo": "<dir>/repo",
+        "run_id": "<ulid:2>",
+        "slice": "gh-7/01",
+        "story": "gh-7",
+        "version": 1,
+        "worktree": "<dir>/repo-worktrees/gh-7-add-login-form--01-form"
+      },
+      {
+        "created_at": "<time>",
+        "holder": {
+          "pid": "<pid>",
+          "pid_start": "<pid_start>"
+        },
+        "kind": "slot",
+        "port_base": 4010,
+        "repo": "<dir>/repo",
+        "run_id": null,
+        "slice": null,
+        "slot": 1,
+        "story": "gh-7",
+        "version": 1,
+        "worktree": "<dir>/repo-worktrees/gh-7-add-login-form"
+      },
+      {
+        "created_at": "<time>",
+        "holder": {
+          "pid": "<pid>",
+          "pid_start": "<pid_start>"
+        },
+        "kind": "slot",
+        "port_base": 4020,
+        "repo": "<dir>/repo",
+        "run_id": null,
+        "slice": "gh-7/01",
+        "slot": 2,
+        "story": "gh-7",
+        "version": 1,
+        "worktree": "<dir>/repo-worktrees/gh-7-add-login-form--01-form"
+      }
+    ],
+    "runner": "fake",
+    "runner_capabilities": {
+      "resume": true,
+      "send": true
+    }
+  },
+  "now": 4072154470000,
+  "orphans": {
+    "branches": [],
+    "worktrees": []
+  },
+  "remote": {
+    "synced_at": 4072154400000
+  },
+  "repo": {
+    "default_branch": "main",
+    "remote": "origin",
+    "root": "<dir>/repo"
+  },
+  "stories": [
+    {
+      "base": {
+        "ahead": 5,
+        "behind": 0,
+        "conflicts": [],
+        "head": "<sha:1>",
+        "merge_base": "<sha:2>",
+        "ref": "refs/remotes/origin/main",
+        "sha": "<sha:2>"
+      },
+      "branch": "gh-7-add-login-form",
+      "claim": {
+        "blob": {
+          "acquired_at": "<time>",
+          "expires_at": "<time>",
+          "heartbeat_id": "<ulid:1>",
+          "holder": "tester@box",
+          "last_tick_id": "<ulid:3>",
+          "renewed_at": "<time>",
+          "story": "gh-7",
+          "version": 1
+        },
+        "sha": "<sha:3>",
+        "state": "mine"
+      },
+      "frontmatter": {
+        "assignee": "tester",
+        "body_hash": "c0246aeb7256a4338e22673c46f83939608564165a78d6d6e47ae30be59fc51c",
+        "id": "gh-7",
+        "intake_at": "<time>",
+        "labels": [
+          "norn",
+          "norn:wf:mini"
+        ],
+        "number": 7,
+        "provider": "gh",
+        "slug": "add-login-form",
+        "status": "active",
+        "title": "Add login form",
+        "url": "https://github.com/o/r/issues/7",
+        "workflow": "mini"
+      },
+      "frontmatter_error": null,
+      "key": "gh-7",
+      "mailbox": [],
+      "mode": "auto",
+      "slices": [
+        {
+          "error": null,
+          "file": ".agents/specs/gh-7-add-login-form/slices/01-form.md",
+          "frontmatter": {
+            "depends_on": [],
+            "id": "gh-7/01",
+            "status": "active",
+            "title": "Login form"
+          },
+          "key": "gh-7/01",
+          "nn": "01",
+          "slug": "form"
+        }
+      ],
+      "slug": "add-login-form",
+      "spec_dir": ".agents/specs/gh-7-add-login-form",
+      "units": [
+        {
+          "errors": [],
+          "last_check": null,
+          "last_findings": null,
+          "last_outcome_receipt": {
+            "file": ".agents/specs/gh-7-add-login-form/runs/_story/receipts/0003-done.json",
+            "n": 3,
+            "receipt": {
+              "at": "<time>",
+              "attempt": 1,
+              "by": "agent",
+              "handoff": "planned one slice",
+              "kind": "done",
+              "outcome": "done",
+              "receipt_id": "<ulid:4>",
+              "run_id": "<ulid:5>",
+              "step": "plan",
+              "who": "claude"
+            }
+          },
+          "lease": null,
+          "run": null,
+          "state": {
+            "applied_through": 3,
+            "attempt": 1,
+            "counters": {},
+            "created_at": "<time>",
+            "last_outcome": {
+              "at": "<time>",
+              "outcome": "done",
+              "receipt_id": "<ulid:4>",
+              "source": "reported",
+              "step": "plan"
+            },
+            "last_tick_id": "<ulid:6>",
+            "mode": "auto",
+            "nudges_used": 0,
+            "park": null,
+            "retries_used": 0,
+            "run": null,
+            "slice": null,
+            "status": "ready",
+            "step": "slices",
+            "step_entered_at": "<time>",
+            "story": "gh-7",
+            "unit_dir": "_story",
+            "updated_at": "<time>",
+            "version": 1,
+            "visits": {
+              "plan": 1,
+              "slices": 1
+            },
+            "workflow": "mini",
+            "workflow_hash": "acbccdf2a34a664138468f747c2f929076ba05cb88f312703c206a6fe42b57cd"
+          },
+          "step_runs": [],
+          "unapplied": [],
+          "uncommitted": false,
+          "unit": {
+            "dir": "_story",
+            "key": "gh-7",
+            "slice": null,
+            "story": "gh-7"
+          },
+          "workflow": {
+            "name": "mini",
+            "start": "plan",
+            "steps": {
+              "open-pr": {
+                "action": "open-pr",
+                "outcomes": {
+                  "done": "$done"
+                },
+                "type": "git"
+              },
+              "plan": {
+                "outcomes": {
+                  "done": {
+                    "means": "slice files written",
+                    "to": "slices"
+                  }
+                },
+                "skill": "norn-plan",
+                "type": "agent"
+              },
+              "slices": {
+                "outcomes": {
+                  "done": "open-pr",
+                  "stuck": "$stuck"
+                },
+                "type": "slices"
+              }
+            }
+          },
+          "workflow_hash": "acbccdf2a34a664138468f747c2f929076ba05cb88f312703c206a6fe42b57cd",
+          "worktree": {
+            "exists": true,
+            "in_progress": {
+              "operation": null,
+              "unmerged": []
+            },
+            "last_commit_at": "<wall-ms>",
+            "last_file_change_at": null,
+            "marker": true,
+            "path": "<dir>/repo-worktrees/gh-7-add-login-form",
+            "slot": 1,
+            "status": {
+              "ahead": 0,
+              "behind": 0,
+              "branch": "gh-7-add-login-form",
+              "clean": true,
+              "head": "<sha:1>",
+              "path": "<dir>/repo-worktrees/gh-7-add-login-form",
+              "rebase_in_progress": false,
+              "staged": [],
+              "unstaged": [],
+              "untracked": [],
+              "upstream": null
+            }
+          }
+        },
+        {
+          "errors": [],
+          "last_check": null,
+          "last_findings": null,
+          "last_outcome_receipt": null,
+          "lease": {
+            "created_at": "<time>",
+            "holder": {
+              "pid": "<pid>",
+              "pid_start": "<pid_start>"
+            },
+            "kind": "agent",
+            "repo": "<dir>/repo",
+            "run_id": "<ulid:2>",
+            "slice": "gh-7/01",
+            "story": "gh-7",
+            "version": 1,
+            "worktree": "<dir>/repo-worktrees/gh-7-add-login-form--01-form"
+          },
+          "run": {
+            "hooks": [],
+            "last_activity_at": "<wall-ms>",
+            "last_hook_at": null,
+            "pane": {
+              "alive": true,
+              "since": null,
+              "state": "working"
+            },
+            "process_alive": null,
+            "run_id": "<ulid:2>",
+            "session": {
+              "pane_id": "p-2",
+              "runner": "fake",
+              "session_id": "s-2"
+            },
+            "transcript": null
+          },
+          "state": {
+            "applied_through": 2,
+            "attempt": 1,
+            "counters": {
+              "test_loop": 0
+            },
+            "created_at": "<time>",
+            "last_outcome": null,
+            "last_tick_id": "<ulid:7>",
+            "nudges_used": 0,
+            "park": null,
+            "retries_used": 0,
+            "run": {
+              "agent": "claude",
+              "attempt": 1,
+              "heartbeat_id": "<ulid:1>",
+              "how": "auto",
+              "machine": "tester@box",
+              "run_id": "<ulid:2>",
+              "session": {
+                "pane_id": "p-2",
+                "reach": "fake attach p-2",
+                "runner": "fake",
+                "session_id": "s-2"
+              },
+              "started_at": "<time>",
+              "step": "implement"
+            },
+            "slice": "gh-7/01",
+            "status": "running",
+            "step": "implement",
+            "step_entered_at": "<time>",
+            "story": "gh-7",
+            "unit_dir": "01-form",
+            "updated_at": "<time>",
+            "version": 1,
+            "visits": {
+              "implement": 1
+            },
+            "workflow": "slice",
+            "workflow_hash": "47f8698e52c6920a2b18cac3fbbf902cc8044f1ede2597fb32d6ce86e12d8a8a"
+          },
+          "step_runs": [
+            {
+              "ended": false,
+              "last_hook_at": null,
+              "run_id": "<ulid:2>"
+            }
+          ],
+          "unapplied": [],
+          "uncommitted": false,
+          "unit": {
+            "dir": "01-form",
+            "key": "gh-7/01",
+            "slice": "gh-7/01",
+            "story": "gh-7"
+          },
+          "workflow": {
+            "counters": {
+              "test_loop": {
+                "max": 3
+              }
+            },
+            "name": "slice",
+            "start": "implement",
+            "steps": {
+              "human-qa": {
+                "outcomes": {
+                  "approve": "integrate",
+                  "reject": {
+                    "counter": "test_loop",
+                    "to": "implement"
+                  }
+                },
+                "prompt": "Try it",
+                "type": "gate"
+              },
+              "implement": {
+                "outcomes": {
+                  "done": {
+                    "means": "tests pass",
+                    "to": "test"
+                  }
+                },
+                "skill": "norn-implement",
+                "type": "agent"
+              },
+              "integrate": {
+                "action": "integrate",
+                "outcomes": {
+                  "conflict": {
+                    "counter": "test_loop",
+                    "to": "implement"
+                  },
+                  "done": "$done"
+                },
+                "type": "git"
+              },
+              "test": {
+                "outcomes": {
+                  "fail": {
+                    "counter": "test_loop",
+                    "to": "implement"
+                  },
+                  "pass": "human-qa"
+                },
+                "run": "test -f pass.flag && echo checked",
+                "timeout": "1m",
+                "type": "check"
+              }
+            }
+          },
+          "workflow_hash": "47f8698e52c6920a2b18cac3fbbf902cc8044f1ede2597fb32d6ce86e12d8a8a",
+          "worktree": {
+            "exists": true,
+            "in_progress": {
+              "operation": null,
+              "unmerged": []
+            },
+            "last_commit_at": "<wall-ms>",
+            "last_file_change_at": null,
+            "marker": true,
+            "path": "<dir>/repo-worktrees/gh-7-add-login-form--01-form",
+            "slot": 2,
+            "status": {
+              "ahead": 0,
+              "behind": 0,
+              "branch": "gh-7/01-form",
+              "clean": true,
+              "head": "<sha:4>",
+              "path": "<dir>/repo-worktrees/gh-7-add-login-form--01-form",
+              "rebase_in_progress": false,
+              "staged": [],
+              "unstaged": [],
+              "untracked": [],
+              "upstream": null
+            }
+          }
+        }
+      ],
+      "worktree": {
+        "exists": true,
+        "in_progress": {
+          "operation": null,
+          "unmerged": []
+        },
+        "last_commit_at": "<wall-ms>",
+        "last_file_change_at": null,
+        "marker": true,
+        "path": "<dir>/repo-worktrees/gh-7-add-login-form",
+        "slot": 1,
+        "status": {
+          "ahead": 0,
+          "behind": 0,
+          "branch": "gh-7-add-login-form",
+          "clean": true,
+          "head": "<sha:1>",
+          "path": "<dir>/repo-worktrees/gh-7-add-login-form",
+          "rebase_in_progress": false,
+          "staged": [],
+          "unstaged": [],
+          "untracked": [],
+          "upstream": null
+        }
+      }
+    }
+  ],
+  "tick_id": "<ulid:8>"
+}

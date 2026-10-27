@@ -103,9 +103,13 @@ function runsFiles(dir: string, tops: readonly string[]): Map<string, string> {
   return out;
 }
 
-export function recordTranscript(h: Harness): Transcript {
-  const lines: string[] = [];
-  const dirNorm = normaliser(h.dir);
+/**
+ * One normaliser for a harness run (also used by the observe snapshots, Phase 0.3): the harness dir
+ * → `<dir>`, norn's temp dirs → `<tmp>/<prefix>-<rand>`, ulids/shas/hashes numbered by first sight,
+ * ISO times → `<time>`, `duration_ms` → `<ms>`. Numbering is per normaliser.
+ */
+export function textNormaliser(dir: string): (text: string) => string {
+  const dirNorm = normaliser(dir);
   const sha = numberer(SHA, "sha");
   const ulid = numberer(ULID, "ulid");
   const hash = numberer(HASH, "hash");
@@ -115,7 +119,7 @@ export function recordTranscript(h: Harness): Transcript {
   // norn's own temp dirs (mkdtemp under the OS temp dir, either spelling): `<tmp>/norn-record-<rand>`
   const tmp = [...new Set([tmpdir(), realpathSync(tmpdir()), tmpdir().replace(/^\/private\//, "/")])].map((d) => d.replace(/\/$/, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const tmpRe = new RegExp(`(?:${tmp.join("|")})/([\\w.-]*-)[A-Za-z0-9]{6}\\b`, "g");
-  const norm = (text: string): string => {
+  return (text: string): string => {
     let t = dirNorm(text).replace(tmpRe, "<tmp>/$1<rand>");
     for (const m of t.match(SHA) ?? []) fullShas.add(m);
     t = t.replace(/\b[0-9a-f]{7,12}\b/g, (m) => {
@@ -129,6 +133,11 @@ export function recordTranscript(h: Harness): Transcript {
     });
     return hash(ulid(sha(t))).replace(ISO, "<time>").replace(/"duration_ms":\s*[\d.]+/g, '"duration_ms":<ms>');
   };
+}
+
+export function recordTranscript(h: Harness): Transcript {
+  const lines: string[] = [];
+  const norm = textNormaliser(h.dir);
   const log = (line: string) => lines.push(norm(line));
 
   let stopped = false;
