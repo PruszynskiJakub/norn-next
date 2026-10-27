@@ -118,7 +118,7 @@ async function take(ctx: Context, key: string, force: boolean) {
   const git = ports.git;
   const now = ctx.clock.now();
   const nowIso = ctx.clock.iso();
-  const remote = await gitRemote(ctx.root, ctx.config.remote.git_remote);
+  const remote = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
 
   const branch = await findStoryBranch(ctx, key, remote);
   if (!branch) throw refuse(`no story branch for ${key}${remote ? ` on ${remote}` : ""}`, "norn sync (intake creates it) or check the story key", "unknown_story");

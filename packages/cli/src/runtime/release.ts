@@ -4,9 +4,9 @@
  */
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
-import type { StoryFacts } from "@norn/core";
+import type { GitPort, StoryFacts } from "@norn/core";
 import { ulid } from "@norn/schema";
-import { acquireTickLock, git as rawGit, releaseClaim, writtenHere } from "@norn/store";
+import { acquireTickLock, releaseClaim, writtenHere } from "@norn/store";
 import type { Context } from "../context.ts";
 import { busyError } from "../output.ts";
 import { type Observed, observe } from "./observe.ts";
@@ -58,7 +58,7 @@ export async function releaseStory(obs: Observed, story: StoryFacts): Promise<Re
     // R3.3 (H6, A21): push only fast-forwards of the remote branches — a stale local branch never
     // replaces the record. Checked for every branch before anything is pushed or deleted.
     for (const b of branches) {
-      const ff = await fastForwardOf(obs.root, remote, b.branch);
+      const ff = await fastForwardOf(git, obs.root, remote, b.branch);
       if (!ff.ok) return { story: story.key, ok: false, pushed, error: `${b.branch} is not a fast-forward of ${remote}/${b.branch} (${ff.reason}); nothing pushed or released` };
     }
     for (const b of branches) {
@@ -72,14 +72,17 @@ export async function releaseStory(obs: Observed, story: StoryFacts): Promise<Re
 }
 
 /** R3.3: is local `branch` a fast-forward of the remote one (fetched now; absent remotely counts)? */
-async function fastForwardOf(root: string, remote: string, branch: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+async function fastForwardOf(git: GitPort, root: string, remote: string, branch: string): Promise<{ ok: true } | { ok: false; reason: string }> {
   const tracking = `refs/remotes/${remote}/${branch}`;
-  const f = await rawGit(root, ["fetch", "--quiet", "--no-tags", remote, `+refs/heads/${branch}:${tracking}`]);
+  const failed = await git.fetch(root, remote, [`+refs/heads/${branch}:${tracking}`], { quiet: true }).then(
+    () => null,
+    (e: unknown) => (e instanceof Error ? e.message : String(e)),
+  );
   // a branch missing on the remote (never pushed) is fine; any other fetch failure decides nothing
-  if (f.code !== 0 && !/couldn't find remote ref/i.test(f.stderr)) return { ok: false, reason: `fetch failed: ${f.stderr.trim()}` };
-  if ((await rawGit(root, ["rev-parse", "--verify", "--quiet", tracking])).code !== 0) return { ok: true };
-  const anc = await rawGit(root, ["merge-base", "--is-ancestor", tracking, `refs/heads/${branch}`]);
-  return anc.code === 0 ? { ok: true } : { ok: false, reason: "the remote has commits this checkout does not" };
+  if (failed !== null && !/couldn't find remote ref/i.test(failed)) return { ok: false, reason: failed };
+  if (!(await git.hasRef(root, tracking))) return { ok: true };
+  const anc = await git.isAncestor(root, tracking, `refs/heads/${branch}`).catch(() => false);
+  return anc ? { ok: true } : { ok: false, reason: "the remote has commits this checkout does not" };
 }
 
 /** Release every claim this heartbeat holds (clean `watch` exit, T6). */

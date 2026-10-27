@@ -17,7 +17,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { GitPort, StoryFacts } from "@norn/core";
 import { isGitSha, type StoryMerge, type StoryStatus } from "@norn/schema";
-import { git as rawGit, patchStoryFile, storyFile } from "@norn/store";
+import { patchStoryFile, storyFile } from "@norn/store";
 
 export type RecordResult =
   | { state: "pushed" | "committed"; sha: string | null; branch: string }
@@ -54,34 +54,38 @@ export async function markStoryOnBase(opts: {
     return sha ? { state: "committed", sha, branch: base } : { state: "unchanged", branch: base };
   }
   const tracking = `refs/remotes/${remote}/${base}`;
-  const f = await rawGit(root, ["fetch", "--quiet", "--no-tags", remote, `+refs/heads/${base}:${tracking}`]);
-  if (f.code !== 0) return { state: "failed", branch: base, reason: `fetch ${base}: ${f.stderr.trim()}` };
-  if ((await rawGit(root, ["cat-file", "-e", `${tracking}:${rel}`])).code !== 0)
-    return { state: "deferred", branch: base, reason: `${rel} is not on ${remote}/${base} yet` };
+  const fetched = await git.fetch(root, remote, [`+refs/heads/${base}:${tracking}`], { quiet: true }).then(
+    () => null,
+    (e: unknown) => (e instanceof Error ? e.message : String(e)),
+  );
+  if (fetched !== null) return { state: "failed", branch: base, reason: `fetch ${base}: ${fetched}` };
+  if (!(await git.hasPath(root, tracking, rel))) return { state: "deferred", branch: base, reason: `${rel} is not on ${remote}/${base} yet` };
   const tmp = mkdtempSync(join(tmpdir(), "norn-record-"));
   const wt = join(tmp, "wt");
   try {
-    const add = await rawGit(root, ["worktree", "add", "--detach", "--quiet", wt, tracking]);
-    if (add.code !== 0) return { state: "failed", branch: base, reason: `worktree: ${add.stderr.trim()}` };
+    const added = await git.worktreeAddDetached(root, wt, tracking).then(
+      () => null,
+      (e: unknown) => (e instanceof Error ? e.message : String(e)),
+    );
+    if (added !== null) return { state: "failed", branch: base, reason: `worktree: ${added}` };
     const r = patchStoryFile(storyFile(join(wt, spec_dir)), patch, wt);
     if (!r.ok) return { state: "failed", branch: base, reason: `story.md: ${r.reason}` };
     const sha = await git.commit(wt, { message, trailers, paths: [rel] });
     if (!sha) return { state: "unchanged", branch: base };
     const p = await git.push(wt, remote, `HEAD:refs/heads/${base}`);
     if (!p.ok) return { state: "failed", branch: base, reason: `push to ${base} rejected (${p.reason}): set status: ${opts.status} in ${rel} by hand` };
-    await rawGit(root, ["update-ref", tracking, sha]);
+    await git.updateRef(root, { ref: tracking, sha });
     return { state: "pushed", sha, branch: base };
   } finally {
-    await rawGit(root, ["worktree", "remove", "--force", wt]);
+    await git.worktreeRemove(root, wt, { force: true }).catch(() => undefined);
     rmSync(tmp, { recursive: true, force: true });
-    await rawGit(root, ["worktree", "prune"]);
+    await git.worktreePrune(root).catch(() => undefined);
   }
 }
 
-async function revOf(root: string, rev: string): Promise<string | null> {
+async function revOf(git: GitPort, root: string, rev: string): Promise<string | null> {
   if (!rev) return null;
-  const r = await rawGit(root, ["rev-parse", "--verify", "--quiet", "--end-of-options", `${rev}^{commit}`]);
-  return r.code === 0 ? r.stdout.trim() : null;
+  return git.revParse(root, `${rev}^{commit}`);
 }
 
 /**
@@ -89,8 +93,8 @@ async function revOf(root: string, rev: string): Promise<string | null> {
  * commit is the first commit of `<remote>/<base>` that contains the head (the head itself when the
  * base's first-parent line holds it), dated by its committer date.
  */
-export async function mergeFacts(opts: { root: string; remote: string | null; base: string; story: StoryFacts }): Promise<StoryMerge> {
-  const { root, remote, story } = opts;
+export async function mergeFacts(opts: { root: string; remote: string | null; git: GitPort; base: string; story: StoryFacts }): Promise<StoryMerge> {
+  const { root, remote, git, story } = opts;
   const pr = story.pr ?? null;
   const out: StoryMerge = {};
   if (pr) {
@@ -104,21 +108,21 @@ export async function mergeFacts(opts: { root: string; remote: string | null; ba
   if (!story.merged_by_ancestry || !remote) return out;
   out.by_ancestry = true;
   const baseRef = `refs/remotes/${remote}/${opts.base}`;
-  const head = (out.head_sha ? await revOf(root, out.head_sha) : null) ?? (await revOf(root, `refs/heads/${story.branch}`)) ?? (await revOf(root, `refs/remotes/${remote}/${story.branch}`));
+  const head = (out.head_sha ? await revOf(git, root, out.head_sha) : null) ?? (await revOf(git, root, `refs/heads/${story.branch}`)) ?? (await revOf(git, root, `refs/remotes/${remote}/${story.branch}`));
   if (!head) return out;
   out.head_sha = head;
   if (!out.merge_commit_sha) {
-    const fp = await rawGit(root, ["rev-list", "--first-parent", "-n", "2000", baseRef]);
-    let merge: string | null = fp.code === 0 && fp.stdout.split("\n").includes(head) ? head : null;
+    const fp = await git.revList(root, baseRef, { firstParent: true, limit: 2000 }).catch(() => null);
+    let merge: string | null = fp?.includes(head) ? head : null;
     if (!merge) {
-      const ap = await rawGit(root, ["rev-list", "--ancestry-path", "--first-parent", "--reverse", `${head}..${baseRef}`]);
-      merge = ap.code === 0 ? (ap.stdout.split("\n").find(Boolean) ?? null) : null;
+      const ap = await git.revList(root, `${head}..${baseRef}`, { ancestryPath: true, firstParent: true, reverse: true }).catch(() => null);
+      merge = ap?.[0] ?? null;
     }
     if (merge) out.merge_commit_sha = merge;
   }
   if (out.merge_commit_sha && !out.merged_at) {
-    const d = await rawGit(root, ["show", "-s", "--format=%cI", out.merge_commit_sha]);
-    if (d.code === 0 && !Number.isNaN(Date.parse(d.stdout.trim()))) out.merged_at = new Date(d.stdout.trim()).toISOString();
+    const [c] = await git.log(root, out.merge_commit_sha, 1).catch(() => []);
+    if (c && Number.isFinite(c.at)) out.merged_at = new Date(c.at).toISOString();
   }
   return out;
 }

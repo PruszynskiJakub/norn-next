@@ -27,7 +27,6 @@ import {
   heartbeatId,
   listMailbox,
   newClaimBlob,
-  git as rawGit,
   parseWorkflowText,
   postMailbox,
   readClaim,
@@ -88,22 +87,18 @@ function localTarget(obs: Observed, story: StoryFacts, uf: UnitFacts): Target {
   };
 }
 
-async function show(root: string, spec: string): Promise<string | null> {
-  const r = await rawGit(root, ["show", spec]);
-  return r.code === 0 ? r.stdout : null;
-}
-
 /**
  * The unit's cursor from the pushed branches (T7: the holder pushes at step boundaries):
  * a slice reads its slice branch first, then the story branch; the story unit its story branch.
  */
 export async function remoteTarget(ctx: Context, key: string): Promise<Target | null> {
-  const remote = await gitRemote(ctx.root, ctx.config.remote.git_remote);
+  const remote = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
   if (!remote) return null;
   const root = ctx.root;
-  await rawGit(root, ["fetch", "--quiet", "--no-tags", remote]);
+  const git = ctx.git;
+  await git.fetch(root, remote, [], { quiet: true }).catch(() => undefined);
   const { story, slice } = parseUnitKey(key);
-  const refs = (await rawGit(root, ["for-each-ref", "--format=%(refname)", `refs/remotes/${remote}/`])).stdout.split("\n").filter(Boolean);
+  const refs = (await git.listRefs(root, `refs/remotes/${remote}/`).catch(() => [])).map((r) => r.ref);
   const prefix = `refs/remotes/${remote}/`;
   const storyRef = refs.find((r) => r.startsWith(prefix) && parseSpecDirName(r.slice(prefix.length))?.story === story);
   if (!storyRef) return null;
@@ -113,12 +108,12 @@ export async function remoteTarget(ctx: Context, key: string): Promise<Target | 
     const nn = slice.split("/")[1] as string;
     const sliceRef = refs.find((r) => r.startsWith(`${prefix}${story}/${nn}-`));
     if (sliceRef) candidates.push({ ref: sliceRef, dir: sliceRef.slice(`${prefix}${story}/`.length) });
-    const listed = (await rawGit(root, ["ls-tree", "--name-only", `${storyRef}:${spec}/runs/`])).stdout.split("\n");
+    const listed = (await git.lsTree(root, storyRef, `${spec}/runs/`)) ?? [];
     const dir = listed.find((d) => d.startsWith(`${nn}-`));
     if (dir) candidates.push({ ref: storyRef, dir });
   } else candidates.push({ ref: storyRef, dir: STORY_UNIT_DIR });
   for (const c of candidates) {
-    const raw = await show(root, `${c.ref}:${spec}/runs/${c.dir}/state.json`);
+    const raw = await git.show(root, c.ref, `${spec}/runs/${c.dir}/state.json`);
     if (raw === null) continue;
     let parsed: unknown;
     try {
@@ -128,7 +123,7 @@ export async function remoteTarget(ctx: Context, key: string): Promise<Target | 
     }
     const st = validate("state", parsed);
     if (!st.ok) continue;
-    const wfText = await show(root, `${c.ref}:${spec}/runs/${c.dir}/workflow.yaml`);
+    const wfText = await git.show(root, c.ref, `${spec}/runs/${c.dir}/workflow.yaml`);
     const wf = wfText === null ? null : parseWorkflowText(wfText, `${spec}/runs/${c.dir}/workflow.yaml`);
     return { key, story, slice, state: st.value, workflow: wf?.ok ? wf.value : null, runsDir: null, source: "remote", obs: null, story_facts: null };
   }
@@ -220,7 +215,7 @@ export async function claimFor(
   const unreadable = opts.unreadable ?? ((e: Error) => failure(`cannot read the claim of ${story}: ${e.message}`, "check the network and retry", "claim_unreadable"));
   let read: ClaimRead;
   try {
-    read = await readClaim(ctx.root, opts.remote !== undefined ? opts.remote : await gitRemote(ctx.root, ctx.config.remote.git_remote), story);
+    read = await readClaim(ctx.root, opts.remote !== undefined ? opts.remote : await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote), story);
   } catch (e) {
     throw unreadable(e as Error);
   }
@@ -232,7 +227,7 @@ export async function claimFor(
  * claim (T8); otherwise the mailbox (T9) — or a refusal when `mailbox` is false (mode, workflow).
  */
 async function claimRoute(ctx: Context, t: Target, opts: { mailbox: boolean; verb: string; claim?: ClaimState }): Promise<Route> {
-  const remote = await gitRemote(ctx.root, ctx.config.remote.git_remote);
+  const remote = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
   const c = opts.claim ?? (await claimFor(ctx, t.story));
   if (c.state === "corrupt") throw refuse(`claim ref of ${t.story} is corrupt`, `norn take ${t.story} --force`, "claim_corrupt", c.error);
   if (c.state === "mine") {
@@ -296,7 +291,7 @@ async function refuseDuplicate(ctx: Context, t: Target, receipt: Receipt, holder
   for (const r of uf?.unapplied ?? []) pending.push({ receipt: r.receipt, where: r.file });
   // a verb that never goes through the mailbox has no receipt of its purpose there
   if (mailbox) {
-    const remote = await gitRemote(ctx.root, ctx.config.remote.git_remote);
+    const remote = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
     if (remote) await fetchNornRefs(ctx.root, remote).catch(() => undefined);
     for (const m of await listMailbox(ctx.root, t.story).catch(() => [])) if (m.receipt) pending.push({ receipt: m.receipt, where: m.ref });
   }
@@ -332,7 +327,7 @@ async function deliver(ctx: Context, t: Target, route: Route, receipt: Receipt):
     const file = rel.startsWith("..") || isAbsolute(rel) ? r.file : rel;
     return { via: "local", claim: route.claim, n: r.n, file };
   }
-  const remote = await gitRemote(ctx.root, ctx.config.remote.git_remote);
+  const remote = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
   const posted = await postMailbox(ctx.root, remote, t.story, receipt);
   if (!posted.ok) throw failure(`mailbox push failed: ${posted.message}`, `norn ${receipt.kind === "reject" ? "approve" : receipt.kind} again`, "mailbox_failed");
   return { via: "mailbox", ref: posted.ref, holder: route.holder.holder };

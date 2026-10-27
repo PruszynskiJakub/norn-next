@@ -3,11 +3,13 @@
  * revParse, commit with trailers (S4) and its H1 refusal, branches, worktrees, ref CAS (T2/T3),
  * push and its stale result, ancestry and divergence (BS1), merge and merge-tree (BS1/BS3),
  * conflict markers (H1), outgoing conflict markers (BS5.2), the base merge commit (BS5), diffStat
- * and fast-forward. Run against real temp repos with a bare remote. Not covered: rebase, log ranges
+ * and fast-forward, and the reads the runtime makes (4.1): remotes, commonDir, hasRef, hasPath,
+ * show, lsTree, listRefs over several prefixes, firstParentLog, revList, quiet fetch, detached
+ * worktrees and prune. Run against real temp repos with a bare remote. Not covered: rebase, log ranges
  * beyond the last commit, and the port methods only the runtime's own wiring reaches.
  */
 import { afterAll, describe, expect } from "bun:test";
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { GitPort } from "@norn/core";
@@ -28,7 +30,14 @@ export type GitContractTest =
   | "outgoingConflictMarkers names marked files changed by commits not on the remote (BS5.2)"
   | "baseMergeCommit is the merge that brought base into head, or null (BS5)"
   | "diffStat summarises the files a range changes"
-  | "fastForward moves only when it can";
+  | "fastForward moves only when it can"
+  | "remotes and commonDir: the repo's remotes and the git dir its worktrees share"
+  | "hasRef, hasPath, show and lsTree read refs and files of a revision"
+  | "listRefs takes several prefixes in one call"
+  | "firstParentLog: first-parent commits with dates and one trailer (Q6, C4)"
+  | "revList: first-parent and ancestry-path walks, limited and reversed"
+  | "fetch: quiet or not; a missing remote branch fails and says so"
+  | "worktreeAddDetached checks out a detached HEAD; worktreePrune forgets removed directories";
 
 /** Deterministic git for the suite's own setup and for the port under test. */
 export const GIT_ENV = {
@@ -295,6 +304,114 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       sh(root, "checkout", "-q", "-b", "behind", init);
       commitFile(root, "c.txt", "c\n");
       expect(await git.fastForward(root, "ahead")).toEqual({ ok: false });
+    });
+
+    t("remotes and commonDir: the repo's remotes and the git dir its worktrees share", async () => {
+      const { base, root, git } = repo();
+      expect(await git.remotes(root)).toEqual(["origin"]);
+      sh(root, "remote", "add", "upstream", join(base, "remote.git"));
+      expect((await git.remotes(root)).sort()).toEqual(["origin", "upstream"]);
+      expect(await git.commonDir(root)).toBe(join(root, ".git"));
+      const wt = join(base, "wt");
+      await git.worktreeAdd(root, wt, "gh-1-wt", { from: "main" });
+      expect(await git.commonDir(wt)).toBe(join(root, ".git"));
+    });
+
+    t("hasRef, hasPath, show and lsTree read refs and files of a revision", async () => {
+      const { root, git } = repo();
+      sh(root, "checkout", "-q", "-b", "side");
+      mkdirSync(join(root, "d", "e"), { recursive: true });
+      writeFileSync(join(root, "d", "x.txt"), "x\n");
+      writeFileSync(join(root, "d", "e", "y.txt"), "y\n");
+      commitFile(root, "a.txt", "side\n");
+      sh(root, "checkout", "-q", "main");
+      expect(await git.hasRef(root, "refs/heads/side")).toBe(true);
+      expect(await git.hasRef(root, "refs/remotes/origin/main")).toBe(true);
+      expect(await git.hasRef(root, "refs/heads/nope")).toBe(false);
+      expect(await git.hasPath(root, "refs/heads/side", "d/x.txt")).toBe(true);
+      expect(await git.hasPath(root, "refs/heads/main", "d/x.txt")).toBe(false);
+      expect(await git.hasPath(root, "refs/heads/nope", "a.txt")).toBe(false);
+      expect(await git.show(root, "refs/heads/side", "a.txt")).toBe("side\n");
+      expect(await git.show(root, "refs/heads/main", "a.txt")).toBe("one\n");
+      expect(await git.show(root, "refs/heads/main", "d/x.txt")).toBeNull();
+      expect(await git.lsTree(root, "refs/heads/side", "d/")).toEqual(["e", "x.txt"]);
+      expect(await git.lsTree(root, "refs/heads/main", "d/")).toBeNull();
+    });
+
+    t("listRefs takes several prefixes in one call", async () => {
+      const { root, git } = repo();
+      const head = sh(root, "rev-parse", "HEAD");
+      await git.createBranch(root, "gh-1-x", "main");
+      sh(root, "update-ref", "refs/norn/claims/gh-1", head);
+      const refs = await git.listRefs(root, ["refs/heads/", "refs/remotes/"]);
+      expect(refs.map((r) => r.ref).sort()).toEqual(["refs/heads/gh-1-x", "refs/heads/main", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"]);
+      expect(refs.every((r) => r.sha === head)).toBe(true);
+      expect(await git.listRefs(root, "refs/heads/")).toEqual(refs.filter((r) => r.ref.startsWith("refs/heads/")));
+    });
+
+    t("firstParentLog: first-parent commits with dates and one trailer (Q6, C4)", async () => {
+      const { root, git } = repo();
+      const init = sh(root, "rev-parse", "HEAD");
+      sh(root, "checkout", "-q", "-b", "side");
+      const sideTip = commitFile(root, "s.txt", "s\n");
+      sh(root, "checkout", "-q", "main");
+      const tagged = await git.commit(root, { message: "norn: tick", trailers: { "Norn-Tick": "01TICK" }, paths: [], allowEmpty: true });
+      commitFile(root, "b.txt", "b\n", "person edit");
+      sh(root, "merge", "-q", "--no-ff", "--no-edit", "side");
+      const log = await git.firstParentLog(root, "HEAD", { exclude: init, limit: 10, trailer: "Norn-Tick" });
+      expect(log.map((c) => c.subject)).toEqual(["Merge branch 'side'", "person edit", "norn: tick"]);
+      expect(log.map((c) => c.sha)).not.toContain(sideTip);
+      expect(log[2]).toMatchObject({ sha: tagged, author: "Norn Contract", trailer: "01TICK" });
+      expect(log[1]?.trailer).toBe("");
+      for (const c of log) {
+        expect(Number.isNaN(Date.parse(c.authored_at))).toBe(false);
+        expect(Number.isNaN(Date.parse(c.committed_at))).toBe(false);
+      }
+      expect(await git.firstParentLog(root, "HEAD", { limit: 1, trailer: "Norn-Tick" })).toHaveLength(1);
+      expect(await git.firstParentLog(root, "HEAD", { exclude: "HEAD", limit: 10, trailer: "Norn-Tick" })).toEqual([]);
+    });
+
+    t("revList: first-parent and ancestry-path walks, limited and reversed", async () => {
+      const { root, git } = repo();
+      const init = sh(root, "rev-parse", "HEAD");
+      sh(root, "checkout", "-q", "-b", "side");
+      const side = commitFile(root, "s.txt", "s\n");
+      sh(root, "checkout", "-q", "main");
+      const b = commitFile(root, "b.txt", "b\n");
+      sh(root, "merge", "-q", "--no-ff", "--no-edit", "side");
+      const merge = sh(root, "rev-parse", "HEAD");
+      const c = commitFile(root, "c.txt", "c\n");
+      expect(await git.revList(root, "HEAD", { firstParent: true })).toEqual([c, merge, b, init]);
+      expect(await git.revList(root, "HEAD", { firstParent: true, limit: 2 })).toEqual([c, merge]);
+      expect(await git.revList(root, `${side}..HEAD`, { ancestryPath: true, firstParent: true, reverse: true })).toEqual([merge, c]);
+      expect(await git.revList(root, "HEAD..HEAD")).toEqual([]);
+    });
+
+    t("fetch: quiet or not; a missing remote branch fails and says so", async () => {
+      const { base, remote, root, git } = repo();
+      const other = join(base, "other");
+      sh(base, "clone", "-q", remote, other);
+      const tip = commitFile(other, "o.txt", "o\n");
+      sh(other, "push", "-q", "origin", "HEAD:refs/heads/gh-2-o");
+      await git.fetch(root, "origin", ["+refs/heads/gh-2-o:refs/remotes/origin/gh-2-o"], { quiet: true });
+      expect(await git.readRef(root, "refs/remotes/origin/gh-2-o")).toBe(tip);
+      await git.fetch(root, "origin", [], { quiet: true });
+      await git.fetch(root, "origin", ["+refs/heads/main:refs/remotes/origin/main"]);
+      const err = await git.fetch(root, "origin", ["+refs/heads/gh-9-none:refs/remotes/origin/gh-9-none"], { quiet: true }).then(() => null, (e: unknown) => e as Error);
+      expect(err?.message).toMatch(/couldn't find remote ref/i);
+    });
+
+    t("worktreeAddDetached checks out a detached HEAD; worktreePrune forgets removed directories", async () => {
+      const { base, root, git } = repo();
+      const head = sh(root, "rev-parse", "HEAD");
+      const wt = join(base, "detached");
+      await git.worktreeAddDetached(root, wt, "refs/remotes/origin/main");
+      expect((await git.worktreeList(root)).find((w) => w.path === wt)).toMatchObject({ branch: null, head });
+      expect((await git.status(wt)).branch).toBeNull();
+      rmSync(wt, { recursive: true, force: true });
+      expect((await git.worktreeList(root)).find((w) => w.path === wt)?.prunable).toBe(true);
+      await git.worktreePrune(root);
+      expect((await git.worktreeList(root)).map((w) => w.path)).toEqual([root]);
     });
   });
 }
