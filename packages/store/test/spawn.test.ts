@@ -3,7 +3,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { NETWORK_TIMEOUT_MS, git, gitTimeoutMs, type SpawnRecord, setSpawnObserver, spawnBounded } from "../src/index.ts";
+import { NETWORK_TIMEOUT_MS, git, gitSync, gitTimeoutMs, type SpawnRecord, setSpawnObserver, spawnBounded } from "../src/index.ts";
 
 const alive = (pid: number) => {
   try {
@@ -63,6 +63,39 @@ describe("git network timeouts", () => {
     expect(Date.now() - t0).toBeLessThan(5_000);
     expect(r.code).toBe(124);
     expect(r.stderr).toMatch(/timed out/);
+  });
+});
+
+describe("gitSync", () => {
+  test("binary-safe stdout, stdin bytes, and a missing cwd is exit 127, never a throw", () => {
+    const repo = realpathSync(mkdtempSync(join(tmpdir(), "norn-spawn-")));
+    tmps.push(repo);
+    expect(gitSync(repo, ["init", "-q"]).code).toBe(0);
+    const sha = gitSync(repo, ["hash-object", "-w", "--stdin"], new Uint8Array([0, 255, 10])).stdout.toString().trim();
+    expect([...gitSync(repo, ["cat-file", "blob", sha]).stdout]).toEqual([0, 255, 10]);
+    expect(gitSync(join(repo, "no-such-dir"), ["status"]).code).toBe(127);
+  });
+
+  test("a fetch from a remote that never answers is killed at the timeout (exit 124)", () => {
+    const repo = realpathSync(mkdtempSync(join(tmpdir(), "norn-spawn-")));
+    tmps.push(repo);
+    gitSync(repo, ["init", "-q"]);
+    const t0 = Date.now();
+    const r = gitSync(repo, ["-c", "protocol.ext.allow=always", "fetch", "--quiet", "ext::sleep 30"], undefined, { timeoutMs: 500 });
+    expect(Date.now() - t0).toBeLessThan(5_000);
+    expect(r.code).toBe(124);
+    expect(r.stderr).toMatch(/timed out after 0.5s/);
+  });
+
+  test("tells the spawn observer", () => {
+    const seen: SpawnRecord[] = [];
+    setSpawnObserver((r) => seen.push(r));
+    try {
+      gitSync("/", ["--version"]);
+    } finally {
+      setSpawnObserver(null);
+    }
+    expect(seen).toEqual([{ argv: ["git", "--version"], cwd: "/" }]);
   });
 });
 

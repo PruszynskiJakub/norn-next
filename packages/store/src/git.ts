@@ -1,5 +1,5 @@
 /** Minimal git plumbing for claim and mailbox refs (§13). Not a GitPort; adapters own that. */
-import { spawnBounded } from "./spawn.ts";
+import { noteSpawn, spawnBounded } from "./spawn.ts";
 
 export interface GitRun {
   code: number;
@@ -31,6 +31,41 @@ export async function git(cwd: string, args: string[], input?: string, opts: { t
     ...(timeoutMs === undefined ? {} : { timeoutMs }),
   });
   return { code: r.code, stdout: r.stdout, stderr: r.stderr };
+}
+
+export interface GitSyncRun {
+  /** exit code; 124 when killed by the timeout, 127 when git could not be started */
+  code: number;
+  /** raw bytes: `cat-file --batch` output is binary-safe only as a Buffer */
+  stdout: Buffer;
+  stderr: string;
+}
+
+/**
+ * `git` for callers that must stay synchronous (the base records snapshot, GR6). Same environment
+ * and H11 timeout rule as `git`; on timeout the child is killed and the code is 124. Never throws.
+ */
+export function gitSync(cwd: string, args: string[], input?: Uint8Array, opts: { timeoutMs?: number } = {}): GitSyncRun {
+  const timeoutMs = opts.timeoutMs ?? gitTimeoutMs(args);
+  noteSpawn(["git", ...args], cwd);
+  try {
+    const p = Bun.spawnSync(["git", ...args], {
+      cwd,
+      stdin: input ?? "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0", LC_ALL: "C" },
+      ...(timeoutMs === undefined ? {} : { timeout: timeoutMs, killSignal: "SIGKILL" as const }),
+    });
+    const stderr = Buffer.from(p.stderr ?? new Uint8Array()).toString("utf8");
+    if (p.exitedDueToTimeout) {
+      const note = `${["git", ...args].slice(0, 2).join(" ")} timed out after ${(timeoutMs ?? 0) / 1000}s (killed)\n`;
+      return { code: 124, stdout: Buffer.from(p.stdout ?? new Uint8Array()), stderr: `${stderr}${stderr && !stderr.endsWith("\n") ? "\n" : ""}${note}` };
+    }
+    return { code: p.exitCode ?? 1, stdout: Buffer.from(p.stdout ?? new Uint8Array()), stderr };
+  } catch (e) {
+    return { code: 127, stdout: Buffer.alloc(0), stderr: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 export async function gitOk(cwd: string, args: string[], input?: string): Promise<string> {
