@@ -1,7 +1,7 @@
 /**
  * `norn pick`: a raw-key picker for a Herdr overlay. Rows are the inbox items that need the person,
  * then one row per story; typing filters them, ↑↓ move, the right side previews the story's orient
- * summary. Pure: keys and a view in, the next state, an effect and a frame out. The command does
+ * summary; every action leaves it open, esc closes it. Pure: keys and a view in, the next state, an effect and a frame out. The command does
  * the IO: verbs through the CLI dispatcher (X1), Herdr through the cockpit adapter.
  */
 import { formatAge, type InboxGroup } from "@norn/core";
