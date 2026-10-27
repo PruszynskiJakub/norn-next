@@ -18,7 +18,7 @@ import { formatInbox, inboxItemsInOrder, type ProjectView } from "@norn/view";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { usageError } from "../output.ts";
-import { goTo, goToWorkspace, labelPanes, oldestYourTurn, parseCockpitLine, planCockpit, toneOf, verbMessage } from "../runtime/cockpit.ts";
+import { cockpitHerdr, goTo, goToWorkspace, labelPanes, oldestYourTurn, parseCockpitLine, planCockpit, toneOf, verbMessage } from "../runtime/cockpit.ts";
 import { frameItems, freshNotes, newestNote, promptOf, renderFrame, type Tone } from "../runtime/cockpit-view.ts";
 import { projectView } from "../runtime/human.ts";
 
@@ -36,14 +36,6 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
     }
     signal?.addEventListener("abort", done, { once: true });
   });
-}
-
-/** HC6/HC8: the Herdr the cockpit talks to — injected, or the real one inside Herdr, else none. */
-function cockpitHerdr(ctx: Context): herdr.HerdrCockpit | null {
-  if (ctx.deps.herdr !== undefined) return ctx.deps.herdr;
-  if (ctx.env.HERDR_ENV !== "1") return null;
-  const o = ctx.config.runner?.adapter === "herdr" ? (ctx.config.runner.options ?? {}) : {};
-  return herdr.createHerdrCockpit({ env: ctx.env, ...(typeof o.bin === "string" ? { bin: o.bin } : {}), ...(typeof o.session === "string" ? { session: o.session } : {}) });
 }
 
 /**
