@@ -1,0 +1,18 @@
+{
+  "kind": "started",
+  "receipt_id": "01M5ZQP9PGXE0DZTCP7FMPE5Q3",
+  "run_id": "01M5ZQP9PGXE0DZTCP7FMPE5Q2",
+  "step": "explore",
+  "attempt": 1,
+  "at": "2026-10-27T22:28:59.729Z",
+  "by": "agent",
+  "who": "claude",
+  "how": "manual",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-61-pin-the-norn-version-a-repo-needs-and",
+  "agent_session_id": "3415c1cd-4c98-4aa1-a3ed-c07a58871ba1",
+  "process": {
+    "pid": 44022,
+    "pid_start": "Tue Oct 27 23:28:51 2026"
+  }
+}

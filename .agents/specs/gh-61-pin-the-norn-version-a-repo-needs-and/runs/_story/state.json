@@ -11,18 +11,30 @@
     "explore": 1
   },
   "step_entered_at": "2026-10-27T22:27:49.685Z",
-  "status": "ready",
+  "status": "running",
   "park": null,
   "counters": {
     "triage_loop": 0
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 0,
-  "run": null,
+  "applied_through": 1,
+  "run": {
+    "run_id": "01M5ZQP9PGXE0DZTCP7FMPE5Q2",
+    "step": "explore",
+    "attempt": 1,
+    "started_at": "2026-10-27T22:28:59.729Z",
+    "how": "manual",
+    "agent": "claude",
+    "agent_session_id": "3415c1cd-4c98-4aa1-a3ed-c07a58871ba1",
+    "process": {
+      "pid": 44022,
+      "pid_start": "Tue Oct 27 23:28:51 2026"
+    }
+  },
   "last_outcome": null,
   "created_at": "2026-10-27T22:27:49.685Z",
-  "updated_at": "2026-10-27T22:27:49.685Z",
-  "last_tick_id": "01M5ZQM59K0YMB9HY8QQKQHPT7",
+  "updated_at": "2026-10-27T22:29:19.691Z",
+  "last_tick_id": "01M5ZQPX69P7DKMB24MJYVFTA9",
   "mode": "manual"
 }
