@@ -11,7 +11,7 @@ import type { Context } from "../context.ts";
 import { busyError } from "../output.ts";
 import { NORN_VERSION } from "../version.ts";
 import { type ActRecord, Actor } from "./act/index.ts";
-import { type Observed, observe, type SyncMode, type SyncReport } from "./observe.ts";
+import { type Observed, observe, type SyncMode, type SyncReport } from "./observe/index.ts";
 
 export interface TickOptions {
   sync?: SyncMode;
