@@ -4,11 +4,12 @@
  * leases (K1, K3), hook facts from the trace (R5.1, R5.3), act failures, the PR and base caches (C1,
  * BS1) and, per unit, what its receipts say: the last outcome receipt (B3), the runs of its cursor step
  * (R5.3), an unknown launch (R5.1); per story its open notes (NT2/NT3) and ready approval (F35/C5).
- * observe (cli) extends these with git, runner, process and remote facts.
+ * observe (cli) extends these with git, runner, process and remote facts; the view (X1) reads them
+ * as they are (`loadProjectView`), so `norn inbox` and the tick see one world.
  */
 import { existsSync, readdirSync } from "node:fs";
-import { type ActFailure, type NumberedReceipt, openNotes, RE_ENTRY_KINDS, readyApproval, type StepRunFacts, type StoryFacts, storyWorktreePath } from "@norn/core";
-import { type HookFact, type LeaseFile, parseReceiptFileName, type ReceiptOf, type UnitState } from "@norn/schema";
+import { type ActFailure, type FileError, type NumberedReceipt, openNotes, RE_ENTRY_KINDS, readyApproval, type StepRunFacts, type StoryFacts, storyWorktreePath } from "@norn/core";
+import { DEFAULT_CONFIG, type HookFact, type LeaseFile, parseDuration, parseReceiptFileName, type ReceiptOf, type RunInfo, type UnitState } from "@norn/schema";
 import { type BaseFactsCache, type PrFactsCache, readBaseFacts, readPrFacts } from "./base.ts";
 import { readActFailures } from "./heartbeat.ts";
 import { type LeaseListing, type LeaseLiveness, listLeases } from "./leases.ts";
@@ -32,8 +33,12 @@ export interface LocalFactsOptions {
   baseRef?: string | null;
   /** lease liveness check (default: holder pid + start time) */
   liveness?: LeaseLiveness;
-  /** R5.3: the stalled window (ms) hook facts are always read back over */
-  stalledMs: number;
+  /** R5.3: the stalled window (ms) hook facts are always read back over; default the snapshot config's `limits.stalled` */
+  stalledMs?: number;
+  /** every valid receipt per unit too (`UnitSnapshot.receipts`): the view's timelines (X1) */
+  includeApplied?: boolean;
+  /** an unlistable leases dir is reported in `leases.errors` (file `leases`) instead of thrown: the view's (X1) */
+  reportLeaseErrors?: boolean;
 }
 
 /** R5.3 + R5.1: the runs of a unit's cursor step/attempt, and every session id its `started` receipts recorded. */
@@ -89,13 +94,18 @@ export interface LocalFacts {
 
 export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Promise<LocalFacts> {
   const now = opts.now;
-  const snapshot = loadSnapshot({ repoRoot: root, storyRoots: [...opts.storyWorktrees.values()], home: opts.home, env: opts.env, baseRef: opts.baseRef });
-  const leases = await listLeases(snapshot.home, opts.liveness);
+  const includeApplied = opts.includeApplied;
+  const snapshot = loadSnapshot({ repoRoot: root, storyRoots: [...opts.storyWorktrees.values()], home: opts.home, env: opts.env, baseRef: opts.baseRef, includeApplied });
+  const leases = await listLeases(snapshot.home, opts.liveness).catch((e: unknown): LeaseListing => {
+    if (!opts.reportLeaseErrors) throw e;
+    return { live: [], dead: [], errors: [{ file: "leases", errors: [{ path: "", message: (e as Error).message }] } satisfies FileError] };
+  });
   const live = leases.live.map((e) => e.lease);
+  const stalledMs = opts.stalledMs ?? parseDuration((snapshot.config.ok ? snapshot.config.config : DEFAULT_CONFIG).limits.stalled);
 
-  const starts: string[] = [new Date(now - opts.stalledMs).toISOString()];
+  const starts: string[] = [new Date(now - stalledMs).toISOString()];
   const read = snapshot.stories.map((s) => {
-    const story = withSliceWorktrees(s, (slice) => opts.sliceWorktrees.get(slice));
+    const story = withSliceWorktrees(s, (slice) => opts.sliceWorktrees.get(slice), { includeApplied });
     for (const u of story.units) {
       if (liveRun(u.state)) starts.push(u.state?.run?.started_at ?? (u.state as UnitState).updated_at);
       const unknown = unknownLaunch(u.unapplied);
@@ -153,6 +163,14 @@ function readyOf(story: StorySnapshot, u: UnitSnapshot | undefined): { sha: stri
   if (!u || !wf) return undefined;
   const ready = readyApproval(wf, receiptsOfKinds(story, u, ["approve", ...RE_ENTRY_KINDS]));
   return ready ? { sha: ready.sha, at: ready.at } : undefined;
+}
+
+/**
+ * A2/R5.3: the hook facts of a run — those naming its run id, and those naming none fired in its
+ * worktree since it started. observe and the view (X1) pick them the same way.
+ */
+export function runHooks(hooks: readonly HookFact[], run: Pick<RunInfo, "run_id" | "started_at">, worktree: string | null): HookFact[] {
+  return hooks.filter((h) => (h.run_id ? h.run_id === run.run_id : !!worktree && h.cwd.startsWith(worktree) && h.at >= run.started_at));
 }
 
 /** Run facts are observed for running units and for parked ones that keep their run (B2: is the session still there to answer into?). */

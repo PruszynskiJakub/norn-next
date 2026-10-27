@@ -2,9 +2,10 @@
  * Machine-local files of a unit worktree (A3, K4): `.env.norn` (slot env), the `.norn-unit`
  * marker, and the shared `info/exclude` entries that keep both out of commits.
  */
+import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { SlotConfig } from "@norn/schema";
-import { isSliceKey, isStoryKey } from "@norn/schema";
+import { isSliceKey, isStoryKey, parseSliceFileName, parseSpecDirName, sliceDirName, sliceKey, storyDirName } from "@norn/schema";
 import { atomicWrite, readText } from "./fsx.ts";
 import { git } from "./git.ts";
 import { envNornPath, unitMarkerPath } from "./paths.ts";
@@ -102,4 +103,43 @@ export function readUnitMarker(worktree: string): { exists: boolean; marker: Uni
     exists: true,
     marker: ok ? { repo: kv.repo as string, story: kv.story as string, slice, unit: kv.unit as string, spec_dir: kv.spec_dir as string } : null,
   };
+}
+
+/** Story and slice worktrees found on disk: story key → path, slice key → path. */
+export interface ScannedWorktrees {
+  stories: Map<string, string>;
+  slices: Map<string, string>;
+}
+
+/**
+ * GR3 + A3: the unit worktrees beside the repo, found without git — what a read-only view (X1)
+ * uses where observe lists `git worktree`. A story worktree is `<repo>-worktrees/<story>-<slug>`
+ * (`storyDirName`), a slice worktree `<that>--<nn>-<slug>` (`sliceDirName`); a folder counts only
+ * when its name has that shape (schema key patterns) and its `.norn-unit` marker names the same
+ * story, and for a slice the slice its name's number gives. First folder (by name) per unit wins.
+ */
+export function scanWorktrees(repoRoot: string): ScannedWorktrees {
+  const out: ScannedWorktrees = { stories: new Map(), slices: new Map() };
+  const base = `${repoRoot.replace(/\/+$/, "")}-worktrees`;
+  let names: string[];
+  try {
+    names = readdirSync(base).sort();
+  } catch {
+    return out;
+  }
+  for (const name of names) {
+    const parts = name.split("--");
+    if (parts.length > 2) continue;
+    const spec = parseSpecDirName(parts[0] as string);
+    if (!spec || storyDirName(spec.story, spec.slug) !== parts[0]) continue;
+    const file = parts.length === 2 ? parseSliceFileName(`${parts[1]}.md`) : null;
+    if (parts.length === 2 && (!file || sliceDirName(file.nn, file.slug) !== parts[1])) continue;
+    const path = join(base, name);
+    const marker = readUnitMarker(path).marker;
+    if (!marker || marker.story !== spec.story) continue;
+    if (!file) {
+      if (marker.slice === null && !out.stories.has(spec.story)) out.stories.set(spec.story, path);
+    } else if (marker.slice === sliceKey(spec.story, file.nn) && !out.slices.has(marker.slice)) out.slices.set(marker.slice, path);
+  }
+  return out;
 }

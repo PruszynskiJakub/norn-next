@@ -1,14 +1,13 @@
 /**
  * loadTraceView (O4, X1): the step timeline of one unit — for a story, its slices too —
  * read from local files only (spec folders in the checkout and story worktrees, slice
- * worktrees, and the whole trace of that story). No writes, no network.
+ * worktrees — found as the project view finds them, `scanWorktrees` — and the whole trace of
+ * that story). No writes, no network.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { storyWorktreePath } from "@norn/core";
 import { storyOf, type TraceEvent } from "@norn/schema";
-import { defaultBaseRef, loadSnapshot, readTrace, type StorySnapshot, traceDir, type UnitSnapshot, withSliceWorktrees } from "@norn/store";
-import { discoverStoryRoots, markedSliceWorktree } from "./load.ts";
+import { defaultBaseRef, loadSnapshot, readTrace, scanWorktrees, type StorySnapshot, traceDir, type UnitSnapshot, withSliceWorktrees } from "@norn/store";
 import { buildStepTimeline, mergeStoryTimeline } from "./steps.ts";
 import type { CriteriaSummary, TraceRecords, TraceView } from "./types.ts";
 
@@ -56,8 +55,6 @@ export interface LoadTraceViewOptions {
   env?: Record<string, string | undefined>;
   /** ms epoch; default Date.now() */
   now?: number;
-  /** default: every `<repoRoot>-worktrees/<story>` folder */
-  storyRoots?: string[];
   /** attach events to rows (no-op / claim-renew ticks hidden) */
   events?: boolean;
   /** attach every event, no-op ticks included */
@@ -70,17 +67,17 @@ export interface LoadTraceViewOptions {
 export function loadTraceView(opts: LoadTraceViewOptions): TraceView | null {
   const now = opts.now ?? Date.now();
   const storyKey = storyOf(opts.key);
+  const wts = scanWorktrees(opts.repoRoot);
   const snap = loadSnapshot({
     repoRoot: opts.repoRoot,
-    storyRoots: opts.storyRoots ?? discoverStoryRoots(opts.repoRoot),
+    storyRoots: [...wts.stories.values()],
     home: opts.home,
     env: opts.env,
     includeApplied: true,
   });
   const read = snap.stories.find((s) => s.key === storyKey);
   if (!read) return null;
-  const storyWt = storyWorktreePath(opts.repoRoot, read.key, read.slug);
-  const story = withSliceWorktrees(read, (slice) => markedSliceWorktree(storyWt, read, slice), { includeApplied: true });
+  const story = withSliceWorktrees(read, (slice) => wts.slices.get(slice), { includeApplied: true });
   const { events } = readTrace(opts.repoRoot, { unit: storyKey });
   const tdir = traceDir(opts.repoRoot);
   const { records, runsDir } = recordsOf(opts.repoRoot, story, snap.config.ok ? snap.config.config.remote.git_remote : "origin");
