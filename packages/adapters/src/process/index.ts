@@ -5,7 +5,7 @@
  */
 import type { AdapterContext, ProcessPort } from "@norn/core";
 import type { ProcessIdentity } from "@norn/schema";
-import { type Exec, bunExec } from "./exec.ts";
+import { type Exec, unobservedExec } from "./exec.ts";
 
 export { AdapterError, isPortError, portError } from "./error.ts";
 export { type Exec, type ExecOptions, type ExecResult, bunExec, shellJoin, shellQuote } from "./exec.ts";
@@ -53,7 +53,7 @@ export interface ProcessPortOptions {
 }
 
 export function createProcessPort(opts: ProcessPortOptions = {}): ProcessPort {
-  const exec = opts.exec ?? bunExec;
+  const exec = opts.exec ?? unobservedExec;
   let selfIdentity: ProcessIdentity | null = null;
   return {
     async identify(pid) {

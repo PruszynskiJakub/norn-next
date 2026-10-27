@@ -25,7 +25,7 @@ import { join, resolve } from "node:path";
 import { git as gitAdapter, herdr, proc } from "@norn/adapters";
 import type { AgentAdapter, RunnerPort, SessionRef } from "@norn/core";
 import { ExitCode, ulid } from "@norn/schema";
-import { skillsReport, writeUnitMarker } from "@norn/store";
+import { noteSpawn, skillsReport, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { rendered, withExit } from "../output.ts";
@@ -45,6 +45,7 @@ interface RunOut {
 
 async function run(argv: string[], o: { cwd?: string; env?: Record<string, string | undefined>; input?: string; timeoutMs: number }): Promise<RunOut> {
   try {
+    noteSpawn(argv, o.cwd);
     const p = Bun.spawn(argv, {
       cwd: o.cwd,
       env: (o.env ?? process.env) as Record<string, string>,
