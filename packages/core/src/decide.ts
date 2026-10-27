@@ -571,14 +571,10 @@ function applyAction(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
         // R5.3: the resumed run is the answered one; any other active run of the step blocks it
         const active = activeRun(ctx, uf, run.run_id);
         if (active) return ctx.noop(uf.unit, "answer.resume.wait_active", `run ${active} of ${res.state.step} still shows hook activity (R5.3)`);
-        if (ctx.agentsFree <= 0) return ctx.noop(uf.unit, "answer.resume.queued", `answer waits: max_agents ${ctx.config.max_agents} in use (K1)`);
-        ctx.agentsFree--;
-        const n = nextReceiptNumber(uf);
-        const started = { ...startedReceipt(ctx, res.state, step, run.run_id, cwd, false), agent_session_id: resumeId, ...(run.agent ? { agent: run.agent } : {}) };
-        extra.push({ n, receipt: started });
-        state = applyReceipts(res.state, [{ n, file: "", receipt: started }], applyCtx(ctx, wf)).state;
-        launch = { ...launchFor(ctx, story, uf, res.state, step, run.run_id, cwd), prompt: res.deliver, resume: resumeId };
-        if (run.agent) launch.agent = run.agent;
+        const resumed = resumeLaunch(ctx, story, uf, res.state, wf, step, run, { resumeId, cwd, prompt: res.deliver, n: nextReceiptNumber(uf) });
+        if (!resumed) return ctx.noop(uf.unit, "answer.resume.queued", `answer waits: max_agents ${ctx.config.max_agents} in use (K1)`);
+        extra.push(resumed.receipt);
+        ({ state, launch } = resumed);
       } else state = { ...res.state, status: "ready", run: null };
     }
   }
@@ -762,6 +758,35 @@ function resumeIdOf(run: NonNullable<UnitState["run"]>, rf: UnitFacts["run"]): s
   return run.agent_session_id ?? (rf?.run_id === run.run_id ? rf.hooks.findLast((h) => h.agent_session_id)?.agent_session_id : undefined);
 }
 
+/**
+ * B2/R4.2: continue `run`'s agent session with `--resume <resumeId>` and `prompt` (an answer or the
+ * nudge text): a `started` receipt numbered `n` for the same run, and the launch. Answer and nudge
+ * resume share it, so they share one lease rule (K1): the run's own agent lease is still held by
+ * the run being resumed, so it does not count against max_agents; any other resume takes a free
+ * agent slot. Null when none is free — the caller queues.
+ */
+function resumeLaunch(
+  ctx: Ctx,
+  story: StoryFacts,
+  uf: UnitFacts,
+  st: UnitState,
+  wf: Workflow,
+  step: AgentStep,
+  run: NonNullable<UnitState["run"]>,
+  o: { resumeId: string; cwd: string; prompt: string; n: number },
+): { receipt: NewReceipt; state: UnitState; launch: AgentLaunch } | null {
+  const ownLease = uf.lease?.kind === "agent" && uf.lease.run_id === run.run_id;
+  if (!ownLease) {
+    if (ctx.agentsFree <= 0) return null;
+    ctx.agentsFree--;
+  }
+  const started: ReceiptOf<"started"> = { ...startedReceipt(ctx, st, step, run.run_id, o.cwd, false), agent_session_id: o.resumeId, ...(run.agent ? { agent: run.agent } : {}) };
+  const state = applyReceipts(st, [{ n: o.n, file: "", receipt: started }], applyCtx(ctx, wf)).state;
+  const launch: AgentLaunch = { ...launchFor(ctx, story, uf, st, step, run.run_id, o.cwd), prompt: o.prompt, resume: o.resumeId };
+  if (run.agent) launch.agent = run.agent;
+  return { receipt: { n: o.n, receipt: started }, state, launch };
+}
+
 /** §10 classification of a live agent run from facts (C1, C2, MO4). */
 function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, step: AgentStep): void {
   const ref = uf.unit;
@@ -888,15 +913,10 @@ function routeOutcome(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st0: UnitState
       // R4.2: type into the live session when the runner can …
       if (caps.send) return ctx.emit({ kind: "nudge", unit: ref, rule: `${rule}.nudge`, input: { run_id: run.run_id, session, text: NUDGE_TEXT }, launch: null, kill: null, snapshot, receipts, state: res.state, commit });
       // … else resume the agent session with the nudge text (the B2 answer path), the old process killed first
-      const ownLease = uf.lease?.kind === "agent" && uf.lease.run_id === run.run_id;
-      if (!ownLease && ctx.agentsFree <= 0) return ctx.noop(ref, "agent.nudge.queued", `nudge waits: max_agents ${ctx.config.max_agents} in use (K1)`);
-      if (!ownLease) ctx.agentsFree--;
-      const started: ReceiptOf<"started"> = { ...startedReceipt(ctx, res.state, step, run.run_id, cwd as string, false), agent_session_id: resumeId as string, ...(run.agent ? { agent: run.agent } : {}) };
-      receipts.push({ n: n + 1, receipt: started });
-      const state = applyReceipts(res.state, [{ n: n + 1, file: "", receipt: started }], applyCtx(ctx, wf)).state;
-      const launch: AgentLaunch = { ...launchFor(ctx, story, uf, res.state, step, run.run_id, cwd as string), prompt: NUDGE_TEXT, resume: resumeId as string };
-      if (run.agent) launch.agent = run.agent;
-      return ctx.emit({ kind: "nudge", unit: ref, rule: `${rule}.nudge.resume`, input: null, launch, kill: session, snapshot, receipts, state, commit });
+      const resumed = resumeLaunch(ctx, story, uf, res.state, wf, step, run, { resumeId: resumeId as string, cwd: cwd as string, prompt: NUDGE_TEXT, n: n + 1 });
+      if (!resumed) return ctx.noop(ref, "agent.nudge.queued", `nudge waits: max_agents ${ctx.config.max_agents} in use (K1)`);
+      receipts.push(resumed.receipt);
+      return ctx.emit({ kind: "nudge", unit: ref, rule: `${rule}.nudge.resume`, input: null, launch: resumed.launch, kill: session, snapshot, receipts, state: resumed.state, commit });
     }
     return ctx.emit({ kind: "classify", unit: ref, rule: `${rule}.surface`, outcome, kill: null, snapshot, receipts, state: res.state, commit });
   }

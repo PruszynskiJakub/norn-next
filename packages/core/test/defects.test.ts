@@ -1,8 +1,6 @@
 /**
  * Confirmed defects, reproduced. Each `test.failing` passes while the defect stands; the fix flips it
  * to `test` in the same commit (refactor plan Phase 1).
- *   - BUG-1 (1.1): the answer resume counts the run's own agent lease against max_agents (K1); the
- *     nudge resume exempts it.
  *   - BUG-2 (1.2): `routeFor` ignores counter exhaustion, so the route act records in a classify
  *     receipt disagrees with where `applyReceipts` sends the unit.
  *   - BUG-5 (found by 0.1's rule coverage): a slice file that failed validation, of a slice not
@@ -51,12 +49,11 @@ describe("BUG-1: a resumed run's own agent lease and max_agents (K1)", () => {
     expect(decide(f, WORKFLOWS, cfg).find((d) => d.unit === "gh-1")?.rule).toBe("agent.stalled.nudge.resume");
   });
 
-  test.failing("answer resume: the run's own lease does not count either", () => {
+  test("answer resume: the run's own lease does not count either", () => {
     const s = solo(running({ status: "parked", park: { kind: "ask", reason: "Q?", since: at() } }), {});
     const u = s.units[0] as UnitFacts;
     u.unapplied = [numbered(1, receipt(u.state as UnitState, "answer", { answer: "yes" }, "human"))];
     const d = decide(headless(s), WORKFLOWS, cfg).find((x) => x.unit === "gh-1");
-    // today: noop answer.resume.queued ("max_agents 1 in use")
     expect(d?.action).toMatchObject({ kind: "apply_receipts", launch: { run_id: RUN, resume: "cs-1" } });
   });
 });
