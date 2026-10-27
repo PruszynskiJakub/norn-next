@@ -19,7 +19,7 @@ import {
   type Workflow,
 } from "@norn/schema";
 import type { NumberedReceipt, UnitRef } from "./facts.ts";
-import { effectiveMode } from "./inbox.ts";
+import { effectiveMode } from "./policy.ts";
 import { epoch, iso } from "./time.ts";
 import { edgeOf, reportableOutcomes, stepOf } from "./workflow.ts";
 

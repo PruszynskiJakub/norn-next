@@ -5,7 +5,7 @@
  * that holds the claim (T7); never through the mailbox. Writes an `update` receipt (P6); the tick
  * applies it (S5). The tick never moves a done unit by itself — only a person does, with this verb.
  */
-import { baseUpdateStep } from "@norn/core";
+import { baseUpdateStep, storyUnit } from "@norn/core";
 import type { UnitState } from "@norn/schema";
 import { readClaim, heartbeatId } from "@norn/store";
 import { defineCommand } from "../command.ts";
@@ -54,7 +54,7 @@ export const updateCommand = defineCommand({
       const who = claim.state === "present" && Date.parse(claim.blob.expires_at) > now ? `held by ${claim.blob.holder}` : "not held by this checkout";
       throw refuse(`${t.story}'s claim is ${who}; only the holder updates a story (T7)`, claim.state === "present" && Date.parse(claim.blob.expires_at) > now ? `ask ${claim.blob.holder} to run norn update ${t.story}, or norn take ${t.story} --force` : `norn take ${t.story}`, "not_holder");
     }
-    const pending = sf?.units.find((u) => u.unit.slice === null)?.unapplied.find((r) => r.receipt.kind === "update");
+    const pending = (sf ? storyUnit(sf) : null)?.unapplied.find((r) => r.receipt.kind === "update");
     if (pending) throw refuse(`an update of ${t.story} is already recorded (${pending.file}) and not applied yet`, "norn tick", "already_recorded");
 
     // P6: the receipt first; the tick applies it and writes state.json last (S5)

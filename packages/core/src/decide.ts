@@ -35,7 +35,8 @@ import { type ApplyResult, applyReceipts, initialState, routeOf } from "./apply.
 import { AUTO_PROMPT, NUDGE_TEXT, sliceWorktreePath, storyWorktreePath } from "./commands.ts";
 import type { Facts, NumberedReceipt, RunFacts, SliceFileFacts, StoryFacts, UnitFacts, UnitRef } from "./facts.ts";
 import { sha256 } from "./hash.ts";
-import { bodyChangedItem, effectiveMode, storyFinished, unitInboxItem } from "./inbox.ts";
+import { bodyChangedItem, unitInboxItem } from "./inbox.ts";
+import { effectiveMode, firstLine, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, storyFinished, storyUnit, unitWorktree } from "./policy.ts";
 import { promptKeys } from "./prompt.ts";
 import type { InboxItem, RemoteIssue, RunnerCapabilities, SessionRef } from "./ports.ts";
 import { epoch, iso } from "./time.ts";
@@ -193,11 +194,11 @@ function intake(ctx: Ctx): void {
 
 // ================================================================= story level
 
-const storyRef = (s: StoryFacts): UnitRef => s.units.find((u) => u.unit.slice === null)?.unit ?? { story: s.key, slice: null, dir: "_story", key: s.key };
+const storyRef = (s: StoryFacts): UnitRef => storyUnit(s)?.unit ?? { story: s.key, slice: null, dir: "_story", key: s.key };
 
 function decideStory(ctx: Ctx, story: StoryFacts): void {
   const ref = storyRef(story);
-  const storyUnit = story.units.find((u) => u.unit.slice === null) ?? null;
+  const su = storyUnit(story);
   const claim = story.claim;
   const { facts } = ctx;
 
@@ -206,7 +207,7 @@ function decideStory(ctx: Ctx, story: StoryFacts): void {
   if (claim.state === "corrupt") return ctx.noop(ref, "claim.corrupt", `claim ref ${claim.sha} is unreadable`);
   if (claim.state === "none" || claim.state === "expired") {
     const ours = claim.state === "expired" && claim.blob.heartbeat_id === ctx.heartbeat;
-    const fresh = claim.state === "none" && !storyUnit?.state && story.frontmatter?.status === "new";
+    const fresh = claim.state === "none" && !su?.state && story.frontmatter?.status === "new";
     // R3.2 (H6, A21): the base record wins over any local spec — a story the base records as done
     // (or whose PR merged) is never acquired by a stale local intake or a returning checkout. Only this
     // heartbeat's own expired claim (nobody took it since) is re-acquired for a merged PR whose record
@@ -239,9 +240,9 @@ function decideStory(ctx: Ctx, story: StoryFacts): void {
     return;
   }
   const fm = story.frontmatter;
-  const halted = storyUnit?.state?.park?.kind === "remote";
+  const halted = su?.state?.park?.kind === "remote";
 
-  if (!ctx.has(ref.key)) storyLifecycle(ctx, story, fm, storyUnit);
+  if (!ctx.has(ref.key)) storyLifecycle(ctx, story, fm, su);
   if (!ctx.has(ref.key) && story.mailbox?.length) importMailbox(ctx, story);
 
   for (const uf of story.units) {
@@ -265,7 +266,7 @@ function claimBlob(ctx: Ctx, story: string, prev: ClaimBlob | null): ClaimBlob {
 }
 
 /** GR6 merged → cleanup; GR7 closed/unassigned/unlabelled → park "remote: …"; GR8 mirror + body change. */
-function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, storyUnit: UnitFacts | null): void {
+function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: UnitFacts | null): void {
   const ref = storyRef(story);
   // P2 (F34): merged when the PR says so, or when its head is already on the fetched base;
   // BS11: a PR merged into another branch than the base is not merged (parked below, GR7)
@@ -285,12 +286,12 @@ function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, story
       story_status: "done",
     });
   }
-  const st = storyUnit?.state;
+  const st = su?.state;
   const reason = remoteProblem(story, ctx.config.remote.label, ctx.facts.repo.default_branch);
   // GR7: a remote problem parks the story unit through the one park path (stuck, kind remote)
-  if (reason && st && st.park?.kind !== "remote" && st.status !== "corrupt") return park(ctx, story, storyUnit as UnitFacts, st, "remote", reason, "remote.park");
+  if (reason && st && st.park?.kind !== "remote" && st.status !== "corrupt") return park(ctx, story, su as UnitFacts, st, "remote", reason, "remote.park");
   const refinedHash = story.issue ? sha256(story.issue.body) : fm.body_hash;
-  if (!fm.refined_body_hash && refinedHash && refineFinished(storyUnit)) {
+  if (!fm.refined_body_hash && refinedHash && refineFinished(su)) {
     // GR8: record the remote body as of refine finishing, so a later body change surfaces in the inbox
     const fields: UpdateStoryMirrorAction["fields"] = { refined_body_hash: refinedHash };
     if (refinedHash !== fm.body_hash) fields.body_hash = refinedHash;
@@ -300,10 +301,10 @@ function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, story
       rule: "remote.mirror.refined",
       fields,
       notify: null,
-      commit: commitFor(ctx, story, storyUnit, `norn: ${story.key} refine finished (record body hash)`, storyUnit?.state?.step ?? null),
+      commit: commitFor(ctx, story, su, `norn: ${story.key} refine finished (record body hash)`, su?.state?.step ?? null),
     });
   }
-  if (story.issue) mirror(ctx, story, fm, storyUnit, story.issue);
+  if (story.issue) mirror(ctx, story, fm, su, story.issue);
 }
 
 /** GR8: the story unit has left a step whose skill is `refine` (cursor elsewhere, or re-entered later). */
@@ -312,20 +313,6 @@ function refineFinished(uf: UnitFacts | null): boolean {
   const wf = uf?.workflow;
   if (!st || !wf) return false;
   return Object.entries(wf.steps).some(([name, step]) => step.type === "agent" && step.skill === "refine" && ((st.visits[name] ?? 0) >= 2 || ((st.visits[name] ?? 0) >= 1 && st.step !== name)));
-}
-
-/** BS11: the PR's target branch, when the remote said (`base_branch`, older adapters `base`). */
-export const prBaseBranch = (pr: StoryFacts["pr"]): string | null => pr?.base_branch ?? pr?.base ?? null;
-
-/**
- * GR6 + BS11: the story's work landed on its base — the PR merged into the base branch, or its head is
- * already on the fetched base (P2). A PR merged into any other branch does not count.
- */
-export function mergedIntoBase(story: StoryFacts, base: string): boolean {
-  if (story.merged_by_ancestry) return true;
-  if (story.pr?.state !== "merged") return false;
-  const target = prBaseBranch(story.pr);
-  return target === null || target === base;
 }
 
 function remoteProblem(story: StoryFacts, label: string, base: string): string | null {
@@ -341,7 +328,7 @@ function remoteProblem(story: StoryFacts, label: string, base: string): string |
   return null;
 }
 
-function mirror(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, storyUnit: UnitFacts | null, issue: RemoteIssue): void {
+function mirror(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: UnitFacts | null, issue: RemoteIssue): void {
   const fields: Partial<Pick<StoryFrontmatter, "title" | "assignee" | "url" | "labels" | "body_hash">> = {};
   if (issue.title !== fm.title) fields.title = issue.title;
   if (issue.url !== fm.url) fields.url = issue.url;
@@ -362,7 +349,7 @@ function mirror(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, storyUnit: Un
     rule: changed ? "remote.mirror.body_changed" : "remote.mirror",
     fields,
     notify: changed,
-    commit: commitFor(ctx, story, storyUnit, `norn: mirror ${story.key} from the remote issue`, storyUnit?.state?.step ?? null),
+    commit: commitFor(ctx, story, su, `norn: mirror ${story.key} from the remote issue`, su?.state?.step ?? null),
   });
 }
 
@@ -406,11 +393,6 @@ const nextReceiptNumber = (uf: UnitFacts): number =>
 /** H1: a merge, rebase, cherry-pick or revert (or unmerged paths) in progress in the unit's worktree. */
 const gitBusy = (uf: UnitFacts): boolean => !!uf.worktree?.in_progress && (!!uf.worktree.in_progress.operation || uf.worktree.in_progress.unmerged.length > 0);
 
-function unitWorktree(story: StoryFacts, uf: UnitFacts | null): string | null {
-  const wt = uf?.worktree ?? (!uf || uf.unit.slice === null ? story.worktree : null);
-  return wt?.exists ? wt.path : null;
-}
-
 function unitBranch(story: StoryFacts, uf: UnitFacts | null): string {
   if (!uf || uf.unit.slice === null) return story.branch;
   const file = sliceFileOf(story, uf.unit.slice);
@@ -451,7 +433,7 @@ function commitFor(ctx: Ctx, story: StoryFacts | string, uf: UnitFacts | null, m
   const key = typeof story === "string" ? story : story.key;
   if (fresh) return { cwd: fresh.path, branch: fresh.branch, message, trailers: trailersFor(ctx, key, fresh.slice, step), push: fresh.push };
   if (typeof story === "string") return null;
-  const cwd = unitWorktree(story, uf);
+  const cwd = unitWorktree(story, uf, { mustExist: true });
   if (!cwd) return null;
   return { cwd, branch: unitBranch(story, uf), message, trailers: trailersFor(ctx, key, uf?.unit.slice ?? null, step), push: true };
 }
@@ -641,7 +623,7 @@ function applyAction(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
     else {
       const step = stepOf(wf, res.state.step);
       const resumeId = foreign ? undefined : resumeIdOf(run, rf);
-      const cwd = unitWorktree(story, uf);
+      const cwd = unitWorktree(story, uf, { mustExist: true });
       if (step?.type === "agent" && resumeId && cwd && ctx.facts.machine.runner) {
         // R5.3: the resumed run is the answered one; any other active run of the step blocks it
         const active = activeRun(ctx, uf, run.run_id);
@@ -699,7 +681,7 @@ function startStoryUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts): void {
       item: { id: `workflow:${story.key}:${fm.workflow}:${sha256(loaded.problem)}`, group: "unblock", story: story.key, slice: null, step: null, title: loaded.problem, command: `norn workflow ${story.key} <name>`, since: ctx.nowIso, url: fm.url },
     });
   }
-  const worktree = unitWorktree(story, uf);
+  const worktree = unitWorktree(story, uf, { mustExist: true });
   if (!worktree) return ctx.noop(uf.unit, "start.no_worktree", "story worktree missing (GR2)");
   const state = initialState({ unit: uf.unit, workflow: loaded.workflow, workflowName: fm.workflow, workflowHash: sha256(loaded.source), now: ctx.nowIso, mode: story.mode, tick_id: ctx.facts.tick_id });
   ctx.emit({
@@ -759,7 +741,7 @@ function startRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf:
   const { mode, downgraded } = effectiveMode(story.mode, !!step.attended, ctx.facts.machine.runner);
   if (mode === "manual")
     return ctx.noop(ref, downgraded ? "agent.ready.manual.no_runner" : "agent.ready.manual", downgraded ? "auto requested, no runner; running manual (MO2)" : "ready: a person starts an agent and runs norn brief");
-  const cwd = unitWorktree(story, uf);
+  const cwd = unitWorktree(story, uf, { mustExist: true });
   if (!cwd) return ctx.noop(ref, "agent.no_worktree", "unit worktree missing");
   // R5.3 (A14b): never a second agent beside a run of this step that is still active
   const active = activeRun(ctx, uf, null);
@@ -927,7 +909,7 @@ function routeOutcome(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st0: UnitState
   // R7.2: a session on another machine is never typed into or killed from here
   const session = run.session && !foreign ? sessionRef(run) : null;
   const { mode } = effectiveMode(story.mode, !!step.attended, ctx.facts.machine.runner);
-  const cwd = unitWorktree(story, uf);
+  const cwd = unitWorktree(story, uf, { mustExist: true });
   const caps = runnerCaps(ctx);
   const local = !!session && session.runner === ctx.facts.machine.runner;
   const resumeId = resumeIdOf(run, rf);
@@ -1054,8 +1036,6 @@ function implicitAsk(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, 
   });
 }
 
-const firstLine = (text: string | undefined): string | undefined => text?.split("\n").map((l) => l.trim()).find((l) => l !== "");
-
 /** Hook events that are the agent waiting, not moving on (R6.1). */
 const WAITING_EVENTS = new Set(["waiting_input", "permission_prompt"]);
 
@@ -1096,10 +1076,10 @@ export const LAUNCH_PROMPT_MS = 60_000;
  */
 function launchPromptCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, rf: RunFacts): "acted" | [string, string, string] | null {
   const run = st.run as NonNullable<UnitState["run"]>;
-  const startIdx = rf.hooks.findLastIndex((h) => h.event === "session_start");
-  if (startIdx < 0 || rf.hooks.slice(startIdx + 1).some((h) => h.event !== "session_start")) return null;
+  const start = sessionStartedNoTurn(rf);
+  if (!start) return null;
   if (!run.session || foreignRun(ctx, run) || run.session.runner !== ctx.facts.machine.runner || !runnerCaps(ctx).send) return null;
-  const startedAt = epoch((rf.hooks[startIdx] as RunFacts["hooks"][number]).at);
+  const startedAt = epoch(start.at);
   const now = ctx.facts.now;
   if (!run.prompt_resent_at) {
     if (now - startedAt < LAUNCH_PROMPT_MS) return null;
@@ -1129,7 +1109,7 @@ function launchPromptCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitS
 function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, command: string, timeout_ms: number): void {
   const ref = uf.unit;
   if (uf.lease?.kind === "check") return ctx.noop(ref, "check.running", `check run ${uf.lease.run_id ?? "?"} in progress`);
-  const cwd = unitWorktree(story, uf);
+  const cwd = unitWorktree(story, uf, { mustExist: true });
   if (!cwd) return ctx.noop(ref, "check.no_worktree", "unit worktree missing");
   if (ctx.checksFree <= 0) return ctx.noop(ref, "check.queued", `queued: max_checks ${ctx.config.max_checks} in use (K1)`);
   ctx.checksFree--;
@@ -1155,7 +1135,7 @@ function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, com
 
 function runGit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, step: GitStep): void {
   const ref = uf.unit;
-  const cwd = unitWorktree(story, uf);
+  const cwd = unitWorktree(story, uf, { mustExist: true });
   if (step.action === "open-pr" && story.pr && story.pr.state === "open")
     return classifyNorn(ctx, story, uf, st, wf, "done", "git.open-pr.exists", `PR #${story.pr.number} already open`);
   if (!cwd) return ctx.noop(ref, "git.no_worktree", "unit worktree missing");
