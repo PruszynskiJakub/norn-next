@@ -8,7 +8,7 @@ import { deriveUlid, type Receipt, type UnitState, type Workflow } from "@norn/s
 import type { Action, Decision } from "../src/actions.ts";
 import { applyReceipts } from "../src/apply.ts";
 import { renderBrief } from "../src/brief.ts";
-import { decide } from "../src/decide.ts";
+import { decide } from "../src/decide/index.ts";
 import { mergedIntoBase } from "../src/policy.ts";
 import type { NumberedReceipt, StoryBase, StoryFacts } from "../src/facts.ts";
 import { buildInbox } from "../src/inbox.ts";

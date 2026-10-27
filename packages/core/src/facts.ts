@@ -369,6 +369,6 @@ export interface Facts {
  */
 export type DecideFn = (
   facts: Facts,
-  workflows: import("./decide.ts").RepoWorkflows,
+  workflows: import("./decide/index.ts").RepoWorkflows,
   config: ResolvedConfig,
 ) => import("./actions.ts").Decision[];

@@ -272,13 +272,11 @@ function switchedKinds(text: string): Set<string> {
   return out;
 }
 
-/** decide sources: decide.ts today, a decide/ folder after 6.1. */
+/** decide's sources: every file of packages/core/src/decide/. */
 function decideText(): string {
-  const core = join(PKGS, "core", "src");
-  const dir = join(core, "decide");
-  const parts = existsSync(dir) ? files(dir) : [];
-  if (existsSync(join(core, "decide.ts"))) parts.push(join(core, "decide.ts"));
-  return parts.map((p) => readFileSync(p, "utf8")).join("\n");
+  return files(join(PKGS, "core", "src", "decide"))
+    .map((p) => readFileSync(p, "utf8"))
+    .join("\n");
 }
 
 /** (f) kinds act handles that decide never emits: dead branches, kept only until their removal item. */

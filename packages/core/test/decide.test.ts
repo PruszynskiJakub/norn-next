@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { LeaseFile, UnitState } from "@norn/schema";
 import type { Action } from "../src/actions.ts";
 import { applyReceipts } from "../src/apply.ts";
-import { decide, isSideAction, unitDecision } from "../src/decide.ts";
+import { decide, isSideAction, unitDecision } from "../src/decide/index.ts";
 import { isIntakeCommit, nornTrailers } from "../src/policy.ts";
 import type { RunFacts, StoryFacts, UnitFacts } from "../src/facts.ts";
 import type { WorktreeStatus } from "../src/ports.ts";
