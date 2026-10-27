@@ -10,9 +10,10 @@
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { StoryBase, StoryPrSeen } from "@norn/core";
+import { SPECS_DIR } from "@norn/schema";
 import { atomicWrite, atomicWriteJson } from "./fsx.ts";
 import { readLocalJson } from "./local-json.ts";
-import { baseCacheDir, baseFactsPath, prFactsPath, remoteCachePath, SPECS_DIR } from "./paths.ts";
+import { baseCacheDir, baseFactsPath, prFactsPath, remoteCachePath } from "./paths.ts";
 import { gitSync } from "./git.ts";
 
 /**

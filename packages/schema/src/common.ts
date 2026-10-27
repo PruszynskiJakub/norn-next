@@ -25,6 +25,8 @@ export const SLUG_PATTERN = "^[a-z0-9]+(-[a-z0-9]+)*$";
 /** `<nn>-<slug>` folder of a slice unit, or `_story`. */
 export const UNIT_DIR_PATTERN = "^(_story|[0-9]{2,3}-[a-z0-9]+(-[a-z0-9]+)*)$";
 /** e.g. `30s`, `10m`, `1h30m`, `500ms`. */
+/** A git commit id: SHA-1 (40) or SHA-256 (64) hex. */
+export const GIT_SHA_PATTERN = "^[0-9a-f]{40,64}$";
 export const DURATION_PATTERN = "^([0-9]+(ms|s|m|h|d))+$";
 const IDENT = "[a-z][a-z0-9_-]*";
 export const STEP_NAME_PATTERN = `^(?!(${RESERVED_STEP_NAMES.join("|")})$)${IDENT}$`;
@@ -35,6 +37,7 @@ export const TARGET_PATTERN = `^(\\$done|\\$stuck|(?!(${RESERVED_STEP_NAMES.join
 export const Ulid = Type.String({ pattern: ULID_PATTERN, description: "ULID (ID2)" });
 export const IsoTime = Type.String({ format: "date-time", description: "ISO-8601 timestamp, UTC" });
 export const Duration = Type.String({ pattern: DURATION_PATTERN, description: "Duration like 30s, 10m, 1h30m" });
+export const GitSha = Type.String({ pattern: GIT_SHA_PATTERN });
 export const StoryKey = Type.String({ pattern: STORY_KEY_PATTERN, description: "Story key, e.g. gh-123 or gl-45" });
 export const SliceKey = Type.String({ pattern: SLICE_KEY_PATTERN, description: "Slice key, e.g. gh-123/03" });
 export const Slug = Type.String({ pattern: SLUG_PATTERN, maxLength: 48 });

@@ -2,6 +2,7 @@ import { type Static, type TProperties, Type } from "@sinclair/typebox";
 import {
   Actor,
   CounterName,
+  GitSha,
   IsoTime,
   Mode,
   NonEmpty,
@@ -80,9 +81,9 @@ export const DoneReceipt = receipt("done", {
   base_merge: Type.Optional(
     Type.Object(
       {
-        sha: Type.String({ pattern: "^[0-9a-f]{40,64}$" }),
-        merge: Type.Union([Type.String({ pattern: "^[0-9a-f]{40,64}$" }), Type.Null()]),
-        head: Type.String({ pattern: "^[0-9a-f]{40,64}$" }),
+        sha: GitSha,
+        merge: Type.Union([GitSha, Type.Null()]),
+        head: GitSha,
       },
       { additionalProperties: false },
     ),
@@ -114,14 +115,14 @@ export const AnswerReceipt = receipt("answer", {
 export const ApproveReceipt = receipt("approve", {
   comment: Type.Optional(Type.String()),
   /** The unit's branch head at the moment of `approve` (story unit: observe's `ready_head_sha`); the ruling's head (C2). */
-  head_sha: Type.Optional(Type.String({ pattern: "^[0-9a-f]{40,64}$" })),
+  head_sha: Type.Optional(GitSha),
   /** NT3: open notes of the story listed at this story-level gate at `approve`; they leave the inbox */
   acknowledged_notes: Type.Optional(Type.Array(NoteId, { uniqueItems: true })),
 });
 export const RejectReceipt = receipt("reject", {
   comment: Type.Optional(Type.String()),
   /** C2: the unit's branch head the person judged — a ruling is tied to it */
-  head_sha: Type.Optional(Type.String({ pattern: "^[0-9a-f]{40,64}$" })),
+  head_sha: Type.Optional(GitSha),
 });
 export const UnstickReceipt = receipt("unstick", {
   to: Type.Optional(StepName),
@@ -184,11 +185,11 @@ export const ClassifyReceipt = receipt("classify", {
     Type.Object(
       {
         ref: NonEmpty,
-        sha: Type.String({ pattern: "^[0-9a-f]{40,64}$" }),
+        sha: GitSha,
         behind: Type.Optional(NonNegInt),
         conflicts: Type.Array(NonEmpty),
         /** BS3: the story head after a `done` update — the `Norn-Tick` merge commit when one was made */
-        head: Type.Optional(Type.String({ pattern: "^[0-9a-f]{40,64}$" })),
+        head: Type.Optional(GitSha),
         /** BS3: a `done` update made a merge commit (false = already up to date) */
         merged: Type.Optional(Type.Boolean()),
       },

@@ -3,11 +3,12 @@
  * workflow (S7), logs (C5), evidence and handoff.md (S9).
  */
 import { cpSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
 import type { UnitState, Workflow } from "@norn/schema";
 import { assertValid } from "@norn/schema";
 import { parse as parseYaml } from "yaml";
 import { atomicWrite, atomicWriteJson, createExclusive, fileError, readJsonFile, readText, type ReadResult, validated } from "./fsx.ts";
-import { evidenceDir, handoffPath, logPath, pinnedWorkflowPath, statePath } from "./paths.ts";
+import { evidenceDir, handoffPath, logPath, orphanedDir, pinnedWorkflowPath, statePath } from "./paths.ts";
 
 // ---------------------------------------------------------------- state.json
 
@@ -200,13 +201,13 @@ export function copyToOrphaned(unitDir: string, file: string, holder: string): s
   if (text === null) return null;
   const name = `${holder}-${file.split("/").at(-1) ?? "file"}`.replace(/[\s/]/g, "_");
   for (let i = 0; i < 100; i++) {
-    const dest = `${unitDir}/orphaned/${i ? name.replace(/(\.[^.]*)?$/, (ext) => `-${i}${ext}`) : name}`;
+    const dest = join(orphanedDir(unitDir), i ? name.replace(/(\.[^.]*)?$/, (ext) => `-${i}${ext}`) : name);
     const prev = readText(dest);
     if (prev === text) return dest;
     if (prev !== null) continue;
-    mkdirSync(`${unitDir}/orphaned`, { recursive: true });
+    mkdirSync(orphanedDir(unitDir), { recursive: true });
     atomicWrite(dest, text);
     return dest;
   }
-  throw new Error(`too many orphaned copies of ${name} in ${unitDir}/orphaned`);
+  throw new Error(`too many orphaned copies of ${name} in ${orphanedDir(unitDir)}`);
 }
