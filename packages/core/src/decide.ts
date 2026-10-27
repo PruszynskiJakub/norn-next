@@ -186,7 +186,7 @@ function intake(ctx: Ctx): void {
       story_file: `${specDir(key, slug)}/story.md`,
       frontmatter,
       body: issue.body,
-      commit: { cwd: path, branch, message: `norn: intake ${key} ${issue.title}`, trailers: { "Norn-Story": key, "Norn-Tick": facts.tick_id }, push: false },
+      commit: commitFor(ctx, key, null, `norn: intake ${key} ${issue.title}`, null, { path, branch, slice: null, push: false }),
     });
   }
 }
@@ -287,19 +287,8 @@ function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, story
   }
   const st = storyUnit?.state;
   const reason = remoteProblem(story, ctx.config.remote.label, ctx.facts.repo.default_branch);
-  if (reason && st && st.park?.kind !== "remote" && st.status !== "corrupt") {
-    const state: UnitState = { ...st, status: "stuck", park: { kind: "remote", reason, since: ctx.nowIso }, updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id };
-    return ctx.emit({
-      kind: "park",
-      unit: ref,
-      rule: "remote.park",
-      park: state.park as NonNullable<UnitState["park"]>,
-      notify: unitItem(ctx, story, storyUnit as UnitFacts, state),
-      receipts: [],
-      state,
-      commit: commitFor(ctx, story, storyUnit as UnitFacts, `norn: ${story.key} parked (${reason})`, st.step),
-    });
-  }
+  // GR7: a remote problem parks the story unit through the one park path (stuck, kind remote)
+  if (reason && st && st.park?.kind !== "remote" && st.status !== "corrupt") return park(ctx, story, storyUnit as UnitFacts, st, "remote", reason, "remote.park");
   const refinedHash = story.issue ? sha256(story.issue.body) : fm.body_hash;
   if (!fm.refined_body_hash && refinedHash && refineFinished(storyUnit)) {
     // GR8: record the remote body as of refine finishing, so a later body change surfaces in the inbox
@@ -311,12 +300,10 @@ function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, story
       rule: "remote.mirror.refined",
       fields,
       notify: null,
-      commit: story.worktree?.exists
-        ? { cwd: story.worktree.path, branch: story.branch, message: `norn: ${story.key} refine finished (record body hash)`, trailers: { "Norn-Story": story.key, "Norn-Tick": ctx.facts.tick_id }, push: true }
-        : null,
+      commit: commitFor(ctx, story, storyUnit, `norn: ${story.key} refine finished (record body hash)`, storyUnit?.state?.step ?? null),
     });
   }
-  if (story.issue) mirror(ctx, story, fm, story.issue);
+  if (story.issue) mirror(ctx, story, fm, storyUnit, story.issue);
 }
 
 /** GR8: the story unit has left a step whose skill is `refine` (cursor elsewhere, or re-entered later). */
@@ -354,7 +341,7 @@ function remoteProblem(story: StoryFacts, label: string, base: string): string |
   return null;
 }
 
-function mirror(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, issue: RemoteIssue): void {
+function mirror(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, storyUnit: UnitFacts | null, issue: RemoteIssue): void {
   const fields: Partial<Pick<StoryFrontmatter, "title" | "assignee" | "url" | "labels" | "body_hash">> = {};
   if (issue.title !== fm.title) fields.title = issue.title;
   if (issue.url !== fm.url) fields.url = issue.url;
@@ -375,9 +362,7 @@ function mirror(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, issue: Remote
     rule: changed ? "remote.mirror.body_changed" : "remote.mirror",
     fields,
     notify: changed,
-    commit: story.worktree?.exists
-      ? { cwd: story.worktree.path, branch: story.branch, message: `norn: mirror ${story.key} from the remote issue`, trailers: { "Norn-Story": story.key, "Norn-Tick": ctx.facts.tick_id }, push: true }
-      : null,
+    commit: commitFor(ctx, story, storyUnit, `norn: mirror ${story.key} from the remote issue`, storyUnit?.state?.step ?? null),
   });
 }
 
@@ -421,27 +406,54 @@ const nextReceiptNumber = (uf: UnitFacts): number =>
 /** H1: a merge, rebase, cherry-pick or revert (or unmerged paths) in progress in the unit's worktree. */
 const gitBusy = (uf: UnitFacts): boolean => !!uf.worktree?.in_progress && (!!uf.worktree.in_progress.operation || uf.worktree.in_progress.unmerged.length > 0);
 
-function unitWorktree(story: StoryFacts, uf: UnitFacts): string | null {
-  const wt = uf.worktree ?? (uf.unit.slice === null ? story.worktree : null);
+function unitWorktree(story: StoryFacts, uf: UnitFacts | null): string | null {
+  const wt = uf?.worktree ?? (!uf || uf.unit.slice === null ? story.worktree : null);
   return wt?.exists ? wt.path : null;
 }
 
-function unitBranch(story: StoryFacts, uf: UnitFacts): string {
-  if (uf.unit.slice === null) return story.branch;
+function unitBranch(story: StoryFacts, uf: UnitFacts | null): string {
+  if (!uf || uf.unit.slice === null) return story.branch;
   const file = sliceFileOf(story, uf.unit.slice);
   return uf.worktree?.status?.branch ?? (file ? sliceBranch(story.key, file.nn, file.slug) : `${story.key}/${uf.unit.dir}`);
 }
 
 const sliceFileOf = (story: StoryFacts, key: string): SliceFileFacts | undefined => story.slices.find((s) => s.key === key);
 
-function commitFor(ctx: Ctx, story: StoryFacts, uf: UnitFacts, message: string, step: string): BoundaryCommit | null {
+/**
+ * S4: the trailers of every commit norn makes for a unit — Norn-Story, Norn-Slice for a slice,
+ * Norn-Step when the unit has a cursor (none before the story unit starts), Norn-Tick.
+ */
+function trailersFor(ctx: Ctx, story: string, slice: string | null, step: string | null): Record<string, string> {
+  const trailers: Record<string, string> = { "Norn-Story": story };
+  if (slice) trailers["Norn-Slice"] = slice;
+  if (step !== null) trailers["Norn-Step"] = step;
+  trailers["Norn-Tick"] = ctx.facts.tick_id;
+  return trailers;
+}
+
+/** A worktree act creates this tick (intake, slice start): the commit goes there, not to an observed one. */
+interface NewWorktree {
+  path: string;
+  branch: string;
+  slice: string | null;
+  /** S8/T7: an intake is not pushed until the claim is held */
+  push: boolean;
+}
+
+/**
+ * S4, S8: the boundary commit for a unit at `step` — in the unit's worktree (no worktree, no commit),
+ * or in the worktree `fresh` that act creates first. `uf` null is the story unit without facts yet
+ * (a story nobody started); `story` is only a key for a story intake creates.
+ */
+function commitFor(ctx: Ctx, story: StoryFacts | string, uf: null, message: string, step: string | null, fresh: NewWorktree): BoundaryCommit;
+function commitFor(ctx: Ctx, story: StoryFacts, uf: UnitFacts | null, message: string, step: string | null): BoundaryCommit | null;
+function commitFor(ctx: Ctx, story: StoryFacts | string, uf: UnitFacts | null, message: string, step: string | null, fresh?: NewWorktree): BoundaryCommit | null {
+  const key = typeof story === "string" ? story : story.key;
+  if (fresh) return { cwd: fresh.path, branch: fresh.branch, message, trailers: trailersFor(ctx, key, fresh.slice, step), push: fresh.push };
+  if (typeof story === "string") return null;
   const cwd = unitWorktree(story, uf);
   if (!cwd) return null;
-  const trailers: Record<string, string> = { "Norn-Story": story.key };
-  if (uf.unit.slice) trailers["Norn-Slice"] = uf.unit.slice;
-  trailers["Norn-Step"] = step;
-  trailers["Norn-Tick"] = ctx.facts.tick_id;
-  return { cwd, branch: unitBranch(story, uf), message, trailers, push: true };
+  return { cwd, branch: unitBranch(story, uf), message, trailers: trailersFor(ctx, key, uf?.unit.slice ?? null, step), push: true };
 }
 
 function unitItem(ctx: Ctx, story: StoryFacts, uf: UnitFacts, state: UnitState): InboxItem | null {
@@ -660,7 +672,7 @@ function sessionRef(run: NonNullable<UnitState["run"]>): SessionRef {
   return ref;
 }
 
-function park(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, kind: "workflow" | "stuck", reason: string, rule: string): void {
+function park(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, kind: "workflow" | "stuck" | "remote", reason: string, rule: string): void {
   const state: UnitState = { ...st, status: "stuck", park: { kind, reason, since: ctx.nowIso }, updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id };
   ctx.emit({
     kind: "park",
@@ -1164,7 +1176,7 @@ function runGit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: W
       sha: b.sha,
       branch: base,
       message: `Update ${story.key} from ${base} (${b.sha.slice(0, 7)})`,
-      trailers: { "Norn-Story": story.key, "Norn-Step": st.step, "Norn-Tick": ctx.facts.tick_id },
+      trailers: trailersFor(ctx, story.key, uf.unit.slice, st.step),
     };
   }
   ctx.emit({
@@ -1304,7 +1316,7 @@ function slicesStep(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, w
       slice_status: "active" as const,
       receipts: [],
       state,
-      commit: { cwd: path, branch, message: `norn: start ${s.key} (${name})`, trailers: { "Norn-Story": story.key, "Norn-Slice": s.key, "Norn-Step": state.step, "Norn-Tick": ctx.facts.tick_id }, push: true },
+      commit: commitFor(ctx, story, null, `norn: start ${s.key} (${name})`, state.step, { path, branch, slice: s.key, push: true }),
     });
   }
   if (starts.length)

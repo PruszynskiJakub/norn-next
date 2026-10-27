@@ -21,6 +21,7 @@ import {
   storyFacts,
   storyUnit,
   T0,
+  TICK,
   unitFacts,
   WORKFLOWS,
 } from "./fixtures.ts";
@@ -271,6 +272,8 @@ describe("slices step (W2)", () => {
       worktree: { path: "/r-worktrees/gh-1-login--02-s02", branch: "gh-1/02-s02", from: "gh-1-login", slot: 1 },
       state: { story: "gh-1", slice: "gh-1/02", unit_dir: "02-s02", step: "implement", workflow_hash: sha256(WORKFLOWS.slice!.source) },
     });
+    // S4: committed (commitFor) in the worktree the start creates, with the slice and its first step
+    expect(a.starts[0]?.commit).toEqual({ cwd: "/r-worktrees/gh-1-login--02-s02", branch: "gh-1/02-s02", message: "norn: start gh-1/02 (slice)", trailers: { "Norn-Story": "gh-1", "Norn-Slice": "gh-1/02", "Norn-Step": "implement", "Norn-Tick": TICK }, push: true });
   });
   test("done when every slice is integrated; stuck when none can ever start", () => {
     expect(only(facts([storyAt("slices", {}, [{ nn: "01", status: "integrated" }, { nn: "02", state: { step: "$done", status: "done" } }])]))).toMatchObject({ kind: "classify", outcome: "done", state: { step: "test" } });
@@ -303,6 +306,34 @@ describe("story lifecycle (GR6–GR8)", () => {
     f.issue = { ...f.issue!, title: "Login v2", body: "new body" };
     f.frontmatter = { ...f.frontmatter!, refined_body_hash: sha256("body") };
     expect(only(facts([f]))).toMatchObject({ kind: "update_story_mirror", fields: { title: "Login v2", body_hash: sha256("new body") }, notify: { title: "issue body changed since refine", group: "your_turn" } });
+  });
+  test("S4: a mirror commit carries the story unit's step (commitFor); none before the story starts", () => {
+    const f = storyAt("test");
+    f.issue = { ...f.issue!, title: "Login v2" };
+    expect(only(facts([f]))).toMatchObject({
+      kind: "update_story_mirror",
+      commit: { cwd: "/r-worktrees/gh-1-login", branch: "gh-1-login", message: "norn: mirror gh-1 from the remote issue", trailers: { "Norn-Story": "gh-1", "Norn-Step": "test", "Norn-Tick": TICK }, push: true },
+    });
+    const refined = storyAt("slices", {}, [{ nn: "01", state: { status: "running" } }]);
+    refined.units[0]!.state = { ...refined.units[0]!.state!, visits: { refine: 1, slices: 1 } };
+    const r = only(facts([refined]));
+    expect(r.kind === "update_story_mirror" && r.commit?.trailers).toEqual({ "Norn-Story": "gh-1", "Norn-Step": "slices", "Norn-Tick": TICK });
+    // a story nobody started: the commit still goes to the story worktree, without Norn-Step
+    const fresh = storyFacts("gh-1", [], { issue: { ...f.issue! } });
+    const m = only(facts([fresh]));
+    expect(m.kind === "update_story_mirror" && m.commit).toEqual({ cwd: "/r-worktrees/gh-1-login", branch: "gh-1-login", message: "norn: mirror gh-1 from the remote issue", trailers: { "Norn-Story": "gh-1", "Norn-Tick": TICK }, push: true });
+    // no story worktree (observe gives the story unit the story's worktree): nothing to commit in
+    const gone = { ...f.worktree!, exists: false };
+    expect(only(facts([{ ...f, worktree: gone, units: [{ ...f.units[0]!, worktree: gone }] }]))).toMatchObject({ kind: "update_story_mirror", commit: null });
+  });
+  test("GR7: a remote park goes through park() — stuck, kind remote, the same commit as any stuck unit", () => {
+    const a = only(facts([storyAt("test", { issue: null })]));
+    expect(a).toMatchObject({
+      kind: "park",
+      rule: "remote.park",
+      state: { status: "stuck", park: { kind: "remote" } },
+      commit: { message: "norn: gh-1 stuck (remote: issue closed, unassigned or unlabelled)", trailers: { "Norn-Story": "gh-1", "Norn-Step": "test", "Norn-Tick": TICK }, push: true },
+    });
   });
 });
 
@@ -351,6 +382,9 @@ describe("intake and start (GR2, W8, W9)", () => {
     const d = decide(f, WORKFLOWS, CONFIG).find((x) => x.action.kind === "intake_story");
     expect(d?.unit).toBe("gh-5");
     expect(d?.rule).toBe("remote.intake");
+    // S4, T7: committed in the worktree intake creates, no step yet, not pushed before the claim
+    expect(d?.action).toMatchObject({ commit: { cwd: "/r-worktrees/gh-5-fix", branch: "gh-5-fix", message: "norn: intake gh-5 Fix", trailers: { "Norn-Story": "gh-5", "Norn-Tick": TICK }, push: false } });
+    expect(d?.action.kind === "intake_story" && Object.keys(d.action.commit.trailers)).toEqual(["Norn-Story", "Norn-Tick"]);
   });
   test("story unit starts with its pinned workflow; invalid workflows are refused", () => {
     const f = storyFacts("gh-1", [unitFacts(storyUnit(), null, null)]);
