@@ -8,24 +8,13 @@
  */
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, storyRulings, storyWorktreePath } from "@norn/core";
+import { currentRun, cursorStep, type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, standingReport, storyRulings, storyWorktreePath } from "@norn/core";
 import { type AgentStep, type ProcessIdentity, type ReceiptOf, storyBranch, ulid } from "@norn/schema";
 import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readText, writeBriefing, readRemoteCache } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
-import {
-  agentName,
-  currentRun,
-  loadUnitSession,
-  refuseUnlessAgentWork,
-  reportCommand,
-  standingReport,
-  stepOfSession,
-  storyMode,
-  type UnitSession,
-  unitCriteria,
-} from "../runtime/agent-unit.ts";
+import { agentName, loadUnitSession, refuseUnlessAgentWork, reportCommand, storyMode, type UnitSession, unitCriteria } from "../runtime/agent-unit.ts";
 import { readHookFacts } from "../runtime/observe.ts";
 
 /** Wrappers between the agent and `norn` that exit right after it (never the run's process). */
@@ -171,7 +160,7 @@ export const briefCommand = defineCommand({
     const pending = s.unapplied.filter((r) => r.receipt.kind !== "started" && r.receipt.kind !== "mode");
     if (pending.length) throw refuse(`unit ${key} has receipts the heartbeat has not applied yet (${pending.map((r) => r.receipt.kind).join(", ")})`, "norn tick, then run norn brief again", "pending_receipts");
     refuseUnlessAgentWork(s, "brief");
-    const step = stepOfSession(s) as AgentStep;
+    const step = cursorStep(s) as AgentStep;
 
     let started = false;
     if (!run) {

@@ -13,13 +13,13 @@
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { type AgentAdapter, type HookDecision, type HookResponse, reportableOutcomes } from "@norn/core";
+import { type AgentAdapter, currentRun, cursorStep, type HookDecision, type HookResponse, reportableOutcomes, standingReport } from "@norn/core";
 import { DEFAULT_CONFIG, type ExitCode, type HookFact, type ResolvedConfig, ulid, ulidTime } from "@norn/schema";
 import { appendTrace, loadConfig, traceDir } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import { type Context, findUnitMarker } from "../context.ts";
 import { withExit } from "../output.ts";
-import { currentRun, loadUnitSession, safeRealpath, standingReport, stepOfSession, type UnitSession } from "../runtime/agent-unit.ts";
+import { loadUnitSession, safeRealpath, type UnitSession } from "../runtime/agent-unit.ts";
 
 /** P5: turn ends refused per run before norn lets the tick classify `silent` and nudge instead. */
 export const MAX_STOP_BLOCKS = 3;
@@ -99,7 +99,7 @@ export const refusableTurnEnd = (adapter: AgentAdapter, fact: HookFact): boolean
 /** A4 / MO4: block turn end only in an unattended agent step whose live run has not reported. */
 function decideBlock(root: string, s: UnitSession | null, fact: HookFact, adapter: AgentAdapter): HookDecision {
   if (!refusableTurnEnd(adapter, fact) || !s) return { block: false };
-  const step = stepOfSession(s);
+  const step = cursorStep(s);
   if (!step || step.type !== "agent" || step.attended) return { block: false };
   if (s.state.status !== "running" && s.state.status !== "ready") return { block: false };
   const run = currentRun(s);
