@@ -10,7 +10,7 @@ import { renderBrief } from "../src/brief.ts";
 import { checkReport, openNotes, unverifiedNeeds, verdictCounts, worstVerdict } from "../src/criteria.ts";
 import { decide } from "../src/decide/index.ts";
 import type { NumberedReceipt } from "../src/facts.ts";
-import { buildInbox, INBOX_GROUPS } from "../src/inbox.ts";
+import { buildInbox, INBOX_GROUPS } from "../src/inbox/items.ts";
 import { validateWorkflowDefinition } from "../src/workflow.ts";
 import { at, CONFIG, facts, loaded, numbered, stateFor, storyFacts, storyUnit, T0, unitFacts } from "./fixtures.ts";
 

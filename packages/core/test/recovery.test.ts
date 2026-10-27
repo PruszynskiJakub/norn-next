@@ -13,7 +13,7 @@ import type { Action } from "../src/actions.ts";
 import { NUDGE_TEXT } from "../src/commands.ts";
 import { decide } from "../src/decide/index.ts";
 import type { ActFailure, Facts, RunFacts, StoryFacts, UnitFacts } from "../src/facts.ts";
-import { actFailureItem, buildInbox, heartbeatDown } from "../src/inbox.ts";
+import { actFailureItem, buildInbox, heartbeatDown } from "../src/inbox/items.ts";
 import { at, CONFIG, facts, HB, numbered, receipt, SOLO_WF, stateFor, storyFacts, storyUnit, T0, TICK, unitFacts, WORKFLOWS } from "./fixtures.ts";
 
 const RUN = "01JDDDDDDDDDDDDDDDDDDDDDDD";
