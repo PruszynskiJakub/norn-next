@@ -4,6 +4,14 @@ All notable changes to norn are listed here. The format follows [Keep a Changelo
 
 ## [Unreleased]
 
+### Added
+
+- The story PR gets a real description. A new `describe` step in the `story` template, after QA, runs the new `norn-pr` skill: it writes `pr.md` in the spec folder with a summary picture of the change, before/after evidence from QA's criteria reports and evidence, and the merge danger (one-way or two-way door, blast radius). `open-pr` uses that file as the PR body, with the issue link under it; without the file the body is the issue link alone, as before (GR9). Existing repos get the step from `norn init` only if they take the new template; add it to your own `story.yaml` to use it.
+
+### Changed
+
+- `open-pr` on a story whose PR is already open now rewrites that PR's body instead of finishing at once, so after a `ready` reject and rework the PR describes the branch as it is (GR9). Both remote adapters gained `editPullRequestBody` (`gh pr edit --body`, `glab mr update --description-file -`).
+
 ## [0.8.0] - 2026-10-27
 
 ### Added

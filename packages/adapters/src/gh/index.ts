@@ -121,6 +121,10 @@ export function createGh(opts: GhOptions): RemotePort {
       const pr = await json<GhPr>(["pr", "view", url, ...repo, "--json", PR_FIELDS]);
       return mapPr(pr);
     },
+    async editPullRequestBody(number, body) {
+      // GR9
+      okOrThrow(await run(["pr", "edit", String(number), ...repo, "--body", body]), "gh pr edit", "gh");
+    },
   };
 }
 
