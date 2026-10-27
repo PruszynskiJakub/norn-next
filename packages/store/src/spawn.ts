@@ -12,6 +12,8 @@ export interface BoundedOptions {
   stdin?: string;
   /** kill the process group after this long; omitted = no limit */
   timeoutMs?: number;
+  /** true: do not tell the spawn observer (read-only pid probes whose argv differs on every run) */
+  unobserved?: boolean;
 }
 
 export interface BoundedResult {
@@ -66,7 +68,7 @@ export function spawnBounded(argv: string[], opts: BoundedOptions): Promise<Boun
     let timedOut = false;
     let settled = false;
     let grace: ReturnType<typeof setTimeout> | undefined;
-    noteSpawn(argv, opts.cwd);
+    if (!opts.unobserved) noteSpawn(argv, opts.cwd);
     const child = spawn(argv[0] as string, argv.slice(1), {
       cwd: opts.cwd,
       env: (opts.env ?? process.env) as NodeJS.ProcessEnv,

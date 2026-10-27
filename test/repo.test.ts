@@ -249,7 +249,7 @@ const RAW_GIT_ALLOW: Counts = {
  */
 const JSON_PARSE_ALLOW: Record<string, [number, string]> = {
   "packages/adapters/src/claude/shared.ts": [3, "files claude owns: settings.json, transcript jsonl"],
-  "packages/adapters/src/git/exec.ts": [1, "tool output: gh/glab --json stdout"],
+  "packages/adapters/src/exec.ts": [1, "tool output: gh/glab --json stdout"],
   "packages/adapters/src/herdr/cockpit.ts": [1, "tool output: herdr stdout"],
   "packages/adapters/src/herdr/index.ts": [2, "tool output: herdr stdout and error stderr"],
   "packages/cli/src/commands/done.ts": [2, "agent-written findings / criteria files (validated after)"],

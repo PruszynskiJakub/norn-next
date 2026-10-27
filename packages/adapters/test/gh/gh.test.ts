@@ -1,6 +1,6 @@
 /** gh adapter against recorded CLI fixtures (X4). */
 import { describe, expect, test } from "bun:test";
-import { fixtureExec, type ExecFixture } from "../../src/git/exec.ts";
+import { fixtureExec, type ExecFixture } from "../../src/exec.ts";
 import calls from "./fixtures/calls.json";
 import { createGh, issueKey } from "../../src/gh/index.ts";
 import { NETWORK_TIMEOUT_MS } from "@norn/store";

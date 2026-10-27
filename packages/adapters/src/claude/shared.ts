@@ -9,14 +9,11 @@ import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { HookFact, HookEventKind } from "@norn/schema";
 import { SLICE_KEY_PATTERN, STORY_KEY_PATTERN, ULID_PATTERN, validateHookFact } from "@norn/schema";
-import type { AgentLaunchRequest, PortError } from "@norn/core";
+import type { AgentLaunchRequest } from "@norn/core";
+import { portError } from "../exec.ts";
 
 /** A1: every norn-installed hook command ends with this shell comment; it is the ownership marker. */
 export const NORN_HOOK_MARKER = "# norn-owned";
-
-export function portError(code: string, message: string, retryable = false): PortError {
-  return Object.assign(new Error(message), { code, retryable });
-}
 
 // ------------------------------------------------------------------ files
 

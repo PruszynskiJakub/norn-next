@@ -15,7 +15,7 @@ import { dirname, join } from "node:path";
 import type { AdapterContext, LaunchSpec, PaneState, ProcessPort, RunnerPort, SessionRef } from "@norn/core";
 import type { RunnerConfig } from "@norn/schema";
 import { noteSpawn } from "@norn/store";
-import { portError } from "../process/error.ts";
+import { portError } from "../exec.ts";
 import { createProcessPort } from "../process/index.ts";
 
 export const RUNNER_NAME = "headless";

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createHerdrCockpit, findAgentPane, findWorkspace, type HerdrAgent } from "../../src/herdr/cockpit.ts";
 import { createHerdrNotifier, herdrNotifyArgv } from "../../src/notify/index.ts";
-import type { Exec, ExecResult } from "../../src/process/exec.ts";
+import type { Exec, ExecResult } from "../../src/exec.ts";
 import agentList from "./fixtures/agent-list.json";
 import paneList from "./fixtures/pane-list.json";
 import workspaceList from "./fixtures/workspace-list.json";

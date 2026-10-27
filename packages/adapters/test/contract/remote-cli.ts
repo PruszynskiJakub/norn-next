@@ -4,7 +4,7 @@
  * test/gh and test/glab show them). Filters follow the flags the adapter passed, so a dropped
  * `--assignee`/`--label`/`--state`/`--draft` shows up as a contract failure. An unknown command throws.
  */
-import type { Exec, ExecResult } from "../../src/git/exec.ts";
+import type { Exec, ExecResult } from "../../src/exec.ts";
 import type { SeedIssue } from "./remote.ts";
 
 interface Pr {

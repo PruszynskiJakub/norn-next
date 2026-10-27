@@ -7,9 +7,9 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { gitTimeoutMs } from "@norn/store";
 import type { CommitSpec, ConflictMarker, GitFactory, GitInProgress, GitPort, MergeResult, OutgoingMarkers, PushResult, RefUpdate, WorktreeInfo, WorktreeStatus } from "@norn/core";
-import { bunExec, isAuthError, isNetworkError, okOrThrow, portError, type Exec, type ExecResult } from "./exec.ts";
+import { bunExec, isAuthError, isNetworkError, okOrThrow, portError, type Exec, type ExecResult } from "../exec.ts";
 
-export { bunExec, fixtureExec, portError, type Exec, type ExecFixture, type ExecOptions, type ExecResult } from "./exec.ts";
+export { bunExec, fixtureExec, portError, type Exec, type ExecFixture, type ExecOptions, type ExecResult } from "../exec.ts";
 
 export interface GitOptions {
   exec?: Exec;

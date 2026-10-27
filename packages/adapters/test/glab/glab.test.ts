@@ -1,6 +1,6 @@
 /** glab adapter against recorded CLI fixtures (X4, M4). */
 import { describe, expect, test } from "bun:test";
-import { fixtureExec, type Exec, type ExecFixture } from "../../src/git/exec.ts";
+import { fixtureExec, type Exec, type ExecFixture } from "../../src/exec.ts";
 import calls from "./fixtures/calls.json";
 import { createGlab, issueKey } from "../../src/glab/index.ts";
 import { NETWORK_TIMEOUT_MS } from "@norn/store";
