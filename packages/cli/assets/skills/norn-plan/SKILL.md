@@ -45,7 +45,7 @@ No prefactor is a fine answer. Do not invent one.
 
 List what the code does not settle and the implementation will need: interface changes, schema or file-format changes, contracts with other systems, error handling, migration of existing data or configuration, anything that is costly to change once shipped. For each, have a recommendation and its reason.
 
-Name the risks too: the part most likely to go wrong, or not known to work. If a question can only be answered by trying (does the library do X, is it fast enough), propose a quick spike or prototype before the plan is agreed, rather than a guess in it.
+Name the risks too: the part most likely to go wrong, or not known to work. If a question can only be answered by trying (does the library do X, is it fast enough), propose a quick spike or prototype before the plan is agreed, rather than a guess in it. When a decision turns on how something looks or feels, or on a state model that is hard to judge on paper, offer the person the `norn-prototype` skill; its verdict is the decision. With no person present, build none: mark the decision proposed and suggest the prototype in it.
 
 A decision that is hard to reverse, surprising without its context, and the result of a real trade-off deserves a decision record. Offer one when all three hold, and only then.
 
