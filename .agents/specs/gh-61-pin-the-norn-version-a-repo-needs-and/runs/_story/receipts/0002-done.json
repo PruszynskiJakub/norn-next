@@ -1,0 +1,12 @@
+{
+  "kind": "done",
+  "receipt_id": "01M5ZQQVDTQFDT59GNN8XG6F4C",
+  "run_id": "01M5ZQP9PGXE0DZTCP7FMPE5Q2",
+  "step": "explore",
+  "attempt": 1,
+  "at": "2026-10-27T22:29:50.650Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "spec",
+  "handoff": "Still occurs on 64300ad: no version pin, drifted skills only warn in doctor. Adds new PRD rules (pin key, refusal on mismatch/drift, upgrade rollout with units in flight) and turns SK1 from report into block; settle the open questions in the PRD first. Run: norn workflow gh-61 spec --to refine"
+}

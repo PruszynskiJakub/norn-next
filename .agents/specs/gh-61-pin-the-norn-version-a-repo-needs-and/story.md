@@ -46,3 +46,27 @@ Nothing records which norn a repo was set up with, so nothing notices when the b
 ## PRD
 
 SK1 (skills copied by init; doctor reports drift), W5 (load-time validation), P8 (`CliError` and exit codes), X3 (distribution).
+
+## Triage
+
+**Still occurs:** yes — on base `64300ad`: no pin exists anywhere, and drifted bundled skills are only a doctor warning.
+**Repro:** in a throwaway repo under `$TMPDIR`, with this checkout's code:
+```sh
+git init -q && git commit -q --allow-empty -m init
+bun …/packages/cli/src/main.ts init --json        # exit 0
+grep -ni version .agents/norn/config.yaml          # no match: nothing records the norn version
+echo drift >> .agents/skills/norn/SKILL.md
+bun …/packages/cli/src/main.ts doctor --json | jq -c '{skills_ok: .skills.ok, drifted: .skills.drifted, warnings}'
+# {"skills_ok":true,"drifted":["norn"],"warnings":["skills differ from this norn's bundled version: norn — run norn init to update them …"]}
+```
+`skills.ok` stays `true` with a drifted skill; the only signal is a warning string.
+**Affected code:**
+- `packages/store/src/skills.ts:169` — `skillsReport` computes `drifted`; its only caller is `doctor` (`packages/cli/src/commands/doctor.ts:350`). `brief`, `tick`, `watch` never check skills.
+- `packages/cli/src/commands/doctor.ts:351,361` — `skillsOk` ignores `drifted`; drift becomes a warning.
+- `packages/schema/src/config.ts` — `ConfigLayer` has no version key; `packages/cli/src/commands/init.ts` writes none.
+- `packages/cli/src/cli.ts` — no common pre-check before acting commands where a refusal would go.
+**PRD:** SK1 (doctor *reports* drift — the issue would make it block a step), W5 (load-time validation), P8 (`CliError`, `refused` = 3), X3 (distribution). A version pin and a refusal on mismatch are new rules not in the PRD today.
+**Context:** CHANGELOG preamble: before 1.0 a minor version may change the machine contract, so a same-minor range is the natural pin. AGENTS.md Process ("the process always runs the latest released `norn`") is the self-hosting rule this would enforce. The issue's three open questions (pin format, refuse newer-on-older or only older-on-newer, rolling an upgrade out across collaborators with claims and units in flight, S7) are design decisions, not implementation detail.
+
+**Recommend:** spec — this adds PRD rules (a config pin key, which commands refuse on a version mismatch or drifted skills, how upgrades roll out with units in flight) and changes SK1 from "report" to "block"; the open questions must be settled in the PRD before a story can be planned and sliced.
+**Run:** `norn workflow gh-61 spec --to refine`
