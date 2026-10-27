@@ -65,7 +65,16 @@ export function stableKey(body: string): string {
     .replace(/"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[+-]\d\d:\d\d"/g, '"<git-date>"');
 }
 
-/** The file name of a harvested case: its source and a hash of its `stableKey`. */
+/**
+ * The text a case is named and deduplicated by: decide's inputs only. decide is pure, so the inputs
+ * identify the case, and its decisions are what the golden test expects of them; an intended
+ * behaviour change (`golden.ts --update`) rewrites the decisions and keeps the name.
+ */
+export function caseInputs(c: { facts: unknown; workflows: unknown; config: unknown }): string {
+  return JSON.stringify({ facts: c.facts, workflows: c.workflows, config: c.config });
+}
+
+/** The file name of a harvested case: its source and a hash of the `stableKey` of its `caseInputs`. */
 export function caseName(source: string, body: string): string {
   return `${source}-${new Bun.CryptoHasher("sha256").update(stableKey(body)).digest("hex").slice(0, 12)}.json`;
 }
@@ -85,8 +94,8 @@ export function harvestGolden(dir: string, root: string, outDir: string, source:
     const start = starts.get(tick.tick_id);
     if (!inputs || !start) continue;
     const body = norm(JSON.stringify({ facts: inputs.facts, workflows: inputs.workflows, config: inputs.config, decisions: start.decisions }));
-    const parsed = JSON.parse(body) as Record<string, unknown>;
-    writeFileSync(join(outDir, caseName(source, body)), `${JSON.stringify({ source, tick_id: tick.tick_id, ...parsed })}\n`);
+    const parsed = JSON.parse(body) as { facts: unknown; workflows: unknown; config: unknown };
+    writeFileSync(join(outDir, caseName(source, caseInputs(parsed))), `${JSON.stringify({ source, tick_id: tick.tick_id, ...parsed })}\n`);
     n++;
   }
   return n;
