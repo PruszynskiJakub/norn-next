@@ -13,7 +13,8 @@ type HerdrCockpit = herdr.HerdrCockpit;
 /** HC6/HC8: the Herdr the cockpit talks to — injected, or the real one inside Herdr, else none. */
 export function cockpitHerdr(ctx: Context): herdr.HerdrCockpit | null {
   if (ctx.deps.herdr !== undefined) return ctx.deps.herdr;
-  if (ctx.env.HERDR_ENV !== "1") return null;
+  // inside a Herdr pane (HERDR_ENV), or a command Herdr runs itself (a tab bar segment: only the socket is set)
+  if (ctx.env.HERDR_ENV !== "1" && !ctx.env.HERDR_SOCKET_PATH) return null;
   const o = ctx.config.runner?.adapter === "herdr" ? (ctx.config.runner.options ?? {}) : {};
   return herdr.createHerdrCockpit({ env: ctx.env, ...(typeof o.bin === "string" ? { bin: o.bin } : {}), ...(typeof o.session === "string" ? { session: o.session } : {}) });
 }

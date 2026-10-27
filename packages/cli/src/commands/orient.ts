@@ -16,9 +16,7 @@ import { refuse, rendered } from "../output.ts";
 import { ORIENT_ENV } from "../runtime/agent-unit.ts";
 import { cockpitHerdr } from "../runtime/cockpit.ts";
 import { parseUnitKey, projectView } from "../runtime/human.ts";
-
-/** Label of a story's orient workspace in Herdr. */
-export const orientLabel = (story: string) => `${story} orient`;
+import { isOrientWorkspace } from "../runtime/segment.ts";
 
 /** The orient agent: the default agent with its configured args, its first prompt `norn orient <key>`. */
 export function orientAgentCommand(config: ResolvedConfig, key: string): string {
@@ -40,14 +38,14 @@ export const orientCommand = defineCommand({
     if (!report) throw refuse(`unknown story ${story}`, "norn status", "unknown_unit");
     if (!opt.bool(args, "open")) return rendered(report, formatOrient(report, ctx.clock.now()));
 
-    const label = orientLabel(story);
+    const label = `${story} orient`;
     const command = orientAgentCommand(ctx.config, key);
     const cockpit = cockpitHerdr(ctx);
     if (!cockpit) {
       const by = `cd ${report.root} && ${command}`;
       return rendered({ story, opened: false, command: by }, `Not inside Herdr. Start the orient agent yourself:\n\n    ${by}\n`);
     }
-    const existing = (await cockpit.listWorkspaces()).find((w) => w.label === label);
+    const existing = (await cockpit.listWorkspaces()).find((w) => isOrientWorkspace(w, story, report.root));
     if (existing) {
       await cockpit.focusWorkspace(existing.workspace_id);
       return rendered({ story, opened: true, created: false, workspace_id: existing.workspace_id }, `Focused workspace ${label}.`);
