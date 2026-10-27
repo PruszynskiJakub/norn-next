@@ -538,3 +538,79 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
     expect(inbox.groups.unblock?.map((i) => i.title)).toEqual([expect.stringContaining("conflict markers in b.txt")]);
   }, 60_000);
 });
+
+describe("BUG-2: an update conflict that exhausts base_conflict_loop, then unstick --to resolve (BS5, W4)", () => {
+  let h: Harness;
+  const wt = () => `${h.root}-worktrees/gh-12-conflict-twice`;
+  const runs = () => join(wt(), ".agents/specs/gh-12-conflict-twice/runs/_story");
+  const inWt = (...argv: string[]) => runCli(argv, { ...h.deps, cwd: wt() });
+  const lastClassify = () => {
+    const file = h.git(["ls-files", "--others", "--cached", "receipts"], runs()).split("\n").filter((f) => f.endsWith("-classify.json")).at(-1) as string;
+    return JSON.parse(readFileSync(join(runs(), file), "utf8"));
+  };
+  const until = async (pred: () => boolean, label: string) => {
+    for (let i = 0; i < 20 && !pred(); i++) {
+      h.clock.advance(10_000);
+      await h.tick();
+    }
+    if (!pred()) throw new Error(`${label} not reached: ${JSON.stringify(h.state(runs()))}`);
+  };
+  /** the story side and a sibling on the base both change a.txt; returns the sibling's sha */
+  const conflict = (n: number) => {
+    writeFileSync(join(wt(), "a.txt"), `story side ${n}\n`);
+    h.git(["add", "-A"], wt());
+    h.git(["commit", "-q", "-m", `story edits a ${n}`, "--trailer", "Norn-Tick: 01JBQ6ZK3E8Y4V5W6X7Y8Z9ABC"], wt());
+    return siblingMerge(h, "a.txt", `base side ${n}\n`);
+  };
+
+  beforeAll(async () => {
+    h = await createHarness();
+    h.write(join(h.root, ".agents/norn/config.yaml"), config());
+    h.write(join(h.root, ".agents/norn/workflows/based.yaml"), BASED.replace("base_conflict_loop: { max: 2 }", "base_conflict_loop: { max: 1 }"));
+    installBundledSkills(h.root);
+    writeFileSync(join(h.root, "a.txt"), "one\n");
+    h.git(["add", "-A"]);
+    h.git(["commit", "-q", "-m", "norn init"]);
+    h.git(["push", "-q", "origin", "main"]);
+    h.remote.issues = [issue(12, "Conflict twice")];
+  });
+  afterAll(() => h.cleanup());
+
+  test("act records route $stuck and the unit stays stuck at update; after unstick --to resolve, done without the merge is refused", async () => {
+    await h.tick();
+    const first = conflict(1);
+    h.clock.advance(10_000);
+    await h.tick("--sync");
+    await until(() => h.state(runs())?.step === "resolve" && h.state(runs())?.status === "running", "resolve running");
+    expect(lastClassify()).toMatchObject({ outcome: "conflict", route: "resolve", base: { sha: first } });
+    // the agent merges and concludes; update merges cleanly
+    expect(Bun.spawnSync(["git", "merge", "--no-ff", first], { cwd: wt() }).exitCode).not.toBe(0);
+    writeFileSync(join(wt(), "a.txt"), "story side 1\nbase side 1\n");
+    h.git(["add", "a.txt"], wt());
+    h.git(["commit", "-q", "--no-edit"], wt());
+    h.report(runs(), "done", { outcome: "done", handoff: "merged main" });
+    await until(() => h.state(runs())?.step === "ready" && h.state(runs())?.status === "parked", "ready");
+    expect(h.state(runs())?.counters.base_conflict_loop).toBe(1);
+
+    // a second conflicting base move (ready → stale → update): base_conflict_loop 1/1 is used up,
+    // so act's classify receipt records $stuck, not the edge's target `resolve`
+    const second = conflict(2);
+    h.clock.advance(10_000);
+    await h.tick("--sync");
+    await until(() => h.state(runs())?.status === "stuck", "stuck");
+    expect(lastClassify()).toMatchObject({ outcome: "conflict", route: "$stuck", base: { sha: second } });
+    expect(h.state(runs())).toMatchObject({ step: "update", status: "stuck", park: { kind: "exhausted" } });
+    h.clock.advance(10_000);
+    await h.tick();
+    expect(h.state(runs())).toMatchObject({ step: "update", status: "stuck" });
+
+    // a person sends it to resolve: the brief still names the base, and done still verifies it (BS5)
+    expect((await h.norn("unstick", "gh-12", "--to", "resolve", "--reset", "base_conflict_loop")).exit).toBe(0);
+    await until(() => h.state(runs())?.step === "resolve" && h.state(runs())?.status === "running", "resolve running again");
+    const b = await inWt("brief", "--json");
+    expect((b.value as { brief: { rework: { base?: { sha: string } } | null } }).brief.rework?.base).toMatchObject({ sha: second });
+    const unmerged = await inWt("done", "done", "--handoff", "nothing merged");
+    expect(unmerged.exit).toBe(3);
+    expect(unmerged.value).toMatchObject({ code: "merge_unfinished" });
+  }, 60_000);
+});
