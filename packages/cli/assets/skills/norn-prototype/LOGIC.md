@@ -49,7 +49,7 @@ Open it for the person or give them the path. When they say "that should not be 
 
 ## 5. Capture
 
-Keep the prototype and record the verdict as [SKILL.md](SKILL.md) says. The pure module is what may be quoted in the plan as the settled model; the HTML page goes only to the throwaway branch, where, being one file, it stays trivial to reopen.
+Keep the prototype and record the verdict as [SKILL.md](SKILL.md) says. The pure module is what may be quoted in the plan as the settled model; the HTML page stays on the branch, where, being one file, it stays trivial to reopen.
 
 ## Anti-patterns
 

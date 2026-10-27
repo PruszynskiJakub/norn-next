@@ -61,7 +61,7 @@ Give the person the one command that starts it, the URL and the variant keys. Th
 
 ## 6. Capture
 
-Record which variant won, or which mix, and why, then keep the prototype as [SKILL.md](SKILL.md) says. Every variant, the switcher and any throwaway route go to the throwaway branch; the page on your branch goes back to how it was. The winning design reaches the code later, rewritten properly by whoever builds it.
+Record which variant won, or which mix, and why, then keep the prototype as [SKILL.md](SKILL.md) says. The variants and the switcher stay on the branch in their own `prototype` files; the page that mounted them, and any route added for them, go back to how they were. The winning design reaches the code later, rewritten properly by whoever builds it.
 
 ## Anti-patterns
 
