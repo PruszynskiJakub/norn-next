@@ -6,27 +6,30 @@ What it gives you:
 
 | Entry | What it does |
 |---|---|
-| pane `cockpit`, action `norn.open` | `norn pane --interactive` below the focused pane: the numbered inbox, one command per line |
-| action `norn.next` | focuses the agent pane of the oldest Your turn item (`norn pane --next`) |
-| pane `pick`, action `norn.pick` | `norn pick` as a popup: what needs you, then every story; type to filter |
+| action `norn.pick`, pane `pick` | `norn cockpit` as a popup over the focused pane, on any workspace |
+| action `norn.open`, pane `cockpit` | `norn cockpit` as a split below the focused pane |
+| action `norn.next` | focuses the agent pane of the oldest Your turn item (`norn cockpit --next`) |
 
-## The picker
+## The cockpit
 
-`norn pick` lists the inbox items that need you (your turn, answer, approve, stuck, check), then one row per story with its slices done, step and PR. The right side previews the story.
+`norn cockpit` lists what needs you (your turn, answer, approve, stuck, check), then one row per story with its step, slices done and PR. The right side previews the selected row's story: its slices, PR, what waits for you, what runs and its open notes. The footer lists the keys the selected row offers.
 
 | Key | Does |
 |---|---|
-| type, ⌫, ⌃u | filter the rows (every word must match), delete a character, clear |
-| ↑ ↓ (⌃p ⌃n) | move |
-| enter | `norn orient <story> --open`: focus the story's `<story> orient` workspace, or create it with an agent that summarizes the story and answers your questions |
-| ⌃o | open the story PR in the browser (`gh pr view <branch> --web`, or `glab mr view` on GitLab) |
-| ⌃y | approve the gate on the row (`norn approve`) |
-| ⌃g | go to the row's agent pane |
-| ⌃t | take an unclaimed story (`norn take`) |
-| ⌃r | refresh |
-| esc | close |
+| ↑ ↓, j k, PgUp PgDn | move |
+| / | filter: type words (every one must match), enter keeps the filter, esc clears it |
+| enter | orient: focus the story's `<story> orient` workspace, or create it with an agent that summarizes the story and answers your questions |
+| g | go to the agent's pane |
+| s | start the agent of a manual step (`norn open`) |
+| a | answer the question: type it in the footer, enter sends, esc cancels |
+| y, x | approve the gate, or reject it with what to change |
+| u | unstick a stuck unit |
+| t | take an unclaimed story |
+| v | the unit's trace, in place of the preview (esc closes it) |
+| o, i | open the PR, the issue, in the browser |
+| r, ?, q | refresh, list the keys, quit |
 
-Every action leaves the popup open with its outcome on the bottom line, so you can do the next one; Esc closes it.
+Every action leaves the cockpit open with its outcome on the footer line. Each one is a norn command (`norn approve`, `norn answer`, …), the same you would type. Opened on a workspace outside any norn repository, the popup shows the repository the last cockpit ran in.
 
 ## Config snippet
 
@@ -41,11 +44,13 @@ tab_bar_right = [{ type = "command", command = "norn status --segment", interval
 [ui.sidebar.spaces]
 rows = [["state_icon", "workspace"], ["$norn"]]
 
+# the cockpit as a popup, on any workspace
 [[keys.command]]
 key = "prefix+p"
 type = "plugin_action"
 command = "norn.pick"
 
+# the cockpit as a split below the focused pane
 [[keys.command]]
 key = "prefix+n"
 type = "plugin_action"

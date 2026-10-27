@@ -1,5 +1,5 @@
 /**
- * Herdr side of the cockpit (`norn pane --interactive`, HC4–HC13): find the agent pane of a run,
+ * Herdr side of the cockpit (`norn cockpit`, HC6–HC15, SPEC-cockpit): find the agent pane of a run,
  * focus it or its workspace, label it in Herdr's sidebar, open a pane that runs a command. Presentation only — none
  * of this is a fact for decide (HC13).
  *

@@ -7,7 +7,7 @@ import { basename } from "node:path";
 import { herdr } from "@norn/adapters";
 import type { InboxGroup } from "@norn/core";
 import { inboxItemsInOrder, type ProjectView } from "@norn/view";
-import { GROUP_MARK } from "./pick.ts";
+import { GROUP_MARK } from "./cockpit.ts";
 
 /** Groups the segment counts, in O1 order, with the word shown after the count. */
 const COUNTED: Array<[InboxGroup, string]> = [
@@ -49,7 +49,7 @@ export function storyToken(view: ProjectView, story: string): { text: string; ne
 
 /**
  * A story's orient workspace: labelled `<story> orient` with a pane in the story's checkout or worktree
- * (another repo's story of the same key has none). Other panes may sit elsewhere: the picker's popup
+ * (another repo's story of the same key has none). Other panes may sit elsewhere: the cockpit's popup
  * runs from the plugin folder inside the workspace it covers.
  */
 export function isOrientWorkspace(w: herdr.HerdrWorkspace, story: string, root: string): boolean {

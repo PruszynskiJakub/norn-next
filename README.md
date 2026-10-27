@@ -194,7 +194,7 @@ claude plugin install norn@norn
 
 ### Herdr
 
-`plugins/herdr` adds the norn cockpit to Herdr: a pane running `norn pane --interactive`, which numbers the inbox items and takes one command per line (`3` goes to item 3's agent, `w 3` to its Herdr workspace, `a 2 Postgres` answers, `y 1` approves, `t 4` takes, `?` lists the rest). Every change goes through the same `norn` commands you would type. While it runs, it labels the agent pane of each norn run in Herdr's sidebar (`gh-12 · refine`, `norn: your turn`).
+`plugins/herdr` adds the norn cockpit to Herdr: `norn cockpit` lists what needs you and every story, previews the selected one, and acts on it with one key (`y` approves, `a` answers, `t` takes, Enter opens an orient workspace with an agent that walks you through the story, `?` lists the rest). Every change goes through the same `norn` commands you would type. While it runs, it labels the agent pane of each norn run in Herdr's sidebar (`gh-12 · refine`, `norn: your turn`).
 
 ```sh
 herdr plugin install PruszynskiJakub/norn-next/plugins/herdr   # update it with herdr plugin update
@@ -202,7 +202,7 @@ herdr plugin install PruszynskiJakub/norn-next/plugins/herdr   # update it with 
 
 Working on norn itself? Link your checkout instead, so the plugin follows `git pull`: `herdr plugin link <checkout>/plugins/herdr`. `norn doctor` suggests whichever fits.
 
-The plugin has three actions you can bind to keys in Herdr's `config.toml`: `norn.open` opens the cockpit below the focused pane, `norn.next` jumps to the agent that waits for you, and `norn.pick` opens a popup listing what needs you and every story; Enter there gives the story an orient workspace with an agent that walks you through it (`norn orient <story> --open`). `plugins/herdr/README.md` has the keys and the config for a tab bar segment (`norn status --segment`) and sidebar row. To get inbox notifications as Herdr toasts, add `{adapter: herdr}` to `notifiers` in the config.
+The plugin has three actions you can bind to keys in Herdr's `config.toml`: `norn.pick` opens the cockpit as a popup on any workspace, `norn.open` opens it below the focused pane, and `norn.next` jumps to the agent that waits for you. `plugins/herdr/README.md` has the keys and the config for a tab bar segment (`norn status --segment`) and sidebar row. To get inbox notifications as Herdr toasts, add `{adapter: herdr}` to `notifiers` in the config.
 
 ## How it works
 
