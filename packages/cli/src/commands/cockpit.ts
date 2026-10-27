@@ -22,7 +22,7 @@ import { defineCommand, opt } from "../command.ts";
 import { Context } from "../context.ts";
 import { usageError } from "../output.ts";
 import { cockpitHerdr, labelPanes, oldestYourTurn, placeAgent, verbMessage } from "../runtime/cockpit.ts";
-import { handleKey, initialState, parseKeys, renderCockpit, type TuiEffect, type TuiState } from "../runtime/cockpit-tui.ts";
+import { clampScroll, handleKey, initialState, parseKeys, renderCockpit, type TuiEffect, type TuiState } from "../runtime/cockpit-tui.ts";
 import { projectView } from "../runtime/human.ts";
 
 const CLEAR = "\x1b[H\x1b[2J";
@@ -126,7 +126,7 @@ async function interactive(ctx: Context, interval: number) {
       const argv = withInput(fx.argv, e.input ?? "");
       const r = await runVerb(ctx, argv, !fx.show);
       ok = r.exit === 0;
-      if (fx.show && ok) state = { ...state, shown: r.stdout };
+      if (fx.show && ok) state = { ...state, shown: r.stdout, scroll: 0 };
       text = fx.show && ok ? `norn ${argv.join(" ")} — esc to close` : verbMessage(argv, r.exit, r.value);
       if (!fx.show) view = null; // a verb changed what needs you
     } else if (fx.kind === "link") {
@@ -171,7 +171,7 @@ async function interactive(ctx: Context, interval: number) {
       let quit = false;
       for (const key of parseKeys(got.value)) {
         const step = handleKey(state, key, model);
-        state = step.state;
+        state = clampScroll(model, step.state, look());
         if (step.effect && (await act(step.effect))) {
           quit = true;
           break;

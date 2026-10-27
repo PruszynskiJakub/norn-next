@@ -6,12 +6,12 @@
  */
 import { basename } from "node:path";
 import { formatAge, type InboxGroup } from "@norn/core";
-import { type CockpitAction, type CockpitModel, type CockpitRow, prLine, unitStanding } from "@norn/view";
+import type { CockpitAction, CockpitModel, CockpitRow } from "@norn/view";
 import { GROUP_MARK } from "./cockpit.ts";
 
 export type Key =
   | { kind: "char"; char: string }
-  | { kind: "up" | "down" | "pgup" | "pgdn" | "home" | "end" | "enter" | "esc" | "backspace" | "clear" | "quit" };
+  | { kind: "up" | "down" | "pgup" | "pgdn" | "home" | "end" | "enter" | "esc" | "backspace" | "clear" | "scroll-down" | "quit" };
 
 export type Tone = "ok" | "error" | "info";
 
@@ -26,11 +26,13 @@ export interface TuiState {
   message: { text: string; tone: Tone } | null;
   /** CP8: a shown verb's markdown (or the key list) in place of the preview */
   shown: string | null;
+  /** first preview line shown (⌃d / ⌃u); back to 0 when the selection moves */
+  scroll: number;
 }
 
 export type TuiEffect = { kind: "run"; row: CockpitRow; action: CockpitAction; input?: string } | { kind: "refresh" } | { kind: "quit" };
 
-export const initialState = (): TuiState => ({ selected: null, filter: "", filtering: false, prompt: null, message: null, shown: null });
+export const initialState = (): TuiState => ({ selected: null, filter: "", filtering: false, prompt: null, message: null, shown: null, scroll: 0 });
 
 /** Raw terminal input → keys. Unknown escape sequences are dropped. */
 export function parseKeys(chunk: string): Key[] {
@@ -47,7 +49,8 @@ export function parseKeys(chunk: string): Key[] {
     const c = chunk[i] as string;
     i++;
     if (c === "\x1b") keys.push({ kind: "esc" });
-    else if (c === "\x03" || c === "\x04") keys.push({ kind: "quit" });
+    else if (c === "\x03") keys.push({ kind: "quit" });
+    else if (c === "\x04") keys.push({ kind: "scroll-down" });
     else if (c === "\r" || c === "\n") keys.push({ kind: "enter" });
     else if (c === "\x7f" || c === "\b") keys.push({ kind: "backspace" });
     else if (c === "\x15") keys.push({ kind: "clear" });
@@ -80,6 +83,7 @@ export function selectedRow(model: CockpitModel, s: TuiState): CockpitRow | null
 export const HELP = [
   "Keys",
   "  ↑ ↓  j k        move (PgUp PgDn a page)",
+  "  ⌃d ⌃u           scroll the preview",
   "  /               filter: type words, enter keeps it, esc clears it",
   "  enter           orient: the story's workspace with an agent (or its report)",
   "  g               go to the agent's pane",
@@ -126,7 +130,7 @@ export function handleKey(s: TuiState, key: Key, model: CockpitModel): { state: 
   }
   const rows = visibleRows(model, s.filter);
   const at = Math.max(0, rows.findIndex((r) => r.id === row?.id));
-  const move = (to: number) => ({ state: { ...s, selected: rows[Math.max(0, Math.min(rows.length - 1, to))]?.id ?? null, shown: null, message: null } });
+  const move = (to: number) => ({ state: { ...s, selected: rows[Math.max(0, Math.min(rows.length - 1, to))]?.id ?? null, shown: null, message: null, scroll: 0 } });
   switch (key.kind) {
     case "up":
       return move(at - 1);
@@ -140,8 +144,13 @@ export function handleKey(s: TuiState, key: Key, model: CockpitModel): { state: 
       return move(0);
     case "end":
       return move(rows.length - 1);
+    // ⌃d / ⌃u: half a screen of preview (renderCockpit keeps it in range)
+    case "scroll-down":
+      return { state: { ...s, scroll: s.scroll + PAGE } };
+    case "clear":
+      return { state: { ...s, scroll: Math.max(0, s.scroll - PAGE) } };
     case "esc":
-      if (s.shown) return { state: { ...s, shown: null } };
+      if (s.shown) return { state: { ...s, shown: null, scroll: 0 } };
       if (s.filter) return { state: { ...s, filter: "", selected: row?.id ?? null } };
       return { state: s, effect: { kind: "quit" } };
     default:
@@ -153,7 +162,7 @@ export function handleKey(s: TuiState, key: Key, model: CockpitModel): { state: 
   if (name === "/") return { state: { ...s, filtering: true, message: null } };
   if (name === "q") return { state: s, effect: { kind: "quit" } };
   if (name === "r") return { state: { ...s, message: null }, effect: { kind: "refresh" } };
-  if (name === "?") return { state: { ...s, shown: HELP } };
+  if (name === "?") return { state: { ...s, shown: HELP, scroll: 0 } };
   if (!name) return { state: s };
   if (!row) return { state: { ...s, message: { text: s.filter ? "no row matches the filter" : "nothing to act on", tone: "error" } } };
   const action = row.actions.find((a) => a.key === name);
@@ -208,37 +217,97 @@ export function wrap(line: string, n: number): string[] {
   return out;
 }
 
-/** CP3: the preview as lines (unstyled), for a column `width` wide. */
-export function previewLines(row: CockpitRow, now: number, width: number): string[] {
+type Paint = (text: string, styles?: readonly Style[]) => string;
+
+/** Lines of an item's full text the preview shows. */
+const FULL_LINES = 12;
+
+/** An item's detail or full text without its open-notes part (`… · open notes (…): …`, `Open notes (…):` and below). */
+export function withoutNotes(text: string): string {
+  const at = text.search(/(^|\n|\s·\s)open notes\b/i);
+  return (at < 0 ? text : text.slice(0, at)).trimEnd();
+}
+
+/** A unit's mark and its colour: ✓ done, ◐ running, ● parked, ✖ stuck, ○ ready, · not started. */
+function unitMark(status: string): [string, Style[]] {
+  if (status === "done") return ["✓", ["green"]];
+  if (status === "running") return ["◐", ["cyan"]];
+  if (status === "parked") return ["●", ["yellow"]];
+  if (status === "stuck" || status === "corrupt") return ["✖", ["red"]];
+  if (status === "ready") return ["○", ["blue"]];
+  return ["·", ["dim"]];
+}
+
+/** `text` wrapped to `width`: the first line after `first`, the rest after `rest` (a hanging indent). */
+function hang(text: string, width: number, first: string, rest: string, max = Number.POSITIVE_INFINITY): string[] {
+  const lines = wrap(text.replace(/\s+/g, " ").trim(), Math.max(10, width - rest.length));
+  const cut = lines.length > max ? [...lines.slice(0, max - 1), fit(lines.slice(max - 1).join(" "), width - rest.length)] : lines;
+  return cut.map((l, i) => `${i === 0 ? first : rest}${l}`);
+}
+
+/**
+ * CP3: the preview, styled, for a column `width` wide — the story, its slices one line each, the PR,
+ * the selected item, what waits and runs, and the open notes by unit. Lines never exceed `width`.
+ */
+export function previewLines(row: CockpitRow, now: number, width: number, paint: Paint = (t) => t): string[] {
   const r = row.preview.report;
-  const out: string[] = [`${r.story} — ${r.title}`, `story: ${unitStanding(r.unit)} · ${r.mode} · ${r.claim}`];
+  const head = (t: string) => paint(t, ["bold", "dim"]);
+  const label = (t: string) => paint(t.padEnd(8), ["dim"]);
+  const out: string[] = [paint(fit(`${r.story} — ${r.title}`, width), ["bold"])];
+  const [mark, markStyle] = unitMark(r.unit.status);
+  const where = r.unit.status === "done" ? "done" : `${r.unit.status}${r.unit.step ? ` at ${r.unit.step}` : ""}`;
+  out.push(`${paint(mark, markStyle)} ${fit(`${where} · ${r.mode} · ${r.claim}`, width - 2)}`);
+  if (r.unit.last_outcome) out.push(paint(fit(`  last: ${r.unit.last_outcome.step} → ${r.unit.last_outcome.outcome}`, width), ["dim"]));
+
   if (r.slices.length) {
-    out.push(`slices: ${r.slices.filter((s) => s.status === "done").length}/${r.slices.length} done`);
-    for (const s of r.slices) out.push(`  ${s.key} ${s.title} — ${unitStanding(s)}`);
+    const done = r.slices.filter((x) => x.status === "done").length;
+    out.push("", `${head("SLICES")} ${paint(`${done}/${r.slices.length} done`, done === r.slices.length ? ["green"] : ["dim"])}`);
+    for (const x of r.slices) {
+      const [m, ms] = unitMark(x.status);
+      const nn = x.key.split("/")[1] ?? x.key;
+      const tail = x.status === "done" ? "" : `  ${x.status === "not_started" ? "not started" : `${x.status} ${x.step ?? ""}`.trim()}`;
+      out.push(`${paint(m, ms)} ${paint(nn, ["dim"])}  ${fit(x.title, width - 6 - tail.length)}${paint(tail, ["dim"])}`);
+    }
   }
-  out.push(`PR: ${prLine(r.pr)}${r.pr ? ` (seen ${formatAge(now - Date.parse(r.pr.seen_at))} ago)` : ""}`);
-  if (r.url) out.push(`issue: ${r.url}`);
+
+  out.push("", head("LINKS"));
+  if (r.pr) {
+    const state = r.pr.is_draft && r.pr.state === "open" ? "draft · open" : r.pr.state;
+    out.push(`${label("PR")}#${r.pr.number} ${state} ${paint(`· seen ${formatAge(now - Date.parse(r.pr.seen_at))} ago`, ["dim"])}`);
+    out.push(`${" ".repeat(8)}${paint(fit(r.pr.url, width - 8), ["blue"])}`);
+  } else out.push(`${label("PR")}${paint("none seen yet", ["dim"])}`);
+  if (r.url) out.push(`${label("issue")}${paint(fit(r.url, width - 8), ["blue"])}`);
+
   const it = row.preview.item;
-  if (it) {
-    out.push("", it.title);
-    if (it.detail) out.push(it.detail);
-    if (it.full) out.push("", ...it.full.split("\n"));
-    out.push(`$ ${it.command}`);
+  if (it && row.group) {
+    out.push("", `${paint(GROUP_MARK[row.group] ?? "·", GROUP_STYLE[row.group] ?? [])} ${head((GROUP_WORD[row.group] ?? row.group).toUpperCase())} ${paint(`${row.unit}${row.step ? ` · ${row.step}` : ""}`, ["dim"])}`);
+    out.push(...hang(it.title, width, "", ""));
+    // a gate's detail and full text repeat its open notes: those show under NOTES, so they end here
+    const detail = it.detail ? withoutNotes(it.detail) : "";
+    if (detail) out.push(...hang(detail, width, "", "", 2).map((l) => paint(l, ["dim"])));
+    const full = it.full ? withoutNotes(it.full).split("\n").flatMap((l) => wrap(l, width)) : [];
+    out.push(...full.slice(0, FULL_LINES).map((l) => paint(l, ["dim"])));
+    if (full.length > FULL_LINES) out.push(paint(`… ${full.length - FULL_LINES} more lines: v shows the trace`, ["dim"]));
+    out.push(paint(fit(`$ ${it.command}`, width), ["cyan"]));
   }
-  if (r.waiting.length) {
-    out.push("", "waits for you:");
-    for (const w of r.waiting) out.push(`  ${GROUP_MARK[w.group] ?? "·"} ${w.unit}${w.step ? ` ${w.step}` : ""}: ${w.command}`);
+
+  const waiting = r.waiting.filter((w) => !it || w.command !== it.command);
+  if (waiting.length || r.running.length) {
+    out.push("", head(waiting.length ? "ALSO WAITS FOR YOU" : "RUNNING"));
+    for (const w of waiting) out.push(`${paint(GROUP_MARK[w.group] ?? "·", GROUP_STYLE[w.group] ?? [])} ${fit(`${w.unit}${w.step ? ` ${w.step}` : ""}`, 18).padEnd(18)} ${paint(fit(w.command, width - 21), ["cyan"])}`);
+    if (waiting.length && r.running.length) out.push("", head("RUNNING"));
+    for (const w of r.running) out.push(`${paint(GROUP_MARK.running ?? "◐", ["cyan"])} ${fit(`${w.unit}${w.step ? ` ${w.step}` : ""} · ${w.age}`, width - 2)}`);
   }
-  if (r.running.length) {
-    out.push("", "running:");
-    for (const w of r.running) out.push(`  ${GROUP_MARK.running} ${w.unit}${w.step ? ` ${w.step}` : ""} · ${w.age}`);
-  }
-  out.push("", `notes: ${r.note_count} open`);
+
+  out.push("", `${head("NOTES")} ${paint(r.note_count ? `${r.note_count} open, no action needed` : "none open", ["dim"])}`);
   for (const g of r.notes) {
-    out.push(`  ${g.unit}`);
-    for (const n of g.notes) out.push(`    - [${n.step}${n.criterion ? ` · ${n.criterion}` : ""}] ${n.text.replace(/\s+/g, " ")}`);
+    out.push(paint(`${g.unit} (${g.notes.length})`, ["bold"]));
+    for (const n of g.notes) {
+      const tag = `[${n.step}${n.criterion ? ` · ${n.criterion}` : ""}] `;
+      out.push(...hang(`${tag}${n.text}`, width, "• ", "  ").map((l, i) => (i === 0 ? l.replace(tag, paint(tag, ["dim"])) : l)));
+    }
   }
-  return out.flatMap((l) => wrap(l, width));
+  return out;
 }
 
 function storySummary(r: CockpitRow): string {
@@ -249,10 +318,36 @@ function storySummary(r: CockpitRow): string {
   return `${where} · ${rep.slices.length ? `${done}/${rep.slices.length} slices` : "no slices"} · ${pr}`;
 }
 
-export function renderCockpit(model: CockpitModel, s: TuiState, o: Look): string {
-  const paint = (t: string, styles: readonly Style[] = []) => (o.color && styles.length && t ? `\x1b[${styles.map((k) => STYLE[k]).join(";")}m${t}\x1b[0m` : t);
+/** The body's geometry for a frame: list and preview widths and heights. */
+function layout(o: Look) {
   const width = Math.max(40, o.width);
   const height = Math.max(10, o.height);
+  // header 3, footer 3, the log's newline 1
+  const bodyH = height - 7;
+  const wide = width >= 100;
+  const listW = wide ? Math.max(48, Math.floor(width * 0.4)) : width;
+  const prevW = wide ? width - listW - 3 : width;
+  const listH = wide ? bodyH : Math.max(3, Math.floor(bodyH / 2));
+  const prevH = wide ? bodyH : bodyH - listH - 1;
+  return { width, height, bodyH, wide, listW, prevW, listH, prevH };
+}
+
+/** The preview's lines for the state (a shown verb, the key list, or the selected row's story). */
+function previewOf(model: CockpitModel, s: TuiState, o: Look, paint?: Paint): string[] {
+  const { prevW } = layout(o);
+  const sel = selectedRow(model, s);
+  return s.shown ? s.shown.split("\n").flatMap((l) => wrap(l, prevW)) : sel ? previewLines(sel, o.now, prevW, paint) : [];
+}
+
+/** ⌃d / ⌃u: the state with its preview scroll kept within what the preview holds. */
+export function clampScroll(model: CockpitModel, s: TuiState, o: Look): TuiState {
+  const max = Math.max(0, previewOf(model, s, o).length - layout(o).prevH);
+  return s.scroll > max ? { ...s, scroll: max } : s;
+}
+
+export function renderCockpit(model: CockpitModel, s: TuiState, o: Look): string {
+  const paint = (t: string, styles: readonly Style[] = []) => (o.color && styles.length && t ? `\x1b[${styles.map((k) => STYLE[k]).join(";")}m${t}\x1b[0m` : t);
+  const { width, bodyH, wide, listW, prevW, listH, prevH } = layout(o);
   const rule = paint("─".repeat(width), ["dim"]);
   const rows = visibleRows(model, s.filter);
   const sel = selectedRow(model, s);
@@ -266,11 +361,7 @@ export function renderCockpit(model: CockpitModel, s: TuiState, o: Look): string
   out.push(s.filtering ? `${paint("/", ["bold", "cyan"])} ${s.filter}${paint("▏", ["dim"])}` : s.filter ? `${paint("filter:", ["dim"])} ${s.filter} ${paint("(esc clears)", ["dim"])}` : paint("/ to filter", ["dim"]));
   out.push(rule);
 
-  // body: list | preview (preview below when narrow); header 3, footer 3, the log's newline 1
-  const bodyH = height - 7;
-  const wide = width >= 100;
-  const listW = wide ? Math.floor(width * 0.5) : width;
-  const prevW = wide ? width - listW - 3 : width;
+  // body: list | preview (preview below when narrow)
   const items = rows.filter((r) => r.kind === "item");
   const w = (f: (r: CockpitRow) => string, max: number) => Math.min(max, Math.max(0, ...items.map((r) => f(r).length)));
   const wordW = w((r) => (r.group ? (GROUP_WORD[r.group] ?? r.group) : ""), 9);
@@ -296,7 +387,6 @@ export function renderCockpit(model: CockpitModel, s: TuiState, o: Look): string
     list.push({ text: "", row: r });
   }
   if (!rows.length) list.push({ text: paint(s.filter ? "  no row matches the filter" : "  no stories yet", ["dim"]) });
-  const listH = wide ? bodyH : Math.max(3, Math.floor(bodyH / 2));
   const selAt = Math.max(0, list.findIndex((l) => l.row && l.row.id === sel?.id));
   const start = Math.max(0, Math.min(selAt - Math.floor(listH / 2), list.length - listH));
   const listLines = list.slice(start, start + listH).map((l) => {
@@ -305,8 +395,11 @@ export function renderCockpit(model: CockpitModel, s: TuiState, o: Look): string
     if (l.row.id === sel?.id) return paint(`▸ ${text}`.padEnd(listW), ["inverse"]);
     return `  ${l.row.kind === "item" ? paint(text, GROUP_STYLE[l.row.group as InboxGroup] ?? []) : text}`;
   });
-  const preview = s.shown ? s.shown.split("\n").flatMap((l) => wrap(l, prevW)) : sel ? previewLines(sel, o.now, prevW) : [];
-  const previewStyled = preview.map((l, i) => (i === 0 && !s.shown ? paint(fit(l, prevW), ["bold"]) : fit(l, prevW)));
+  const all = previewOf(model, s, o, paint);
+  // ⌃d / ⌃u scroll the preview; the footer says so when it does not fit
+  const scroll = Math.max(0, Math.min(s.scroll, all.length - prevH));
+  const previewStyled = all.slice(scroll, scroll + prevH);
+  const overflow = all.length > prevH;
   if (wide) {
     for (let i = 0; i < bodyH; i++) {
       const l = listLines[i] ?? "";
@@ -325,7 +418,7 @@ export function renderCockpit(model: CockpitModel, s: TuiState, o: Look): string
     const a = target?.actions.find((x) => x.id === s.prompt?.action);
     out.push(`${paint(`${a?.input?.prompt ?? "Text"} (${a?.label ?? "?"} ${target?.unit ?? ""}):`, ["bold", "yellow"])} ${s.prompt.text}${paint("▏", ["dim"])}`);
   } else out.push(s.message ? paint(fit(s.message.text, width), TONE[s.message.tone]) : "");
-  const keys = [...(sel?.actions.map((a) => `${paint(a.key, ["bold"])} ${paint(a.label, ["dim"])}`) ?? []), `${paint("/", ["bold"])} ${paint("filter", ["dim"])}`, `${paint("?", ["bold"])} ${paint("keys", ["dim"])}`, `${paint("q", ["bold"])} ${paint("quit", ["dim"])}`];
+  const keys = [...(sel?.actions.map((a) => `${paint(a.key, ["bold"])} ${paint(a.label, ["dim"])}`) ?? []), ...(overflow ? [`${paint("⌃d/⌃u", ["bold"])} ${paint("scroll", ["dim"])}`] : []), `${paint("/", ["bold"])} ${paint("filter", ["dim"])}`, `${paint("?", ["bold"])} ${paint("keys", ["dim"])}`, `${paint("q", ["bold"])} ${paint("quit", ["dim"])}`];
   const footer = s.prompt ? paint("enter sends · esc cancels", ["dim"]) : keys.join(paint(" · ", ["dim"]));
   out.push(visible(footer) > width ? fit(footer.replace(/\x1b\[[0-9;]*m/g, ""), width) : footer);
   return out.join("\n");
