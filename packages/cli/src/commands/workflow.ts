@@ -9,7 +9,8 @@ import { checkWorkflowLevel, sha256, stepOf } from "@norn/core";
 import { acquireTickLock, patchSliceFile, patchStoryFile, pinWorkflow, storyFile } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import { busyError, claimHeld, failure, refuse } from "../output.ts";
-import { humanReceipt, parseUnitKey, resolveTarget, runHumanVerb } from "../runtime/human.ts";
+import { parseUnitKey } from "../runtime/args.ts";
+import { humanReceipt, resolveTarget, runHumanVerb } from "../runtime/human.ts";
 
 export const workflowCommand = defineCommand({
   name: "workflow",

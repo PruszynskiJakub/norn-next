@@ -5,7 +5,7 @@
  */
 import { basename } from "node:path";
 import { INBOX_GROUPS, INBOX_TITLES } from "@norn/core";
-import { groupAbout, type InboxEntry, type ProjectView } from "@norn/view";
+import { groupAbout, type InboxEntry, oneLine, type ProjectView, stripStep } from "@norn/view";
 
 type InboxGroup = (typeof INBOX_GROUPS)[number];
 
@@ -106,13 +106,6 @@ const KEYS: Array<[string, string]> = [
   ["q", "quit"],
 ];
 
-/** Cut `s` to `n` columns with an ellipsis. */
-export function fit(s: string, n: number): string {
-  if (n <= 0) return "";
-  const one = s.replace(/\s+/g, " ").trim();
-  return one.length <= n ? one : `${one.slice(0, Math.max(0, n - 1))}…`;
-}
-
 /** Wrap one line to `n` columns at spaces, keeping its indent on the continuation lines. */
 export function wrap(line: string, n: number): string[] {
   if (line.length <= n) return [line];
@@ -127,11 +120,6 @@ export function wrap(line: string, n: number): string[] {
   }
   if (rest.trim()) out.push(rest);
   return out;
-}
-
-/** The item's title without a leading `<step>: ` (the step has its own column). */
-function titleOf(it: InboxEntry): string {
-  return it.step && it.title.startsWith(`${it.step}: `) ? it.title.slice(it.step.length + 2) : it.title;
 }
 
 export function renderFrame(view: ProjectView, items: readonly InboxEntry[], o: FrameOptions): string {
@@ -168,23 +156,23 @@ export function renderFrame(view: ProjectView, items: readonly InboxEntry[], o: 
     const about = [groupAbout(g, all), accordion ? `o to ${accordion.open ? "close" : "open"}` : ""].filter(Boolean).join(" · ");
     const head = `${marker}${INBOX_TITLES[g].toUpperCase()}`;
     const count = `${all.length}${fresh}`;
-    out.push("", `${paint(head, GROUP_STYLE[g])} ${paint(count, ["dim"])}  ${paint(fit(about, width - head.length - count.length - 3), ["dim"])}`);
+    out.push("", `${paint(head, GROUP_STYLE[g])} ${paint(count, ["dim"])}  ${paint(oneLine(about, width - head.length - count.length - 3), ["dim"])}`);
     for (const it of group) {
       n++;
       const age = it.age;
-      const title = fit(titleOf(it), width - indent - age.length - 2);
+      const title = oneLine(stripStep(it.step, it.title), width - indent - age.length - 2);
       const pad = " ".repeat(Math.max(1, width - indent - title.length - age.length));
       const fade = g === "recently_done";
       out.push(
-        `  ${paint(String(n).padStart(numW), ["bold", ...GROUP_STYLE[g].filter((s) => s !== "bold")])}  ${paint(fit(it.slice ?? it.story, unitW).padEnd(unitW), fade ? ["dim"] : ["bold"])}  ${paint(fit(it.step ?? "", stepW).padEnd(stepW), ["dim"])}  ${fade ? paint(title, ["dim"]) : title}${pad}${paint(age, ["dim"])}`,
-        `${" ".repeat(indent)}${paint(`→ ${fit(it.command, width - indent - 2)}`, ["dim"])}`,
+        `  ${paint(String(n).padStart(numW), ["bold", ...GROUP_STYLE[g].filter((s) => s !== "bold")])}  ${paint(oneLine(it.slice ?? it.story, unitW).padEnd(unitW), fade ? ["dim"] : ["bold"])}  ${paint(oneLine(it.step ?? "", stepW).padEnd(stepW), ["dim"])}  ${fade ? paint(title, ["dim"]) : title}${pad}${paint(age, ["dim"])}`,
+        `${" ".repeat(indent)}${paint(`→ ${oneLine(it.command, width - indent - 2)}`, ["dim"])}`,
       );
     }
   }
 
   if (o.output?.trim()) out.push("", rule, ...o.output.trimEnd().split("\n").flatMap((l) => wrap(l, width)));
   out.push("", rule);
-  if (o.message) out.push(paint(fit(o.message.text, width), TONE_STYLE[o.message.tone]));
+  if (o.message) out.push(paint(oneLine(o.message.text, width), TONE_STYLE[o.message.tone]));
   const keys = KEYS.map(([k, what]) => `${paint(k, ["bold"])} ${paint(what, ["dim"])}`);
   const footer: string[] = [];
   let line = "";

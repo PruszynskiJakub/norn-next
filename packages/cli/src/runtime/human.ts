@@ -9,13 +9,10 @@ import { type ClaimState, type StoryFacts, storyUnit, type UnitFacts } from "@no
 import { loadProjectView, type ProjectView } from "@norn/view";
 import {
   type ClaimBlob,
-  isStoryKey,
   parseSpecDirName,
   type Receipt,
   SPECS_DIR,
   STORY_UNIT_DIR,
-  sliceKey,
-  storyOf,
   ulid,
   type UnitState,
   validate,
@@ -38,21 +35,8 @@ import {
 } from "@norn/store";
 import type { Context } from "../context.ts";
 import { claimHeld, failure, refuse, usageError } from "../output.ts";
-import { machineHolder, type Observed, observe } from "./observe.ts";
-
-// ------------------------------------------------------------------ addressing (ID1)
-
-/** Normalize a unit key: `gh-123`, `gh-123/03` (also `gh-123/3`). Usage error otherwise. */
-export function parseUnitKey(raw: string): { key: string; story: string; slice: string | null } {
-  const s = raw.trim();
-  if (isStoryKey(s)) return { key: s, story: s, slice: null };
-  const m = /^((?:gh|gl)-[1-9][0-9]*)\/([0-9]{1,3})$/.exec(s);
-  if (m) {
-    const key = sliceKey(m[1] as string, m[2] as string);
-    return { key, story: storyOf(key), slice: key };
-  }
-  throw usageError(`not a story or slice key: '${raw}' (use e.g. gh-123 or gh-123/03)`, "norn status");
-}
+import { parseUnitKey } from "./args.ts";
+import { gitRemote, machineHolder, type Observed, observe } from "./observe.ts";
 
 // ------------------------------------------------------------------ views (X1)
 
@@ -90,12 +74,6 @@ export interface Target {
   story_facts: StoryFacts | null;
 }
 
-export async function gitRemote(ctx: Context): Promise<string | null> {
-  const name = ctx.config.remote.git_remote;
-  const r = await rawGit(ctx.root, ["remote"]);
-  return r.code === 0 && r.stdout.split("\n").some((l) => l.trim() === name) ? name : null;
-}
-
 function localTarget(obs: Observed, story: StoryFacts, uf: UnitFacts): Target {
   return {
     key: uf.unit.key,
@@ -120,7 +98,7 @@ async function show(root: string, spec: string): Promise<string | null> {
  * a slice reads its slice branch first, then the story branch; the story unit its story branch.
  */
 export async function remoteTarget(ctx: Context, key: string): Promise<Target | null> {
-  const remote = await gitRemote(ctx);
+  const remote = await gitRemote(ctx.root, ctx.config.remote.git_remote);
   if (!remote) return null;
   const root = ctx.root;
   await rawGit(root, ["fetch", "--quiet", "--no-tags", remote]);
@@ -242,7 +220,7 @@ export async function claimFor(
   const unreadable = opts.unreadable ?? ((e: Error) => failure(`cannot read the claim of ${story}: ${e.message}`, "check the network and retry", "claim_unreadable"));
   let read: ClaimRead;
   try {
-    read = await readClaim(ctx.root, opts.remote !== undefined ? opts.remote : await gitRemote(ctx), story);
+    read = await readClaim(ctx.root, opts.remote !== undefined ? opts.remote : await gitRemote(ctx.root, ctx.config.remote.git_remote), story);
   } catch (e) {
     throw unreadable(e as Error);
   }
@@ -254,7 +232,7 @@ export async function claimFor(
  * claim (T8); otherwise the mailbox (T9) — or a refusal when `mailbox` is false (mode, workflow).
  */
 async function claimRoute(ctx: Context, t: Target, opts: { mailbox: boolean; verb: string; claim?: ClaimState }): Promise<Route> {
-  const remote = await gitRemote(ctx);
+  const remote = await gitRemote(ctx.root, ctx.config.remote.git_remote);
   const c = opts.claim ?? (await claimFor(ctx, t.story));
   if (c.state === "corrupt") throw refuse(`claim ref of ${t.story} is corrupt`, `norn take ${t.story} --force`, "claim_corrupt", c.error);
   if (c.state === "mine") {
@@ -318,7 +296,7 @@ async function refuseDuplicate(ctx: Context, t: Target, receipt: Receipt, holder
   for (const r of uf?.unapplied ?? []) pending.push({ receipt: r.receipt, where: r.file });
   // a verb that never goes through the mailbox has no receipt of its purpose there
   if (mailbox) {
-    const remote = await gitRemote(ctx);
+    const remote = await gitRemote(ctx.root, ctx.config.remote.git_remote);
     if (remote) await fetchNornRefs(ctx.root, remote).catch(() => undefined);
     for (const m of await listMailbox(ctx.root, t.story).catch(() => [])) if (m.receipt) pending.push({ receipt: m.receipt, where: m.ref });
   }
@@ -354,7 +332,7 @@ async function deliver(ctx: Context, t: Target, route: Route, receipt: Receipt):
     const file = rel.startsWith("..") || isAbsolute(rel) ? r.file : rel;
     return { via: "local", claim: route.claim, n: r.n, file };
   }
-  const remote = await gitRemote(ctx);
+  const remote = await gitRemote(ctx.root, ctx.config.remote.git_remote);
   const posted = await postMailbox(ctx.root, remote, t.story, receipt);
   if (!posted.ok) throw failure(`mailbox push failed: ${posted.message}`, `norn ${receipt.kind === "reject" ? "approve" : receipt.kind} again`, "mailbox_failed");
   return { via: "mailbox", ref: posted.ref, holder: route.holder.holder };

@@ -6,7 +6,8 @@
 import type { Mode } from "@norn/schema";
 import { defineCommand } from "../command.ts";
 import { refuse, usageError } from "../output.ts";
-import { humanReceipt, parseUnitKey, refuseIfHeldElsewhere, resolveTarget, runHumanVerb } from "../runtime/human.ts";
+import { parseUnitKey } from "../runtime/args.ts";
+import { humanReceipt, refuseIfHeldElsewhere, resolveTarget, runHumanVerb } from "../runtime/human.ts";
 
 export const modeCommand = defineCommand({
   name: "mode",

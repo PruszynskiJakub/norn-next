@@ -3,13 +3,13 @@
  * unit worktree (A3) and load its runs/<unit>/ (S1, S2). The rules over the loaded unit (live run,
  * standing report, implicit ask, agent work) live in core `agent-unit.ts`.
  */
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { AgentUnit, UnitRef } from "@norn/core";
 import { agentWorkRefusal, cursorStep, storyWorktreePath } from "@norn/core";
 import type { Criterion, Mode, Receipt, ResolvedConfig } from "@norn/schema";
 import { loadUnit, readSliceFile, readState, readStoryFile, type UnitMarker, unitDir } from "@norn/store";
-import { type Context, findUnitMarker } from "../context.ts";
+import { type Context, findUnitMarker, safeRealpath } from "../context.ts";
 import { corruptError, refuse } from "../output.ts";
 
 export interface UnitSession extends AgentUnit {
@@ -21,14 +21,6 @@ export interface UnitSession extends AgentUnit {
   specPath: string;
   /** absolute runs/<unit>/ inside the worktree */
   runsDir: string;
-}
-
-export function safeRealpath(p: string): string {
-  try {
-    return realpathSync(p);
-  } catch {
-    return p;
-  }
 }
 
 export const unitRefOf = (m: UnitMarker): UnitRef => ({ story: m.story, slice: m.slice, dir: m.unit, key: m.slice ?? m.story });

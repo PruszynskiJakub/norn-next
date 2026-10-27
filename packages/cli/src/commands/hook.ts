@@ -17,9 +17,9 @@ import { type AgentAdapter, currentRun, cursorStep, type HookDecision, type Hook
 import { DEFAULT_CONFIG, type ExitCode, type HookFact, type ResolvedConfig, ulid, ulidTime } from "@norn/schema";
 import { appendTrace, loadConfig, traceDir } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
-import { type Context, findUnitMarker } from "../context.ts";
+import { type Context, findUnitMarker, safeRealpath } from "../context.ts";
 import { withExit } from "../output.ts";
-import { loadUnitSession, safeRealpath, type UnitSession } from "../runtime/agent-unit.ts";
+import { loadUnitSession, type UnitSession } from "../runtime/agent-unit.ts";
 
 /** P5: turn ends refused per run before norn lets the tick classify `silent` and nudge instead. */
 export const MAX_STOP_BLOCKS = 3;

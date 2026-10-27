@@ -14,7 +14,8 @@
  * - listPanes   → `herdr pane list`                                   (K7: each pane with its tab, workspace, cwd)
  * - closePane / closeTab / closeWorkspace → `herdr pane|tab|workspace close <id>` (K7; not found = already gone)
  */
-import { type Exec, bunExec, portError } from "../exec.ts";
+import { type Exec, bunExec } from "../exec.ts";
+import { herdrCaller, splitAndRun } from "./call.ts";
 
 export interface HerdrAgent {
   pane_id: string;
@@ -152,25 +153,9 @@ export function findWorkspace(workspaces: readonly HerdrWorkspace[], reach: RunR
 }
 
 export function createHerdrCockpit(opts: HerdrCockpitOptions = {}): HerdrCockpit {
-  const exec = opts.exec ?? bunExec;
-  const base = [opts.bin ?? "herdr", ...(opts.session ? ["--session", opts.session] : [])];
   const env = opts.env ?? process.env;
-
-  async function herdr(args: string[]): Promise<unknown> {
-    const r = await exec([...base, ...args], { timeoutMs: 10_000 });
-    if (r.code === 127) throw portError("runner_unavailable", `herdr not runnable: ${r.stderr.trim()}`);
-    if (r.code !== 0) {
-      const message = `herdr ${args.slice(0, 2).join(" ")}: ${r.stderr.trim() || `exit ${r.code}`}`;
-      throw portError(/"code"\s*:\s*"(pane|tab|workspace)_not_found"/.test(r.stderr) ? "session_gone" : "herdr_error", message);
-    }
-    const text = r.stdout.trim();
-    if (!text) return null;
-    try {
-      return JSON.parse(text);
-    } catch {
-      return text;
-    }
-  }
+  // the cockpit answers keystrokes: a hung herdr must not hang it (H11)
+  const herdr = herdrCaller(opts.exec ?? bunExec, { ...opts, timeoutMs: 10_000 });
 
   /** K7: close one thing; one already gone is not an error. */
   async function close(kind: "pane" | "tab" | "workspace", id: string): Promise<void> {
@@ -230,13 +215,7 @@ export function createHerdrCockpit(opts: HerdrCockpitOptions = {}): HerdrCockpit
       await herdr(["pane", "report-metadata", paneId, "--source", LABEL_SOURCE, "--title", label.title, ...states, "--ttl-ms", String(Math.max(1, Math.round(label.ttl_ms)))]);
     },
     async openCommand(cwd, command, title) {
-      const target = env.HERDR_PANE_ID ? ["--current"] : [];
-      const out = (await herdr(["pane", "split", ...target, "--direction", "right", "--cwd", cwd, "--no-focus"])) as { result?: { pane?: { pane_id?: string } } } | null;
-      const paneId = out?.result?.pane?.pane_id;
-      if (!paneId) throw portError("launch_failed", "herdr pane split did not return a pane");
-      if (title) await herdr(["pane", "rename", paneId, title]).catch(() => null); // cosmetic
-      await herdr(["pane", "run", paneId, command]);
-      return { pane_id: paneId };
+      return splitAndRun(herdr, { cwd, direction: "right", current: !!env.HERDR_PANE_ID, ...(title ? { title } : {}), command });
     },
     async pluginLinked() {
       const out = (await herdr(["plugin", "list", "--json"])) as { result?: { plugins?: Array<{ plugin_id?: string; enabled?: boolean; plugin_root?: string }> } } | null;
