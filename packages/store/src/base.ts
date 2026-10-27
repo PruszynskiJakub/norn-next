@@ -13,19 +13,7 @@ import type { StoryBase, StoryPrSeen } from "@norn/core";
 import { atomicWrite, atomicWriteJson } from "./fsx.ts";
 import { readLocalJson } from "./local-json.ts";
 import { SPECS_DIR, traceDir } from "./paths.ts";
-import { noteSpawn } from "./spawn.ts";
-
-function gitSync(cwd: string, args: string[], input?: Uint8Array): { code: number; stdout: Buffer } {
-  noteSpawn(["git", ...args], cwd);
-  const p = Bun.spawnSync(["git", ...args], {
-    cwd,
-    stdin: input ?? "ignore",
-    stdout: "pipe",
-    stderr: "pipe",
-    env: { ...process.env, GIT_TERMINAL_PROMPT: "0", LC_ALL: "C" },
-  });
-  return { code: p.exitCode ?? 1, stdout: Buffer.from(p.stdout ?? new Uint8Array()) };
-}
+import { gitSync } from "./git.ts";
 
 const baseCacheDir = (repoRoot: string) => join(traceDir(repoRoot), "base");
 
