@@ -242,7 +242,12 @@ export interface ParkAction extends UnitBase, Transition {
 /** Unit reached `$done`: slice → release slot, remove worktree after integration (K5). */
 export interface MarkDoneAction extends UnitBase, Transition {
   kind: "mark_done";
-  cleanup: { worktree: string | null; branch_local: string | null; release_slot: boolean };
+  /**
+   * `branch_local`: the slice branch act deletes — only one decide knows is in the story branch
+   * (`branch_in_story`, or the worktree act integrates first is on it); null = keep it, with
+   * `branch_kept` saying why when there is one.
+   */
+  cleanup: { worktree: string | null; branch_local: string | null; branch_kept?: string; release_slot: boolean };
   slice_status: "integrated" | null;
 }
 
@@ -266,6 +271,12 @@ export interface RejectReceiptAction extends UnitBase {
 export interface MarkCorruptAction extends UnitBase {
   kind: "mark_corrupt";
   errors: FileError[];
+  /**
+   * S2: write `status: corrupt` into the unit's state.json — only when the failing files are the
+   * unit's own runs/ files and its state.json reads. A broken story.md (or state.json) is surfaced,
+   * never written into state.
+   */
+  mark_state: boolean;
   notify: InboxItem | null;
 }
 
@@ -283,6 +294,12 @@ export interface ClaimAction extends UnitBase {
   expected: string | null;
   /** null for release (delete ref) */
   blob: ClaimBlob | null;
+  /**
+   * R3.1 (H6): for `claim.acquire.intake`, what act does when the acquire is lost — `drop` the story
+   * worktree (when there) and local branch (they hold nothing beyond the intake, `intake_only`), or
+   * `keep` them, with why. Absent = not decided (no `intake_only` fact): act keeps everything.
+   */
+  lost_intake?: { drop: { worktree: string | null; branch: string } } | { keep: string };
 }
 
 /** Inbox notification for an item that has no other action this tick. */

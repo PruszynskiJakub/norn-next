@@ -156,6 +156,12 @@ export interface UnitFacts {
   step_runs?: StepRunFacts[];
   /** R4.3: last failed act effect for the unit on this checkout; absent = none */
   act_failure?: ActFailure;
+  /**
+   * A done slice: its local branch is in the story branch (its head an ancestor of the story
+   * branch head), so the slice cleanup may delete it. Absent = not observed (no local branch, not a
+   * done slice) — decide then keeps the branch unless the cleanup integrates its worktree first.
+   */
+  branch_in_story?: boolean;
 }
 
 export interface SliceFileFacts {
@@ -295,6 +301,12 @@ export interface StoryFacts {
    * none, held here, or not observed.
    */
   unpushed_runs?: UnpushedRuns[];
+  /**
+   * R3.1: an unclaimed new story — its local branch holds nothing beyond the intake commit: no
+   * commit past the base ref, or one whose trailers are the story's intake (`isIntakeCommit`, never
+   * its subject). Absent = not observed (claimed, not new, or the branch could not be listed).
+   */
+  intake_only?: boolean;
   /** BS1: the story branch against its base; absent = not observed (no story branch or base ref) */
   base?: StoryBase;
   /**

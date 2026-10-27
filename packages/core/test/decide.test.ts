@@ -3,7 +3,9 @@ import type { LeaseFile, UnitState } from "@norn/schema";
 import type { Action } from "../src/actions.ts";
 import { applyReceipts } from "../src/apply.ts";
 import { decide, isSideAction, unitDecision } from "../src/decide.ts";
-import type { RunFacts, StoryFacts } from "../src/facts.ts";
+import { isIntakeCommit, nornTrailers } from "../src/policy.ts";
+import type { RunFacts, StoryFacts, UnitFacts } from "../src/facts.ts";
+import type { WorktreeStatus } from "../src/ports.ts";
 import { sha256 } from "../src/hash.ts";
 import {
   at,
@@ -24,7 +26,10 @@ import {
   TICK,
   unitFacts,
   WORKFLOWS,
+  worktree as worktreeOf,
 } from "./fixtures.ts";
+
+const wtStatus = (path: string, branch: string): WorktreeStatus => ({ path, branch, head: "h", clean: true, staged: [], unstaged: [], untracked: [], ahead: 0, behind: 0, upstream: null, rebase_in_progress: false });
 
 const RUN = "01JDDDDDDDDDDDDDDDDDDDDDDD";
 const kinds = (f: Parameters<typeof decide>[0]) => decide(f, WORKFLOWS, CONFIG).map((d) => `${d.unit} ${d.action.kind} ${d.rule}`);
@@ -80,6 +85,22 @@ describe("claims (T1–T10)", () => {
     expect(isSideAction(ds[0]!.action)).toBe(true);
     expect(unitDecision(ds, "gh-1")?.rule).toBe("receipts.apply");
   });
+  test("R3.1: the intake claim carries what to remove if it is lost — from the intake_only fact, never decided without it", () => {
+    const fresh = (patch: Partial<StoryFacts>) => {
+      const s = storyFacts("gh-1", [unitFacts(storyUnit(), null, null)], { claim: { state: "none" }, ...patch });
+      s.frontmatter = { ...s.frontmatter!, status: "new" };
+      const a = only(facts([s]));
+      return a.kind === "claim" ? a : null;
+    };
+    expect(fresh({})).toMatchObject({ rule: "claim.acquire.intake" });
+    expect(fresh({})).not.toHaveProperty("lost_intake");
+    const clean = { ...worktreeOf("/r-worktrees/gh-1-login"), status: wtStatus("/r-worktrees/gh-1-login", "gh-1-login") };
+    expect(fresh({ intake_only: true, worktree: clean })?.lost_intake).toEqual({ drop: { worktree: "/r-worktrees/gh-1-login", branch: "gh-1-login" } });
+    expect(fresh({ intake_only: true, worktree: null })?.lost_intake).toEqual({ drop: { worktree: null, branch: "gh-1-login" } });
+    expect(fresh({ intake_only: false, worktree: clean })?.lost_intake).toEqual({ keep: "gh-1-login has commits beyond the intake" });
+    const dirty = { ...clean, status: { ...clean.status, clean: false, untracked: ["x"] } };
+    expect(fresh({ intake_only: true, worktree: dirty })?.lost_intake).toEqual({ keep: "/r-worktrees/gh-1-login has uncommitted changes" });
+  });
   test("R3.2: the base record wins — no acquire for a story the base records as done or whose PR merged", () => {
     // a stale local intake (status new) of a story the base already records as done (A21)
     const fresh = storyFacts("gh-1", [unitFacts(storyUnit(), null, null)], { claim: { state: "none" }, base_status: "done" });
@@ -98,6 +119,17 @@ describe("claims (T1–T10)", () => {
 });
 
 describe("corrupt units (S2)", () => {
+  test("decide says whether act writes corrupt into state: only the unit's own runs/ files, never a broken state.json or story.md", () => {
+    const corrupt = (file: string) => {
+      const s = solo();
+      s.units[0]!.errors = [{ file, errors: [{ path: "", message: "bad" }] }];
+      return only(facts([s]));
+    };
+    expect(corrupt(".agents/specs/gh-1-login/runs/_story/receipts/0001-done.json")).toMatchObject({ kind: "mark_corrupt", mark_state: true });
+    expect(corrupt(".agents/specs/gh-1-login/runs/_story/state.json")).toMatchObject({ kind: "mark_corrupt", mark_state: false });
+    const broken = solo({}, null, { frontmatter: null, frontmatter_error: { file: ".agents/specs/gh-1-login/story.md", errors: [{ path: "", message: "bad" }] } });
+    expect(only(facts([broken]))).toMatchObject({ kind: "mark_corrupt", rule: "story.corrupt", mark_state: false });
+  });
   test("never touched: mark once, then noop forever", () => {
     const s = solo();
     s.units[0]!.errors = [{ file: "runs/_story/state.json", errors: [{ path: "/step", message: "bad" }] }];
@@ -281,7 +313,24 @@ describe("slices step (W2)", () => {
   });
   test("a finished slice releases its worktree and is marked integrated", () => {
     const f = storyAt("slices", {}, [{ nn: "01", state: { step: "$done", status: "done" } }, { nn: "02", deps: ["gh-1/01"] }]);
+    f.units[1]!.worktree!.status = wtStatus("/r-worktrees/gh-1-login--01-s01", "gh-1/01-s01");
     expect(decide(facts([f]), WORKFLOWS, CONFIG).find((d) => d.unit === "gh-1/01")?.action).toMatchObject({ kind: "mark_done", slice_status: "integrated", cleanup: { worktree: "/r-worktrees/gh-1-login--01-s01", branch_local: "gh-1/01-s01", release_slot: true } });
+  });
+  test("the cleanup deletes the slice branch only when decide knows it is in the story branch", () => {
+    const cleanup = (patch: Partial<UnitFacts>) => {
+      const f = storyAt("slices", {}, [{ nn: "01", state: { step: "$done", status: "done" } }]);
+      Object.assign(f.units[1]!, patch);
+      const a = decide(facts([f]), WORKFLOWS, CONFIG).find((d) => d.unit === "gh-1/01")?.action;
+      return a?.kind === "mark_done" ? a.cleanup : null;
+    };
+    // the worktree is on the slice branch: act integrates it first, so the branch is in the story branch
+    expect(cleanup({ worktree: { ...worktreeOf("/w"), status: wtStatus("/w", "gh-1/01-s01") } })).toEqual({ worktree: "/w", branch_local: "gh-1/01-s01", release_slot: true });
+    // no worktree: observe's `branch_in_story` decides
+    expect(cleanup({ worktree: null, branch_in_story: true })).toEqual({ worktree: null, branch_local: "gh-1/01-s01", release_slot: true });
+    expect(cleanup({ worktree: null, branch_in_story: false })).toEqual({ worktree: null, branch_local: null, branch_kept: "gh-1/01-s01 is not in the story branch", release_slot: true });
+    expect(cleanup({ worktree: null })).toEqual({ worktree: null, branch_local: null, branch_kept: "gh-1/01-s01 not observed in the story branch", release_slot: true });
+    // a worktree on another branch, with the branch not seen in the story branch, keeps it
+    expect(cleanup({ worktree: { ...worktreeOf("/w"), status: wtStatus("/w", "other") } })).toMatchObject({ branch_local: null, branch_kept: "/w is not on gh-1/01-s01" });
   });
 });
 
@@ -503,5 +552,19 @@ describe("audit fixes", () => {
     const atRefine = storyAt("refine");
     atRefine.units[0]!.state = { ...atRefine.units[0]!.state!, status: "parked", park: { kind: "attended", reason: "x", since: at() } };
     expect(kinds(facts([atRefine]))[0]).not.toContain("update_story_mirror");
+  });
+});
+
+describe("commit trailers (S4, R3.1)", () => {
+  test("nornTrailers builds them; isIntakeCommit reads an intake off them, never off a subject", () => {
+    expect(nornTrailers(TICK, "gh-1", null, null)).toEqual({ "Norn-Story": "gh-1", "Norn-Tick": TICK });
+    expect(nornTrailers(TICK, "gh-1", "gh-1/01", "$done")).toEqual({ "Norn-Story": "gh-1", "Norn-Slice": "gh-1/01", "Norn-Step": "$done", "Norn-Tick": TICK });
+    expect(isIntakeCommit(nornTrailers(TICK, "gh-1", null, null), "gh-1")).toBe(true);
+    expect(isIntakeCommit(nornTrailers(TICK, "gh-1", null, null), "gh-2")).toBe(false);
+    expect(isIntakeCommit(nornTrailers(TICK, "gh-1", null, "plan"), "gh-1")).toBe(false);
+    expect(isIntakeCommit(nornTrailers(TICK, "gh-1", "gh-1/01", null), "gh-1")).toBe(false);
+    // a person's commit (no Norn-Tick) is never the intake, whatever its subject says
+    expect(isIntakeCommit({ "Norn-Story": "gh-1" }, "gh-1")).toBe(false);
+    expect(isIntakeCommit({}, "gh-1")).toBe(false);
   });
 });

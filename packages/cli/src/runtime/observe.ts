@@ -19,6 +19,7 @@ import {
   type FileError,
   type ForeignCommit,
   type GitPort,
+  isIntakeCommit,
   type MailboxItem,
   type NumberedReceipt,
   openNotes,
@@ -372,6 +373,14 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       const uf = await unitFacts(ports, root, s, u, worktree, hooks, leases.live.map((e) => e.lease), local);
       const failure = failures[u.unit.key];
       if (failure) uf.act_failure = failure;
+      // a done slice not yet integrated: is its branch in the story branch (the slice cleanup's delete)
+      if (sliceFile && u.state?.status === "done" && sliceFile.frontmatter?.status !== "integrated") {
+        const head = refs.get(`refs/heads/${unitBranch}`);
+        if (head && refs.has(`refs/heads/${branch}`)) {
+          const inStory = await git.isAncestor(root, head, `refs/heads/${branch}`).catch(() => null);
+          if (inStory !== null) uf.branch_in_story = inStory;
+        }
+      }
       units.push(uf);
       // Q6: commits norn did not make; an agent's own commits mid-run are not foreign
       // C4: …nor are commits made during any run of this unit (e.g. while it is parked on an ask)
@@ -417,6 +426,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       ...storyNotes(s, unitSnaps.get(s) ?? []),
       ...(s.base_status !== undefined ? { base_status: s.base_status } : {}),
       ...(lost.length ? { unpushed_runs: lost.map((l) => ({ unit: l.unit, files: l.files })) } : {}),
+      ...(claim.state === "none" && s.frontmatter?.status === "new" ? await intakeOnly(git, root, remote ? baseRef : `refs/heads/${base}`, branch, s.key, refs) : {}),
       ...(await storyBase(git, root, remote, base, branch, s.frontmatter?.status, refs, baseCacheIn, baseCache, s.key)),
       units,
       slices: s.slices satisfies SliceFileFacts[],
@@ -498,6 +508,17 @@ async function storyBase(
 }
 
 /** `refs/remotes/<remote>/<base>` when it exists locally (fetched), else null (solo, never fetched). */
+/**
+ * R3.1: does the local story branch hold nothing beyond its intake commit — read off the commits'
+ * trailers (`isIntakeCommit`), never their subjects. Not observed without the branch or the base ref.
+ */
+async function intakeOnly(git: GitPort, root: string, baseRef: string | null, branch: string, story: string, refs: Map<string, string>): Promise<{ intake_only?: boolean }> {
+  if (!baseRef || !refs.has(`refs/heads/${branch}`)) return {};
+  const commits = await git.log(root, `${baseRef}..refs/heads/${branch}`).catch(() => null);
+  if (!commits) return {};
+  return { intake_only: commits.length === 0 || (commits.length === 1 && isIntakeCommit((commits[0] as (typeof commits)[number]).trailers, story)) };
+}
+
 async function trackingRef(git: GitPort, root: string, remote: string | null, base: string): Promise<string | null> {
   if (!remote) return null;
   const ref = `refs/remotes/${remote}/${base}`;

@@ -61,3 +61,22 @@ export function unitWorktree(story: StoryFacts, uf: UnitFacts | null): string | 
   const wt = uf?.worktree ?? (!uf || uf.unit.slice === null ? story.worktree : null);
   return wt?.exists ? wt.path : null;
 }
+
+/**
+ * S4: the trailers of every commit norn makes for a unit — Norn-Story, Norn-Slice for a slice,
+ * Norn-Step when the unit has a cursor (none before the story unit starts), Norn-Tick.
+ */
+export function nornTrailers(tick: string, story: string, slice: string | null, step: string | null): Record<string, string> {
+  const trailers: Record<string, string> = { "Norn-Story": story };
+  if (slice) trailers["Norn-Slice"] = slice;
+  if (step !== null) trailers["Norn-Step"] = step;
+  trailers["Norn-Tick"] = tick;
+  return trailers;
+}
+
+/**
+ * R3.1: the trailers of a story's intake commit (`remote.intake`) — norn's (Norn-Tick), for `story`,
+ * made before any unit has a cursor (no Norn-Step, no Norn-Slice). Read off the trailers, never the subject.
+ */
+export const isIntakeCommit = (trailers: Record<string, string>, story: string): boolean =>
+  trailers["Norn-Story"] === story && !!trailers["Norn-Tick"] && !("Norn-Step" in trailers) && !("Norn-Slice" in trailers);

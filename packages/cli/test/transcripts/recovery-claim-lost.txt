@@ -48,6 +48,7 @@
   spawn repo-worktrees/gh-9-add-search $ git merge-base HEAD refs/remotes/origin/main
   spawn repo-worktrees/gh-9-add-search $ git diff --name-only --no-renames --diff-filter=AM <sha:1> -- .agents/specs/gh-9-add-search/runs/_story/
   spawn repo-worktrees/gh-9-add-search $ git ls-files --others --exclude-standard -- .agents/specs/gh-9-add-search/runs/_story/
+  spawn repo $ git log "--format=%H%x1f%s%x1f%ct%x1f%(trailers:only,unfold)%x1e" refs/remotes/origin/main..refs/heads/gh-9-add-search --
   spawn repo $ git rev-list --left-right --count <sha:2>...<sha:1> --
   spawn repo $ git merge-base <sha:2> <sha:1>
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
