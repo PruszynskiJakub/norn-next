@@ -34,10 +34,8 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-9-add-search $ git rev-parse --show-toplevel
+  spawn repo-worktrees/gh-9-add-search $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
   spawn repo-worktrees/gh-9-add-search $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path rebase-merge
-  spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path rebase-apply
   spawn repo-worktrees/gh-9-add-search $ git log -1 "--format=%ct" HEAD
   spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-worktrees/gh-9-add-search $ git diff --name-only --diff-filter=U -z
@@ -64,10 +62,8 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-9-add-search $ git rev-parse --show-toplevel
+  spawn repo-worktrees/gh-9-add-search $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
   spawn repo-worktrees/gh-9-add-search $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path rebase-merge
-  spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path rebase-apply
   spawn repo-worktrees/gh-9-add-search $ git log -1 "--format=%ct" HEAD
   spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-worktrees/gh-9-add-search $ git diff --name-only --diff-filter=U -z
@@ -98,10 +94,8 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-9-add-search $ git rev-parse --show-toplevel
+  spawn repo-worktrees/gh-9-add-search $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
   spawn repo-worktrees/gh-9-add-search $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path rebase-merge
-  spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path rebase-apply
   spawn repo-worktrees/gh-9-add-search $ git log -1 "--format=%ct" HEAD
   spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-worktrees/gh-9-add-search $ git diff --name-only --diff-filter=U -z
@@ -180,10 +174,8 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-9-add-search $ git rev-parse --show-toplevel
+  spawn repo-worktrees/gh-9-add-search $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
   spawn repo-worktrees/gh-9-add-search $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path rebase-merge
-  spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path rebase-apply
   spawn repo-worktrees/gh-9-add-search $ git log -1 "--format=%ct" HEAD
   spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-worktrees/gh-9-add-search $ git diff --name-only --diff-filter=U -z
@@ -207,10 +199,8 @@
   A.remote.listAssignedIssues norn
   A.remote.findPullRequest gh-9-add-search
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-9-add-search $ git rev-parse --show-toplevel
+  spawn repo-worktrees/gh-9-add-search $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
   spawn repo-worktrees/gh-9-add-search $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path rebase-merge
-  spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path rebase-apply
   spawn repo-worktrees/gh-9-add-search $ git log -1 "--format=%ct" HEAD
   spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-worktrees/gh-9-add-search $ git diff --name-only --diff-filter=U -z
@@ -241,10 +231,8 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-9-add-search $ git rev-parse --show-toplevel
+  spawn repo-worktrees/gh-9-add-search $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
   spawn repo-worktrees/gh-9-add-search $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path rebase-merge
-  spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path rebase-apply
   spawn repo-worktrees/gh-9-add-search $ git log -1 "--format=%ct" HEAD
   spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-worktrees/gh-9-add-search $ git diff --name-only --diff-filter=U -z

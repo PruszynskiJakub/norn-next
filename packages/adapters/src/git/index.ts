@@ -182,15 +182,14 @@ export function createGit(opts: GitOptions = {}): GitPort {
     return r.code === 0 && r.stdout.trim() ? r.stdout.trim() : null;
   };
 
-  const worktreeRoot = (cwd: string) => line(cwd, ["rev-parse", "--show-toplevel"]);
   const commonDir = (cwd: string) => line(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
 
+  // one rev-parse names both directories git keeps while a rebase waits
+  const REBASE_PATHS = ["--git-path", "rebase-merge", "--git-path", "rebase-apply"];
+  const rebaseIn = (cwd: string, paths: string[]) => paths.some((p) => existsSync(resolve(cwd, p)));
   const rebaseInProgress = async (cwd: string) => {
-    for (const d of ["rebase-merge", "rebase-apply"]) {
-      const p = await nullIfFail(cwd, ["rev-parse", "--git-path", d]);
-      if (p && existsSync(resolve(cwd, p))) return true;
-    }
-    return false;
+    const r = await run(cwd, ["rev-parse", ...REBASE_PATHS]);
+    return r.code === 0 && rebaseIn(cwd, lines(r.stdout));
   };
 
   /** H1: MERGE_HEAD, a rebase, CHERRY_PICK_HEAD or REVERT_HEAD in cwd's worktree, and the unmerged paths. */
@@ -229,9 +228,10 @@ export function createGit(opts: GitOptions = {}): GitPort {
       return r && r.code === 0 ? r.stdout.trim() : null;
     },
     async status(cwd) {
-      const root = await worktreeRoot(cwd);
-      const out = await must(cwd, ["status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all"]);
-      return parseStatusV2(out, root, await rebaseInProgress(cwd));
+      // the worktree root and the rebase markers in one rev-parse, beside the status itself
+      const [paths, out] = await Promise.all([must(cwd, ["rev-parse", "--show-toplevel", ...REBASE_PATHS]), must(cwd, ["status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all"])]);
+      const [root, ...rebase] = lines(paths);
+      return parseStatusV2(out, (root as string).trim(), rebaseIn(cwd, rebase));
     },
     revParse: (cwd, rev) => nullIfFail(cwd, ["rev-parse", "--verify", "--quiet", "--end-of-options", rev]),
     async defaultBranch(cwd, remote) {
