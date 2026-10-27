@@ -152,7 +152,7 @@ describe("release metadata", () => {
 });
 
 describe("herdr plugin (HC9)", () => {
-  test("the manifest parses, has the cockpit pane and the open/next actions, and names only scripts that exist", () => {
+  test("the manifest parses, has the cockpit and pick panes and the open/next/pick actions, and names only scripts that exist", () => {
     const dir = join(ROOT, "plugins", "herdr");
     const m = Bun.TOML.parse(readFileSync(join(dir, "herdr-plugin.toml"), "utf8")) as {
       id: string;
@@ -160,8 +160,8 @@ describe("herdr plugin (HC9)", () => {
       actions: Array<{ id: string; command: string[] }>;
     };
     expect(m.id).toBe("norn");
-    expect(m.panes.map((p) => p.id)).toEqual(["cockpit"]);
-    expect(m.actions.map((a) => a.id)).toEqual(["open", "next"]);
+    expect(m.panes.map((p) => p.id)).toEqual(["cockpit", "pick"]);
+    expect(m.actions.map((a) => a.id)).toEqual(["open", "next", "pick"]);
     const scripts = [...m.panes, ...m.actions].map((e) => e.command.at(-1) as string);
     expect(scripts.filter((s) => !existsSync(join(dir, s)))).toEqual([]);
   });
