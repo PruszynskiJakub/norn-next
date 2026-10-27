@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { herdr } from "@norn/adapters";
 import { runCli, type TickReport } from "../src/index.ts";
 import { createHarness, type Harness, installBundledSkills, issue, sh } from "./harness.ts";
+import { expectTranscript, recordTranscript, type Transcript } from "./transcript.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -94,8 +95,13 @@ describe("base sync with real git", () => {
     h.git(["commit", "-q", "-m", "norn init"]);
     h.git(["push", "-q", "origin", "main"]);
     h.remote.issues = [issue(7, "Add login form")];
+    transcript = recordTranscript(h);
   });
-  afterAll(() => h.cleanup());
+  afterAll(() => {
+    transcript.stop();
+    h.cleanup();
+  });
+  let transcript: Transcript;
 
   test("1: a sibling merge without conflicts is merged by update — one Norn-Tick merge commit, no foreign item, → test", async () => {
     expect(kinds(await h.tick())).toEqual(["gh-7 remote.intake"]);
@@ -205,6 +211,10 @@ describe("base sync with real git", () => {
     expect(merged.exit).toBe(3);
     expect(merged.value).toMatchObject({ code: "story_merged" });
   }, 60_000);
+
+  test("effect transcript: spawns, port calls and runs/ files of cases 1, 4 + 2 and 6 (refactor Phase 0.2)", () => {
+    expectTranscript(transcript, "base-sync");
+  });
 });
 
 describe("BS3.3a (dogfood D4): a person's push to the branch of a $done story", () => {

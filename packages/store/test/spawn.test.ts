@@ -3,7 +3,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { NETWORK_TIMEOUT_MS, git, gitTimeoutMs, spawnBounded } from "../src/index.ts";
+import { NETWORK_TIMEOUT_MS, git, gitTimeoutMs, type SpawnRecord, setSpawnObserver, spawnBounded } from "../src/index.ts";
 
 const alive = (pid: number) => {
   try {
@@ -63,5 +63,28 @@ describe("git network timeouts", () => {
     expect(Date.now() - t0).toBeLessThan(5_000);
     expect(r.code).toBe(124);
     expect(r.stderr).toMatch(/timed out/);
+  });
+});
+
+describe("spawn observer (refactor Phase 0.2: effect transcripts)", () => {
+  test("off by default; when set, sees argv + cwd of every spawn in order; a throwing observer changes nothing", async () => {
+    const seen: SpawnRecord[] = [];
+    expect(setSpawnObserver((r) => seen.push(r))).toBeNull();
+    try {
+      await spawnBounded(["sh", "-c", "exit 0"], { cwd: "/" });
+      await git("/", ["--version"]);
+      expect(seen).toEqual([
+        { argv: ["sh", "-c", "exit 0"], cwd: "/" },
+        { argv: ["git", "--version"], cwd: "/" },
+      ]);
+      setSpawnObserver(() => {
+        throw new Error("boom");
+      });
+      expect((await spawnBounded(["sh", "-c", "echo ok"], {})).stdout).toBe("ok\n");
+    } finally {
+      setSpawnObserver(null);
+    }
+    await spawnBounded(["sh", "-c", "exit 0"], {});
+    expect(seen).toHaveLength(2);
   });
 });
