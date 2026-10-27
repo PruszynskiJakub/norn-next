@@ -266,13 +266,6 @@ export class Actor {
         const committed = await this.commit(a.commit, a.unit, a.state, `${a.rule}: ${a.park.kind} — ${a.park.reason}`);
         return { ok: true, detail: committed };
       }
-      case "kill_run": {
-        const loc = this.unitLoc(a.unit);
-        this.writeReceipts(loc.runsDir, a.receipts);
-        await this.kill(a.session);
-        if (a.state) this.writeUnitState(a.unit, loc.runsDir, a.state);
-        return { ok: true, detail: await this.commit(a.commit, a.unit, a.state, `${a.rule}: killed (${a.reason})`) };
-      }
       case "mark_done":
         return this.markDone(a);
       case "commit_push": {

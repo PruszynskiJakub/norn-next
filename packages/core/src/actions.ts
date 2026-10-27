@@ -239,13 +239,6 @@ export interface ParkAction extends UnitBase, Transition {
   notify: InboxItem | null;
 }
 
-/** Kill a live run (unstick --to, workflow switch, drop). */
-export interface KillRunAction extends UnitBase, Transition {
-  kind: "kill_run";
-  session: SessionRef;
-  reason: string;
-}
-
 /** Unit reached `$done`: slice → release slot, remove worktree after integration (K5). */
 export interface MarkDoneAction extends UnitBase, Transition {
   kind: "mark_done";
@@ -358,7 +351,6 @@ export type UnitAction =
   | StartSlicesAction
   | ClassifyAction
   | ParkAction
-  | KillRunAction
   | MarkDoneAction
   | CommitPushAction
   | RejectReceiptAction

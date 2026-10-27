@@ -297,7 +297,7 @@ function decideText(): string {
 }
 
 /** (f) kinds act handles that decide never emits: dead branches, kept only until their removal item. */
-const ACT_ONLY_KINDS = ["kill_run"]; // 1.5 deletes KillRunAction and its act case
+const ACT_ONLY_KINDS: string[] = [];
 
 describe("ratchet lints", () => {
   test("matcher: a new hit and a stale allowlist entry both fail", () => {

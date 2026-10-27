@@ -37,9 +37,6 @@ export type CockpitStep =
   | { kind: "refresh" }
   | { kind: "quit" };
 
-export const COCKPIT_HELP =
-  "<n> go to the item's agent · w <n> its workspace · a <n> <text> answer · y <n> approve · x <n> <reason> reject · t <n> take · u <n> unstick · v <n> trace · d <n> full text · o open/close notes · n next waiting agent · r refresh · q quit";
-
 /** `?`: every command, one per line. */
 export const HELP_TEXT = [
   "Commands (<n> is an item number)",
