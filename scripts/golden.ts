@@ -1,99 +1,210 @@
 /**
- * Regenerate the golden decisions corpus (refactor Phase 0.1): `bun scripts/golden.ts`.
+ * The golden decisions corpus (refactor Phase 0.1): `packages/core/test/golden/*.json`, replayed by
+ * `packages/core/test/golden.test.ts`, which wants each case's recorded decisions exactly. Two modes,
+ * so that what changes in the corpus is a diff a reviewer can read:
  *
- * Runs every cli integration test file that builds a harness with `NORN_GOLDEN_OUT` set, so each
- * harness repo's ticks are harvested on cleanup (`packages/cli/test/golden-harvest.ts`): decide's
- * inputs as `norn why` replays them (O5) and the decisions the tick recorded (R5.4), temp paths
- * normalised. From those it keeps, smallest first, every case that brings a rule fewer than
- * `PER_RULE` kept cases fire, and writes them to `packages/core/test/golden/`, replacing what is
- * there. `packages/core/test/golden.test.ts` replays each one through decide and wants exactly the
- * recorded decisions.
- *
- * Regenerate only when decide is meant to decide differently (a behaviour change), and review the
- * diff: a structural refactor must leave the corpus as it is and the golden test green.
+ *   bun scripts/golden.ts --update
+ *     A behaviour change (decide is meant to decide differently). Decides every existing case again
+ *     and rewrites only its `decisions`; file names, facts, workflows and config stay as they are.
+ *     Prints, per changed case, the decisions that went and came. Nothing is harvested, added or
+ *     dropped, so the diff is exactly the decisions that changed.
  *
  *   bun scripts/golden.ts [--per-rule N] [test-file …]
+ *     Adding cases. Runs the cli integration test files that build a harness with `NORN_GOLDEN_OUT`
+ *     set, so each harness repo's ticks are harvested on cleanup (`packages/cli/test/golden-harvest.ts`):
+ *     decide's inputs as `norn why` replays them (O5) and the decisions the tick recorded (R5.4), temp
+ *     paths normalised. Existing cases are never touched. A harvested case is added, smallest
+ *     `stableKey` first, only when it brings a rule that fewer than `N` (default 2) cases fire —
+ *     counting the existing corpus — and its `stableKey` is not in the corpus yet. Cases are named by
+ *     `stableKey`, so a rerun with nothing new to cover adds nothing.
+ *
+ * A structural refactor uses neither: it leaves the corpus as it is and the golden test green.
  */
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, relative } from "node:path";
+import { stableKey } from "../packages/cli/test/golden-harvest.ts";
+import { decide, type RepoWorkflows } from "../packages/core/src/decide.ts";
+import type { Facts } from "../packages/core/src/facts.ts";
 
 const ROOT = join(import.meta.dir, "..");
 const CLI_TESTS = join(ROOT, "packages", "cli", "test");
 const OUT = join(ROOT, "packages", "core", "test", "golden");
 
-const argv = process.argv.slice(2);
-let perRule = 2;
-const named: string[] = [];
-for (let i = 0; i < argv.length; i++) {
-  const a = argv[i] as string;
-  if (a === "--per-rule") perRule = Number(argv[++i]);
-  else named.push(a);
-}
-if (!Number.isInteger(perRule) || perRule < 1) throw new Error("--per-rule takes a positive integer");
-
-const testFiles = named.length
-  ? named.map((f) => join(ROOT, f))
-  : readdirSync(CLI_TESTS)
-      .filter((n) => n.endsWith(".test.ts") && readFileSync(join(CLI_TESTS, n), "utf8").includes("createHarness("))
-      .sort()
-      .map((n) => join(CLI_TESTS, n));
-
-const raw = mkdtempSync(join(tmpdir(), "norn-golden-"));
-const failed: string[] = [];
-
-async function harvest(file: string): Promise<void> {
-  const source = basename(file).replace(/\.test\.ts$/, "");
-  const proc = Bun.spawn(["bun", "test", relative(ROOT, file)], {
-    cwd: ROOT,
-    env: { ...process.env, NORN_GOLDEN_OUT: join(raw, source), NORN_GOLDEN_SOURCE: source },
-    stdout: "ignore",
-    stderr: "pipe",
-  });
-  const err = await new Response(proc.stderr).text();
-  const code = await proc.exited;
-  if (code !== 0) failed.push(`${relative(ROOT, file)} (exit ${code})\n${err.split("\n").filter((l) => /fail|error/i.test(l)).slice(0, 10).join("\n")}`);
-  console.error(`${code === 0 ? "ok  " : "FAIL"} ${relative(ROOT, file)}`);
+export interface RecordedDecision {
+  unit: string;
+  rule: string;
+  action: unknown;
 }
 
-const queue = [...testFiles];
-const workers = Array.from({ length: 4 }, async () => {
-  for (let f = queue.shift(); f; f = queue.shift()) await harvest(f);
-});
-await Promise.all(workers);
-if (failed.length) {
-  rmSync(raw, { recursive: true, force: true });
-  console.error(`\nnot regenerated: a harvested test file failed\n${failed.join("\n")}`);
-  process.exit(1);
+export interface GoldenCase {
+  source: string;
+  tick_id: string;
+  facts: Facts;
+  workflows: RepoWorkflows;
+  config: Parameters<typeof decide>[2];
+  decisions: RecordedDecision[];
 }
 
-interface Case {
+/** The text a case's `stableKey` is taken from: what the harvest names it by (decide's inputs and decisions). */
+export function caseBody(c: Pick<GoldenCase, "facts" | "workflows" | "config" | "decisions">): string {
+  return JSON.stringify({ facts: c.facts, workflows: c.workflows, config: c.config, decisions: c.decisions });
+}
+
+/** Rule ids a case's decisions fire, once each. */
+export function rulesOf(c: Pick<GoldenCase, "decisions">): string[] {
+  return [...new Set(c.decisions.map((d) => d.rule))];
+}
+
+export interface Candidate {
   name: string;
-  text: string;
+  key: string;
   rules: string[];
 }
-const byHash = new Map<string, Case>();
-for (const source of readdirSync(raw).sort()) {
-  for (const name of readdirSync(join(raw, source)).sort()) {
-    const text = readFileSync(join(raw, source, name), "utf8");
-    const hash = name.replace(/\.json$/, "").split("-").at(-1) as string;
-    if (byHash.has(hash)) continue;
-    const c = JSON.parse(text) as { decisions: Array<{ rule: string }> };
-    byHash.set(hash, { name, text, rules: [...new Set(c.decisions.map((d) => d.rule))] });
+
+/**
+ * The candidates to add to a corpus whose cases fire `existing` (one rule list per case) and whose
+ * stable keys are `have`: smallest key first (then name), each only when its key is new and it brings
+ * a rule fired by fewer than `perRule` cases so far. Depends on nothing but its inputs.
+ */
+export function selectNew(existing: string[][], have: Set<string>, candidates: Candidate[], perRule: number): Candidate[] {
+  const fired = new Map<string, number>();
+  for (const rules of existing) for (const r of rules) fired.set(r, (fired.get(r) ?? 0) + 1);
+  const seen = new Set(have);
+  const added: Candidate[] = [];
+  for (const c of [...candidates].sort((a, b) => a.key.length - b.key.length || a.name.localeCompare(b.name))) {
+    if (seen.has(c.key)) continue;
+    if (!c.rules.some((r) => (fired.get(r) ?? 0) < perRule)) continue;
+    seen.add(c.key);
+    added.push(c);
+    for (const r of c.rules) fired.set(r, (fired.get(r) ?? 0) + 1);
   }
+  return added;
 }
 
-const kept: Case[] = [];
-const fired = new Map<string, number>();
-for (const c of [...byHash.values()].sort((a, b) => a.text.length - b.text.length || a.name.localeCompare(b.name))) {
-  if (!c.rules.some((r) => (fired.get(r) ?? 0) < perRule)) continue;
-  kept.push(c);
-  for (const r of c.rules) fired.set(r, (fired.get(r) ?? 0) + 1);
+/** Decisions in `before` and not in `after` (gone) and the reverse (came), as `unit rule action` lines, counted as multisets. */
+export function decisionChanges(before: RecordedDecision[], after: RecordedDecision[]): { gone: string[]; came: string[] } {
+  const line = (d: RecordedDecision) => `${d.unit} ${d.rule} ${JSON.stringify(d.action)}`;
+  const minus = (a: string[], b: string[]) => {
+    const left = [...b];
+    return a.filter((x) => {
+      const i = left.indexOf(x);
+      if (i < 0) return true;
+      left.splice(i, 1);
+      return false;
+    });
+  };
+  const b = before.map(line);
+  const a = after.map(line);
+  return { gone: minus(b, a), came: minus(a, b) };
 }
 
-rmSync(OUT, { recursive: true, force: true });
-mkdirSync(OUT, { recursive: true });
-for (const c of kept) writeFileSync(join(OUT, c.name), `${c.text.trimEnd()}\n`);
-rmSync(raw, { recursive: true, force: true });
-const bytes = kept.reduce((s, c) => s + c.text.length, 0);
-console.error(`\n${kept.length} golden case(s) of ${byHash.size} harvested, ${fired.size} rule(s), ~${Math.round(bytes / 1024)} KiB → ${relative(ROOT, OUT)}`);
+/** decide's output as the trace records it: JSON-safe (`tick.start` decisions, R5.4). */
+function decideRecorded(c: GoldenCase): RecordedDecision[] {
+  const ds = decide(c.facts, c.workflows, c.config);
+  return JSON.parse(JSON.stringify(ds.map((d) => ({ unit: d.unit, rule: d.rule, action: d.action })))) as RecordedDecision[];
+}
+
+function readCorpus(): Array<[string, GoldenCase]> {
+  return readdirSync(OUT)
+    .filter((n) => n.endsWith(".json"))
+    .sort()
+    .map((n) => [n, JSON.parse(readFileSync(join(OUT, n), "utf8")) as GoldenCase]);
+}
+
+function update(): void {
+  const corpus = readCorpus();
+  let changed = 0;
+  for (const [name, c] of corpus) {
+    const now = decideRecorded(c);
+    if (JSON.stringify(now) === JSON.stringify(c.decisions)) continue;
+    const { gone, came } = decisionChanges(c.decisions, now);
+    console.error(`\n${name}`);
+    for (const g of gone) console.error(`  - ${g}`);
+    for (const k of came) console.error(`  + ${k}`);
+    if (!gone.length && !came.length) console.error("  (same decisions, new order)");
+    writeFileSync(join(OUT, name), `${JSON.stringify({ ...c, decisions: now })}\n`);
+    changed++;
+  }
+  console.error(`\n${changed} of ${corpus.length} golden case(s) decide differently now; only their decisions were rewritten`);
+}
+
+async function add(perRule: number, named: string[]): Promise<void> {
+  const testFiles = named.length
+    ? named.map((f) => join(ROOT, f))
+    : readdirSync(CLI_TESTS)
+        .filter((n) => n.endsWith(".test.ts") && readFileSync(join(CLI_TESTS, n), "utf8").includes("createHarness("))
+        .sort()
+        .map((n) => join(CLI_TESTS, n));
+
+  const raw = mkdtempSync(join(tmpdir(), "norn-golden-"));
+  const failed: string[] = [];
+  const harvest = async (file: string) => {
+    const source = basename(file).replace(/\.test\.ts$/, "");
+    const proc = Bun.spawn(["bun", "test", relative(ROOT, file)], {
+      cwd: ROOT,
+      env: { ...process.env, NORN_GOLDEN_OUT: join(raw, source), NORN_GOLDEN_SOURCE: source },
+      stdout: "ignore",
+      stderr: "pipe",
+    });
+    const err = await new Response(proc.stderr).text();
+    const code = await proc.exited;
+    if (code !== 0) failed.push(`${relative(ROOT, file)} (exit ${code})\n${err.split("\n").filter((l) => /fail|error/i.test(l)).slice(0, 10).join("\n")}`);
+    console.error(`${code === 0 ? "ok  " : "FAIL"} ${relative(ROOT, file)}`);
+  };
+  const queue = [...testFiles];
+  await Promise.all(
+    Array.from({ length: 4 }, async () => {
+      for (let f = queue.shift(); f; f = queue.shift()) await harvest(f);
+    }),
+  );
+  if (failed.length) {
+    rmSync(raw, { recursive: true, force: true });
+    console.error(`\nnothing added: a harvested test file failed\n${failed.join("\n")}`);
+    process.exit(1);
+  }
+
+  const texts = new Map<string, string>();
+  const candidates: Candidate[] = [];
+  for (const source of readdirSync(raw).sort()) {
+    for (const name of readdirSync(join(raw, source)).sort()) {
+      if (texts.has(name)) continue;
+      const text = readFileSync(join(raw, source, name), "utf8");
+      const c = JSON.parse(text) as GoldenCase;
+      texts.set(name, text);
+      candidates.push({ name, key: stableKey(caseBody(c)), rules: rulesOf(c) });
+    }
+  }
+  rmSync(raw, { recursive: true, force: true });
+
+  const corpus = readCorpus();
+  const names = new Set(corpus.map(([n]) => n));
+  const added = selectNew(
+    corpus.map(([, c]) => rulesOf(c)),
+    new Set(corpus.map(([, c]) => stableKey(caseBody(c)))),
+    candidates.filter((c) => !names.has(c.name)),
+    perRule,
+  );
+  for (const c of added) {
+    writeFileSync(join(OUT, c.name), `${(texts.get(c.name) as string).trimEnd()}\n`);
+    console.error(`added ${c.name}: ${c.rules.join(", ")}`);
+  }
+  console.error(`\n${added.length} golden case(s) added of ${candidates.length} harvested; the ${corpus.length} existing left as they were → ${relative(ROOT, OUT)}`);
+}
+
+if (import.meta.main) {
+  const argv = process.argv.slice(2);
+  let perRule = 2;
+  let doUpdate = false;
+  const named: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i] as string;
+    if (a === "--per-rule") perRule = Number(argv[++i]);
+    else if (a === "--update") doUpdate = true;
+    else named.push(a);
+  }
+  if (!Number.isInteger(perRule) || perRule < 1) throw new Error("--per-rule takes a positive integer");
+  if (doUpdate && named.length) throw new Error("--update decides the existing cases again; it takes no test files");
+  if (doUpdate) update();
+  else await add(perRule, named);
+}
