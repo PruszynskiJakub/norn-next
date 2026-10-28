@@ -20,7 +20,7 @@ import type { Context } from "../context.ts";
 import { busyError, claimHeld, failure, refuse, usageError } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
 import { humanReceipt, refuseIfHeldElsewhere, resolveTarget, runHumanVerb } from "../runtime/human.ts";
-import { resolveTarget as pickTarget, type TargetRule, unitOf } from "../runtime/target.ts";
+import { targetKey, type TargetRule, unitOf } from "../runtime/target.ts";
 
 const USAGE = "norn story edit [<story|slice>] --auto|--manual | --workflow <name> [--at <step>]";
 
@@ -48,7 +48,7 @@ async function editMode(ctx: Context, raw: string, mode: Mode) {
     // MO1: every mode receipt applies, the last one wins — a second switch is no duplicate
     refuseDuplicate: false,
     check(t, st) {
-      if (st.status === "done") throw refuse(`${t.key} is done`, cmd.status(t.key), "unit_done");
+      if (st.status === "done") throw refuse(`${t.key} is done`, cmd.status(t.story), "unit_done");
     },
     noop(t, st) {
       const previous: Mode = st.mode ?? ctx.config.default_mode;
@@ -146,7 +146,7 @@ export const storyEditCommand = defineCommand({
     if ((auto || manual) && workflow !== undefined) throw usageError("story edit: change the mode or the workflow, one at a time", USAGE);
     if (at !== undefined && workflow === undefined) throw usageError("story edit: --at needs --workflow", USAGE);
     if (!auto && !manual && workflow === undefined) throw usageError("story edit: nothing to change (pass --auto, --manual or --workflow <name>)", USAGE);
-    const raw = await pickTarget(ctx, args.positionals[0], args.json === true, editable(workflow === undefined ? "mode" : "workflow"));
+    const raw = await targetKey(ctx, args.positionals[0], args.json === true, editable(workflow === undefined ? "mode" : "workflow"));
     if (workflow !== undefined) return editWorkflow(ctx, raw, workflow, at);
     return editMode(ctx, raw, auto ? "auto" : "manual");
   },

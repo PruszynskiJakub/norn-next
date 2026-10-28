@@ -19,6 +19,7 @@ function story(key: string, over: Partial<StoryView> = {}): StoryView {
     claim: { state: "mine", holder: "me@box", expires_at: AT, unclaimed: false },
     status: "parked",
     step: "refine",
+    step_type: "agent",
     attempt: 1,
     counters: [],
     park: null,

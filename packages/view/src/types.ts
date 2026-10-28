@@ -43,6 +43,8 @@ export interface UnitView {
   status: UnitStatus | "not_started";
   /** cursor step (`$done` once finished); null when not started */
   step: string | null;
+  /** the cursor step's type in the pinned workflow; null when not started or unknown */
+  step_type: StepType | null;
   attempt: number | null;
   counters: CounterView[];
   park: { kind: ParkKind; reason: string; since: string } | null;

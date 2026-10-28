@@ -11,16 +11,16 @@ import { defineCommand, opt } from "../command.ts";
 import { refuse } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
 import { refuseIfHeldElsewhere, resolveTarget, started } from "../runtime/human.ts";
-import { resolveTarget as pickTarget, type TargetRule, unitOf } from "../runtime/target.ts";
+import { targetKey, type TargetRule, unitOf } from "../runtime/target.ts";
 
-/** B28: the units a person starts — parked at an attended step, or a ready step that waits for a person (manual). */
+/** B28: the units a person starts — parked at an attended step, or a ready agent step that waits for a person (manual). */
 const startable: TargetRule = {
   verb: "story start",
   command: (key) => cmd.storyStart(key),
   none: "Nothing waits for a person to start it",
   applies(key, view) {
     const u = unitOf(view, key);
-    return (u?.status === "parked" && u.park?.kind === "attended") || (u?.status === "ready" && u.effective_mode === "manual");
+    return (u?.status === "parked" && u.park?.kind === "attended") || (u?.status === "ready" && u.step_type === "agent" && u.effective_mode === "manual");
   },
 };
 
@@ -32,7 +32,7 @@ export const storyStartCommand = defineCommand({
   options: { print: { type: "boolean" } },
   positionals: { max: 1 },
   async run(ctx, args) {
-    const raw = await pickTarget(ctx, args.positionals[0], args.json === true, startable);
+    const raw = await targetKey(ctx, args.positionals[0], args.json === true, startable);
     const t = await resolveTarget(ctx, parseUnitKey(raw).key);
     const sf = t.story_facts;
     const uf = sf?.units.find((u) => u.unit.key === t.key);

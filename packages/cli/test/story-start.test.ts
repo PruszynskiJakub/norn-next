@@ -46,6 +46,16 @@ steps:
     outcomes: { approve: $done, reject: $stuck }
 `;
 
+const CHECK_FIRST = `name: checkfirst
+start: test
+steps:
+  test:
+    type: check
+    run: "true"
+    timeout: 1m
+    outcomes: { pass: $done, fail: $stuck }
+`;
+
 let h: Harness;
 beforeAll(async () => {
   h = await createHarness();
@@ -53,6 +63,7 @@ beforeAll(async () => {
   h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
   h.write(join(h.root, ".agents/norn/workflows/story.yaml"), STORY);
   h.write(join(h.root, ".agents/norn/workflows/gatefirst.yaml"), GATE_FIRST);
+  h.write(join(h.root, ".agents/norn/workflows/checkfirst.yaml"), CHECK_FIRST);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);
   h.git(["push", "-q", "origin", "main"]);
@@ -128,6 +139,20 @@ describe("norn story start (B28, MO5)", () => {
     const term = new FakeInteraction();
     const none = await norn({ interaction: term }, "story", "start");
     expect(none.exit).toBe(3);
+    expect(none.value).toMatchObject({ code: "no_target" });
+    expect(term.picks).toEqual([]);
+  });
+
+  test("a manual unit ready at a step that is not an agent step is not offered (B28, B57)", async () => {
+    h.remote.issues = [...h.remote.issues, issue(9, "Run checks", ["norn", "norn:wf:checkfirst"])];
+    for (let i = 0; i < 3; i++) {
+      h.clock.advance(6 * 60_000);
+      await h.tick();
+    }
+    const status = (await h.norn("status", "--json")).value as { stories: Array<{ key: string; status: string; step: string; effective_mode: string }> };
+    expect(status.stories.find((s) => s.key === "gh-9")).toMatchObject({ status: "ready", step: "test", effective_mode: "manual" });
+    const term = new FakeInteraction();
+    const none = await norn({ interaction: term }, "story", "start");
     expect(none.value).toMatchObject({ code: "no_target" });
     expect(term.picks).toEqual([]);
   });

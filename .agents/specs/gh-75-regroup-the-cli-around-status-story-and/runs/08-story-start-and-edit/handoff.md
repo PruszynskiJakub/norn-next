@@ -33,6 +33,8 @@
 - review#1: changes requested. Blocking F1 (AC1): the `startable` picker in story-start.ts:22 offers a manual unit that is ready at a non-agent step, which the command then refuses with nothing_to_open. Minor: F2 (explicit slice key + mode now edits the story), F3 (the AC2 test doesn't show the tick running in auto), F4 (cmd.open/cmd.workflow still printed; slice 14 owns it), F5 (pickTarget alias naming). Suite 1251 pass, typecheck green.
 - review#1 changes_requested: 1 blocking (F1, AC1): story start's no-target picker offers manual units ready at non-agent steps, which the command then refuses. 4 minor/nit. Suite and typecheck green.
 
+- implement#2 (rework): F1 fixed — `UnitView` now carries `step_type` (cursor step's type), and the `story start` picker requires `step_type === "agent"` for a ready manual unit, matching the command. Test: story-start.test.ts "a manual unit ready at a step that is not an agent step is not offered" (gh-9 on a check-first workflow; was red with nothing_to_open). F5: target.ts `resolveTarget` renamed `targetKey` (no more alias); both `unit_done` hints now `cmd.status(t.story)`. F2 kept by design (mode is per story, B55; a slice key means its story) — slice 15's PRD wording should say so. F3 not changed: in that test gh-5's agent is running (MO3), so a launch assertion needs a separate story; carried-over gap. F4 left for slice 14 (update.ts do_instead, agent-unit.ts, cockpit's `cmd.open()` startsWith check must change with the rename). Suite 1252 pass, typecheck green.
+
 ## Resume
 
-Rework F1: make `startable.applies` require an agent step, matching story-start.ts:45, and add a story-start test where a manual unit ready at a check step is not offered. Optionally address F2/F3/F5.
+Review the rework (implement#2).
