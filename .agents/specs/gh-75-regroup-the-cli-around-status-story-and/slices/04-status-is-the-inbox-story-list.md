@@ -2,7 +2,7 @@
 id: gh-75/04
 title: norn status shows what needs you; the listing moves to story list
 depends_on: [ gh-75/01 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
