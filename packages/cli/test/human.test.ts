@@ -438,6 +438,14 @@ describe("a slice gate in its own worktree (X1: views read slice runs from the s
     expect(only.steps.every((s) => s.unit === "gh-8")).toBe(true);
   });
 
+  test("run rerun of the story key stands for its one slice waiting at a gate", async () => {
+    const r = await h.norn("run", "rerun", "gh-8");
+    expect(r.exit).toBe(0);
+    expect((r.value as Verb).receipt).toMatchObject({ kind: "unstick", step: "qa", slice: "gh-8/01", attempt: 1 });
+    await tick();
+    expect(h.state(sliceRuns())).toMatchObject({ step: "qa", attempt: 2, status: "parked", park: { kind: "gate" } });
+  });
+
   test("approve lands in the slice worktree; the next tick finishes the slice and the inbox clears", async () => {
     const r = await h.norn("approve", "gh-8/01");
     expect(r.exit).toBe(0);

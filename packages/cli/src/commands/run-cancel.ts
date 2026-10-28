@@ -23,7 +23,7 @@ export const runCancelCommand = defineCommand({
   async run(ctx, args) {
     const key = await resolveTarget(ctx, args.positionals[0], args.json === true, inState("run cancel", (k) => cmd.runCancel(k), "Nothing is running", (u) => u.status === "running"));
     const t = await resolveUnit(ctx, key, (st) => st.status === "running");
-    started(t);
+    const st = started(t);
     // B53: the session runs on the claim holder's machine; this checkout's copy may be stale (T9)
     const claim = await claimFor(ctx, t.story);
     const notHolder = () => {
@@ -35,27 +35,35 @@ export const runCancelCommand = defineCommand({
       verb: "run cancel",
       mailbox: false,
       claim,
-      check(t, st) {
-        if (st.status !== "running" || !st.run) throw refuse(`${t.key} has no running agent: it is at ${at(st)}`, cmd.status(t.story), "nothing_to_cancel");
+      check(t, cur) {
+        if (cur.status !== "running" || !cur.run) throw refuse(`${t.key} has no running agent: it is at ${at(cur)}`, cmd.status(t.story), "nothing_to_cancel");
         if (claim.state !== "mine" || !t.runsDir) throw notHolder();
       },
-      build: (t, st) => humanReceipt(ctx, t, st, "stuck", { reason: CANCEL_REASON }),
+      build: (t, cur) => humanReceipt(ctx, t, cur, "stuck", { reason: CANCEL_REASON }),
     });
-    // P6: the receipt is written; now stop the session (what kill means is the runner's)
-    const session = sessionOf(t.state as UnitState);
-    let killed = false;
-    if (session && (!t.state?.run?.machine || t.state.run.machine === machineHolder(ctx.env))) {
-      const runner = (await ctx.ports()).runner;
-      if (runner && runner.name === session.runner) {
-        try {
-          await runner.kill(session);
-          killed = true;
-        } catch (e) {
-          throw failure(`${t.key}: cancel recorded, but the session was not stopped: ${(e as Error).message}`, "stop the agent by hand; the next tick will not restart it", "kill_failed");
-        }
-      }
+    // P6: the receipt is written; now stop the session (what kill means is the runner's). A session
+    // norn cannot stop from here is said, never skipped: decide does not kill on a person's stuck (B51)
+    const recorded = { receipt_id: done.receipt.receipt_id, ...(done.delivered.file ? { file: done.delivered.file } : {}) };
+    const notStopped = (why: string, code: string) =>
+      failure(
+        `${t.key}: cancel recorded (${done.delivered.file ?? done.receipt.receipt_id}), but the session was not stopped: ${why}`,
+        `stop the agent by hand; the next tick will not restart it, then ${cmd.runRerun(t.key)}`,
+        code,
+        recorded,
+      );
+    const session = sessionOf(st);
+    if (!session) throw notStopped("norn did not start it, so it has no session to stop", "not_stopped");
+    const here = machineHolder(ctx.env);
+    if (st.run?.machine && st.run.machine !== here) throw notStopped(`it runs on ${st.run.machine}, not ${here}`, "not_stopped");
+    const runner = (await ctx.ports()).runner;
+    if (!runner || runner.name !== session.runner)
+      throw notStopped(`it runs in ${session.runner}, and this checkout's runner is ${runner?.name ?? "not configured"}`, "not_stopped");
+    try {
+      await runner.kill(session);
+    } catch (e) {
+      throw notStopped((e as Error).message, "kill_failed");
     }
-    return { ...done, killed, next: cmd.runRerun(t.key) };
+    return { ...done, killed: true, next: cmd.runRerun(t.key) };
   },
 });
 

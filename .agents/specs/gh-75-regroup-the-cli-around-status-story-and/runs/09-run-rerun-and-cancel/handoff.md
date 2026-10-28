@@ -37,6 +37,15 @@
 - review#1: changes requested. Blocking F1: run cancel skips the kill without saying so (no session, run on another machine, no runner, or the runner name differs), exits 0 and suggests run rerun while the agent keeps working (B51). Minor: the Herdr kill closes the pane AC3/B52 keeps (the slice Notes accepted this, so a person settles it); AC5's ask-parked case and not_stuck are untested; rerun's story-key pick matches stuck slices only; kill_failed drops the receipt. Checks: typecheck green; bun test 1261/1262, the one failure being the ProcessPort zombie contract test (environmental, outside this diff).
 - review#1 changes_requested: Blocking F1: run cancel can write the receipt, skip the kill without saying so and exit 0 with next=run rerun, leaving the agent running (B51). Minor: the Herdr kill closes the pane B52 keeps (a person settles it); AC5 ask-parked and not_stuck untested; rerun's story-key pick matches stuck slices only; kill_failed drops the receipt. Typecheck green; bun test only fails the environmental zombie contract test.
 
+- implement#2 (rework of review#1):
+  - F1: `run cancel` never skips the kill silently. No session, a run on another machine, no runner, or a runner other than the session's → exit 1 `not_stopped`; a throwing kill → `kill_failed`. Both say the receipt is recorded (file in the error, `{receipt_id, file}` in details) and do_instead "stop the agent by hand; the next tick will not restart it, then norn run rerun <unit>". Test: runner renamed vs the session's, and a throwing kill.
+  - F3: tests for rerun of an ask-parked unit and the `not_stuck` refusal (a done unit).
+  - F4: rerun's story-key pick uses `blocked` (stuck or parked); test in human.test.ts (story key → its slice at a gate).
+  - F5: covered by F1 (receipt in kill_failed).
+  - F6: `const st = started(t)`, no cast. The holder check stays twice: the early one refuses before a stale nothing_to_cancel, the one in check stops runHumanVerb acquiring a free claim (mailbox: false); refuseUnlessHolder's do_instead (take --force) is not the spec's `norn story checkout`.
+  - F2 (Herdr kill closes the pane, AC3/B52) left for a person: RunnerPort.kill is used as is per the slice Notes.
+  - Checks: typecheck, bun test (1266 pass), golden (nothing added).
+
 ## Resume
 
-Fix F1 in packages/cli/src/commands/run-cancel.ts (report a skipped kill with a stop-it-by-hand do_instead, plus a test), then address the minor findings from the review receipt.
+Nothing left for implement; next step reviews the rework.

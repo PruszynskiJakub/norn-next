@@ -29,7 +29,7 @@ export const runRerunCommand = defineCommand({
     const reset = [...new Set(opt.list(args, "reset"))];
     const reason = opt.str(args, "reason")?.trim();
     const key = await resolveTarget(ctx, args.positionals[0], args.json === true, inState("run rerun", (k) => cmd.runRerun(k), "Nothing is stuck, parked or at a gate", blocked));
-    const t = await resolveUnit(ctx, key, (st) => st.status === "stuck");
+    const t = await resolveUnit(ctx, key, blocked);
     return runHumanVerb(ctx, t, {
       verb: "run rerun",
       mailbox: true,

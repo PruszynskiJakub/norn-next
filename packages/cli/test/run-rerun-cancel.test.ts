@@ -188,6 +188,45 @@ describe("run cancel (B51–B53)", () => {
     expect(h.runner.killed.length).toBe(killed);
     expect(h.state(runs5())).toMatchObject({ status: "running" });
   });
+
+  test("a session this checkout cannot stop is said, with the receipt, never skipped (B51)", async () => {
+    const killed = h.runner.killed.length;
+    // the run was started by another runner than the one configured here now
+    const runner = h.runner as { name: string };
+    runner.name = "other";
+    const r = await h.norn("run", "cancel", "gh-5", "--json");
+    runner.name = "fake";
+    expect(r.exit).toBe(1);
+    const last = receipts(runs5()).at(-1) as string;
+    expect(last).toMatch(/-stuck\.json$/);
+    expect(r.value).toMatchObject({
+      code: "not_stopped",
+      error: expect.stringContaining("it runs in fake"),
+      do_instead: "stop the agent by hand; the next tick will not restart it, then norn run rerun gh-5",
+      details: { receipt_id: expect.any(String), file: expect.stringContaining(last) },
+    });
+    expect(h.runner.killed.length).toBe(killed);
+    // a kill that throws says the same, with its own code
+    await tick();
+    expect((await h.norn("run", "rerun", "gh-5")).exit).toBe(0);
+    await tick();
+    await tick();
+    expect(h.state(runs5())).toMatchObject({ status: "running" });
+    const kill = h.runner.kill.bind(h.runner);
+    h.runner.kill = async () => {
+      throw new Error("pane gone");
+    };
+    const f = await h.norn("run", "cancel", "gh-5", "--json");
+    h.runner.kill = kill;
+    expect(f.exit).toBe(1);
+    expect(f.value).toMatchObject({ code: "kill_failed", error: expect.stringContaining("pane gone"), details: { receipt_id: expect.any(String) } });
+    await tick();
+    expect(h.state(runs5())).toMatchObject({ status: "stuck", park: { reason: "cancelled by person" } });
+    expect((await h.norn("run", "rerun", "gh-5")).exit).toBe(0);
+    await tick();
+    await tick();
+    expect(h.state(runs5())).toMatchObject({ status: "running" });
+  });
 });
 
 describe("run rerun --step (B49)", () => {
@@ -213,6 +252,27 @@ describe("run rerun --step (B49)", () => {
     expect((r.value as Verb).receipt).toMatchObject({ kind: "unstick", step: "review" });
     await tick();
     expect(h.state(runs6())).toMatchObject({ step: "review", attempt: 2, status: "parked", park: { kind: "gate" } });
+  });
+
+  test("a unit parked on an ask resumes as unstick resumed it", async () => {
+    h.report(runs5(), "ask", { question: "Which currency?", options: [] });
+    await tick();
+    expect(h.state(runs5())).toMatchObject({ step: "implement", status: "parked", park: { kind: "ask" } });
+    const attempt = h.state(runs5())?.attempt as number;
+    const r = await h.norn("run", "rerun", "gh-5");
+    expect(r.exit).toBe(0);
+    expect((r.value as Verb).receipt).toMatchObject({ kind: "unstick", step: "implement", attempt });
+    await tick();
+    await tick();
+    expect(h.state(runs5())).toMatchObject({ step: "implement", attempt: attempt + 1, status: "running" });
+  });
+
+  test("a unit that is not stuck, parked or at a gate is refused", async () => {
+    expect((await h.norn("approve", "gh-6")).exit).toBe(0);
+    await tick();
+    await tick();
+    expect(h.state(runs6())).toMatchObject({ status: "done" });
+    refused(await h.norn("run", "rerun", "gh-6"), "not_stuck");
   });
 });
 
