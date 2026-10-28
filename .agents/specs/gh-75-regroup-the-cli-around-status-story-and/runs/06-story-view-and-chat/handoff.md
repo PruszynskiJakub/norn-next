@@ -14,6 +14,16 @@
 
 ## Goal
 
+`norn story view [<story|slice>] [--web]` and `norn story chat [<story>]` replace `status <key>` and `orient`; `orient` is an unknown command (AC1–AC7).
+
 ## Progress
 
+- Tests: `packages/cli/test/story-view.test.ts` (AC1–AC6, moved from the deleted `orient.test.ts`); `packages/view/test/view.test.ts` orient test updated for the extended report and `formatStoryView`.
+- `@norn/view` orient report extended (D6): each unit carries `workflow`, `attempt`, `next`; slices `slice_status`, `depends_on`; top-level `pr_state`. `formatOrient` → `formatStoryView(r, now, { rules })`: heading `# gh-N — Title`; the chat agent's rules print only under `NORN_ORIENT=1`.
+- cli: `story view` (`--web` opens PR url, else issue url via `runtime/open-link.ts`, moved out of cockpit.ts) and `story chat` (was `orient --open`; agent prompt `Run \`norn story view gh-N\` and follow it.`). Target rule `aStory` in `runtime/target.ts`: in a slice worktree acts on the story (B55), prompt offers stories only.
+- Cockpit: orient place action runs `story chat`; outside Herdr the orient action's argv is `story view <key>`. Action ids/labels ("orient") left for slice 14 (printed strings).
+- `cmd.orient` removed; `cmd.storyView`, `cmd.storyChat` added (printed-commands table updated). `look.status` still prints `norn status <key>` — rename belongs to slice 14.
+
 ## Resume
+
+Run `bun test` and `bun run typecheck`; if green, commit and `norn done done`.
