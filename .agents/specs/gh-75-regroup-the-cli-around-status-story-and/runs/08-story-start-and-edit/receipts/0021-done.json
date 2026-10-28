@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61V5TAAZFDYJZENRWPSCNTC",
+  "run_id": "01M61T7FMXTAWZA0W1FXGH2CEX",
+  "step": "merge",
+  "attempt": 1,
+  "at": "2026-10-28T18:08:22.859Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/08",
+  "outcome": "done",
+  "handoff": "Merged the story branch (slices 04–06) into 08, keeping both sides: the story noun has list/view/chat/start/edit; inbox/cockpit/orient and open/mode/workflow are all gone; help Start here lists status and story; target.ts combines base's story flag (B55) with the view-aware applies/unitOf, base callers renamed to targetKey; cmd keeps statusWatch/storyChat/storyView plus storyEdit/storyStart. Fixed semantic fallout: story-start tests use status / story list instead of inbox/status stories; base's story verb tests include start, edit. Suite 1273 pass, typecheck green. Merge commit 6384978."
+}
