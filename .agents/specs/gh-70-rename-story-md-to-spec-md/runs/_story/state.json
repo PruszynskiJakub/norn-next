@@ -5,36 +5,35 @@
   "unit_dir": "_story",
   "workflow": "triage",
   "workflow_hash": "c0202af600b5edd136ac0ee38c69d4812666f629d955b3b83ad0ac61fc196380",
-  "step": "explore",
+  "step": "confirm",
   "attempt": 1,
   "visits": {
-    "explore": 1
+    "explore": 1,
+    "confirm": 1
   },
-  "step_entered_at": "2026-10-27T22:37:49.730Z",
-  "status": "running",
-  "park": null,
+  "step_entered_at": "2026-10-28T13:49:35.083Z",
+  "status": "parked",
+  "park": {
+    "kind": "gate",
+    "reason": "Read the triage findings and the recommendation in story.md (also posted on the issue). N is the issue number. Switch to a workflow: `norn workflow gh-N fix --to reproduce`, `norn workflow gh-N quick --to implement`, `norn workflow gh-N story --to refine` or `norn workflow gh-N spec --to refine`. Close: `norn approve gh-N --reason \"<why>\"`, then `gh issue close N --reason \"not planned\"`, then `norn drop gh-N` (a story at $done without a PR otherwise waits for a merge, GR6), then `git push origin --delete gh-N-<slug>` (drop pushed the story branch; the findings stay on the issue comment). Triage again: `norn approve gh-N --reject --reason \"<what to look at>\"`.",
+    "since": "2026-10-28T13:49:35.083Z"
+  },
   "counters": {
     "triage_loop": 0
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 1,
-  "run": {
-    "run_id": "01M61BZAHFD7E0GVBBVVHP3YJQ",
+  "applied_through": 2,
+  "run": null,
+  "last_outcome": {
     "step": "explore",
-    "attempt": 1,
-    "started_at": "2026-10-28T13:42:41.655Z",
-    "how": "manual",
-    "agent": "claude",
-    "agent_session_id": "a529886f-b448-4bfb-a2e6-c58387a64a84",
-    "process": {
-      "pid": 9613,
-      "pid_start": "Wed Oct 28 14:42:30 2026"
-    }
+    "outcome": "story",
+    "source": "reported",
+    "at": "2026-10-28T13:43:47.150Z",
+    "receipt_id": "01M61C1APDXVH758Q1N2GVJ223"
   },
-  "last_outcome": null,
   "created_at": "2026-10-27T22:37:49.730Z",
-  "updated_at": "2026-10-28T13:43:03.085Z",
-  "last_tick_id": "01M61BZZNCQQD6003J0PVZ8XMG",
+  "updated_at": "2026-10-28T13:49:35.083Z",
+  "last_tick_id": "01M61CBYFAJBMRQGZHVSM94PNK",
   "mode": "manual"
 }
