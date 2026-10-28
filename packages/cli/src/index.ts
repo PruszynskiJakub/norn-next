@@ -10,6 +10,7 @@ export { busyError, CliFailure, corruptError, failure, isRendered, isWithExit, r
 export { type ActRecord, Actor } from "./runtime/act/index.ts";
 export { heartbeatId, markNotified, readNotified, readRemoteCache } from "@norn/store";
 export { type Observed, observe, type ObserveOptions, type StoryLoc, type SyncMode, type UnitLoc } from "./runtime/observe/index.ts";
+export { type Interaction, type InteractionChoice, isAgentSession, terminalInteraction } from "./runtime/interaction.ts";
 export { releaseHeldClaims, releaseStory } from "./runtime/release.ts";
 export { runShell, tailLines } from "./runtime/shell.ts";
 export { replayInputs, runTick, type TickOptions, type TickReport, traceRecord } from "./runtime/tick.ts";

@@ -12,7 +12,7 @@ import { dirname, join } from "node:path";
 import type { Clock, InboxItem, LaunchSpec, NotifierPort, PaneState, PromptKey, RemoteIssue, RemotePort, RemotePullRequest, RunnerCapabilities, RunnerPort, RunnerSessionInfo, SessionRef } from "@norn/core";
 import { type Receipt, type UnitState, ulid } from "@norn/schema";
 import { appendReceipt, installSkills, linkSkills, readState } from "@norn/store";
-import { bundledSkills, type CliDeps, type CliResult, runCli, type TickReport } from "../src/index.ts";
+import { bundledSkills, type CliDeps, type CliResult, type Interaction, type InteractionChoice, runCli, type TickReport } from "../src/index.ts";
 import { assetsDir } from "../src/runtime/assets.ts";
 import { harvestGolden } from "./golden-harvest.ts";
 
@@ -140,6 +140,22 @@ export class FakeNotifier implements NotifierPort {
   }
 }
 
+/** D2: the terminal, scripted. `tty: false` is "no TTY"; each `pick` takes the next answer (null = the person left). */
+export class FakeInteraction implements Interaction {
+  picks: Array<{ question: string; choices: InteractionChoice[]; preselect: number }> = [];
+  answers: Array<string | null> = [];
+  constructor(readonly tty = true) {}
+  async pick(question: string, choices: readonly InteractionChoice[], preselect: number) {
+    this.picks.push({ question, choices: [...choices], preselect });
+    const next = this.answers.shift();
+    return next === undefined ? (choices[preselect]?.value ?? null) : next;
+  }
+}
+
+/** A6 launch env and the orient env: the env of the agent session a test may run in is not the harness's. */
+const AGENT_ENV = ["NORN_HOME", "NORN_STORY", "NORN_SLICE", "NORN_RUN", "NORN_BIN", "NORN_ORIENT"];
+const hostEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !AGENT_ENV.includes(k)));
+
 export function sh(cwd: string, args: string[], input?: string): string {
   const r = Bun.spawnSync(["git", ...args], { cwd, stdin: input === undefined ? "ignore" : new TextEncoder().encode(input), stdout: "pipe", stderr: "pipe" });
   if (r.exitCode !== 0) throw new Error(`git ${args.join(" ")} (${cwd}): ${r.stderr.toString()}`);
@@ -201,9 +217,10 @@ export async function createHarness(): Promise<Harness> {
   const notifier = new FakeNotifier();
   const deps: CliDeps = {
     cwd: root,
-    env: { ...process.env, NORN_HOME_DIR: home, USER: "tester", NORN_MACHINE: "box", NORN_HOOK_COMMAND: "norn hook" },
+    env: { ...hostEnv(), NORN_HOME_DIR: home, USER: "tester", NORN_MACHINE: "box", NORN_HOOK_COMMAND: "norn hook" },
     clock,
     ports: { remote, runner, notifiers: [notifier] },
+    interaction: null,
   };
   const h: Harness = {
     dir,

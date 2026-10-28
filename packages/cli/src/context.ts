@@ -12,6 +12,7 @@ import type { AdapterContext, AdapterRegistry, Clock, GitPort, Ports } from "@no
 import { DEFAULT_CONFIG, type ResolvedConfig } from "@norn/schema";
 import { type LoadedConfig, loadConfig, nornHome, readUnitMarker, type UnitMarker } from "@norn/store";
 import { corruptError, refuse } from "./output.ts";
+import { type Interaction, isAgentSession, terminalInteraction } from "./runtime/interaction.ts";
 import { buildPorts, defaultRegistry } from "./wiring.ts";
 
 /** Everything a command may get injected; all optional (tests pass fakes). */
@@ -36,6 +37,8 @@ export interface CliDeps {
   herdr?: herdr.HerdrCockpit | null;
   /** an outside command a front end starts for the person (`norn cockpit` opens a PR or issue link); default Bun.spawn */
   shell?: (argv: string[], cwd: string) => Promise<{ code: number; stderr: string }>;
+  /** D2: the terminal a person answers prompts in; null = none (no TTY); absent = the process terminal */
+  interaction?: Interaction | null;
 }
 
 export const systemClock: Clock = {
@@ -164,6 +167,12 @@ export class Context {
       this.builtPorts = await buildPorts(this.registry, this.adapterContext(this.root, config), config, { git: this.git, ...this.deps.ports });
     }
     return this.builtPorts;
+  }
+
+  /** D2: the terminal to prompt in — a TTY, no `--json`, not an agent session (A6, orient) — else null. */
+  terminal(json: boolean): Interaction | null {
+    const t = this.deps.interaction === undefined ? terminalInteraction() : this.deps.interaction;
+    return t?.tty && !json && !isAgentSession(this.env) ? t : null;
   }
 
   log(line: string): void {

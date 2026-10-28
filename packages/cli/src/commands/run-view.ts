@@ -32,6 +32,7 @@ import { defineCommand, opt, type ParsedArgs } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, rendered, usageError, withExit } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
+import { hasRun, resolveTarget } from "../runtime/target.ts";
 import { replayInputs } from "../runtime/tick.ts";
 import { NORN_VERSION } from "../version.ts";
 
@@ -336,7 +337,7 @@ const WHY_ONLY = ["tick", "step", "attempt", "transition", "rule"] as const;
 export const runViewCommand = defineCommand({
   name: "run view",
   summary: "One run of a unit: step, attempt, outcome, durations, receipts; --why replays the decision (B44, O5)",
-  usage: "norn run view <run|unit> [--why [--tick <tick_id>] [--step <step>] [--attempt <n>] [--transition <step>.<outcome>] [--rule <prefix>]] | norn run view [<unit>] --receipt <receipt_id>",
+  usage: "norn run view [<run|unit>] [--why [--tick <tick_id>] [--step <step>] [--attempt <n>] [--transition <step>.<outcome>] [--rule <prefix>]] | norn run view [<unit>] --receipt <receipt_id>",
   markdown: true,
   optionHelp: {
     "--why": "replay decide on the recorded tick and show the rule that fired and what triggered it",
@@ -353,8 +354,7 @@ export const runViewCommand = defineCommand({
     if (opt.bool(args, "why") || opt.str(args, "receipt") !== undefined) return why(ctx, args);
     const stray = WHY_ONLY.find((o) => args.values[o] !== undefined);
     if (stray) throw usageError(`--${stray} needs --why`, `norn run view <unit> --why --${stray} …`);
-    const target = args.positionals[0];
-    if (!target) throw usageError("run view: expected a run id or a unit", "norn run view <run|unit>");
+    const target = await resolveTarget(ctx, args.positionals[0], args.json === true, hasRun(ctx, "run view", cmd.runView));
     const runId = new RegExp(ULID_PATTERN).test(target);
     const key = runId ? target : parseUnitKey(target).key;
     const run = loadRunView({ repoRoot: ctx.root, home: ctx.home, env: ctx.env, now: ctx.clock.now(), target: key });

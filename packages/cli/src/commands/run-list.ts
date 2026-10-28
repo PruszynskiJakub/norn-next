@@ -10,12 +10,13 @@ import { formatStepTimeline, loadTraceView } from "@norn/view";
 import { defineCommand, opt } from "../command.ts";
 import { refuse, rendered, usageError } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
+import { hasRun, resolveTarget } from "../runtime/target.ts";
 import { cmd } from "@norn/core";
 
 export const runListCommand = defineCommand({
   name: "run list",
   summary: "Step timeline of a unit: durations, outcomes, who, reasons; a story with its slices (O4)",
-  usage: "norn run list <unit> [--json] [--full] [--events] [--all] [--story-only] [--limit N]",
+  usage: "norn run list [<unit>] [--json] [--full] [--events] [--all] [--story-only] [--limit N]",
   markdown: true,
   optionHelp: {
     "--full": "keep reasons whole and list briefings and receipts",
@@ -31,9 +32,9 @@ export const runListCommand = defineCommand({
     "story-only": { type: "boolean" },
     limit: { type: "string" },
   },
-  positionals: { min: 1, max: 1 },
+  positionals: { max: 1 },
   async run(ctx, args) {
-    const { key } = parseUnitKey(args.positionals[0] as string);
+    const { key } = parseUnitKey(await resolveTarget(ctx, args.positionals[0], args.json === true, hasRun(ctx, "run list", cmd.runList)));
     const rawLimit = opt.str(args, "limit");
     const limit = rawLimit === undefined ? null : Number(rawLimit);
     if (limit !== null && !(Number.isInteger(limit) && limit > 0)) throw usageError(`bad --limit '${rawLimit}'`, cmd.runList(key, { limit: 20 }));
