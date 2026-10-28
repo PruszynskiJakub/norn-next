@@ -14,6 +14,18 @@
 
 ## Goal
 
+`norn story checkout|handoff|close` replace `take|release|drop` (B33–B39, B55, B5); take's restore lives in `runtime/checkout.ts` (prefactor 3).
+
 ## Progress
 
+- Prefactor 3 committed first (c52bc0f): `checkoutStory` in `packages/cli/src/runtime/checkout.ts`, behaviour unchanged.
+- `story` noun (`commands/story.ts`) with `story-checkout.ts`, `story-handoff.ts`, `story-close.ts` (moved from take/release/drop; old commands gone → unknown commands). `withStory` moved to `runtime/release.ts`.
+- Close: already_closed reads `story.md` from the fetched story branch (D5, new store `parseStoryFile`); B38 reads the claim from the remote (`claimFor`) — the local claim ref can be stale (a lost race left the loser "mine"), which made the old drop push and fail.
+- Interaction gained `confirm` (real: line on stdin; harness `FakeInteraction.confirms`/`questions`). `aStory`/`resolveStory` in `runtime/target.ts` (B55).
+- New cmd builders `storyCheckout`, `storyHandoff`, `storyClose`; unused `cmd.drop`/`cmd.release` removed. `cmd.take` stays for other commands' do_instead (slice 14 renames).
+- team.test.ts: harness clones now strip the agent env (`hostEnv`, exported) — before, an agent-run suite saw NORN_RUN and treated every clone as an agent session.
+- AC10 checked by hand in two throwaway clones with a fake `gh` on PATH: handoff on A, checkout on B (refine parked), close --yes on B → remote story.md `status: dropped`, no claim, only `issue list`/`pr list` gh calls.
+
 ## Resume
+
+Run the full suite and typecheck; if green, commit and report `norn done done`.
