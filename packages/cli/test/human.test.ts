@@ -349,6 +349,25 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
     refused(await h.norn("run", "list", "gh-9"), "unknown_unit");
   });
 
+  test("run list: --all shows the no-op ticks; --full keeps reasons whole and lists receipts (AC3)", async () => {
+    type Row = { events?: Array<{ source: string; kind: string; summary: string }>; reason: string | null; paths: { receipts: string[] } };
+    const r = (await h.norn("run", "list", "gh-5")).value as { steps: Row[]; hidden_events: number };
+    expect(r.hidden_events).toBeGreaterThan(0);
+    const all = (await h.norn("run", "list", "gh-5", "--all")).value as { steps: Row[]; hidden_events: number };
+    expect(all.hidden_events).toBe(0);
+    const noise = all.steps.flatMap((s) => s.events ?? []).filter((e) => e.source === "tick" && (e.kind === "noop" || e.summary.startsWith("tick claim.renew ")));
+    expect(noise.length).toBe(r.hidden_events);
+    const short = (await h.norn("run", "list", "gh-5")).stdout;
+    const full = (await h.norn("run", "list", "gh-5", "--full")).stdout;
+    const receipts = r.steps.flatMap((s) => s.paths.receipts);
+    expect(receipts.length).toBeGreaterThan(0);
+    for (const p of receipts) {
+      expect(full).toContain(p);
+      expect(short).not.toContain(p);
+    }
+    expect((await h.norn("run", "list", "gh-5", "--full", "--json")).value).toEqual((await h.norn("run", "list", "gh-5", "--json")).value);
+  });
+
   test("run view: a unit's latest run, a run by its id; --json is the data (B44, B6)", async () => {
     type Row = { unit: string; step: string; attempt: number; outcome: string | null; who: Array<{ run_id: string | null }> };
     const steps = ((await h.norn("run", "list", "gh-5", "--json")).value as { steps: Row[] }).steps;
@@ -371,6 +390,9 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
     refused(await h.norn("run", "view", "gh-9"), "unknown_unit");
     expect((await h.norn("run", "view")).exit).toBe(2);
     expect((await h.norn("run", "view", "gh-5", "--tick", "01ARZ3NDEKTSV4RRFFQ69G5FAV")).exit).toBe(2); // --tick needs --why
+    const noUnit = await h.norn("run", "view", "--why", "--json");
+    expect(noUnit.exit).toBe(2); // --why without a unit or --receipt is a usage error, not a refusal
+    expect((noUnit.value as { error: string }).error).not.toContain("undefined");
   });
 });
 
@@ -411,6 +433,9 @@ describe("a slice gate in its own worktree (X1: views read slice runs from the s
     expect(v.steps).toContainEqual(expect.objectContaining({ unit: "gh-8/01", step: "qa" }));
     expect(list.stdout).toContain("\n  gh-8/01 ");
     expect((await h.norn("run", "view", "gh-8/01", "--json")).value).toMatchObject({ unit: "gh-8/01", story: "gh-8", slice: "gh-8/01", step: "qa", type: "gate", open: true, run_id: null });
+    const only = (await h.norn("run", "list", "gh-8", "--story-only")).value as typeof v;
+    expect(only.units.map((u) => u.unit)).toEqual(["gh-8"]);
+    expect(only.steps.every((s) => s.unit === "gh-8")).toBe(true);
   });
 
   test("approve lands in the slice worktree; the next tick finishes the slice and the inbox clears", async () => {

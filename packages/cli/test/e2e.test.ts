@@ -191,6 +191,14 @@ describe("norn init", () => {
     expect((await h.norn("run", "view", "--help", "--json")).value).toEqual(r.value);
   });
 
+  test("help with an unknown name, or a word after a plain command, is a usage error (B5)", async () => {
+    for (const args of [["nosuch"], ["init", "extra"]]) {
+      const r = await h.norn("help", ...args);
+      expect(r.exit).toBe(2);
+      expect(r.value).toMatchObject({ error: `Unknown command: ${args.join(" ")}`, code: "unknown_command" });
+    }
+  });
+
   test("help --all adds the hidden tier", async () => {
     const all = await h.norn("help", "--all");
     expect(all.exit).toBe(0);
@@ -198,13 +206,13 @@ describe("norn init", () => {
   });
 
   test("the old trace and why are unknown commands, and write nothing (B5)", async () => {
-    const before = h.git(["status", "--porcelain", "--untracked-files=all"]);
+    const before = h.git(["status", "--porcelain", "--untracked-files=all", "--ignored"]);
     for (const name of ["trace", "why"]) {
       const r = await h.norn(name, "gh-1");
       expect(r.exit).toBe(2);
       expect(r.value).toMatchObject({ error: `Unknown command: ${name}`, code: "unknown_command", do_instead: expect.stringContaining("norn help") });
     }
-    expect(h.git(["status", "--porcelain", "--untracked-files=all"])).toBe(before);
+    expect(h.git(["status", "--porcelain", "--untracked-files=all", "--ignored"])).toBe(before);
   });
 
   test("every command accepts --json", async () => {

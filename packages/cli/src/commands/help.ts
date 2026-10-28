@@ -119,6 +119,8 @@ export const helpCommand = defineCommand({
     }
     if (noun) return rendered({ ...nounHelp(noun), for: commandFor(noun.name) }, formatNounHelp(noun));
     const c = name ? findCommand(name) : undefined;
+    // B5: an unknown name, or a word after a plain command, is a usage error, as it is for `norn <name>`
+    if (name && (!c || verb)) throw usageError(`Unknown command: ${args.positionals.join(" ")}`, "norn help", "unknown_command");
     if (c) return rendered({ ...helpFor(c), for: commandFor(c.name) }, formatCommandHelp(c));
     const skills = bundledSkills(ctx.env);
     const all = opt.bool(args, "all");
