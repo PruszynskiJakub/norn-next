@@ -880,7 +880,7 @@ norn uninstall`,
 
 { part: "team", id: "no-herdr", title: "Run norn without Herdr", tags: ["headless", "manual", "fallback", "brief"],
   when: "You don't use Herdr, or you are on a server.",
-  steps: ["Use the <code>headless</code> runner for auto mode: unattended agents run as background processes.", "Run <code>norn watch --human</code> in one terminal and <code>norn cockpit</code> in another. The cockpit works; <kbd>Enter</kbd> shows the <code>norn orient</code> report instead of opening a workspace.", "For attended steps, run the <code>cd … && claude …</code> line the item prints in any terminal. Or open any agent in the unit's worktree and type <code>/norn</code> (Claude Code plugin), or tell it <i>Use the norn skill, then run <code>norn brief</code></i>."],
+  steps: ["Use the <code>headless</code> runner for auto mode: unattended agents run as background processes.", "Run <code>norn watch --human</code> in one terminal and <code>norn cockpit</code> in another. The cockpit works; <kbd>Enter</kbd> shows the <code>norn orient</code> report instead of opening a workspace.", "For attended steps, run the <code>cd … && claude …</code> line the item prints in any terminal. Or open any agent in the unit's worktree and tell it <i>Use the norn skill, then run <code>norn brief</code></i>."],
   code: `# ~/.norn/config.yaml
 runner:
   adapter: headless
