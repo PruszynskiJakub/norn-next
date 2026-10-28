@@ -3,9 +3,9 @@
 - Workflow: slice · Step: review (attempt 2)
 - Status: running
 - Counters: conflict_loop 0/2, qa_loop 0/2, review_loop 1/3, test_loop 0/5
-- Last outcome: test.pass (classified, 2026-10-28T17:40:23.342Z)
+- Last outcome: review.died (classified, 2026-10-28T17:42:39.390Z)
 - Next: `norn trace gh-75/09`
-- Updated: 2026-10-28T17:42:14.629Z
+- Updated: 2026-10-28T17:42:50.037Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - slice.start: slice at implement
@@ -18,6 +18,7 @@
 - receipts.apply: implement.done → test
 - receipts.apply: test.pass → review
 - agent.start: review run 01M61SNSQ97GV6MKHTGDX3WKTG
+- agent.died.retry: fresh session
 <!-- norn:heartbeat:end -->
 
 ## Goal
