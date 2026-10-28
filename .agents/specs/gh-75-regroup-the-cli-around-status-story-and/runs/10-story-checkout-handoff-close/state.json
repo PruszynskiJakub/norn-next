@@ -5,14 +5,14 @@
   "unit_dir": "10-story-checkout-handoff-close",
   "workflow": "slice",
   "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
-  "step": "test",
+  "step": "review",
   "attempt": 2,
   "visits": {
     "implement": 2,
     "test": 2,
-    "review": 1
+    "review": 2
   },
-  "step_entered_at": "2026-10-28T18:48:25.916Z",
+  "step_entered_at": "2026-10-28T18:55:33.563Z",
   "status": "ready",
   "park": null,
   "counters": {
@@ -23,16 +23,16 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 10,
+  "applied_through": 11,
   "run": null,
   "last_outcome": {
-    "step": "implement",
-    "outcome": "done",
-    "source": "reported",
-    "at": "2026-10-28T18:48:20.275Z",
-    "receipt_id": "01M61XEZHJJG01PKHAA9FW20N2"
+    "step": "test",
+    "outcome": "pass",
+    "source": "classified",
+    "at": "2026-10-28T18:55:28.578Z",
+    "receipt_id": "01M61XW1T1YXRMCQJXZ2V0RES2"
   },
   "created_at": "2026-10-28T14:13:16.910Z",
-  "updated_at": "2026-10-28T18:48:25.916Z",
-  "last_tick_id": "01M61XF51VY9XDRBZQRC93SF0Y"
+  "updated_at": "2026-10-28T18:55:33.563Z",
+  "last_tick_id": "01M61XW6NVHJ9DV2K3TEE8V130"
 }
