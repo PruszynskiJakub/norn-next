@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M610P8KTCEK3WD4KENF8QJZR",
+  "run_id": "01M61057KQ36WXTZW85RBVBGY2",
+  "step": "implement",
+  "attempt": 2,
+  "at": "2026-10-28T10:25:30.234Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/01",
+  "outcome": "done",
+  "handoff": "Review#1 rework: run view --why with no unit/--receipt is now a usage error (exit 2), tested; run list tests for --all, --full and --story-only; AC6 write check uses git status --ignored; help <unknown> and help <cmd> extra are Unknown command usage errors; small nits (unknownCommand name, blank line). F3 hidden help tier left for slice 14. typecheck green, bun test 1208 pass."
+}
