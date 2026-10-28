@@ -5,7 +5,7 @@
   "unit_dir": "04-status-is-the-inbox-story-list",
   "workflow": "slice",
   "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
-  "step": "integrate",
+  "step": "$done",
   "attempt": 3,
   "visits": {
     "implement": 1,
@@ -16,7 +16,7 @@
     "merge": 2
   },
   "step_entered_at": "2026-10-28T15:41:33.668Z",
-  "status": "ready",
+  "status": "done",
   "park": null,
   "counters": {
     "test_loop": 0,
@@ -26,16 +26,16 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 18,
+  "applied_through": 19,
   "run": null,
   "last_outcome": {
-    "step": "merge",
+    "step": "integrate",
     "outcome": "done",
-    "source": "reported",
-    "at": "2026-10-28T15:33:23.732Z",
-    "receipt_id": "01M61JA14M3S76WAC8673G2WT8"
+    "source": "classified",
+    "at": "2026-10-28T15:42:09.151Z",
+    "receipt_id": "01M61JT27ZP9R5ZTTC37SDNH1B"
   },
   "created_at": "2026-10-28T13:10:40.637Z",
-  "updated_at": "2026-10-28T15:41:33.668Z",
-  "last_tick_id": "01M61JRZK3QRMHG88RNJNKTDCJ"
+  "updated_at": "2026-10-28T15:42:33.675Z",
+  "last_tick_id": "01M61JTT69CBBYDXS5PWECXQ5T"
 }
