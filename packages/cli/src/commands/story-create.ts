@@ -12,7 +12,7 @@ import { storyKey } from "@norn/schema";
 import { loadWorkflows } from "@norn/store";
 import { defineCommand, opt, type ParsedArgs } from "../command.ts";
 import type { Context } from "../context.ts";
-import { failure, refuse, rendered, usageError } from "../output.ts";
+import { CliFailure, failure, refuse, rendered, usageError } from "../output.ts";
 import { openLink } from "../runtime/open-link.ts";
 import { runTick } from "../runtime/tick.ts";
 
@@ -64,10 +64,20 @@ export const storyCreateCommand = defineCommand({
       throw remoteFailed(e); // B22: nothing written locally yet
     }
     const story = storyKey(created.provider, created.number);
+    const made = { story, url: created.url, number: created.number, labels: created.labels };
+    const later = (error: string) =>
+      // B22: the issue exists, so a failed intake is no failure of this command; a retry would create it twice
+      rendered({ ...made, taken_in: false, intake_error: error, do_instead: cmd.sync() }, `${story}\n\nCreated ${created.url}, but the intake did not run: ${error}\nIt is taken in by the next tick, or now with \`${cmd.sync()}\` — do not create it again.\n`);
     // GR1: the same intake `norn sync` runs
-    const report = await runTick(ctx, { sync: "force" });
-    const intake = report.decisions.filter((d) => d.kind === "intake_story").map((d) => ({ rule: d.rule, ok: d.ok, ...(d.error ? { error: d.error } : {}) }));
-    return rendered({ story, url: created.url, number: created.number, labels: created.labels, intake }, `${story}\n\nCreated ${created.url} and took it in; it starts like any new story (\`${cmd.status()}\`).\n`);
+    let report;
+    try {
+      report = await runTick(ctx, { sync: "force" });
+    } catch (e) {
+      return later(e instanceof CliFailure ? e.body.error : (e as Error).message);
+    }
+    const intake = report.decisions.find((d) => d.kind === "intake_story" && d.story === story);
+    if (!intake?.ok) return later(intake?.error ?? "this tick did not take it in");
+    return rendered({ ...made, taken_in: true }, `${story}\n\nCreated ${created.url} and took it in; it starts like any new story (\`${cmd.status()}\`).\n`);
   },
 });
 

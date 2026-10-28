@@ -7,6 +7,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { acquireTickLock } from "@norn/store";
 import type { StoryView } from "@norn/view";
 import type { CliDeps, CliResult } from "../src/index.ts";
 import { runCli } from "../src/index.ts";
@@ -75,7 +76,7 @@ describe("with a title (B18)", () => {
     const r = await norn({}, "story", "create", "--title", "Second one", "--json");
     expect(r.exit).toBe(0);
     const created = h.remote.issues.at(-1)!;
-    expect(r.value).toMatchObject({ story: `gh-${created.number}`, url: created.url });
+    expect(r.value).toMatchObject({ story: `gh-${created.number}`, url: created.url, taken_in: true });
     expect(created.labels).toEqual(["norn"]); // no --workflow: the norn label only
     expect(created.body).toBe("");
   });
@@ -146,6 +147,28 @@ describe("the remote failing (B22)", () => {
     expect(local()).toEqual(before);
     expect(h.git(["rev-parse", "HEAD"])).toBe(head);
     expect((await stories()).map((s) => s.title)).not.toContain("Never made");
+  });
+});
+
+describe("the intake failing after the issue exists (B22)", () => {
+  test("prints the created story with exit 0 and points at norn sync, never at a second create", async () => {
+    const lock = await acquireTickLock(h.root, { note: "watch" }); // a running `norn watch` holds it
+    if (!lock.ok) throw new Error("tick lock not taken");
+    try {
+      const r = await norn({}, "story", "create", "--title", "Made while watch ticks", "--json");
+      expect(r.exit).toBe(0);
+      const created = h.remote.issues.at(-1)!;
+      expect(creates()).toHaveLength(1);
+      expect(r.value).toMatchObject({ story: `gh-${created.number}`, url: created.url, taken_in: false, do_instead: "norn sync" });
+      expect((r.value as { intake_error: string }).intake_error).toContain("another tick is running");
+      const md = await norn({}, "story", "create", "--title", "Made while watch ticks, markdown");
+      expect(md.exit).toBe(0);
+      expect(md.stdout).toContain(`gh-${h.remote.issues.at(-1)!.number}`);
+      expect(md.stdout).toContain("norn sync");
+      expect(md.stdout).not.toContain("took it in");
+    } finally {
+      lock.release();
+    }
   });
 });
 

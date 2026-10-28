@@ -17,7 +17,7 @@ export interface Interaction {
   readonly tty: boolean;
   /** one of `choices`, starting at `preselect`; null when the person leaves (Esc, Ctrl-C) */
   pick(question: string, choices: readonly InteractionChoice[], preselect: number): Promise<string | null>;
-  /** one line typed after `question`; null when the person leaves (Ctrl-C, Ctrl-D) */
+  /** one line typed after `question`; null on end of input (Ctrl-D) */
   ask(question: string): Promise<string | null>;
   /** `text` edited in `$VISUAL` / `$EDITOR` (vi when neither is set); null when the editor fails */
   edit(text: string): Promise<string | null>;
