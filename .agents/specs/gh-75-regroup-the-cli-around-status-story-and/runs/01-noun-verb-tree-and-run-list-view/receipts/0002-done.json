@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M60Z53K9ZQK58J9D6J7QKW0N",
+  "run_id": "01M60XSE396EDG8JTG93WCRZXG",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-28T09:58:39.465Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/01",
+  "outcome": "done",
+  "handoff": "Noun-verb tree in the command framework (nouns, verb help with options, help <noun>, help --all hidden-group flag, 'Unknown command: …'); run noun with run list (moved trace) and run view <unit|run-id> [--why|--receipt] (moved why, JSON unchanged; --receipt works without a unit); trace/why removed; cockpit trace action runs run list. Old tests moved, new tests in e2e/human/criteria; bun test 1206 pass, typecheck green; AC8 checked in a harness-built repo. Printed 'norn trace/why' hints left for slice 14 as specified."
+}
