@@ -1,0 +1,56 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61K1BM04KJQ8PXJWT49D5RE",
+  "run_id": "01M61J828FX9YCCDJ8QHK4FWRD",
+  "step": "qa",
+  "attempt": 1,
+  "at": "2026-10-28T15:46:08.132Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/07",
+  "outcome": "pass",
+  "handoff": "QA pass: AC1–AC8 observed. cli suite 355 pass, typecheck green. AC8: in a throwaway harness repo, story approve/reject --reason give the same stdout, receipts and next-tick routing as base's approve/approve --reject (diff empty). Reject without --reason exits 2 with reason_required. The old verbs are unknown commands.",
+  "evidence": "evidence/01M61J828FX9YCCDJ8QHK4FWRD",
+  "criteria": [
+    {
+      "id": "AC1",
+      "verdict": "pass",
+      "evidence": "AC1.md, tests-AC1-7.txt: story-decision 'story answer delivers the answer…' + human.test.ts answer tests (receipt, typing, mailbox)"
+    },
+    {
+      "id": "AC2",
+      "verdict": "pass",
+      "evidence": "AC2.md, tests-AC1-7.txt; also observed in AC8-new.txt (approve receipt, next tick → $done)"
+    },
+    {
+      "id": "AC3",
+      "verdict": "pass",
+      "evidence": "AC3.md, tests-AC1-7.txt; observed in AC8-new.txt and AC8-new-refusals.txt (reject receipt with comment, routes to work loop=1; no --reason → exit 2 reason_required, do_instead 'pass --reason')"
+    },
+    {
+      "id": "AC4",
+      "verdict": "pass",
+      "evidence": "AC4.md, tests-AC1-7.txt: base-sync.test.ts story update-branch (re-entry, not_waiting refusal), transcript base-sync.txt"
+    },
+    {
+      "id": "AC5",
+      "verdict": "pass",
+      "evidence": "AC5.md, tests-AC1-7.txt: 'in the slice worktree, update-branch acts on the story and approve on the slice'"
+    },
+    {
+      "id": "AC6",
+      "verdict": "pass",
+      "evidence": "AC6.md, tests-AC1-7.txt: pick-list offers gh-1/gh-2/gh-4-01 for approve/reject, gh-3 for answer; 'Nothing waits at a gate' refusal"
+    },
+    {
+      "id": "AC7",
+      "verdict": "pass",
+      "evidence": "AC7.md, tests-AC1-7.txt; observed in AC8-new-refusals.txt (approve/update exit 2 Unknown command)"
+    },
+    {
+      "id": "AC8",
+      "verdict": "pass",
+      "evidence": "AC8.md, AC8-new.txt, AC8-old.txt, AC8-new-refusals.txt"
+    }
+  ]
+}
