@@ -48,6 +48,8 @@ Noun–verb command tree in the framework (prefactor 1), and the `run` noun: `ru
 - qa#1: all 8 criteria pass. bun test 1208 pass, typecheck green. In a harness-built throwaway repo (13 ticks), `run list gh-5` is byte-identical to released 0.10.0 `trace gh-5` for every flag (text and --json); `run view --why` (all filters) and `--receipt` (with and without unit) identical to `why` except refusal do_instead now names `run list`; trace/why exit 2 Unknown command, nothing written; status/inbox/config/doctor unchanged.
 - qa#1 pass: QA pass on all 8 criteria: bun test 1208 pass, typecheck green; in a throwaway repo run list is byte-identical to released trace for every flag (text and JSON), run view --why/--receipt identical to why (receipt works without a unit), run view by unit and run id correct, trace/why are exit-2 Unknown command and write nothing, other commands unchanged.
 
+- merge#1: merged story branch (gh-75/02, every printed command through `cmd` in core/commands.ts) into the slice with `git merge --no-ff` (a5a751e). Conflicts in cli.ts, run-list.ts, run-view.ts, format.ts resolved keeping both: added `cmd.runList`/`cmd.runView` (pinned in printed-commands.test.ts) and used them where this slice printed `norn run list`/`run view`; cli.ts keeps the noun dispatcher with `cmd.help()`; format.ts imports both `cmd` and `RunDetail`. `cmd.trace`/`cmd.why` stay for slice 14. typecheck green, bun test 1239 pass.
+
 ## Resume
 
-QA passed; nothing left in this step.
+Merge committed; nothing left in this step.
