@@ -14,6 +14,17 @@
 
 ## Goal
 
+`norn story start [<unit>] [--print]` and `norn story edit [<unit>] --auto|--manual | --workflow <name> [--at <step>]` replace `open`, `mode` and `workflow` (AC1–AC7).
+
 ## Progress
 
+- New `story` noun (`commands/story.ts`) with `story start` (moved from `open.ts`) and `story edit` (`mode.ts` + `workflow.ts` merged into `story-edit.ts`); old commands removed (D1), so they are unknown commands (B5).
+- Without a target both verbs use slice 03's `resolveTarget` (`runtime/target.ts`); its `TargetRule.applies` now gets the project view too, and `unitOf(view, key)` finds a unit. `story start` offers only units parked at an attended step or ready in manual mode; `story edit` mode offers open stories, `--workflow` open units.
+- Mode is per story: a slice key or a slice worktree means its story (B55). Mode and `--workflow` together, `--auto --manual`, `--at` without `--workflow`, or no change flag are usage errors.
+- Printed commands: added `cmd.storyStart` / `cmd.storyEdit` (used by the new refusals, e.g. `needs_to` names `--at`); removed the now unused `cmd.mode`. `cmd.open` / `cmd.workflow` stay for inbox/decide strings until slice 14's rename.
+- Cockpit's start action now runs `story start <unit>`; help "Start here" lists `story`.
+- Tests: `story-start.test.ts` (was `open.test.ts`), `human.test.ts` mode/workflow cases moved to `story edit` plus a B55 slice-worktree case, e2e B5 table extended with `open`, `mode`, `workflow`.
+
 ## Resume
+
+Run the full suite and typecheck; do the AC7 throwaway-repo check; commit; `norn done done`.
