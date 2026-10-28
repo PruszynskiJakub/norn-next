@@ -5,13 +5,14 @@
   "unit_dir": "03-targets-and-terminal-prompts",
   "workflow": "slice",
   "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
-  "step": "test",
+  "step": "review",
   "attempt": 1,
   "visits": {
     "implement": 1,
-    "test": 1
+    "test": 1,
+    "review": 1
   },
-  "step_entered_at": "2026-10-28T13:34:21.169Z",
+  "step_entered_at": "2026-10-28T13:42:03.724Z",
   "status": "ready",
   "park": null,
   "counters": {
@@ -22,16 +23,16 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 5,
+  "applied_through": 6,
   "run": null,
   "last_outcome": {
-    "step": "implement",
-    "outcome": "done",
-    "source": "reported",
-    "at": "2026-10-28T13:34:18.945Z",
-    "receipt_id": "01M61BFZT0V38CZ7E1AYE965W4"
+    "step": "test",
+    "outcome": "pass",
+    "source": "classified",
+    "at": "2026-10-28T13:41:59.539Z",
+    "receipt_id": "01M61BY1KK92D1XJJWKF0KPJPE"
   },
   "created_at": "2026-10-28T13:10:40.637Z",
-  "updated_at": "2026-10-28T13:34:21.169Z",
-  "last_tick_id": "01M61BG1ZGGC8650CX994RGRP6"
+  "updated_at": "2026-10-28T13:42:03.724Z",
+  "last_tick_id": "01M61BY5PBKS9BJ21ZX09C127H"
 }
