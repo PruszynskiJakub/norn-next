@@ -11,12 +11,8 @@
     "refine": 1
   },
   "step_entered_at": "2026-10-28T08:51:06.916Z",
-  "status": "parked",
-  "park": {
-    "kind": "attended",
-    "reason": "attended step refine: work with the agent in the worktree",
-    "since": "2026-10-28T08:51:06.916Z"
-  },
+  "status": "running",
+  "park": null,
   "counters": {
     "plan_loop": 0,
     "test_loop": 0,
@@ -27,11 +23,23 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 0,
-  "run": null,
+  "applied_through": 1,
+  "run": {
+    "run_id": "01M60VDJ8QYAQ3JMJQ3D15X59H",
+    "step": "refine",
+    "attempt": 1,
+    "started_at": "2026-10-28T08:53:22.369Z",
+    "how": "manual",
+    "agent": "claude",
+    "agent_session_id": "3427570d-363e-4f8f-b2f9-2716fa424b5d",
+    "process": {
+      "pid": 99758,
+      "pid_start": "Wed Oct 28 09:53:10 2026"
+    }
+  },
   "last_outcome": null,
   "created_at": "2026-10-28T08:51:06.916Z",
-  "updated_at": "2026-10-28T08:51:06.916Z",
-  "last_tick_id": "01M60V9E12BYQ43C6MFMTJ3N85",
+  "updated_at": "2026-10-28T08:53:36.928Z",
+  "last_tick_id": "01M60VE0GXAXQ3DS6S9PJWBEFF",
   "mode": "manual"
 }
