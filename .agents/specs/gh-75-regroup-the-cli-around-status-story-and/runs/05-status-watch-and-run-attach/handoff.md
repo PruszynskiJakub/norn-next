@@ -29,6 +29,7 @@
 - AC7 was checked by hand under a pty (python `pty`): in a throwaway repo it drew 4 frames in 3.5s at `--interval 1s` and quit on q with exit 0.
 - Left for slice 15: the Herdr plugin (`plugins/herdr/next.sh` etc.) still calls `cockpit` and relies on the old `--next` JSON. The cockpit header still reads "norn cockpit" (a title, not a printed command).
 - implement#1 done: status --watch [--interval/--pane/--json] replaces cockpit (pane split via new HerdrCockpit.openBelow, refused outside Herdr); run attach [<unit>] [--next] focuses the live agent pane, refused nothing_to_attach with the start command; norn cockpit is an unknown command; run lists attach. AC1–AC6 tested in status-watch.test.ts/e2e.test.ts; AC7 checked under a pty. Plugin still calls cockpit until slice 15.
+- review#1 approve: review#1 approve: AC1–AC6 met with tests at S1 (fake Herdr, scripted keys), AC7 checked by hand; cli/adapters/core tests and typecheck green. Minor: --next with an agent but no pane is now refused nothing_to_attach instead of focused:null (plugin rewrite in slice 15 must read it); nit: run attach swallows listAgents errors. README/doc comments still say norn cockpit (slice 15).
 
 ## Resume
 
