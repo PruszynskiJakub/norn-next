@@ -9,6 +9,9 @@
  * The story table this command printed before is `norn story list` (B15); the first `status` on a
  * checkout says so once on stderr (B13).
  *
+ * `--watch [--interval 5s] [--pane]` (B11, B12): the live cockpit full screen (`runtime/status-watch.ts`);
+ * `--pane` runs it in a Herdr pane split below the caller; `--watch --json` prints the cockpit model.
+ *
  * `--segment [--ttl 30s]` (B14, only in `help --all`): one plain line for Herdr's tab bar
  * (`tab_bar_right`, run in the focused pane's cwd; outside a repository it prints an empty line).
  * Inside Herdr it also writes a `norn` sidebar token on each `<story> orient` workspace and moves
@@ -23,6 +26,7 @@ import type { Context } from "../context.ts";
 import { rendered, usageError } from "../output.ts";
 import { cockpitHerdr } from "../runtime/cockpit.ts";
 import { projectView } from "../runtime/human.ts";
+import { statusWatch } from "../runtime/status-watch.ts";
 import { isOrientWorkspace, planWorkspaceMoves, segmentLine, storyToken } from "../runtime/segment.ts";
 import { cmd } from "@norn/core";
 
@@ -116,13 +120,34 @@ async function segment(ctx: Context, ttlRaw: string) {
 export const statusCommand = defineCommand({
   name: "status",
   summary: "What needs you, grouped by action, with the command to resolve each item; --history for when items came and went (O1)",
-  usage: "norn status [--json] [--details] [--notes] [--history [--since <iso|duration>]]",
+  usage: "norn status [--json] [--details] [--notes] [--history [--since <iso|duration>]] | norn status --watch [--interval 5s] [--pane]",
   markdown: true,
-  options: { details: { type: "boolean" }, notes: { type: "boolean" }, history: { type: "boolean" }, since: { type: "string" }, segment: { type: "boolean" }, ttl: { type: "string" } },
+  optionHelp: {
+    "--details": "each item's full text",
+    "--notes": "list the open notes, not one summary line",
+    "--history [--since <iso|duration>]": "every item that needed you, with when it came and went",
+    "--watch": "the live cockpit full screen: act on items by key, q or Esc quits",
+    "--interval <duration>": "with --watch: how often it refreshes (default 5s)",
+    "--pane": "with --watch: run it in a Herdr pane split below this one",
+  },
+  options: {
+    details: { type: "boolean" },
+    notes: { type: "boolean" },
+    history: { type: "boolean" },
+    since: { type: "string" },
+    segment: { type: "boolean" },
+    ttl: { type: "string" },
+    watch: { type: "boolean" },
+    interval: { type: "string" },
+    pane: { type: "boolean" },
+  },
   // located below: a tab bar segment runs in whatever cwd the focused pane has
   repo: false,
   async run(ctx, args) {
     if (opt.bool(args, "segment")) return segment(ctx, opt.str(args, "ttl") ?? "30s");
+    if (opt.bool(args, "watch")) return statusWatch(ctx, args);
+    const stray = (["interval", "pane"] as const).find((o) => args.values[o] !== undefined);
+    if (stray) throw usageError(`--${stray} needs --watch`, cmd.statusWatch());
     await ctx.locate();
     const out = await inbox(ctx, args);
     if (!args.json && firstNotice(ctx.root, "status-is-the-inbox")) ctx.stderr.push(MOVED_NOTICE);

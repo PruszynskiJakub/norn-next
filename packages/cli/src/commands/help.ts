@@ -25,7 +25,7 @@ const SEGMENT = {
 const HELP_GROUPS: ReadonlyArray<{ title: string; for: CommandFor; commands: readonly string[]; hidden?: boolean }> = [
   { title: "Start here", for: "person", commands: ["init", "doctor", "sync", "watch", "status", "open"] },
   { title: "Answer what needs you", for: "person", commands: ["answer", "approve", "unstick", "update", "mode", "workflow"] },
-  { title: "Look around", for: "person", commands: ["cockpit", "story", "orient", "run", "config", "tick"] },
+  { title: "Look around", for: "person", commands: ["story", "orient", "run", "config", "tick"] },
   { title: "Team", for: "person", commands: ["take", "release", "drop"] },
   { title: "Housekeeping", for: "person", commands: ["tidy", "uninstall", "help"] },
   { title: "Run by Herdr, not by hand", for: "person", commands: [SEGMENT.name], hidden: true },

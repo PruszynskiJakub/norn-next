@@ -170,13 +170,13 @@ describe("norn init", () => {
     const r = await h.norn("run");
     expect(r.exit).toBe(0);
     expect(r.stdout).toStartWith("norn run — ");
-    expect(r.stdout).toMatch(/\n  norn run list +.+\n  norn run view +.+\n/);
-    expect(r.value).toMatchObject({ command: "run", verbs: [{ command: "run list" }, { command: "run view" }] });
+    expect(r.stdout).toMatch(/\n  norn run list +.+\n  norn run view +.+\n  norn run attach +.+\n/);
+    expect(r.value).toMatchObject({ command: "run", verbs: [{ command: "run list" }, { command: "run view" }, { command: "run attach" }] });
     expect((await h.norn("help", "run")).stdout).toBe(r.stdout);
     expect((await h.norn("run", "--help")).stdout).toBe(r.stdout);
     expect((await h.norn("run", "--json")).value).toEqual(r.value);
     // norn help names the noun with its verbs
-    expect((await h.norn("help")).stdout).toMatch(/\n  norn run +.*\(list, view\)\n/);
+    expect((await h.norn("help")).stdout).toMatch(/\n  norn run +.*\(list, view, attach\)\n/);
   });
 
   test("help <noun> <verb> and <noun> <verb> --help show that verb's usage and options (B4)", async () => {

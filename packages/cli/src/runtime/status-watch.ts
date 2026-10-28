@@ -1,29 +1,27 @@
 /**
- * `norn cockpit [--interval 5s] [--json] [--next] [--open]` (SPEC-cockpit CP5–CP13): the cockpit
+ * `norn status --watch [--interval 5s] [--json] [--pane]` (B11, B12, SPEC-cockpit CP5–CP13): the cockpit
  * model (@norn/view cockpitModel) drawn full screen with raw keys — what needs you, then every
  * story, the selected row's preview, its actions by key. It writes only through CLI verbs run by the
  * dispatcher (X1, HC7) and stays open until q or Esc. Frames go to stderr, one JSON summary to
  * stdout at exit (P8).
  *
- * - `--json`: print the model once (CP5), for a front end outside TypeScript.
- * - `--next` (HC10): focus the agent pane of the oldest Your turn item with a run, once.
- * - `--open`: split a Herdr pane below the caller and run the cockpit there.
+ * - `--json`: print the model once (CP5), for a front end outside TypeScript (`status --json` is the inbox, B10).
+ * - `--pane` (B12): split a Herdr pane below the caller and run the cockpit there.
  *
  * CP13: outside a norn repository — no repository, or one norn was never set up in (a Herdr popup over
  * any workspace) — it shows the repository the last cockpit ran in on this machine (`~/.norn/cockpit.json`).
  */
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { herdr } from "@norn/adapters";
 import { parseDuration } from "@norn/schema";
 import { readCockpitFile, spawnBounded, writeCockpitFile } from "@norn/store";
 import { type CockpitModel, cockpitModel, inboxItemsInOrder, type ProjectView, withInput } from "@norn/view";
-import { defineCommand, opt } from "../command.ts";
+import { opt, type ParsedArgs } from "../command.ts";
 import { Context } from "../context.ts";
-import { usageError } from "../output.ts";
-import { cockpitHerdr, labelPanes, oldestYourTurn, placeAgent, verbMessage } from "../runtime/cockpit.ts";
-import { clampScroll, handleKey, initialState, parseKeys, renderCockpit, type TuiEffect, type TuiState } from "../runtime/cockpit-tui.ts";
-import { projectView } from "../runtime/human.ts";
+import { refuse, usageError } from "../output.ts";
+import { cockpitHerdr, labelPanes, placeAgent, verbMessage } from "./cockpit.ts";
+import { clampScroll, handleKey, initialState, parseKeys, renderCockpit, type TuiEffect, type TuiState } from "./cockpit-tui.ts";
+import { projectView } from "./human.ts";
 import { cmd } from "@norn/core";
 
 const CLEAR = "\x1b[H\x1b[2J";
@@ -193,38 +191,28 @@ async function interactive(ctx: Context, interval: number) {
   return { frames, last };
 }
 
-export const cockpitCommand = defineCommand({
-  name: "cockpit",
-  summary: "What needs you and every story, with the actions each offers: approve, answer, orient, go to the agent",
-  usage: "norn cockpit [--interval 5s] [--json] [--next] [--open]",
-  options: { interval: { type: "string" }, next: { type: "boolean" }, open: { type: "boolean" } },
-  // CP13: located below, falling back to the last repository a cockpit ran in
-  repo: false,
-  async run(raw, args) {
-    const intervalRaw = opt.str(args, "interval") ?? "5s";
-    let interval: number;
-    try {
-      interval = parseDuration(intervalRaw);
-    } catch {
-      throw usageError(`bad --interval '${intervalRaw}' (use e.g. 5s, 1m)`, cmd.cockpit({ interval: "5s" }));
-    }
-    const ctx = await located(raw);
-    writeCockpitFile(ctx.home, { last_repo: ctx.root });
+/**
+ * `norn status --watch [--interval 5s] [--pane] [--json]` (B11, B12): `--pane` opens it in a Herdr pane
+ * split below the caller; `--json` prints the cockpit model once; else the cockpit until q or Esc.
+ */
+export async function statusWatch(raw: Context, args: ParsedArgs) {
+  const intervalRaw = opt.str(args, "interval") ?? "5s";
+  let interval: number;
+  try {
+    interval = parseDuration(intervalRaw);
+  } catch {
+    throw usageError(`bad --interval '${intervalRaw}' (use e.g. 5s, 1m)`, cmd.statusWatch({ interval: "5s" }));
+  }
+  const ctx = await located(raw);
+  writeCockpitFile(ctx.home, { last_repo: ctx.root });
 
-    if (opt.bool(args, "open")) {
-      const opened = await herdr.openCockpitPane(ctx.cwd, { env: ctx.env, ...(opt.str(args, "interval") ? { interval: intervalRaw } : {}) });
-      return { opened: true, runner: "herdr", pane_id: opened.pane_id };
-    }
-    if (opt.bool(args, "next")) {
-      // HC10: one shot — focus the agent pane of the oldest Your turn item with a run; never starts an agent
-      const cockpit = cockpitHerdr(ctx);
-      const oldest = oldestYourTurn(inboxItemsInOrder(await projectView(ctx)), true);
-      if (!cockpit || !oldest) return { focused: null, item: oldest?.id ?? null };
-      const pane = herdr.findAgentPane(await cockpit.listAgents(), oldest.reach);
-      if (pane) await cockpit.focus(pane);
-      return { focused: pane, item: oldest.id, ...(pane ? {} : { command: oldest.command }) };
-    }
-    if (args.json) return cockpitModel(await projectView(ctx), { places: !!cockpitHerdr(ctx), provider: ctx.config.remote.provider });
-    return interactive(ctx, interval);
-  },
-});
+  if (opt.bool(args, "pane")) {
+    // B12: a pane below the caller runs the cockpit; only inside Herdr
+    const herdr = cockpitHerdr(ctx);
+    if (!herdr) throw refuse("not inside Herdr: there is no pane to split", cmd.statusWatch(), "not_in_herdr");
+    const opened = await herdr.openBelow(ctx.cwd, cmd.statusWatch(opt.str(args, "interval") ? { interval: intervalRaw } : {}), "norn");
+    return { opened: true, runner: "herdr", pane_id: opened.pane_id };
+  }
+  if (args.json) return cockpitModel(await projectView(ctx), { places: !!cockpitHerdr(ctx), provider: ctx.config.remote.provider });
+  return interactive(ctx, interval);
+}
