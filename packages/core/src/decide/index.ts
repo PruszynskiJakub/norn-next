@@ -13,6 +13,7 @@
 import {
   type ResolvedConfig,
   slugify,
+  SPEC_FILE,
   specDir,
   type StoryFrontmatter,
   storyBranch,
@@ -104,7 +105,7 @@ function intake(ctx: Ctx): void {
       key,
       slug,
       worktree: { path, branch, from: facts.repo.default_branch, env: ctx.slotEnv(slot), slot },
-      story_file: `${specDir(key, slug)}/story.md`,
+      story_file: `${specDir(key, slug)}/${SPEC_FILE}`,
       frontmatter,
       body: issue.body,
       commit: commitFor(ctx, key, null, `norn: intake ${key} ${issue.title}`, null, { path, branch, slice: null, push: false }),

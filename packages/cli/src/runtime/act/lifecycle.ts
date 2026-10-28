@@ -194,8 +194,9 @@ export async function intake(act: ActEnv, a: Extract<Action, { kind: "intake_sto
   if (act.obs.remote && !existsSync(a.worktree.path) && !(await act.git.branchExists(act.root, a.worktree.branch)) && (await act.git.branchExists(act.root, a.worktree.branch, "remote", act.obs.remote)))
     return { ok: true, detail: { skipped: `${a.worktree.branch} already exists on ${act.obs.remote}`, do_instead: `norn take ${a.key}` } };
   const wt = await ensureWorktree(act, a.worktree, unit, specDir);
+  // GR2: a folder an older norn intook keeps its story.md (storyFile reads it), so it is never written twice
   const file = join(a.worktree.path, a.story_file);
-  const written = !existsSync(file);
+  const written = !existsSync(storyFile(dirname(file)));
   if (written) writeStoryFile(file, a.frontmatter, a.body.endsWith("\n") || !a.body ? `\n${a.body}` : `\n${a.body}\n`);
   const committed = await act.commit(a.commit, null, null, null);
   return { ok: true, detail: { worktree: a.worktree.path, ...wt, story_file: written ? a.story_file : "exists", ...committed } };
