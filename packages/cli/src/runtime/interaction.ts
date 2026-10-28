@@ -16,6 +16,8 @@ export interface Interaction {
   readonly tty: boolean;
   /** one of `choices`, starting at `preselect`; null when the person leaves (Esc, Ctrl-C) */
   pick(question: string, choices: readonly InteractionChoice[], preselect: number): Promise<string | null>;
+  /** y/N: true only when the person answers y (yes) */
+  confirm(question: string): Promise<boolean>;
 }
 
 /** A6: what norn sets when it launches an agent; the orient env marks the agent beside a person. */
@@ -59,6 +61,18 @@ export function terminalInteraction(): Interaction {
         return null;
       } finally {
         stdin.setRawMode(false);
+        stdin.pause();
+      }
+    },
+    async confirm(question) {
+      if (!tty) return false;
+      process.stderr.write(`${question} `);
+      const stdin = process.stdin;
+      stdin.resume();
+      try {
+        for await (const chunk of stdin) return /^\s*y(es)?\s*$/i.test(chunk.toString());
+        return false;
+      } finally {
         stdin.pause();
       }
     },

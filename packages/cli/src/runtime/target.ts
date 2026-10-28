@@ -12,6 +12,7 @@ import { inboxItemsInOrder, loadRunView, stepTitle } from "@norn/view";
 import { cmd } from "@norn/core";
 import type { Context } from "../context.ts";
 import { refuse, usageError } from "../output.ts";
+import { storyArg } from "./args.ts";
 import { projectView } from "./human.ts";
 import type { InteractionChoice } from "./interaction.ts";
 
@@ -65,7 +66,12 @@ export function hasRun(ctx: Context, verb: string, command: (key: string) => str
   };
 }
 
-/** B55: a story verb (`story view`, `story chat`) applies to every story, never to a slice. */
+/** B55: a story verb (`story view`, `chat`, `checkout`, `handoff`, `close`) applies to every story, never to a slice. */
 export function aStory(verb: string, command: (key: string) => string): TargetRule {
   return { verb, command, none: "No story yet", story: true, applies: (key) => !key.includes("/") };
+}
+
+/** B55: the story a team verb (`story checkout`, `handoff`, `close`) acts on; a slice key, or a slice worktree, means the slice's story. */
+export async function resolveStory(ctx: Context, explicit: string | undefined, json: boolean, rule: TargetRule): Promise<string> {
+  return storyArg(await resolveTarget(ctx, explicit, json, rule), rule.verb);
 }

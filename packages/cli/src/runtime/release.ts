@@ -1,15 +1,29 @@
 /**
  * Claim release (T6): push the story and slice branches first, then delete the claim ref by
- * CAS. Only by the heartbeat holding the claim, and only fast-forward pushes (R3.3). Edited handoff.md files are committed first. Used by a clean `watch` exit and `norn release <story>`.
+ * CAS. Only by the heartbeat holding the claim, and only fast-forward pushes (R3.3). Edited handoff.md files are committed first. Used by a clean `watch` exit and `norn story handoff` (B34).
  */
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
-import type { GitPort, StoryFacts } from "@norn/core";
+import { cmd, type GitPort, type StoryFacts } from "@norn/core";
 import { ulid } from "@norn/schema";
 import { acquireTickLock, releaseClaim, writtenHere } from "@norn/store";
 import type { Context } from "../context.ts";
-import { busyError } from "../output.ts";
+import { busyError, refuse } from "../output.ts";
 import { type Observed, observe } from "./observe/index.ts";
+
+/** Observe under the tick lock (no remote sync) and find the story, or refuse. */
+export async function withStory<T>(ctx: Context, key: string, note: string, f: (obs: Observed, story: Observed["facts"]["stories"][number]) => Promise<T>): Promise<T> {
+  const lock = await acquireTickLock(ctx.root, { note, now: () => ctx.clock.iso() });
+  if (!lock.ok) throw busyError(`a tick is running (pid ${lock.holder.holder.pid})`, `retry: ${note}`, "tick_locked");
+  try {
+    const obs = await observe(ctx, { tick_id: ulid(ctx.clock.now()), sync: "never" });
+    const story = obs.facts.stories.find((s) => s.key === key);
+    if (!story) throw refuse(`story ${key} is not checked out here`, cmd.storyCheckout(key), "unknown_story");
+    return await f(obs, story);
+  } finally {
+    lock.release();
+  }
+}
 
 export interface ReleaseResult {
   story: string;

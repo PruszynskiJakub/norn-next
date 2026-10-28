@@ -1,6 +1,6 @@
 /**
  * Story checkout (T5, M3): continue a story on this machine from git alone. The command is
- * `norn take`; a later reopen restores through the same steps.
+ * `norn story checkout`; a later reopen restores through the same steps.
  *
  * 1. Claim by CAS (T3): free or expired → acquire; held by another heartbeat and unexpired →
  *    refused "held by X since Y" unless `--force`, which records `forced_from` in the claim blob
@@ -108,9 +108,9 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean) {
   const hb = heartbeatId(root, now);
   const holder = machineHolder(ctx.env);
   const cur = await claimFor(ctx, key, { remote, unreadable: (e) => failure(`cannot read the claim: ${e.message}`, "check the network, then retry", "network") });
-  if (cur.state === "corrupt" && !force) throw corruptError(`claim ref of ${key} is unreadable`, cmd.take(key, { force: true }), cur.error);
+  if (cur.state === "corrupt" && !force) throw corruptError(`claim ref of ${key} is unreadable`, cmd.storyCheckout(key, { force: true }), cur.error);
   if (cur.state === "other" && !force)
-    throw claimHeld(cur.blob, `wait until ${cur.blob.expires_at}, ask ${cur.blob.holder} to run ${cmd.release(key)}, or ${cmd.take(key, { force: true })}`);
+    throw claimHeld(cur.blob, `wait until ${cur.blob.expires_at}, ask ${cur.blob.holder} to run ${cmd.storyHandoff(key)}, or ${cmd.storyCheckout(key, { force: true })}`);
   const mine = writtenHere(cur, hb);
   const forced = force && (cur.state === "other" || cur.state === "corrupt");
   const prev = cur.state === "none" || cur.state === "corrupt" ? null : cur.blob;
@@ -126,8 +126,8 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean) {
   });
   const claimed = await acquireClaim(root, remote, blob, { now, force: forced });
   if (!claimed.ok) {
-    if (claimed.reason === "held") throw claimHeld(claimed.holder, `wait until ${claimed.holder.expires_at} or ${cmd.take(key, { force: true })}`);
-    throw failure(`claim failed (${claimed.reason}): ${claimed.message}`, `retry: ${cmd.take(key)}`, "claim_failed");
+    if (claimed.reason === "held") throw claimHeld(claimed.holder, `wait until ${claimed.holder.expires_at} or ${cmd.storyCheckout(key, { force: true })}`);
+    throw failure(`claim failed (${claimed.reason}): ${claimed.message}`, `retry: ${cmd.storyCheckout(key)}`, "claim_failed");
   }
   // R10.1 (M8, A17): every take is in the record — the trace event first; the `take` receipt on the
   // story unit as soon as the story branch is checked out (it lives on that branch), before anything else
@@ -141,7 +141,7 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean) {
     const f = await git
       .fetch(root, remote, [`+refs/heads/${branch}:refs/remotes/${remote}/${branch}`, `+refs/heads/${key}/*:refs/remotes/${remote}/${key}/*`], { quiet: true })
       .catch((e: unknown) => e as Error);
-    if (f instanceof Error) throw failure(`fetch failed: ${f.message}`, `retry: ${cmd.take(key)} (the claim is held by you now)`, "network");
+    if (f instanceof Error) throw failure(`fetch failed: ${f.message}`, `retry: ${cmd.storyCheckout(key)} (the claim is held by you now)`, "network");
   }
   const wtByBranch = new Map((await git.worktreeList(root)).filter((w) => w.branch).map((w) => [w.branch as string, w.path]));
   const equip = { root, home: ctx.home, config, now: nowIso, liveness: leaseLiveness((p) => ports.process.isAlive(p)) };
@@ -168,7 +168,7 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean) {
 
   const storyWt = wtByBranch.get(branch) ?? storyWorktreePath(root, key, slug);
   if (!(await checkout({ path: storyWt, branch, story: key, slice: null, unit: STORY_UNIT_DIR, spec_dir }, key)))
-    throw failure(problems.join("; "), `fix the story branch, then ${cmd.take(key)} again (the claim is held by you now)`, "branch_diverged", { claim: blob });
+    throw failure(problems.join("; "), `fix the story branch, then ${cmd.storyCheckout(key)} again (the claim is held by you now)`, "branch_diverged", { claim: blob });
 
   const storyRuns = join(storyWt, spec_dir, "runs", STORY_UNIT_DIR);
   const record = takeReceipt(storyRuns, { holder, now: nowIso, ...takeFacts });

@@ -120,7 +120,7 @@ describe("a claim lost mid-run (R1.2, R2.3)", () => {
     // the agent on A finishes; before A's next tick, B force-takes the story
     h.report(storyRuns(A.root), "done", { outcome: "done", handoff: "search works" });
     B = cloneOf(h, "repo-b", "bob");
-    expect((await B.norn("take", "gh-9", "--force")).exit).toBe(0);
+    expect((await B.norn("story", "checkout", "gh-9", "--force")).exit).toBe(0);
     const head = remoteHead();
     step(4 * 60_000); // A's renewal is due; A still believes it holds the claim (no sync)
     const r = await A.tick("--offline");
@@ -220,7 +220,7 @@ describe("intake race and release (R3.1, R3.3)", () => {
     sh(other, ["-c", "user.email=o@example.com", "-c", "user.name=O", "commit", "-q", "--allow-empty", "-m", "outside"]);
     sh(other, ["push", "-q", "origin", BRANCH]);
     const head = h.git(["ls-remote", "origin", `refs/heads/${BRANCH}`]).split("\t")[0];
-    const r = await A.norn("release", "gh-10");
+    const r = await A.norn("story", "handoff", "gh-10");
     expect(r.exit).not.toBe(0);
     expect((r.value as { error: string }).error).toContain(`${BRANCH} is not a fast-forward of origin/${BRANCH}`);
     expect(h.git(["ls-remote", "origin", `refs/heads/${BRANCH}`]).split("\t")[0]).toBe(head);

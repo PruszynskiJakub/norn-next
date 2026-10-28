@@ -205,9 +205,9 @@ describe("norn init", () => {
     for (const c of (all.value as { commands: Array<{ command: string }> }).commands) expect(all.stdout).toContain(`  norn ${c.command} `);
   });
 
-  test("the old trace and why are unknown commands, and write nothing (B5)", async () => {
+  test("the old trace, why, take, release and drop are unknown commands, and write nothing (B5)", async () => {
     const before = h.git(["status", "--porcelain", "--untracked-files=all", "--ignored"]);
-    for (const name of ["trace", "why"]) {
+    for (const name of ["trace", "why", "take", "release", "drop"]) {
       const r = await h.norn(name, "gh-1");
       expect(r.exit).toBe(2);
       expect(r.value).toMatchObject({ error: `Unknown command: ${name}`, code: "unknown_command", do_instead: expect.stringContaining("norn help") });
