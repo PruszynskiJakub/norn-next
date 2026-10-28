@@ -14,6 +14,13 @@
 
 ## Goal
 
+Write the gh-75 spec (Problem, Solution, Behaviour, Out of scope, Open questions) into story.md from an interview with the person.
+
 ## Progress
 
+- Interview done (Q1–Q16), summary confirmed. Key decisions: noun stays `story` until #74; `status` takes the inbox meaning with a one-time notice; `status --watch --pane` public; no aliases (old names are plain unknown commands); `run cancel` parks and keeps pane; `story close` confirms (`--yes`); `story reopen` restores units at their step, running ones parked; `story create` stops at intake; `config set|unset --user|--repo` on today's two layers (#64 to be rewritten on it); `run attach --next` for Herdr; `story reject` requires `--reason`.
+- Spec written: B1–B71, out of scope, no open questions.
+
 ## Resume
+
+Person reviews the spec in story.md; on agreement report `norn done done`.
