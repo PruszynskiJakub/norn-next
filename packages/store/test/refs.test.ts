@@ -120,7 +120,7 @@ describe("batched renewals (T4, H5)", () => {
   async function pushesDuring<T>(f: () => Promise<T>): Promise<{ value: T; pushes: string[][] }> {
     const pushes: string[][] = [];
     const prev = setSpawnObserver(({ argv }) => {
-      if (argv.includes("push")) pushes.push(argv);
+      if (argv.includes("push")) pushes.push([...argv]);
     });
     try {
       return { value: await f(), pushes };

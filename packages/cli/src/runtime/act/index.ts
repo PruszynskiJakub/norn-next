@@ -25,7 +25,7 @@ import { ActEnv, QueueFull, claimLost } from "./env.ts";
 import { applyReceipts, startRun, nudge, retryFresh, classify } from "./session.ts";
 import { runCheck } from "./check.ts";
 import { runGit } from "./git-step.ts";
-import { startUnit, markDone, rejectReceipt, claim, intake, mirror, cleanupMerged, retryRecords } from "./lifecycle.ts";
+import { startUnit, markDone, rejectReceipt, claim, renewAll, intake, mirror, cleanupMerged, retryRecords } from "./lifecycle.ts";
 
 export interface ActRecord {
   decision: Decision;
@@ -73,6 +73,7 @@ export class Actor extends ActEnv {
     // that story is done this tick (R2.2: a checkout without the claim writes and pushes nothing)
     const order = [...decisions.filter((d) => isSideAction(d.action)), ...decisions.filter((d) => !isSideAction(d.action))];
     const lost = new Set<string>();
+    const renewed = await this.renewals(order.filter((d) => isSideAction(d.action)));
     for (const d of order) {
       const story = d.action.unit?.story;
       let result: ActionResult;
@@ -85,7 +86,7 @@ export class Actor extends ActEnv {
         counted = false;
       } else
         try {
-          result = await this.perform(d.action);
+          result = renewed.get(d) ?? (await this.perform(d.action));
           // R4.3: an action whose effect failed is never ok, even when its state was written
           if (result.ok && this.effectErrors.length) result = { ...result, ok: false, error: this.effectErrors.map((f) => f.reason).join("; ") };
         } catch (e) {
@@ -99,6 +100,18 @@ export class Actor extends ActEnv {
     if (this.failuresChanged) writeActFailures(this.root, this.failures);
     // the trace keeps decide's order
     return decisions.map((d) => out.find((r) => r.decision === d) as ActRecord);
+  }
+
+  /** T4, H5: every renewal due this tick in one CAS batch (one push); a failed batch fails each. */
+  private async renewals(ds: Decision[]): Promise<Map<Decision, ActionResult>> {
+    if (ds.length === 0) return new Map();
+    let results: ActionResult[];
+    try {
+      results = await renewAll(this, ds.map((d) => d.action as Extract<Action, { kind: "claim" }>));
+    } catch (e) {
+      results = ds.map(() => ({ ok: false, error: (e as Error).message }));
+    }
+    return new Map(ds.map((d, i) => [d, results[i] as ActionResult]));
   }
 
   /**
