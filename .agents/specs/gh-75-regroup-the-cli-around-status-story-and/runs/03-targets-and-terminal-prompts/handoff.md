@@ -15,7 +15,15 @@
 <!-- norn:heartbeat:end -->
 
 ## Goal
+`run view` / `run list` without a target: the worktree's unit (B54), an explicit target wins (B56), a terminal elsewhere picks from the units with runs in `norn status` order with a preselection (B57, B58); none applicable → exit 3 (B59); `--json` / no TTY / agent session → exit 2 with candidates (B60). D2 interaction dep + harness fake.
 
 ## Progress
+- `packages/cli/src/runtime/interaction.ts`: `Interaction` (tty, pick), `isAgentSession` (NORN_RUN or NORN_ORIENT=1), thin `terminalInteraction` (raw stdin, arrows/j/k, Enter, Esc/Ctrl-C/q leave).
+- `CliDeps.interaction` (null = no TTY), `Context.terminal(json)` applies the D2 rule.
+- `packages/cli/src/runtime/target.ts`: `resolveTarget(ctx, explicit, json, rule)` + `TargetRule` (verb, applies, none, command) — the hook later verbs use; `hasRun` is the run verbs' rule. Status order = inbox items in order, then stories with their slices. Leaving the pick-list → refused `cancelled` (exit 3).
+- Harness: `FakeInteraction`; `deps.interaction: null`; the harness env drops the A6/orient vars so tests run the same inside an agent session.
+- Tests: `packages/cli/test/targets.test.ts` (AC1–AC6). Full suite + typecheck green.
+- AC7 checked by hand under a pty (`script -q /dev/null bun packages/cli/src/main.ts run view` in a harness-seeded throwaway repo): list drawn with `>` on the first unit; ↓+Enter picked gh-2; Enter picked gh-1; Esc and Ctrl-C → "Refused (cancelled): Nothing picked". Fixed there: a chunk holding several keys hung; labels repeated the step (now `stepTitle`).
 
 ## Resume
+Done; reported `norn done done`.
