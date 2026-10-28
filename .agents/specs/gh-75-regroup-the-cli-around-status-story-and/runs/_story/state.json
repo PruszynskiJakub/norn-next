@@ -5,21 +5,18 @@
   "unit_dir": "_story",
   "workflow": "story",
   "workflow_hash": "bd5ef0fbb2da1f4313555a687d9e9ce40829c98ae5c6398e299646accc1ffe05",
-  "step": "approve-plan",
+  "step": "slices",
   "attempt": 1,
   "visits": {
     "refine": 1,
     "plan": 1,
     "slice": 1,
-    "approve-plan": 1
+    "approve-plan": 1,
+    "slices": 1
   },
-  "step_entered_at": "2026-10-28T09:32:07.109Z",
-  "status": "parked",
-  "park": {
-    "kind": "gate",
-    "reason": "Review the Plan section in story.md and the slice files (edit them if needed). Approve to start the slices, or reject with what to change.",
-    "since": "2026-10-28T09:32:07.109Z"
-  },
+  "step_entered_at": "2026-10-28T09:33:37.114Z",
+  "status": "ready",
+  "park": null,
   "counters": {
     "plan_loop": 0,
     "test_loop": 0,
@@ -30,17 +27,17 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 6,
+  "applied_through": 7,
   "run": null,
   "last_outcome": {
-    "step": "slice",
-    "outcome": "done",
-    "source": "reported",
-    "at": "2026-10-28T09:31:39.016Z",
-    "receipt_id": "01M60XKN47M8GQ8DJFDAPA5CHD"
+    "step": "approve-plan",
+    "outcome": "approve",
+    "source": "human",
+    "at": "2026-10-28T09:33:27.589Z",
+    "receipt_id": "01M60XPZ55CWT4WQS4Q37TAFVR"
   },
   "created_at": "2026-10-28T08:51:06.916Z",
-  "updated_at": "2026-10-28T09:32:07.109Z",
-  "last_tick_id": "01M60XMGJ2VM61Y2CC4JY92RT8",
+  "updated_at": "2026-10-28T09:33:37.114Z",
+  "last_tick_id": "01M60XQ8ERKCA22PEDEDZMEVDB",
   "mode": "manual"
 }
