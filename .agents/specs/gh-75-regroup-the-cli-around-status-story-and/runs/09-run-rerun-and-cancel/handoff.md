@@ -14,6 +14,18 @@
 
 ## Goal
 
+`norn run cancel` (human `stuck` receipt first, then runner kill) and `norn run rerun [--step] [--reset] [--reason]` (was `unstick`); `unstick` removed (AC1–AC8 by test; AC9 is the agent verifier's, for QA).
+
 ## Progress
 
+- AC1 first (red): a person's `stuck` at a running cursor took the workflow's agent `stuck` edge. Fix in `packages/core/src/apply.ts`: a `by: "human"` stuck always parks stuck (B51, D4). Otherwise decide already applied it and noops `unit.stuck`.
+- `packages/cli/src/commands/run-cancel.ts` (new) and `run-rerun.ts` (moved from `unstick.ts`, `--to` → `--step`, running → refused `running`, do_instead `norn run cancel <unit>`). Both registered under `run` (`run.ts`); `unstick` removed from the registry and help groups.
+- Cancel: claim held elsewhere → `not_holder` (exit 3, do_instead `norn story checkout <story>`); not running → `nothing_to_cancel`; receipt via `runHumanVerb` (mailbox off), then `runner.kill` for a run started on this machine; kill failure after the receipt → `kill_failed`.
+- `runtime/target.ts`: `TargetRule.applies(key, view)` and `inState(...)` so cancel offers only running units, rerun only stuck/parked ones.
+- New builders `cmd.runRerun`, `cmd.runCancel`, `cmd.storyCheckout` (pinned in printed-commands test). Other printed `norn unstick` hints left alone (slice 14).
+- Cockpit's unstick action now runs `run rerun <unit>` (it ran the removed command).
+- Tests: `packages/cli/test/run-rerun-cancel.test.ts` (AC1–AC8); old unstick tests in `human.test.ts`/`base-sync.test.ts` moved to `run rerun`; e2e B5 list and `norn run` listing updated.
+
 ## Resume
+
+Run `bun test`, `bun run typecheck`, `bun run golden`; if green, commit and report `norn done done`.
