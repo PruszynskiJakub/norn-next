@@ -5,7 +5,7 @@
 - Counters: base_conflict_loop 0/2, plan_loop 0/3, qa_loop 0/2, ready_loop 0/2, stale_loop 0/10, test_loop 0/5
 - Last outcome: approve-plan.approve (human, 2026-10-28T09:33:27.589Z)
 - Next: `norn brief`
-- Updated: 2026-10-28T09:33:37.114Z
+- Updated: 2026-10-28T09:36:37.128Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - story.start: story at refine
@@ -16,6 +16,7 @@
 - receipts.apply: applied 5
 - receipts.apply: slice.done → approve-plan
 - receipts.apply: approve-plan.approve → slices
+- receipts.apply: applied 8
 <!-- norn:heartbeat:end -->
 
 ## Goal
