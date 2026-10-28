@@ -14,6 +14,17 @@
 
 ## Goal
 
+`norn story answer|approve|reject|update-branch` replace `answer`, `approve` (`--reject`) and `update` (B24–B27, B55, B57, B5).
+
 ## Progress
 
+- Old command files moved (git mv) to `commands/story-{answer,approve,update-branch}.ts`; `commands/story.ts` is the `story` noun (only these four verbs so far; later slices add theirs).
+- Targets: `runtime/target.ts` `TargetRule.applies` now gets the unit's view (status, park, story fields); `storyOnly` makes a slice worktree act on its story (B55); `parkedOn("ask"|"gate", …)` for the pick-lists.
+- `story reject` without `--reason` is a usage error (`reason_required`, do_instead "pass --reason …"); the old reject-without-reason warning is gone. `story approve` keeps an optional `--reason` comment.
+- Cockpit verb argv (view/src/cockpit.ts) call the new verbs; `verbMessage` prints the words up to the unit (`norn story answer gh-6`).
+- Printed commands (`cmd.approve` → `norn approve …`) left for slice 14.
+- Tests: new `packages/cli/test/story-decision.test.ts` (AC2–AC7); old tests renamed in place (human, base-sync, prompts, criteria, inbox-why, records, team, pr-body, cockpit).
+
 ## Resume
+
+Run the whole suite and typecheck; commit; AC8 is the agent's check in QA.
