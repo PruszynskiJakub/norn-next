@@ -1,0 +1,6 @@
+**Refused (not_in_herdr):** not inside Herdr: there is no pane to split
+
+Do instead: norn status --watch
+exit=3
+{"error":"not inside Herdr: there is no pane to split","do_instead":"norn status --watch","code":"not_in_herdr"}
+exit=3
