@@ -5,18 +5,18 @@
   "unit_dir": "01-noun-verb-tree-and-run-list-view",
   "workflow": "slice",
   "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
-  "step": "merge",
-  "attempt": 1,
+  "step": "integrate",
+  "attempt": 2,
   "visits": {
     "implement": 2,
     "test": 2,
     "review": 2,
     "qa": 1,
-    "integrate": 1,
+    "integrate": 2,
     "merge": 1
   },
-  "step_entered_at": "2026-10-28T10:55:06.097Z",
-  "status": "running",
+  "step_entered_at": "2026-10-28T11:04:13.100Z",
+  "status": "ready",
   "park": null,
   "counters": {
     "test_loop": 0,
@@ -26,35 +26,16 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 19,
-  "run": {
-    "run_id": "01M612DC52SBY5GM0MY7FZSMPM",
-    "step": "merge",
-    "attempt": 1,
-    "started_at": "2026-10-28T10:55:40.192Z",
-    "how": "auto",
-    "agent": "claude",
-    "session": {
-      "runner": "herdr",
-      "session_id": "w6M:p1",
-      "pane_id": "w6M:p1",
-      "reach": "herdr agent attach w6M:p1"
-    },
-    "process": {
-      "pid": 43328,
-      "pid_start": "Wed Oct 28 11:55:39 2026"
-    },
-    "machine": "jakubpruszynski@mac",
-    "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD"
-  },
+  "applied_through": 20,
+  "run": null,
   "last_outcome": {
-    "step": "integrate",
-    "outcome": "conflict",
-    "source": "classified",
-    "at": "2026-10-28T10:54:38.141Z",
-    "receipt_id": "01M612BKHXCVSDKXQZG1HMEKA1"
+    "step": "merge",
+    "outcome": "done",
+    "source": "reported",
+    "at": "2026-10-28T11:03:49.311Z",
+    "receipt_id": "01M612WDSZJQHG1KQPDM8EH7Z7"
   },
   "created_at": "2026-10-28T09:34:07.116Z",
-  "updated_at": "2026-10-28T10:55:40.194Z",
-  "last_tick_id": "01M612DC521065QEXVA8FS03JP"
+  "updated_at": "2026-10-28T11:04:13.100Z",
+  "last_tick_id": "01M612X512MVGB6HAXC144P0E0"
 }
