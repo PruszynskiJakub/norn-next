@@ -120,28 +120,63 @@ export type CasResult =
  * local copy is updated to match. Without (solo, no remote): `git update-ref` with old value.
  */
 export async function casRef(cwd: string, remote: string | null, ref: string, sha: string | null, expected: string | null): Promise<CasResult> {
+  return (await casRefs(cwd, remote, [{ ref, sha, expected }]))[0] as CasResult;
+}
+
+export interface CasUpdate {
+  ref: string;
+  sha: string | null;
+  expected: string | null;
+}
+
+/**
+ * Compare-and-swap several refs, one result per update in order (T3). With a remote they go out in
+ * one plain (not `--atomic`) push, a lease per refspec (H5: one round trip however many refs), so
+ * one lost CAS does not fail the others. git exits non-zero when any ref is rejected, so each
+ * ref's outcome comes from its `--porcelain` line; a ref without one (the push never reached the
+ * remote) is classified from the whole output. Each ref pushed is mirrored locally.
+ */
+export async function casRefs(cwd: string, remote: string | null, updates: readonly CasUpdate[]): Promise<CasResult[]> {
   if (remote === null) {
-    const args = sha === null ? ["update-ref", "-d", ref, expected ?? ZERO_SHA] : ["update-ref", ref, sha, expected ?? ZERO_SHA];
-    if (sha === null && expected === null) return { ok: true };
-    const r = await git(cwd, args);
-    return r.code === 0 ? { ok: true } : { ok: false, reason: "stale", message: r.stderr.trim() };
+    const out: CasResult[] = [];
+    for (const u of updates) out.push(await casLocal(cwd, u));
+    return out;
   }
-  const r = await git(cwd, ["push", "--porcelain", `--force-with-lease=${ref}:${expected ?? ""}`, remote, `${sha ?? ""}:${ref}`]);
-  if (r.code !== 0) {
-    const text = `${r.stdout}\n${r.stderr}`;
-    const reason = /stale info/.test(text)
-      ? "stale"
-      : /\[rejected\]|\[remote rejected\]/.test(text)
-        ? "rejected"
-        : /Could not read from remote|unable to access|Connection|resolve host|does not appear to be a git repository/i.test(text)
-          ? "network"
-          : "other";
-    return { ok: false, reason, message: text.trim() };
+  if (updates.length === 0) return [];
+  const r = await git(cwd, ["push", "--porcelain", ...updates.map((u) => `--force-with-lease=${u.ref}:${u.expected ?? ""}`), remote, ...updates.map((u) => `${u.sha ?? ""}:${u.ref}`)]);
+  const text = `${r.stdout}\n${r.stderr}`;
+  const out: CasResult[] = [];
+  for (const u of updates) {
+    // porcelain: `<flag>\t<from>:<to>\t<summary>`; `!` = rejected, any other flag = done
+    const line = r.stdout.split("\n").find((l) => l.split("\t")[1]?.endsWith(`:${u.ref}`));
+    const ok = r.code === 0 || (line !== undefined && !line.startsWith("!"));
+    if (!ok) {
+      out.push({ ok: false, reason: casFailReason(line ?? text), message: line !== undefined ? `${line}\n${r.stderr}`.trim() : text.trim() });
+      continue;
+    }
+    // mirror locally so later reads without fetch agree
+    if (u.sha === null) await git(cwd, ["update-ref", "-d", u.ref]);
+    else await git(cwd, ["update-ref", u.ref, u.sha]);
+    out.push({ ok: true });
   }
-  // mirror locally so later reads without fetch agree
-  if (sha === null) await git(cwd, ["update-ref", "-d", ref]);
-  else await git(cwd, ["update-ref", ref, sha]);
-  return { ok: true };
+  return out;
+}
+
+async function casLocal(cwd: string, u: CasUpdate): Promise<CasResult> {
+  if (u.sha === null && u.expected === null) return { ok: true };
+  const args = u.sha === null ? ["update-ref", "-d", u.ref, u.expected ?? ZERO_SHA] : ["update-ref", u.ref, u.sha, u.expected ?? ZERO_SHA];
+  const r = await git(cwd, args);
+  return r.code === 0 ? { ok: true } : { ok: false, reason: "stale", message: r.stderr.trim() };
+}
+
+function casFailReason(text: string): Extract<CasResult, { ok: false }>["reason"] {
+  return /stale info/.test(text)
+    ? "stale"
+    : /\[rejected\]|\[remote rejected\]/.test(text)
+      ? "rejected"
+      : /Could not read from remote|unable to access|Connection|resolve host|does not appear to be a git repository/i.test(text)
+        ? "network"
+        : "other";
 }
 
 /** Fetch `refs/norn/*` from the remote, pruning local norn refs gone remotely (T9, H2). */

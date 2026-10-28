@@ -1,0 +1,12 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61C1APDXVH758Q1N2GVJ223",
+  "run_id": "01M61BZAHFD7E0GVBBVVHP3YJQ",
+  "step": "explore",
+  "attempt": 1,
+  "at": "2026-10-28T13:43:47.150Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "story",
+  "handoff": "Persisted-format rename across every package with an open compatibility design (dual read vs migration, mixed norn versions, two-release order since the released norn reads this story's own story.md); PRD GR2/W9/§7/skills table to amend; run norn workflow gh-70 story --to refine"
+}

@@ -1,22 +1,22 @@
 /**
  * GR6 record: after the story PR merged, the spec folder on the base branch is the record. Mark
- * its `story.md` `status: done` there without touching the person's main checkout:
+ * its `spec.md` (or an older folder's `story.md`, GR2) `status: done` there without touching the person's main checkout:
  *   - with a remote: fetch the base branch, commit in a throwaway detached worktree at
  *     `<remote>/<base>`, push `HEAD:refs/heads/<base>` (fast-forward only, never forced). A
  *     protected base branch or a race rejects the push: the record is then left as merged
  *     (`failed`, with the reason) — nothing is forced and the main checkout is untouched.
  *   - solo (no remote): commit in the main checkout only when it is on the base branch.
- * `deferred` when story.md is not on the base branch yet (the merge has not reached it).
+ * `deferred` when the spec file is not on the base branch yet (the merge has not reached it).
  *
- * The done record carries how the PR landed: story.md frontmatter `merge:` (StoryMerge — pr, url,
+ * The done record carries how the PR landed: spec file frontmatter `merge:` (StoryMerge — pr, url,
  * head_sha, merge_commit_sha, merged_by, merged_at, by_ancestry), mirrored as commit trailers
  * (`Norn-Merge-Commit`, `Norn-Merged-By`, `Norn-Merged-At`) on the record commit.
  */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import type { GitPort, StoryFacts } from "@norn/core";
-import { isGitSha, type StoryMerge, type StoryStatus } from "@norn/schema";
+import { isGitSha, LEGACY_SPEC_FILE, SPEC_FILE, type StoryMerge, type StoryStatus } from "@norn/schema";
 import { patchStoryFile, storyFile } from "@norn/store";
 
 export type RecordResult =
@@ -43,14 +43,14 @@ export async function markStoryOnBase(opts: {
     ...(opts.merge?.merged_by ? { "Norn-Merged-By": opts.merge.merged_by } : {}),
     ...(opts.merge?.merged_at ? { "Norn-Merged-At": opts.merge.merged_at } : {}),
   };
-  const rel = join(spec_dir, "story.md");
   const message = `norn: ${opts.story} ${opts.status} (PR merged)`;
   if (!remote) {
     const branch = (await git.status(root).catch(() => null))?.branch;
     if (branch !== base) return { state: "deferred", branch: base, reason: `main checkout is on ${branch ?? "a detached HEAD"}, not ${base}` };
-    const r = patchStoryFile(storyFile(join(root, spec_dir)), patch, root);
-    if (!r.ok) return { state: "deferred", branch: base, reason: `story.md: ${r.reason}` };
-    const sha = await git.commit(root, { message, trailers, paths: [rel] });
+    const file = storyFile(join(root, spec_dir));
+    const r = patchStoryFile(file, patch, root);
+    if (!r.ok) return { state: "deferred", branch: base, reason: `${relative(root, file)}: ${r.reason}` };
+    const sha = await git.commit(root, { message, trailers, paths: [relative(root, file)] });
     return sha ? { state: "committed", sha, branch: base } : { state: "unchanged", branch: base };
   }
   const tracking = `refs/remotes/${remote}/${base}`;
@@ -59,7 +59,10 @@ export async function markStoryOnBase(opts: {
     (e: unknown) => (e instanceof Error ? e.message : String(e)),
   );
   if (fetched !== null) return { state: "failed", branch: base, reason: `fetch ${base}: ${fetched}` };
-  if (!(await git.hasPath(root, tracking, rel))) return { state: "deferred", branch: base, reason: `${rel} is not on ${remote}/${base} yet` };
+  // GR2: the base holds spec.md, or story.md for a story an older norn intook
+  const onBase = async (name: string) => ((await git.hasPath(root, tracking, join(spec_dir, name))) ? join(spec_dir, name) : null);
+  const rel = (await onBase(SPEC_FILE)) ?? (await onBase(LEGACY_SPEC_FILE));
+  if (!rel) return { state: "deferred", branch: base, reason: `${join(spec_dir, SPEC_FILE)} is not on ${remote}/${base} yet` };
   const tmp = mkdtempSync(join(tmpdir(), "norn-record-"));
   const wt = join(tmp, "wt");
   try {
@@ -68,8 +71,8 @@ export async function markStoryOnBase(opts: {
       (e: unknown) => (e instanceof Error ? e.message : String(e)),
     );
     if (added !== null) return { state: "failed", branch: base, reason: `worktree: ${added}` };
-    const r = patchStoryFile(storyFile(join(wt, spec_dir)), patch, wt);
-    if (!r.ok) return { state: "failed", branch: base, reason: `story.md: ${r.reason}` };
+    const r = patchStoryFile(join(wt, rel), patch, wt);
+    if (!r.ok) return { state: "failed", branch: base, reason: `${rel}: ${r.reason}` };
     const sha = await git.commit(wt, { message, trailers, paths: [rel] });
     if (!sha) return { state: "unchanged", branch: base };
     const p = await git.push(wt, remote, `HEAD:refs/heads/${base}`);

@@ -1,0 +1,42 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61FG2KK55BE6FKSNM4DR5TF",
+  "run_id": "01M61F1SZADYVZBWXHGF92KB22",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-28T14:44:16.116Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "approve",
+  "handoff": "Approve: the plugin, scripts/sync-plugin* and the sync:plugin/check:plugin scripts are removed, and the docs, release skill and release.yaml are updated. typecheck, tests (1198 pass) and schema:emit are green. Non-blocking: no CHANGELOG [Unreleased] entry (AGENTS.md forbids it, so the PR body should carry the marketplace note); PRD X3 is stale; an AGENTS.md comma nit.",
+  "findings": [
+    {
+      "severity": "minor",
+      "title": "No [Unreleased] changelog entry, as story.md's Update list asks",
+      "id": "F1",
+      "file": "CHANGELOG.md",
+      "detail": "story.md asks for: '`CHANGELOG.md`: `[Unreleased]` entry noting the Claude Code plugin was removed (existing marketplace installs stop updating)'. AGENTS.md Process: 'Do not edit `CHANGELOG.md` in a PR. The `release` step writes it from the squash commits.' The documented rule overrides the spec, so this is not blocking. The release step will take the entry from the squash message, which should therefore say that existing marketplace installs stop updating.\nAxis: spec\nSuggestion: Put the note about existing marketplace installs in the PR description (the squash message), so the release step carries it into the changelog."
+    },
+    {
+      "severity": "minor",
+      "title": "PRD X3 still describes the Claude Code plugin with a /norn command",
+      "id": "F2",
+      "file": ".agents/PRD.md",
+      "line": 466,
+      "detail": "X3: 'Agent plugins (Claude Code first) are thin wrappers with a `/norn` command; …'. That no longer matches the repo. The story does not ask for a PRD change, and PRD amendments go through the `spec` workflow, so this falls outside this story.\nAxis: spec\nSuggestion: File a follow-up (spec workflow) to amend X3, or record the divergence under Decisions in AGENTS.md."
+    },
+    {
+      "severity": "nit",
+      "title": "Leftover comma in the release sentence",
+      "id": "F3",
+      "file": "AGENTS.md",
+      "line": 24,
+      "detail": "'bumps `version` in `packages/cli/package.json`, and the README release badge, builds and smokes' reads as if 'and the README release badge' were a separate verb phrase.\nAxis: standards\nSuggestion: 'bumps `version` in `packages/cli/package.json` and the README release badge, builds and smokes, …'"
+    }
+  ],
+  "notes": [
+    {
+      "text": "PRD X3 (.agents/PRD.md:466) still describes the Claude Code plugin with a /norn command. Worth a follow-up issue in the spec workflow?"
+    }
+  ]
+}

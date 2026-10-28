@@ -423,7 +423,7 @@ describe("intake and start (GR2, W8, W9)", () => {
       kind: "intake_story",
       key: "gh-5",
       slug: "fix-lodz-bug",
-      story_file: ".agents/specs/gh-5-fix-lodz-bug/story.md",
+      story_file: ".agents/specs/gh-5-fix-lodz-bug/spec.md",
       worktree: { path: "/r-worktrees/gh-5-fix-lodz-bug", branch: "gh-5-fix-lodz-bug", from: "main" },
       frontmatter: { workflow: "solo", status: "new", intake_at: at(), body_hash: sha256("b") },
     });
