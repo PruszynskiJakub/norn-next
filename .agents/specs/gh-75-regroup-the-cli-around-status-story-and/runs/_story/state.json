@@ -6,22 +6,17 @@
   "workflow": "story",
   "workflow_hash": "bd5ef0fbb2da1f4313555a687d9e9ce40829c98ae5c6398e299646accc1ffe05",
   "step": "slices",
-  "attempt": 1,
+  "attempt": 2,
   "visits": {
     "refine": 1,
     "plan": 1,
     "slice": 1,
     "approve-plan": 1,
-    "slices": 1
+    "slices": 2
   },
-  "step_entered_at": "2026-10-28T09:33:37.114Z",
-  "status": "stuck",
-  "park": {
-    "kind": "stuck",
-    "reason": "slices.stuck → $stuck",
-    "since": "2026-10-28T11:08:13.135Z",
-    "receipt_id": "01M6134FE4FF9GXJXAE488D6RE"
-  },
+  "step_entered_at": "2026-10-28T13:05:10.626Z",
+  "status": "ready",
+  "park": null,
   "counters": {
     "plan_loop": 0,
     "test_loop": 0,
@@ -32,7 +27,7 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 9,
+  "applied_through": 10,
   "run": null,
   "last_outcome": {
     "step": "slices",
@@ -42,7 +37,7 @@
     "receipt_id": "01M6134FE4FF9GXJXAE488D6RE"
   },
   "created_at": "2026-10-28T08:51:06.916Z",
-  "updated_at": "2026-10-28T11:08:13.135Z",
-  "last_tick_id": "01M6134FE4J9BRS1QKWDW8059E",
+  "updated_at": "2026-10-28T13:05:10.626Z",
+  "last_tick_id": "01M619TMF1BPN77GZ3WPDKZ6P8",
   "mode": "auto"
 }
