@@ -13,8 +13,13 @@
     "test": 1
   },
   "step_entered_at": "2026-10-28T21:44:36.168Z",
-  "status": "ready",
-  "park": null,
+  "status": "stuck",
+  "park": {
+    "kind": "stuck",
+    "reason": "test.fail → $stuck",
+    "since": "2026-10-28T21:51:38.280Z",
+    "receipt_id": "01M627YKS81PSD8Z83VKSEY2TZ"
+  },
   "counters": {
     "version_loop": 0,
     "ready_loop": 0,
@@ -23,17 +28,17 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 5,
+  "applied_through": 6,
   "run": null,
   "last_outcome": {
-    "step": "confirm-version",
-    "outcome": "approve",
-    "source": "human",
-    "at": "2026-10-28T21:43:32.144Z",
-    "receipt_id": "01M627FS1G1HXDVGWR52Q3SVSV"
+    "step": "test",
+    "outcome": "fail",
+    "source": "classified",
+    "at": "2026-10-28T21:51:38.280Z",
+    "receipt_id": "01M627YKS81PSD8Z83VKSEY2TZ"
   },
   "created_at": "2026-10-28T21:39:55.890Z",
-  "updated_at": "2026-10-28T21:44:36.168Z",
-  "last_tick_id": "01M627HQJ7PWB5W0JRC3G8M20C",
+  "updated_at": "2026-10-28T21:51:38.301Z",
+  "last_tick_id": "01M627YKSWBR2F2379XJ9HV48V",
   "mode": "auto"
 }
