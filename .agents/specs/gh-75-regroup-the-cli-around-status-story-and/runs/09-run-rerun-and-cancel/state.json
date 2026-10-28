@@ -5,13 +5,14 @@
   "unit_dir": "09-run-rerun-and-cancel",
   "workflow": "slice",
   "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
-  "step": "test",
+  "step": "review",
   "attempt": 1,
   "visits": {
     "implement": 1,
-    "test": 1
+    "test": 1,
+    "review": 1
   },
-  "step_entered_at": "2026-10-28T15:31:49.356Z",
+  "step_entered_at": "2026-10-28T15:41:33.668Z",
   "status": "ready",
   "park": null,
   "counters": {
@@ -22,16 +23,16 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 3,
+  "applied_through": 4,
   "run": null,
   "last_outcome": {
-    "step": "implement",
-    "outcome": "done",
-    "source": "reported",
-    "at": "2026-10-28T15:31:47.561Z",
-    "receipt_id": "01M61J73799RNDJYN00F4ZNGRJ"
+    "step": "test",
+    "outcome": "pass",
+    "source": "classified",
+    "at": "2026-10-28T15:40:08.209Z",
+    "receipt_id": "01M61JPC4G1KXH15N5431RHWYZ"
   },
   "created_at": "2026-10-28T14:13:16.910Z",
-  "updated_at": "2026-10-28T15:31:49.356Z",
-  "last_tick_id": "01M61J74ZA0YQNQY8J9YKAAG0Q"
+  "updated_at": "2026-10-28T15:41:33.668Z",
+  "last_tick_id": "01M61JRZK3QRMHG88RNJNKTDCJ"
 }
