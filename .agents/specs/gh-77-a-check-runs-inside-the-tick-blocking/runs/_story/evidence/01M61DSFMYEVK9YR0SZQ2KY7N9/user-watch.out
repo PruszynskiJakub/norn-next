@@ -1,0 +1,7 @@
+{"tick_id":"01M61DVQC1Q2RH7NREG62JCYNJ","at":"2026-10-28T14:15:40.673Z","duration_ms":581,"decisions":[{"unit":"gh-5","rule":"claim.acquire.intake","kind":"claim","ok":true}],"failed":0}
+{"tick_id":"01M61DVSAHN48R9E693CWDXJEB","at":"2026-10-28T14:15:42.673Z","duration_ms":614,"decisions":[{"unit":"gh-5","rule":"story.start","kind":"start_unit","ok":true}],"failed":0}
+{"tick_id":"01M61DVV937SR48Z0VWBCWCACG","at":"2026-10-28T14:15:44.675Z","duration_ms":20468,"decisions":[{"unit":"gh-5","rule":"check.run","kind":"run_check","ok":true}],"failed":0}
+{"tick_id":"01M61DWF8XDE2JHEWZ7HB3NQZJ","at":"2026-10-28T14:16:05.149Z","duration_ms":591,"decisions":[{"unit":"gh-5","rule":"receipts.apply","kind":"apply_receipts","ok":true}],"failed":0}
+{"tick_id":"01M61DWH7HDQAE9YMQNV42VVF4","at":"2026-10-28T14:16:07.153Z","duration_ms":276,"decisions":[],"failed":0}
+{"tick_id":"01M61DWK6218BA3FRTFZ3KZEPE","at":"2026-10-28T14:16:09.154Z","duration_ms":250,"decisions":[],"failed":0}
+{"ticks":6,"failed_actions":0,"skipped_busy":0,"interval":"2s","released":[{"story":"gh-5","ok":true,"pushed":["gh-5-slow-check"]}]}

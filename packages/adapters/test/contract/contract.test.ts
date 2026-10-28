@@ -5,6 +5,7 @@
  * @norn/cli's tests, so the dependency stays cli → adapters). Herdr is not here: its contract
  * needs a herdr server.
  */
+import { expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -19,10 +20,18 @@ import { processContract } from "./process.ts";
 import { remoteContract } from "./remote.ts";
 import { scriptedGh, scriptedGlab } from "./remote-cli.ts";
 import { runnerContract } from "./runner.ts";
+import { makeZombie, zombieUnsupported } from "./zombie.ts";
 
 processContract("process adapter (createProcessPort)", () => createProcessPort());
 // store's own ProcessPort guards leases and the tick lock (K3, H1)
 processContract("store localProcess", () => localProcess);
+
+// the zombie the K3 test needs is made even under load: the shell must not reap it before its exec
+test.skipIf(zombieUnsupported !== null)("makeZombie: 60 at once are all zombies", async () => {
+  const made = await Promise.all(Array.from({ length: 60 }, () => makeZombie()));
+  for (const z of made) if (typeof z !== "string") z.stop();
+  expect(made.filter((z) => typeof z === "string")).toEqual([]);
+});
 
 gitContract("git adapter (createGit)", () => createGit({ env: GIT_ENV }));
 

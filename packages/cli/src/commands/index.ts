@@ -7,6 +7,7 @@ import { askCommand } from "./ask.ts";
 import { briefCommand } from "./brief.ts";
 import { doneCommand } from "./done.ts";
 import { hookEventCommand } from "./hook.ts";
+import { checkRunCommand } from "./check-run.ts";
 import { stuckCommand } from "./stuck.ts";
 import { helpCommand } from "./help.ts";
 import { initCommand } from "./init.ts";
@@ -34,7 +35,7 @@ import { openCommand } from "./open.ts";
 import { orientCommand } from "./orient.ts";
 import { updateCommand } from "./update.ts";
 
-export const COMMANDS: readonly Command[] = [initCommand, uninstallCommand, syncCommand, tickCommand, watchCommand, briefCommand, doneCommand, askCommand, stuckCommand, hookEventCommand, inboxCommand, cockpitCommand, openCommand, orientCommand, statusCommand, traceCommand, whyCommand, answerCommand, approveCommand, unstickCommand, updateCommand, modeCommand, workflowCommand, takeCommand, releaseCommand, dropCommand, tidyCommand, doctorCommand, configCommand, helpCommand];
+export const COMMANDS: readonly Command[] = [initCommand, uninstallCommand, syncCommand, tickCommand, watchCommand, briefCommand, doneCommand, askCommand, stuckCommand, hookEventCommand, checkRunCommand, inboxCommand, cockpitCommand, openCommand, orientCommand, statusCommand, traceCommand, whyCommand, answerCommand, approveCommand, unstickCommand, updateCommand, modeCommand, workflowCommand, takeCommand, releaseCommand, dropCommand, tidyCommand, doctorCommand, configCommand, helpCommand];
 
 export function findCommand(name: string): Command | undefined {
   return COMMANDS.find((c) => c.name === name);
