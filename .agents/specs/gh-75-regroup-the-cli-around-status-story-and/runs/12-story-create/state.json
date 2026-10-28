@@ -5,17 +5,22 @@
   "unit_dir": "12-story-create",
   "workflow": "slice",
   "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
-  "step": "qa",
+  "step": "human-qa",
   "attempt": 1,
   "visits": {
     "implement": 2,
     "test": 2,
     "review": 2,
-    "qa": 1
+    "qa": 1,
+    "human-qa": 1
   },
-  "step_entered_at": "2026-10-28T19:38:39.684Z",
-  "status": "running",
-  "park": null,
+  "step_entered_at": "2026-10-28T19:50:30.638Z",
+  "status": "parked",
+  "park": {
+    "kind": "gate",
+    "reason": "Check the criteria QA could not settle (listed with how to check each). Approve, or reject with what failed.",
+    "since": "2026-10-28T19:50:30.638Z"
+  },
   "counters": {
     "test_loop": 0,
     "review_loop": 1,
@@ -24,35 +29,16 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 16,
-  "run": {
-    "run_id": "01M620C1FNQD3R90SEMDTHPDBS",
-    "step": "qa",
-    "attempt": 1,
-    "started_at": "2026-10-28T19:39:14.552Z",
-    "how": "auto",
-    "agent": "claude",
-    "session": {
-      "runner": "herdr",
-      "session_id": "w89:p1",
-      "pane_id": "w89:p1",
-      "reach": "herdr agent attach w89:p1"
-    },
-    "process": {
-      "pid": 53564,
-      "pid_start": "Wed Oct 28 20:39:14 2026"
-    },
-    "machine": "jakubpruszynski@mac",
-    "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD"
-  },
+  "applied_through": 17,
+  "run": null,
   "last_outcome": {
-    "step": "review",
-    "outcome": "approve",
+    "step": "qa",
+    "outcome": "unverified",
     "source": "reported",
-    "at": "2026-10-28T19:38:19.890Z",
-    "receipt_id": "01M620AGVJSK3Q353M5VTQ978C"
+    "at": "2026-10-28T19:50:29.152Z",
+    "receipt_id": "01M6210S0ZZ4R0BMM9PZ22G6ZR"
   },
   "created_at": "2026-10-28T14:13:16.910Z",
-  "updated_at": "2026-10-28T19:39:14.554Z",
-  "last_tick_id": "01M620C1FN8CZ0M929SWPHND5B"
+  "updated_at": "2026-10-28T19:50:30.638Z",
+  "last_tick_id": "01M6210TFCZK50B9GCPT845NPR"
 }
