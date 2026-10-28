@@ -167,8 +167,8 @@ The target defaults to the unit of the current worktree; at a terminal a missing
   Example: `norn story close gh-12 --yes` twice → second is refused `already_closed` (exit 3); nothing changes.
 - B40 As a person, I want `norn story reopen [<story>]` to undo a close: re-claim the story here, re-create its worktrees from the pushed branches and put each unit back at the step it was at, so that a close is not final.
   Example: gh-12 closed while slice 2 was at `review` → `norn story reopen gh-12` → worktrees back, claim held here, slice 2 at `review`.
-- B41 As a person, I want a unit that was running when the story was closed to come back parked, so that nothing starts by itself after a reopen.
-  Example: slice 3 was running `implement` at close → after reopen it is parked with reason `reopened` under Unblock; `norn run rerun` resumes it.
+- B41 As a person, I want a unit that was running when the story was closed to come back stopped (stuck), so that nothing starts by itself after a reopen.
+  Example: slice 3 was running `implement` at close → after reopen it is stuck with reason `reopened` under Unblock (a `stuck` receipt by the person, D4); `norn run rerun` resumes it.
 - B42 As a person, I want `story reopen` refused when it cannot restore the story, with the reason.
   Example: gh-12 not closed → refused `not_closed`; its branch gone from the remote → refused naming the branch; issue #12 closed → refused, do_instead "reopen the issue first" (GR7 would park it anyway). All exit 3.
 
@@ -191,7 +191,7 @@ The target defaults to the unit of the current worktree; at a terminal a missing
 - B50 As a person, I want `run rerun` on a running unit to be refused, so that stopping an agent is always a separate, explicit act.
   Example: gh-12 running `implement` → refused (exit 3), do_instead `norn run cancel gh-12` first.
 - B51 As a person, I want `norn run cancel [<unit>]` to stop a unit's running agent session without cancelling the story, so that I can stop an agent that went wrong.
-  Example: gh-12 running `implement` → the session is stopped; a receipt is written first (P6); the unit parks with reason `cancelled by person` under Unblock; the next tick does not restart it.
+  Example: gh-12 running `implement` → a `stuck` receipt by the person is written first (P6, D4), then the session is stopped; the unit is stuck with reason `cancelled by person` under Unblock; the next tick does not restart it.
 - B52 As a person, I want `run cancel` to keep everything else, so that no work is lost.
   Example: after `norn run cancel gh-12` → commits, uncommitted changes in the worktree, the branch, the claim and the Herdr pane are all still there; `norn run rerun gh-12` resumes `implement` in a fresh session, `--step` moves it, `norn story close` ends the story.
 - B53 As a person, I want `run cancel` refused when there is nothing to cancel or I do not hold the claim.
@@ -238,7 +238,7 @@ The target defaults to the unit of the current worktree; at a terminal a missing
 - B69 As an agent, I want `brief`, `done`, `ask`, `stuck` and `hook` unchanged, so that running sessions, installed hook configs and skill copies keep working across the upgrade.
   Example: a session started before the upgrade reports with `norn done approve` after it → accepted as before.
 - B70 As a maintainer, I want receipt kinds, `state.json`, trace events, exit codes, the `CliError` shape and the `--json` shapes of moved commands unchanged, so that existing units, traces and scripts that parse JSON keep working.
-  Example: a unit mid-workflow before the upgrade continues after it with no migration; `norn run list --json` prints what `norn trace --json` did.
+  Example: a unit mid-workflow before the upgrade continues after it with no migration; `norn run list --json` prints what `norn trace --json` did. This holds for commands that move one to one (`status`, `story list`, `run list`, `run view --why`); `story view` merges `status <key>` and `orient` and has its own shape, the orient report's JSON extended (D6).
 - B71 As a maintainer, I want the PRD's command table (§15) rewritten as the noun tree, and every rule that names an old command (O1, O2, O5, MO5, S7, BS9, GR7, K2a, HC4–HC13, …) to name the new one, so that the spec and the CLI agree.
   Example: S7 reads "through `norn story edit <unit> --workflow <name> --at <step>`".
 
@@ -261,3 +261,125 @@ None.
 
 - #74 renames the core noun "story"; until it lands the noun is `story`.
 - #64 (minimal config) is to be rewritten to build on `config set`/`unset` as specified here.
+
+## Plan
+
+Agreed with the person in plan#1 (seams, prefactoring, D1–D9).
+
+### Seams
+
+- **S1 The CLI, through `runCli` in the integration harness.** Observes everything a person, a script or the Herdr plugin does by typing a command: B1–B6, B9–B70 except where noted. The harness already drives `runCli` in-process against a temp repo cloned from a bare remote, a fake clock and fake remote, runner, notifier, Herdr and shell; this story adds one more fake at the same level, the terminal interaction (D2), so prompts, pick-lists, confirmations and the editor are scripted answers, and "no TTY" is the fake switched off. Checks read only what the user sees: exit code, stdout (markdown or `--json`), stderr notices, files and refs in the repo and remote, receipts and state the next tick acts on, and the calls recorded on the fakes.
+  Prior art: `human.test.ts` (answer/approve/unstick/mode/workflow), `team.test.ts` (take/release/drop), `orient.test.ts`, `open.test.ts`, `cockpit.test.ts` (with `fake-herdr`), `config.test.ts`, `segment.test.ts`, `inbox-why.test.ts` (inbox, trace, why), `agent-protocol.test.ts`.
+- **S2 The repository lint, through `test/repo.test.ts`.** Observes B8 and B71: no shipped text — package sources, `packages/cli/assets`, `plugins/`, `.agents/skills`, README, CONTRIBUTING, AGENTS.md, the PRD — names a removed command (`norn drop`, `norn inbox`, … the B5 list), the same way the glossary lint already scans those files.
+  Prior art: the glossary lint in `test/repo.test.ts`.
+- **S3 The remote port contract, through `remoteContract`.** Observes the one new remote effect `story create` needs (D3) on every implementation: gh and glab over scripted CLIs and the harness's `FakeRemote`, so the fake that S1 relies on behaves like the real adapters.
+  Prior art: `packages/adapters/test/contract/remote.ts`, `contract.test.ts`, `packages/cli/test/contract-fakes.test.ts`.
+
+The existing pinned suites stay the guard for "nothing else changed" (B69, B70): the golden decide corpus, the effect transcripts and the observe snapshots. They change only where a printed command string is renamed, through their documented update commands, and that diff is reviewed as exactly the rename.
+
+### Coverage
+
+| Behaviour | Seam | Test kind | Notes |
+|---|---|---|---|
+| B1 | S1 | integration | `help` markdown and `--json` |
+| B2 | S1 | integration | `story`, `run`, `help story` |
+| B3 | S1 | integration | |
+| B4 | S1 | integration | `help story reject`, `story reject --help` |
+| B5 | S1 | integration | table over the 15 old names; nothing changes on disk |
+| B6 | S1 | integration | every `list`/`view` with `--json` |
+| B7 | S1 | integration | gate, stuck, ask items and a `do_instead`; S2 lint covers the rest statically |
+| B8 | S2 | unit | lint over docs, skills, plugin |
+| B9 | S1 | integration | |
+| B10 | S1 | integration | output equal to what `inbox` printed (existing inbox tests moved) |
+| B11 | S1 | integration | cockpit with scripted keys (`input` dep), actions name new commands |
+| B12 | S1 | integration | fake Herdr: split call; no Herdr → refusal |
+| B13 | S1 | integration | stderr notice once per checkout |
+| B14 | S1 | integration | existing `segment.test.ts` unchanged |
+| B15 | S1 | integration | JSON equal to old `status --json` |
+| B16 | S1 | integration | |
+| B17 | S1 | integration | fake shell records the opened URL |
+| B18 | S1 | integration | fake remote records the issue; intake ran |
+| B19 | S1 | integration | fake interaction: title + editor; empty title |
+| B20 | S1 | integration | |
+| B21 | S1 | integration | fake remote shows no create call |
+| B22 | S1 | integration | fake remote throws; no story taken in |
+| B23 | S1 | integration | fake shell records the new-issue URL |
+| B24 | S1 | integration | |
+| B25 | S1 | integration | |
+| B26 | S1 | integration | |
+| B27 | S1 | integration | |
+| B28 | S1 | integration | |
+| B29 | S1 | integration | fake Herdr |
+| B30 | S1 | integration | |
+| B31 | S1 | integration | |
+| B32 | S1 | integration | |
+| B33 | S1 | integration | |
+| B34 | S1 | integration | |
+| B35 | S1 | integration | |
+| B36 | S1 | integration | fake interaction answers N |
+| B37 | S1 | integration | |
+| B38 | S1 | integration | |
+| B39 | S1 | integration | |
+| B40 | S1 | integration | close, reopen, next tick resumes the step |
+| B41 | S1 | integration | |
+| B42 | S1 | integration | three refusals |
+| B43 | S1 | integration | output equal to old `trace` |
+| B44 | S1 | integration | |
+| B45 | S1 | integration | output equal to old `why` |
+| B46 | S1 | integration | fake Herdr |
+| B47 | S1 | integration | fake Herdr |
+| B48 | S1 | integration | |
+| B49 | S1 | integration | |
+| B50 | S1 | integration | |
+| B51 | S1 | integration | fake runner records the kill after the receipt; next tick does not relaunch |
+| B52 | S1 | integration | |
+| B53 | S1 | integration | |
+| B54 | S1 | integration | harness `cwd` set to a unit worktree |
+| B55 | S1 | integration | |
+| B56 | S1 | integration | |
+| B57 | S1 | integration | fake interaction records the offered choices |
+| B58 | S1 | integration | |
+| B59 | S1 | integration | |
+| B60 | S1 | integration | `--json`, no TTY, agent-session env |
+| B61 | S1 | integration | existing config tests moved |
+| B62 | S1 | integration | |
+| B63 | S1 | integration | |
+| B64 | S1 | integration | |
+| B65 | S1 | integration | |
+| B66 | S1 | integration | file bytes unchanged |
+| B67 | S1 | integration | commented file, one-line diff |
+| B68 | S1 | integration | |
+| B69 | S1 | integration | existing `agent-protocol.test.ts` and transcripts unchanged in behaviour |
+| B70 | S1 | integration | a unit mid-workflow before the switch continues; `--json` shapes compared |
+| B71 | S2 | unit | lint over the PRD |
+
+### Prefactoring
+
+1. **Noun–verb command tree in the command framework.** Today a command is one flat name. Teach the framework a noun with verbs (`norn story approve`): lookup by noun and verb, verb-level `--help`, `norn <noun>` listing its verbs in groups, and help printed in tiers with a hidden tier for `help --all`. Lands with today's flat commands registered unchanged. Makes B1–B4 one change and every later slice only registers verbs.
+2. **One place builds every command norn prints.** Printed commands are spelled in about forty places across core (inbox items, decide details, `nextCommand`), view, store and cli. Route them all through the existing printed-commands module in core, strings unchanged (golden, transcripts and snapshots stay byte-identical). Makes B7 a one-module rename, and S2's lint has one place to allow.
+3. **Take's restore as a runtime module.** `take` claims a story and rebuilds its worktrees and branches from the pushed branches inside the command. Move that into a runtime module the command calls. `story reopen` (B40–B42) then reuses it instead of copying it; `story close` likewise reuses drop's teardown as it is.
+
+### Implementation decisions
+
+- D1 **Old commands move, not copy.** Each slice that adds new verbs removes the old commands they replace in the same slice, so there is never a second code path; everything ships in one release (B5). The docs, PRD and S2 lint land in the last slice.
+- D2 **A terminal interaction dependency.** `CliDeps` gains one interaction dependency: whether the session is interactive, pick one of a list (with a preselection), confirm y/N, ask a line, edit text in `$EDITOR`. The real one uses the process TTY; the harness scripts it. Interactive means: a TTY on stdin and stdout, no `--json`, and not an agent session (the launch env of A6 or the orient env present). One rule for every prompt in the story (B19, B20, B36, B37, B57–B60, B64, B65).
+- D3 **RemotePort gains `createIssue` and a new-issue link.** `createIssue({title, body, labels, assignee})` returns the issue; `newIssueUrl({labels})` builds the browser page for `--web` (B23). gh and glab implement both; the contract suite covers them (S3). `story create` checks the workflow name, creates the issue, then runs the same intake `sync` runs (GR1); a remote failure stops before any local write (B21, B22).
+- D4 **A person stopping a run is a human `stuck` receipt.** `run cancel` writes a `stuck` receipt by the person with reason `cancelled by person`, then kills the session through the runner (P6); `story reopen` writes one with reason `reopened` for each unit that was running at close. No new receipt kind (B70). Consequence: the unit shows as stuck, under Unblock, and `run rerun` resumes it; B41 and B51 were amended to say so. A new `cancel` receipt kind that truly parks lost: it breaks B70.
+- D5 **Closed means `story.md` says `dropped`.** `story close` is `drop` with confirmation and the claim check; `already_closed` reads that status from the pushed story branch. `story reopen` restores via prefactor 3, sets the status back to `active` in one commit on the story branch, and writes D4's receipts. The status value stays `dropped` (no schema change).
+- D6 **`story view` is built on the orient report.** It adds the slice steps and PR state that `status <key>` showed; `story view --json` is the orient report's JSON extended with those fields. B70's "unchanged `--json` shapes" applies to commands that move one to one (`story list`, `status`, `run list`, `run view --why`); `story view` merges two and has its own shape.
+- D7 **The one-time notice lives in the checkout's machine-local trace folder.** A small validated local file records that the notice was shown; `CliResult` gains a `stderr` field that `main` writes, so `runCli` still never prints. A missing or unreadable file shows the notice again rather than failing.
+- D8 **`config set` / `unset` edit the YAML document in place.** Parse the layer with the yaml library's document model (already used for story frontmatter), set or delete the dotted path, validate the whole layer against the config schema and the merged result, then write atomically (S1). Lists are replaced whole; a key not in the schema is refused before any write.
+- D9 **Verb grouping and markdown.** `story list|view`, `run list|view` and `status` print markdown for a person and take `--json` (P8 decision in AGENTS.md); `run attach --next` and `status --segment` keep their current output.
+
+### Testing decisions
+
+A good test here types a command and checks what a user would see or what the next tick acts on: exit code, stdout, stderr, repo files and refs, receipts and state, and the calls recorded on the fakes. Never a command module's internals. Faked, and only these, as system boundaries: the remote (gh/glab), the runner, notifiers, Herdr, the outside shell (browser opener), the clock and the terminal interaction (D2). Git and the file system are real. Tests of the old commands move with them and keep their assertions, renamed; a test that asserted an old printed string asserts the new one. The pinned suites change only through their update commands, in the slice that renames the string, and the diff is reviewed as exactly that rename.
+
+### Risks
+
+- **Printed-command churn across pinned suites.** Renaming strings emitted by decide changes the golden corpus, transcripts and maybe snapshots. Prefactor 2 lands first with byte-identical output; the rename is then one reviewed diff.
+- **`norn why` on traces recorded before the rename.** Replays of old ticks will differ where an item's command string changed; `why` already labels a replay by another version, so this shows as a version mismatch, not a bug. Worth one test.
+- **Reopen after a long gap.** The base may have moved and branches may have diverged; reopen restores the claim and worktrees only, and the next tick's base sync handles the rest. The reopen slice should test a reopen after the base moved.
+- **Killing a session (`run cancel`).** Headless and Herdr runners differ in what kill means; the runner contract already covers kill, so cancel uses it as is.
+- **A person's `stuck` receipt on a running unit (D4).** Today a `stuck` receipt comes from the agent of the run; decide must take one by the person, at the cursor of a running unit, as the end of that run and not relaunch, retry or nudge it. The `run cancel` slice proves this first with a test of the next tick, before building the rest of cancel.
+- **Real TTY prompts** are not exercised by S1; the real interaction is kept thin and smoke-checked by hand in QA.
