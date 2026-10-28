@@ -252,7 +252,7 @@ async function claimRoute(ctx: Context, t: Target, opts: { mailbox: boolean; ver
 }
 
 /**
- * Refuse a verb that needs the claim (mode, open) while another heartbeat holds it: this
+ * Refuse a verb that needs the claim (story edit --auto|--manual, story start) while another heartbeat holds it: this
  * checkout's copy may be stale (T9), so no answer is computed from it — not even a no-op.
  */
 export async function refuseIfHeldElsewhere(ctx: Context, story: string, verb: string): Promise<ClaimState> {

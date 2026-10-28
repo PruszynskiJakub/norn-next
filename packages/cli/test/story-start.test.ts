@@ -1,12 +1,15 @@
 /**
- * `norn open` (MO5, O1): a person opens an agent on the step only a person starts — refused before
- * the story starts and while the step is not theirs; prints the start command when the runner
- * cannot open a terminal, opens one through the runner when it can.
+ * `norn story start` (B28, MO5, O1): a person opens an agent on the step only a person starts —
+ * refused before the story starts and while the step is not theirs; prints the start command when
+ * the runner cannot open a terminal or with `--print`, opens one through the runner when it can.
+ * Without a target a person picks from the units a person can start (B57–B59).
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
 import type { PersonOpenSpec } from "@norn/core";
-import { createHarness, type Harness, issue } from "./harness.ts";
+import type { CliDeps } from "../src/index.ts";
+import { runCli } from "../src/index.ts";
+import { createHarness, FakeInteraction, type Harness, issue } from "./harness.ts";
 
 setDefaultTimeout(30_000);
 
@@ -34,28 +37,42 @@ steps:
 counters: { spec_loop: { max: 2 } }
 `;
 
+const GATE_FIRST = `name: gatefirst
+start: approve
+steps:
+  approve:
+    type: gate
+    prompt: "Approve it"
+    outcomes: { approve: $done, reject: $stuck }
+`;
+
 let h: Harness;
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
   h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
   h.write(join(h.root, ".agents/norn/workflows/story.yaml"), STORY);
+  h.write(join(h.root, ".agents/norn/workflows/gatefirst.yaml"), GATE_FIRST);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);
   h.git(["push", "-q", "origin", "main"]);
-  h.remote.issues = [issue(7, "Add login form", ["norn"])];
+  h.remote.issues = [issue(7, "Add login form", ["norn"]), issue(8, "Sign off", ["norn", "norn:wf:gatefirst"])];
 });
 afterAll(() => h.cleanup());
 
-describe("norn open (MO5)", () => {
+describe("norn story start (B28, MO5)", () => {
   const wt = () => `${h.root}-worktrees/gh-7-add-login-form`;
+  const norn = (deps: Partial<CliDeps>, ...argv: string[]) => runCli(argv, { ...h.deps, ...deps });
 
   test("taken in, not started: refused with the command that starts it; the inbox says so (GR2, O1)", async () => {
     await h.tick();
     h.clock.advance(10_000);
-    const r = await h.norn("open", "gh-7");
+    const r = await h.norn("story", "start", "gh-7");
     expect(r.exit).toBe(3);
-    expect(r.value).toMatchObject({ code: "not_started", do_instead: expect.stringContaining("norn tick") });
+    const v = r.value as { code: string; do_instead: string };
+    expect(v.code).toBe("not_started");
+    expect(v.do_instead).toContain("norn tick");
+    expect(v.do_instead).toContain("norn story start gh-7");
   });
 
   test("an attended step, a runner that cannot open terminals: the inbox and open give the start command", async () => {
@@ -66,33 +83,52 @@ describe("norn open (MO5)", () => {
     const inbox = (await h.norn("status")).value as { groups: { your_turn: Array<{ story: string; command: string; detail?: string }> } };
     const start = `cd ${wt()} && claude 'Use the norn skill, then run \`norn brief\`.'`;
     expect(inbox.groups.your_turn).toMatchObject([{ story: "gh-7", command: start }]);
-    const r = await h.norn("open", "gh-7");
+    const r = await h.norn("story", "start", "gh-7", "--json");
     expect(r.exit).toBe(0);
     expect(r.value).toEqual({ unit: "gh-7", step: "refine", worktree: wt(), command: start, opened: false });
   });
 
-  test("a runner that opens terminals: the inbox says norn open, and open opens one in the worktree", async () => {
+  test("without a target a person picks from the units a person can start only (B28, B57)", async () => {
+    const term = new FakeInteraction();
+    const r = await norn({ interaction: term }, "story", "start");
+    expect(term.picks.map((p) => p.choices.map((c) => c.value))).toEqual([["gh-7"]]);
+    expect(r.exit).toBe(0);
+    expect(r.value).toMatchObject({ unit: "gh-7", step: "refine" });
+    // a script is refused with only that unit (B60)
+    const script = await norn({ interaction: new FakeInteraction(false) }, "story", "start");
+    expect(script.exit).toBe(2);
+    expect(script.value).toMatchObject({ code: "target_required", do_instead: "norn story start gh-7" });
+  });
+
+  test("a runner that opens terminals: story start opens one in the worktree; --print prints the command", async () => {
     const opened: PersonOpenSpec[] = [];
     h.runner.capabilities = { ...h.runner.capabilities, open: true };
     Object.assign(h.runner, { openForPerson: async (spec: PersonOpenSpec) => (opened.push(spec), { pane_id: "p-9" }) });
     const inbox = (await h.norn("status")).value as { groups: { your_turn: Array<{ command: string; detail?: string }> } };
     expect(inbox.groups.your_turn).toMatchObject([{ command: "norn open gh-7", detail: expect.stringContaining(`by hand: cd ${wt()}`) }]);
-    const r = await h.norn("open", "gh-7");
+    const r = await h.norn("story", "start", "gh-7");
+    expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ unit: "gh-7", opened: true, runner: "fake", pane_id: "p-9" });
     expect(opened).toMatchObject([{ cwd: wt(), title: "gh-7 refine", command: expect.stringContaining("claude") }]);
     // --print never opens
-    expect((await h.norn("open", "gh-7", "--print")).value).toMatchObject({ opened: false });
+    const printed = await h.norn("story", "start", "gh-7", "--print");
+    expect(printed.value).toMatchObject({ opened: false, command: expect.stringContaining(`cd ${wt()} && claude`) });
     expect(opened).toHaveLength(1);
   });
 
-  test("a step a person does not start is refused (nothing_to_open)", async () => {
+  test("a step a person does not start is refused (nothing_to_open); with no target, nothing to pick (B59)", async () => {
     const runs = join(wt(), ".agents/specs/gh-7-add-login-form/runs/_story");
     h.report(runs, "done", { outcome: "done", handoff: "spec written" });
     h.clock.advance(10_000);
     await h.tick();
     expect(h.state(runs)).toMatchObject({ step: "approve", status: "parked" });
-    const r = await h.norn("open", "gh-7");
+    const r = await h.norn("story", "start", "gh-7");
     expect(r.exit).toBe(3);
     expect(r.value).toMatchObject({ code: "nothing_to_open", do_instead: "norn inbox" });
+    const term = new FakeInteraction();
+    const none = await norn({ interaction: term }, "story", "start");
+    expect(none.exit).toBe(3);
+    expect(none.value).toMatchObject({ code: "no_target" });
+    expect(term.picks).toEqual([]);
   });
 });

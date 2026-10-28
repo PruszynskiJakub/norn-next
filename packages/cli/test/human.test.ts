@@ -1,10 +1,10 @@
 /**
  * Human verbs and views through the CLI (§15, O1, O2, O5, S7, W9, T8, T9): inbox / status / trace /
- * why read via @norn/view and the trace; answer / approve / unstick / mode / workflow write receipts
+ * why read via @norn/view and the trace; answer / approve / unstick / story edit write receipts
  * the next tick applies; a non-holder clone posts to the mailbox the holder's tick imports.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Receipt } from "@norn/schema";
 import { type CliResult, runCli, type TickReport } from "../src/index.ts";
@@ -105,11 +105,11 @@ beforeAll(async () => {
 afterAll(() => h.cleanup());
 
 describe("before start", () => {
-  test("intake; norn workflow sets frontmatter (W9) and refuses unknown names and --to", async () => {
+  test("intake; story edit --workflow sets frontmatter (W9, B31) and refuses unknown names and --at", async () => {
     await tick();
-    refused(await h.norn("workflow", "gh-6", "nope"), "unknown_workflow");
-    refused(await h.norn("workflow", "gh-6", "alt", "--to", "draft"), "not_started");
-    const r = await h.norn("workflow", "gh-6", "alt");
+    refused(await h.norn("story", "edit", "gh-6", "--workflow", "nope"), "unknown_workflow");
+    refused(await h.norn("story", "edit", "gh-6", "--workflow", "alt", "--at", "draft"), "not_started");
+    const r = await h.norn("story", "edit", "gh-6", "--workflow", "alt");
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ unit: "gh-6", workflow: "alt", previous: "gated", started: false, changed: true });
     expect(h.read(join(wt6(), spec6, "story.md"))).toContain("workflow: alt");
@@ -158,11 +158,14 @@ describe("preconditions refuse with do_instead", () => {
   });
 });
 
-describe("norn workflow after start (S7)", () => {
-  test("needs --to; --to must exist; switch journals a receipt, re-pins, and the tick enters --to", async () => {
-    refused(await h.norn("workflow", "gh-6", "gated"), "needs_to");
-    refused(await h.norn("workflow", "gh-6", "gated", "--to", "nope"), "unknown_step");
-    const r = await h.norn("workflow", "gh-6", "gated", "--to", "review");
+describe("story edit --workflow after start (S7, B32)", () => {
+  test("needs --at; --at must exist; switch journals a receipt, re-pins, and the tick enters --at", async () => {
+    const needs = await h.norn("story", "edit", "gh-6", "--workflow", "gated");
+    expect((needs.value as { do_instead: string }).do_instead).toBe("norn story edit gh-6 --workflow gated --at <work|review>");
+    refused(needs, "needs_to");
+    refused(await h.norn("story", "edit", "gh-6", "--workflow", "gated", "--at", "nope"), "unknown_step");
+    expect((await h.norn("story", "edit", "gh-6", "--at", "review")).exit).toBe(2);
+    const r = await h.norn("story", "edit", "gh-6", "--workflow", "gated", "--at", "review");
     expect(r.exit).toBe(0);
     const v = r.value as Verb & { previous: string };
     expect(v.previous).toBe("alt");
@@ -224,13 +227,25 @@ describe("unstick (W4)", () => {
   });
 });
 
-describe("mode (MO1)", () => {
-  test("bad value and slice keys refused; switch writes a mode receipt once; tick stores it", async () => {
-    expect((await h.norn("mode", "gh-5", "sideways")).exit).toBe(2);
-    refused(await h.norn("mode", "gh-5/01", "manual"), "story_only");
-    const r = await h.norn("mode", "gh-5", "manual");
-    expect(r.value).toMatchObject({ changed: true, previous: "auto", mode: "manual", receipt: { kind: "mode", mode: "manual", previous: "auto" } });
-    expect((await h.norn("mode", "gh-5", "manual")).value).toMatchObject({ changed: false });
+describe("story edit --auto|--manual (MO1, B30)", () => {
+  test("both flags, no change flag, or a mode with --workflow are usage errors; nothing is written", async () => {
+    for (const flags of [["--auto", "--manual"], [], ["--manual", "--workflow", "alt"]]) {
+      const r = await h.norn("story", "edit", "gh-5", ...flags);
+      expect([flags, r.exit]).toEqual([flags, 2]);
+    }
+    expect(h.state(runs5())?.mode).toBe("auto");
+  });
+
+  test("--manual writes a mode receipt once; the tick stores it; --auto the reverse", async () => {
+    const r = await h.norn("story", "edit", "gh-5", "--manual");
+    expect(r.exit).toBe(0);
+    expect(r.value).toMatchObject({ unit: "gh-5", changed: true, previous: "auto", mode: "manual", receipt: { kind: "mode", mode: "manual", previous: "auto", slice: null } });
+    expect((await h.norn("story", "edit", "gh-5", "--manual")).value).toMatchObject({ changed: false });
+    await tick();
+    expect(h.state(runs5())?.mode).toBe("manual");
+    // the last switch wins, a pending one counts as the current mode
+    expect((await h.norn("story", "edit", "gh-5", "--auto")).value).toMatchObject({ changed: true, previous: "manual", mode: "auto" });
+    expect((await h.norn("story", "edit", "gh-5", "--manual")).value).toMatchObject({ changed: true, previous: "auto", mode: "manual" });
     await tick();
     expect(h.state(runs5())?.mode).toBe("manual");
   });
@@ -307,7 +322,7 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
     expect(h.git(["ls-remote", "origin", "refs/norn/inbox/*"])).toContain("refs/norn/inbox/gh-5/");
     // the same decision twice is refused before it reaches the mailbox
     refused(await b("approve", "gh-5"), "already_recorded");
-    held(await b("mode", "gh-5", "auto"));
+    held(await b("story", "edit", "gh-5", "--auto"));
   });
 
   test("the holder's tick imports it, deletes the ref, and the next tick applies it", async () => {
@@ -438,6 +453,21 @@ describe("a slice gate in its own worktree (X1: views read slice runs from the s
     const only = (await h.norn("run", "list", "gh-8", "--story-only")).value as typeof v;
     expect(only.units.map((u) => u.unit)).toEqual(["gh-8"]);
     expect(only.steps.every((s) => s.unit === "gh-8")).toBe(true);
+  });
+
+  test("in the slice worktree, story edit --auto|--manual acts on the story, --workflow on the slice (B55)", async () => {
+    const inSlice = (...argv: string[]) => runCli(argv, { ...h.deps, cwd: sliceWt() });
+    const m = await inSlice("story", "edit", "--manual", "--json");
+    expect(m.exit).toBe(0);
+    expect(m.value).toMatchObject({ unit: "gh-8", mode: "manual", changed: true, receipt: { kind: "mode", slice: null } });
+    expect(readdirSync(join(wt8(), spec8, "runs/_story/receipts")).filter((f) => f.endsWith("-mode.json"))).toHaveLength(1);
+    const w = await inSlice("story", "edit", "--workflow", "sliceqa", "--json");
+    expect(w.exit).toBe(3);
+    expect(w.value).toMatchObject({ code: "needs_to", error: expect.stringContaining("gh-8/01"), do_instead: "norn story edit gh-8/01 --workflow sliceqa --at <qa>" });
+    // an explicit slice key with a mode flag means the slice's story too
+    expect((await h.norn("story", "edit", "gh-8/01", "--auto")).value).toMatchObject({ unit: "gh-8", mode: "auto", previous: "manual" });
+    await tick();
+    expect(h.state(storyRuns())?.mode).toBe("auto");
   });
 
   test("approve lands in the slice worktree; the next tick finishes the slice and the inbox clears", async () => {

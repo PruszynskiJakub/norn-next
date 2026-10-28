@@ -7,7 +7,7 @@
  *
  * Each verb says which units it applies to (`applies`) and why none does (`none`); later verbs reuse this.
  */
-import type { ProjectView } from "@norn/view";
+import type { ProjectView, UnitView } from "@norn/view";
 import { inboxItemsInOrder, loadRunView, stepTitle } from "@norn/view";
 import { cmd } from "@norn/core";
 import type { Context } from "../context.ts";
@@ -18,8 +18,8 @@ import type { InteractionChoice } from "./interaction.ts";
 export interface TargetRule {
   /** the verb as typed, e.g. `run view` */
   verb: string;
-  /** whether the verb applies to this unit */
-  applies(key: string): boolean;
+  /** whether the verb applies to this unit, as the project view shows it */
+  applies(key: string, view: ProjectView): boolean;
   /** why no unit applies, e.g. `No unit has a run yet` */
   none: string;
   /** the verb on one unit, as printed (`cmd.runView`) */
@@ -42,10 +42,11 @@ function unitsInStatusOrder(view: ProjectView): InteractionChoice[] {
 }
 
 /** The unit key the verb acts on, or a refusal. */
-export async function resolveTarget(ctx: Context, explicit: string | undefined, json: boolean, rule: TargetRule): Promise<string> {
+export async function targetKey(ctx: Context, explicit: string | undefined, json: boolean, rule: TargetRule): Promise<string> {
   if (explicit) return explicit;
   if (ctx.unit) return rule.story ? ctx.unit.story : (ctx.unit.slice ?? ctx.unit.story);
-  const candidates = unitsInStatusOrder(await projectView(ctx)).filter((c) => rule.applies(c.value));
+  const view = await projectView(ctx);
+  const candidates = unitsInStatusOrder(view).filter((c) => rule.applies(c.value, view));
   if (!candidates.length) throw refuse(rule.none, cmd.status(), "no_target");
   const terminal = ctx.terminal(json);
   if (!terminal)
@@ -63,6 +64,16 @@ export function hasRun(ctx: Context, verb: string, command: (key: string) => str
     none: "No unit has a run yet",
     applies: (key) => loadRunView({ repoRoot: ctx.root, home: ctx.home, env: ctx.env, now: ctx.clock.now(), target: key }) !== null,
   };
+}
+
+/** The units of the view, story units and slices, by key. */
+export function unitOf(view: ProjectView, key: string): UnitView | undefined {
+  for (const s of view.stories) {
+    if (s.key === key) return s;
+    const x = s.slices.find((u) => u.slice === key);
+    if (x) return x;
+  }
+  return undefined;
 }
 
 /** B55: a story verb (`story view`, `story chat`) applies to every story, never to a slice. */

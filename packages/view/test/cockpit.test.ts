@@ -116,6 +116,8 @@ describe("cockpitModel", () => {
 
   test("effects: verbs with {input}, links, places only when the front end has them", () => {
     const { rows } = cockpitModel(view(), { places: true, provider: "gh" });
+    // B28: the start action runs `norn story start <unit>`
+    expect(row(rows, "your_turn:gh-1")?.actions.find((a) => a.id === "start")?.effect).toEqual({ kind: "verb", argv: ["story", "start", "gh-1"] });
     const answer = row(rows, "answer:gh-3")?.actions.find((a) => a.id === "answer");
     expect(answer).toEqual({ id: "answer", label: "answer", key: "a", input: { prompt: "Your answer", required: true }, effect: { kind: "verb", argv: ["answer", "gh-3/02", "{input}"] } });
     if (answer?.effect.kind !== "verb") throw new Error("unreachable");
