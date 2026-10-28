@@ -6,7 +6,9 @@ The spec is `.agents/PRD.md`. Read it before changing behaviour; cite its ids (S
 
 ```sh
 bun install
-bun test            # all tests (packages/*/test, test/)
+bun test            # all tests (packages/*/test, test/, scripts/); same as `bun run test`
+bun run test:fast   # everything but packages/cli/test (~30 s): what a slice's test check runs
+bun run test:cli    # packages/cli/test, the cli integration tests (~90% of the suite's time)
 bun run typecheck   # tsc --noEmit over every package
 bun run schema:emit # regenerate packages/schema/json/*.schema.json after changing a schema
 bun run golden -- --update  # behaviour change: re-decide every golden case, rewrite only its decisions
@@ -23,7 +25,7 @@ Port contract suites state what every implementation of a port must do, in `pack
 
 To release: a person runs `/release-start`. It opens the release issue; the `release` workflow rebuilds `CHANGELOG.md` from the squash commits since the last tag, bumps `version` in `packages/cli/package.json`, the README release badge and the plugin (`bun run sync:plugin`), builds and smokes, and opens the PR. Merging that PR tags `vX.Y.Z` and publishes in one CI run. See Process.
 
-All three must pass before you hand work back; CI (`.github/workflows/ci.yml`) runs them on every PR, then builds the npm package and a binary and runs `scripts/smoke.sh` on each; a release also smokes each binary on its own OS (macOS arm64/x64, Linux arm64). A test fails if the emitted JSON schemas are stale.
+The full suite (`bun test`) and the type check must pass before you hand work back; a slice's `test` check runs only `test:fast` and the type check, the story's `test` check runs the full suite. CI (`.github/workflows/ci.yml`) runs them on every PR, then builds the npm package and a binary and runs `scripts/smoke.sh` on each; a release also smokes each binary on its own OS (macOS arm64/x64, Linux arm64). A test fails if the emitted JSON schemas are stale.
 
 ## Layout and dependency direction
 
