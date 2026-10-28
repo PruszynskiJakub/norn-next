@@ -233,8 +233,7 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
     case "stuck": {
       if (step.type !== "agent") return { reject: `${st.step} is a ${step.type} step; stuck is for agent steps` };
       if (st.run && r.run_id && st.run.run_id !== r.run_id) return { reject: `stale run ${r.run_id}` };
-      // B51 (D4): a person's stuck (`norn run cancel`) ends the run here; the step's `stuck` edge is the agent's
-      if (r.by !== "human" && edgeOf(wf, st.step, "stuck")) return take(st, "stuck", r, ctx, lastOutcome("stuck"));
+      if (edgeOf(wf, st.step, "stuck")) return take(st, "stuck", r, ctx, lastOutcome("stuck"));
       return {
         state: { ...stuckPark(st, "stuck", r.reason, r.at, r.receipt_id), last_outcome: lastOutcome("stuck") },
         log: `${st.step}#${st.attempt} stuck: ${r.reason}`,
