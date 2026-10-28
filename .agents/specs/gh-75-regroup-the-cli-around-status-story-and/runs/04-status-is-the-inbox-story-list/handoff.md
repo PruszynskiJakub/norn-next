@@ -14,6 +14,17 @@
 
 ## Goal
 
+`norn status` is the inbox (all its flags), `norn story list` is the old status table, a one-time notice tells upgraders, `status --segment` stays (only in `help --all`), `norn inbox` and `status <key>` are gone.
+
 ## Progress
 
+- `status.ts` now holds the inbox (moved from the deleted `inbox.ts`) plus `--segment`; no positionals (`status gh-1` is a usage error). New noun `story` (`story.ts`) with `story list` (`story-list.ts`): same JSON as old `status --json` (view minus `timeline`).
+- Notice (D7): schema `local-notices` (`trace/notices.json`, `{shown: string[]}`), store `firstNotice(root, id)`; an unreadable/unwritable file shows it again. `Context.stderr` → `CliResult.stderr`, written by `main.ts`. Decision: the notice shows only without `--json` and never for `--segment` (a script or Herdr must not spend it).
+- Help: `status` in Start here, `story` in Look around, hidden group "Run by Herdr, not by hand" with a `status --segment` row (JSON entry too) shown by `help --all`.
+- Tests: new `test/status.test.ts` (AC1 empty, AC3, AC4, AC5, AC6); AC1 gate+ask groups in `human.test.ts` answer test; every `norn inbox` test call moved to `status`, `status`/`status <key>` to `story list` / new harness `h.listed(key)` (goes through `h.norn`, so transcripts record it). Transcripts base-sync and recovery-claim-lost rewritten: label rename only.
+- AC7 checked by hand in a scratch repo: notice once on stderr, inbox on stdout, `story list` table, `inbox` exit 2.
+- Left for slice 14 (printed commands): `cmd.inbox()` / `cmd.status(key)` still print `norn inbox …` / `norn status <key>` in hints and do_instead (e.g. story list footer "0 items need you — norn inbox").
+
 ## Resume
+
+Done; report `norn done done`.
