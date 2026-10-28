@@ -1,0 +1,9 @@
+[DEBUG-gh76] net: push --porcelain --force-with-lease=refs/norn/claims/gh-1:<sha> origin <sha>:refs/norn/claims/gh-1
+[DEBUG-gh76] net: push --porcelain --force-with-lease=refs/norn/claims/gh-2:<sha> origin <sha>:refs/norn/claims/gh-2
+[DEBUG-gh76] net: push --porcelain --force-with-lease=refs/norn/claims/gh-3:<sha> origin <sha>:refs/norn/claims/gh-3
+[DEBUG-gh76] renewals=3 ok=3 claim pushes=3 tick_ms=794
+[DEBUG-gh76]   push --porcelain --force-with-lease=refs/norn/claims/gh-1:<sha> origin <sha>:refs/norn/claims/gh-1
+[DEBUG-gh76]   push --porcelain --force-with-lease=refs/norn/claims/gh-2:<sha> origin <sha>:refs/norn/claims/gh-2
+[DEBUG-gh76]   push --porcelain --force-with-lease=refs/norn/claims/gh-3:<sha> origin <sha>:refs/norn/claims/gh-3
+56 |   console.log(`[DEBUG-gh76] renewals=${renewed.length} ok=${renewed.filter((d) => d.ok).length} claim pushes=${pushes.length} tick_ms=${ms.toFixed(0)}`);
+57 |   for (const p of pushes) console.log(`[DEBUG-gh76]   ${p.slice(p.indexOf("push")).join(" ").replace(/[0-9a-f]{40}/g, "<sha>")}`);
