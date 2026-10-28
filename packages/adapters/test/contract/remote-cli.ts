@@ -26,6 +26,14 @@ function flag(argv: string[], name: string): string | undefined {
   return eq?.slice(name.length + 1);
 }
 
+/** Every value of a repeatable flag, comma lists split (`--label a --label b,c`). */
+function flags(argv: string[], name: string): string[] {
+  return argv.flatMap((a, i) => (argv[i - 1] === name ? a.split(",") : a.startsWith(`${name}=`) ? a.slice(name.length + 1).split(",") : []));
+}
+
+/** The next issue number after the seeded ones. */
+const nextNumber = (issues: SeedIssue[]) => Math.max(0, ...issues.map((i) => i.number)) + 1;
+
 export interface ScriptedRemote {
   exec: Exec;
   seed(issues: SeedIssue[]): void;
@@ -55,6 +63,12 @@ export function scriptedGh(login = "octocat"): ScriptedRemote {
       const state = flag(argv, "--state") ?? "open";
       return ok(issues.filter((i) => (state === "all" || i.state === state) && (!assignee || i.assignees.includes(assignee)) && (!label || i.labels.includes(label))).map(issueJson));
     }
+    if (a === "issue" && b === "create") {
+      const i: SeedIssue = { number: nextNumber(issues), title: flag(argv, "--title")!, body: flag(argv, "--body") ?? "", state: "open", assignees: flags(argv, "--assignee"), labels: flags(argv, "--label") };
+      issues = [...issues, i];
+      return ok(`\nCreating issue in acme/app\n\nhttps://github.com/acme/app/issues/${i.number}\n`);
+    }
+    if (a === "repo" && b === "view") return ok({ url: "https://github.com/acme/app" });
     if (a === "issue" && b === "view") {
       const i = issues.find((x) => x.number === Number(argv[3]));
       return i ? ok(issueJson(i)) : { code: 1, stdout: "", stderr: `GraphQL: Could not resolve to an issue or pull request with the number of ${argv[3]}.` };
@@ -92,7 +106,7 @@ export function scriptedGlab(login = "tanuki"): ScriptedRemote {
     updated_at: AT,
   });
   const mrJson = (m: Pr) => ({ iid: m.number, web_url: `https://gitlab.com/acme/app/-/merge_requests/${m.number}`, state: "opened", draft: m.draft, source_branch: m.head, target_branch: m.base, merged_at: null, sha: SHA, merge_commit_sha: null, squash_commit_sha: null, merged_by: null, merge_user: null });
-  const exec: Exec = async (argv) => {
+  const exec: Exec = async (argv, opts) => {
     const [bin, a, b] = argv;
     if (bin !== "glab") throw new Error(`scripted glab: not a glab call: ${argv.join(" ")}`);
     if (a === "api" && b === "user") return ok({ id: 1, username: login });
@@ -102,6 +116,13 @@ export function scriptedGlab(login = "tanuki"): ScriptedRemote {
       const all = argv.includes("--all");
       return ok(issues.filter((i) => (all || i.state === "open") && (!assignee || i.assignees.includes(assignee)) && (!label || i.labels.includes(label))).map(issueJson));
     }
+    if (a === "issue" && b === "create") {
+      const body = flag(argv, "--description-file") === "-" ? (opts?.stdin ?? "") : (flag(argv, "--description") ?? "");
+      const i: SeedIssue = { number: nextNumber(issues), title: flag(argv, "--title")!, body, state: "open", assignees: flags(argv, "--assignee"), labels: flags(argv, "--label") };
+      issues = [...issues, i];
+      return ok(`- Creating issue in acme/app\n#${i.number} ${i.title} (now)\n https://gitlab.com/acme/app/-/issues/${i.number}\n`);
+    }
+    if (a === "repo" && b === "view") return ok({ id: 1, web_url: "https://gitlab.com/acme/app" });
     if (a === "issue" && b === "view") {
       const i = issues.find((x) => x.number === Number(argv[3]));
       return i ? ok(issueJson(i)) : { code: 1, stdout: "", stderr: "ERROR: 404 Not Found" };

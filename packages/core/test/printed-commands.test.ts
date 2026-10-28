@@ -26,6 +26,7 @@ const today: Record<keyof typeof cmd, [string, ...string[]]> = {
   stuck: [`norn stuck "<reason>"`, cmd.stuck(), `norn stuck "<why>"`, cmd.stuck("<why>")],
   runList: [`norn run list ${U}`, cmd.runList(U), `norn run list ${U} --limit 20`, cmd.runList(U, { limit: 20 })],
   runView: [`norn run view ${U}`, cmd.runView(U), "norn run view <unit> --why", cmd.runView(undefined, { why: true })],
+  storyCreate: [`norn story create --title "…"`, cmd.storyCreate(), `norn story create --title "…" --workflow <a|b>`, cmd.storyCreate({ workflow: "<a|b>" })],
   sync: ["norn sync", cmd.sync()],
   take: [`norn take ${S}`, cmd.take(S), `norn take ${S} --force`, cmd.take(S, { force: true })],
   tick: ["norn tick", cmd.tick()],

@@ -16,7 +16,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { herdr } from "@norn/adapters";
 import { parseDuration } from "@norn/schema";
-import { readCockpitFile, spawnBounded, writeCockpitFile } from "@norn/store";
+import { readCockpitFile, writeCockpitFile } from "@norn/store";
 import { type CockpitModel, cockpitModel, inboxItemsInOrder, type ProjectView, withInput } from "@norn/view";
 import { defineCommand, opt } from "../command.ts";
 import { Context } from "../context.ts";
@@ -24,6 +24,7 @@ import { usageError } from "../output.ts";
 import { cockpitHerdr, labelPanes, oldestYourTurn, placeAgent, verbMessage } from "../runtime/cockpit.ts";
 import { clampScroll, handleKey, initialState, parseKeys, renderCockpit, type TuiEffect, type TuiState } from "../runtime/cockpit-tui.ts";
 import { projectView } from "../runtime/human.ts";
+import { openLink } from "../runtime/open-link.ts";
 import { cmd } from "@norn/core";
 
 const CLEAR = "\x1b[H\x1b[2J";
@@ -47,15 +48,6 @@ function keyChunks(ctx: Context): { chunks: AsyncIterator<string>; close: () => 
       stdin.pause();
     },
   };
-}
-
-/** CP8: a link with the platform opener (`open` on macOS, `xdg-open` elsewhere), or the injected shell. */
-async function openLink(ctx: Context, url: string): Promise<{ code: number; stderr: string }> {
-  const argv = [process.platform === "darwin" ? "open" : "xdg-open", url];
-  if (ctx.deps.shell) return ctx.deps.shell(argv, ctx.root);
-  // H11 seam: store's bounded spawn (a missing opener is exit 127, never a throw)
-  const r = await spawnBounded(argv, {});
-  return { code: r.code, stderr: r.stderr };
 }
 
 /** HC7: a verb in-process through the dispatcher (loaded lazily: the dispatcher imports this command). */

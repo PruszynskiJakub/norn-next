@@ -13,7 +13,9 @@ export type RemoteContractTest =
   | "getIssue: the listed issue, closed ones too; null when missing"
   | "findPullRequest: null for a branch without one"
   | "openDraftPullRequest opens a draft the branch then finds (GR6)"
-  | "findPullRequest picks the newest of a branch's PRs";
+  | "findPullRequest picks the newest of a branch's PRs"
+  | "createIssue opens an issue with the labels and assignee, which intake then lists (B18)"
+  | "newIssueUrl: the remote's new-issue page with the labels filled in (B23)";
 
 export interface SeedIssue {
   number: number;
@@ -114,6 +116,27 @@ export function remoteContract(name: string, make: () => RemoteSubject, opts: Co
       await port.openDraftPullRequest({ head: "gh-1-add-login", base: "main", title: "first", body: "" });
       const second = await port.openDraftPullRequest({ head: "gh-1-add-login", base: "main", title: "second", body: "" });
       expect((await port.findPullRequest("gh-1-add-login"))?.number).toBe(second.number);
+    });
+
+    t("createIssue opens an issue with the labels and assignee, which intake then lists (B18)", async () => {
+      const { port, me } = await seeded();
+      const created = await port.createIssue({ title: "Fix login timeout", body: "It times out.", labels: ["norn", "norn:wf:fix"], assignee: me });
+      expectIssueShape(created, port.provider);
+      expect(created).toMatchObject({ title: "Fix login timeout", body: "It times out.", state: "open", assignees: [me], labels: ["norn", "norn:wf:fix"] });
+      expect([1, 2, 3, 4]).not.toContain(created.number);
+      expect(await port.getIssue(created.number)).toEqual(created);
+      expect((await port.listAssignedIssues({ label: "norn" })).map((i) => i.number)).toEqual([1, created.number]);
+    });
+
+    t("newIssueUrl: the remote's new-issue page with the labels filled in (B23)", async () => {
+      const { port } = await seeded();
+      const url = await port.newIssueUrl({ labels: ["norn", "norn:wf:spec"] });
+      expect(url).toStartWith("https://");
+      const page = decodeURIComponent(url.replace(/\+/g, " "));
+      expect(page).toContain("issues/new");
+      expect(page).toContain("norn:wf:spec");
+      expect(page).toMatch(/\bnorn\b(?!:)/);
+      expect((await port.listAssignedIssues({ label: "norn" })).map((i) => i.number)).toEqual([1]); // nothing created
     });
   });
 }

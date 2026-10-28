@@ -19,6 +19,7 @@ import { approveCommand } from "./approve.ts";
 import { inboxCommand } from "./inbox.ts";
 import { modeCommand } from "./mode.ts";
 import { runNoun } from "./run.ts";
+import { storyNoun } from "./story.ts";
 import { statusCommand } from "./status.ts";
 import { unstickCommand } from "./unstick.ts";
 import { workflowCommand } from "./workflow.ts";
@@ -35,7 +36,7 @@ import { updateCommand } from "./update.ts";
 
 export const COMMANDS: readonly Command[] = [initCommand, uninstallCommand, syncCommand, tickCommand, watchCommand, briefCommand, doneCommand, askCommand, stuckCommand, hookEventCommand, inboxCommand, cockpitCommand, openCommand, orientCommand, statusCommand, answerCommand, approveCommand, unstickCommand, updateCommand, modeCommand, workflowCommand, takeCommand, releaseCommand, dropCommand, tidyCommand, doctorCommand, configCommand, helpCommand];
 
-export const NOUNS: readonly Noun[] = [runNoun];
+export const NOUNS: readonly Noun[] = [storyNoun, runNoun];
 
 /** A flat command by name, or a verb by its full name (`run list`). */
 export function findCommand(name: string): Command | undefined {
