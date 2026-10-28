@@ -537,7 +537,7 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
   }, 60_000);
 });
 
-describe("BUG-2: an update conflict that exhausts base_conflict_loop, then unstick --to resolve (BS5, W4)", () => {
+describe("BUG-2: an update conflict that exhausts base_conflict_loop, then run rerun --step resolve (BS5, W4)", () => {
   let h: Harness;
   const wt = () => `${h.root}-worktrees/gh-12-conflict-twice`;
   const runs = () => join(wt(), ".agents/specs/gh-12-conflict-twice/runs/_story");
@@ -574,7 +574,7 @@ describe("BUG-2: an update conflict that exhausts base_conflict_loop, then unsti
   });
   afterAll(() => h.cleanup());
 
-  test("act records route $stuck and the unit stays stuck at update; after unstick --to resolve, done without the merge is refused", async () => {
+  test("act records route $stuck and the unit stays stuck at update; after run rerun --step resolve, done without the merge is refused", async () => {
     await h.tick();
     const first = conflict(1);
     h.clock.advance(10_000);
@@ -603,7 +603,7 @@ describe("BUG-2: an update conflict that exhausts base_conflict_loop, then unsti
     expect(h.state(runs())).toMatchObject({ step: "update", status: "stuck" });
 
     // a person sends it to resolve: the brief still names the base, and done still verifies it (BS5)
-    expect((await h.norn("unstick", "gh-12", "--to", "resolve", "--reset", "base_conflict_loop")).exit).toBe(0);
+    expect((await h.norn("run", "rerun", "gh-12", "--step", "resolve", "--reset", "base_conflict_loop")).exit).toBe(0);
     await until(() => h.state(runs())?.step === "resolve" && h.state(runs())?.status === "running", "resolve running again");
     const b = await inWt("brief", "--json");
     expect((b.value as { brief: { rework: { base?: { sha: string } } | null } }).brief.rework?.base).toMatchObject({ sha: second });

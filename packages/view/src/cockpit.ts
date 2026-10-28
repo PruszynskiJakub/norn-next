@@ -98,7 +98,7 @@ function itemActions(i: InboxEntry, unit: string, o: CockpitOptions): CockpitAct
     out.push(action("approve", { kind: "verb", argv: ["approve", unit] }));
     out.push(action("reject", { kind: "verb", argv: ["approve", unit, "--reject", "--reason", "{input}"] }, { prompt: "What to change", required: true }));
   }
-  if (i.command.startsWith(`${cmd.unstick()} `)) out.push(action("unstick", { kind: "verb", argv: ["unstick", unit] }));
+  if (i.command.startsWith(`${cmd.unstick()} `)) out.push(action("unstick", { kind: "verb", argv: ["run", "rerun", unit] }));
   return out;
 }
 

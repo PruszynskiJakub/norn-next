@@ -121,6 +121,8 @@ describe("cockpitModel", () => {
     if (answer?.effect.kind !== "verb") throw new Error("unreachable");
     expect(withInput(answer.effect.argv, "CSV only")).toEqual(["answer", "gh-3/02", "CSV only"]);
     expect(row(rows, "approve:gh-4")?.actions.find((a) => a.id === "reject")?.effect).toEqual({ kind: "verb", argv: ["approve", "gh-4", "--reject", "--reason", "{input}"] });
+    // B48: unstick is gone; a stuck unit is rerun
+    expect(row(rows, "unblock:gh-5")?.actions.find((a) => a.id === "unstick")?.effect).toEqual({ kind: "verb", argv: ["run", "rerun", "gh-5"] });
     expect(row(rows, "story:gh-4")?.actions.find((a) => a.id === "pr")?.effect).toEqual({ kind: "link", url: "https://github.com/o/r/pull/7" });
     expect(row(rows, "attended:gh-2")?.actions[1]?.effect).toEqual({ kind: "place", place: "agent", story: "gh-2", reach: { worktree: "/repo-worktrees/gh-2-x", agent_session_id: "s2", pane_id: null } });
     expect(row(rows, "story:gh-1")?.actions[0]?.effect).toEqual({ kind: "place", place: "orient", story: "gh-1" });

@@ -1,6 +1,6 @@
 /**
  * Human verbs and views through the CLI (§15, O1, O2, O5, S7, W9, T8, T9): inbox / status / trace /
- * why read via @norn/view and the trace; answer / approve / unstick / mode / workflow write receipts
+ * why read via @norn/view and the trace; answer / approve / run rerun / mode / workflow write receipts
  * the next tick applies; a non-holder clone posts to the mailbox the holder's tick imports.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
@@ -147,12 +147,12 @@ describe("views (X1)", () => {
 });
 
 describe("preconditions refuse with do_instead", () => {
-  test("approve on a non-gate step, answer when not asking, unstick when not stuck, unknown unit", async () => {
+  test("approve on a non-gate step, answer when not asking, run rerun when running, unknown unit", async () => {
     const a = await h.norn("approve", "gh-5");
     refused(a, "not_at_gate");
     expect(a.value).toMatchObject({ do_instead: "norn trace gh-5" });
     refused(await h.norn("answer", "gh-5", "EUR"), "not_parked_on_ask");
-    refused(await h.norn("unstick", "gh-5"), "not_stuck");
+    refused(await h.norn("run", "rerun", "gh-5"), "running");
     refused(await h.norn("answer", "gh-99", "x"), "unknown_unit");
   });
 });
@@ -205,17 +205,17 @@ describe("answer (O2, B2)", () => {
   });
 });
 
-describe("unstick (W4)", () => {
-  test("unknown step / counter refused; --to + --reset journaled and applied", async () => {
+describe("run rerun (W4, B48, B49)", () => {
+  test("unknown step / counter refused; --step + --reset journaled and applied", async () => {
     h.report(runs5(), "stuck", { reason: "no API key" });
     await tick();
     expect(h.state(runs5())).toMatchObject({ status: "stuck" });
-    refused(await h.norn("unstick", "gh-5", "--to", "nope"), "unknown_step");
-    refused(await h.norn("unstick", "gh-5", "--reset", "bogus"), "unknown_counter");
-    const r = await h.norn("unstick", "gh-5", "--to", "work", "--reset", "loop", "--reason", "key added");
+    refused(await h.norn("run", "rerun", "gh-5", "--step", "nope"), "unknown_step");
+    refused(await h.norn("run", "rerun", "gh-5", "--reset", "bogus"), "unknown_counter");
+    const r = await h.norn("run", "rerun", "gh-5", "--step", "work", "--reset", "loop", "--reason", "key added");
     expect(r.exit).toBe(0);
     expect((r.value as Verb).receipt).toMatchObject({ kind: "unstick", to: "work", reset: ["loop"], comment: "key added", step: "work", attempt: 1 });
-    refused(await h.norn("unstick", "gh-5"), "already_recorded");
+    refused(await h.norn("run", "rerun", "gh-5"), "already_recorded");
     await tick();
     expect(h.state(runs5())).toMatchObject({ step: "work", attempt: 2, counters: { loop: 0 } });
   });

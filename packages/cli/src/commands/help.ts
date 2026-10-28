@@ -16,7 +16,7 @@ export type CommandFor = "person" | "agent" | "hooks";
 /** Help groups in print order; a command missing here lands in "Other" (for a person). A `hidden` group only with `--all`. */
 const HELP_GROUPS: ReadonlyArray<{ title: string; for: CommandFor; commands: readonly string[]; hidden?: boolean }> = [
   { title: "Start here", for: "person", commands: ["init", "doctor", "sync", "watch", "inbox", "open"] },
-  { title: "Answer what needs you", for: "person", commands: ["answer", "approve", "unstick", "update", "mode", "workflow"] },
+  { title: "Answer what needs you", for: "person", commands: ["answer", "approve", "update", "mode", "workflow"] },
   { title: "Look around", for: "person", commands: ["cockpit", "status", "orient", "run", "config", "tick"] },
   { title: "Team", for: "person", commands: ["take", "release", "drop"] },
   { title: "Housekeeping", for: "person", commands: ["tidy", "uninstall", "help"] },
