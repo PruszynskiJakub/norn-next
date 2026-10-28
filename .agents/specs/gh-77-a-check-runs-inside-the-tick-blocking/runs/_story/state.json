@@ -24,9 +24,9 @@
     "base_conflict_loop": 0,
     "stale_loop": 0
   },
-  "nudges_used": 1,
+  "nudges_used": 2,
   "retries_used": 0,
-  "applied_through": 14,
+  "applied_through": 15,
   "run": {
     "run_id": "01M61KGEBDT2KTF5D0JRBPKXX7",
     "step": "review",
@@ -44,11 +44,11 @@
     "step": "review",
     "outcome": "silent",
     "source": "classified",
-    "at": "2026-10-28T15:59:14.805Z",
-    "receipt_id": "01M61KSBVK9Q7RF6RSKJQZBAWB"
+    "at": "2026-10-28T15:59:55.631Z",
+    "receipt_id": "01M61KTKQEBB76FHAH6SPF2RR8"
   },
   "created_at": "2026-10-28T14:13:16.910Z",
-  "updated_at": "2026-10-28T15:59:14.805Z",
-  "last_tick_id": "01M61KSBVKP01BF7FWFRZPZRBV",
+  "updated_at": "2026-10-28T15:59:55.631Z",
+  "last_tick_id": "01M61KTKQE4XKS7T3TP8GPTWZA",
   "mode": "manual"
 }
