@@ -14,6 +14,18 @@
 
 ## Goal
 
+Split the test command (#82): `test:fast` / `test:cli` scripts, slice checks run `test:fast` + typecheck, docs updated; look into why base-sync and human are slow.
+
 ## Progress
 
+- `package.json`: `test:fast` = `bun test --path-ignore-patterns='packages/cli/**'` (52 files, ~32 s here); `test:cli` = `bun test ./packages/cli/test`; `test` unchanged.
+- `slice.yaml` and `bug.yaml` (the two slice workflows) run `test:fast`; story/quick/fix and CI keep the full suite.
+- Kept `bun install --frozen-lockfile`: a fresh unit worktree has no node_modules (cli tests fail to resolve `@norn/store` without it) and it costs ~0.15 s.
+- Cli tests per file selected by the slice's diff: not simple, left out.
+- AGENTS.md Commands lists the new scripts; the "all three must pass" line now says which check runs what.
+- `test/repo.test.ts`: a test that `test:fast` skips exactly the folder `test:cli` runs and that the workflows run the right script.
+- Why base-sync (~80 s) and human (~40 s) are slow: human.test.ts makes ~1,900 git spawns (~18 per tick, ~106 ticks); on this Mac each `/usr/bin/git` call costs ~15 ms (the xcrun shim ~8 ms + git ~7 ms), so the spawns are nearly all the time. Making them cheaper means fewer git calls per tick in norn itself (e.g. 314 `rev-parse --verify`, 143 `cat-file blob`, 133 `rev-parse --git-path` in human.test.ts), which changes the effect transcripts: a production change, left for its own issue. Noted, not changed. `bun test --parallel` also exists (not tried).
+
 ## Resume
+
+Run `bun test` and `bun run typecheck`, commit, report `norn done done`.
