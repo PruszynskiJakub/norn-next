@@ -29,10 +29,9 @@ import { releaseCommand } from "./release.ts";
 import { takeCommand } from "./take.ts";
 import { tidyCommand } from "./tidy.ts";
 import { openCommand } from "./open.ts";
-import { orientCommand } from "./orient.ts";
 import { updateCommand } from "./update.ts";
 
-export const COMMANDS: readonly Command[] = [initCommand, uninstallCommand, syncCommand, tickCommand, watchCommand, briefCommand, doneCommand, askCommand, stuckCommand, hookEventCommand, statusCommand, openCommand, orientCommand, answerCommand, approveCommand, unstickCommand, updateCommand, modeCommand, workflowCommand, takeCommand, releaseCommand, dropCommand, tidyCommand, doctorCommand, configCommand, helpCommand];
+export const COMMANDS: readonly Command[] = [initCommand, uninstallCommand, syncCommand, tickCommand, watchCommand, briefCommand, doneCommand, askCommand, stuckCommand, hookEventCommand, statusCommand, openCommand, answerCommand, approveCommand, unstickCommand, updateCommand, modeCommand, workflowCommand, takeCommand, releaseCommand, dropCommand, tidyCommand, doctorCommand, configCommand, helpCommand];
 
 export const NOUNS: readonly Noun[] = [storyNoun, runNoun];
 

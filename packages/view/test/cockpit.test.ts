@@ -127,7 +127,7 @@ describe("cockpitModel", () => {
 
     const web = cockpitModel(view(), { places: false, provider: "gh" });
     expect(web.rows.flatMap((r) => r.actions).some((a) => a.effect.kind === "place")).toBe(false);
-    expect(row(web.rows, "story:gh-1")?.actions[0]?.effect).toEqual({ kind: "verb", argv: ["orient", "gh-1"], show: true });
+    expect(row(web.rows, "story:gh-1")?.actions[0]?.effect).toEqual({ kind: "verb", argv: ["story", "view", "gh-1"], show: true });
     expect(ids(row(web.rows, "attended:gh-2"))).toEqual(["orient", "trace", "issue"]);
   });
 

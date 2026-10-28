@@ -79,7 +79,7 @@ const action = (id: CockpitActionId, effect: CockpitEffect, input?: CockpitActio
 
 /** Actions on every row of a story: orient, trace, its PR and issue links; take on the story's own row. */
 function storyActions(s: StoryView, unit: string, o: CockpitOptions, own: boolean): CockpitAction[] {
-  const out = [o.places ? action("orient", { kind: "place", place: "orient", story: s.key }) : action("orient", { kind: "verb", argv: ["orient", s.key], show: true })];
+  const out = [o.places ? action("orient", { kind: "place", place: "orient", story: s.key }) : action("orient", { kind: "verb", argv: ["story", "view", s.key], show: true })];
   out.push(action("trace", { kind: "verb", argv: ["run", "list", unit], show: true }));
   if (own && s.claim.unclaimed) out.push(action("take", { kind: "verb", argv: ["take", s.key] }));
   if (s.pr) out.push(action("pr", { kind: "link", url: s.pr.url }));

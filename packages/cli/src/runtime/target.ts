@@ -24,6 +24,8 @@ export interface TargetRule {
   none: string;
   /** the verb on one unit, as printed (`cmd.runView`) */
   command(key: string): string;
+  /** B55: a story-only verb — in a slice worktree it acts on the slice's story */
+  story?: boolean;
 }
 
 /** `norn status` order: what needs the person first (inbox order), then every story with its slices. */
@@ -42,7 +44,7 @@ function unitsInStatusOrder(view: ProjectView): InteractionChoice[] {
 /** The unit key the verb acts on, or a refusal. */
 export async function resolveTarget(ctx: Context, explicit: string | undefined, json: boolean, rule: TargetRule): Promise<string> {
   if (explicit) return explicit;
-  if (ctx.unit) return ctx.unit.slice ?? ctx.unit.story;
+  if (ctx.unit) return rule.story ? ctx.unit.story : (ctx.unit.slice ?? ctx.unit.story);
   const candidates = unitsInStatusOrder(await projectView(ctx)).filter((c) => rule.applies(c.value));
   if (!candidates.length) throw refuse(rule.none, cmd.status(), "no_target");
   const terminal = ctx.terminal(json);
@@ -61,4 +63,9 @@ export function hasRun(ctx: Context, verb: string, command: (key: string) => str
     none: "No unit has a run yet",
     applies: (key) => loadRunView({ repoRoot: ctx.root, home: ctx.home, env: ctx.env, now: ctx.clock.now(), target: key }) !== null,
   };
+}
+
+/** B55: a story verb (`story view`, `story chat`) applies to every story, never to a slice. */
+export function aStory(verb: string, command: (key: string) => string): TargetRule {
+  return { verb, command, none: "No story yet", story: true, applies: (key) => !key.includes("/") };
 }

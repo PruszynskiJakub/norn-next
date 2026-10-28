@@ -85,7 +85,7 @@ describe("norn story list (B15, B6)", () => {
   test("norn story lists its verbs", async () => {
     const r = await h.norn("story");
     expect(r.exit).toBe(0);
-    expect(r.value).toMatchObject({ command: "story", verbs: [{ command: "story list" }] });
+    expect(r.value).toMatchObject({ command: "story", verbs: [{ command: "story list" }, { command: "story view" }, { command: "story chat" }] });
   });
 });
 
@@ -108,7 +108,7 @@ describe("help and removed names (B5, B14)", () => {
     const all = await h.norn("help", "--all");
     expect(all.stdout).toMatch(/\n  norn status --segment +/);
     expect((all.value as { commands: Array<{ command: string }> }).commands.map((c) => c.command)).toContain("status --segment");
-    expect(help.stdout).toMatch(/\n  norn story +.*\(list\)\n/);
+    expect(help.stdout).toMatch(/\n  norn story +.*\(list, view, chat\)\n/);
     expect(help.stdout).not.toMatch(/\n  norn inbox /);
   });
 });

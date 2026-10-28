@@ -14,7 +14,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { parseDuration } from "@norn/schema";
-import { readCockpitFile, spawnBounded, writeCockpitFile } from "@norn/store";
+import { readCockpitFile, writeCockpitFile } from "@norn/store";
 import { type CockpitModel, cockpitModel, inboxItemsInOrder, type ProjectView, withInput } from "@norn/view";
 import { opt, type ParsedArgs } from "../command.ts";
 import { Context } from "../context.ts";
@@ -22,6 +22,7 @@ import { refuse, usageError } from "../output.ts";
 import { cockpitHerdr, labelPanes, placeAgent, verbMessage } from "./cockpit.ts";
 import { clampScroll, handleKey, initialState, parseKeys, renderCockpit, type TuiEffect, type TuiState } from "./cockpit-tui.ts";
 import { projectView } from "./human.ts";
+import { openLink } from "./open-link.ts";
 import { cmd } from "@norn/core";
 
 const CLEAR = "\x1b[H\x1b[2J";
@@ -45,15 +46,6 @@ function keyChunks(ctx: Context): { chunks: AsyncIterator<string>; close: () => 
       stdin.pause();
     },
   };
-}
-
-/** CP8: a link with the platform opener (`open` on macOS, `xdg-open` elsewhere), or the injected shell. */
-async function openLink(ctx: Context, url: string): Promise<{ code: number; stderr: string }> {
-  const argv = [process.platform === "darwin" ? "open" : "xdg-open", url];
-  if (ctx.deps.shell) return ctx.deps.shell(argv, ctx.root);
-  // H11 seam: store's bounded spawn (a missing opener is exit 127, never a throw)
-  const r = await spawnBounded(argv, {});
-  return { code: r.code, stderr: r.stderr };
 }
 
 /** HC7: a verb in-process through the dispatcher (loaded lazily: the dispatcher imports this command). */
@@ -138,10 +130,10 @@ async function interactive(ctx: Context, interval: number) {
       ok = r.code === 0;
       text = ok ? `opened ${fx.url}` : `could not open ${fx.url}: ${r.stderr.trim().split("\n")[0] || `exit ${r.code}`}`;
     } else if (fx.place === "orient") {
-      const r = await runVerb(ctx, ["orient", fx.story, "--open"], true);
+      const r = await runVerb(ctx, ["story", "chat", fx.story], true);
       ok = r.exit === 0;
       const v = r.value as { created?: boolean; workspace_id?: string } | null;
-      text = ok ? `${v?.created ? "opened" : "focused"} ${fx.story} orient${v?.workspace_id ? ` (${v.workspace_id})` : ""}` : verbMessage(["orient", fx.story], r.exit, r.value);
+      text = ok ? `${v?.created ? "opened" : "focused"} ${fx.story} orient${v?.workspace_id ? ` (${v.workspace_id})` : ""}` : verbMessage(["story", "chat", fx.story], r.exit, r.value);
     } else {
       text = cockpit ? await placeAgent(cockpit, fx.reach, row.unit).catch((err: Error) => `could not go there: ${err.message}`) : "outside Herdr: no pane to go to";
       ok = /^focused\b/.test(text);

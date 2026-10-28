@@ -20,7 +20,7 @@ import {
   writePrFacts,
   writeUnitMarker,
 } from "@norn/store";
-import { formatInbox, formatOrient, formatStatus, formatTimeline, loadProjectView, orientReport, prCommand, receiptSummary, stepTitle } from "../src/index.ts";
+import { formatInbox, formatStatus, formatStoryView, formatTimeline, loadProjectView, orientReport, prCommand, receiptSummary, stepTitle } from "../src/index.ts";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -357,27 +357,29 @@ describe("orient", () => {
     ]);
   });
 
-  test("orientReport: slices, PR command per provider, waiting items, notes by unit; formatOrient renders it", async () => {
+  test("orientReport: slices with their steps, PR command and state, waiting items, notes by unit; formatStoryView renders it", async () => {
     const v = await seedOrient();
     expect(orientReport(v, "gh-99", "gh")).toBeNull();
     const r = orientReport(v, "gh-12/02", "glab");
     if (!r) throw new Error("unreachable");
     expect(r).toMatchObject({ key: "gh-12/02", story: "gh-12", title: "Fix login", claim: "held here", branch: "gh-12-fix-login", pr_command: "glab mr view gh-12-fix-login", note_count: 2 });
-    expect(r.slices.map((s) => [s.key, s.status, s.integrated])).toEqual([
-      ["gh-12/01", "running", false],
-      ["gh-12/02", "done", true],
-      ["gh-12/03", "not_started", false],
+    expect(r.slices.map((s) => [s.key, s.status, s.workflow, s.step, s.attempt, s.integrated, s.depends_on])).toEqual([
+      ["gh-12/01", "running", "slice", "implement", 2, false, []],
+      ["gh-12/02", "done", "slice", "$done", 1, true, ["gh-12/01"]],
+      ["gh-12/03", "not_started", "slice", null, null, false, ["gh-12/02"]],
     ]);
+    expect(r.pr_state).toBe("draft");
     expect(r.waiting.map((w) => [w.group, w.unit, w.command])).toEqual([["answer", "gh-12", 'norn answer gh-12 "…"']]);
     expect(r.running.map((w) => w.unit)).toEqual(["gh-12/01"]);
     expect(r.notes.map((g) => [g.unit, g.notes.length])).toEqual([["gh-12/02", 2]]);
     expect(r.look).toEqual({ spec: `${r.root}/.agents/specs/gh-12-fix-login`, trace: "norn trace gh-12/02", why: "norn why gh-12/02", status: "norn status gh-12/02" });
     expect(prCommand("gh", "b", true)).toBe("gh pr view b --web");
 
-    const md = formatOrient(r, NOW);
-    expect(md).toStartWith("# Orient: gh-12 — Fix login\n");
-    expect(md).toContain("> 4. Never edit code, commit, or report an outcome");
-    expect(md).toContain("- gh-12/02 Wire API — done, integrated");
+    const md = formatStoryView(r, NOW);
+    expect(md).toStartWith("# gh-12 — Fix login\n\n## The story\n");
+    expect(md).not.toContain("> 4. Never edit code");
+    expect(formatStoryView(r, NOW, { rules: true })).toContain("> 4. Never edit code, commit, or report an outcome");
+    expect(md).toContain("- gh-12/02 Wire API — done, integrated · after 01 · slice\n");
     expect(md).toContain("- #7 draft, open — https://x/pull/7 (seen 1h ago)");
     expect(md).toContain("**Answer** gh-12 (implement), 40m: Which OAuth provider?\n  - `norn answer gh-12 \"…\"`");
     expect(md).toContain("## Open notes (2)");
