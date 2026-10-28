@@ -1,0 +1,18 @@
+{
+  "kind": "started",
+  "receipt_id": "01M60WRVV79C9Z8DGYZPP7463K",
+  "run_id": "01M60WRVV79C9Z8DGYZPP7463J",
+  "step": "plan",
+  "attempt": 1,
+  "at": "2026-10-28T09:17:01.258Z",
+  "by": "agent",
+  "who": "claude",
+  "how": "manual",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-75-regroup-the-cli-around-status-story-and",
+  "agent_session_id": "ca03b511-4562-49b0-b5c8-45042cd43989",
+  "process": {
+    "pid": 25528,
+    "pid_start": "Wed Oct 28 10:16:49 2026"
+  }
+}

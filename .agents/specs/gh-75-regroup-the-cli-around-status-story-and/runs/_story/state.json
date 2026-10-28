@@ -12,12 +12,8 @@
     "plan": 1
   },
   "step_entered_at": "2026-10-28T09:16:07.027Z",
-  "status": "parked",
-  "park": {
-    "kind": "attended",
-    "reason": "attended step plan: work with the agent in the worktree",
-    "since": "2026-10-28T09:16:07.027Z"
-  },
+  "status": "running",
+  "park": null,
   "counters": {
     "plan_loop": 0,
     "test_loop": 0,
@@ -28,8 +24,20 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 2,
-  "run": null,
+  "applied_through": 3,
+  "run": {
+    "run_id": "01M60WRVV79C9Z8DGYZPP7463J",
+    "step": "plan",
+    "attempt": 1,
+    "started_at": "2026-10-28T09:17:01.258Z",
+    "how": "manual",
+    "agent": "claude",
+    "agent_session_id": "ca03b511-4562-49b0-b5c8-45042cd43989",
+    "process": {
+      "pid": 25528,
+      "pid_start": "Wed Oct 28 10:16:49 2026"
+    }
+  },
   "last_outcome": {
     "step": "refine",
     "outcome": "done",
@@ -38,7 +46,7 @@
     "receipt_id": "01M60WPZ3GD8DCT4CPHA0HB78Y"
   },
   "created_at": "2026-10-28T08:51:06.916Z",
-  "updated_at": "2026-10-28T09:16:07.027Z",
-  "last_tick_id": "01M60WQ6ZHFJX45DW552EQR6HE",
+  "updated_at": "2026-10-28T09:17:07.030Z",
+  "last_tick_id": "01M60WS1JMQKAZ1ZPQ8FKTK70M",
   "mode": "manual"
 }
