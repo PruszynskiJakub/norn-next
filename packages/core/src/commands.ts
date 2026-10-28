@@ -60,7 +60,7 @@ const norn = (...parts: (string | false | null | undefined)[]) => ["norn", ...pa
  * is a change here and in its pinned table (`packages/core/test/printed-commands.test.ts`), nowhere else.
  */
 export const cmd = {
-  config: (key?: string) => norn("config", key),
+  config: (key?: string) => norn("config", key ? "get" : "list", key),
   answer: (unit: string, text = "…") => norn("answer", unit, `"${text}"`),
   approve: (unit: string, o: { reject?: boolean } = {}) => norn("approve", unit, o.reject && `--reject --reason "…"`),
   ask: () => norn("ask", `"<question>"`),

@@ -6,7 +6,7 @@ import { cmd } from "@norn/core";
 const U = "gh-12/03";
 const S = "gh-12";
 const today: Record<keyof typeof cmd, [string, ...string[]]> = {
-  config: ["norn config", cmd.config()],
+  config: ["norn config list", cmd.config()],
   answer: [`norn answer ${U} "…"`, cmd.answer(U), `norn answer ${U} "1"`, cmd.answer(U, "1")],
   approve: [`norn approve ${U}`, cmd.approve(U), `norn approve ${U} --reject --reason "…"`, cmd.approve(U, { reject: true })],
   ask: [`norn ask "<question>"`, cmd.ask()],
