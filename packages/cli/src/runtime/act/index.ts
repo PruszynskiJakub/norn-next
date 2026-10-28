@@ -191,7 +191,7 @@ export class Actor extends ActEnv {
         return rejectReceipt(this, a);
       case "mark_corrupt": {
         const loc = this.obs.units[a.unit.key];
-        // S2: decide says whether the state is marked (`mark_state`); a broken story.md never is
+        // S2: decide says whether the state is marked (`mark_state`); a broken spec.md never is
         let marked = false;
         if (a.mark_state && loc?.state) {
           const reason = `corrupt: ${a.errors.map((e) => e.file).join(", ")} failed validation (S2)`;
