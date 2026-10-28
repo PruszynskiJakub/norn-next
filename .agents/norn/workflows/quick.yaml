@@ -14,7 +14,8 @@ steps:
     skill: norn-implement
     inputs: [spec, handoff, last_check, last_findings]
     instructions: >-
-      The spec is story.md: the issue and the triage findings. Keep to what it asks. A change in
+      The spec is story.md (the issue) and the triage findings in the issue's latest `## Triage`
+      comment (`gh issue view <N> --comments`). Keep to what they ask. A change in
       behaviour gets a test first; a change to docs or a pure refactor needs none beyond the suite
       staying green. Test your change with `bun packages/cli/src/main.ts …`, never the installed `norn`.
       Run that dev build only in a throwaway git repo under $TMPDIR, never in this worktree: it is a live norn unit (NORN_HOME points at it) and a dev build would act on its runs/, claim and state.json.
