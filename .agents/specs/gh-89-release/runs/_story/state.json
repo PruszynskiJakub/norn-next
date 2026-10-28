@@ -5,19 +5,16 @@
   "unit_dir": "_story",
   "workflow": "release",
   "workflow_hash": "1dba3383234e1630ccbebc9df02987f6e430b96e55c57cc3ce9c935092385bcb",
-  "step": "confirm-version",
+  "step": "test",
   "attempt": 1,
   "visits": {
     "prepare": 1,
-    "confirm-version": 1
+    "confirm-version": 1,
+    "test": 1
   },
-  "step_entered_at": "2026-10-28T21:42:56.390Z",
-  "status": "parked",
-  "park": {
-    "kind": "gate",
-    "reason": "Read the proposed version and its reason in pr.md and the new CHANGELOG.md section. Approve to check the release, or reject with the version or changelog changes you want.",
-    "since": "2026-10-28T21:42:56.390Z"
-  },
+  "step_entered_at": "2026-10-28T21:44:36.168Z",
+  "status": "ready",
+  "park": null,
   "counters": {
     "version_loop": 0,
     "ready_loop": 0,
@@ -26,17 +23,17 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 4,
+  "applied_through": 5,
   "run": null,
   "last_outcome": {
-    "step": "prepare",
-    "outcome": "done",
-    "source": "reported",
-    "at": "2026-10-28T21:42:53.495Z",
-    "receipt_id": "01M627EK9QP85Z7Q3WBGY1EXCJ"
+    "step": "confirm-version",
+    "outcome": "approve",
+    "source": "human",
+    "at": "2026-10-28T21:43:32.144Z",
+    "receipt_id": "01M627FS1G1HXDVGWR52Q3SVSV"
   },
   "created_at": "2026-10-28T21:39:55.890Z",
-  "updated_at": "2026-10-28T21:42:56.390Z",
-  "last_tick_id": "01M627EP3YQKH8RQ549N37PXVH",
+  "updated_at": "2026-10-28T21:44:36.168Z",
+  "last_tick_id": "01M627HQJ7PWB5W0JRC3G8M20C",
   "mode": "auto"
 }
