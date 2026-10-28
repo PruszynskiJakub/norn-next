@@ -1,0 +1,15 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M6107733TDP8J44Y1R7052B7",
+  "run_id": "01M610726WSYQBZ2N52CYCXPC0",
+  "step": "integrate",
+  "attempt": 1,
+  "at": "2026-10-28T10:17:17.155Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M610726WBHX2KWTX4XKWFB6X",
+  "outcome": "done",
+  "rule": "git.integrate",
+  "detail": "gh-75/02-one-module-for-printed-commands integrated into gh-75-regroup-the-cli-around-status-story-and at 3513dc93bd9d",
+  "route": "$done"
+}
