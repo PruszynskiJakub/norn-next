@@ -532,6 +532,8 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       }
       // R5.5 (A8): an auto step waits for the heartbeat, not for a person — no manual start hint
       if (step?.type === "agent" && heartbeatDown(facts, config)) return item("running", `${st.step} #${st.attempt} (waiting for the heartbeat — norn watch)`, "norn watch", st.step_entered_at);
+      // C5: `norn check-run` holds the unit's check lease while its command runs; it is not queued
+      if (step?.type === "check" && uf.lease?.kind === "check") return item("running", `${st.step} #${st.attempt} (check running)`, `norn trace ${key}`, uf.lease.created_at);
       return item("running", `${st.step} #${st.attempt} (queued)`, `norn trace ${key}`, st.step_entered_at);
     }
     case "done": {

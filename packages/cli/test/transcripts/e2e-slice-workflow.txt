@@ -330,7 +330,7 @@
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:9> "^<sha:1>" --
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ sh -c "test -f pass.flag && echo checked"
+  spawn repo-worktrees/gh-7-add-login-form--01-form $ norn check-run <ulid:17>
   + repo-worktrees/gh-7-add-login-form--01-form/.agents/specs/gh-7-add-login-form/runs/01-form/logs/<ulid:17>.log
       text 1 lines, normalised sha256 e3b0c44298fc
   + repo-worktrees/gh-7-add-login-form--01-form/.agents/specs/gh-7-add-login-form/runs/01-form/receipts/0004-check.json
@@ -469,9 +469,9 @@
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:11> "^<sha:1>" --
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ sh -c "test -f pass.flag && echo checked"
+  spawn repo-worktrees/gh-7-add-login-form--01-form $ norn check-run <ulid:27>
   + repo-worktrees/gh-7-add-login-form--01-form/.agents/specs/gh-7-add-login-form/runs/01-form/receipts/0008-check.json
-      {"kind":"check","receipt_id":"<ulid:27>","run_id":"<ulid:28>","step":"test","attempt":2,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:29>","outcome":"pass","command":"test -f pass.flag && echo checked","exit_code":0,"duration_ms":<ms>,"output_tail":"checked"}
+      {"kind":"check","receipt_id":"<ulid:28>","run_id":"<ulid:27>","step":"test","attempt":2,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:29>","outcome":"pass","command":"test -f pass.flag && echo checked","exit_code":0,"duration_ms":<ms>,"output_tail":"checked"}
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -507,7 +507,7 @@
   ~ repo-worktrees/gh-7-add-login-form--01-form/.agents/specs/gh-7-add-login-form/runs/01-form/handoff.md
       text 25 lines, normalised sha256 a3bca7b8ad04
   ~ repo-worktrees/gh-7-add-login-form--01-form/.agents/specs/gh-7-add-login-form/runs/01-form/state.json
-      {"version":1,"story":"gh-7","slice":"gh-7/01","unit_dir":"01-form","workflow":"slice","workflow_hash":"47f8698e52c6920a2b18cac3fbbf902cc8044f1ede2597fb32d6ce86e12d8a8a","step":"human-qa","attempt":1,"visits":{"implement":2,"test":2,"human-qa":1},"step_entered_at":"<time>","status":"parked","park":{"kind":"gate","reason":"Try it","since":"<time>"},"counters":{"test_loop":1},"nudges_used":0,"retries_used":0,"applied_through":8,"run":null,"last_outcome":{"step":"test","outcome":"pass","source":"classified","at":"<time>","receipt_id":"<ulid:27>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:30>"}
+      {"version":1,"story":"gh-7","slice":"gh-7/01","unit_dir":"01-form","workflow":"slice","workflow_hash":"47f8698e52c6920a2b18cac3fbbf902cc8044f1ede2597fb32d6ce86e12d8a8a","step":"human-qa","attempt":1,"visits":{"implement":2,"test":2,"human-qa":1},"step_entered_at":"<time>","status":"parked","park":{"kind":"gate","reason":"Try it","since":"<time>"},"counters":{"test_loop":1},"nudges_used":0,"retries_used":0,"applied_through":8,"run":null,"last_outcome":{"step":"test","outcome":"pass","source":"classified","at":"<time>","receipt_id":"<ulid:28>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:30>"}
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -614,7 +614,7 @@
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/01-form/receipts/0007-done.json
       {"kind":"done","receipt_id":"<ulid:26>","run_id":"<ulid:21>","step":"implement","attempt":2,"at":"<time>","by":"agent","who":"claude","outcome":"done","handoff":"fixed"}
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/01-form/receipts/0008-check.json
-      {"kind":"check","receipt_id":"<ulid:27>","run_id":"<ulid:28>","step":"test","attempt":2,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:29>","outcome":"pass","command":"test -f pass.flag && echo checked","exit_code":0,"duration_ms":<ms>,"output_tail":"checked"}
+      {"kind":"check","receipt_id":"<ulid:28>","run_id":"<ulid:27>","step":"test","attempt":2,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:29>","outcome":"pass","command":"test -f pass.flag && echo checked","exit_code":0,"duration_ms":<ms>,"output_tail":"checked"}
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/01-form/receipts/0009-approve.json
       {"kind":"approve","receipt_id":"<ulid:32>","run_id":null,"step":"human-qa","attempt":1,"at":"<time>","by":"human","who":"tester@box"}
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/01-form/state.json

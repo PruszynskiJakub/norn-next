@@ -1,12 +1,37 @@
-/** act: run a check step's command (W2, C5). */
+/**
+ * act: start a check step's command (W2, C5) without holding the tick (H6).
+ *
+ * The tick takes the unit's `check` run lease (K1), writes a check order to `~/.norn/checks/<run_id>.json`
+ * and starts a detached `norn check-run <run_id>`, then hands the lease to that process. It runs the
+ * command, writes the `check` receipt and releases the lease; while it lives, decide sees the lease
+ * and waits (`check.running`), and the tick after it ends applies the receipt. One that dies leaves
+ * a dead lease: it is reclaimed (K3) and the check runs again.
+ */
+import { spawn } from "node:child_process";
+import { join } from "node:path";
 import { type Action, type ActionResult } from "@norn/core";
-import { type ReceiptOf, ulid } from "@norn/schema";
-import { acquireRunLease, appendReceipt, readEnvNorn, releaseLease, writeLog } from "@norn/store";
+import { assertValid, type CheckOrder, type ReceiptOf, ulid } from "@norn/schema";
+import {
+  acquireRunLease,
+  appendReceipt,
+  atomicWriteJson,
+  checkOrderPath,
+  leasesDir,
+  noteSpawn,
+  readEnvNorn,
+  readJsonFile,
+  readText,
+  releaseLease,
+  safeUnlink,
+  updateLease,
+  writeLog,
+} from "@norn/store";
+import { nornEntry } from "../shim.ts";
 import { runShell, tailLines } from "../shell.ts";
 import { stopStrayListeners } from "../strays.ts";
 import { type ActEnv, QueueFull } from "./env.ts";
 
-/** W2/C5: run the command in the worktree with `.env.norn`; write the check receipt after. */
+/** W2/C5: start the command in the worktree with `.env.norn`; `norn check-run` writes the check receipt. */
 export async function runCheck(act: ActEnv, a: Extract<Action, { kind: "run_check" }>): Promise<ActionResult> {
   const loc = act.unitLoc(a.unit);
   const attempt = loc.state?.attempt;
@@ -20,37 +45,98 @@ export async function runCheck(act: ActEnv, a: Extract<Action, { kind: "run_chec
     liveness: act.liveness(),
   });
   if (!lease.ok) throw new QueueFull(`queued: max_checks ${act.config.max_checks} in use (K1)`);
+  const env = definedOnly({ ...process.env, ...act.ctx.env, ...(readEnvNorn(a.cwd) ?? {}), ...a.env, NORN_HOME: act.root });
+  const portBase = Number(env.PORT_BASE);
+  const order: CheckOrder = {
+    version: 1,
+    home: act.ctx.home,
+    lease_file: lease.entry.file,
+    runs_dir: loc.runsDir,
+    run_id: a.run_id,
+    step: a.step,
+    attempt,
+    tick_id: act.tick,
+    who: act.obs.facts.machine.holder,
+    command: a.command,
+    cwd: a.cwd,
+    env,
+    timeout_ms: a.timeout_ms,
+    ports: Number.isInteger(portBase) && portBase > 0 ? { from: portBase, to: portBase + act.config.slots.ports_per_slot - 1 } : null,
+  };
+  const path = checkOrderPath(act.ctx.home, a.run_id);
   try {
-    const env = { ...process.env, ...act.ctx.env, ...(readEnvNorn(a.cwd) ?? {}), ...a.env, NORN_HOME: act.root };
+    assertValid("check-order", order);
+    atomicWriteJson(path, order);
+    const [cmd, ...args] = nornEntry();
+    noteSpawn(["norn", "check-run", a.run_id], a.cwd); // effect transcripts: it runs the command
+    const child = spawn(cmd!, [...args, "check-run", a.run_id], {
+      cwd: a.cwd,
+      env: { ...process.env, ...act.ctx.env } as NodeJS.ProcessEnv,
+      detached: true, // own process group: outlives the tick
+      stdio: "ignore",
+    });
+    const pid = await new Promise<number | undefined>((resolve, reject) => {
+      child.once("spawn", () => resolve(child.pid));
+      child.once("error", reject);
+    });
+    const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
+    child.unref();
+    act.ctx.deps.onCheckStarted?.(exited);
+    // K1/K3: the lease lives as long as `norn check-run` does; one it already released stays released
+    const holder = pid ? await act.obs.ports.process.identify(pid) : null;
+    const file = join(leasesDir(act.ctx.home), lease.entry.file);
+    if (holder && readText(file) !== null) updateLease(act.ctx.home, lease.entry.file, { ...lease.entry.lease, holder });
+    return { ok: true, detail: { started: true, pid: pid ?? null } };
+  } catch (e) {
+    safeUnlink(path);
+    releaseLease(act.ctx.home, lease.entry.file);
+    throw e;
+  }
+}
+
+/** The order runCheck wrote for a run, or null when it is missing or invalid (S2). */
+export function readCheckOrder(home: string, runId: string): CheckOrder | null {
+  const r = readJsonFile("check-order", checkOrderPath(home, runId));
+  return r.ok ? r.value : null;
+}
+
+/** `norn check-run`: run the order's command (timeout kills the group, C5), write the receipt, release the lease. */
+export async function runCheckOrder(order: CheckOrder, now: () => number): Promise<ReceiptOf<"check">> {
+  try {
     // K4.1: a server an agent left running from this worktree must not hold the slot's ports
-    const portBase = Number((env as Record<string, string | undefined>).PORT_BASE);
-    const stopped = Number.isInteger(portBase) && portBase > 0
-      ? await stopStrayListeners(a.cwd, { from: portBase, to: portBase + act.config.slots.ports_per_slot - 1 })
-      : [];
-    const res = await runShell(a.command, { cwd: a.cwd, env, timeoutMs: a.timeout_ms });
+    const stopped = order.ports ? await stopStrayListeners(order.cwd, order.ports) : [];
+    const res = await runShell(order.command, { cwd: order.cwd, env: order.env, timeoutMs: order.timeout_ms });
     if (stopped.length) res.output = `${stopped.map((s) => `norn: stopped pid ${s.pid} (${s.command}) left listening on :${s.port} from this worktree (K4.1)`).join("\n")}\n${res.output}`;
     const pass = !res.timed_out && res.exit_code === 0;
     const receipt: ReceiptOf<"check"> = {
       kind: "check",
-      receipt_id: ulid(act.ctx.clock.now()),
-      run_id: a.run_id,
-      step: a.step,
-      attempt,
-      at: act.nowIso(),
+      receipt_id: ulid(now()),
+      run_id: order.run_id,
+      step: order.step,
+      attempt: order.attempt,
+      at: new Date(now()).toISOString(),
       by: "norn",
-      who: act.obs.facts.machine.holder,
-      tick_id: act.tick,
+      who: order.who,
+      tick_id: order.tick_id,
       outcome: pass ? "pass" : "fail",
-      command: a.command,
+      command: order.command,
       exit_code: res.exit_code,
       duration_ms: res.duration_ms,
       output_tail: tailLines(res.output, 200),
       ...(res.timed_out ? { reason: "timeout" as const } : {}),
     };
-    if (!pass) receipt.log = writeLog(loc.runsDir, a.run_id, res.output);
-    const written = appendReceipt(loc.runsDir, receipt);
-    return { ok: true, detail: { outcome: receipt.outcome, exit_code: res.exit_code, duration_ms: res.duration_ms, receipt: written.n, ...(receipt.log ? { log: receipt.log } : {}) } };
+    if (!pass) receipt.log = writeLog(order.runs_dir, order.run_id, res.output);
+    appendReceipt(order.runs_dir, receipt);
+    return receipt;
   } finally {
-    releaseLease(act.ctx.home, lease.entry.file);
+    safeUnlink(checkOrderPath(order.home, order.run_id));
+    // a lease reclaimed meanwhile (K3) may be another run's now: release only this run's
+    if (readText(join(leasesDir(order.home), order.lease_file))?.includes(`"${order.run_id}"`)) releaseLease(order.home, order.lease_file);
   }
+}
+
+
+/** The env a check runs with, as the order stores it: unset names left out. */
+function definedOnly(env: Record<string, string | undefined>): Record<string, string> {
+  return Object.fromEntries(Object.entries(env).filter((e): e is [string, string] => e[1] !== undefined));
 }
