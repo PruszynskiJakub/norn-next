@@ -50,7 +50,9 @@
   - F2 (Herdr kill closes the pane, AC3/B52) left for a person: RunnerPort.kill is used as is per the slice Notes.
   - Checks: typecheck, bun test (1266 pass), golden (nothing added).
 - implement#2 done: Rework of review#1: run cancel no longer skips the kill silently — no session / other machine / no or other runner → not_stopped, throwing kill → kill_failed, both exit 1 naming the receipt (details receipt_id+file) and telling the person to stop the agent by hand. Rerun story-key pick uses stuck-or-parked. New tests: cannot-stop + kill_failed, ask-parked rerun, not_stuck, story key → slice at gate. Herdr pane closing (F2) left for a person. typecheck, bun test 1266/1266, golden green.
+- review#2: approve. AC1–AC8 met and tested; typecheck green, bun test 1266/1266. No blocking findings. Minor: the Herdr kill closes the pane AC3/B52 keeps (a person settles it); the --reset test asserts a counter that was already 0; hints derived from the receipt kind print `norn unstick again` and `norn stuck --help`; notHolder duplicates refuseUnlessHolder's wording.
+- review#2 approve: AC1–AC8 met and tested at the fake runner; typecheck green, bun test 1266/1266; the review#1 fixes are in and tested. No blocking findings. Minor: the Herdr kill closes the pane AC3/B52 keeps (a person settles it); the --reset test asserts a counter that was already 0; hints derived from the receipt kind print 'norn unstick again' and 'norn stuck --help'; notHolder duplicates refuseUnlessHolder.
 
 ## Resume
 
-Nothing left for implement; next step reviews the rework.
+Review approved; nothing left for review.
