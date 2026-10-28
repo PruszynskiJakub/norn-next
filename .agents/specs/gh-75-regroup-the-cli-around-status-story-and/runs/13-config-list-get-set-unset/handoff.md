@@ -14,6 +14,19 @@
 
 ## Goal
 
+`norn config` becomes a noun: `list`/`get` show the resolved config as before; `set`/`unset` edit one value in the user or repo file, validated, comments kept (B61–B68).
+
 ## Progress
 
+- `config` is now a noun (`packages/cli/src/commands/config.ts`: list, get; `config-edit.ts`: set, unset). The old `norn config [<key>]` is gone (D1): `norn config` lists the verbs, `norn config <key>` is a usage error. `cmd.config()` prints `norn config list` / `norn config get <key>` (pinned table updated).
+- Store `editConfigLayer` (`packages/store/src/config.ts`): parses the file as a YAML document, sets/deletes the dotted path (drops maps left empty), validates the layer and the merged result, writes atomically. A changed scalar or a removed key is spliced into the original text (only its lines change), checked to mean the same as the edited document; otherwise the re-rendered document is written (flow maps, new keys).
+- Schema `isConfigKey` walks the layer schema: an unknown key is refused (exit 3, `unknown_key`) before any write; invalid values are refused with the schema path (`invalid_value`).
+- Decision: setting `agents.<name>.<field>` where the file has no `agents.<name>` seeds the entry from the built-in agent (a layer replaces an agent whole, K2), so `agents.claude.model opus --repo` keeps the built-in args.
+- `config get` of a key inside one setting's value (`agents.claude.model`) shows that value with the setting's layer.
+- No file flag: at a terminal a pick (user/repo); `--json`/no TTY/agent session → usage error, do_instead "pass --user or --repo"; leaving the pick → refused `cancelled`.
+- Tests: `packages/cli/test/config.test.ts` (AC1–AC8). AC9 checked by hand in a throwaway repo with the dev build: set and unset each left a one-line `git diff`.
+- Not changed (later docs slice): `packages/cli/assets/config.yaml` still says "Run `norn config`", README mentions `norn config`.
+
 ## Resume
+
+Done; report `norn done done`.
