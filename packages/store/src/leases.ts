@@ -16,7 +16,7 @@ import type { FileError } from "@norn/core";
 import type { LeaseFile, LeaseKind, ProcessIdentity, SlotConfig } from "@norn/schema";
 import { assertValid } from "@norn/schema";
 import { atomicWriteJson, createExclusive, isErrno, json, readJsonFile, readText, safeUnlink } from "./fsx.ts";
-import { removeIfUnchanged } from "./lock.ts";
+import { removeIfUnchanged, replaceIfUnchanged } from "./lock.ts";
 import { leasesDir } from "./paths.ts";
 import { defaultLiveness, type LivenessCheck, localProcess } from "./proc.ts";
 
@@ -164,9 +164,46 @@ export function updateLease(home: string, file: string, lease: LeaseFile): void 
   atomicWriteJson(join(leasesDir(home), file), lease);
 }
 
+/** Hand a held lease over (K1): rewrite it only while it is still exactly `from`; false when it was released or changed meanwhile. */
+export function handOverLease(home: string, file: string, from: LeaseFile, to: LeaseFile): boolean {
+  assertValid("lease", to);
+  return replaceIfUnchanged(join(leasesDir(home), file), json(from), json(to));
+}
+
 export function releaseLease(home: string, file: string): boolean {
   if (!LEASE_NAME.test(file)) throw new Error(`not a lease file: ${file}`);
   return safeUnlink(join(leasesDir(home), file));
+}
+
+/**
+ * Take a run's lease over for `holder` (K1): the process that does the run's work holds it, so the
+ * lease dies with that process (K3). Only while the lease validates (S2) and still names `runId`; false otherwise.
+ */
+export function claimRunLease(home: string, file: string, runId: string, holder: ProcessIdentity): boolean {
+  if (!LEASE_NAME.test(file)) throw new Error(`not a lease file: ${file}`);
+  const path = join(leasesDir(home), file);
+  const raw = readText(path);
+  if (raw === null) return false;
+  const cur = readJsonFile("lease", path);
+  if (!cur.ok || cur.value.run_id !== runId) return false;
+  if (cur.value.holder.pid === holder.pid && cur.value.holder.pid_start === holder.pid_start) return true;
+  const next = { ...cur.value, holder };
+  assertValid("lease", next);
+  return replaceIfUnchanged(path, raw, json(next));
+}
+
+/**
+ * Release a run's own lease (K1): remove the file only while it validates (S2) and still names
+ * `runId`; one reclaimed (K3) and taken by another run, or one gone already, stays as it is.
+ */
+export function releaseRunLease(home: string, file: string, runId: string): boolean {
+  if (!LEASE_NAME.test(file)) throw new Error(`not a lease file: ${file}`);
+  const path = join(leasesDir(home), file);
+  const raw = readText(path);
+  if (raw === null) return false;
+  const cur = readJsonFile("lease", path);
+  if (!cur.ok || cur.value.run_id !== runId) return false;
+  return removeIfUnchanged(path, raw);
 }
 
 /** Remove the named lease files whose holders are (still) dead, or that are unreadable (K3). */

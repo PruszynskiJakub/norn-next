@@ -66,3 +66,6 @@ export function nornHome(override?: string, env: Record<string, string | undefin
 }
 export const userConfigPath = (home: string) => join(home, "config.yaml");
 export const leasesDir = (home: string) => join(home, "leases");
+/** Check orders a tick hands a detached `norn check-run` (C5): `<run_id>.json`, removed by that process. */
+export const checkOrdersDir = (home: string) => join(home, "checks");
+export const checkOrderPath = (home: string, runId: string) => join(checkOrdersDir(home), `${runId}.json`);

@@ -1,7 +1,7 @@
 import type { Static, TSchema } from "@sinclair/typebox";
 import { Ajv, type ErrorObject, type ValidateFunction } from "ajv";
 import addFormatsModule from "ajv-formats";
-import { ClaimBlob, LeaseFile } from "./claim.ts";
+import { CheckOrder, ClaimBlob, LeaseFile } from "./claim.ts";
 import { CliError } from "./cli.ts";
 import { CriteriaReport } from "./criteria.ts";
 import { ConfigLayer, ResolvedConfig } from "./config.ts";
@@ -35,6 +35,7 @@ export const SCHEMAS = {
   hook: HookFact,
   claim: ClaimBlob,
   lease: LeaseFile,
+  "check-order": CheckOrder,
   config: ConfigLayer,
   "resolved-config": ResolvedConfig,
   "cli-error": CliError,

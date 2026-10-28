@@ -155,8 +155,9 @@ export function json(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
-export function atomicWriteJson(path: string, value: unknown): void {
-  atomicWrite(path, json(value));
+/** `mode` 0o600 for a file only its owner may read (a check order, C5). */
+export function atomicWriteJson(path: string, value: unknown, mode?: number): void {
+  atomicWrite(path, json(value), mode);
 }
 
 export function readText(path: string): string | null {
