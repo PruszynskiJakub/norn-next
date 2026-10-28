@@ -46,6 +46,8 @@ export interface UnitView {
   attempt: number | null;
   counters: CounterView[];
   park: { kind: ParkKind; reason: string; since: string } | null;
+  /** C5: the check step's `norn check-run` holds its lease; `since` is then the lease's */
+  check_running?: true;
   /** ISO time the unit entered its current situation (park, run start, step entry) */
   since: string | null;
   /** compact age of `since`, e.g. `12m` */

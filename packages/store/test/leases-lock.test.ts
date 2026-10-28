@@ -7,6 +7,7 @@ import {
   acquireRunLease,
   acquireSlotLease,
   acquireTickLock,
+  handOverLease,
   leasesDir,
   listLeases,
   localProcess,
@@ -71,6 +72,18 @@ describe("leases (K1, K3, K4)", () => {
     expect(r3).toMatchObject({ ok: true, entry: { file: "agent-1.json" }, reclaimed: [{ file: "agent-1.json" }] });
     expect(releaseLease(home, "agent-2.json")).toBe(true);
     expect(readdirSync(leasesDir(home))).toEqual(["agent-1.json"]);
+  });
+  test("a lease is handed over only while it is unchanged: one released meanwhile stays released (K1)", async () => {
+    const home = tmp();
+    const r = await acquireRunLease(home, "check", 1, { ...unit, run_id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB1", holder: A, liveness: () => true });
+    if (!r.ok) throw new Error("no lease");
+    const to = { ...r.entry.lease, holder: B };
+    expect(handOverLease(home, r.entry.file, r.entry.lease, to)).toBe(true);
+    expect((await listLeases(home, () => true)).live.map((e) => e.lease.holder)).toEqual([B]);
+    expect(handOverLease(home, r.entry.file, r.entry.lease, to)).toBe(false); // no longer the tick's
+    expect(releaseLease(home, r.entry.file)).toBe(true);
+    expect(handOverLease(home, r.entry.file, to, { ...to, holder: A })).toBe(false);
+    expect(readdirSync(leasesDir(home))).toEqual([]);
   });
   test("slot leases: range, port base, worktree liveness by default, reclaim", async () => {
     const home = tmp();

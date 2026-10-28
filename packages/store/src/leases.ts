@@ -16,7 +16,7 @@ import type { FileError } from "@norn/core";
 import type { LeaseFile, LeaseKind, ProcessIdentity, SlotConfig } from "@norn/schema";
 import { assertValid } from "@norn/schema";
 import { atomicWriteJson, createExclusive, isErrno, json, readJsonFile, readText, safeUnlink } from "./fsx.ts";
-import { removeIfUnchanged } from "./lock.ts";
+import { removeIfUnchanged, replaceIfUnchanged } from "./lock.ts";
 import { leasesDir } from "./paths.ts";
 import { defaultLiveness, type LivenessCheck, localProcess } from "./proc.ts";
 
@@ -162,6 +162,12 @@ export function acquireSlotLease(
 export function updateLease(home: string, file: string, lease: LeaseFile): void {
   assertValid("lease", lease);
   atomicWriteJson(join(leasesDir(home), file), lease);
+}
+
+/** Hand a held lease over (K1): rewrite it only while it is still exactly `from`; false when it was released or changed meanwhile. */
+export function handOverLease(home: string, file: string, from: LeaseFile, to: LeaseFile): boolean {
+  assertValid("lease", to);
+  return replaceIfUnchanged(join(leasesDir(home), file), json(from), json(to));
 }
 
 export function releaseLease(home: string, file: string): boolean {

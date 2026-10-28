@@ -119,7 +119,9 @@ function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: Uni
   const step = st && u.workflow ? stepOf(u.workflow.workflow, st.step) : null;
   const eff = effectiveMode(sf.mode, step?.type === "agent" && !!step.attended, ctx.runner);
   const corrupt = u.errors.length > 0 || st?.status === "corrupt";
-  const since = st ? (st.park?.since ?? (st.status === "running" ? st.run?.started_at : null) ?? (st.status === "done" ? st.updated_at : st.step_entered_at)) : null;
+  // C5: a check step whose `norn check-run` holds the lease is running since the lease, not queued
+  const checkRunning = step?.type === "check" && uf.lease?.kind === "check" && !!st && !st.park;
+  const since = st ? (st.park?.since ?? (st.status === "running" ? st.run?.started_at : null) ?? (checkRunning ? uf.lease?.created_at : null) ?? (st.status === "done" ? st.updated_at : st.step_entered_at)) : null;
   // R5.5 (A8): while the heartbeat is down an auto step waits for `norn watch`, not a person
   const waitsForHeartbeat = ctx.heartbeatDown && step?.type === "agent" && eff.mode === "auto";
   const start = step?.type === "agent" ? (waitsForHeartbeat ? "norn watch" : startCommandFor(uf, sf, ctx.config)) : undefined;
@@ -140,6 +142,7 @@ function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: Uni
     attempt: st?.attempt ?? null,
     counters: counters(u),
     park: st?.park ? { kind: st.park.kind, reason: st.park.reason, since: st.park.since } : null,
+    ...(checkRunning ? { check_running: true as const } : {}),
     since,
     age: since ? formatAge(ctx.now - Date.parse(since)) : null,
     last_outcome: st?.last_outcome ? { step: st.last_outcome.step, outcome: st.last_outcome.outcome, at: st.last_outcome.at } : null,

@@ -8,6 +8,7 @@
  * a dead lease: it is reclaimed (K3) and the check runs again.
  */
 import { spawn } from "node:child_process";
+import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { type Action, type ActionResult } from "@norn/core";
 import { assertValid, type CheckOrder, type ReceiptOf, ulid } from "@norn/schema";
@@ -16,18 +17,20 @@ import {
   appendReceipt,
   atomicWriteJson,
   checkOrderPath,
+  checkOrdersDir,
+  handOverLease,
   leasesDir,
+  listLeases,
   noteSpawn,
   readEnvNorn,
   readJsonFile,
   readText,
   releaseLease,
   safeUnlink,
-  updateLease,
   writeLog,
 } from "@norn/store";
 import { nornEntry } from "../shim.ts";
-import { runShell, tailLines } from "../shell.ts";
+import { runShell, type ShellResult, tailLines } from "../shell.ts";
 import { stopStrayListeners } from "../strays.ts";
 import { type ActEnv, QueueFull } from "./env.ts";
 
@@ -45,8 +48,10 @@ export async function runCheck(act: ActEnv, a: Extract<Action, { kind: "run_chec
     liveness: act.liveness(),
   });
   if (!lease.ok) throw new QueueFull(`queued: max_checks ${act.config.max_checks} in use (K1)`);
-  const env = definedOnly({ ...process.env, ...act.ctx.env, ...(readEnvNorn(a.cwd) ?? {}), ...a.env, NORN_HOME: act.root });
-  const portBase = Number(env.PORT_BASE);
+  await sweepCheckOrders(act);
+  // only what the tick adds: `norn check-run` inherits the process env, so secrets in it never reach the disk
+  const env = definedOnly({ ...(readEnvNorn(a.cwd) ?? {}), ...a.env, NORN_HOME: act.root });
+  const portBase = Number({ ...act.ctx.env, ...env }.PORT_BASE);
   const order: CheckOrder = {
     version: 1,
     home: act.ctx.home,
@@ -66,7 +71,7 @@ export async function runCheck(act: ActEnv, a: Extract<Action, { kind: "run_chec
   const path = checkOrderPath(act.ctx.home, a.run_id);
   try {
     assertValid("check-order", order);
-    atomicWriteJson(path, order);
+    atomicWriteJson(path, order, 0o600);
     const [cmd, ...args] = nornEntry();
     noteSpawn(["norn", "check-run", a.run_id], a.cwd); // effect transcripts: it runs the command
     const child = spawn(cmd!, [...args, "check-run", a.run_id], {
@@ -84,8 +89,8 @@ export async function runCheck(act: ActEnv, a: Extract<Action, { kind: "run_chec
     act.ctx.deps.onCheckStarted?.(exited);
     // K1/K3: the lease lives as long as `norn check-run` does; one it already released stays released
     const holder = pid ? await act.obs.ports.process.identify(pid) : null;
-    const file = join(leasesDir(act.ctx.home), lease.entry.file);
-    if (holder && readText(file) !== null) updateLease(act.ctx.home, lease.entry.file, { ...lease.entry.lease, holder });
+    if (!holder) releaseLease(act.ctx.home, lease.entry.file); // already gone: its receipt, if any, is applied next tick
+    else handOverLease(act.ctx.home, lease.entry.file, lease.entry.lease, { ...lease.entry.lease, holder });
     return { ok: true, detail: { started: true, pid: pid ?? null } };
   } catch (e) {
     safeUnlink(path);
@@ -102,13 +107,10 @@ export function readCheckOrder(home: string, runId: string): CheckOrder | null {
 
 /** `norn check-run`: run the order's command (timeout kills the group, C5), write the receipt, release the lease. */
 export async function runCheckOrder(order: CheckOrder, now: () => number): Promise<ReceiptOf<"check">> {
-  try {
-    // K4.1: a server an agent left running from this worktree must not hold the slot's ports
-    const stopped = order.ports ? await stopStrayListeners(order.cwd, order.ports) : [];
-    const res = await runShell(order.command, { cwd: order.cwd, env: order.env, timeoutMs: order.timeout_ms });
-    if (stopped.length) res.output = `${stopped.map((s) => `norn: stopped pid ${s.pid} (${s.command}) left listening on :${s.port} from this worktree (K4.1)`).join("\n")}\n${res.output}`;
+  const started = now();
+  const receipt = (res: ShellResult): ReceiptOf<"check"> => {
     const pass = !res.timed_out && res.exit_code === 0;
-    const receipt: ReceiptOf<"check"> = {
+    return {
       kind: "check",
       receipt_id: ulid(now()),
       run_id: order.run_id,
@@ -125,9 +127,21 @@ export async function runCheckOrder(order: CheckOrder, now: () => number): Promi
       output_tail: tailLines(res.output, 200),
       ...(res.timed_out ? { reason: "timeout" as const } : {}),
     };
-    if (!pass) receipt.log = writeLog(order.runs_dir, order.run_id, res.output);
-    appendReceipt(order.runs_dir, receipt);
-    return receipt;
+  };
+  try {
+    // K4.1: a server an agent left running from this worktree must not hold the slot's ports
+    const stopped = order.ports ? await stopStrayListeners(order.cwd, order.ports) : [];
+    const res = await runShell(order.command, { cwd: order.cwd, env: { ...process.env, ...order.env }, timeoutMs: order.timeout_ms });
+    if (stopped.length) res.output = `${stopped.map((s) => `norn: stopped pid ${s.pid} (${s.command}) left listening on :${s.port} from this worktree (K4.1)`).join("\n")}\n${res.output}`;
+    const r = receipt(res);
+    if (r.outcome === "fail") r.log = writeLog(order.runs_dir, order.run_id, res.output);
+    appendReceipt(order.runs_dir, r);
+    return r;
+  } catch (e) {
+    // C5: a check-run that breaks on its own side still ends the step, or every tick would start it again
+    const r = receipt({ exit_code: null, output: `norn check-run failed: ${(e as Error).message}`, duration_ms: now() - started, timed_out: false });
+    appendReceipt(order.runs_dir, r);
+    return r;
   } finally {
     safeUnlink(checkOrderPath(order.home, order.run_id));
     // a lease reclaimed meanwhile (K3) may be another run's now: release only this run's
@@ -135,8 +149,20 @@ export async function runCheckOrder(order: CheckOrder, now: () => number): Promi
   }
 }
 
+/** Remove orders no live check lease names: a `norn check-run` that died (crash, reboot) left them (K3). */
+async function sweepCheckOrders(act: ActEnv): Promise<void> {
+  const live = new Set((await listLeases(act.ctx.home, act.liveness())).live.map((e) => e.lease.kind === "check" && e.lease.run_id));
+  const dir = checkOrdersDir(act.ctx.home);
+  let names: string[];
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return; // no orders yet
+  }
+  for (const name of names) if (name.endsWith(".json") && !live.has(name.slice(0, -".json".length))) safeUnlink(join(dir, name));
+}
 
-/** The env a check runs with, as the order stores it: unset names left out. */
+/** What the tick adds to a check's env, as the order stores it: unset names left out. */
 function definedOnly(env: Record<string, string | undefined>): Record<string, string> {
   return Object.fromEntries(Object.entries(env).filter((e): e is [string, string] => e[1] !== undefined));
 }
