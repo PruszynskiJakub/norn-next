@@ -11,7 +11,7 @@
     "implement": 1
   },
   "step_entered_at": "2026-10-28T14:13:16.910Z",
-  "status": "ready",
+  "status": "running",
   "park": null,
   "counters": {
     "test_loop": 0,
@@ -21,10 +21,29 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 0,
-  "run": null,
+  "applied_through": 2,
+  "run": {
+    "run_id": "01M61DVXF8HBD7RGF5G7YR8J43",
+    "step": "implement",
+    "attempt": 1,
+    "started_at": "2026-10-28T14:16:30.595Z",
+    "how": "auto",
+    "agent": "claude",
+    "session": {
+      "runner": "herdr",
+      "session_id": "w6Y:p1",
+      "pane_id": "w6Y:p1",
+      "reach": "herdr agent attach w6Y:p1"
+    },
+    "process": {
+      "pid": 18998,
+      "pid_start": "Wed Oct 28 15:16:30 2026"
+    },
+    "machine": "jakubpruszynski@mac",
+    "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD"
+  },
   "last_outcome": null,
   "created_at": "2026-10-28T14:13:16.910Z",
-  "updated_at": "2026-10-28T14:13:16.910Z",
-  "last_tick_id": "01M61DQAZD0R3VBD189CH3Q8F0"
+  "updated_at": "2026-10-28T14:16:30.597Z",
+  "last_tick_id": "01M61DVXF8309761JB4ENM338M"
 }
