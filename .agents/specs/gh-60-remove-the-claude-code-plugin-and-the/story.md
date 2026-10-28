@@ -10,9 +10,16 @@ labels:
   - norn
   - norn:wf:quick
 workflow: quick
-status: active
+status: done
 intake_at: 2026-10-28T13:42:03.724Z
 body_hash: 33260c590eb50d043b27bedc68ad631ada67a787e89e8cd33f017243bc55e391
+merge:
+  pr: 84
+  url: https://github.com/PruszynskiJakub/norn-next/pull/84
+  head_sha: 01c932fd9e3c69c46632dc3a9f1d3765560c8aa1
+  merge_commit_sha: 4c3277d61bc7e3f9409ef4fe6c1183f9bce5e83b
+  merged_by: PruszynskiJakub
+  merged_at: 2026-10-28T15:55:41.000Z
 ---
 
 We no longer want to expose the Claude Code plugin (`/norn` command). With it gone, `bun run sync:plugin` / `check:plugin` have nothing to do: they only keep `plugins/claude-code/.claude-plugin/plugin.json`'s version equal to `@norn/cli`'s and refuse a `skills/` folder there. The Herdr plugin is unaffected (it carries its own version in `plugins/herdr/herdr-plugin.toml`).
