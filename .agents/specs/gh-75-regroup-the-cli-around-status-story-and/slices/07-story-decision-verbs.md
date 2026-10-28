@@ -1,8 +1,8 @@
 ---
 id: gh-75/07
 title: story answer, approve, reject and update-branch
-depends_on: [gh-75/03]
-status: planned
+depends_on: [ gh-75/03 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
