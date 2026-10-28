@@ -63,6 +63,16 @@ Fix #77: a check step no longer blocks the tick that starts it; the repro is a p
 - implement#2 done: Review#1 rework done. F1: check order stores only .env.norn, action env and NORN_HOME (check-run merges it over its inherited env), written 0600; orders no live check lease names are swept. F2: norn status shows 'test#1 (check running) <lease age>'. F3: a check-run failing on its own side writes a fail receipt. F4: lease handoff is a compare-and-swap (handOverLease), null identify releases the lease. F5 fixed. Each has a test (check-run.test.ts, leases-lock.test.ts); typecheck and full suite (1207) green. Friction: the implement#2 'started' commit (61e2940) swept my uncommitted work in.
 - review#2 changes_requested: review#2: fix addresses the cause; review#1 points addressed; typecheck + 1213 tests green. Blocking F1: runCheckOrder releases the lease by substring-matching run_id in raw unvalidated lease JSON (AGENTS: every JSON read validated) — add a store helper that reads the lease validated and releases only on matching run_id. Minor: replaceIfUnchanged gap (F2), null identify releases a live child's lease (F3), duplicated check-running predicate core/view (F4), no tests for parallel checks/K3 rerun (F5), heartbeat-item attribution fallback untouched (F6). Nits F7-F9.
 
+**implement#3 (review#2 rework, commit `e791ca6`):**
+- F1 (blocking): store `releaseRunLease(home, file, run_id)` reads the lease validated (S2) and removes it (removeIfUnchanged) only while it names the run; `runCheckOrder` uses it. Test in leases-lock.test.ts: a lease reclaimed and taken by another run stays; an unreadable one stays.
+- F2: `replaceIfUnchanged` links the new content in (EEXIST → false) instead of renaming, so a lease another tick created in the gap is kept. Not testable deterministically (needs interleaving); behaviour otherwise covered by the existing CAS test.
+- F3: store `claimRunLease(home, file, run_id, holder)`: `norn check-run` takes its run's lease over itself as it starts (test in check-run.test.ts: a lease held by the tick ends up with the check-run's pid, released after; store test in leases-lock.test.ts). The tick no longer releases on a null/throwing `identify`; it only hands over when identified, and after a spawn never releases.
+- F4: one predicate `checkRunningSince(step, uf)` in core policy.ts, used by inbox items and view.
+- F5: check-run.test.ts: one tick starts two checks (both leases and orders live, tick < 2.5 s); killing one check-run → next tick `reclaim_leases` + `run_check` for that unit only, both end with pass; a tick past claim.renew while a check runs renews the claim.
+- F6: left out as the reviewer allowed: the "no heartbeat" item still attaches to the first held story when watch is really down — for the person to file as its own issue.
+- F7–F9 fixed (help groups split by `for`, filtered run-id set, reworded env comment).
+- typecheck and full suite (1217) green.
+
 ## Resume
 
 Nothing left in this step: report `norn done done`.
