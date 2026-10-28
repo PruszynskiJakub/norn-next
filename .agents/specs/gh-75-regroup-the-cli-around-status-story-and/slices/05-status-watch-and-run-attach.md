@@ -2,7 +2,7 @@
 id: gh-75/05
 title: status --watch replaces the cockpit; run attach
 depends_on: [ gh-75/03, gh-75/04 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
