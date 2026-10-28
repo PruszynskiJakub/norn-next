@@ -1,0 +1,31 @@
+{
+  "kind": "done",
+  "receipt_id": "01M6105KXK6MPKKK8QHMZAXNJZ",
+  "run_id": "01M60ZMR6HMQ00MGBD9PN5BG39",
+  "step": "qa",
+  "attempt": 1,
+  "at": "2026-10-28T10:16:24.756Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/02",
+  "outcome": "pass",
+  "handoff": "AC1 and AC2 pass. No fixture changed and typecheck is clean. CLI output on base and head is byte-identical apart from the temp path. Full bun test: 1228 pass, 1 fail (load-related zombie contract test, passes 3/3 alone, diff leaves adapters untouched). The printed-commands test pins all 28 builders with a key check.",
+  "evidence": "evidence/01M60ZMR6HMQ00MGBD9PN5BG39",
+  "criteria": [
+    {
+      "id": "AC1",
+      "verdict": "pass",
+      "evidence": "/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-02/AC1.md, /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-02/AC1-cli-diff.txt, /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-02/out-base.txt, /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-02/out-head.txt, /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-02/bun-test.txt"
+    },
+    {
+      "id": "AC2",
+      "verdict": "pass",
+      "evidence": "/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-02/AC2.md"
+    }
+  ],
+  "notes": [
+    {
+      "text": "In the full bun test run, the adapters zombie contract test (K3) failed once under load ('ps stat \"\", not Z') and passed 3/3 when run alone. It is unrelated to this slice but may be flaky on macOS."
+    }
+  ]
+}
