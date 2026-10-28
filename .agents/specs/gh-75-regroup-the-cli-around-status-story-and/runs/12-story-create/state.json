@@ -5,14 +5,14 @@
   "unit_dir": "12-story-create",
   "workflow": "slice",
   "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
-  "step": "test",
+  "step": "review",
   "attempt": 2,
   "visits": {
     "implement": 2,
     "test": 2,
-    "review": 1
+    "review": 2
   },
-  "step_entered_at": "2026-10-28T19:16:18.413Z",
+  "step_entered_at": "2026-10-28T19:23:34.645Z",
   "status": "ready",
   "park": null,
   "counters": {
@@ -23,16 +23,16 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 10,
+  "applied_through": 11,
   "run": null,
   "last_outcome": {
-    "step": "implement",
-    "outcome": "done",
-    "source": "reported",
-    "at": "2026-10-28T19:15:59.223Z",
-    "receipt_id": "01M61Z1KKP0EJWAD0K6EK56T82"
+    "step": "test",
+    "outcome": "pass",
+    "source": "classified",
+    "at": "2026-10-28T19:23:29.913Z",
+    "receipt_id": "01M61ZFBQRPMKHVWNNA84XRCJX"
   },
   "created_at": "2026-10-28T14:13:16.910Z",
-  "updated_at": "2026-10-28T19:16:18.413Z",
-  "last_tick_id": "01M61Z26BDNJF970QBFVR6Z49D"
+  "updated_at": "2026-10-28T19:23:34.645Z",
+  "last_tick_id": "01M61ZFGBMA3XGDBQ9R2QND5SX"
 }
