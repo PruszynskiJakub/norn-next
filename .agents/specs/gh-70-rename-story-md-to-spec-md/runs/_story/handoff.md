@@ -19,15 +19,17 @@
 
 ## Goal
 
-Triage gh-70 (rename story.md → spec.md): check it on base, write `## Triage` in story.md, post it, recommend one workflow.
+Rename the story's spec file story.md → spec.md (gh-70), design (a) as the person answered: intake writes spec.md, every reader prefers spec.md and falls back to story.md, nothing is renamed.
 
 ## Progress
 
-- Confirmed on base ba2dc5d: `storyFile` (store/paths.ts:34) plus 4 hardcoded copies (decide/index.ts:107, brief.ts:187, agent-unit.ts:96, record.ts:46).
-- Wrote `## Triage` into story.md and posted it as an issue comment (#issuecomment-6470633687).
-- Recommended story: open compatibility design (dual read vs migration, mixed versions, two-release order forced by self-hosting).
-- explore#1 story: Persisted-format rename across every package with an open compatibility design (dual read vs migration, mixed norn versions, two-release order since the released norn reads this story's own story.md); PRD GR2/W9/§7/skills table to amend; run norn workflow gh-70 story --to refine
+- `SPEC_FILE`/`LEGACY_SPEC_FILE` in schema ids.ts; store `storyFile(specDir)` resolves spec.md, else an existing story.md, else spec.md (tests in store snapshot.test.ts).
+- decide intake emits `<spec dir>/spec.md` (decide.test.ts); missing-file error names spec.md.
+- Hardcoded copies now go through storyFile: brief.ts, agent-unit.ts, record.ts (remote path checks spec.md then story.md on the base tree), intake (skips when either exists).
+- Docs: PRD GR2 (legacy rule), W9, §7 layout, line 146, skills table; README; bundled story.yaml and norn-retro skill; code comments; repo-local release skill reads both names.
+- Deliberately left: repo-local .agents/norn/workflows/*.yaml and triage skill still say story.md, because the released norn (which self-hosts this repo) writes story.md until this ships. Switch them in a follow-up after the release. This story's own story.md stays (released norn reads it).
+- Kept the inbox item id `corrupt:<story>:spec.md` renamed along with the text.
 
 ## Resume
 
-Nothing left for this step; the person decides at the triage gate (`norn workflow gh-70 story --to refine`).
+Run the full suite (`bun test`, `bun run typecheck`), fix any test asserting story.md text, commit, then `norn done done`.
