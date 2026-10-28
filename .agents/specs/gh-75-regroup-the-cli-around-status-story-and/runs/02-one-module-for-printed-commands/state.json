@@ -5,13 +5,14 @@
   "unit_dir": "02-one-module-for-printed-commands",
   "workflow": "slice",
   "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
-  "step": "test",
+  "step": "review",
   "attempt": 1,
   "visits": {
     "implement": 1,
-    "test": 1
+    "test": 1,
+    "review": 1
   },
-  "step_entered_at": "2026-10-28T09:49:37.185Z",
+  "step_entered_at": "2026-10-28T09:56:58.569Z",
   "status": "ready",
   "park": null,
   "counters": {
@@ -22,16 +23,16 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 3,
+  "applied_through": 4,
   "run": null,
   "last_outcome": {
-    "step": "implement",
-    "outcome": "done",
-    "source": "reported",
-    "at": "2026-10-28T09:49:27.684Z",
-    "receipt_id": "01M60YM8R3WE83GN1PK8N46JJ7"
+    "step": "test",
+    "outcome": "pass",
+    "source": "classified",
+    "at": "2026-10-28T09:56:58.551Z",
+    "receipt_id": "01M60Z211QNGFMVME9M14SBVEG"
   },
   "created_at": "2026-10-28T09:34:07.116Z",
-  "updated_at": "2026-10-28T09:49:37.185Z",
-  "last_tick_id": "01M60YMJ0XFQ539K8NE4FGRG2J"
+  "updated_at": "2026-10-28T09:56:58.569Z",
+  "last_tick_id": "01M60Z2128RRX0GGSNQBWRF4MW"
 }
