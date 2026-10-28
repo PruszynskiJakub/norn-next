@@ -13,7 +13,7 @@
     "review": 1
   },
   "step_entered_at": "2026-10-28T18:44:37.596Z",
-  "status": "ready",
+  "status": "running",
   "park": null,
   "counters": {
     "test_loop": 0,
@@ -23,8 +23,27 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 4,
-  "run": null,
+  "applied_through": 6,
+  "run": {
+    "run_id": "01M61XG2BFJX8V0B2D9WEHZS7P",
+    "step": "review",
+    "attempt": 1,
+    "started_at": "2026-10-28T18:55:30.978Z",
+    "how": "auto",
+    "agent": "claude",
+    "session": {
+      "runner": "herdr",
+      "session_id": "w82:p1",
+      "pane_id": "w82:p1",
+      "reach": "herdr agent attach w82:p1"
+    },
+    "process": {
+      "pid": 2028,
+      "pid_start": "Wed Oct 28 19:55:30 2026"
+    },
+    "machine": "jakubpruszynski@mac",
+    "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD"
+  },
   "last_outcome": {
     "step": "test",
     "outcome": "pass",
@@ -33,6 +52,6 @@
     "receipt_id": "01M61X81B4AMHBPZ832PDK023Y"
   },
   "created_at": "2026-10-28T14:13:16.910Z",
-  "updated_at": "2026-10-28T18:44:37.596Z",
-  "last_tick_id": "01M61X862VYCTATV1FS0BFJ8GV"
+  "updated_at": "2026-10-28T18:55:30.979Z",
+  "last_tick_id": "01M61XG2BFR5HR6H6F4YDGBXTQ"
 }
