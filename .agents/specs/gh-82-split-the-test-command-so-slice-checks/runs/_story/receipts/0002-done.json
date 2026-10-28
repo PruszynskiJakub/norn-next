@@ -1,0 +1,17 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61MZ2F8D4MWSVTQD92WS3T4",
+  "run_id": "01M61KX4NRQ7ZMMJZ1QFYJKKTC",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-28T16:19:50.377Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "done",
+  "handoff": "Added test:fast (everything but packages/cli, ~35 s) and test:cli scripts; slice/bug checks run test:fast + typecheck, story/quick/fix and CI keep the full suite; bun install kept (fresh worktrees need it, 0.15 s); AGENTS.md updated; repo test guards the split. base-sync/human slowness diagnosed (≈18 git spawns per tick at ~15 ms each via the /usr/bin/git shim), not changed: cutting it means fewer git calls in norn itself, which changes the transcripts, so it belongs in its own issue. Suite green: 872 + 329 pass, typecheck clean.",
+  "notes": [
+    {
+      "text": "Wanted item 'make base-sync and human cheaper' was investigated, not done: the cost is ~1,900 git spawns (~18 per tick) at ~15 ms each on macOS. Reducing it is a production change to norn's git calls (and the effect transcripts); suggest a separate issue. bun test --parallel is another option, untried."
+    }
+  ]
+}
