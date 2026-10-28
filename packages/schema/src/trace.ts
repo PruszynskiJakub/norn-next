@@ -60,7 +60,7 @@ export type TickUnitRecord = Static<typeof TickUnitRecord>;
 
 /**
  * O1/O4 inbox history: an inbox item (needing a person) appeared in, or left, the inbox after this
- * tick's act. `norn inbox --history` pairs them into appeared_at / resolved_at / resolved_by.
+ * tick's act. `norn status --history` pairs them into appeared_at / resolved_at / resolved_by.
  */
 export const InboxChange = Type.Object(
   {

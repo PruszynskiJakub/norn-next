@@ -12,6 +12,7 @@ import { dirname, join } from "node:path";
 import type { Clock, InboxItem, LaunchSpec, NotifierPort, PaneState, PromptKey, RemoteIssue, RemotePort, RemotePullRequest, RunnerCapabilities, RunnerPort, RunnerSessionInfo, SessionRef } from "@norn/core";
 import { type Receipt, type UnitState, ulid } from "@norn/schema";
 import { appendReceipt, installSkills, linkSkills, readState } from "@norn/store";
+import type { ProjectView } from "@norn/view";
 import { bundledSkills, type CliDeps, type CliResult, type Interaction, type InteractionChoice, runCli, type TickReport } from "../src/index.ts";
 import { assetsDir } from "../src/runtime/assets.ts";
 import { harvestGolden } from "./golden-harvest.ts";
@@ -162,6 +163,9 @@ export function sh(cwd: string, args: string[], input?: string): string {
   return r.stdout.toString().trim();
 }
 
+/** A story or one of its slices in `norn story list --json`. */
+export type Listed = ProjectView["stories"][number] | ProjectView["stories"][number]["slices"][number];
+
 export interface Harness {
   dir: string;
   root: string;
@@ -173,6 +177,8 @@ export interface Harness {
   notifier: FakeNotifier;
   deps: CliDeps;
   norn(...argv: string[]): Promise<CliResult>;
+  /** a story or slice as `norn story list --json` shows it (B15); undefined when not listed */
+  listed(key: string): Promise<Listed | undefined>;
   /** one `norn tick`; throws unless it exits 0 */
   tick(...flags: string[]): Promise<TickReport>;
   git(args: string[], cwd?: string): string;
@@ -233,6 +239,10 @@ export async function createHarness(): Promise<Harness> {
     notifier,
     deps,
     norn: (...argv) => runCli(argv, deps),
+    async listed(key) {
+      const view = (await this.norn("story", "list", "--json")).value as ProjectView;
+      return view.stories.flatMap((s): Listed[] => [s, ...s.slices]).find((u) => u.key === key);
+    },
     async tick(...flags) {
       const r = await runCli(["tick", ...flags], deps);
       if (r.exit !== 0) throw new Error(`tick failed: ${r.stdout}`);

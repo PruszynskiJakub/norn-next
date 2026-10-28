@@ -1,6 +1,6 @@
 /**
  * Inbox history (O1, O4): each tick diffs the items needing a person after act against the ones
- * open before and records the changes in its trace record (`inbox`); `norn inbox --history` pairs
+ * open before and records the changes in its trace record (`inbox`); `norn status --history` pairs
  * them. The open set lives machine-locally in the gitignored trace dir (`inbox.json`), like
  * `notified.json`; when it is missing every current item appears again (harmless for pairing).
  */

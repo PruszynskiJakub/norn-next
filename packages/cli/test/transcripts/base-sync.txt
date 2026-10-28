@@ -161,23 +161,23 @@
       text 20 lines, normalised sha256 8338573c94c5
   ~ repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/state.json
       {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"test","attempt":1,"visits":{"update":1,"test":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":0,"stale_loop":0},"nudges_used":0,"retries_used":0,"applied_through":1,"run":null,"last_outcome":{"step":"update","outcome":"done","source":"classified","at":"<time>","receipt_id":"<ulid:4>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:6>","mode":"auto"}
-> norn inbox
-  spawn repo $ git rev-parse --path-format=absolute --git-common-dir
-  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
-  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
-  spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-7
-  spawn repo $ git cat-file blob <sha:4>
-  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
-  exit 0
-> norn status gh-7
-  spawn repo $ git rev-parse --path-format=absolute --git-common-dir
-  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
-  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
-  spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-7
-  spawn repo $ git cat-file blob <sha:4>
-  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
-  exit 0
 > norn status
+  spawn repo $ git rev-parse --path-format=absolute --git-common-dir
+  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
+  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
+  spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-7
+  spawn repo $ git cat-file blob <sha:4>
+  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
+  exit 0
+> norn story list --json
+  spawn repo $ git rev-parse --path-format=absolute --git-common-dir
+  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
+  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
+  spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-7
+  spawn repo $ git cat-file blob <sha:4>
+  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
+  exit 0
+> norn story list
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs

@@ -60,7 +60,7 @@ const lastReceipt = (kind: string) => {
   return JSON.parse(h.read(join(runs(), "receipts", name)));
 };
 type Item = { id: string; title: string; detail?: string; full?: string; command: string; step: string | null };
-const inbox = async () => ((await h.norn("inbox")).value as { groups: Record<string, Item[]> }).groups;
+const inbox = async () => ((await h.norn("status")).value as { groups: Record<string, Item[]> }).groups;
 const notes = async () => (await inbox()).notes?.filter((i) => i.id.startsWith("note:")) ?? [];
 
 async function tickUntil(pred: () => boolean, label: string, max = 12) {
@@ -154,7 +154,7 @@ describe("criteria reports and notes through norn done", () => {
     expect(gate?.detail).toContain("AC2 unverified (no browser in this session) — how: open /today, add 'buy milk p1', expect red flag");
     expect(gate?.detail).toContain("AC3 person — how: compare against Figma frame 12");
     expect(gate?.full).toBeUndefined(); // L1: the long form only with --details
-    const details = ((await h.norn("inbox", "--details")).value as { groups: Record<string, Item[]> }).groups;
+    const details = ((await h.norn("status", "--details")).value as { groups: Record<string, Item[]> }).groups;
     expect(details.approve?.find((i) => i.step === "human-qa")?.full).toContain("Criteria for a person to check:\n- AC2 unverified");
 
     // NT2: the note is a Check item whose command explains the report

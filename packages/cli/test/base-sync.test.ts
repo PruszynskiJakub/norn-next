@@ -117,13 +117,13 @@ describe("base sync with real git", () => {
     expect(log[2]).toMatch(/^[0-9A-Z]{26}$/);
     // pushed at the step boundary (S8)
     expect(h.git(["ls-remote", "origin", "refs/heads/gh-7-add-login-form"]).split("\t")[0]).toBe(h.git(["rev-parse", "HEAD"], wt()));
-    const inbox = (await h.norn("inbox")).value as { groups: Record<string, Array<{ id: string }>> };
+    const inbox = (await h.norn("status")).value as { groups: Record<string, Array<{ id: string }>> };
     expect(inbox.groups.check?.filter((i) => i.id.startsWith("foreign:"))).toEqual([]);
     // norn status shows the base sync state and the update's merge commit
     const merge = h.git(["log", "--merges", "-1", "--format=%H"], wt());
-    const status = (await h.norn("status", "gh-7")).value as { base_sync: unknown };
+    const status = (await h.listed("gh-7")) as { base_sync: unknown };
     expect(status.base_sync).toMatchObject({ branch: "main", conflicts: [], last_update: { sha: merge, base_sha: sibling, step: "update" } });
-    expect((await h.norn("status")).stdout).toContain(`base main: up to date · last update merge ${merge.slice(0, 12)} (update, `);
+    expect((await h.norn("story", "list")).stdout).toContain(`base main: up to date · last update merge ${merge.slice(0, 12)} (update, `);
   }, 60_000);
 
   test("4 + 2: waiting at ready, a conflicting sibling merge → stale → update → conflict → resolve (brief: base sha + paths) → done → update → test", async () => {
@@ -300,7 +300,7 @@ describe("PR items between syncs and in the read model (C1), ready approval void
   const wt = () => `${h.root}-worktrees/gh-9-pay-by-card`;
   const runs = () => join(wt(), ".agents/specs/gh-9-pay-by-card/runs/_story");
   type View = { groups: Record<string, Array<{ id: string; command: string; detail?: string }>> };
-  const view = async () => (await h.norn("inbox")).value as View;
+  const view = async () => (await h.norn("status")).value as View;
   const ids = (v: View, group: string) => (v.groups[group] ?? []).map((i) => i.id);
   /** the tick-side open set (inbox history, O4) */
   const open = () => Object.keys((JSON.parse(h.read(join(h.root, ".agents/norn/trace/inbox.json"))) as { open: Record<string, unknown> }).open);
@@ -350,8 +350,8 @@ describe("PR items between syncs and in the read model (C1), ready approval void
     expect(ids(v, "check")).toContain(retarget);
     expect(open()).toEqual(expect.arrayContaining([merge, retarget]));
     // a done story behind a conflicting base says so in norn status
-    expect(((await h.norn("status", "gh-9")).value as { base_sync: unknown }).base_sync).toMatchObject({ branch: "main", behind: 1, conflicts: ["a.txt"] });
-    expect((await h.norn("status")).stdout).toContain("base main: 1 behind · conflicts a.txt");
+    expect(((await h.listed("gh-9")) as { base_sync: unknown }).base_sync).toMatchObject({ branch: "main", behind: 1, conflicts: ["a.txt"] });
+    expect((await h.norn("story", "list")).stdout).toContain("base main: 1 behind · conflicts a.txt");
     // ticks between syncs: the items stay open (no appear/resolve flicker)
     const calls = h.remote.calls.length;
     for (let i = 0; i < 3; i++) {
@@ -360,7 +360,7 @@ describe("PR items between syncs and in the read model (C1), ready approval void
       expect(open()).toEqual(expect.arrayContaining([merge, retarget]));
     }
     expect(h.remote.calls.length).toBe(calls);
-    const history = (await h.norn("inbox", "--history")).value as { items: Array<{ id: string; resolved_at: string | null }> };
+    const history = (await h.norn("status", "--history")).value as { items: Array<{ id: string; resolved_at: string | null }> };
     expect(history.items.filter((i) => i.id === merge || i.id === retarget).map((i) => i.resolved_at)).toEqual([null, null]);
     pr.base_branch = "main";
   }, 60_000);
@@ -477,7 +477,7 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
     h.clock.advance(10_000);
     expect(kinds(await h.tick())).toEqual(["gh-11 agent.ask.implicit"]);
     expect(h.state(runs())).toMatchObject({ status: "parked", park: { kind: "ask" } });
-    expect(((await h.norn("inbox")).value as { groups: Record<string, Array<{ id: string }>> }).groups.answer).toHaveLength(1);
+    expect(((await h.norn("status")).value as { groups: Record<string, Array<{ id: string }>> }).groups.answer).toHaveLength(1);
     expect(h.git(["rev-parse", "HEAD"], wt())).toBe(before);
 
     // done mid-merge → refused, nothing written
@@ -503,7 +503,7 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
     expect(kinds(held)[0]).toContain(`(commit ${merge.slice(0, 12)})`);
     expect(h.git(["rev-parse", "HEAD~1"], wt())).toBe(merge);
     expect(h.git(["ls-remote", "origin", "refs/heads/gh-11-merge-safely"]).split("\t")[0]).toBe(pushed);
-    const unblock = ((await h.norn("inbox")).value as { groups: Record<string, Array<{ title: string }>> }).groups.unblock ?? [];
+    const unblock = ((await h.norn("status")).value as { groups: Record<string, Array<{ title: string }>> }).groups.unblock ?? [];
     expect(unblock.map((i) => i.title)).toEqual([expect.stringContaining(`conflict markers in a.txt (commit ${merge.slice(0, 12)})`)]);
     writeFileSync(join(wt(), "a.txt"), "story side\nbase side\n");
     h.git(["commit", "-q", "-am", "resolve a.txt"], wt());
@@ -518,7 +518,7 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
     const why = (await h.norn("run", "view", "gh-11", "--why", "--transition", "resolve.done")).stdout;
     expect(why).toContain(`by merge commit ${merge}`);
     // the agent's merge and fix-up, made during its run, are not foreign (C4)
-    const inbox = (await h.norn("inbox")).value as { groups: Record<string, Array<{ id: string }>> };
+    const inbox = (await h.norn("status")).value as { groups: Record<string, Array<{ id: string }>> };
     expect(inbox.groups.check?.filter((i) => i.id.startsWith("foreign:"))).toEqual([]);
   }, 60_000);
 
@@ -532,7 +532,7 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
     expect(kinds(t).find((k) => k.startsWith("gh-11 receipts.apply"))).toContain("FAILED commit on gh-11-merge-safely refused: conflict markers in b.txt");
     expect(h.git(["rev-parse", "HEAD"], wt())).toBe(before);
     expect(h.git(["ls-remote", "origin", "refs/heads/gh-11-merge-safely"]).split("\t")[0]).toBe(before);
-    const inbox = (await h.norn("inbox")).value as { groups: Record<string, Array<{ title: string }>> };
+    const inbox = (await h.norn("status")).value as { groups: Record<string, Array<{ title: string }>> };
     expect(inbox.groups.unblock?.map((i) => i.title)).toEqual([expect.stringContaining("conflict markers in b.txt")]);
   }, 60_000);
 });

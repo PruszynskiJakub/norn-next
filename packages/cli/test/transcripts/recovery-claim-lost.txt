@@ -213,7 +213,7 @@
   spawn repo-worktrees/gh-9-add-search $ git diff --name-only --no-renames --diff-filter=AM <sha:6> -- .agents/specs/gh-9-add-search/runs/_story/
   spawn repo-worktrees/gh-9-add-search $ git ls-files --others --exclude-standard -- .agents/specs/gh-9-add-search/runs/_story/
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
-> [A] norn inbox
+> [A] norn status
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
@@ -258,7 +258,7 @@
   + repo-worktrees/gh-9-add-search/.agents/specs/gh-9-add-search/runs/_story/orphaned/tester@box-0003-done.json
       {"kind":"done","receipt_id":"<ulid:11>","run_id":"<ulid:3>","step":"implement","attempt":1,"at":"<time>","by":"agent","who":"claude","outcome":"done","handoff":"search works"}
   - repo-worktrees/gh-9-add-search/.agents/specs/gh-9-add-search/runs/_story/receipts/0003-done.json
-> [A] norn inbox
+> [A] norn status
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs

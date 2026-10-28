@@ -135,7 +135,7 @@ describe("a claim lost mid-run (R1.2, R2.3)", () => {
     const r = await A.tick("--sync");
     expect(r.decisions.filter((d) => d.unit === "gh-9")).toEqual([{ unit: "gh-9", rule: "claim.other", kind: "noop", ok: true }]);
     const done = readdirSync(join(storyRuns(A.root), "receipts")).find((f) => f.endsWith("-done.json")) as string;
-    const inbox = (await A.norn("inbox")).value as Inbox;
+    const inbox = (await A.norn("status")).value as Inbox;
     expect(inbox.groups.check).toEqual([
       expect.objectContaining({ story: "gh-9", command: "norn tidy", title: `local work on gh-9 is not in the record (${done.replace(/\.json$/, "")}) — the story is now held by bob@repo-b` }),
     ]);
@@ -150,7 +150,7 @@ describe("a claim lost mid-run (R1.2, R2.3)", () => {
     // committed on the local branch only; the record is untouched
     expect(remoteHead()).toBe(head);
     expect(sh(`${A.root}-worktrees/${BRANCH}`, ["status", "--porcelain"])).toBe("");
-    expect(((await A.norn("inbox")).value as Inbox).groups.check).toEqual([]);
+    expect(((await A.norn("status")).value as Inbox).groups.check).toEqual([]);
   });
 
   test("effect transcript: spawns, port calls and runs/ files of both clones (refactor Phase 0.2)", () => {
