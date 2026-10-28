@@ -5,7 +5,7 @@
   "unit_dir": "10-story-checkout-handoff-close",
   "workflow": "slice",
   "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
-  "step": "integrate",
+  "step": "merge",
   "attempt": 2,
   "visits": {
     "implement": 3,
@@ -13,29 +13,29 @@
     "review": 3,
     "qa": 1,
     "integrate": 2,
-    "merge": 1
+    "merge": 2
   },
-  "step_entered_at": "2026-10-28T20:08:33.797Z",
+  "step_entered_at": "2026-10-28T20:09:33.803Z",
   "status": "ready",
   "park": null,
   "counters": {
     "test_loop": 0,
     "review_loop": 2,
     "qa_loop": 0,
-    "conflict_loop": 1
+    "conflict_loop": 2
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 28,
+  "applied_through": 29,
   "run": null,
   "last_outcome": {
-    "step": "merge",
-    "outcome": "done",
-    "source": "reported",
-    "at": "2026-10-28T20:08:33.883Z",
-    "receipt_id": "01M6221WAV23F4J3B4SXDY6GAA"
+    "step": "integrate",
+    "outcome": "conflict",
+    "source": "classified",
+    "at": "2026-10-28T20:09:06.330Z",
+    "receipt_id": "01M6222W0TJCR3F31Y8JP3WY8J"
   },
   "created_at": "2026-10-28T14:13:16.910Z",
-  "updated_at": "2026-10-28T20:08:33.797Z",
-  "last_tick_id": "01M6221W84ZTHGGFEQGV466DT9"
+  "updated_at": "2026-10-28T20:09:33.803Z",
+  "last_tick_id": "01M6223PV929HEKKS37PNG9CVP"
 }
