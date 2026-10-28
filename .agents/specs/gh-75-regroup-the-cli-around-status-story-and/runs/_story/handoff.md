@@ -16,14 +16,16 @@
 
 ## Goal
 
-Write the gh-75 spec (Problem, Solution, Behaviour, Out of scope, Open questions) into story.md from an interview with the person.
+Write the Plan section of the gh-75 spec (seams, coverage of B1–B71, prefactoring, decisions, risks) and agree it with the person.
 
 ## Progress
 
-- Interview done (Q1–Q16), summary confirmed. Key decisions: noun stays `story` until #74; `status` takes the inbox meaning with a one-time notice; `status --watch --pane` public; no aliases (old names are plain unknown commands); `run cancel` parks and keeps pane; `story close` confirms (`--yes`); `story reopen` restores units at their step, running ones parked; `story create` stops at intake; `config set|unset --user|--repo` on today's two layers (#64 to be rewritten on it); `run attach --next` for Herdr; `story reject` requires `--reason`.
-- Spec written: B1–B71, out of scope, no open questions.
-- refine#1 done: Spec written: gh-style CLI tree (status / story / run / setup / background / agent), B1–B71 with examples, out of scope, no open questions. Key decisions: noun stays story until #74; status = inbox+cockpit with one-time notice; no aliases; run cancel parks; story close/reopen; story create stops at intake; config set/unset --user|--repo (#64 to build on it).
+- Plan written into story.md and agreed with the person: seams S1 (`runCli` in the harness + a new terminal-interaction fake), S2 (repo lint for removed command names: B8, B71), S3 (remote contract for `createIssue`); coverage table for B1–B71.
+- Prefactoring agreed: (1) noun–verb command tree + tiered help in the framework; (2) every printed command built in one core module, strings unchanged; (3) take's claim-and-restore extracted for `story reopen`.
+- Decisions agreed: D1 move old commands per slice (docs/PRD/lint last); D2 prompt only with TTY + no `--json` + not an agent session; D3 RemotePort `createIssue` + `newIssueUrl`; D4 `run cancel`/reopen write a human `stuck` receipt (no new kind); D5 closed = story.md `dropped`; D6 `story view --json` = orient JSON extended; D7 notice in a machine-local trace file, `CliResult.stderr`; D8 `config set/unset` via yaml document round-trip; D9 markdown default for status/list/view.
+- Spec amended with the person's agreement: B41 and B51 say "stuck" instead of "parks" (D4); B70 says it covers one-to-one moves, and that `story view` has its own shape (D6).
+- plan#1 done: Plan agreed with the person: seams S1 runCli harness (+ interaction fake), S2 old-name repo lint, S3 remote contract; coverage for B1–B71; 3 prefactors (noun–verb framework, one printed-commands module, take restore extracted); D1–D9 (cancel = human stuck receipt, story view = orient JSON extended, prompts only TTY+no --json+not agent). B41/B51/B70 wording amended.
 
 ## Resume
 
-Person reviews the spec in story.md; on agreement report `norn done done`.
+Plan is complete; the next step slices it.
