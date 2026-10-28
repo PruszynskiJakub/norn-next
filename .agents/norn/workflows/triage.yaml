@@ -1,6 +1,7 @@
 # Triage workflow — norn's own default (config default_workflow: triage), repo-local (W1, W9).
-# An unattended agent checks the issue still holds, adds the repro, the affected code and context
-# to story.md and to an issue comment, and reports the workflow it recommends as its outcome.
+# An unattended agent checks the issue still holds, posts the repro, the affected code and context
+# as an issue comment (story.md stays as intake wrote it), and reports the workflow it recommends
+# as its outcome.
 # A person then decides at `confirm`. A gate has only approve/reject/stale (W2), so the choice of
 # workflow is not a gate outcome: the person switches the story with `norn workflow … --to`
 # (W9, S7), which works while the unit waits at the gate. Agents never run it.
@@ -15,10 +16,10 @@ steps:
     inputs: [spec, handoff]
     instructions: >-
       Read the issue mirrored in story.md. Check it still occurs or still applies on the base branch.
-      Write the findings (repro, affected code, PRD ids touched, context) and the recommendation with
-      its reason into the body of story.md, keeping its frontmatter unchanged, and post them as an
-      issue comment. Never edit the issue body. Change no other file. Report the recommendation itself
-      as the outcome: `norn done fix|quick|story|spec|close --handoff "<reason>"`.
+      Post the findings (repro, affected code, PRD ids touched, context) and the recommendation with
+      its reason as an issue comment, and only there. Never edit the issue body. Change no file,
+      story.md included. Report the recommendation itself as the outcome:
+      `norn done fix|quick|story|spec|close --handoff "<reason>"`.
     outcomes:
       fix:   { to: confirm, means: "a defect that still occurs: repro and cause or suspects written; recommend the fix workflow" }
       quick: { to: confirm, means: "a small change (refactor, docs, chore): what to change written; recommend the quick workflow" }
@@ -28,7 +29,7 @@ steps:
   confirm:
     type: gate
     prompt: >-
-      Read the triage findings and the recommendation in story.md (also posted on the issue). N is the issue number.
+      Read the triage findings and the recommendation in the issue comment (`gh issue view N --comments`). N is the issue number.
       Switch to a workflow: `norn workflow gh-N fix --to reproduce`, `norn workflow gh-N quick --to implement`,
       `norn workflow gh-N story --to refine` or `norn workflow gh-N spec --to refine`.
       Close: `norn approve gh-N --reason "<why>"`, then `gh issue close N --reason "not planned"`,

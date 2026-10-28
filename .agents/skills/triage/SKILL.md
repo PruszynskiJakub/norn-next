@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Triage one norn issue in this repo — check it still occurs on the current base by running it, add the repro, the affected code (file:line), the PRD ids it touches and the context, and recommend exactly one next workflow (fix, quick, story, spec) or close, with its reason and the command the person runs. Writes a `## Triage` section into the story's `story.md` and posts the same as an issue comment. Read-only on code. Use in the `triage` workflow's `explore` step.
+description: Triage one norn issue in this repo — check it still occurs on the current base by running it, add the repro, the affected code (file:line), the PRD ids it touches and the context, and recommend exactly one next workflow (fix, quick, story, spec) or close, with its reason and the command the person runs. Posts its findings as a `## Triage` issue comment, the one place they live; changes no file. Use in the `triage` workflow's `explore` step.
 ---
 
 # Triage
@@ -23,9 +23,9 @@ The story worktree is on the current base. Try what the issue describes there.
 
 Use `norn-diagnose`'s loop only when the symptom does not show on the first try; stop at a repro, never at a cause you guessed.
 
-## 3. Write `## Triage` in `story.md`
+## 3. Write `## Triage`
 
-Append it below the mirrored issue body; never change the body or the frontmatter.
+Write the findings in this shape; they go only into the issue comment (section 4), never into `story.md`, which stays as intake wrote it.
 
 ```markdown
 ## Triage
@@ -52,9 +52,9 @@ Pick exactly one:
 
 Cite PRD ids exactly as written in `.agents/PRD.md`. A rule the issue would change is a `spec`, not a `fix`.
 
-## 4. Post the same as an issue comment
+## 4. Post it as an issue comment
 
-Pipe the `## Triage` section as written into `gh issue comment <N> --body-file -` (no temp file in the worktree: norn commits what is left). This one comment is the only remote write this skill allows, an exception to the `norn` skill's rule; never edit the issue body or title (norn tracks the body, GR8), never label, assign or close. On a rerun, post a new comment that starts with `## Triage (updated)`.
+Pipe the `## Triage` section into `gh issue comment <N> --body-file -` (no temp file in the worktree: norn commits what is left). This one comment is the only remote write this skill allows, an exception to the `norn` skill's rule; never edit the issue body or title (norn tracks the body, GR8), never label, assign or close. On a rerun, post a new comment that starts with `## Triage (updated)`.
 
 ## 5. Report
 
@@ -62,5 +62,5 @@ Report the recommendation itself as the outcome: `norn done <fix|quick|story|spe
 
 ## Rules
 
-- Read-only on code, tests and docs. The only file you change is `story.md`.
+- Read-only: you change no file but the handoff the `norn` skill keeps current; `story.md` stays as intake wrote it. Later steps read the findings from the issue comment.
 - Never run `norn workflow` yourself: switching is the person's (W9, S7).

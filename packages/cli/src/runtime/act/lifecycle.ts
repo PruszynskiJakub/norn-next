@@ -2,9 +2,10 @@
 import { existsSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { type Action, type ActionResult, nornTrailers, type UnitRef, type WorktreeSpec } from "@norn/core";
-import { parseDuration, STORY_UNIT_DIR } from "@norn/schema";
+import { type ClaimBlob, parseDuration, STORY_UNIT_DIR } from "@norn/schema";
 import {
   acquireClaim,
+  type ClaimWriteResult,
   deleteMailbox,
   listLeases,
   patchSliceFile,
@@ -12,7 +13,7 @@ import {
   pinWorkflow,
   releaseClaim,
   releaseLease,
-  renewClaim,
+  renewClaims,
   sliceFile as sliceFilePath,
   storyFile,
   writeStoryFile,
@@ -153,13 +154,34 @@ export async function claim(act: ActEnv, a: Extract<Action, { kind: "claim" }>):
     return r.ok ? { ok: true } : { ok: false, error: r.message };
   }
   if (!a.blob) throw new Error("claim without blob");
-  const r = a.op === "acquire" ? await acquireClaim(act.root, remote, a.blob, { now: act.obs.facts.now }) : await renewClaim(act.root, remote, a.blob, a.expected ?? "");
-  if (r.ok) act.claimed.set(story, { blob: a.blob, sha: r.sha });
-  if (r.ok) return { ok: true, detail: { sha: r.sha } };
-  const detail: Record<string, unknown> = { reason: r.reason };
+  if (a.op === "renew") return (await renewAll(act, [a]))[0] as ActionResult;
+  const r = await acquireClaim(act.root, remote, a.blob, { now: act.obs.facts.now });
+  const res = claimed(act, a, r);
   // R3.1 (H6): the intake race is lost — undo what the intake made here, unless it holds work
-  if (a.rule === "claim.acquire.intake" && claimLost({ ok: false, detail })) detail.intake = await dropLostIntake(act, story, a.lost_intake).catch((e: Error) => ({ kept: `clean-up failed: ${e.message}` }));
-  return { ok: false, error: r.message, detail };
+  if (a.rule === "claim.acquire.intake" && !res.ok && claimLost(res)) (res.detail as Record<string, unknown>).intake = await dropLostIntake(act, story, a.lost_intake).catch((e: Error) => ({ kept: `clean-up failed: ${e.message}` }));
+  return res;
+}
+
+/**
+ * T4, H5: renew every claim due this tick in one CAS batch (one push to the remote), one result
+ * per action in order. A lost CAS fails only its own story (R1.2).
+ */
+export async function renewAll(act: ActEnv, as: ReadonlyArray<Extract<Action, { kind: "claim" }>>): Promise<ActionResult[]> {
+  const rs = await renewClaims(
+    act.root,
+    act.obs.remote,
+    as.map((a) => {
+      if (!a.blob) throw new Error("claim without blob");
+      return { blob: a.blob, expected: a.expected ?? "" };
+    }),
+  );
+  return rs.map((r, i) => claimed(act, as[i] as Extract<Action, { kind: "claim" }>, r));
+}
+
+function claimed(act: ActEnv, a: Extract<Action, { kind: "claim" }>, r: ClaimWriteResult): ActionResult {
+  if (!r.ok) return { ok: false, error: r.message, detail: { reason: r.reason } };
+  act.claimed.set(a.unit.story, { blob: a.blob as ClaimBlob, sha: r.sha });
+  return { ok: true, detail: { sha: r.sha } };
 }
 
 /**
