@@ -1,0 +1,45 @@
+gh-5 · review#1 (gate)
+
+run      -
+outcome  (in step)
+entered  2099-01-15T10:05:00.000Z
+left     …
+duration 0s so far
+who      claude
+
+Reason
+  with tests
+
+Receipts
+  /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-8xK78F/repo-worktrees/gh-5-pay-invoices/.agents/specs/gh-5-pay-invoices/runs/_story/receipts/0004-done.json
+[exit 0]
+{"unit":"gh-5","slice":null,"step":"review","attempt":1,"type":"gate","attended":false,"entered_at":"2099-01-15T10:05:00.000Z","left_at":null,"duration_ms":0,"open":true,"outcome":"done","to":null,"counter":null,"who":[{"by":"agent","name":"claude","run_id":null,"tick_id":null}],"reason":"with tests","wait_ms":0,"paths":{"receipts":["/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-8xK78F/repo-worktrees/gh-5-pay-invoices/.agents/specs/gh-5-pay-invoices/runs/_story/receipts/0004-done.json"],"evidence":[],"logs":[],"briefings":[]},"story":"gh-5","run_id":null}
+
+[exit 0]
+run id 03PGFN9BM07BQP89SGMCQ4Z4Z7
+gh-5 · work#1 (agent)
+
+run      03PGFN9BM07BQP89SGMCQ4Z4Z7
+outcome  done → review
+entered  2099-01-15T10:03:00.000Z
+left     2099-01-15T10:05:00.000Z
+duration 2m00s
+who      tick 03PGFN9BM0AM3F5H1A01GD2200
+
+Reason
+  first try
+
+Receipts
+  /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-8xK78F/repo-worktrees/gh-5-pay-invoices/.agents/specs/gh-5-pay-invoices/runs/_story/receipts/0001-started.json
+  /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-8xK78F/repo-worktrees/gh-5-pay-invoices/.agents/specs/gh-5-pay-invoices/runs/_story/receipts/0002-started.json
+  /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-8xK78F/repo-worktrees/gh-5-pay-invoices/.agents/specs/gh-5-pay-invoices/runs/_story/receipts/0003-done.json
+[exit 0]
+{'unit': 'gh-5', 'run_id': '03PGFN9BM07BQP89SGMCQ4Z4Z7', 'step': 'work', 'attempt': 1, 'outcome': 'done'}
+**Refused (unknown_run):** no run 01ARZ3NDEKTSV4RRFFQ69G5FAV in the trace
+
+Do instead: norn status
+[exit 3]
+**Usage error (usage):** run view: expected a run id or a unit
+
+Do instead: norn run view <run|unit>
+[exit 2]
