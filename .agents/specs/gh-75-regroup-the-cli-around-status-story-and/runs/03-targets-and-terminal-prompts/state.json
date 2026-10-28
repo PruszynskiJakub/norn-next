@@ -5,7 +5,7 @@
   "unit_dir": "03-targets-and-terminal-prompts",
   "workflow": "slice",
   "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
-  "step": "integrate",
+  "step": "$done",
   "attempt": 1,
   "visits": {
     "implement": 1,
@@ -15,7 +15,7 @@
     "integrate": 1
   },
   "step_entered_at": "2026-10-28T14:11:33.232Z",
-  "status": "ready",
+  "status": "done",
   "park": null,
   "counters": {
     "test_loop": 0,
@@ -25,16 +25,16 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 12,
+  "applied_through": 13,
   "run": null,
   "last_outcome": {
-    "step": "qa",
-    "outcome": "pass",
-    "source": "reported",
-    "at": "2026-10-28T14:11:13.273Z",
-    "receipt_id": "01M61DKJ7SP269DPG3B51NQK5C"
+    "step": "integrate",
+    "outcome": "done",
+    "source": "classified",
+    "at": "2026-10-28T14:12:21.762Z",
+    "receipt_id": "01M61DNN42VPEMJHQT1CVZF3VY"
   },
   "created_at": "2026-10-28T13:10:40.637Z",
-  "updated_at": "2026-10-28T14:11:33.232Z",
-  "last_tick_id": "01M61DM5QFM7BQF06RBBSRB069"
+  "updated_at": "2026-10-28T14:12:33.236Z",
+  "last_tick_id": "01M61DP0AKDPMD5XRJ8EYWCV0Q"
 }
