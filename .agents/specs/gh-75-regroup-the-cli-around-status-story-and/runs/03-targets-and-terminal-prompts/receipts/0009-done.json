@@ -1,0 +1,48 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61CDHW5AA6FFCBR4HJXZ69K",
+  "run_id": "01M61BZZNCBQZ4NYY89WM50K3E",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-28T13:50:27.717Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/03",
+  "outcome": "approve",
+  "handoff": "review#1: approve. Spec and standards checked: B54, B56-B60 on run view/list, D2 interaction + FakeInteraction; AC1-AC6 tested in targets.test.ts, AC7 hand-checked by implement. bun test packages/cli 345 pass, typecheck clean. Non-blocking: B57 order test mirrors the impl (recheck after slice 04 status change), for-await over stdin may break a second prompt in one process (later D2 prompts), hasRun loads a run view per unit, a redundant wrapper.",
+  "findings": [
+    {
+      "severity": "minor",
+      "title": "The status-order test rebuilds its expected order the same way the code does",
+      "id": "F1",
+      "file": "packages/cli/test/targets.test.ts",
+      "line": 150,
+      "criterion": "AC3",
+      "detail": "The B57 test builds the expected order as inbox items followed by stories with their slices. That is the same algorithm as unitsInStatusOrder in runtime/target.ts, so a wrong idea of 'status order' would pass in both places. Today `norn status` prints stories only. Inbox-first status is slice 04 (B9). The implementation follows where status is going, which is a reasonable reading.\nAxis: spec\nSuggestion: Once slice 04 lands, assert the pick-list order against the order of units in `norn status` output, or against a literal list for this fixture."
+    },
+    {
+      "severity": "minor",
+      "title": "Returning from `for await` over process.stdin can end the stream for later prompts",
+      "id": "F2",
+      "file": "packages/cli/src/runtime/interaction.ts",
+      "line": 49,
+      "detail": "pick() returns from inside `for await (const chunk of stdin)`. That calls the iterator's return(), which in Node-compatible streams destroys the readable. One prompt per process works today. D2's confirm, ask-a-line and edit prompts (later slices) may chain a second prompt after a pick in the same process, and it would get no input.\nAxis: standards\nSuggestion: When a second prompt is added, read keys with a 'data' listener that is removed in finally, instead of async iteration."
+    },
+    {
+      "severity": "minor",
+      "title": "hasRun loads a full run view for every unit",
+      "id": "F3",
+      "file": "packages/cli/src/runtime/target.ts",
+      "line": 62,
+      "detail": "applies() calls loadRunView for each candidate just to test for a run, which reads receipts and state per unit. The cost is O(units) file reads on every command without a target. It is fine at current sizes.\nAxis: standards\nSuggestion: Decide from the ProjectView that was already loaded (view.runs, or each unit's run state), if it carries enough."
+    },
+    {
+      "severity": "nit",
+      "title": "Wrapper that only forwards its argument",
+      "id": "F4",
+      "file": "packages/cli/src/runtime/target.ts",
+      "line": 59,
+      "detail": "`command: (key) => command(key)` just passes `command` through.\nAxis: standards\nSuggestion: `command,`"
+    }
+  ]
+}
