@@ -1,0 +1,12 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61PSFBBKR8ZGYPGD5KWHXK8",
+  "run_id": "01M61PA1X02REPWZD8B2Y9E4M2",
+  "step": "implement",
+  "attempt": 4,
+  "at": "2026-10-28T16:51:44.108Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "done",
+  "handoff": "test.fail rework: the failing K3 zombie contract test was a flaky helper, not story code. makeZombie's background 'true' could exit before the shell exec'd into sleep and get reaped (ps stat empty) under load. Now the child blocks on the parent's stdin (fd 3), which is closed only once the parent is sleep. Regression test 'makeZombie: 60 at once are all zombies' in contract.test.ts fails on the old helper and passes now. Full suite (1220) and typecheck green."
+}
