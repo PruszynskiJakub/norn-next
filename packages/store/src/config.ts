@@ -55,8 +55,8 @@ export type ConfigEditResult =
  * Set (`set`: a YAML value as typed, `auto`, `90m`, `[{adapter: os}]`) or remove (`unset`) one
  * dotted key in the user or repo config file (D8). The file is edited as a YAML document; a list is
  * replaced whole (B63). The edited layer and the merged result are validated before anything is
- * written (B66), and the write is atomic (S1). A changed scalar or a removed key touches only its
- * own lines, so comments and key order stay (B67). Removing a key the file lacks writes nothing.
+ * written (B66), and the write is atomic (S1). A changed scalar, a new key or a removed key touches
+ * only its own lines, so comments and key order stay (B67). Removing a key the file lacks writes nothing.
  */
 export function editConfigLayer(opts: {
   repoRoot: string;
@@ -86,6 +86,7 @@ export function editConfigLayer(opts: {
       value = parseYaml(edit.set);
       spliced = withScalar(raw, doc, segs, value);
       setIn(doc, segs, value);
+      spliced ??= withNewKey(raw, doc, segs);
     }
   } catch (e) {
     return { ok: false, code: "invalid_value", error: `${key}: ${(e as Error).message}` };
@@ -133,6 +134,36 @@ function withScalar(raw: string, doc: Document, segs: string[], value: unknown):
   const node = doc.getIn(segs, true);
   if (!isScalar(node) || !node.range || (value !== null && typeof value === "object")) return null;
   return raw.slice(0, node.range[0]) + stringifyYaml(value).trimEnd() + raw.slice(node.range[1]);
+}
+
+/**
+ * `raw` with the lines of a key it lacks added: after the last entry of the nearest map the file has
+ * (`limits:` gets `  retries: 4`), or at the end for a new top-level key. `edited` already holds the
+ * value (and an agent seeded from the built-in one). Null when the key exists or the map is a flow map.
+ */
+function withNewKey(raw: string, edited: Document, segs: string[]): string | null {
+  const orig = parseDocument(raw);
+  if (orig.hasIn(segs)) return null;
+  let n = 0;
+  while (n < segs.length - 1 && orig.hasIn(segs.slice(0, n + 1))) n++;
+  let value = edited.toJS() as unknown;
+  for (const s of segs.slice(0, n + 1)) value = (value as Record<string, unknown>)[s];
+  const lines = stringifyYaml({ [segs[n] as string]: value });
+  if (n === 0) {
+    if (orig.contents !== null && (!isMap(orig.contents) || orig.contents.flow)) return null;
+    return raw + (raw && !raw.endsWith("\n") ? "\n" : "") + lines;
+  }
+  const parent = orig.getIn(segs.slice(0, n), true);
+  if (!isMap(parent) || parent.flow || !parent.items.length) return null;
+  const first = parent.items[0]?.key;
+  const last = parent.items.at(-1);
+  const keyRange = isScalar(first) ? first.range : undefined;
+  const lastRange = (last?.value as { range?: [number, number, number] } | null)?.range ?? (isScalar(last?.key) ? last.key.range : undefined);
+  if (!keyRange || !lastRange) return null;
+  const indent = " ".repeat(keyRange[0] - raw.lastIndexOf("\n", keyRange[0] - 1) - 1);
+  const added = lines.replace(/^(?=.)/gm, indent);
+  const eol = raw.indexOf("\n", lastRange[1] - 1);
+  return eol === -1 ? `${raw}\n${added}` : raw.slice(0, eol + 1) + added + raw.slice(eol + 1);
 }
 
 /**

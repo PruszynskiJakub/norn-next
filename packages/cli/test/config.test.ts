@@ -190,6 +190,21 @@ describe("norn config set and unset", () => {
     expect(changed).toEqual([["  deadline: 30m # long enough for a slice", "  deadline: 90m # long enough for a slice"]]);
   });
 
+  test("setting a key the file lacks adds only its lines; padded comments stay as typed (B67)", async () => {
+    const before = "# norn repo config\ndefault_mode: manual   # who starts\nlimits:\n  deadline: 30m  # long enough\n\n# the end\n";
+    h.write(repoFile(), before);
+    expect((await h.norn("config", "set", "limits.retries", "4", "--repo")).exit).toBe(0);
+    const nested = "# norn repo config\ndefault_mode: manual   # who starts\nlimits:\n  deadline: 30m  # long enough\n  retries: 4\n\n# the end\n";
+    expect(read(repoFile())).toBe(nested);
+    expect((await h.norn("config", "set", "max_agents", "1", "--repo")).exit).toBe(0);
+    expect(read(repoFile())).toBe(`${nested}max_agents: 1\n`);
+    expect((await h.norn("config", "set", "slots.max", "3", "--repo")).exit).toBe(0);
+    expect(read(repoFile())).toBe(`${nested}max_agents: 1\nslots:\n  max: 3\n`);
+    h.write(repoFile(), "default_mode: manual   # who starts");
+    expect((await h.norn("config", "set", "max_agents", "1", "--repo")).exit).toBe(0);
+    expect(read(repoFile())).toBe("default_mode: manual   # who starts\nmax_agents: 1\n");
+  });
+
   test("unset in a commented file removes only the key's line (B67, B68)", async () => {
     const before = ["# norn repo config", "default_mode: manual # who starts unattended steps", "", "# limits for every step", "limits:", "  deadline: 30m", "  nudges: 2", ""];
     h.write(repoFile(), before.join("\n"));
