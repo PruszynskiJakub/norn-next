@@ -16,7 +16,7 @@
 
 ## Goal
 
-Reproduce gh-76 (claim renewals push one ref per story, so a renewal tick costs N round trips), build a loop that goes red on it and confirm the cause. No fix.
+Fix gh-76: all claim renewals due in a tick go to the remote in one non-atomic `git push`, per-ref outcome from `--porcelain` (H5, T4, R1.2), proven by regression tests.
 
 ## Progress
 
@@ -27,7 +27,9 @@ Reproduce gh-76 (claim renewals push one ref per story, so a renewal tick costs 
 - **Fix shape checked** (`git-batched-push-probe.txt`): one non-atomic `git push --porcelain --force-with-lease=A:x --force-with-lease=B:y origin s:A s:B` with B stale prints `+\t…:refs/norn/claims/gh-1\t… (forced update)` and `!\t…:refs/norn/claims/gh-2\t[rejected] (stale info)`, exits 1, and gh-1 is updated. So per-ref outcome must come from the porcelain lines, not the exit code.
 - **Seams for regression tests.** Store: a batched CAS beside `casRef`/`renewClaim` tested in `packages/store/test/refs.test.ts` over real bare repos (all ok; one stale among several → only that one `stale`, others ok and mirrored locally; network failure → all `network`). Cli: the loop above as a tick-level test (N renewals → 1 claim push), and R1.2 in `recovery.test.ts` (one lost renewal still skips only that story's actions); its claim-lost transcript changes if spawns change. The actor must batch the side `claim` renew decisions before the per-decision loop (R1.2 order stays: renewals first, `lost` set per story).
 - reproduce#1 reproduced: Reproduced: one renewal tick with N claimed stories makes N separate claim pushes (loop: N=2→2, 3→3, 5→5; asserts 1). Cause: Actor.run performs each claim decision alone → renewClaim → casRef, one git push per story. Live trace: avg tick 3.7s with 0 renewals, 35.7s with 10. Batched non-atomic push with per-ref porcelain verified to work.
+- **implement#1.** Store: `casRefs` (`packages/store/src/git.ts`) — one push, a lease per refspec, each ref's outcome from its porcelain line (`!` = failed, reason from that line; no line → whole output, so a network failure fails all), each pushed ref mirrored with `update-ref`; `casRef` is now `casRefs` of one (same args, same spawns). `renewClaims` (`packages/store/src/refs.ts`) batches blobs + one `casRefs`. Cli: `Actor.run` renews every side `claim` decision in one `renewAll` batch before the per-decision loop; results are fed into the loop so R1.2 (`lost` per story, skip its other actions) is unchanged. Tests: `refs.test.ts` "batched renewals" (all ok + one push + mirrored; one stale among three; unreachable → all network; no remote; empty → no push); `recovery.test.ts` "renewals due together go out in one push" (3 stories, B force-takes gh-2: 1 claim push, gh-2 renewal fails stale and its receipts.apply is skipped, gh-1/gh-3 apply). Red before: 3 pushes. Claim-lost transcript unchanged (one renewal = same push argv).
+- implement#1 done: Claim renewals due in a tick now go out in one non-atomic git push (store casRefs/renewClaims, Actor.run renewAll batch); per-ref outcome from --porcelain lines, only a lost story fails and its actions are skipped (H5, T4, R1.2). Tests: refs.test.ts batched renewals (all ok/one push, one stale, network, no remote, empty), recovery.test.ts 3 stories with one force-taken → 1 claim push (red before: 3). Claim-lost transcript unchanged. Full suite + typecheck green.
 
 ## Resume
 
-Done; reported `reproduced`.
+Done; reported `done`. Next step reviews the diff on this branch.
