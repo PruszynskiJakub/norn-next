@@ -5,7 +5,7 @@
   "unit_dir": "01-noun-verb-tree-and-run-list-view",
   "workflow": "slice",
   "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
-  "step": "integrate",
+  "step": "merge",
   "attempt": 2,
   "visits": {
     "implement": 2,
@@ -13,29 +13,29 @@
     "review": 2,
     "qa": 1,
     "integrate": 2,
-    "merge": 1
+    "merge": 2
   },
-  "step_entered_at": "2026-10-28T11:04:13.100Z",
+  "step_entered_at": "2026-10-28T11:05:13.097Z",
   "status": "ready",
   "park": null,
   "counters": {
     "test_loop": 0,
     "review_loop": 1,
     "qa_loop": 0,
-    "conflict_loop": 1
+    "conflict_loop": 2
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 20,
+  "applied_through": 21,
   "run": null,
   "last_outcome": {
-    "step": "merge",
-    "outcome": "done",
-    "source": "reported",
-    "at": "2026-10-28T11:03:49.311Z",
-    "receipt_id": "01M612WDSZJQHG1KQPDM8EH7Z7"
+    "step": "integrate",
+    "outcome": "conflict",
+    "source": "classified",
+    "at": "2026-10-28T11:04:45.000Z",
+    "receipt_id": "01M612Y4683V7VSR37X5336A1J"
   },
   "created_at": "2026-10-28T09:34:07.116Z",
-  "updated_at": "2026-10-28T11:04:13.100Z",
-  "last_tick_id": "01M612X512MVGB6HAXC144P0E0"
+  "updated_at": "2026-10-28T11:05:13.097Z",
+  "last_tick_id": "01M612YZM64Z7XMWR28DJ9T54H"
 }

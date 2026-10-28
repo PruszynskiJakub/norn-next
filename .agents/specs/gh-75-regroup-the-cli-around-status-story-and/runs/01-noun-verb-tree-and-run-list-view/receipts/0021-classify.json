@@ -1,0 +1,15 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M612Y4683V7VSR37X5336A1J",
+  "run_id": "01M612Y2AKN86A20SKM3TSNQ4E",
+  "step": "integrate",
+  "attempt": 2,
+  "at": "2026-10-28T11:04:45.000Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M612Y2AKS88TCMBX2NWW937B",
+  "outcome": "conflict",
+  "rule": "git.integrate",
+  "detail": "rebase onto gh-75-regroup-the-cli-around-status-story-and conflicts in packages/cli/src/cli.ts, packages/cli/src/commands/run-list.ts, packages/cli/src/commands/run-view.ts, packages/view/src/format.ts",
+  "route": "merge"
+}
