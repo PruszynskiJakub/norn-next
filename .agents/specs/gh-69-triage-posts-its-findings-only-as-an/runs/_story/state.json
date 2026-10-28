@@ -5,7 +5,7 @@
   "unit_dir": "_story",
   "workflow": "quick",
   "workflow_hash": "e1035bf08337c2d63967792add84270d2c199f94830cec0b60aefd3b34ae39cb",
-  "step": "describe",
+  "step": "open-pr",
   "attempt": 1,
   "visits": {
     "explore": 1,
@@ -14,9 +14,10 @@
     "update": 1,
     "test": 1,
     "review": 1,
-    "describe": 1
+    "describe": 1,
+    "open-pr": 1
   },
-  "step_entered_at": "2026-10-28T14:34:42.414Z",
+  "step_entered_at": "2026-10-28T14:52:03.938Z",
   "status": "ready",
   "park": null,
   "counters": {
@@ -24,17 +25,17 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 9,
+  "applied_through": 11,
   "run": null,
   "last_outcome": {
-    "step": "review",
-    "outcome": "approve",
+    "step": "describe",
+    "outcome": "done",
     "source": "reported",
-    "at": "2026-10-28T14:25:52.458Z",
-    "receipt_id": "01M61EECT9EBAS56KCDNVMPA6S"
+    "at": "2026-10-28T14:42:47.558Z",
+    "receipt_id": "01M61FDC45404RR3QJBRF7DWFJ"
   },
   "created_at": "2026-10-27T22:37:49.730Z",
-  "updated_at": "2026-10-28T14:34:42.414Z",
-  "last_tick_id": "01M61EYJBCBDY5MFG5W0RF038A",
+  "updated_at": "2026-10-28T14:52:03.938Z",
+  "last_tick_id": "01M61FYBF10V7KC20DWXCMDJJZ",
   "mode": "manual"
 }
