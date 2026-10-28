@@ -10,7 +10,7 @@ labels:
   - norn
   - norn:wf:fix
 workflow: fix
-status: new
+status: active
 intake_at: 2026-10-28T13:42:03.724Z
 body_hash: 298d5b28d9ff97a13e6e3aace26f65b8904aabca94378e0ab882e0d39ea6dd35
 ---
