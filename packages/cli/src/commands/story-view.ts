@@ -14,7 +14,7 @@ import { ORIENT_ENV } from "../runtime/agent-unit.ts";
 import { parseUnitKey } from "../runtime/args.ts";
 import { projectView } from "../runtime/human.ts";
 import { openLink } from "../runtime/open-link.ts";
-import { aStory, resolveTarget } from "../runtime/target.ts";
+import { aStory, targetKey } from "../runtime/target.ts";
 
 export const storyViewCommand = defineCommand({
   name: "story view",
@@ -24,7 +24,7 @@ export const storyViewCommand = defineCommand({
   options: { web: { type: "boolean" } },
   positionals: { max: 1 },
   async run(ctx, args) {
-    const raw = await resolveTarget(ctx, args.positionals[0], args.json === true, aStory("story view", cmd.storyView));
+    const raw = await targetKey(ctx, args.positionals[0], args.json === true, aStory("story view", cmd.storyView));
     const { key, story, slice } = parseUnitKey(raw);
     const view = await projectView(ctx);
     const report = orientReport(view, key, ctx.config.remote.provider);

@@ -149,7 +149,7 @@ describe("norn story start (B28, MO5)", () => {
       h.clock.advance(6 * 60_000);
       await h.tick();
     }
-    const status = (await h.norn("status", "--json")).value as { stories: Array<{ key: string; status: string; step: string; effective_mode: string }> };
+    const status = (await h.norn("story", "list", "--json")).value as { stories: Array<{ key: string; status: string; step: string; effective_mode: string }> };
     expect(status.stories.find((s) => s.key === "gh-9")).toMatchObject({ status: "ready", step: "test", effective_mode: "manual" });
     const term = new FakeInteraction();
     const none = await norn({ interaction: term }, "story", "start");

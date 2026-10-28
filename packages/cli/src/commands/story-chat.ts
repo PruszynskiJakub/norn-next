@@ -18,7 +18,7 @@ import { cockpitHerdr } from "../runtime/cockpit.ts";
 import { projectView } from "../runtime/human.ts";
 import { isOrientWorkspace } from "../runtime/segment.ts";
 import { ensureShim, nornEntry, withNornOnPath } from "../runtime/shim.ts";
-import { aStory, resolveTarget } from "../runtime/target.ts";
+import { aStory, targetKey } from "../runtime/target.ts";
 
 /** The chat agent: the default agent with its configured args, its first prompt `norn story view <story>`. */
 function chatAgentCommand(config: ResolvedConfig, story: string): string {
@@ -34,7 +34,7 @@ export const storyChatCommand = defineCommand({
   markdown: true,
   positionals: { max: 1 },
   async run(ctx, args) {
-    const raw = await resolveTarget(ctx, args.positionals[0], args.json === true, aStory("story chat", cmd.storyChat));
+    const raw = await targetKey(ctx, args.positionals[0], args.json === true, aStory("story chat", cmd.storyChat));
     const { story } = parseUnitKey(raw);
     const report = orientReport(await projectView(ctx), story, ctx.config.remote.provider);
     if (!report) throw refuse(`unknown story ${story}`, cmd.status(), "unknown_unit");

@@ -13,7 +13,7 @@ import { refuse, usageError } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
 import { cockpitHerdr, oldestYourTurn } from "../runtime/cockpit.ts";
 import { projectView } from "../runtime/human.ts";
-import { resolveTarget } from "../runtime/target.ts";
+import { targetKey } from "../runtime/target.ts";
 
 const unitOf = (i: InboxEntry) => i.slice ?? i.story;
 
@@ -48,7 +48,7 @@ export const runAttachCommand = defineCommand({
       const pane = herdr.findAgentPane(agents, i.reach);
       if (pane && !paneOf.has(unitOf(i))) paneOf.set(unitOf(i), pane);
     }
-    const target = await resolveTarget(ctx, args.positionals[0], args.json === true, {
+    const target = await targetKey(ctx, args.positionals[0], args.json === true, {
       verb: "run attach",
       applies: (key) => paneOf.has(key),
       none: "No unit has a live agent pane",
