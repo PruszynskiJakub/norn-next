@@ -42,7 +42,8 @@ Noun–verb command tree in the framework (prefactor 1), and the `run` noun: `ru
 - implement#2 done: Review#1 rework: run view --why with no unit/--receipt is now a usage error (exit 2), tested; run list tests for --all, --full and --story-only; AC6 write check uses git status --ignored; help <unknown> and help <cmd> extra are Unknown command usage errors; small nits (unknownCommand name, blank line). F3 hidden help tier left for slice 14. typecheck green, bun test 1208 pass.
 - review#2: approve. Spec and Standards axes: no blocking findings; bun test 1208 pass, typecheck green. Minor: run view --why/--receipt refusals print markdown without --json (JSON identical); help --all test cannot fail until a group is hidden (slice 14). Nits: N+1 trace loads in run-id lookup; verb-name string surgery and duplicated ULID test.
 - review#2 approve: Review#2 approve: no blocking findings on spec or standards; bun test 1208 pass, typecheck green; review#1 blockers fixed. Minor: run view --why/--receipt refusals print markdown without --json (JSON identical); help --all test can't fail until a group is hidden (slice 14). Nits: N+1 trace loads in run-id lookup, verb-name string surgery, duplicated ULID test.
+- qa#1: all 8 criteria pass. bun test 1208 pass, typecheck green. In a harness-built throwaway repo (13 ticks), `run list gh-5` is byte-identical to released 0.10.0 `trace gh-5` for every flag (text and --json); `run view --why` (all filters) and `--receipt` (with and without unit) identical to `why` except refusal do_instead now names `run list`; trace/why exit 2 Unknown command, nothing written; status/inbox/config/doctor unchanged.
 
 ## Resume
 
-Review approved; nothing left in this step.
+QA passed; nothing left in this step.
