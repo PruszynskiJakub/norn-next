@@ -55,7 +55,7 @@ export type ConfigEditResult =
  * Set (`set`: a YAML value as typed, `auto`, `90m`, `[{adapter: os}]`) or remove (`unset`) one
  * dotted key in the user or repo config file (D8). The file is edited as a YAML document; a list is
  * replaced whole (B63). The edited layer and the merged result are validated before anything is
- * written (B66), and the write is atomic (S1). A changed scalar, a new key or a removed key touches
+ * written (B66), and the write is atomic (S1). A changed value, a new key or a removed key touches
  * only its own lines, so comments and key order stay (B67). Removing a key the file lacks writes nothing.
  */
 export function editConfigLayer(opts: {
@@ -75,6 +75,8 @@ export function editConfigLayer(opts: {
   const doc = parseDocument(raw);
   if (doc.errors.length) return { ok: false, code: "invalid_value", error: `${path}: YAML: ${doc.errors[0]?.message}` };
   const segs = key.split(".");
+  const otherFile = opts.file === "user" ? "repo" : "user";
+  const other = readConfigLayer(paths[otherFile]);
   let value: unknown;
   let spliced: string | null;
   try {
@@ -84,8 +86,8 @@ export function editConfigLayer(opts: {
       removeIn(doc, segs);
     } else {
       value = parseYaml(edit.set);
-      spliced = withScalar(raw, doc, segs, value);
-      setIn(doc, segs, value);
+      spliced = withScalar(raw, doc, segs, value) ?? withValueLines(raw, doc, segs, value);
+      setIn(doc, segs, value, opts.file === "repo" ? other : undefined);
       spliced ??= withNewKey(raw, doc, segs);
     }
   } catch (e) {
@@ -94,8 +96,6 @@ export function editConfigLayer(opts: {
   const layer = (doc.toJS() ?? {}) as unknown;
   const checked = validate("config", layer);
   if (!checked.ok) return { ok: false, code: "invalid_value", error: problems(opts.file, checked.errors) };
-  const otherFile = opts.file === "user" ? "repo" : "user";
-  const other = readConfigLayer(paths[otherFile]);
   const layers = { [opts.file]: checked.value, [otherFile]: other.ok ? other.value : {} } as Record<ConfigLayerName, ConfigLayer>;
   const merged = validate("resolved-config", resolveConfig(layers.user, layers.repo));
   if (!merged.ok) return { ok: false, code: "invalid_value", error: problems("merged config", merged.errors) };
@@ -109,9 +109,11 @@ export function editConfigLayer(opts: {
 const problems = (where: string, errors: Array<{ path: string; message: string }>) =>
   `${where}: ${errors.map((e) => `${e.path || "/"} ${e.message}`).join("; ")}`;
 
-function setIn(doc: Document, segs: string[], value: unknown): void {
-  // a layer's `agents.<name>` replaces the agent whole (K2), so a new entry starts from the built-in one
-  const agent = segs[0] === "agents" && segs.length > 2 ? DEFAULT_CONFIG.agents[segs[1] as string] : undefined;
+function setIn(doc: Document, segs: string[], value: unknown, below?: ReadResult<ConfigLayer>): void {
+  // a layer's `agents.<name>` replaces the agent whole (K2), so a new entry starts from the agent the
+  // layers below resolve to: the user file's for the repo file, else the built-in one
+  const name = segs[1] as string;
+  const agent = segs[0] === "agents" && segs.length > 2 ? ((below?.ok ? below.value.agents?.[name] : undefined) ?? DEFAULT_CONFIG.agents[name]) : undefined;
   if (agent && !doc.hasIn(segs.slice(0, 2))) doc.setIn(segs.slice(0, 2), doc.createNode(structuredClone(agent)));
   doc.setIn(segs, doc.createNode(value));
 }
@@ -134,6 +136,30 @@ function withScalar(raw: string, doc: Document, segs: string[], value: unknown):
   const node = doc.getIn(segs, true);
   if (!isScalar(node) || !node.range || (value !== null && typeof value === "object")) return null;
   return raw.slice(0, node.range[0]) + stringifyYaml(value).trimEnd() + raw.slice(node.range[1]);
+}
+
+/**
+ * `raw` with an existing key's lines (`notifiers:` through its last item) replaced by the key with
+ * its new value, at the key's indentation; the lines around it stay as typed. Null when the key is
+ * missing or sits in a flow map.
+ */
+function withValueLines(raw: string, doc: Document, segs: string[], value: unknown): string | null {
+  const span = pairLines(raw, segs.length > 1 ? doc.getIn(segs.slice(0, -1), true) : doc.contents, segs.at(-1) as string);
+  if (!span) return null;
+  const lines = stringifyYaml({ [segs.at(-1) as string]: value }).replace(/^(?=.)/gm, " ".repeat(span.indent));
+  return raw.slice(0, span.from) + lines + raw.slice(span.to);
+}
+
+/** The lines of `key`'s pair in a block map: from its key's line start to past its value's last line. */
+function pairLines(raw: string, parent: unknown, key: string): { from: number; to: number; indent: number } | null {
+  if (!isMap(parent) || parent.flow) return null;
+  const pair = parent.items.find((p) => isScalar(p.key) && p.key.value === key);
+  const keyRange = pair && isScalar(pair.key) ? pair.key.range : undefined;
+  const valueRange = (pair?.value as { range?: [number, number, number] } | null)?.range ?? keyRange;
+  if (!keyRange || !valueRange) return null;
+  const from = raw.lastIndexOf("\n", keyRange[0] - 1) + 1;
+  const eol = raw.indexOf("\n", Math.max(valueRange[1] - 1, keyRange[0]));
+  return { from, to: eol === -1 ? raw.length : eol + 1, indent: keyRange[0] - from };
 }
 
 /**
@@ -173,15 +199,8 @@ function withNewKey(raw: string, edited: Document, segs: string[]): string | nul
 function withoutLines(raw: string, doc: Document, segs: string[]): string | null {
   let n = segs.length;
   while (n > 1 && (doc.getIn(segs.slice(0, n - 1), true) as { items?: unknown[] }).items?.length === 1) n--;
-  const parent = n > 1 ? doc.getIn(segs.slice(0, n - 1), true) : doc.contents;
-  if (!isMap(parent) || parent.flow) return null;
-  const pair = parent.items.find((p) => isScalar(p.key) && p.key.value === segs[n - 1]);
-  const keyRange = pair && isScalar(pair.key) ? pair.key.range : undefined;
-  const valueRange = (pair?.value as { range?: [number, number, number] } | null)?.range ?? keyRange;
-  if (!keyRange || !valueRange) return null;
-  const from = raw.lastIndexOf("\n", keyRange[0] - 1) + 1;
-  const eol = raw.indexOf("\n", Math.max(valueRange[1] - 1, keyRange[0]));
-  return raw.slice(0, from) + (eol === -1 ? "" : raw.slice(eol + 1));
+  const span = pairLines(raw, n > 1 ? doc.getIn(segs.slice(0, n - 1), true) : doc.contents, segs[n - 1] as string);
+  return span && raw.slice(0, span.from) + raw.slice(span.to);
 }
 
 // ---------------------------------------------------------------- workflows (W1)

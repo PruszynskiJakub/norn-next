@@ -205,6 +205,38 @@ describe("norn config set and unset", () => {
     expect(read(repoFile())).toBe("default_mode: manual   # who starts\nmax_agents: 1\n");
   });
 
+  test("replacing a list or map rewrites only that value's lines; padded comments stay as typed (B63, B67)", async () => {
+    const head = "# norn repo config\ndefault_mode: manual   # who starts\n";
+    const tail = "\n# limits\nlimits:\n  deadline: 30m  # long enough\n  nudges: 2\n";
+    h.write(repoFile(), `${head}notifiers:\n  - adapter: ntfy\n  - adapter: webhook\n${tail}`);
+    expect((await h.norn("config", "set", "notifiers", "[{adapter: os}, {adapter: os}]", "--repo")).exit).toBe(0);
+    expect(read(repoFile())).toBe(`${head}notifiers:\n  - adapter: os\n  - adapter: os\n${tail}`);
+    expect((await h.norn("config", "set", "limits", "{deadline: 90m}", "--repo")).exit).toBe(0);
+    expect(read(repoFile())).toBe(`${head}notifiers:\n  - adapter: os\n  - adapter: os\n\n# limits\nlimits:\n  deadline: 90m\n`);
+    h.write(repoFile(), `${head}max_agents: 2  # two\nslots:\n  max: 3\n`);
+    expect((await h.norn("config", "set", "max_agents", "[1]", "--repo", "--json")).exit).toBe(3);
+    expect((await h.norn("config", "set", "slots", "{max: 4}", "--repo")).exit).toBe(0);
+    expect(read(repoFile())).toBe(`${head}max_agents: 2  # two\nslots:\n  max: 4\n`);
+  });
+
+  test("a new agents.<name> entry starts from the agent the layers below resolve to", async () => {
+    h.write(userFile(), "agents:\n  claude:\n    adapter: claude\n    args: [--mine]\n");
+    expect((await h.norn("config", "set", "agents.claude.model", "opus", "--repo")).exit).toBe(0);
+    expect(await get("agents.claude")).toMatchObject([{ value: { args: ["--mine"], model: "opus" }, source: "repo" }]);
+    rmSync(repoFile());
+    rmSync(userFile());
+    expect((await h.norn("config", "set", "agents.claude.model", "opus", "--repo")).exit).toBe(0);
+    expect(await get("agents.claude")).toMatchObject([{ value: { args: ["--permission-mode", "auto"], model: "opus" }, source: "repo" }]);
+  });
+
+  test("--user and --repo together is a usage error", async () => {
+    const r = await h.norn("config", "set", "default_mode", "auto", "--user", "--repo", "--json");
+    expect(r.exit).toBe(2);
+    expect(r.value).toMatchObject({ do_instead: expect.stringContaining("--user or --repo") });
+    expect(read(repoFile())).toBeNull();
+    expect(read(userFile())).toBeNull();
+  });
+
   test("unset in a commented file removes only the key's line (B67, B68)", async () => {
     const before = ["# norn repo config", "default_mode: manual # who starts unattended steps", "", "# limits for every step", "limits:", "  deadline: 30m", "  nudges: 2", ""];
     h.write(repoFile(), before.join("\n"));
