@@ -13,6 +13,78 @@ workflow: story
 status: active
 intake_at: 2026-10-28T08:50:06.913Z
 body_hash: 59e0017417215f20d7c84bfcd35d4145fa644d1bcbad6f876e80e737d54021d0
+criteria:
+  - { id: B1, verifier: agent }
+  - { id: B2, verifier: agent }
+  - { id: B3, verifier: agent }
+  - { id: B4, verifier: agent }
+  - { id: B5, verifier: agent }
+  - { id: B6, verifier: agent }
+  - { id: B7, verifier: agent }
+  - { id: B8, verifier: test }
+  - { id: B9, verifier: agent }
+  - { id: B10, verifier: agent }
+  - { id: B11, verifier: agent }
+  - { id: B12, verifier: agent, needs: [herdr] }
+  - { id: B13, verifier: agent }
+  - { id: B14, verifier: agent }
+  - { id: B15, verifier: agent }
+  - { id: B16, verifier: agent }
+  - { id: B17, verifier: agent, needs: [browser] }
+  - { id: B18, verifier: agent, needs: [remote] }
+  - { id: B19, verifier: person }
+  - { id: B20, verifier: agent }
+  - { id: B21, verifier: agent }
+  - { id: B22, verifier: agent }
+  - { id: B23, verifier: agent, needs: [browser, remote] }
+  - { id: B24, verifier: agent }
+  - { id: B25, verifier: agent }
+  - { id: B26, verifier: agent }
+  - { id: B27, verifier: agent }
+  - { id: B28, verifier: agent }
+  - { id: B29, verifier: agent, needs: [herdr] }
+  - { id: B30, verifier: agent }
+  - { id: B31, verifier: agent }
+  - { id: B32, verifier: agent }
+  - { id: B33, verifier: agent }
+  - { id: B34, verifier: agent }
+  - { id: B35, verifier: agent }
+  - { id: B36, verifier: agent }
+  - { id: B37, verifier: agent }
+  - { id: B38, verifier: agent }
+  - { id: B39, verifier: agent }
+  - { id: B40, verifier: agent }
+  - { id: B41, verifier: agent }
+  - { id: B42, verifier: agent }
+  - { id: B43, verifier: agent }
+  - { id: B44, verifier: agent }
+  - { id: B45, verifier: agent }
+  - { id: B46, verifier: agent, needs: [herdr] }
+  - { id: B47, verifier: agent, needs: [herdr] }
+  - { id: B48, verifier: agent }
+  - { id: B49, verifier: agent }
+  - { id: B50, verifier: agent }
+  - { id: B51, verifier: agent }
+  - { id: B52, verifier: agent }
+  - { id: B53, verifier: agent }
+  - { id: B54, verifier: agent }
+  - { id: B55, verifier: agent }
+  - { id: B56, verifier: agent }
+  - { id: B57, verifier: agent }
+  - { id: B58, verifier: agent }
+  - { id: B59, verifier: agent }
+  - { id: B60, verifier: agent }
+  - { id: B61, verifier: agent }
+  - { id: B62, verifier: agent }
+  - { id: B63, verifier: agent }
+  - { id: B64, verifier: agent }
+  - { id: B65, verifier: agent }
+  - { id: B66, verifier: agent }
+  - { id: B67, verifier: agent }
+  - { id: B68, verifier: agent }
+  - { id: B69, verifier: agent }
+  - { id: B70, verifier: agent }
+  - { id: B71, verifier: test }
 ---
 
 # Regroup the CLI around status, story and run, modelled on gh
