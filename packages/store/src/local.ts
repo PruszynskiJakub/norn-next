@@ -58,7 +58,7 @@ export interface PendingRecord {
   attempted_at: number;
   attempts: number;
   reason: string;
-  /** how the PR landed (GR6 done record), written into story.md `merge:` with the status */
+  /** how the PR landed (GR6 done record), written into spec.md `merge:` with the status */
   merge?: StoryMerge;
 }
 

@@ -80,7 +80,7 @@
   spawn repo-worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Step: update" --trailer "Norn-Tick: <ulid:2>"
   spawn repo-worktrees/gh-7-add-login-form $ git rev-parse HEAD
   spawn repo-worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
-  spawn repo-worktrees/gh-7-add-login-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7-add-login-form -- .agents/specs/gh-7-add-login-form/runs/_story/handoff.md .agents/specs/gh-7-add-login-form/runs/_story/state.json .agents/specs/gh-7-add-login-form/runs/_story/workflow.yaml .agents/specs/gh-7-add-login-form/story.md
+  spawn repo-worktrees/gh-7-add-login-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7-add-login-form -- .agents/specs/gh-7-add-login-form/runs/_story/handoff.md .agents/specs/gh-7-add-login-form/runs/_story/state.json .agents/specs/gh-7-add-login-form/runs/_story/workflow.yaml .agents/specs/gh-7-add-login-form/spec.md
   spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/handoff.md
       text 19 lines, normalised sha256 fddf651653af
@@ -1166,14 +1166,14 @@
   spawn repo $ git update-ref -d refs/norn/claims/gh-7
   spawn repo $ git push --porcelain origin :refs/norn/claims/gh-7
   spawn repo $ git fetch --quiet --no-tags origin +refs/heads/main:refs/remotes/origin/main
-  spawn repo $ git cat-file -e refs/remotes/origin/main:.agents/specs/gh-7-add-login-form/story.md
+  spawn repo $ git cat-file -e refs/remotes/origin/main:.agents/specs/gh-7-add-login-form/spec.md
   spawn repo $ git worktree add --detach --quiet <tmp>/norn-record-<rand>/wt refs/remotes/origin/main
   spawn <tmp>/norn-record-<rand>/wt $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn <tmp>/norn-record-<rand>/wt $ git diff --name-only --diff-filter=U -z
-  spawn <tmp>/norn-record-<rand>/wt $ git add -A -- .agents/specs/gh-7-add-login-form/story.md
-  spawn <tmp>/norn-record-<rand>/wt $ git diff --cached --quiet -- .agents/specs/gh-7-add-login-form/story.md
-  spawn <tmp>/norn-record-<rand>/wt $ git diff --cached -U0 --no-color --no-ext-diff -- .agents/specs/gh-7-add-login-form/story.md
-  spawn <tmp>/norn-record-<rand>/wt $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Tick: <ulid:61>" -- .agents/specs/gh-7-add-login-form/story.md
+  spawn <tmp>/norn-record-<rand>/wt $ git add -A -- .agents/specs/gh-7-add-login-form/spec.md
+  spawn <tmp>/norn-record-<rand>/wt $ git diff --cached --quiet -- .agents/specs/gh-7-add-login-form/spec.md
+  spawn <tmp>/norn-record-<rand>/wt $ git diff --cached -U0 --no-color --no-ext-diff -- .agents/specs/gh-7-add-login-form/spec.md
+  spawn <tmp>/norn-record-<rand>/wt $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Tick: <ulid:61>" -- .agents/specs/gh-7-add-login-form/spec.md
   spawn <tmp>/norn-record-<rand>/wt $ git rev-parse HEAD
   spawn <tmp>/norn-record-<rand>/wt $ git push --porcelain origin HEAD:refs/heads/main
   spawn repo $ git update-ref refs/remotes/origin/main <sha:30>

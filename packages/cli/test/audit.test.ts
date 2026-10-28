@@ -131,7 +131,7 @@ describe("audit: runtime", () => {
     step(5 * 60_000);
     const r = await h.tick();
     expect(r.records).toEqual([{ story: "gh-4", state: "pushed" }]);
-    expect(h.git(["show", `origin/main:${spec}/story.md`])).toContain("status: done");
+    expect(h.git(["show", `origin/main:${spec}/spec.md`])).toContain("status: done");
     expect(JSON.parse(readFileSync(records, "utf8")).records).toEqual([]);
     step(10 * 60_000);
     expect((await h.tick()).records).toBeUndefined();

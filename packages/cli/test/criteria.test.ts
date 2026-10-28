@@ -99,8 +99,8 @@ beforeAll(async () => {
   h.git(["push", "-q", "origin", "main"]);
   h.remote.issues = [issue(4, "Today view")];
   await tickUntil(at("qa", "ready"), "intake");
-  // QV1: story-level criteria in story.md frontmatter (the slice skill's job), committed like agent work
-  const file = join(wt(), spec, "story.md");
+  // QV1: story-level criteria in spec.md frontmatter (the slice skill's job), committed like agent work
+  const file = join(wt(), spec, "spec.md");
   h.write(file, h.read(file).replace(/\n---\n/, "\ncriteria:\n  - { id: AC1, verifier: test }\n  - { id: AC2, verifier: agent, needs: [browser] }\n  - { id: AC3, verifier: person }\n---\n"));
   h.git(["add", "-A"], wt());
   h.git(["commit", "-q", "-m", "story criteria", "--trailer", "Norn-Tick: 01JBQ6ZK3E8Y4V5W6X7Y8Z9ABC"], wt());

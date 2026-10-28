@@ -9,7 +9,7 @@ You write what the release says and which version it is. A person confirms the v
 
 ## 1. Inputs
 
-- `story.md`: the release issue's body, with `## Version` (empty: you propose), `## Must include` (PRs to wait for) and `## Notes` (put into the changelog as asked).
+- The spec file (`spec.md`, or `story.md` in a story intaken by norn before the rename): the release issue's body, with `## Version` (empty: you propose), `## Must include` (PRs to wait for) and `## Notes` (put into the changelog as asked).
 - The brief's **Rework** section, if any: the person rejected the version at the gate. A version named there wins over everything; apply it and do not argue it again. Any other point there comes first too.
 - Each PR under Must include: `gh pr view <n> --json state`. One not merged → `norn stuck "waiting for #<n> to merge"`.
 
@@ -24,7 +24,7 @@ git log --first-parent --format='%h%x09%s' "$last"..origin/main
 Every commit on main is one squashed PR: title `<PR title> (#<pr>)`, body the PR description with `Closes #<issue>`. For each:
 
 1. `gh pr view <pr> --json title,body,author,labels,closingIssuesReferences`.
-2. The workflow that delivered it: `workflow:` in the frontmatter of `.agents/specs/gh-<issue>-*/story.md` on `origin/main` (`git show`). The issue's `norn:wf:*` label only picks the first workflow, and a triaged issue was switched after it (W9); use the label only when there is no `story.md`.
+2. The workflow that delivered it: `workflow:` in the frontmatter of `.agents/specs/gh-<issue>-*/spec.md` on `origin/main` (`git show`; `story.md` in a story intaken before the rename). The issue's `norn:wf:*` label only picks the first workflow, and a triaged issue was switched after it (W9); use the label only when there is neither file.
 3. Its section:
 
 | Workflow | Section |

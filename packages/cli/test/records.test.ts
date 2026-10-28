@@ -141,7 +141,7 @@ describe("records: ready head, foreign commits, merged by ancestry, durable stat
     expect(facts).toMatchObject({ merged_by_ancestry: true, pr: { state: "open", head_sha: head } });
     expect(existsSync(wt())).toBe(false);
     // the done record on the base carries how it landed
-    const story = h.git(["show", `origin/main:${spec}/story.md`]);
+    const story = h.git(["show", `origin/main:${spec}/spec.md`]);
     expect(story).toContain("status: done");
     expect(story).toContain(`merge_commit_sha: ${merge}`);
     expect(story).toContain(`head_sha: ${head}`);
@@ -186,7 +186,7 @@ describe("records: PR merge facts from the remote", () => {
     h.clock.advance(10_000);
     const s = await h.norn("sync");
     expect(acted(s.value as TickReport)).toEqual(["gh-6 cleanup_merged_story"]);
-    const story = h.git(["show", `origin/main:${spec}/story.md`]);
+    const story = h.git(["show", `origin/main:${spec}/spec.md`]);
     expect(story).toContain("status: done");
     expect(story).toContain(`merge_commit_sha: ${merge}`);
     expect(story).toContain("merged_by: octo");

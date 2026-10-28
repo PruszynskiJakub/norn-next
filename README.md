@@ -32,7 +32,7 @@ Answer (1)
       $ norn answer gh-18/02 "…"
 
 Approve (1)
-  gh-17      approve-plan: Review the Plan section in story.md and the slice files (edit them if needed). Approve to start the slices, or reject with what to change. · 25m
+  gh-17      approve-plan: Review the Plan section in spec.md and the slice files (edit them if needed). Approve to start the slices, or reject with what to change. · 25m
       $ norn approve gh-17
 
 Running (1)
