@@ -1,8 +1,8 @@
 ---
 id: gh-75/04
 title: norn status shows what needs you; the listing moves to story list
-depends_on: [gh-75/01]
-status: planned
+depends_on: [ gh-75/01 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
