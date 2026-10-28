@@ -70,8 +70,16 @@ export function terminalInteraction(): Interaction {
       const stdin = process.stdin;
       stdin.resume();
       try {
-        for await (const chunk of stdin) return /^\s*y(es)?\s*$/i.test(chunk.toString());
-        return false;
+        // one line, without iterating stdin (leaving a `for await` early destroys it)
+        const line = await new Promise<string>((resolve) => {
+          const done = (chunk?: Buffer) => {
+            stdin.off("data", done).off("end", done);
+            resolve(chunk?.toString() ?? "");
+          };
+          stdin.on("data", done).on("end", done);
+        });
+        if (!line.endsWith("\n")) process.stderr.write("\n");
+        return /^\s*y(es)?\s*$/i.test(line);
       } finally {
         stdin.pause();
       }

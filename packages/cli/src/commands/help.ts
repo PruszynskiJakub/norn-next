@@ -26,7 +26,6 @@ const HELP_GROUPS: ReadonlyArray<{ title: string; for: CommandFor; commands: rea
   { title: "Start here", for: "person", commands: ["init", "doctor", "sync", "watch", "status", "open"] },
   { title: "Answer what needs you", for: "person", commands: ["answer", "approve", "unstick", "update", "mode", "workflow"] },
   { title: "Look around", for: "person", commands: ["story", "run", "config", "tick"] },
-  { title: "Team", for: "person", commands: ["take", "release", "drop"] },
   { title: "Housekeeping", for: "person", commands: ["tidy", "uninstall", "help"] },
   { title: "Run by Herdr, not by hand", for: "person", commands: [SEGMENT.name], hidden: true },
   { title: "Agent protocol: the only commands an agent runs", for: "agent", commands: ["brief", "done", "ask", "stuck"] },

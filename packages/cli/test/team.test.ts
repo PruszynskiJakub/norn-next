@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { RunnerPort } from "@norn/core";
 import { ulid } from "@norn/schema";
-import { appendReceipt, readState } from "@norn/store";
+import { acquireTickLock, appendReceipt, readState } from "@norn/store";
 import { type CliDeps, type CliResult, runCli, type TickReport } from "../src/index.ts";
 import { createHarness, FakeInteraction, FakeRunner, type Harness, hostEnv, issue, sh } from "./harness.ts";
 
@@ -371,15 +371,37 @@ describe("story close asks at the terminal (B36)", () => {
     const wt = `${h2.root}-worktrees/gh-8-add-logout`;
     expect(existsSync(wt)).toBe(true);
 
-    const asked = new FakeInteraction(true);
+    // the question is asked without the tick lock: a tick may run while it is open
+    const lockFree: boolean[] = [];
+    const asked = new (class extends FakeInteraction {
+      override async confirm(question: string) {
+        const lock = await acquireTickLock(h2.root);
+        lockFree.push(lock.ok);
+        if (lock.ok) lock.release();
+        return super.confirm(question);
+      }
+    })(true);
     asked.confirms = [true];
     const r = await runCli(["story", "close", "gh-8"], { ...h2.deps, interaction: asked });
     expect(r.exit).toBe(0);
+    expect(lockFree).toEqual([true]);
     expect(asked.questions).toEqual(["Close gh-8? Worktrees for 1 units will be removed [y/N]"]);
     expect(r.value).toMatchObject({ story: "gh-8", dropped: true, pushed: ["gh-8-add-logout"], claim_deleted: true });
     expect(existsSync(wt)).toBe(false);
     expect(h2.git(["ls-remote", "origin", "refs/norn/claims/gh-8"])).toBe("");
     expect(h2.git(["show", "origin/gh-8-add-logout:.agents/specs/gh-8-add-logout/story.md"])).toContain("status: dropped");
     expect(h2.remote.issues[0]?.state).toBe("open");
+  });
+
+  test("an unreadable pushed story.md is refused story_corrupt, never taken as open (S2, B39)", async () => {
+    const tmp = `${h2.root}-corrupt`;
+    h2.git(["fetch", "-q", "origin"]);
+    h2.git(["worktree", "add", "-q", "--detach", tmp, "origin/gh-8-add-logout"]);
+    h2.write(join(tmp, ".agents/specs/gh-8-add-logout/story.md"), "no frontmatter here\n");
+    sh(tmp, ["commit", "-q", "-am", "break story.md"]);
+    sh(tmp, ["push", "-q", "origin", "HEAD:refs/heads/gh-8-add-logout"]);
+    h2.git(["worktree", "remove", "--force", tmp]);
+    const r = await h2.norn("story", "close", "gh-8", "--yes");
+    expect(r.value).toMatchObject({ code: "story_corrupt" });
   });
 });

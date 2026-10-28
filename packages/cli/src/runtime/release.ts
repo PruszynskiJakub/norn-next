@@ -101,7 +101,7 @@ async function fastForwardOf(git: GitPort, root: string, remote: string, branch:
 
 /** Release every claim this heartbeat holds (clean `watch` exit, T6). */
 export async function releaseHeldClaims(ctx: Context): Promise<ReleaseResult[]> {
-  const lock = await acquireTickLock(ctx.root, { note: "norn release", now: () => ctx.clock.iso() });
+  const lock = await acquireTickLock(ctx.root, { note: "norn story handoff", now: () => ctx.clock.iso() });
   if (!lock.ok) throw busyError("a tick is running", "retry when it finishes", "tick_locked");
   try {
     const obs = await observe(ctx, { tick_id: ulid(ctx.clock.now()), sync: "never" });

@@ -62,7 +62,7 @@ function view(): ProjectView {
     approve: [entry("approve", "gh-4", { step: "ready", command: "norn approve gh-4" })],
     unblock: [entry("unblock", "gh-5", { command: "norn unstick gh-5" })],
     check: [entry("check", "gh-4", { command: "norn why gh-4" })],
-    unclaimed: [entry("unclaimed", "gh-6", { command: "norn take gh-6" })],
+    unclaimed: [entry("unclaimed", "gh-6", { command: "norn story checkout gh-6" })],
     running: [entry("running", "gh-2")],
     notes: [entry("notes", "gh-4")],
     recently_done: [],

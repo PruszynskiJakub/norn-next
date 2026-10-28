@@ -16,7 +16,7 @@ import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { cmd, type StoryFacts } from "@norn/core";
 import { specDir } from "@norn/schema";
-import { acquireClaim, listLeases, newClaimBlob, parseStoryFile, patchStoryFile, releaseClaim, releaseLease, storyFile } from "@norn/store";
+import { acquireClaim, listLeases, newClaimBlob, parseStoryFile, patchStoryFile, releaseClaim, releaseLease, scanWorktrees, storyFile } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { failure, refuse } from "../output.ts";
@@ -26,10 +26,15 @@ import { gitRemote, type Observed } from "../runtime/observe/index.ts";
 import { heldHere, withStory } from "../runtime/release.ts";
 import { aStory, resolveStory } from "../runtime/target.ts";
 
+/** B38: the refusal for a claim another machine holds (exit 3, unlike checkout's busy `claim_held`). */
+function heldElsewhere(key: string, holder: { holder: string; acquired_at: string }) {
+  return refuse(`${key} is held by ${holder.holder} since ${holder.acquired_at}`, cmd.storyCheckout(key), "claim_held");
+}
+
 /** B38: another machine's claim (or an unreadable one), as the remote has it now, is refused, never taken over here. */
 async function refuseOthers(ctx: Context, key: string): Promise<void> {
   const c = await claimFor(ctx, key);
-  if (c.state === "other") throw refuse(`${key} is held by ${c.blob.holder} since ${c.blob.acquired_at}`, cmd.storyCheckout(key), "claim_held");
+  if (c.state === "other") throw heldElsewhere(key, c.blob);
   if (c.state === "corrupt") throw refuse(`claim ref of ${key} is unreadable`, cmd.storyCheckout(key, { force: true }), "claim_corrupt");
 }
 
@@ -40,7 +45,7 @@ async function claimIfFree(obs: Observed, story: StoryFacts): Promise<string> {
   const blob = newClaimBlob({ story: story.key, holder: obs.facts.machine.holder, heartbeat_id: obs.heartbeat_id, now, lease: obs.config.claim.lease });
   const r = await acquireClaim(obs.root, obs.remote, blob, { now });
   if (!r.ok) {
-    if (r.reason === "held") throw refuse(`${story.key} is held by ${r.holder.holder} since ${r.holder.acquired_at}`, cmd.storyCheckout(story.key), "claim_held");
+    if (r.reason === "held") throw heldElsewhere(story.key, r.holder);
     throw failure(`cannot claim ${story.key}: ${r.message}`, `retry: ${cmd.storyClose(story.key)}`, "claim_failed");
   }
   return r.sha;
@@ -51,7 +56,7 @@ async function isClosed(ctx: Context, key: string): Promise<boolean> {
   const remote = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
   const branch = await findStoryBranch(ctx, key, remote);
   if (!branch) return false;
-  const git = (await ctx.ports()).git;
+  const git = ctx.git;
   let rev = `refs/heads/${branch}`;
   if (remote) {
     const f = await git.fetch(ctx.root, remote, [`+refs/heads/${branch}:refs/remotes/${remote}/${branch}`], { quiet: true }).catch((e: unknown) => e as Error);
@@ -62,7 +67,9 @@ async function isClosed(ctx: Context, key: string): Promise<boolean> {
   const text = await git.show(ctx.root, rev, path);
   if (text === null) return false;
   const doc = parseStoryFile(text, `${rev}:${path}`);
-  return doc.ok && doc.value.frontmatter.status === "dropped";
+  // S2: an unreadable record is never guessed open
+  if (!doc.ok) throw failure(`${rev}:${path} is unreadable (${doc.reason})`, `fix story.md on ${branch}, then ${cmd.storyClose(key)} again`, "story_corrupt");
+  return doc.value.frontmatter.status === "dropped";
 }
 
 export const storyCloseCommand = defineCommand({
@@ -77,15 +84,17 @@ export const storyCloseCommand = defineCommand({
     const key = await resolveStory(ctx, args.positionals[0], json, aStory("story close", cmd.storyClose));
     if (await isClosed(ctx, key)) throw refuse(`${key} is already closed`, null, "already_closed");
     await refuseOthers(ctx, key);
+    // B36: ask before taking the tick lock, so an open prompt never blocks tick or watch
+    if (!opt.bool(args, "yes")) {
+      const terminal = ctx.terminal(json);
+      if (!terminal) throw refuse(`closing ${key} removes its worktrees; there is no terminal to ask in`, "pass --yes", "confirm_required");
+      const wts = scanWorktrees(ctx.root);
+      const count = (wts.stories.has(key) ? 1 : 0) + [...wts.slices.keys()].filter((s) => s.startsWith(`${key}/`)).length;
+      if (!(await terminal.confirm(`Close ${key}? Worktrees for ${count} units will be removed [y/N]`))) return { story: key, dropped: false };
+    }
     return withStory(ctx, key, cmd.storyClose(key), async (obs, story) => {
       const git = obs.ports.git;
       const loc = obs.stories[key];
-      if (!opt.bool(args, "yes")) {
-        const terminal = ctx.terminal(json);
-        if (!terminal) throw refuse(`closing ${key} removes its worktrees; there is no terminal to ask in`, "pass --yes", "confirm_required");
-        const worktrees = new Set(story.units.map((u) => obs.units[u.unit.key]?.worktree).filter((w): w is string => !!w && existsSync(w)));
-        if (!(await terminal.confirm(`Close ${key}? Worktrees for ${worktrees.size} units will be removed [y/N]`))) return { story: key, dropped: false };
-      }
       const claimSha = await claimIfFree(obs, story);
       const tick = obs.facts.tick_id;
       const trailers = (unit: string | null, step: string) => ({ "Norn-Story": key, ...(unit ? { "Norn-Slice": unit } : {}), "Norn-Step": step, "Norn-Tick": tick });

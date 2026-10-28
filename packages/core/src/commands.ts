@@ -84,7 +84,6 @@ export const cmd = {
   runAttach: (unit?: string, o: { next?: boolean } = {}) => norn("run attach", unit, o.next && "--next"),
   runView: (unit = "<unit>", o: { why?: boolean } = {}) => norn("run view", unit, o.why && "--why"),
   sync: () => norn("sync"),
-  take: (story: string, o: { force?: boolean } = {}) => norn("take", story, o.force && "--force"),
   tick: () => norn("tick"),
   tidy: (o: { dryRun?: boolean } = {}) => norn("tidy", o.dryRun && "--dry-run"),
   trace: (unit: string, o: { limit?: number } = {}) => norn("trace", unit, o.limit !== undefined && `--limit ${o.limit}`),

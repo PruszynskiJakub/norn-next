@@ -265,7 +265,7 @@ describe("loadProjectView", () => {
     const { repo, home } = await seed();
     const v = await loadProjectView({ repoRoot: repo, home, now: NOW + 3_600_000, holder: "me@box", liveness: () => true, env: {} });
     expect(v.stories[0]?.claim).toMatchObject({ state: "expired", unclaimed: true });
-    expect(v.inbox.groups.unclaimed.map((i) => i.command)).toEqual(["norn take gh-12"]);
+    expect(v.inbox.groups.unclaimed.map((i) => i.command)).toEqual(["norn story checkout gh-12"]);
   });
 
   test("corrupt state is reported, not guessed (S2)", async () => {

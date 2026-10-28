@@ -187,7 +187,7 @@ describe("base sync with real git", () => {
     expect((await h.norn("story", "handoff", "gh-7")).exit).toBe(0);
     const noClaim = await h.norn("update", "gh-7");
     expect(noClaim.exit).toBe(3);
-    expect(noClaim.value).toMatchObject({ code: "not_holder", do_instead: "norn take gh-7" });
+    expect(noClaim.value).toMatchObject({ code: "not_holder", do_instead: "norn story checkout gh-7" });
     expect((await h.norn("story", "checkout", "gh-7")).exit).toBe(0);
 
     // 7b: merged into another branch → parked, no cleanup

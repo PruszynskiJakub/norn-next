@@ -22,7 +22,7 @@ export const openCommand = defineCommand({
     const t = await resolveTarget(ctx, parseUnitKey(raw).key);
     const sf = t.story_facts;
     const uf = sf?.units.find((u) => u.unit.key === t.key);
-    if (!sf || !uf || !t.obs) throw refuse(`${t.key} is not on this checkout`, cmd.take(t.story), "not_local");
+    if (!sf || !uf || !t.obs) throw refuse(`${t.key} is not on this checkout`, cmd.storyCheckout(t.story), "not_local");
     if (!t.state) throw refuse(`${t.key} has not started yet`, `${cmd.tick()} (or keep ${cmd.watch()} running), then ${cmd.open()} again`, "not_started");
     const st = started(t);
     await refuseIfHeldElsewhere(ctx, t.story, "open");
