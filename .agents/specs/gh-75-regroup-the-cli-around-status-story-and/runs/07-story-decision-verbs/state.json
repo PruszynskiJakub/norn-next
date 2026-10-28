@@ -5,13 +5,14 @@
   "unit_dir": "07-story-decision-verbs",
   "workflow": "slice",
   "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
-  "step": "test",
+  "step": "review",
   "attempt": 1,
   "visits": {
     "implement": 1,
-    "test": 1
+    "test": 1,
+    "review": 1
   },
-  "step_entered_at": "2026-10-28T14:52:03.938Z",
+  "step_entered_at": "2026-10-28T15:10:19.882Z",
   "status": "ready",
   "park": null,
   "counters": {
@@ -22,16 +23,16 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 3,
+  "applied_through": 4,
   "run": null,
   "last_outcome": {
-    "step": "implement",
-    "outcome": "done",
-    "source": "reported",
-    "at": "2026-10-28T14:36:42.994Z",
-    "receipt_id": "01M61F283JBX36JZTJ1AK87XVN"
+    "step": "test",
+    "outcome": "pass",
+    "source": "classified",
+    "at": "2026-10-28T15:01:58.752Z",
+    "receipt_id": "01M61GGGB0ZX2CX5FY1V9E3BBD"
   },
   "created_at": "2026-10-28T14:13:16.910Z",
-  "updated_at": "2026-10-28T14:52:03.938Z",
-  "last_tick_id": "01M61FYBF10V7KC20DWXCMDJJZ"
+  "updated_at": "2026-10-28T15:10:19.882Z",
+  "last_tick_id": "01M61GZSQ9D94Z7BZM7855979C"
 }
