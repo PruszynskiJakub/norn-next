@@ -103,7 +103,7 @@ export interface StoryView extends UnitView {
   notes: StoryNote[];
   /** BS1/BS3: base sync state; null = no measurement and no base merge on record */
   base_sync: BaseSyncView | null;
-  /** coarse frontmatter status; null if story.md is unreadable */
+  /** coarse frontmatter status; null if spec.md is unreadable */
   story_status: StoryStatus | null;
   /** root-relative spec folder */
   spec_dir: string;

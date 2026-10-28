@@ -174,11 +174,11 @@ describe("GR6 record on the base branch", () => {
   };
   const opts = (h: Harness) => ({ root: h.root, remote: "origin", git: gitAdapter.createGit(), base: "main", spec_dir: ".agents/specs/gh-5-merged", story: "gh-5", status: "done" as const, trailers: { "Norn-Story": "gh-5" } });
 
-  test("deferred while story.md is not on the base branch", async () => {
+  test("deferred while the spec file is not on the base branch", async () => {
     expect(await markStoryOnBase(opts(h))).toMatchObject({ state: "deferred" });
   });
 
-  test("after the merge: committed in a throwaway worktree and pushed to the base branch; main checkout untouched", async () => {
+  test("after the merge: committed in a throwaway worktree and pushed to the base branch; main checkout untouched (story.md an older norn wrote, GR2)", async () => {
     // a merged story PR: the spec folder reaches main on the remote (not pulled here)
     const other = join(h.dir, "merger");
     h.git(["clone", "-q", h.remoteDir, other], h.dir);
@@ -196,6 +196,20 @@ describe("GR6 record on the base branch", () => {
     expect(h.git(["log", "-1", "--format=%(trailers:only)", "origin/main"])).toContain("Norn-Story: gh-5");
     expect(h.git(["worktree", "list"]).split("\n")).toHaveLength(1);
     expect(await markStoryOnBase(opts(h))).toMatchObject({ state: "unchanged" });
+  });
+
+  test("GR2: a story intaken as spec.md is marked done in spec.md", async () => {
+    const other = join(h.dir, "merger-spec");
+    h.git(["clone", "-q", h.remoteDir, other], h.dir);
+    writeStoryFile(join(other, ".agents/specs/gh-6-merged/spec.md"), { ...fm, id: "gh-6", number: 6 }, "\nspec\n");
+    h.git(["-c", "user.email=m@x", "-c", "user.name=m", "add", "-A"], other);
+    h.git(["-c", "user.email=m@x", "-c", "user.name=m", "commit", "-q", "-m", "merge story"], other);
+    h.git(["push", "-q", "origin", "main"], other);
+
+    const r = await markStoryOnBase({ ...opts(h), spec_dir: ".agents/specs/gh-6-merged", story: "gh-6" });
+    expect(r).toMatchObject({ state: "pushed", branch: "main" });
+    expect(h.git(["show", "origin/main:.agents/specs/gh-6-merged/spec.md"])).toContain("status: done");
+    expect(h.git(["ls-tree", "--name-only", "origin/main", ".agents/specs/gh-6-merged/"])).not.toContain("story.md");
   });
 });
 

@@ -216,8 +216,9 @@ export async function intake(act: ActEnv, a: Extract<Action, { kind: "intake_sto
   if (act.obs.remote && !existsSync(a.worktree.path) && !(await act.git.branchExists(act.root, a.worktree.branch)) && (await act.git.branchExists(act.root, a.worktree.branch, "remote", act.obs.remote)))
     return { ok: true, detail: { skipped: `${a.worktree.branch} already exists on ${act.obs.remote}`, do_instead: `norn take ${a.key}` } };
   const wt = await ensureWorktree(act, a.worktree, unit, specDir);
+  // GR2: a folder an older norn intook keeps its story.md (storyFile reads it), so it is never written twice
   const file = join(a.worktree.path, a.story_file);
-  const written = !existsSync(file);
+  const written = !existsSync(storyFile(dirname(file)));
   if (written) writeStoryFile(file, a.frontmatter, a.body.endsWith("\n") || !a.body ? `\n${a.body}` : `\n${a.body}\n`);
   const committed = await act.commit(a.commit, null, null, null);
   return { ok: true, detail: { worktree: a.worktree.path, ...wt, story_file: written ? a.story_file : "exists", ...committed } };
@@ -225,9 +226,9 @@ export async function intake(act: ActEnv, a: Extract<Action, { kind: "intake_sto
 
 export async function mirror(act: ActEnv, a: Extract<Action, { kind: "update_story_mirror" }>): Promise<ActionResult> {
   const story = act.storyLoc(a.unit.story);
-  if (!story.worktree) return { ok: true, detail: { skipped: "no story worktree; story.md is never written in the main checkout" } };
+  if (!story.worktree) return { ok: true, detail: { skipped: "no story worktree; spec.md is never written in the main checkout" } };
   const r = patchStoryFile(storyFile(join(story.worktree, story.spec_dir)), a.fields, story.worktree);
-  if (!r.ok) throw new Error(`cannot update story.md: ${r.reason}`);
+  if (!r.ok) throw new Error(`cannot update spec.md: ${r.reason}`);
   await act.notify(a.notify);
   return { ok: true, detail: await act.commit(a.commit, null, null, null) };
 }
@@ -255,10 +256,10 @@ export async function cleanupMerged(act: ActEnv, a: Extract<Action, { kind: "cle
       if (act.obs.remote) await act.git.pushRef(act.root, act.obs.remote, { ref, sha: null });
     });
   }
-  // the record stays on the base branch (GR6): mark story.md done there (record.ts; never forced).
+  // the record stays on the base branch (GR6): mark spec.md done there (record.ts; never forced).
   // Deferred (merge not on the base yet) or failed → owed; later ticks retry it (retryRecords).
   // GR6 done record: how the PR landed (merge commit, merged_by, merged_at; P2 ancestry) goes into
-  // story.md `merge:` on the base with the status (record.ts), and is kept in records.json while owed
+  // spec.md `merge:` on the base with the status (record.ts), and is kept in records.json while owed
   const story = act.storyLoc(a.unit.story);
   const facts = act.obs.facts.stories.find((s) => s.key === a.unit.story);
   const merge = facts ? await mergeFacts({ root: act.root, remote: act.obs.remote, git: act.git, base: act.obs.facts.repo.default_branch, story: facts }).catch(() => undefined) : undefined;

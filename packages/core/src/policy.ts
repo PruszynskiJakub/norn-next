@@ -20,7 +20,7 @@ export function effectiveMode(story: Mode, attended: boolean, runner: string | n
 /** The story's own unit (slice null), or null before it has facts. */
 export const storyUnit = (story: StoryFacts): UnitFacts | null => story.units.find((u) => u.unit.slice === null) ?? null;
 
-/** GR6: the story unit reached `$done`, or story.md says done/dropped — finished, never "unclaimed". */
+/** GR6: the story unit reached `$done`, or spec.md says done/dropped — finished, never "unclaimed". */
 export function storyFinished(story: StoryFacts): boolean {
   const status = story.frontmatter?.status;
   if (status === "done" || status === "dropped") return true;

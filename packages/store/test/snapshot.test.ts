@@ -98,3 +98,32 @@ describe("loadSnapshot", () => {
     expect(loadSnapshot({ repoRoot: repo, storyRoots: [tmp()], home: tmp(), baseRef: null }).stories).toEqual([]);
   });
 });
+
+describe("storyFile (GR2: spec.md, story.md still read)", () => {
+  test("a new folder gets spec.md; spec.md wins over story.md; a folder holding only story.md keeps it", () => {
+    const spec = storyDir(tmp(), "gh-12", "fix-login");
+    expect(storyFile(spec)).toBe(join(spec, "spec.md"));
+    mkdirSync(spec, { recursive: true });
+    writeFileSync(join(spec, "story.md"), "");
+    expect(storyFile(spec)).toBe(join(spec, "story.md"));
+    writeFileSync(join(spec, "spec.md"), "");
+    expect(storyFile(spec)).toBe(join(spec, "spec.md"));
+  });
+
+  test("a story whose folder holds only story.md loads as before", () => {
+    const repo = tmp();
+    const spec = storyDir(repo, "gh-12", "fix-login");
+    mkdirSync(spec, { recursive: true });
+    writeStoryFile(join(spec, "story.md"), { id: "gh-12", slug: "fix-login", provider: "gh", number: 12, url: "u", title: "Old", assignee: null, workflow: "story", status: "active", intake_at: AT }, "");
+    const story = loadSnapshot({ repoRoot: repo, home: tmp() }).stories.find((s) => s.key === "gh-12");
+    expect(story?.frontmatter_error).toBeNull();
+    expect(story?.frontmatter?.title).toBe("Old");
+  });
+
+  test("a folder with neither file reports spec.md missing", () => {
+    const repo = tmp();
+    mkdirSync(storyDir(repo, "gh-12", "fix-login"), { recursive: true });
+    const story = loadSnapshot({ repoRoot: repo, home: tmp() }).stories.find((s) => s.key === "gh-12");
+    expect(story?.frontmatter_error).toEqual({ file: ".agents/specs/gh-12-fix-login/spec.md", errors: [{ path: "", message: "spec.md missing" }] });
+  });
+});

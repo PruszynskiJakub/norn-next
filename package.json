@@ -9,9 +9,7 @@
     "schema:emit": "bun packages/schema/scripts/emit.ts",
     "golden": "bun scripts/golden.ts",
     "build": "bun scripts/build.ts",
-    "build:bin": "bun scripts/build.ts --bin",
-    "sync:plugin": "bun scripts/sync-plugin.ts",
-    "check:plugin": "bun scripts/sync-plugin.ts --check"
+    "build:bin": "bun scripts/build.ts --bin"
   },
   "devDependencies": {
     "@types/bun": "1.3.13",
