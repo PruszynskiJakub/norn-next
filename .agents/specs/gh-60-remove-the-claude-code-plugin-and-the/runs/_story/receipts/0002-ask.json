@@ -1,0 +1,15 @@
+{
+  "kind": "ask",
+  "receipt_id": "01M61DMPKSWV6FDTGEQ0W9EBSV",
+  "run_id": "01M61D56MTT704GTV4YETXCPTT",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-28T14:11:50.521Z",
+  "by": "agent",
+  "who": "claude",
+  "question": "The repo-local release workflow .agents/norn/workflows/release.yaml still runs 'bun run check:plugin' in its test step (line 42) and mentions the plugin on lines 5 and 27. With the script removed, the next release check would fail. The norn skill forbids me to edit files under .agents/norn/. Should I edit release.yaml in this story (drop the check:plugin line and the plugin mentions), or will you change it yourself?",
+  "options": [
+    "Edit release.yaml in this story",
+    "Leave it, I'll change it"
+  ]
+}
