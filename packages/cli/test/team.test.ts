@@ -321,6 +321,31 @@ describe("claim races (T3) and forced takes (T5)", () => {
     expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-7"])).not.toBe("");
   });
 
+  test("a claim taken elsewhere while the close question is open is seen under the lock: refused, nothing changed (B38)", async () => {
+    const before = h.git(["ls-remote", "origin", "refs/heads/gh-7/01-form", "refs/heads/gh-7-add-login-form"]);
+    const C = cloneOf(h, "repo-c2", "carol");
+    const asked = new (class extends FakeInteraction {
+      override async confirm(question: string) {
+        step();
+        expect((await C.norn("story", "checkout", "gh-7", "--force")).exit).toBe(0);
+        return super.confirm(question);
+      }
+    })(true);
+    asked.confirms = [true];
+    const r = await runCli(["story", "close", "gh-7"], { ...B.deps, interaction: asked });
+    expect(r.exit).toBe(3);
+    expect(r.value).toMatchObject({ code: "claim_held", error: expect.stringContaining("carol@repo-c2") });
+    expect(existsSync(storyWt(B.root))).toBe(true);
+    expect(existsSync(sliceWt(B.root))).toBe(true);
+    expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-7"]).split("\t")[0]).toBe(sh(C.root, ["rev-parse", "refs/norn/claims/gh-7"]));
+    expect(JSON.parse(sh(C.root, ["cat-file", "-p", "refs/norn/claims/gh-7"]))).toMatchObject({ holder: "carol@repo-c2" });
+    // B's close pushed nothing: the slice branch is as C's checkout left it
+    expect(h.git(["ls-remote", "origin", "refs/heads/gh-7/01-form"])).toBe(before.split("\n").find((l) => l.endsWith("gh-7/01-form")) ?? "");
+    // B takes the story back for the tests below
+    step();
+    expect((await B.norn("story", "checkout", "gh-7", "--force")).exit).toBe(0);
+  });
+
   test("story close --yes from the slice worktree pushes first, then removes worktrees, local branches, slots and the claim; the record stays; issue and PRs untouched (GR7, B35, B55)", async () => {
     h.write(join(sliceWt(B.root), "wip.txt"), "unfinished\n");
     const calls = h.remote.calls.length;
@@ -401,7 +426,10 @@ describe("story close asks at the terminal (B36)", () => {
     sh(tmp, ["commit", "-q", "-am", "break story.md"]);
     sh(tmp, ["push", "-q", "origin", "HEAD:refs/heads/gh-8-add-logout"]);
     h2.git(["worktree", "remove", "--force", tmp]);
+    const before = h2.git(["ls-remote", "origin"]);
     const r = await h2.norn("story", "close", "gh-8", "--yes");
+    expect(r.exit).toBe(1);
     expect(r.value).toMatchObject({ code: "story_corrupt" });
+    expect(h2.git(["ls-remote", "origin"])).toBe(before);
   });
 });

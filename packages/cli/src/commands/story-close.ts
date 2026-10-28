@@ -14,16 +14,16 @@
  */
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
-import { cmd, type StoryFacts } from "@norn/core";
+import { type ClaimState, cmd } from "@norn/core";
 import { specDir } from "@norn/schema";
-import { acquireClaim, listLeases, newClaimBlob, parseStoryFile, patchStoryFile, releaseClaim, releaseLease, scanWorktrees, storyFile } from "@norn/store";
+import { acquireClaim, listLeases, newClaimBlob, parseStoryFile, patchStoryFile, releaseClaim, releaseLease, scanWorktrees, storyFile, writtenHere } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { failure, refuse } from "../output.ts";
 import { findStoryBranch } from "../runtime/checkout.ts";
 import { claimFor } from "../runtime/human.ts";
 import { gitRemote, type Observed } from "../runtime/observe/index.ts";
-import { heldHere, withStory } from "../runtime/release.ts";
+import { withStory } from "../runtime/release.ts";
 import { aStory, resolveStory } from "../runtime/target.ts";
 
 /** B38: the refusal for a claim another machine holds (exit 3, unlike checkout's busy `claim_held`). */
@@ -31,22 +31,31 @@ function heldElsewhere(key: string, holder: { holder: string; acquired_at: strin
   return refuse(`${key} is held by ${holder.holder} since ${holder.acquired_at}`, cmd.storyCheckout(key), "claim_held");
 }
 
-/** B38: another machine's claim (or an unreadable one), as the remote has it now, is refused, never taken over here. */
-async function refuseOthers(ctx: Context, key: string): Promise<void> {
-  const c = await claimFor(ctx, key);
+/** B38: the remote's claim now — another machine's (or an unreadable one) is refused, never taken over here. */
+async function refuseOthers(ctx: Context, key: string, remote?: string | null): Promise<ClaimState> {
+  const c = await claimFor(ctx, key, remote !== undefined ? { remote } : {});
   if (c.state === "other") throw heldElsewhere(key, c.blob);
-  if (c.state === "corrupt") throw refuse(`claim ref of ${key} is unreadable`, cmd.storyCheckout(key, { force: true }), "claim_corrupt");
+  if (c.state === "corrupt") throw claimCorrupt(key);
+  return c;
 }
 
-async function claimIfFree(obs: Observed, story: StoryFacts): Promise<string> {
-  const c = story.claim;
-  if (heldHere(obs, story) && (c.state === "mine" || c.state === "expired")) return c.sha;
+const claimCorrupt = (key: string) => refuse(`claim ref of ${key} is unreadable`, cmd.storyCheckout(key, { force: true }), "claim_corrupt");
+
+/**
+ * Under the tick lock: read the remote claim again (B38) — the prompt may have stayed open while
+ * another machine ran `story checkout --force`, and the local claim ref can be stale — then keep
+ * this heartbeat's claim or take a free one (T7: only the holder pushes).
+ */
+async function claimIfFree(ctx: Context, obs: Observed, key: string): Promise<string> {
+  const c = await refuseOthers(ctx, key, obs.remote);
+  if ((c.state === "mine" || c.state === "expired") && writtenHere(c, obs.heartbeat_id)) return c.sha;
   const now = obs.facts.now;
-  const blob = newClaimBlob({ story: story.key, holder: obs.facts.machine.holder, heartbeat_id: obs.heartbeat_id, now, lease: obs.config.claim.lease });
+  const blob = newClaimBlob({ story: key, holder: obs.facts.machine.holder, heartbeat_id: obs.heartbeat_id, now, lease: obs.config.claim.lease });
   const r = await acquireClaim(obs.root, obs.remote, blob, { now });
   if (!r.ok) {
-    if (r.reason === "held") throw heldElsewhere(story.key, r.holder);
-    throw failure(`cannot claim ${story.key}: ${r.message}`, `retry: ${cmd.storyClose(story.key)}`, "claim_failed");
+    if (r.reason === "held") throw heldElsewhere(key, r.holder);
+    if (r.reason === "corrupt") throw claimCorrupt(key);
+    throw failure(`cannot claim ${key}: ${r.message}`, `retry: ${cmd.storyClose(key)}`, "claim_failed");
   }
   return r.sha;
 }
@@ -95,7 +104,7 @@ export const storyCloseCommand = defineCommand({
     return withStory(ctx, key, cmd.storyClose(key), async (obs, story) => {
       const git = obs.ports.git;
       const loc = obs.stories[key];
-      const claimSha = await claimIfFree(obs, story);
+      const claimSha = await claimIfFree(ctx, obs, key);
       const tick = obs.facts.tick_id;
       const trailers = (unit: string | null, step: string) => ({ "Norn-Story": key, ...(unit ? { "Norn-Slice": unit } : {}), "Norn-Step": step, "Norn-Tick": tick });
 
