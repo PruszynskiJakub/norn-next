@@ -88,6 +88,10 @@ Fix #77: a check step no longer blocks the tick that starts it; the repro is a p
 - implement#4 done: test.fail rework: the failing K3 zombie contract test was a flaky helper, not story code. makeZombie's background 'true' could exit before the shell exec'd into sleep and get reaped (ps stat empty) under load. Now the child blocks on the parent's stdin (fd 3), which is closed only once the parent is sleep. Regression test 'makeZombie: 60 at once are all zombies' in contract.test.ts fails on the old helper and passes now. Full suite (1220) and typecheck green.
 - review#3 approve: review#3 approve: the detached norn check-run fixes the cause (tick no longer blocks; heartbeat, claim renewal, K3 rerun, timeout→fail, status '(check running)' with age all work). Typecheck + 1220 tests green. Only minor findings: claimRunLease false ignored (F1), lease stuck if identify fails and check-run dies before claiming (F2), command orphaned when check-run is killed (F3), person commands don't stop a running check (F4), silent catches/sweep before try (F5), run_id not ULID-validated (F6); nits F7-F8.
 
+
+**describe#1:** wrote `pr.md` in the spec folder (summary call tree, evidence per Wanted item from loop-red.txt / user-inbox-probes.md before and check-run.test.ts after, re-run green 5/5; fallback item marked not changed; merge danger two-way, every check step, review#3 minor edges listed).
+- describe#1 done: pr.md written: summary (call tree of tick → detached norn check-run → receipt), evidence per Wanted item (before: loop-red.txt 3.5 s tick + 'no heartbeat', user-inbox-probes.md; after: check-run.test.ts green 5/5 — tick <2.5 s, check.running, claim.renew, parallel + K3 rerun, status '(check running) 1m', timeout fail), fallback item noted as not changed, zombie helper fix called out, merge danger two-way / every check step with review#3 edges.
+
 ## Resume
 
-Nothing left in this step: report `norn done done`.
+pr.md is written; nothing left in describe.
