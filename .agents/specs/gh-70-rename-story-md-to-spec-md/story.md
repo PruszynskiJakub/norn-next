@@ -8,7 +8,7 @@ title: Rename story.md to spec.md
 assignee: PruszynskiJakub
 labels:
   - norn
-workflow: triage
+workflow: quick
 status: active
 intake_at: 2026-10-27T22:36:49.724Z
 body_hash: b597efcf65f30b03feaef7b4d34f84c6edd9f040ce25fddd31999afc366514d1

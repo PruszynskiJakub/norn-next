@@ -3,27 +3,24 @@
   "story": "gh-70",
   "slice": null,
   "unit_dir": "_story",
-  "workflow": "triage",
-  "workflow_hash": "c0202af600b5edd136ac0ee38c69d4812666f629d955b3b83ad0ac61fc196380",
-  "step": "confirm",
+  "workflow": "quick",
+  "workflow_hash": "e1035bf08337c2d63967792add84270d2c199f94830cec0b60aefd3b34ae39cb",
+  "step": "implement",
   "attempt": 1,
   "visits": {
     "explore": 1,
-    "confirm": 1
+    "confirm": 1,
+    "implement": 1
   },
-  "step_entered_at": "2026-10-28T13:49:35.083Z",
-  "status": "parked",
-  "park": {
-    "kind": "gate",
-    "reason": "Read the triage findings and the recommendation in story.md (also posted on the issue). N is the issue number. Switch to a workflow: `norn workflow gh-N fix --to reproduce`, `norn workflow gh-N quick --to implement`, `norn workflow gh-N story --to refine` or `norn workflow gh-N spec --to refine`. Close: `norn approve gh-N --reason \"<why>\"`, then `gh issue close N --reason \"not planned\"`, then `norn drop gh-N` (a story at $done without a PR otherwise waits for a merge, GR6), then `git push origin --delete gh-N-<slug>` (drop pushed the story branch; the findings stay on the issue comment). Triage again: `norn approve gh-N --reject --reason \"<what to look at>\"`.",
-    "since": "2026-10-28T13:49:35.083Z"
-  },
+  "step_entered_at": "2026-10-28T14:03:08.958Z",
+  "status": "ready",
+  "park": null,
   "counters": {
     "triage_loop": 0
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 2,
+  "applied_through": 3,
   "run": null,
   "last_outcome": {
     "step": "explore",
@@ -33,7 +30,7 @@
     "receipt_id": "01M61C1APDXVH758Q1N2GVJ223"
   },
   "created_at": "2026-10-27T22:37:49.730Z",
-  "updated_at": "2026-10-28T13:49:35.083Z",
-  "last_tick_id": "01M61CBYFAJBMRQGZHVSM94PNK",
+  "updated_at": "2026-10-28T14:03:08.958Z",
+  "last_tick_id": "01M61D4S8WH0KR3M1J9BABBEHT",
   "mode": "manual"
 }
