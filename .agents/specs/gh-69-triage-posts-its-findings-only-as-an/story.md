@@ -31,3 +31,18 @@ Triage writes its findings only as an issue comment. `story.md` stays as intake 
 ## PRD
 
 None: the workflow and skill are repo-local (W8, W9 decision in AGENTS.md).
+
+## Triage
+
+**Still occurs:** yes — on base 3c5ada5 the triage workflow and skill still tell `explore` to write the findings into `story.md` and post them as a comment (this very run did both, as the current skill requires).
+**Repro:** `sed -n 16,21p .agents/norn/workflows/triage.yaml` → "Write the findings … into the body of story.md … and post them as an issue comment"; `grep -n "story.md" .agents/skills/triage/SKILL.md` → lines 3, 12, 26, 65.
+**Affected code:**
+- `.agents/norn/workflows/triage.yaml:2-3,16-21` — header comment and `explore` instructions write into story.md
+- `.agents/norn/workflows/triage.yaml:31` — `confirm` gate prompt reads the findings "in story.md (also posted on the issue)"
+- `.agents/skills/triage/SKILL.md:3,26-53,65` — description, section 3 "Write `## Triage` in `story.md`", Rules ("The only file you change is `story.md`"); section 4 then says "Post the same"
+- **Not in the issue:** `.agents/norn/workflows/fix.yaml:17` ("Start from the triage findings in story.md") and `.agents/norn/workflows/quick.yaml:17` ("The spec is story.md: the issue and the triage findings") also read the triage from story.md. They must point at the issue comment (`gh issue view <N> --comments`) too, or fix/quick lose the findings.
+**PRD:** none — the workflows and skills are repo-local (AGENTS.md Decisions, W8/W9).
+**Context:** gh-61 is the example of the duplicate. No comments on #69. `CONTRIBUTING.md:9` does not mention story.md, so it needs no change.
+
+**Recommend:** quick — edits to four repo-local files (triage.yaml, triage SKILL.md, fix.yaml, quick.yaml), no code and no open design question; the issue already says where the findings live.
+**Run:** `norn workflow gh-69 quick --to implement`
