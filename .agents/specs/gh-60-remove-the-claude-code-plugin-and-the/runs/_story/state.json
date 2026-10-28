@@ -11,13 +11,8 @@
     "implement": 1
   },
   "step_entered_at": "2026-10-28T13:49:35.083Z",
-  "status": "parked",
-  "park": {
-    "kind": "ask",
-    "reason": "The repo-local release workflow .agents/norn/workflows/release.yaml still runs 'bun run check:plugin' in its test step (line 42) and mentions the plugin on lines 5 and 27. With the script removed, the next release check would fail. The norn skill forbids me to edit files under .agents/norn/. Should I edit release.yaml in this story (drop the check:plugin line and the plugin mentions), or will you change it yourself?",
-    "since": "2026-10-28T14:11:50.521Z",
-    "receipt_id": "01M61DMPKSWV6FDTGEQ0W9EBSV"
-  },
+  "status": "running",
+  "park": null,
   "counters": {
     "test_loop": 0,
     "review_loop": 0,
@@ -27,7 +22,7 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 2,
+  "applied_through": 3,
   "run": {
     "run_id": "01M61D56MTT704GTV4YETXCPTT",
     "step": "implement",
@@ -49,7 +44,7 @@
     "receipt_id": "01M61DMPKSWV6FDTGEQ0W9EBSV"
   },
   "created_at": "2026-10-28T13:49:35.083Z",
-  "updated_at": "2026-10-28T14:12:03.234Z",
-  "last_tick_id": "01M61DN311VKJH3JKASA17PCQ0",
+  "updated_at": "2026-10-28T14:13:46.912Z",
+  "last_tick_id": "01M61DR88ZF6G50JHE00ST48N3",
   "mode": "manual"
 }
