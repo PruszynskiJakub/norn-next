@@ -210,7 +210,7 @@ export const ClassifyReceipt = receipt("classify", {
   ),
 });
 /**
- * R10.1 (M8): a `norn take` of the story, forced or not, recorded on the story unit. Informational:
+ * R10.1 (M8): a `norn story checkout` of the story, forced or not, recorded on the story unit. Informational:
  * applied at any cursor (like `mode`), it moves nothing; `norn trace` / `why` show it.
  */
 export const TakeReceipt = receipt("take", {

@@ -62,7 +62,7 @@ function view(): ProjectView {
     approve: [entry("approve", "gh-4", { step: "ready", command: "norn approve gh-4" })],
     unblock: [entry("unblock", "gh-5", { command: "norn unstick gh-5" })],
     check: [entry("check", "gh-4", { command: "norn why gh-4" })],
-    unclaimed: [entry("unclaimed", "gh-6", { command: "norn take gh-6" })],
+    unclaimed: [entry("unclaimed", "gh-6", { command: "norn story checkout gh-6" })],
     running: [entry("running", "gh-2")],
     notes: [entry("notes", "gh-4")],
     recently_done: [],
@@ -127,7 +127,7 @@ describe("cockpitModel", () => {
 
     const web = cockpitModel(view(), { places: false, provider: "gh" });
     expect(web.rows.flatMap((r) => r.actions).some((a) => a.effect.kind === "place")).toBe(false);
-    expect(row(web.rows, "story:gh-1")?.actions[0]?.effect).toEqual({ kind: "verb", argv: ["orient", "gh-1"], show: true });
+    expect(row(web.rows, "story:gh-1")?.actions[0]?.effect).toEqual({ kind: "verb", argv: ["story", "view", "gh-1"], show: true });
     expect(ids(row(web.rows, "attended:gh-2"))).toEqual(["orient", "trace", "issue"]);
   });
 

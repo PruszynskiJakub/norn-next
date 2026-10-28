@@ -96,6 +96,8 @@ export class Context {
   readonly home: string;
   readonly registry: AdapterRegistry;
   readonly deps: CliDeps;
+  /** lines for a person on stderr (a one-time notice, B13), returned in `CliResult.stderr`; never data */
+  readonly stderr: string[] = [];
   private located: Located | null = null;
   private loadedConfig: LoadedConfig | null = null;
   private builtPorts: Ports | null = null;

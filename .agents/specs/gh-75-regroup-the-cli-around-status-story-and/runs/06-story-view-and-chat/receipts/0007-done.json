@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61NVCTWZG99ANFGGRFXBBF8",
+  "run_id": "01M61N9R1A78HJ2B7QJD1T7AJP",
+  "step": "implement",
+  "attempt": 2,
+  "at": "2026-10-28T16:35:18.492Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/06",
+  "outcome": "done",
+  "handoff": "Rework: the only failing test was the zombie ProcessPort contract test, a load race in test/contract/zombie.ts (sh reaped the backgrounded child before exec). Background child now outlives the exec (sleep 0.3), poll widened. Test-only, unrelated to the slice. Full check passes: 1264 pass, 0 fail, typecheck clean."
+}

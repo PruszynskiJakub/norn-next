@@ -183,7 +183,7 @@ describe("watch", () => {
   });
 
   test("--human prints a line per action and a sentence at exit; --json wins", async () => {
-    expect((await h.norn("take", "gh-11")).exit).toBe(0); // the first test released it
+    expect((await h.norn("story", "checkout", "gh-11")).exit).toBe(0); // the first test released it
     expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-11"])).not.toBe("");
     const lines: string[] = [];
     const r = await runCli(["watch", "--interval", "1ms", "--max-ticks", "2", "--human"], { ...h.deps, log: (l) => lines.push(l) });

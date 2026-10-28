@@ -13,13 +13,21 @@ import { bundledSkills } from "../runtime/workflows.ts";
 /** Who runs a command: a person, the agent doing a step, or the agent's hooks (never by hand). */
 export type CommandFor = "person" | "agent" | "hooks";
 
+/** B14: `status --segment` is a mode of `status` that only Herdr runs, so it is a row of its own in `help --all`. */
+const SEGMENT = {
+  name: "status --segment",
+  summary: "One line for Herdr's tab bar; sorts and marks the orient workspaces",
+  usage: "norn status --segment [--ttl 30s]",
+  options: ["ttl"],
+};
+
 /** Help groups in print order; a command missing here lands in "Other" (for a person). A `hidden` group only with `--all`. */
 const HELP_GROUPS: ReadonlyArray<{ title: string; for: CommandFor; commands: readonly string[]; hidden?: boolean }> = [
-  { title: "Start here", for: "person", commands: ["init", "doctor", "sync", "watch", "inbox", "open"] },
+  { title: "Start here", for: "person", commands: ["init", "doctor", "sync", "watch", "status", "open"] },
   { title: "Answer what needs you", for: "person", commands: ["answer", "approve", "unstick", "update", "mode", "workflow"] },
-  { title: "Look around", for: "person", commands: ["cockpit", "status", "orient", "run", "config", "tick"] },
-  { title: "Team", for: "person", commands: ["take", "release", "drop"] },
+  { title: "Look around", for: "person", commands: ["story", "run", "config", "tick"] },
   { title: "Housekeeping", for: "person", commands: ["tidy", "uninstall", "help"] },
+  { title: "Run by Herdr, not by hand", for: "person", commands: [SEGMENT.name], hidden: true },
   { title: "Agent protocol: the only commands an agent runs", for: "agent", commands: ["brief", "done", "ask", "stuck"] },
   { title: "Called by the agent's hooks, not by hand", for: "hooks", commands: ["hook"] },
 ];
@@ -125,10 +133,11 @@ export const helpCommand = defineCommand({
     const skills = bundledSkills(ctx.env);
     const all = opt.bool(args, "all");
     const hidden = new Set(HELP_GROUPS.filter((g) => g.hidden && !all).flatMap((g) => g.commands));
-    const commands = [...COMMANDS.map((c) => ({ ...helpFor(c), for: commandFor(c.name) })), ...NOUNS.map((n) => ({ ...nounHelp(n), for: commandFor(n.name) }))].filter((c) => !hidden.has(c.command));
+    const segment = { command: SEGMENT.name, summary: SEGMENT.summary, usage: SEGMENT.usage, options: SEGMENT.options, for: commandFor(SEGMENT.name) };
+    const commands = [...COMMANDS.map((c) => ({ ...helpFor(c), for: commandFor(c.name) })), ...NOUNS.map((n) => ({ ...nounHelp(n), for: commandFor(n.name) })), segment].filter((c) => !hidden.has(c.command));
     return rendered(
       { commands, skills: skills.map((s) => ({ skill: s, for: skillFor(s) })) },
-      formatHelp([...COMMANDS, ...NOUNS.map(nounRow)], skills, all),
+      formatHelp([...COMMANDS, ...NOUNS.map(nounRow), SEGMENT], skills, all),
     );
   },
 });

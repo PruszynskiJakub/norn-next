@@ -128,19 +128,20 @@ describe("before start", () => {
 });
 
 describe("views (X1)", () => {
-  test("status: JSON for all, one story, --text; unknown units refused", async () => {
-    const all = (await h.norn("status")).value as { stories: Array<{ key: string }> };
-    expect(all.stories.map((s) => s.key)).toEqual(["gh-5", "gh-6"]);
-    const one = await h.norn("status", "gh-5");
-    expect(one.value).toMatchObject({ key: "gh-5", step: "work", status: "running", workflow: "gated", claim: { state: "mine" } });
-    const text = await h.norn("status", "gh-5");
+  test("story list: the table and its JSON, as status printed them (B15)", async () => {
+    const all = await h.norn("story", "list", "--json");
+    expect((all.value as { stories: Array<{ key: string }> }).stories.map((s) => s.key)).toEqual(["gh-5", "gh-6"]);
+    expect(all.value).toMatchObject({ runs: expect.any(Array), recently_done: expect.any(Array) });
+    expect(all.value).not.toHaveProperty("timeline");
+    expect(await h.listed("gh-5")).toMatchObject({ key: "gh-5", step: "work", status: "running", workflow: "gated", claim: { state: "mine" } });
+    const text = await h.norn("story", "list");
+    expect(text.value).toEqual(all.value);
     expect(text.stdout).toContain("gh-5 Pay invoices");
-    expect(text.stdout).not.toContain("gh-6");
-    refused(await h.norn("status", "gh-5/01"), "unknown_unit");
+    expect(text.stdout).toContain("gh-6 Export report");
   });
 
-  test("inbox: running items; the rest empty", async () => {
-    const inbox = (await h.norn("inbox")).value as { groups: Record<string, Array<{ story: string }>>; pending: number };
+  test("status: running items; the rest empty (B9)", async () => {
+    const inbox = (await h.norn("status")).value as { groups: Record<string, Array<{ story: string }>>; pending: number };
     expect(inbox.groups.running?.map((i) => i.story).sort()).toEqual(["gh-5", "gh-6"]);
     expect(inbox.pending).toBe(0);
   });
@@ -168,11 +169,11 @@ describe("norn workflow after start (S7)", () => {
     expect(v.receipt).toMatchObject({ kind: "workflow", name: "gated", to: "review", step: "draft", attempt: 1, slice: null, by: "human" });
     expect(h.read(join(runs6(), "workflow.yaml"))).toBe(GATED);
     // the re-pin before the tick is not corruption (S2)
-    const st = (await h.norn("status", "gh-6")).value as { status: string };
+    const st = (await h.listed("gh-6")) as { status: string };
     expect(st.status).not.toBe("corrupt");
     await tick();
     expect(h.state(runs6())).toMatchObject({ workflow: "gated", step: "review", status: "parked", park: { kind: "gate" } });
-    const inbox = (await h.norn("inbox")).value as { groups: Record<string, Array<{ story: string; command: string }>> };
+    const inbox = (await h.norn("status")).value as { groups: Record<string, Array<{ story: string; command: string }>> };
     expect(inbox.groups.approve).toEqual([expect.objectContaining({ story: "gh-6", command: "norn approve gh-6" })]);
   });
 });
@@ -183,11 +184,13 @@ describe("answer (O2, B2)", () => {
     await tick();
     const st = h.state(runs5());
     expect(st).toMatchObject({ status: "parked", park: { kind: "ask", reason: "Which currency?" } });
-    const inbox = (await h.norn("inbox")).value as { groups: Record<string, Array<{ command: string }>> };
+    const inbox = (await h.norn("status")).value as { groups: Record<string, Array<{ command: string }>> };
     expect(inbox.groups.answer?.[0]?.command).toBe('norn answer gh-5 "…"');
-    const text = await h.norn("inbox");
-    expect(text.stdout).toContain("Answer (1)");
-    expect(text.stdout).toContain('$ norn answer gh-5 "…"');
+    // B9: one gate and one ask → the Approve and Answer groups, each item with its age and command
+    const text = await h.norn("status");
+    expect(text.exit).toBe(0);
+    expect(text.stdout).toMatch(/^Answer \(1\) · .*\n  gh-5 +work: Which currency\? · \d+[smhd]\S*\n(?: {6}.*\n)*? {6}\$ norn answer gh-5 "…"\n/m);
+    expect(text.stdout).toMatch(/^Approve \(1\) · .*\n  gh-6 +review: Look at it · \d+[smhd]\S*\n(?: {6}.*\n)*? {6}\$ norn approve gh-6\n/m);
 
     const r = await h.norn("answer", "gh-5", "EUR");
     expect(r.exit).toBe(0);
@@ -416,10 +419,9 @@ describe("a slice gate in its own worktree (X1: views read slice runs from the s
     expect(h.state(join(wt8(), spec8, "runs/01-part"))?.status).not.toBe("parked");
   });
 
-  test("status and inbox show the gate read from the slice worktree", async () => {
-    const one = await h.norn("status", "gh-8/01");
-    expect(one.value).toMatchObject({ key: "gh-8/01", step: "qa", status: "parked", park: { kind: "gate", reason: "Try the slice" } });
-    const inbox = (await h.norn("inbox")).value as { groups: Record<string, InboxItem[]> };
+  test("story list and status show the gate read from the slice worktree", async () => {
+    expect(await h.listed("gh-8/01")).toMatchObject({ key: "gh-8/01", step: "qa", status: "parked", park: { kind: "gate", reason: "Try the slice" } });
+    const inbox = (await h.norn("status")).value as { groups: Record<string, InboxItem[]> };
     expect(inbox.groups.approve).toEqual([
       expect.objectContaining({ slice: "gh-8/01", step: "qa", title: "Try the slice", command: "norn approve gh-8/01" }),
     ]);
@@ -444,7 +446,7 @@ describe("a slice gate in its own worktree (X1: views read slice runs from the s
     expect((r.value as Verb).receipt).toMatchObject({ kind: "approve", step: "qa", slice: "gh-8/01", by: "human" });
     await tick();
     expect(h.state(sliceRuns())).toMatchObject({ step: "$done", status: "done", last_outcome: { outcome: "approve", source: "human" } });
-    const inbox = (await h.norn("inbox")).value as { groups: Record<string, InboxItem[]> };
+    const inbox = (await h.norn("status")).value as { groups: Record<string, InboxItem[]> };
     expect(inbox.groups.approve).toEqual([]);
   });
 });

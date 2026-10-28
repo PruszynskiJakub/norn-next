@@ -1,0 +1,9 @@
+$ norn story view gh-2 --web
+exit 0
+Opened https://github.com/o/r/pull/40
+
+$ norn story view gh-3 --web --json
+exit 0
+{"story":"gh-3","opened":"https://github.com/o/r/issues/3"}
+
+shell recorded: [["open","https://github.com/o/r/pull/40"],["open","https://github.com/o/r/issues/3"]]

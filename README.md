@@ -52,7 +52,7 @@ An agent on its own is good at one step. Delivering a story is many steps, and t
 | it loops, drifts or repeats a step | an LLM decides when to stop | code picks every next step; each retry and loop has a counter with a max, and going past it is a visible `stuck` |
 | `main` moves under the story | you merge by hand | an `update` step merges the base in; predicted conflicts go to a `resolve` step |
 | you wonder why something happened | scroll back through a transcript | `norn trace` shows the step timeline; `norn why` replays the decision and names the rule |
-| a colleague takes over | they start from scratch | state lives in the repo and in git refs; `norn take` continues from any commit |
+| a colleague takes over | they start from scratch | state lives in the repo and in git refs; `norn story checkout` continues from any commit |
 
 The evidence is in the dogfood audits: [`docs/audit-todoist-dogfood/`](docs/audit-todoist-dogfood/), [`docs/audit-auto-mode/`](docs/audit-auto-mode/) and [`docs/audit-base-sync-qa/`](docs/audit-base-sync-qa/).
 

@@ -2,7 +2,7 @@
 id: gh-75/03
 title: Targets from the worktree, and terminal prompts
 depends_on: [ gh-75/01 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }

@@ -33,7 +33,7 @@ export const updateCommand = defineCommand({
       check(t, st) {
         const sf = t.story_facts;
         // not in this checkout (another checkout holds it): only the holder updates a story (T7)
-        if (t.source === "remote") throw refuse(`${t.story} is not in this checkout; only the claim holder updates a story (T7)`, cmd.take(t.story), "story_not_local");
+        if (t.source === "remote") throw refuse(`${t.story} is not in this checkout; only the claim holder updates a story (T7)`, cmd.storyCheckout(t.story), "story_not_local");
         // BS9: a merged story is finished (GR6) — nothing to update
         const fm = sf?.frontmatter;
         if (fm?.status === "done" || sf?.pr?.state === "merged" || sf?.merged_by_ancestry)

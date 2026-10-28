@@ -37,7 +37,7 @@ function requireWorktree(ctx: Context, verb: string): { worktree: string; marker
   );
 }
 
-/** Set in the environment of an orient agent (`norn orient --open`): its hooks are not facts of any run. */
+/** Set in the environment of an orient agent (`norn story chat`): its hooks are not facts of any run. */
 export const ORIENT_ENV = "NORN_ORIENT";
 
 /** Load the unit of the current worktree; refuses when not started, corrupt (S2) or workflow missing. */

@@ -60,7 +60,7 @@ export type TickUnitRecord = Static<typeof TickUnitRecord>;
 
 /**
  * O1/O4 inbox history: an inbox item (needing a person) appeared in, or left, the inbox after this
- * tick's act. `norn inbox --history` pairs them into appeared_at / resolved_at / resolved_by.
+ * tick's act. `norn status --history` pairs them into appeared_at / resolved_at / resolved_by.
  */
 export const InboxChange = Type.Object(
   {
@@ -170,7 +170,7 @@ export const ForeignCommitsTrace = Type.Object(
 );
 export type ForeignCommitsTrace = Static<typeof ForeignCommitsTrace>;
 
-/** R10.1 (M8): a `norn take` of a story, forced or not, with the claim it replaced. */
+/** R10.1 (M8): a `norn story checkout` of a story, forced or not, with the claim it replaced. */
 export const TakeTrace = Type.Object(
   {
     type: Type.Literal("take"),

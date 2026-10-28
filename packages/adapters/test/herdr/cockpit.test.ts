@@ -68,6 +68,19 @@ describe("herdr cockpit (HC6, HC12)", () => {
   });
 });
 
+test("openBelow splits a short pane below the caller without focus, names it, runs the command (B12)", async () => {
+  const { exec, calls } = fakeExec([["pane split", ok({ result: { pane: { pane_id: "w1:p3" } } })], ["pane rename", empty], ["pane run", empty]]);
+  expect(await createHerdrCockpit({ exec, env: { HERDR_PANE_ID: "w1:p1" } }).openBelow("/repo", "norn status --watch", "norn")).toEqual({ pane_id: "w1:p3" });
+  expect(calls.map((a) => a.slice(1))).toEqual([
+    ["pane", "split", "--current", "--direction", "down", "--ratio", "0.3", "--cwd", "/repo", "--no-focus"],
+    ["pane", "rename", "w1:p3", "norn"],
+    ["pane", "run", "w1:p3", "norn status --watch"],
+  ]);
+  // a split without a pane id is a launch failure
+  const none = fakeExec([["pane split", ok({ result: {} })]]);
+  expect(await createHerdrCockpit({ exec: none.exec, env: {} }).openBelow("/repo", "x").catch((e) => e)).toMatchObject({ code: "launch_failed" });
+});
+
 test("listWorkspaces pairs `herdr workspace list` with each pane's cwd; focusWorkspace argv (HC15)", async () => {
   const { exec, calls } = fakeExec([
     ["workspace list", ok(workspaceList)],
