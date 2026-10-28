@@ -1,7 +1,7 @@
 /** act: unit and story lifecycle — start, done, rejected receipts, claims, intake, mirror, merged clean-up and base records. */
 import { existsSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
-import { type Action, type ActionResult, nornTrailers, type UnitRef, type WorktreeSpec } from "@norn/core";
+import { cmd, type Action, type ActionResult, nornTrailers, type UnitRef, type WorktreeSpec } from "@norn/core";
 import { parseDuration, STORY_UNIT_DIR } from "@norn/schema";
 import {
   acquireClaim,
@@ -192,7 +192,7 @@ export async function intake(act: ActEnv, a: Extract<Action, { kind: "intake_sto
   const specDir = dirname(a.story_file);
   // T5/T10: a story already intaken elsewhere (its branch is on the remote) is continued by take, never re-intaken
   if (act.obs.remote && !existsSync(a.worktree.path) && !(await act.git.branchExists(act.root, a.worktree.branch)) && (await act.git.branchExists(act.root, a.worktree.branch, "remote", act.obs.remote)))
-    return { ok: true, detail: { skipped: `${a.worktree.branch} already exists on ${act.obs.remote}`, do_instead: `norn take ${a.key}` } };
+    return { ok: true, detail: { skipped: `${a.worktree.branch} already exists on ${act.obs.remote}`, do_instead: cmd.take(a.key) } };
   const wt = await ensureWorktree(act, a.worktree, unit, specDir);
   const file = join(a.worktree.path, a.story_file);
   const written = !existsSync(file);

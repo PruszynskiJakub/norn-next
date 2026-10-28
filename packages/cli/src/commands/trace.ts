@@ -10,6 +10,7 @@ import { formatStepTimeline, loadTraceView } from "@norn/view";
 import { defineCommand, opt } from "../command.ts";
 import { refuse, rendered, usageError } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
+import { cmd } from "@norn/core";
 
 export const traceCommand = defineCommand({
   name: "trace",
@@ -28,7 +29,7 @@ export const traceCommand = defineCommand({
     const { key } = parseUnitKey(args.positionals[0] as string);
     const rawLimit = opt.str(args, "limit");
     const limit = rawLimit === undefined ? null : Number(rawLimit);
-    if (limit !== null && !(Number.isInteger(limit) && limit > 0)) throw usageError(`bad --limit '${rawLimit}'`, `norn trace ${key} --limit 20`);
+    if (limit !== null && !(Number.isInteger(limit) && limit > 0)) throw usageError(`bad --limit '${rawLimit}'`, cmd.trace(key, { limit: 20 }));
     const view = loadTraceView({
       repoRoot: ctx.root,
       home: ctx.home,
@@ -39,7 +40,7 @@ export const traceCommand = defineCommand({
       all: opt.bool(args, "all"),
       storyOnly: opt.bool(args, "story-only"),
     });
-    if (!view) throw refuse(`unknown unit ${key}`, "norn status", "unknown_unit");
+    if (!view) throw refuse(`unknown unit ${key}`, cmd.status(), "unknown_unit");
     const out = { ...view, total: view.steps.length, steps: limit === null ? view.steps : view.steps.slice(-limit) };
     return rendered(out, formatStepTimeline(out, { full: opt.bool(args, "full") }));
   },

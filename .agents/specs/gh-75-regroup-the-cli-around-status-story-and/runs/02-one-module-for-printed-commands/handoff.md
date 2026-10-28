@@ -14,6 +14,15 @@
 
 ## Goal
 
+Route every printed norn command through one core module (`cmd` in `packages/core/src/commands.ts`), output byte-identical (AC1); pin each builder's string in one test (AC2).
+
 ## Progress
 
+- Added `cmd` (one builder per command: answer, approve, ask, brief, cockpit, config, doctor, done, drop, help, inbox, init, mode, open, orient, release, status, stuck, sync, take, tick, tidy, trace, unstick, update, watch, why, workflow) and `packages/core/test/printed-commands.test.ts`, which fails if a builder is added without a pinned string.
+- Routed through it: `nextCommand`, inbox items, decide details, apply rejects, agent-unit refusals, brief "Finish with", criteria hints, view (format, orient, load, cockpit action matching), cli `do_instead` hints and next steps (init, doctor, hook, report, agent-unit, human, every command's cross-command hints).
+- Left spelled on purpose: each command's own `usage:` line and self-usage examples (moved by the slice that moves the command, D1); tick-lock `note:` and runner titles (not printed commands); `LEGACY_SKILL_MARKER` in store (a marker matched in files, must never change); adapters' hook block reason "Report with norn done/ask/stuck" (protocol, B69); `human.ts` `norn ${verb} ${story}` (verb is dynamic); prose that names a protocol verb without being a command (help.ts, orient rules, workflow.ts QV5 message).
+- bun test 1229 pass, typecheck clean, no fixture rewritten.
+
 ## Resume
+
+Nothing left for this step; review the diff.

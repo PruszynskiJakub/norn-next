@@ -3,7 +3,7 @@
  * Writes an `approve` or `reject` receipt at the cursor. Claim free: acquired here (T8); held
  * elsewhere: posted to the mailbox (T9).
  */
-import { nextCommand, stepOf } from "@norn/core";
+import { cmd, nextCommand, stepOf } from "@norn/core";
 import { isGitSha, type UnitState } from "@norn/schema";
 import type { Context } from "../context.ts";
 import { defineCommand, opt } from "../command.ts";
@@ -56,7 +56,7 @@ export const approveCommand = defineCommand({
         if (step?.type !== "gate" || !atGate(st))
           throw refuse(
             `${t.key} is not waiting at a gate: ${st.step} is ${step ? `a ${step.type} step` : "not in its workflow"}, at ${at(st)}`,
-            nextCommand(t.key, st) ?? `norn status ${t.story}`,
+            nextCommand(t.key, st) ?? cmd.status(t.story),
             "not_at_gate",
           );
       },

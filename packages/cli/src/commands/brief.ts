@@ -8,7 +8,7 @@
  */
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { currentRun, cursorStep, type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, standingReport, storyRulings, storyWorktreePath } from "@norn/core";
+import { cmd, currentRun, cursorStep, type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, standingReport, storyRulings, storyWorktreePath } from "@norn/core";
 import { type AgentStep, type ProcessIdentity, type ReceiptOf, storyBranch, ulid } from "@norn/schema";
 import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readHookFacts, readText, writeBriefing, readRemoteCache, traceEvent } from "@norn/store";
 import { defineCommand } from "../command.ts";
@@ -157,7 +157,7 @@ export const briefCommand = defineCommand({
       if (report) throw refuse(`this run already reported \`${reportCommand(report.receipt)}\`; exactly one report per run`, "end your turn", "already_reported");
     }
     const pending = s.unapplied.filter((r) => r.receipt.kind !== "started" && r.receipt.kind !== "mode");
-    if (pending.length) throw refuse(`unit ${key} has receipts the heartbeat has not applied yet (${pending.map((r) => r.receipt.kind).join(", ")})`, "norn tick, then run norn brief again", "pending_receipts");
+    if (pending.length) throw refuse(`unit ${key} has receipts the heartbeat has not applied yet (${pending.map((r) => r.receipt.kind).join(", ")})`, `${cmd.tick()}, then run ${cmd.brief()} again`, "pending_receipts");
     refuseUnlessAgentWork(s, "brief");
     const step = cursorStep(s) as AgentStep;
 

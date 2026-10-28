@@ -12,7 +12,7 @@ import {
 } from "@norn/schema";
 import type { RunGitAction, WorktreeSpec } from "../actions.ts";
 import { initialState, routeOf } from "../apply.ts";
-import { sliceWorktreePath, storyWorktreePath } from "../commands.ts";
+import { cmd, sliceWorktreePath, storyWorktreePath } from "../commands.ts";
 import type { SliceFileFacts, StoryFacts, UnitFacts, UnitRef } from "../facts.ts";
 import { sha256 } from "../hash.ts";
 import { unitWorktree } from "../policy.ts";
@@ -29,7 +29,7 @@ export function startStoryUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts): void
       kind: "notify",
       unit: uf.unit,
       rule: "start.workflow_invalid",
-      item: { id: `workflow:${story.key}:${fm.workflow}:${sha256(loaded.problem)}`, group: "unblock", story: story.key, slice: null, step: null, title: loaded.problem, command: `norn workflow ${story.key} <name>`, since: ctx.nowIso, url: fm.url },
+      item: { id: `workflow:${story.key}:${fm.workflow}:${sha256(loaded.problem)}`, group: "unblock", story: story.key, slice: null, step: null, title: loaded.problem, command: cmd.workflow(story.key), since: ctx.nowIso, url: fm.url },
     });
   }
   const worktree = unitWorktree(story, uf);
@@ -204,7 +204,7 @@ function slicesStuck(story: StoryFacts): { rule: string; detail: string } | null
   const stuckSlices = activeUnits.filter(isStuck);
   if (stuckSlices.length && stuckSlices.length === activeUnits.length) {
     const named = stuckSlices.map((s) => `slice ${s.key} stuck: ${unitOf(s.key)?.state?.park?.reason ?? "?"}`);
-    return { rule: "slices.slice_stuck", detail: `${named.join("; ")} — norn unstick ${stuckSlices[0]?.key}` };
+    return { rule: "slices.slice_stuck", detail: `${named.join("; ")} — ${cmd.unstick(stuckSlices[0]?.key)}` };
   }
   if (!activeUnits.length) {
     const blocked = pending.map((s) => `${s.key} waits for ${s.frontmatter.depends_on.filter((d) => !done.has(d)).join(", ")}`);

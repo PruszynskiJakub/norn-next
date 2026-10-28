@@ -3,7 +3,7 @@
  * what the story is, each slice's outcome, the PR, open notes by unit, what waits for the person
  * (exact commands) and where to look. Pure: a ProjectView in, a report out; read only (X1).
  */
-import { formatAge, type InboxGroup } from "@norn/core";
+import { cmd, formatAge, type InboxGroup } from "@norn/core";
 import type { RemoteProvider, StoryStatus } from "@norn/schema";
 import { inboxItemsInOrder } from "./format.ts";
 import type { ClaimView, PrView, ProjectView, StoryView, UnitView } from "./types.ts";
@@ -101,7 +101,7 @@ export function orientReport(view: ProjectView, key: string, provider: RemotePro
   const byUnit = new Map<string, OrientNote[]>();
   for (const n of story.notes) {
     const list = byUnit.get(n.unit) ?? [];
-    list.push({ id: n.id, step: n.step, text: n.text, ...(n.criterion ? { criterion: n.criterion } : {}), at: n.at, command: `norn why ${n.unit} --receipt ${n.receipt_id}` });
+    list.push({ id: n.id, step: n.step, text: n.text, ...(n.criterion ? { criterion: n.criterion } : {}), at: n.at, command: cmd.why(n.unit, { receipt: n.receipt_id }) });
     byUnit.set(n.unit, list);
   }
   const newest = (ns: OrientNote[]) => Math.max(...ns.map((n) => Date.parse(n.at)));
@@ -127,7 +127,7 @@ export function orientReport(view: ProjectView, key: string, provider: RemotePro
     running: items.filter((i) => i.group === "running").map(toItem),
     notes,
     note_count: story.notes.length,
-    look: { spec, trace: `norn trace ${focus}`, why: `norn why ${focus}`, status: `norn status ${focus}` },
+    look: { spec, trace: cmd.trace(focus), why: cmd.why(focus), status: cmd.status(focus) },
   };
 }
 
@@ -191,7 +191,7 @@ export function formatOrient(r: OrientReport, now: number): string {
   for (const w of r.waiting) {
     out.push(`- **${GROUP_WORD[w.group]}** ${w.unit}${w.step ? ` (${w.step})` : ""}, ${w.age}: ${w.title}`);
     out.push(`  - \`${w.command}\``);
-    if (w.group === "approve") out.push(`  - reject: \`norn approve ${w.unit} --reject --reason "…"\``);
+    if (w.group === "approve") out.push(`  - reject: \`${cmd.approve(w.unit, { reject: true })}\``);
   }
   if (r.running.length) {
     out.push("", "## Running", "");

@@ -9,6 +9,7 @@ import { type ConfigEntry, type ConfigGroup, explainConfig, type ResolvedConfig 
 import { type LoadedConfig, repoConfigPath, userConfigPath } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import { rendered, usageError } from "../output.ts";
+import { cmd } from "@norn/core";
 
 const GROUPS: Array<{ group: ConfigGroup; title: string; file: "user" | "repo" }> = [
   { group: "machine", title: "This machine", file: "user" },
@@ -33,7 +34,7 @@ export const configCommand = defineCommand({
     const key = args.positionals[0];
     if (key) {
       entries = entries.filter((e) => e.key === key || e.key.startsWith(`${key}.`));
-      if (!entries.length) throw usageError(`no setting '${key}'`, "norn config", "unknown_key");
+      if (!entries.length) throw usageError(`no setting '${key}'`, cmd.config(), "unknown_key");
     }
     const notes = key ? [] : configNotes(config, entries);
     const md = formatConfig(entries, notes, { user: files.user, repo: { ...files.repo, path: relative(ctx.root, files.repo.path) } });

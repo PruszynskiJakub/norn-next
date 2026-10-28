@@ -8,6 +8,7 @@ import { defineCommand } from "../command.ts";
 import { refuse, usageError } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
 import { humanReceipt, refuseIfHeldElsewhere, resolveTarget, runHumanVerb } from "../runtime/human.ts";
+import { cmd } from "@norn/core";
 
 export const modeCommand = defineCommand({
   name: "mode",
@@ -19,7 +20,7 @@ export const modeCommand = defineCommand({
     if (m !== "auto" && m !== "manual") throw usageError(`mode must be auto or manual, not '${m}'`, "norn mode <story> auto|manual");
     const mode: Mode = m;
     const key = parseUnitKey(raw);
-    if (key.slice) throw refuse(`mode is per story, not per slice (MO1)`, `norn mode ${key.story} ${mode}`, "story_only");
+    if (key.slice) throw refuse(`mode is per story, not per slice (MO1)`, cmd.mode(key.story, mode), "story_only");
     const t = await resolveTarget(ctx, key.story);
     // T9: refused before anything (even a no-op) is computed from a possibly stale local copy
     const claim = await refuseIfHeldElsewhere(ctx, t.story, "mode");
@@ -31,7 +32,7 @@ export const modeCommand = defineCommand({
       // MO1: every mode receipt applies, the last one wins — a second switch is no duplicate
       refuseDuplicate: false,
       check(t, st) {
-        if (st.status === "done") throw refuse(`${t.key} is done`, `norn status ${t.key}`, "unit_done");
+        if (st.status === "done") throw refuse(`${t.key} is done`, cmd.status(t.key), "unit_done");
       },
       noop(t, st) {
         const previous: Mode = st.mode ?? ctx.config.default_mode;

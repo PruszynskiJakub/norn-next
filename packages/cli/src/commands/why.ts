@@ -20,7 +20,7 @@
  * recorded decisions ("tick crashed during act") — `--tick <id>` resolves the tick a receipt cites,
  * and without `--tick` a crashed tick newer than the unit's last finished one is the one explained.
  */
-import { criterionLine, decide, type Decision, legacyAction, type NumberedReceipt, type StoryFacts, type UnitFacts, unitDecision } from "@norn/core";
+import { cmd, criterionLine, decide, type Decision, legacyAction, type NumberedReceipt, type StoryFacts, type UnitFacts, unitDecision } from "@norn/core";
 import { ExitCode, type Receipt, type TickStartTrace, type TickTrace, type TickUnitRecord, ULID_PATTERN } from "@norn/schema";
 import { crashedTicksFor, decisionUnit, findCrashedTick, findTick, readTrace } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
@@ -180,7 +180,7 @@ function parseFilter(args: Parameters<typeof opt.str>[0]): Filter {
   if (rule) f.rule = rule;
   const receipt = opt.str(args, "receipt");
   if (receipt !== undefined) {
-    if (!new RegExp(ULID_PATTERN).test(receipt)) throw usageError(`--receipt must be a receipt id (ULID), not '${receipt}'`, "norn inbox");
+    if (!new RegExp(ULID_PATTERN).test(receipt)) throw usageError(`--receipt must be a receipt id (ULID), not '${receipt}'`, cmd.inbox());
     f.receipt = receipt;
   }
   return f;
@@ -189,7 +189,7 @@ function parseFilter(args: Parameters<typeof opt.str>[0]): Filter {
 /** R5.4: explain a tick that died during act from its `tick.start` decisions (no results, no replay). */
 function crashedExplanation(tick: TickStartTrace, key: string) {
   const d = unitDecision(tick.decisions, key, decisionUnit);
-  if (!d) throw refuse(`tick ${tick.tick_id} decided nothing for ${key}`, `norn trace ${key}`, "no_decision");
+  if (!d) throw refuse(`tick ${tick.tick_id} decided nothing for ${key}`, cmd.trace(key), "no_decision");
   const record: TickUnitRecord = { unit: d.unit, rule: d.rule, action: d.action, result: { ok: false } };
   const a = d.action as { kind: string; reason?: string; receipts?: Array<{ n: number; receipt: Receipt }> };
   return {
@@ -229,10 +229,10 @@ export const whyCommand = defineCommand({
       if (!tick) {
         const crashed = findCrashedTick(ctx.root, tickId);
         if (crashed) return crashedExplanation(crashed, key);
-        throw refuse(`no tick ${tickId} in the trace`, `norn trace ${key}`, "no_tick");
+        throw refuse(`no tick ${tickId} in the trace`, cmd.trace(key), "no_tick");
       }
       const d = unitDecision(tick.decisions, key, decisionUnit);
-      if (!d) throw refuse(`tick ${tick.tick_id} decided nothing for ${key}`, `norn trace ${key}`, "no_decision");
+      if (!d) throw refuse(`tick ${tick.tick_id} decided nothing for ${key}`, cmd.trace(key), "no_decision");
       found = [{ tick, d }];
     } else {
       const { events } = readTrace(ctx.root, { unit: key, types: ["tick"] });
@@ -250,19 +250,19 @@ export const whyCommand = defineCommand({
       if (!found.length)
         throw refuse(
           filtered ? `no tick in the trace matches ${JSON.stringify(filter)} for ${key}` : `no tick in the trace decided anything for ${key}`,
-          filtered ? `norn trace ${key}` : "norn tick",
+          filtered ? cmd.trace(key) : cmd.tick(),
           "no_tick",
         );
     }
     const { tick, d: recorded } = found.at(-1) as { tick: TickTrace; d: TickUnitRecord };
     const inputs = replayInputs(ctx.root, tick);
-    if (!inputs) throw refuse(`tick ${tick.tick_id} has no replay block (recorded by an older norn)`, `norn trace ${key}`, "no_replay");
+    if (!inputs) throw refuse(`tick ${tick.tick_id} has no replay block (recorded by an older norn)`, cmd.trace(key), "no_replay");
 
     let replayed: Decision[];
     try {
       replayed = decide(inputs.facts, inputs.workflows, inputs.config);
     } catch (e) {
-      throw refuse(`replay of tick ${tick.tick_id} failed: ${(e as Error).message}`, `norn trace ${key}`, "replay_failed");
+      throw refuse(`replay of tick ${tick.tick_id} failed: ${(e as Error).message}`, cmd.trace(key), "replay_failed");
     }
     const mine = replayed.find((d) => d.unit === key && d.rule === recorded.rule) ?? unitDecision(replayed, key);
     const same = !!mine && mine.rule === recorded.rule && canon(mine.action) === canon(recorded.action);

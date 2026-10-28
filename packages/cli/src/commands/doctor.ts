@@ -34,6 +34,7 @@ import { gitRemoteUrl } from "../runtime/detect.ts";
 import { ensureShim, withNornOnPath } from "../runtime/shim.ts";
 import { bundledSkills } from "../runtime/workflows.ts";
 import { hookBinary, hookCommand } from "./init.ts";
+import { cmd } from "@norn/core";
 
 interface RunOut {
   code: number | null;
@@ -71,7 +72,7 @@ const SHORT = 200;
 /** An error as one readable line for a person; `--json` keeps all of it. */
 const short = (s: string) => {
   const one = s.replace(/\s+/g, " ").trim();
-  return one.length > SHORT ? `${one.slice(0, SHORT)}… (norn doctor --json has the rest)` : one;
+  return one.length > SHORT ? `${one.slice(0, SHORT)}… (${cmd.doctor({ json: true })} has the rest)` : one;
 };
 const which = (cmd: string, env: Record<string, string | undefined>) => (cmd.includes("/") ? cmd : Bun.which(cmd, { PATH: env.PATH ?? process.env.PATH ?? "" }));
 
@@ -119,14 +120,14 @@ async function liveTurn(ctx: Context, name: string, agent: AgentAdapter, command
     await run(["git", "init", "-q", repo], { timeoutMs: 10_000 });
     if (agent.tier !== "none") await agent.installHooks(repo, command, name);
     const cfg = ctx.config.agents[name];
-    const cmd = agent.launchCommand({
+    const launch = agent.launchCommand({
       cwd: repo,
       prompt: "This is a connectivity test. Reply with the single word OK and do nothing else.",
       headless: true,
       env: { NORN_HOME: repo, NORN_STORY: "gh-1" },
       config: { ...(cfg?.command ? { command: cfg.command } : {}), ...(cfg?.args ? { args: cfg.args } : {}), ...(cfg?.env ? { env: cfg.env } : {}) },
     });
-    const r = await run(cmd.argv, { cwd: repo, env: { ...process.env, ...ctx.env, ...cmd.env }, timeoutMs: 180_000 });
+    const r = await run(launch.argv, { cwd: repo, env: { ...process.env, ...ctx.env, ...launch.env }, timeoutMs: 180_000 });
     const facts = readHookFacts(repo, "0000");
     const ok = r.code === 0 && (agent.tier === "none" || facts.length > 0);
     return { ok, exit: r.code, timed_out: r.timed_out, hook_events: facts.map((f) => f.event), ...(ok ? {} : { error: r.error ?? (r.code !== 0 ? firstLine(r.out.slice(-500)) : "the agent ran but no hook reported to norn") }) };
@@ -298,7 +299,7 @@ export const doctorCommand = defineCommand({
       if (agent.tier === "none") notes.push("no hooks: runner, process and git facts only (A5)");
       if (cfg?.adapter === "codex" || name === "codex")
         notes.push("Codex runs project hooks only once the project's .codex/ layer is trusted and the hooks reviewed via /hooks in Codex");
-      if (hooksInstalled === false) notes.push("run norn init to install hooks");
+      if (hooksInstalled === false) notes.push(`run ${cmd.init()} to install hooks`);
       const ok = !!path && hooksInstalled !== false && (fires?.ok ?? true) && (turn?.ok ?? true);
       agents.push({
         name,
@@ -349,7 +350,7 @@ export const doctorCommand = defineCommand({
     const names = bundledSkills(ctx.env);
     const sk = skillsReport(ctx.root, join(assetsDir(ctx.env), "skills"), names, Object.fromEntries(Object.entries(ports.agents).map(([n, a]) => [n, a.skillDir(ctx.root)])));
     const skillsOk = sk.missing.length === 0 && Object.keys(sk.unlinked).length === 0;
-    const skills = { ok: skillsOk, ...sk, ...(skillsOk ? {} : { do_instead: "norn init" }) };
+    const skills = { ok: skillsOk, ...sk, ...(skillsOk ? {} : { do_instead: cmd.init() }) };
 
     // R7.3: NORN_MACHINE overrides the machine name — a test aid (single-host dogfood), never a
     // setup for real teams: two checkouts claiming one machine name defeat R7.2's liveness rules
@@ -358,7 +359,7 @@ export const doctorCommand = defineCommand({
     if (machine.override !== null)
       warnings.push(`NORN_MACHINE=${machine.override} overrides this machine's name (a test aid): runs are judged by pid only on the machine they were started on (R7.2), so two hosts must never share a name — unset it outside tests`);
 
-    if (sk.drifted.length) warnings.push(`skills differ from this norn's bundled version: ${sk.drifted.join(", ")} — run norn init to update them (git diff .agents/skills/ shows the change)`);
+    if (sk.drifted.length) warnings.push(`skills differ from this norn's bundled version: ${sk.drifted.join(", ")} — run ${cmd.init()} to update them (git diff .agents/skills/ shows the change)`);
 
     const ok = gitCheck.ok && agents.every((a) => a.ok) && remote.ok === true && (runner.ok === true || runner.required === false) && skillsOk;
     const report = { ok, live, hook_command: command, machine, git: gitCheck, agents, remote, runner, skills, warnings };

@@ -12,7 +12,7 @@ import {
 } from "@norn/schema";
 import type { AgentLaunch, NewReceipt, SessionInput } from "../actions.ts";
 import { applyReceipts, routeOf } from "../apply.ts";
-import { AUTO_PROMPT, NUDGE_TEXT } from "../commands.ts";
+import { AUTO_PROMPT, cmd, NUDGE_TEXT } from "../commands.ts";
 import type { NumberedReceipt, RunFacts, StoryFacts, UnitFacts } from "../facts.ts";
 import { effectiveMode, firstLine, sessionStartedNoTurn, unitWorktree } from "../policy.ts";
 import { promptKeys } from "../prompt.ts";
@@ -112,7 +112,7 @@ export function startRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitSta
   const ref = uf.unit;
   const { mode, downgraded } = effectiveMode(story.mode, !!step.attended, ctx.facts.machine.runner);
   if (mode === "manual")
-    return ctx.noop(ref, downgraded ? "agent.ready.manual.no_runner" : "agent.ready.manual", downgraded ? "auto requested, no runner; running manual (MO2)" : "ready: a person starts an agent and runs norn brief");
+    return ctx.noop(ref, downgraded ? "agent.ready.manual.no_runner" : "agent.ready.manual", downgraded ? "auto requested, no runner; running manual (MO2)" : `ready: a person starts an agent and runs ${cmd.brief()}`);
   const cwd = unitWorktree(story, uf);
   if (!cwd) return ctx.noop(ref, "agent.no_worktree", "unit worktree missing");
   // R5.3 (A14b): never a second agent beside a run of this step that is still active

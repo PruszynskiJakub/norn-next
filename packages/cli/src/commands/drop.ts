@@ -17,18 +17,19 @@ import type { Observed } from "../runtime/observe/index.ts";
 import { heldHere } from "../runtime/release.ts";
 import { withStory } from "./release.ts";
 import { storyArg } from "../runtime/args.ts";
+import { cmd } from "@norn/core";
 
 async function claimIfFree(obs: Observed, story: StoryFacts): Promise<string> {
   const c = story.claim;
   if (heldHere(obs, story) && (c.state === "mine" || c.state === "expired")) return c.sha;
-  if (c.state === "other") throw claimHeld(c.blob, `the holder drops it, or norn take ${story.key} --force first`);
-  if (c.state === "corrupt") throw refuse(`claim ref of ${story.key} is unreadable`, `norn take ${story.key} --force`, "claim_corrupt");
+  if (c.state === "other") throw claimHeld(c.blob, `the holder drops it, or ${cmd.take(story.key, { force: true })} first`);
+  if (c.state === "corrupt") throw refuse(`claim ref of ${story.key} is unreadable`, cmd.take(story.key, { force: true }), "claim_corrupt");
   const now = obs.facts.now;
   const blob = newClaimBlob({ story: story.key, holder: obs.facts.machine.holder, heartbeat_id: obs.heartbeat_id, now, lease: obs.config.claim.lease });
   const r = await acquireClaim(obs.root, obs.remote, blob, { now });
   if (!r.ok) {
-    if (r.reason === "held") throw claimHeld(r.holder, `the holder drops it, or norn take ${story.key} --force first`);
-    throw failure(`cannot claim ${story.key}: ${r.message}`, `retry: norn drop ${story.key}`, "claim_failed");
+    if (r.reason === "held") throw claimHeld(r.holder, `the holder drops it, or ${cmd.take(story.key, { force: true })} first`);
+    throw failure(`cannot claim ${story.key}: ${r.message}`, `retry: ${cmd.drop(story.key)}`, "claim_failed");
   }
   return r.sha;
 }
@@ -40,7 +41,7 @@ export const dropCommand = defineCommand({
   positionals: { min: 1, max: 1 },
   async run(ctx, args) {
     const key = storyArg(args.positionals[0] as string, "drop");
-    return withStory(ctx, key, `norn drop ${key}`, async (obs, story) => {
+    return withStory(ctx, key, cmd.drop(key), async (obs, story) => {
       const git = obs.ports.git;
       const claimSha = await claimIfFree(obs, story);
       const loc = obs.stories[key];
@@ -69,7 +70,7 @@ export const dropCommand = defineCommand({
       if (storyWt) {
         const file = storyFile(join(storyWt, loc?.spec_dir ?? ""));
         const p = patchStoryFile(file, { status: "dropped" }, storyWt);
-        if (!p.ok) throw failure(`cannot mark ${relative(storyWt, file)} dropped: ${p.reason}`, "fix story.md, then norn drop again", "story_corrupt");
+        if (!p.ok) throw failure(`cannot mark ${relative(storyWt, file)} dropped: ${p.reason}`, `fix story.md, then ${cmd.drop()} again`, "story_corrupt");
         if (await git.commit(storyWt, { message: `norn: ${key} dropped`, trailers: trailers(null, "drop") })) committed.push(key);
       }
 
@@ -79,7 +80,7 @@ export const dropCommand = defineCommand({
         const branches = [...(storyWt && loc ? [{ cwd: storyWt, branch: loc.branch, force: false }] : []), ...sliceWts.map((w) => ({ cwd: w.path, branch: w.branch, force: true }))];
         for (const b of branches) {
           const r = await git.push(b.cwd, obs.remote, `${b.force ? "+" : ""}refs/heads/${b.branch}:refs/heads/${b.branch}`);
-          if (!r.ok) throw failure(`push ${b.branch} failed (${r.reason}): ${r.message}`, `fix the push problem, then norn drop ${key} again; nothing was removed`, "push_failed", { pushed });
+          if (!r.ok) throw failure(`push ${b.branch} failed (${r.reason}): ${r.message}`, `fix the push problem, then ${cmd.drop(key)} again; nothing was removed`, "push_failed", { pushed });
           pushed.push(b.branch);
         }
       }

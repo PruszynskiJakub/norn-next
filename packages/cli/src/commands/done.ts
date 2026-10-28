@@ -8,7 +8,7 @@
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
-import { checkReport, cursorStep, enteringReceipt, reportableOutcomes, unverifiedNeeds, verdictCounts } from "@norn/core";
+import { cmd, checkReport, cursorStep, enteringReceipt, reportableOutcomes, unverifiedNeeds, verdictCounts } from "@norn/core";
 import { type AgentStep, type CriterionVerdict, type Finding, type Note, type ReceiptOf, validate } from "@norn/schema";
 import { appendTrace, ensureEvidenceDir, traceEvent } from "@norn/store";
 import { defineCommand, type ParsedArgs, opt } from "../command.ts";
@@ -111,7 +111,7 @@ async function verifyBaseMerge(ctx: Context, s: UnitSession, base: NonNullable<R
   const git = ctx.git;
   const cwd = s.worktree;
   const short = base.sha.slice(0, 12);
-  const how = `conclude the merge of ${short}: resolve every conflict by intent, \`git add\` the files and \`git commit\` (never rebase), then report again; or \`git merge --abort\` and \`norn stuck "<why>"\``;
+  const how = `conclude the merge of ${short}: resolve every conflict by intent, \`git add\` the files and \`git commit\` (never rebase), then report again; or \`git merge --abort\` and \`${cmd.stuck("<why>")}\``;
   const busy = await git.inProgress(cwd);
   if (busy.operation || busy.unmerged.length)
     throw refuse(`the merge of ${short} is not concluded: ${busy.operation ?? "merge"} in progress${busy.unmerged.length ? `, unmerged: ${busy.unmerged.join(", ")}` : ""}`, how, "merge_unfinished", busy);
@@ -147,13 +147,13 @@ export const doneCommand = defineCommand({
   async run(ctx, args) {
     const outcome = args.positionals[0] as string;
     const handoff = opt.str(args, "handoff")?.trim();
-    if (!handoff) throw usageError("norn done needs --handoff \"<short summary of what was done>\"", `norn done ${outcome} --handoff "…"`);
+    if (!handoff) throw usageError("norn done needs --handoff \"<short summary of what was done>\"", cmd.done(outcome));
     const t = reportTarget(ctx, "done");
     const step = cursorStep(t.s) as AgentStep;
     const valid = reportableOutcomes(step);
-    if (outcome === "ask" || outcome === "stuck") throw refuse(`'${outcome}' is reported with its own verb`, outcome === "ask" ? 'norn ask "<question>"' : 'norn stuck "<reason>"', "use_verb");
+    if (outcome === "ask" || outcome === "stuck") throw refuse(`'${outcome}' is reported with its own verb`, outcome === "ask" ? cmd.ask() : cmd.stuck(), "use_verb");
     if (!valid.includes(outcome))
-      throw refuse(`outcome '${outcome}' is not declared at step ${t.s.state.step}; valid: ${valid.join(", ")}`, valid.map((o) => `norn done ${o} --handoff "…"`).join(" | "), "invalid_outcome", { valid });
+      throw refuse(`outcome '${outcome}' is not declared at step ${t.s.state.step}; valid: ${valid.join(", ")}`, valid.map((o) => cmd.done(o)).join(" | "), "invalid_outcome", { valid });
 
     let findings: Finding[] | undefined;
     const findingsFile = opt.str(args, "findings");

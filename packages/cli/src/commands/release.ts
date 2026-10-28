@@ -11,6 +11,7 @@ import { busyError, claimHeld, failure, refuse } from "../output.ts";
 import { type Observed, observe } from "../runtime/observe/index.ts";
 import { heldHere, releaseStory } from "../runtime/release.ts";
 import { storyArg } from "../runtime/args.ts";
+import { cmd } from "@norn/core";
 
 /** Observe under the tick lock (no remote sync) and find the story, or refuse. */
 export async function withStory<T>(ctx: Context, key: string, note: string, f: (obs: Observed, story: Observed["facts"]["stories"][number]) => Promise<T>): Promise<T> {
@@ -19,7 +20,7 @@ export async function withStory<T>(ctx: Context, key: string, note: string, f: (
   try {
     const obs = await observe(ctx, { tick_id: ulid(ctx.clock.now()), sync: "never" });
     const story = obs.facts.stories.find((s) => s.key === key);
-    if (!story) throw refuse(`story ${key} is not checked out here`, `norn take ${key}`, "unknown_story");
+    if (!story) throw refuse(`story ${key} is not checked out here`, cmd.take(key), "unknown_story");
     return await f(obs, story);
   } finally {
     lock.release();
@@ -33,15 +34,15 @@ export const releaseCommand = defineCommand({
   positionals: { min: 1, max: 1 },
   async run(ctx, args) {
     const key = storyArg(args.positionals[0] as string, "release");
-    return withStory(ctx, key, `norn release ${key}`, async (obs, story) => {
+    return withStory(ctx, key, cmd.release(key), async (obs, story) => {
       const c = story.claim;
       if (!heldHere(obs, story)) {
-        if (c.state === "other") throw claimHeld(c.blob, `only the holder releases; or norn take ${key} --force`);
+        if (c.state === "other") throw claimHeld(c.blob, `only the holder releases; or ${cmd.take(key, { force: true })}`);
         throw refuse(`${key} is not claimed by this machine (claim: ${c.state})`, null, "not_held");
       }
       const r = await releaseStory(obs, story);
-      if (!r.ok) throw failure(`release failed: ${r.error}`, `fix the push problem, then norn release ${key} (the claim is kept until the branches are pushed)`, "release_failed", { pushed: r.pushed });
-      return { story: key, released: true, pushed: r.pushed, remote: obs.remote, next: `norn take ${key} (on the other machine)` };
+      if (!r.ok) throw failure(`release failed: ${r.error}`, `fix the push problem, then ${cmd.release(key)} (the claim is kept until the branches are pushed)`, "release_failed", { pushed: r.pushed });
+      return { story: key, released: true, pushed: r.pushed, remote: obs.remote, next: `${cmd.take(key)} (on the other machine)` };
     });
   },
 });

@@ -24,6 +24,7 @@ import { usageError } from "../output.ts";
 import { cockpitHerdr, labelPanes, oldestYourTurn, placeAgent, verbMessage } from "../runtime/cockpit.ts";
 import { clampScroll, handleKey, initialState, parseKeys, renderCockpit, type TuiEffect, type TuiState } from "../runtime/cockpit-tui.ts";
 import { projectView } from "../runtime/human.ts";
+import { cmd } from "@norn/core";
 
 const CLEAR = "\x1b[H\x1b[2J";
 /** The alternate screen (frames leave no scrollback), no cursor, SGR mouse reporting for the wheel. */
@@ -205,7 +206,7 @@ export const cockpitCommand = defineCommand({
     try {
       interval = parseDuration(intervalRaw);
     } catch {
-      throw usageError(`bad --interval '${intervalRaw}' (use e.g. 5s, 1m)`, "norn cockpit --interval 5s");
+      throw usageError(`bad --interval '${intervalRaw}' (use e.g. 5s, 1m)`, cmd.cockpit({ interval: "5s" }));
     }
     const ctx = await located(raw);
     writeCockpitFile(ctx.home, { last_repo: ctx.root });

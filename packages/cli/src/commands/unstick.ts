@@ -3,7 +3,7 @@
  * parked unit, optionally at another step of its pinned workflow and with counters reset
  * (journaled in the receipt). Claim free: acquired here (T8); held elsewhere: mailbox (T9).
  */
-import { nextCommand, stepOf } from "@norn/core";
+import { cmd, nextCommand, stepOf } from "@norn/core";
 import type { UnitState } from "@norn/schema";
 import { defineCommand, opt } from "../command.ts";
 import { refuse } from "../output.ts";
@@ -26,20 +26,20 @@ export const unstickCommand = defineCommand({
       verb: "unstick",
       mailbox: true,
       check(t, st) {
-        if (!blocked(st)) throw refuse(`${t.key} is not stuck: it is at ${at(st)}`, nextCommand(t.key, st) ?? `norn status ${t.story}`, "not_stuck");
+        if (!blocked(st)) throw refuse(`${t.key} is not stuck: it is at ${at(st)}`, nextCommand(t.key, st) ?? cmd.status(t.story), "not_stuck");
         const wf = t.workflow;
-        if (!wf) throw refuse(`${t.key} has no readable pinned workflow`, `norn why ${t.key}`, "workflow_missing");
+        if (!wf) throw refuse(`${t.key} has no readable pinned workflow`, cmd.why(t.key), "workflow_missing");
         const steps = Object.keys(wf.steps);
         if (to !== undefined && !stepOf(wf, to))
-          throw refuse(`no step '${to}' in ${t.key}'s pinned workflow ${wf.name}`, `norn unstick ${t.key} --to <${steps.join("|")}>`, "unknown_step");
+          throw refuse(`no step '${to}' in ${t.key}'s pinned workflow ${wf.name}`, cmd.unstick(t.key, { to: `<${steps.join("|")}>` }), "unknown_step");
         if (to === undefined && !stepOf(wf, st.step))
-          throw refuse(`step '${st.step}' no longer exists in workflow ${wf.name} (S7)`, `norn unstick ${t.key} --to <${steps.join("|")}>`, "unknown_step");
+          throw refuse(`step '${st.step}' no longer exists in workflow ${wf.name} (S7)`, cmd.unstick(t.key, { to: `<${steps.join("|")}>` }), "unknown_step");
         const declared = Object.keys(wf.counters ?? {});
         const unknown = reset.filter((c) => !declared.includes(c));
         if (unknown.length)
           throw refuse(
             `unknown counter(s) ${unknown.join(", ")} in workflow ${wf.name}`,
-            declared.length ? `norn unstick ${t.key} --reset <${declared.join("|")}>` : `norn unstick ${t.key}`,
+            declared.length ? cmd.unstick(t.key, { reset: `<${declared.join("|")}>` }) : cmd.unstick(t.key),
             "unknown_counter",
           );
       },

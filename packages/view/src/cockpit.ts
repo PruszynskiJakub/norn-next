@@ -9,6 +9,7 @@ import type { RemoteProvider } from "@norn/schema";
 import { inboxItemsInOrder } from "./format.ts";
 import { type OrientReport, orientReport } from "./orient.ts";
 import type { HeartbeatView, InboxEntry, ProjectView, StoryView } from "./types.ts";
+import { cmd } from "@norn/core";
 
 /** CP2: inbox groups that are rows, in O1 order; running, notes and recently done live in the preview. */
 const COCKPIT_GROUPS: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock", "check"];
@@ -91,13 +92,13 @@ function itemActions(i: InboxEntry, unit: string, o: CockpitOptions): CockpitAct
   const out: CockpitAction[] = [];
   if (o.places && i.reach) out.push(action("agent", { kind: "place", place: "agent", story: i.story, reach: i.reach }));
   // MO5: a manual start the runner opens itself
-  if (i.group === "your_turn" && !i.reach && i.command.startsWith("norn open ")) out.push(action("start", { kind: "verb", argv: ["open", unit] }));
+  if (i.group === "your_turn" && !i.reach && i.command.startsWith(`${cmd.open()} `)) out.push(action("start", { kind: "verb", argv: ["open", unit] }));
   if (i.group === "answer") out.push(action("answer", { kind: "verb", argv: ["answer", unit, "{input}"] }, { prompt: "Your answer", required: true }));
   if (i.group === "approve") {
     out.push(action("approve", { kind: "verb", argv: ["approve", unit] }));
     out.push(action("reject", { kind: "verb", argv: ["approve", unit, "--reject", "--reason", "{input}"] }, { prompt: "What to change", required: true }));
   }
-  if (i.command.startsWith("norn unstick ")) out.push(action("unstick", { kind: "verb", argv: ["unstick", unit] }));
+  if (i.command.startsWith(`${cmd.unstick()} `)) out.push(action("unstick", { kind: "verb", argv: ["unstick", unit] }));
   return out;
 }
 

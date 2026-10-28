@@ -16,6 +16,7 @@ import { cockpitHerdr } from "../runtime/cockpit.ts";
 import { parseUnitKey } from "../runtime/args.ts";
 import { projectView } from "../runtime/human.ts";
 import { isOrientWorkspace, planWorkspaceMoves, segmentLine, storyToken } from "../runtime/segment.ts";
+import { cmd } from "@norn/core";
 
 /** The orient workspaces' tokens and order; failures are ignored (presentation, HC13). */
 async function presentOrientWorkspaces(ctx: Context, view: ProjectView, ttlMs: number): Promise<{ tokens: number; moves: number }> {
@@ -84,9 +85,9 @@ export const statusCommand = defineCommand({
     }
     const key = parseUnitKey(raw);
     const story = view.stories.find((s) => s.key === key.story);
-    if (!story) throw refuse(`unknown story ${key.story}`, "norn status", "unknown_unit");
+    if (!story) throw refuse(`unknown story ${key.story}`, cmd.status(), "unknown_unit");
     const slice = key.slice ? story.slices.find((s) => s.key === key.slice) : null;
-    if (key.slice && !slice) throw refuse(`no slice ${key.slice} in story ${key.story}`, `norn status ${key.story}`, "unknown_unit");
+    if (key.slice && !slice) throw refuse(`no slice ${key.slice} in story ${key.story}`, cmd.status(key.story), "unknown_unit");
     const units = new Set([story.key, ...story.slices.map((s) => s.key)]);
     const filtered: ProjectView = {
       ...view,

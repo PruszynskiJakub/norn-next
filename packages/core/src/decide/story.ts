@@ -20,6 +20,7 @@ import { edgeOf, isStale, stepOf } from "../workflow.ts";
 import { applyAction, classifyRun, implicitAskResolved, launchUnknown, resolveImplicitAsk, startRun } from "./agent.ts";
 import { commitFor, type Ctx, gitBusy, nextReceiptNumber, park, sliceFileOf, unitItem } from "./receipts.ts";
 import { baseOf, classifyNorn, resumeSlices, runCheck, runGit, slicesCanResume, slicesStep, startStoryUnit } from "./steps.ts";
+import { cmd } from "../commands.ts";
 
 // ================================================================= story level
 
@@ -71,7 +72,7 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
       return ctx.noop(ref, "story.finished", baseDone ? `finished: ${ctx.facts.repo.default_branch} records it ${story.base_status} (R3.2); nothing to acquire` : "finished: PR merged (R3.2); nothing to acquire");
     // GR6: a finished story (workflow done, merged/recorded or dropped) needs no owner — never "unclaimed"
     if (!ours && !fresh && storyFinished(story)) return ctx.noop(ref, "story.finished", `finished (${story.frontmatter?.status === "done" || story.frontmatter?.status === "dropped" ? story.frontmatter.status : "workflow done"}); nothing to take`);
-    if (!ours && !fresh) return ctx.noop(ref, "claim.unclaimed", `unclaimed — norn take ${story.key} (T10)`);
+    if (!ours && !fresh) return ctx.noop(ref, "claim.unclaimed", `unclaimed — ${cmd.take(story.key)} (T10)`);
     const lost = fresh ? lostIntake(story) : undefined;
     return ctx.emit({
       kind: "claim",
@@ -305,7 +306,7 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
       return ctx.noop(ref, ref.slice ? "slice.done" : "story.wait_merge", ref.slice ? "integrated" : "workflow done; waiting for the PR merge (GR6)");
     case "stuck":
       if (slicesCanResume(story, uf, st, wf)) return resumeSlices(ctx, story, uf, st, wf);
-      return ctx.noop(ref, "unit.stuck", `stuck: ${st.park?.reason ?? "?"} — norn unstick ${ref.key}`);
+      return ctx.noop(ref, "unit.stuck", `stuck: ${st.park?.reason ?? "?"} — ${cmd.unstick(ref.key)}`);
     case "parked": {
       // R6.1 (H3, A14): an implicit ask a later fact shows the agent has moved past resolves itself
       const moved = implicitAskResolved(st, uf);

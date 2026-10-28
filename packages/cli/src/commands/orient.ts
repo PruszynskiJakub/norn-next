@@ -10,7 +10,7 @@
  * that opened it, first on PATH. Outside Herdr it prints the command.
  */
 import { join } from "node:path";
-import { startAgentCommand } from "@norn/core";
+import { cmd, startAgentCommand } from "@norn/core";
 import type { ResolvedConfig } from "@norn/schema";
 import { formatOrient, orientReport } from "@norn/view";
 import { defineCommand, opt } from "../command.ts";
@@ -26,7 +26,7 @@ import { isOrientWorkspace } from "../runtime/segment.ts";
 function orientAgentCommand(config: ResolvedConfig, key: string): string {
   const name = config.default_agent;
   const agent = config.agents[name];
-  return `${ORIENT_ENV}=1 ${startAgentCommand(null, agent?.command ?? agent?.adapter ?? name, agent?.args, `Run \`norn orient ${key}\` and follow it.`)}`;
+  return `${ORIENT_ENV}=1 ${startAgentCommand(null, agent?.command ?? agent?.adapter ?? name, agent?.args, `Run \`${cmd.orient(key)}\` and follow it.`)}`;
 }
 
 export const orientCommand = defineCommand({
@@ -39,7 +39,7 @@ export const orientCommand = defineCommand({
   async run(ctx, args) {
     const { key, story } = parseUnitKey(args.positionals[0] as string);
     const report = orientReport(await projectView(ctx), key, ctx.config.remote.provider);
-    if (!report) throw refuse(`unknown story ${story}`, "norn status", "unknown_unit");
+    if (!report) throw refuse(`unknown story ${story}`, cmd.status(), "unknown_unit");
     if (!opt.bool(args, "open")) return rendered(report, formatOrient(report, ctx.clock.now()));
 
     const label = `${story} orient`;

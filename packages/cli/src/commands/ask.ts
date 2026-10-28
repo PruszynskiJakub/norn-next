@@ -6,6 +6,7 @@ import type { ReceiptOf } from "@norn/schema";
 import { defineCommand, opt } from "../command.ts";
 import { usageError } from "../output.ts";
 import { reported, reportedFor, reportHeader, reportTarget, writeReport } from "../runtime/report.ts";
+import { cmd } from "@norn/core";
 
 export const askCommand = defineCommand({
   name: "ask",
@@ -16,13 +17,13 @@ export const askCommand = defineCommand({
   markdown: true,
   async run(ctx, args) {
     const question = (args.positionals[0] as string).trim();
-    if (!question) throw usageError("norn ask needs a non-empty question", 'norn ask "<question>"');
+    if (!question) throw usageError("norn ask needs a non-empty question", cmd.ask());
     const options = opt.list(args, "option").map((o) => o.trim()).filter(Boolean);
     const t = reportTarget(ctx, "ask");
     const receipt: ReceiptOf<"ask"> = { kind: "ask", ...reportHeader(ctx, t), question };
     if (options.length) receipt.options = options;
     const written = writeReport(t, receipt);
-    const answerWith = `norn answer ${t.s.unit.key} "…"`;
+    const answerWith = cmd.answer(t.s.unit.key);
     return reported(t, "ask", written, { question, ...(options.length ? { options } : {}), answer_with: answerWith }, [
       `Asked a person (${reportedFor(t)}): ${question}`,
       ...(options.length ? [`Options: ${options.join(" · ")}`] : []),

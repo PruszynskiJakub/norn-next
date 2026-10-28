@@ -2,7 +2,7 @@
  * Compact terminal text for `norn status` / `norn inbox` human mode. Pure: a ProjectView
  * in, a string out (no colour, no clock). The CLI's default output stays JSON (P8).
  */
-import { INBOX_ABOUT, INBOX_GROUPS, INBOX_TITLES } from "@norn/core";
+import { cmd, INBOX_ABOUT, INBOX_GROUPS, INBOX_TITLES } from "@norn/core";
 import { oneLine } from "./timeline.ts";
 import type { InboxEntry, ProjectView, SliceView, StepRow, StepWho, StoryView, TimelineEntry, TraceView, UnitView } from "./types.ts";
 
@@ -54,7 +54,7 @@ function sliceLine(s: SliceView): string {
 /** R5.5 (N3): this checkout's heartbeat, one line. */
 function heartbeatText(view: ProjectView): string | null {
   const h = view.heartbeat;
-  if (h.down) return `! no heartbeat on ${h.holder}${h.age ? ` for ${h.age}` : " yet"} — run \`norn watch\` (auto steps wait for it)`;
+  if (h.down) return `! no heartbeat on ${h.holder}${h.age ? ` for ${h.age}` : " yet"} — run \`${cmd.watch()}\` (auto steps wait for it)`;
   return h.last_tick_at ? `heartbeat: last tick ${h.age} ago on ${h.holder}` : null;
 }
 
@@ -72,7 +72,7 @@ function baseSyncText(s: StoryView): string | null {
 
 export function formatStatus(view: ProjectView): string {
   const out: string[] = [];
-  if (!view.stories.length) out.push("No stories. Run `norn sync` to pick up labelled issues.");
+  if (!view.stories.length) out.push(`No stories. Run \`${cmd.sync()}\` to pick up labelled issues.`);
   for (const s of view.stories) {
     out.push(`${s.key} ${s.title}`);
     out.push(`  ${s.workflow} · ${modeText(s)} · ${claimText(s)} · ${stateText(s)}`);
@@ -103,7 +103,7 @@ export function formatStatus(view: ProjectView): string {
   for (const e of view.errors) out.push(`! ${e.file}: ${e.errors[0]?.message ?? "invalid"}`);
   const hb = heartbeatText(view);
   if (hb) out.push(hb);
-  out.push(`${view.inbox.pending} ${view.inbox.pending === 1 ? "item needs" : "items need"} you — norn inbox`);
+  out.push(`${view.inbox.pending} ${view.inbox.pending === 1 ? "item needs" : "items need"} you — ${cmd.inbox()}`);
   return `${out.join("\n").trimEnd()}\n`;
 }
 
@@ -145,7 +145,7 @@ export function formatInbox(view: ProjectView, opts: { details?: boolean; home?:
     if (!items.length) continue;
     out.push(`${INBOX_TITLES[g]} (${items.length}) · ${groupAbout(g, items)}`);
     if (g === "notes" && !opts.notes) {
-      out.push("      $ norn inbox --notes", "");
+      out.push(`      $ ${cmd.inbox({ notes: true })}`, "");
       continue;
     }
     for (const it of items) {
@@ -160,7 +160,7 @@ export function formatInbox(view: ProjectView, opts: { details?: boolean; home?:
   }
   if (!out.length && !view.stories.length) {
     // a fresh repo: point at the first story instead of a dead end
-    return "Inbox empty — no stories yet.\nLabel an issue `norn` (the config's `remote.label`) and assign it to yourself, then run `norn sync`.\n";
+    return `Inbox empty — no stories yet.\nLabel an issue \`norn\` (the config's \`remote.label\`) and assign it to yourself, then run \`${cmd.sync()}\`.\n`;
   }
   if (!out.length) return "Inbox empty — nothing needs you.\n";
   return `${out.join("\n").trimEnd()}\n`;

@@ -10,7 +10,7 @@
  * A failed delivery writes no receipt, keeps the unit parked, is kept as the unit's act failure
  * (R4.3) and names how to reach the pane.
  */
-import { nextCommand, optionIndex, optionsLine, promptKeys, type SessionRef } from "@norn/core";
+import { cmd, nextCommand, optionIndex, optionsLine, promptKeys, type SessionRef } from "@norn/core";
 import { type Receipt, ulid, type UnitState } from "@norn/schema";
 import { machineHolder, readActFailures, writeActFailures } from "@norn/store";
 import { defineCommand } from "../command.ts";
@@ -35,7 +35,7 @@ export const answerCommand = defineCommand({
       mailbox: true,
       check(t, st) {
         if (!asks(st))
-          throw refuse(`${t.key} is not waiting for an answer: it is at ${at(st)}`, nextCommand(t.key, st) ?? `norn status ${t.story}`, "not_parked_on_ask");
+          throw refuse(`${t.key} is not waiting for an answer: it is at ${at(st)}`, nextCommand(t.key, st) ?? cmd.status(t.story), "not_parked_on_ask");
       },
       build: (t, st) => humanReceipt(ctx, t, st, "answer", { answer: text, ...(st.park?.receipt_id ? { ask_receipt_id: st.park.receipt_id } : {}) }),
       before: (t, st, route, receipt) => typeIntoPrompt(ctx, t, st, route, receipt, text),
@@ -66,10 +66,10 @@ async function typeIntoPrompt(ctx: Context, t: Target, st: UnitState, route: Rou
   // the prompt as it is now: the agent may have moved on, or the menu may differ from the parked one
   const pane = await runner.paneState(session).catch(() => null);
   if (pane && pane.alive && pane.state !== "waiting_input" && pane.state !== "unknown")
-    throw refuse(`${t.key}'s agent no longer waits on the prompt (pane is ${pane.state})`, "norn tick (it records that the agent moved on, R6.1)", "prompt_gone");
+    throw refuse(`${t.key}'s agent no longer waits on the prompt (pane is ${pane.state})`, `${cmd.tick()} (it records that the agent moved on, R6.1)`, "prompt_gone");
   const prompt = pane?.state === "waiting_input" && pane.prompt ? pane.prompt : { options: park.options ?? [], choice: park.choice ?? null };
   if (prompt.options.length && optionIndex(prompt.options, text) === null)
-    throw usageError(`'${text}' is not one of the prompt's options: ${optionsLine(prompt.options)}`, `norn answer ${t.key} "1"`, "not_an_option");
+    throw usageError(`'${text}' is not one of the prompt's options: ${optionsLine(prompt.options)}`, cmd.answer(t.key, "1"), "not_an_option");
   try {
     await runner.sendKeys(session, promptKeys(prompt, text).keys);
   } catch (e) {

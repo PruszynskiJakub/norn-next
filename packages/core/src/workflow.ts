@@ -10,6 +10,7 @@ import {
   validate,
   type Workflow,
 } from "@norn/schema";
+import { cmd } from "./commands.ts";
 
 export type WorkflowIssueCode =
   | "schema"
@@ -121,7 +122,7 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
         issues.push({
           code: "unknown_skill",
           path: `/steps/${name}/skill`,
-          message: `skill '${step.skill}' is not installed for agent '${agent}' (run norn init, or add it to that agent's skill folder)`,
+          message: `skill '${step.skill}' is not installed for agent '${agent}' (run ${cmd.init()}, or add it to that agent's skill folder)`,
         });
       if ("exhausted" in step.outcomes)
         issues.push({
