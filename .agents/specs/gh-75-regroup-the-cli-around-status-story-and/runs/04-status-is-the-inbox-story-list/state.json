@@ -5,18 +5,18 @@
   "unit_dir": "04-status-is-the-inbox-story-list",
   "workflow": "slice",
   "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
-  "step": "merge",
-  "attempt": 2,
+  "step": "integrate",
+  "attempt": 3,
   "visits": {
     "implement": 1,
     "test": 1,
     "review": 1,
     "qa": 1,
-    "integrate": 2,
+    "integrate": 3,
     "merge": 2
   },
-  "step_entered_at": "2026-10-28T15:11:19.898Z",
-  "status": "running",
+  "step_entered_at": "2026-10-28T15:41:33.668Z",
+  "status": "ready",
   "park": null,
   "counters": {
     "test_loop": 0,
@@ -26,35 +26,16 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 17,
-  "run": {
-    "run_id": "01M61HMMCY3SR6E9GPM2174PX9",
-    "step": "merge",
-    "attempt": 2,
-    "started_at": "2026-10-28T15:21:49.037Z",
-    "how": "auto",
-    "agent": "claude",
-    "session": {
-      "runner": "herdr",
-      "session_id": "w73:p1",
-      "pane_id": "w73:p1",
-      "reach": "herdr agent attach w73:p1"
-    },
-    "process": {
-      "pid": 23987,
-      "pid_start": "Wed Oct 28 16:21:48 2026"
-    },
-    "machine": "jakubpruszynski@mac",
-    "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD"
-  },
+  "applied_through": 18,
+  "run": null,
   "last_outcome": {
-    "step": "integrate",
-    "outcome": "conflict",
-    "source": "classified",
-    "at": "2026-10-28T15:10:53.047Z",
-    "receipt_id": "01M61H0T3Q23ERH6NFBXYCE9FY"
+    "step": "merge",
+    "outcome": "done",
+    "source": "reported",
+    "at": "2026-10-28T15:33:23.732Z",
+    "receipt_id": "01M61JA14M3S76WAC8673G2WT8"
   },
   "created_at": "2026-10-28T13:10:40.637Z",
-  "updated_at": "2026-10-28T15:21:49.039Z",
-  "last_tick_id": "01M61HMMCY35SM76H8AR15W9B0"
+  "updated_at": "2026-10-28T15:41:33.668Z",
+  "last_tick_id": "01M61JRZK3QRMHG88RNJNKTDCJ"
 }
