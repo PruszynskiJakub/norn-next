@@ -2,7 +2,7 @@
 id: gh-75/01
 title: Noun–verb command tree, with run list and run view
 depends_on: []
-status: planned
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
