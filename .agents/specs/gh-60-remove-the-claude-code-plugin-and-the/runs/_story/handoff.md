@@ -33,7 +33,9 @@ Remove the Claude Code plugin, `scripts/sync-plugin*` and the `sync:plugin`/`che
 - implement#1 done: Removed the Claude Code plugin, scripts/sync-plugin*, and the sync:plugin/check:plugin scripts. Updated AGENTS.md, README, docs/cookbook.html, the release skill and release.yaml (the person approved editing release.yaml). Did not edit CHANGELOG.md, following AGENTS.md (no Unreleased section; the release step writes it). typecheck, bun test (1198 pass) and schema:emit are green.
 - review#1: approve. Both axes checked; typecheck, bun test (1198 pass) and schema:emit are green. Non-blocking findings: the CHANGELOG [Unreleased] item was skipped as AGENTS.md requires, so the PR body should carry the note about existing marketplace installs; PRD X3 still describes the Claude Code plugin (a follow-up for the spec workflow); a comma nit in the AGENTS.md release sentence.
 - review#1 approve: Approve: the plugin, scripts/sync-plugin* and the sync:plugin/check:plugin scripts are removed, and the docs, release skill and release.yaml are updated. typecheck, tests (1198 pass) and schema:emit are green. Non-blocking: no CHANGELOG [Unreleased] entry (AGENTS.md forbids it, so the PR body should carry the marketplace note); PRD X3 is stale; an AGENTS.md comma nit.
+- describe#1: wrote pr.md (summary file tree, evidence per spec item incl. the deliberately skipped CHANGELOG entry, marketplace-install note for the squash message, PRD X3 follow-up under merge danger).
+- describe#1 done: Wrote pr.md: summary with file tree, evidence per spec item (CHANGELOG entry skipped per AGENTS.md, marketplace-install note carried in the description for the squash message), tests 1198 pass, two-way door, PRD X3 follow-up noted.
 
 ## Resume
 
-Nothing left: review is reported approved.
+Nothing left in describe: pr.md is written; report `norn done done`.

@@ -1,0 +1,18 @@
+{
+  "kind": "started",
+  "receipt_id": "01M61KDXPT6FR6XXGJFT3T2076",
+  "run_id": "01M61KDXPT6FR6XXGJFT3T2075",
+  "step": "describe",
+  "attempt": 1,
+  "at": "2026-10-28T15:52:59.997Z",
+  "by": "agent",
+  "who": "claude",
+  "how": "manual",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-60-remove-the-claude-code-plugin-and-the",
+  "agent_session_id": "6399ad28-e545-4076-8850-d087e754cd16",
+  "process": {
+    "pid": 45258,
+    "pid_start": "Wed Oct 28 16:52:47 2026"
+  }
+}
