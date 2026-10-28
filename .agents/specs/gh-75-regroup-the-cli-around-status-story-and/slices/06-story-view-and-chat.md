@@ -1,8 +1,8 @@
 ---
 id: gh-75/06
 title: story view and story chat replace status <key> and orient
-depends_on: [gh-75/03, gh-75/04]
-status: planned
+depends_on: [ gh-75/03, gh-75/04 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
