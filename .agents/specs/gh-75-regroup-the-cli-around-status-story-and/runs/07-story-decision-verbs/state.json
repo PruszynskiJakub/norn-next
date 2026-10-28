@@ -5,13 +5,14 @@
   "unit_dir": "07-story-decision-verbs",
   "workflow": "slice",
   "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
-  "step": "implement",
+  "step": "test",
   "attempt": 1,
   "visits": {
-    "implement": 1
+    "implement": 1,
+    "test": 1
   },
-  "step_entered_at": "2026-10-28T14:13:16.910Z",
-  "status": "running",
+  "step_entered_at": "2026-10-28T14:52:03.938Z",
+  "status": "ready",
   "park": null,
   "counters": {
     "test_loop": 0,
@@ -21,29 +22,16 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 2,
-  "run": {
-    "run_id": "01M61DR88Z21B9TTSWFRZT06Z2",
+  "applied_through": 3,
+  "run": null,
+  "last_outcome": {
     "step": "implement",
-    "attempt": 1,
-    "started_at": "2026-10-28T14:13:52.301Z",
-    "how": "auto",
-    "agent": "claude",
-    "session": {
-      "runner": "herdr",
-      "session_id": "w6X:p1",
-      "pane_id": "w6X:p1",
-      "reach": "herdr agent attach w6X:p1"
-    },
-    "process": {
-      "pid": 88434,
-      "pid_start": "Wed Oct 28 15:13:52 2026"
-    },
-    "machine": "jakubpruszynski@mac",
-    "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD"
+    "outcome": "done",
+    "source": "reported",
+    "at": "2026-10-28T14:36:42.994Z",
+    "receipt_id": "01M61F283JBX36JZTJ1AK87XVN"
   },
-  "last_outcome": null,
   "created_at": "2026-10-28T14:13:16.910Z",
-  "updated_at": "2026-10-28T14:13:52.303Z",
-  "last_tick_id": "01M61DR88ZF6G50JHE00ST48N3"
+  "updated_at": "2026-10-28T14:52:03.938Z",
+  "last_tick_id": "01M61FYBF10V7KC20DWXCMDJJZ"
 }
