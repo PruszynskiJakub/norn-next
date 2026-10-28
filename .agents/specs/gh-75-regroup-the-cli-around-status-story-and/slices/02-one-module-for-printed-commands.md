@@ -2,7 +2,7 @@
 id: gh-75/02
 title: One module builds every command norn prints
 depends_on: []
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
