@@ -142,7 +142,7 @@ describe("gate item and rulings (F21, F28)", () => {
 
 describe("why by step, attempt, transition and rule (O5, F5)", () => {
   test("--transition finds the tick that applied the reject and quotes the comment", async () => {
-    const r = await h.norn("why", "gh-7", "--transition", "human-qa.reject");
+    const r = await h.norn("run", "view", "gh-7", "--why", "--transition", "human-qa.reject");
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({
       unit: "gh-7",
@@ -155,25 +155,25 @@ describe("why by step, attempt, transition and rule (O5, F5)", () => {
   });
 
   test("--step/--attempt pick the report of that attempt with its handoff in full", async () => {
-    const r = await h.norn("why", "gh-7", "--step", "qa", "--attempt", "1");
+    const r = await h.norn("run", "view", "gh-7", "--why", "--step", "qa", "--attempt", "1");
     expect(r.value).toMatchObject({ trigger: { kind: "done", outcome: "partial", step: "qa", attempt: 1 } });
     expect((r.value as { trigger: { reason: string } }).trigger.reason).toStartWith("AC6 vs B6: spec conflict, counted raw");
-    const second = await h.norn("why", "gh-7", "--transition", "qa.partial");
+    const second = await h.norn("run", "view", "gh-7", "--why", "--transition", "qa.partial");
     expect((second.value as { matches: unknown[] }).matches).toHaveLength(2);
     expect(second.value).toMatchObject({ trigger: { attempt: 2, reason: "AC7 still needs a browser" } });
   });
 
   test("the intake decision is keyed by the story (F5)", async () => {
-    const r = await h.norn("why", "gh-7", "--rule", "remote.intake");
+    const r = await h.norn("run", "view", "gh-7", "--why", "--rule", "remote.intake");
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ unit: "gh-7", rule: "remote.intake", action: "intake_story", trigger: { source: "fact", kind: "remote_issue" }, replay: { matches: true } });
     expect((r.value as { trigger: { reason: string } }).trigger.reason).toContain("#7 Count items");
   });
 
   test("bad filters are usage errors; no match is refused", async () => {
-    expect((await h.norn("why", "gh-7", "--transition", "qa")).exit).toBe(2);
-    expect((await h.norn("why", "gh-7", "--attempt", "x")).exit).toBe(2);
-    const none = await h.norn("why", "gh-7", "--transition", "qa.fail");
+    expect((await h.norn("run", "view", "gh-7", "--why", "--transition", "qa")).exit).toBe(2);
+    expect((await h.norn("run", "view", "gh-7", "--why", "--attempt", "x")).exit).toBe(2);
+    const none = await h.norn("run", "view", "gh-7", "--why", "--transition", "qa.fail");
     expect(none.exit).toBe(3);
     expect(none.value).toMatchObject({ code: "no_tick" });
   });

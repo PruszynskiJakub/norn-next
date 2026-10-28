@@ -2,9 +2,9 @@
  * @norn/cli — wiring and commands. `main.ts` is the `norn` bin; `runCli` runs a command
  * in-process (tests, embedding). Command files live in `src/commands/` (see commands/index.ts).
  */
-export { type CliResult, helpFor, parseCommandArgs, runCli } from "./cli.ts";
+export { type CliResult, helpFor, nounHelp, parseCommandArgs, runCli } from "./cli.ts";
 export { type Command, defineCommand, opt, type OptionSpec, type ParsedArgs } from "./command.ts";
-export { COMMANDS, findCommand } from "./commands/index.ts";
+export { COMMANDS, findCommand, findNoun, NOUNS } from "./commands/index.ts";
 export { type CliDeps, Context, findUnitMarker, type Located, locateRepo, systemClock } from "./context.ts";
 export { busyError, CliFailure, corruptError, failure, isRendered, isWithExit, refuse, render, rendered, toFailure, usageError, withExit } from "./output.ts";
 export { type ActRecord, Actor } from "./runtime/act/index.ts";

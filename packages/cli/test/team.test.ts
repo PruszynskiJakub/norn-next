@@ -214,7 +214,7 @@ describe("two clones hand a story over through git (§19.3, T5, T6)", () => {
     const rec = JSON.parse(readFileSync(join(storyRuns(B.root), "receipts", file), "utf8"));
     expect(rec).toMatchObject({ kind: "take", by: "human", who: "bob@repo-b", previous_holder: null, previous_heartbeat_id: null, expired: false });
     expect(h.git(["ls-remote", "origin", "refs/heads/gh-7-add-login-form"]).split("\t")[0]).toBe(sh(B.root, ["rev-parse", "gh-7-add-login-form"]));
-    const trace = await B.norn("trace", "gh-7", "--events");
+    const trace = await B.norn("run", "list", "gh-7", "--events");
     expect(JSON.stringify(trace.value)).toContain("take by bob@repo-b (claim was free)");
 
     // clone A now sees the claim held elsewhere and does nothing to the story (T7)

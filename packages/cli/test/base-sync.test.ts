@@ -515,7 +515,7 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
 
     h.runner.pane = { alive: true, state: "working", since: null };
     await until(() => h.state(runs())?.step === "ready" && h.state(runs())?.status === "parked", "ready");
-    const why = (await h.norn("why", "gh-11", "--transition", "resolve.done")).stdout;
+    const why = (await h.norn("run", "view", "gh-11", "--why", "--transition", "resolve.done")).stdout;
     expect(why).toContain(`by merge commit ${merge}`);
     // the agent's merge and fix-up, made during its run, are not foreign (C4)
     const inbox = (await h.norn("inbox")).value as { groups: Record<string, Array<{ id: string }>> };

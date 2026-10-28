@@ -1,6 +1,9 @@
 /**
- * `norn why <unit> [--tick <id>] [--step <s>] [--attempt <n>] [--transition <step>.<outcome>] [--rule <prefix>]`
- * (O5, H3): explain a tick's decision for a unit by replaying the pure `decide` on the facts
+ * `norn run view <run|unit>` (B44): one run of a unit from @norn/view — its step row: step,
+ * attempt, outcome, durations, who, reason, receipts; a unit key means its latest run.
+ *
+ * `norn run view <unit> --why [--tick <id>] [--step <s>] [--attempt <n>] [--transition <step>.<outcome>] [--rule <prefix>]`
+ * (B45, O5, H3; what `norn why` was, JSON unchanged, B70): explain a tick's decision for a unit by replaying the pure `decide` on the facts
  * snapshot, workflows and config recorded in the trace, showing the rule that fired, what
  * triggered it — the receipt applied (with its reason text: handoff, comment, check output) or the
  * fact the rule read — and verifying the replay equals the recorded decision. A mismatch exits 1
@@ -12,19 +15,22 @@
  * Without `--tick` the matching ticks are found automatically: by default the latest decision for
  * the unit; with `--step` / `--attempt` / `--transition` / `--rule` every decision that matches
  * (noops excluded unless `--rule` names them), newest explained, all listed under `matches`.
- * Intake decisions are keyed by the story (F5), so `norn why gh-1 --rule remote.intake` covers them.
+ * Intake decisions are keyed by the story (F5), so `norn run view gh-1 --why --rule remote.intake` covers them.
  * `--receipt <id>` (NT2: the command of a note's inbox item) picks the decision that applied that
- * receipt; its reason text lists the report's criteria not passed and its notes.
+ * receipt (the unit may be left out: it is the one whose decision applied it); its reason text
+ * lists the report's criteria not passed and its notes.
  *
- * R5.4 (N2): a tick with a `tick.start` but no end died during act. `why` explains it from its
+ * R5.4 (N2): a tick with a `tick.start` but no end died during act. `--why` explains it from its
  * recorded decisions ("tick crashed during act") — `--tick <id>` resolves the tick a receipt cites,
  * and without `--tick` a crashed tick newer than the unit's last finished one is the one explained.
  */
 import { cmd, criterionLine, decide, type Decision, legacyAction, type NumberedReceipt, type StoryFacts, type UnitFacts, unitDecision } from "@norn/core";
-import { ExitCode, type Receipt, type TickStartTrace, type TickTrace, type TickUnitRecord, ULID_PATTERN } from "@norn/schema";
+import { ExitCode, type Receipt, storyOf, type TickStartTrace, type TickTrace, type TickUnitRecord, ULID_PATTERN } from "@norn/schema";
 import { crashedTicksFor, decisionUnit, findCrashedTick, findTick, readTrace } from "@norn/store";
-import { defineCommand, opt } from "../command.ts";
-import { refuse, usageError, withExit } from "../output.ts";
+import { formatRunView, loadRunView } from "@norn/view";
+import { defineCommand, opt, type ParsedArgs } from "../command.ts";
+import type { Context } from "../context.ts";
+import { refuse, rendered, usageError, withExit } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
 import { replayInputs } from "../runtime/tick.ts";
 import { NORN_VERSION } from "../version.ts";
@@ -167,13 +173,13 @@ function parseFilter(args: Parameters<typeof opt.str>[0]): Filter {
   if (step) f.step = step;
   const attempt = opt.str(args, "attempt");
   if (attempt !== undefined) {
-    if (!/^[1-9]\d*$/.test(attempt)) throw usageError(`--attempt must be a positive number, not '${attempt}'`, "norn why <unit> --step implement --attempt 2");
+    if (!/^[1-9]\d*$/.test(attempt)) throw usageError(`--attempt must be a positive number, not '${attempt}'`, "norn run view <unit> --why --step implement --attempt 2");
     f.attempt = Number(attempt);
   }
   const tr = opt.str(args, "transition");
   if (tr !== undefined) {
     const i = tr.lastIndexOf(".");
-    if (i <= 0 || i === tr.length - 1) throw usageError(`--transition must be <step>.<outcome>, not '${tr}'`, "norn why <unit> --transition qa.fail");
+    if (i <= 0 || i === tr.length - 1) throw usageError(`--transition must be <step>.<outcome>, not '${tr}'`, "norn run view <unit> --why --transition qa.fail");
     f.transition = { step: tr.slice(0, i), outcome: tr.slice(i + 1) };
   }
   const rule = opt.str(args, "rule");
@@ -189,7 +195,7 @@ function parseFilter(args: Parameters<typeof opt.str>[0]): Filter {
 /** R5.4: explain a tick that died during act from its `tick.start` decisions (no results, no replay). */
 function crashedExplanation(tick: TickStartTrace, key: string) {
   const d = unitDecision(tick.decisions, key, decisionUnit);
-  if (!d) throw refuse(`tick ${tick.tick_id} decided nothing for ${key}`, cmd.trace(key), "no_decision");
+  if (!d) throw refuse(`tick ${tick.tick_id} decided nothing for ${key}`, cmd.runList(key), "no_decision");
   const record: TickUnitRecord = { unit: d.unit, rule: d.rule, action: d.action, result: { ok: false } };
   const a = d.action as { kind: string; reason?: string; receipts?: Array<{ n: number; receipt: Receipt }> };
   return {
@@ -210,107 +216,149 @@ function crashedExplanation(tick: TickStartTrace, key: string) {
   };
 }
 
-export const whyCommand = defineCommand({
-  name: "why",
-  summary: "Replay decide on a recorded tick and show the rule that fired for a unit and what triggered it (O5)",
-  usage: "norn why <unit> [--tick <tick_id>] [--step <step>] [--attempt <n>] [--transition <step>.<outcome>] [--rule <prefix>] [--receipt <receipt_id>]",
-  options: { tick: { type: "string" }, step: { type: "string" }, attempt: { type: "string" }, transition: { type: "string" }, rule: { type: "string" }, receipt: { type: "string" } },
-  positionals: { min: 1, max: 1 },
+/** NT2: the unit of the decision that applied a receipt, for `--receipt` without a unit. */
+function unitOfReceipt(root: string, receiptId: string): string | null {
+  const { events } = readTrace(root, { types: ["tick"] });
+  for (const ev of (events as TickTrace[]).toReversed())
+    for (const d of ev.decisions) {
+      const key = decisionUnit(d);
+      if (key === "*") continue;
+      if (receiptsOf(d, unitIn(ev, storyOf(key), key).uf).some((r) => r.receipt.receipt_id === receiptId)) return key;
+    }
+  return null;
+}
+
+/** O5: `run view --why` / `--receipt`, what `norn why` was. */
+async function why(ctx: Context, args: ParsedArgs) {
+  const filter = parseFilter(args);
+  if (!args.positionals[0] && !filter.receipt) throw usageError("run view --why: expected a unit", cmd.runView(undefined, { why: true }));
+  const raw = args.positionals[0] ?? (filter.receipt ? unitOfReceipt(ctx.root, filter.receipt) : null);
+  if (!raw) throw refuse(`no tick in the trace applied receipt ${filter.receipt}`, cmd.inbox({ notes: true }), "no_tick");
+  const { key, story } = parseUnitKey(raw);
+  const tickId = opt.str(args, "tick");
+  const filtered = Object.keys(filter).length > 0;
+
+  // every (tick, decision) for the unit that passes the filter, oldest first
+  let found: Array<{ tick: TickTrace; d: TickUnitRecord }>;
+  if (tickId) {
+    const tick = findTick(ctx.root, tickId);
+    if (!tick) {
+      const crashed = findCrashedTick(ctx.root, tickId);
+      if (crashed) return crashedExplanation(crashed, key);
+      throw refuse(`no tick ${tickId} in the trace`, cmd.runList(key), "no_tick");
+    }
+    const d = unitDecision(tick.decisions, key, decisionUnit);
+    if (!d) throw refuse(`tick ${tick.tick_id} decided nothing for ${key}`, cmd.runList(key), "no_decision");
+    found = [{ tick, d }];
+  } else {
+    const { events } = readTrace(ctx.root, { unit: key, types: ["tick"] });
+    found = [];
+    for (const ev of events as TickTrace[]) {
+      // R1.1: by default the unit's own action, not the claim renewal riding along; a filter may pick either
+      const d = filtered
+        ? ev.decisions.filter((x) => decisionUnit(x) === key).find((x) => matches(x, unitIn(ev, story, key).uf, filter))
+        : unitDecision(ev.decisions, key, decisionUnit);
+      if (d) found.push({ tick: ev, d });
+    }
+    // R5.4: a newer tick that died during act is the one to explain
+    const crashed = filtered ? undefined : crashedTicksFor(ctx.root, key).at(-1);
+    if (crashed && (!found.length || crashed.at >= (found.at(-1) as { tick: TickTrace }).tick.at)) return crashedExplanation(crashed, key);
+    if (!found.length)
+      throw refuse(
+        filtered ? `no tick in the trace matches ${JSON.stringify(filter)} for ${key}` : `no tick in the trace decided anything for ${key}`,
+        filtered ? cmd.runList(key) : cmd.tick(),
+        "no_tick",
+      );
+  }
+  const { tick, d: recorded } = found.at(-1) as { tick: TickTrace; d: TickUnitRecord };
+  const inputs = replayInputs(ctx.root, tick);
+  if (!inputs) throw refuse(`tick ${tick.tick_id} has no replay block (recorded by an older norn)`, cmd.runList(key), "no_replay");
+
+  let replayed: Decision[];
+  try {
+    replayed = decide(inputs.facts, inputs.workflows, inputs.config);
+  } catch (e) {
+    throw refuse(`replay of tick ${tick.tick_id} failed: ${(e as Error).message}`, cmd.runList(key), "replay_failed");
+  }
+  const mine = replayed.find((d) => d.unit === key && d.rule === recorded.rule) ?? unitDecision(replayed, key);
+  const same = !!mine && mine.rule === recorded.rule && canon(mine.action) === canon(recorded.action);
+  const allMatch =
+    replayed.length === tick.decisions.length &&
+    replayed.every((d, i) => d.unit === (tick.decisions[i] ? decisionUnit(tick.decisions[i]) : undefined) && d.rule === tick.decisions[i]?.rule && canon(d.action) === canon(tick.decisions[i]?.action));
+
+  const sf = inputs.facts.stories.find((s) => s.key === story);
+  const uf = sf?.units.find((u) => u.unit.key === key);
+  const st = uf?.state ?? null;
+  const action = recorded.action as { kind?: string; reason?: string };
+  const out = {
+    unit: key,
+    tick_id: tick.tick_id,
+    at: tick.at,
+    rule: recorded.rule,
+    action: action.kind ?? null,
+    ...(action.reason ? { reason: action.reason } : {}),
+    trigger: triggerOf(recorded, uf),
+    result: recorded.result,
+    facts: {
+      claim: sf?.claim.state ?? null,
+      status: st?.status ?? (uf ? "not_started" : null),
+      step: st?.step ?? null,
+      attempt: st?.attempt ?? null,
+      park: st?.park ?? null,
+      counters: st?.counters ?? {},
+      unapplied: uf?.unapplied.map((r) => `${String(r.n).padStart(4, "0")}-${r.receipt.kind}`) ?? [],
+      errors: uf?.errors ?? [],
+    },
+    decision: recorded.action,
+    replay: {
+      matches: same,
+      all_match: allMatch,
+      rule: mine?.rule ?? null,
+      ...(same ? {} : { action: mine?.action ?? null }),
+      // O5: decide may have changed since; say whose decision the replay is compared with
+      ...(tick.norn_version && tick.norn_version !== NORN_VERSION ? { label: `recorded by norn ${tick.norn_version}, replayed by norn ${NORN_VERSION}` } : {}),
+    },
+    ...(filtered && !tickId
+      ? {
+          matches: found.map(({ tick: t, d }) => {
+            const tr = triggerOf(d, unitIn(t, story, key).uf);
+            return { tick_id: t.tick_id, at: t.at, rule: d.rule, action: d.action.kind, trigger: tr.source === "receipt" ? `${tr.kind}${tr.outcome && tr.outcome !== tr.kind ? ` ${tr.outcome}` : ""} at ${tr.step}#${tr.attempt}` : tr.kind };
+          }),
+        }
+      : {}),
+  };
+  return same ? out : withExit(out, ExitCode.error);
+}
+
+/** Options only `--why` reads. */
+const WHY_ONLY = ["tick", "step", "attempt", "transition", "rule"] as const;
+
+export const runViewCommand = defineCommand({
+  name: "run view",
+  summary: "One run of a unit: step, attempt, outcome, durations, receipts; --why replays the decision (B44, O5)",
+  usage: "norn run view <run|unit> [--why [--tick <tick_id>] [--step <step>] [--attempt <n>] [--transition <step>.<outcome>] [--rule <prefix>]] | norn run view [<unit>] --receipt <receipt_id>",
+  markdown: true,
+  optionHelp: {
+    "--why": "replay decide on the recorded tick and show the rule that fired and what triggered it",
+    "--tick <tick_id>": "with --why: that tick",
+    "--step <step>": "with --why: decisions about that step",
+    "--attempt <n>": "with --why: that attempt",
+    "--transition <step>.<outcome>": "with --why: the decision that took that edge",
+    "--rule <prefix>": "with --why: decisions by rules with that prefix",
+    "--receipt <id>": "the decision that applied that receipt (a note's inbox item)",
+  },
+  options: { why: { type: "boolean" }, tick: { type: "string" }, step: { type: "string" }, attempt: { type: "string" }, transition: { type: "string" }, rule: { type: "string" }, receipt: { type: "string" } },
+  positionals: { max: 1 },
   async run(ctx, args) {
-    const { key, story } = parseUnitKey(args.positionals[0] as string);
-    const tickId = opt.str(args, "tick");
-    const filter = parseFilter(args);
-    const filtered = Object.keys(filter).length > 0;
-
-    // every (tick, decision) for the unit that passes the filter, oldest first
-    let found: Array<{ tick: TickTrace; d: TickUnitRecord }>;
-    if (tickId) {
-      const tick = findTick(ctx.root, tickId);
-      if (!tick) {
-        const crashed = findCrashedTick(ctx.root, tickId);
-        if (crashed) return crashedExplanation(crashed, key);
-        throw refuse(`no tick ${tickId} in the trace`, cmd.trace(key), "no_tick");
-      }
-      const d = unitDecision(tick.decisions, key, decisionUnit);
-      if (!d) throw refuse(`tick ${tick.tick_id} decided nothing for ${key}`, cmd.trace(key), "no_decision");
-      found = [{ tick, d }];
-    } else {
-      const { events } = readTrace(ctx.root, { unit: key, types: ["tick"] });
-      found = [];
-      for (const ev of events as TickTrace[]) {
-        // R1.1: by default the unit's own action, not the claim renewal riding along; a filter may pick either
-        const d = filtered
-          ? ev.decisions.filter((x) => decisionUnit(x) === key).find((x) => matches(x, unitIn(ev, story, key).uf, filter))
-          : unitDecision(ev.decisions, key, decisionUnit);
-        if (d) found.push({ tick: ev, d });
-      }
-      // R5.4: a newer tick that died during act is the one to explain
-      const crashed = filtered ? undefined : crashedTicksFor(ctx.root, key).at(-1);
-      if (crashed && (!found.length || crashed.at >= (found.at(-1) as { tick: TickTrace }).tick.at)) return crashedExplanation(crashed, key);
-      if (!found.length)
-        throw refuse(
-          filtered ? `no tick in the trace matches ${JSON.stringify(filter)} for ${key}` : `no tick in the trace decided anything for ${key}`,
-          filtered ? cmd.trace(key) : cmd.tick(),
-          "no_tick",
-        );
-    }
-    const { tick, d: recorded } = found.at(-1) as { tick: TickTrace; d: TickUnitRecord };
-    const inputs = replayInputs(ctx.root, tick);
-    if (!inputs) throw refuse(`tick ${tick.tick_id} has no replay block (recorded by an older norn)`, cmd.trace(key), "no_replay");
-
-    let replayed: Decision[];
-    try {
-      replayed = decide(inputs.facts, inputs.workflows, inputs.config);
-    } catch (e) {
-      throw refuse(`replay of tick ${tick.tick_id} failed: ${(e as Error).message}`, cmd.trace(key), "replay_failed");
-    }
-    const mine = replayed.find((d) => d.unit === key && d.rule === recorded.rule) ?? unitDecision(replayed, key);
-    const same = !!mine && mine.rule === recorded.rule && canon(mine.action) === canon(recorded.action);
-    const allMatch =
-      replayed.length === tick.decisions.length &&
-      replayed.every((d, i) => d.unit === (tick.decisions[i] ? decisionUnit(tick.decisions[i]) : undefined) && d.rule === tick.decisions[i]?.rule && canon(d.action) === canon(tick.decisions[i]?.action));
-
-    const sf = inputs.facts.stories.find((s) => s.key === story);
-    const uf = sf?.units.find((u) => u.unit.key === key);
-    const st = uf?.state ?? null;
-    const action = recorded.action as { kind?: string; reason?: string };
-    const out = {
-      unit: key,
-      tick_id: tick.tick_id,
-      at: tick.at,
-      rule: recorded.rule,
-      action: action.kind ?? null,
-      ...(action.reason ? { reason: action.reason } : {}),
-      trigger: triggerOf(recorded, uf),
-      result: recorded.result,
-      facts: {
-        claim: sf?.claim.state ?? null,
-        status: st?.status ?? (uf ? "not_started" : null),
-        step: st?.step ?? null,
-        attempt: st?.attempt ?? null,
-        park: st?.park ?? null,
-        counters: st?.counters ?? {},
-        unapplied: uf?.unapplied.map((r) => `${String(r.n).padStart(4, "0")}-${r.receipt.kind}`) ?? [],
-        errors: uf?.errors ?? [],
-      },
-      decision: recorded.action,
-      replay: {
-        matches: same,
-        all_match: allMatch,
-        rule: mine?.rule ?? null,
-        ...(same ? {} : { action: mine?.action ?? null }),
-        // O5: decide may have changed since; say whose decision the replay is compared with
-        ...(tick.norn_version && tick.norn_version !== NORN_VERSION ? { label: `recorded by norn ${tick.norn_version}, replayed by norn ${NORN_VERSION}` } : {}),
-      },
-      ...(filtered && !tickId
-        ? {
-            matches: found.map(({ tick: t, d }) => {
-              const tr = triggerOf(d, unitIn(t, story, key).uf);
-              return { tick_id: t.tick_id, at: t.at, rule: d.rule, action: d.action.kind, trigger: tr.source === "receipt" ? `${tr.kind}${tr.outcome && tr.outcome !== tr.kind ? ` ${tr.outcome}` : ""} at ${tr.step}#${tr.attempt}` : tr.kind };
-            }),
-          }
-        : {}),
-    };
-    return same ? out : withExit(out, ExitCode.error);
+    if (opt.bool(args, "why") || opt.str(args, "receipt") !== undefined) return why(ctx, args);
+    const stray = WHY_ONLY.find((o) => args.values[o] !== undefined);
+    if (stray) throw usageError(`--${stray} needs --why`, `norn run view <unit> --why --${stray} …`);
+    const target = args.positionals[0];
+    if (!target) throw usageError("run view: expected a run id or a unit", "norn run view <run|unit>");
+    const runId = new RegExp(ULID_PATTERN).test(target);
+    const key = runId ? target : parseUnitKey(target).key;
+    const run = loadRunView({ repoRoot: ctx.root, home: ctx.home, env: ctx.env, now: ctx.clock.now(), target: key });
+    if (!run) throw refuse(runId ? `no run ${key} in the trace` : `${key} is unknown or has no run yet`, cmd.status(), runId ? "unknown_run" : "unknown_unit");
+    return rendered(run, formatRunView(run));
   },
 });

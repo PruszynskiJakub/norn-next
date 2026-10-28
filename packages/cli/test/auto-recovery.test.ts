@@ -253,11 +253,11 @@ describe("R5.4 / R5.5: tick records and the heartbeat (acceptance 7, 8)", () => 
       decisions: [{ unit: "gh-9", rule: "agent.start", action: { kind: "start_run", receipts: [{ n: 7, receipt: { kind: "started", receipt_id: tick_id, run_id: tick_id } }] } as TickStartTrace["decisions"][number]["action"] }],
     };
     appendTrace(h.root, start);
-    const why = await h.norn("why", "gh-9", "--tick", tick_id);
+    const why = await h.norn("run", "view", "gh-9", "--why", "--tick", tick_id);
     expect(why.exit).toBe(0);
     expect(why.value).toMatchObject({ tick_id, crashed: true, rule: "agent.start", action: "start_run", explanation: expect.stringContaining("tick crashed during act"), receipts: [{ n: 7, kind: "started", run_id: tick_id }] });
     // the newest tick for the unit is the crashed one
-    expect((await h.norn("why", "gh-9")).value).toMatchObject({ tick_id, crashed: true });
+    expect((await h.norn("run", "view", "gh-9", "--why")).value).toMatchObject({ tick_id, crashed: true });
   });
 
   test("no heartbeat for 3 watch intervals with auto work held: inbox item, no manual start hint", async () => {

@@ -14,6 +14,18 @@
 
 ## Goal
 
+Noun–verb command tree in the framework (prefactor 1), and the `run` noun: `run list` (was `trace`) and `run view [--why | --receipt]` (was `why`), with the old names removed.
+
 ## Progress
 
+- Framework: `Noun`/`defineNoun` and `Command.optionHelp` (command.ts); registry `NOUNS`, `findNoun`, `findCommand("run list")` (commands/index.ts); dispatcher resolves `<noun> <verb>`, `norn <noun>` = `help <noun>`, verb `--help` = `help <noun> <verb>`; unknown names are `Unknown command: …` (cli.ts).
+- help: noun row names its verbs, `help <noun>`, `help <noun> <verb>` with an Options section, `--all` with a `hidden` group flag (no group hidden yet — slice 14 sets the tiers).
+- `trace.ts` → `run-list.ts`, `why.ts` → `run-view.ts` (git mv). `run view <unit|run-id>` reads `loadRunView` (new, packages/view/src/run-view.ts; type `RunDetail` since `RunView` existed) and `formatRunView`. `--why`'s JSON unchanged; `--receipt` without a unit finds it from the trace. Why's filter flags without `--why` are a usage error.
+- cockpit's trace action runs `run list` (view/src/cockpit.ts).
+- Old trace/why tests moved (renamed calls); new tests: e2e (noun listing, verb help, help --all, trace/why unknown), human (run view by unit/run id, slice story run list), criteria (`--receipt` without unit).
+- Full `bun test` (1206 pass) and typecheck green. AC8 checked with a harness-built repo: output reads correctly.
+- Left for slice 14 as the slice says: printed `norn trace …`/`norn why …` in inbox items, do_instead hints and handoff headers still name the old commands.
+
 ## Resume
+
+Nothing left in this step; report `norn done done`.

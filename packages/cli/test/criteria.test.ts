@@ -146,7 +146,7 @@ describe("criteria reports and notes through norn done", () => {
     // QV8: the trace counts unverified per capability; norn trace sums it
     const ev = readTrace(h.root, { unit: "gh-4", types: ["criteria"] }).events as CriteriaTrace[];
     expect(ev.at(-1)).toMatchObject({ unit: "gh-4", rule: "criteria.checked", outcome: "unverified", verdicts: { pass: 1, fail: 0, person: 1, unverified: 1 }, unverified_needs: { browser: 1 } });
-    expect(((await h.norn("trace", "gh-4")).value as { criteria: unknown }).criteria).toEqual({ reports: 1, verdicts: { pass: 1, fail: 0, person: 1, unverified: 1 }, unverified_needs: { browser: 1 }, unchecked_coverage: 0 });
+    expect(((await h.norn("run", "list", "gh-4")).value as { criteria: unknown }).criteria).toEqual({ reports: 1, verdicts: { pass: 1, fail: 0, person: 1, unverified: 1 }, unverified_needs: { browser: 1 }, unchecked_coverage: 0 });
 
     await tickUntil(at("human-qa", "parked"), "human-qa");
     const g = await inbox();
@@ -160,9 +160,11 @@ describe("criteria reports and notes through norn done", () => {
     // NT2: the note is a Check item whose command explains the report
     const [n] = await notes();
     expect(n).toMatchObject({ id: `note:${done.receipt_id}:1`, title: "qa note on gh-4 (AC1): kept whitespace inside backticks", command: `norn why gh-4 --receipt ${done.receipt_id}` });
-    const why = await h.norn("why", "gh-4", "--receipt", done.receipt_id);
+    const why = await h.norn("run", "view", "gh-4", "--why", "--receipt", done.receipt_id);
     expect(why.exit).toBe(0);
     expect(why.value).toMatchObject({ trigger: { kind: "done", outcome: "unverified", reason: expect.stringContaining("Notes for a person:\n1. (AC1) kept whitespace inside backticks") } });
+    // B45: the receipt names its unit; the same JSON without it
+    expect((await h.norn("run", "view", "--receipt", done.receipt_id)).value).toEqual(why.value);
   });
 
   test("10: reject leaves notes open; a later note joins them; ready.approve acknowledges both", async () => {

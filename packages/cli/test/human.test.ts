@@ -315,38 +315,62 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
     expect(h.state(runs5())).toMatchObject({ step: "$done", status: "done", last_outcome: { outcome: "approve", source: "human" } });
   });
 
-  test("why replays decide on the recorded snapshot and equals the recorded decision (O5)", async () => {
-    const r = await h.norn("why", "gh-5");
+  test("run view --why replays decide on the recorded snapshot and equals the recorded decision (O5)", async () => {
+    const r = await h.norn("run", "view", "gh-5", "--why");
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ unit: "gh-5", replay: { matches: true, all_match: true } });
     const v = r.value as { rule: string; replay: { rule: string } };
     expect(v.replay.rule).toBe(v.rule);
-    const at = await h.norn("why", "gh-5", "--tick", importTick.tick_id);
+    const at = await h.norn("run", "view", "gh-5", "--why", "--tick", importTick.tick_id);
     expect(at.value).toMatchObject({ tick_id: importTick.tick_id, rule: "mailbox.import", action: "import_mailbox", replay: { matches: true } });
-    refused(await h.norn("why", "gh-5", "--tick", "01ARZ3NDEKTSV4RRFFQ69G5FAV"), "no_tick");
+    refused(await h.norn("run", "view", "gh-5", "--why", "--tick", "01ARZ3NDEKTSV4RRFFQ69G5FAV"), "no_tick");
   });
 
-  test("trace: step rows with who and reasons; --events with every human receipt; --limit; --text", async () => {
+  test("run list: step rows with who and reasons; --events with every human receipt; --limit; --text", async () => {
     type Row = { step: string; attempt: number; who: Array<{ by: string; name: string }>; events?: Array<{ source: string; kind: string }> };
-    const r = (await h.norn("trace", "gh-5")).value as { total: number; steps: Row[]; hidden_events: number };
+    const r = (await h.norn("run", "list", "gh-5")).value as { total: number; steps: Row[]; hidden_events: number };
     expect(r.total).toBe(r.steps.length);
     expect(r.steps.every((s) => s.events === undefined)).toBe(true);
     expect(r.steps.flatMap((s) => s.who).some((w) => w.by === "human" && w.name === "colleague@laptop")).toBe(true);
-    const ev = (await h.norn("trace", "gh-5", "--events")).value as { steps: Row[] };
+    const ev = (await h.norn("run", "list", "gh-5", "--events")).value as { steps: Row[] };
     const events = ev.steps.flatMap((s) => s.events ?? []);
     const kinds = events.filter((e) => e.source === "receipt").map((e) => e.kind);
     for (const k of ["ask", "answer", "stuck", "unstick", "mode", "reject", "approve"]) expect(kinds).toContain(k);
     expect(events.some((e) => e.source === "tick")).toBe(true);
     expect(events.some((e) => e.kind === "noop")).toBe(false);
-    const last = (await h.norn("trace", "gh-5", "--limit", "2")).value as { total: number; steps: Row[] };
+    const last = (await h.norn("run", "list", "gh-5", "--limit", "2")).value as { total: number; steps: Row[] };
     expect(last.steps).toHaveLength(2);
     expect(last.total).toBe(r.total);
     expect(last.steps).toEqual(r.steps.slice(-2));
-    const text = (await h.norn("trace", "gh-5")).stdout;
+    const text = (await h.norn("run", "list", "gh-5")).stdout;
     expect(text).toContain("STEP");
     expect(text).toContain("human wait");
-    expect((await h.norn("trace", "gh-5", "--limit", "0")).exit).toBe(2);
-    refused(await h.norn("trace", "gh-9"), "unknown_unit");
+    expect((await h.norn("run", "list", "gh-5", "--limit", "0")).exit).toBe(2);
+    refused(await h.norn("run", "list", "gh-9"), "unknown_unit");
+  });
+
+  test("run view: a unit's latest run, a run by its id; --json is the data (B44, B6)", async () => {
+    type Row = { unit: string; step: string; attempt: number; outcome: string | null; who: Array<{ run_id: string | null }> };
+    const steps = ((await h.norn("run", "list", "gh-5", "--json")).value as { steps: Row[] }).steps;
+    const latest = steps.at(-1) as Row;
+    const r = await h.norn("run", "view", "gh-5");
+    expect(r.exit).toBe(0);
+    expect(r.value).toMatchObject({ unit: "gh-5", story: "gh-5", step: latest.step, attempt: latest.attempt, outcome: latest.outcome, paths: { receipts: expect.any(Array) } });
+    expect(r.stdout).toStartWith(`gh-5 · ${latest.step}#${latest.attempt} (`);
+    expect(r.stdout).toMatch(/\nduration +\S+/);
+    expect(r.stdout).toContain("\nReceipts\n  /");
+    expect(JSON.parse((await h.norn("run", "view", "gh-5", "--json")).stdout)).toEqual(r.value);
+
+    // an older run, by the id of its agent session
+    const older = steps.find((s) => s.step === "work" && s.who.some((w) => w.run_id)) as Row;
+    const runId = older.who.find((w) => w.run_id)?.run_id as string;
+    const byId = await h.norn("run", "view", runId, "--json");
+    expect(byId.value).toMatchObject({ unit: "gh-5", run_id: runId, step: "work", attempt: older.attempt });
+
+    refused(await h.norn("run", "view", "01ARZ3NDEKTSV4RRFFQ69G5FAV"), "unknown_run");
+    refused(await h.norn("run", "view", "gh-9"), "unknown_unit");
+    expect((await h.norn("run", "view")).exit).toBe(2);
+    expect((await h.norn("run", "view", "gh-5", "--tick", "01ARZ3NDEKTSV4RRFFQ69G5FAV")).exit).toBe(2); // --tick needs --why
   });
 });
 
@@ -377,6 +401,16 @@ describe("a slice gate in its own worktree (X1: views read slice runs from the s
     expect(inbox.groups.approve).toEqual([
       expect.objectContaining({ slice: "gh-8/01", step: "qa", title: "Try the slice", command: "norn approve gh-8/01" }),
     ]);
+  });
+
+  test("run list of the story shows its slices; run view of the slice is its gate (B43, B44)", async () => {
+    const list = await h.norn("run", "list", "gh-8");
+    expect(list.exit).toBe(0);
+    const v = list.value as { units: Array<{ unit: string }>; steps: Array<{ unit: string; step: string }> };
+    expect(v.units.map((u) => u.unit)).toEqual(["gh-8", "gh-8/01"]);
+    expect(v.steps).toContainEqual(expect.objectContaining({ unit: "gh-8/01", step: "qa" }));
+    expect(list.stdout).toContain("\n  gh-8/01 ");
+    expect((await h.norn("run", "view", "gh-8/01", "--json")).value).toMatchObject({ unit: "gh-8/01", story: "gh-8", slice: "gh-8/01", step: "qa", type: "gate", open: true, run_id: null });
   });
 
   test("approve lands in the slice worktree; the next tick finishes the slice and the inbox clears", async () => {

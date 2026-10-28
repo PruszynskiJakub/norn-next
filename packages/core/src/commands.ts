@@ -78,6 +78,8 @@ export const cmd = {
   release: (story: string) => norn("release", story),
   status: (target?: string) => norn("status", target),
   stuck: (reason = "<reason>") => norn("stuck", `"${reason}"`),
+  runList: (unit: string, o: { limit?: number } = {}) => norn("run list", unit, o.limit !== undefined && `--limit ${o.limit}`),
+  runView: (unit = "<unit>", o: { why?: boolean } = {}) => norn("run view", unit, o.why && "--why"),
   sync: () => norn("sync"),
   take: (story: string, o: { force?: boolean } = {}) => norn("take", story, o.force && "--force"),
   tick: () => norn("tick"),

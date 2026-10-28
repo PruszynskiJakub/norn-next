@@ -1,21 +1,23 @@
 /**
  * `norn help`: the commands grouped for a person, "Start here" first; `--json` for the list as data.
+ * A noun is one row naming its verbs; `norn help <noun>` lists the verbs (B2), `norn help <noun> <verb>`
+ * shows one verb (B4). A hidden group is printed only by `norn help --all`.
  * An agent may run it too, so it says up front which commands an agent runs (the B3–B6 protocol)
  * and marks every command and bundled skill (§16) with who it is for.
  */
-import type { Command } from "../command.ts";
-import { defineCommand } from "../command.ts";
-import { rendered } from "../output.ts";
+import type { Command, Noun } from "../command.ts";
+import { defineCommand, opt } from "../command.ts";
+import { rendered, usageError } from "../output.ts";
 import { bundledSkills } from "../runtime/workflows.ts";
 
 /** Who runs a command: a person, the agent doing a step, or the agent's hooks (never by hand). */
 export type CommandFor = "person" | "agent" | "hooks";
 
-/** Help groups in print order; a command missing here lands in "Other" (for a person). */
-const HELP_GROUPS: ReadonlyArray<{ title: string; for: CommandFor; commands: readonly string[] }> = [
+/** Help groups in print order; a command missing here lands in "Other" (for a person). A `hidden` group only with `--all`. */
+const HELP_GROUPS: ReadonlyArray<{ title: string; for: CommandFor; commands: readonly string[]; hidden?: boolean }> = [
   { title: "Start here", for: "person", commands: ["init", "doctor", "sync", "watch", "inbox", "open"] },
   { title: "Answer what needs you", for: "person", commands: ["answer", "approve", "unstick", "update", "mode", "workflow"] },
-  { title: "Look around", for: "person", commands: ["cockpit", "status", "orient", "trace", "why", "config", "tick"] },
+  { title: "Look around", for: "person", commands: ["cockpit", "status", "orient", "run", "config", "tick"] },
   { title: "Team", for: "person", commands: ["take", "release", "drop"] },
   { title: "Housekeeping", for: "person", commands: ["tidy", "uninstall", "help"] },
   { title: "Agent protocol: the only commands an agent runs", for: "agent", commands: ["brief", "done", "ask", "stuck"] },
@@ -43,19 +45,28 @@ const AGENT_NOTE = [
 const plainSummary = (summary: string): string =>
   summary.replace(/\s*\((?:(?:§[\d.]+|[A-Z]{1,3}\d+(?:\.\d+)?[a-z]?)(?:[–-][A-Z]{0,3}\d+)?(?:,\s*)?)+\)/g, "");
 
-const commandFor = (name: string): CommandFor => HELP_GROUPS.find((g) => g.commands.includes(name))?.for ?? "person";
+/** A verb is for whoever its noun is for. */
+const commandFor = (name: string): CommandFor => {
+  const top = name.split(" ")[0] as string;
+  return HELP_GROUPS.find((g) => g.commands.includes(top))?.for ?? "person";
+};
 
 const skillFor = (name: string): SkillFor => SKILL_GROUPS.find((g) => g.skills.includes(name))?.for ?? "step";
 
-function formatHelp(commands: readonly Command[], skills: readonly string[] = []): string {
-  const width = Math.max(...commands.map((c) => c.name.length)) + 2;
-  const row = (c: Command) => `  norn ${c.name.padEnd(width)}${plainSummary(c.summary)}`;
+/** A row of `norn help`: a command, or a noun with its verbs. */
+type Row = { name: string; summary: string };
+
+const nounRow = (n: Noun): Row => ({ name: n.name, summary: `${n.summary} (${n.verbs.map((v) => v.name.slice(n.name.length + 1)).join(", ")})` });
+
+function formatHelp(rows: readonly Row[], skills: readonly string[] = [], all = false): string {
+  const width = Math.max(...rows.map((c) => c.name.length)) + 2;
+  const row = (c: Row) => `  norn ${c.name.padEnd(width)}${plainSummary(c.summary)}`;
   const grouped = new Set(HELP_GROUPS.flatMap((g) => g.commands));
-  const other = { title: "Other", commands: commands.map((c) => c.name).filter((n) => !grouped.has(n)) };
-  const groups = [...HELP_GROUPS.slice(0, -2), other, ...HELP_GROUPS.slice(-2)];
+  const other = { title: "Other", commands: rows.map((c) => c.name).filter((n) => !grouped.has(n)) };
+  const groups = [...HELP_GROUPS.slice(0, -2), other, ...HELP_GROUPS.slice(-2)].filter((g) => all || !("hidden" in g && g.hidden));
   const out = ["norn — deliver software stories with coding agents; code decides the next step, agents do it.", "", ...AGENT_NOTE, ""];
   for (const g of groups) {
-    const cs = g.commands.flatMap((n) => commands.filter((c) => c.name === n));
+    const cs = g.commands.flatMap((n) => rows.filter((c) => c.name === n));
     if (cs.length) out.push(g.title, ...cs.map(row), "");
   }
   if (skills.length) {
@@ -74,27 +85,48 @@ function formatHelp(commands: readonly Command[], skills: readonly string[] = []
 
 function formatCommandHelp(c: Command): string {
   const note = commandFor(c.name) === "person" ? "\n\nFor the person; an agent runs it only when the person asks it to." : "";
-  return `norn ${c.name} — ${plainSummary(c.summary)}\n\n    ${c.usage}${note}`;
+  const opts = Object.entries(c.optionHelp ?? {});
+  const width = Math.max(0, ...opts.map(([k]) => k.length)) + 2;
+  const options = opts.length ? `\n\nOptions\n${opts.map(([k, v]) => `  ${k.padEnd(width)}${v}`).join("\n")}` : "";
+  return `norn ${c.name} — ${plainSummary(c.summary)}\n\n    ${c.usage}${options}${note}`;
+}
+
+/** B2: `norn <noun>` — its verbs, in order. */
+function formatNounHelp(n: Noun): string {
+  const width = Math.max(...n.verbs.map((v) => v.name.length)) + 2;
+  const verbs = n.verbs.map((v) => `  norn ${v.name.padEnd(width)}${plainSummary(v.summary)}`);
+  return [`norn ${n.name} — ${plainSummary(n.summary)}`, "", ...verbs, "", `\`norn help ${n.name} <verb>\` shows one verb's usage and options.`].join("\n");
 }
 
 export const helpCommand = defineCommand({
   name: "help",
   summary: "List commands, and who runs each: a person or the agent",
-  usage: "norn help [command]",
-  positionals: { max: 1 },
+  usage: "norn help [--all] [<command> | <noun> [<verb>]]",
+  options: { all: { type: "boolean" } },
+  positionals: { max: 2 },
   markdown: true,
   repo: false,
   async run(ctx, args) {
     // imported lazily: the registry imports this file
-    const { COMMANDS, findCommand } = await import("./index.ts");
-    const { helpFor } = await import("../cli.ts");
-    const name = args.positionals[0];
+    const { COMMANDS, NOUNS, findCommand, findNoun } = await import("./index.ts");
+    const { helpFor, nounHelp } = await import("../cli.ts");
+    const [name, verb] = args.positionals;
+    const noun = name ? findNoun(name) : undefined;
+    if (noun && verb) {
+      const c = findCommand(`${noun.name} ${verb}`);
+      if (!c) throw usageError(`Unknown command: ${noun.name} ${verb}`, `norn help ${noun.name}`, "unknown_command");
+      return rendered({ ...helpFor(c), for: commandFor(c.name) }, formatCommandHelp(c));
+    }
+    if (noun) return rendered({ ...nounHelp(noun), for: commandFor(noun.name) }, formatNounHelp(noun));
     const c = name ? findCommand(name) : undefined;
     if (c) return rendered({ ...helpFor(c), for: commandFor(c.name) }, formatCommandHelp(c));
     const skills = bundledSkills(ctx.env);
+    const all = opt.bool(args, "all");
+    const hidden = new Set(HELP_GROUPS.filter((g) => g.hidden && !all).flatMap((g) => g.commands));
+    const commands = [...COMMANDS.map((c) => ({ ...helpFor(c), for: commandFor(c.name) })), ...NOUNS.map((n) => ({ ...nounHelp(n), for: commandFor(n.name) }))].filter((c) => !hidden.has(c.command));
     return rendered(
-      { commands: COMMANDS.map((c) => ({ ...helpFor(c), for: commandFor(c.name) })), skills: skills.map((s) => ({ skill: s, for: skillFor(s) })) },
-      formatHelp(COMMANDS, skills),
+      { commands, skills: skills.map((s) => ({ skill: s, for: skillFor(s) })) },
+      formatHelp([...COMMANDS, ...NOUNS.map(nounRow)], skills, all),
     );
   },
 });

@@ -3,6 +3,7 @@
  * in, a string out (no colour, no clock). The CLI's default output stays JSON (P8).
  */
 import { cmd, INBOX_ABOUT, INBOX_GROUPS, INBOX_TITLES } from "@norn/core";
+import type { RunDetail } from "./run-view.ts";
 import { oneLine } from "./timeline.ts";
 import type { InboxEntry, ProjectView, SliceView, StepRow, StepWho, StoryView, TimelineEntry, TraceView, UnitView } from "./types.ts";
 
@@ -265,3 +266,23 @@ export function formatStepTimeline(v: TraceView, opts: { full?: boolean } = {}):
   return `${out.join("\n")}\n`;
 }
 
+/**
+ * `norn run view <run|unit>` (B44): one run — step and attempt, the run id, outcome, when it
+ * entered and left with its duration, who, the time a person was waited on, the reason in full
+ * and the receipt, evidence and log paths.
+ */
+export function formatRunView(r: RunDetail): string {
+  const out = [`${r.unit} · ${r.step}#${r.attempt} (${r.type}${r.attended ? ", attended" : ""})`, ""];
+  const field = (k: string, v: string) => out.push(`${k.padEnd(9)}${v}`);
+  field("run", r.run_id ?? "-");
+  field("outcome", r.open ? "(in step)" : `${outcomeText(r)}${r.to ? ` → ${r.to}` : ""}`);
+  field("entered", r.entered_at ?? "-");
+  field("left", r.open ? "…" : (r.left_at ?? "-"));
+  field("duration", r.duration_ms === null ? "-" : `${formatDuration(r.duration_ms)}${r.open ? " so far" : ""}`);
+  field("who", r.who.map(whoText).join(", ") || "-");
+  if (r.wait_ms) field("waited", formatDuration(r.wait_ms));
+  if (r.reason) out.push("", "Reason", ...r.reason.split("\n").map((l) => `  ${l}`.trimEnd()));
+  const paths: Array<[string, string[]]> = [["Receipts", r.paths.receipts], ["Evidence", r.paths.evidence], ["Logs", r.paths.logs], ["Briefings", r.paths.briefings]];
+  for (const [title, ps] of paths) if (ps.length) out.push("", title, ...ps.map((p) => `  ${p}`));
+  return `${out.join("\n")}\n`;
+}

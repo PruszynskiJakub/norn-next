@@ -241,7 +241,7 @@ const JSON_PARSE_ALLOW: Record<string, [number, string]> = {
   "packages/adapters/src/herdr/cockpit.ts": [1, "tool output: herdr socket API reply line"],
   "packages/cli/src/commands/done.ts": [2, "agent-written findings / criteria files (validated after)"],
   "packages/cli/src/commands/hook.ts": [2, "tool output: hook payload on stdin, hook command stdout"],
-  "packages/cli/src/commands/why.ts": [1, "clone: canonical JSON for the replay diff"],
+  "packages/cli/src/commands/run-view.ts": [1, "clone: canonical JSON for the replay diff"],
   "packages/cli/src/runtime/detect.ts": [1, "file another tool owns: the repo's package.json"],
   "packages/cli/src/runtime/human.ts": [1, "norn file: state.json from git show"],
   "packages/cli/src/runtime/tick.ts": [1, "clone: trace-safe copy of facts"],

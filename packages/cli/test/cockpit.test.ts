@@ -168,7 +168,7 @@ describe("norn cockpit (CP6–CP8)", () => {
     const r = await runCli(["cockpit", "--interval", "1h"], { ...c.deps, herdr: null, env: { ...c.deps.env, COLUMNS: "160", LINES: "40" }, input: keys("j", "v", "\x1b", "y", "a", "CSV only\r", "q"), log: (l) => frames.push(l) });
     expect(r.exit).toBe(0);
     expect(r.value).toEqual({ frames: 7, last: { action: "answer", unit: "gh-6", ok: true } });
-    expect(frames[2]).toContain("norn trace gh-6 — esc to close");
+    expect(frames[2]).toContain("norn run list gh-6 — esc to close");
     expect(frames[4]).toContain("no y here: gh-6");
     expect(frames[5]).toContain("Your answer (answer gh-6):");
     expect(frames[6]).toContain("ok: norn answer gh-6");

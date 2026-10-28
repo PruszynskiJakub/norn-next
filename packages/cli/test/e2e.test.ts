@@ -163,6 +163,48 @@ describe("norn init", () => {
     expect(r.exit).toBe(2);
     expect(r.value).toMatchObject({ code: "unknown_command", do_instead: expect.stringContaining("norn help") });
     expect((await h.norn("tick", "--bogus")).exit).toBe(2);
+    expect((await h.norn("run", "frobnicate")).value).toMatchObject({ error: "Unknown command: run frobnicate", code: "unknown_command", do_instead: expect.stringContaining("norn help run") });
+  });
+
+  test("a noun with no verb, and help <noun>, list its verbs in order (B2)", async () => {
+    const r = await h.norn("run");
+    expect(r.exit).toBe(0);
+    expect(r.stdout).toStartWith("norn run — ");
+    expect(r.stdout).toMatch(/\n  norn run list +.+\n  norn run view +.+\n/);
+    expect(r.value).toMatchObject({ command: "run", verbs: [{ command: "run list" }, { command: "run view" }] });
+    expect((await h.norn("help", "run")).stdout).toBe(r.stdout);
+    expect((await h.norn("run", "--help")).stdout).toBe(r.stdout);
+    expect((await h.norn("run", "--json")).value).toEqual(r.value);
+    // norn help names the noun with its verbs
+    expect((await h.norn("help")).stdout).toMatch(/\n  norn run +.*\(list, view\)\n/);
+  });
+
+  test("help <noun> <verb> and <noun> <verb> --help show that verb's usage and options (B4)", async () => {
+    const r = await h.norn("help", "run", "view");
+    expect(r.exit).toBe(0);
+    expect(r.stdout).toStartWith("norn run view — ");
+    expect(r.stdout).toContain("    norn run view ");
+    expect(r.stdout).toMatch(/\nOptions\n(?:.*\n)*  --why +.+\n/);
+    expect(r.stdout).toMatch(/\n  --receipt <id> +.+\n/);
+    expect(r.value).toMatchObject({ command: "run view", options: expect.arrayContaining(["why", "receipt", "tick"]) });
+    expect((await h.norn("run", "view", "--help")).stdout).toBe(r.stdout);
+    expect((await h.norn("run", "view", "--help", "--json")).value).toEqual(r.value);
+  });
+
+  test("help --all adds the hidden tier", async () => {
+    const all = await h.norn("help", "--all");
+    expect(all.exit).toBe(0);
+    for (const c of (all.value as { commands: Array<{ command: string }> }).commands) expect(all.stdout).toContain(`  norn ${c.command} `);
+  });
+
+  test("the old trace and why are unknown commands, and write nothing (B5)", async () => {
+    const before = h.git(["status", "--porcelain", "--untracked-files=all"]);
+    for (const name of ["trace", "why"]) {
+      const r = await h.norn(name, "gh-1");
+      expect(r.exit).toBe(2);
+      expect(r.value).toMatchObject({ error: `Unknown command: ${name}`, code: "unknown_command", do_instead: expect.stringContaining("norn help") });
+    }
+    expect(h.git(["status", "--porcelain", "--untracked-files=all"])).toBe(before);
   });
 
   test("every command accepts --json", async () => {
