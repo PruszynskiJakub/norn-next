@@ -53,7 +53,7 @@ function formatHelp(commands: readonly Command[], skills: readonly string[] = []
   const row = (c: Command) => `  norn ${c.name.padEnd(width)}${plainSummary(c.summary)}`;
   const grouped = new Set(HELP_GROUPS.flatMap((g) => g.commands));
   const other = { title: "Other", commands: commands.map((c) => c.name).filter((n) => !grouped.has(n)) };
-  const groups = [...HELP_GROUPS.slice(0, -3), other, ...HELP_GROUPS.slice(-3)];
+  const groups = [...HELP_GROUPS.filter((g) => g.for === "person"), other, ...HELP_GROUPS.filter((g) => g.for !== "person")];
   const out = ["norn — deliver software stories with coding agents; code decides the next step, agents do it.", "", ...AGENT_NOTE, ""];
   for (const g of groups) {
     const cs = g.commands.flatMap((n) => commands.filter((c) => c.name === n));

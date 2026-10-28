@@ -7,12 +7,14 @@ import {
   acquireRunLease,
   acquireSlotLease,
   acquireTickLock,
+  claimRunLease,
   handOverLease,
   leasesDir,
   listLeases,
   localProcess,
   reclaimLeases,
   releaseLease,
+  releaseRunLease,
 } from "../src/index.ts";
 import { tmp } from "./helpers.ts";
 
@@ -83,6 +85,37 @@ describe("leases (K1, K3, K4)", () => {
     expect(handOverLease(home, r.entry.file, r.entry.lease, to)).toBe(false); // no longer the tick's
     expect(releaseLease(home, r.entry.file)).toBe(true);
     expect(handOverLease(home, r.entry.file, to, { ...to, holder: A })).toBe(false);
+    expect(readdirSync(leasesDir(home))).toEqual([]);
+  });
+  test("a run releases its lease only while it still names its run: one reclaimed by another run stays (K3)", async () => {
+    const home = tmp();
+    const r = await acquireRunLease(home, "check", 1, { ...unit, run_id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB1", holder: A, liveness: () => true });
+    if (!r.ok) throw new Error("no lease");
+    rmSync(join(leasesDir(home), r.entry.file)); // reclaimed (K3) ...
+    const other = await acquireRunLease(home, "check", 1, { ...unit, run_id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB2", holder: B, liveness: () => true });
+    expect(other).toMatchObject({ ok: true, entry: { file: r.entry.file } }); // ... and taken by another run
+    expect(releaseRunLease(home, r.entry.file, "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB1")).toBe(false);
+    expect(readdirSync(leasesDir(home))).toEqual([r.entry.file]);
+    writeFileSync(join(leasesDir(home), r.entry.file), '{"run_id":"01JBQ6ZK3E8Y4V5W6X7Y8Z9AB2"'); // unreadable (S2): not this run's to remove
+    expect(releaseRunLease(home, r.entry.file, "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB2")).toBe(false);
+    rmSync(join(leasesDir(home), r.entry.file));
+    const mine = await acquireRunLease(home, "check", 1, { ...unit, run_id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB1", holder: A, liveness: () => true });
+    expect(mine.ok).toBe(true);
+    expect(releaseRunLease(home, r.entry.file, "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB1")).toBe(true);
+    expect(readdirSync(leasesDir(home))).toEqual([]);
+    expect(releaseRunLease(home, r.entry.file, "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB1")).toBe(false); // gone already
+  });
+  test("a run takes its own lease over, never another run's (K1)", async () => {
+    const home = tmp();
+    const r = await acquireRunLease(home, "check", 1, { ...unit, run_id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB1", holder: A, liveness: () => true });
+    if (!r.ok) throw new Error("no lease");
+    expect(claimRunLease(home, r.entry.file, "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB2", B)).toBe(false);
+    expect((await listLeases(home, () => true)).live.map((e) => e.lease.holder)).toEqual([A]);
+    expect(claimRunLease(home, r.entry.file, "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB1", B)).toBe(true);
+    expect(claimRunLease(home, r.entry.file, "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB1", B)).toBe(true); // already its own
+    expect((await listLeases(home, () => true)).live.map((e) => e.lease)).toMatchObject([{ run_id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB1", holder: B }]);
+    expect(releaseRunLease(home, r.entry.file, "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB1")).toBe(true);
+    expect(claimRunLease(home, r.entry.file, "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB1", B)).toBe(false); // gone
     expect(readdirSync(leasesDir(home))).toEqual([]);
   });
   test("slot leases: range, port base, worktree liveness by default, reclaim", async () => {

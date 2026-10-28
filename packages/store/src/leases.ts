@@ -175,6 +175,37 @@ export function releaseLease(home: string, file: string): boolean {
   return safeUnlink(join(leasesDir(home), file));
 }
 
+/**
+ * Take a run's lease over for `holder` (K1): the process that does the run's work holds it, so the
+ * lease dies with that process (K3). Only while the lease validates (S2) and still names `runId`; false otherwise.
+ */
+export function claimRunLease(home: string, file: string, runId: string, holder: ProcessIdentity): boolean {
+  if (!LEASE_NAME.test(file)) throw new Error(`not a lease file: ${file}`);
+  const path = join(leasesDir(home), file);
+  const raw = readText(path);
+  if (raw === null) return false;
+  const cur = readJsonFile("lease", path);
+  if (!cur.ok || cur.value.run_id !== runId) return false;
+  if (cur.value.holder.pid === holder.pid && cur.value.holder.pid_start === holder.pid_start) return true;
+  const next = { ...cur.value, holder };
+  assertValid("lease", next);
+  return replaceIfUnchanged(path, raw, json(next));
+}
+
+/**
+ * Release a run's own lease (K1): remove the file only while it validates (S2) and still names
+ * `runId`; one reclaimed (K3) and taken by another run, or one gone already, stays as it is.
+ */
+export function releaseRunLease(home: string, file: string, runId: string): boolean {
+  if (!LEASE_NAME.test(file)) throw new Error(`not a lease file: ${file}`);
+  const path = join(leasesDir(home), file);
+  const raw = readText(path);
+  if (raw === null) return false;
+  const cur = readJsonFile("lease", path);
+  if (!cur.ok || cur.value.run_id !== runId) return false;
+  return removeIfUnchanged(path, raw);
+}
+
 /** Remove the named lease files whose holders are (still) dead, or that are unreadable (K3). */
 export async function reclaimLeases(home: string, files: string[], liveness: LeaseLiveness = defaultLeaseLiveness()): Promise<string[]> {
   const removed: string[] = [];

@@ -43,7 +43,7 @@ export function removeIfUnchanged(path: string, expectedRaw: string): boolean {
 /**
  * Replace `path` with `nextRaw` only if its content is still `expectedRaw`; false when it is gone or
  * someone else changed it (that content is left as it was). Moves it aside atomically first, as
- * removeIfUnchanged does.
+ * removeIfUnchanged does, and links the new content in, so it never overwrites a file created in between.
  */
 export function replaceIfUnchanged(path: string, expectedRaw: string, nextRaw: string): boolean {
   const next = join(dirname(path), `.${basename(path)}.replace.${process.pid}.${seq++}`);
@@ -66,7 +66,16 @@ export function replaceIfUnchanged(path: string, expectedRaw: string, nextRaw: s
     safeUnlink(next);
     return false;
   }
-  renameSync(next, path);
+  // link, not rename: a file someone created at `path` meanwhile (another tick taking the free slot) is kept
+  try {
+    linkSync(next, path);
+  } catch (e) {
+    if (!isErrno(e, "EEXIST")) throw e;
+    safeUnlink(next);
+    safeUnlink(aside);
+    return false;
+  }
+  safeUnlink(next);
   safeUnlink(aside);
   return true;
 }

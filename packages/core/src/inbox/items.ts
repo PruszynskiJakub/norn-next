@@ -14,7 +14,7 @@ import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../cri
 import type { Facts, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
 import { sha256 } from "../hash.ts";
-import { effectiveMode, firstLine, heartbeatUp, prBaseBranch, sessionStartedNoTurn, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
+import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, prBaseBranch, sessionStartedNoTurn, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
 import { optionsLine } from "../prompt.ts";
 import { epoch, formatAge, iso } from "../time.ts";
 import { baseUpdateStep, edgeOf, edgesOf, isStale, stepOf } from "../workflow.ts";
@@ -532,8 +532,8 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       }
       // R5.5 (A8): an auto step waits for the heartbeat, not for a person — no manual start hint
       if (step?.type === "agent" && heartbeatDown(facts, config)) return item("running", `${st.step} #${st.attempt} (waiting for the heartbeat — norn watch)`, "norn watch", st.step_entered_at);
-      // C5: `norn check-run` holds the unit's check lease while its command runs; it is not queued
-      if (step?.type === "check" && uf.lease?.kind === "check") return item("running", `${st.step} #${st.attempt} (check running)`, `norn trace ${key}`, uf.lease.created_at);
+      const checkSince = checkRunningSince(step, uf);
+      if (checkSince) return item("running", `${st.step} #${st.attempt} (check running)`, `norn trace ${key}`, checkSince);
       return item("running", `${st.step} #${st.attempt} (queued)`, `norn trace ${key}`, st.step_entered_at);
     }
     case "done": {

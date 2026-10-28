@@ -4,8 +4,9 @@
  * The tick takes the unit's `check` run lease (K1), writes a check order to `~/.norn/checks/<run_id>.json`
  * and starts a detached `norn check-run <run_id>`, then hands the lease to that process. It runs the
  * command, writes the `check` receipt and releases the lease; while it lives, decide sees the lease
- * and waits (`check.running`), and the tick after it ends applies the receipt. One that dies leaves
- * a dead lease: it is reclaimed (K3) and the check runs again.
+ * and waits (`check.running`), and the tick after it ends applies the receipt. The process also takes
+ * the lease over itself as it starts, so one the tick could not identify still holds it. One that dies
+ * leaves a dead lease: it is reclaimed (K3) and the check runs again.
  */
 import { spawn } from "node:child_process";
 import { readdirSync } from "node:fs";
@@ -18,14 +19,15 @@ import {
   atomicWriteJson,
   checkOrderPath,
   checkOrdersDir,
+  claimRunLease,
   handOverLease,
-  leasesDir,
   listLeases,
+  localProcess,
   noteSpawn,
   readEnvNorn,
   readJsonFile,
-  readText,
   releaseLease,
+  releaseRunLease,
   safeUnlink,
   writeLog,
 } from "@norn/store";
@@ -49,7 +51,7 @@ export async function runCheck(act: ActEnv, a: Extract<Action, { kind: "run_chec
   });
   if (!lease.ok) throw new QueueFull(`queued: max_checks ${act.config.max_checks} in use (K1)`);
   await sweepCheckOrders(act);
-  // only what the tick adds: `norn check-run` inherits the process env, so secrets in it never reach the disk
+  // the process env is inherited by `norn check-run`, not written: the order holds only `.env.norn`, the step env and NORN_HOME
   const env = definedOnly({ ...(readEnvNorn(a.cwd) ?? {}), ...a.env, NORN_HOME: act.root });
   const portBase = Number({ ...act.ctx.env, ...env }.PORT_BASE);
   const order: CheckOrder = {
@@ -69,6 +71,7 @@ export async function runCheck(act: ActEnv, a: Extract<Action, { kind: "run_chec
     ports: Number.isInteger(portBase) && portBase > 0 ? { from: portBase, to: portBase + act.config.slots.ports_per_slot - 1 } : null,
   };
   const path = checkOrderPath(act.ctx.home, a.run_id);
+  let started = false;
   try {
     assertValid("check-order", order);
     atomicWriteJson(path, order, 0o600);
@@ -84,17 +87,21 @@ export async function runCheck(act: ActEnv, a: Extract<Action, { kind: "run_chec
       child.once("spawn", () => resolve(child.pid));
       child.once("error", reject);
     });
+    started = true;
     const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
     child.unref();
     act.ctx.deps.onCheckStarted?.(exited);
-    // K1/K3: the lease lives as long as `norn check-run` does; one it already released stays released
-    const holder = pid ? await act.obs.ports.process.identify(pid) : null;
-    if (!holder) releaseLease(act.ctx.home, lease.entry.file); // already gone: its receipt, if any, is applied next tick
-    else handOverLease(act.ctx.home, lease.entry.file, lease.entry.lease, { ...lease.entry.lease, holder });
+    // K1/K3: the lease lives as long as `norn check-run` does. It takes the lease over itself as it starts;
+    // handing it over here only closes the gap before that. An unidentified pid (a failed probe) leaves
+    // the tick's lease for it to take, and one it already released stays released.
+    const holder = pid ? await act.obs.ports.process.identify(pid).catch(() => null) : null;
+    if (holder) handOverLease(act.ctx.home, lease.entry.file, lease.entry.lease, { ...lease.entry.lease, holder });
     return { ok: true, detail: { started: true, pid: pid ?? null } };
   } catch (e) {
-    safeUnlink(path);
-    releaseLease(act.ctx.home, lease.entry.file);
+    if (!started) {
+      safeUnlink(path);
+      releaseLease(act.ctx.home, lease.entry.file);
+    }
     throw e;
   }
 }
@@ -108,6 +115,7 @@ export function readCheckOrder(home: string, runId: string): CheckOrder | null {
 /** `norn check-run`: run the order's command (timeout kills the group, C5), write the receipt, release the lease. */
 export async function runCheckOrder(order: CheckOrder, now: () => number): Promise<ReceiptOf<"check">> {
   const started = now();
+  claimRunLease(order.home, order.lease_file, order.run_id, localProcess.self()); // K1: the lease dies with this process
   const receipt = (res: ShellResult): ReceiptOf<"check"> => {
     const pass = !res.timed_out && res.exit_code === 0;
     return {
@@ -144,14 +152,14 @@ export async function runCheckOrder(order: CheckOrder, now: () => number): Promi
     return r;
   } finally {
     safeUnlink(checkOrderPath(order.home, order.run_id));
-    // a lease reclaimed meanwhile (K3) may be another run's now: release only this run's
-    if (readText(join(leasesDir(order.home), order.lease_file))?.includes(`"${order.run_id}"`)) releaseLease(order.home, order.lease_file);
+    releaseRunLease(order.home, order.lease_file, order.run_id); // one reclaimed meanwhile (K3) may be another run's now
   }
 }
 
 /** Remove orders no live check lease names: a `norn check-run` that died (crash, reboot) left them (K3). */
 async function sweepCheckOrders(act: ActEnv): Promise<void> {
-  const live = new Set((await listLeases(act.ctx.home, act.liveness())).live.map((e) => e.lease.kind === "check" && e.lease.run_id));
+  const leases = (await listLeases(act.ctx.home, act.liveness())).live.map((e) => e.lease);
+  const live = new Set(leases.flatMap((l) => (l.kind === "check" && l.run_id ? [l.run_id] : [])));
   const dir = checkOrdersDir(act.ctx.home);
   let names: string[];
   try {
