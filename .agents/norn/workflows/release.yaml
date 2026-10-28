@@ -2,7 +2,7 @@
 # (W1, W9: label norn:wf:release). A story workflow without `slices` (W8): every step works in
 # the story worktree. Prepare the release (changelog from the commits on the base since the last
 # tag, proposed version, version bumps, pr.md), let a person confirm the version, run what CI runs
-# (tests incl. the stale-schema test, typecheck, plugin version, npm package and this machine's
+# (tests incl. the stale-schema test, typecheck, npm package and this machine's
 # binary built and smoke-tested), open the draft PR and wait for a person at `ready`; the person
 # merges the PR, and CI tags and publishes on that merge.
 # Any commit on the base makes the changelog incomplete (base.stale: behind, BS7): a release
@@ -24,7 +24,7 @@ steps:
       reason and the new changelog section; norn puts the issue link under it. Rename the issue to
       "Release X.Y.Z" with `gh issue edit`, the one remote write this step allows. Change no code.
     outcomes:
-      done: { to: confirm-version, means: "CHANGELOG.md, packages/cli/package.json, the README badge and the plugin carry version X.Y.Z; pr.md and the handoff name it with its reason" }
+      done: { to: confirm-version, means: "CHANGELOG.md, packages/cli/package.json and the README badge carry version X.Y.Z; pr.md and the handoff name it with its reason" }
   confirm-version:
     type: gate
     prompt: "Read the proposed version and its reason in pr.md and the new CHANGELOG.md section. Approve to check the release, or reject with the version or changelog changes you want."
@@ -39,7 +39,6 @@ steps:
       bun install --frozen-lockfile
       bun run test
       bun run typecheck
-      bun run check:plugin
       version=$(bun -e 'console.log(require("./packages/cli/package.json").version)')
       os=$(uname -s | tr 'A-Z' 'a-z')
       arch=$(uname -m)
