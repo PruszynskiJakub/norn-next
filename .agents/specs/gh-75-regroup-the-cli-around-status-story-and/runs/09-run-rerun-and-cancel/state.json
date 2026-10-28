@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "story": "gh-75",
+  "slice": "gh-75/09",
+  "unit_dir": "09-run-rerun-and-cancel",
+  "workflow": "slice",
+  "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
+  "step": "implement",
+  "attempt": 1,
+  "visits": {
+    "implement": 1
+  },
+  "step_entered_at": "2026-10-28T14:13:16.910Z",
+  "status": "ready",
+  "park": null,
+  "counters": {
+    "test_loop": 0,
+    "review_loop": 0,
+    "qa_loop": 0,
+    "conflict_loop": 0
+  },
+  "nudges_used": 0,
+  "retries_used": 0,
+  "applied_through": 0,
+  "run": null,
+  "last_outcome": null,
+  "created_at": "2026-10-28T14:13:16.910Z",
+  "updated_at": "2026-10-28T14:13:16.910Z",
+  "last_tick_id": "01M61DQAZD0R3VBD189CH3Q8F0"
+}
