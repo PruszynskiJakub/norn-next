@@ -13,14 +13,19 @@
     "implement": 1
   },
   "step_entered_at": "2026-10-28T14:03:08.958Z",
-  "status": "running",
-  "park": null,
+  "status": "parked",
+  "park": {
+    "kind": "ask",
+    "reason": "gh-70 compatibility choice (triage recommended the story workflow for this; you chose quick). Which design should implement build? (a) Dual read in one PR: intake writes spec.md; every reader (storyFile, snapshot, decide intake, brief, agent-unit, record) prefers spec.md and falls back to story.md; no files are renamed, this story's own story.md stays. Risk: a collaborator on an older norn sees a newly intaken spec.md-only story as corrupt (story.md missing) until they upgrade. (b) Two releases: this PR only adds the dual read (intake still writes story.md); a follow-up issue switches intake to spec.md after this ships. (c) Migrate on tick: the holder's tick renames story.md → spec.md and commits it (a new effect touching P6/S5/T7) — wider, better as the story workflow.",
+    "since": "2026-10-28T14:04:55.319Z",
+    "receipt_id": "01M61D814PYGN6S35VGS041VWW"
+  },
   "counters": {
     "triage_loop": 0
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 4,
+  "applied_through": 5,
   "run": {
     "run_id": "01M61D7G66MDJY7X7ABHKEQ6S0",
     "step": "implement",
@@ -35,14 +40,14 @@
     }
   },
   "last_outcome": {
-    "step": "explore",
-    "outcome": "story",
+    "step": "implement",
+    "outcome": "ask",
     "source": "reported",
-    "at": "2026-10-28T13:43:47.150Z",
-    "receipt_id": "01M61C1APDXVH758Q1N2GVJ223"
+    "at": "2026-10-28T14:04:55.319Z",
+    "receipt_id": "01M61D814PYGN6S35VGS041VWW"
   },
   "created_at": "2026-10-27T22:37:49.730Z",
-  "updated_at": "2026-10-28T14:04:48.669Z",
-  "last_tick_id": "01M61D7TMWZ8XWE9HJXMTRTXHD",
+  "updated_at": "2026-10-28T14:05:18.672Z",
+  "last_tick_id": "01M61D8QYEAWPN5V7ZPJJ8P3KD",
   "mode": "manual"
 }
