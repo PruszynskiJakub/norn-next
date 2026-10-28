@@ -1,0 +1,18 @@
+{
+  "kind": "started",
+  "receipt_id": "01M61Q02QH28X09SAT6V2NJ9G5",
+  "run_id": "01M61Q02QH28X09SAT6V2NJ9G4",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-28T16:55:20.711Z",
+  "by": "agent",
+  "who": "claude",
+  "how": "manual",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-82-split-the-test-command-so-slice-checks",
+  "agent_session_id": "0f6bf46d-37a1-441d-bc1d-c3dcb235b91f",
+  "process": {
+    "pid": 84100,
+    "pid_start": "Wed Oct 28 17:55:11 2026"
+  }
+}

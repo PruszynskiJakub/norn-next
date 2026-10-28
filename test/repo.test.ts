@@ -141,6 +141,16 @@ describe("test layout (AGENTS.md)", () => {
     });
     expect(missing).toEqual([]);
   });
+
+  test("test:fast and test:cli split the suite: fast skips exactly the folder cli runs, and slice checks run fast", () => {
+    const scripts: Record<string, string> = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).scripts;
+    const cliDir = scripts["test:cli"]?.match(/^bun test \.\/(\S+)$/)?.[1];
+    const ignored = scripts["test:fast"]?.match(/^bun test --path-ignore-patterns='(\S+)\/\*\*'$/)?.[1];
+    expect({ test: scripts.test, cliDir, ignored }).toEqual({ test: "bun test", cliDir: "packages/cli/test", ignored: "packages/cli" });
+    const run = (wf: string) => readFileSync(join(ROOT, ".agents", "norn", "workflows", `${wf}.yaml`), "utf8").match(/^ {4}run: "(.*)"$/m)?.[1];
+    expect(["slice", "bug"].map(run)).toEqual(Array(2).fill("bun install --frozen-lockfile && bun run test:fast && bun run typecheck"));
+    expect(["story", "quick", "fix"].map(run)).toEqual(Array(3).fill("bun install --frozen-lockfile && bun run test && bun run typecheck"));
+  });
 });
 
 describe("release metadata", () => {

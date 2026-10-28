@@ -1,0 +1,22 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M61N8C8P9AVYFDPK5HVZDRPN",
+  "run_id": "01M61N7XE63RQRPJCB4E2CFRW5",
+  "step": "update",
+  "attempt": 1,
+  "at": "2026-10-28T16:24:55.318Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M61N7XE62VQTZNCC1N8ZMK5C",
+  "outcome": "done",
+  "rule": "git.update",
+  "detail": "merged main (a40660f08ac7) into gh-82-split-the-test-command-so-slice-checks at d939531dbb55",
+  "route": "test",
+  "base": {
+    "ref": "refs/remotes/origin/main",
+    "sha": "a40660f08ac7213f82e78d2f242ede265ff6fab5",
+    "conflicts": [],
+    "head": "d939531dbb552fb5066673ca38d504d48b2ec043",
+    "merged": true
+  }
+}
