@@ -5,54 +5,35 @@
   "unit_dir": "13-config-list-get-set-unset",
   "workflow": "slice",
   "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
-  "step": "review",
-  "attempt": 2,
+  "step": "implement",
+  "attempt": 3,
   "visits": {
-    "implement": 2,
+    "implement": 3,
     "test": 2,
     "review": 2,
     "qa": 1
   },
-  "step_entered_at": "2026-10-28T20:20:58.762Z",
-  "status": "running",
+  "step_entered_at": "2026-10-28T20:26:19.207Z",
+  "status": "ready",
   "park": null,
   "counters": {
     "test_loop": 0,
-    "review_loop": 0,
+    "review_loop": 1,
     "qa_loop": 1,
     "conflict_loop": 0
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 16,
-  "run": {
-    "run_id": "01M622T3Q8V7NWJ4C00A51NJM7",
-    "step": "review",
-    "attempt": 2,
-    "started_at": "2026-10-28T20:21:55.555Z",
-    "how": "auto",
-    "agent": "claude",
-    "session": {
-      "runner": "herdr",
-      "session_id": "w8F:p1",
-      "pane_id": "w8F:p1",
-      "reach": "herdr agent attach w8F:p1"
-    },
-    "process": {
-      "pid": 31801,
-      "pid_start": "Wed Oct 28 21:21:55 2026"
-    },
-    "machine": "jakubpruszynski@mac",
-    "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD"
-  },
+  "applied_through": 17,
+  "run": null,
   "last_outcome": {
-    "step": "test",
-    "outcome": "pass",
-    "source": "classified",
-    "at": "2026-10-28T20:20:58.736Z",
-    "receipt_id": "01M622RKQGSJEG6XRP2BHFQKV0"
+    "step": "review",
+    "outcome": "changes_requested",
+    "source": "reported",
+    "at": "2026-10-28T20:25:52.410Z",
+    "receipt_id": "01M6231JGSTQC1WFHX7MSSQAR1"
   },
   "created_at": "2026-10-28T14:13:16.910Z",
-  "updated_at": "2026-10-28T20:21:55.556Z",
-  "last_tick_id": "01M622T3Q8G0S4GX9A8SZSFAX3"
+  "updated_at": "2026-10-28T20:26:19.207Z",
+  "last_tick_id": "01M6232CP52ZBA5QZFXKNJ3FDM"
 }
