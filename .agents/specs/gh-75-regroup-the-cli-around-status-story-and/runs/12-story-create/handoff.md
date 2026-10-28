@@ -14,6 +14,16 @@
 
 ## Goal
 
+`norn story create` (B18–B23): create the labelled, assigned issue on the remote and take it in, or open the new-issue page with `--web`; RemotePort gains `createIssue` / `newIssueUrl` (D3).
+
 ## Progress
 
+- AC1: `remoteContract` has two new tests (createIssue, newIssueUrl); gh and glab adapters implement them (gh: `issue create` + `issue view`, `repo view --json url`; glab: `issue create --description-file -`, `repo view --output json`, labels via a `/label` quick action since GitLab's new-issue page takes no label names); scripted CLIs and `FakeRemote` follow. Seen red, then green.
+- AC2–AC7: `packages/cli/test/story-create.test.ts` (S1). New `story` noun with one verb `create` (`commands/story.ts`, `story-create.ts`). Workflow checked first (B21), body read, then whoami + createIssue (failure → `remote_failed`, do_instead `norn doctor`, nothing local), then `runTick(sync: force)` like `norn sync`.
+- D2: `Interaction` gained `ask` (a line) and `edit` (`$VISUAL`/`$EDITOR`); the editor runs through a new store `spawnAttached` (Bun.spawn stays out of cli, repo ratchet). `FakeInteraction` scripts both.
+- `openLink` moved from cockpit to `runtime/open-link.ts` for reuse. `WF_LABEL` exported from core; `cmd.storyCreate` added with its printed-commands row.
+- AC8 (real GitHub) not run: no test remote this agent may write to — left for a person.
+
 ## Resume
+
+Full suite + typecheck, review the diff, commit, `norn done done`.
