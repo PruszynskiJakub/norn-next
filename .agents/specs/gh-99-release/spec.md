@@ -10,9 +10,16 @@ labels:
   - norn
   - norn:wf:release
 workflow: release
-status: active
+status: done
 intake_at: 2026-10-29T11:45:37.194Z
 body_hash: ecd2a3d560ba8183290bd34ae39b8154b8c8e66a8d95a1b8ae593a261e0ffb56
+merge:
+  pr: 100
+  url: https://github.com/PruszynskiJakub/norn-next/pull/100
+  head_sha: 01b9b93504f22b5e4b386f04cc3554d4bb884923
+  merge_commit_sha: 76135144bc56100dc7a7f24d678e7028d131db7c
+  merged_by: PruszynskiJakub
+  merged_at: 2026-10-29T11:55:29.000Z
 ---
 
 ## Version
