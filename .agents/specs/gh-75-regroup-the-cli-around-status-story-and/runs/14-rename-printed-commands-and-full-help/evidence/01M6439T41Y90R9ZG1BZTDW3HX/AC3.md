@@ -1,0 +1,5 @@
+# AC3 — pinned suites only through update commands; continuity
+- Re-ran `bun run golden -- --update` ("0 of 91 golden case(s) decide differently now") and `NORN_TRANSCRIPT_UPDATE=1 bun test` on e2e, base-sync, recovery, observe-snapshots (45 pass): `git status` clean afterwards, so the committed files are exactly what the update commands produce.
+- Golden diff vs base: 6 files, 1 line each; the changed values are `norn answer gh-11` → `norn story answer gh-11`, `norn unstick gh-7` → `norn run rerun gh-7`, `norn why gh-9` → `norn run view gh-9 --why`, nothing else. Transcripts: only handoff.md hashes changed, line counts equal. Observe snapshots unchanged.
+- Live (AC3-live.log, AC3-driver.test.ts): a stuck tick rewritten as recorded by norn 0.9.0 with `norn unstick gh-5`; `norn run view gh-5 --why --tick <id>` → no error, replay `label: "recorded by norn 0.9.0, replayed by norn 0.10.0"`, matches:false, replayed reason `… norn run rerun gh-5`; exit 1 (O5: a replay that differs). Then `norn run rerun gh-5` exit 0 and the unit moved on (stuck → parked at its attended step) with no migration.
+- rename-continuity.test.ts passes (both tests).

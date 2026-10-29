@@ -1,0 +1,534 @@
+brief gh-5 exit 0
+brief gh-6 exit 0
+brief gh-7 exit 0
+brief gh-8 exit 0
+done exit 0
+Reported `done done` (gh-5, step work #1).
+Receipt: `.agents/specs/gh-5-pay-invoices/runs/_story/receipts/0002-done.json`
+
+**End your turn now.** Do not report again; norn routes the work from here.
+
+ask exit 0
+Asked a person (gh-6, step work #1): CSV only, or CSV and PDF?
+They answer with `norn story answer gh-6 "…"`; the answer comes back to this session.
+Receipt: `.agents/specs/gh-6-export-report/runs/_story/receipts/0002-ask.json`
+
+**End your turn now.** Do not report again; norn routes the work from here.
+
+stuck exit 0
+Reported stuck (gh-7, step work #1): no API key
+A person unblocks it with `norn run rerun gh-7`.
+Receipt: `.agents/specs/gh-7-sync-ledger/runs/_story/receipts/0002-stuck.json`
+
+**End your turn now.** Do not report again; norn routes the work from here.
+
+
+===== $ norn status (exit 0)
+Answer (1) · agents waiting for your answer
+  gh-6       work: CSV only, or CSV and PDF? · 3s
+      $ norn story answer gh-6 "…"
+
+Approve (1) · gates waiting for your decision
+  gh-5       review: Look at it · 2s
+      step work#1 reported done (receipt 0002) · or reject: norn story reject gh-5 --reason "…"
+      $ norn story approve gh-5
+
+Unblock (2) · stuck or broken, needs you to unstick it
+  gh-7       work: no API key · 3s
+      $ norn run rerun gh-7
+  gh-8       corrupt: .agents/specs/gh-8-audit-log/runs/_story/state.json failed validation (S2) · 0s
+      $ norn run view gh-8 --why
+
+Running (2) · agents and checks at work
+  gh-8       taken in — the next tick starts it · 2m
+      $ norn story view gh-8
+  gh-9       work #1 (auto) · 2s
+      $ norn run list gh-9
+
+
+===== $ norn status --json (exit 0)
+{"at":"2099-01-15T10:03:04.000Z","groups":{"your_turn":[],"answer":[{"story":"gh-6","slice":null,"url":"https://github.com/o/r/issues/6","reach":{"worktree":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-6-export-report","agent_session_id":null,"pane_id":null},"id":"03PGFN7J08QRQ815D993PSDRRK","group":"answer","step":"work","title":"CSV only, or CSV and PDF?","command":"norn story answer gh-6 \"…\"","since":"2099-01-15T10:03:01.000Z","age":"3s"}],"approve":[{"story":"gh-5","slice":null,"url":"https://github.com/o/r/issues/5","id":"approve:gh-5:review#1","group":"approve","step":"review","title":"Look at it","command":"norn story approve gh-5","since":"2099-01-15T10:03:02.000Z","detail":"step work#1 reported done (receipt 0002) · or reject: norn story reject gh-5 --reason \"…\"","age":"2s"}],"unblock":[{"story":"gh-7","slice":null,"url":"https://github.com/o/r/issues/7","reach":{"worktree":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-7-sync-ledger","agent_session_id":null,"pane_id":null},"id":"03PGFN7J08QRQ815D993PSDRRM","group":"unblock","step":"work","title":"no API key","command":"norn run rerun gh-7","since":"2099-01-15T10:03:01.000Z","age":"3s"},{"story":"gh-8","slice":null,"url":"https://github.com/o/r/issues/8","id":"corrupt:gh-8:.agents/specs/gh-8-audit-log/runs/_story/state.json","group":"unblock","step":null,"title":"corrupt: .agents/specs/gh-8-audit-log/runs/_story/state.json failed validation (S2)","command":"norn run view gh-8 --why","since":"2099-01-15T10:03:04.000Z","age":"0s"}],"check":[],"unclaimed":[],"running":[{"id":"not-started:gh-8","story":"gh-8","slice":null,"step":null,"since":"2099-01-15T10:01:00.000Z","url":"https://github.com/o/r/issues/8","group":"running","title":"taken in — the next tick starts it","command":"norn story view gh-8","age":"2m"},{"story":"gh-9","slice":null,"url":"https://github.com/o/r/issues/9","reach":{"worktree":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-9-dark-mode","agent_session_id":null,"pane_id":"p-1"},"id":"running:gh-9:work#1","group":"running","step":"work","title":"work #1 (auto)","command":"norn run list gh-9","since":"2099-01-15T10:03:02.000Z","age":"2s"}],"notes":[],"recently_done":[]},"pending":4}
+
+
+===== $ norn status --watch --json (exit 0)
+{"at":"2099-01-15T10:03:04.000Z","header":{"repo":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo","pending":4,"heartbeat":{"holder":"tester@box","last_tick_at":"2099-01-15T10:03:04.000Z","age":"0s","down":false}},"rows":[{"id":"03PGFN7J08QRQ815D993PSDRRK","kind":"item","group":"answer","story":"gh-6","unit":"gh-6","step":"work","title":"CSV only, or CSV and PDF?","since":"2099-01-15T10:03:01.000Z","age":"3s","preview":{"report":{"key":"gh-6","story":"gh-6","title":"Export report","url":"https://github.com/o/r/issues/6","story_status":"active","claim":"held here","mode":"auto","unit":{"key":"gh-6","title":"Export report","status":"parked","workflow":"gated","step":"work","attempt":1,"last_outcome":{"step":"work","outcome":"ask","at":"2099-01-15T10:03:01.000Z"},"next":"norn story answer gh-6 \"…\"","integrated":false},"slices":[],"root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-6-export-report","spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-6-export-report/.agents/specs/gh-6-export-report","branch":"gh-6-export-report","pr":null,"pr_state":null,"pr_command":"gh pr view gh-6-export-report","waiting":[{"group":"answer","unit":"gh-6","step":"work","title":"CSV only, or CSV and PDF?","command":"norn story answer gh-6 \"…\"","age":"3s","url":"https://github.com/o/r/issues/6"}],"running":[],"notes":[],"note_count":0,"look":{"spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-6-export-report/.agents/specs/gh-6-export-report","trace":"norn run list gh-6","why":"norn run view gh-6 --why","status":"norn story view gh-6"}},"item":{"title":"CSV only, or CSV and PDF?","command":"norn story answer gh-6 \"…\""}},"actions":[{"id":"orient","label":"orient","key":"enter","effect":{"kind":"place","place":"orient","story":"gh-6"}},{"id":"agent","label":"agent","key":"g","effect":{"kind":"place","place":"agent","story":"gh-6","reach":{"worktree":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-6-export-report","agent_session_id":null,"pane_id":null}}},{"id":"answer","label":"answer","key":"a","input":{"prompt":"Your answer","required":true},"effect":{"kind":"verb","argv":["story","answer","gh-6","{input}"]}},{"id":"trace","label":"trace","key":"v","effect":{"kind":"verb","argv":["run","list","gh-6"],"show":true}},{"id":"issue","label":"issue","key":"i","effect":{"kind":"link","url":"https://github.com/o/r/issues/6"}}]},{"id":"approve:gh-5:review#1","kind":"item","group":"approve","story":"gh-5","unit":"gh-5","step":"review","title":"Look at it","since":"2099-01-15T10:03:02.000Z","age":"2s","preview":{"report":{"key":"gh-5","story":"gh-5","title":"Pay invoices","url":"https://github.com/o/r/issues/5","story_status":"active","claim":"held here","mode":"auto","unit":{"key":"gh-5","title":"Pay invoices","status":"parked","workflow":"gated","step":"review","attempt":1,"last_outcome":{"step":"work","outcome":"done","at":"2099-01-15T10:03:01.000Z"},"next":"norn story approve gh-5","integrated":false},"slices":[],"root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-5-pay-invoices","spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-5-pay-invoices/.agents/specs/gh-5-pay-invoices","branch":"gh-5-pay-invoices","pr":null,"pr_state":null,"pr_command":"gh pr view gh-5-pay-invoices","waiting":[{"group":"approve","unit":"gh-5","step":"review","title":"Look at it","command":"norn story approve gh-5","age":"2s","url":"https://github.com/o/r/issues/5"}],"running":[],"notes":[],"note_count":0,"look":{"spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-5-pay-invoices/.agents/specs/gh-5-pay-invoices","trace":"norn run list gh-5","why":"norn run view gh-5 --why","status":"norn story view gh-5"}},"item":{"title":"Look at it","detail":"step work#1 reported done (receipt 0002) · or reject: norn story reject gh-5 --reason \"…\"","full":"Report: /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-5-pay-invoices/.agents/specs/gh-5-pay-invoices/runs/_story/receipts/0002-done.json","command":"norn story approve gh-5"}},"actions":[{"id":"orient","label":"orient","key":"enter","effect":{"kind":"place","place":"orient","story":"gh-5"}},{"id":"approve","label":"approve","key":"y","effect":{"kind":"verb","argv":["story","approve","gh-5"]}},{"id":"reject","label":"reject","key":"x","input":{"prompt":"What to change","required":true},"effect":{"kind":"verb","argv":["story","reject","gh-5","--reason","{input}"]}},{"id":"trace","label":"trace","key":"v","effect":{"kind":"verb","argv":["run","list","gh-5"],"show":true}},{"id":"issue","label":"issue","key":"i","effect":{"kind":"link","url":"https://github.com/o/r/issues/5"}}]},{"id":"03PGFN7J08QRQ815D993PSDRRM","kind":"item","group":"unblock","story":"gh-7","unit":"gh-7","step":"work","title":"no API key","since":"2099-01-15T10:03:01.000Z","age":"3s","preview":{"report":{"key":"gh-7","story":"gh-7","title":"Sync ledger","url":"https://github.com/o/r/issues/7","story_status":"active","claim":"held here","mode":"auto","unit":{"key":"gh-7","title":"Sync ledger","status":"stuck","workflow":"gated","step":"work","attempt":1,"last_outcome":{"step":"work","outcome":"stuck","at":"2099-01-15T10:03:01.000Z"},"next":"norn run rerun gh-7","integrated":false},"slices":[],"root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-7-sync-ledger","spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-7-sync-ledger/.agents/specs/gh-7-sync-ledger","branch":"gh-7-sync-ledger","pr":null,"pr_state":null,"pr_command":"gh pr view gh-7-sync-ledger","waiting":[{"group":"unblock","unit":"gh-7","step":"work","title":"no API key","command":"norn run rerun gh-7","age":"3s","url":"https://github.com/o/r/issues/7"}],"running":[],"notes":[],"note_count":0,"look":{"spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-7-sync-ledger/.agents/specs/gh-7-sync-ledger","trace":"norn run list gh-7","why":"norn run view gh-7 --why","status":"norn story view gh-7"}},"item":{"title":"no API key","command":"norn run rerun gh-7"}},"actions":[{"id":"orient","label":"orient","key":"enter","effect":{"kind":"place","place":"orient","story":"gh-7"}},{"id":"agent","label":"agent","key":"g","effect":{"kind":"place","place":"agent","story":"gh-7","reach":{"worktree":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-7-sync-ledger","agent_session_id":null,"pane_id":null}}},{"id":"unstick","label":"unstick","key":"u","effect":{"kind":"verb","argv":["run","rerun","gh-7"]}},{"id":"trace","label":"trace","key":"v","effect":{"kind":"verb","argv":["run","list","gh-7"],"show":true}},{"id":"issue","label":"issue","key":"i","effect":{"kind":"link","url":"https://github.com/o/r/issues/7"}}]},{"id":"corrupt:gh-8:.agents/specs/gh-8-audit-log/runs/_story/state.json","kind":"item","group":"unblock","story":"gh-8","unit":"gh-8","step":null,"title":"corrupt: .agents/specs/gh-8-audit-log/runs/_story/state.json failed validation (S2)","since":"2099-01-15T10:03:04.000Z","age":"0s","preview":{"report":{"key":"gh-8","story":"gh-8","title":"Audit log","url":"https://github.com/o/r/issues/8","story_status":"active","claim":"held here","mode":"auto","unit":{"key":"gh-8","title":"Audit log","status":"corrupt","workflow":"gated","step":null,"attempt":null,"last_outcome":null,"next":"norn run view gh-8 --why","integrated":false},"slices":[],"root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-8-audit-log","spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-8-audit-log/.agents/specs/gh-8-audit-log","branch":"gh-8-audit-log","pr":null,"pr_state":null,"pr_command":"gh pr view gh-8-audit-log","waiting":[{"group":"unblock","unit":"gh-8","step":null,"title":"corrupt: .agents/specs/gh-8-audit-log/runs/_story/state.json failed validation (S2)","command":"norn run view gh-8 --why","age":"0s","url":"https://github.com/o/r/issues/8"}],"running":[{"group":"running","unit":"gh-8","step":null,"title":"taken in — the next tick starts it","command":"norn story view gh-8","age":"2m","url":"https://github.com/o/r/issues/8"}],"notes":[],"note_count":0,"look":{"spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-8-audit-log/.agents/specs/gh-8-audit-log","trace":"norn run list gh-8","why":"norn run view gh-8 --why","status":"norn story view gh-8"}},"item":{"title":"corrupt: .agents/specs/gh-8-audit-log/runs/_story/state.json failed validation (S2)","command":"norn run view gh-8 --why"}},"actions":[{"id":"orient","label":"orient","key":"enter","effect":{"kind":"place","place":"orient","story":"gh-8"}},{"id":"trace","label":"trace","key":"v","effect":{"kind":"verb","argv":["run","list","gh-8"],"show":true}},{"id":"issue","label":"issue","key":"i","effect":{"kind":"link","url":"https://github.com/o/r/issues/8"}}]},{"id":"story:gh-5","kind":"story","group":null,"story":"gh-5","unit":"gh-5","step":"review","title":"Pay invoices","since":"2099-01-15T10:03:02.000Z","age":"2s","preview":{"report":{"key":"gh-5","story":"gh-5","title":"Pay invoices","url":"https://github.com/o/r/issues/5","story_status":"active","claim":"held here","mode":"auto","unit":{"key":"gh-5","title":"Pay invoices","status":"parked","workflow":"gated","step":"review","attempt":1,"last_outcome":{"step":"work","outcome":"done","at":"2099-01-15T10:03:01.000Z"},"next":"norn story approve gh-5","integrated":false},"slices":[],"root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-5-pay-invoices","spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-5-pay-invoices/.agents/specs/gh-5-pay-invoices","branch":"gh-5-pay-invoices","pr":null,"pr_state":null,"pr_command":"gh pr view gh-5-pay-invoices","waiting":[{"group":"approve","unit":"gh-5","step":"review","title":"Look at it","command":"norn story approve gh-5","age":"2s","url":"https://github.com/o/r/issues/5"}],"running":[],"notes":[],"note_count":0,"look":{"spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-5-pay-invoices/.agents/specs/gh-5-pay-invoices","trace":"norn run list gh-5","why":"norn run view gh-5 --why","status":"norn story view gh-5"}},"item":null},"actions":[{"id":"orient","label":"orient","key":"enter","effect":{"kind":"place","place":"orient","story":"gh-5"}},{"id":"trace","label":"trace","key":"v","effect":{"kind":"verb","argv":["run","list","gh-5"],"show":true}},{"id":"issue","label":"issue","key":"i","effect":{"kind":"link","url":"https://github.com/o/r/issues/5"}}]},{"id":"story:gh-6","kind":"story","group":null,"story":"gh-6","unit":"gh-6","step":"work","title":"Export report","since":"2099-01-15T10:03:01.000Z","age":"3s","preview":{"report":{"key":"gh-6","story":"gh-6","title":"Export report","url":"https://github.com/o/r/issues/6","story_status":"active","claim":"held here","mode":"auto","unit":{"key":"gh-6","title":"Export report","status":"parked","workflow":"gated","step":"work","attempt":1,"last_outcome":{"step":"work","outcome":"ask","at":"2099-01-15T10:03:01.000Z"},"next":"norn story answer gh-6 \"…\"","integrated":false},"slices":[],"root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-6-export-report","spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-6-export-report/.agents/specs/gh-6-export-report","branch":"gh-6-export-report","pr":null,"pr_state":null,"pr_command":"gh pr view gh-6-export-report","waiting":[{"group":"answer","unit":"gh-6","step":"work","title":"CSV only, or CSV and PDF?","command":"norn story answer gh-6 \"…\"","age":"3s","url":"https://github.com/o/r/issues/6"}],"running":[],"notes":[],"note_count":0,"look":{"spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-6-export-report/.agents/specs/gh-6-export-report","trace":"norn run list gh-6","why":"norn run view gh-6 --why","status":"norn story view gh-6"}},"item":null},"actions":[{"id":"orient","label":"orient","key":"enter","effect":{"kind":"place","place":"orient","story":"gh-6"}},{"id":"trace","label":"trace","key":"v","effect":{"kind":"verb","argv":["run","list","gh-6"],"show":true}},{"id":"issue","label":"issue","key":"i","effect":{"kind":"link","url":"https://github.com/o/r/issues/6"}}]},{"id":"story:gh-7","kind":"story","group":null,"story":"gh-7","unit":"gh-7","step":"work","title":"Sync ledger","since":"2099-01-15T10:03:01.000Z","age":"3s","preview":{"report":{"key":"gh-7","story":"gh-7","title":"Sync ledger","url":"https://github.com/o/r/issues/7","story_status":"active","claim":"held here","mode":"auto","unit":{"key":"gh-7","title":"Sync ledger","status":"stuck","workflow":"gated","step":"work","attempt":1,"last_outcome":{"step":"work","outcome":"stuck","at":"2099-01-15T10:03:01.000Z"},"next":"norn run rerun gh-7","integrated":false},"slices":[],"root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-7-sync-ledger","spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-7-sync-ledger/.agents/specs/gh-7-sync-ledger","branch":"gh-7-sync-ledger","pr":null,"pr_state":null,"pr_command":"gh pr view gh-7-sync-ledger","waiting":[{"group":"unblock","unit":"gh-7","step":"work","title":"no API key","command":"norn run rerun gh-7","age":"3s","url":"https://github.com/o/r/issues/7"}],"running":[],"notes":[],"note_count":0,"look":{"spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-7-sync-ledger/.agents/specs/gh-7-sync-ledger","trace":"norn run list gh-7","why":"norn run view gh-7 --why","status":"norn story view gh-7"}},"item":null},"actions":[{"id":"orient","label":"orient","key":"enter","effect":{"kind":"place","place":"orient","story":"gh-7"}},{"id":"trace","label":"trace","key":"v","effect":{"kind":"verb","argv":["run","list","gh-7"],"show":true}},{"id":"issue","label":"issue","key":"i","effect":{"kind":"link","url":"https://github.com/o/r/issues/7"}}]},{"id":"story:gh-8","kind":"story","group":null,"story":"gh-8","unit":"gh-8","step":null,"title":"Audit log","since":null,"age":null,"preview":{"report":{"key":"gh-8","story":"gh-8","title":"Audit log","url":"https://github.com/o/r/issues/8","story_status":"active","claim":"held here","mode":"auto","unit":{"key":"gh-8","title":"Audit log","status":"corrupt","workflow":"gated","step":null,"attempt":null,"last_outcome":null,"next":"norn run view gh-8 --why","integrated":false},"slices":[],"root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-8-audit-log","spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-8-audit-log/.agents/specs/gh-8-audit-log","branch":"gh-8-audit-log","pr":null,"pr_state":null,"pr_command":"gh pr view gh-8-audit-log","waiting":[{"group":"unblock","unit":"gh-8","step":null,"title":"corrupt: .agents/specs/gh-8-audit-log/runs/_story/state.json failed validation (S2)","command":"norn run view gh-8 --why","age":"0s","url":"https://github.com/o/r/issues/8"}],"running":[{"group":"running","unit":"gh-8","step":null,"title":"taken in — the next tick starts it","command":"norn story view gh-8","age":"2m","url":"https://github.com/o/r/issues/8"}],"notes":[],"note_count":0,"look":{"spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-8-audit-log/.agents/specs/gh-8-audit-log","trace":"norn run list gh-8","why":"norn run view gh-8 --why","status":"norn story view gh-8"}},"item":null},"actions":[{"id":"orient","label":"orient","key":"enter","effect":{"kind":"place","place":"orient","story":"gh-8"}},{"id":"trace","label":"trace","key":"v","effect":{"kind":"verb","argv":["run","list","gh-8"],"show":true}},{"id":"issue","label":"issue","key":"i","effect":{"kind":"link","url":"https://github.com/o/r/issues/8"}}]},{"id":"story:gh-9","kind":"story","group":null,"story":"gh-9","unit":"gh-9","step":"work","title":"Dark mode","since":"2099-01-15T10:03:02.000Z","age":"2s","preview":{"report":{"key":"gh-9","story":"gh-9","title":"Dark mode","url":"https://github.com/o/r/issues/9","story_status":"active","claim":"held here","mode":"auto","unit":{"key":"gh-9","title":"Dark mode","status":"running","workflow":"gated","step":"work","attempt":1,"last_outcome":null,"next":"norn run list gh-9","integrated":false},"slices":[],"root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-9-dark-mode","spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-9-dark-mode/.agents/specs/gh-9-dark-mode","branch":"gh-9-dark-mode","pr":null,"pr_state":null,"pr_command":"gh pr view gh-9-dark-mode","waiting":[],"running":[{"group":"running","unit":"gh-9","step":"work","title":"work #1 (auto)","command":"norn run list gh-9","age":"2s","url":"https://github.com/o/r/issues/9"}],"notes":[],"note_count":0,"look":{"spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-9-dark-mode/.agents/specs/gh-9-dark-mode","trace":"norn run list gh-9","why":"norn run view gh-9 --why","status":"norn story view gh-9"}},"item":null},"actions":[{"id":"orient","label":"orient","key":"enter","effect":{"kind":"place","place":"orient","story":"gh-9"}},{"id":"trace","label":"trace","key":"v","effect":{"kind":"verb","argv":["run","list","gh-9"],"show":true}},{"id":"issue","label":"issue","key":"i","effect":{"kind":"link","url":"https://github.com/o/r/issues/9"}}]}]}
+
+
+===== $ norn story view gh-5 (exit 0)
+# gh-5 — Pay invoices
+
+## The story
+
+- Issue: https://github.com/o/r/issues/5
+- Story: parked at review (last: work → done) · gated · auto · held here
+- Worktree: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-5-pay-invoices` · branch `gh-5-pay-invoices`
+- Spec: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-5-pay-invoices/.agents/specs/gh-5-pay-invoices`
+
+## Slices
+
+No slices yet.
+
+## Pull request
+
+- none seen yet
+- Look: `gh pr view gh-5-pay-invoices`; open it in the browser: `norn story view gh-5 --web`
+
+## Waits for the person
+
+- **Approve** gh-5 (review), 2s: Look at it
+  - `norn story approve gh-5`
+  - reject: `norn story reject gh-5 --reason "…"`
+
+## Open notes (0)
+
+No open notes.
+
+## Where to look
+
+- Spec folder: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-5-pay-invoices/.agents/specs/gh-5-pay-invoices`
+- Every step and who acted: `norn run list gh-5`
+- Why norn did what it did: `norn run view gh-5 --why`
+- Status: `norn story view gh-5`
+
+
+===== $ norn story view gh-5 --json (exit 0)
+{"key":"gh-5","story":"gh-5","title":"Pay invoices","url":"https://github.com/o/r/issues/5","story_status":"active","claim":"held here","mode":"auto","unit":{"key":"gh-5","title":"Pay invoices","status":"parked","workflow":"gated","step":"review","attempt":1,"last_outcome":{"step":"work","outcome":"done","at":"2099-01-15T10:03:01.000Z"},"next":"norn story approve gh-5","integrated":false},"slices":[],"root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-5-pay-invoices","spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-5-pay-invoices/.agents/specs/gh-5-pay-invoices","branch":"gh-5-pay-invoices","pr":null,"pr_state":null,"pr_command":"gh pr view gh-5-pay-invoices","waiting":[{"group":"approve","unit":"gh-5","step":"review","title":"Look at it","command":"norn story approve gh-5","age":"2s","url":"https://github.com/o/r/issues/5"}],"running":[],"notes":[],"note_count":0,"look":{"spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-5-pay-invoices/.agents/specs/gh-5-pay-invoices","trace":"norn run list gh-5","why":"norn run view gh-5 --why","status":"norn story view gh-5"}}
+
+
+===== $ norn story view gh-6 (exit 0)
+# gh-6 — Export report
+
+## The story
+
+- Issue: https://github.com/o/r/issues/6
+- Story: parked at work (last: work → ask) · gated · auto · held here
+- Worktree: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-6-export-report` · branch `gh-6-export-report`
+- Spec: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-6-export-report/.agents/specs/gh-6-export-report`
+
+## Slices
+
+No slices yet.
+
+## Pull request
+
+- none seen yet
+- Look: `gh pr view gh-6-export-report`; open it in the browser: `norn story view gh-6 --web`
+
+## Waits for the person
+
+- **Answer** gh-6 (work), 3s: CSV only, or CSV and PDF?
+  - `norn story answer gh-6 "…"`
+
+## Open notes (0)
+
+No open notes.
+
+## Where to look
+
+- Spec folder: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-6-export-report/.agents/specs/gh-6-export-report`
+- Every step and who acted: `norn run list gh-6`
+- Why norn did what it did: `norn run view gh-6 --why`
+- Status: `norn story view gh-6`
+
+
+===== $ norn story view gh-6 --json (exit 0)
+{"key":"gh-6","story":"gh-6","title":"Export report","url":"https://github.com/o/r/issues/6","story_status":"active","claim":"held here","mode":"auto","unit":{"key":"gh-6","title":"Export report","status":"parked","workflow":"gated","step":"work","attempt":1,"last_outcome":{"step":"work","outcome":"ask","at":"2099-01-15T10:03:01.000Z"},"next":"norn story answer gh-6 \"…\"","integrated":false},"slices":[],"root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-6-export-report","spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-6-export-report/.agents/specs/gh-6-export-report","branch":"gh-6-export-report","pr":null,"pr_state":null,"pr_command":"gh pr view gh-6-export-report","waiting":[{"group":"answer","unit":"gh-6","step":"work","title":"CSV only, or CSV and PDF?","command":"norn story answer gh-6 \"…\"","age":"3s","url":"https://github.com/o/r/issues/6"}],"running":[],"notes":[],"note_count":0,"look":{"spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-6-export-report/.agents/specs/gh-6-export-report","trace":"norn run list gh-6","why":"norn run view gh-6 --why","status":"norn story view gh-6"}}
+
+
+===== $ norn story view gh-7 (exit 0)
+# gh-7 — Sync ledger
+
+## The story
+
+- Issue: https://github.com/o/r/issues/7
+- Story: stuck at work (last: work → stuck) · gated · auto · held here
+- Worktree: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-7-sync-ledger` · branch `gh-7-sync-ledger`
+- Spec: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-7-sync-ledger/.agents/specs/gh-7-sync-ledger`
+
+## Slices
+
+No slices yet.
+
+## Pull request
+
+- none seen yet
+- Look: `gh pr view gh-7-sync-ledger`; open it in the browser: `norn story view gh-7 --web`
+
+## Waits for the person
+
+- **Unblock** gh-7 (work), 3s: no API key
+  - `norn run rerun gh-7`
+
+## Open notes (0)
+
+No open notes.
+
+## Where to look
+
+- Spec folder: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-7-sync-ledger/.agents/specs/gh-7-sync-ledger`
+- Every step and who acted: `norn run list gh-7`
+- Why norn did what it did: `norn run view gh-7 --why`
+- Status: `norn story view gh-7`
+
+
+===== $ norn story view gh-7 --json (exit 0)
+{"key":"gh-7","story":"gh-7","title":"Sync ledger","url":"https://github.com/o/r/issues/7","story_status":"active","claim":"held here","mode":"auto","unit":{"key":"gh-7","title":"Sync ledger","status":"stuck","workflow":"gated","step":"work","attempt":1,"last_outcome":{"step":"work","outcome":"stuck","at":"2099-01-15T10:03:01.000Z"},"next":"norn run rerun gh-7","integrated":false},"slices":[],"root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-7-sync-ledger","spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-7-sync-ledger/.agents/specs/gh-7-sync-ledger","branch":"gh-7-sync-ledger","pr":null,"pr_state":null,"pr_command":"gh pr view gh-7-sync-ledger","waiting":[{"group":"unblock","unit":"gh-7","step":"work","title":"no API key","command":"norn run rerun gh-7","age":"3s","url":"https://github.com/o/r/issues/7"}],"running":[],"notes":[],"note_count":0,"look":{"spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-7-sync-ledger/.agents/specs/gh-7-sync-ledger","trace":"norn run list gh-7","why":"norn run view gh-7 --why","status":"norn story view gh-7"}}
+
+
+===== $ norn story view gh-8 (exit 0)
+# gh-8 — Audit log
+
+## The story
+
+- Issue: https://github.com/o/r/issues/8
+- Story: corrupt · gated · auto · held here
+- Worktree: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-8-audit-log` · branch `gh-8-audit-log`
+- Spec: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-8-audit-log/.agents/specs/gh-8-audit-log`
+
+## Slices
+
+No slices yet.
+
+## Pull request
+
+- none seen yet
+- Look: `gh pr view gh-8-audit-log`; open it in the browser: `norn story view gh-8 --web`
+
+## Waits for the person
+
+- **Unblock** gh-8, 0s: corrupt: .agents/specs/gh-8-audit-log/runs/_story/state.json failed validation (S2)
+  - `norn run view gh-8 --why`
+
+## Running
+
+- gh-8, 2m: taken in — the next tick starts it
+
+## Open notes (0)
+
+No open notes.
+
+## Where to look
+
+- Spec folder: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-8-audit-log/.agents/specs/gh-8-audit-log`
+- Every step and who acted: `norn run list gh-8`
+- Why norn did what it did: `norn run view gh-8 --why`
+- Status: `norn story view gh-8`
+
+
+===== $ norn story view gh-8 --json (exit 0)
+{"key":"gh-8","story":"gh-8","title":"Audit log","url":"https://github.com/o/r/issues/8","story_status":"active","claim":"held here","mode":"auto","unit":{"key":"gh-8","title":"Audit log","status":"corrupt","workflow":"gated","step":null,"attempt":null,"last_outcome":null,"next":"norn run view gh-8 --why","integrated":false},"slices":[],"root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-8-audit-log","spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-8-audit-log/.agents/specs/gh-8-audit-log","branch":"gh-8-audit-log","pr":null,"pr_state":null,"pr_command":"gh pr view gh-8-audit-log","waiting":[{"group":"unblock","unit":"gh-8","step":null,"title":"corrupt: .agents/specs/gh-8-audit-log/runs/_story/state.json failed validation (S2)","command":"norn run view gh-8 --why","age":"0s","url":"https://github.com/o/r/issues/8"}],"running":[{"group":"running","unit":"gh-8","step":null,"title":"taken in — the next tick starts it","command":"norn story view gh-8","age":"2m","url":"https://github.com/o/r/issues/8"}],"notes":[],"note_count":0,"look":{"spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-8-audit-log/.agents/specs/gh-8-audit-log","trace":"norn run list gh-8","why":"norn run view gh-8 --why","status":"norn story view gh-8"}}
+
+
+===== $ norn story view gh-9 (exit 0)
+# gh-9 — Dark mode
+
+## The story
+
+- Issue: https://github.com/o/r/issues/9
+- Story: running at work · gated · auto · held here
+- Worktree: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-9-dark-mode` · branch `gh-9-dark-mode`
+- Spec: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-9-dark-mode/.agents/specs/gh-9-dark-mode`
+
+## Slices
+
+No slices yet.
+
+## Pull request
+
+- none seen yet
+- Look: `gh pr view gh-9-dark-mode`; open it in the browser: `norn story view gh-9 --web`
+
+## Waits for the person
+
+Nothing waits for the person.
+
+## Running
+
+- gh-9 (work), 2s: work #1 (auto)
+
+## Open notes (0)
+
+No open notes.
+
+## Where to look
+
+- Spec folder: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-9-dark-mode/.agents/specs/gh-9-dark-mode`
+- Every step and who acted: `norn run list gh-9`
+- Why norn did what it did: `norn run view gh-9 --why`
+- Status: `norn story view gh-9`
+
+
+===== $ norn story view gh-9 --json (exit 0)
+{"key":"gh-9","story":"gh-9","title":"Dark mode","url":"https://github.com/o/r/issues/9","story_status":"active","claim":"held here","mode":"auto","unit":{"key":"gh-9","title":"Dark mode","status":"running","workflow":"gated","step":"work","attempt":1,"last_outcome":null,"next":"norn run list gh-9","integrated":false},"slices":[],"root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-9-dark-mode","spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-9-dark-mode/.agents/specs/gh-9-dark-mode","branch":"gh-9-dark-mode","pr":null,"pr_state":null,"pr_command":"gh pr view gh-9-dark-mode","waiting":[],"running":[{"group":"running","unit":"gh-9","step":"work","title":"work #1 (auto)","command":"norn run list gh-9","age":"2s","url":"https://github.com/o/r/issues/9"}],"notes":[],"note_count":0,"look":{"spec":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-9-dark-mode/.agents/specs/gh-9-dark-mode","trace":"norn run list gh-9","why":"norn run view gh-9 --why","status":"norn story view gh-9"}}
+
+
+===== harvested 24 distinct commands
+
+----- PASTE (from status --json): norn run view gh-8 --why
+exit 0
+{"unit":"gh-8","tick_id":"03PGFN7MY0RX9MH81T4DQT1YF3","at":"2099-01-15T10:03:04.000Z","rule":"unit.corrupt","action":"mark_corrupt","trigger":{"source":"fact","kind":"unit.corrupt","reason":null},"result":{"ok":true,"detail":{"marked":false,"errors":[{"file":".agents/specs/gh-8-audit-log/runs/_story/state.json","errors":[{"path":"","message":"invalid JSON: JSON Parse error: Expected '}'"}]}]}},"facts":{"claim":"mine","status":"not_started","step":null,"attempt":null,"park":null,"counters":{},"unapplied":["0001-started"],"errors":[{"file":".agents/specs/gh-8-audit-log/runs/_story/state.json","e
+
+----- PASTE (from status --json): norn story view gh-8
+exit 0
+# gh-8 — Audit log
+
+## The story
+
+- Issue: https://github.com/o/r/issues/8
+- Story: corrupt · gated · auto · held here
+- Worktree: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-8-audit-log` · branch `gh-8-audit-log`
+- Spec: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-8-audit-log/.agents/specs/gh-8-audit-log`
+
+## Slices
+
+No slices yet.
+
+## Pull request
+
+- none seen yet
+- Look: `gh pr view gh-8-audit-log`; open it in the browser: `norn story view gh-8 --web`
+
+## Waits for the person
+
+- **Unblock** gh-8,
+
+----- PASTE (from status --json): norn run list gh-9
+exit 0
+gh-9 · Dark mode · running at work
+intake 2099-01-15 10:01:00Z · not done · wall-clock 2m04s so far
+time in steps: agent 4s · human wait 0s
+(2 no-op/claim-renew tick events hidden — --all shows them)
+
+UNIT  STEP    ENTERED   LEFT  DUR  OUTCOME    WHO
+gh-9  work#1  10:03:00  …     4s+  (in step)  tick 03PGFN7JZGX94HX217MHB507ET
+
+
+----- PASTE (from cockpit): norn run list gh-6
+exit 0
+gh-6 · Export report · parked at work
+intake 2099-01-15 10:01:00Z · not done · wall-clock 2m04s so far
+time in steps: agent 4s · human wait 3s
+(2 no-op/claim-renew tick events hidden — --all shows them)
+
+UNIT  STEP    ENTERED   LEFT  DUR  OUTCOME    WHO
+gh-6  work#1  10:03:00  …     4s+  (in step)  claude run 03PGFN7H106AXC8P8AMFYZZEB1
+      ask: CSV only, or CSV and PDF?
+
+
+----- PASTE (from cockpit): norn run view gh-6 --why
+exit 0
+{"unit":"gh-6","tick_id":"03PGFN7MY0RX9MH81T4DQT1YF3","at":"2099-01-15T10:03:04.000Z","rule":"unit.parked.ask","action":"noop","reason":"CSV only, or CSV and PDF?","trigger":{"source":"fact","kind":"unit.parked.ask","reason":"CSV only, or CSV and PDF?"},"result":{"ok":true},"facts":{"claim":"mine","status":"parked","step":"work","attempt":1,"park":{"kind":"ask","reason":"CSV only, or CSV and PDF?","since":"2099-01-15T10:03:01.000Z","receipt_id":"03PGFN7J08QRQ815D993PSDRRK"},"counters":{"loop":0},"unapplied":[],"errors":[]},"decision":{"kind":"noop","unit":{"story":"gh-6","slice":null,"dir":"_s
+
+----- PASTE (from cockpit): norn story view gh-6
+exit 0
+# gh-6 — Export report
+
+## The story
+
+- Issue: https://github.com/o/r/issues/6
+- Story: parked at work (last: work → ask) · gated · auto · held here
+- Worktree: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-6-export-report` · branch `gh-6-export-report`
+- Spec: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-6-export-report/.agents/specs/gh-6-export-report`
+
+## Slices
+
+No slices yet.
+
+## Pull request
+
+- none seen yet
+- Look: `gh pr view gh-6-export-report`; open it in the browser: `norn story view gh-6 --
+
+----- PASTE (from cockpit): norn run list gh-5
+exit 0
+gh-5 · Pay invoices · parked at review
+intake 2099-01-15 10:01:00Z · not done · wall-clock 2m04s so far
+time in steps: agent 2s · gate 2s · human wait 2s
+(2 no-op/claim-renew tick events hidden — --all shows them)
+
+UNIT  STEP      ENTERED   LEFT      DUR  OUTCOME    WHO
+gh-5  work#1    10:03:00  10:03:02  2s   done       claude run 03PGFN7H106AXC8P8AMFYZZEAX
+      ready
+gh-5  review#1  10:03:02  …         2s+  (in step)  -
+
+
+----- PASTE (from cockpit): norn run view gh-5 --why
+exit 0
+{"unit":"gh-5","tick_id":"03PGFN7MY0RX9MH81T4DQT1YF3","at":"2099-01-15T10:03:04.000Z","rule":"unit.parked.gate","action":"noop","reason":"Look at it","trigger":{"source":"fact","kind":"unit.parked.gate","reason":"Look at it"},"result":{"ok":true},"facts":{"claim":"mine","status":"parked","step":"review","attempt":1,"park":{"kind":"gate","reason":"Look at it","since":"2099-01-15T10:03:02.000Z"},"counters":{"loop":0},"unapplied":[],"errors":[]},"decision":{"kind":"noop","unit":{"story":"gh-5","slice":null,"dir":"_story","key":"gh-5"},"rule":"unit.parked.gate","reason":"Look at it"},"replay":{"ma
+
+----- PASTE (from cockpit): norn story view gh-5
+exit 0
+# gh-5 — Pay invoices
+
+## The story
+
+- Issue: https://github.com/o/r/issues/5
+- Story: parked at review (last: work → done) · gated · auto · held here
+- Worktree: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-5-pay-invoices` · branch `gh-5-pay-invoices`
+- Spec: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-5-pay-invoices/.agents/specs/gh-5-pay-invoices`
+
+## Slices
+
+No slices yet.
+
+## Pull request
+
+- none seen yet
+- Look: `gh pr view gh-5-pay-invoices`; open it in the browser: `norn story view gh-5 --web
+
+----- PASTE (from cockpit): norn run list gh-7
+exit 0
+gh-7 · Sync ledger · stuck at work
+intake 2099-01-15 10:01:00Z · not done · wall-clock 2m04s so far
+time in steps: agent 4s · human wait 0s
+(2 no-op/claim-renew tick events hidden — --all shows them)
+
+UNIT  STEP    ENTERED   LEFT  DUR  OUTCOME    WHO
+gh-7  work#1  10:03:00  …     4s+  (in step)  claude run 03PGFN7H106AXC8P8AMFYZZEB5
+      stuck: no API key
+
+
+----- PASTE (from cockpit): norn run view gh-7 --why
+exit 0
+{"unit":"gh-7","tick_id":"03PGFN7MY0RX9MH81T4DQT1YF3","at":"2099-01-15T10:03:04.000Z","rule":"unit.stuck","action":"noop","reason":"stuck: no API key — norn run rerun gh-7","trigger":{"source":"fact","kind":"unit.stuck","reason":"stuck: no API key — norn run rerun gh-7"},"result":{"ok":true},"facts":{"claim":"mine","status":"stuck","step":"work","attempt":1,"park":{"kind":"stuck","reason":"no API key","since":"2099-01-15T10:03:01.000Z","receipt_id":"03PGFN7J08QRQ815D993PSDRRM"},"counters":{"loop":0},"unapplied":[],"errors":[]},"decision":{"kind":"noop","unit":{"story":"gh-7","slice":null,"dir"
+
+----- PASTE (from cockpit): norn story view gh-7
+exit 0
+# gh-7 — Sync ledger
+
+## The story
+
+- Issue: https://github.com/o/r/issues/7
+- Story: stuck at work (last: work → stuck) · gated · auto · held here
+- Worktree: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-7-sync-ledger` · branch `gh-7-sync-ledger`
+- Spec: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-7-sync-ledger/.agents/specs/gh-7-sync-ledger`
+
+## Slices
+
+No slices yet.
+
+## Pull request
+
+- none seen yet
+- Look: `gh pr view gh-7-sync-ledger`; open it in the browser: `norn story view gh-7 --web`
+
+## Wa
+
+----- PASTE (from cockpit): norn run list gh-8
+exit 0
+gh-8 · Audit log · not_started
+intake 2099-01-15 10:01:00Z · not done · wall-clock 2m04s so far
+time in steps: agent 0s · human wait 0s
+(1 no-op/claim-renew tick events hidden — --all shows them)
+
+UNIT  STEP    ENTERED   LEFT  DUR  OUTCOME  WHO
+gh-8  work#1  10:03:00  -     -    -        claude run 03PGFN7H106AXC8P8AMFYZZEB9
+
+
+----- PASTE (from cockpit): norn run view gh-9 --why
+exit 0
+{"unit":"gh-9","tick_id":"03PGFN7MY0RX9MH81T4DQT1YF3","at":"2099-01-15T10:03:04.000Z","rule":"agent.running","action":"noop","reason":"run 03PGFN7JZGJ7A15PF4XE4GFMR4 in progress","trigger":{"source":"fact","kind":"agent.running","reason":"run 03PGFN7JZGJ7A15PF4XE4GFMR4 in progress"},"result":{"ok":true},"facts":{"claim":"mine","status":"running","step":"work","attempt":1,"park":null,"counters":{"loop":0},"unapplied":[],"errors":[]},"decision":{"kind":"noop","unit":{"story":"gh-9","slice":null,"dir":"_story","key":"gh-9"},"rule":"agent.running","reason":"run 03PGFN7JZGJ7A15PF4XE4GFMR4 in progre
+
+----- PASTE (from cockpit): norn story view gh-9
+exit 0
+# gh-9 — Dark mode
+
+## The story
+
+- Issue: https://github.com/o/r/issues/9
+- Story: running at work · gated · auto · held here
+- Worktree: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-9-dark-mode` · branch `gh-9-dark-mode`
+- Spec: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-JsPekh/repo-worktrees/gh-9-dark-mode/.agents/specs/gh-9-dark-mode`
+
+## Slices
+
+No slices yet.
+
+## Pull request
+
+- none seen yet
+- Look: `gh pr view gh-9-dark-mode`; open it in the browser: `norn story view gh-9 --web`
+
+## Waits for the person
+
+Nothing wai
+
+----- PASTE (from story view gh-5): norn story view gh-5 --web
+exit 0
+Opened https://github.com/o/r/issues/5
+
+
+----- PASTE (from story view gh-6): norn story view gh-6 --web
+exit 0
+Opened https://github.com/o/r/issues/6
+
+
+----- PASTE (from story view gh-7): norn story view gh-7 --web
+exit 0
+Opened https://github.com/o/r/issues/7
+
+
+----- PASTE (from story view gh-8): norn story view gh-8 --web
+exit 0
+Opened https://github.com/o/r/issues/8
+
+
+----- PASTE (from story view gh-9): norn story view gh-9 --web
+exit 0
+Opened https://github.com/o/r/issues/9
+
+
+----- PASTE (from status --json): norn story answer gh-6 "…"
+exit 0
+{"unit":"gh-6","receipt":{"kind":"answer","receipt_id":"03PGFN7MY0RX9MH81T4DQT1YF5","run_id":"03PGFN7H106AXC8P8AMFYZZEB1","step":"work","attempt":1,"at":"2099-01-15T10:03:04.000Z","by":"human","who":"tester@box","slice":null,"answer":"…","ask_receipt_id":"03PGFN7J08QRQ815D993PSDRRK"},"delivered":{"via":"local","claim":"mine","n":3,"file":".agents/specs/gh-6-export-report/runs/_story/receipts/0003-answer.json"},"next":"norn tick"}
+
+
+----- PASTE (from status --json): norn story approve gh-5
+exit 0
+{"unit":"gh-5","receipt":{"kind":"approve","receipt_id":"03PGFN7MY0RX9MH81T4DQT1YF7","run_id":null,"step":"review","attempt":1,"at":"2099-01-15T10:03:04.000Z","by":"human","who":"tester@box","slice":null,"head_sha":"d743a6ae670a94519aea6d17f271c9e6d8a79c78"},"delivered":{"via":"local","claim":"mine","n":3,"file":".agents/specs/gh-5-pay-invoices/runs/_story/receipts/0003-approve.json"},"next":"norn tick"}
+
+
+----- PASTE (from status --json): norn run rerun gh-7
+exit 0
+{"unit":"gh-7","receipt":{"kind":"unstick","receipt_id":"03PGFN7MY0RX9MH81T4DQT1YF9","run_id":"03PGFN7H106AXC8P8AMFYZZEB5","step":"work","attempt":1,"at":"2099-01-15T10:03:04.000Z","by":"human","who":"tester@box","slice":null},"delivered":{"via":"local","claim":"mine","n":3,"file":".agents/specs/gh-7-sync-ledger/runs/_story/receipts/0003-unstick.json"},"next":"norn tick"}
+
+
+----- PASTE (from story view gh-5): norn story reject gh-5 --reason "…"
+exit 3 error: approve already recorded for review#1 (.agents/specs/gh-5-pay-invoices/runs/_story/receipts/0003-approve.json) and not applied yet code: already_recorded
+{"error":"approve already recorded for review#1 (.agents/specs/gh-5-pay-invoices/runs/_story/receipts/0003-approve.json) and not applied yet","do_instead":"norn tick","code":"already_recorded","details":{"receipt_id":"03PGFN7MY0RX9MH81T4DQT1YF7"}}
+
+
+===== after paste + 2 ticks: $ norn story list
+gh-5 Pay invoices
+  gated · auto · mine · done 1s
+  base main: up to date
+
+gh-6 Export report
+  gated · auto · mine · running work#1 6s [loop 0/2]
+  base main: up to date
+
+gh-7 Sync ledger
+  gated · auto · mine · running work#2 0s [loop 0/2]
+  base main: up to date
+
+gh-8 Audit log
+  gated · auto · mine · corrupt [loop 0/2]
+  → norn run view gh-8 --why
+  base main: up to date
+  ! .agents/specs/gh-8-audit-log/runs/_story/state.json: invalid JSON: JSON Parse error: Expected '}'
+
+gh-9 Dark mode
+  gated · auto · mine · running work#1 4s [loop 0/2]
+  base main: up to date
+
+Runs
+  gh-6       work#1 manual claude since 2099-01-15T10:03:00.000Z
+  gh-9       work#1 auto claude alive since 2099-01-15T10:03:02.000Z
+  gh-7       work#2 auto claude alive since 2099-01-15T10:03:06.000Z
+
+Recently done
+  gh-5       Pay invoices (1s ago)
+
+heartbeat: last tick 0s ago on tester@box
+1 item needs you — norn status
+
