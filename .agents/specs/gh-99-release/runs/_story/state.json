@@ -5,14 +5,19 @@
   "unit_dir": "_story",
   "workflow": "release",
   "workflow_hash": "1dba3383234e1630ccbebc9df02987f6e430b96e55c57cc3ce9c935092385bcb",
-  "step": "prepare",
+  "step": "confirm-version",
   "attempt": 1,
   "visits": {
-    "prepare": 1
+    "prepare": 1,
+    "confirm-version": 1
   },
-  "step_entered_at": "2026-10-29T11:46:12.981Z",
-  "status": "running",
-  "park": null,
+  "step_entered_at": "2026-10-29T11:50:14.387Z",
+  "status": "parked",
+  "park": {
+    "kind": "gate",
+    "reason": "Read the proposed version and its reason in pr.md and the new CHANGELOG.md section. Approve to check the release, or reject with the version or changelog changes you want.",
+    "since": "2026-10-29T11:50:14.387Z"
+  },
   "counters": {
     "version_loop": 0,
     "ready_loop": 0,
@@ -21,22 +26,17 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 1,
-  "run": {
-    "run_id": "01M63QWZ6CTSV5PCJAJ1XC9XKD",
+  "applied_through": 2,
+  "run": null,
+  "last_outcome": {
     "step": "prepare",
-    "attempt": 1,
-    "started_at": "2026-10-29T11:49:36.175Z",
-    "how": "manual",
-    "agent": "claude",
-    "process": {
-      "pid": 56462,
-      "pid_start": "Thu Oct 29 08:59:15 2026"
-    }
+    "outcome": "done",
+    "source": "reported",
+    "at": "2026-10-29T11:50:09.803Z",
+    "receipt_id": "01M63QY04BGV5JKRJWZAXK4F9G"
   },
-  "last_outcome": null,
   "created_at": "2026-10-29T11:46:12.981Z",
-  "updated_at": "2026-10-29T11:49:52.980Z",
-  "last_tick_id": "01M63QXFPHVYV8DZGS12RJQR3R",
+  "updated_at": "2026-10-29T11:50:14.387Z",
+  "last_tick_id": "01M63QY4KC1MXMFJ76CWXR65VT",
   "mode": "manual"
 }
