@@ -21,6 +21,8 @@ export interface Interaction {
   ask(question: string): Promise<string | null>;
   /** `text` edited in `$VISUAL` / `$EDITOR` (vi when neither is set); null when the editor fails */
   edit(text: string): Promise<string | null>;
+  /** y/N: true only when the person answers y (yes) */
+  confirm(question: string): Promise<boolean>;
 }
 
 /** A6: what norn sets when it launches an agent; the orient env marks the agent beside a person. */
@@ -80,6 +82,27 @@ export function terminalInteraction(): Interaction {
           if (end >= 0) return line.slice(0, end).replace(/\r$/, "");
         }
         return null; // Ctrl-D
+      } finally {
+        stdin.pause();
+      }
+    },
+    async confirm(question) {
+      if (!tty) return false;
+      process.stderr.write(`${question} `);
+      const stdin = process.stdin;
+      stdin.resume();
+      try {
+        // one line, without iterating stdin (leaving a `for await` early destroys it)
+        // EOF or a read error is no answer: N
+        const line = await new Promise<string>((resolve) => {
+          const done = (chunk?: unknown) => {
+            stdin.off("data", done).off("end", done).off("error", done);
+            resolve(Buffer.isBuffer(chunk) ? chunk.toString() : "");
+          };
+          stdin.on("data", done).on("end", done).on("error", done);
+        });
+        if (!line.endsWith("\n")) process.stderr.write("\n");
+        return /^\s*y(es)?\s*$/i.test(line);
       } finally {
         stdin.pause();
       }

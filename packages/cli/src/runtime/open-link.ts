@@ -1,4 +1,4 @@
-/** CP8, B23: a link opened for the person with the platform opener (`open` on macOS, `xdg-open` elsewhere), or the injected shell. */
+/** CP8, B17, B23: open a link with the platform opener (`open` on macOS, `xdg-open` elsewhere), or the injected shell. */
 import { spawnBounded } from "@norn/store";
 import type { Context } from "../context.ts";
 

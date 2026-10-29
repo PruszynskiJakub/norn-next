@@ -85,7 +85,7 @@ describe("story PR body (GR9)", () => {
   });
 
   test("after rework the open PR gets the new pr.md with the link under it; no second PR", async () => {
-    expect((await h.norn("approve", "gh-7", "--reject", "--reason", "describe the change")).exit).toBe(0);
+    expect((await h.norn("story", "reject", "gh-7", "--reason", "describe the change")).exit).toBe(0);
     await tick();
     expect(h.state(runs())).toMatchObject({ step: "describe", attempt: 2 });
     await describeAndOpen("## Summary\n\ncount items\n\n");

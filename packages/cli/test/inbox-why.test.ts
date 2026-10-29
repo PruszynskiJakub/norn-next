@@ -101,18 +101,18 @@ describe("gate item and rulings (F21, F28)", () => {
     await run("done", "built");
     qaRun = await run("partial", "AC6 vs B6: spec conflict, counted raw", true);
     expect(h.state(runs())).toMatchObject({ step: "human-qa", status: "parked" });
-    const item = ((await h.norn("inbox")).value as Inbox).groups.approve?.[0];
+    const item = ((await h.norn("status")).value as Inbox).groups.approve?.[0];
     expect(item?.title).toBe("evidence attached");
     expect(item?.detail).toMatch(/^step qa#1 reported partial \(receipt \d{4}\) · /);
     expect(item?.detail).toContain('or reject: norn approve gh-7 --reject --reason "…"');
-    const full = ((await h.norn("inbox", "--details")).value as Inbox).groups.approve?.[0]?.full;
+    const full = ((await h.norn("status", "--details")).value as Inbox).groups.approve?.[0]?.full;
     expect(full).toContain(`Report: ${runs()}/receipts/`);
     expect(full).toContain(`Evidence: ${runs()}/evidence/${qaRun.run_id}/`);
   });
 
   test("a reject reason is a ruling every later brief of the story carries", async () => {
     const judged = h.git(["rev-parse", "HEAD"], wt());
-    const rej = await h.norn("approve", "gh-7", "--reject", "--reason", "AC6 wins over B6: show the raw count");
+    const rej = await h.norn("story", "reject", "gh-7", "--reason", "AC6 wins over B6: show the raw count");
     expect(rej.exit).toBe(0);
     // C2: the ruling is tied to the head it judged
     expect(rej.value).toMatchObject({ receipt: { kind: "reject", head_sha: judged } });
@@ -134,7 +134,7 @@ describe("gate item and rulings (F21, F28)", () => {
     await tick();
     expect((await inWt("done", "partial", "--handoff", "AC7 still needs a browser")).exit).toBe(0);
     await tick();
-    expect((await h.norn("approve", "gh-7", "--reason", "AC7 checked by hand")).exit).toBe(0);
+    expect((await h.norn("story", "approve", "gh-7", "--reason", "AC7 checked by hand")).exit).toBe(0);
     await tick();
     expect(h.state(runs())?.step).toBe("open-pr");
   });
@@ -184,18 +184,18 @@ describe("merge PR item and inbox history (F25, Q3)", () => {
     await tick(); // run_git open-pr
     await tick(); // apply → ready gate
     expect(h.state(runs())).toMatchObject({ step: "ready", status: "parked" });
-    expect((await h.norn("approve", "gh-7")).exit).toBe(0);
+    expect((await h.norn("story", "approve", "gh-7")).exit).toBe(0);
     await tick();
     expect(h.state(runs())).toMatchObject({ step: "$done", status: "done" });
     await tick("--sync");
     const pr = h.remote.prs[0];
-    const hist = (await h.norn("inbox", "--history")).value as History;
+    const hist = (await h.norn("status", "--history")).value as History;
     const merge = hist.items.find((i) => i.id === `merge:gh-7:${pr?.number}`);
     expect(merge).toMatchObject({ group: "your_turn", title: `Merge PR #${pr?.number} (still a draft)`, url: pr?.url, resolved_at: null });
   });
 
   test("--history pairs appeared/resolved with who resolved each item", async () => {
-    const hist = (await h.norn("inbox", "--history")).value as History;
+    const hist = (await h.norn("status", "--history")).value as History;
     const gates = hist.items.filter((i) => i.group === "approve");
     expect(gates.map((g) => [g.id, g.resolved_by?.replace(/\(\d{4}-/, "(NNNN-")])).toEqual([
       ["approve:gh-7:human-qa#1", "reject by tester@box (NNNN-reject.json)"],
@@ -204,11 +204,11 @@ describe("merge PR item and inbox history (F25, Q3)", () => {
     ]);
     for (const g of gates) expect(Date.parse(g.resolved_at as string)).toBeGreaterThanOrEqual(Date.parse(g.appeared_at as string));
     expect(hist.open).toBeGreaterThanOrEqual(1);
-    const text = (await h.norn("inbox", "--history")).stdout;
+    const text = (await h.norn("status", "--history")).stdout;
     expect(text).toContain("approve   human-qa: evidence attached (reject by tester@box");
-    const later = (await h.norn("inbox", "--history", "--since", new Date(h.clock.now() + 60_000).toISOString())).value as History;
+    const later = (await h.norn("status", "--history", "--since", new Date(h.clock.now() + 60_000).toISOString())).value as History;
     expect(later.items).toEqual([]);
-    expect((await h.norn("inbox", "--history", "--since", "soon")).exit).toBe(2);
+    expect((await h.norn("status", "--history", "--since", "soon")).exit).toBe(2);
   });
 
   test("the PR merge resolves the merge item", async () => {
@@ -216,7 +216,7 @@ describe("merge PR item and inbox history (F25, Q3)", () => {
     if (pr) Object.assign(pr, { state: "merged", merged_at: new Date(h.clock.now()).toISOString() });
     h.clock.advance(10 * 60_000);
     await tick("--sync");
-    const hist = (await h.norn("inbox", "--history")).value as History;
+    const hist = (await h.norn("status", "--history")).value as History;
     expect(hist.items.find((i) => i.id === `merge:gh-7:${pr?.number}`)?.resolved_at).not.toBeNull();
   });
 });

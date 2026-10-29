@@ -62,7 +62,7 @@ function view(): ProjectView {
     approve: [entry("approve", "gh-4", { step: "ready", command: "norn approve gh-4" })],
     unblock: [entry("unblock", "gh-5", { command: "norn unstick gh-5" })],
     check: [entry("check", "gh-4", { command: "norn why gh-4" })],
-    unclaimed: [entry("unclaimed", "gh-6", { command: "norn take gh-6" })],
+    unclaimed: [entry("unclaimed", "gh-6", { command: "norn story checkout gh-6" })],
     running: [entry("running", "gh-2")],
     notes: [entry("notes", "gh-4")],
     recently_done: [],
@@ -117,17 +117,17 @@ describe("cockpitModel", () => {
   test("effects: verbs with {input}, links, places only when the front end has them", () => {
     const { rows } = cockpitModel(view(), { places: true, provider: "gh" });
     const answer = row(rows, "answer:gh-3")?.actions.find((a) => a.id === "answer");
-    expect(answer).toEqual({ id: "answer", label: "answer", key: "a", input: { prompt: "Your answer", required: true }, effect: { kind: "verb", argv: ["answer", "gh-3/02", "{input}"] } });
+    expect(answer).toEqual({ id: "answer", label: "answer", key: "a", input: { prompt: "Your answer", required: true }, effect: { kind: "verb", argv: ["story", "answer", "gh-3/02", "{input}"] } });
     if (answer?.effect.kind !== "verb") throw new Error("unreachable");
-    expect(withInput(answer.effect.argv, "CSV only")).toEqual(["answer", "gh-3/02", "CSV only"]);
-    expect(row(rows, "approve:gh-4")?.actions.find((a) => a.id === "reject")?.effect).toEqual({ kind: "verb", argv: ["approve", "gh-4", "--reject", "--reason", "{input}"] });
+    expect(withInput(answer.effect.argv, "CSV only")).toEqual(["story", "answer", "gh-3/02", "CSV only"]);
+    expect(row(rows, "approve:gh-4")?.actions.find((a) => a.id === "reject")?.effect).toEqual({ kind: "verb", argv: ["story", "reject", "gh-4", "--reason", "{input}"] });
     expect(row(rows, "story:gh-4")?.actions.find((a) => a.id === "pr")?.effect).toEqual({ kind: "link", url: "https://github.com/o/r/pull/7" });
     expect(row(rows, "attended:gh-2")?.actions[1]?.effect).toEqual({ kind: "place", place: "agent", story: "gh-2", reach: { worktree: "/repo-worktrees/gh-2-x", agent_session_id: "s2", pane_id: null } });
     expect(row(rows, "story:gh-1")?.actions[0]?.effect).toEqual({ kind: "place", place: "orient", story: "gh-1" });
 
     const web = cockpitModel(view(), { places: false, provider: "gh" });
     expect(web.rows.flatMap((r) => r.actions).some((a) => a.effect.kind === "place")).toBe(false);
-    expect(row(web.rows, "story:gh-1")?.actions[0]?.effect).toEqual({ kind: "verb", argv: ["orient", "gh-1"], show: true });
+    expect(row(web.rows, "story:gh-1")?.actions[0]?.effect).toEqual({ kind: "verb", argv: ["story", "view", "gh-1"], show: true });
     expect(ids(row(web.rows, "attended:gh-2"))).toEqual(["orient", "trace", "issue"]);
   });
 

@@ -39,7 +39,7 @@ let shell: string[][];
 const norn = (deps: Partial<CliDeps>, ...argv: string[]): Promise<CliResult> =>
   runCli(argv, { ...h.deps, shell: async (a) => (shell.push(a), { code: 0, stderr: "" }), ...deps });
 const creates = () => h.remote.calls.filter((c) => c.startsWith("issue+ "));
-const stories = async () => ((await h.norn("status", "--json")).value as { stories: StoryView[] }).stories;
+const stories = async () => ((await h.norn("story", "list", "--json")).value as { stories: StoryView[] }).stories;
 /** what the checkout has on disk: spec folders and worktrees */
 const local = () => [join(h.root, ".agents/specs"), `${h.root}-worktrees`].flatMap((d) => (existsSync(d) ? readdirSync(d) : [])).sort();
 

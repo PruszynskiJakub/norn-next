@@ -1,0 +1,23 @@
+$ norn tick --json
+{"tick_id":"01M61VEW6VCQJH97CWQDFYNK1P","at":"2026-10-28T18:13:19.707Z","duration_ms":928,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"*","rule":"leases.reclaim","kind":"reclaim_leases","ok":true},{"unit":"gh-5","rule":"receipts.apply","kind":"apply_receipts","ok":true}],"notified":["01M61VEAGJN51ZAYDXEE5N42TA"],"trace":"2026-10-28.jsonl","failed":0}
+$ norn tick --json
+{"tick_id":"01M61VEXA8VV4T63ZHTSWN7113","at":"2026-10-28T18:13:20.840Z","duration_ms":459,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-5","rule":"unit.stuck","kind":"noop","ok":true}],"notified":[],"trace":"2026-10-28.jsonl","failed":0}
+$ norn tick --json
+{"tick_id":"01M61VEXYXGR1BTDS3R8JBTYHA","at":"2026-10-28T18:13:21.501Z","duration_ms":384,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-5","rule":"unit.stuck","kind":"noop","ok":true}],"notified":[],"trace":"2026-10-28.jsonl","failed":0}
+pgrep after 3 ticks (empty = not relaunched):
+state:
+{"step":"implement","status":"stuck","park":{"kind":"stuck","reason":"cancelled by person","since":"2026-10-28T18:13:01.586Z","receipt_id":"01M61VEAGJN51ZAYDXEE5N42TA"},"attempt":1,"retries_used":0,"nudges_used":0,"last_outcome":{"step":"implement","outcome":"stuck","source":"human","at":"2026-10-28T18:13:01.586Z","receipt_id":"01M61VEAGJN51ZAYDXEE5N42TA"}}
+worktree:
+gh-5-pay-invoices
+142d1ee norn: gh-5 implement#1 stuck: cancelled by person
+e82b4f0 agent commit
+4d1c8fe norn: gh-5 implement started (run 01M61VDPKW9NPCS3SBHJVS6TJA)
+work.txt:
+uncommitted work 70734
+claim ref:
+df98a5062c7faedd6f45e1e8e58bff3e89d680e1 blob	refs/norn/claims/gh-5
+$ norn status --json (unit)
+{"at":"2026-10-28T18:13:24.242Z","repo":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh75-09/work/repo","holder":"jakubpruszynski@mac","runner":"headless","heartbeat":{"holder":"jakubpruszynski@mac","last_tick_at":"2026-10-28T18:13:21.886Z","age":"2s","down":false},"stories":[{"key":"gh-5","story":"gh-5","slice":null,"title":"Pay invoices","url":"https://github.com/acme/app/issues/5","workflow":"flow","mode":"auto","effective_mode":"auto","mode_downgraded":false,"claim":{"state":"mine","holder":"jakubpruszynski@mac","expires_at":"2026-10-28T18:22:38.869Z","unclaimed":false},"status":"stuck","step":"implement","attempt":1,"counters":[{"name":"loop","value":0,"max":2}],"park":{"kind":"stuck","reason":"cancelled by person","since":"2026-10-28T18:13:01.586Z"},"since":"2026-10-2
+$ norn run cancel gh-5 --json (again, now stuck)
+{"error":"gh-5 has no running agent: it is at implement#1 (stuck: stuck)","do_instead":"norn status gh-5","code":"nothing_to_cancel"}
+exit 3

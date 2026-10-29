@@ -1,0 +1,15 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M61DNN42VPEMJHQT1CVZF3VY",
+  "run_id": "01M61DN3111KXK7FEHRJEJP9VM",
+  "step": "integrate",
+  "attempt": 1,
+  "at": "2026-10-28T14:12:21.762Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M61DN311VKJH3JKASA17PCQ0",
+  "outcome": "done",
+  "rule": "git.integrate",
+  "detail": "gh-75/03-targets-and-terminal-prompts integrated into gh-75-regroup-the-cli-around-status-story-and at bfab25144053",
+  "route": "$done"
+}

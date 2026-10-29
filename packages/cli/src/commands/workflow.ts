@@ -28,7 +28,7 @@ export const workflowCommand = defineCommand({
       const t = await resolveTarget(ctx, key.key);
       const obs = t.obs;
       const sf = t.story_facts;
-      if (!obs || !sf) throw refuse(`${t.story} is not in this checkout`, cmd.take(t.story), "story_not_local");
+      if (!obs || !sf) throw refuse(`${t.story} is not in this checkout`, cmd.storyCheckout(t.story), "story_not_local");
       const listed = Object.keys(obs.workflows).sort();
       const loaded = obs.workflows[name];
       if (!loaded) throw refuse(`no workflow '${name}' in .agents/norn/workflows/`, cmd.workflow(t.key, `<${listed.join("|")}>`), "unknown_workflow");
@@ -50,7 +50,7 @@ export const workflowCommand = defineCommand({
       if (!t.state) {
         // W9: before start the choice lives in frontmatter
         if (to !== undefined) throw refuse(`${t.key} has not started; --to applies only to a running unit (S7)`, cmd.workflow(t.key, name), "not_started");
-        if (sf.claim.state === "other") throw claimHeld(sf.claim.blob, `ask ${sf.claim.blob.holder} to run it, or ${cmd.take(t.story, { force: true })}`);
+        if (sf.claim.state === "other") throw claimHeld(sf.claim.blob, `ask ${sf.claim.blob.holder} to run it, or ${cmd.storyCheckout(t.story, { force: true })}`);
         if (t.slice ? !sliceFile?.frontmatter : !sf.frontmatter) throw refuse(`${t.key}'s frontmatter is missing or invalid`, cmd.status(t.story), "frontmatter");
         const previous = t.slice ? (sliceFile?.frontmatter?.workflow ?? null) : (sf.frontmatter?.workflow ?? null);
         const file = previous === name ? null : patchFm();

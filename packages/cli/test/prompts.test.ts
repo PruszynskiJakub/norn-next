@@ -111,7 +111,7 @@ describe("R6.1: the agent's report while parked on an implicit ask (acceptance 9
   test("the Answer item is the question, the first command line and the options; the screen only with --details", async () => {
     await untilRunning(h);
     await parkOnPrompt(h);
-    const inbox = (await h.norn("inbox")).value as Inbox;
+    const inbox = (await h.norn("status")).value as Inbox;
     expect(inbox.groups.answer).toEqual([
       expect.objectContaining({
         title: "Contains brace with quote character (expansion obfuscation) Do you want to proceed?",
@@ -120,11 +120,11 @@ describe("R6.1: the agent's report while parked on an implicit ask (acceptance 9
       }),
     ]);
     expect(inbox.groups.answer[0]).not.toHaveProperty("full");
-    const details = (await h.norn("inbox", "--details")).value as Inbox;
+    const details = (await h.norn("status", "--details")).value as Inbox;
     expect(details.groups.answer[0]?.full).toBe(SCREEN);
-    const text = (await h.norn("inbox")).stdout as string;
+    const text = (await h.norn("status")).stdout as string;
     expect(text).not.toContain("│ EOF");
-    expect((await h.norn("inbox", "--details")).stdout).toContain("      | ╌╌╌");
+    expect((await h.norn("status", "--details")).stdout).toContain("      | ╌╌╌");
   });
 
   test("`norn done` is accepted: an answer by the agent closes the ask, then the report applies", async () => {
@@ -157,28 +157,28 @@ describe("R6.2/R6.3: norn answer types into the prompt (acceptance 9)", () => {
     await parkOnPrompt(h);
     const before = receipts(h).length;
     h.runner.keysError = new Error("pane p-1 is gone");
-    const r = await h.norn("answer", "gh-9", "1");
+    const r = await h.norn("story", "answer", "gh-9", "1");
     expect(r.exit).toBe(1);
     expect(r.value).toMatchObject({ code: "answer_not_delivered", error: "answer to gh-9 not delivered: pane p-1 is gone", do_instead: "answer it in the pane: fake attach p-1" });
     expect(receipts(h)).toHaveLength(before);
     h.clock.advance(10_000);
     await h.tick();
     expect(h.state(runs(h))).toMatchObject({ status: "parked", park: { kind: "ask" } });
-    const inbox = (await h.norn("inbox")).value as Inbox;
+    const inbox = (await h.norn("status")).value as Inbox;
     expect(inbox.groups.answer[0]).toMatchObject({ command: "fake attach p-1", detail: expect.stringContaining("not delivered: answer to gh-9 not delivered: pane p-1 is gone") });
     expect(inbox.groups.unblock).toEqual([]);
   });
 
   test("not an option of the prompt → usage error, nothing typed", async () => {
     h.runner.keysError = null;
-    const r = await h.norn("answer", "gh-9", "maybe");
+    const r = await h.norn("story", "answer", "gh-9", "maybe");
     expect(r.exit).toBe(2);
     expect(r.value).toMatchObject({ code: "not_an_option", error: expect.stringContaining("1. Yes · 2. Yes, and switch") });
     expect(h.runner.keyed).toEqual([]);
   });
 
   test("a choice: option number + enter typed, then the receipt (delivered); the tick types nothing again", async () => {
-    const r = await h.norn("answer", "gh-9", "3");
+    const r = await h.norn("story", "answer", "gh-9", "3");
     expect(r.exit).toBe(0);
     expect(h.runner.keyed).toEqual([{ session: expect.objectContaining({ pane_id: "p-1" }), keys: [{ text: "3" }, { key: "enter" }] }]);
     expect(receipts(h).at(-1)).toMatchObject({ kind: "answer", by: "human", answer: "3", delivered: true });
@@ -188,7 +188,7 @@ describe("R6.2/R6.3: norn answer types into the prompt (acceptance 9)", () => {
     expect(acted(t)).toEqual(["gh-9 receipts.apply"]);
     expect(h.state(runs(h))).toMatchObject({ status: "running", park: null });
     expect(h.runner.sent).toEqual([]);
-    expect(((await h.norn("inbox")).value as Inbox).groups.answer).toEqual([]);
+    expect(((await h.norn("status")).value as Inbox).groups.answer).toEqual([]);
   });
 });
 
@@ -204,7 +204,7 @@ describe("B6: the agent's report after a person's `norn answer`, before the tick
     await untilRunning(h);
     await parkOnPrompt(h);
     // the prompt was about the agent's own `… && norn done …`: the keys arrive and it runs at once
-    expect((await h.norn("answer", "gh-9", "1")).exit).toBe(0);
+    expect((await h.norn("story", "answer", "gh-9", "1")).exit).toBe(0);
     const r = await runCli(["done", "done", "--handoff", "reviewed"], { ...h.deps, cwd: wt(h) });
     expect(r.value).toMatchObject({ ok: true, kind: "done" });
     expect(r.exit).toBe(0);
@@ -320,7 +320,7 @@ describe("R9.1: launch prompt not received (acceptance 12)", () => {
     expect(receipts(h).at(-1)).toMatchObject({ kind: "classify", outcome: "silent", rule: "agent.silent.launch_prompt", detail: "launch prompt not received" });
     h.clock.advance(10_000);
     await h.tick();
-    const inbox = (await h.norn("inbox")).value as Inbox;
+    const inbox = (await h.norn("status")).value as Inbox;
     expect(inbox.groups.unblock).toEqual([expect.objectContaining({ title: "launch prompt not received by gh-9 implement — look at pane p-1", command: "fake attach p-1" })]);
   });
 });

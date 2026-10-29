@@ -14,9 +14,6 @@ import { syncCommand } from "./sync.ts";
 import { tickCommand } from "./tick.ts";
 import { uninstallCommand } from "./uninstall.ts";
 import { watchCommand } from "./watch.ts";
-import { answerCommand } from "./answer.ts";
-import { approveCommand } from "./approve.ts";
-import { inboxCommand } from "./inbox.ts";
 import { modeCommand } from "./mode.ts";
 import { runNoun } from "./run.ts";
 import { storyNoun } from "./story.ts";
@@ -25,16 +22,10 @@ import { unstickCommand } from "./unstick.ts";
 import { workflowCommand } from "./workflow.ts";
 import { configCommand } from "./config.ts";
 import { doctorCommand } from "./doctor.ts";
-import { dropCommand } from "./drop.ts";
-import { releaseCommand } from "./release.ts";
-import { takeCommand } from "./take.ts";
 import { tidyCommand } from "./tidy.ts";
-import { cockpitCommand } from "./cockpit.ts";
 import { openCommand } from "./open.ts";
-import { orientCommand } from "./orient.ts";
-import { updateCommand } from "./update.ts";
 
-export const COMMANDS: readonly Command[] = [initCommand, uninstallCommand, syncCommand, tickCommand, watchCommand, briefCommand, doneCommand, askCommand, stuckCommand, hookEventCommand, inboxCommand, cockpitCommand, openCommand, orientCommand, statusCommand, answerCommand, approveCommand, unstickCommand, updateCommand, modeCommand, workflowCommand, takeCommand, releaseCommand, dropCommand, tidyCommand, doctorCommand, configCommand, helpCommand];
+export const COMMANDS: readonly Command[] = [initCommand, uninstallCommand, syncCommand, tickCommand, watchCommand, briefCommand, doneCommand, askCommand, stuckCommand, hookEventCommand, statusCommand, openCommand, unstickCommand, modeCommand, workflowCommand, tidyCommand, doctorCommand, configCommand, helpCommand];
 
 export const NOUNS: readonly Noun[] = [storyNoun, runNoun];
 

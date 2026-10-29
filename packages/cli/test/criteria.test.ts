@@ -60,7 +60,7 @@ const lastReceipt = (kind: string) => {
   return JSON.parse(h.read(join(runs(), "receipts", name)));
 };
 type Item = { id: string; title: string; detail?: string; full?: string; command: string; step: string | null };
-const inbox = async () => ((await h.norn("inbox")).value as { groups: Record<string, Item[]> }).groups;
+const inbox = async () => ((await h.norn("status")).value as { groups: Record<string, Item[]> }).groups;
 const notes = async () => (await inbox()).notes?.filter((i) => i.id.startsWith("note:")) ?? [];
 
 async function tickUntil(pred: () => boolean, label: string, max = 12) {
@@ -154,7 +154,7 @@ describe("criteria reports and notes through norn done", () => {
     expect(gate?.detail).toContain("AC2 unverified (no browser in this session) — how: open /today, add 'buy milk p1', expect red flag");
     expect(gate?.detail).toContain("AC3 person — how: compare against Figma frame 12");
     expect(gate?.full).toBeUndefined(); // L1: the long form only with --details
-    const details = ((await h.norn("inbox", "--details")).value as { groups: Record<string, Item[]> }).groups;
+    const details = ((await h.norn("status", "--details")).value as { groups: Record<string, Item[]> }).groups;
     expect(details.approve?.find((i) => i.step === "human-qa")?.full).toContain("Criteria for a person to check:\n- AC2 unverified");
 
     // NT2: the note is a Check item whose command explains the report
@@ -168,7 +168,7 @@ describe("criteria reports and notes through norn done", () => {
   });
 
   test("10: reject leaves notes open; a later note joins them; ready.approve acknowledges both", async () => {
-    expect((await h.norn("approve", "gh-4", "--reject", "--reason", "AC2 shows no red flag")).exit).toBe(0);
+    expect((await h.norn("story", "reject", "gh-4", "--reason", "AC2 shows no red flag")).exit).toBe(0);
     expect(lastReceipt("reject").acknowledged_notes).toBeUndefined();
     await startQa();
     expect(await notes()).toHaveLength(1);
@@ -187,14 +187,14 @@ describe("criteria reports and notes through norn done", () => {
     const ready = (await inbox()).approve?.find((i) => i.step === "ready");
     expect(ready?.detail).toContain("open notes (approve acknowledges them)");
 
-    expect((await h.norn("approve", "gh-4", "--reject", "--reason", "tighten AC3")).exit).toBe(0);
+    expect((await h.norn("story", "reject", "gh-4", "--reason", "tighten AC3")).exit).toBe(0);
     await startQa();
     expect(await notes()).toHaveLength(2);
 
     expect((await inWt("done", "pass", "--handoff", "all observed again", "--criteria", pass)).exit).toBe(0);
     await tickUntil(at("ready", "parked"), "ready again");
     const open = (await notes()).map((i) => i.id);
-    expect((await h.norn("approve", "gh-4")).exit).toBe(0);
+    expect((await h.norn("story", "approve", "gh-4")).exit).toBe(0);
     expect(lastReceipt("approve").acknowledged_notes).toEqual(open);
     expect(await notes()).toEqual([]);
     await tickUntil(() => h.state(runs())?.status === "done", "$done");

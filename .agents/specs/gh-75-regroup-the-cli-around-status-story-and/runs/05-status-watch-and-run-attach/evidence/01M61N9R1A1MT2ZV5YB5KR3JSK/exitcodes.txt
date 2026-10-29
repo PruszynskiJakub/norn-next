@@ -1,0 +1,9 @@
+norn cockpit -> exit 2
+norn cockpit --json -> exit 2
+norn status --pane -> exit 2
+norn status --interval 5s -> exit 2
+norn run attach -> exit 3
+norn run attach --next -> exit 3
+norn run attach gh-1 -> exit 3
+norn status --json -> exit 0
+norn status --watch --json -> exit 0
