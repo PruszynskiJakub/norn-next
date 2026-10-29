@@ -16,8 +16,13 @@
     "merge": 3
   },
   "step_entered_at": "2026-10-29T13:27:38.049Z",
-  "status": "ready",
-  "park": null,
+  "status": "stuck",
+  "park": {
+    "kind": "exhausted",
+    "reason": "conflict_loop 2/2 at integrate.conflict",
+    "since": "2026-10-29T13:28:28.882Z",
+    "receipt_id": "01M63XJ0YJPMZG5JK9R228BY7H"
+  },
   "counters": {
     "test_loop": 0,
     "review_loop": 1,
@@ -26,16 +31,16 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 34,
+  "applied_through": 35,
   "run": null,
   "last_outcome": {
-    "step": "merge",
-    "outcome": "done",
-    "source": "reported",
-    "at": "2026-10-29T13:27:16.947Z",
-    "receipt_id": "01M63XFTPK0647QJKDJ6JKTQRV"
+    "step": "integrate",
+    "outcome": "exhausted",
+    "source": "classified",
+    "at": "2026-10-29T13:28:28.882Z",
+    "receipt_id": "01M63XJ0YJPMZG5JK9R228BY7H"
   },
   "created_at": "2026-10-28T14:13:16.910Z",
-  "updated_at": "2026-10-29T13:27:38.049Z",
-  "last_tick_id": "01M63XGF9ZFMJQYY138MRM5KR8"
+  "updated_at": "2026-10-29T13:28:38.050Z",
+  "last_tick_id": "01M63XJ9X14J1HH49413PC7JJY"
 }
