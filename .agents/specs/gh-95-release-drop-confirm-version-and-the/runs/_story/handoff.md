@@ -14,6 +14,17 @@
 
 ## Goal
 
+Release workflow becomes prepare → open-pr → ci → ready: drop the `confirm-version` gate and the local `test` check, wait for the PR's CI (the `ci` check from #93) with fail → $stuck, keep base.stale: behind.
+
 ## Progress
 
+- Merged origin/main first (#93's `ci` step, its AGENTS.md line and repo test landed after this branch was cut).
+- Red test in `test/repo.test.ts` pinning the release flow (steps, open-pr → ci, ci fail → $stuck, ready reject → prepare, no version_loop, base stale behind); then green.
+- `.agents/norn/workflows/release.yaml`: removed confirm-version, test and version_loop; added `ci` (same script as quick/story); prepare.done → open-pr; ready prompt now asks to judge the version and changelog; header and description rewritten. Loads and validates with store `loadWorkflow`.
+- Docs: release skill intro/inputs, release-start (two mentions of confirm-version), AGENTS.md "To release" and the check paragraph, CONTRIBUTING.md label table and Releasing paragraph.
+- `.github/workflows/release.yml` unchanged: it already smokes on every OS before `publish` pushes the tag.
+- Full suite (1237 pass) and typecheck green.
+
 ## Resume
+
+Nothing left in implement; reported done.

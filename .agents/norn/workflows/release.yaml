@@ -1,16 +1,16 @@
 # Release workflow — repo-local, for the story a person starts with /release-start
 # (W1, W9: label norn:wf:release). A story workflow without `slices` (W8): every step works in
 # the story worktree. Prepare the release (changelog from the commits on the base since the last
-# tag, proposed version, version bumps, pr.md), let a person confirm the version, run what CI runs
-# (tests incl. the stale-schema test, typecheck, npm package and this machine's
-# binary built and smoke-tested), open the draft PR and wait for a person at `ready`; the person
-# merges the PR, and CI tags and publishes on that merge.
+# tag, proposed version, version bumps, pr.md), open the draft PR, wait for the PR's CI (tests incl.
+# the stale-schema test, typecheck, npm package and a binary built and smoke-tested) and wait for a
+# person at `ready`, who judges the version and the changelog there; the person merges the PR, and
+# CI smokes every binary on its own OS, tags and publishes on that merge.
 # Any commit on the base makes the changelog incomplete (base.stale: behind, BS7): a release
-# waiting at a gate goes back through update and prepare. A failing check means the base is
+# waiting at `ready` goes back through update and prepare. A red CI means the base is
 # broken: the story goes $stuck; fix the base in its own story, then
 # `norn unstick gh-N --to update`.
 name: release
-description: Write the changelog and propose the version, confirm it with a person, check like CI, open the draft PR.
+description: Write the changelog and propose the version, open the draft PR, wait for its CI, and let a person judge it at ready.
 start: prepare
 steps:
   prepare:
@@ -24,37 +24,7 @@ steps:
       reason and the new changelog section; norn puts the issue link under it. Rename the issue to
       "Release X.Y.Z" with `gh issue edit`, the one remote write this step allows. Change no code.
     outcomes:
-      done: { to: confirm-version, means: "CHANGELOG.md, packages/cli/package.json and the README badge carry version X.Y.Z; pr.md and the handoff name it with its reason" }
-  confirm-version:
-    type: gate
-    prompt: "Read the proposed version and its reason in pr.md and the new CHANGELOG.md section. Approve to check the release, or reject with the version or changelog changes you want."
-    outcomes:
-      approve: test
-      reject:  { to: prepare, counter: version_loop }
-      stale:   { to: update, counter: stale_loop }
-  test:
-    type: check
-    run: |
-      set -e
-      bun install --frozen-lockfile
-      bun run test
-      bun run typecheck
-      version=$(bun -e 'console.log(require("./packages/cli/package.json").version)')
-      os=$(uname -s | tr 'A-Z' 'a-z')
-      arch=$(uname -m)
-      case "$arch" in x86_64) arch=x64 ;; aarch64) arch=arm64 ;; esac
-      bun scripts/build.ts
-      bun scripts/build.ts --bin "$os-$arch"
-      tmp=$(mktemp -d)
-      trap 'rm -rf "$tmp"' EXIT
-      (cd dist/npm && npm pack --pack-destination "$tmp")
-      mkdir "$tmp/app"
-      echo '{"name":"app","private":true}' > "$tmp/app/package.json"
-      (cd "$tmp/app" && bun add "$tmp"/norn-cli-*.tgz)
-      scripts/smoke.sh "$tmp/app/node_modules/.bin/norn" "$version"
-      scripts/smoke.sh "dist/bin/norn-$os-$arch" "$version"
-    timeout: 25m
-    outcomes: { pass: open-pr, fail: $stuck }
+      done: { to: open-pr, means: "CHANGELOG.md, packages/cli/package.json and the README badge carry version X.Y.Z; pr.md and the handoff name it with its reason" }
   update:
     type: git
     action: update
@@ -69,20 +39,33 @@ steps:
   open-pr:
     type: git
     action: open-pr
-    outcomes: { done: ready }
+    outcomes: { done: ci }
+  # waits for the PR's CI (a detached check run, so the tick is not blocked): tests, typecheck, the
+  # npm package and a binary built and smoke-tested; release.yml smokes every binary on its own OS
+  # after the merge, before it pushes the tag
+  ci:
+    type: check
+    run: |
+      for i in $(seq 1 30); do gh pr checks >/dev/null 2>&1 && break; sleep 10; done
+      gh pr checks --watch --fail-fast --interval 30 && exit 0
+      run=$(gh run list --branch "$(git branch --show-current)" --limit 1 --json databaseId -q '.[0].databaseId')
+      gh run view "$run" --log-failed | tail -300
+      exit 1
+    timeout: 30m
+    outcomes: { pass: ready, fail: $stuck }
   ready:
     type: gate
     prompt: >-
-      Read the draft release PR. Check the PR title reads `Release X.Y.Z` (edit it if a rework changed the
-      version: open-pr sets the title only when it opens the PR, GR9); the squash commit takes it.
-      Approve to mark the release finished (a person merges the PR; CI then tags and publishes),
-      or reject with what to change.
+      Read the draft release PR: the proposed version and its reason, and the new CHANGELOG.md section.
+      Check the PR title reads `Release X.Y.Z` (edit it if a rework changed the version: open-pr sets
+      the title only when it opens the PR, GR9); the squash commit takes it. Approve to mark the release
+      finished (a person merges the PR; CI then tags and publishes), or reject with the version or
+      changelog changes you want.
     outcomes:
       approve: $done
       reject:  { to: prepare, counter: ready_loop }
       stale:   { to: update, counter: stale_loop }
 counters:
-  version_loop: { max: 3 }
   ready_loop: { max: 2 }
   # resets each time update merges cleanly: only repeated conflicts on one base move count (W4)
   base_conflict_loop: { max: 2, reset_on: update.done }
