@@ -14,6 +14,19 @@
 
 ## Goal
 
+Every printed command names the new surface (B7), and `norn help` shows the finished tree in tiers (B1–B3); old names stay plain unknown commands (B5).
+
 ## Progress
 
+- Renamed the old builders in `packages/core/src/commands.ts` (answer/approve/inbox/open/trace/unstick/update/why/workflow → storyAnswer/storyApprove/storyReject/status/storyStart/runList/runRerun/storyUpdateBranch/runView/storyEdit) and every caller. `cmd.status(<key>)` printed `norn status gh-N`, which status refuses now; those became `cmd.storyView`.
+- Added `REMOVED_COMMANDS` and `nameRemoved` to core. The pinned table in `printed-commands.test.ts` sweeps every builder. The harness checks the stdout and stderr of every command a cli suite runs (`h.norn`, `h.tick`, and the new `runChecked` that replaces direct `runCli` calls) and fails if one names an old verb (AC2).
+- Fixed the hard-coded old names in printed text: the orient rules, the doctor plugin hint, the cockpit title ("norn status") and the decide drift reason (`outside norn story edit`).
+- `norn help` is now in tiers: Core, Setup, Background, Agent protocol. `tick` and `status --segment` are in a hidden tier, and `hook` in its own hidden tier (`--all`). `help` is no longer a row (the footer says how to use it). `--json` adds `tiers`. `norn story` lists its verbs grouped (general, decision, work, team) through a new `Noun.groups`; nounHelp JSON carries `groups`.
+- Kept the agent preamble right under the title, as before. AC4's wording "then the agent preamble" could also mean moving it after the tiers. I kept it at the top because an agent reading help must see it first.
+- Pinned suites changed only through their update commands: golden `--update` (6 cases, only command strings), transcripts (handoff.md hashes only, same line counts), observe snapshots unchanged, the bun snapshot of handoff-inbox (`-u`).
+- Tests: `help-tree.test.ts` (AC4–AC7), `rename-continuity.test.ts` (AC3: an old-version tick with `norn unstick` replays as a labelled mismatch; the stuck unit continues), plus existing tests renamed (AC1: inbox, handoff, view, agent-protocol).
+- Left for slice 15 (docs, skills, PRD): comments in package sources, `packages/cli/assets/skills/norn/SKILL.md` (`norn inbox`, `norn open`), `packages/cli/assets/config.yaml` (`norn open`, `norn mode`), schema titles ("norn trace event", "norn workflow").
+
 ## Resume
+
+Implementation done: typecheck and the full suite are green. Next: report `norn done done`.
