@@ -1,0 +1,15 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M63QA9SH9AMB9Z1XQ6VABEAT",
+  "run_id": "01M63QA1A3ZS20YJJ7C4H76D9Y",
+  "step": "open-pr",
+  "attempt": 1,
+  "at": "2026-10-29T11:39:24.337Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M63QA1A3ABYVBSS9ANVFX05E",
+  "outcome": "done",
+  "rule": "git.open-pr",
+  "detail": "draft PR #97 https://github.com/PruszynskiJakub/norn-next/pull/97",
+  "route": "ready"
+}

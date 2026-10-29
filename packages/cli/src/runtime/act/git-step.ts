@@ -1,7 +1,7 @@
 /** act: git steps — integrate, update, push, open-pr (W2, K6, BS3, GR9). */
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { type Action, type ActionResult, applyReceipts, routeOf } from "@norn/core";
+import { type Action, type ActionResult, applyReceipts, nornTrailers, routeOf } from "@norn/core";
 import { type ReceiptOf, ulid } from "@norn/schema";
 import { acquireIntegrateLock, appendReceipt, readText, traceDir } from "@norn/store";
 import { integrate, update as updateStory } from "../integrate.ts";
@@ -76,7 +76,7 @@ async function runGitLocked(act: ActEnv, a: Extract<Action, { kind: "run_git" }>
     }
     case "integrate": {
       if (!a.onto) throw new Error("integrate without a story branch");
-      const res = await integrate(act.git, { sliceCwd: a.cwd, storyBranch: a.onto });
+      const res = await integrate(act.git, { sliceCwd: a.cwd, storyBranch: a.onto, trailers: nornTrailers(act.tick, a.unit.story, a.unit.slice, a.step) });
       if (res.outcome === "conflict") {
         outcome = "conflict";
         detail = `rebase onto ${a.onto} conflicts in ${res.files.join(", ") || "?"}`;

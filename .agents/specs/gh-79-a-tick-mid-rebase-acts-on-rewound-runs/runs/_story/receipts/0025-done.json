@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M63Q8RD9QDMPANP5XFCPZM4M",
+  "run_id": "01M63Q6JYQ5KTA6SP94A24SPFJ",
+  "step": "describe",
+  "attempt": 1,
+  "at": "2026-10-29T11:38:33.769Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "done",
+  "handoff": "Wrote pr.md: summary (rebase hold in decideUnit, storyLifecycle guard, mailbox wait, slicesStuck, corrupt title, norn why hint), evidence before (loop-red.txt, user-side.txt) and after (rebase-rewind.test.ts 2/2, gh-79 decide tests 8/8 green), merge danger two-way, blast radius units mid-rebase with known gaps noted.",
+  "evidence": "evidence/01M63Q6JYQ5KTA6SP94A24SPFJ"
+}
