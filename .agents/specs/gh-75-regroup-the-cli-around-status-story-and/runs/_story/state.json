@@ -5,49 +5,45 @@
   "unit_dir": "_story",
   "workflow": "story",
   "workflow_hash": "bd5ef0fbb2da1f4313555a687d9e9ce40829c98ae5c6398e299646accc1ffe05",
-  "step": "human-qa",
-  "attempt": 1,
+  "step": "update",
+  "attempt": 3,
   "visits": {
     "refine": 1,
     "plan": 1,
     "slice": 1,
     "approve-plan": 1,
     "slices": 2,
-    "update": 2,
+    "update": 3,
     "resolve": 1,
     "test": 2,
     "qa": 2,
     "implement": 1,
     "human-qa": 1
   },
-  "step_entered_at": "2026-10-29T22:37:55.988Z",
-  "status": "parked",
-  "park": {
-    "kind": "gate",
-    "reason": "Check the criteria QA could not settle (listed with how to check each). Approve, or reject with what failed.",
-    "since": "2026-10-29T22:37:55.988Z"
-  },
+  "step_entered_at": "2026-10-29T22:38:25.992Z",
+  "status": "ready",
+  "park": null,
   "counters": {
     "plan_loop": 0,
     "test_loop": 0,
     "qa_loop": 1,
     "ready_loop": 0,
     "base_conflict_loop": 0,
-    "stale_loop": 0
+    "stale_loop": 1
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 27,
+  "applied_through": 28,
   "run": null,
   "last_outcome": {
-    "step": "qa",
-    "outcome": "unverified",
-    "source": "reported",
-    "at": "2026-10-29T22:37:52.592Z",
-    "receipt_id": "01M64X002FZXS6GD03FZTW0TF6"
+    "step": "human-qa",
+    "outcome": "stale",
+    "source": "classified",
+    "at": "2026-10-29T22:38:25.992Z",
+    "receipt_id": "01M64X10P6BPXSS7RG2NDPX0JQ"
   },
   "created_at": "2026-10-28T08:51:06.916Z",
-  "updated_at": "2026-10-29T22:37:55.988Z",
-  "last_tick_id": "01M64X03CJJ06ZM7V63A010RQG",
+  "updated_at": "2026-10-29T22:38:25.992Z",
+  "last_tick_id": "01M64X10P68CXPZYG8AC3NXEB3",
   "mode": "auto"
 }
