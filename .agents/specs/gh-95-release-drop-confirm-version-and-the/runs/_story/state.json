@@ -5,13 +5,14 @@
   "unit_dir": "_story",
   "workflow": "quick",
   "workflow_hash": "e1035bf08337c2d63967792add84270d2c199f94830cec0b60aefd3b34ae39cb",
-  "step": "implement",
+  "step": "update",
   "attempt": 1,
   "visits": {
-    "implement": 1
+    "implement": 1,
+    "update": 1
   },
-  "step_entered_at": "2026-10-29T10:59:15.396Z",
-  "status": "running",
+  "step_entered_at": "2026-10-29T13:54:38.170Z",
+  "status": "ready",
   "park": null,
   "counters": {
     "test_loop": 0,
@@ -22,23 +23,17 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 1,
-  "run": {
-    "run_id": "01M63YETRAG990N8TB8NAXC0QX",
+  "applied_through": 2,
+  "run": null,
+  "last_outcome": {
     "step": "implement",
-    "attempt": 1,
-    "started_at": "2026-10-29T13:44:13.183Z",
-    "how": "manual",
-    "agent": "claude",
-    "agent_session_id": "5aa59b75-7ab0-4c34-b19a-7ec9919255d0",
-    "process": {
-      "pid": 87636,
-      "pid_start": "Thu Oct 29 14:44:03 2026"
-    }
+    "outcome": "done",
+    "source": "reported",
+    "at": "2026-10-29T13:54:13.224Z",
+    "receipt_id": "01M63Z1537B1T6MRXBS83HKX11"
   },
-  "last_outcome": null,
   "created_at": "2026-10-29T10:59:15.396Z",
-  "updated_at": "2026-10-29T13:44:38.102Z",
-  "last_tick_id": "01M63YFKEMQG9P61NC03K1A18R",
+  "updated_at": "2026-10-29T13:54:38.170Z",
+  "last_tick_id": "01M63Z1XERNPF6WXEB93XS346P",
   "mode": "manual"
 }
