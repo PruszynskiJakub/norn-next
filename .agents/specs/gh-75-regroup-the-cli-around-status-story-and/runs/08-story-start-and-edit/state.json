@@ -5,7 +5,7 @@
   "unit_dir": "08-story-start-and-edit",
   "workflow": "slice",
   "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
-  "step": "integrate",
+  "step": "$done",
   "attempt": 4,
   "visits": {
     "implement": 2,
@@ -16,7 +16,7 @@
     "merge": 4
   },
   "step_entered_at": "2026-10-29T13:51:38.156Z",
-  "status": "ready",
+  "status": "done",
   "park": null,
   "counters": {
     "test_loop": 0,
@@ -26,16 +26,16 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 39,
+  "applied_through": 40,
   "run": null,
   "last_outcome": {
-    "step": "merge",
+    "step": "integrate",
     "outcome": "done",
-    "source": "reported",
-    "at": "2026-10-29T13:51:27.025Z",
-    "receipt_id": "01M63YW2SH8XGNKT8RGTSCF8GP"
+    "source": "classified",
+    "at": "2026-10-29T13:52:16.705Z",
+    "receipt_id": "01M63YXKA00T9WXGFK6QHEWNVG"
   },
   "created_at": "2026-10-28T14:13:16.910Z",
-  "updated_at": "2026-10-29T13:51:38.156Z",
-  "last_tick_id": "01M63YWDNBKNG3WVEG7C1PVWCB"
+  "updated_at": "2026-10-29T13:52:38.161Z",
+  "last_tick_id": "01M63YY88GRCGVTC3FBHQ42Q56"
 }
