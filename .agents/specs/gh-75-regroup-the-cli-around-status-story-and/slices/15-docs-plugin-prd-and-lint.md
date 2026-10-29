@@ -2,7 +2,7 @@
 id: gh-75/15
 title: Docs, skills, Herdr plugin and PRD on the new names, held by a lint
 depends_on: [ gh-75/14 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
