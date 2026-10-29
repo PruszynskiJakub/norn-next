@@ -1,0 +1,22 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M63Z40C5FW6B257BXJWNEYE6",
+  "run_id": "01M63Z3R1WEDPQANRSCSTWY6VQ",
+  "step": "update",
+  "attempt": 1,
+  "at": "2026-10-29T13:55:46.693Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M63Z3R1WJ0H0QEG9269AASJ7",
+  "outcome": "done",
+  "rule": "git.update",
+  "detail": "gh-94-intake-by-kind-triage-for-stories is up to date with main (15d2902fd130)",
+  "route": "test",
+  "base": {
+    "ref": "refs/remotes/origin/main",
+    "sha": "15d2902fd130b3148454301302a80464be93213a",
+    "conflicts": [],
+    "head": "7f2b1a72c106a48507b411379b419832c98fad23",
+    "merged": false
+  }
+}
