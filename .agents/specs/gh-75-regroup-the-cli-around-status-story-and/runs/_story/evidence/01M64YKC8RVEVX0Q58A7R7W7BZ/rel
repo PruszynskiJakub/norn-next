@@ -1,0 +1,4 @@
+#!/bin/zsh
+export NORN_HOME_DIR=/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75c/r/home
+unset HERDR_ENV HERDR_SESSION HERDR_TAB_ID HERDR_SOCKET_PATH HERDR_BIN_PATH HERDR_WORKSPACE_ID HERDR_PANE_ID NORN_HOME NORN_STORY NORN_SLICE NORN_RUN NORN_BIN NORN_ORIENT
+exec /Users/jakubpruszynski/.local/bin/norn "$@"
