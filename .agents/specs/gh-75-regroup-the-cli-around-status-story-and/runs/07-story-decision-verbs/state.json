@@ -24,9 +24,9 @@
     "qa_loop": 0,
     "conflict_loop": 1
   },
-  "nudges_used": 0,
+  "nudges_used": 1,
   "retries_used": 0,
-  "applied_through": 13,
+  "applied_through": 14,
   "run": {
     "run_id": "01M61M9BG73KBDVZC5CKQC6JYJ",
     "step": "merge",
@@ -48,13 +48,13 @@
     "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD"
   },
   "last_outcome": {
-    "step": "integrate",
-    "outcome": "conflict",
+    "step": "merge",
+    "outcome": "timeout",
     "source": "classified",
-    "at": "2026-10-28T15:53:52.902Z",
-    "receipt_id": "01M61KFHG6APB6MF9W01VH4MCD"
+    "at": "2026-10-29T12:42:31.760Z",
+    "receipt_id": "01M63TXWE59VPMD0DCFF20ZPCN"
   },
   "created_at": "2026-10-28T14:13:16.910Z",
-  "updated_at": "2026-10-28T16:15:07.577Z",
-  "last_tick_id": "01M61M9BG7K8H4NDT8XM9C69JT"
+  "updated_at": "2026-10-29T12:42:31.760Z",
+  "last_tick_id": "01M63TXWE5PK17GSCQ8JRABB2F"
 }
