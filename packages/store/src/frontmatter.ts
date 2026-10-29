@@ -85,6 +85,7 @@ export const readStoryFile = (path: string, root?: string) => readMarkdown("stor
 export const readSliceFile = (path: string, root?: string) => readMarkdown("slice", path, root);
 /** story.md text read elsewhere (e.g. `git show` of a pushed branch); `path` names it in errors. */
 export const parseStoryFile = (raw: string, path: string) => parseMarkdown("story", raw, path);
+export const parseSliceFile = (raw: string, path: string) => parseMarkdown("slice", raw, path);
 
 /** Render a new markdown file (intake, tests). Body is appended verbatim. */
 function renderMarkdown(frontmatter: object, body: string): string {

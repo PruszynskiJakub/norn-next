@@ -15,14 +15,13 @@
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { type ClaimState, cmd } from "@norn/core";
-import { specDir } from "@norn/schema";
-import { acquireClaim, listLeases, newClaimBlob, parseStoryFile, patchStoryFile, releaseClaim, releaseLease, scanWorktrees, storyFile, writtenHere } from "@norn/store";
+import { acquireClaim, listLeases, newClaimBlob, patchStoryFile, releaseClaim, releaseLease, scanWorktrees, storyFile, writtenHere } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { failure, refuse } from "../output.ts";
-import { findStoryBranch } from "../runtime/checkout.ts";
+import { isClosed, pushedStory } from "../runtime/closed.ts";
 import { claimFor } from "../runtime/human.ts";
-import { gitRemote, type Observed } from "../runtime/observe/index.ts";
+import type { Observed } from "../runtime/observe/index.ts";
 import { withStory } from "../runtime/release.ts";
 import { aStory, resolveStory } from "../runtime/target.ts";
 
@@ -60,27 +59,6 @@ async function claimIfFree(ctx: Context, obs: Observed, key: string): Promise<st
   return r.sha;
 }
 
-/** D5, B39: closed = `story.md` on the pushed story branch (the local one without a remote) says `dropped`. */
-async function isClosed(ctx: Context, key: string): Promise<boolean> {
-  const remote = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
-  const branch = await findStoryBranch(ctx, key, remote);
-  if (!branch) return false;
-  const git = ctx.git;
-  let rev = `refs/heads/${branch}`;
-  if (remote) {
-    const f = await git.fetch(ctx.root, remote, [`+refs/heads/${branch}:refs/remotes/${remote}/${branch}`], { quiet: true }).catch((e: unknown) => e as Error);
-    if (f instanceof Error) throw failure(`fetch failed: ${f.message}`, `retry: ${cmd.storyClose(key)}`, "network");
-    rev = `refs/remotes/${remote}/${branch}`;
-  }
-  const path = `${specDir(key, branch.slice(key.length + 1))}/story.md`;
-  const text = await git.show(ctx.root, rev, path);
-  if (text === null) return false;
-  const doc = parseStoryFile(text, `${rev}:${path}`);
-  // S2: an unreadable record is never guessed open
-  if (!doc.ok) throw failure(`${rev}:${path} is unreadable (${doc.reason})`, `fix story.md on ${branch}, then ${cmd.storyClose(key)} again`, "story_corrupt");
-  return doc.value.frontmatter.status === "dropped";
-}
-
 export const storyCloseCommand = defineCommand({
   name: "story close",
   summary: "Close a story: push its branches, then remove worktrees, local branches and the claim; the record, issue and PR stay (B35, GR7)",
@@ -91,7 +69,7 @@ export const storyCloseCommand = defineCommand({
   async run(ctx, args) {
     const json = args.json === true;
     const key = await resolveStory(ctx, args.positionals[0], json, aStory("story close", cmd.storyClose));
-    if (await isClosed(ctx, key)) throw refuse(`${key} is already closed`, null, "already_closed");
+    if (isClosed(await pushedStory(ctx, key, cmd.storyClose(key)))) throw refuse(`${key} is already closed`, null, "already_closed");
     await refuseOthers(ctx, key);
     // B36: ask before taking the tick lock, so an open prompt never blocks tick or watch
     if (!opt.bool(args, "yes")) {

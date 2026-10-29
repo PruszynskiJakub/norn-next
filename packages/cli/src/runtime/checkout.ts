@@ -89,8 +89,19 @@ interface UnitView {
   handoff: string | null;
 }
 
+/**
+ * More of the record a caller writes once the worktrees are back (`story reopen`), committed with the
+ * take receipt in the one story-branch commit: its paths relative to the story worktree, the commit
+ * message, and what to add to the printed value.
+ */
+export type CheckoutRecord = (restored: { storyWt: string; spec_dir: string; worktrees: ReadonlyArray<{ unit: string; path: string; branch: string }> }) => {
+  paths: string[];
+  message: string;
+  value: Record<string, unknown>;
+};
+
 /** T5: claim `key` here (`force` takes a live claim over) and restore its worktrees from the pushed branches. */
-export async function checkoutStory(ctx: Context, key: string, force: boolean) {
+export async function checkoutStory(ctx: Context, key: string, force: boolean, more?: CheckoutRecord) {
   const root = ctx.root;
   const config = ctx.config;
   const ports = await ctx.ports();
@@ -210,9 +221,15 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean) {
   const runsDir = storyRuns;
   const line = forced ? `- ${nowIso} take --force by ${holder} from ${blob.forced_from}` : null;
   if (line && existsSync(runsDir)) appendHandoffHeartbeat(runsDir, line);
-  if (record.receipt || (line && existsSync(runsDir))) {
-    const paths = [...(record.receipt ? [relative(storyWt, join(runsDir, "receipts", record.receipt))] : []), ...(line ? [relative(storyWt, handoffPath(runsDir))] : [])];
-    const sha = await git.commit(storyWt, { message: forced ? `norn: ${key} taken with --force by ${holder}` : `norn: ${key} taken by ${holder}`, trailers: { "Norn-Story": key, "Norn-Step": "take", "Norn-Tick": ulid(now) }, paths });
+  const extra = more?.({ storyWt, spec_dir, worktrees });
+  if (record.receipt || (line && existsSync(runsDir)) || extra?.paths.length) {
+    const paths = [
+      ...(record.receipt ? [relative(storyWt, join(runsDir, "receipts", record.receipt))] : []),
+      ...(line ? [relative(storyWt, handoffPath(runsDir))] : []),
+      ...(extra?.paths ?? []),
+    ];
+    const message = extra?.message ?? (forced ? `norn: ${key} taken with --force by ${holder}` : `norn: ${key} taken by ${holder}`);
+    const sha = await git.commit(storyWt, { message, trailers: { "Norn-Story": key, "Norn-Step": "take", "Norn-Tick": ulid(now) }, paths });
     const pushed = remote && sha ? await git.push(storyWt, remote, `refs/heads/${branch}:refs/heads/${branch}`) : null;
     committed = { commit: sha, pushed: pushed ? pushed.ok : null };
   }
@@ -229,6 +246,7 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean) {
     worktrees,
     units,
     ...(problems.length ? { problems } : {}),
+    ...extra?.value,
     next: cmd.tick(),
   };
   return problems.length ? withExit(value, ExitCode.error) : value;

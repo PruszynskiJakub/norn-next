@@ -27,6 +27,8 @@ export interface TargetRule {
   command(key: string): string;
   /** B55: a story-only verb — in a slice worktree it acts on the slice's story */
   story?: boolean;
+  /** the units offered, when they are not in the read model (`story reopen`: closed stories); `applies` is then unused */
+  candidates?: () => Promise<InteractionChoice[]>;
 }
 
 /** `norn status` order: what needs the person first (inbox order), then every story with its slices. */
@@ -42,12 +44,16 @@ function unitsInStatusOrder(view: ProjectView): InteractionChoice[] {
   return [...out].map(([value, label]) => ({ value, label }));
 }
 
+async function fromView(ctx: Context, rule: TargetRule): Promise<InteractionChoice[]> {
+  const view = await projectView(ctx);
+  return unitsInStatusOrder(view).filter((c) => rule.applies(c.value, view));
+}
+
 /** The unit key the verb acts on, or a refusal. */
 export async function resolveTarget(ctx: Context, explicit: string | undefined, json: boolean, rule: TargetRule): Promise<string> {
   if (explicit) return explicit;
   if (ctx.unit) return rule.story ? ctx.unit.story : (ctx.unit.slice ?? ctx.unit.story);
-  const view = await projectView(ctx);
-  const candidates = unitsInStatusOrder(view).filter((c) => rule.applies(c.value, view));
+  const candidates = rule.candidates ? await rule.candidates() : await fromView(ctx, rule);
   if (!candidates.length) throw refuse(rule.none, cmd.status(), "no_target");
   const terminal = ctx.terminal(json);
   if (!terminal)

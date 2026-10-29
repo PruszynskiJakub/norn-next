@@ -80,6 +80,7 @@ export const cmd = {
   storyCheckout: (story: string, o: { force?: boolean } = {}) => norn("story checkout", story, o.force && "--force"),
   storyClose: (story?: string, o: { yes?: boolean } = {}) => norn("story close", story, o.yes && "--yes"),
   storyHandoff: (story?: string) => norn("story handoff", story),
+  storyReopen: (story?: string) => norn("story reopen", story),
   runList: (unit: string, o: { limit?: number } = {}) => norn("run list", unit, o.limit !== undefined && `--limit ${o.limit}`),
   runAttach: (unit?: string, o: { next?: boolean } = {}) => norn("run attach", unit, o.next && "--next"),
   runView: (unit = "<unit>", o: { why?: boolean } = {}) => norn("run view", unit, o.why && "--why"),

@@ -26,6 +26,7 @@ const today: Record<keyof typeof cmd, [string, ...string[]]> = {
   storyCheckout: [`norn story checkout ${S}`, cmd.storyCheckout(S), `norn story checkout ${S} --force`, cmd.storyCheckout(S, { force: true })],
   storyClose: [`norn story close ${S}`, cmd.storyClose(S), `norn story close ${S} --yes`, cmd.storyClose(S, { yes: true }), "norn story close", cmd.storyClose()],
   storyHandoff: [`norn story handoff ${S}`, cmd.storyHandoff(S), "norn story handoff", cmd.storyHandoff()],
+  storyReopen: [`norn story reopen ${S}`, cmd.storyReopen(S), "norn story reopen", cmd.storyReopen()],
   runList: [`norn run list ${U}`, cmd.runList(U), `norn run list ${U} --limit 20`, cmd.runList(U, { limit: 20 })],
   runAttach: [`norn run attach ${U}`, cmd.runAttach(U), "norn run attach --next", cmd.runAttach(undefined, { next: true })],
   runView: [`norn run view ${U}`, cmd.runView(U), "norn run view <unit> --why", cmd.runView(undefined, { why: true })],
