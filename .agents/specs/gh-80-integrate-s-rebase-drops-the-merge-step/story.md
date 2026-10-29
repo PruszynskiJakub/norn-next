@@ -10,9 +10,16 @@ labels:
   - friction
   - norn
 workflow: fix
-status: active
+status: done
 intake_at: 2026-10-28T13:34:51.169Z
 body_hash: 2cb900933ac22c364522892f65eaf0f38674657dd1ed12816fcaa68e9efe6946
+merge:
+  pr: 98
+  url: https://github.com/PruszynskiJakub/norn-next/pull/98
+  head_sha: 8f0aa760f2af6f031935764cc9e63d33307c1142
+  merge_commit_sha: 967367a4c84f9d49240ff3ab70bf7a9d65d7d8db
+  merged_by: PruszynskiJakub
+  merged_at: 2026-10-29T11:43:04.000Z
 ---
 
 ## Observed
