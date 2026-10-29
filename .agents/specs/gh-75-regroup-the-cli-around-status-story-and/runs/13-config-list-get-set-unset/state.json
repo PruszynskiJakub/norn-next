@@ -16,8 +16,13 @@
     "merge": 3
   },
   "step_entered_at": "2026-10-29T12:42:31.760Z",
-  "status": "running",
-  "park": null,
+  "status": "parked",
+  "park": {
+    "kind": "ask",
+    "reason": "Merge#2's blocker is still there: the story branch (2751d0f) is already merged into the slice (fead181), but integrate rebases, which drops that merge commit and hits the same conflict in packages/cli/src/commands/index.ts again. The slice branch is published, so the merge step may not rebase it. May I rewrite the slice branch locally into one linear commit on 2751d0f? I'd re-apply the known resolution (the story side's COMMANDS without configCommand, NOUNS [storyNoun, runNoun, configNoun]) and run the full suite. norn would then need to force-push it. Or will you change how integrate works (merge instead of rebase, --rebase-merges, or rerere)?",
+    "since": "2026-10-29T12:44:51.928Z",
+    "receipt_id": "01M63V25AQG0ZX8V6MTVPJW5X9"
+  },
   "counters": {
     "test_loop": 0,
     "review_loop": 1,
@@ -26,7 +31,7 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 38,
+  "applied_through": 39,
   "run": {
     "run_id": "01M63V0R1DBNC812XY3A5GEHCZ",
     "step": "merge",
@@ -49,12 +54,12 @@
   },
   "last_outcome": {
     "step": "merge",
-    "outcome": "stuck",
+    "outcome": "ask",
     "source": "reported",
-    "at": "2026-10-28T21:10:20.342Z",
-    "receipt_id": "01M625JZXPQRZ50CC97G9A9AZE"
+    "at": "2026-10-29T12:44:51.928Z",
+    "receipt_id": "01M63V25AQG0ZX8V6MTVPJW5X9"
   },
   "created_at": "2026-10-28T14:13:16.910Z",
-  "updated_at": "2026-10-29T12:44:16.675Z",
-  "last_tick_id": "01M63V0R1DZE4BAMR9RBYN2J4Q"
+  "updated_at": "2026-10-29T12:45:05.559Z",
+  "last_tick_id": "01M63V2JMN1643TT7WA0MJNHW9"
 }
