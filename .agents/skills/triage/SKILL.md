@@ -1,11 +1,11 @@
 ---
 name: triage
-description: Triage one norn issue in this repo — check it still occurs on the current base by running it, add the repro, the affected code (file:line), the PRD ids it touches and the context, and recommend exactly one next workflow (fix, quick, story, spec) or close, with its reason and the command the person runs. Posts its findings as a `## Triage` issue comment, the one place they live; changes no file. Use in the `triage` workflow's `explore` step.
+description: Triage one norn story or feature issue in this repo — check it still applies on the current base by running it, add the repro, the affected code (file:line), the PRD ids it touches and the context, and recommend exactly one next workflow (quick, story) or close, with its reason and the command the person runs. Posts its findings as a `## Triage` issue comment, the one place they live; changes no file. Use in the `triage` workflow's `explore` step.
 ---
 
 # Triage
 
-You turn a fresh issue into a decision a person can take in a minute. You do not fix, plan or spec anything. Follow the `norn` skill for the brief and the report; this skill is the craft.
+You turn a fresh story or feature issue into a decision a person can take in a minute. You do not fix, plan or spec anything. Bugs do not come here: they start in the `reproduce` workflow (label `norn:wf:reproduce`). Follow the `norn` skill for the brief and the report; this skill is the craft.
 
 ## 1. Read
 
@@ -36,7 +36,7 @@ Write the findings in this shape; they go only into the issue comment (section 4
 **PRD:** <ids the issue touches, e.g. W9, GR8; "none" if it is outside the PRD>
 **Context:** <related issues, PRs, earlier decisions; only what changes the decision>
 
-**Recommend:** <fix | quick | story | spec | close> — <reason in one or two lines>
+**Recommend:** <quick | story | close> — <reason in one or two lines>
 **Run:** `norn workflow gh-<N> <workflow> --to <start step>`
 ```
 
@@ -44,13 +44,11 @@ Pick exactly one:
 
 | Recommend | When | Start step |
 |---|---|---|
-| `fix` | it is a bug and it occurs | `reproduce` |
 | `quick` | a refactor, docs, a chore or a small change with no open design question | `implement` |
-| `story` | a feature: new behaviour that needs refining, a plan and slices | `refine` |
-| `spec` | the PRD must change or be settled first (new or changed ids); no code | `refine` |
+| `story` | a feature: new behaviour, or a PRD rule to settle or change first (refine amends `.agents/PRD.md`), that needs refining, a plan and slices | `refine` |
 | `close` | it no longer occurs, is a duplicate, or is out of scope (name the issue, PR or PRD id that says so) | — (no `Run:` line; the person closes it at the gate) |
 
-Cite PRD ids exactly as written in `.agents/PRD.md`. A rule the issue would change is a `spec`, not a `fix`.
+Cite PRD ids exactly as written in `.agents/PRD.md`. A rule the issue would change is a `story`, unless the change is small and settled, then `quick`. An issue that turns out to be a bug (it came without `norn:wf:reproduce`) is a `quick`, since `quick` delivers its fix, with the `Run:` line `norn workflow gh-<N> reproduce --to reproduce` so it is reproduced first.
 
 ## 4. Post it as an issue comment
 
@@ -58,7 +56,7 @@ Pipe the `## Triage` section into `gh issue comment <N> --body-file -` (no temp 
 
 ## 5. Report
 
-Report the recommendation itself as the outcome: `norn done <fix|quick|story|spec|close> --handoff "<reason>; run <command>"`. `norn stuck` only when the environment stops you (no `gh` auth, `bun install` fails); a bug you cannot reproduce is a `close` or a `not checked` with the reason, not a stuck.
+Report the recommendation itself as the outcome: `norn done <quick|story|close> --handoff "<reason>; run <command>"`. `norn stuck` only when the environment stops you (no `gh` auth, `bun install` fails); a bug you cannot reproduce is a `close` or a `not checked` with the reason, not a stuck.
 
 ## Rules
 

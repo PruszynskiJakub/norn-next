@@ -2,7 +2,7 @@
 name: Bug report
 about: norn did something wrong
 title: ""
-labels: []
+labels: ["norn:wf:reproduce"]
 ---
 
 ## What happened

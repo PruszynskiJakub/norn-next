@@ -1,12 +1,12 @@
-# Quick workflow — repo-local, for refactors, docs, chores and other small changes
-# (W1, W9: label norn:wf:quick). A story workflow without `slices` (W8): every step works in the
-# story worktree. Implement, bring the story up to date with its base, check, review, describe,
+# Quick workflow — repo-local, for refactors, docs, chores, other small changes and the fix of a
+# bug `reproduce` confirmed (W1, W9: label norn:wf:quick). A story workflow without `slices` (W8):
+# every step works in the story worktree. Implement, bring the story up to date with its base, check, review, describe,
 # open the draft PR (or rewrite the body of the open one), wait for the PR's CI, and wait for a
 # person at `ready`; the person merges the PR. The local check runs test:fast; CI runs the full suite.
 # A story waiting at ready goes back through update when the base moved under it in a way
 # that conflicts (BS6–BS8, base.stale: conflict).
 name: quick
-description: Make a small change (refactor, docs, chore), check and review it, open the draft PR.
+description: Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR.
 start: implement
 steps:
   implement:
@@ -17,7 +17,10 @@ steps:
       The spec is story.md (the issue) and the triage findings in the issue's latest `## Triage`
       comment (`gh issue view <N> --comments`). Keep to what they ask. A change in
       behaviour gets a test first; a change to docs or a pure refactor needs none beyond the suite
-      staying green. Test your change with `bun packages/cli/src/main.ts …`, never the installed `norn`.
+      staying green. A bug comes from `reproduce` with a red loop in the handoff's Progress and the
+      issue's latest `## Reproduce` comment: turn it into a failing test at the seam named there before
+      changing any code, then fix the cause and cite the PRD ids the fix enforces.
+      Test your change with `bun packages/cli/src/main.ts …`, never the installed `norn`.
       Run that dev build only in a throwaway git repo under $TMPDIR, never in this worktree: it is a live norn unit (NORN_HOME points at it) and a dev build would act on its runs/, claim and state.json.
     outcomes:
       done: { to: update, means: "the change is made; each behaviour change and rework point has a passing test" }
