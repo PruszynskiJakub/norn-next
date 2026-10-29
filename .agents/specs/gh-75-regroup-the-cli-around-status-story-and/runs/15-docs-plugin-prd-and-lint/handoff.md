@@ -14,6 +14,17 @@
 
 ## Goal
 
+Nothing shipped names a removed command (B8, B71): docs, skills, Herdr plugin and PRD on the new surface, held by a lint in `test/repo.test.ts`.
+
 ## Progress
 
+- Lint "removed commands (B5, B8, B71)" in `test/repo.test.ts`: `norn <old>` inside code spans/quotes in docs and .ts, anywhere in plugin .sh/.toml (incl. `"$NORN" <old>`); `norn status <key>`; old flags (`cockpit --next`, `approve --reject`, `unstick --to`, `orient --open`, `workflow --to`). List read as text from core's `REMOVED_COMMANDS` (root tests cannot import workspace packages). Allowed by exact line: the Workflow and TraceEvent schema titles. A planted `norn unstick` in CONTRIBUTING.md fails it (checked).
+- PRD §15 rewritten as the noun tree; a test checks every story/run verb is in §15 and S7's wording. Rules naming old commands (MO1, MO5, S7, W4, W9, GR7, BS9, BS10, T5–T10, O1, O2, O5, K2a, NT2, NT6, H6, H9, milestones) renamed. Receipt kinds (`approve`, `unstick`, `update`, `take`, …) left as they are (B70).
+- Herdr plugin 0.4.0: next.sh runs `norn run attach --next --json` and toasts the refusal (error + do_instead); open.sh runs `norn status --watch --pane` (the old herdr plugin-pane split is gone, so the `cockpit` pane and cockpit.sh were removed); pick.sh runs `norn status --watch`. Manifest test updated (panes: pick). Scripts exercised with a stub norn/herdr.
+- Source comments, config template, bundled norn skill (copied to `.agents/skills/norn`), triage skill, README, CONTRIBUTING, AGENTS.md renamed. Two local-file schema descriptions reworded; `bun run schema:emit` rerun.
+- typecheck and full `bun test` green. Committed.
+- Not done: `docs/cookbook.html` (~43 old names) and the `docs/audit-*` history are outside the lint's scope (AC1 list); the cookbook is worth a follow-up. AC4 (plugin in real Herdr) is for QA: link the plugin from this branch; open.sh relies on `status --watch --pane` splitting the focused pane from an action context (no HERDR_PANE_ID → no `--current`).
+
 ## Resume
+
+Implement done; next is the workflow's test/review. Nothing pending.
