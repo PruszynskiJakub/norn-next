@@ -36,8 +36,10 @@ describe("repo workflows", () => {
   test("load without errors", () => {
     expect(listing.errors).toEqual([]);
   });
-  test("include the six story workflows of the process", () => {
-    for (const name of ["triage", "story", "fix", "quick", "spec", "release"]) expect(Object.keys(listing.workflows)).toContain(name);
+  test("include the five story workflows of the process, and no fix or spec", () => {
+    const names = Object.keys(listing.workflows);
+    for (const name of ["triage", "reproduce", "story", "quick", "release"]) expect(names).toContain(name);
+    expect(names.filter((n) => n === "fix" || n === "spec")).toEqual([]);
   });
   test.each(Object.keys(listing.workflows))("%s is valid for claude with the linked skills", (name) => {
     const result = validateWorkflowDefinition(listing.workflows[name]!.workflow, {
