@@ -111,7 +111,7 @@ export function traceEntries(ev: TraceEvent, unit: string, max = MAX): TimelineE
     }
     case "tick.start":
     case "tick.end":
-      // R5.4: bracket records of a tick; its `tick` record carries the decisions (a crashed tick: `norn why`)
+      // R5.4: bracket records of a tick; its `tick` record carries the decisions (a crashed tick: `norn run view --why`)
       return [];
     case "local_file":
       // S2: a machine-local cache read as empty; belongs to no unit

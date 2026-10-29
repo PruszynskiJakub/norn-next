@@ -3,7 +3,7 @@
  * attempt, outcome, durations, who, reason, receipts; a unit key means its latest run.
  *
  * `norn run view <unit> --why [--tick <id>] [--step <s>] [--attempt <n>] [--transition <step>.<outcome>] [--rule <prefix>]`
- * (B45, O5, H3; what `norn why` was, JSON unchanged, B70): explain a tick's decision for a unit by replaying the pure `decide` on the facts
+ * (B45, O5, H3; what `why` was, JSON unchanged, B70): explain a tick's decision for a unit by replaying the pure `decide` on the facts
  * snapshot, workflows and config recorded in the trace, showing the rule that fired, what
  * triggered it — the receipt applied (with its reason text: handoff, comment, check output) or the
  * fact the rule read — and verifying the replay equals the recorded decision. A mismatch exits 1
@@ -229,7 +229,7 @@ function unitOfReceipt(root: string, receiptId: string): string | null {
   return null;
 }
 
-/** O5: `run view --why` / `--receipt`, what `norn why` was. */
+/** O5: `run view --why` / `--receipt`, what `why` was. */
 async function why(ctx: Context, args: ParsedArgs) {
   const filter = parseFilter(args);
   if (!args.positionals[0] && !filter.receipt) throw usageError("run view --why: expected a unit", cmd.runView(undefined, { why: true }));

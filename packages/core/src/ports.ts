@@ -432,7 +432,7 @@ export interface RunnerPort {
    */
   output?(session: SessionRef): Promise<string | null>;
   /**
-   * MO5 (`norn open`): open a focused terminal a person works in, running `spec.command`. Records
+   * MO5 (`norn story start`): open a focused terminal a person works in, running `spec.command`. Records
    * no session: the agent's `norn brief` starts the run (MO3). Present iff `capabilities.open`.
    */
   openForPerson?(spec: PersonOpenSpec): Promise<{ pane_id: string | null }>;
@@ -525,7 +525,7 @@ export interface InboxItem {
   /** question, reason or gate prompt */
   title: string;
   detail?: string;
-  /** exact command that resolves it, e.g. `norn answer gh-123/03 "..."` */
+  /** exact command that resolves it, e.g. `norn story answer gh-123/03 "..."` */
   command: string;
   /** L1: long text behind the item (an implicit ask's full pane screen) — shown only on request (`inbox --details`) */
   full?: string;

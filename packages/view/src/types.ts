@@ -202,7 +202,7 @@ export interface StepWho {
   tick_id: string | null;
 }
 
-/** One visit of a unit to a step: `norn trace` row (O4). Paths are absolute. */
+/** One visit of a unit to a step: `norn run list` row (O4). Paths are absolute. */
 export interface StepRow {
   unit: string;
   slice: string | null;
@@ -271,7 +271,7 @@ export interface TraceRecords {
   ref?: string;
 }
 
-/** `norn trace <unit>`: rows of the unit (and, for a story, its slices interleaved). */
+/** `norn run list <unit>`: rows of the unit (and, for a story, its slices interleaved). */
 /** QV8: criteria reports of the units shown (`norn done --criteria`), counted from the trace. */
 export interface CriteriaSummary {
   reports: number;

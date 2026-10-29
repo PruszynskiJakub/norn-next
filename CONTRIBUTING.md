@@ -6,8 +6,8 @@ norn is built with norn. Code rules, layout and the agent side of the process ar
 
 1. **Everything is an issue.** Every change to a file in the repo starts as a GitHub issue labelled `norn` and assigned to whoever runs norn on it.
 2. **norn picks it up.** `norn sync` turns the issue into story `gh-N` (a branch `gh-N-<slug>`, a worktree, a spec folder).
-3. **Triage.** Unless the issue names a workflow, the `triage` workflow runs first: an agent checks the issue still occurs, adds a repro and the affected code, and recommends a workflow or `close`. You confirm at the gate and switch the story with `norn workflow gh-N <name> --to <start step>`; the gate prompt lists the exact command for each workflow. To close instead: `norn approve gh-N`, `gh issue close N --reason "not planned"`, `norn story close gh-N`, then delete the pushed story branch (`git push origin --delete gh-N-<slug>`).
-4. **The workflow runs.** Agents do the unattended steps; you answer the inbox (`norn inbox`).
+3. **Triage.** Unless the issue names a workflow, the `triage` workflow runs first: an agent checks the issue still occurs, adds a repro and the affected code, and recommends a workflow or `close`. You confirm at the gate and switch the story with `norn story edit gh-N --workflow <name> --at <start step>`; the gate prompt lists the exact command for each workflow. To close instead: `norn story approve gh-N`, `gh issue close N --reason "not planned"`, `norn story close gh-N`, then delete the pushed story branch (`git push origin --delete gh-N-<slug>`).
+4. **The workflow runs.** Agents do the unattended steps; you answer the inbox (`norn status`).
 5. **A person merges.** Every workflow ends at a `ready` gate with a PR. You merge it (squash).
 
 ## Workflows
@@ -45,7 +45,7 @@ You need write access to the repo.
    runner: { adapter: herdr }
    max_agents: 2
    ```
-4. `norn watch`, and `norn inbox` in another terminal.
+4. `norn watch`, and `norn status` in another terminal.
 
 **No write access?** Open an issue with one of the templates. A PR from a fork is read as input to an issue, never merged as is.
 

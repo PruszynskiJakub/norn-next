@@ -55,7 +55,7 @@ export interface BriefInput {
 }
 
 /**
- * A person's ruling at a gate (O2): `norn approve|--reject --reason "…"` on any unit of the story.
+ * A person's ruling at a gate (O2): `norn story approve|reject --reason "…"` on any unit of the story.
  * The gate receipt is the record; every later brief of the story and its slices repeats it (F28).
  */
 export interface Ruling {

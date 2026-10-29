@@ -270,7 +270,7 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
   // C2: receipts first — they always win over runner facts
   if (uf.unapplied.length) return applyAction(ctx, story, uf, st, wf, uf.unapplied, "receipts.apply");
 
-  // S7: pinned workflow edited outside `norn workflow`, or cursor step gone
+  // S7: pinned workflow edited outside `norn story edit --workflow`, or cursor step gone
   if (st.status !== "stuck" || st.park?.kind !== "workflow") {
     const drift = uf.workflow_hash && uf.workflow_hash !== st.workflow_hash ? "pinned workflow.yaml changed outside norn story edit (S7)" : null;
     const gone = st.step !== "$done" && !stepOf(wf, st.step) ? `step '${st.step}' no longer exists in workflow ${wf.name} (S7)` : null;

@@ -22,7 +22,7 @@
  *   next tick applies it. Re-running an interrupted check/git step is safe. `start_slices` carries
  *   its transitions in its `starts`.
  * - Traces written by an older norn carry `receipts: []`, `state: null`, `commit: null` on those three
- *   kinds and a `park` copy of `state.park` on `park`; `legacyAction` drops them so `norn why` still
+ *   kinds and a `park` copy of `state.park` on `park`; `legacyAction` drops them so `norn run view --why` still
  *   compares an old recorded decision with its replay.
  */
 import type {

@@ -139,7 +139,7 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
     if (!edgeOf(wf, from, outcome))
       issues.push({ code: "unknown_reset", path: `/counters/${name}/reset_on`, message: `counter '${name}' resets on '${c.reset_on}', but step '${from}' declares no outcome '${outcome}'` });
   }
-  // BS9: `base.step` names the step `norn update` re-enters
+  // BS9: `base.step` names the step `norn story update-branch` re-enters
   if (wf.base?.step !== undefined && !stepOf(wf, wf.base.step))
     issues.push({ code: "unknown_target", path: "/base/step", message: `base.step '${wf.base.step}' does not exist` });
   for (const e of edgesOf(wf)) {
@@ -245,7 +245,7 @@ export function checkWorkflowLevel(wf: Workflow, level: UnitLevel): WorkflowIssu
   return issues;
 }
 
-/** BS9: the step `norn update` re-enters — `base.step`, else the first step with `action: update`; null = none. */
+/** BS9: the step `norn story update-branch` re-enters — `base.step`, else the first step with `action: update`; null = none. */
 export function baseUpdateStep(wf: Workflow): string | null {
   if (wf.base?.step) return stepOf(wf, wf.base.step) ? wf.base.step : null;
   return Object.entries(wf.steps).find(([, s]) => s.type === "git" && s.action === "update")?.[0] ?? null;

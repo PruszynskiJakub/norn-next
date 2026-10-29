@@ -57,7 +57,7 @@ export function readPinnedWorkflow(unitDir: string, root?: string): ReadResult<P
 /**
  * Copy the workflow text verbatim to `runs/<unit>/workflow.yaml` at unit start (S7).
  * Exclusive: an existing pin with identical text is fine (replay); a different one is
- * refused unless `replace` (the journaled `norn workflow --to` switch). Returns the hash.
+ * refused unless `replace` (the journaled `norn story edit --workflow --at` switch). Returns the hash.
  */
 export function pinWorkflow(
   unitDir: string,

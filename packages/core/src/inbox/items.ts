@@ -189,7 +189,7 @@ export function startCommandFor(uf: UnitFacts, story: StoryFacts, config: Resolv
 }
 
 /**
- * MO5: how a person starts the unit's step agent — `norn open <unit>` when this machine's runner
+ * MO5: how a person starts the unit's step agent — `norn story start <unit>` when this machine's runner
  * opens terminals for a person (the hand-typed command then in the detail), else that command itself.
  */
 function personStart(uf: UnitFacts, story: StoryFacts, facts: Facts, config: ResolvedConfig): { command: string; detail?: string } {
@@ -367,7 +367,7 @@ function baseSyncSteps(wf: Workflow): Set<string> {
 
 /**
  * BS10: the story waits for a person and the base moved under it (BS7), with no gate `stale` route
- * to send it back by itself (BS6) — a Check item with `norn update`. BS10.1 (dogfood D1): only where
+ * to send it back by itself (BS6) — a Check item with `norn story update-branch`. BS10.1 (dogfood D1): only where
  * an update is the next thing to do — parked at a gate, or stuck outside the steps that sync the
  * base; never for an ask (a permission prompt in any step) nor in update/resolve.
  */
@@ -573,8 +573,8 @@ export const RE_ENTRY_KINDS = ["update", "workflow"] as const;
 /**
  * F35: the story branch head when the person gave `approve` at the `ready` gate — the `head_sha` of
  * the newest `approve` receipt at that gate (the `ready` step, or any gate whose `approve` goes to
- * `$done`). C5: only an approval newer than the unit's last re-entry (`norn update`, `norn workflow
- * --to`) counts; a re-entry voids it until a new approve at the gate. `receipts` are the story
+ * `$done`). C5: only an approval newer than the unit's last re-entry (`norn story update-branch`, `norn story edit
+ * --at`) counts; a re-entry voids it until a new approve at the gate. `receipts` are the story
  * unit's, at least of the kinds `approve` and RE_ENTRY_KINDS; order does not matter.
  */
 function readyHeadSha(wf: Workflow, receipts: readonly NumberedReceipt[]): string | undefined {

@@ -170,7 +170,7 @@ export function slicesCanResume(story: StoryFacts, uf: UnitFacts, st: UnitState,
   return parkedBySlices && !sliceProgress(story).broken.length && slicesStuck(story) === null;
 }
 
-/** §10, O2: norn unsticks the story back into its slices step, as `norn unstick <story>` would. */
+/** §10, O2: norn unsticks the story back into its slices step, as `norn run rerun <story>` would. */
 export function resumeSlices(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow): void {
   const unstick = nornReceipt(ctx, st, "unstick", { comment: "a slice can move again" });
   const { nr, res } = synth(ctx, st, wf, nextReceiptNumber(uf), unstick);

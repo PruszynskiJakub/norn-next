@@ -1,12 +1,7 @@
 #!/bin/sh
-# Action: open the cockpit below the focused pane, without taking focus (HC9).
-# The directory travels as NORN_COCKPIT_DIR, not --cwd: the pane command runs from its cwd, so
-# `sh cockpit.sh` must start in the plugin folder. A target pane already names its workspace.
+# Action: open the cockpit below the focused pane, without taking focus (HC9, B12): `norn status
+# --watch --pane` splits the pane and runs the cockpit there, in the repo of the focused pane
+# (outside a norn repo, the last one).
 cd "$(dirname "$0")" && . ./lib.sh
-dir=$(repo_dir)
-pane=$(ctx_get focused_pane_id)
-set -- plugin pane open --plugin "$HERDR_PLUGIN_ID" --entrypoint cockpit --placement split --direction down --env "NORN_COCKPIT_DIR=$dir" --no-focus
-if [ -n "$pane" ]; then set -- "$@" --target-pane "$pane"
-elif [ -n "${HERDR_WORKSPACE_ID:-}" ]; then set -- "$@" --workspace "$HERDR_WORKSPACE_ID"
-fi
-exec "$HERDR" "$@"
+cd "$(repo_dir)" || cd "$HOME" || exit 1
+"$NORN" status --watch --pane --json >/dev/null 2>&1 || notify "norn" "norn status --watch --pane failed in $PWD"

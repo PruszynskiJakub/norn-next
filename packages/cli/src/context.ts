@@ -31,11 +31,11 @@ export interface CliDeps {
   signal?: AbortSignal;
   /** stdin text for commands that read it (`norn hook`); else the process stdin */
   stdin?: string;
-  /** SPEC-cockpit CP6: raw key chunks for `norn cockpit`; else the process stdin in raw mode */
+  /** SPEC-cockpit CP6: raw key chunks for `norn status --watch`; else the process stdin in raw mode */
   input?: AsyncIterable<string>;
   /** HC6/HC12: Herdr for the cockpit; null = none; absent = the real one when `HERDR_ENV=1` */
   herdr?: herdr.HerdrCockpit | null;
-  /** an outside command a front end starts for the person (`norn cockpit` opens a PR or issue link); default Bun.spawn */
+  /** an outside command a front end starts for the person (`norn status --watch` opens a PR or issue link); default Bun.spawn */
   shell?: (argv: string[], cwd: string) => Promise<{ code: number; stderr: string }>;
   /** D2: the terminal a person answers prompts in; null = none (no TTY); absent = the process terminal */
   interaction?: Interaction | null;

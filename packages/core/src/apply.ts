@@ -169,7 +169,7 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
   }
   if (st.status === "corrupt") return { reject: "unit is corrupt (S2)" };
   if (r.slice !== undefined && r.slice !== st.slice) return { reject: `receipt for unit ${r.slice ?? st.story}, not ${st.slice ?? st.story}` };
-  // BS9: `norn update` may re-enter a story unit that is done (PR unmerged), at a gate, or stuck
+  // BS9: `norn story update-branch` may re-enter a story unit that is done (PR unmerged), at a gate, or stuck
   if (r.kind === "update") return updateFrom(st, r, ctx);
   if (st.step === "$done") return { reject: "unit is done" };
   if (r.step !== st.step || r.attempt !== st.attempt)
@@ -244,7 +244,7 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
       if (st.status !== "parked" || st.park?.kind !== "ask")
         return { reject: st.park?.kind === "gate" ? "gate needs approve or reject" : "unit is not waiting for an answer" };
       const resumed: UnitState = { ...st, park: null };
-      // R6.1: the agent moved on by itself; R6.2: `norn answer` already typed it — nothing to deliver
+      // R6.1: the agent moved on by itself; R6.2: `norn story answer` already typed it — nothing to deliver
       if ((r.by === "agent" || r.delivered) && st.run) return { state: { ...resumed, status: "running" }, log: `answered: ${r.answer}` };
       // B2: same session while it lives; manual runs get the answer from the person; else fresh session from the handoff
       if (st.run?.session)

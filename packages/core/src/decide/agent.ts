@@ -59,7 +59,7 @@ export function applyAction(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: Unit
       } else state = { ...res.state, status: "ready", run: null };
     }
   }
-  // S7/O2: `workflow --to` / `unstick` re-enter a step: the old run's session must not keep working
+  // S7/O2: `story edit --at` / `run rerun` re-enter a step: the old run's session must not keep working
   const moved = res.applied.some((n) => {
     const k = receipts.find((r) => r.n === n)?.receipt.kind;
     return k === "workflow" || k === "unstick";

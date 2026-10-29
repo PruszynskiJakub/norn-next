@@ -1,7 +1,7 @@
 /**
  * The cockpit model (SPEC-cockpit CP1–CP5): rows — what needs the person, then every story — each with
  * its story's orient preview and the actions it offers, as data. Pure: a ProjectView in, plain JSON
- * out. Renderers (the terminal `norn cockpit`, a web panel later) map actions to keys or buttons and
+ * out. Renderers (the terminal `norn status --watch`, a web panel later) map actions to keys or buttons and
  * run their effects; they never decide which actions fit a row (CP4). Writes stay CLI verbs (X1).
  */
 import type { InboxGroup, InboxItem } from "@norn/core";

@@ -1,6 +1,6 @@
 /**
  * `norn stuck "<reason>"` (§9.3, §10 universal report): the agent cannot continue. The tick
- * parks the unit under Unblock (W7: `$stuck`) until a person runs `norn unstick`.
+ * parks the unit under Unblock (W7: `$stuck`) until a person runs `norn run rerun`.
  */
 import type { ReceiptOf } from "@norn/schema";
 import { defineCommand } from "../command.ts";

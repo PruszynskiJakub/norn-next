@@ -107,7 +107,7 @@ export const AnswerReceipt = receipt("answer", {
   /** receipt_id of the ask being answered */
   ask_receipt_id: Type.Optional(Ulid),
   /**
-   * R6.2/R6.3: `norn answer` already typed the keystrokes into the agent's pane before writing this
+   * R6.2/R6.3: `norn story answer` already typed the keystrokes into the agent's pane before writing this
    * receipt, so the tick does not deliver it again. (`by: "agent"` answers, R6.1, are never delivered.)
    */
   delivered: Type.Optional(Type.Boolean()),
@@ -211,7 +211,7 @@ export const ClassifyReceipt = receipt("classify", {
 });
 /**
  * R10.1 (M8): a `norn story checkout` of the story, forced or not, recorded on the story unit. Informational:
- * applied at any cursor (like `mode`), it moves nothing; `norn trace` / `why` show it.
+ * applied at any cursor (like `mode`), it moves nothing; `norn run list` / `why` show it.
  */
 export const TakeReceipt = receipt("take", {
   /** `user@machine` of the claim taken over; null when the claim was free */
@@ -223,7 +223,7 @@ export const TakeReceipt = receipt("take", {
   forced: Type.Optional(Type.Boolean()),
 });
 /**
- * BS9: `norn update <story>` — a person sends the story unit back to its base-update step (from a
+ * BS9: `norn story update-branch <story>` — a person sends the story unit back to its base-update step (from a
  * gate, from stuck, or from `$done` while the PR is unmerged). Written before the state change (P6).
  */
 export const UpdateReceipt = receipt("update", {
@@ -233,7 +233,7 @@ export const UpdateReceipt = receipt("update", {
   to: StepName,
   reason: Type.Literal("person"),
 });
-/** Journaled workflow switch (`norn workflow <unit> <name> --to <step>`, S7). */
+/** Journaled workflow switch (`norn story edit <unit> --workflow <name> --at <step>`, S7). */
 export const WorkflowReceipt = receipt("workflow", {
   name: NonEmpty,
   from_hash: Type.Union([NonEmpty, Type.Null()]),

@@ -63,7 +63,7 @@ export interface LoadProjectViewOptions {
   holder?: string;
   /** this machine's heartbeat id, also counted as `mine` */
   heartbeatId?: string | null;
-  /** what the configured runner can do (R4.1); `open` makes Your turn show `norn open` (MO5) */
+  /** what the configured runner can do (R4.1); `open` makes Your turn show `norn story start` (MO5) */
   runnerCapabilities?: RunnerCapabilities;
   /** trace window lower bound (ISO); default 14 days before now */
   traceSince?: string;

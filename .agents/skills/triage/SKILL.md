@@ -37,7 +37,7 @@ Append it below the mirrored issue body; never change the body or the frontmatte
 **Context:** <related issues, PRs, earlier decisions; only what changes the decision>
 
 **Recommend:** <fix | quick | story | spec | close> — <reason in one or two lines>
-**Run:** `norn workflow gh-<N> <workflow> --to <start step>`
+**Run:** `norn story edit gh-<N> --workflow <workflow> --at <start step>`
 ```
 
 Pick exactly one:
@@ -63,4 +63,4 @@ Report the recommendation itself as the outcome: `norn done <fix|quick|story|spe
 ## Rules
 
 - Read-only on code, tests and docs. The only file you change is `story.md`.
-- Never run `norn workflow` yourself: switching is the person's (W9, S7).
+- Never run `norn story edit --workflow` yourself: switching is the person's (W9, S7).

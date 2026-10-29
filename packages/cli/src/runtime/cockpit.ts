@@ -1,5 +1,5 @@
 /**
- * Herdr side of `norn cockpit` (SPEC-cockpit CP8–CP10, HC6, HC12, HC15): which Herdr the cockpit talks
+ * Herdr side of `norn status --watch` (SPEC-cockpit CP8–CP10, HC6, HC12, HC15): which Herdr the cockpit talks
  * to, going to an agent's pane, labelling agent panes, and the oldest Your turn item for `--next`.
  * Presentation only — none of this is a fact for decide (HC13). Verbs run through the CLI dispatcher.
  */
@@ -43,7 +43,7 @@ export function oldestYourTurn(items: readonly InboxEntry[], agentsOnly = false)
 
 /** HC7: one line for a verb's JSON outcome. */
 export function verbMessage(argv: readonly string[], exit: number, value: unknown): string {
-  // the command words and the unit: `norn take gh-6`, `norn story answer gh-6`
+  // the command words and the unit: `norn story checkout gh-6`, `norn story answer gh-6`
   const unit = argv.findIndex((a) => /^(gh|gl)-\d/.test(a));
   const what = `norn ${argv.slice(0, unit < 0 ? 2 : unit + 1).join(" ")}`;
   if (exit === 0) return `ok: ${what}`;

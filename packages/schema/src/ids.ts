@@ -52,7 +52,7 @@ export function ulid(now: number = Date.now()): string {
 /**
  * Deterministic ULID derived from a seed ULID and an index: same timestamp as the
  * seed, randomness from sha256(seed:index). Lets the pure `decide` mint receipt and
- * run ids from `tick_id` so `norn why` replays to identical actions (O5).
+ * run ids from `tick_id` so `norn run view --why` replays to identical actions (O5).
  */
 export function deriveUlid(seed: string, index: number): string {
   if (!isUlid(seed)) throw new Error(`not a ULID: ${seed}`);

@@ -209,7 +209,7 @@ export const briefCommand = defineCommand({
     // B4: the exact briefing of every run, in the trace
     const id = ulid(ctx.clock.now());
     const stored = writeBriefing(s.root, run.run_id, id, briefing.markdown);
-    // O4: link the run to its briefing in the trace (`norn trace <unit>` shows it)
+    // O4: link the run to its briefing in the trace (`norn run list <unit>` shows it)
     appendTrace(s.root, traceEvent("briefing", ctx.clock.now(), { id, unit: key, run_id: run.run_id, step: s.state.step, attempt: s.state.attempt, briefing: stored }));
     return rendered({ unit: key, step: s.state.step, attempt: s.state.attempt, run_id: run.run_id, started, briefing: stored, markdown: briefing.markdown, brief: briefing.json }, briefing.markdown);
   },

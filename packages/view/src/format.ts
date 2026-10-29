@@ -167,7 +167,7 @@ export function formatInbox(view: ProjectView, opts: { details?: boolean; home?:
   return `${out.join("\n").trimEnd()}\n`;
 }
 
-/** `norn trace <unit>` human mode: one line per timeline entry. */
+/** `norn run list <unit>` human mode: one line per timeline entry. */
 export function formatTimeline(entries: readonly TimelineEntry[]): string {
   if (!entries.length) return "No events.\n";
   return `${entries.map((e) => `${e.at}  ${e.source.padEnd(7)} ${e.summary}`).join("\n")}\n`;
@@ -208,7 +208,7 @@ function outcomeText(r: StepRow): string {
 }
 
 /**
- * `norn trace <unit> --text`: a header with the totals, then one row per (step, attempt) —
+ * `norn run list <unit> --text`: a header with the totals, then one row per (step, attempt) —
  * entered, left, duration, outcome, who — with the reason beneath (cut to one line unless
  * `full`) and absolute evidence / log paths. Slice rows of a story are indented.
  */

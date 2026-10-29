@@ -9,7 +9,7 @@ You do exactly one step of a larger delivery and report how it ended. Code decid
 
 ## 1. Read the brief
 
-Run `norn brief` in this worktree. If it refuses because this is not a unit worktree (for example the repo's main checkout), stop and tell the person to start the agent from the unit's item in `norn inbox` (`norn open <unit>` opens or prints it). Never change directory to look for the work yourself.
+Run `norn brief` in this worktree. If it refuses because this is not a unit worktree (for example the repo's main checkout), stop and tell the person to start the agent from the unit's item in `norn status` (`norn story start <unit>` opens or prints it). Never change directory to look for the work yourself.
 
 The brief prints as markdown (`norn brief --json` for data). It gives:
 
@@ -61,7 +61,7 @@ After a report succeeds, **end your turn**. Do not keep working and do not repor
 
 ## Hard rules
 
-- Of the norn commands, run only `brief`, `done`, `ask` and `stuck` (`norn help` marks them). Every other one (`approve`, `answer`, `unstick`, `open`, `tick`, …) is the person's: run one only when the person asks you to directly, never because a refusal, the brief or the inbox names it. Otherwise `norn ask`.
+- Of the norn commands, run only `brief`, `done`, `ask` and `stuck` (`norn help` marks them). Every other one (`story approve`, `story answer`, `run rerun`, `story start`, `tick`, …) is the person's: run one only when the person asks you to directly, never because a refusal, the brief or the inbox names it. Otherwise `norn ask`.
 - Never `git push`, and never switch branches or worktrees.
 - Never run a `gh` or `glab` command that changes the remote (creating, editing, commenting, labelling, closing, merging). Reading is fine.
 - Never edit anything under `runs/`, the generated top of handoff.md, or files in `.agents/norn/`.

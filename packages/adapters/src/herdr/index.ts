@@ -23,7 +23,7 @@
  *                `herdr pane process-info --pane <pane>`      (their agent pid)
  * - openForPerson → `herdr workspace list`                  (the workspace on the worktree, else the caller's)
  *                `herdr tab create --workspace W --cwd C --label T` or `herdr workspace create …` (focused)
- *                `herdr pane run <pane> "<command>"`          (MO5, `norn open`)
+ *                `herdr pane run <pane> "<command>"`          (MO5, `norn story start`)
  * - capabilities: send + resume + open (R4.1, MO5)
  *
  * - cockpit helpers (agent list, focus, labels, command panes): `./cockpit.ts` (HC6, HC12)

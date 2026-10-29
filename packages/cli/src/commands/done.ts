@@ -94,7 +94,7 @@ function parseNotes(args: ParsedArgs): Note[] {
  * BS5: the base a base-mode step (entered by a `git: update` conflict) must merge — the base of the
  * classify `conflict` receipt that entered the current step, the same receipt whose base the brief's
  * Rework shows (`enteringReceipt`); null for any other step. Never keyed on the receipt's `route`: a
- * conflict that exhausted its counter records `$stuck`, and `norn unstick --to <step>` still enters
+ * conflict that exhausted its counter records `$stuck`, and `norn run rerun --step <step>` still enters
  * the step from it (BUG-2 follow-up).
  */
 function baseToMerge(s: UnitSession): NonNullable<ReceiptOf<"classify">["base"]> | null {

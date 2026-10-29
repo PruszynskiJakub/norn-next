@@ -1,7 +1,7 @@
 /**
  * decide (H3): `(facts, repo workflows, config) → Decision[]`, pure and deterministic.
  * At most one action per unit per tick; every decision records the rule that fired (O5).
- * Ids come from `deriveUlid(facts.tick_id, i)` and times from `facts.now`, so `norn why`
+ * Ids come from `deriveUlid(facts.tick_id, i)` and times from `facts.now`, so `norn run view --why`
  * replays to identical output.
  *
  * Order per story: claim (T3–T6; a due renewal is a side action, R1.1) → corrupt (S2) → remote
