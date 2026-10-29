@@ -3,9 +3,9 @@
 - Workflow: slice · Step: merge (attempt 2)
 - Status: running
 - Counters: conflict_loop 2/2, qa_loop 0/2, review_loop 1/3, test_loop 0/5
-- Last outcome: merge.timeout (classified, 2026-10-29T12:44:05.550Z)
+- Last outcome: merge.timeout (classified, 2026-10-29T12:59:05.594Z)
 - Next: `norn trace gh-75/08`
-- Updated: 2026-10-29T12:44:05.550Z
+- Updated: 2026-10-29T12:59:05.594Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - slice.start: slice at implement
@@ -27,6 +27,7 @@
 - receipts.apply: integrate.conflict → merge
 - agent.start: merge run 01M61VK9EFRZBGDHVZ25FDNWZR
 - agent.timeout.nudge: nudged 1
+- agent.timeout.nudge: nudged 2
 <!-- norn:heartbeat:end -->
 
 ## Goal
@@ -56,6 +57,8 @@
 - merge#2: integrate rebases the slice branch, so merge#1's merge commit still conflicted. Rebuilt the branch linearly on the story branch (8fcce26) in memory (git merge-tree + commit-tree, every original commit kept, conflicts resolved with merge#1's versions, plus 3495187 carrying merge#1's targetKey/test fixups); tree identical to merge#1's; branch moved to 3495187. Suite 1273 pass, typecheck green.
 - merge#2 incident: a first attempt with plain `git rebase` checked out old runs/ files in this worktree; a tick then wrote receipts/0003-classify.json (bogus "implement died"). Rebase aborted, but the stray receipt duplicates 0003-done.json and the next tick marked the unit corrupt (S2). The stray file must go (person).
 
+- merge#2 (continued): the unit was restored. The story branch moved twice more (slices 10 and 09), so I merged it twice (4195427, then the slice-09 merge on top), keeping both sides: the story verbs are list, view, chat, start, edit, checkout, handoff, close; open, mode, workflow, unstick, take, release and drop are gone (B5 test lists all of them); story-start/edit use cmd.storyCheckout; target.ts has unitOf, inState and resolveStory on targetKey; run cancel/rerun call targetKey. No linearizing (per the slice-09 answer: norn 0.11.1 integrates by merge, gh-80). Suite 1298 pass, typecheck green.
+
 ## Resume
 
-A person removes the stray untracked runs/08-story-start-and-edit/receipts/0003-classify.json and restores state.json (git checkout -- state.json), then the unit continues: the branch 3495187 is linear on the story branch, so integrate's rebase is a no-op.
+Merge done; nothing left for this step.

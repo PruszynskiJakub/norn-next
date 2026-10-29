@@ -24,9 +24,9 @@
     "qa_loop": 0,
     "conflict_loop": 2
   },
-  "nudges_used": 1,
+  "nudges_used": 2,
   "retries_used": 0,
-  "applied_through": 25,
+  "applied_through": 26,
   "run": {
     "run_id": "01M61VK9EFRZBGDHVZ25FDNWZR",
     "step": "merge",
@@ -51,10 +51,10 @@
     "step": "merge",
     "outcome": "timeout",
     "source": "classified",
-    "at": "2026-10-29T12:44:05.550Z",
-    "receipt_id": "01M63V0R1DR7GA8JMXAJCRJGE0"
+    "at": "2026-10-29T12:59:05.594Z",
+    "receipt_id": "01M63VW6ZRMW766ZHTA5G71MZV"
   },
   "created_at": "2026-10-28T14:13:16.910Z",
-  "updated_at": "2026-10-29T12:44:05.550Z",
-  "last_tick_id": "01M63V0R1DZE4BAMR9RBYN2J4Q"
+  "updated_at": "2026-10-29T12:59:05.594Z",
+  "last_tick_id": "01M63VW6ZRQQ4BA7J8MT6HRAS9"
 }
