@@ -6,6 +6,7 @@ import {
   type ClaimBlob,
   parseDuration,
   sliceBranch,
+  SPEC_FILE,
   type StoryFrontmatter,
   type UnitState,
 } from "@norn/schema";
@@ -91,8 +92,8 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
 
   // ---- story file corrupt: never touch anything of the story (S2)
   if (story.frontmatter_error || !story.frontmatter) {
-    const errors = story.frontmatter_error ? [story.frontmatter_error] : [{ file: `${story.spec_dir}/story.md`, errors: [{ path: "", message: "missing" }] }];
-    // S2: a broken story.md is surfaced, never written into the unit's state
+    const errors = story.frontmatter_error ? [story.frontmatter_error] : [{ file: `${story.spec_dir}/${SPEC_FILE}`, errors: [{ path: "", message: "missing" }] }];
+    // S2: a broken spec.md is surfaced, never written into the unit's state
     if (!ctx.has(ref.key)) ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "story.corrupt", errors, mark_state: false, notify: null });
     return;
   }

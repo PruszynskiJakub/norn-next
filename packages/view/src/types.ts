@@ -46,6 +46,8 @@ export interface UnitView {
   attempt: number | null;
   counters: CounterView[];
   park: { kind: ParkKind; reason: string; since: string } | null;
+  /** C5: the check step's `norn check-run` holds its lease; `since` is then the lease's */
+  check_running?: true;
   /** ISO time the unit entered its current situation (park, run start, step entry) */
   since: string | null;
   /** compact age of `since`, e.g. `12m` */
@@ -101,7 +103,7 @@ export interface StoryView extends UnitView {
   notes: StoryNote[];
   /** BS1/BS3: base sync state; null = no measurement and no base merge on record */
   base_sync: BaseSyncView | null;
-  /** coarse frontmatter status; null if story.md is unreadable */
+  /** coarse frontmatter status; null if spec.md is unreadable */
   story_status: StoryStatus | null;
   /** root-relative spec folder */
   spec_dir: string;

@@ -79,7 +79,7 @@
   spawn repo-worktrees/gh-9-add-search $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-9" --trailer "Norn-Step: implement" --trailer "Norn-Tick: <ulid:2>"
   spawn repo-worktrees/gh-9-add-search $ git rev-parse HEAD
   spawn repo-worktrees/gh-9-add-search $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-9-add-search --not --remotes=origin --
-  spawn repo-worktrees/gh-9-add-search $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-9-add-search -- .agents/specs/gh-9-add-search/runs/_story/handoff.md .agents/specs/gh-9-add-search/runs/_story/state.json .agents/specs/gh-9-add-search/runs/_story/workflow.yaml .agents/specs/gh-9-add-search/story.md
+  spawn repo-worktrees/gh-9-add-search $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-9-add-search -- .agents/specs/gh-9-add-search/runs/_story/handoff.md .agents/specs/gh-9-add-search/runs/_story/state.json .agents/specs/gh-9-add-search/runs/_story/workflow.yaml .agents/specs/gh-9-add-search/spec.md
   spawn repo-worktrees/gh-9-add-search $ git push --porcelain origin refs/heads/gh-9-add-search:refs/heads/gh-9-add-search
   + repo-worktrees/gh-9-add-search/.agents/specs/gh-9-add-search/runs/_story/handoff.md
       text 19 lines, normalised sha256 0c5e14e469c2

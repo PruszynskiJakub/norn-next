@@ -7,7 +7,7 @@
 import type { ClaimState, FileError, MailboxItem } from "@norn/core";
 import { type ClaimBlob, MAILBOX_KINDS, type Receipt, assertValid, claimRef, isUlid, mailboxPrefix, mailboxRef, parseDuration, validate } from "@norn/schema";
 import { json } from "./fsx.ts";
-import { type CasResult, casRef, git, listLocalRefs, listRemoteRefs, readBlob, readLocalRef, writeBlob } from "./git.ts";
+import { type CasResult, casRef, casRefs, git, listLocalRefs, listRemoteRefs, readBlob, readLocalRef, writeBlob } from "./git.ts";
 
 export type ClaimRead =
   | { state: "none" }
@@ -176,6 +176,20 @@ async function writeClaim(cwd: string, remote: string | null, blob: ClaimBlob, e
 export async function renewClaim(cwd: string, remote: string | null, blob: ClaimBlob, expected: string): Promise<ClaimWriteResult> {
   assertValid("claim", blob);
   return writeClaim(cwd, remote, blob, expected);
+}
+
+/**
+ * Renew several claims (T4) in one CAS batch: one push to the remote however many there are (H5),
+ * one result per renewal in order. A lost CAS fails only its own renewal (R1.2).
+ */
+export async function renewClaims(cwd: string, remote: string | null, renewals: ReadonlyArray<{ blob: ClaimBlob; expected: string }>): Promise<ClaimWriteResult[]> {
+  const shas: string[] = [];
+  for (const { blob } of renewals) {
+    assertValid("claim", blob);
+    shas.push(await writeBlob(cwd, json(blob)));
+  }
+  const res = await casRefs(cwd, remote, renewals.map(({ blob, expected }, i) => ({ ref: claimRef(blob.story), sha: shas[i] as string, expected })));
+  return res.map((r, i) => (r.ok ? { ok: true, sha: shas[i] as string } : casFail(r)));
 }
 
 /** Release (T6): delete the ref by CAS. */

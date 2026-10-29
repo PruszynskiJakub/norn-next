@@ -208,6 +208,10 @@ export function sliceBranch(story: string, nn: string, slug: string): string {
 export function specDir(story: string, slug: string): string {
   return `${SPECS_DIR}/${storyDirName(story, slug)}`;
 }
+/** GR2: the story's spec file in its spec folder: the mirrored issue, then the refined spec. */
+export const SPEC_FILE = "spec.md";
+/** The name older norn releases wrote; still read when a spec folder has no `spec.md` (GR2). */
+export const LEGACY_SPEC_FILE = "story.md";
 /** GR9: the story PR body an agent writes, in the spec folder. */
 export const PR_BODY_FILE = "pr.md";
 export function claimRef(story: string): string {

@@ -80,7 +80,7 @@
   spawn repo-worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Step: update" --trailer "Norn-Tick: <ulid:2>"
   spawn repo-worktrees/gh-7-add-login-form $ git rev-parse HEAD
   spawn repo-worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
-  spawn repo-worktrees/gh-7-add-login-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7-add-login-form -- .agents/specs/gh-7-add-login-form/runs/_story/handoff.md .agents/specs/gh-7-add-login-form/runs/_story/state.json .agents/specs/gh-7-add-login-form/runs/_story/workflow.yaml .agents/specs/gh-7-add-login-form/story.md
+  spawn repo-worktrees/gh-7-add-login-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7-add-login-form -- .agents/specs/gh-7-add-login-form/runs/_story/handoff.md .agents/specs/gh-7-add-login-form/runs/_story/state.json .agents/specs/gh-7-add-login-form/runs/_story/workflow.yaml .agents/specs/gh-7-add-login-form/spec.md
   spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/handoff.md
       text 19 lines, normalised sha256 fddf651653af
@@ -204,9 +204,9 @@
   spawn repo $ git rev-list --left-right --count <sha:7>...<sha:3> --
   spawn repo $ git merge-base <sha:7> <sha:3>
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
-  spawn repo-worktrees/gh-7-add-login-form $ sh -c true
+  spawn repo-worktrees/gh-7-add-login-form $ norn check-run <ulid:7>
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/receipts/0002-check.json
-      {"kind":"check","receipt_id":"<ulid:7>","run_id":"<ulid:8>","step":"test","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:9>","outcome":"pass","command":"true","exit_code":0,"duration_ms":<ms>,"output_tail":""}
+      {"kind":"check","receipt_id":"<ulid:8>","run_id":"<ulid:7>","step":"test","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:9>","outcome":"pass","command":"true","exit_code":0,"duration_ms":<ms>,"output_tail":""}
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -236,7 +236,7 @@
   ~ repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/handoff.md
       text 21 lines, normalised sha256 99bd2aa5cff7
   ~ repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"open-pr","attempt":1,"visits":{"update":1,"test":1,"open-pr":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":0,"stale_loop":0},"nudges_used":0,"retries_used":0,"applied_through":2,"run":null,"last_outcome":{"step":"test","outcome":"pass","source":"classified","at":"<time>","receipt_id":"<ulid:7>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:10>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"open-pr","attempt":1,"visits":{"update":1,"test":1,"open-pr":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":0,"stale_loop":0},"nudges_used":0,"retries_used":0,"applied_through":2,"run":null,"last_outcome":{"step":"test","outcome":"pass","source":"classified","at":"<time>","receipt_id":"<ulid:8>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:10>","mode":"auto"}
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -556,9 +556,9 @@
   spawn repo $ git rev-list --left-right --count <sha:15>...<sha:10> --
   spawn repo $ git merge-base <sha:15> <sha:10>
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
-  spawn repo-worktrees/gh-7-add-login-form $ sh -c true
+  spawn repo-worktrees/gh-7-add-login-form $ norn check-run <ulid:32>
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/receipts/0010-check.json
-      {"kind":"check","receipt_id":"<ulid:32>","run_id":"<ulid:33>","step":"test","attempt":2,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:34>","outcome":"pass","command":"true","exit_code":0,"duration_ms":<ms>,"output_tail":""}
+      {"kind":"check","receipt_id":"<ulid:33>","run_id":"<ulid:32>","step":"test","attempt":2,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:34>","outcome":"pass","command":"true","exit_code":0,"duration_ms":<ms>,"output_tail":""}
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -588,7 +588,7 @@
   ~ repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/handoff.md
       text 28 lines, normalised sha256 7f604bf226eb
   ~ repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"open-pr","attempt":2,"visits":{"update":3,"test":2,"open-pr":2,"ready":1,"resolve":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":10,"run":null,"last_outcome":{"step":"test","outcome":"pass","source":"classified","at":"<time>","receipt_id":"<ulid:32>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:35>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"open-pr","attempt":2,"visits":{"update":3,"test":2,"open-pr":2,"ready":1,"resolve":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":10,"run":null,"last_outcome":{"step":"test","outcome":"pass","source":"classified","at":"<time>","receipt_id":"<ulid:33>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:35>","mode":"auto"}
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -866,9 +866,9 @@
   spawn repo $ git rev-list --left-right --count <sha:21>...<sha:10> --
   spawn repo $ git merge-base <sha:21> <sha:10>
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
-  spawn repo-worktrees/gh-7-add-login-form $ sh -c true
+  spawn repo-worktrees/gh-7-add-login-form $ norn check-run <ulid:48>
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/receipts/0015-check.json
-      {"kind":"check","receipt_id":"<ulid:48>","run_id":"<ulid:49>","step":"test","attempt":3,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:50>","outcome":"pass","command":"true","exit_code":0,"duration_ms":<ms>,"output_tail":""}
+      {"kind":"check","receipt_id":"<ulid:49>","run_id":"<ulid:48>","step":"test","attempt":3,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:50>","outcome":"pass","command":"true","exit_code":0,"duration_ms":<ms>,"output_tail":""}
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -898,7 +898,7 @@
   ~ repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/handoff.md
       text 33 lines, normalised sha256 2cbd183efaad
   ~ repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"open-pr","attempt":3,"visits":{"update":4,"test":3,"open-pr":3,"ready":2,"resolve":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":15,"run":null,"last_outcome":{"step":"test","outcome":"pass","source":"classified","at":"<time>","receipt_id":"<ulid:48>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:51>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"open-pr","attempt":3,"visits":{"update":4,"test":3,"open-pr":3,"ready":2,"resolve":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":15,"run":null,"last_outcome":{"step":"test","outcome":"pass","source":"classified","at":"<time>","receipt_id":"<ulid:49>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:51>","mode":"auto"}
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -1166,14 +1166,14 @@
   spawn repo $ git update-ref -d refs/norn/claims/gh-7
   spawn repo $ git push --porcelain origin :refs/norn/claims/gh-7
   spawn repo $ git fetch --quiet --no-tags origin +refs/heads/main:refs/remotes/origin/main
-  spawn repo $ git cat-file -e refs/remotes/origin/main:.agents/specs/gh-7-add-login-form/story.md
+  spawn repo $ git cat-file -e refs/remotes/origin/main:.agents/specs/gh-7-add-login-form/spec.md
   spawn repo $ git worktree add --detach --quiet <tmp>/norn-record-<rand>/wt refs/remotes/origin/main
   spawn <tmp>/norn-record-<rand>/wt $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn <tmp>/norn-record-<rand>/wt $ git diff --name-only --diff-filter=U -z
-  spawn <tmp>/norn-record-<rand>/wt $ git add -A -- .agents/specs/gh-7-add-login-form/story.md
-  spawn <tmp>/norn-record-<rand>/wt $ git diff --cached --quiet -- .agents/specs/gh-7-add-login-form/story.md
-  spawn <tmp>/norn-record-<rand>/wt $ git diff --cached -U0 --no-color --no-ext-diff -- .agents/specs/gh-7-add-login-form/story.md
-  spawn <tmp>/norn-record-<rand>/wt $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Tick: <ulid:61>" -- .agents/specs/gh-7-add-login-form/story.md
+  spawn <tmp>/norn-record-<rand>/wt $ git add -A -- .agents/specs/gh-7-add-login-form/spec.md
+  spawn <tmp>/norn-record-<rand>/wt $ git diff --cached --quiet -- .agents/specs/gh-7-add-login-form/spec.md
+  spawn <tmp>/norn-record-<rand>/wt $ git diff --cached -U0 --no-color --no-ext-diff -- .agents/specs/gh-7-add-login-form/spec.md
+  spawn <tmp>/norn-record-<rand>/wt $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Tick: <ulid:61>" -- .agents/specs/gh-7-add-login-form/spec.md
   spawn <tmp>/norn-record-<rand>/wt $ git rev-parse HEAD
   spawn <tmp>/norn-record-<rand>/wt $ git push --porcelain origin HEAD:refs/heads/main
   spawn repo $ git update-ref refs/remotes/origin/main <sha:30>

@@ -36,6 +36,8 @@ export interface CliDeps {
   herdr?: herdr.HerdrCockpit | null;
   /** an outside command a front end starts for the person (`norn cockpit` opens a PR or issue link); default Bun.spawn */
   shell?: (argv: string[], cwd: string) => Promise<{ code: number; stderr: string }>;
+  /** a tick started a detached `norn check-run` (C5); `exited` settles when it ends (tests wait on it) */
+  onCheckStarted?: (exited: Promise<void>) => void;
 }
 
 export const systemClock: Clock = {
