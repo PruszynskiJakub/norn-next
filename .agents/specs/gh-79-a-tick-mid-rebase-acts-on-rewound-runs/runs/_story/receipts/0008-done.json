@@ -1,0 +1,12 @@
+{
+  "kind": "done",
+  "receipt_id": "01M63JR21CX3NS3NMD4FXXHR5V",
+  "run_id": "01M63J3HTKWVV6FZE9A851A7Z9",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-29T10:19:32.268Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "done",
+  "handoff": "Fixed gh-79: decideUnit holds a unit whose worktree is mid-rebase (noop unit.rebase_in_progress, before corrupt checks; H1/S2/S5), mailbox import waits for it; corrupt inbox title carries the validation message (names the stray duplicate); slices.slice_stuck points a corrupt slice at norn why, not unstick. Repro is now packages/cli/test/rebase-rewind.test.ts; decide tests + rule case added; one golden title updated. bun test 1207/1207, typecheck clean."
+}
