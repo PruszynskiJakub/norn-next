@@ -17,8 +17,13 @@
     "merge": 2
   },
   "step_entered_at": "2026-10-29T10:25:45.269Z",
-  "status": "running",
-  "park": null,
+  "status": "parked",
+  "park": {
+    "kind": "ask",
+    "reason": "integrate keeps conflicting even though there is nothing left to merge. The story tip 2751d0f is already in this slice (merge#1, commit 72a7a80). integrate rebases the slice onto the story branch, and that rebase drops merge#1's merge commit and replays 40ecc39, so the same conflicts come back (I reproduced it in a scratch clone). Another merge cannot fix this, and the conflict loop is at 2/2. Should I make the slice history linear? That means one commit on top of 2751d0f with exactly this branch's current tree (typecheck and 1293 tests green). It rewrites the slice branch, which is local and unpublished, and replaces its 25 commits.",
+    "since": "2026-10-29T10:27:28.071Z",
+    "receipt_id": "01M63K6JP71Y463XAE30ZFBHRW"
+  },
   "counters": {
     "test_loop": 0,
     "review_loop": 1,
@@ -27,7 +32,7 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 28,
+  "applied_through": 29,
   "run": {
     "run_id": "01M63K4BK5JX9VC2NYC8BFME5Q",
     "step": "merge",
@@ -49,13 +54,13 @@
     "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD"
   },
   "last_outcome": {
-    "step": "integrate",
-    "outcome": "conflict",
-    "source": "classified",
-    "at": "2026-10-29T10:25:18.201Z",
-    "receipt_id": "01M63K2KVSQE3SFNEA8D82BYA4"
+    "step": "merge",
+    "outcome": "ask",
+    "source": "reported",
+    "at": "2026-10-29T10:27:28.071Z",
+    "receipt_id": "01M63K6JP71Y463XAE30ZFBHRW"
   },
   "created_at": "2026-10-28T14:13:16.910Z",
-  "updated_at": "2026-10-29T10:26:20.566Z",
-  "last_tick_id": "01M63K4BK5DCSCXS4CYJG0YM1F"
+  "updated_at": "2026-10-29T10:27:45.285Z",
+  "last_tick_id": "01M63K73G45YZRY915V4DWMRX2"
 }
