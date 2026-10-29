@@ -1,8 +1,9 @@
 # Story workflow — example installed by `norn init`; edit freely (W1).
 # Refine and plan with a person, cut slices, approve the plan, run the slices,
 # bring the story up to date with its base, verify the whole story, describe it,
-# open the draft PR (or rewrite the body of the open one), and wait for a person to call it ready.
-# Rework found by the story-level test or QA is done in the story worktree.
+# open the draft PR (or rewrite the body of the open one), wait for the PR's CI, and wait for a
+# person to call it ready. The local check runs test:fast; CI runs the full suite.
+# Rework found by the story-level test, QA or CI is done in the story worktree.
 # QA reports a verdict per acceptance criterion (criteria: required) and may only report the outcome
 # matching its worst verdict; `unverified` (could not check here) goes to a person at human-qa.
 # A story waiting at human-qa or ready goes back through update when the base moved
@@ -63,7 +64,7 @@ steps:
       done: { to: update, means: "base merged into the story branch, conflicts resolved and committed" }
   test:
     type: check
-    run: "bun install --frozen-lockfile && bun run test && bun run typecheck"
+    run: "bun install --frozen-lockfile && bun run test:fast && bun run typecheck"
     timeout: 15m
     outcomes: { pass: qa, fail: { to: implement, counter: test_loop } }
   qa:
@@ -99,7 +100,19 @@ steps:
   open-pr:
     type: git
     action: open-pr
-    outcomes: { done: ready }
+    outcomes: { done: ci }
+  # waits for the PR's CI (a detached check run, so the tick is not blocked); a red run's failed
+  # log becomes last_check for implement, whose rework goes back through open-pr to the new head
+  ci:
+    type: check
+    run: |
+      for i in $(seq 1 30); do gh pr checks >/dev/null 2>&1 && break; sleep 10; done
+      gh pr checks --watch --fail-fast --interval 30 && exit 0
+      run=$(gh run list --branch "$(git branch --show-current)" --limit 1 --json databaseId -q '.[0].databaseId')
+      gh run view "$run" --log-failed | tail -300
+      exit 1
+    timeout: 30m
+    outcomes: { pass: ready, fail: { to: implement, counter: ci_loop } }
   ready:
     type: gate
     prompt: "Read the draft PR. Approve to mark the story finished (a person still merges the PR), or reject with what to change."
@@ -110,6 +123,7 @@ steps:
 counters:
   plan_loop: { max: 3 }
   test_loop: { max: 5 }
+  ci_loop: { max: 3 }
   qa_loop: { max: 2 }
   ready_loop: { max: 2 }
   # resets each time update merges cleanly: only repeated conflicts on one base move count (W4)
