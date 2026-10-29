@@ -85,6 +85,8 @@ export const cmd = {
   runList: (unit: string, o: { limit?: number } = {}) => norn("run list", unit, o.limit !== undefined && `--limit ${o.limit}`),
   runAttach: (unit?: string, o: { next?: boolean } = {}) => norn("run attach", unit, o.next && "--next"),
   runView: (unit = "<unit>", o: { why?: boolean } = {}) => norn("run view", unit, o.why && "--why"),
+  runRerun: (unit?: string, o: { step?: string; reset?: string } = {}) => norn("run rerun", unit, o.step && `--step ${o.step}`, o.reset && `--reset ${o.reset}`),
+  runCancel: (unit?: string) => norn("run cancel", unit),
   sync: () => norn("sync"),
   tick: () => norn("tick"),
   tidy: (o: { dryRun?: boolean } = {}) => norn("tidy", o.dryRun && "--dry-run"),

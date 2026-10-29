@@ -1,0 +1,15 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M63V1XEJYZ4T6A1A83DDDXR8",
+  "run_id": "01M63V1NB3XX40HP2BY66J4WWM",
+  "step": "integrate",
+  "attempt": 3,
+  "at": "2026-10-29T12:44:43.859Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M63V1NB3F043YSW6XCEPVVFF",
+  "outcome": "done",
+  "rule": "git.integrate",
+  "detail": "gh-75/09-run-rerun-and-cancel integrated into gh-75-regroup-the-cli-around-status-story-and at acfaea3fccbb",
+  "route": "$done"
+}

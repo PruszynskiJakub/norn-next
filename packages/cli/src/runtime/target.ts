@@ -19,7 +19,7 @@ import type { InteractionChoice } from "./interaction.ts";
 export interface TargetRule {
   /** the verb as typed, e.g. `run view` */
   verb: string;
-  /** whether the verb applies to this unit, as the project view shows it */
+  /** whether the verb applies to this unit, judged on the read model the candidates came from */
   applies(key: string, view: ProjectView): boolean;
   /** why no unit applies, e.g. `No unit has a run yet` */
   none: string;
@@ -75,6 +75,16 @@ export function unitOf(view: ProjectView, key: string): UnitView | undefined {
     if (x) return x;
   }
   return undefined;
+}
+
+/** A verb that applies to units in some state (`run cancel`: running; `run rerun`: stuck or parked). */
+export function inState(verb: string, command: (key: string) => string, none: string, ok: (u: UnitView) => boolean): TargetRule {
+  return {
+    verb,
+    command,
+    none,
+    applies: (key, view) => view.stories.some((s) => [s, ...s.slices].some((u) => u.key === key && ok(u))),
+  };
 }
 
 /** B55: a story verb (`story view`, `chat`, `checkout`, `handoff`, `close`) applies to every story, never to a slice. */

@@ -30,6 +30,8 @@ const today: Record<keyof typeof cmd, [string, ...string[]]> = {
   runList: [`norn run list ${U}`, cmd.runList(U), `norn run list ${U} --limit 20`, cmd.runList(U, { limit: 20 })],
   runAttach: [`norn run attach ${U}`, cmd.runAttach(U), "norn run attach --next", cmd.runAttach(undefined, { next: true })],
   runView: [`norn run view ${U}`, cmd.runView(U), "norn run view <unit> --why", cmd.runView(undefined, { why: true })],
+  runRerun: [`norn run rerun ${U}`, cmd.runRerun(U), `norn run rerun ${U} --step <a|b>`, cmd.runRerun(U, { step: "<a|b>" }), `norn run rerun ${U} --reset <a|b>`, cmd.runRerun(U, { reset: "<a|b>" })],
+  runCancel: [`norn run cancel ${U}`, cmd.runCancel(U), "norn run cancel", cmd.runCancel()],
   sync: ["norn sync", cmd.sync()],
   tick: ["norn tick", cmd.tick()],
   tidy: ["norn tidy", cmd.tidy(), "norn tidy --dry-run", cmd.tidy({ dryRun: true })],
