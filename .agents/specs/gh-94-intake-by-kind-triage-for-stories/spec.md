@@ -4,7 +4,7 @@ slug: intake-by-kind-triage-for-stories
 provider: gh
 number: 94
 url: https://github.com/PruszynskiJakub/norn-next/issues/94
-title: "Intake by kind: triage for stories, reproduce for bugs; remove fix and spec"
+title: "Intake: triage stays the default and can recommend reproduce for bugs; remove fix and spec"
 assignee: PruszynskiJakub
 labels:
   - norn
@@ -12,7 +12,7 @@ labels:
 workflow: quick
 status: active
 intake_at: 2026-10-29T10:58:15.394Z
-body_hash: f5007a9316be6f8ac4f12c9d138209bad70fc78c9529273bbb676f7f6fd8ae3c
+body_hash: 9dda173d82b5c4935084040f694f727000f5c384d61078bbc09ced1b85b1bd58
 ---
 
 ## Observed
