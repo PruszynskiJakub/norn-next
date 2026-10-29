@@ -237,7 +237,7 @@ export interface StartSlicesAction extends UnitBase {
 export interface ClassifyAction extends UnitBase, Transition {
   kind: "classify";
   outcome: string;
-  /** session to kill (timeout beyond nudges, unstick --to) */
+  /** session to kill (timeout beyond nudges, run rerun --step) */
   kill: SessionRef | null;
   /** C4 snapshot request: act fills last message / diff into the trace + handoff */
   snapshot: { transcript: string | null; cwd: string } | null;

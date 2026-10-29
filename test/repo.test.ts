@@ -1,6 +1,7 @@
 /** Repo-wide rules: dependency direction (§17) and banned glossary synonyms (§5). */
 import { describe, expect, test } from "bun:test";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 
 const ROOT = join(import.meta.dir, "..");
@@ -154,24 +155,29 @@ describe("release metadata", () => {
 
 /**
  * B5, B8, B71: commands this release removed. A hit is `norn <old>` (or the plugin's `"$NORN" <old>`)
- * where it reads as a command: in docs and .ts inside a code span or a quoted string, in the plugin's
- * scripts and manifest anywhere. Prose like "a norn workflow" or "a norn release" names a thing, not a
- * command. Also hit: `norn status <key>` (now `story view`) and the flags that changed what an old
- * command did (`cockpit --next`, `approve --reject`, …), with or without `norn`. The list is core's
+ * anywhere in a line: prose, comments, code spans, strings and scripts alike. Prose that names a thing
+ * with an article ("a norn workflow", "the norn cockpit") is not a command and is left out first. Also
+ * hit: `norn status <key>` (now `story view`) and the flags that changed what an old command did
+ * (`cockpit --next`, `approve --reject`, …), with or without `norn`. The list is core's
  * REMOVED_COMMANDS, read as text (the root tests cannot import a workspace package).
  */
-const REMOVED_COMMANDS: string[] = JSON.parse(
-  /export const REMOVED_COMMANDS = (\[[^\]]*\])/.exec(readFileSync(join(PKGS, "core", "src", "commands.ts"), "utf8"))?.[1] ?? "[]",
-);
+function removedCommands(source: string): string[] {
+  const list = /export const REMOVED_COMMANDS = (\[[^\]\n]*\])/.exec(source)?.[1];
+  const names: unknown = list === undefined ? [] : JSON.parse(list);
+  // a lint with no names would pass on anything: fail loudly instead
+  if (!Array.isArray(names) || names.length === 0) throw new Error("REMOVED_COMMANDS not found in packages/core/src/commands.ts: update the lint's reader");
+  return names as string[];
+}
+const REMOVED_COMMANDS = removedCommands(readFileSync(join(PKGS, "core", "src", "commands.ts"), "utf8"));
 const OLD_COMMAND = new RegExp(`(?:\\bnorn|"\\$NORN")\\s+(${REMOVED_COMMANDS.join("|")})(?![\\w-])`);
 const OLD_STATUS_KEY = /\bnorn status (?:<(?:key|story|unit|slice)>|g[hl]-\d+)/;
 const OLD_FLAG = /\b(?:cockpit --(?:next|open|interval)|approve --reject|unstick --to|orient --open|workflow --to)\b/;
-const QUOTED = /`[^`\n]*`|"[^"\n]*"|'[^'\n]*'/g;
+const NAMED_THING = /\b(?:a|an|the) norn \w+/gi;
 
 /** The removed commands one line names (`norn <old>`, `norn status <key>`, an old flag). */
-function oldCommandHits(line: string, file: string): string[] {
-  const text = /\.(sh|toml)$/.test(file) ? line : (line.match(QUOTED) ?? []).join(" ");
-  return [OLD_COMMAND, OLD_STATUS_KEY, OLD_FLAG].flatMap((re) => re.exec(text)?.[0] ?? []);
+function oldCommandHits(line: string): string[] {
+  const text = line.replace(NAMED_THING, "");
+  return [OLD_COMMAND, OLD_STATUS_KEY, OLD_FLAG].flatMap((re) => [...text.matchAll(new RegExp(re.source, "g"))].map((m) => m[0]));
 }
 
 /** Lines allowed to match, by file and exact text, with why: a quoted name of a thing, not a command. */
@@ -184,21 +190,33 @@ const OLD_COMMAND_FILES = (): string[] => [
   ...GLOSSARY_FILES().filter((f) => !f.includes("/schema/json/")),
   ...textFiles(join(ROOT, ".agents", "skills"), DOCS),
   join(ROOT, ".agents", "PRD.md"),
+  // the SPEC-*.md files the PRD cites for its rules (HC, CP, R, BS, QV, NT), and the limits README points at
+  ...readdirSync(join(ROOT, ".agents")).filter((n) => /^SPEC-.*\.md$/.test(n)).map((n) => join(ROOT, ".agents", n)),
+  join(ROOT, ".agents", "LIMITATIONS.md"),
 ];
 
 describe("removed commands (B5, B8, B71)", () => {
-  test("matcher: commands in code spans, quotes and plugin scripts; prose, new names and other flags are not hits", () => {
-    expect(oldCommandHits("run `norn unstick gh-1` then", "README.md")).toEqual(["norn unstick"]);
-    expect(oldCommandHits(`  hint: "norn inbox",`, "a.ts")).toEqual(["norn inbox"]);
-    expect(oldCommandHits(`out=$("$NORN" cockpit --next --json)`, "plugins/herdr/next.sh")).toEqual([`"$NORN" cockpit`, "cockpit --next"]);
-    expect(oldCommandHits("`norn status gh-12` shows one story", "a.md")).toEqual(["norn status gh-12"]);
-    expect(oldCommandHits("`approve --reject --reason`", "a.md")).toEqual(["approve --reject"]);
-    expect(oldCommandHits("lands through a norn workflow, as a norn release", "AGENTS.md")).toEqual([]);
-    expect(oldCommandHits("`norn story approve gh-1`, `norn run view --why`, `norn status --watch`", "a.md")).toEqual([]);
-    expect(oldCommandHits("`norn workflow-run` and `norn opening`", "a.md")).toEqual([]);
+  test("matcher: commands anywhere in a line; a named thing (`a norn workflow`), new names and other flags are not hits", () => {
+    expect(oldCommandHits("run `norn unstick gh-1` then")).toEqual(["norn unstick"]);
+    expect(oldCommandHits(`  hint: "norn inbox",`)).toEqual(["norn inbox"]);
+    expect(oldCommandHits(`out=$("$NORN" cockpit --next --json)`)).toEqual([`"$NORN" cockpit`, "cockpit --next"]);
+    expect(oldCommandHits("`norn status gh-12` shows one story")).toEqual(["norn status gh-12"]);
+    expect(oldCommandHits("`approve --reject --reason`")).toEqual(["approve --reject"]);
+    expect(oldCommandHits("lands through a norn workflow, as a norn release")).toEqual([]);
+    expect(oldCommandHits("// manual (you, with norn open) or auto")).toEqual(["norn open"]);
+    expect(oldCommandHits("`norn trace` and `norn why` show it")).toEqual(["norn trace", "norn why"]);
+    expect(oldCommandHits("Start a norn release; the norn cockpit lists it")).toEqual([]);
+    expect(oldCommandHits("`norn story approve gh-1`, `norn run view --why`, `norn status --watch`")).toEqual([]);
+    expect(oldCommandHits("`norn workflow-run` and `norn opening`")).toEqual([]);
   });
 
-  test("no removed command in sources, assets, plugins, skills, README, CONTRIBUTING, AGENTS.md and the PRD", () => {
+  test("the list of removed commands is read from core, or the lint fails loudly", () => {
+    expect(REMOVED_COMMANDS).toContain("unstick");
+    expect(() => removedCommands("export const REMOVED_COMMANDS = [\n  \"drop\",\n] as const;")).toThrow("REMOVED_COMMANDS not found");
+    expect(() => removedCommands("export const OLD = [];")).toThrow("REMOVED_COMMANDS not found");
+  });
+
+  test("no removed command in sources, assets, plugins, skills, README, CONTRIBUTING, AGENTS.md, the PRD and its SPEC files", () => {
     const hits: string[] = [];
     for (const f of OLD_COMMAND_FILES()) {
       const rel = relative(ROOT, f);
@@ -206,7 +224,7 @@ describe("removed commands (B5, B8, B71)", () => {
         .split("\n")
         .forEach((line, i) => {
           if (OLD_COMMAND_ALLOW.some(([file, text]) => file === rel && line.trim() === text)) return;
-          for (const old of oldCommandHits(line, f)) hits.push(`${rel}:${i + 1} → \`${old}\` was removed (B5): ${line.trim()}`);
+          for (const old of oldCommandHits(line)) hits.push(`${rel}:${i + 1} → \`${old}\` was removed (B5): ${line.trim()}`);
         });
     }
     expect(hits).toEqual([]);
@@ -243,6 +261,33 @@ describe("herdr plugin (HC9)", () => {
     expect(run("next.sh")).toContain(`"$NORN" run attach --next --json`);
     expect(run("open.sh")).toContain(`"$NORN" status --watch --pane`);
     expect(run("pick.sh")).toContain(`"$NORN" status --watch >`);
+  });
+
+  /** Runs next.sh with a stub norn that refuses with `refusal` and a stub herdr that records the toast. */
+  function nextToast(refusal: object): string {
+    const dir = mkdtempSync(join(tmpdir(), "norn-next-"));
+    const stub = (name: string, body: string) => {
+      writeFileSync(join(dir, name), `#!/bin/sh\n${body}\n`);
+      chmodSync(join(dir, name), 0o755);
+      return join(dir, name);
+    };
+    writeFileSync(join(dir, "refusal.json"), JSON.stringify(refusal));
+    const env = {
+      ...process.env,
+      NORN_BIN: stub("norn", `cat "${dir}/refusal.json"; exit 3`),
+      HERDR_BIN_PATH: stub("herdr", `printf '%s|' "$@" > "${dir}/toast"`),
+      HERDR_PLUGIN_CONTEXT_JSON: JSON.stringify({ focused_pane_cwd: dir }),
+    };
+    Bun.spawnSync(["sh", join(ROOT, "plugins", "herdr", "next.sh")], { env });
+    return readFileSync(join(dir, "toast"), "utf8");
+  }
+
+  test("P8: next.sh branches on the refusal's code, not its text, and keeps escaped quotes", () => {
+    const attach = nextToast({ error: 'no live agent pane for "gh-1/01"', do_instead: "norn story start gh-1/01", code: "nothing_to_attach" });
+    expect(attach).toContain('no live agent pane for \\"gh-1/01\\"; run: norn story start gh-1/01|');
+    const other = nextToast({ error: "No agent waits for you", do_instead: "norn status", code: "not_in_herdr" });
+    expect(other).toContain("norn run attach --next failed in ");
+    expect(other).toContain(": No agent waits for you|");
   });
 });
 

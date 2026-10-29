@@ -24,8 +24,8 @@ The rules each fix maps to are in its spec.
 
 - **Stale story branches (F8).** The `update` step merges the base into the story branch, never by rebasing.
   - Conflicts are predicted and routed to a `resolve` agent step.
-  - Gates send a story back with `stale`, and `norn update <story>` re-enters the update step.
-  - `status` and `inbox` show how far behind each story is and which files conflict.
+  - Gates send a story back with `stale`, and `norn story update-branch <story>` re-enters the update step.
+  - `status` and `story list` show how far behind each story is and which files conflict.
   - In the dogfood, every story reached `ready` up to date with no manual merge.
 - **Conflict markers.** norn does not commit while a merge is open, and refuses a push whose head has markers in the outgoing files (BS5.2). A resolve agent's `norn done` is refused until its merge is concluded.
 - **A person's push to a story branch** is merged in by `update` or by a rejected push, and is never lost (BS3.3a).
@@ -38,7 +38,7 @@ The rules each fix maps to are in its spec.
   - An agent killed mid-step or mid-merge is classified `died` and retried within seconds.
   - A hung headless agent is nudged through `--resume`.
   - A launch crash is adopted or classified (R4, R5).
-- **Prompts the agent is blocked on.** Permission prompts show up as implicit asks, including mid-merge. `norn answer` types the right keystroke, and the agent's own report is accepted afterwards (R6).
+- **Prompts the agent is blocked on.** Permission prompts show up as implicit asks, including mid-merge. `norn story answer` types the right keystroke, and the agent's own report is accepted afterwards (R6).
 - **Agents run the right norn.** A PATH shim and a launcher script do this (R8). Failed actions are reported `ok:false` and never as success (R4.3).
 - **`watch` survives a sleeping laptop (H11).** Every call that reaches a remote (`git fetch`/`push`/…, `gh`, `glab`) times out after 2 minutes and fails as a retryable network error, so a dead SSH connection no longer holds the tick lock for good.
 - **An attended agent waiting for its person is visible (HC1–HC3).** After `limits.attended_wait` (default `2m`) the inbox moves it from Running to Your turn, and notifiers fire once per wait. Its command reaches the waiting session and never starts a second agent, which was the dogfood mistake.
@@ -47,12 +47,12 @@ The rules each fix maps to are in its spec.
 ## Gaps still open
 
 1. **Cross-machine handoff edges.**
-   - After a `take`, a foreign run parked on a prompt is never judged (B8).
+   - After a `story checkout`, a foreign run parked on a prompt is never judged (B8).
    - An approve followed by a merge within one tick leaves main's record at the gate (B7).
-   - A merged story stays offered for `take` on a checkout that once worked on it, and `norn tidy` does not remove leaked intake worktrees or slot leases (B10).
+   - A merged story stays offered for `story checkout` on a checkout that once worked on it, and `norn tidy` does not remove leaked intake worktrees or slot leases (B10).
 2. **A machine-specific hook command is committed as is** (rerun D2). The default hook command, `"${NORN_BIN:-norn}" hook`, is portable. But `norn init --hook-command` or `NORN_HOOK_COMMAND` with an absolute path writes that path into the committed `.claude/settings.json`, as the dogfood sandbox did, and a second machine then gets no hook facts. Without hook facts, `silent`, stalled, adoption and implicit asks are all lost. Neither `init` nor `doctor` flags it: `doctor` tests the hook command this machine would install, not the one committed.
-3. **Implicit asks flicker** (B9, F1). When an agent sends several tool calls at once, its Answer item can vanish for one tick and return with a new id. A notifier fires twice, and a `norn answer` sent in the gap is refused.
-   - After an accepted answer, `status` and `inbox` show the old question until the next tick, which takes 20–40 s (F2).
+3. **Implicit asks flicker** (B9, F1). When an agent sends several tool calls at once, its Answer item can vanish for one tick and return with a new id. A notifier fires twice, and a `norn story answer` sent in the gap is refused.
+   - After an accepted answer, `status` and `story view` show the old question until the next tick, which takes 20–40 s (F2).
    - If a runner kept reporting `waiting_input` from before the last answer, a second prompt would not be raised.
 4. **Agents' housekeeping.**
    - An agent's `git add -A` can sweep norn's pending `runs/` files into its own merge commit (D2).
@@ -78,7 +78,7 @@ The rules each fix maps to are in its spec.
   - an agent that dies with no retries left;
   - killing a herdr pane mid-merge.
 - **An agent with the `browser` capability.** Nobody ever checked a browser criterion live; every such approval says so.
-- **The herdr cockpit (HC1–HC15).** The attended wait, the cockpit (`norn cockpit`, SPEC-cockpit), the Herdr plugin (`plugins/herdr`), pane labels and the `herdr` notifier are tested against fixtures and a fake runner only. No dogfood run has used them yet.
+- **The herdr cockpit (HC1–HC15).** The attended wait, the cockpit (`norn status --watch`, SPEC-cockpit), the Herdr plugin (`plugins/herdr`), pane labels and the `herdr` notifier are tested against fixtures and a fake runner only. No dogfood run has used them yet.
 - **The auto permission mode default** (`--permission-mode auto` for `agents.claude`). Every live run used configs that replace it.
 - **codex, opencode, gemini and glab adapters.** They are tested only against recorded fixtures. Only claude, git, gh, herdr and headless ran live.
 
@@ -91,7 +91,7 @@ The rules each fix maps to are in its spec.
 - **No fork contributions.** norn works only for collaborators with write access to the repo: it needs to push story branches and claim refs to the remote. A PR from a fork cannot run through a workflow; in norn's own repo it is read as input to an issue, never merged as is.
 - **GitHub/GitLab-style flows only.** norn assumes PRs, branches and git refs. Trunk-based work without PRs, many teams sharing one `.agents/`, and non-git VCS are out of scope.
 - **Merge, never rebase.** Story branches gain merge commits from the base. Teams that require linear history must squash on merge; the base then stays linear.
-- **The cockpit takes keys, not the mouse.** `norn cockpit` is full screen with raw keys; there is no mouse support and no web panel yet (SPEC-cockpit §8 says how one would plug in).
+- **The cockpit takes keys, not the mouse.** `norn status --watch` is full screen with raw keys; there is no mouse support and no web panel yet (SPEC-cockpit §8 says how one would plug in).
 - **Coarse grain.** norn works per story and slice on a heartbeat. It is the wrong tool for quick interactive edits, and the overhead is not worth it for tiny changes.
 - **Local environment must stay healthy.**
   - It needs Bun, git ≥ 2.38 (for `merge-tree --write-tree`), git worktrees (disk plus per-worktree setup), an authenticated `gh`, and herdr for attended panes. The cockpit needs Herdr ≥ 0.9, and its plugin is installed by hand (`herdr plugin install PruszynskiJakub/norn-next/plugins/herdr`, HC11); `norn init` does not install it.
@@ -99,4 +99,4 @@ The rules each fix maps to are in its spec.
   - A sleeping laptop pauses every watch, and claims expire. They are reacquired cleanly after wake, but nothing moves in the meantime.
 - **Workflows are pinned per unit.** Editing a workflow does not affect units already in flight. This is intended, but surprising.
 - **`heartbeat_id` per checkout, not per process** (a deliberate divergence from ID2, see `AGENTS.md`). Two `watch` processes on one checkout would each think they own the same claim.
-- **Observability covers only what goes through norn.** `norn why` and `norn trace` replay norn's own decisions exactly. Anything a person or agent does outside norn, such as pane keystrokes or hand merges, shows up only as later-observed facts, without the reason.
+- **Observability covers only what goes through norn.** `norn run view --why` and `norn run list` replay norn's own decisions exactly. Anything a person or agent does outside norn, such as pane keystrokes or hand merges, shows up only as later-observed facts, without the reason.

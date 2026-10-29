@@ -12,12 +12,12 @@ So the cockpit is split in two:
 
 Writes stay CLI verbs (X1).
 
-This spec also gives ids to what 0.8.0 shipped without them: `norn orient` (OR1–OR4) and `norn status --segment` (SG1–SG3).
+This spec also gives ids to what 0.8.0 shipped without them: the story's own view and chat (OR1–OR4, now `norn story view` and `norn story chat`) and `norn status --segment` (SG1–SG3).
 
 ## 2. Goals and non-goals
 
 Goals:
-- One cockpit command, `norn cockpit`, with the picker's look and the old cockpit's reach (answer, reject, unstick, trace) (CP4–CP9).
+- One cockpit command, `norn status --watch`, with the picker's look and the old cockpit's reach (answer, reject, unstick, trace) (CP4–CP9).
 - A front-end-neutral cockpit model that a web panel can render without norn logic of its own (CP1–CP3).
 
 Non-goals:
@@ -60,24 +60,24 @@ Non-goals:
 
   | id | key | Row | Effect |
   |---|---|---|---|
-  | orient | enter | every row | place orient (inside Herdr: `norn orient <story> --open`); without places: verb `orient <story>`, shown |
+  | orient | enter | every row | place orient (inside Herdr: `norn story chat <story>`); without places: verb `story view <story>`, shown |
   | agent | g | an item whose unit has a current run (`reach`) | place agent (HC6, then HC15) |
-  | start | s | a Your turn manual start (`norn open <unit>` in its command, MO5) | verb `open <unit>` |
-  | answer | a | Answer | input "Your answer" → verb `answer <unit> {input}` |
-  | approve | y | Approve | verb `approve <unit>` |
-  | reject | x | Approve | input "What to change" → verb `approve <unit> --reject --reason {input}` |
-  | unstick | u | an item whose command is `norn unstick …` | verb `unstick <unit>` |
-  | take | t | the story row of a story nobody holds (claim `unclaimed`) | verb `take <story>` |
-  | trace | v | every row | verb `trace <unit>`, shown |
+  | start | s | a Your turn manual start (`norn story start <unit>` in its command, MO5) | verb `story start <unit>` |
+  | answer | a | Answer | input "Your answer" → verb `story answer <unit> {input}` |
+  | approve | y | Approve | verb `story approve <unit>` |
+  | reject | x | Approve | input "What to change" → verb `story reject <unit> --reason {input}` |
+  | unstick | u | an item whose command is `norn run rerun …` | verb `run rerun <unit>` |
+  | take | t | the story row of a story nobody holds (claim `unclaimed`) | verb `story checkout <story>` |
+  | trace | v | every row | verb `run list <unit>`, shown |
   | pr | o | every row of a story whose PR is known (`StoryView.pr`) | link to the PR URL |
   | issue | i | every row of a story with an issue URL | link to the issue URL |
 
   The model alone decides which rows offer which action: a renderer never infers it from groups or commands. An action a row does not offer is absent, not disabled.
-- CP5 `norn cockpit --json` prints the model once and exits (P8), so a front end outside TypeScript can read it. Running an action needs no extra entry point: its `argv` is a norn command (`norn <argv…> --json`).
+- CP5 `norn status --watch --json` prints the model once and exits (P8), so a front end outside TypeScript can read it. Running an action needs no extra entry point: its `argv` is a norn command (`norn <argv…> --json`).
 
 ## 4. The terminal cockpit (replaces HC4, HC5, HC8, HC16)
 
-- CP6 `norn cockpit [--interval 5s]` draws the model full screen: the header, a filter line, the rows on the left (about 40% of the width; the needs-you section, then stories), the selected row's preview on the right (below the rows when the pane is narrower than 100 columns), and a footer. The footer lists the selected row's actions by key, then `/ filter · r refresh · ? help · q quit`.
+- CP6 `norn status --watch [--interval 5s]` draws the model full screen: the header, a filter line, the rows on the left (about 40% of the width; the needs-you section, then stories), the selected row's preview on the right (below the rows when the pane is narrower than 100 columns), and a footer. The footer lists the selected row's actions by key, then `/ filter · r refresh · ? help · q quit`.
   - It reads raw keys (a terminal in raw mode), draws on the alternate screen (frames leave no scrollback) and turns on mouse reporting for the wheel; all of it is restored on exit, SIGINT and SIGTERM included.
   - It redraws on every key and every interval, with a fresh view on the interval and after each action.
   - Frames go to stderr, one JSON summary (the last action taken) to stdout at exit (P8).
@@ -90,21 +90,21 @@ Non-goals:
   - An action's key runs it on the selected row. A key the row does not offer shows `no <action> here`; nothing runs.
   - An action with `input` opens a one-line prompt in the footer, labelled with its `prompt`. Enter submits; Esc cancels. Empty text is refused when `required`.
   - `r` refreshes, `?` lists every key, `q` quits.
-- CP8 Every action leaves the cockpit open. Its outcome is one line in the footer: `ok: norn approve gh-1`, or the `CliError` `error` and `do_instead` (HC7), or where a place action went. A shown verb's markdown replaces the preview until the selection moves or Esc is pressed.
+- CP8 Every action leaves the cockpit open. Its outcome is one line in the footer: `ok: norn story approve gh-1`, or the `CliError` `error` and `do_instead` (HC7), or where a place action went. A shown verb's markdown replaces the preview until the selection moves or Esc is pressed.
   - Effects run as follows: `verb` through the CLI dispatcher in-process (HC7); `link` with the platform opener (`open` on macOS, `xdg-open` on Linux); `place` through the Herdr cockpit adapter.
 - CP9 Inside Herdr the cockpit also labels agent panes, as before (HC12, HC13).
 
 ## 5. Names, plugin and what goes away (amends HC9, HC10)
 
-- CP10 `norn cockpit` is the only cockpit command; `norn pane` and `norn pick` are removed, with no aliases (pre-1.0, a minor version may change the machine contract). What `norn pane` also did moves:
-  - `norn cockpit --next` focuses the agent pane of the oldest Your turn item with a run, as `norn pane --next` did (HC10).
-  - `norn cockpit --open` opens the cockpit in a Herdr split below the caller, as `norn pane --open` did.
-  - The plain redrawn inbox (`norn pane` without flags, O1 "a Herdr status pane") is dropped: `norn inbox` prints it and the cockpit replaces the pane.
-- CP11 The Herdr plugin keeps its ids, and every entry runs `norn cockpit`:
-  - `norn.open` and pane `cockpit` show it as a split below the focused pane;
+- CP10 `norn status --watch` is the only cockpit command; `norn pane` and `norn pick` are removed, with no aliases (pre-1.0, a minor version may change the machine contract). What `norn pane` also did moves:
+  - `norn run attach --next` focuses the agent pane of the oldest Your turn item with a run, as `norn pane --next` did (HC10).
+  - `norn status --watch --pane` opens the cockpit in a Herdr split below the caller, as `norn pane --open` did.
+  - The plain redrawn inbox (`norn pane` without flags, O1 "a Herdr status pane") is dropped: `norn status` prints it and the cockpit replaces the pane.
+- CP11 The Herdr plugin keeps its ids, and every entry runs the cockpit:
+  - `norn.open` shows it as a split below the focused pane (`norn status --watch --pane`);
   - `norn.pick` and pane `pick` show it as a popup over it;
-  - `norn.next` runs `norn cockpit --next`.
-- CP13 The cockpit opens on any workspace. When its directory is in no repository, or in one norn was never set up in (no `.agents/norn/`), it shows the repository the last `norn cockpit` ran in on this machine. That path is kept in `<norn home>/cockpit.json` (`last_repo`), written by every `norn cockpit`; it is presentation state, never a fact. With no such repository it refuses as any command outside a repository does.
+  - `norn.next` runs `norn run attach --next`.
+- CP13 The cockpit opens on any workspace. When its directory is in no repository, or in one norn was never set up in (no `.agents/norn/`), it shows the repository the last `norn status --watch` ran in on this machine. That path is kept in `<norn home>/cockpit.json` (`last_repo`), written by every `norn status --watch`; it is presentation state, never a fact. With no such repository it refuses as any command outside a repository does.
 - CP12 Removed:
   - the `norn pane` and `norn pick` commands (CP10);
   - the line commands (HC5's table) and their parser (`parseCockpitLine`, `planCockpit`);
@@ -113,7 +113,7 @@ Non-goals:
 
 ## 6. Orient (shipped in 0.8.0)
 
-- OR1 `norn orient <story|unit> [--json]` is read only: no receipt, run or claim. It prints markdown by default and `--json` gives the report (P8).
+- OR1 `norn story view <story|unit> [--json]` is read only: no receipt, run or claim. It prints markdown by default and `--json` gives the report (P8).
 - OR2 The report (`orientReport` in `@norn/view`) holds:
   - the story's title, issue URL, standing, mode and claim;
   - each slice's standing and last outcome;
@@ -121,14 +121,14 @@ Non-goals:
   - the PR as last seen, and the `gh pr view <branch>` / `glab mr view <branch>` command (`config.remote.provider`);
   - the inbox items of the story that wait for the person, with their commands, and those running;
   - the open notes, grouped by unit, the unit with the newest note first;
-  - where to look: the spec, `norn trace`, `norn why`, `norn status`.
+  - where to look: the spec, `norn run list`, `norn run view --why`, `norn status`.
 
   The markdown opens with rules for an agent: a summary of at most 5 lines that counts the notes, then answers; norn commands that change anything only when the person says so; no code edits, commits or outcomes; notes grouped by topic when asked.
-- OR3 `--open`, inside Herdr:
+- OR3 `norn story chat`, inside Herdr:
   - It focuses the workspace labelled `<story> orient` that has a pane in the story's root (or no panes).
-  - Otherwise it creates that workspace in `StoryView.root` and runs the default agent there, with its configured args, prompt "Run `norn orient <key>` and follow it."
+  - Otherwise it creates that workspace in `StoryView.root` and runs the default agent there, with its configured args, prompt "Run `norn story view <key>` and follow it."
   - The agent runs with `NORN_ORIENT=1` and its own shim `~/.norn/orient/bin/norn`, first on PATH (R8.1).
-  - Outside Herdr, `--open` prints the command.
+  - Outside Herdr, it prints the command.
 - OR4 With `NORN_ORIENT=1`, `norn hook` records nothing and `brief`, `done`, `ask` and `stuck` refuse with code `orient_session`. An orient session is no run.
 
 ## 7. Tab bar segment (shipped in 0.8.0)
@@ -144,21 +144,21 @@ Non-goals:
 ## 8. A web panel later (non-goal, the shape it plugs into)
 
 A web panel is another renderer of CP1:
-- It reads `cockpitModel(loadProjectView(…), { places: false })`, in-process or as `norn cockpit --json`.
+- It reads `cockpitModel(loadProjectView(…), { places: false })`, in-process or as `norn status --watch --json`.
 - It draws rows, previews and one control per action.
 - It runs `verb` effects through the same dispatcher (`runCli`) or as `norn <argv…> --json`, and shows the `CliError` on refusal.
 - It renders `link` as a link.
-- It offers no `place` actions. Its own "orient" would be a chat that reads `norn orient <story>`, a later spec.
+- It offers no `place` actions. Its own "orient" would be a chat that reads `norn story view <story>`, a later spec.
 
 Nothing in the model is terminal-specific: keys are defaults a web panel may show as shortcuts.
 
 ## 9. Contract changes
 
 - `@norn/view`: `cockpitModel`, types `CockpitModel`, `CockpitRow`, `CockpitAction`, `CockpitEffect`.
-- `norn cockpit [--interval 5s] [--json] [--next] [--open]` (new); `norn cockpit --json` is P8 data.
+- `norn status --watch [--interval 5s] [--json] [--pane]` and `norn run attach --next`; `norn status --watch --json` is P8 data.
 - Removed: `norn pane` (all its modes) and `norn pick`; `trace/cockpit.json` (`notes_seen_at`).
 - New: `<norn home>/cockpit.json` (`last_repo`, CP13).
-- The Herdr plugin's entries run `norn cockpit`.
+- The Herdr plugin's entries run `norn status --watch` and `norn run attach --next`.
 
 ## 10. Tests
 
@@ -170,7 +170,7 @@ Nothing in the model is terminal-specific: keys are defaults a web panel may sho
   - key parsing (letters, `/`, arrows, the prompt);
   - a scripted session against the harness covering: filter, approve, answer with input, a refused key, trace shown, quit;
   - `--json` printing the model;
-  - `--next` and `--open`;
+  - `run attach --next` and `--pane`;
   - outside a repository, and in one without norn, it shows the last repository (CP13);
   - `norn pane` and `norn pick` are unknown commands.
-- Repo: the plugin manifest's entries name existing scripts that run `norn cockpit`.
+- Repo: the plugin manifest's entries name existing scripts that run `norn status --watch` and `norn run attach --next`.

@@ -10,9 +10,14 @@ elif command -v norn >/dev/null 2>&1; then NORN=norn
 else NORN="$HOME/.norn/bin/norn"
 fi
 
-# ctx_get <key>: a string field of the flat plugin context JSON (no jq needed).
+# json_get <key>: a string field of the flat JSON on stdin (no jq needed); escaped quotes are kept.
+json_get() {
+  sed -nE "s/.*\"$1\":\"(([^\"\\\\]|\\\\.)*)\".*/\\1/p"
+}
+
+# ctx_get <key>: a string field of the plugin context JSON.
 ctx_get() {
-  printf '%s' "$CTX" | sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p"
+  printf '%s' "$CTX" | json_get "$1"
 }
 
 # The directory the cockpit runs in: the focused pane's, else the workspace's, else $PWD.

@@ -6,7 +6,7 @@ Status: draft for review · Amends `.agents/PRD.md` · Fixes gap 1 (F8) and gap 
 
 Two gaps from the Todoist dogfood run would hurt a Scrum team more than they hurt one person:
 
-1. **Stale story branches (F8).** A story branch is cut from the base at intake and never sees the base again. When a sibling story merges, the others fall behind; in the dogfood run a person merged `main` into story branches by hand four times, and conflict resolution after `$done` happened outside norn — invisible to receipts, the trace and `norn why`. A sprint with five stories against one base turns this into daily manual work.
+1. **Stale story branches (F8).** A story branch is cut from the base at intake and never sees the base again. When a sibling story merges, the others fall behind; in the dogfood run a person merged `main` into story branches by hand four times, and conflict resolution after `$done` happened outside norn — invisible to receipts, the trace and `norn run view --why`. A sprint with five stories against one base turns this into daily manual work.
 2. **QA that can only say pass or fail (F30, F37).** QA has no outcome for "I could not check this here" (a browser criterion without a browser) and no way to pass while leaving a question for a person. Agents picked the closest wrong outcome (`partial`) or buried the question in `handoff.md`. "Never pass what you did not observe" is prose in a skill, not a rule the code enforces.
 
 ## 2. Topology this must fit
@@ -53,7 +53,7 @@ Non-goals (this spec):
     conflicts: string[];    // paths that would conflict, [] when a merge would be clean
   }
   ```
-  `conflicts` comes from `git merge-tree --write-tree --name-only --no-messages <story_head> <base_sha>` and is computed only when `behind > 0` and the pair (story head, base sha) changed since last tick (cache in `.agents/norn/trace/base.json`; the facts themselves are recorded in the trace as today, so `norn why` replays them).
+  `conflicts` comes from `git merge-tree --write-tree --name-only --no-messages <story_head> <base_sha>` and is computed only when `behind > 0` and the pair (story head, base sha) changed since last tick (cache in `.agents/norn/trace/base.json`; the facts themselves are recorded in the trace as today, so `norn run view --why` replays them).
 - BS2 `norn doctor` requires git ≥ 2.38 (for `merge-tree --write-tree`) and refuses to start a heartbeat otherwise.
 
 ### 4.2 The `update` git action
@@ -73,7 +73,7 @@ Non-goals (this spec):
   - Run the slice/story check commands before reporting and fix what the merge broke; the `test` step after `update` re-checks anyway.
   On `done` the workflow returns to `update`, which now finds `behind == 0` (or a new, smaller gap if the base moved again).
   The agent's merge commit is not a foreign commit (Q6): a commit made during a run of the unit (from its first to its last receipt, open-ended while the unit runs or is parked on an ask, e.g. a permission prompt) is the agent's (dogfood C4).
-  `norn done` in base mode is refused (`merge_unfinished`) unless the merge is concluded: no merge or rebase in progress, no unmerged path, the base sha an ancestor of HEAD, and no conflict marker in the conflicting paths or the files changed since the merge commit. The done receipt records `base_merge {sha, merge, head}`; `norn why` and `norn status` show the merge commit (audit).
+  `norn done` in base mode is refused (`merge_unfinished`) unless the merge is concluded: no merge or rebase in progress, no unmerged path, the base sha an ancestor of HEAD, and no conflict marker in the conflicting paths or the files changed since the merge commit. The done receipt records `base_merge {sha, merge, head}`; `norn run view --why` and `norn status` show the merge commit (audit).
   norn's own commits never conclude an agent's merge: while the worktree has `MERGE_HEAD`, a rebase, a cherry-pick or unmerged paths, norn commits nothing there (git cannot commit some paths mid-merge) and records why in the trace; its runs/ files go with the next commit after. A norn commit whose staged changes add conflict markers is refused (a failed `commit` effect, Unblock item), so nothing with markers is pushed (audit H1).
 - BS5.1 **A deferred commit never takes the unit's turn** (dogfood D3). Observe reports the operation in progress per worktree (`worktree.in_progress`). While one is, the owed recovery commit is not decided at all (act could only defer it): the unit's other rules run as usual — an implicit ask on a second prompt mid-merge, `died`, `silent`, `stalled`, `timeout`. The commit follows once the merge is concluded.
 - BS5.2 **Nothing with conflict markers is published** (dogfood D5). Before any push of a story or slice branch, norn looks at the files changed by the commits not yet on any `<remote>` ref (merge commits against their first parent). If one still holds both an opening `<<<<<<< ` and a closing `>>>>>>> ` marker line (with the label; a lone `=======` is a setext heading) at the head being pushed, the push is held: a failed `push` effect (`ok: false`, Unblock item) naming each file and the newest outgoing commit that changed it. A follow-up commit that removes the markers releases it; norn never rewrites the branch.
@@ -89,17 +89,17 @@ Non-goals (this spec):
   It is reserved (W7) and applies only if the gate declares a `stale` route; otherwise no classification happens and only the inbox item (BS10) appears.
 - BS7 A story is **stale** when `base.conflicts` is non-empty (default) or, with workflow field `base: { stale: behind }`, when `base.behind > 0`. `behind` suits repos whose host requires branches to be up to date before merge.
 - BS8 Taking a `stale` route writes a `classify` receipt `{outcome: stale, rule: "base moved", detail: "<n> behind, conflicts: …"}`. Like every cycle (W4), the edge back must carry a counter; the default uses `stale_loop: { max: 10 }`: a stale re-entry is progress from outside, bounded by the number of sibling merges (dogfood C3).
-- BS9 **After `$done`, before the merge.** The story unit is done but its PR is open (GR6 has not fired). A new verb `norn update <story>` re-enters the step named by the workflow field `base.step` (default: the first step with `action: update`):
+- BS9 **After `$done`, before the merge.** The story unit is done but its PR is open (GR6 has not fired). A new verb `norn story update-branch <story>` re-enters the step named by the workflow field `base.step` (default: the first step with `action: update`):
   - allowed when the story unit is done with an unmerged PR, parked at a gate, or parked stuck, and this checkout holds the claim (T7); refused otherwise with `do_instead`;
   - writes a new receipt kind `update` `{from: <step or "$done">, to: <step>, reason: "person" }` before the state change (P6, S5);
   - re-entering from `$done` sets the unit back to running at `to`; the ready gate must then be passed again (the head changes, F35). The old approval no longer pins the head: `ready_head_sha` comes only from an `approve` receipt newer than the unit's last re-entry (`update`, `workflow`) (dogfood C5).
   It is never triggered by the tick on a done unit — a done unit only moves when a person says so.
 - BS10 Inbox:
-  - Check group, one item per story that is stale (BS7) and not routed by BS6: `gh-3 conflicts with main in a.ts, b.ts (4 behind)`, command `norn update gh-3`, id `stale:<story>:<base_sha>`.
-  - The existing "Merge PR #N" item gains detail `behind main by N` and, when conflicting, its command becomes `norn update <story>`.
-  - BS10.1 (dogfood D1): the `stale:*` item appears only where `norn update` is the next thing to do — the story unit parked at a gate without a `stale` route, or stuck in a step other than an `update` step and the step its `conflict` routes to (resolve). Never for an ask (a permission prompt parks the unit in any step), nor while the story is in update or resolve.
+  - Check group, one item per story that is stale (BS7) and not routed by BS6: `gh-3 conflicts with main in a.ts, b.ts (4 behind)`, command `norn story update-branch gh-3`, id `stale:<story>:<base_sha>`.
+  - The existing "Merge PR #N" item gains detail `behind main by N` and, when conflicting, its command becomes `norn story update-branch <story>`.
+  - BS10.1 (dogfood D1): the `stale:*` item appears only where `norn story update-branch` is the next thing to do — the story unit parked at a gate without a `stale` route, or stuck in a step other than an `update` step and the step its `conflict` routes to (resolve). Never for an ask (a permission prompt parks the unit in any step), nor while the story is in update or resolve.
   - BS10.2 (dogfood D6): the F35 head-changed item compares the ready approval's head only with a PR fetched this tick or one seen after the approval; a PR remembered from before the approval is not compared.
-  - PRs are fetched only on sync ticks. Each checkout keeps the last PR seen per story with its observation time (`.agents/norn/trace/pr.json`, fact `story.pr_seen`); the PR items (merge, BS11 retarget, F35 head changed) use it between syncs and in the read model (`norn inbox`, `status`), so they neither flicker nor go missing. Decide acts only on a PR fetched this tick (dogfood C1).
+  - PRs are fetched only on sync ticks. Each checkout keeps the last PR seen per story with its observation time (`.agents/norn/trace/pr.json`, fact `story.pr_seen`); the PR items (merge, BS11 retarget, F35 head changed) use it between syncs and in the read model (`norn status`, `story list`), so they neither flicker nor go missing. Decide acts only on a PR fetched this tick (dogfood C1).
 
 - BS11 **Merged means merged into the base.** GR6 cleanup fires only when the PR's base branch equals the story's base branch (BS0). A PR merged into any other branch parks the story with reason `remote: PR merged into <branch>, not <base>` (GR7) — the lesson from old norn 0.1.1, where a merge into the wrong base skipped story review. Retargeting a PR is reported as a Check item.
 
@@ -170,12 +170,12 @@ base: { stale: conflict }
   ```
   A workflow may instead route `unverified` to another agent step whose `agent`/`model` has the capability (e.g. a browser-equipped runner). The default routes to a person, because norn does not yet know which runner has which capability.
 - QV7 The `human-qa` gate's inbox item and brief list the `person` and `unverified` criteria from the last QA `done` receipt with `reason` and `how` — the person sees what to check without opening a file.
-- QV8 Trace and `norn trace` count `unverified` per capability in `needs`, so "we keep failing to verify browser criteria" shows up as data.
+- QV8 Trace and `norn run list` count `unverified` per capability in `needs`, so "we keep failing to verify browser criteria" shows up as data.
 
 ### 5.4 Notes for a person
 
 - NT1 Every `norn done` accepts `--note "<text>"` (repeatable, optional `--note-criterion AC3`). Notes are stored in the `done` receipt (`notes: [{text, criterion?}]`). They never block and never change the route.
-- NT2 Each note becomes a Check-group inbox item `note:<receipt_id>:<n>`: `QA note on gh-4/01 (AC3): …`, command `norn why gh-4/01 --receipt <id>`.
+- NT2 Each note becomes a Check-group inbox item `note:<receipt_id>:<n>`: `QA note on gh-4/01 (AC3): …`, command `norn run view gh-4/01 --receipt <id>`.
 - NT3 Every story-level gate (`human-qa`, `ready`) lists the story's open notes in its inbox detail and brief. Approving that gate records the note ids in the `approve` receipt (`acknowledged_notes`); acknowledged notes leave the inbox. Rejecting leaves them open.
 - NT4 The qa skill states when to use a note instead of `person`: the criterion passed as written, but the person may disagree with the reading (F37: whitespace inside backticks vs AC3).
 
@@ -189,12 +189,12 @@ base: { stale: conflict }
 | `Receipt` | new kind `update` (13 kinds); `done.criteria`, `done.notes`; `approve.acknowledged_notes` |
 | Frontmatter | `criteria` on slice and story |
 | New schema | `CriteriaReport` |
-| CLI | `norn update <story>`; `norn done --criteria --note --note-criterion`; refusals `invalid_criteria`, `pass_without_capability`, `outcome_contradicts_verdicts` |
+| CLI | `norn story update-branch <story>`; `norn done --criteria --note --note-criterion`; refusals `invalid_criteria`, `pass_without_capability`, `outcome_contradicts_verdicts` |
 | Inbox | items `stale:*`, `note:*`; merge item detail; gate details |
 | Skills | `merge` (base mode), `qa` (verdicts, report file, notes), `slice` (frontmatter `criteria`) |
 | PRD | §5 glossary adds **verdict** and **note**; §10 table adds `stale`; §11 W2/W7; §12 adds BS0–BS10 after GR8 |
 
-Every change ships with its tests, the emitted JSON schemas (`bun run schema:emit`) and updated templates in `packages/cli/assets/workflows/`. Pinned workflows of units already in flight are unchanged (S7); they get the new behaviour only via `norn workflow <unit> <name> --to <step>`.
+Every change ships with its tests, the emitted JSON schemas (`bun run schema:emit`) and updated templates in `packages/cli/assets/workflows/`. Pinned workflows of units already in flight are unchanged (S7); they get the new behaviour only via `norn story edit <unit> --workflow <name> --at <step>`.
 
 ## 7. Acceptance
 
@@ -204,7 +204,7 @@ Unit and replay tests (core, by replaying traces, X4):
 3. `base_conflict_loop` exhausted → `$stuck` with reason.
 4. Story waits at `ready`, sibling merge makes `conflicts` non-empty → `stale` → `update`; same with `stale: behind` and a clean merge.
 5. Gate without a `stale` route → no classification, Check item `stale:*` only.
-6. `norn update` on a done, unmerged story → `update` receipt, unit running at `update`; on a merged story → refused; without the claim → refused.
+6. `norn story update-branch` on a done, unmerged story → `update` receipt, unit running at `update`; on a merged story → refused; without the claim → refused.
 7. Remote story branch fast-forwarded by a person → `update` adopts it; diverged → `update` merges it (BS3.3a); diverged into a conflict → `$stuck` naming the paths. A rejected push of a `$done` story's branch takes the person's commit in by a merge and pushes.
 7a. `resolve` agent reports `stuck` (no resolution without new behaviour) → `$stuck` with its reason, merge aborted, worktree clean.
 7b. PR merged into a branch other than the base → no cleanup, story parked `remote: PR merged into …`; config `base_branch: develop` → `update` and `open-pr` use `develop`.
@@ -214,5 +214,5 @@ Unit and replay tests (core, by replaying traces, X4):
 11. Host-less: with no git remote, BS0 uses `refs/heads/<base>` and cases 1–4 pass.
 
 Sandbox dogfood (the verification gap 1 asks for):
-- Three checkouts of the sandbox, each with its own claim holder (separate `heartbeat.json`), run three stories that touch the same files against one base. Merge them one by one. Pass when no person runs `git merge`/`git rebase` in a story worktree, every conflict resolution is visible in receipts and `norn why`, and each story reaches `ready` with `behind == 0`.
+- Three checkouts of the sandbox, each with its own claim holder (separate `heartbeat.json`), run three stories that touch the same files against one base. Merge them one by one. Pass when no person runs `git merge`/`git rebase` in a story worktree, every conflict resolution is visible in receipts and `norn run view --why`, and each story reaches `ready` with `behind == 0`.
 - One story's QA runs without a browser and must end at `human-qa` via `unverified`, with `how` shown in the inbox.
