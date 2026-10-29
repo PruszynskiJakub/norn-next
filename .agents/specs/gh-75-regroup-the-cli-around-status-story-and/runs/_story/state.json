@@ -5,7 +5,7 @@
   "unit_dir": "_story",
   "workflow": "story",
   "workflow_hash": "bd5ef0fbb2da1f4313555a687d9e9ce40829c98ae5c6398e299646accc1ffe05",
-  "step": "update",
+  "step": "resolve",
   "attempt": 1,
   "visits": {
     "refine": 1,
@@ -13,9 +13,10 @@
     "slice": 1,
     "approve-plan": 1,
     "slices": 2,
-    "update": 1
+    "update": 1,
+    "resolve": 1
   },
-  "step_entered_at": "2026-10-29T20:48:23.137Z",
+  "step_entered_at": "2026-10-29T20:49:23.133Z",
   "status": "ready",
   "park": null,
   "counters": {
@@ -23,22 +24,22 @@
     "test_loop": 0,
     "qa_loop": 0,
     "ready_loop": 0,
-    "base_conflict_loop": 0,
+    "base_conflict_loop": 1,
     "stale_loop": 0
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 11,
+  "applied_through": 12,
   "run": null,
   "last_outcome": {
-    "step": "slices",
-    "outcome": "done",
+    "step": "update",
+    "outcome": "conflict",
     "source": "classified",
-    "at": "2026-10-29T20:48:23.137Z",
-    "receipt_id": "01M64PQGJM53M2YZAX99W1K6V2"
+    "at": "2026-10-29T20:48:58.812Z",
+    "receipt_id": "01M64PRKDWJXJ2BKB85XZKQEF4"
   },
   "created_at": "2026-10-28T08:51:06.916Z",
-  "updated_at": "2026-10-29T20:48:23.137Z",
-  "last_tick_id": "01M64PQGJMGSF0NQCPTVN2CM66",
+  "updated_at": "2026-10-29T20:49:23.133Z",
+  "last_tick_id": "01M64PSB5VY7JQJY86F5PR8YHM",
   "mode": "auto"
 }
