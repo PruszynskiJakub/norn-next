@@ -10,7 +10,7 @@ labels:
   - norn
   - norn:wf:story
 workflow: story
-status: new
+status: active
 intake_at: 2026-10-29T10:58:15.394Z
 body_hash: 3361cb8be93fd6e3cbe16527e24140e3ab53b191f807731de5af39a2c7ee13c3
 ---
