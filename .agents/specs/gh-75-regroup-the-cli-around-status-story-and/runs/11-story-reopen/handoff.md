@@ -14,6 +14,17 @@
 
 ## Goal
 
+`norn story reopen [<story>]` undoes a close (B40–B42, B55): re-claim, restore worktrees, `story.md` back to `active`, running units back stuck (`reopened`).
+
 ## Progress
 
+- `packages/cli/test/story-reopen.test.ts` (S1) covers AC1–AC5: three refusals (`not_closed`, `issue_closed` "reopen the issue first", `branch_missing` naming the branch), the pick-list of closed stories only, restore + one story-branch commit, stuck `reopened` → Unblock, not relaunched, `run rerun` resumes, reopen from a left-behind slice marker, reopen after the base moved.
+- `runtime/closed.ts`: the pushed record read (moved out of `story-close.ts`, which now uses it), closed-story listing for the prompt, started (`active`) slices whose branches must be on the remote.
+- `runtime/checkout.ts` `checkoutStory` takes an optional `CheckoutRecord` so reopen's `story.md` patch and the story unit's stuck receipt go in the same commit as the take receipt (one commit).
+- `TargetRule.candidates`: a verb can offer units not in the read model (closed stories have no worktree).
+- Decision: the `reopened` stuck receipts are applied by the next tick (as `run cancel` does); right after reopen and before a tick, status still shows the unit running.
+- AC4: reopen does not merge the base; this test workflow has no `git: update` step, so the test asserts ticks after reopen go on without a failed decision and the base is not merged by reopen.
+
 ## Resume
+
+Run `bun test` and `bun run typecheck`, commit, then `norn done done`.
