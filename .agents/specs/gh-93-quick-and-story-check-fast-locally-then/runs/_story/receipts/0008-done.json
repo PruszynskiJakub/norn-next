@@ -1,0 +1,12 @@
+{
+  "kind": "done",
+  "receipt_id": "01M63WKDWX4S1CGJH3PJSSQZMK",
+  "run_id": "01M63WGQV08QE204CGY09VH89W",
+  "step": "describe",
+  "attempt": 1,
+  "at": "2026-10-29T13:11:46.334Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "done",
+  "handoff": "pr.md written: summary diagram of test:fast + new ci step, evidence (422 s full-suite check before vs test:fast 40.5 s after, repo.test assertions; live ci step not yet exercised), merge danger two-way with the failed-log lookup gap noted."
+}
