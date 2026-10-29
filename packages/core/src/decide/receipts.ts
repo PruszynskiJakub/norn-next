@@ -95,6 +95,12 @@ export const nextReceiptNumber = (uf: UnitFacts): number =>
 /** H1: a merge, rebase, cherry-pick or revert (or unmerged paths) in progress in the unit's worktree. */
 export const gitBusy = (uf: UnitFacts): boolean => !!uf.worktree?.in_progress && (!!uf.worktree.in_progress.operation || uf.worktree.in_progress.unmerged.length > 0);
 
+/**
+ * gh-79 (H1, S5): a rebase waiting in the unit's worktree. HEAD is detached on an older commit, so
+ * the working tree's `runs/` is rewound: its state.json and receipts are not the live unit's.
+ */
+export const rebasing = (uf: UnitFacts): boolean => uf.worktree?.in_progress?.operation === "rebase";
+
 export function unitBranch(story: StoryFacts, uf: UnitFacts | null): string {
   if (!uf || uf.unit.slice === null) return story.branch;
   const file = sliceFileOf(story, uf.unit.slice);

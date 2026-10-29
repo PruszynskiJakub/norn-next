@@ -1,0 +1,46 @@
+bun test v1.3.13 (bf2e2cec)
+
+packages/cli/test/rebase-rewind.repro.ts:
+86 |   test("mid-rebase the tick writes nothing into the rewound runs/", async () => {
+87 |     expect(() => sh(wt(), ["rebase", "old"])).toThrow(/conflict/i);
+88 |     expect(h.state(runs())).toMatchObject({ step: "first", applied_through: 1 }); // rewound
+89 |     h.clock.advance(5 * 60_000); // first's 1m deadline (from the run's start) is long past
+90 |     const r = await h.tick();
+91 |     expect(acted(r)).toEqual([]); // red: ["agent.timeout.surface"]
+                          ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   "agent.timeout.surface",
++ ]
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-79-a-tick-mid-rebase-acts-on-rewound-runs/packages/cli/test/rebase-rewind.repro.ts:91:22)
+(fail) gh-79: a tick mid-rebase > mid-rebase the tick writes nothing into the rewound runs/ [544.59ms]
+94 | 
+95 |   test("after `git rebase --abort` the unit is not corrupt", async () => {
+96 |     sh(wt(), ["rebase", "--abort"]);
+97 |     h.clock.advance(30_000);
+98 |     const r = await h.tick();
+99 |     expect(acted(r)).toEqual([]); // red: ["unit.corrupt"] (duplicate receipt number 2, also 0002-classify.json)
+                          ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   "unit.corrupt",
++ ]
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-79-a-tick-mid-rebase-acts-on-rewound-runs/packages/cli/test/rebase-rewind.repro.ts:99:22)
+(fail) gh-79: a tick mid-rebase > after `git rebase --abort` the unit is not corrupt [273.15ms]
+
+ 0 pass
+ 2 fail
+ 4 expect() calls
+Ran 2 tests across 1 file. [4.26s]

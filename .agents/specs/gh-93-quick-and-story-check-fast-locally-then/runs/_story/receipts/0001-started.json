@@ -1,0 +1,18 @@
+{
+  "kind": "started",
+  "receipt_id": "01M63Q77733NJR5H9JQ22ARZMF",
+  "run_id": "01M63Q77733NJR5H9JQ22ARZME",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-29T11:37:43.594Z",
+  "by": "agent",
+  "who": "claude",
+  "how": "manual",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-93-quick-and-story-check-fast-locally-then",
+  "agent_session_id": "a511556c-3326-4c91-adf8-7065351b9590",
+  "process": {
+    "pid": 30495,
+    "pid_start": "Thu Oct 29 12:37:32 2026"
+  }
+}

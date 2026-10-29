@@ -17,7 +17,7 @@ import type { SliceFileFacts, StoryFacts, UnitFacts, UnitRef } from "../facts.ts
 import { sha256 } from "../hash.ts";
 import { unitWorktree } from "../policy.ts";
 import { checkWorkflowLevel, stepOf, type UnitLevel } from "../workflow.ts";
-import { commitFor, type Ctx, emitApplied, nextReceiptNumber, nornReceipt, park, synth, trailersFor, unitBranch } from "./receipts.ts";
+import { commitFor, type Ctx, emitApplied, nextReceiptNumber, nornReceipt, park, rebasing, synth, trailersFor, unitBranch } from "./receipts.ts";
 
 // ---------------------------------------------------------------- start
 
@@ -197,14 +197,20 @@ function slicesStuck(story: StoryFacts): { rule: string; detail: string } | null
   if (done.size === files.length || startable.length) return null;
   const activeUnits = files.filter((s) => !done.has(s.key) && unitOf(s.key)?.state);
   const isStuck = (s: SliceFileFacts) => {
-    const status = unitOf(s.key)?.state?.status;
+    const u = unitOf(s.key);
+    // gh-79 (H1): a rebasing slice's state is a rewound copy; it is held, so it still progresses
+    if (u && rebasing(u)) return false;
+    const status = u?.state?.status;
     return status === "stuck" || status === "corrupt";
   };
   // running or parked slices still progress
   const stuckSlices = activeUnits.filter(isStuck);
   if (stuckSlices.length && stuckSlices.length === activeUnits.length) {
-    const named = stuckSlices.map((s) => `slice ${s.key} stuck: ${unitOf(s.key)?.state?.park?.reason ?? "?"}`);
-    return { rule: "slices.slice_stuck", detail: `${named.join("; ")} — norn unstick ${stuckSlices[0]?.key}` };
+    const corrupt = (s: SliceFileFacts) => unitOf(s.key)?.state?.status === "corrupt";
+    const named = stuckSlices.map((s) => (corrupt(s) ? `slice ${s.key} corrupt (S2)` : `slice ${s.key} stuck: ${unitOf(s.key)?.state?.park?.reason ?? "?"}`));
+    // gh-79: unstick refuses a corrupt unit, so a corrupt one is pointed at norn why
+    const first = stuckSlices[0] as SliceFileFacts;
+    return { rule: "slices.slice_stuck", detail: `${named.join("; ")} — norn ${corrupt(first) ? "why" : "unstick"} ${first.key}` };
   }
   if (!activeUnits.length) {
     const blocked = pending.map((s) => `${s.key} waits for ${s.frontmatter.depends_on.filter((d) => !done.has(d)).join(", ")}`);
