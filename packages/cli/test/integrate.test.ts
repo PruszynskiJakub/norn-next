@@ -123,6 +123,26 @@ describe("integrate (W2, K6)", () => {
     expect(await sh(story, "show", "HEAD:a.txt")).toBe("both sides");
     expect((await git.status(story)).clean).toBe(true);
   });
+
+  test("the resolution stays when the story branch moves on after the merge step (gh-80)", async () => {
+    const { story, slice } = await storyAndSlice();
+    writeFileSync(join(story, "a.txt"), "story side\n");
+    await git.commit(story, { message: "story edit", trailers: {} });
+    writeFileSync(join(slice, "a.txt"), "slice side\n");
+    await git.commit(slice, { message: "slice edit", trailers: {} });
+    expect((await bunExec(["git", "merge", "--no-ff", "gh-4-s"], { cwd: slice, env: ENV })).code).toBe(1);
+    writeFileSync(join(slice, "a.txt"), "both sides\n");
+    await sh(slice, "commit", "-qam", "resolve");
+    // another slice integrates while the merge step ran
+    writeFileSync(join(story, "b.txt"), "other slice\n");
+    await git.commit(story, { message: "other slice", trailers: {} });
+    const res = await integrate(git, { sliceCwd: slice, storyBranch: "gh-4-s", trailers: { "Norn-Tick": "t1" } });
+    expect(res.outcome).toBe("done");
+    expect(await sh(story, "show", "HEAD:a.txt")).toBe("both sides");
+    expect(await sh(story, "show", "HEAD:b.txt")).toBe("other slice");
+    expect(await sh(story, "log", "-1", "--format=%(trailers:key=Norn-Tick,valueonly)")).toBe("t1");
+    expect((await git.status(story)).clean).toBe(true);
+  });
 });
 
 describe("update and remote sync (BS3, BS3.3a)", () => {

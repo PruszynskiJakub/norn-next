@@ -587,7 +587,10 @@
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:13> "^<sha:1>" --
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rebase --rebase-merges gh-7-add-login-form
+  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-list --left-right --count HEAD...gh-7-add-login-form --
+  spawn repo-worktrees/gh-7-add-login-form--01-form $ git merge-base HEAD gh-7-add-login-form
+  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-list --merges --ancestry-path --reverse <sha:7>..HEAD --
+  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rebase gh-7-add-login-form
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse HEAD
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git worktree list --porcelain -z
   spawn repo-worktrees/gh-7-add-login-form $ git merge --ff-only --no-edit <sha:13>
@@ -695,7 +698,10 @@
   spawn repo-worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
   spawn repo-worktrees/gh-7-add-login-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7-add-login-form -- .agents/specs/gh-7-add-login-form/runs/_story/handoff.md .agents/specs/gh-7-add-login-form/runs/_story/receipts/0004-classify.json .agents/specs/gh-7-add-login-form/runs/_story/state.json
   spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rebase --rebase-merges gh-7-add-login-form
+  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-list --left-right --count HEAD...gh-7-add-login-form --
+  spawn repo-worktrees/gh-7-add-login-form--01-form $ git merge-base HEAD gh-7-add-login-form
+  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-list --merges --ancestry-path --reverse <sha:13>..HEAD --
+  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rebase gh-7-add-login-form
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse HEAD
   spawn repo-worktrees/gh-7-add-login-form $ git merge --ff-only --no-edit <sha:16>
   spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD

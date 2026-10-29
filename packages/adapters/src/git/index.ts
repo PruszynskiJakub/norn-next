@@ -435,9 +435,7 @@ export function createGit(opts: GitOptions = {}): GitPort {
       return { ok: (await run(cwd, ["merge", "--ff-only", "--no-edit", onto])).code === 0 };
     },
     async rebase(cwd, onto) {
-      // gh-80 (W2, W4): keep merge commits — a conflict the merge step resolved by merging `onto`
-      // in stays resolved instead of being linearised away and conflicting again
-      const r = await run(cwd, ["rebase", "--rebase-merges", onto]);
+      const r = await run(cwd, ["rebase", onto]);
       if (r.code === 0) return { ok: true, head: await line(cwd, ["rev-parse", "HEAD"]) };
       if (!(await rebaseInProgress(cwd))) okOrThrow(r, "git rebase", "git"); // e.g. dirty tree: not a conflict
       const files = lines((await run(cwd, ["diff", "--name-only", "--diff-filter=U"])).stdout);
