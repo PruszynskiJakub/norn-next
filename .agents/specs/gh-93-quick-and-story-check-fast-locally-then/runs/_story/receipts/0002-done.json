@@ -1,0 +1,12 @@
+{
+  "kind": "done",
+  "receipt_id": "01M63QPTMQWRVX50XCM3HFX9SP",
+  "run_id": "01M63Q77733NJR5H9JQ22ARZME",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-29T11:46:14.807Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "done",
+  "handoff": "quick and story: test check runs test:fast; new ci check after open-pr waits for PR CI (gh pr checks --watch), fail → implement via ci_loop (max 3). repo.test.ts asserts both (new test red first); AGENTS.md updated; fix.yaml and the shipped story asset untouched. Full suite + typecheck green."
+}

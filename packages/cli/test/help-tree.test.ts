@@ -97,14 +97,14 @@ describe("noun help (B2)", () => {
 });
 
 describe("norn help --all (B3)", () => {
-  test("everything in help plus tick, hook and status --segment", async () => {
+  test("everything in help plus tick, hook, check-run and status --segment", async () => {
     const plain = (await h.norn("help")).value as Help;
     const r = await h.norn("help", "--all");
     expect(r.exit).toBe(0);
     const rows = sections(r.stdout).flatMap((x) => x.rows);
-    for (const c of [...CORE, ...SETUP, ...BACKGROUND, ...PROTOCOL, "tick", "hook", "status --segment"]) expect(rows).toContain(c);
+    for (const c of [...CORE, ...SETUP, ...BACKGROUND, ...PROTOCOL, "tick", "hook", "check-run", "status --segment"]) expect(rows).toContain(c);
     const all = (r.value as Help).commands.map((c) => c.command);
-    expect(all.sort()).toEqual([...plain.commands.map((c) => c.command), "tick", "hook", "status --segment"].sort());
+    expect(all.sort()).toEqual([...plain.commands.map((c) => c.command), "tick", "hook", "check-run", "status --segment"].sort());
     expect((r.value as Help).tiers.flatMap((t) => t.commands).sort()).toEqual(all.sort());
   });
 });

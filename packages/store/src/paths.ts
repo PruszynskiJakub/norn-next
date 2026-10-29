@@ -2,9 +2,10 @@
  * Repository layout (§7). Every function returns an absolute path from a root
  * (the main checkout or a story worktree — both hold the same relative layout).
  */
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName } from "@norn/schema";
+import { LEGACY_SPEC_FILE, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName } from "@norn/schema";
 
 const NORN_DIR = ".agents/norn";
 
@@ -32,7 +33,15 @@ export const baseCacheDir = (root: string) => join(traceDir(root), "base");
 
 export const specsDir = (root: string) => join(root, SPECS_DIR);
 export const storyDir = (root: string, story: string, slug: string) => join(specsDir(root), storyDirName(story, slug));
-export const storyFile = (specDir: string) => join(specDir, "story.md");
+/**
+ * GR2: the story's spec file — `spec.md`, or `story.md` in a folder an older norn intook and that has
+ * no `spec.md` yet. Both readers and writers go through here, so such a folder keeps its name.
+ */
+export function storyFile(specDir: string): string {
+  const spec = join(specDir, SPEC_FILE);
+  const legacy = join(specDir, LEGACY_SPEC_FILE);
+  return !existsSync(spec) && existsSync(legacy) ? legacy : spec;
+}
 export const slicesDir = (specDir: string) => join(specDir, "slices");
 export const sliceFile = (specDir: string, nn: string, slug: string) => join(slicesDir(specDir), `${sliceDirName(nn, slug)}.md`);
 
@@ -58,3 +67,6 @@ export function nornHome(override?: string, env: Record<string, string | undefin
 }
 export const userConfigPath = (home: string) => join(home, "config.yaml");
 export const leasesDir = (home: string) => join(home, "leases");
+/** Check orders a tick hands a detached `norn check-run` (C5): `<run_id>.json`, removed by that process. */
+export const checkOrdersDir = (home: string) => join(home, "checks");
+export const checkOrderPath = (home: string, runId: string) => join(checkOrdersDir(home), `${runId}.json`);

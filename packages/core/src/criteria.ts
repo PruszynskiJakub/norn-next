@@ -35,7 +35,7 @@ export interface CriteriaCheckInput {
   outcome: string;
   /** the `--criteria` report, already schema-valid (CriteriaReport); null = none given */
   report: readonly CriterionVerdict[] | null;
-  /** the unit's frontmatter `criteria` (slice file, or story.md for the story unit); null = none declared */
+  /** the unit's frontmatter `criteria` (slice file, or spec.md for the story unit); null = none declared */
   criteria: readonly Criterion[] | null;
   /** `--note` values (NT1) */
   notes: readonly Note[];

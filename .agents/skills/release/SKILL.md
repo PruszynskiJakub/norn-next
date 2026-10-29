@@ -1,16 +1,16 @@
 ---
 name: release
-description: Prepare a norn release on the release story's branch — rebuild the changelog from the squash commits on main since the last tag, propose the version with its reason (or apply the one the person gave), bump packages/cli/package.json, the README release badge and the Claude Code plugin, and rename the release issue to "Release X.Y.Z". Use in the `release` workflow's `prepare` step.
+description: Prepare a norn release on the release story's branch — rebuild the changelog from the squash commits on main since the last tag, propose the version with its reason (or apply the one the person gave), bump packages/cli/package.json and the README release badge, and rename the release issue to "Release X.Y.Z". Use in the `release` workflow's `prepare` step.
 ---
 
 # Release: prepare
 
-You write what the release says and which version it is. A person confirms the version at the gate after you; tests, the build and the smoke run come after that. Follow the `norn` skill for the brief and the report; this skill is the craft.
+You write what the release says and which version it is. norn then opens the draft PR with your pr.md as its body and waits for the PR's CI (tests, the build and the smoke run); a person judges the version and the changelog at the `ready` gate after that. Follow the `norn` skill for the brief and the report; this skill is the craft.
 
 ## 1. Inputs
 
-- `story.md`: the release issue's body, with `## Version` (empty: you propose), `## Must include` (PRs to wait for) and `## Notes` (put into the changelog as asked).
-- The brief's **Rework** section, if any: the person rejected the version at the gate. A version named there wins over everything; apply it and do not argue it again. Any other point there comes first too.
+- The spec file (`spec.md`, or `story.md` in a story intaken by norn before the rename): the release issue's body, with `## Version` (empty: you propose), `## Must include` (PRs to wait for) and `## Notes` (put into the changelog as asked).
+- The brief's **Rework** section, if any: the person rejected the release at the `ready` gate. A version named there wins over everything; apply it and do not argue it again. Any other point there comes first too.
 - Each PR under Must include: `gh pr view <n> --json state`. One not merged → `norn stuck "waiting for #<n> to merge"`.
 
 ## 2. Collect the commits
@@ -24,7 +24,7 @@ git log --first-parent --format='%h%x09%s' "$last"..origin/main
 Every commit on main is one squashed PR: title `<PR title> (#<pr>)`, body the PR description with `Closes #<issue>`. For each:
 
 1. `gh pr view <pr> --json title,body,author,labels,closingIssuesReferences`.
-2. The workflow that delivered it: `workflow:` in the frontmatter of `.agents/specs/gh-<issue>-*/story.md` on `origin/main` (`git show`). The issue's `norn:wf:*` label only picks the first workflow, and a triaged issue was switched after it (W9); use the label only when there is no `story.md`.
+2. The workflow that delivered it: `workflow:` in the frontmatter of `.agents/specs/gh-<issue>-*/spec.md` on `origin/main` (`git show`; `story.md` in a story intaken before the rename). The issue's `norn:wf:*` label only picks the first workflow, and a triaged issue was switched after it (W9); use the label only when there is neither file.
 3. Its section:
 
 | Workflow | Section |
@@ -34,7 +34,7 @@ Every commit on main is one squashed PR: title `<PR title> (#<pr>)`, body the PR
 | `quick`, bypass PR | your call from the diff: a change users notice goes under Changed or Fixed; docs-only, tests, CI and internal refactors are omitted |
 | `spec`, `release`, `triage` (closed), dependabot | omitted |
 
-Write the commit → section (or omitted, with why) list under Progress in handoff.md, so the person sees it at the gate.
+Write the commit → section (or omitted, with why) list under Progress in handoff.md, so the person sees it at the `ready` gate.
 
 ## 3. Write the changelog
 
@@ -50,7 +50,6 @@ In this order: the version from Rework, else the one in `## Version`, else your 
 
 - `version` in `packages/cli/package.json`.
 - The README release badge: `badge/release-vX.Y.Z-blue` and its alt text `Release vX.Y.Z`.
-- `bun run sync:plugin`, then `bun run check:plugin` must pass.
 
 On a rework with another version, change the section heading and every bump to it; leave no old version behind (`git grep` the old one in these files).
 
@@ -64,5 +63,5 @@ On a rework with another version, change the section heading and every bump to i
 
 ## Rules
 
-- Change only `CHANGELOG.md`, `packages/cli/package.json`, `README.md`, what `sync:plugin` writes, and `pr.md` in the spec folder (the PR body: the version, its reason and the new changelog section).
+- Change only `CHANGELOG.md`, `packages/cli/package.json`, `README.md` and `pr.md` in the spec folder (the PR body: the version, its reason and the new changelog section).
 - Never tag, publish or push: the merge of the release PR does that in CI.

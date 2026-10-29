@@ -39,6 +39,8 @@ export interface CliDeps {
   shell?: (argv: string[], cwd: string) => Promise<{ code: number; stderr: string }>;
   /** D2: the terminal a person answers prompts in; null = none (no TTY); absent = the process terminal */
   interaction?: Interaction | null;
+  /** a tick started a detached `norn check-run` (C5); `exited` settles when it ends (tests wait on it) */
+  onCheckStarted?: (exited: Promise<void>) => void;
 }
 
 export const systemClock: Clock = {

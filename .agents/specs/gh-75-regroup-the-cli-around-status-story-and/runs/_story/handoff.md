@@ -26,16 +26,16 @@
 
 ## Goal
 
-Cut the agreed Plan of gh-75 into slice files covering B1–B71.
+resolve#1: merge origin/main (13e0986a) into the story branch, resolving 17 conflicts by intent.
 
 ## Progress
 
-- Plan (plan#1) agreed: seams S1–S3, prefactors 1–3, D1–D9 (see story.md Plan).
-- slice#1: wrote 15 slice files in `slices/` (01 noun–verb tree + run list/view; 02 printed-commands module; 03 targets + prompts; 04 status/story list/notice; 05 status --watch + run attach; 06 story view/chat; 07 decision verbs; 08 start/edit; 09 run rerun/cancel; 10 checkout/handoff/close (+ prefactor 3); 11 reopen; 12 create (+ remote contract); 13 config; 14 printed-command rename + full help; 15 docs/plugin/PRD + lint). Script check: frontmatter valid, criteria match Acceptance id for id, deps acyclic and earlier, every B1–B71 cited.
-- Added story-level `criteria` B1–B71 to story.md frontmatter (story QA is `criteria: required`): B8/B71 test, B19 person (real $EDITOR), rest agent.
-- Call left for the person (slice 05 Notes): spec map sends `cockpit --json` → `status --json`, but B10 keeps `status --json` as inbox JSON; slice 05 puts the cockpit model under `status --watch --json`.
-- slice#1 done: 15 slices cover B1–B71: 01 noun–verb tree + run list/view, 02 printed-commands module (parallel), 03 targets+prompts, 04–13 per-noun verbs moving old commands (D1), 14 printed-command rename + full help, 15 docs/plugin/PRD + lint. Story criteria B1–B71 added. Open call in slice 05: cockpit --json lands at status --watch --json.
+- Merged 13e0986a: main's spec.md rename (GR2), check-run (C5), gh-79 corrupt hints, zombie fix, plugin removal, H5 claim batching kept; printed commands moved to the noun–verb names (`run view --why`, `run rerun`, `run list`, `story edit --workflow`, `story start`).
+- `check-run` is a hidden help tier (`for: "tick"`), like hook/tick.
+- Semantic fix: `runtime/closed.ts` (story close/reopen) reads the pushed `spec.md`, falling back to `story.md` (GR2); reopen/close messages and tests say spec.md.
+- Main's new tests moved to the new commands (decide gh-79 test, recovery `story checkout --force`, check-run `status --json` / `story list`, help --all lists check-run).
+- Golden runtime-3aec7a560471 kept main's facts with the `run view --why` command.
 
 ## Resume
 
-Slicing is done; approve-plan reviews story.md's Plan and the slice files.
+If not yet committed: run `bun run typecheck && bun test`, then `git commit --no-edit` on the merge.

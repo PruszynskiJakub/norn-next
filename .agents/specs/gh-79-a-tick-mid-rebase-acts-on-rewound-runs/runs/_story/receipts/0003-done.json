@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M63ENM5S4GZGVN096DAMSV7N",
+  "run_id": "01M63EBXC9NZBFZQ7BRHQPEKP4",
+  "step": "reproduce",
+  "attempt": 1,
+  "at": "2026-10-29T09:08:18.233Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "reproduced",
+  "handoff": "Reproduced as a user with the dev build (rebase stopped on conflicts rewinds runs/; tick classifies the old step's deadline, writes 0002-classify.json + state.json, commit deferred; after rebase --abort the duplicate receipt number marks the unit corrupt, unstick refuses). Loop: bun test ./packages/cli/test/rebase-rewind.repro.ts (deterministic, 2 red). Cause confirmed: decide ignores worktree.in_progress except for recover.commit and acts on the rewound working-tree runs/; act writes files and defers only the commit. A gitBusy hold probe turned the loop green (reverted).",
+  "evidence": "evidence/01M63EBXC9NZBFZQ7BRHQPEKP4"
+}

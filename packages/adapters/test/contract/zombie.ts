@@ -1,8 +1,9 @@
 /**
- * A real zombie process for the ProcessPort contract (K3, refactor plan BUG-3): a short `sleep`
- * runs in the background and exits after its parent has exec'd into `sleep`, which never reaps it.
- * (A child that exits at once can be reaped by `sh` itself before the exec on a loaded machine.)
- * Some platforms (or sandboxes) cannot make one; `zombieSupport` says so once, with the reason, so suites skip instead.
+ * A real zombie process for the ProcessPort contract (K3, refactor plan BUG-3): a background child
+ * waits on its parent's stdin; the parent execs into `sleep`, which never reaps it. The child exits
+ * only once the parent is `sleep` (stdin closed then), never before: a shell reaps a child that exits
+ * before its exec, and under load that left no zombie. Some platforms (or sandboxes) cannot make
+ * one; `zombieUnsupported` says so once, with the reason, so suites skip instead.
  */
 
 export interface Zombie {
@@ -20,10 +21,13 @@ function ps(fields: string, pid: number): string {
 
 /** A zombie, or the reason this platform did not make one. */
 export async function makeZombie(): Promise<Zombie | string> {
-  const p = Bun.spawn(["sh", "-c", "sleep 0.3 & echo $!; exec sleep 10"], { stdout: "pipe" });
+  // fd 3: a non-interactive shell gives a background job /dev/null as its stdin
+  const p = Bun.spawn(["sh", "-c", "exec 3<&0; read _ <&3 & echo $!; exec sleep 10"], { stdin: "pipe", stdout: "pipe" });
   const { value } = await p.stdout.getReader().read();
   const pid = Number(new TextDecoder().decode(value).trim());
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 100 && !/(^|\/)sleep$/.test(ps("comm=", p.pid)); i++) await Bun.sleep(20);
+  p.stdin.end();
+  for (let i = 0; i < 100; i++) {
     if (ps("stat=", pid).startsWith("Z")) return { pid, lstart: ps("lstart=", pid).replace(/\s+/g, " "), stop: () => p.kill() };
     await Bun.sleep(50);
   }

@@ -2,11 +2,11 @@
  * `norn story close [<story>] [--yes]` (B35–B39, GR7): stop working on a story and clean up this
  * machine, keeping the record; the remote issue and PR are left alone.
  *
- * Refused first, before anything changes: a story already closed — its pushed `story.md` says
+ * Refused first, before anything changes: a story already closed — its pushed `spec.md` says
  * `dropped` (D5, B39); a claim another machine holds (B38). Then consent: `--yes`, or y at the
  * terminal (B36); without a terminal (no TTY, `--json`, an agent session) it is refused (B37).
  *
- * Order (nothing is lost): claim it if free (T7: only the holder pushes) → mark `story.md`
+ * Order (nothing is lost): claim it if free (T7: only the holder pushes) → mark `spec.md`
  * `status: dropped` and commit every unit worktree's changes → push story and slice branches
  * (as `story handoff` does) → then remove worktrees, local branches, leases and the claim ref.
  * The spec folder with `runs/` and `handoff.md` stays on the pushed story branch. Without a git
@@ -108,7 +108,7 @@ export const storyCloseCommand = defineCommand({
       if (storyWt) {
         const file = storyFile(join(storyWt, loc?.spec_dir ?? ""));
         const p = patchStoryFile(file, { status: "dropped" }, storyWt);
-        if (!p.ok) throw failure(`cannot mark ${relative(storyWt, file)} dropped: ${p.reason}`, `fix story.md, then ${cmd.storyClose(key)} again`, "story_corrupt");
+        if (!p.ok) throw failure(`cannot mark ${relative(storyWt, file)} dropped: ${p.reason}`, `fix spec.md, then ${cmd.storyClose(key)} again`, "story_corrupt");
         if (await git.commit(storyWt, { message: `norn: ${key} dropped`, trailers: trailers(null, "drop") })) committed.push(key);
       }
 

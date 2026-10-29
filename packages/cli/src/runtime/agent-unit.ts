@@ -8,7 +8,7 @@ import { basename, join } from "node:path";
 import type { AgentUnit, UnitRef } from "@norn/core";
 import { cmd, agentWorkRefusal, cursorStep, storyWorktreePath } from "@norn/core";
 import type { Criterion, Mode, Receipt, ResolvedConfig } from "@norn/schema";
-import { loadUnit, readSliceFile, readState, readStoryFile, type UnitMarker, unitDir } from "@norn/store";
+import { loadUnit, readSliceFile, readState, readStoryFile, storyFile, type UnitMarker, unitDir } from "@norn/store";
 import { type Context, findUnitMarker, safeRealpath } from "../context.ts";
 import { corruptError, refuse } from "../output.ts";
 
@@ -91,9 +91,9 @@ export function agentName(s: UnitSession, config: ResolvedConfig): string {
   return s.state.run?.agent ?? (step?.type === "agent" ? step.agent : undefined) ?? config.default_agent;
 }
 
-/** QV1/QV4: the unit's frontmatter `criteria` — its slice file, or story.md for the story unit; null = none declared. */
+/** QV1/QV4: the unit's frontmatter `criteria` — its slice file, or spec.md for the story unit; null = none declared. */
 export function unitCriteria(s: UnitSession): Criterion[] | null {
-  const file = s.unit.slice ? join(s.specPath, "slices", `${s.unit.dir}.md`) : join(s.specPath, "story.md");
+  const file = s.unit.slice ? join(s.specPath, "slices", `${s.unit.dir}.md`) : storyFile(s.specPath);
   const r = s.unit.slice ? readSliceFile(file, s.worktree) : readStoryFile(file, s.worktree);
   if (r.ok) return r.value.frontmatter.criteria ?? null;
   if (r.reason === "missing") return null;

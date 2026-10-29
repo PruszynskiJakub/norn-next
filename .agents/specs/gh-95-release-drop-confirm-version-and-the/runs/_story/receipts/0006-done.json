@@ -1,0 +1,22 @@
+{
+  "kind": "done",
+  "receipt_id": "01M63ZX84VPN7G7CKSSSJKCHPK",
+  "run_id": "01M63ZWDEM8X53357NNRG7SYEQ",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-29T14:09:33.851Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "approve",
+  "handoff": "Review #1: change matches gh-95 — release is prepare → open-pr → ci → ready, confirm-version/test/version_loop removed, ci fail → $stuck, ready_loop and base.stale: behind kept; skills, AGENTS.md, CONTRIBUTING.md updated; repo test pins the flow and passes. One nit (ci script duplicated across workflows), no blocking findings.",
+  "findings": [
+    {
+      "severity": "nit",
+      "title": "ci script duplicated across quick, story and release",
+      "id": "F1",
+      "file": ".agents/norn/workflows/release.yaml",
+      "line": 60,
+      "detail": "The release ci run block is a verbatim copy of quick.yaml:60-67 (and story). A later change to how CI is awaited must be made three times. Workflows have no include mechanism, so this is the accepted pattern for now.\nAxis: standards\nSuggestion: None needed now; consider a shared script under scripts/ if the ci check changes again."
+    }
+  ]
+}

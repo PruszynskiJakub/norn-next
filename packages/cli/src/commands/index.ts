@@ -7,6 +7,7 @@ import { askCommand } from "./ask.ts";
 import { briefCommand } from "./brief.ts";
 import { doneCommand } from "./done.ts";
 import { hookEventCommand } from "./hook.ts";
+import { checkRunCommand } from "./check-run.ts";
 import { stuckCommand } from "./stuck.ts";
 import { helpCommand } from "./help.ts";
 import { initCommand } from "./init.ts";
@@ -21,7 +22,7 @@ import { configNoun } from "./config.ts";
 import { doctorCommand } from "./doctor.ts";
 import { tidyCommand } from "./tidy.ts";
 
-export const COMMANDS: readonly Command[] = [initCommand, uninstallCommand, syncCommand, tickCommand, watchCommand, briefCommand, doneCommand, askCommand, stuckCommand, hookEventCommand, statusCommand, tidyCommand, doctorCommand, helpCommand];
+export const COMMANDS: readonly Command[] = [initCommand, uninstallCommand, syncCommand, tickCommand, watchCommand, briefCommand, doneCommand, askCommand, stuckCommand, hookEventCommand, checkRunCommand, statusCommand, tidyCommand, doctorCommand, helpCommand];
 
 export const NOUNS: readonly Noun[] = [storyNoun, runNoun, configNoun];
 

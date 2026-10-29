@@ -125,7 +125,7 @@ Three separate concepts decide where a human is involved:
     workflows/                  # story.yaml, slice.yaml, bug.yaml — examples copied by init, editable
     trace/                      # gitignored: JSONL per tick, hook events, briefings, transcripts
   specs/<id>-<slug>/            # id is provider-prefixed: gh-123, gl-45
-    story.md                    # frontmatter mirrors remote issue + workflow + spec body
+    spec.md                     # frontmatter mirrors remote issue + workflow + spec body
     slices/<nn>-<slug>.md       # frontmatter: id, title, workflow, depends_on, status, labels?
     pr.md                       # story PR body, written by an agent (GR9); prose, never read by decide
     runs/<unit>/                # <unit> = _story or a slice <nn>-<slug>; committed, collapsed in PR diffs (S10)
@@ -143,7 +143,7 @@ refs/norn/inbox/<story-id>/<ulid> # git ref: receipt from a non-holder (M3)
   leases/                       # runtime only: agent and port slot leases
 ```
 
-The story worktree is on the story branch and holds `.agents/specs/<id>-<slug>/`; it is created at intake, and `story.md` is never written in the main checkout. Worktrees contain a `.norn-unit` marker and a `.env.norn` (`NORN_SLOT`, `PORT_BASE`, …).
+The story worktree is on the story branch and holds `.agents/specs/<id>-<slug>/`; it is created at intake, and `spec.md` is never written in the main checkout. Worktrees contain a `.norn-unit` marker and a `.env.norn` (`NORN_SLOT`, `PORT_BASE`, …).
 
 ### 7.1 State ownership
 
@@ -293,7 +293,7 @@ Three sources of outcomes:
 - W6 v1 has no `fork/join`; parallelism comes from independent slices.
 - W7 **Reserved targets** start with `$`: `$done` (unit finished) and `$stuck` (park in inbox under Unblock with the reason). `$stuck` is always an implicit target of `exhausted`, `stuck` reports and C1 routes. Step names may not start with `$` nor be a reserved word: `done`, `stuck`, `ask`, `exhausted`, `silent`, `died`, `timeout`, `stalled`, `stale`.
 - W8 **Workflows are not tied to a level.** Any workflow may run on a story or a slice; constraints are checked at unit start: `slices`, `git: open-pr` and `git: update` only on a story, `git: integrate` only on a slice. A story workflow without `slices` works directly in the story worktree.
-- W9 **Workflow selection.** A story's workflow is `workflow:` in `story.md`, set at intake from a remote label `norn:wf:<name>` if present, else `config.default_workflow`; changeable before start with `norn story edit <story> --workflow <name>`, after start only with `--at <step>` (S7). A slice's workflow is `workflow:` in its frontmatter, proposed by the `slice` skill, editable at the plan gate, default `config.default_slice_workflow`.
+- W9 **Workflow selection.** A story's workflow is `workflow:` in `spec.md`, set at intake from a remote label `norn:wf:<name>` if present, else `config.default_workflow`; changeable before start with `norn story edit <story> --workflow <name>`, after start only with `--at <step>` (S7). A slice's workflow is `workflow:` in its frontmatter, proposed by the `slice` skill, editable at the plan gate, default `config.default_slice_workflow`.
 
 Example (slice):
 
@@ -346,7 +346,7 @@ Example `bug` workflow: `reproduce (agent, norn-diagnose: seen as a user, then a
 ## 12. Remote and git
 
 - GR1 `norn sync` (also run by `tick`, throttled ~5 min) uses `gh`/`glab` to list issues assigned to the user with the configured label (default `norn`).
-- GR2 Intake: create the story branch and story worktree, write `.agents/specs/<id>-<slug>/story.md` there mirroring provider, number, URL, title, assignee, body and `workflow` (W9); start the story workflow.
+- GR2 Intake: create the story branch and story worktree, write `.agents/specs/<id>-<slug>/spec.md` there mirroring provider, number, URL, title, assignee, body and `workflow` (W9); start the story workflow. A spec folder an older norn wrote holds `story.md` instead: norn reads and writes that file while the folder has no `spec.md`, and never renames it.
 - GR3 Story branch `<id>-<slug>`; slice branches `<id>/<nn>-<slug>` cut from the story branch, each in its own worktree.
 - GR4 Only the CLI rebases, integrates and pushes. Pushes happen at every step boundary (S8), so every step boundary is a handoff point.
 - GR5 A person merges the story PR.
@@ -432,9 +432,9 @@ Single-job skills ported from ai-engine (norn v0.11.0): its skill files are the 
 |---|---|---|
 | `norn` | One-step protocol: brief, work in scope, keep handoff, report once, end turn, follow refusals. Only skill aware of norn. | — |
 | `norn-interview` | One question per turn until shared understanding; only talks. | done |
-| `norn-refine` | Story → spec in `story.md`: Problem, Solution, numbered Behaviour items (`B1`…, each with an example; edges walked as items), Out of scope, Open questions. Owns the spec layout. | done / questions |
+| `norn-refine` | Story → spec in `spec.md`: Problem, Solution, numbered Behaviour items (`B1`…, each with an example; edges walked as items), Out of scope, Open questions. Owns the spec layout. | done / questions |
 | `norn-clarify` | Sort the open questions, settle them with the person, fold each answer into the section it changes. | done |
-| `norn-plan` | The `## Plan` section of `story.md`: seams, coverage table (Behaviour → seam), prefactoring, implementation and testing decisions, risks. Reference: `norn-codebase-design`. | done |
+| `norn-plan` | The `## Plan` section of `spec.md`: seams, coverage table (Behaviour → seam), prefactoring, implementation and testing decisions, risks. Reference: `norn-codebase-design`. | done |
 | `norn-slice` | Plan → tracer-bullet slice files (`workflow`, `depends_on`, acceptance citing Behaviour numbers, frontmatter `criteria` with verifier and `needs` (QV1), check commands); expand–contract for wide refactors. | done |
 | `norn-implement` | Test-first build of one slice or story at the Plan's agreed seams, then a review pass. On rework, the points from the brief's Rework section come first: each is a red test, a QA failure gives its repro. Reference: `norn-tdd`. | done |
 | `norn-review` | Spec and Standards axes kept apart (a subagent per axis when the agent has them); smells baseline (`SMELLS.md`); findings as structured data. | approve / changes_requested |

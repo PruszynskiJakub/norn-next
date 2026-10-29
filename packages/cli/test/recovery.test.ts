@@ -1,6 +1,7 @@
 /**
  * Auto-mode recovery (SPEC-auto-mode-recovery R1–R3): two clones of one bare remote.
  *   - R1.2: a renewal that loses its CAS stops the story's other actions in that tick.
+ *   - H5: the renewals due in a tick go out in one claim push; one lost among them fails alone.
  *   - R2.3: the checkout that lost the claim reports its unpushed receipt; `tidy` moves it to
  *     `orphaned/` on the local branch and pushes nothing.
  *   - R3.1: the loser of an intake race removes its local intake.
@@ -10,6 +11,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Inbox, RunnerPort } from "@norn/core";
+import { setSpawnObserver } from "@norn/store";
 import { type CliDeps, type CliResult, type TickReport } from "../src/index.ts";
 import { createHarness, FakeRunner, type Harness, issue, sh } from "./harness.ts";
 import { runChecked } from "./harness.ts";
@@ -156,6 +158,48 @@ describe("a claim lost mid-run (R1.2, R2.3)", () => {
 
   test("effect transcript: spawns, port calls and runs/ files of both clones (refactor Phase 0.2)", () => {
     expectTranscript(transcript as Transcript, "recovery-claim-lost");
+  });
+});
+
+describe("renewals due together go out in one push (H5, R1.2)", () => {
+  let h: Harness;
+  let A: Clone;
+  const N = 3;
+  const storyRuns = (n: number) => join(`${h.root}-worktrees/gh-${n}-story-${n}`, `.agents/specs/gh-${n}-story-${n}`, "runs/_story");
+
+  beforeAll(async () => {
+    h = await createHarness();
+    A = wrap(h.root, h.deps);
+    await setup(h, 1, "Story 1");
+    h.remote.issues = Array.from({ length: N }, (_, i) => issue(i + 1, `Story ${i + 1}`));
+    for (let i = 0; i < 6 * N; i++) {
+      await A.tick();
+      h.clock.advance(5_000);
+    }
+    expect(h.git(["ls-remote", "origin", "refs/norn/claims/*"]).split("\n").filter(Boolean)).toHaveLength(N);
+  });
+  afterAll(() => h.cleanup());
+
+  test("one renewal lost among several: one claim push, only that story fails and its actions are skipped", async () => {
+    for (let n = 1; n <= N; n++) h.report(storyRuns(n), "done", { outcome: "done", handoff: `story ${n} works` });
+    const B = cloneOf(h, "repo-b", "bob");
+    expect((await B.norn("story", "checkout", "gh-2", "--force")).exit).toBe(0);
+    h.clock.advance(4 * 60_000);
+    const pushes: string[][] = [];
+    const prev = setSpawnObserver(({ argv }) => {
+      if (argv.includes("push") && argv.some((a) => a.includes("refs/norn/claims/"))) pushes.push([...argv]);
+    });
+    let r: TickReport;
+    try {
+      r = await A.tick("--offline");
+    } finally {
+      setSpawnObserver(prev);
+    }
+    expect(pushes).toHaveLength(1);
+    const renewals = r.decisions.filter((d) => d.rule === "claim.renew");
+    expect(renewals.map((d) => `${d.unit} ${d.ok}`)).toEqual(["gh-1 true", "gh-2 false", "gh-3 true"]);
+    expect(renewals[1]?.error).toContain("stale info");
+    expect(r.decisions.filter((d) => d.rule === "receipts.apply").map((d) => `${d.unit} ${d.ok ? "ok" : d.error}`)).toEqual(["gh-1 ok", "gh-2 skipped: claim lost", "gh-3 ok"]);
   });
 });
 

@@ -14,7 +14,7 @@ import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../cri
 import type { Facts, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
 import { sha256 } from "../hash.ts";
-import { effectiveMode, firstLine, heartbeatUp, prBaseBranch, sessionStartedNoTurn, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
+import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, prBaseBranch, sessionStartedNoTurn, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
 import { optionsLine } from "../prompt.ts";
 import { epoch, formatAge, iso } from "../time.ts";
 import { baseUpdateStep, edgeOf, edgesOf, isStale, stepOf } from "../workflow.ts";
@@ -470,7 +470,9 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
   const base = { story: story.key, slice: uf.unit.slice, url: story.frontmatter?.url, ...(reach ? { reach } : {}) };
   if (uf.errors.length || st?.status === "corrupt") {
     const files = uf.errors.map((e) => e.file).join(", ") || "state.json";
-    return { ...base, id: `corrupt:${key}:${files}`, group: "unblock", step: st?.step ?? null, title: `corrupt: ${files} failed validation (S2)`, command: cmd.runView(key, { why: true }), since: iso(facts.now) };
+    // gh-79: what failed, so a duplicate receipt number names the other (stray) file too
+    const why = [...new Set(uf.errors.flatMap((e) => e.errors.map((x) => x.message)))].join("; ");
+    return { ...base, id: `corrupt:${key}:${files}`, group: "unblock", step: st?.step ?? null, title: `corrupt: ${files} failed validation (S2)${why ? `: ${why}` : ""}`, command: cmd.runView(key, { why: true }), since: iso(facts.now) };
   }
   if (!st) return null;
   const item = (group: InboxGroup, title: string, command: string, since: string, extra: Partial<InboxItem> = {}): InboxItem => ({
@@ -532,6 +534,8 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       }
       // R5.5 (A8): an auto step waits for the heartbeat, not for a person — no manual start hint
       if (step?.type === "agent" && heartbeatDown(facts, config)) return item("running", `${st.step} #${st.attempt} (waiting for the heartbeat — ${cmd.watch()})`, cmd.watch(), st.step_entered_at);
+      const checkSince = checkRunningSince(step, uf);
+      if (checkSince) return item("running", `${st.step} #${st.attempt} (check running)`, cmd.runList(key), checkSince);
       return item("running", `${st.step} #${st.attempt} (queued)`, cmd.runList(key), st.step_entered_at);
     }
     case "done": {
@@ -540,7 +544,7 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
         if (merge) return merge;
       }
       if (facts.now - epoch(st.updated_at) > RECENT_MS) return null;
-      // story.md says `done` once norn saw the merge (GR6) — the durable record when no PR was fetched
+      // spec.md says `done` once norn saw the merge (GR6) — the durable record when no PR was fetched
       const waiting = uf.unit.slice === null && knownPr(story)?.state !== "merged" && !story.merged_by_ancestry && story.frontmatter?.status !== "done";
       return item("recently_done", waiting ? "workflow done — waiting for the PR merge (GR6)" : "done", cmd.runList(key), st.updated_at);
     }
@@ -695,7 +699,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
       continue;
     }
     if (story.frontmatter_error) {
-      add({ id: `corrupt:${story.key}:story.md`, group: "unblock", story: story.key, slice: null, step: null, title: `corrupt: ${story.frontmatter_error.file} failed validation (S2)`, command: cmd.runView(story.key, { why: true }), since: iso(facts.now) });
+      add({ id: `corrupt:${story.key}:spec.md`, group: "unblock", story: story.key, slice: null, step: null, title: `corrupt: ${story.frontmatter_error.file} failed validation (S2)`, command: cmd.runView(story.key, { why: true }), since: iso(facts.now) });
       continue;
     }
     add(notStartedItem(story, facts, config));

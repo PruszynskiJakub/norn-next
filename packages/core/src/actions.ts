@@ -287,7 +287,7 @@ export interface MarkCorruptAction extends UnitBase {
   errors: FileError[];
   /**
    * S2: write `status: corrupt` into the unit's state.json — only when the failing files are the
-   * unit's own runs/ files and its state.json reads. A broken story.md (or state.json) is surfaced,
+   * unit's own runs/ files and its state.json reads. A broken spec.md (or state.json) is surfaced,
    * never written into state.
    */
   mark_state: boolean;
@@ -322,7 +322,7 @@ export interface NotifyAction extends UnitBase {
   item: InboxItem;
 }
 
-/** GR8: mirror remote issue fields into story.md frontmatter; body change → inbox item. */
+/** GR8: mirror remote issue fields into spec.md frontmatter; body change → inbox item. */
 export interface UpdateStoryMirrorAction extends UnitBase {
   kind: "update_story_mirror";
   fields: Partial<Pick<StoryFrontmatter, "title" | "assignee" | "url" | "labels" | "body_hash" | "refined_body_hash">>;
@@ -337,7 +337,7 @@ export interface CleanupMergedStoryAction extends UnitBase {
   local_branches: string[];
   remote_branches: string[];
   refs: string[];
-  /** story.md status → done (committed on the base branch record) */
+  /** spec.md status → done (committed on the base branch record) */
   story_status: "done";
 }
 
@@ -349,14 +349,14 @@ export interface NoopAction extends UnitBase {
 
 // ------------------------------------------------------------------ repo-level actions
 
-/** GR2: new assigned + labelled issue → story branch, worktree, story.md, start story unit. */
+/** GR2: new assigned + labelled issue → story branch, worktree, spec.md, start story unit. */
 export interface IntakeStoryAction extends RepoBase {
   kind: "intake_story";
   issue: RemoteIssue;
   key: string;
   slug: string;
   worktree: WorktreeSpec;
-  /** repo-relative path of story.md inside the story worktree */
+  /** repo-relative path of spec.md inside the story worktree */
   story_file: string;
   frontmatter: StoryFrontmatter;
   /** initial spec body (issue body) */

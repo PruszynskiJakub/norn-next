@@ -1,7 +1,7 @@
 /**
  * `norn story reopen [<story>]` (B40–B42, D4, D5): undo a close. Re-claim the story here, restore
  * its worktrees from the pushed branches (`runtime/checkout.ts`, as `story checkout` does) and set
- * `story.md` back to `active`, in one commit on the story branch with the take receipt, pushed. Each
+ * `spec.md` back to `active`, in one commit on the story branch with the take receipt, pushed. Each
  * unit is back at the step it was at; a unit that was running at close gets a `stuck` receipt by the
  * person with reason `reopened` (B41), so the next tick parks it under Unblock instead of starting
  * it, and `norn run rerun` resumes it. A moved base is left to the next tick's base sync.
@@ -28,7 +28,7 @@ const REOPEN_REASON = "reopened";
 async function restorable(ctx: Context, key: string): Promise<PushedStory> {
   const s = await pushedStory(ctx, key, cmd.storyReopen(key));
   if (!s) throw refuse(`no story branch for ${key}`, "check the story key", "unknown_story");
-  if (!isClosed(s)) throw refuse(`${key} is not closed (story.md says ${s.frontmatter.status})`, cmd.storyView(key), "not_closed");
+  if (!isClosed(s)) throw refuse(`${key} is not closed (spec.md says ${s.frontmatter.status})`, cmd.storyView(key), "not_closed");
   const remote = (await ctx.ports()).remote;
   const issue = remote ? await remote.getIssue(s.frontmatter.number).catch((e: unknown) => {
     throw failure(`cannot read issue #${s.frontmatter.number}: ${(e as Error).message}`, `retry: ${cmd.storyReopen(key)}`, "network");
@@ -66,7 +66,7 @@ export const storyReopenCommand = defineCommand({
       return await checkoutStory(ctx, key, false, ({ storyWt, spec_dir, worktrees }) => {
         const file = storyFile(join(storyWt, spec_dir));
         const p = patchStoryFile(file, { status: "active" }, storyWt);
-        if (!p.ok) throw failure(`cannot mark ${relative(storyWt, file)} active: ${p.reason}`, `fix story.md on ${record.branch}, then ${cmd.storyReopen(key)} again`, "story_corrupt");
+        if (!p.ok) throw failure(`cannot mark ${relative(storyWt, file)} active: ${p.reason}`, `fix ${relative(storyWt, file)} on ${record.branch}, then ${cmd.storyReopen(key)} again`, "story_corrupt");
         const paths = [relative(storyWt, file)];
         // B41, D4: a unit that was running comes back stuck; the next tick parks it, never starts it
         const stuck: string[] = [];

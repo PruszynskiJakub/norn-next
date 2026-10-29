@@ -1,5 +1,5 @@
 /**
- * Markdown with YAML frontmatter: story.md and slices/<nn>-<slug>.md (§7, §7.1).
+ * Markdown with YAML frontmatter: spec.md and slices/<nn>-<slug>.md (§7, §7.1).
  * The body is preserved byte for byte; patches touch only the given keys and keep
  * the rest of the YAML (order, comments) as written by humans and skills.
  */

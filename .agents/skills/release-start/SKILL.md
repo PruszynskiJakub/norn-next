@@ -29,7 +29,7 @@ Then list what is open, for the person to pick from: `gh pr list --state open --
 
 Show the commits since `$last` and the open PRs, then ask, in one message:
 
-- **Version**: empty means the release step proposes one at the gate. Take one given as an argument.
+- **Version**: empty means the release step proposes one in the PR, judged at the `ready` gate. Take one given as an argument.
 - **Must include**: open PRs the release waits for.
 - **Notes**: anything the changelog must say.
 
@@ -65,4 +65,4 @@ EOF
 
 ## 4. Hand over
 
-Print the issue link and: `norn sync` takes it in now (or the next `norn watch` sync does); the `prepare` step then writes the changelog and proposes the version for the `confirm-version` gate.
+Print the issue link and: `norn sync` takes it in now (or the next `norn watch` sync does); the `prepare` step then writes the changelog and proposes the version; norn opens the PR, waits for its CI and stops at the `ready` gate.

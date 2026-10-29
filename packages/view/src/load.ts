@@ -9,6 +9,7 @@ import {
   cmd,
   actFailureItem,
   buildInbox,
+  checkRunningSince,
   type ClaimState,
   effectiveMode,
   type Facts,
@@ -120,7 +121,8 @@ function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: Uni
   const step = st && u.workflow ? stepOf(u.workflow.workflow, st.step) : null;
   const eff = effectiveMode(sf.mode, step?.type === "agent" && !!step.attended, ctx.runner);
   const corrupt = u.errors.length > 0 || st?.status === "corrupt";
-  const since = st ? (st.park?.since ?? (st.status === "running" ? st.run?.started_at : null) ?? (st.status === "done" ? st.updated_at : st.step_entered_at)) : null;
+  const checkSince = checkRunningSince(step, uf);
+  const since = st ? (st.park?.since ?? (st.status === "running" ? st.run?.started_at : null) ?? checkSince ?? (st.status === "done" ? st.updated_at : st.step_entered_at)) : null;
   // R5.5 (A8): while the heartbeat is down an auto step waits for `norn watch`, not a person
   const waitsForHeartbeat = ctx.heartbeatDown && step?.type === "agent" && eff.mode === "auto";
   const start = step?.type === "agent" ? (waitsForHeartbeat ? cmd.watch() : startCommandFor(uf, sf, ctx.config)) : undefined;
@@ -142,6 +144,7 @@ function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: Uni
     attempt: st?.attempt ?? null,
     counters: counters(u),
     park: st?.park ? { kind: st.park.kind, reason: st.park.reason, since: st.park.since } : null,
+    ...(checkSince ? { check_running: true as const } : {}),
     since,
     age: since ? formatAge(ctx.now - Date.parse(since)) : null,
     last_outcome: st?.last_outcome ? { step: st.last_outcome.step, outcome: st.last_outcome.outcome, at: st.last_outcome.at } : null,

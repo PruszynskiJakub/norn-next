@@ -102,8 +102,10 @@ function wrap(root: string, deps: CliDeps, runner: FakeRunner): Clone {
     norn: (...argv) => runChecked(argv, deps),
     at: (cwd, ...argv) => runChecked(argv, { ...deps, cwd }),
     async tick(...flags) {
-      const r = await runChecked(["tick", ...flags], deps);
+      const checks: Promise<void>[] = [];
+      const r = await runChecked(["tick", ...flags], { ...deps, onCheckStarted: (exited) => void checks.push(exited) });
       if (r.exit !== 0) throw new Error(`tick failed: ${r.stdout}`);
+      await Promise.all(checks); // the check-run receipt is the next tick's to apply (C5)
       return r.value as TickReport;
     },
   };
@@ -357,7 +359,7 @@ describe("claim races (T3) and forced takes (T5)", () => {
     expect(existsSync(sliceWt(B.root))).toBe(false);
     expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-7"])).toBe("");
     sh(h.root, ["fetch", "-q", "origin"]);
-    expect(h.git(["show", `origin/gh-7-add-login-form:${SPEC}/story.md`])).toContain("status: dropped");
+    expect(h.git(["show", `origin/gh-7-add-login-form:${SPEC}/spec.md`])).toContain("status: dropped");
     expect(h.git(["show", "origin/gh-7/01-form:wip.txt"])).toBe("unfinished");
     expect(sh(B.root, ["branch", "--list", "gh-7*"])).toBe("");
     expect(h.remote.issues.find((i) => i.number === 7)?.state).toBe("open");
@@ -415,16 +417,16 @@ describe("story close asks at the terminal (B36)", () => {
     expect(r.value).toMatchObject({ story: "gh-8", dropped: true, pushed: ["gh-8-add-logout"], claim_deleted: true });
     expect(existsSync(wt)).toBe(false);
     expect(h2.git(["ls-remote", "origin", "refs/norn/claims/gh-8"])).toBe("");
-    expect(h2.git(["show", "origin/gh-8-add-logout:.agents/specs/gh-8-add-logout/story.md"])).toContain("status: dropped");
+    expect(h2.git(["show", "origin/gh-8-add-logout:.agents/specs/gh-8-add-logout/spec.md"])).toContain("status: dropped");
     expect(h2.remote.issues[0]?.state).toBe("open");
   });
 
-  test("an unreadable pushed story.md is refused story_corrupt, never taken as open (S2, B39)", async () => {
+  test("an unreadable pushed spec.md is refused story_corrupt, never taken as open (S2, B39)", async () => {
     const tmp = `${h2.root}-corrupt`;
     h2.git(["fetch", "-q", "origin"]);
     h2.git(["worktree", "add", "-q", "--detach", tmp, "origin/gh-8-add-logout"]);
-    h2.write(join(tmp, ".agents/specs/gh-8-add-logout/story.md"), "no frontmatter here\n");
-    sh(tmp, ["commit", "-q", "-am", "break story.md"]);
+    h2.write(join(tmp, ".agents/specs/gh-8-add-logout/spec.md"), "no frontmatter here\n");
+    sh(tmp, ["commit", "-q", "-am", "break spec.md"]);
     sh(tmp, ["push", "-q", "origin", "HEAD:refs/heads/gh-8-add-logout"]);
     h2.git(["worktree", "remove", "--force", tmp]);
     const before = h2.git(["ls-remote", "origin"]);

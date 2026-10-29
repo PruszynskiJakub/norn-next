@@ -6,7 +6,9 @@ The spec is `.agents/PRD.md`. Read it before changing behaviour; cite its ids (S
 
 ```sh
 bun install
-bun test            # all tests (packages/*/test, test/)
+bun test            # all tests (packages/*/test, test/, scripts/); same as `bun run test`
+bun run test:fast   # everything but packages/cli/test (~30 s): what a workflow's test check runs
+bun run test:cli    # packages/cli/test, the cli integration tests (~90% of the suite's time)
 bun run typecheck   # tsc --noEmit over every package
 bun run schema:emit # regenerate packages/schema/json/*.schema.json after changing a schema
 bun run golden -- --update  # behaviour change: re-decide every golden case, rewrite only its decisions
@@ -21,9 +23,9 @@ Observe snapshots pin what `observe` sees at five points of one story in `packag
 
 Port contract suites state what every implementation of a port must do, in `packages/adapters/test/contract/` (`processContract`, `gitContract`, `runnerContract`, `remoteContract`). `contract.test.ts` there runs them against the real adapters offline: real processes (a real zombie included), real git repos, the headless runner, gh and glab over scripted CLIs. Store's `localProcess` runs them too. `packages/cli/test/contract-fakes.test.ts` runs them against the harness's `FakeRunner` and `FakeRemote`. A known break is listed in the suite's `failing` option with its reason and runs as `test.failing`; fixing it means removing the entry. A new port implementation or harness fake gets a contract run.
 
-To release: a person runs `/release-start`. It opens the release issue; the `release` workflow rebuilds `CHANGELOG.md` from the squash commits since the last tag, bumps `version` in `packages/cli/package.json`, the README release badge and the plugin (`bun run sync:plugin`), builds and smokes, and opens the PR. Merging that PR tags `vX.Y.Z` and publishes in one CI run. See Process.
+To release: a person runs `/release-start`. It opens the release issue; the `release` workflow rebuilds `CHANGELOG.md` from the squash commits since the last tag, bumps `version` in `packages/cli/package.json` and the README release badge, opens the PR and waits for its CI; the person judges the version and the changelog at `ready`. Merging that PR smokes every binary on its own OS, tags `vX.Y.Z` and publishes in one CI run. See Process.
 
-All three must pass before you hand work back; CI (`.github/workflows/ci.yml`) runs them on every PR, then builds the npm package and a binary and runs `scripts/smoke.sh` on each; a release also smokes each binary on its own OS (macOS arm64/x64, Linux arm64). A test fails if the emitted JSON schemas are stale.
+The full suite (`bun test`) and the type check must pass before you hand work back; a workflow's `test` check runs only `test:fast` and the type check (`fix` still runs the full suite), and `quick` and `story` then wait for the PR's CI in a `ci` check, which sends a red run back to `implement` (`release` waits for it too, with no local test, and goes `$stuck` on a red run). CI (`.github/workflows/ci.yml`) runs them on every PR, then builds the npm package and a binary and runs `scripts/smoke.sh` on each; a release also smokes each binary on its own OS (macOS arm64/x64, Linux arm64). A test fails if the emitted JSON schemas are stale.
 
 ## Layout and dependency direction
 

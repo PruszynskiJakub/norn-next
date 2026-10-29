@@ -1,0 +1,22 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M61H10ZKH5D3Q4CNCB5KCVEP",
+  "run_id": "01M61H0Q0SJNQYXQJ006VFRCDE",
+  "step": "update",
+  "attempt": 1,
+  "at": "2026-10-28T15:11:00.083Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M61H0Q0S6PQHDKVYC6GAQ1N6",
+  "outcome": "done",
+  "rule": "git.update",
+  "detail": "gh-77-a-check-runs-inside-the-tick-blocking is up to date with main (2bf94d1e96f8)",
+  "route": "test",
+  "base": {
+    "ref": "refs/remotes/origin/main",
+    "sha": "2bf94d1e96f8437bbee842e7605326625a40c2e7",
+    "conflicts": [],
+    "head": "803c860799b1a10645dc022d85f0ac3b161d76cf",
+    "merged": false
+  }
+}

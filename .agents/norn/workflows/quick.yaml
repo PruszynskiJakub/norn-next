@@ -1,8 +1,8 @@
 # Quick workflow — repo-local, for refactors, docs, chores and other small changes
 # (W1, W9: label norn:wf:quick). A story workflow without `slices` (W8): every step works in the
 # story worktree. Implement, bring the story up to date with its base, check, review, describe,
-# open the draft PR (or rewrite the body of the open one), and wait for a person at `ready`;
-# the person merges the PR.
+# open the draft PR (or rewrite the body of the open one), wait for the PR's CI, and wait for a
+# person at `ready`; the person merges the PR. The local check runs test:fast; CI runs the full suite.
 # A story waiting at ready goes back through update when the base moved under it in a way
 # that conflicts (BS6–BS8, base.stale: conflict).
 name: quick
@@ -14,7 +14,8 @@ steps:
     skill: norn-implement
     inputs: [spec, handoff, last_check, last_findings]
     instructions: >-
-      The spec is story.md: the issue and the triage findings. Keep to what it asks. A change in
+      The spec is story.md (the issue) and the triage findings in the issue's latest `## Triage`
+      comment (`gh issue view <N> --comments`). Keep to what they ask. A change in
       behaviour gets a test first; a change to docs or a pure refactor needs none beyond the suite
       staying green. Test your change with `bun packages/cli/src/main.ts …`, never the installed `norn`.
       Run that dev build only in a throwaway git repo under $TMPDIR, never in this worktree: it is a live norn unit (NORN_HOME points at it) and a dev build would act on its runs/, claim and state.json.
@@ -33,7 +34,7 @@ steps:
       done: { to: update, means: "base merged into the story branch, conflicts resolved and committed" }
   test:
     type: check
-    run: "bun install --frozen-lockfile && bun run test && bun run typecheck"
+    run: "bun install --frozen-lockfile && bun run test:fast && bun run typecheck"
     timeout: 15m
     outcomes: { pass: review, fail: { to: implement, counter: test_loop } }
   review:
@@ -53,7 +54,19 @@ steps:
   open-pr:
     type: git
     action: open-pr
-    outcomes: { done: ready }
+    outcomes: { done: ci }
+  # waits for the PR's CI (a detached check run, so the tick is not blocked); a red run's failed
+  # log becomes last_check for implement, whose rework goes back through open-pr to the new head
+  ci:
+    type: check
+    run: |
+      for i in $(seq 1 30); do gh pr checks >/dev/null 2>&1 && break; sleep 10; done
+      gh pr checks --watch --fail-fast --interval 30 && exit 0
+      run=$(gh run list --branch "$(git branch --show-current)" --limit 1 --json databaseId -q '.[0].databaseId')
+      gh run view "$run" --log-failed | tail -300
+      exit 1
+    timeout: 30m
+    outcomes: { pass: ready, fail: { to: implement, counter: ci_loop } }
   ready:
     type: gate
     prompt: "Read the draft PR. Approve to mark the story finished (a person still merges the PR), or reject with what to change."
@@ -63,6 +76,7 @@ steps:
       stale:   { to: update, counter: stale_loop }
 counters:
   test_loop: { max: 5 }
+  ci_loop: { max: 3 }
   review_loop: { max: 3 }
   ready_loop: { max: 2 }
   # resets each time update merges cleanly: only repeated conflicts on one base move count (W4)

@@ -16,8 +16,9 @@ function stateText(u: UnitView): string {
   if (u.status === "not_started") return "not started";
   const step = u.step && u.step !== "$done" ? ` ${u.step}#${u.attempt}` : "";
   const park = u.park ? ` (${u.park.kind}: ${u.park.reason})` : "";
+  const check = u.check_running ? " (check running)" : "";
   const age = u.age ? ` ${u.age}` : "";
-  return `${u.status}${step}${park}${age}${counterText(u)}`;
+  return `${u.status}${step}${park}${check}${age}${counterText(u)}`;
 }
 
 function claimText(s: StoryView): string {

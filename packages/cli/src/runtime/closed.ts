@@ -1,9 +1,9 @@
 /**
- * Closed stories (D5): a story is closed when `story.md` on its pushed story branch (the local one
+ * Closed stories (D5): a story is closed when its spec file on its pushed story branch (the local one
  * without a remote) says `dropped`. `story close` refuses a closed story (B39); `story reopen`
  * acts only on one (B42) and offers only those (B55).
  */
-import { parseSliceFileName, type SliceFrontmatter, sliceBranch, specDir, STORY_KEY_PATTERN, type StoryFrontmatter } from "@norn/schema";
+import { LEGACY_SPEC_FILE, parseSliceFileName, type SliceFrontmatter, sliceBranch, SPEC_FILE, specDir, STORY_KEY_PATTERN, type StoryFrontmatter } from "@norn/schema";
 import { parseSliceFile, parseStoryFile } from "@norn/store";
 import type { Context } from "../context.ts";
 import { failure } from "../output.ts";
@@ -31,12 +31,17 @@ export async function pushedStory(ctx: Context, key: string, again: string): Pro
     rev = `refs/remotes/${remote}/${branch}`;
   }
   const spec_dir = specDir(key, branch.slice(key.length + 1));
-  const path = `${spec_dir}/story.md`;
-  const text = await ctx.git.show(ctx.root, rev, path);
+  // GR2: spec.md, or story.md for a story an older norn intook
+  let path = `${spec_dir}/${SPEC_FILE}`;
+  let text = await ctx.git.show(ctx.root, rev, path);
+  if (text === null) {
+    path = `${spec_dir}/${LEGACY_SPEC_FILE}`;
+    text = await ctx.git.show(ctx.root, rev, path);
+  }
   if (text === null) return null;
   const doc = parseStoryFile(text, `${rev}:${path}`);
   // S2: an unreadable record is never guessed open or closed
-  if (!doc.ok) throw failure(`${rev}:${path} is unreadable (${doc.reason})`, `fix story.md on ${branch}, then ${again} again`, "story_corrupt");
+  if (!doc.ok) throw failure(`${rev}:${path} is unreadable (${doc.reason})`, `fix ${path} on ${branch}, then ${again} again`, "story_corrupt");
   return { key, branch, rev, spec_dir, frontmatter: doc.value.frontmatter };
 }
 

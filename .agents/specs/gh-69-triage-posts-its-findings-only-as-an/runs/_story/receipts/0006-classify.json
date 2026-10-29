@@ -1,0 +1,22 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M61C0400EYZGAG02Z1RRDF98",
+  "run_id": "01M61BZZNCZ1T0JDW64QVBC7C4",
+  "step": "update",
+  "attempt": 1,
+  "at": "2026-10-28T13:43:07.520Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M61BZZNCQQD6003J0PVZ8XMG",
+  "outcome": "done",
+  "rule": "git.update",
+  "detail": "gh-69-triage-posts-its-findings-only-as-an is up to date with main (2bf94d1e96f8)",
+  "route": "test",
+  "base": {
+    "ref": "refs/remotes/origin/main",
+    "sha": "2bf94d1e96f8437bbee842e7605326625a40c2e7",
+    "conflicts": [],
+    "head": "b8d53148184dba787b8a7cc838564b7b9c427d31",
+    "merged": false
+  }
+}

@@ -113,7 +113,7 @@ describe("before start", () => {
     const r = await h.norn("story", "edit", "gh-6", "--workflow", "alt");
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ unit: "gh-6", workflow: "alt", previous: "gated", started: false, changed: true });
-    expect(h.read(join(wt6(), spec6, "story.md"))).toContain("workflow: alt");
+    expect(h.read(join(wt6(), spec6, "spec.md"))).toContain("workflow: alt");
     expect((await h.norn("story", "answer", "not-a-key", "x")).exit).toBe(2);
   });
 

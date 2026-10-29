@@ -48,7 +48,7 @@ export interface BriefInput {
   evidence_files?: Readonly<Record<string, readonly string[]>>;
   /** F28/O2: the story's gate rulings (`storyRulings` over the receipts of every unit of the story), when the caller read them */
   rulings?: readonly Ruling[];
-  /** QV1: the unit's frontmatter `criteria` (slice file, or story.md for the story unit), when the caller read them */
+  /** QV1: the unit's frontmatter `criteria` (slice file, or spec.md for the story unit), when the caller read them */
   criteria?: readonly Criterion[] | null;
   /** QV5a: what this run's agent can do to verify criteria (config `agents.<name>.capabilities`) */
   capabilities?: readonly string[];

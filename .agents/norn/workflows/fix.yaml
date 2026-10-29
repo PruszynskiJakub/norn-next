@@ -14,7 +14,7 @@ steps:
     skill: norn-diagnose
     inputs: [spec, handoff]
     instructions: >-
-      Start from the triage findings in story.md. First follow the report as a user, through the real
+      Start from the triage findings in the issue's latest `## Triage` comment (`gh issue view <N> --comments`). First follow the report as a user, through the real
       interface (`bun packages/cli/src/main.ts …`, never the installed `norn`), and record what you saw.
       Run that dev build only in a throwaway git repo under $TMPDIR, never in this worktree: it is a live norn unit (NORN_HOME points at it) and a dev build would act on its runs/, claim and state.json.
       Then build a loop that goes red on that exact symptom, minimise it and confirm the cause. Do not

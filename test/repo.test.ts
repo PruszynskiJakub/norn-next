@@ -142,6 +142,49 @@ describe("test layout (AGENTS.md)", () => {
     });
     expect(missing).toEqual([]);
   });
+
+  test("test:fast and test:cli split the suite: fast skips exactly the folder cli runs, and slice, story and quick checks run fast", () => {
+    const scripts: Record<string, string> = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).scripts;
+    const cliDir = scripts["test:cli"]?.match(/^bun test \.\/(\S+)$/)?.[1];
+    const ignored = scripts["test:fast"]?.match(/^bun test --path-ignore-patterns='(\S+)\/\*\*'$/)?.[1];
+    expect({ test: scripts.test, cliDir, ignored }).toEqual({ test: "bun test", cliDir: "packages/cli/test", ignored: "packages/cli" });
+    const run = (wf: string) => readFileSync(join(ROOT, ".agents", "norn", "workflows", `${wf}.yaml`), "utf8").match(/^ {4}run: "(.*)"$/m)?.[1];
+    expect(["slice", "bug", "story", "quick"].map(run)).toEqual(Array(4).fill("bun install --frozen-lockfile && bun run test:fast && bun run typecheck"));
+    expect(["fix"].map(run)).toEqual(["bun install --frozen-lockfile && bun run test && bun run typecheck"]);
+  });
+
+  test("quick and story wait for the PR's CI after open-pr and send a red run back to implement", () => {
+    for (const wf of ["quick", "story"]) {
+      const { steps, counters } = Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "norn", "workflows", `${wf}.yaml`), "utf8")) as {
+        steps: Record<string, { type: string; run?: string; outcomes: Record<string, unknown> }>;
+        counters: Record<string, unknown>;
+      };
+      expect(steps["open-pr"]?.outcomes).toEqual({ done: "ci" });
+      expect(steps.ci?.type).toBe("check");
+      expect(steps.ci?.run).toContain("gh pr checks --watch --fail-fast");
+      expect(steps.ci?.outcomes).toEqual({ pass: "ready", fail: { to: "implement", counter: "ci_loop" } });
+      expect(counters.ci_loop).toEqual({ max: 3 });
+    }
+  });
+
+  test("release goes prepare → open-pr → ci → ready, a red CI goes $stuck, and a base commit makes it stale (BS7)", () => {
+    const { start, steps, counters, base } = Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "norn", "workflows", "release.yaml"), "utf8")) as {
+      start: string;
+      steps: Record<string, { type: string; run?: string; outcomes: Record<string, unknown> }>;
+      counters: Record<string, unknown>;
+      base: unknown;
+    };
+    expect(start).toBe("prepare");
+    expect(Object.keys(steps).sort()).toEqual(["ci", "open-pr", "prepare", "ready", "resolve", "update"]);
+    expect(steps.prepare?.outcomes.done).toMatchObject({ to: "open-pr" });
+    expect(steps["open-pr"]?.outcomes).toEqual({ done: "ci" });
+    expect(steps.ci?.type).toBe("check");
+    expect(steps.ci?.run).toContain("gh pr checks --watch --fail-fast");
+    expect(steps.ci?.outcomes).toEqual({ pass: "ready", fail: "$stuck" });
+    expect(steps.ready?.outcomes.reject).toEqual({ to: "prepare", counter: "ready_loop" });
+    expect(counters.version_loop).toBeUndefined();
+    expect(base).toEqual({ stale: "behind" });
+  });
 });
 
 describe("release metadata", () => {

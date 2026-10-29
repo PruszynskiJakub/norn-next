@@ -1,6 +1,6 @@
 /**
  * `norn story reopen` (B40–B42, B55, D4, D5): a close is not final. Reopen re-claims the story here,
- * restores its worktrees from the pushed branches, sets `story.md` back to `active` in one commit,
+ * restores its worktrees from the pushed branches, sets `spec.md` back to `active` in one commit,
  * and brings each unit back at its step — a unit that was running comes back stuck (`reopened`).
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
@@ -151,7 +151,7 @@ describe("story reopen (B40, B41, B55)", () => {
     expect(script.value).toMatchObject({ code: "target_required", do_instead: "norn story reopen gh-7" });
   });
 
-  test("restores worktrees and the claim, marks story.md active in one commit; a running unit comes back stuck (reopened)", async () => {
+  test("restores worktrees and the claim, marks spec.md active in one commit; a running unit comes back stuck (reopened)", async () => {
     h.git(["fetch", "-q", "origin"]);
     const closedAt = h.git(["rev-parse", `origin/${BRANCH}`]);
     const asked = new FakeInteraction(true);
@@ -167,7 +167,7 @@ describe("story reopen (B40, B41, B55)", () => {
     expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-7"])).not.toBe("");
     h.git(["fetch", "-q", "origin"]);
     expect(h.git(["rev-list", "--count", `${closedAt}..origin/${BRANCH}`])).toBe("1");
-    expect(h.git(["show", `origin/${BRANCH}:${SPEC}/story.md`])).toContain("status: active");
+    expect(h.git(["show", `origin/${BRANCH}:${SPEC}/spec.md`])).toContain("status: active");
     // D4: the person's stuck receipt on the unit that was running
     const files = readdirSync(join(sliceRuns("02-list"), "receipts")).sort();
     const last = JSON.parse(readFileSync(join(sliceRuns("02-list"), "receipts", files.at(-1) as string), "utf8"));

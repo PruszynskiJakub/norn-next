@@ -10,8 +10,8 @@ import { defineCommand, opt } from "../command.ts";
 import { rendered, usageError } from "../output.ts";
 import { bundledSkills } from "../runtime/workflows.ts";
 
-/** Who runs a command: a person, the agent doing a step, or the agent's hooks (never by hand). */
-export type CommandFor = "person" | "agent" | "hooks";
+/** Who runs a command: a person, the agent doing a step, the agent's hooks or a tick (never by hand). */
+export type CommandFor = "person" | "agent" | "hooks" | "tick";
 
 /** B14: `status --segment` is a mode of `status` that only Herdr runs, so it is a row of its own in `help --all`. */
 const SEGMENT = {
@@ -33,6 +33,7 @@ const HELP_GROUPS: ReadonlyArray<{ title: string; for: CommandFor; commands: rea
   { title: "Run by watch, cron or Herdr, not by hand", for: "person", commands: ["tick", SEGMENT.name], hidden: true },
   { title: "Agent protocol: the only commands an agent runs", for: "agent", commands: ["brief", "done", "ask", "stuck"] },
   { title: "Called by the agent's hooks, not by hand", for: "hooks", commands: ["hook"], hidden: true },
+  { title: "Started by a tick, not by hand", for: "tick", commands: ["check-run"], hidden: true },
 ];
 
 /** Not a row of `norn help`: the footer says how to use it. */
@@ -82,7 +83,7 @@ function formatHelp(rows: readonly Row[], skills: readonly string[] = [], all = 
   const row = (c: Row) => `  norn ${c.name.padEnd(width)}${plainSummary(c.summary)}`;
   const grouped = new Set(HELP_GROUPS.flatMap((g) => g.commands));
   const other = { title: "Other", commands: rows.map((c) => c.name).filter((n) => !grouped.has(n) && !UNLISTED.has(n)) };
-  const groups = [...HELP_GROUPS.slice(0, -2), other, ...HELP_GROUPS.slice(-2)].filter((g) => all || !("hidden" in g && g.hidden));
+  const groups = [...HELP_GROUPS.filter((g) => g.for === "person"), other, ...HELP_GROUPS.filter((g) => g.for !== "person")].filter((g) => all || !("hidden" in g && g.hidden));
   const out = ["norn — deliver software stories with coding agents; code decides the next step, agents do it.", "", ...AGENT_NOTE, ""];
   for (const g of groups) {
     const cs = g.commands.flatMap((n) => rows.filter((c) => c.name === n));

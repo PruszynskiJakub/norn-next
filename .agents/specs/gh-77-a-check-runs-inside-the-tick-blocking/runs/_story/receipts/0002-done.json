@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61E4GJ92VAXYP297HM5XNAX",
+  "run_id": "01M61DSFMYEVK9YR0SZQ2KY7N9",
+  "step": "reproduce",
+  "attempt": 1,
+  "at": "2026-10-28T14:20:28.618Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "reproduced",
+  "handoff": "Reproduced as a user: in a throwaway repo, the dev-build watch ran a 20 s check in a 20.5 s tick, and inbox said 'no heartbeat … run norn watch' while watch ran. Loop: harness test (evidence debug-gh77.test.ts), red 3/3, green on the 0 s control. Cause: act/check.ts awaits runShell inside the tick, holding the tick lock, so the next ticks are busy and markTick runs only after tick.end. Also: a running check shows as '(queued)'.",
+  "evidence": "evidence/01M61DSFMYEVK9YR0SZQ2KY7N9"
+}
