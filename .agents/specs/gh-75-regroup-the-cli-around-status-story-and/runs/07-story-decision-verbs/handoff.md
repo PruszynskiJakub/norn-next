@@ -39,6 +39,9 @@
 - qa#1: every AC is a pass. cli suite 355 pass, typecheck green. AC8: in a throwaway harness repo, `story approve`/`story reject --reason` print the same output, write the same receipts and route the next tick the same way as base's `approve`/`approve --reject --reason`. `story reject` without --reason gives exit 2 (reason_required); old `approve`/`update` give exit 2 (Unknown command). Evidence is in $TMPDIR/qa-gh75-07.
 - qa#1 pass: QA pass: AC1–AC8 observed. cli suite 355 pass, typecheck green. AC8: in a throwaway harness repo, story approve/reject --reason give the same stdout, receipts and next-tick routing as base's approve/approve --reject (diff empty). Reject without --reason exits 2 with reason_required. The old verbs are unknown commands.
 
+- merge#1: rebased onto the story branch (now with slices 05, 06, 10). The story noun has every verb: list, view, chat, answer, approve, reject, update-branch, checkout, handoff, close. Help: story moved to "Answer what needs you", and Team is gone (base removed it). target.ts: the base's `story` flag (B55) replaces this slice's `storyOnly`; update-branch uses it; aStory/resolveStory and parkedOn are both kept. status.test verb lists include the decision verbs. base-sync uses story handoff + story update-branch. Full suite 1285 pass on the resolved tree, typecheck green. Friction: the first rebase attempt stayed stopped mid-rebase while the suite ran, and a tick read the rewound state.json and started an implement retry, which the person cleaned up.
+- merge#1 done: Rebased onto the story branch (slices 05, 06, 10 landed). The story noun keeps every verb: list, view, chat, answer, approve, reject, update-branch, checkout, handoff, close. Help: story is under Answer what needs you. target.ts uses the base's story flag (B55) in place of storyOnly, and keeps aStory/resolveStory and parkedOn. status.test verb lists and base-sync are updated. Full suite 1285 pass, typecheck green. Friction: a tick read state.json from a worktree with a rebase in progress and started a stray implement retry.
+
 ## Resume
 
-QA reported pass; nothing left in this step.
+Merge done; integrate should now fast-forward.
