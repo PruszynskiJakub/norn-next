@@ -9,8 +9,8 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { CliDeps, CliResult } from "../src/index.ts";
-import { runCli } from "../src/index.ts";
 import { createHarness, FakeInteraction, type Harness, issue } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 
 setDefaultTimeout(30_000);
 
@@ -74,7 +74,7 @@ const until = async (done: () => boolean) => {
   expect(done()).toBe(true);
 };
 /** `norn …` with these deps over the harness's */
-const norn = (deps: Partial<CliDeps>, ...argv: string[]): Promise<CliResult> => runCli(argv, { ...h.deps, ...deps });
+const norn = (deps: Partial<CliDeps>, ...argv: string[]): Promise<CliResult> => runChecked(argv, { ...h.deps, ...deps });
 
 beforeAll(async () => {
   h = await createHarness();

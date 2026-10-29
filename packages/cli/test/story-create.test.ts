@@ -10,8 +10,8 @@ import { join } from "node:path";
 import { acquireTickLock } from "@norn/store";
 import type { StoryView } from "@norn/view";
 import type { CliDeps, CliResult } from "../src/index.ts";
-import { runCli } from "../src/index.ts";
 import { createHarness, FakeInteraction, type Harness } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 
 setDefaultTimeout(30_000);
 
@@ -37,7 +37,7 @@ let h: Harness;
 let shell: string[][];
 /** `norn …` with these deps over the harness's, the outside shell recorded */
 const norn = (deps: Partial<CliDeps>, ...argv: string[]): Promise<CliResult> =>
-  runCli(argv, { ...h.deps, shell: async (a) => (shell.push(a), { code: 0, stderr: "" }), ...deps });
+  runChecked(argv, { ...h.deps, shell: async (a) => (shell.push(a), { code: 0, stderr: "" }), ...deps });
 const creates = () => h.remote.calls.filter((c) => c.startsWith("issue+ "));
 const stories = async () => ((await h.norn("story", "list", "--json")).value as { stories: StoryView[] }).stories;
 /** what the checkout has on disk: spec folders and worktrees */

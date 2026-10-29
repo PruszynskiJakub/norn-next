@@ -12,11 +12,11 @@ import type { herdr } from "@norn/adapters";
 import { ulid } from "@norn/schema";
 import { appendTrace, readCockpitFile } from "@norn/store";
 import type { CockpitModel } from "@norn/view";
-import { runCli } from "../src/index.ts";
 import { placeAgent } from "../src/runtime/cockpit.ts";
 import { clampScroll, handleKey, initialState, parseKeys, previewLines, renderCockpit, type TuiState, withoutNotes } from "../src/runtime/cockpit-tui.ts";
 import { fakeHerdr } from "./fake-herdr.ts";
 import { createHarness, FakeInteraction, type Harness, issue } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 
 setDefaultTimeout(30_000);
 
@@ -39,7 +39,7 @@ beforeAll(async () => {
     await c.tick();
   }
   // gh-6 asks a question: an Answer item
-  expect((await runCli(["brief", "--json"], { ...c.deps, cwd: wt(6), env: { ...c.deps.env, NORN_AGENT_PID: String(process.pid) } })).exit).toBe(0);
+  expect((await runChecked(["brief", "--json"], { ...c.deps, cwd: wt(6), env: { ...c.deps.env, NORN_AGENT_PID: String(process.pid) } })).exit).toBe(0);
   c.clock.advance(1000);
   c.report(runs(6), "ask", { question: "CSV only, or CSV and PDF?" });
   c.clock.advance(1000);
@@ -47,7 +47,7 @@ beforeAll(async () => {
 });
 afterAll(() => c.cleanup());
 
-const model = async (h: herdr.HerdrCockpit | null = null) => (await runCli(["status", "--watch", "--json"], { ...c.deps, herdr: h })).value as CockpitModel;
+const model = async (h: herdr.HerdrCockpit | null = null) => (await runChecked(["status", "--watch", "--json"], { ...c.deps, herdr: h })).value as CockpitModel;
 
 describe("norn status --watch --json (CP5)", () => {
   test("prints the model once: what needs you, then every story; no places outside Herdr", async () => {
@@ -166,7 +166,7 @@ describe("the preview (CP3)", () => {
 describe("norn status --watch (B11, CP6–CP8)", () => {
   test("a session: trace shown, answer typed and sent, a refused key, quit; stays open after each action", async () => {
     const frames: string[] = [];
-    const r = await runCli(["status", "--watch", "--interval", "1h"], { ...c.deps, herdr: null, env: { ...c.deps.env, COLUMNS: "160", LINES: "40" }, input: keys("j", "v", "\x1b", "y", "a", "CSV only\r", "q"), log: (l) => frames.push(l) });
+    const r = await runChecked(["status", "--watch", "--interval", "1h"], { ...c.deps, herdr: null, env: { ...c.deps.env, COLUMNS: "160", LINES: "40" }, input: keys("j", "v", "\x1b", "y", "a", "CSV only\r", "q"), log: (l) => frames.push(l) });
     expect(r.exit).toBe(0);
     expect(r.value).toEqual({ frames: 7, last: { action: "answer", unit: "gh-6", ok: true } });
     expect(frames[2]).toContain("norn run list gh-6 — esc to close");
@@ -184,7 +184,7 @@ describe("norn status --watch (B11, CP6–CP8)", () => {
       yield "";
     }
     setTimeout(() => abort.abort(), 50);
-    const r = await runCli(["status", "--watch", "--interval", "1h"], { ...c.deps, herdr: null, signal: abort.signal, input: waiting(), log: () => {} });
+    const r = await runChecked(["status", "--watch", "--interval", "1h"], { ...c.deps, herdr: null, signal: abort.signal, input: waiting(), log: () => {} });
     expect(r.exit).toBe(0);
     expect(r.value).toEqual({ frames: 1, last: null });
   });
@@ -193,7 +193,7 @@ describe("norn status --watch (B11, CP6–CP8)", () => {
     const h = fakeHerdr();
     const shell: string[][] = [];
     const frames: string[] = [];
-    await runCli(["status", "--watch", "--interval", "1h"], { ...c.deps, herdr: h.cockpit, input: keys("\r", "i", "q"), shell: async (argv) => (shell.push(argv), { code: 0, stderr: "" }), log: (l) => frames.push(l) });
+    await runChecked(["status", "--watch", "--interval", "1h"], { ...c.deps, herdr: h.cockpit, input: keys("\r", "i", "q"), shell: async (argv) => (shell.push(argv), { code: 0, stderr: "" }), log: (l) => frames.push(l) });
     expect(h.calls[0]).toMatch(new RegExp(`^open workspace ${wt(5)} gh-5 orient focus `));
     expect(frames[1]).toContain("opened gh-5 orient (w9)");
     expect(shell).toEqual([[process.platform === "darwin" ? "open" : "xdg-open", "https://github.com/o/r/issues/5"]]);
@@ -203,12 +203,12 @@ describe("norn status --watch (B11, CP6–CP8)", () => {
     expect(readCockpitFile(c.home).last_repo).toBe(c.root);
     const away = mkdtempSync(join(tmpdir(), "norn-away-"));
     try {
-      const r = await runCli(["status", "--watch", "--json"], { ...c.deps, cwd: away, herdr: null });
+      const r = await runChecked(["status", "--watch", "--json"], { ...c.deps, cwd: away, herdr: null });
       expect(r.exit).toBe(0);
       expect((r.value as CockpitModel).header.repo).toBe(c.root);
       // a git repository norn was never set up in: the last one too
       c.git(["init", "-q", away]);
-      expect(((await runCli(["status", "--watch", "--json"], { ...c.deps, cwd: away, herdr: null })).value as CockpitModel).header.repo).toBe(c.root);
+      expect(((await runChecked(["status", "--watch", "--json"], { ...c.deps, cwd: away, herdr: null })).value as CockpitModel).header.repo).toBe(c.root);
     } finally {
       rmSync(away, { recursive: true, force: true });
     }
@@ -238,16 +238,16 @@ describe("norn status --watch (B11, CP6–CP8)", () => {
 describe("norn status --watch --pane (B12)", () => {
   test("inside Herdr: a pane split below the caller runs the cockpit", async () => {
     const h = fakeHerdr();
-    const r = await runCli(["status", "--watch", "--pane", "--json"], { ...c.deps, herdr: h.cockpit });
+    const r = await runChecked(["status", "--watch", "--pane", "--json"], { ...c.deps, herdr: h.cockpit });
     expect(r.exit).toBe(0);
     expect(r.value).toEqual({ opened: true, runner: "herdr", pane_id: "w9:p2" });
     expect(h.calls).toEqual([`open below ${c.root} norn status --watch norn`]);
-    await runCli(["status", "--watch", "--pane", "--interval", "10s"], { ...c.deps, herdr: h.cockpit });
+    await runChecked(["status", "--watch", "--pane", "--interval", "10s"], { ...c.deps, herdr: h.cockpit });
     expect(h.calls[1]).toBe(`open below ${c.root} norn status --watch --interval 10s norn`);
   });
 
   test("outside Herdr: refused with the reason, do_instead norn status --watch", async () => {
-    const r = await runCli(["status", "--watch", "--pane", "--json"], { ...c.deps, herdr: null });
+    const r = await runChecked(["status", "--watch", "--pane", "--json"], { ...c.deps, herdr: null });
     expect(r.exit).toBe(3);
     expect(r.value).toMatchObject({ error: expect.stringContaining("not inside Herdr"), do_instead: "norn status --watch", code: "not_in_herdr" });
   });
@@ -260,7 +260,7 @@ describe("norn status --watch --pane (B12)", () => {
 describe("run attach (B46, B47, HC10), labels (HC12) and the agent place (HC6, HC15)", () => {
   test("an attended agent waiting for its person: run attach focuses its pane; the cockpit labels it", async () => {
     const env = { ...c.deps.env, NORN_AGENT_PID: String(process.pid), NORN_AGENT_SESSION_ID: "sess-5" };
-    const brief = await runCli(["brief", "--json"], { ...c.deps, cwd: wt(5), env });
+    const brief = await runChecked(["brief", "--json"], { ...c.deps, cwd: wt(5), env });
     expect(brief.exit).toBe(0);
     const runId = (brief.value as { run_id: string }).run_id;
     c.clock.advance(1000);
@@ -270,43 +270,43 @@ describe("run attach (B46, B47, HC10), labels (HC12) and the agent place (HC6, H
 
     c.clock.advance(30_000);
     // B47: no Your turn agent yet → nothing to attach
-    const none = await runCli(["run", "attach", "--next", "--json"], { ...c.deps, herdr: fakeHerdr(agents).cockpit });
+    const none = await runChecked(["run", "attach", "--next", "--json"], { ...c.deps, herdr: fakeHerdr(agents).cockpit });
     expect(none.exit).toBe(3);
     expect(none.value).toMatchObject({ code: "nothing_to_attach" });
 
     c.clock.advance(3 * 60_000);
     const h = fakeHerdr(agents);
-    const next = await runCli(["run", "attach", "--next", "--json"], { ...c.deps, herdr: h.cockpit });
+    const next = await runChecked(["run", "attach", "--next", "--json"], { ...c.deps, herdr: h.cockpit });
     expect(next.exit).toBe(0);
     expect(next.value).toMatchObject({ focused: "w9:p5", item: expect.stringMatching(new RegExp(`^attended:gh-5:${runId}:`)) });
     expect(h.calls).toEqual(["focus w9:p5"]);
 
     // B46: by unit — its live pane is focused; a unit with no live pane is refused with its start command
     const byUnit = fakeHerdr(agents);
-    const att = await runCli(["run", "attach", "gh-5", "--json"], { ...c.deps, herdr: byUnit.cockpit });
+    const att = await runChecked(["run", "attach", "gh-5", "--json"], { ...c.deps, herdr: byUnit.cockpit });
     expect(att.exit).toBe(0);
     expect(att.value).toMatchObject({ unit: "gh-5", focused: "w9:p5" });
     expect(byUnit.calls).toEqual(["focus w9:p5"]);
-    const gone = await runCli(["run", "attach", "gh-5", "--json"], { ...c.deps, herdr: fakeHerdr([]).cockpit });
+    const gone = await runChecked(["run", "attach", "gh-5", "--json"], { ...c.deps, herdr: fakeHerdr([]).cockpit });
     expect(gone.exit).toBe(3);
     expect(gone.value).toMatchObject({ code: "nothing_to_attach", do_instead: expect.stringContaining(wt(5)) });
-    const answer = await runCli(["run", "attach", "gh-6", "--json"], { ...c.deps, herdr: fakeHerdr(agents).cockpit });
+    const answer = await runChecked(["run", "attach", "gh-6", "--json"], { ...c.deps, herdr: fakeHerdr(agents).cockpit });
     expect(answer.value).toMatchObject({ code: "nothing_to_attach", error: expect.stringContaining("gh-6") });
     // outside Herdr there is no pane to focus
-    expect((await runCli(["run", "attach", "gh-5", "--json"], { ...c.deps, herdr: null })).value).toMatchObject({ code: "nothing_to_attach" });
+    expect((await runChecked(["run", "attach", "gh-5", "--json"], { ...c.deps, herdr: null })).value).toMatchObject({ code: "nothing_to_attach" });
 
     // without a target: only units with a live pane are offered (B57), a script is refused with them (B60)
     const ask = new FakeInteraction();
-    const picked = await runCli(["run", "attach"], { ...c.deps, herdr: fakeHerdr(agents).cockpit, interaction: ask });
+    const picked = await runChecked(["run", "attach"], { ...c.deps, herdr: fakeHerdr(agents).cockpit, interaction: ask });
     expect(picked.exit).toBe(0);
     expect(ask.picks.map((q) => q.choices.map((ch) => ch.value))).toEqual([["gh-5"]]);
-    const script = await runCli(["run", "attach", "--json"], { ...c.deps, herdr: fakeHerdr(agents).cockpit });
+    const script = await runChecked(["run", "attach", "--json"], { ...c.deps, herdr: fakeHerdr(agents).cockpit });
     expect(script.exit).toBe(2);
     expect(script.value).toMatchObject({ code: "target_required", do_instead: "norn run attach gh-5" });
-    expect((await runCli(["run", "attach", "--json"], { ...c.deps, herdr: fakeHerdr([]).cockpit })).value).toMatchObject({ code: "no_target" });
+    expect((await runChecked(["run", "attach", "--json"], { ...c.deps, herdr: fakeHerdr([]).cockpit })).value).toMatchObject({ code: "no_target" });
 
     const lab = fakeHerdr(agents);
-    await runCli(["status", "--watch", "--interval", "5s"], { ...c.deps, herdr: lab.cockpit, input: keys("g", "q") });
+    await runChecked(["status", "--watch", "--interval", "5s"], { ...c.deps, herdr: lab.cockpit, input: keys("g", "q") });
     expect(lab.calls).toEqual(["label w9:p5 gh-5 · refine norn: your turn 15000", "focus w9:p5"]);
   });
 

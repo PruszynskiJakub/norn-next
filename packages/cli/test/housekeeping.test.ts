@@ -12,8 +12,9 @@ import { appendReceipt, leasesDir, readState, writeStoryFile } from "@norn/store
 import { pluginLinkHint } from "../src/commands/doctor.ts";
 import { assetsDir } from "../src/runtime/assets.ts";
 import { markStoryOnBase } from "../src/runtime/record.ts";
-import { runCli, type TickReport } from "../src/index.ts";
+import { type TickReport } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -210,7 +211,7 @@ describe("norn doctor (A7)", () => {
 
   test("reports agents, hooks (installed and firing through the hook command), remote auth and runner", async () => {
     const env = { ...h.deps.env, NORN_HOOK_COMMAND: `${process.execPath} ${main} hook` };
-    const r = await runCli(["doctor"], { ...h.deps, env });
+    const r = await runChecked(["doctor"], { ...h.deps, env });
     const v = r.value as {
       ok: boolean;
       live: boolean;
@@ -235,8 +236,8 @@ describe("norn doctor (A7)", () => {
 
   test("prints the report for a person, with the same exit code as --json", async () => {
     const env = { ...h.deps.env, NORN_HOOK_COMMAND: `${process.execPath} ${main} hook` };
-    const r = await runCli(["doctor"], { ...h.deps, env });
-    const json = await runCli(["doctor", "--json"], { ...h.deps, env });
+    const r = await runChecked(["doctor"], { ...h.deps, env });
+    const json = await runChecked(["doctor", "--json"], { ...h.deps, env });
     // whether every check passes depends on the machine (a CI runner has no `claude`), as above
     const ok = (json.value as { ok: boolean }).ok;
     expect(r.exit).toBe(json.exit);
@@ -250,13 +251,13 @@ describe("norn doctor (A7)", () => {
 
   test("missing hooks and an unusable hook command fail the check with what to do", async () => {
     expect((await h.norn("uninstall")).exit).toBe(0);
-    const r = await runCli(["doctor"], { ...h.deps, env: { ...h.deps.env, NORN_HOOK_COMMAND: "norn-missing-binary hook" } });
+    const r = await runChecked(["doctor"], { ...h.deps, env: { ...h.deps.env, NORN_HOOK_COMMAND: "norn-missing-binary hook" } });
     expect(r.exit).toBe(1);
     expect(r.value).toMatchObject({
       ok: false,
       agents: [{ name: "claude", ok: false, hooks_installed: false, hook_fires: { ok: false, error: expect.stringContaining("not found on PATH") }, notes: expect.arrayContaining(["run norn init to install hooks"]) }],
     });
-    const t = await runCli(["doctor"], { ...h.deps, env: { ...h.deps.env, NORN_HOOK_COMMAND: "norn-missing-binary hook" } });
+    const t = await runChecked(["doctor"], { ...h.deps, env: { ...h.deps.env, NORN_HOOK_COMMAND: "norn-missing-binary hook" } });
     expect(t.exit).toBe(1);
     expect(t.stdout).toMatch(/^norn doctor: \d+ checks? failed \(.*agent claude.*\)/);
     expect(t.stdout).toMatch(/FAIL agent claude .* · hooks missing/);
@@ -277,7 +278,7 @@ describe("norn doctor: a fresh repository", () => {
     h.git(["remote", "rename", "origin", "upstream"]);
     try {
       const env = { ...h.deps.env, NORN_HOOK_COMMAND: `${process.execPath} ${main} hook` };
-      const r = await runCli(["doctor"], { ...h.deps, env });
+      const r = await runChecked(["doctor"], { ...h.deps, env });
       expect(r.exit).toBe(1);
       expect(r.value).toMatchObject({ ok: false, remote: { ok: false, git_remote: { name: "origin", url: null }, do_instead: "git remote add origin <url>" } });
       expect(r.stdout).toMatch(/FAIL remote +gh as tester/);
@@ -293,12 +294,12 @@ describe("norn doctor: a fresh repository", () => {
     const env = { ...h.deps.env, NORN_HOOK_COMMAND: `${process.execPath} ${main} hook` };
     try {
       // auto mode starts agents through the runner: there it fails the check
-      const auto = await runCli(["doctor"], { ...h.deps, env });
+      const auto = await runChecked(["doctor"], { ...h.deps, env });
       expect(auto.exit).toBe(1);
       expect(auto.value).toMatchObject({ ok: false, runner: { ok: false, required: true } });
       expect(auto.stdout).toMatch(/FAIL runner +fake not available/);
       h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG.replace("default_mode: auto", "default_mode: manual"));
-      const r = await runCli(["doctor"], { ...h.deps, env });
+      const r = await runChecked(["doctor"], { ...h.deps, env });
       const v = r.value as { runner: Record<string, unknown>; agents: Array<{ ok: boolean }> };
       expect(v.runner).toMatchObject({ ok: false, required: false, available: false });
       expect(r.stdout).toMatch(/warn runner +fake not available/);
@@ -314,7 +315,7 @@ describe("norn doctor: a fresh repository", () => {
 describe("norn doctor: the cockpit plugin hint (HC11)", () => {
   test("links this checkout's plugins/herdr when norn runs from source, else installs it from GitHub", () => {
     const repo = join(import.meta.dir, "..", "..", "..");
-    expect(pluginLinkHint(assetsDir())).toBe(`herdr plugin link ${join(repo, "plugins", "herdr")} (optional: the norn cockpit, HC9)`);
-    expect(pluginLinkHint("/nowhere/a/b/c")).toBe("herdr plugin install PruszynskiJakub/norn-next/plugins/herdr (optional: the norn cockpit, HC9)");
+    expect(pluginLinkHint(assetsDir())).toBe(`herdr plugin link ${join(repo, "plugins", "herdr")} (optional: the cockpit of norn status --watch, HC9)`);
+    expect(pluginLinkHint("/nowhere/a/b/c")).toBe("herdr plugin install PruszynskiJakub/norn-next/plugins/herdr (optional: the cockpit of norn status --watch, HC9)");
   });
 });

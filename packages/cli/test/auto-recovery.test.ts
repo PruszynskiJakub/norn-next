@@ -91,7 +91,7 @@ describe("R4: nudges that can be delivered (acceptance 5)", () => {
     expect(r.failed).toBe(1);
 
     const inbox = (await h.norn("status")).value as Inbox;
-    expect(inbox.groups.unblock).toEqual([expect.objectContaining({ story: "gh-9", step: "implement", title: "nudge to gh-9 not delivered: agent p-1 is blocked by a dialog", command: `norn why gh-9 --tick ${r.tick_id}` })]);
+    expect(inbox.groups.unblock).toEqual([expect.objectContaining({ story: "gh-9", step: "implement", title: "nudge to gh-9 not delivered: agent p-1 is blocked by a dialog", command: `norn run view gh-9 --why --tick ${r.tick_id}` })]);
     // notified once, from the tick that failed (O3)
     expect(h.notifier.items.filter((i) => i.id === `failed:gh-9:${r.tick_id}`)).toHaveLength(1);
     const status = (await h.listed("gh-9")) as ProjectView["stories"][number];

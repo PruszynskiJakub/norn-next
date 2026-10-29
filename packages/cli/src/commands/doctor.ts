@@ -175,7 +175,7 @@ const RUNNER_PATH_WAIT_MS = 15_000;
 export function pluginLinkHint(assets: string): string {
   const dir = join(assets, "..", "..", "..", "plugins", "herdr");
   const how = existsSync(join(dir, "herdr-plugin.toml")) ? `herdr plugin link ${resolve(dir)}` : `herdr plugin install ${HERDR_PLUGIN_SOURCE}`;
-  return `${how} (optional: the norn cockpit, HC9)`;
+  return `${how} (optional: the cockpit of norn status --watch, HC9)`;
 }
 
 /** HC11: the plugin's GitHub source for `herdr plugin install`. */

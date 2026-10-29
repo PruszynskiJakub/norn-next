@@ -21,5 +21,11 @@ import { storyViewCommand } from "./story-view.ts";
 export const storyNoun = defineNoun({
   name: "story",
   summary: "The stories of this repository",
-  verbs: [storyListCommand, storyViewCommand, storyChatCommand, storyCreateCommand, storyAnswerCommand, storyApproveCommand, storyRejectCommand, storyUpdateBranchCommand, storyStartCommand, storyEditCommand, storyCheckoutCommand, storyHandoffCommand, storyCloseCommand, storyReopenCommand],
+  verbs: [storyCreateCommand, storyListCommand, storyViewCommand, storyAnswerCommand, storyApproveCommand, storyRejectCommand, storyUpdateBranchCommand, storyStartCommand, storyChatCommand, storyEditCommand, storyCheckoutCommand, storyHandoffCommand, storyCloseCommand, storyReopenCommand],
+  groups: [
+    { title: "general", verbs: ["create", "list", "view"] },
+    { title: "decision", verbs: ["answer", "approve", "reject", "update-branch"] },
+    { title: "work", verbs: ["start", "chat", "edit"] },
+    { title: "team", verbs: ["checkout", "handoff", "close", "reopen"] },
+  ],
 });

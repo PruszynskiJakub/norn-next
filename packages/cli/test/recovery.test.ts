@@ -10,8 +10,9 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Inbox, RunnerPort } from "@norn/core";
-import { type CliDeps, type CliResult, runCli, type TickReport } from "../src/index.ts";
+import { type CliDeps, type CliResult, type TickReport } from "../src/index.ts";
 import { createHarness, FakeRunner, type Harness, issue, sh } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 import { expectTranscript, recordTranscript, type Transcript } from "./transcript.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
@@ -48,9 +49,9 @@ function wrap(root: string, deps: CliDeps, name = "A"): Clone {
   const run = <T>(label: string, fn: () => Promise<T>) => (transcript ? transcript.command(`[${name}] ${label}`, fn) : fn());
   return {
     root,
-    norn: (...argv) => run(`norn ${argv.join(" ")}`, () => runCli(argv, deps)),
+    norn: (...argv) => run(`norn ${argv.join(" ")}`, () => runChecked(argv, deps)),
     async tick(...flags) {
-      const r = await run(["norn tick", ...flags].join(" "), () => runCli(["tick", ...flags], deps));
+      const r = await run(["norn tick", ...flags].join(" "), () => runChecked(["tick", ...flags], deps));
       if (r.exit !== 0) throw new Error(`tick failed: ${r.stdout}`);
       return r.value as TickReport;
     },

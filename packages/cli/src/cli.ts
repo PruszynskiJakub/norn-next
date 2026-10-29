@@ -38,7 +38,8 @@ export function helpFor(c: Command) {
 
 /** A noun as `norn help` lists it: its verbs in order (B2). */
 export function nounHelp(n: Noun) {
-  return { command: n.name, summary: n.summary, usage: `norn ${n.name} <verb>`, options: [], verbs: n.verbs.map(helpFor) };
+  const groups = n.groups?.map((g) => ({ title: g.title, verbs: g.verbs.map((v) => `${n.name} ${v}`) }));
+  return { command: n.name, summary: n.summary, usage: `norn ${n.name} <verb>`, options: [], verbs: n.verbs.map(helpFor), ...(groups ? { groups } : {}) };
 }
 
 export function parseCommandArgs(c: Command, argv: string[]): ParsedArgs {

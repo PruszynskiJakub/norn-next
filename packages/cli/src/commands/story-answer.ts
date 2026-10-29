@@ -31,14 +31,14 @@ export const storyAnswerCommand = defineCommand({
     const [unit, raw] = args.positionals.length === 2 ? (args.positionals as [string, string]) : [undefined, args.positionals[0] as string];
     const text = raw.trim();
     if (!text) throw usageError("the answer is empty", 'norn story answer <unit> "<text>"');
-    const key = await targetKey(ctx, unit, args.json === true, parkedOn("ask", "story answer", "Nothing waits for an answer", (k) => cmd.answer(k)));
+    const key = await targetKey(ctx, unit, args.json === true, parkedOn("ask", "story answer", "Nothing waits for an answer", (k) => cmd.storyAnswer(k)));
     const t = await resolveTarget(ctx, key, asks);
     const out = await runHumanVerb(ctx, t, {
       verb: "story answer",
       mailbox: true,
       check(t, st) {
         if (!asks(st))
-          throw refuse(`${t.key} is not waiting for an answer: it is at ${at(st)}`, nextCommand(t.key, st) ?? cmd.status(t.story), "not_parked_on_ask");
+          throw refuse(`${t.key} is not waiting for an answer: it is at ${at(st)}`, nextCommand(t.key, st) ?? cmd.storyView(t.story), "not_parked_on_ask");
       },
       build: (t, st) => humanReceipt(ctx, t, st, "answer", { answer: text, ...(st.park?.receipt_id ? { ask_receipt_id: st.park.receipt_id } : {}) }),
       before: (t, st, route, receipt) => typeIntoPrompt(ctx, t, st, route, receipt, text),
@@ -72,7 +72,7 @@ async function typeIntoPrompt(ctx: Context, t: Target, st: UnitState, route: Rou
     throw refuse(`${t.key}'s agent no longer waits on the prompt (pane is ${pane.state})`, `${cmd.tick()} (it records that the agent moved on, R6.1)`, "prompt_gone");
   const prompt = pane?.state === "waiting_input" && pane.prompt ? pane.prompt : { options: park.options ?? [], choice: park.choice ?? null };
   if (prompt.options.length && optionIndex(prompt.options, text) === null)
-    throw usageError(`'${text}' is not one of the prompt's options: ${optionsLine(prompt.options)}`, cmd.answer(t.key, "1"), "not_an_option");
+    throw usageError(`'${text}' is not one of the prompt's options: ${optionsLine(prompt.options)}`, cmd.storyAnswer(t.key, "1"), "not_an_option");
   try {
     await runner.sendKeys(session, promptKeys(prompt, text).keys);
   } catch (e) {

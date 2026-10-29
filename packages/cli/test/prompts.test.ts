@@ -24,6 +24,7 @@ import type { TickReport } from "../src/index.ts";
 import { withNornOnPath } from "../src/runtime/shim.ts";
 import { runCli } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -116,7 +117,7 @@ describe("R6.1: the agent's report while parked on an implicit ask (acceptance 9
       expect.objectContaining({
         title: "Contains brace with quote character (expansion obfuscation) Do you want to proceed?",
         detail: "pending command: cat >> test/web.test.ts <<'EOF' · options: 1. Yes · 2. Yes, and switch to auto mode · auto mode handles these prompts for you · 3. No — answer with the number",
-        command: 'norn answer gh-9 "…"',
+        command: 'norn story answer gh-9 "…"',
       }),
     ]);
     expect(inbox.groups.answer[0]).not.toHaveProperty("full");
@@ -128,7 +129,7 @@ describe("R6.1: the agent's report while parked on an implicit ask (acceptance 9
   });
 
   test("`norn done` is accepted: an answer by the agent closes the ask, then the report applies", async () => {
-    const r = await runCli(["done", "done", "--handoff", "fixed"], { ...h.deps, cwd: wt(h) });
+    const r = await runChecked(["done", "done", "--handoff", "fixed"], { ...h.deps, cwd: wt(h) });
     expect(r.value).toMatchObject({ ok: true, kind: "done" });
     expect(r.exit).toBe(0);
     const tail = receipts(h).slice(-2);
@@ -205,7 +206,7 @@ describe("B6: the agent's report after a person's `norn answer`, before the tick
     await parkOnPrompt(h);
     // the prompt was about the agent's own `… && norn done …`: the keys arrive and it runs at once
     expect((await h.norn("story", "answer", "gh-9", "1")).exit).toBe(0);
-    const r = await runCli(["done", "done", "--handoff", "reviewed"], { ...h.deps, cwd: wt(h) });
+    const r = await runChecked(["done", "done", "--handoff", "reviewed"], { ...h.deps, cwd: wt(h) });
     expect(r.value).toMatchObject({ ok: true, kind: "done" });
     expect(r.exit).toBe(0);
     expect(receipts(h).slice(-2).map((x) => `${x.kind}:${x.by}`)).toEqual(["answer:human", "done:agent"]);
@@ -231,7 +232,7 @@ describe("B11: the tick and the agent resolve the same implicit ask", () => {
     h.runner.pane = { alive: true, state: "working", since: null };
     let report: Awaited<ReturnType<typeof runCli>> | null = null;
     h.runner.onPaneState = async () => {
-      report = await runCli(["done", "done", "--handoff", "fixed"], { ...h.deps, cwd: wt(h) });
+      report = await runChecked(["done", "done", "--handoff", "fixed"], { ...h.deps, cwd: wt(h) });
     };
     h.clock.advance(10_000);
     const t = await h.tick();

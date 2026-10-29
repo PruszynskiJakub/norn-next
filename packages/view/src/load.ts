@@ -145,7 +145,7 @@ function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: Uni
     since,
     age: since ? formatAge(ctx.now - Date.parse(since)) : null,
     last_outcome: st?.last_outcome ? { step: st.last_outcome.step, outcome: st.last_outcome.outcome, at: st.last_outcome.at } : null,
-    next: corrupt ? cmd.why(u.unit.key) : nextCommand(u.unit.key, st, start),
+    next: corrupt ? cmd.runView(u.unit.key, { why: true }) : nextCommand(u.unit.key, st, start),
     updated_at: st?.updated_at ?? null,
     errors: u.errors,
     act_failure: failure ? { effect: failure.effect, reason: failure.reason, at: failure.at, tick_id: failure.tick_id } : null,

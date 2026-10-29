@@ -23,7 +23,7 @@ export const askCommand = defineCommand({
     const receipt: ReceiptOf<"ask"> = { kind: "ask", ...reportHeader(ctx, t), question };
     if (options.length) receipt.options = options;
     const written = writeReport(t, receipt);
-    const answerWith = cmd.answer(t.s.unit.key);
+    const answerWith = cmd.storyAnswer(t.s.unit.key);
     return reported(t, "ask", written, { question, ...(options.length ? { options } : {}), answer_with: answerWith }, [
       `Asked a person (${reportedFor(t)}): ${question}`,
       ...(options.length ? [`Options: ${options.join(" · ")}`] : []),

@@ -44,7 +44,7 @@ export const storyStartCommand = defineCommand({
     const manualReady = st.status === "ready" && step?.type === "agent" && effectiveMode(sf.mode, !!step.attended, t.obs.facts.machine.runner).mode === "manual";
     if (!attended && !manualReady) {
       const why = st.status === "ready" && step?.type === "agent" ? "the heartbeat starts it (auto mode)" : `it is ${st.status}${st.park ? ` (${st.park.kind})` : ""}`;
-      throw refuse(`${t.key} ${st.step}: nothing for a person to start — ${why}`, cmd.inbox(), "nothing_to_open");
+      throw refuse(`${t.key} ${st.step}: nothing for a person to start — ${why}`, cmd.status(), "nothing_to_open");
     }
     const worktree = uf.worktree?.path ?? null;
     if (!worktree) throw refuse(`${t.key} has no worktree on this checkout`, cmd.tidy({ dryRun: true }), "no_worktree");

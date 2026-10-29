@@ -20,7 +20,7 @@ export const stuckCommand = defineCommand({
     const t = reportTarget(ctx, "stuck");
     const receipt: ReceiptOf<"stuck"> = { kind: "stuck", ...reportHeader(ctx, t), reason };
     const written = writeReport(t, receipt);
-    const unblockWith = cmd.unstick(t.s.unit.key);
+    const unblockWith = cmd.runRerun(t.s.unit.key);
     return reported(t, "stuck", written, { reason, unblock_with: unblockWith }, [`Reported stuck (${reportedFor(t)}): ${reason}`, `A person unblocks it with \`${unblockWith}\`.`]);
   },
 });

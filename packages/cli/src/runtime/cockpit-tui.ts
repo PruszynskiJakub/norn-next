@@ -378,7 +378,7 @@ export function renderCockpit(model: CockpitModel, s: TuiState, o: Look): string
   // header
   const hb = model.header.heartbeat;
   const pending = model.header.pending;
-  const left = `${paint("norn cockpit", ["bold"])} ${paint("·", ["dim"])} ${basename(model.header.repo)}  ${pending ? paint(`${pending} need${pending === 1 ? "s" : ""} you`, ["bold", "yellow"]) : paint("nothing needs you", ["green"])}`;
+  const left = `${paint("norn status", ["bold"])} ${paint("·", ["dim"])} ${basename(model.header.repo)}  ${pending ? paint(`${pending} need${pending === 1 ? "s" : ""} you`, ["bold", "yellow"]) : paint("nothing needs you", ["green"])}`;
   const right = `${hb.down ? paint(`no heartbeat${hb.age ? ` for ${hb.age}` : ""} — ${cmd.watch()}`, ["red"]) : paint(hb.age ? `tick ${hb.age} ago` : "no tick yet", ["dim"])}  ${paint(o.clock, ["dim"])}`;
   const out = [`${left}${" ".repeat(Math.max(2, width - visible(left) - visible(right)))}${right}`];
   out.push(s.filtering ? `${paint("/", ["bold", "cyan"])} ${s.filter}${paint("▏", ["dim"])}` : s.filter ? `${paint("filter:", ["dim"])} ${s.filter} ${paint("(esc clears)", ["dim"])}` : paint("/ to filter", ["dim"]));

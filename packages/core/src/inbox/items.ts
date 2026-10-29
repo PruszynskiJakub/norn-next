@@ -136,7 +136,7 @@ export function actFailureItem(story: StoryFacts, uf: UnitFacts): InboxItem | nu
     step: st.step,
     title: f.reason.includes(key) ? f.reason : `${f.effect} for ${key} failed: ${f.reason}`,
     detail: `tick ${f.tick_id} (${f.rule})${f.session ? ` · session ${f.session.runner} ${f.session.pane_id ?? f.session.session_id}` : ""}`,
-    command: cmd.why(key, { tick: f.tick_id }),
+    command: cmd.runView(key, { why: true, tick: f.tick_id }),
     since: f.at,
     ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
   };
@@ -195,7 +195,7 @@ export function startCommandFor(uf: UnitFacts, story: StoryFacts, config: Resolv
 function personStart(uf: UnitFacts, story: StoryFacts, facts: Facts, config: ResolvedConfig): { command: string; detail?: string } {
   const start = startCommandFor(uf, story, config);
   if (!facts.machine.runner_capabilities?.open) return { command: start };
-  return { command: cmd.open(uf.unit.key), detail: `by hand: ${start}` };
+  return { command: cmd.storyStart(uf.unit.key), detail: `by hand: ${start}` };
 }
 
 /**
@@ -207,7 +207,7 @@ function notStartedItem(story: StoryFacts, facts: Facts, config: ResolvedConfig)
   if (story.claim.state !== "mine" || isStarted(story) || storyFinished(story) || !story.frontmatter) return null;
   const up = heartbeatUp(facts, config);
   const base = { id: `not-started:${story.key}`, story: story.key, slice: null, step: null, since: story.frontmatter.intake_at, url: story.frontmatter.url };
-  if (up) return { ...base, group: "running", title: "taken in — the next tick starts it", command: cmd.status(story.key) };
+  if (up) return { ...base, group: "running", title: "taken in — the next tick starts it", command: cmd.storyView(story.key) };
   return { ...base, group: "your_turn", title: `taken in, not started — ${story.frontmatter.title}`, detail: "a tick starts the story; the inbox then shows how to start its first step", command: cmd.watch() };
 }
 
@@ -311,7 +311,7 @@ function noteItems(story: StoryFacts): InboxItem[] {
     step: n.step,
     title: oneLine(noteTitle(n)),
     ...(n.text.includes("\n") ? { full: n.text } : {}),
-    command: cmd.why(n.unit, { receipt: n.receipt_id }),
+    command: cmd.runView(n.unit, { receipt: n.receipt_id }),
     since: n.at,
     cleared_by,
     ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
@@ -347,7 +347,7 @@ function mergeItem(story: StoryFacts, st: UnitState, base: string): InboxItem | 
     step: null,
     title: `Merge PR #${pr.number}${draft ? " (still a draft)" : ""}`,
     detail: details.join(" · "),
-    command: conflicting ? cmd.update(story.key) : `${cli} merge ${pr.number}`,
+    command: conflicting ? cmd.storyUpdateBranch(story.key) : `${cli} merge ${pr.number}`,
     since: st.updated_at,
     url: pr.url,
   };
@@ -392,7 +392,7 @@ function staleItem(story: StoryFacts, base: string): InboxItem | null {
     step: st.step,
     title,
     detail: `${base} at ${short(b.sha)}; the story head ${short(b.head)} has ${b.ahead} commit(s) of its own`,
-    command: baseUpdateStep(wf) ? cmd.update(story.key) : `git log --oneline ${b.head}..${b.sha}`,
+    command: baseUpdateStep(wf) ? cmd.storyUpdateBranch(story.key) : `git log --oneline ${b.head}..${b.sha}`,
     since: st.park?.since ?? st.updated_at,
     ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
   };
@@ -470,7 +470,7 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
   const base = { story: story.key, slice: uf.unit.slice, url: story.frontmatter?.url, ...(reach ? { reach } : {}) };
   if (uf.errors.length || st?.status === "corrupt") {
     const files = uf.errors.map((e) => e.file).join(", ") || "state.json";
-    return { ...base, id: `corrupt:${key}:${files}`, group: "unblock", step: st?.step ?? null, title: `corrupt: ${files} failed validation (S2)`, command: cmd.why(key), since: iso(facts.now) };
+    return { ...base, id: `corrupt:${key}:${files}`, group: "unblock", step: st?.step ?? null, title: `corrupt: ${files} failed validation (S2)`, command: cmd.runView(key, { why: true }), since: iso(facts.now) };
   }
   if (!st) return null;
   const item = (group: InboxGroup, title: string, command: string, since: string, extra: Partial<InboxItem> = {}): InboxItem => ({
@@ -489,22 +489,22 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       if (park?.kind === "ask") return answerItem(uf, st, park, item);
       if (park?.kind === "gate") {
         const judged = judgedDetail(story, uf);
-        const reject = `or reject: ${cmd.approve(key, { reject: true })}`;
+        const reject = `or reject: ${cmd.storyReject(key)}`;
         const { detail, full } = gateChecks(story, uf);
         const fullText = [judged?.full, full].filter(Boolean).join("\n\n");
-        return item("approve", park.reason, cmd.approve(key), park.since, { detail: [judged?.detail, detail, reject].filter(Boolean).join(" · "), ...(fullText ? { full: fullText } : {}) });
+        return item("approve", park.reason, cmd.storyApprove(key), park.since, { detail: [judged?.detail, detail, reject].filter(Boolean).join(" · "), ...(fullText ? { full: fullText } : {}) });
       }
       if (park?.kind === "attended") {
         const start = personStart(uf, story, facts, config);
         return item("your_turn", `${st.step}: attended step — work with the agent`, start.command, park.since, start.detail ? { detail: start.detail } : {});
       }
-      return item("unblock", park?.reason ?? "parked", cmd.unstick(key), park?.since ?? st.updated_at);
+      return item("unblock", park?.reason ?? "parked", cmd.runRerun(key), park?.since ?? st.updated_at);
     case "stuck":
-      return item("unblock", park?.reason ?? "stuck", cmd.unstick(key), park?.since ?? st.updated_at, park?.receipt_id ? { id: park.receipt_id } : {});
+      return item("unblock", park?.reason ?? "stuck", cmd.runRerun(key), park?.since ?? st.updated_at, park?.receipt_id ? { id: park.receipt_id } : {});
     case "running": {
       // R9.1: the agent never took its launch prompt — a person looks at the pane
       const unsent = launchPromptMissed(uf, st);
-      if (unsent) return item("unblock", `launch prompt not received by ${key} ${st.step}${unsent.pane ? ` — look at pane ${unsent.pane}` : ""}`, st.run?.session?.reach ?? cmd.trace(key), unsent.since, { id: `launch:${key}:${st.run?.run_id ?? st.step}`, detail: "the agent session started but never began a turn; the prompt was re-sent once (R9.1)" });
+      if (unsent) return item("unblock", `launch prompt not received by ${key} ${st.step}${unsent.pane ? ` — look at pane ${unsent.pane}` : ""}`, st.run?.session?.reach ?? cmd.runList(key), unsent.since, { id: `launch:${key}:${st.run?.run_id ?? st.step}`, detail: "the agent session started but never began a turn; the prompt was re-sent once (R9.1)" });
       const nudge = undeliveredNudge(story, uf, facts);
       if (nudge && !heartbeatDown(facts, config)) return item("your_turn", `agent ended its turn without reporting — reopen the agent and run ${cmd.brief()}`, startCommandFor(uf, story, config), nudge.at, { id: `${nudge.outcome}:${key}:${st.step}#${st.attempt}:${st.nudges_used}` });
       // HC2: an attended agent waiting for its person past `attended_wait`; one item (and notification) per wait
@@ -512,14 +512,14 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       if (waiting !== null && st.run && facts.now - waiting >= parseDuration(config.limits.attended_wait)) {
         // HC3: reach the session that waits — never start a second agent for the step
         const worktree = reach?.worktree ?? null;
-        const command = st.run.session?.reach ?? (worktree ? `cd ${worktree}` : cmd.trace(key));
+        const command = st.run.session?.reach ?? (worktree ? `cd ${worktree}` : cmd.runList(key));
         return item("your_turn", `${st.step}: the agent is waiting for you`, command, iso(waiting), {
           id: `attended:${key}:${st.run.run_id}:${iso(waiting)}`,
           detail: "attended step: answer in the agent's pane; it reports when you agree (MO4)",
         });
       }
     }
-      return item("running", `${st.step} #${st.attempt}${st.run ? ` (${st.run.how})` : ""}`, cmd.trace(key), st.run?.started_at ?? st.step_entered_at);
+      return item("running", `${st.step} #${st.attempt}${st.run ? ` (${st.run.how})` : ""}`, cmd.runList(key), st.run?.started_at ?? st.step_entered_at);
     case "ready": {
       const step = uf.workflow ? stepOf(uf.workflow, st.step) : null;
       if (step?.type === "agent") {
@@ -532,7 +532,7 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       }
       // R5.5 (A8): an auto step waits for the heartbeat, not for a person — no manual start hint
       if (step?.type === "agent" && heartbeatDown(facts, config)) return item("running", `${st.step} #${st.attempt} (waiting for the heartbeat — ${cmd.watch()})`, cmd.watch(), st.step_entered_at);
-      return item("running", `${st.step} #${st.attempt} (queued)`, cmd.trace(key), st.step_entered_at);
+      return item("running", `${st.step} #${st.attempt} (queued)`, cmd.runList(key), st.step_entered_at);
     }
     case "done": {
       if (uf.unit.slice === null) {
@@ -542,7 +542,7 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       if (facts.now - epoch(st.updated_at) > RECENT_MS) return null;
       // story.md says `done` once norn saw the merge (GR6) — the durable record when no PR was fetched
       const waiting = uf.unit.slice === null && knownPr(story)?.state !== "merged" && !story.merged_by_ancestry && story.frontmatter?.status !== "done";
-      return item("recently_done", waiting ? "workflow done — waiting for the PR merge (GR6)" : "done", cmd.trace(key), st.updated_at);
+      return item("recently_done", waiting ? "workflow done — waiting for the PR merge (GR6)" : "done", cmd.runList(key), st.updated_at);
     }
   }
 }
@@ -561,7 +561,7 @@ export function bodyChangedItem(story: StoryFacts): InboxItem | null {
     step: null,
     title: "issue body changed since refine",
     detail: "the spec body is never overwritten; fold the change into the spec if it matters",
-    command: cmd.status(story.key),
+    command: cmd.storyView(story.key),
     since: fm.intake_at,
     url: fm.url,
   };
@@ -695,7 +695,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
       continue;
     }
     if (story.frontmatter_error) {
-      add({ id: `corrupt:${story.key}:story.md`, group: "unblock", story: story.key, slice: null, step: null, title: `corrupt: ${story.frontmatter_error.file} failed validation (S2)`, command: cmd.why(story.key), since: iso(facts.now) });
+      add({ id: `corrupt:${story.key}:story.md`, group: "unblock", story: story.key, slice: null, step: null, title: `corrupt: ${story.frontmatter_error.file} failed validation (S2)`, command: cmd.runView(story.key, { why: true }), since: iso(facts.now) });
       continue;
     }
     add(notStartedItem(story, facts, config));

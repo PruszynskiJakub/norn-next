@@ -6,8 +6,8 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
 import type { CliDeps, CliResult } from "../src/index.ts";
-import { runCli } from "../src/index.ts";
 import { createHarness, FakeInteraction, type Harness, issue } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 
 setDefaultTimeout(30_000);
 
@@ -67,7 +67,7 @@ const tick = async () => {
   return h.tick();
 };
 /** `norn …` with these deps over the harness's */
-const norn = (deps: Partial<CliDeps>, ...argv: string[]): Promise<CliResult> => runCli(argv, { ...h.deps, ...deps });
+const norn = (deps: Partial<CliDeps>, ...argv: string[]): Promise<CliResult> => runChecked(argv, { ...h.deps, ...deps });
 const unitOf = (r: CliResult) => (r.value as { unit?: string }).unit;
 
 beforeAll(async () => {

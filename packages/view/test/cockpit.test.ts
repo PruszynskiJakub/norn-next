@@ -49,7 +49,7 @@ const entry = (group: InboxGroup, story: string, over: Partial<InboxEntry> = {})
   slice: null,
   step: "refine",
   title: `${group} title`,
-  command: "norn trace x",
+  command: "norn run list x",
   since: "2026-10-27T11:30:00.000Z",
   age: "30m",
   ...over,
@@ -58,11 +58,11 @@ const entry = (group: InboxGroup, story: string, over: Partial<InboxEntry> = {})
 function view(): ProjectView {
   const reach = { worktree: "/repo-worktrees/gh-2-x", agent_session_id: "s2", pane_id: null };
   const groups = {
-    your_turn: [entry("your_turn", "gh-1", { command: "norn open gh-1" }), entry("your_turn", "gh-2", { id: "attended:gh-2", command: "cd /wt", reach })],
-    answer: [entry("answer", "gh-3", { slice: "gh-3/02", command: 'norn answer gh-3/02 "…"' })],
-    approve: [entry("approve", "gh-4", { step: "ready", command: "norn approve gh-4" })],
-    unblock: [entry("unblock", "gh-5", { command: "norn unstick gh-5" })],
-    check: [entry("check", "gh-4", { command: "norn why gh-4" })],
+    your_turn: [entry("your_turn", "gh-1", { command: "norn story start gh-1" }), entry("your_turn", "gh-2", { id: "attended:gh-2", command: "cd /wt", reach })],
+    answer: [entry("answer", "gh-3", { slice: "gh-3/02", command: 'norn story answer gh-3/02 "…"' })],
+    approve: [entry("approve", "gh-4", { step: "ready", command: "norn story approve gh-4" })],
+    unblock: [entry("unblock", "gh-5", { command: "norn run rerun gh-5" })],
+    check: [entry("check", "gh-4", { command: "norn run view gh-4 --why" })],
     unclaimed: [entry("unclaimed", "gh-6", { command: "norn story checkout gh-6" })],
     running: [entry("running", "gh-2")],
     notes: [entry("notes", "gh-4")],
@@ -141,7 +141,7 @@ describe("cockpitModel", () => {
     const r = row(m.rows, "approve:gh-4");
     expect(r?.preview.report.story).toBe("gh-4");
     expect(r?.preview.report.pr_command).toBe("glab mr view gh-4-x");
-    expect(r?.preview.item).toEqual({ title: "approve title", command: "norn approve gh-4" });
+    expect(r?.preview.item).toEqual({ title: "approve title", command: "norn story approve gh-4" });
     expect(row(m.rows, "story:gh-4")?.preview.item).toBeNull();
     expect(JSON.parse(JSON.stringify(m))).toEqual(m);
   });

@@ -11,8 +11,9 @@ import { NUDGE_TEXT } from "@norn/core";
 import { ulid } from "@norn/schema";
 import { appendReceipt, appendTrace, readTrace } from "@norn/store";
 import { humanSummary, humanTickLines } from "../src/commands/watch.ts";
-import { runCli, runShell, type TickReport } from "../src/index.ts";
+import { runShell, type TickReport } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -73,7 +74,7 @@ describe("runtime", () => {
 
   test("commands work from inside a unit worktree (A3 marker → main checkout)", async () => {
     h.clock.advance(10_000);
-    const r = await runCli(["tick", "--offline"], { ...h.deps, cwd: join(wt(), ".agents") });
+    const r = await runChecked(["tick", "--offline"], { ...h.deps, cwd: join(wt(), ".agents") });
     expect(r.exit).toBe(0);
     expect(acted(r.value as TickReport).length).toBeGreaterThanOrEqual(0);
     expect(h.state(runs())).toMatchObject({ step: "implement" });
@@ -81,7 +82,7 @@ describe("runtime", () => {
 
   test("outside a repository the command refuses with do_instead (§9.3)", async () => {
     const away = realpathSync(mkdtempSync(join(tmpdir(), "norn-away-")));
-    const r = await runCli(["tick"], { ...h.deps, cwd: away });
+    const r = await runChecked(["tick"], { ...h.deps, cwd: away });
     expect(r.exit).toBe(3);
     expect(r.value).toMatchObject({ code: "not_in_repo", do_instead: expect.any(String) });
   });
@@ -175,7 +176,7 @@ describe("watch", () => {
     await h.tick(); // claim
     expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-11"])).not.toBe("");
     const lines: string[] = [];
-    const r = await runCli(["watch", "--interval", "1ms", "--max-ticks", "2"], { ...h.deps, log: (l) => lines.push(l) });
+    const r = await runChecked(["watch", "--interval", "1ms", "--max-ticks", "2"], { ...h.deps, log: (l) => lines.push(l) });
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ ticks: 2, released: [{ story: "gh-11", ok: true, pushed: ["gh-11-watch-me"] }] });
     expect(lines).toHaveLength(2);
@@ -186,7 +187,7 @@ describe("watch", () => {
     expect((await h.norn("story", "checkout", "gh-11")).exit).toBe(0); // the first test released it
     expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-11"])).not.toBe("");
     const lines: string[] = [];
-    const r = await runCli(["watch", "--interval", "1ms", "--max-ticks", "2", "--human"], { ...h.deps, log: (l) => lines.push(l) });
+    const r = await runChecked(["watch", "--interval", "1ms", "--max-ticks", "2", "--human"], { ...h.deps, log: (l) => lines.push(l) });
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ ticks: 2, released: [{ story: "gh-11", ok: true }] });
     expect(r.stdout).toMatch(/^Stopped after 2 ticks \(0 failed actions\)\.\nReleased gh-11 \(pushed gh-11-watch-me\)\.\n$/);
@@ -195,7 +196,7 @@ describe("watch", () => {
     for (const l of lines.slice(1)) expect(l).toMatch(/^\d\d:\d\d:\d\d {2}gh-11 {2}\S+ → \S+$/);
     expect(lines.some((l) => l.startsWith("{"))).toBe(false);
 
-    const json = await runCli(["watch", "--interval", "1ms", "--max-ticks", "1", "--human", "--json", "--keep-claims"], { ...h.deps, log: () => {} });
+    const json = await runChecked(["watch", "--interval", "1ms", "--max-ticks", "1", "--human", "--json", "--keep-claims"], { ...h.deps, log: () => {} });
     expect(JSON.parse(json.stdout)).toMatchObject({ ticks: 1, released: [] });
   });
 

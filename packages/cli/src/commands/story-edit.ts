@@ -47,7 +47,7 @@ async function editMode(ctx: Context, raw: string, mode: Mode) {
     // MO1: every mode receipt applies, the last one wins — a second switch is no duplicate
     refuseDuplicate: false,
     check(t, st) {
-      if (st.status === "done") throw refuse(`${t.key} is done`, cmd.status(t.story), "unit_done");
+      if (st.status === "done") throw refuse(`${t.key} is done`, cmd.storyView(t.story), "unit_done");
     },
     noop(t, st) {
       const previous: Mode = st.mode ?? ctx.config.default_mode;
@@ -94,7 +94,7 @@ async function editWorkflow(ctx: Context, raw: string, name: string, at: string 
       // W9: before start the choice lives in frontmatter
       if (at !== undefined) throw refuse(`${t.key} has not started; --at applies only to a running unit (S7)`, cmd.storyEdit(t.key, { workflow: name }), "not_started");
       if (sf.claim.state === "other") throw claimHeld(sf.claim.blob, `ask ${sf.claim.blob.holder} to run it, or ${cmd.storyCheckout(t.story, { force: true })}`);
-      if (t.slice ? !sliceFile?.frontmatter : !sf.frontmatter) throw refuse(`${t.key}'s frontmatter is missing or invalid`, cmd.status(t.story), "frontmatter");
+      if (t.slice ? !sliceFile?.frontmatter : !sf.frontmatter) throw refuse(`${t.key}'s frontmatter is missing or invalid`, cmd.storyView(t.story), "frontmatter");
       const previous = t.slice ? (sliceFile?.frontmatter?.workflow ?? null) : (sf.frontmatter?.workflow ?? null);
       const file = previous === name ? null : patchFm();
       return { unit: t.key, workflow: name, previous, started: false, changed: previous !== name, file };
@@ -108,7 +108,7 @@ async function editWorkflow(ctx: Context, raw: string, name: string, at: string 
       // as before: a second switch before the tick is written, not refused as a duplicate (S6)
       refuseDuplicate: false,
       check(t, st) {
-        if (st.status === "done") throw refuse(`${t.key} is done`, cmd.status(t.story), "unit_done");
+        if (st.status === "done") throw refuse(`${t.key} is done`, cmd.storyView(t.story), "unit_done");
         // B32, S7: the step a started unit lands on is always explicit
         if (at === undefined) throw refuse(`${t.key} already runs workflow ${st.workflow}; switching a started unit needs --at <step> (S7)`, cmd.storyEdit(t.key, { workflow: name, at: steps }), "needs_to");
         if (!stepOf(wf, at)) throw refuse(`no step '${at}' in workflow ${name}`, cmd.storyEdit(t.key, { workflow: name, at: steps }), "unknown_step");

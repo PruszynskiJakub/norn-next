@@ -239,7 +239,7 @@ describe("base sync replay", () => {
     s.base = base({ behind: 4, conflicts: ["a.ts", "b.ts"] });
     expect(s.tick().rule).toBe("unit.parked.gate");
     const inbox = buildInbox(s.facts(), CONFIG);
-    expect(inbox.groups.check).toMatchObject([{ id: `stale:gh-1:${SHA("b")}`, title: "gh-1 conflicts with main in a.ts, b.ts (4 behind)", command: "norn update gh-1" }]);
+    expect(inbox.groups.check).toMatchObject([{ id: `stale:gh-1:${SHA("b")}`, title: "gh-1 conflicts with main in a.ts, b.ts (4 behind)", command: "norn story update-branch gh-1" }]);
     // a gate with the route: the tick classifies it, so no item
     const routed = new Sim(BASE_WF);
     routed.runUntil(at_("ready", "parked"));
@@ -255,7 +255,7 @@ describe("base sync replay", () => {
     s.runUntil(at_("ready", "parked"));
     s.base = base({ behind: 4, conflicts: ["a.ts"] });
     const items = () => buildInbox(s.facts(), CONFIG).groups.check.filter((i) => i.id.startsWith("stale:")).map((i) => i.command);
-    expect(items()).toEqual(["norn update gh-1"]);
+    expect(items()).toEqual(["norn story update-branch gh-1"]);
     const gate = s.state;
     const since = at(s.now);
     // a permission prompt parks the unit (implicit ask) — in resolve, in test, anywhere: no item
@@ -270,7 +270,7 @@ describe("base sync replay", () => {
     }
     // stuck elsewhere: norn update is a way on
     s.state = { ...gate, step: "test", status: "stuck", park: { kind: "stuck", reason: "tests fail", since } };
-    expect(items()).toEqual(["norn update gh-1"]);
+    expect(items()).toEqual(["norn story update-branch gh-1"]);
   });
 
   test("6 (core): an update receipt re-enters update from $done, a gate or stuck; refused while running", () => {
@@ -289,7 +289,7 @@ describe("base sync replay", () => {
     s.pr = { number: 7, url: "https://github.com/o/r/pull/7", state: "open", is_draft: false, head_sha: SHA("h"), base_branch: "main" };
     s.base = base({ behind: 5, conflicts: ["a.ts"] });
     const merge = buildInbox(s.facts(), CONFIG).groups.your_turn[0];
-    expect(merge).toMatchObject({ id: "merge:gh-1:7", command: "norn update gh-1" });
+    expect(merge).toMatchObject({ id: "merge:gh-1:7", command: "norn story update-branch gh-1" });
     expect(merge?.detail).toContain("behind main by 5");
     s.base = base({ behind: 5 });
     expect(buildInbox(s.facts(), CONFIG).groups.your_turn[0]).toMatchObject({ command: "gh pr merge 7", detail: "https://github.com/o/r/pull/7 · behind main by 5" });

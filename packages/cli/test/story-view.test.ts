@@ -11,9 +11,9 @@ import { join } from "node:path";
 import { readTrace } from "@norn/store";
 import type { OrientReport } from "@norn/view";
 import type { CliDeps, CliResult } from "../src/index.ts";
-import { runCli } from "../src/index.ts";
 import { fakeHerdr } from "./fake-herdr.ts";
 import { createHarness, FakeInteraction, type Harness, issue } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 
 setDefaultTimeout(30_000);
 
@@ -57,7 +57,7 @@ const tick = async () => {
   h.clock.advance(10_000);
   return h.tick();
 };
-const norn = (deps: Partial<CliDeps>, ...argv: string[]): Promise<CliResult> => runCli(argv, { ...h.deps, ...deps });
+const norn = (deps: Partial<CliDeps>, ...argv: string[]): Promise<CliResult> => runChecked(argv, { ...h.deps, ...deps });
 const slice = (nn: string, title: string) => `---\nid: gh-2/${nn.slice(0, 2)}\ntitle: ${title}\nworkflow: sliceqa\ndepends_on: []\nstatus: planned\n---\n\nAcceptance: it works.\n`;
 
 beforeAll(async () => {
@@ -110,7 +110,7 @@ describe("norn story view", () => {
     expect(v.pr_state).toBe("draft");
     expect(v.unit).toMatchObject({ key: "gh-2", workflow: "sliced", step: "slices" });
     expect(v.slices).toEqual([
-      expect.objectContaining({ key: "gh-2/01", title: "First part", status: "parked", workflow: "sliceqa", step: "qa", attempt: 1, slice_status: expect.any(String), depends_on: [], next: "norn approve gh-2/01" }),
+      expect.objectContaining({ key: "gh-2/01", title: "First part", status: "parked", workflow: "sliceqa", step: "qa", attempt: 1, slice_status: expect.any(String), depends_on: [], next: "norn story approve gh-2/01" }),
       expect.objectContaining({ key: "gh-2/02", status: "parked", workflow: "sliceqa", step: "qa", attempt: 1, depends_on: [] }),
     ]);
     expect(v.waiting.map((w) => [w.group, w.unit])).toEqual([

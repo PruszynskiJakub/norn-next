@@ -7,8 +7,9 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Receipt } from "@norn/schema";
-import { type CliResult, runCli, type TickReport } from "../src/index.ts";
+import { type CliResult, type TickReport } from "../src/index.ts";
 import { createHarness, type Harness, issue, sh } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -151,7 +152,7 @@ describe("preconditions refuse with do_instead", () => {
   test("approve on a non-gate step, answer when not asking, run rerun when running, unknown unit", async () => {
     const a = await h.norn("story", "approve", "gh-5");
     refused(a, "not_at_gate");
-    expect(a.value).toMatchObject({ do_instead: "norn trace gh-5" });
+    expect(a.value).toMatchObject({ do_instead: "norn run list gh-5" });
     refused(await h.norn("story", "answer", "gh-5", "EUR"), "not_parked_on_ask");
     refused(await h.norn("run", "rerun", "gh-5"), "running");
     refused(await h.norn("story", "answer", "gh-99", "x"), "unknown_unit");
@@ -177,7 +178,7 @@ describe("story edit --workflow after start (S7, B32)", () => {
     await tick();
     expect(h.state(runs6())).toMatchObject({ workflow: "gated", step: "review", status: "parked", park: { kind: "gate" } });
     const inbox = (await h.norn("status")).value as { groups: Record<string, Array<{ story: string; command: string }>> };
-    expect(inbox.groups.approve).toEqual([expect.objectContaining({ story: "gh-6", command: "norn approve gh-6" })]);
+    expect(inbox.groups.approve).toEqual([expect.objectContaining({ story: "gh-6", command: "norn story approve gh-6" })]);
   });
 });
 
@@ -188,12 +189,12 @@ describe("answer (O2, B2)", () => {
     const st = h.state(runs5());
     expect(st).toMatchObject({ status: "parked", park: { kind: "ask", reason: "Which currency?" } });
     const inbox = (await h.norn("status")).value as { groups: Record<string, Array<{ command: string }>> };
-    expect(inbox.groups.answer?.[0]?.command).toBe('norn answer gh-5 "…"');
+    expect(inbox.groups.answer?.[0]?.command).toBe('norn story answer gh-5 "…"');
     // B9: one gate and one ask → the Approve and Answer groups, each item with its age and command
     const text = await h.norn("status");
     expect(text.exit).toBe(0);
-    expect(text.stdout).toMatch(/^Answer \(1\) · .*\n  gh-5 +work: Which currency\? · \d+[smhd]\S*\n(?: {6}.*\n)*? {6}\$ norn answer gh-5 "…"\n/m);
-    expect(text.stdout).toMatch(/^Approve \(1\) · .*\n  gh-6 +review: Look at it · \d+[smhd]\S*\n(?: {6}.*\n)*? {6}\$ norn approve gh-6\n/m);
+    expect(text.stdout).toMatch(/^Answer \(1\) · .*\n  gh-5 +work: Which currency\? · \d+[smhd]\S*\n(?: {6}.*\n)*? {6}\$ norn story answer gh-5 "…"\n/m);
+    expect(text.stdout).toMatch(/^Approve \(1\) · .*\n  gh-6 +review: Look at it · \d+[smhd]\S*\n(?: {6}.*\n)*? {6}\$ norn story approve gh-6\n/m);
 
     const r = await h.norn("story", "answer", "gh-5", "EUR");
     expect(r.exit).toBe(0);
@@ -312,7 +313,7 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
     await tick();
     expect(h.state(runs5())).toMatchObject({ step: "review", attempt: 3, status: "parked" });
     const deps = { ...h.deps, cwd: bRoot, env: { ...h.deps.env, NORN_HOME_DIR: bHome, USER: "colleague", NORN_MACHINE: "laptop" } };
-    b = (...argv) => runCli(argv, deps);
+    b = (...argv) => runChecked(argv, deps);
 
     const r = await b("story", "approve", "gh-5", "--reason", "lgtm");
     expect(r.exit).toBe(0);
@@ -439,7 +440,7 @@ describe("a slice gate in its own worktree (X1: views read slice runs from the s
     expect(await h.listed("gh-8/01")).toMatchObject({ key: "gh-8/01", step: "qa", status: "parked", park: { kind: "gate", reason: "Try the slice" } });
     const inbox = (await h.norn("status")).value as { groups: Record<string, InboxItem[]> };
     expect(inbox.groups.approve).toEqual([
-      expect.objectContaining({ slice: "gh-8/01", step: "qa", title: "Try the slice", command: "norn approve gh-8/01" }),
+      expect.objectContaining({ slice: "gh-8/01", step: "qa", title: "Try the slice", command: "norn story approve gh-8/01" }),
     ]);
   });
 
@@ -457,7 +458,7 @@ describe("a slice gate in its own worktree (X1: views read slice runs from the s
   });
 
   test("in the slice worktree, story edit --auto|--manual acts on the story, --workflow on the slice (B55)", async () => {
-    const inSlice = (...argv: string[]) => runCli(argv, { ...h.deps, cwd: sliceWt() });
+    const inSlice = (...argv: string[]) => runChecked(argv, { ...h.deps, cwd: sliceWt() });
     const m = await inSlice("story", "edit", "--manual", "--json");
     expect(m.exit).toBe(0);
     expect(m.value).toMatchObject({ unit: "gh-8", mode: "manual", changed: true, receipt: { kind: "mode", slice: null } });

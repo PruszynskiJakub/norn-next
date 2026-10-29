@@ -28,7 +28,7 @@ const REOPEN_REASON = "reopened";
 async function restorable(ctx: Context, key: string): Promise<PushedStory> {
   const s = await pushedStory(ctx, key, cmd.storyReopen(key));
   if (!s) throw refuse(`no story branch for ${key}`, "check the story key", "unknown_story");
-  if (!isClosed(s)) throw refuse(`${key} is not closed (story.md says ${s.frontmatter.status})`, cmd.status(key), "not_closed");
+  if (!isClosed(s)) throw refuse(`${key} is not closed (story.md says ${s.frontmatter.status})`, cmd.storyView(key), "not_closed");
   const remote = (await ctx.ports()).remote;
   const issue = remote ? await remote.getIssue(s.frontmatter.number).catch((e: unknown) => {
     throw failure(`cannot read issue #${s.frontmatter.number}: ${(e as Error).message}`, `retry: ${cmd.storyReopen(key)}`, "network");

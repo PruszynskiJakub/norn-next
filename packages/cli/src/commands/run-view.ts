@@ -187,7 +187,7 @@ function parseFilter(args: Parameters<typeof opt.str>[0]): Filter {
   if (rule) f.rule = rule;
   const receipt = opt.str(args, "receipt");
   if (receipt !== undefined) {
-    if (!new RegExp(ULID_PATTERN).test(receipt)) throw usageError(`--receipt must be a receipt id (ULID), not '${receipt}'`, cmd.inbox());
+    if (!new RegExp(ULID_PATTERN).test(receipt)) throw usageError(`--receipt must be a receipt id (ULID), not '${receipt}'`, cmd.status());
     f.receipt = receipt;
   }
   return f;
@@ -234,7 +234,7 @@ async function why(ctx: Context, args: ParsedArgs) {
   const filter = parseFilter(args);
   if (!args.positionals[0] && !filter.receipt) throw usageError("run view --why: expected a unit", cmd.runView(undefined, { why: true }));
   const raw = args.positionals[0] ?? (filter.receipt ? unitOfReceipt(ctx.root, filter.receipt) : null);
-  if (!raw) throw refuse(`no tick in the trace applied receipt ${filter.receipt}`, cmd.inbox({ notes: true }), "no_tick");
+  if (!raw) throw refuse(`no tick in the trace applied receipt ${filter.receipt}`, cmd.status({ notes: true }), "no_tick");
   const { key, story } = parseUnitKey(raw);
   const tickId = opt.str(args, "tick");
   const filtered = Object.keys(filter).length > 0;

@@ -21,15 +21,22 @@ const SEGMENT = {
   options: ["ttl"],
 };
 
-/** Help groups in print order; a command missing here lands in "Other" (for a person). A `hidden` group only with `--all`. */
+/**
+ * Help tiers in print order (B1): Core, Setup, Background, then the agent protocol. A command missing
+ * here lands in "Other" (for a person). A `hidden` tier only with `--all` (B3): what norn, Herdr or the
+ * hooks run, never a person by hand. `help` itself is the footer, not a row.
+ */
 const HELP_GROUPS: ReadonlyArray<{ title: string; for: CommandFor; commands: readonly string[]; hidden?: boolean }> = [
-  { title: "Start here", for: "person", commands: ["init", "doctor", "sync", "watch", "status", "story"] },
-  { title: "Look around", for: "person", commands: ["run", "config", "tick"] },
-  { title: "Housekeeping", for: "person", commands: ["tidy", "uninstall", "help"] },
-  { title: "Run by Herdr, not by hand", for: "person", commands: [SEGMENT.name], hidden: true },
+  { title: "Core", for: "person", commands: ["status", "story", "run"] },
+  { title: "Setup", for: "person", commands: ["init", "doctor", "config", "uninstall"] },
+  { title: "Background", for: "person", commands: ["watch", "sync", "tidy"] },
+  { title: "Run by watch, cron or Herdr, not by hand", for: "person", commands: ["tick", SEGMENT.name], hidden: true },
   { title: "Agent protocol: the only commands an agent runs", for: "agent", commands: ["brief", "done", "ask", "stuck"] },
-  { title: "Called by the agent's hooks, not by hand", for: "hooks", commands: ["hook"] },
+  { title: "Called by the agent's hooks, not by hand", for: "hooks", commands: ["hook"], hidden: true },
 ];
+
+/** Not a row of `norn help`: the footer says how to use it. */
+const UNLISTED = new Set(["help"]);
 
 /** How a bundled skill is used (§16): only an agent loads skills; some steps also need a person with it. */
 export type SkillFor = "protocol" | "step" | "attended" | "reference";
@@ -63,13 +70,18 @@ const skillFor = (name: string): SkillFor => SKILL_GROUPS.find((g) => g.skills.i
 /** A row of `norn help`: a command, or a noun with its verbs. */
 type Row = { name: string; summary: string };
 
-const nounRow = (n: Noun): Row => ({ name: n.name, summary: `${n.summary} (${n.verbs.map((v) => v.name.slice(n.name.length + 1)).join(", ")})` });
+const verbName = (n: Noun, v: Command) => v.name.slice(n.name.length + 1);
+
+/** A noun's verbs in the order `norn <noun>` lists them: by group when it has groups (B2). */
+const verbsInOrder = (n: Noun): string[] => n.groups?.flatMap((g) => g.verbs) ?? n.verbs.map((v) => verbName(n, v));
+
+const nounRow = (n: Noun): Row => ({ name: n.name, summary: `${n.summary} (${verbsInOrder(n).join(", ")})` });
 
 function formatHelp(rows: readonly Row[], skills: readonly string[] = [], all = false): string {
   const width = Math.max(...rows.map((c) => c.name.length)) + 2;
   const row = (c: Row) => `  norn ${c.name.padEnd(width)}${plainSummary(c.summary)}`;
   const grouped = new Set(HELP_GROUPS.flatMap((g) => g.commands));
-  const other = { title: "Other", commands: rows.map((c) => c.name).filter((n) => !grouped.has(n)) };
+  const other = { title: "Other", commands: rows.map((c) => c.name).filter((n) => !grouped.has(n) && !UNLISTED.has(n)) };
   const groups = [...HELP_GROUPS.slice(0, -2), other, ...HELP_GROUPS.slice(-2)].filter((g) => all || !("hidden" in g && g.hidden));
   const out = ["norn — deliver software stories with coding agents; code decides the next step, agents do it.", "", ...AGENT_NOTE, ""];
   for (const g of groups) {
@@ -98,11 +110,15 @@ function formatCommandHelp(c: Command): string {
   return `norn ${c.name} — ${plainSummary(c.summary)}\n\n    ${c.usage}${options}${note}`;
 }
 
-/** B2: `norn <noun>` — its verbs, in order. */
+/** B2: `norn <noun>` — its verbs, under their group titles when the noun has groups. */
 function formatNounHelp(n: Noun): string {
   const width = Math.max(...n.verbs.map((v) => v.name.length)) + 2;
-  const verbs = n.verbs.map((v) => `  norn ${v.name.padEnd(width)}${plainSummary(v.summary)}`);
-  return [`norn ${n.name} — ${plainSummary(n.summary)}`, "", ...verbs, "", `\`norn help ${n.name} <verb>\` shows one verb's usage and options.`].join("\n");
+  const line = (v: Command) => `  norn ${v.name.padEnd(width)}${plainSummary(v.summary)}`;
+  const byName = (name: string) => n.verbs.find((v) => verbName(n, v) === name);
+  const verbs = n.groups
+    ? n.groups.flatMap((g) => [`${g.title[0]?.toUpperCase()}${g.title.slice(1)}`, ...g.verbs.flatMap((name) => byName(name) ?? []).map(line), ""])
+    : [...n.verbs.map(line), ""];
+  return [`norn ${n.name} — ${plainSummary(n.summary)}`, "", ...verbs, `\`norn help ${n.name} <verb>\` shows one verb's usage and options.`].join("\n");
 }
 
 export const helpCommand = defineCommand({
@@ -131,11 +147,16 @@ export const helpCommand = defineCommand({
     if (c) return rendered({ ...helpFor(c), for: commandFor(c.name) }, formatCommandHelp(c));
     const skills = bundledSkills(ctx.env);
     const all = opt.bool(args, "all");
-    const hidden = new Set(HELP_GROUPS.filter((g) => g.hidden && !all).flatMap((g) => g.commands));
+    const tiers = HELP_GROUPS.filter((g) => all || !g.hidden);
+    const shown = new Set(tiers.flatMap((g) => g.commands));
     const segment = { command: SEGMENT.name, summary: SEGMENT.summary, usage: SEGMENT.usage, options: SEGMENT.options, for: commandFor(SEGMENT.name) };
-    const commands = [...COMMANDS.map((c) => ({ ...helpFor(c), for: commandFor(c.name) })), ...NOUNS.map((n) => ({ ...nounHelp(n), for: commandFor(n.name) })), segment].filter((c) => !hidden.has(c.command));
+    const entries = [...COMMANDS.map((c) => ({ ...helpFor(c), for: commandFor(c.name) })), ...NOUNS.map((n) => ({ ...nounHelp(n), for: commandFor(n.name) })), segment];
+    const hidden = new Set(HELP_GROUPS.filter((g) => g.hidden).flatMap((g) => g.commands).filter((n) => !shown.has(n)));
+    const commands = entries.filter((c) => !hidden.has(c.command) && !UNLISTED.has(c.command));
+    // B1: the tree as data, tier by tier, in print order
+    const tree = tiers.map((g) => ({ title: g.title, for: g.for, commands: g.commands.filter((n) => commands.some((c) => c.command === n)) }));
     return rendered(
-      { commands, skills: skills.map((s) => ({ skill: s, for: skillFor(s) })) },
+      { tiers: tree, commands, skills: skills.map((s) => ({ skill: s, for: skillFor(s) })) },
       formatHelp([...COMMANDS, ...NOUNS.map(nounRow), SEGMENT], skills, all),
     );
   },

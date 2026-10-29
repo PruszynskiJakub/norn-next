@@ -3,8 +3,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:tes
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { ConfigEntry } from "@norn/schema";
-import { type CliDeps, type CliResult, runCli } from "../src/index.ts";
+import { type CliDeps, type CliResult } from "../src/index.ts";
 import { createHarness, FakeInteraction, type Harness } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 
 type Listed = { entries: Array<ConfigEntry & { meaning: string }> };
 
@@ -79,7 +80,7 @@ describe("norn config set and unset", () => {
       return null;
     }
   };
-  const norn = (deps: Partial<CliDeps>, ...argv: string[]): Promise<CliResult> => runCli(argv, { ...h.deps, ...deps });
+  const norn = (deps: Partial<CliDeps>, ...argv: string[]): Promise<CliResult> => runChecked(argv, { ...h.deps, ...deps });
   const get = async (key: string) => ((await h.norn("config", "get", key, "--json")).value as Listed).entries;
 
   beforeAll(async () => {

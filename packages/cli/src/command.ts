@@ -56,6 +56,8 @@ export interface Noun {
   /** one line, shown by `norn help` */
   summary: string;
   verbs: readonly Command[];
+  /** B2: `norn <noun>` lists the verbs under these titles, by verb name (`create`); default: one list */
+  groups?: ReadonlyArray<{ title: string; verbs: readonly string[] }>;
 }
 
 export function defineNoun(n: Noun): Noun {

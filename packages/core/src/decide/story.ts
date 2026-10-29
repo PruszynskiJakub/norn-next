@@ -272,7 +272,7 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
 
   // S7: pinned workflow edited outside `norn workflow`, or cursor step gone
   if (st.status !== "stuck" || st.park?.kind !== "workflow") {
-    const drift = uf.workflow_hash && uf.workflow_hash !== st.workflow_hash ? "pinned workflow.yaml changed outside norn workflow (S7)" : null;
+    const drift = uf.workflow_hash && uf.workflow_hash !== st.workflow_hash ? "pinned workflow.yaml changed outside norn story edit (S7)" : null;
     const gone = st.step !== "$done" && !stepOf(wf, st.step) ? `step '${st.step}' no longer exists in workflow ${wf.name} (S7)` : null;
     const reason = drift ?? gone;
     if (reason) return park(ctx, story, uf, st, "workflow", reason, "workflow.drift");
@@ -306,7 +306,7 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
       return ctx.noop(ref, ref.slice ? "slice.done" : "story.wait_merge", ref.slice ? "integrated" : "workflow done; waiting for the PR merge (GR6)");
     case "stuck":
       if (slicesCanResume(story, uf, st, wf)) return resumeSlices(ctx, story, uf, st, wf);
-      return ctx.noop(ref, "unit.stuck", `stuck: ${st.park?.reason ?? "?"} — ${cmd.unstick(ref.key)}`);
+      return ctx.noop(ref, "unit.stuck", `stuck: ${st.park?.reason ?? "?"} — ${cmd.runRerun(ref.key)}`);
     case "parked": {
       // R6.1 (H3, A14): an implicit ask a later fact shows the agent has moved past resolves itself
       const moved = implicitAskResolved(st, uf);

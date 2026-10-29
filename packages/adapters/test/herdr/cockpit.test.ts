@@ -159,13 +159,13 @@ test("openWorkspace, reportWorkspace argv; moveWorkspace over the socket API", a
     return req.params.workspace_id === "gone" ? { id: req.id, error: { code: "workspace_not_found", message: "workspace gone not found" } } : { id: req.id, result: { type: "ok" } };
   };
   const cockpit = createHerdrCockpit({ exec, socket });
-  expect(await cockpit.openWorkspace("/wt", "gh-1 orient", "claude -- 'Run `norn orient gh-1` and follow it.'")).toEqual({ workspace_id: "w1", pane_id: "w1:p1" });
+  expect(await cockpit.openWorkspace("/wt", "gh-1 orient", "claude -- 'Run `norn story view gh-1` and follow it.'")).toEqual({ workspace_id: "w1", pane_id: "w1:p1" });
   await cockpit.reportWorkspace("w1", { norn: "● approve" }, 15_000);
   await cockpit.moveWorkspace("w1", 0);
   await expect(cockpit.moveWorkspace("gone", 0)).rejects.toMatchObject({ code: "session_gone" });
   expect(calls.map((a) => a.slice(1))).toEqual([
     ["workspace", "create", "--cwd", "/wt", "--label", "gh-1 orient", "--focus"],
-    ["pane", "run", "w1:p1", "claude -- 'Run `norn orient gh-1` and follow it.'"],
+    ["pane", "run", "w1:p1", "claude -- 'Run `norn story view gh-1` and follow it.'"],
     ["workspace", "report-metadata", "w1", "--source", "norn", "--token", "norn=● approve", "--ttl-ms", "15000"],
   ]);
   expect(requests).toEqual([

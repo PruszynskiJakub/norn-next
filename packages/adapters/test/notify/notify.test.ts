@@ -17,7 +17,7 @@ const item: InboxItem = {
   slice: "03-api",
   step: "implement",
   title: 'Use "v2" endpoint?',
-  command: 'norn answer gh-123/03 "..."',
+  command: 'norn story answer gh-123/03 "..."',
   since: "2026-10-23T10:00:00.000Z",
   url: "https://github.com/o/r/issues/123",
 };
@@ -36,7 +36,7 @@ describe("os notifier", () => {
   test("macOS passes text as osascript argv (no escaping)", () => {
     const argv = osNotifyArgv("darwin", item)!;
     expect(argv[0]).toBe("osascript");
-    expect(argv.slice(-3)).toEqual(["norn · Answer", "gh-123/03-api · implement", 'Use "v2" endpoint?\nnorn answer gh-123/03 "..."']);
+    expect(argv.slice(-3)).toEqual(["norn · Answer", "gh-123/03-api · implement", 'Use "v2" endpoint?\nnorn story answer gh-123/03 "..."']);
   });
 
   test("Linux uses notify-send; other platforms are unsupported", async () => {
@@ -64,7 +64,7 @@ describe("ntfy notifier", () => {
       body: {
         topic: "norn-me",
         title: "norn · Answer — gh-123/03-api · implement",
-        message: 'Use "v2" endpoint?\nnorn answer gh-123/03 "..."',
+        message: 'Use "v2" endpoint?\nnorn story answer gh-123/03 "..."',
         tags: ["norn", "answer"],
         click: "https://github.com/o/r/issues/123",
       },

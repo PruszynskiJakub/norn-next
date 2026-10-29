@@ -182,8 +182,8 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
     return { state: next, log: `workflow → ${r.name} at ${r.to}`, advance: { from: st.step, outcome: "workflow", to: r.to } };
   }
   if (r.kind === "unstick") return unstick(st, r, ctx);
-  if (!step) return { reject: `step '${st.step}' no longer exists (S7); use ${cmd.unstick()} --to` };
-  if (st.status === "stuck") return { reject: `unit is stuck: ${st.park?.reason ?? "unknown"}; use ${cmd.unstick()}` };
+  if (!step) return { reject: `step '${st.step}' no longer exists (S7); use ${cmd.runRerun(undefined, { step: "<step>" })}` };
+  if (st.status === "stuck") return { reject: `unit is stuck: ${st.park?.reason ?? "unknown"}; use ${cmd.runRerun()}` };
   const lastOutcome = (outcome: string): LastOutcome => ({
     step: st.step,
     outcome,
@@ -303,7 +303,7 @@ function unstick(st: UnitState, r: ReceiptOf<"unstick">, ctx: ApplyContext): Ste
  * merged), a gate, or stuck. Counters are unchanged; the ready gate is passed again later (F35).
  */
 function updateFrom(st: UnitState, r: ReceiptOf<"update">, ctx: ApplyContext): Step1 {
-  if (st.slice !== null) return { reject: `${cmd.update()} is for the story unit` };
+  if (st.slice !== null) return { reject: `${cmd.storyUpdateBranch()} is for the story unit` };
   if (r.step !== st.step || r.attempt !== st.attempt) return { reject: `stale: receipt for ${r.step}#${r.attempt}, cursor at ${st.step}#${st.attempt}` };
   const waiting = st.status === "done" || st.status === "stuck" || (st.status === "parked" && st.park?.kind === "gate");
   if (!waiting) return { reject: `unit is ${st.status}${st.park ? ` (${st.park.kind})` : ""}; update needs it done, at a gate or stuck` };

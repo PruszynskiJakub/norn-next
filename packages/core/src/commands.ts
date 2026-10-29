@@ -37,18 +37,18 @@ export function nextCommand(unitKey: string, state: UnitState | null, start?: st
     case "done":
       return null;
     case "corrupt":
-      return cmd.why(unitKey);
+      return cmd.runView(unitKey, { why: true });
     case "stuck":
-      return cmd.unstick(unitKey);
+      return cmd.runRerun(unitKey);
     case "parked":
-      if (state.park?.kind === "ask") return cmd.answer(unitKey);
-      if (state.park?.kind === "gate") return cmd.approve(unitKey);
+      if (state.park?.kind === "ask") return cmd.storyAnswer(unitKey);
+      if (state.park?.kind === "gate") return cmd.storyApprove(unitKey);
       if (state.park?.kind === "attended") return start ?? cmd.brief();
-      return cmd.unstick(unitKey);
+      return cmd.runRerun(unitKey);
     case "ready":
       return start ?? cmd.brief();
     case "running":
-      return cmd.trace(unitKey);
+      return cmd.runList(unitKey);
   }
 }
 
@@ -61,18 +61,18 @@ const norn = (...parts: (string | false | null | undefined)[]) => ["norn", ...pa
  */
 export const cmd = {
   config: (key?: string) => norn("config", key ? "get" : "list", key),
-  answer: (unit: string, text = "…") => norn("answer", unit, `"${text}"`),
-  approve: (unit: string, o: { reject?: boolean } = {}) => norn("approve", unit, o.reject && `--reject --reason "…"`),
   ask: () => norn("ask", `"<question>"`),
   brief: () => norn("brief"),
   doctor: (o: { json?: boolean } = {}) => norn("doctor", o.json && "--json"),
   done: (outcome: string, o: { criteria?: boolean } = {}) => norn("done", outcome, o.criteria && "--criteria <file>", `--handoff "…"`),
   help: () => norn("help"),
-  inbox: (o: { notes?: boolean; since?: string } = {}) => norn("inbox", o.notes && "--notes", o.since && `--history --since ${o.since}`),
   init: () => norn("init"),
-  open: (unit?: string) => norn("open", unit),
-  status: (target?: string) => norn("status", target),
+  status: (o: { notes?: boolean; since?: string } = {}) => norn("status", o.notes && "--notes", o.since && `--history --since ${o.since}`),
   statusWatch: (o: { interval?: string } = {}) => norn("status --watch", o.interval && `--interval ${o.interval}`),
+  storyAnswer: (unit: string, text = "…") => norn("story answer", unit, `"${text}"`),
+  storyApprove: (unit: string) => norn("story approve", unit),
+  storyReject: (unit: string) => norn("story reject", unit, `--reason "…"`),
+  storyUpdateBranch: (story?: string) => norn("story update-branch", story),
   storyChat: (story?: string) => norn("story chat", story),
   storyEdit: (unit: string, o: { mode?: "auto" | "manual"; workflow?: string; at?: string } = {}) =>
     norn("story edit", unit, o.mode && `--${o.mode}`, o.workflow && `--workflow ${o.workflow}`, o.at && `--at ${o.at}`),
@@ -86,16 +86,23 @@ export const cmd = {
   storyReopen: (story?: string) => norn("story reopen", story),
   runList: (unit: string, o: { limit?: number } = {}) => norn("run list", unit, o.limit !== undefined && `--limit ${o.limit}`),
   runAttach: (unit?: string, o: { next?: boolean } = {}) => norn("run attach", unit, o.next && "--next"),
-  runView: (unit = "<unit>", o: { why?: boolean } = {}) => norn("run view", unit, o.why && "--why"),
+  runView: (unit = "<unit>", o: { why?: boolean; tick?: string; receipt?: string } = {}) =>
+    norn("run view", unit, o.why && "--why", o.tick && `--tick ${o.tick}`, o.receipt && `--receipt ${o.receipt}`),
   runRerun: (unit?: string, o: { step?: string; reset?: string } = {}) => norn("run rerun", unit, o.step && `--step ${o.step}`, o.reset && `--reset ${o.reset}`),
   runCancel: (unit?: string) => norn("run cancel", unit),
   sync: () => norn("sync"),
   tick: () => norn("tick"),
   tidy: (o: { dryRun?: boolean } = {}) => norn("tidy", o.dryRun && "--dry-run"),
-  trace: (unit: string, o: { limit?: number } = {}) => norn("trace", unit, o.limit !== undefined && `--limit ${o.limit}`),
-  unstick: (unit?: string, o: { to?: string; reset?: string } = {}) => norn("unstick", unit, o.to && `--to ${o.to}`, o.reset && `--reset ${o.reset}`),
-  update: (story?: string) => norn("update", story),
   watch: (o: { interval?: string; maxTicks?: number } = {}) => norn("watch", o.interval && `--interval ${o.interval}`, o.maxTicks !== undefined && `--max-ticks ${o.maxTicks}`),
-  why: (unit: string, o: { tick?: string; receipt?: string } = {}) => norn("why", unit, o.tick && `--tick ${o.tick}`, o.receipt && `--receipt ${o.receipt}`),
-  workflow: (unit: string, name = "<name>", o: { to?: string } = {}) => norn("workflow", unit, name, o.to && `--to ${o.to}`),
 };
+
+/** B5: the top-level commands this release removed; no printed command names one (B7). */
+export const REMOVED_COMMANDS = ["drop", "inbox", "cockpit", "orient", "open", "answer", "approve", "unstick", "update", "mode", "workflow", "take", "release", "trace", "why"] as const;
+
+const REMOVED = new RegExp(`\\bnorn (${REMOVED_COMMANDS.join("|")})(?![\\w-])`);
+
+/** B7: the first removed command (`norn <old>`) a printed text names, or null. */
+export function nameRemoved(text: string): string | null {
+  const m = REMOVED.exec(text);
+  return m ? `norn ${m[1]}` : null;
+}

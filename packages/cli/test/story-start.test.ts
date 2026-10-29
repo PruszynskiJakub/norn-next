@@ -8,8 +8,8 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { join } from "node:path";
 import type { PersonOpenSpec } from "@norn/core";
 import type { CliDeps } from "../src/index.ts";
-import { runCli } from "../src/index.ts";
 import { createHarness, FakeInteraction, type Harness, issue } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 
 setDefaultTimeout(30_000);
 
@@ -73,7 +73,7 @@ afterAll(() => h.cleanup());
 
 describe("norn story start (B28, MO5)", () => {
   const wt = () => `${h.root}-worktrees/gh-7-add-login-form`;
-  const norn = (deps: Partial<CliDeps>, ...argv: string[]) => runCli(argv, { ...h.deps, ...deps });
+  const norn = (deps: Partial<CliDeps>, ...argv: string[]) => runChecked(argv, { ...h.deps, ...deps });
 
   test("taken in, not started: refused with the command that starts it; the inbox says so (GR2, O1)", async () => {
     await h.tick();
@@ -116,7 +116,7 @@ describe("norn story start (B28, MO5)", () => {
     h.runner.capabilities = { ...h.runner.capabilities, open: true };
     Object.assign(h.runner, { openForPerson: async (spec: PersonOpenSpec) => (opened.push(spec), { pane_id: "p-9" }) });
     const inbox = (await h.norn("status")).value as { groups: { your_turn: Array<{ command: string; detail?: string }> } };
-    expect(inbox.groups.your_turn).toMatchObject([{ command: "norn open gh-7", detail: expect.stringContaining(`by hand: cd ${wt()}`) }]);
+    expect(inbox.groups.your_turn).toMatchObject([{ command: "norn story start gh-7", detail: expect.stringContaining(`by hand: cd ${wt()}`) }]);
     const r = await h.norn("story", "start", "gh-7");
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ unit: "gh-7", opened: true, runner: "fake", pane_id: "p-9" });
@@ -135,7 +135,7 @@ describe("norn story start (B28, MO5)", () => {
     expect(h.state(runs)).toMatchObject({ step: "approve", status: "parked" });
     const r = await h.norn("story", "start", "gh-7");
     expect(r.exit).toBe(3);
-    expect(r.value).toMatchObject({ code: "nothing_to_open", do_instead: "norn inbox" });
+    expect(r.value).toMatchObject({ code: "nothing_to_open", do_instead: "norn status" });
     const term = new FakeInteraction();
     const none = await norn({ interaction: term }, "story", "start");
     expect(none.exit).toBe(3);

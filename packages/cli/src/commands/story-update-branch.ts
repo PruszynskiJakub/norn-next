@@ -22,7 +22,7 @@ const updatable: TargetRule = {
   verb: "story update-branch",
   story: true,
   none: "No story waits for a base update (done with an unmerged PR, at a gate, or stuck)",
-  command: (k) => cmd.update(k),
+  command: (k) => cmd.storyUpdateBranch(k),
   applies: (_key, u) =>
     u?.slice === null && u.story_status !== "done" && u.story_status !== "dropped" && u.pr?.state !== "merged" && (u.status === "done" || u.status === "stuck" || (u.status === "parked" && u.park?.kind === "gate")),
 };
@@ -35,7 +35,7 @@ export const storyUpdateBranchCommand = defineCommand({
   async run(ctx, args) {
     const key = storyArg(await targetKey(ctx, args.positionals[0], args.json === true, updatable), "story update-branch");
     const t = await resolveTarget(ctx, key);
-    if (t.slice !== null) throw refuse(`${t.key} is a slice; ${cmd.update()} re-enters the story unit`, cmd.update(t.story), "not_a_story");
+    if (t.slice !== null) throw refuse(`${t.key} is a slice; ${cmd.storyUpdateBranch()} re-enters the story unit`, cmd.storyUpdateBranch(t.story), "not_a_story");
     let to = "";
     const out = await runHumanVerb(ctx, t, {
       verb: "story update-branch",
@@ -49,14 +49,14 @@ export const storyUpdateBranchCommand = defineCommand({
         // BS9: a merged story is finished (GR6) — nothing to update
         const fm = sf?.frontmatter;
         if (fm?.status === "done" || sf?.pr?.state === "merged" || sf?.merged_by_ancestry)
-          throw refuse(`${t.story} is merged; nothing to update`, cmd.status(t.story), "story_merged");
-        if (fm?.status === "dropped") throw refuse(`${t.story} is dropped`, cmd.status(t.story), "story_dropped");
+          throw refuse(`${t.story} is merged; nothing to update`, cmd.storyView(t.story), "story_merged");
+        if (fm?.status === "dropped") throw refuse(`${t.story} is dropped`, cmd.storyView(t.story), "story_dropped");
         if (!waiting(st))
-          throw refuse(`${t.story} is not waiting: it is at ${at(st)}; update re-enters a story that is done, at a gate or stuck`, cmd.status(t.story), "not_waiting");
+          throw refuse(`${t.story} is not waiting: it is at ${at(st)}; update re-enters a story that is done, at a gate or stuck`, cmd.storyView(t.story), "not_waiting");
         const wf = t.workflow;
-        if (!wf) throw refuse(`${t.story} has no readable pinned workflow`, cmd.why(t.story), "workflow_missing");
+        if (!wf) throw refuse(`${t.story} has no readable pinned workflow`, cmd.runView(t.story, { why: true }), "workflow_missing");
         const step = baseUpdateStep(wf);
-        if (!step) throw refuse(`workflow ${wf.name} of ${t.story} has no base update step (no \`git: update\` step, no base.step)`, cmd.workflow(t.story, "<name>", { to: "<step>" }), "no_update_step");
+        if (!step) throw refuse(`workflow ${wf.name} of ${t.story} has no base update step (no \`git: update\` step, no base.step)`, cmd.storyEdit(t.story, { workflow: "<name>", at: "<step>" }), "no_update_step");
         to = step;
       },
       // any unapplied update of the story, whatever step it was recorded at

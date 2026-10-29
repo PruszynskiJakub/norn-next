@@ -32,7 +32,7 @@ function requireWorktree(ctx: Context, verb: string): { worktree: string; marker
   if (found) return found;
   throw refuse(
     `norn ${verb} runs only inside a unit worktree (a directory with a .norn-unit marker)`,
-    `stop: this session is not in a unit worktree. A person starts the agent from the unit's item in \`${cmd.inbox()}\` (\`${cmd.open("<unit>")}\` opens or prints it)`,
+    `stop: this session is not in a unit worktree. A person starts the agent from the unit's item in \`${cmd.status()}\` (\`${cmd.storyStart("<unit>")}\` opens or prints it)`,
     "not_in_unit",
   );
 }
@@ -44,15 +44,15 @@ export const ORIENT_ENV = "NORN_ORIENT";
 export function loadUnitSession(ctx: Context, verb: string, at?: { worktree: string; marker: UnitMarker }): UnitSession {
   // orient: the agent beside a person is no run of the unit, so it cannot start or report one
   if (ctx.env[ORIENT_ENV] === "1" && verb !== "hook")
-    throw refuse(`norn ${verb} is not for an orient session: it is no run of the unit`, `tell the person what you found; they run the step's agent with \`${cmd.open()}\` or the cockpit`, "orient_session");
+    throw refuse(`norn ${verb} is not for an orient session: it is no run of the unit`, `tell the person what you found; they run the step's agent with \`${cmd.storyStart()}\` or the cockpit`, "orient_session");
   const { worktree, marker } = at ?? requireWorktree(ctx, verb);
   const unit = unitRefOf(marker);
   const specPath = join(worktree, marker.spec_dir);
   const snap = loadUnit(worktree, specPath, unit, { includeApplied: true });
   if (snap.errors.length || snap.state?.status === "corrupt")
-    throw corruptError(`unit ${unit.key} is corrupt (S2): ${snap.errors.map((e) => e.file).join(", ") || "state.json"}`, `stop and tell the person: ${cmd.why(unit.key)}`, snap.errors);
+    throw corruptError(`unit ${unit.key} is corrupt (S2): ${snap.errors.map((e) => e.file).join(", ") || "state.json"}`, `stop and tell the person: ${cmd.runView(unit.key, { why: true })}`, snap.errors);
   if (!snap.state) throw refuse(`unit ${unit.key} has not started yet`, `${cmd.tick()} (or wait for the heartbeat), then run it again`, "not_started");
-  if (!snap.workflow) throw corruptError(`unit ${unit.key} has no pinned workflow (S7)`, `stop and tell the person: ${cmd.why(unit.key)}`);
+  if (!snap.workflow) throw corruptError(`unit ${unit.key} has no pinned workflow (S7)`, `stop and tell the person: ${cmd.runView(unit.key, { why: true })}`);
   return {
     root: safeRealpath(marker.repo),
     worktree,
@@ -97,5 +97,5 @@ export function unitCriteria(s: UnitSession): Criterion[] | null {
   const r = s.unit.slice ? readSliceFile(file, s.worktree) : readStoryFile(file, s.worktree);
   if (r.ok) return r.value.frontmatter.criteria ?? null;
   if (r.reason === "missing") return null;
-  throw corruptError(`${file} failed validation (S2): its criteria cannot be checked`, `stop and tell the person: ${cmd.why(s.unit.key)}`, r.error ? [r.error] : []);
+  throw corruptError(`${file} failed validation (S2): its criteria cannot be checked`, `stop and tell the person: ${cmd.runView(s.unit.key, { why: true })}`, r.error ? [r.error] : []);
 }

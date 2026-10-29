@@ -39,7 +39,7 @@ function sinceOf(raw: string | undefined, now: number): string | undefined {
   try {
     return new Date(now - parseDuration(raw)).toISOString();
   } catch {
-    throw usageError(`--since must be an ISO time or a duration like 2h or 3d, not '${raw}'`, cmd.inbox({ since: "1d" }));
+    throw usageError(`--since must be an ISO time or a duration like 2h or 3d, not '${raw}'`, cmd.status({ since: "1d" }));
   }
 }
 
@@ -60,7 +60,7 @@ async function inbox(ctx: Context, args: ParsedArgs) {
     const items = inboxHistory(ctx.root, since);
     return rendered({ ...(since ? { since } : {}), items, open: items.filter((i) => i.resolved_at === null).length }, formatHistory(items));
   }
-  if (opt.str(args, "since") !== undefined) throw usageError("--since goes with --history", cmd.inbox({ since: "1d" }));
+  if (opt.str(args, "since") !== undefined) throw usageError("--since goes with --history", cmd.status({ since: "1d" }));
   const view = await projectView(ctx);
   const details = opt.bool(args, "details");
   const text = formatInbox(view, { details, notes: opt.bool(args, "notes"), home: ctx.env.HOME });

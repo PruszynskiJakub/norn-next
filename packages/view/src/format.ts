@@ -104,7 +104,7 @@ export function formatStatus(view: ProjectView): string {
   for (const e of view.errors) out.push(`! ${e.file}: ${e.errors[0]?.message ?? "invalid"}`);
   const hb = heartbeatText(view);
   if (hb) out.push(hb);
-  out.push(`${view.inbox.pending} ${view.inbox.pending === 1 ? "item needs" : "items need"} you — ${cmd.inbox()}`);
+  out.push(`${view.inbox.pending} ${view.inbox.pending === 1 ? "item needs" : "items need"} you — ${cmd.status()}`);
   return `${out.join("\n").trimEnd()}\n`;
 }
 
@@ -146,7 +146,7 @@ export function formatInbox(view: ProjectView, opts: { details?: boolean; home?:
     if (!items.length) continue;
     out.push(`${INBOX_TITLES[g]} (${items.length}) · ${groupAbout(g, items)}`);
     if (g === "notes" && !opts.notes) {
-      out.push(`      $ ${cmd.inbox({ notes: true })}`, "");
+      out.push(`      $ ${cmd.status({ notes: true })}`, "");
       continue;
     }
     for (const it of items) {

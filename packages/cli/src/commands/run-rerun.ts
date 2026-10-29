@@ -36,7 +36,7 @@ export const runRerunCommand = defineCommand({
       check(t, st) {
         // B50: stopping an agent is always its own, explicit act
         if (st.status === "running") throw refuse(`${t.key} is running ${at(st)}; stop it first`, cmd.runCancel(t.key), "running");
-        if (!blocked(st)) throw refuse(`${t.key} is not stuck: it is at ${at(st)}`, nextCommand(t.key, st) ?? cmd.status(t.story), "not_stuck");
+        if (!blocked(st)) throw refuse(`${t.key} is not stuck: it is at ${at(st)}`, nextCommand(t.key, st) ?? cmd.storyView(t.story), "not_stuck");
         const wf = t.workflow;
         if (!wf) throw refuse(`${t.key} has no readable pinned workflow`, cmd.runView(t.key, { why: true }), "workflow_missing");
         const steps = Object.keys(wf.steps);

@@ -10,8 +10,9 @@ import { readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { CriteriaTrace } from "@norn/schema";
 import { readTrace } from "@norn/store";
-import { type CliResult, runCli } from "../src/index.ts";
+import { type CliResult } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -54,7 +55,7 @@ const env = () => {
   for (const k of ["NORN_AGENT", "NORN_RUN", "NORN_STORY", "NORN_SLICE", "NORN_AGENT_SESSION_ID"]) delete e[k];
   return e;
 };
-const inWt = (...argv: string[]): Promise<CliResult> => runCli(argv, { ...h.deps, cwd: wt(), env: env() });
+const inWt = (...argv: string[]): Promise<CliResult> => runChecked(argv, { ...h.deps, cwd: wt(), env: env() });
 const lastReceipt = (kind: string) => {
   const name = readdirSync(join(runs(), "receipts")).filter((f) => f.endsWith(`-${kind}.json`)).sort().at(-1) as string;
   return JSON.parse(h.read(join(runs(), "receipts", name)));
@@ -159,7 +160,7 @@ describe("criteria reports and notes through norn done", () => {
 
     // NT2: the note is a Check item whose command explains the report
     const [n] = await notes();
-    expect(n).toMatchObject({ id: `note:${done.receipt_id}:1`, title: "qa note on gh-4 (AC1): kept whitespace inside backticks", command: `norn why gh-4 --receipt ${done.receipt_id}` });
+    expect(n).toMatchObject({ id: `note:${done.receipt_id}:1`, title: "qa note on gh-4 (AC1): kept whitespace inside backticks", command: `norn run view gh-4 --receipt ${done.receipt_id}` });
     const why = await h.norn("run", "view", "gh-4", "--why", "--receipt", done.receipt_id);
     expect(why.exit).toBe(0);
     expect(why.value).toMatchObject({ trigger: { kind: "done", outcome: "unverified", reason: expect.stringContaining("Notes for a person:\n1. (AC1) kept whitespace inside backticks") } });

@@ -6,8 +6,9 @@
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
-import { type CliResult, runCli } from "../src/index.ts";
+import { type CliResult } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -61,7 +62,7 @@ const env = () => {
   for (const k of ["NORN_AGENT", "NORN_RUN", "NORN_STORY", "NORN_SLICE", "NORN_AGENT_SESSION_ID"]) delete e[k];
   return e;
 };
-const inWt = (...argv: string[]): Promise<CliResult> => runCli(argv, { ...h.deps, cwd: wt(), env: env() });
+const inWt = (...argv: string[]): Promise<CliResult> => runChecked(argv, { ...h.deps, cwd: wt(), env: env() });
 type Brief = { markdown: string; run_id: string };
 /** an agent run of the cursor step: brief (starts the run), then report; the tick applies it */
 async function run(outcome: string, handoff: string, evidence = false): Promise<Brief> {
@@ -104,7 +105,7 @@ describe("gate item and rulings (F21, F28)", () => {
     const item = ((await h.norn("status")).value as Inbox).groups.approve?.[0];
     expect(item?.title).toBe("evidence attached");
     expect(item?.detail).toMatch(/^step qa#1 reported partial \(receipt \d{4}\) · /);
-    expect(item?.detail).toContain('or reject: norn approve gh-7 --reject --reason "…"');
+    expect(item?.detail).toContain('or reject: norn story reject gh-7 --reason "…"');
     const full = ((await h.norn("status", "--details")).value as Inbox).groups.approve?.[0]?.full;
     expect(full).toContain(`Report: ${runs()}/receipts/`);
     expect(full).toContain(`Evidence: ${runs()}/evidence/${qaRun.run_id}/`);

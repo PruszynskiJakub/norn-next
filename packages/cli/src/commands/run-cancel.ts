@@ -36,7 +36,7 @@ export const runCancelCommand = defineCommand({
       mailbox: false,
       claim,
       check(t, cur) {
-        if (cur.status !== "running" || !cur.run) throw refuse(`${t.key} has no running agent: it is at ${at(cur)}`, cmd.status(t.story), "nothing_to_cancel");
+        if (cur.status !== "running" || !cur.run) throw refuse(`${t.key} has no running agent: it is at ${at(cur)}`, cmd.storyView(t.story), "nothing_to_cancel");
         if (claim.state !== "mine" || !t.runsDir) throw notHolder();
       },
       build: (t, cur) => humanReceipt(ctx, t, cur, "stuck", { reason: CANCEL_REASON }),

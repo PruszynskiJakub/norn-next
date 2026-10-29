@@ -7,8 +7,9 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Receipt } from "@norn/schema";
-import { type CliDeps, type CliResult, runCli } from "../src/index.ts";
+import { type CliDeps, type CliResult } from "../src/index.ts";
 import { createHarness, FakeInteraction, type Harness, issue, sh } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 
 setDefaultTimeout(30_000);
 
@@ -50,7 +51,7 @@ const tick = async () => {
   h.clock.advance(10_000);
   return h.tick();
 };
-const norn = (deps: Partial<CliDeps>, ...argv: string[]): Promise<CliResult> => runCli(argv, { ...h.deps, ...deps });
+const norn = (deps: Partial<CliDeps>, ...argv: string[]): Promise<CliResult> => runChecked(argv, { ...h.deps, ...deps });
 const refused = (r: CliResult, code: string, doInstead?: string) => {
   expect(r.exit).toBe(3);
   expect(r.value).toMatchObject({ code, do_instead: doInstead ?? expect.any(String) });

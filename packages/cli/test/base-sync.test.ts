@@ -9,8 +9,9 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { herdr } from "@norn/adapters";
-import { runCli, type TickReport } from "../src/index.ts";
+import { type TickReport } from "../src/index.ts";
 import { createHarness, type Harness, installBundledSkills, issue, sh } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 import { expectTranscript, recordTranscript, type Transcript } from "./transcript.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
@@ -145,7 +146,7 @@ describe("base sync with real git", () => {
     await until(() => h.state(runs())?.step === "resolve" && h.state(runs())?.status === "running", "resolve running");
     expect(h.state(runs())?.counters.base_conflict_loop).toBe(1);
     // the agent's brief, from the story worktree
-    const b = await runCli(["brief", "--json"], { ...h.deps, cwd: wt() });
+    const b = await runChecked(["brief", "--json"], { ...h.deps, cwd: wt() });
     const json = (b.value as { brief: { rework: { base?: { sha: string; conflicts: string[] } } | null } }).brief;
     expect(json.rework?.base).toMatchObject({ sha: sibling, conflicts: ["a.txt"] });
     expect(sh(wt(), ["status", "--porcelain"])).toBe("");
@@ -345,7 +346,7 @@ describe("PR items between syncs and in the read model (C1), ready approval void
     const retarget = `retarget:gh-9:${pr.number}:release`;
     // the read model: no remote calls, the last sync's PR
     const v = await view();
-    expect(v.groups.your_turn?.find((i) => i.id === merge)).toMatchObject({ command: "norn update gh-9" });
+    expect(v.groups.your_turn?.find((i) => i.id === merge)).toMatchObject({ command: "norn story update-branch gh-9" });
     expect(v.groups.your_turn?.find((i) => i.id === merge)?.detail).toContain("behind main by 1");
     expect(ids(v, "check")).toContain(retarget);
     expect(open()).toEqual(expect.arrayContaining([merge, retarget]));
@@ -416,7 +417,7 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
   const runs = () => join(wt(), ".agents/specs/gh-11-merge-safely/runs/_story");
   /** a Claude Code permission dialog in the agent's pane (as in prompts.test.ts) */
   const SCREEN = [" Bash command", "", " │ python3 fix.py", "╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌", " Do you want to proceed?", " ❯ 1. Yes", "   2. No", "", " Esc to cancel · Tab to amend"].join("\n");
-  const inWt = (...argv: string[]) => runCli(argv, { ...h.deps, cwd: wt() });
+  const inWt = (...argv: string[]) => runChecked(argv, { ...h.deps, cwd: wt() });
   const until = async (pred: () => boolean, label: string) => {
     const seen: string[] = [];
     for (let i = 0; i < 20 && !pred(); i++) {
@@ -541,7 +542,7 @@ describe("BUG-2: an update conflict that exhausts base_conflict_loop, then run r
   let h: Harness;
   const wt = () => `${h.root}-worktrees/gh-12-conflict-twice`;
   const runs = () => join(wt(), ".agents/specs/gh-12-conflict-twice/runs/_story");
-  const inWt = (...argv: string[]) => runCli(argv, { ...h.deps, cwd: wt() });
+  const inWt = (...argv: string[]) => runChecked(argv, { ...h.deps, cwd: wt() });
   const lastClassify = () => {
     const file = h.git(["ls-files", "--others", "--cached", "receipts"], runs()).split("\n").filter((f) => f.endsWith("-classify.json")).at(-1) as string;
     return JSON.parse(readFileSync(join(runs(), file), "utf8"));

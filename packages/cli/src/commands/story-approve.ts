@@ -43,7 +43,7 @@ async function decideGate(ctx: Context, args: ParsedArgs, kind: "approve" | "rej
   const reason = opt.str(args, "reason")?.trim();
   // B26 (B3): the agent sent back gets only what the reason says, so a rejection needs one
   if (kind === "reject" && !reason) throw usageError("story reject: the reason is required", 'pass --reason "what failed": norn story reject <unit> --reason "…"', "reason_required");
-  const key = await targetKey(ctx, args.positionals[0], args.json === true, parkedOn("gate", verb, "Nothing waits at a gate", (k) => cmd.approve(k, { reject: kind === "reject" })));
+  const key = await targetKey(ctx, args.positionals[0], args.json === true, parkedOn("gate", verb, "Nothing waits at a gate", (k) => (kind === "reject" ? cmd.storyReject(k) : cmd.storyApprove(k))));
   const t = await resolveTarget(ctx, key, atGate);
   const head = await unitHead(ctx, t).catch(() => null);
   // NT3: approving a story-level gate acknowledges the story's open notes listed at it; reject leaves them open
@@ -56,7 +56,7 @@ async function decideGate(ctx: Context, args: ParsedArgs, kind: "approve" | "rej
       if (step?.type !== "gate" || !atGate(st))
         throw refuse(
           `${t.key} is not waiting at a gate: ${st.step} is ${step ? `a ${step.type} step` : "not in its workflow"}, at ${at(st)}`,
-          nextCommand(t.key, st) ?? cmd.status(t.story),
+          nextCommand(t.key, st) ?? cmd.storyView(t.story),
           "not_at_gate",
         );
     },

@@ -6,8 +6,9 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { type CliResult, runCli } from "../src/index.ts";
+import { type CliResult } from "../src/index.ts";
 import { createHarness, FakeInteraction, type Harness, issue, sh } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 
 setDefaultTimeout(60_000);
 
@@ -142,10 +143,10 @@ describe("story reopen (B40, B41, B55)", () => {
   test("without a target a terminal is offered closed stories only; a script is refused with them", async () => {
     const asked = new FakeInteraction(true);
     asked.answers = [null];
-    const r = await runCli(["story", "reopen"], { ...h.deps, interaction: asked });
+    const r = await runChecked(["story", "reopen"], { ...h.deps, interaction: asked });
     refused(r, "cancelled");
     expect(asked.picks.map((p) => p.choices.map((c) => c.value))).toEqual([["gh-7"]]);
-    const script = await runCli(["story", "reopen"], { ...h.deps, interaction: new FakeInteraction(false) });
+    const script = await runChecked(["story", "reopen"], { ...h.deps, interaction: new FakeInteraction(false) });
     expect(script.exit).toBe(2);
     expect(script.value).toMatchObject({ code: "target_required", do_instead: "norn story reopen gh-7" });
   });
@@ -154,7 +155,7 @@ describe("story reopen (B40, B41, B55)", () => {
     h.git(["fetch", "-q", "origin"]);
     const closedAt = h.git(["rev-parse", `origin/${BRANCH}`]);
     const asked = new FakeInteraction(true);
-    const r = await runCli(["story", "reopen"], { ...h.deps, interaction: asked });
+    const r = await runChecked(["story", "reopen"], { ...h.deps, interaction: asked });
     expect(r.exit).toBe(0);
     expect(asked.picks[0]?.preselect).toBe(0);
     expect(r.value).toMatchObject({ story: "gh-7", reopened: true, stuck: ["gh-7/02"] });
@@ -197,7 +198,7 @@ describe("story reopen (B40, B41, B55)", () => {
     await close();
     const left = join(h.dir, "left-behind");
     h.write(join(left, ".norn-unit"), marker);
-    const r = await runCli(["story", "reopen"], { ...h.deps, cwd: left });
+    const r = await runChecked(["story", "reopen"], { ...h.deps, cwd: left });
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ story: "gh-7", reopened: true });
     expect(existsSync(storyWt())).toBe(true);

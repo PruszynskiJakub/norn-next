@@ -11,8 +11,9 @@ import { join } from "node:path";
 import type { RunnerPort } from "@norn/core";
 import { ulid } from "@norn/schema";
 import { acquireTickLock, appendReceipt, readState } from "@norn/store";
-import { type CliDeps, type CliResult, runCli, type TickReport } from "../src/index.ts";
+import { type CliDeps, type CliResult, type TickReport } from "../src/index.ts";
 import { createHarness, FakeInteraction, FakeRunner, type Harness, hostEnv, issue, sh } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -98,10 +99,10 @@ function wrap(root: string, deps: CliDeps, runner: FakeRunner): Clone {
     root,
     deps,
     runner,
-    norn: (...argv) => runCli(argv, deps),
-    at: (cwd, ...argv) => runCli(argv, { ...deps, cwd }),
+    norn: (...argv) => runChecked(argv, deps),
+    at: (cwd, ...argv) => runChecked(argv, { ...deps, cwd }),
     async tick(...flags) {
-      const r = await runCli(["tick", ...flags], deps);
+      const r = await runChecked(["tick", ...flags], deps);
       if (r.exit !== 0) throw new Error(`tick failed: ${r.stdout}`);
       return r.value as TickReport;
     },
@@ -168,7 +169,7 @@ describe("two clones hand a story over through git (§19.3, T5, T6)", () => {
     h.write(join(sliceWt(h.root), "form.txt"), "form v1\n");
     h.write(join(sliceWt(h.root), "pass.flag"), "ok\n");
     const run = state(sliceRuns(h.root))?.run?.run_id as string;
-    const ask = await runCli(["ask", "Which colour should the button be?"], { ...h.deps, cwd: sliceWt(h.root), env: { ...h.deps.env, NORN_RUN: run } });
+    const ask = await runChecked(["ask", "Which colour should the button be?"], { ...h.deps, cwd: sliceWt(h.root), env: { ...h.deps.env, NORN_RUN: run } });
     expect(ask.exit).toBe(0);
     step();
     expect(kinds(await A.tick())).toEqual(["gh-7/01 apply_receipts"]);
@@ -309,10 +310,10 @@ describe("claim races (T3) and forced takes (T5)", () => {
   test("story close without --yes asks; under --json or with no TTY it is refused; N changes nothing (B36, B37)", async () => {
     const asked = new FakeInteraction(true);
     asked.confirms = [false];
-    const no = await runCli(["story", "close", "gh-7"], { ...B.deps, interaction: asked });
+    const no = await runChecked(["story", "close", "gh-7"], { ...B.deps, interaction: asked });
     expect(no.exit).toBe(0);
     expect(asked.questions).toEqual(["Close gh-7? Worktrees for 2 units will be removed [y/N]"]);
-    for (const r of [await runCli(["story", "close", "gh-7", "--json"], { ...B.deps, interaction: new FakeInteraction(true) }), await runCli(["story", "close", "gh-7"], { ...B.deps, interaction: new FakeInteraction(false) })]) {
+    for (const r of [await runChecked(["story", "close", "gh-7", "--json"], { ...B.deps, interaction: new FakeInteraction(true) }), await runChecked(["story", "close", "gh-7"], { ...B.deps, interaction: new FakeInteraction(false) })]) {
       expect(r.exit).toBe(3);
       expect(r.value).toMatchObject({ do_instead: "pass --yes" });
     }
@@ -332,7 +333,7 @@ describe("claim races (T3) and forced takes (T5)", () => {
       }
     })(true);
     asked.confirms = [true];
-    const r = await runCli(["story", "close", "gh-7"], { ...B.deps, interaction: asked });
+    const r = await runChecked(["story", "close", "gh-7"], { ...B.deps, interaction: asked });
     expect(r.exit).toBe(3);
     expect(r.value).toMatchObject({ code: "claim_held", error: expect.stringContaining("carol@repo-c2") });
     expect(existsSync(storyWt(B.root))).toBe(true);
@@ -407,7 +408,7 @@ describe("story close asks at the terminal (B36)", () => {
       }
     })(true);
     asked.confirms = [true];
-    const r = await runCli(["story", "close", "gh-8"], { ...h2.deps, interaction: asked });
+    const r = await runChecked(["story", "close", "gh-8"], { ...h2.deps, interaction: asked });
     expect(r.exit).toBe(0);
     expect(lockFree).toEqual([true]);
     expect(asked.questions).toEqual(["Close gh-8? Worktrees for 1 units will be removed [y/N]"]);

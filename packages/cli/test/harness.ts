@@ -9,7 +9,7 @@ import { setDefaultTimeout } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import type { Clock, InboxItem, LaunchSpec, NotifierPort, PaneState, PromptKey, RemoteIssue, RemotePort, RemotePullRequest, RunnerCapabilities, RunnerPort, RunnerSessionInfo, SessionRef } from "@norn/core";
+import { type Clock, type InboxItem, type LaunchSpec, type NotifierPort, type PaneState, type PromptKey, type RemoteIssue, type RemotePort, type RemotePullRequest, type RunnerCapabilities, type RunnerPort, type RunnerSessionInfo, nameRemoved, type SessionRef } from "@norn/core";
 import { type Receipt, type UnitState, ulid } from "@norn/schema";
 import { appendReceipt, installSkills, linkSkills, readState } from "@norn/store";
 import type { ProjectView } from "@norn/view";
@@ -234,6 +234,20 @@ export interface Harness {
  */
 export const T0 = Date.parse("2099-01-15T10:00:00.000Z");
 
+/**
+ * B7: no command norn prints names a removed command (B5). Every command a cli suite runs through the
+ * harness (`h.norn`, `h.tick`, `runChecked`) is checked here — its stdout (markdown or JSON: inbox items, `do_instead`, briefs, decide
+ * details) and stderr — so a printed old verb fails the test that printed it.
+ */
+export function printsNoRemovedCommand(argv: readonly string[], r: CliResult): CliResult {
+  const old = nameRemoved(r.stdout) ?? nameRemoved(r.stderr ?? "");
+  if (old) throw new Error(`\`norn ${argv.join(" ")}\` printed the removed command \`${old}\` (B7):\n${r.stdout}${r.stderr ?? ""}`);
+  return r;
+}
+
+/** `runCli` with the B7 check: what a suite that passes its own deps calls instead. */
+export const runChecked = async (argv: string[], deps: CliDeps): Promise<CliResult> => printsNoRemovedCommand(argv, await runCli(argv, deps));
+
 export async function createHarness(): Promise<Harness> {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "norn-cli-")));
   const remoteDir = join(dir, "remote.git");
@@ -275,13 +289,13 @@ export async function createHarness(): Promise<Harness> {
     runner,
     notifier,
     deps,
-    norn: (...argv) => runCli(argv, deps),
+    norn: async (...argv) => printsNoRemovedCommand(argv, await runCli(argv, deps)),
     async listed(key) {
       const view = (await this.norn("story", "list", "--json")).value as ProjectView;
       return view.stories.flatMap((s): Listed[] => [s, ...s.slices]).find((u) => u.key === key);
     },
     async tick(...flags) {
-      const r = await runCli(["tick", ...flags], deps);
+      const r = printsNoRemovedCommand(["tick", ...flags], await runCli(["tick", ...flags], deps));
       if (r.exit !== 0) throw new Error(`tick failed: ${r.stdout}`);
       return r.value as TickReport;
     },

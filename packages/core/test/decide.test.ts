@@ -345,7 +345,7 @@ describe("story lifecycle (GR6–GR8)", () => {
   test("issue closed / unlabelled / PR closed → park remote under Unblock, once", () => {
     const closed = storyAt("test", { issue: null });
     const a = only(facts([closed]));
-    expect(a).toMatchObject({ kind: "park", state: { park: { kind: "remote", reason: "remote: issue closed, unassigned or unlabelled" } }, notify: { group: "unblock", command: "norn unstick gh-1" } });
+    expect(a).toMatchObject({ kind: "park", state: { park: { kind: "remote", reason: "remote: issue closed, unassigned or unlabelled" } }, notify: { group: "unblock", command: "norn run rerun gh-1" } });
     const parked = storyAt("test", { issue: null });
     parked.units[0]!.state = { ...parked.units[0]!.state!, status: "stuck", park: { kind: "remote", reason: "x", since: at() } };
     expect(kinds(facts([parked]))).toEqual(["gh-1 noop unit.stuck"]);

@@ -149,7 +149,7 @@ export async function resolveTarget(ctx: Context, raw: string, pick?: (st: UnitS
     if (slice) {
       const uf = sf.units.find((u) => u.unit.key === slice);
       if (uf) return localTarget(obs, sf, uf);
-      throw refuse(`no slice ${slice} in story ${story}`, cmd.status(story), "unknown_unit");
+      throw refuse(`no slice ${slice} in story ${story}`, cmd.storyView(story), "unknown_unit");
     }
     const su = storyUnit(sf);
     if (pick && su && !(su.state && pick(su.state))) {
@@ -167,10 +167,10 @@ export async function resolveTarget(ctx: Context, raw: string, pick?: (st: UnitS
 export function started(t: Target): UnitState {
   if (t.story_facts) {
     const uf = t.story_facts.units.find((u) => u.unit.key === t.key);
-    if (uf?.errors.length) throw refuse(`${t.key} is corrupt (S2): ${uf.errors.map((e) => e.file).join(", ")}`, cmd.why(t.key), "corrupt_unit", uf.errors);
+    if (uf?.errors.length) throw refuse(`${t.key} is corrupt (S2): ${uf.errors.map((e) => e.file).join(", ")}`, cmd.runView(t.key, { why: true }), "corrupt_unit", uf.errors);
   }
   if (!t.state) throw refuse(`${t.key} has not started yet`, cmd.tick(), "not_started");
-  if (t.state.status === "corrupt") throw refuse(`${t.key} is corrupt (S2)`, cmd.why(t.key), "corrupt_unit");
+  if (t.state.status === "corrupt") throw refuse(`${t.key} is corrupt (S2)`, cmd.runView(t.key, { why: true }), "corrupt_unit");
   return t.state;
 }
 

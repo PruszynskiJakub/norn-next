@@ -10,9 +10,10 @@ import { join } from "node:path";
 import type { BriefJson } from "@norn/core";
 import type { HookTrace } from "@norn/schema";
 import { readTrace, readTraceFile } from "@norn/store";
-import { type CliResult, runCli } from "../src/index.ts";
+import { type CliResult } from "../src/index.ts";
 import { parseFindings } from "../src/commands/done.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -68,9 +69,9 @@ function env() {
   return e;
 }
 /** run `norn …` inside a worktree, as an agent would */
-const inWt = (cwd: string, ...argv: string[]): Promise<CliResult> => runCli(argv, { ...h.deps, cwd, env: env() });
+const inWt = (cwd: string, ...argv: string[]): Promise<CliResult> => runChecked(argv, { ...h.deps, cwd, env: env() });
 const hook = (cwd: string, event: string, payload: Record<string, unknown>, ...flags: string[]) =>
-  runCli(["hook", event, ...flags], { ...h.deps, cwd, env: env(), stdin: JSON.stringify({ session_id: "sess-1", transcript_path: "/tmp/t.jsonl", cwd, ...payload }) });
+  runChecked(["hook", event, ...flags], { ...h.deps, cwd, env: env(), stdin: JSON.stringify({ session_id: "sess-1", transcript_path: "/tmp/t.jsonl", cwd, ...payload }) });
 const stop = (cwd: string) => hook(cwd, "stop", { hook_event_name: "Stop", stop_hook_active: false });
 const receipts = (dir: string) => (existsSync(join(dir, "receipts")) ? readdirSync(join(dir, "receipts")).sort() : []);
 const readReceipt = (dir: string, name: string) => JSON.parse(h.read(join(dir, "receipts", name)));
@@ -257,8 +258,8 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
 
   test("ask records the question and options; the parked unit refuses brief with norn answer", async () => {
     const r = await inWt(wt(), "ask", "Which expiry?", "--option", "24h", "--option", "7d");
-    expect(r.value).toMatchObject({ ok: true, kind: "ask", question: "Which expiry?", options: ["24h", "7d"], answer_with: 'norn answer gh-9 "…"', next: "end your turn" });
-    expect(r.stdout).toContain("Options: 24h · 7d\nThey answer with `norn answer gh-9 \"…\"`");
+    expect(r.value).toMatchObject({ ok: true, kind: "ask", question: "Which expiry?", options: ["24h", "7d"], answer_with: 'norn story answer gh-9 "…"', next: "end your turn" });
+    expect(r.stdout).toContain("Options: 24h · 7d\nThey answer with `norn story answer gh-9 \"…\"`");
     expect(r.stdout).toContain("**End your turn now.**");
     expect((await inWt(wt(), "stuck", "nope")).value).toMatchObject({ code: "already_reported" });
     h.clock.advance(10_000);
@@ -273,11 +274,11 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     const v = (await inWt(wt(), "brief", "--json")).value as { started: boolean; brief: BriefJson };
     expect(v.started).toBe(false);
     expect(v.brief.context.answers).toEqual([{ question: "Which expiry?", answer: "24h" }]);
-    expect((await inWt(wt(), "stuck", "cannot reach the API")).value).toMatchObject({ ok: true, kind: "stuck", unblock_with: "norn unstick gh-9" });
+    expect((await inWt(wt(), "stuck", "cannot reach the API")).value).toMatchObject({ ok: true, kind: "stuck", unblock_with: "norn run rerun gh-9" });
     h.clock.advance(10_000);
     await h.tick();
     expect(h.state(runs())).toMatchObject({ status: "stuck", park: { kind: "stuck", reason: "cannot reach the API" } });
-    expect((await inWt(wt(), "brief")).value).toMatchObject({ code: "unit_stuck", do_instead: expect.stringContaining("norn unstick gh-9") });
+    expect((await inWt(wt(), "brief")).value).toMatchObject({ code: "unit_stuck", do_instead: expect.stringContaining("norn run rerun gh-9") });
   });
 
   test("a gate step refuses brief with norn approve", async () => {
@@ -287,7 +288,7 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     expect(h.state(runs())).toMatchObject({ step: "sign-off", status: "parked" });
     const r = await inWt(wt(), "brief");
     expect(r.exit).toBe(3);
-    expect(r.value).toMatchObject({ code: "gate_step", do_instead: expect.stringContaining("norn approve gh-9") });
+    expect(r.value).toMatchObject({ code: "gate_step", do_instead: expect.stringContaining("norn story approve gh-9") });
   });
 });
 
@@ -319,7 +320,7 @@ describe("norn hook robustness (A3)", () => {
   });
 
   test("garbage stdin, unknown events and unknown agents never fail", async () => {
-    expect(await runCli(["hook", "stop"], { ...h.deps, cwd: wt(), env: env(), stdin: "not json{" })).toMatchObject({ exit: 0, value: {} });
+    expect(await runChecked(["hook", "stop"], { ...h.deps, cwd: wt(), env: env(), stdin: "not json{" })).toMatchObject({ exit: 0, value: {} });
     expect((await hook(wt(), "frobnicate", {})).value).toEqual({});
     expect((await hook(wt(), "stop", { hook_event_name: "Stop" }, "--agent", "nope")).value).toEqual({});
   });
@@ -390,7 +391,7 @@ describe("norn hook robustness (A3)", () => {
     expect(readReceipt(runs(), receipts(runs()).at(-1) as string)).toMatchObject({ kind: "ask", implicit: true, command: "Bash(rm -rf build)" });
     const inbox = (await h.norn("status")).value as { groups: Record<string, Array<{ story: string; title: string; detail?: string; command: string }>> };
     expect(inbox.groups.answer).toContainEqual(
-      expect.objectContaining({ story: "gh-9", title: "Claude needs your permission to use Bash", detail: "pending command: Bash(rm -rf build)", command: 'norn answer gh-9 "…"' }),
+      expect.objectContaining({ story: "gh-9", title: "Claude needs your permission to use Bash", detail: "pending command: Bash(rm -rf build)", command: 'norn story answer gh-9 "…"' }),
     );
     const text = (await h.norn("status")).stdout;
     expect(text).toContain("pending command: Bash(rm -rf build)");

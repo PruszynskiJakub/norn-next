@@ -127,11 +127,11 @@ describe("norn init", () => {
     expect((await h.norn("init", "--text")).stdout).toBe(r.stdout);
   });
 
-  test("help prints the commands grouped for a person, Start here first; --json prints the list", async () => {
+  test("help prints the commands grouped for a person, Core first; --json prints the list", async () => {
     const r = await h.norn("help");
     expect(r.exit).toBe(0);
     expect(r.stdout).toStartWith("norn — deliver software stories");
-    expect(r.stdout).toMatch(/\nStart here\n  norn init +Set up norn in this repository: config, workflows, skills, hooks\n/);
+    expect(r.stdout).toMatch(/\nSetup\n  norn init +Set up norn in this repository: config, workflows, skills, hooks\n/);
     expect(r.stdout).not.toMatch(/\((?:A1|§9\.3)/); // spec ids stay in the JSON
     // an agent that runs help reads first which commands are its own; each command and skill says who it is for
     expect(r.stdout.split("\n")[2]).toStartWith("Agent doing a norn step? Run only `norn brief`");
@@ -142,7 +142,7 @@ describe("norn init", () => {
     expect(list.find((c) => c.command === "init")?.summary).toContain("(A1, SK1, W1)");
     const by = (f: string) => list.filter((c) => (c as { for?: string }).for === f).map((c) => c.command);
     expect(by("agent")).toEqual(["brief", "done", "ask", "stuck"]);
-    expect(by("hooks")).toEqual(["hook"]);
+    expect(by("hooks")).toEqual([]); // `hook` only in help --all (B3)
     const skills = (r.value as { skills: Array<{ skill: string; for: string }> }).skills;
     expect(skills.find((s) => s.skill === "norn")?.for).toBe("protocol");
     expect(skills.find((s) => s.skill === "norn-qa-person")?.for).toBe("attended");

@@ -123,7 +123,7 @@ function nextSteps(r: InitReport, changed: boolean): string[] {
       ? `Make a first story: an issue labelled \`${label}\` and assigned to you, e.g. \`gh label create ${label}\` (once), then \`gh issue create --label ${label} --assignee @me --title "…"\`.`
       : `Make a first story: an issue labelled \`${label}\` and assigned to you.`,
   );
-  steps.push(`Pick it up: \`${cmd.sync()}\`, then \`${cmd.inbox()}\` shows what needs you and the command for each item; \`${cmd.watch()}\` keeps norn working.`);
+  steps.push(`Pick it up: \`${cmd.sync()}\`, then \`${cmd.status()}\` shows what needs you and the command for each item; \`${cmd.watch()}\` keeps norn working.`);
   return steps;
 }
 
