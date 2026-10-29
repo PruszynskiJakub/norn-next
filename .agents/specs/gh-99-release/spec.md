@@ -4,7 +4,7 @@ slug: release
 provider: gh
 number: 99
 url: https://github.com/PruszynskiJakub/norn-next/issues/99
-title: Release
+title: Release 0.11.1
 assignee: PruszynskiJakub
 labels:
   - norn
