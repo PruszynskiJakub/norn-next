@@ -3,9 +3,9 @@
 - Workflow: slice · Step: merge (attempt 1)
 - Status: running
 - Counters: conflict_loop 1/2, qa_loop 0/2, review_loop 1/3, test_loop 0/5
-- Last outcome: integrate.conflict (classified, 2026-10-29T10:10:51.023Z)
+- Last outcome: merge.timeout (classified, 2026-10-29T12:42:31.760Z)
 - Next: `norn trace gh-75/12`
-- Updated: 2026-10-29T10:11:50.258Z
+- Updated: 2026-10-29T12:42:31.760Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - slice.start: slice at implement
@@ -24,6 +24,7 @@
 - receipts.apply: human-qa.approve → integrate
 - receipts.apply: integrate.conflict → merge
 - agent.start: merge run 01M63J9SXNKQ5TQM7DGRA0BW86
+- agent.timeout.nudge: nudged 1
 <!-- norn:heartbeat:end -->
 
 ## Goal
