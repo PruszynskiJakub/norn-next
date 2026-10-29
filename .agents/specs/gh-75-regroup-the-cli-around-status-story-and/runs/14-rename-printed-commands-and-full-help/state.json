@@ -5,15 +5,16 @@
   "unit_dir": "14-rename-printed-commands-and-full-help",
   "workflow": "slice",
   "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
-  "step": "review",
+  "step": "qa",
   "attempt": 1,
   "visits": {
     "implement": 1,
     "test": 1,
-    "review": 1
+    "review": 1,
+    "qa": 1
   },
-  "step_entered_at": "2026-10-29T15:04:21.176Z",
-  "status": "running",
+  "step_entered_at": "2026-10-29T15:08:21.202Z",
+  "status": "ready",
   "park": null,
   "counters": {
     "test_loop": 0,
@@ -21,37 +22,18 @@
     "qa_loop": 0,
     "conflict_loop": 0
   },
-  "nudges_used": 2,
+  "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 8,
-  "run": {
-    "run_id": "01M6432FQ8HMDTHP6B7WBPPQ68",
-    "step": "review",
-    "attempt": 1,
-    "started_at": "2026-10-29T15:04:59.586Z",
-    "how": "auto",
-    "agent": "claude",
-    "session": {
-      "runner": "herdr",
-      "session_id": "w97:p1",
-      "pane_id": "w97:p1",
-      "reach": "herdr agent attach w97:p1"
-    },
-    "process": {
-      "pid": 2249,
-      "pid_start": "Thu Oct 29 16:04:59 2026"
-    },
-    "machine": "jakubpruszynski@mac",
-    "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD"
-  },
+  "applied_through": 9,
+  "run": null,
   "last_outcome": {
     "step": "review",
-    "outcome": "silent",
-    "source": "classified",
-    "at": "2026-10-29T15:07:51.200Z",
-    "receipt_id": "01M6437ZGZ3CPZD4WPBQ8EMPRA"
+    "outcome": "approve",
+    "source": "reported",
+    "at": "2026-10-29T15:08:16.724Z",
+    "receipt_id": "01M6438REK8XZ7HSQPJ0T7R8V6"
   },
   "created_at": "2026-10-29T14:05:08.209Z",
-  "updated_at": "2026-10-29T15:07:51.200Z",
-  "last_tick_id": "01M6437ZGZ5A9FP7TD389ZC9AG"
+  "updated_at": "2026-10-29T15:08:21.202Z",
+  "last_tick_id": "01M6438WTGR4KSY5DT2T6K3CDK"
 }
