@@ -16,7 +16,7 @@
     "review": 2
   },
   "step_entered_at": "2026-10-29T11:11:45.491Z",
-  "status": "ready",
+  "status": "running",
   "park": null,
   "counters": {
     "triage_loop": 0,
@@ -24,8 +24,20 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 15,
-  "run": null,
+  "applied_through": 16,
+  "run": {
+    "run_id": "01M63PHQPEH6ZGH978VS0V4ZG4",
+    "step": "review",
+    "attempt": 2,
+    "started_at": "2026-10-29T11:25:59.448Z",
+    "how": "manual",
+    "agent": "claude",
+    "agent_session_id": "57b23eef-b2ef-4af9-b6c7-3bf2dd63a0e1",
+    "process": {
+      "pid": 81540,
+      "pid_start": "Thu Oct 29 12:25:48 2026"
+    }
+  },
   "last_outcome": {
     "step": "test",
     "outcome": "pass",
@@ -34,7 +46,7 @@
     "receipt_id": "01M63NPW273CSMYJE5ZZP4PAZ8"
   },
   "created_at": "2026-10-28T13:43:03.085Z",
-  "updated_at": "2026-10-29T11:11:45.491Z",
-  "last_tick_id": "01M63NQNTJT2TDB99JTW892XF0",
+  "updated_at": "2026-10-29T11:26:15.563Z",
+  "last_tick_id": "01M63PJ7GASDXTPSZ7F9FQQ0BM",
   "mode": "manual"
 }
