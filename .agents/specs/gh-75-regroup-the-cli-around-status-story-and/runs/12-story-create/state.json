@@ -17,7 +17,7 @@
     "merge": 2
   },
   "step_entered_at": "2026-10-29T13:14:05.714Z",
-  "status": "ready",
+  "status": "running",
   "park": null,
   "counters": {
     "test_loop": 0,
@@ -27,8 +27,27 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 25,
-  "run": null,
+  "applied_through": 27,
+  "run": {
+    "run_id": "01M63WRKB8DF8JVM7C7509H60R",
+    "step": "merge",
+    "attempt": 2,
+    "started_at": "2026-10-29T13:14:49.641Z",
+    "how": "auto",
+    "agent": "claude",
+    "session": {
+      "runner": "herdr",
+      "session_id": "w91:p1",
+      "pane_id": "w91:p1",
+      "reach": "herdr agent attach w91:p1"
+    },
+    "process": {
+      "pid": 37406,
+      "pid_start": "Thu Oct 29 14:14:49 2026"
+    },
+    "machine": "jakubpruszynski@mac",
+    "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD"
+  },
   "last_outcome": {
     "step": "merge",
     "outcome": "timeout",
@@ -37,6 +56,6 @@
     "receipt_id": "01M63WMY3CBZHD4ZRRBYRKTM2T"
   },
   "created_at": "2026-10-28T14:13:16.910Z",
-  "updated_at": "2026-10-29T13:14:05.714Z",
-  "last_tick_id": "01M63WQP0HZWM612T4S02HPCHY"
+  "updated_at": "2026-10-29T13:14:49.642Z",
+  "last_tick_id": "01M63WRKB8740WJM8JR37TWPCJ"
 }
