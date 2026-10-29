@@ -225,7 +225,7 @@ describe("two clones hand a story over through git (§19.3, T5, T6)", () => {
   });
 
   test("clone B answers, briefs and continues the slice to its gate", async () => {
-    expect((await B.norn("answer", "gh-7/01", "Blue.")).exit).toBe(0);
+    expect((await B.norn("story", "answer", "gh-7/01", "Blue.")).exit).toBe(0);
     step();
     // the story unit applies the take receipt (R10.1) alongside the slice's answer
     expect(kinds(await B.tick())).toEqual(["gh-7 apply_receipts", "gh-7/01 apply_receipts"]);

@@ -14,17 +14,14 @@ import { syncCommand } from "./sync.ts";
 import { tickCommand } from "./tick.ts";
 import { uninstallCommand } from "./uninstall.ts";
 import { watchCommand } from "./watch.ts";
-import { answerCommand } from "./answer.ts";
-import { approveCommand } from "./approve.ts";
 import { runNoun } from "./run.ts";
 import { statusCommand } from "./status.ts";
 import { storyNoun } from "./story.ts";
 import { configCommand } from "./config.ts";
 import { doctorCommand } from "./doctor.ts";
 import { tidyCommand } from "./tidy.ts";
-import { updateCommand } from "./update.ts";
 
-export const COMMANDS: readonly Command[] = [initCommand, uninstallCommand, syncCommand, tickCommand, watchCommand, briefCommand, doneCommand, askCommand, stuckCommand, hookEventCommand, statusCommand, answerCommand, approveCommand, updateCommand, tidyCommand, doctorCommand, configCommand, helpCommand];
+export const COMMANDS: readonly Command[] = [initCommand, uninstallCommand, syncCommand, tickCommand, watchCommand, briefCommand, doneCommand, askCommand, stuckCommand, hookEventCommand, statusCommand, tidyCommand, doctorCommand, configCommand, helpCommand];
 
 export const NOUNS: readonly Noun[] = [storyNoun, runNoun];
 

@@ -157,7 +157,7 @@ describe("R6.2/R6.3: norn answer types into the prompt (acceptance 9)", () => {
     await parkOnPrompt(h);
     const before = receipts(h).length;
     h.runner.keysError = new Error("pane p-1 is gone");
-    const r = await h.norn("answer", "gh-9", "1");
+    const r = await h.norn("story", "answer", "gh-9", "1");
     expect(r.exit).toBe(1);
     expect(r.value).toMatchObject({ code: "answer_not_delivered", error: "answer to gh-9 not delivered: pane p-1 is gone", do_instead: "answer it in the pane: fake attach p-1" });
     expect(receipts(h)).toHaveLength(before);
@@ -171,14 +171,14 @@ describe("R6.2/R6.3: norn answer types into the prompt (acceptance 9)", () => {
 
   test("not an option of the prompt → usage error, nothing typed", async () => {
     h.runner.keysError = null;
-    const r = await h.norn("answer", "gh-9", "maybe");
+    const r = await h.norn("story", "answer", "gh-9", "maybe");
     expect(r.exit).toBe(2);
     expect(r.value).toMatchObject({ code: "not_an_option", error: expect.stringContaining("1. Yes · 2. Yes, and switch") });
     expect(h.runner.keyed).toEqual([]);
   });
 
   test("a choice: option number + enter typed, then the receipt (delivered); the tick types nothing again", async () => {
-    const r = await h.norn("answer", "gh-9", "3");
+    const r = await h.norn("story", "answer", "gh-9", "3");
     expect(r.exit).toBe(0);
     expect(h.runner.keyed).toEqual([{ session: expect.objectContaining({ pane_id: "p-1" }), keys: [{ text: "3" }, { key: "enter" }] }]);
     expect(receipts(h).at(-1)).toMatchObject({ kind: "answer", by: "human", answer: "3", delivered: true });
@@ -204,7 +204,7 @@ describe("B6: the agent's report after a person's `norn answer`, before the tick
     await untilRunning(h);
     await parkOnPrompt(h);
     // the prompt was about the agent's own `… && norn done …`: the keys arrive and it runs at once
-    expect((await h.norn("answer", "gh-9", "1")).exit).toBe(0);
+    expect((await h.norn("story", "answer", "gh-9", "1")).exit).toBe(0);
     const r = await runCli(["done", "done", "--handoff", "reviewed"], { ...h.deps, cwd: wt(h) });
     expect(r.value).toMatchObject({ ok: true, kind: "done" });
     expect(r.exit).toBe(0);

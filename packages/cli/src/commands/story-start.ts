@@ -11,15 +11,14 @@ import { defineCommand, opt } from "../command.ts";
 import { refuse } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
 import { refuseIfHeldElsewhere, resolveTarget, started } from "../runtime/human.ts";
-import { targetKey, type TargetRule, unitOf } from "../runtime/target.ts";
+import { targetKey, type TargetRule } from "../runtime/target.ts";
 
 /** B28: the units a person starts — parked at an attended step, or a ready agent step that waits for a person (manual). */
 const startable: TargetRule = {
   verb: "story start",
   command: (key) => cmd.storyStart(key),
   none: "Nothing waits for a person to start it",
-  applies(key, view) {
-    const u = unitOf(view, key);
+  applies(_key, u) {
     return (u?.status === "parked" && u.park?.kind === "attended") || (u?.status === "ready" && u.step_type === "agent" && u.effective_mode === "manual");
   },
 };

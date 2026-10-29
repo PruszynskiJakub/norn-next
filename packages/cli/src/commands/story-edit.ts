@@ -20,7 +20,7 @@ import type { Context } from "../context.ts";
 import { busyError, claimHeld, failure, refuse, usageError } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
 import { humanReceipt, refuseIfHeldElsewhere, resolveTarget, runHumanVerb } from "../runtime/human.ts";
-import { targetKey, type TargetRule, unitOf } from "../runtime/target.ts";
+import { targetKey, type TargetRule } from "../runtime/target.ts";
 
 const USAGE = "norn story edit [<story|slice>] --auto|--manual | --workflow <name> [--at <step>]";
 
@@ -29,8 +29,7 @@ const editable = (verb: "mode" | "workflow"): TargetRule => ({
   verb: "story edit",
   command: (key) => (verb === "mode" ? cmd.storyEdit(key, { mode: "auto" }) : cmd.storyEdit(key, { workflow: "<name>" })),
   none: "No story is open to edit",
-  applies(key, view) {
-    const u = unitOf(view, key);
+  applies(_key, u) {
     return !!u && u.status !== "done" && (verb === "workflow" || u.slice === null);
   },
 });

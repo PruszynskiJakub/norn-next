@@ -1,6 +1,6 @@
 /**
  * Human verbs and views through the CLI (§15, O1, O2, O5, S7, W9, T8, T9): inbox / status / trace /
- * why read via @norn/view and the trace; answer / approve / run rerun / story edit write receipts
+ * why read via @norn/view and the trace; story answer / approve / reject / edit and run rerun write receipts
  * the next tick applies; a non-holder clone posts to the mailbox the holder's tick imports.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
@@ -113,7 +113,7 @@ describe("before start", () => {
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ unit: "gh-6", workflow: "alt", previous: "gated", started: false, changed: true });
     expect(h.read(join(wt6(), spec6, "story.md"))).toContain("workflow: alt");
-    expect((await h.norn("answer", "not-a-key", "x")).exit).toBe(2);
+    expect((await h.norn("story", "answer", "not-a-key", "x")).exit).toBe(2);
   });
 
   test("claims, start (alt pinned for gh-6), launch", async () => {
@@ -149,12 +149,12 @@ describe("views (X1)", () => {
 
 describe("preconditions refuse with do_instead", () => {
   test("approve on a non-gate step, answer when not asking, run rerun when running, unknown unit", async () => {
-    const a = await h.norn("approve", "gh-5");
+    const a = await h.norn("story", "approve", "gh-5");
     refused(a, "not_at_gate");
     expect(a.value).toMatchObject({ do_instead: "norn trace gh-5" });
-    refused(await h.norn("answer", "gh-5", "EUR"), "not_parked_on_ask");
+    refused(await h.norn("story", "answer", "gh-5", "EUR"), "not_parked_on_ask");
     refused(await h.norn("run", "rerun", "gh-5"), "running");
-    refused(await h.norn("answer", "gh-99", "x"), "unknown_unit");
+    refused(await h.norn("story", "answer", "gh-99", "x"), "unknown_unit");
   });
 });
 
@@ -195,14 +195,14 @@ describe("answer (O2, B2)", () => {
     expect(text.stdout).toMatch(/^Answer \(1\) · .*\n  gh-5 +work: Which currency\? · \d+[smhd]\S*\n(?: {6}.*\n)*? {6}\$ norn answer gh-5 "…"\n/m);
     expect(text.stdout).toMatch(/^Approve \(1\) · .*\n  gh-6 +review: Look at it · \d+[smhd]\S*\n(?: {6}.*\n)*? {6}\$ norn approve gh-6\n/m);
 
-    const r = await h.norn("answer", "gh-5", "EUR");
+    const r = await h.norn("story", "answer", "gh-5", "EUR");
     expect(r.exit).toBe(0);
     const v = r.value as Verb;
     expect(v.delivered).toMatchObject({ via: "local", claim: "mine" });
     expect(v.delivered.file).toMatch(/^\.agents\/specs\/gh-5-pay-invoices\/runs\/_story\/receipts\/\d{4}-answer\.json$/);
     expect(v.receipt).toMatchObject({ kind: "answer", answer: "EUR", step: "work", attempt: 1, slice: null, ask_receipt_id: st?.park?.receipt_id, run_id: st?.run?.run_id });
     // a second answer for the same ask while the first is unapplied is refused, not silently dropped later
-    const dup = await h.norn("answer", "gh-5", "USD");
+    const dup = await h.norn("story", "answer", "gh-5", "USD");
     refused(dup, "already_recorded");
     expect(dup.value).toMatchObject({ do_instead: "norn tick" });
     await tick();
@@ -256,24 +256,25 @@ describe("approve (gate)", () => {
     h.report(runs5(), "done", { outcome: "done", handoff: "done" });
     await tick();
     expect(h.state(runs5())).toMatchObject({ step: "review", status: "parked" });
-    const r = await h.norn("approve", "gh-5", "--reject", "--reason", "needs tests");
+    const r = await h.norn("story", "reject", "gh-5", "--reason", "needs tests");
     expect((r.value as Verb).receipt).toMatchObject({ kind: "reject", comment: "needs tests", step: "review", attempt: 1 });
     // approve and reject decide the same gate: one decision per step attempt
-    refused(await h.norn("approve", "gh-5"), "already_recorded");
+    refused(await h.norn("story", "approve", "gh-5"), "already_recorded");
     await tick();
     expect(h.state(runs5())).toMatchObject({ step: "work", attempt: 3, counters: { loop: 1 } });
     // O6: the rejection is a milestone in handoff.md, so the next brief's Context carries it
     expect(h.read(join(runs5(), "handoff.md"))).toContain("- review#1 reject by tester@box: needs tests");
     expect(r.value).not.toHaveProperty("warning");
 
-    // B3: a rejection without a reason leaves the agent nothing to fix; it lands, with a warning
+    // B26 (B3): a rejection without a reason would leave the agent nothing to fix: a usage error, nothing written
     h.report(runs5(), "done", { outcome: "done", handoff: "with tests" });
     await tick();
-    const bare = await h.norn("approve", "gh-5", "--reject");
-    expect(bare.exit).toBe(0);
-    expect(bare.value).toMatchObject({ warning: expect.stringContaining("--reason"), receipt: { kind: "reject", step: "review", attempt: 2 } });
-    expect((bare.value as Verb).receipt).not.toHaveProperty("comment");
-    expect(h.read(join(runs5(), "handoff.md"))).toContain("- review#2 reject by tester@box: (no comment given)");
+    const bare = await h.norn("story", "reject", "gh-5");
+    expect(bare.exit).toBe(2);
+    expect(bare.value).toMatchObject({ do_instead: expect.stringContaining("pass --reason") });
+    expect(h.state(runs5())).toMatchObject({ step: "review", attempt: 2, status: "parked" });
+    expect((await h.norn("story", "reject", "gh-5", "--reason", "still no tests")).exit).toBe(0);
+    expect(h.read(join(runs5(), "handoff.md"))).toContain("- review#2 reject by tester@box: still no tests");
     await tick();
     expect(h.state(runs5())).toMatchObject({ step: "work", attempt: 4, counters: { loop: 2 } });
 
@@ -281,7 +282,7 @@ describe("approve (gate)", () => {
     const hb = JSON.parse(h.read(join(h.root, ".agents/norn/trace/heartbeat.json"))).heartbeat_id;
     h.git(["push", "-q", "origin", ":refs/norn/claims/gh-6"]);
     h.git(["update-ref", "-d", "refs/norn/claims/gh-6"]);
-    const a = await h.norn("approve", "gh-6");
+    const a = await h.norn("story", "approve", "gh-6");
     expect(a.exit).toBe(0);
     expect((a.value as Verb).delivered).toMatchObject({ via: "local", claim: "acquired" });
     const blob = JSON.parse(h.git(["cat-file", "-p", h.git(["ls-remote", "origin", "refs/norn/claims/gh-6"]).split("\t")[0] as string]));
@@ -313,7 +314,7 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
     const deps = { ...h.deps, cwd: bRoot, env: { ...h.deps.env, NORN_HOME_DIR: bHome, USER: "colleague", NORN_MACHINE: "laptop" } };
     b = (...argv) => runCli(argv, deps);
 
-    const r = await b("approve", "gh-5", "--reason", "lgtm");
+    const r = await b("story", "approve", "gh-5", "--reason", "lgtm");
     expect(r.exit).toBe(0);
     const v = r.value as Verb;
     expect(v.delivered).toMatchObject({ via: "mailbox", holder: "tester@box" });
@@ -321,7 +322,7 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
     expect(v.receipt).toMatchObject({ kind: "approve", step: "review", attempt: 3, slice: null, who: "colleague@laptop", comment: "lgtm" });
     expect(h.git(["ls-remote", "origin", "refs/norn/inbox/*"])).toContain("refs/norn/inbox/gh-5/");
     // the same decision twice is refused before it reaches the mailbox
-    refused(await b("approve", "gh-5"), "already_recorded");
+    refused(await b("story", "approve", "gh-5"), "already_recorded");
     held(await b("story", "edit", "gh-5", "--auto"));
   });
 
@@ -479,7 +480,7 @@ describe("a slice gate in its own worktree (X1: views read slice runs from the s
   });
 
   test("approve lands in the slice worktree; the next tick finishes the slice and the inbox clears", async () => {
-    const r = await h.norn("approve", "gh-8/01");
+    const r = await h.norn("story", "approve", "gh-8/01");
     expect(r.exit).toBe(0);
     expect((r.value as Verb).receipt).toMatchObject({ kind: "approve", step: "qa", slice: "gh-8/01", by: "human" });
     await tick();

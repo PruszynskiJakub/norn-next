@@ -93,10 +93,10 @@ function itemActions(i: InboxEntry, unit: string, o: CockpitOptions): CockpitAct
   if (o.places && i.reach) out.push(action("agent", { kind: "place", place: "agent", story: i.story, reach: i.reach }));
   // MO5: a manual start the runner opens itself
   if (i.group === "your_turn" && !i.reach && i.command.startsWith(`${cmd.open()} `)) out.push(action("start", { kind: "verb", argv: ["story", "start", unit] }));
-  if (i.group === "answer") out.push(action("answer", { kind: "verb", argv: ["answer", unit, "{input}"] }, { prompt: "Your answer", required: true }));
+  if (i.group === "answer") out.push(action("answer", { kind: "verb", argv: ["story", "answer", unit, "{input}"] }, { prompt: "Your answer", required: true }));
   if (i.group === "approve") {
-    out.push(action("approve", { kind: "verb", argv: ["approve", unit] }));
-    out.push(action("reject", { kind: "verb", argv: ["approve", unit, "--reject", "--reason", "{input}"] }, { prompt: "What to change", required: true }));
+    out.push(action("approve", { kind: "verb", argv: ["story", "approve", unit] }));
+    out.push(action("reject", { kind: "verb", argv: ["story", "reject", unit, "--reason", "{input}"] }, { prompt: "What to change", required: true }));
   }
   if (i.command.startsWith(`${cmd.unstick()} `)) out.push(action("unstick", { kind: "verb", argv: ["run", "rerun", unit] }));
   return out;

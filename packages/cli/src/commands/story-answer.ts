@@ -1,5 +1,6 @@
 /**
- * `norn answer <story|unit> "<text>"` (O2, C3): answer the question a unit is parked on. Writes an
+ * `norn story answer [<story|unit>] "<text>"` (B24, O2, C3): answer the question a unit is parked on. Without
+ * a unit: the worktree's, else a pick of the units parked on a question (B54, B57). Writes an
  * `answer` receipt at the unit's cursor; the next tick delivers it into the same session or a
  * fresh one from the handoff (B2). Claim free: acquired here (T8); held elsewhere: mailbox (T9).
  *
@@ -17,21 +18,23 @@ import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
 import { failure, refuse, usageError } from "../output.ts";
 import { at, humanReceipt, resolveTarget, type Route, runHumanVerb, type Target } from "../runtime/human.ts";
+import { parkedOn, targetKey } from "../runtime/target.ts";
 
 const asks = (st: UnitState) => st.status === "parked" && st.park?.kind === "ask";
 
-export const answerCommand = defineCommand({
-  name: "answer",
-  summary: "Answer the question a unit is parked on (O2); a prompt in an agent's pane gets the keys it expects (R6.2)",
-  usage: 'norn answer <story|unit> "<text>"   (a choice prompt: the option number, e.g. "1")',
-  positionals: { min: 2, max: 2 },
+export const storyAnswerCommand = defineCommand({
+  name: "story answer",
+  summary: "Answer the question a unit is parked on (B24, O2); a prompt in an agent's pane gets the keys it expects (R6.2)",
+  usage: 'norn story answer [<story|unit>] "<text>"   (a choice prompt: the option number, e.g. "1")',
+  positionals: { min: 1, max: 2 },
   async run(ctx, args) {
-    const [unit, raw] = args.positionals as [string, string];
+    const [unit, raw] = args.positionals.length === 2 ? (args.positionals as [string, string]) : [undefined, args.positionals[0] as string];
     const text = raw.trim();
-    if (!text) throw usageError("the answer is empty", 'norn answer <unit> "<text>"');
-    const t = await resolveTarget(ctx, unit, asks);
+    if (!text) throw usageError("the answer is empty", 'norn story answer <unit> "<text>"');
+    const key = await targetKey(ctx, unit, args.json === true, parkedOn("ask", "story answer", "Nothing waits for an answer", (k) => cmd.answer(k)));
+    const t = await resolveTarget(ctx, key, asks);
     const out = await runHumanVerb(ctx, t, {
-      verb: "answer",
+      verb: "story answer",
       mailbox: true,
       check(t, st) {
         if (!asks(st))

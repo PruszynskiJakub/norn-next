@@ -1,9 +1,10 @@
 /**
- * `norn update <story>` (BS9): send a waiting story back through its base update — re-enter the
+ * `norn story update-branch [<story>]` (B27, BS9): send a waiting story back through its base update — re-enter the
  * step named by the workflow's `base.step` (default: the first `git: update` step). Allowed when the
  * story unit is done with its PR unmerged, parked at a gate, or stuck, and only for the heartbeat
  * that holds the claim (T7); never through the mailbox. Writes an `update` receipt (P6); the tick
  * applies it (S5). The tick never moves a done unit by itself — only a person does, with this verb.
+ * Without a story: the worktree's story, a slice worktree's too (B55), else a pick of the waiting stories (B57).
  */
 import { cmd, baseUpdateStep, storyUnit } from "@norn/core";
 import type { UnitState } from "@norn/schema";
@@ -11,22 +12,33 @@ import { defineCommand } from "../command.ts";
 import { refuse } from "../output.ts";
 import { at, humanReceipt, resolveTarget, runHumanVerb } from "../runtime/human.ts";
 import { storyArg } from "../runtime/args.ts";
+import { targetKey, type TargetRule } from "../runtime/target.ts";
 
 /** BS9: done (PR unmerged), at a gate, or stuck. */
 const waiting = (st: UnitState) => st.status === "done" || st.status === "stuck" || (st.status === "parked" && st.park?.kind === "gate");
 
-export const updateCommand = defineCommand({
-  name: "update",
-  summary: "Send a waiting story back through its base update: done with an unmerged PR, at a gate, or stuck (BS9)",
-  usage: "norn update <story>",
-  positionals: { min: 1, max: 1 },
+/** B57: the stories the pick offers — waiting (BS9) and not finished. */
+const updatable: TargetRule = {
+  verb: "story update-branch",
+  story: true,
+  none: "No story waits for a base update (done with an unmerged PR, at a gate, or stuck)",
+  command: (k) => cmd.update(k),
+  applies: (_key, u) =>
+    u?.slice === null && u.story_status !== "done" && u.story_status !== "dropped" && u.pr?.state !== "merged" && (u.status === "done" || u.status === "stuck" || (u.status === "parked" && u.park?.kind === "gate")),
+};
+
+export const storyUpdateBranchCommand = defineCommand({
+  name: "story update-branch",
+  summary: "Send a waiting story back through its base update: done with an unmerged PR, at a gate, or stuck (B27, BS9)",
+  usage: "norn story update-branch [<story>]",
+  positionals: { max: 1 },
   async run(ctx, args) {
-    const key = storyArg(args.positionals[0] as string, "update");
+    const key = storyArg(await targetKey(ctx, args.positionals[0], args.json === true, updatable), "story update-branch");
     const t = await resolveTarget(ctx, key);
     if (t.slice !== null) throw refuse(`${t.key} is a slice; ${cmd.update()} re-enters the story unit`, cmd.update(t.story), "not_a_story");
     let to = "";
     const out = await runHumanVerb(ctx, t, {
-      verb: "update",
+      verb: "story update-branch",
       // T7: only the claim holder writes receipts for the story; never through the mailbox
       mailbox: false,
       requireHolder: "only the holder updates a story (T7)",

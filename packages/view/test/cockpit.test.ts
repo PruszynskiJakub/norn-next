@@ -120,10 +120,10 @@ describe("cockpitModel", () => {
     // B28: the start action runs `norn story start <unit>`
     expect(row(rows, "your_turn:gh-1")?.actions.find((a) => a.id === "start")?.effect).toEqual({ kind: "verb", argv: ["story", "start", "gh-1"] });
     const answer = row(rows, "answer:gh-3")?.actions.find((a) => a.id === "answer");
-    expect(answer).toEqual({ id: "answer", label: "answer", key: "a", input: { prompt: "Your answer", required: true }, effect: { kind: "verb", argv: ["answer", "gh-3/02", "{input}"] } });
+    expect(answer).toEqual({ id: "answer", label: "answer", key: "a", input: { prompt: "Your answer", required: true }, effect: { kind: "verb", argv: ["story", "answer", "gh-3/02", "{input}"] } });
     if (answer?.effect.kind !== "verb") throw new Error("unreachable");
-    expect(withInput(answer.effect.argv, "CSV only")).toEqual(["answer", "gh-3/02", "CSV only"]);
-    expect(row(rows, "approve:gh-4")?.actions.find((a) => a.id === "reject")?.effect).toEqual({ kind: "verb", argv: ["approve", "gh-4", "--reject", "--reason", "{input}"] });
+    expect(withInput(answer.effect.argv, "CSV only")).toEqual(["story", "answer", "gh-3/02", "CSV only"]);
+    expect(row(rows, "approve:gh-4")?.actions.find((a) => a.id === "reject")?.effect).toEqual({ kind: "verb", argv: ["story", "reject", "gh-4", "--reason", "{input}"] });
     // B48: unstick is gone; a stuck unit is rerun
     expect(row(rows, "unblock:gh-5")?.actions.find((a) => a.id === "unstick")?.effect).toEqual({ kind: "verb", argv: ["run", "rerun", "gh-5"] });
     expect(row(rows, "story:gh-4")?.actions.find((a) => a.id === "pr")?.effect).toEqual({ kind: "link", url: "https://github.com/o/r/pull/7" });

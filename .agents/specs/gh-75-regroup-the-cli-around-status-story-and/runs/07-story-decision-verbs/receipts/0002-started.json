@@ -1,0 +1,26 @@
+{
+  "kind": "started",
+  "receipt_id": "01M61DRDHD0KY852FAMNZ7KMH0",
+  "run_id": "01M61DR88Z21B9TTSWFRZT06Z2",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-28T14:13:52.301Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M61DR88ZF6G50JHE00ST48N3",
+  "how": "auto",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-75-regroup-the-cli-around-status-story-and--07-story-decision-verbs",
+  "machine": "jakubpruszynski@mac",
+  "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD",
+  "session": {
+    "runner": "herdr",
+    "session_id": "w6X:p1",
+    "pane_id": "w6X:p1",
+    "reach": "herdr agent attach w6X:p1"
+  },
+  "process": {
+    "pid": 88434,
+    "pid_start": "Wed Oct 28 15:13:52 2026"
+  }
+}
