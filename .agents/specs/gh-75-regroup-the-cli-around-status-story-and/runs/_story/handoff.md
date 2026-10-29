@@ -35,6 +35,7 @@ resolve#1: merge origin/main (13e0986a) into the story branch, resolving 17 conf
 - Semantic fix: `runtime/closed.ts` (story close/reopen) reads the pushed `spec.md`, falling back to `story.md` (GR2); reopen/close messages and tests say spec.md.
 - Main's new tests moved to the new commands (decide gh-79 test, recovery `story checkout --force`, check-run `status --json` / `story list`, help --all lists check-run).
 - Golden runtime-3aec7a560471 kept main's facts with the `run view --why` command.
+- resolve#1 done: Merged origin/main 13e0986a into the story branch; 17 conflicts resolved by intent (spec.md rename, check-run, gh-79 hints, zombie fix kept; printed commands moved to noun–verb names; check-run hidden in help). Semantic fix: story close/reopen read pushed spec.md with story.md fallback. Typecheck passes; full suite 1413 pass, 1 timing flake (status-watch SIGINT test, passes 3/3 alone and in the first full run).
 
 ## Resume
 
