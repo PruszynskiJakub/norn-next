@@ -101,7 +101,7 @@ export async function markDone(act: ActEnv, a: Extract<Action, { kind: "mark_don
   const wt = a.cleanup.worktree;
   if (wt && existsSync(wt) && a.unit.slice) {
     // the slice's final state commit ($done) lands after integration: bring it into the story branch
-    const res = await integrate(act.git, { sliceCwd: wt, storyBranch: story.branch, ...(storyWt ? { storyCwd: storyWt } : {}) });
+    const res = await integrate(act.git, { sliceCwd: wt, storyBranch: story.branch, trailers: nornTrailers(act.tick, a.unit.story, a.unit.slice, "$done"), ...(storyWt ? { storyCwd: storyWt } : {}) });
     if (res.outcome === "conflict") throw new Error(`cannot bring ${a.unit.key}'s final state into ${story.branch}: conflict in ${res.files.join(", ")}`);
   }
   if (a.slice_status && a.unit.slice && storyWt) {

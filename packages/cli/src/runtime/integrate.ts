@@ -13,13 +13,17 @@ export type IntegrateResult = { outcome: "done"; head: string } | { outcome: "co
 
 /**
  * W2 `git: integrate`: rebase the slice branch (checked out in `sliceCwd`) onto the story
- * branch, then fast-forward the story branch to it. A conflicting rebase is aborted cleanly
- * and yields `conflict` (K6). The caller serializes integrations per story (K6).
+ * branch — or merge the story branch in when the slice already merged it once (gh-80, `trailers`
+ * on that merge commit) — then fast-forward the story branch to it. A conflicting rebase or merge
+ * is aborted cleanly and yields `conflict` (K6). The caller serializes integrations per story (K6).
  * If the story branch is checked out in a worktree it is fast-forwarded there (keeps that
  * checkout in sync); otherwise its ref is moved with a compare-and-swap.
  */
-export async function integrate(git: GitPort, opts: { sliceCwd: string; storyBranch: string; storyCwd?: string }): Promise<IntegrateResult> {
-  const rb = await git.rebase(opts.sliceCwd, opts.storyBranch);
+export async function integrate(
+  git: GitPort,
+  opts: { sliceCwd: string; storyBranch: string; storyCwd?: string; trailers?: Record<string, string> },
+): Promise<IntegrateResult> {
+  const rb = await bringInStory(git, opts.sliceCwd, opts.storyBranch, opts.trailers ?? {});
   if (!rb.ok) return { outcome: "conflict", files: rb.files };
   const storyRef = `refs/heads/${opts.storyBranch}`;
   let storyCwd = opts.storyCwd;
@@ -34,6 +38,18 @@ export async function integrate(git: GitPort, opts: { sliceCwd: string; storyBra
   if (!(await git.isAncestor(opts.sliceCwd, old, rb.head)) || !(await git.updateRef(opts.sliceCwd, { ref: storyRef, sha: rb.head, expected: old })))
     throw portError("git_ff_failed", `cannot fast-forward ${opts.storyBranch} to ${rb.head}`, true);
   return { outcome: "done", head: rb.head };
+}
+
+/**
+ * gh-80 (W2, W4): a slice whose merge step merged the story branch in (a merge on the ancestry
+ * path from its fork point) takes the story branch in by merging again, never by rebasing: a
+ * rebase linearises the resolution away (or re-creates the merge on a story tip that moved on)
+ * and the same conflict comes back, spending `conflict_loop` twice on one conflict.
+ */
+async function bringInStory(git: GitPort, cwd: string, storyBranch: string, trailers: Record<string, string>) {
+  const fork = (await git.divergence(cwd, "HEAD", storyBranch)).merge_base;
+  if (!fork || !(await git.baseMergeCommit(cwd, fork, "HEAD"))) return git.rebase(cwd, storyBranch);
+  return git.merge(cwd, storyBranch, { message: `Merge ${storyBranch} into the slice`, trailers });
 }
 
 export type UpdateResult =
