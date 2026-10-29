@@ -50,6 +50,9 @@ Fix gh-80: a conflict resolved in `merge` (by merging the story branch into the 
 - review#2: approve. bringInStory keeps the resolution whether the story branch stayed put or moved on; follow-on integrates fall back to a plain rebase. integrate.test.ts 12/12, typecheck green. Minor: the conflict detail still says "rebase" after a merge; W2 is not amended in the PRD. Nit: integrate's doc comment wording on trailers.
 - review#2 approve: F1 rework is correct: integrate merges the story branch into a slice that already merged it, then fast-forwards (Norn trailers on the merge), otherwise it rebases. The resolution holds whether the story branch stayed put or moved on. Tests 12/12, typecheck green. No blocking findings. Minor: the conflict detail says rebase after a merge; W2 is not amended. Nit: doc comment.
 
+- describe#1: wrote pr.md (summary, before/after evidence, merge danger). Re-ran the evidence harness loop on the branch: integrate#2 integrates, conflict_loop stays 1 (green). integrate.test.ts 12/12. Removed packages/cli/test/zz-gh80-repro.test.ts: the throwaway harness copy was swept into the "describe#1 started" commit, though implement meant it to stay uncommitted (a copy stays in the evidence folder).
+- describe#1 done: pr.md written: integrate merges the story branch into a slice that already merged it, otherwise rebases. Evidence: plain-git and harness loop red before, harness loop and integrate.test.ts green now. Merge danger two-way, low. Removed the throwaway zz-gh80-repro.test.ts that the describe-start commit swept in.
+
 ## Resume
 
-Nothing left for review; the story goes on to its next step.
+pr.md is written; nothing left for describe.
