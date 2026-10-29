@@ -7,15 +7,15 @@
  * it, and `norn run rerun` resumes it. A moved base is left to the next tick's base sync.
  *
  * Refused before anything changes (B42, exit 3): a story that is not closed; issue #N closed on the
- * remote; a started slice whose branch is missing from the remote.
+ * remote; the story branch or a started slice's branch missing from the remote.
  */
 import { join, relative } from "node:path";
 import { cmd } from "@norn/core";
-import { STORY_UNIT_DIR } from "@norn/schema";
+import { parseStoryKey, STORY_UNIT_DIR, slugify, storyBranch } from "@norn/schema";
 import { acquireTickLock, appendReceipt, patchStoryFile, readState, storyFile } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
-import { busyError, failure, refuse } from "../output.ts";
+import { busyError, type CliFailure, failure, refuse } from "../output.ts";
 import { checkoutStory } from "../runtime/checkout.ts";
 import { closedStories, isClosed, type PushedStory, pushedStory, startedSliceBranches } from "../runtime/closed.ts";
 import { humanReceipt } from "../runtime/human.ts";
@@ -27,7 +27,7 @@ const REOPEN_REASON = "reopened";
 /** B42: the closed story's pushed record, or a refusal saying what keeps it from being restored — checked before any change. */
 async function restorable(ctx: Context, key: string): Promise<PushedStory> {
   const s = await pushedStory(ctx, key, cmd.storyReopen(key));
-  if (!s) throw refuse(`no story branch for ${key}`, "check the story key", "unknown_story");
+  if (!s) throw await noStoryBranch(ctx, key);
   if (!isClosed(s)) throw refuse(`${key} is not closed (spec.md says ${s.frontmatter.status})`, cmd.storyView(key), "not_closed");
   const remote = (await ctx.ports()).remote;
   const issue = remote ? await remote.getIssue(s.frontmatter.number).catch((e: unknown) => {
@@ -42,6 +42,23 @@ async function restorable(ctx: Context, key: string): Promise<PushedStory> {
   for (const b of await startedSliceBranches(ctx, s))
     if (!listed.includes(b.branch)) throw refuse(`${b.key}'s branch ${b.branch} is missing from ${origin}`, `push ${b.branch} to ${origin}, or mark ${b.key} dropped on ${s.branch}, then ${cmd.storyReopen(key)}`, "branch_missing");
   return s;
+}
+
+/**
+ * B42: no story branch on the remote or here. The issue still names it: intake made the branch from
+ * the issue title (`storyBranch(key, slugify(title))`), so the refusal says which branch is gone.
+ * Without a remote or an issue there is nothing to name; then the key itself is the likely mistake.
+ */
+async function noStoryBranch(ctx: Context, key: string): Promise<CliFailure> {
+  const unknown = refuse(`no story branch for ${key}`, "check the story key", "unknown_story");
+  const n = parseStoryKey(key)?.number;
+  const remote = (await ctx.ports()).remote;
+  const origin = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
+  if (n == null || !remote || !origin) return unknown;
+  const issue = await remote.getIssue(n).catch(() => null);
+  if (!issue) return unknown;
+  const branch = storyBranch(key, slugify(issue.title));
+  return refuse(`${key}'s story branch ${branch} is missing from ${origin}`, `push ${branch} to ${origin}, then ${cmd.storyReopen(key)}`, "branch_missing");
 }
 
 export const storyReopenCommand = defineCommand({

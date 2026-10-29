@@ -137,6 +137,20 @@ describe("story reopen refusals (B42)", () => {
     expect(existsSync(storyWt())).toBe(false);
     h.git(["push", "-q", "origin", `${sha}:refs/heads/gh-7/02-list`]);
   });
+
+  test("the story branch missing from the remote is refused naming the branch; nothing changes", async () => {
+    const sha = h.git(["ls-remote", "origin", `refs/heads/${BRANCH}`]).split("\t")[0] as string;
+    // as a person would: `git push origin --delete` drops the remote-tracking ref too
+    h.git(["push", "-q", "origin", "--delete", BRANCH]);
+    const before = remoteState();
+    const r = await h.norn("story", "reopen", "gh-7");
+    refused(r, "branch_missing");
+    expect((r.value as { error: string }).error).toContain(BRANCH);
+    expect((r.value as { do_instead: string }).do_instead).toContain(`push ${BRANCH}`);
+    expect(remoteState()).toBe(before);
+    expect(existsSync(storyWt())).toBe(false);
+    h.git(["push", "-q", "origin", `${sha}:refs/heads/${BRANCH}`]);
+  });
 });
 
 describe("story reopen (B40, B41, B55)", () => {
