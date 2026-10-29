@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M647A3R5V0ZVHF3AZVQYFGHT",
+  "run_id": "01M646H8ZMPAZVFXXER8R7H6YZ",
+  "step": "implement",
+  "attempt": 2,
+  "at": "2026-10-29T16:18:55.366Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/15",
+  "outcome": "done",
+  "handoff": "Review#1 rework: SPEC-herdr-cockpit (HC4/HC5/HC9/HC10), SPEC-cockpit, SPEC-auto-mode-recovery, SPEC-base-sync-and-qa, LIMITATIONS amended to new names and added to the lint; PRD S9 -> story checkout; config.yaml story start; lint scans whole lines (skips 'a/the norn <thing>'), reports every hit, throws if REMOVED_COMMANDS unreadable; next.sh branches on refusal code via shared json_get (stub test, red on old script). Typecheck + full suite green (1380 pass). AC4/F7 still for QA in real Herdr."
+}
