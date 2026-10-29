@@ -125,7 +125,7 @@
       {"kind":"started","receipt_id":"<ulid:7>","run_id":"<ulid:3>","step":"implement","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:4>","how":"auto","agent":"claude","worktree":"<dir>/repo-worktrees/gh-9-add-search","machine":"tester@box","heartbeat_id":"<ulid:6>","session":{"runner":"fake","session_id":"s-1","pane_id":"p-1","reach":"fake attach p-1"}}
   ~ repo-worktrees/gh-9-add-search/.agents/specs/gh-9-add-search/runs/_story/state.json
       {"version":1,"story":"gh-9","slice":null,"unit_dir":"_story","workflow":"solo","workflow_hash":"51d9743b83bdefcffc2af22c467294a98d957b6a7fca5a1ede44a62a468c618e","step":"implement","attempt":1,"visits":{"implement":1},"step_entered_at":"<time>","status":"running","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":2,"run":{"run_id":"<ulid:3>","step":"implement","attempt":1,"started_at":"<time>","how":"auto","agent":"claude","session":{"runner":"fake","session_id":"s-1","pane_id":"p-1","reach":"fake attach p-1"},"machine":"tester@box","heartbeat_id":"<ulid:6>"},"last_outcome":null,"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:4>","mode":"auto"}
-> [repo-b] norn take gh-9 --force
+> [repo-b] norn story checkout gh-9 --force
   spawn repo-b $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo-b $ git remote
   spawn repo-b $ git ls-remote --heads origin "refs/heads/gh-9-*"

@@ -170,7 +170,7 @@ export const ForeignCommitsTrace = Type.Object(
 );
 export type ForeignCommitsTrace = Static<typeof ForeignCommitsTrace>;
 
-/** R10.1 (M8): a `norn take` of a story, forced or not, with the claim it replaced. */
+/** R10.1 (M8): a `norn story checkout` of a story, forced or not, with the claim it replaced. */
 export const TakeTrace = Type.Object(
   {
     type: Type.Literal("take"),

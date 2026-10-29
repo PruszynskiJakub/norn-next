@@ -1,7 +1,8 @@
 /**
- * Team handoff (M3, §19.3): clone A runs a slice until it parks on `ask`, releases (T6); clone B
- * takes the story from git alone (T5), briefs and continues. Then a CAS race between two takes
- * (T3: one wins, the other gets "held by X since Y"), `take --force` journaled, and `drop` (GR7).
+ * Team handoff (M3, §19.3): clone A runs a slice until it parks on `ask`, hands it over (T6, B34);
+ * clone B checks the story out from git alone (T5, B33), briefs and continues. Then a CAS race between
+ * two checkouts (T3: one wins, the other gets "held by X since Y"), `story checkout --force` journaled,
+ * and `story close` (GR7, B35–B39).
  * Real git: two clones of one bare remote; each clone has its own ~/.norn and heartbeat.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
@@ -9,9 +10,9 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { RunnerPort } from "@norn/core";
 import { ulid } from "@norn/schema";
-import { appendReceipt, readState } from "@norn/store";
+import { acquireTickLock, appendReceipt, readState } from "@norn/store";
 import { type CliDeps, type CliResult, runCli, type TickReport } from "../src/index.ts";
-import { createHarness, FakeRunner, type Harness, issue, sh } from "./harness.ts";
+import { createHarness, FakeInteraction, FakeRunner, type Harness, hostEnv, issue, sh } from "./harness.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -85,7 +86,7 @@ function cloneOf(h: Harness, name: string, user: string): Clone {
   (runner as { name: string }).name = `fake-${name}`;
   const deps: CliDeps = {
     cwd: root,
-    env: { ...process.env, NORN_HOME_DIR: home, USER: user, NORN_MACHINE: name, NORN_HOOK_COMMAND: "norn hook" },
+    env: { ...hostEnv(), NORN_HOME_DIR: home, USER: user, NORN_MACHINE: name, NORN_HOOK_COMMAND: "norn hook" },
     clock: h.clock,
     ports: { remote: h.remote, runner: runner as RunnerPort, notifiers: [] },
   };
@@ -178,20 +179,20 @@ describe("two clones hand a story over through git (§19.3, T5, T6)", () => {
     h.write(handoff, `${readFileSync(handoff, "utf8")}\n## Resume\nForm done; use blue unless told otherwise.\n`);
   });
 
-  test("clone A releases: handoff committed, branches pushed, then the claim ref deleted (T6)", async () => {
-    const r = await A.norn("release", "gh-7");
+  test("clone A hands over from its slice worktree: handoff committed, branches pushed, then the claim ref deleted (T6, B34, B55)", async () => {
+    const r = await A.at(sliceWt(h.root), "story", "handoff");
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ story: "gh-7", released: true, pushed: ["gh-7-add-login-form", "gh-7/01-form"] });
     expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-7"])).toBe("");
     expect(h.git(["show", `origin/gh-7/01-form:${SPEC}/runs/01-form/handoff.md`])).toContain("use blue");
-    // released, so a second release is refused
-    expect((await A.norn("release", "gh-7")).exit).toBe(3);
+    // handed over, so a second handoff is refused
+    expect((await A.norn("story", "handoff", "gh-7")).exit).toBe(3);
   });
 
   test("clone B takes from git alone: claim, worktrees with slots, cursor and handoff printed (T5)", async () => {
     B = cloneOf(h, "repo-b", "bob");
     step();
-    const r = await B.norn("take", "gh-7");
+    const r = await B.norn("story", "checkout", "gh-7");
     expect(r.exit).toBe(0);
     const v = r.value as { claim: { holder: string }; forced: boolean; worktrees: Array<{ unit: string; path: string; slot: number | null }>; units: Array<{ unit: string; step: string; status: string; handoff: string | null }> };
     expect(v.claim.holder).toBe("bob@repo-b");
@@ -252,7 +253,7 @@ describe("claim races (T3) and forced takes (T5)", () => {
   test("after B's claim expires, two concurrent takes: exactly one wins, the other is told who holds it", async () => {
     C = cloneOf(h, "repo-c", "carol");
     step(11 * 60_000); // B stopped beating: its 10m lease expires
-    const [ra, rc] = await Promise.all([A.norn("take", "gh-7"), C.norn("take", "gh-7")]);
+    const [ra, rc] = await Promise.all([A.norn("story", "checkout", "gh-7"), C.norn("story", "checkout", "gh-7")]);
     const results = [ra, rc];
     const won = results.filter((r) => r.exit === 0);
     const lost = results.filter((r) => r.exit !== 0);
@@ -269,11 +270,11 @@ describe("claim races (T3) and forced takes (T5)", () => {
   });
 
   test("before expiry a take needs --force; the forced take is journaled in the claim and the handoff", async () => {
-    const r1 = await B.norn("take", "gh-7");
+    const r1 = await B.norn("story", "checkout", "gh-7");
     expect(r1.exit).toBe(5);
     expect(r1.value).toMatchObject({ code: "claim_held", do_instead: expect.stringContaining("--force") });
     step();
-    const r2 = await B.norn("take", "gh-7", "--force");
+    const r2 = await B.norn("story", "checkout", "gh-7", "--force");
     expect(r2.exit).toBe(0);
     const v = r2.value as { forced: boolean; claim: { forced_from: string }; journal: { line: string; pushed: boolean } };
     expect(v.forced).toBe(true);
@@ -285,9 +286,70 @@ describe("claim races (T3) and forced takes (T5)", () => {
     expect(h.git(["show", `origin/gh-7-add-login-form:${SPEC}/runs/_story/handoff.md`])).toContain("take --force by bob@repo-b");
   });
 
-  test("drop pushes first, then removes worktrees, local branches, slots and the claim; the record stays (GR7)", async () => {
+  test("story close is refused on a story another machine holds, whether this checkout has it or not; nothing changes (B38)", async () => {
+    for (const other of [A, C]) {
+      const r = await other.norn("story", "close", "gh-7", "--yes");
+      expect(r.exit).toBe(3);
+      expect(r.value).toMatchObject({ do_instead: "norn story checkout gh-7" });
+    }
+    expect(JSON.parse(sh(B.root, ["cat-file", "-p", "refs/norn/claims/gh-7"]))).toMatchObject({ holder: "bob@repo-b" });
+    expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-7"])).not.toBe("");
+  });
+
+  test("the old take, release and drop are unknown commands; nothing is dropped (B5)", async () => {
+    for (const name of ["take", "release", "drop"]) {
+      const r = await B.norn(name, "gh-7");
+      expect(r.exit).toBe(2);
+      expect(r.value).toMatchObject({ error: `Unknown command: ${name}`, code: "unknown_command" });
+    }
+    expect(existsSync(sliceWt(B.root))).toBe(true);
+    expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-7"])).not.toBe("");
+  });
+
+  test("story close without --yes asks; under --json or with no TTY it is refused; N changes nothing (B36, B37)", async () => {
+    const asked = new FakeInteraction(true);
+    asked.confirms = [false];
+    const no = await runCli(["story", "close", "gh-7"], { ...B.deps, interaction: asked });
+    expect(no.exit).toBe(0);
+    expect(asked.questions).toEqual(["Close gh-7? Worktrees for 2 units will be removed [y/N]"]);
+    for (const r of [await runCli(["story", "close", "gh-7", "--json"], { ...B.deps, interaction: new FakeInteraction(true) }), await runCli(["story", "close", "gh-7"], { ...B.deps, interaction: new FakeInteraction(false) })]) {
+      expect(r.exit).toBe(3);
+      expect(r.value).toMatchObject({ do_instead: "pass --yes" });
+    }
+    expect(existsSync(storyWt(B.root))).toBe(true);
+    expect(existsSync(sliceWt(B.root))).toBe(true);
+    expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-7"])).not.toBe("");
+  });
+
+  test("a claim taken elsewhere while the close question is open is seen under the lock: refused, nothing changed (B38)", async () => {
+    const before = h.git(["ls-remote", "origin", "refs/heads/gh-7/01-form", "refs/heads/gh-7-add-login-form"]);
+    const C = cloneOf(h, "repo-c2", "carol");
+    const asked = new (class extends FakeInteraction {
+      override async confirm(question: string) {
+        step();
+        expect((await C.norn("story", "checkout", "gh-7", "--force")).exit).toBe(0);
+        return super.confirm(question);
+      }
+    })(true);
+    asked.confirms = [true];
+    const r = await runCli(["story", "close", "gh-7"], { ...B.deps, interaction: asked });
+    expect(r.exit).toBe(3);
+    expect(r.value).toMatchObject({ code: "claim_held", error: expect.stringContaining("carol@repo-c2") });
+    expect(existsSync(storyWt(B.root))).toBe(true);
+    expect(existsSync(sliceWt(B.root))).toBe(true);
+    expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-7"]).split("\t")[0]).toBe(sh(C.root, ["rev-parse", "refs/norn/claims/gh-7"]));
+    expect(JSON.parse(sh(C.root, ["cat-file", "-p", "refs/norn/claims/gh-7"]))).toMatchObject({ holder: "carol@repo-c2" });
+    // B's close pushed nothing: the slice branch is as C's checkout left it
+    expect(h.git(["ls-remote", "origin", "refs/heads/gh-7/01-form"])).toBe(before.split("\n").find((l) => l.endsWith("gh-7/01-form")) ?? "");
+    // B takes the story back for the tests below
+    step();
+    expect((await B.norn("story", "checkout", "gh-7", "--force")).exit).toBe(0);
+  });
+
+  test("story close --yes from the slice worktree pushes first, then removes worktrees, local branches, slots and the claim; the record stays; issue and PRs untouched (GR7, B35, B55)", async () => {
     h.write(join(sliceWt(B.root), "wip.txt"), "unfinished\n");
-    const r = await B.norn("drop", "gh-7");
+    const calls = h.remote.calls.length;
+    const r = await B.at(sliceWt(B.root), "story", "close", "--yes");
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ story: "gh-7", dropped: true, pushed: ["gh-7-add-login-form", "gh-7/01-form"], claim_deleted: true, branches_deleted: ["gh-7/01-form", "gh-7-add-login-form"] });
     expect(existsSync(storyWt(B.root))).toBe(false);
@@ -297,9 +359,77 @@ describe("claim races (T3) and forced takes (T5)", () => {
     expect(h.git(["show", `origin/gh-7-add-login-form:${SPEC}/story.md`])).toContain("status: dropped");
     expect(h.git(["show", "origin/gh-7/01-form:wip.txt"])).toBe("unfinished");
     expect(sh(B.root, ["branch", "--list", "gh-7*"])).toBe("");
-    // dropping an unknown story is refused with what to do instead
-    const r3 = await B.norn("drop", "gh-7");
-    expect(r3.exit).toBe(3);
-    expect(r3.value).toMatchObject({ code: "unknown_story", do_instead: "norn take gh-7" });
+    expect(h.remote.issues.find((i) => i.number === 7)?.state).toBe("open");
+    expect(h.remote.calls.slice(calls).filter((c) => c.startsWith("pr+") || c.startsWith("pr~"))).toEqual([]);
+  });
+
+  test("closing a closed story is refused already_closed; nothing changes (B39)", async () => {
+    const before = h.git(["ls-remote", "origin"]);
+    for (const clone of [B, C]) {
+      const r = await clone.norn("story", "close", "gh-7", "--yes");
+      expect(r.exit).toBe(3);
+      expect(r.value).toMatchObject({ code: "already_closed" });
+    }
+    expect(h.git(["ls-remote", "origin"])).toBe(before);
+  });
+});
+
+describe("story close asks at the terminal (B36)", () => {
+  let h2: Harness;
+  beforeAll(async () => {
+    h2 = await createHarness();
+  });
+  afterAll(() => h2.cleanup());
+
+  test("y closes the story as --yes does", async () => {
+    expect((await h2.norn("init")).exit).toBe(0);
+    h2.write(join(h2.root, ".agents/norn/config.yaml"), CONFIG);
+    h2.write(join(h2.root, ".agents/norn/workflows/mini.yaml"), MINI);
+    h2.git(["add", "-A"]);
+    h2.git(["commit", "-q", "-m", "norn init"]);
+    h2.git(["push", "-q", "origin", "main"]);
+    h2.remote.issues = [issue(8, "Add logout", ["norn", "norn:wf:mini"])];
+    for (const want of ["gh-8 intake_story", "gh-8 claim", "gh-8 start_unit"]) {
+      h2.clock.advance(10_000);
+      expect(kinds((await h2.norn("tick")).value as TickReport)).toEqual([want]);
+    }
+    const wt = `${h2.root}-worktrees/gh-8-add-logout`;
+    expect(existsSync(wt)).toBe(true);
+
+    // the question is asked without the tick lock: a tick may run while it is open
+    const lockFree: boolean[] = [];
+    const asked = new (class extends FakeInteraction {
+      override async confirm(question: string) {
+        const lock = await acquireTickLock(h2.root);
+        lockFree.push(lock.ok);
+        if (lock.ok) lock.release();
+        return super.confirm(question);
+      }
+    })(true);
+    asked.confirms = [true];
+    const r = await runCli(["story", "close", "gh-8"], { ...h2.deps, interaction: asked });
+    expect(r.exit).toBe(0);
+    expect(lockFree).toEqual([true]);
+    expect(asked.questions).toEqual(["Close gh-8? Worktrees for 1 units will be removed [y/N]"]);
+    expect(r.value).toMatchObject({ story: "gh-8", dropped: true, pushed: ["gh-8-add-logout"], claim_deleted: true });
+    expect(existsSync(wt)).toBe(false);
+    expect(h2.git(["ls-remote", "origin", "refs/norn/claims/gh-8"])).toBe("");
+    expect(h2.git(["show", "origin/gh-8-add-logout:.agents/specs/gh-8-add-logout/story.md"])).toContain("status: dropped");
+    expect(h2.remote.issues[0]?.state).toBe("open");
+  });
+
+  test("an unreadable pushed story.md is refused story_corrupt, never taken as open (S2, B39)", async () => {
+    const tmp = `${h2.root}-corrupt`;
+    h2.git(["fetch", "-q", "origin"]);
+    h2.git(["worktree", "add", "-q", "--detach", tmp, "origin/gh-8-add-logout"]);
+    h2.write(join(tmp, ".agents/specs/gh-8-add-logout/story.md"), "no frontmatter here\n");
+    sh(tmp, ["commit", "-q", "-am", "break story.md"]);
+    sh(tmp, ["push", "-q", "origin", "HEAD:refs/heads/gh-8-add-logout"]);
+    h2.git(["worktree", "remove", "--force", tmp]);
+    const before = h2.git(["ls-remote", "origin"]);
+    const r = await h2.norn("story", "close", "gh-8", "--yes");
+    expect(r.exit).toBe(1);
+    expect(r.value).toMatchObject({ code: "story_corrupt" });
+    expect(h2.git(["ls-remote", "origin"])).toBe(before);
   });
 });

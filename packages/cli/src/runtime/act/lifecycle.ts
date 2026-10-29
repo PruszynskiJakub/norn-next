@@ -192,7 +192,7 @@ export async function intake(act: ActEnv, a: Extract<Action, { kind: "intake_sto
   const specDir = dirname(a.story_file);
   // T5/T10: a story already intaken elsewhere (its branch is on the remote) is continued by take, never re-intaken
   if (act.obs.remote && !existsSync(a.worktree.path) && !(await act.git.branchExists(act.root, a.worktree.branch)) && (await act.git.branchExists(act.root, a.worktree.branch, "remote", act.obs.remote)))
-    return { ok: true, detail: { skipped: `${a.worktree.branch} already exists on ${act.obs.remote}`, do_instead: cmd.take(a.key) } };
+    return { ok: true, detail: { skipped: `${a.worktree.branch} already exists on ${act.obs.remote}`, do_instead: cmd.storyCheckout(a.key) } };
   const wt = await ensureWorktree(act, a.worktree, unit, specDir);
   const file = join(a.worktree.path, a.story_file);
   const written = !existsSync(file);

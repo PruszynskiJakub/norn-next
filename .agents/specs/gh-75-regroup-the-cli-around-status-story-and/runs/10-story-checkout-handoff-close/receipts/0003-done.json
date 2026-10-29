@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61TSJ3J06BSHKXF4XARD2YS",
+  "run_id": "01M61SQMCAQCGSKZN65RMENVW2",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-28T18:01:41.234Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/10",
+  "outcome": "done",
+  "handoff": "story checkout/handoff/close replace take/release/drop. Prefactor 3 first (runtime/checkout.ts checkoutStory, behaviour unchanged). Close = drop's effects plus: already_closed read from the fetched story branch's story.md (D5; new store parseStoryFile), B38 claim check against the remote claim (the local ref can be stale after a lost race), consent via --yes or Interaction.confirm (new on the D2 interaction), refused 'pass --yes' with no terminal. B55 through target.ts aStory/resolveStory. New cmd builders storyCheckout/storyHandoff/storyClose; unused cmd.drop/release removed, cmd.take kept for other commands (slice 14). Tests: team.test.ts covers AC1-AC9 (plus a fresh-harness interactive y close); e2e covers old names; transcripts regenerated (only the argv rename). Team clones now strip agent env (hostEnv). AC10 checked by hand in two throwaway clones with a fake gh. Full suite 1253 pass, typecheck green."
+}

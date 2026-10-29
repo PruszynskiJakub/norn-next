@@ -74,7 +74,7 @@ describe("inbox (O1)", () => {
       approve: ["gh-1/02 | approve or reject human-qa | 1h | norn approve gh-1/02"],
       unblock: ["gh-1/03 | review_loop 3/3 at review.changes_requested | 1h | norn unstick gh-1/03"],
       check: [],
-      unclaimed: ["gh-2 | Unclaimed — Login form | 2h | norn take gh-2"],
+      unclaimed: ["gh-2 | Unclaimed — Login form | 2h | norn story checkout gh-2"],
       notes: [],
       running: ["gh-1/04 | implement #1 (auto) | 1h | norn trace gh-1/04"],
       recently_done: [],

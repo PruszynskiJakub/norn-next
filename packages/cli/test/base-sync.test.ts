@@ -184,11 +184,11 @@ describe("base sync with real git", () => {
     await until(() => h.state(runs())?.status === "done", "done again");
 
     // without the claim: refused
-    expect((await h.norn("release", "gh-7")).exit).toBe(0);
+    expect((await h.norn("story", "handoff", "gh-7")).exit).toBe(0);
     const noClaim = await h.norn("update", "gh-7");
     expect(noClaim.exit).toBe(3);
-    expect(noClaim.value).toMatchObject({ code: "not_holder", do_instead: "norn take gh-7" });
-    expect((await h.norn("take", "gh-7")).exit).toBe(0);
+    expect(noClaim.value).toMatchObject({ code: "not_holder", do_instead: "norn story checkout gh-7" });
+    expect((await h.norn("story", "checkout", "gh-7")).exit).toBe(0);
 
     // 7b: merged into another branch → parked, no cleanup
     const pr = h.remote.prs[0] as (typeof h.remote.prs)[number];

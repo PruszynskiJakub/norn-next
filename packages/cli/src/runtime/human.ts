@@ -231,7 +231,7 @@ export async function claimFor(
 async function claimRoute(ctx: Context, t: Target, opts: { mailbox: boolean; verb: string; claim?: ClaimState }): Promise<Route> {
   const remote = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
   const c = opts.claim ?? (await claimFor(ctx, t.story));
-  if (c.state === "corrupt") throw refuse(`claim ref of ${t.story} is corrupt`, cmd.take(t.story, { force: true }), "claim_corrupt", c.error);
+  if (c.state === "corrupt") throw refuse(`claim ref of ${t.story} is corrupt`, cmd.storyCheckout(t.story, { force: true }), "claim_corrupt", c.error);
   if (c.state === "mine") {
     if (!t.runsDir) throw refuse(`${t.key} is held here but its runs/ are not in this checkout`, cmd.tick(), "story_not_local");
     return { via: "local", claim: "mine" };
@@ -239,7 +239,7 @@ async function claimRoute(ctx: Context, t: Target, opts: { mailbox: boolean; ver
   let holder: ClaimBlob;
   if (c.state === "other") holder = c.blob;
   else {
-    if (!t.runsDir) throw refuse(`${t.story} is unclaimed and not in this checkout`, cmd.take(t.story), "story_not_local");
+    if (!t.runsDir) throw refuse(`${t.story} is unclaimed and not in this checkout`, cmd.storyCheckout(t.story), "story_not_local");
     const now = ctx.clock.now();
     const blob = newClaimBlob({ story: t.story, holder: machineHolder(ctx.env), heartbeat_id: heartbeatId(ctx.root, now), now, at: ctx.clock.iso(), lease: ctx.config.claim.lease });
     const r = await acquireClaim(ctx.root, remote, blob, { now });
@@ -247,7 +247,7 @@ async function claimRoute(ctx: Context, t: Target, opts: { mailbox: boolean; ver
     if (r.reason !== "held") throw failure(`cannot acquire the claim of ${t.story}: ${r.message}`, `norn ${opts.verb} again`, "claim_failed");
     holder = r.holder;
   }
-  if (!opts.mailbox) throw claimHeld(holder, `ask ${holder.holder} to run it, or ${cmd.take(t.story, { force: true })}`, `; ${opts.verb} cannot go through the mailbox (T9)`);
+  if (!opts.mailbox) throw claimHeld(holder, `ask ${holder.holder} to run it, or ${cmd.storyCheckout(t.story, { force: true })}`, `; ${opts.verb} cannot go through the mailbox (T9)`);
   return { via: "mailbox", holder };
 }
 
@@ -258,7 +258,7 @@ async function claimRoute(ctx: Context, t: Target, opts: { mailbox: boolean; ver
 export async function refuseIfHeldElsewhere(ctx: Context, story: string, verb: string): Promise<ClaimState> {
   const claim = await claimFor(ctx, story);
   const holder = heldElsewhere(claim);
-  if (holder) throw claimHeld(holder, `ask ${holder.holder} to run it, or ${cmd.take(story, { force: true })}`, `; ${verb} cannot go through the mailbox (T9)`);
+  if (holder) throw claimHeld(holder, `ask ${holder.holder} to run it, or ${cmd.storyCheckout(story, { force: true })}`, `; ${verb} cannot go through the mailbox (T9)`);
   return claim;
 }
 
@@ -270,7 +270,7 @@ function refuseUnlessHolder(claim: ClaimState, t: Target, verb: string, rule: st
   if (claim.state === "mine" && t.runsDir) return { via: "local", claim: "mine" };
   const live = claim.state === "mine" || claim.state === "other";
   const who = live ? `held by ${claim.blob.holder}` : "not held by this checkout";
-  throw refuse(`${t.story}'s claim is ${who}; ${rule}`, live ? `ask ${claim.blob.holder} to run norn ${verb} ${t.story}, or ${cmd.take(t.story, { force: true })}` : cmd.take(t.story), "not_holder");
+  throw refuse(`${t.story}'s claim is ${who}; ${rule}`, live ? `ask ${claim.blob.holder} to run norn ${verb} ${t.story}, or ${cmd.storyCheckout(t.story, { force: true })}` : cmd.storyCheckout(t.story), "not_holder");
 }
 
 /** A live claim of another heartbeat (T9: the verb goes through the mailbox), else null. */

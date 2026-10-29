@@ -62,6 +62,11 @@ function readMarkdown<N extends "story" | "slice">(name: N, path: string, root?:
   type T = N extends "story" ? StoryFrontmatter : SliceFrontmatter;
   const raw = readText(path);
   if (raw === null) return { ok: false, reason: "missing" } as ReadResult<MarkdownDoc<T>>;
+  return parseMarkdown(name, raw, path, root);
+}
+
+function parseMarkdown<N extends "story" | "slice">(name: N, raw: string, path: string, root?: string) {
+  type T = N extends "story" ? StoryFrontmatter : SliceFrontmatter;
   const split = splitFrontmatter(raw);
   if (!split)
     return {
@@ -78,6 +83,8 @@ function readMarkdown<N extends "story" | "slice">(name: N, path: string, root?:
 
 export const readStoryFile = (path: string, root?: string) => readMarkdown("story", path, root);
 export const readSliceFile = (path: string, root?: string) => readMarkdown("slice", path, root);
+/** story.md text read elsewhere (e.g. `git show` of a pushed branch); `path` names it in errors. */
+export const parseStoryFile = (raw: string, path: string) => parseMarkdown("story", raw, path);
 
 /** Render a new markdown file (intake, tests). Body is appended verbatim. */
 function renderMarkdown(frontmatter: object, body: string): string {

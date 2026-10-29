@@ -1,0 +1,15 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M622T8WW8Y0NMC5FQWDYPPSH",
+  "run_id": "01M622T3Q8TC1DWWB6SQ5BRX9E",
+  "step": "integrate",
+  "attempt": 3,
+  "at": "2026-10-28T20:21:53.181Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M622T3Q8G0S4GX9A8SZSFAX3",
+  "outcome": "done",
+  "rule": "git.integrate",
+  "detail": "gh-75/10-story-checkout-handoff-close integrated into gh-75-regroup-the-cli-around-status-story-and at 6e8597a5ea0b",
+  "route": "$done"
+}

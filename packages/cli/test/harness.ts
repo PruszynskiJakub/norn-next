@@ -141,11 +141,17 @@ export class FakeNotifier implements NotifierPort {
   }
 }
 
-/** D2: the terminal, scripted. `tty: false` is "no TTY"; each `pick` takes the next answer (null = the person left). */
+/** D2: the terminal, scripted. `tty: false` is "no TTY"; each `pick` takes the next answer (null = the person left), each `confirm` the next of `confirms` (default N). */
 export class FakeInteraction implements Interaction {
   picks: Array<{ question: string; choices: InteractionChoice[]; preselect: number }> = [];
   answers: Array<string | null> = [];
+  questions: string[] = [];
+  confirms: boolean[] = [];
   constructor(readonly tty = true) {}
+  async confirm(question: string) {
+    this.questions.push(question);
+    return this.confirms.shift() ?? false;
+  }
   async pick(question: string, choices: readonly InteractionChoice[], preselect: number) {
     this.picks.push({ question, choices: [...choices], preselect });
     const next = this.answers.shift();
@@ -155,7 +161,7 @@ export class FakeInteraction implements Interaction {
 
 /** A6 launch env and the orient env: the env of the agent session a test may run in is not the harness's. */
 const AGENT_ENV = ["NORN_HOME", "NORN_STORY", "NORN_SLICE", "NORN_RUN", "NORN_BIN", "NORN_ORIENT"];
-const hostEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !AGENT_ENV.includes(k)));
+export const hostEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !AGENT_ENV.includes(k)));
 
 export function sh(cwd: string, args: string[], input?: string): string {
   const r = Bun.spawnSync(["git", ...args], { cwd, stdin: input === undefined ? "ignore" : new TextEncoder().encode(input), stdout: "pipe", stderr: "pipe" });

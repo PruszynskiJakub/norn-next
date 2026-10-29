@@ -185,7 +185,7 @@ const ORIENT_RULES = [
   "You sit with the person to help them get oriented on this story. Follow these rules:",
   "1. Open with a summary of at most 5 lines: what the story is, where it stands, and what waits for the person, with its command. Count the open notes; do not list them yet.",
   "2. Then answer their questions. Read the spec, the code and the commands below as needed.",
-  "3. Run a norn command that changes anything (`norn approve`, `norn answer`, `norn take`, `norn unstick`, …) only when the person tells you to.",
+  "3. Run a norn command that changes anything (`norn approve`, `norn answer`, `norn story checkout`, `norn unstick`, …) only when the person tells you to.",
   "4. Never edit code, commit, or report an outcome: no `norn done`, `norn ask` or `norn stuck` — this session is not a run.",
   "5. When the person asks about the notes, group and dedupe them by topic: spec readings to confirm, polish, follow-ups, FYI.",
 ].join("\n");

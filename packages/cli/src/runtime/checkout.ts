@@ -1,5 +1,6 @@
 /**
- * `norn take <story> [--force]` (T5, M3): continue a story on this machine from git alone.
+ * Story checkout (T5, M3): continue a story on this machine from git alone. The command is
+ * `norn story checkout`; a later reopen restores through the same steps.
  *
  * 1. Claim by CAS (T3): free or expired → acquire; held by another heartbeat and unexpired →
  *    refused "held by X since Y" unless `--force`, which records `forced_from` in the claim blob
@@ -29,19 +30,17 @@ import {
   machineHolder,
   traceEvent,
 } from "@norn/store";
-import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
-import { busyError, claimHeld, corruptError, failure, refuse, withExit } from "../output.ts";
-import { storyArg } from "../runtime/args.ts";
-import { claimFor } from "../runtime/human.ts";
-import { leaseLiveness } from "../runtime/leases.ts";
-import { gitRemote } from "../runtime/observe/index.ts";
-import { equipWorktree, syncLocalBranch, type WorktreeTarget } from "../runtime/worktrees.ts";
+import { claimHeld, corruptError, failure, refuse, withExit } from "../output.ts";
+import { claimFor } from "./human.ts";
+import { leaseLiveness } from "./leases.ts";
+import { gitRemote } from "./observe/index.ts";
+import { equipWorktree, syncLocalBranch, type WorktreeTarget } from "./worktrees.ts";
 
 const storyBranchRe = (key: string) => new RegExp(`^${key}-[a-z0-9][a-z0-9-]*$`);
 
 /** The story branch name: on the remote (truth for a take), else a local branch. */
-async function findStoryBranch(ctx: Context, key: string, remote: string | null): Promise<string | null> {
+export async function findStoryBranch(ctx: Context, key: string, remote: string | null): Promise<string | null> {
   const re = storyBranchRe(key);
   if (remote) {
     const listed = await ctx.git.remoteBranches(ctx.root, remote, `refs/heads/${key}-*`).catch((e: unknown) => e as Error);
@@ -90,26 +89,8 @@ interface UnitView {
   handoff: string | null;
 }
 
-export const takeCommand = defineCommand({
-  name: "take",
-  summary: "Take over a story on this machine: claim it, check out its branches, print the handoff (T5)",
-  usage: "norn take <story> [--force]",
-  options: { force: { type: "boolean" } },
-  positionals: { min: 1, max: 1 },
-  async run(ctx, args) {
-    const key = storyArg(args.positionals[0] as string, "take");
-    const force = opt.bool(args, "force");
-    const lock = await acquireTickLock(ctx.root, { note: "norn take", now: () => ctx.clock.iso() });
-    if (!lock.ok) throw busyError(`a tick is running (pid ${lock.holder.holder.pid})`, `retry: ${cmd.take(key)}`, "tick_locked");
-    try {
-      return await take(ctx, key, force);
-    } finally {
-      lock.release();
-    }
-  },
-});
-
-async function take(ctx: Context, key: string, force: boolean) {
+/** T5: claim `key` here (`force` takes a live claim over) and restore its worktrees from the pushed branches. */
+export async function checkoutStory(ctx: Context, key: string, force: boolean) {
   const root = ctx.root;
   const config = ctx.config;
   const ports = await ctx.ports();
@@ -127,9 +108,9 @@ async function take(ctx: Context, key: string, force: boolean) {
   const hb = heartbeatId(root, now);
   const holder = machineHolder(ctx.env);
   const cur = await claimFor(ctx, key, { remote, unreadable: (e) => failure(`cannot read the claim: ${e.message}`, "check the network, then retry", "network") });
-  if (cur.state === "corrupt" && !force) throw corruptError(`claim ref of ${key} is unreadable`, cmd.take(key, { force: true }), cur.error);
+  if (cur.state === "corrupt" && !force) throw corruptError(`claim ref of ${key} is unreadable`, cmd.storyCheckout(key, { force: true }), cur.error);
   if (cur.state === "other" && !force)
-    throw claimHeld(cur.blob, `wait until ${cur.blob.expires_at}, ask ${cur.blob.holder} to run ${cmd.release(key)}, or ${cmd.take(key, { force: true })}`);
+    throw claimHeld(cur.blob, `wait until ${cur.blob.expires_at}, ask ${cur.blob.holder} to run ${cmd.storyHandoff(key)}, or ${cmd.storyCheckout(key, { force: true })}`);
   const mine = writtenHere(cur, hb);
   const forced = force && (cur.state === "other" || cur.state === "corrupt");
   const prev = cur.state === "none" || cur.state === "corrupt" ? null : cur.blob;
@@ -145,8 +126,8 @@ async function take(ctx: Context, key: string, force: boolean) {
   });
   const claimed = await acquireClaim(root, remote, blob, { now, force: forced });
   if (!claimed.ok) {
-    if (claimed.reason === "held") throw claimHeld(claimed.holder, `wait until ${claimed.holder.expires_at} or ${cmd.take(key, { force: true })}`);
-    throw failure(`claim failed (${claimed.reason}): ${claimed.message}`, `retry: ${cmd.take(key)}`, "claim_failed");
+    if (claimed.reason === "held") throw claimHeld(claimed.holder, `wait until ${claimed.holder.expires_at} or ${cmd.storyCheckout(key, { force: true })}`);
+    throw failure(`claim failed (${claimed.reason}): ${claimed.message}`, `retry: ${cmd.storyCheckout(key)}`, "claim_failed");
   }
   // R10.1 (M8, A17): every take is in the record — the trace event first; the `take` receipt on the
   // story unit as soon as the story branch is checked out (it lives on that branch), before anything else
@@ -160,7 +141,7 @@ async function take(ctx: Context, key: string, force: boolean) {
     const f = await git
       .fetch(root, remote, [`+refs/heads/${branch}:refs/remotes/${remote}/${branch}`, `+refs/heads/${key}/*:refs/remotes/${remote}/${key}/*`], { quiet: true })
       .catch((e: unknown) => e as Error);
-    if (f instanceof Error) throw failure(`fetch failed: ${f.message}`, `retry: ${cmd.take(key)} (the claim is held by you now)`, "network");
+    if (f instanceof Error) throw failure(`fetch failed: ${f.message}`, `retry: ${cmd.storyCheckout(key)} (the claim is held by you now)`, "network");
   }
   const wtByBranch = new Map((await git.worktreeList(root)).filter((w) => w.branch).map((w) => [w.branch as string, w.path]));
   const equip = { root, home: ctx.home, config, now: nowIso, liveness: leaseLiveness((p) => ports.process.isAlive(p)) };
@@ -187,7 +168,7 @@ async function take(ctx: Context, key: string, force: boolean) {
 
   const storyWt = wtByBranch.get(branch) ?? storyWorktreePath(root, key, slug);
   if (!(await checkout({ path: storyWt, branch, story: key, slice: null, unit: STORY_UNIT_DIR, spec_dir }, key)))
-    throw failure(problems.join("; "), `fix the story branch, then ${cmd.take(key)} again (the claim is held by you now)`, "branch_diverged", { claim: blob });
+    throw failure(problems.join("; "), `fix the story branch, then ${cmd.storyCheckout(key)} again (the claim is held by you now)`, "branch_diverged", { claim: blob });
 
   const storyRuns = join(storyWt, spec_dir, "runs", STORY_UNIT_DIR);
   const record = takeReceipt(storyRuns, { holder, now: nowIso, ...takeFacts });

@@ -22,13 +22,10 @@ import { storyNoun } from "./story.ts";
 import { unstickCommand } from "./unstick.ts";
 import { configCommand } from "./config.ts";
 import { doctorCommand } from "./doctor.ts";
-import { dropCommand } from "./drop.ts";
-import { releaseCommand } from "./release.ts";
-import { takeCommand } from "./take.ts";
 import { tidyCommand } from "./tidy.ts";
 import { updateCommand } from "./update.ts";
 
-export const COMMANDS: readonly Command[] = [initCommand, uninstallCommand, syncCommand, tickCommand, watchCommand, briefCommand, doneCommand, askCommand, stuckCommand, hookEventCommand, statusCommand, answerCommand, approveCommand, unstickCommand, updateCommand, takeCommand, releaseCommand, dropCommand, tidyCommand, doctorCommand, configCommand, helpCommand];
+export const COMMANDS: readonly Command[] = [initCommand, uninstallCommand, syncCommand, tickCommand, watchCommand, briefCommand, doneCommand, askCommand, stuckCommand, hookEventCommand, statusCommand, answerCommand, approveCommand, unstickCommand, updateCommand, tidyCommand, doctorCommand, configCommand, helpCommand];
 
 export const NOUNS: readonly Noun[] = [storyNoun, runNoun];
 
