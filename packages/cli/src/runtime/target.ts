@@ -7,7 +7,7 @@
  *
  * Each verb says which units it applies to (`applies`) and why none does (`none`); later verbs reuse this.
  */
-import type { ProjectView, UnitView } from "@norn/view";
+import type { ProjectView, SliceView, StoryView } from "@norn/view";
 import { inboxItemsInOrder, loadRunView, stepTitle } from "@norn/view";
 import { cmd } from "@norn/core";
 import type { Context } from "../context.ts";
@@ -19,8 +19,8 @@ import type { InteractionChoice } from "./interaction.ts";
 export interface TargetRule {
   /** the verb as typed, e.g. `run view` */
   verb: string;
-  /** whether the verb applies to this unit, judged on the read model the candidates came from */
-  applies(key: string, view: ProjectView): boolean;
+  /** whether the verb applies to this unit (its view, when this checkout shows it) */
+  applies(key: string, unit: StoryView | SliceView | undefined): boolean;
   /** why no unit applies, e.g. `No unit has a run yet` */
   none: string;
   /** the verb on one unit, as printed (`cmd.runView`) */
@@ -46,11 +46,12 @@ function unitsInStatusOrder(view: ProjectView): InteractionChoice[] {
 
 async function fromView(ctx: Context, rule: TargetRule): Promise<InteractionChoice[]> {
   const view = await projectView(ctx);
-  return unitsInStatusOrder(view).filter((c) => rule.applies(c.value, view));
+  const units = new Map<string, StoryView | SliceView>(view.stories.flatMap((s) => [[s.key, s] as const, ...s.slices.map((x) => [x.key, x] as const)]));
+  return unitsInStatusOrder(view).filter((c) => rule.applies(c.value, units.get(c.value)));
 }
 
 /** The unit key the verb acts on, or a refusal. */
-export async function resolveTarget(ctx: Context, explicit: string | undefined, json: boolean, rule: TargetRule): Promise<string> {
+export async function targetKey(ctx: Context, explicit: string | undefined, json: boolean, rule: TargetRule): Promise<string> {
   if (explicit) return explicit;
   if (ctx.unit) return rule.story ? ctx.unit.story : (ctx.unit.slice ?? ctx.unit.story);
   const candidates = rule.candidates ? await rule.candidates() : await fromView(ctx, rule);
@@ -74,13 +75,8 @@ export function hasRun(ctx: Context, verb: string, command: (key: string) => str
 }
 
 /** A verb that applies to units in some state (`run cancel`: running; `run rerun`: stuck or parked). */
-export function inState(verb: string, command: (key: string) => string, none: string, ok: (u: UnitView) => boolean): TargetRule {
-  return {
-    verb,
-    command,
-    none,
-    applies: (key, view) => view.stories.some((s) => [s, ...s.slices].some((u) => u.key === key && ok(u))),
-  };
+export function inState(verb: string, command: (key: string) => string, none: string, ok: (u: StoryView | SliceView) => boolean): TargetRule {
+  return { verb, command, none, applies: (_key, u) => !!u && ok(u) };
 }
 
 /** B55: a story verb (`story view`, `chat`, `checkout`, `handoff`, `close`) applies to every story, never to a slice. */
@@ -90,5 +86,10 @@ export function aStory(verb: string, command: (key: string) => string): TargetRu
 
 /** B55: the story a team verb (`story checkout`, `handoff`, `close`) acts on; a slice key, or a slice worktree, means the slice's story. */
 export async function resolveStory(ctx: Context, explicit: string | undefined, json: boolean, rule: TargetRule): Promise<string> {
-  return storyArg(await resolveTarget(ctx, explicit, json, rule), rule.verb);
+  return storyArg(await targetKey(ctx, explicit, json, rule), rule.verb);
+}
+
+/** A unit parked on a question (`story answer`) or at a gate (`story approve`, `story reject`). */
+export function parkedOn(kind: "ask" | "gate", verb: string, none: string, command: (key: string) => string): TargetRule {
+  return { verb, command, none, applies: (_key, u) => u?.status === "parked" && u.park?.kind === kind };
 }

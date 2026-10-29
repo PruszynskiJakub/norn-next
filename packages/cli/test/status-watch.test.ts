@@ -172,7 +172,7 @@ describe("norn status --watch (B11, CP6–CP8)", () => {
     expect(frames[2]).toContain("norn run list gh-6 — esc to close");
     expect(frames[4]).toContain("no y here: gh-6");
     expect(frames[5]).toContain("Your answer (answer gh-6):");
-    expect(frames[6]).toContain("ok: norn answer gh-6");
+    expect(frames[6]).toContain("ok: norn story answer gh-6");
     await c.tick(); // the answer receipt is applied by the tick (S5)
     expect(c.state(runs(6))?.park).toBeNull();
   });

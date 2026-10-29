@@ -6,7 +6,7 @@ import { cmd } from "@norn/core";
 const U = "gh-12/03";
 const S = "gh-12";
 const today: Record<keyof typeof cmd, [string, ...string[]]> = {
-  config: ["norn config", cmd.config()],
+  config: ["norn config list", cmd.config()],
   answer: [`norn answer ${U} "…"`, cmd.answer(U), `norn answer ${U} "1"`, cmd.answer(U, "1")],
   approve: [`norn approve ${U}`, cmd.approve(U), `norn approve ${U} --reject --reason "…"`, cmd.approve(U, { reject: true })],
   ask: [`norn ask "<question>"`, cmd.ask()],
@@ -16,11 +16,12 @@ const today: Record<keyof typeof cmd, [string, ...string[]]> = {
   help: ["norn help", cmd.help()],
   inbox: ["norn inbox", cmd.inbox(), "norn inbox --notes", cmd.inbox({ notes: true }), "norn inbox --history --since 1d", cmd.inbox({ since: "1d" })],
   init: ["norn init", cmd.init()],
-  mode: [`norn mode ${S} auto`, cmd.mode(S, "auto")],
   open: [`norn open ${U}`, cmd.open(U), "norn open", cmd.open()],
   status: ["norn status", cmd.status(), `norn status ${S}`, cmd.status(S)],
   statusWatch: ["norn status --watch", cmd.statusWatch(), "norn status --watch --interval 5s", cmd.statusWatch({ interval: "5s" })],
   storyChat: [`norn story chat ${S}`, cmd.storyChat(S), "norn story chat", cmd.storyChat()],
+  storyEdit: [`norn story edit ${S} --auto`, cmd.storyEdit(S, { mode: "auto" }), `norn story edit ${U} --workflow fix --at <a|b>`, cmd.storyEdit(U, { workflow: "fix", at: "<a|b>" })],
+  storyStart: [`norn story start ${U}`, cmd.storyStart(U), "norn story start", cmd.storyStart(), `norn story start ${U} --print`, cmd.storyStart(U, { print: true })],
   storyView: [`norn story view ${U}`, cmd.storyView(U), `norn story view ${S} --web`, cmd.storyView(S, { web: true })],
   stuck: [`norn stuck "<reason>"`, cmd.stuck(), `norn stuck "<why>"`, cmd.stuck("<why>")],
   storyCheckout: [`norn story checkout ${S}`, cmd.storyCheckout(S), `norn story checkout ${S} --force`, cmd.storyCheckout(S, { force: true })],
@@ -32,6 +33,7 @@ const today: Record<keyof typeof cmd, [string, ...string[]]> = {
   runView: [`norn run view ${U}`, cmd.runView(U), "norn run view <unit> --why", cmd.runView(undefined, { why: true })],
   runRerun: [`norn run rerun ${U}`, cmd.runRerun(U), `norn run rerun ${U} --step <a|b>`, cmd.runRerun(U, { step: "<a|b>" }), `norn run rerun ${U} --reset <a|b>`, cmd.runRerun(U, { reset: "<a|b>" })],
   runCancel: [`norn run cancel ${U}`, cmd.runCancel(U), "norn run cancel", cmd.runCancel()],
+  storyCreate: [`norn story create --title "…"`, cmd.storyCreate(), `norn story create --title "…" --workflow <a|b>`, cmd.storyCreate({ workflow: "<a|b>" })],
   sync: ["norn sync", cmd.sync()],
   tick: ["norn tick", cmd.tick()],
   tidy: ["norn tidy", cmd.tidy(), "norn tidy --dry-run", cmd.tidy({ dryRun: true })],

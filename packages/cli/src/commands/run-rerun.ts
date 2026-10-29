@@ -9,7 +9,7 @@ import { cmd, nextCommand, stepOf } from "@norn/core";
 import { defineCommand, opt } from "../command.ts";
 import { refuse } from "../output.ts";
 import { at, humanReceipt, resolveTarget as resolveUnit, runHumanVerb } from "../runtime/human.ts";
-import { inState, resolveTarget } from "../runtime/target.ts";
+import { inState, targetKey } from "../runtime/target.ts";
 
 const blocked = (st: { status: string }) => st.status === "stuck" || st.status === "parked";
 
@@ -28,7 +28,7 @@ export const runRerunCommand = defineCommand({
     const to = opt.str(args, "step");
     const reset = [...new Set(opt.list(args, "reset"))];
     const reason = opt.str(args, "reason")?.trim();
-    const key = await resolveTarget(ctx, args.positionals[0], args.json === true, inState("run rerun", (k) => cmd.runRerun(k), "Nothing is stuck, parked or at a gate", blocked));
+    const key = await targetKey(ctx, args.positionals[0], args.json === true, inState("run rerun", (k) => cmd.runRerun(k), "Nothing is stuck, parked or at a gate", blocked));
     const t = await resolveUnit(ctx, key, blocked);
     return runHumanVerb(ctx, t, {
       verb: "run rerun",

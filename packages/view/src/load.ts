@@ -138,6 +138,7 @@ function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: Uni
     claim: claimView(sf.claim),
     status: corrupt ? "corrupt" : (st?.status ?? "not_started"),
     step: st?.step ?? null,
+    step_type: step?.type ?? null,
     attempt: st?.attempt ?? null,
     counters: counters(u),
     park: st?.park ? { kind: st.park.kind, reason: st.park.reason, since: st.park.since } : null,

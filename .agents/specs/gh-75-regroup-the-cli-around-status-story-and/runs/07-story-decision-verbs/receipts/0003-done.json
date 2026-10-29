@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61F283JBX36JZTJ1AK87XVN",
+  "run_id": "01M61DR88Z21B9TTSWFRZT06Z2",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-28T14:36:42.994Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/07",
+  "outcome": "done",
+  "handoff": "story answer/approve/reject/update-branch registered under the story noun (old answer/approve/update moved, now unknown commands). Pick-lists offer only units at a gate / parked on a question (TargetRule.applies gets the unit view); update-branch in a slice worktree acts on the story (storyOnly). reject without --reason: usage error, do_instead 'pass --reason'. Cockpit verbs call the new names. New story-decision.test.ts covers AC2–AC7; old tests renamed in place; base-sync transcript rewritten (diff = the 6 renamed command lines). Printed cmd.* strings left for slice 14. Full suite + typecheck green. AC8 (terminal check) is for QA."
+}

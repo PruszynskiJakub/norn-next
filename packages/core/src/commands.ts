@@ -60,7 +60,7 @@ const norn = (...parts: (string | false | null | undefined)[]) => ["norn", ...pa
  * is a change here and in its pinned table (`packages/core/test/printed-commands.test.ts`), nowhere else.
  */
 export const cmd = {
-  config: (key?: string) => norn("config", key),
+  config: (key?: string) => norn("config", key ? "get" : "list", key),
   answer: (unit: string, text = "…") => norn("answer", unit, `"${text}"`),
   approve: (unit: string, o: { reject?: boolean } = {}) => norn("approve", unit, o.reject && `--reject --reason "…"`),
   ask: () => norn("ask", `"<question>"`),
@@ -70,13 +70,16 @@ export const cmd = {
   help: () => norn("help"),
   inbox: (o: { notes?: boolean; since?: string } = {}) => norn("inbox", o.notes && "--notes", o.since && `--history --since ${o.since}`),
   init: () => norn("init"),
-  mode: (story: string, mode: string) => norn("mode", story, mode),
   open: (unit?: string) => norn("open", unit),
   status: (target?: string) => norn("status", target),
   statusWatch: (o: { interval?: string } = {}) => norn("status --watch", o.interval && `--interval ${o.interval}`),
   storyChat: (story?: string) => norn("story chat", story),
+  storyEdit: (unit: string, o: { mode?: "auto" | "manual"; workflow?: string; at?: string } = {}) =>
+    norn("story edit", unit, o.mode && `--${o.mode}`, o.workflow && `--workflow ${o.workflow}`, o.at && `--at ${o.at}`),
+  storyStart: (unit?: string, o: { print?: boolean } = {}) => norn("story start", unit, o.print && "--print"),
   storyView: (target?: string, o: { web?: boolean } = {}) => norn("story view", target, o.web && "--web"),
   stuck: (reason = "<reason>") => norn("stuck", `"${reason}"`),
+  storyCreate: (o: { title?: string; workflow?: string } = {}) => norn("story create", `--title "${o.title ?? "…"}"`, o.workflow && `--workflow ${o.workflow}`),
   storyCheckout: (story: string, o: { force?: boolean } = {}) => norn("story checkout", story, o.force && "--force"),
   storyClose: (story?: string, o: { yes?: boolean } = {}) => norn("story close", story, o.yes && "--yes"),
   storyHandoff: (story?: string) => norn("story handoff", story),

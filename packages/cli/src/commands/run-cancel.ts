@@ -11,7 +11,7 @@ import { machineHolder } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import { failure, refuse } from "../output.ts";
 import { at, claimFor, humanReceipt, resolveTarget as resolveUnit, runHumanVerb, started } from "../runtime/human.ts";
-import { inState, resolveTarget } from "../runtime/target.ts";
+import { inState, targetKey } from "../runtime/target.ts";
 
 const CANCEL_REASON = "cancelled by person";
 
@@ -21,7 +21,7 @@ export const runCancelCommand = defineCommand({
   usage: "norn run cancel [<unit>]",
   positionals: { max: 1 },
   async run(ctx, args) {
-    const key = await resolveTarget(ctx, args.positionals[0], args.json === true, inState("run cancel", (k) => cmd.runCancel(k), "Nothing is running", (u) => u.status === "running"));
+    const key = await targetKey(ctx, args.positionals[0], args.json === true, inState("run cancel", (k) => cmd.runCancel(k), "Nothing is running", (u) => u.status === "running"));
     const t = await resolveUnit(ctx, key, (st) => st.status === "running");
     const st = started(t);
     // B53: the session runs on the claim holder's machine; this checkout's copy may be stale (T9)

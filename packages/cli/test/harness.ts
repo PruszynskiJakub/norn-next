@@ -68,6 +68,20 @@ export class FakeRemote implements RemotePort {
     this.calls.push(`pr~ ${n}`);
     this.bodies.set(n, body);
   }
+  /** set → `createIssue` throws it (B22) */
+  createError: Error | null = null;
+  async createIssue(o: { title: string; body: string; labels: string[]; assignee: string }) {
+    this.calls.push(`issue+ ${o.title}`);
+    if (this.createError) throw this.createError;
+    const number = Math.max(80, ...this.issues.map((i) => i.number)) + 1;
+    const created: RemoteIssue = { provider: "gh", number, url: `https://github.com/o/r/issues/${number}`, title: o.title, body: o.body, state: "open", assignees: [o.assignee], labels: [...o.labels], updated_at: new Date(T0).toISOString() };
+    this.issues.push(created);
+    return created;
+  }
+  async newIssueUrl(o: { labels: string[] }) {
+    this.calls.push(`issue+? ${o.labels.join(",")}`);
+    return `https://github.com/o/r/issues/new?labels=${encodeURIComponent(o.labels.join(","))}`;
+  }
 }
 
 export class FakeRunner implements RunnerPort {
@@ -141,16 +155,33 @@ export class FakeNotifier implements NotifierPort {
   }
 }
 
-/** D2: the terminal, scripted. `tty: false` is "no TTY"; each `pick` takes the next answer (null = the person left), each `confirm` the next of `confirms` (default N). */
+/**
+ * D2: the terminal, scripted. `tty: false` is "no TTY"; each `pick` takes the next answer (null = the
+ * person left), each `confirm` the next of `confirms` (default N), each `ask` the next of `lines`, each
+ * `edit` the next of `edited` (else the text unchanged).
+ */
 export class FakeInteraction implements Interaction {
   picks: Array<{ question: string; choices: InteractionChoice[]; preselect: number }> = [];
   answers: Array<string | null> = [];
   questions: string[] = [];
   confirms: boolean[] = [];
+  asks: string[] = [];
+  lines: Array<string | null> = [];
+  edits: string[] = [];
+  edited: Array<string | null> = [];
   constructor(readonly tty = true) {}
   async confirm(question: string) {
     this.questions.push(question);
     return this.confirms.shift() ?? false;
+  }
+  async ask(question: string) {
+    this.asks.push(question);
+    return this.lines.shift() ?? null;
+  }
+  async edit(text: string) {
+    this.edits.push(text);
+    const next = this.edited.shift();
+    return next === undefined ? text : next;
   }
   async pick(question: string, choices: readonly InteractionChoice[], preselect: number) {
     this.picks.push({ question, choices: [...choices], preselect });

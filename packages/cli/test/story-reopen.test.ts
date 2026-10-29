@@ -183,7 +183,7 @@ describe("story reopen (B40, B41, B55)", () => {
     const inbox = (await h.norn("status", "--json")).value as Inbox;
     expect(inbox.groups.unblock).toContainEqual(expect.objectContaining({ story: "gh-7", slice: "gh-7/02" }));
     // slice 01 goes on from its gate
-    expect((await h.norn("approve", "gh-7/01")).exit).toBe(0);
+    expect((await h.norn("story", "approve", "gh-7/01")).exit).toBe(0);
     await tickUntil(() => h.state(sliceRuns("01-form"))?.step !== "review");
     // and run rerun resumes slice 02 in a fresh session
     expect((await h.norn("run", "rerun", "gh-7/02")).exit).toBe(0);

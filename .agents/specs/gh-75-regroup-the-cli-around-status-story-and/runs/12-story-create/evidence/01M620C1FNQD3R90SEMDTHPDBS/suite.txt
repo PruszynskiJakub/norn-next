@@ -1,0 +1,7 @@
+bun test v1.3.13 (bf2e2cec)
+
+ 1265 pass
+ 0 fail
+ 16 snapshots, 23797 expect() calls
+Ran 1265 tests across 84 files. [384.72s]
+$ tsc --noEmit -p tsconfig.json && tsc --noEmit -p scripts/tsconfig.json

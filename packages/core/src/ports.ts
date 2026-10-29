@@ -317,6 +317,10 @@ export interface RemotePort {
   openDraftPullRequest(opts: { head: string; base: string; title: string; body: string }): Promise<RemotePullRequest>;
   /** GR9: replace the body of an open PR/MR */
   editPullRequestBody(number: number, body: string): Promise<void>;
+  /** B18 (D3): open an issue with these labels, assigned to `assignee` (a login) */
+  createIssue(opts: { title: string; body: string; labels: string[]; assignee: string }): Promise<RemoteIssue>;
+  /** B23 (D3): the remote's new-issue page in the browser with `labels` filled in; creates nothing */
+  newIssueUrl(opts: { labels: string[] }): Promise<string>;
 }
 
 // ============================================================= Runner

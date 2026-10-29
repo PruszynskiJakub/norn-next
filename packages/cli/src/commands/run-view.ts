@@ -32,7 +32,7 @@ import { defineCommand, opt, type ParsedArgs } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, rendered, usageError, withExit } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
-import { hasRun, resolveTarget } from "../runtime/target.ts";
+import { hasRun, targetKey } from "../runtime/target.ts";
 import { replayInputs } from "../runtime/tick.ts";
 import { NORN_VERSION } from "../version.ts";
 
@@ -354,7 +354,7 @@ export const runViewCommand = defineCommand({
     if (opt.bool(args, "why") || opt.str(args, "receipt") !== undefined) return why(ctx, args);
     const stray = WHY_ONLY.find((o) => args.values[o] !== undefined);
     if (stray) throw usageError(`--${stray} needs --why`, `norn run view <unit> --why --${stray} …`);
-    const target = await resolveTarget(ctx, args.positionals[0], args.json === true, hasRun(ctx, "run view", cmd.runView));
+    const target = await targetKey(ctx, args.positionals[0], args.json === true, hasRun(ctx, "run view", cmd.runView));
     const runId = new RegExp(ULID_PATTERN).test(target);
     const key = runId ? target : parseUnitKey(target).key;
     const run = loadRunView({ repoRoot: ctx.root, home: ctx.home, env: ctx.env, now: ctx.clock.now(), target: key });

@@ -43,7 +43,9 @@ export function oldestYourTurn(items: readonly InboxEntry[], agentsOnly = false)
 
 /** HC7: one line for a verb's JSON outcome. */
 export function verbMessage(argv: readonly string[], exit: number, value: unknown): string {
-  const what = `norn ${argv.slice(0, 2).join(" ")}`;
+  // the command words and the unit: `norn take gh-6`, `norn story answer gh-6`
+  const unit = argv.findIndex((a) => /^(gh|gl)-\d/.test(a));
+  const what = `norn ${argv.slice(0, unit < 0 ? 2 : unit + 1).join(" ")}`;
   if (exit === 0) return `ok: ${what}`;
   const v = value as { error?: string; do_instead?: string } | null;
   return `refused: ${what} — ${v?.error ?? `exit ${exit}`}${v?.do_instead ? ` (${v.do_instead})` : ""}`;

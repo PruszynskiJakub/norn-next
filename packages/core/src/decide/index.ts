@@ -43,7 +43,8 @@ export interface LoadedWorkflow {
 }
 export type RepoWorkflows = Readonly<Record<string, LoadedWorkflow>>;
 
-const WF_LABEL = "norn:wf:";
+/** W9: the issue label that picks a story's workflow at intake (`norn:wf:<name>`). */
+export const WF_LABEL = "norn:wf:";
 
 /** The decision that is the unit's one action this tick (O5), else its side action, else null. */
 export function unitDecision<D extends { unit: string; action: { kind: string; op?: unknown } }>(decisions: readonly D[], unit: string, unitOf: (d: D) => string = (d) => d.unit): D | null {

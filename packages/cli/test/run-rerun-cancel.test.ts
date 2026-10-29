@@ -268,7 +268,7 @@ describe("run rerun --step (B49)", () => {
   });
 
   test("a unit that is not stuck, parked or at a gate is refused", async () => {
-    expect((await h.norn("approve", "gh-6")).exit).toBe(0);
+    expect((await h.norn("story", "approve", "gh-6")).exit).toBe(0);
     await tick();
     await tick();
     expect(h.state(runs6())).toMatchObject({ status: "done" });

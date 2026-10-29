@@ -112,7 +112,7 @@ describe("gate item and rulings (F21, F28)", () => {
 
   test("a reject reason is a ruling every later brief of the story carries", async () => {
     const judged = h.git(["rev-parse", "HEAD"], wt());
-    const rej = await h.norn("approve", "gh-7", "--reject", "--reason", "AC6 wins over B6: show the raw count");
+    const rej = await h.norn("story", "reject", "gh-7", "--reason", "AC6 wins over B6: show the raw count");
     expect(rej.exit).toBe(0);
     // C2: the ruling is tied to the head it judged
     expect(rej.value).toMatchObject({ receipt: { kind: "reject", head_sha: judged } });
@@ -134,7 +134,7 @@ describe("gate item and rulings (F21, F28)", () => {
     await tick();
     expect((await inWt("done", "partial", "--handoff", "AC7 still needs a browser")).exit).toBe(0);
     await tick();
-    expect((await h.norn("approve", "gh-7", "--reason", "AC7 checked by hand")).exit).toBe(0);
+    expect((await h.norn("story", "approve", "gh-7", "--reason", "AC7 checked by hand")).exit).toBe(0);
     await tick();
     expect(h.state(runs())?.step).toBe("open-pr");
   });
@@ -184,7 +184,7 @@ describe("merge PR item and inbox history (F25, Q3)", () => {
     await tick(); // run_git open-pr
     await tick(); // apply → ready gate
     expect(h.state(runs())).toMatchObject({ step: "ready", status: "parked" });
-    expect((await h.norn("approve", "gh-7")).exit).toBe(0);
+    expect((await h.norn("story", "approve", "gh-7")).exit).toBe(0);
     await tick();
     expect(h.state(runs())).toMatchObject({ step: "$done", status: "done" });
     await tick("--sync");

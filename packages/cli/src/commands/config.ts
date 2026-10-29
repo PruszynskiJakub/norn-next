@@ -1,15 +1,18 @@
 /**
- * `norn config [<key>]` (K2): the resolved config, each setting with the layer it came from
- * (built-in, `~/.norn/config.yaml` or `.agents/norn/config.yaml`), grouped by who it belongs to.
- * Read only. With a key: that setting, or every setting under it (`limits`, `agents`).
+ * `norn config <verb>` (K2, B61–B68): `list` the resolved config, each setting with the layer it
+ * came from (built-in, `~/.norn/config.yaml` or `.agents/norn/config.yaml`), grouped by who it
+ * belongs to; `get <key>` that setting, or every setting under it (`limits`, `agents`); `set` and
+ * `unset` one value in the user or repo file (`config-edit.ts`).
  */
 import { existsSync } from "node:fs";
 import { relative } from "node:path";
 import { type ConfigEntry, type ConfigGroup, explainConfig, type ResolvedConfig } from "@norn/schema";
 import { type LoadedConfig, repoConfigPath, userConfigPath } from "@norn/store";
-import { defineCommand } from "../command.ts";
+import { defineCommand, defineNoun } from "../command.ts";
+import type { Context } from "../context.ts";
 import { rendered, usageError } from "../output.ts";
 import { cmd } from "@norn/core";
+import { configSetCommand, configUnsetCommand } from "./config-edit.ts";
 
 const GROUPS: Array<{ group: ConfigGroup; title: string; file: "user" | "repo" }> = [
   { group: "machine", title: "This machine", file: "user" },
@@ -17,30 +20,56 @@ const GROUPS: Array<{ group: ConfigGroup; title: string; file: "user" | "repo" }
   { group: "team", title: "The team", file: "repo" },
 ];
 
-export const configCommand = defineCommand({
-  name: "config",
+const configListCommand = defineCommand({
+  name: "config list",
   summary: "Show the resolved config and which file set each value",
-  usage: "norn config [--json] [<key>]",
+  usage: "norn config list [--json]",
   markdown: true,
-  positionals: { max: 1 },
-  async run(ctx, args) {
-    const config = ctx.config; // refuses a corrupt layer (S2), so the load below is ok
-    const loaded = ctx.loaded as Extract<LoadedConfig, { ok: true }>;
-    const files = {
-      user: { path: userConfigPath(ctx.home), exists: existsSync(userConfigPath(ctx.home)) },
-      repo: { path: repoConfigPath(ctx.root), exists: existsSync(repoConfigPath(ctx.root)) },
-    };
-    let entries = explainConfig(loaded.user, loaded.repo);
-    const key = args.positionals[0];
-    if (key) {
-      entries = entries.filter((e) => e.key === key || e.key.startsWith(`${key}.`));
-      if (!entries.length) throw usageError(`no setting '${key}'`, cmd.config(), "unknown_key");
-    }
-    const notes = key ? [] : configNotes(config, entries);
-    const md = formatConfig(entries, notes, { user: files.user, repo: { ...files.repo, path: relative(ctx.root, files.repo.path) } });
-    return rendered({ files, entries: entries.map((e) => ({ ...e, meaning: meaning(e.key) })), notes }, md);
-  },
+  run: async (ctx) => showConfig(ctx),
 });
+
+const configGetCommand = defineCommand({
+  name: "config get",
+  summary: "Show one setting, or every setting under a key, and which file set it",
+  usage: "norn config get <key> [--json]",
+  markdown: true,
+  positionals: { min: 1, max: 1 },
+  run: async (ctx, args) => showConfig(ctx, args.positionals[0]),
+});
+
+export const configNoun = defineNoun({
+  name: "config",
+  summary: "Show the resolved config; set or unset one value in the user or repo file",
+  verbs: [configListCommand, configGetCommand, configSetCommand, configUnsetCommand],
+});
+
+function showConfig(ctx: Context, key?: string) {
+  const config = ctx.config; // refuses a corrupt layer (S2), so the load below is ok
+  const loaded = ctx.loaded as Extract<LoadedConfig, { ok: true }>;
+  const files = {
+    user: { path: userConfigPath(ctx.home), exists: existsSync(userConfigPath(ctx.home)) },
+    repo: { path: repoConfigPath(ctx.root), exists: existsSync(repoConfigPath(ctx.root)) },
+  };
+  const all = explainConfig(loaded.user, loaded.repo);
+  let entries = all;
+  if (key) {
+    entries = all.filter((e) => e.key === key || e.key.startsWith(`${key}.`));
+    if (!entries.length) entries = within(all, key);
+    if (!entries.length) throw usageError(`no setting '${key}'`, cmd.config(), "unknown_key");
+  }
+  const notes = key ? [] : configNotes(config, entries);
+  const md = formatConfig(entries, notes, { user: files.user, repo: { ...files.repo, path: relative(ctx.root, files.repo.path) } });
+  return rendered({ files, entries: entries.map((e) => ({ ...e, meaning: meaning(e.key) })), notes }, md);
+}
+
+/** A key inside one setting's value (`agents.claude.model`), credited to the layer that set the setting. */
+function within(entries: ConfigEntry[], key: string): ConfigEntry[] {
+  const outer = entries.find((e) => key.startsWith(`${e.key}.`));
+  if (!outer) return [];
+  let value: unknown = outer.value;
+  for (const seg of key.slice(outer.key.length + 1).split(".")) value = typeof value === "object" && value !== null ? (value as Record<string, unknown>)[seg] : undefined;
+  return value === undefined ? [] : [{ key, value, source: outer.source, group: outer.group }];
+}
 
 /** Hints for the mistakes the layering makes easy; one line each, no decisions. */
 function configNotes(config: ResolvedConfig, entries: ConfigEntry[]): string[] {

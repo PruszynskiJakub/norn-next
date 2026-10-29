@@ -1,0 +1,8 @@
+set timeout 30
+spawn devnorn story create --json
+expect {
+  "Title:" { puts "\nPROMPTED (unexpected)" }
+  eof {}
+}
+catch wait result
+puts "exit [lindex $result 3]"

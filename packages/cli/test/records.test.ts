@@ -100,7 +100,7 @@ describe("records: ready head, foreign commits, merged by ancestry, durable stat
     step();
     await h.tick(); // push the parked state
     readyHead = h.git(["rev-parse", "HEAD"], wt());
-    const r = await h.norn("approve", "gh-5");
+    const r = await h.norn("story", "approve", "gh-5");
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ receipt: { kind: "approve", head_sha: readyHead } });
     step();

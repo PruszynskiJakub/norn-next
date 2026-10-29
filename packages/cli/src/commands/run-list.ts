@@ -10,7 +10,7 @@ import { formatStepTimeline, loadTraceView } from "@norn/view";
 import { defineCommand, opt } from "../command.ts";
 import { refuse, rendered, usageError } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
-import { hasRun, resolveTarget } from "../runtime/target.ts";
+import { hasRun, targetKey } from "../runtime/target.ts";
 import { cmd } from "@norn/core";
 
 export const runListCommand = defineCommand({
@@ -34,7 +34,7 @@ export const runListCommand = defineCommand({
   },
   positionals: { max: 1 },
   async run(ctx, args) {
-    const { key } = parseUnitKey(await resolveTarget(ctx, args.positionals[0], args.json === true, hasRun(ctx, "run list", cmd.runList)));
+    const { key } = parseUnitKey(await targetKey(ctx, args.positionals[0], args.json === true, hasRun(ctx, "run list", cmd.runList)));
     const rawLimit = opt.str(args, "limit");
     const limit = rawLimit === undefined ? null : Number(rawLimit);
     if (limit !== null && !(Number.isInteger(limit) && limit > 0)) throw usageError(`bad --limit '${rawLimit}'`, cmd.runList(key, { limit: 20 }));
