@@ -44,16 +44,14 @@
 
 ## Goal
 
-resolve#2: merge main (b563d55a) into the story branch and resolve the conflicts in .agents/skills/triage/SKILL.md, AGENTS.md, CONTRIBUTING.md.
+qa#3: QA every story criterion (B1–B71) on the current HEAD after the main merge, by running the CLI.
 
 ## Progress
 
-- Merged with --no-ff. Kept main's intake by kind (triage + reproduce; fix and spec workflows removed, gh-94) and applied this branch's command renames on top: `norn workflow … --to` → `norn story edit … --workflow … --at`, `norn approve` → `norn story approve`, `norn drop` → `norn story close`, `norn inbox` → `norn status`.
-- Also renamed the cleanly merged triage-skill line that named `norn workflow gh-<N> reproduce --to reproduce`.
-- Left main's `.agents/norn/workflows/{triage,reproduce}.yaml` gate prompts as they are (old command names): this branch never edits `.agents/norn/`, same as the old triage.yaml.
-- Typecheck clean; full suite 1421 pass / 0 fail.
-- resolve#2 done: Merged main b563d55a: kept gh-94's intake by kind (triage+reproduce, fix/spec removed) with this branch's command renames (story edit --workflow/--at, story approve, story close, status) in AGENTS.md, CONTRIBUTING.md, triage SKILL.md. Left .agents/norn/workflows yaml as main has it (old command names; this branch never edits .agents/norn). Typecheck clean, suite 1421/0.
+- Evidence in /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75c (report.md, criteria.json): real CLI (`bun packages/cli/src/main.ts`) in a throwaway repo with a local remote, released 0.11.1 side by side for comparisons; harness drivers (runCli + fake remote/runner/terminal) for the flows that need stories.
+- 63 pass, B19 person (real $EDITOR round trip), 7 unverified for missing capabilities: B12, B29, B46, B47 (herdr), B17 (browser), B18 (remote), B23 (browser+remote). No fail.
+- Small observations (not failures): close prompt says "Worktrees for 1 units"; `config set agents.claude.model` writes the whole agents.claude entry into the layer.
 
 ## Resume
 
-Merge committed; nothing left in this step.
+Report `norn done unverified --criteria /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75c/criteria.json` once the full suite result (/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75c/suite.txt) is in; if the suite fails, look at the failure first.
