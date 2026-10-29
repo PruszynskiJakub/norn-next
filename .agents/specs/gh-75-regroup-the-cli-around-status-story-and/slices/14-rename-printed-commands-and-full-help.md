@@ -2,7 +2,7 @@
 id: gh-75/14
 title: Printed commands use the new names; help shows the whole tree
 depends_on: [ gh-75/02, gh-75/05, gh-75/06, gh-75/07, gh-75/08, gh-75/09, gh-75/10, gh-75/11, gh-75/12, gh-75/13 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
