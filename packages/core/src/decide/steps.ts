@@ -203,8 +203,11 @@ function slicesStuck(story: StoryFacts): { rule: string; detail: string } | null
   // running or parked slices still progress
   const stuckSlices = activeUnits.filter(isStuck);
   if (stuckSlices.length && stuckSlices.length === activeUnits.length) {
-    const named = stuckSlices.map((s) => `slice ${s.key} stuck: ${unitOf(s.key)?.state?.park?.reason ?? "?"}`);
-    return { rule: "slices.slice_stuck", detail: `${named.join("; ")} — norn unstick ${stuckSlices[0]?.key}` };
+    const corrupt = (s: SliceFileFacts) => unitOf(s.key)?.state?.status === "corrupt";
+    const named = stuckSlices.map((s) => (corrupt(s) ? `slice ${s.key} corrupt (S2)` : `slice ${s.key} stuck: ${unitOf(s.key)?.state?.park?.reason ?? "?"}`));
+    // gh-79: unstick refuses a corrupt unit, so a corrupt one is pointed at norn why
+    const first = stuckSlices[0] as SliceFileFacts;
+    return { rule: "slices.slice_stuck", detail: `${named.join("; ")} — norn ${corrupt(first) ? "why" : "unstick"} ${first.key}` };
   }
   if (!activeUnits.length) {
     const blocked = pending.map((s) => `${s.key} waits for ${s.frontmatter.depends_on.filter((d) => !done.has(d)).join(", ")}`);

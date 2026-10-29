@@ -1,12 +1,8 @@
 /**
- * gh-79 repro loop (reproduce step; not picked up by `bun test`, run it by path):
- *   bun test ./packages/cli/test/rebase-rewind.repro.ts
- * A rebase stopped on conflicts in a story worktree rewinds `runs/` to an older state.json. The
- * tick reads that rewound state as the live unit, classifies the old step's deadline and writes a
- * receipt + state.json into the working tree (commit deferred). After `git rebase --abort` the
- * stray receipt collides with the committed one of the same number and the unit is `corrupt` (S2).
- * The assertions state the wanted behaviour (no write while a rebase is in progress, no corrupt
- * unit after the abort), so the loop is red while the bug is there.
+ * gh-79 (H1, S2, S5): a rebase stopped on conflicts in a story worktree rewinds `runs/` to an older
+ * state.json. The tick must not read that as the live unit: no deadline classified against it, no
+ * receipt or state.json written into it (commit deferred), so after `git rebase --abort` no stray
+ * receipt collides with the committed one of the same number and the unit is not `corrupt`.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
@@ -88,16 +84,17 @@ describe("gh-79: a tick mid-rebase", () => {
     expect(h.state(runs())).toMatchObject({ step: "first", applied_through: 1 }); // rewound
     h.clock.advance(5 * 60_000); // first's 1m deadline (from the run's start) is long past
     const r = await h.tick();
-    expect(acted(r)).toEqual([]); // red: ["agent.timeout.surface"]
-    expect(receipts()).toEqual(["0001-started.json"]); // red: + 0002-classify.json
+    expect(acted(r)).toEqual([]);
+    expect(r.decisions.find((d) => d.unit === "gh-1" && d.rule === "unit.rebase_in_progress")).toBeDefined();
+    expect(receipts()).toEqual(["0001-started.json"]);
   });
 
   test("after `git rebase --abort` the unit is not corrupt", async () => {
     sh(wt(), ["rebase", "--abort"]);
     h.clock.advance(30_000);
     const r = await h.tick();
-    expect(acted(r)).toEqual([]); // red: ["unit.corrupt"] (duplicate receipt number 2, also 0002-classify.json)
-    expect(h.state(runs())).toMatchObject({ step: "second", status: "ready" }); // red: status corrupt
-    expect(receipts()).toEqual(["0001-started.json", "0002-done.json"]); // red: + the stray 0002-classify.json
+    expect(acted(r)).toEqual([]);
+    expect(h.state(runs())).toMatchObject({ step: "second", status: "ready" });
+    expect(receipts()).toEqual(["0001-started.json", "0002-done.json"]);
   });
 });

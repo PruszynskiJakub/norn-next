@@ -470,7 +470,9 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
   const base = { story: story.key, slice: uf.unit.slice, url: story.frontmatter?.url, ...(reach ? { reach } : {}) };
   if (uf.errors.length || st?.status === "corrupt") {
     const files = uf.errors.map((e) => e.file).join(", ") || "state.json";
-    return { ...base, id: `corrupt:${key}:${files}`, group: "unblock", step: st?.step ?? null, title: `corrupt: ${files} failed validation (S2)`, command: `norn why ${key}`, since: iso(facts.now) };
+    // gh-79: what failed, so a duplicate receipt number names the other (stray) file too
+    const why = [...new Set(uf.errors.flatMap((e) => e.errors.map((x) => x.message)))].join("; ");
+    return { ...base, id: `corrupt:${key}:${files}`, group: "unblock", step: st?.step ?? null, title: `corrupt: ${files} failed validation (S2)${why ? `: ${why}` : ""}`, command: `norn why ${key}`, since: iso(facts.now) };
   }
   if (!st) return null;
   const item = (group: InboxGroup, title: string, command: string, since: string, extra: Partial<InboxItem> = {}): InboxItem => ({
