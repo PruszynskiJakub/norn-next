@@ -1,0 +1,18 @@
+{
+  "kind": "started",
+  "receipt_id": "01M63J3HTKWVV6FZE9A851A7ZA",
+  "run_id": "01M63J3HTKWVV6FZE9A851A7Z9",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-29T10:08:20.693Z",
+  "by": "agent",
+  "who": "claude",
+  "how": "manual",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-79-a-tick-mid-rebase-acts-on-rewound-runs",
+  "agent_session_id": "bace8e35-cb32-48b5-91e3-ec97b7f44bda",
+  "process": {
+    "pid": 11470,
+    "pid_start": "Thu Oct 29 11:08:11 2026"
+  }
+}

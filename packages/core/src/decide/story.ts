@@ -19,7 +19,7 @@ import type { RemoteIssue } from "../ports.ts";
 import { epoch, iso } from "../time.ts";
 import { edgeOf, isStale, stepOf } from "../workflow.ts";
 import { applyAction, classifyRun, implicitAskResolved, launchUnknown, resolveImplicitAsk, startRun } from "./agent.ts";
-import { commitFor, type Ctx, gitBusy, nextReceiptNumber, park, sliceFileOf, unitItem } from "./receipts.ts";
+import { commitFor, type Ctx, gitBusy, nextReceiptNumber, park, rebasing, sliceFileOf, unitItem } from "./receipts.ts";
 import { baseOf, classifyNorn, resumeSlices, runCheck, runGit, slicesCanResume, slicesStep, startStoryUnit } from "./steps.ts";
 
 // ================================================================= story level
@@ -144,6 +144,9 @@ function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: U
       story_status: "done",
     });
   }
+  // gh-79 (H1, S5): mid-rebase the story unit's state.json and story.md are a rewound copy; a park or
+  // mirror written from them would land in the rebased history. Held with the unit (decideUnit)
+  if (su && rebasing(su)) return;
   const st = su?.state;
   const reason = remoteProblem(story, ctx.config.remote.label, ctx.facts.repo.default_branch);
   // GR7: a remote problem parks the story unit through the one park path (stuck, kind remote)
@@ -225,9 +228,12 @@ function importMailbox(ctx: Ctx, story: StoryFacts): void {
     // routed by unit when the receipt names one (story unit = null)
     const unit = story.units.find((u) => u.unit.slice === r.slice);
     if (!unit) return reject(`no unit ${r.slice ?? story.key} in story ${story.key}`);
+    // gh-79 (H1): its cursor is read from a rewound state.json until the rebase is concluded; wait
+    if (rebasing(unit)) return;
     if (!atCursor(unit)) return reject(`stale: ${unit.unit.key} is not at ${r.step}#${r.attempt}`);
     target = unit;
   } else {
+    if (story.units.some(rebasing)) return;
     const matches = story.units.filter(atCursor);
     target = matches.find((u) => u.state?.status === "parked" || u.state?.status === "stuck") ?? matches[0];
   }
@@ -247,6 +253,11 @@ function importMailbox(ctx: Ctx, story: StoryFacts): void {
 
 function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean): void {
   const ref = uf.unit;
+  // gh-79 (H1, S2, S5): mid-rebase the unit's runs/ files are a rewound copy, so nothing is decided
+  // against them and nothing is written there (a receipt numbered from the rewound state would
+  // collide with a committed one once the rebase is aborted); the unit is held until it is concluded.
+  // An exception to BS5.1, which still decides liveness and deadlines during a merge, cherry-pick or revert
+  if (rebasing(uf)) return ctx.noop(ref, "unit.rebase_in_progress", `rebase in progress in ${uf.worktree?.path}; runs/ rewound — held until it is concluded (H1)`);
   if (uf.errors.length) {
     if (uf.state?.status === "corrupt") return ctx.noop(ref, "unit.corrupt", "corrupt; never touched (S2)");
     const notify = unitItem(ctx, story, uf, uf.state as UnitState);
