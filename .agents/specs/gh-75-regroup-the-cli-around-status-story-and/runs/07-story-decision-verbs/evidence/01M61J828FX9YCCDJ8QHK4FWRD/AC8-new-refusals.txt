@@ -1,0 +1,28 @@
+### story reject gh-1
+exit 2
+{"error":"story reject: the reason is required","do_instead":"pass --reason \"what failed\": norn story reject <unit> --reason \"…\"","code":"reason_required"}
+
+
+### approve (old name)
+exit 2
+{"error":"Unknown command: approve","do_instead":"norn help — commands: init, uninstall, sync, tick, watch, brief, done, ask, stuck, hook, inbox, cockpit, open, orient, status, unstick, mode, workflow, take, release, drop, tidy, doctor, config, help, story, run","code":"unknown_command"}
+
+
+### update (old name)
+exit 2
+{"error":"Unknown command: update","do_instead":"norn help — commands: init, uninstall, sync, tick, watch, brief, done, ask, stuck, hook, inbox, cockpit, open, orient, status, unstick, mode, workflow, take, release, drop, tidy, doctor, config, help, story, run","code":"unknown_command"}
+
+
+### story approve gh-2
+exit 0
+{"unit":"gh-2","receipt":{"kind":"approve","receipt_id":"03PGFN38A0JVYMHBB4AZDKVV4S","run_id":null,"step":"review","attempt":1,"at":"2099-01-15T10:00:40.000Z","by":"human","who":"tester@box","slice":null,"head_sha":"ed72db76a88e91aa76b387bcd0c8915ef4aba56b"},"delivered":{"via":"local","claim":"mine","n":4,"file":".agents/specs/gh-2-send-receipts/runs/_story/receipts/0004-approve.json"},"next":"norn tick"}
+
+
+### story reject gh-1 --reason misses B4
+exit 0
+{"unit":"gh-1","receipt":{"kind":"reject","receipt_id":"03PGFN38A0JVYMHBB4AZDKVV4V","run_id":null,"step":"review","attempt":1,"at":"2099-01-15T10:00:40.000Z","by":"human","who":"tester@box","slice":null,"comment":"misses B4","head_sha":"5b033e4194c40864964a0855a084a0d026f6110c"},"delivered":{"via":"local","claim":"mine","n":4,"file":".agents/specs/gh-1-pay-invoices/runs/_story/receipts/0004-reject.json"},"next":"norn tick"}
+
+
+### after next tick
+gh-1 {"step":"work","status":"ready","attempt":2,"counters":{"loop":1}} 
+gh-2 {"step":"$done","status":"done","attempt":1,"counters":{"loop":0}}

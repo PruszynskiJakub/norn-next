@@ -7,7 +7,7 @@
  *
  * Each verb says which units it applies to (`applies`) and why none does (`none`); later verbs reuse this.
  */
-import type { ProjectView } from "@norn/view";
+import type { ProjectView, SliceView, StoryView } from "@norn/view";
 import { inboxItemsInOrder, loadRunView, stepTitle } from "@norn/view";
 import { cmd } from "@norn/core";
 import type { Context } from "../context.ts";
@@ -19,8 +19,8 @@ import type { InteractionChoice } from "./interaction.ts";
 export interface TargetRule {
   /** the verb as typed, e.g. `run view` */
   verb: string;
-  /** whether the verb applies to this unit */
-  applies(key: string): boolean;
+  /** whether the verb applies to this unit (its view, when this checkout shows it) */
+  applies(key: string, unit: StoryView | SliceView | undefined): boolean;
   /** why no unit applies, e.g. `No unit has a run yet` */
   none: string;
   /** the verb on one unit, as printed (`cmd.runView`) */
@@ -46,7 +46,9 @@ function unitsInStatusOrder(view: ProjectView): InteractionChoice[] {
 export async function resolveTarget(ctx: Context, explicit: string | undefined, json: boolean, rule: TargetRule): Promise<string> {
   if (explicit) return explicit;
   if (ctx.unit) return rule.story ? ctx.unit.story : (ctx.unit.slice ?? ctx.unit.story);
-  const candidates = unitsInStatusOrder(await projectView(ctx)).filter((c) => rule.applies(c.value));
+  const view = await projectView(ctx);
+  const units = new Map<string, StoryView | SliceView>(view.stories.flatMap((s) => [[s.key, s] as const, ...s.slices.map((x) => [x.key, x] as const)]));
+  const candidates = unitsInStatusOrder(view).filter((c) => rule.applies(c.value, units.get(c.value)));
   if (!candidates.length) throw refuse(rule.none, cmd.status(), "no_target");
   const terminal = ctx.terminal(json);
   if (!terminal)
@@ -74,4 +76,9 @@ export function aStory(verb: string, command: (key: string) => string): TargetRu
 /** B55: the story a team verb (`story checkout`, `handoff`, `close`) acts on; a slice key, or a slice worktree, means the slice's story. */
 export async function resolveStory(ctx: Context, explicit: string | undefined, json: boolean, rule: TargetRule): Promise<string> {
   return storyArg(await resolveTarget(ctx, explicit, json, rule), rule.verb);
+}
+
+/** A unit parked on a question (`story answer`) or at a gate (`story approve`, `story reject`). */
+export function parkedOn(kind: "ask" | "gate", verb: string, none: string, command: (key: string) => string): TargetRule {
+  return { verb, command, none, applies: (_key, u) => u?.status === "parked" && u.park?.kind === kind };
 }

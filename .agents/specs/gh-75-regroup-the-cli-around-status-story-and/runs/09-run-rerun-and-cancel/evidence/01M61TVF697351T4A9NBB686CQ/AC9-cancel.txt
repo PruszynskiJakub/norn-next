@@ -1,0 +1,27 @@
+before: pgrep
+70734 bash /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-09/work/bin/fake-agent -p -- Use the norn skill, then run `norn brief`.
+$ norn run cancel gh-5 --json
+{"unit":"gh-5","receipt":{"kind":"stuck","receipt_id":"01M61VEAGJN51ZAYDXEE5N42TA","run_id":"01M61VDPKW9NPCS3SBHJVS6TJA","step":"implement","attempt":1,"at":"2026-10-28T18:13:01.586Z","by":"human","who":"jakubpruszynski@mac","slice":null,"reason":"cancelled by person"},"delivered":{"via":"local","claim":"mine","n":3,"file":".agents/specs/gh-5-pay-invoices/runs/_story/receipts/0003-stuck.json"},"next":"norn run rerun gh-5","killed":true}
+exit 0
+after: pgrep (empty = stopped)
+receipts:
+0001-started.json
+0002-started.json
+0003-stuck.json
+{
+  "kind": "stuck",
+  "receipt_id": "01M61VEAGJN51ZAYDXEE5N42TA",
+  "run_id": "01M61VDPKW9NPCS3SBHJVS6TJA",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-28T18:13:01.586Z",
+  "by": "human",
+  "who": "jakubpruszynski@mac",
+  "slice": null,
+  "reason": "cancelled by person"
+}
+agent log:
+(eval):12: no matches found: /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-09/work/repo/.agents/norn/trace/*.log
+fake agent pid 70734 run=01M61VDPKW9NPCS3SBHJVS6TJA args: -p -- Use the norn skill, then run `norn brief`.
+Terminated: 15
+got TERM 70734
