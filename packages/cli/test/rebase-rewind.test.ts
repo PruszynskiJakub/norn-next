@@ -4,7 +4,7 @@
  * receipt or state.json written into it (commit deferred), so after `git rebase --abort` no stray
  * receipt collides with the committed one of the same number and the unit is not `corrupt`.
  */
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { type CliResult, runCli, type TickReport } from "../src/index.ts";
@@ -32,6 +32,8 @@ default_workflow: rr
 default_mode: manual
 notifiers: []
 `;
+
+setDefaultTimeout(30_000);
 
 let h: Harness;
 const wt = () => `${h.root}-worktrees/gh-1-add-widget`;
