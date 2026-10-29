@@ -144,6 +144,9 @@ function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: U
       story_status: "done",
     });
   }
+  // gh-79 (H1, S5): mid-rebase the story unit's state.json and story.md are a rewound copy; a park or
+  // mirror written from them would land in the rebased history. Held with the unit (decideUnit)
+  if (su && rebasing(su)) return;
   const st = su?.state;
   const reason = remoteProblem(story, ctx.config.remote.label, ctx.facts.repo.default_branch);
   // GR7: a remote problem parks the story unit through the one park path (stuck, kind remote)
@@ -252,7 +255,8 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
   const ref = uf.unit;
   // gh-79 (H1, S2, S5): mid-rebase the unit's runs/ files are a rewound copy, so nothing is decided
   // against them and nothing is written there (a receipt numbered from the rewound state would
-  // collide with a committed one once the rebase is aborted); the unit is held until it is concluded
+  // collide with a committed one once the rebase is aborted); the unit is held until it is concluded.
+  // An exception to BS5.1, which still decides liveness and deadlines during a merge, cherry-pick or revert
   if (rebasing(uf)) return ctx.noop(ref, "unit.rebase_in_progress", `rebase in progress in ${uf.worktree?.path}; runs/ rewound — held until it is concluded (H1)`);
   if (uf.errors.length) {
     if (uf.state?.status === "corrupt") return ctx.noop(ref, "unit.corrupt", "corrupt; never touched (S2)");

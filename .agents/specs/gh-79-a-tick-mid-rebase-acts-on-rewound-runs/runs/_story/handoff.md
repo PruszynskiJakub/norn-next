@@ -3,9 +3,9 @@
 - Workflow: fix · Step: implement (attempt 3)
 - Status: running
 - Counters: base_conflict_loop 0/2, ready_loop 0/2, review_loop 1/3, stale_loop 0/10, test_loop 1/5, triage_loop 0
-- Last outcome: review.changes_requested (reported, 2026-10-29T10:56:38.776Z)
+- Last outcome: implement.silent (classified, 2026-10-29T11:05:45.475Z)
 - Next: `norn trace gh-79`
-- Updated: 2026-10-29T11:02:45.409Z
+- Updated: 2026-10-29T11:05:45.475Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - story.start: triage at explore
@@ -27,6 +27,8 @@
 - receipts.apply: applied 15
 - receipts.apply: review.changes_requested → implement
 - receipts.apply: applied 17
+- silent: last message snapshot in trace/transcripts/01M63N6AAXAWX56F20N71CN6T2/01M63NCW1JJR41TS6Z89EGYXX7.txt
+- agent.silent.surface: silent
 <!-- norn:heartbeat:end -->
 
 ## Goal
@@ -47,6 +49,10 @@ Fix gh-79: while a rebase rewinds a unit's `runs/`, norn decides and writes noth
 - review#1: changes requested. Blocking F1: storyLifecycle (remote.park, remote.mirror, remote.mirror.refined; story.ts:103) runs before the decideUnit hold and still writes state.json/story.md into a story worktree mid-rebase, from the rewound state. Minor: F2 slicesStep judges a rebasing slice by its rewound state; F3 BS5.1 contradicts the rebase hold. Nit F4: a long-held rebase has no inbox item.
 - review#1 changes_requested: Core hold, mailbox wait, corrupt title and stuck hint are right and tested. Blocking F1: storyLifecycle (remote.park/mirror) runs before the decideUnit hold and still writes state.json/story.md into a story worktree mid-rebase from rewound state. Minor F2 (slicesStep reads a rebasing slice's rewound state), F3 (BS5.1 contradicts), nit F4.
 
+- implement#3 (rework of review#1): F1 — `storyLifecycle` returns before park/mirror/refined-hash when the story unit is rebasing (`packages/core/src/decide/story.ts`); a merged PR is still cleaned up. The story unit then gets its `unit.rebase_in_progress` hold. F2 — `slicesStuck` treats a rebasing slice as progressing, not by its rewound stuck/corrupt state (`steps.ts`). F3 — the decideUnit comment now names the hold as an exception to BS5.1. New decide tests (`gh-79 … holds the story-level writes`), each red before its change.
+- **For the person (F3):** BS5.1 in `.agents/SPEC-base-sync-and-qa.md` still says every rule runs as usual while a git operation is in progress; for a rebase the unit is now held entirely. The spec amendment goes through the spec workflow.
+- **For the person (F4, follow-up issue):** a rebase left waiting forever holds the unit with only a trace noop, no inbox item; consider an inbox item or a liveness check for a long-held rebase.
+
 ## Resume
 
-Rework F1 test-first: decide test with the story unit rebasing and the issue closed (and one with a mirror change) expecting only unit.rebase_in_progress; then guard storyLifecycle's park/mirror writes with `rebasing(su)`. Consider F2/F3.
+If the suite is green: report `norn done done`. Otherwise fix what failed in the gh-79 decide tests or the rebase hold.

@@ -428,6 +428,36 @@ describe("story lifecycle (GR6–GR8)", () => {
   });
 });
 
+describe("gh-79 (H1, S5): a rebasing story worktree holds the story-level writes", () => {
+  const rebasingStory = (f: StoryFacts) => {
+    f.units[0]!.worktree = { ...worktreeOf("/r-worktrees/gh-1-login"), in_progress: { operation: "rebase", unmerged: [] } };
+    return f;
+  };
+  test("a remote problem does not park the story unit from its rewound state", () => {
+    expect(kinds(facts([rebasingStory(storyAt("test", { issue: null }))]))).toEqual(["gh-1 noop unit.rebase_in_progress"]);
+  });
+  test("a remote change is not mirrored into the rewound story.md", () => {
+    const f = rebasingStory(storyAt("test"));
+    f.issue = { provider: "gh", number: 1, url: "u", title: "Renamed", body: "body", state: "open", assignees: ["jakub"], labels: ["norn"], updated_at: at() };
+    expect(kinds(facts([f]))).toEqual(["gh-1 noop unit.rebase_in_progress"]);
+    const refined = rebasingStory(storyAt("slices", {}, [{ nn: "01", state: { status: "running" } }]));
+    refined.units[0]!.state = { ...refined.units[0]!.state!, visits: { refine: 1, slices: 1 } };
+    expect(kinds(facts([refined]))[0]).toBe("gh-1 noop unit.rebase_in_progress");
+  });
+  test("a merged PR is still cleaned up", () => {
+    const f = rebasingStory(storyAt("ready", { pr: { number: 9, url: "u", state: "merged", is_draft: false, head_sha: "abc" } }));
+    expect(kinds(facts([f]))).toEqual(["gh-1 cleanup_merged_story remote.pr_merged"]);
+  });
+  test("a rebasing slice is judged progressing, not by its rewound stuck state", () => {
+    const stuck: Partial<UnitState> = { status: "stuck", park: { kind: "exhausted", reason: "review_loop 3/3", since: at() } };
+    const f = storyAt("slices", {}, [{ nn: "01", state: stuck }]);
+    f.frontmatter = { ...f.frontmatter!, refined_body_hash: sha256("body") };
+    expect(kinds(facts([f]))[0]).toContain("slices.slice_stuck");
+    f.units[1]!.worktree = { ...worktreeOf("/r-worktrees/gh-1-login/01-s01"), in_progress: { operation: "rebase", unmerged: [] } };
+    expect(kinds(facts([f]))).toEqual(["gh-1 noop slices.wait", "gh-1/01 noop unit.rebase_in_progress"]);
+  });
+});
+
 describe("mailbox (T9)", () => {
   test("a matching receipt is imported into the parked unit; unmatched ones are rejected", () => {
     const f = storyAt("ready");
