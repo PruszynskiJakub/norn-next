@@ -11,7 +11,7 @@
     "prepare": 1
   },
   "step_entered_at": "2026-10-29T11:46:12.981Z",
-  "status": "ready",
+  "status": "running",
   "park": null,
   "counters": {
     "version_loop": 0,
@@ -21,11 +21,22 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 0,
-  "run": null,
+  "applied_through": 1,
+  "run": {
+    "run_id": "01M63QWZ6CTSV5PCJAJ1XC9XKD",
+    "step": "prepare",
+    "attempt": 1,
+    "started_at": "2026-10-29T11:49:36.175Z",
+    "how": "manual",
+    "agent": "claude",
+    "process": {
+      "pid": 56462,
+      "pid_start": "Thu Oct 29 08:59:15 2026"
+    }
+  },
   "last_outcome": null,
   "created_at": "2026-10-29T11:46:12.981Z",
-  "updated_at": "2026-10-29T11:46:12.981Z",
-  "last_tick_id": "01M63QPRVCQVTHZRRZ6J2YSKTX",
+  "updated_at": "2026-10-29T11:49:52.980Z",
+  "last_tick_id": "01M63QXFPHVYV8DZGS12RJQR3R",
   "mode": "manual"
 }
