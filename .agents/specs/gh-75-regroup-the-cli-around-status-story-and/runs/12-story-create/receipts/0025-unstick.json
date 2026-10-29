@@ -1,0 +1,12 @@
+{
+  "kind": "unstick",
+  "receipt_id": "01M63WQGYH3PY227T09TB67T8W",
+  "run_id": "01M63J9SXNKQ5TQM7DGRA0BW86",
+  "step": "merge",
+  "attempt": 1,
+  "at": "2026-10-29T13:14:00.529Z",
+  "by": "human",
+  "who": "jakubpruszynski@mac",
+  "slice": "gh-75/12",
+  "comment": "The previous merge session went idle after two nudges and ended with a clean worktree. Bring the story tip into the slice and report done; note slice 09's run cancel/rerun is missing on the story tip and gh-75/08 restores it, so don't restore it here."
+}
