@@ -1,0 +1,24 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M64X23NP2MS1468QXHXESD8X",
+  "run_id": "01M64X1XZSS67G0J8PRQMPS1Z6",
+  "step": "update",
+  "attempt": 3,
+  "at": "2026-10-29T22:39:01.814Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M64X1XZS7BB24VS7X99QR8AT",
+  "outcome": "conflict",
+  "rule": "git.update",
+  "detail": "merging main (b563d55a178d) into gh-75-regroup-the-cli-around-status-story-and conflicts in .agents/skills/triage/SKILL.md, AGENTS.md, CONTRIBUTING.md",
+  "route": "resolve",
+  "base": {
+    "ref": "refs/remotes/origin/main",
+    "sha": "b563d55a178d934ae8fda3bce63d9e68e643e49d",
+    "conflicts": [
+      ".agents/skills/triage/SKILL.md",
+      "AGENTS.md",
+      "CONTRIBUTING.md"
+    ]
+  }
+}
