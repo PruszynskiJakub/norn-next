@@ -1,0 +1,16 @@
+{
+  "kind": "started",
+  "receipt_id": "01M644DGV69210WYV11CX93FKX",
+  "run_id": "01M644DGV6MY2P3QBF7FBW2SPP",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-29T15:28:21.352Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M644DGV66K7YAB0YBXTN9HW0",
+  "how": "auto",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-75-regroup-the-cli-around-status-story-and--15-docs-plugin-prd-and-lint",
+  "machine": "jakubpruszynski@mac",
+  "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD"
+}
