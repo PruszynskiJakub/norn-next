@@ -5,17 +5,22 @@
   "unit_dir": "15-docs-plugin-prd-and-lint",
   "workflow": "slice",
   "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
-  "step": "qa",
+  "step": "human-qa",
   "attempt": 1,
   "visits": {
     "implement": 2,
     "test": 2,
     "review": 2,
-    "qa": 1
+    "qa": 1,
+    "human-qa": 1
   },
-  "step_entered_at": "2026-10-29T16:39:21.736Z",
-  "status": "running",
-  "park": null,
+  "step_entered_at": "2026-10-29T16:50:21.806Z",
+  "status": "parked",
+  "park": {
+    "kind": "gate",
+    "reason": "Check the criteria QA could not settle (listed with how to check each). Approve, or reject with what failed.",
+    "since": "2026-10-29T16:50:21.806Z"
+  },
   "counters": {
     "test_loop": 0,
     "review_loop": 1,
@@ -24,35 +29,16 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 16,
-  "run": {
-    "run_id": "01M648GENPX3BX0HVWYMHN0XR5",
-    "step": "qa",
-    "attempt": 1,
-    "started_at": "2026-10-29T16:39:56.507Z",
-    "how": "auto",
-    "agent": "claude",
-    "session": {
-      "runner": "herdr",
-      "session_id": "w9E:p1",
-      "pane_id": "w9E:p1",
-      "reach": "herdr agent attach w9E:p1"
-    },
-    "process": {
-      "pid": 19031,
-      "pid_start": "Thu Oct 29 17:39:56 2026"
-    },
-    "machine": "jakubpruszynski@mac",
-    "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD"
-  },
+  "applied_through": 17,
+  "run": null,
   "last_outcome": {
-    "step": "review",
-    "outcome": "approve",
+    "step": "qa",
+    "outcome": "unverified",
     "source": "reported",
-    "at": "2026-10-29T16:39:07.161Z",
-    "receipt_id": "01M648F34SHM04Y855DNSGF7MR"
+    "at": "2026-10-29T16:49:52.051Z",
+    "receipt_id": "01M6492RXKJCM7BX91N7Q2GX9K"
   },
   "created_at": "2026-10-29T15:27:51.349Z",
-  "updated_at": "2026-10-29T16:39:56.508Z",
-  "last_tick_id": "01M648GENP64SVM017GC15ERQ9"
+  "updated_at": "2026-10-29T16:50:21.806Z",
+  "last_tick_id": "01M6493NZBCV8P5B6YKT50C6PZ"
 }
