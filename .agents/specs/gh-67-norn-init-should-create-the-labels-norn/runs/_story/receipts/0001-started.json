@@ -1,0 +1,18 @@
+{
+  "kind": "started",
+  "receipt_id": "01M63BWDW335C6TMVK7NP7ZR80",
+  "run_id": "01M63BWDW335C6TMVK7NP7ZR7Z",
+  "step": "explore",
+  "attempt": 1,
+  "at": "2026-10-29T08:19:35.443Z",
+  "by": "agent",
+  "who": "claude",
+  "how": "manual",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-67-norn-init-should-create-the-labels-norn",
+  "agent_session_id": "6fbdfb09-71e8-4ede-9440-96ed9939c469",
+  "process": {
+    "pid": 78420,
+    "pid_start": "Thu Oct 29 09:19:27 2026"
+  }
+}
