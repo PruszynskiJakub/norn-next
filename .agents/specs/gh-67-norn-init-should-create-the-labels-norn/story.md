@@ -41,3 +41,14 @@ Open for triage: does this belong in `init`, or in `norn doctor` (check, with `-
 ## PRD
 
 GR1 (intake label), W9 (`norn:wf:<name>`), X2 (ports).
+
+## Triage
+
+**Still occurs:** yes — base `5c59c46`
+**Repro:** in a throwaway repo under `$TMPDIR` (`git init && git remote add origin https://github.com/example/x.git`), `bun packages/cli/src/main.ts init` touches no remote and only prints next step 4: "an issue labelled `norn` … e.g. `gh label create norn` (once)". `init --json` carries `remote.label: "norn"` and nothing about labels created or existing. No `norn:wf:<name>` label is created or named; with a GitLab remote the hint drops the command entirely.
+**Affected code:** `packages/cli/src/commands/init.ts:119-125` — `nextSteps` prints the `gh label create` hint for GitHub only; `packages/core/src/ports.ts:311` — `RemotePort` reads issues (`listAssignedIssues`) and has no label operation; `packages/adapters/src/gh/index.ts`, `packages/adapters/src/glab/index.ts` — read labels only. Workflows a label could name: built-in `packages/cli/assets/workflows/{bug,slice,story}.yaml` plus a repo's `.agents/norn/workflows/` (here also `fix, quick, release, spec, triage`).
+**PRD:** GR1 (intake label), W9 (`norn:wf:<name>`), X2 (ports), A1/SK1/S10 (what `init` sets up), A7 (`doctor`); §Open items "Write-back to GitHub/GitLab … Deferred — v1 writes only pushes".
+**Context:** Seen in the self-hosting bootstrap (#63): `CONTRIBUTING.md` lists `norn` and `norn:wf:{triage,story,fix,quick,spec,release}` as labels to create by hand. The PRD has no rule that `init` (or `doctor`) writes to the remote, and its open-items table says v1 writes only pushes, so creating labels is a new remote write that the PRD must allow first. The issue's own open questions are design questions: `init` vs `doctor --fix` vs both; a new `RemotePort` operation (e.g. `listLabels` + `createLabel`, one effect each, X2) vs shelling `gh`/`glab` from `init`; which workflows count as "story workflows" (W9 names only story selection; `slice.yaml`/`bug.yaml` are not selected by label); how missing/unauthenticated CLI is reported.
+
+**Recommend:** spec — the change needs a new PRD rule (an `init`/`doctor` id for ensuring remote labels, an amendment to the "v1 writes only pushes" item, and the port shape under X2) before any code; once settled, the build is a small story.
+**Run:** `norn workflow gh-67 spec --to refine`

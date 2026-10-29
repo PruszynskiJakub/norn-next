@@ -1,0 +1,12 @@
+{
+  "kind": "done",
+  "receipt_id": "01M63BY0JE1WVB5NGCHJBGRG5N",
+  "run_id": "01M63BWDW335C6TMVK7NP7ZR7Z",
+  "step": "explore",
+  "attempt": 1,
+  "at": "2026-10-29T08:20:27.343Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "spec",
+  "handoff": "Still occurs on 5c59c46; label creation is a new remote write the PRD does not allow yet (v1 writes only pushes) and needs an init/doctor rule and a RemotePort shape (X2) settled first; run norn workflow gh-67 spec --to refine"
+}
