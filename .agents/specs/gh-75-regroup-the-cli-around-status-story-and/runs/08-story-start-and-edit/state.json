@@ -16,8 +16,13 @@
     "merge": 2
   },
   "step_entered_at": "2026-10-28T18:11:11.701Z",
-  "status": "running",
-  "park": null,
+  "status": "parked",
+  "park": {
+    "kind": "ask",
+    "reason": "The story branch tip (52478d3, slice 07 integrated) has lost slice 09's work: slice 07's commit as it landed (36ee8273) deletes run-cancel.ts, run-rerun.ts, run-rerun-cancel.test.ts and slice 09's golden cases, removes cancel/rerun from run.ts, and brings back unstick.ts. Slice 08 is already merged with the story branch through slice 09 (34fc15e; suite 1298 pass, typecheck green). Merging 52478d3 now conflicts on those files (modify/delete), and the merge is aborted with a clean worktree. Should my merge restore slice 09's run cancel/rerun and keep unstick removed (this partly reverts slice 07's commit from slice 08), or should I take the story branch as it is, with run cancel/rerun gone, and leave the repair to a separate fix?",
+    "since": "2026-10-29T13:05:14.821Z",
+    "receipt_id": "01M63W7FJ3J2BJ28PT7SAX2RWA"
+  },
   "counters": {
     "test_loop": 0,
     "review_loop": 1,
@@ -26,7 +31,7 @@
   },
   "nudges_used": 2,
   "retries_used": 0,
-  "applied_through": 26,
+  "applied_through": 27,
   "run": {
     "run_id": "01M61VK9EFRZBGDHVZ25FDNWZR",
     "step": "merge",
@@ -49,12 +54,12 @@
   },
   "last_outcome": {
     "step": "merge",
-    "outcome": "timeout",
-    "source": "classified",
-    "at": "2026-10-29T12:59:05.594Z",
-    "receipt_id": "01M63VW6ZRMW766ZHTA5G71MZV"
+    "outcome": "ask",
+    "source": "reported",
+    "at": "2026-10-29T13:05:14.821Z",
+    "receipt_id": "01M63W7FJ3J2BJ28PT7SAX2RWA"
   },
   "created_at": "2026-10-28T14:13:16.910Z",
-  "updated_at": "2026-10-29T12:59:05.594Z",
-  "last_tick_id": "01M63VW6ZRQQ4BA7J8MT6HRAS9"
+  "updated_at": "2026-10-29T13:05:35.631Z",
+  "last_tick_id": "01M63W83WAQWRP3QCX1YCW8WGT"
 }
