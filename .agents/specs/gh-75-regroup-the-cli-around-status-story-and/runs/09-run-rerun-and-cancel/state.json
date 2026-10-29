@@ -5,22 +5,19 @@
   "unit_dir": "09-run-rerun-and-cancel",
   "workflow": "slice",
   "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
-  "step": "human-qa",
+  "step": "integrate",
   "attempt": 1,
   "visits": {
     "implement": 2,
     "test": 2,
     "review": 2,
     "qa": 1,
-    "human-qa": 1
+    "human-qa": 1,
+    "integrate": 1
   },
-  "step_entered_at": "2026-10-28T18:15:14.336Z",
-  "status": "parked",
-  "park": {
-    "kind": "gate",
-    "reason": "Check the criteria QA could not settle (listed with how to check each). Approve, or reject with what failed.",
-    "since": "2026-10-28T18:15:14.336Z"
-  },
+  "step_entered_at": "2026-10-29T10:08:15.195Z",
+  "status": "ready",
+  "park": null,
   "counters": {
     "test_loop": 0,
     "review_loop": 1,
@@ -29,16 +26,16 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 20,
+  "applied_through": 21,
   "run": null,
   "last_outcome": {
-    "step": "qa",
-    "outcome": "partial",
-    "source": "reported",
-    "at": "2026-10-28T18:15:07.604Z",
-    "receipt_id": "01M61VJ5JK1J2ZK6XMNMKRQ813"
+    "step": "human-qa",
+    "outcome": "approve",
+    "source": "human",
+    "at": "2026-10-29T10:07:50.460Z",
+    "receipt_id": "01M63J2MNWCBZTGK1JGMBJTRE3"
   },
   "created_at": "2026-10-28T14:13:16.910Z",
-  "updated_at": "2026-10-28T18:15:14.336Z",
-  "last_tick_id": "01M61VJC4ZY07P6YRJ3GPQFZKD"
+  "updated_at": "2026-10-29T10:08:15.195Z",
+  "last_tick_id": "01M63J3CTRJH9HCXT8CP9CQQ7X"
 }
