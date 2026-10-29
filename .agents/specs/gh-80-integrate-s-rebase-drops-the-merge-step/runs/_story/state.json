@@ -5,7 +5,7 @@
   "unit_dir": "_story",
   "workflow": "fix",
   "workflow_hash": "e782a3ecf7ffb2d0b985a110350c437f6c5e9ecefc558e4c41b66a384999a1b5",
-  "step": "open-pr",
+  "step": "ready",
   "attempt": 1,
   "visits": {
     "explore": 1,
@@ -15,28 +15,33 @@
     "test": 2,
     "review": 2,
     "describe": 1,
-    "open-pr": 1
+    "open-pr": 1,
+    "ready": 1
   },
-  "step_entered_at": "2026-10-29T11:41:15.658Z",
-  "status": "ready",
-  "park": null,
+  "step_entered_at": "2026-10-29T11:42:15.659Z",
+  "status": "parked",
+  "park": {
+    "kind": "gate",
+    "reason": "Read the draft PR. Approve to mark the story finished (a person still merges the PR), or reject with what to change.",
+    "since": "2026-10-29T11:42:15.659Z"
+  },
   "counters": {
     "triage_loop": 0,
     "review_loop": 1
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 19,
+  "applied_through": 20,
   "run": null,
   "last_outcome": {
-    "step": "describe",
+    "step": "open-pr",
     "outcome": "done",
-    "source": "reported",
-    "at": "2026-10-29T11:40:47.209Z",
-    "receipt_id": "01M63QCTQ9AW2AXJWT79HT9C3G"
+    "source": "classified",
+    "at": "2026-10-29T11:41:56.670Z",
+    "receipt_id": "01M63QEYHXF7JGBMM39KTS42RB"
   },
   "created_at": "2026-10-28T13:43:03.085Z",
-  "updated_at": "2026-10-29T11:41:15.658Z",
-  "last_tick_id": "01M63QDPG86K7ESMWVYAFBF7QS",
+  "updated_at": "2026-10-29T11:42:15.659Z",
+  "last_tick_id": "01M63QFH3A6H3VW4JZX3Q0T1QN",
   "mode": "manual"
 }
