@@ -1,0 +1,48 @@
+{
+  "kind": "done",
+  "receipt_id": "01M6492RXKJCM7BX91N7Q2GX9K",
+  "run_id": "01M648GENPX3BX0HVWYMHN0XR5",
+  "step": "qa",
+  "attempt": 1,
+  "at": "2026-10-29T16:49:52.051Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/15",
+  "outcome": "unverified",
+  "handoff": "QA#1: suite 1380 pass, typecheck clean. AC1-AC3 pass (planted removed names in CONTRIBUTING, plugin, skill, PRD each fail the lint; PRD §15 noun tree and S7 wording observed). AC4 unverified: plugin scripts run in real Herdr against a dev build (next toast on nothing_to_attach, open splits a pane with status --watch --pane, pick renders the cockpit and quits cleanly), but the actions through a linked plugin need a released norn with the new surface on the Herdr PATH; how-to in AC4.md.",
+  "evidence": "evidence/01M648GENPX3BX0HVWYMHN0XR5",
+  "criteria": [
+    {
+      "id": "AC1",
+      "verdict": "pass",
+      "evidence": "/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75/ev/AC1.md"
+    },
+    {
+      "id": "AC2",
+      "verdict": "pass",
+      "evidence": "/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75/ev/AC2.md"
+    },
+    {
+      "id": "AC3",
+      "verdict": "pass",
+      "evidence": "/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75/ev/AC3.md"
+    },
+    {
+      "id": "AC4",
+      "verdict": "unverified",
+      "evidence": "/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75/ev/AC4.md",
+      "reason": "The plugin's actions run the norn on the Herdr server's PATH (released 0.11.1, no run attach / status --watch); linking this branch's plugin would replace the person's installed one. The scripts themselves were run in real Herdr against a dev build: next's toast, open's split, pick's cockpit all observed (AC4.md).",
+      "how": "With a norn carrying the new surface on PATH (or NORN_BIN in the Herdr server env): herdr plugin uninstall norn; herdr plugin link <worktree>/plugins/herdr; from a pane in a norn repo invoke herdr plugin action invoke open|pick|next --plugin norn and check: cockpit split below the focused pane, cockpit popup, toast when nothing waits and focus on the agent pane when a Your turn item has a live pane. Restore: herdr plugin install PruszynskiJakub/norn-next/plugins/herdr."
+    }
+  ],
+  "notes": [
+    {
+      "text": "The open split runs bare 'norn status --watch' in the new pane (not NORN_BIN), so with a dev build it ran released 0.11.1 and failed with Unknown option '--watch'. Fine once released; confirm that is intended.",
+      "criterion": "AC4"
+    },
+    {
+      "text": "AC2/AC4 name a separate 'cockpit' action; the plugin folds it into 'open' (status --watch --pane) and removes the cockpit pane. Confirm that reading.",
+      "criterion": "AC2"
+    }
+  ]
+}
