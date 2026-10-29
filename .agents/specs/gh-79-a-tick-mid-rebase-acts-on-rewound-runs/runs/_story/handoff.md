@@ -15,6 +15,29 @@
 
 ## Goal
 
+Reproduce gh-79 (a tick mid-rebase acts on rewound `runs/` and leaves a stray receipt that corrupts the unit) as a user and with a loop that goes red; confirm the cause. No fix.
+
 ## Progress
 
+**Reproduced as a user** (dev build `bun packages/cli/src/main.ts`, throwaway repo under $TMPDIR, scripted `gh` on PATH, temp `NORN_HOME_DIR`, story workflow `first` (agent, deadline 1m) → `second`, manual mode):
+1. intake, claim, start; `brief` in the worktree starts `first#1`; agent commits `X.txt=story`; `done done`; tick → step `second`, applied_through 2 (`0001-started`, `0002-done` committed).
+2. A branch `old` cut at the commit where state was `first`/applied_through 1, with a conflicting `X.txt=old`. In the worktree: `git rebase old` stops on the conflict → `runs/` rewound to `first`, applied_through 1.
+3. Tick past first's deadline → `agent.timeout.surface` (classify). Worktree now has `?? receipts/0002-classify.json`, ` M state.json`, ` M handoff.md`; commit deferred.
+4. `git rebase --abort` → tracked files back (`second`, ready); stray `0002-classify.json` stays next to `0002-done.json`.
+5. Next tick → `unit.corrupt` (`mark_corrupt`), then `unit.corrupt` noop forever. Inbox Unblock: "corrupt: …/receipts/0002-done.json failed validation (S2)" → `norn why gh-1` (names the valid committed receipt, not the stray). `norn unstick gh-1` → exit 3 `corrupt_unit`, "duplicate receipt number 2 (also 0002-classify.json)".
+(The `slices.stuck → norn unstick` hint from the report is slice-only; this repro is story-level, so that part was not exercised.) Evidence: `user-side.txt`, `loop-red.txt` in the attached evidence dir.
+
+**Loop** (deterministic, ~4 s, FakeClock + real git, 3/3 red): `bun test ./packages/cli/test/rebase-rewind.repro.ts`. Named `.repro.ts` so plain `bun test` does not pick it up; it asserts the wanted behaviour. Red output:
+- test 1 "mid-rebase the tick writes nothing into the rewound runs/": decisions `["agent.timeout.surface"]`, receipts gain `0002-classify.json`.
+- test 2 "after `git rebase --abort` the unit is not corrupt": decisions `["unit.corrupt"]`, status `corrupt`.
+
+**Minimised repro**: story-level unit (no slices, no integrate, no merge step needed), one agent step with a short deadline whose run is in the commit the rebase rewinds to, a later step committed on HEAD, `git rebase <branch cut at the earlier commit with a conflicting file>`, one tick past the deadline, `git rebase --abort`, one tick.
+
+**Confirmed cause**: in_progress *is* detected (trace facts of the mid-rebase tick: `worktree.in_progress = {operation: "rebase", unmerged: ["X.txt"]}`; hypothesis "git adapter misses the rebase" ruled out). decide uses it only to skip `recover.commit` (`gitBusy`, `packages/core/src/decide/receipts.ts:95`; `packages/core/src/decide/story.ts:276-283`, comment BS5.1: "liveness, implicit asks and deadlines are still decided below"). Everything else in `decideUnit` runs on `state.json`/receipts read from the working tree (`packages/store/src/local-facts.ts`), which a rebase has rewound; the receipt number comes from that rewound state (`nextReceiptNumber`, receipts.ts:92) so it collides with the committed one. act writes receipt + state.json + handoff and defers only the commit (`packages/cli/src/runtime/act/env.ts:162-164`). After abort, store rejects the duplicate number (`packages/store/src/receipts.ts:43-47`) → S2 corrupt, and `decideUnit` never touches it again (story.ts:248-249, 262).
+Probe (reverted): `if (gitBusy(uf)) return ctx.noop(...)` right after the corrupt checks in `decideUnit` turned both tests green. That proves the cause, but it is not the fix as is: BS5.1 wants liveness/deadlines decided during an agent's *merge* (where runs/ is not rewound), and the unapplied-receipts path (`receipts.apply`) also writes. The distinction the fix needs: rebase (HEAD detached, runs/ rewound) vs merge; or never write a receipt while git is busy. Also open from the issue's Wanted: inbox item names the committed file not the stray one (`packages/core/src/inbox/items.ts:471-473`), `unstick` refuses corrupt (`packages/cli/src/commands/unstick.ts:24`) while the slice stuck hint names it (`packages/core/src/decide/steps.ts:199-207`).
+
+**Seam for the regression test**: the CLI harness (`packages/cli/test/harness.ts`, real git + FakeClock), as in the repro file — rename it to `rebase-rewind.test.ts` (or fold into `integrate.test.ts`/`base-sync.test.ts`) when fixing. A decide-only golden case would also catch the mid-rebase decision (facts with `worktree.in_progress.operation = "rebase"` + overdue run → no classify), but only the harness proves the post-abort duplicate.
+
 ## Resume
+
+Reproduce done; report `norn done reproduced`.
