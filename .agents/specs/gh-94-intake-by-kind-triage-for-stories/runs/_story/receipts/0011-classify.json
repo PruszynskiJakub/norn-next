@@ -1,0 +1,23 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M64PX8CD8R4B36QNFN794X59",
+  "run_id": "01M64PX0DG7HMYDD9NTYYPMNDR",
+  "step": "update",
+  "attempt": 2,
+  "at": "2026-10-29T20:51:31.341Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M64PX0DG5N5KT196CHWXX8PC",
+  "outcome": "conflict",
+  "rule": "git.update",
+  "detail": "merging main (13e0986a33f7) into gh-94-intake-by-kind-triage-for-stories conflicts in AGENTS.md, CONTRIBUTING.md",
+  "route": "resolve",
+  "base": {
+    "ref": "refs/remotes/origin/main",
+    "sha": "13e0986a33f7ac7daecf59e1c319025f12f2260e",
+    "conflicts": [
+      "AGENTS.md",
+      "CONTRIBUTING.md"
+    ]
+  }
+}

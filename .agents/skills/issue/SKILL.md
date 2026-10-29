@@ -44,7 +44,8 @@ Assignee: @me
 Leave out a section with nothing in it. Labels:
 
 - `norn`: always, so norn takes the issue in.
-- `norn:wf:<name>` (`fix`, `quick`, `story`, `spec`): only when the person names the workflow; otherwise the `triage` workflow decides.
+- `norn:wf:reproduce`: always for a bug (norn does something wrong), so it starts in `reproduce`, not `triage`.
+- `norn:wf:<name>` (`quick`, `story`): only when the person names the workflow; otherwise the `triage` workflow decides.
 - `friction`: when it is friction with norn itself (a refusal that made no sense, a step that went in circles, a missing command).
 
 A fork PR is input: link it in the body, never ask to merge it as is.

@@ -1,0 +1,17 @@
+{
+  "kind": "done",
+  "receipt_id": "01M64QWRE8Z7RG8DGPH9GST33H",
+  "run_id": "01M64QBTCBKX6JA5Q4KZT0C161",
+  "step": "resolve",
+  "attempt": 1,
+  "at": "2026-10-29T21:08:43.592Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "done",
+  "handoff": "Merged origin/main 13e0986a; resolved AGENTS.md (branch's check sentence minus deleted fix, plus main's release CI clause) and CONTRIBUTING.md (branch's table with main's release row). Typecheck green, 1240 tests pass.",
+  "base_merge": {
+    "sha": "13e0986a33f7ac7daecf59e1c319025f12f2260e",
+    "merge": "fde51374f32f3b06f52ecfeb4dc54596034efaf4",
+    "head": "3395ad89481d266cdfbaf276ddc757255cf8a394"
+  }
+}

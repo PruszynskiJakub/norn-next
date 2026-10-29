@@ -40,16 +40,15 @@
 
 ## Goal
 
-qa#2: QA every story criterion (B1–B71) on HEAD ac1d3321, after implement#1 fixed B42.
+resolve#2: merge main (b563d55a) into the story branch and resolve the conflicts in .agents/skills/triage/SKILL.md, AGENTS.md, CONTRIBUTING.md.
 
 ## Progress
 
-- Full suite 1418 pass / 0 fail; typecheck clean.
-- Reran qa#1's harness drivers ($TMPDIR/qa75/qa.ts, qa3.ts) on HEAD into a fresh evidence dir. Normalised diff against qa#1's output: only ids/shas differ, except B42, which now refuses `branch_missing` and names gh-6-close-me (was `unknown_story`). B42 → pass.
-- Reran the hand-run checks (help, removed commands, status, story create, config list/get/set/unset, TTY prompts for status --watch and config set) in a fresh throwaway repo: same output as qa#1. Wrote a new driver for B69 (brief/ask/answer/done/hook/stuck in unit worktrees): unchanged behaviour.
-- Verdicts: 63 pass; B12, B29, B46, B47 unverified (need herdr); B17 unverified (needs browser); B18 unverified (needs remote); B23 unverified (needs browser and remote); B19 person. Evidence and criteria: /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75b/evidence (criteria.json, report.md).
-- qa#2 unverified: QA #2 on HEAD: suite 1418/0, typecheck clean. B42 now passes (story reopen refuses branch_missing and names the story branch). 63 pass, the rest match qa#1 apart from ids/shas. B12/B29/B46/B47 need herdr, B17 a browser, B18 a remote, B23 both: unverified. B19 is person. Evidence and how-to-check in criteria.json/report.md.
+- Merged with --no-ff. Kept main's intake by kind (triage + reproduce; fix and spec workflows removed, gh-94) and applied this branch's command renames on top: `norn workflow … --to` → `norn story edit … --workflow … --at`, `norn approve` → `norn story approve`, `norn drop` → `norn story close`, `norn inbox` → `norn status`.
+- Also renamed the cleanly merged triage-skill line that named `norn workflow gh-<N> reproduce --to reproduce`.
+- Left main's `.agents/norn/workflows/{triage,reproduce}.yaml` gate prompts as they are (old command names): this branch never edits `.agents/norn/`, same as the old triage.yaml.
+- Typecheck clean; full suite 1421 pass / 0 fail.
 
 ## Resume
 
-Reported `unverified` with /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75b/evidence/criteria.json. Next: a person or an agent with herdr, browser and remote checks B12, B17, B18, B23, B29, B46, B47 and judges B19 as each entry's `how` says.
+Merge committed; nothing left in this step.

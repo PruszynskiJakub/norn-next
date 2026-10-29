@@ -150,7 +150,6 @@ describe("test layout (AGENTS.md)", () => {
     expect({ test: scripts.test, cliDir, ignored }).toEqual({ test: "bun test", cliDir: "packages/cli/test", ignored: "packages/cli" });
     const run = (wf: string) => readFileSync(join(ROOT, ".agents", "norn", "workflows", `${wf}.yaml`), "utf8").match(/^ {4}run: "(.*)"$/m)?.[1];
     expect(["slice", "bug", "story", "quick"].map(run)).toEqual(Array(4).fill("bun install --frozen-lockfile && bun run test:fast && bun run typecheck"));
-    expect(["fix"].map(run)).toEqual(["bun install --frozen-lockfile && bun run test && bun run typecheck"]);
   });
 
   test("quick and story wait for the PR's CI after open-pr and send a red run back to implement", () => {
@@ -184,6 +183,38 @@ describe("test layout (AGENTS.md)", () => {
     expect(steps.ready?.outcomes.reject).toEqual({ to: "prepare", counter: "ready_loop" });
     expect(counters.version_loop).toBeUndefined();
     expect(base).toEqual({ stale: "behind" });
+  });
+});
+
+describe("intake by kind (W9)", () => {
+  type Wf = { start: string; steps: Record<string, { type: string; skill?: string; instructions?: string; outcomes: Record<string, unknown> }> };
+  const workflow = (wf: string) => Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "norn", "workflows", `${wf}.yaml`), "utf8")) as Wf;
+
+  test("triage recommends quick, story or close, all to its confirm gate", () => {
+    const { steps } = workflow("triage");
+    expect(Object.keys(steps.explore?.outcomes ?? {}).sort()).toEqual(["close", "quick", "story"]);
+    expect(steps.confirm?.type).toBe("gate");
+  });
+
+  test("reproduce is one norn-diagnose agent step that reports reproduced or cannot_reproduce to a confirm gate", () => {
+    const { start, steps } = workflow("reproduce");
+    expect(start).toBe("reproduce");
+    expect(Object.keys(steps).sort()).toEqual(["confirm", "reproduce"]);
+    expect(steps.reproduce?.skill).toBe("norn-diagnose");
+    const targets = Object.fromEntries(Object.entries(steps.reproduce?.outcomes ?? {}).map(([k, v]) => [k, (v as { to: string }).to]));
+    expect(targets).toEqual({ reproduced: "confirm", cannot_reproduce: "confirm" });
+    expect(steps.confirm?.type).toBe("gate");
+    expect(steps.confirm?.outcomes.approve).toBe("$done");
+  });
+
+  test("quick's implement turns a red loop from reproduce into a failing test first", () => {
+    expect(workflow("quick").steps.implement?.instructions).toContain("## Reproduce");
+  });
+
+  test("the bug report template applies norn:wf:reproduce", () => {
+    const text = readFileSync(join(ROOT, ".github", "ISSUE_TEMPLATE", "bug_report.md"), "utf8");
+    const fm = Bun.YAML.parse(text.match(/^---\n([\s\S]*?)\n---\n/)?.[1] ?? "") as { labels: string[] };
+    expect(fm.labels).toEqual(["norn:wf:reproduce"]);
   });
 });
 
