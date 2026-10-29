@@ -33,18 +33,15 @@
 
 ## Goal
 
-qa#1: check every story criterion (B1–B71) from the user's side on the merged branch and report verdicts.
+implement#1 (qa_loop 1/2): fix qa#1's blocking finding on B42 — `story reopen` with the story branch gone from the remote must be refused naming the branch.
 
 ## Progress
 
-- Full suite on the branch: 1417 pass, 0 fail; typecheck in the suite run.
-- Real CLI (`bun packages/cli/src/main.ts`) in a throwaway repo: help tiers, verb lists, verb usage, old names, config list/get/set/unset (real TTY prompt via `script`), status, one-time notice, segment, `status --watch` full screen, story create refusals and real gh failure.
-- Stateful verbs through runCli over the test harness (fake remote/runner, real git): approve/reject/answer/update-branch, start, edit, checkout/handoff/close/reopen, run list/view/why/receipt, rerun/cancel, targets and pick-lists, agent protocol.
-- Verdicts: 62 pass, 1 fail (B42), 1 person (B19), 7 unverified (B12, B17, B18, B23, B29, B46, B47: herdr/browser/remote).
-- F1 (B42): `story reopen` when the story's own branch is gone from the remote refuses `unknown_story` "no story branch for gh-6" / "check the story key" — branch not named (packages/cli/src/commands/story-reopen.ts:30).
-- Evidence: /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75 (criteria.json, findings.json, report.md, one file per criterion).
-- qa#1 fail: QA of B1–B71 on the merged branch: suite 1417 pass; 62 pass, 1 fail (B42: story reopen with the story branch gone from the remote refuses 'no story branch for gh-6' / 'check the story key' without naming the branch), B19 person, 7 unverified needing herdr/browser/remote.
+- Red test from the QA repro: `packages/cli/test/story-reopen.test.ts` "the story branch missing from the remote is refused naming the branch" (`git push origin --delete gh-7-add-login-form`, then reopen) failed with `unknown_story` "no story branch for gh-7", as QA saw.
+- Fix in `packages/cli/src/commands/story-reopen.ts` (`noStoryBranch`): when no story branch is found, the branch name is rebuilt from the issue title the way intake made it (`storyBranch(key, slugify(title))`) and the refusal is `branch_missing` "gh-7's story branch gh-7-add-login-form is missing from origin", do_instead "push gh-7-add-login-form to origin, then norn story reopen gh-7" (exit 3, nothing changes). Without a remote or an issue it stays `unknown_story` / "check the story key".
+- story-reopen tests 9/9 pass; typecheck clean; full suite run before reporting.
+- Other non-pass criteria (B12, B17, B18, B19, B23, B29, B46, B47) are herdr/browser/remote/person verdicts, not code defects; untouched.
 
 ## Resume
 
-QA reported fail with F1; the next step fixes story-reopen's missing-story-branch refusal to name the branch and gives a useful do_instead, then re-QA B42.
+Report `norn done done`; QA re-checks B42.
