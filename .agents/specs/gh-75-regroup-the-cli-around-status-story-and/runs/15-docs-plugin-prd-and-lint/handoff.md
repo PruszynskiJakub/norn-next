@@ -32,6 +32,15 @@ Nothing shipped names a removed command (B8, B71): docs, skills, Herdr plugin an
 - implement#1 done: Removed-commands lint in test/repo.test.ts (sources, assets, plugins, .agents/skills, README, CONTRIBUTING, AGENTS.md, PRD; planted norn unstick fails it) plus a PRD §15 noun-tree/S7 test; PRD, docs, skills, comments renamed; Herdr plugin 0.4.0: next → run attach --next, open → status --watch --pane (cockpit pane removed), pick → status --watch. Typecheck and full suite green. Not covered: docs/cookbook.html (outside AC1 scope); AC4 needs real Herdr in QA.
 - review#1 changes_requested: Changes requested. Suite and typecheck green. Blocking: HC rules in SPEC-herdr-cockpit.md still name old commands (B71/AC3); PRD S9 'take prints it'; config.yaml:48 'norn open'; lint passes vacuously if REMOVED_COMMANDS unreadable; next.sh branches on refusal prose not code (P8). Minor: lint reads only quoted text; open.sh Herdr env assumptions for AC4 QA.
 
+- implement#2 (review#1 rework):
+  - F1/AC3: SPEC-herdr-cockpit (HC4, HC9, HC10, HC5 key table), SPEC-cockpit (CP4–CP13, OR1–OR3), SPEC-auto-mode-recovery, SPEC-base-sync-and-qa and LIMITATIONS.md amended onto the new names (decision: amended, not exempted, since the PRD and README cite them as live); all `.agents/SPEC-*.md` and LIMITATIONS.md added to the lint's files. Problem/background prose naming `norn pane` (not a B5 name) left as history.
+  - F2: PRD S9 → "`story checkout` prints it". Bare backticked old verbs in the PRD are all receipt kinds, outcomes or step names (B70).
+  - F3: config.yaml:48 → "with `norn story start`".
+  - F4: the lint now scans whole lines (prose, comments, fences); only "a/an/the norn <word>" (a named thing) is skipped. Every hit per line is reported. Caught and fixed two .ts comments (`unstick --to`, `workflow --to`).
+  - F5: `removedCommands` throws when REMOVED_COMMANDS is not found or empty; test covers a wrapped and a renamed constant.
+  - F6: next.sh branches on `code` (`nothing_to_attach`), via a shared `json_get` in lib.sh that keeps escaped quotes; repo test runs next.sh with stub norn/herdr (red against the old script).
+  - F7 (AC4, QA): unchanged; check open.sh in real Herdr (HERDR_ENV in action env, split placement, `norn` on PATH in the split). F8 nit left.
+
 ## Resume
 
-Implement done; next is the workflow's test/review. Nothing pending.
+Implement rework done; review next. Nothing pending.
