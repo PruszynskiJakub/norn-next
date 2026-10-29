@@ -4,6 +4,7 @@
  * on stdin and stdout, the command was not given `--json`, and it is not an agent session — the launch
  * env of A6 or the orient env present. Anywhere else a prompt is a refusal that names the candidates (B60).
  */
+import { editInTerminal } from "@norn/store";
 import { ORIENT_ENV } from "./agent-unit.ts";
 
 export interface InteractionChoice {
@@ -16,6 +17,10 @@ export interface Interaction {
   readonly tty: boolean;
   /** one of `choices`, starting at `preselect`; null when the person leaves (Esc, Ctrl-C) */
   pick(question: string, choices: readonly InteractionChoice[], preselect: number): Promise<string | null>;
+  /** one line typed after `question`; null on end of input (Ctrl-D) */
+  ask(question: string): Promise<string | null>;
+  /** `text` edited in `$VISUAL` / `$EDITOR` (vi when neither is set); null when the editor fails */
+  edit(text: string): Promise<string | null>;
   /** y/N: true only when the person answers y (yes) */
   confirm(question: string): Promise<boolean>;
 }
@@ -64,6 +69,23 @@ export function terminalInteraction(): Interaction {
         stdin.pause();
       }
     },
+    async ask(question) {
+      if (!tty) return null;
+      process.stderr.write(`${question} `);
+      const stdin = process.stdin;
+      stdin.resume();
+      try {
+        let line = "";
+        for await (const chunk of stdin) {
+          line += chunk.toString();
+          const end = line.indexOf("\n");
+          if (end >= 0) return line.slice(0, end).replace(/\r$/, "");
+        }
+        return null; // Ctrl-D
+      } finally {
+        stdin.pause();
+      }
+    },
     async confirm(question) {
       if (!tty) return false;
       process.stderr.write(`${question} `);
@@ -84,6 +106,9 @@ export function terminalInteraction(): Interaction {
       } finally {
         stdin.pause();
       }
+    },
+    async edit(text) {
+      return tty ? editInTerminal(text, process.env.VISUAL || process.env.EDITOR || "vi") : null;
     },
   };
 }

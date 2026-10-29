@@ -6,7 +6,7 @@ import { cmd } from "@norn/core";
 const U = "gh-12/03";
 const S = "gh-12";
 const today: Record<keyof typeof cmd, [string, ...string[]]> = {
-  config: ["norn config", cmd.config()],
+  config: ["norn config list", cmd.config()],
   answer: [`norn answer ${U} "…"`, cmd.answer(U), `norn answer ${U} "1"`, cmd.answer(U, "1")],
   approve: [`norn approve ${U}`, cmd.approve(U), `norn approve ${U} --reject --reason "…"`, cmd.approve(U, { reject: true })],
   ask: [`norn ask "<question>"`, cmd.ask()],
@@ -32,6 +32,7 @@ const today: Record<keyof typeof cmd, [string, ...string[]]> = {
   runView: [`norn run view ${U}`, cmd.runView(U), "norn run view <unit> --why", cmd.runView(undefined, { why: true })],
   runRerun: [`norn run rerun ${U}`, cmd.runRerun(U), `norn run rerun ${U} --step <a|b>`, cmd.runRerun(U, { step: "<a|b>" }), `norn run rerun ${U} --reset <a|b>`, cmd.runRerun(U, { reset: "<a|b>" })],
   runCancel: [`norn run cancel ${U}`, cmd.runCancel(U), "norn run cancel", cmd.runCancel()],
+  storyCreate: [`norn story create --title "…"`, cmd.storyCreate(), `norn story create --title "…" --workflow <a|b>`, cmd.storyCreate({ workflow: "<a|b>" })],
   sync: ["norn sync", cmd.sync()],
   tick: ["norn tick", cmd.tick()],
   tidy: ["norn tidy", cmd.tidy(), "norn tidy --dry-run", cmd.tidy({ dryRun: true })],

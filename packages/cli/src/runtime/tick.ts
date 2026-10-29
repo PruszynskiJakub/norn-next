@@ -23,7 +23,7 @@ export interface TickReport {
   duration_ms: number;
   sync: SyncReport;
   /** one line per decision: unit, rule, action kind, result */
-  decisions: Array<{ unit: string; rule: string; kind: string; ok: boolean; error?: string }>;
+  decisions: Array<{ unit: string; rule: string; kind: string; ok: boolean; error?: string; story?: string }>;
   /** inbox item ids notified this tick (O3) */
   notified: string[];
   /** trace day file the record went to */
@@ -136,6 +136,7 @@ export async function runTick(ctx: Context, opts: TickOptions = {}): Promise<Tic
       kind: decision.action.kind,
       ok: result.ok,
       ...(result.error ? { error: result.error } : {}),
+      ...(decision.action.kind === "intake_story" ? { story: decision.action.key } : {}),
     }));
     return {
       tick_id,

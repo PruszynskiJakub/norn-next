@@ -1,0 +1,16 @@
+{
+  "kind": "started",
+  "receipt_id": "01M625HE4TCHC8SG2X2722E8SS",
+  "run_id": "01M625HE4TZQMV7DWJ303YP2J4",
+  "step": "merge",
+  "attempt": 2,
+  "at": "2026-10-28T21:09:29.373Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M625HE4T4ZJV68PNTMYQZAWW",
+  "how": "auto",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-75-regroup-the-cli-around-status-story-and--13-config-list-get-set-unset",
+  "machine": "jakubpruszynski@mac",
+  "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD"
+}

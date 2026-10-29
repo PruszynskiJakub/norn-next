@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61Y51FMT5EA0RESBJ68291A",
+  "run_id": "01M61WWNQBZNS8NK1JPC8GN6Z3",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-28T19:00:23.156Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/13",
+  "outcome": "done",
+  "handoff": "config is a noun: list/get as before (old 'config [<key>]' removed, cmd.config prints 'norn config list|get'); set/unset edit one dotted key in the user or repo file via store editConfigLayer (YAML doc edit, layer + merged validation, only changed lines spliced, atomic write), unknown key / invalid value refused with file unchanged, file pick at a terminal else usage error 'pass --user or --repo'. AC1-AC8 in packages/cli/test/config.test.ts; AC9 checked by hand in a throwaway repo (one-line git diff for set and unset). Decision: agents.<name>.<field> on a file without that agent seeds it from the built-in agent (layers replace agents whole). Assets/README still say 'norn config' (docs slice)."
+}

@@ -1,0 +1,8 @@
+set timeout 20
+set keys [lindex $argv 0]
+spawn {*}[lrange $argv 1 end]
+expect "Enter to pick"
+send -- $keys
+expect eof
+catch wait result
+puts "\[exit [lindex $result 3]\]"
