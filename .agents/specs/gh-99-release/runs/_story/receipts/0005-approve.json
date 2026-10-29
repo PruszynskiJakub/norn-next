@@ -1,0 +1,12 @@
+{
+  "kind": "approve",
+  "receipt_id": "01M63R18FG4WZ21D4XTQ6SES5T",
+  "run_id": null,
+  "step": "ready",
+  "attempt": 1,
+  "at": "2026-10-29T11:51:56.657Z",
+  "by": "human",
+  "who": "jakubpruszynski@mac",
+  "slice": null,
+  "head_sha": "ae2b041b89fe6217ad413060052c5602061adb22"
+}
