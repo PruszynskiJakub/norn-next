@@ -2,9 +2,10 @@
 import { existsSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { type Action, type ActionResult, nornTrailers, type UnitRef, type WorktreeSpec } from "@norn/core";
-import { parseDuration, STORY_UNIT_DIR } from "@norn/schema";
+import { type ClaimBlob, parseDuration, STORY_UNIT_DIR } from "@norn/schema";
 import {
   acquireClaim,
+  type ClaimWriteResult,
   deleteMailbox,
   listLeases,
   patchSliceFile,
@@ -12,7 +13,7 @@ import {
   pinWorkflow,
   releaseClaim,
   releaseLease,
-  renewClaim,
+  renewClaims,
   sliceFile as sliceFilePath,
   storyFile,
   writeStoryFile,
@@ -153,13 +154,34 @@ export async function claim(act: ActEnv, a: Extract<Action, { kind: "claim" }>):
     return r.ok ? { ok: true } : { ok: false, error: r.message };
   }
   if (!a.blob) throw new Error("claim without blob");
-  const r = a.op === "acquire" ? await acquireClaim(act.root, remote, a.blob, { now: act.obs.facts.now }) : await renewClaim(act.root, remote, a.blob, a.expected ?? "");
-  if (r.ok) act.claimed.set(story, { blob: a.blob, sha: r.sha });
-  if (r.ok) return { ok: true, detail: { sha: r.sha } };
-  const detail: Record<string, unknown> = { reason: r.reason };
+  if (a.op === "renew") return (await renewAll(act, [a]))[0] as ActionResult;
+  const r = await acquireClaim(act.root, remote, a.blob, { now: act.obs.facts.now });
+  const res = claimed(act, a, r);
   // R3.1 (H6): the intake race is lost — undo what the intake made here, unless it holds work
-  if (a.rule === "claim.acquire.intake" && claimLost({ ok: false, detail })) detail.intake = await dropLostIntake(act, story, a.lost_intake).catch((e: Error) => ({ kept: `clean-up failed: ${e.message}` }));
-  return { ok: false, error: r.message, detail };
+  if (a.rule === "claim.acquire.intake" && !res.ok && claimLost(res)) (res.detail as Record<string, unknown>).intake = await dropLostIntake(act, story, a.lost_intake).catch((e: Error) => ({ kept: `clean-up failed: ${e.message}` }));
+  return res;
+}
+
+/**
+ * T4, H5: renew every claim due this tick in one CAS batch (one push to the remote), one result
+ * per action in order. A lost CAS fails only its own story (R1.2).
+ */
+export async function renewAll(act: ActEnv, as: ReadonlyArray<Extract<Action, { kind: "claim" }>>): Promise<ActionResult[]> {
+  const rs = await renewClaims(
+    act.root,
+    act.obs.remote,
+    as.map((a) => {
+      if (!a.blob) throw new Error("claim without blob");
+      return { blob: a.blob, expected: a.expected ?? "" };
+    }),
+  );
+  return rs.map((r, i) => claimed(act, as[i] as Extract<Action, { kind: "claim" }>, r));
+}
+
+function claimed(act: ActEnv, a: Extract<Action, { kind: "claim" }>, r: ClaimWriteResult): ActionResult {
+  if (!r.ok) return { ok: false, error: r.message, detail: { reason: r.reason } };
+  act.claimed.set(a.unit.story, { blob: a.blob as ClaimBlob, sha: r.sha });
+  return { ok: true, detail: { sha: r.sha } };
 }
 
 /**
@@ -194,8 +216,9 @@ export async function intake(act: ActEnv, a: Extract<Action, { kind: "intake_sto
   if (act.obs.remote && !existsSync(a.worktree.path) && !(await act.git.branchExists(act.root, a.worktree.branch)) && (await act.git.branchExists(act.root, a.worktree.branch, "remote", act.obs.remote)))
     return { ok: true, detail: { skipped: `${a.worktree.branch} already exists on ${act.obs.remote}`, do_instead: `norn take ${a.key}` } };
   const wt = await ensureWorktree(act, a.worktree, unit, specDir);
+  // GR2: a folder an older norn intook keeps its story.md (storyFile reads it), so it is never written twice
   const file = join(a.worktree.path, a.story_file);
-  const written = !existsSync(file);
+  const written = !existsSync(storyFile(dirname(file)));
   if (written) writeStoryFile(file, a.frontmatter, a.body.endsWith("\n") || !a.body ? `\n${a.body}` : `\n${a.body}\n`);
   const committed = await act.commit(a.commit, null, null, null);
   return { ok: true, detail: { worktree: a.worktree.path, ...wt, story_file: written ? a.story_file : "exists", ...committed } };
@@ -203,9 +226,9 @@ export async function intake(act: ActEnv, a: Extract<Action, { kind: "intake_sto
 
 export async function mirror(act: ActEnv, a: Extract<Action, { kind: "update_story_mirror" }>): Promise<ActionResult> {
   const story = act.storyLoc(a.unit.story);
-  if (!story.worktree) return { ok: true, detail: { skipped: "no story worktree; story.md is never written in the main checkout" } };
+  if (!story.worktree) return { ok: true, detail: { skipped: "no story worktree; spec.md is never written in the main checkout" } };
   const r = patchStoryFile(storyFile(join(story.worktree, story.spec_dir)), a.fields, story.worktree);
-  if (!r.ok) throw new Error(`cannot update story.md: ${r.reason}`);
+  if (!r.ok) throw new Error(`cannot update spec.md: ${r.reason}`);
   await act.notify(a.notify);
   return { ok: true, detail: await act.commit(a.commit, null, null, null) };
 }
@@ -233,10 +256,10 @@ export async function cleanupMerged(act: ActEnv, a: Extract<Action, { kind: "cle
       if (act.obs.remote) await act.git.pushRef(act.root, act.obs.remote, { ref, sha: null });
     });
   }
-  // the record stays on the base branch (GR6): mark story.md done there (record.ts; never forced).
+  // the record stays on the base branch (GR6): mark spec.md done there (record.ts; never forced).
   // Deferred (merge not on the base yet) or failed → owed; later ticks retry it (retryRecords).
   // GR6 done record: how the PR landed (merge commit, merged_by, merged_at; P2 ancestry) goes into
-  // story.md `merge:` on the base with the status (record.ts), and is kept in records.json while owed
+  // spec.md `merge:` on the base with the status (record.ts), and is kept in records.json while owed
   const story = act.storyLoc(a.unit.story);
   const facts = act.obs.facts.stories.find((s) => s.key === a.unit.story);
   const merge = facts ? await mergeFacts({ root: act.root, remote: act.obs.remote, git: act.git, base: act.obs.facts.repo.default_branch, story: facts }).catch(() => undefined) : undefined;

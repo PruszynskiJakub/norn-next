@@ -1,0 +1,22 @@
+bun test v1.3.13 (bf2e2cec)
+
+packages/cli/test/debug-gh77.test.ts:
+[gh77] run_check tick: 3478 ms (check 3000 ms); acts=run_check; unblock during check=["no heartbeat on tester@box for 1m — run `norn watch`"]; concurrent tick exit=5 {"error":"another tick is running (pid 67791 since 2099-01-15T10:00:40.000Z)","do_instead":"wait for it to finish; ticks
+57 |   const during = await h.norn("tick").catch((e) => e);
+58 |   const inbox = (await h.norn("inbox", "--json")).value as { groups: { unblock: Array<{ title: string }> } };
+59 |   const r = await pending;
+60 |   console.log(`[gh77] run_check tick: ${Math.round(r.duration_ms)} ms (check ${CHECK_MS} ms); acts=${acts(r)}; unblock during check=${JSON.stringify(inbox.groups.unblock.map((i) => i.title))}; concurrent tick exit=${during.exit} ${JSON.stringify(during.value).slice(0, 120)}`);
+61 |   expect(acts(r)).toContain("run_check");
+62 |   expect(inbox.groups.unblock.map((i) => i.title)).not.toContainEqual(expect.stringContaining("no heartbeat"));
+                                                            ^
+error: expect(received).not.toContainEqual(expected)
+
+Expected to not contain: StringContaining "no heartbeat"
+
+      at <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-77-a-check-runs-inside-the-tick-blocking/packages/cli/test/debug-gh77.test.ts:62:56)
+(fail) gh-77: the tick that starts a check returns at once, and the heartbeat stays up while the check runs [3502.03ms]
+
+ 0 pass
+ 1 fail
+ 2 expect() calls
+Ran 1 test across 1 file. [7.28s]

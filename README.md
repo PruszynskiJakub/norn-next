@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/PruszynskiJakub/norn-next/actions/workflows/ci.yml"><img src="https://github.com/PruszynskiJakub/norn-next/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/PruszynskiJakub/norn-next/releases"><img src="https://img.shields.io/badge/release-v0.10.0-blue" alt="Release v0.10.0"></a>
+  <a href="https://github.com/PruszynskiJakub/norn-next/releases"><img src="https://img.shields.io/badge/release-v0.11.0-blue" alt="Release v0.11.0"></a>
   <img src="https://img.shields.io/badge/bun-%3E%3D1.3-f9f1e1" alt="Bun 1.3 or later">
 </p>
 
@@ -32,7 +32,7 @@ Answer (1)
       $ norn answer gh-18/02 "…"
 
 Approve (1)
-  gh-17      approve-plan: Review the Plan section in story.md and the slice files (edit them if needed). Approve to start the slices, or reject with what to change. · 25m
+  gh-17      approve-plan: Review the Plan section in spec.md and the slice files (edit them if needed). Approve to start the slices, or reject with what to change. · 25m
       $ norn approve gh-17
 
 Running (1)
@@ -141,7 +141,7 @@ For recipes by situation (a first story, an agent that asks or dies, a moved `ma
 
 **Manual and auto mode.** Each story has a mode. The repo default is `default_mode` in the config, and `norn mode <story> auto|manual` switches it.
 
-- **manual** (the default): when an agent step is ready, the inbox shows how to start it. With the `herdr` runner, `norn open <unit>` opens a tab in the unit's worktree with the agent started on the brief. Otherwise, open any agent in the unit's worktree and tell it *"Use the norn skill, then run `norn brief`"* (or type `/norn` with the Claude Code plugin).
+- **manual** (the default): when an agent step is ready, the inbox shows how to start it. With the `herdr` runner, `norn open <unit>` opens a tab in the unit's worktree with the agent started on the brief. Otherwise, open any agent in the unit's worktree and tell it *"Use the norn skill, then run `norn brief`"*.
 - **auto**: norn starts agents itself through the configured `runner` (`herdr` or `headless`). A machine with no runner runs its stories in manual mode.
 
 In both modes, `check` and `git` steps run on their own. Attended steps (`attended: true`, such as refine and plan) and `gate` steps always wait for a person, even in auto mode. When the agent of an attended step has waited for you longer than `limits.attended_wait` (default 2 minutes), the inbox moves it from Running to Your turn.
@@ -182,15 +182,6 @@ A unit pins its workflow when it starts, so editing a file does not affect stori
 **Config** lives in two files with the same keys: `.agents/norn/config.yaml` (committed, what the team agrees on: remote, workflows, limits) and `~/.norn/config.yaml` (yours: runner, machine caps, notifiers, default mode). The repo file wins, except that it can only lower machine caps. The template `norn init` writes groups the keys by who they belong to, with their defaults. `norn config` shows every setting in effect, the file it came from and what it does.
 
 ## Plugins
-
-### Claude Code
-
-`plugins/claude-code` adds a `/norn` command, which loads the norn skill and runs `norn brief`. The plugin has no logic and no skills of its own: the skills come from your repo (`norn init`), and the `norn` CLI must still be on `PATH`. You don't need it: `norn init` already puts the skills where Claude finds them.
-
-```sh
-claude plugin marketplace add ./plugins     # from a checkout of this repo
-claude plugin install norn@norn
-```
 
 ### Herdr
 
@@ -238,16 +229,15 @@ packages/store     @norn/store     .agents/ files, runs/ JSON, claim and mailbox
 packages/adapters  @norn/adapters  git, gh, glab, herdr, headless, claude, codex, opencode, gemini, notify
 packages/view      @norn/view      read model loadProjectView()
 packages/cli       @norn/cli       wiring and commands; assets/ holds skills, workflows, config template
-plugins/                           Claude Code plugin (the /norn command) and Herdr plugin (the cockpit)
-scripts/                           build, plugin sync, smoke test
+plugins/                           Herdr plugin (the cockpit)
+scripts/                           build, golden cases, process check, smoke test
 ```
 
 ```sh
 bun install
-bun test               # all tests, including the check that the plugin is in sync
+bun test               # all tests
 bun run typecheck
 bun run schema:emit    # after changing a schema
-bun run sync:plugin    # after changing the @norn/cli version
 bun run build          # dist/npm/: bundled norn.js + assets/ + package.json, ready to pack
 bun run build:bin      # dist/bin/norn-{darwin-arm64,darwin-x64,linux-x64,linux-arm64}
 ```

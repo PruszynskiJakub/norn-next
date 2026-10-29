@@ -14,7 +14,7 @@
 import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { FileError, NumberedReceipt, SliceFileFacts, UnitRef } from "@norn/core";
-import { STORY_UNIT_DIR, type StoryFrontmatter, type UnitState, parseSliceFileName, parseSpecDirName, sliceKey } from "@norn/schema";
+import { SPEC_FILE, STORY_UNIT_DIR, type StoryFrontmatter, type UnitState, parseSliceFileName, parseSpecDirName, sliceKey } from "@norn/schema";
 import { baseSpecsRoot, defaultBaseRef } from "./base.ts";
 import { type LoadedConfig, loadConfig, loadWorkflows, type WorkflowListing } from "./config.ts";
 import { readSliceFile, readStoryFile } from "./frontmatter.ts";
@@ -120,7 +120,7 @@ export function loadUnit(root: string, specPath: string, unit: UnitRef, opts: { 
   };
 }
 
-/** Read one spec folder (story.md, slices/, runs/). */
+/** Read one spec folder (spec.md, slices/, runs/). */
 export function loadStory(root: string, specPath: string, opts: { includeApplied?: boolean } = {}): StorySnapshot | null {
   const name = specPath.split("/").at(-1) ?? "";
   const m = parseSpecDirName(name);
@@ -130,7 +130,7 @@ export function loadStory(root: string, specPath: string, opts: { includeApplied
   let frontmatter_error: FileError | null = null;
   if (!story.ok)
     frontmatter_error =
-      story.reason === "corrupt" ? story.error : { file: relative(root, storyFile(specPath)), errors: [{ path: "", message: "story.md missing" }] };
+      story.reason === "corrupt" ? story.error : { file: relative(root, storyFile(specPath)), errors: [{ path: "", message: `${SPEC_FILE} missing` }] };
   else if (story.value.frontmatter.id !== key)
     frontmatter_error = { file: relative(root, storyFile(specPath)), errors: [{ path: "/id", message: `must equal folder key '${key}'` }] };
 

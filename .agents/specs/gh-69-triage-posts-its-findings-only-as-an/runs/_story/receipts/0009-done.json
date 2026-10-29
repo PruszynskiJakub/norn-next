@@ -1,0 +1,30 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61EECT9EBAS56KCDNVMPA6S",
+  "run_id": "01M61DXA6APYEK3M0QDH5W1HSQ",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-28T14:25:52.458Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "approve",
+  "handoff": "Change does what story.md asks: triage posts findings only as an issue comment and changes no file; fix/quick read the latest ## Triage comment. No blocking findings; one minor (quick review approve still cites only story.md), one nit. Suite and typecheck green.",
+  "findings": [
+    {
+      "severity": "minor",
+      "title": "quick review's approve still judges only against story.md",
+      "id": "F1",
+      "file": ".agents/norn/workflows/quick.yaml",
+      "line": 45,
+      "detail": "implement now reads 'story.md (the issue) and the triage findings in the issue's latest `## Triage` comment', but review's approve means 'the change does what story.md asks'. With story.md no longer holding the triage, a reviewer could treat triage-added scope (e.g. this story's fix.yaml/quick.yaml edits) as unrequested. Story: 'The decide step (and anything after it) reads the triage from the issue comment'.\nAxis: spec\nSuggestion: Optionally say 'what story.md and the triage comment ask' in the review step's approve meaning/instructions."
+    },
+    {
+      "severity": "nit",
+      "title": "Unwrapped long line in folded block",
+      "id": "F2",
+      "file": ".agents/norn/workflows/fix.yaml",
+      "line": 17,
+      "detail": "The edited line runs ~170 chars while the surrounding `>-` text wraps near 100.\nAxis: standards\nSuggestion: Rewrap to match neighbours."
+    }
+  ]
+}

@@ -12,7 +12,7 @@ A person asks for this after a story's pull request merges. You read what the de
 
 The person names the story: a key such as `gh-123`, or its folder `.agents/specs/<key>-<slug>/`. Ask if they did not. Read only: never edit anything under `runs/`, and run no command that changes the repository or the remote.
 
-- **The spec**: `story.md` (Behaviour items, Plan) and each `slices/<nn>-<slug>.md` (acceptance, frontmatter `criteria` with `verifier` and `needs`).
+- **The spec**: `spec.md` (Behaviour items, Plan) and each `slices/<nn>-<slug>.md` (acceptance, frontmatter `criteria` with `verifier` and `needs`).
 - **The delivery record**: one folder per unit under `runs/`, `runs/_story/` for the story and `runs/<nn>-<slug>/` for each slice. In each:
   - `state.json`: `counters` (name: times its loop was taken), `visits` (stage name: entries), `attempt`, `status`, `park` (`kind`, `reason`), `nudges_used`, `retries_used`.
   - `workflow.yaml`: the definition this unit ran, pinned when it began. Its `counters` give each `max`; each edge with a `counter` is a loop.

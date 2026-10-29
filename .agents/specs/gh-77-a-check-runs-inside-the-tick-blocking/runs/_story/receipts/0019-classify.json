@@ -1,0 +1,22 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M61N87PEE705C1312Y3YTQB3",
+  "run_id": "01M61N7XE66RXVGYXM4Y4PGPPB",
+  "step": "update",
+  "attempt": 3,
+  "at": "2026-10-28T16:24:50.638Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M61N7XE62VQTZNCC1N8ZMK5C",
+  "outcome": "done",
+  "rule": "git.update",
+  "detail": "merged main (a40660f08ac7) into gh-77-a-check-runs-inside-the-tick-blocking at ad41eb318929",
+  "route": "test",
+  "base": {
+    "ref": "refs/remotes/origin/main",
+    "sha": "a40660f08ac7213f82e78d2f242ede265ff6fab5",
+    "conflicts": [],
+    "head": "ad41eb318929427f5d4928fb2ac6a031d5a50479",
+    "merged": true
+  }
+}

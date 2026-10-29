@@ -2,8 +2,13 @@
  * Rules decide and the inbox both read off Facts — each defined once here, so the tick that acts
  * and the inbox that tells a person never disagree about them.
  */
-import { type Mode, parseDuration, type ResolvedConfig } from "@norn/schema";
+import { type Mode, parseDuration, type ResolvedConfig, type Step } from "@norn/schema";
 import type { Facts, RunFacts, StoryFacts, UnitFacts } from "./facts.ts";
+
+/** C5: when `norn check-run` holds the unit's check lease at a check step, the lease's time (running since then, not queued); else null. */
+export function checkRunningSince(step: Step | null | undefined, uf: UnitFacts): string | null {
+  return step?.type === "check" && uf.lease?.kind === "check" && uf.state && !uf.state.park ? uf.lease.created_at : null;
+}
 
 /** MO2: manual if the step is attended or no runner is configured; else the story's mode. */
 export function effectiveMode(story: Mode, attended: boolean, runner: string | null): { mode: Mode; downgraded: boolean } {
@@ -15,7 +20,7 @@ export function effectiveMode(story: Mode, attended: boolean, runner: string | n
 /** The story's own unit (slice null), or null before it has facts. */
 export const storyUnit = (story: StoryFacts): UnitFacts | null => story.units.find((u) => u.unit.slice === null) ?? null;
 
-/** GR6: the story unit reached `$done`, or story.md says done/dropped — finished, never "unclaimed". */
+/** GR6: the story unit reached `$done`, or spec.md says done/dropped — finished, never "unclaimed". */
 export function storyFinished(story: StoryFacts): boolean {
   const status = story.frontmatter?.status;
   if (status === "done" || status === "dropped") return true;

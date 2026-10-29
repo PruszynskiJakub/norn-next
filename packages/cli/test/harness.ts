@@ -157,8 +157,10 @@ export interface Harness {
   notifier: FakeNotifier;
   deps: CliDeps;
   norn(...argv: string[]): Promise<CliResult>;
-  /** one `norn tick`; throws unless it exits 0 */
+  /** one `norn tick`; throws unless it exits 0. Waits for the `norn check-run`s it started (C5), so the next tick applies their receipts */
   tick(...flags: string[]): Promise<TickReport>;
+  /** wait for every `norn check-run` a tick started to end */
+  checksDone(): Promise<void>;
   git(args: string[], cwd?: string): string;
   write(path: string, text: string): void;
   read(path: string): string;
@@ -199,8 +201,10 @@ export async function createHarness(): Promise<Harness> {
   const remote = new FakeRemote();
   const runner = new FakeRunner();
   const notifier = new FakeNotifier();
+  const checks: Promise<void>[] = [];
   const deps: CliDeps = {
     cwd: root,
+    onCheckStarted: (exited) => void checks.push(exited),
     env: { ...process.env, NORN_HOME_DIR: home, USER: "tester", NORN_MACHINE: "box", NORN_HOOK_COMMAND: "norn hook" },
     clock,
     ports: { remote, runner, notifiers: [notifier] },
@@ -219,7 +223,11 @@ export async function createHarness(): Promise<Harness> {
     async tick(...flags) {
       const r = await runCli(["tick", ...flags], deps);
       if (r.exit !== 0) throw new Error(`tick failed: ${r.stdout}`);
+      await h.checksDone();
       return r.value as TickReport;
+    },
+    async checksDone() {
+      while (checks.length) await checks.shift();
     },
     git: (args, cwd = root) => sh(cwd, args),
     write(path, text) {

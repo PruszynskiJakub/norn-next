@@ -28,7 +28,7 @@ steps:
       done: { to: test, means: "the repro (and each rework point) is a passing test" }
   test:
     type: check
-    run: "bun install --frozen-lockfile && bun run test && bun run typecheck"
+    run: "bun install --frozen-lockfile && bun run test:fast && bun run typecheck"
     timeout: 10m
     outcomes: { pass: review, fail: { to: implement, counter: test_loop } }
   review:

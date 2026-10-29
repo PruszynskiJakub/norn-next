@@ -14,7 +14,7 @@ import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../cri
 import type { Facts, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
 import { sha256 } from "../hash.ts";
-import { effectiveMode, firstLine, heartbeatUp, prBaseBranch, sessionStartedNoTurn, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
+import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, prBaseBranch, sessionStartedNoTurn, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
 import { optionsLine } from "../prompt.ts";
 import { epoch, formatAge, iso } from "../time.ts";
 import { baseUpdateStep, edgeOf, edgesOf, isStale, stepOf } from "../workflow.ts";
@@ -532,6 +532,8 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       }
       // R5.5 (A8): an auto step waits for the heartbeat, not for a person — no manual start hint
       if (step?.type === "agent" && heartbeatDown(facts, config)) return item("running", `${st.step} #${st.attempt} (waiting for the heartbeat — norn watch)`, "norn watch", st.step_entered_at);
+      const checkSince = checkRunningSince(step, uf);
+      if (checkSince) return item("running", `${st.step} #${st.attempt} (check running)`, `norn trace ${key}`, checkSince);
       return item("running", `${st.step} #${st.attempt} (queued)`, `norn trace ${key}`, st.step_entered_at);
     }
     case "done": {
@@ -540,7 +542,7 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
         if (merge) return merge;
       }
       if (facts.now - epoch(st.updated_at) > RECENT_MS) return null;
-      // story.md says `done` once norn saw the merge (GR6) — the durable record when no PR was fetched
+      // spec.md says `done` once norn saw the merge (GR6) — the durable record when no PR was fetched
       const waiting = uf.unit.slice === null && knownPr(story)?.state !== "merged" && !story.merged_by_ancestry && story.frontmatter?.status !== "done";
       return item("recently_done", waiting ? "workflow done — waiting for the PR merge (GR6)" : "done", `norn trace ${key}`, st.updated_at);
     }
@@ -695,7 +697,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
       continue;
     }
     if (story.frontmatter_error) {
-      add({ id: `corrupt:${story.key}:story.md`, group: "unblock", story: story.key, slice: null, step: null, title: `corrupt: ${story.frontmatter_error.file} failed validation (S2)`, command: `norn why ${story.key}`, since: iso(facts.now) });
+      add({ id: `corrupt:${story.key}:spec.md`, group: "unblock", story: story.key, slice: null, step: null, title: `corrupt: ${story.frontmatter_error.file} failed validation (S2)`, command: `norn why ${story.key}`, since: iso(facts.now) });
       continue;
     }
     add(notStartedItem(story, facts, config));

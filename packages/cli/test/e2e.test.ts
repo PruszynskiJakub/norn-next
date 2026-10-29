@@ -203,12 +203,12 @@ describe("a story through the slice workflow", () => {
     h.remote.issues = [issue(7, "Add login form", ["norn", "norn:wf:mini"])];
   });
 
-  test("tick 1: sync → intake (GR2): story branch, worktree, story.md, slot, marker", async () => {
+  test("tick 1: sync → intake (GR2): story branch, worktree, spec.md, slot, marker", async () => {
     const r = await h.tick();
     expect(r.sync).toEqual({ ran: true, ok: true });
     expect(kinds(r)).toEqual(["gh-7 intake_story"]);
-    expect(existsSync(join(storyWt(), spec, "story.md"))).toBe(true);
-    const story = h.read(join(storyWt(), spec, "story.md"));
+    expect(existsSync(join(storyWt(), spec, "spec.md"))).toBe(true);
+    const story = h.read(join(storyWt(), spec, "spec.md"));
     expect(story).toContain("workflow: mini");
     expect(story).toContain("status: new");
     expect(story).toContain("As a user I want to log in.");
@@ -229,7 +229,7 @@ describe("a story through the slice workflow", () => {
     expect(st).toMatchObject({ step: "plan", status: "ready", mode: "auto", workflow: "mini" });
     expect(h.read(join(storyRuns(), "workflow.yaml"))).toBe(MINI);
     expect(h.read(join(storyRuns(), "handoff.md"))).toContain("Step: plan (attempt 1)");
-    expect(h.read(join(storyWt(), spec, "story.md"))).toContain("status: active");
+    expect(h.read(join(storyWt(), spec, "spec.md"))).toContain("status: active");
     expect(h.git(["ls-remote", "origin", "refs/heads/gh-7-add-login-form"])).not.toBe("");
   });
 

@@ -12,6 +12,8 @@ import {
   readLocalClaim,
   releaseClaim,
   renewClaim,
+  renewClaims,
+  setSpawnObserver,
 } from "../src/index.ts";
 import { gitOk } from "../src/git.ts";
 import { AT, tmp } from "./helpers.ts";
@@ -101,6 +103,87 @@ describe("claims (T2–T6)", () => {
     expect(r.ok).toBe(true);
     expect(await acquireClaim(a, null, blob("x@y", ulid()), { now: NOW })).toMatchObject({ ok: false, reason: "held" });
     if (r.ok) expect((await releaseClaim(a, null, "gh-12", r.sha)).ok).toBe(true);
+  });
+});
+
+describe("batched renewals (T4, H5)", () => {
+  const STORIES = ["gh-1", "gh-2", "gh-3"];
+  async function claimed(a: string, hb: string) {
+    const out: Array<{ blob: ClaimBlob; expected: string }> = [];
+    for (const story of STORIES) {
+      const r = await acquireClaim(a, "origin", { ...blob("jakub@mac", hb), story }, { now: NOW });
+      if (!r.ok) throw new Error(r.message);
+      out.push({ blob: { ...blob("jakub@mac", hb, 900_000), story, renewed_at: iso(NOW + 1) }, expected: r.sha });
+    }
+    return out;
+  }
+  async function pushesDuring<T>(f: () => Promise<T>): Promise<{ value: T; pushes: string[][] }> {
+    const pushes: string[][] = [];
+    const prev = setSpawnObserver(({ argv }) => {
+      if (argv.includes("push")) pushes.push([...argv]);
+    });
+    try {
+      return { value: await f(), pushes };
+    } finally {
+      setSpawnObserver(prev);
+    }
+  }
+
+  test("every renewal goes out in one push and is mirrored locally", async () => {
+    const { a, b } = await setup();
+    const renewals = await claimed(a, ulid());
+    const { value, pushes } = await pushesDuring(() => renewClaims(a, "origin", renewals));
+    expect(pushes).toHaveLength(1);
+    expect(value.map((r) => r.ok)).toEqual([true, true, true]);
+    for (const [i, story] of STORIES.entries()) {
+      const r = value[i];
+      if (!r?.ok) throw new Error("unreachable");
+      expect(await readLocalClaim(a, story)).toMatchObject({ state: "present", sha: r.sha, blob: { renewed_at: iso(NOW + 1) } });
+      expect(await readClaim(b, "origin", story)).toMatchObject({ state: "present", sha: r.sha });
+    }
+  });
+
+  test("one stale renewal among several fails alone; the others land", async () => {
+    const { a } = await setup();
+    const renewals = await claimed(a, ulid());
+    const stale = renewals.map((r, i) => (i === 1 ? { ...r, expected: "0".repeat(40) } : r));
+    const before = await readLocalClaim(a, "gh-2");
+    const res = await renewClaims(a, "origin", stale);
+    expect(res[0]).toMatchObject({ ok: true });
+    expect(res[1]).toMatchObject({ ok: false, reason: "stale" });
+    expect(!res[1]?.ok && res[1]?.message).toContain("refs/norn/claims/gh-2");
+    expect(!res[1]?.ok && res[1]?.message).not.toContain("refs/norn/claims/gh-1");
+    expect(res[2]).toMatchObject({ ok: true });
+    expect(await readLocalClaim(a, "gh-2")).toEqual(before);
+    expect(await readClaim(a, "origin", "gh-3")).toMatchObject({ state: "present", blob: { renewed_at: iso(NOW + 1) } });
+  });
+
+  test("an unreachable remote fails every renewal as network", async () => {
+    const { a } = await setup();
+    const renewals = await claimed(a, ulid());
+    await gitOk(a, ["remote", "set-url", "origin", join(a, "..", "gone.git")]);
+    const res = await renewClaims(a, "origin", renewals);
+    expect(res.map((r) => !r.ok && r.reason)).toEqual(["network", "network", "network"]);
+  });
+
+  test("without a remote each renewal is its own local CAS", async () => {
+    const { a } = await setup();
+    const hb = ulid();
+    const renewals: Array<{ blob: ClaimBlob; expected: string }> = [];
+    for (const [i, story] of STORIES.entries()) {
+      const r = await acquireClaim(a, null, { ...blob("jakub@mac", hb), story }, { now: NOW });
+      if (!r.ok) throw new Error(r.message);
+      renewals.push({ blob: { ...blob("jakub@mac", hb, 900_000), story }, expected: i === 1 ? "0".repeat(40) : r.sha });
+    }
+    const res = await renewClaims(a, null, renewals);
+    expect(res.map((r) => r.ok || r.reason)).toEqual([true, "stale", true]);
+  });
+
+  test("no renewals, no push", async () => {
+    const { a } = await setup();
+    const { value, pushes } = await pushesDuring(() => renewClaims(a, "origin", []));
+    expect(value).toEqual([]);
+    expect(pushes).toHaveLength(0);
   });
 });
 

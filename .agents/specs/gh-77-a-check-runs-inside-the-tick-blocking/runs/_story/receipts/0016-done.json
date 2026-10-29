@@ -1,0 +1,83 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61KZVPJ0B1XKQ33S1BBC0HF",
+  "run_id": "01M61KGEBDT2KTF5D0JRBPKXX7",
+  "step": "review",
+  "attempt": 2,
+  "at": "2026-10-28T16:02:47.634Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "changes_requested",
+  "handoff": "review#2: fix addresses the cause; review#1 points addressed; typecheck + 1213 tests green. Blocking F1: runCheckOrder releases the lease by substring-matching run_id in raw unvalidated lease JSON (AGENTS: every JSON read validated) — add a store helper that reads the lease validated and releases only on matching run_id. Minor: replaceIfUnchanged gap (F2), null identify releases a live child's lease (F3), duplicated check-running predicate core/view (F4), no tests for parallel checks/K3 rerun (F5), heartbeat-item attribution fallback untouched (F6). Nits F7-F9.",
+  "findings": [
+    {
+      "severity": "blocking",
+      "title": "Lease ownership is decided by substring-matching raw, unvalidated lease JSON",
+      "id": "F1",
+      "file": "packages/cli/src/runtime/act/check.ts",
+      "line": 267,
+      "detail": "The finally block of runCheckOrder runs `readText(join(leasesDir(order.home), order.lease_file))?.includes(`\"${order.run_id}\"`)`. AGENTS.md Rules (S1/S2) say: 'Every JSON read is validated against @norn/schema'. This read is also cli reaching into the store's lease layout (leasesDir + raw text) instead of going through a store helper.\nAxis: standards\nSuggestion: Add a store helper, e.g. `releaseLeaseOf(home, file, run_id)`. It reads with readJsonFile('lease', …), releases only when lease.run_id matches (ideally with removeIfUnchanged on the raw read), and returns whether it released. Call it here. Cover it with a test in leases-lock.test.ts: a reclaimed lease with another run_id stays."
+    },
+    {
+      "severity": "minor",
+      "title": "replaceIfUnchanged leaves a gap where the lease file is absent",
+      "id": "F2",
+      "file": "packages/store/src/lock.ts",
+      "line": 667,
+      "detail": "The function renames path → aside, then next → path. In between, `check-N.json` does not exist. Another repo's tick on the same machine (~/.norn is shared) can createExclusive the same slot in that gap. The final renameSync then overwrites that lease silently, and a sweep in that gap does not see this run's lease. The window is microseconds.\nAxis: standards\nSuggestion: Finish with linkSync(next, path), which fails with EEXIST and returns false (then unlink next), instead of renameSync. Or document the window next to F4's."
+    },
+    {
+      "severity": "minor",
+      "title": "A null identify(pid) for a live child releases the lease",
+      "id": "F3",
+      "file": "packages/cli/src/runtime/act/check.ts",
+      "line": 197,
+      "detail": "`if (!holder) releaseLease(...)` treats any null from identify as 'already gone'. A failed ps probe also returns null while `norn check-run` is still running. The next tick then sees no lease and no receipt and starts the same check again. identify throwing takes the catch path: it unlinks the order and releases the lease while the child may still run.\nAxis: standards\nSuggestion: Before releasing, check with process liveness (kill 0) that the pid is really gone. If it is alive but unidentified, keep the tick's lease and log."
+    },
+    {
+      "severity": "minor",
+      "title": "The 'check running' predicate is duplicated in core and view",
+      "id": "F4",
+      "file": "packages/view/src/load.ts",
+      "line": 763,
+      "detail": "items.ts uses `step?.type === \"check\" && uf.lease?.kind === \"check\"`. load.ts uses the same test plus `!!st && !st.park`. The two can drift (Duplicated Code).\nAxis: standards\nSuggestion: Add one exported predicate in core (e.g. `checkRunning(step, uf, st)`) and use it in both places."
+    },
+    {
+      "severity": "minor",
+      "title": "Parallel checks, claim renewal and the K3 rerun of a dead check-run are not tested",
+      "id": "F5",
+      "detail": "The spec says 'Checks up to `max_checks` actually run in parallel' and 'claims keep being renewed'. The act/check.ts header says a dead check-run's lease is reclaimed and the check reruns. No test starts two checks in one tick, advances past a claim renewal while a check runs, or kills a check-run.\nAxis: spec\nSuggestion: Add a test where one tick starts two checks and both orders or leases are live at once. Optionally add one that kills the check-run pid and expects run_check again."
+    },
+    {
+      "severity": "minor",
+      "title": "The 'no heartbeat' item still attaches to the first held story",
+      "id": "F6",
+      "file": "packages/core/src/inbox/items.ts",
+      "detail": "Wanted, 'Until then, at minimum: … attached to a story that needs the heartbeat … rather than to the first held story.' This is a fallback, and the main fix makes it far rarer. Still, heartbeatItem still uses `facts.stories.find((s) => s.claim.state === \"mine\")`, so the gh-61 case remains when watch is really down.\nAxis: spec\nSuggestion: Leave it out of this fix and have the person file it as its own issue, or pick a held auto story with live units."
+    },
+    {
+      "severity": "nit",
+      "title": "slice(0, -3) depends on group order",
+      "id": "F7",
+      "file": "packages/cli/src/commands/help.ts",
+      "line": 56,
+      "detail": "The 'Other' group is inserted before the last three groups because those are the non-person ones. Adding a group breaks this silently.\nAxis: standards\nSuggestion: Split HELP_GROUPS by `for === \"person\"`."
+    },
+    {
+      "severity": "nit",
+      "title": "sweepCheckOrders builds a set that contains false and null",
+      "id": "F8",
+      "file": "packages/cli/src/runtime/act/check.ts",
+      "line": 273,
+      "detail": "`.map((e) => e.lease.kind === \"check\" && e.lease.run_id)` adds false and null values to a set of run ids. It works only by accident.\nAxis: standards\nSuggestion: Filter first, then map."
+    },
+    {
+      "severity": "nit",
+      "title": "The comment overstates what stays off disk",
+      "id": "F9",
+      "file": "packages/cli/src/runtime/act/check.ts",
+      "line": 150,
+      "detail": "The comment says 'secrets in it never reach the disk'. That holds only for the process env: `.env.norn` and the action env are still written into the order (mode 0600).\nAxis: standards\nSuggestion: Reword: 'the process env is inherited, not written; the order holds only .env.norn, the step env and NORN_HOME'."
+    }
+  ]
+}

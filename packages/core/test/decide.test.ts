@@ -3,6 +3,7 @@ import type { LeaseFile, UnitState } from "@norn/schema";
 import { type Action, legacyAction } from "../src/actions.ts";
 import { applyReceipts } from "../src/apply.ts";
 import { decide, isSideAction, unitDecision } from "../src/decide/index.ts";
+import { buildInbox } from "../src/inbox/items.ts";
 import { isIntakeCommit, nornTrailers } from "../src/policy.ts";
 import type { RunFacts, StoryFacts, UnitFacts } from "../src/facts.ts";
 import type { WorktreeStatus } from "../src/ports.ts";
@@ -279,6 +280,13 @@ describe("check, git, gate steps (W2)", () => {
     leased.units[0]!.lease = { version: 1, kind: "check", repo: "/r", story: "gh-1", slice: null, run_id: RUN, holder: { pid: 1, pid_start: "1" }, created_at: at() };
     expect(kinds(facts([leased]))).toEqual(["gh-1 noop check.running"]);
   });
+  test("a check whose job holds the lease shows as running since the lease, not queued (C5)", () => {
+    const title = (s: StoryFacts) => buildInbox(facts([s]), CONFIG).groups.running.map((i) => `${i.title} ${i.since}`);
+    expect(title(storyAt("test"))).toEqual([expect.stringContaining("test #1 (queued)")]);
+    const leased = storyAt("test");
+    leased.units[0]!.lease = { version: 1, kind: "check", repo: "/r", story: "gh-1", slice: null, run_id: RUN, holder: { pid: 1, pid_start: "1" }, created_at: at(T0 - 5 * 60_000) };
+    expect(title(leased)).toEqual([`test #1 (check running) ${at(T0 - 5 * 60_000)}`]);
+  });
   test("open-pr runs git with the spec folder's pr.md as body file; an already open PR runs it too (GR9)", () => {
     const pr = { base: "main", title: "Login form", body_file: expect.stringMatching(/^\.agents\/specs\/gh-1-[^/]+\/pr\.md$/), body: expect.stringMatching(/^Closes /) };
     expect(only(facts([storyAt("open-pr")]))).toMatchObject({ kind: "run_git", action: "open-pr", pr });
@@ -423,7 +431,7 @@ describe("intake and start (GR2, W8, W9)", () => {
       kind: "intake_story",
       key: "gh-5",
       slug: "fix-lodz-bug",
-      story_file: ".agents/specs/gh-5-fix-lodz-bug/story.md",
+      story_file: ".agents/specs/gh-5-fix-lodz-bug/spec.md",
       worktree: { path: "/r-worktrees/gh-5-fix-lodz-bug", branch: "gh-5-fix-lodz-bug", from: "main" },
       frontmatter: { workflow: "solo", status: "new", intake_at: at(), body_hash: sha256("b") },
     });

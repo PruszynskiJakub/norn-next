@@ -100,8 +100,10 @@ function wrap(root: string, deps: CliDeps, runner: FakeRunner): Clone {
     norn: (...argv) => runCli(argv, deps),
     at: (cwd, ...argv) => runCli(argv, { ...deps, cwd }),
     async tick(...flags) {
-      const r = await runCli(["tick", ...flags], deps);
+      const checks: Promise<void>[] = [];
+      const r = await runCli(["tick", ...flags], { ...deps, onCheckStarted: (exited) => void checks.push(exited) });
       if (r.exit !== 0) throw new Error(`tick failed: ${r.stdout}`);
+      await Promise.all(checks); // the check-run receipt is the next tick's to apply (C5)
       return r.value as TickReport;
     },
   };
@@ -294,7 +296,7 @@ describe("claim races (T3) and forced takes (T5)", () => {
     expect(existsSync(sliceWt(B.root))).toBe(false);
     expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-7"])).toBe("");
     sh(h.root, ["fetch", "-q", "origin"]);
-    expect(h.git(["show", `origin/gh-7-add-login-form:${SPEC}/story.md`])).toContain("status: dropped");
+    expect(h.git(["show", `origin/gh-7-add-login-form:${SPEC}/spec.md`])).toContain("status: dropped");
     expect(h.git(["show", "origin/gh-7/01-form:wip.txt"])).toBe("unfinished");
     expect(sh(B.root, ["branch", "--list", "gh-7*"])).toBe("");
     // dropping an unknown story is refused with what to do instead

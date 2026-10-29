@@ -8,8 +8,8 @@ import { defineCommand } from "../command.ts";
 import { rendered } from "../output.ts";
 import { bundledSkills } from "../runtime/workflows.ts";
 
-/** Who runs a command: a person, the agent doing a step, or the agent's hooks (never by hand). */
-export type CommandFor = "person" | "agent" | "hooks";
+/** Who runs a command: a person, the agent doing a step, the agent's hooks or a tick (never by hand). */
+export type CommandFor = "person" | "agent" | "hooks" | "tick";
 
 /** Help groups in print order; a command missing here lands in "Other" (for a person). */
 const HELP_GROUPS: ReadonlyArray<{ title: string; for: CommandFor; commands: readonly string[] }> = [
@@ -20,6 +20,7 @@ const HELP_GROUPS: ReadonlyArray<{ title: string; for: CommandFor; commands: rea
   { title: "Housekeeping", for: "person", commands: ["tidy", "uninstall", "help"] },
   { title: "Agent protocol: the only commands an agent runs", for: "agent", commands: ["brief", "done", "ask", "stuck"] },
   { title: "Called by the agent's hooks, not by hand", for: "hooks", commands: ["hook"] },
+  { title: "Started by a tick, not by hand", for: "tick", commands: ["check-run"] },
 ];
 
 /** How a bundled skill is used (§16): only an agent loads skills; some steps also need a person with it. */
@@ -52,7 +53,7 @@ function formatHelp(commands: readonly Command[], skills: readonly string[] = []
   const row = (c: Command) => `  norn ${c.name.padEnd(width)}${plainSummary(c.summary)}`;
   const grouped = new Set(HELP_GROUPS.flatMap((g) => g.commands));
   const other = { title: "Other", commands: commands.map((c) => c.name).filter((n) => !grouped.has(n)) };
-  const groups = [...HELP_GROUPS.slice(0, -2), other, ...HELP_GROUPS.slice(-2)];
+  const groups = [...HELP_GROUPS.filter((g) => g.for === "person"), other, ...HELP_GROUPS.filter((g) => g.for !== "person")];
   const out = ["norn — deliver software stories with coding agents; code decides the next step, agents do it.", "", ...AGENT_NOTE, ""];
   for (const g of groups) {
     const cs = g.commands.flatMap((n) => commands.filter((c) => c.name === n));
