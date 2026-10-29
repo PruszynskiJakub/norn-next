@@ -21,7 +21,7 @@ Picked by the issue label `norn:wf:<name>` (PRD W9); without one, `triage` runs.
 | `norn:wf:fix` | fix | Bugs: reproduce → fix test-first → test → review → PR. |
 | `norn:wf:quick` | quick | Refactors, docs, chores, small changes: implement → test → review → PR. |
 | `norn:wf:spec` | spec | Design: refine with you, amend `.agents/PRD.md`, review → PR. No code. |
-| `norn:wf:release` | release | Changelog, version bump, build and smoke → PR. Started by `/release-start`. |
+| `norn:wf:release` | release | Changelog, version bump → PR, wait for its CI. Started by `/release-start`. |
 
 ## Labels
 
@@ -58,7 +58,7 @@ Run these yourself in Claude Code; agents never invoke them.
 
 ## Releases
 
-Run `/release-start`. The release workflow rebuilds `CHANGELOG.md` from the squash commits since the last tag, proposes a version at the `confirm-version` gate, bumps it, builds and smokes the binaries and opens the PR. When you merge it, CI tags `vX.Y.Z` and publishes in the same run. Do not edit `CHANGELOG.md` in a regular PR.
+Run `/release-start`. The release workflow rebuilds `CHANGELOG.md` from the squash commits since the last tag, proposes and bumps a version, opens the PR and waits for its CI; you judge the version and the changelog at `ready`. When you merge it, CI tags `vX.Y.Z` and publishes in the same run. Do not edit `CHANGELOG.md` in a regular PR.
 
 ## The bypass
 
