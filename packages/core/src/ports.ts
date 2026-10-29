@@ -232,7 +232,7 @@ export interface GitPort {
   fetch(cwd: string, remote: string, refspecs: string[], opts?: { quiet?: boolean }): Promise<void>;
   /** `git pull --ff-only` equivalent for the current branch. */
   fastForward(cwd: string, onto: string): Promise<{ ok: boolean }>;
-  /** Rebase current branch of cwd onto `onto`; aborts and reports files on conflict. */
+  /** Rebase current branch of cwd onto `onto`, keeping merge commits; aborts and reports files on conflict. */
   rebase(cwd: string, onto: string): Promise<RebaseResult>;
   /** Is `ancestor` an ancestor of `descendant`? */
   isAncestor(cwd: string, ancestor: string, descendant: string): Promise<boolean>;

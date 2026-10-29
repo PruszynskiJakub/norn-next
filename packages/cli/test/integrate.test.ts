@@ -105,6 +105,24 @@ describe("integrate (W2, K6)", () => {
     expect(await git.revParse(story, "HEAD")).toBe(storySha);
     expect(await git.fastForward(story, "gh-4/01-a")).toEqual({ ok: false });
   });
+
+  test("conflict resolved by merging the story branch stays resolved (gh-80)", async () => {
+    const { story, slice } = await storyAndSlice();
+    writeFileSync(join(story, "a.txt"), "story side\n");
+    await git.commit(story, { message: "story edit", trailers: {} });
+    writeFileSync(join(slice, "a.txt"), "slice side\n");
+    await git.commit(slice, { message: "slice edit", trailers: {} });
+    expect(await integrate(git, { sliceCwd: slice, storyBranch: "gh-4-s" })).toEqual({ outcome: "conflict", files: ["a.txt"] });
+    // the merge step (norn-merge: merge by default) brings the story branch in and resolves it
+    expect((await bunExec(["git", "merge", "--no-ff", "gh-4-s"], { cwd: slice, env: ENV })).code).toBe(1);
+    writeFileSync(join(slice, "a.txt"), "both sides\n");
+    await sh(slice, "commit", "-qam", "resolve");
+    expect(await git.isAncestor(slice, "gh-4-s", "HEAD")).toBe(true);
+    const res = await integrate(git, { sliceCwd: slice, storyBranch: "gh-4-s" });
+    expect(res.outcome).toBe("done");
+    expect(await sh(story, "show", "HEAD:a.txt")).toBe("both sides");
+    expect((await git.status(story)).clean).toBe(true);
+  });
 });
 
 describe("update and remote sync (BS3, BS3.3a)", () => {
