@@ -28,19 +28,20 @@
 - agent.start: qa run 01M64SM0D5XCP2VV0SNX14GQVM
 <!-- norn:heartbeat:end -->
 
+
 ## Goal
 
-resolve#1: merge origin/main (13e0986a) into the story branch, resolving 17 conflicts by intent.
+qa#1: check every story criterion (B1–B71) from the user's side on the merged branch and report verdicts.
 
 ## Progress
 
-- Merged 13e0986a: main's spec.md rename (GR2), check-run (C5), gh-79 corrupt hints, zombie fix, plugin removal, H5 claim batching kept; printed commands moved to the noun–verb names (`run view --why`, `run rerun`, `run list`, `story edit --workflow`, `story start`).
-- `check-run` is a hidden help tier (`for: "tick"`), like hook/tick.
-- Semantic fix: `runtime/closed.ts` (story close/reopen) reads the pushed `spec.md`, falling back to `story.md` (GR2); reopen/close messages and tests say spec.md.
-- Main's new tests moved to the new commands (decide gh-79 test, recovery `story checkout --force`, check-run `status --json` / `story list`, help --all lists check-run).
-- Golden runtime-3aec7a560471 kept main's facts with the `run view --why` command.
-- resolve#1 done: Merged origin/main 13e0986a into the story branch; 17 conflicts resolved by intent (spec.md rename, check-run, gh-79 hints, zombie fix kept; printed commands moved to noun–verb names; check-run hidden in help). Semantic fix: story close/reopen read pushed spec.md with story.md fallback. Typecheck passes; full suite 1413 pass, 1 timing flake (status-watch SIGINT test, passes 3/3 alone and in the first full run).
+- Full suite on the branch: 1417 pass, 0 fail; typecheck in the suite run.
+- Real CLI (`bun packages/cli/src/main.ts`) in a throwaway repo: help tiers, verb lists, verb usage, old names, config list/get/set/unset (real TTY prompt via `script`), status, one-time notice, segment, `status --watch` full screen, story create refusals and real gh failure.
+- Stateful verbs through runCli over the test harness (fake remote/runner, real git): approve/reject/answer/update-branch, start, edit, checkout/handoff/close/reopen, run list/view/why/receipt, rerun/cancel, targets and pick-lists, agent protocol.
+- Verdicts: 62 pass, 1 fail (B42), 1 person (B19), 7 unverified (B12, B17, B18, B23, B29, B46, B47: herdr/browser/remote).
+- F1 (B42): `story reopen` when the story's own branch is gone from the remote refuses `unknown_story` "no story branch for gh-6" / "check the story key" — branch not named (packages/cli/src/commands/story-reopen.ts:30).
+- Evidence: /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75 (criteria.json, findings.json, report.md, one file per criterion).
 
 ## Resume
 
-If not yet committed: run `bun run typecheck && bun test`, then `git commit --no-edit` on the merge.
+QA reported fail with F1; the next step fixes story-reopen's missing-story-branch refusal to name the branch and gives a useful do_instead, then re-QA B42.
