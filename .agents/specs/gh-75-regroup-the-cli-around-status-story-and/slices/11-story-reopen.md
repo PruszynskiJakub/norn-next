@@ -1,8 +1,8 @@
 ---
 id: gh-75/11
 title: story reopen undoes a close
-depends_on: [gh-75/09, gh-75/10]
-status: planned
+depends_on: [ gh-75/09, gh-75/10 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
