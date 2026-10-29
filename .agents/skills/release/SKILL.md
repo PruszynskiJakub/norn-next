@@ -24,15 +24,15 @@ git log --first-parent --format='%h%x09%s' "$last"..origin/main
 Every commit on main is one squashed PR: title `<PR title> (#<pr>)`, body the PR description with `Closes #<issue>`. For each:
 
 1. `gh pr view <pr> --json title,body,author,labels,closingIssuesReferences`.
-2. The workflow that delivered it: `workflow:` in the frontmatter of `.agents/specs/gh-<issue>-*/spec.md` on `origin/main` (`git show`; `story.md` in a story intaken before the rename). The issue's `norn:wf:*` label only picks the first workflow, and a triaged issue was switched after it (W9); use the label only when there is neither file.
+2. The workflow that delivered it: `workflow:` in the frontmatter of `.agents/specs/gh-<issue>-*/spec.md` on `origin/main` (`git show`; `story.md` in a story intaken before the rename). The issue's `norn:wf:*` label only picks the first workflow, and a triaged issue was switched after it (W9); use the label when there is neither file, and always for `norn:wf:reproduce` (`gh issue view <issue> --json labels`): a bug's fix is delivered by `quick`, so its file says `quick`, but it is Fixed.
 3. Its section:
 
 | Workflow | Section |
 |---|---|
-| `fix` | Fixed |
+| `reproduce` (the story's first workflow: its `norn:wf:reproduce` label) | Fixed |
 | `story` | Added; Changed if it alters existing behaviour; Removed if it takes something away |
 | `quick`, bypass PR | your call from the diff: a change users notice goes under Changed or Fixed; docs-only, tests, CI and internal refactors are omitted |
-| `spec`, `release`, `triage` (closed), dependabot | omitted |
+| `release`, `triage` (closed), dependabot | omitted |
 
 Write the commit → section (or omitted, with why) list under Progress in handoff.md, so the person sees it at the `ready` gate.
 
