@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "story": "gh-92",
+  "slice": null,
+  "unit_dir": "_story",
+  "workflow": "triage",
+  "workflow_hash": "c0202af600b5edd136ac0ee38c69d4812666f629d955b3b83ad0ac61fc196380",
+  "step": "explore",
+  "attempt": 1,
+  "visits": {
+    "explore": 1
+  },
+  "step_entered_at": "2026-10-29T10:39:15.323Z",
+  "status": "ready",
+  "park": null,
+  "counters": {
+    "triage_loop": 0
+  },
+  "nudges_used": 0,
+  "retries_used": 0,
+  "applied_through": 0,
+  "run": null,
+  "last_outcome": null,
+  "created_at": "2026-10-29T10:39:15.323Z",
+  "updated_at": "2026-10-29T10:39:15.323Z",
+  "last_tick_id": "01M63KW5BTYPSNVB06WY2RCGR8",
+  "mode": "manual"
+}
