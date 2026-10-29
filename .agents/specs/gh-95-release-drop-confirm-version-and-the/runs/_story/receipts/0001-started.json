@@ -1,0 +1,18 @@
+{
+  "kind": "started",
+  "receipt_id": "01M63YETRAG990N8TB8NAXC0QY",
+  "run_id": "01M63YETRAG990N8TB8NAXC0QX",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-29T13:44:13.183Z",
+  "by": "agent",
+  "who": "claude",
+  "how": "manual",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-95-release-drop-confirm-version-and-the",
+  "agent_session_id": "5aa59b75-7ab0-4c34-b19a-7ec9919255d0",
+  "process": {
+    "pid": 87636,
+    "pid_start": "Thu Oct 29 14:44:03 2026"
+  }
+}
