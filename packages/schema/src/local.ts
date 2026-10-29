@@ -152,6 +152,10 @@ export type LocalPrFile = Static<typeof LocalPrFile>;
 export const LocalCockpitFile = Type.Object({ last_repo: Type.Optional(Type.String()) }, id("local-cockpit", "norn cockpit memory (<norn home>/cockpit.json)"));
 export type LocalCockpitFile = Static<typeof LocalCockpitFile>;
 
+/** `notices.json`: the one-time notices this checkout has shown (B13), by id. */
+export const LocalNoticesFile = Type.Object({ shown: Type.Optional(Type.Array(Type.String())) }, id("local-notices", "norn one-time notices shown (trace/notices.json)"));
+export type LocalNoticesFile = Static<typeof LocalNoticesFile>;
+
 /** A lock file (H1 tick lock, K6 integrate lock): the holder process and when it took the lock. */
 export const LocalLockFile = Type.Object(
   {
@@ -177,5 +181,6 @@ export const LOCAL_SCHEMA_NAMES = [
   "local-pr",
   "local-cockpit",
   "local-lock",
+  "local-notices",
 ] as const;
 export type LocalSchemaName = (typeof LOCAL_SCHEMA_NAMES)[number];

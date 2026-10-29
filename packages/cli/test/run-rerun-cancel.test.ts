@@ -91,7 +91,7 @@ describe("a person's stuck at the cursor of a running unit (B51, D4)", () => {
     expect(h.state(runs5())).toMatchObject({ step: "implement", attempt: 1, status: "stuck" });
     expect(h.runner.launches.filter((l) => l.cwd === wt5()).length).toBe(1);
     expect(h.runner.sent.filter((s) => s.session.session_id === session)).toEqual([]);
-    const inbox = (await h.norn("inbox", "--json")).value as Inbox;
+    const inbox = (await h.norn("status", "--json")).value as Inbox;
     expect(inbox.groups.unblock).toContainEqual(expect.objectContaining({ story: "gh-5", slice: null }));
   });
 });

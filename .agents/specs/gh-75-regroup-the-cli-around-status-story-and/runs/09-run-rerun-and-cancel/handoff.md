@@ -62,6 +62,8 @@
 - qa#1: bun test 1266/1266. In a throwaway repo (headless runner, scripted gh, fake agent) observed: rerun while running refused `running` → `norn run cancel`; cancel writes the human stuck receipt then SIGTERMs the live agent; ticks leave it stuck under Unblock, not relaunched; commits, uncommitted file, branch, claim kept; rerun (--reason, --step, --reset) starts a fresh session; cancel at a gate or of a stuck unit → nothing_to_cancel exit 3; `norn unstick` exit 2. AC1, AC2, AC4–AC9 pass; AC3 person: the Herdr kill (`herdr pane close`) closes the pane B52 says is kept, which the slice Notes accept.
 - qa#1 partial: QA in a throwaway repo with the headless runner and a live fake agent: run cancel writes the human stuck receipt then stops the agent, ticks keep it stuck under Unblock; run rerun (--reason/--step/--reset) starts a fresh session; refusals (running, nothing_to_cancel, unknown unstick) as specified. AC1, AC2, AC4–AC9 pass; AC3 person: Herdr kill closes the pane B52 says is kept.
 
+- merge#1: merged the story branch (`git merge --no-ff`, slice 10's story/take→checkout regroup) into this slice. Conflicts kept both sides: help groups (base's story/status layout, without `unstick`), command registry (base's removals + storyNoun, without unstick), `run` noun (list, view, attach, rerun, cancel), target.ts (`applies(key, view)` + `inState` with base's `story` flag, `aStory`, `resolveStory`), e2e B5 list (trace, why, unstick, take, release, drop) and run listing. Semantic: duplicate `cmd.storyCheckout` dropped (base's takes `--force`), its printed-commands row too; run-rerun-cancel test reads the inbox via `norn status --json` (`inbox` is gone). typecheck green, bun test 1293/1293, golden nothing added.
+
 ## Resume
 
-QA done (partial): a person settles AC3's Herdr pane clause (amend B52/AC3 or file a Herdr stop-without-close).
+Merge done: the slice goes back to integrate.

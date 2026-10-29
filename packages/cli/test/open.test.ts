@@ -63,7 +63,7 @@ describe("norn open (MO5)", () => {
     await h.tick();
     h.clock.advance(10_000);
     await h.tick();
-    const inbox = (await h.norn("inbox")).value as { groups: { your_turn: Array<{ story: string; command: string; detail?: string }> } };
+    const inbox = (await h.norn("status")).value as { groups: { your_turn: Array<{ story: string; command: string; detail?: string }> } };
     const start = `cd ${wt()} && claude 'Use the norn skill, then run \`norn brief\`.'`;
     expect(inbox.groups.your_turn).toMatchObject([{ story: "gh-7", command: start }]);
     const r = await h.norn("open", "gh-7");
@@ -75,7 +75,7 @@ describe("norn open (MO5)", () => {
     const opened: PersonOpenSpec[] = [];
     h.runner.capabilities = { ...h.runner.capabilities, open: true };
     Object.assign(h.runner, { openForPerson: async (spec: PersonOpenSpec) => (opened.push(spec), { pane_id: "p-9" }) });
-    const inbox = (await h.norn("inbox")).value as { groups: { your_turn: Array<{ command: string; detail?: string }> } };
+    const inbox = (await h.norn("status")).value as { groups: { your_turn: Array<{ command: string; detail?: string }> } };
     expect(inbox.groups.your_turn).toMatchObject([{ command: "norn open gh-7", detail: expect.stringContaining(`by hand: cd ${wt()}`) }]);
     const r = await h.norn("open", "gh-7");
     expect(r.value).toMatchObject({ unit: "gh-7", opened: true, runner: "fake", pane_id: "p-9" });

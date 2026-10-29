@@ -152,12 +152,11 @@ describe("records: ready head, foreign commits, merged by ancestry, durable stat
   test("F36: the story stays in status after its worktree is gone; local main is stale", async () => {
     expect(h.git(["ls-tree", "--name-only", "main", ".agents/specs/"])).toBe(""); // never pulled
     step();
-    const r = await h.norn("status");
+    const r = await h.norn("story", "list");
     expect(r.exit).toBe(0);
     const keys = (r.value as { stories: Array<{ key: string }> }).stories.map((x) => x.key);
     expect(keys).toContain("gh-5");
-    const one = await h.norn("status", "gh-5");
-    expect(one.exit).toBe(0);
+    expect(await h.listed("gh-5")).toMatchObject({ key: "gh-5" });
   });
 });
 

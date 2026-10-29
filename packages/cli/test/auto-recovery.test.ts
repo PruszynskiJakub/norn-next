@@ -90,19 +90,19 @@ describe("R4: nudges that can be delivered (acceptance 5)", () => {
     expect(acted(r)).toEqual(["gh-9 agent.silent.nudge FAILED nudge to gh-9 not delivered: agent p-1 is blocked by a dialog"]);
     expect(r.failed).toBe(1);
 
-    const inbox = (await h.norn("inbox")).value as Inbox;
+    const inbox = (await h.norn("status")).value as Inbox;
     expect(inbox.groups.unblock).toEqual([expect.objectContaining({ story: "gh-9", step: "implement", title: "nudge to gh-9 not delivered: agent p-1 is blocked by a dialog", command: `norn why gh-9 --tick ${r.tick_id}` })]);
     // notified once, from the tick that failed (O3)
     expect(h.notifier.items.filter((i) => i.id === `failed:gh-9:${r.tick_id}`)).toHaveLength(1);
-    const status = (await h.norn("status", "gh-9")).value as ProjectView["stories"][number];
+    const status = (await h.listed("gh-9")) as ProjectView["stories"][number];
     expect(status.act_failure).toMatchObject({ effect: "nudge", tick_id: r.tick_id });
-    expect((await h.norn("status")).stdout).toContain("  ! nudge to gh-9 not delivered: agent p-1 is blocked by a dialog");
+    expect((await h.norn("story", "list")).stdout).toContain("  ! nudge to gh-9 not delivered: agent p-1 is blocked by a dialog");
 
     // the classify receipt is applied next tick: the nudge is counted, the item stays
     h.clock.advance(10_000);
     await h.tick();
     expect(h.state(runs(h))).toMatchObject({ nudges_used: 1 });
-    expect(((await h.norn("inbox")).value as Inbox).groups.unblock).toHaveLength(1);
+    expect(((await h.norn("status")).value as Inbox).groups.unblock).toHaveLength(1);
   });
 
   test("R4.2: a runner without `send` resumes the agent session with the nudge text; the failure clears", async () => {
@@ -121,11 +121,11 @@ describe("R4: nudges that can be delivered (acceptance 5)", () => {
     expect(h.runner.launches.at(-1)?.argv.join(" ")).toContain("cs-1");
     expect(h.runner.launches.at(-1)?.argv.join(" ")).toContain(NUDGE_TEXT);
     expect(h.state(runs(h))).toMatchObject({ status: "running", nudges_used: 2, run: { run_id: st.run?.run_id, session: { session_id: `s-${launches + 1}` }, agent_session_id: "cs-1" } });
-    expect(((await h.norn("inbox")).value as Inbox).groups.unblock).toEqual([]);
+    expect(((await h.norn("status")).value as Inbox).groups.unblock).toEqual([]);
   });
 
   test("R4.4: status shows the run's last classification, not only liveness", async () => {
-    const text = (await h.norn("status")).stdout as string;
+    const text = (await h.norn("story", "list")).stdout as string;
     expect(text).toMatch(/gh-9 +implement#1 auto claude .*— silent since /);
   });
 });
@@ -264,19 +264,19 @@ describe("R5.4 / R5.5: tick records and the heartbeat (acceptance 7, 8)", () => 
     // the launch is queued forever (max_agents 0 would be config; simply stop ticking at `ready`)
     const st = h.state(runs(h)) as UnitState;
     writeState(runs(h), { ...st, status: "ready", run: null });
-    const fresh = (await h.norn("status", "gh-9")).value as ProjectView["stories"][number];
+    const fresh = (await h.listed("gh-9")) as ProjectView["stories"][number];
     expect(fresh.next).not.toBe("norn watch");
     h.clock.advance(7 * 60_000);
-    const inbox = (await h.norn("inbox")).value as Inbox;
+    const inbox = (await h.norn("status")).value as Inbox;
     expect(inbox.groups.unblock.map((i) => [i.title, i.command])).toEqual([["no heartbeat on tester@box for 7m — run `norn watch`", "norn watch"]]);
     expect(inbox.groups.running.map((i) => i.title)).toEqual(["implement #1 (waiting for the heartbeat — norn watch)"]);
-    const status = (await h.norn("status")).value as ProjectView;
+    const status = (await h.norn("story", "list")).value as ProjectView;
     expect(status.heartbeat).toMatchObject({ holder: "tester@box", down: true, age: "7m" });
     expect(status.stories[0]?.next).toBe("norn watch");
-    expect((await h.norn("status")).stdout).toContain("! no heartbeat on tester@box for 7m — run `norn watch`");
+    expect((await h.norn("story", "list")).stdout).toContain("! no heartbeat on tester@box for 7m — run `norn watch`");
     // the next tick is the heartbeat: the item goes away
     await h.tick();
-    expect(((await h.norn("inbox")).value as Inbox).groups.unblock).toEqual([]);
+    expect(((await h.norn("status")).value as Inbox).groups.unblock).toEqual([]);
   });
 });
 

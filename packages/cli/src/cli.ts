@@ -4,6 +4,7 @@
  * A command with `markdown: true` prints markdown (its `rendered` result, refusals too) unless
  * `--json` is given; every command accepts `--json`. `value` is always the data. A JSON command
  * may print text the caller asked for with its own flag (`rendered(…, { asked: true })`).
+ * A command adds lines for a person on stderr through `ctx.stderr`; they come back in `stderr`.
  * `norn <noun> <verb>` runs the verb; `norn <noun>` alone is `norn help <noun>` (B2).
  */
 import { parseArgs } from "node:util";
@@ -21,6 +22,8 @@ export interface CliResult {
   value: unknown;
   /** exactly what goes to stdout */
   stdout: string;
+  /** what goes to stderr, when anything does (a one-time notice for a person, B13); never data */
+  stderr?: string;
 }
 
 const done = (value: unknown, exit: ExitCode = ExitCode.ok): CliResult => ({ exit, value, stdout: render(value) });
@@ -82,14 +85,15 @@ async function dispatch(command: Command, rest: string[], deps: CliDeps): Promis
   const json = flags.includes("--json");
   const markdown = command.markdown === true && !json;
   const argvOwn = [...flags.filter((a) => a !== "--json" && (command.markdown !== true || a !== "--text")), ...(end < 0 ? [] : rest.slice(end))];
+  const ctx = new Context(deps);
+  const withStderr = (r: CliResult): CliResult => (ctx.stderr.length ? { ...r, stderr: ctx.stderr.map((l) => `${l}\n`).join("") } : r);
   try {
     const args = { ...parseCommandArgs(command, argvOwn), json };
-    const ctx = new Context(deps);
     if (command.repo !== false) await ctx.locate();
     const out = await command.run(ctx, args);
     const [value, exit] = isWithExit(out) ? [out.value, out.exit] : [out ?? { ok: true }, ExitCode.ok];
-    if (isRendered(value)) return markdown || (value.asked && !json) ? { exit, value: value.value, stdout: value.markdown } : done(value.value, exit);
-    return done(value, exit);
+    if (isRendered(value)) return withStderr(markdown || (value.asked && !json) ? { exit, value: value.value, stdout: value.markdown } : done(value.value, exit));
+    return withStderr(done(value, exit));
   } catch (e) {
     const f = toFailure(e);
     return markdown ? { exit: f.exit, value: f.body, stdout: failureMarkdown(f) } : failed(f);

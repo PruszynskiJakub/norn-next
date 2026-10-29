@@ -1,8 +1,8 @@
 ---
 id: gh-75/12
 title: story create, with the remote's createIssue
-depends_on: [gh-75/03]
-status: planned
+depends_on: [ gh-75/03 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }

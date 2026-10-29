@@ -1,5 +1,5 @@
 /**
- * Compact terminal text for `norn status` / `norn inbox` human mode. Pure: a ProjectView
+ * Compact terminal text for `norn story list` / `norn status` human mode. Pure: a ProjectView
  * in, a string out (no colour, no clock). The CLI's default output stays JSON (P8).
  */
 import { cmd, INBOX_ABOUT, INBOX_GROUPS, INBOX_TITLES } from "@norn/core";
@@ -59,7 +59,7 @@ function heartbeatText(view: ProjectView): string | null {
   return h.last_tick_at ? `heartbeat: last tick ${h.age} ago on ${h.holder}` : null;
 }
 
-/** `norn status` human mode: one block per story, slices indented, then runs and errors. */
+/** `norn story list` human mode: one block per story, slices indented, then runs and errors. */
 /** BS1/BS3: `base main: 17 behind · conflicts a.ts, b.ts · last update merge 1a2b3c4d5e6f (…)`; null when nothing is known. */
 function baseSyncText(s: StoryView): string | null {
   const b = s.base_sync;
@@ -131,7 +131,7 @@ export function stepTitle(step: string | null | undefined, title: string): strin
 }
 
 /**
- * `norn inbox` human mode: groups in O1 order, each item with reason, age and command; `details` adds
+ * `norn status` human mode: groups in O1 order, each item with reason, age and command; `details` adds
  * full texts (L1). With `home`, paths under it print as `~/…` (the JSON keeps them absolute).
  * `numbered` prefixes `[n]` for the cockpit (HC4). Notes show as their header line only, with the
  * command that lists them, unless `notes` (NT6).

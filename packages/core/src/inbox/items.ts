@@ -688,7 +688,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
         slice: null,
         step: null,
         title: `Unclaimed — ${story.frontmatter?.title ?? story.key}`,
-        command: cmd.take(story.key),
+        command: cmd.storyCheckout(story.key),
         since,
         ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
       });

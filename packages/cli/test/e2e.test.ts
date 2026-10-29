@@ -170,13 +170,13 @@ describe("norn init", () => {
     const r = await h.norn("run");
     expect(r.exit).toBe(0);
     expect(r.stdout).toStartWith("norn run — ");
-    expect(r.stdout).toMatch(/\n  norn run list +.+\n  norn run view +.+\n  norn run rerun +.+\n  norn run cancel +.+\n/);
-    expect(r.value).toMatchObject({ command: "run", verbs: [{ command: "run list" }, { command: "run view" }, { command: "run rerun" }, { command: "run cancel" }] });
+    expect(r.stdout).toMatch(/\n  norn run list +.+\n  norn run view +.+\n  norn run attach +.+\n  norn run rerun +.+\n  norn run cancel +.+\n/);
+    expect(r.value).toMatchObject({ command: "run", verbs: [{ command: "run list" }, { command: "run view" }, { command: "run attach" }, { command: "run rerun" }, { command: "run cancel" }] });
     expect((await h.norn("help", "run")).stdout).toBe(r.stdout);
     expect((await h.norn("run", "--help")).stdout).toBe(r.stdout);
     expect((await h.norn("run", "--json")).value).toEqual(r.value);
     // norn help names the noun with its verbs
-    expect((await h.norn("help")).stdout).toMatch(/\n  norn run +.*\(list, view, rerun, cancel\)\n/);
+    expect((await h.norn("help")).stdout).toMatch(/\n  norn run +.*\(list, view, attach, rerun, cancel\)\n/);
   });
 
   test("help <noun> <verb> and <noun> <verb> --help show that verb's usage and options (B4)", async () => {
@@ -205,9 +205,9 @@ describe("norn init", () => {
     for (const c of (all.value as { commands: Array<{ command: string }> }).commands) expect(all.stdout).toContain(`  norn ${c.command} `);
   });
 
-  test("the old trace, why and unstick are unknown commands, and write nothing (B5)", async () => {
+  test("the old trace, why, unstick, take, release and drop are unknown commands, and write nothing (B5)", async () => {
     const before = h.git(["status", "--porcelain", "--untracked-files=all", "--ignored"]);
-    for (const name of ["trace", "why", "unstick"]) {
+    for (const name of ["trace", "why", "unstick", "take", "release", "drop"]) {
       const r = await h.norn(name, "gh-1");
       expect(r.exit).toBe(2);
       expect(r.value).toMatchObject({ error: `Unknown command: ${name}`, code: "unknown_command", do_instead: expect.stringContaining("norn help") });

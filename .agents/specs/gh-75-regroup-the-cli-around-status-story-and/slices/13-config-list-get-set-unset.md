@@ -1,8 +1,8 @@
 ---
 id: gh-75/13
 title: config list, get, set and unset
-depends_on: [gh-75/03]
-status: planned
+depends_on: [ gh-75/03 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }

@@ -388,11 +388,11 @@ describe("norn hook robustness (A3)", () => {
     await h.tick();
     expect(h.state(runs())).toMatchObject({ status: "parked", park: { kind: "ask", reason: "Claude needs your permission to use Bash", command: "Bash(rm -rf build)" } });
     expect(readReceipt(runs(), receipts(runs()).at(-1) as string)).toMatchObject({ kind: "ask", implicit: true, command: "Bash(rm -rf build)" });
-    const inbox = (await h.norn("inbox")).value as { groups: Record<string, Array<{ story: string; title: string; detail?: string; command: string }>> };
+    const inbox = (await h.norn("status")).value as { groups: Record<string, Array<{ story: string; title: string; detail?: string; command: string }>> };
     expect(inbox.groups.answer).toContainEqual(
       expect.objectContaining({ story: "gh-9", title: "Claude needs your permission to use Bash", detail: "pending command: Bash(rm -rf build)", command: 'norn answer gh-9 "…"' }),
     );
-    const text = (await h.norn("inbox")).stdout;
+    const text = (await h.norn("status")).stdout;
     expect(text).toContain("pending command: Bash(rm -rf build)");
   });
 });

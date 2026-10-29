@@ -72,7 +72,7 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
       return ctx.noop(ref, "story.finished", baseDone ? `finished: ${ctx.facts.repo.default_branch} records it ${story.base_status} (R3.2); nothing to acquire` : "finished: PR merged (R3.2); nothing to acquire");
     // GR6: a finished story (workflow done, merged/recorded or dropped) needs no owner — never "unclaimed"
     if (!ours && !fresh && storyFinished(story)) return ctx.noop(ref, "story.finished", `finished (${story.frontmatter?.status === "done" || story.frontmatter?.status === "dropped" ? story.frontmatter.status : "workflow done"}); nothing to take`);
-    if (!ours && !fresh) return ctx.noop(ref, "claim.unclaimed", `unclaimed — ${cmd.take(story.key)} (T10)`);
+    if (!ours && !fresh) return ctx.noop(ref, "claim.unclaimed", `unclaimed — ${cmd.storyCheckout(story.key)} (T10)`);
     const lost = fresh ? lostIntake(story) : undefined;
     return ctx.emit({
       kind: "claim",

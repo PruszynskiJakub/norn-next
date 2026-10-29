@@ -161,23 +161,23 @@
       text 20 lines, normalised sha256 8338573c94c5
   ~ repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/state.json
       {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"test","attempt":1,"visits":{"update":1,"test":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":0,"stale_loop":0},"nudges_used":0,"retries_used":0,"applied_through":1,"run":null,"last_outcome":{"step":"update","outcome":"done","source":"classified","at":"<time>","receipt_id":"<ulid:4>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:6>","mode":"auto"}
-> norn inbox
-  spawn repo $ git rev-parse --path-format=absolute --git-common-dir
-  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
-  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
-  spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-7
-  spawn repo $ git cat-file blob <sha:4>
-  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
-  exit 0
-> norn status gh-7
-  spawn repo $ git rev-parse --path-format=absolute --git-common-dir
-  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
-  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
-  spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-7
-  spawn repo $ git cat-file blob <sha:4>
-  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
-  exit 0
 > norn status
+  spawn repo $ git rev-parse --path-format=absolute --git-common-dir
+  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
+  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
+  spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-7
+  spawn repo $ git cat-file blob <sha:4>
+  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
+  exit 0
+> norn story list --json
+  spawn repo $ git rev-parse --path-format=absolute --git-common-dir
+  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
+  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
+  spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-7
+  spawn repo $ git cat-file blob <sha:4>
+  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
+  exit 0
+> norn story list
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
@@ -1015,7 +1015,7 @@
       text 35 lines, normalised sha256 35efae378294
   ~ repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/state.json
       {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"$done","attempt":3,"visits":{"update":4,"test":3,"open-pr":3,"ready":3,"resolve":1},"step_entered_at":"<time>","status":"done","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":17,"run":null,"last_outcome":{"step":"ready","outcome":"approve","source":"human","at":"<time>","receipt_id":"<ulid:56>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:57>","mode":"auto"}
-> norn release gh-7
+> norn story handoff gh-7
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
   spawn repo $ git worktree list --porcelain -z
@@ -1068,7 +1068,7 @@
   spawn repo $ git ls-remote origin refs/norn/claims/gh-7
   spawn repo $ git update-ref -d refs/norn/claims/gh-7
   exit 3
-> norn take gh-7
+> norn story checkout gh-7
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
   spawn repo $ git ls-remote --heads origin "refs/heads/gh-7-*"

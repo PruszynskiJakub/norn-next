@@ -1,6 +1,6 @@
 /**
  * ProjectView: the read model front ends consume (X1). Plain JSON — no functions,
- * Dates or Maps — so `norn status --json`, a web cockpit and a Herdr pane share it.
+ * Dates or Maps — so `norn story list --json`, a web cockpit and a Herdr pane share it.
  */
 import type { FileError, Inbox, InboxEntry, StoryNote } from "@norn/core";
 import type { LeaseKind, Mode, ParkKind, SliceStatus, StoryStatus, UnitStatus } from "@norn/schema";

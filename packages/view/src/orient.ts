@@ -1,12 +1,13 @@
 /**
- * `norn orient <story|unit>`: one story at a glance for a person and the agent that sits with them —
- * what the story is, each slice's outcome, the PR, open notes by unit, what waits for the person
- * (exact commands) and where to look. Pure: a ProjectView in, a report out; read only (X1).
+ * `norn story view [<story|slice>]` (B16, D6): one story at a glance for a person and the agent that
+ * sits with them (`norn story chat`) — what the story is, each slice with its workflow and step, the
+ * PR and its state, open notes by unit, what waits for the person (exact commands) and where to look.
+ * Built on the orient report, which it extends. Pure: a ProjectView in, a report out; read only (X1).
  */
 import { cmd, formatAge, type InboxGroup } from "@norn/core";
 import type { RemoteProvider, StoryStatus } from "@norn/schema";
 import { inboxItemsInOrder } from "./format.ts";
-import type { ClaimView, PrView, ProjectView, StoryView, UnitView } from "./types.ts";
+import type { ClaimView, PrView, ProjectView, SliceView, StoryView, UnitView } from "./types.ts";
 
 /** Inbox groups that wait for the person (O1), in order. */
 const WAITING: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock", "check", "unclaimed"];
@@ -15,10 +16,18 @@ export interface OrientUnit {
   key: string;
   title: string;
   status: UnitView["status"];
+  /** the unit's workflow (pinned, else the one it would start with) */
+  workflow: string;
   step: string | null;
+  attempt: number | null;
   last_outcome: { step: string; outcome: string; at: string } | null;
+  /** next command for a person or agent (S9) */
+  next: string | null;
   /** slices only: integrated into the story branch */
   integrated: boolean;
+  /** slices only: frontmatter status and the slices it waits for */
+  slice_status?: SliceView["slice_status"];
+  depends_on?: string[];
 }
 
 export interface OrientItem {
@@ -58,6 +67,8 @@ export interface OrientReport {
   spec: string;
   branch: string;
   pr: PrView | null;
+  /** the PR's state in one word; null when no PR was seen */
+  pr_state: "draft" | "open" | "closed" | "merged" | null;
   /** `gh pr view <branch>` / `glab mr view <branch>` */
   pr_command: string;
   waiting: OrientItem[];
@@ -81,7 +92,13 @@ function claimLine(c: ClaimView): string {
   return c.state === "corrupt" ? "claim corrupt" : "unclaimed";
 }
 
-const orientUnit = (u: UnitView, integrated = false): OrientUnit => ({ key: u.key, title: u.title, status: u.status, step: u.step, last_outcome: u.last_outcome, integrated });
+const orientUnit = (u: UnitView): OrientUnit => ({ key: u.key, title: u.title, status: u.status, workflow: u.workflow, step: u.step, attempt: u.attempt, last_outcome: u.last_outcome, next: u.next, integrated: false });
+const orientSlice = (s: SliceView): OrientUnit => ({ ...orientUnit(s), integrated: s.integrated, slice_status: s.slice_status, depends_on: s.depends_on });
+
+function prState(pr: PrView | null): OrientReport["pr_state"] {
+  if (!pr) return null;
+  return pr.state === "open" && pr.is_draft ? "draft" : pr.state;
+}
 
 /** Report for the story of `key` (a story or slice key); null when the view has no such story. */
 export function orientReport(view: ProjectView, key: string, provider: RemoteProvider): OrientReport | null {
@@ -117,11 +134,12 @@ export function orientReport(view: ProjectView, key: string, provider: RemotePro
     claim: claimLine(story.claim),
     mode: story.mode_downgraded ? `${story.mode}→${story.effective_mode}` : story.effective_mode,
     unit: orientUnit(story),
-    slices: story.slices.map((s) => orientUnit(s, s.integrated)),
+    slices: story.slices.map(orientSlice),
     root: story.root,
     spec,
     branch: story.branch,
     pr: story.pr,
+    pr_state: prState(story.pr),
     pr_command: prCommand(provider, story.branch),
     waiting: items.filter((i) => WAITING.includes(i.group)).map(toItem),
     running: items.filter((i) => i.group === "running").map(toItem),
@@ -167,25 +185,36 @@ const ORIENT_RULES = [
   "You sit with the person to help them get oriented on this story. Follow these rules:",
   "1. Open with a summary of at most 5 lines: what the story is, where it stands, and what waits for the person, with its command. Count the open notes; do not list them yet.",
   "2. Then answer their questions. Read the spec, the code and the commands below as needed.",
-  "3. Run a norn command that changes anything (`norn approve`, `norn answer`, `norn take`, `norn unstick`, …) only when the person tells you to.",
+  "3. Run a norn command that changes anything (`norn approve`, `norn answer`, `norn story checkout`, `norn unstick`, …) only when the person tells you to.",
   "4. Never edit code, commit, or report an outcome: no `norn done`, `norn ask` or `norn stuck` — this session is not a run.",
   "5. When the person asks about the notes, group and dedupe them by topic: spec readings to confirm, polish, follow-ups, FYI.",
 ].join("\n");
 
-/** Markdown for `norn orient`: the rules for the agent, then the report. */
-export function formatOrient(r: OrientReport, now: number): string {
-  const out: string[] = [`# Orient: ${r.story} — ${r.title}`, "", ...ORIENT_RULES.split("\n").map((l) => `> ${l}`), ""];
+/** A slice's line after its title: where it stands, the slices it waits for, its workflow. */
+function sliceLine(s: OrientUnit): string {
+  const deps = s.depends_on?.length ? ` · after ${s.depends_on.map((d) => d.split("/").at(-1)).join(",")}` : "";
+  const next = s.next && s.status !== "running" ? `\n  - \`${s.next}\`` : "";
+  return `- ${s.key} ${s.title} — ${unitStanding(s)}${deps} · ${s.workflow}${next}`;
+}
+
+/**
+ * Markdown for `norn story view`; `rules` puts the chat agent's rules first (`norn story chat`
+ * starts its agent on this view, B29).
+ */
+export function formatStoryView(r: OrientReport, now: number, o: { rules?: boolean } = {}): string {
+  const out: string[] = [`# ${r.story} — ${r.title}`, ""];
+  if (o.rules) out.push(...ORIENT_RULES.split("\n").map((l) => `> ${l}`), "");
   out.push("## The story", "");
   if (r.url) out.push(`- Issue: ${r.url}`);
-  out.push(`- Story: ${unitStanding(r.unit)} · ${r.mode} · ${r.claim}`);
+  out.push(`- Story: ${unitStanding(r.unit)} · ${r.unit.workflow} · ${r.mode} · ${r.claim}`);
   out.push(`- Worktree: \`${r.root}\` · branch \`${r.branch}\``);
   out.push(`- Spec: \`${r.spec}\``, "");
   out.push("## Slices", "");
   if (r.slices.length === 0) out.push("No slices yet.");
-  for (const s of r.slices) out.push(`- ${s.key} ${s.title} — ${unitStanding(s)}`);
+  for (const s of r.slices) out.push(sliceLine(s));
   out.push("", "## Pull request", "");
   const seen = r.pr ? ` (seen ${formatAge(now - Date.parse(r.pr.seen_at))} ago)` : "";
-  out.push(`- ${prLine(r.pr)}${seen}`, `- Look: \`${r.pr_command}\` (add \`--web\` to open it in the browser)`, "");
+  out.push(`- ${prLine(r.pr)}${seen}`, `- Look: \`${r.pr_command}\`; open it in the browser: \`${cmd.storyView(r.story, { web: true })}\``, "");
   out.push("## Waits for the person", "");
   if (r.waiting.length === 0) out.push("Nothing waits for the person.");
   for (const w of r.waiting) {

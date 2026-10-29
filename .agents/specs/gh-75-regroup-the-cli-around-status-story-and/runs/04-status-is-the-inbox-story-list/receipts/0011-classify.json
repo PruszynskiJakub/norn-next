@@ -1,0 +1,15 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M61DX5RYXXAW2596555S109M",
+  "run_id": "01M61DVXF8JRQPQ0ER4X75YEJS",
+  "step": "integrate",
+  "attempt": 1,
+  "at": "2026-10-28T14:16:28.190Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M61DVXF8309761JB4ENM338M",
+  "outcome": "conflict",
+  "rule": "git.integrate",
+  "detail": "rebase onto gh-75-regroup-the-cli-around-status-story-and conflicts in packages/cli/test/harness.ts",
+  "route": "merge"
+}

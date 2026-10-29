@@ -1,8 +1,8 @@
 ---
 id: gh-75/10
 title: story checkout, handoff and close
-depends_on: [gh-75/03]
-status: planned
+depends_on: [ gh-75/03 ]
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }

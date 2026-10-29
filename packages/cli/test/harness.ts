@@ -12,6 +12,7 @@ import { dirname, join } from "node:path";
 import type { Clock, InboxItem, LaunchSpec, NotifierPort, PaneState, PromptKey, RemoteIssue, RemotePort, RemotePullRequest, RunnerCapabilities, RunnerPort, RunnerSessionInfo, SessionRef } from "@norn/core";
 import { type Receipt, type UnitState, ulid } from "@norn/schema";
 import { appendReceipt, installSkills, linkSkills, readState } from "@norn/store";
+import type { ProjectView } from "@norn/view";
 import { bundledSkills, type CliDeps, type CliResult, type Interaction, type InteractionChoice, runCli, type TickReport } from "../src/index.ts";
 import { assetsDir } from "../src/runtime/assets.ts";
 import { harvestGolden } from "./golden-harvest.ts";
@@ -140,11 +141,17 @@ export class FakeNotifier implements NotifierPort {
   }
 }
 
-/** D2: the terminal, scripted. `tty: false` is "no TTY"; each `pick` takes the next answer (null = the person left). */
+/** D2: the terminal, scripted. `tty: false` is "no TTY"; each `pick` takes the next answer (null = the person left), each `confirm` the next of `confirms` (default N). */
 export class FakeInteraction implements Interaction {
   picks: Array<{ question: string; choices: InteractionChoice[]; preselect: number }> = [];
   answers: Array<string | null> = [];
+  questions: string[] = [];
+  confirms: boolean[] = [];
   constructor(readonly tty = true) {}
+  async confirm(question: string) {
+    this.questions.push(question);
+    return this.confirms.shift() ?? false;
+  }
   async pick(question: string, choices: readonly InteractionChoice[], preselect: number) {
     this.picks.push({ question, choices: [...choices], preselect });
     const next = this.answers.shift();
@@ -154,13 +161,16 @@ export class FakeInteraction implements Interaction {
 
 /** A6 launch env and the orient env: the env of the agent session a test may run in is not the harness's. */
 const AGENT_ENV = ["NORN_HOME", "NORN_STORY", "NORN_SLICE", "NORN_RUN", "NORN_BIN", "NORN_ORIENT"];
-const hostEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !AGENT_ENV.includes(k)));
+export const hostEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !AGENT_ENV.includes(k)));
 
 export function sh(cwd: string, args: string[], input?: string): string {
   const r = Bun.spawnSync(["git", ...args], { cwd, stdin: input === undefined ? "ignore" : new TextEncoder().encode(input), stdout: "pipe", stderr: "pipe" });
   if (r.exitCode !== 0) throw new Error(`git ${args.join(" ")} (${cwd}): ${r.stderr.toString()}`);
   return r.stdout.toString().trim();
 }
+
+/** A story or one of its slices in `norn story list --json`. */
+export type Listed = ProjectView["stories"][number] | ProjectView["stories"][number]["slices"][number];
 
 export interface Harness {
   dir: string;
@@ -173,6 +183,8 @@ export interface Harness {
   notifier: FakeNotifier;
   deps: CliDeps;
   norn(...argv: string[]): Promise<CliResult>;
+  /** a story or slice as `norn story list --json` shows it (B15); undefined when not listed */
+  listed(key: string): Promise<Listed | undefined>;
   /** one `norn tick`; throws unless it exits 0 */
   tick(...flags: string[]): Promise<TickReport>;
   git(args: string[], cwd?: string): string;
@@ -233,6 +245,10 @@ export async function createHarness(): Promise<Harness> {
     notifier,
     deps,
     norn: (...argv) => runCli(argv, deps),
+    async listed(key) {
+      const view = (await this.norn("story", "list", "--json")).value as ProjectView;
+      return view.stories.flatMap((s): Listed[] => [s, ...s.slices]).find((u) => u.key === key);
+    },
     async tick(...flags) {
       const r = await runCli(["tick", ...flags], deps);
       if (r.exit !== 0) throw new Error(`tick failed: ${r.stdout}`);

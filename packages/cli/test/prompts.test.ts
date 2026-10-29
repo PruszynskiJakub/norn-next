@@ -111,7 +111,7 @@ describe("R6.1: the agent's report while parked on an implicit ask (acceptance 9
   test("the Answer item is the question, the first command line and the options; the screen only with --details", async () => {
     await untilRunning(h);
     await parkOnPrompt(h);
-    const inbox = (await h.norn("inbox")).value as Inbox;
+    const inbox = (await h.norn("status")).value as Inbox;
     expect(inbox.groups.answer).toEqual([
       expect.objectContaining({
         title: "Contains brace with quote character (expansion obfuscation) Do you want to proceed?",
@@ -120,11 +120,11 @@ describe("R6.1: the agent's report while parked on an implicit ask (acceptance 9
       }),
     ]);
     expect(inbox.groups.answer[0]).not.toHaveProperty("full");
-    const details = (await h.norn("inbox", "--details")).value as Inbox;
+    const details = (await h.norn("status", "--details")).value as Inbox;
     expect(details.groups.answer[0]?.full).toBe(SCREEN);
-    const text = (await h.norn("inbox")).stdout as string;
+    const text = (await h.norn("status")).stdout as string;
     expect(text).not.toContain("│ EOF");
-    expect((await h.norn("inbox", "--details")).stdout).toContain("      | ╌╌╌");
+    expect((await h.norn("status", "--details")).stdout).toContain("      | ╌╌╌");
   });
 
   test("`norn done` is accepted: an answer by the agent closes the ask, then the report applies", async () => {
@@ -164,7 +164,7 @@ describe("R6.2/R6.3: norn answer types into the prompt (acceptance 9)", () => {
     h.clock.advance(10_000);
     await h.tick();
     expect(h.state(runs(h))).toMatchObject({ status: "parked", park: { kind: "ask" } });
-    const inbox = (await h.norn("inbox")).value as Inbox;
+    const inbox = (await h.norn("status")).value as Inbox;
     expect(inbox.groups.answer[0]).toMatchObject({ command: "fake attach p-1", detail: expect.stringContaining("not delivered: answer to gh-9 not delivered: pane p-1 is gone") });
     expect(inbox.groups.unblock).toEqual([]);
   });
@@ -188,7 +188,7 @@ describe("R6.2/R6.3: norn answer types into the prompt (acceptance 9)", () => {
     expect(acted(t)).toEqual(["gh-9 receipts.apply"]);
     expect(h.state(runs(h))).toMatchObject({ status: "running", park: null });
     expect(h.runner.sent).toEqual([]);
-    expect(((await h.norn("inbox")).value as Inbox).groups.answer).toEqual([]);
+    expect(((await h.norn("status")).value as Inbox).groups.answer).toEqual([]);
   });
 });
 
@@ -320,7 +320,7 @@ describe("R9.1: launch prompt not received (acceptance 12)", () => {
     expect(receipts(h).at(-1)).toMatchObject({ kind: "classify", outcome: "silent", rule: "agent.silent.launch_prompt", detail: "launch prompt not received" });
     h.clock.advance(10_000);
     await h.tick();
-    const inbox = (await h.norn("inbox")).value as Inbox;
+    const inbox = (await h.norn("status")).value as Inbox;
     expect(inbox.groups.unblock).toEqual([expect.objectContaining({ title: "launch prompt not received by gh-9 implement — look at pane p-1", command: "fake attach p-1" })]);
   });
 });

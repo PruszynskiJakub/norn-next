@@ -23,6 +23,10 @@ export function fakeHerdr(agents: herdr.HerdrAgent[] = [], workspaces: herdr.Her
       calls.push(`open ${cwd} ${command}`);
       return { pane_id: "w9:p1" };
     },
+    async openBelow(cwd, command, title) {
+      calls.push(`open below ${cwd} ${command} ${title ?? "-"}`);
+      return { pane_id: "w9:p2" };
+    },
     async pluginLinked() {
       return null;
     },
