@@ -1,0 +1,26 @@
+{
+  "kind": "started",
+  "receipt_id": "01M6439Z61YMZGA1KE2CVEKCB8",
+  "run_id": "01M6439T41Y90R9ZG1BZTDW3HX",
+  "step": "qa",
+  "attempt": 1,
+  "at": "2026-10-29T15:08:56.385Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M6439T41Z0T9GW8SSS4RK78E",
+  "how": "auto",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-75-regroup-the-cli-around-status-story-and--14-rename-printed-commands-and-full-help",
+  "machine": "jakubpruszynski@mac",
+  "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD",
+  "session": {
+    "runner": "herdr",
+    "session_id": "w98:p1",
+    "pane_id": "w98:p1",
+    "reach": "herdr agent attach w98:p1"
+  },
+  "process": {
+    "pid": 22992,
+    "pid_start": "Thu Oct 29 16:08:56 2026"
+  }
+}
