@@ -5,33 +5,28 @@
   "unit_dir": "08-story-start-and-edit",
   "workflow": "slice",
   "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
-  "step": "integrate",
-  "attempt": 3,
+  "step": "merge",
+  "attempt": 4,
   "visits": {
     "implement": 2,
     "test": 2,
     "review": 2,
     "qa": 1,
     "integrate": 3,
-    "merge": 3
+    "merge": 4
   },
-  "step_entered_at": "2026-10-29T13:27:38.049Z",
-  "status": "stuck",
-  "park": {
-    "kind": "exhausted",
-    "reason": "conflict_loop 2/2 at integrate.conflict",
-    "since": "2026-10-29T13:28:28.882Z",
-    "receipt_id": "01M63XJ0YJPMZG5JK9R228BY7H"
-  },
+  "step_entered_at": "2026-10-29T13:40:38.087Z",
+  "status": "ready",
+  "park": null,
   "counters": {
     "test_loop": 0,
     "review_loop": 1,
     "qa_loop": 0,
-    "conflict_loop": 2
+    "conflict_loop": 0
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 35,
+  "applied_through": 36,
   "run": null,
   "last_outcome": {
     "step": "integrate",
@@ -41,6 +36,6 @@
     "receipt_id": "01M63XJ0YJPMZG5JK9R228BY7H"
   },
   "created_at": "2026-10-28T14:13:16.910Z",
-  "updated_at": "2026-10-29T13:28:38.050Z",
-  "last_tick_id": "01M63XJ9X14J1HH49413PC7JJY"
+  "updated_at": "2026-10-29T13:40:38.087Z",
+  "last_tick_id": "01M63Y8925VD5ZEHGJ6R7DH14E"
 }

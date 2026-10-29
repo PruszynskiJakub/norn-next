@@ -1,0 +1,16 @@
+{
+  "kind": "unstick",
+  "receipt_id": "01M63Y82EGH2RHNH7ABX7E0GXE",
+  "run_id": null,
+  "step": "integrate",
+  "attempt": 3,
+  "at": "2026-10-29T13:40:31.313Z",
+  "by": "human",
+  "who": "jakubpruszynski@mac",
+  "slice": "gh-75/08",
+  "to": "merge",
+  "reset": [
+    "conflict_loop"
+  ],
+  "comment": "Merge the story tip (slice 13 integrated) in; only packages/cli/src/commands/index.ts conflicts: keep both 13's configNoun and 08's story start/edit. Keep slice 09's restored run cancel/rerun. Run the suite and report done."
+}
