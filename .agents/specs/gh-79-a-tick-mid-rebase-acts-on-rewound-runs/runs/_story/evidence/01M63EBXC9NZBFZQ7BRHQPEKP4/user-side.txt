@@ -1,0 +1,31 @@
+09:06:34
+--- tick mid-rebase:
+[{"rule":"agent.timeout.surface","kind":"classify","ok":true,"error":null}]
+--- after tick:
+ M .agents/specs/gh-1-add-widget/runs/_story/handoff.md
+ M .agents/specs/gh-1-add-widget/runs/_story/state.json
+UU X.txt
+?? .agents/specs/gh-1-add-widget/runs/_story/receipts/0002-classify.json
+{"step":"first","status":"running","applied_through":2}
+0001-started.json
+0002-classify.json
+{"kind":"classify","step":"first","outcome":"timeout","rule":"agent.timeout","route":"nudge"}
+--- git rebase --abort
+?? .agents/specs/gh-1-add-widget/runs/_story/receipts/0002-classify.json
+{"step":"second","status":"ready","applied_through":2}
+0001-started.json
+0002-classify.json
+0002-done.json
+--- next tick:
+[{"rule":"unit.corrupt","kind":"mark_corrupt","ok":true,"error":null,"detail":null}]
+{"step":"second","status":"corrupt"}
+ M .agents/specs/gh-1-add-widget/runs/_story/state.json
+?? .agents/specs/gh-1-add-widget/runs/_story/receipts/0002-classify.json
+--- two more ticks:
+[{"rule":"unit.corrupt","kind":"noop"}]
+[{"rule":"unit.corrupt","kind":"noop"}]
+--- inbox (unblock):
+{"title":"corrupt: .agents/specs/gh-1-add-widget/runs/_story/receipts/0002-done.json failed validation (S2)","command":"norn why gh-1"}
+--- norn unstick gh-1:
+{"error":"gh-1 is corrupt (S2): .agents/specs/gh-1-add-widget/runs/_story/receipts/0002-done.json","do_instead":"norn why gh-1","code":"corrupt_unit","details":[{"file":".agents/specs/gh-1-add-widget/runs/_story/receipts/0002-done.json","errors":[{"path":"","message":"duplicate receipt number 2 (also 0002-classify.json)"}]}]}
+exit 3
