@@ -13,7 +13,15 @@
 <!-- norn:heartbeat:end -->
 
 ## Goal
+quick and story run test:fast in their local `test` check and wait for the PR's CI in a new `ci` check after open-pr (fail → implement, ci_loop max 3).
 
 ## Progress
+- quick.yaml, story.yaml: test.run → test:fast; open-pr → ci; ci check step as in the issue; ci_loop counter. Header comments updated.
+- test/repo.test.ts: run assertions updated (fix stays full suite); new test parses quick/story and checks the ci step wiring (red before the yaml change).
+- AGENTS.md: the "must pass" line and the test:fast comment.
+- Both workflows load and validate with store loadWorkflow. Full suite (1222 pass) and typecheck green.
+- Left packages/cli/assets/workflows/story.yaml (generic shipped template) and fix.yaml (#94) alone.
+- implement#1 done: quick and story: test check runs test:fast; new ci check after open-pr waits for PR CI (gh pr checks --watch), fail → implement via ci_loop (max 3). repo.test.ts asserts both (new test red first); AGENTS.md updated; fix.yaml and the shipped story asset untouched. Full suite + typecheck green.
 
 ## Resume
+Nothing left; reported done.
