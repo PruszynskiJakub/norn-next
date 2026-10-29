@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M625E04MRS5FKF5Q1ZHY8M6G",
+  "run_id": "01M624ZX1RNA9DCT54G25HBQZD",
+  "step": "merge",
+  "attempt": 1,
+  "at": "2026-10-28T21:07:36.724Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/13",
+  "outcome": "done",
+  "handoff": "Merged story branch 2751d0f into the slice (fead181). Only conflict: packages/cli/src/commands/index.ts. Kept the story side's COMMANDS (inbox/cockpit/orient/take/release/drop moved into the story noun) minus the flat configCommand, and set NOUNS to [storyNoun, runNoun, configNoun] so config stays a noun. Typecheck green, full suite 1293 pass."
+}

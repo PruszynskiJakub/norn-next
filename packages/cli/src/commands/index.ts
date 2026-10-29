@@ -20,14 +20,14 @@ import { storyNoun } from "./story.ts";
 import { statusCommand } from "./status.ts";
 import { unstickCommand } from "./unstick.ts";
 import { workflowCommand } from "./workflow.ts";
-import { configCommand } from "./config.ts";
+import { configNoun } from "./config.ts";
 import { doctorCommand } from "./doctor.ts";
 import { tidyCommand } from "./tidy.ts";
 import { openCommand } from "./open.ts";
 
-export const COMMANDS: readonly Command[] = [initCommand, uninstallCommand, syncCommand, tickCommand, watchCommand, briefCommand, doneCommand, askCommand, stuckCommand, hookEventCommand, statusCommand, openCommand, unstickCommand, modeCommand, workflowCommand, tidyCommand, doctorCommand, configCommand, helpCommand];
+export const COMMANDS: readonly Command[] = [initCommand, uninstallCommand, syncCommand, tickCommand, watchCommand, briefCommand, doneCommand, askCommand, stuckCommand, hookEventCommand, statusCommand, openCommand, unstickCommand, modeCommand, workflowCommand, tidyCommand, doctorCommand, helpCommand];
 
-export const NOUNS: readonly Noun[] = [storyNoun, runNoun];
+export const NOUNS: readonly Noun[] = [storyNoun, runNoun, configNoun];
 
 /** A flat command by name, or a verb by its full name (`run list`). */
 export function findCommand(name: string): Command | undefined {
