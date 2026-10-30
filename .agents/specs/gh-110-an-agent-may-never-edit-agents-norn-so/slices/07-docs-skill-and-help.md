@@ -1,8 +1,8 @@
 ---
 id: gh-110/07
 title: Docs, the shipped skill and help describe the new layout
-depends_on: [gh-110/05, gh-110/06]
-status: planned
+depends_on: [ gh-110/05, gh-110/06 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
