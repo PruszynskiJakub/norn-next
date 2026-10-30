@@ -1,0 +1,26 @@
+{
+  "kind": "started",
+  "receipt_id": "01M66DGC0C1SK5FG6JG1YHP9VJ",
+  "run_id": "01M66DG2RW1N0DSGM4BHPF19H4",
+  "step": "prepare",
+  "attempt": 2,
+  "at": "2026-10-30T12:45:40.748Z",
+  "by": "norn",
+  "who": "jakubpruszynski@MacBook-Pro-Jakub-2",
+  "tick_id": "01M66DG2RWSRY1K7J2QV79WJ3W",
+  "how": "auto",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-109-release",
+  "machine": "jakubpruszynski@MacBook-Pro-Jakub-2",
+  "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD",
+  "session": {
+    "runner": "herdr",
+    "session_id": "w9X:p1",
+    "pane_id": "w9X:p1",
+    "reach": "herdr agent attach w9X:p1"
+  },
+  "process": {
+    "pid": 19575,
+    "pid_start": "Fri Oct 30 13:45:40 2026"
+  }
+}
