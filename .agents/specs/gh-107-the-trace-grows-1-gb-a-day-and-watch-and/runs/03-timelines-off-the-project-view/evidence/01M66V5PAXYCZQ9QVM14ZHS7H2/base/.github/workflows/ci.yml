@@ -1,0 +1,59 @@
+# Every PR and every push to main: the same gates as AGENTS.md (test, typecheck), then the
+# distributables built and smoke-tested as a user would install them.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+      - run: bun install --frozen-lockfile
+      - name: Test
+        run: |
+          git config --global user.name "norn ci"
+          git config --global user.email "ci@norn.invalid"
+          git config --global init.defaultBranch main
+          bun test
+      - run: bun run typecheck
+
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+      - run: bun install --frozen-lockfile
+      - name: Build
+        run: |
+          bun scripts/build.ts
+          bun scripts/build.ts --bin linux-x64
+      - name: Smoke-test the npm package installed from its tarball
+        run: |
+          git config --global user.name "norn ci"
+          git config --global user.email "ci@norn.invalid"
+          version=$(jq -r .version packages/cli/package.json)
+          (cd dist/npm && npm pack --pack-destination "$RUNNER_TEMP")
+          mkdir "$RUNNER_TEMP/app" && cd "$RUNNER_TEMP/app"
+          echo '{"name":"app","private":true}' > package.json
+          bun add "$RUNNER_TEMP"/norn-cli-*.tgz
+          "$GITHUB_WORKSPACE/scripts/smoke.sh" node_modules/.bin/norn "$version"
+      - name: Smoke-test the linux-x64 binary
+        run: scripts/smoke.sh dist/bin/norn-linux-x64 "$(jq -r .version packages/cli/package.json)"

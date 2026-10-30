@@ -1,0 +1,12 @@
+{
+  "kind": "approve",
+  "receipt_id": "01M5MT2BY96K997PRW8MSDN11S",
+  "run_id": null,
+  "step": "human-qa",
+  "attempt": 1,
+  "at": "2026-10-23T16:38:53.641Z",
+  "by": "human",
+  "who": "jakubpruszynski@MacBook-Pro-Jakub-2",
+  "slice": "gh-1/03",
+  "comment": "AC6 confirm() present on delete form; accepted on markup + QA evidence"
+}

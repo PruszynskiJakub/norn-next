@@ -180,11 +180,9 @@ export interface ProjectView {
   inbox: Inbox;
   /** current run per unit, oldest first */
   runs: RunView[];
-  /** unit key → entries, oldest first */
-  timeline: Record<string, TimelineEntry[]>;
   /** units finished within the last 24 h, newest first */
   recently_done: RecentDone[];
-  /** config, workflow, trace or lease files that failed to read */
+  /** config, workflow or lease files that failed to read */
   errors: FileError[];
 }
 

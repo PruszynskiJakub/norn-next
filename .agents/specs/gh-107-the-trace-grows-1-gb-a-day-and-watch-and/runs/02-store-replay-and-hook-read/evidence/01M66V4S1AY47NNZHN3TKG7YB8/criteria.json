@@ -1,0 +1,5 @@
+[
+  { "id": "AC1", "verdict": "pass", "evidence": "AC1.md, ac1-sample-branch.txt, checks.txt, full-suite.txt" },
+  { "id": "AC2", "verdict": "pass", "evidence": "AC2.md, AC23-summary-branch.txt, AC23-summary-base.txt, ac23.diff" },
+  { "id": "AC3", "verdict": "pass", "evidence": "AC3.md, AC23-summary-branch.txt, ac23.diff, checks.txt" }
+]

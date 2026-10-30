@@ -1,0 +1,526 @@
+[
+ {
+  "label": "tick",
+  "v": [
+   [
+    "gh-9",
+    "remote.intake",
+    null
+   ],
+   [
+    "gh-10",
+    "remote.intake",
+    null
+   ]
+  ]
+ },
+ {
+  "label": "tick",
+  "v": [
+   [
+    "gh-10",
+    "claim.acquire.intake",
+    null
+   ],
+   [
+    "gh-9",
+    "claim.acquire.intake",
+    null
+   ]
+  ]
+ },
+ {
+  "label": "tick",
+  "v": [
+   [
+    "gh-10",
+    "story.start",
+    null
+   ],
+   [
+    "gh-9",
+    "story.start",
+    null
+   ]
+  ]
+ },
+ {
+  "label": "tick",
+  "v": [
+   [
+    "gh-10",
+    "unit.parked.attended",
+    null
+   ],
+   [
+    "gh-9",
+    "agent.ready.manual",
+    null
+   ]
+  ]
+ },
+ {
+  "label": "tick",
+  "v": [
+   [
+    "gh-10",
+    "unit.parked.attended",
+    null
+   ],
+   [
+    "gh-9",
+    "agent.ready.manual",
+    null
+   ]
+  ]
+ },
+ {
+  "label": "tick",
+  "v": [
+   [
+    "gh-10",
+    "unit.parked.attended",
+    null
+   ],
+   [
+    "gh-9",
+    "agent.ready.manual",
+    null
+   ]
+  ]
+ },
+ {
+  "label": "state9",
+  "v": {
+   "version": 1,
+   "story": "gh-9",
+   "slice": null,
+   "unit_dir": "_story",
+   "workflow": "duo",
+   "workflow_hash": "b860afe5681e52294c66c9127b984eb0481263126b67ee86f5f096a9d1615f3e",
+   "step": "implement",
+   "attempt": 1,
+   "visits": {
+    "implement": 1
+   },
+   "step_entered_at": "2099-01-15T10:00:30.000Z",
+   "status": "ready",
+   "park": null,
+   "counters": {},
+   "nudges_used": 0,
+   "retries_used": 0,
+   "applied_through": 0,
+   "run": null,
+   "last_outcome": null,
+   "created_at": "2099-01-15T10:00:30.000Z",
+   "updated_at": "2099-01-15T10:00:30.000Z",
+   "last_tick_id": "<ULID>",
+   "mode": "manual"
+  }
+ },
+ {
+  "label": "state10",
+  "v": {
+   "version": 1,
+   "story": "gh-10",
+   "slice": null,
+   "unit_dir": "_story",
+   "workflow": "pair",
+   "workflow_hash": "47627414f890c2fbfb054086d08c8701debbc34263f56de04728261706fefcc6",
+   "step": "refine",
+   "attempt": 1,
+   "visits": {
+    "refine": 1
+   },
+   "step_entered_at": "2099-01-15T10:00:30.000Z",
+   "status": "parked",
+   "park": {
+    "kind": "attended",
+    "reason": "attended step refine: work with the agent in the worktree",
+    "since": "2099-01-15T10:00:30.000Z"
+   },
+   "counters": {},
+   "nudges_used": 0,
+   "retries_used": 0,
+   "applied_through": 0,
+   "run": null,
+   "last_outcome": null,
+   "created_at": "2099-01-15T10:00:30.000Z",
+   "updated_at": "2099-01-15T10:00:30.000Z",
+   "last_tick_id": "<ULID>",
+   "mode": "manual"
+  }
+ },
+ {
+  "label": "brief9.exit",
+  "v": 0
+ },
+ {
+  "label": "brief9.md",
+  "v": "# norn brief — gh-9 · implement #1\n\n## Where you are\n\n- Story: gh-9\n- Step: implement (attempt 1)\n- Mode: manual\n- Run: <ULID>\n\n## Your work\n\nUse the `norn-implement` skill.\n\n## Inputs\n\n- Story spec: `.agents/specs/gh-9-manual-thing/spec.md`\n- Handoff (text under Context; update it here): `.agents/specs/gh-9-manual-thing/runs/_story/handoff.md`\n\n## Context\n\n### Goal\n\n### Progress\n\n### Resume\n\n## Finish with exactly one of\n\n- `norn done done --handoff \"…\"` — every criterion has a passing test\n- `norn ask \"<question>\"` — you need a person's answer to continue; the step parks until answered\n- `norn stuck \"<reason>\"` — you cannot continue; a person unblocks the step\n\nThen end your turn. Never edit `runs/`; never push.\n\n## Limits\n\n- Deadline: 60m (until 2099-01-15T11:01:03.000Z)\n- Nudges left: 2\n- Fresh-session retries left: 1\n- Port slot: 1 (PORT_BASE=4010)\n"
+ },
+ {
+  "label": "brief10.exit",
+  "v": 0
+ },
+ {
+  "label": "brief10.md",
+  "v": "# norn brief — gh-10 · refine #1\n\n## Where you are\n\n- Story: gh-10\n- Step: refine (attempt 1)\n- Mode: manual · attended: work with the person in this session\n- Run: <ULID>\n\n## Your work\n\nUse the `norn-refine` skill.\n\n## Inputs\n\n- Story spec: `.agents/specs/gh-10-pair-on-it/spec.md`\n- Handoff (text under Context; update it here): `.agents/specs/gh-10-pair-on-it/runs/_story/handoff.md`\n\n## Context\n\n### Goal\n\n### Progress\n\n### Resume\n\n## Finish with exactly one of\n\n- `norn done done --handoff \"…\"` — agreed\n- `norn ask \"<question>\"` — you need a person's answer to continue; the step parks until answered\n- `norn stuck \"<reason>\"` — you cannot continue; a person unblocks the step\n\nThen end your turn. Never edit `runs/`; never push.\n\n## Limits\n\n- Attended step: no deadline or nudges (MO4)\n- Fresh-session retries left: 1\n- Port slot: 2 (PORT_BASE=4020)\n"
+ },
+ {
+  "label": "started9",
+  "v": {
+   "kind": "started",
+   "receipt_id": "<ULID>",
+   "run_id": "<ULID>",
+   "step": "implement",
+   "attempt": 1,
+   "at": "2099-01-15T10:01:03.000Z",
+   "by": "agent",
+   "who": "claude",
+   "how": "manual",
+   "agent": "claude",
+   "worktree": "<DIR>/repo-worktrees/gh-9-manual-thing",
+   "agent_session_id": "sess-nine-later",
+   "process": {
+    "pid":<PID>,
+    "pid_start": "Fri Oct 30 17:48:25 2026"
+   }
+  }
+ },
+ {
+  "label": "started10",
+  "v": {
+   "kind": "started",
+   "receipt_id": "<ULID>",
+   "run_id": "<ULID>",
+   "step": "refine",
+   "attempt": 1,
+   "at": "2099-01-15T10:01:03.000Z",
+   "by": "agent",
+   "who": "claude",
+   "how": "manual",
+   "agent": "claude",
+   "worktree": "<DIR>/repo-worktrees/gh-10-pair-on-it",
+   "agent_session_id": "sess-ten",
+   "process": {
+    "pid":<PID>,
+    "pid_start": "Fri Oct 30 17:48:25 2026"
+   }
+  }
+ },
+ {
+  "label": "tick",
+  "v": [
+   [
+    "gh-10",
+    "receipts.apply",
+    null
+   ],
+   [
+    "gh-9",
+    "receipts.apply",
+    null
+   ]
+  ]
+ },
+ {
+  "label": "state9b",
+  "v": {
+   "version": 1,
+   "story": "gh-9",
+   "slice": null,
+   "unit_dir": "_story",
+   "workflow": "duo",
+   "workflow_hash": "b860afe5681e52294c66c9127b984eb0481263126b67ee86f5f096a9d1615f3e",
+   "step": "implement",
+   "attempt": 1,
+   "visits": {
+    "implement": 1
+   },
+   "step_entered_at": "2099-01-15T10:00:30.000Z",
+   "status": "running",
+   "park": null,
+   "counters": {},
+   "nudges_used": 0,
+   "retries_used": 0,
+   "applied_through": 1,
+   "run": {
+    "run_id": "<ULID>",
+    "step": "implement",
+    "attempt": 1,
+    "started_at": "2099-01-15T10:01:03.000Z",
+    "how": "manual",
+    "agent": "claude",
+    "agent_session_id": "sess-nine-later",
+    "process": {
+     "pid":<PID>,
+     "pid_start": "Fri Oct 30 17:48:25 2026"
+    }
+   },
+   "last_outcome": null,
+   "created_at": "2099-01-15T10:00:30.000Z",
+   "updated_at": "2099-01-15T10:01:13.000Z",
+   "last_tick_id": "<ULID>",
+   "mode": "manual"
+  }
+ },
+ {
+  "label": "state10b",
+  "v": {
+   "version": 1,
+   "story": "gh-10",
+   "slice": null,
+   "unit_dir": "_story",
+   "workflow": "pair",
+   "workflow_hash": "47627414f890c2fbfb054086d08c8701debbc34263f56de04728261706fefcc6",
+   "step": "refine",
+   "attempt": 1,
+   "visits": {
+    "refine": 1
+   },
+   "step_entered_at": "2099-01-15T10:00:30.000Z",
+   "status": "running",
+   "park": null,
+   "counters": {},
+   "nudges_used": 0,
+   "retries_used": 0,
+   "applied_through": 1,
+   "run": {
+    "run_id": "<ULID>",
+    "step": "refine",
+    "attempt": 1,
+    "started_at": "2099-01-15T10:01:03.000Z",
+    "how": "manual",
+    "agent": "claude",
+    "agent_session_id": "sess-ten",
+    "process": {
+     "pid":<PID>,
+     "pid_start": "Fri Oct 30 17:48:25 2026"
+    }
+   },
+   "last_outcome": null,
+   "created_at": "2099-01-15T10:00:30.000Z",
+   "updated_at": "2099-01-15T10:01:13.000Z",
+   "last_tick_id": "<ULID>",
+   "mode": "manual"
+  }
+ },
+ {
+  "label": "stop9.0",
+  "v": [
+   0,
+   {
+    "decision": "block",
+    "reason": "norn: step implement of gh-9 has no report for this run. Before ending your turn, report exactly once: `norn done <done> --handoff \"…\"`, `norn ask \"<question>\"` or `norn stuck \"<reason>\"`. Run `norn brief` to see what each outcome means."
+   }
+  ]
+ },
+ {
+  "label": "stop9.1",
+  "v": [
+   0,
+   {
+    "decision": "block",
+    "reason": "norn: step implement of gh-9 has no report for this run. Before ending your turn, report exactly once: `norn done <done> --handoff \"…\"`, `norn ask \"<question>\"` or `norn stuck \"<reason>\"`. Run `norn brief` to see what each outcome means."
+   }
+  ]
+ },
+ {
+  "label": "stop9.2",
+  "v": [
+   0,
+   {
+    "decision": "block",
+    "reason": "norn: step implement of gh-9 has no report for this run. Before ending your turn, report exactly once: `norn done <done> --handoff \"…\"`, `norn ask \"<question>\"` or `norn stuck \"<reason>\"`. Run `norn brief` to see what each outcome means."
+   }
+  ]
+ },
+ {
+  "label": "stop9.3",
+  "v": [
+   0,
+   {}
+  ]
+ },
+ {
+  "label": "stop9.4",
+  "v": [
+   0,
+   {}
+  ]
+ },
+ {
+  "label": "stop10.0",
+  "v": [
+   0,
+   {}
+  ]
+ },
+ {
+  "label": "stop10.1",
+  "v": [
+   0,
+   {}
+  ]
+ },
+ {
+  "label": "tick",
+  "v": [
+   [
+    "gh-10",
+    "agent.attended.running",
+    null
+   ],
+   [
+    "gh-9",
+    "agent.silent.surface",
+    null
+   ]
+  ]
+ },
+ {
+  "label": "tick",
+  "v": [
+   [
+    "gh-10",
+    "agent.attended.running",
+    null
+   ],
+   [
+    "gh-9",
+    "agent.running",
+    null
+   ]
+  ]
+ },
+ {
+  "label": "state9c",
+  "v": {
+   "version": 1,
+   "story": "gh-9",
+   "slice": null,
+   "unit_dir": "_story",
+   "workflow": "duo",
+   "workflow_hash": "b860afe5681e52294c66c9127b984eb0481263126b67ee86f5f096a9d1615f3e",
+   "step": "implement",
+   "attempt": 1,
+   "visits": {
+    "implement": 1
+   },
+   "step_entered_at": "2099-01-15T10:00:30.000Z",
+   "status": "running",
+   "park": null,
+   "counters": {},
+   "nudges_used": 1,
+   "retries_used": 0,
+   "applied_through": 2,
+   "run": {
+    "run_id": "<ULID>",
+    "step": "implement",
+    "attempt": 1,
+    "started_at": "2099-01-15T10:01:03.000Z",
+    "how": "manual",
+    "agent": "claude",
+    "agent_session_id": "sess-nine-later",
+    "process": {
+     "pid":<PID>,
+     "pid_start": "Fri Oct 30 17:48:25 2026"
+    }
+   },
+   "last_outcome": {
+    "step": "implement",
+    "outcome": "silent",
+    "source": "classified",
+    "at": "2099-01-15T10:01:25.500Z",
+    "receipt_id": "<ULID>"
+   },
+   "created_at": "2099-01-15T10:00:30.000Z",
+   "updated_at": "2099-01-15T10:01:25.500Z",
+   "last_tick_id": "<ULID>",
+   "mode": "manual"
+  }
+ },
+ {
+  "label": "inbox",
+  "v": "{\"at\":\"2099-01-15T10:01:35.500Z\",\"groups\":{\"your_turn\":[{\"story\":\"gh-9\",\"slice\":null,\"url\":\"https://github.com/o/r/issues/9\",\"reach\":{\"worktree\":\"<DIR>/repo-worktrees/gh-9-manual-thing\",\"agent_session_id\":\"sess-nine-later\",\"pane_id\":null},\"id\":\"silent:gh-9:implement#1:1\",\"group\":\"your_turn\",\"step\":\"implement\",\"title\":\"agent ended its turn without reporting — reopen the agent and run norn brief\",\"command\":\"cd <DIR>/repo-worktrees/gh-9-manual-thing && claude 'Use the norn skill, then run `norn brief`.'\",\"since\":\"2099-01-15T10:01:25.500Z\",\"age\":\"10s\"}],\"answer\":[],\"approve\":[],\"unblock\":[],\"check\":[],\"unclaimed\":[],\"running\":[{\"story\":\"gh-10\",\"slice\":null,\"url\":\"https://github.com/o/r/issues/10\",\"reach\":{\"worktree\":\"<DIR>/repo-worktrees/gh-10-pair-on-it\",\"agent_session_id\":\"sess-ten\",\"pane_id\":null},\"id\":\"running:gh-10:refine#1\",\"group\":\"running\",\"step\":\"refine\",\"title\":\"refine #1 (manual)\",\"command\":\"norn trace gh-10\",\"since\":\"2099-01-15T10:01:03.000Z\",\"age\":\"32s\"}],\"notes\":[],\"recently_done\":[]},\"pending\":1}\n"
+ },
+ {
+  "label": "done9",
+  "v": 0
+ },
+ {
+  "label": "tick",
+  "v": [
+   [
+    "gh-10",
+    "agent.attended.running",
+    null
+   ],
+   [
+    "gh-9",
+    "receipts.apply",
+    null
+   ]
+  ]
+ },
+ {
+  "label": "tick",
+  "v": [
+   [
+    "gh-10",
+    "agent.attended.running",
+    null
+   ],
+   [
+    "gh-9",
+    "agent.ready.manual",
+    null
+   ]
+  ]
+ },
+ {
+  "label": "state9d",
+  "v": {
+   "version": 1,
+   "story": "gh-9",
+   "slice": null,
+   "unit_dir": "_story",
+   "workflow": "duo",
+   "workflow_hash": "b860afe5681e52294c66c9127b984eb0481263126b67ee86f5f096a9d1615f3e",
+   "step": "review",
+   "attempt": 1,
+   "visits": {
+    "implement": 1,
+    "review": 1
+   },
+   "step_entered_at": "2099-01-15T10:01:45.500Z",
+   "status": "ready",
+   "park": null,
+   "counters": {},
+   "nudges_used": 0,
+   "retries_used": 0,
+   "applied_through": 3,
+   "run": null,
+   "last_outcome": {
+    "step": "implement",
+    "outcome": "done",
+    "source": "reported",
+    "at": "2099-01-15T10:01:35.500Z",
+    "receipt_id": "<ULID>"
+   },
+   "created_at": "2099-01-15T10:00:30.000Z",
+   "updated_at": "2099-01-15T10:01:45.500Z",
+   "last_tick_id": "<ULID>",
+   "mode": "manual"
+  }
+ },
+ {
+  "label": "why9",
+  "v": "{\"unit\":\"gh-9\",\"tick_id\":\"<ULID>\",\"at\":\"2099-01-15T10:01:55.500Z\",\"rule\":\"agent.ready.manual\",\"action\":\"noop\",\"reason\":\"ready: a person starts an agent and runs norn brief\",\"trigger\":{\"source\":\"fact\",\"kind\":\"agent.ready.manual\",\"reason\":\"ready: a person starts an agent and runs norn brief\"},\"result\":{\"ok\":true},\"facts\":{\"claim\":\"mine\",\"status\":\"ready\",\"step\":\"review\",\"attempt\":1,\"park\":null,\"counters\":{},\"unapplied\":[],\"errors\":[]},\"decision\":{\"kind\":\"noop\",\"unit\":{\"story\":\"gh-9\",\"slice\":null,\"dir\":\"_story\",\"key\":\"gh-9\"},\"rule\":\"agent.ready.manual\",\"reason\":\"ready: a person starts an agent and runs norn brief\"},\"replay\":{\"matches\":true,\"all_match\":true,\"rule\":\"agent.ready.manual\"}}\n"
+ },
+ {
+  "label": "why10",
+  "v": "{\"unit\":\"gh-10\",\"tick_id\":\"<ULID>\",\"at\":\"2099-01-15T10:01:55.500Z\",\"rule\":\"agent.attended.running\",\"action\":\"noop\",\"reason\":\"run <ULID> in progress\",\"trigger\":{\"source\":\"fact\",\"kind\":\"agent.attended.running\",\"reason\":\"run <ULID> in progress\"},\"result\":{\"ok\":true},\"facts\":{\"claim\":\"mine\",\"status\":\"running\",\"step\":\"refine\",\"attempt\":1,\"park\":null,\"counters\":{},\"unapplied\":[],\"errors\":[]},\"decision\":{\"kind\":\"noop\",\"unit\":{\"story\":\"gh-10\",\"slice\":null,\"dir\":\"_story\",\"key\":\"gh-10\"},\"rule\":\"agent.attended.running\",\"reason\":\"run <ULID> in progress\"},\"replay\":{\"matches\":true,\"all_match\":true,\"rule\":\"agent.attended.running\"}}\n"
+ }
+]

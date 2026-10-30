@@ -2,11 +2,11 @@
  * One heartbeat pass (H1): local lock → observe → decide → `tick.start` → act → log → `tick.end`
  * (R5.4) → `heartbeat.json` `last_tick_at` (R5.5). The tick trace record
  * holds the facts snapshot, the workflows and config decide used, each rule fired, action and
- * result (O4), so `norn why` replays decide on exactly the same inputs (O5) via `replayInputs`.
+ * result (O4), so `norn why` replays decide on exactly the same inputs (O5) via store `readTickInputs`.
  */
-import { decide, type Facts, type LoadedWorkflow, type RepoWorkflows } from "@norn/core";
-import { type ResolvedConfig, type TickTrace, type TickUnitRecord, ulid } from "@norn/schema";
-import { acquireTickLock, appendTrace, markTick, parseWorkflowText, readTraceFile, writeTraceFile, trackInbox } from "@norn/store";
+import { decide, type Facts, type RepoWorkflows } from "@norn/core";
+import { type TickTrace, type TickUnitRecord, ulid } from "@norn/schema";
+import { acquireTickLock, appendTrace, markTick, type ReplayBlock, type ReplayWorkflowRef, readTraceFile, writeTraceFile, trackInbox } from "@norn/store";
 import type { Context } from "../context.ts";
 import { busyError } from "../output.ts";
 import { NORN_VERSION } from "../version.ts";
@@ -35,17 +35,6 @@ export interface TickReport {
   orphans?: Facts["orphans"];
 }
 
-/** Workflows as recorded in the trace: name → hash of the text stored at `trace/workflows/<hash>.yaml`. */
-export interface ReplayWorkflowRef {
-  hash: string | null;
-  issues: LoadedWorkflow["issues"];
-}
-
-export interface ReplayBlock {
-  workflows: Record<string, ReplayWorkflowRef>;
-  config: ResolvedConfig;
-}
-
 const sha = (text: string) => new Bun.CryptoHasher("sha256").update(text).digest("hex");
 const jsonSafe = <T>(v: T): T => JSON.parse(JSON.stringify(v ?? null)) as T;
 
@@ -57,20 +46,6 @@ function recordWorkflows(root: string, workflows: RepoWorkflows): Record<string,
     out[name] = { hash, issues: w.issues };
   }
   return out;
-}
-
-/** Rebuild decide's inputs from a tick record (O5). */
-export function replayInputs(root: string, trace: TickTrace): { facts: Facts; workflows: RepoWorkflows; config: ResolvedConfig } | null {
-  const { replay, ...facts } = trace.facts as unknown as Facts & { replay?: ReplayBlock };
-  if (!replay) return null;
-  const workflows: Record<string, LoadedWorkflow> = {};
-  for (const [name, ref] of Object.entries(replay.workflows)) {
-    const source = ref.hash ? (readTraceFile(root, `workflows/${ref.hash}.yaml`) ?? "") : "";
-    const parsed = source ? parseWorkflowText(source, `trace/workflows/${ref.hash}.yaml`) : null;
-    const workflow = parsed?.ok ? parsed.value : null;
-    workflows[name] = { name, workflow, source, issues: ref.issues };
-  }
-  return { facts: facts as Facts, workflows, config: replay.config };
 }
 
 export function traceRecord(obs: Observed, records: ActRecord[], startedAt: number, duration: number): TickTrace {

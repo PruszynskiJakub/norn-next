@@ -1,0 +1,12 @@
+{
+  "kind": "done",
+  "receipt_id": "01M63M7SAMMQXF6SCWSPX7HMKG",
+  "run_id": "01M63KTG85FMVC0X8SYRE81ZQC",
+  "step": "implement",
+  "attempt": 2,
+  "at": "2026-10-29T10:45:36.212Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "done",
+  "handoff": "Rework of test.fail: rebase-rewind.test.ts's beforeAll (~4.6s alone) exceeded bun's 5s default hook timeout under full-suite load; added setDefaultTimeout(30_000) as in every other cli harness test. bun run test 1228/1228, typecheck clean."
+}

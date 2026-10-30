@@ -84,7 +84,7 @@ function decideBlock(root: string, s: UnitSession | null, fact: HookFact, adapte
   const run = currentRun(s);
   if (!run || (fact.run_id && fact.run_id !== run.run_id)) return { block: false };
   if (standingReport(s, run.run_id)) return { block: false };
-  if (blockedHookCount(root, run.run_id) >= MAX_STOP_BLOCKS) return { block: false };
+  if (blockedHookCount(root, { story: s.unit.story, slice: s.unit.slice, worktree: s.worktree }, run.run_id) >= MAX_STOP_BLOCKS) return { block: false };
   const outcomes = reportableOutcomes(step);
   return {
     block: true,

@@ -7,8 +7,8 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { TickTrace } from "@norn/schema";
-import { loadWorkflows, readTrace } from "@norn/store";
-import { replayInputs, type TickReport } from "../src/index.ts";
+import { loadWorkflows, readTickInputs, readTrace } from "@norn/store";
+import type { TickReport } from "../src/index.ts";
 import { decide } from "@norn/core";
 import { createHarness, type Harness, issue } from "./harness.ts";
 import { expectTranscript, recordTranscript, type Transcript } from "./transcript.ts";
@@ -355,7 +355,7 @@ describe("a story through the slice workflow", () => {
     expect(Math.max(...ticks.map((t) => t.duration_ms))).toBeLessThan(5000);
     expect(ticks.length).toBeGreaterThan(20);
     for (const t of ticks.slice(-6)) {
-      const inputs = replayInputs(h.root, t);
+      const inputs = readTickInputs(h.root, t);
       expect(inputs).not.toBeNull();
       const replayed = decide(inputs!.facts, inputs!.workflows, inputs!.config);
       expect(replayed.map((d) => d.rule)).toEqual(t.decisions.map((d) => d.rule));

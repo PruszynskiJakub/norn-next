@@ -1,0 +1,8 @@
+# Every change to norn starts as an issue. A collaborator adds the `norn` label and assigns the
+# issue to themselves when norn should pick it up (GR1). The bug report template only routes: it sets
+# norn:wf:reproduce so a bug starts in `reproduce` instead of `triage` (W9); the rest is left to them.
+blank_issues_enabled: true
+contact_links:
+  - name: How to contribute
+    url: https://github.com/PruszynskiJakub/norn-next/blob/main/CONTRIBUTING.md
+    about: How a change reaches norn, and what happens to a pull request from a fork.

@@ -1,0 +1,21 @@
+{
+  "name": "norn-monorepo",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "test": "bun test",
+    "test:fast": "bun test --path-ignore-patterns='packages/cli/**'",
+    "test:cli": "bun test ./packages/cli/test",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p scripts/tsconfig.json",
+    "schema:emit": "bun packages/schema/scripts/emit.ts",
+    "golden": "bun scripts/golden.ts",
+    "build": "bun scripts/build.ts",
+    "build:bin": "bun scripts/build.ts --bin"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.13",
+    "typescript": "^5.9.3",
+    "yaml": "^2.8.1"
+  }
+}

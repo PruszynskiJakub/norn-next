@@ -259,7 +259,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       const ownWt = lu.worktree;
       const worktree = await wtFacts(ownWt);
       const unitBranch = u.unit.slice ? (sliceFile ? sliceBranch(s.key, sliceFile.nn, sliceFile.slug) : (worktree?.status?.branch ?? `${s.key}/${u.unit.dir}`)) : branch;
-      const uf = await unitFacts(ports, s, lu, worktree, local.hooks, runEnv);
+      const uf = await unitFacts(ports, s, lu, worktree, lu.hooks, runEnv);
       if (lu.act_failure) uf.act_failure = lu.act_failure;
       // a done slice not yet integrated: is its branch in the story branch (the slice cleanup's delete)
       if (sliceFile && u.state?.status === "done" && sliceFile.frontmatter?.status !== "integrated") {

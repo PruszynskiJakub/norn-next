@@ -1,0 +1,155 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://norn.dev/schema/local-inbox.json",
+  "title": "norn open inbox items (trace/inbox.json)",
+  "type": "object",
+  "properties": {
+    "open": {
+      "type": "object",
+      "patternProperties": {
+        "^(.*)$": {
+          "type": "object",
+          "required": [
+            "id",
+            "group",
+            "story",
+            "slice",
+            "step",
+            "title",
+            "command",
+            "since"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "group": {
+              "anyOf": [
+                {
+                  "const": "your_turn",
+                  "type": "string"
+                },
+                {
+                  "const": "answer",
+                  "type": "string"
+                },
+                {
+                  "const": "approve",
+                  "type": "string"
+                },
+                {
+                  "const": "unblock",
+                  "type": "string"
+                },
+                {
+                  "const": "check",
+                  "type": "string"
+                },
+                {
+                  "const": "unclaimed",
+                  "type": "string"
+                },
+                {
+                  "const": "running",
+                  "type": "string"
+                },
+                {
+                  "const": "notes",
+                  "type": "string"
+                },
+                {
+                  "const": "recently_done",
+                  "type": "string"
+                }
+              ]
+            },
+            "story": {
+              "type": "string"
+            },
+            "slice": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "step": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": {
+              "type": "string"
+            },
+            "detail": {
+              "type": "string"
+            },
+            "command": {
+              "type": "string"
+            },
+            "full": {
+              "type": "string"
+            },
+            "since": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "reach": {
+              "type": "object",
+              "required": [
+                "worktree",
+                "agent_session_id",
+                "pane_id"
+              ],
+              "properties": {
+                "worktree": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "agent_session_id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "pane_id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "cleared_by": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,89 @@
+# Quick workflow — repo-local, for refactors, docs, chores, other small changes and the fix of a
+# bug `reproduce` confirmed (W1, W9: label norn:wf:quick). A story workflow without `slices` (W8):
+# every step works in the story worktree. Implement, bring the story up to date with its base, check, review, describe,
+# open the draft PR (or rewrite the body of the open one), wait for the PR's CI, and wait for a
+# person at `ready`; the person merges the PR. The local check runs test:fast; CI runs the full suite.
+# A story waiting at ready goes back through update when the base moved under it in a way
+# that conflicts (BS6–BS8, base.stale: conflict).
+name: quick
+description: Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR.
+start: implement
+steps:
+  implement:
+    type: agent
+    skill: norn-implement
+    inputs: [spec, handoff, last_check, last_findings]
+    instructions: >-
+      The spec is story.md (the issue) and the triage findings in the issue's latest `## Triage`
+      comment (`gh issue view <N> --comments`). Keep to what they ask. A change in
+      behaviour gets a test first; a change to docs or a pure refactor needs none beyond the suite
+      staying green. A bug comes from `reproduce` with a red loop in the handoff's Progress and the
+      issue's latest `## Reproduce` comment: turn it into a failing test at the seam named there before
+      changing any code, then fix the cause and cite the PRD ids the fix enforces.
+      Test your change with `bun packages/cli/src/main.ts …`, never the installed `norn`.
+      Run that dev build only in a throwaway git repo under $TMPDIR, never in this worktree: it is a live norn unit (NORN_HOME points at it) and a dev build would act on its runs/, claim and state.json.
+    outcomes:
+      done: { to: update, means: "the change is made; each behaviour change and rework point has a passing test" }
+  update:
+    type: git
+    action: update
+    outcomes: { done: test, conflict: { to: resolve, counter: base_conflict_loop } }
+  resolve:
+    type: agent
+    skill: norn-merge
+    inputs: [spec, handoff]
+    instructions: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase."
+    outcomes:
+      done: { to: update, means: "base merged into the story branch, conflicts resolved and committed" }
+  test:
+    type: check
+    run: "bun install --frozen-lockfile && bun run test:fast && bun run typecheck"
+    timeout: 15m
+    outcomes: { pass: review, fail: { to: implement, counter: test_loop } }
+  review:
+    type: agent
+    skill: norn-review
+    inputs: [spec, diff]
+    outcomes:
+      approve:           { to: describe, means: "the change does what story.md asks and nothing else, no blocking findings" }
+      changes_requested: { to: implement, counter: review_loop, means: "blocking findings in the receipt" }
+  describe:
+    type: agent
+    skill: norn-pr
+    inputs: [spec, diff, handoff]
+    instructions: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
+    outcomes:
+      done: { to: open-pr, means: "pr.md describes the branch as it is now: summary, evidence, merge danger" }
+  open-pr:
+    type: git
+    action: open-pr
+    outcomes: { done: ci }
+  # waits for the PR's CI (a detached check run, so the tick is not blocked); a red run's failed
+  # log becomes last_check for implement, whose rework goes back through open-pr to the new head
+  ci:
+    type: check
+    run: |
+      for i in $(seq 1 30); do gh pr checks >/dev/null 2>&1 && break; sleep 10; done
+      gh pr checks --watch --fail-fast --interval 30 && exit 0
+      run=$(gh run list --branch "$(git branch --show-current)" --limit 1 --json databaseId -q '.[0].databaseId')
+      gh run view "$run" --log-failed | tail -300
+      exit 1
+    timeout: 30m
+    outcomes: { pass: ready, fail: { to: implement, counter: ci_loop } }
+  ready:
+    type: gate
+    prompt: "Read the draft PR. Approve to mark the story finished (a person still merges the PR), or reject with what to change."
+    outcomes:
+      approve: $done
+      reject:  { to: implement, counter: ready_loop }
+      stale:   { to: update, counter: stale_loop }
+counters:
+  test_loop: { max: 5 }
+  ci_loop: { max: 3 }
+  review_loop: { max: 3 }
+  ready_loop: { max: 2 }
+  # resets each time update merges cleanly: only repeated conflicts on one base move count (W4)
+  base_conflict_loop: { max: 2, reset_on: update.done }
+  # a stale re-entry is progress from outside (a sibling merged), bounded by the sibling merges
+  stale_loop: { max: 10 }
+base: { stale: conflict }

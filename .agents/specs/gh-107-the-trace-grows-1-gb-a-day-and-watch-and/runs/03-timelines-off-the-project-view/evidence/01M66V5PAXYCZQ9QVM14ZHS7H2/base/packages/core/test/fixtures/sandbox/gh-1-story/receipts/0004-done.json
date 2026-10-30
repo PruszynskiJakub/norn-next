@@ -1,0 +1,12 @@
+{
+  "kind": "done",
+  "receipt_id": "01M5MRRRSHD95CGFTMWJN92H36",
+  "run_id": "01M5MRN5T9Y6WHREEWTHQH0B7H",
+  "step": "plan",
+  "attempt": 1,
+  "at": "2026-10-23T16:16:10.545Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "done",
+  "handoff": "plan.md written: seams S1 store.ts openStore(path,{now})->Store (all SQLite + domain rules, StoreError invalid|not_found), S2 createApp(store) fetch handler (api.ts JSON, web.ts forms, views.ts HTML; tested by calling handler), S3 server.ts process (DB_PATH/PORT, exit 1 on DB failure; spawned tests with PORT=0). Coverage table B1-B32. P1 extract createApp from server.ts. Key decisions: domain rules in store; UI is server-rendered forms with POST-redirect-GET (only confirm/onchange inline JS) so B24-B31 test at HTTP seam; ORDER BY id, no position column; FK cascade + transaction; suggested slices store -> JSON API+server -> web UI. Risk: B29 'API error message' read via store message."
+}

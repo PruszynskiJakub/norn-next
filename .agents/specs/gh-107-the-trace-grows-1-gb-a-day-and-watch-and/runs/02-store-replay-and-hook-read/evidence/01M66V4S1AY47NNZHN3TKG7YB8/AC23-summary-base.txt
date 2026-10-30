@@ -1,0 +1,31 @@
+tick [["gh-9","remote.intake",null],["gh-10","remote.intake",null]]
+tick [["gh-10","claim.acquire.intake",null],["gh-9","claim.acquire.intake",null]]
+tick [["gh-10","story.start",null],["gh-9","story.start",null]]
+tick [["gh-10","unit.parked.attended",null],["gh-9","agent.ready.manual",null]]
+tick [["gh-10","unit.parked.attended",null],["gh-9","agent.ready.manual",null]]
+tick [["gh-10","unit.parked.attended",null],["gh-9","agent.ready.manual",null]]
+state9 {"step":"implement","status":"ready"}
+state10 {"step":"refine","status":"parked"}
+brief9.exit 0
+brief10.exit 0
+started9 {"agent_session_id":"sess-nine-later","worktree":"<DIR>/repo-worktrees/gh-9-manual-thing","step":"implement"}
+started10 {"agent_session_id":"sess-ten","worktree":"<DIR>/repo-worktrees/gh-10-pair-on-it","step":"refine"}
+tick [["gh-10","receipts.apply",null],["gh-9","receipts.apply",null]]
+state9b {"step":"implement","status":"running","sess":"sess-nine-later"}
+state10b {"step":"refine","status":"running","sess":"sess-ten"}
+stop9.0 [0,{"decision":"block","reason":"norn: step implement of gh-9 has no report for this run. Before ending your turn, report exactly once: `norn done <done> --handoff \"…\"`, `norn ask \"<question>\"` or
+stop9.1 [0,{"decision":"block","reason":"norn: step implement of gh-9 has no report for this run. Before ending your turn, report exactly once: `norn done <done> --handoff \"…\"`, `norn ask \"<question>\"` or
+stop9.2 [0,{"decision":"block","reason":"norn: step implement of gh-9 has no report for this run. Before ending your turn, report exactly once: `norn done <done> --handoff \"…\"`, `norn ask \"<question>\"` or
+stop9.3 [0,{}]
+stop9.4 [0,{}]
+stop10.0 [0,{}]
+stop10.1 [0,{}]
+tick [["gh-10","agent.attended.running",null],["gh-9","agent.silent.surface",null]]
+tick [["gh-10","agent.attended.running",null],["gh-9","agent.running",null]]
+state9c {"step":"implement","status":"running","sess":"sess-nine-later"}
+done9 0
+tick [["gh-10","agent.attended.running",null],["gh-9","receipts.apply",null]]
+tick [["gh-10","agent.attended.running",null],["gh-9","agent.ready.manual",null]]
+state9d {"step":"review","status":"ready"}
+why9 {"unit":"gh-9","tick_id":"<ULID>","at":"2099-01-15T10:01:55.500Z","rule":"agent.ready.manual","action":"noop","reason":"ready: a person starts an agent and runs norn brief","trigger":{"source":"fact","kind":"agent.ready.manual","reason":"ready: a per
+why10 {"unit":"gh-10","tick_id":"<ULID>","at":"2099-01-15T10:01:55.500Z","rule":"agent.attended.running","action":"noop","reason":"run <ULID> in progress","trigger":{"source":"fact","kind":"agent.attended.running","reason":"run <ULID> in progress"},"result

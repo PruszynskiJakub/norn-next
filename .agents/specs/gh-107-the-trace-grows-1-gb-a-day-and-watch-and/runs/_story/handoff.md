@@ -5,7 +5,7 @@
 - Counters: base_conflict_loop 0/2, ci_loop 0/3, plan_loop 1/3, qa_loop 0/2, ready_loop 0/2, stale_loop 0/10, test_loop 0/5, triage_loop 0
 - Last outcome: approve-plan.approve (human, 2026-10-30T15:11:47.812Z)
 - Next: `norn brief`
-- Updated: 2026-10-30T15:12:08.376Z
+- Updated: 2026-10-30T18:02:31.030Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - story.start: triage at explore
@@ -22,6 +22,7 @@
 - agent.start: slice run 01M66NGMHNPQM0EG644XB0TEQH
 - receipts.apply: slice.done → approve-plan
 - receipts.apply: approve-plan.approve → slices
+- receipts.apply: applied 17
 <!-- norn:heartbeat:end -->
 
 ## Goal

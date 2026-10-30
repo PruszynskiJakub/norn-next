@@ -1,0 +1,12 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61BWCM3ZPB2NCSPXCRJWMSX",
+  "run_id": "01M61BF1MGVGEDZVW1D188350Y",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-28T13:41:05.283Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "done",
+  "handoff": "Triage now posts findings only as an issue comment; triage.yaml, triage SKILL.md, fix.yaml and quick.yaml read/write the triage via the issue comment, not story.md. Docs-only; suite and typecheck green."
+}

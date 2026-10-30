@@ -1,7 +1,8 @@
 /**
  * loadProjectView (X1): one read-only pass over local data — the checkout's local facts as observe
  * reads them (`loadLocalFacts`: spec folders in the main checkout and story worktrees, runs/, hook
- * facts, caches, ~/.norn leases), the trace window for timelines, and local claim refs.
+ * facts, caches, ~/.norn leases) and local claim refs. No trace day file (B1, B2, D1): timelines are
+ * a separate read, `loadTimelines`.
  * No network (no fetch, no ls-remote, no remote API) and no writes of any kind.
  */
 import { existsSync } from "node:fs";
@@ -27,7 +28,7 @@ import {
   type UnpushedRuns,
   type WorktreeFacts,
 } from "@norn/core";
-import { DEFAULT_CONFIG, type HookFact, type Mode, type ResolvedConfig, sliceBranch, storyBranch, type TraceEvent } from "@norn/schema";
+import { DEFAULT_CONFIG, type HookFact, type Mode, type ResolvedConfig, sliceBranch, storyBranch } from "@norn/schema";
 import {
   cachedDefaultBranch,
   classifyClaim,
@@ -41,7 +42,6 @@ import {
   onlyNornCommitsSince,
   readEnvNorn,
   readLocalClaim,
-  readTrace,
   runHooks,
   scanWorktrees,
   type StorySnapshot,
@@ -49,8 +49,7 @@ import {
   type UnpushedTarget,
   unpushedRuns,
 } from "@norn/store";
-import { mergeTimeline, receiptEntry, traceEntries, traceUnits } from "./timeline.ts";
-import type { BaseSyncView, ClaimView, CounterView, PrView, ProjectView, RecentDone, RunView, SliceView, StoryView, TimelineEntry, UnitView } from "./types.ts";
+import type { BaseSyncView, ClaimView, CounterView, PrView, ProjectView, RecentDone, RunView, SliceView, StoryView, UnitView } from "./types.ts";
 
 export interface LoadProjectViewOptions {
   repoRoot: string;
@@ -65,18 +64,8 @@ export interface LoadProjectViewOptions {
   heartbeatId?: string | null;
   /** what the configured runner can do (R4.1); `open` makes Your turn show `norn open` (MO5) */
   runnerCapabilities?: RunnerCapabilities;
-  /** trace window lower bound (ISO); default 14 days before now */
-  traceSince?: string;
   /** lease liveness check (default: holder pid + start time) */
   liveness?: LeaseLiveness;
-}
-
-const TRACE_WINDOW_MS = 14 * 86_400_000;
-
-function push<T>(m: Map<string, T[]>, k: string, v: T): void {
-  const list = m.get(k);
-  if (list) list.push(v);
-  else m.set(k, [v]);
 }
 
 /** A worktree as the view sees it: on disk and its slot; git status is not read (no git, X1). Null when absent, as observe. */
@@ -262,14 +251,9 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   const ctx: Ctx = { now, config, runner, heartbeatDown: false };
 
   const leases = local.leases;
-  const [claims, trace] = await Promise.all([
-    Promise.all(local.stories.map((s) => readLocalClaim(opts.repoRoot, s.snapshot.key).catch(() => ({ state: "none" }) as const))),
-    Promise.resolve(readTrace(opts.repoRoot, { since: opts.traceSince ?? new Date(now - TRACE_WINDOW_MS).toISOString() })),
-  ]);
-  errors.push(...leases.errors, ...trace.errors);
+  const claims = await Promise.all(local.stories.map((s) => readLocalClaim(opts.repoRoot, s.snapshot.key).catch(() => ({ state: "none" }) as const)));
+  errors.push(...leases.errors);
 
-  const traceByUnit = new Map<string, TraceEvent[]>();
-  for (const ev of trace.events) for (const k of traceUnits(ev)) push(traceByUnit, k, ev);
   const leaseByRun = new Map<string, { entry: LeaseEntry; alive: boolean }>();
   for (const [list, alive] of [[leases.dead, false], [leases.live, true]] as const)
     for (const entry of list) if (entry.lease.run_id && entry.lease.kind !== "slot") leaseByRun.set(entry.lease.run_id, { entry, alive });
@@ -307,7 +291,6 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     }),
   );
   const runs: RunView[] = [];
-  const timeline: Record<string, TimelineEntry[]> = {};
   const storyFacts: StoryFacts[] = [];
   const stories: StoryView[] = [];
   const views: Array<() => void> = [];
@@ -320,7 +303,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     const mode: Mode = storyState?.mode ?? config.default_mode;
     const finished = story.frontmatter?.status === "done" || story.frontmatter?.status === "dropped";
 
-    const units: UnitFacts[] = ls.units.map((lu) => unitFacts(lu, local.hooks, leaseByRun));
+    const units: UnitFacts[] = ls.units.map((lu) => unitFacts(lu, lu.hooks, leaseByRun));
     const sf: StoryFacts = {
       key: story.key,
       slug: story.slug,
@@ -347,7 +330,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     };
     storyFacts.push(sf);
 
-    // Runs and timelines.
+    // Runs.
     story.units.forEach((u, j) => {
       const r = u.state?.run;
       const uf = units[j] as UnitFacts;
@@ -375,9 +358,6 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
           machine: r.machine ?? null,
         });
       }
-      const entries = (u.receipts ?? u.unapplied).map(receiptEntry);
-      for (const ev of traceByUnit.get(u.unit.key) ?? []) entries.push(...traceEntries(ev, u.unit.key));
-      timeline[u.unit.key] = mergeTimeline(entries);
     });
 
     // Unit views — built once the heartbeat state is known (R5.5), below.
@@ -454,7 +434,6 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     stories,
     inbox: buildInbox(facts, config),
     runs,
-    timeline,
     recently_done,
     errors,
   };

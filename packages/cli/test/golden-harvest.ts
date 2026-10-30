@@ -1,7 +1,7 @@
 /**
  * Golden decisions harvest (refactor Phase 0.1). With `NORN_GOLDEN_OUT` set, `Harness.cleanup()`
  * calls `harvestGolden` before deleting the temp repo: every tick of the repo's trace becomes one
- * golden case — decide's inputs as `norn why` rebuilds them (O5, `replayInputs`) and the decisions
+ * golden case — decide's inputs as `norn why` rebuilds them (O5, store `readTickInputs`) and the decisions
  * the tick's `tick.start` record holds (R5.4) — with the harness's temp paths normalised.
  * `scripts/golden.ts` runs the cli integration tests with it on and writes the corpus that
  * `packages/core/test/golden.test.ts` replays. Off (the default), this does nothing.
@@ -14,8 +14,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import type { TickStartTrace, TickTrace } from "@norn/schema";
-import { readTrace } from "@norn/store";
-import { replayInputs } from "../src/runtime/tick.ts";
+import { readTickInputs, readTrace } from "@norn/store";
 
 /** Placeholders the golden corpus uses in place of machine-specific paths. */
 export const GOLDEN_DIR_TOKEN = "<dir>";
@@ -90,7 +89,7 @@ export function harvestGolden(dir: string, root: string, outDir: string, source:
   for (const ev of events) {
     if (ev.type !== "tick") continue;
     const tick = ev as TickTrace;
-    const inputs = replayInputs(root, tick);
+    const inputs = readTickInputs(root, tick);
     const start = starts.get(tick.tick_id);
     if (!inputs || !start) continue;
     const body = norm(JSON.stringify({ facts: inputs.facts, workflows: inputs.workflows, config: inputs.config, decisions: start.decisions }));

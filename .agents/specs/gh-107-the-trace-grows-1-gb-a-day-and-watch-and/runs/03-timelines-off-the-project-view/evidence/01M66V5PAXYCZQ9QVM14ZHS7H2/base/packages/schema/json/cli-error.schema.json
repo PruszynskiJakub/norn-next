@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://norn.dev/schema/cli-error.json",
+  "title": "norn CLI error",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "error",
+    "do_instead"
+  ],
+  "properties": {
+    "error": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "do_instead": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "code": {
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "type": "string"
+    },
+    "details": {}
+  }
+}

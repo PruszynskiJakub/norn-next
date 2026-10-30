@@ -1,0 +1,22 @@
+{
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "blocking",
+      "criterion": "AC4",
+      "title": "Cockpit footprint over a 2 GB trace is 2.1x the empty-trace footprint, not within ~10%",
+      "repro": "bun scripts/trace-bench.ts (defaults). Expected cockpit peak RSS ratio ~1.1; observed 2.10 (352 MB vs 167 MB). status ratio 1.00 is fine.",
+      "detail": "The project view still opens today's day file through local facts' hook read (readHookFacts in loadLocalFacts, window from the live run's start). The read observer shows `norn status --json` opening exactly today's file when a run is live. Per-unit hook files are slice 04 (B8), which this slice puts out of scope. Base code: 52.6x, so the slice removes most of it."
+    },
+    {
+      "id": "F2",
+      "severity": "minor",
+      "criterion": "AC4",
+      "title": "trace-bench's synthetic hook facts fail HookFact validation",
+      "file": "scripts/trace-bench.ts",
+      "line": 119,
+      "repro": "bun scripts/trace-bench.ts --gb 0.02 --days 16 --hooks 50 --keep, then loadTimelines on the repo: 50 errors `unknown property 'input'` at /fact on each hook line.",
+      "detail": "Hook facts are built with `input: { command }`; HookFact has `command` and rejects `input`. None of the 420 hooks loads as a fact, so the benchmark under-models the live run, and slice 04's QA reuses it."
+    }
+  ]
+}

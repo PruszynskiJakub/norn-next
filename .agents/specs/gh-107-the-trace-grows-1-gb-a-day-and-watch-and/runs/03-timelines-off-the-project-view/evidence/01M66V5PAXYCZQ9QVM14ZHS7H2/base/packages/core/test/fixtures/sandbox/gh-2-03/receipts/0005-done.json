@@ -1,0 +1,39 @@
+{
+  "kind": "done",
+  "receipt_id": "01M5MWW7FQSV7H6SKT4YSH43JT",
+  "run_id": "01M5MWV36NEDJK0ZBEJ36D6GVF",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-23T17:27:58.199Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-2/03",
+  "outcome": "approve",
+  "handoff": "review#1: approve. AC1/2/4/5/6 tested via HTTP (248 pass, tsc clean); AC3 person + AC7 browser left to QA. Minor: script shows raw HTML body on 404/5xx; li.overdue has no CSS. Nit: script test checks source substrings.",
+  "findings": [
+    {
+      "severity": "minor",
+      "title": "Non-400 error bodies are shown raw as the row error",
+      "id": "F1",
+      "file": "src/views.ts",
+      "line": 191,
+      "criterion": "AC7",
+      "detail": "On any non-ok response the script shows `await res.text()` as the error text. A 404 (item deleted in another tab) or a 5xx returns the HTML not-found or error page, so the row would show raw HTML markup as text. Only the 400 path returns text/plain.\nAxis: standards\nSuggestion: Use the body only for 400 text/plain responses, and otherwise show the generic 'Could not save the due date'. Verify by deleting the item in another tab, then changing its date."
+    },
+    {
+      "severity": "minor",
+      "title": "No style for li.overdue; only the due span is coloured",
+      "id": "F2",
+      "file": "src/views.ts",
+      "line": 72,
+      "detail": "The row gets class `overdue` (AC2), but the only CSS rule is `.due.overdue{color:#c53727}`. This meets AC3 as written, since the date is a distinct colour, but the row-level class has no visual effect.\nAxis: standards\nSuggestion: Optional: drop it, or keep it as a hook. The person checking AC3 should confirm the colour is enough."
+    },
+    {
+      "severity": "nit",
+      "title": "Script test asserts on substrings of the source",
+      "id": "F3",
+      "file": "test/web.test.ts",
+      "detail": "The AC4 'includes the inline date-saving script' test checks for literals such as 'outerHTML' and 'defaultValue' in the script text. This is acceptable because AC4 explicitly asks for the script's presence, but it is close to testing implementation details. The behaviour itself is covered by AC7 (browser).\nAxis: standards\nSuggestion: None required."
+    }
+  ]
+}

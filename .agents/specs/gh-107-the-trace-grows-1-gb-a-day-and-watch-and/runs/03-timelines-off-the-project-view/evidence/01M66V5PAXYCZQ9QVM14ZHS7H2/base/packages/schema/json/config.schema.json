@@ -1,0 +1,267 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://norn.dev/schema/config.json",
+  "title": "norn config layer",
+  "additionalProperties": false,
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "agents": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_-]*$": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "adapter"
+          ],
+          "properties": {
+            "adapter": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "command": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "args": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "env": {
+              "type": "object",
+              "patternProperties": {
+                "^(.*)$": {
+                  "type": "string"
+                }
+              }
+            },
+            "capabilities": {
+              "uniqueItems": true,
+              "type": "array",
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "default_agent": {
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "type": "string"
+    },
+    "runner": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "adapter"
+          ],
+          "properties": {
+            "adapter": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "options": {
+              "type": "object",
+              "patternProperties": {
+                "^(.*)$": {}
+              }
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "remote": {
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "provider": {
+          "description": "Issue provider CLI: gh (GitHub) or glab (GitLab)",
+          "anyOf": [
+            {
+              "const": "gh",
+              "type": "string"
+            },
+            {
+              "const": "glab",
+              "type": "string"
+            }
+          ]
+        },
+        "label": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "host": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "git_remote": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "sync_interval": {
+          "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+          "description": "Duration like 30s, 10m, 1h30m",
+          "type": "string"
+        }
+      }
+    },
+    "base_branch": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "default_workflow": {
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "type": "string"
+    },
+    "default_slice_workflow": {
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "type": "string"
+    },
+    "default_mode": {
+      "anyOf": [
+        {
+          "const": "manual",
+          "type": "string"
+        },
+        {
+          "const": "auto",
+          "type": "string"
+        }
+      ]
+    },
+    "max_agents": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "max_checks": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "slots": {
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "min": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "port_base": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "ports_per_slot": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "env": {
+          "type": "object",
+          "patternProperties": {
+            "^[A-Z_][A-Z0-9_]*$": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "notifiers": {
+      "type": "array",
+      "items": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "adapter"
+        ],
+        "properties": {
+          "adapter": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "options": {
+            "type": "object",
+            "patternProperties": {
+              "^(.*)$": {}
+            }
+          }
+        }
+      }
+    },
+    "watch_interval": {
+      "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+      "description": "Duration like 30s, 10m, 1h30m",
+      "type": "string"
+    },
+    "claim": {
+      "type": "object",
+      "properties": {
+        "lease": {
+          "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+          "description": "Duration like 30s, 10m, 1h30m",
+          "type": "string"
+        },
+        "renew": {
+          "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+          "description": "Duration like 30s, 10m, 1h30m",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "limits": {
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "deadline": {
+          "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+          "description": "Duration like 30s, 10m, 1h30m",
+          "type": "string"
+        },
+        "nudges": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retries": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "stalled": {
+          "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+          "description": "Duration like 30s, 10m, 1h30m",
+          "type": "string"
+        },
+        "attended_wait": {
+          "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+          "description": "Duration like 30s, 10m, 1h30m",
+          "type": "string"
+        }
+      }
+    }
+  }
+}

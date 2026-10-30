@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "event",
+    "at",
+    "agent",
+    "native",
+    "cwd"
+  ],
+  "properties": {
+    "event": {
+      "anyOf": [
+        {
+          "const": "session_start",
+          "type": "string"
+        },
+        {
+          "const": "turn_start",
+          "type": "string"
+        },
+        {
+          "const": "tool_use",
+          "type": "string"
+        },
+        {
+          "const": "waiting_input",
+          "type": "string"
+        },
+        {
+          "const": "permission_prompt",
+          "type": "string"
+        },
+        {
+          "const": "turn_end",
+          "type": "string"
+        },
+        {
+          "const": "session_end",
+          "type": "string"
+        }
+      ]
+    },
+    "at": {
+      "format": "date-time",
+      "description": "ISO-8601 timestamp, UTC",
+      "type": "string"
+    },
+    "agent": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "native": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "cwd": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "story": {
+      "pattern": "^(gh|gl)-[1-9][0-9]*$",
+      "description": "Story key, e.g. gh-123 or gl-45",
+      "type": "string"
+    },
+    "slice": {
+      "pattern": "^(gh|gl)-[1-9][0-9]*/[0-9]{2,3}$",
+      "description": "Slice key, e.g. gh-123/03",
+      "type": "string"
+    },
+    "run_id": {
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "ULID (ID2)",
+      "type": "string"
+    },
+    "agent_session_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "transcript": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "tool": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "command": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    }
+  }
+}

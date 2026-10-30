@@ -1,7 +1,7 @@
 /**
  * loadLocalFacts (H2, X1): the facts of a checkout read from its own files — no network, no port, no
  * writes. The store snapshot with each slice unit re-read from its own worktree (§7), this machine's
- * leases (K1, K3), hook facts from the trace (R5.1, R5.3), act failures, the PR and base caches (C1,
+ * leases (K1, K3), each unit's hook facts from the trace (R5.1, R5.3), act failures, the PR and base caches (C1,
  * BS1) and, per unit, what its receipts say: the last outcome receipt (B3), the runs of its cursor step
  * (R5.3), an unknown launch (R5.1); per story its open notes (NT2/NT3) and ready approval (F35/C5).
  * observe (cli) extends these with git, runner, process and remote facts; the view (X1) reads them
@@ -16,7 +16,7 @@ import { type LeaseListing, type LeaseLiveness, listLeases } from "./leases.ts";
 import { receiptsDir } from "./paths.ts";
 import { readReceipt } from "./receipts.ts";
 import { loadSnapshot, type RepoSnapshot, type StorySnapshot, type UnitSnapshot, withSliceWorktrees } from "./snapshot.ts";
-import { readHookFacts } from "./trace.ts";
+import { readUnitHooks } from "./trace.ts";
 import { readUnitMarker } from "./worktree.ts";
 
 export interface LocalFactsOptions {
@@ -61,6 +61,8 @@ export interface LocalUnit {
   unknown_launch: (NumberedReceipt & { receipt: ReceiptOf<"started"> }) | null;
   /** this machine's check lease of the unit, else its agent lease */
   lease: LeaseFile | null;
+  /** the unit's hook facts (`readUnitHooks`), back to the oldest live or launch-unknown run of any unit (R5.1), and always the stalled window (R5.3) */
+  hooks: HookFact[];
   /** R5.3: runs of the cursor step and their hook activity */
   step_runs?: StepRunFacts[];
   act_failure?: ActFailure;
@@ -83,8 +85,6 @@ export interface LocalFacts {
   /** in snapshot story order */
   stories: LocalStory[];
   leases: LeaseListing;
-  /** back to the oldest live or launch-unknown run (R5.1), and always the stalled window (R5.3) */
-  hooks: HookFact[];
   failures: Record<string, ActFailure>;
   /** C1: the PR cache as the last sync left it */
   pr_seen: PrFactsCache;
@@ -113,18 +113,23 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
     }
     return story;
   });
-  const hooks = readHookFacts(root, starts.sort()[0] as string);
   const failures = readActFailures(root);
 
-  const stories = read.map((s): LocalStory => {
+  const placed = read.map((s) => {
     const conventional = storyWorktreePath(root, s.key, s.slug);
     const storyWt = opts.storyWorktrees.get(s.key) ?? (existsSync(conventional) && readUnitMarker(conventional).marker ? conventional : null);
-    const units = s.units.map((u) => localUnit(root, s, u, u.unit.slice ? (opts.sliceWorktrees.get(u.unit.slice) ?? null) : storyWt, hooks, live, failures));
+    return { s, storyWt, units: s.units.map((u) => ({ u, worktree: u.unit.slice ? (opts.sliceWorktrees.get(u.unit.slice) ?? null) : storyWt })) };
+  });
+  const all = placed.flatMap(({ units }) => units);
+  const unitHooks = readUnitHooks(root, all.map(({ u, worktree }) => ({ story: u.unit.story, slice: u.unit.slice, worktree })), starts.sort()[0] as string);
+  const hooksOf = new Map(all.map(({ u }, i) => [u, (unitHooks[i] ?? []).map((e) => e.fact)]));
+  const stories = placed.map(({ s, storyWt, units: us }): LocalStory => {
+    const units = us.map(({ u, worktree }) => localUnit(root, s, u, worktree, hooksOf.get(u) ?? [], live, failures));
     const ready = readyOf(s, s.units[0]);
     const notes = openNotes(s.units.map((u) => ({ unit: u.unit.key, receipts: receiptsOfKinds(s, u, ["done", "approve"]) })));
     return { snapshot: s, worktree: storyWt, units, ...(notes.length ? { notes } : {}), ...(ready ? { ready } : {}) };
   });
-  return { snapshot, stories, leases, hooks, failures, pr_seen: readPrFacts(root), base: readBaseFacts(root) };
+  return { snapshot, stories, leases, failures, pr_seen: readPrFacts(root), base: readBaseFacts(root) };
 }
 
 function localUnit(root: string, story: StorySnapshot, u: UnitSnapshot, worktree: string | null, hooks: HookFact[], leases: LeaseFile[], failures: Record<string, ActFailure>): LocalUnit {
@@ -152,6 +157,7 @@ function localUnit(root: string, story: StorySnapshot, u: UnitSnapshot, worktree
     cursor,
     unknown_launch: st ? unknownLaunch(u.unapplied) : null,
     lease: mine.find((l) => l.kind === "check") ?? mine.find((l) => l.kind === "agent") ?? null,
+    hooks,
     ...(step_runs ? { step_runs } : {}),
     ...(failure ? { act_failure: failure } : {}),
   };

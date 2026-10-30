@@ -12,7 +12,7 @@ export { heartbeatId, markNotified, readNotified, readRemoteCache } from "@norn/
 export { type Observed, observe, type ObserveOptions, type StoryLoc, type SyncMode, type UnitLoc } from "./runtime/observe/index.ts";
 export { releaseHeldClaims, releaseStory } from "./runtime/release.ts";
 export { runShell, tailLines } from "./runtime/shell.ts";
-export { replayInputs, runTick, type TickOptions, type TickReport, traceRecord } from "./runtime/tick.ts";
+export { runTick, type TickOptions, type TickReport, traceRecord } from "./runtime/tick.ts";
 export { type AssetsSources, assetsDir, resolveAssetsDir } from "./runtime/assets.ts";
 export { agentSkills, bundledSkills, repoWorkflows } from "./runtime/workflows.ts";
 export { buildPorts, defaultRegistry } from "./wiring.ts";
