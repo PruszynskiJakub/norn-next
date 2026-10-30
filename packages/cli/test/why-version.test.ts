@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type TickTrace, validate } from "@norn/schema";
+import { repoConfigPath, traceDir as traceDirOf, workflowsDir } from "@norn/store";
 import { version } from "../package.json";
 import { createHarness, type Harness, issue } from "./harness.ts";
 
@@ -30,7 +31,7 @@ notifiers: []
 `;
 
 let h: Harness;
-const traceDir = () => join(h.root, ".agents/norn/trace");
+const traceDir = () => traceDirOf(h.root);
 
 function ticks(): TickTrace[] {
   return readdirSync(traceDir())
@@ -62,8 +63,8 @@ type Why = { tick_id: string; rule: string; replay: { matches: boolean; rule: st
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-  h.write(join(h.root, ".agents/norn/workflows/ship.yaml"), WORKFLOW);
+  h.write(repoConfigPath(h.root), CONFIG);
+  h.write(join(workflowsDir(h.root), "ship.yaml"), WORKFLOW);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn"]);
   h.git(["push", "-q", "origin", "main"]);

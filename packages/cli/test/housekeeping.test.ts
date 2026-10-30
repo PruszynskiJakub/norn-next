@@ -8,7 +8,7 @@ import { existsSync, readdirSync, readFileSync, utimesSync } from "node:fs";
 import { join } from "node:path";
 import { git as gitAdapter } from "@norn/adapters";
 import type { StoryFrontmatter } from "@norn/schema";
-import { appendReceipt, leasesDir, readState, writeStoryFile } from "@norn/store";
+import { appendReceipt, leasesDir, readState, repoConfigPath, workflowsDir, writeStoryFile } from "@norn/store";
 import { pluginLinkHint } from "../src/commands/doctor.ts";
 import { assetsDir } from "../src/runtime/assets.ts";
 import { markStoryOnBase } from "../src/runtime/record.ts";
@@ -41,8 +41,8 @@ const kinds = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop" && 
 
 async function boot(h: Harness) {
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-  h.write(join(h.root, ".agents/norn/workflows/solo.yaml"), SOLO);
+  h.write(repoConfigPath(h.root), CONFIG);
+  h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn"]);
   h.git(["push", "-q", "origin", "main"]);
@@ -312,7 +312,7 @@ describe("norn doctor: a fresh repository", () => {
       expect(auto.exit).toBe(1);
       expect(auto.value).toMatchObject({ ok: false, runner: { ok: false, required: true } });
       expect(auto.stdout).toMatch(/FAIL runner +fake not available/);
-      h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG.replace("default_mode: auto", "default_mode: manual"));
+      h.write(repoConfigPath(h.root), CONFIG.replace("default_mode: auto", "default_mode: manual"));
       const r = await runChecked(["doctor"], { ...h.deps, env });
       const v = r.value as { runner: Record<string, unknown>; agents: Array<{ ok: boolean }> };
       expect(v.runner).toMatchObject({ ok: false, required: false, available: false });
@@ -321,7 +321,7 @@ describe("norn doctor: a fresh repository", () => {
       expect(r.stdout).not.toMatch(/failed \(.*runner/);
     } finally {
       h.runner.availableResult = true;
-      h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
+      h.write(repoConfigPath(h.root), CONFIG);
     }
   });
 });

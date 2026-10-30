@@ -1,7 +1,7 @@
 /** Machine-local files (S2, BUG-4): every read is validated; a bad file reads as empty and is traced once. */
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import {
   acquireLock,
   cachedDefaultBranch,
@@ -43,8 +43,8 @@ describe("readLocalJson (S2, BUG-4)", () => {
     expect(readLocalJson("local-notified", join(traceDir(r), "notified.json"), {}, r)).toEqual({});
     const evs = localEvents(r) as Array<{ file: string; schema: string; reason: string }>;
     expect(evs.map((e) => [e.file, e.schema, e.reason])).toEqual([
-      [".agents/norn/trace/remote.json", "local-remote", "wrong_shape"],
-      [".agents/norn/trace/notified.json", "local-notified", "invalid_json"],
+      [relative(r, remote), "local-remote", "wrong_shape"],
+      [relative(r, join(traceDir(r), "notified.json")), "local-notified", "invalid_json"],
     ]);
   });
 

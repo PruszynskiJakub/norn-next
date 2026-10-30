@@ -12,6 +12,12 @@ const NORN_DIR = ".agents/norn";
 export const repoConfigPath = (root: string) => join(root, NORN_DIR, "config.yaml");
 export const workflowsDir = (root: string) => join(root, NORN_DIR, "workflows");
 export const traceDir = (root: string) => join(root, NORN_DIR, "trace");
+/** Whether norn is set up in this checkout (CP13: the cockpit falls back to the last repo otherwise). */
+export const hasNornDir = (root: string) => existsSync(join(root, NORN_DIR));
+/** `.gitignore` entry for the machine-local trace dir, as `init` writes it (§7.1). */
+export const TRACE_IGNORE_ENTRY = `${NORN_DIR}/trace/`;
+/** The headless runner's default session log dir: machine-local, in the trace dir. */
+export const runnerLogDir = (root: string) => join(traceDir(root), "runs");
 /** Local tick lock (H1); lives in the gitignored trace dir. */
 export const tickLockPath = (root: string) => join(traceDir(root), "tick.lock");
 /** K6/BS3: a story's integrate lock — slice integrations and base updates of one story never interleave. */

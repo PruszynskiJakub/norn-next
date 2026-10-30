@@ -453,6 +453,39 @@ const SPAWN_ALLOW: Counts = {
   "packages/cli/src/runtime/strays.ts": 1,
 };
 
+/**
+ * (g) B1, B2, B5: norn's paths under a repo are spelled only by store's path module (paths.ts), so a
+ * layout change is a change there. Counts lines of package sources and tests that spell `.agents/norn`
+ * (or join `".agents", "norn"`) outside a comment. Allowed: user-facing message text, renamed with the
+ * layout (gh-110 D11).
+ */
+const NORN_PATH = /\.agents\/norn\b|["'`]\.agents["'`]\s*,\s*["'`]norn["'`]/;
+const NORN_PATH_ALLOW: Record<string, [number, string]> = {
+  "packages/store/src/paths.ts": [1, "the path module"],
+  "packages/cli/src/wiring.ts": [2, "message: do_instead naming the repo config"],
+  "packages/cli/src/commands/config-edit.ts": [3, "message: --repo help and the user-or-repo pick"],
+  "packages/cli/src/commands/init.ts": [3, "message: init's config row and next steps"],
+  "packages/cli/src/commands/story-create.ts": [1, "message: unknown_workflow refusal"],
+  "packages/cli/src/commands/story-edit.ts": [1, "message: unknown_workflow refusal"],
+  "packages/cli/test/config.test.ts": [2, "message: the user-or-repo pick and its test name"],
+  "packages/cli/test/e2e.test.ts": [1, "message: init's config row"],
+  "packages/core/test/printed-commands.test.ts": [1, "not a path read: a string the removed-command matcher must pass"],
+};
+
+function nornPathLines(): Counts {
+  const out: Counts = {};
+  const all = files(PKGS)
+    .map((p) => relative(ROOT, p))
+    .filter((p) => p.includes("/src/") || p.includes("/test/"));
+  for (const f of all) {
+    const n = readFileSync(join(ROOT, f), "utf8")
+      .split("\n")
+      .filter((l) => !/^\s*(\*|\/\*|\/\/)/.test(l) && NORN_PATH.test(l.replace(/\s\/\/ .*$/, ""))).length;
+    if (n) out[f] = n;
+  }
+  return out;
+}
+
 /** Action kinds: the `kind` literals of actions.ts; emitted ones appear as `kind: "…"` in decide. */
 function literalKinds(text: string): Set<string> {
   return new Set([...text.matchAll(/\bkind:\s*"([a-z_]+)"/g)].map((m) => m[1] as string));
@@ -517,6 +550,11 @@ describe("ratchet lints", () => {
 
   test("(e) core is pure: no node:fs, Bun.spawn, Date.now, Math.random", () => {
     expect(countHits(/node:fs|\bBun\.spawn|\bDate\.now\b|\bMath\.random\b/g, (f) => f.startsWith("packages/core/src/"))).toEqual({});
+  });
+
+  test("(g) B1, B2, B5: `.agents/norn` paths are spelled only in store's path module", () => {
+    const allow = Object.fromEntries(Object.entries(NORN_PATH_ALLOW).map(([f, [n]]) => [f, n]));
+    expect(ratchet(nornPathLines(), allow)).toEqual([]);
   });
 
   test("(f) act handles exactly the action kinds decide emits", () => {

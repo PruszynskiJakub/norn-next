@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createHeadlessRunner, logPath } from "../../src/headless/index.ts";
+import type { AdapterContext } from "@norn/core";
+import { runnerLogDir, traceDir } from "@norn/store";
+import { createHeadlessRunner, headlessFactory, logPath } from "../../src/headless/index.ts";
 
 describe("headless runner (real processes)", () => {
   test("spawns detached with env + log, tracks liveness by pid + start time, kills", async () => {
@@ -62,6 +64,15 @@ describe("headless runner (real processes)", () => {
       "Error: Input must be provided either through stdin or as a prompt argument when using --print",
     );
     expect(await runner.output?.({ runner: "headless", session_id: "01JNONE" })).toBeNull();
+  });
+
+  test("without log_dir, logs go to store's runner log dir for the checkout: the trace dir's runs/, as before", async () => {
+    const root = mkdtempSync(join(tmpdir(), "norn-headless-"));
+    expect(runnerLogDir(root)).toBe(join(traceDir(root), "runs"));
+    mkdirSync(runnerLogDir(root), { recursive: true });
+    copyFileSync(join(import.meta.dir, "fixtures", "claude-prompt-swallowed.log"), logPath(runnerLogDir(root), "01JRUN"));
+    const runner = headlessFactory({ repoRoot: root } as AdapterContext, { adapter: "headless" });
+    expect(await runner.output?.({ runner: "headless", session_id: "01JRUN" })).toContain("Input must be provided");
   });
 
   test("launch of a missing binary fails with launch_failed", async () => {

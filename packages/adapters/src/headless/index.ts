@@ -14,7 +14,7 @@ import { closeSync, mkdirSync, openSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { AdapterContext, LaunchSpec, PaneState, ProcessPort, RunnerPort, SessionRef } from "@norn/core";
 import type { RunnerConfig } from "@norn/schema";
-import { noteSpawn } from "@norn/store";
+import { noteSpawn, runnerLogDir } from "@norn/store";
 import { portError } from "../exec.ts";
 import { createProcessPort } from "../process/index.ts";
 
@@ -147,10 +147,10 @@ function signal(pid: number, sig: NodeJS.Signals): void {
   }
 }
 
-/** RunnerFactory: option `log_dir` (default `<repo>/.agents/norn/trace/runs`). */
+/** RunnerFactory: option `log_dir` (default store's `runnerLogDir`, machine-local). */
 export const headlessFactory = (ctx: AdapterContext, config: RunnerConfig): RunnerPort => {
   const dir = config.options?.log_dir;
   return createHeadlessRunner({
-    logDir: typeof dir === "string" ? dir : join(ctx.repoRoot, ".agents", "norn", "trace", "runs"),
+    logDir: typeof dir === "string" ? dir : runnerLogDir(ctx.repoRoot),
   });
 };

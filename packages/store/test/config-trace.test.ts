@@ -1,7 +1,7 @@
 import { describe, expect, spyOn, test } from "bun:test";
 import * as fs from "node:fs";
 import { mkdirSync, writeFileSync, appendFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { type TraceEvent, ulid } from "@norn/schema";
 import {
   appendTrace,
@@ -12,7 +12,9 @@ import {
   loadWorkflows,
   readTrace,
   readTraceFile,
+  repoConfigPath,
   traceDir,
+  workflowsDir,
   writeBriefing,
 } from "../src/index.ts";
 import { AT, tmp, WORKFLOW_YAML } from "./helpers.ts";
@@ -23,26 +25,26 @@ describe("config (K2)", () => {
     const home = tmp();
     expect(loadConfig({ repoRoot: repo, home })).toMatchObject({ ok: true, config: { max_agents: 2 } });
     writeFileSync(join(home, "config.yaml"), "max_agents: 4\ndefault_mode: auto\n");
-    mkdirSync(join(repo, ".agents/norn"), { recursive: true });
-    writeFileSync(join(repo, ".agents/norn/config.yaml"), "max_agents: 8\nremote: { label: mine }\n");
+    mkdirSync(dirname(repoConfigPath(repo)), { recursive: true });
+    writeFileSync(repoConfigPath(repo), "max_agents: 8\nremote: { label: mine }\n");
     const c = loadConfig({ repoRoot: repo, env: { NORN_HOME_DIR: home } });
     expect(c.ok && c.config).toMatchObject({ max_agents: 4, default_mode: "auto", remote: { label: "mine", provider: "gh" } });
     expect(c.home).toBe(home);
   });
   test("invalid layer → errors with repo-relative path", () => {
     const repo = tmp();
-    mkdirSync(join(repo, ".agents/norn"), { recursive: true });
-    writeFileSync(join(repo, ".agents/norn/config.yaml"), "max_agents: zero\n");
+    mkdirSync(dirname(repoConfigPath(repo)), { recursive: true });
+    writeFileSync(repoConfigPath(repo), "max_agents: zero\n");
     const c = loadConfig({ repoRoot: repo, home: tmp() });
     expect(c.ok).toBe(false);
-    expect(!c.ok && c.errors[0]?.file).toBe(".agents/norn/config.yaml");
+    expect(!c.ok && c.errors[0]?.file).toBe(relative(repo, repoConfigPath(repo)));
   });
 });
 
 describe("workflows (W1)", () => {
   test("loads yaml and json, reports invalid and name mismatch", () => {
     const repo = tmp();
-    const dir = join(repo, ".agents/norn/workflows");
+    const dir = workflowsDir(repo);
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "slice.yaml"), WORKFLOW_YAML);
     writeFileSync(join(dir, "bug.json"), JSON.stringify({ name: "bug", start: "fix", steps: { fix: { type: "gate", outcomes: { approve: "$done" } } } }));
@@ -50,7 +52,7 @@ describe("workflows (W1)", () => {
     writeFileSync(join(dir, "README.md"), "ignored");
     const l = loadWorkflows(repo);
     expect(Object.keys(l.workflows).sort()).toEqual(["bug", "slice"]);
-    expect(l.errors.map((e) => e.file)).toEqual([".agents/norn/workflows/story.yaml"]);
+    expect(l.errors.map((e) => e.file)).toEqual([relative(repo, join(dir, "story.yaml"))]);
     expect(loadWorkflow(repo, "slice")).toMatchObject({ ok: true, value: { name: "slice", workflow: { start: "implement" } } });
     expect(loadWorkflow(repo, "nope")).toEqual({ ok: false, reason: "missing" });
   });

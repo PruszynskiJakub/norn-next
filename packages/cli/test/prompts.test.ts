@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { herdr, proc } from "@norn/adapters";
 import { AUTO_PROMPT, type Inbox } from "@norn/core";
 import { type Receipt, type UnitState, ulid } from "@norn/schema";
-import { appendTrace } from "@norn/store";
+import { appendTrace, repoConfigPath, workflowsDir } from "@norn/store";
 import type { TickReport } from "../src/index.ts";
 import { withNornOnPath } from "../src/runtime/shim.ts";
 import { runCli } from "../src/index.ts";
@@ -72,8 +72,8 @@ const receipts = (h: Harness): Receipt[] =>
 
 async function boot(h: Harness): Promise<void> {
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-  h.write(join(h.root, ".agents/norn/workflows/solo.yaml"), SOLO);
+  h.write(repoConfigPath(h.root), CONFIG);
+  h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn"]);
   h.git(["push", "-q", "origin", "main"]);

@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:tes
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { ConfigEntry } from "@norn/schema";
+import { repoConfigPath } from "@norn/store";
 import { type CliDeps, type CliResult } from "../src/index.ts";
 import { createHarness, FakeInteraction, type Harness } from "./harness.ts";
 import { runChecked } from "./harness.ts";
@@ -14,7 +15,7 @@ describe("norn config list and get", () => {
   beforeAll(async () => {
     h = await createHarness();
     h.write(join(h.home, "config.yaml"), "runner: { adapter: herdr }\ndefault_mode: auto\nmax_agents: 3\n");
-    h.write(join(h.root, ".agents/norn/config.yaml"), "runner: null\nmax_agents: 5\nlimits: { deadline: 30m }\n");
+    h.write(repoConfigPath(h.root), "runner: null\nmax_agents: 5\nlimits: { deadline: 30m }\n");
   });
   afterAll(() => h.cleanup());
 
@@ -72,7 +73,7 @@ describe("norn config list and get", () => {
 describe("norn config set and unset", () => {
   let h: Harness;
   const userFile = () => join(h.home, "config.yaml");
-  const repoFile = () => join(h.root, ".agents/norn/config.yaml");
+  const repoFile = () => repoConfigPath(h.root);
   const read = (path: string) => {
     try {
       return readFileSync(path, "utf8");

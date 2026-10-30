@@ -7,7 +7,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { acquireTickLock } from "@norn/store";
+import { acquireTickLock, repoConfigPath, workflowsDir } from "@norn/store";
 import type { StoryView } from "@norn/view";
 import type { CliDeps, CliResult } from "../src/index.ts";
 import { createHarness, FakeInteraction, type Harness } from "./harness.ts";
@@ -46,8 +46,8 @@ const local = () => [join(h.root, ".agents/specs"), `${h.root}-worktrees`].flatM
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-  for (const name of ["fix", "spec"]) h.write(join(h.root, `.agents/norn/workflows/${name}.yaml`), workflow(name));
+  h.write(repoConfigPath(h.root), CONFIG);
+  for (const name of ["fix", "spec"]) h.write(join(workflowsDir(h.root), `${name}.yaml`), workflow(name));
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);
   h.git(["push", "-q", "origin", "main"]);

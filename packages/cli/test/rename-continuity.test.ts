@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { TickTrace } from "@norn/schema";
+import { repoConfigPath, traceDir as traceDirOf, workflowsDir } from "@norn/store";
 import { version } from "../package.json";
 import { runCli } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
@@ -40,7 +41,7 @@ notifiers: []
 let h: Harness;
 const wt = () => `${h.root}-worktrees/gh-5-pay-invoices`;
 const runs = () => join(wt(), ".agents/specs/gh-5-pay-invoices/runs/_story");
-const traceDir = () => join(h.root, ".agents/norn/trace");
+const traceDir = () => traceDirOf(h.root);
 const tick = async () => {
   h.clock.advance(10_000);
   return h.tick();
@@ -73,8 +74,8 @@ function asRecordedBefore(tickId: string): void {
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-  h.write(join(h.root, ".agents/norn/workflows/flow.yaml"), FLOW);
+  h.write(repoConfigPath(h.root), CONFIG);
+  h.write(join(workflowsDir(h.root), "flow.yaml"), FLOW);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);
   h.git(["push", "-q", "origin", "main"]);

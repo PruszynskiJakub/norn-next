@@ -25,7 +25,7 @@ import { join, resolve } from "node:path";
 import { git as gitAdapter, herdr, proc } from "@norn/adapters";
 import type { AgentAdapter, RunnerPort, SessionRef } from "@norn/core";
 import { ExitCode, ulid } from "@norn/schema";
-import { machineHolder, noteSpawn, readHookFacts, skillsReport, writeUnitMarker } from "@norn/store";
+import { machineHolder, noteSpawn, readHookFacts, skillsReport, traceDir, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { rendered, withExit } from "../output.ts";
@@ -90,7 +90,7 @@ function syntheticEvent(agent: AgentAdapter, cwd: string, env: Record<string, st
 function scratchUnit(): { dir: string; repo: string } {
   const dir = mkdtempSync(join(tmpdir(), "norn-doctor-"));
   const repo = join(dir, "repo");
-  mkdirSync(join(repo, ".agents", "norn", "trace"), { recursive: true });
+  mkdirSync(traceDir(repo), { recursive: true });
   writeUnitMarker(repo, { repo, story: "gh-1", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-1-norn-doctor" });
   return { dir, repo };
 }

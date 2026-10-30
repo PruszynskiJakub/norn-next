@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { TickTrace } from "@norn/schema";
-import { loadWorkflows, readTrace } from "@norn/store";
+import { loadWorkflows, readTrace, repoConfigPath, TRACE_IGNORE_ENTRY, workflowsDir } from "@norn/store";
 import { replayInputs, type TickReport } from "../src/index.ts";
 import { decide } from "@norn/core";
 import { createHarness, type Harness, issue } from "./harness.ts";
@@ -88,7 +88,7 @@ describe("norn init", () => {
     expect(v.skills.updated).toContain("norn-implement");
     expect(v.skills.links[0]).toMatchObject({ agent: "claude", linked: v.skills.updated });
     expect(v.hooks[0]?.changed).toEqual([join(h.root, ".claude", "settings.json")]);
-    expect(v.gitignore).toEqual([".agents/norn/trace/", ".env.norn", ".norn-unit"]);
+    expect(v.gitignore).toEqual([TRACE_IGNORE_ENTRY, ".env.norn", ".norn-unit"]);
     expect(v.gitattributes).toEqual([".agents/specs/*/runs/** linguist-generated=true gitlab-generated=true"]);
     // nothing in the repo names a test command: the templates keep theirs, and init says so
     expect(r.value).toMatchObject({ remote: { provider: "gh", label: "norn", git_remote: "origin", url: h.remoteDir }, test_command: { command: "bun test", detected_from: null, set_in: ["bug.yaml", "slice.yaml", "story.yaml"] } });
@@ -244,9 +244,9 @@ describe("a story through the slice workflow", () => {
   afterAll(() => transcript.stop());
 
   test("setup: repo config and workflows committed on main", async () => {
-    h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-    h.write(join(h.root, ".agents/norn/workflows/mini.yaml"), MINI);
-    h.write(join(h.root, ".agents/norn/workflows/slice.yaml"), SLICE);
+    h.write(repoConfigPath(h.root), CONFIG);
+    h.write(join(workflowsDir(h.root), "mini.yaml"), MINI);
+    h.write(join(workflowsDir(h.root), "slice.yaml"), SLICE);
     h.git(["add", "-A"]);
     h.git(["commit", "-q", "-m", "norn init"]);
     h.git(["push", "-q", "origin", "main"]);
@@ -432,7 +432,7 @@ describe("norn init in a repository with a test command and no remote", () => {
     const r = await f.norn("init");
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ remote: { url: null }, test_command: { command: "npm ci && npm test", detected_from: "package.json", set_in: ["bug.yaml", "slice.yaml", "story.yaml"] } });
-    const story = readFileSync(join(f.root, ".agents/norn/workflows/story.yaml"), "utf8");
+    const story = readFileSync(join(workflowsDir(f.root), "story.yaml"), "utf8");
     expect(story).toContain('run: "npm ci && npm test"');
     expect(story).not.toContain("run: bun test");
     expect(r.stdout).toContain("remote          no git remote named origin");
