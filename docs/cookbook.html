@@ -454,7 +454,8 @@ const R = [
   when: "You have git 2.38 or later, Claude Code, and <code>gh</code> or <code>glab</code> signed in.",
   steps: ["Download the single-file norn binary for your machine and put it on your <code>PATH</code>. No Bun, token or sign-in needed.", "Install Herdr 0.9 or later, then norn's Herdr plugin: it brings the cockpit and three actions you will bind to keys."],
   code: `curl -fsSLO https://github.com/PruszynskiJakub/norn-next/releases/latest/download/norn-darwin-arm64
-install -m 755 norn-darwin-arm64 /usr/local/bin/norn
+sudo install -d /usr/local/bin           # missing on a fresh Apple Silicon Mac
+sudo install -m 755 norn-darwin-arm64 /usr/local/bin/norn
 norn --version
 herdr plugin install PruszynskiJakub/norn-next/plugins/herdr     # update later with: herdr plugin update`,
   norn: "On first run the binary unpacks its skills and workflow templates into <code>~/.cache/norn/</code>.",
