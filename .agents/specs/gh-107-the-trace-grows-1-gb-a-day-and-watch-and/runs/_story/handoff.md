@@ -36,18 +36,17 @@
 - agent.start: implement run 01M67A5FT384VT2MG86G7KYTPE
 <!-- norn:heartbeat:end -->
 
+
 ## Goal
 
-QA the story against B1–B35 through the real CLI (throwaway repos, dev build), with evidence and a criteria report.
+implement#1 (qa_loop 1/2): fix QA's two B1 findings — the flaky frame-count test and trace-bench.ts spawning the removed `norn cockpit`.
 
 ## Progress
 
-- Full `bun test`: 1467 pass / 3 fail. trace-free-views B1 is flaky (2 of 10 runs alone, frames 2 not > 2). check-run "two long checks" timed out under QA's concurrent load, passed 3 of 3 alone, and is not in this diff. Typecheck green.
-- B2–B35 pass, observed through the CLI: chmod-000/200 day files plus store's trace-read observer for "reads no day file"; a 2.15 GB bench for footprint and timing; backfill, chunks, replay, corrupt/pruned refusals; tidy/doctor/retain; the 0.12.1 release as the older norn (B35).
-- B1 fail: the behaviour holds (peak 0.91x of an empty trace), but its test is flaky (F1) and scripts/trace-bench.ts still runs the removed `norn cockpit` (F2).
-- Evidence was written outside the repo ($TMPDIR/qa107/ev: criteria.json, findings.json, report.md).
-- qa#1 fail: QA of B1–B35 through the dev CLI in throwaway repos: B2–B35 pass. B1 fails on its delivery, not its behaviour: no day file is opened and the 2 GB footprint is 0.91x of an empty trace, but the B1 test (trace-free-views.test.ts:86) is flaky (2 of 10 runs; it also failed the full suite), and scripts/trace-bench.ts still spawns the removed `norn cockpit` (F2).
+- F1: trace-free-views.test.ts B1 test now quits after 3 frames are drawn (`quitAfterFrames`), not after 150 ms; asserts frames >= 3. 10 of 10 runs green alone.
+- F2: scripts/trace-bench.ts spawns `status --watch --interval …`; header names the cockpit as `norn status --watch`; it throws if the cockpit exits before sampling, so an error can no longer be measured as a footprint. Small run (0.02 GB) measured a live cockpit (3 samples, peak 0.98x).
+- Full `bun test` and typecheck run before reporting.
 
 ## Resume
 
-QA reported `fail` with findings F1 (stabilise trace-free-views.test.ts:86) and F2 (trace-bench.ts → `status --watch`).
+Report `norn done done` once the full suite and typecheck are green.
