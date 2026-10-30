@@ -15,6 +15,15 @@
 
 ## Goal
 
+Write receipts and state.json (the JSON norn commits under runs/) as one line plus newline; reading of older pretty files unchanged.
+
 ## Progress
 
+- Added `jsonLine()` in `packages/store/src/fsx.ts`; `writeReceiptAt` (receipts.ts) and `writeState` (unit.ts) use it.
+- Kept `json()` (pretty) for machine-local files on purpose: `handOverLease` compares the on-disk lease text to `json(from)`, so changing it would break handover of leases written by an older norn.
+- Tests in `packages/store/test/files.test.ts` ("committed runs/ JSON is one line"): one-line write (was red), pretty older files still read and replay idempotently.
+- Mailbox receipt blobs (refs.ts) are git blobs, not files in the PR diff; left as is.
+
 ## Resume
+
+Full suite green → commit → `norn done done`. If transcripts/snapshots differ, regenerate with `NORN_TRANSCRIPT_UPDATE=1` and review.
