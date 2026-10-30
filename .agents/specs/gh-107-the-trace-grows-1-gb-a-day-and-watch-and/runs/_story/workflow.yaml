@@ -1,42 +1,133 @@
-# Triage workflow — norn's own default (config default_workflow: triage), repo-local (W1, W9).
-# An unattended agent checks the issue still holds, adds the repro, the affected code and context
-# to story.md and to an issue comment, and reports the workflow it recommends as its outcome.
-# A person then decides at `confirm`. A gate has only approve/reject/stale (W2), so the choice of
-# workflow is not a gate outcome: the person switches the story with `norn workflow … --to`
-# (W9, S7), which works while the unit waits at the gate. Agents never run it.
-# Triage changes no code and opens no PR, so it has no base sync (BS*).
-name: triage
-description: Check an issue still holds, add repro and context, recommend a workflow (fix, quick, story, spec) or close.
-start: explore
+# Story workflow — example installed by `norn init`; edit freely (W1).
+# Refine and plan with a person, cut slices, approve the plan, run the slices,
+# bring the story up to date with its base, verify the whole story, describe it,
+# open the draft PR (or rewrite the body of the open one), wait for the PR's CI, and wait for a
+# person to call it ready. The local check runs test:fast; CI runs the full suite.
+# Rework found by the story-level test, QA or CI is done in the story worktree.
+# QA reports a verdict per acceptance criterion (criteria: required) and may only report the outcome
+# matching its worst verdict; `unverified` (could not check here) goes to a person at human-qa.
+# A story waiting at human-qa or ready goes back through update when the base moved
+# under it in a way that conflicts (base.stale; `behind` re-updates on any base commit).
+# Change `test.run` to your repo's test command.
+name: story
+description: Default story lifecycle — spec, plan, slices, story-level verification, draft PR.
+start: refine
 steps:
-  explore:
+  refine:
     type: agent
-    skill: triage
+    skill: norn-refine
+    attended: true
     inputs: [spec, handoff]
-    instructions: >-
-      Read the issue mirrored in story.md. Check it still occurs or still applies on the base branch.
-      Write the findings (repro, affected code, PRD ids touched, context) and the recommendation with
-      its reason into the body of story.md, keeping its frontmatter unchanged, and post them as an
-      issue comment. Never edit the issue body. Change no other file. Report the recommendation itself
-      as the outcome: `norn done fix|quick|story|spec|close --handoff "<reason>"`.
+    instructions: "Write the spec into the body of story.md; keep its frontmatter unchanged."
     outcomes:
-      fix:   { to: confirm, means: "a defect that still occurs: repro and cause or suspects written; recommend the fix workflow" }
-      quick: { to: confirm, means: "a small change (refactor, docs, chore): what to change written; recommend the quick workflow" }
-      story: { to: confirm, means: "a feature that needs a spec, a plan and slices: scope written; recommend the story workflow" }
-      spec:  { to: confirm, means: "a design question or a PRD change, no code: what to decide written; recommend the spec workflow" }
-      close: { to: confirm, means: "nothing to do (no longer occurs, duplicate, out of scope, works as designed): evidence written; recommend closing" }
-  confirm:
+      done:      { to: plan, means: "spec complete: problem, solution, numbered Behaviour items with examples, out of scope; no open questions" }
+      questions: { to: clarify, means: "spec written, but open questions are listed that need the person's answers" }
+  clarify:
+    type: agent
+    skill: norn-clarify
+    attended: true
+    inputs: [spec, handoff]
+    outcomes:
+      done: { to: plan, means: "every open question is answered and folded into the spec" }
+  plan:
+    type: agent
+    skill: norn-plan
+    attended: true
+    inputs: [spec, handoff]
+    instructions: "Write the Plan section of story.md."
+    outcomes:
+      done: { to: slice, means: "story.md's Plan section has seams, a coverage table for every Behaviour item, prefactoring, decisions and risks" }
+  slice:
+    type: agent
+    skill: norn-slice
+    inputs: [spec, slices]
+    instructions: "Write slice files to slices/<nn>-<slug>.md in the spec folder."
+    outcomes:
+      done: { to: approve-plan, means: "slice files written; every Behaviour item is covered by some slice's acceptance" }
+  approve-plan:
     type: gate
-    prompt: >-
-      Read the triage findings and the recommendation in story.md (also posted on the issue). N is the issue number.
-      Switch to a workflow: `norn workflow gh-N fix --to reproduce`, `norn workflow gh-N quick --to implement`,
-      `norn workflow gh-N story --to refine` or `norn workflow gh-N spec --to refine`.
-      Close: `norn approve gh-N --reason "<why>"`, then `gh issue close N --reason "not planned"`,
-      then `norn drop gh-N` (a story at $done without a PR otherwise waits for a merge, GR6),
-      then `git push origin --delete gh-N-<slug>` (drop pushed the story branch; the findings stay on the issue comment).
-      Triage again: `norn approve gh-N --reject --reason "<what to look at>"`.
+    prompt: "Review the Plan section in story.md and the slice files (edit them if needed). Approve to start the slices, or reject with what to change."
+    outcomes: { approve: slices, reject: { to: plan, counter: plan_loop } }
+  slices:
+    type: slices
+    outcomes: { done: update, stuck: $stuck }
+  update:
+    type: git
+    action: update
+    outcomes: { done: test, conflict: { to: resolve, counter: base_conflict_loop } }
+  resolve:
+    type: agent
+    skill: norn-merge
+    inputs: [spec, handoff]
+    instructions: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase."
+    outcomes:
+      done: { to: update, means: "base merged into the story branch, conflicts resolved and committed" }
+  test:
+    type: check
+    run: "bun install --frozen-lockfile && bun run test:fast && bun run typecheck"
+    timeout: 15m
+    outcomes: { pass: qa, fail: { to: implement, counter: test_loop } }
+  qa:
+    type: agent
+    skill: norn-qa
+    inputs: [spec, slices, diff]
+    criteria: required
+    outcomes:
+      pass:       { to: describe, verdict: pass, means: "every acceptance criterion of the story observed with evidence" }
+      fail:       { to: implement, counter: qa_loop, verdict: fail, means: "a criterion fails; repro in findings" }
+      partial:    { to: human-qa, verdict: person, means: "criteria only a person can judge, evidence prepared" }
+      unverified: { to: human-qa, verdict: unverified, means: "criteria this session could not check; how to check each one is in the report" }
+  human-qa:
+    type: gate
+    prompt: "Check the criteria QA could not settle (listed with how to check each). Approve, or reject with what failed."
+    outcomes:
+      approve: describe
+      reject:  { to: implement, counter: qa_loop }
+      stale:   { to: update, counter: stale_loop }
+  implement:
+    type: agent
+    skill: norn-implement
+    inputs: [spec, handoff, last_check, last_findings]
+    outcomes:
+      done: { to: test, means: "every rework point has a passing test" }
+  describe:
+    type: agent
+    skill: norn-pr
+    inputs: [spec, diff, { file: runs/, label: "QA criteria reports and evidence (receipts/ and evidence/ of each unit)" }]
+    instructions: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
+    outcomes:
+      done: { to: open-pr, means: "pr.md describes the branch as it is now: summary, evidence, merge danger" }
+  open-pr:
+    type: git
+    action: open-pr
+    outcomes: { done: ci }
+  # waits for the PR's CI (a detached check run, so the tick is not blocked); a red run's failed
+  # log becomes last_check for implement, whose rework goes back through open-pr to the new head
+  ci:
+    type: check
+    run: |
+      for i in $(seq 1 30); do gh pr checks >/dev/null 2>&1 && break; sleep 10; done
+      gh pr checks --watch --fail-fast --interval 30 && exit 0
+      run=$(gh run list --branch "$(git branch --show-current)" --limit 1 --json databaseId -q '.[0].databaseId')
+      gh run view "$run" --log-failed | tail -300
+      exit 1
+    timeout: 30m
+    outcomes: { pass: ready, fail: { to: implement, counter: ci_loop } }
+  ready:
+    type: gate
+    prompt: "Read the draft PR. Approve to mark the story finished (a person still merges the PR), or reject with what to change."
     outcomes:
       approve: $done
-      reject:  { to: explore, counter: triage_loop }
+      reject:  { to: implement, counter: ready_loop }
+      stale:   { to: update, counter: stale_loop }
 counters:
-  triage_loop: { max: 2 }
+  plan_loop: { max: 3 }
+  test_loop: { max: 5 }
+  ci_loop: { max: 3 }
+  qa_loop: { max: 2 }
+  ready_loop: { max: 2 }
+  # resets each time update merges cleanly: only repeated conflicts on one base move count (W4)
+  base_conflict_loop: { max: 2, reset_on: update.done }
+  # a stale re-entry is progress from outside (a sibling merged), bounded by the sibling merges
+  stale_loop: { max: 10 }
+base: { stale: conflict }

@@ -9,7 +9,7 @@ assignee: PruszynskiJakub
 labels:
   - friction
   - norn
-workflow: triage
+workflow: story
 status: active
 intake_at: 2026-10-30T10:30:20.759Z
 body_hash: 4aec03ac7d6c0aadb80fd12805af7dd19fa71dea889e32579bc397d67dcb27e2
