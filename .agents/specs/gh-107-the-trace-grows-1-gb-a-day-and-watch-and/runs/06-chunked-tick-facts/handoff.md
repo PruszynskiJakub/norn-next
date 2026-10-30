@@ -14,6 +14,17 @@
 
 ## Goal
 
+Tick lines keep decisions inline and store facts as a `$chunked` skeleton whose chunks (stories with run hooks as 64-fact `$blocks`, machine, remote issues, replay config, workflow sources) live once in `<day>.chunks.jsonl`; `norn why` and the golden harvest replay both chunked and full-facts ticks (AC1–AC12).
+
 ## Progress
 
+- Spike on a real tick from this repo's trace (515 KB): stories 495 KB, decisions 14.7 KB (51 units, ~250 B each, mostly noops), machine 3.9 KB, replay 1.3 KB. Decisions must stay inline (D6, B35), so the largest part that can be chunked, `machine`, became a chunk too (stable between ticks). The inline part of a quiet tick is then about decisions + 77 B per story reference: under 5 KB at harness scale (AC1 test), about 18 KB on this repo's 51 units. The 5 KB in B13 cannot hold for a repo with dozens of units while decisions stay inline.
+- Store `packages/store/src/tick-trace.ts`: `appendTick` (chunks fsynced in one write before the tick line; per-process memory of the hashes in the current chunks file, trusted only while the size matches; a torn last line is skipped and the next write starts on a new line), `tickReader`/`readTickInputs` now return `{ok, inputs} | no_replay | corrupt` (a missing chunk names the hash). The replay types moved there from `trace.ts`.
+- cli: the tick writes via `appendTick` (no more `trace/workflows/` writes, D9; old ticks still read them). `why` uses one reader and refuses a missing chunk with exit 4, code `trace_corrupt`; the filtered search resolves story facts through the reader. The golden harvest reads through the reader. `records.test.ts` read raw `tick.facts` and now reads through `readTickInputs`.
+- Tests: S2 in `packages/store/test/config-trace.test.ts` ("chunked tick facts": golden round-trip byte for byte, B13, B14, B15, B16, B18, B19, B21); S1 in `packages/cli/test/chunked-ticks.test.ts` (B13 bytes, B17 + B14 against `observeNow` byte for byte, B35 schema + inbox history, B18/B35 full ticks after chunked, B22 harvest equality, B21 exit 4).
+- `bun run golden`: adds the same 3 cases (check-run ×2, cockpit) on the base as on this branch, i.e. coverage gaps that already existed, not caused here. They are not committed.
+- PRD O4, O5 and X4 amended.
+
 ## Resume
+
+Report done. The PR body must name the downgrade as the merge danger (AC13): an older norn cannot replay chunked ticks and there is no compatibility mode.
