@@ -267,6 +267,7 @@ const OLD_COMMAND_FILES = (): string[] => [
   // the SPEC-*.md files the PRD cites for its rules (HC, CP, R, BS, QV, NT), and the limits README points at
   ...readdirSync(join(ROOT, ".agents")).filter((n) => /^SPEC-.*\.md$/.test(n)).map((n) => join(ROOT, ".agents", n)),
   join(ROOT, ".agents", "LIMITATIONS.md"),
+  join(ROOT, "docs", "cookbook.html"),
 ];
 
 describe("removed commands (B5, B8, B71)", () => {
@@ -290,7 +291,7 @@ describe("removed commands (B5, B8, B71)", () => {
     expect(() => removedCommands("export const OLD = [];")).toThrow("REMOVED_COMMANDS not found");
   });
 
-  test("no removed command in sources, assets, plugins, skills, README, CONTRIBUTING, AGENTS.md, the PRD and its SPEC files", () => {
+  test("no removed command in sources, assets, plugins, skills, README, CONTRIBUTING, AGENTS.md, the PRD and its SPEC files, the cookbook", () => {
     const hits: string[] = [];
     for (const f of OLD_COMMAND_FILES()) {
       const rel = relative(ROOT, f);
