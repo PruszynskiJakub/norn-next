@@ -14,6 +14,15 @@
 
 ## Goal
 
+`norn tidy` also prunes hook files of finished units and briefings/transcripts of old, not-live runs (B28–B32, D12), never a live run's.
+
 ## Progress
 
+- store `trace.ts`: `listHookFiles`, `listRunTraces`, `deleteTracePaths` (removes an emptied `hooks/<story>/`).
+- cli `runtime/trace-retention.ts`: `unitTracesBefore` picks what to prune; a unit is live while running/parked or with an unapplied `started` receipt (launch in flight), and its run ids with it.
+- `tidy` output `trace` gains `hook_files` [{unit, file, bytes}] and `runs` [{run_id, files, bytes}]; `bytes` is the total freed. 08's B31/B32 expectations updated for the new fields.
+- Tests: new describe in `packages/cli/test/housekeeping.test.ts` (AC1–AC4); red before the code, green after.
+
 ## Resume
+
+Done: full suite and typecheck green; report `norn done done`.
