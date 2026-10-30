@@ -22,16 +22,13 @@
 
 ## Goal
 
-Cut the gh-107 Plan into slice files covering B1–B35.
+Rework the gh-107 Plan after approve-plan rejected the 06/07 split: chunked tick facts and 64-fact hook blocks ship in one slice.
 
 ## Progress
 
-- Wrote 9 slices in `slices/`: 01 day-file line reader + read observer (B4); 02 store replay/hook read prefactor (parity B9, B10, B18); 03 cockpit/status/inbox read no trace (B1–B3); 04 per-unit hook files (B5–B10); 05 backfill (B11, B12); 06 chunked tick facts (B13, B15–B19, B21, B22, B35); 07 64-fact hook blocks (B14); 08 trace.retain + day pruning + doctor + tick_pruned (B20, B23–B27, B31–B34); 09 prune hook files and run dirs (B28–B30).
-- Edges: 02→01, 03→01, 04→02, 05→04, 06→02, 07→06, 09→04+08; 01 and 08 start in parallel.
-- Hook blocks split from chunks (06/07) so 06 fits one context; noted in 06 for the person.
-- slice#1 done: 9 slices covering B1–B35: 01 day-file reader+observer (B4); 02 store replay/hook-read prefactor; 03 cockpit/status/inbox read no trace (B1–B3); 04 per-unit hook files (B5–B10); 05 backfill (B11–B12); 06 chunked tick facts (B13,B15–B19,B21,B22,B35); 07 hook blocks (B14); 08 trace.retain, day pruning, doctor hint, tick_pruned (B20,B23–B27,B31–B34); 09 prune hook files/briefings/transcripts (B28–B30). 01 and 08 have no deps.
-- approve-plan#1 reject by jakubpruszynski@MacBook-Pro-Jakub-2: Merge slices 06 and 07 into one slice: chunked tick facts and 64-fact hook blocks ship together
+- Earlier slice step wrote 9 slices; 06 (chunked tick facts) and 07 (hook blocks) were split so 06 fit one context. Rejected at approve-plan: merge them.
+- plan#2: added D15 to the Plan (chunks and hook blocks ship together, with the reason: `$blocks` is part of the tick line skeleton, so a split would change the line format twice) and a Risk on that slice's size, met by ordering (spike, then S2 tests, then S1). No other Plan change.
 
 ## Resume
 
-Slices written; report `norn done done`.
+Next slice step: merge `slices/06-chunked-tick-facts.md` and `slices/07-hook-blocks.md` into one slice covering B13–B19, B21, B22, B35 (per D15), renumber 08/09 deps accordingly (07→06 edge disappears; 09 still depends on 04 and the retention slice).
