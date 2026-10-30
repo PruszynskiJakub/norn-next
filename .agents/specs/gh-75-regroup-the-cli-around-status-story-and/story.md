@@ -10,7 +10,7 @@ labels:
   - norn
   - norn:wf:story
 workflow: story
-status: active
+status: done
 intake_at: 2026-10-28T08:50:06.913Z
 body_hash: 59e0017417215f20d7c84bfcd35d4145fa644d1bcbad6f876e80e737d54021d0
 criteria:
@@ -85,6 +85,13 @@ criteria:
   - { id: B69, verifier: agent }
   - { id: B70, verifier: agent }
   - { id: B71, verifier: test }
+merge:
+  pr: 106
+  url: https://github.com/PruszynskiJakub/norn-next/pull/106
+  head_sha: 17241c8bada3cede31dac828b2fa169e875d794f
+  merge_commit_sha: 2d43e08144f48990965eaa24bfc719bc5f3f0fad
+  merged_by: PruszynskiJakub
+  merged_at: 2026-10-30T10:47:36.000Z
 ---
 
 # Regroup the CLI around status, story and run, modelled on gh
