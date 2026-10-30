@@ -4,7 +4,7 @@ slug: release
 provider: gh
 number: 114
 url: https://github.com/PruszynskiJakub/norn-next/issues/114
-title: Release
+title: Release 0.12.1
 assignee: PruszynskiJakub
 labels:
   - norn
