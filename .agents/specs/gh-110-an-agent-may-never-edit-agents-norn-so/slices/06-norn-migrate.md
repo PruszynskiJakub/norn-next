@@ -2,7 +2,7 @@
 id: gh-110/06
 title: norn migrate moves a repo to the new layout
 depends_on: [ gh-110/05 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
