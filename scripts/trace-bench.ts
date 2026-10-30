@@ -116,7 +116,7 @@ const hooks: HookFact[] = Array.from({ length: nHooks }, (_, i) => ({
   story: "gh-1",
   run_id: runId,
   tool: "Bash",
-  input: { command: `echo ${"x".repeat(1200)} ${i}` },
+  command: `echo ${"x".repeat(1200)} ${i}`,
 }) as HookFact);
 const tdir = traceDir(repo);
 mkdirSync(tdir, { recursive: true });
