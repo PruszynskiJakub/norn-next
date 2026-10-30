@@ -14,6 +14,18 @@
 
 ## Goal
 
+`norn migrate` moves a main checkout from the old layout to the new one (B11–B17, D6): staged git renames, machine files into the machine dir, norn's old `.gitignore` line dropped, nothing committed; refuses safely; no-op on a migrated repo.
+
 ## Progress
 
+- GitPort gains `move` (git mv when in the index, else false so the caller moves it plainly) and `stage` (git add); contract case added in `packages/adapters/test/contract/git.ts`.
+- Store `old-layout.ts`: the file moves (`moveFile` with copy-then-delete across filesystems, `moveOldTrace`, `dropOldIgnoreLine`, `removeOldLayoutDirs`, `traceClashes`); paths.ts gains `OLD_NORN_DIR` and `oldTickLockPath`.
+- `packages/cli/src/commands/migrate.ts`: checks (main checkout `not_main_checkout`, both layouts `both_layouts`, tick lock at its old place `tick_locked`, all exit 3), then moves under the lock; lock released last, then empty old dirs removed. Listed in `norn help` under Setup.
+- Decision: the machine-files part in both places is not refused by migrate when no file name is in both — only an interrupted run can leave it so (machine files are never committed), and D6 wants every step rerunnable. A name in both places is refused naming both paths. Config/workflows in both places are refused as D4 says.
+- Tests: `packages/cli/test/migrate.test.ts` (AC1–AC8); help tree and repo lint allowlists updated.
+- AC9 done by hand in a throwaway repo under $TMPDIR with the dev build: old layout refused by `status`; `migrate` listed every move and the commit; `git status` showed the staged renames and `.gitignore`; commit then `norn status` exit 0; a second `migrate` said nothing to move.
+- Noted, not changed: the machine dir path printed is not the realpath of NORN_HOME_DIR (`/var/…` vs `/private/var/…` on macOS), from slice 04.
+
 ## Resume
+
+Report `norn done done` once the full suite and typecheck are green and the work is committed.
