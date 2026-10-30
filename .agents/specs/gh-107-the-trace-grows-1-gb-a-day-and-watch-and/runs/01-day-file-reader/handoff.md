@@ -14,6 +14,18 @@
 
 ## Goal
 
+Route every trace day-file read through one store line reader with a read observer, skipping lines of unrequested types by their `{"type":"…"` prefix (B4, D2, prefactoring 1).
+
 ## Progress
 
+- `packages/store/src/trace.ts`: `dayFileLines` (one reader; observer call per opened day file) used by `readTrace` (and so `inboxHistory`, `why`, the views), `readHookFacts`, `blockedHookCount`. `setTraceReadObserver` (off by default, modelled on `setSpawnObserver`). `appendTrace` writes `type` as the first key.
+- D2 in `readTrace`: with `types`, a line whose prefix names another type is skipped unparsed; a line without a type prefix (older norn) is parsed and kept if its type was asked for; unparseable non-prefixed lines are reported only by a reader of every type.
+- `loadTraceView` (`norn trace`) reads only `TIMELINE_TYPES` (`packages/view/src/timeline.ts`): skips tick.start, tick.end, local_file, which the timeline never showed.
+- Tests: store `config-trace.test.ts` (type-first, skip vs report, observer over all four readers); cli `agent-protocol.test.ts` (B4: `norn trace` output unchanged with unshown/broken lines added; observer sees day files for trace, hook stop, tick, inbox --history).
+- `norn trace` never surfaced trace errors, so AC2's "does not report" part is guarded at S1 and made red at S2 (readTrace with types).
+- Checked this repo's real trace: every line already starts with `{"type":"`, so no reader parses more than before.
+- AC4 (agent verifier: compare with the released norn on a throwaway repo) not run here; left for QA.
+
 ## Resume
+
+Nothing left for implement; next step reviews the diff.
