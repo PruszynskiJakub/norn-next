@@ -80,7 +80,8 @@ You need git ≥ 2.38, an agent CLI (Claude Code is the tested one), and `gh` or
 
 ```sh
 curl -fsSLO https://github.com/PruszynskiJakub/norn-next/releases/latest/download/norn-darwin-arm64
-install -m 755 norn-darwin-arm64 /usr/local/bin/norn
+sudo install -d /usr/local/bin           # missing on a fresh Apple Silicon Mac
+sudo install -m 755 norn-darwin-arm64 /usr/local/bin/norn
 norn --version
 ```
 
