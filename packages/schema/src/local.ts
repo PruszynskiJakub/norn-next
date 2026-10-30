@@ -152,6 +152,13 @@ export type LocalPrFile = Static<typeof LocalPrFile>;
 export const LocalCockpitFile = Type.Object({ last_repo: Type.Optional(Type.String()) }, id("local-cockpit", "norn cockpit memory (<norn home>/cockpit.json)"));
 export type LocalCockpitFile = Static<typeof LocalCockpitFile>;
 
+/** `hooks/backfill.json` (B11, B12, D5): when the first tick of the per-unit hook files ran, and the units whose live runs' hook lines it has copied from the day files. Never pruned. */
+export const LocalHookBackfillFile = Type.Object(
+  { since: Type.String(), done: Type.Array(Type.String()) },
+  id("local-hook-backfill", "norn hook file backfill (trace/hooks/backfill.json)"),
+);
+export type LocalHookBackfillFile = Static<typeof LocalHookBackfillFile>;
+
 /** A lock file (H1 tick lock, K6 integrate lock): the holder process and when it took the lock. */
 export const LocalLockFile = Type.Object(
   {
@@ -177,5 +184,6 @@ export const LOCAL_SCHEMA_NAMES = [
   "local-pr",
   "local-cockpit",
   "local-lock",
+  "local-hook-backfill",
 ] as const;
 export type LocalSchemaName = (typeof LOCAL_SCHEMA_NAMES)[number];

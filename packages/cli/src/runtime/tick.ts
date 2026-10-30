@@ -78,7 +78,7 @@ export async function runTick(ctx: Context, opts: TickOptions = {}): Promise<Tic
   if (!lock.ok) throw busyError(`another tick is running (pid ${lock.holder.holder.pid} since ${lock.holder.acquired_at})`, "wait for it to finish; ticks are idempotent", "tick_locked");
   try {
     const tick_id = ulid(startedAt);
-    const obs = await observe(ctx, { tick_id, ...(opts.sync ? { sync: opts.sync } : {}) });
+    const obs = await observe(ctx, { tick_id, backfillHooks: true, ...(opts.sync ? { sync: opts.sync } : {}) });
     const decisions = decide(obs.facts, obs.workflows, obs.config);
     // R5.4 (N2): the decisions reach the trace before act, so a tick that dies mid-act is explainable
     appendTrace(ctx.root, {

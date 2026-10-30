@@ -347,11 +347,12 @@ export function readTickInputs(root: string, tick: TickTrace): TickInputs | null
  */
 export function readHookFacts(root: string, since: string): HookFact[] {
   const out: HookFact[] = [];
-  for (const ev of hookLines(root, since)) out.push(ev.fact);
+  for (const ev of dayHookLines(root, since)) out.push(ev.fact);
   return out.sort((a, b) => a.at.localeCompare(b.at));
 }
 
-function* hookLines(root: string, since: string): Generator<HookTrace> {
+/** The hook events of the day files at `since` or later, in file order: a fast scan like `readHookFacts` (D5 backfills from it). */
+export function* dayHookLines(root: string, since: string): Generator<HookTrace> {
   for (const { text } of dayFileLines(root, { sinceDay: since, types: ["hook"], quiet: true })) {
     const ev = hookLine(text, since);
     if (ev) yield ev;
@@ -405,6 +406,20 @@ function unitHookLines(root: string, unit: HookUnit, since: string): HookTrace[]
  */
 export function readUnitHooks(root: string, units: readonly HookUnit[], since: string): HookTrace[][] {
   return units.map((u) => unitHookLines(root, u, since));
+}
+
+/**
+ * D5 (B11, B12): append to the unit's hook file the events whose id it does not hold yet, in one
+ * append — never a rewrite, so a concurrent `norn hook` append is never lost. Returns how many it appended.
+ */
+export function appendMissingUnitHooks(root: string, unit: HookUnit, events: readonly HookTrace[]): number {
+  const held = new Set(unitHookLines(root, unit, "").map((e) => e.id));
+  const missing = events.filter((e) => !held.has(e.id) && held.add(e.id));
+  if (!missing.length) return 0;
+  const file = hookFilePath(root, unit);
+  mkdirSync(dirname(file), { recursive: true });
+  appendFileSync(file, missing.map(traceLine).join(""));
+  return missing.length;
 }
 
 /** D4: when the unit's hook file was last written (ms, the time of its last appended fact), or null when it has none. */

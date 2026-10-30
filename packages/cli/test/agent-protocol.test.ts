@@ -5,7 +5,7 @@
  * do_instead, and `norn hook` block/allow on turn end (unattended vs attended steps).
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { appendFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { BriefJson, Facts } from "@norn/core";
 import { type HookTrace, type TickTrace, ulid } from "@norn/schema";
@@ -495,5 +495,98 @@ describe("parseFindings", () => {
     expect(parseFindings(JSON.stringify([{ severity: "minor", title: "t" }]), "f")).toEqual([{ severity: "minor", title: "t" }]);
     expect(() => parseFindings(JSON.stringify({ findings: [{ title: "t" }] }), "f")).toThrow("severity");
     expect(() => parseFindings("{", "f")).toThrow("not valid JSON");
+  });
+});
+
+describe("hook backfill on upgrade (B11, B12, D5)", () => {
+  let g: Harness;
+  const gWt = () => `${g.root}-worktrees/gh-9-manual-thing`;
+  const gRuns = () => join(gWt(), spec, "runs/_story");
+  const backfillFile = () => join(traceDir(g.root), "hooks", "backfill.json");
+  const gHookFile = () => join(traceDir(g.root), "hooks", "gh-9", "_story.jsonl");
+  const gHookIds = () => (existsSync(gHookFile()) ? g.read(gHookFile()).split("\n").filter(Boolean).map((l) => (JSON.parse(l) as HookTrace).id) : []);
+  const gDays = () => readdirSync(traceDir(g.root)).filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n));
+  let runId = "";
+  let runStart = 0;
+  /** 400 hook lines of gh-9's run, written only to the day files, the way the previous version wrote them */
+  const old: HookTrace[] = [];
+
+  beforeAll(async () => {
+    g = await createHarness();
+    expect((await g.norn("init")).exit).toBe(0);
+    g.write(join(g.root, ".agents/norn/config.yaml"), CONFIG);
+    g.write(join(g.root, ".agents/norn/workflows/duo.yaml"), DUO);
+    g.git(["add", "-A"]);
+    g.git(["commit", "-q", "-m", "norn init"]);
+    g.git(["push", "-q", "origin", "main"]);
+    g.remote.issues = [issue(9, "Manual thing")];
+  });
+  afterAll(() => g.cleanup());
+
+  test("AC3: a run started after the backfill's since never has a day file scanned for it", async () => {
+    for (let i = 0; i < 10 && g.state(gRuns())?.status !== "ready"; i++) {
+      g.clock.advance(10_000);
+      await g.tick();
+    }
+    expect(g.state(gRuns())).toMatchObject({ step: "implement", status: "ready" });
+    const since = (JSON.parse(g.read(backfillFile())) as { since: string; done: string[] }).since;
+    g.clock.advance(10_000);
+    const brief = await runCli(["brief", "--json"], { ...g.deps, cwd: gWt(), env: { ...g.deps.env, NORN_AGENT_PID: String(process.pid) } });
+    expect(brief.exit).toBe(0);
+    runId = (brief.value as { run_id: string }).run_id;
+    g.clock.advance(10_000);
+    expect(await openedDays(() => g.tick())).toEqual([]);
+    const st = g.state(gRuns());
+    expect(st).toMatchObject({ status: "running", run: { run_id: runId } });
+    runStart = Date.parse(st?.run?.started_at as string);
+    expect(st?.run?.started_at as string > since).toBe(true);
+    expect(await openedDays(() => g.tick())).toEqual([]);
+  });
+
+  test("AC1: the first tick of the new version copies a live run's hook lines from yesterday's and today's day files once", async () => {
+    // the upgrade: no backfill.json, no hook file yet, the run's hook lines only in the day files
+    rmSync(backfillFile());
+    rmSync(gHookFile(), { force: true });
+    const midnight = Date.parse(`${new Date(runStart).toISOString().slice(0, 10)}T00:00:00.000Z`) + 86_400_000;
+    for (let i = 0; i < 400; i++) {
+      // 200 lines yesterday (after the run began), 200 today
+      const at = i < 200 ? runStart + (i + 1) * 60_000 : midnight + (i - 200) * 1_000;
+      const ev: HookTrace = { type: "hook", id: ulid(at), fact: { event: "tool_use", at: new Date(at).toISOString(), agent: "claude", native: "PostToolUse", cwd: gWt(), story: "gh-9", run_id: runId, tool: "Bash" } };
+      old.push(ev);
+      appendFileSync(join(traceDir(g.root), `${ev.fact.at.slice(0, 10)}.jsonl`), `${JSON.stringify(ev)}\n`);
+    }
+    // another unit's hook line in the same day file is never copied into gh-9's
+    const other: HookTrace = { type: "hook", id: ulid(midnight), fact: { event: "tool_use", at: new Date(midnight).toISOString(), agent: "claude", native: "PostToolUse", cwd: "/elsewhere", story: "gh-404" } };
+    appendFileSync(join(traceDir(g.root), `${other.fact.at.slice(0, 10)}.jsonl`), `${JSON.stringify(other)}\n`);
+    g.clock.t = midnight + 400_000;
+    await g.tick();
+    expect(gHookIds()).toEqual(old.map((e) => e.id));
+    expect(JSON.parse(g.read(backfillFile()))).toEqual({ since: new Date(midnight + 400_000).toISOString(), done: ["gh-9"] });
+    // the second tick copies nothing and scans no day file
+    g.clock.advance(10_000);
+    const before = g.read(gHookFile());
+    expect(await openedDays(() => g.tick())).toEqual([]);
+    expect(g.read(gHookFile())).toBe(before);
+  });
+
+  test("AC2: a backfill left unfinished, with a hook fired meanwhile, completes on the next tick with each event id once", async () => {
+    // a crashed backfill: part of the copy written, gh-9 not yet in done
+    const backfill = JSON.parse(g.read(backfillFile())) as { since: string; done: string[] };
+    g.write(backfillFile(), JSON.stringify({ since: backfill.since, done: [] }));
+    g.write(gHookFile(), `${old.slice(0, 150).map((e) => JSON.stringify(e)).join("\n")}\n`);
+    // a hook fires into gh-9's hook file (and today's day file) meanwhile
+    g.clock.advance(10_000);
+    const fired = await runCli(["hook", "post-tool-use"], { ...g.deps, cwd: gWt(), env: { ...g.deps.env, NORN_AGENT_PID: String(process.pid) }, stdin: JSON.stringify({ session_id: "sess-1", cwd: gWt(), hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "ls" } }) });
+    expect(fired.exit).toBe(0);
+    const ids = gHookIds();
+    expect(ids).toHaveLength(151);
+    const newId = ids.at(-1) as string;
+    g.clock.advance(10_000);
+    await g.tick();
+    const after = gHookIds();
+    expect(new Set(after).size).toBe(after.length);
+    expect(after.sort()).toEqual([...old.map((e) => e.id), newId].sort());
+    expect((JSON.parse(g.read(backfillFile())) as { done: string[] }).done).toEqual(["gh-9"]);
+    expect(gDays().length).toBeGreaterThan(1);
   });
 });

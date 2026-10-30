@@ -12,6 +12,7 @@ import {
   LocalFailuresFile,
   LocalForeignFile,
   LocalHeartbeatFile,
+  LocalHookBackfillFile,
   LocalInboxFile,
   LocalLockFile,
   LocalNotifiedFile,
@@ -52,6 +53,7 @@ export const SCHEMAS = {
   "local-pr": LocalPrFile,
   "local-cockpit": LocalCockpitFile,
   "local-lock": LocalLockFile,
+  "local-hook-backfill": LocalHookBackfillFile,
 } as const;
 export type SchemaName = keyof typeof SCHEMAS;
 export type SchemaType<N extends SchemaName> = Static<(typeof SCHEMAS)[N]>;
