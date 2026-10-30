@@ -324,8 +324,15 @@ describe("attended steps never block (MO4)", () => {
   test("brief starts the attended run; Stop is allowed without a report; done completes it", async () => {
     await tickUntil(() => h.state(pairRuns())?.step === "refine");
     expect(h.state(pairRuns())).toMatchObject({ status: "parked", park: { kind: "attended" } });
+    // B10: hook facts of two units in the trace; the brief takes the session from its own unit's only
+    const tool = (cwd: string, session_id: string) => hook(cwd, "pre-tool-use", { hook_event_name: "PreToolUse", session_id, tool_name: "Bash", tool_input: { command: "ls" } });
+    await tool(pairWt(), "sess-pair");
+    h.clock.advance(1_000);
+    await tool(wt(), "sess-other");
     const b = await inWt(pairWt(), "brief", "--json");
     expect(b.value).toMatchObject({ unit: "gh-10", step: "refine", started: true });
+    const started = receipts(pairRuns()).filter((f) => f.endsWith("-started.json"));
+    expect(readReceipt(pairRuns(), started.at(-1) as string)).toMatchObject({ kind: "started", agent_session_id: "sess-pair", worktree: pairWt() });
     expect((b.value as { markdown: string }).markdown).toContain("Attended step: no deadline or nudges (MO4)");
     expect((await stop(pairWt())).value).toEqual({});
     h.clock.advance(10_000);

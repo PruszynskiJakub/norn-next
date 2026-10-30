@@ -320,7 +320,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     const mode: Mode = storyState?.mode ?? config.default_mode;
     const finished = story.frontmatter?.status === "done" || story.frontmatter?.status === "dropped";
 
-    const units: UnitFacts[] = ls.units.map((lu) => unitFacts(lu, local.hooks, leaseByRun));
+    const units: UnitFacts[] = ls.units.map((lu) => unitFacts(lu, lu.hooks, leaseByRun));
     const sf: StoryFacts = {
       key: story.key,
       slug: story.slug,

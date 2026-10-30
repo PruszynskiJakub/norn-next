@@ -22,11 +22,10 @@
  */
 import { criterionLine, decide, type Decision, legacyAction, type NumberedReceipt, type StoryFacts, type UnitFacts, unitDecision } from "@norn/core";
 import { ExitCode, type Receipt, type TickStartTrace, type TickTrace, type TickUnitRecord, ULID_PATTERN } from "@norn/schema";
-import { crashedTicksFor, decisionUnit, findCrashedTick, findTick, readTrace } from "@norn/store";
+import { crashedTicksFor, decisionUnit, findCrashedTick, findTick, readTickInputs, readTrace } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import { refuse, usageError, withExit } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
-import { replayInputs } from "../runtime/tick.ts";
 import { NORN_VERSION } from "../version.ts";
 
 /** An action as compared with its replay; one an older norn recorded drops the fields since removed (O5). */
@@ -255,7 +254,7 @@ export const whyCommand = defineCommand({
         );
     }
     const { tick, d: recorded } = found.at(-1) as { tick: TickTrace; d: TickUnitRecord };
-    const inputs = replayInputs(ctx.root, tick);
+    const inputs = readTickInputs(ctx.root, tick);
     if (!inputs) throw refuse(`tick ${tick.tick_id} has no replay block (recorded by an older norn)`, `norn trace ${key}`, "no_replay");
 
     let replayed: Decision[];

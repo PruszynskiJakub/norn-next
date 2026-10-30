@@ -7,10 +7,22 @@
  */
 import { appendFileSync, mkdirSync, readdirSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
-import type { FileError } from "@norn/core";
-import { type HookFact, type TickStartTrace, type TickTrace, type TraceEvent, assertValid, ulid, ulidTime, validate } from "@norn/schema";
+import type { Facts, FileError, LoadedWorkflow, RepoWorkflows } from "@norn/core";
+import {
+  type HookFact,
+  type HookTrace,
+  type ResolvedConfig,
+  type TickStartTrace,
+  type TickTrace,
+  type TraceEvent,
+  assertValid,
+  ulid,
+  ulidTime,
+  validate,
+} from "@norn/schema";
 import { appendDurable, atomicWrite, isErrno, readText } from "./fsx.ts";
 import { traceDir } from "./paths.ts";
+import { parseWorkflowText } from "./unit.ts";
 
 function eventTime(ev: TraceEvent): string {
   return ev.type === "hook" ? ev.fact.at : ev.at;
@@ -124,7 +136,7 @@ let readObserver: TraceReadObserver | null = null;
 
 /**
  * Test hook (B4), modelled on `setSpawnObserver`: call `fn` with each day file a trace reader opens
- * (`readTrace` and every reader built on it, `readHookFacts`, `blockedHookCount`). `null` (the
+ * (`readTrace` and every reader built on it, `readHookFacts`, `readUnitHooks`, `blockedHookCount`). `null` (the
  * default) turns it off. Returns the observer it replaced. It only watches; one that throws is ignored.
  */
 export function setTraceReadObserver(fn: TraceReadObserver | null): TraceReadObserver | null {
@@ -253,6 +265,44 @@ export function crashedTicksFor(root: string, unit: string): TickStartTrace[] {
   return events.filter((e): e is TickStartTrace => e.type === "tick.start" && !ended.has(e.tick_id) && eventMatchesUnit(e, unit));
 }
 
+// ---------------------------------------------------------------- replay inputs (O5)
+
+/** Workflows as recorded in a tick's replay block: name → hash of the text stored at `trace/workflows/<hash>.yaml`. */
+export interface ReplayWorkflowRef {
+  hash: string | null;
+  issues: LoadedWorkflow["issues"];
+}
+
+/** What a tick records beside its facts so `norn why` can replay decide on the same inputs (O5). */
+export interface ReplayBlock {
+  workflows: Record<string, ReplayWorkflowRef>;
+  config: ResolvedConfig;
+}
+
+/** decide's inputs as a tick recorded them (O5). */
+export interface TickInputs {
+  facts: Facts;
+  workflows: RepoWorkflows;
+  config: ResolvedConfig;
+}
+
+/**
+ * Rebuild decide's inputs from a tick record (O5): its facts without the replay block, each workflow
+ * read back from its stored source, the config. Null for a tick recorded without a replay block.
+ */
+export function readTickInputs(root: string, tick: TickTrace): TickInputs | null {
+  const { replay, ...facts } = tick.facts as unknown as Facts & { replay?: ReplayBlock };
+  if (!replay) return null;
+  const workflows: Record<string, LoadedWorkflow> = {};
+  for (const [name, ref] of Object.entries(replay.workflows)) {
+    const source = ref.hash ? (readTraceFile(root, `workflows/${ref.hash}.yaml`) ?? "") : "";
+    const parsed = source ? parseWorkflowText(source, `trace/workflows/${ref.hash}.yaml`) : null;
+    const workflow = parsed?.ok ? parsed.value : null;
+    workflows[name] = { name, workflow, source, issues: ref.issues };
+  }
+  return { facts: facts as Facts, workflows, config: replay.config };
+}
+
 // ---------------------------------------------------------------- hook lines (A2, A4): fast scans
 
 /**
@@ -262,24 +312,54 @@ export function crashedTicksFor(root: string, unit: string): TickStartTrace[] {
  */
 export function readHookFacts(root: string, since: string): HookFact[] {
   const out: HookFact[] = [];
+  for (const ev of hookLines(root, since)) out.push(ev.fact);
+  return out.sort((a, b) => a.at.localeCompare(b.at));
+}
+
+function* hookLines(root: string, since: string): Generator<HookTrace> {
   for (const { text } of dayFileLines(root, { sinceDay: since, types: ["hook"], quiet: true })) {
     try {
-      const ev = JSON.parse(text) as { type?: string; fact?: HookFact };
-      if (ev.type === "hook" && ev.fact && ev.fact.at >= since) out.push(ev.fact);
+      const ev = JSON.parse(text) as HookTrace;
+      if (ev.type === "hook" && ev.fact && ev.fact.at >= since) yield ev;
     } catch {
       /* diagnostic file; bad lines are skipped */
     }
   }
-  return out.sort((a, b) => a.at.localeCompare(b.at));
 }
 
-/** A4: hook events of `runId` that norn blocked, counted in the trace day files since the run began (text match, no parse). */
-export function blockedHookCount(root: string, runId: string): number {
+/** A unit whose hook events are read: its key, and its worktree when known. */
+export interface HookUnit {
+  story: string;
+  slice?: string | null;
+  worktree: string | null;
+}
+
+/**
+ * A hook event belongs to a unit when `norn hook` recorded it for that unit (the fact's story and
+ * slice: the launch env, else the worktree's marker), or when it fired under the unit's worktree —
+ * the prefix match `runHooks` picks facts without a run id by (A2, R5.3).
+ */
+function hookOfUnit(fact: HookFact, unit: HookUnit): boolean {
+  if (fact.story === unit.story && (fact.slice ?? null) === (unit.slice ?? null)) return true;
+  return !!unit.worktree && fact.cwd.startsWith(unit.worktree);
+}
+
+/**
+ * A2/A4: the hook events of each unit in `units` since `since`, oldest first, in the order given —
+ * one read for every caller of a unit's hooks (the tick's local facts, `brief`, `hook`'s blocked
+ * count). A fast scan like `readHookFacts`: nothing is schema-checked, bad lines are skipped.
+ */
+export function readUnitHooks(root: string, units: readonly HookUnit[], since: string): HookTrace[][] {
+  const out = units.map((): HookTrace[] => []);
+  for (const ev of hookLines(root, since)) units.forEach((u, i) => hookOfUnit(ev.fact, u) && out[i]?.push(ev));
+  for (const evs of out) evs.sort((a, b) => a.fact.at.localeCompare(b.fact.at));
+  return out;
+}
+
+/** A4: hook events of `runId` that norn blocked, counted in its unit's hooks since the day the run began. */
+export function blockedHookCount(root: string, unit: HookUnit, runId: string): number {
   const day = new Date(ulidTime(runId)).toISOString().slice(0, 10);
-  const needle = `"run_id":"${runId}"`;
-  let n = 0;
-  for (const { text, type } of dayFileLines(root, { sinceDay: day, types: ["hook"], quiet: true })) if (type === "hook" && text.includes('"blocked":true') && text.includes(needle)) n++;
-  return n;
+  return (readUnitHooks(root, [unit], day)[0] ?? []).filter((e) => e.blocked && e.fact.run_id === runId).length;
 }
 
 // ---------------------------------------------------------------- side files (B4, C4)
