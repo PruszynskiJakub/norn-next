@@ -22,9 +22,9 @@ Hook facts fired in a unit worktree also land in that unit's hook file (`trace/h
 - tick (local-facts): reads the hook files of units with a live run / unknown launch, or whose hook file mtime is within `limits.stalled` (D4).
 - Decision: `appendHookTrace` sets the hook file's mtime to the fact's `at`, so D4's "written within the stalled window" compares on the clock the facts carry (`facts.now`), not wall-clock. Found by auto-recovery's R5.3 test under the fake clock.
 - `norn hook` writes to the unit of the worktree marker (B7: run id or not).
-- Tests: agent-protocol (AC1–AC6: hook file = day lines, no hook file outside a unit, no day file opened by stop/tick/brief, blocked-limit answers unchanged), store config-trace (hook files, dedupe, no day file). Five cli tests that stood in for `norn hook` by appending to the day file now use `appendHookTrace`.
+- Tests: agent-protocol (AC1–AC6: hook file = day lines, no hook file outside a unit, no day file opened by stop/tick/brief, blocked-limit answers unchanged), store config-trace (hook files, dedupe, no day file). Five cli tests and the view test that stood in for `norn hook` by appending to the day file now use `appendHookTrace`.
 - PRD A2/A4 amended.
-- Parity: observe snapshots, golden, e2e and recovery transcripts unchanged.
+- Parity: observe snapshots, golden, e2e and recovery transcripts unchanged. Full suite 1246/1246 green (the one failure, view.test.ts, was the same stand-in fixture, fixed and rerun) and the type check passes.
 - AC7 (agent verifier) waits for 03's benchmark script, not landed yet (03 still active).
 
 ## Resume

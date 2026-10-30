@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { type ClaimBlob, type LeaseFile, type Receipt, type UnitState, ulid } from "@norn/schema";
 import {
   acquireClaim,
+  appendHookTrace,
   appendReceipt,
   appendTrace,
   leasesDir,
@@ -142,7 +143,7 @@ async function seed() {
       { unit: "gh-12", rule: "noop", action: { kind: "wait" }, result: { ok: true } },
     ],
   });
-  appendTrace(repo, {
+  appendHookTrace(repo, { story: "gh-12", slice: "gh-12/01" }, {
     type: "hook",
     id: ulid(NOW),
     fact: { event: "tool_use", at: ago(20), agent: "claude", native: "PreToolUse", cwd: "/w", story: "gh-12", slice: "gh-12/01", run_id: RUN, tool: "Bash" },

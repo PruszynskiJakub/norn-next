@@ -188,9 +188,9 @@ The story worktree is on the story branch and holds `.agents/specs/<id>-<slug>/`
 ### 9.1 Hooks
 
 - A1 `norn init` appends norn hooks into each configured agent tool's repo config (e.g. `.claude/settings.json`), marked as norn-owned; re-running updates them in place; `norn uninstall` removes them.
-- A2 Hooks call `"${NORN_BIN:-norn}" hook <event>` (R8.1) and report lifecycle facts: turn start/end, tool use, waiting for input (incl. permission prompts), session end, transcript path.
+- A2 Hooks call `"${NORN_BIN:-norn}" hook <event>` (R8.1) and report lifecycle facts: turn start/end, tool use, waiting for input (incl. permission prompts), session end, transcript path. Each fact is appended to the unit's own hook file (`trace/hooks/<story>/_story.jsonl` or `<nn>.jsonl`, the unit of the worktree it fired in, with or without a run id) and to the trace day file. Ticks, `norn hook` and `norn brief` read a unit's hook facts from its hook file only, never from the day files; a tick reads the hook files of units with a live run or an unknown launch (R5.1) and of units whose hook file was written within `limits.stalled` (R5.3).
 - A3 Hooks are no-ops outside worktrees containing `.norn-unit`.
-- A4 Where the agent supports blocking (e.g. Claude Code `Stop`), ending a turn without a receipt is refused with an instruction to report — in unattended steps only (MO4).
+- A4 Where the agent supports blocking (e.g. Claude Code `Stop`), ending a turn without a receipt is refused with an instruction to report — in unattended steps only (MO4). The refusals already given to a run are counted from its unit's hook file (A2).
 - A5 Agents without hooks are a lower tier: runner, process and git facts only.
 - A6 When launching, norn sets `NORN_HOME`, `NORN_STORY`, `NORN_SLICE`, `NORN_RUN` and `NORN_BIN`. The launched command itself starts with `env PATH=<shim dir>:… NORN_BIN=<shim>`, where the shim `~/.norn/bin/norn` execs the launching norn, so `command -v norn` in a runner pane resolves to it even after a login shell resets `PATH` (R8.1).
 - A7 `norn doctor` (M4) runs a test turn per adapter and verifies hooks fire; it runs `command -v norn` in one throwaway runner session and fails when it resolves to another norn (R8.2), and warns when `NORN_MACHINE` overrides the machine name (R7.3).

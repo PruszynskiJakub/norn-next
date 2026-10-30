@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { herdr } from "@norn/adapters";
 import { ulid } from "@norn/schema";
-import { appendTrace, readCockpitFile } from "@norn/store";
+import { appendHookTrace, readCockpitFile } from "@norn/store";
 import type { CockpitModel } from "@norn/view";
 import { runCli } from "../src/index.ts";
 import { placeAgent } from "../src/runtime/cockpit.ts";
@@ -226,7 +226,7 @@ describe("--next (HC10), labels (HC12) and the agent place (HC6, HC15)", () => {
     const runId = (brief.value as { run_id: string }).run_id;
     c.clock.advance(1000);
     await c.tick();
-    appendTrace(c.root, { type: "hook", id: ulid(c.clock.now()), fact: { event: "turn_end", at: c.clock.iso(), agent: "claude", native: "Stop", cwd: wt(5), story: "gh-5", run_id: runId, agent_session_id: "sess-5" } });
+    appendHookTrace(c.root, { story: "gh-5" }, { type: "hook", id: ulid(c.clock.now()), fact: { event: "turn_end", at: c.clock.iso(), agent: "claude", native: "Stop", cwd: wt(5), story: "gh-5", run_id: runId, agent_session_id: "sess-5" } });
     const agents: herdr.HerdrAgent[] = [{ pane_id: "w9:p5", workspace_id: "w9", agent: "claude", status: "idle", cwd: wt(5), agent_session_id: "sess-5" }];
 
     c.clock.advance(30_000);

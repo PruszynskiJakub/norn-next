@@ -16,7 +16,7 @@ import { type LeaseListing, type LeaseLiveness, listLeases } from "./leases.ts";
 import { receiptsDir } from "./paths.ts";
 import { readReceipt } from "./receipts.ts";
 import { loadSnapshot, type RepoSnapshot, type StorySnapshot, type UnitSnapshot, withSliceWorktrees } from "./snapshot.ts";
-import { readUnitHooks } from "./trace.ts";
+import { readUnitHooks, unitHooksChangedAt } from "./trace.ts";
 import { readUnitMarker } from "./worktree.ts";
 
 export interface LocalFactsOptions {
@@ -61,7 +61,7 @@ export interface LocalUnit {
   unknown_launch: (NumberedReceipt & { receipt: ReceiptOf<"started"> }) | null;
   /** this machine's check lease of the unit, else its agent lease */
   lease: LeaseFile | null;
-  /** the unit's hook facts (`readUnitHooks`), back to the oldest live or launch-unknown run of any unit (R5.1), and always the stalled window (R5.3) */
+  /** the unit's hook facts (its hook file, `readUnitHooks`), back to the oldest live or launch-unknown run of any unit (R5.1), and always the stalled window (R5.3); empty for a unit with no such run whose hook file was not written within the stalled window (D4) */
   hooks: HookFact[];
   /** R5.3: runs of the cursor step and their hook activity */
   step_runs?: StepRunFacts[];
@@ -120,9 +120,14 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
     const storyWt = opts.storyWorktrees.get(s.key) ?? (existsSync(conventional) && readUnitMarker(conventional).marker ? conventional : null);
     return { s, storyWt, units: s.units.map((u) => ({ u, worktree: u.unit.slice ? (opts.sliceWorktrees.get(u.unit.slice) ?? null) : storyWt })) };
   });
-  const all = placed.flatMap(({ units }) => units);
-  const unitHooks = readUnitHooks(root, all.map(({ u, worktree }) => ({ story: u.unit.story, slice: u.unit.slice, worktree })), starts.sort()[0] as string);
-  const hooksOf = new Map(all.map(({ u }, i) => [u, (unitHooks[i] ?? []).map((e) => e.fact)]));
+  // B8 (D4): only the hook files of units with a live run or an unknown launch (R5.1), or written within the stalled window (R5.3)
+  const hooked = placed.flatMap(({ units }) => units.map(({ u }) => u)).filter((u) => {
+    if (liveRun(u.state) || unknownLaunch(u.unapplied)) return true;
+    const changed = unitHooksChangedAt(root, u.unit);
+    return changed !== null && changed >= now - stalledMs;
+  });
+  const unitHooks = readUnitHooks(root, hooked.map((u) => u.unit), starts.sort()[0] as string);
+  const hooksOf = new Map(hooked.map((u, i) => [u, (unitHooks[i] ?? []).map((e) => e.fact)]));
   const stories = placed.map(({ s, storyWt, units: us }): LocalStory => {
     const units = us.map(({ u, worktree }) => localUnit(root, s, u, worktree, hooksOf.get(u) ?? [], live, failures));
     const ready = readyOf(s, s.units[0]);

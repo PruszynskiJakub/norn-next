@@ -4,8 +4,10 @@
  * appends cheap and let old days be deleted wholesale; `trace <unit>` / `why <unit>`
  * filter by unit while reading. Briefings and transcript snapshots are separate files
  * under `briefings/<run_id>/` and `transcripts/<run_id>/`, referenced by trace-relative path.
+ * Each hook event fired in a unit worktree is also kept in that unit's hook file under `hooks/` (D3),
+ * which is where every reader of a unit's hooks reads them.
  */
-import { appendFileSync, mkdirSync, readdirSync } from "node:fs";
+import { appendFileSync, mkdirSync, readdirSync, statSync, utimesSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
 import type { Facts, FileError, LoadedWorkflow, RepoWorkflows } from "@norn/core";
 import {
@@ -21,7 +23,7 @@ import {
   validate,
 } from "@norn/schema";
 import { appendDurable, atomicWrite, isErrno, readText } from "./fsx.ts";
-import { traceDir } from "./paths.ts";
+import { hookFilePath, traceDir } from "./paths.ts";
 import { parseWorkflowText } from "./unit.ts";
 
 function eventTime(ev: TraceEvent): string {
@@ -52,6 +54,26 @@ export function appendTrace(root: string, event: TraceEvent): string {
     mkdirSync(dirname(path), { recursive: true });
     appendFileSync(path, line);
   }
+  return name;
+}
+
+/**
+ * B5 (D3, A2): append a hook event to its unit's hook file, then the same line to the day file —
+ * both unsynced appends, like every diagnostic line. The hook file's mtime is set to the fact's time,
+ * so the tick's "written within the stalled window" (D4, `unitHooksChangedAt`) is on the clock the
+ * facts carry. Returns the day file's trace-relative name.
+ */
+export function appendHookTrace(root: string, unit: HookUnit, event: HookTrace): string {
+  assertValid("trace", event);
+  const { type, ...rest } = event;
+  const line = `${JSON.stringify({ type, ...rest })}\n`;
+  const file = hookFilePath(root, unit);
+  mkdirSync(dirname(file), { recursive: true });
+  appendFileSync(file, line);
+  const at = new Date(event.fact.at);
+  utimesSync(file, at, at);
+  const name = traceFileName(event.fact.at);
+  appendFileSync(join(traceDir(root), name), line);
   return name;
 }
 
@@ -136,7 +158,7 @@ let readObserver: TraceReadObserver | null = null;
 
 /**
  * Test hook (B4), modelled on `setSpawnObserver`: call `fn` with each day file a trace reader opens
- * (`readTrace` and every reader built on it, `readHookFacts`, `readUnitHooks`, `blockedHookCount`). `null` (the
+ * (`readTrace` and every reader built on it, `readHookFacts`); a unit's hook file is not a day file. `null` (the
  * default) turns it off. Returns the observer it replaced. It only watches; one that throws is ignored.
  */
 export function setTraceReadObserver(fn: TraceReadObserver | null): TraceReadObserver | null {
@@ -327,33 +349,55 @@ function* hookLines(root: string, since: string): Generator<HookTrace> {
   }
 }
 
-/** A unit whose hook events are read: its key, and its worktree when known. */
+/** A unit whose hook events are read or written (D3): its story, and its slice for a slice unit. */
 export interface HookUnit {
   story: string;
   slice?: string | null;
-  worktree: string | null;
 }
 
 /**
- * A hook event belongs to a unit when `norn hook` recorded it for that unit (the fact's story and
- * slice: the launch env, else the worktree's marker), or when it fired under the unit's worktree —
- * the prefix match `runHooks` picks facts without a run id by (A2, R5.3).
+ * The hook events in a unit's hook file at `since` or later (B5): duplicate event ids dropped, sorted by
+ * the fact's time (D3). A fast scan like `readHookFacts`: nothing is schema-checked, bad lines are skipped.
  */
-function hookOfUnit(fact: HookFact, unit: HookUnit): boolean {
-  if (fact.story === unit.story && (fact.slice ?? null) === (unit.slice ?? null)) return true;
-  return !!unit.worktree && fact.cwd.startsWith(unit.worktree);
+function unitHookLines(root: string, unit: HookUnit, since: string): HookTrace[] {
+  let text: string | null;
+  try {
+    text = readText(hookFilePath(root, unit));
+  } catch {
+    return []; // diagnostic file: unreadable is empty
+  }
+  const seen = new Set<string>();
+  const out: HookTrace[] = [];
+  for (const line of (text ?? "").split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      const ev = JSON.parse(line) as HookTrace;
+      if (ev.type !== "hook" || !ev.fact || ev.fact.at < since || seen.has(ev.id)) continue;
+      seen.add(ev.id);
+      out.push(ev);
+    } catch {
+      /* diagnostic file; bad lines are skipped */
+    }
+  }
+  return out.sort((a, b) => a.fact.at.localeCompare(b.fact.at));
 }
 
 /**
- * A2/A4: the hook events of each unit in `units` since `since`, oldest first, in the order given —
- * one read for every caller of a unit's hooks (the tick's local facts, `brief`, `hook`'s blocked
- * count). A fast scan like `readHookFacts`: nothing is schema-checked, bad lines are skipped.
+ * A2/A4 (B8–B10): the hook events of each unit in `units` since `since`, oldest first, in the order
+ * given — one read for every caller of a unit's hooks (the tick's local facts, `brief`, `hook`'s
+ * blocked count). Each unit's own hook file only: no day file is read.
  */
 export function readUnitHooks(root: string, units: readonly HookUnit[], since: string): HookTrace[][] {
-  const out = units.map((): HookTrace[] => []);
-  for (const ev of hookLines(root, since)) units.forEach((u, i) => hookOfUnit(ev.fact, u) && out[i]?.push(ev));
-  for (const evs of out) evs.sort((a, b) => a.fact.at.localeCompare(b.fact.at));
-  return out;
+  return units.map((u) => unitHookLines(root, u, since));
+}
+
+/** D4: when the unit's hook file was last written (ms, the time of its last appended fact), or null when it has none. */
+export function unitHooksChangedAt(root: string, unit: HookUnit): number | null {
+  try {
+    return statSync(hookFilePath(root, unit)).mtimeMs;
+  } catch {
+    return null;
+  }
 }
 
 /** A4: hook events of `runId` that norn blocked, counted in its unit's hooks since the day the run began. */
