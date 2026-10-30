@@ -205,7 +205,7 @@ function withoutLines(raw: string, doc: Document, segs: string[]): string | null
 
 // ---------------------------------------------------------------- workflows (W1)
 
-const WORKFLOW_EXT = [".yaml", ".yml", ".json"];
+export const WORKFLOW_EXT = [".yaml", ".yml", ".json"];
 
 export interface WorkflowFile extends PinnedWorkflow {
   name: string;

@@ -15,7 +15,8 @@
  *   - machine: the `user@host` runs are recorded with (R7.1); a warning when NORN_MACHINE overrides it (R7.3)
  *   - skills (SK1): every bundled skill is in `.agents/skills/` and linked from each configured
  *     agent's skill folder; one that differs from the bundled version is a warning (`norn init`)
- * Repo checks (D7, B7–B9): every repo workflow validated exactly as a tick validates it (W5, the
+ * Repo checks (D7, B7–B9): the layout (D4; an old or mixed one is the only check reported, failed,
+ * naming `norn migrate`, B20), every repo workflow validated exactly as a tick validates it (W5, the
  * shared `checkedRepoWorkflows`), and the repo config layer against its schema. Read-only.
  * `--live` also runs one cheap headless test turn per agent in a throwaway repo with norn hooks
  * installed, and checks that the agent's own hooks reported to norn.
@@ -28,7 +29,7 @@ import { basename, extname, join, relative, resolve } from "node:path";
 import { git as gitAdapter, herdr, proc } from "@norn/adapters";
 import type { AgentAdapter, FileError, RunnerPort, SessionRef, WorkflowIssue } from "@norn/core";
 import { ExitCode, ulid } from "@norn/schema";
-import { bindNornHome, loadWorkflows, machineDir, machineHolder, noteSpawn, orphanedMachineDirs, readHookFacts, repoConfigPath, skillsReport, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
+import { bindNornHome, type Layout, layoutProblems, loadWorkflows, machineDir, machineHolder, noteSpawn, orphanedMachineDirs, readHookFacts, repoConfigPath, repoLayout, skillsReport, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { rendered, withExit } from "../output.ts";
@@ -36,6 +37,7 @@ import { assetsDir } from "../runtime/assets.ts";
 import { gitRemoteUrl } from "../runtime/detect.ts";
 import { ensureShim, withNornOnPath } from "../runtime/shim.ts";
 import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
+import { layoutRefusal } from "../runtime/layout.ts";
 import { hookBinary, hookCommand } from "./init.ts";
 import { cmd } from "@norn/core";
 
@@ -216,6 +218,8 @@ interface Check {
 
 interface RepoReport {
   ok: boolean;
+  /** D4: reaching the other repo checks means the new layout; an old or mixed one is reported alone (B20) */
+  layout: { ok: true; layout: "new" };
   workflows: Array<{ name: string; file: string; ok: boolean; issues: WorkflowIssue[] }>;
   config: { ok: boolean; file: string; present: boolean; errors: FileError["errors"] };
   /** why a workflow's skills went unchecked (the config does not load, so its agents are unknown) */
@@ -249,10 +253,25 @@ async function repoGroup(ctx: Context): Promise<RepoReport> {
   const config = { ok: configErrors.length === 0, file: configFile, present: existsSync(repoConfigPath(root)), errors: configErrors };
   return {
     ok: workflows.every((w) => w.ok) && config.ok,
+    layout: { ok: true, layout: "new" },
     workflows,
     config,
     ...(loaded.ok ? {} : { skills_unchecked: "the config does not load, so no step's skill was checked against its agent" }),
   };
+}
+
+/** D4, B20: the layout check of the repo group, failed on an old or mixed layout with what to run. */
+function layoutCheck(l: Layout, root: string) {
+  const refusal = layoutRefusal(l, root).body;
+  return { ok: false, layout: l.layout, parts: layoutProblems(l, root), error: refusal.error, do_instead: refusal.do_instead, code: refusal.code };
+}
+
+function formatLayoutOnly(c: ReturnType<typeof layoutCheck>): string {
+  const l = lines();
+  l.line(false, "layout", c.layout === "both" ? "old and new layout both present" : "old layout");
+  for (const p of c.parts) l.sub(`! ${p}`);
+  l.sub(`→ ${c.do_instead}`);
+  return [l.head(false), "", ...l.out, "", "  · other checks skipped: they read the new layout"].join("\n");
 }
 
 /** One line per check: `ok`, `warn` or `FAIL`, a label, the text; failed labels are collected for the head line. */
@@ -275,6 +294,7 @@ function lines() {
 /** The repo group's lines: the valid workflows on one line, each invalid one with its issues, the config (B7, B8). */
 function formatRepo(r: RepoReport, l: ReturnType<typeof lines>, dir: string): void {
   const valid = r.workflows.filter((w) => w.ok).map((w) => w.name);
+  l.line(true, "layout", `${dir}/ and ${r.config.file}`);
   if (valid.length || !r.workflows.length || r.skills_unchecked) l.line(true, "workflows", valid.length ? `${valid.join(", ")} valid (${dir}/)` : `none valid in ${dir}/`);
   if (r.skills_unchecked) l.sub(`· ${r.skills_unchecked}`);
   for (const w of r.workflows.filter((x) => !x.ok)) {
@@ -361,9 +381,17 @@ export const doctorCommand = defineCommand({
     "--repo": "check only the repo workflows and config: no agent, runner or remote needed (CI, a test check)",
     "--live": "also run one cheap headless test turn per agent",
   },
+  // D5, B20: an old or mixed layout is a failed repo check here, not a refusal
+  layout: false,
   async run(ctx, args) {
     const live = opt.bool(args, "live");
     const repoOnly = opt.bool(args, "repo");
+    const layout = repoLayout(ctx.root);
+    if (layout.layout !== "new") {
+      // nothing else is read: config and workflows at the new places are not the repo's yet (B20)
+      const report = { ok: false, repo: { ok: false, layout: layoutCheck(layout, ctx.root) } };
+      return withExit(rendered(report, formatLayoutOnly(report.repo.layout)), ExitCode.error);
+    }
     const repo = await repoGroup(ctx);
     const dir = relative(ctx.root, workflowsDir(ctx.root));
     // B10: --repo looks at no agent, runner or remote; a config that does not load leaves the machine checks nothing to run on

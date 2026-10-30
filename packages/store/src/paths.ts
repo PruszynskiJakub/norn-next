@@ -13,6 +13,11 @@ import { LEGACY_SPEC_FILE, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, s
 export const REPO_CONFIG_FILE = ".agents/norn.config.yaml";
 export const WORKFLOWS_DIR = ".agents/workflows";
 
+/** gh-110 D4: the old layout's places, relative to the main checkout; only refused and moved from, never read. */
+export const OLD_CONFIG_FILE = ".agents/norn/config.yaml";
+export const OLD_WORKFLOWS_DIR = ".agents/norn/workflows";
+export const OLD_TRACE_DIR = ".agents/norn/trace";
+
 export const repoConfigPath = (root: string) => join(root, REPO_CONFIG_FILE);
 export const workflowsDir = (root: string) => join(root, WORKFLOWS_DIR);
 /** Whether norn is set up in this checkout (CP13: the cockpit falls back to the last repo otherwise). */

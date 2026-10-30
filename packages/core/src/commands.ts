@@ -67,6 +67,7 @@ export const cmd = {
   done: (outcome: string, o: { criteria?: boolean } = {}) => norn("done", outcome, o.criteria && "--criteria <file>", `--handoff "…"`),
   help: () => norn("help"),
   init: () => norn("init"),
+  migrate: () => norn("migrate"),
   status: (o: { notes?: boolean; since?: string } = {}) => norn("status", o.notes && "--notes", o.since && `--history --since ${o.since}`),
   statusWatch: (o: { interval?: string } = {}) => norn("status --watch", o.interval && `--interval ${o.interval}`),
   storyAnswer: (unit: string, text = "…") => norn("story answer", unit, `"${text}"`),

@@ -461,7 +461,8 @@ const SPAWN_ALLOW: Counts = {
  */
 const NORN_PATH = /\.agents\/norn\b|["'`]\.agents["'`]\s*,\s*["'`]norn["'`]/;
 const NORN_PATH_ALLOW: Record<string, [number, string]> = {
-  "packages/store/src/paths.ts": [1, "the path module"],
+  "packages/store/src/paths.ts": [4, "the path module, and the old layout's places (gh-110 D4)"],
+  "packages/cli/test/harness.ts": [1, "the old layout's places as a person had them, spelled independently of store (gh-110 S1)"],
   "packages/cli/test/config.test.ts": [1, "message: the user-or-repo pick"],
   "packages/cli/test/e2e.test.ts": [1, "message: init's config row"],
   "packages/cli/test/layout.test.ts": [1, "the layout test: the repo config file as a person sees it"],
