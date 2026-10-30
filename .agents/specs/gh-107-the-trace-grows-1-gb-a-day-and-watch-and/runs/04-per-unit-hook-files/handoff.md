@@ -36,6 +36,15 @@ Hook facts fired in a unit worktree also land in that unit's hook file (`trace/h
 - review#1: changes requested. Blocking: AC4 / D4 selection untested (no S1 test that a unit without a live run is read when its hook file was written within limits.stalled and skipped after; AC4 setup lacks other units' hook lines in the day files). Minor: unrecorded parity changes (story unit no longer sees slice facts via cwd prefix; units outside the D4 set get no hooks), utimes between the two appends can drop the day line / move mtime backwards. Suite green except check-run 'two long checks' beforeAll timeout under load (passes alone); typecheck green.
 - review#1 changes_requested: Blocking: AC4/D4 hook-file selection has no S1 test (unit without live run read within limits.stalled, skipped after; no other units' hook lines in the AC4 setup). Minor: unrecorded parity changes (story unit no longer gets slice facts via cwd prefix), utimes between appends can drop the day line or move mtime backwards, duplication. AC1-3, AC5, AC6 met; snapshots/golden unchanged; typecheck green; suite green bar a load-timeout flake in check-run.test.ts (passes alone).
 
+- implement#2 (rework of review#1):
+  - AC4/D4 S1 test (agent-protocol "B8 (D4)"): gh-9 parked (live run), gh-10 done, hook lines for gh-10 and a non-unit in hook files and day files; a tick 14m later opens gh-9's and gh-10's hook files and no day file, gh-9's run hooks are in the tick's facts; 2m later only gh-9's. Verified red when the window check is removed.
+  - The trace-read observer now also reports hook files (`TraceFileRead.kind: "day" | "hook"`), so tests see which units' hook files a reader opens; the test helper `opened` is shared.
+  - `appendHookTrace`: both lines are appended before the hook file's time is set; its time only moves forward (max of the previous time and the fact's `at`); a failing utimes is swallowed after both lines are written. Store test pins it.
+  - Duplication removed: one `traceLine` builder, one `hookLine` parser, live/unknown-launch set computed once in local-facts.
+  - Decision (parity, recorded for the gate): the story unit no longer collects hook facts fired in its slice worktrees (the old `cwd.startsWith(worktree)` match had no trailing `/`); each unit reads its own hook file. Snapshots, golden and transcripts unchanged.
+  - Decision (parity): a unit outside the D4 set (no live run / unknown launch, hook file older than limits.stalled) gets `hooks: []`, where it used to get facts back to the oldest live run's start; the view reads `lu.hooks` but only for run facts of live runs, so nothing shown changes.
+  - AC1 test fires PostToolUse.
+
 ## Resume
 
-Address review#1's findings, F1 first: add the S1 tick test for D4's hook-file selection.
+Report done; next is review of the rework.
