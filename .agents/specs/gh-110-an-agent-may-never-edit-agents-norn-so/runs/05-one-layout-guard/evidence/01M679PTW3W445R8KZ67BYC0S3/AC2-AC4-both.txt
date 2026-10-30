@@ -1,0 +1,39 @@
+=== config in both places
+### norn status
+**Refused (both_layouts):** /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo has norn files in both the old and the new layout (config: .agents/norn/config.yaml and .agents/norn.config.yaml); norn reads neither
+
+Do instead: keep one of each pair and remove the other, then run norn migrate in /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo
+[exit 3]
+### norn status --json
+{"error":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo has norn files in both the old and the new layout (config: .agents/norn/config.yaml and .agents/norn.config.yaml); norn reads neither","do_instead":"keep one of each pair and remove the other, then run norn migrate in /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo","code":"both_layouts","details":{"layout":"both","root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo","parts":[{"part":"config","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo/.agents/norn/config.yaml","new":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo/.agents/norn.config.yaml","at_old":true,"at_new":true}]}}
+[exit 3]
+### norn tick --json
+{"error":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo has norn files in both the old and the new layout (config: .agents/norn/config.yaml and .agents/norn.config.yaml); norn reads neither","do_instead":"keep one of each pair and remove the other, then run norn migrate in /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo","code":"both_layouts","details":{"layout":"both","root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo","parts":[{"part":"config","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo/.agents/norn/config.yaml","new":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo/.agents/norn.config.yaml","at_old":true,"at_new":true}]}}
+[exit 3]
+### norn story list --json
+{"error":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo has norn files in both the old and the new layout (config: .agents/norn/config.yaml and .agents/norn.config.yaml); norn reads neither","do_instead":"keep one of each pair and remove the other, then run norn migrate in /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo","code":"both_layouts","details":{"layout":"both","root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo","parts":[{"part":"config","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo/.agents/norn/config.yaml","new":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo/.agents/norn.config.yaml","at_old":true,"at_new":true}]}}
+[exit 3]
+### norn doctor
+norn doctor: 1 check failed (layout)
+
+  FAIL layout         old and new layout both present
+                      ! config: .agents/norn/config.yaml and .agents/norn.config.yaml
+                      → keep one of each pair and remove the other, then run norn migrate in /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo
+
+  · other checks skipped: they read the new layout
+[exit 1]
+### norn doctor --repo --json
+{"ok":false,"repo":{"ok":false,"layout":{"ok":false,"layout":"both","parts":["config: .agents/norn/config.yaml and .agents/norn.config.yaml"],"error":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo has norn files in both the old and the new layout (config: .agents/norn/config.yaml and .agents/norn.config.yaml); norn reads neither","do_instead":"keep one of each pair and remove the other, then run norn migrate in /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo","code":"both_layouts"}}}
+[exit 1]
+### norn hook stop </dev/null
+{}
+[exit 0]
+both(config): NOTHING CHANGED
+=== workflows in both
+### norn tick --json
+{"error":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo has norn files in both the old and the new layout (workflows: .agents/norn/workflows and .agents/workflows); norn reads neither","do_instead":"keep one of each pair and remove the other, then run norn migrate in /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo","code":"both_layouts","details":{"layout":"both","root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo","parts":[{"part":"workflows","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo/.agents/norn/workflows","new":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo/.agents/workflows","at_old":true,"at_new":true}]}}
+[exit 3]
+=== machine files in both
+### norn status --json
+{"error":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo has norn files in both the old and the new layout (machine files: .agents/norn/trace and /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/home/repos/repo-437e861f); norn reads neither","do_instead":"keep one of each pair and remove the other, then run norn migrate in /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo","code":"both_layouts","details":{"layout":"both","root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo","parts":[{"part":"machine files","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo/.agents/norn/trace","new":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/home/repos/repo-437e861f","at_old":true,"at_new":true}]}}
+[exit 3]

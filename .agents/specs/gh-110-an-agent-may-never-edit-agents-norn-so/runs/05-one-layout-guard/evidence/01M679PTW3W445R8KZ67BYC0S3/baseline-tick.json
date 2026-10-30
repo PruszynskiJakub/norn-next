@@ -1,0 +1,1 @@
+{"tick_id":"01M679RC98BVJZ242Y4XX6ZZMM","at":"2026-10-30T20:59:23.304Z","duration_ms":420,"sync":{"ran":true,"ok":false,"error":"gh issue list failed (exit 1): no git remotes found"},"decisions":[],"notified":[],"trace":"2026-10-30.jsonl","failed":0}
