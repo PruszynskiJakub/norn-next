@@ -1,0 +1,3 @@
+## AC7: machine chunk line removed
+01M671TKGZRNCA522AQBPXEJMH schema-valid: true read: {"ok":false,"reason":"corrupt","error":{"file":"2026-10-30.chunks.jsonl","errors":[{"path":"","message":"tick 01M671TKGZRNCA522AQBPXEJMH names chunk 7134d4caf1ae53b827b0677febe0466ff976fb1b7eb1f31d8a137be72f8b1aa8, which is not in 2026-10-30.chunks.jsonl"}]}}
+01M671TV6P6CCHBH7FQMYT6K8P schema-valid: true read: {"ok":false,"reason":"corrupt","error":{"file":"2026-10-30.chunks.jsonl","errors":[{"path":"","message":"tick 01M671TV6P6CCHBH7FQMYT6K8P names chunk 7134d4caf1ae53b827b0677febe0466ff976fb1b7eb1f31d8a137be72f8b1aa8, which is not in 2026-10-30.chunks.jsonl"}]}}
