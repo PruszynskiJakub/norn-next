@@ -37,7 +37,9 @@ Write receipts and state.json (the JSON norn commits under runs/) as one line pl
 
 - implement#2 (rework of test.fail): the check timed out under heavy machine load (load avg 11–18; one setup took 117 s, one test 281 s). Failures were 30 s timeouts in targets.test.ts, human.test.ts (answer) and check-run.test.ts and what followed from them; all 36 tests in those files pass when run alone. No code change needed. Full suite rerun: 1422/1424, typecheck green; the only failure is check-run 'two long checks' beforeAll hitting bun's 5 s hook timeout under load (it passes alone).
 - implement#2 done: Rework of test.fail: the check timed out under heavy machine load (load avg 11-18), not because of this change. Failures were 30 s/5 s timeouts (targets, human answer, check-run) and what followed from them; all 36 tests in those files pass alone. Full suite rerun 1422/1424 (only check-run 'two long checks' beforeAll 5 s hook timeout under load, passes alone); typecheck green. No code change in this round.
+- review#1: approve, no findings. Only writers of receipts (writeReceiptAt) and state.json (writeState) switched; readers and sameReceipt (by receipt_id) accept old pretty files. Store tests 84/84, typecheck green.
+- review#1 approve: Review: approve, no blocking findings. Receipts and state.json now one-line JSON via jsonLine() at their only writers; older pretty files still read; machine-local files intentionally unchanged. Store tests and typecheck green.
 
 ## Resume
 
-If the full suite and the type check are green, report `norn done done`. If the test check times out again, the cause is machine load, not this change.
+Review approved; nothing left for this step. Next step follows from norn.
