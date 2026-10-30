@@ -14,6 +14,7 @@ export const REPO_CONFIG_FILE = ".agents/norn.config.yaml";
 export const WORKFLOWS_DIR = ".agents/workflows";
 
 /** gh-110 D4: the old layout's places, relative to the main checkout; only refused and moved from, never read. */
+export const OLD_NORN_DIR = ".agents/norn";
 export const OLD_CONFIG_FILE = ".agents/norn/config.yaml";
 export const OLD_WORKFLOWS_DIR = ".agents/norn/workflows";
 export const OLD_TRACE_DIR = ".agents/norn/trace";
@@ -124,6 +125,8 @@ export const checkoutFilePath = (dir: string) => join(dir, "checkout.json");
 export const runnerLogDir = (root: string) => join(machineDir(root), "runs");
 /** Local tick lock (H1); in the machine dir. */
 export const tickLockPath = (root: string) => join(machineDir(root), "tick.lock");
+/** D6: where an older norn took the tick lock; `norn migrate` takes it there. */
+export const oldTickLockPath = (root: string) => join(root, OLD_TRACE_DIR, "tick.lock");
 /** K6/BS3: a story's integrate lock — slice integrations and base updates of one story never interleave. */
 export const integrateLockPath = (root: string, story: string) => join(machineDir(root), `integrate-${story}.lock`);
 

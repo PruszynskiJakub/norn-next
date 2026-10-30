@@ -21,8 +21,9 @@ import { statusCommand } from "./status.ts";
 import { configNoun } from "./config.ts";
 import { doctorCommand } from "./doctor.ts";
 import { tidyCommand } from "./tidy.ts";
+import { migrateCommand } from "./migrate.ts";
 
-export const COMMANDS: readonly Command[] = [initCommand, uninstallCommand, syncCommand, tickCommand, watchCommand, briefCommand, doneCommand, askCommand, stuckCommand, hookEventCommand, checkRunCommand, statusCommand, tidyCommand, doctorCommand, helpCommand];
+export const COMMANDS: readonly Command[] = [initCommand, uninstallCommand, syncCommand, tickCommand, watchCommand, briefCommand, doneCommand, askCommand, stuckCommand, hookEventCommand, checkRunCommand, statusCommand, tidyCommand, doctorCommand, migrateCommand, helpCommand];
 
 export const NOUNS: readonly Noun[] = [storyNoun, runNoun, configNoun];
 

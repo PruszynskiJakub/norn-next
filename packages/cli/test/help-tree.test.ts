@@ -38,7 +38,7 @@ function sections(stdout: string): Array<{ title: string; rows: string[] }> {
 }
 
 const CORE = ["status", "story", "run"];
-const SETUP = ["init", "doctor", "config", "uninstall"];
+const SETUP = ["init", "migrate", "doctor", "config", "uninstall"];
 const BACKGROUND = ["watch", "sync", "tidy"];
 const PROTOCOL = ["brief", "done", "ask", "stuck"];
 

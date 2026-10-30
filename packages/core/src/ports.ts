@@ -187,6 +187,13 @@ export interface GitPort {
   checkoutPaths(cwd: string, rev: string, paths: string[]): Promise<void>;
   /** Stop tracking `paths`, leaving the files (`git rm -q --cached --ignore-unmatch -- <paths>`). */
   untrack(cwd: string, paths: string[]): Promise<void>;
+  /**
+   * `git mv -- <from> <to>` when `from` is in the index: the rename is staged (true). An untracked
+   * `from` is left where it is (false), for the caller to move plainly. The folder of `to` must exist.
+   */
+  move(cwd: string, from: string, to: string): Promise<boolean>;
+  /** Stage `paths` (`git add -- <paths>`). */
+  stage(cwd: string, paths: string[]): Promise<void>;
 
   branchExists(cwd: string, branch: string, where?: "local" | "remote", remote?: string): Promise<boolean>;
   createBranch(cwd: string, branch: string, from: string): Promise<void>;
