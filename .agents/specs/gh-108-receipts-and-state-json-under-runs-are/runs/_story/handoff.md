@@ -25,6 +25,7 @@ Write receipts and state.json (the JSON norn commits under runs/) as one line pl
 - Kept `json()` (pretty) for machine-local files on purpose: `handOverLease` compares the on-disk lease text to `json(from)`, so changing it would break handover of leases written by an older norn.
 - Tests in `packages/store/test/files.test.ts` ("committed runs/ JSON is one line"): one-line write (was red), pretty older files still read and replay idempotently.
 - Mailbox receipt blobs (refs.ts) are git blobs, not files in the PR diff; left as is.
+- implement#1 done: Receipts (writeReceiptAt) and state.json (writeState) now written via new jsonLine() in packages/store/src/fsx.ts: one line of JSON + newline. Machine-local files keep pretty json() deliberately: handOverLease compares on-disk lease text to json(from), so changing it would break handover of leases written by an older norn. Tests in packages/store/test/files.test.ts: one-line write (red before), older pretty receipts/state still read and replay idempotently. Typecheck green; full suite 1240/1243 — the 3 failures (check-run 'two long checks', integrate 'update and remote sync') are 5s timeouts under load and pass when run alone. Transcripts/snapshots needed no update.
 
 ## Resume
 
