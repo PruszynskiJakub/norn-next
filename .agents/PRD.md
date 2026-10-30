@@ -461,7 +461,7 @@ TypeScript on **Bun**, monorepo with one-way dependencies: `schema ← core ← 
 | `@norn/view` | Read model `loadProjectView()` → stories, slices, inbox, runs, timeline. |
 | `@norn/cli` | Wiring and commands. |
 
-- X1 Front ends (web cockpit, Herdr pane, TUI) read only via `@norn/view` and write only via CLI verbs.
+- X1 Front ends (web cockpit, Herdr pane, TUI) read only via `@norn/view` and write only via CLI verbs. The project view (`loadProjectView`) carries no timeline and reads no trace day file; a front end that shows timelines asks for them with a separate timeline read (`loadTimelines`, or `loadTraceView` for one unit's step timeline).
 - X2 Adapters are selected in config by package name; third-party adapters implement interfaces from `@norn/core`.
 - X3 Distribution: npm package plus `bun build --compile` single-file binaries. Agent plugins (Claude Code first) are thin wrappers with a `/norn` command; skills come from the repo (SK1), and no logic lives in plugins.
 - X4 Core is tested by replaying recorded traces as snapshots; adapters against recorded fixtures.
