@@ -14,6 +14,18 @@
 
 ## Goal
 
+One layout guard (D4, D5): old or mixed layout on the main checkout → every command refuses (`old_layout` / `both_layouts`, `do_instead: norn migrate`); doctor reports it; hook stays quiet; a worktree's own old files are ignored (B17–B21).
+
 ## Progress
 
+- store `layout.ts`: `repoLayout(root)` classifies config / workflows / machine files per part (D4); `OLD_*` paths for slice 06's migrate.
+- cli `runtime/layout.ts` `guardLayout`; run in `Context.locate()` (so `status`, which locates itself, is covered) unless the command sets `layout: false` (doctor). Always on the main checkout root, never the worktree (B21).
+- `hook`: old/both → `{}` exit 0, nothing recorded. `doctor` / `doctor --repo`: old/both → only a failed `layout` check naming `norn migrate`, exit 1, nothing else read; new layout → an `ok layout` line.
+- `cmd.migrate()` added (printed only; the command itself is slice 06).
+- Tests: `packages/cli/test/layout-guard.test.ts` (AC1–AC6); harness `toOldLayout`/`toNewLayout`/`layoutPlaces`. Red without the guard (10 of 14 fail).
+- AC7 checked by hand in a throwaway repo with the dev build: status and doctor name what is wrong and `norn migrate`.
+- Note: bun's `toMatchObject` with an asymmetric matcher rewrites the received value; tests check `error` before it.
+
 ## Resume
+
+Full suite + typecheck, commit, `norn done done`.
