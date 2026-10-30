@@ -59,16 +59,14 @@
 
 ## Goal
 
-describe#1: write the PR body for gh-75 to `.agents/specs/gh-75-regroup-the-cli-around-status-story-and/pr.md`.
+implement#3 (ready.reject rework): rename every removed command in docs/cookbook.html to the new noun tree, and keep the cookbook in the removed-commands lint (test/repo.test.ts).
 
 ## Progress
 
-- pr.md written from the spec (B1–B71), the diff against origin/main, the qa#3 report (63 pass, 0 fail) and the human-qa rulings. A person verified B12, B17, B18, B19, B23, B29, B46 and B47; pr.md says so and does not count them as agent passes.
-- Every evidence link points at a file committed under runs/_story/evidence/01M64YKC8RVEVX0Q58A7R7W7BZ (checked they exist).
-- Merge danger: two-way for data (no format change), user-facing break for old command names (no aliases), old Herdr plugin installs.
-- describe#1 done: pr.md written: noun-tree summary, an evidence entry for each of B1–B71 linking the committed qa#3 evidence, with person checks (human-qa rulings) marked as such, and the merge danger (two-way for data, old names break scripts and older Herdr plugin installs).
-- ready#1 reject by jakubpruszynski@mac: Rename every removed command in docs/cookbook.html to the new tree (cockpit -> status --watch, cockpit --open -> status --watch --pane, cockpit --next -> run attach --next, orient -> story view / story chat, open -> story start, answer/approve/reject/unstick/update/mode/workflow/drop/take/release -> story answer/approve/reject, run rerun, story update-branch, story edit, story close/checkout/handoff; keys table, Herdr actions, recipes, aria labels) and add docs/cookbook.html to the removed-commands lint in test/repo.test.ts so it stays clean. Note: commit 59741733 (by the person) already renamed the commands in .agents/norn/workflows and config.yaml; leave those.
+- The lint already lists docs/cookbook.html (OLD_COMMAND_FILES, committed by an earlier attempt); it was red with 53 hits.
+- docs/cookbook.html renamed: keys table (third column), cockpit mock (title, header, footer hint), aria label, recipes (code, steps, `same`, `watch`), Commands table (bare names too), search hint and recipe tags. Mapping: cockpit → status --watch, --open → status --watch --pane, --next → run attach --next, orient → story chat / story view, open → story start, answer/approve → story answer/approve, approve --reject → story reject --reason, unstick → run rerun (--to → --step), take → story checkout, release → story handoff, drop → story close, update → story update-branch, mode → story edit --auto|--manual, workflow → story edit --workflow, trace → run list, why → run view --why, inbox → status. Herdr action names (norn.open/next/pick) and cockpit keys are unchanged in code, so kept. Workflow step names (`update`) kept.
+- test/repo.test.ts removed-commands lint is green.
 
 ## Resume
 
-Nothing left: pr.md is done; report `norn done done`.
+Run `bun test` and `bun run typecheck`; if green, report `norn done done`.
