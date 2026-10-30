@@ -22,17 +22,21 @@
 
 ## Goal
 
-Plan gh-110: write spec.md's Plan section (seams, coverage, prefactoring, decisions, risks), agreed with the person.
+Slice gh-110: write slice files covering every Behaviour item of the planned spec.
 
 ## Progress
 
-- Seams agreed: S1 = CLI through `runCli` in the integration harness (B1, B2, B4-B21); S2 = repo lint + help tree (B3, B22); B23 has no seam (PR description, checked at release).
-- Prefactors agreed: route every norn path through store's path functions (code + ~40 test files); one shared workflow/config validator for observe and doctor.
-- Decisions agreed (D1-D14): the machine-local files move to `~/.norn/repos/<folder>-<hash8>/` (the person chose this over `.git/norn/`, because of agent-sandbox risk on `.git`); the id is derived from the path; doctor warns about an orphaned machine dir; layout classified per part; one dispatch guard (hook exits 0, doctor reports, migrate exempt); migrate mechanics; `doctor --repo`; docs split between the product (new layout now) and this repo's process docs (old paths until the follow-up); the release note goes in the PR description.
-- Spec amended with the person's agreement: Solution bullet, B5, B6, B10 (now `doctor --repo` itself; wiring it into this repo's CI moves to the follow-up story), B12. The title/frontmatter still says `.git/norn/`: it mirrors the GitHub issue, so it is left for the person to update on the issue.
-- Plan written in spec.md.
-- plan#1 done: Plan written and agreed: seams S1 (runCli integration harness: B1, B2, B4-B21) and S2 (repo lint/help tree: B3, B22), B23 via the PR description; 2 prefactors (paths through store, shared workflow/config validator); D1-D14. The machine-local files move to ~/.norn/repos/<folder>-<hash8>/ (not .git/norn/); the spec is amended at B5, B6, B10 (doctor --repo; this repo's CI wiring moves to the follow-up), B12. The issue title still says .git/norn/ and needs updating on GitHub.
+- Seven slices written in `slices/`, frontmatter validated against the slice schema, `criteria` ids match Acceptance:
+  1. 01 paths through store (prefactor 1), deps none
+  2. 02 doctor validates repo workflows/config + `--repo` (prefactor 2; B7–B10), deps none
+  3. 03 config + workflows at new paths (B1, B2, B4), deps 01
+  4. 04 machine-local files in `~/.norn/repos/<id>/` + orphan warning (B5, B6), deps 01
+  5. 05 one layout guard (B17–B21), deps 02, 03, 04
+  6. 06 `norn migrate` (B11–B17), deps 05
+  7. 07 docs, shipped skill, help (B3, B22; B23 person-verified via PR description), deps 05, 06
+- Every B1–B23 is cited by an acceptance criterion.
+- slice#1 done: 7 slices written covering B1–B23: 01 paths through store (prefactor), 02 doctor validates workflows/config + --repo (B7–B10), 03 config+workflows at new paths (B1,B2,B4; dep 01), 04 machine dir in ~/.norn/repos/<id>/ (B5,B6; dep 01), 05 layout guard (B17–B21; deps 02,03,04), 06 norn migrate (B11–B17; dep 05), 07 docs/skill/help (B3,B22,B23 person; deps 05,06).
 
 ## Resume
 
-Plan is done; next step slices the spec. Nothing pending here.
+Slicing done; a person reviews the slice files. Slices 01 and 02 can start in parallel.
