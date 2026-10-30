@@ -10,9 +10,16 @@ labels:
   - friction
   - norn
 workflow: story
-status: active
+status: done
 intake_at: 2026-10-30T10:30:20.759Z
 body_hash: 4aec03ac7d6c0aadb80fd12805af7dd19fa71dea889e32579bc397d67dcb27e2
+merge:
+  pr: 120
+  url: https://github.com/PruszynskiJakub/norn-next/pull/120
+  head_sha: b2ffd4cec52063ec9683d728cbb9d58d44481366
+  merge_commit_sha: d32c649867b79eff111255260ccbaf1ecdd79e32
+  merged_by: PruszynskiJakub
+  merged_at: 2026-10-30T21:56:52.000Z
 ---
 
 # The trace grows ~1 GB a day and watch and the cockpit read it whole every cycle, so they climb to 8–21 GB of memory
