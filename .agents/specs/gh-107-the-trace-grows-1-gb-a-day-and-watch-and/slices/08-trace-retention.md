@@ -2,7 +2,7 @@
 id: gh-107/08
 title: norn tidy prunes day files older than trace.retain
 depends_on: []
-status: planned
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
