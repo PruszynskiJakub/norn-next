@@ -1,0 +1,1013 @@
+bun install v1.3.13 (bf2e2cec)
+
+Checked 25 installs across 20 packages (no changes) [34.00ms]
+$ bun test
+bun test v1.3.13 (bf2e2cec)
+
+scripts/process-check.test.ts:
+(pass) closing keywords > #N, owner/name#N and the issue URL of this repository [3.67ms]
+(pass) closing keywords > ignores other repositories, bare mentions and words that only contain a keyword [0.06ms]
+(pass) closing keywords > references inside HTML comments and fenced code blocks do not count [0.60ms]
+(pass) closing keywords > links in an issue body leave out the issue itself [0.44ms]
+(pass) (a) norn story branch > passes when the PR closes the story's issue, from the body or from GitHub's list [0.03ms]
+(pass) (a) norn story branch > refuses when it closes another issue or none, and says to add Closes #N [0.51ms]
+(pass) (a) norn story branch > slice branches and look-alikes are not story branches [0.69ms]
+(pass) (a) norn story branch > refuses a story branch from a fork [0.06ms]
+(pass) (b) bypass > passes: PR labelled bypass closes a bypass issue that links another issue [0.07ms]
+(pass) (b) bypass > refuses without the PR label [0.04ms]
+(pass) (b) bypass > refuses when the closed issue lacks the label or links nothing [0.06ms]
+(pass) (b) bypass > refuses when it closes no issue [0.03ms]
+(pass) (b) bypass > refuses a bypass from a fork
+(pass) (c) Dependabot and everything else > Dependabot passes whatever its branch [0.04ms]
+(pass) (c) Dependabot and everything else > any other branch is refused with what to do instead [0.03ms]
+(pass) gathering facts with gh > a PR gh cannot read is a refusal, not a crash [0.64ms]
+(pass) gathering facts with gh > a closed number gh cannot read as an issue (e.g. the PR itself) is a refusal, not a crash [0.12ms]
+(pass) gathering facts with gh > reads the bypass issue and passes; other repositories' closing references are ignored [0.14ms]
+
+scripts/golden.test.ts:
+(pass) stableKey ignores what differs between two runs of one tick and keeps which ids are equal [0.64ms]
+(pass) a case is named by decide's inputs, so new decisions (golden.ts --update) keep its name [5.09ms]
+(pass) every committed golden case is named by its stable key [103.21ms]
+(pass) selectNew adds only new keys that bring an under-covered rule, smallest first, whatever the input order [0.32ms]
+(pass) decisionChanges lists the decisions that went and came, not those only reordered [0.11ms]
+
+test/process.test.ts:
+(pass) repo config > loads, with triage as the default workflow [8.33ms]
+(pass) repo workflows > load without errors [0.05ms]
+(pass) repo workflows > include the five story workflows of the process, and no fix or spec [0.04ms]
+(pass) repo workflows > bug is valid for claude with the linked skills [0.91ms]
+(pass) repo workflows > quick is valid for claude with the linked skills [0.35ms]
+(pass) repo workflows > release is valid for claude with the linked skills [0.10ms]
+(pass) repo workflows > reproduce is valid for claude with the linked skills [0.06ms]
+(pass) repo workflows > slice is valid for claude with the linked skills [0.24ms]
+(pass) repo workflows > story is valid for claude with the linked skills [0.43ms]
+(pass) repo workflows > triage is valid for claude with the linked skills [0.06ms]
+(pass) repo skills > norn: frontmatter name matches its folder, with a description [0.58ms]
+(pass) repo skills > norn-merge: frontmatter name matches its folder, with a description [0.21ms]
+(pass) repo skills > norn-clarify: frontmatter name matches its folder, with a description [0.37ms]
+(pass) repo skills > norn-slice: frontmatter name matches its folder, with a description [0.27ms]
+(pass) repo skills > norn-pr: frontmatter name matches its folder, with a description [0.26ms]
+(pass) repo skills > release: frontmatter name matches its folder, with a description [0.22ms]
+(pass) repo skills > triage: frontmatter name matches its folder, with a description [0.30ms]
+(pass) repo skills > norn-prototype: frontmatter name matches its folder, with a description [0.33ms]
+(pass) repo skills > release-start: frontmatter name matches its folder, with a description [0.29ms]
+(pass) repo skills > norn-qa: frontmatter name matches its folder, with a description [0.31ms]
+(pass) repo skills > norn-interview: frontmatter name matches its folder, with a description [0.27ms]
+(pass) repo skills > norn-diagnose: frontmatter name matches its folder, with a description [0.20ms]
+(pass) repo skills > issue: frontmatter name matches its folder, with a description [0.32ms]
+(pass) repo skills > norn-retro: frontmatter name matches its folder, with a description [0.29ms]
+(pass) repo skills > norn-refine: frontmatter name matches its folder, with a description [0.21ms]
+(pass) repo skills > norn-implement: frontmatter name matches its folder, with a description [0.23ms]
+(pass) repo skills > norn-tdd: frontmatter name matches its folder, with a description [0.15ms]
+(pass) repo skills > norn-review: frontmatter name matches its folder, with a description [0.44ms]
+(pass) repo skills > norn-qa-person: frontmatter name matches its folder, with a description [0.22ms]
+(pass) repo skills > norn-codebase-design: frontmatter name matches its folder, with a description [0.22ms]
+(pass) repo skills > norn-plan: frontmatter name matches its folder, with a description [0.23ms]
+(pass) repo skills > norn is linked for claude [0.13ms]
+(pass) repo skills > norn-merge is linked for claude [0.01ms]
+(pass) repo skills > norn-clarify is linked for claude [0.04ms]
+(pass) repo skills > norn-slice is linked for claude [0.06ms]
+(pass) repo skills > norn-pr is linked for claude [0.07ms]
+(pass) repo skills > release is linked for claude [0.06ms]
+(pass) repo skills > triage is linked for claude [0.03ms]
+(pass) repo skills > norn-prototype is linked for claude [0.04ms]
+(pass) repo skills > release-start is linked for claude [0.04ms]
+(pass) repo skills > norn-qa is linked for claude [0.01ms]
+(pass) repo skills > norn-interview is linked for claude [0.05ms]
+(pass) repo skills > norn-diagnose is linked for claude [0.03ms]
+(pass) repo skills > issue is linked for claude [0.04ms]
+(pass) repo skills > norn-retro is linked for claude [0.05ms]
+(pass) repo skills > norn-refine is linked for claude [0.02ms]
+(pass) repo skills > norn-implement is linked for claude [0.03ms]
+(pass) repo skills > norn-tdd is linked for claude [0.03ms]
+(pass) repo skills > norn-review is linked for claude [0.04ms]
+(pass) repo skills > norn-qa-person is linked for claude [0.03ms]
+(pass) repo skills > norn-codebase-design is linked for claude [0.02ms]
+(pass) repo skills > norn-plan is linked for claude [0.02ms]
+(pass) repo skills > issue is person-only [0.16ms]
+(pass) repo skills > release-start is person-only [0.11ms]
+(pass) repo skills > repo-local skills never use the bundled norn- prefix [0.10ms]
+
+test/repo.test.ts:
+(pass) dependency direction > packages are exactly the known set [0.06ms]
+(pass) dependency direction > @norn/schema imports only allowed packages, all declared [0.47ms]
+(pass) dependency direction > @norn/core imports only allowed packages, all declared [1.39ms]
+(pass) dependency direction > @norn/store imports only allowed packages, all declared [0.85ms]
+(pass) dependency direction > @norn/adapters imports only allowed packages, all declared [0.98ms]
+(pass) dependency direction > @norn/view imports only allowed packages, all declared [2.16ms]
+(pass) dependency direction > @norn/cli imports only allowed packages, all declared [13.54ms]
+(pass) glossary > matcher: word boundaries, URLs and doc code spans are not prose [0.29ms]
+(pass) glossary > no banned synonyms in sources, assets, plugin, JSON schemas, README and AGENTS.md [45.64ms]
+(pass) test layout (AGENTS.md) > tests and fixtures live under packages/<pkg>/test, never in src [4.79ms]
+(pass) test layout (AGENTS.md) > every adapter has its tests in packages/adapters/test/<adapter>/ [0.30ms]
+(pass) test layout (AGENTS.md) > test:fast and test:cli split the suite: fast skips exactly the folder cli runs, and slice, story and quick checks run fast [0.27ms]
+(pass) test layout (AGENTS.md) > quick and story wait for the PR's CI after open-pr and send a red run back to implement [2.06ms]
+(pass) test layout (AGENTS.md) > release goes prepare → open-pr → ci → ready, a red CI goes $stuck, and a base commit makes it stale (BS7) [0.24ms]
+(pass) intake by kind (W9) > triage recommends quick, story or close, all to its confirm gate [0.08ms]
+(pass) intake by kind (W9) > reproduce is one norn-diagnose agent step that reports reproduced or cannot_reproduce to a confirm gate [0.16ms]
+(pass) intake by kind (W9) > quick's implement turns a red loop from reproduce into a failing test first [0.10ms]
+(pass) intake by kind (W9) > the bug report template applies norn:wf:reproduce [0.30ms]
+(pass) release metadata > the README release badge names the cli version, and CHANGELOG.md has its section [0.42ms]
+(pass) removed commands (B5, B8, B71) > matcher: commands anywhere in a line; a named thing (`a norn workflow`), new names and other flags are not hits [0.24ms]
+(pass) removed commands (B5, B8, B71) > the list of removed commands is read from core, or the lint fails loudly [0.11ms]
+(pass) removed commands (B5, B8, B71) > no removed command in sources, assets, plugins, skills, README, CONTRIBUTING, AGENTS.md, the PRD and its SPEC files, the cookbook [110.61ms]
+(pass) removed commands (B5, B8, B71) > the PRD's command table (§15) is the noun tree [0.46ms]
+(pass) herdr plugin (HC9) > the manifest parses, has the pick pane and the open/next/pick actions, and names only scripts that exist [0.49ms]
+(pass) herdr plugin (HC9) > B8: the actions and panes run the new commands [0.15ms]
+(pass) herdr plugin (HC9) > P8: next.sh branches on the refusal's code, not its text, and keeps escaped quotes [1757.22ms]
+(pass) ratchet lints > matcher: a new hit and a stale allowlist entry both fail [0.66ms]
+(pass) ratchet lints > (a) S1: fs writes only in packages/store/src [29.40ms]
+(pass) ratchet lints > (b) cli does not call store's raw git [15.99ms]
+(pass) ratchet lints > (c) S2: JSON.parse only in store and schema [7.44ms]
+(pass) ratchet lints > (d) Bun.spawn only in store and adapters [7.54ms]
+(pass) ratchet lints > (e) core is pure: no node:fs, Bun.spawn, Date.now, Math.random [5.95ms]
+(pass) ratchet lints > (f) act handles exactly the action kinds decide emits [0.93ms]
+
+packages/core/test/decide.test.ts:
+(pass) claims (T1–T10) > held by another heartbeat → nothing but a noop [0.92ms]
+(pass) claims (T1–T10) > fresh intake story without a claim acquires one; a released story waits for take (T10) [0.29ms]
+(pass) claims (T1–T10) > renewal due → renew with CAS on the current sha (T4) [1.16ms]
+(pass) claims (T1–T10) > R1.1/R1.3: renewal is a side action — a merged PR is cleaned up in the same tick [0.08ms]
+(pass) claims (T1–T10) > R1.3: renewal due and a done receipt waiting → the receipt is applied in the same tick [0.43ms]
+(pass) claims (T1–T10) > R3.1: the intake claim carries what to remove if it is lost — from the intake_only fact, never decided without it [0.18ms]
+(pass) claims (T1–T10) > R3.2: the base record wins — no acquire for a story the base records as done or whose PR merged [0.13ms]
+(pass) corrupt units (S2) > decide says whether act writes corrupt into state: only the unit's own runs/ files, never a broken state.json or story.md [0.50ms]
+(pass) corrupt units (S2) > never touched: mark once, then noop forever [0.08ms]
+(pass) corrupt units (S2) > gh-79: the corrupt item says what failed, so a duplicate receipt names the other file [0.05ms]
+(pass) receipts first (C2) > a done receipt wins over a dead process [0.11ms]
+(pass) receipts first (C2) > answer delivered into the live session [0.12ms]
+(pass) agent steps: modes and caps (§6, MO2, K1) > auto + runner → start_run with a started receipt and the run applied [0.08ms]
+(pass) agent steps: modes and caps (§6, MO2, K1) > manual mode, attended steps and missing runner wait for a person [0.10ms]
+(pass) agent steps: modes and caps (§6, MO2, K1) > max_agents caps launches; the oldest story goes first, others queue (K1) [0.12ms]
+(pass) agent steps: modes and caps (§6, MO2, K1) > a running step is never launched again (MO3) [0.29ms]
+(pass) classification (§10, C1, MO4) > turn ended without receipt → silent → nudge in the same session [0.42ms]
+(pass) classification (§10, C1, MO4) > a turn end before the last nudge is not silent again [0.09ms]
+(pass) classification (§10, C1, MO4) > nudges exhausted → classify to $stuck [0.11ms]
+(pass) classification (§10, C1, MO4) > died → retry_fresh with a new launch and started receipt [0.16ms]
+(pass) classification (§10, C1, MO4) > died before it got going: what the session printed is in the classify detail (B3) [0.13ms]
+(pass) classification (§10, C1, MO4) > timeout after the deadline; stalled after no activity [0.22ms]
+(pass) classification (§10, C1, MO4) > waiting for input → implicit ask parks with the pending command [0.28ms]
+(pass) classification (§10, C1, MO4) > BS5.1 (dogfood D3): an owed commit deferred by an agent's merge never takes the unit's action [0.27ms]
+(pass) classification (§10, C1, MO4) > gh-79 (H1, S5): a rebase in progress rewinds runs/, so the unit is held — nothing decided against it [0.12ms]
+(pass) classification (§10, C1, MO4) > attended runs only classify died (MO4) [0.05ms]
+(pass) check, git, gate steps (W2) > check runs automatically, capped by max_checks; a live check lease waits [0.24ms]
+(pass) check, git, gate steps (W2) > a check whose job holds the lease shows as running since the lease, not queued (C5) [0.65ms]
+(pass) check, git, gate steps (W2) > open-pr runs git with the spec folder's pr.md as body file; an already open PR runs it too (GR9) [0.18ms]
+(pass) check, git, gate steps (W2) > integrate is serialized per story (K6) [0.36ms]
+(pass) slices step (W2) > starts slices whose depends_on are integrated, each with a worktree, slot and pinned workflow [0.21ms]
+(pass) slices step (W2) > done when every slice is integrated; stuck when none can ever start [0.22ms]
+(pass) slices step (W2) > gh-79: every slice stuck — a corrupt one is pointed at run view --why, since run rerun refuses a corrupt unit [0.17ms]
+(pass) slices step (W2) > a finished slice releases its worktree and is marked integrated [0.14ms]
+(pass) slices step (W2) > the cleanup deletes the slice branch only when decide knows it is in the story branch [0.26ms]
+(pass) story lifecycle (GR6–GR8) > PR merged → cleanup [0.06ms]
+(pass) story lifecycle (GR6–GR8) > issue closed / unlabelled / PR closed → park remote under Unblock, once [0.16ms]
+(pass) story lifecycle (GR6–GR8) > issue edited → mirror; body changed after refine → inbox item [0.07ms]
+(pass) story lifecycle (GR6–GR8) > S4: a mirror commit carries the story unit's step (commitFor); none before the story starts [0.16ms]
+(pass) story lifecycle (GR6–GR8) > GR7: a remote park goes through park() — stuck, kind remote, the same commit as any stuck unit [0.04ms]
+(pass) gh-79 (H1, S5): a rebasing story worktree holds the story-level writes > a remote problem does not park the story unit from its rewound state [0.04ms]
+(pass) gh-79 (H1, S5): a rebasing story worktree holds the story-level writes > a remote change is not mirrored into the rewound story.md [0.06ms]
+(pass) gh-79 (H1, S5): a rebasing story worktree holds the story-level writes > a merged PR is still cleaned up [0.06ms]
+(pass) gh-79 (H1, S5): a rebasing story worktree holds the story-level writes > a rebasing slice is judged progressing, not by its rewound stuck state [0.12ms]
+(pass) mailbox (T9) > a matching receipt is imported into the parked unit; unmatched ones are rejected [0.18ms]
+(pass) mailbox (T9) > a receipt naming its unit is routed to that unit, even when another unit has the same cursor [0.18ms]
+(pass) mailbox (T9) > gh-79 (H1): a receipt waits while its unit's worktree is mid-rebase — neither imported into nor judged by the rewound cursor [0.13ms]
+(pass) intake and start (GR2, W8, W9) > new issue → intake with workflow from the norn:wf label [0.63ms]
+(pass) intake and start (GR2, W8, W9) > O5/F5: an intake decision is keyed by the new story, so `norn why gh-5` covers it [0.06ms]
+(pass) intake and start (GR2, W8, W9) > story unit starts with its pinned workflow; invalid workflows are refused [0.12ms]
+(pass) determinism (O5) > same facts → identical decisions [1.27ms]
+(pass) determinism (O5) > the decided state equals re-applying the decided receipts (S6) [0.06ms]
+(pass) audit fixes > GR6: a finished story without a claim is never 'unclaimed' [0.09ms]
+(pass) audit fixes > S7/O2: workflow --to / unstick --to moving the cursor off a live run kills it [0.10ms]
+(pass) audit fixes > B2: an answer to a headless run resumes the agent session with the answer as the prompt [0.21ms]
+(pass) audit fixes > C1: manual-mode silent is surfaced in the inbox, not typed into nobody; exhausted → $stuck [0.27ms]
+(pass) audit fixes > deadline is measured from run.started_at, not the last state write [0.07ms]
+(pass) audit fixes > a stuck slice makes the slices step stuck, naming the slice (§10) [0.21ms]
+(pass) audit fixes > the slices step resumes by itself once a stuck slice moves again (§10) [0.23ms]
+(pass) audit fixes > GR8: leaving the refine step records refined_body_hash once [0.21ms]
+(pass) commit trailers (S4, R3.1) > nornTrailers builds them; isIntakeCommit reads an intake off them, never off a subject [0.22ms]
+(pass) trace compatibility (O5) > an action an older norn recorded reads as the action decide emits now [0.11ms]
+
+packages/core/test/agent-unit.test.ts:
+(pass) agent-unit rules (§9) > currentRun: the applied run, else an unapplied started receipt (MO3) [1.24ms]
+(pass) agent-unit rules (§9) > standingReport: an agent ask stands until answered; implicit asks never count (§9.3) [0.10ms]
+(pass) agent-unit rules (§9) > implicitAsk / implicitAskOpen (R6.1) [0.11ms]
+(pass) agent-unit rules (§9) > agentWorkRefusal names why an agent may not work the unit [0.21ms]
+
+packages/core/test/apply.test.ts:
+(pass) initialState > enters the start step at attempt 1 with declared counters at 0 [0.05ms]
+(pass) initialState > attended start parks for a person; gates park with their prompt [0.05ms]
+(pass) transitions (W3, W4) > done → next step; check fail goes back, counted; re-entry bumps attempt [0.16ms]
+(pass) transitions (W3, W4) > exceeding max is exhausted → $stuck with the counter reason [0.22ms]
+(pass) transitions (W3, W4) > $done and $stuck targets [0.06ms]
+(pass) rejections and idempotence (S6, T9) > stale step/attempt is rejected and skipped past, never applied [0.10ms]
+(pass) rejections and idempotence (S6, T9) > receipts ≤ applied_through are skipped: re-applying is a no-op [0.06ms]
+(pass) rejections and idempotence (S6, T9) > undeclared outcome, stale run, wrong kind for the step and second run are rejected [0.09ms]
+(pass) rejections and idempotence (S6, T9) > a receipt naming another unit is rejected; naming this unit applies [0.06ms]
+(pass) universal reports and human receipts > ask parks; answer resumes the same session and delivers the text (B2) [0.10ms]
+(pass) universal reports and human receipts > answer without a live session resumes as ready for a fresh session; restart never answers (C3) [0.08ms]
+(pass) universal reports and human receipts > stuck report parks under Unblock; unstick --to --reset re-enters [0.03ms]
+(pass) universal reports and human receipts > gate approve / reject take the gate's edges [0.14ms]
+(pass) universal reports and human receipts > mode applies regardless of cursor [0.10ms]
+(pass) universal reports and human receipts > workflow switch enters the target step (S7) [0.05ms]
+(pass) classified outcomes (C1) > silent nudges up to step.nudges, then $stuck as exhausted [0.07ms]
+(pass) classified outcomes (C1) > died retries in a fresh session up to step.retries, then $stuck [0.04ms]
+(pass) classified outcomes (C1) > a workflow may override a classified route [0.01ms]
+(pass) classified outcomes (C1) > git/slices classify take edges; foreign outcomes are rejected [0.07ms]
+(pass) take receipts (R10.1) > applied at any cursor without moving it, even on a stuck unit [0.02ms]
+
+packages/core/test/handoff-inbox.test.ts:
+(pass) handoff.md (S9, O6) > status block is rendered from state [1.15ms]
+(pass) handoff.md (S9, O6) > heartbeat repeats collapse into (×n) with the newest time [0.12ms]
+(pass) handoff.md (S9, O6) > renderHandoff replaces the status block, keeps agent sections, appends heartbeat lines [0.25ms]
+(pass) inbox (O1) > groups items with reason, age and exact command [0.60ms]
+(pass) inbox (O1) > a runner that opens terminals for a person: Your turn shows norn open, the typed command in the detail (MO5) [0.10ms]
+(pass) inbox (O1) > a story taken in but not started: Your turn (norn watch) while no heartbeat runs, else Running (GR2) [0.14ms]
+(pass) inbox (O1) > manual ready step under Your turn notes the MO2 downgrade [0.03ms]
+(pass) the inbox points only at a worktree on disk, as decide does (refactor 3.4) > a manual ready step whose worktree is gone: start command without cd, same as no worktree [0.17ms]
+(pass) the inbox points only at a worktree on disk, as decide does (refactor 3.4) > a running unit whose worktree is gone reaches no worktree (HC3) [0.01ms]
+(pass) start command for a person (MO2, B3) > carries the agent's configured args, ended by --
+(pass) start command for a person (MO2, B3) > no args, no --
+(pass) inbox audit fixes > GR6: a finished story with no claim is not 'Unclaimed' [0.13ms]
+(pass) inbox audit fixes > C1: a manual run that ended its turn without reporting is surfaced, once per counted nudge [0.15ms]
+(pass) inbox: the person's last actions (F21, F25, F35, Q6) > story at $done with an open PR: 'Merge PR #N' under Your turn with its URL, not under Recently done [0.09ms]
+(pass) inbox: the person's last actions (F21, F25, F35, Q6) > a draft PR says so and how to mark it ready [0.05ms]
+(pass) inbox: the person's last actions (F21, F25, F35, Q6) > merged PR or PR not fetched: no merge item [0.08ms]
+(pass) inbox: the person's last actions (F21, F25, F35, Q6) > branch already in origin/<base> (merged by ancestry): no merge item, not 'waiting for the PR merge' [0.02ms]
+(pass) inbox: the person's last actions (F21, F25, F35, Q6) > story.md says done (merge seen, PR not fetched): plain 'done', no merge item [0.06ms]
+(pass) inbox: the person's last actions (F21, F25, F35, Q6) > PR head changed after the ready approval: a Check item naming both heads [0.05ms]
+(pass) inbox: the person's last actions (F21, F25, F35, Q6) > BS10.2 (dogfood D6): a PR remembered from before the ready approval is no head change [0.19ms]
+(pass) inbox: the person's last actions (F21, F25, F35, Q6) > commits outside norn: one Check item per branch, newest commit in the id [0.10ms]
+(pass) inbox: the person's last actions (F21, F25, F35, Q6) > a gate item names the report by receipt number; its full text gives the report and evidence folder, absolute [0.24ms]
+(pass) inbox history (O1, O4) > items needing a person appear once with their since; running items are not tracked [0.25ms]
+(pass) inbox history (O1, O4) > a resolved item names the receipt that resolved it and its time [0.27ms]
+(pass) unpushed runs (R2.3) > a non-holder's local receipts are a Check item naming the holder, resolved by norn tidy [0.13ms]
+
+packages/core/test/base-sync.test.ts:
+(pass) workflow contract (W2, W7, W8, BS9) > update is a story-only git action; stale is a gate outcome; base.step must exist [0.57ms]
+(pass) workflow contract (W2, W7, W8, BS9) > BS7: stale by conflict (default) or by behind [0.05ms]
+(pass) base sync replay > 1: behind, no conflict → update merges (Norn-Tick trailer), done → test [0.42ms]
+(pass) base sync replay > 2: conflicts → resolve (brief carries base sha + paths) → done → update finds behind 0 → test [1.47ms]
+(pass) base sync replay > 3: base_conflict_loop exhausted → $stuck with the reason [0.53ms]
+(pass) base sync replay > 4: waiting at ready, a sibling merge makes conflicts → stale → update; and with stale: behind + clean merge [0.95ms]
+(pass) base sync replay > 4b: an approve waiting at the gate wins over stale (C2: receipts first) [0.48ms]
+(pass) base sync replay > 5: gate without a stale route → no classification, Check item stale:* only [0.47ms]
+(pass) base sync replay > BS10.1 (dogfood D1): no stale:* item for an ask in any step, nor while in update/resolve [0.47ms]
+(pass) base sync replay > 6 (core): an update receipt re-enters update from $done, a gate or stuck; refused while running [0.44ms]
+(pass) base sync replay > 7 (core): update stuck (dirty worktree, diverged branch) → $stuck with the reason [0.14ms]
+(pass) base sync replay > 7a: resolve reports stuck (no resolution without new behaviour) → $stuck with its reason [0.02ms]
+(pass) base sync replay > 7b: PR merged into another branch → no cleanup, parked `remote: PR merged into …`; base_branch develop → update and open-pr use it [0.62ms]
+(pass) base sync replay > 11: host-less — base ref refs/heads/<base>; cases 1–4 hold [0.44ms]
+(pass) base sync replay > C3: base_conflict_loop with reset_on update.done — unrelated base moves never exhaust it; the reset is journaled [2.45ms]
+(pass) base sync replay > no base observed → update waits [0.04ms]
+
+packages/core/test/printed-commands.test.ts:
+(pass) printed commands (B7) > the table covers every builder the module exports [0.06ms]
+(pass) printed commands (B7) > config prints today's string [0.06ms]
+(pass) printed commands (B7) > ask prints today's string
+(pass) printed commands (B7) > brief prints today's string
+(pass) printed commands (B7) > doctor prints today's string
+(pass) printed commands (B7) > done prints today's string
+(pass) printed commands (B7) > help prints today's string
+(pass) printed commands (B7) > init prints today's string
+(pass) printed commands (B7) > status prints today's string
+(pass) printed commands (B7) > statusWatch prints today's string
+(pass) printed commands (B7) > storyAnswer prints today's string
+(pass) printed commands (B7) > storyApprove prints today's string
+(pass) printed commands (B7) > storyReject prints today's string
+(pass) printed commands (B7) > storyUpdateBranch prints today's string
+(pass) printed commands (B7) > storyChat prints today's string
+(pass) printed commands (B7) > storyEdit prints today's string
+(pass) printed commands (B7) > storyStart prints today's string
+(pass) printed commands (B7) > storyView prints today's string
+(pass) printed commands (B7) > stuck prints today's string
+(pass) printed commands (B7) > storyCheckout prints today's string
+(pass) printed commands (B7) > storyClose prints today's string
+(pass) printed commands (B7) > storyHandoff prints today's string
+(pass) printed commands (B7) > storyReopen prints today's string
+(pass) printed commands (B7) > runList prints today's string
+(pass) printed commands (B7) > runAttach prints today's string
+(pass) printed commands (B7) > runView prints today's string
+(pass) printed commands (B7) > runRerun prints today's string
+(pass) printed commands (B7) > runCancel prints today's string
+(pass) printed commands (B7) > storyCreate prints today's string
+(pass) printed commands (B7) > sync prints today's string
+(pass) printed commands (B7) > tick prints today's string [0.05ms]
+(pass) printed commands (B7) > tidy prints today's string
+(pass) printed commands (B7) > watch prints today's string
+(pass) printed commands (B7) > no builder prints a removed command (B5) [0.19ms]
+(pass) printed commands (B7) > the removed-command check catches each old verb, and not its new spelling [0.07ms]
+
+packages/core/test/prompts.test.ts:
+(pass) R6.2: answers become the keys a prompt expects > numbered menu: option number + enter, by number or by label [0.05ms]
+(pass) R6.2: answers become the keys a prompt expects > unnumbered menu: arrows from the cursor + enter [0.20ms]
+(pass) R6.2: answers become the keys a prompt expects > no option named (or no options): the text + enter [0.10ms]
+(pass) §10 implicit ask from a pane prompt (L1, R6.2) > parks with the question block, first command line, options, choice and the screen [0.24ms]
+(pass) §10 implicit ask from a pane prompt (L1, R6.2) > the Answer item is readable; the screen only as `full` [0.10ms]
+(pass) §10 implicit ask from a pane prompt (L1, R6.2) > R6.3: an answer that did not reach the pane: the item says so and names how to reach it [0.23ms]
+(pass) §10 implicit ask from a pane prompt (L1, R6.2) > a person's answer is typed as the prompt's keys (SessionInput.keys) [0.14ms]
+(pass) R6.1: an implicit ask resolved by a later fact > the pane no longer waits for input → answer by agent, the run goes on, nothing typed [0.05ms]
+(pass) R6.1: an implicit ask resolved by a later fact > a newer hook for the run (not another wait) resolves it; a newer wait does not [0.22ms]
+(pass) R6.1: an implicit ask resolved by a later fact > an explicit `norn ask` is never resolved by facts [0.03ms]
+(pass) R6.1: an implicit ask resolved by a later fact > apply: an agent's answer and an answer `norn answer` already typed are never delivered again [0.07ms]
+(pass) R9.1: launch prompt not received > SessionStart and no turn for 60 s → the launch prompt is typed again, once (not counted) [0.08ms]
+(pass) R9.1: launch prompt not received > still nothing 60 s after the re-send → silent with the launch rule, then the inbox names the pane [0.30ms]
+(pass) R9.1: launch prompt not received > a runner that cannot type (headless takes its prompt as an argument) is left to the usual rules [0.03ms]
+
+packages/core/test/attended-wait.test.ts:
+(pass) attended wait (HC1) > starts at the first trailing waiting hook; idle_prompt does not restart it
+(pass) attended wait (HC1) > a new turn ends the wait [0.31ms]
+(pass) attended wait (HC1) > permission prompts and questions count as waiting [0.01ms]
+(pass) attended wait (HC1) > a dead or ended session never waits [0.04ms]
+(pass) attended wait (HC1) > with no hook since the last activity, a pane that went idle afterwards starts it [0.03ms]
+(pass) attended wait (HC1) > unattended steps and other runs are not attended waits [0.04ms]
+(pass) attended wait in the inbox (HC2, HC3) > stays under Running until limits.attended_wait has passed [0.06ms]
+(pass) attended wait in the inbox (HC2, HC3) > then is Your turn, reached in place — never a second agent [0.10ms]
+(pass) attended wait in the inbox (HC2, HC3) > a runner session is reached with the runner's command [0.05ms]
+(pass) attended wait in the inbox (HC2, HC3) > 0s shows it at once; each new wait is a new item (one notification per wait) [0.13ms]
+
+packages/core/test/recovery.test.ts:
+(pass) R4.2: nudge delivery by runner capability > a runner that types gets the nudge typed into the live session [0.26ms]
+(pass) R4.2: nudge delivery by runner capability > headless stalled: the old process is killed and the agent session resumed with the nudge text [0.14ms]
+(pass) R4.2: nudge delivery by runner capability > a runner that can neither type nor resume: a fresh session, counted as a retry [0.16ms]
+(pass) R4.2: nudge delivery by runner capability > resume without an agent session id to resume falls through to the retry too [0.07ms]
+(pass) R5: launch unknown, adoption and no second run > found by the runner → adopted: the session is recorded and the step runs on [0.28ms]
+(pass) R5: launch unknown, adoption and no second run > found by its hooks only → adopted with the agent session id [0.07ms]
+(pass) R5: launch unknown, adoption and no second run > not found: wait 2 watch intervals, then `died` (counted) and a fresh run [0.14ms]
+(pass) R5: launch unknown, adoption and no second run > R5.3: no new run while a run of the step shows hook activity; an ended one does not block [0.02ms]
+(pass) R5: launch unknown, adoption and no second run > R5.3: an answer that would resume waits too while another run of the step is active [0.17ms]
+(pass) R7: liveness across machines > started receipts record the machine and heartbeat [0.11ms]
+(pass) R7: liveness across machines > a foreign run after a take: no pid check; died with the foreign rule once quiet for the stalled window [0.11ms]
+(pass) R4.3 / R5.5: inbox items > a failed nudge is an Unblock item until the cursor moves or the agent shows activity [0.21ms]
+(pass) R4.3 / R5.5: inbox items > heartbeat down with auto work held here: Unblock item, and a ready auto step waits for `norn watch` [0.18ms]
+
+packages/core/test/replay.test.ts:
+(pass) scripted ticks: each attempt runs once, counters stay bounded, exhaustion parks [2.19ms]
+
+packages/core/test/criteria.test.ts:
+(pass) criteria report checks (QV3–QV5, NT1) > QV5a (C2): pass for a criterion whose needs the agent lacks is refused — report unverified with how [0.42ms]
+(pass) criteria report checks (QV3–QV5, NT1) > 8: pass with an unverified criterion is refused; do_instead names unverified [0.04ms]
+(pass) criteria report checks (QV3–QV5, NT1) > QV5: the worst verdict decides — fail > unverified > person > pass [0.15ms]
+(pass) criteria report checks (QV3–QV5, NT1) > 9: a report missing a frontmatter criterion id, or naming an unknown one, is invalid_criteria [0.05ms]
+(pass) criteria report checks (QV3–QV5, NT1) > QV4: without frontmatter criteria coverage is not checked (unchecked) [0.02ms]
+(pass) criteria report checks (QV3–QV5, NT1) > QV3: criteria: required, or an outcome gated by a verdict, needs a report [0.03ms]
+(pass) criteria report checks (QV3–QV5, NT1) > NT1: a note's criterion must be one of the unit's criteria; notes never change the outcome check [0.05ms]
+(pass) criteria report checks (QV3–QV5, NT1) > QV8: unverified counted per capability in needs [0.06ms]
+(pass) criteria report checks (QV3–QV5, NT1) > W5/QV5: verdict only on outcomes an agent reports [0.27ms]
+(pass) the gate a person checks (QV6, QV7) > 8: done unverified → human-qa; the gate item lists the unverified and person criteria with reason and how [0.33ms]
+(pass) the gate a person checks (QV6, QV7) > a report without person or unverified criteria adds nothing to a gate [0.20ms]
+(pass) the gate a person checks (QV6, QV7) > QV7: a rework brief after a rejection repeats the judged report's criteria not passed [0.34ms]
+(pass) notes for a person (NT1–NT3) > 10: a note on a pass is a Notes item; the story-level gate lists it [0.31ms]
+(pass) notes for a person (NT1–NT3) > 10: acknowledged by ready.approve; still open after ready.reject [0.08ms]
+(pass) notes for a person (NT1–NT3) > a slice-level gate does not list the story's notes [0.15ms]
+(pass) the Notes group (NT2, NT5) > a slice's two notes are Notes items, below Running, naming the story gate that clears them; they need no one [0.12ms]
+(pass) the Notes group (NT2, NT5) > the story waiting at a gate names that gate; with no gate ahead, the story's end [0.15ms]
+(pass) the Notes group (NT2, NT5) > a slice gate lists the slice's own open notes, saying they stay open [0.09ms]
+
+packages/core/test/golden.test.ts:
+(pass) golden decisions > the corpus is there [0.41ms]
+(pass) golden decisions > agent-protocol-8850c636c928.json (tick 03PGFN3J2GVKBX7BYEJBKKW1C0) [0.16ms]
+(pass) golden decisions > agent-protocol-fa843e498a4b.json (tick 03PGFN38A090C8WR8FXS0ND8F4) [0.18ms]
+(pass) golden decisions > audit-1122388d0dc8.json (tick 03PGFN45KGFEYXGPR0G68ECY1Y) [0.05ms]
+(pass) golden decisions > audit-47b487e6949a.json (tick 03PGFNH9H0CXWVZC80301QMKTQ) [0.13ms]
+(pass) golden decisions > audit-83cd1ca13a9c.json (tick 03PGFP3KF0ZPMZDVK8TXMXA0KH) [0.03ms]
+(pass) golden decisions > audit-8a781bfa5b64.json (tick 03PGFN69Z0YB41Y6GBFAX3ZHZJ) [0.01ms]
+(pass) golden decisions > audit-eabfd06c5264.json (tick 03PGFN45KGEK70748VDQSGTEYM) [0.03ms]
+(pass) golden decisions > auto-recovery-23065fd56b25.json (tick 03PGFN3K1R8FMKE1NKFPGKH0H1) [0.06ms]
+(pass) golden decisions > auto-recovery-42106339b9c4.json (tick 03PGFP3Y6RHPATWGR8NWWX86JV) [0.19ms]
+(pass) golden decisions > auto-recovery-55fa2dd0f752.json (tick 03PGFP3Y6RNYP2H8YD3BY5KBPW) [0.07ms]
+(pass) golden decisions > auto-recovery-76977adfe05a.json (tick 03PGFN5RCGXXR0EHES3CHSW6N1) [0.13ms]
+(pass) golden decisions > auto-recovery-7dea41027d4b.json (tick 03PGFNN9ERRB73WM75780B4AZR) [0.03ms]
+(pass) golden decisions > auto-recovery-8bcaec21b1f8.json (tick 03PGFP3Y6RHPATWGR8NWWX86J7) [0.05ms]
+(pass) golden decisions > auto-recovery-8d37c327c5d7.json (tick 03PGFN5RCGXXR0EHES3CHSW6NH) [0.02ms]
+(pass) golden decisions > auto-recovery-ae38899a53ae.json (tick 03PGFN69Z0A0WVNHD8KNCAF881) [0.03ms]
+(pass) golden decisions > auto-recovery-b0b8546d93cd.json (tick 03PGFN5RCGXXR0EHES3CHSW6NA) [0.06ms]
+(pass) golden decisions > auto-recovery-bac06541c033.json (tick 03PGFP3Y6RHPATWGR8NWWX86JQ) [0.05ms]
+(pass) golden decisions > auto-recovery-c02318efe6e2.json (tick 03PGFP3Y6RNYP2H8YD3BY5KBP8) [0.03ms]
+(pass) golden decisions > auto-recovery-c378004fe573.json (tick 03PGFP3Y6RHPATWGR8NWWX86JR) [0.03ms]
+(pass) golden decisions > auto-recovery-cbaa504b4e2d.json (tick 03PGFN5RCGPDS2N2T8WQZ8RW3Z) [0.02ms]
+(pass) golden decisions > auto-recovery-d61ba261f4c8.json (tick 03PGFN5RCGPDS2N2T8WQZ8RW3R) [0.02ms]
+(pass) golden decisions > auto-recovery-e0b6ebbf251a.json (tick 03PGFN6MPRY5T2NECCPSFFK4NT) [0.04ms]
+(pass) golden decisions > auto-recovery-ed265349a2ae.json (tick 03PGFN5RCGPDS2N2T8WQZ8RW3F) [0.06ms]
+(pass) golden decisions > auto-recovery-fdb205c8b206.json (tick 03PGFN69Z0QEQS8H988YKGNWHD) [0.01ms]
+(pass) golden decisions > base-sync-058cea090f15.json (tick 03PGFNB670E2YRW2BZQS7KNF7Z) [0.07ms]
+(pass) golden decisions > base-sync-05fe1e567e0c.json (tick 03PGFN4S4GZPSZGKPQQEXYNCVW) [0.03ms]
+(pass) golden decisions > base-sync-0bcbf56f904d.json (tick 03PGFNB670E2YRW2BZQS7KNF8W) [0.12ms]
+(pass) golden decisions > base-sync-12adbd8e4318.json (tick 03PGFNB670E2YRW2BZQS7KNF96) [0.05ms]
+(pass) golden decisions > base-sync-26edecb2a585.json (tick 03PGFNB670E2YRW2BZQS7KNF8X) [0.08ms]
+(pass) golden decisions > base-sync-2b5da27afbaa.json (tick 03PGFNB670E2YRW2BZQS7KNF92) [0.01ms]
+(pass) golden decisions > base-sync-4340f597f750.json (tick 03PGFNB670E2YRW2BZQS7KNF9A)
+(pass) golden decisions > base-sync-4c5921958ec7.json (tick 03PGFNB670E2YRW2BZQS7KNFAA) [0.03ms]
+(pass) golden decisions > base-sync-5165e258478b.json (tick 03PGFNB670E2YRW2BZQS7KNF9D) [0.04ms]
+(pass) golden decisions > base-sync-5cc4a9bd466e.json (tick 03PGFNB670E2YRW2BZQS7KNF7V) [0.01ms]
+(pass) golden decisions > base-sync-637b97c27dcc.json (tick 03PGFNB670E2YRW2BZQS7KNFAC) [0.02ms]
+(pass) golden decisions > base-sync-7fca4c6ce2c8.json (tick 03PGFNB6702T45GZSKJ6QD4NTE) [0.11ms]
+(pass) golden decisions > base-sync-89c583ab6582.json (tick 03PGFNB670E2YRW2BZQS7KNF8S) [0.04ms]
+(pass) golden decisions > base-sync-8da3ee1b011a.json (tick 03PGFN7TSGJFC2WXDMQGGG2Y69) [0.05ms]
+(pass) golden decisions > base-sync-91bba6ffb752.json (tick 03PGFNAWEGX7XX3TPV8DV2CAG5) [0.03ms]
+(pass) golden decisions > base-sync-94024d833bb3.json (tick 03PGFNB6702T45GZSKJ6QD4NTA) [0.04ms]
+(pass) golden decisions > base-sync-9903079204db.json (tick 03PGFNB670E2YRW2BZQS7KNF93) [0.07ms]
+(pass) golden decisions > base-sync-9e95867927a0.json (tick 03PGFN5PE00KFAWS55MQ6P609C) [0.01ms]
+(pass) golden decisions > base-sync-af4a4af8c9fa.json (tick 03PGFNB670E2YRW2BZQS7KNF9R) [0.03ms]
+(pass) golden decisions > base-sync-b36c46dc43f7.json (tick 03PGFNB670E2YRW2BZQS7KNF90) [0.02ms]
+(pass) golden decisions > base-sync-c4bc385404c6.json (tick 03PGFNB670E2YRW2BZQS7KNF9F)
+(pass) golden decisions > base-sync-ceb535fd45e9.json (tick 03PGFNB670E2YRW2BZQS7KNF9G)
+(pass) golden decisions > base-sync-d23294e9204d.json (tick 03PGFNB670E2YRW2BZQS7KNF98) [0.02ms]
+(pass) golden decisions > base-sync-dea2f089abb0.json (tick 03PGFNB670E2YRW2BZQS7KNF9S) [0.02ms]
+(pass) golden decisions > base-sync-efd88433db22.json (tick 03PGFNB670E2YRW2BZQS7KNFAG) [0.04ms]
+(pass) golden decisions > base-sync-f77ee0448a7c.json (tick 03PGFNB670E2YRW2BZQS7KNF99) [0.03ms]
+(pass) golden decisions > check-run-92177de34390.json (tick 03PGFN69Z0X56F1VFJTRAR2D3H) [0.04ms]
+(pass) golden decisions > cockpit-0dba1192222f.json (tick 03PGFN7KYRYDTX5Y6297P4DFPP) [0.02ms]
+(pass) golden decisions > e2e-07d2991985b1.json (tick 03PGFN6KQGV7WFX0MS67K9EG53) [0.06ms]
+(pass) golden decisions > e2e-55de600f5c35.json (tick 03PGFN778G9NCHB5W0YZS5XJY4)
+(pass) golden decisions > e2e-5c3bbeb7c14a.json (tick 03PGFN84J0CK0QPQZZ0EZXFM37) [0.02ms]
+(pass) golden decisions > e2e-5c79caea0c57.json (tick 03PGFN7TSGXCNQG3NJW7SQN1Z4) [0.04ms]
+(pass) golden decisions > e2e-6cb636d22ccc.json (tick 03PGFN8EAGH2HM5PR6DARV87JN) [0.05ms]
+(pass) golden decisions > e2e-a1e342e3162f.json (tick 03PGFN3VV0A24YVE8SADFNQ58B) [0.06ms]
+(pass) golden decisions > e2e-a48dd0c0c4bd.json (tick 03PGFN38A0WT5C0XGZ6154D22N) [0.02ms]
+(pass) golden decisions > e2e-b7ef0253d270.json (tick 03PGFN778G5M8ZNH1N5FY5ERD1) [0.02ms]
+(pass) golden decisions > housekeeping-070c5482e762.json (tick 03PGFN3J2GCKMTP3VVG97PZ1B5) [0.02ms]
+(pass) golden decisions > housekeeping-10ee802e2193.json (tick 03PGFN4FC0ZM47RAJEDH5GA6GE) [0.02ms]
+(pass) golden decisions > housekeeping-4d364b986f22.json (tick 03PGFN3VV0BHGM2BSEYRHTHDQE)
+(pass) golden decisions > housekeeping-b067ffc845e6.json (tick 03PGFN4FC0ZM47RAJEDH5GA6GB) [0.03ms]
+(pass) golden decisions > human-19545887c474.json (tick 03PGFN778GRBWB33GQHSVVH80J) [0.04ms]
+(pass) golden decisions > human-23adb5e51235.json (tick 03PGFN6KQGMX7GHMFB0J9T8RD2) [0.04ms]
+(pass) golden decisions > human-e59809a3208d.json (tick 03PGFN778G80WSDMDA1CS0JAT0) [0.03ms]
+(pass) golden decisions > inbox-why-063f73ad9653.json (tick 03PGFNSTZ0KAMXBB16RQXRTAH0) [0.01ms]
+(pass) golden decisions > inbox-why-47556c263d7e.json (tick 03PGFNSTZ0CFP8A6QDW6TV1MWH)
+(pass) golden decisions > observe-snapshots-2c2e1899a6f4.json (tick 03PGFN6XG0S73NPEP788X8WA2M) [0.04ms]
+(pass) golden decisions > prompts-450a2c6ef8d0.json (tick 03PGFN45KG9YWWBBD15HQM6Z53) [0.03ms]
+(pass) golden decisions > prompts-743caa9ff2f2.json (tick 03PGFN53W8GPZBNE68BH7RFN21) [0.01ms]
+(pass) golden decisions > prompts-8b638fdc0ec7.json (tick 03PGFN53W8R96BBA2ETQP6ZGJA) [0.04ms]
+(pass) golden decisions > prompts-92950f72bd15.json (tick 03PGFN6ZEG9TX68EE6HN276XQ1) [0.05ms]
+(pass) golden decisions > prompts-ade775215dfe.json (tick 03PGFN45KG3MNN26TBC3E0B71J) [0.03ms]
+(pass) golden decisions > prompts-f3b63c9cceb9.json (tick 03PGFN6ZEGPYGA1HC7C46T7909) [0.07ms]
+(pass) golden decisions > rebase-rewind-991cf8776bae.json (tick 03PGFNBFZGFNHRA4JMC8MBXSRR) [0.02ms]
+(pass) golden decisions > records-2ef0c44efb33.json (tick 03PGFN45KGDEMDY300RZA2CR0A) [0.02ms]
+(pass) golden decisions > records-4efe2f0e79ac.json (tick 03PGFN5PE0GDWMTEH4PW4SZ25N)
+(pass) golden decisions > records-a54228dee1cb.json (tick 03PGFN5PE0GDWMTEH4PW4SZ25M)
+(pass) golden decisions > recovery-ff499da67644.json (tick 03PGFNAWEGTK61RY4T8VVR6Y7P) [0.01ms]
+(pass) golden decisions > run-rerun-cancel-5416069c64b5.json (tick 03PGG9QYWGADHAW0X5SHFP84BK) [0.03ms]
+(pass) golden decisions > run-rerun-cancel-b3aecfd793e0.json (tick 03PGG9Q1K07T44GKC3Z1HMV498) [0.07ms]
+(pass) golden decisions > runtime-3aec7a560471.json (tick 03PGFN4GB84608PJQCFHHA5H1C) [0.04ms]
+(pass) golden decisions > runtime-514b00500935.json (tick 03PGFN4T3RAD6Z7HM0NF2WEXHE) [0.03ms]
+(pass) golden decisions > runtime-533e4814cafe.json (tick 03PGFN53W87DE0M3AW7Z8DGJMP)
+(pass) golden decisions > runtime-865bc5ca8cf0.json (tick 03PGFN3WT8CC1H5AG299CT5R3Z) [0.04ms]
+(pass) golden decisions > runtime-ab160a87d984.json (tick 03PGFN3WT8EPZ5Y6HZEWT0MZDC) [0.06ms]
+(pass) golden decisions > runtime-bd0cc4d744e0.json (tick 03PGFN3K1R5N270KPK9M4PSCHD) [0.04ms]
+(pass) golden decisions > runtime-dfb559eb4636.json (tick 03PGFN53W8M7J74GYPK99X77FH) [0.01ms]
+(pass) golden decisions > team-280825eaf6f2.json (tick 03PGFN52X0ENWM0G8XAPMYF05W) [0.01ms]
+(pass) golden decisions > team-a01bfb06e786.json (tick 03PGFN3VV01GSEG8547MFKGB6J) [0.04ms]
+(pass) golden decisions > team-a48dd0c0c4bd.json (tick 03PGFN38A0TS84DHGC6WJXPZZY) [0.02ms]
+(pass) rule coverage > decide/ builds rule ids from exactly the known templates [0.69ms]
+(pass) rule coverage > every routed base is a literal in decide/ and parked kinds are park kinds [0.05ms]
+(pass) rule coverage > hand-built: dead lease files are reclaimed fires leases.reclaim [0.05ms]
+(pass) rule coverage > hand-built: an unreadable claim ref fires claim.corrupt
+(pass) rule coverage > hand-built: a story file that failed validation fires story.corrupt [0.01ms]
+(pass) rule coverage > hand-built: the issue title changed fires remote.mirror [0.01ms]
+(pass) rule coverage > hand-built: refine finished: the body hash is recorded fires remote.mirror.refined [0.03ms]
+(pass) rule coverage > hand-built: the issue body changed after refine fires remote.mirror.body_changed [0.02ms]
+(pass) rule coverage > hand-built: an unreadable mailbox receipt fires mailbox.reject [0.02ms]
+(pass) rule coverage > hand-built: the story names a workflow that does not exist fires start.workflow_invalid [0.01ms]
+(pass) rule coverage > hand-built: the story worktree is missing at start fires start.no_worktree [0.03ms]
+(pass) rule coverage > hand-built: the pinned workflow is missing fires unit.workflow_missing
+(pass) rule coverage > hand-built: the pinned workflow changed outside norn fires workflow.drift [0.01ms]
+(pass) rule coverage > hand-built: a rebase waits in the unit's worktree past the step's deadline fires unit.rebase_in_progress [0.01ms]
+(pass) rule coverage > hand-built: a ready unit whose cursor is $done fires unit.no_step [0.01ms]
+(pass) rule coverage > hand-built: a stuck unit waits for unstick fires unit.stuck [0.02ms]
+(pass) rule coverage > hand-built: a receipt for another step is rejected fires receipts.reject [0.02ms]
+(pass) rule coverage > hand-built: a ready slice of a story parked on the remote fires story.halted
+(pass) rule coverage > hand-built: auto requested but no runner fires agent.ready.manual.no_runner
+(pass) rule coverage > hand-built: the unit worktree is missing fires agent.no_worktree
+(pass) rule coverage > hand-built: an attended run in progress fires agent.attended.running
+(pass) rule coverage > hand-built: running without a run record fires agent.running.no_run
+(pass) rule coverage > hand-built: running with no facts for the run fires agent.running.unobserved
+(pass) rule coverage > hand-built: no activity for the stalled window fires agent.stalled.nudge [0.03ms]
+(pass) rule coverage > hand-built: the deadline passed fires agent.timeout.nudge [0.02ms]
+(pass) rule coverage > hand-built: a turn ended in manual mode surfaces in the inbox fires agent.silent.surface [0.02ms]
+(pass) rule coverage > hand-built: a runner that can neither type nor resume retries instead of nudging fires agent.silent.retry.no_nudge [0.03ms]
+(pass) rule coverage > hand-built: nudges used up: stuck fires agent.silent.stuck [0.02ms]
+(pass) rule coverage > hand-built: a declared stalled route moves to another step fires agent.stalled.route [0.03ms]
+(pass) rule coverage > hand-built: a resumed nudge waits for a free agent slot fires agent.nudge.queued [0.02ms]
+(pass) rule coverage > hand-built: an answer waits for a free agent slot fires answer.resume.queued [0.03ms]
+(pass) rule coverage > hand-built: an answer waits while another run shows activity fires answer.resume.wait_active [0.03ms]
+(pass) rule coverage > hand-built: a check is already running fires check.running [0.01ms]
+(pass) rule coverage > hand-built: a check with no worktree fires check.no_worktree
+(pass) rule coverage > hand-built: max_checks in use fires check.queued
+(pass) rule coverage > hand-built: a ready unit at a gate step fires gate.wait
+(pass) rule coverage > hand-built: a git step with no worktree fires git.no_worktree [0.01ms]
+(pass) rule coverage > hand-built: open-pr with a PR already open runs again: the body is updated (GR9, main 0.9.x) fires git.open-pr
+(pass) rule coverage > hand-built: a push step fires git.push
+(pass) rule coverage > hand-built: an update step with no base observed fires git.update.no_base [0.02ms]
+(pass) rule coverage > hand-built: a second slice integrate in the same tick fires git.integrate.queued [0.03ms]
+(pass) rule coverage > hand-built: a story update after a slice integrate in the same tick fires git.update.queued [0.03ms]
+(pass) rule coverage > hand-built: no slice files fires slices.none [0.02ms]
+(pass) rule coverage > hand-built: a not-started slice's file failed validation fires slices.file_invalid [0.03ms]
+(pass) rule coverage > hand-built: a started slice's file failed validation fires slices.file_invalid [0.02ms]
+(pass) rule coverage > hand-built: no slice can start fires slices.blocked [0.05ms]
+(pass) rule coverage > hand-built: every active slice is stuck fires slices.slice_stuck [0.02ms]
+(pass) rule coverage > hand-built: a slice names a workflow that does not exist fires slices.workflow_invalid [0.03ms]
+(pass) rule coverage > hand-built: a stuck slices step resumes once a slice can start fires slices.resume [0.02ms]
+(pass) rule coverage > every rule id fires in a golden or hand-built case, or is listed unreachable with a reason [2.30ms]
+(pass) rule coverage > every rule that fires is one the catalogue knows [1.64ms]
+
+packages/core/test/workflow.test.ts:
+(pass) validateWorkflowDefinition (W5) > PRD slice example and the story fixture are valid [2.08ms]
+(pass) validateWorkflowDefinition (W5) > every uncounted elementary cycle is listed with its path (W4) [1.17ms]
+(pass) validateWorkflowDefinition (W5) > a cycle with one counted edge among parallel edges is still uncounted via the other [0.06ms]
+(pass) validateWorkflowDefinition (W5) > self-loop without counter is a cycle [0.08ms]
+(pass) validateWorkflowDefinition (W5) > steps that cannot reach $done [0.07ms]
+(pass) validateWorkflowDefinition (W5) > reserved step names, unknown targets/counters/start, unknown skills, declared exhausted [0.05ms]
+(pass) validateWorkflowDefinition (W5) > a step's skill must be installed for the agent that runs it (W5, SK1) [0.47ms]
+(pass) validateWorkflowDefinition (W5) > schema errors are reported with paths [0.06ms]
+(pass) elementaryCycles (Johnson) > complete digraph on 3 nodes has 5 elementary cycles [0.03ms]
+(pass) elementaryCycles (Johnson) > acyclic graph has none [0.04ms]
+(pass) checkWorkflowLevel (W8) > slices/open-pr only on a story, integrate only on a slice [0.03ms]
+(pass) workflowHash is stable across key order [0.23ms]
+
+packages/core/test/brief.test.ts:
+(pass) renderBrief (B3) > first run of implement [1.02ms]
+(pass) renderBrief (B3) > the step's description and instructions follow the skill under Your work, instructions trimmed [0.25ms]
+(pass) renderBrief (B3) > rework after a failing check shows the output tail and log [0.43ms]
+(pass) renderBrief (B3) > rework after review findings lists them [0.35ms]
+(pass) renderBrief (B3) > attended step with answers in context, manual downgrade, no deadline [0.17ms]
+(pass) renderBrief (B3) > declared inputs, entered from review: findings shown, a failing check settled by a later pass is not (B6) [0.27ms]
+(pass) renderBrief (B3) > declared last_check shows only the failure after the previous attempt, not an older one (B6) [0.14ms]
+(pass) renderBrief (B3) > declared inputs drop findings and checks that a later pass settled; a gate reject shows its comment (B6) [0.24ms]
+(pass) renderBrief (B3) > non-agent steps have no briefing [0.05ms]
+(pass) Rework only when sent back (B3, B6, W4) > qa.fail without findings: the handoff verbatim and the absolute evidence dir with its files [0.18ms]
+(pass) Rework only when sent back (B3, B6, W4) > qa.fail with findings: criterion and repro, then the evidence [0.09ms]
+(pass) Rework only when sent back (B3, B6, W4) > gate reject with a comment: the comment verbatim and who; the judged receipt's evidence; an earlier approve's findings are not rework [0.18ms]
+(pass) Rework only when sent back (B3, B6, W4) > gate reject without a comment says so and points at the evidence [0.09ms]
+(pass) Rework only when sent back (B3, B6, W4) > review.approve → qa is forward: no Rework; non-blocking findings are neutral notes in Context [0.10ms]
+(pass) Rework only when sent back (B3, B6, W4) > test.fail after the qa rework round: the check only; qa's failure was settled by the previous attempt (B6) [0.13ms]
+(pass) Rework only when sent back (B3, B6, W4) > integrate conflict → merge: the conflicting files [0.15ms]
+(pass) Rework only when sent back (B3, B6, W4) > no Rework means no dangling 'see Rework' in Inputs [0.03ms]
+(pass) Re-entry, fresh sessions, handoff and criteria (B2, C2, QV1) > a second qa after the code changed: why this attempt, earlier qa is history, review's Resume dropped [0.31ms]
+(pass) Re-entry, fresh sessions, handoff and criteria (B2, C2, QV1) > a fresh session of a rework step keeps its Rework (died is in-step, not the entry) [0.13ms]
+(pass) Re-entry, fresh sessions, handoff and criteria (B2, C2, QV1) > the Resume of this step's own earlier report is kept; a first entry has no history [0.15ms]
+(pass) Re-entry, fresh sessions, handoff and criteria (B2, C2, QV1) > without declared criteria the brief points at the spec's Acceptance section [0.07ms]
+(pass) golden replays (norn-sandbox-todoist) > gh-1 story: qa.fail with handoff + evidence and no findings → implement#1 gets the failure (F22) [1.69ms]
+(pass) golden replays (norn-sandbox-todoist) > gh-2/03: human-qa.reject → implement#2 gets the comment, not review#1's approve findings (F31) [1.14ms]
+(pass) golden replays (norn-sandbox-todoist) > gh-2/03: review.approve → qa#1 is forward, no Rework (F17) [0.39ms]
+(pass) Rulings (F28, O2): gate reasons as story-level notes > storyRulings collects gate comments of every unit, oldest first, skipping empty and duplicate ones [0.05ms]
+(pass) Rulings (F28, O2): gate reasons as story-level notes > every later brief of the story carries the rulings, the one already in Rework excepted [0.40ms]
+
+packages/core/test/properties.test.ts:
+(pass) applyReceipts properties (S6, W4, C1) > the generators make valid workflows and receipts, and reach every step type, park kind and limit [92.91ms]
+(pass) applyReceipts properties (S6, W4, C1) > counters never exceed their max, and every state is well formed [63.38ms]
+(pass) applyReceipts properties (S6, W4, C1) > every receipt is either applied or rejected, and applied_through moves past it [33.96ms]
+(pass) applyReceipts properties (S6, W4, C1) > applying the receipts in one batch equals applying them one at a time [33.37ms]
+(pass) applyReceipts properties (S6, W4, C1) > applying the same receipts twice changes nothing — also after a crash mid-way (replay of a prefix) [37.03ms]
+(pass) applyReceipts properties (S6, W4, C1) > the recorded route matches where applyReceipts sends the unit while the outcome has room (no limit hit) [24.61ms]
+(pass) applyReceipts properties (S6, W4, C1) > the recorded route matches where applyReceipts sends the unit, limits included (BUG-2) [27.49ms]
+(pass) decide properties (O5, W4) > at most one action per unit, and every state it writes keeps counters within max [118.36ms]
+
+packages/core/test/defects.test.ts:
+(pass) BUG-1: a resumed run's own agent lease and max_agents (K1) > nudge resume: the run's own lease does not count [0.27ms]
+(pass) BUG-1: a resumed run's own agent lease and max_agents (K1) > answer resume: the run's own lease does not count either [0.08ms]
+(pass) BUG-2: the route recorded for a git step's classify receipt > an exhausted counter routes to $stuck, as applyReceipts does [0.16ms]
+(pass) BUG-5: a broken slice file of a slice not started yet > decide notes slices.file_invalid instead of throwing [0.06ms]
+
+packages/cli/test/auto-recovery.test.ts:
+(pass) R4: nudges that can be delivered (acceptance 5) > R4.3: a send that fails is ok:false, an Unblock item and shown in status [4196.60ms]
+(pass) R4: nudges that can be delivered (acceptance 5) > R4.2: a runner without `send` resumes the agent session with the nudge text; the failure clears [1698.58ms]
+(pass) R4: nudges that can be delivered (acceptance 5) > R4.4: status shows the run's last classification, not only liveness [119.04ms]
+(pass) R5: a launch norn did not see finish (acceptance 6) > the runner finds the run → adopted, no second agent [3493.26ms]
+(pass) R5: a launch norn did not see finish (acceptance 6) > nothing finds it → waits 2 watch intervals, then died (counted) and a fresh run [3589.06ms]
+(pass) R5: a launch norn did not see finish (acceptance 6) > R5.3: no new run while another run of the step shows hook activity [2399.38ms]
+(pass) R5.4 / R5.5: tick records and the heartbeat (acceptance 7, 8) > every tick writes tick.start before act and tick.end after; heartbeat.json records last_tick_at [1097.51ms]
+(pass) R5.4 / R5.5: tick records and the heartbeat (acceptance 7, 8) > a tick that died during act: why says so and resolves the receipt that cites it [2068.61ms]
+(pass) R5.4 / R5.5: tick records and the heartbeat (acceptance 7, 8) > no heartbeat for 3 watch intervals with auto work held: inbox item, no manual start hint [2355.47ms]
+(pass) R7: a run from another machine (acceptance 10) > no pid or pane check; after the take, no hooks for the stalled window → died with the foreign rule [5379.79ms]
+
+packages/cli/test/inbox-why.test.ts:
+(pass) gate item and rulings (F21, F28) > the human-qa item names the qa report; --details gives it and its evidence folder, absolute [3026.28ms]
+(pass) gate item and rulings (F21, F28) > a reject reason is a ruling every later brief of the story carries [4646.71ms]
+(pass) why by step, attempt, transition and rule (O5, F5) > --transition finds the tick that applied the reject and quotes the comment [67.21ms]
+(pass) why by step, attempt, transition and rule (O5, F5) > --step/--attempt pick the report of that attempt with its handoff in full [56.36ms]
+(pass) why by step, attempt, transition and rule (O5, F5) > the intake decision is keyed by the story (F5) [43.49ms]
+(pass) why by step, attempt, transition and rule (O5, F5) > bad filters are usage errors; no match is refused [173.70ms]
+(pass) merge PR item and inbox history (F25, Q3) > open-pr → ready → approve → $done: the open PR is 'Merge PR #N' with its URL [3295.93ms]
+(pass) merge PR item and inbox history (F25, Q3) > --history pairs appeared/resolved with who resolved each item [80.43ms]
+(pass) merge PR item and inbox history (F25, Q3) > the PR merge resolves the merge item [516.72ms]
+
+packages/cli/test/help-tree.test.ts:
+(pass) norn help in tiers (B1) > Core, Setup, Background, Agent protocol in that order, then the skills; tick and hook absent [2.48ms]
+(pass) norn help in tiers (B1) > --json gives the same tree as data [0.81ms]
+(pass) noun help (B2) > norn story and norn help story list the verbs under general, decision, work, team [0.65ms]
+(pass) noun help (B2) > norn run lists list, view, attach, rerun, cancel [0.16ms]
+(pass) norn help --all (B3) > everything in help plus tick, hook, check-run and status --segment [0.57ms]
+(pass) removed names are unknown commands (B5, B69) > the table of old names covers the B5 list [0.06ms]
+(pass) removed names are unknown commands (B5, B69) > norn drop is a usage error and changes nothing on disk [40.86ms]
+(pass) removed names are unknown commands (B5, B69) > norn inbox is a usage error and changes nothing on disk [39.40ms]
+(pass) removed names are unknown commands (B5, B69) > norn cockpit is a usage error and changes nothing on disk [40.47ms]
+(pass) removed names are unknown commands (B5, B69) > norn orient is a usage error and changes nothing on disk [40.52ms]
+(pass) removed names are unknown commands (B5, B69) > norn open is a usage error and changes nothing on disk [63.35ms]
+(pass) removed names are unknown commands (B5, B69) > norn answer is a usage error and changes nothing on disk [36.53ms]
+(pass) removed names are unknown commands (B5, B69) > norn approve is a usage error and changes nothing on disk [37.12ms]
+(pass) removed names are unknown commands (B5, B69) > norn unstick is a usage error and changes nothing on disk [71.51ms]
+(pass) removed names are unknown commands (B5, B69) > norn update is a usage error and changes nothing on disk [62.99ms]
+(pass) removed names are unknown commands (B5, B69) > norn mode is a usage error and changes nothing on disk [42.18ms]
+(pass) removed names are unknown commands (B5, B69) > norn workflow is a usage error and changes nothing on disk [41.09ms]
+(pass) removed names are unknown commands (B5, B69) > norn take is a usage error and changes nothing on disk [40.59ms]
+(pass) removed names are unknown commands (B5, B69) > norn release is a usage error and changes nothing on disk [39.72ms]
+(pass) removed names are unknown commands (B5, B69) > norn trace is a usage error and changes nothing on disk [40.17ms]
+(pass) removed names are unknown commands (B5, B69) > norn why is a usage error and changes nothing on disk [42.42ms]
+(pass) removed names are unknown commands (B5, B69) > brief, done, ask, stuck and hook are still commands [22.68ms]
+
+packages/cli/test/run-rerun-cancel.test.ts:
+(pass) a person's stuck at the cursor of a running unit (B51, D4) > the next tick ends the run there: stuck under Unblock, not relaunched, retried or nudged [3867.47ms]
+(pass) run rerun (B48, B50) > a stuck unit resumes its step in a fresh session; --reset and --reason are journaled [2979.75ms]
+(pass) run rerun (B48, B50) > a running unit is refused: stopping it is run cancel [461.18ms]
+(pass) run cancel (B51–B53) > writes the stuck receipt first, then kills the session; everything else stays; rerun resumes [3996.61ms]
+(pass) run cancel (B51–B53) > a unit waiting at a gate has nothing to cancel; a unit that is not started either [2477.38ms]
+(pass) run cancel (B51–B53) > without a target a terminal is offered only the running units [108.00ms]
+(pass) run cancel (B51–B53) > a claim another machine holds is refused: check the story out first [647.90ms]
+(pass) run cancel (B51–B53) > a session this checkout cannot stop is said, with the receipt, never skipped (B51) [6862.77ms]
+(pass) run rerun --step (B49) > a unit stuck at qa moves to implement [7087.95ms]
+(pass) run rerun --step (B49) > a gate-waiting unit resumes as unstick resumed it [3065.32ms]
+(pass) run rerun --step (B49) > a unit parked on an ask resumes as unstick resumed it [2689.85ms]
+(pass) run rerun --step (B49) > a unit that is not stuck, parked or at a gate is refused [2375.34ms]
+(pass) the surface (B2, B5) > unstick is an unknown command; run lists rerun and cancel [2.50ms]
+
+packages/cli/test/agent-protocol.test.ts:
+(pass) manual mode: tick → brief → done → tick (MO3, B3, §9.3) > the tick marks the agent step ready and never launches (manual) [3962.64ms]
+(pass) manual mode: tick → brief → done → tick (MO3, B3, §9.3) > outside a unit worktree the verbs refuse with do_instead [62.01ms]
+(pass) manual mode: tick → brief → done → tick (MO3, B3, §9.3) > done before brief: no run yet → do_instead norn brief [2.16ms]
+(pass) manual mode: tick → brief → done → tick (MO3, B3, §9.3) > hook in a ready step without a run never blocks; the fact lands in the trace (A2) [9.02ms]
+(pass) manual mode: tick → brief → done → tick (MO3, B3, §9.3) > first brief starts the run: started receipt with session + PID; briefing stored (B4) [143.73ms]
+(pass) manual mode: tick → brief → done → tick (MO3, B3, §9.3) > brief again (no tick yet) reuses the run; --json gives the data form [18.86ms]
+(pass) manual mode: tick → brief → done → tick (MO3, B3, §9.3) > Stop in an unattended step whose run has not reported → blocked with the report instruction (A4) [1.91ms]
+(pass) manual mode: tick → brief → done → tick (MO3, B3, §9.3) > the tick applies the started receipt: running, how manual (MO3) [934.17ms]
+(pass) manual mode: tick → brief → done → tick (MO3, B3, §9.3) > done with an undeclared outcome is refused, listing the valid ones [3.43ms]
+(pass) manual mode: tick → brief → done → tick (MO3, B3, §9.3) > done writes the receipt, appends handoff progress and says end your turn; a second report is refused [14.17ms]
+(pass) manual mode: tick → brief → done → tick (MO3, B3, §9.3) > the tick advances to review; the next brief starts a fresh run [907.87ms]
+(pass) manual mode: tick → brief → done → tick (MO3, B3, §9.3) > done --findings/--evidence: findings copied into the receipt, evidence into runs/<unit>/evidence/<run_id>/ [6.13ms]
+(pass) manual mode: tick → brief → done → tick (MO3, B3, §9.3) > back in implement, the brief shows the findings as Rework (B3, B6) [718.94ms]
+(pass) manual mode: tick → brief → done → tick (MO3, B3, §9.3) > ask records the question and options; the parked unit refuses brief with norn answer [2145.91ms]
+(pass) manual mode: tick → brief → done → tick (MO3, B3, §9.3) > a gate step refuses brief with norn approve [641.60ms]
+(pass) attended steps never block (MO4) > brief starts the attended run; Stop is allowed without a report; done completes it [1637.99ms]
+(pass) norn hook robustness (A3) > outside a unit worktree: no-op, nothing traced [2.84ms]
+(pass) norn hook robustness (A3) > garbage stdin, unknown events and unknown agents never fail [2.46ms]
+(pass) norn hook robustness (A3) > --agent picks the adapter even when another one also knows the event (A2) [4.68ms]
+(pass) norn hook robustness (A3) > installed hook commands use event names the hook accepts (A1/A2) [8.23ms]
+(pass) norn hook robustness (A3) > blocks are bounded per run (P5) [731.13ms]
+(pass) norn hook robustness (A3) > a Claude permission prompt parks the unit and shows the pending command in norn inbox (§10, O1) [2266.83ms]
+(pass) parseFindings > accepts an array or {findings}; refuses missing severity
+
+packages/cli/test/strays.test.ts:
+(pass) stray listeners on a slot's ports (K4.1) > a server started from the worktree, listening on its slot's ports, is stopped and reported [758.46ms]
+(pass) stray listeners on a slot's ports (K4.1) > a listener started elsewhere is left alone [182.98ms]
+
+packages/cli/test/e2e.test.ts:
+(pass) norn init > writes config, workflows, skills, hooks, .gitignore and .gitattributes; idempotent [108.45ms]
+(pass) norn init > prints a summary for a person; --json prints the data [106.43ms]
+(pass) norn init > help prints the commands grouped for a person, Core first; --json prints the list [2.99ms]
+(pass) norn init > unknown commands and bad options are usage errors with do_instead [0.24ms]
+(pass) norn init > a noun with no verb, and help <noun>, list its verbs in order (B2) [0.45ms]
+(pass) norn init > help <noun> <verb> and <noun> <verb> --help show that verb's usage and options (B4) [0.25ms]
+(pass) norn init > help with an unknown name, or a word after a plain command, is a usage error (B5) [0.12ms]
+(pass) norn init > help --all adds the hidden tier [0.70ms]
+(pass) norn init > the old trace, why, open, mode, workflow, unstick, take, release and drop are unknown commands, and write nothing (B5) [38.56ms]
+(pass) norn init > every command accepts --json [144.72ms]
+(pass) norn init > --version prints the cli package version [1.79ms]
+(pass) a story through the slice workflow > setup: repo config and workflows committed on main [404.16ms]
+(pass) a story through the slice workflow > tick 1: sync → intake (GR2): story branch, worktree, spec.md, slot, marker [996.32ms]
+(pass) a story through the slice workflow > tick 2: claim acquired (T3); tick 3: story unit started with pinned workflow (S7) [1570.25ms]
+(pass) a story through the slice workflow > tick 4: auto mode launches the agent via the runner with NORN_* env (A6, B5) [1366.76ms]
+(pass) a story through the slice workflow > plan done → slices step starts the slice: worktree from the story branch, slot 2, slice active (W2, K4) [1618.53ms]
+(pass) a story through the slice workflow > slice implement runs; check fails (C5: receipt tail + committed log) and routes back counted (W4) [3072.63ms]
+(pass) a story through the slice workflow > rework passes the check; gate parks and notifies once (O3); approve → integrate (K6) [3859.58ms]
+(pass) a story through the slice workflow > slice $done → cleanup (K5): final state on the story branch, worktree + branch removed, integrated [1866.01ms]
+(pass) a story through the slice workflow > slices done → open-pr through the RemotePort → story $done; trace replays (O4, O5) [897.17ms]
+(pass) a story through the slice workflow > effect transcript: spawns, port calls and runs/ files of the whole flow (refactor Phase 0.2) [1.22ms]
+(pass) norn init in a repository with a test command and no remote > writes the detected test command into the workflows and puts adding the remote first [78.95ms]
+
+packages/cli/test/pr-body.test.ts:
+(pass) story PR body (GR9) > no pr.md: the draft PR body is the issue link alone [1966.23ms]
+(pass) story PR body (GR9) > after rework the open PR gets the new pr.md with the link under it; no second PR [2834.68ms]
+
+packages/cli/test/audit.test.ts:
+(pass) audit: runtime > O3: an item created by this tick's act is notified in the same tick [699.93ms]
+(pass) audit: runtime > B2: an answer to a gone session resumes the agent session with the answer as the prompt [562.71ms]
+(pass) audit: runtime > S7/O2: unstick --to off a live run kills it and releases its agent lease [1471.12ms]
+(pass) audit: runtime > GR6: a deferred base-branch record is retried on later ticks until it lands [4546.67ms]
+
+packages/cli/test/story-view.test.ts:
+(pass) norn story view > shows the slices with their steps, the PR link and state, the open notes and what waits (B16) [206.19ms]
+(pass) norn story view > --json is the orient report extended with the slice steps and PR state (B6, D6) [215.41ms]
+(pass) norn story view > a slice key views its story with the slice in focus; an unknown story or slice is refused [371.71ms]
+(pass) norn story view > --web opens the PR, or the issue when there is none (B17) [799.69ms]
+(pass) norn story chat > creates the `<story> orient` workspace with an agent in the story worktree, then focuses it (B29) [623.44ms]
+(pass) norn story chat > the chat agent reads the view with its rules; it is no run: brief and done refuse it, its hooks record nothing [156.75ms]
+(pass) targets (B55) > in a slice worktree, view and chat act on the story [268.15ms]
+(pass) targets (B55) > outside a worktree without a target, a terminal is offered stories only; a script is refused with them [1175.40ms]
+(pass) norn orient is gone (B5) > any flags: a usage error, Unknown command: orient [0.36ms]
+
+packages/cli/test/rebase-rewind.test.ts:
+(pass) gh-79: a tick mid-rebase > mid-rebase the tick writes nothing into the rewound runs/ [492.32ms]
+(pass) gh-79: a tick mid-rebase > after `git rebase --abort` the unit is not corrupt [387.03ms]
+
+packages/cli/test/contract-fakes.test.ts:
+(pass) RunnerPort contract: harness FakeRunner > name and capabilities are well-formed; openForPerson is present iff capabilities.open (MO5) [0.70ms]
+(pass) RunnerPort contract: harness FakeRunner > available() answers a boolean [0.72ms]
+(pass) RunnerPort contract: harness FakeRunner > launch returns a session of this runner that is alive, and its pane state says so [0.71ms]
+(pass) RunnerPort contract: harness FakeRunner > kill ends the session, and killing it again is harmless [known failure: FakeRunner.kill only records the session; isAlive/paneState keep answering `pane.alive`, which tests set by hand] [1.54ms]
+(pass) RunnerPort contract: harness FakeRunner > send delivers when capabilities.send, else rejects with a PortError (R4.1) [1.01ms]
+(pass) RunnerPort contract: harness FakeRunner > reach and output, when present, answer a string (output: or null) [0.66ms]
+(pass) RunnerPort contract: harness FakeRunner > findSessions, when present, reports only sessions of this runner (R5.1) [0.95ms]
+(pass) RemotePort contract: harness FakeRemote > provider and whoami [0.13ms]
+(pass) RemotePort contract: harness FakeRemote > listAssignedIssues: open issues assigned to the user with the label, nothing else (GR1) [0.23ms]
+(pass) RemotePort contract: harness FakeRemote > getIssue: the listed issue, closed ones too; null when missing [0.34ms]
+(pass) RemotePort contract: harness FakeRemote > findPullRequest: null for a branch without one [0.04ms]
+(pass) RemotePort contract: harness FakeRemote > openDraftPullRequest opens a draft the branch then finds (GR6) [0.11ms]
+(pass) RemotePort contract: harness FakeRemote > findPullRequest picks the newest of a branch's PRs [0.04ms]
+(pass) RemotePort contract: harness FakeRemote > createIssue opens an issue with the labels and assignee, which intake then lists (B18) [0.06ms]
+(pass) RemotePort contract: harness FakeRemote > newIssueUrl: the remote's new-issue page with the labels filled in (B23) [0.23ms]
+
+packages/cli/test/rename-continuity.test.ts:
+(pass) printed commands renamed, nothing else (B69, B70) > why on a tick recorded before the rename is a labelled version mismatch, its diff only the command [977.15ms]
+(pass) printed commands renamed, nothing else (B69, B70) > the unit stuck under the old norn continues after the upgrade with no migration [4524.55ms]
+
+packages/cli/test/status.test.ts:
+(pass) norn status (B9, B13) > the first status on a checkout prints the notice on stderr once; stdout is the inbox either way [216.00ms]
+(pass) norn status (B9, B13) > --json prints the same value with or without the notice, and never the notice [320.74ms]
+(pass) norn status (B9, B13) > an unreadable notice file shows the notice again rather than failing [552.44ms]
+(pass) norn status (B9, B13) > status --segment neither shows nor spends the notice [463.10ms]
+(pass) norn status (B9, B13) > status takes no story key; that view is the story list now [0.32ms]
+(pass) norn story list (B15, B6) > prints the story table, --json its data [350.99ms]
+(pass) norn story list (B15, B6) > norn story lists its verbs [20.00ms]
+(pass) help and removed names (B5, B14) > norn inbox, with any flags, is an unknown command and writes nothing [44.00ms]
+(pass) help and removed names (B5, B14) > status --segment is absent from help and listed by help --all [1.52ms]
+
+packages/cli/test/detect.test.ts:
+(pass) detectTestCommand > a JS repo installs with its package manager, then runs its test script [38.60ms]
+(pass) detectTestCommand > npm's placeholder script and an unreadable package.json name nothing [13.78ms]
+(pass) detectTestCommand > other ecosystems by their build file; a Makefile only with a test target [15.47ms]
+(pass) withTestCommand > replaces the template's `run: bun test` lines only, quoted for YAML [0.20ms]
+
+packages/cli/test/housekeeping.test.ts:
+(pass) max_agents holds across ticks when the runner reports no process (K1, K3) > the second story stays queued after the launching tick is gone; it starts when the first run ends [5349.26ms]
+(pass) orphans (K5): reported by every tick, cleaned by norn tidy > tick reports orphan branches and worktrees; tidy --dry-run lists, tidy removes only what is safe [4529.47ms]
+(pass) GR6 record on the base branch > deferred while the spec file is not on the base branch [80.08ms]
+(pass) GR6 record on the base branch > after the merge: committed in a throwaway worktree and pushed to the base branch; main checkout untouched (story.md an older norn wrote, GR2) [886.21ms]
+(pass) GR6 record on the base branch > GR2: a story intaken as spec.md is marked done in spec.md [619.61ms]
+(pass) norn doctor (A7) > reports agents, hooks (installed and firing through the hook command), remote auth and runner [2170.66ms]
+(pass) norn doctor (A7) > prints the report for a person, with the same exit code as --json [1327.00ms]
+(pass) norn doctor (A7) > missing hooks and an unusable hook command fail the check with what to do [697.04ms]
+(pass) norn doctor: a fresh repository > no git remote fails the remote check with the command that adds one [1434.18ms]
+(pass) norn doctor: a fresh repository > in manual mode an unavailable runner is a warning, not a failed check (MO2) [626.31ms]
+(pass) norn doctor: the cockpit plugin hint (HC11) > links this checkout's plugins/herdr when norn runs from source, else installs it from GitHub [0.53ms]
+
+packages/cli/test/story-decision.test.ts:
+(pass) nothing applies > approve and reject: refused 'Nothing waits at a gate'; answer: nothing parked on a question (B59) [888.55ms]
+(pass) gh-1 and gh-2 at gates, gh-3 parked on a question, gh-4/01 at its gate in its slice worktree > setup [7602.45ms]
+(pass) gh-1 and gh-2 at gates, gh-3 parked on a question, gh-4/01 at its gate in its slice worktree > the old answer, approve and update are unknown commands; nothing is written (B5) [1.03ms]
+(pass) gh-1 and gh-2 at gates, gh-3 parked on a question, gh-4/01 at its gate in its slice worktree > in the main checkout at a terminal, approve and reject offer only the units at a gate, answer only the one parked on a question (B57) [503.67ms]
+(pass) gh-1 and gh-2 at gates, gh-3 parked on a question, gh-4/01 at its gate in its slice worktree > a script is refused with the candidates (B60) [135.39ms]
+(pass) gh-1 and gh-2 at gates, gh-3 parked on a question, gh-4/01 at its gate in its slice worktree > story reject without --reason is a usage error: do_instead 'pass --reason', nothing written (B26) [73.94ms]
+(pass) gh-1 and gh-2 at gates, gh-3 parked on a question, gh-4/01 at its gate in its slice worktree > story reject --reason writes the reject receipt with that comment; the next tick routes as reject (B26) [2172.56ms]
+(pass) gh-1 and gh-2 at gates, gh-3 parked on a question, gh-4/01 at its gate in its slice worktree > story approve writes the approve receipt; the next tick moves on (B25) [2066.21ms]
+(pass) gh-1 and gh-2 at gates, gh-3 parked on a question, gh-4/01 at its gate in its slice worktree > story answer delivers the answer into the session, as answer did (B24) [2715.23ms]
+(pass) gh-1 and gh-2 at gates, gh-3 parked on a question, gh-4/01 at its gate in its slice worktree > in the slice worktree, update-branch acts on the story and approve on the slice (B55, B54) [2065.50ms]
+
+packages/cli/test/why-version.test.ts:
+(pass) norn_version on tick traces (O5) > every tick record carries this norn's package version and stays schema-valid [0.72ms]
+(pass) norn_version on tick traces (O5) > why on a tick this version recorded has no label [22.90ms]
+(pass) norn_version on tick traces (O5) > why on a tick another version recorded still replays, labelled, exit unchanged [59.61ms]
+(pass) norn_version on tick traces (O5) > a mismatch on a tick another version recorded still shows the diff, labelled, and exits 1 [42.31ms]
+
+packages/cli/test/tidy-herdr.test.ts:
+(pass) planHerdrTidy (K7) > a workspace holding only finished runs closes whole [0.60ms]
+(pass) planHerdrTidy (K7) > a tab holding only the run closes; the workspace stays for what else is in it [0.14ms]
+(pass) planHerdrTidy (K7) > a tab shared with something else loses only the run's pane [0.02ms]
+(pass) planHerdrTidy (K7) > never closes a pane that left the run's worktree or whose agent still works; a gone pane is skipped [0.08ms]
+(pass) norn tidy closes Herdr panes of runs that reported done (K7) > finds only done runs recorded on this machine [3.15ms]
+(pass) norn tidy closes Herdr panes of runs that reported done (K7) > another runner: tidy leaves Herdr alone [257.05ms]
+(pass) norn tidy closes Herdr panes of runs that reported done (K7) > Herdr as the runner: --dry-run lists, tidy closes the done run's workspace only [700.08ms]
+(pass) norn tidy closes Herdr panes of runs that reported done (K7) > a Herdr that cannot be reached is reported under kept, and the rest of tidy still runs [427.60ms]
+
+packages/cli/test/base-sync.test.ts:
+(pass) base sync with real git > 1: a sibling merge without conflicts is merged by update — one Norn-Tick merge commit, no foreign item, → test [4533.23ms]
+(pass) base sync with real git > 4 + 2: waiting at ready, a conflicting sibling merge → stale → update → conflict → resolve (brief: base sha + paths) → done → update → test [9592.02ms]
+(pass) base sync with real git > 6: norn update re-enters a done, unmerged story; refused without the claim and once merged [10391.66ms]
+(pass) base sync with real git > effect transcript: spawns, port calls and runs/ files of cases 1, 4 + 2 and 6 (refactor Phase 0.2) [0.65ms]
+(pass) BS3.3a (dogfood D4): a person's push to the branch of a $done story > norn's next commit merges it in (never rebases) and pushes; norn update does not end stuck diverged [12710.46ms]
+(pass) base_branch: develop (BS0, 7b) > intake from develop, update merges develop, open-pr targets develop [5912.65ms]
+(pass) PR items between syncs and in the read model (C1), ready approval voided by norn update (C5) > C1: a done story conflicting with its base keeps its Merge item (norn update) and a retarget item, in every tick and in norn inbox [9154.71ms]
+(pass) PR items between syncs and in the read model (C1), ready approval voided by norn update (C5) > C5: norn's own commits after the ready approval (its $done commit) are no head change; anyone else's commit is [1989.00ms]
+(pass) PR items between syncs and in the read model (C1), ready approval voided by norn update (C5) > C5: after norn update from $done, the old ready approval no longer pins the head [2256.67ms]
+(pass) H1/BS5: a resolve parked mid-merge — norn never concludes the merge; done is verified > park while the agent's merge is in progress: no commit, MERGE_HEAD kept, nothing pushed; done refused until the merge is concluded clean [12850.93ms]
+(pass) H1/BS5: a resolve parked mid-merge — norn never concludes the merge; done is verified > a norn commit that would record conflict markers is refused: ok:false, an Unblock item, nothing pushed [875.33ms]
+(pass) BUG-2: an update conflict that exhausts base_conflict_loop, then run rerun --step resolve (BS5, W4) > act records route $stuck and the unit stays stuck at update; after run rerun --step resolve, done without the merge is refused [14019.39ms]
+
+packages/cli/test/story-start.test.ts:
+(pass) norn story start (B28, MO5) > taken in, not started: refused with the command that starts it; the inbox says so (GR2, O1) [3899.46ms]
+(pass) norn story start (B28, MO5) > an attended step, a runner that cannot open terminals: the inbox and open give the start command [3137.09ms]
+(pass) norn story start (B28, MO5) > without a target a person picks from the units a person can start only (B28, B57) [1220.06ms]
+(pass) norn story start (B28, MO5) > a runner that opens terminals: story start opens one in the worktree; --print prints the command [1724.91ms]
+(pass) norn story start (B28, MO5) > a step a person does not start is refused (nothing_to_open); with no target, nothing to pick (B59) [2031.07ms]
+(pass) norn story start (B28, MO5) > a manual unit ready at a step that is not an agent step is not offered (B28, B57) [3136.02ms]
+
+packages/cli/test/targets.test.ts:
+(pass) no unit has a run > refused with the reason, nothing prompted (B59) [273.26ms]
+(pass) one unit has a run > the pick-list is shown with it preselected; accepting it acts on it (B58) [3733.83ms]
+(pass) one unit has a run > leaving the pick-list (Esc, Ctrl-C) acts on nothing [184.44ms]
+killed 1 dangling process
+(fail) a story and its slice have runs > setup: gh-2's slice parks at its gate in the slice worktree [117382.99ms]
+  ^ this test timed out after 30000ms.
+128 |   });
+129 | 
+130 |   test("in the slice worktree, no target means the slice (B54)", async () => {
+131 |     const term = new FakeInteraction();
+132 |     const view = await norn({ cwd: sliceWt(), interaction: term }, "run", "view", "--json");
+133 |     expect(view.exit).toBe(0);
+                            ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 3
+
+      at <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-108-receipts-and-state-json-under-runs-are/packages/cli/test/targets.test.ts:133:23)
+(fail) a story and its slice have runs > in the slice worktree, no target means the slice (B54) [96.55ms]
+138 |     expect(term.picks).toEqual([]);
+139 |   });
+140 | 
+141 |   test("an explicit target wins over the worktree (B56)", async () => {
+142 |     const r = await norn({ cwd: wt2() }, "run", "view", "gh-1", "--json");
+143 |     expect(r.exit).toBe(0);
+                         ^
+error: expect(received).toBe(expected)
+
+Expected: 0
+Received: 3
+
+      at <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-108-receipts-and-state-json-under-runs-are/packages/cli/test/targets.test.ts:143:20)
+(fail) a story and its slice have runs > an explicit target wins over the worktree (B56) [4.99ms]
+148 |     type Inbox = { groups: Record<string, Array<{ story: string; slice: string | null }>> };
+149 |     type Stories = { stories: Array<{ key: string; slices: Array<{ slice: string }> }> };
+150 |     const inbox = (await h.norn("status", "--json")).value as Inbox;
+151 |     const stories = (await h.norn("story", "list", "--json")).value as Stories;
+152 |     const order = [...new Set([...Object.values(inbox.groups).flat().map((i) => i.slice ?? i.story), ...stories.stories.flatMap((s) => [s.key, ...s.slices.map((x) => x.slice)])])];
+153 |     expect([...order].sort()).toEqual(["gh-1", "gh-2", "gh-2/01"]);
+                                    ^
+error: expect(received).toEqual(expected)
+
+  [
+    "gh-1",
+-   "gh-2",
+-   "gh-2/01",
+  ]
+
+- Expected  - 2
++ Received  + 0
+
+      at <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-108-receipts-and-state-json-under-runs-are/packages/cli/test/targets.test.ts:153:31)
+(fail) a story and its slice have runs > in the main checkout at a terminal: offered the units with runs in `norn status` order, the pick shown (B57) [441.62ms]
+180 |       const term = deps.interaction === undefined ? new FakeInteraction() : deps.interaction;
+181 |       for (const verb of ["view", "list"]) {
+182 |         const r = await norn({ interaction: term, ...deps }, "run", verb, ...flags);
+183 |         expect([why, verb, r.exit]).toEqual([why, verb, 2]);
+184 |         expect(r.value).toMatchObject({ code: "target_required" });
+185 |         for (const k of ["gh-1", "gh-2", "gh-2/01"]) expect((r.value as { do_instead: string }).do_instead).toContain(k);
+                                                                                                                  ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "gh-2"
+Received: "norn run view gh-1"
+
+      at <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-108-receipts-and-state-json-under-runs-are/packages/cli/test/targets.test.ts:185:109)
+(fail) a story and its slice have runs > a script or an agent is refused (exit 2) with the candidates, never prompted (B60) [441.75ms]
+
+packages/cli/test/human.test.ts:
+(pass) before start > intake; story edit --workflow sets frontmatter (W9, B31) and refuses unknown names and --at [2751.30ms]
+(pass) before start > claims, start (alt pinned for gh-6), launch [12434.89ms]
+(pass) views (X1) > story list: the table and its JSON, as status printed them (B15) [3789.18ms]
+(pass) views (X1) > status: running items; the rest empty (B9) [953.89ms]
+(pass) preconditions refuse with do_instead > approve on a non-gate step, answer when not asking, run rerun when running, unknown unit [13103.83ms]
+(pass) story edit --workflow after start (S7, B32) > needs --at; --at must exist; switch journals a receipt, re-pins, and the tick enters --at [8608.61ms]
+killed 1 dangling process
+(fail) answer (O2, B2) > parked ask shows in the inbox with the exact command; answer → receipt → delivered to the same session [281578.47ms]
+  ^ this test timed out after 30000ms.
+
+# Unhandled error between tests
+-------------------------------
+205 |     // a second answer for the same ask while the first is unapplied is refused, not silently dropped later
+206 |     const dup = await h.norn("story", "answer", "gh-5", "USD");
+207 |     refused(dup, "already_recorded");
+208 |     expect(dup.value).toMatchObject({ do_instead: "norn tick" });
+209 |     await tick();
+210 |     expect(h.state(runs5())).toMatchObject({ status: "running", park: null });
+                                   ^
+error: expect(received).toMatchObject(expected)
+
+  {
+-   "park": null,
+-   "status": "running",
++   "applied_through": 5,
++   "attempt": 1,
++   "counters": {
++     "loop": 0,
++   },
++   "created_at": "2099-01-15T10:00:30.000Z",
++   "last_outcome": {
++     "at": "2099-01-15T10:01:00.000Z",
++     "outcome": "stuck",
++     "receipt_id": "03PGG9YBZ0JRVT2J5VWC1GDHJM",
++     "source": "reported",
++     "step": "work",
++   },
++   "last_tick_id": "03PGG9YBZ0JRVT2J5VWC1GDHJN",
++   "mode": "auto",
++   "nudges_used": 0,
++   "park": {
++     "kind": "stuck",
++     "reason": "no API key",
++     "receipt_id": "03PGG9YBZ0JRVT2J5VWC1GDHJM",
++     "since": "2099-01-15T10:01:00.000Z",
++   },
++   "retries_used": 0,
++   "run": {
++     "agent": "claude",
++     "attempt": 1,
++     "heartbeat_id": "03PGG9YBZ0JRVT2J5VWC1GDHHZ",
++     "how": "auto",
++     "machine": "tester@box",
++     "run_id": "03PGG9YBZ0FWVDF1T67CQ5BB2Y",
++     "session": {
++       "pane_id": "p-1",
++       "reach": "fake attach p-1",
++       "runner": "fake",
++       "session_id": "s-1",
++     },
++     "started_at": "2099-01-15T10:00:40.000Z",
++     "step": "work",
++   },
++   "slice": null,
++   "status": "stuck",
++   "step": "work",
++   "step_entered_at": "2099-01-15T10:00:30.000Z",
++   "story": "gh-5",
++   "unit_dir": "_story",
++   "updated_at": "2099-01-15T10:01:10.000Z",
++   "version": 1,
++   "visits": {
++     "work": 1,
++   },
++   "workflow": "gated",
++   "workflow_hash": "bd93eb4b4007a6f91c66188efba8d5a5b29f4de149cdaee56cb70fbda1c4dc5d",
+  }
+
+- Expected  - 2
++ Received  + 52
+
+      at <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-108-receipts-and-state-json-under-runs-are/packages/cli/test/human.test.ts:210:30)
+-------------------------------
+
+(pass) run rerun (W4, B48, B49) > unknown step / counter refused; --step + --reset journaled and applied [5345.86ms]
+(pass) story edit --auto|--manual (MO1, B30) > both flags, no change flag, or a mode with --workflow are usage errors; nothing is written [46.36ms]
+(pass) story edit --auto|--manual (MO1, B30) > --manual writes a mode receipt once; the tick stores it; --auto the reverse [13336.81ms]
+(pass) approve (gate) > --reject --reason routes back counted; T8: a free claim is acquired for this heartbeat [16447.47ms]
+(pass) mailbox (T9): a second clone while this one holds the claim > non-holder approve (with a stale local copy) posts to refs/norn/inbox/<story>/<ulid>; mode refuses [3690.64ms]
+(pass) mailbox (T9): a second clone while this one holds the claim > the holder's tick imports it, deletes the ref, and the next tick applies it [1969.48ms]
+(pass) mailbox (T9): a second clone while this one holds the claim > run view --why replays decide on the recorded snapshot and equals the recorded decision (O5) [66.41ms]
+(pass) mailbox (T9): a second clone while this one holds the claim > run list: step rows with who and reasons; --events with every human receipt; --limit; --text [395.46ms]
+(pass) mailbox (T9): a second clone while this one holds the claim > run list: --all shows the no-op ticks; --full keeps reasons whole and lists receipts (AC3) [379.81ms]
+(pass) mailbox (T9): a second clone while this one holds the claim > run view: a unit's latest run, a run by its id; --json is the data (B44, B6) [682.01ms]
+(pass) a slice gate in its own worktree (X1: views read slice runs from the slice worktree) > the slice parks at its gate in the slice worktree; the story worktree copy is stale [7678.64ms]
+(pass) a slice gate in its own worktree (X1: views read slice runs from the slice worktree) > story list and status show the gate read from the slice worktree [278.92ms]
+(pass) a slice gate in its own worktree (X1: views read slice runs from the slice worktree) > run list of the story shows its slices; run view of the slice is its gate (B43, B44) [296.89ms]
+(pass) a slice gate in its own worktree (X1: views read slice runs from the slice worktree) > in the slice worktree, story edit --auto|--manual acts on the story, --workflow on the slice (B55) [4940.11ms]
+(pass) a slice gate in its own worktree (X1: views read slice runs from the slice worktree) > run rerun of the story key stands for its one slice waiting at a gate [2404.40ms]
+(pass) a slice gate in its own worktree (X1: views read slice runs from the slice worktree) > approve lands in the slice worktree; the next tick finishes the slice and the inbox clears [2735.48ms]
+
+packages/cli/test/check-run.test.ts:
+(pass) a long check (gh-77) > the tick that starts it returns at once; ticks and the heartbeat go on while it runs; the receipt lands after [5036.29ms]
+killed 1 dangling process
+(fail) two long checks (K1, K3) > (unnamed) [5006.84ms]
+  ^ a beforeEach/afterEach hook timed out for this test.
+123 | 
+124 | describe("two long checks (K1, K3)", () => {
+125 |   let h: Harness;
+126 |   let runsDirs: string[];
+127 |   beforeAll(async () => ({ h, runsDirs } = await atChecks("sleep 3", "1m", ["Slow check", "Other check"])));
+128 |   afterAll(() => h.cleanup());
+                       ^
+TypeError: undefined is not an object (evaluating 'h.cleanup')
+      at <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-108-receipts-and-state-json-under-runs-are/packages/cli/test/check-run.test.ts:128:18)
+(fail) two long checks (K1, K3) > (unnamed) [15.68ms]
+(pass) a check past its step timeout (C5) > norn check-run kills it and writes a fail with reason timeout [2902.73ms]
+(pass) a check-run that fails on its own side (C5) > still writes a fail receipt with the error, so the step ends instead of rerunning [80.03ms]
+(pass) a check-run the tick could not identify (K1, K3) > takes its run's lease over itself while it runs, and releases it after [30.54ms]
+
+packages/cli/test/observe-snapshots.test.ts:
+(pass) observe snapshots and inbox parity (refactor Phase 0.3) > fresh intake: story worktree and story.md, no claim yet [1652.76ms]
+(pass) observe snapshots and inbox parity (refactor Phase 0.3) > running slice: the slice agent runs in its own worktree [4999.82ms]
+(pass) observe snapshots and inbox parity (refactor Phase 0.3) > parked ask: the slice agent asked a question [1217.65ms]
+(pass) observe snapshots and inbox parity (refactor Phase 0.3) > gate waiting: the check passed and the slice waits at human-qa [3652.27ms]
+(pass) observe snapshots and inbox parity (refactor Phase 0.3) > merged: the story's PR landed on the base branch [6233.70ms]
+
+packages/cli/test/prompts.test.ts:
+(pass) R6.1: the agent's report while parked on an implicit ask (acceptance 9) > the Answer item is the question, the first command line and the options; the screen only with --details [4043.92ms]
+(pass) R6.1: the agent's report while parked on an implicit ask (acceptance 9) > `norn done` is accepted: an answer by the agent closes the ask, then the report applies [517.66ms]
+(pass) R6.2/R6.3: norn answer types into the prompt (acceptance 9) > delivery failure: no receipt, still parked, the Answer item names the pane [3802.58ms]
