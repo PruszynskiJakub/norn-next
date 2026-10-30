@@ -14,6 +14,20 @@
 
 ## Goal
 
+Move the checkout's machine-local files (trace, locks, heartbeat, caches, runner logs) from `.agents/norn/trace/` to `<norn home>/repos/<folder>-<hash8>/` (B5, B6, D1–D3, D9, D10); doctor warns about an orphaned machine dir.
+
 ## Progress
 
+- Store `paths.ts`: `traceDir` renamed `machineDir(root)` (every caller and test moved). `checkoutOf(root)` derives the id from git's files without a git process: walks up to `.git`, follows `gitdir:` + `commondir` in a linked worktree, real path → `<main checkout folder>-<sha256[0:8]>` (D2). A root outside git stands for itself.
+- The home: store's path functions keep taking only the root, but a command's home comes from its context (`NORN_HOME_DIR` in `deps.env`, not process env). `bindNornHome(root, home)` maps a checkout (by common dir) to a home; `Context.locate()` binds it, and `loadProjectView`/`loadTraceView` bind when given `home`. Unbound → `nornHome()` (process env, else ~/.norn).
+- `bunfig.toml` + `test/preload.ts`: every test process gets an isolated `NORN_HOME_DIR`, so unit tests that reach a machine dir without binding never write into the real ~/.norn.
+- `checkout.json` (new schema `local-checkout`, emitted) written by `heartbeatId` (every tick) via store `machine-dir.ts` `ensureCheckoutFile`; `orphanedMachineDirs(home, root)` → doctor warning with the `mv` that adopts it (D3). Read-only.
+- `init` no longer writes the trace `.gitignore` line; `TRACE_IGNORE_ENTRY` removed (slice 06 migrate will need the old line text for B13).
+- D10: `local_file` trace event `file` is now the absolute path.
+- doctor's scratch unit (hook-fires / --live) is now a git repo bound to the command's home, and its machine dir is removed afterwards.
+- Tests: `packages/cli/test/machine-dir.test.ts` (AC1–AC5, all red before the change). AC6 checked by hand in a throwaway repo under the scratchpad: after `init` + `tick`, `home/repos/app-709760dc/` held the day file, heartbeat, checkout.json, remote/inbox caches; nothing in the tree; `.gitignore` only `.env.norn`/`.norn-unit`; with `runner: { adapter: headless }`, `doctor` launched a session whose log landed in `home/repos/app-709760dc/runs/<run>.log`.
+- Docs (README/PRD/AGENTS/skill) still name `.agents/norn/trace/`: slice 07's job (D12).
+
 ## Resume
+
+Full suite + typecheck green → `norn done done`.
