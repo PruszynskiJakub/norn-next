@@ -36,6 +36,8 @@ Prefactor 1 (gh-110/01): every `.agents/norn/` path in package sources and tests
 - review#1 approve: Review approved: AC1–AC3 met; full suite 1423 pass and typecheck green; transcripts, snapshots and golden unchanged. No blocking findings. Minor F1: transcript.ts no longer skips unit worktrees' trace dirs (latent). Nit F2: the lint's comment strip.
 - qa#1 pass: QA pass: AC1 full suite 1423 pass (test:fast 948 + test:cli 475), typecheck green, transcripts/observe snapshots/golden unchanged. AC2 grep finds only allowlisted message texts; the repo lint goes red on a new .agents/norn literal in packages/core/src and green once removed. AC3 headless runner from @norn/adapters with no log_dir writes its log to <repo>/.agents/norn/trace/runs via store's runnerLogDir. Friction: test:cli runs ~10 min with no output when piped (bun buffers), which looks like a hang.
 
+- merge#1: merged story branch (slice 02) with --no-ff (fec8db88). doctor.ts import conflict: union of both sides' store imports. Semantic conflict: slice 02's housekeeping.test.ts spelled 10 `.agents/norn` literals, red under this slice's lint (g); rewritten through workflowsDir/repoConfigPath, assertions unchanged. Typecheck green, full bun test 1430 pass.
+
 ## Resume
 
-Review reported approve; nothing left for this step. Optional follow-up: tighten transcript.ts's trace-dir skip (F1).
+Merge committed; nothing left for this step.
