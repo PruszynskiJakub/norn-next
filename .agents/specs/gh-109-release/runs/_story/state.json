@@ -5,17 +5,22 @@
   "unit_dir": "_story",
   "workflow": "release",
   "workflow_hash": "1dba3383234e1630ccbebc9df02987f6e430b96e55c57cc3ce9c935092385bcb",
-  "step": "open-pr",
+  "step": "ready",
   "attempt": 1,
   "visits": {
     "prepare": 1,
     "confirm-version": 1,
     "test": 2,
-    "open-pr": 1
+    "open-pr": 1,
+    "ready": 1
   },
-  "step_entered_at": "2026-10-30T12:31:31.206Z",
-  "status": "ready",
-  "park": null,
+  "step_entered_at": "2026-10-30T12:32:31.207Z",
+  "status": "parked",
+  "park": {
+    "kind": "gate",
+    "reason": "Read the draft release PR. Check the PR title reads `Release X.Y.Z` (edit it if a rework changed the version: open-pr sets the title only when it opens the PR, GR9); the squash commit takes it. Approve to mark the release finished (a person merges the PR; CI then tags and publishes), or reject with what to change.",
+    "since": "2026-10-30T12:32:31.207Z"
+  },
   "counters": {
     "version_loop": 0,
     "ready_loop": 0,
@@ -24,17 +29,17 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 9,
+  "applied_through": 10,
   "run": null,
   "last_outcome": {
-    "step": "test",
-    "outcome": "fail",
+    "step": "open-pr",
+    "outcome": "done",
     "source": "classified",
-    "at": "2026-10-30T11:58:01.534Z",
-    "receipt_id": "01M66AS3STJRD4K0NVEPD48K8F"
+    "at": "2026-10-30T12:32:15.055Z",
+    "receipt_id": "01M66CQS6FB3NHC0JVJE5176W1"
   },
   "created_at": "2026-10-30T11:22:24.404Z",
-  "updated_at": "2026-10-30T12:31:31.206Z",
-  "last_tick_id": "01M66CPEC3VJMXW0MKD6TFCNK5",
+  "updated_at": "2026-10-30T12:32:31.207Z",
+  "last_tick_id": "01M66CR8Z57DNX3WE7D34D9Q92",
   "mode": "auto"
 }
