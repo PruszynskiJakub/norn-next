@@ -7,7 +7,7 @@ import { type Receipt, type ReceiptOf, ulid } from "@norn/schema";
 import { appendReceipt, readHandoff, writeHandoffBody } from "@norn/store";
 import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
-import { currentRun, implicitAskOpen, standingReport } from "@norn/core";
+import { cmd, currentRun, implicitAskOpen, standingReport } from "@norn/core";
 import { agentName, loadUnitSession, refuseUnlessAgentWork, reportCommand, type UnitSession } from "./agent-unit.ts";
 
 export interface ReportTarget {
@@ -26,7 +26,7 @@ export function reportTarget(ctx: Context, verb: string): ReportTarget {
       throw refuse(`this run already reported \`${reportCommand(report.receipt)}\` (receipt ${String(report.n).padStart(4, "0")}); exactly one report per run`, "end your turn", "already_reported");
   }
   refuseUnlessAgentWork(s, verb);
-  if (!run) throw refuse(`no run of ${s.state.step}#${s.state.attempt} has started in this worktree`, "norn brief (it starts the run), do the step, then report", "no_run");
+  if (!run) throw refuse(`no run of ${s.state.step}#${s.state.attempt} has started in this worktree`, `${cmd.brief()} (it starts the run), do the step, then report`, "no_run");
   return { s, run_id: run.run_id, agent: agentName(s, ctx.config) };
 }
 

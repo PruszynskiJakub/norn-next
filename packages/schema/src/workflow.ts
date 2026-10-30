@@ -154,12 +154,12 @@ export const CounterSpec = Type.Object(
 );
 export type CounterSpec = Static<typeof CounterSpec>;
 
-/** BS7/BS9: when a waiting story counts as stale, and the step `norn update` re-enters. */
+/** BS7/BS9: when a waiting story counts as stale, and the step `norn story update-branch` re-enters. */
 export const BaseSync = Type.Object(
   {
     /** `conflict` (default): a merge of the base would conflict; `behind`: the base has any commit the story lacks */
     stale: Type.Optional(Type.Union([Type.Literal("conflict"), Type.Literal("behind")])),
-    /** step `norn update` re-enters (BS9); default: the first step with `action: update` */
+    /** step `norn story update-branch` re-enters (BS9); default: the first step with `action: update` */
     step: Type.Optional(StepName),
   },
   { additionalProperties: false },

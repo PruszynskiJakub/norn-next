@@ -1,5 +1,5 @@
 /**
- * Herdr side of the cockpit (`norn cockpit`, HC6–HC15, SPEC-cockpit): find the agent pane of a run,
+ * Herdr side of the cockpit (`norn status --watch`, HC6–HC15, SPEC-cockpit): find the agent pane of a run,
  * focus it or its workspace, label it in Herdr's sidebar, open a pane that runs a command. Presentation only — none
  * of this is a fact for decide (HC13).
  *
@@ -10,6 +10,7 @@
  * - focusWorkspace → `herdr workspace focus <workspace>`
  * - label       → `herdr pane report-metadata <pane> --source norn --title T --state-label S=L… --ttl-ms N`
  * - openCommand → `herdr pane split [--current] --direction right --cwd C --no-focus`, `herdr pane run <pane> <cmd>`
+ * - openBelow   → `herdr pane split [--current] --direction down --ratio 0.3 --cwd C --no-focus`, `herdr pane rename <pane> T`, `herdr pane run <pane> <cmd>`
  * - pluginLinked → `herdr plugin list --json`                         (HC11: is norn's plugin linked and enabled)
  * - listPanes   → `herdr pane list`                                   (K7: each pane with its tab, workspace, cwd)
  * - closePane / closeTab / closeWorkspace → `herdr pane|tab|workspace close <id>` (K7; not found = already gone)
@@ -75,6 +76,8 @@ export interface HerdrCockpit {
   label(paneId: string, label: PaneLabel): Promise<void>;
   /** split a pane beside the caller (focus stays put) and run `command` in it */
   openCommand(cwd: string, command: string, title?: string): Promise<{ pane_id: string }>;
+  /** B12: split a short pane below the caller (focus stays put) and run `command` in it */
+  openBelow(cwd: string, command: string, title?: string): Promise<{ pane_id: string }>;
   /** HC11: norn's plugin (`PLUGIN_ID`) is linked — enabled or not; null = not linked */
   pluginLinked(): Promise<{ enabled: boolean; root: string | null } | null>;
   /** K7: every pane with its tab and workspace */
@@ -281,6 +284,9 @@ export function createHerdrCockpit(opts: HerdrCockpitOptions = {}): HerdrCockpit
     },
     async openCommand(cwd, command, title) {
       return splitAndRun(herdr, { cwd, direction: "right", current: !!env.HERDR_PANE_ID, ...(title ? { title } : {}), command });
+    },
+    async openBelow(cwd, command, title) {
+      return splitAndRun(herdr, { cwd, direction: "down", ratio: "0.3", current: !!env.HERDR_PANE_ID, ...(title ? { title } : {}), command });
     },
     async pluginLinked() {
       const out = (await herdr(["plugin", "list", "--json"])) as { result?: { plugins?: Array<{ plugin_id?: string; enabled?: boolean; plugin_root?: string }> } } | null;

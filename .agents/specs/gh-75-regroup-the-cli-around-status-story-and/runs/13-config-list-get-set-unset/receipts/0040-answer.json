@@ -1,0 +1,13 @@
+{
+  "kind": "answer",
+  "receipt_id": "01M63WG4Q0F16RQDTESQDXXXWX",
+  "run_id": "01M63V0R1DBNC812XY3A5GEHCZ",
+  "step": "merge",
+  "attempt": 3,
+  "at": "2026-10-29T13:09:58.624Z",
+  "by": "human",
+  "who": "jakubpruszynski@mac",
+  "slice": "gh-75/13",
+  "answer": "Don't rewrite or force-push. norn 0.11.1 (gh-80) integrates by merging, not rebasing, when the slice already merged the story branch, and yours has (fead181). Merge the current story tip (52478d3) into the slice, keep your known index.ts resolution, run the suite, and report done.",
+  "ask_receipt_id": "01M63V25AQG0ZX8V6MTVPJW5X9"
+}

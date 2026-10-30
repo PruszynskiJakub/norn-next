@@ -1,0 +1,5 @@
+/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa75/repo :: init --json
+/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa75/repo :: run attach --next --json
+/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa75/repo :: run attach --next --json
+/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa75/repo :: status --watch --pane --json
+/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa75/repo :: status --watch

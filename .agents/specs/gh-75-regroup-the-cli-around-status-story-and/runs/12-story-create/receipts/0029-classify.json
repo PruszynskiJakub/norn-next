@@ -1,0 +1,15 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M63Y9HAMR9BSNQBC02FGA10F",
+  "run_id": "01M63Y96BQ8KJF0SBZM6P5HM3B",
+  "step": "integrate",
+  "attempt": 2,
+  "at": "2026-10-29T13:41:19.316Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M63Y96BQ0DV80HTYAB5B0FJA",
+  "outcome": "done",
+  "rule": "git.integrate",
+  "detail": "gh-75/12-story-create integrated into gh-75-regroup-the-cli-around-status-story-and at 47d99975855d",
+  "route": "$done"
+}

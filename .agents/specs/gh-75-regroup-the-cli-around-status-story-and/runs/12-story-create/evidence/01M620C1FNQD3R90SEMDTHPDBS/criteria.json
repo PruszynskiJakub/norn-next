@@ -1,0 +1,10 @@
+[
+ {"id":"AC1","verdict":"pass","evidence":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-12/AC1.txt"},
+ {"id":"AC2","verdict":"pass","evidence":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-12/AC2-title.txt, /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-12/AC2-body-file.txt"},
+ {"id":"AC3","verdict":"pass","evidence":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-12/AC3.txt, /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-12/AC3-tempfile.txt"},
+ {"id":"AC4","verdict":"pass","evidence":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-12/AC4.txt"},
+ {"id":"AC5","verdict":"pass","evidence":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-12/AC5.txt"},
+ {"id":"AC6","verdict":"pass","evidence":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-12/AC6.txt"},
+ {"id":"AC7","verdict":"pass","evidence":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-12/AC7.txt"},
+ {"id":"AC8","verdict":"unverified","reason":"no GitHub test repository this session may create issues in (needs: remote)","how":"see /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-12/AC8.md: in a throwaway GitHub repo run the dev build's 'story create --title … --workflow story' (expect gh-N, labels norn + norn:wf:story, assigned to you, new story in status) and 'story create --web --workflow story' (expect the new-issue page with both labels filled, nothing created)","evidence":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-12/AC8.md"}
+]

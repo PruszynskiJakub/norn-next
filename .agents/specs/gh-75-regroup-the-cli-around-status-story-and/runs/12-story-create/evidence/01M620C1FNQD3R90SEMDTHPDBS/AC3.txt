@@ -1,0 +1,29 @@
+$ (expect pty, NORN_* unset) devnorn story create   # types "Typed in terminal⏎"
+spawn devnorn story create
+Title: Typed in terminal
+gh-103
+
+Created https://github.com/acme/app/issues/103 and took it in; it starts like any new story (`norn status`).
+exit 0
+--- editor log
+editor got: /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-edit-j5Cmar/BODY.md
+--- gh calls
+["api","user","--jq",".login"]
+["issue","create","--title","Typed in terminal","--body","Body written in the editor.\n","--label","norn","--assignee","qa-person"]
+["issue","view","103","--json","number,url,title,body,state,assignees,labels,updatedAt"]
+["issue","list","--assignee","@me","--label","norn","--state","open","--limit","500","--json","number,url,title,body,state,assignees,labels,updatedAt"]
+["pr","list","--head","gh-101-fix-login-timeout","--state","all","--limit","1","--json","number,url,state,isDraft,headRefName,headRefOid,baseRefName,mergedAt,mergeCommit,mergedBy"]
+["pr","list","--head","gh-102-body-from-file","--state","all","--limit","1","--json","number,url,state,isDraft,headRefName,headRefOid,baseRefName,mergedAt,mergeCommit,mergedBy"]
+--- created
+{"number":103,"title":"Typed in terminal","body":"Body written in the editor.\n","assignees":["qa-person"],"labels":["norn"]}
+
+$ (expect pty) devnorn story create   # types "   ⏎" (blank title)
+spawn devnorn story create
+Title:    
+**Usage error (usage):** the title is empty; nothing was created
+
+Do instead: norn story create --title "…"
+exit 2
+--- gh calls after blank title (expect none)
+--- editor log (expect none)
+issues before 3, after 3

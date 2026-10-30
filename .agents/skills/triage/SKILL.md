@@ -37,7 +37,7 @@ Write the findings in this shape; they go only into the issue comment (section 4
 **Context:** <related issues, PRs, earlier decisions; only what changes the decision>
 
 **Recommend:** <quick | story | close> — <reason in one or two lines>
-**Run:** `norn workflow gh-<N> <workflow> --to <start step>`
+**Run:** `norn story edit gh-<N> --workflow <workflow> --at <start step>`
 ```
 
 Pick exactly one:
@@ -48,7 +48,7 @@ Pick exactly one:
 | `story` | a feature: new behaviour, or a PRD rule to settle or change first (refine amends `.agents/PRD.md`), that needs refining, a plan and slices | `refine` |
 | `close` | it no longer occurs, is a duplicate, or is out of scope (name the issue, PR or PRD id that says so) | — (no `Run:` line; the person closes it at the gate) |
 
-Cite PRD ids exactly as written in `.agents/PRD.md`. A rule the issue would change is a `story`, unless the change is small and settled, then `quick`. An issue that turns out to be a bug (it came without `norn:wf:reproduce`) is a `quick`, since `quick` delivers its fix, with the `Run:` line `norn workflow gh-<N> reproduce --to reproduce` so it is reproduced first.
+Cite PRD ids exactly as written in `.agents/PRD.md`. A rule the issue would change is a `story`, unless the change is small and settled, then `quick`. An issue that turns out to be a bug (it came without `norn:wf:reproduce`) is a `quick`, since `quick` delivers its fix, with the `Run:` line `norn story edit gh-<N> --workflow reproduce --at reproduce` so it is reproduced first.
 
 ## 4. Post it as an issue comment
 
@@ -61,4 +61,4 @@ Report the recommendation itself as the outcome: `norn done <quick|story|close> 
 ## Rules
 
 - Read-only: you change no file but the handoff the `norn` skill keeps current; `story.md` stays as intake wrote it. Later steps read the findings from the issue comment.
-- Never run `norn workflow` yourself: switching is the person's (W9, S7).
+- Never run `norn story edit --workflow` yourself: switching is the person's (W9, S7).

@@ -1,0 +1,15 @@
+{
+  "kind": "workflow",
+  "receipt_id": "01M666CX1SR1FM5A67069QXQR3",
+  "run_id": null,
+  "step": "test",
+  "attempt": 4,
+  "at": "2026-10-30T10:41:27.097Z",
+  "by": "human",
+  "who": "jakubpruszynski@mac",
+  "slice": null,
+  "name": "story",
+  "from_hash": "bd5ef0fbb2da1f4313555a687d9e9ce40829c98ae5c6398e299646accc1ffe05",
+  "to_hash": "bd5ef0fbb2da1f4313555a687d9e9ce40829c98ae5c6398e299646accc1ffe05",
+  "to": "open-pr"
+}

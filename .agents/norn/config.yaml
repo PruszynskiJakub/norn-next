@@ -26,7 +26,7 @@ remote:
 
 # Workflows in .agents/norn/workflows/. An issue label norn:wf:<name> picks another one per story.
 # Every story starts in triage unless its issue names a workflow; a person switches it from the
-# triage gate with `norn workflow <story> <name> --to <step>` (W9, S7).
+# triage gate with `norn story edit <story> --workflow <name> --at <step>` (W9, S7).
 default_workflow: triage
 # default_slice_workflow: slice
 
@@ -47,8 +47,8 @@ default_workflow: triage
 # ---------------------------------------------------------------- You
 # Usually set in ~/.norn/config.yaml. Set one here only to make it the same for everyone.
 
-# Who starts the unattended agent steps of a story: manual (you, with norn open) or auto
-# (the tick, through the runner). A story follows this until `norn mode <story> auto|manual`
+# Who starts the unattended agent steps of a story: manual (you, with norn story start) or auto
+# (the tick, through the runner). A story follows this until `norn story edit <story> --auto|--manual`
 # gives it a mode of its own. Gates and attended steps always wait for a person.
 # default_mode: manual
 

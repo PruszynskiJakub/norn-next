@@ -4,8 +4,8 @@
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
-import { runCli } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 
 // whole flows over real git, several ticks each
 setDefaultTimeout(30_000);
@@ -48,7 +48,7 @@ const env = () => {
   for (const k of ["NORN_AGENT", "NORN_RUN", "NORN_STORY", "NORN_SLICE", "NORN_AGENT_SESSION_ID"]) delete e[k];
   return e;
 };
-const inWt = (...argv: string[]) => runCli(argv, { ...h.deps, cwd: wt(), env: env() });
+const inWt = (...argv: string[]) => runChecked(argv, { ...h.deps, cwd: wt(), env: env() });
 /** one run of the describe step, optionally writing `pr.md`, then the open-pr step */
 async function describeAndOpen(prMd: string | null): Promise<void> {
   await inWt("brief", "--json");
@@ -85,7 +85,7 @@ describe("story PR body (GR9)", () => {
   });
 
   test("after rework the open PR gets the new pr.md with the link under it; no second PR", async () => {
-    expect((await h.norn("approve", "gh-7", "--reject", "--reason", "describe the change")).exit).toBe(0);
+    expect((await h.norn("story", "reject", "gh-7", "--reason", "describe the change")).exit).toBe(0);
     await tick();
     expect(h.state(runs())).toMatchObject({ step: "describe", attempt: 2 });
     await describeAndOpen("## Summary\n\ncount items\n\n");

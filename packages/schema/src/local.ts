@@ -79,7 +79,7 @@ export const InboxItemEntry = Type.Object({
 });
 
 /** `inbox.json`: the inbox items open after the last tick (O1, O4). */
-export const LocalInboxFile = Type.Object({ open: Type.Optional(Type.Record(Type.String(), InboxItemEntry)) }, id("local-inbox", "norn open inbox items (trace/inbox.json)"));
+export const LocalInboxFile = Type.Object({ open: Type.Optional(Type.Record(Type.String(), InboxItemEntry)) }, id("local-inbox", "open inbox items norn has seen (trace/inbox.json)"));
 export type LocalInboxFile = Static<typeof LocalInboxFile>;
 
 /** `heartbeat.json`: this checkout's heartbeat_id (ID2) and `last_tick_at` (R5.5). */
@@ -149,8 +149,12 @@ export const LocalPrFile = Type.Object(
 export type LocalPrFile = Static<typeof LocalPrFile>;
 
 /** `<norn home>/cockpit.json`: CP13 `last_repo`, the main checkout the last cockpit ran in. */
-export const LocalCockpitFile = Type.Object({ last_repo: Type.Optional(Type.String()) }, id("local-cockpit", "norn cockpit memory (<norn home>/cockpit.json)"));
+export const LocalCockpitFile = Type.Object({ last_repo: Type.Optional(Type.String()) }, id("local-cockpit", "memory of norn status --watch (<norn home>/cockpit.json)"));
 export type LocalCockpitFile = Static<typeof LocalCockpitFile>;
+
+/** `notices.json`: the one-time notices this checkout has shown (B13), by id. */
+export const LocalNoticesFile = Type.Object({ shown: Type.Optional(Type.Array(Type.String())) }, id("local-notices", "norn one-time notices shown (trace/notices.json)"));
+export type LocalNoticesFile = Static<typeof LocalNoticesFile>;
 
 /** A lock file (H1 tick lock, K6 integrate lock): the holder process and when it took the lock. */
 export const LocalLockFile = Type.Object(
@@ -177,5 +181,6 @@ export const LOCAL_SCHEMA_NAMES = [
   "local-pr",
   "local-cockpit",
   "local-lock",
+  "local-notices",
 ] as const;
 export type LocalSchemaName = (typeof LOCAL_SCHEMA_NAMES)[number];

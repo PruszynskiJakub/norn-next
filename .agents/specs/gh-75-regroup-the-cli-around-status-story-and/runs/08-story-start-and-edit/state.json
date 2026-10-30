@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "story": "gh-75",
+  "slice": "gh-75/08",
+  "unit_dir": "08-story-start-and-edit",
+  "workflow": "slice",
+  "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
+  "step": "$done",
+  "attempt": 4,
+  "visits": {
+    "implement": 2,
+    "test": 2,
+    "review": 2,
+    "qa": 1,
+    "integrate": 4,
+    "merge": 4
+  },
+  "step_entered_at": "2026-10-29T13:51:38.156Z",
+  "status": "done",
+  "park": null,
+  "counters": {
+    "test_loop": 0,
+    "review_loop": 1,
+    "qa_loop": 0,
+    "conflict_loop": 0
+  },
+  "nudges_used": 0,
+  "retries_used": 0,
+  "applied_through": 40,
+  "run": null,
+  "last_outcome": {
+    "step": "integrate",
+    "outcome": "done",
+    "source": "classified",
+    "at": "2026-10-29T13:52:16.705Z",
+    "receipt_id": "01M63YXKA00T9WXGFK6QHEWNVG"
+  },
+  "created_at": "2026-10-28T14:13:16.910Z",
+  "updated_at": "2026-10-29T13:52:38.161Z",
+  "last_tick_id": "01M63YY88GRCGVTC3FBHQ42Q56"
+}

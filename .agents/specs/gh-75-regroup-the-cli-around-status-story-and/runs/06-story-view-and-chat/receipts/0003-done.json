@@ -1,0 +1,18 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61MD0VNY4RCRZBEGJENHEMV",
+  "run_id": "01M61KFSKYG8JS33K6B099PD2H",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-28T16:09:58.902Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/06",
+  "outcome": "done",
+  "handoff": "story view (--web, --json = orient report + workflow/step/attempt/next per unit, depends_on/slice_status per slice, pr_state) and story chat (was orient --open) added; orient removed. Story-scoped target rule aStory (B55). Tests: packages/cli/test/story-view.test.ts (AC1–AC6), view.test.ts updated. Full suite: 1262 pass + 2 help-listing tests fixed; typecheck clean. AC7 (agent, throwaway repo) not run here — left for QA. Printed strings (look.status 'norn status <key>', cockpit 'orient' action label, ORIENT_RULES command names) left for slice 14.",
+  "notes": [
+    {
+      "text": "story view's 'Where to look' still prints `norn status <key>` (cmd.status(target)); status no longer takes a key since slice 04, so this printed command is broken until slice 14 renames it."
+    }
+  ]
+}

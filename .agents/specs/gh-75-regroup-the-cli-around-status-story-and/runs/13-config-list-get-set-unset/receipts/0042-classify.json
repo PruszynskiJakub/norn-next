@@ -1,0 +1,15 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M63X207R0HYQK7N4HDZY19DJ",
+  "run_id": "01M63X1TGTBXW2038DSNA3Q39E",
+  "step": "integrate",
+  "attempt": 3,
+  "at": "2026-10-29T13:19:43.864Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M63X1TGTVNX0Q555XPCJFA20",
+  "outcome": "done",
+  "rule": "git.integrate",
+  "detail": "gh-75/13-config-list-get-set-unset integrated into gh-75-regroup-the-cli-around-status-story-and at 57a47792d0de",
+  "route": "$done"
+}

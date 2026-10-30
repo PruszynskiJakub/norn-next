@@ -1,0 +1,61 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61RAR6S8VSX5G7M6Q05EH5V",
+  "run_id": "01M61QW54BGNAYFZ20YWZBW1BJ",
+  "step": "qa",
+  "attempt": 1,
+  "at": "2026-10-28T17:18:38.809Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/06",
+  "outcome": "pass",
+  "handoff": "QA: AC1–AC7 pass. Suite 1264 pass, typecheck clean. story view (markdown, --json, --web), story chat (Herdr create/focus/outside), story targets (B55) and 'Unknown command: orient' all observed through the CLI; evidence in the pack.",
+  "evidence": "evidence/01M61QW54BGNAYFZ20YWZBW1BJ",
+  "criteria": [
+    {
+      "id": "AC1",
+      "verdict": "pass",
+      "evidence": "AC1-AC7-view.txt: `norn story view gh-2` (two slices parked at qa, PR #40 draft, one open note) shows Slices with step+workflow, PR '#40 draft, open — https://github.com/o/r/pull/40', Open notes (1), Waits for the person: Approve gh-2/01 and gh-2/02; exit 0"
+    },
+    {
+      "id": "AC2",
+      "verdict": "pass",
+      "evidence": "AC2-json.txt: `--json` prints one JSON value (orient report keys) with per-slice workflow/step/attempt/next/slice_status/depends_on, unit workflow/step/attempt and pr_state 'draft'"
+    },
+    {
+      "id": "AC3",
+      "verdict": "pass",
+      "evidence": "AC3-web.txt: gh-2 --web → shell recorded [open, .../pull/40]; gh-3 (no PR) --web → [open, .../issues/3]; both exit 0"
+    },
+    {
+      "id": "AC4",
+      "verdict": "pass",
+      "evidence": "AC4-chat.txt: fake Herdr records 'open workspace <story wt> gh-2 orient focus … NORN_ORIENT=1 claude \"Run `norn story view gh-2` and follow it.\"'; an existing gh-2 orient workspace is only focused (focus workspace w4); outside Herdr prints the command to run"
+    },
+    {
+      "id": "AC5",
+      "verdict": "pass",
+      "evidence": "AC5-targets.txt: in the gh-2/01 slice worktree, `story view` and `story chat` act on gh-2 with no prompt; at repo root a terminal is offered [gh-3, gh-2] (stories only) for both verbs; without a terminal both exit 2 target_required listing only stories"
+    },
+    {
+      "id": "AC6",
+      "verdict": "pass",
+      "evidence": "AC6-orient.txt: `norn orient`, `orient gh-2`, `--open`, `--json`, `--help` all exit 2 with 'Unknown command: orient' (code unknown_command); also via main.ts in a throwaway repo"
+    },
+    {
+      "id": "AC7",
+      "verdict": "pass",
+      "evidence": "AC1-AC7-view.txt + AC7-mainjs.txt: the view reads top-down as one story (heading, story line, slices, PR, what waits, running, notes, where to look); main.ts in a throwaway git repo lists story view/chat under `help story` and refuses an unknown story cleanly"
+    }
+  ],
+  "notes": [
+    {
+      "text": "`norn story view gh-2/01` prints the same view as gh-2 except the Where-to-look commands; there is no visible slice focus. Intended?",
+      "criterion": "AC7"
+    },
+    {
+      "text": "With no target and no terminal, story view/chat refuse with 'name the unit' although only stories are offered; wording may belong to slice 14.",
+      "criterion": "AC5"
+    }
+  ]
+}

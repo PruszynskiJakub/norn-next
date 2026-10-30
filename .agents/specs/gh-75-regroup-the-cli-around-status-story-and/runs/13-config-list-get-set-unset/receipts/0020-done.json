@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M623K1Z3RGWT54QRS1MRNXH3",
+  "run_id": "01M62339ZNCNGA7B421F95JHVH",
+  "step": "implement",
+  "attempt": 3,
+  "at": "2026-10-28T20:35:25.283Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/13",
+  "outcome": "done",
+  "handoff": "review#2 rework: F1 (blocking) config set of a key holding a list/map (or any existing value replaced by a collection) now splices only that pair's lines (withValueLines + shared pairLines in packages/store/src/config.ts), so padded comments on untouched lines stay; red test from the review's repro. F2: a new agents.<name> in the repo file starts from the user file's agent, else the built-in. F3: --user --repo together tested (exit 2). Full suite 1265 pass, typecheck green."
+}

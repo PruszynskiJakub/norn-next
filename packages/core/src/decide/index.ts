@@ -1,7 +1,7 @@
 /**
  * decide (H3): `(facts, repo workflows, config) → Decision[]`, pure and deterministic.
  * At most one action per unit per tick; every decision records the rule that fired (O5).
- * Ids come from `deriveUlid(facts.tick_id, i)` and times from `facts.now`, so `norn why`
+ * Ids come from `deriveUlid(facts.tick_id, i)` and times from `facts.now`, so `norn run view --why`
  * replays to identical output.
  *
  * Order per story: claim (T3–T6; a due renewal is a side action, R1.1) → corrupt (S2) → remote
@@ -44,7 +44,8 @@ export interface LoadedWorkflow {
 }
 export type RepoWorkflows = Readonly<Record<string, LoadedWorkflow>>;
 
-const WF_LABEL = "norn:wf:";
+/** W9: the issue label that picks a story's workflow at intake (`norn:wf:<name>`). */
+export const WF_LABEL = "norn:wf:";
 
 /** The decision that is the unit's one action this tick (O5), else its side action, else null. */
 export function unitDecision<D extends { unit: string; action: { kind: string; op?: unknown } }>(decisions: readonly D[], unit: string, unitOf: (d: D) => string = (d) => d.unit): D | null {

@@ -1,0 +1,20 @@
+$ norn orient
+exit 2
+{"error":"Unknown command: orient","do_instead":"norn help — commands: init, uninstall, sync, tick, watch, brief, done, ask, stuck, hook, status, cockpit, open, answer, approve, unstick, update, mode, workflow, take, release, drop, tidy, doctor, config, help, story, run","code":"unknown_command"}
+
+$ norn orient gh-2
+exit 2
+{"error":"Unknown command: orient","do_instead":"norn help — commands: init, uninstall, sync, tick, watch, brief, done, ask, stuck, hook, status, cockpit, open, answer, approve, unstick, update, mode, workflow, take, release, drop, tidy, doctor, config, help, story, run","code":"unknown_command"}
+
+$ norn orient gh-2 --open
+exit 2
+{"error":"Unknown command: orient","do_instead":"norn help — commands: init, uninstall, sync, tick, watch, brief, done, ask, stuck, hook, status, cockpit, open, answer, approve, unstick, update, mode, workflow, take, release, drop, tidy, doctor, config, help, story, run","code":"unknown_command"}
+
+$ norn orient gh-2 --json
+exit 2
+{"error":"Unknown command: orient","do_instead":"norn help — commands: init, uninstall, sync, tick, watch, brief, done, ask, stuck, hook, status, cockpit, open, answer, approve, unstick, update, mode, workflow, take, release, drop, tidy, doctor, config, help, story, run","code":"unknown_command"}
+
+$ norn orient --help
+exit 2
+{"error":"Unknown command: orient","do_instead":"norn help — commands: init, uninstall, sync, tick, watch, brief, done, ask, stuck, hook, status, cockpit, open, answer, approve, unstick, update, mode, workflow, take, release, drop, tidy, doctor, config, help, story, run","code":"unknown_command"}
+

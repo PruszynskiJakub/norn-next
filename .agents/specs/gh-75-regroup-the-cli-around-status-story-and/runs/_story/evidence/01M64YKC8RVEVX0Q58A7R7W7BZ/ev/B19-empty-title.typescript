@@ -1,0 +1,4 @@
+Title: 
+^D**Usage error (usage):** the title is empty; nothing was created
+
+Do instead: norn story create --title "…"

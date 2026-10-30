@@ -4,6 +4,9 @@
  * A connection dropped while the machine slept otherwise never errors and holds the tick lock.
  */
 import { spawn } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 export interface BoundedOptions {
   cwd?: string;
@@ -109,4 +112,29 @@ export function spawnBounded(argv: string[], opts: BoundedOptions): Promise<Boun
     child.on("close", (code) => finish(code ?? 1));
     if (opts.stdin !== undefined) child.stdin?.end(opts.stdin);
   });
+}
+
+/**
+ * `text` edited by the person in `editor` (a shell command, `code --wait` included) on their
+ * terminal — stdin, stdout and stderr inherited — until it exits (D2). Not bounded: the person
+ * decides when it ends. The edited text, or null when the editor fails. Never throws.
+ */
+export async function editInTerminal(text: string, editor: string): Promise<string | null> {
+  const dir = mkdtempSync(join(tmpdir(), "norn-edit-"));
+  const file = join(dir, "BODY.md");
+  try {
+    writeFileSync(file, text);
+    const argv = ["sh", "-c", `${editor} "$1"`, "sh", file];
+    noteSpawn(argv, undefined);
+    const code = await new Promise<number>((resolve) => {
+      const child = spawn(argv[0] as string, argv.slice(1), { stdio: "inherit" });
+      child.on("error", () => resolve(127));
+      child.on("close", (c) => resolve(c ?? 1));
+    });
+    return code === 0 ? readFileSync(file, "utf8") : null;
+  } catch {
+    return null;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }

@@ -1,0 +1,15 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M61SNYHHRB7S961Y5F75BWT9",
+  "run_id": "01M61SNSQ9NF55CB932Q10EFJX",
+  "step": "integrate",
+  "attempt": 3,
+  "at": "2026-10-28T17:42:14.321Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M61SNSQ9280NYJBTKC807XQ1",
+  "outcome": "done",
+  "rule": "git.integrate",
+  "detail": "gh-75/06-story-view-and-chat integrated into gh-75-regroup-the-cli-around-status-story-and at d9942ae4054c",
+  "route": "$done"
+}

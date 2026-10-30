@@ -15,6 +15,7 @@ import { rendered } from "../output.ts";
 import { assetsDir } from "../runtime/assets.ts";
 import { detectTestCommand, gitRemoteUrl, TEMPLATE_TEST_COMMAND, withTestCommand } from "../runtime/detect.ts";
 import { bundledSkills } from "../runtime/workflows.ts";
+import { cmd } from "@norn/core";
 
 /** Paths that must never be committed (§7.1). */
 const IGNORED = [".agents/norn/trace/", ".env.norn", ".norn-unit"];
@@ -115,14 +116,14 @@ function nextSteps(r: InitReport, changed: boolean): string[] {
     const paths = [".agents", ...r.skills.links.map((l) => top(l.dir)), ...r.hooks.flatMap((h) => h.changed.map(top)), ...(r.gitignore.length ? [".gitignore"] : []), ...(r.gitattributes.length ? [".gitattributes"] : [])];
     steps.push(`Commit and push the setup: \`git add ${[...new Set(paths)].join(" ")} && git commit -m "Set up norn" && git push\`.`);
   }
-  steps.push("Check this machine: `norn doctor`.");
+  steps.push(`Check this machine: \`${cmd.doctor()}\`.`);
   const label = r.remote.label;
   steps.push(
     r.remote.provider === "gh"
       ? `Make a first story: an issue labelled \`${label}\` and assigned to you, e.g. \`gh label create ${label}\` (once), then \`gh issue create --label ${label} --assignee @me --title "…"\`.`
       : `Make a first story: an issue labelled \`${label}\` and assigned to you.`,
   );
-  steps.push("Pick it up: `norn sync`, then `norn inbox` shows what needs you and the command for each item; `norn watch` keeps norn working.");
+  steps.push(`Pick it up: \`${cmd.sync()}\`, then \`${cmd.status()}\` shows what needs you and the command for each item; \`${cmd.watch()}\` keeps norn working.`);
   return steps;
 }
 

@@ -6,6 +6,7 @@
  */
 import { existsSync } from "node:fs";
 import {
+  cmd,
   actFailureItem,
   buildInbox,
   checkRunningSince,
@@ -63,7 +64,7 @@ export interface LoadProjectViewOptions {
   holder?: string;
   /** this machine's heartbeat id, also counted as `mine` */
   heartbeatId?: string | null;
-  /** what the configured runner can do (R4.1); `open` makes Your turn show `norn open` (MO5) */
+  /** what the configured runner can do (R4.1); `open` makes Your turn show `norn story start` (MO5) */
   runnerCapabilities?: RunnerCapabilities;
   /** trace window lower bound (ISO); default 14 days before now */
   traceSince?: string;
@@ -124,7 +125,7 @@ function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: Uni
   const since = st ? (st.park?.since ?? (st.status === "running" ? st.run?.started_at : null) ?? checkSince ?? (st.status === "done" ? st.updated_at : st.step_entered_at)) : null;
   // R5.5 (A8): while the heartbeat is down an auto step waits for `norn watch`, not a person
   const waitsForHeartbeat = ctx.heartbeatDown && step?.type === "agent" && eff.mode === "auto";
-  const start = step?.type === "agent" ? (waitsForHeartbeat ? "norn watch" : startCommandFor(uf, sf, ctx.config)) : undefined;
+  const start = step?.type === "agent" ? (waitsForHeartbeat ? cmd.watch() : startCommandFor(uf, sf, ctx.config)) : undefined;
   const failure = actFailureItem(sf, uf) ? uf.act_failure : undefined;
   return {
     key: u.unit.key,
@@ -139,6 +140,7 @@ function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: Uni
     claim: claimView(sf.claim),
     status: corrupt ? "corrupt" : (st?.status ?? "not_started"),
     step: st?.step ?? null,
+    step_type: step?.type ?? null,
     attempt: st?.attempt ?? null,
     counters: counters(u),
     park: st?.park ? { kind: st.park.kind, reason: st.park.reason, since: st.park.since } : null,
@@ -146,7 +148,7 @@ function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: Uni
     since,
     age: since ? formatAge(ctx.now - Date.parse(since)) : null,
     last_outcome: st?.last_outcome ? { step: st.last_outcome.step, outcome: st.last_outcome.outcome, at: st.last_outcome.at } : null,
-    next: corrupt ? `norn why ${u.unit.key}` : nextCommand(u.unit.key, st, start),
+    next: corrupt ? cmd.runView(u.unit.key, { why: true }) : nextCommand(u.unit.key, st, start),
     updated_at: st?.updated_at ?? null,
     errors: u.errors,
     act_failure: failure ? { effect: failure.effect, reason: failure.reason, at: failure.at, tick_id: failure.tick_id } : null,

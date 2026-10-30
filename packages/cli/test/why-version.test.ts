@@ -87,7 +87,7 @@ describe("norn_version on tick traces (O5)", () => {
   });
 
   test("why on a tick this version recorded has no label", async () => {
-    const r = await h.norn("why", "gh-3");
+    const r = await h.norn("run", "view", "gh-3", "--why");
     expect(r.exit).toBe(0);
     const v = r.value as Why;
     expect(v.replay.matches).toBe(true);
@@ -95,11 +95,11 @@ describe("norn_version on tick traces (O5)", () => {
   });
 
   test("why on a tick another version recorded still replays, labelled, exit unchanged", async () => {
-    const before = (await h.norn("why", "gh-3")).value as Why;
+    const before = (await h.norn("run", "view", "gh-3", "--why")).value as Why;
     editTick(before.tick_id, (t) => {
       t.norn_version = "0.0.1";
     });
-    const r = await h.norn("why", "gh-3");
+    const r = await h.norn("run", "view", "gh-3", "--why");
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ tick_id: before.tick_id, rule: before.rule, replay: { matches: true, rule: before.rule, label: `recorded by norn 0.0.1, replayed by norn ${version}` } });
 
@@ -107,19 +107,19 @@ describe("norn_version on tick traces (O5)", () => {
     editTick(before.tick_id, (t) => {
       delete t.norn_version;
     });
-    const older = await h.norn("why", "gh-3");
+    const older = await h.norn("run", "view", "gh-3", "--why");
     expect(older.exit).toBe(0);
     expect((older.value as Why).replay.label).toBeUndefined();
   });
 
   test("a mismatch on a tick another version recorded still shows the diff, labelled, and exits 1", async () => {
-    const before = (await h.norn("why", "gh-3")).value as Why;
+    const before = (await h.norn("run", "view", "gh-3", "--why")).value as Why;
     editTick(before.tick_id, (t) => {
       t.norn_version = "0.0.1";
       const d = t.decisions.find((x) => x.rule === before.rule) as TickTrace["decisions"][number];
       (d.action as { reason?: string }).reason = "decided differently by an older rule";
     });
-    const r = await h.norn("why", "gh-3");
+    const r = await h.norn("run", "view", "gh-3", "--why");
     expect(r.exit).toBe(1);
     const v = r.value as Why;
     expect(v.replay.matches).toBe(false);

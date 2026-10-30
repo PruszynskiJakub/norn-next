@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61Q5C36ETNQW35WH99T36YK",
+  "run_id": "01M61P767R9XSXGZYMKV6B5PGK",
+  "step": "implement",
+  "attempt": 2,
+  "at": "2026-10-28T16:58:13.990Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/08",
+  "outcome": "done",
+  "handoff": "Rework: F1 fixed — UnitView gains step_type; story start's picker offers a ready manual unit only at an agent step (new story-start test, gh-9 ready at a check step, was red). F5: target.ts resolveTarget renamed targetKey; unit_done hints aligned. F2 kept by design (mode per story, B55; note for slice 15 PRD wording). F3 unchanged (gh-5's agent runs in that test, MO3). F4 left for slice 14. Suite 1252 pass, typecheck green."
+}

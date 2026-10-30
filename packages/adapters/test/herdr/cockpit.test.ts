@@ -68,6 +68,19 @@ describe("herdr cockpit (HC6, HC12)", () => {
   });
 });
 
+test("openBelow splits a short pane below the caller without focus, names it, runs the command (B12)", async () => {
+  const { exec, calls } = fakeExec([["pane split", ok({ result: { pane: { pane_id: "w1:p3" } } })], ["pane rename", empty], ["pane run", empty]]);
+  expect(await createHerdrCockpit({ exec, env: { HERDR_PANE_ID: "w1:p1" } }).openBelow("/repo", "norn status --watch", "norn")).toEqual({ pane_id: "w1:p3" });
+  expect(calls.map((a) => a.slice(1))).toEqual([
+    ["pane", "split", "--current", "--direction", "down", "--ratio", "0.3", "--cwd", "/repo", "--no-focus"],
+    ["pane", "rename", "w1:p3", "norn"],
+    ["pane", "run", "w1:p3", "norn status --watch"],
+  ]);
+  // a split without a pane id is a launch failure
+  const none = fakeExec([["pane split", ok({ result: {} })]]);
+  expect(await createHerdrCockpit({ exec: none.exec, env: {} }).openBelow("/repo", "x").catch((e) => e)).toMatchObject({ code: "launch_failed" });
+});
+
 test("listWorkspaces pairs `herdr workspace list` with each pane's cwd; focusWorkspace argv (HC15)", async () => {
   const { exec, calls } = fakeExec([
     ["workspace list", ok(workspaceList)],
@@ -146,13 +159,13 @@ test("openWorkspace, reportWorkspace argv; moveWorkspace over the socket API", a
     return req.params.workspace_id === "gone" ? { id: req.id, error: { code: "workspace_not_found", message: "workspace gone not found" } } : { id: req.id, result: { type: "ok" } };
   };
   const cockpit = createHerdrCockpit({ exec, socket });
-  expect(await cockpit.openWorkspace("/wt", "gh-1 orient", "claude -- 'Run `norn orient gh-1` and follow it.'")).toEqual({ workspace_id: "w1", pane_id: "w1:p1" });
+  expect(await cockpit.openWorkspace("/wt", "gh-1 orient", "claude -- 'Run `norn story view gh-1` and follow it.'")).toEqual({ workspace_id: "w1", pane_id: "w1:p1" });
   await cockpit.reportWorkspace("w1", { norn: "● approve" }, 15_000);
   await cockpit.moveWorkspace("w1", 0);
   await expect(cockpit.moveWorkspace("gone", 0)).rejects.toMatchObject({ code: "session_gone" });
   expect(calls.map((a) => a.slice(1))).toEqual([
     ["workspace", "create", "--cwd", "/wt", "--label", "gh-1 orient", "--focus"],
-    ["pane", "run", "w1:p1", "claude -- 'Run `norn orient gh-1` and follow it.'"],
+    ["pane", "run", "w1:p1", "claude -- 'Run `norn story view gh-1` and follow it.'"],
     ["workspace", "report-metadata", "w1", "--source", "norn", "--token", "norn=● approve", "--ttl-ms", "15000"],
   ]);
   expect(requests).toEqual([

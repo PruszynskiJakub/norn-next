@@ -60,6 +60,8 @@ const REMOTE_CALLS: Record<string, (...a: never[]) => string> = {
   findPullRequest: (branch: string) => `findPullRequest ${branch}`,
   openDraftPullRequest: (o: { head: string; base: string; title: string }) => `openDraftPullRequest ${o.head} → ${o.base} ${JSON.stringify(o.title)}`,
   editPullRequestBody: (n: number) => `editPullRequestBody ${n}`,
+  createIssue: (o: { title: string; labels: string[] }) => `createIssue ${JSON.stringify(o.title)} ${o.labels.join(",")}`,
+  newIssueUrl: (o: { labels: string[] }) => `newIssueUrl ${o.labels.join(",")}`,
 };
 const NOTIFIER_CALLS: Record<string, (...a: never[]) => string> = {
   notify: (item: { id: string }) => `notify ${item.id}`,

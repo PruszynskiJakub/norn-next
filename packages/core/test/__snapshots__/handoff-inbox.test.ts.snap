@@ -7,7 +7,7 @@ exports[`handoff.md (S9, O6) status block is rendered from state 1`] = `
 - Status: parked (ask: Which DB?)
 - Counters: conflict_loop 0/2, qa_loop 0/2, review_loop 2/3, test_loop 1/5
 - Last outcome: test.pass (classified, 2026-10-23T10:00:00.000Z)
-- Next: \`norn answer gh-1/02 "…"\`
+- Next: \`norn story answer gh-1/02 "…"\`
 - Updated: 2026-10-23T10:00:00.000Z
 <!-- /norn:status -->"
 `;
@@ -19,7 +19,7 @@ exports[`handoff.md (S9, O6) renderHandoff replaces the status block, keeps agen
 - Status: parked (ask: Which DB?)
 - Counters: conflict_loop 0, qa_loop 0, review_loop 2, test_loop 1
 - Last outcome: test.pass (classified, 2026-10-23T10:00:00.000Z)
-- Next: \`norn answer gh-1/02 "…"\`
+- Next: \`norn story answer gh-1/02 "…"\`
 - Updated: 2026-10-23T10:00:00.000Z
 <!-- /norn:status -->
 

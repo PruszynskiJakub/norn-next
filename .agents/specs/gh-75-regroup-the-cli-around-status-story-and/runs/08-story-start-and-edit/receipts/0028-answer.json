@@ -1,0 +1,13 @@
+{
+  "kind": "answer",
+  "receipt_id": "01M63WFWMRF09TGJ99F23WBYPS",
+  "run_id": "01M61VK9EFRZBGDHVZ25FDNWZR",
+  "step": "merge",
+  "attempt": 2,
+  "at": "2026-10-29T13:09:50.360Z",
+  "by": "human",
+  "who": "jakubpruszynski@mac",
+  "slice": "gh-75/08",
+  "answer": "Restore slice 09's run cancel/rerun (run-cancel.ts, run-rerun.ts, run-rerun-cancel.test.ts and their golden cases, run.ts, the core/commands.ts and printed-commands entries) and keep unstick removed. Take slice 07's own changes as they are; for those files take 09's side as of f82d4db8. Run the full suite, then report done.",
+  "ask_receipt_id": "01M63W7FJ3J2BJ28PT7SAX2RWA"
+}

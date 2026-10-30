@@ -11,6 +11,7 @@ import { defineCommand, opt } from "../command.ts";
 import { CliFailure, refuse, rendered, usageError, withExit } from "../output.ts";
 import { type ReleaseResult, releaseHeldClaims } from "../runtime/release.ts";
 import { runTick, type TickReport } from "../runtime/tick.ts";
+import { cmd } from "@norn/core";
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
@@ -52,15 +53,15 @@ export const watchCommand = defineCommand({
     try {
       interval = parseDuration(raw);
     } catch {
-      throw usageError(`bad --interval '${raw}' (use e.g. 30s, 2m)`, "norn watch --interval 30s");
+      throw usageError(`bad --interval '${raw}' (use e.g. 30s, 2m)`, cmd.watch({ interval: "30s" }));
     }
     const maxRaw = opt.str(args, "max-ticks");
     const max = maxRaw === undefined ? Number.POSITIVE_INFINITY : Number(maxRaw);
-    if (!(max > 0)) throw usageError(`bad --max-ticks '${maxRaw}'`, "norn watch --max-ticks 10");
+    if (!(max > 0)) throw usageError(`bad --max-ticks '${maxRaw}'`, cmd.watch({ maxTicks: 10 }));
     // BS2: no heartbeat without `git merge-tree --write-tree` (git ≥ 2.38) — base conflicts would go unseen
     const v = await ctx.git.version(ctx.root);
     if (!v || !gitAdapter.gitVersionOk(v))
-      throw refuse(`git ≥ ${gitAdapter.MIN_GIT_VERSION.join(".")} is required to run a heartbeat (found: ${v || "no git"}) (BS2)`, "upgrade git, then norn doctor", "git_too_old");
+      throw refuse(`git ≥ ${gitAdapter.MIN_GIT_VERSION.join(".")} is required to run a heartbeat (found: ${v || "no git"}) (BS2)`, `upgrade git, then ${cmd.doctor()}`, "git_too_old");
     const human = opt.bool(args, "human");
     if (human) ctx.log(`norn watch: a tick every ${raw}, one line per action; Ctrl-C finishes the tick and releases claims`);
     const signal = ctx.deps.signal;

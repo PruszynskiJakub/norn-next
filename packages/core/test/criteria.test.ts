@@ -206,8 +206,8 @@ describe("notes for a person (NT1–NT3)", () => {
     expect(state).toMatchObject({ step: "ready", status: "parked" });
     const notes = inbox.groups.notes.filter((i) => i.id.startsWith("note:"));
     expect(notes.map((i) => [i.id, i.title, i.command])).toEqual([
-      [id1, "qa note on gh-1 (AC3): kept whitespace inside backticks", `norn why gh-1 --receipt ${withNote.receipt_id}`],
-      [id2, "qa note on gh-1: copy says 'Today' not 'today'", `norn why gh-1 --receipt ${withNote.receipt_id}`],
+      [id1, "qa note on gh-1 (AC3): kept whitespace inside backticks", `norn run view gh-1 --receipt ${withNote.receipt_id}`],
+      [id2, "qa note on gh-1: copy says 'Today' not 'today'", `norn run view gh-1 --receipt ${withNote.receipt_id}`],
     ]);
     const gate = inbox.groups.approve.find((i) => i.story === "gh-1");
     expect(gate?.detail).toContain("open notes (approve acknowledges them): gh-1 qa (AC3): kept whitespace inside backticks; gh-1 qa: copy says 'Today' not 'today'");

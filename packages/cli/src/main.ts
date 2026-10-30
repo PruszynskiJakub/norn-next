@@ -15,5 +15,6 @@ const result = await runCli(process.argv.slice(2), {
   signal: controller.signal,
   log: (line) => process.stderr.write(`${line}\n`),
 });
+if (result.stderr) process.stderr.write(result.stderr);
 process.stdout.write(result.stdout);
 process.exit(result.exit);

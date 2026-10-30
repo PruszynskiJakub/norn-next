@@ -22,7 +22,7 @@ import { SessionInfo } from "./receipt.ts";
  * - ready: cursor step can start (manual: waits for `norn brief`; auto: tick launches; check/git: tick runs)
  * - running: a live run exists for the cursor step
  * - parked: waiting for a human in the normal flow (ask, gate, attended step)
- * - stuck: needs `norn unstick` ($stuck, exhausted, remote change, missing step)
+ * - stuck: needs `norn run rerun` ($stuck, exhausted, remote change, missing step)
  * - done: reached `$done`
  * - corrupt: a file of this unit failed validation (S2); never guessed past
  */
