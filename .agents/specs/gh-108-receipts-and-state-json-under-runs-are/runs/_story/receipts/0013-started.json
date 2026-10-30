@@ -1,0 +1,16 @@
+{
+  "kind": "started",
+  "receipt_id": "01M66AE3DAWS3F5Q7KPA4WM5ME",
+  "run_id": "01M66AE3DA4ZFEZBQTPTKETT8R",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-30T11:52:00.683Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M66AE3DAN1FC4TBWXB7DD918",
+  "how": "auto",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-108-receipts-and-state-json-under-runs-are",
+  "machine": "jakubpruszynski@mac",
+  "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD"
+}
