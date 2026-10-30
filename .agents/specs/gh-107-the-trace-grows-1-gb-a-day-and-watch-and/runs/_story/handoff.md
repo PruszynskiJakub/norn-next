@@ -28,6 +28,7 @@ Rework the gh-107 Plan after approve-plan rejected the 06/07 split: chunked tick
 
 - Earlier slice step wrote 9 slices; 06 (chunked tick facts) and 07 (hook blocks) were split so 06 fit one context. Rejected at approve-plan: merge them.
 - plan#2: added D15 to the Plan (chunks and hook blocks ship together, with the reason: `$blocks` is part of the tick line skeleton, so a split would change the line format twice) and a Risk on that slice's size, met by ordering (spike, then S2 tests, then S1). No other Plan change.
+- plan#2 done: Plan reworked per approve-plan reject: added D15 (chunked tick facts and 64-fact hook blocks ship in one slice, since $blocks is part of the tick line skeleton) and a risk on that slice's size met by ordering (spike, S2 tests, then S1). Next slice step merges slices 06 and 07.
 
 ## Resume
 
