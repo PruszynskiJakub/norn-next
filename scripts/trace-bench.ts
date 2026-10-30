@@ -1,5 +1,5 @@
 /**
- * Trace benchmark (gh-107 B1, B2, B10): how `norn cockpit`, `norn status` and `norn brief` fare
+ * Trace benchmark (gh-107 B1, B2, B10): how the cockpit (`norn status --watch`), `norn status` and `norn brief` fare
  * over a large trace against the same repo with an empty one. Footprint and timing are not asserted
  * in the suite (see the gh-107 spec, Plan); QA runs this.
  *
@@ -165,13 +165,14 @@ async function status(): Promise<number> {
 
 /** the cockpit refreshing every `--interval` for `--cockpit`: peak and last RSS (KB), sampled each second */
 async function cockpit(): Promise<{ peak_kb: number; last_kb: number; samples: number }> {
-  const p = Bun.spawn([...norn, "cockpit", "--interval", a.interval as string], { cwd: repo, env: { ...env, COLUMNS: "160", LINES: "40" }, stdin: "pipe", stdout: "ignore", stderr: "ignore" });
+  const p = Bun.spawn([...norn, "status", "--watch", "--interval", a.interval as string], { cwd: repo, env: { ...env, COLUMNS: "160", LINES: "40" }, stdin: "pipe", stdout: "ignore", stderr: "ignore" });
   const end = Date.now() + parseDuration(a.cockpit as string);
   let peak = 0;
   let last = 0;
   let samples = 0;
   while (Date.now() < end) {
     await Bun.sleep(1000);
+    if (p.exitCode !== null) throw new Error(`the cockpit exited early (${p.exitCode}): nothing to measure`);
     last = rssKb(p.pid);
     peak = Math.max(peak, last);
     samples++;

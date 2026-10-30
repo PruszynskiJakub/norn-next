@@ -27,8 +27,9 @@ const DAY = 86_400_000;
 let h: Harness;
 const days = () => readdirSync(traceDir(h.root)).filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n));
 
-async function* quitAfter(ms: number) {
-  await new Promise((r) => setTimeout(r, ms));
+/** quits once `drawn()` reaches `n` frames: what is pinned is the count, not wall time */
+async function* quitAfterFrames(n: number, drawn: () => number) {
+  while (drawn() < n) await new Promise((r) => setTimeout(r, 5));
   yield "q";
 }
 
@@ -79,11 +80,11 @@ describe("views that read no trace (B1, B2)", () => {
     let frames = 0;
     expect(
       await opened(async () => {
-        const r = await runCli(["status", "--watch", "--interval", "20ms"], { ...h.deps, herdr: null, input: quitAfter(150), log: () => frames++ });
+        const r = await runCli(["status", "--watch", "--interval", "20ms"], { ...h.deps, herdr: null, input: quitAfterFrames(3, () => frames), log: () => frames++ });
         expect(r.exit).toBe(0);
       }),
     ).toEqual([]);
-    expect(frames).toBeGreaterThan(2); // it refreshed
+    expect(frames).toBeGreaterThanOrEqual(3); // it refreshed
   });
 
   test("story list, status --segment, status and story view open no day file and print the same as over an empty trace (B2)", async () => {
