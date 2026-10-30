@@ -54,6 +54,8 @@ const checkouts = new Map<string, CheckoutOf>();
  * D2: which checkout `root` belongs to, from the files git keeps (no git process): walk up to a `.git`,
  * follow a linked worktree's `gitdir:` and its `commondir`, take the real path. Every worktree of one
  * repository resolves to the same common dir, so all share one machine dir; two clones never do.
+ * `root` is a located checkout (or a unit worktree), so the walk-up only matters for a path inside one;
+ * a root outside git stands for itself. A submodule's common dir is `.git/modules/<x>` and names it.
  */
 export function checkoutOf(root: string): CheckoutOf {
   const cached = checkouts.get(root);
@@ -95,6 +97,12 @@ const homes = new Map<string, string>();
  */
 export function bindNornHome(root: string, home: string): void {
   homes.set(checkoutOf(root).common, home);
+}
+
+/** Drop a binding made for a throwaway checkout (doctor's scratch unit). */
+export function unbindNornHome(root: string): void {
+  homes.delete(checkoutOf(root).common);
+  checkouts.delete(root);
 }
 
 /** The norn home `root`'s machine dir lives in. */

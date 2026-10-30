@@ -28,7 +28,7 @@ import { basename, extname, join, relative, resolve } from "node:path";
 import { git as gitAdapter, herdr, proc } from "@norn/adapters";
 import type { AgentAdapter, FileError, RunnerPort, SessionRef, WorkflowIssue } from "@norn/core";
 import { ExitCode, ulid } from "@norn/schema";
-import { bindNornHome, loadWorkflows, machineDir, machineHolder, noteSpawn, orphanedMachineDirs, readHookFacts, repoConfigPath, skillsReport, workflowsDir, writeUnitMarker } from "@norn/store";
+import { bindNornHome, loadWorkflows, machineDir, machineHolder, noteSpawn, orphanedMachineDirs, readHookFacts, repoConfigPath, skillsReport, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { rendered, withExit } from "../output.ts";
@@ -94,15 +94,21 @@ function syntheticEvent(agent: AgentAdapter, cwd: string, env: Record<string, st
 async function scratchUnit(ctx: Context): Promise<{ repo: string; drop: () => void }> {
   const dir = mkdtempSync(join(tmpdir(), "norn-doctor-"));
   const repo = join(dir, "repo");
-  await run(["git", "init", "-q", repo], { timeoutMs: 10_000 });
-  bindNornHome(repo, ctx.home);
+  try {
+    await run(["git", "init", "-q", repo], { timeoutMs: 10_000 });
+    bindNornHome(repo, ctx.home);
+    writeUnitMarker(repo, { repo, story: "gh-1", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-1-norn-doctor" });
+  } catch (e) {
+    rmSync(dir, { recursive: true, force: true });
+    throw e;
+  }
   const machine = machineDir(repo);
-  writeUnitMarker(repo, { repo, story: "gh-1", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-1-norn-doctor" });
   return {
     repo,
     drop: () => {
-      rmSync(dir, { recursive: true, force: true });
       rmSync(machine, { recursive: true, force: true });
+      unbindNornHome(repo);
+      rmSync(dir, { recursive: true, force: true });
     },
   };
 }
@@ -457,9 +463,13 @@ export const doctorCommand = defineCommand({
     if (machine.override !== null)
       warnings.push(`NORN_MACHINE=${machine.override} overrides this machine's name (a test aid): runs are judged by pid only on the machine they were started on (R7.2), so two hosts must never share a name — unset it outside tests`);
 
-    // D3: a machine dir left behind when this repo folder moved; adopting it keeps the heartbeat (ID2)
+    // D3: a machine dir left behind when this repo folder moved; adopting it keeps the heartbeat (ID2).
+    // The own dir exists already (every traced command makes it), so a plain mv would nest into it.
+    const mine = proc.shellQuote(machineDir(ctx.root));
     for (const o of orphanedMachineDirs(ctx.home, ctx.root))
-      warnings.push(`orphaned machine dir ${o.dir}: its checkout ${o.checkout} no longer exists — if this repo moved from there, adopt it (keeps its heartbeat and claims): mv ${o.dir} ${machineDir(ctx.root)}`);
+      warnings.push(
+        `orphaned machine dir ${o.dir}: its checkout ${o.checkout} no longer exists — if this repo moved from there, stop norn watch and adopt it (keeps its heartbeat and claims): rm -rf ${mine} && mv ${proc.shellQuote(o.dir)} ${mine}`,
+      );
     if (sk.drifted.length) warnings.push(`skills differ from this norn's bundled version: ${sk.drifted.join(", ")} — run ${cmd.init()} to update them (git diff .agents/skills/ shows the change)`);
 
     const ok = gitCheck.ok && agents.every((a) => a.ok) && remote.ok === true && (runner.ok === true || runner.required === false) && skillsOk && repo.ok;

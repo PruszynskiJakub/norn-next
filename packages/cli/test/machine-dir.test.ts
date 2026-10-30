@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
-import { acquireTickLock, leasesDir, repoConfigPath, userConfigPath, workflowsDir } from "@norn/store";
+import { acquireTickLock, leasesDir, listLeases, repoConfigPath, unbindNornHome, userConfigPath, workflowsDir } from "@norn/store";
 import { type CliResult } from "../src/index.ts";
 import { createHarness, type Harness, issue, runChecked, sh } from "./harness.ts";
 
@@ -48,10 +48,12 @@ async function boot(h: Harness) {
   h.git(["push", "-q", "origin", "main"]);
 }
 
-/** Every path under `dir` that norn may write machine-locally (trace day files, locks, heartbeat, caches). */
-const MACHINE_NAMES = /(\.jsonl|\.lock|heartbeat\.json|remote\.json|inbox\.json|checkout\.json)$/;
-function machineFilesUnder(dir: string): string[] {
-  return (readdirSync(dir, { recursive: true }) as string[]).filter((p) => !p.startsWith(`.git${"/"}objects`) && MACHINE_NAMES.test(p) && !p.includes("/runs/"));
+/** Every path under `dir` (outside `.git/objects`) named like a file the machine dir holds, plus the old trace dir. */
+function machineFilesUnder(dir: string, machine: string): string[] {
+  const files = readdirSync(machine, { recursive: true, withFileTypes: true }).filter((e) => e.isFile());
+  const names = new Set(files.map((e) => e.name));
+  for (const n of ["tick.lock", "failures.json", "notices.json", "pr.json", "remote.json", "inbox.json", "heartbeat.json", "checkout.json"]) names.add(n);
+  return (readdirSync(dir, { recursive: true }) as string[]).filter((p) => !p.startsWith(`.git${"/"}objects`) && (names.has(basename(p)) || p.endsWith(".jsonl") || p.includes(join(".agents", "norn", "trace"))));
 }
 
 describe("machine-local files in the norn home (B5, B6)", () => {
@@ -79,7 +81,8 @@ describe("machine-local files in the norn home (B5, B6)", () => {
     expect(files).toContain("heartbeat.json");
     expect(files).toContain("remote.json");
     expect(JSON.parse(readFileSync(join(machine, "checkout.json"), "utf8"))).toMatchObject({ checkout: h.root });
-    expect(machineFilesUnder(h.root)).toEqual([]);
+    expect(machineFilesUnder(h.root, machine)).toEqual([]);
+    expect(existsSync(join(h.root, ".agents", "norn", "trace"))).toBe(false);
     expect(h.git(["status", "--porcelain"])).toBe("");
     const ignore = h.read(join(h.root, ".gitignore")).split("\n");
     expect(ignore).toContain(".env.norn");
@@ -105,20 +108,21 @@ describe("machine-local files in the norn home (B5, B6)", () => {
     const env: Record<string, string | undefined> = { ...h.deps.env, NORN_AGENT_PID: String(process.pid) };
     for (const k of ["NORN_AGENT", "NORN_RUN", "NORN_STORY", "NORN_SLICE", "NORN_AGENT_SESSION_ID"]) delete env[k];
     const inWt = (argv: string[], stdin?: string): Promise<CliResult> => runChecked(argv, { ...h.deps, cwd: wt(), env, ...(stdin ? { stdin } : {}) });
-    const before = readdirSync(machine).filter((f) => f.endsWith(".jsonl"));
+    // hook is repo: false: drop the binding earlier commands in this process left, so only its own can find the home
+    unbindNornHome(wt());
+    expect((await inWt(["hook", "session-start"], JSON.stringify({ session_id: "s1-ac2", cwd: wt(), hook_event_name: "SessionStart" }))).exit).toBe(0);
     const brief = await inWt(["brief", "--json"]);
     expect(brief.exit).toBe(0);
-    expect((await inWt(["hook", "session-start"], JSON.stringify({ session_id: "s1", cwd: wt(), hook_event_name: "SessionStart" }))).exit).toBe(0);
     expect((await runChecked(["tick", "--json"], { ...h.deps, cwd: wt() })).exit).toBe(0);
     expect(machineDirOf(h.home, wt())).toBe(machine);
-    expect(machineFilesUnder(wt())).toEqual([]);
-    // the brief and the hook were traced into the main checkout's machine dir
-    const trace = readdirSync(machine)
+    expect(machineFilesUnder(wt(), machine)).toEqual([]);
+    expect(existsSync(join(wt(), ".agents", "norn", "trace"))).toBe(false);
+    // the hook was traced into the main checkout's machine dir
+    const events = readdirSync(machine)
       .filter((f) => f.endsWith(".jsonl"))
-      .map((f) => readFileSync(join(machine, f), "utf8"))
-      .join("");
-    expect(before.length).toBeGreaterThan(0);
-    expect(trace).toContain('"type":"hook"');
+      .flatMap((f) => readFileSync(join(machine, f), "utf8").split("\n").filter(Boolean))
+      .map((l) => JSON.parse(l) as { type: string; fact?: { agent_session_id?: string } });
+    expect(events.some((e) => e.type === "hook" && e.fact?.agent_session_id === "s1-ac2")).toBe(true);
     expect(JSON.parse(readFileSync(join(machine, "heartbeat.json"), "utf8")).heartbeat_id).toBe(heartbeat);
     expect(readdirSync(join(h.home, "repos"))).toEqual([basename(machine)]);
   });
@@ -127,7 +131,10 @@ describe("machine-local files in the norn home (B5, B6)", () => {
     const cfg = await h.norn("config", "list", "--json");
     expect(JSON.stringify(cfg.value)).toContain(userConfigPath(h.home));
     expect(readFileSync(userConfigPath(h.home), "utf8")).toBe("max_agents: 3\n");
-    expect(existsSync(leasesDir(h.home))).toBe(true);
+    // the gh-4 worktree's slot lease, read back from the home's leases dir
+    const leases = await listLeases(h.home, () => true);
+    expect(leases.live.some((e) => e.lease.kind === "slot" && e.lease.worktree === wt())).toBe(true);
+    expect(readdirSync(leasesDir(h.home)).length).toBeGreaterThan(0);
     const top = readdirSync(h.home);
     expect(top).toContain("repos");
     expect(top).toContain("config.yaml");
@@ -175,27 +182,42 @@ describe("norn doctor: an orphaned machine dir (AC5, D3)", () => {
   });
   afterAll(() => h.cleanup());
 
-  test("a machine dir whose checkout.json names a vanished path with this folder name: warned, with the mv that adopts it; nothing moved", async () => {
+  test("a machine dir whose checkout.json names a vanished path with this folder name: warned, with the command that adopts it; nothing moved until it runs", async () => {
     const mine = machineDirOf(h.home, h.root);
-    const gone = join(h.dir, "old-place", basename(h.root));
+    const gone = join(h.dir, "old place", basename(h.root));
     const orphan = join(h.home, "repos", `${basename(h.root)}-0badc0de`);
+    const adopted = "01J00000000000000000000000";
     mkdirSync(orphan, { recursive: true });
     writeFileSync(join(orphan, "checkout.json"), JSON.stringify({ checkout: gone }));
-    writeFileSync(join(orphan, "heartbeat.json"), JSON.stringify({ heartbeat_id: "01J00000000000000000000000" }));
-    // another repo's dir, and one whose checkout still exists, are no orphans of this one
+    writeFileSync(join(orphan, "heartbeat.json"), JSON.stringify({ heartbeat_id: adopted }));
+    // another repo's dir, and a same-named dir whose checkout still exists, are no orphans of this one
     const unrelated = join(h.home, "repos", "other-12345678");
     mkdirSync(unrelated);
     writeFileSync(join(unrelated, "checkout.json"), JSON.stringify({ checkout: join(h.dir, "nowhere", "other") }));
+    const alive = join(h.dir, "elsewhere", basename(h.root));
+    mkdirSync(alive, { recursive: true });
+    const sibling = join(h.home, "repos", `${basename(h.root)}-abcdef12`);
+    mkdirSync(sibling);
+    writeFileSync(join(sibling, "checkout.json"), JSON.stringify({ checkout: alive }));
 
     const r = await runChecked(["doctor", "--json"], h.deps);
     const warnings = (r.value as { warnings: string[] }).warnings.filter((w) => w.includes("orphan"));
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain(gone);
-    expect(warnings[0]).toContain(`mv ${orphan} ${mine}`);
+    const adopt = /: (rm -rf .+)$/.exec(warnings[0] ?? "")?.[1] ?? "";
+    expect(adopt).toContain(orphan);
     const text = await runChecked(["doctor"], h.deps);
-    expect(text.stdout).toContain(`mv ${orphan} ${mine}`);
+    expect(text.stdout).toContain(adopt);
     expect(existsSync(join(orphan, "heartbeat.json"))).toBe(true);
-    expect(existsSync(join(mine, "heartbeat.json"))).toBe(true);
-    expect(JSON.parse(readFileSync(join(mine, "heartbeat.json"), "utf8")).heartbeat_id).not.toBe("01J00000000000000000000000");
+    expect(JSON.parse(readFileSync(join(mine, "heartbeat.json"), "utf8")).heartbeat_id).not.toBe(adopted);
+
+    // running the printed command adopts the dir: the next tick keeps its heartbeat and names this checkout
+    expect(Bun.spawnSync(["sh", "-c", adopt]).exitCode).toBe(0);
+    expect(existsSync(orphan)).toBe(false);
+    h.clock.advance(10_000);
+    await h.tick();
+    expect(JSON.parse(readFileSync(join(mine, "heartbeat.json"), "utf8")).heartbeat_id).toBe(adopted);
+    expect(JSON.parse(readFileSync(join(mine, "checkout.json"), "utf8"))).toEqual({ checkout: h.root });
+    expect(readdirSync(mine)).not.toContain(basename(orphan));
   });
 });

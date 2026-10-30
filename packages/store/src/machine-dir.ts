@@ -8,10 +8,11 @@ import { atomicWriteJson } from "./fsx.ts";
 import { readLocalJson } from "./local-json.ts";
 import { checkoutFilePath, checkoutOf, machineDir, machineReposDir } from "./paths.ts";
 
-/** Write `checkout.json` in `root`'s machine dir when it has none yet. */
+/** Write `checkout.json` in `root`'s machine dir when it is missing or names another checkout (a dir adopted after a move, D3). */
 export function ensureCheckoutFile(root: string): void {
   const path = checkoutFilePath(machineDir(root));
-  if (!existsSync(path)) atomicWriteJson(path, { checkout: checkoutOf(root).checkout });
+  const checkout = checkoutOf(root).checkout;
+  if (!existsSync(path) || readLocalJson("local-checkout", path, { checkout: "" }).checkout !== checkout) atomicWriteJson(path, { checkout });
 }
 
 export interface OrphanedMachineDir {

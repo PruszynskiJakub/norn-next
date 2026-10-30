@@ -13,7 +13,7 @@
  */
 import { cmd, type AgentAdapter, currentRun, cursorStep, type HookDecision, type HookResponse, reportableOutcomes, standingReport } from "@norn/core";
 import { DEFAULT_CONFIG, type ExitCode, type HookFact, type ResolvedConfig, ulid } from "@norn/schema";
-import { appendTrace, blockedHookCount, loadConfig } from "@norn/store";
+import { appendTrace, bindNornHome, blockedHookCount, loadConfig } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import { type Context, findUnitMarker, safeRealpath } from "../context.ts";
 import { withExit } from "../output.ts";
@@ -123,6 +123,7 @@ export const hookEventCommand = defineCommand({
       const found = findUnitMarker(safeRealpath(cwd)) ?? findUnitMarker(safeRealpath(ctx.cwd));
       if (!found) return {}; // A3: no-op outside unit worktrees
       const root = safeRealpath(found.marker.repo);
+      bindNornHome(root, ctx.home); // repo: false, so no locate() bound this command's home
       const loaded = loadConfig({ repoRoot: root, home: ctx.home, env: ctx.env });
       const config = loaded.ok ? loaded.config : DEFAULT_CONFIG;
       const at = ctx.clock.iso();
