@@ -2,7 +2,7 @@
 id: gh-107/06
 title: Tick facts stored as content-addressed chunks with 64-fact hook blocks
 depends_on: [ gh-107/02 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
