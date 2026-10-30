@@ -34,11 +34,13 @@ Prepare release 0.12.0: changelog section, version bumps, pr.md, issue renamed.
   - cf89d2b7 #105 (gh-94, quick) Intake triage/reproduce → omitted: repo-local workflows, skills, issue templates and docs only.
   - 533fb102 #104 (gh-95, quick) Release waits for CI → omitted: repo-local release workflow and skills only.
   - 2bc6febd #102 (gh-93, quick) quick/story wait for CI → omitted: repo-local workflows only.
+  - 9d8676ad Remove gitlinks QA evidence committed on main (direct commit, no PR) → omitted: removes stray repo files under runs/ evidence, nothing shipped.
   - norn bookkeeping commits (gh-75/94/95/93/99 done) → omitted.
 - Proposed 0.12.0 (minor): #106 Adds, Changes and Removes commands (pre-1.0 rule). `## Version` in the issue was empty; no Rework.
 - Bumped packages/cli/package.json and the README badge to 0.12.0; CHANGELOG `## [0.12.0] - 2026-10-30` inserted; no `[Unreleased]` section.
 - Herdr plugin (`plugins/herdr/herdr-plugin.toml`) keeps its own version, already 0.4.0 from #106; the Claude Code plugin was removed in 0.11.0. Nothing else to bump.
 - Issue #109 renamed to "Release 0.12.0".
+- prepare#2 (after update from main 9d8676a): re-collected commits on current HEAD; only new commit is 9d8676ad, omitted. Changelog, bumps (0.12.0, person-confirmed at confirm-version#1) and issue title verified unchanged; pr.md notes the omission.
 - prepare#1 done: Propose 0.12.0: minor, #106 regroups the CLI (old command names removed, no aliases) and adds story create, story reopen, run cancel, config set|unset. 1 Added group (5 bullets), 2 Changed, 1 Removed, 0 Fixed; omitted #105, #104, #102 (repo-local process only). Herdr plugin keeps its own version (0.4.0 already); no Claude plugin to bump since 0.11.0.
 
 ## Resume
