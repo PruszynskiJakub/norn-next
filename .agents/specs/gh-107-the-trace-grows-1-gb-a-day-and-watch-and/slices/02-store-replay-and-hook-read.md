@@ -1,8 +1,8 @@
 ---
 id: gh-107/02
 title: Replay inputs and unit hook facts read through store
-depends_on: [gh-107/01]
-status: planned
+depends_on: [ gh-107/01 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
