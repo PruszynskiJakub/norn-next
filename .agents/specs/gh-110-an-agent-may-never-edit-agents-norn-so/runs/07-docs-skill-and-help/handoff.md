@@ -14,6 +14,15 @@
 
 ## Goal
 
+Nothing shipped sends anyone to `.agents/norn/`: README, PRD, AGENTS.md's Layout and contracts, `norn help`, shipped skills and config name the new layout and `norn migrate`; the shipped norn skill's hard rule names only `runs/` and the generated top of handoff.md (B3, B22, B23).
+
 ## Progress
 
+- Red first: `test/repo.test.ts` "the new layout in product docs (gh-110 B3, B22)" — scan of README, PRD, `packages/cli/assets`, package sources and AGENTS.md's Layout + "Where the contracts live" for `.agents/norn/` (and `.agents/*/`), with one allowlisted place (store's `OLD_*` constants); README's Workflows/Config paragraphs; PRD §7 + ID2 name `repos/<id>/`; the shipped skill's never-edit sentence has only `runs/` as a code span (AC1). `packages/cli/test/help-tree.test.ts` "norn migrate in help": migrate has a one-line summary and no help output names the old folder (AC3).
+- Green: shipped norn skill hard rule narrowed; norn-retro skill and shipped `config.yaml` name the new places; README (init, what gets committed, glossary row, Workflows/Config, an upgrade paragraph for `norn migrate`, Setup row); PRD (§7 tree with `repos/<id>/`, new LY1–LY3 under §7, ID2 machine dir and id, W1, BS1, BS10, K2, K6, S8, §7.1 row, A7 doctor repo group, §15 Setup row, retro/redaction rows); AGENTS.md Layout, contracts and the heartbeat decision path; `migrate`'s help summary no longer spells the old folder.
+- Not touched (D12): AGENTS.md Process/repo-local lines, CONTRIBUTING.md, `.agents/skills/norn*` copies, CHANGELOG.md.
+- AC4 (person): the story's PR description (story-level pr step) must carry a "Release note" paragraph: after `norn migrate` an older norn cannot read the repository and must be upgraded on every machine (D13). There is no pr.md yet; not written in this slice.
+
 ## Resume
+
+Full suite + typecheck, then `norn done done`. If anything is red, fix it in this slice's scope.
