@@ -1,0 +1,13 @@
+{
+  "kind": "approve",
+  "receipt_id": "01M666QSK64G73SPKCR81H4NK8",
+  "run_id": null,
+  "step": "ready",
+  "attempt": 2,
+  "at": "2026-10-30T10:47:24.006Z",
+  "by": "human",
+  "who": "jakubpruszynski@mac",
+  "slice": null,
+  "comment": "Cookbook and workflow renames in; test/qa skipped by the person's choice, PR CI green (check, package, process).",
+  "head_sha": "17241c8bada3cede31dac828b2fa169e875d794f"
+}
