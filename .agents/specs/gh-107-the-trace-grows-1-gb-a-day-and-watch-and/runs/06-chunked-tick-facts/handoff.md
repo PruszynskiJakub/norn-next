@@ -28,7 +28,9 @@ Tick lines keep decisions inline and store facts as a `$chunked` skeleton whose 
 - `bun run golden`: adds the same 3 cases (check-run ×2, cockpit) on the base as on this branch, i.e. coverage gaps that already existed, not caused here. They are not committed.
 - PRD O4, O5 and X4 amended.
 - implement#1 done: Tick lines keep their decisions inline and store facts as a $chunked skeleton. Each story (with run hooks as 64-fact $blocks), machine, remote.issues, replay config and each workflow source is a chunk in <day>.chunks.jsonl, written in one fsynced append before the tick line (store tick-trace.ts: appendTick, tickReader/readTickInputs). why and the golden harvest read chunked and full-facts ticks. A missing chunk gives exit 4 trace_corrupt. S2 tests are in store config-trace.test.ts, including a byte-for-byte round-trip of every golden case. S1 tests are in cli chunked-ticks.test.ts. PRD O4/O5/X4 amended. Full suite (1260) and typecheck green. The PR body must name the downgrade as the merge danger (AC13).
+- review#1: approve. Full suite 1260 pass, typecheck green. AC1–AC12 tested at S1/S2. Minor findings: F1 B13 5 KB does not hold at ~50 units (inline decisions), F2 filtered why drops story facts of ticks with no replay block or a corrupt chunk, F3 chunk values are not hash-checked, F4/F5 nits.
+- review#1 approve: AC1–AC12 met and tested at S1/S2; full suite (1260) and typecheck green. No blocking findings. Minor: B13's 5 KB holds at harness scale, not on ~50-unit repos (decisions inline, D6); filtered why skips story facts of no-replay/corrupt ticks; chunk values not hash-checked on read. AC13 is the person's at ready.
 
 ## Resume
 
-Report done. The PR body must name the downgrade as the merge danger (AC13): an older norn cannot replay chunked ticks and there is no compatibility mode.
+Review done (approve). Optional follow-ups: F2 (why.ts unitIn fallback to tick.facts on no_replay), F3 (verify sha256 of the chunk value on read).
