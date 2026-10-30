@@ -375,7 +375,7 @@ steps:
     expect(r.exit).toBe(0);
     expect(r.stdout).toStartWith("norn doctor: every check passes\n");
     expect(r.stdout).toMatch(/ok {3}workflows +.*solo/);
-    expect(r.stdout).toMatch(/ok {3}config +\.agents\/norn\/config\.yaml/);
+    expect(r.stdout).toMatch(/ok {3}config +\.agents\/norn\.config\.yaml/);
     expect(status()).toBe("");
   });
 
@@ -390,7 +390,7 @@ steps:
         repo: { ok: false, workflows: expect.arrayContaining([{ name: "loop", file: relWorkflow("loop"), ok: false, issues: [expect.objectContaining({ code: "uncounted_cycle", path: "/steps/a", cycle: ["a", "b"] })] }]) },
       });
       expect(r.stdout).toMatch(/^norn doctor: 1 check failed \(workflow loop\)/);
-      expect(r.stdout).toMatch(/FAIL workflow loop +\.agents\/norn\/workflows\/loop\.yaml/);
+      expect(r.stdout).toMatch(/FAIL workflow loop +\.agents\/workflows\/loop\.yaml/);
       expect(r.stdout).toContain("! /steps/a: cycle without a counter: a.done → b.again → a (W4)");
     } finally {
       rmSync(file);
@@ -408,7 +408,7 @@ steps:
         repo: { ok: false, workflows: expect.arrayContaining([{ name: "nope", file: relWorkflow("nope"), ok: false, issues: [expect.objectContaining({ code: "unknown_skill", path: "/steps/implement/skill", message: expect.stringContaining(reason) })] }]) },
       });
       const text = await runChecked(["doctor"], { ...h.deps, env: env() });
-      expect(text.stdout).toMatch(/FAIL workflow nope +\.agents\/norn\/workflows\/nope\.yaml/);
+      expect(text.stdout).toMatch(/FAIL workflow nope +\.agents\/workflows\/nope\.yaml/);
       expect(text.stdout).toContain(`! /steps/implement/skill: ${reason}`);
 
       // the same validator: a tick refuses to start a story on that workflow, naming the same skill
@@ -434,12 +434,12 @@ steps:
       expect(r.exit).toBe(1);
       expect(r.value).toMatchObject({ ok: false, repo: { ok: false, config: { ok: false, file: relConfig, errors: [expect.objectContaining({ path: "/max_agents" })] } } });
       expect(r.stdout).toMatch(/^norn doctor: .*failed \(.*config.*\)/);
-      expect(r.stdout).toMatch(/FAIL config +\.agents\/norn\/config\.yaml/);
+      expect(r.stdout).toMatch(/FAIL config +\.agents\/norn\.config\.yaml/);
       expect(r.stdout).toMatch(/! \/max_agents: .*integer/);
       // --repo needs no config that loads either
       const repo = await runChecked(["doctor", "--repo"], { ...h.deps, env: env() });
       expect(repo.exit).toBe(1);
-      expect(repo.stdout).toMatch(/FAIL config +\.agents\/norn\/config\.yaml/);
+      expect(repo.stdout).toMatch(/FAIL config +\.agents\/norn\.config\.yaml/);
     } finally {
       h.write(file, CONFIG);
     }

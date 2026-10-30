@@ -456,19 +456,15 @@ const SPAWN_ALLOW: Counts = {
 /**
  * (g) B1, B2, B5: norn's paths under a repo are spelled only by store's path module (paths.ts), so a
  * layout change is a change there. Counts lines of package sources and tests that spell `.agents/norn`
- * (or join `".agents", "norn"`) outside a comment. Allowed: user-facing message text, renamed with the
- * layout (gh-110 D11).
+ * (or join `".agents", "norn"`) outside a comment; messages name paths through its `REPO_CONFIG_FILE` and
+ * `WORKFLOWS_DIR` (gh-110 D11). Allowed: tests asserting text a person sees.
  */
 const NORN_PATH = /\.agents\/norn\b|["'`]\.agents["'`]\s*,\s*["'`]norn["'`]/;
 const NORN_PATH_ALLOW: Record<string, [number, string]> = {
   "packages/store/src/paths.ts": [1, "the path module"],
-  "packages/cli/src/wiring.ts": [2, "message: do_instead naming the repo config"],
-  "packages/cli/src/commands/config-edit.ts": [3, "message: --repo help and the user-or-repo pick"],
-  "packages/cli/src/commands/init.ts": [3, "message: init's config row and next steps"],
-  "packages/cli/src/commands/story-create.ts": [1, "message: unknown_workflow refusal"],
-  "packages/cli/src/commands/story-edit.ts": [1, "message: unknown_workflow refusal"],
-  "packages/cli/test/config.test.ts": [2, "message: the user-or-repo pick and its test name"],
+  "packages/cli/test/config.test.ts": [1, "message: the user-or-repo pick"],
   "packages/cli/test/e2e.test.ts": [1, "message: init's config row"],
+  "packages/cli/test/layout.test.ts": [1, "the layout test: the repo config file as a person sees it"],
   "packages/core/test/printed-commands.test.ts": [1, "not a path read: a string the removed-command matcher must pass"],
 };
 

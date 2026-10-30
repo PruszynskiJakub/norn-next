@@ -2,7 +2,7 @@
 id: gh-110/03
 title: Repo config at .agents/norn.config.yaml, workflows in .agents/workflows/
 depends_on: [ gh-110/01 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }

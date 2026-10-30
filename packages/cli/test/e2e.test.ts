@@ -111,7 +111,7 @@ describe("norn init", () => {
     const r = await h.norn("init");
     expect(r.exit).toBe(0);
     expect(r.stdout).toStartWith(`norn init in ${h.root}\n`);
-    expect(r.stdout).toContain("config          .agents/norn/config.yaml kept (exists)");
+    expect(r.stdout).toContain("config          .agents/norn.config.yaml kept (exists)");
     expect(r.stdout).toContain("workflows       kept bug.yaml, slice.yaml, story.yaml");
     expect(r.stdout).toMatch(/skills +\.agents\/skills: up to date \(\d+ skills\)/);
     expect(r.stdout).toContain("claude → .claude/skills: all linked");

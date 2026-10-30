@@ -54,7 +54,9 @@ Move the checkout's machine-local files (trace, locks, heartbeat, caches, runner
 
 - qa#1: all six criteria pass. Full suite 1437/1437, typecheck green. Hand checks in a throwaway repo with an isolated NORN_HOME_DIR: machine dir repos/app-f8c1edd7 (hash checked on its own), tick.lock seen there, tree and .git clean, no trace ignore line; a linked worktree's tick reused the same dir and heartbeat; a second clone got its own dir and id; user config read as before; doctor warned about a planted orphan without moving anything, and the printed command adopted it (heartbeat kept, checkout.json rewritten); headless logs landed in repos/<id>/runs/. Side note: doctor's hook check failed 2 of 6 runs in the scratch repo, then passed.
 - qa#1 pass: QA pass: AC1-AC6 observed. Full suite 1437/1437, typecheck green. In a throwaway repo with an isolated home: files under repos/<folder>-<hash8> (hash checked on its own), tick.lock there, tree/.git clean, no trace ignore line; a worktree tick shares the dir and heartbeat; a second clone gets its own; user config read as before; doctor warns about an orphan, moves nothing, and its printed command adopts it; headless logs in repos/<id>/runs/.
+- merge#1 (integrate.conflict): merged the story branch (slice 03: config at `.agents/norn.config.yaml`, workflows in `.agents/workflows/`) with `git merge --no-ff`. paths.ts: kept 03's REPO_CONFIG_FILE/WORKFLOWS_DIR/isNornRepo and this slice's machine-dir paths; dropped traceDir, TRACE_IGNORE_ENTRY and the now-unused NORN_DIR (this slice removed them). init.ts import: 03's names without TRACE_IGNORE_ENTRY. Typecheck green.
+- merge#1: full suite 1443/1446: the (g) path ratchet wanted paths.ts lowered 2 → 1 (this slice dropped the trace path line), done; check-run's two-long-checks beforeAll timed out under suite load and passes alone (39/39 for repo.test + check-run).
 
 ## Resume
 
-qa#1: pass reported; the next step is norn's to route.
+merge#1: merge committed; report done.

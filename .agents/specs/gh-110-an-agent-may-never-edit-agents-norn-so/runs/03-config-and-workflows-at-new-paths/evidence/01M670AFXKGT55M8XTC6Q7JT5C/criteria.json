@@ -1,0 +1,8 @@
+[
+  { "id": "AC1", "verdict": "pass", "evidence": "AC1-5.md, AC1-5-layout-test.log, AC6.md (init writes .agents/norn.config.yaml, no .agents/norn/; config list names it)" },
+  { "id": "AC2", "verdict": "pass", "evidence": "AC1-5.md, AC6.md (init writes .agents/workflows/{bug,slice,story}.yaml; next step 2 names .agents/workflows/)" },
+  { "id": "AC3", "verdict": "pass", "evidence": "AC1-5.md (norn:wf:quick story pins .agents/workflows/quick.yaml), AC6.md (story create --workflow nope: unknown_workflow, exit 3, names .agents/workflows/)" },
+  { "id": "AC4", "verdict": "pass", "evidence": "AC1-5.md, AC1-5-layout-test.log (gh-7 keeps v1 pinned, gh-9 started after pins v2)" },
+  { "id": "AC5", "verdict": "pass", "evidence": "AC1-5.md (config set pick + --repo help, story create/edit unknown_workflow, unknown_adapter do_instead), AC6.md (same texts from the real CLI)" },
+  { "id": "AC6", "verdict": "pass", "evidence": "AC6.md: throwaway repo, dev build: init creates .agents/norn.config.yaml + .agents/workflows/, config list shows repo: .agents/norn.config.yaml, config set --repo help names it and writes default_mode there, doctor names the new files" }
+]

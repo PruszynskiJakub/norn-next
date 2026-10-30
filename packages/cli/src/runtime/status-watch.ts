@@ -13,7 +13,7 @@
  */
 import { existsSync } from "node:fs";
 import { parseDuration } from "@norn/schema";
-import { hasNornDir, readCockpitFile, writeCockpitFile } from "@norn/store";
+import { isNornRepo, readCockpitFile, writeCockpitFile } from "@norn/store";
 import { type CockpitModel, cockpitModel, inboxItemsInOrder, type ProjectView, withInput } from "@norn/view";
 import { opt, type ParsedArgs } from "../command.ts";
 import { Context } from "../context.ts";
@@ -82,7 +82,7 @@ async function located(ctx: Context): Promise<Context> {
   } catch (e) {
     return elsewhere(e);
   }
-  if (hasNornDir(ctx.root) || !last) return ctx;
+  if (isNornRepo(ctx.root) || !last) return ctx;
   return elsewhere(null);
 }
 

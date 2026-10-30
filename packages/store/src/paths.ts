@@ -9,12 +9,14 @@ import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { LEGACY_SPEC_FILE, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName } from "@norn/schema";
 
-const NORN_DIR = ".agents/norn";
+/** gh-110 B1, B2 (D1): the committed repo config and workflows, relative to a root, as messages name them. */
+export const REPO_CONFIG_FILE = ".agents/norn.config.yaml";
+export const WORKFLOWS_DIR = ".agents/workflows";
 
-export const repoConfigPath = (root: string) => join(root, NORN_DIR, "config.yaml");
-export const workflowsDir = (root: string) => join(root, NORN_DIR, "workflows");
+export const repoConfigPath = (root: string) => join(root, REPO_CONFIG_FILE);
+export const workflowsDir = (root: string) => join(root, WORKFLOWS_DIR);
 /** Whether norn is set up in this checkout (CP13: the cockpit falls back to the last repo otherwise). */
-export const hasNornDir = (root: string) => existsSync(join(root, NORN_DIR));
+export const isNornRepo = (root: string) => existsSync(repoConfigPath(root)) || existsSync(workflowsDir(root));
 
 /** The checkout a root belongs to: its git common dir (real path) and the main checkout's path. */
 export interface CheckoutOf {

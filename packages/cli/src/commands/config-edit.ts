@@ -1,18 +1,18 @@
 /**
  * `norn config set <key> <value>` and `norn config unset <key>` (B62–B68): one value in the user
- * (`~/.norn/config.yaml`) or repo (`.agents/norn/config.yaml`) file, edited in place (D8). Without
+ * (`~/.norn/config.yaml`) or repo (`.agents/norn.config.yaml`) file, edited in place (D8). Without
  * `--user`/`--repo` a person at a terminal is asked which file (B64); anywhere else it is a usage
  * error (B65).
  */
 import { relative } from "node:path";
-import { type ConfigLayerName, editConfigLayer } from "@norn/store";
+import { type ConfigLayerName, editConfigLayer, REPO_CONFIG_FILE } from "@norn/store";
 import { defineCommand, opt, type ParsedArgs } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, rendered, usageError } from "../output.ts";
 import { cmd } from "@norn/core";
 
 const FILE_OPTIONS = { user: { type: "boolean" }, repo: { type: "boolean" } } as const;
-const FILE_HELP = { "--user": "edit ~/.norn/config.yaml (yours, this machine)", "--repo": "edit .agents/norn/config.yaml (the team's, committed)" };
+const FILE_HELP = { "--user": "edit ~/.norn/config.yaml (yours, this machine)", "--repo": `edit ${REPO_CONFIG_FILE} (the team's, committed)` };
 const PASS_FILE = "pass --user or --repo";
 
 export const configSetCommand = defineCommand({
@@ -61,9 +61,9 @@ async function layerFile(ctx: Context, args: ParsedArgs, verb: string): Promise<
   if (!terminal) throw usageError("which config file? (no terminal to ask in)", PASS_FILE, "file_required");
   const choices = [
     { value: "user", label: "user (~/.norn/config.yaml): yours, this machine" },
-    { value: "repo", label: "repo (.agents/norn/config.yaml): the team's, committed" },
+    { value: "repo", label: `repo (${REPO_CONFIG_FILE}): the team's, committed` },
   ];
-  const picked = await terminal.pick(`${verb} user (~/.norn/config.yaml) or repo (.agents/norn/config.yaml)?`, choices, 0);
+  const picked = await terminal.pick(`${verb} user (~/.norn/config.yaml) or repo (${REPO_CONFIG_FILE})?`, choices, 0);
   if (!picked) throw refuse("Nothing picked", null, "cancelled");
   return picked as ConfigLayerName;
 }
