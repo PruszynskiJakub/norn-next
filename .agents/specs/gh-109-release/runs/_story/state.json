@@ -21,11 +21,11 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 0,
+  "applied_through": 1,
   "run": null,
   "last_outcome": null,
   "created_at": "2026-10-30T11:22:24.404Z",
-  "updated_at": "2026-10-30T11:22:24.404Z",
-  "last_tick_id": "01M668QWR7K7JXFG3WGDG6FC0T",
-  "mode": "manual"
+  "updated_at": "2026-10-30T11:23:29.243Z",
+  "last_tick_id": "01M668SW2F0K26YAG6WE166S7A",
+  "mode": "auto"
 }
