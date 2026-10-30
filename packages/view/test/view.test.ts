@@ -6,6 +6,7 @@ import { type ClaimBlob, type LeaseFile, type Receipt, type UnitState, ulid } fr
 import {
   acquireClaim,
   appendReceipt,
+  bindNornHome,
   appendTrace,
   leasesDir,
   pinWorkflow,
@@ -88,6 +89,7 @@ async function seed() {
   const repo = tmp();
   const home = tmp();
   Bun.spawnSync(["git", "init", "-q", repo], { cwd: repo });
+  bindNornHome(repo, home);
   const spec = storyDir(repo, "gh-12", "fix-login");
   writeStoryFile(
     storyFile(spec),

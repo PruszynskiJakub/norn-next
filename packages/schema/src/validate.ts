@@ -8,6 +8,7 @@ import { ConfigLayer, ResolvedConfig } from "./config.ts";
 import { SliceFrontmatter, StoryFrontmatter } from "./frontmatter.ts";
 import {
   LocalBaseFile,
+  LocalCheckoutFile,
   LocalCockpitFile,
   LocalFailuresFile,
   LocalForeignFile,
@@ -41,7 +42,7 @@ export const SCHEMAS = {
   "resolved-config": ResolvedConfig,
   "cli-error": CliError,
   "criteria-report": CriteriaReport,
-  // machine-local files of one checkout (trace dir), read through store readLocalJson (S2, BUG-4)
+  // machine-local files of one checkout (its machine dir, B5), read through store readLocalJson (S2, BUG-4)
   "local-remote": LocalRemoteFile,
   "local-notified": LocalNotifiedFile,
   "local-records": LocalRecordsFile,
@@ -54,6 +55,7 @@ export const SCHEMAS = {
   "local-cockpit": LocalCockpitFile,
   "local-lock": LocalLockFile,
   "local-notices": LocalNoticesFile,
+  "local-checkout": LocalCheckoutFile,
 } as const;
 export type SchemaName = keyof typeof SCHEMAS;
 export type SchemaType<N extends SchemaName> = Static<(typeof SCHEMAS)[N]>;

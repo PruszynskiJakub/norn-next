@@ -28,7 +28,7 @@ import { basename, extname, join, relative, resolve } from "node:path";
 import { git as gitAdapter, herdr, proc } from "@norn/adapters";
 import type { AgentAdapter, FileError, RunnerPort, SessionRef, WorkflowIssue } from "@norn/core";
 import { ExitCode, ulid } from "@norn/schema";
-import { loadWorkflows, machineHolder, noteSpawn, readHookFacts, repoConfigPath, skillsReport, traceDir, workflowsDir, writeUnitMarker } from "@norn/store";
+import { bindNornHome, loadWorkflows, machineDir, machineHolder, noteSpawn, orphanedMachineDirs, readHookFacts, repoConfigPath, skillsReport, workflowsDir, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { rendered, withExit } from "../output.ts";
@@ -90,19 +90,28 @@ function syntheticEvent(agent: AgentAdapter, cwd: string, env: Record<string, st
   return null;
 }
 
-function scratchUnit(): { dir: string; repo: string } {
+/** A throwaway unit worktree (its own git repo) whose machine dir is in this command's home; `drop` removes both. */
+async function scratchUnit(ctx: Context): Promise<{ repo: string; drop: () => void }> {
   const dir = mkdtempSync(join(tmpdir(), "norn-doctor-"));
   const repo = join(dir, "repo");
-  mkdirSync(traceDir(repo), { recursive: true });
+  await run(["git", "init", "-q", repo], { timeoutMs: 10_000 });
+  bindNornHome(repo, ctx.home);
+  const machine = machineDir(repo);
   writeUnitMarker(repo, { repo, story: "gh-1", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-1-norn-doctor" });
-  return { dir, repo };
+  return {
+    repo,
+    drop: () => {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(machine, { recursive: true, force: true });
+    },
+  };
 }
 
 /** Invoke the installed hook command the way the agent tool would, and look for the recorded fact. */
 async function hookFires(ctx: Context, name: string, agent: AgentAdapter, command: string) {
   const bin = hookBinary(command, ctx.env);
   if (!which(bin, ctx.env)) return { ok: false, command, error: `${bin} not found on PATH (the installed hooks call it)` };
-  const { dir, repo } = scratchUnit();
+  const { repo, drop } = await scratchUnit(ctx);
   try {
     const ev = syntheticEvent(agent, repo, ctx.env);
     if (!ev) return { ok: false, command, error: "adapter recognizes none of its own hook events" };
@@ -112,15 +121,14 @@ async function hookFires(ctx: Context, name: string, agent: AgentAdapter, comman
     const ok = r.code === 0 && facts.length > 0;
     return { ok, command: `${command} ${ev.arg} --agent ${name}`, exit: r.code, recorded: facts.length, ...(ok ? {} : { error: r.error ?? (r.code !== 0 ? firstLine(r.out) || `exit ${r.code}` : `no hook fact recorded (since ${since})`) }) };
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    drop();
   }
 }
 
 /** --live: one cheap headless turn in a throwaway repo with norn hooks installed. */
 async function liveTurn(ctx: Context, name: string, agent: AgentAdapter, command: string) {
-  const { dir, repo } = scratchUnit();
+  const { repo, drop } = await scratchUnit(ctx);
   try {
-    await run(["git", "init", "-q", repo], { timeoutMs: 10_000 });
     if (agent.tier !== "none") await agent.installHooks(repo, command, name);
     const cfg = ctx.config.agents[name];
     const launch = agent.launchCommand({
@@ -135,7 +143,7 @@ async function liveTurn(ctx: Context, name: string, agent: AgentAdapter, command
     const ok = r.code === 0 && (agent.tier === "none" || facts.length > 0);
     return { ok, exit: r.code, timed_out: r.timed_out, hook_events: facts.map((f) => f.event), ...(ok ? {} : { error: r.error ?? (r.code !== 0 ? firstLine(r.out.slice(-500)) : "the agent ran but no hook reported to norn") }) };
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    drop();
   }
 }
 
@@ -449,6 +457,9 @@ export const doctorCommand = defineCommand({
     if (machine.override !== null)
       warnings.push(`NORN_MACHINE=${machine.override} overrides this machine's name (a test aid): runs are judged by pid only on the machine they were started on (R7.2), so two hosts must never share a name — unset it outside tests`);
 
+    // D3: a machine dir left behind when this repo folder moved; adopting it keeps the heartbeat (ID2)
+    for (const o of orphanedMachineDirs(ctx.home, ctx.root))
+      warnings.push(`orphaned machine dir ${o.dir}: its checkout ${o.checkout} no longer exists — if this repo moved from there, adopt it (keeps its heartbeat and claims): mv ${o.dir} ${machineDir(ctx.root)}`);
     if (sk.drifted.length) warnings.push(`skills differ from this norn's bundled version: ${sk.drifted.join(", ")} — run ${cmd.init()} to update them (git diff .agents/skills/ shows the change)`);
 
     const ok = gitCheck.ok && agents.every((a) => a.ok) && remote.ok === true && (runner.ok === true || runner.required === false) && skillsOk && repo.ok;

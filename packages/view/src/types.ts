@@ -262,7 +262,7 @@ export interface UnitTraceSummary {
 /**
  * Where a trace's record paths point (F36): a story worktree, the main checkout, or — for a
  * story with no worktree whose records the checkout does not have — the cached copy of the
- * base branch in the trace dir (replaced when `origin/<base>` moves; `ref` is the live source).
+ * base branch in the machine dir (replaced when `origin/<base>` moves; `ref` is the live source).
  */
 export interface TraceRecords {
   source: "worktree" | "checkout" | "base_cache";

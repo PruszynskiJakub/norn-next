@@ -18,7 +18,7 @@ export interface StepTimelineInput {
   title: string;
   /** absolute runs/<unit>/ */
   runs_dir: string;
-  /** absolute trace dir (briefing paths are relative to it) */
+  /** absolute machine dir (briefing paths are relative to it) */
   trace_dir: string;
   state: UnitState | null;
   workflow: Workflow | null;

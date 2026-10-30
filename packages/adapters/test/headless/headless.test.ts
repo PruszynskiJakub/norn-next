@@ -3,7 +3,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AdapterContext } from "@norn/core";
-import { runnerLogDir, traceDir } from "@norn/store";
+import { runnerLogDir, machineDir } from "@norn/store";
 import { createHeadlessRunner, headlessFactory, logPath } from "../../src/headless/index.ts";
 
 describe("headless runner (real processes)", () => {
@@ -68,7 +68,7 @@ describe("headless runner (real processes)", () => {
 
   test("without log_dir, logs go to store's runner log dir for the checkout: the trace dir's runs/, as before", async () => {
     const root = mkdtempSync(join(tmpdir(), "norn-headless-"));
-    expect(runnerLogDir(root)).toBe(join(traceDir(root), "runs"));
+    expect(runnerLogDir(root)).toBe(join(machineDir(root), "runs"));
     mkdirSync(runnerLogDir(root), { recursive: true });
     copyFileSync(join(import.meta.dir, "fixtures", "claude-prompt-swallowed.log"), logPath(runnerLogDir(root), "01JRUN"));
     const runner = headlessFactory({ repoRoot: root } as AdapterContext, { adapter: "headless" });

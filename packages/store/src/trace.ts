@@ -1,5 +1,5 @@
 /**
- * Trace (O4, B4, gitignored): `.agents/norn/trace/<YYYY-MM-DD>.jsonl` — one JSONL file
+ * Trace (O4, B4, machine-local): `<norn home>/repos/<id>/<YYYY-MM-DD>.jsonl` — one JSONL file
  * per UTC day holding every event (tick, hook, reject, briefing) in append order. Day files keep
  * appends cheap and let old days be deleted wholesale; `trace <unit>` / `why <unit>`
  * filter by unit while reading. Briefings and transcript snapshots are separate files
@@ -10,7 +10,7 @@ import { dirname, join, normalize } from "node:path";
 import type { FileError } from "@norn/core";
 import { type HookFact, type TickStartTrace, type TickTrace, type TraceEvent, assertValid, ulid, ulidTime, validate } from "@norn/schema";
 import { appendDurable, atomicWrite, isErrno, readText } from "./fsx.ts";
-import { traceDir } from "./paths.ts";
+import { machineDir } from "./paths.ts";
 
 function eventTime(ev: TraceEvent): string {
   return ev.type === "hook" ? ev.fact.at : ev.at;
@@ -31,7 +31,7 @@ function traceFileName(at: string): string {
 export function appendTrace(root: string, event: TraceEvent): string {
   assertValid("trace", event);
   const name = traceFileName(eventTime(event));
-  const path = join(traceDir(root), name);
+  const path = join(machineDir(root), name);
   const line = `${JSON.stringify(event)}\n`;
   if (event.type === "tick.start") appendDurable(path, line);
   else {
@@ -110,7 +110,7 @@ function eventMatchesUnit(ev: TraceEvent, unit: string): boolean {
 
 function dayFiles(root: string): string[] {
   try {
-    return readdirSync(traceDir(root))
+    return readdirSync(machineDir(root))
       .filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n))
       .sort();
   } catch (e) {
@@ -124,7 +124,7 @@ export function readTrace(root: string, q: TraceQuery = {}): TraceRead {
   const sinceDay = q.since ? traceFileName(q.since) : null;
   for (const name of dayFiles(root)) {
     if (sinceDay && name < sinceDay) continue;
-    const text = readText(join(traceDir(root), name)) ?? "";
+    const text = readText(join(machineDir(root), name)) ?? "";
     const lines = text.split("\n");
     lines.forEach((line, i) => {
       if (!line.trim()) return;
@@ -186,7 +186,7 @@ export function crashedTicksFor(root: string, unit: string): TickStartTrace[] {
 /** Day files of the trace, unsorted; none when the trace dir cannot be listed (diagnostic, never fatal). */
 function hookDayFiles(root: string): string[] | null {
   try {
-    return readdirSync(traceDir(root)).filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n));
+    return readdirSync(machineDir(root)).filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n));
   } catch {
     return null;
   }
@@ -206,7 +206,7 @@ export function readHookFacts(root: string, since: string): HookFact[] {
     if (name.slice(0, 10) < day) continue;
     let text: string;
     try {
-      text = readFileSync(join(traceDir(root), name), "utf8");
+      text = readFileSync(join(machineDir(root), name), "utf8");
     } catch {
       continue;
     }
@@ -232,7 +232,7 @@ export function blockedHookCount(root: string, runId: string): number {
   let n = 0;
   for (const name of names) {
     if (name.slice(0, 10) < day) continue;
-    for (const line of readFileSync(join(traceDir(root), name), "utf8").split("\n"))
+    for (const line of readFileSync(join(machineDir(root), name), "utf8").split("\n"))
       if (line.startsWith('{"type":"hook"') && line.includes('"blocked":true') && line.includes(needle)) n++;
   }
   return n;
@@ -251,11 +251,11 @@ function safeRel(rel: string): string {
 
 /** Write a trace side file atomically; returns its trace-relative path. */
 export function writeTraceFile(root: string, rel: string, text: string): string {
-  atomicWrite(join(traceDir(root), safeRel(rel)), text);
+  atomicWrite(join(machineDir(root), safeRel(rel)), text);
   return rel;
 }
 export function readTraceFile(root: string, rel: string): string | null {
-  return readText(join(traceDir(root), safeRel(rel)));
+  return readText(join(machineDir(root), safeRel(rel)));
 }
 
 /** Store the exact briefing of a run (B4). */

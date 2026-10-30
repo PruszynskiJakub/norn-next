@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://norn.dev/schema/local-checkout.json",
+  "title": "the checkout a norn machine dir belongs to (<norn home>/repos/<id>/checkout.json)",
+  "type": "object",
+  "required": [
+    "checkout"
+  ],
+  "properties": {
+    "checkout": {
+      "minLength": 1,
+      "type": "string"
+    }
+  }
+}

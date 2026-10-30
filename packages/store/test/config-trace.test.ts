@@ -13,7 +13,7 @@ import {
   readTrace,
   readTraceFile,
   repoConfigPath,
-  traceDir,
+  machineDir,
   workflowsDir,
   writeBriefing,
 } from "../src/index.ts";
@@ -81,7 +81,7 @@ describe("trace (O4)", () => {
       id: ulid(),
       fact: { event: "turn_end", at: "2026-10-24T00:00:03.000Z", agent: "claude", native: "Stop", cwd: "/w", story: "gh-12", slice: "gh-12/01" },
     });
-    appendFileSync(join(traceDir(repo), "2026-10-24.jsonl"), "garbage\n");
+    appendFileSync(join(machineDir(repo), "2026-10-24.jsonl"), "garbage\n");
     const all = readTrace(repo);
     expect(all.events.length).toBe(4);
     expect(all.errors.map((e) => e.file)).toEqual(["2026-10-24.jsonl:4"]);

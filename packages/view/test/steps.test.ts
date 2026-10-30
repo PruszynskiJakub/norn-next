@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { NumberedReceipt } from "@norn/core";
 import type { Receipt, UnitState } from "@norn/schema";
-import { baseCacheDir, traceDir } from "@norn/store";
+import { baseCacheDir, bindNornHome, machineDir } from "@norn/store";
 import { buildStepTimeline, criteriaSummary, formatDuration, formatStepTimeline, loadTraceView, type StepRow, type TraceView } from "../src/index.ts";
 
 const FIX = join(import.meta.dir, "fixtures/gh-1");
@@ -24,9 +24,10 @@ function seed(opts: { trace?: boolean } = {}): string {
   const repo = mkdtempSync(join(tmpdir(), "norn-steps-"));
   dirs.push(repo);
   cpSync(join(FIX, "spec"), join(repo, SPEC), { recursive: true });
+  bindNornHome(repo, join(repo, ".home"));
   if (opts.trace !== false) {
-    mkdirSync(traceDir(repo), { recursive: true });
-    cpSync(join(FIX, "trace.jsonl"), join(traceDir(repo), "2026-10-23.jsonl"));
+    mkdirSync(machineDir(repo), { recursive: true });
+    cpSync(join(FIX, "trace.jsonl"), join(machineDir(repo), "2026-10-23.jsonl"));
   }
   return repo;
 }

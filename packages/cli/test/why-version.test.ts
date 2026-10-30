@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type TickTrace, validate } from "@norn/schema";
-import { repoConfigPath, traceDir as traceDirOf, workflowsDir } from "@norn/store";
+import { repoConfigPath, machineDir as machineDirOf, workflowsDir } from "@norn/store";
 import { version } from "../package.json";
 import { createHarness, type Harness, issue } from "./harness.ts";
 
@@ -31,21 +31,21 @@ notifiers: []
 `;
 
 let h: Harness;
-const traceDir = () => traceDirOf(h.root);
+const machineDir = () => machineDirOf(h.root);
 
 function ticks(): TickTrace[] {
-  return readdirSync(traceDir())
+  return readdirSync(machineDir())
     .filter((f) => f.endsWith(".jsonl"))
     .sort()
-    .flatMap((f) => readFileSync(join(traceDir(), f), "utf8").split("\n").filter(Boolean))
+    .flatMap((f) => readFileSync(join(machineDir(), f), "utf8").split("\n").filter(Boolean))
     .map((l) => JSON.parse(l) as { type: string })
     .filter((e): e is TickTrace => e.type === "tick");
 }
 
 /** Rewrite one tick record in the trace (as an older norn, or an edited trace, would have left it). */
 function editTick(tickId: string, edit: (t: TickTrace) => void): void {
-  for (const f of readdirSync(traceDir()).filter((n) => n.endsWith(".jsonl"))) {
-    const path = join(traceDir(), f);
+  for (const f of readdirSync(machineDir()).filter((n) => n.endsWith(".jsonl"))) {
+    const path = join(machineDir(), f);
     const lines = readFileSync(path, "utf8").split("\n");
     const out = lines.map((l) => {
       if (!l) return l;

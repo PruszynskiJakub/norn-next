@@ -132,12 +132,12 @@ export async function acquireLock(path: string, opts: LockOptions = {}): Promise
   return { ok: false, path, holder: cur ?? { holder: { pid: 1, pid_start: "unknown" }, acquired_at: "" } };
 }
 
-/** The local tick lock (H1) at `.agents/norn/trace/tick.lock`. */
+/** The local tick lock (H1) in the machine dir (`tick.lock`, B5). */
 export function acquireTickLock(repoRoot: string, opts: LockOptions = {}): Promise<LockResult> {
   return acquireLock(tickLockPath(repoRoot), opts);
 }
 
-/** K6/BS3: the story's integrate lock at `.agents/norn/trace/integrate-<story>.lock`. */
+/** K6/BS3: the story's integrate lock in the machine dir (`integrate-<story>.lock`). */
 export function acquireIntegrateLock(repoRoot: string, story: string, opts: LockOptions = {}): Promise<LockResult> {
   return acquireLock(integrateLockPath(repoRoot, story), opts);
 }

@@ -8,7 +8,7 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { atomicWrite, installSkills, linkSkills, readText, repoConfigPath, TRACE_IGNORE_ENTRY, workflowsDir } from "@norn/store";
+import { atomicWrite, installSkills, linkSkills, readText, repoConfigPath, workflowsDir } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { rendered } from "../output.ts";
@@ -17,8 +17,8 @@ import { detectTestCommand, gitRemoteUrl, TEMPLATE_TEST_COMMAND, withTestCommand
 import { bundledSkills } from "../runtime/workflows.ts";
 import { cmd } from "@norn/core";
 
-/** Paths that must never be committed (§7.1). */
-const IGNORED = [TRACE_IGNORE_ENTRY, ".env.norn", ".norn-unit"];
+/** Paths that must never be committed (§7.1); the machine-local files live outside the checkout (B5). */
+const IGNORED = [".env.norn", ".norn-unit"];
 
 function ensureGitignore(root: string): string[] {
   const path = join(root, ".gitignore");

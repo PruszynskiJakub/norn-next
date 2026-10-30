@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { BriefJson } from "@norn/core";
 import type { HookTrace } from "@norn/schema";
-import { readTrace, readTraceFile, repoConfigPath, traceDir, workflowsDir } from "@norn/store";
+import { readTrace, readTraceFile, repoConfigPath, machineDir, workflowsDir } from "@norn/store";
 import { type CliResult } from "../src/index.ts";
 import { parseFindings } from "../src/commands/done.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
@@ -160,8 +160,8 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     expect(linked.at(-1)).toMatchObject({ type: "briefing", unit: "gh-9", run_id: runId, step: "implement", attempt: 1, briefing: v.briefing });
     const timeline = (await h.norn("run", "list", "gh-9", "--events")).value as { steps: Array<{ step: string; paths: { briefings: string[] }; events: Array<{ source: string; ref: string; summary: string }> }> };
     const row = timeline.steps.find((r) => r.step === "implement");
-    expect(row?.paths.briefings).toEqual([join(traceDir(h.root), v.briefing)]);
-    expect(row?.events.find((e) => e.source === "briefing")).toMatchObject({ ref: join(traceDir(h.root), v.briefing), summary: expect.stringContaining(runId) });
+    expect(row?.paths.briefings).toEqual([join(machineDir(h.root), v.briefing)]);
+    expect(row?.events.find((e) => e.source === "briefing")).toMatchObject({ ref: join(machineDir(h.root), v.briefing), summary: expect.stringContaining(runId) });
 
     const added = receipts(runs()).filter((f) => !before.includes(f));
     expect(added).toHaveLength(1);

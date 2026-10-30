@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 import type { herdr } from "@norn/adapters";
 import type { AdapterContext, AdapterRegistry, Clock, GitPort, Ports } from "@norn/core";
 import { DEFAULT_CONFIG, type ResolvedConfig } from "@norn/schema";
-import { type LoadedConfig, loadConfig, nornHome, readUnitMarker, type UnitMarker } from "@norn/store";
+import { bindNornHome, type LoadedConfig, loadConfig, nornHome, readUnitMarker, type UnitMarker } from "@norn/store";
 import { corruptError, refuse } from "./output.ts";
 import { type Interaction, isAgentSession, terminalInteraction } from "./runtime/interaction.ts";
 import { buildPorts, defaultRegistry } from "./wiring.ts";
@@ -123,7 +123,11 @@ export class Context {
 
   /** Resolve the repo; commands with `repo: true` get this before `run`. */
   async locate(): Promise<Located> {
-    if (!this.located) this.located = await locateRepo(this.cwd, this.git);
+    if (!this.located) {
+      this.located = await locateRepo(this.cwd, this.git);
+      // B5: the checkout's machine dir lives in this command's norn home, not the process env's
+      bindNornHome(this.located.root, this.home);
+    }
     return this.located;
   }
 

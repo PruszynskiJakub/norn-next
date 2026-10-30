@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { herdr } from "@norn/adapters";
-import { inboxOpenPath, repoConfigPath, traceDir, workflowsDir } from "@norn/store";
+import { inboxOpenPath, repoConfigPath, machineDir, workflowsDir } from "@norn/store";
 import { type TickReport } from "../src/index.ts";
 import { createHarness, type Harness, installBundledSkills, issue, sh } from "./harness.ts";
 import { runChecked } from "./harness.ts";
@@ -463,7 +463,7 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
     expect(kinds(t)).toEqual(["gh-11 agent.ask.implicit"]);
     expect(h.state(runs())).toMatchObject({ status: "parked", park: { kind: "ask" } });
     // the trace records why the park commit waits
-    const traced = h.read(join(traceDir(h.root), t.trace));
+    const traced = h.read(join(machineDir(h.root), t.trace));
     expect(traced).toContain("merge in progress (unmerged: a.txt): nothing committed; the commit waits until it is concluded");
     expect(h.git(["rev-parse", "HEAD"], wt())).toBe(before);
     expect(existsSync(join(h.git(["rev-parse", "--absolute-git-dir"], wt()), "MERGE_HEAD"))).toBe(true);

@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { TickTrace } from "@norn/schema";
-import { repoConfigPath, traceDir as traceDirOf, workflowsDir } from "@norn/store";
+import { repoConfigPath, machineDir as machineDirOf, workflowsDir } from "@norn/store";
 import { version } from "../package.json";
 import { runCli } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
@@ -41,23 +41,23 @@ notifiers: []
 let h: Harness;
 const wt = () => `${h.root}-worktrees/gh-5-pay-invoices`;
 const runs = () => join(wt(), ".agents/specs/gh-5-pay-invoices/runs/_story");
-const traceDir = () => traceDirOf(h.root);
+const machineDir = () => machineDirOf(h.root);
 const tick = async () => {
   h.clock.advance(10_000);
   return h.tick();
 };
 
 function recordedTick(tickId: string): TickTrace {
-  const lines = readdirSync(traceDir())
+  const lines = readdirSync(machineDir())
     .filter((n) => n.endsWith(".jsonl"))
-    .flatMap((f) => readFileSync(join(traceDir(), f), "utf8").split("\n").filter(Boolean));
+    .flatMap((f) => readFileSync(join(machineDir(), f), "utf8").split("\n").filter(Boolean));
   return lines.map((l) => JSON.parse(l) as TickTrace).find((ev) => ev.type === "tick" && ev.tick_id === tickId) as TickTrace;
 }
 
 /** Rewrite one tick record as the norn before the rename would have left it. */
 function asRecordedBefore(tickId: string): void {
-  for (const f of readdirSync(traceDir()).filter((n) => n.endsWith(".jsonl"))) {
-    const path = join(traceDir(), f);
+  for (const f of readdirSync(machineDir()).filter((n) => n.endsWith(".jsonl"))) {
+    const path = join(machineDir(), f);
     const out = readFileSync(path, "utf8")
       .split("\n")
       .map((l) => {
