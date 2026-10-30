@@ -8,6 +8,7 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { REMOVED_COMMANDS } from "@norn/core";
+import { OLD_NORN_DIR } from "@norn/store";
 import { createHarness, type Harness } from "./harness.ts";
 
 setDefaultTimeout(30_000);
@@ -93,6 +94,18 @@ describe("noun help (B2)", () => {
     expect(r.exit).toBe(0);
     expect((r.value as NounHelp).verbs.map((v) => v.command)).toEqual(["run list", "run view", "run attach", "run rerun", "run cancel"]);
     expect(r.stdout).toMatch(/\n  norn run list +.+\n  norn run view +.+\n  norn run attach +.+\n  norn run rerun +.+\n  norn run cancel +.+\n/);
+  });
+});
+
+describe("norn migrate in help (gh-110 B22)", () => {
+  test("help lists migrate with one line on what it does, and no help text names the old layout's folder", async () => {
+    const v = (await h.norn("help")).value as Help;
+    const migrate = v.commands.find((c) => c.command === "migrate");
+    expect(migrate?.summary).toMatch(/^Move .*layout.*stage/);
+    expect(migrate?.summary).not.toContain("\n");
+    for (const args of [["help"], ["help", "--all"], ["help", "--json"], ["help", "--all", "--json"]]) {
+      expect((await h.norn(...args)).stdout).not.toContain(`${OLD_NORN_DIR}/`);
+    }
   });
 });
 

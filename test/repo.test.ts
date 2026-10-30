@@ -316,6 +316,93 @@ describe("removed commands (B5, B8, B71)", () => {
   });
 });
 
+/**
+ * gh-110 B22 (D12): no product doc or shipped text sends anyone to the old `.agents/norn/` folder. Scanned:
+ * README, the PRD, everything under packages/cli/assets, package sources (`norn help` and every message
+ * are built there), and AGENTS.md's Layout and "Where the contracts live". Not scanned, until the
+ * follow-up story migrates this repo: AGENTS.md's other sections, CONTRIBUTING.md and the
+ * `.agents/skills/norn*` copies (this repo's own process text).
+ */
+const OLD_DIR = /\.agents\/(norn|\*)\//;
+
+/** Lines allowed to name the old folder, by file and a substring of the line, with why. */
+const OLD_DIR_ALLOW: Array<[file: string, text: string, why: string]> = [
+  ["packages/store/src/paths.ts", "export const OLD_", "the old layout's places, only refused and moved from (gh-110 D4)"],
+];
+
+/** The text of `## <title>` up to the next `## ` heading. */
+function section(text: string, title: string): string {
+  const start = text.indexOf(`\n## ${title}`);
+  if (start < 0) throw new Error(`section not found: ${title}`);
+  const end = text.indexOf("\n## ", start + 1);
+  return text.slice(start, end < 0 ? undefined : end);
+}
+
+function productDocs(): Array<[file: string, text: string]> {
+  const agents = readFileSync(join(ROOT, "AGENTS.md"), "utf8");
+  return [
+    ...[join(ROOT, "README.md"), join(ROOT, ".agents", "PRD.md"), ...textFiles(join(PKGS, "cli", "assets"), [...DOCS, ".txt"])].map(
+      (f): [string, string] => [relative(ROOT, f), readFileSync(f, "utf8")],
+    ),
+    ...files(PKGS)
+      .filter((p) => p.includes("/src/"))
+      .map((f): [string, string] => [relative(ROOT, f), readFileSync(f, "utf8")]),
+    ["AGENTS.md#Layout", section(agents, "Layout and dependency direction")],
+    ["AGENTS.md#Where the contracts live", section(agents, "Where the contracts live")],
+  ];
+}
+
+describe("the new layout in product docs (gh-110 B3, B22)", () => {
+  test("matcher: the old folder and its parts are hits; the new config file and other .agents folders are not", () => {
+    for (const hit of ["`.agents/norn/config.yaml`", "in .agents/norn/workflows/", ".agents/*/trace/x.jsonl", "(.agents/norn/)"]) expect(OLD_DIR.test(hit)).toBe(true);
+    for (const miss of ["`.agents/norn.config.yaml`", ".agents/workflows/", ".agents/skills/norn/SKILL.md", ".agents/specs/gh-1-x/"]) expect(OLD_DIR.test(miss)).toBe(false);
+  });
+
+  test("AGENTS.md's sections are found, or the lint fails loudly", () => {
+    expect(() => section("# x\n## A\nbody", "B")).toThrow("section not found: B");
+    expect(section("# x\n## A\na\n## B\nb", "A")).toBe("\n## A\na");
+  });
+
+  test("README, the PRD, shipped assets, package sources and AGENTS.md's Layout and contracts name no `.agents/norn/`", () => {
+    const hits: string[] = [];
+    for (const [file, text] of productDocs()) {
+      text.split("\n").forEach((line, i) => {
+        if (!OLD_DIR.test(line) || OLD_DIR_ALLOW.some(([f, t]) => f === file && line.includes(t))) return;
+        hits.push(`${file}:${i + 1}: ${line.trim()}`);
+      });
+    }
+    expect(hits).toEqual([]);
+  });
+
+  test("README's Workflows are data and Config paragraphs name the new places", () => {
+    const readme = readFileSync(join(ROOT, "README.md"), "utf8").split("\n");
+    expect(readme.find((l) => l.startsWith("**Workflows are data.**"))).toContain("`.agents/workflows/`");
+    expect(readme.find((l) => l.startsWith("**Config**"))).toContain("`.agents/norn.config.yaml`");
+  });
+
+  test("the PRD's §7 layout and ID2 describe the machine dir and its id", () => {
+    const prd = readFileSync(join(ROOT, ".agents", "PRD.md"), "utf8");
+    const s7 = prd.slice(prd.search(/^## 7\b/m), prd.search(/^## 8\b/m));
+    expect(s7).toContain("norn.config.yaml");
+    expect(s7).toContain("workflows/");
+    expect(s7).toContain("repos/<id>/");
+    const id2 = prd.split("\n").find((l) => l.startsWith("- ID2 ")) ?? "";
+    expect(id2).toContain("repos/<id>/");
+  });
+
+  test("B3: the shipped norn skill puts only runs/ and the generated top of handoff.md off limits", () => {
+    const skill = readFileSync(join(PKGS, "cli", "assets", "skills", "norn", "SKILL.md"), "utf8");
+    const rules = section(skill, "Hard rules");
+    const never = rules.split("\n").filter((l) => /\bnever edit\b/i.test(l));
+    expect(never).toHaveLength(1);
+    const offLimits = (never[0] as string).split(/\.\s/)[0] as string;
+    expect([...offLimits.matchAll(CODE_SPAN)].map((m) => m[0])).toEqual(["`runs/`"]);
+    expect(offLimits).toContain("the generated top of handoff.md");
+    expect(rules).toContain("`.agents/workflows/`");
+    expect(rules).toContain("`.agents/norn.config.yaml`");
+  });
+});
+
 describe("herdr plugin (HC9)", () => {
   test("the manifest parses, has the pick pane and the open/next/pick actions, and names only scripts that exist", () => {
     const dir = join(ROOT, "plugins", "herdr");

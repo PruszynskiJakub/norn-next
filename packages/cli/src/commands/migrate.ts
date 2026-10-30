@@ -7,14 +7,14 @@
  * places (B17), the tick lock free (B15). Then, holding the tick lock at its old place: the config and
  * workflows by `git mv` (an untracked file is moved plainly and listed as untracked), the old trace
  * dir's contents into the machine dir (copy then delete across filesystems) with its `checkout.json`,
- * norn's old trace line out of `.gitignore` (staged), `.agents/norn/` removed, the old lock last.
+ * norn's old trace line out of `.gitignore` (staged), the old folder removed, the old lock last.
  * Every step can run again, so a rerun finishes an interrupted run; no rollback. On the new layout:
  * nothing to move (B14). Never commits, pushes, or touches a unit worktree.
  */
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { cmd } from "@norn/core";
-import { acquireLock, dropOldIgnoreLine, machineDir, moveFile, moveOldTrace, OLD_CONFIG_FILE, OLD_NORN_DIR, OLD_TRACE_DIR, OLD_WORKFLOWS_DIR, oldTickLockPath, oldWorkflowEntries, REPO_CONFIG_FILE, removeOldLayoutDirs, repoLayout, traceClashes, WORKFLOWS_DIR } from "@norn/store";
+import { acquireLock, dropOldIgnoreLine, machineDir, moveFile, moveOldTrace, OLD_CONFIG_FILE, OLD_TRACE_DIR, OLD_WORKFLOWS_DIR, oldTickLockPath, oldWorkflowEntries, REPO_CONFIG_FILE, removeOldLayoutDirs, repoLayout, traceClashes, WORKFLOWS_DIR } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import { type Context, safeRealpath } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
@@ -97,7 +97,7 @@ function markdown(r: MigrateReport, root: string): string {
 
 export const migrateCommand = defineCommand({
   name: "migrate",
-  summary: `Move this repo from the old layout (${OLD_NORN_DIR}/) to the new one and stage the moves for you to commit`,
+  summary: "Move this repo's config, workflows and trace from the old layout to the new one and stage the moves for you to commit",
   usage: "norn migrate [--json]",
   markdown: true,
   layout: false,
