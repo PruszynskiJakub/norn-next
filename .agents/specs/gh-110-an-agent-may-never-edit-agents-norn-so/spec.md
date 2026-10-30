@@ -4,16 +4,16 @@ slug: an-agent-may-never-edit-agents-norn-so
 provider: gh
 number: 110
 url: https://github.com/PruszynskiJakub/norn-next/issues/110
-title: An agent may never edit .agents/norn/, so workflow and config changes have no route through norn
+title: Move workflows and config out of .agents/norn/ and the trace into .git/norn/, so agents can change workflows and config
 assignee: PruszynskiJakub
 labels:
   - friction
   - norn
-  - norn:wf:quick
+  - norn:wf:story
 workflow: story
 status: active
 intake_at: 2026-10-30T11:26:29.364Z
-body_hash: 4c5fb9642bcee931dfe7a0fa7635b5ad8d52d2d134efa2efc277162ca2a20b49
+body_hash: bfcbad50e64591e29e5e35aae634c9390637f6426c19a953f8d7498f5aa27d53
 ---
 
 ## Observed
