@@ -4,7 +4,7 @@
 - Status: running
 - Counters: base_conflict_loop 0/2, plan_loop 0/3, qa_loop 0/2, ready_loop 0/2, stale_loop 0/10, test_loop 0/5, triage_loop 0
 - Last outcome: none
-- Next: `norn trace gh-110`
+- Next: `norn run list gh-110`
 - Updated: 2026-10-30T11:39:30.579Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
@@ -18,14 +18,15 @@
 
 ## Goal
 
-Narrow the norn skill's hard rule so an agent may edit `.agents/norn/workflows/` and `.agents/norn/config.yaml` in a step; only `runs/`, `.agents/norn/trace/` and the generated top of handoff.md stay off limits.
+Refine gh-110 into a spec: move workflows/config out of `.agents/norn/` (to `.agents/workflows/`, `.agents/norn.config.yaml`) and machine-local files to `.git/norn/`, so agents may change workflows and config in a step.
 
 ## Progress
 
-- Edited `packages/cli/assets/skills/norn/SKILL.md` (hard rules) and synced the copy `.agents/skills/norn/SKILL.md` (identical). Kept PRD ids out of the shipped skill: other repos have no PRD.
-- Added the same rule to AGENTS.md Process (hard rule bullet), citing S7, W1, W5.
-- Docs-only change: no new test; full suite + typecheck run to confirm green.
+- Interview with the person settled the layout, `norn migrate` (stage only, refuses under tick lock, refuses in a unit worktree, idempotent), doctor validating workflows (W5) and config read-only, old layout refused everywhere on the main checkout only, both-layouts refused, no fallback reads.
+- Decided: this story does not migrate this repo (released norn reads the old layout); a follow-up story does, after a release with `migrate`.
+- The narrowed rule text already on this branch (skill, its copy, AGENTS.md; from the earlier `quick` implement round) stays correct for the interim old paths; the final wording for the new layout belongs to implement.
+- Spec written in spec.md body: B1–B23, out of scope, no open questions.
 
 ## Resume
 
-If the suite is green, report `norn done done`. Otherwise fix what failed (likely a skill-drift or glossary lint in test/repo.test.ts).
+Refine is done; next is plan (norn-plan) on spec.md.
