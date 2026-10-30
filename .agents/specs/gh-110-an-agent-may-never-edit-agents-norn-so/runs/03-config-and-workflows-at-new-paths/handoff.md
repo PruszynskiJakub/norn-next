@@ -14,6 +14,18 @@
 
 ## Goal
 
+Repo config at `.agents/norn.config.yaml`, workflows in `.agents/workflows/`: init writes them there, every command reads and names them there (B1, B2, B4, D11).
+
 ## Progress
 
+- store `paths.ts`: `REPO_CONFIG_FILE` / `WORKFLOWS_DIR` (relative, for messages); `repoConfigPath`/`workflowsDir` use them. `hasNornDir` → `isNornRepo` (config or workflows present; the cockpit's CP13 check), since `.agents/norn/` now holds only the trace (slice 04 moves that).
+- Messages through the constants: init's config row and next steps, `config set` --repo help and the user-or-repo pick, story create/edit `unknown_workflow`, wiring's `unknown_adapter` do_instead. Comments naming the old paths in the touched modules updated.
+- New `packages/cli/test/layout.test.ts` (S1): AC1–AC5, red before the change, green after. AC4 pins via a gate-first `story.yaml` changed on the base.
+- Repo lint (g) allowlist shrunk: package sources now spell `.agents/norn` only in paths.ts (2 lines: the trace dir and the new config file name).
+- `test/process.test.ts` (this repo's own workflows/config, still on the old layout): loads from a temp copy at the new paths while `.agents/norn/` exists.
+- AC6 (agent): throwaway repo under $TMPDIR with the dev build: `init` writes `.agents/norn.config.yaml` + `.agents/workflows/{bug,slice,story}.yaml`, no `.agents/norn/`; next steps name `.agents/workflows/`; `config list` shows repo: `.agents/norn.config.yaml`; `config set --repo` (there is no `config edit` verb; `config-edit.ts` is `set`/`unset`) help names and writes the new file; `doctor --json` names the new files.
+- init's `.gitignore` still adds `.agents/norn/trace/` (slice 04).
+
 ## Resume
+
+Run the full `bun test` and `bun run typecheck`; commit; report `norn done done`.
