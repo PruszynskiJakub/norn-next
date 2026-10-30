@@ -14,6 +14,14 @@
 
 ## Goal
 
+First tick of the new version backfills live units' hook files from the day files once (B11, B12, D5).
+
 ## Progress
 
+- Store `backfillHookFiles` (`packages/store/src/hook-backfill.ts`): writes `trace/hooks/backfill.json` (`since`, `done`; schema `local-hook-backfill`) on first call; for live runs (or unknown launches) begun before `since` and not done, scans day files from the earliest start once, matches hook lines by the fact's story/slice and `at >= run start`, appends the missing ids (`appendMissingUnitHooks` in trace.ts, one append, never a rewrite), then records the units done.
+- Called from `loadLocalFacts` only with `backfillHooks` (observe option, set by `runTick` only), before the hook files are read.
+- PRD A2 amended. Tests: `agent-protocol.test.ts` "hook backfill on upgrade" (AC1–AC3), staging old-style day lines.
+
 ## Resume
+
+Full suite + typecheck green → commit → `norn done done`.
