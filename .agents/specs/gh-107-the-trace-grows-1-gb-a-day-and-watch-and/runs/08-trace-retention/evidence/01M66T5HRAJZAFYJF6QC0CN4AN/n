@@ -1,0 +1,2 @@
+#!/bin/sh
+exec bun /Users/jakubpruszynski/Projects/norn-worktrees/gh-107-the-trace-grows-1-gb-a-day-and-watch-and--08-trace-retention/packages/cli/src/main.ts "$@"
