@@ -39,6 +39,9 @@ function machineDirOf(home: string, checkout: string): string {
   return join(home, "repos", `${basename(dirname(common))}-${hash}`);
 }
 
+/** Where the machine-local files lived before B5: `.agents/norn/trace/`. */
+const oldTraceDir = (root: string) => join(dirname(workflowsDir(root)), "trace");
+
 async function boot(h: Harness) {
   expect((await h.norn("init")).exit).toBe(0);
   h.write(repoConfigPath(h.root), CONFIG);
@@ -48,12 +51,12 @@ async function boot(h: Harness) {
   h.git(["push", "-q", "origin", "main"]);
 }
 
-/** Every path under `dir` (outside `.git/objects`) named like a file the machine dir holds, plus the old trace dir. */
+/** Every path under `dir` (outside `.git/objects`) named like a file the machine dir holds, or a trace day file. */
 function machineFilesUnder(dir: string, machine: string): string[] {
   const files = readdirSync(machine, { recursive: true, withFileTypes: true }).filter((e) => e.isFile());
   const names = new Set(files.map((e) => e.name));
   for (const n of ["tick.lock", "failures.json", "notices.json", "pr.json", "remote.json", "inbox.json", "heartbeat.json", "checkout.json"]) names.add(n);
-  return (readdirSync(dir, { recursive: true }) as string[]).filter((p) => !p.startsWith(`.git${"/"}objects`) && (names.has(basename(p)) || p.endsWith(".jsonl") || p.includes(join(".agents", "norn", "trace"))));
+  return (readdirSync(dir, { recursive: true }) as string[]).filter((p) => !p.startsWith(`.git${"/"}objects`) && (names.has(basename(p)) || p.endsWith(".jsonl")));
 }
 
 describe("machine-local files in the norn home (B5, B6)", () => {
@@ -82,7 +85,7 @@ describe("machine-local files in the norn home (B5, B6)", () => {
     expect(files).toContain("remote.json");
     expect(JSON.parse(readFileSync(join(machine, "checkout.json"), "utf8"))).toMatchObject({ checkout: h.root });
     expect(machineFilesUnder(h.root, machine)).toEqual([]);
-    expect(existsSync(join(h.root, ".agents", "norn", "trace"))).toBe(false);
+    expect(existsSync(oldTraceDir(h.root))).toBe(false);
     expect(h.git(["status", "--porcelain"])).toBe("");
     const ignore = h.read(join(h.root, ".gitignore")).split("\n");
     expect(ignore).toContain(".env.norn");
@@ -116,7 +119,7 @@ describe("machine-local files in the norn home (B5, B6)", () => {
     expect((await runChecked(["tick", "--json"], { ...h.deps, cwd: wt() })).exit).toBe(0);
     expect(machineDirOf(h.home, wt())).toBe(machine);
     expect(machineFilesUnder(wt(), machine)).toEqual([]);
-    expect(existsSync(join(wt(), ".agents", "norn", "trace"))).toBe(false);
+    expect(existsSync(oldTraceDir(wt()))).toBe(false);
     // the hook was traced into the main checkout's machine dir
     const events = readdirSync(machine)
       .filter((f) => f.endsWith(".jsonl"))
