@@ -1,8 +1,8 @@
 ---
 id: gh-107/05
 title: First tick of the new version backfills live units' hook files
-depends_on: [gh-107/04]
-status: planned
+depends_on: [ gh-107/04 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
