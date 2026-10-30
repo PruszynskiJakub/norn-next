@@ -2,7 +2,7 @@
 id: gh-110/01
 title: Every norn path goes through store's path functions
 depends_on: []
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
