@@ -1,0 +1,59 @@
+## B3/B4 before any new tick: old (0.12.1) vs new over the same old-style trace
+run list: identical
+run list --events --all: identical
+status --history: identical
+new norn exit 0
+B4 new: broken tick lines not reported (output unchanged)
+old norn exit 0
+old mentions of broken lines: 0
+## B2: status / --segment / story list with day files readable, chmod 000, and moved away
+status --json readable exit 0
+segment readable exit 0
+status --json unreadable exit 0
+segment unreadable exit 0
+status --json empty exit 0
+segment empty exit 0
+status-readable.json == status-unreadable.json
+status-readable.json == status-empty.json
+status-readable.md != status-unreadable.md
+status-readable.md != status-empty.md
+segment-readable.txt == segment-unreadable.txt
+segment-readable.txt == segment-empty.txt
+storylist-readable.json != storylist-unreadable.json
+storylist-readable.json != storylist-empty.json
+## B1: status --watch refreshing every 1s for 6s with every day file chmod 000
+watch exit 0
+frames (lines holding 'gh-1'): 18
+error lines: 0
+## B11: first tick backfills the live run's day-file hooks
+hook lines in day files: 100; hook file exists before: no
+tick1 exit 0
+after tick1:      100 lines,      100 unique ids; backfill.json: {
+  "since": "2026-10-30T21:29:24.358Z",
+  "done": [
+    "gh-1"
+  ]
+}
+after tick2:      100 lines
+## B13: two quiet ticks
+day file +3036 B, chunks +0 B (two quiet ticks)
+
+## B14: hook blocks of 64
+   1 {"hash":"2900a17a23d76536a01e7199d426b786acdd5b0c563c6aa1cb026109910e57e5","n":null}
+   1 {"hash":"2e7b38c28c5653e6446c24fc8a64eabf8a8eba71e25ab50903ec4ea0ff1372d7","n":64}
+   1 {"hash":"72e6638127f533da02e383fa5d5dc3055a64e6038e20c1069b07c5a68b97ee0c","n":null}
+   1 {"hash":"b394dcdf64d1cc30a4b56b02e7fac4bc732921725163c63f0eebb59b38b3b6b6","n":null}
+   1 {"hash":"b5d45d4ec78a9a198d562faf9f70d9a3268a7d995406dff98b83a07d48238d33","n":36}
+new chunk lines after one more hook: 2
+{"keys":["h","v"],"len":37}
+{"keys":["h","v"],"len":0}
+{"keys":["h","v"],"len":0}
+{"keys":["h","v"],"len":5}
+{"keys":["h","v"],"len":0}
+## B17: why on every chunked tick of today
+chunked ticks:        5
+{"tick":"01M67BFB40CPGBWWQ0ZPPMRFJ1","replay":{"matches":true,"all_match":true,"rule":"claim.unclaimed"}}
+{"tick":"01M67BFC1ZG0YKP30648C6M123","replay":{"matches":true,"all_match":true,"rule":"claim.unclaimed"}}
+{"tick":"01M67BFCKFNDA7CDSDPNS4ZSRF","replay":{"matches":true,"all_match":true,"rule":"claim.unclaimed"}}
+{"tick":"01M67BFD4RXHX8N524BY333TYS","replay":{"matches":true,"all_match":true,"rule":"claim.unclaimed"}}
+{"tick":"01M67BFE05WP16SV2AMVBM46CF","replay":{"matches":true,"all_match":true,"rule":"claim.unclaimed"}}

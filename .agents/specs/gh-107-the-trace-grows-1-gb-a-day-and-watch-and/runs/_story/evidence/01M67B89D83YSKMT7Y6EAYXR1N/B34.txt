@@ -1,0 +1,4 @@
+after watch --max-ticks 3 and a tick:
+/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-gAO0Ti/repo/.agents/norn/trace/2026-09-20.chunks.jsonl
+/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-gAO0Ti/repo/.agents/norn/trace/2026-09-20.jsonl
+/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-gAO0Ti/repo/.agents/norn/trace/hooks/gh-3/_story.jsonl

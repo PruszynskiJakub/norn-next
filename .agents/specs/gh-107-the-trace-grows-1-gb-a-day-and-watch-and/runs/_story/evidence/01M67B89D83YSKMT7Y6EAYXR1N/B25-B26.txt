@@ -1,0 +1,13 @@
+{"error":"the trace window must be at least 14d (--retain 7d)","do_instead":"norn tidy --retain 14d","code":"retain_too_short"}
+ [exit 3]
+{"error":"the trace window must be at least 14d (--retain 7d)","do_instead":"norn tidy --retain 14d","code":"retain_too_short"}
+ [exit 3]
+{"error":"--retain soon is not a duration: expected a form like 14d","do_instead":"norn tidy --retain 14d","code":"retain_invalid"}
+ [exit 2]
+{"error":"--retain soon is not a duration: expected a form like 14d","do_instead":"norn tidy --retain 14d","code":"retain_invalid"}
+ [exit 2]
+{"error":"the trace window must be at least 14d (trace.retain 7d)","do_instead":"set trace.retain to 14d or more (norn config get trace shows the layer that sets it)","code":"retain_too_short"}
+ [config 7d exit 3]
+{"error":"trace.retain soon is not a duration: expected a form like 14d","do_instead":"set trace.retain to 14d or more (norn config get trace shows the layer that sets it)","code":"retain_invalid"}
+ [config soon exit 3]
+trace unchanged after the refusals

@@ -1,0 +1,6 @@
+**Refused (tick_pruned):** tick 01M30BN4A1A91AY44WHEHM0VJ7 is older than the trace retained (14d)
+
+Do instead: norn run list gh-1
+[exit 3]
+{"error":"tick 01M30BN4A1A91AY44WHEHM0VJ7 is older than the trace retained (14d)","do_instead":"norn run list gh-1","code":"tick_pruned"}
+[exit 3]

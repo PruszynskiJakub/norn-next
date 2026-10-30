@@ -51,8 +51,9 @@ qa#2: check B1–B35 of the gh-107 spec on HEAD 40f18f6c as a user would, one ve
 - Product source (packages/*/src) is identical to qa#1's head f69d37a4; only the B1 test and scripts/trace-bench.ts changed. All checks were rerun anyway.
 - Throwaway bench repos under $TMPDIR (scripts/trace-bench.ts --keep); every command `bun packages/cli/src/main.ts`, NORN_* unset, NORN_HOME_DIR isolated; ~/.local/bin/norn 0.12.1 acts as the older norn.
 - Drivers: scratchpad qa1.sh (B1–B4, B11, B13, B14, B17), qa2.sh (B5–B10, B12, B15, B16, B19–B21, B35/B18), qa3.sh (B23–B34). All observed as the spec says. B22: recovery harvest, main vs branch, 30/30 names and decisions equal once config.trace.retain is set aside.
-- Pending: full `bun test` + typecheck (running in the background), 2 GB bench for B1/B2/B10 (running), then the B1 test 10x alone.
+- Suite 1469 pass / 0 fail, typecheck green. 2 GB bench: cockpit (status --watch) peak 0.77x the empty-trace footprint; alternating timing: status 487 vs 499 ms, brief 385 vs 383 ms (medians). The B1 test passed 10 of 10 alone. All 35 criteria pass; report in $TMPDIR/gh107-qa2/ev/report.md.
+- qa#2 pass: qa#2 on HEAD 40f18f6c: all 35 criteria (B1–B35) observed passing through the CLI in throwaway bench repos; bun test 1469/0, typecheck green. B1 now passes: the fixed trace-bench drives status --watch over 2.15 GB/14 days/420 hooks at peak 0.77x the empty-trace footprint, and the B1 test passed 10/10 alone. B2/B10 timing in alternating rounds: status 487 vs 499 ms, brief 385 vs 383 ms. Product source is unchanged since qa#1's head.
 
 ## Resume
 
-Wait for $TMPDIR/gh107-qa-test.log and $TMPDIR/gh107-qa2/ev/B1-B2-B10-bench.json, write criteria.json + report.md in $TMPDIR/gh107-qa2/ev, report `norn done`.
+qa#2 reported `pass`; nothing left for this step.

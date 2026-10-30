@@ -1,0 +1,60 @@
+live run: 01M66Q241NX2MXZ7MZRTFJHKC3
+day files: 41, oldest 2026-09-20.chunks.jsonl
+## B23 default: config shows trace.retain
+{"files":{"user":{"path":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-gAO0Ti/home/config.yaml","exists":false},"repo":{"path":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-gAO0Ti/repo/.agents/norn/config.yaml","exists":false}},"entries":[{"key":"trace.retain","value":"14d","source":"built-in","group":"machine","meaning":"trace days norn tidy keeps (at least 14d)"}],"notes":[]}
+
+## B25/B26: refusals, nothing deleted
+{"error":"the trace window must be at least 14d (--retain 7d)","do_instead":"norn tidy --retain 14d","code":"retain_too_short"}
+ [exit 3]
+{"error":"the trace window must be at least 14d (--retain 7d)","do_instead":"norn tidy --retain 14d","code":"retain_too_short"}
+ [exit 3]
+{"error":"--retain soon is not a duration: expected a form like 14d","do_instead":"norn tidy --retain 14d","code":"retain_invalid"}
+ [exit 2]
+{"error":"--retain soon is not a duration: expected a form like 14d","do_instead":"norn tidy --retain 14d","code":"retain_invalid"}
+ [exit 2]
+{"error":"the trace window must be at least 14d (trace.retain 7d)","do_instead":"set trace.retain to 14d or more (norn config get trace shows the layer that sets it)","code":"retain_too_short"}
+ [config 7d exit 3]
+{"error":"trace.retain soon is not a duration: expected a form like 14d","do_instead":"set trace.retain to 14d or more (norn config get trace shows the layer that sets it)","code":"retain_invalid"}
+ [config soon exit 3]
+trace unchanged after the refusals
+## B33: doctor hint
+doctor exit 1
+"trace keeps 26 days (3.8 MB) beyond trace.retain 14d — run `norn tidy` (`norn tidy --dry-run` lists them)"
+  · trace keeps 26 days (3.8 MB) beyond trace.retain 14d — run `norn tidy` (`norn tidy --dry-run` lists them)
+## B31: dry run
+exit 0
+{"retain":"14d","days":26,"first":{"day":"2026-09-20","files":["2026-09-20.chunks.jsonl","2026-09-20.jsonl"],"bytes":17},"hook_files":[{"unit":"gh-3","file":"hooks/gh-3/_story.jsonl","bytes":3}],"runs":[{"run_id":"01OLDRUN0000000000000000AA","files":["briefings/01OLDRUN0000000000000000AA","transcripts/01OLDRUN0000000000000000AA"],"bytes":8}],"bytes":3766528}
+trace unchanged after --dry-run
+## B24: trace.retain 14d + --retain 30d
+exit 0
+{"retain":"30d","days":["2026-09-20","2026-09-21","2026-09-22","2026-09-23","2026-09-24","2026-09-25","2026-09-26","2026-09-27","2026-09-28","2026-09-29"],"hook_files":["gh-3"],"runs":[]}
+## B23/B27/B29/B30: default tidy
+exit 0
+{"retain":"14d","n_days":16,"days":["2026-09-30","2026-10-01","2026-10-02","2026-10-03","2026-10-04","2026-10-05","2026-10-06","2026-10-07","2026-10-08","2026-10-09","2026-10-10","2026-10-11","2026-10-12","2026-10-13","2026-10-14","2026-10-15"],"hook_files":[],"runs":["01OLDRUN0000000000000000AA"],"bytes":2410568}
+remaining day files:
+2026-10-16.jsonl 2026-10-17.jsonl 2026-10-18.jsonl 2026-10-19.jsonl 2026-10-20.jsonl 2026-10-21.jsonl 2026-10-22.jsonl 2026-10-23.jsonl 2026-10-24.jsonl 2026-10-25.jsonl 2026-10-26.jsonl 2026-10-27.jsonl 2026-10-28.jsonl 2026-10-29.jsonl 2026-10-30.chunks.jsonl 2026-10-30.jsonl 
+./base.json
+./briefings/01M66Q241NX2MXZ7MZRTFJHKC3/01M67BNAS6SKSN0ZS385JTK28M.md
+./briefings/01M66Q241NX2MXZ7MZRTFJHKC3/01M67BNDGTVRCKXCJYXHRDV5AD.md
+./briefings/01M66Q241NX2MXZ7MZRTFJHKC3/qa.md
+./briefings/01NEWRUN0000000000000000AA/b.md
+./heartbeat.json
+./hooks/backfill.json
+./hooks/gh-1/_story.jsonl
+./inbox.json
+./notified.json
+./remote.json
+./transcripts/01M66Q241NX2MXZ7MZRTFJHKC3/t.jsonl
+./transcripts/01NEWRUN0000000000000000AA/t.jsonl
+./workflows/old.yaml
+## B32: second tidy
+{"days":[],"hook_files":[],"runs":[],"bytes":0}
+doctor hint lines within the window: 0
+## B34: watch and tick never prune
+/private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-107-the-trace-grows-1-gb-a-day-and-watch-and/01fa0270-f9ac-45f1-a585-81853ea3dd9b/scratchpad/qa3.sh: line 66: /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-gAO0Ti/repo/.agents/norn/trace/hooks/gh-3/_story.jsonl: No such file or directory
+touch: /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-gAO0Ti/repo/.agents/norn/trace/hooks/gh-3/_story.jsonl: No such file or directory
+watch exit 0
+tick exit 0
+ls: /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-gAO0Ti/repo/.agents/norn/trace/hooks/gh-3/_story.jsonl: No such file or directory
+/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-gAO0Ti/repo/.agents/norn/trace/2026-09-20.chunks.jsonl
+/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-gAO0Ti/repo/.agents/norn/trace/2026-09-20.jsonl

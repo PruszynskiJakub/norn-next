@@ -1,0 +1,2 @@
+"trace keeps 26 days (3.8 MB) beyond trace.retain 14d — run `norn tidy` (`norn tidy --dry-run` lists them)"
+  · trace keeps 26 days (3.8 MB) beyond trace.retain 14d — run `norn tidy` (`norn tidy --dry-run` lists them)

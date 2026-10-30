@@ -1,0 +1,8 @@
+trace bytes:  2152125499
+round 1: status full 750 empty 635 | brief full 698 empty 450
+round 2: status full 492 empty 439 | brief full 344 empty 370
+round 3: status full 442 empty 509 | brief full 358 empty 378
+round 4: status full 487 empty 452 | brief full 397 empty 370
+round 5: status full 439 empty 499 | brief full 385 empty 410
+round 6: status full 573 empty 511 | brief full 531 empty 388
+round 7: status full 455 empty 477 | brief full 382 empty 383
