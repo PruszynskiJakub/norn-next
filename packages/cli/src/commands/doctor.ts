@@ -15,6 +15,8 @@
  *   - machine: the `user@host` runs are recorded with (R7.1); a warning when NORN_MACHINE overrides it (R7.3)
  *   - skills (SK1): every bundled skill is in `.agents/skills/` and linked from each configured
  *     agent's skill folder; one that differs from the bundled version is a warning (`norn init`)
+ *   - trace (O7; D11, D13): a `trace.retain` that is not a duration of at least 14d is a warning; day
+ *     pairs older than the window are a hint naming `norn tidy` — never a failed check
  * Repo checks (D7, B7–B9): the layout (D4; an old or mixed one is the only check reported, failed,
  * naming `norn migrate`, B20), every repo workflow validated exactly as a tick validates it (W5, the
  * shared `checkedRepoWorkflows`), and the repo config layer against its schema. Read-only.
@@ -29,13 +31,14 @@ import { basename, extname, join, relative, resolve } from "node:path";
 import { git as gitAdapter, herdr, proc } from "@norn/adapters";
 import type { AgentAdapter, FileError, RunnerPort, SessionRef, WorkflowIssue } from "@norn/core";
 import { ExitCode, ulid } from "@norn/schema";
-import { bindNornHome, type Layout, layoutProblems, loadWorkflows, machineDir, machineHolder, noteSpawn, orphanedMachineDirs, readHookFacts, repoConfigPath, repoLayout, skillsReport, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
+import { bindNornHome, type Layout, layoutProblems, loadWorkflows, machineDir, machineHolder, noteSpawn, orphanedMachineDirs, readHookFacts, repoConfigPath, repoLayout, skillsReport, traceDaysBefore, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { rendered, withExit } from "../output.ts";
 import { assetsDir } from "../runtime/assets.ts";
 import { gitRemoteUrl } from "../runtime/detect.ts";
 import { ensureShim, withNornOnPath } from "../runtime/shim.ts";
+import { effectiveRetain, formatBytes, retainCutoffDay, retainWarning } from "../runtime/trace-retention.ts";
 import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
 import { layoutRefusal } from "../runtime/layout.ts";
 import { hookBinary, hookCommand } from "./init.ts";
@@ -325,6 +328,7 @@ function formatDoctor(r: {
   skills: Check & { dir: string; missing: string[]; drifted: string[]; unlinked: Record<string, string[]> };
   repo: RepoReport;
   warnings: string[];
+  hints: string[];
 }, dir: string): string {
   const l = lines();
   const { out, line, sub, fix } = l;
@@ -360,7 +364,8 @@ function formatDoctor(r: {
   formatRepo(r.repo, l, dir);
 
   const warnings = r.warnings.length ? ["", "Warnings", ...r.warnings.map((w) => `  ! ${w}`)] : [];
-  return [l.head(r.ok), "", ...out, ...warnings].join("\n");
+  const hints = r.hints.length ? ["", "Hints", ...r.hints.map((h) => `  · ${h}`)] : [];
+  return [l.head(r.ok), "", ...out, ...warnings, ...hints].join("\n");
 }
 
 /** `norn doctor --repo`, or plain doctor when the config does not load and the machine checks cannot run. */
@@ -500,8 +505,19 @@ export const doctorCommand = defineCommand({
       );
     if (sk.drifted.length) warnings.push(`skills differ from this norn's bundled version: ${sk.drifted.join(", ")} — run ${cmd.init()} to update them (git diff .agents/skills/ shows the change)`);
 
+    // D11, D13: the trace window — a value that does not apply warns; days beyond it are a hint
+    const retainWarn = retainWarning(config.trace.retain);
+    if (retainWarn) warnings.push(retainWarn);
+    const hints: string[] = [];
+    const window = effectiveRetain(config);
+    const beyond = traceDaysBefore(ctx.root, retainCutoffDay(ctx.clock.now(), window.ms));
+    if (beyond.length) {
+      const bytes = beyond.reduce((n, d) => n + d.bytes, 0);
+      hints.push(`trace keeps ${beyond.length} day${beyond.length === 1 ? "" : "s"} (${formatBytes(bytes)}) beyond trace.retain ${window.retain} — run \`norn tidy\` (\`norn tidy --dry-run\` lists them)`);
+    }
+
     const ok = gitCheck.ok && agents.every((a) => a.ok) && remote.ok === true && (runner.ok === true || runner.required === false) && skillsOk && repo.ok;
-    const report = { ok, live, hook_command: command, machine, git: gitCheck, agents, remote, runner, skills, repo, warnings };
+    const report = { ok, live, hook_command: command, machine, git: gitCheck, agents, remote, runner, skills, repo, warnings, hints };
     const out = rendered(report, formatDoctor(report, dir));
     return ok ? out : withExit(out, ExitCode.error);
   },

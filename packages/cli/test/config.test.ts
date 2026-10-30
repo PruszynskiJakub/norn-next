@@ -285,4 +285,12 @@ describe("norn config set and unset", () => {
     const unknown = await h.norn("config", "unset", "nope", "--user", "--json");
     expect(unknown).toMatchObject({ exit: 3, value: { code: "unknown_key" } });
   });
+
+  test("trace.retain: a machine setting, 14d by default (B23, D11)", async () => {
+    const r = await h.norn("config", "get", "trace", "--json");
+    expect(r.exit).toBe(0);
+    expect((r.value as { entries: Array<ConfigEntry & { meaning: string }> }).entries).toEqual([
+      expect.objectContaining({ key: "trace.retain", value: "14d", source: "built-in", group: "machine", meaning: expect.stringContaining("norn tidy") }),
+    ]);
+  });
 });

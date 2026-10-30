@@ -28,21 +28,16 @@
 
 ## Goal
 
-Slice gh-110: write slice files covering every Behaviour item of the planned spec.
+Resolve: merge origin/main (21b3cc6f) into the story branch, resolve conflicts by intent, commit the merge.
 
 ## Progress
 
-- Seven slices written in `slices/`, frontmatter validated against the slice schema, `criteria` ids match Acceptance:
-  1. 01 paths through store (prefactor 1), deps none
-  2. 02 doctor validates repo workflows/config + `--repo` (prefactor 2; B7–B10), deps none
-  3. 03 config + workflows at new paths (B1, B2, B4), deps 01
-  4. 04 machine-local files in `~/.norn/repos/<id>/` + orphan warning (B5, B6), deps 01
-  5. 05 one layout guard (B17–B21), deps 02, 03, 04
-  6. 06 `norn migrate` (B11–B17), deps 05
-  7. 07 docs, shipped skill, help (B3, B22; B23 person-verified via PR description), deps 05, 06
-- Every B1–B23 is cited by an acceptance criterion.
-- slice#1 done: 7 slices written covering B1–B23: 01 paths through store (prefactor), 02 doctor validates workflows/config + --repo (B7–B10), 03 config+workflows at new paths (B1,B2,B4; dep 01), 04 machine dir in ~/.norn/repos/<id>/ (B5,B6; dep 01), 05 layout guard (B17–B21; deps 02,03,04), 06 norn migrate (B11–B17; dep 05), 07 docs/skill/help (B3,B22,B23 person; deps 05,06).
+- The story branch carries rewritten copies of main's commits (main stripped `runs/` from its history), so git's merge base was 83c7fa3c and 99 files "conflicted". The branch's real fork point 2d43e081 equals main's 397a34fd except for runs/ files; merged with `git merge-tree --merge-base=397a34fd` → 15 real conflicts. Worktree set from that tree with MERGE_HEAD=21b3cc6f, so the commit is a true two-parent merge.
+- Main's gh-120 (per-unit hook files, trace retention, chunked ticks) used `traceDir`; the branch replaced the trace dir by the machine dir. Resolution: main's behaviour at the branch's location — every `traceDir` → `machineDir` (store trace.ts, tick-trace.ts, paths.ts hookFilePath/hookBackfillPath, view trace-view.ts, tests, scripts/trace-bench.ts); hook files at `<machine dir>/hooks/<story>/…`.
+- doctor.ts: branch's lines()/repo group/--repo kept, main's trace.retain warning and Hints section added.
+- Main's new tests' `.agents/norn/{config.yaml,workflows,trace}` literals → repoConfigPath/workflowsDir/machineDir. PRD A2/O7 and the backfill schema title name hook files in the machine dir.
+- Typecheck passes; schemas re-emitted (local-hook-backfill added).
 
 ## Resume
 
-Slicing done; a person reviews the slice files. Slices 01 and 02 can start in parallel.
+Run `bun test`; fix anything the merge broke; `git commit --no-edit` the merge (MERGE_HEAD is set); report `norn done done`.

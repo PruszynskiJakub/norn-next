@@ -1,0 +1,108 @@
+/**
+ * The cockpit (`status --watch`), `status`, `story list`, `story view` and `status --segment` read no trace day file (B1, B2, D1): the
+ * project view carries no timeline, so what they show is the same over a trace of several days and
+ * over an empty one. The trace-read observer (store) sees every day file a reader opens.
+ *
+ * The days here are older than the hook-fact window (no live run, last hook beyond `limits.stalled`):
+ * the hook-fact read of local facts still scans day files within that window until hooks move to
+ * per-unit files (B8).
+ */
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
+import { copyFileSync, mkdirSync, readdirSync, renameSync } from "node:fs";
+import { join } from "node:path";
+import { machineDir, repoConfigPath, setTraceReadObserver } from "@norn/store";
+import { runCli } from "../src/index.ts";
+import { createHarness, type Harness, issue } from "./harness.ts";
+
+setDefaultTimeout(30_000);
+
+const CONFIG = `agents:
+  claude: { adapter: claude }
+remote: { provider: gh, label: norn }
+default_mode: manual
+notifiers: []
+`;
+
+const DAY = 86_400_000;
+let h: Harness;
+const days = () => readdirSync(machineDir(h.root)).filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n));
+
+/** quits once `drawn()` reaches `n` frames: what is pinned is the count, not wall time */
+async function* quitAfterFrames(n: number, drawn: () => number) {
+  while (drawn() < n) await new Promise((r) => setTimeout(r, 5));
+  yield "q";
+}
+
+/** the day files `run` opens */
+async function opened(run: () => Promise<unknown>): Promise<string[]> {
+  const seen: string[] = [];
+  const prev = setTraceReadObserver(({ file }) => seen.push(file));
+  try {
+    await run();
+  } finally {
+    setTraceReadObserver(prev);
+  }
+  return [...new Set(seen)];
+}
+
+beforeAll(async () => {
+  h = await createHarness();
+  expect((await h.norn("init")).exit).toBe(0);
+  h.write(repoConfigPath(h.root), CONFIG);
+  h.git(["add", "-A"]);
+  h.git(["commit", "-q", "-m", "norn"]);
+  h.git(["push", "-q", "origin", "main"]);
+  h.remote.issues = [issue(7, "Count items"), issue(8, "Export report")];
+  for (let i = 0; i < 4; i++) {
+    h.clock.advance(60_000);
+    await h.tick();
+  }
+  // several days of trace: today's ticks copied onto the days before, then the clock moves past them all
+  const [today] = days();
+  if (!today) throw new Error("no day file");
+  const t0 = Date.parse(today.slice(0, 10));
+  for (const n of [1, 2, 3]) copyFileSync(join(machineDir(h.root), today), join(machineDir(h.root), `${new Date(t0 - n * DAY).toISOString().slice(0, 10)}.jsonl`));
+  h.clock.advance(2 * DAY);
+  expect(days().length).toBe(4);
+});
+afterAll(() => h.cleanup());
+
+const views = {
+  "story list": () => h.norn("story", "list", "--json"),
+  segment: () => runCli(["status", "--segment", "--json"], { ...h.deps, herdr: null }),
+  status: () => h.norn("status", "--json"),
+  "story view gh-7": () => h.norn("story", "view", "gh-7", "--json"),
+};
+
+describe("views that read no trace (B1, B2)", () => {
+  test("norn status --watch --json and a refreshing cockpit open no day file (B1)", async () => {
+    expect(await opened(() => runCli(["status", "--watch", "--json"], { ...h.deps, herdr: null }))).toEqual([]);
+    let frames = 0;
+    expect(
+      await opened(async () => {
+        const r = await runCli(["status", "--watch", "--interval", "20ms"], { ...h.deps, herdr: null, input: quitAfterFrames(3, () => frames), log: () => frames++ });
+        expect(r.exit).toBe(0);
+      }),
+    ).toEqual([]);
+    expect(frames).toBeGreaterThanOrEqual(3); // it refreshed
+  });
+
+  test("story list, status --segment, status and story view open no day file and print the same as over an empty trace (B2)", async () => {
+    const full: Record<string, unknown> = {};
+    for (const [name, run] of Object.entries(views)) {
+      let out: unknown;
+      expect(await opened(async () => void (out = (await run()).value))).toEqual([]);
+      full[name] = out;
+    }
+    expect((full["story list"] as { stories: Array<{ key: string }> }).stories.map((s) => s.key)).toEqual(["gh-7", "gh-8"]);
+
+    const away = join(h.dir, "trace-away");
+    mkdirSync(away);
+    for (const n of days()) renameSync(join(machineDir(h.root), n), join(away, n));
+    try {
+      for (const [name, run] of Object.entries(views)) expect([name, (await run()).value]).toEqual([name, full[name]]);
+    } finally {
+      for (const n of readdirSync(away)) renameSync(join(away, n), join(machineDir(h.root), n));
+    }
+  });
+});

@@ -161,6 +161,12 @@ export const LocalCheckoutFile = Type.Object(
   id("local-checkout", "the checkout a norn machine dir belongs to (<norn home>/repos/<id>/checkout.json)"),
 );
 export type LocalCheckoutFile = Static<typeof LocalCheckoutFile>;
+/** `hooks/backfill.json` in the machine dir (B11, B12, D5): when the first tick of the per-unit hook files ran, and the units whose live runs' hook lines it has copied from the day files. Never pruned. */
+export const LocalHookBackfillFile = Type.Object(
+  { since: Type.String(), done: Type.Array(Type.String()) },
+  id("local-hook-backfill", "norn hook file backfill (<norn home>/repos/<id>/hooks/backfill.json)"),
+);
+export type LocalHookBackfillFile = Static<typeof LocalHookBackfillFile>;
 
 /** `notices.json`: the one-time notices this checkout has shown (B13), by id. */
 export const LocalNoticesFile = Type.Object({ shown: Type.Optional(Type.Array(Type.String())) }, id("local-notices", "norn one-time notices shown (trace/notices.json)"));
@@ -191,6 +197,7 @@ export const LOCAL_SCHEMA_NAMES = [
   "local-pr",
   "local-cockpit",
   "local-lock",
+  "local-hook-backfill",
   "local-notices",
   "local-checkout",
 ] as const;

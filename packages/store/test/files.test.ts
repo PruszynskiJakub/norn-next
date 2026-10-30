@@ -10,7 +10,9 @@ import {
   listReceipts,
   readJsonFile,
   readReceipt,
+  readState,
   writeReceiptAt,
+  writeState,
 } from "../src/index.ts";
 import { receipt, state, tmp } from "./helpers.ts";
 
@@ -95,5 +97,31 @@ describe("receipts (S6)", () => {
     expect(l.receipts[0]?.file).toBe("receipts/0002-done.json");
     expect(l.errors.map((e) => e.file)).toEqual(["receipts/0003-done.json", "receipts/0004-ask.json"]);
     expect(existsSync(join(u, "receipts/0003-done.json"))).toBe(true);
+  });
+});
+
+describe("committed runs/ JSON is one line (gh-108)", () => {
+  test("receipts and state.json are written as one line of JSON plus a newline", () => {
+    const u = tmp();
+    const r = receipt();
+    appendReceipt(u, r);
+    writeReceiptAt(u, 5, receipt({ kind: "stuck", reason: "blocked" }));
+    writeState(u, state());
+    for (const f of ["receipts/0001-done.json", "receipts/0005-stuck.json", "state.json"]) {
+      const text = readFileSync(join(u, f), "utf8");
+      expect(text.endsWith("}\n")).toBe(true);
+      expect(text.slice(0, -1)).not.toContain("\n");
+    }
+    expect(readFileSync(join(u, "receipts/0001-done.json"), "utf8")).toBe(`${JSON.stringify(r)}\n`);
+  });
+  test("older pretty-printed receipts and state.json still read", () => {
+    const u = tmp();
+    const r = receipt();
+    mkdirSync(join(u, "receipts"), { recursive: true });
+    writeFileSync(join(u, "receipts/0001-done.json"), `${JSON.stringify(r, null, 2)}\n`);
+    writeFileSync(join(u, "state.json"), `${JSON.stringify(state(), null, 2)}\n`);
+    expect(readReceipt(u, 1)).toMatchObject({ n: 1, receipt: { receipt_id: r.receipt_id } });
+    expect(appendReceipt(u, r)).toMatchObject({ n: 1, existed: true });
+    expect(readState(u)).toMatchObject({ ok: true, value: { step: "implement" } });
   });
 });

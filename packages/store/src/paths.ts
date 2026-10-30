@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
-import { LEGACY_SPEC_FILE, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName } from "@norn/schema";
+import { LEGACY_SPEC_FILE, parseSliceKey, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName } from "@norn/schema";
 
 /** gh-110 B1, B2 (D1): the committed repo config and workflows, relative to a root, as messages name them. */
 export const REPO_CONFIG_FILE = ".agents/norn.config.yaml";
@@ -141,6 +141,17 @@ export const inboxOpenPath = (root: string) => join(machineDir(root), "inbox.jso
 export const baseFactsPath = (root: string) => join(machineDir(root), "base.json");
 export const noticesPath = (root: string) => join(machineDir(root), "notices.json");
 export const prFactsPath = (root: string) => join(machineDir(root), "pr.json");
+/**
+ * B5 (D3): a unit's hook file — `hooks/<story>/_story.jsonl` for the story unit,
+ * `hooks/<story>/<nn>.jsonl` for a slice.
+ */
+export function hookFilePath(root: string, unit: { story: string; slice?: string | null }): string {
+  const nn = unit.slice ? parseSliceKey(unit.slice)?.nn : null;
+  if (unit.slice && !nn) throw new Error(`not a slice key: ${unit.slice}`);
+  return join(machineDir(root), "hooks", unit.story, `${nn ?? STORY_UNIT_DIR}.jsonl`);
+}
+/** D5: the one-time backfill of the hook files from the day files (`hooks/backfill.json`). */
+export const hookBackfillPath = (root: string) => join(machineDir(root), "hooks", "backfill.json");
 /** GR6: the base branch's `.agents/specs/` materialized per tree id (store/base.ts). */
 export const baseCacheDir = (root: string) => join(machineDir(root), "base");
 

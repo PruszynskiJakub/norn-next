@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/PruszynskiJakub/norn-next/actions/workflows/ci.yml"><img src="https://github.com/PruszynskiJakub/norn-next/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/PruszynskiJakub/norn-next/releases"><img src="https://img.shields.io/badge/release-v0.11.1-blue" alt="Release v0.11.1"></a>
+  <a href="https://github.com/PruszynskiJakub/norn-next/releases"><img src="https://img.shields.io/badge/release-v0.12.1-blue" alt="Release v0.12.1"></a>
   <img src="https://img.shields.io/badge/bun-%3E%3D1.3-f9f1e1" alt="Bun 1.3 or later">
 </p>
 
@@ -80,7 +80,8 @@ You need git ≥ 2.38, an agent CLI (Claude Code is the tested one), and `gh` or
 
 ```sh
 curl -fsSLO https://github.com/PruszynskiJakub/norn-next/releases/latest/download/norn-darwin-arm64
-install -m 755 norn-darwin-arm64 /usr/local/bin/norn
+sudo install -d /usr/local/bin           # missing on a fresh Apple Silicon Mac
+sudo install -m 755 norn-darwin-arm64 /usr/local/bin/norn
 norn --version
 ```
 

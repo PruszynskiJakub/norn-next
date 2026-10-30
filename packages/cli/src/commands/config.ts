@@ -98,6 +98,7 @@ const MEANING: Record<string, string> = {
   "slots.ports_per_slot": "ports reserved per worktree",
   "slots.env": "extra per-slot env vars ({slot} is replaced)",
   notifiers: "how you are told about new inbox items",
+  "trace.retain": "trace days norn tidy keeps (at least 14d)",
   agents: "a coding agent norn can brief or start",
   default_agent: "agent for steps that do not name one",
   default_mode: "who starts unattended steps of a story with no mode set: manual (you) or auto (the tick)",

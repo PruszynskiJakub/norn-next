@@ -14,7 +14,6 @@ export const storyListCommand = defineCommand({
   markdown: true,
   async run(ctx) {
     const view = await projectView(ctx);
-    const { timeline: _timeline, ...rest } = view;
-    return rendered(rest, formatStatus(view));
+    return rendered(view, formatStatus(view));
   },
 });

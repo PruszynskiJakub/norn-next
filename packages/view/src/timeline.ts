@@ -65,6 +65,9 @@ export function receiptEntry(nr: NumberedReceipt): TimelineEntry {
   return { at: nr.receipt.at, source: "receipt", kind: nr.receipt.kind, summary: receiptSummary(nr.receipt), ref: nr.file.split("/").at(-1) ?? String(nr.n) };
 }
 
+/** B4: the trace event types a timeline shows (`traceEntries` maps every other type to nothing), so a timeline read skips the rest unparsed. */
+export const TIMELINE_TYPES: Array<TraceEvent["type"]> = ["tick", "hook", "reject", "briefing", "foreign_commits", "take", "criteria"];
+
 /** Unit key a trace event belongs to, per decision for ticks (exact match, not prefix). */
 export function traceEntries(ev: TraceEvent, unit: string, max = MAX): TimelineEntry[] {
   const oneLine = (t: string) => cut(t, max);

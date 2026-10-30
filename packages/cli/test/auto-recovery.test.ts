@@ -13,7 +13,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Inbox, NUDGE_TEXT } from "@norn/core";
 import { type TickStartTrace, type UnitState, ulid } from "@norn/schema";
-import { appendTrace, heartbeatFilePath, readTrace, repoConfigPath, workflowsDir, writeState } from "@norn/store";
+import { appendHookTrace, appendTrace, heartbeatFilePath, readTrace, repoConfigPath, workflowsDir, writeState } from "@norn/store";
 import type { ProjectView } from "@norn/view";
 import type { TickReport } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
@@ -69,7 +69,7 @@ async function untilRunning(h: Harness): Promise<UnitState> {
 }
 
 function hook(h: Harness, runId: string, event: "turn_end" | "tool_use" | "session_start", extra: Record<string, string> = {}) {
-  appendTrace(h.root, { type: "hook", id: ulid(h.clock.now()), fact: { event, at: h.clock.iso(), agent: "claude", native: event, cwd: wt(h), story: "gh-9", run_id: runId, ...extra } });
+  appendHookTrace(h.root, { story: "gh-9" }, { type: "hook", id: ulid(h.clock.now()), fact: { event, at: h.clock.iso(), agent: "claude", native: event, cwd: wt(h), story: "gh-9", run_id: runId, ...extra } });
 }
 
 describe("R4: nudges that can be delivered (acceptance 5)", () => {

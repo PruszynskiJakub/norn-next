@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { NUDGE_TEXT } from "@norn/core";
 import { ulid } from "@norn/schema";
-import { appendReceipt, appendTrace, readTrace, repoConfigPath, workflowsDir } from "@norn/store";
+import { appendHookTrace, appendReceipt, readTrace, repoConfigPath, workflowsDir } from "@norn/store";
 import { humanSummary, humanTickLines } from "../src/commands/watch.ts";
 import { runShell, type TickReport } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
@@ -97,7 +97,7 @@ describe("runtime", () => {
     await h.tick(); // recovery commit of runs/ after the launch
     const st = h.state(runs());
     h.clock.advance(10_000);
-    appendTrace(h.root, { type: "hook", id: ulid(h.clock.now()), fact: { event: "turn_end", at: h.clock.iso(), agent: "claude", native: "Stop", cwd: wt(), story: "gh-9", run_id: st?.run?.run_id as string } });
+    appendHookTrace(h.root, { story: "gh-9" }, { type: "hook", id: ulid(h.clock.now()), fact: { event: "turn_end", at: h.clock.iso(), agent: "claude", native: "Stop", cwd: wt(), story: "gh-9", run_id: st?.run?.run_id as string } });
     h.clock.advance(1000);
     const r = await h.tick();
     expect(acted(r)).toEqual(["gh-9 nudge"]);
