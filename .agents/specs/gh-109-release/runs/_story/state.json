@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "story": "gh-109",
+  "slice": null,
+  "unit_dir": "_story",
+  "workflow": "release",
+  "workflow_hash": "1dba3383234e1630ccbebc9df02987f6e430b96e55c57cc3ce9c935092385bcb",
+  "step": "prepare",
+  "attempt": 1,
+  "visits": {
+    "prepare": 1
+  },
+  "step_entered_at": "2026-10-30T11:22:24.404Z",
+  "status": "ready",
+  "park": null,
+  "counters": {
+    "version_loop": 0,
+    "ready_loop": 0,
+    "base_conflict_loop": 0,
+    "stale_loop": 0
+  },
+  "nudges_used": 0,
+  "retries_used": 0,
+  "applied_through": 0,
+  "run": null,
+  "last_outcome": null,
+  "created_at": "2026-10-30T11:22:24.404Z",
+  "updated_at": "2026-10-30T11:22:24.404Z",
+  "last_tick_id": "01M668QWR7K7JXFG3WGDG6FC0T",
+  "mode": "manual"
+}
