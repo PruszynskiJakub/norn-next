@@ -14,6 +14,16 @@
 
 ## Goal
 
+Prefactors 2 and 3 of gh-107 with no change in output: `why`, the golden harvest and the tick read a tick's decide inputs through one store read; the tick, `brief` and `hook` read a unit's hook facts through one store read.
+
 ## Progress
 
+- Store `readTickInputs(root, tick)` (trace.ts) replaces cli `replayInputs`; `ReplayBlock`/`ReplayWorkflowRef` moved to store. `why`, golden-harvest and the e2e replay use it.
+- Store `readUnitHooks(root, units, since)` returns each unit's hook events in one day-file pass. A unit's events are those recorded for it (fact story/slice) or fired under its worktree (the prefix match `runHooks` uses), so every consumer's filter sees the same facts.
+- `LocalFacts.hooks` is gone; each `LocalUnit` carries its own `hooks`, and observe and the view pass `lu.hooks` to their `unitFacts`.
+- `brief` reads its own unit through `readUnitHooks` and keeps its cwd filter. `blockedHookCount(root, unit, runId)` is built on it; `hook` passes the session's unit.
+- Tests: store S2 tests for both reads; agent-protocol B10 test (hooks of two units, brief takes its own session). Golden, transcripts and observe snapshots unchanged; full suite and typecheck green.
+
 ## Resume
+
+Nothing left in this step. Slice 04 changes `readUnitHooks` to read the per-unit hook files.
