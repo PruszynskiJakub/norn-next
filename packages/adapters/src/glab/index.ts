@@ -128,6 +128,23 @@ export function createGlab(opts: GlabOptions): RemotePort {
       // GR9
       okOrThrow(await run(["mr", "update", String(number), ...repo, "--description-file", "-", "--yes"], body), "glab mr update", "glab");
     },
+    async createIssue({ title, body, labels, assignee }) {
+      // B18
+      const out = okOrThrow(
+        await run(["issue", "create", ...repo, "--title", title, "--description-file", "-", ...labels.flatMap((l) => ["--label", l]), "--assignee", assignee, "--yes"], body),
+        "glab issue create",
+        "glab",
+      );
+      const m = /\/issues\/(\d+)/.exec(out);
+      if (!m) throw portError("glab_bad_output", `glab issue create: no issue URL in output: ${out.slice(0, 200)}`);
+      return mapIssue(await json<GlIssue>(["issue", "view", m[1] as string, ...repo, "--output", "json"]));
+    },
+    async newIssueUrl({ labels }) {
+      // B23: GitLab's new-issue page takes no label names, so the labels go in as a /label quick action
+      const { web_url } = await json<{ web_url: string }>(["repo", "view", ...(opts.repo ? [opts.repo] : []), "--output", "json"]);
+      const action = `/label ${labels.map((l) => `~"${l}"`).join(" ")}`;
+      return `${web_url}/-/issues/new?${new URLSearchParams({ "issue[description]": action })}`;
+    },
   };
 }
 

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Action: open the picker as a popup over the focused pane. As for the cockpit, the directory travels
+# Action: open the cockpit as a popup over the focused pane. The directory travels
 # as NORN_COCKPIT_DIR (the pane command runs from the plugin folder); NORN_BIN passes through.
 # No --workspace: Herdr opens an overlay over the active pane and refuses a target.
 cd "$(dirname "$0")" && . ./lib.sh

@@ -12,8 +12,9 @@ import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Inbox, RunnerPort } from "@norn/core";
 import { setSpawnObserver } from "@norn/store";
-import { type CliDeps, type CliResult, runCli, type TickReport } from "../src/index.ts";
+import { type CliDeps, type CliResult, type TickReport } from "../src/index.ts";
 import { createHarness, FakeRunner, type Harness, issue, sh } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 import { expectTranscript, recordTranscript, type Transcript } from "./transcript.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
@@ -50,9 +51,9 @@ function wrap(root: string, deps: CliDeps, name = "A"): Clone {
   const run = <T>(label: string, fn: () => Promise<T>) => (transcript ? transcript.command(`[${name}] ${label}`, fn) : fn());
   return {
     root,
-    norn: (...argv) => run(`norn ${argv.join(" ")}`, () => runCli(argv, deps)),
+    norn: (...argv) => run(`norn ${argv.join(" ")}`, () => runChecked(argv, deps)),
     async tick(...flags) {
-      const r = await run(["norn tick", ...flags].join(" "), () => runCli(["tick", ...flags], deps));
+      const r = await run(["norn tick", ...flags].join(" "), () => runChecked(["tick", ...flags], deps));
       if (r.exit !== 0) throw new Error(`tick failed: ${r.stdout}`);
       return r.value as TickReport;
     },
@@ -122,7 +123,7 @@ describe("a claim lost mid-run (R1.2, R2.3)", () => {
     // the agent on A finishes; before A's next tick, B force-takes the story
     h.report(storyRuns(A.root), "done", { outcome: "done", handoff: "search works" });
     B = cloneOf(h, "repo-b", "bob");
-    expect((await B.norn("take", "gh-9", "--force")).exit).toBe(0);
+    expect((await B.norn("story", "checkout", "gh-9", "--force")).exit).toBe(0);
     const head = remoteHead();
     step(4 * 60_000); // A's renewal is due; A still believes it holds the claim (no sync)
     const r = await A.tick("--offline");
@@ -137,7 +138,7 @@ describe("a claim lost mid-run (R1.2, R2.3)", () => {
     const r = await A.tick("--sync");
     expect(r.decisions.filter((d) => d.unit === "gh-9")).toEqual([{ unit: "gh-9", rule: "claim.other", kind: "noop", ok: true }]);
     const done = readdirSync(join(storyRuns(A.root), "receipts")).find((f) => f.endsWith("-done.json")) as string;
-    const inbox = (await A.norn("inbox")).value as Inbox;
+    const inbox = (await A.norn("status")).value as Inbox;
     expect(inbox.groups.check).toEqual([
       expect.objectContaining({ story: "gh-9", command: "norn tidy", title: `local work on gh-9 is not in the record (${done.replace(/\.json$/, "")}) — the story is now held by bob@repo-b` }),
     ]);
@@ -152,7 +153,7 @@ describe("a claim lost mid-run (R1.2, R2.3)", () => {
     // committed on the local branch only; the record is untouched
     expect(remoteHead()).toBe(head);
     expect(sh(`${A.root}-worktrees/${BRANCH}`, ["status", "--porcelain"])).toBe("");
-    expect(((await A.norn("inbox")).value as Inbox).groups.check).toEqual([]);
+    expect(((await A.norn("status")).value as Inbox).groups.check).toEqual([]);
   });
 
   test("effect transcript: spawns, port calls and runs/ files of both clones (refactor Phase 0.2)", () => {
@@ -182,7 +183,7 @@ describe("renewals due together go out in one push (H5, R1.2)", () => {
   test("one renewal lost among several: one claim push, only that story fails and its actions are skipped", async () => {
     for (let n = 1; n <= N; n++) h.report(storyRuns(n), "done", { outcome: "done", handoff: `story ${n} works` });
     const B = cloneOf(h, "repo-b", "bob");
-    expect((await B.norn("take", "gh-2", "--force")).exit).toBe(0);
+    expect((await B.norn("story", "checkout", "gh-2", "--force")).exit).toBe(0);
     h.clock.advance(4 * 60_000);
     const pushes: string[][] = [];
     const prev = setSpawnObserver(({ argv }) => {
@@ -264,7 +265,7 @@ describe("intake race and release (R3.1, R3.3)", () => {
     sh(other, ["-c", "user.email=o@example.com", "-c", "user.name=O", "commit", "-q", "--allow-empty", "-m", "outside"]);
     sh(other, ["push", "-q", "origin", BRANCH]);
     const head = h.git(["ls-remote", "origin", `refs/heads/${BRANCH}`]).split("\t")[0];
-    const r = await A.norn("release", "gh-10");
+    const r = await A.norn("story", "handoff", "gh-10");
     expect(r.exit).not.toBe(0);
     expect((r.value as { error: string }).error).toContain(`${BRANCH} is not a fast-forward of origin/${BRANCH}`);
     expect(h.git(["ls-remote", "origin", `refs/heads/${BRANCH}`]).split("\t")[0]).toBe(head);

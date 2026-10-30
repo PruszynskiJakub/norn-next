@@ -24,6 +24,7 @@ import { busyError } from "../output.ts";
 import { leaseLiveness } from "../runtime/leases.ts";
 import { type Observed, observe } from "../runtime/observe/index.ts";
 import { doneHerdrRuns, planHerdrTidy } from "../runtime/tidy-herdr.ts";
+import { cmd } from "@norn/core";
 
 /** A reservation lives only while a receipt is being written; older ones are crash leftovers. */
 const RESERVE_STALE_MS = 60_000;
@@ -74,7 +75,7 @@ export const tidyCommand = defineCommand({
   async run(ctx, args) {
     const dry = opt.bool(args, "dry-run");
     const lock = await acquireTickLock(ctx.root, { note: "norn tidy", now: () => ctx.clock.iso() });
-    if (!lock.ok) throw busyError(`a tick is running (pid ${lock.holder.holder.pid})`, "retry: norn tidy", "tick_locked");
+    if (!lock.ok) throw busyError(`a tick is running (pid ${lock.holder.holder.pid})`, `retry: ${cmd.tidy()}`, "tick_locked");
     try {
       const obs = await observe(ctx, { tick_id: ulid(ctx.clock.now()), sync: "never" });
       const git = obs.ports.git;

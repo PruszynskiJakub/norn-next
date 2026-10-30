@@ -171,7 +171,7 @@ describe("R4.3 / R5.5: inbox items", () => {
   test("a failed nudge is an Unblock item until the cursor moves or the agent shows activity", () => {
     const s = solo(running(), { last_activity_at: T0 - 120_000 }, { act_failure: failure() });
     const item = actFailureItem(s, s.units[0] as UnitFacts);
-    expect(item).toMatchObject({ group: "unblock", title: "nudge to gh-1 not delivered: herdr agent prompt: blocked", command: `norn why gh-1 --tick ${TICK}` });
+    expect(item).toMatchObject({ group: "unblock", title: "nudge to gh-1 not delivered: herdr agent prompt: blocked", command: `norn run view gh-1 --why --tick ${TICK}` });
     expect(buildInbox(facts([s]), CONFIG).groups.unblock.map((i) => i.id)).toEqual([`failed:gh-1:${TICK}`]);
     const moved = solo(running({ attempt: 2 }), { last_activity_at: T0 - 120_000 }, { act_failure: failure() });
     expect(actFailureItem(moved, moved.units[0] as UnitFacts)).toBeNull();

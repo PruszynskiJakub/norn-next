@@ -114,7 +114,7 @@
   spawn repo-worktrees/gh-7-add-login-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7-add-login-form -- .agents/specs/gh-7-add-login-form/runs/_story/handoff.md .agents/specs/gh-7-add-login-form/runs/_story/receipts/0001-started.json .agents/specs/gh-7-add-login-form/runs/_story/receipts/0002-started.json .agents/specs/gh-7-add-login-form/runs/_story/state.json
   spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
   ~ repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/handoff.md
-      text 20 lines, normalised sha256 1e51c7e936b3
+      text 20 lines, normalised sha256 63ad26b6569b
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/receipts/0001-started.json
       {"kind":"started","receipt_id":"<ulid:5>","run_id":"<ulid:3>","step":"plan","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:4>","how":"auto","agent":"claude","worktree":"<dir>/repo-worktrees/gh-7-add-login-form","machine":"tester@box","heartbeat_id":"<ulid:6>"}
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/receipts/0002-started.json
@@ -265,7 +265,7 @@
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7/01-form -- .agents/specs/gh-7-add-login-form/runs/01-form/handoff.md .agents/specs/gh-7-add-login-form/runs/01-form/receipts/0001-started.json .agents/specs/gh-7-add-login-form/runs/01-form/receipts/0002-started.json .agents/specs/gh-7-add-login-form/runs/01-form/state.json
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form
   ~ repo-worktrees/gh-7-add-login-form--01-form/.agents/specs/gh-7-add-login-form/runs/01-form/handoff.md
-      text 20 lines, normalised sha256 6ca7105fad0e
+      text 20 lines, normalised sha256 18ea23cbb75a
   + repo-worktrees/gh-7-add-login-form--01-form/.agents/specs/gh-7-add-login-form/runs/01-form/receipts/0001-started.json
       {"kind":"started","receipt_id":"<ulid:13>","run_id":"<ulid:11>","step":"implement","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:12>","how":"auto","agent":"claude","worktree":"<dir>/repo-worktrees/gh-7-add-login-form--01-form","machine":"tester@box","heartbeat_id":"<ulid:6>"}
   + repo-worktrees/gh-7-add-login-form--01-form/.agents/specs/gh-7-add-login-form/runs/01-form/receipts/0002-started.json
@@ -404,7 +404,7 @@
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7/01-form -- .agents/specs/gh-7-add-login-form/runs/01-form/handoff.md .agents/specs/gh-7-add-login-form/runs/01-form/receipts/0005-started.json .agents/specs/gh-7-add-login-form/runs/01-form/receipts/0006-started.json .agents/specs/gh-7-add-login-form/runs/01-form/state.json
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form
   ~ repo-worktrees/gh-7-add-login-form--01-form/.agents/specs/gh-7-add-login-form/runs/01-form/handoff.md
-      text 23 lines, normalised sha256 3bdd4d3026bd
+      text 23 lines, normalised sha256 f2978e454430
   + repo-worktrees/gh-7-add-login-form--01-form/.agents/specs/gh-7-add-login-form/runs/01-form/receipts/0005-started.json
       {"kind":"started","receipt_id":"<ulid:23>","run_id":"<ulid:21>","step":"implement","attempt":2,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:22>","how":"auto","agent":"claude","worktree":"<dir>/repo-worktrees/gh-7-add-login-form--01-form","machine":"tester@box","heartbeat_id":"<ulid:6>"}
   + repo-worktrees/gh-7-add-login-form--01-form/.agents/specs/gh-7-add-login-form/runs/01-form/receipts/0006-started.json
@@ -505,7 +505,7 @@
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form
   A.notifier.notify approve:gh-7/01:human-qa#1
   ~ repo-worktrees/gh-7-add-login-form--01-form/.agents/specs/gh-7-add-login-form/runs/01-form/handoff.md
-      text 25 lines, normalised sha256 a3bca7b8ad04
+      text 25 lines, normalised sha256 bc246c091904
   ~ repo-worktrees/gh-7-add-login-form--01-form/.agents/specs/gh-7-add-login-form/runs/01-form/state.json
       {"version":1,"story":"gh-7","slice":"gh-7/01","unit_dir":"01-form","workflow":"slice","workflow_hash":"47f8698e52c6920a2b18cac3fbbf902cc8044f1ede2597fb32d6ce86e12d8a8a","step":"human-qa","attempt":1,"visits":{"implement":2,"test":2,"human-qa":1},"step_entered_at":"<time>","status":"parked","park":{"kind":"gate","reason":"Try it","since":"<time>"},"counters":{"test_loop":1},"nudges_used":0,"retries_used":0,"applied_through":8,"run":null,"last_outcome":{"step":"test","outcome":"pass","source":"classified","at":"<time>","receipt_id":"<ulid:28>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:30>"}
 > norn tick

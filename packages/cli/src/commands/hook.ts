@@ -11,7 +11,7 @@
  * `--agent` (a configured agent name or an adapter name; `norn init` always installs it), else
  * NORN_AGENT, else the first configured adapter (claude first) that recognizes the event.
  */
-import { type AgentAdapter, currentRun, cursorStep, type HookDecision, type HookResponse, reportableOutcomes, standingReport } from "@norn/core";
+import { cmd, type AgentAdapter, currentRun, cursorStep, type HookDecision, type HookResponse, reportableOutcomes, standingReport } from "@norn/core";
 import { DEFAULT_CONFIG, type ExitCode, type HookFact, type ResolvedConfig, ulid } from "@norn/schema";
 import { appendTrace, blockedHookCount, loadConfig } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
@@ -90,8 +90,8 @@ function decideBlock(root: string, s: UnitSession | null, fact: HookFact, adapte
     block: true,
     reason:
       `norn: step ${s.state.step} of ${s.unit.key} has no report for this run. Before ending your turn, report exactly once: ` +
-      `\`norn done <${outcomes.join("|")}> --handoff "…"\`, \`norn ask "<question>"\` or \`norn stuck "<reason>"\`. ` +
-      "Run `norn brief` to see what each outcome means.",
+      `\`${cmd.done(`<${outcomes.join("|")}>`)}\`, \`${cmd.ask()}\` or \`${cmd.stuck()}\`. ` +
+      `Run \`${cmd.brief()}\` to see what each outcome means.`,
   };
 }
 

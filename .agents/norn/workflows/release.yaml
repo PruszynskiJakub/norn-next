@@ -8,7 +8,7 @@
 # Any commit on the base makes the changelog incomplete (base.stale: behind, BS7): a release
 # waiting at `ready` goes back through update and prepare. A red CI means the base is
 # broken: the story goes $stuck; fix the base in its own story, then
-# `norn unstick gh-N --to update`.
+# `norn run rerun gh-N --step update`.
 name: release
 description: Write the changelog and propose the version, open the draft PR, wait for its CI, and let a person judge it at ready.
 start: prepare

@@ -9,6 +9,7 @@
  *                     each with the merge facts to write (`merge`, StoryMerge)
  * - `foreign.json`    commit shas already traced as `foreign_commits` (Q6: once per sha)
  * - `base.json`       per story, the last `story.base` measured (BS1; base.ts)
+ * - `notices.json`    one-time notices already shown on this checkout (B13)
  * Every read is validated (S2, BUG-4): a file that is unreadable or of the wrong shape reads as
  * empty through `readLocalJson`, never as a cast of what was there. Paths are in paths.ts.
  */
@@ -16,7 +17,7 @@ import type { StoryFacts } from "@norn/core";
 import type { StoryMerge } from "@norn/schema";
 import { atomicWriteJson } from "./fsx.ts";
 import { readLocalJson } from "./local-json.ts";
-import { foreignCommitsPath, notifiedPath, pendingRecordsPath, remoteCachePath } from "./paths.ts";
+import { foreignCommitsPath, noticesPath, notifiedPath, pendingRecordsPath, remoteCachePath } from "./paths.ts";
 import { appendTrace, traceEvent } from "./trace.ts";
 
 export interface RemoteCache {
@@ -47,6 +48,21 @@ export function readNotified(root: string): Set<string> {
 export function markNotified(root: string, ids: Set<string>, id: string): void {
   ids.add(id);
   atomicWriteJson(notifiedPath(root), { ids: [...ids].slice(-KEEP_NOTIFIED) });
+}
+
+/**
+ * B13: true the first time notice `id` is asked for on this checkout, then false. A notice file that
+ * cannot be read or written never fails the command: the notice shows again.
+ */
+export function firstNotice(root: string, id: string): boolean {
+  const shown = readLocalJson("local-notices", noticesPath(root), {}, root).shown ?? [];
+  if (shown.includes(id)) return false;
+  try {
+    atomicWriteJson(noticesPath(root), { shown: [...shown, id] });
+  } catch {
+    // presentation only: shown again next time
+  }
+  return true;
 }
 
 /** GR6: a merged story whose `status: done` record on the base branch is still owed (deferred or failed). */

@@ -4,7 +4,7 @@
 # as an issue comment (story.md stays as intake wrote it), and reports the workflow it recommends
 # as its outcome.
 # A person then decides at `confirm`. A gate has only approve/reject/stale (W2), so the choice of
-# workflow is not a gate outcome: the person switches the story with `norn workflow … --to`
+# workflow is not a gate outcome: the person switches the story with `norn story edit … --workflow … --at`
 # (W9, S7), which works while the unit waits at the gate. Agents never run it.
 # Triage changes no code and opens no PR, so it has no base sync (BS*).
 name: triage
@@ -29,12 +29,12 @@ steps:
     type: gate
     prompt: >-
       Read the triage findings and the recommendation in the issue comment (`gh issue view N --comments`). N is the issue number.
-      Switch to a workflow: `norn workflow gh-N quick --to implement` or `norn workflow gh-N story --to refine`;
-      a bug: `norn workflow gh-N reproduce --to reproduce`.
-      Close: `norn approve gh-N --reason "<why>"`, then `gh issue close N --reason "not planned"`,
-      then `norn drop gh-N` (a story at $done without a PR otherwise waits for a merge, GR6),
-      then `git push origin --delete gh-N-<slug>` (drop pushed the story branch; the findings stay on the issue comment).
-      Triage again: `norn approve gh-N --reject --reason "<what to look at>"`.
+      Switch to a workflow: `norn story edit gh-N --workflow quick --at implement` or `norn story edit gh-N --workflow story --at refine`;
+      a bug: `norn story edit gh-N --workflow reproduce --at reproduce`.
+      Close: `norn story approve gh-N --reason "<why>"`, then `gh issue close N --reason "not planned"`,
+      then `norn story close gh-N --yes` (a story at $done without a PR otherwise waits for a merge, GR6),
+      then `git push origin --delete gh-N-<slug>` (close pushed the story branch; the findings stay on the issue comment).
+      Triage again: `norn story reject gh-N --reason "<what to look at>"`.
     outcomes:
       approve: $done
       reject:  { to: explore, counter: triage_loop }

@@ -57,7 +57,7 @@ export class Ctx {
     return this.taken.has(unit);
   }
   emit(action: Action): void {
-    // O5 (F5): an intake is about one story — key it by that story so `norn why <story>` finds it;
+    // O5 (F5): an intake is about one story — key it by that story so `norn run view <story> --why` finds it;
     // other repo-level actions (lease reclaim) stay `*`
     const unit = action.unit?.key ?? (action.kind === "intake_story" ? action.key : "*");
     // R1.1: a claim renewal rides along; it does not take the unit's one action
@@ -150,7 +150,7 @@ type ReceiptHeader = "kind" | "receipt_id" | "run_id" | "step" | "attempt" | "at
 
 /**
  * A receipt norn writes this tick at the unit's cursor (P6): its id derived from the tick
- * (`ctx.id()`, so `norn why` replays it), at `facts.now`, by norn on this machine, no run unless
+ * (`ctx.id()`, so `norn run view --why` replays it), at `facts.now`, by norn on this machine, no run unless
  * `fields` names one. `fields` may also set `by`/`who` (R6.1: an answer recorded for the agent).
  */
 export function nornReceipt<K extends Receipt["kind"]>(

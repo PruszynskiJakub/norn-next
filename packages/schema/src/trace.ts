@@ -60,7 +60,7 @@ export type TickUnitRecord = Static<typeof TickUnitRecord>;
 
 /**
  * O1/O4 inbox history: an inbox item (needing a person) appeared in, or left, the inbox after this
- * tick's act. `norn inbox --history` pairs them into appeared_at / resolved_at / resolved_by.
+ * tick's act. `norn status --history` pairs them into appeared_at / resolved_at / resolved_by.
  */
 export const InboxChange = Type.Object(
   {
@@ -90,10 +90,10 @@ export const TickTrace = Type.Object(
     tick_id: Ulid,
     at: IsoTime,
     heartbeat_id: Type.Union([Ulid, Type.Null()]),
-    /** the norn that recorded this tick (`@norn/cli` version); `norn why` labels a replay by another version (O5). Absent on older traces. */
+    /** the norn that recorded this tick (`@norn/cli` version); `norn run view --why` labels a replay by another version (O5). Absent on older traces. */
     norn_version: Type.Optional(NonEmpty),
     duration_ms: NonNegInt,
-    /** Facts snapshot (the `Facts` type of @norn/core); replayed by `norn why` (O5). */
+    /** Facts snapshot (the `Facts` type of @norn/core); replayed by `norn run view --why` (O5). */
     facts: Type.Record(Type.String(), Type.Unknown()),
     decisions: Type.Array(TickUnitRecord),
     /** inbox items that appeared or were resolved by this tick (O1 history); absent = none */
@@ -170,7 +170,7 @@ export const ForeignCommitsTrace = Type.Object(
 );
 export type ForeignCommitsTrace = Static<typeof ForeignCommitsTrace>;
 
-/** R10.1 (M8): a `norn take` of a story, forced or not, with the claim it replaced. */
+/** R10.1 (M8): a `norn story checkout` of a story, forced or not, with the claim it replaced. */
 export const TakeTrace = Type.Object(
   {
     type: Type.Literal("take"),
@@ -191,7 +191,7 @@ export type TakeTrace = Static<typeof TakeTrace>;
 
 /**
  * R5.4 (N2): written after decide, before act — so a tick that dies during act still leaves its
- * decisions (and the receipts they number) in the trace. `norn why` reports a `tick.start` with no
+ * decisions (and the receipts they number) in the trace. `norn run view --why` reports a `tick.start` with no
  * `tick.end` as "tick crashed during act". No facts snapshot: the full `tick` record carries those.
  */
 export const TickStartTrace = Type.Object(
@@ -223,7 +223,7 @@ export type TickEndTrace = Static<typeof TickEndTrace>;
 
 /**
  * QV2–QV4, QV8: a `norn done --criteria` report, counted — so "we keep failing to verify browser
- * criteria" shows up as data (`norn trace` sums `unverified_needs`). `rule` is
+ * criteria" shows up as data (`norn run list` sums `unverified_needs`). `rule` is
  * `criteria.unchecked_coverage` when the unit's frontmatter had no `criteria` to check coverage
  * against (QV4), else `criteria.checked`.
  */

@@ -21,6 +21,7 @@ import { edgeOf, isStale, stepOf } from "../workflow.ts";
 import { applyAction, classifyRun, implicitAskResolved, launchUnknown, resolveImplicitAsk, startRun } from "./agent.ts";
 import { commitFor, type Ctx, gitBusy, nextReceiptNumber, park, rebasing, sliceFileOf, unitItem } from "./receipts.ts";
 import { baseOf, classifyNorn, resumeSlices, runCheck, runGit, slicesCanResume, slicesStep, startStoryUnit } from "./steps.ts";
+import { cmd } from "../commands.ts";
 
 // ================================================================= story level
 
@@ -72,7 +73,7 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
       return ctx.noop(ref, "story.finished", baseDone ? `finished: ${ctx.facts.repo.default_branch} records it ${story.base_status} (R3.2); nothing to acquire` : "finished: PR merged (R3.2); nothing to acquire");
     // GR6: a finished story (workflow done, merged/recorded or dropped) needs no owner — never "unclaimed"
     if (!ours && !fresh && storyFinished(story)) return ctx.noop(ref, "story.finished", `finished (${story.frontmatter?.status === "done" || story.frontmatter?.status === "dropped" ? story.frontmatter.status : "workflow done"}); nothing to take`);
-    if (!ours && !fresh) return ctx.noop(ref, "claim.unclaimed", `unclaimed — norn take ${story.key} (T10)`);
+    if (!ours && !fresh) return ctx.noop(ref, "claim.unclaimed", `unclaimed — ${cmd.storyCheckout(story.key)} (T10)`);
     const lost = fresh ? lostIntake(story) : undefined;
     return ctx.emit({
       kind: "claim",
@@ -281,9 +282,9 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
   // C2: receipts first — they always win over runner facts
   if (uf.unapplied.length) return applyAction(ctx, story, uf, st, wf, uf.unapplied, "receipts.apply");
 
-  // S7: pinned workflow edited outside `norn workflow`, or cursor step gone
+  // S7: pinned workflow edited outside `norn story edit --workflow`, or cursor step gone
   if (st.status !== "stuck" || st.park?.kind !== "workflow") {
-    const drift = uf.workflow_hash && uf.workflow_hash !== st.workflow_hash ? "pinned workflow.yaml changed outside norn workflow (S7)" : null;
+    const drift = uf.workflow_hash && uf.workflow_hash !== st.workflow_hash ? "pinned workflow.yaml changed outside norn story edit (S7)" : null;
     const gone = st.step !== "$done" && !stepOf(wf, st.step) ? `step '${st.step}' no longer exists in workflow ${wf.name} (S7)` : null;
     const reason = drift ?? gone;
     if (reason) return park(ctx, story, uf, st, "workflow", reason, "workflow.drift");
@@ -317,7 +318,7 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
       return ctx.noop(ref, ref.slice ? "slice.done" : "story.wait_merge", ref.slice ? "integrated" : "workflow done; waiting for the PR merge (GR6)");
     case "stuck":
       if (slicesCanResume(story, uf, st, wf)) return resumeSlices(ctx, story, uf, st, wf);
-      return ctx.noop(ref, "unit.stuck", `stuck: ${st.park?.reason ?? "?"} — norn unstick ${ref.key}`);
+      return ctx.noop(ref, "unit.stuck", `stuck: ${st.park?.reason ?? "?"} — ${cmd.runRerun(ref.key)}`);
     case "parked": {
       // R6.1 (H3, A14): an implicit ask a later fact shows the agent has moved past resolves itself
       const moved = implicitAskResolved(st, uf);
