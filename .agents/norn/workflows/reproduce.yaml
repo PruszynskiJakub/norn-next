@@ -3,7 +3,7 @@
 # interface, builds a loop that goes red on the symptom, minimises it, confirms the cause and names
 # the seam for a regression test. It posts all of that as an issue comment and changes no code.
 # A person then decides at `confirm`, as in triage: the fix is delivered by `quick`, switched to with
-# `norn workflow … --to implement` (W9, S7), whose implement turns the red loop into a failing test.
+# `norn story edit … --workflow … --at implement` (W9, S7), whose implement turns the red loop into a failing test.
 # Reproduce changes no code and opens no PR, so it has no base sync (BS*).
 name: reproduce
 description: Reproduce a bug through the real interface, confirm its cause and the seam for a regression test; change no code.
@@ -33,11 +33,11 @@ steps:
     type: gate
     prompt: >-
       Read the reproduce findings in the issue comment (`gh issue view N --comments`). N is the issue number.
-      Fix it: `norn workflow gh-N quick --to implement` (implement starts from the red loop).
-      Close: `norn approve gh-N --reason "<why>"`, then `gh issue close N --reason "not planned"`,
-      then `norn drop gh-N` (a story at $done without a PR otherwise waits for a merge, GR6),
-      then `git push origin --delete gh-N-<slug>` (drop pushed the story branch; the findings stay on the issue comment).
-      Reproduce again: `norn approve gh-N --reject --reason "<what to look at>"`.
+      Fix it: `norn story edit gh-N --workflow quick --at implement` (implement starts from the red loop).
+      Close: `norn story approve gh-N --reason "<why>"`, then `gh issue close N --reason "not planned"`,
+      then `norn story close gh-N --yes` (a story at $done without a PR otherwise waits for a merge, GR6),
+      then `git push origin --delete gh-N-<slug>` (close pushed the story branch; the findings stay on the issue comment).
+      Reproduce again: `norn story reject gh-N --reason "<what to look at>"`.
     outcomes:
       approve: $done
       reject:  { to: reproduce, counter: reproduce_loop }
