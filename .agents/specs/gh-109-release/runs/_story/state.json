@@ -6,20 +6,15 @@
   "workflow": "release",
   "workflow_hash": "1dba3383234e1630ccbebc9df02987f6e430b96e55c57cc3ce9c935092385bcb",
   "step": "test",
-  "attempt": 1,
+  "attempt": 2,
   "visits": {
     "prepare": 1,
     "confirm-version": 1,
-    "test": 1
+    "test": 2
   },
-  "step_entered_at": "2026-10-30T11:27:30.485Z",
-  "status": "stuck",
-  "park": {
-    "kind": "stuck",
-    "reason": "test.fail → $stuck",
-    "since": "2026-10-30T11:40:31.475Z",
-    "receipt_id": "01M669S2BEMH8G68XTTM6QMKY4"
-  },
+  "step_entered_at": "2026-10-30T11:44:30.628Z",
+  "status": "ready",
+  "park": null,
   "counters": {
     "version_loop": 0,
     "ready_loop": 0,
@@ -28,7 +23,7 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 6,
+  "applied_through": 7,
   "run": null,
   "last_outcome": {
     "step": "test",
@@ -38,7 +33,7 @@
     "receipt_id": "01M669S2BEMH8G68XTTM6QMKY4"
   },
   "created_at": "2026-10-30T11:22:24.404Z",
-  "updated_at": "2026-10-30T11:41:24.319Z",
-  "last_tick_id": "01M669TNYQX3Y5DTEKV7NCPYH0",
+  "updated_at": "2026-10-30T11:44:30.628Z",
+  "last_tick_id": "01M66A0BX29JE886796TGWAQ76",
   "mode": "auto"
 }
