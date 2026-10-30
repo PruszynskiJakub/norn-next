@@ -1,0 +1,21 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M66DDAW9EQ0FAH8CGZY1WTEG",
+  "run_id": null,
+  "step": "ready",
+  "attempt": 1,
+  "at": "2026-10-30T12:44:01.297Z",
+  "by": "norn",
+  "who": "jakubpruszynski@MacBook-Pro-Jakub-2",
+  "tick_id": "01M66DDAW9FJ17J3FJG4XYNQ0M",
+  "outcome": "stale",
+  "rule": "base moved",
+  "detail": "1 behind, conflicts: none",
+  "route": "update",
+  "base": {
+    "ref": "refs/remotes/origin/main",
+    "sha": "9d8676ad385997b2a79717cfe388787dfa65e176",
+    "behind": 1,
+    "conflicts": []
+  }
+}
