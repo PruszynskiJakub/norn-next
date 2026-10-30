@@ -17,15 +17,16 @@
 
 ## Goal
 
-Write the gh-107 spec (problem, solution, Behaviour, out of scope) from the issue's design-interview decisions plus this step's interview.
+Write the Plan section of the gh-107 spec: seams, coverage of B1–B35, prefactoring, decisions, risks — agreed with the person.
 
 ## Progress
 
-- Took the issue comment "Decisions (design interview, 2026-10-30)" as settled (slices A–D, storage, reads, retention, upgrade).
-- Interviewed the person on the gaps: the retention window (`trace.retain` default 14d, `tidy --retain`, a window under 14d refused); `why` on a pruned tick (refused, exit 3) or a missing chunk (corrupt, no partial replay); the targets (B1, B13, …); prompting (`tidy --dry-run` with bytes, a `doctor` hint, watch never prunes); downgrade as a one-way door with no compatibility mode. The person confirmed the summary.
-- Wrote spec.md: B1–B35, Out of scope, no open questions.
-- refine#1 done: Spec written: B1–B35 across slices A–D (on-demand trace reads, per-unit hook files + backfill, chunked tick facts, tidy pruning with trace.retain ≥14d), out of scope listed, no open questions; confirmed by the person.
+- Mapped the spec onto the code: the project view reads 14 days of trace only for an unused `timeline`; `norn hook` is a no-op outside unit worktrees (A3); workflow sources are shared across days in `trace/workflows/`; ticks read recent hook facts of non-live units for `step_runs`.
+- Interviewed the person (plan#1, attended); all agreed: seams S1 (CLI harness + store read observer) and S2 (store trace interface); prefactors (one day-file line reader, replay inputs into store, one unit-scoped hook read); decisions D1–D14 (tick `facts` as a `$chunked` skeleton, chunk boundaries, `<day>.chunks.jsonl` with fsync before the tick line, per-unit hook files + backfill.json, `trace.retain`, tidy prune rules, why refusals).
+- Amended B3, B6, B8, B35 with the person's agreement (no renumbering).
+- Wrote `## Plan` in spec.md with the coverage table for B1–B35.
+- plan#1 done: Plan written and agreed with the person: seams S1 (CLI harness + store trace-read observer) and S2 (store trace interface), coverage of B1–B35, 3 prefactors, decisions D1–D14 (chunked facts skeleton, chunks file, per-unit hook files + backfill, trace.retain, tidy pruning, why refusals), risks incl. a 5 KB spike. B3, B6, B8, B35 amended with the person's agreement.
 
 ## Resume
 
-Ask the person to confirm that the spec says what they meant, then `norn done done`.
+Plan done; report `norn done done`.
