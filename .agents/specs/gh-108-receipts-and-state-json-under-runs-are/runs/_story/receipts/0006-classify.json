@@ -1,0 +1,22 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M667KPYF2DYPVKT8WJ2PCPJ2",
+  "run_id": "01M667KB3P8GBYBJ556YCJVJPH",
+  "step": "update",
+  "attempt": 1,
+  "at": "2026-10-30T11:02:38.800Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M667KB3PH2Q84TK6TC4G4AB6",
+  "outcome": "done",
+  "rule": "git.update",
+  "detail": "merged main (c6c6b9870f97) into gh-108-receipts-and-state-json-under-runs-are at b064f020382f",
+  "route": "test",
+  "base": {
+    "ref": "refs/remotes/origin/main",
+    "sha": "c6c6b9870f97f77454470581c10b32d455fbe491",
+    "conflicts": [],
+    "head": "b064f020382f1fb063bb211fc17a21dbaab3293b",
+    "merged": true
+  }
+}

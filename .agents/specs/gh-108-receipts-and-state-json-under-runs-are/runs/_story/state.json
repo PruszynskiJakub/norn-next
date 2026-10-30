@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "story": "gh-108",
+  "slice": null,
+  "unit_dir": "_story",
+  "workflow": "quick",
+  "workflow_hash": "e1035bf08337c2d63967792add84270d2c199f94830cec0b60aefd3b34ae39cb",
+  "step": "$done",
+  "attempt": 1,
+  "visits": {
+    "implement": 2,
+    "update": 2,
+    "test": 2,
+    "review": 1,
+    "describe": 1,
+    "open-pr": 1,
+    "ready": 1
+  },
+  "step_entered_at": "2026-10-30T11:56:30.726Z",
+  "status": "done",
+  "park": null,
+  "counters": {
+    "test_loop": 1,
+    "review_loop": 0,
+    "ready_loop": 0,
+    "base_conflict_loop": 0,
+    "stale_loop": 0
+  },
+  "nudges_used": 0,
+  "retries_used": 0,
+  "applied_through": 20,
+  "run": null,
+  "last_outcome": {
+    "step": "ready",
+    "outcome": "approve",
+    "source": "human",
+    "at": "2026-10-30T12:51:18.265Z",
+    "receipt_id": "01M66DTNKSGY9QB1CSYTC8ZMDH"
+  },
+  "created_at": "2026-10-30T10:36:30.661Z",
+  "updated_at": "2026-10-30T12:51:31.405Z",
+  "last_tick_id": "01M66DV2D6AT7G0FERDE38V3Q2",
+  "mode": "auto"
+}

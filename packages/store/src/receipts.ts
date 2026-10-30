@@ -6,7 +6,7 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { FileError, NumberedReceipt } from "@norn/core";
 import { type Receipt, assertValid, parseReceiptFileName, receiptFileName } from "@norn/schema";
-import { createExclusive, displayPath, isErrno, json, readJsonFile, readText, safeUnlink } from "./fsx.ts";
+import { createExclusive, displayPath, isErrno, jsonLine, readJsonFile, readText, safeUnlink } from "./fsx.ts";
 import { receiptsDir } from "./paths.ts";
 
 export interface ReceiptListing {
@@ -128,7 +128,7 @@ export function writeReceiptAt(unitDir: string, n: number, receipt: Receipt): Wr
     safeUnlink(reserve);
     return { ok: false, reason: "taken", n, file: raced.file };
   }
-  const created = raced ? false : createExclusive(file, json(receipt));
+  const created = raced ? false : createExclusive(file, jsonLine(receipt));
   const result: WriteReceiptResult =
     created || sameReceipt(raced?.file ?? file, receipt)
       ? { ok: true, n, file: raced?.file ?? file, existed: !created }
