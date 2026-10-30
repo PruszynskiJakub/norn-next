@@ -2,13 +2,14 @@
 - Story: gh-108
 - Workflow: quick · Step: implement (attempt 1)
 - Status: ready
-- Counters: base_conflict_loop 0, ready_loop 0, review_loop 0, stale_loop 0, test_loop 0
+- Counters: base_conflict_loop 0/2, ready_loop 0/2, review_loop 0/3, stale_loop 0/10, test_loop 0/5
 - Last outcome: none
 - Next: `norn brief`
-- Updated: 2026-10-30T10:36:30.661Z
+- Updated: 2026-10-30T10:47:08.937Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - story.start: quick at implement
+- receipts.apply: applied 1
 <!-- norn:heartbeat:end -->
 
 ## Goal
