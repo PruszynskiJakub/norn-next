@@ -42,15 +42,15 @@
 
 ## Goal
 
-implement#1 (qa_loop 1/2): fix QA's two B1 findings — the flaky frame-count test and trace-bench.ts spawning the removed `norn cockpit`.
+qa#2: check B1–B35 of the gh-107 spec on HEAD 40f18f6c as a user would, one verdict each, evidence in $TMPDIR/gh107-qa2/ev.
 
 ## Progress
 
-- F1: trace-free-views.test.ts B1 test now quits after 3 frames are drawn (`quitAfterFrames`), not after 150 ms; asserts frames >= 3. 10 of 10 runs green alone.
-- F2: scripts/trace-bench.ts spawns `status --watch --interval …`; header names the cockpit as `norn status --watch`; it throws if the cockpit exits before sampling, so an error can no longer be measured as a footprint. Small run (0.02 GB) measured a live cockpit (3 samples, peak 0.98x).
-- Full `bun test` and typecheck run before reporting.
-- implement#1 done: F1: the B1 test in trace-free-views.test.ts now quits after 3 drawn frames (quitAfterFrames) instead of after 150 ms, and passed 10 of 10 runs alone. F2: scripts/trace-bench.ts now spawns status --watch --interval, its header names the cockpit as norn status --watch, and it throws if the cockpit exits before sampling. A small bench run measured a live cockpit. Typecheck is green. Full bun test: 1468 pass, 1 fail. The failure is integrate.test.ts 'remote story branch fast-forwarded by a person', which this branch does not touch; it is flaky (passed 6 of 7 runs alone).
+- Product source (packages/*/src) is identical to qa#1's head f69d37a4; only the B1 test and scripts/trace-bench.ts changed. All checks were rerun anyway.
+- Throwaway bench repos under $TMPDIR (scripts/trace-bench.ts --keep); every command `bun packages/cli/src/main.ts`, NORN_* unset, NORN_HOME_DIR isolated; ~/.local/bin/norn 0.12.1 acts as the older norn.
+- Drivers: scratchpad qa1.sh (B1–B4, B11, B13, B14, B17), qa2.sh (B5–B10, B12, B15, B16, B19–B21, B35/B18), qa3.sh (B23–B34). All observed as the spec says. B22: recovery harvest, main vs branch, 30/30 names and decisions equal once config.trace.retain is set aside.
+- Pending: full `bun test` + typecheck (running in the background), 2 GB bench for B1/B2/B10 (running), then the B1 test 10x alone.
 
 ## Resume
 
-Report `norn done done` once the full suite and typecheck are green.
+Wait for $TMPDIR/gh107-qa-test.log and $TMPDIR/gh107-qa2/ev/B1-B2-B10-bench.json, write criteria.json + report.md in $TMPDIR/gh107-qa2/ev, report `norn done`.
