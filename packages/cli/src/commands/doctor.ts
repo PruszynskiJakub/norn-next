@@ -15,24 +15,27 @@
  *   - machine: the `user@host` runs are recorded with (R7.1); a warning when NORN_MACHINE overrides it (R7.3)
  *   - skills (SK1): every bundled skill is in `.agents/skills/` and linked from each configured
  *     agent's skill folder; one that differs from the bundled version is a warning (`norn init`)
+ * Repo checks (D7, B7–B9): every repo workflow validated exactly as a tick validates it (W5, the
+ * shared `checkedRepoWorkflows`), and the repo config layer against its schema. Read-only.
  * `--live` also runs one cheap headless test turn per agent in a throwaway repo with norn hooks
  * installed, and checks that the agent's own hooks reported to norn.
+ * `--repo` runs only the repo checks: no agent, runner or remote is looked at (B10).
  * Exit 0 when every check passes, else 1 with the same report.
  */
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, extname, join, relative, resolve } from "node:path";
 import { git as gitAdapter, herdr, proc } from "@norn/adapters";
-import type { AgentAdapter, RunnerPort, SessionRef } from "@norn/core";
+import type { AgentAdapter, FileError, RunnerPort, SessionRef, WorkflowIssue } from "@norn/core";
 import { ExitCode, ulid } from "@norn/schema";
-import { machineHolder, noteSpawn, readHookFacts, skillsReport, traceDir, writeUnitMarker } from "@norn/store";
+import { loadWorkflows, machineHolder, noteSpawn, readHookFacts, repoConfigPath, skillsReport, traceDir, workflowsDir, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { rendered, withExit } from "../output.ts";
 import { assetsDir } from "../runtime/assets.ts";
 import { gitRemoteUrl } from "../runtime/detect.ts";
 import { ensureShim, withNornOnPath } from "../runtime/shim.ts";
-import { bundledSkills } from "../runtime/workflows.ts";
+import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
 import { hookBinary, hookCommand } from "./init.ts";
 import { cmd } from "@norn/core";
 
@@ -197,6 +200,77 @@ interface Check {
   do_instead?: string;
 }
 
+interface RepoReport {
+  ok: boolean;
+  workflows: Array<{ name: string; file: string; ok: boolean; issues: WorkflowIssue[] }>;
+  config: { ok: boolean; file: string; present: boolean; errors: FileError["errors"] };
+  /** why a workflow's skills went unchecked (the config does not load, so its agents are unknown) */
+  skills_unchecked?: string;
+}
+
+/**
+ * D7 (B7, B8): the repo workflows through the validator a tick uses, with each configured agent's
+ * visible skills, and the repo config layer against its schema. Reads files only (B9).
+ */
+async function repoGroup(ctx: Context): Promise<RepoReport> {
+  const root = ctx.root;
+  const loaded = ctx.loaded;
+  const listing = loadWorkflows(root);
+  const agents = loaded.ok ? (await ctx.ports()).agents : {};
+  const checked = checkedRepoWorkflows(listing, root, { default_agent: loaded.ok ? loaded.config.default_agent : "" }, agents);
+  const fileOf = (name: string) => {
+    const wf = listing.workflows[name];
+    return wf ? relative(root, wf.file) : (listing.errors.find((e) => basename(e.file, extname(e.file)) === name)?.file ?? name);
+  };
+  const workflows = Object.values(checked)
+    .map((w) => {
+      const file = fileOf(w.name);
+      // schema issues carry their file in the message for a tick's inbox; doctor names it once, on its own line
+      const issues = w.issues.map((i) => (i.message.startsWith(`${file}: `) ? { ...i, message: i.message.slice(file.length + 2) } : i));
+      return { name: w.name, file, ok: issues.length === 0, issues };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const configFile = relative(root, repoConfigPath(root));
+  const configErrors = loaded.ok ? [] : loaded.errors.filter((e) => e.file === configFile).flatMap((e) => e.errors);
+  const config = { ok: configErrors.length === 0, file: configFile, present: existsSync(repoConfigPath(root)), errors: configErrors };
+  return {
+    ok: workflows.every((w) => w.ok) && config.ok,
+    workflows,
+    config,
+    ...(loaded.ok ? {} : { skills_unchecked: "the config does not load, so no step's skill was checked against its agent" }),
+  };
+}
+
+/** One line per check: `ok`, `warn` or `FAIL`, a label, the text; failed labels are collected for the head line. */
+function lines() {
+  const out: string[] = [];
+  const failed: string[] = [];
+  const line = (ok: boolean, label: string, text: string, warn = false) => {
+    out.push(`  ${ok ? "ok  " : warn ? "warn" : "FAIL"} ${label.padEnd(14)} ${text}`);
+    if (!ok && !warn) failed.push(label);
+  };
+  const sub = (text: string) => out.push(`       ${"".padEnd(14)} ${text}`);
+  const fix = (c: { error?: unknown; do_instead?: unknown }) => {
+    if (c.error) sub(`! ${short(String(c.error))}`);
+    if (c.do_instead) sub(`→ ${String(c.do_instead)}`);
+  };
+  const head = (ok: boolean) => (ok ? "norn doctor: every check passes" : `norn doctor: ${failed.length} check${failed.length === 1 ? "" : "s"} failed (${failed.join(", ")})`);
+  return { out, line, sub, fix, head };
+}
+
+/** The repo group's lines: the valid workflows on one line, each invalid one with its issues, the config (B7, B8). */
+function formatRepo(r: RepoReport, l: ReturnType<typeof lines>, dir: string): void {
+  const valid = r.workflows.filter((w) => w.ok).map((w) => w.name);
+  if (valid.length || !r.workflows.length || r.skills_unchecked) l.line(true, "workflows", valid.length ? `${valid.join(", ")} valid (${dir}/)` : `none valid in ${dir}/`);
+  if (r.skills_unchecked) l.sub(`· ${r.skills_unchecked}`);
+  for (const w of r.workflows.filter((x) => !x.ok)) {
+    l.line(false, `workflow ${w.name}`, w.file);
+    for (const i of w.issues) l.sub(`! ${i.path || "/"}: ${i.message}`);
+  }
+  l.line(r.config.ok, "config", r.config.present ? r.config.file : `${r.config.file} (none: built-in defaults)`);
+  for (const e of r.config.errors) l.sub(`! ${e.path || "/"}: ${e.message}`);
+}
+
 /** `norn doctor`: one line per check, then what failed and what to do. */
 function formatDoctor(r: {
   ok: boolean;
@@ -215,19 +289,11 @@ function formatDoctor(r: {
   remote: Record<string, unknown>;
   runner: Record<string, unknown>;
   skills: Check & { dir: string; missing: string[]; drifted: string[]; unlinked: Record<string, string[]> };
+  repo: RepoReport;
   warnings: string[];
-}): string {
-  const out: string[] = [];
-  const failed: string[] = [];
-  const line = (ok: boolean, label: string, text: string, warn = false) => {
-    out.push(`  ${ok ? "ok  " : warn ? "warn" : "FAIL"} ${label.padEnd(14)} ${text}`);
-    if (!ok && !warn) failed.push(label);
-  };
-  const sub = (text: string) => out.push(`       ${"".padEnd(14)} ${text}`);
-  const fix = (c: { error?: unknown; do_instead?: unknown }) => {
-    if (c.error) sub(`! ${short(String(c.error))}`);
-    if (c.do_instead) sub(`→ ${String(c.do_instead)}`);
-  };
+}, dir: string): string {
+  const l = lines();
+  const { out, line, sub, fix } = l;
 
   line(r.git.ok, "git", r.git.version ?? "not found");
   fix(r.git);
@@ -257,20 +323,44 @@ function formatDoctor(r: {
   line(sk.ok, "skills", sk.ok ? "installed and linked" : [sk.missing.length ? `missing ${sk.missing.join(", ")}` : "", ...unlinked.map(([agent, names]) => `not linked for ${agent}: ${names.join(", ")}`)].filter(Boolean).join("; "));
   if (!sk.ok) fix(sk);
   out.push(`       ${"machine".padEnd(14)} ${r.machine.holder}`);
+  formatRepo(r.repo, l, dir);
 
-  const head = r.ok ? "norn doctor: every check passes" : `norn doctor: ${failed.length} check${failed.length === 1 ? "" : "s"} failed (${failed.join(", ")})`;
   const warnings = r.warnings.length ? ["", "Warnings", ...r.warnings.map((w) => `  ! ${w}`)] : [];
-  return [head, "", ...out, ...warnings].join("\n");
+  return [l.head(r.ok), "", ...out, ...warnings].join("\n");
+}
+
+/** `norn doctor --repo`, or plain doctor when the config does not load and the machine checks cannot run. */
+function formatRepoOnly(r: { ok: boolean; repo: RepoReport; skipped?: string }, dir: string): string {
+  const l = lines();
+  formatRepo(r.repo, l, dir);
+  const skipped = r.skipped ? ["", `  · ${r.skipped}`] : [];
+  return [l.head(r.ok), "", ...l.out, ...skipped].join("\n");
 }
 
 export const doctorCommand = defineCommand({
   name: "doctor",
-  summary: "Check agents, hooks, skills, remote auth and runner on this machine (A7); --live runs one test turn per agent",
-  usage: "norn doctor [--live] [--json]",
+  summary: "Check agents, hooks, skills, remote auth and runner on this machine, and the repo workflows and config (A7, W5)",
+  usage: "norn doctor [--repo] [--live] [--json]",
   markdown: true,
-  options: { live: { type: "boolean" } },
+  options: { live: { type: "boolean" }, repo: { type: "boolean" } },
+  optionHelp: {
+    "--repo": "check only the repo workflows and config: no agent, runner or remote needed (CI, a test check)",
+    "--live": "also run one cheap headless test turn per agent",
+  },
   async run(ctx, args) {
     const live = opt.bool(args, "live");
+    const repoOnly = opt.bool(args, "repo");
+    const repo = await repoGroup(ctx);
+    const dir = relative(ctx.root, workflowsDir(ctx.root));
+    // B10: --repo looks at no agent, runner or remote; a config that does not load leaves the machine checks nothing to run on
+    if (repoOnly || !ctx.loaded.ok) {
+      const others = ctx.loaded.ok ? [] : ctx.loaded.errors.filter((e) => e.file !== repo.config.file);
+      const which = others.map((e) => `${e.file}: ${e.errors.map((x) => `${x.path || "/"} ${x.message}`).join("; ")}`).join(" | ");
+      const skipped = repoOnly ? undefined : `machine checks skipped: they need a config that loads${which ? ` (${which})` : ""}; fix it and run ${cmd.doctor()} again`;
+      const report = { ok: repo.ok && !skipped, repo, ...(skipped ? { skipped } : {}) };
+      const out = rendered(report, formatRepoOnly(report, dir));
+      return report.ok ? out : withExit(out, ExitCode.error);
+    }
     const config = ctx.config;
     const ports = await ctx.ports();
     const command = hookCommand(ctx);
@@ -361,9 +451,9 @@ export const doctorCommand = defineCommand({
 
     if (sk.drifted.length) warnings.push(`skills differ from this norn's bundled version: ${sk.drifted.join(", ")} — run ${cmd.init()} to update them (git diff .agents/skills/ shows the change)`);
 
-    const ok = gitCheck.ok && agents.every((a) => a.ok) && remote.ok === true && (runner.ok === true || runner.required === false) && skillsOk;
-    const report = { ok, live, hook_command: command, machine, git: gitCheck, agents, remote, runner, skills, warnings };
-    const out = rendered(report, formatDoctor(report));
+    const ok = gitCheck.ok && agents.every((a) => a.ok) && remote.ok === true && (runner.ok === true || runner.required === false) && skillsOk && repo.ok;
+    const report = { ok, live, hook_command: command, machine, git: gitCheck, agents, remote, runner, skills, repo, warnings };
+    const out = rendered(report, formatDoctor(report, dir));
     return ok ? out : withExit(out, ExitCode.error);
   },
 });

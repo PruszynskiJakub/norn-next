@@ -2,7 +2,7 @@
 id: gh-110/02
 title: norn doctor validates the repo workflows and config, and doctor --repo
 depends_on: []
-status: planned
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
