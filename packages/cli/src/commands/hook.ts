@@ -1,8 +1,9 @@
 /**
  * `norn hook <event> [--agent <name>]` (A2–A4, MO4): called by the agent tool's hooks with the
  * native payload on stdin. Normalizes it through the agent adapter, appends the hook fact to
- * the trace, and on turn end of an UNATTENDED step whose run has no report yet answers with the
- * adapter's block response telling the agent to report (A4). Attended steps never block (MO4).
+ * the unit's hook file and the trace (B5), and on turn end of an UNATTENDED step whose run has no
+ * report yet answers with the adapter's block response telling the agent to report (A4). Attended
+ * steps never block (MO4).
  *
  * Must be fast and must never break the agent: outside a `.norn-unit` worktree it is a no-op
  * (A3), and any failure is swallowed into the adapter's "allow" answer (`{}`), exit 0.
@@ -13,7 +14,7 @@
  */
 import { cmd, type AgentAdapter, currentRun, cursorStep, type HookDecision, type HookResponse, reportableOutcomes, standingReport } from "@norn/core";
 import { DEFAULT_CONFIG, type ExitCode, type HookFact, type ResolvedConfig, ulid } from "@norn/schema";
-import { appendTrace, blockedHookCount, loadConfig } from "@norn/store";
+import { appendHookTrace, blockedHookCount, loadConfig } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import { type Context, findUnitMarker, safeRealpath } from "../context.ts";
 import { withExit } from "../output.ts";
@@ -84,7 +85,7 @@ function decideBlock(root: string, s: UnitSession | null, fact: HookFact, adapte
   const run = currentRun(s);
   if (!run || (fact.run_id && fact.run_id !== run.run_id)) return { block: false };
   if (standingReport(s, run.run_id)) return { block: false };
-  if (blockedHookCount(root, run.run_id) >= MAX_STOP_BLOCKS) return { block: false };
+  if (blockedHookCount(root, { story: s.unit.story, slice: s.unit.slice }, run.run_id) >= MAX_STOP_BLOCKS) return { block: false };
   const outcomes = reportableOutcomes(step);
   return {
     block: true,
@@ -144,7 +145,9 @@ export const hookEventCommand = defineCommand({
         if (run) fact.run_id = run.run_id;
       }
       const decision = decideBlock(root, session, fact, adapter);
-      appendTrace(root, { type: "hook", id: ulid(ctx.clock.now()), fact, ...(decision.block ? { blocked: true, reason: decision.reason } : {}) });
+      // B5, B7 (D3): the unit is the worktree's, whether the fact names a run or not
+      const unit = { story: found.marker.story, slice: found.marker.slice ?? null };
+      appendHookTrace(root, unit, { type: "hook", id: ulid(ctx.clock.now()), fact, ...(decision.block ? { blocked: true, reason: decision.reason } : {}) });
       return answer(adapter.hookResponse(fact, decision));
     } catch {
       return {}; // never break the agent

@@ -152,6 +152,13 @@ export type LocalPrFile = Static<typeof LocalPrFile>;
 export const LocalCockpitFile = Type.Object({ last_repo: Type.Optional(Type.String()) }, id("local-cockpit", "memory of norn status --watch (<norn home>/cockpit.json)"));
 export type LocalCockpitFile = Static<typeof LocalCockpitFile>;
 
+/** `hooks/backfill.json` (B11, B12, D5): when the first tick of the per-unit hook files ran, and the units whose live runs' hook lines it has copied from the day files. Never pruned. */
+export const LocalHookBackfillFile = Type.Object(
+  { since: Type.String(), done: Type.Array(Type.String()) },
+  id("local-hook-backfill", "norn hook file backfill (trace/hooks/backfill.json)"),
+);
+export type LocalHookBackfillFile = Static<typeof LocalHookBackfillFile>;
+
 /** `notices.json`: the one-time notices this checkout has shown (B13), by id. */
 export const LocalNoticesFile = Type.Object({ shown: Type.Optional(Type.Array(Type.String())) }, id("local-notices", "norn one-time notices shown (trace/notices.json)"));
 export type LocalNoticesFile = Static<typeof LocalNoticesFile>;
@@ -181,6 +188,7 @@ export const LOCAL_SCHEMA_NAMES = [
   "local-pr",
   "local-cockpit",
   "local-lock",
+  "local-hook-backfill",
   "local-notices",
 ] as const;
 export type LocalSchemaName = (typeof LOCAL_SCHEMA_NAMES)[number];

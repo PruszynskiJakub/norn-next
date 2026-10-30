@@ -343,7 +343,8 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
     expect(v.replay.rule).toBe(v.rule);
     const at = await h.norn("run", "view", "gh-5", "--why", "--tick", importTick.tick_id);
     expect(at.value).toMatchObject({ tick_id: importTick.tick_id, rule: "mailbox.import", action: "import_mailbox", replay: { matches: true } });
-    refused(await h.norn("run", "view", "gh-5", "--why", "--tick", "01ARZ3NDEKTSV4RRFFQ69G5FAV"), "no_tick");
+    // a 2016 tick id, its day long gone: older than the trace retained (D10)
+    refused(await h.norn("run", "view", "gh-5", "--why", "--tick", "01ARZ3NDEKTSV4RRFFQ69G5FAV"), "tick_pruned");
   });
 
   test("run list: step rows with who and reasons; --events with every human receipt; --limit; --text", async () => {

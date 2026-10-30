@@ -15,6 +15,8 @@
  *   - machine: the `user@host` runs are recorded with (R7.1); a warning when NORN_MACHINE overrides it (R7.3)
  *   - skills (SK1): every bundled skill is in `.agents/skills/` and linked from each configured
  *     agent's skill folder; one that differs from the bundled version is a warning (`norn init`)
+ *   - trace (O7; D11, D13): a `trace.retain` that is not a duration of at least 14d is a warning; day
+ *     pairs older than the window are a hint naming `norn tidy` — never a failed check
  * `--live` also runs one cheap headless test turn per agent in a throwaway repo with norn hooks
  * installed, and checks that the agent's own hooks reported to norn.
  * Exit 0 when every check passes, else 1 with the same report.
@@ -25,13 +27,14 @@ import { join, resolve } from "node:path";
 import { git as gitAdapter, herdr, proc } from "@norn/adapters";
 import type { AgentAdapter, RunnerPort, SessionRef } from "@norn/core";
 import { ExitCode, ulid } from "@norn/schema";
-import { machineHolder, noteSpawn, readHookFacts, skillsReport, writeUnitMarker } from "@norn/store";
+import { machineHolder, noteSpawn, readHookFacts, skillsReport, traceDaysBefore, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { rendered, withExit } from "../output.ts";
 import { assetsDir } from "../runtime/assets.ts";
 import { gitRemoteUrl } from "../runtime/detect.ts";
 import { ensureShim, withNornOnPath } from "../runtime/shim.ts";
+import { effectiveRetain, formatBytes, retainCutoffDay, retainWarning } from "../runtime/trace-retention.ts";
 import { bundledSkills } from "../runtime/workflows.ts";
 import { hookBinary, hookCommand } from "./init.ts";
 import { cmd } from "@norn/core";
@@ -216,6 +219,7 @@ function formatDoctor(r: {
   runner: Record<string, unknown>;
   skills: Check & { dir: string; missing: string[]; drifted: string[]; unlinked: Record<string, string[]> };
   warnings: string[];
+  hints: string[];
 }): string {
   const out: string[] = [];
   const failed: string[] = [];
@@ -260,7 +264,8 @@ function formatDoctor(r: {
 
   const head = r.ok ? "norn doctor: every check passes" : `norn doctor: ${failed.length} check${failed.length === 1 ? "" : "s"} failed (${failed.join(", ")})`;
   const warnings = r.warnings.length ? ["", "Warnings", ...r.warnings.map((w) => `  ! ${w}`)] : [];
-  return [head, "", ...out, ...warnings].join("\n");
+  const hints = r.hints.length ? ["", "Hints", ...r.hints.map((h) => `  · ${h}`)] : [];
+  return [head, "", ...out, ...warnings, ...hints].join("\n");
 }
 
 export const doctorCommand = defineCommand({
@@ -361,8 +366,19 @@ export const doctorCommand = defineCommand({
 
     if (sk.drifted.length) warnings.push(`skills differ from this norn's bundled version: ${sk.drifted.join(", ")} — run ${cmd.init()} to update them (git diff .agents/skills/ shows the change)`);
 
+    // D11, D13: the trace window — a value that does not apply warns; days beyond it are a hint
+    const retainWarn = retainWarning(config.trace.retain);
+    if (retainWarn) warnings.push(retainWarn);
+    const hints: string[] = [];
+    const window = effectiveRetain(config);
+    const beyond = traceDaysBefore(ctx.root, retainCutoffDay(ctx.clock.now(), window.ms));
+    if (beyond.length) {
+      const bytes = beyond.reduce((n, d) => n + d.bytes, 0);
+      hints.push(`trace keeps ${beyond.length} day${beyond.length === 1 ? "" : "s"} (${formatBytes(bytes)}) beyond trace.retain ${window.retain} — run \`norn tidy\` (\`norn tidy --dry-run\` lists them)`);
+    }
+
     const ok = gitCheck.ok && agents.every((a) => a.ok) && remote.ok === true && (runner.ok === true || runner.required === false) && skillsOk;
-    const report = { ok, live, hook_command: command, machine, git: gitCheck, agents, remote, runner, skills, warnings };
+    const report = { ok, live, hook_command: command, machine, git: gitCheck, agents, remote, runner, skills, warnings, hints };
     const out = rendered(report, formatDoctor(report));
     return ok ? out : withExit(out, ExitCode.error);
   },

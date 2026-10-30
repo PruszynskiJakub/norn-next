@@ -8,8 +8,8 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import type { Facts, StoryFacts } from "@norn/core";
-import { readTrace } from "@norn/store";
+import type { StoryFacts } from "@norn/core";
+import { readTickInputs, readTrace } from "@norn/store";
 import type { TickReport } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
 
@@ -45,7 +45,8 @@ function lastFacts(h: Harness, key: string): StoryFacts | undefined {
   const ticks = readTrace(h.root, { types: ["tick"] }).events;
   const last = ticks.at(-1);
   if (last?.type !== "tick") return undefined;
-  return (last.facts as unknown as Facts).stories.find((s) => s.key === key);
+  const read = readTickInputs(h.root, last);
+  return read.ok ? read.inputs.facts.stories.find((s) => s.key === key) : undefined;
 }
 
 async function bootTo(h: Harness, n: number, title: string, runs: () => string) {
@@ -136,8 +137,7 @@ describe("records: ready head, foreign commits, merged by ancestry, durable stat
     const s = await h.norn("sync");
     expect(s.exit).toBe(0);
     expect(acted(s.value as TickReport)).toEqual(["gh-5 cleanup_merged_story"]);
-    const tick = readTrace(h.root, { types: ["tick"] }).events.at(-1);
-    const facts = tick?.type === "tick" ? (tick.facts as unknown as Facts).stories.find((x) => x.key === "gh-5") : undefined;
+    const facts = lastFacts(h, "gh-5");
     expect(facts).toMatchObject({ merged_by_ancestry: true, pr: { state: "open", head_sha: head } });
     expect(existsSync(wt())).toBe(false);
     // the done record on the base carries how it landed

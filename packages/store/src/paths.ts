@@ -5,7 +5,7 @@
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { LEGACY_SPEC_FILE, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName } from "@norn/schema";
+import { LEGACY_SPEC_FILE, parseSliceKey, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName } from "@norn/schema";
 
 const NORN_DIR = ".agents/norn";
 
@@ -28,6 +28,17 @@ export const inboxOpenPath = (root: string) => join(traceDir(root), "inbox.json"
 export const baseFactsPath = (root: string) => join(traceDir(root), "base.json");
 export const noticesPath = (root: string) => join(traceDir(root), "notices.json");
 export const prFactsPath = (root: string) => join(traceDir(root), "pr.json");
+/**
+ * B5 (D3): a unit's hook file — `trace/hooks/<story>/_story.jsonl` for the story unit,
+ * `trace/hooks/<story>/<nn>.jsonl` for a slice.
+ */
+export function hookFilePath(root: string, unit: { story: string; slice?: string | null }): string {
+  const nn = unit.slice ? parseSliceKey(unit.slice)?.nn : null;
+  if (unit.slice && !nn) throw new Error(`not a slice key: ${unit.slice}`);
+  return join(traceDir(root), "hooks", unit.story, `${nn ?? STORY_UNIT_DIR}.jsonl`);
+}
+/** D5: the one-time backfill of the hook files from the day files (`trace/hooks/backfill.json`). */
+export const hookBackfillPath = (root: string) => join(traceDir(root), "hooks", "backfill.json");
 /** GR6: the base branch's `.agents/specs/` materialized per tree id (store/base.ts). */
 export const baseCacheDir = (root: string) => join(traceDir(root), "base");
 
