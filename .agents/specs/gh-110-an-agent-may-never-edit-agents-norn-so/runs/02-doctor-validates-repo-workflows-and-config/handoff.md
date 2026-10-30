@@ -14,6 +14,17 @@
 
 ## Goal
 
+`norn doctor` gains a repo group (every repo workflow through the tick's validator, W5; the repo config layer against its schema), read-only; `norn doctor --repo` runs only that group (B7–B10, AC1–AC7).
+
 ## Progress
 
+- Prefactor 2: `checkedRepoWorkflows(listing, root, config, agents)` in `packages/cli/src/runtime/workflows.ts` — the one validator; observe now calls it, and so does doctor.
+- `packages/cli/src/commands/doctor.ts`: `repoGroup` (workflows with file, step path, issues; config with file, key, reason), `formatRepo`, a shared `lines()` builder; `--repo` (report is only `{ok, repo}`; no agent, runner or remote check). Plain doctor with a config that does not load runs the repo group and reports the machine checks as skipped (naming any user-config error), exit 1; skills are then not checked against agents, and doctor says so.
+- Tests: `packages/cli/test/housekeeping.test.ts` "norn doctor: the repo group (B7–B10, D7)" — AC1 (uncounted cycle), AC2 (missing skill; a tick emits `start.workflow_invalid` with the same reason), AC3 (`max_agents: "two"`), AC4 (clean: exit 0 with a fake `claude` on PATH, `git status` clean), AC5 (`--repo`, PATH without agents, whoami throwing, runner unavailable), AC6 (`--json` carries `repo`; `help doctor` lists `--repo`), plus the user-config case.
+- AC7 checked by hand in a throwaway repo (dev build, isolated NORN_HOME_DIR): broken workflow (cycle + missing skill) and `max_agents: "two"`; both commands name the file, the step/key and the reason.
+- Still reads workflows and config at the old paths (store's path functions); the new layout is slice 03, layout check slice 05.
+- Note: building ports for `--repo` (to know each agent's skill folder) also constructs the remote and runner adapters; nothing is called on them.
+
 ## Resume
+
+Full suite + typecheck run, then commit and `norn done done`.
