@@ -1,0 +1,8 @@
+-rw-r--r--@ 1 jakubpruszynski  staff   2 Aug 31 20:24:00 2026 .agents/norn/trace/backfill.json
+-rw-r--r--@ 1 jakubpruszynski  staff   1 Oct 29 20:24:00 2026 .agents/norn/trace/briefings/01KZZZZZZZZZZZZZZZZZZZZNEW/01.md
+-rw-r--r--@ 1 jakubpruszynski  staff  95 Oct 30 20:24:02 2026 .agents/norn/trace/heartbeat.json
+-rw-r--r--@ 1 jakubpruszynski  staff   1 Oct 28 20:24:00 2026 .agents/norn/trace/hooks/gh-4/_story.jsonl
+-rw-r--r--@ 1 jakubpruszynski  staff   2 Aug 31 20:24:00 2026 .agents/norn/trace/integrate-gh-3.lock
+-rw-r--r--@ 1 jakubpruszynski  staff  98 Oct 30 20:24:10 2026 .agents/norn/trace/remote.json
+-rw-r--r--@ 1 jakubpruszynski  staff   1 Oct 29 20:24:00 2026 .agents/norn/trace/transcripts/01KZZZZZZZZZZZZZZZZZZZZNEW/01.txt
+-rw-r--r--@ 1 jakubpruszynski  staff   9 Aug 31 20:24:00 2026 .agents/norn/trace/workflows/abc.yaml

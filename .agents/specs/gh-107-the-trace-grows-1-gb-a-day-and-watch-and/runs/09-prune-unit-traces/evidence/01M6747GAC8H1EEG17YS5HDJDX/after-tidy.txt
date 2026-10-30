@@ -1,0 +1,16 @@
+.agents/norn/trace
+.agents/norn/trace/backfill.json
+.agents/norn/trace/briefings
+.agents/norn/trace/briefings/01KZZZZZZZZZZZZZZZZZZZZNEW
+.agents/norn/trace/briefings/01KZZZZZZZZZZZZZZZZZZZZNEW/01.md
+.agents/norn/trace/heartbeat.json
+.agents/norn/trace/hooks
+.agents/norn/trace/hooks/gh-4
+.agents/norn/trace/hooks/gh-4/_story.jsonl
+.agents/norn/trace/integrate-gh-3.lock
+.agents/norn/trace/remote.json
+.agents/norn/trace/transcripts
+.agents/norn/trace/transcripts/01KZZZZZZZZZZZZZZZZZZZZNEW
+.agents/norn/trace/transcripts/01KZZZZZZZZZZZZZZZZZZZZNEW/01.txt
+.agents/norn/trace/workflows
+.agents/norn/trace/workflows/abc.yaml
