@@ -1,0 +1,106 @@
+norn ask — Report that the step needs a person's answer to continue; then end your turn
+
+    norn ask "<question>" [--option "<a>" --option "<b>"]
+norn brief — Brief the agent on the current step of this worktree's unit; starts the run in manual mode
+
+    norn brief [--json]
+norn config — Show the resolved config; set or unset one value in the user or repo file
+
+  norn config list   Show the resolved config and which file set each value
+  norn config get    Show one setting, or every setting under a key, and which file set it
+  norn config set    Set one value in the user or repo config file
+  norn config unset  Remove one value from the user or repo config file
+
+`norn help config <verb>` shows one verb's usage and options.
+norn doctor — Check agents, hooks, skills, remote auth and runner on this machine, and the repo workflows and config
+
+    norn doctor [--repo] [--live] [--json]
+
+Options
+  --repo  check only the repo workflows and config: no agent, runner or remote needed (CI, a test check)
+  --live  also run one cheap headless test turn per agent
+
+For the person; an agent runs it only when the person asks it to.
+norn done — Report that the current step finished with a declared outcome; then end your turn
+
+    norn done <outcome> --handoff "…" [--findings <file>] [--evidence <dir>] [--criteria <file>] [--note "…" [--note-criterion <id>]]…
+norn init — Set up norn in this repository: config, workflows, skills, hooks
+
+    norn init [--json] [--hook-command <cmd>]
+
+For the person; an agent runs it only when the person asks it to.
+norn migrate — Move this repo's config, workflows and trace from the old layout to the new one and stage the moves for you to commit
+
+    norn migrate [--json]
+
+For the person; an agent runs it only when the person asks it to.
+norn run — The runs of a unit: its step timeline, one run, why a tick decided what it did, its agent pane; rerun or cancel it
+
+  norn run list    Step timeline of a unit: durations, outcomes, who, reasons; a story with its slices
+  norn run view    One run of a unit: step, attempt, outcome, durations, receipts; --why replays the decision
+  norn run attach  Focus the Herdr agent pane of a unit's live run; --next: the oldest one waiting for you
+  norn run rerun   Resume a stuck, parked or gate-waiting unit in a fresh session, optionally --step elsewhere and --reset counters
+  norn run cancel  Stop a unit's running agent session; the story and its work stay (rerun resumes it)
+
+`norn help run <verb>` shows one verb's usage and options.
+norn status — What needs you, grouped by action, with the command to resolve each item; --history for when items came and went
+
+    norn status [--json] [--details] [--notes] [--history [--since <iso|duration>]] | norn status --watch [--interval 5s] [--pane]
+
+Options
+  --details                           each item's full text
+  --notes                             list the open notes, not one summary line
+  --history [--since <iso|duration>]  every item that needed you, with when it came and went
+  --watch                             the live cockpit full screen: act on items by key, q or Esc quits
+  --interval <duration>               with --watch: how often it refreshes (default 5s)
+  --pane                              with --watch: run it in a Herdr pane split below this one
+
+For the person; an agent runs it only when the person asks it to.
+norn story — The stories of this repository
+
+General
+  norn story create         Create a story's issue on the remote, assigned to you, and take it in
+  norn story list           Stories, slices, runs and claims at a glance
+  norn story view           One story: slices with their steps, the PR, open notes, what waits for you; --web opens the PR or issue
+
+Decision
+  norn story answer         Answer the question a unit is parked on; a prompt in an agent's pane gets the keys it expects
+  norn story approve        Approve the gate a unit waits at
+  norn story reject         Reject the gate a unit waits at, with the reason the next attempt gets
+  norn story update-branch  Send a waiting story back through its base update: done with an unmerged PR, at a gate, or stuck
+
+Work
+  norn story start          Open an agent on the step a person starts: a Herdr tab in the unit worktree, or the command to run
+  norn story chat           Give a story its own Herdr workspace with an agent to talk it over
+  norn story edit           Switch a story between auto and manual mode, or choose a unit's workflow
+
+Team
+  norn story checkout       Take a story over on this machine: claim it, check out its branches, print the handoff
+  norn story handoff        Hand a story over: push branches and handoff, then delete the claim
+  norn story close          Close a story: push its branches, then remove worktrees, local branches and the claim; the record, issue and PR stay
+  norn story reopen         Undo a close: claim the story here, restore its worktrees and put each unit back at its step
+
+`norn help story <verb>` shows one verb's usage and options.
+norn stuck — Report that the step cannot continue; then end your turn
+
+    norn stuck "<reason>"
+norn sync — Sync the remote now and take in new stories
+
+    norn sync
+
+For the person; an agent runs it only when the person asks it to.
+norn tidy — Report or clean orphan worktrees, branches, stale leases, receipt reservations, runs/ work not in the record and Herdr panes of runs that reported done
+
+    norn tidy [--dry-run]
+
+For the person; an agent runs it only when the person asks it to.
+norn uninstall — Remove norn-owned hooks and skills; keep config, workflows and specs
+
+    norn uninstall
+
+For the person; an agent runs it only when the person asks it to.
+norn watch — Run ticks in a loop; a clean exit releases held claims
+
+    norn watch [--interval 30s] [--max-ticks N] [--keep-claims] [--human]
+
+For the person; an agent runs it only when the person asks it to.
