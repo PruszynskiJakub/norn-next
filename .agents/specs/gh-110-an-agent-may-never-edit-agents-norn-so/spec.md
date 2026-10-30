@@ -31,7 +31,7 @@ Nothing checks a changed workflow or config before it merges either. A tick vali
 Committed and machine-local files no longer share a folder:
 
 - The repo config is `.agents/norn.config.yaml` and the repo workflows are in `.agents/workflows/`. Both are ordinary repo files an agent may change in a step. A running unit keeps its pinned workflow (S7), so the change applies to later units.
-- The checkout's machine-local files (trace, locks, heartbeat, caches) live in `.git/norn/` under the repository's common git dir. There is one set per checkout (ID2), shared by every unit worktree, and nothing of it sits in the working tree. `~/.norn/` (user config, machine leases, shims) does not change.
+- The checkout's machine-local files (trace, locks, heartbeat, caches) live in `~/.norn/repos/<id>/`, where `<id>` is derived from the checkout's path. There is one set per checkout (ID2), shared by every unit worktree, and nothing of it sits in the working tree or in `.git`. What `~/.norn/` already holds (user config, machine leases, shims) does not change.
 - The agent's hard rule narrows to `runs/` and the generated top of handoff.md.
 - `norn doctor` validates the repo workflows and the repo config and fails on an invalid one. It stays read-only, so CI and a workflow's `test` check can run it and stop a broken workflow before it merges.
 - A new command, `norn migrate`, moves a repository from the old layout to the new one and stages the moves for the person to commit. The code knows one layout: on the old one every other command refuses and names `norn migrate`.
@@ -52,10 +52,10 @@ This story ships the feature; it does not migrate this repository. That happens 
 - B4 As a person, I want an edited workflow to leave running units alone, so that a story cannot change the rules of a unit in flight (S7).
   Example: a story's PR changes `.agents/workflows/story.yaml` and merges while gh-7 is at `review` on `story`. gh-7 keeps its pinned copy. A story started after the merge pins the new one.
 
-- B5 As a person, I want the checkout's machine-local files in `.git/norn/` of the repository's common git dir, so that they are never in the working tree and every unit worktree shares the same ones.
-  Example: after a tick, the trace, the tick lock, the heartbeat and the caches are in `<repo>/.git/norn/`. A unit worktree has no machine-local norn files of its own. `git status` in any checkout shows nothing of them, without any `.gitignore` line for them.
+- B5 As a person, I want the checkout's machine-local files in `~/.norn/repos/<id>/`, one folder per checkout, so that they are never in the working tree (nor wiped by `git clean -fdx`) and every unit worktree shares the same ones.
+  Example: after a tick in `~/code/norn-next`, the trace, the tick lock, the heartbeat and the caches are in `~/.norn/repos/norn-next-<hash>/`, where `<hash>` comes from the real path of the repository's git common dir. A second clone on the same machine gets its own folder. A unit worktree has no machine-local norn files of its own. `git status` in any checkout shows nothing of them, without any `.gitignore` line for them.
 
-- B6 As a person, I want `~/.norn/` to stay as it is, so that my user config, machine leases and shims are not affected.
+- B6 As a person, I want what `~/.norn/` already holds to stay as it is, so that my user config, machine leases and shims are not affected; only `repos/` is added.
   Example: after the change (and after `norn migrate`), `~/.norn/config.yaml` and the machine's slot leases are where they were and are read as before.
 
 - B7 As a person or CI, I want `norn doctor` to validate every repo workflow as a tick would (W5), so that a broken workflow fails before it merges.
@@ -67,14 +67,14 @@ This story ships the feature; it does not migrate this repository. That happens 
 - B9 As CI, I want `norn doctor` to change nothing, so that it is safe to run in any check.
   Example: `norn doctor` in a clean checkout with valid workflows and config → reports them valid, exits 0, and `git status` is still clean.
 
-- B10 As the maintainer of this repo, I want CI and the repo workflows' `test` check to run `norn doctor`, so that a story here cannot merge a workflow or config that W5 or the schema would refuse.
-  Example: a story's branch breaks `.agents/workflows/quick.yaml` → the `test` check fails and names the workflow, and so does the PR's CI.
+- B10 As the maintainer of a repo, I want `norn doctor --repo` to check only the layout, the repo workflows and the repo config, with no agent, runner or remote, so that CI and a workflow's `test` check can run it on a machine without agents.
+  Example: on a CI runner with no agent installed and no gh auth, `norn doctor --repo` in a checkout with valid workflows and config exits 0; with `.agents/workflows/quick.yaml` broken it names the workflow and exits non-zero. Wiring it into this repo's CI and `test` checks belongs to the follow-up story that migrates this repo (amended in plan: this repo stays on the old layout until then).
 
 - B11 As a person with a repository on the old layout, I want `norn migrate` to move the committed config and workflows to the new layout as git moves, staged and not committed, so that I review and commit the move myself.
   Example: in a repo with `.agents/norn/config.yaml` and `.agents/norn/workflows/{story,quick}.yaml`, `norn migrate` → `git status` shows them renamed to `.agents/norn.config.yaml` and `.agents/workflows/{story,quick}.yaml`, staged. No commit is made. The output lists each move and ends with the commit to make.
 
-- B12 As a person, I want `norn migrate` to move the machine-local files to `.git/norn/`, so that the checkout's trace, heartbeat and claims carry over.
-  Example: before, `.agents/norn/trace/heartbeat.json` holds heartbeat id H. After `norn migrate`, `.git/norn/heartbeat.json` holds H, and the next tick recognises its own claims as before (ID2). `.agents/norn/` no longer exists.
+- B12 As a person, I want `norn migrate` to move the machine-local files to `~/.norn/repos/<id>/`, so that the checkout's trace, heartbeat and claims carry over.
+  Example: before, `.agents/norn/trace/heartbeat.json` holds heartbeat id H. After `norn migrate`, `~/.norn/repos/<id>/heartbeat.json` holds H, and the next tick recognises its own claims as before (ID2). `.agents/norn/` no longer exists.
 
 - B13 As a person, I want `norn migrate` to drop the `.gitignore` line norn wrote for the old trace folder, so that no stale entry is left.
   Example: `.gitignore` held `.agents/norn/trace/` under norn's lines → after `norn migrate` that line is gone, it is staged, and the person's own lines are untouched.
@@ -123,3 +123,81 @@ This story ships the feature; it does not migrate this repository. That happens 
 None.
 
 ## Plan
+
+### Seams
+
+- **S1 The CLI, through `runCli` in the integration harness** (temp repo cloned from a bare remote, an isolated norn home via `NORN_HOME_DIR`, fake clock, fake remote and runner). Observes B1, B2, B4–B9, B10 (`doctor --repo` itself), B11–B21. An old-layout repo is built by running `init` and moving its files back to the old places; a held tick lock by taking it the way `watch` does.
+  Prior art: the `norn doctor (A7)` tests in the cli housekeeping tests, the cli config tests, `init` in the e2e test, the story-create tests (`unknown_workflow`), the workflow pinning tests (S7), and the help tree test.
+- **S2 The repo lint and help tree tests** (the repo test's doc and banned-word scans, the help tree test). Observes B3 (the shipped norn skill's hard rule names only `runs/` and the generated top of handoff.md) and B22 (no product doc, shipped asset or `norn help` text names `.agents/norn/`; `help` lists `migrate`).
+  Prior art: the glossary lint in the repo test; the help tree test.
+
+B23 has no seam: the changelog is written at release from the squash commits, so the note travels in this story's PR description (D13) and the person checks it at the release `ready` gate.
+
+### Coverage
+
+| Behaviour | Seam | Test kind | Notes |
+|---|---|---|---|
+| B1 | S1 | integration | `init` writes `.agents/norn.config.yaml`, no `.agents/norn/`; `config` names the new file |
+| B2 | S1 | integration | `init` writes `.agents/workflows/`; a `norn:wf:quick` story runs it |
+| B3 | S2 | unit (lint) | shipped skill text |
+| B4 | S1 | integration | existing pinning behaviour, now at the new path |
+| B5 | S1 | integration | after a tick, machine files under the home's `repos/<id>/`; nothing in the working tree or `.git`; `git status` clean with no ignore line |
+| B6 | S1 | integration | user config and leases read as before |
+| B7 | S1 | integration | uncounted cycle; missing skill — named, non-zero |
+| B8 | S1 | integration | bad key — file, key, reason, non-zero |
+| B9 | S1 | integration | valid repo — exit 0, `git status` clean |
+| B10 | S1 | integration | `doctor --repo` with no agent binaries on PATH and no remote auth |
+| B11 | S1 | integration | staged renames, no commit, listed moves and the commit to make |
+| B12 | S1 | integration | heartbeat id carried over; next tick keeps its claims |
+| B13 | S1 | integration | norn's ignore line gone and staged; the person's lines kept |
+| B14 | S1 | integration | second run: nothing to move, exit 0 |
+| B15 | S1 | integration | tick lock held → refused, nothing moved |
+| B16 | S1 | integration | in a unit worktree → refused, names the main checkout |
+| B17 | S1 | integration | one part in both places → every command refuses, names both paths |
+| B18 | S1 | integration | `status`, `tick`, `watch` refuse with `do_instead: norn migrate`; `--json` gives a `CliError` |
+| B19 | S1 | integration | `init` refuses and writes nothing |
+| B20 | S1 | integration | `doctor` reports old layout, names `migrate`, non-zero, moves nothing |
+| B21 | S1 | integration | migrated main, old files in a unit worktree → `brief`, `done`, `ask`, `hook` work |
+| B22 | S2 | unit (lint) | product docs and `help` only (D12) |
+| B23 | none | manual | PR description, checked at release (D13) |
+
+### Prefactoring
+
+1. Route every norn path through store's path functions — the headless runner's default log dir, doctor's scratch repo, and the literal `.agents/norn/…` paths in the tests (about 40 files) go through store's path functions or one harness helper. Makes B1, B2 and B5 a change in one module plus `migrate`, and leaves the test diff to tests of the layout itself.
+2. Extract one function that loads and validates the repo workflows (W5, with each agent's visible skills) and the repo config, used by observe today and by doctor in this story. B7 and B8 then give exactly the verdict a tick gives; the rules are never copied.
+
+### Implementation decisions
+
+- D1 **Layout.** Repo config at `.agents/norn.config.yaml`; repo workflows in `.agents/workflows/`; the checkout's machine-local files in the machine dir `<norn home>/repos/<id>/`, a flat copy of the old trace dir (heartbeat, tick and integrate locks, day files, caches, `base/`, `runs/` logs keep their names). What the norn home already holds does not change. Chosen over the common git dir (`.git/norn/`): agent sandboxes may keep `.git` read-only, and norn writes the trace from processes an agent starts; the home is outside both the working tree and `.git`, and survives `git clean -fdx`.
+- D2 **The id.** `<id>` is the main checkout's folder name, a dash, and the first 8 hex characters of the sha256 of the real path of the repository's git common dir (e.g. `norn-next-3f9a2c1b`). Derived, never stored, so it needs no write into the repo or `.git`; two clones on one machine never share it. A generated id kept in git config was rejected: a copied repo would carry it, and two checkouts would share one heartbeat. Store resolves it; the machine-dir path function keeps taking the root, and `NORN_HOME_DIR` keeps isolating tests. Team effect: none beyond the checkout — the id never appears in a ref, receipt or trace a teammate reads; the `heartbeat_id` inside it is unchanged (ID2).
+- D3 **Orphaned machine dirs.** Each machine dir holds a small `checkout.json` (the checkout's path), a new schema in `@norn/schema`, validated on read. After a repo folder is moved, `norn doctor` warns about a machine dir whose recorded path has the same folder name but no longer exists, and prints the `mv` that adopts it (keeping the heartbeat). No adopt command.
+- D4 **Layout classification, per part, on the main checkout only.** Three parts, each with an old and a new place: config, workflows (a folder with at least one workflow file), machine files (a non-empty dir). *Both*: any one part present in both places. *Old*: not both, and at least one part at its old place. *New*: otherwise. Covers a teammate who pulled the migration commit but still has an untracked old trace (old → `migrate` moves only the trace), an interrupted migration (a rerun finishes it), and a merge that brings an old file back beside the new one (both → refused).
+- D5 **One layout guard at command dispatch,** for every command that locates a repo, after `locate()` and before config loads. It classifies the main checkout (also when run from a unit worktree) and never looks at a worktree's own files (B21). Old → refused, exit 3, code `old_layout`, `do_instead: norn migrate`, naming the main checkout. Both → refused, code `both_layouts`, naming each pair of paths. Exempt: `migrate` (handles both itself), `doctor` (reports the layout as a failed check, B20), `help`. `init` is refused like the rest (B19). `norn hook` on old or both exits 0, records nothing and blocks nothing, so a hook never breaks an agent's tool calls; `brief`, `done`, `ask`, `stuck` refuse.
+- D6 **`norn migrate`.** A new command for a person (listed in `norn help`), markdown by default and one JSON value with `--json` (`{moves, staged, commit}`).
+  Checks first, nothing moved on a refusal (exit 3): not the main checkout (a unit worktree, or any linked worktree whose top level is not the root) → names the main checkout's path; any part in both places; the tick lock not available (B15).
+  Then, holding the tick lock (taken at its old place): config and workflows by `git mv` so the renames are staged (an untracked workflow file is moved plainly and listed as untracked); the old trace dir's contents into the machine dir (rename, or copy then delete across filesystems) and `checkout.json` written; norn's own old-trace line removed from `.gitignore` and `.gitignore` staged (the person's lines untouched); `.agents/norn/` removed when empty; the old lock file dropped last.
+  Every step can run again, so an interrupted run is finished by a rerun; no rollback. On a new layout: "nothing to move", exit 0 (B14). Never commits, pushes, or touches a unit worktree.
+- D7 **`norn doctor` gains a repo group:** layout (D4; old or both is a failure naming `migrate`), each repo workflow through the prefactored validator (file, step, path of each issue — uncounted cycle, missing skill for its agent), and the repo config against its schema (file, key, reason). Plain `doctor` runs the machine and repo groups and fails on either; `doctor --repo` runs only the repo group and needs no agent, runner or remote (B10). Both read-only (B9).
+- D8 **`init`** writes the new layout; its `.gitignore` lines drop the old trace line and keep `.env.norn` and `.norn-unit`. Its next steps name `.agents/workflows/`.
+- D9 **Headless runner** default log dir: the machine dir's `runs/`.
+- D10 **Trace event for an unreadable machine-local file:** its `file` becomes an absolute path (the file is no longer under the repo). A comment and schema emit only; the type does not change.
+- D11 **Every message and hint** (refusals, `do_instead`, `config`, `config edit`, `story create`/`edit` `unknown_workflow`, adapter errors) names the new paths.
+- D12 **Docs (B22).** Product docs move to the new layout now: README, `.agents/PRD.md` (§7 layout, ID2 and every id that names a path), `norn help`, `init` output, the shipped skills and shipped config, code comments, and AGENTS.md's Layout and "Where the contracts live". This repo's own process text keeps the old paths until the follow-up migrates it: AGENTS.md's Process and repo-local workflows lines, CONTRIBUTING.md's lines on this repo's files, and the `.agents/skills/norn*` copies (written by the released `init`; the narrowed rule already on this branch stays). S2's lint covers the product docs only.
+- D13 **Release note (B23).** This story's PR description carries a "Release note" paragraph — after `norn migrate` an older norn cannot read the repository and must be upgraded — which the `release` step takes into the changelog. `CHANGELOG.md` is not edited in the PR.
+- D14 **B10's wiring is deferred.** This repo stays on the old layout, so neither the released `doctor` (no workflow validation) nor a dev-build `doctor` (refuses the old layout) can guard it now; the follow-up story that migrates this repo adds `norn doctor --repo` to CI and the `test` checks.
+
+### Testing decisions
+
+- Tests drive `runCli` through the harness and observe what a person or agent sees: exit code, `--json` value or `CliError`, files on disk, `git status` and the staged index. Never the guard's or `migrate`'s internals.
+- Faked: only system boundaries — the remote and runner (harness fakes), the clock, the norn home (`NORN_HOME_DIR` on a temp dir), and agent binaries on PATH for `doctor --repo` (absent). Git is real.
+- The existing transcripts and observe snapshots are expected not to change (they record `runs/` and Facts, not machine-dir paths); a change there is reviewed as a layout change, not rewritten blindly.
+- The golden corpus does not change: decide's inputs and decisions are untouched.
+- Existing tests that wrote or read the old paths move to the new ones through the prefactor's helpers; they are not new behaviour.
+
+### Risks
+
+- **Test churn** (about 40 test files) hiding a real behaviour change — met by prefactor 1 landing green first, so the layout slice's diff is small.
+- **`migrate` moving live state** (heartbeat, locks) under a running tick — met by taking the tick lock at its old place before any move (B15) and the rerunnable steps; the first slice that ships `migrate` covers B12 and B15.
+- **Moving the repo folder** gives it a new id and a fresh heartbeat; its claims expire and may be recovered by a teammate. Met by D3's orphan warning with the `mv` that adopts the old dir.
+- **Cross-filesystem home** (repo and home on different volumes): the move is copy then delete; covered by the same rerunnable step, not by a test of its own.
+- **A teammate on an older norn** after the migration commit merges cannot read the repo — by design (B23), stated in the release note.
