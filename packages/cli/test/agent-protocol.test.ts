@@ -5,11 +5,11 @@
  * do_instead, and `norn hook` block/allow on turn end (unattended vs attended steps).
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { BriefJson } from "@norn/core";
 import type { HookTrace } from "@norn/schema";
-import { readTrace, readTraceFile } from "@norn/store";
+import { readTrace, readTraceFile, setTraceReadObserver, traceDir } from "@norn/store";
 import { type CliResult, runCli } from "../src/index.ts";
 import { parseFindings } from "../src/commands/done.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
@@ -185,6 +185,35 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     expect(r.value).toMatchObject({ decision: "block", reason: expect.stringContaining("norn done <done>") });
     const last = (readTrace(h.root, { types: ["hook"] }).events as HookTrace[]).at(-1);
     expect(last).toMatchObject({ blocked: true, fact: { event: "turn_end", run_id: runId } });
+  });
+
+  test("B4: `norn trace` prints the same events with lines it does not show added, broken or not; every reader opens day files through the observer", async () => {
+    const before = await h.norn("trace", "gh-9", "--events", "--all", "--json");
+    expect(before.exit).toBe(0);
+    const days = () => readdirSync(traceDir(h.root)).filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n)).sort().map((n) => join(traceDir(h.root), n));
+    const last = days().at(-1) as string;
+    appendFileSync(last, '{"type":"tick.start",broken\n');
+    appendFileSync(last, `${JSON.stringify({ type: "local_file", id: "01M5MA3PG0DB4G1MJNV0HKQYSA", at: new Date(h.clock.now()).toISOString(), file: ".agents/norn/trace/remote.json", schema: "local-remote", reason: "unreadable", errors: [] })}\n`);
+    const after = await h.norn("trace", "gh-9", "--events", "--all", "--json");
+    expect(after.stdout).toBe(before.stdout);
+    // a reader of every type still reports the broken line
+    expect(readTrace(h.root).errors.map((e) => e.file)).toContainEqual(expect.stringMatching(/\.jsonl:\d+$/));
+
+    const seen: string[] = [];
+    const prev = setTraceReadObserver(({ file }) => seen.push(file));
+    const opened = async (run: () => Promise<unknown>) => {
+      seen.length = 0;
+      await run();
+      return [...new Set(seen)];
+    };
+    try {
+      expect(await opened(() => h.norn("trace", "gh-9"))).toEqual(days());
+      expect(await opened(() => stop(wt()))).toContain(last); // the blocked-hook count (A4)
+      expect(await opened(() => h.tick())).toContain(last); // the tick's hook-fact scan (A2)
+      expect(await opened(() => h.norn("inbox", "--history"))).toEqual(days());
+    } finally {
+      setTraceReadObserver(prev);
+    }
   });
 
   test("the tick applies the started receipt: running, how manual (MO3)", async () => {

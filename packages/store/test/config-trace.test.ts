@@ -5,13 +5,17 @@ import { join } from "node:path";
 import { type TraceEvent, ulid } from "@norn/schema";
 import {
   appendTrace,
+  blockedHookCount,
   decisionUnit,
+  inboxHistory,
   lastTickFor,
   loadConfig,
   loadWorkflow,
   loadWorkflows,
+  readHookFacts,
   readTrace,
   readTraceFile,
+  setTraceReadObserver,
   traceDir,
   writeBriefing,
 } from "../src/index.ts";
@@ -103,6 +107,61 @@ describe("trace (O4)", () => {
       sync.mockRestore();
     }
     expect(readTrace(repo).events.map((e) => e.type)).toEqual(["tick", "tick.end", "tick.start"]);
+  });
+  test("B4 (D2): every line is written with `type` as its first key", () => {
+    const repo = tmp();
+    const end = { tick_id: ulid(), at: AT, duration_ms: 3, failed: 0, type: "tick.end" } as unknown as TraceEvent;
+    appendTrace(repo, end);
+    appendTrace(repo, { fact: { event: "turn_end", at: AT, agent: "claude", native: "Stop", cwd: "/w", story: "gh-12" }, id: ulid(), type: "hook" } as unknown as TraceEvent);
+    const lines = readTraceFile(repo, "2026-10-23.jsonl")?.trim().split("\n") ?? [];
+    expect(lines.map((l) => Object.keys(JSON.parse(l))[0])).toEqual(["type", "type"]);
+    expect(lines[0]).toStartWith('{"type":"tick.end",');
+    expect(readTrace(repo).events.map((e) => e.type)).toEqual(["tick.end", "hook"]);
+  });
+  test("B4 (D2): a reader given types skips lines of other types unparsed; a reader of every type reports them", () => {
+    const repo = tmp();
+    appendTrace(repo, tick("gh-12", AT));
+    const day = join(traceDir(repo), "2026-10-23.jsonl");
+    appendFileSync(day, '{"type":"tick.start",broken\n');
+    // an older norn's line with `type` not first is parsed, not skipped
+    const old = tick("gh-12", "2026-10-23T00:00:05.000Z") as Record<string, unknown>;
+    const { type, ...rest } = old;
+    appendFileSync(day, `${JSON.stringify({ ...rest, type })}\n`);
+    appendFileSync(day, `${JSON.stringify({ ...rest, tick_id: ulid(), type: "tick.end", duration_ms: 1, failed: 0, facts: undefined, decisions: undefined, heartbeat_id: undefined })}\n`);
+    const ticks = readTrace(repo, { types: ["tick"] });
+    expect(ticks.errors).toEqual([]);
+    expect(ticks.events.map((e) => e.type)).toEqual(["tick", "tick"]);
+    const all = readTrace(repo);
+    expect(all.errors.map((e) => e.file)).toEqual(["2026-10-23.jsonl:2"]);
+    expect(all.events.map((e) => e.type)).toEqual(["tick", "tick", "tick.end"]);
+    // a typed reader still reports a bad line of a type it asked for
+    appendFileSync(day, '{"type":"tick","tick_id":"x"}\n');
+    expect(readTrace(repo, { types: ["tick"] }).errors.map((e) => e.file)).toEqual(["2026-10-23.jsonl:5"]);
+  });
+  test("B4: the trace-read observer sees every day file each reader opens", () => {
+    const repo = tmp();
+    const runId = "01M5MA3PG0DB4G1MJNV0HKQYSA"; // a ulid of AT
+    appendTrace(repo, tick("gh-12", AT));
+    appendTrace(repo, { type: "hook", id: ulid(), blocked: true, fact: { event: "turn_end", at: "2026-10-24T00:00:03.000Z", agent: "claude", native: "Stop", cwd: "/w", story: "gh-12", run_id: runId } });
+    const seen: string[] = [];
+    const prev = setTraceReadObserver(({ file }) => seen.push(file));
+    try {
+      const opened = (read: () => unknown) => {
+        seen.length = 0;
+        read();
+        return [...seen];
+      };
+      const both = [join(traceDir(repo), "2026-10-23.jsonl"), join(traceDir(repo), "2026-10-24.jsonl")];
+      expect(opened(() => readTrace(repo, { types: ["tick"] }))).toEqual(both);
+      expect(opened(() => inboxHistory(repo))).toEqual(both);
+      expect(opened(() => readHookFacts(repo, AT))).toEqual(both);
+      expect(opened(() => blockedHookCount(repo, runId))).toEqual(both);
+      expect(blockedHookCount(repo, runId)).toBe(1);
+      expect(opened(() => readHookFacts(repo, "2026-10-24T00:00:00.000Z"))).toEqual(both.slice(1));
+    } finally {
+      expect(setTraceReadObserver(prev)).not.toBeNull();
+    }
+    expect(setTraceReadObserver(null)).toBeNull();
   });
   test("briefings stored by trace-relative path (B4)", () => {
     const repo = tmp();

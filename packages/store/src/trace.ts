@@ -5,7 +5,7 @@
  * filter by unit while reading. Briefings and transcript snapshots are separate files
  * under `briefings/<run_id>/` and `transcripts/<run_id>/`, referenced by trace-relative path.
  */
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
 import type { FileError } from "@norn/core";
 import { type HookFact, type TickStartTrace, type TickTrace, type TraceEvent, assertValid, ulid, ulidTime, validate } from "@norn/schema";
@@ -32,8 +32,10 @@ export function appendTrace(root: string, event: TraceEvent): string {
   assertValid("trace", event);
   const name = traceFileName(eventTime(event));
   const path = join(traceDir(root), name);
-  const line = `${JSON.stringify(event)}\n`;
-  if (event.type === "tick.start") appendDurable(path, line);
+  // B4 (D2): `type` first, so a reader can skip a line by its prefix without parsing it
+  const { type, ...rest } = event;
+  const line = `${JSON.stringify({ type, ...rest })}\n`;
+  if (type === "tick.start") appendDurable(path, line);
   else {
     mkdirSync(dirname(path), { recursive: true });
     appendFileSync(path, line);
@@ -108,44 +110,114 @@ function eventMatchesUnit(ev: TraceEvent, unit: string): boolean {
   }
 }
 
-function dayFiles(root: string): string[] {
+// ---------------------------------------------------------------- day-file lines (B4)
+
+/** One day file a reader opened: what the trace-read observer sees. */
+export interface TraceFileRead {
+  /** absolute path of the day file */
+  file: string;
+}
+
+export type TraceReadObserver = (read: TraceFileRead) => void;
+
+let readObserver: TraceReadObserver | null = null;
+
+/**
+ * Test hook (B4), modelled on `setSpawnObserver`: call `fn` with each day file a trace reader opens
+ * (`readTrace` and every reader built on it, `readHookFacts`, `blockedHookCount`). `null` (the
+ * default) turns it off. Returns the observer it replaced. It only watches; one that throws is ignored.
+ */
+export function setTraceReadObserver(fn: TraceReadObserver | null): TraceReadObserver | null {
+  const prev = readObserver;
+  readObserver = fn;
+  return prev;
+}
+
+interface DayLine {
+  /** day file name, e.g. `2026-10-23.jsonl` */
+  name: string;
+  /** 1-based line number */
+  n: number;
+  text: string;
+  /** the type its `{"type":"…"` prefix names; null for a line without one (an older norn's, or garbage) */
+  type: string | null;
+}
+
+const TYPE_PREFIX = '{"type":"';
+
+function prefixType(line: string): string | null {
+  if (!line.startsWith(TYPE_PREFIX)) return null;
+  const end = line.indexOf('"', TYPE_PREFIX.length);
+  return end < 0 ? null : line.slice(TYPE_PREFIX.length, end);
+}
+
+/**
+ * The one day-file line reader (B4): the non-blank lines of every day file from `sinceDay` on,
+ * oldest file first. With `types`, a line whose prefix names another type is skipped unparsed (D2);
+ * a line without a type prefix is always yielded for the caller to parse. Throws when the trace dir
+ * cannot be listed or a file cannot be read, unless `quiet` (a file that went away is skipped either way).
+ */
+function* dayFileLines(root: string, opts: { sinceDay?: string | null; types?: readonly string[]; quiet?: boolean } = {}): Generator<DayLine> {
+  let names: string[];
   try {
-    return readdirSync(traceDir(root))
+    names = readdirSync(traceDir(root))
       .filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n))
       .sort();
   } catch (e) {
-    if (isErrno(e, "ENOENT")) return [];
+    if (opts.quiet || isErrno(e, "ENOENT")) return;
     throw e;
+  }
+  for (const name of names) {
+    if (opts.sinceDay && name.slice(0, 10) < opts.sinceDay.slice(0, 10)) continue;
+    const path = join(traceDir(root), name);
+    if (readObserver) {
+      try {
+        readObserver({ file: path });
+      } catch {
+        // an observer never changes what norn does
+      }
+    }
+    let text: string | null;
+    try {
+      text = readText(path);
+    } catch (e) {
+      if (opts.quiet) continue;
+      throw e;
+    }
+    if (text === null) continue;
+    const lines = text.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i] as string;
+      if (!line.trim()) continue;
+      const type = prefixType(line);
+      if (opts.types && type !== null && !opts.types.includes(type)) continue;
+      yield { name, n: i + 1, text: line, type };
+    }
   }
 }
 
 export function readTrace(root: string, q: TraceQuery = {}): TraceRead {
   const out: TraceRead = { events: [], errors: [] };
-  const sinceDay = q.since ? traceFileName(q.since) : null;
-  for (const name of dayFiles(root)) {
-    if (sinceDay && name < sinceDay) continue;
-    const text = readText(join(traceDir(root), name)) ?? "";
-    const lines = text.split("\n");
-    lines.forEach((line, i) => {
-      if (!line.trim()) return;
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(line);
-      } catch (e) {
-        out.errors.push({ file: `${name}:${i + 1}`, errors: [{ path: "", message: `invalid JSON: ${(e as Error).message}` }] });
-        return;
-      }
-      const v = validate("trace", parsed);
-      if (!v.ok) {
-        out.errors.push({ file: `${name}:${i + 1}`, errors: v.errors });
-        return;
-      }
-      const ev = v.value;
-      if (q.types && !q.types.includes(ev.type)) return;
-      if (q.since && eventTime(ev) < q.since) return;
-      if (q.unit && !eventMatchesUnit(ev, q.unit)) return;
-      out.events.push(ev);
-    });
+  for (const { name, n, text, type } of dayFileLines(root, { sinceDay: q.since ? traceFileName(q.since) : null, ...(q.types ? { types: q.types } : {}) })) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      // D2: a line that names no type is garbage only to a reader of every type
+      if (!q.types || type !== null) out.errors.push({ file: `${name}:${n}`, errors: [{ path: "", message: `invalid JSON: ${(e as Error).message}` }] });
+      continue;
+    }
+    const parsedType = (parsed as { type?: unknown } | null)?.type;
+    if (q.types && !q.types.includes(parsedType as TraceEvent["type"])) continue;
+    const v = validate("trace", parsed);
+    if (!v.ok) {
+      out.errors.push({ file: `${name}:${n}`, errors: v.errors });
+      continue;
+    }
+    const ev = v.value;
+    if (q.since && eventTime(ev) < q.since) continue;
+    if (q.unit && !eventMatchesUnit(ev, q.unit)) continue;
+    out.events.push(ev);
   }
   if (q.limit !== undefined) out.events = out.events.slice(-q.limit);
   return out;
@@ -183,41 +255,19 @@ export function crashedTicksFor(root: string, unit: string): TickStartTrace[] {
 
 // ---------------------------------------------------------------- hook lines (A2, A4): fast scans
 
-/** Day files of the trace, unsorted; none when the trace dir cannot be listed (diagnostic, never fatal). */
-function hookDayFiles(root: string): string[] | null {
-  try {
-    return readdirSync(traceDir(root)).filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n));
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Hook facts appended by `norn hook` (A2), read from trace day files since `since`, oldest first.
- * A fast scan: only lines starting `{"type":"hook"` are parsed, and neither they nor the facts are
- * schema-checked (the trace is diagnostic: an unreadable file or a bad line is skipped).
+ * A fast scan: only hook lines are parsed, and neither they nor the facts are schema-checked (the
+ * trace is diagnostic: an unreadable file or a bad line is skipped).
  */
 export function readHookFacts(root: string, since: string): HookFact[] {
-  const names = hookDayFiles(root);
-  if (!names) return [];
-  const day = since.slice(0, 10);
   const out: HookFact[] = [];
-  for (const name of names.sort()) {
-    if (name.slice(0, 10) < day) continue;
-    let text: string;
+  for (const { text } of dayFileLines(root, { sinceDay: since, types: ["hook"], quiet: true })) {
     try {
-      text = readFileSync(join(traceDir(root), name), "utf8");
+      const ev = JSON.parse(text) as { type?: string; fact?: HookFact };
+      if (ev.type === "hook" && ev.fact && ev.fact.at >= since) out.push(ev.fact);
     } catch {
-      continue;
-    }
-    for (const line of text.split("\n")) {
-      if (!line.startsWith('{"type":"hook"')) continue;
-      try {
-        const ev = JSON.parse(line) as { fact?: HookFact };
-        if (ev.fact && ev.fact.at >= since) out.push(ev.fact);
-      } catch {
-        /* diagnostic file; bad lines are skipped */
-      }
+      /* diagnostic file; bad lines are skipped */
     }
   }
   return out.sort((a, b) => a.at.localeCompare(b.at));
@@ -225,16 +275,10 @@ export function readHookFacts(root: string, since: string): HookFact[] {
 
 /** A4: hook events of `runId` that norn blocked, counted in the trace day files since the run began (text match, no parse). */
 export function blockedHookCount(root: string, runId: string): number {
-  const names = hookDayFiles(root);
-  if (!names) return 0;
   const day = new Date(ulidTime(runId)).toISOString().slice(0, 10);
   const needle = `"run_id":"${runId}"`;
   let n = 0;
-  for (const name of names) {
-    if (name.slice(0, 10) < day) continue;
-    for (const line of readFileSync(join(traceDir(root), name), "utf8").split("\n"))
-      if (line.startsWith('{"type":"hook"') && line.includes('"blocked":true') && line.includes(needle)) n++;
-  }
+  for (const { text, type } of dayFileLines(root, { sinceDay: day, types: ["hook"], quiet: true })) if (type === "hook" && text.includes('"blocked":true') && text.includes(needle)) n++;
   return n;
 }
 
