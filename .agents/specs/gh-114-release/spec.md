@@ -10,7 +10,7 @@ labels:
   - norn
   - norn:wf:release
 workflow: release
-status: new
+status: active
 intake_at: 2026-10-30T13:01:21.339Z
 body_hash: f38c4f4acf90f24d0e41bd922345656b38e92c4a2b245306a1de5f3cb3f07c20
 ---
