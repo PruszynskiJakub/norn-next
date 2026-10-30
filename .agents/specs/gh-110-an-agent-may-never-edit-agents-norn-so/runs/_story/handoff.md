@@ -5,12 +5,13 @@
 - Counters: base_conflict_loop 0/2, ready_loop 0/2, review_loop 0/3, stale_loop 0/10, test_loop 0/5, triage_loop 0
 - Last outcome: none
 - Next: `norn trace gh-110`
-- Updated: 2026-10-30T11:33:30.559Z
+- Updated: 2026-10-30T11:35:00.563Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - story.start: triage at explore
 - receipts.apply: explore.workflow → implement
 - receipts.apply: applied 2
+- receipts.apply: applied 3
 <!-- norn:heartbeat:end -->
 
 ## Goal
