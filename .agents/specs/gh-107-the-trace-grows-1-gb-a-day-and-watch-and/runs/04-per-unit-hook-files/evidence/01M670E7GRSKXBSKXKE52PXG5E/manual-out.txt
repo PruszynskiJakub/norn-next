@@ -1,0 +1,25 @@
+== AC1 (B5) PostToolUse in gh-1's worktree
+{}
+ exit=0
+hook file lines:      420 ->      421; day file lines:      670 ->      671
+hook file last line:
+{"type":"hook","id":"01M671948MK1T90VQSJGRCG4RY","fact":{"event":"tool_use","at":"2026-10-30T18:31:14.848Z","agent":"claude","native":"PostToolUse","cwd":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-B2KVTh/repo-worktrees/gh-1-long-step","agent_session_id":"qa-s1","transcript":"/tmp/qa.jsonl","tool":"Bash","command":"echo qa-ac1-marker","story":"gh-1","run_id":"01M66CKKZSK12P2
+day file lines with marker: 1
+SAME LINE in hook file and day file
+norn trace gh-1 exit=0 ; mentions marker: 0
+== AC2 (B6) hook in the main checkout
+{}
+ exit=0
+same set of trace files (no new hook file)
+day lines      671 ->      671; gh-1 hook lines      421 ->      421; marker anywhere in trace:        0
+/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-B2KVTh/repo/.agents/norn/trace/hooks/gh-1/_story.jsonl
+== AC3 (B7) SessionStart (no run id) in gh-1's worktree
+{}
+ exit=0
+hook file lines:      421 ->      422
+{"type":"hook","id":"01M6719ZDQXJXGESGR9PWDXRZK","fact":{"event":"session_start","at":"2026-10-30T18:31:42.673Z","agent":"claude","native":"SessionStart","cwd":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-B2KVTh/repo-worktrees/gh-1-long-step","agent_session_id":"qa-s3","transcript":"/tmp/qa.jsonl","message":"startup","story":"gh-1","run_id":"01M66CKKZSK12P2CXYHTSJJNPP"}}
+
+== AC6 (B10) brief with day files unreadable (chmod 000)
+brief (readable) exit=0
+brief (day files 000) exit=1
+/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-04/AC6-brief-readable.json /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-04/AC6-brief-unreadable.json differ: char 3, line 1
