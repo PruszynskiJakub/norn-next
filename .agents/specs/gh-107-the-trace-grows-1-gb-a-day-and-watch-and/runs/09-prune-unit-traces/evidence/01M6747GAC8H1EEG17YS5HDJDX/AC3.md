@@ -1,0 +1,3 @@
+# AC3 (B30)
+Real CLI: workflows/abc.yaml, backfill.json, integrate-gh-3.lock aged 60d: after tidy same size and mtime (ls -lT diff in before-tidy.txt vs after-tidy-l.txt shows only the pruned files gone and the remote.json cache refreshed by observe).
+Live run 20 days old (hook file, briefings, transcripts all 20d): harness test "a live run 20 days old keeps its hook file, briefings and transcripts; workflows, backfill.json, caches and locks are untouched (B30)" compares name, size and mtime before and after; it passes (housekeeping.txt). Code: unitTracesBefore treats running/parked state or an unapplied started receipt as live.

@@ -61,6 +61,8 @@ export interface ObserveOptions {
   tick_id: string;
   /** remote sync: when due (default), now, or not at all */
   sync?: SyncMode;
+  /** B11, B12 (D5): backfill the live runs' hook files from the day files first (the tick's) */
+  backfillHooks?: boolean;
 }
 
 /** Where a story lives on disk (not part of Facts; used by act). */
@@ -164,7 +166,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
 
   // ---- local facts (H2): the snapshot, leases (K1, K3), hook facts, caches, what the receipts say
   const liveness = leaseLiveness((p) => ports.process.isAlive(p));
-  const local = await loadLocalFacts(root, { now, home: ctx.home, env: ctx.env, storyWorktrees: storyWts, sliceWorktrees: sliceWts, baseRef, liveness, stalledMs: parseDuration(config.limits.stalled) });
+  const local = await loadLocalFacts(root, { now, home: ctx.home, env: ctx.env, storyWorktrees: storyWts, sliceWorktrees: sliceWts, baseRef, liveness, stalledMs: parseDuration(config.limits.stalled), backfillHooks: opts.backfillHooks });
   const snapshot = local.snapshot;
   const workflows = repoWorkflows(snapshot.workflows, { default_agent: config.default_agent, visible: agentSkills(ports.agents, root) });
 

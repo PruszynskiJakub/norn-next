@@ -9,7 +9,7 @@
  * Each hook event fired in a unit worktree is also kept in that unit's hook file under `hooks/` (D3),
  * which is where every reader of a unit's hooks reads them.
  */
-import { appendFileSync, existsSync, mkdirSync, readdirSync, statSync, utimesSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, rmSync, type Stats, statSync, utimesSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
 import type { FileError } from "@norn/core";
 import {
@@ -19,6 +19,7 @@ import {
   type TickTrace,
   type TraceEvent,
   assertValid,
+  STORY_UNIT_DIR,
   ulid,
   ulidTime,
   validate,
@@ -309,11 +310,12 @@ export function crashedTicksFor(root: string, unit: string): TickStartTrace[] {
  */
 export function readHookFacts(root: string, since: string): HookFact[] {
   const out: HookFact[] = [];
-  for (const ev of hookLines(root, since)) out.push(ev.fact);
+  for (const ev of dayHookLines(root, since)) out.push(ev.fact);
   return out.sort((a, b) => a.at.localeCompare(b.at));
 }
 
-function* hookLines(root: string, since: string): Generator<HookTrace> {
+/** The hook events of the day files at `since` or later, in file order: a fast scan like `readHookFacts` (D5 backfills from it). */
+export function* dayHookLines(root: string, since: string): Generator<HookTrace> {
   for (const { text } of dayFileLines(root, { sinceDay: since, types: ["hook"], quiet: true })) {
     const ev = hookLine(text, since);
     if (ev) yield ev;
@@ -367,6 +369,20 @@ function unitHookLines(root: string, unit: HookUnit, since: string): HookTrace[]
  */
 export function readUnitHooks(root: string, units: readonly HookUnit[], since: string): HookTrace[][] {
   return units.map((u) => unitHookLines(root, u, since));
+}
+
+/**
+ * D5 (B11, B12): append to the unit's hook file the events whose id it does not hold yet, in one
+ * append — never a rewrite, so a concurrent `norn hook` append is never lost. Returns how many it appended.
+ */
+export function appendMissingUnitHooks(root: string, unit: HookUnit, events: readonly HookTrace[]): number {
+  const held = new Set(unitHookLines(root, unit, "").map((e) => e.id));
+  const missing = events.filter((e) => !held.has(e.id) && held.add(e.id));
+  if (!missing.length) return 0;
+  const file = hookFilePath(root, unit);
+  mkdirSync(dirname(file), { recursive: true });
+  appendFileSync(file, missing.map(traceLine).join(""));
+  return missing.length;
 }
 
 /** D4: when the unit's hook file was last written (ms, the time of its last appended fact), or null when it has none. */
@@ -430,6 +446,97 @@ export function traceDaysBefore(root: string, beforeDay: string): TraceDay[] {
 /** D12: delete the files of these day pairs (deleted wholesale: a day pair is self-contained). */
 export function deleteTraceDays(root: string, days: TraceDay[]): void {
   for (const d of days) for (const f of d.files) safeUnlink(join(traceDir(root), f));
+}
+
+// ---------------------------------------------------------------- retention (D12): hook files and run dirs
+
+/** A unit's hook file (D3), as tidy weighs it: the unit, its trace-relative path, its size and last write. */
+export interface HookFileEntry {
+  story: string;
+  /** null = the story unit */
+  slice: string | null;
+  /** trace-relative, `hooks/<story>/<file>` */
+  file: string;
+  bytes: number;
+  mtimeMs: number;
+}
+
+const HOOK_FILE = /^(\d+|_story)\.jsonl$/;
+
+/** D12: every unit hook file under `hooks/`, sorted by path. */
+export function listHookFiles(root: string): HookFileEntry[] {
+  const out: HookFileEntry[] = [];
+  for (const story of listDir(join(traceDir(root), "hooks"))) {
+    for (const name of listDir(join(traceDir(root), "hooks", story))) {
+      const nn = HOOK_FILE.exec(name)?.[1];
+      if (!nn) continue;
+      const file = `hooks/${story}/${name}`;
+      const st = statOrNull(join(traceDir(root), file));
+      if (!st?.isFile()) continue;
+      out.push({ story, slice: nn === STORY_UNIT_DIR ? null : `${story}/${nn}`, file, bytes: st.size, mtimeMs: st.mtimeMs });
+    }
+  }
+  return out;
+}
+
+/** One run's side files (B4, C4): its `briefings/<run>/` and `transcripts/<run>/`, their size and newest write. */
+export interface RunTraceEntry {
+  run_id: string;
+  /** trace-relative dirs, sorted */
+  files: string[];
+  bytes: number;
+  /** the newest file's mtime (the dir's own when it is empty) */
+  newestMs: number;
+}
+
+/** D12: the runs that have briefings or transcripts, sorted by run id. */
+export function listRunTraces(root: string): RunTraceEntry[] {
+  const runs = new Map<string, RunTraceEntry>();
+  for (const kind of ["briefings", "transcripts"]) {
+    for (const run of listDir(join(traceDir(root), kind))) {
+      const dir = join(traceDir(root), kind, run);
+      const st = statOrNull(dir);
+      if (!st?.isDirectory()) continue;
+      const e = runs.get(run) ?? { run_id: run, files: [], bytes: 0, newestMs: Number.NEGATIVE_INFINITY };
+      e.files.push(`${kind}/${run}`);
+      let newest = Number.NEGATIVE_INFINITY;
+      for (const name of readdirSync(dir, { recursive: true }) as string[]) {
+        const f = statOrNull(join(dir, name));
+        if (!f?.isFile()) continue;
+        e.bytes += f.size;
+        newest = Math.max(newest, f.mtimeMs);
+      }
+      e.newestMs = Math.max(e.newestMs, newest === Number.NEGATIVE_INFINITY ? st.mtimeMs : newest);
+      runs.set(run, e);
+    }
+  }
+  return [...runs.values()].sort((a, b) => (a.run_id < b.run_id ? -1 : 1));
+}
+
+/** D12: delete these trace-relative files and dirs, then a story's `hooks/<story>/` left empty. */
+export function deleteTracePaths(root: string, rels: readonly string[]): void {
+  for (const rel of rels) {
+    rmSync(join(traceDir(root), safeRel(rel)), { recursive: true, force: true });
+    const parent = dirname(join(traceDir(root), rel));
+    if (dirname(parent) === join(traceDir(root), "hooks") && listDir(parent).length === 0) rmSync(parent, { recursive: true, force: true });
+  }
+}
+
+function listDir(dir: string): string[] {
+  try {
+    return readdirSync(dir).sort();
+  } catch (e) {
+    if (isErrno(e, "ENOENT") || isErrno(e, "ENOTDIR")) return [];
+    throw e;
+  }
+}
+
+function statOrNull(path: string): Stats | null {
+  try {
+    return statSync(path);
+  } catch {
+    return null;
+  }
 }
 
 /** Whether the trace still holds the day file of the UTC day of `at` (D10: a gone day means pruned). */

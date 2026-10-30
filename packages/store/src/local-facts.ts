@@ -5,13 +5,15 @@
  * BS1) and, per unit, what its receipts say: the last outcome receipt (B3), the runs of its cursor step
  * (R5.3), an unknown launch (R5.1); per story its open notes (NT2/NT3) and ready approval (F35/C5).
  * observe (cli) extends these with git, runner, process and remote facts; the view (X1) reads them
- * as they are (`loadProjectView`), so `norn inbox` and the tick see one world.
+ * as they are (`loadProjectView`), so `norn inbox` and the tick see one world. Its one write is the
+ * tick's hook-file backfill (`backfillHooks`, D5).
  */
 import { existsSync, readdirSync } from "node:fs";
 import { type ActFailure, type FileError, type NumberedReceipt, openNotes, RE_ENTRY_KINDS, readyApproval, type StepRunFacts, type StoryFacts, storyWorktreePath } from "@norn/core";
 import { DEFAULT_CONFIG, type HookFact, type LeaseFile, parseDuration, parseReceiptFileName, type ReceiptOf, type RunInfo, type UnitState } from "@norn/schema";
 import { type BaseFactsCache, type PrFactsCache, readBaseFacts, readPrFacts } from "./base.ts";
 import { readActFailures } from "./heartbeat.ts";
+import { type BackfillRun, backfillHookFiles } from "./hook-backfill.ts";
 import { type LeaseListing, type LeaseLiveness, listLeases } from "./leases.ts";
 import { receiptsDir } from "./paths.ts";
 import { readReceipt } from "./receipts.ts";
@@ -39,6 +41,8 @@ export interface LocalFactsOptions {
   includeApplied?: boolean;
   /** an unlistable leases dir is reported in `leases.errors` (file `leases`) instead of thrown: the view's (X1) */
   reportLeaseErrors?: boolean;
+  /** B11, B12 (D5): first copy the live runs' hook lines from the day files into their hook files (the tick's, under its lock) */
+  backfillHooks?: boolean;
 }
 
 /** R5.3 + R5.1: the runs of a unit's cursor step/attempt, and every session id its `started` receipts recorded. */
@@ -105,14 +109,15 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
 
   const starts: string[] = [new Date(now - stalledMs).toISOString()];
   // units with a live run or an unknown launch (R5.1): their hook files are always read (D4)
-  const running = new Set<UnitSnapshot>();
+  const running = new Map<UnitSnapshot, string>();
   const read = snapshot.stories.map((s) => {
     const story = withSliceWorktrees(s, (slice) => opts.sliceWorktrees.get(slice), { includeApplied });
     for (const u of story.units) {
-      if (liveRun(u.state)) starts.push(u.state?.run?.started_at ?? (u.state as UnitState).updated_at);
-      const unknown = unknownLaunch(u.unapplied);
-      if (unknown) starts.push(unknown.receipt.at);
-      if (liveRun(u.state) || unknown) running.add(u);
+      const run = liveRun(u.state) ? (u.state?.run?.started_at ?? (u.state as UnitState).updated_at) : null;
+      const unknown = unknownLaunch(u.unapplied)?.receipt.at ?? null;
+      for (const at of [run, unknown]) if (at) starts.push(at);
+      const began = [run, unknown].filter((at): at is string => !!at).sort()[0];
+      if (began) running.set(u, began);
     }
     return story;
   });
@@ -123,6 +128,10 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
     const storyWt = opts.storyWorktrees.get(s.key) ?? (existsSync(conventional) && readUnitMarker(conventional).marker ? conventional : null);
     return { s, storyWt, units: s.units.map((u) => ({ u, worktree: u.unit.slice ? (opts.sliceWorktrees.get(u.unit.slice) ?? null) : storyWt })) };
   });
+  if (opts.backfillHooks) {
+    const runs: BackfillRun[] = [...running].map(([u, started_at]) => ({ unit: { key: u.unit.key, story: u.unit.story, slice: u.unit.slice }, started_at }));
+    backfillHookFiles(root, runs, new Date(now).toISOString());
+  }
   // B8 (D4): only the hook files of units with a live run or an unknown launch (R5.1), or written within the stalled window (R5.3)
   const hooked = placed.flatMap(({ units }) => units.map(({ u }) => u)).filter((u) => {
     if (running.has(u)) return true;

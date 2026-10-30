@@ -14,20 +14,23 @@
  *   - O7, D12: trace day pairs (day file and chunks file) dated before today minus the window
  *     (`--retain`, else `trace.retain`, default 14d, at least 14d: B23–B26); `trace/workflows/`
  *     is never pruned. Only tidy prunes the trace, never watch or a tick (B34).
+ *   - D12, B28–B30: the hook files of units with no live run untouched within the window, and the
+ *     briefings and transcripts of runs that are not live whose newest file is older than the window;
+ *     never a live run's, nor `backfill.json`, the caches or the locks.
  * Nothing with unique work is removed; such items are listed under `kept` with the reason.
  */
 import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { herdr } from "@norn/adapters";
 import { ulid } from "@norn/schema";
-import { acquireTickLock, copyToOrphaned, deleteTraceDays, orphanedDir, reclaimLeases, receiptsDir, safeUnlink, traceDaysBefore } from "@norn/store";
+import { acquireTickLock, copyToOrphaned, deleteTraceDays, deleteTracePaths, orphanedDir, reclaimLeases, receiptsDir, safeUnlink, traceDaysBefore } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { busyError, refuse, usageError } from "../output.ts";
 import { leaseLiveness } from "../runtime/leases.ts";
 import { type Observed, observe } from "../runtime/observe/index.ts";
 import { doneHerdrRuns, planHerdrTidy } from "../runtime/tidy-herdr.ts";
-import { checkRetain, MIN_TRACE_RETAIN, retainCutoffDay } from "../runtime/trace-retention.ts";
+import { checkRetain, MIN_TRACE_RETAIN, retainCutoffDay, unitTracesBefore } from "../runtime/trace-retention.ts";
 
 /** A reservation lives only while a receipt is being written; older ones are crash leftovers. */
 const RESERVE_STALE_MS = 60_000;
@@ -84,7 +87,7 @@ function retainWindow(ctx: Context, flag: string | undefined): { retain: string;
 
 export const tidyCommand = defineCommand({
   name: "tidy",
-  summary: "Report or clean orphan worktrees, branches, stale leases, receipt reservations (K5), runs/ work not in the record (R2.3), Herdr panes of runs that reported done (K7) and trace days older than trace.retain (D12)",
+  summary: "Report or clean orphan worktrees, branches, stale leases, receipt reservations (K5), runs/ work not in the record (R2.3), Herdr panes of runs that reported done (K7) and trace days, hook files, briefings and transcripts older than trace.retain (D12)",
   usage: "norn tidy [--dry-run] [--retain <duration>]",
   options: { "dry-run": { type: "boolean" }, retain: { type: "string" } },
   async run(ctx, args) {
@@ -200,8 +203,14 @@ export const tidyCommand = defineCommand({
 
       // ---- D12: trace day pairs older than the window (under the tick lock, so no tick appends to them)
       const days = traceDaysBefore(root, retainCutoffDay(ctx.clock.now(), window.ms));
-      if (!dry) deleteTraceDays(root, days);
-      const trace = { retain: window.retain, days, bytes: days.reduce((n, d) => n + d.bytes, 0) };
+      // B28–B30: hook files and run dirs past the window that no live run needs
+      const { hook_files, runs } = unitTracesBefore(root, obs.facts.stories.flatMap((s) => s.units), ctx.clock.now() - window.ms);
+      if (!dry) {
+        deleteTraceDays(root, days);
+        deleteTracePaths(root, [...hook_files.map((f) => f.file), ...runs.flatMap((r) => r.files)]);
+      }
+      const bytes = [...days, ...hook_files, ...runs].reduce((n, d) => n + d.bytes, 0);
+      const trace = { retain: window.retain, days, hook_files, runs, bytes };
 
       const verb = dry ? "would_remove" : "removed";
       return {

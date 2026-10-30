@@ -15,6 +15,7 @@ export * from "./inbox-history.ts";
 export * from "./leases.ts";
 export * from "./local.ts";
 export * from "./local-facts.ts";
+export * from "./hook-backfill.ts";
 export * from "./local-json.ts";
 export * from "./lock.ts";
 export * from "./machine.ts";

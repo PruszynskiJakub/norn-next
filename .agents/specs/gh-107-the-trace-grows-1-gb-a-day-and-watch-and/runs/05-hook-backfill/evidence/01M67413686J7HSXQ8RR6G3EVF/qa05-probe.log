@@ -1,0 +1,35 @@
+unit status before brief: "ready"
+backfill.json after first ticks: {
+  "since": "2099-01-15T10:00:10.000Z",
+  "done": []
+}
+
+backfill.json exists after inbox+status (expect false): false
+brief exit 0 run 03PGFN38A0VN3TRN9MAR2BFTG6
+run status running started_at 2099-01-15T10:00:40.000Z
+backfill.json (run started before this first tick -> AC3 case false): {
+  "since": "2099-01-15T10:00:50.000Z",
+  "done": []
+}
+
+day files: 2099-01-16.jsonl,2099-01-15.jsonl
+UPGRADE TICK opened day files: 2099-01-15.jsonl,2099-01-16.jsonl
+hook file lines: 400, unique 400, equals the 400 run lines in order: true
+backfill.json: {
+  "since": "2099-01-16T00:06:40.000Z",
+  "done": [
+    "gh-9"
+  ]
+}
+
+SECOND TICK opened day files: [], hook file unchanged: true
+after crash-sim + live hook: exit 0, lines 151
+RESUME TICK opened day files: 2099-01-15.jsonl,2099-01-16.jsonl; lines 401 unique 401; set == 400 + live hook: true
+backfill.json: {
+  "since": "2099-01-16T00:06:40.000Z",
+  "done": [
+    "gh-9"
+  ]
+}
+
+NEXT TICK opened day files: [] lines 401

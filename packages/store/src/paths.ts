@@ -36,6 +36,8 @@ export function hookFilePath(root: string, unit: { story: string; slice?: string
   if (unit.slice && !nn) throw new Error(`not a slice key: ${unit.slice}`);
   return join(traceDir(root), "hooks", unit.story, `${nn ?? STORY_UNIT_DIR}.jsonl`);
 }
+/** D5: the one-time backfill of the hook files from the day files (`trace/hooks/backfill.json`). */
+export const hookBackfillPath = (root: string) => join(traceDir(root), "hooks", "backfill.json");
 /** GR6: the base branch's `.agents/specs/` materialized per tree id (store/base.ts). */
 export const baseCacheDir = (root: string) => join(traceDir(root), "base");
 
