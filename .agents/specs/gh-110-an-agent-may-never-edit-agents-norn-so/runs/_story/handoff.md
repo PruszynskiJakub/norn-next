@@ -18,6 +18,14 @@
 
 ## Goal
 
+Narrow the norn skill's hard rule so an agent may edit `.agents/norn/workflows/` and `.agents/norn/config.yaml` in a step; only `runs/`, `.agents/norn/trace/` and the generated top of handoff.md stay off limits.
+
 ## Progress
 
+- Edited `packages/cli/assets/skills/norn/SKILL.md` (hard rules) and synced the copy `.agents/skills/norn/SKILL.md` (identical). Kept PRD ids out of the shipped skill: other repos have no PRD.
+- Added the same rule to AGENTS.md Process (hard rule bullet), citing S7, W1, W5.
+- Docs-only change: no new test; full suite + typecheck run to confirm green.
+
 ## Resume
+
+If the suite is green, report `norn done done`. Otherwise fix what failed (likely a skill-drift or glossary lint in test/repo.test.ts).
