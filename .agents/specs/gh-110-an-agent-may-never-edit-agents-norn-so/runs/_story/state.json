@@ -13,22 +13,30 @@
     "refine": 1
   },
   "step_entered_at": "2026-10-30T11:38:24.119Z",
-  "status": "parked",
-  "park": {
-    "kind": "attended",
-    "reason": "attended step refine: work with the agent in the worktree",
-    "since": "2026-10-30T11:38:24.119Z"
-  },
+  "status": "running",
+  "park": null,
   "counters": {
     "triage_loop": 0
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 4,
-  "run": null,
+  "applied_through": 5,
+  "run": {
+    "run_id": "01M669PZ54FCP18TSW5X3VDFY0",
+    "step": "refine",
+    "attempt": 1,
+    "started_at": "2026-10-30T11:39:23.208Z",
+    "how": "manual",
+    "agent": "claude",
+    "agent_session_id": "88a48834-69af-40d2-8e20-94b24d908bf0",
+    "process": {
+      "pid": 75012,
+      "pid_start": "Fri Oct 30 12:39:07 2026"
+    }
+  },
   "last_outcome": null,
   "created_at": "2026-10-30T11:27:30.485Z",
-  "updated_at": "2026-10-30T11:38:24.119Z",
-  "last_tick_id": "01M669N5ZFYK9SD62XGF5F15HA",
+  "updated_at": "2026-10-30T11:39:30.579Z",
+  "last_tick_id": "01M669Q6WG7XYW6H3HPJXVE4TS",
   "mode": "auto"
 }
