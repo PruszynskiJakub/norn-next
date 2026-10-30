@@ -1,0 +1,19 @@
+## B23 default (no trace.retain)
+{"files":{"user":{"path":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-8HJMqd/home/config.yaml","exists":false},"repo":{"path":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-8HJMqd/repo/.agents/norn/config.yaml","exists":true}},"entries":[{"key":"trace.retain","value":"14d","source":"built-in","group":"machine","meaning":"trace days norn tidy keeps (at least 14d)"}],"notes":[]}
+[exit 0]
+retain 14d days pruned 16 2026-09-30 2026-10-15 hook files [] runs ['01OLDRUN0000000000000000AA'] bytes 321768
+## remaining trace
+2026-10-16 2026-10-17 2026-10-18 2026-10-19 2026-10-20 2026-10-21 2026-10-22 2026-10-23 2026-10-24 2026-10-25 2026-10-26 2026-10-27 2026-10-28 2026-10-29 2026-10-30 
+briefings/01M66KT75AJZK8N7AYKYSF1Q4T/01M678DEHAAPD3T90EPZS2SHXJ.md
+briefings/01M66KT75AJZK8N7AYKYSF1Q4T/01M678DKN1C5RT0NVGAVXVA3Q3.md
+briefings/01M66KT75AJZK8N7AYKYSF1Q4T/01M678EEN8RB0VCN8Y4N3ACP37.md
+briefings/01M66KT75AJZK8N7AYKYSF1Q4T/01M678EHGNP2Q9BSQZ7A4SGKMN.md
+briefings/01M66KT75AJZK8N7AYKYSF1Q4T/01M678ET6F58B65V3X989FKPJ3.md
+briefings/01M66KT75AJZK8N7AYKYSF1Q4T/01M678ETZEE0K5CY6KG910TAD0.md
+briefings/01NEWRUN0000000000000000AA/b.md
+hooks/backfill.json
+hooks/gh-1/_story.jsonl
+transcripts/01M66KT75AJZK8N7AYKYSF1Q4T/t.jsonl
+workflows/old.yaml
+## B32 second tidy
+{'retain': '14d', 'days': [], 'hook_files': [], 'runs': [], 'bytes': 0}

@@ -1,0 +1,9 @@
+before:       78 lines /       78 ids; staged partial:       31 lines
+after tick:       78 lines,       78 unique ids
+{
+  "since": "2026-10-30T20:42:53.000Z",
+  "done": [
+    "gh-1"
+  ]
+}
+after 2nd tick:       78 lines

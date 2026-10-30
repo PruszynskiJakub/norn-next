@@ -1,0 +1,117 @@
+[H[2Jnorn status · repo  nothing needs you                                                                 no tick yet  21:36
+/ to filter
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+STORIES                                          │ gh-1 — Long step
+▸ gh-1  Long step  running implement · no slice… │ ◐ running at implement · auto→manual · unclaimed
+                                                 │ 
+                                                 │ LINKS
+                                                 │ PR      none seen yet
+                                                 │ issue   https://example.com/1
+                                                 │ 
+                                                 │ ALSO WAITS FOR YOU
+                                                 │ ○ gh-1               norn story checkout gh-1
+                                                 │ 
+                                                 │ NOTES none open
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+enter orient · v trace · t take · i issue · / filter · ? keys · q quit
+[H[2Jnorn status · repo  nothing needs you                                                                 no tick yet  21:36
+/ to filter
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+STORIES                                          │ gh-1 — Long step
+▸ gh-1  Long step  running implement · no slice… │ ◐ running at implement · auto→manual · unclaimed
+                                                 │ 
+                                                 │ LINKS
+                                                 │ PR      none seen yet
+                                                 │ issue   https://example.com/1
+                                                 │ 
+                                                 │ ALSO WAITS FOR YOU
+                                                 │ ○ gh-1               norn story checkout gh-1
+                                                 │ 
+                                                 │ NOTES none open
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+enter orient · v trace · t take · i issue · / filter · ? keys · q quit
+[H[2Jnorn status · repo  nothing needs you                                                                 no tick yet  21:36
+/ to filter
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+STORIES                                          │ gh-1 — Long step
+▸ gh-1  Long step  running implement · no slice… │ ◐ running at implement · auto→manual · unclaimed
+                                                 │ 
+                                                 │ LINKS
+                                                 │ PR      none seen yet
+                                                 │ issue   https://example.com/1
+                                                 │ 
+                                                 │ ALSO WAITS FOR YOU
+                                                 │ ○ gh-1               norn story checkout gh-1
+                                                 │ 
+                                                 │ NOTES none open
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+enter orient · v trace · t take · i issue · / filter · ? keys · q quit
+[H[2Jnorn status · repo  nothing needs you                                                                 no tick yet  21:36
+/ to filter
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+STORIES                                          │ gh-1 — Long step
+▸ gh-1  Long step  running implement · no slice… │ ◐ running at implement · auto→manual · unclaimed
+                                                 │ 
+                                                 │ LINKS
+                                                 │ PR      none seen yet
+                                                 │ issue   https://example.com/1
+                                                 │ 
+                                                 │ ALSO WAITS FOR YOU
+                                                 │ ○ gh-1               norn story checkout gh-1
+                                                 │ 
+                                                 │ NOTES none open
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+                                                 │ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+enter orient · v trace · t take · i issue · / filter · ? keys · q quit
+{"frames":4,"last":null}

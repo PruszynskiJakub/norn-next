@@ -1,0 +1,38 @@
+bun test v1.3.13 (bf2e2cec)
+
+packages/cli/test/trace-free-views.test.ts:
+81 |       await opened(async () => {
+82 |         const r = await runCli(["status", "--watch", "--interval", "20ms"], { ...h.deps, herdr: null, input: quitAfter(150), log: () => frames++ });
+83 |         expect(r.exit).toBe(0);
+84 |       }),
+85 |     ).toEqual([]);
+86 |     expect(frames).toBeGreaterThan(2); // it refreshed
+                        ^
+error: expect(received).toBeGreaterThan(expected)
+
+Expected: > 2
+Received: 2
+
+      at <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-107-the-trace-grows-1-gb-a-day-and-watch-and/packages/cli/test/trace-free-views.test.ts:86:20)
+(fail) views that read no trace (B1, B2) > norn status --watch --json and a refreshing cockpit open no day file (B1) [595.08ms]
+killed 1 dangling process
+
+packages/cli/test/check-run.test.ts:
+(fail) two long checks (K1, K3) > (unnamed) [5005.51ms]
+  ^ a beforeEach/afterEach hook timed out for this test.
+123 | 
+124 | describe("two long checks (K1, K3)", () => {
+125 |   let h: Harness;
+126 |   let runsDirs: string[];
+127 |   beforeAll(async () => ({ h, runsDirs } = await atChecks("sleep 3", "1m", ["Slow check", "Other check"])));
+128 |   afterAll(() => h.cleanup());
+                       ^
+TypeError: undefined is not an object (evaluating 'h.cleanup')
+      at <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-107-the-trace-grows-1-gb-a-day-and-watch-and/packages/cli/test/check-run.test.ts:128:18)
+(fail) two long checks (K1, K3) > (unnamed) [5.45ms]
+
+ 1467 pass
+ 3 fail
+ 16 snapshots, 25177 expect() calls
+Ran 1470 tests across 93 files. [759.03s]
+exit 1

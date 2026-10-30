@@ -1,0 +1,7 @@
+gh-1 · Long step · running at implement
+intake 2026-10-27 20:35:54Z · not done · wall-clock 3d00h so far
+time in steps: agent 6h05m · human wait 0s
+(16 no-op/claim-renew tick events hidden — --all shows them)
+
+UNIT  STEP         ENTERED         LEFT  DUR     OUTCOME    WHO
+gh-1  implement#1  10-30 14:35:54  …     6h05m+  (in step)  claude run 01M66KT75AJZK8N7AYKYSF1Q4T

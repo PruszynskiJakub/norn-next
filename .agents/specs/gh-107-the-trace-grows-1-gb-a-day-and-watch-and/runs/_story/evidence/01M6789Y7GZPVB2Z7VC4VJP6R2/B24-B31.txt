@@ -1,0 +1,58 @@
+## B31 dry-run (default 14d)
+{"dry_run":true,"would_remove":{"worktrees":[],"stale_worktree_records":[],"branches":[],"leases":[],"reserve_files":[]},"would_orphan":[],"trace":{"retain":"14d","days":[{"day":"2026-09-20","files":["2026-09-20.chunks.jsonl","2026-09-20.jsonl"],"bytes":20110},{"day":"2026-09-21","files":["2026-09-21.chunks.jsonl","2026-09-21.jsonl"],"bytes":20110},{"day":"2026-09-22","files":["2026-09-22.chunks.jsonl","2026-09-22.jsonl"],"bytes":20110},{"day":"2026-09-23","files":["2026-09-23.chunks.jsonl","2026-09-23.jsonl"],"bytes":20110},{"day":"2026-09-24","files":["2026-09-24.chunks.jsonl","2026-09-24.jsonl"],"bytes":20110},{"day":"2026-09-25","files":["2026-09-25.chunks.jsonl","2026-09-25.jsonl"],"bytes":20110},{"day":"2026-09-26","files":["2026-09-26.chunks.jsonl","2026-09-26.jsonl"],"bytes":20110},{"day":"2026-09-27","files":["2026-09-27.chunks.jsonl","2026-09-27.jsonl"],"bytes":20110},{"day":"2026-09-28","files":["2026-09-28.chunks.jsonl","2026-09-28.jsonl"],"bytes":20110},{"day":"2026-09-29","files":["2026-09-29.chunks.jsonl","2026-09-29.jsonl"],"bytes":20110},{"day":"2026-09-30","files":["2026-09-30.chunks.jsonl","2026-09-30.jsonl"],"bytes":20110},{"day":"2026-10-01","files":["2026-10-01.chunks.jsonl","2026-10-01.jsonl"],"bytes":20110},{"day":"2026-10-02","files":["2026-10-02.chunks.jsonl","2026-10-02.jsonl"],"bytes":20110},{"day":"2026-10-03","files":["2026-10-03.chunks.jsonl","2026-10-03.jsonl"],"bytes":20110},{"day":"2026-10-04","files":["2026-10-04.chunks.jsonl","2026-10-04.jsonl"],"bytes":20110},{"day":"2026-10-05","files":["2026-10-05.chunks.jsonl","2026-10-05.jsonl"],"bytes":20110},{"day":"2026-10-06","files":["2026-10-06.chunks.jsonl","2026-10-06.jsonl"],"bytes":20110},{"day":"2026-10-07","files":["2026-10-07.chunks.jsonl","2026-10-07.jsonl"],"bytes":20110},{"day":"2026-10-08","files":["2026-10-08.chunks.jsonl","2026-10-08.jsonl"],"bytes":20110},{"day":"2026-10-09","files":["2026-10-09.chunks.jsonl","2026-10-09.jsonl"],"bytes":20110},{"day":"2026-10-10","files":["2026-10-10.chunks.jsonl","2026-10-10.jsonl"],"bytes":20110},{"day":"2026-10-11","files":["2026-10-11.chunks.jsonl","2026-10-11.jsonl"],"bytes":20110},{"day":"2026-10-12","files":["2026-10-12.chunks.jsonl","2026-10-12.jsonl"],"bytes":20110},{"day":"2026-10-13","files":["2026-10-13.chunks.jsonl","2026-10-13.jsonl"],"bytes":20110},{"day":"2026-10-14","files":["2026-10-14.chunks.jsonl","2026-10-14.jsonl"],"bytes":20110},{"day":"2026-10-15","files":["2026-10-15.chunks.jsonl","2026-10-15.jsonl"],"bytes":20110}],"hook_files":[{"unit":"gh-3","file":"hooks/gh-3/_story.jsonl","bytes":3}],"runs":[{"run_id":"01OLDRUN0000000000000000AA","files":["briefings/01OLDRUN0000000000000000AA","transcripts/01OLDRUN0000000000000000AA"],"bytes":8}],"bytes":522871},"kept":[]}
+trace unchanged
+{
+ "retain": "14d",
+ "days": [
+  {
+   "day": "2026-09-20",
+   "files": [
+    "2026-09-20.chunks.jsonl",
+    "2026-09-20.jsonl"
+   ],
+   "bytes": 20110
+  },
+  {
+   "day": "2026-09-21",
+   "files": [
+    "2026-09-21.chunks.jsonl",
+    "2026-09-21.jsonl"
+   ],
+   "bytes": 20110
+  },
+  {
+   "day": "2026-09-22",
+   "files": [
+    "2026-09-22.chunks.jsonl",
+    "2026-09-22.jsonl"
+   ],
+   "bytes": 20110
+  },
+  "... 26 total"
+ ],
+ "hook_files": [
+  {
+   "unit": "gh-3",
+   "file": "hooks/gh-3/_story.jsonl",
+   "bytes": 3
+  }
+ ],
+ "runs": [
+  {
+   "run_id": "01OLDRUN0000000000000000AA",
+   "files": [
+    "briefings/01OLDRUN0000000000000000AA",
+    "transcripts/01OLDRUN0000000000000000AA"
+   ],
+   "bytes": 8
+  }
+ ],
+ "bytes": 522871
+}
+trace unchanged
+## B24 config 14d, --retain 30d
+[exit 0]
+days pruned ['2026-09-20', '2026-09-21', '2026-09-22'] 10 hook files ['hooks/gh-3/_story.jsonl'] runs []
+60
+2026-09-30.chunks.jsonl
+2026-09-30.jsonl

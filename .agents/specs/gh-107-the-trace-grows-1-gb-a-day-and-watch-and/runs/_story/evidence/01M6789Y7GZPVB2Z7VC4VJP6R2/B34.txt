@@ -1,0 +1,7 @@
+{"tick_id":"01M678PYMR66YQT1BWHD3S4V4W","at":"2026-10-30T20:41:07.992Z","duration_ms":383,"decisions":[],"failed":0}
+{"tick_id":"01M678PZM2917MBAQM1E3NSHY3","at":"2026-10-30T20:41:08.994Z","duration_ms":164,"decisions":[],"failed":0}
+{"tick_id":"01M678Q0KH6FKTR6DM2V7D655T","at":"2026-10-30T20:41:10.001Z","duration_ms":155,"decisions":[],"failed":0}
+{"ticks":3,"failed_actions":0,"skipped_busy":0,"interval":"1s","released":[]}
+/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-8HJMqd/repo/.agents/norn/trace/2026-09-20.chunks.jsonl
+/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-8HJMqd/repo/.agents/norn/trace/2026-09-20.jsonl
+/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-8HJMqd/repo/.agents/norn/trace/hooks/gh-3/_story.jsonl

@@ -36,15 +36,16 @@
 
 ## Goal
 
-Merge origin/main (c3aa7312) into the story branch, resolving the 12 conflicts by intent; never rebase.
+QA the story against B1–B35 through the real CLI (throwaway repos, dev build), with evidence and a criteria report.
 
 ## Progress
 
-- Main regrouped the CLI (#106: `why` → `run view --why`, `trace` → `run list`, `inbox` → `status`, old `status` → `story list`, `cockpit` → `status --watch`, `config <key>` → `config get`) and added `local-notices`.
-- Resolved: run-view.ts takes main's file with the branch's tickReader/readTickInputs replay, `trace_corrupt` and `tick_pruned` (B20/B21) re-applied; replayInputs stays removed (tick.ts keeps the branch's chunked trace). PRD O4/O5/O7 keep the branch's text with the new command names. Schemas keep both `local-hook-backfill` and `local-notices`. story-list.ts drops the view's removed `timeline` field (slice 03). Tests: union of imports; new branch tests use `run view --why`, `config get trace`, `runChecked`; trace-free-views uses `story list`/`status`/`story view`/`status --watch`.
-- Follow-up after the first suite run: the branch's new tests in agent-protocol, why-version, chunked-ticks use `run list`, `run view --why`, `status --history`. Merge committed as afbf58e5; typecheck green, full `bun test` 1469 pass / 0 fail.
-- resolve#1 done: Merged origin/main c3aa7312 into gh-107 (afbf58e5): 12 conflicts resolved by intent. Main's CLI regroup (#106) is kept, and the branch's chunked-trace replay (tickReader, trace_corrupt, tick_pruned) is applied to run view --why. story list drops the removed view timeline. Both the local-hook-backfill and local-notices schemas are kept. The PRD and the branch's tests use the new command names. Typecheck green; full bun test 1469 pass / 0 fail.
+- Full `bun test`: 1467 pass / 3 fail. trace-free-views B1 is flaky (2 of 10 runs alone, frames 2 not > 2). check-run "two long checks" timed out under QA's concurrent load, passed 3 of 3 alone, and is not in this diff. Typecheck green.
+- B2–B35 pass, observed through the CLI: chmod-000/200 day files plus store's trace-read observer for "reads no day file"; a 2.15 GB bench for footprint and timing; backfill, chunks, replay, corrupt/pruned refusals; tidy/doctor/retain; the 0.12.1 release as the older norn (B35).
+- B1 fail: the behaviour holds (peak 0.91x of an empty trace), but its test is flaky (F1) and scripts/trace-bench.ts still runs the removed `norn cockpit` (F2).
+- Evidence was written outside the repo ($TMPDIR/qa107/ev: criteria.json, findings.json, report.md).
+- qa#1 fail: QA of B1–B35 through the dev CLI in throwaway repos: B2–B35 pass. B1 fails on its delivery, not its behaviour: no day file is opened and the 2 GB footprint is 0.91x of an empty trace, but the B1 test (trace-free-views.test.ts:86) is flaky (2 of 10 runs; it also failed the full suite), and scripts/trace-bench.ts still spawns the removed `norn cockpit` (F2).
 
 ## Resume
 
-Merge done and committed; nothing left in this step.
+QA reported `fail` with findings F1 (stabilise trace-free-views.test.ts:86) and F2 (trace-bench.ts → `status --watch`).

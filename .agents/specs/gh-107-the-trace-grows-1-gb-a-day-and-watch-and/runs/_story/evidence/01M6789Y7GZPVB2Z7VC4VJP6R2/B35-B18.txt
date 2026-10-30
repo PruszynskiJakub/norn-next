@@ -1,0 +1,14 @@
+## old norn (0.12.1 release) after chunked ticks
+{"error":"replay of tick 01M678HFMCK0W655C8FP8ZHADT failed: undefined is not an object (evaluating 'X.filter')","do_instead":"norn run list gh-1","code":"replay_failed"}
+ [exit ?]
+{"items":[{"id":"unclaimed:gh-1","group":"unclaimed","story":"gh-1","slice":null,"step":null,"title":"Unclaimed — Long step","command":"norn story checkout gh-1","url":"https://example.com/1","appeared_at":"2026-10-27T20:35:54.922Z","resolved_at":null,"resolved_by":null}],"open":1}
+
+{"at":"2026-10-30T20:39:29.856Z","groups":{"your_turn":[],"answer":[],"approve":[],"unblock":[],"check":[],"unclaimed":[{"id":"unclaimed:gh-1","group":"unclaimed","story":"gh-1","slice":null,"step":null,"title":"Unclaimed — Long step","command":"norn story checkout gh-1","since":"2026-10-27T20:35:
+old run list exit 0
+{"tick_id":"01M678M1K6DMRNDF00R2CW28M4","at":"2026-10-30T20:39:32.710Z","duration_ms":181,"decisions":[],"failed":0}
+{"ticks":2,"failed_actions":0,"skipped_busy":0,"interval":"2s","released":[]}
+old tick 01M678M1K6DMRNDF00R2CW28M4 chunked? 0
+## new norn after the old norn's ticks
+"replay":{"matches":true,"all_match":true,"rule":"claim.unclaimed"}
+"replay":{"matches":true,"all_match":true,"rule":"claim.unclaimed"}
+new status --history exit 0

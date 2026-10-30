@@ -1,0 +1,1 @@
+{"type":"hook","id":"01M678TQGA77GWNHWM8K34D0QF","fact":{"event":"session_start","at":"2026-10-30T20:43:11.653Z","agent":"claude","native":"SessionStart","cwd":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-8HJMqd/repo-worktrees/gh-1-long-step","agent_session_id":"qa-b7","message":"startup","story":"gh-1"}}

@@ -1,0 +1,24 @@
+{
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "blocking",
+      "criterion": "B1",
+      "title": "The B1 test is flaky: the refreshing status --watch sometimes draws only 2 frames in 150 ms",
+      "file": "packages/cli/test/trace-free-views.test.ts",
+      "line": 86,
+      "repro": "for i in $(seq 10); do bun test packages/cli/test/trace-free-views.test.ts; done → 2 of 10 fail: expect(frames).toBeGreaterThan(2), Received: 2 (runCli status --watch --interval 20ms, input quitAfter(150)). It also failed in the full bun test. Expected: green on every run, since CI's test:fast runs it.",
+      "detail": "The behaviour holds (no day file opened, footprint 0.91x of an empty trace); only the frame-count assertion is timing-bound. Make it independent of wall time, e.g. quit after N frames instead of after 150 ms. Evidence: suite.txt, suite-rerun.txt."
+    },
+    {
+      "id": "F2",
+      "severity": "blocking",
+      "criterion": "B1",
+      "title": "scripts/trace-bench.ts runs the removed `norn cockpit`, so it measures an unknown_command error",
+      "file": "scripts/trace-bench.ts",
+      "line": 168,
+      "repro": "In a throwaway repo, `bun packages/cli/src/main.ts cockpit --interval 5s` → exit 2 {\"code\":\"unknown_command\"}. trace-bench.ts:168 spawns exactly that and samples the RSS of a process that has already exited, so the B1 footprint numbers it prints are meaningless. Since #106 (merged in afbf58e5), the cockpit is `norn status --watch`.",
+      "detail": "QA measured B1 with a copy that runs `status --watch --interval` instead (and also times `status --segment`): B1-B2-B10-bench.json. The header comment (line 2, `norn cockpit`, `norn status`) needs the new names too."
+    }
+  ]
+}

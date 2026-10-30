@@ -1,0 +1,2 @@
+tick2: day +1518 B, chunks +0 B, total 1518 B; hook lines       72 ->       72
+tick3: day +1518 B, chunks +0 B, total 1518 B; hook lines       72 ->       72

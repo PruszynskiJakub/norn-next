@@ -1,0 +1,4 @@
+recovery main 30 branch 30 only main 30 only branch 30 same decisions+facts 0 differ 0
+base-sync main 113 branch 113 only main 113 only branch 113 same decisions+facts 0 differ 0
+{"source":"recovery","main":30,"branch":30,"names_match_after_adding_trace_retain":30,"decisions_equal":30}
+{"source":"base-sync","main":113,"branch":113,"names_match_after_adding_trace_retain":72,"decisions_equal":58}

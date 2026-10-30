@@ -1,0 +1,18 @@
+{
+ "status": {
+  "full_ms": 626,
+  "empty_ms": 469,
+  "ratio": 1.33
+ },
+ "segment": {
+  "full_ms": 518,
+  "empty_ms": 478,
+  "ratio": 1.08
+ },
+ "brief": {
+  "full_ms": 409,
+  "empty_ms": 359,
+  "ratio": 1.14
+ }
+}
+day files present: 14

@@ -1,0 +1,25 @@
+## B33 doctor
+Hints
+  · trace keeps 26 days (522.9 KB) beyond trace.retain 14d — run `norn tidy` (`norn tidy --dry-run` lists them)
+## B25 --retain 7d
+{"error":"the trace window must be at least 14d (--retain 7d)","do_instead":"norn tidy --retain 14d","code":"retain_too_short"}
+[exit 3]
+trace unchanged
+## B26 --retain soon
+{"error":"--retain soon is not a duration: expected a form like 14d","do_instead":"norn tidy --retain 14d","code":"retain_invalid"}
+[exit 2]
+trace unchanged
+## B25 config trace.retain 7d
+Set `trace.retain` to `7d` in the repo file (`.agents/norn/config.yaml`).
+[set exit 0]
+{"error":"the trace window must be at least 14d (trace.retain 7d)","do_instead":"set trace.retain to 14d or more (norn config get trace shows the layer that sets it)","code":"retain_too_short"}
+[exit 3]
+trace unchanged
+"claude":["norn","norn-clarify","norn-codebase-design","norn-diagnose","norn-implement","norn-interview","norn-merge","norn-plan","norn-pr","norn-prototype","norn-qa","norn-qa-person","norn-refine","norn-retro","norn-review","norn-slice","norn-tdd"]},"do_instead":"norn init"},"warnings":["NORN_MACHINE=bench overrides this machine's name (a test aid): runs are judged by pid only on the machine they were started on (R7.2), so two hosts must never share a name — unset it outside tests","trace.retain 7d is under 14d, the trace window's minimum: norn tidy refuses to prune until it is at least 14d"],"hints":["trace keeps 26 days (522.9 KB) beyond trace.retain 14d — run `norn tidy` (`norn tidy --dry-run` lists them)"]
+## B26 config trace.retain soon
+Set `trace.retain` to `soon` in the repo file (`.agents/norn/config.yaml`).
+[set exit 0]
+{"error":"trace.retain soon is not a duration: expected a form like 14d","do_instead":"set trace.retain to 14d or more (norn config get trace shows the layer that sets it)","code":"retain_invalid"}
+[exit 3]
+trace unchanged
+unset 0

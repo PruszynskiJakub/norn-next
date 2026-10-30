@@ -1,0 +1,3 @@
+ 7 pass  0 fail 
+ 7 pass  0 fail 
+(fail) views that read no trace (B1, B2) > norn status --watch --json and a refreshing cockpit open no day file (B1) [679.55ms]  6 pass  1 fail 

@@ -1,0 +1,9 @@
+**Refused (tick_pruned):** tick 01M308QNC2ZTJ6ZTNAY14RQDZV is older than the trace retained (14d)
+
+Do instead: norn run list gh-1
+[exit 3]
+{"error":"tick 01M308QNC2ZTJ6ZTNAY14RQDZV is older than the trace retained (14d)","do_instead":"norn run list gh-1","code":"tick_pruned"}
+[exit 3]
+-- a missing tick within the window:
+{"error":"no tick 01M5ZHE8H12GMNC0Q6NVZVV12F in the trace","do_instead":"norn run list gh-1","code":"no_tick"}
+[exit 3]
