@@ -14,6 +14,17 @@
 
 ## Goal
 
+Cockpit, status, status --segment, inbox and orient read no trace day file (B1, B2); timelines become a separate `@norn/view` read with the same entries (B3, D1); a benchmark script for QA (AC4).
+
 ## Progress
 
+- `loadProjectView` no longer reads the trace; `ProjectView.timeline` and the `traceSince` option are gone; trace parse errors left the view's errors (D1).
+- New `loadTimelines` (`packages/view/src/timeline-read.ts`): receipts + trace events of the 14-day window per unit, read with `TIMELINE_TYPES` (B4 skip), same entries as the old view timeline. `norn trace` still uses `loadTraceView`, unchanged.
+- `status` no longer strips/blanks `timeline`. PRD X1 amended.
+- Tests: `packages/view/test/view.test.ts` (timeline assertions moved to `loadTimelines`, window + broken line not a view error); `packages/cli/test/trace-free-views.test.ts` (AC1 cockpit --json + refreshing cockpit; AC2 status/segment/inbox/status <story> open no day file and print the same with the day files moved away). Both red on the old view code.
+- Caveat: the local-facts hook read (`readHookFacts` in `loadLocalFacts`) still scans day files from min(now − limits.stalled, live run start); the AC1/AC2 test stages days older than that window. Per-unit hook files are slice 04 (B8).
+- `scripts/trace-bench.ts`: synthetic trace (default 14 days, ~2 GB, live run with 420 hooks) + status/brief timing and cockpit RSS over full vs empty trace.
+
 ## Resume
+
+Report done once the full suite and typecheck are green.
