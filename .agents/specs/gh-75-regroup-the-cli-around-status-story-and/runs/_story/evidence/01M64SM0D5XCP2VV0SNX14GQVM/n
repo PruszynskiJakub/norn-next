@@ -1,0 +1,4 @@
+#!/bin/zsh
+export NORN_HOME_DIR=/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75/r/home
+unset NORN_HOME NORN_STORY NORN_SLICE NORN_RUN NORN_BIN NORN_ORIENT
+exec bun /Users/jakubpruszynski/Projects/norn-worktrees/gh-75-regroup-the-cli-around-status-story-and/packages/cli/src/main.ts "$@"

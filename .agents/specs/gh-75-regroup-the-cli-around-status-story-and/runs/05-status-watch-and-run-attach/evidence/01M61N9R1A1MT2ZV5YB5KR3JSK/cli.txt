@@ -1,0 +1,64 @@
+=== norn cockpit
+{"error":"Unknown command: cockpit","do_instead":"norn help — commands: init, uninstall, sync, tick, watch, brief, done, ask, stuck, hook, status, open, orient, answer, approve, unstick, update, mode, workflow, take, release, drop, tidy, doctor, config, help, story, run","code":"unknown_command"}
+exit=
+=== norn cockpit --json
+{"error":"Unknown command: cockpit","do_instead":"norn help — commands: init, uninstall, sync, tick, watch, brief, done, ask, stuck, hook, status, open, orient, answer, approve, unstick, update, mode, workflow, take, release, drop, tidy, doctor, config, help, story, run","code":"unknown_command"}
+exit=
+=== norn cockpit --next
+{"error":"Unknown command: cockpit","do_instead":"norn help — commands: init, uninstall, sync, tick, watch, brief, done, ask, stuck, hook, status, open, orient, answer, approve, unstick, update, mode, workflow, take, release, drop, tidy, doctor, config, help, story, run","code":"unknown_command"}
+exit=
+=== norn run
+norn run — The runs of a unit: its step timeline, one run, why a tick decided what it did, its agent pane
+
+  norn run list    Step timeline of a unit: durations, outcomes, who, reasons; a story with its slices
+  norn run view    One run of a unit: step, attempt, outcome, durations, receipts; --why replays the decision
+  norn run attach  Focus the Herdr agent pane of a unit's live run; --next: the oldest one waiting for you
+
+`norn help run <verb>` shows one verb's usage and options.
+exit=
+=== norn help status
+norn status — What needs you, grouped by action, with the command to resolve each item; --history for when items came and went
+
+    norn status [--json] [--details] [--notes] [--history [--since <iso|duration>]] | norn status --watch [--interval 5s] [--pane]
+
+Options
+  --details                           each item's full text
+  --notes                             list the open notes, not one summary line
+  --history [--since <iso|duration>]  every item that needed you, with when it came and went
+  --watch                             the live cockpit full screen: act on items by key, q or Esc quits
+  --interval <duration>               with --watch: how often it refreshes (default 5s)
+  --pane                              with --watch: run it in a Herdr pane split below this one
+
+For the person; an agent runs it only when the person asks it to.
+exit=
+=== norn status --json
+{"at":"2026-10-28T16:33:43.160Z","groups":{"your_turn":[],"answer":[],"approve":[],"unblock":[],"check":[],"unclaimed":[],"running":[],"notes":[],"recently_done":[]},"pending":0}
+exit=
+=== norn status --watch --json
+{"at":"2026-10-28T16:33:43.527Z","header":{"repo":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh75-05-repo","pending":0,"heartbeat":{"holder":"jakubpruszynski@mac","last_tick_at":null,"age":null,"down":false}},"rows":[]}
+exit=
+=== norn status --pane
+**Usage error (usage):** --pane needs --watch
+
+Do instead: norn status --watch
+exit=
+=== norn status --interval 5s
+**Usage error (usage):** --interval needs --watch
+
+Do instead: norn status --watch
+exit=
+=== norn status --watch --pane
+{"opened":true,"runner":"herdr","pane_id":"wK:p1V"}
+exit=
+=== norn run attach
+{"error":"No unit has a live agent pane","do_instead":"norn status","code":"no_target"}
+exit=
+=== norn run attach --next
+{"error":"No agent waits for you","do_instead":"norn status","code":"nothing_to_attach"}
+exit=
+=== norn run attach gh-1
+{"error":"gh-1 has no live agent pane","do_instead":"norn status","code":"nothing_to_attach"}
+exit=
+=== norn run attach --next --json
+{"error":"No agent waits for you","do_instead":"norn status","code":"nothing_to_attach"}
+exit=

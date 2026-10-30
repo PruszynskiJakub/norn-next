@@ -1,7 +1,7 @@
 /**
  * Facts: everything `observe` collects in one tick (H2). Decide is a pure function
  * of `Facts` + config (H3), so a Facts value must be JSON-serializable: it is stored
- * in the tick trace and replayed by `norn why` (O5). No functions, Dates or Maps.
+ * in the tick trace and replayed by `norn run view --why` (O5). No functions, Dates or Maps.
  *
  * Absence conventions:
  * - `null`       = observed, and nothing is there

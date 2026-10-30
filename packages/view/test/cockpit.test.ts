@@ -19,6 +19,7 @@ function story(key: string, over: Partial<StoryView> = {}): StoryView {
     claim: { state: "mine", holder: "me@box", expires_at: AT, unclaimed: false },
     status: "parked",
     step: "refine",
+    step_type: "agent",
     attempt: 1,
     counters: [],
     park: null,
@@ -48,7 +49,7 @@ const entry = (group: InboxGroup, story: string, over: Partial<InboxEntry> = {})
   slice: null,
   step: "refine",
   title: `${group} title`,
-  command: "norn trace x",
+  command: "norn run list x",
   since: "2026-10-27T11:30:00.000Z",
   age: "30m",
   ...over,
@@ -57,12 +58,12 @@ const entry = (group: InboxGroup, story: string, over: Partial<InboxEntry> = {})
 function view(): ProjectView {
   const reach = { worktree: "/repo-worktrees/gh-2-x", agent_session_id: "s2", pane_id: null };
   const groups = {
-    your_turn: [entry("your_turn", "gh-1", { command: "norn open gh-1" }), entry("your_turn", "gh-2", { id: "attended:gh-2", command: "cd /wt", reach })],
-    answer: [entry("answer", "gh-3", { slice: "gh-3/02", command: 'norn answer gh-3/02 "…"' })],
-    approve: [entry("approve", "gh-4", { step: "ready", command: "norn approve gh-4" })],
-    unblock: [entry("unblock", "gh-5", { command: "norn unstick gh-5" })],
-    check: [entry("check", "gh-4", { command: "norn why gh-4" })],
-    unclaimed: [entry("unclaimed", "gh-6", { command: "norn take gh-6" })],
+    your_turn: [entry("your_turn", "gh-1", { command: "norn story start gh-1" }), entry("your_turn", "gh-2", { id: "attended:gh-2", command: "cd /wt", reach })],
+    answer: [entry("answer", "gh-3", { slice: "gh-3/02", command: 'norn story answer gh-3/02 "…"' })],
+    approve: [entry("approve", "gh-4", { step: "ready", command: "norn story approve gh-4" })],
+    unblock: [entry("unblock", "gh-5", { command: "norn run rerun gh-5" })],
+    check: [entry("check", "gh-4", { command: "norn run view gh-4 --why" })],
+    unclaimed: [entry("unclaimed", "gh-6", { command: "norn story checkout gh-6" })],
     running: [entry("running", "gh-2")],
     notes: [entry("notes", "gh-4")],
     recently_done: [],
@@ -116,18 +117,22 @@ describe("cockpitModel", () => {
 
   test("effects: verbs with {input}, links, places only when the front end has them", () => {
     const { rows } = cockpitModel(view(), { places: true, provider: "gh" });
+    // B28: the start action runs `norn story start <unit>`
+    expect(row(rows, "your_turn:gh-1")?.actions.find((a) => a.id === "start")?.effect).toEqual({ kind: "verb", argv: ["story", "start", "gh-1"] });
     const answer = row(rows, "answer:gh-3")?.actions.find((a) => a.id === "answer");
-    expect(answer).toEqual({ id: "answer", label: "answer", key: "a", input: { prompt: "Your answer", required: true }, effect: { kind: "verb", argv: ["answer", "gh-3/02", "{input}"] } });
+    expect(answer).toEqual({ id: "answer", label: "answer", key: "a", input: { prompt: "Your answer", required: true }, effect: { kind: "verb", argv: ["story", "answer", "gh-3/02", "{input}"] } });
     if (answer?.effect.kind !== "verb") throw new Error("unreachable");
-    expect(withInput(answer.effect.argv, "CSV only")).toEqual(["answer", "gh-3/02", "CSV only"]);
-    expect(row(rows, "approve:gh-4")?.actions.find((a) => a.id === "reject")?.effect).toEqual({ kind: "verb", argv: ["approve", "gh-4", "--reject", "--reason", "{input}"] });
+    expect(withInput(answer.effect.argv, "CSV only")).toEqual(["story", "answer", "gh-3/02", "CSV only"]);
+    expect(row(rows, "approve:gh-4")?.actions.find((a) => a.id === "reject")?.effect).toEqual({ kind: "verb", argv: ["story", "reject", "gh-4", "--reason", "{input}"] });
+    // B48: unstick is gone; a stuck unit is rerun
+    expect(row(rows, "unblock:gh-5")?.actions.find((a) => a.id === "unstick")?.effect).toEqual({ kind: "verb", argv: ["run", "rerun", "gh-5"] });
     expect(row(rows, "story:gh-4")?.actions.find((a) => a.id === "pr")?.effect).toEqual({ kind: "link", url: "https://github.com/o/r/pull/7" });
     expect(row(rows, "attended:gh-2")?.actions[1]?.effect).toEqual({ kind: "place", place: "agent", story: "gh-2", reach: { worktree: "/repo-worktrees/gh-2-x", agent_session_id: "s2", pane_id: null } });
     expect(row(rows, "story:gh-1")?.actions[0]?.effect).toEqual({ kind: "place", place: "orient", story: "gh-1" });
 
     const web = cockpitModel(view(), { places: false, provider: "gh" });
     expect(web.rows.flatMap((r) => r.actions).some((a) => a.effect.kind === "place")).toBe(false);
-    expect(row(web.rows, "story:gh-1")?.actions[0]?.effect).toEqual({ kind: "verb", argv: ["orient", "gh-1"], show: true });
+    expect(row(web.rows, "story:gh-1")?.actions[0]?.effect).toEqual({ kind: "verb", argv: ["story", "view", "gh-1"], show: true });
     expect(ids(row(web.rows, "attended:gh-2"))).toEqual(["orient", "trace", "issue"]);
   });
 
@@ -136,7 +141,7 @@ describe("cockpitModel", () => {
     const r = row(m.rows, "approve:gh-4");
     expect(r?.preview.report.story).toBe("gh-4");
     expect(r?.preview.report.pr_command).toBe("glab mr view gh-4-x");
-    expect(r?.preview.item).toEqual({ title: "approve title", command: "norn approve gh-4" });
+    expect(r?.preview.item).toEqual({ title: "approve title", command: "norn story approve gh-4" });
     expect(row(m.rows, "story:gh-4")?.preview.item).toBeNull();
     expect(JSON.parse(JSON.stringify(m))).toEqual(m);
   });

@@ -1,0 +1,12 @@
+{
+  "kind": "done",
+  "receipt_id": "01M60XKN47M8GQ8DJFDAPA5CHD",
+  "run_id": "01M60XB7AYGNVMBTKNEJFS9R7K",
+  "step": "slice",
+  "attempt": 1,
+  "at": "2026-10-28T09:31:39.016Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "done",
+  "handoff": "15 slices cover B1–B71: 01 noun–verb tree + run list/view, 02 printed-commands module (parallel), 03 targets+prompts, 04–13 per-noun verbs moving old commands (D1), 14 printed-command rename + full help, 15 docs/plugin/PRD + lint. Story criteria B1–B71 added. Open call in slice 05: cockpit --json lands at status --watch --json."
+}

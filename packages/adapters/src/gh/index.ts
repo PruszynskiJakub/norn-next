@@ -123,6 +123,22 @@ export function createGh(opts: GhOptions): RemotePort {
       // GR9
       okOrThrow(await run(["pr", "edit", String(number), ...repo, "--body", body]), "gh pr edit", "gh");
     },
+    async createIssue({ title, body, labels, assignee }) {
+      // B18
+      const out = okOrThrow(
+        await run(["issue", "create", ...repo, "--title", title, "--body", body, ...labels.flatMap((l) => ["--label", l]), "--assignee", assignee]),
+        "gh issue create",
+        "gh",
+      );
+      const m = /\/issues\/(\d+)/.exec(out);
+      if (!m) throw portError("gh_bad_output", `gh issue create: no issue URL in output: ${out.slice(0, 200)}`);
+      return mapIssue(await json<GhIssue>(["issue", "view", m[1] as string, ...repo, "--json", ISSUE_FIELDS]));
+    },
+    async newIssueUrl({ labels }) {
+      // B23
+      const { url } = await json<{ url: string }>(["repo", "view", ...(opts.repo ? [opts.repo] : []), "--json", "url"]);
+      return `${url}/issues/new?labels=${encodeURIComponent(labels.join(","))}`;
+    },
   };
 }
 

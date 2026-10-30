@@ -1,7 +1,7 @@
 /**
  * The cockpit model (SPEC-cockpit CP1–CP5): rows — what needs the person, then every story — each with
  * its story's orient preview and the actions it offers, as data. Pure: a ProjectView in, plain JSON
- * out. Renderers (the terminal `norn cockpit`, a web panel later) map actions to keys or buttons and
+ * out. Renderers (the terminal `norn status --watch`, a web panel later) map actions to keys or buttons and
  * run their effects; they never decide which actions fit a row (CP4). Writes stay CLI verbs (X1).
  */
 import type { InboxGroup, InboxItem } from "@norn/core";
@@ -9,6 +9,7 @@ import type { RemoteProvider } from "@norn/schema";
 import { inboxItemsInOrder } from "./format.ts";
 import { type OrientReport, orientReport } from "./orient.ts";
 import type { HeartbeatView, InboxEntry, ProjectView, StoryView } from "./types.ts";
+import { cmd } from "@norn/core";
 
 /** CP2: inbox groups that are rows, in O1 order; running, notes and recently done live in the preview. */
 const COCKPIT_GROUPS: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock", "check"];
@@ -78,9 +79,9 @@ const action = (id: CockpitActionId, effect: CockpitEffect, input?: CockpitActio
 
 /** Actions on every row of a story: orient, trace, its PR and issue links; take on the story's own row. */
 function storyActions(s: StoryView, unit: string, o: CockpitOptions, own: boolean): CockpitAction[] {
-  const out = [o.places ? action("orient", { kind: "place", place: "orient", story: s.key }) : action("orient", { kind: "verb", argv: ["orient", s.key], show: true })];
-  out.push(action("trace", { kind: "verb", argv: ["trace", unit], show: true }));
-  if (own && s.claim.unclaimed) out.push(action("take", { kind: "verb", argv: ["take", s.key] }));
+  const out = [o.places ? action("orient", { kind: "place", place: "orient", story: s.key }) : action("orient", { kind: "verb", argv: ["story", "view", s.key], show: true })];
+  out.push(action("trace", { kind: "verb", argv: ["run", "list", unit], show: true }));
+  if (own && s.claim.unclaimed) out.push(action("take", { kind: "verb", argv: ["story", "checkout", s.key] }));
   if (s.pr) out.push(action("pr", { kind: "link", url: s.pr.url }));
   if (s.url) out.push(action("issue", { kind: "link", url: s.url }));
   return out;
@@ -91,13 +92,13 @@ function itemActions(i: InboxEntry, unit: string, o: CockpitOptions): CockpitAct
   const out: CockpitAction[] = [];
   if (o.places && i.reach) out.push(action("agent", { kind: "place", place: "agent", story: i.story, reach: i.reach }));
   // MO5: a manual start the runner opens itself
-  if (i.group === "your_turn" && !i.reach && i.command.startsWith("norn open ")) out.push(action("start", { kind: "verb", argv: ["open", unit] }));
-  if (i.group === "answer") out.push(action("answer", { kind: "verb", argv: ["answer", unit, "{input}"] }, { prompt: "Your answer", required: true }));
+  if (i.group === "your_turn" && !i.reach && i.command.startsWith(`${cmd.storyStart()} `)) out.push(action("start", { kind: "verb", argv: ["story", "start", unit] }));
+  if (i.group === "answer") out.push(action("answer", { kind: "verb", argv: ["story", "answer", unit, "{input}"] }, { prompt: "Your answer", required: true }));
   if (i.group === "approve") {
-    out.push(action("approve", { kind: "verb", argv: ["approve", unit] }));
-    out.push(action("reject", { kind: "verb", argv: ["approve", unit, "--reject", "--reason", "{input}"] }, { prompt: "What to change", required: true }));
+    out.push(action("approve", { kind: "verb", argv: ["story", "approve", unit] }));
+    out.push(action("reject", { kind: "verb", argv: ["story", "reject", unit, "--reason", "{input}"] }, { prompt: "What to change", required: true }));
   }
-  if (i.command.startsWith("norn unstick ")) out.push(action("unstick", { kind: "verb", argv: ["unstick", unit] }));
+  if (i.command.startsWith(`${cmd.runRerun()} `)) out.push(action("unstick", { kind: "verb", argv: ["run", "rerun", unit] }));
   return out;
 }
 

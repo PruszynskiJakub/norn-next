@@ -9,10 +9,11 @@ import { setDefaultTimeout } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import type { Clock, InboxItem, LaunchSpec, NotifierPort, PaneState, PromptKey, RemoteIssue, RemotePort, RemotePullRequest, RunnerCapabilities, RunnerPort, RunnerSessionInfo, SessionRef } from "@norn/core";
+import { type Clock, type InboxItem, type LaunchSpec, type NotifierPort, type PaneState, type PromptKey, type RemoteIssue, type RemotePort, type RemotePullRequest, type RunnerCapabilities, type RunnerPort, type RunnerSessionInfo, nameRemoved, type SessionRef } from "@norn/core";
 import { type Receipt, type UnitState, ulid } from "@norn/schema";
 import { appendReceipt, installSkills, linkSkills, readState } from "@norn/store";
-import { bundledSkills, type CliDeps, type CliResult, runCli, type TickReport } from "../src/index.ts";
+import type { ProjectView } from "@norn/view";
+import { bundledSkills, type CliDeps, type CliResult, type Interaction, type InteractionChoice, runCli, type TickReport } from "../src/index.ts";
 import { assetsDir } from "../src/runtime/assets.ts";
 import { harvestGolden } from "./golden-harvest.ts";
 
@@ -66,6 +67,20 @@ export class FakeRemote implements RemotePort {
   async editPullRequestBody(n: number, body: string) {
     this.calls.push(`pr~ ${n}`);
     this.bodies.set(n, body);
+  }
+  /** set → `createIssue` throws it (B22) */
+  createError: Error | null = null;
+  async createIssue(o: { title: string; body: string; labels: string[]; assignee: string }) {
+    this.calls.push(`issue+ ${o.title}`);
+    if (this.createError) throw this.createError;
+    const number = Math.max(80, ...this.issues.map((i) => i.number)) + 1;
+    const created: RemoteIssue = { provider: "gh", number, url: `https://github.com/o/r/issues/${number}`, title: o.title, body: o.body, state: "open", assignees: [o.assignee], labels: [...o.labels], updated_at: new Date(T0).toISOString() };
+    this.issues.push(created);
+    return created;
+  }
+  async newIssueUrl(o: { labels: string[] }) {
+    this.calls.push(`issue+? ${o.labels.join(",")}`);
+    return `https://github.com/o/r/issues/new?labels=${encodeURIComponent(o.labels.join(","))}`;
   }
 }
 
@@ -140,11 +155,53 @@ export class FakeNotifier implements NotifierPort {
   }
 }
 
+/**
+ * D2: the terminal, scripted. `tty: false` is "no TTY"; each `pick` takes the next answer (null = the
+ * person left), each `confirm` the next of `confirms` (default N), each `ask` the next of `lines`, each
+ * `edit` the next of `edited` (else the text unchanged).
+ */
+export class FakeInteraction implements Interaction {
+  picks: Array<{ question: string; choices: InteractionChoice[]; preselect: number }> = [];
+  answers: Array<string | null> = [];
+  questions: string[] = [];
+  confirms: boolean[] = [];
+  asks: string[] = [];
+  lines: Array<string | null> = [];
+  edits: string[] = [];
+  edited: Array<string | null> = [];
+  constructor(readonly tty = true) {}
+  async confirm(question: string) {
+    this.questions.push(question);
+    return this.confirms.shift() ?? false;
+  }
+  async ask(question: string) {
+    this.asks.push(question);
+    return this.lines.shift() ?? null;
+  }
+  async edit(text: string) {
+    this.edits.push(text);
+    const next = this.edited.shift();
+    return next === undefined ? text : next;
+  }
+  async pick(question: string, choices: readonly InteractionChoice[], preselect: number) {
+    this.picks.push({ question, choices: [...choices], preselect });
+    const next = this.answers.shift();
+    return next === undefined ? (choices[preselect]?.value ?? null) : next;
+  }
+}
+
+/** A6 launch env and the orient env: the env of the agent session a test may run in is not the harness's. */
+const AGENT_ENV = ["NORN_HOME", "NORN_STORY", "NORN_SLICE", "NORN_RUN", "NORN_BIN", "NORN_ORIENT"];
+export const hostEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !AGENT_ENV.includes(k)));
+
 export function sh(cwd: string, args: string[], input?: string): string {
   const r = Bun.spawnSync(["git", ...args], { cwd, stdin: input === undefined ? "ignore" : new TextEncoder().encode(input), stdout: "pipe", stderr: "pipe" });
   if (r.exitCode !== 0) throw new Error(`git ${args.join(" ")} (${cwd}): ${r.stderr.toString()}`);
   return r.stdout.toString().trim();
 }
+
+/** A story or one of its slices in `norn story list --json`. */
+export type Listed = ProjectView["stories"][number] | ProjectView["stories"][number]["slices"][number];
 
 export interface Harness {
   dir: string;
@@ -157,6 +214,8 @@ export interface Harness {
   notifier: FakeNotifier;
   deps: CliDeps;
   norn(...argv: string[]): Promise<CliResult>;
+  /** a story or slice as `norn story list --json` shows it (B15); undefined when not listed */
+  listed(key: string): Promise<Listed | undefined>;
   /** one `norn tick`; throws unless it exits 0. Waits for the `norn check-run`s it started (C5), so the next tick applies their receipts */
   tick(...flags: string[]): Promise<TickReport>;
   /** wait for every `norn check-run` a tick started to end */
@@ -176,6 +235,20 @@ export interface Harness {
  * anything keyed by an id's day (hook block counts) misses. Ahead of the real clock, fake time wins.
  */
 export const T0 = Date.parse("2099-01-15T10:00:00.000Z");
+
+/**
+ * B7: no command norn prints names a removed command (B5). Every command a cli suite runs through the
+ * harness (`h.norn`, `h.tick`, `runChecked`) is checked here — its stdout (markdown or JSON: inbox items, `do_instead`, briefs, decide
+ * details) and stderr — so a printed old verb fails the test that printed it.
+ */
+export function printsNoRemovedCommand(argv: readonly string[], r: CliResult): CliResult {
+  const old = nameRemoved(r.stdout) ?? nameRemoved(r.stderr ?? "");
+  if (old) throw new Error(`\`norn ${argv.join(" ")}\` printed the removed command \`${old}\` (B7):\n${r.stdout}${r.stderr ?? ""}`);
+  return r;
+}
+
+/** `runCli` with the B7 check: what a suite that passes its own deps calls instead. */
+export const runChecked = async (argv: string[], deps: CliDeps): Promise<CliResult> => printsNoRemovedCommand(argv, await runCli(argv, deps));
 
 export async function createHarness(): Promise<Harness> {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "norn-cli-")));
@@ -205,9 +278,10 @@ export async function createHarness(): Promise<Harness> {
   const deps: CliDeps = {
     cwd: root,
     onCheckStarted: (exited) => void checks.push(exited),
-    env: { ...process.env, NORN_HOME_DIR: home, USER: "tester", NORN_MACHINE: "box", NORN_HOOK_COMMAND: "norn hook" },
+    env: { ...hostEnv(), NORN_HOME_DIR: home, USER: "tester", NORN_MACHINE: "box", NORN_HOOK_COMMAND: "norn hook" },
     clock,
     ports: { remote, runner, notifiers: [notifier] },
+    interaction: null,
   };
   const h: Harness = {
     dir,
@@ -219,9 +293,13 @@ export async function createHarness(): Promise<Harness> {
     runner,
     notifier,
     deps,
-    norn: (...argv) => runCli(argv, deps),
+    norn: async (...argv) => printsNoRemovedCommand(argv, await runCli(argv, deps)),
+    async listed(key) {
+      const view = (await this.norn("story", "list", "--json")).value as ProjectView;
+      return view.stories.flatMap((s): Listed[] => [s, ...s.slices]).find((u) => u.key === key);
+    },
     async tick(...flags) {
-      const r = await runCli(["tick", ...flags], deps);
+      const r = printsNoRemovedCommand(["tick", ...flags], await runCli(["tick", ...flags], deps));
       if (r.exit !== 0) throw new Error(`tick failed: ${r.stdout}`);
       await h.checksDone();
       return r.value as TickReport;

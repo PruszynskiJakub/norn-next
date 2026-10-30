@@ -1,0 +1,8 @@
+set timeout 60
+set title [lindex $argv 0]
+spawn devnorn story create
+expect "Title:"
+send -- "$title\r"
+expect eof
+catch wait result
+puts "exit [lindex $result 3]"

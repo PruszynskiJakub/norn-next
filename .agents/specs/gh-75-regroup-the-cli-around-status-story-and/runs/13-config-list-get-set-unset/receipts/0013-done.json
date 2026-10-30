@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M622AYJPGFYDX4J48E43JEFF",
+  "run_id": "01M621V5396MAECBDP731ME8YT",
+  "step": "implement",
+  "attempt": 2,
+  "at": "2026-10-28T20:13:31.095Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/13",
+  "outcome": "done",
+  "handoff": "qa#1 rework (AC7/AC9): config set of a key the file lacks now splices only its lines into the original text (store withNewKey: after the last entry of the nearest block map with its indentation, or at end of file for a new top-level key; flow maps still re-render, meaning check kept), so padded inline comments on untouched lines stay. Red test from QA's repro in packages/cli/test/config.test.ts (nested, top-level, new map, no trailing newline). Full suite 1262 pass, typecheck green."
+}

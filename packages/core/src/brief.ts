@@ -22,6 +22,7 @@ import type { NumberedReceipt, UnitRef } from "./facts.ts";
 import { effectiveMode } from "./policy.ts";
 import { epoch, iso } from "./time.ts";
 import { edgeOf, reportableOutcomes, stepOf } from "./workflow.ts";
+import { cmd } from "./commands.ts";
 
 export interface BriefInput {
   unit: UnitRef;
@@ -54,7 +55,7 @@ export interface BriefInput {
 }
 
 /**
- * A person's ruling at a gate (O2): `norn approve|--reject --reason "…"` on any unit of the story.
+ * A person's ruling at a gate (O2): `norn story approve|reject --reason "…"` on any unit of the story.
  * The gate receipt is the record; every later brief of the story and its slices repeats it (F28).
  */
 export interface Ruling {
@@ -429,13 +430,13 @@ function finish(step: AgentStep): BriefJson["finish"] {
     // QV3/QV5: a step requiring criteria, or an outcome gated by a verdict, takes the report file
     const criteria = step.criteria === "required" || edge.verdict !== undefined;
     return {
-      command: `norn done ${o}${criteria ? " --criteria <file>" : ""} --handoff "…"`,
+      command: cmd.done(o, { criteria }),
       means: edge.means ?? `step finished with outcome ${o}`,
       ...(edge.verdict ? { verdict: edge.verdict } : {}),
     };
   });
-  out.push({ command: `norn ask "<question>"`, means: "you need a person's answer to continue; the step parks until answered" });
-  out.push({ command: `norn stuck "<reason>"`, means: "you cannot continue; a person unblocks the step" });
+  out.push({ command: cmd.ask(), means: "you need a person's answer to continue; the step parks until answered" });
+  out.push({ command: cmd.stuck(), means: "you cannot continue; a person unblocks the step" });
   return out;
 }
 
@@ -572,7 +573,7 @@ function markdown(b: BriefJson): string {
       out.push(`Merge \`${bs.sha}\` (${branch}) into the story branch in this worktree, resolve, commit the merge; never rebase:`, "");
       out.push("```sh", `git merge --no-ff ${bs.sha}`, "```", "");
       out.push(`Conflicting paths: ${bs.conflicts.length ? bs.conflicts.map((p) => `\`${p}\``).join(", ") : "(not reported)"}`, "");
-      out.push("Resolve each conflict by intent; resolve to existing behaviour only. When no resolution fits without new behaviour, run `git merge --abort` (the worktree stays clean) and report `norn stuck \"<why>\"`. Otherwise commit the merge, run the checks, and report done. Do not push.", "");
+      out.push("Resolve each conflict by intent; resolve to existing behaviour only. When no resolution fits without new behaviour, run `git merge --abort` (the worktree stays clean) and report `" + cmd.stuck("<why>") + "`. Otherwise commit the merge, run the checks, and report done. Do not push.", "");
     }
   }
 

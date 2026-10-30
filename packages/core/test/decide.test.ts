@@ -345,13 +345,13 @@ describe("slices step (W2)", () => {
     expect(only(facts([storyAt("slices", {}, [{ nn: "01", status: "integrated" }, { nn: "02", state: { step: "$done", status: "done" } }])]))).toMatchObject({ kind: "classify", outcome: "done", state: { step: "test" } });
     expect(only(facts([storyAt("slices", {}, [{ nn: "01", deps: ["gh-1/09"] }])]))).toMatchObject({ kind: "classify", outcome: "stuck", state: { status: "stuck" } });
   });
-  test("gh-79: every slice stuck — a corrupt one is pointed at norn why, since unstick refuses a corrupt unit", () => {
+  test("gh-79: every slice stuck — a corrupt one is pointed at run view --why, since run rerun refuses a corrupt unit", () => {
     const stuck = (state: Partial<UnitState>) => {
       const a = only(facts([storyAt("slices", {}, [{ nn: "01", status: "integrated" }, { nn: "02", deps: ["gh-1/01"], state }])]));
       return a.kind === "classify" ? a.receipts[0]?.receipt : null;
     };
-    expect(stuck({ status: "stuck", park: { kind: "exhausted", reason: "review_loop 3/3", since: at() } })).toMatchObject({ outcome: "stuck", detail: "slice gh-1/02 stuck: review_loop 3/3 — norn unstick gh-1/02" });
-    expect(stuck({ status: "corrupt", park: null })).toMatchObject({ outcome: "stuck", detail: "slice gh-1/02 corrupt (S2) — norn why gh-1/02" });
+    expect(stuck({ status: "stuck", park: { kind: "exhausted", reason: "review_loop 3/3", since: at() } })).toMatchObject({ outcome: "stuck", detail: "slice gh-1/02 stuck: review_loop 3/3 — norn run rerun gh-1/02" });
+    expect(stuck({ status: "corrupt", park: null })).toMatchObject({ outcome: "stuck", detail: "slice gh-1/02 corrupt (S2) — norn run view gh-1/02 --why" });
   });
   test("a finished slice releases its worktree and is marked integrated", () => {
     const f = storyAt("slices", {}, [{ nn: "01", state: { step: "$done", status: "done" } }, { nn: "02", deps: ["gh-1/01"] }]);
@@ -384,7 +384,7 @@ describe("story lifecycle (GR6–GR8)", () => {
   test("issue closed / unlabelled / PR closed → park remote under Unblock, once", () => {
     const closed = storyAt("test", { issue: null });
     const a = only(facts([closed]));
-    expect(a).toMatchObject({ kind: "park", state: { park: { kind: "remote", reason: "remote: issue closed, unassigned or unlabelled" } }, notify: { group: "unblock", command: "norn unstick gh-1" } });
+    expect(a).toMatchObject({ kind: "park", state: { park: { kind: "remote", reason: "remote: issue closed, unassigned or unlabelled" } }, notify: { group: "unblock", command: "norn run rerun gh-1" } });
     const parked = storyAt("test", { issue: null });
     parked.units[0]!.state = { ...parked.units[0]!.state!, status: "stuck", park: { kind: "remote", reason: "x", since: at() } };
     expect(kinds(facts([parked]))).toEqual(["gh-1 noop unit.stuck"]);

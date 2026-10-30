@@ -1,0 +1,20 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M6437ZGZ3CPZD4WPBQ8EMPRA",
+  "run_id": "01M6432FQ8HMDTHP6B7WBPPQ68",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-29T15:07:51.200Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M6437ZGZ5A9FP7TD389ZC9AG",
+  "outcome": "silent",
+  "rule": "agent.silent",
+  "route": "nudge",
+  "detail": "turn ended without a receipt",
+  "counter": {
+    "name": "nudges",
+    "value": 2,
+    "max": 2
+  }
+}

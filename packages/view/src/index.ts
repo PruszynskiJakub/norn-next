@@ -7,6 +7,7 @@ export * from "./cockpit.ts";
 export * from "./format.ts";
 export * from "./load.ts";
 export * from "./orient.ts";
+export * from "./run-view.ts";
 export * from "./steps.ts";
 export * from "./timeline.ts";
 export * from "./trace-view.ts";

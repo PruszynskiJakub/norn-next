@@ -1,0 +1,9 @@
+$ devnorn story create --title "X" --workflow nope
+**Refused (unknown_workflow):** no workflow 'nope' in .agents/norn/workflows/ (available: bug, fix, slice, spec, story)
+
+Do instead: norn story create --title "…" --workflow <bug|fix|slice|spec|story>
+exit 3
+$ devnorn story create --title "X" --workflow nope --json
+{"error":"no workflow 'nope' in .agents/norn/workflows/ (available: bug, fix, slice, spec, story)","do_instead":"norn story create --title \"…\" --workflow <bug|fix|slice|spec|story>","code":"unknown_workflow","details":{"workflows":["bug","fix","slice","spec","story"]}}
+exit 3
+--- gh calls (expect none)

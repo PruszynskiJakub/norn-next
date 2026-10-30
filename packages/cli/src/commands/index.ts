@@ -1,8 +1,8 @@
 /**
  * Command registry. To add a command: create `src/commands/<name>.ts` exporting
- * `defineCommand({...})`, then list it here.
+ * `defineCommand({...})`, then list it here. A verb goes in its noun's `verbs` and the noun here.
  */
-import type { Command } from "../command.ts";
+import type { Command, Noun } from "../command.ts";
 import { askCommand } from "./ask.ts";
 import { briefCommand } from "./brief.ts";
 import { doneCommand } from "./done.ts";
@@ -15,28 +15,22 @@ import { syncCommand } from "./sync.ts";
 import { tickCommand } from "./tick.ts";
 import { uninstallCommand } from "./uninstall.ts";
 import { watchCommand } from "./watch.ts";
-import { answerCommand } from "./answer.ts";
-import { approveCommand } from "./approve.ts";
-import { inboxCommand } from "./inbox.ts";
-import { modeCommand } from "./mode.ts";
+import { runNoun } from "./run.ts";
+import { storyNoun } from "./story.ts";
 import { statusCommand } from "./status.ts";
-import { traceCommand } from "./trace.ts";
-import { unstickCommand } from "./unstick.ts";
-import { whyCommand } from "./why.ts";
-import { workflowCommand } from "./workflow.ts";
-import { configCommand } from "./config.ts";
+import { configNoun } from "./config.ts";
 import { doctorCommand } from "./doctor.ts";
-import { dropCommand } from "./drop.ts";
-import { releaseCommand } from "./release.ts";
-import { takeCommand } from "./take.ts";
 import { tidyCommand } from "./tidy.ts";
-import { cockpitCommand } from "./cockpit.ts";
-import { openCommand } from "./open.ts";
-import { orientCommand } from "./orient.ts";
-import { updateCommand } from "./update.ts";
 
-export const COMMANDS: readonly Command[] = [initCommand, uninstallCommand, syncCommand, tickCommand, watchCommand, briefCommand, doneCommand, askCommand, stuckCommand, hookEventCommand, checkRunCommand, inboxCommand, cockpitCommand, openCommand, orientCommand, statusCommand, traceCommand, whyCommand, answerCommand, approveCommand, unstickCommand, updateCommand, modeCommand, workflowCommand, takeCommand, releaseCommand, dropCommand, tidyCommand, doctorCommand, configCommand, helpCommand];
+export const COMMANDS: readonly Command[] = [initCommand, uninstallCommand, syncCommand, tickCommand, watchCommand, briefCommand, doneCommand, askCommand, stuckCommand, hookEventCommand, checkRunCommand, statusCommand, tidyCommand, doctorCommand, helpCommand];
 
+export const NOUNS: readonly Noun[] = [storyNoun, runNoun, configNoun];
+
+/** A flat command by name, or a verb by its full name (`run list`). */
 export function findCommand(name: string): Command | undefined {
-  return COMMANDS.find((c) => c.name === name);
+  return COMMANDS.find((c) => c.name === name) ?? NOUNS.flatMap((n) => n.verbs).find((c) => c.name === name);
+}
+
+export function findNoun(name: string): Noun | undefined {
+  return NOUNS.find((n) => n.name === name);
 }

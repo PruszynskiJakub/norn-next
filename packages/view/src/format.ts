@@ -1,8 +1,9 @@
 /**
- * Compact terminal text for `norn status` / `norn inbox` human mode. Pure: a ProjectView
+ * Compact terminal text for `norn story list` / `norn status` human mode. Pure: a ProjectView
  * in, a string out (no colour, no clock). The CLI's default output stays JSON (P8).
  */
-import { INBOX_ABOUT, INBOX_GROUPS, INBOX_TITLES } from "@norn/core";
+import { cmd, INBOX_ABOUT, INBOX_GROUPS, INBOX_TITLES } from "@norn/core";
+import type { RunDetail } from "./run-view.ts";
 import { oneLine } from "./timeline.ts";
 import type { InboxEntry, ProjectView, SliceView, StepRow, StepWho, StoryView, TimelineEntry, TraceView, UnitView } from "./types.ts";
 
@@ -55,11 +56,11 @@ function sliceLine(s: SliceView): string {
 /** R5.5 (N3): this checkout's heartbeat, one line. */
 function heartbeatText(view: ProjectView): string | null {
   const h = view.heartbeat;
-  if (h.down) return `! no heartbeat on ${h.holder}${h.age ? ` for ${h.age}` : " yet"} — run \`norn watch\` (auto steps wait for it)`;
+  if (h.down) return `! no heartbeat on ${h.holder}${h.age ? ` for ${h.age}` : " yet"} — run \`${cmd.watch()}\` (auto steps wait for it)`;
   return h.last_tick_at ? `heartbeat: last tick ${h.age} ago on ${h.holder}` : null;
 }
 
-/** `norn status` human mode: one block per story, slices indented, then runs and errors. */
+/** `norn story list` human mode: one block per story, slices indented, then runs and errors. */
 /** BS1/BS3: `base main: 17 behind · conflicts a.ts, b.ts · last update merge 1a2b3c4d5e6f (…)`; null when nothing is known. */
 function baseSyncText(s: StoryView): string | null {
   const b = s.base_sync;
@@ -73,7 +74,7 @@ function baseSyncText(s: StoryView): string | null {
 
 export function formatStatus(view: ProjectView): string {
   const out: string[] = [];
-  if (!view.stories.length) out.push("No stories. Run `norn sync` to pick up labelled issues.");
+  if (!view.stories.length) out.push(`No stories. Run \`${cmd.sync()}\` to pick up labelled issues.`);
   for (const s of view.stories) {
     out.push(`${s.key} ${s.title}`);
     out.push(`  ${s.workflow} · ${modeText(s)} · ${claimText(s)} · ${stateText(s)}`);
@@ -104,7 +105,7 @@ export function formatStatus(view: ProjectView): string {
   for (const e of view.errors) out.push(`! ${e.file}: ${e.errors[0]?.message ?? "invalid"}`);
   const hb = heartbeatText(view);
   if (hb) out.push(hb);
-  out.push(`${view.inbox.pending} ${view.inbox.pending === 1 ? "item needs" : "items need"} you — norn inbox`);
+  out.push(`${view.inbox.pending} ${view.inbox.pending === 1 ? "item needs" : "items need"} you — ${cmd.status()}`);
   return `${out.join("\n").trimEnd()}\n`;
 }
 
@@ -131,7 +132,7 @@ export function stepTitle(step: string | null | undefined, title: string): strin
 }
 
 /**
- * `norn inbox` human mode: groups in O1 order, each item with reason, age and command; `details` adds
+ * `norn status` human mode: groups in O1 order, each item with reason, age and command; `details` adds
  * full texts (L1). With `home`, paths under it print as `~/…` (the JSON keeps them absolute).
  * `numbered` prefixes `[n]` for the cockpit (HC4). Notes show as their header line only, with the
  * command that lists them, unless `notes` (NT6).
@@ -146,7 +147,7 @@ export function formatInbox(view: ProjectView, opts: { details?: boolean; home?:
     if (!items.length) continue;
     out.push(`${INBOX_TITLES[g]} (${items.length}) · ${groupAbout(g, items)}`);
     if (g === "notes" && !opts.notes) {
-      out.push("      $ norn inbox --notes", "");
+      out.push(`      $ ${cmd.status({ notes: true })}`, "");
       continue;
     }
     for (const it of items) {
@@ -161,13 +162,13 @@ export function formatInbox(view: ProjectView, opts: { details?: boolean; home?:
   }
   if (!out.length && !view.stories.length) {
     // a fresh repo: point at the first story instead of a dead end
-    return "Inbox empty — no stories yet.\nLabel an issue `norn` (the config's `remote.label`) and assign it to yourself, then run `norn sync`.\n";
+    return `Inbox empty — no stories yet.\nLabel an issue \`norn\` (the config's \`remote.label\`) and assign it to yourself, then run \`${cmd.sync()}\`.\n`;
   }
   if (!out.length) return "Inbox empty — nothing needs you.\n";
   return `${out.join("\n").trimEnd()}\n`;
 }
 
-/** `norn trace <unit>` human mode: one line per timeline entry. */
+/** `norn run list <unit>` human mode: one line per timeline entry. */
 export function formatTimeline(entries: readonly TimelineEntry[]): string {
   if (!entries.length) return "No events.\n";
   return `${entries.map((e) => `${e.at}  ${e.source.padEnd(7)} ${e.summary}`).join("\n")}\n`;
@@ -208,7 +209,7 @@ function outcomeText(r: StepRow): string {
 }
 
 /**
- * `norn trace <unit> --text`: a header with the totals, then one row per (step, attempt) —
+ * `norn run list <unit> --text`: a header with the totals, then one row per (step, attempt) —
  * entered, left, duration, outcome, who — with the reason beneath (cut to one line unless
  * `full`) and absolute evidence / log paths. Slice rows of a story are indented.
  */
@@ -266,3 +267,23 @@ export function formatStepTimeline(v: TraceView, opts: { full?: boolean } = {}):
   return `${out.join("\n")}\n`;
 }
 
+/**
+ * `norn run view <run|unit>` (B44): one run — step and attempt, the run id, outcome, when it
+ * entered and left with its duration, who, the time a person was waited on, the reason in full
+ * and the receipt, evidence and log paths.
+ */
+export function formatRunView(r: RunDetail): string {
+  const out = [`${r.unit} · ${r.step}#${r.attempt} (${r.type}${r.attended ? ", attended" : ""})`, ""];
+  const field = (k: string, v: string) => out.push(`${k.padEnd(9)}${v}`);
+  field("run", r.run_id ?? "-");
+  field("outcome", r.open ? "(in step)" : `${outcomeText(r)}${r.to ? ` → ${r.to}` : ""}`);
+  field("entered", r.entered_at ?? "-");
+  field("left", r.open ? "…" : (r.left_at ?? "-"));
+  field("duration", r.duration_ms === null ? "-" : `${formatDuration(r.duration_ms)}${r.open ? " so far" : ""}`);
+  field("who", r.who.map(whoText).join(", ") || "-");
+  if (r.wait_ms) field("waited", formatDuration(r.wait_ms));
+  if (r.reason) out.push("", "Reason", ...r.reason.split("\n").map((l) => `  ${l}`.trimEnd()));
+  const paths: Array<[string, string[]]> = [["Receipts", r.paths.receipts], ["Evidence", r.paths.evidence], ["Logs", r.paths.logs], ["Briefings", r.paths.briefings]];
+  for (const [title, ps] of paths) if (ps.length) out.push("", title, ...ps.map((p) => `  ${p}`));
+  return `${out.join("\n")}\n`;
+}

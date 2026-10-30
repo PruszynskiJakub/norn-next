@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "story": "gh-75",
+  "slice": "gh-75/06",
+  "unit_dir": "06-story-view-and-chat",
+  "workflow": "slice",
+  "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
+  "step": "$done",
+  "attempt": 3,
+  "visits": {
+    "implement": 2,
+    "test": 2,
+    "review": 1,
+    "qa": 1,
+    "integrate": 3,
+    "merge": 2
+  },
+  "step_entered_at": "2026-10-28T17:41:39.384Z",
+  "status": "done",
+  "park": null,
+  "counters": {
+    "test_loop": 1,
+    "review_loop": 0,
+    "qa_loop": 0,
+    "conflict_loop": 2
+  },
+  "nudges_used": 0,
+  "retries_used": 0,
+  "applied_through": 23,
+  "run": null,
+  "last_outcome": {
+    "step": "integrate",
+    "outcome": "done",
+    "source": "classified",
+    "at": "2026-10-28T17:42:14.321Z",
+    "receipt_id": "01M61SNYHHRB7S961Y5F75BWT9"
+  },
+  "created_at": "2026-10-28T15:43:03.677Z",
+  "updated_at": "2026-10-28T17:42:39.390Z",
+  "last_tick_id": "01M61SPQ0WZRHCA9ZDKF5T5339"
+}

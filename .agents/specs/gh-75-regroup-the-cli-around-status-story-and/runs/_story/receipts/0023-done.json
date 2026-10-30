@@ -1,0 +1,12 @@
+{
+  "kind": "done",
+  "receipt_id": "01M64VEACEHX5MB6EHK7REMB41",
+  "run_id": "01M64TMZ77AJACYG62Y0WVBR0Q",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-29T22:10:44.751Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "done",
+  "handoff": "B42 fixed: story reopen with the story branch gone from the remote now refuses branch_missing naming the branch (rebuilt from the issue title as intake made it), do_instead 'push <branch> to <origin>, then norn story reopen <key>'; unknown_story kept when there is no remote or issue. Red test from the QA repro in story-reopen.test.ts; full suite 1418 pass, typecheck clean."
+}

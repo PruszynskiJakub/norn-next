@@ -317,6 +317,10 @@ export interface RemotePort {
   openDraftPullRequest(opts: { head: string; base: string; title: string; body: string }): Promise<RemotePullRequest>;
   /** GR9: replace the body of an open PR/MR */
   editPullRequestBody(number: number, body: string): Promise<void>;
+  /** B18 (D3): open an issue with these labels, assigned to `assignee` (a login) */
+  createIssue(opts: { title: string; body: string; labels: string[]; assignee: string }): Promise<RemoteIssue>;
+  /** B23 (D3): the remote's new-issue page in the browser with `labels` filled in; creates nothing */
+  newIssueUrl(opts: { labels: string[] }): Promise<string>;
 }
 
 // ============================================================= Runner
@@ -428,7 +432,7 @@ export interface RunnerPort {
    */
   output?(session: SessionRef): Promise<string | null>;
   /**
-   * MO5 (`norn open`): open a focused terminal a person works in, running `spec.command`. Records
+   * MO5 (`norn story start`): open a focused terminal a person works in, running `spec.command`. Records
    * no session: the agent's `norn brief` starts the run (MO3). Present iff `capabilities.open`.
    */
   openForPerson?(spec: PersonOpenSpec): Promise<{ pane_id: string | null }>;
@@ -521,7 +525,7 @@ export interface InboxItem {
   /** question, reason or gate prompt */
   title: string;
   detail?: string;
-  /** exact command that resolves it, e.g. `norn answer gh-123/03 "..."` */
+  /** exact command that resolves it, e.g. `norn story answer gh-123/03 "..."` */
   command: string;
   /** L1: long text behind the item (an implicit ask's full pane screen) — shown only on request (`inbox --details`) */
   full?: string;

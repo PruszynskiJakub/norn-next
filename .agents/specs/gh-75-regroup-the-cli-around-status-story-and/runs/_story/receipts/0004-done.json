@@ -1,0 +1,12 @@
+{
+  "kind": "done",
+  "receipt_id": "01M60X7SH4XZRWGCXX3QW8AE41",
+  "run_id": "01M60WRVV79C9Z8DGYZPP7463J",
+  "step": "plan",
+  "attempt": 1,
+  "at": "2026-10-28T09:25:10.309Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "done",
+  "handoff": "Plan agreed with the person: seams S1 runCli harness (+ interaction fake), S2 old-name repo lint, S3 remote contract; coverage for B1–B71; 3 prefactors (noun–verb framework, one printed-commands module, take restore extracted); D1–D9 (cancel = human stuck receipt, story view = orient JSON extended, prompts only TTY+no --json+not agent). B41/B51/B70 wording amended."
+}

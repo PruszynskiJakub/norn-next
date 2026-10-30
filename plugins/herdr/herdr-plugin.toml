@@ -1,40 +1,33 @@
-# norn's Herdr plugin (SPEC-cockpit CP11): `norn cockpit` as a split or as a popup, and three actions.
+# norn's Herdr plugin (SPEC-cockpit CP11): the cockpit (`norn status --watch`) as a split (through norn) or as a popup, and three actions.
 # Config snippet (tab bar segment, sidebar tokens, key bindings): README.md beside this file.
 # Install it once:  herdr plugin install PruszynskiJakub/norn-next/plugins/herdr
 # (from a norn checkout: herdr plugin link <checkout>/plugins/herdr)
 id = "norn"
 name = "norn"
-version = "0.3.0"
+version = "0.4.0"
 min_herdr_version = "0.9.0"
-description = "norn cockpit: what needs you and every story, with the actions each offers"
+description = "norn's cockpit: what needs you and every story, with the actions each offers"
 platforms = ["linux", "macos"]
 
-# `norn cockpit` in the repo of the pane it was opened from, as a split below it.
-[[panes]]
-id = "cockpit"
-title = "norn"
-placement = "split"
-command = ["sh", "cockpit.sh"]
-
-# `norn cockpit` as a popup over the focused pane, on any workspace.
+# `norn status --watch` as a popup over the focused pane, on any workspace.
 [[panes]]
 id = "pick"
-title = "norn cockpit"
+title = "norn's cockpit"
 placement = "overlay"
 command = ["sh", "pick.sh"]
 
-# Opens the cockpit below the focused pane without taking focus. Bind it to a key:
+# Opens the cockpit below the focused pane without taking focus (`norn status --watch --pane`). Bind it to a key:
 #   [[keys.command]]
 #   key = "prefix+n"
 #   type = "plugin_action"
 #   command = "norn.open"
 [[actions]]
 id = "open"
-title = "Open the norn cockpit"
+title = "Open the cockpit below (norn status --watch --pane)"
 contexts = ["workspace"]
 command = ["sh", "open.sh"]
 
-# Focuses the agent pane of the oldest Your turn item (`norn cockpit --next`); a toast when none.
+# Focuses the agent pane of the oldest Your turn item (`norn run attach --next`); a toast when none.
 #   [[keys.command]]
 #   key = "prefix+N"
 #   type = "plugin_action"
@@ -52,6 +45,6 @@ command = ["sh", "next.sh"]
 #   command = "norn.pick"
 [[actions]]
 id = "pick"
-title = "Open the norn cockpit as a popup"
+title = "Open the cockpit as a popup"
 contexts = ["workspace"]
 command = ["sh", "pick-open.sh"]

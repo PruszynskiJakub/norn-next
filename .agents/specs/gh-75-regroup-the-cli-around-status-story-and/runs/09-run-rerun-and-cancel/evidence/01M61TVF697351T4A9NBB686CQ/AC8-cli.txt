@@ -1,0 +1,19 @@
+$ norn unstick gh-5 --json
+{"error":"Unknown command: unstick","do_instead":"norn help — commands: init, uninstall, sync, tick, watch, brief, done, ask, stuck, hook, inbox, cockpit, open, orient, status, answer, approve, update, mode, workflow, take, release, drop, tidy, doctor, config, help, run","code":"unknown_command"}
+exit 2
+$ norn unstick gh-5
+{"error":"Unknown command: unstick","do_instead":"norn help — commands: init, uninstall, sync, tick, watch, brief, done, ask, stuck, hook, inbox, cockpit, open, orient, status, answer, approve, update, mode, workflow, take, release, drop, tidy, doctor, config, help, run","code":"unknown_command"}
+exit 2
+$ norn run --json
+{"command":"run","summary":"The runs of a unit: its step timeline, one run, why a tick decided what it did; rerun or cancel it","usage":"norn run <verb>","options":[],"verbs":[{"command":"run list","summary":"Step timeline of a unit: durations, outcomes, who, reasons; a story with its slices (O4)","usage":"norn run list [<unit>] [--json] [--full] [--events] [--all] [--story-only] [--limit N]","options":["full","events","all","story-only","limit"]},{"command":"run view","summary":"One run of a unit: step, attempt, outcome, durations, receipts; --why replays the decision (B44, O5)","usage":"norn run view [<run|unit>] [--why [--tick <tick_id>] [--step <step>] [--attempt <n>] [--transition <step>.<outcome>] [--rule <prefix>]] | norn run view [<unit>] --receipt <receipt_id>","options":["why","tick","step","attempt","transition","rule","receipt"]},{"command":"run rerun","summary":"Resume a stuck, parked or gate-waiting unit in a fresh session, optionally --step elsewhere and --reset counters","usage":"norn run rerun [<unit>] [--step <step>] [--reset <counter>]… [--reason \"…\"]","options":["step","reset","reason"]},{"command":"run cancel","summary":"Stop a unit's running agent session; the story and its work stay (rerun resumes it)","usage":"norn run cancel [<unit>]","options":[]}],"for":"person"}
+exit 0
+$ norn run
+norn run — The runs of a unit: its step timeline, one run, why a tick decided what it did; rerun or cancel it
+
+  norn run list    Step timeline of a unit: durations, outcomes, who, reasons; a story with its slices
+  norn run view    One run of a unit: step, attempt, outcome, durations, receipts; --why replays the decision
+  norn run rerun   Resume a stuck, parked or gate-waiting unit in a fresh session, optionally --step elsewhere and --reset counters
+  norn run cancel  Stop a unit's running agent session; the story and its work stay (rerun resumes it)
+
+`norn help run <verb>` shows one verb's usage and options.
+exit 0

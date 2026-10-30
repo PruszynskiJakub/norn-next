@@ -1,0 +1,66 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61Q8TGX8JB35S5DFK0RC6KX",
+  "run_id": "01M61P767RVFT2HY68DVGVT7NR",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-28T17:00:07.069Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/09",
+  "outcome": "changes_requested",
+  "handoff": "Blocking F1: run cancel can write the receipt, skip the kill without saying so and exit 0 with next=run rerun, leaving the agent running (B51). Minor: the Herdr kill closes the pane B52 keeps (a person settles it); AC5 ask-parked and not_stuck untested; rerun's story-key pick matches stuck slices only; kill_failed drops the receipt. Typecheck green; bun test only fails the environmental zombie contract test.",
+  "findings": [
+    {
+      "severity": "blocking",
+      "title": "run cancel silently skips the kill and still exits 0",
+      "id": "F1",
+      "file": "packages/cli/src/commands/run-cancel.ts",
+      "line": 47,
+      "criterion": "AC2",
+      "detail": "B51: 'a stuck receipt by the person is written first (P6, D4), then the session is stopped'. After the receipt is written, the kill is skipped without an error when any of these holds: there is no session (a manual run), state.run.machine is another machine (e.g. after take --force), ctx.ports().runner is missing, or runner.name !== session.runner. The command then returns exit 0 with killed: false and next = `norn run rerun <unit>`. decide does not kill on a human stuck either (decide/agent.ts kills only for unstick/workflow), so nothing ever stops the agent. A person who follows `next` gets a second session next to the live one. Only the kill-throws path (line 54) tells the person to stop it by hand.\nAxis: spec\nSuggestion: When the receipt is written but the kill cannot be attempted, report it the way kill_failed does: a failure or refusal whose do_instead says to stop the agent by hand, or at least a do_instead/next that says so instead of run rerun. Add a test with a session whose runner name differs from the configured runner."
+    },
+    {
+      "severity": "minor",
+      "title": "On Herdr, cancel closes the pane that B52 says stays",
+      "id": "F2",
+      "file": "packages/cli/src/commands/run-cancel.ts",
+      "line": 51,
+      "criterion": "AC3",
+      "detail": "AC3/B52: 'the claim and the Herdr pane are all still there'. Herdr's kill is `herdr pane close <pane>` (packages/adapters/src/herdr/index.ts), so the pane goes away. The slice Notes say 'headless and Herdr differ in what kill means, so use it as is', which contradicts AC3. The test runs headless only and never asserts the pane.\nAxis: spec\nSuggestion: A person decides whether the pane must stay (then interrupting the agent needs something other than RunnerPort.kill) or whether AC3/B52 is amended. Leave a note for QA (AC9)."
+    },
+    {
+      "severity": "minor",
+      "title": "AC5's ask-parked case and the not_stuck refusal are untested",
+      "id": "F3",
+      "file": "packages/cli/test/run-rerun-cancel.test.ts",
+      "line": 210,
+      "criterion": "AC5",
+      "detail": "AC5: 'parked and gate-waiting units resume as unstick resumed them'. Only a gate-waiting unit is tested. In human.test.ts the old not_stuck assertion now expects `running`, so no test reaches run-rerun.ts:40 (not_stuck) any more.\nAxis: spec\nSuggestion: Add a rerun of a unit parked on an ask, and a not_stuck refusal (e.g. a unit that has finished)."
+    },
+    {
+      "severity": "minor",
+      "title": "Story-key resolution picks only stuck slices, not parked ones",
+      "id": "F4",
+      "file": "packages/cli/src/commands/run-rerun.ts",
+      "line": 32,
+      "detail": "resolveUnit(ctx, key, (st) => st.status === 'stuck') disagrees with the verb's own `blocked` predicate (stuck or parked). `norn run rerun gh-7`, when only slice 02 is parked at a gate, resolves to the story unit and is refused not_stuck. The behaviour is inherited from unstick, but the verb now advertises gate-waiting units.\nAxis: standards\nSuggestion: Pass `blocked` as the pick."
+    },
+    {
+      "severity": "minor",
+      "title": "kill_failed drops the receipt that was written",
+      "id": "F5",
+      "file": "packages/cli/src/commands/run-cancel.ts",
+      "line": 54,
+      "detail": "The receipt is written before the kill throws, but the CliError carries no receipt id or file, so a --json reader cannot see what was recorded.\nAxis: standards\nSuggestion: Mention the receipt in the error text or in do_instead."
+    },
+    {
+      "severity": "nit",
+      "title": "Duplicated holder check and an unneeded cast",
+      "id": "F6",
+      "file": "packages/cli/src/commands/run-cancel.ts",
+      "line": 29,
+      "detail": "A local notHolder duplicates refuseUnlessHolder/requireHolder in runtime/human.ts, and the holder check runs twice (line 33 and inside check). started(t)'s return value is discarded, and sessionOf(t.state as UnitState) casts later. The `resolveTarget as resolveUnit` alias exists because human.ts and target.ts export the same name with different meanings. The cockpit action id is still 'unstick' while its argv is run rerun (printed hints are slice 14).\nAxis: standards\nSuggestion: Use const st = started(t); reuse the existing holder helper where it fits."
+    }
+  ]
+}

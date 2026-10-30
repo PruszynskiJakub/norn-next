@@ -6,6 +6,7 @@
  */
 import type { CliError, Receipt, Step, UnitState, Workflow } from "@norn/schema";
 import type { NumberedReceipt, UnitRef } from "./facts.ts";
+import { cmd } from "./commands.ts";
 
 /** One unit as the agent verbs see it: its state, pinned workflow and receipts. */
 export interface AgentUnit {
@@ -78,17 +79,17 @@ export function agentWorkRefusal(s: AgentUnit, verb: string): CliError | null {
   const st = s.state;
   const key = s.unit.key;
   if (st.status === "done" || st.step === "$done") return no(`unit ${key} is done; there is nothing to ${verb}`, "end your turn", "unit_done");
-  if (st.status === "stuck") return no(`unit ${key} is stuck: ${st.park?.reason ?? "unknown"}`, `end your turn; a person unblocks it with: norn unstick ${key}`, "unit_stuck");
+  if (st.status === "stuck") return no(`unit ${key} is stuck: ${st.park?.reason ?? "unknown"}`, `end your turn; a person unblocks it with: ${cmd.runRerun(key)}`, "unit_stuck");
   const step = cursorStep(s);
-  if (!step) return no(`step '${st.step}' does not exist in workflow ${s.workflow.name} (S7)`, `end your turn; a person fixes it with: norn unstick ${key} --to <step>`, "no_step");
-  if (step.type === "gate") return no(`${st.step} is a gate: a person decides, not an agent`, `end your turn; a person runs: norn approve ${key} (or --reject)`, "gate_step");
-  if (step.type !== "agent") return no(`${st.step} is a ${step.type} step: norn runs it, not an agent`, "end your turn; the heartbeat (norn tick / norn watch) runs it", "not_agent_step");
+  if (!step) return no(`step '${st.step}' does not exist in workflow ${s.workflow.name} (S7)`, `end your turn; a person fixes it with: ${cmd.runRerun(key, { step: "<step>" })}`, "no_step");
+  if (step.type === "gate") return no(`${st.step} is a gate: a person decides, not an agent`, `end your turn; a person runs: ${cmd.storyApprove(key)} (or ${cmd.storyReject(key)})`, "gate_step");
+  if (step.type !== "agent") return no(`${st.step} is a ${step.type} step: norn runs it, not an agent`, `end your turn; the heartbeat (${cmd.tick()} / ${cmd.watch()}) runs it`, "not_agent_step");
   // R6.1 (A14): an implicit ask (a prompt norn saw in the pane or a hook) does not hold the agent
   // back — its report is the answer, also once a person's answer waits to be applied (B6: the
   // answer let the agent's own `norn done` run); an explicit `norn ask` waits for the person
   if (st.status === "parked" && st.park?.kind === "ask") {
-    if (!implicitAsk(s)) return no(`unit ${key} waits for an answer: ${st.park.reason}`, `end your turn; a person answers with: norn answer ${key} "…"`, "parked_ask");
+    if (!implicitAsk(s)) return no(`unit ${key} waits for an answer: ${st.park.reason}`, `end your turn; a person answers with: ${cmd.storyAnswer(key)}`, "parked_ask");
   } else if (st.status === "parked" && st.park?.kind !== "attended")
-    return no(`unit ${key} is parked (${st.park?.kind}): ${st.park?.reason ?? ""}`, `end your turn; a person resolves it: norn unstick ${key}`, "parked");
+    return no(`unit ${key} is parked (${st.park?.kind}): ${st.park?.reason ?? ""}`, `end your turn; a person resolves it: ${cmd.runRerun(key)}`, "parked");
   return null;
 }

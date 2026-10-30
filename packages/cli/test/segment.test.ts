@@ -7,10 +7,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { herdr } from "@norn/adapters";
-import { runCli } from "../src/index.ts";
 import { planWorkspaceMoves } from "../src/runtime/segment.ts";
 import { fakeHerdr } from "./fake-herdr.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 
 setDefaultTimeout(30_000);
 
@@ -70,12 +70,12 @@ describe("norn status --segment", () => {
   afterAll(() => c.cleanup());
 
   test("one plain line; outside a repository an empty one", async () => {
-    const r = await runCli(["status", "--segment"], { ...c.deps, herdr: null });
+    const r = await runChecked(["status", "--segment"], { ...c.deps, herdr: null });
     expect(r.exit).toBe(0);
     expect(r.stdout).toMatch(/^norn·[^\n]+ ▶ 2 your turn\n$/);
     const away = mkdtempSync(join(tmpdir(), "norn-segment-"));
     try {
-      const out = await runCli(["status", "--segment"], { ...c.deps, cwd: away, herdr: null });
+      const out = await runChecked(["status", "--segment"], { ...c.deps, cwd: away, herdr: null });
       expect(out.exit).toBe(0);
       expect(out.stdout).toBe("\n");
     } finally {
@@ -87,7 +87,7 @@ describe("norn status --segment", () => {
     const ws = (id: string, label: string, cwd: string): herdr.HerdrWorkspace => ({ workspace_id: id, label, pane_ids: [`${id}:p1`], cwds: [cwd] });
     // w3 is another repo's gh-5: not ours, never labelled or moved
     const h = fakeHerdr([], [ws("w1", "repo", c.root), ws("w2", "gh-6 orient", `${c.root}-worktrees/gh-6-export-report`), ws("w3", "gh-5 orient", "/other-repo-worktrees/gh-5-x"), ws("w4", "gh-5 orient", wt())]);
-    const r = await runCli(["status", "--segment", "--json", "--ttl", "20s"], { ...c.deps, herdr: h.cockpit });
+    const r = await runChecked(["status", "--segment", "--json", "--ttl", "20s"], { ...c.deps, herdr: h.cockpit });
     expect(r.value).toMatchObject({ tokens: 2, moves: 0 });
     expect(h.calls).toEqual([`report workspace w4 {"norn":"▶ your turn"} 20000`, `report workspace w2 {"norn":"▶ your turn"} 20000`]);
   });

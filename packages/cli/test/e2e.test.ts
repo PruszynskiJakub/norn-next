@@ -127,11 +127,11 @@ describe("norn init", () => {
     expect((await h.norn("init", "--text")).stdout).toBe(r.stdout);
   });
 
-  test("help prints the commands grouped for a person, Start here first; --json prints the list", async () => {
+  test("help prints the commands grouped for a person, Core first; --json prints the list", async () => {
     const r = await h.norn("help");
     expect(r.exit).toBe(0);
     expect(r.stdout).toStartWith("norn — deliver software stories");
-    expect(r.stdout).toMatch(/\nStart here\n  norn init +Set up norn in this repository: config, workflows, skills, hooks\n/);
+    expect(r.stdout).toMatch(/\nSetup\n  norn init +Set up norn in this repository: config, workflows, skills, hooks\n/);
     expect(r.stdout).not.toMatch(/\((?:A1|§9\.3)/); // spec ids stay in the JSON
     // an agent that runs help reads first which commands are its own; each command and skill says who it is for
     expect(r.stdout.split("\n")[2]).toStartWith("Agent doing a norn step? Run only `norn brief`");
@@ -142,7 +142,7 @@ describe("norn init", () => {
     expect(list.find((c) => c.command === "init")?.summary).toContain("(A1, SK1, W1)");
     const by = (f: string) => list.filter((c) => (c as { for?: string }).for === f).map((c) => c.command);
     expect(by("agent")).toEqual(["brief", "done", "ask", "stuck"]);
-    expect(by("hooks")).toEqual(["hook"]);
+    expect(by("hooks")).toEqual([]); // `hook` only in help --all (B3)
     const skills = (r.value as { skills: Array<{ skill: string; for: string }> }).skills;
     expect(skills.find((s) => s.skill === "norn")?.for).toBe("protocol");
     expect(skills.find((s) => s.skill === "norn-qa-person")?.for).toBe("attended");
@@ -163,6 +163,56 @@ describe("norn init", () => {
     expect(r.exit).toBe(2);
     expect(r.value).toMatchObject({ code: "unknown_command", do_instead: expect.stringContaining("norn help") });
     expect((await h.norn("tick", "--bogus")).exit).toBe(2);
+    expect((await h.norn("run", "frobnicate")).value).toMatchObject({ error: "Unknown command: run frobnicate", code: "unknown_command", do_instead: expect.stringContaining("norn help run") });
+  });
+
+  test("a noun with no verb, and help <noun>, list its verbs in order (B2)", async () => {
+    const r = await h.norn("run");
+    expect(r.exit).toBe(0);
+    expect(r.stdout).toStartWith("norn run — ");
+    expect(r.stdout).toMatch(/\n  norn run list +.+\n  norn run view +.+\n  norn run attach +.+\n  norn run rerun +.+\n  norn run cancel +.+\n/);
+    expect(r.value).toMatchObject({ command: "run", verbs: [{ command: "run list" }, { command: "run view" }, { command: "run attach" }, { command: "run rerun" }, { command: "run cancel" }] });
+    expect((await h.norn("help", "run")).stdout).toBe(r.stdout);
+    expect((await h.norn("run", "--help")).stdout).toBe(r.stdout);
+    expect((await h.norn("run", "--json")).value).toEqual(r.value);
+    // norn help names the noun with its verbs
+    expect((await h.norn("help")).stdout).toMatch(/\n  norn run +.*\(list, view, attach, rerun, cancel\)\n/);
+  });
+
+  test("help <noun> <verb> and <noun> <verb> --help show that verb's usage and options (B4)", async () => {
+    const r = await h.norn("help", "run", "view");
+    expect(r.exit).toBe(0);
+    expect(r.stdout).toStartWith("norn run view — ");
+    expect(r.stdout).toContain("    norn run view ");
+    expect(r.stdout).toMatch(/\nOptions\n(?:.*\n)*  --why +.+\n/);
+    expect(r.stdout).toMatch(/\n  --receipt <id> +.+\n/);
+    expect(r.value).toMatchObject({ command: "run view", options: expect.arrayContaining(["why", "receipt", "tick"]) });
+    expect((await h.norn("run", "view", "--help")).stdout).toBe(r.stdout);
+    expect((await h.norn("run", "view", "--help", "--json")).value).toEqual(r.value);
+  });
+
+  test("help with an unknown name, or a word after a plain command, is a usage error (B5)", async () => {
+    for (const args of [["nosuch"], ["init", "extra"]]) {
+      const r = await h.norn("help", ...args);
+      expect(r.exit).toBe(2);
+      expect(r.value).toMatchObject({ error: `Unknown command: ${args.join(" ")}`, code: "unknown_command" });
+    }
+  });
+
+  test("help --all adds the hidden tier", async () => {
+    const all = await h.norn("help", "--all");
+    expect(all.exit).toBe(0);
+    for (const c of (all.value as { commands: Array<{ command: string }> }).commands) expect(all.stdout).toContain(`  norn ${c.command} `);
+  });
+
+  test("the old trace, why, open, mode, workflow, unstick, take, release and drop are unknown commands, and write nothing (B5)", async () => {
+    const before = h.git(["status", "--porcelain", "--untracked-files=all", "--ignored"]);
+    for (const name of ["trace", "why", "open", "mode", "workflow", "unstick", "take", "release", "drop"]) {
+      const r = await h.norn(name, "gh-1");
+      expect(r.exit).toBe(2);
+      expect(r.value).toMatchObject({ error: `Unknown command: ${name}`, code: "unknown_command", do_instead: expect.stringContaining("norn help") });
+    }
+    expect(h.git(["status", "--porcelain", "--untracked-files=all", "--ignored"])).toBe(before);
   });
 
   test("every command accepts --json", async () => {

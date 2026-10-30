@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M645C2AR5YK14RZ7G4GB4446",
+  "run_id": "01M644DGV6MY2P3QBF7FBW2SPP",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-29T15:45:02.296Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/15",
+  "outcome": "done",
+  "handoff": "Removed-commands lint in test/repo.test.ts (sources, assets, plugins, .agents/skills, README, CONTRIBUTING, AGENTS.md, PRD; planted norn unstick fails it) plus a PRD §15 noun-tree/S7 test; PRD, docs, skills, comments renamed; Herdr plugin 0.4.0: next → run attach --next, open → status --watch --pane (cockpit pane removed), pick → status --watch. Typecheck and full suite green. Not covered: docs/cookbook.html (outside AC1 scope); AC4 needs real Herdr in QA."
+}

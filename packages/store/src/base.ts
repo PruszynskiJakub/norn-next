@@ -115,7 +115,7 @@ export function writeBaseFacts(repoRoot: string, cache: BaseFactsCache): void {
 /**
  * C1 (BS10, BS11, F35): story key → the story PR as the last remote sync of this checkout saw it
  * (`trace/pr.json`, machine-local), with the observation time. PRs are fetched only on sync ticks;
- * the ticks between and the read model (`norn inbox`/`status`) show the PR items from this.
+ * the ticks between and the read model (`norn status`, `norn story list`) show the PR items from this.
  */
 export type PrFactsCache = Record<string, StoryPrSeen>;
 

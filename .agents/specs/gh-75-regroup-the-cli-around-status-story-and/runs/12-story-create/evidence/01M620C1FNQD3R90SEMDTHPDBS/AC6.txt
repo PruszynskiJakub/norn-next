@@ -1,0 +1,18 @@
+$ FAKE_GH_FAIL_CREATE=1 devnorn story create --title "Will fail" --workflow fix
+**Error (remote_failed):** the remote failed: gh issue create failed (exit 1): HTTP 403: Resource not accessible by integration
+
+Do instead: norn doctor
+exit 1
+$ FAKE_GH_FAIL_CREATE=1 devnorn story create --title "Will fail" --json
+{"error":"the remote failed: gh issue create failed (exit 1): HTTP 403: Resource not accessible by integration","do_instead":"norn doctor","code":"remote_failed"}
+exit 1
+--- gh calls
+["api","user","--jq",".login"]
+["issue","create","--title","Will fail","--body","","--label","norn","--label","norn:wf:fix","--assignee","qa-person"]
+["api","user","--jq",".login"]
+["issue","create","--title","Will fail","--body","","--label","norn","--assignee","qa-person"]
+issues before 3, after 3
+--- local diff (specs, worktrees, git status, files written under .agents/norn) before vs after:
+(no difference)
+--- stories in status
+["gh-101","gh-102","gh-103"]

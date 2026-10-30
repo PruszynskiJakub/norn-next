@@ -1,0 +1,3 @@
+#!/bin/sh
+echo "editor got: $1" >> "$FAKE_EDITOR_LOG"
+printf 'Body written in the editor.\n' > "$1"

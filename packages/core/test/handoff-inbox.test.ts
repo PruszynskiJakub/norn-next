@@ -70,13 +70,13 @@ describe("inbox (O1)", () => {
     const view = Object.fromEntries(Object.entries(inbox.groups).map(([g, items]) => [g, items.map((i) => `${i.slice ?? i.story} | ${i.title} | ${i.age} | ${i.command}`)]));
     expect(view).toEqual({
       your_turn: [`gh-1 | refine: attended step — work with the agent | 1h | cd /r-worktrees/gh-1-login && claude --permission-mode auto -- 'Use the norn skill, then run \`norn brief\`.'`],
-      answer: ['gh-1/01 | Which DB? | 1h | norn answer gh-1/01 "…"'],
-      approve: ["gh-1/02 | approve or reject human-qa | 1h | norn approve gh-1/02"],
-      unblock: ["gh-1/03 | review_loop 3/3 at review.changes_requested | 1h | norn unstick gh-1/03"],
+      answer: ['gh-1/01 | Which DB? | 1h | norn story answer gh-1/01 "…"'],
+      approve: ["gh-1/02 | approve or reject human-qa | 1h | norn story approve gh-1/02"],
+      unblock: ["gh-1/03 | review_loop 3/3 at review.changes_requested | 1h | norn run rerun gh-1/03"],
       check: [],
-      unclaimed: ["gh-2 | Unclaimed — Login form | 2h | norn take gh-2"],
+      unclaimed: ["gh-2 | Unclaimed — Login form | 2h | norn story checkout gh-2"],
       notes: [],
-      running: ["gh-1/04 | implement #1 (auto) | 1h | norn trace gh-1/04"],
+      running: ["gh-1/04 | implement #1 (auto) | 1h | norn run list gh-1/04"],
       recently_done: [],
     });
     expect(inbox.pending).toBe(5);
@@ -88,7 +88,7 @@ describe("inbox (O1)", () => {
     const f = facts([storyFacts("gh-1", [unitFacts(storyUnit(), STORY_WF, st)])]);
     f.machine.runner_capabilities = { send: true, resume: true, open: true };
     expect(buildInbox(f, CONFIG).groups.your_turn).toMatchObject([
-      { command: "norn open gh-1", detail: `by hand: cd /r-worktrees/gh-1-login && claude --permission-mode auto -- 'Use the norn skill, then run \`norn brief\`.'` },
+      { command: "norn story start gh-1", detail: `by hand: cd /r-worktrees/gh-1-login && claude --permission-mode auto -- 'Use the norn skill, then run \`norn brief\`.'` },
     ]);
   });
 
@@ -273,7 +273,7 @@ describe("inbox: the person's last actions (F21, F25, F35, Q6)", () => {
     const uf = unitFacts(unit, SLICE_WF, st, { last_outcome_receipt: { ...qa, file: ".agents/specs/gh-1-login/runs/02-form/receipts/0009-done.json" } });
     const item = buildInbox(facts([storyFacts("gh-1", [uf])]), CONFIG).groups.approve[0];
     const dir = "/r-worktrees/gh-1-login--02-form/.agents/specs/gh-1-login/runs/02-form";
-    expect(item?.detail).toBe('step qa#1 reported partial (receipt 0009) · or reject: norn approve gh-1/02 --reject --reason "…"');
+    expect(item?.detail).toBe('step qa#1 reported partial (receipt 0009) · or reject: norn story reject gh-1/02 --reason "…"');
     expect(item?.full).toBe(`Report: ${dir}/receipts/0009-done.json\nEvidence: ${dir}/evidence/01JDDDDDDDDDDDDDDDDDDDDDDD/`);
   });
 });
@@ -286,7 +286,7 @@ describe("inbox history (O1, O4)", () => {
     const f = facts([storyFacts("gh-1", [unitFacts(unit, SLICE_WF, gate), unitFacts(sliceUnit("gh-1", "03", "c"), SLICE_WF, stateFor(sliceUnit("gh-1", "03", "c"), SLICE_WF, { status: "running" }))])]);
     const first = inboxChanges({}, buildInbox(f, CONFIG), f, []);
     expect(first.changes).toEqual([
-      expect.objectContaining({ event: "appeared", id: "approve:gh-1/02:human-qa#1", group: "approve", slice: "gh-1/02", step: "human-qa", at: at(T0 - 60_000), command: "norn approve gh-1/02" }),
+      expect.objectContaining({ event: "appeared", id: "approve:gh-1/02:human-qa#1", group: "approve", slice: "gh-1/02", step: "human-qa", at: at(T0 - 60_000), command: "norn story approve gh-1/02" }),
     ]);
     expect(Object.keys(first.open)).toEqual(["approve:gh-1/02:human-qa#1"]);
     expect(inboxChanges(first.open, buildInbox(f, CONFIG), f, []).changes).toEqual([]);

@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M612WDSZJQHG1KQPDM8EH7Z7",
+  "run_id": "01M612DC52SBY5GM0MY7FZSMPM",
+  "step": "merge",
+  "attempt": 1,
+  "at": "2026-10-28T11:03:49.311Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/01",
+  "outcome": "done",
+  "handoff": "Merged story branch (gh-75/02 printed-command builders) into the slice: conflicts in cli.ts, run-list.ts, run-view.ts, format.ts resolved keeping both — added cmd.runList/cmd.runView (pinned) and used them for this slice's run list/run view hints; cmd.trace/why kept for slice 14. typecheck green, bun test 1239 pass."
+}

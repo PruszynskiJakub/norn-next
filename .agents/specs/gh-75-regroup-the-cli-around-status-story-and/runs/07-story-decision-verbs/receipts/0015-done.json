@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M63VK4P5NGV2YQ6CGQQR88ZA",
+  "run_id": "01M61M9BG73KBDVZC5CKQC6JYJ",
+  "step": "merge",
+  "attempt": 1,
+  "at": "2026-10-29T12:54:08.325Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/07",
+  "outcome": "done",
+  "handoff": "Rebased onto the story branch (slices 05, 06, 10 landed). The story noun keeps every verb: list, view, chat, answer, approve, reject, update-branch, checkout, handoff, close. Help: story is under Answer what needs you. target.ts uses the base's story flag (B55) in place of storyOnly, and keeps aStory/resolveStory and parkedOn. status.test verb lists and base-sync are updated. Full suite 1285 pass, typecheck green. Friction: a tick read state.json from a worktree with a rebase in progress and started a stray implement retry."
+}

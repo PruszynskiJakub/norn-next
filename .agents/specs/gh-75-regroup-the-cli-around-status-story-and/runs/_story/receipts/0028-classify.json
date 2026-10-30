@@ -1,0 +1,25 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M64X10P6BPXSS7RG2NDPX0JQ",
+  "run_id": null,
+  "step": "human-qa",
+  "attempt": 1,
+  "at": "2026-10-29T22:38:25.992Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M64X10P68CXPZYG8AC3NXEB3",
+  "outcome": "stale",
+  "rule": "base moved",
+  "detail": "2 behind, conflicts: .agents/skills/triage/SKILL.md, AGENTS.md, CONTRIBUTING.md",
+  "route": "update",
+  "base": {
+    "ref": "refs/remotes/origin/main",
+    "sha": "b563d55a178d934ae8fda3bce63d9e68e643e49d",
+    "behind": 2,
+    "conflicts": [
+      ".agents/skills/triage/SKILL.md",
+      "AGENTS.md",
+      "CONTRIBUTING.md"
+    ]
+  }
+}

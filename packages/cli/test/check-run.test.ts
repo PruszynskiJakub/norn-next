@@ -103,10 +103,10 @@ describe("a long check (gh-77)", () => {
     const during = await h.norn("tick");
     expect(during.exit).toBe(0);
     expect(rules(during.value as TickReport)).toContain("check.running");
-    const inbox = (await h.norn("inbox", "--json")).value as { groups: { unblock: Array<{ title: string }>; running: Array<{ title: string }> } };
+    const inbox = (await h.norn("status", "--json")).value as { groups: { unblock: Array<{ title: string }>; running: Array<{ title: string }> } };
     expect(inbox.groups.unblock.map((i) => i.title)).not.toContainEqual(expect.stringContaining("no heartbeat"));
     expect(inbox.groups.running.map((i) => i.title)).toContain("test #1 (check running)");
-    expect((await h.norn("status")).stdout).toContain("test#1 (check running) 1m");
+    expect((await h.norn("story", "list")).stdout).toContain("test#1 (check running) 1m");
     expect(checks(runsDir)).toEqual([]);
     h.clock.advance(100_000); // past claim.renew (3m): the claim is kept while it runs
     expect(rules((await h.norn("tick")).value as TickReport)).toEqual(expect.arrayContaining(["claim.renew", "check.running"]));

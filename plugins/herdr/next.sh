@@ -1,9 +1,14 @@
 #!/bin/sh
-# Action: focus the agent pane of the oldest Your turn item (HC10); a toast when there is none.
+# Action: focus the agent pane of the oldest Your turn item (HC10, `norn run attach --next`); a toast
+# when there is none, or when its agent has no live pane (the refusal's do_instead starts it).
 cd "$(dirname "$0")" && . ./lib.sh
 cd "$(repo_dir)" || exit 1
-out=$("$NORN" cockpit --next --json 2>/dev/null) || { notify "norn" "norn cockpit --next failed in $PWD"; exit 1; }
-case "$out" in
-  *'"item":null'*) notify "norn" "No agent waits for you" ;;
-  *'"focused":null'*) notify "norn · Your turn" "No agent pane found; run: $(printf '%s' "$out" | sed -n 's/.*"command":"\([^"]*\)".*/\1/p')" ;;
+out=$("$NORN" run attach --next --json 2>/dev/null) && exit 0
+# P8: branch on the refusal's code, never on its text
+code=$(printf '%s' "$out" | json_get code)
+err=$(printf '%s' "$out" | json_get error)
+hint=$(printf '%s' "$out" | json_get do_instead)
+case "$code" in
+  nothing_to_attach) notify "norn" "$err; run: $hint" ;;
+  *) notify "norn" "norn run attach --next failed in $PWD${err:+: $err}" ;;
 esac
