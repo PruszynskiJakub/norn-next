@@ -5,8 +5,8 @@
   "unit_dir": "_story",
   "workflow": "story",
   "workflow_hash": "bd5ef0fbb2da1f4313555a687d9e9ce40829c98ae5c6398e299646accc1ffe05",
-  "step": "test",
-  "attempt": 4,
+  "step": "open-pr",
+  "attempt": 2,
   "visits": {
     "refine": 1,
     "plan": 1,
@@ -20,10 +20,10 @@
     "implement": 3,
     "human-qa": 2,
     "describe": 1,
-    "open-pr": 1,
+    "open-pr": 2,
     "ready": 1
   },
-  "step_entered_at": "2026-10-30T10:40:06.483Z",
+  "step_entered_at": "2026-10-30T10:41:38.779Z",
   "status": "ready",
   "park": null,
   "counters": {
@@ -36,7 +36,7 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 52,
+  "applied_through": 53,
   "run": null,
   "last_outcome": {
     "step": "implement",
@@ -46,7 +46,7 @@
     "receipt_id": "01M666A4J3K0WW2VAQFMJDGBFR"
   },
   "created_at": "2026-10-28T08:51:06.916Z",
-  "updated_at": "2026-10-30T10:40:06.483Z",
-  "last_tick_id": "01M666AEAF6S595HAMTHX7MWYG",
+  "updated_at": "2026-10-30T10:41:38.779Z",
+  "last_tick_id": "01M666D8ERZ15DGX180ARQ0A9S",
   "mode": "auto"
 }

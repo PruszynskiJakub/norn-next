@@ -25,24 +25,24 @@ criteria:
   - { id: B9, verifier: agent }
   - { id: B10, verifier: agent }
   - { id: B11, verifier: agent }
-  - { id: B12, verifier: agent, needs: [herdr] }
+  - { id: B12, verifier: agent, needs: [ herdr ] }
   - { id: B13, verifier: agent }
   - { id: B14, verifier: agent }
   - { id: B15, verifier: agent }
   - { id: B16, verifier: agent }
-  - { id: B17, verifier: agent, needs: [browser] }
-  - { id: B18, verifier: agent, needs: [remote] }
+  - { id: B17, verifier: agent, needs: [ browser ] }
+  - { id: B18, verifier: agent, needs: [ remote ] }
   - { id: B19, verifier: person }
   - { id: B20, verifier: agent }
   - { id: B21, verifier: agent }
   - { id: B22, verifier: agent }
-  - { id: B23, verifier: agent, needs: [browser, remote] }
+  - { id: B23, verifier: agent, needs: [ browser, remote ] }
   - { id: B24, verifier: agent }
   - { id: B25, verifier: agent }
   - { id: B26, verifier: agent }
   - { id: B27, verifier: agent }
   - { id: B28, verifier: agent }
-  - { id: B29, verifier: agent, needs: [herdr] }
+  - { id: B29, verifier: agent, needs: [ herdr ] }
   - { id: B30, verifier: agent }
   - { id: B31, verifier: agent }
   - { id: B32, verifier: agent }
@@ -59,8 +59,8 @@ criteria:
   - { id: B43, verifier: agent }
   - { id: B44, verifier: agent }
   - { id: B45, verifier: agent }
-  - { id: B46, verifier: agent, needs: [herdr] }
-  - { id: B47, verifier: agent, needs: [herdr] }
+  - { id: B46, verifier: agent, needs: [ herdr ] }
+  - { id: B47, verifier: agent, needs: [ herdr ] }
   - { id: B48, verifier: agent }
   - { id: B49, verifier: agent }
   - { id: B50, verifier: agent }
