@@ -1,6 +1,6 @@
 ---
 id: gh-107/06
-title: Tick facts stored as content-addressed chunks
+title: Tick facts stored as content-addressed chunks with 64-fact hook blocks
 depends_on: [gh-107/02]
 status: planned
 criteria:
@@ -14,14 +14,16 @@ criteria:
   - { id: AC8, verifier: test }
   - { id: AC9, verifier: test }
   - { id: AC10, verifier: test }
-  - { id: AC11, verifier: person }
+  - { id: AC11, verifier: test }
+  - { id: AC12, verifier: test }
+  - { id: AC13, verifier: person }
 ---
 
 ## Goal
-A tick line keeps its decisions but stores its facts as a `$chunked` skeleton whose chunks live once in the day's chunks file, so a quiet tick writes a few kilobytes instead of ~650 KB, and `norn why` still replays every tick exactly, old and new.
+A tick line keeps its decisions but stores its facts as a `$chunked` skeleton whose chunks live once in the day's chunks file, with each run's hook facts as fixed 64-fact blocks written once, so a quiet tick writes a few kilobytes instead of ~650 KB, a long agent step makes the trace grow linearly with its hooks, and `norn why` still replays every tick exactly, old and new.
 
 ## Scope
-Behaviour: B13, B15, B16, B17, B18, B19, B21, B22, B35. Seams: S1, S2. D6, D7 (without hook blocks: a run's hooks stay inside its story chunk until 07), D8, D9, D10's corrupt-entry half, D14. PRD: amend O4, O5, X4. Out: 64-fact hook blocks (07), the `tick_pruned` refusal (08).
+Behaviour: B13, B14, B15, B16, B17, B18, B19, B21, B22, B35. Seams: S1, S2. D6, D7 (hook blocks included), D8, D9, D10's corrupt-entry half, D14, D15. PRD: amend O4, O5, X4. Out: the `tick_pruned` refusal (08).
 
 ## Acceptance
 - AC1 (B13) Given two ticks a minute apart with nothing changed, when the second runs, then it adds a tick line and no new chunk, and the bytes both add to the trace together are under 5 KB. — verifier: test
@@ -34,7 +36,9 @@ Behaviour: B13, B15, B16, B17, B18, B19, B21, B22, B35. Seams: S1, S2. D6, D7 (w
 - AC8 (B22) Given the cli harness tests run with golden harvesting on, when they harvest from chunked ticks, then the harvest yields the same case names and decisions as from full ticks. — verifier: test
 - AC9 (B35) Given a chunked tick line, when it is checked against the older tick schema shape and read by `norn inbox --history`, then it validates (`facts` an object) and its decisions and inbox changes are read. — verifier: test
 - AC10 (B35) Given full-facts ticks written after chunked ones (as an older norn would after a downgrade), when the new version reads them, then `norn why` replays both kinds. — verifier: test
-- AC11 (B35) The PR body names the downgrade as its merge danger: an older norn cannot replay chunked ticks and there is no compatibility mode. — verifier: person, because judging the PR's stated merge danger is a reviewer's call at the `ready` gate
+- AC11 (B14) Given a run with 416 hook facts appended over its life, when its ticks are written, then 6 full blocks are each written once, and each later tick adds only the last partial block when it changed. — verifier: test
+- AC12 (B14, B17) Given chunked ticks whose runs carry `$blocks` references, when `norn why --tick <id>` runs, then the rebuilt facts equal the observed facts byte for byte and decide gives the recorded decisions. — verifier: test
+- AC13 (B35) The PR body names the downgrade as its merge danger: an older norn cannot replay chunked ticks and there is no compatibility mode. — verifier: person, because judging the PR's stated merge danger is a reviewer's call at the `ready` gate
 
 ## Checks
 - `bun test packages/store/test/config-trace.test.ts`
@@ -42,4 +46,4 @@ Behaviour: B13, B15, B16, B17, B18, B19, B21, B22, B35. Seams: S1, S2. D6, D7 (w
 - `bun run typecheck`
 
 ## Notes
-Start with the spike from Risks: split a real recorded tick from this repo's trace by D7 and measure the inline part; if over 5 KB, make the largest inline part a chunk too, without returning to the person. Guard byte-for-byte replay (key order) with the S2 round-trip before switching `why` over. Hook blocks are split out to 07 so this slice fits one context; until 07 lands a run with many hooks rewrites its story chunk when a hook arrives — AC1 holds because a quiet tick changes no story. If the reviewer prefers one PR for 06+07, that is the person's call.
+Chunks and hook blocks ship together (D15, ruled at approve-plan): `$blocks` is part of the tick line skeleton, so splitting them would change the line format twice. This is the largest slice; keep it in one context by ordering (Risks): first the spike — split a real recorded tick from this repo's trace by D7 and measure the inline part; if over 5 KB, make the largest inline part a chunk too, without returning to the person — then the S2 tests (B14, B15, B16, B19, B21 and the byte-for-byte round-trip guarding key order) before any CLI path reads chunks, then S1 (B13, B17, B18, B22, B35: switch `why` and the golden harvest over). Blocks are cut by position in the run's refined hook list; Claude's refinement looks only backwards, so full blocks stay stable (D7). A late hook simply makes a new block. Slice 07 (hook blocks) was merged into this one and its file removed; the key gh-107/07 is unused.
