@@ -24,8 +24,13 @@
     "ready": 1
   },
   "step_entered_at": "2026-10-30T08:41:03.611Z",
-  "status": "running",
-  "park": null,
+  "status": "stuck",
+  "park": {
+    "kind": "exhausted",
+    "reason": "silent: nudges 2/2 at implement",
+    "since": "2026-10-30T08:47:03.644Z",
+    "receipt_id": "01M65ZVEA9V0P2D16YBMP9E20W"
+  },
   "counters": {
     "plan_loop": 0,
     "test_loop": 0,
@@ -36,7 +41,7 @@
   },
   "nudges_used": 2,
   "retries_used": 0,
-  "applied_through": 47,
+  "applied_through": 48,
   "run": {
     "run_id": "01M65ZHBVJT17558F1V8B9BQBJ",
     "step": "implement",
@@ -61,11 +66,11 @@
     "step": "implement",
     "outcome": "silent",
     "source": "classified",
-    "at": "2026-10-30T08:45:33.387Z",
-    "receipt_id": "01M65ZRPA8SH7JZ3JVM095YE8F"
+    "at": "2026-10-30T08:47:03.644Z",
+    "receipt_id": "01M65ZVEA9V0P2D16YBMP9E20W"
   },
   "created_at": "2026-10-28T08:51:06.916Z",
-  "updated_at": "2026-10-30T08:45:33.387Z",
-  "last_tick_id": "01M65ZRPA8AQPDK7KHR9MCD30V",
+  "updated_at": "2026-10-30T08:47:03.644Z",
+  "last_tick_id": "01M65ZVEA9EDMP4WGPA7V8X6ME",
   "mode": "auto"
 }
