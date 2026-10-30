@@ -200,6 +200,9 @@ describe("trace (O4)", () => {
     appendHookTrace(repo, gh9s, hook("2026-10-24T00:00:02.000Z", "/w/gh-9--01", { story: "gh-9", slice: "gh-9/01" }));
     // B7: the unit is the one written to, whatever the fact names
     appendHookTrace(repo, gh10, hook("2026-10-24T00:00:03.000Z", "/elsewhere", { story: "gh-10", run_id: ulid() }));
+    // D4: the hook file's time is its latest fact's; an older fact appended later never moves it back
+    expect(unitHooksChangedAt(repo, gh9)).toBe(Date.parse("2026-10-24T00:00:01.000Z"));
+    expect(unitHooksChangedAt(repo, gh10)).toBe(Date.parse("2026-10-24T00:00:03.000Z"));
     // a duplicate line (a backfill overlapping an append) is read once
     appendFileSync(hookFilePath(repo, gh9), `${JSON.stringify(late)}\n`);
     expect(hookFilePath(repo, gh9)).toBe(join(traceDir(repo), "hooks/gh-9/_story.jsonl"));
@@ -208,7 +211,7 @@ describe("trace (O4)", () => {
     expect(readTrace(repo, { types: ["hook"] }).events).toHaveLength(6);
 
     const seen: string[] = [];
-    const prev = setTraceReadObserver(({ file }) => seen.push(file));
+    const prev = setTraceReadObserver(({ file, kind }) => seen.push(`${kind} ${file.slice(traceDir(repo).length + 1)}`));
     const ats = (units: Parameters<typeof readUnitHooks>[1], since: string) => readUnitHooks(repo, units, since).map((evs) => evs.map((e) => e.fact.at.slice(11, 19)));
     try {
       // the story unit no longer sees its slice's hooks: each unit has its own file
@@ -220,8 +223,8 @@ describe("trace (O4)", () => {
     } finally {
       setTraceReadObserver(prev);
     }
-    expect(seen).toEqual([]); // B8–B10: no day file opened
-    expect(unitHooksChangedAt(repo, gh9)).toBeNumber();
+    // B8–B10: only the units' own hook files are opened (gh-11 has none), no day file
+    expect([...new Set(seen)].sort()).toEqual(["hook hooks/gh-10/_story.jsonl", "hook hooks/gh-9/01.jsonl", "hook hooks/gh-9/_story.jsonl"]);
     expect(unitHooksChangedAt(repo, { story: "gh-11" })).toBeNull();
   });
   test("briefings stored by trace-relative path (B4)", () => {

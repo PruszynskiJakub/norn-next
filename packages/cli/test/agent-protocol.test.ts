@@ -7,9 +7,9 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { BriefJson } from "@norn/core";
-import type { HookTrace } from "@norn/schema";
-import { readTrace, readTraceFile, setTraceReadObserver, traceDir } from "@norn/store";
+import type { BriefJson, Facts } from "@norn/core";
+import { type HookTrace, type TickTrace, ulid } from "@norn/schema";
+import { appendHookTrace, readTrace, readTraceFile, setTraceReadObserver, type TraceFileRead, traceDir } from "@norn/store";
 import { type CliResult, runCli } from "../src/index.ts";
 import { parseFindings } from "../src/commands/done.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
@@ -84,17 +84,19 @@ const dayHookLines = () =>
     .sort()
     .flatMap((n) => h.read(join(traceDir(h.root), n)).split("\n"))
     .filter((l) => l.startsWith('{"type":"hook"'));
-/** the day files `run` opens through the trace-read observer (B8–B10) */
-async function openedDays(run: () => Promise<unknown>): Promise<string[]> {
-  const seen: string[] = [];
-  const prev = setTraceReadObserver(({ file }) => seen.push(file));
+/** the trace files `run` opens through the trace-read observer, each once, by kind (B4, B8–B10) */
+async function opened(run: () => Promise<unknown>): Promise<Record<TraceFileRead["kind"], string[]>> {
+  const seen: TraceFileRead[] = [];
+  const prev = setTraceReadObserver((r) => seen.push(r));
   try {
     await run();
   } finally {
     setTraceReadObserver(prev);
   }
-  return [...new Set(seen)];
+  const of = (kind: TraceFileRead["kind"]) => [...new Set(seen.filter((r) => r.kind === kind).map((r) => r.file))];
+  return { day: of("day"), hook: of("hook") };
 }
+const openedDays = async (run: () => Promise<unknown>) => (await opened(run)).day;
 const receipts = (dir: string) => (existsSync(join(dir, "receipts")) ? readdirSync(join(dir, "receipts")).sort() : []);
 const readReceipt = (dir: string, name: string) => JSON.parse(h.read(join(dir, "receipts", name)));
 
@@ -152,12 +154,12 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
   });
 
   test("hook in a ready step without a run never blocks; the fact lands in the trace (A2)", async () => {
-    const r = await hook(wt(), "pre-tool-use", { hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "norn brief" } });
+    const r = await hook(wt(), "post-tool-use", { hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "norn brief" } });
     expect(r).toMatchObject({ exit: 0, value: {} });
     expect((await stop(wt())).value).toEqual({});
     const hooks = readTrace(h.root, { types: ["hook"] }).events as HookTrace[];
     expect(hooks.map((e) => e.fact.event)).toEqual(["tool_use", "turn_end"]);
-    expect(hooks[0]?.fact).toMatchObject({ agent: "claude", native: "PreToolUse", story: "gh-9", agent_session_id: "sess-1", command: "norn brief" });
+    expect(hooks[0]?.fact).toMatchObject({ agent: "claude", native: "PostToolUse", story: "gh-9", agent_session_id: "sess-1", command: "norn brief" });
     expect(hooks.some((e) => e.blocked)).toBe(false);
     // B5, B7: the same lines land in gh-9's hook file, run id or not (no run yet), and `norn trace` shows them
     expect(hooks.every((e) => !e.fact.run_id)).toBe(true);
@@ -228,22 +230,11 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     // a reader of every type still reports the broken line
     expect(readTrace(h.root).errors.map((e) => e.file)).toContainEqual(expect.stringMatching(/\.jsonl:\d+$/));
 
-    const seen: string[] = [];
-    const prev = setTraceReadObserver(({ file }) => seen.push(file));
-    const opened = async (run: () => Promise<unknown>) => {
-      seen.length = 0;
-      await run();
-      return [...new Set(seen)];
-    };
-    try {
-      expect(await opened(() => h.norn("trace", "gh-9"))).toEqual(days());
-      // B8, B9: the blocked-hook count and the tick's hook facts come from the unit's hook file, no day file
-      expect(await opened(() => stop(wt()))).toEqual([]);
-      expect(await opened(() => h.tick())).toEqual([]);
-      expect(await opened(() => h.norn("inbox", "--history"))).toEqual(days());
-    } finally {
-      setTraceReadObserver(prev);
-    }
+    expect(await openedDays(() => h.norn("trace", "gh-9"))).toEqual(days());
+    // B8, B9: the blocked-hook count and the tick's hook facts come from the unit's hook file, no day file
+    expect(await openedDays(() => stop(wt()))).toEqual([]);
+    expect(await openedDays(() => h.tick())).toEqual([]);
+    expect(await openedDays(() => h.norn("inbox", "--history"))).toEqual(days());
   });
 
   test("the tick applies the started receipt: running, how manual (MO3)", async () => {
@@ -467,6 +458,35 @@ describe("norn hook robustness (A3)", () => {
     );
     const text = (await h.norn("inbox")).stdout;
     expect(text).toContain("pending command: Bash(rm -rf build)");
+  });
+
+  test("B8 (D4): a tick reads the hook files of units with a live run and of units written within limits.stalled, never a day file", async () => {
+    // gh-9 is parked on its implicit ask (a live run); gh-10 is done, with no live run
+    const run9 = h.state(runs())?.run?.run_id as string;
+    expect(h.state(pairRuns())).toMatchObject({ status: "done", run: null });
+    h.clock.advance(1_000);
+    // hook lines for other units: gh-10's lands in its hook file and the day file, gh-404's (no such unit) too
+    appendHookTrace(h.root, { story: "gh-10" }, { type: "hook", id: ulid(h.clock.now()), fact: { event: "tool_use", at: h.clock.iso(), agent: "claude", native: "PostToolUse", cwd: pairWt(), story: "gh-10" } });
+    appendHookTrace(h.root, { story: "gh-404" }, { type: "hook", id: ulid(h.clock.now()), fact: { event: "tool_use", at: h.clock.iso(), agent: "claude", native: "PostToolUse", cwd: "/elsewhere", story: "gh-404" } });
+    const file = (story: string) => join(traceDir(h.root), "hooks", story, "_story.jsonl");
+    /** one tick: the hook files and day files it opens, and the hook facts of gh-9's run in its facts */
+    const tick = async () => {
+      const { day: days, hook } = await opened(() => h.tick());
+      const hooks = hook.sort();
+      const last = readTrace(h.root, { types: ["tick"] }).events.at(-1) as TickTrace;
+      const facts = last.facts as unknown as Facts;
+      const gh9 = facts.stories.find((s) => s.key === "gh-9")?.units[0];
+      return { hooks, days, run9: gh9?.run?.hooks.map((f) => f.run_id) ?? [] };
+    };
+    const own = (hookFileLines("gh-9").map((l) => JSON.parse(l) as HookTrace)).filter((e) => e.fact.run_id === run9);
+    expect(own.length).toBeGreaterThan(0);
+    // within the stalled window (15m): gh-10's file is read beside gh-9's, gh-404 (no unit) never
+    h.clock.advance(14 * 60_000);
+    expect(await tick()).toEqual({ hooks: [file("gh-10"), file("gh-9")], days: [], run9: own.map(() => run9) });
+    // past it: gh-9's file only
+    h.clock.advance(2 * 60_000);
+    expect(await tick()).toEqual({ hooks: [file("gh-9")], days: [], run9: own.map(() => run9) });
+    expect(h.state(runs())).toMatchObject({ status: "parked", run: { run_id: run9 } });
   });
 });
 

@@ -104,12 +104,15 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
   const stalledMs = opts.stalledMs ?? parseDuration((snapshot.config.ok ? snapshot.config.config : DEFAULT_CONFIG).limits.stalled);
 
   const starts: string[] = [new Date(now - stalledMs).toISOString()];
+  // units with a live run or an unknown launch (R5.1): their hook files are always read (D4)
+  const running = new Set<UnitSnapshot>();
   const read = snapshot.stories.map((s) => {
     const story = withSliceWorktrees(s, (slice) => opts.sliceWorktrees.get(slice), { includeApplied });
     for (const u of story.units) {
       if (liveRun(u.state)) starts.push(u.state?.run?.started_at ?? (u.state as UnitState).updated_at);
       const unknown = unknownLaunch(u.unapplied);
       if (unknown) starts.push(unknown.receipt.at);
+      if (liveRun(u.state) || unknown) running.add(u);
     }
     return story;
   });
@@ -122,7 +125,7 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
   });
   // B8 (D4): only the hook files of units with a live run or an unknown launch (R5.1), or written within the stalled window (R5.3)
   const hooked = placed.flatMap(({ units }) => units.map(({ u }) => u)).filter((u) => {
-    if (liveRun(u.state) || unknownLaunch(u.unapplied)) return true;
+    if (running.has(u)) return true;
     const changed = unitHooksChangedAt(root, u.unit);
     return changed !== null && changed >= now - stalledMs;
   });

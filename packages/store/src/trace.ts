@@ -46,10 +46,8 @@ export function appendTrace(root: string, event: TraceEvent): string {
   assertValid("trace", event);
   const name = traceFileName(eventTime(event));
   const path = join(traceDir(root), name);
-  // B4 (D2): `type` first, so a reader can skip a line by its prefix without parsing it
-  const { type, ...rest } = event;
-  const line = `${JSON.stringify({ type, ...rest })}\n`;
-  if (type === "tick.start") appendDurable(path, line);
+  const line = traceLine(event);
+  if (event.type === "tick.start") appendDurable(path, line);
   else {
     mkdirSync(dirname(path), { recursive: true });
     appendFileSync(path, line);
@@ -57,23 +55,33 @@ export function appendTrace(root: string, event: TraceEvent): string {
   return name;
 }
 
+/** B4 (D2): one trace line, `type` first, so a reader can skip a line by its prefix without parsing it. */
+function traceLine(event: TraceEvent): string {
+  const { type, ...rest } = event;
+  return `${JSON.stringify({ type, ...rest })}\n`;
+}
+
 /**
  * B5 (D3, A2): append a hook event to its unit's hook file, then the same line to the day file —
- * both unsynced appends, like every diagnostic line. The hook file's mtime is set to the fact's time,
- * so the tick's "written within the stalled window" (D4, `unitHooksChangedAt`) is on the clock the
- * facts carry. Returns the day file's trace-relative name.
+ * both unsynced appends, like every diagnostic line. Then the hook file's mtime is moved forward to the
+ * fact's time, never back, so the tick's "written within the stalled window" (D4, `unitHooksChangedAt`)
+ * is on the clock the facts carry. Returns the day file's trace-relative name.
  */
 export function appendHookTrace(root: string, unit: HookUnit, event: HookTrace): string {
   assertValid("trace", event);
-  const { type, ...rest } = event;
-  const line = `${JSON.stringify({ type, ...rest })}\n`;
+  const line = traceLine(event);
+  const name = traceFileName(event.fact.at);
   const file = hookFilePath(root, unit);
+  const before = unitHooksChangedAt(root, unit) ?? Number.NEGATIVE_INFINITY;
   mkdirSync(dirname(file), { recursive: true });
   appendFileSync(file, line);
-  const at = new Date(event.fact.at);
-  utimesSync(file, at, at);
-  const name = traceFileName(event.fact.at);
   appendFileSync(join(traceDir(root), name), line);
+  const at = new Date(Math.max(before, Date.parse(event.fact.at)));
+  try {
+    utimesSync(file, at, at);
+  } catch {
+    /* diagnostic: the lines are written; a later fact sets the time */
+  }
   return name;
 }
 
@@ -146,10 +154,12 @@ function eventMatchesUnit(ev: TraceEvent, unit: string): boolean {
 
 // ---------------------------------------------------------------- day-file lines (B4)
 
-/** One day file a reader opened: what the trace-read observer sees. */
+/** One trace file a reader opened: what the trace-read observer sees. */
 export interface TraceFileRead {
-  /** absolute path of the day file */
+  /** absolute path of the file */
   file: string;
+  /** a day file, or a unit's hook file (D3) */
+  kind: "day" | "hook";
 }
 
 export type TraceReadObserver = (read: TraceFileRead) => void;
@@ -157,14 +167,23 @@ export type TraceReadObserver = (read: TraceFileRead) => void;
 let readObserver: TraceReadObserver | null = null;
 
 /**
- * Test hook (B4), modelled on `setSpawnObserver`: call `fn` with each day file a trace reader opens
- * (`readTrace` and every reader built on it, `readHookFacts`); a unit's hook file is not a day file. `null` (the
- * default) turns it off. Returns the observer it replaced. It only watches; one that throws is ignored.
+ * Test hook (B4, B8–B10), modelled on `setSpawnObserver`: call `fn` with each day file a trace reader
+ * opens (`readTrace` and every reader built on it, `readHookFacts`) and each unit hook file `readUnitHooks`
+ * opens. `null` (the default) turns it off. Returns the observer it replaced. It only watches; one that throws is ignored.
  */
 export function setTraceReadObserver(fn: TraceReadObserver | null): TraceReadObserver | null {
   const prev = readObserver;
   readObserver = fn;
   return prev;
+}
+
+function observeRead(read: TraceFileRead): void {
+  if (!readObserver) return;
+  try {
+    readObserver(read);
+  } catch {
+    // an observer never changes what norn does
+  }
 }
 
 interface DayLine {
@@ -204,13 +223,7 @@ function* dayFileLines(root: string, opts: { sinceDay?: string | null; types?: r
   for (const name of names) {
     if (opts.sinceDay && name.slice(0, 10) < opts.sinceDay.slice(0, 10)) continue;
     const path = join(traceDir(root), name);
-    if (readObserver) {
-      try {
-        readObserver({ file: path });
-      } catch {
-        // an observer never changes what norn does
-      }
-    }
+    observeRead({ file: path, kind: "day" });
     let text: string | null;
     try {
       text = readText(path);
@@ -340,12 +353,18 @@ export function readHookFacts(root: string, since: string): HookFact[] {
 
 function* hookLines(root: string, since: string): Generator<HookTrace> {
   for (const { text } of dayFileLines(root, { sinceDay: since, types: ["hook"], quiet: true })) {
-    try {
-      const ev = JSON.parse(text) as HookTrace;
-      if (ev.type === "hook" && ev.fact && ev.fact.at >= since) yield ev;
-    } catch {
-      /* diagnostic file; bad lines are skipped */
-    }
+    const ev = hookLine(text, since);
+    if (ev) yield ev;
+  }
+}
+
+/** One hook line at `since` or later, unchecked (a fast scan); null for any other or a bad line. */
+function hookLine(text: string, since: string): HookTrace | null {
+  try {
+    const ev = JSON.parse(text) as HookTrace;
+    return ev.type === "hook" && ev.fact && ev.fact.at >= since ? ev : null;
+  } catch {
+    return null; // diagnostic file; bad lines are skipped
   }
 }
 
@@ -360,24 +379,21 @@ export interface HookUnit {
  * the fact's time (D3). A fast scan like `readHookFacts`: nothing is schema-checked, bad lines are skipped.
  */
 function unitHookLines(root: string, unit: HookUnit, since: string): HookTrace[] {
+  const file = hookFilePath(root, unit);
   let text: string | null;
   try {
-    text = readText(hookFilePath(root, unit));
+    text = readText(file);
   } catch {
     return []; // diagnostic file: unreadable is empty
   }
+  if (text !== null) observeRead({ file, kind: "hook" });
   const seen = new Set<string>();
   const out: HookTrace[] = [];
   for (const line of (text ?? "").split("\n")) {
-    if (!line.trim()) continue;
-    try {
-      const ev = JSON.parse(line) as HookTrace;
-      if (ev.type !== "hook" || !ev.fact || ev.fact.at < since || seen.has(ev.id)) continue;
-      seen.add(ev.id);
-      out.push(ev);
-    } catch {
-      /* diagnostic file; bad lines are skipped */
-    }
+    const ev = line.trim() ? hookLine(line, since) : null;
+    if (!ev || seen.has(ev.id)) continue;
+    seen.add(ev.id);
+    out.push(ev);
   }
   return out.sort((a, b) => a.fact.at.localeCompare(b.fact.at));
 }
