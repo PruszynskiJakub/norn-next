@@ -14,7 +14,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import type { TickStartTrace, TickTrace } from "@norn/schema";
-import { readTickInputs, readTrace } from "@norn/store";
+import { readTrace, tickReader } from "@norn/store";
 
 /** Placeholders the golden corpus uses in place of machine-specific paths. */
 export const GOLDEN_DIR_TOKEN = "<dir>";
@@ -85,13 +85,15 @@ export function harvestGolden(dir: string, root: string, outDir: string, source:
   for (const ev of events) if (ev.type === "tick.start") starts.set(ev.tick_id, ev);
   const norm = normaliser(dir);
   mkdirSync(outDir, { recursive: true });
+  const reader = tickReader(root);
   let n = 0;
   for (const ev of events) {
     if (ev.type !== "tick") continue;
     const tick = ev as TickTrace;
-    const inputs = readTickInputs(root, tick);
+    const read = reader.inputs(tick);
     const start = starts.get(tick.tick_id);
-    if (!inputs || !start) continue;
+    if (!read.ok || !start) continue;
+    const { inputs } = read;
     const body = norm(JSON.stringify({ facts: inputs.facts, workflows: inputs.workflows, config: inputs.config, decisions: start.decisions }));
     const parsed = JSON.parse(body) as { facts: unknown; workflows: unknown; config: unknown };
     writeFileSync(join(outDir, caseName(source, caseInputs(parsed))), `${JSON.stringify({ source, tick_id: tick.tick_id, ...parsed })}\n`);

@@ -29,8 +29,8 @@ export const refuse = (error: string, do_instead: string | null, code?: string, 
 export const usageError = (error: string, do_instead: string | null = "norn help", code = "usage") =>
   new CliFailure(body(error, do_instead, code), ExitCode.usage);
 /** A state or config file failed validation (S2, exit 4). */
-export const corruptError = (error: string, do_instead: string | null, details?: unknown) =>
-  new CliFailure(body(error, do_instead, "corrupt", details), ExitCode.corrupt);
+export const corruptError = (error: string, do_instead: string | null, details?: unknown, code = "corrupt") =>
+  new CliFailure(body(error, do_instead, code, details), ExitCode.corrupt);
 /** Another process holds the lock or claim (exit 5). */
 export const busyError = (error: string, do_instead: string | null, code = "busy", details?: unknown) =>
   new CliFailure(body(error, do_instead, code, details), ExitCode.busy);

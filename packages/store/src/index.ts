@@ -25,6 +25,7 @@ export * from "./receipts.ts";
 export * from "./refs.ts";
 export * from "./skills.ts";
 export * from "./snapshot.ts";
+export * from "./tick-trace.ts";
 export * from "./trace.ts";
 export * from "./unit.ts";
 export * from "./unpushed.ts";

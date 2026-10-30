@@ -22,9 +22,9 @@
  */
 import { criterionLine, decide, type Decision, legacyAction, type NumberedReceipt, type StoryFacts, type UnitFacts, unitDecision } from "@norn/core";
 import { ExitCode, type Receipt, type TickStartTrace, type TickTrace, type TickUnitRecord, ULID_PATTERN } from "@norn/schema";
-import { crashedTicksFor, decisionUnit, findCrashedTick, findTick, readTickInputs, readTrace } from "@norn/store";
+import { crashedTicksFor, decisionUnit, findCrashedTick, findTick, readTrace, type TickReader, tickReader } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
-import { refuse, usageError, withExit } from "../output.ts";
+import { corruptError, refuse, usageError, withExit } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
 import { NORN_VERSION } from "../version.ts";
 
@@ -139,8 +139,9 @@ function triggerOf(d: TickUnitRecord, uf: UnitFacts | undefined): Trigger {
   return { source: "fact", kind: d.rule, reason: a.reason ?? a.item?.title ?? null };
 }
 
-function unitIn(tick: TickTrace, story: string, key: string): { sf?: StoryFacts; uf?: UnitFacts } {
-  const sf = (tick.facts as unknown as { stories?: StoryFacts[] }).stories?.find((s) => s.key === story);
+function unitIn(reader: TickReader, tick: TickTrace, story: string, key: string): { sf?: StoryFacts; uf?: UnitFacts } {
+  const read = reader.inputs(tick);
+  const sf = read.ok ? read.inputs.facts.stories.find((s) => s.key === story) : undefined;
   return { sf, uf: sf?.units.find((u) => u.unit.key === key) };
 }
 
@@ -220,6 +221,7 @@ export const whyCommand = defineCommand({
     const tickId = opt.str(args, "tick");
     const filter = parseFilter(args);
     const filtered = Object.keys(filter).length > 0;
+    const reader = tickReader(ctx.root);
 
     // every (tick, decision) for the unit that passes the filter, oldest first
     let found: Array<{ tick: TickTrace; d: TickUnitRecord }>;
@@ -239,7 +241,7 @@ export const whyCommand = defineCommand({
       for (const ev of events as TickTrace[]) {
         // R1.1: by default the unit's own action, not the claim renewal riding along; a filter may pick either
         const d = filtered
-          ? ev.decisions.filter((x) => decisionUnit(x) === key).find((x) => matches(x, unitIn(ev, story, key).uf, filter))
+          ? ev.decisions.filter((x) => decisionUnit(x) === key).find((x) => matches(x, unitIn(reader, ev, story, key).uf, filter))
           : unitDecision(ev.decisions, key, decisionUnit);
         if (d) found.push({ tick: ev, d });
       }
@@ -254,8 +256,11 @@ export const whyCommand = defineCommand({
         );
     }
     const { tick, d: recorded } = found.at(-1) as { tick: TickTrace; d: TickUnitRecord };
-    const inputs = readTickInputs(ctx.root, tick);
-    if (!inputs) throw refuse(`tick ${tick.tick_id} has no replay block (recorded by an older norn)`, `norn trace ${key}`, "no_replay");
+    const read = reader.inputs(tick);
+    // D10 (B21, S2): a chunk the tick names is missing; nothing is replayed from a partial snapshot
+    if (!read.ok && read.reason === "corrupt") throw corruptError(`trace entry of tick ${tick.tick_id} is corrupt: ${read.error.errors[0]?.message}`, `norn trace ${key}`, [read.error], "trace_corrupt");
+    if (!read.ok) throw refuse(`tick ${tick.tick_id} has no replay block (recorded by an older norn)`, `norn trace ${key}`, "no_replay");
+    const { inputs } = read;
 
     let replayed: Decision[];
     try {
@@ -304,7 +309,7 @@ export const whyCommand = defineCommand({
       ...(filtered && !tickId
         ? {
             matches: found.map(({ tick: t, d }) => {
-              const tr = triggerOf(d, unitIn(t, story, key).uf);
+              const tr = triggerOf(d, unitIn(reader, t, story, key).uf);
               return { tick_id: t.tick_id, at: t.at, rule: d.rule, action: d.action.kind, trigger: tr.source === "receipt" ? `${tr.kind}${tr.outcome && tr.outcome !== tr.kind ? ` ${tr.outcome}` : ""} at ${tr.step}#${tr.attempt}` : tr.kind };
             }),
           }

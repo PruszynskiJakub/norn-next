@@ -417,8 +417,8 @@ Example `bug` workflow: `reproduce (agent, norn-diagnose: seen as a user, then a
 - O1 `norn inbox` (and the cockpit, `norn cockpit`) groups by action: **Your turn** (attended steps), **Answer**, **Approve**, **Unblock**, **Check**, **Unclaimed**, **Running**, **Notes** (NT2), **Recently done**; each group title carries a few words on what it holds, and each item shows question/reason, age and the exact command to resolve it. A person's start of an agent step (Your turn) shows `norn open <unit>` when the runner can open a terminal (MO5), with the start command to type by hand in the detail; otherwise the start command itself. A story taken in on this checkout that no tick has started yet is listed too: under Running while the heartbeat is up, else under Your turn with `norn watch`. `norn pane --interactive` acts on the items through CLI verbs (SPEC-herdr-cockpit HC4–HC8).
 - O2 `answer`, `approve`, `unstick`, `mode`, `workflow` write receipts; the next tick applies them and delivers answers into the same session or a fresh one from the handoff. Typing directly into an agent pane is also allowed.
 - O3 Notifiers are optional plugins (OS default; ntfy, webhook, herdr) and fire once per new inbox item, receipt-first.
-- O4 Trace: one JSONL record per tick with facts snapshot, rule fired, action, result, briefing and transcript pointers.
-- O5 `norn why <unit>` replays the pure decide function on the recorded snapshot and shows the rule that fired; `--receipt <id>` picks the decision that applied that receipt (the command of a note item, NT2).
+- O4 Trace: one JSONL record per tick with facts snapshot, rule fired, action, result, briefing and transcript pointers. The record keeps its decisions inline and stores the facts snapshot as a skeleton marked `"$chunked": 1`: each story's facts, the machine facts, the remote issues, the replay config and each workflow source are chunks addressed by the sha256 of their JSON, and each run's hook facts are blocks of 64 cut by position, written once. Chunks live once in the day's `<day>.chunks.jsonl` beside the day file, appended and fsynced before the tick line that names them, so no tick line names an unwritten chunk and one day's two files replay every tick of that day. A record without the marker is a full-facts snapshot and is read as before.
+- O5 `norn why <unit>` replays the pure decide function on the recorded snapshot and shows the rule that fired; `--receipt <id>` picks the decision that applied that receipt (the command of a note item, NT2). A chunked snapshot is rebuilt byte for byte as observe produced it; a chunk missing from its day makes the record a corrupt trace entry (exit 4, code `trace_corrupt`, naming the hash) and nothing is replayed.
 - O6 `handoff.md`: generated status header (S9); tool writes heartbeat lines (repeats collapsed, e.g. "(×3)"); agents write milestones.
 
 ## 16. Skills
@@ -464,7 +464,7 @@ TypeScript on **Bun**, monorepo with one-way dependencies: `schema ← core ← 
 - X1 Front ends (web cockpit, Herdr pane, TUI) read only via `@norn/view` and write only via CLI verbs.
 - X2 Adapters are selected in config by package name; third-party adapters implement interfaces from `@norn/core`.
 - X3 Distribution: npm package plus `bun build --compile` single-file binaries. Agent plugins (Claude Code first) are thin wrappers with a `/norn` command; skills come from the repo (SK1), and no logic lives in plugins.
-- X4 Core is tested by replaying recorded traces as snapshots; adapters against recorded fixtures.
+- X4 Core is tested by replaying recorded traces as snapshots (chunked and full-facts records alike, rebuilt by the store's tick read); adapters against recorded fixtures.
 
 ## 18. Milestones
 

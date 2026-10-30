@@ -355,9 +355,9 @@ describe("a story through the slice workflow", () => {
     expect(Math.max(...ticks.map((t) => t.duration_ms))).toBeLessThan(5000);
     expect(ticks.length).toBeGreaterThan(20);
     for (const t of ticks.slice(-6)) {
-      const inputs = readTickInputs(h.root, t);
-      expect(inputs).not.toBeNull();
-      const replayed = decide(inputs!.facts, inputs!.workflows, inputs!.config);
+      const read = readTickInputs(h.root, t);
+      if (!read.ok) throw new Error(`tick ${t.tick_id} does not replay: ${JSON.stringify(read)}`);
+      const replayed = decide(read.inputs.facts, read.inputs.workflows, read.inputs.config);
       expect(replayed.map((d) => d.rule)).toEqual(t.decisions.map((d) => d.rule));
       expect(JSON.parse(JSON.stringify(replayed.map((d) => d.action)))).toEqual(t.decisions.map((d) => d.action));
     }

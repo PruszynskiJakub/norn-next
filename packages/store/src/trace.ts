@@ -3,15 +3,16 @@
  * per UTC day holding every event (tick, hook, reject, briefing) in append order. Day files keep
  * appends cheap and let old days be deleted wholesale; `trace <unit>` / `why <unit>`
  * filter by unit while reading. Briefings and transcript snapshots are separate files
- * under `briefings/<run_id>/` and `transcripts/<run_id>/`, referenced by trace-relative path.
+ * under `briefings/<run_id>/` and `transcripts/<run_id>/`, referenced by trace-relative path. A tick's
+ * facts are chunks in `<day>.chunks.jsonl` beside its day file, which the day-file pattern never
+ * matches; `tick-trace.ts` writes and reads them.
  */
 import { appendFileSync, mkdirSync, readdirSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
-import type { Facts, FileError, LoadedWorkflow, RepoWorkflows } from "@norn/core";
+import type { FileError } from "@norn/core";
 import {
   type HookFact,
   type HookTrace,
-  type ResolvedConfig,
   type TickStartTrace,
   type TickTrace,
   type TraceEvent,
@@ -22,14 +23,13 @@ import {
 } from "@norn/schema";
 import { appendDurable, atomicWrite, isErrno, readText } from "./fsx.ts";
 import { traceDir } from "./paths.ts";
-import { parseWorkflowText } from "./unit.ts";
 
 function eventTime(ev: TraceEvent): string {
   return ev.type === "hook" ? ev.fact.at : ev.at;
 }
 
 /** Day file name for an ISO time: `2026-10-23.jsonl` (UTC). */
-function traceFileName(at: string): string {
+export function traceFileName(at: string): string {
   const d = new Date(at);
   if (Number.isNaN(d.getTime())) throw new Error(`bad trace time: ${at}`);
   return `${d.toISOString().slice(0, 10)}.jsonl`;
@@ -263,44 +263,6 @@ export function crashedTicksFor(root: string, unit: string): TickStartTrace[] {
   const { events } = readTrace(root, { types: ["tick.start", "tick", "tick.end"] });
   const ended = new Set(events.filter((e) => e.type === "tick" || e.type === "tick.end").map((e) => (e as { tick_id: string }).tick_id));
   return events.filter((e): e is TickStartTrace => e.type === "tick.start" && !ended.has(e.tick_id) && eventMatchesUnit(e, unit));
-}
-
-// ---------------------------------------------------------------- replay inputs (O5)
-
-/** Workflows as recorded in a tick's replay block: name → hash of the text stored at `trace/workflows/<hash>.yaml`. */
-export interface ReplayWorkflowRef {
-  hash: string | null;
-  issues: LoadedWorkflow["issues"];
-}
-
-/** What a tick records beside its facts so `norn why` can replay decide on the same inputs (O5). */
-export interface ReplayBlock {
-  workflows: Record<string, ReplayWorkflowRef>;
-  config: ResolvedConfig;
-}
-
-/** decide's inputs as a tick recorded them (O5). */
-export interface TickInputs {
-  facts: Facts;
-  workflows: RepoWorkflows;
-  config: ResolvedConfig;
-}
-
-/**
- * Rebuild decide's inputs from a tick record (O5): its facts without the replay block, each workflow
- * read back from its stored source, the config. Null for a tick recorded without a replay block.
- */
-export function readTickInputs(root: string, tick: TickTrace): TickInputs | null {
-  const { replay, ...facts } = tick.facts as unknown as Facts & { replay?: ReplayBlock };
-  if (!replay) return null;
-  const workflows: Record<string, LoadedWorkflow> = {};
-  for (const [name, ref] of Object.entries(replay.workflows)) {
-    const source = ref.hash ? (readTraceFile(root, `workflows/${ref.hash}.yaml`) ?? "") : "";
-    const parsed = source ? parseWorkflowText(source, `trace/workflows/${ref.hash}.yaml`) : null;
-    const workflow = parsed?.ok ? parsed.value : null;
-    workflows[name] = { name, workflow, source, issues: ref.issues };
-  }
-  return { facts: facts as Facts, workflows, config: replay.config };
 }
 
 // ---------------------------------------------------------------- hook lines (A2, A4): fast scans
