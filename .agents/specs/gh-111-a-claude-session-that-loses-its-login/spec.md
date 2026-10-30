@@ -10,7 +10,7 @@ labels:
   - friction
   - norn
 workflow: triage
-status: new
+status: active
 intake_at: 2026-10-30T11:31:18.349Z
 body_hash: 4bc0a7b74656872747f7b5551596d3bd718de25b0fbbef52a8a354edb9c21d4d
 ---
