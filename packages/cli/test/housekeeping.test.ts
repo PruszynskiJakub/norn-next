@@ -4,16 +4,16 @@
  * GR6 record on the base branch, and `norn doctor` (A7).
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, mkdirSync, readdirSync, readFileSync, utimesSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, utimesSync } from "node:fs";
 import { join } from "node:path";
 import { git as gitAdapter } from "@norn/adapters";
-import type { StoryFrontmatter } from "@norn/schema";
+import { type StoryFrontmatter, ulid } from "@norn/schema";
 import { appendReceipt, leasesDir, readState, safeUnlink, writeStoryFile } from "@norn/store";
 import { pluginLinkHint } from "../src/commands/doctor.ts";
 import { assetsDir } from "../src/runtime/assets.ts";
 import { markStoryOnBase } from "../src/runtime/record.ts";
 import { runCli, type TickReport } from "../src/index.ts";
-import { createHarness, type Harness, issue } from "./harness.ts";
+import { createHarness, type Harness, issue, T0 } from "./harness.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -363,7 +363,7 @@ describe("trace retention: norn tidy prunes day pairs older than trace.retain (B
     const user = join(h.home, "config.yaml");
     h.write(user, retain === null ? "" : `trace: { retain: ${retain} }\n`);
   };
-  type Tidy = { trace: { retain: string; days: Array<{ day: string; files: string[]; bytes: number }>; bytes: number } };
+  type Tidy = { trace: { retain: string; days: Array<{ day: string; files: string[]; bytes: number }>; hook_files: unknown[]; runs: unknown[]; bytes: number } };
 
   beforeAll(async () => {
     h = await createHarness();
@@ -458,6 +458,8 @@ describe("trace retention: norn tidy prunes day pairs older than trace.retain (B
         { day: dayOf(16), files: [`${dayOf(16)}.chunks.jsonl`, `${dayOf(16)}.jsonl`], bytes: 600 },
         { day: dayOf(15), files: [`${dayOf(15)}.chunks.jsonl`, `${dayOf(15)}.jsonl`], bytes: 600 },
       ],
+      hook_files: [],
+      runs: [],
       bytes: 1250,
     });
     expect(ages()).toEqual([...range(0, 16), 20]);
@@ -471,7 +473,7 @@ describe("trace retention: norn tidy prunes day pairs older than trace.retain (B
     expect(((await h.norn("tidy")).value as Tidy).trace.days).toHaveLength(26);
     const again = await h.norn("tidy");
     expect(again.exit).toBe(0);
-    expect((again.value as Tidy).trace).toEqual({ retain: "14d", days: [], bytes: 0 });
+    expect((again.value as Tidy).trace).toEqual({ retain: "14d", days: [], hook_files: [], runs: [], bytes: 0 });
   });
 
   test("doctor hints, without failing a check, how many days and bytes lie beyond the window; none within it (B33)", async () => {
@@ -504,5 +506,115 @@ describe("trace retention: norn tidy prunes day pairs older than trace.retain (B
     }
     const after = readdirSync(trace()).filter((n) => n.endsWith(".jsonl"));
     for (const f of before) expect(after).toContain(f);
+  });
+});
+
+describe("trace retention: norn tidy prunes old hook files, briefings and transcripts, never a live run's (B28–B32)", () => {
+  let h: Harness;
+  let liveRun: string;
+  const DAY = 86_400_000;
+  const trace = () => join(h.root, ".agents/norn/trace");
+  const OLD = ulid(T0 - 20 * DAY);
+  const RECENT = ulid(T0 - DAY);
+  /** A trace file `age` days old (by the fake clock), `text` its content. */
+  const put = (rel: string, age: number, text = "x\n") => {
+    const file = join(trace(), rel);
+    h.write(file, text);
+    const at = new Date(h.clock.now() - age * DAY);
+    utimesSync(file, at, at);
+  };
+  /** Every file under the trace dir with its size and mtime, sorted. */
+  const listing = () =>
+    (readdirSync(trace(), { recursive: true }) as string[])
+      .filter((n) => statSync(join(trace(), n)).isFile())
+      .sort()
+      .map((n) => ({ n, size: statSync(join(trace(), n)).size, mtime: statSync(join(trace(), n)).mtimeMs }));
+  const exists = (rel: string) => existsSync(join(trace(), rel));
+  /** gh-3 merged 30 days ago, gh-4 touched two days ago, gh-9 live since 20 days ago; runs that ended 20 days ago and yesterday. */
+  const stage = () => {
+    for (const d of ["hooks", "briefings", "transcripts"]) rmSync(join(trace(), d), { recursive: true, force: true });
+    for (const n of readdirSync(trace())) if (/^\d{4}-\d{2}-\d{2}(\.chunks)?\.jsonl$/.test(n)) safeUnlink(join(trace(), n)); // the ticks' day pairs, pruned by 08's tests
+    put("hooks/gh-3/_story.jsonl", 30, "a".repeat(40));
+    put("hooks/gh-3/01.jsonl", 30, "b".repeat(10));
+    put("hooks/gh-4/_story.jsonl", 2);
+    put("hooks/gh-9/_story.jsonl", 20);
+    put(`briefings/${OLD}/01.md`, 20, "c".repeat(30));
+    put(`transcripts/${OLD}/01.txt`, 20, "d".repeat(20));
+    put(`briefings/${RECENT}/01.md`, 1);
+    put(`transcripts/${RECENT}/01.txt`, 1);
+    put(`briefings/${liveRun}/01.md`, 20);
+    put(`transcripts/${liveRun}/01.txt`, 20);
+    put("workflows/abc.yaml", 60, "name: old\n");
+    put("backfill.json", 60, "{}\n");
+    put("integrate-gh-3.lock", 60, "{}\n");
+  };
+  type Pruned = { unit: string; file: string; bytes: number };
+  type RunPruned = { run_id: string; files: string[]; bytes: number };
+  type Tidy = { trace: { retain: string; days: unknown[]; hook_files: Pruned[]; runs: RunPruned[]; bytes: number } };
+  const HOOKS: Pruned[] = [
+    { unit: "gh-3/01", file: "hooks/gh-3/01.jsonl", bytes: 10 },
+    { unit: "gh-3", file: "hooks/gh-3/_story.jsonl", bytes: 40 },
+  ];
+  const RUNS: RunPruned[] = [{ run_id: OLD, files: [`briefings/${OLD}`, `transcripts/${OLD}`], bytes: 50 }];
+
+  beforeAll(async () => {
+    h = await createHarness();
+    await boot(h);
+    h.remote.issues = [issue(9, "Ninth")];
+    for (let i = 0; i < 4; i++) {
+      h.clock.advance(10_000);
+      await h.tick();
+    }
+    const st = readState(join(`${h.root}-worktrees/gh-9-ninth`, ".agents/specs/gh-9-ninth/runs/_story"));
+    if (!st.ok || st.value.status !== "running" || !st.value.run) throw new Error("gh-9 has no live run");
+    liveRun = st.value.run.run_id;
+    h.clock.advance(20 * DAY); // the live run started 20 days ago
+  });
+  afterAll(() => h.cleanup());
+
+  test("the hook files of units with no live run and no change within the window are deleted; a live unit's are kept (B28)", async () => {
+    stage();
+    const r = await h.norn("tidy");
+    expect(r.exit).toBe(0);
+    expect((r.value as Tidy).trace.hook_files).toEqual(HOOKS);
+    expect(exists("hooks/gh-3")).toBe(false);
+    expect(exists("hooks/gh-9/_story.jsonl")).toBe(true);
+    expect(exists("hooks/gh-4/_story.jsonl")).toBe(true);
+  });
+
+  test("the briefings and transcripts of a run that ended 20 days ago are deleted, yesterday's kept (B29)", async () => {
+    stage();
+    const r = await h.norn("tidy");
+    expect(r.exit).toBe(0);
+    expect((r.value as Tidy).trace.runs).toEqual(RUNS);
+    expect(exists(`briefings/${OLD}`)).toBe(false);
+    expect(exists(`transcripts/${OLD}`)).toBe(false);
+    expect(exists(`briefings/${RECENT}/01.md`)).toBe(true);
+    expect(exists(`transcripts/${RECENT}/01.txt`)).toBe(true);
+  });
+
+  test("a live run 20 days old keeps its hook file, briefings and transcripts; workflows, backfill.json, caches and locks are untouched (B30)", async () => {
+    stage();
+    const kept = ["hooks/gh-9/_story.jsonl", `briefings/${liveRun}/01.md`, `transcripts/${liveRun}/01.txt`, "workflows/abc.yaml", "backfill.json", "integrate-gh-3.lock"];
+    const before = listing().filter((f) => kept.includes(f.n));
+    expect(before.map((f) => f.n)).toEqual(expect.arrayContaining(kept));
+    expect((await h.norn("tidy")).exit).toBe(0);
+    const after = listing();
+    for (const f of before) expect(after).toContainEqual(f);
+  });
+
+  test("--dry-run lists the hook files and runs with their bytes and deletes nothing; a second tidy prunes nothing (B31, B32)", async () => {
+    stage();
+    // observe refreshes the caches (base.json, remote.json); the prunable parts must not change
+    const prunable = () => listing().filter((f) => /^(hooks|briefings|transcripts)\//.test(f.n));
+    const before = prunable();
+    const dry = await h.norn("tidy", "--dry-run");
+    expect(dry.exit).toBe(0);
+    expect((dry.value as Tidy).trace).toEqual({ retain: "14d", days: [], hook_files: HOOKS, runs: RUNS, bytes: 100 });
+    expect(prunable()).toEqual(before);
+    expect(((await h.norn("tidy")).value as Tidy).trace.bytes).toBe(100);
+    const again = await h.norn("tidy");
+    expect(again.exit).toBe(0);
+    expect((again.value as Tidy).trace).toEqual({ retain: "14d", days: [], hook_files: [], runs: [], bytes: 0 });
   });
 });
