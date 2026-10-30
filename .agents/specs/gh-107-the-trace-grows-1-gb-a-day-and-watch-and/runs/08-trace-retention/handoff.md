@@ -3,9 +3,9 @@
 - Workflow: slice · Step: merge (attempt 2)
 - Status: running
 - Counters: conflict_loop 2/2, qa_loop 0/2, review_loop 0/3, test_loop 0/5
-- Last outcome: integrate.conflict (classified, 2026-10-30T17:10:47.100Z)
+- Last outcome: merge.died (classified, 2026-10-30T18:03:01.030Z)
 - Next: `norn run list gh-107/08`
-- Updated: 2026-10-30T18:02:43.896Z
+- Updated: 2026-10-30T18:03:13.613Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - slice.start: slice at implement
@@ -21,6 +21,7 @@
 - receipts.apply: merge.done → integrate
 - receipts.apply: integrate.conflict → merge
 - agent.start: merge run 01M66ZMGQJWJRM05BDVVE92XXT
+- agent.died.retry: fresh session
 <!-- norn:heartbeat:end -->
 
 ## Goal
