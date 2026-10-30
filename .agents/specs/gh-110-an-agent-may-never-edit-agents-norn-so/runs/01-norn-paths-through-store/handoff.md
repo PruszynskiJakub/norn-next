@@ -14,6 +14,16 @@
 
 ## Goal
 
+Prefactor 1 (gh-110/01): every `.agents/norn/` path in package sources and tests goes through store's path module; no behaviour change.
+
 ## Progress
 
+- store `paths.ts`: added `hasNornDir`, `TRACE_IGNORE_ENTRY`, `runnerLogDir`. Source now uses them: headless default log dir (AC3), doctor's scratch repo (`traceDir`), init's gitignore line, the cockpit's "is a norn repo" check (status-watch).
+- ~35 test files rewritten mechanically to `repoConfigPath`/`workflowsDir`/`traceDir`/`heartbeatFilePath`/… (store, view and cli tests, transcript.ts' trace-dir skip). No assertion changes meaning.
+- AC2 lint: `test/repo.test.ts` ratchet (g) counts non-comment lines spelling `.agents/norn` in packages' src and test; allowlist = paths.ts plus user-facing message texts (renamed in slice 03, D11) and one matcher string in core's printed-commands test. test/repo.test.ts itself still reads this repo's own `.agents/norn/workflows` (this repo stays on the old layout); it is outside the lint's scope (packages only).
+- AC3 test in `packages/adapters/test/headless/headless.test.ts`: red without the change, green with.
+- No harness helper needed the literal path: tests call store's path functions directly.
+
 ## Resume
+
+Run `bun test` and `bun run typecheck`; if green, commit and report `norn done done`.
