@@ -15,6 +15,14 @@
 
 ## Goal
 
+Write the gh-107 spec (problem, solution, Behaviour, out of scope) from the issue's design-interview decisions plus this step's interview.
+
 ## Progress
 
+- Took the issue comment "Decisions (design interview, 2026-10-30)" as settled (slices A–D, storage, reads, retention, upgrade).
+- Interviewed the person on the gaps: the retention window (`trace.retain` default 14d, `tidy --retain`, a window under 14d refused); `why` on a pruned tick (refused, exit 3) or a missing chunk (corrupt, no partial replay); the targets (B1, B13, …); prompting (`tidy --dry-run` with bytes, a `doctor` hint, watch never prunes); downgrade as a one-way door with no compatibility mode. The person confirmed the summary.
+- Wrote spec.md: B1–B35, Out of scope, no open questions.
+
 ## Resume
+
+Ask the person to confirm that the spec says what they meant, then `norn done done`.
