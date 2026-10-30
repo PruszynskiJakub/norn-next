@@ -31,6 +31,7 @@
 
 - Full suite: 1469 pass, 3 fail, all timeouts while other test runs shared the machine. check-run passes on its own. integrate's "acceptance 7" is flaky at its 5 s limit: it failed once on a HEAD copy without this change and passed on a copy with it. Typecheck green. Committed 458e0d83.
 - implement#1 done: norn migrate (B11–B17): staged git renames for config/workflows (untracked files moved plainly and listed), trace into the machine dir, old .gitignore line dropped, no commit; refuses (exit 3) outside the main checkout, with a part in both places, or with the tick lock held; rerun finishes an interrupted run; nothing to move on a migrated repo. GitPort gains move/stage with a contract case. AC1–AC8 in packages/cli/test/migrate.test.ts; AC9 checked by hand in a throwaway repo. Typecheck green; full suite green apart from timeouts under load (integrate 'acceptance 7' is flaky at its 5 s limit, and fails on HEAD too).
+- review#1 approve: review#1: approve. AC1–AC8 each have an integration test at S1 (migrate.test.ts); AC9 done by hand per implement's handoff. Checks run before any move, the old lock goes last, GitPort move/stage has a contract case. Typecheck green; full suite 1473 pass, 0 fail. Two non-blocking points: (minor) a run cut short after the trace moved but before .gitignore leaves the stale ignore line, and a rerun sees the new layout and skips it; (nit) entries() in store old-layout.ts swallows every readdir error, not only ENOENT.
 
 ## Resume
 
