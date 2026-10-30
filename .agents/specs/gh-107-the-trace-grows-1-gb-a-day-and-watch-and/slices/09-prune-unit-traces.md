@@ -1,8 +1,8 @@
 ---
 id: gh-107/09
 title: norn tidy prunes old hook files, briefings and transcripts
-depends_on: [gh-107/04, gh-107/08]
-status: planned
+depends_on: [ gh-107/04, gh-107/08 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
