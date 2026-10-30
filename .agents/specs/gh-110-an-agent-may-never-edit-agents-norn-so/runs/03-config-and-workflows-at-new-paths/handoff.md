@@ -32,6 +32,9 @@ Repo config at `.agents/norn.config.yaml`, workflows in `.agents/workflows/`: in
 - init's `.gitignore` still adds `.agents/norn/trace/` (slice 04).
 - implement#1 done: Repo config at .agents/norn.config.yaml, workflows in .agents/workflows/: store paths.ts gains REPO_CONFIG_FILE/WORKFLOWS_DIR (hasNornDir -> isNornRepo), and init, config set, story create/edit and wiring messages name the new paths. New packages/cli/test/layout.test.ts covers AC1-AC5 (red before, green after). AC6 checked by hand in a throwaway repo; there is no 'config edit' verb, so 'config set --repo' was used. test/process.test.ts reads this repo's old-layout files from a temp copy at the new paths. Doctor regexes in housekeeping.test updated. Typecheck green; full suite 1437 pass with 2 fails in check-run.test.ts (beforeAll timed out at 5s under load; the file passes 3/3 alone and passed in the previous full run). Transcripts, snapshots and golden unchanged.
 
+- review#1: approve. Spec and standards checked; layout/config/repo/process tests 118/118, typecheck green. Minor: test/process.test.ts falls back on `.agents/norn/` existing rather than its config file (breaks once only the trace dir is left). Nit for slice 07: `packages/cli/assets/config.yaml` header still names the old paths.
+- review#1 approve: Approve: slice 03 meets AC1-AC6; paths via store constants, messages name the new paths (D11), layout.test.ts covers AC1-AC5. Targeted tests 118/118, typecheck green. Minor: process.test.ts fallback keys on .agents/norn/ instead of its config file; nit for slice 07: assets/config.yaml header names old paths.
+
 ## Resume
 
-Committed; nothing left for this step.
+Review done (approve); nothing left for this step.
