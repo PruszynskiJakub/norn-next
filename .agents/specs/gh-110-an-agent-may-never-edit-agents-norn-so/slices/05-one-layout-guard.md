@@ -2,7 +2,7 @@
 id: gh-110/05
 title: Commands refuse the old or a mixed layout and name norn migrate
 depends_on: [ gh-110/02, gh-110/03, gh-110/04 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
