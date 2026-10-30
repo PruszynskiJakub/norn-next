@@ -15,61 +15,130 @@ intake_at: 2026-10-30T10:30:20.759Z
 body_hash: 4aec03ac7d6c0aadb80fd12805af7dd19fa71dea889e32579bc397d67dcb27e2
 ---
 
-## Observed
+# The trace grows ~1 GB a day and watch and the cockpit read it whole every cycle, so they climb to 8–21 GB of memory
 
-After a day of use, `norn cockpit` sat at a 20 GB footprint and `norn watch --human` at 6 GB (`footprint -p <pid>`; most of it is tagged `IOAccelerator`, which is mimalloc's VM tag 100, i.e. Bun's native heap). RSS swings by gigabytes between 20 s samples (cockpit 7.1 GB → 356 MB → 174 MB): not a leak, but gigabytes allocated and freed on every loop.
+## Problem
 
-`.agents/norn/trace/` is 2.0 GB: `2026-10-29.jsonl` 1.0 GB, `2026-10-30.jsonl` 674 MB by 09:30. Measured on 2026-10-30's 1,045 ticks:
+A person who leaves `norn watch` and `norn cockpit` running for a day with one long agent step finds them at 6 GB and 20 GB of memory, swinging by gigabytes between samples, and the machine slowing down. The trace on disk grows by about 1 GB a day and is never pruned.
 
-- each `tick` line is ~650 KB, almost all `facts`; facts total 655 MB for the day
-- 350 MB of that is `stories[].units[].run.hooks`: every tick re-records every hook fact of each running run, so a long run grows the trace quadratically (gh-71's run: 416 hooks, ~340 KB per tick). Only 454 KB of those hook facts are distinct (~770× repetition)
-- the same facts stored content-addressed (one chunk per unit and per story, each hook fact one chunk) come to ~29 MB
-- 7 of the 1,045 ticks decided anything but `noop`/`claim`
+Two things cause it. Every tick records the whole facts snapshot again (~650 KB a line), including every hook fact of each live run, so a long run makes the trace grow quadratically; on a measured day only 7 of 1,045 ticks decided anything but a no-op or a claim renewal. And the readers load whole day files on every cycle: the cockpit reads 14 days of trace every 5 seconds to build its view, every tick and view load reads every day since the oldest live run began to find hook facts, and every `norn hook` call does the same for its run. The longer norn has run, the more each cycle costs, and today the person's only remedy is to delete trace files by hand and lose `norn why` for those ticks.
 
-The readers then load whole day files on each cycle:
+## Solution
 
-- cockpit: `projectView` every 5 s → `loadProjectView` → `readTrace` over 14 days (today: every file, 2 GB): read whole, split, `JSON.parse` and schema-validate every line, keep all events
-- every tick (watch, cron, by hand) and every view load: `loadLocalFacts` → `readHookFacts` reads every day file since the oldest live run began, whole, to pick out the `{"type":"hook"` lines
-- every `norn hook` call: `blockedHookCount` reads every day file since its run began, whole
+After this story the cost of each cycle follows what changed, not how long norn has run, and the trace on disk stays bounded once the person tidies.
 
-## Wanted
+- The cockpit, `status`, `status --segment` and `inbox` never read the trace. Only the views that show timelines read it, and readers skip lines of event types they did not ask for without parsing them.
+- Each hook fact fired in a unit worktree also lands in that unit's own hook file. Ticks, `norn hook` and `brief` read only the hook files of the units they concern. The first tick of the new version fills those files once from the existing day files.
+- A tick line keeps its decisions but stores its facts as chunks addressed by content hash, written once into a chunks file kept beside the day file. A quiet tick then writes a few kilobytes instead of ~650 KB, and a run's hook facts are stored once, not once per tick. `norn why` still replays every tick exactly, old and new.
+- `norn tidy` prunes the trace older than a retention window (`trace.retain`, default 14 days, at least 14 days), never anything a live run needs. `norn doctor` says when the trace holds more than the window.
 
-Memory and per-cycle work of watch, the cockpit, ticks and hooks stay bounded by what changed, not by how long norn has run; the trace on disk stays bounded; `norn why` still replays exactly (O4, O5). Four parts, each shippable and measurable on its own:
+The trace stays in JSONL day files. Each slice amends the PRD ids it changes in the same diff (X1; A2/A4; O4/O5/X4; a new retention rule). Downgrading to an older release is a one-way door, with no compatibility mode: see B35.
 
-1. **Hook facts by run.** `norn hook` also appends its fact to `trace/hooks/<run_id>.jsonl` (a fact without `run_id` keeps only the day file). `readHookFacts` reads the live runs' files; `blockedHookCount` reads one. Reads that only need a few event types stream line by line and test the `{"type":"…"` prefix before `JSON.parse`.
-2. **Facts stored by content hash.** A tick line keeps its decisions and a tree of hashes; the chunks go to `trace/facts/<sha>.json`, written once (atomic, skip when present) — the pattern `workflows/<hash>.yaml` already uses. `why`, `findTick`, `lastTickFor` and the golden harvest rebuild the facts from the hashes. ~22× less per day, and no more quadratic hook growth.
-3. **Incremental reads in long-lived processes.** Day files are append-only, so `(inode, size, mtime)` is an exact etag: the cockpit and watch keep `{inode, offset, events}` per day file and read only the bytes after `offset`; a new inode or a smaller size reads the file again. The cockpit also skips rebuilding the view when nothing it reads changed (`heartbeat.json` `last_tick_at`, trace sizes, `runs/` state mtimes).
-4. **Retention.** `trace.retain` (default 14d, the view's window) deletes older day files and, with part 2, the chunks no kept tick references (mark from the kept ticks, sweep the rest). A backstop for disk, not a fix for reads.
+## Behaviour
 
-Considered and left out: a tick stored as a diff of the previous one (replay then depends on a chain; one bad line breaks every later tick); quiet ticks without facts (changes O4, and part 2 already makes them cheap); gzip of old days (saves disk, not reads).
+Measured where a size or a footprint is named on a synthetic trace like the reported one: 14 day files totalling ~2 GB, one live run with 400+ hook facts.
 
-## Repro
+### Reading the trace only on demand
 
-Run `norn watch` and `norn cockpit` for a day with one long-running agent step, then:
+- B1 As a person running `norn cockpit`, I want it to read no trace day file, so that its memory does not grow with the trace.
+  Example: with the 2 GB trace, the cockpit refreshes every 5 s for a minute; no day file is opened, and its footprint stays within ~10% of its footprint with an empty trace (against 7–20 GB today).
+- B2 As a person running `norn status`, `norn status --segment` or `norn inbox`, I want them to read no trace day file, so that they answer at the same speed however large the trace is.
+  Example: `norn status` with the 2 GB trace and with an empty trace prints the same thing in about the same time, and opens no day file.
+- B3 As a person looking at `norn story list`, `norn run list` or a run's view, I want the timelines I see today unchanged, so that nothing is lost by reading the trace less often.
+  Example: the same repo before and after the change shows the same timeline entries over the 14-day window.
+- B4 As a person reading `norn trace`, inbox history or a timeline, I want the same output as before, produced without parsing lines of event types the command does not show.
+  Example: `norn trace gh-9` prints the same events as before; the tick lines it does not need are skipped by their type without being parsed, so a broken line of a type the command does not show is no longer reported by it.
 
-```sh
-ls -la .agents/norn/trace/*.jsonl
-ps -o pid,etime,rss,command -p "$(pgrep -f 'norn cockpit')","$(pgrep -f 'norn watch')"
-footprint -p "$(pgrep -f 'norn cockpit')" | head -12
-```
+### Hook facts per unit
 
-Size of a tick line and of its hook facts:
+- B5 As an agent whose hook fires in a unit worktree, I want the fact appended to that unit's own hook file as well as to the day file, so that readers of that unit's hooks need not read the day files, and `norn trace` and the timelines still show it.
+  Example: a `PostToolUse` hook in the gh-9 worktree → one line in gh-9's hook file and the same line in today's day file; `norn trace gh-9` shows it.
+- B6 As an agent whose hook fires outside any unit worktree, I want the fact recorded in the day file only, as today.
+  Example: a hook fired in the repo's main checkout → a line in today's day file; no hook file is created.
+- B7 As an agent in a unit worktree, I want hook facts that carry no run id to go to the unit's hook file too, since the unit is found by the worktree, not by the run.
+  Example: a session-start hook without a run id in gh-9's worktree → a line in gh-9's hook file.
+- B8 As a person running ticks (watch, cron or by hand), I want each tick to read the hook files of units with a live run only, so that its cost does not grow with the day files.
+  Example: with the 2 GB trace and one live run on gh-9, a tick reads gh-9's hook file and no day file to collect hook facts, and decides the same as before.
+- B9 As an agent whose hook is counted against the blocked-hook limit (A4), I want `norn hook` to count from its unit's hook file only, with the same count as before.
+  Example: the 6th blocked hook of a run on gh-9 gets the same answer as before, and the day files are not read.
+- B10 As an agent running `norn brief`, I want it to read only its own unit's hook file for hook facts.
+  Example: `norn brief` in gh-9 with the 2 GB trace answers in about the same time as with an empty trace.
+- B11 As a person upgrading norn while runs are live, I want the first tick of the new version to copy the hook lines of live units from the day files into their hook files once, so that no hook fact of a live run is lost.
+  Example: gh-9 has a live run with 400 hook lines in yesterday's and today's day files → after the first tick, gh-9's hook file holds those 400 lines; the second tick copies nothing.
+- B12 As a person whose upgrade tick was interrupted or overlapped with new hooks, I want the backfill to be deduplicated by event id and to finish on a later tick, so that no hook fact is copied twice or missed.
+  Example: a hook fires into gh-9's hook file while the backfill runs, then the tick crashes → the next tick completes the backfill; each event id appears once in gh-9's hook file.
 
-```sh
-grep '^{"type":"tick",' .agents/norn/trace/$(date -u +%F).jsonl | tail -1 | wc -c
-```
+### Facts stored as chunks
 
-## Where
+- B13 As a person whose watch runs all day, I want a quiet tick (nothing changed since the previous one) to write under 5 KB to the trace, so that the trace grows with what changes, not with time.
+  Example: two ticks a minute apart with no change → the second adds a tick line and no new chunks, under 5 KB together (against ~650 KB today).
+- B14 As a person with a long-running agent step, I want each run's hook facts stored once, in fixed blocks of 64 facts that are written once and never change, so that the trace grows linearly with a run's hooks instead of quadratically.
+  Example: a run with 416 hook facts adds 6 full blocks once each over its life; each tick then adds only the last partial block when it changed.
+- B15 As a person whose tick crashes midway through writing the trace, I want no tick line ever to name a chunk that was not written, so that a crash leaves at worst unused chunks.
+  Example: a tick is killed after appending its chunks and before its tick line → the trace has extra chunks and no tick line; `norn why` on earlier ticks still works.
+- B16 As a person whose list of chunks already written today is lost or stale, I want the next tick simply to write its chunks again, with no harm to replay.
+  Example: the list is deleted → the next tick appends chunks that already exist; `norn why` on any of today's ticks replays the same as before.
+- B17 As a person running `norn why` on a tick written by the new version, I want it to replay exactly: the same decisions from facts equal to the ones observe produced (O5).
+  Example: `norn why --tick <id>` on a chunked tick → the rebuilt facts equal the observed facts byte for byte, and decide gives the recorded decisions.
+- B18 As a person running `norn why` on a tick written before the upgrade, I want it to replay as it does today.
+  Example: `norn why --tick <id>` on a tick from yesterday's file, written by the old version → the same answer as before the upgrade.
+- B19 As a person who copies or keeps one day's trace on its own, I want the day file and its chunks file to be enough to replay every tick of that day, with no chunk taken from another day.
+  Example: copy one day's two files into an empty trace folder → `norn why` replays every tick of that day.
+- B20 As a person running `norn why` on a tick whose day has been pruned, I want a refusal that says so, not a guess.
+  Example: `norn why --tick <id>` for a tick from 40 days ago with `trace.retain` 14d → exit 3, "tick 01… is older than the trace retained (14d)", and do-instead pointing at a newer tick.
+- B21 As a person running `norn why` on a tick whose chunk is missing from a day that is still kept, I want the tick reported as a corrupt trace entry naming the missing hash, and never a replay from a partial snapshot (S2).
+  Example: one chunk line removed by hand → `norn why --tick <id>` reports the trace entry as corrupt with the missing hash, and replays nothing.
+- B22 As a contributor running the golden harvest, I want it to read chunked ticks and harvest the same cases it would from full ticks (X4).
+  Example: the harness run with harvesting on, before and after the change, yields the same case names and decisions.
 
-- `packages/store/src/trace.ts:31` `appendTrace` (one line per event, full facts in `tick`)
-- `packages/cli/src/runtime/tick.ts:94` (writes the tick record with the full `obs.facts`); `:63` `replayInputs` (the one place a tick line becomes decide's inputs again: where part 2 rebuilds facts)
-- `packages/store/src/trace.ts:122` `readTrace` (whole file, parse + validate every line)
-- `packages/store/src/trace.ts:200` `readHookFacts`, `:227` `blockedHookCount` (whole files)
-- `packages/store/src/local-facts.ts:116` (calls `readHookFacts` on every tick and view load)
-- `packages/view/src/load.ts:73,264` (`TRACE_WINDOW_MS` 14 days, read on every view load)
-- `packages/cli/src/commands/cockpit.ts:160` (`projectView` every interval, default 5 s)
-- `packages/cli/src/commands/hook.ts:87` (`blockedHookCount` on every hook)
+### Pruning
 
-## PRD
+- B23 As a person, I want the trace retention window set by `trace.retain` in config, a duration with default `14d`.
+  Example: no `trace.retain` in any config layer → `norn tidy` prunes what is older than 14 days; `trace.retain: 30d` → older than 30 days.
+- B24 As a person, I want `norn tidy --retain <duration>` to override `trace.retain` for that run.
+  Example: `trace.retain: 14d` and `norn tidy --retain 30d` → nothing newer than 30 days is pruned.
+- B25 As a person, I want a window shorter than 14 days (the timelines' window), from config or flag, refused, so that tidy never deletes what the views still show.
+  Example: `norn tidy --retain 7d` → exit 3, "the trace window must be at least 14d", do-instead naming 14d; nothing is deleted.
+- B26 As a person, I want a `trace.retain` or `--retain` value that is not a duration refused with the expected form.
+  Example: `norn tidy --retain soon` → refused, naming the expected form (e.g. `14d`); nothing is deleted.
+- B27 As a person running `norn tidy`, I want it to delete each day file, with its chunks file, older than the window.
+  Example: day files from 40 to 0 days ago, window 14d → the 26 oldest day pairs are deleted; the last 14 days stay.
+- B28 As a person running `norn tidy`, I want it to delete the hook files of units with no live run and no change within the window.
+  Example: gh-3 merged 30 days ago, its hook file last written then → deleted; gh-9's hook file with a live run → kept.
+- B29 As a person running `norn tidy`, I want it to delete the briefings and transcripts of runs that are not live and are older than the window.
+  Example: a run that ended 20 days ago → its briefings and transcripts are deleted; a run that ended yesterday → kept.
+- B30 As a person, I want `norn tidy` never to delete anything a live run needs, nor any recorded workflow, however old.
+  Example: a run that started 20 days ago and is still live → its hook file, briefings and transcripts are kept; a workflow recorded 60 days ago is kept.
+- B31 As a person running `norn tidy --dry-run`, I want to see what would be pruned (day pairs, hook files, briefings, transcripts), with the bytes each would free, and nothing deleted.
+  Example: `norn tidy --dry-run` lists `2026-09-15` day pair (1.1 GB), gh-3's hook file (2 MB), … and the trace is unchanged afterwards.
+- B32 As a person running `norn tidy` twice, I want the second run to prune nothing.
+  Example: `norn tidy` then `norn tidy` → the second reports nothing pruned from the trace.
+- B33 As a person running `norn doctor`, I want a hint when the trace holds days older than the window, with how many and how large.
+  Example: 45 days of trace and `trace.retain` 14d → "trace keeps 31 days (2.4 GB) beyond trace.retain 14d — run `norn tidy`"; within the window → no hint.
+- B34 As a person running watch, I want neither watch nor any tick to prune the trace; only `norn tidy` does.
+  Example: watch runs for 30 days without `norn tidy` → no day file is deleted.
 
-O4 (one trace record per tick with the facts snapshot — kept, as a reference), O5 (`why` replays the recorded snapshot), A2/A4 (hook facts, blocked-hook count), B4/C4 (side files under `trace/`, the precedent for chunks), H2, X1 (view reads), X4 (core replayed from recorded traces: the golden harvest reads tick facts), S1 (atomic chunk writes).
+### Upgrade and downgrade
+
+- B35 As a person who reinstalls the previous release after upgrading, I want the older norn to keep working: it skips the new tick lines it cannot read (its `norn why` cannot replay them), ignores the hook files, and its own ticks write full facts that the new version reads unchanged. This one-way door is named as the merge danger of the PR that ships chunks.
+  Example: downgrade after a day of chunked ticks → watch and ticks run; `norn why --tick <new id>` with the older norn cannot replay that tick; upgrading again → `norn why` replays both the chunked ticks and the older norn's full ticks.
+
+## Out of scope
+
+- SQLite or any other trace store — JSONL day files stay; the change is in what goes in them.
+- A cursor into a hook log for `run.hooks` — run hooks include facts without a run id and are refined by the adapters, so replay must be self-contained.
+- Chunk boundaries chosen by size — fixed boundaries keep chunks stable across ticks.
+- A tick stored as a diff of the previous one — replay would depend on a chain, and one bad line would break every later tick.
+- Incremental reads and skipping the view rebuild in the cockpit and watch — dropped; file again if a profile still shows the cockpit hot.
+- Shrinking `Facts` itself — chunks make repeated facts cheap without changing what observe sees.
+- Chunks shared across days, and mark-and-sweep of chunks — a day pair stays self-contained, so pruning deletes whole files.
+- Gzip of old days — saves disk, not reads.
+- Pruning from watch or the tick — pruning is a person's housekeeping in `norn tidy` (B34).
+- A compatibility mode that keeps writing full facts for one release — it would give up the saving for that release (B35).
+
+## Open questions
+
+None.
+
+## Plan
+Written by the `norn-plan` skill.
