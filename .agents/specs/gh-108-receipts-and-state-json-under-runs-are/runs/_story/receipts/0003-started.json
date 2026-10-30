@@ -1,0 +1,26 @@
+{
+  "kind": "started",
+  "receipt_id": "01M666RRGC91KC4YQGFHEPVZ4H",
+  "run_id": "01M666R856GZFFHT4FBQ6ARSR2",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-30T10:47:55.661Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M666R8564BA64Z7FZG7RKG3N",
+  "how": "auto",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-108-receipts-and-state-json-under-runs-are",
+  "machine": "jakubpruszynski@mac",
+  "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD",
+  "session": {
+    "runner": "herdr",
+    "session_id": "w9R:p1",
+    "pane_id": "w9R:p1",
+    "reach": "herdr agent attach w9R:p1"
+  },
+  "process": {
+    "pid": 63009,
+    "pid_start": "Fri Oct 30 11:47:55 2026"
+  }
+}
