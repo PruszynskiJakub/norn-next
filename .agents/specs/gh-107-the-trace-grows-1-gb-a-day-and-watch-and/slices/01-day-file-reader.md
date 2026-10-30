@@ -2,7 +2,7 @@
 id: gh-107/01
 title: One day-file line reader that skips lines by type
 depends_on: []
-status: planned
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
