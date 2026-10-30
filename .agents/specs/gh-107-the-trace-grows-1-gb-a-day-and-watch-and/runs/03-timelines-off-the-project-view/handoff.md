@@ -31,7 +31,9 @@ Cockpit, status, status --segment, inbox and orient read no trace day file (B1, 
 - Benchmark at full size (14 days, 2.15 GB, 420 hooks, cockpit 5 s × 60 s): status 439 vs 436 ms (1.01×), brief 325 vs 312 ms (1.04×), cockpit peak RSS 626 vs 192 MB (3.25×). A probe with the read observer shows the one day file the view still opens is today's, from the local-facts hook read (live run) — slice 04 (B8) removes it, so AC4's cockpit ~10% holds only after 04.
 - Full suite 1248 pass, typecheck green.
 - implement#1 done: loadProjectView reads no trace and drops ProjectView.timeline; new loadTimelines in @norn/view gives the same per-unit timelines (14-day window). Tests: view.test.ts (B3) and new cli trace-free-views.test.ts (AC1 cockpit --json plus a refreshing cockpit; AC2 status, segment and inbox open no day file and print the same over an empty trace), both red on the old code. PRD X1 amended. scripts/trace-bench.ts added for AC4. Full suite and typecheck green.
+- review#1: approve. Full suite 1248 pass, typecheck green. Minor only: AC3 tested at the view seam rather than S1; orient not in the trace-free test; local 14-day constant.
+- review#1 approve: Review approve: project view reads no trace, loadTimelines keeps the 14-day entries, AC1/AC2 proven by the read observer, AC3 pinned in view.test.ts, PRD X1 amended. Suite 1248 pass, typecheck green. Minor: AC3 at view seam not S1, orient untested for trace-free, local window constant. AC4 cockpit ~10% only after slice 04.
 
 ## Resume
 
-Implementation done and committed; next is review. QA of AC4: `bun scripts/trace-bench.ts` (expect the cockpit ratio to drop after slice 04).
+Review approved. QA of AC4: `bun scripts/trace-bench.ts` (expect the cockpit RSS ratio to stay high until slice 04 removes the live-run hook scan).
