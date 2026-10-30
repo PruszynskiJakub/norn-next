@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/PruszynskiJakub/norn-next/actions/workflows/ci.yml"><img src="https://github.com/PruszynskiJakub/norn-next/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/PruszynskiJakub/norn-next/releases"><img src="https://img.shields.io/badge/release-v0.11.1-blue" alt="Release v0.11.1"></a>
+  <a href="https://github.com/PruszynskiJakub/norn-next/releases"><img src="https://img.shields.io/badge/release-v0.12.0-blue" alt="Release v0.12.0"></a>
   <img src="https://img.shields.io/badge/bun-%3E%3D1.3-f9f1e1" alt="Bun 1.3 or later">
 </p>
 

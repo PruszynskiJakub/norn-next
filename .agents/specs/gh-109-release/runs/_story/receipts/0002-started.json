@@ -1,0 +1,16 @@
+{
+  "kind": "started",
+  "receipt_id": "01M668TSCTP6A0KT2Z7GC66ZGR",
+  "run_id": "01M668TSCTEZC48ZA7QYQ7GZW5",
+  "step": "prepare",
+  "attempt": 1,
+  "at": "2026-10-30T11:23:59.263Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M668TSCTRJ6B0R949B71H3QW",
+  "how": "auto",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-109-release",
+  "machine": "jakubpruszynski@mac",
+  "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD"
+}

@@ -1,0 +1,12 @@
+{
+  "kind": "done",
+  "receipt_id": "01M66DHBH5W0RFFTNCED1M7D4P",
+  "run_id": "01M66DG2RW1N0DSGM4BHPF19H4",
+  "step": "prepare",
+  "attempt": 2,
+  "at": "2026-10-30T12:46:13.029Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "done",
+  "handoff": "Apply 0.12.0 (person-confirmed at confirm-version#1; matches proposal: minor, #106 regroups the CLI with old names removed and adds story create, story reopen, run cancel, config set|unset). 5 Added, 2 Changed, 1 Removed, 0 Fixed; omitted #105, #104, #102 (repo-local process) and 9d8676a (QA evidence cleanup, new since prepare#1). Bumps, changelog and issue title unchanged; pr.md notes the new omission."
+}

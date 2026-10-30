@@ -1,0 +1,13 @@
+{
+  "kind": "mode",
+  "receipt_id": "01M668S0X74EHD2TTZCY7GMH8X",
+  "run_id": null,
+  "step": "prepare",
+  "attempt": 1,
+  "at": "2026-10-30T11:23:01.415Z",
+  "by": "human",
+  "who": "jakubpruszynski@mac",
+  "slice": null,
+  "mode": "auto",
+  "previous": "manual"
+}
