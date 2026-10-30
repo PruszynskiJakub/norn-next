@@ -9,6 +9,7 @@ assignee: PruszynskiJakub
 labels:
   - friction
   - norn
+  - norn:wf:quick
 workflow: triage
 status: active
 intake_at: 2026-10-30T11:26:29.364Z
