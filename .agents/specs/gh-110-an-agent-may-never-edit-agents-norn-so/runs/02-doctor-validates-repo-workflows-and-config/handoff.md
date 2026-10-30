@@ -35,6 +35,8 @@
 - review#1: approve. Spec and Standards both checked: AC1–AC7 met, tests at S1, housekeeping tests 18 pass, typecheck green. One minor finding (F1): --repo builds runner/remote/notifier ports, which throws when a configured external adapter package is missing.
 - review#1 approve: Review approved: AC1–AC7 met with S1 integration tests; one shared validator for observe and doctor; housekeeping tests and typecheck green. One minor finding (F1): doctor --repo still builds runner/remote ports, which throws when a configured external adapter package is missing.
 
+- qa#1: every criterion pass. Full suite 1428 pass, typecheck green. By hand in a throwaway `norn init` repo (dev build, isolated NORN_HOME_DIR): uncounted cycle in slice.yaml, missing skill in story.yaml and `max_agents: "two"` each named with file, path and reason, exit 1; clean repo exit 0 with git status clean; `--repo` with no claude/gh on PATH shows only workflows and config. Seen: a config that does not load hides the missing-skill check until fixed (doctor says so). Evidence: /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh110-02/ev (report.md, criteria.json).
+
 ## Resume
 
-Review approved; nothing to resume for this step.
+QA reported pass; nothing to resume for this step.
