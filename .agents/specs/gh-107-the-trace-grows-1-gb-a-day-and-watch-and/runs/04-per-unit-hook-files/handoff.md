@@ -42,7 +42,7 @@ Hook facts fired in a unit worktree also land in that unit's hook file (`trace/h
   - `appendHookTrace`: both lines are appended before the hook file's time is set; its time only moves forward (max of the previous time and the fact's `at`); a failing utimes is swallowed after both lines are written. Store test pins it.
   - Duplication removed: one `traceLine` builder, one `hookLine` parser, live/unknown-launch set computed once in local-facts.
   - Decision (parity, recorded for the gate): the story unit no longer collects hook facts fired in its slice worktrees (the old `cwd.startsWith(worktree)` match had no trailing `/`); each unit reads its own hook file. Snapshots, golden and transcripts unchanged.
-  - Decision (parity): a unit outside the D4 set (no live run / unknown launch, hook file older than limits.stalled) gets `hooks: []`, where it used to get facts back to the oldest live run's start; the view reads `lu.hooks` but only for run facts of live runs, so nothing shown changes.
+  - Decision (parity): a unit outside the D4 set (no live run / unknown launch, hook file older than limits.stalled) gets `hooks: []`, where it used to get facts back to the oldest live run's start; the view and observe use `lu.hooks` only for the run in state.json, an unknown launch (both always in the set) and R5.3 step runs (whose hooks past the stalled window no longer matter), so nothing shown or decided changes.
   - AC1 test fires PostToolUse.
 
 ## Resume
