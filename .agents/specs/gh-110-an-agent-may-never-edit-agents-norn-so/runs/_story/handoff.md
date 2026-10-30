@@ -37,6 +37,7 @@ Resolve: merge origin/main (21b3cc6f) into the story branch, resolve conflicts b
 - doctor.ts: branch's lines()/repo group/--repo kept, main's trace.retain warning and Hints section added.
 - Main's new tests' `.agents/norn/{config.yaml,workflows,trace}` literals → repoConfigPath/workflowsDir/machineDir. PRD A2/O7 and the backfill schema title name hook files in the machine dir.
 - Typecheck passes; schemas re-emitted (local-hook-backfill added).
+- resolve#1 done: Merged origin/main 21b3cc6f into the story branch (317dd0e1). Main's history drops runs/, so git's merge base was stale (99 false conflicts); merged against the true fork point 397a34fd → 15 real conflicts. Main's gh-120 trace work (hook files, retention, chunked ticks) moved from traceDir to the branch's machineDir; doctor keeps --repo/repo group plus main's retain warning and Hints; main's new tests use store path functions. Typecheck clean, bun test 1528 pass / 0 fail.
 
 ## Resume
 
