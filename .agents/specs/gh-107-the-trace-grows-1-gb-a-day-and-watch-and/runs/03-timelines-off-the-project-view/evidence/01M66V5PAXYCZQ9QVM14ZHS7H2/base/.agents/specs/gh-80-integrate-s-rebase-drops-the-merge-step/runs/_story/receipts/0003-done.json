@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M63EHG2PDRCJ0FM73K835FE4",
+  "run_id": "01M63EBK1AYY9RP8EA0G898E00",
+  "step": "reproduce",
+  "attempt": 1,
+  "at": "2026-10-29T09:06:02.967Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "reproduced",
+  "handoff": "Reproduced: after merge resolves an integrate conflict with git merge --no-ff, integrate's plain git rebase (adapters git rebase(), no --rebase-merges) drops the merge commit and conflicts again (conflict_loop 2). The loop is a cli harness test (red 3/3). Confirmed: adding --rebase-merges turns it green. Seams: integrate.test.ts and the harness flow.",
+  "evidence": "evidence/01M63EBK1AYY9RP8EA0G898E00"
+}

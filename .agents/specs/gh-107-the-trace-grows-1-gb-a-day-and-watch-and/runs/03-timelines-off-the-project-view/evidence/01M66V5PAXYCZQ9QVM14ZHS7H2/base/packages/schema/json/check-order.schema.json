@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://norn.dev/schema/check-order.json",
+  "title": "norn check order",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "version",
+    "home",
+    "lease_file",
+    "runs_dir",
+    "run_id",
+    "step",
+    "attempt",
+    "tick_id",
+    "who",
+    "command",
+    "cwd",
+    "env",
+    "timeout_ms",
+    "ports"
+  ],
+  "properties": {
+    "version": {
+      "const": 1,
+      "type": "number"
+    },
+    "home": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "lease_file": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "runs_dir": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "run_id": {
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "ULID (ID2)",
+      "type": "string"
+    },
+    "step": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "attempt": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "tick_id": {
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "ULID (ID2)",
+      "type": "string"
+    },
+    "who": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "command": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "cwd": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "env": {
+      "type": "object",
+      "patternProperties": {
+        "^(.*)$": {
+          "type": "string"
+        }
+      }
+    },
+    "timeout_ms": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "ports": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "from",
+            "to"
+          ],
+          "properties": {
+            "from": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "to": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

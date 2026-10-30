@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type TickTrace, ulid, validate } from "@norn/schema";
-import { appendTrace, readTickInputs, readTrace, sha256, traceDir, writeTraceFile } from "@norn/store";
+import { appendHookTrace, appendTrace, readTickInputs, readTrace, sha256, traceDir, writeTraceFile } from "@norn/store";
 import { harvestGolden } from "./golden-harvest.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
 import { observeNow } from "./observe-snapshot.ts";
@@ -75,7 +75,7 @@ beforeAll(async () => {
   // a live run with 70 hook facts: two hook blocks (B14)
   for (let i = 0; i < 70; i++) {
     h.clock.advance(1_000);
-    appendTrace(h.root, { type: "hook", id: ulid(h.clock.now()), fact: { event: "tool_use", at: h.clock.iso(), agent: "claude", native: "PostToolUse", cwd: wt(), story: "gh-9", run_id: runId } });
+    appendHookTrace(h.root, { story: "gh-9" }, { type: "hook", id: ulid(h.clock.now()), fact: { event: "tool_use", at: h.clock.iso(), agent: "claude", native: "PostToolUse", cwd: wt(), story: "gh-9", run_id: runId } });
   }
   h.clock.advance(10_000);
   await h.tick();

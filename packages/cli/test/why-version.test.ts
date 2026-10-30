@@ -4,7 +4,7 @@
  * same exit code as for a tick this version recorded.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type TickTrace, validate } from "@norn/schema";
 import { version } from "../package.json";
@@ -125,5 +125,46 @@ describe("norn_version on tick traces (O5)", () => {
     expect(v.replay.matches).toBe(false);
     expect(v.replay.action).toBeDefined();
     expect(v.replay.label).toBe(`recorded by norn 0.0.1, replayed by norn ${version}`);
+  });
+});
+
+describe("why on a tick the trace no longer keeps (B20, D10)", () => {
+  const DAY = 86_400_000;
+  /** A ulid of time `ms` exactly: `ulid()` is monotonic per process, so it never goes back 40 days. */
+  const ulidAt = (ms: number) => {
+    const A = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+    let time = "";
+    for (let t = ms, i = 0; i < 10; i++, t = Math.floor(t / 32)) time = A[t % 32] + time;
+    return `${time}${"0".repeat(16)}`;
+  };
+
+  test("a tick older than the window whose day is gone is refused as tick_pruned, pointing at a newer tick", async () => {
+    const old = ulidAt(h.clock.now() - 40 * DAY);
+    const r = await h.norn("why", "gh-3", "--tick", old, "--json");
+    expect(r.exit).toBe(3);
+    expect(r.value).toMatchObject({ code: "tick_pruned", error: `tick ${old} is older than the trace retained (14d)`, do_instead: "norn trace gh-3" });
+  });
+
+  test("the window is trace.retain's", async () => {
+    h.write(join(h.home, "config.yaml"), "trace: { retain: 60d }\n");
+    try {
+      const old = ulidAt(h.clock.now() - 70 * DAY);
+      expect((await h.norn("why", "gh-3", "--tick", old, "--json")).value).toMatchObject({ code: "tick_pruned", error: `tick ${old} is older than the trace retained (60d)` });
+      // within the window a tick that is not found is just not in the trace
+      expect((await h.norn("why", "gh-3", "--tick", ulidAt(h.clock.now() - 40 * DAY), "--json")).value).toMatchObject({ code: "no_tick" });
+    } finally {
+      h.write(join(h.home, "config.yaml"), "");
+    }
+  });
+
+  test("an unknown tick within the window, or whose day is still kept, is not called pruned", async () => {
+    expect((await h.norn("why", "gh-3", "--tick", ulidAt(h.clock.now() - DAY), "--json")).value).toMatchObject({ code: "no_tick" });
+    const day = new Date(h.clock.now() - 40 * DAY).toISOString().slice(0, 10);
+    h.write(join(traceDir(), `${day}.jsonl`), "\n");
+    try {
+      expect((await h.norn("why", "gh-3", "--tick", ulidAt(h.clock.now() - 40 * DAY), "--json")).value).toMatchObject({ code: "no_tick" });
+    } finally {
+      rmSync(join(traceDir(), `${day}.jsonl`));
+    }
   });
 });

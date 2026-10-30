@@ -2,7 +2,7 @@
 id: gh-107/04
 title: Hook facts land in and are read from per-unit hook files
 depends_on: [ gh-107/02 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }

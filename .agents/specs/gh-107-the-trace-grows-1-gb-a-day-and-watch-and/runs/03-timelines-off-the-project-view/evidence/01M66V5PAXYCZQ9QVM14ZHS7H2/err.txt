@@ -1,0 +1,106 @@
+TRACE-READ 2026-10-16.jsonl
+TRACE-READ 2026-10-17.jsonl
+TRACE-READ 2026-10-18.jsonl
+TRACE-READ 2026-10-19.jsonl
+TRACE-READ 2026-10-20.jsonl
+TRACE-READ 2026-10-21.jsonl
+TRACE-READ 2026-10-22.jsonl
+TRACE-READ 2026-10-23.jsonl
+TRACE-READ 2026-10-24.jsonl
+TRACE-READ 2026-10-25.jsonl
+TRACE-READ 2026-10-26.jsonl
+TRACE-READ 2026-10-27.jsonl
+TRACE-READ 2026-10-28.jsonl
+TRACE-READ 2026-10-29.jsonl
+[H[2Jnorn cockpit · repo  nothing needs you                                                                                                        no tick yet  17:47
+/ to filter
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+STORIES                                                          │ gh-1 — Long step
+▸ gh-1  Long step  running implement · no slices · no PR         │ ◐ running at implement · auto→manual · unclaimed
+                                                                 │ 
+                                                                 │ LINKS
+                                                                 │ PR      none seen yet
+                                                                 │ issue   https://example.com/1
+                                                                 │ 
+                                                                 │ ALSO WAITS FOR YOU
+                                                                 │ ○ gh-1               norn take gh-1
+                                                                 │ 
+                                                                 │ NOTES none open
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+enter orient · v trace · t take · i issue · / filter · ? keys · q quit
+TRACE-READ 2026-10-16.jsonl
+TRACE-READ 2026-10-17.jsonl
+TRACE-READ 2026-10-18.jsonl
+TRACE-READ 2026-10-19.jsonl
+TRACE-READ 2026-10-20.jsonl
+TRACE-READ 2026-10-21.jsonl
+TRACE-READ 2026-10-22.jsonl
+TRACE-READ 2026-10-23.jsonl
+TRACE-READ 2026-10-24.jsonl
+TRACE-READ 2026-10-25.jsonl
+TRACE-READ 2026-10-26.jsonl
+TRACE-READ 2026-10-27.jsonl
+TRACE-READ 2026-10-28.jsonl
+TRACE-READ 2026-10-29.jsonl
+[H[2Jnorn cockpit · repo  nothing needs you                                                                                                        no tick yet  17:47
+/ to filter
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+STORIES                                                          │ gh-1 — Long step
+▸ gh-1  Long step  running implement · no slices · no PR         │ ◐ running at implement · auto→manual · unclaimed
+                                                                 │ 
+                                                                 │ LINKS
+                                                                 │ PR      none seen yet
+                                                                 │ issue   https://example.com/1
+                                                                 │ 
+                                                                 │ ALSO WAITS FOR YOU
+                                                                 │ ○ gh-1               norn take gh-1
+                                                                 │ 
+                                                                 │ NOTES none open
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+                                                                 │ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+enter orient · v trace · t take · i issue · / filter · ? keys · q quit

@@ -188,9 +188,9 @@ The story worktree is on the story branch and holds `.agents/specs/<id>-<slug>/`
 ### 9.1 Hooks
 
 - A1 `norn init` appends norn hooks into each configured agent tool's repo config (e.g. `.claude/settings.json`), marked as norn-owned; re-running updates them in place; `norn uninstall` removes them.
-- A2 Hooks call `"${NORN_BIN:-norn}" hook <event>` (R8.1) and report lifecycle facts: turn start/end, tool use, waiting for input (incl. permission prompts), session end, transcript path.
+- A2 Hooks call `"${NORN_BIN:-norn}" hook <event>` (R8.1) and report lifecycle facts: turn start/end, tool use, waiting for input (incl. permission prompts), session end, transcript path. Each fact is appended to the unit's own hook file (`trace/hooks/<story>/_story.jsonl` or `<nn>.jsonl`, the unit of the worktree it fired in, with or without a run id) and to the trace day file. Ticks, `norn hook` and `norn brief` read a unit's hook facts from its hook file only, never from the day files; a tick reads the hook files of units with a live run or an unknown launch (R5.1) and of units whose hook file was written within `limits.stalled` (R5.3).
 - A3 Hooks are no-ops outside worktrees containing `.norn-unit`.
-- A4 Where the agent supports blocking (e.g. Claude Code `Stop`), ending a turn without a receipt is refused with an instruction to report — in unattended steps only (MO4).
+- A4 Where the agent supports blocking (e.g. Claude Code `Stop`), ending a turn without a receipt is refused with an instruction to report — in unattended steps only (MO4). The refusals already given to a run are counted from its unit's hook file (A2).
 - A5 Agents without hooks are a lower tier: runner, process and git facts only.
 - A6 When launching, norn sets `NORN_HOME`, `NORN_STORY`, `NORN_SLICE`, `NORN_RUN` and `NORN_BIN`. The launched command itself starts with `env PATH=<shim dir>:… NORN_BIN=<shim>`, where the shim `~/.norn/bin/norn` execs the launching norn, so `command -v norn` in a runner pane resolves to it even after a login shell resets `PATH` (R8.1).
 - A7 `norn doctor` (M4) runs a test turn per adapter and verifies hooks fire; it runs `command -v norn` in one throwaway runner session and fails when it resolves to another norn (R8.2), and warns when `NORN_MACHINE` overrides the machine name (R7.3).
@@ -420,6 +420,7 @@ Example `bug` workflow: `reproduce (agent, norn-diagnose: seen as a user, then a
 - O4 Trace: one JSONL record per tick with facts snapshot, rule fired, action, result, briefing and transcript pointers. The record keeps its decisions inline and stores the facts snapshot as a skeleton marked `"$chunked": 1`: each story's facts, the machine facts, the remote issues, the replay config and each workflow source are chunks addressed by the sha256 of their JSON, and each run's hook facts are blocks of 64 cut by position, written once. Chunks live once in the day's `<day>.chunks.jsonl` beside the day file, appended and fsynced before the tick line that names them, so no tick line names an unwritten chunk and one day's two files replay every tick of that day. A record without the marker is a full-facts snapshot and is read as before.
 - O5 `norn why <unit>` replays the pure decide function on the recorded snapshot and shows the rule that fired; `--receipt <id>` picks the decision that applied that receipt (the command of a note item, NT2). A chunked snapshot is rebuilt byte for byte as observe produced it; a chunk missing from its day makes the record a corrupt trace entry (exit 4, code `trace_corrupt`, naming the hash) and nothing is replayed.
 - O6 `handoff.md`: generated status header (S9); tool writes heartbeat lines (repeats collapsed, e.g. "(×3)"); agents write milestones.
+- O7 Trace retention: the trace is machine-local and kept for `trace.retain` (a duration, default `14d`, never less than `14d`, the timelines' window). Only `norn tidy [--retain <duration>]` prunes it, never watch or a tick: it deletes each day file, with its chunks file, dated before today minus the window, and never `trace/workflows/`; `--dry-run` lists each day with the bytes it would free. A window under `14d` or a value that is not a duration is refused by tidy and a warning in `norn doctor`, never a config load failure. `norn doctor` hints, without failing a check, when the trace holds days beyond the window. `norn why --tick <id>` for a tick older than the window whose day is gone refuses with `tick_pruned`.
 
 ## 16. Skills
 
@@ -461,7 +462,7 @@ TypeScript on **Bun**, monorepo with one-way dependencies: `schema ← core ← 
 | `@norn/view` | Read model `loadProjectView()` → stories, slices, inbox, runs, timeline. |
 | `@norn/cli` | Wiring and commands. |
 
-- X1 Front ends (web cockpit, Herdr pane, TUI) read only via `@norn/view` and write only via CLI verbs.
+- X1 Front ends (web cockpit, Herdr pane, TUI) read only via `@norn/view` and write only via CLI verbs. The project view (`loadProjectView`) carries no timeline and reads no trace day file; a front end that shows timelines asks for them with a separate timeline read (`loadTimelines`, or `loadTraceView` for one unit's step timeline).
 - X2 Adapters are selected in config by package name; third-party adapters implement interfaces from `@norn/core`.
 - X3 Distribution: npm package plus `bun build --compile` single-file binaries. Agent plugins (Claude Code first) are thin wrappers with a `/norn` command; skills come from the repo (SK1), and no logic lives in plugins.
 - X4 Core is tested by replaying recorded traces as snapshots (chunked and full-facts records alike, rebuilt by the store's tick read); adapters against recorded fixtures.

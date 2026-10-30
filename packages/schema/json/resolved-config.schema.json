@@ -17,7 +17,8 @@
     "notifiers",
     "watch_interval",
     "claim",
-    "limits"
+    "limits",
+    "trace"
   ],
   "properties": {
     "agents": {
@@ -294,6 +295,20 @@
         "attended_wait": {
           "pattern": "^([0-9]+(ms|s|m|h|d))+$",
           "description": "Duration like 30s, 10m, 1h30m",
+          "type": "string"
+        }
+      }
+    },
+    "trace": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "retain"
+      ],
+      "properties": {
+        "retain": {
+          "minLength": 1,
+          "description": "Duration like 14d, at least 14d (checked by norn tidy and norn doctor)",
           "type": "string"
         }
       }

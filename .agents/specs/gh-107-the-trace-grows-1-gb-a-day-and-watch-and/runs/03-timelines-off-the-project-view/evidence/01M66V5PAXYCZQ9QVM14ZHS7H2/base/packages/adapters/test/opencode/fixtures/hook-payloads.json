@@ -1,0 +1,5 @@
+{
+  "session.idle": { "hook_event_name": "session.idle", "session_id": "ses_01", "cwd": "/repo/.worktrees/gh-12" },
+  "permission.asked": { "hook_event_name": "permission.asked", "session_id": "ses_01", "cwd": "/repo/.worktrees/gh-12", "message": "bash: git push", "tool": "bash" },
+  "tool.execute.before": { "hook_event_name": "tool.execute.before", "session_id": "ses_01", "cwd": "/repo/.worktrees/gh-12", "tool": "bash", "command": "bun test" }
+}

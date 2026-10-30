@@ -1,0 +1,12 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61GEND72EGBGF608ZT4P14N",
+  "run_id": "01M61E6TWGEP3RF0WBB0GKP419",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-28T15:00:58.407Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "done",
+  "handoff": "A check step now runs in a detached 'norn check-run' that holds the check lease and writes the C5 receipt; the tick returns at once, later ticks keep running (check.running) and apply the receipt; timeout still fails with reason timeout. Inbox shows '(check running)' instead of '(queued)'. Repro loop is now check-run.test.ts (red on old code, green now); full suite, typecheck green."
+}

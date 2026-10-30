@@ -1,0 +1,12 @@
+{
+  "kind": "done",
+  "receipt_id": "01M626BWRT42F00B2MTWS888QD",
+  "run_id": "01M6269E4RBXA6KFZAZTY0PDQK",
+  "step": "describe",
+  "attempt": 1,
+  "at": "2026-10-28T21:23:56.314Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "done",
+  "handoff": "pr.md written: summary (call tree of tick → detached norn check-run → receipt), evidence per Wanted item (before: loop-red.txt 3.5 s tick + 'no heartbeat', user-inbox-probes.md; after: check-run.test.ts green 5/5 — tick <2.5 s, check.running, claim.renew, parallel + K3 rerun, status '(check running) 1m', timeout fail), fallback item noted as not changed, zombie helper fix called out, merge danger two-way / every check step with review#3 edges."
+}

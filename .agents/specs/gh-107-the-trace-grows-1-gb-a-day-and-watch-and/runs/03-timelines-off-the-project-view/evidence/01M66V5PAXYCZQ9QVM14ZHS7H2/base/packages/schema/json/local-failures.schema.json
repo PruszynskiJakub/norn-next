@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://norn.dev/schema/local-failures.json",
+  "title": "norn failed act effects (trace/failures.json)",
+  "type": "object",
+  "properties": {
+    "units": {
+      "type": "object",
+      "patternProperties": {
+        "^(.*)$": {
+          "type": "object",
+          "required": [
+            "effect",
+            "rule",
+            "reason",
+            "at",
+            "tick_id",
+            "step",
+            "attempt"
+          ],
+          "properties": {
+            "effect": {
+              "type": "string"
+            },
+            "rule": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "at": {
+              "type": "string"
+            },
+            "tick_id": {
+              "type": "string"
+            },
+            "step": {
+              "type": "string"
+            },
+            "attempt": {
+              "type": "number"
+            },
+            "session": {
+              "type": "object",
+              "required": [
+                "runner",
+                "session_id"
+              ],
+              "properties": {
+                "runner": {
+                  "type": "string"
+                },
+                "session_id": {
+                  "type": "string"
+                },
+                "pane_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

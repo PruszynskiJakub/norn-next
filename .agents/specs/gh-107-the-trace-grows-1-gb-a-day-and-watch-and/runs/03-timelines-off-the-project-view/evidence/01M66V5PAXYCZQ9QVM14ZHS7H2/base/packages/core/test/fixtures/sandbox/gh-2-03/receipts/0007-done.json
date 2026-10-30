@@ -1,0 +1,14 @@
+{
+  "kind": "done",
+  "receipt_id": "01M5MWZ2TCM5BDQ72EV8PFT1FC",
+  "run_id": "01M5MWWYVA3RSHY979ARH9HSAE",
+  "step": "qa",
+  "attempt": 1,
+  "at": "2026-10-23T17:29:31.724Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-2/03",
+  "outcome": "partial",
+  "handoff": "qa#1 partial: AC1,AC2,AC4,AC5,AC6 pass via curl against real server :4050 (today 2026-10-23). AC3 person: confirm #c53727 overdue date vs #808080 (row itself unstyled). AC7 unchecked: no browser in unattended run; steps prepared in AC7.md. Review finding 1 confirmed server-side: 404 from POST /items/:id/due is full HTML page, so script would show raw HTML as row error (AC7 example path, server stopped, uses generic message).",
+  "evidence": "evidence/01M5MWWYVA3RSHY979ARH9HSAE"
+}

@@ -1,0 +1,12 @@
+{
+  "kind": "done",
+  "receipt_id": "01M5MRKTG45ZCZP9026E5BTWA9",
+  "run_id": "01M5MRHZK7F089C3QW0FFY796H",
+  "step": "refine",
+  "attempt": 1,
+  "at": "2026-10-23T16:13:28.453Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "done",
+  "handoff": "Spec written below the story text in story.md (frontmatter unchanged): Context, B1-B32 (persistence/Inbox, projects API, items API, API-wide validation, web UI), filled edge checklist, out of scope. PO answers folded in; other gaps decided and marked (assumed): case-insensitive duplicate names -> 400, API returns completed items (UI hides), /projects/:id URLs with ?completed=1 toggle, description max 10k, 201/204 status codes. No open questions."
+}

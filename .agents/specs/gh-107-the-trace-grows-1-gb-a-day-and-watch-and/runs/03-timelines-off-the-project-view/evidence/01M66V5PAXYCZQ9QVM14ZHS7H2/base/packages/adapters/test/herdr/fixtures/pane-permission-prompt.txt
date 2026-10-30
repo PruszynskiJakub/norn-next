@@ -1,0 +1,30 @@
+ │     const { press } = await shortcutOnPage();
+ │     expect(press("q")).toEqual({ focused: 1, prevented: true });
+ │   });
+ │
+ │   test("q does nothing special while focus is in an input, textarea or select", async () => {
+ │     for (const tag of ["input", "textarea", "select"]) {
+ │       const { doc, press } = await shortcutOnPage();
+ │       doc.activeElement = field(tag);
+ │       expect(press("q")).toEqual({ focused: 0, prevented: false });
+ │     }
+ │   });
+ │
+ │   test("q does nothing special with Ctrl, Meta or Alt held", async () => {
+ │     for (const mod of ["ctrlKey", "metaKey", "altKey"]) {
+ │       const { press } = await shortcutOnPage();
+ │       expect(press("q", { [mod]: true })).toEqual({ focused: 0, prevented: false });
+ │     }
+ │   });
+ │ });
+ │ EOF
+ │ bun test test/web.test.ts 2>&1 | tail -30
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ Contains brace with quote character (expansion obfuscation)
+
+ Do you want to proceed?
+ ❯ 1. Yes
+   2. Yes, and switch to auto mode · auto mode handles these prompts for you
+   3. No
+
+ Esc to cancel · Tab to amend

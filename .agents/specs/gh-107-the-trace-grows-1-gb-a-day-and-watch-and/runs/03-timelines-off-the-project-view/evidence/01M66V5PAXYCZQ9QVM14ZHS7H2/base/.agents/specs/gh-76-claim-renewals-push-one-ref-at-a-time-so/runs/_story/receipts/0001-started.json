@@ -1,0 +1,18 @@
+{
+  "kind": "started",
+  "receipt_id": "01M61DSSA60T9F4M3XCZRG3NSD",
+  "run_id": "01M61DSSA60T9F4M3XCZRG3NSC",
+  "step": "reproduce",
+  "attempt": 1,
+  "at": "2026-10-28T14:14:37.234Z",
+  "by": "agent",
+  "who": "claude",
+  "how": "manual",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-76-claim-renewals-push-one-ref-at-a-time-so",
+  "agent_session_id": "0b568e85-eded-47f2-8bcf-415855edd3dd",
+  "process": {
+    "pid": 96267,
+    "pid_start": "Wed Oct 28 15:14:29 2026"
+  }
+}

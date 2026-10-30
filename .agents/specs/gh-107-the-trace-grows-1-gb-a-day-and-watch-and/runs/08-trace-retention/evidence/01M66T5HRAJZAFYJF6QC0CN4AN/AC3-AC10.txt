@@ -1,0 +1,24 @@
+$ norn doctor (trace.retain soon)
+doctor exit 1
+Warnings
+  ! trace.retain soon is not a duration (like 14d): norn tidy refuses to prune until it is
+
+FAIL lines: 1
+$ norn config trace --json
+{"files":{"user":{"path":"/Users/jakubpruszynski/.norn/config.yaml","exists":true},"repo":{"path":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa08/repo/.agents/norn/config.yaml","exists":true}},"entries":[{"key":"trace.retain","value":"soon","source":"repo","group":"machine","meaning":"trace days norn tidy keeps (at least 14d)"}],"notes":[]}
+exit 0
+
+$ norn why --tick 01M2ZTC8GF6C10ACPS3PRCE27D   # 40 days old, its day file deleted
+{"error":"why: expected 1 argument(s), got 0","do_instead":"norn why <unit> [--tick <tick_id>] [--step <step>] [--attempt <n>] [--transition <step>.<outcome>] [--rule <prefix>] [--receipt <receipt_id>]","code":"usage"}
+exit 2
+$ norn why --tick 01M2ZTC8GF6C10ACPS3PRCE27D --json
+{"error":"why: expected 1 argument(s), got 0","do_instead":"norn why <unit> [--tick <tick_id>] [--step <step>] [--attempt <n>] [--transition <step>.<outcome>] [--rule <prefix>] [--receipt <receipt_id>]","code":"usage"}
+exit 2
+
+$ norn why --tick 01M5Z32VGG8WD5RJZ3V8E0F7GC   # 3 days old, unknown, day present
+{"error":"why: expected 1 argument(s), got 0","do_instead":"norn why <unit> [--tick <tick_id>] [--step <step>] [--attempt <n>] [--transition <step>.<outcome>] [--rule <prefix>] [--receipt <receipt_id>]","code":"usage"}
+exit 2
+
+$ norn why --tick 01M2ZTC8GF6C10ACPS3PRCE27D   # 40 days old, day file still present
+{"error":"why: expected 1 argument(s), got 0","do_instead":"norn why <unit> [--tick <tick_id>] [--step <step>] [--attempt <n>] [--transition <step>.<outcome>] [--rule <prefix>] [--receipt <receipt_id>]","code":"usage"}
+exit 2

@@ -45,7 +45,7 @@ async function agentProcess(ctx: Context, proc: ProcessPort): Promise<ProcessIde
 /** Agent session id and transcript from the hooks that fired in this worktree just before (A2). */
 function recentSession(ctx: Context, s: UnitSession): { agent_session_id?: string; transcript?: string; agent?: string } {
   const since = new Date(ctx.clock.now() - 3_600_000).toISOString();
-  const own = readUnitHooks(s.root, [{ story: s.unit.story, slice: s.unit.slice, worktree: s.worktree }], since)[0] ?? [];
+  const own = readUnitHooks(s.root, [{ story: s.unit.story, slice: s.unit.slice }], since)[0] ?? [];
   const facts = own.map((e) => e.fact).filter((f) => f.cwd === s.worktree || f.cwd.startsWith(`${s.worktree}/`));
   const last = facts.findLast((f) => f.agent_session_id);
   const id = last?.agent_session_id ?? ctx.env.NORN_AGENT_SESSION_ID;

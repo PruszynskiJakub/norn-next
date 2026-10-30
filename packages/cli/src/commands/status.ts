@@ -78,10 +78,7 @@ export const statusCommand = defineCommand({
     await ctx.locate();
     const view = await projectView(ctx);
     const raw = args.positionals[0];
-    if (!raw) {
-      const { timeline: _timeline, ...rest } = view;
-      return rendered(rest, formatStatus(view));
-    }
+    if (!raw) return rendered(view, formatStatus(view));
     const key = parseUnitKey(raw);
     const story = view.stories.find((s) => s.key === key.story);
     if (!story) throw refuse(`unknown story ${key.story}`, "norn status", "unknown_unit");
@@ -93,7 +90,6 @@ export const statusCommand = defineCommand({
       stories: [slice ? { ...story, slices: [slice] } : story],
       runs: view.runs.filter((r) => units.has(r.unit) && (!slice || r.unit === slice.key)),
       recently_done: view.recently_done.filter((d) => units.has(d.unit)),
-      timeline: {},
     };
     return rendered(slice ?? story, formatStatus(filtered));
   },

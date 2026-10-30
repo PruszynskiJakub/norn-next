@@ -1,0 +1,22 @@
+bun test v1.3.13 (bf2e2cec)
+killed 1 dangling process
+
+packages/cli/test/check-run.test.ts:
+(fail) two long checks (K1, K3) > (unnamed) [5001.48ms]
+  ^ a beforeEach/afterEach hook timed out for this test.
+123 | 
+124 | describe("two long checks (K1, K3)", () => {
+125 |   let h: Harness;
+126 |   let runsDirs: string[];
+127 |   beforeAll(async () => ({ h, runsDirs } = await atChecks("sleep 3", "1m", ["Slow check", "Other check"])));
+128 |   afterAll(() => h.cleanup());
+                       ^
+TypeError: undefined is not an object (evaluating 'h.cleanup')
+      at <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-107-the-trace-grows-1-gb-a-day-and-watch-and--03-timelines-off-the-project-view/packages/cli/test/check-run.test.ts:128:18)
+(fail) two long checks (K1, K3) > (unnamed) [0.40ms]
+
+ 1247 pass
+ 2 fail
+ 16 snapshots, 23604 expect() calls
+Ran 1249 tests across 83 files. [484.50s]
+exit 1

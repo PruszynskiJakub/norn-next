@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { type ClaimBlob, type LeaseFile, type Receipt, type UnitState, ulid } from "@norn/schema";
 import {
   acquireClaim,
+  appendHookTrace,
   appendReceipt,
   appendTrace,
   leasesDir,
@@ -20,7 +21,7 @@ import {
   writePrFacts,
   writeUnitMarker,
 } from "@norn/store";
-import { formatInbox, formatOrient, formatStatus, formatTimeline, loadProjectView, orientReport, prCommand, receiptSummary, stepTitle } from "../src/index.ts";
+import { formatInbox, formatOrient, formatStatus, formatTimeline, loadProjectView, loadTimelines, orientReport, prCommand, receiptSummary, stepTitle } from "../src/index.ts";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -142,7 +143,7 @@ async function seed() {
       { unit: "gh-12", rule: "noop", action: { kind: "wait" }, result: { ok: true } },
     ],
   });
-  appendTrace(repo, {
+  appendHookTrace(repo, { story: "gh-12", slice: "gh-12/01" }, {
     type: "hook",
     id: ulid(NOW),
     fact: { event: "tool_use", at: ago(20), agent: "claude", native: "PreToolUse", cwd: "/w", story: "gh-12", slice: "gh-12/01", run_id: RUN, tool: "Bash" },
@@ -175,7 +176,7 @@ function tree(root: string): string[] {
 }
 
 describe("loadProjectView", () => {
-  test("stories, slices, inbox, runs, timeline, recently done", async () => {
+  test("stories, slices, inbox, runs, recently done", async () => {
     const { repo, home } = await seed();
     const v = await loadProjectView({ repoRoot: repo, home, now: NOW, holder: "me@box", liveness: () => true, env: {} });
 
@@ -238,18 +239,39 @@ describe("loadProjectView", () => {
       },
     ]);
 
-    expect(v.timeline["gh-12/01"]?.map((e) => [e.source, e.kind])).toEqual([
+    // D1 (B3): the project view carries no timeline
+    expect("timeline" in v).toBe(false);
+
+    expect(v.recently_done).toEqual([{ unit: "gh-12/02", title: "Wire API", done_at: ago(60), age: "1h" }]);
+    expect(JSON.parse(JSON.stringify(v))).toEqual(v);
+  });
+
+  test("timelines are a separate read: receipts and trace events per unit (B3, D1)", async () => {
+    const { repo, home } = await seed();
+    const t = loadTimelines({ repoRoot: repo, home, now: NOW, env: {} });
+    expect(t.errors).toEqual([]);
+    expect(t.timeline["gh-12/01"]?.map((e) => [e.source, e.kind])).toEqual([
       ["receipt", "check"],
       ["tick", "launch"],
       ["receipt", "started"],
       ["hook", "tool_use"],
     ]);
-    expect(v.timeline["gh-12/01"]?.[1]?.summary).toBe("tick launch-ready-auto → launch");
-    expect(v.timeline["gh-12"]?.map((e) => e.kind)).toEqual(["ask", "wait"]);
-    expect(v.timeline["gh-12/03"]).toEqual([]);
+    expect(t.timeline["gh-12/01"]?.[1]?.summary).toBe("tick launch-ready-auto → launch");
+    expect(t.timeline["gh-12"]?.map((e) => e.kind)).toEqual(["ask", "wait"]);
+    expect(t.timeline["gh-12/03"]).toEqual([]);
+    expect(formatTimeline(t.timeline["gh-12/01"] ?? [])).toContain("check fail at test#1: bun test (exit 1, 2.3s)");
+  });
 
-    expect(v.recently_done).toEqual([{ unit: "gh-12/02", title: "Wire API", done_at: ago(60), age: "1h" }]);
-    expect(JSON.parse(JSON.stringify(v))).toEqual(v);
+  test("trace window: the timeline read keeps 14 days; the project view reads no trace, so a broken line is not its error (B3, D1)", async () => {
+    const { repo, home } = await seed();
+    const old = NOW - 20 * 86_400_000;
+    appendTrace(repo, { type: "tick", tick_id: ulid(old), at: new Date(old).toISOString(), heartbeat_id: null, duration_ms: 5, facts: {}, decisions: [{ unit: "gh-12", rule: "old", action: { kind: "wait" }, result: { ok: true } }] });
+    writeFileSync(join(repo, ".agents/norn/trace", "2026-10-22.jsonl"), '{"type":"tick",broken\n');
+    const v = await loadProjectView({ repoRoot: repo, home, now: NOW, holder: "me@box", liveness: () => true, env: {} });
+    expect(v.errors).toEqual([]);
+    const t = loadTimelines({ repoRoot: repo, home, now: NOW, env: {} });
+    expect(t.timeline["gh-12"]?.map((e) => e.summary)).not.toContainEqual(expect.stringContaining("old"));
+    expect(t.errors.map((e) => e.file)).toEqual(["2026-10-22.jsonl:1"]);
   });
 
   test("dead lease → alive false; claim by someone else hides the story from the inbox", async () => {
@@ -402,7 +424,6 @@ describe("formatters", () => {
     expect(inbox.split("\n").slice(0, 3)).toEqual(["Answer (1) · agents waiting for your answer", "  gh-12      implement: Which OAuth provider? · 40m", '      $ norn answer gh-12 "…"']);
     expect(inbox).toContain("Running (1) · agents and checks at work");
     expect(inbox).toContain("Recently done (1) · finished in the last 24h");
-    expect(formatTimeline(v.timeline["gh-12/01"] ?? [])).toContain("check fail at test#1: bun test (exit 1, 2.3s)");
   });
 
   test("an item line names its step once, also when the title already starts with it (F4)", () => {
@@ -448,7 +469,6 @@ describe("formatters", () => {
       stories: [],
       inbox: { at: "", pending: 0, groups: { your_turn: [], answer: [], approve: [], unblock: [], check: [], unclaimed: [], running: [], notes: [], recently_done: [] } },
       runs: [],
-      timeline: {},
       recently_done: [],
       errors: [],
     };

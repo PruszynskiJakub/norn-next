@@ -1,0 +1,156 @@
+{
+  "heartbeat": {
+    "last_tick_at": 4072154400000
+  },
+  "machine": {
+    "dead_lease_files": [],
+    "heartbeat_id": "<ulid:1>",
+    "holder": "tester@box",
+    "leases": [
+      {
+        "created_at": "<time>",
+        "holder": {
+          "pid": "<pid>",
+          "pid_start": "<pid_start>"
+        },
+        "kind": "slot",
+        "port_base": 4010,
+        "repo": "<dir>/repo",
+        "run_id": null,
+        "slice": null,
+        "slot": 1,
+        "story": "gh-7",
+        "version": 1,
+        "worktree": "<dir>/repo-worktrees/gh-7-add-login-form"
+      }
+    ],
+    "runner": "fake",
+    "runner_capabilities": {
+      "resume": true,
+      "send": true
+    }
+  },
+  "now": 4072154400000,
+  "orphans": {
+    "branches": [],
+    "worktrees": []
+  },
+  "remote": {},
+  "repo": {
+    "default_branch": "main",
+    "remote": "origin",
+    "root": "<dir>/repo"
+  },
+  "stories": [
+    {
+      "base": {
+        "ahead": 1,
+        "behind": 0,
+        "conflicts": [],
+        "head": "<sha:1>",
+        "merge_base": "<sha:2>",
+        "ref": "refs/remotes/origin/main",
+        "sha": "<sha:2>"
+      },
+      "branch": "gh-7-add-login-form",
+      "claim": {
+        "state": "none"
+      },
+      "frontmatter": {
+        "assignee": "tester",
+        "body_hash": "c0246aeb7256a4338e22673c46f83939608564165a78d6d6e47ae30be59fc51c",
+        "id": "gh-7",
+        "intake_at": "<time>",
+        "labels": [
+          "norn",
+          "norn:wf:mini"
+        ],
+        "number": 7,
+        "provider": "gh",
+        "slug": "add-login-form",
+        "status": "new",
+        "title": "Add login form",
+        "url": "https://github.com/o/r/issues/7",
+        "workflow": "mini"
+      },
+      "frontmatter_error": null,
+      "intake_only": true,
+      "key": "gh-7",
+      "mailbox": [],
+      "mode": "auto",
+      "slices": [],
+      "slug": "add-login-form",
+      "spec_dir": ".agents/specs/gh-7-add-login-form",
+      "units": [
+        {
+          "errors": [],
+          "last_check": null,
+          "last_findings": null,
+          "last_outcome_receipt": null,
+          "lease": null,
+          "run": null,
+          "state": null,
+          "unapplied": [],
+          "uncommitted": false,
+          "unit": {
+            "dir": "_story",
+            "key": "gh-7",
+            "slice": null,
+            "story": "gh-7"
+          },
+          "workflow": null,
+          "workflow_hash": null,
+          "worktree": {
+            "exists": true,
+            "in_progress": {
+              "operation": null,
+              "unmerged": []
+            },
+            "last_commit_at": "<wall-ms>",
+            "last_file_change_at": null,
+            "path": "<dir>/repo-worktrees/gh-7-add-login-form",
+            "slot": 1,
+            "status": {
+              "ahead": 0,
+              "behind": 0,
+              "branch": "gh-7-add-login-form",
+              "clean": true,
+              "head": "<sha:1>",
+              "path": "<dir>/repo-worktrees/gh-7-add-login-form",
+              "rebase_in_progress": false,
+              "staged": [],
+              "unstaged": [],
+              "untracked": [],
+              "upstream": null
+            }
+          }
+        }
+      ],
+      "worktree": {
+        "exists": true,
+        "in_progress": {
+          "operation": null,
+          "unmerged": []
+        },
+        "last_commit_at": "<wall-ms>",
+        "last_file_change_at": null,
+        "path": "<dir>/repo-worktrees/gh-7-add-login-form",
+        "slot": 1,
+        "status": {
+          "ahead": 0,
+          "behind": 0,
+          "branch": "gh-7-add-login-form",
+          "clean": true,
+          "head": "<sha:1>",
+          "path": "<dir>/repo-worktrees/gh-7-add-login-form",
+          "rebase_in_progress": false,
+          "staged": [],
+          "unstaged": [],
+          "untracked": [],
+          "upstream": null
+        }
+      }
+    }
+  ],
+  "tick_id": "<ulid:2>"
+}

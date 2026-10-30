@@ -1,0 +1,7 @@
+readable exit=0
+write-only day files exit=0
+today's day file lines:      674 ->      675; last type: briefing
+65c65
+<   "briefing": "briefings/01M66CKKZSK12P2CXYHTSJJNPP/01M671AMJYFHHWRMQ7K5626BRE.md",
+---
+>   "briefing": "briefings/01M66CKKZSK12P2CXYHTSJJNPP/01M671AP98RQMFG7R2NDG3AAET.md",

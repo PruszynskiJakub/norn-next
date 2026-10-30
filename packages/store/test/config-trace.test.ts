@@ -4,12 +4,14 @@ import { mkdirSync, writeFileSync, appendFileSync } from "node:fs";
 import { copyFileSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { Facts, LoadedWorkflow } from "@norn/core";
-import { type HookFact, type ResolvedConfig, type TickTrace, type TraceEvent, ulid } from "@norn/schema";
+import { type HookFact, type HookTrace, type ResolvedConfig, type TickTrace, type TraceEvent, ulid } from "@norn/schema";
 import {
+  appendHookTrace,
   appendTick,
   appendTrace,
   blockedHookCount,
   decisionUnit,
+  hookFilePath,
   inboxHistory,
   lastTickFor,
   loadConfig,
@@ -23,6 +25,7 @@ import {
   sha256,
   setTraceReadObserver,
   traceDir,
+  unitHooksChangedAt,
   writeBriefing,
   writeTraceFile,
 } from "../src/index.ts";
@@ -162,8 +165,8 @@ describe("trace (O4)", () => {
       expect(opened(() => readTrace(repo, { types: ["tick"] }))).toEqual(both);
       expect(opened(() => inboxHistory(repo))).toEqual(both);
       expect(opened(() => readHookFacts(repo, AT))).toEqual(both);
-      expect(opened(() => blockedHookCount(repo, { story: "gh-12", worktree: "/w" }, runId))).toEqual(both);
-      expect(blockedHookCount(repo, { story: "gh-12", worktree: "/w" }, runId)).toBe(1);
+      // B9: the blocked count reads the unit's hook file, never a day file (this hook is only in the day file)
+      expect(opened(() => blockedHookCount(repo, { story: "gh-12" }, runId))).toEqual([]);
       expect(opened(() => readHookFacts(repo, "2026-10-24T00:00:00.000Z"))).toEqual(both.slice(1));
     } finally {
       expect(setTraceReadObserver(prev)).not.toBeNull();
@@ -186,27 +189,48 @@ describe("trace (O4)", () => {
     // a tick an older norn recorded without the replay block
     expect(readTickInputs(repo, tick("gh-12", AT) as TickTrace)).toEqual({ ok: false, reason: "no_replay" });
   });
-  test("A2/A4: a unit's hook events — its own (marker or worktree) since a time, oldest first; blocked ones counted per run", () => {
+  test("A2/A4 (B5, D3): a unit's hook events — from its own hook file, since a time, oldest first, each id once; blocked ones counted per run", () => {
     const repo = tmp();
     const run9 = "01M5MA3PG0DB4G1MJNV0HKQYSA"; // a ulid of AT
-    const hook = (at: string, cwd: string, extra: Record<string, unknown> = {}, blocked = false): TraceEvent =>
-      ({ type: "hook", id: ulid(), ...(blocked ? { blocked: true, reason: "r" } : {}), fact: { event: "turn_end", at, agent: "claude", native: "Stop", cwd, ...extra } }) as TraceEvent;
-    appendTrace(repo, hook("2026-10-23T12:00:05.000Z", "/w/gh-9", { story: "gh-9", run_id: run9 }, true));
-    appendTrace(repo, hook("2026-10-23T12:00:01.000Z", "/w/gh-9/sub", { story: "gh-9" }));
-    appendTrace(repo, hook("2026-10-23T12:00:02.000Z", "/w/gh-10", { story: "gh-10" }, true));
-    appendTrace(repo, hook("2026-10-24T00:00:01.000Z", "/w/gh-9", { story: "gh-9", run_id: run9 }, true));
-    appendTrace(repo, hook("2026-10-24T00:00:02.000Z", "/w/gh-9--01", { story: "gh-9", slice: "gh-9/01" }));
-    appendTrace(repo, hook("2026-10-24T00:00:03.000Z", "/elsewhere", { story: "gh-10", run_id: ulid() }));
-    const gh9 = { story: "gh-9", worktree: "/w/gh-9" };
-    const gh9s = { story: "gh-9", slice: "gh-9/01", worktree: "/w/gh-9--01" };
-    const gh10 = { story: "gh-10", worktree: null };
+    const hook = (at: string, cwd: string, extra: Record<string, unknown> = {}, blocked = false): HookTrace =>
+      ({ type: "hook", id: ulid(), ...(blocked ? { blocked: true, reason: "r" } : {}), fact: { event: "turn_end", at, agent: "claude", native: "Stop", cwd, ...extra } }) as HookTrace;
+    const gh9 = { story: "gh-9" };
+    const gh9s = { story: "gh-9", slice: "gh-9/01" };
+    const gh10 = { story: "gh-10" };
+    const late = hook("2026-10-23T12:00:05.000Z", "/w/gh-9", { story: "gh-9", run_id: run9 }, true);
+    expect(appendHookTrace(repo, gh9, late)).toBe("2026-10-23.jsonl");
+    appendHookTrace(repo, gh9, hook("2026-10-23T12:00:01.000Z", "/w/gh-9/sub", { story: "gh-9" }));
+    appendHookTrace(repo, gh10, hook("2026-10-23T12:00:02.000Z", "/w/gh-10", { story: "gh-10" }, true));
+    appendHookTrace(repo, gh9, hook("2026-10-24T00:00:01.000Z", "/w/gh-9", { story: "gh-9", run_id: run9 }, true));
+    appendHookTrace(repo, gh9s, hook("2026-10-24T00:00:02.000Z", "/w/gh-9--01", { story: "gh-9", slice: "gh-9/01" }));
+    // B7: the unit is the one written to, whatever the fact names
+    appendHookTrace(repo, gh10, hook("2026-10-24T00:00:03.000Z", "/elsewhere", { story: "gh-10", run_id: ulid() }));
+    // D4: the hook file's time is its latest fact's; an older fact appended later never moves it back
+    expect(unitHooksChangedAt(repo, gh9)).toBe(Date.parse("2026-10-24T00:00:01.000Z"));
+    expect(unitHooksChangedAt(repo, gh10)).toBe(Date.parse("2026-10-24T00:00:03.000Z"));
+    // a duplicate line (a backfill overlapping an append) is read once
+    appendFileSync(hookFilePath(repo, gh9), `${JSON.stringify(late)}\n`);
+    expect(hookFilePath(repo, gh9)).toBe(join(traceDir(repo), "hooks/gh-9/_story.jsonl"));
+    expect(hookFilePath(repo, gh9s)).toBe(join(traceDir(repo), "hooks/gh-9/01.jsonl"));
+    // every line also lands in its day file (B5)
+    expect(readTrace(repo, { types: ["hook"] }).events).toHaveLength(6);
+
+    const seen: string[] = [];
+    const prev = setTraceReadObserver(({ file, kind }) => seen.push(`${kind} ${file.slice(traceDir(repo).length + 1)}`));
     const ats = (units: Parameters<typeof readUnitHooks>[1], since: string) => readUnitHooks(repo, units, since).map((evs) => evs.map((e) => e.fact.at.slice(11, 19)));
-    // the story unit's worktree is a prefix of its slice's, so it sees the slice's hooks too (runHooks picks them so)
-    expect(ats([gh9, gh9s, gh10], AT)).toEqual([["12:00:01", "12:00:05", "00:00:01", "00:00:02"], ["00:00:02"], ["12:00:02", "00:00:03"]]);
-    expect(ats([gh10], "2026-10-24T00:00:00.000Z")).toEqual([["00:00:03"]]);
-    expect(readUnitHooks(repo, [gh9], AT)[0]?.filter((e) => e.blocked).map((e) => e.reason)).toEqual(["r", "r"]);
-    expect(blockedHookCount(repo, gh9, run9)).toBe(2);
-    expect(blockedHookCount(repo, gh10, run9)).toBe(0);
+    try {
+      // the story unit no longer sees its slice's hooks: each unit has its own file
+      expect(ats([gh9, gh9s, gh10, { story: "gh-11" }], AT)).toEqual([["12:00:01", "12:00:05", "00:00:01"], ["00:00:02"], ["12:00:02", "00:00:03"], []]);
+      expect(ats([gh10], "2026-10-24T00:00:00.000Z")).toEqual([["00:00:03"]]);
+      expect(readUnitHooks(repo, [gh9], AT)[0]?.filter((e) => e.blocked).map((e) => e.reason)).toEqual(["r", "r"]);
+      expect(blockedHookCount(repo, gh9, run9)).toBe(2);
+      expect(blockedHookCount(repo, gh10, run9)).toBe(0);
+    } finally {
+      setTraceReadObserver(prev);
+    }
+    // B8–B10: only the units' own hook files are opened (gh-11 has none), no day file
+    expect([...new Set(seen)].sort()).toEqual(["hook hooks/gh-10/_story.jsonl", "hook hooks/gh-9/01.jsonl", "hook hooks/gh-9/_story.jsonl"]);
+    expect(unitHooksChangedAt(repo, { story: "gh-11" })).toBeNull();
   });
   test("briefings stored by trace-relative path (B4)", () => {
     const repo = tmp();

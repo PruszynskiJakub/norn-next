@@ -1,0 +1,45 @@
+{
+  "kind": "done",
+  "receipt_id": "01M63MW0BREM4Q4G1683A1HEQ6",
+  "run_id": "01M63MRM0C5RBCDZT5JARHD0F9",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-29T10:56:38.776Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "changes_requested",
+  "handoff": "Core hold, mailbox wait, corrupt title and stuck hint are right and tested. Blocking F1: storyLifecycle (remote.park/mirror) runs before the decideUnit hold and still writes state.json/story.md into a story worktree mid-rebase from rewound state. Minor F2 (slicesStep reads a rebasing slice's rewound state), F3 (BS5.1 contradicts), nit F4.",
+  "findings": [
+    {
+      "severity": "blocking",
+      "title": "storyLifecycle still writes into a rebasing story worktree",
+      "id": "F1",
+      "file": "packages/core/src/decide/story.ts",
+      "line": 103,
+      "criterion": "Wanted: no receipt, no state.json against the rewound state",
+      "detail": "decideStory calls storyLifecycle (line 103) and importMailbox before the per-unit loop, and the rebasing hold lives only in decideUnit (line 256). Story facts are read from the story worktree (loadSnapshot storyRoots, local-facts.ts:98), so mid-rebase `su.state` and the story.md frontmatter are the rewound copy. storyLifecycle then still emits: `park(..., \"remote\", ..., \"remote.park\")` (state.json built from the rewound `st`, written into runs/_story), `update_story_mirror` for `remote.mirror` / `remote.mirror.refined` (story.md rewritten from the rewound frontmatter; refineFinished reads the rewound visits). Commit is deferred, but the file sits modified in the worktree: on `git rebase --continue` after the agent's `git add -A` the rewound state.json/story.md lands in the rebased history; on abort it is discarded and re-decided. Spec: 'norn does not act on that unit's runs/ files: no receipt, no state.json, no deadline classified against the rewound state … and holds the unit.' Repro: the rebase-rewind harness with the issue closed (h.remote.issues = [] or label removed) before the mid-rebase tick — acted(r) shows remote.park and runs/_story/state.json is modified.\nAxis: spec\nSuggestion: Hold the story-level writes too when the story unit (or the story worktree) is rebasing: e.g. in decideStory skip storyLifecycle's park/mirror (and the refined-hash record) when `su && rebasing(su)` — cleanup_merged_story may stay — and add a decide test (issue closed + story unit rebasing → only unit.rebase_in_progress) plus one for a mirror change."
+    },
+    {
+      "severity": "minor",
+      "title": "slicesStep judges a rebasing slice by its rewound state",
+      "id": "F2",
+      "file": "packages/core/src/decide/steps.ts",
+      "line": 205,
+      "detail": "The story unit's slices step reads each slice unit's state (isStuck, done, corrupt) from the slice worktree; mid-rebase that is the rewound copy. A slice that was stuck earlier and unstuck since reads as stuck again, and if it is the only active slice the story unit is classified `stuck` (slices.slice_stuck) — a receipt written to the story unit, which is not rebasing, against a slice's rewound state. Edge case, but the same class as the issue.\nAxis: spec\nSuggestion: Treat a rebasing slice as still progressing (not stuck, not done) in slicesStuck/slicesStep, with a decide test."
+    },
+    {
+      "severity": "minor",
+      "title": "BS5.1 now contradicts the code for a rebase",
+      "id": "F3",
+      "file": ".agents/SPEC-base-sync-and-qa.md",
+      "line": 78,
+      "detail": "BS5.1 says that while an operation is in progress 'the unit's other rules run as usual — … died, silent, stalled, timeout'. For a rebase the unit is now held entirely (unit.rebase_in_progress). AGENTS.md: 'The spec is .agents/PRD.md. Read it before changing behaviour; cite its ids'. The code comment cites H1/S2/S5 but not the BS5.1 exception, and nothing records the new rule in a spec.\nAxis: standards\nSuggestion: Cite the BS5.1 exception in the decideUnit comment and note the spec amendment in the handoff for the person (a spec change goes through the spec workflow)."
+    },
+    {
+      "severity": "nit",
+      "title": "A rebase left waiting forever holds the unit silently",
+      "id": "F4",
+      "detail": "While held, deadlines and died/silent are not decided, and no inbox item says a rebase waits; only a trace noop. An agent that dies mid-rebase leaves the unit held with nothing in the inbox. The issue asks for a distinct fact, which the noop is, so not blocking.\nAxis: spec\nSuggestion: Consider an inbox item (or a process_alive check) for a long-held rebase in a follow-up issue."
+    }
+  ]
+}

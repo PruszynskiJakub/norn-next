@@ -1,0 +1,7 @@
+# day file of 40 days ago deleted; ulid 01M2ZTC8GF6C10ACPS3PRCE27D = 40 days ago, 01M5Z32VGG8WD5RJZ3V8E0F7GC = 3 days ago
+$ norn why gh-1 --tick 01M2ZTC8GF6C10ACPS3PRCE27D
+{"error":"tick 01M2ZTC8GF6C10ACPS3PRCE27D is older than the trace retained (14d)","do_instead":"norn trace gh-1","code":"tick_pruned"}
+exit 3
+$ norn why gh-1 --tick 01M5Z32VGG8WD5RJZ3V8E0F7GC
+{"error":"no tick 01M5Z32VGG8WD5RJZ3V8E0F7GC in the trace","do_instead":"norn trace gh-1","code":"no_tick"}
+exit 3

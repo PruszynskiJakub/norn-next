@@ -39,7 +39,8 @@ Tick lines keep decisions inline and store facts as a `$chunked` skeleton whose 
 
 - qa#1: full suite 1260 pass, typecheck green. Dev build in a throwaway repo: quiet 2nd tick adds 1310 B and no chunk; day files alone replay; orphan/torn chunk lines harmless and the next chunk starts on a new line; a removed chunk reads as corrupt naming the hash. why/harvest/hook-block criteria checked through the harness (no gh remote for a real unit). AC1–AC12 pass, AC13 person (PR body at ready).
 - qa#1 partial: QA: AC1–AC12 pass (full suite 1260 green, typecheck green; dev-build tick/read checks in a throwaway repo plus harness why/harvest/hook-block tests). AC13 is the person's: the PR body must name the downgrade as merge danger.
+- merge#1: merged the story branch (slices 04 per-unit hook files, 08 retention) with `git merge --no-ff`. Conflicts were imports and doc headers only: why.ts keeps tickReader plus 08's tick_pruned (isUlid, ulidTime, hasTraceDay); trace.ts keeps both header notes, and readTickInputs stays in tick-trace.ts (08's chunks-aware day pairs already prune `<day>.chunks.jsonl`). Semantic fixes: chunked-ticks.test.ts seeds run hooks with appendHookTrace (ticks read per-unit hook files now); agent-protocol B8 test reads tick facts through readTickInputs.
 
 ## Resume
 
-QA done: AC1–AC12 pass, AC13 for the person at ready (PR body names the downgrade). Evidence in $TMPDIR/qa-gh107-06/ev.
+Merge committed; full suite and typecheck checked. Next: integrate retries the rebase.

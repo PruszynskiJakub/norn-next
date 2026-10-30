@@ -1,0 +1,18 @@
+{
+  "kind": "started",
+  "receipt_id": "01M5MWV36NEDJK0ZBEJ36D6GVG",
+  "run_id": "01M5MWV36NEDJK0ZBEJ36D6GVF",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-23T17:27:21.049Z",
+  "by": "agent",
+  "who": "claude",
+  "how": "manual",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-sandbox-todoist-worktrees/gh-2-due-dates-with-today-and-upcoming-views--03-due-dates-in-project-lists",
+  "process": {
+    "pid": 4345,
+    "pid_start": "Fri Oct 23 13:00:52 2026"
+  },
+  "slice": "gh-2/03"
+}
