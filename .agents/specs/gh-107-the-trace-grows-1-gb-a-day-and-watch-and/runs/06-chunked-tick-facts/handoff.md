@@ -33,6 +33,8 @@ Tick lines keep decisions inline and store facts as a `$chunked` skeleton whose 
 - review#1: approve. Full suite 1260 pass, typecheck green. AC1–AC12 tested at S1/S2. Minor findings: F1 B13 5 KB does not hold at ~50 units (inline decisions), F2 filtered why drops story facts of ticks with no replay block or a corrupt chunk, F3 chunk values are not hash-checked, F4/F5 nits.
 - review#1 approve: AC1–AC12 met and tested at S1/S2; full suite (1260) and typecheck green. No blocking findings. Minor: B13's 5 KB holds at harness scale, not on ~50-unit repos (decisions inline, D6); filtered why skips story facts of no-replay/corrupt ticks; chunk values not hash-checked on read. AC13 is the person's at ready.
 
+- qa#1: full suite 1260 pass, typecheck green. Dev build in a throwaway repo: quiet 2nd tick adds 1310 B and no chunk; day files alone replay; orphan/torn chunk lines harmless and the next chunk starts on a new line; a removed chunk reads as corrupt naming the hash. why/harvest/hook-block criteria checked through the harness (no gh remote for a real unit). AC1–AC12 pass, AC13 person (PR body at ready).
+
 ## Resume
 
-Review done (approve). Optional follow-ups: F2 (why.ts unitIn fallback to tick.facts on no_replay), F3 (verify sha256 of the chunk value on read).
+QA done: AC1–AC12 pass, AC13 for the person at ready (PR body names the downgrade). Evidence in $TMPDIR/qa-gh107-06/ev.
