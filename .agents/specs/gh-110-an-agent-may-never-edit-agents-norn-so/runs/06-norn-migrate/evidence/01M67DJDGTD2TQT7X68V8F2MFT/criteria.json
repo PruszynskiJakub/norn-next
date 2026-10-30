@@ -1,0 +1,11 @@
+[
+  { "id": "AC1", "verdict": "pass", "evidence": "AC1-AC3-migrate.txt, AC1-json.txt, migrate-tests.txt" },
+  { "id": "AC2", "verdict": "pass", "evidence": "AC1-AC3-migrate.txt, AC9-after.txt, AC8-interrupted.txt (heartbeat id kept, .agents/norn/ gone, tick after migrate keeps it); migrate-tests.txt (the next tick recognises its own claim, ID2 — no remote issues in the hand-run repo, so the claim part is observed through the test)" },
+  { "id": "AC3", "verdict": "pass", "evidence": "AC1-AC3-migrate.txt (staged .gitignore diff drops only .agents/norn/trace/; node_modules/, *.log and the rest untouched)" },
+  { "id": "AC4", "verdict": "pass", "evidence": "AC4.txt (rerun before and after the commit: 'nothing to move', exit 0, git status unchanged; --json {moves:[],staged:[],commit:null})" },
+  { "id": "AC5", "verdict": "pass", "evidence": "AC5.txt (tick lock held at .agents/norn/trace/tick.lock with note 'norn watch': exit 3 tick_locked, do_instead 'stop norn watch (and any tick), then run norn migrate again', nothing moved)" },
+  { "id": "AC6", "verdict": "pass", "evidence": "AC6.txt (in a linked worktree: exit 3 not_main_checkout, do_instead cd <main checkout> && norn migrate, nothing moved); migrate-tests.txt (unit worktree case)" },
+  { "id": "AC7", "verdict": "pass", "evidence": "AC7.txt (config, workflows, and one machine file each in both places: exit 3 both_layouts naming both paths, nothing moved)" },
+  { "id": "AC8", "verdict": "pass", "evidence": "AC8-interrupted.txt (rerun after staged renames moves the trace, drops the .gitignore line, heartbeat kept, status exit 0); AC8-untracked.txt (draft.yaml moved plainly, listed as untracked, not staged)" },
+  { "id": "AC9", "verdict": "pass", "evidence": "AC1-AC3-migrate.txt, AC4.txt, AC9-after.txt (old-layout repo with a trace from 3 ticks: status refused old_layout; migrate listed each move and the commit; git status staged renames + .gitignore; commit; tick and norn status exit 0)" }
+]

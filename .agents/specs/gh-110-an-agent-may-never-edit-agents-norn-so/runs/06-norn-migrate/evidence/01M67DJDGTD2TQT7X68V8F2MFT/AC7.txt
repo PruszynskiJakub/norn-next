@@ -1,0 +1,24 @@
+## config in both places
+$ norn migrate
+**Refused (both_layouts):** /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-migrate/repo has norn files in both the old and the new layout (config: .agents/norn/config.yaml and .agents/norn.config.yaml; workflows: .agents/norn/workflows; machine files: .agents/norn/trace); norn reads neither
+
+Do instead: keep one of each pair and remove the other, then run norn migrate in /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-migrate/repo
+[exit 3]
+{"error":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-migrate/repo has norn files in both the old and the new layout (config: .agents/norn/config.yaml and .agents/norn.config.yaml; workflows: .agents/norn/workflows; machine files: .agents/norn/trace); norn reads neither","do_instead":"keep one of each pair and remove the other, then run norn migrate in /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-migrate/repo","code":"both_layouts","details":{"layout":"both","root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-migrate/repo","parts":[{"part":"config","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-migrate/repo/.agents/norn/config.yaml","new":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-migrate/repo/.agents/norn.config.yaml","at_old":true,"at_new":true},{"part":"workflows","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-migrate/repo/.agents/norn/workflows","new":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-migrate/repo/.agents/workflows","at_old":true,"at_new":false},{"part":"machine files","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-migrate/repo/.agents/norn/trace","new":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-migrate/home/repos/repo-695ef367","at_old":true,"at_new":false}]}}
+[exit 3]
+unchanged: yes
+
+## workflows in both places
+**Refused (both_layouts):** /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-migrate/repo has norn files in both the old and the new layout (config: .agents/norn/config.yaml; workflows: .agents/norn/workflows and .agents/workflows; machine files: .agents/norn/trace); norn reads neither
+
+Do instead: keep one of each pair and remove the other, then run norn migrate in /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-migrate/repo
+[exit 3]
+unchanged: yes
+
+## a machine file name in both places
+**Refused (both_layouts):** /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-migrate/repo has norn files in both the old and the new layout (machine files: .agents/norn/trace/heartbeat.json and /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-migrate/home/repos/repo-695ef367/heartbeat.json); norn reads neither
+
+Do instead: keep one of each pair and remove the other, then run norn migrate in /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-migrate/repo
+[exit 3]
+unchanged: yes
+
