@@ -38,6 +38,14 @@ export function agentSkills(agents: Record<string, AgentAdapter>, root: string):
   return out;
 }
 
+/**
+ * W5 (D7): the repo workflows validated exactly as a tick validates them, against the skills each
+ * configured agent can see. The one validator observe and `norn doctor` share; never copy its rules.
+ */
+export function checkedRepoWorkflows(listing: WorkflowListing, root: string, config: { default_agent: string }, agents: Record<string, AgentAdapter>): RepoWorkflows {
+  return repoWorkflows(listing, { default_agent: config.default_agent, visible: agentSkills(agents, root) });
+}
+
 export function repoWorkflows(listing: WorkflowListing, skills: { default_agent: string; visible: Record<string, string[]> }): RepoWorkflows {
   const out: Record<string, LoadedWorkflow> = {};
   for (const [name, wf] of Object.entries(listing.workflows)) {

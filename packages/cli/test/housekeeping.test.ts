@@ -4,7 +4,7 @@
  * GR6 record on the base branch, and `norn doctor` (A7).
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, readdirSync, readFileSync, utimesSync } from "node:fs";
+import { chmodSync, existsSync, readdirSync, readFileSync, rmSync, utimesSync } from "node:fs";
 import { join } from "node:path";
 import { git as gitAdapter } from "@norn/adapters";
 import type { StoryFrontmatter } from "@norn/schema";
@@ -331,5 +331,166 @@ describe("norn doctor: the cockpit plugin hint (HC11)", () => {
     const repo = join(import.meta.dir, "..", "..", "..");
     expect(pluginLinkHint(assetsDir())).toBe(`herdr plugin link ${join(repo, "plugins", "herdr")} (optional: the cockpit of norn status --watch, HC9)`);
     expect(pluginLinkHint("/nowhere/a/b/c")).toBe("herdr plugin install PruszynskiJakub/norn-next/plugins/herdr (optional: the cockpit of norn status --watch, HC9)");
+  });
+});
+
+describe("norn doctor: the repo group (B7–B10, D7)", () => {
+  let h: Harness;
+  let bin: string;
+  const main = join(import.meta.dir, "../src/main.ts");
+  const LOOP = `name: loop
+start: a
+steps:
+  a: { type: agent, skill: norn-implement, outcomes: { done: b } }
+  b: { type: agent, skill: norn-review, outcomes: { again: a, ok: $done } }
+`;
+  const NOPE = SOLO.replace("name: solo", "name: nope").replace("skill: norn-implement", "skill: norn-nope");
+  // the machine group passes too: an agent binary on PATH and hooks that fire through this norn
+  const env = () => ({ ...h.deps.env, PATH: `${bin}:${h.deps.env?.PATH ?? process.env.PATH}`, NORN_HOOK_COMMAND: `${process.execPath} ${main} hook` });
+  const status = () => h.git(["status", "--porcelain"]);
+  beforeAll(async () => {
+    h = await createHarness();
+    await boot(h);
+    bin = join(h.dir, "bin");
+    h.write(join(bin, "claude"), "#!/bin/sh\necho 1.0.0\n");
+    chmodSync(join(bin, "claude"), 0o755);
+  });
+  afterAll(() => h.cleanup());
+
+  test("a clean checkout: workflows and config valid, exit 0, nothing changed (B9)", async () => {
+    expect(status()).toBe("");
+    const r = await runChecked(["doctor"], { ...h.deps, env: env() });
+    expect(r.value).toMatchObject({
+      ok: true,
+      repo: {
+        ok: true,
+        workflows: expect.arrayContaining([{ name: "solo", file: ".agents/norn/workflows/solo.yaml", ok: true, issues: [] }]),
+        config: { ok: true, file: ".agents/norn/config.yaml", errors: [] },
+      },
+    });
+    expect(r.exit).toBe(0);
+    expect(r.stdout).toStartWith("norn doctor: every check passes\n");
+    expect(r.stdout).toMatch(/ok {3}workflows +.*solo/);
+    expect(r.stdout).toMatch(/ok {3}config +\.agents\/norn\/config\.yaml/);
+    expect(status()).toBe("");
+  });
+
+  test("a workflow with an uncounted cycle is named with the cycle and its path; non-zero (B7)", async () => {
+    const file = join(h.root, ".agents/norn/workflows/loop.yaml");
+    h.write(file, LOOP);
+    try {
+      const r = await runChecked(["doctor"], { ...h.deps, env: env() });
+      expect(r.exit).toBe(1);
+      expect(r.value).toMatchObject({
+        ok: false,
+        repo: { ok: false, workflows: expect.arrayContaining([{ name: "loop", file: ".agents/norn/workflows/loop.yaml", ok: false, issues: [expect.objectContaining({ code: "uncounted_cycle", path: "/steps/a", cycle: ["a", "b"] })] }]) },
+      });
+      expect(r.stdout).toMatch(/^norn doctor: 1 check failed \(workflow loop\)/);
+      expect(r.stdout).toMatch(/FAIL workflow loop +\.agents\/norn\/workflows\/loop\.yaml/);
+      expect(r.stdout).toContain("! /steps/a: cycle without a counter: a.done → b.again → a (W4)");
+    } finally {
+      rmSync(file);
+    }
+  });
+
+  test("a workflow naming a skill its agent lacks: doctor names it, and a tick refuses it for the same reason (B7)", async () => {
+    const file = join(h.root, ".agents/norn/workflows/nope.yaml");
+    h.write(file, NOPE);
+    const reason = "skill 'norn-nope' is not installed for agent 'claude'";
+    try {
+      const r = await runChecked(["doctor", "--json"], { ...h.deps, env: env() });
+      expect(r.exit).toBe(1);
+      expect(r.value).toMatchObject({
+        repo: { ok: false, workflows: expect.arrayContaining([{ name: "nope", file: ".agents/norn/workflows/nope.yaml", ok: false, issues: [expect.objectContaining({ code: "unknown_skill", path: "/steps/implement/skill", message: expect.stringContaining(reason) })] }]) },
+      });
+      const text = await runChecked(["doctor"], { ...h.deps, env: env() });
+      expect(text.stdout).toMatch(/FAIL workflow nope +\.agents\/norn\/workflows\/nope\.yaml/);
+      expect(text.stdout).toContain(`! /steps/implement/skill: ${reason}`);
+
+      // the same validator: a tick refuses to start a story on that workflow, naming the same skill
+      h.remote.issues = [issue(7, "Nope", ["norn", "norn:wf:nope"])];
+      const rules: string[] = [];
+      for (let i = 0; i < 3; i++) {
+        h.clock.advance(10_000);
+        rules.push(...(await h.tick()).decisions.filter((d) => d.unit === "gh-7").map((d) => d.rule));
+      }
+      expect(rules).toContain("start.workflow_invalid");
+      expect(h.notifier.items.find((i) => i.story === "gh-7")?.title).toContain(`workflow 'nope' is invalid: ${reason}`);
+    } finally {
+      rmSync(file);
+      h.remote.issues = [];
+    }
+  });
+
+  test("a config value of the wrong type names the file, the key and why; non-zero (B8)", async () => {
+    const file = join(h.root, ".agents/norn/config.yaml");
+    h.write(file, CONFIG.replace("max_agents: 1", 'max_agents: "two"'));
+    try {
+      const r = await runChecked(["doctor"], { ...h.deps, env: env() });
+      expect(r.exit).toBe(1);
+      expect(r.value).toMatchObject({ ok: false, repo: { ok: false, config: { ok: false, file: ".agents/norn/config.yaml", errors: [expect.objectContaining({ path: "/max_agents" })] } } });
+      expect(r.stdout).toMatch(/^norn doctor: .*failed \(.*config.*\)/);
+      expect(r.stdout).toMatch(/FAIL config +\.agents\/norn\/config\.yaml/);
+      expect(r.stdout).toMatch(/! \/max_agents: .*integer/);
+      // --repo needs no config that loads either
+      const repo = await runChecked(["doctor", "--repo"], { ...h.deps, env: env() });
+      expect(repo.exit).toBe(1);
+      expect(repo.stdout).toMatch(/FAIL config +\.agents\/norn\/config\.yaml/);
+    } finally {
+      h.write(file, CONFIG);
+    }
+  });
+
+  test("a user config that does not load: the repo group still runs, the machine checks are skipped naming that file", async () => {
+    const file = join(h.home, "config.yaml");
+    h.write(file, 'max_checks: "many"\n');
+    try {
+      const r = await runChecked(["doctor"], { ...h.deps, env: env() });
+      expect(r.exit).toBe(1);
+      expect(r.value).toMatchObject({ ok: false, repo: { ok: true }, skipped: expect.stringContaining(`${file}: /max_checks`) });
+      expect(r.stdout).toContain("machine checks skipped");
+      // --repo reads only the repo's files: the person's own config is not its concern
+      expect((await runChecked(["doctor", "--repo"], { ...h.deps, env: env() })).exit).toBe(0);
+    } finally {
+      rmSync(file);
+    }
+  });
+
+  test("--repo checks only the repo: no agent on PATH, no remote auth, no runner (B10)", async () => {
+    const whoami = h.remote.whoami;
+    h.remote.whoami = async () => {
+      throw new Error("not logged in");
+    };
+    h.runner.availableResult = false;
+    const bare = { ...h.deps, env: { ...h.deps.env, PATH: "/usr/bin:/bin" } };
+    try {
+      const r = await runChecked(["doctor", "--repo", "--json"], bare);
+      expect(r.exit).toBe(0);
+      expect(r.value).toMatchObject({ ok: true, repo: { ok: true } });
+      expect(Object.keys(r.value as object).sort()).toEqual(["ok", "repo"]);
+      const text = await runChecked(["doctor", "--repo"], bare);
+      expect(text.stdout).toStartWith("norn doctor: every check passes\n");
+      expect(text.stdout).not.toMatch(/\b(agent|remote|runner)\b/);
+
+      const file = join(h.root, ".agents/norn/workflows/loop.yaml");
+      h.write(file, LOOP);
+      try {
+        const broken = await runChecked(["doctor", "--repo"], bare);
+        expect(broken.exit).toBe(1);
+        expect(broken.stdout).toMatch(/^norn doctor: 1 check failed \(workflow loop\)/);
+        expect(broken.stdout).toContain(".agents/norn/workflows/loop.yaml");
+      } finally {
+        rmSync(file);
+      }
+    } finally {
+      h.remote.whoami = whoami;
+      h.runner.availableResult = true;
+    }
+  });
+
+  test("norn help doctor lists --repo (B10)", async () => {
+    const r = await runChecked(["help", "doctor"], h.deps);
+    expect(r.exit).toBe(0);
+    expect(r.stdout).toContain("--repo");
   });
 });
