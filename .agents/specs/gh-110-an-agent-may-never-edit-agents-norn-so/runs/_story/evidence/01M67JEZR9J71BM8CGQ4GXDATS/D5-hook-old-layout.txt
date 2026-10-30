@@ -1,0 +1,3 @@
+$ echo "{}" | norn hook   (old layout)
+{}
+exit=0
