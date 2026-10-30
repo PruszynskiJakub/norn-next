@@ -44,7 +44,7 @@ Measured where a size or a footprint is named on a synthetic trace like the repo
   Example: with the 2 GB trace, the cockpit refreshes every 5 s for a minute; no day file is opened, and its footprint stays within ~10% of its footprint with an empty trace (against 7–20 GB today).
 - B2 As a person running `norn status`, `norn status --segment` or `norn inbox`, I want them to read no trace day file, so that they answer at the same speed however large the trace is.
   Example: `norn status` with the 2 GB trace and with an empty trace prints the same thing in about the same time, and opens no day file.
-- B3 As a person looking at `norn story list`, `norn run list` or a run's view, I want the timelines I see today unchanged, so that nothing is lost by reading the trace less often.
+- B3 As a front end reading timelines through `@norn/view` (X1), or a person reading `norn trace`, I want the same timeline entries over the 14-day window as before, so that nothing is lost by reading the trace less often. The project view itself (`loadProjectView`) carries no timeline; a caller that wants one asks for it.
   Example: the same repo before and after the change shows the same timeline entries over the 14-day window.
 - B4 As a person reading `norn trace`, inbox history or a timeline, I want the same output as before, produced without parsing lines of event types the command does not show.
   Example: `norn trace gh-9` prints the same events as before; the tick lines it does not need are skipped by their type without being parsed, so a broken line of a type the command does not show is no longer reported by it.
@@ -53,11 +53,11 @@ Measured where a size or a footprint is named on a synthetic trace like the repo
 
 - B5 As an agent whose hook fires in a unit worktree, I want the fact appended to that unit's own hook file as well as to the day file, so that readers of that unit's hooks need not read the day files, and `norn trace` and the timelines still show it.
   Example: a `PostToolUse` hook in the gh-9 worktree → one line in gh-9's hook file and the same line in today's day file; `norn trace gh-9` shows it.
-- B6 As an agent whose hook fires outside any unit worktree, I want the fact recorded in the day file only, as today.
-  Example: a hook fired in the repo's main checkout → a line in today's day file; no hook file is created.
+- B6 As an agent whose hook fires outside any unit worktree, I want `norn hook` to stay a no-op, as today (A3): no day-file line and no hook file.
+  Example: a hook fired in the repo's main checkout → nothing traced; no hook file is created.
 - B7 As an agent in a unit worktree, I want hook facts that carry no run id to go to the unit's hook file too, since the unit is found by the worktree, not by the run.
   Example: a session-start hook without a run id in gh-9's worktree → a line in gh-9's hook file.
-- B8 As a person running ticks (watch, cron or by hand), I want each tick to read the hook files of units with a live run only, so that its cost does not grow with the day files.
+- B8 As a person running ticks (watch, cron or by hand), I want each tick to read only the hook files of units with a live run (or an unknown launch, R5.1), or whose hook file changed within `limits.stalled`, so that its cost does not grow with the day files.
   Example: with the 2 GB trace and one live run on gh-9, a tick reads gh-9's hook file and no day file to collect hook facts, and decides the same as before.
 - B9 As an agent whose hook is counted against the blocked-hook limit (A4), I want `norn hook` to count from its unit's hook file only, with the same count as before.
   Example: the 6th blocked hook of a run on gh-9 gets the same answer as before, and the day files are not read.
@@ -120,7 +120,7 @@ Measured where a size or a footprint is named on a synthetic trace like the repo
 
 ### Upgrade and downgrade
 
-- B35 As a person who reinstalls the previous release after upgrading, I want the older norn to keep working: it skips the new tick lines it cannot read (its `norn why` cannot replay them), ignores the hook files, and its own ticks write full facts that the new version reads unchanged. This one-way door is named as the merge danger of the PR that ships chunks.
+- B35 As a person who reinstalls the previous release after upgrading, I want the older norn to keep working: it reads the new tick lines' decisions and inbox changes but its `norn why` cannot replay them (refused as a failed replay), ignores the hook files, and its own ticks write full facts that the new version reads unchanged. This one-way door is named as the merge danger of the PR that ships chunks.
   Example: downgrade after a day of chunked ticks → watch and ticks run; `norn why --tick <new id>` with the older norn cannot replay that tick; upgrading again → `norn why` replays both the chunked ticks and the older norn's full ticks.
 
 ## Out of scope
@@ -141,4 +141,90 @@ Measured where a size or a footprint is named on a synthetic trace like the repo
 None.
 
 ## Plan
-Written by the `norn-plan` skill.
+
+Agreed with the person on 2026-10-30. B3, B6, B8 and B35 were amended during planning (timelines leave the project view; a hook outside a unit worktree stays a no-op; ticks also read hook files changed within `limits.stalled`; the older norn reads new tick lines but cannot replay them).
+
+### Seams
+
+- **S1 the CLI, through the integration harness** (`createHarness`: `h.norn(…)` and ticks with the fake clock and fake ports, in a temp repo). Observes B1–B13, B17, B18, B20, B22–B35.
+  "Opens no day file" (B1, B2, B8–B10) is observed through a trace-read observer in store, off by default, that sees every day file a reader opens — modelled on store's spawn observer (`setSpawnObserver`), which the effect transcripts already use. B22 is observed by the existing golden harvest (harness run with harvesting on, then the golden test).
+  Prior art: the agent-protocol tests (hook, brief, blocked hooks), the inbox-why and why-version tests (`norn why`, history), the housekeeping tests (tidy, doctor), the cockpit tests (`cockpit --json`), the view tests (`loadProjectView`, timelines), the observe snapshots, and the golden test.
+- **S2 the store trace module, through its public interface**: append and read a tick (facts resolved from chunks or a corrupt-entry error), append and read a unit's hook facts, and the prune plan. Observes the file-level cases that are awkward to stage through the CLI: B14, B15, B16, B19, B21.
+  Prior art: the store trace tests ("trace (O4)" in the store config/trace tests), which write and read day files in a temp root.
+
+Footprint and timing numbers (B1's ~10%, B2/B10's "about the same time") are not asserted in the suite: QA measures them with a benchmark script on a synthetic trace like the reported one (14 day files, ~2 GB, one live run with 400+ hook facts). The suite asserts the structure behind them: no day file opened, and the bytes a quiet tick writes (B13).
+
+### Coverage
+
+| Behaviour | Seam | Test kind | Notes |
+|---|---|---|---|
+| B1 | S1 | integration | `cockpit --json` and a refresh: observer sees no day file; footprint by QA benchmark |
+| B2 | S1 | integration | `status`, `status --segment`, `inbox`: same output, no day file opened |
+| B3 | S1 | integration | timelines through the view's timeline read and `norn trace` equal the old entries; project view has none |
+| B4 | S1 | integration | `norn trace` output unchanged; a broken line of an unshown type is not reported |
+| B5 | S1 | integration | hook in a unit worktree → line in the unit's hook file and the day file; `norn trace` shows it |
+| B6 | S1 | integration | hook outside a unit worktree → nothing traced, no hook file (extends the existing A3 test) |
+| B7 | S1 | integration | hook without a run id in a unit worktree → in the unit's hook file |
+| B8 | S1 | integration | tick reads only qualifying hook files, no day file; same decisions |
+| B9 | S1 | integration | blocked-hook limit answers as before; no day file read |
+| B10 | S1 | integration | `brief` reads only its unit's hook file; timing by QA benchmark |
+| B11 | S1 | integration | old-style trace with a live run's hook lines in day files → first tick backfills, second copies nothing |
+| B12 | S1 | integration | hook lines already present plus a duplicate; a backfill left unfinished → next tick completes it, each id once |
+| B13 | S1 | integration | two quiet ticks → second writes no chunk; tick line + chunks under 5 KB |
+| B14 | S2 | unit | 416 hook facts → 6 full blocks written once; next append adds only the changed partial block |
+| B15 | S2 | unit | chunks appended, tick line not → earlier ticks still read; extra chunks harmless |
+| B16 | S2 | unit | written-chunks memory lost or stale → chunks written again; every tick of the day still reads the same |
+| B17 | S1 | integration | `why --tick` on a chunked tick: rebuilt facts equal the observed facts byte for byte; decisions match |
+| B18 | S1 | integration | `why` on a full-facts tick from an older norn replays as before |
+| B19 | S2 | unit | one day pair copied to an empty trace dir → every tick of the day reads |
+| B20 | S1 | integration | `why --tick` of a pruned day → exit 3 `tick_pruned` |
+| B21 | S2 | unit | a chunk line removed → reading the tick reports a corrupt entry naming the hash, no facts (the CLI mapping to exit 4 rides on S1's why tests) |
+| B22 | S1 | integration | golden harvest over chunked ticks yields the same case names and decisions |
+| B23 | S1 | integration | default 14d; `trace.retain: 30d` honoured |
+| B24 | S1 | integration | `--retain` overrides config |
+| B25 | S1 | integration | window under 14d from config or flag → exit 3, nothing deleted |
+| B26 | S1 | integration | non-duration → refused with the expected form |
+| B27 | S1 | integration | day pairs older than the window deleted, the rest kept |
+| B28 | S1 | integration | hook files of finished, untouched units deleted; live unit's kept |
+| B29 | S1 | integration | briefings and transcripts of old, not-live runs deleted |
+| B30 | S1 | integration | a live run older than the window keeps everything; `trace/workflows` kept |
+| B31 | S1 | integration | `--dry-run` lists with bytes; trace unchanged |
+| B32 | S1 | integration | second `tidy` prunes nothing |
+| B33 | S1 | integration | `doctor` hint with count and size beyond the window; none within it |
+| B34 | S1 | integration | ticks over 30 fake-clock days never delete a day file |
+| B35 | S1 | integration | a chunked tick line validates against the older tick schema shape (`facts` an object), `inbox --history` reads it; full-facts ticks written after it are read and replayed by the new version |
+
+### Prefactoring
+
+1. **One day-file line reader in store.** The trace read, the hook-fact scan and the blocked-hook count each scan day files their own way; route them through one line iterator that the read observer hooks into. Makes the "opens no day file" assertions (B1, B2, B8–B10) possible at S1 and gives B4's skip-by-type one home.
+2. **Move replay-input rebuilding from the cli tick runtime into a store read of a tick's decide inputs.** `why` and the golden harvest already share it; chunk resolution (B17, B18, B21, B22) then lands in one place.
+3. **One unit-scoped hook-fact read in store**, used by the tick's local facts, `brief` (its cwd filter) and `hook` (the blocked count), still implemented over the day files. The hooks slice (B5–B12) then changes one function, not three callers.
+
+### Implementation decisions
+
+- D1 **Timelines leave the project view (B1–B3, X1).** `loadProjectView` no longer reads the trace and `ProjectView` loses `timeline`; `@norn/view` gets a separate timeline read for callers that show timelines (`norn trace` keeps `loadTraceView`). Trace parse errors leave the project view's errors. `cockpit`, `status`, `status --segment`, `inbox` and `orient` never call the timeline read.
+- D2 **Lines are skipped by type without parsing (B4).** Every trace line is written with `type` as its first key; a reader given types skips any line whose prefix names another type. A garbage line is reported only by readers that read every type.
+- D3 **Per-unit hook files (B5–B10, A2).** `trace/hooks/<story>/_story.jsonl` for a story unit and `trace/hooks/<story>/<slice nn>.jsonl` for a slice, in the main checkout's trace dir (the marker's repo). The line is the same hook event as the day file's (id, fact, blocked, reason). `norn hook` appends to the unit file first, then the day file; both unsynced appends. Outside a unit worktree nothing changes (A3, B6). Every reader of a hook file drops duplicate event ids and sorts by `at`.
+- D4 **What a tick reads (B8).** The hook file of each unit with a live run or an unknown launch (R5.1), plus each unit whose hook file's mtime is within `limits.stalled` (one stat, no read otherwise) — the hook facts observe used for `step_runs` before, so decide sees the same facts. `brief` reads only its own unit's file; `hook` counts blocked hooks from its unit's file only (A4).
+- D5 **Backfill on upgrade (B11, B12).** The first tick of the new version writes `trace/hooks/backfill.json` with `since` (its own time) and an empty `done` list. For each unit with a live run started before `since` and not in `done`, a tick scans the day files from the run's start for that unit's hook lines, appends those whose event id the unit file lacks (append only, never a rewrite, so a concurrent `norn hook` append is never lost), then adds the unit to `done`. Runs started after `since` need nothing. A crash before `done` is written just redoes the copy next tick, deduplicated by id.
+- D6 **Tick line shape (B13, B17, B35, O4).** The tick line keeps the field `facts`, which now holds a skeleton marked `"$chunked": 1`: inline parts as they are, a chunked subtree replaced by `{"$chunk": "<hash>"}`, a run's hook list by `{"$blocks": ["<hash>", …]}`. The line stays valid under the older schema, so an older norn still reads its decisions and inbox changes; its `why` fails as a failed replay (B35). The tick schema accepts both shapes; a line without the marker is a full-facts tick, read as today (B18).
+- D7 **Chunk boundaries (B13, B14).** Chunked: each story's facts (with each run's `hooks` as block references), each block of 64 hook facts cut by position in the run's refined hook list (Claude's refinement looks only backwards, so full blocks stay stable; a late hook just makes a new block), `remote.issues`, the replay config, and each workflow source. Inline: `tick_id`, `now`, `repo`, `machine`, `heartbeat`, `orphans`, the decisions and inbox changes. Rebuilding puts each value back where its reference stood, so the rebuilt facts serialize byte for byte as observed (B17).
+- D8 **Chunks file (B15, B16, B19).** `<day>.chunks.jsonl` beside `<day>.jsonl`, day taken from the tick's `at`; one line per chunk, `{"h": "<sha256 hex of the value's JSON>", "v": <value>}`. Neither norn's day-file pattern matches the name. A tick appends all its new chunks in one write and fsyncs them before appending its tick line, so no tick line names an unwritten chunk; a quiet tick has none and pays no fsync. Each process remembers which hashes today's chunks file holds and trusts that only while the file's size equals the size after its own last append; otherwise it rebuilds the set by a hash-only scan. Duplicate chunk lines are harmless (same content). Reading a tick scans only that day's chunks file and parses only the lines whose hash it needs.
+- D9 **Workflow sources become chunks (B19, B30).** New ticks store each workflow source as a chunk of the day; `trace/workflows/` stays for ticks written before the upgrade and is never pruned.
+- D10 **`why` refusals (B20, B21, S2).** `why --tick <id>` for a tick that is not found and whose ulid time is older than now minus the retention window → refused, exit 3, code `tick_pruned`, "tick … is older than the trace retained (<window>)", do-instead naming a newer tick (`norn trace <unit>`). A chunked tick with a missing chunk → corrupt trace entry naming the missing hash, exit 4, code `trace_corrupt`; nothing is replayed.
+- D11 **`trace.retain` (B23–B26).** New config key `trace.retain`, a duration, default `14d`, scope `machine` (the trace is machine-local). The 14-day minimum is checked where the value is used, not in the schema: `tidy` refuses a window under 14d or a non-duration (exit 3, or a usage error for a bad `--retain` form, naming `14d`); `doctor` reports such a config value as a warning and config loading does not fail. `tidy --retain <duration>` overrides it for that run.
+- D12 **What `tidy` prunes (B27–B32, B34).** Under the tick lock tidy already takes: each day pair (day file and chunks file) whose date is older than today minus the window; each unit hook file whose unit has no live run and whose mtime is older than the window; each run's `briefings/<run>/` and `transcripts/<run>/` when the run is not live and the newest file in them is older than the window. Never: `trace/workflows/`, `backfill.json`, the caches and locks. Tidy's output gains a `trace` part (days, hook files and runs pruned, each with bytes, and the total freed); `--dry-run` lists the same and deletes nothing. Watch and the tick never prune.
+- D13 **`doctor` hint (B33).** When day pairs older than the window exist: a hint (not a failed check) with how many days and how many bytes beyond `trace.retain`, naming `norn tidy`.
+- D14 **PRD and the one-way door (B35).** Each slice amends the PRD ids it changes in its own diff (X1; A2/A4; O4/O5/X4; a new retention rule in the observability section). The PR that ships chunks names the downgrade as its merge danger: an older norn cannot replay chunked ticks; there is no compatibility mode.
+
+### Testing decisions
+
+A good test drives a command (S1) or the store trace interface (S2) and checks what a person or reader observes: command output and exit code, files under the trace dir, decisions and replays. No test reaches into chunk internals beyond S2's interface or checks private helpers. Fakes stay at system boundaries only: the harness's fake clock, remote, runner and notifier, plus the store read observer (a test hook that only observes). Old-format traces (full-facts ticks, hook lines only in day files) are built by writing day files the way the previous version wrote them, which is also how B11, B18 and B35 are staged. Size claims (B13) are asserted in bytes written; footprint and timing are QA's benchmark. The golden corpus, effect transcripts and observe snapshots change only where the trace layout is the intended change (transcripts record files under `runs/` only, so they should stay as they are); any rewrite is reviewed as a behaviour diff.
+
+### Risks
+
+- **The 5 KB quiet tick (B13) is not yet known to hold.** `machine` facts or the decisions may be larger than they look. The chunks slice starts with a spike: split a real recorded tick from this repo's trace by D7 and measure it; if over 5 KB, the largest inline part becomes a chunk too, without returning to the person.
+- **Byte-for-byte replay (B17).** Rebuilding must reproduce key order and values exactly; a round-trip test at S2 over real recorded facts (golden cases) guards it before why is switched over.
+- **Hook routing parity (B8, D4).** Facts without a run id are matched by worktree and start time today; moving to per-unit files must keep exactly the facts observe saw. The observe snapshots and golden harvest catch a drift; run them before and after the hooks slice.
+- **Backfill on a large trace (B11).** The one-time scan reads the day files since the oldest live run; it is bounded and runs once, but on the reported machine it reads up to ~2 GB in one tick. It uses the same hash-free prefix scan as today's hook reader and runs under the tick lock.
+- **Downgrade (B35).** One-way door; named in the chunks PR's merge danger.
