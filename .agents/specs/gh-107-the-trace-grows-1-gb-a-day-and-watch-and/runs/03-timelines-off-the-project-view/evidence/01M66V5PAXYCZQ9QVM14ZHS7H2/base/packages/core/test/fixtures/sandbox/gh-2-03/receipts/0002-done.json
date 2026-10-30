@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M5MWSXPH8AMQKDSGJWFWBK3C",
+  "run_id": "01M5MWNTE3KX5SVC4ZA1JF6480",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-23T17:26:42.641Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-2/03",
+  "outcome": "done",
+  "handoff": "AC1,AC2,AC4,AC5,AC6 covered by red→green tests in test/web.test.ts (248 pass, typecheck clean). views.ts: itemRow shows due label + li.overdue + <input type=date name=due_date>; projectPage takes today and appends inline DUE_DATE_SCRIPT (delegated change → POST /items/:id/due, swap outerHTML; on error show .due-error and revert to defaultValue). web.ts: POST /items/:id/due ('' clears, invalid → 400 text/plain store message, unknown → 404), returns itemRow with completed state. Curl smoke OK; inline script parses. AC3 (person) and AC7 (browser, agent) not exercised here — left for QA. Missing due_date field is treated as clear."
+}

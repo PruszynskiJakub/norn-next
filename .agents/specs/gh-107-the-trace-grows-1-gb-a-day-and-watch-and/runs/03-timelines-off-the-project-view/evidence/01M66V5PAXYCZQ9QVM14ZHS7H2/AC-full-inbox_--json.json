@@ -1,0 +1,26 @@
+{
+  "groups": {
+    "answer": [],
+    "approve": [],
+    "check": [],
+    "notes": [],
+    "recently_done": [],
+    "running": [],
+    "unblock": [],
+    "unclaimed": [
+      {
+        "command": "norn take gh-1",
+        "group": "unclaimed",
+        "id": "unclaimed:gh-1",
+        "since": "2026-10-14T16:45:17.202Z",
+        "slice": null,
+        "step": null,
+        "story": "gh-1",
+        "title": "Unclaimed — Long step",
+        "url": "https://example.com/1"
+      }
+    ],
+    "your_turn": []
+  },
+  "pending": 1
+}

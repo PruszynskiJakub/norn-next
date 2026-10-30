@@ -1,0 +1,15 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M5MTDHBZ8X9P91AXTS60VMJD",
+  "run_id": null,
+  "step": "slices",
+  "attempt": 1,
+  "at": "2026-10-23T16:44:59.652Z",
+  "by": "norn",
+  "who": "jakubpruszynski@MacBook-Pro-Jakub-2",
+  "tick_id": "01M5MTDHBZEDA967BE5KS4GFXN",
+  "outcome": "done",
+  "rule": "slices.done",
+  "detail": "4 slice(s) integrated",
+  "route": "test"
+}

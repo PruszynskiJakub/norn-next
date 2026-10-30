@@ -1,0 +1,6 @@
+{ "sessionId": "gem-1", "messages": [
+  { "id": "1", "type": "user", "content": "Use the norn skill, then run `norn brief`." },
+  { "id": "2", "type": "gemini", "content": "Ran the brief; implementing." },
+  { "id": "3", "type": "gemini", "content": [{ "text": "All checks pass." }] },
+  { "id": "4", "type": "info", "content": "tool output" }
+] }

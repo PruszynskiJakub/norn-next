@@ -1,0 +1,76 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${NORN_BIN:-norn}\" hook session-start --agent claude # norn-owned"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${NORN_BIN:-norn}\" hook user-prompt-submit --agent claude # norn-owned"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${NORN_BIN:-norn}\" hook pre-tool-use --agent claude # norn-owned"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${NORN_BIN:-norn}\" hook post-tool-use --agent claude # norn-owned"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${NORN_BIN:-norn}\" hook notification --agent claude # norn-owned"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${NORN_BIN:-norn}\" hook stop --agent claude # norn-owned"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${NORN_BIN:-norn}\" hook session-end --agent claude # norn-owned"
+          }
+        ]
+      }
+    ]
+  }
+}

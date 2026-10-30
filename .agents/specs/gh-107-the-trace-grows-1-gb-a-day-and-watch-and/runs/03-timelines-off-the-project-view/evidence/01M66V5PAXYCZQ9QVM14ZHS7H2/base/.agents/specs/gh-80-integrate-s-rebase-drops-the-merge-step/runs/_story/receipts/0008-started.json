@@ -1,0 +1,18 @@
+{
+  "kind": "started",
+  "receipt_id": "01M63KT7280TRPWVVKGWM4HTGK",
+  "run_id": "01M63KT7280TRPWVVKGWM4HTGJ",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-29T10:38:11.608Z",
+  "by": "agent",
+  "who": "claude",
+  "how": "manual",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-80-integrate-s-rebase-drops-the-merge-step",
+  "agent_session_id": "981c6001-3559-44f6-b0b1-b7d7cfdb3893",
+  "process": {
+    "pid": 17309,
+    "pid_start": "Thu Oct 29 11:38:04 2026"
+  }
+}

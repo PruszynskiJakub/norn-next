@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "story": "gh-1",
+  "slice": "gh-1/03",
+  "unit_dir": "03-web-projects",
+  "workflow": "slice",
+  "workflow_hash": "f9e36deae63f861f2f11a020e6d8b6817e1f862befcca56cab0e7ccafcd912d5",
+  "step": "$done",
+  "attempt": 1,
+  "visits": {
+    "implement": 1,
+    "test": 1,
+    "review": 1,
+    "qa": 1,
+    "human-qa": 1,
+    "integrate": 1
+  },
+  "step_entered_at": "2026-10-23T16:38:58.896Z",
+  "status": "done",
+  "park": null,
+  "counters": {
+    "test_loop": 0,
+    "review_loop": 0,
+    "qa_loop": 0,
+    "conflict_loop": 0
+  },
+  "nudges_used": 0,
+  "retries_used": 0,
+  "applied_through": 9,
+  "run": null,
+  "last_outcome": {
+    "step": "integrate",
+    "outcome": "done",
+    "source": "classified",
+    "at": "2026-10-23T16:39:15.186Z",
+    "receipt_id": "01M5MT30ZJD7XT9T0PFK13JVP6"
+  },
+  "created_at": "2026-10-23T16:32:15.328Z",
+  "updated_at": "2026-10-23T16:39:15.331Z",
+  "last_tick_id": "01M5MT313X8JRYB4KZXEY6Q9DP"
+}

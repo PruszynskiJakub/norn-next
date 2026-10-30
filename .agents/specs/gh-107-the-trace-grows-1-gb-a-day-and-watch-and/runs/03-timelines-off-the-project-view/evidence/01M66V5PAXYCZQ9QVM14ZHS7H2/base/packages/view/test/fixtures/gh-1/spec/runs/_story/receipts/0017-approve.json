@@ -1,0 +1,12 @@
+{
+  "kind": "approve",
+  "receipt_id": "01M5MV5TF91JRFHHE1Q98D025Z",
+  "run_id": null,
+  "step": "human-qa",
+  "attempt": 1,
+  "at": "2026-10-23T16:58:15.401Z",
+  "by": "human",
+  "who": "jakubpruszynski@MacBook-Pro-Jakub-2",
+  "slice": null,
+  "comment": "Accepted on QA markup evidence; browser-only checks NOT performed by a person in this dogfood run"
+}

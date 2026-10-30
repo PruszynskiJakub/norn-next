@@ -1,0 +1,18 @@
+{
+  "kind": "started",
+  "receipt_id": "01M5MSV23XS0GMRCD2K7MMY8XC",
+  "run_id": "01M5MSV23XS0GMRCD2K7MMY8XB",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-23T16:34:54.207Z",
+  "by": "agent",
+  "who": "claude",
+  "how": "manual",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-sandbox-todoist-worktrees/gh-1-projects-and-items--03-web-projects",
+  "process": {
+    "pid": 4345,
+    "pid_start": "Fri Oct 23 13:00:52 2026"
+  },
+  "slice": "gh-1/03"
+}

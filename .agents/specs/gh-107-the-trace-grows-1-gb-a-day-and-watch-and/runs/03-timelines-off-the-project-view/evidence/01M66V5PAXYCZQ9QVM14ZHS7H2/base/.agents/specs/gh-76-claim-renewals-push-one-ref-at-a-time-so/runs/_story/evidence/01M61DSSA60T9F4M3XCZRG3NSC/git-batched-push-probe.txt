@@ -1,0 +1,8 @@
+error: failed to push some refs to '/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/tmp.Yyq4cOqnBj/r.git'
+To /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/tmp.Yyq4cOqnBj/r.git
++	<sha>:refs/norn/claims/gh-1	7898192...6178079 (forced update)
+!	<sha>:refs/norn/claims/gh-2	[rejected] (stale info)
+Done
+exit=1
+<new>	refs/norn/claims/gh-1
+<other>	refs/norn/claims/gh-2

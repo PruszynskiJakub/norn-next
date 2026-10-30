@@ -1,0 +1,8 @@
+name: story
+start: test
+steps:
+  test:
+    type: check
+    run: sleep 20 && echo checked
+    timeout: 1m
+    outcomes: { pass: $done, fail: $stuck }

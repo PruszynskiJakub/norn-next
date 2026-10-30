@@ -1,0 +1,95 @@
+{
+  "errors": [],
+  "heartbeat": {
+    "down": false,
+    "holder": "jakubpruszynski@MacBook-Pro-Jakub-2",
+    "last_tick_at": null
+  },
+  "holder": "jakubpruszynski@MacBook-Pro-Jakub-2",
+  "inbox": {
+    "groups": {
+      "answer": [],
+      "approve": [],
+      "check": [],
+      "notes": [],
+      "recently_done": [],
+      "running": [],
+      "unblock": [],
+      "unclaimed": [
+        {
+          "command": "norn take gh-1",
+          "group": "unclaimed",
+          "id": "unclaimed:gh-1",
+          "since": "2026-10-14T16:45:17.202Z",
+          "slice": null,
+          "step": null,
+          "story": "gh-1",
+          "title": "Unclaimed — Long step",
+          "url": "https://example.com/1"
+        }
+      ],
+      "your_turn": []
+    },
+    "pending": 1
+  },
+  "recently_done": [],
+  "repo": "/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-wttJls/repo",
+  "runner": null,
+  "runs": [
+    {
+      "agent": "claude",
+      "alive": null,
+      "attempt": 1,
+      "classified": null,
+      "how": "auto",
+      "last_hook_at": null,
+      "lease": null,
+      "machine": null,
+      "run_id": "01M666KXRJ6P0R2462Q72WN49Z",
+      "session": null,
+      "slice": null,
+      "started_at": "2026-10-30T10:45:17.202Z",
+      "step": "implement",
+      "story": "gh-1",
+      "unit": "gh-1"
+    }
+  ],
+  "stories": [
+    {
+      "act_failure": null,
+      "attempt": 1,
+      "base_sync": null,
+      "branch": "gh-1-long-step",
+      "claim": {
+        "expires_at": null,
+        "holder": null,
+        "state": "none",
+        "unclaimed": true
+      },
+      "counters": [],
+      "effective_mode": "manual",
+      "errors": [],
+      "key": "gh-1",
+      "last_outcome": null,
+      "mode": "auto",
+      "mode_downgraded": true,
+      "next": "norn trace gh-1",
+      "notes": [],
+      "park": null,
+      "pr": null,
+      "root": "/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-wttJls/repo-worktrees/gh-1-long-step",
+      "since": "2026-10-30T10:45:17.202Z",
+      "slice": null,
+      "slices": [],
+      "spec_dir": ".agents/specs/gh-1-long-step",
+      "status": "running",
+      "step": "implement",
+      "story": "gh-1",
+      "story_status": "active",
+      "title": "Long step",
+      "updated_at": "2026-10-30T10:45:17.202Z",
+      "url": "https://example.com/1",
+      "workflow": "one"
+    }
+  ]
+}

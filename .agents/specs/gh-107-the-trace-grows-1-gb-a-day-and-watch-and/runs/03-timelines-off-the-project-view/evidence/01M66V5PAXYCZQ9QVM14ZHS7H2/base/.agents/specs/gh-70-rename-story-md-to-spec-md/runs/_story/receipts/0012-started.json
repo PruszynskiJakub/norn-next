@@ -1,0 +1,18 @@
+{
+  "kind": "started",
+  "receipt_id": "01M61KYBPA7DEZPBAD8ETBP4A9",
+  "run_id": "01M61KYBPA7DEZPBAD8ETBP4A8",
+  "step": "describe",
+  "attempt": 1,
+  "at": "2026-10-28T16:01:58.834Z",
+  "by": "agent",
+  "who": "claude",
+  "how": "manual",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-70-rename-story-md-to-spec-md",
+  "agent_session_id": "40e78fd8-6eae-4848-81bf-0721741660a8",
+  "process": {
+    "pid": 16217,
+    "pid_start": "Wed Oct 28 17:01:47 2026"
+  }
+}
