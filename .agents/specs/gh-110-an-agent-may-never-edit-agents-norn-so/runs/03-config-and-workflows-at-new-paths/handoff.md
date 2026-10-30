@@ -24,8 +24,10 @@ Repo config at `.agents/norn.config.yaml`, workflows in `.agents/workflows/`: in
 - Repo lint (g) allowlist shrunk: package sources now spell `.agents/norn` only in paths.ts (2 lines: the trace dir and the new config file name).
 - `test/process.test.ts` (this repo's own workflows/config, still on the old layout): loads from a temp copy at the new paths while `.agents/norn/` exists.
 - AC6 (agent): throwaway repo under $TMPDIR with the dev build: `init` writes `.agents/norn.config.yaml` + `.agents/workflows/{bug,slice,story}.yaml`, no `.agents/norn/`; next steps name `.agents/workflows/`; `config list` shows repo: `.agents/norn.config.yaml`; `config set --repo` (there is no `config edit` verb; `config-edit.ts` is `set`/`unset`) help names and writes the new file; `doctor --json` names the new files.
+- housekeeping.test.ts' doctor regexes spelled the old paths escaped (`\.agents\/norn\/…`), which lint (g) does not see; updated.
+- Full `bun test`: 1437 pass; 2 fails in check-run.test.ts "two long checks" — its beforeAll timed out at 5s under full-suite load; the file passes 3/3 alone and passed in the previous full run (flake, not this change). Typecheck green. Transcripts, observe snapshots and golden unchanged.
 - init's `.gitignore` still adds `.agents/norn/trace/` (slice 04).
 
 ## Resume
 
-Run the full `bun test` and `bun run typecheck`; commit; report `norn done done`.
+Committed; nothing left for this step.

@@ -30,7 +30,7 @@ export type LoadedConfig =
 
 /**
  * `~/.norn/config.yaml` (user; home from `home` arg, else NORN_HOME_DIR, else ~/.norn)
- * merged with `<repoRoot>/.agents/norn/config.yaml` via resolveConfig (K2).
+ * merged with `<repoRoot>/.agents/norn.config.yaml` via resolveConfig (K2).
  */
 export function loadConfig(opts: { repoRoot: string; home?: string; env?: Record<string, string | undefined> }): LoadedConfig {
   const home = nornHome(opts.home, opts.env);
@@ -218,7 +218,7 @@ export interface WorkflowListing {
   errors: FileError[];
 }
 
-/** Workflow files in `.agents/norn/workflows/`, name → absolute path (first by extension order). */
+/** Workflow files in `.agents/workflows/`, name → absolute path (first by extension order). */
 function listWorkflowFiles(root: string): Array<{ name: string; file: string }> {
   let names: string[];
   try {

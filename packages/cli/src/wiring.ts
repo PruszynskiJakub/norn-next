@@ -17,6 +17,7 @@ import type {
   RunnerPort,
 } from "@norn/core";
 import type { ResolvedConfig } from "@norn/schema";
+import { REPO_CONFIG_FILE } from "@norn/store";
 import { failure } from "./output.ts";
 
 export function defaultRegistry(): AdapterRegistry {
@@ -44,10 +45,10 @@ async function external<T>(kind: Kind, id: string): Promise<T> {
   try {
     mod = (await import(id)) as Record<string, unknown>;
   } catch (e) {
-    throw failure(`unknown ${kind} adapter '${id}': not built in and not importable (${(e as Error).message})`, `install the package '${id}' or fix .agents/norn/config.yaml`, "unknown_adapter");
+    throw failure(`unknown ${kind} adapter '${id}': not built in and not importable (${(e as Error).message})`, `install the package '${id}' or fix ${REPO_CONFIG_FILE}`, "unknown_adapter");
   }
   for (const name of EXPORT_NAMES[kind]) if (typeof mod[name] === "function") return mod[name] as T;
-  throw failure(`package '${id}' exports none of ${EXPORT_NAMES[kind].join(", ")}`, `fix the ${kind} adapter in .agents/norn/config.yaml`, "unknown_adapter");
+  throw failure(`package '${id}' exports none of ${EXPORT_NAMES[kind].join(", ")}`, `fix the ${kind} adapter in ${REPO_CONFIG_FILE}`, "unknown_adapter");
 }
 
 /** Build every port the config selects. `overrides` replace whole ports (tests, embedding). */

@@ -1,5 +1,5 @@
 /**
- * Repo workflows for decide (W1, W5): every `.agents/norn/workflows/*` file parsed, schema- and
+ * Repo workflows for decide (W1, W5): every `.agents/workflows/*` file parsed, schema- and
  * graph-validated (incl. that each referenced skill is installed for its agent), with its exact text for pinning (S7).
  */
 import { readdirSync } from "node:fs";

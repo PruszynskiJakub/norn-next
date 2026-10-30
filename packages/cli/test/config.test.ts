@@ -102,7 +102,7 @@ describe("norn config set and unset", () => {
     expect(await get("default_mode")).toMatchObject([{ value: "auto", source: "user" }]);
   });
 
-  test("--repo writes .agents/norn/config.yaml (B62)", async () => {
+  test("--repo writes the repo config file (B62)", async () => {
     const r = await h.norn("config", "set", "default_mode", "auto", "--repo");
     expect(r.exit).toBe(0);
     expect(r.stdout).toContain("default_mode");
@@ -126,7 +126,7 @@ describe("norn config set and unset", () => {
     const r = await norn({ interaction: term }, "config", "set", "default_mode", "auto");
     expect(r.exit).toBe(0);
     expect(term.picks).toMatchObject([
-      { question: "Write to user (~/.norn/config.yaml) or repo (.agents/norn/config.yaml)?", choices: [{ value: "user" }, { value: "repo" }] },
+      { question: "Write to user (~/.norn/config.yaml) or repo (.agents/norn.config.yaml)?", choices: [{ value: "user" }, { value: "repo" }] },
     ]);
     expect(read(repoFile())).toBe("default_mode: auto\n");
     expect(read(userFile())).toBeNull();

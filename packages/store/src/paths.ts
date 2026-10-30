@@ -9,11 +9,15 @@ import { LEGACY_SPEC_FILE, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, s
 
 const NORN_DIR = ".agents/norn";
 
-export const repoConfigPath = (root: string) => join(root, NORN_DIR, "config.yaml");
-export const workflowsDir = (root: string) => join(root, NORN_DIR, "workflows");
+/** gh-110 B1, B2 (D1): the committed repo config and workflows, relative to a root, as messages name them. */
+export const REPO_CONFIG_FILE = ".agents/norn.config.yaml";
+export const WORKFLOWS_DIR = ".agents/workflows";
+
+export const repoConfigPath = (root: string) => join(root, REPO_CONFIG_FILE);
+export const workflowsDir = (root: string) => join(root, WORKFLOWS_DIR);
 export const traceDir = (root: string) => join(root, NORN_DIR, "trace");
 /** Whether norn is set up in this checkout (CP13: the cockpit falls back to the last repo otherwise). */
-export const hasNornDir = (root: string) => existsSync(join(root, NORN_DIR));
+export const isNornRepo = (root: string) => existsSync(repoConfigPath(root)) || existsSync(workflowsDir(root));
 /** `.gitignore` entry for the machine-local trace dir, as `init` writes it (§7.1). */
 export const TRACE_IGNORE_ENTRY = `${NORN_DIR}/trace/`;
 /** The headless runner's default session log dir: machine-local, in the trace dir. */

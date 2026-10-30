@@ -9,7 +9,7 @@
 import { readFileSync } from "node:fs";
 import { cmd, WF_LABEL } from "@norn/core";
 import { storyKey } from "@norn/schema";
-import { loadWorkflows } from "@norn/store";
+import { loadWorkflows, WORKFLOWS_DIR } from "@norn/store";
 import { defineCommand, opt, type ParsedArgs } from "../command.ts";
 import type { Context } from "../context.ts";
 import { CliFailure, failure, refuse, rendered, usageError } from "../output.ts";
@@ -41,7 +41,7 @@ export const storyCreateCommand = defineCommand({
       // B21: before anything is created
       const listed = Object.keys(loadWorkflows(ctx.root).workflows).sort();
       if (!listed.includes(workflow))
-        throw refuse(`no workflow '${workflow}' in .agents/norn/workflows/ (available: ${listed.join(", ") || "none"})`, cmd.storyCreate({ workflow: `<${listed.join("|")}>` }), "unknown_workflow", { workflows: listed });
+        throw refuse(`no workflow '${workflow}' in ${WORKFLOWS_DIR}/ (available: ${listed.join(", ") || "none"})`, cmd.storyCreate({ workflow: `<${listed.join("|")}>` }), "unknown_workflow", { workflows: listed });
     }
     const labels = [ctx.config.remote.label, ...(workflow ? [`${WF_LABEL}${workflow}`] : [])];
     const remote = (await ctx.ports()).remote;

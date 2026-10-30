@@ -117,7 +117,7 @@ export const ResolvedConfig = Type.Object(
 );
 export type ResolvedConfig = Static<typeof ResolvedConfig>;
 
-/** One config layer (`~/.norn/config.yaml` or `.agents/norn/config.yaml`): everything optional. */
+/** One config layer (`~/.norn/config.yaml` or `.agents/norn.config.yaml`): everything optional. */
 export const ConfigLayer = Type.Object(
   {
     $schema: Type.Optional(Type.String()),
