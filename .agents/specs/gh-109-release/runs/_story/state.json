@@ -5,19 +5,23 @@
   "unit_dir": "_story",
   "workflow": "release",
   "workflow_hash": "1dba3383234e1630ccbebc9df02987f6e430b96e55c57cc3ce9c935092385bcb",
-  "step": "prepare",
+  "step": "confirm-version",
   "attempt": 2,
   "visits": {
     "prepare": 2,
-    "confirm-version": 1,
+    "confirm-version": 2,
     "test": 2,
     "open-pr": 1,
     "ready": 1,
     "update": 1
   },
-  "step_entered_at": "2026-10-30T12:45:01.288Z",
-  "status": "running",
-  "park": null,
+  "step_entered_at": "2026-10-30T12:46:31.313Z",
+  "status": "parked",
+  "park": {
+    "kind": "gate",
+    "reason": "Read the proposed version and its reason in pr.md and the new CHANGELOG.md section. Approve to check the release, or reject with the version or changelog changes you want.",
+    "since": "2026-10-30T12:46:31.313Z"
+  },
   "counters": {
     "version_loop": 0,
     "ready_loop": 0,
@@ -26,36 +30,17 @@
   },
   "nudges_used": 0,
   "retries_used": 0,
-  "applied_through": 14,
-  "run": {
-    "run_id": "01M66DG2RW1N0DSGM4BHPF19H4",
-    "step": "prepare",
-    "attempt": 2,
-    "started_at": "2026-10-30T12:45:40.748Z",
-    "how": "auto",
-    "agent": "claude",
-    "session": {
-      "runner": "herdr",
-      "session_id": "w9X:p1",
-      "pane_id": "w9X:p1",
-      "reach": "herdr agent attach w9X:p1"
-    },
-    "process": {
-      "pid": 19575,
-      "pid_start": "Fri Oct 30 13:45:40 2026"
-    },
-    "machine": "jakubpruszynski@MacBook-Pro-Jakub-2",
-    "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD"
-  },
+  "applied_through": 15,
+  "run": null,
   "last_outcome": {
-    "step": "update",
+    "step": "prepare",
     "outcome": "done",
-    "source": "classified",
-    "at": "2026-10-30T12:44:42.728Z",
-    "receipt_id": "01M66DEKB8X82XT04N25P9BX7B"
+    "source": "reported",
+    "at": "2026-10-30T12:46:13.029Z",
+    "receipt_id": "01M66DHBH5W0RFFTNCED1M7D4P"
   },
   "created_at": "2026-10-30T11:22:24.404Z",
-  "updated_at": "2026-10-30T12:45:40.751Z",
-  "last_tick_id": "01M66DG2RWSRY1K7J2QV79WJ3W",
+  "updated_at": "2026-10-30T12:46:31.313Z",
+  "last_tick_id": "01M66DHXCF3Y6M7JJMCBPXDJ2A",
   "mode": "auto"
 }

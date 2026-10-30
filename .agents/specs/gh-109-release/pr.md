@@ -2,7 +2,7 @@
 
 **Proposed version: 0.12.0** (minor). Reason: before 1.0 anything Added, Changed or Removed makes a minor release, and #106 regroups the CLI (old command names removed with no aliases) and adds `story create`, `story reopen`, `run cancel` and `config set|unset`.
 
-Commits since v0.11.1: #106 → Added, Changed, Removed. Omitted: #105, #104, #102 (quick; they change only this repo's own workflows, skills, docs and repo tests, nothing shipped).
+Commits since v0.11.1: #106 → Added, Changed, Removed. Omitted: #105, #104, #102 (quick; they change only this repo's own workflows, skills, docs and repo tests, nothing shipped); 9d8676a (direct cleanup of QA evidence committed on main).
 
 ## Changelog
 
