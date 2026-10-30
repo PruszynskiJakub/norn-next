@@ -33,6 +33,9 @@ Prefactors 2 and 3 of gh-107 with no change in output: `why`, the golden harvest
 - review#1: approve, no blocking findings. Minor: blockedHookCount now JSON-parses hook lines (slice 04 reworks it); the per-unit hook selection assumes a hook fact's story/slice match its run. Nit: worktree prefix match without a path separator (same as runHooks). check-run.test.ts flaked once under full-suite load; green on rerun.
 - review#1 approve: Pure prefactor verified: readTickInputs and readUnitHooks in store; golden, transcripts, observe snapshots unchanged; typecheck and full suite green (check-run timing flake once, green on rerun). No blocking findings; 2 minor, 1 nit.
 
+- qa#1: all three criteria pass, by differential runs of base (e83f5f1e) vs branch code. AC1: `why --tick` on 964 (tick, unit) pairs from real recorded ticks, byte-identical (894 replays matching, 70 `no_replay` on both). AC2/AC3: a CLI scenario with two units (hook facts interleaved, brief in each, Stop ×5 then ticks): Stop blocks 3 times then allows, each brief takes its own unit's session, every tick decision and the inbox identical. Pins untouched; full suite 1246/0 and typecheck green. Evidence in $TMPDIR/qa-107-02.
+- qa#1 pass: QA pass: base-vs-branch differential. AC1: why --tick on 964 real (tick,unit) pairs byte-identical, golden unchanged. AC2: Stop blocks 3x then allows, identical. AC3: two units' hook facts, each brief takes its own session; ticks, inbox, why identical; pins untouched. Full suite 1246/0, typecheck green.
+
 ## Resume
 
-Review approved. Nothing pending from review; slice 04 changes `readUnitHooks` to read the per-unit hook files.
+QA passed. Nothing pending from QA; slice 04 changes `readUnitHooks` to read the per-unit hook files.
