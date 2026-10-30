@@ -1,0 +1,6 @@
+{
+  "SessionStart": { "session_id": "019a-codex", "transcript_path": "/home/u/.codex/sessions/2026/10/23/rollout-019a.jsonl", "cwd": "/repo/.worktrees/gh-12", "hook_event_name": "SessionStart", "model": "gpt-5-codex", "source": "startup" },
+  "PreToolUse": { "session_id": "019a-codex", "transcript_path": "/home/u/.codex/sessions/2026/10/23/rollout-019a.jsonl", "cwd": "/repo/.worktrees/gh-12", "hook_event_name": "PreToolUse", "model": "gpt-5-codex", "turn_id": "t1", "tool_name": "Bash", "tool_use_id": "call_1", "tool_input": { "command": "bun test" } },
+  "PermissionRequest": { "session_id": "019a-codex", "transcript_path": "/home/u/.codex/sessions/2026/10/23/rollout-019a.jsonl", "cwd": "/repo/.worktrees/gh-12", "hook_event_name": "PermissionRequest", "model": "gpt-5-codex", "turn_id": "t1", "tool_name": "Bash", "tool_input": { "command": "git push" } },
+  "Stop": { "session_id": "019a-codex", "transcript_path": "/home/u/.codex/sessions/2026/10/23/rollout-019a.jsonl", "cwd": "/repo/.worktrees/gh-12", "hook_event_name": "Stop", "model": "gpt-5-codex", "turn_id": "t1", "stop_hook_active": false, "last_assistant_message": "Done." }
+}

@@ -262,6 +262,17 @@
           "type": "string"
         }
       }
+    },
+    "trace": {
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "retain": {
+          "minLength": 1,
+          "description": "Duration like 14d, at least 14d (checked by norn tidy and norn doctor)",
+          "type": "string"
+        }
+      }
     }
   }
 }

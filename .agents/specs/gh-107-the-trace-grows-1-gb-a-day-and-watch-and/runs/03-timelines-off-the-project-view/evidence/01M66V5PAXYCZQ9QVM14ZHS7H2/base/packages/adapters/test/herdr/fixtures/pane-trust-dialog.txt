@@ -1,0 +1,22 @@
+/tmp/auto-run/claude-b.sh --model sonnet --permission-mode acceptEdits --allowedTools 'Bash(norn:*) Bash(bun:*) Bash(git:*) Bash(ls:*) Bash(cat:*) Bash(gre
+p:*) Bash(sed:*) Bash(head:*) Bash(tail:*) Bash(find:*) Bash(wc:*) Bash(mkdir:*) Bash(curl:*) Read Edit Write Glob Grep Skill TodoWrite' 'Use the norn skill, then run `norn brief`.'
+/Users/u/.zshrc:97: command not found: openclaw
+(base) u@mac gh-9-keyboard-shortcut-q-focuses-quick-add % /tmp/auto-run/claude-b.sh --model sonnet --permission-mode acceptEd
+its --allowedTools 'Bash(norn:*) Bash(bun:*) Bash(git:*) Bash(ls:*) Bash(cat:*) Bash(grep:*) Bash(sed:*) Bash(head:*) Bash(tail:*) Bash(find:*) Bash(wc:*) Bash(mkdir:*) Bash(curl:*) Read Edit Write Glob Grep Skill TodoWrite' 'Use the norn skill, then run `nor
+n brief`.'
+
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Accessing workspace:
+
+ /Users/u/Projects/norn-sandbox-todoist-b-worktrees/gh-9-keyboard-shortcut-q-focuses-quick-add
+
+ Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source project, or work from your team). If not, take a moment to review what's in this folder first.
+
+ Claude Code'll be able to read, edit, and execute files here.
+
+ Security guide
+
+ ❯ No, exit
+   Yes, I trust this folder
+
+ Enter to confirm · Esc to cancel

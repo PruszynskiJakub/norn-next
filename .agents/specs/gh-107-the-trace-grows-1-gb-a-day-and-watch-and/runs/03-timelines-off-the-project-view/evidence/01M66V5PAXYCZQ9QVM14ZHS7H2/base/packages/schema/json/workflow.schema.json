@@ -1,0 +1,842 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://norn.dev/schema/workflow.json",
+  "title": "norn workflow",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "name",
+    "start",
+    "steps"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "name": {
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "start": {
+      "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
+      "type": "string"
+    },
+    "steps": {
+      "minProperties": 1,
+      "additionalProperties": false,
+      "type": "object",
+      "patternProperties": {
+        "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$": {
+          "type": "object",
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "type",
+                "skill",
+                "outcomes"
+              ],
+              "properties": {
+                "type": {
+                  "const": "agent",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "skill": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "instructions": {
+                  "type": "string"
+                },
+                "inputs": {
+                  "uniqueItems": true,
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "const": "spec",
+                            "type": "string"
+                          },
+                          {
+                            "const": "slice",
+                            "type": "string"
+                          },
+                          {
+                            "const": "slices",
+                            "type": "string"
+                          },
+                          {
+                            "const": "diff",
+                            "type": "string"
+                          },
+                          {
+                            "const": "handoff",
+                            "type": "string"
+                          },
+                          {
+                            "const": "last_check",
+                            "type": "string"
+                          },
+                          {
+                            "const": "last_findings",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "file"
+                        ],
+                        "properties": {
+                          "file": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "label": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                },
+                "agent": {
+                  "minLength": 1,
+                  "description": "Name from config.agents; default config.default_agent",
+                  "type": "string"
+                },
+                "model": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "attended": {
+                  "description": "Worked with a person; always started by a person (MO4)",
+                  "type": "boolean"
+                },
+                "deadline": {
+                  "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+                  "description": "Duration like 30s, 10m, 1h30m",
+                  "type": "string"
+                },
+                "nudges": {
+                  "minimum": 0,
+                  "description": "Max nudges in the same session (C1)",
+                  "type": "integer"
+                },
+                "retries": {
+                  "minimum": 0,
+                  "description": "Max fresh-session retries after died (C1)",
+                  "type": "integer"
+                },
+                "criteria": {
+                  "const": "required",
+                  "type": "string"
+                },
+                "outcomes": {
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "type": "object",
+                  "patternProperties": {
+                    "^[a-z][a-z0-9_-]*$": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "means": {
+                              "minLength": 1,
+                              "description": "Shown to the agent in the brief (B3)",
+                              "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "type",
+                "run",
+                "timeout",
+                "outcomes"
+              ],
+              "properties": {
+                "type": {
+                  "const": "check",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "run": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "timeout": {
+                  "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+                  "description": "Duration like 30s, 10m, 1h30m",
+                  "type": "string"
+                },
+                "outcomes": {
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "type": "object",
+                  "properties": {
+                    "pass": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "means": {
+                              "minLength": 1,
+                              "description": "Shown to the agent in the brief (B3)",
+                              "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "fail": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "means": {
+                              "minLength": 1,
+                              "description": "Shown to the agent in the brief (B3)",
+                              "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "type",
+                "outcomes"
+              ],
+              "properties": {
+                "type": {
+                  "const": "gate",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "prompt": {
+                  "description": "What the person decides; shown in inbox",
+                  "type": "string"
+                },
+                "outcomes": {
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "type": "object",
+                  "properties": {
+                    "approve": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "means": {
+                              "minLength": 1,
+                              "description": "Shown to the agent in the brief (B3)",
+                              "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "reject": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "means": {
+                              "minLength": 1,
+                              "description": "Shown to the agent in the brief (B3)",
+                              "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "stale": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "means": {
+                              "minLength": 1,
+                              "description": "Shown to the agent in the brief (B3)",
+                              "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "type",
+                "action",
+                "outcomes"
+              ],
+              "properties": {
+                "type": {
+                  "const": "git",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "action": {
+                  "anyOf": [
+                    {
+                      "const": "integrate",
+                      "type": "string"
+                    },
+                    {
+                      "const": "push",
+                      "type": "string"
+                    },
+                    {
+                      "const": "open-pr",
+                      "type": "string"
+                    },
+                    {
+                      "const": "update",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "outcomes": {
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "type": "object",
+                  "properties": {
+                    "done": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "means": {
+                              "minLength": 1,
+                              "description": "Shown to the agent in the brief (B3)",
+                              "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "conflict": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "means": {
+                              "minLength": 1,
+                              "description": "Shown to the agent in the brief (B3)",
+                              "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "type",
+                "outcomes"
+              ],
+              "properties": {
+                "type": {
+                  "const": "slices",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "outcomes": {
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "type": "object",
+                  "properties": {
+                    "done": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "means": {
+                              "minLength": 1,
+                              "description": "Shown to the agent in the brief (B3)",
+                              "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "stuck": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "means": {
+                              "minLength": 1,
+                              "description": "Shown to the agent in the brief (B3)",
+                              "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "discriminator": {
+            "propertyName": "type"
+          }
+        }
+      }
+    },
+    "counters": {
+      "additionalProperties": false,
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_-]*$": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "max"
+          ],
+          "properties": {
+            "max": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "reset_on": {
+              "pattern": "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$",
+              "description": "<step>.<outcome> whose edge resets the counter",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "base": {
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "stale": {
+          "anyOf": [
+            {
+              "const": "conflict",
+              "type": "string"
+            },
+            {
+              "const": "behind",
+              "type": "string"
+            }
+          ]
+        },
+        "step": {
+          "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
+          "type": "string"
+        }
+      }
+    }
+  }
+}

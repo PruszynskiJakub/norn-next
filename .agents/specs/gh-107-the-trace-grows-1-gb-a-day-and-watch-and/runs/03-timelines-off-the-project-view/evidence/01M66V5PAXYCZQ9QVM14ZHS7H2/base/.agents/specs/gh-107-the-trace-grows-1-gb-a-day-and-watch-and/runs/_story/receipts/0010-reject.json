@@ -1,0 +1,1 @@
+{"kind":"reject","receipt_id":"01M66MX6K4WDWZ1ACJ5AE97S5G","run_id":null,"step":"approve-plan","attempt":1,"at":"2026-10-30T14:55:01.220Z","by":"human","who":"jakubpruszynski@MacBook-Pro-Jakub-2","slice":null,"comment":"Merge slices 06 and 07 into one slice: chunked tick facts and 64-fact hook blocks ship together","head_sha":"ab19e90b6a2328f0692b339db67530c40da3b55d"}

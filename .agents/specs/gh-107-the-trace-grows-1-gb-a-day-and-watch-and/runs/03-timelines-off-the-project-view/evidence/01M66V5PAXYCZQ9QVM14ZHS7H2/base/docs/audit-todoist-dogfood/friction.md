@@ -1,0 +1,44 @@
+# norn dogfood (Todoist sandbox) — friction log
+
+Setup:
+- F1 Suggested `claude` command in inbox doesn't put norn on PATH; agent's `norn brief` fails unless PATH exported.
+- F2 `norn doctor` checks/tests `hook_command: "norn hook"`, not the command init installed (`--hook-command`).
+- F3 No per-worktree setup step (bun install); check steps had to prepend `bun install --frozen-lockfile`. No config key for checks.
+- F4 Inbox text repeats step name: "refine: refine: attended step".
+- F5 `sync` decisions show "unit":"*" for every intake — can't tell which story.
+- F6 Slots assigned in reverse order (gh-1 slot 4).
+- F7 Remote-touching ticks 10–16 s (local 0.6 s); H6 is local-only but watch UX suffers.
+- F8 (orchestrator) Story branches are cut from main at intake; no step/verb to bring a story up to date with main after a sibling story merges → stories touching the same app must be sequenced or rebased by hand.
+- F9 (orchestrator) Agents here are Claude Code subagents of the orchestrator session, so the sandbox's .claude hooks never fire → hook facts absent (A5 lower tier). Observability audit should note it.
+gh-1 refine:
+- F10 handoff.md lives in runs/<unit>/ but agents are told never to edit runs/ AND to keep handoff Goal/Progress/Resume current → contradiction; agent left it untouched. Brief shows empty Goal/Progress/Resume with no hint where to write.
+- F11 After `norn done` the agent's work (story.md) is uncommitted until a tick; skill says "norn commits what is left when you report" — wording vs timing mismatch.
+- F12 runs/_story/receipts/ shows as untracked in worktree even after "norn: start gh-1" commit (receipt 0001 not committed?).
+- F13 Claim renewal consumes the unit's single action per tick → applying pending receipts delayed a full tick (renew should not compete with progress).
+- F14 Attended-step protocol ("report done once the person agrees") has no representation when the agent is not in a human pane; plan skill lacks a Slices section though story workflow's next step is slice.
+- F15 status shows '→ norn brief' as next command for the story while it sits on the automatic 'slices' step (no agent can brief there) — misleading.
+- F16 Brief Inputs list 'Last failing check: see Rework' / 'Last findings: see Rework' on attempt 1 when no Rework section exists.
+- F17 Brief for qa after review.approve renders a "Rework: … Address every point below first" section from the approving review's non-blocking findings — rework framing on a forward transition.
+- F18 handoff Progress line prefix doubled: "review#1 approve: review#1 approve:".
+- F19 .env.norn PORT_BASE (slot-derived, e.g. 4060) is not surfaced in brief/skills; slice/plan docs assumed PORT=4040 — slot ports not discoverable by agents.
+- F20 `norn done --evidence` output shows "evidence/<run_id>" without base dir; brief lacks the --findings flag hint for review steps (only in norn skill).
+- F21 human-qa gate inbox item says "evidence attached" but gives no path to the evidence or the qa report/steps for the person. Story "slices" step listed under Running as "(queued)" — confusing label.
+- F22 **HIGH (B6)** After story qa.fail → implement (rework), the brief had NO Rework section: Inputs say "see Rework" but nothing rendered; the qa findings/repro were only reachable by searching runs/_story/evidence/<run_id>/. Rework framing appears on forward transitions (F17) but is missing on the actual failure path. Possibly regression of the "newer than step entry" filter in core/brief.ts.
+- F23 Started receipts (e.g. 0012-started.json) left untracked in the worktree until the next tick commit.
+- (helper note) My drive.sh initially hid claim.renew decisions and stopped early → looked like a receipt was not applied; actually F13 (renew takes the unit's action slot).
+- F24 An agent edited runs/_story/handoff.md then reverted it by itself — nothing in norn would have detected an edit to runs/ (hard-deny deferred, §20); worth at least a tick-time integrity warning.
+- F25 Story at $done "waiting for the PR merge" is listed under "Recently done", not as an action for a person (merge PR #N) — the one remaining human action is not in an action group and shows no PR URL.
+- F8b Workaround used: person ran 'git merge origin/main' in gh-2..4 story worktrees after gh-1 merged; norn has no verb/step for this and didn't comment on the foreign merge commits.
+- F26 No outcome for 'done with a noted spec deviation' in unattended steps; ask parks the unit. Agent (gh-3/01) decided to edit runs/…/handoff.md below the header (others refused) — inconsistent interpretation of the same rule (F10).
+- F27 norn's step-boundary commit squashes agent's working-tree changes into one 'implement.done' commit when agent didn't commit → reviewers can't verify test-first from history (agents that commit themselves keep history).
+- F28 Spec-wording conflicts (AC6 vs B6) can only route through qa.partial → human-qa gate; no lightweight 'amend spec' path, and the gate reason is the only record of the ruling (spec text stays wrong).
+- F29 Brief "Mode: manual" conflates mode (who starts agents) with attended/unattended; agents read it as "this is an attended step".
+- F30 No outcome for 'agent-verified criterion that can't be run here (no browser)'; partial used as closest fit.
+- F28b Confirmed: the person's AC6 ruling at gh-3/01 human-qa did not reach gh-3/03 (same conflict re-raised); gate reasons are not carried as story-level context into later briefs.
+- F31 **HIGH (B6/O2)** After human-qa.reject → implement, the brief's Rework section says "because of human-qa.reject" but omits the person's rejection comment; it shows only the stale review(approve) findings. The comment lives only in receipts/NNNN-reject.json (field `comment`). Together with F22: rework briefs never show the actual reason the unit was sent back (qa fail findings, gate reject comment). Saved brief: brief-gh2-03-rework.md.
+- F32 Brief JSON `briefing` path is relative ("briefings/…") without base (actually .agents/norn/trace/briefings in main checkout).
+- F33 Brief diff input uses local 'main...HEAD'; local main in the main checkout is never fast-forwarded by norn after merges (ec5063d), so diffs include already-merged gh-1 code. Should use origin/<base> or merge-base with the fetched base.
+- F34 GitHub 502 during merge left PR #7 OPEN/CONFLICTING while its merge commit 524744d is on origin/main. norn trusts PR state only (GR6) → gh-2 never cleans up; it could also detect 'story branch head is an ancestor of origin/<base>' as a merged fact (P2 pull, don't trust).
+- F35 After a story reaches $done, an out-of-band merge (main into story branch, conflict resolution, new commits/behaviour) is invisible to norn: no re-check/QA, no inbox signal that the reviewed PR head changed after 'ready' approval.
+- F36 After the gh-2/gh-3 cleanups, 'norn status' lists gh-1 (done, unclaimed) but omits gh-2/gh-3 entirely — inconsistent record view (likely reads specs from stale local main, F33). Claims of all stories expired during the ~20 min human wait (no watch running) → 'claim.reacquire' on next tick; fine, but nothing warned that claims were lapsing.
+- F37 A pass outcome with an open question for a person (gh-4/01 QA: backtick whitespace vs AC3) has no route to the inbox — the question is only in the receipt/handoff text; no 'note for person' channel without blocking.

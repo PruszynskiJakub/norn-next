@@ -2,7 +2,7 @@
 id: gh-107/03
 title: Cockpit, status and inbox read no trace
 depends_on: [ gh-107/01 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }

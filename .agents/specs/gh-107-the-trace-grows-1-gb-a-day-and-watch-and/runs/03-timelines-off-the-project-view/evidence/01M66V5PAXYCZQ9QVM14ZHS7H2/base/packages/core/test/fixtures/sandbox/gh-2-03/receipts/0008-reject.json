@@ -1,0 +1,12 @@
+{
+  "kind": "reject",
+  "receipt_id": "01M5MWZSR593G0AP11JSHKNKC5",
+  "run_id": null,
+  "step": "human-qa",
+  "attempt": 1,
+  "at": "2026-10-23T17:29:55.205Z",
+  "by": "human",
+  "who": "jakubpruszynski@MacBook-Pro-Jakub-2",
+  "slice": "gh-2/03",
+  "comment": "AC7: on 404/5xx the inline due-date editor shows the raw HTML error page as the row's error text (review F1, confirmed by QA). Show a short human message instead (e.g. 'Item not found' / 'Could not save the date'), with a test."
+}

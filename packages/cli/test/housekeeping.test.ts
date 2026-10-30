@@ -4,11 +4,11 @@
  * GR6 record on the base branch, and `norn doctor` (A7).
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, readdirSync, readFileSync, utimesSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, utimesSync } from "node:fs";
 import { join } from "node:path";
 import { git as gitAdapter } from "@norn/adapters";
 import type { StoryFrontmatter } from "@norn/schema";
-import { appendReceipt, leasesDir, readState, writeStoryFile } from "@norn/store";
+import { appendReceipt, leasesDir, readState, safeUnlink, writeStoryFile } from "@norn/store";
 import { pluginLinkHint } from "../src/commands/doctor.ts";
 import { assetsDir } from "../src/runtime/assets.ts";
 import { markStoryOnBase } from "../src/runtime/record.ts";
@@ -330,5 +330,179 @@ describe("norn doctor: the cockpit plugin hint (HC11)", () => {
     const repo = join(import.meta.dir, "..", "..", "..");
     expect(pluginLinkHint(assetsDir())).toBe(`herdr plugin link ${join(repo, "plugins", "herdr")} (optional: the norn cockpit, HC9)`);
     expect(pluginLinkHint("/nowhere/a/b/c")).toBe("herdr plugin install PruszynskiJakub/norn-next/plugins/herdr (optional: the norn cockpit, HC9)");
+  });
+});
+
+describe("trace retention: norn tidy prunes day pairs older than trace.retain (B23–B27, B31–B34)", () => {
+  let h: Harness;
+  const DAY = 86_400_000;
+  const trace = () => join(h.root, ".agents/norn/trace");
+  const dayOf = (age: number) => new Date(h.clock.now() - age * DAY).toISOString().slice(0, 10);
+  /** Day files (and chunks files where `chunks`) `ages` days ago, each `size` bytes of blank lines the readers skip. */
+  const stage = (ages: number[], opts: { chunks?: boolean; size?: number } = {}) => {
+    const size = opts.size ?? 100;
+    const body = `${" ".repeat(size - 1)}\n`;
+    for (const a of ages) {
+      h.write(join(trace(), `${dayOf(a)}.jsonl`), body);
+      if (opts.chunks) h.write(join(trace(), `${dayOf(a)}.chunks.jsonl`), body);
+    }
+  };
+  const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
+  /** Ages (days before the fake now) of the day files left, youngest first. */
+  const ages = () =>
+    readdirSync(trace())
+      .filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n))
+      .map((n) => Math.round((Date.parse(dayOf(0)) - Date.parse(n.slice(0, 10))) / DAY))
+      .sort((a, b) => a - b);
+  const chunkFiles = () => readdirSync(trace()).filter((n) => n.endsWith(".chunks.jsonl"));
+  const clear = () => {
+    mkdirSync(trace(), { recursive: true });
+    for (const n of readdirSync(trace())) if (/^\d{4}-\d{2}-\d{2}(\.chunks)?\.jsonl$/.test(n)) safeUnlink(join(trace(), n));
+  };
+  const setRetain = (retain: string | null) => {
+    const user = join(h.home, "config.yaml");
+    h.write(user, retain === null ? "" : `trace: { retain: ${retain} }\n`);
+  };
+  type Tidy = { trace: { retain: string; days: Array<{ day: string; files: string[]; bytes: number }>; bytes: number } };
+
+  beforeAll(async () => {
+    h = await createHarness();
+    await boot(h);
+  });
+  afterAll(() => h.cleanup());
+
+  test("no trace.retain: tidy deletes the 26 oldest of 41 day pairs and keeps the last 14 days and trace/workflows (B23, B27)", async () => {
+    setRetain(null);
+    clear();
+    stage(range(0, 40), { chunks: true });
+    h.write(join(trace(), "workflows/abc.yaml"), "name: old\n");
+    const r = await h.norn("tidy");
+    expect(r.exit).toBe(0);
+    const v = r.value as Tidy;
+    expect(v.trace.retain).toBe("14d");
+    expect(v.trace.days).toHaveLength(26);
+    expect(v.trace.days[0]).toEqual({ day: dayOf(40), files: [`${dayOf(40)}.chunks.jsonl`, `${dayOf(40)}.jsonl`], bytes: 200 });
+    expect(v.trace.bytes).toBe(26 * 200);
+    expect(ages()).toEqual(range(0, 14));
+    expect(chunkFiles()).toHaveLength(15);
+    expect(existsSync(join(trace(), "workflows/abc.yaml"))).toBe(true);
+  });
+
+  test("trace.retain: 30d prunes only what is older than 30 days (B23)", async () => {
+    setRetain("30d");
+    clear();
+    stage(range(0, 40));
+    const r = await h.norn("tidy");
+    expect(r.exit).toBe(0);
+    expect((r.value as Tidy).trace.retain).toBe("30d");
+    expect(ages()).toEqual(range(0, 30));
+  });
+
+  test("--retain overrides trace.retain for that run (B24)", async () => {
+    setRetain("14d");
+    clear();
+    stage(range(0, 40));
+    const r = await h.norn("tidy", "--retain", "30d");
+    expect(r.exit).toBe(0);
+    expect((r.value as Tidy).trace.retain).toBe("30d");
+    expect(ages()).toEqual(range(0, 30));
+  });
+
+  test("a window under 14d, from the flag or the config, is refused and nothing is deleted; doctor warns, config still loads (B25)", async () => {
+    setRetain(null);
+    clear();
+    stage(range(0, 40));
+    const flag = await h.norn("tidy", "--retain", "7d", "--json");
+    expect(flag.exit).toBe(3);
+    expect(flag.value).toMatchObject({ error: expect.stringContaining("the trace window must be at least 14d"), do_instead: expect.stringContaining("14d") });
+    expect(ages()).toEqual(range(0, 40));
+
+    setRetain("7d");
+    const cfg = await h.norn("tidy", "--json");
+    expect(cfg.exit).toBe(3);
+    expect(cfg.value).toMatchObject({ error: expect.stringContaining("the trace window must be at least 14d"), do_instead: expect.stringContaining("14d") });
+    expect(ages()).toEqual(range(0, 40));
+    expect((await h.norn("config", "trace", "--json")).exit).toBe(0);
+    const doc = await h.norn("doctor", "--json");
+    expect((doc.value as { warnings: string[] }).warnings).toEqual(expect.arrayContaining([expect.stringContaining("trace.retain 7d")]));
+    expect((doc.value as { warnings: string[] }).warnings.find((w) => w.includes("trace.retain"))).toContain("14d");
+    setRetain(null);
+  });
+
+  test("a value that is not a duration is refused naming the expected form, nothing deleted (B26)", async () => {
+    setRetain(null);
+    clear();
+    stage(range(0, 40));
+    const flag = await h.norn("tidy", "--retain", "soon", "--json");
+    expect(flag.exit).toBe(2);
+    expect(flag.value).toMatchObject({ error: expect.stringContaining("soon"), do_instead: expect.stringContaining("14d") });
+    setRetain("soon");
+    const cfg = await h.norn("tidy", "--json");
+    expect(cfg.exit).toBe(3);
+    expect(cfg.value).toMatchObject({ error: expect.stringContaining("soon"), do_instead: expect.stringContaining("14d") });
+    expect(ages()).toEqual(range(0, 40));
+    setRetain(null);
+  });
+
+  test("--dry-run lists each day pair with its bytes and the total, and deletes nothing (B31)", async () => {
+    setRetain(null);
+    clear();
+    stage(range(0, 16), { chunks: true, size: 300 });
+    stage([20], { size: 50 });
+    const r = await h.norn("tidy", "--dry-run");
+    expect(r.exit).toBe(0);
+    expect((r.value as Tidy).trace).toEqual({
+      retain: "14d",
+      days: [
+        { day: dayOf(20), files: [`${dayOf(20)}.jsonl`], bytes: 50 },
+        { day: dayOf(16), files: [`${dayOf(16)}.chunks.jsonl`, `${dayOf(16)}.jsonl`], bytes: 600 },
+        { day: dayOf(15), files: [`${dayOf(15)}.chunks.jsonl`, `${dayOf(15)}.jsonl`], bytes: 600 },
+      ],
+      bytes: 1250,
+    });
+    expect(ages()).toEqual([...range(0, 16), 20]);
+    expect(chunkFiles()).toHaveLength(17);
+  });
+
+  test("a second tidy prunes nothing from the trace (B32)", async () => {
+    setRetain(null);
+    clear();
+    stage(range(0, 40));
+    expect(((await h.norn("tidy")).value as Tidy).trace.days).toHaveLength(26);
+    const again = await h.norn("tidy");
+    expect(again.exit).toBe(0);
+    expect((again.value as Tidy).trace).toEqual({ retain: "14d", days: [], bytes: 0 });
+  });
+
+  test("doctor hints, without failing a check, how many days and bytes lie beyond the window; none within it (B33)", async () => {
+    setRetain("14d");
+    clear();
+    stage(range(0, 44), { size: 1000 });
+    const r = await h.norn("doctor", "--json");
+    const v = r.value as { hints: string[]; warnings: string[] };
+    expect(v.hints).toEqual([expect.stringMatching(/^trace keeps 30 days \(30\.0 KB\) beyond trace\.retain 14d — run `norn tidy`/)]);
+    expect(v.warnings.join("\n")).not.toContain("norn tidy");
+    const md = await h.norn("doctor");
+    expect(md.exit).toBe(r.exit);
+    expect(md.stdout).toContain("trace keeps 30 days (30.0 KB) beyond trace.retain 14d — run `norn tidy`");
+    // whether every other check passes depends on the machine; the hint never fails one
+    const ok = (await h.norn("doctor", "--json")).value as { ok: boolean };
+    await h.norn("tidy");
+    const after = await h.norn("doctor", "--json");
+    expect((after.value as { hints: string[] }).hints).toEqual([]);
+    expect((after.value as { ok: boolean }).ok).toBe(ok.ok);
+  });
+
+  test("ticks over 30 fake-clock days never delete a day file; only tidy prunes (B34)", async () => {
+    setRetain(null);
+    clear();
+    stage(range(20, 40));
+    const before = readdirSync(trace()).filter((n) => n.endsWith(".jsonl")).sort();
+    for (let d = 0; d < 30; d += 5) {
+      h.clock.advance(5 * DAY);
+      await h.tick("--offline");
+    }
+    const after = readdirSync(trace()).filter((n) => n.endsWith(".jsonl"));
+    for (const f of before) expect(after).toContain(f);
   });
 });

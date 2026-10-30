@@ -420,6 +420,7 @@ Example `bug` workflow: `reproduce (agent, norn-diagnose: seen as a user, then a
 - O4 Trace: one JSONL record per tick with facts snapshot, rule fired, action, result, briefing and transcript pointers.
 - O5 `norn why <unit>` replays the pure decide function on the recorded snapshot and shows the rule that fired; `--receipt <id>` picks the decision that applied that receipt (the command of a note item, NT2).
 - O6 `handoff.md`: generated status header (S9); tool writes heartbeat lines (repeats collapsed, e.g. "(×3)"); agents write milestones.
+- O7 Trace retention: the trace is machine-local and kept for `trace.retain` (a duration, default `14d`, never less than `14d`, the timelines' window). Only `norn tidy [--retain <duration>]` prunes it, never watch or a tick: it deletes each day file, with its chunks file, dated before today minus the window, and never `trace/workflows/`; `--dry-run` lists each day with the bytes it would free. A window under `14d` or a value that is not a duration is refused by tidy and a warning in `norn doctor`, never a config load failure. `norn doctor` hints, without failing a check, when the trace holds days beyond the window. `norn why --tick <id>` for a tick older than the window whose day is gone refuses with `tick_pruned`.
 
 ## 16. Skills
 
@@ -461,7 +462,7 @@ TypeScript on **Bun**, monorepo with one-way dependencies: `schema ← core ← 
 | `@norn/view` | Read model `loadProjectView()` → stories, slices, inbox, runs, timeline. |
 | `@norn/cli` | Wiring and commands. |
 
-- X1 Front ends (web cockpit, Herdr pane, TUI) read only via `@norn/view` and write only via CLI verbs.
+- X1 Front ends (web cockpit, Herdr pane, TUI) read only via `@norn/view` and write only via CLI verbs. The project view (`loadProjectView`) carries no timeline and reads no trace day file; a front end that shows timelines asks for them with a separate timeline read (`loadTimelines`, or `loadTraceView` for one unit's step timeline).
 - X2 Adapters are selected in config by package name; third-party adapters implement interfaces from `@norn/core`.
 - X3 Distribution: npm package plus `bun build --compile` single-file binaries. Agent plugins (Claude Code first) are thin wrappers with a `/norn` command; skills come from the repo (SK1), and no logic lives in plugins.
 - X4 Core is tested by replaying recorded traces as snapshots; adapters against recorded fixtures.

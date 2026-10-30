@@ -1,0 +1,15 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M5MT30ZJD7XT9T0PFK13JVP6",
+  "run_id": "01M5MT2XS4VWGHACXEQ829SYYW",
+  "step": "integrate",
+  "attempt": 1,
+  "at": "2026-10-23T16:39:15.186Z",
+  "by": "norn",
+  "who": "jakubpruszynski@MacBook-Pro-Jakub-2",
+  "tick_id": "01M5MT2XS4Q67H02RNV8MCK6JN",
+  "outcome": "done",
+  "rule": "git.integrate",
+  "detail": "gh-1/03-web-projects integrated into gh-1-projects-and-items at ae2c5d6e4702",
+  "route": "$done"
+}

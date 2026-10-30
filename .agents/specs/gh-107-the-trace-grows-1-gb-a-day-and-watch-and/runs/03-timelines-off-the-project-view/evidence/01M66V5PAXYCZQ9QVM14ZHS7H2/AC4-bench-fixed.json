@@ -1,0 +1,31 @@
+{
+  "repo": "/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-7nm5A8/repo",
+  "trace": {
+    "days": 14,
+    "bytes": 2152125250,
+    "hooks": 420
+  },
+  "full": {
+    "status_ms": 445.2317500000004,
+    "brief_ms": 323.7106250000006,
+    "cockpit": {
+      "peak_kb": 474704,
+      "last_kb": 226416,
+      "samples": 60
+    }
+  },
+  "empty": {
+    "status_ms": 446.4206669999985,
+    "brief_ms": 376.86837500000547,
+    "cockpit": {
+      "peak_kb": 171648,
+      "last_kb": 70032,
+      "samples": 60
+    }
+  },
+  "ratios": {
+    "status_ms": 1,
+    "brief_ms": 0.86,
+    "cockpit_peak_kb": 2.77
+  }
+}

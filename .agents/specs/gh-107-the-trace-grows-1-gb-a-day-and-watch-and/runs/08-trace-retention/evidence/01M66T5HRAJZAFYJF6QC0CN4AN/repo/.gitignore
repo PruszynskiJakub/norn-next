@@ -1,0 +1,4 @@
+# norn (machine-local)
+.agents/norn/trace/
+.env.norn
+.norn-unit

@@ -1,0 +1,1 @@
+{"kind":"answer","receipt_id":"01M66XJS07XNXZBFXMH7KCCTR8","run_id":"01M66V5PAXYCZQ9QVM14ZHS7H2","step":"qa","attempt":1,"at":"2026-10-30T17:26:36.817Z","by":"agent","who":"claude","tick_id":"01M66XJS07C52P6BQX8SJGWKBP","answer":"the agent moved on: the pane no longer waits for input (working)","ask_receipt_id":"01M66XF3QXE4YMZMFSVNA64JTR","slice":"gh-107/03"}

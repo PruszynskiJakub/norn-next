@@ -1,0 +1,5 @@
+    1 /sbin/launchd
+  612 /usr/libexec/logd
+59610 claude -p Use the norn skill, then run `norn brief`. --output-format stream-json NORN_HOME=/repo NORN_STORY=gh-1 NORN_RUN=01JRUNAAAAAAAAAAAAAAAAAAAA PATH=/usr/bin:/bin HOME=/Users/u
+59611 claude -p Use the norn skill, then run `norn brief`. NORN_STORY=gh-2 NORN_RUN=01JRUNBBBBBBBBBBBBBBBBBBBB PATH=/usr/bin:/bin HOME=/Users/u
+59700 grep NORN_RUN=01JRUNAAAAAAAAAAAAAAAAAAAAX TERM=xterm-256color

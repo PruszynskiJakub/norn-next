@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.agents/norn/trace/
+.DS_Store
+# norn (machine-local)
+.env.norn
+.norn-unit
+.claude/worktrees/

@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://norn.dev/schema/local-lock.json",
+  "title": "norn lock file (trace/*.lock)",
+  "type": "object",
+  "required": [
+    "holder",
+    "acquired_at"
+  ],
+  "properties": {
+    "holder": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "pid",
+        "pid_start"
+      ],
+      "properties": {
+        "pid": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "pid_start": {
+          "minLength": 1,
+          "description": "Process start time as reported by the OS (opaque)",
+          "type": "string"
+        }
+      }
+    },
+    "acquired_at": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    }
+  }
+}

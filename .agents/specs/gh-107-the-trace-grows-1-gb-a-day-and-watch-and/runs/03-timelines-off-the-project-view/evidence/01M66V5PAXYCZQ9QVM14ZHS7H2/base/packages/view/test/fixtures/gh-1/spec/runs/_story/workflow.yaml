@@ -1,0 +1,83 @@
+# Story workflow — example installed by `norn init`; edit freely (W1).
+# Refine and plan with a person, cut slices, approve the plan, run the slices,
+# verify the whole story, open the draft PR, and wait for a person to call it ready.
+# Rework found by the story-level test or QA is done in the story worktree.
+# Check: bun install (worktrees start without node_modules) + bun test + typecheck.
+name: story
+description: Default story lifecycle — spec, plan, slices, story-level verification, draft PR.
+start: refine
+steps:
+  refine:
+    type: agent
+    skill: refine
+    attended: true
+    inputs: [spec, handoff]
+    instructions: "Write the spec into the body of story.md; keep its frontmatter unchanged."
+    outcomes:
+      done:      { to: plan, means: "spec complete: numbered Behaviour, edge checklist, out of scope; no open questions" }
+      questions: { to: clarify, means: "spec written, but open questions are listed that need the person's answers" }
+  clarify:
+    type: agent
+    skill: clarify
+    attended: true
+    inputs: [spec, handoff]
+    outcomes:
+      done: { to: plan, means: "every open question is answered and folded into the spec" }
+  plan:
+    type: agent
+    skill: plan
+    attended: true
+    inputs: [spec, handoff]
+    instructions: "Write the plan to plan.md in the spec folder."
+    outcomes:
+      done: { to: slice, means: "plan.md has seams, a coverage table for every Behaviour item, prefactoring and decisions" }
+  slice:
+    type: agent
+    skill: slice
+    inputs: [spec, { file: plan.md, label: plan }, slices]
+    instructions: "Write slice files to slices/<nn>-<slug>.md in the spec folder."
+    outcomes:
+      done: { to: approve-plan, means: "slice files written; every Behaviour item is covered by some slice's acceptance" }
+  approve-plan:
+    type: gate
+    prompt: "Review plan.md and the slice files (edit them if needed). Approve to start the slices, or reject with what to change."
+    outcomes: { approve: slices, reject: { to: plan, counter: plan_loop } }
+  slices:
+    type: slices
+    outcomes: { done: test, stuck: $stuck }
+  test:
+    type: check
+    run: bun install --frozen-lockfile && bun test && bun run typecheck
+    timeout: 15m
+    outcomes: { pass: qa, fail: { to: implement, counter: test_loop } }
+  qa:
+    type: agent
+    skill: qa
+    inputs: [spec, slices, diff]
+    outcomes:
+      pass:    { to: open-pr, means: "every acceptance criterion of the story verified with evidence" }
+      fail:    { to: implement, counter: qa_loop, means: "a criterion fails; repro in the receipt" }
+      partial: { to: human-qa, means: "criteria only a person can check are listed with prepared evidence" }
+  human-qa:
+    type: gate
+    prompt: "Check the criteria QA listed as person-only (evidence attached). Approve, or reject with what failed."
+    outcomes: { approve: open-pr, reject: { to: implement, counter: qa_loop } }
+  implement:
+    type: agent
+    skill: implement
+    inputs: [spec, handoff, last_check, last_findings]
+    outcomes:
+      done: { to: test, means: "every rework point has a passing test" }
+  open-pr:
+    type: git
+    action: open-pr
+    outcomes: { done: ready }
+  ready:
+    type: gate
+    prompt: "Read the draft PR. Approve to mark the story finished (a person still merges the PR), or reject with what to change."
+    outcomes: { approve: $done, reject: { to: implement, counter: ready_loop } }
+counters:
+  plan_loop: { max: 3 }
+  test_loop: { max: 5 }
+  qa_loop: { max: 2 }
+  ready_loop: { max: 2 }

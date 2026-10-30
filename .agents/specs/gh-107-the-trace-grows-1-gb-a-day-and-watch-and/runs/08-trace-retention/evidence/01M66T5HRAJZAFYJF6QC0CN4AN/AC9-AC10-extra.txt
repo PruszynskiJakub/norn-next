@@ -1,0 +1,10 @@
+$ norn why gh-1 --tick 01M2ZTC8GF6C10ACPS3PRCE27D --json   # 40 days old, day still kept
+{"error":"no tick 01M2ZTC8GF6C10ACPS3PRCE27D in the trace","do_instead":"norn trace gh-1","code":"no_tick"}
+exit 3
+
+day files before tick: 46
+$ norn tick (x3)
+tick exit 0: {"tick_id":"01M66T9P03KFJ3CD8EG905NAQ7","at":"2026-10-30T16:29:13.091Z","duration_ms":398,"sync":{"ran":true,"ok":false,"error":"gh issue list failed (exit 1): no git remotes found"},"decisions":[],"n
+tick exit 0: {"tick_id":"01M66T9PPV4RCNNFM96SEQTEJ4","at":"2026-10-30T16:29:13.819Z","duration_ms":287,"sync":{"ran":false,"ok":true},"decisions":[],"notified":[],"trace":"2026-10-30.jsonl","failed":0}
+tick exit 0: {"tick_id":"01M66T9Q771YV9MY55YY626FMY","at":"2026-10-30T16:29:14.343Z","duration_ms":204,"sync":{"ran":false,"ok":true},"decisions":[],"notified":[],"trace":"2026-10-30.jsonl","failed":0}
+day files after tick: 46

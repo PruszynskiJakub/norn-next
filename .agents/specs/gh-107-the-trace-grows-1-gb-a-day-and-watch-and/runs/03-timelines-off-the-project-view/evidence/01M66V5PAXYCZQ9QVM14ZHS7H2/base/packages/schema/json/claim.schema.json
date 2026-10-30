@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://norn.dev/schema/claim.json",
+  "title": "norn claim blob",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "version",
+    "story",
+    "holder",
+    "heartbeat_id",
+    "acquired_at",
+    "renewed_at",
+    "expires_at",
+    "last_tick_id"
+  ],
+  "properties": {
+    "version": {
+      "const": 1,
+      "type": "number"
+    },
+    "story": {
+      "pattern": "^(gh|gl)-[1-9][0-9]*$",
+      "description": "Story key, e.g. gh-123 or gl-45",
+      "type": "string"
+    },
+    "holder": {
+      "pattern": "^[^@\\s]+@[^@\\s]+$",
+      "type": "string"
+    },
+    "heartbeat_id": {
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "ULID (ID2)",
+      "type": "string"
+    },
+    "acquired_at": {
+      "format": "date-time",
+      "description": "ISO-8601 timestamp, UTC",
+      "type": "string"
+    },
+    "renewed_at": {
+      "format": "date-time",
+      "description": "ISO-8601 timestamp, UTC",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "description": "ISO-8601 timestamp, UTC",
+      "type": "string"
+    },
+    "last_tick_id": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "forced_from": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,474 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://norn.dev/schema/state.json",
+  "title": "norn unit state",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "version",
+    "story",
+    "slice",
+    "unit_dir",
+    "workflow",
+    "workflow_hash",
+    "step",
+    "attempt",
+    "visits",
+    "step_entered_at",
+    "status",
+    "park",
+    "counters",
+    "nudges_used",
+    "retries_used",
+    "applied_through",
+    "run",
+    "last_outcome",
+    "created_at",
+    "updated_at",
+    "last_tick_id"
+  ],
+  "properties": {
+    "version": {
+      "const": 1,
+      "type": "number"
+    },
+    "story": {
+      "pattern": "^(gh|gl)-[1-9][0-9]*$",
+      "description": "Story key, e.g. gh-123 or gl-45",
+      "type": "string"
+    },
+    "slice": {
+      "anyOf": [
+        {
+          "pattern": "^(gh|gl)-[1-9][0-9]*/[0-9]{2,3}$",
+          "description": "Slice key, e.g. gh-123/03",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "unit_dir": {
+      "pattern": "^(_story|[0-9]{2,3}-[a-z0-9]+(-[a-z0-9]+)*)$",
+      "description": "_story or <nn>-<slug>",
+      "type": "string"
+    },
+    "workflow": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "workflow_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "step": {
+      "anyOf": [
+        {
+          "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
+          "type": "string"
+        },
+        {
+          "const": "$done",
+          "type": "string"
+        }
+      ]
+    },
+    "attempt": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "visits": {
+      "type": "object",
+      "patternProperties": {
+        "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      }
+    },
+    "step_entered_at": {
+      "format": "date-time",
+      "description": "ISO-8601 timestamp, UTC",
+      "type": "string"
+    },
+    "status": {
+      "anyOf": [
+        {
+          "const": "ready",
+          "type": "string"
+        },
+        {
+          "const": "running",
+          "type": "string"
+        },
+        {
+          "const": "parked",
+          "type": "string"
+        },
+        {
+          "const": "stuck",
+          "type": "string"
+        },
+        {
+          "const": "done",
+          "type": "string"
+        },
+        {
+          "const": "corrupt",
+          "type": "string"
+        }
+      ]
+    },
+    "park": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "kind",
+            "reason",
+            "since"
+          ],
+          "properties": {
+            "kind": {
+              "anyOf": [
+                {
+                  "const": "ask",
+                  "type": "string"
+                },
+                {
+                  "const": "gate",
+                  "type": "string"
+                },
+                {
+                  "const": "attended",
+                  "type": "string"
+                },
+                {
+                  "const": "stuck",
+                  "type": "string"
+                },
+                {
+                  "const": "exhausted",
+                  "type": "string"
+                },
+                {
+                  "const": "remote",
+                  "type": "string"
+                },
+                {
+                  "const": "workflow",
+                  "type": "string"
+                },
+                {
+                  "const": "corrupt",
+                  "type": "string"
+                }
+              ]
+            },
+            "reason": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "since": {
+              "format": "date-time",
+              "description": "ISO-8601 timestamp, UTC",
+              "type": "string"
+            },
+            "receipt_id": {
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "description": "ULID (ID2)",
+              "type": "string"
+            },
+            "command": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "implicit": {
+              "anyOf": [
+                {
+                  "const": "pane",
+                  "type": "string"
+                },
+                {
+                  "const": "hook",
+                  "type": "string"
+                }
+              ]
+            },
+            "options": {
+              "type": "array",
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "choice": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "numbered",
+                "cursor"
+              ],
+              "properties": {
+                "numbered": {
+                  "type": "boolean"
+                },
+                "cursor": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              }
+            },
+            "screen": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "counters": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z][a-z0-9_-]*$": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      }
+    },
+    "nudges_used": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "retries_used": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "applied_through": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "run": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "run_id",
+            "step",
+            "attempt",
+            "started_at",
+            "how"
+          ],
+          "properties": {
+            "run_id": {
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "description": "ULID (ID2)",
+              "type": "string"
+            },
+            "step": {
+              "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
+              "type": "string"
+            },
+            "attempt": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "started_at": {
+              "format": "date-time",
+              "description": "ISO-8601 timestamp, UTC",
+              "type": "string"
+            },
+            "how": {
+              "anyOf": [
+                {
+                  "const": "manual",
+                  "type": "string"
+                },
+                {
+                  "const": "auto",
+                  "type": "string"
+                },
+                {
+                  "const": "tick",
+                  "type": "string"
+                }
+              ]
+            },
+            "agent": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "session": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "runner",
+                "session_id"
+              ],
+              "properties": {
+                "runner": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "session_id": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "pane_id": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "reach": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              }
+            },
+            "agent_session_id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "process": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "pid",
+                "pid_start"
+              ],
+              "properties": {
+                "pid": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "pid_start": {
+                  "minLength": 1,
+                  "description": "Process start time as reported by the OS (opaque)",
+                  "type": "string"
+                }
+              }
+            },
+            "transcript": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "machine": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "heartbeat_id": {
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "description": "ULID (ID2)",
+              "type": "string"
+            },
+            "prompt_resent_at": {
+              "format": "date-time",
+              "description": "ISO-8601 timestamp, UTC",
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "last_outcome": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "step",
+            "outcome",
+            "source",
+            "at",
+            "receipt_id"
+          ],
+          "properties": {
+            "step": {
+              "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
+              "type": "string"
+            },
+            "outcome": {
+              "pattern": "^[a-z][a-z0-9_-]*$",
+              "type": "string"
+            },
+            "source": {
+              "anyOf": [
+                {
+                  "const": "reported",
+                  "type": "string"
+                },
+                {
+                  "const": "classified",
+                  "type": "string"
+                },
+                {
+                  "const": "human",
+                  "type": "string"
+                }
+              ]
+            },
+            "at": {
+              "format": "date-time",
+              "description": "ISO-8601 timestamp, UTC",
+              "type": "string"
+            },
+            "receipt_id": {
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "description": "ULID (ID2)",
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "mode": {
+      "anyOf": [
+        {
+          "const": "manual",
+          "type": "string"
+        },
+        {
+          "const": "auto",
+          "type": "string"
+        }
+      ]
+    },
+    "created_at": {
+      "format": "date-time",
+      "description": "ISO-8601 timestamp, UTC",
+      "type": "string"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "description": "ISO-8601 timestamp, UTC",
+      "type": "string"
+    },
+    "last_tick_id": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

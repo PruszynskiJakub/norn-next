@@ -1,0 +1,18 @@
+{
+  "kind": "started",
+  "receipt_id": "01M61DSFMYEVK9YR0SZQ2KY7NA",
+  "run_id": "01M61DSFMYEVK9YR0SZQ2KY7N9",
+  "step": "reproduce",
+  "attempt": 1,
+  "at": "2026-10-28T14:14:27.338Z",
+  "by": "agent",
+  "who": "claude",
+  "how": "manual",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-77-a-check-runs-inside-the-tick-blocking",
+  "agent_session_id": "ad9c6031-95df-4fb4-b540-0d538cee68d5",
+  "process": {
+    "pid": 94074,
+    "pid_start": "Wed Oct 28 15:14:20 2026"
+  }
+}

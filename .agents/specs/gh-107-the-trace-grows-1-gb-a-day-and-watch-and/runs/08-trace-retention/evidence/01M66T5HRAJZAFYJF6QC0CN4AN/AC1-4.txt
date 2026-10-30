@@ -1,0 +1,34 @@
+seed: 46 day files (ages 0..45), today 2026-10-30
+
+### config trace.retain=<unset>  args: tidy 
+trace: 14d 31 days pruned, last pruned 2026-10-15
+exit 0; day files left: 15, oldest 2026-10-16.jsonl
+
+### config trace.retain=30d  args: tidy 
+trace: 30d 15 days pruned, last pruned 2026-09-29
+exit 0; day files left: 31, oldest 2026-09-30.jsonl
+
+### config trace.retain=14d  args: tidy --retain 30d
+trace: 30d 15 days pruned, last pruned 2026-09-29
+exit 0; day files left: 31, oldest 2026-09-30.jsonl
+
+### config trace.retain=<unset>  args: tidy --retain 7d
+{"error":"the trace window must be at least 14d (--retain 7d)","do_instead":"norn tidy --retain 14d","code":"retain_too_short"}
+exit 3; day files left: 46, oldest 2026-09-15.jsonl
+
+### config trace.retain=7d  args: tidy 
+{"error":"the trace window must be at least 14d (trace.retain 7d)","do_instead":"set trace.retain to 14d or more (norn config trace shows the layer that sets it)","code":"retain_too_short"}
+exit 3; day files left: 46, oldest 2026-09-15.jsonl
+
+### config trace.retain=<unset>  args: tidy --retain soon
+{"error":"--retain soon is not a duration: expected a form like 14d","do_instead":"norn tidy --retain 14d","code":"retain_invalid"}
+exit 2; day files left: 46, oldest 2026-09-15.jsonl
+
+### config trace.retain=soon  args: tidy 
+{"error":"trace.retain soon is not a duration: expected a form like 14d","do_instead":"set trace.retain to 14d or more (norn config trace shows the layer that sets it)","code":"retain_invalid"}
+exit 3; day files left: 46, oldest 2026-09-15.jsonl
+
+### config trace.retain=14d  args: tidy --retain 14d --dry-run
+trace: 14d 31 days pruned, last pruned 2026-10-15
+exit 0; day files left: 46, oldest 2026-09-15.jsonl
+

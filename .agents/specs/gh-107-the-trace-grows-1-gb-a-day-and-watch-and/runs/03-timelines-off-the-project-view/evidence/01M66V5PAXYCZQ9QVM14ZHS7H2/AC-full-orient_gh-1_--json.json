@@ -1,0 +1,42 @@
+{
+  "branch": "gh-1-long-step",
+  "claim": "unclaimed",
+  "key": "gh-1",
+  "look": {
+    "spec": "/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-wttJls/repo-worktrees/gh-1-long-step/.agents/specs/gh-1-long-step",
+    "status": "norn status gh-1",
+    "trace": "norn trace gh-1",
+    "why": "norn why gh-1"
+  },
+  "mode": "auto→manual",
+  "note_count": 0,
+  "notes": [],
+  "pr": null,
+  "pr_command": "gh pr view gh-1-long-step",
+  "root": "/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-wttJls/repo-worktrees/gh-1-long-step",
+  "running": [],
+  "slices": [],
+  "spec": "/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-trace-bench-wttJls/repo-worktrees/gh-1-long-step/.agents/specs/gh-1-long-step",
+  "story": "gh-1",
+  "story_status": "active",
+  "title": "Long step",
+  "unit": {
+    "integrated": false,
+    "key": "gh-1",
+    "last_outcome": null,
+    "status": "running",
+    "step": "implement",
+    "title": "Long step"
+  },
+  "url": "https://example.com/1",
+  "waiting": [
+    {
+      "command": "norn take gh-1",
+      "group": "unclaimed",
+      "step": null,
+      "title": "Unclaimed — Long step",
+      "unit": "gh-1",
+      "url": "https://example.com/1"
+    }
+  ]
+}

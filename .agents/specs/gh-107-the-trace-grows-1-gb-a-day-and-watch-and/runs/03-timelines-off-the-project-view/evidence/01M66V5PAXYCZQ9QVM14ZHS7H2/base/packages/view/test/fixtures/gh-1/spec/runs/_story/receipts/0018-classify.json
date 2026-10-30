@@ -1,0 +1,15 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M5MV6ZW4K3P814PQ3V4EGC4T",
+  "run_id": "01M5MV6NNEPVXHDRDW275PF5AM",
+  "step": "open-pr",
+  "attempt": 1,
+  "at": "2026-10-23T16:58:53.701Z",
+  "by": "norn",
+  "who": "jakubpruszynski@MacBook-Pro-Jakub-2",
+  "tick_id": "01M5MV6NNEB8DSBH8KR5K14WDP",
+  "outcome": "done",
+  "rule": "git.open-pr",
+  "detail": "draft PR #5 https://github.com/PruszynskiJakub/norn-sandbox-todoist/pull/5",
+  "route": "ready"
+}

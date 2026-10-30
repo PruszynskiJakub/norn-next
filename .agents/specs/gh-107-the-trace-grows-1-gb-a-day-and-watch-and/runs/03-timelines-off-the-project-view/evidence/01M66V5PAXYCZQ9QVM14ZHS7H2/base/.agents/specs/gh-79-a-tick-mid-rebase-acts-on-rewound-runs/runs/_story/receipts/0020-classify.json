@@ -1,0 +1,22 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M63NVJHVH5GRG4WZ4WZ7VRB4",
+  "run_id": "01M63NVB0V1ST361RJNSA1S9YK",
+  "step": "update",
+  "attempt": 3,
+  "at": "2026-10-29T11:13:53.211Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M63NVB0VMHRST9BDAE8HYNDW",
+  "outcome": "done",
+  "rule": "git.update",
+  "detail": "gh-79-a-tick-mid-rebase-acts-on-rewound-runs is up to date with main (3116c90d4292)",
+  "route": "test",
+  "base": {
+    "ref": "refs/remotes/origin/main",
+    "sha": "3116c90d429290a94820f57c66b015a0b31cd1da",
+    "conflicts": [],
+    "head": "8c974904ef5f9dc9032e661d2d7a8746c2261006",
+    "merged": false
+  }
+}
