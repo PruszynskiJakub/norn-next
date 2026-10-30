@@ -7,7 +7,7 @@ import { join } from "node:path";
 import type { UnitState, Workflow } from "@norn/schema";
 import { assertValid } from "@norn/schema";
 import { parse as parseYaml } from "yaml";
-import { atomicCopyDir, atomicWrite, atomicWriteJson, createExclusive, fileError, readJsonFile, readText, type ReadResult, validated } from "./fsx.ts";
+import { atomicCopyDir, atomicWrite, createExclusive, fileError, jsonLine, readJsonFile, readText, type ReadResult, validated } from "./fsx.ts";
 import { evidenceDir, handoffPath, logPath, orphanedDir, pinnedWorkflowPath, statePath } from "./paths.ts";
 
 // ---------------------------------------------------------------- state.json
@@ -19,7 +19,7 @@ export function readState(unitDir: string, root?: string): ReadResult<UnitState>
 /** Validate and atomically write state.json. Callers write it last (S5). */
 export function writeState(unitDir: string, state: UnitState): void {
   assertValid("state", state);
-  atomicWriteJson(statePath(unitDir), state);
+  atomicWrite(statePath(unitDir), jsonLine(state));
 }
 
 // ---------------------------------------------------------------- pinned workflow (S7)
@@ -57,7 +57,7 @@ export function readPinnedWorkflow(unitDir: string, root?: string): ReadResult<P
 /**
  * Copy the workflow text verbatim to `runs/<unit>/workflow.yaml` at unit start (S7).
  * Exclusive: an existing pin with identical text is fine (replay); a different one is
- * refused unless `replace` (the journaled `norn workflow --to` switch). Returns the hash.
+ * refused unless `replace` (the journaled `norn story edit --workflow --at` switch). Returns the hash.
  */
 export function pinWorkflow(
   unitDir: string,

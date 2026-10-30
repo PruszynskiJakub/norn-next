@@ -8,7 +8,7 @@
  */
 import { readdirSync } from "node:fs";
 import { basename, join } from "node:path";
-import { currentRun, cursorStep, type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, standingReport, storyRulings, storyWorktreePath } from "@norn/core";
+import { cmd, currentRun, cursorStep, type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, standingReport, storyRulings, storyWorktreePath } from "@norn/core";
 import { type AgentStep, type ProcessIdentity, type ReceiptOf, storyBranch, ulid } from "@norn/schema";
 import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readText, readUnitHooks, writeBriefing, readRemoteCache, storyFile, traceEvent } from "@norn/store";
 import { defineCommand } from "../command.ts";
@@ -158,7 +158,7 @@ export const briefCommand = defineCommand({
       if (report) throw refuse(`this run already reported \`${reportCommand(report.receipt)}\`; exactly one report per run`, "end your turn", "already_reported");
     }
     const pending = s.unapplied.filter((r) => r.receipt.kind !== "started" && r.receipt.kind !== "mode");
-    if (pending.length) throw refuse(`unit ${key} has receipts the heartbeat has not applied yet (${pending.map((r) => r.receipt.kind).join(", ")})`, "norn tick, then run norn brief again", "pending_receipts");
+    if (pending.length) throw refuse(`unit ${key} has receipts the heartbeat has not applied yet (${pending.map((r) => r.receipt.kind).join(", ")})`, `${cmd.tick()}, then run ${cmd.brief()} again`, "pending_receipts");
     refuseUnlessAgentWork(s, "brief");
     const step = cursorStep(s) as AgentStep;
 
@@ -210,7 +210,7 @@ export const briefCommand = defineCommand({
     // B4: the exact briefing of every run, in the trace
     const id = ulid(ctx.clock.now());
     const stored = writeBriefing(s.root, run.run_id, id, briefing.markdown);
-    // O4: link the run to its briefing in the trace (`norn trace <unit>` shows it)
+    // O4: link the run to its briefing in the trace (`norn run list <unit>` shows it)
     appendTrace(s.root, traceEvent("briefing", ctx.clock.now(), { id, unit: key, run_id: run.run_id, step: s.state.step, attempt: s.state.attempt, briefing: stored }));
     return rendered({ unit: key, step: s.state.step, attempt: s.state.attempt, run_id: run.run_id, started, briefing: stored, markdown: briefing.markdown, brief: briefing.json }, briefing.markdown);
   },

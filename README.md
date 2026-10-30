@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/PruszynskiJakub/norn-next/actions/workflows/ci.yml"><img src="https://github.com/PruszynskiJakub/norn-next/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/PruszynskiJakub/norn-next/releases"><img src="https://img.shields.io/badge/release-v0.11.1-blue" alt="Release v0.11.1"></a>
+  <a href="https://github.com/PruszynskiJakub/norn-next/releases"><img src="https://img.shields.io/badge/release-v0.12.1-blue" alt="Release v0.12.1"></a>
   <img src="https://img.shields.io/badge/bun-%3E%3D1.3-f9f1e1" alt="Bun 1.3 or later">
 </p>
 
@@ -22,22 +22,22 @@ You give a story to a coding agent and switch to something else. Forty minutes l
 **norn delivers stories with coding agents one bounded step at a time and keeps one inbox of everything that needs you.** You label a GitHub or GitLab issue. norn takes it in, gives it a branch and a worktree, and walks it through a workflow: refine the spec with you, plan, implement in slices, test, review, QA, open a draft PR. Agents do the steps. Plain code decides what comes next, notices when an agent asks, dies or stalls, and tells you exactly which command answers it.
 
 ```console
-$ norn inbox
+$ norn status
 Your turn (1)
   gh-21      refine: attended step — work with the agent · 2m
-      $ norn open gh-21
+      $ norn story start gh-21
 
 Answer (1)
   gh-18/02   implement: Keep the old /export endpoint for API clients, or remove it? · 6m
-      $ norn answer gh-18/02 "…"
+      $ norn story answer gh-18/02 "…"
 
 Approve (1)
   gh-17      approve-plan: Review the Plan section in spec.md and the slice files (edit them if needed). Approve to start the slices, or reject with what to change. · 25m
-      $ norn approve gh-17
+      $ norn story approve gh-17
 
 Running (1)
   gh-18/01   review #1 (auto) · 3m
-      $ norn trace gh-18/01
+      $ norn run list gh-18/01
 ```
 
 ## Why not just run Claude Code, or a loop around it?
@@ -47,12 +47,12 @@ An agent on its own is good at one step. Delivering a story is many steps, and t
 | When… | With an agent alone | With norn |
 |---|---|---|
 | the agent asks a question | it waits in its pane until you happen to look | the question is an inbox item with the command that answers it, and a desktop notification fires |
-| a permission prompt blocks it | same, but quieter | it shows up as a question; `norn answer` types the key the prompt expects |
+| a permission prompt blocks it | same, but quieter | it shows up as a question; `norn story answer` types the key the prompt expects |
 | the agent dies or hangs mid-step | nobody notices | it is classified `died` or `stalled` and retried or nudged; a killed agent was retried within 9 s in the dogfood runs |
 | it loops, drifts or repeats a step | an LLM decides when to stop | code picks every next step; each retry and loop has a counter with a max, and going past it is a visible `stuck` |
 | `main` moves under the story | you merge by hand | an `update` step merges the base in; predicted conflicts go to a `resolve` step |
-| you wonder why something happened | scroll back through a transcript | `norn trace` shows the step timeline; `norn why` replays the decision and names the rule |
-| a colleague takes over | they start from scratch | state lives in the repo and in git refs; `norn take` continues from any commit |
+| you wonder why something happened | scroll back through a transcript | `norn run list` shows the step timeline; `norn run view --why` replays the decision and names the rule |
+| a colleague takes over | they start from scratch | state lives in the repo and in git refs; `norn story checkout` continues from any commit |
 
 The evidence is in the dogfood audits: [`docs/audit-todoist-dogfood/`](docs/audit-todoist-dogfood/), [`docs/audit-auto-mode/`](docs/audit-auto-mode/) and [`docs/audit-base-sync-qa/`](docs/audit-base-sync-qa/).
 
@@ -80,7 +80,8 @@ You need git ≥ 2.38, an agent CLI (Claude Code is the tested one), and `gh` or
 
 ```sh
 curl -fsSLO https://github.com/PruszynskiJakub/norn-next/releases/latest/download/norn-darwin-arm64
-install -m 755 norn-darwin-arm64 /usr/local/bin/norn
+sudo install -d /usr/local/bin           # missing on a fresh Apple Silicon Mac
+sudo install -m 755 norn-darwin-arm64 /usr/local/bin/norn
 norn --version
 ```
 
@@ -118,10 +119,10 @@ gh label create norn                                          # once
 gh issue create --label norn --assignee @me --title "Add CSV export of orders"
 norn sync      # the issue becomes story gh-N: a branch, a worktree, a spec folder
 norn watch     # keeps norn working; Ctrl-C finishes the current tick and releases claims
-norn inbox     # in another terminal: what needs you, with the command for each item
+norn status    # in another terminal: what needs you, with the command for each item
 ```
 
-The default `story` workflow starts with **refine**, an attended step. Run the command in the inbox (`norn open gh-N` with Herdr, otherwise a `cd … && claude …` line), then work out the spec with the agent. When you agree, the agent reports and norn moves on to plan, slices, test, QA and the draft PR. You come back when the inbox says so. Your last act is merging the PR. Squash it if you want a linear base: the story branch carries merge commits from `update`, since norn never rebases.
+The default `story` workflow starts with **refine**, an attended step. Run the command in the inbox (`norn story start gh-N` with Herdr, otherwise a `cd … && claude …` line), then work out the spec with the agent. When you agree, the agent reports and norn moves on to plan, slices, test, QA and the draft PR. You come back when the inbox says so. Your last act is merging the PR. Squash it if you want a linear base: the story branch carries merge commits from `update`, since norn never rebases.
 
 ## Everyday use
 
@@ -130,18 +131,18 @@ Five commands cover most days:
 | Command | What it does |
 |---|---|
 | `norn watch` | keeps norn working: observe, decide, act, every 30 s; prints a JSON line per tick, `--human` a line per action |
-| `norn inbox` | what needs you, grouped as Your turn, Answer, Approve, Unblock, Unclaimed, Running |
-| `norn open <story>` | starts an agent on a step that waits for you |
-| `norn answer` / `norn approve` / `norn unstick` | resolves an item; the inbox prints the exact line |
-| `norn status` | every story, slice, run and claim at a glance |
+| `norn status` | what needs you, grouped as Your turn, Answer, Approve, Unblock, Unclaimed, Running; `--watch` keeps it on screen |
+| `norn story start <story>` | starts an agent on a step that waits for you |
+| `norn story answer` / `norn story approve` / `norn run rerun` | resolves an item; the inbox prints the exact line |
+| `norn story list` | every story, slice, run and claim at a glance |
 
-`norn help` lists every command, grouped, with the ones to start with first, and says who runs each: an agent doing a step runs only `brief`, `done`, `ask` and `stuck`; the rest are yours, and an agent runs one only when you ask it to. It also sorts the bundled skills into the protocol, steps an agent works alone, steps a person works with the agent, and references. `norn help <command>` shows one command's usage.
+`norn help` lists every command, grouped, with the ones to start with first, and says who runs each: an agent doing a step runs only `brief`, `done`, `ask` and `stuck`; the rest are yours, and an agent runs one only when you ask it to. It also sorts the bundled skills into the protocol, steps an agent works alone, steps a person works with the agent, and references. `norn help <command>` shows one command's usage, `norn help story reject` one verb's.
 
 For recipes by situation (a first story, an agent that asks or dies, a moved `main`, custom workflows, handing a story over), open [`docs/cookbook.html`](docs/cookbook.html) in a browser.
 
-**Manual and auto mode.** Each story has a mode. The repo default is `default_mode` in the config, and `norn mode <story> auto|manual` switches it.
+**Manual and auto mode.** Each story has a mode. The repo default is `default_mode` in the config, and `norn story edit <story> --auto|--manual` switches it.
 
-- **manual** (the default): when an agent step is ready, the inbox shows how to start it. With the `herdr` runner, `norn open <unit>` opens a tab in the unit's worktree with the agent started on the brief. Otherwise, open any agent in the unit's worktree and tell it *"Use the norn skill, then run `norn brief`"*.
+- **manual** (the default): when an agent step is ready, the inbox shows how to start it. With the `herdr` runner, `norn story start <unit>` opens a tab in the unit's worktree with the agent started on the brief. Otherwise, open any agent in the unit's worktree and tell it *"Use the norn skill, then run `norn brief`"*.
 - **auto**: norn starts agents itself through the configured `runner` (`herdr` or `headless`). A machine with no runner runs its stories in manual mode.
 
 In both modes, `check` and `git` steps run on their own. Attended steps (`attended: true`, such as refine and plan) and `gate` steps always wait for a person, even in auto mode. When the agent of an attended step has waited for you longer than `limits.attended_wait` (default 2 minutes), the inbox moves it from Running to Your turn.
@@ -154,7 +155,7 @@ In both modes, `check` and `git` steps run on their own. Attended steps (`attend
 |---|---|
 | **story** | a labelled issue assigned to you: one spec folder, one branch, one worktree, one draft PR |
 | **slice** | a piece of a story with its own branch and worktree, merged back into the story |
-| **unit** | a story or a slice: what commands like `answer`, `trace` and `why` take, written `gh-18` (a story) or `gh-18/02` (its second slice) |
+| **unit** | a story or a slice: what commands like `story answer`, `run list` and `run view` take, written `gh-18` (a story) or `gh-18/02` (its second slice) |
 | **workflow** | the steps a story or slice goes through, as YAML in `.agents/norn/workflows/` |
 | **step** | one node of a workflow: an `agent` step, a `check` (a command), a `git` action, or a `gate` (a person approves) |
 | **outcome** | how an agent says a step ended: `norn done <outcome>`, `norn ask` or `norn stuck`; the workflow maps each outcome to the next step |
@@ -165,7 +166,7 @@ The full glossary is in [PRD §5](.agents/PRD.md#5-glossary).
 
 ## Make it yours
 
-**Workflows are data.** Edit the YAML in `.agents/norn/workflows/` or add your own; `norn workflow <unit> <name>` picks one for a unit. A step names its skill and its outcomes:
+**Workflows are data.** Edit the YAML in `.agents/norn/workflows/` or add your own; `norn story edit <unit> --workflow <name>` picks one for a unit. A step names its skill and its outcomes:
 
 ```yaml
   test:
@@ -185,7 +186,7 @@ A unit pins its workflow when it starts, so editing a file does not affect stori
 
 ### Herdr
 
-`plugins/herdr` adds the norn cockpit to Herdr: `norn cockpit` lists what needs you and every story, previews the selected one, and acts on it with one key (`y` approves, `a` answers, `t` takes, Enter opens an orient workspace with an agent that walks you through the story, `?` lists the rest). Every change goes through the same `norn` commands you would type. While it runs, it labels the agent pane of each norn run in Herdr's sidebar (`gh-12 · refine`, `norn: your turn`).
+`plugins/herdr` adds the norn cockpit to Herdr: `norn status --watch` lists what needs you and every story, previews the selected one, and acts on it with one key (`y` approves, `a` answers, `t` takes, Enter opens an orient workspace with an agent that walks you through the story, `?` lists the rest). Every change goes through the same `norn` commands you would type. While it runs, it labels the agent pane of each norn run in Herdr's sidebar (`gh-12 · refine`, `norn: your turn`).
 
 ```sh
 herdr plugin install PruszynskiJakub/norn-next/plugins/herdr   # update it with herdr plugin update
@@ -200,8 +201,8 @@ The plugin has three actions you can bind to keys in Herdr's `config.toml`: `nor
 - **Code decides, agents do.** The tick owns every transition. An agent does one step and reports an outcome (`norn done`, `norn ask` or `norn stuck`), and never names the next step.
 - **Pull, don't trust.** Each tick observes the runner, git and the files again. Notifications are never treated as truth, and a restarted heartbeat behaves the same.
 - **Bounded everything.** Every retry, nudge and loop has a counter with a max. Going past it is a visible `stuck`.
-- **Receipts before effects.** Every externally visible action writes an immutable receipt first, so a repeated tick never repeats the action. Every action can be traced (`norn trace`) and explained (`norn why`).
-- **Markdown to read, JSON for code, exit codes for both.** Commands an agent or a person reads print markdown: `brief`, `done`, `ask`, `stuck`, `help`, `init`, `doctor`, `config`, `status`, `inbox`, `trace`. Every command prints one JSON value with `--json`, and the rest always do. Refusals exit with code 3 and print `{error, do_instead}` (as markdown without `--json`).
+- **Receipts before effects.** Every externally visible action writes an immutable receipt first, so a repeated tick never repeats the action. Every action can be traced (`norn run list`) and explained (`norn run view --why`).
+- **Markdown to read, JSON for code, exit codes for both.** Commands an agent or a person reads print markdown: `brief`, `done`, `ask`, `stuck`, `help`, `init`, `doctor`, `config`, `status`, `story list|view`, `run list|view`. Every command prints one JSON value with `--json`, and the rest always do. Refusals exit with code 3 and print `{error, do_instead}` (as markdown without `--json`).
 
 The full spec is in [`.agents/PRD.md`](.agents/PRD.md); the files norn writes in a repo are described in PRD §7.
 
@@ -209,14 +210,13 @@ The full spec is in [`.agents/PRD.md`](.agents/PRD.md); the files norn writes in
 
 | Area | Commands |
 |---|---|
-| Setup | `init`, `uninstall`, `doctor` |
-| Remote | `sync` |
-| Heartbeat | `tick`, `watch` |
-| Agent protocol | `brief`, `done`, `ask`, `stuck`, `hook` |
-| Human | `inbox`, `open`, `answer`, `approve [--reject]`, `unstick [--to <step>] [--reset <counter>]`, `update`, `mode`, `workflow` |
-| Team | `take`, `release`, `drop` |
-| Views | `status`, `config [<key>]`, `trace <unit>`, `why <unit>`, `pane [--interactive \| --next \| --open]` |
-| Housekeeping | `tidy` |
+| Core | `status [--watch [--pane]]` |
+| `story` | general: `create`, `list`, `view`; decision: `answer`, `approve`, `reject`, `update-branch`; work: `start`, `chat`, `edit`; team: `checkout`, `handoff`, `close`, `reopen` |
+| `run` | `list`, `view [--why \| --receipt]`, `attach [--next]`, `rerun [--step <step>] [--reset <counter>]`, `cancel` |
+| Setup | `init`, `doctor`, `config list\|get\|set\|unset`, `uninstall` |
+| Background | `watch`, `sync`, `tidy` |
+| Agent protocol | `brief`, `done`, `ask`, `stuck` |
+| Only in `help --all` | `tick`, `hook`, `status --segment` |
 
 ## Contributing
 

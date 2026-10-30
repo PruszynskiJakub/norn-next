@@ -5,7 +5,7 @@
  * holds it (T9). Views read through @norn/view only (X1).
  */
 import { isAbsolute, relative } from "node:path";
-import { type ClaimState, type StoryFacts, storyUnit, type UnitFacts } from "@norn/core";
+import { cmd, type ClaimState, type StoryFacts, storyUnit, type UnitFacts } from "@norn/core";
 import { loadProjectView, type ProjectView } from "@norn/view";
 import {
   type ClaimBlob,
@@ -149,7 +149,7 @@ export async function resolveTarget(ctx: Context, raw: string, pick?: (st: UnitS
     if (slice) {
       const uf = sf.units.find((u) => u.unit.key === slice);
       if (uf) return localTarget(obs, sf, uf);
-      throw refuse(`no slice ${slice} in story ${story}`, `norn status ${story}`, "unknown_unit");
+      throw refuse(`no slice ${slice} in story ${story}`, cmd.storyView(story), "unknown_unit");
     }
     const su = storyUnit(sf);
     if (pick && su && !(su.state && pick(su.state))) {
@@ -160,26 +160,26 @@ export async function resolveTarget(ctx: Context, raw: string, pick?: (st: UnitS
   }
   const remote = await remoteTarget(ctx, key);
   if (remote) return remote;
-  throw refuse(`unknown unit ${key}: not in this checkout or on the remote`, "norn status", "unknown_unit");
+  throw refuse(`unknown unit ${key}: not in this checkout or on the remote`, cmd.status(), "unknown_unit");
 }
 
 /** Refuse unless the unit has started (state.json exists and is readable). */
 export function started(t: Target): UnitState {
   if (t.story_facts) {
     const uf = t.story_facts.units.find((u) => u.unit.key === t.key);
-    if (uf?.errors.length) throw refuse(`${t.key} is corrupt (S2): ${uf.errors.map((e) => e.file).join(", ")}`, `norn why ${t.key}`, "corrupt_unit", uf.errors);
+    if (uf?.errors.length) throw refuse(`${t.key} is corrupt (S2): ${uf.errors.map((e) => e.file).join(", ")}`, cmd.runView(t.key, { why: true }), "corrupt_unit", uf.errors);
   }
-  if (!t.state) throw refuse(`${t.key} has not started yet`, "norn tick", "not_started");
-  if (t.state.status === "corrupt") throw refuse(`${t.key} is corrupt (S2)`, `norn why ${t.key}`, "corrupt_unit");
+  if (!t.state) throw refuse(`${t.key} has not started yet`, cmd.tick(), "not_started");
+  if (t.state.status === "corrupt") throw refuse(`${t.key} is corrupt (S2)`, cmd.runView(t.key, { why: true }), "corrupt_unit");
   return t.state;
 }
 
 // ------------------------------------------------------------------ receipts
 
-type HumanKind = "answer" | "approve" | "reject" | "unstick" | "mode" | "workflow" | "update";
+type HumanKind = "answer" | "approve" | "reject" | "unstick" | "stuck" | "mode" | "workflow" | "update";
 
 /** A human receipt at the unit's cursor (S6): step + attempt + slice so the tick routes it (T9). */
-export function humanReceipt<K extends HumanKind>(ctx: Context, t: Target, st: UnitState, kind: K, body: Record<string, unknown>): Extract<Receipt, { kind: K }> {
+export function humanReceipt<K extends HumanKind>(ctx: Context, t: Pick<Target, "slice">, st: UnitState, kind: K, body: Record<string, unknown>): Extract<Receipt, { kind: K }> {
   const r = {
     kind,
     receipt_id: ulid(ctx.clock.now()),
@@ -231,15 +231,15 @@ export async function claimFor(
 async function claimRoute(ctx: Context, t: Target, opts: { mailbox: boolean; verb: string; claim?: ClaimState }): Promise<Route> {
   const remote = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
   const c = opts.claim ?? (await claimFor(ctx, t.story));
-  if (c.state === "corrupt") throw refuse(`claim ref of ${t.story} is corrupt`, `norn take ${t.story} --force`, "claim_corrupt", c.error);
+  if (c.state === "corrupt") throw refuse(`claim ref of ${t.story} is corrupt`, cmd.storyCheckout(t.story, { force: true }), "claim_corrupt", c.error);
   if (c.state === "mine") {
-    if (!t.runsDir) throw refuse(`${t.key} is held here but its runs/ are not in this checkout`, "norn tick", "story_not_local");
+    if (!t.runsDir) throw refuse(`${t.key} is held here but its runs/ are not in this checkout`, cmd.tick(), "story_not_local");
     return { via: "local", claim: "mine" };
   }
   let holder: ClaimBlob;
   if (c.state === "other") holder = c.blob;
   else {
-    if (!t.runsDir) throw refuse(`${t.story} is unclaimed and not in this checkout`, `norn take ${t.story}`, "story_not_local");
+    if (!t.runsDir) throw refuse(`${t.story} is unclaimed and not in this checkout`, cmd.storyCheckout(t.story), "story_not_local");
     const now = ctx.clock.now();
     const blob = newClaimBlob({ story: t.story, holder: machineHolder(ctx.env), heartbeat_id: heartbeatId(ctx.root, now), now, at: ctx.clock.iso(), lease: ctx.config.claim.lease });
     const r = await acquireClaim(ctx.root, remote, blob, { now });
@@ -247,18 +247,18 @@ async function claimRoute(ctx: Context, t: Target, opts: { mailbox: boolean; ver
     if (r.reason !== "held") throw failure(`cannot acquire the claim of ${t.story}: ${r.message}`, `norn ${opts.verb} again`, "claim_failed");
     holder = r.holder;
   }
-  if (!opts.mailbox) throw claimHeld(holder, `ask ${holder.holder} to run it, or norn take ${t.story} --force`, `; ${opts.verb} cannot go through the mailbox (T9)`);
+  if (!opts.mailbox) throw claimHeld(holder, `ask ${holder.holder} to run it, or ${cmd.storyCheckout(t.story, { force: true })}`, `; ${opts.verb} cannot go through the mailbox (T9)`);
   return { via: "mailbox", holder };
 }
 
 /**
- * Refuse a verb that needs the claim (mode, open) while another heartbeat holds it: this
+ * Refuse a verb that needs the claim (story edit --auto|--manual, story start) while another heartbeat holds it: this
  * checkout's copy may be stale (T9), so no answer is computed from it — not even a no-op.
  */
 export async function refuseIfHeldElsewhere(ctx: Context, story: string, verb: string): Promise<ClaimState> {
   const claim = await claimFor(ctx, story);
   const holder = heldElsewhere(claim);
-  if (holder) throw claimHeld(holder, `ask ${holder.holder} to run it, or norn take ${story} --force`, `; ${verb} cannot go through the mailbox (T9)`);
+  if (holder) throw claimHeld(holder, `ask ${holder.holder} to run it, or ${cmd.storyCheckout(story, { force: true })}`, `; ${verb} cannot go through the mailbox (T9)`);
   return claim;
 }
 
@@ -270,7 +270,7 @@ function refuseUnlessHolder(claim: ClaimState, t: Target, verb: string, rule: st
   if (claim.state === "mine" && t.runsDir) return { via: "local", claim: "mine" };
   const live = claim.state === "mine" || claim.state === "other";
   const who = live ? `held by ${claim.blob.holder}` : "not held by this checkout";
-  throw refuse(`${t.story}'s claim is ${who}; ${rule}`, live ? `ask ${claim.blob.holder} to run norn ${verb} ${t.story}, or norn take ${t.story} --force` : `norn take ${t.story}`, "not_holder");
+  throw refuse(`${t.story}'s claim is ${who}; ${rule}`, live ? `ask ${claim.blob.holder} to run norn ${verb} ${t.story}, or ${cmd.storyCheckout(t.story, { force: true })}` : cmd.storyCheckout(t.story), "not_holder");
 }
 
 /** A live claim of another heartbeat (T9: the verb goes through the mailbox), else null. */
@@ -299,7 +299,7 @@ async function refuseDuplicate(ctx: Context, t: Target, receipt: Receipt, holder
   }
   const dup = pending.find((p) => sameDecision(p.receipt, receipt));
   if (!dup) return;
-  const next = holder ? `wait for ${holder.holder}'s next tick to import it (T9)` : "norn tick";
+  const next = holder ? `wait for ${holder.holder}'s next tick to import it (T9)` : cmd.tick();
   throw refuse(
     `${dup.receipt.kind} already recorded for ${receipt.step}#${receipt.attempt} (${dup.where}) and not applied yet`,
     next,
@@ -402,7 +402,7 @@ export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptio
   }
   if (opts.before) receipt = await opts.before(target, started(target), route, receipt);
   const delivered = await deliver(ctx, target, route, receipt);
-  const next = route.via === "local" ? "norn tick" : `${route.holder.holder}'s next tick imports it (T9)`;
+  const next = route.via === "local" ? cmd.tick() : `${route.holder.holder}'s next tick imports it (T9)`;
   return { unit: target.key, receipt, delivered, next };
 }
 

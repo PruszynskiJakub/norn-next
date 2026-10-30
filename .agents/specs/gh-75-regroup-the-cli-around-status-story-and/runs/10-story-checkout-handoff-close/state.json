@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "story": "gh-75",
+  "slice": "gh-75/10",
+  "unit_dir": "10-story-checkout-handoff-close",
+  "workflow": "slice",
+  "workflow_hash": "c932ae645fb54a38db2d6d9f7d98533632fc9e7eef1aa3dd4d54861a1328fe09",
+  "step": "$done",
+  "attempt": 3,
+  "visits": {
+    "implement": 3,
+    "test": 3,
+    "review": 3,
+    "qa": 1,
+    "integrate": 3,
+    "merge": 2
+  },
+  "step_entered_at": "2026-10-28T20:20:58.762Z",
+  "status": "done",
+  "park": null,
+  "counters": {
+    "test_loop": 0,
+    "review_loop": 2,
+    "qa_loop": 0,
+    "conflict_loop": 2
+  },
+  "nudges_used": 0,
+  "retries_used": 0,
+  "applied_through": 33,
+  "run": null,
+  "last_outcome": {
+    "step": "integrate",
+    "outcome": "done",
+    "source": "classified",
+    "at": "2026-10-28T20:21:53.181Z",
+    "receipt_id": "01M622T8WW8Y0NMC5FQWDYPPSH"
+  },
+  "created_at": "2026-10-28T14:13:16.910Z",
+  "updated_at": "2026-10-28T20:22:17.886Z",
+  "last_tick_id": "01M622V10W4T0V8BQJN6CH6R3B"
+}

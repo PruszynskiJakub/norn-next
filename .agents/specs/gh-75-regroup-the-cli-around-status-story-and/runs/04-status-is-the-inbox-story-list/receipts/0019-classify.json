@@ -1,0 +1,15 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M61JT27ZP9R5ZTTC37SDNH1B",
+  "run_id": "01M61JSWWNNZKM57Z17SV4A9FQ",
+  "step": "integrate",
+  "attempt": 3,
+  "at": "2026-10-28T15:42:09.151Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M61JSWWNV7D1TF715BYKWZHP",
+  "outcome": "done",
+  "rule": "git.integrate",
+  "detail": "gh-75/04-status-is-the-inbox-story-list integrated into gh-75-regroup-the-cli-around-status-story-and at f4ec30404ccc",
+  "route": "$done"
+}

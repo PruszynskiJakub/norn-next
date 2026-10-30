@@ -155,6 +155,15 @@ export function json(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
+/**
+ * One line of JSON: for the files norn commits under runs/ (receipts, state.json), so they
+ * add one diff line each, not one per field (gh-108). Readers parse either form.
+ * Machine-local files keep `json()`: lease handover compares the raw text it wrote.
+ */
+export function jsonLine(value: unknown): string {
+  return `${JSON.stringify(value)}\n`;
+}
+
 /** `mode` 0o600 for a file only its owner may read (a check order, C5). */
 export function atomicWriteJson(path: string, value: unknown, mode?: number): void {
   atomicWrite(path, json(value), mode);

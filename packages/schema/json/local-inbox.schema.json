@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://norn.dev/schema/local-inbox.json",
-  "title": "norn open inbox items (trace/inbox.json)",
+  "title": "open inbox items norn has seen (trace/inbox.json)",
   "type": "object",
   "properties": {
     "open": {

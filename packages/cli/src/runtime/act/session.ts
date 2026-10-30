@@ -114,7 +114,7 @@ export async function applyReceipts(act: ActEnv, a: Extract<Action, { kind: "app
   const prevRun = loc.state?.run?.run_id;
   let state = a.state;
   let resumed: SessionRef | null = null;
-  // S7/O2: the cursor moved off a live run (workflow --to / unstick): stop it before the new state
+  // S7/O2: the cursor moved off a live run (story edit --workflow --at / run rerun): stop it before the new state
   const killed = await killSession(act, a.kill ?? null);
   if (a.launch) {
     // B2: resume the same agent session with the answer as the prompt (headless / session gone)

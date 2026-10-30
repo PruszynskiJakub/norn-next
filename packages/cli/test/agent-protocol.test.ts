@@ -10,9 +10,10 @@ import { join } from "node:path";
 import type { BriefJson } from "@norn/core";
 import { type HookTrace, type TickTrace, ulid } from "@norn/schema";
 import { appendHookTrace, readTickInputs, readTrace, readTraceFile, setTraceReadObserver, type TraceFileRead, traceDir } from "@norn/store";
-import { type CliResult, runCli } from "../src/index.ts";
+import { type CliResult } from "../src/index.ts";
 import { parseFindings } from "../src/commands/done.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -68,9 +69,9 @@ function env() {
   return e;
 }
 /** run `norn …` inside a worktree, as an agent would */
-const inWt = (cwd: string, ...argv: string[]): Promise<CliResult> => runCli(argv, { ...h.deps, cwd, env: env() });
+const inWt = (cwd: string, ...argv: string[]): Promise<CliResult> => runChecked(argv, { ...h.deps, cwd, env: env() });
 const hook = (cwd: string, event: string, payload: Record<string, unknown>, ...flags: string[]) =>
-  runCli(["hook", event, ...flags], { ...h.deps, cwd, env: env(), stdin: JSON.stringify({ session_id: "sess-1", transcript_path: "/tmp/t.jsonl", cwd, ...payload }) });
+  runChecked(["hook", event, ...flags], { ...h.deps, cwd, env: env(), stdin: JSON.stringify({ session_id: "sess-1", transcript_path: "/tmp/t.jsonl", cwd, ...payload }) });
 const stop = (cwd: string) => hook(cwd, "stop", { hook_event_name: "Stop", stop_hook_active: false });
 /** B5 (D3): the lines of a unit's hook file (`_story` for the story unit) */
 const hookFileLines = (story: string, unit = "_story") => {
@@ -161,11 +162,11 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     expect(hooks.map((e) => e.fact.event)).toEqual(["tool_use", "turn_end"]);
     expect(hooks[0]?.fact).toMatchObject({ agent: "claude", native: "PostToolUse", story: "gh-9", agent_session_id: "sess-1", command: "norn brief" });
     expect(hooks.some((e) => e.blocked)).toBe(false);
-    // B5, B7: the same lines land in gh-9's hook file, run id or not (no run yet), and `norn trace` shows them
+    // B5, B7: the same lines land in gh-9's hook file, run id or not (no run yet), and `norn run list` shows them
     expect(hooks.every((e) => !e.fact.run_id)).toBe(true);
     expect(hookFileLines("gh-9")).toEqual(dayHookLines());
     expect(hookFileLines("gh-9")).toHaveLength(2);
-    const trace = await h.norn("trace", "gh-9", "--events", "--all", "--json");
+    const trace = await h.norn("run", "list", "gh-9", "--events", "--all", "--json");
     expect(trace.stdout).toContain(hooks[0]?.id as string);
   });
 
@@ -185,10 +186,10 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     expect(v.markdown).toContain('`norn done done --handoff "…"` — every criterion has a passing test');
     expect(v.markdown).toContain("Diff: `git diff origin/main...HEAD`"); // F33: the fetched base, not local main
     expect(readTraceFile(h.root, v.briefing)).toBe(v.markdown);
-    // O4: the trace links the run to its briefing, and `norn trace` shows it
+    // O4: the trace links the run to its briefing, and `norn run list` shows it
     const linked = readTrace(h.root, { unit: "gh-9", types: ["briefing"] }).events;
     expect(linked.at(-1)).toMatchObject({ type: "briefing", unit: "gh-9", run_id: runId, step: "implement", attempt: 1, briefing: v.briefing });
-    const timeline = (await h.norn("trace", "gh-9", "--events")).value as { steps: Array<{ step: string; paths: { briefings: string[] }; events: Array<{ source: string; ref: string; summary: string }> }> };
+    const timeline = (await h.norn("run", "list", "gh-9", "--events")).value as { steps: Array<{ step: string; paths: { briefings: string[] }; events: Array<{ source: string; ref: string; summary: string }> }> };
     const row = timeline.steps.find((r) => r.step === "implement");
     expect(row?.paths.briefings).toEqual([join(h.root, ".agents/norn/trace", v.briefing)]);
     expect(row?.events.find((e) => e.source === "briefing")).toMatchObject({ ref: join(h.root, ".agents/norn/trace", v.briefing), summary: expect.stringContaining(runId) });
@@ -218,23 +219,23 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     expect(last).toMatchObject({ blocked: true, fact: { event: "turn_end", run_id: runId } });
   });
 
-  test("B4: `norn trace` prints the same events with lines it does not show added, broken or not; every reader opens day files through the observer", async () => {
-    const before = await h.norn("trace", "gh-9", "--events", "--all", "--json");
+  test("B4: `norn run list` prints the same events with lines it does not show added, broken or not; every reader opens day files through the observer", async () => {
+    const before = await h.norn("run", "list", "gh-9", "--events", "--all", "--json");
     expect(before.exit).toBe(0);
     const days = () => readdirSync(traceDir(h.root)).filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n)).sort().map((n) => join(traceDir(h.root), n));
     const last = days().at(-1) as string;
     appendFileSync(last, '{"type":"tick.start",broken\n');
     appendFileSync(last, `${JSON.stringify({ type: "local_file", id: "01M5MA3PG0DB4G1MJNV0HKQYSA", at: new Date(h.clock.now()).toISOString(), file: ".agents/norn/trace/remote.json", schema: "local-remote", reason: "unreadable", errors: [] })}\n`);
-    const after = await h.norn("trace", "gh-9", "--events", "--all", "--json");
+    const after = await h.norn("run", "list", "gh-9", "--events", "--all", "--json");
     expect(after.stdout).toBe(before.stdout);
     // a reader of every type still reports the broken line
     expect(readTrace(h.root).errors.map((e) => e.file)).toContainEqual(expect.stringMatching(/\.jsonl:\d+$/));
 
-    expect(await openedDays(() => h.norn("trace", "gh-9"))).toEqual(days());
+    expect(await openedDays(() => h.norn("run", "list", "gh-9"))).toEqual(days());
     // B8, B9: the blocked-hook count and the tick's hook facts come from the unit's hook file, no day file
     expect(await openedDays(() => stop(wt()))).toEqual([]);
     expect(await openedDays(() => h.tick())).toEqual([]);
-    expect(await openedDays(() => h.norn("inbox", "--history"))).toEqual(days());
+    expect(await openedDays(() => h.norn("status", "--history"))).toEqual(days());
   });
 
   test("the tick applies the started receipt: running, how manual (MO3)", async () => {
@@ -307,8 +308,8 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
 
   test("ask records the question and options; the parked unit refuses brief with norn answer", async () => {
     const r = await inWt(wt(), "ask", "Which expiry?", "--option", "24h", "--option", "7d");
-    expect(r.value).toMatchObject({ ok: true, kind: "ask", question: "Which expiry?", options: ["24h", "7d"], answer_with: 'norn answer gh-9 "…"', next: "end your turn" });
-    expect(r.stdout).toContain("Options: 24h · 7d\nThey answer with `norn answer gh-9 \"…\"`");
+    expect(r.value).toMatchObject({ ok: true, kind: "ask", question: "Which expiry?", options: ["24h", "7d"], answer_with: 'norn story answer gh-9 "…"', next: "end your turn" });
+    expect(r.stdout).toContain("Options: 24h · 7d\nThey answer with `norn story answer gh-9 \"…\"`");
     expect(r.stdout).toContain("**End your turn now.**");
     expect((await inWt(wt(), "stuck", "nope")).value).toMatchObject({ code: "already_reported" });
     h.clock.advance(10_000);
@@ -323,11 +324,11 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     const v = (await inWt(wt(), "brief", "--json")).value as { started: boolean; brief: BriefJson };
     expect(v.started).toBe(false);
     expect(v.brief.context.answers).toEqual([{ question: "Which expiry?", answer: "24h" }]);
-    expect((await inWt(wt(), "stuck", "cannot reach the API")).value).toMatchObject({ ok: true, kind: "stuck", unblock_with: "norn unstick gh-9" });
+    expect((await inWt(wt(), "stuck", "cannot reach the API")).value).toMatchObject({ ok: true, kind: "stuck", unblock_with: "norn run rerun gh-9" });
     h.clock.advance(10_000);
     await h.tick();
     expect(h.state(runs())).toMatchObject({ status: "stuck", park: { kind: "stuck", reason: "cannot reach the API" } });
-    expect((await inWt(wt(), "brief")).value).toMatchObject({ code: "unit_stuck", do_instead: expect.stringContaining("norn unstick gh-9") });
+    expect((await inWt(wt(), "brief")).value).toMatchObject({ code: "unit_stuck", do_instead: expect.stringContaining("norn run rerun gh-9") });
   });
 
   test("a gate step refuses brief with norn approve", async () => {
@@ -337,7 +338,7 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     expect(h.state(runs())).toMatchObject({ step: "sign-off", status: "parked" });
     const r = await inWt(wt(), "brief");
     expect(r.exit).toBe(3);
-    expect(r.value).toMatchObject({ code: "gate_step", do_instead: expect.stringContaining("norn approve gh-9") });
+    expect(r.value).toMatchObject({ code: "gate_step", do_instead: expect.stringContaining("norn story approve gh-9") });
   });
 });
 
@@ -380,7 +381,7 @@ describe("norn hook robustness (A3)", () => {
   });
 
   test("garbage stdin, unknown events and unknown agents never fail", async () => {
-    expect(await runCli(["hook", "stop"], { ...h.deps, cwd: wt(), env: env(), stdin: "not json{" })).toMatchObject({ exit: 0, value: {} });
+    expect(await runChecked(["hook", "stop"], { ...h.deps, cwd: wt(), env: env(), stdin: "not json{" })).toMatchObject({ exit: 0, value: {} });
     expect((await hook(wt(), "frobnicate", {})).value).toEqual({});
     expect((await hook(wt(), "stop", { hook_event_name: "Stop" }, "--agent", "nope")).value).toEqual({});
   });
@@ -452,11 +453,11 @@ describe("norn hook robustness (A3)", () => {
     await h.tick();
     expect(h.state(runs())).toMatchObject({ status: "parked", park: { kind: "ask", reason: "Claude needs your permission to use Bash", command: "Bash(rm -rf build)" } });
     expect(readReceipt(runs(), receipts(runs()).at(-1) as string)).toMatchObject({ kind: "ask", implicit: true, command: "Bash(rm -rf build)" });
-    const inbox = (await h.norn("inbox")).value as { groups: Record<string, Array<{ story: string; title: string; detail?: string; command: string }>> };
+    const inbox = (await h.norn("status")).value as { groups: Record<string, Array<{ story: string; title: string; detail?: string; command: string }>> };
     expect(inbox.groups.answer).toContainEqual(
-      expect.objectContaining({ story: "gh-9", title: "Claude needs your permission to use Bash", detail: "pending command: Bash(rm -rf build)", command: 'norn answer gh-9 "…"' }),
+      expect.objectContaining({ story: "gh-9", title: "Claude needs your permission to use Bash", detail: "pending command: Bash(rm -rf build)", command: 'norn story answer gh-9 "…"' }),
     );
-    const text = (await h.norn("inbox")).stdout;
+    const text = (await h.norn("status")).stdout;
     expect(text).toContain("pending command: Bash(rm -rf build)");
   });
 
@@ -533,7 +534,7 @@ describe("hook backfill on upgrade (B11, B12, D5)", () => {
     expect(g.state(gRuns())).toMatchObject({ step: "implement", status: "ready" });
     const since = (JSON.parse(g.read(backfillFile())) as { since: string; done: string[] }).since;
     g.clock.advance(10_000);
-    const brief = await runCli(["brief", "--json"], { ...g.deps, cwd: gWt(), env: { ...g.deps.env, NORN_AGENT_PID: String(process.pid) } });
+    const brief = await runChecked(["brief", "--json"], { ...g.deps, cwd: gWt(), env: { ...g.deps.env, NORN_AGENT_PID: String(process.pid) } });
     expect(brief.exit).toBe(0);
     runId = (brief.value as { run_id: string }).run_id;
     g.clock.advance(10_000);
@@ -578,7 +579,7 @@ describe("hook backfill on upgrade (B11, B12, D5)", () => {
     g.write(gHookFile(), `${old.slice(0, 150).map((e) => JSON.stringify(e)).join("\n")}\n`);
     // a hook fires into gh-9's hook file (and today's day file) meanwhile
     g.clock.advance(10_000);
-    const fired = await runCli(["hook", "post-tool-use"], { ...g.deps, cwd: gWt(), env: { ...g.deps.env, NORN_AGENT_PID: String(process.pid) }, stdin: JSON.stringify({ session_id: "sess-1", cwd: gWt(), hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "ls" } }) });
+    const fired = await runChecked(["hook", "post-tool-use"], { ...g.deps, cwd: gWt(), env: { ...g.deps.env, NORN_AGENT_PID: String(process.pid) }, stdin: JSON.stringify({ session_id: "sess-1", cwd: gWt(), hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "ls" } }) });
     expect(fired.exit).toBe(0);
     const ids = gHookIds();
     expect(ids).toHaveLength(151);

@@ -1,0 +1,19 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61S46NWJN28SVWCWQTSKZJ0",
+  "run_id": "01M61RBVZ2SA9AEXDGYPS50WKZ",
+  "step": "implement",
+  "attempt": 2,
+  "at": "2026-10-28T17:32:32.828Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/09",
+  "outcome": "done",
+  "handoff": "Rework of review#1: run cancel no longer skips the kill silently — no session / other machine / no or other runner → not_stopped, throwing kill → kill_failed, both exit 1 naming the receipt (details receipt_id+file) and telling the person to stop the agent by hand. Rerun story-key pick uses stuck-or-parked. New tests: cannot-stop + kill_failed, ask-parked rerun, not_stuck, story key → slice at gate. Herdr pane closing (F2) left for a person. typecheck, bun test 1266/1266, golden green.",
+  "notes": [
+    {
+      "text": "F2/AC3: on Herdr, run cancel's kill is 'herdr pane close', so the pane B52 says stays goes away. Keep (amend B52) or interrupt the agent another way?",
+      "criterion": "AC3"
+    }
+  ]
+}

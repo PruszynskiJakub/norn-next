@@ -3,6 +3,7 @@ dist/
 *.tsbuildinfo
 .agents/norn/trace/
 .DS_Store
+.idea/
 # norn (machine-local)
 .env.norn
 .norn-unit

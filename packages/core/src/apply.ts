@@ -17,6 +17,7 @@ import {
 } from "@norn/schema";
 import type { NumberedReceipt, UnitRef } from "./facts.ts";
 import { edgeOf, OVERRIDABLE_ROUTES, stepOf } from "./workflow.ts";
+import { cmd } from "./commands.ts";
 
 export interface ApplyContext {
   /** the unit's pinned workflow (S7) */
@@ -168,7 +169,7 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
   }
   if (st.status === "corrupt") return { reject: "unit is corrupt (S2)" };
   if (r.slice !== undefined && r.slice !== st.slice) return { reject: `receipt for unit ${r.slice ?? st.story}, not ${st.slice ?? st.story}` };
-  // BS9: `norn update` may re-enter a story unit that is done (PR unmerged), at a gate, or stuck
+  // BS9: `norn story update-branch` may re-enter a story unit that is done (PR unmerged), at a gate, or stuck
   if (r.kind === "update") return updateFrom(st, r, ctx);
   if (st.step === "$done") return { reject: "unit is done" };
   if (r.step !== st.step || r.attempt !== st.attempt)
@@ -181,8 +182,8 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
     return { state: next, log: `workflow → ${r.name} at ${r.to}`, advance: { from: st.step, outcome: "workflow", to: r.to } };
   }
   if (r.kind === "unstick") return unstick(st, r, ctx);
-  if (!step) return { reject: `step '${st.step}' no longer exists (S7); use norn unstick --to` };
-  if (st.status === "stuck") return { reject: `unit is stuck: ${st.park?.reason ?? "unknown"}; use norn unstick` };
+  if (!step) return { reject: `step '${st.step}' no longer exists (S7); use ${cmd.runRerun(undefined, { step: "<step>" })}` };
+  if (st.status === "stuck") return { reject: `unit is stuck: ${st.park?.reason ?? "unknown"}; use ${cmd.runRerun()}` };
   const lastOutcome = (outcome: string): LastOutcome => ({
     step: st.step,
     outcome,
@@ -232,7 +233,8 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
     case "stuck": {
       if (step.type !== "agent") return { reject: `${st.step} is a ${step.type} step; stuck is for agent steps` };
       if (st.run && r.run_id && st.run.run_id !== r.run_id) return { reject: `stale run ${r.run_id}` };
-      if (edgeOf(wf, st.step, "stuck")) return take(st, "stuck", r, ctx, lastOutcome("stuck"));
+      // B51 (D4): a person's stuck (`norn run cancel`) ends the run here; the step's `stuck` edge is the agent's
+      if (r.by !== "human" && edgeOf(wf, st.step, "stuck")) return take(st, "stuck", r, ctx, lastOutcome("stuck"));
       return {
         state: { ...stuckPark(st, "stuck", r.reason, r.at, r.receipt_id), last_outcome: lastOutcome("stuck") },
         log: `${st.step}#${st.attempt} stuck: ${r.reason}`,
@@ -242,7 +244,7 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
       if (st.status !== "parked" || st.park?.kind !== "ask")
         return { reject: st.park?.kind === "gate" ? "gate needs approve or reject" : "unit is not waiting for an answer" };
       const resumed: UnitState = { ...st, park: null };
-      // R6.1: the agent moved on by itself; R6.2: `norn answer` already typed it — nothing to deliver
+      // R6.1: the agent moved on by itself; R6.2: `norn story answer` already typed it — nothing to deliver
       if ((r.by === "agent" || r.delivered) && st.run) return { state: { ...resumed, status: "running" }, log: `answered: ${r.answer}` };
       // B2: same session while it lives; manual runs get the answer from the person; else fresh session from the handoff
       if (st.run?.session)
@@ -301,7 +303,7 @@ function unstick(st: UnitState, r: ReceiptOf<"unstick">, ctx: ApplyContext): Ste
  * merged), a gate, or stuck. Counters are unchanged; the ready gate is passed again later (F35).
  */
 function updateFrom(st: UnitState, r: ReceiptOf<"update">, ctx: ApplyContext): Step1 {
-  if (st.slice !== null) return { reject: "norn update is for the story unit" };
+  if (st.slice !== null) return { reject: `${cmd.storyUpdateBranch()} is for the story unit` };
   if (r.step !== st.step || r.attempt !== st.attempt) return { reject: `stale: receipt for ${r.step}#${r.attempt}, cursor at ${st.step}#${st.attempt}` };
   const waiting = st.status === "done" || st.status === "stuck" || (st.status === "parked" && st.park?.kind === "gate");
   if (!waiting) return { reject: `unit is ${st.status}${st.park ? ` (${st.park.kind})` : ""}; update needs it done, at a gate or stuck` };

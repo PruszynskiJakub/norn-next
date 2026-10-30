@@ -1,0 +1,6 @@
+Write to user (~/.norn/config.yaml) or repo (.agents/norn/config.yaml)? (↑/↓, Enter to pick, Esc to leave)
+[2K> user (~/.norn/config.yaml): yours, this machine
+[2K  repo (.agents/norn/config.yaml): the team's, committed
+[2A[2K  user (~/.norn/config.yaml): yours, this machine
+[2K> repo (.agents/norn/config.yaml): the team's, committed
+Set `default_mode` to `auto` in the repo file (`.agents/norn/config.yaml`).

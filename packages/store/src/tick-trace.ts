@@ -27,7 +27,7 @@ export interface ReplayWorkflowRef {
   issues: LoadedWorkflow["issues"];
 }
 
-/** What a full-facts tick records beside its facts so `norn why` can replay decide on the same inputs (O5). */
+/** What a full-facts tick records beside its facts so `norn run view --why` can replay decide on the same inputs (O5). */
 export interface ReplayBlock {
   workflows: Record<string, ReplayWorkflowRef>;
   config: ResolvedConfig;

@@ -1,0 +1,16 @@
+{
+  "kind": "started",
+  "receipt_id": "01M611MCMWVTG2S7QC6CXACBJB",
+  "run_id": "01M611MCMWZJGGHWJBEQYQ9AGA",
+  "step": "qa",
+  "attempt": 1,
+  "at": "2026-10-28T10:41:57.407Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M611MCMWNMG3P1NXPJN2MCGV",
+  "how": "auto",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-75-regroup-the-cli-around-status-story-and--01-noun-verb-tree-and-run-list-view",
+  "machine": "jakubpruszynski@mac",
+  "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD"
+}

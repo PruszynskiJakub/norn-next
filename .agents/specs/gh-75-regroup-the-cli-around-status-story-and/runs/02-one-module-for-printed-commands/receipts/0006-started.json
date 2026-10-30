@@ -1,0 +1,26 @@
+{
+  "kind": "started",
+  "receipt_id": "01M60Z3BPP9BKB3SGARX13HYSY",
+  "run_id": "01M60Z37FCCR5R18CZ8JK3NWH9",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-28T09:57:42.230Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M60Z37FCET3WVKAB4AEYCX4P",
+  "how": "auto",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-75-regroup-the-cli-around-status-story-and--02-one-module-for-printed-commands",
+  "machine": "jakubpruszynski@mac",
+  "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD",
+  "session": {
+    "runner": "herdr",
+    "session_id": "w6E:p1",
+    "pane_id": "w6E:p1",
+    "reach": "herdr agent attach w6E:p1"
+  },
+  "process": {
+    "pid": 17836,
+    "pid_start": "Wed Oct 28 10:57:41 2026"
+  }
+}

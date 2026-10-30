@@ -1,0 +1,64 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61YVY6GVTGEDH8GGCF4DTKF",
+  "run_id": "01M61Y60BX588DHM4RTGNVZC8D",
+  "step": "review",
+  "attempt": 2,
+  "at": "2026-10-28T19:12:53.456Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/10",
+  "outcome": "changes_requested",
+  "handoff": "Review #2: one blocking finding. Review #1 rework is in (prompt before the tick lock, cmd.take gone, confirm one read, story_corrupt) and AC1-AC9 are tested; 1253 pass, typecheck green. F1: under the lock claimIfFree trusts the local claim ref (observe sync never) and never re-reads the remote, so a story checkout --force elsewhere while the close prompt is open goes unseen and close force-pushes slices and tears down. Re-read the remote claim inside withStory and test it. Minor: corrupt claim under the lock exits claim_failed, confirm ignores stdin error, story_corrupt test asserts only code, stale doc names.",
+  "findings": [
+    {
+      "severity": "blocking",
+      "title": "Claim taken by another machine while the close prompt is open is not seen; close tears down their story",
+      "id": "F1",
+      "file": "packages/cli/src/commands/story-close.ts",
+      "line": 41,
+      "criterion": "AC6",
+      "detail": "B38: 'story close on a story another machine holds to be refused, so that I do not tear down someone else's work.' refuseOthers reads the remote claim (claimFor) before the prompt. The prompt can stay open indefinitely (it is outside the lock since the F1 rework). Under the lock withStory observes with sync: 'never', so story.claim comes from the local claim ref; claimIfFree returns early when heldHere && state is mine/expired without reading the remote. If B runs `story checkout --force` meanwhile, A's local ref still says mine: close commits, force-pushes slice branches (+refs/heads/..., line ~131) over B's work, removes worktrees and exits 0 with claim_deleted: false. The implement#1 notes already record that the local claim ref can be stale. No test covers a claim changing between the confirm and the lock.\nAxis: spec\nSuggestion: Inside withStory, before any effect, re-read the remote claim (claimFor, or the remote CAS state) and refuse heldElsewhere / claim_corrupt as refuseOthers does; add a team test where the fake confirm runs `story checkout --force` on another clone and close must be refused with nothing changed."
+    },
+    {
+      "severity": "minor",
+      "title": "Corrupt claim seen under the lock fails claim_failed instead of being refused claim_corrupt",
+      "id": "F2",
+      "file": "packages/cli/src/commands/story-close.ts",
+      "line": 49,
+      "detail": "acquireClaim's non-held reasons (corrupt included) fall to failure(..., 'claim_failed'); the same state before the lock is refuse(..., 'claim_corrupt') exit 3. Two claim checks with drifting refusal paths.\nAxis: standards\nSuggestion: One claim check used both before and under the lock (fixing F1 likely gives this)."
+    },
+    {
+      "severity": "minor",
+      "title": "confirm never resolves on a stdin error",
+      "id": "F3",
+      "file": "packages/cli/src/runtime/interaction.ts",
+      "line": 74,
+      "detail": "Listens for 'data' and 'end' only; an 'error' on stdin leaves the promise pending with stdin resumed.\nAxis: standards\nSuggestion: Also listen for 'error' and resolve false (or reject)."
+    },
+    {
+      "severity": "minor",
+      "title": "isClosed and the worktree count are computed outside the lock from different sources than the teardown",
+      "id": "F4",
+      "file": "packages/cli/src/commands/story-close.ts",
+      "line": 85,
+      "detail": "isClosed is not rechecked under the lock (a concurrent close on the same machine ends in unknown_story rather than already_closed — harmless). The prompt counts from scanWorktrees while removal uses observe's obs.units, so the promised count can differ; 'Worktrees for 1 units' is ungrammatical (the AC text fixes '<n> units', so acceptable).\nAxis: standards\nSuggestion: Optional: recheck under the lock; derive the count the same way teardown selects worktrees."
+    },
+    {
+      "severity": "minor",
+      "title": "story_corrupt test checks only the code",
+      "id": "F5",
+      "file": "packages/cli/test/team.test.ts",
+      "line": 395,
+      "detail": "Plan: checks read exit code, files and refs. The test asserts code only — no exit 3/1, no 'nothing changed' (worktree present, claim ref untouched). It sits under the B36 describe.\nAxis: spec\nSuggestion: Assert exit code and that worktree and claim are unchanged."
+    },
+    {
+      "severity": "nit",
+      "title": "Stale old command names in docs and schema comments",
+      "id": "F6",
+      "file": "CONTRIBUTING.md",
+      "line": 9,
+      "detail": "CONTRIBUTING.md:9 'norn drop gh-N'; packages/schema/src/receipt.ts:213 and trace.ts:173 'a `norn take`'. D1 puts docs and the S2 lint in the last slice, so not blocking here.\nAxis: standards\nSuggestion: Leave for the docs slice, or rename now."
+    }
+  ]
+}

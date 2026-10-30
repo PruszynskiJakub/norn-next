@@ -7,6 +7,7 @@ import { type AgentStep, type Criterion, type CriterionVerdict, type Note, noteI
 import type { NumberedReceipt } from "./facts.ts";
 import { epoch } from "./time.ts";
 import { reportableOutcomes } from "./workflow.ts";
+import { cmd } from "./commands.ts";
 
 /** QV5: `fail` > `unverified` > `person` > `pass`. */
 const VERDICT_RANK: Readonly<Record<Verdict, number>> = { pass: 0, person: 1, unverified: 2, fail: 3 };
@@ -56,7 +57,6 @@ const edgeVerdict = (step: AgentStep, outcome: string): Verdict | undefined => {
   return spec === undefined ? undefined : outcomeEdge(spec).verdict;
 };
 
-const doneCmd = (o: string, criteria: boolean) => `norn done ${o}${criteria ? " --criteria <file>" : ""} --handoff "…"`;
 
 /**
  * QV3–QV5, NT1: may this `norn done <outcome>` be written with this report and these notes?
@@ -90,7 +90,7 @@ export function checkReport(input: CriteriaCheckInput): CriteriaCheck {
         step.criteria === "required"
           ? `step ${input.step_name} requires a criteria report (criteria: required): one verdict per criterion`
           : `outcome '${outcome}' is gated by verdict '${gated}': it needs a criteria report to check against`,
-        `write the report (a JSON array of {id, verdict, …}) and run: ${doneCmd(outcome, true)}`,
+        `write the report (a JSON array of {id, verdict, …}) and run: ${cmd.done(outcome, { criteria: true })}`,
       );
     return { ok: true, worst: null, coverage: null };
   }
@@ -125,7 +125,7 @@ export function checkReport(input: CriteriaCheckInput): CriteriaCheck {
     return refuse(
       "pass_without_capability",
       `${what}: this agent has ${input.capabilities.length ? `only ${input.capabilities.join(", ")}` : "no declared capabilities"} (config agents.<name>.capabilities), so it cannot have observed ${lacking.length === 1 ? "it" : "them"} pass; a person's earlier ruling does not verify a criterion on the current code`,
-      `report ${lacking.map((l) => l.id).join(", ")} as {"verdict": "unverified", "reason": "no ${lacking[0]?.missing[0]} in this session", "how": "<the exact steps a person or an equipped agent follows to check it>"} and report the outcome matching the worst verdict (${doneCmd(reportableOutcomes(step).find((o) => edgeVerdict(step, o) === "unverified") ?? "unverified", true)})`,
+      `report ${lacking.map((l) => l.id).join(", ")} as {"verdict": "unverified", "reason": "no ${lacking[0]?.missing[0]} in this session", "how": "<the exact steps a person or an equipped agent follows to check it>"} and report the outcome matching the worst verdict (${cmd.done(reportableOutcomes(step).find((o) => edgeVerdict(step, o) === "unverified") ?? "unverified", { criteria: true })})`,
       { criteria: lacking, capabilities: [...input.capabilities] },
     );
   }
@@ -138,7 +138,7 @@ export function checkReport(input: CriteriaCheckInput): CriteriaCheck {
     return refuse(
       "outcome_contradicts_verdicts",
       `outcome '${outcome}' needs the worst verdict to be '${gated}', but it is '${worst}' (${culprits.join(", ")})${matching.length ? `; the matching outcome is ${matching.map((o) => `'${o}'`).join(" or ")}` : ""}`,
-      matching.length ? matching.map((o) => doneCmd(o, true)).join(" | ") : `no outcome of ${input.step_name} is gated by '${worst}'; re-check ${culprits.join(", ")} or report norn stuck "<why>"`,
+      matching.length ? matching.map((o) => cmd.done(o, { criteria: true })).join(" | ") : `no outcome of ${input.step_name} is gated by '${worst}'; re-check ${culprits.join(", ")} or report ${cmd.stuck("<why>")}`,
       { worst, matching, criteria: culprits },
     );
   }

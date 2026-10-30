@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M66AGWJ9SH7932JD3QAFJ2W6",
+  "run_id": "01M66AE3DA4ZFEZBQTPTKETT8R",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-30T11:53:31.978Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "approve",
+  "handoff": "Review: approve, no blocking findings. Receipts and state.json now one-line JSON via jsonLine() at their only writers; older pretty files still read; machine-local files intentionally unchanged. Store tests and typecheck green.",
+  "findings": []
+}

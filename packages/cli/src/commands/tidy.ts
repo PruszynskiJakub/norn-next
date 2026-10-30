@@ -31,6 +31,7 @@ import { leaseLiveness } from "../runtime/leases.ts";
 import { type Observed, observe } from "../runtime/observe/index.ts";
 import { doneHerdrRuns, planHerdrTidy } from "../runtime/tidy-herdr.ts";
 import { checkRetain, MIN_TRACE_RETAIN, retainCutoffDay, unitTracesBefore } from "../runtime/trace-retention.ts";
+import { cmd } from "@norn/core";
 
 /** A reservation lives only while a receipt is being written; older ones are crash leftovers. */
 const RESERVE_STALE_MS = 60_000;
@@ -79,7 +80,7 @@ function retainWindow(ctx: Context, flag: string | undefined): { retain: string;
   const c = checkRetain(retain);
   if (c.ok) return c;
   const source = flag === undefined ? `trace.retain ${retain}` : `--retain ${retain}`;
-  const fix = flag === undefined ? `set trace.retain to ${MIN_TRACE_RETAIN} or more (norn config trace shows the layer that sets it)` : `norn tidy --retain ${MIN_TRACE_RETAIN}`;
+  const fix = flag === undefined ? `set trace.retain to ${MIN_TRACE_RETAIN} or more (norn config get trace shows the layer that sets it)` : `norn tidy --retain ${MIN_TRACE_RETAIN}`;
   if (c.reason === "short") throw refuse(`the trace window must be at least ${MIN_TRACE_RETAIN} (${source})`, fix, "retain_too_short");
   const error = `${source} is not a duration: expected a form like ${MIN_TRACE_RETAIN}`;
   throw flag === undefined ? refuse(error, fix, "retain_invalid") : usageError(error, fix, "retain_invalid");
@@ -94,7 +95,7 @@ export const tidyCommand = defineCommand({
     const dry = opt.bool(args, "dry-run");
     const window = retainWindow(ctx, opt.str(args, "retain"));
     const lock = await acquireTickLock(ctx.root, { note: "norn tidy", now: () => ctx.clock.iso() });
-    if (!lock.ok) throw busyError(`a tick is running (pid ${lock.holder.holder.pid})`, "retry: norn tidy", "tick_locked");
+    if (!lock.ok) throw busyError(`a tick is running (pid ${lock.holder.holder.pid})`, `retry: ${cmd.tidy()}`, "tick_locked");
     try {
       const obs = await observe(ctx, { tick_id: ulid(ctx.clock.now()), sync: "never" });
       const git = obs.ports.git;

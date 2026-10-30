@@ -1,0 +1,26 @@
+{
+  "kind": "started",
+  "receipt_id": "01M61D812ABKM2E12HVK7QJ7XA",
+  "run_id": "01M61D7TMWB17WW5P1NVQYN31D",
+  "step": "qa",
+  "attempt": 1,
+  "at": "2026-10-28T14:04:55.242Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M61D7TMWZ8XWE9HJXMTRTXHD",
+  "how": "auto",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-75-regroup-the-cli-around-status-story-and--04-status-is-the-inbox-story-list",
+  "machine": "jakubpruszynski@mac",
+  "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD",
+  "session": {
+    "runner": "herdr",
+    "session_id": "w6W:p1",
+    "pane_id": "w6W:p1",
+    "reach": "herdr agent attach w6W:p1"
+  },
+  "process": {
+    "pid": 73415,
+    "pid_start": "Wed Oct 28 15:04:55 2026"
+  }
+}

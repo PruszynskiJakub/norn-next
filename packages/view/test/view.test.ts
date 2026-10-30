@@ -21,7 +21,7 @@ import {
   writePrFacts,
   writeUnitMarker,
 } from "@norn/store";
-import { formatInbox, formatOrient, formatStatus, formatTimeline, loadProjectView, loadTimelines, orientReport, prCommand, receiptSummary, stepTitle } from "../src/index.ts";
+import { formatInbox, formatStatus, formatStoryView, formatTimeline, loadProjectView, loadTimelines, orientReport, prCommand, receiptSummary, stepTitle } from "../src/index.ts";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -197,7 +197,7 @@ describe("loadProjectView", () => {
       story_status: "active",
       park: { kind: "ask", reason: "Which OAuth provider?" },
       age: "40m",
-      next: 'norn answer gh-12 "…"',
+      next: 'norn story answer gh-12 "…"',
     });
     expect(s.claim).toEqual({ state: "mine", holder: "me@box", expires_at: ago(-8), unclaimed: false });
     expect(s.counters).toEqual([{ name: "test_loop", value: 0, max: 3 }]);
@@ -208,7 +208,7 @@ describe("loadProjectView", () => {
       ["gh-12/03", "not_started", "planned", false, ["gh-12/02"]],
     ]);
     const s1 = s.slices[0];
-    expect(s1).toMatchObject({ title: "Add form", attempt: 2, age: "30m", next: "norn trace gh-12/01" });
+    expect(s1).toMatchObject({ title: "Add form", attempt: 2, age: "30m", next: "norn run list gh-12/01" });
     expect(s1?.counters).toEqual([{ name: "test_loop", value: 1, max: 3 }]);
     expect(s.slices[2]).toMatchObject({ workflow: "slice", step: null, attempt: null, age: null });
 
@@ -287,7 +287,7 @@ describe("loadProjectView", () => {
     const { repo, home } = await seed();
     const v = await loadProjectView({ repoRoot: repo, home, now: NOW + 3_600_000, holder: "me@box", liveness: () => true, env: {} });
     expect(v.stories[0]?.claim).toMatchObject({ state: "expired", unclaimed: true });
-    expect(v.inbox.groups.unclaimed.map((i) => i.command)).toEqual(["norn take gh-12"]);
+    expect(v.inbox.groups.unclaimed.map((i) => i.command)).toEqual(["norn story checkout gh-12"]);
   });
 
   test("corrupt state is reported, not guessed (S2)", async () => {
@@ -296,7 +296,7 @@ describe("loadProjectView", () => {
     const v = await loadProjectView({ repoRoot: repo, home, now: NOW, holder: "me@box", liveness: () => true, env: {} });
     const s2 = v.stories[0]?.slices[1];
     expect(s2?.status).toBe("corrupt");
-    expect(s2?.next).toBe("norn why gh-12/02");
+    expect(s2?.next).toBe("norn run view gh-12/02 --why");
     expect(v.inbox.groups.unblock.map((i) => i.slice)).toEqual(["gh-12/02"]);
   });
 
@@ -379,29 +379,31 @@ describe("orient", () => {
     ]);
   });
 
-  test("orientReport: slices, PR command per provider, waiting items, notes by unit; formatOrient renders it", async () => {
+  test("orientReport: slices with their steps, PR command and state, waiting items, notes by unit; formatStoryView renders it", async () => {
     const v = await seedOrient();
     expect(orientReport(v, "gh-99", "gh")).toBeNull();
     const r = orientReport(v, "gh-12/02", "glab");
     if (!r) throw new Error("unreachable");
     expect(r).toMatchObject({ key: "gh-12/02", story: "gh-12", title: "Fix login", claim: "held here", branch: "gh-12-fix-login", pr_command: "glab mr view gh-12-fix-login", note_count: 2 });
-    expect(r.slices.map((s) => [s.key, s.status, s.integrated])).toEqual([
-      ["gh-12/01", "running", false],
-      ["gh-12/02", "done", true],
-      ["gh-12/03", "not_started", false],
+    expect(r.slices.map((s) => [s.key, s.status, s.workflow, s.step, s.attempt, s.integrated, s.depends_on])).toEqual([
+      ["gh-12/01", "running", "slice", "implement", 2, false, []],
+      ["gh-12/02", "done", "slice", "$done", 1, true, ["gh-12/01"]],
+      ["gh-12/03", "not_started", "slice", null, null, false, ["gh-12/02"]],
     ]);
-    expect(r.waiting.map((w) => [w.group, w.unit, w.command])).toEqual([["answer", "gh-12", 'norn answer gh-12 "…"']]);
+    expect(r.pr_state).toBe("draft");
+    expect(r.waiting.map((w) => [w.group, w.unit, w.command])).toEqual([["answer", "gh-12", 'norn story answer gh-12 "…"']]);
     expect(r.running.map((w) => w.unit)).toEqual(["gh-12/01"]);
     expect(r.notes.map((g) => [g.unit, g.notes.length])).toEqual([["gh-12/02", 2]]);
-    expect(r.look).toEqual({ spec: `${r.root}/.agents/specs/gh-12-fix-login`, trace: "norn trace gh-12/02", why: "norn why gh-12/02", status: "norn status gh-12/02" });
+    expect(r.look).toEqual({ spec: `${r.root}/.agents/specs/gh-12-fix-login`, trace: "norn run list gh-12/02", why: "norn run view gh-12/02 --why", status: "norn story view gh-12/02" });
     expect(prCommand("gh", "b", true)).toBe("gh pr view b --web");
 
-    const md = formatOrient(r, NOW);
-    expect(md).toStartWith("# Orient: gh-12 — Fix login\n");
-    expect(md).toContain("> 4. Never edit code, commit, or report an outcome");
-    expect(md).toContain("- gh-12/02 Wire API — done, integrated");
+    const md = formatStoryView(r, NOW);
+    expect(md).toStartWith("# gh-12 — Fix login\n\n## The story\n");
+    expect(md).not.toContain("> 4. Never edit code");
+    expect(formatStoryView(r, NOW, { rules: true })).toContain("> 4. Never edit code, commit, or report an outcome");
+    expect(md).toContain("- gh-12/02 Wire API — done, integrated · after 01 · slice\n");
     expect(md).toContain("- #7 draft, open — https://x/pull/7 (seen 1h ago)");
-    expect(md).toContain("**Answer** gh-12 (implement), 40m: Which OAuth provider?\n  - `norn answer gh-12 \"…\"`");
+    expect(md).toContain("**Answer** gh-12 (implement), 40m: Which OAuth provider?\n  - `norn story answer gh-12 \"…\"`");
     expect(md).toContain("## Open notes (2)");
     expect(md).toContain("### gh-12/02 (2)\n\n- [implement] retries are capped at 3; confirm\n- [implement · AC2] renamed fetchUser\n  to loadUser\n");
   });
@@ -414,14 +416,14 @@ describe("formatters", () => {
     const status = formatStatus(v);
     expect(status).toContain("gh-12 Fix login");
     expect(status).toContain("slice · auto→manual · mine · parked implement#1 (ask: Which OAuth provider?) 40m [test_loop 0/3]");
-    expect(status).toContain('→ norn answer gh-12 "…"');
+    expect(status).toContain('→ norn story answer gh-12 "…"');
     expect(status).toContain("gh-12/01   Add form — running implement#2 30m [test_loop 1/3]");
     expect(status).toContain("gh-12/02   Wire API — done 1h integrated after 01");
     expect(status).toContain("gh-12/01   implement#2 auto claude alive");
     expect(status).toContain("1 item needs you");
 
     const inbox = formatInbox(v);
-    expect(inbox.split("\n").slice(0, 3)).toEqual(["Answer (1) · agents waiting for your answer", "  gh-12      implement: Which OAuth provider? · 40m", '      $ norn answer gh-12 "…"']);
+    expect(inbox.split("\n").slice(0, 3)).toEqual(["Answer (1) · agents waiting for your answer", "  gh-12      implement: Which OAuth provider? · 40m", '      $ norn story answer gh-12 "…"']);
     expect(inbox).toContain("Running (1) · agents and checks at work");
     expect(inbox).toContain("Recently done (1) · finished in the last 24h");
   });
@@ -436,8 +438,8 @@ describe("formatters", () => {
   });
 
   test("formatInbox: Notes after Running, its header naming each story's clearing approval once (NT5)", () => {
-    const note = (id: string, story: string, cleared_by: string) => ({ id, group: "notes", story, slice: null, step: "qa", title: `qa note on ${story}: x`, command: `norn why ${story} --receipt r`, since: "", age: "1m", cleared_by });
-    const run = { id: "r", group: "running", story: "gh-3", slice: null, step: "qa", title: "qa #1 (auto)", command: "norn trace gh-3", since: "", age: "1m" };
+    const note = (id: string, story: string, cleared_by: string) => ({ id, group: "notes", story, slice: null, step: "qa", title: `qa note on ${story}: x`, command: `norn run view ${story} --receipt r`, since: "", age: "1m", cleared_by });
+    const run = { id: "r", group: "running", story: "gh-3", slice: null, step: "qa", title: "qa #1 (auto)", command: "norn run list gh-3", since: "", age: "1m" };
     const notes = [note("a", "gh-1", "cleared by gh-1 human-qa approval"), note("b", "gh-1", "cleared by gh-1 human-qa approval"), note("c", "gh-2", "cleared when the story is done")];
     const v = { stories: [{}], inbox: { at: "", pending: 0, groups: { your_turn: [], answer: [], approve: [], unblock: [], check: [], unclaimed: [], running: [run], notes, recently_done: [] } } } as unknown as Parameters<typeof formatInbox>[0];
     const out = formatInbox(v).split("\n");
@@ -445,15 +447,15 @@ describe("formatters", () => {
     expect(out).toContain("Notes (3) · agents' notes for you, no action needed · cleared by gh-1 human-qa approval; cleared when the story is done");
     // NT6: the header line alone, with the command that lists them; `notes` lists them
     const at = out.indexOf("Notes (3) · agents' notes for you, no action needed · cleared by gh-1 human-qa approval; cleared when the story is done");
-    expect(out[at + 1]).toBe("      $ norn inbox --notes");
+    expect(out[at + 1]).toBe("      $ norn status --notes");
     expect(out.some((l) => l.includes("qa note on"))).toBe(false);
     const listed = formatInbox(v, { notes: true });
     expect(listed).toContain("  gh-1       qa note on gh-1: x · 1m");
-    expect(listed).not.toContain("norn inbox --notes");
+    expect(listed).not.toContain("norn status --notes");
   });
 
   test("formatInbox prints paths under home as ~/…", () => {
-    const item = { id: "approve:gh-1:qa#1", group: "approve", story: "gh-1", slice: null, step: "human-qa", title: "evidence attached", command: "norn approve gh-1", since: "", age: "1m", detail: "step qa#1 reported partial (receipt 0009)", full: "Report: /Users/me/wt/runs/_story/receipts/0009-done.json" };
+    const item = { id: "approve:gh-1:qa#1", group: "approve", story: "gh-1", slice: null, step: "human-qa", title: "evidence attached", command: "norn story approve gh-1", since: "", age: "1m", detail: "step qa#1 reported partial (receipt 0009)", full: "Report: /Users/me/wt/runs/_story/receipts/0009-done.json" };
     const v = { inbox: { at: "", pending: 1, groups: { your_turn: [], answer: [], approve: [item], unblock: [], check: [], unclaimed: [], running: [], notes: [], recently_done: [] } } } as unknown as Parameters<typeof formatInbox>[0];
     expect(formatInbox(v, { details: true, home: "/Users/me/" })).toContain("      | Report: ~/wt/runs/_story/receipts/0009-done.json");
     expect(formatInbox(v, { details: true })).toContain("      | Report: /Users/me/wt/runs/_story/receipts/0009-done.json");

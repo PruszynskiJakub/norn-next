@@ -8,9 +8,9 @@ import { join } from "node:path";
 import type { herdr } from "@norn/adapters";
 import { type Receipt, ulid } from "@norn/schema";
 import { appendReceipt } from "@norn/store";
-import { runCli } from "../src/index.ts";
 import { type DoneRun, doneHerdrRuns, planHerdrTidy } from "../src/runtime/tidy-herdr.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
+import { runChecked } from "./harness.ts";
 
 setDefaultTimeout(30_000);
 
@@ -103,7 +103,7 @@ describe("norn tidy closes Herdr panes of runs that reported done (K7)", () => {
 
   test("another runner: tidy leaves Herdr alone", async () => {
     const f = fakeHerdr([spot("w4:t1.p1", wt())]);
-    const r = await runCli(["tidy"], { ...h.deps, herdr: f.cockpit });
+    const r = await runChecked(["tidy"], { ...h.deps, herdr: f.cockpit });
     expect(r.exit).toBe(0);
     expect((r.value as { removed: Record<string, unknown> }).removed.herdr).toBeUndefined();
     expect(f.calls).toEqual([]);
@@ -113,20 +113,20 @@ describe("norn tidy closes Herdr panes of runs that reported done (K7)", () => {
     h.write(join(h.home, "config.yaml"), "runner: { adapter: herdr }\n");
     const panes = [spot("w4:t1.p1", wt()), spot("w5:t1.p1", wt()), spot("w6:t1.p1", wt(), "working"), spot("w7:t1.p1", wt())];
     const dry = fakeHerdr(panes);
-    const d = await runCli(["tidy", "--dry-run"], { ...h.deps, herdr: dry.cockpit });
+    const d = await runChecked(["tidy", "--dry-run"], { ...h.deps, herdr: dry.cockpit });
     expect(d.exit).toBe(0);
     expect(d.value).toMatchObject({ would_remove: { herdr: { workspaces: ["w4"], tabs: [], panes: [] } } });
     expect(dry.calls).toEqual([]);
 
     const real = fakeHerdr(panes);
-    const t = await runCli(["tidy"], { ...h.deps, herdr: real.cockpit });
+    const t = await runChecked(["tidy"], { ...h.deps, herdr: real.cockpit });
     expect(t.value).toMatchObject({ removed: { herdr: { workspaces: ["w4"], tabs: [], panes: [] } } });
     expect(real.calls).toEqual(["workspace w4"]);
   });
 
   test("a Herdr that cannot be reached is reported under kept, and the rest of tidy still runs", async () => {
     const broken = { listPanes: async () => Promise.reject(new Error("socket refused")) } as unknown as herdr.HerdrCockpit;
-    const t = await runCli(["tidy"], { ...h.deps, herdr: broken });
+    const t = await runChecked(["tidy"], { ...h.deps, herdr: broken });
     expect(t.exit).toBe(0);
     expect(t.value).toMatchObject({ removed: { herdr: { workspaces: [], tabs: [], panes: [] } }, kept: [{ item: "herdr", reason: "could not tidy Herdr: socket refused" }] });
   });

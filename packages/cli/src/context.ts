@@ -12,6 +12,7 @@ import type { AdapterContext, AdapterRegistry, Clock, GitPort, Ports } from "@no
 import { DEFAULT_CONFIG, type ResolvedConfig } from "@norn/schema";
 import { type LoadedConfig, loadConfig, nornHome, readUnitMarker, type UnitMarker } from "@norn/store";
 import { corruptError, refuse } from "./output.ts";
+import { type Interaction, isAgentSession, terminalInteraction } from "./runtime/interaction.ts";
 import { buildPorts, defaultRegistry } from "./wiring.ts";
 
 /** Everything a command may get injected; all optional (tests pass fakes). */
@@ -30,12 +31,14 @@ export interface CliDeps {
   signal?: AbortSignal;
   /** stdin text for commands that read it (`norn hook`); else the process stdin */
   stdin?: string;
-  /** SPEC-cockpit CP6: raw key chunks for `norn cockpit`; else the process stdin in raw mode */
+  /** SPEC-cockpit CP6: raw key chunks for `norn status --watch`; else the process stdin in raw mode */
   input?: AsyncIterable<string>;
   /** HC6/HC12: Herdr for the cockpit; null = none; absent = the real one when `HERDR_ENV=1` */
   herdr?: herdr.HerdrCockpit | null;
-  /** an outside command a front end starts for the person (`norn cockpit` opens a PR or issue link); default Bun.spawn */
+  /** an outside command a front end starts for the person (`norn status --watch` opens a PR or issue link); default Bun.spawn */
   shell?: (argv: string[], cwd: string) => Promise<{ code: number; stderr: string }>;
+  /** D2: the terminal a person answers prompts in; null = none (no TTY); absent = the process terminal */
+  interaction?: Interaction | null;
   /** a tick started a detached `norn check-run` (C5); `exited` settles when it ends (tests wait on it) */
   onCheckStarted?: (exited: Promise<void>) => void;
 }
@@ -95,6 +98,8 @@ export class Context {
   readonly home: string;
   readonly registry: AdapterRegistry;
   readonly deps: CliDeps;
+  /** lines for a person on stderr (a one-time notice, B13), returned in `CliResult.stderr`; never data */
+  readonly stderr: string[] = [];
   private located: Located | null = null;
   private loadedConfig: LoadedConfig | null = null;
   private builtPorts: Ports | null = null;
@@ -166,6 +171,12 @@ export class Context {
       this.builtPorts = await buildPorts(this.registry, this.adapterContext(this.root, config), config, { git: this.git, ...this.deps.ports });
     }
     return this.builtPorts;
+  }
+
+  /** D2: the terminal to prompt in — a TTY, no `--json`, not an agent session (A6, orient) — else null. */
+  terminal(json: boolean): Interaction | null {
+    const t = this.deps.interaction === undefined ? terminalInteraction() : this.deps.interaction;
+    return t?.tty && !json && !isAgentSession(this.env) ? t : null;
   }
 
   log(line: string): void {

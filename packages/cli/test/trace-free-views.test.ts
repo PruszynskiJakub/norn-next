@@ -1,5 +1,5 @@
 /**
- * The cockpit, `status`, `status --segment` and `inbox` read no trace day file (B1, B2, D1): the
+ * The cockpit (`status --watch`), `status`, `story list`, `story view` and `status --segment` read no trace day file (B1, B2, D1): the
  * project view carries no timeline, so what they show is the same over a trace of several days and
  * over an empty one. The trace-read observer (store) sees every day file a reader opens.
  *
@@ -67,33 +67,33 @@ beforeAll(async () => {
 afterAll(() => h.cleanup());
 
 const views = {
-  status: () => h.norn("status", "--json"),
+  "story list": () => h.norn("story", "list", "--json"),
   segment: () => runCli(["status", "--segment", "--json"], { ...h.deps, herdr: null }),
-  inbox: () => h.norn("inbox", "--json"),
-  "status gh-7": () => h.norn("status", "gh-7", "--json"),
+  status: () => h.norn("status", "--json"),
+  "story view gh-7": () => h.norn("story", "view", "gh-7", "--json"),
 };
 
 describe("views that read no trace (B1, B2)", () => {
-  test("norn cockpit --json and a refreshing cockpit open no day file (B1)", async () => {
-    expect(await opened(() => runCli(["cockpit", "--json"], { ...h.deps, herdr: null }))).toEqual([]);
+  test("norn status --watch --json and a refreshing cockpit open no day file (B1)", async () => {
+    expect(await opened(() => runCli(["status", "--watch", "--json"], { ...h.deps, herdr: null }))).toEqual([]);
     let frames = 0;
     expect(
       await opened(async () => {
-        const r = await runCli(["cockpit", "--interval", "20ms"], { ...h.deps, herdr: null, input: quitAfter(150), log: () => frames++ });
+        const r = await runCli(["status", "--watch", "--interval", "20ms"], { ...h.deps, herdr: null, input: quitAfter(150), log: () => frames++ });
         expect(r.exit).toBe(0);
       }),
     ).toEqual([]);
     expect(frames).toBeGreaterThan(2); // it refreshed
   });
 
-  test("status, status --segment and inbox open no day file and print the same as over an empty trace (B2)", async () => {
+  test("story list, status --segment, status and story view open no day file and print the same as over an empty trace (B2)", async () => {
     const full: Record<string, unknown> = {};
     for (const [name, run] of Object.entries(views)) {
       let out: unknown;
       expect(await opened(async () => void (out = (await run()).value))).toEqual([]);
       full[name] = out;
     }
-    expect((full.status as { stories: Array<{ key: string }> }).stories.map((s) => s.key)).toEqual(["gh-7", "gh-8"]);
+    expect((full["story list"] as { stories: Array<{ key: string }> }).stories.map((s) => s.key)).toEqual(["gh-7", "gh-8"]);
 
     const away = join(h.dir, "trace-away");
     mkdirSync(away);

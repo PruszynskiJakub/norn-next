@@ -1,0 +1,26 @@
+{
+  "kind": "started",
+  "receipt_id": "01M6224RWPQW6RMZ0HC7CSS44T",
+  "run_id": "01M6224M4VN20C0E8GXVKHTQ39",
+  "step": "merge",
+  "attempt": 2,
+  "at": "2026-10-28T20:10:08.662Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M6224M4V5GBWRJA9J5BZ64WM",
+  "how": "auto",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-75-regroup-the-cli-around-status-story-and--10-story-checkout-handoff-close",
+  "machine": "jakubpruszynski@mac",
+  "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD",
+  "session": {
+    "runner": "herdr",
+    "session_id": "w8E:p1",
+    "pane_id": "w8E:p1",
+    "reach": "herdr agent attach w8E:p1"
+  },
+  "process": {
+    "pid": 51994,
+    "pid_start": "Wed Oct 28 21:10:08 2026"
+  }
+}

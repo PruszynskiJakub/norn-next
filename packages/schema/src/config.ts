@@ -300,3 +300,35 @@ export function explainConfig(user: ConfigLayer = {}, repo: ConfigLayer = {}): C
   }
   return entries;
 }
+
+/**
+ * B66: whether a dotted key names a setting a config layer can hold (`default_mode`,
+ * `limits.deadline`, `agents.claude.model`, `runner.options.x`), read off the layer schema. A key
+ * into a list (`notifiers.0`) is not one: lists are set whole (B63). Pure.
+ */
+export function isConfigKey(key: string): boolean {
+  const segs = key.split(".");
+  if (segs.some((s) => !s)) return false;
+  let at: Record<string, unknown> | undefined = ConfigLayer as unknown as Record<string, unknown>;
+  for (const seg of segs) {
+    at = at && childSchema(at, seg);
+    if (!at) return false;
+  }
+  return true;
+}
+
+function childSchema(s: Record<string, unknown>, seg: string): Record<string, unknown> | undefined {
+  if (Array.isArray(s.anyOf)) {
+    for (const branch of s.anyOf as Array<Record<string, unknown>>) {
+      const c = childSchema(branch, seg);
+      if (c) return c;
+    }
+    return undefined;
+  }
+  const props = s.properties as Record<string, Record<string, unknown>> | undefined;
+  if (props) return seg === "$schema" ? undefined : props[seg];
+  const patterns = s.patternProperties as Record<string, Record<string, unknown>> | undefined;
+  if (patterns) return Object.entries(patterns).find(([p]) => new RegExp(p).test(seg))?.[1];
+  // an open value (`options`: anything) holds any key; a scalar or a list holds none
+  return s.type === undefined ? s : undefined;
+}

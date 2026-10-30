@@ -1,6 +1,6 @@
 /**
  * Tick facts stored as chunks (O4, O5; gh-107 B13, B17, B18, B21, B22, B35): a quiet tick writes a tick
- * line and no chunk, `norn why` replays a chunked tick from facts equal to the ones observe produced,
+ * line and no chunk, `norn run view --why` replays a chunked tick from facts equal to the ones observe produced,
  * a full-facts tick an older norn wrote (before or after chunked ones) replays as before, a missing
  * chunk is a corrupt trace entry, and the golden harvest reads chunked ticks as it read full ones.
  */
@@ -110,12 +110,12 @@ describe("chunked tick facts (O4, O5)", () => {
     const storyRef = (t.facts.stories as Array<{ $chunk: string }>)[0]?.$chunk;
     const story = readFileSync(chunksFile(), "utf8").split("\n").find((l) => l.startsWith(`{"h":"${storyRef}"`)) as string;
     expect((JSON.parse(story).v.units[0].run.hooks.$blocks as string[]).length).toBe(2);
-    const r = await h.norn("why", "gh-9", "--tick", t.tick_id);
+    const r = await h.norn("run", "view", "gh-9", "--why", "--tick", t.tick_id);
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ tick_id: t.tick_id, replay: { matches: true, all_match: true } });
   });
 
-  test("B35: a chunked tick line validates as a tick (facts an object) and inbox --history reads its changes", async () => {
+  test("B35: a chunked tick line validates as a tick (facts an object) and status --history reads its changes", async () => {
     h.report(runs(), "ask", { question: "Which currency?" });
     h.clock.advance(10_000);
     await h.tick();
@@ -126,7 +126,7 @@ describe("chunked tick facts (O4, O5)", () => {
       expect(t.facts.$chunked).toBe(1);
     }
     expect(all.some((t) => t.inbox?.length)).toBe(true);
-    const r = await h.norn("inbox", "--history", "--json");
+    const r = await h.norn("status", "--history", "--json");
     expect(r.exit).toBe(0);
     expect((r.value as { items: Array<{ title: string; appeared_at: string | null }> }).items).toContainEqual(expect.objectContaining({ title: "Which currency?", appeared_at: expect.any(String) }));
   });
@@ -137,7 +137,7 @@ describe("chunked tick facts (O4, O5)", () => {
     appendTrace(h.root, old);
     expect(ticks().at(-1)?.facts.$chunked).toBeUndefined();
     for (const id of [chunked.tick_id, old.tick_id]) {
-      const r = await h.norn("why", "gh-9", "--tick", id);
+      const r = await h.norn("run", "view", "gh-9", "--why", "--tick", id);
       expect(r.exit).toBe(0);
       expect((r.value as Why).replay).toMatchObject({ matches: true, all_match: true });
     }
@@ -170,7 +170,7 @@ describe("chunked tick facts (O4, O5)", () => {
     const text = readFileSync(path, "utf8");
     writeFileSync(path, text.split("\n").filter((l) => !l.startsWith(`{"h":"${storyRef}"`)).join("\n"));
     try {
-      const r = await h.norn("why", "gh-9", "--tick", t.tick_id, "--json");
+      const r = await h.norn("run", "view", "gh-9", "--why", "--tick", t.tick_id, "--json");
       expect(r.exit).toBe(4);
       expect(r.value).toMatchObject({ code: "trace_corrupt" });
       expect(JSON.stringify(r.value)).toContain(storyRef);

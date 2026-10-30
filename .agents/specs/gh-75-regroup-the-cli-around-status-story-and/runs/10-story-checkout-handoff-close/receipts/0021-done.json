@@ -1,0 +1,14 @@
+{
+  "kind": "done",
+  "receipt_id": "01M620P8H2RNHZ0XD2NEBNB4K0",
+  "run_id": "01M620860ZMNDH201N0G9E62C3",
+  "step": "review",
+  "attempt": 3,
+  "at": "2026-10-28T19:44:44.578Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/10",
+  "outcome": "approve",
+  "handoff": "Review #3: approve. The review #2 rework is in: close re-reads the remote claim under the tick lock (claim_held/claim_corrupt), tested with a forced checkout on another clone while the prompt is open. confirm resolves N on a stdin error; the story_corrupt test checks exit and remote. AC1-AC9 tested, AC10 checked by hand. 1254 pass, typecheck green. No findings.",
+  "findings": []
+}

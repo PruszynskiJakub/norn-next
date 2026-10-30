@@ -1,0 +1,12 @@
+{
+  "kind": "done",
+  "receipt_id": "01M668Y0DKH8DEZQZE4APSH247",
+  "run_id": "01M668TSCTEZC48ZA7QYQ7GZW5",
+  "step": "prepare",
+  "attempt": 1,
+  "at": "2026-10-30T11:25:44.755Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "done",
+  "handoff": "Propose 0.12.0: minor, #106 regroups the CLI (old command names removed, no aliases) and adds story create, story reopen, run cancel, config set|unset. 1 Added group (5 bullets), 2 Changed, 1 Removed, 0 Fixed; omitted #105, #104, #102 (repo-local process only). Herdr plugin keeps its own version (0.4.0 already); no Claude plugin to bump since 0.11.0."
+}

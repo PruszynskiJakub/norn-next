@@ -5,7 +5,7 @@
  * BS1) and, per unit, what its receipts say: the last outcome receipt (B3), the runs of its cursor step
  * (R5.3), an unknown launch (R5.1); per story its open notes (NT2/NT3) and ready approval (F35/C5).
  * observe (cli) extends these with git, runner, process and remote facts; the view (X1) reads them
- * as they are (`loadProjectView`), so `norn inbox` and the tick see one world. Its one write is the
+ * as they are (`loadProjectView`), so `norn status` and the tick see one world. Its one write is the
  * tick's hook-file backfill (`backfillHooks`, D5).
  */
 import { existsSync, readdirSync } from "node:fs";

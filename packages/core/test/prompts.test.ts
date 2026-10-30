@@ -74,7 +74,7 @@ describe("§10 implicit ask from a pane prompt (L1, R6.2)", () => {
   test("the Answer item is readable; the screen only as `full`", () => {
     const st = parkedOnPrompt();
     const item = buildInbox(facts([solo(st, {})]), CONFIG).groups.answer[0];
-    expect(item).toMatchObject({ title: "Do you want to proceed?", detail: "pending command: rm -rf build · options: 1. Yes · 2. No — answer with the number", command: 'norn answer gh-1 "…"', full: SCREEN });
+    expect(item).toMatchObject({ title: "Do you want to proceed?", detail: "pending command: rm -rf build · options: 1. Yes · 2. No — answer with the number", command: 'norn story answer gh-1 "…"', full: SCREEN });
   });
 
   test("R6.3: an answer that did not reach the pane: the item says so and names how to reach it", () => {

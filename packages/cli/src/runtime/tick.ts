@@ -2,7 +2,7 @@
  * One heartbeat pass (H1): local lock → observe → decide → `tick.start` → act → log → `tick.end`
  * (R5.4) → `heartbeat.json` `last_tick_at` (R5.5). The tick trace record
  * holds the facts snapshot, the workflows and config decide used (as chunks of the day, store
- * `appendTick`), each rule fired, action and result (O4), so `norn why` replays decide on exactly the
+ * `appendTick`), each rule fired, action and result (O4), so `norn run view --why` replays decide on exactly the
  * same inputs (O5) via store `readTickInputs`.
  */
 import { decide, type Facts } from "@norn/core";
@@ -24,7 +24,7 @@ export interface TickReport {
   duration_ms: number;
   sync: SyncReport;
   /** one line per decision: unit, rule, action kind, result */
-  decisions: Array<{ unit: string; rule: string; kind: string; ok: boolean; error?: string }>;
+  decisions: Array<{ unit: string; rule: string; kind: string; ok: boolean; error?: string; story?: string }>;
   /** inbox item ids notified this tick (O3) */
   notified: string[];
   /** trace day file the record went to */
@@ -52,7 +52,7 @@ export function traceRecord(obs: Observed, records: ActRecord[], startedAt: numb
     tick_id: obs.facts.tick_id,
     at: new Date(startedAt).toISOString(),
     heartbeat_id: obs.heartbeat_id,
-    // O5: `norn why` labels a replay of a tick another norn recorded
+    // O5: `norn run view --why` labels a replay of a tick another norn recorded
     norn_version: NORN_VERSION,
     duration_ms: Math.max(0, Math.round(duration)),
     decisions,
@@ -99,6 +99,7 @@ export async function runTick(ctx: Context, opts: TickOptions = {}): Promise<Tic
       kind: decision.action.kind,
       ok: result.ok,
       ...(result.error ? { error: result.error } : {}),
+      ...(decision.action.kind === "intake_story" ? { story: decision.action.key } : {}),
     }));
     return {
       tick_id,

@@ -12,7 +12,7 @@ import {
 } from "@norn/schema";
 import type { RunGitAction, WorktreeSpec } from "../actions.ts";
 import { initialState, routeOf } from "../apply.ts";
-import { sliceWorktreePath, storyWorktreePath } from "../commands.ts";
+import { cmd, sliceWorktreePath, storyWorktreePath } from "../commands.ts";
 import type { SliceFileFacts, StoryFacts, UnitFacts, UnitRef } from "../facts.ts";
 import { sha256 } from "../hash.ts";
 import { unitWorktree } from "../policy.ts";
@@ -29,7 +29,7 @@ export function startStoryUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts): void
       kind: "notify",
       unit: uf.unit,
       rule: "start.workflow_invalid",
-      item: { id: `workflow:${story.key}:${fm.workflow}:${sha256(loaded.problem)}`, group: "unblock", story: story.key, slice: null, step: null, title: loaded.problem, command: `norn workflow ${story.key} <name>`, since: ctx.nowIso, url: fm.url },
+      item: { id: `workflow:${story.key}:${fm.workflow}:${sha256(loaded.problem)}`, group: "unblock", story: story.key, slice: null, step: null, title: loaded.problem, command: cmd.storyEdit(story.key, { workflow: "<name>" }), since: ctx.nowIso, url: fm.url },
     });
   }
   const worktree = unitWorktree(story, uf);
@@ -170,7 +170,7 @@ export function slicesCanResume(story: StoryFacts, uf: UnitFacts, st: UnitState,
   return parkedBySlices && !sliceProgress(story).broken.length && slicesStuck(story) === null;
 }
 
-/** §10, O2: norn unsticks the story back into its slices step, as `norn unstick <story>` would. */
+/** §10, O2: norn unsticks the story back into its slices step, as `norn run rerun <story>` would. */
 export function resumeSlices(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow): void {
   const unstick = nornReceipt(ctx, st, "unstick", { comment: "a slice can move again" });
   const { nr, res } = synth(ctx, st, wf, nextReceiptNumber(uf), unstick);
@@ -208,9 +208,9 @@ function slicesStuck(story: StoryFacts): { rule: string; detail: string } | null
   if (stuckSlices.length && stuckSlices.length === activeUnits.length) {
     const corrupt = (s: SliceFileFacts) => unitOf(s.key)?.state?.status === "corrupt";
     const named = stuckSlices.map((s) => (corrupt(s) ? `slice ${s.key} corrupt (S2)` : `slice ${s.key} stuck: ${unitOf(s.key)?.state?.park?.reason ?? "?"}`));
-    // gh-79: unstick refuses a corrupt unit, so a corrupt one is pointed at norn why
+    // gh-79: run rerun refuses a corrupt unit, so a corrupt one is pointed at run view --why
     const first = stuckSlices[0] as SliceFileFacts;
-    return { rule: "slices.slice_stuck", detail: `${named.join("; ")} — norn ${corrupt(first) ? "why" : "unstick"} ${first.key}` };
+    return { rule: "slices.slice_stuck", detail: `${named.join("; ")} — ${corrupt(first) ? cmd.runView(first.key, { why: true }) : cmd.runRerun(first.key)}` };
   }
   if (!activeUnits.length) {
     const blocked = pending.map((s) => `${s.key} waits for ${s.frontmatter.depends_on.filter((d) => !done.has(d)).join(", ")}`);

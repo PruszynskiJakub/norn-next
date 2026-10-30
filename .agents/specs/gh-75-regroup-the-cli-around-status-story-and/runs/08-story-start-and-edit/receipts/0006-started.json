@@ -1,0 +1,26 @@
+{
+  "kind": "started",
+  "receipt_id": "01M61JT4HXJ7RAAXV4W2J4N174",
+  "run_id": "01M61JSWWNQT9TWNJKBWREZDJC",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-28T15:42:11.517Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M61JSWWNV7D1TF715BYKWZHP",
+  "how": "auto",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-75-regroup-the-cli-around-status-story-and--08-story-start-and-edit",
+  "machine": "jakubpruszynski@mac",
+  "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD",
+  "session": {
+    "runner": "herdr",
+    "session_id": "w75:p1",
+    "pane_id": "w75:p1",
+    "reach": "herdr agent attach w75:p1"
+  },
+  "process": {
+    "pid": 57118,
+    "pid_start": "Wed Oct 28 16:42:11 2026"
+  }
+}

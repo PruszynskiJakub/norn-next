@@ -101,7 +101,7 @@ export function loadUnit(root: string, specPath: string, unit: UnitRef, opts: { 
   const all = listReceipts(path, { root });
   errors.push(...all.errors);
   const after = state?.applied_through ?? 0;
-  // S7: `norn workflow --to` re-pins workflow.yaml right after journaling a workflow receipt;
+  // S7: `norn story edit --workflow --at` re-pins workflow.yaml right after journaling a workflow receipt;
   // until the tick applies it, the new pin matching that receipt's to_hash is expected.
   const switching = (hash: string) => all.receipts.some((r) => r.n > after && r.receipt.kind === "workflow" && r.receipt.to_hash === hash);
   if (state && wf.ok && state.workflow_hash !== wf.value.hash && !switching(wf.value.hash))

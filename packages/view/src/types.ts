@@ -1,6 +1,6 @@
 /**
  * ProjectView: the read model front ends consume (X1). Plain JSON — no functions,
- * Dates or Maps — so `norn status --json`, a web cockpit and a Herdr pane share it.
+ * Dates or Maps — so `norn story list --json`, a web cockpit and a Herdr pane share it.
  */
 import type { FileError, Inbox, InboxEntry, StoryNote } from "@norn/core";
 import type { LeaseKind, Mode, ParkKind, SliceStatus, StoryStatus, UnitStatus } from "@norn/schema";
@@ -43,6 +43,8 @@ export interface UnitView {
   status: UnitStatus | "not_started";
   /** cursor step (`$done` once finished); null when not started */
   step: string | null;
+  /** the cursor step's type in the pinned workflow; null when not started or unknown */
+  step_type: StepType | null;
   attempt: number | null;
   counters: CounterView[];
   park: { kind: ParkKind; reason: string; since: string } | null;
@@ -200,7 +202,7 @@ export interface StepWho {
   tick_id: string | null;
 }
 
-/** One visit of a unit to a step: `norn trace` row (O4). Paths are absolute. */
+/** One visit of a unit to a step: `norn run list` row (O4). Paths are absolute. */
 export interface StepRow {
   unit: string;
   slice: string | null;
@@ -269,7 +271,7 @@ export interface TraceRecords {
   ref?: string;
 }
 
-/** `norn trace <unit>`: rows of the unit (and, for a story, its slices interleaved). */
+/** `norn run list <unit>`: rows of the unit (and, for a story, its slices interleaved). */
 /** QV8: criteria reports of the units shown (`norn done --criteria`), counted from the trace. */
 export interface CriteriaSummary {
   reports: number;

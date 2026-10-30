@@ -1,0 +1,48 @@
+{
+  "kind": "done",
+  "receipt_id": "01M60ZHJP902EVR2D458VVQ36D",
+  "run_id": "01M60Z37FCCR5R18CZ8JK3NWH9",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-28T10:05:28.138Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/02",
+  "outcome": "approve",
+  "handoff": "No blocking findings. AC1 met: bun test 1229 pass, typecheck clean, no fixture changed, all replaced literals byte-identical. AC2 met: the pinned table is typed and key-checked against every cmd builder. Minor notes for slice 14: usage and dynamic norn hints are still literal, B7 is cited without the story qualifier, quoted text is not escaped, and some flags are appended outside the builders.",
+  "findings": [
+    {
+      "severity": "minor",
+      "title": "Usage and dynamic command hints stay literal outside cmd",
+      "id": "F1",
+      "file": "packages/cli/src/commands/mode.ts",
+      "line": 20,
+      "criterion": "AC2",
+      "detail": "These strings are still spelled literally: usage do_instead hints at mode.ts:20, answer.ts:31, status.ts:49, done.ts:80/86 and why.ts:170/176; dynamic hints built from the command name at cli.ts:37 (`norn ${c.name} --help`), runtime/args.ts:21, human.ts:196/247/334 and agent-unit.ts:70 (reportCommand); the echo in runtime/cockpit.ts:46 verbMessage; and the `norn init` next step in help.ts:71 and orient rules 170-171. Most fall under the stated exceptions (self-usage, D1; dynamic verb). The help.ts:71 next step and reportCommand are borderline against the goal line 'Every command string norn prints … doctor/init next steps'.\nAxis: spec\nSuggestion: Slice 14 should grep for these locations when it renames. Optionally route help.ts:71 through cmd.init()."
+    },
+    {
+      "severity": "minor",
+      "title": "B7 cited without the story qualifier",
+      "id": "F2",
+      "file": "packages/core/src/commands.ts",
+      "line": 57,
+      "detail": "The comment in commands.ts and the header of printed-commands.test.ts cite 'B7'. In .agents/PRD.md, B7 is 'Launch unknown'. The id meant is the gh-75 story spec's B7.\nAxis: standards\nSuggestion: Write 'gh-75 B7' or similar."
+    },
+    {
+      "severity": "minor",
+      "title": "Builders do not escape quoted text, and flags are sometimes appended outside the builder",
+      "id": "F3",
+      "file": "packages/core/src/commands.ts",
+      "line": 63,
+      "detail": "cmd.answer and cmd.stuck wrap their text in quotes without escaping, while q() in the same file does escape. Every current caller passes a literal, so nothing breaks today. Some flags are appended outside the builder: apply.ts `${cmd.unstick()} --to` and agent-unit.ts `${cmd.approve(key)} (or --reject)`. norn() also drops '' arguments, but no caller passes one.\nAxis: standards\nSuggestion: Escape the text, or accept only literal text. Fold the trailing flags into the builder options when slice 14 renames."
+    },
+    {
+      "severity": "nit",
+      "title": "Import order",
+      "id": "F4",
+      "file": "packages/cli/src/cli.ts",
+      "line": 15,
+      "detail": "In cli.ts the @norn/core import comes after the local imports. In view/src/load.ts:9, cmd is out of alphabetical order.\nAxis: standards\nSuggestion: Move the import to match the surrounding files."
+    }
+  ]
+}

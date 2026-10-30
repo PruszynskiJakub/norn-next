@@ -1,0 +1,3 @@
+default_mode: manual
+notifiers:
+  - adapter: os

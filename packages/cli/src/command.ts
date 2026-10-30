@@ -8,6 +8,10 @@
  * or throws a `CliFailure` (`refuse`, `usageError`, `corruptError`, `busyError`, `failure`).
  * A command whose reader is an agent or a person sets `markdown: true` and returns
  * `rendered(value, markdown)`; `--json` (accepted by every command) prints the value instead.
+ *
+ * A noun groups verbs (`norn run list`): `defineNoun({...})` with each verb a command named
+ * `<noun> <verb>`, listed in `src/commands/index.ts` too. `norn <noun>` lists its verbs (B2);
+ * `norn help <noun> <verb>` and `--help` on a verb show its usage and `optionHelp` (B4).
  */
 import type { ParseArgsConfig } from "node:util";
 import type { Context } from "./context.ts";
@@ -31,6 +35,8 @@ export interface Command {
   /** e.g. `norn watch [--interval 30s]` */
   usage: string;
   options?: OptionSpec;
+  /** one line per option for `norn help <command>`, keyed as typed (`--receipt <id>`) */
+  optionHelp?: Record<string, string>;
   /** positional argument count bounds (default: none allowed) */
   positionals?: { min?: number; max?: number };
   /** prints markdown unless `--json` (refusals too): its reader is an agent or a person, not a program */
@@ -42,6 +48,20 @@ export interface Command {
 
 export function defineCommand(c: Command): Command {
   return c;
+}
+
+/** A noun and its verbs, in the order `norn <noun>` lists them. */
+export interface Noun {
+  name: string;
+  /** one line, shown by `norn help` */
+  summary: string;
+  verbs: readonly Command[];
+  /** B2: `norn <noun>` lists the verbs under these titles, by verb name (`create`); default: one list */
+  groups?: ReadonlyArray<{ title: string; verbs: readonly string[] }>;
+}
+
+export function defineNoun(n: Noun): Noun {
+  return n;
 }
 
 /** Typed option getters (parseArgs values are loosely typed). */

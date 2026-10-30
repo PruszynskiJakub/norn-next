@@ -3,9 +3,9 @@
 - Workflow: story · Step: resolve (attempt 1)
 - Status: running
 - Counters: base_conflict_loop 1/2, ci_loop 0/3, plan_loop 1/3, qa_loop 0/2, ready_loop 0/2, stale_loop 0/10, test_loop 0/5, triage_loop 0
-- Last outcome: update.conflict (classified, 2026-10-30T19:46:57.300Z)
+- Last outcome: resolve.silent (classified, 2026-10-30T20:04:20.574Z)
 - Next: `norn run list gh-107`
-- Updated: 2026-10-30T19:48:01.323Z
+- Updated: 2026-10-30T20:04:20.574Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - story.start: triage at explore
@@ -26,18 +26,20 @@
 - slices.done: done
 - receipts.apply: update.conflict → resolve
 - agent.start: resolve run 01M675NBFDD9S5CHX2A9MTYHNS
+- silent: last message snapshot in trace/transcripts/01M675NBFDD9S5CHX2A9MTYHNS/01M676KZFJBT2RDEE91QBBCJH3.txt
+- agent.silent.nudge: nudged 1
 <!-- norn:heartbeat:end -->
 
 ## Goal
 
-Re-slice gh-107 on the reworked Plan: chunked tick facts and 64-fact hook blocks in one slice (D15, approve-plan ruling).
+Merge origin/main (c3aa7312) into the story branch, resolving the 12 conflicts by intent; never rebase.
 
 ## Progress
 
-- Earlier slice step wrote 9 slices; approve-plan rejected the 06/07 split; plan#2 added D15 and a size Risk.
-- slice#2: merged 07 (hook blocks) into 06: 06 now covers B13–B19, B21, B22, B35 with AC11/AC12 (from 07) and the PR-danger criterion as AC13 (person); its Notes carry the D15 ordering (spike, S2 tests, then S1). `07-hook-blocks.md` removed; key gh-107/07 left unused (no renumbering). Nothing depended on 07; 08/09 unchanged. Every B item is still cited by an AC.
-- slice#2 done: Merged slice 07 (64-fact hook blocks) into 06 per the approve-plan ruling and D15: 06 now covers B13–B19, B21, B22, B35 (AC11/AC12 from 07, PR-danger criterion now AC13, person) with the spike → S2 tests → S1 ordering in Notes. 07-hook-blocks.md removed, key gh-107/07 left unused; nothing depended on it. Slices: 01 reader, 02 store reads, 03 timelines off view, 04 hook files, 05 backfill, 06 chunks+blocks, 08 retention, 09 prune unit traces. Every Behaviour item cited.
+- Main regrouped the CLI (#106: `why` → `run view --why`, `trace` → `run list`, `inbox` → `status`, old `status` → `story list`, `cockpit` → `status --watch`, `config <key>` → `config get`) and added `local-notices`.
+- Resolved: run-view.ts takes main's file with the branch's tickReader/readTickInputs replay, `trace_corrupt` and `tick_pruned` (B20/B21) re-applied; replayInputs stays removed (tick.ts keeps the branch's chunked trace). PRD O4/O5/O7 keep the branch's text with the new command names. Schemas keep both `local-hook-backfill` and `local-notices`. story-list.ts drops the view's removed `timeline` field (slice 03). Tests: union of imports; new branch tests use `run view --why`, `config get trace`, `runChecked`; trace-free-views uses `story list`/`status`/`story view`/`status --watch`.
+- typecheck green; test:fast green; test:cli rerun pending (first full run: 13 fails, 1 was trace-free-views, now fixed; check-run K1/K3 timed out under load).
 
 ## Resume
 
-Slicing done; slices 01–06, 08, 09 stand. Nothing left for this step.
+Finish the cli test run, fix any merge breakage, commit the merge (`git commit --no-edit`), then `norn done done`.

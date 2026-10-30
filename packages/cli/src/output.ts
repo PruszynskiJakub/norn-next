@@ -4,6 +4,7 @@
  * Commands return a value (exit 0) or `withExit(value, code)`, and throw `CliFailure` to refuse.
  */
 import { type ClaimBlob, type CliError, ExitCode } from "@norn/schema";
+import { cmd } from "@norn/core";
 
 export class CliFailure extends Error {
   constructor(
@@ -26,7 +27,7 @@ const body = (error: string, do_instead: string | null, code?: string, details?:
 export const refuse = (error: string, do_instead: string | null, code?: string, details?: unknown) =>
   new CliFailure(body(error, do_instead, code, details), ExitCode.refused);
 /** Bad arguments (exit 2). */
-export const usageError = (error: string, do_instead: string | null = "norn help", code = "usage") =>
+export const usageError = (error: string, do_instead: string | null = cmd.help(), code = "usage") =>
   new CliFailure(body(error, do_instead, code), ExitCode.usage);
 /** A state or config file failed validation (S2, exit 4). */
 export const corruptError = (error: string, do_instead: string | null, details?: unknown, code = "corrupt") =>

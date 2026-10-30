@@ -16,7 +16,7 @@ Herdr (≥ 0.9) has what is needed: plugin manifests with panes, key-bindable ac
 
 Goals:
 - The inbox says when an attended agent waits for its person, and where (HC1–HC3).
-- `norn pane --interactive` lets a person act on inbox items with one line each, through CLI verbs only (HC4–HC8).
+- The cockpit (`norn status --watch`) lets a person act on inbox items with one line each, through CLI verbs only (HC4–HC8).
 - A Herdr plugin shipped with norn opens that pane and jumps to the oldest item waiting for you (HC9–HC11).
 - While the cockpit runs, agent panes of norn runs carry the unit and step in Herdr's sidebar (HC12–HC13).
 - Notifications can be Herdr toasts (HC14).
@@ -42,19 +42,19 @@ MO4 gains one sentence: *an attended run waiting for its person is shown as Your
 
 ## 4. Part B — interactive cockpit (amends O1, X1)
 
-- HC4 `norn pane --interactive` draws its own frame of the inbox (not `formatInbox`): a header with the repo, how many items need you, the heartbeat and the time; the groups in O1 order, each item one row — number, unit, step, title (cut to the pane width, the step not repeated), age — with its command dimmed beneath; colour per group on a terminal (off with `NO_COLOR`, `TERM=dumb` or when stderr is not a terminal). It reads one command per line from stdin between redraws. The frame and messages go to stderr, the JSON summary to stdout at exit (P8), as today. It ends on `q`, end of input, SIGINT or SIGTERM.
+- HC4 The cockpit, `norn status --watch`, draws its own frame of the inbox (not `formatInbox`): a header with the repo, how many items need you, the heartbeat and the time; the groups in O1 order, each item one row — number, unit, step, title (cut to the pane width, the step not repeated), age — with its command dimmed beneath; colour per group on a terminal (off with `NO_COLOR`, `TERM=dumb` or when stderr is not a terminal). It reads one command per line from stdin between redraws. The frame and messages go to stderr, the JSON summary to stdout at exit (P8), as today. It ends on `q`, end of input, SIGINT or SIGTERM.
 - HC5 Commands (`<n>` is an item number in the current frame):
 
   | Line | Does |
   |---|---|
-  | `<n>` or `g <n>` | go to the item: focus the agent pane of its run (HC6); for a manual start (`… is ready (manual)`, attended step not started) run `norn open <unit>` when the item shows it (MO5), else open a pane beside the cockpit and run the item's command there; else focus the workspace of its run (HC15); otherwise show the command |
+  | `<n>` or `g <n>` | go to the item: focus the agent pane of its run (HC6); for a manual start (`… is ready (manual)`, attended step not started) run `norn story start <unit>` when the item shows it (MO5), else open a pane beside the cockpit and run the item's command there; else focus the workspace of its run (HC15); otherwise show the command |
   | `w <n>` | focus the Herdr workspace of the item's run (HC15) |
-  | `a <n> <text>` | `norn answer <unit> <text>` |
-  | `y <n>` | `norn approve <unit>` |
-  | `x <n> <reason>` | `norn approve <unit> --reject --reason <reason>` |
-  | `t <n>` | `norn take <story>` |
-  | `u <n>` | `norn unstick <unit>` |
-  | `v <n>` | `norn trace <unit>` (its markdown) into the frame |
+  | `a <n> <text>` | `norn story answer <unit> <text>` |
+  | `y <n>` | `norn story approve <unit>` |
+  | `x <n> <reason>` | `norn story reject <unit> --reason <reason>` |
+  | `t <n>` | `norn story checkout <story>` |
+  | `u <n>` | `norn run rerun <unit>` |
+  | `v <n>` | `norn run list <unit>` (its markdown) into the frame |
   | `d <n>` | the item's full text (title, detail, full screen, command, link), wrapped to the width |
   | `o` | open or close Notes (HC16) |
   | `n` | go to the oldest Your turn item with a run (an agent waits there), else the oldest Your turn item |
@@ -69,8 +69,8 @@ MO4 gains one sentence: *an attended run waiting for its person is shown as Your
 
 ## 5. Part C — Herdr plugin
 
-- HC9 norn ships a Herdr plugin at `plugins/herdr/` (id `norn`): a `cockpit` pane entrypoint running `norn pane --interactive`; an `open` action that opens it as a split below the focused pane without taking focus; a `next` action that focuses the agent pane of the oldest Your turn item with a run (`norn pane --next`) or shows a toast when there is none.
-- HC10 `norn pane --next` is a one-shot: it builds the view once, takes the oldest Your turn item **with a run** (manual starts are skipped: it never starts an agent), focuses its agent pane (HC6), prints `{focused: <pane_id> | null, item: <id> | null}` (plus the item's `command` when no pane was found) and exits 0 either way. `norn pane --open` opens the cockpit pane with `--interactive`.
+- HC9 norn ships a Herdr plugin at `plugins/herdr/` (id `norn`): an `open` action that opens the cockpit as a split below the focused pane without taking focus (`norn status --watch --pane`); a `pick` action and pane that show it as a popup (`norn status --watch`); a `next` action that focuses the agent pane of the oldest Your turn item with a run (`norn run attach --next`) or shows a toast when there is none.
+- HC10 `norn run attach --next` is a one-shot: it builds the view once, takes the oldest Your turn item **with a run** (manual starts are skipped: it never starts an agent), focuses its agent pane (HC6) and prints `{focused: <pane_id>, item: <id>}`. With no such item, or no live pane for it, it refuses `nothing_to_attach` (exit 3) with the item's command, else `norn status`, as `do_instead`. `norn status --watch --pane` opens the cockpit pane.
 - HC11 The plugin's commands call `$NORN_BIN` when set, else `norn` from `PATH`, else the launch shim `~/.norn/bin/norn`. The plugin ships in the repo, not in the package or binary, so the README documents `herdr plugin install PruszynskiJakub/norn-next/plugins/herdr` (or `herdr plugin link <checkout>/plugins/herdr` from a checkout), and the actions `norn.open` and `norn.next`. `norn doctor` reports under `runner.cockpit_plugin`, informationally (never failing doctor), whether the plugin is linked when Herdr is the runner; when it is not, `do_instead` is `herdr plugin link` with this checkout's `plugins/herdr` when norn runs from source, else `herdr plugin install`.
 
 ## 6. Part D — pane labels

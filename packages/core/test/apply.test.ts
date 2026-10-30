@@ -127,7 +127,7 @@ describe("universal reports and human receipts", () => {
       receipt(s, "stuck", { reason: "no DB" }),
     ).state;
     expect(st).toMatchObject({ status: "stuck", park: { kind: "stuck", reason: "no DB" } });
-    expect(run(st, SLICE_WF, done("done")).rejected[0]?.reason).toBe("unit is stuck: no DB; use norn unstick");
+    expect(run(st, SLICE_WF, done("done")).rejected[0]?.reason).toBe("unit is stuck: no DB; use norn run rerun");
     const un = run(st, SLICE_WF, (s) => receipt(s, "unstick", { to: "review", reset: ["test_loop"] }, "human"));
     expect(un.state).toMatchObject({ step: "review", attempt: 1, status: "ready", counters: { test_loop: 0 } });
     expect(run(st, SLICE_WF, (s) => receipt(s, "unstick", { reset: ["zzz"] }, "human")).rejected[0]?.reason).toBe("unknown counter(s): zzz");

@@ -1,0 +1,39 @@
+{
+  "kind": "done",
+  "receipt_id": "01M63Y1TQWFEB3SPDVFF6PFA1W",
+  "run_id": "01M63XHCKG46AVPFBD2G7NHZQ0",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-29T13:37:06.813Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/11",
+  "outcome": "approve",
+  "handoff": "Review: AC1–AC5 met with S1 integration tests, AC6 evidence checked; suite (394) and typecheck green. Three non-blocking points (silent skip of unreadable pushed slice file, per-story fetch in pick-list, dummy applies).",
+  "findings": [
+    {
+      "severity": "minor",
+      "title": "An unreadable pushed slice file is silently skipped",
+      "id": "F1",
+      "file": "packages/cli/src/runtime/closed.ts",
+      "line": 72,
+      "detail": "startedSliceBranches treats a slice file whose frontmatter fails to parse as not started (`fm = doc.ok ? … : null` then skipped), so B42's branch check passes it by and the problem only shows later, if at all. AGENTS.md S1/S2: a failing file is never guessed; pushedStory itself refuses story_corrupt for the same case.\nAxis: standards\nSuggestion: Refuse (story_corrupt, naming the file on the branch) as pushedStory does."
+    },
+    {
+      "severity": "minor",
+      "title": "The pick-list fetches once per story branch on the remote",
+      "id": "F2",
+      "file": "packages/cli/src/runtime/closed.ts",
+      "line": 56,
+      "detail": "closedStories calls pushedStory per key, each doing its own git fetch; with many story branches the interactive `norn story reopen` waits on N sequential fetches, and one corrupt story.md anywhere refuses the whole list.\nAxis: standards\nSuggestion: Fetch the story branches in one call (one refspec per branch) and skip-with-note an unreadable record in the list rather than refusing it."
+    },
+    {
+      "severity": "nit",
+      "title": "`applies: () => false` is a placeholder required by TargetRule",
+      "id": "F3",
+      "file": "packages/cli/src/commands/story-reopen.ts",
+      "line": 59,
+      "detail": "With `candidates` set, `applies` is documented as unused, yet every such rule must supply a dummy.\nAxis: standards\nSuggestion: Make TargetRule a union (applies | candidates) or `applies` optional when candidates is given."
+    }
+  ]
+}

@@ -26,6 +26,7 @@ export const pendingRecordsPath = (root: string) => join(traceDir(root), "record
 export const foreignCommitsPath = (root: string) => join(traceDir(root), "foreign.json");
 export const inboxOpenPath = (root: string) => join(traceDir(root), "inbox.json");
 export const baseFactsPath = (root: string) => join(traceDir(root), "base.json");
+export const noticesPath = (root: string) => join(traceDir(root), "notices.json");
 export const prFactsPath = (root: string) => join(traceDir(root), "pr.json");
 /**
  * B5 (D3): a unit's hook file — `trace/hooks/<story>/_story.jsonl` for the story unit,

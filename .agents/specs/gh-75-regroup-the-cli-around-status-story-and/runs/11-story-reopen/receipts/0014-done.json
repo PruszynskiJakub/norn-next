@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M63ZJ9DJD2Q25CSNB8EYE8M0",
+  "run_id": "01M63YXAYXDF4G3BKHWSTH6GNV",
+  "step": "merge",
+  "attempt": 1,
+  "at": "2026-10-29T14:03:34.706Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/11",
+  "outcome": "done",
+  "handoff": "Merged the story branch (787de081: slices 07, 08, 12, 13) into slice 11 (6ec80d11). Resolved story.ts (base verbs kept, reopen appended), target.ts (base's targetKey rename and applies(key, unit) kept with the slice's candidates path), status.test.ts (verb lists plus reopen). Also fixed story-reopen.test.ts, which still called the removed 'norn approve', to call 'story approve'. Typecheck is clean. Full suite: 1351 pass, 2 fail. The story-reopen failure is fixed; the integrate.test.ts failure is a 5s timeout under load that passes when run alone."
+}

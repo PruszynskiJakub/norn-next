@@ -1,0 +1,20 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M63V0R1DR7GA8JMXAJCRJGE0",
+  "run_id": "01M61VK9EFRZBGDHVZ25FDNWZR",
+  "step": "merge",
+  "attempt": 2,
+  "at": "2026-10-29T12:44:05.550Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M63V0R1DZE4BAMR9RBYN2J4Q",
+  "outcome": "timeout",
+  "rule": "agent.timeout",
+  "route": "nudge",
+  "detail": "deadline 60m passed",
+  "counter": {
+    "name": "nudges",
+    "value": 1,
+    "max": 2
+  }
+}

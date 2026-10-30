@@ -124,7 +124,7 @@ article.recipe h3 a.self { color: inherit; text-decoration: none; }
 .code:hover button.copy, .code button.copy:focus-visible { opacity: 1; }
 @media (hover: none) { .code button.copy { opacity: 1; } }
 
-/* cockpit input: the keys you press in norn cockpit */
+/* cockpit input: the keys you press in norn status --watch */
 .keys { min-width: 0; }
 .keys pre { margin: 0; background: #0f1419; color: #d8dee6; border-radius: 8px; padding: 12px 16px; overflow-x: auto; line-height: 1.6; font-size: 13.5px; }
 .keys pre .p { color: #6fc6dc; user-select: none; }
@@ -236,7 +236,7 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--rule)
       <tr><td>it dies or hangs</td><td>nobody notices</td><td>classified <code>died</code> or <code>stalled</code>, then retried or nudged</td></tr>
       <tr><td>it loops</td><td>the model decides when to stop</td><td>every loop has a counter with a max; past it is a visible <code>stuck</code></td></tr>
       <tr><td>main moves</td><td>you merge by hand</td><td>an <code>update</code> step merges the base in; conflicts go to <code>resolve</code></td></tr>
-      <tr><td>you ask "why?"</td><td>scroll a transcript</td><td><kbd>v</kbd> in the cockpit shows the trace; <code>norn why</code> names the rule that fired</td></tr>
+      <tr><td>you ask "why?"</td><td>scroll a transcript</td><td><kbd>v</kbd> in the cockpit shows the trace; <code>norn run view --why</code> names the rule that fired</td></tr>
     </tbody>
   </table></div>
   <div class="grid2" style="margin-top:20px">
@@ -249,7 +249,7 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--rule)
 <section class="part" id="rig" data-part="The setup">
   <h2><span class="num">01</span> The setup you live in</h2>
   <p class="intro">One Herdr workspace per repository. Its first tab holds norn: the heartbeat on top, the cockpit below. Each agent norn starts gets its own tab, labelled with its unit and step. You spend the day in your editor or elsewhere; a toast or your phone tells you when to come back.</p>
-  <div class="rig" role="img" aria-label="A Herdr window: a sidebar of tabs labelled by norn, and the norn tab split into norn watch on top and norn cockpit below, with its rows on the left and the selected story's preview on the right">
+  <div class="rig" role="img" aria-label="A Herdr window: a sidebar of tabs labelled by norn, and the norn tab split into norn watch on top and norn status --watch below, with its rows on the left and the selected story's preview on the right">
     <div class="side">
       <div class="ws">todoist-app</div>
       <div class="tab on"><span>norn</span><span class="st">cockpit</span></div>
@@ -265,14 +265,14 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--rule)
 <span class="dim">10:34:47</span>  gh-18/03  check.start → test
 <span class="dim">10:38:15</span>  gh-21     sync → take_in
 <span class="dim">10:41:30</span>  gh-18/01  agent.done → review</div>
-<div class="term"><span class="ptitle">norn cockpit</span><b>norn cockpit</b> <span class="dim">·</span> todoist-app  <span class="g">3 need you</span>                        <span class="dim">tick 8s ago  10:42</span>
+<div class="term"><span class="ptitle">norn status --watch</span><b>norn status</b> <span class="dim">·</span> todoist-app  <span class="g">3 need you</span>                        <span class="dim">tick 8s ago  10:42</span>
 <span class="dim">/ to filter</span>
 <span class="dim">NEEDS YOU</span>                                  <span class="dim">│</span> <b>gh-18  Export report</b>
   <span class="g">▶ your turn</span>  <b>gh-21   </b>  <span class="dim">refine      </span> <span class="dim">2m</span>   <span class="dim">│</span> <span class="dim">slices · 1/3 done · PR #7 draft · issue #18</span>
 <b>▸</b> <span class="g">◆ answer</span>     <b>gh-18/02</b>  <span class="dim">implement   </span> <span class="dim">6m</span>   <span class="dim">│</span>
   <span class="g">● approve</span>    <b>gh-17   </b>  <span class="dim">approve-plan</span> <span class="dim">25m</span>  <span class="dim">│</span> <span class="g">◆</span> gh-18/02 implement <span class="dim">· 6m</span>
                                            <span class="dim">│</span>   Keep /export for API clients, or remove?
-<span class="dim">STORIES</span>                                    <span class="dim">│</span>   <span class="dim">→ norn answer gh-18/02 "…"</span>
+<span class="dim">STORIES</span>                                    <span class="dim">│</span>   <span class="dim">→ norn story answer gh-18/02 "…"</span>
   <b>gh-17</b>  Search filters  <span class="dim">approve-plan</span>      <span class="dim">│</span> <span class="cy">◐</span> gh-18/01 review #1 (auto) <span class="dim">· 3m</span>
   <b>gh-18</b>  Export report   <span class="dim">1/3 · PR #7</span>       <span class="dim">│</span> <span class="cy">◐</span> gh-18/03 test #2 <span class="dim">· 40s</span>
   <b>gh-21</b>  CSV export      <span class="dim">refine</span>            <span class="dim">│</span> <span class="dim">notes</span> gh-18/01  added an index on orders.date
@@ -283,7 +283,7 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--rule)
   </div>
   <div class="callouts">
     <div><b>The heartbeat</b><span class="k">norn watch --human</span><br>Ticks every 30 s: observes agents, git and the remote, decides, acts. One line per thing it did. Leave it running.</div>
-    <div><b>The cockpit</b><span class="k">norn cockpit</span><br>Full screen, one key per action. Left: what needs you, then one row per story. Right: the selected story, with its slices, PR, what runs and its notes. It never decides; it runs the same verbs you would type.</div>
+    <div><b>The cockpit</b><span class="k">norn status --watch</span><br>Full screen, one key per action. Left: what needs you, then one row per story. Right: the selected story, with its slices, PR, what runs and its notes. It never decides; it runs the same verbs you would type.</div>
     <div><b>Agent tabs</b><span class="k">gh-18/02 · implement</span><br>Opened by norn in auto mode without taking focus, or by you from the cockpit for attended steps. The sidebar shows who waits for you.</div>
     <div><b>Notifications</b><span class="k">herdr · os · ntfy</span><br>Each new item fires once: a Herdr toast at the desk, a desktop notification, a push to your phone when you are away.</div>
   </div>
@@ -368,7 +368,7 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--rule)
 </section>
 
 <div id="recipes"></div>
-<p class="empty" id="empty">No recipe matches. Try a cockpit key, a command name like <code>unstick</code>, or a word from the inbox.</p>
+<p class="empty" id="empty">No recipe matches. Try a cockpit key, a command name like <code>rerun</code>, or a word from the inbox.</p>
 
 <!-- ============================================================ -->
 <section class="part" id="reference" data-part="Reference">
@@ -381,19 +381,19 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--rule)
     <tbody>
       <tr><td><kbd>↑</kbd> <kbd>↓</kbd> or <kbd>j</kbd> <kbd>k</kbd> · <kbd>PgUp</kbd> <kbd>PgDn</kbd></td><td>move the selection · a page at a time</td><td>—</td></tr>
       <tr><td><kbd>/</kbd></td><td>filter: type words, every one must match. Enter keeps the filter, Esc clears it</td><td>—</td></tr>
-      <tr><td><kbd>Enter</kbd></td><td>orient: focus the story's <code>&lt;story&gt; orient</code> Herdr workspace, or create it with an agent that summarizes the story and answers your questions. Outside Herdr it shows the report</td><td><code>norn orient &lt;story&gt;</code></td></tr>
+      <tr><td><kbd>Enter</kbd></td><td>orient: focus the story's <code>&lt;story&gt; orient</code> Herdr workspace, or create it with an agent that summarizes the story and answers your questions. Outside Herdr it shows the report</td><td><code>norn story chat &lt;story&gt;</code> · <code>norn story view &lt;story&gt;</code></td></tr>
       <tr><td><kbd>g</kbd></td><td>go to the agent's pane (rows with a running agent)</td><td>—</td></tr>
-      <tr><td><kbd>s</kbd></td><td>start the agent a manual or attended step waits for</td><td><code>norn open &lt;unit&gt;</code></td></tr>
-      <tr><td><kbd>a</kbd></td><td>answer: type it on the footer line, Enter sends, Esc cancels</td><td><code>norn answer &lt;unit&gt; "…"</code></td></tr>
-      <tr><td><kbd>y</kbd> · <kbd>x</kbd></td><td>approve · reject a gate; reject asks <i>What to change</i></td><td><code>norn approve &lt;unit&gt; [--reject --reason "…"]</code></td></tr>
-      <tr><td><kbd>u</kbd></td><td>unstick a stuck unit at the step where it stopped</td><td><code>norn unstick &lt;unit&gt;</code></td></tr>
-      <tr><td><kbd>t</kbd></td><td>take an unclaimed story (story rows)</td><td><code>norn take &lt;story&gt;</code></td></tr>
-      <tr><td><kbd>v</kbd></td><td>the unit's trace, in place of the preview; Esc closes it</td><td><code>norn trace &lt;unit&gt;</code></td></tr>
+      <tr><td><kbd>s</kbd></td><td>start the agent a manual or attended step waits for</td><td><code>norn story start &lt;unit&gt;</code></td></tr>
+      <tr><td><kbd>a</kbd></td><td>answer: type it on the footer line, Enter sends, Esc cancels</td><td><code>norn story answer &lt;unit&gt; "…"</code></td></tr>
+      <tr><td><kbd>y</kbd> · <kbd>x</kbd></td><td>approve · reject a gate; reject asks <i>What to change</i></td><td><code>norn story approve &lt;unit&gt;</code> · <code>norn story reject &lt;unit&gt; --reason "…"</code></td></tr>
+      <tr><td><kbd>u</kbd></td><td>unstick a stuck unit at the step where it stopped</td><td><code>norn run rerun &lt;unit&gt;</code></td></tr>
+      <tr><td><kbd>t</kbd></td><td>take an unclaimed story (story rows)</td><td><code>norn story checkout &lt;story&gt;</code></td></tr>
+      <tr><td><kbd>v</kbd></td><td>the unit's trace, in place of the preview; Esc closes it</td><td><code>norn run list &lt;unit&gt;</code></td></tr>
       <tr><td><kbd>o</kbd> · <kbd>i</kbd></td><td>open the PR · the issue in the browser</td><td>—</td></tr>
       <tr><td><kbd>r</kbd> · <kbd>?</kbd> · <kbd>q</kbd> or <kbd>Esc</kbd></td><td>refresh · list the keys · quit</td><td>—</td></tr>
     </tbody>
   </table></div>
-  <p class="intro" style="margin-top:14px">Outside the cockpit: <code>norn cockpit --next</code> (Herdr action <code>norn.next</code>) jumps to the oldest agent waiting for you. <code>norn cockpit --open</code> splits a Herdr pane below and runs the cockpit there. <code>norn cockpit --json</code> prints the model.</p>
+  <p class="intro" style="margin-top:14px">Outside the cockpit: <code>norn run attach --next</code> (Herdr action <code>norn.next</code>) jumps to the oldest agent waiting for you. <code>norn status --watch --pane</code> splits a Herdr pane below and runs the cockpit there. <code>norn status --watch --json</code> prints the model.</p>
 
   <h3 style="font-size:18px;margin:28px 0 12px">Inbox groups</h3>
   <p class="intro">Each item is one row under Needs you, with its mark. Stories follow under Stories. Running units, notes and recently done are not rows: they show in the selected story's preview.</p>
@@ -416,12 +416,12 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--rule)
     <thead><tr><th>Area</th><th>Command</th><th>Does</th></tr></thead>
     <tbody>
       <tr><td>Once</td><td><code>init</code> · <code>doctor [--live]</code> · <code>config [&lt;key&gt;]</code></td><td>set up a repo · check this machine · show the settings in effect</td></tr>
-      <tr><td>Always on</td><td><code>watch --human</code> · <code>cockpit [--open | --next]</code></td><td>the heartbeat · the cockpit</td></tr>
-      <tr><td>Behind the keys</td><td><code>open</code> · <code>answer</code> · <code>approve [--reject]</code> · <code>unstick</code> · <code>take</code> · <code>trace</code></td><td>what the cockpit runs for you</td></tr>
-      <tr><td>Only by hand</td><td><code>unstick --reset &lt;counter&gt; | --to &lt;step&gt;</code> · <code>update</code> · <code>mode</code> · <code>workflow</code> · <code>why</code></td><td>the rarer moves the cockpit has no key for</td></tr>
-      <tr><td></td><td><code>sync</code> · <code>status</code> · <code>inbox</code> · <code>orient &lt;story&gt;</code> · <code>tick</code></td><td>take in issues now · everything at a glance · the inbox as text · one story's report · one tick</td></tr>
+      <tr><td>Always on</td><td><code>watch --human</code> · <code>status --watch [--pane]</code> · <code>run attach --next</code></td><td>the heartbeat · the cockpit · the agent that waits for you</td></tr>
+      <tr><td>Behind the keys</td><td><code>story start</code> · <code>story answer</code> · <code>story approve</code> · <code>story reject</code> · <code>run rerun</code> · <code>story checkout</code> · <code>run list</code></td><td>what the cockpit runs for you</td></tr>
+      <tr><td>Only by hand</td><td><code>run rerun --reset &lt;counter&gt; | --step &lt;step&gt;</code> · <code>story update-branch</code> · <code>story edit --auto | --manual | --workflow</code> · <code>run view --why</code></td><td>the rarer moves the cockpit has no key for</td></tr>
+      <tr><td></td><td><code>sync</code> · <code>status</code> · <code>story view &lt;story&gt;</code> · <code>story chat &lt;story&gt;</code> · <code>tick</code></td><td>take in issues now · the inbox as text · one story's report · talk a story over with an agent · one tick</td></tr>
       <tr><td>Herdr</td><td><code>status --segment</code></td><td>one line for the tab bar: what the focused repo needs</td></tr>
-      <tr><td>Team</td><td><code>release</code> · <code>drop</code></td><td>hand a story on, or give it up</td></tr>
+      <tr><td>Team</td><td><code>story handoff</code> · <code>story checkout</code> · <code>story close</code></td><td>hand a story on, take one over, or give it up</td></tr>
       <tr><td>Housekeeping</td><td><code>tidy [--dry-run]</code> · <code>uninstall</code></td><td>clean orphans and done panes · remove hooks and skills</td></tr>
       <tr><td>Agent only</td><td><code>brief</code> · <code>done</code> · <code>ask</code> · <code>stuck</code> · <code>hook</code></td><td>the agent's side of the protocol; you never type these</td></tr>
     </tbody>
@@ -454,7 +454,8 @@ const R = [
   when: "You have git 2.38 or later, Claude Code, and <code>gh</code> or <code>glab</code> signed in.",
   steps: ["Download the single-file norn binary for your machine and put it on your <code>PATH</code>. No Bun, token or sign-in needed.", "Install Herdr 0.9 or later, then norn's Herdr plugin: it brings the cockpit and three actions you will bind to keys."],
   code: `curl -fsSLO https://github.com/PruszynskiJakub/norn-next/releases/latest/download/norn-darwin-arm64
-install -m 755 norn-darwin-arm64 /usr/local/bin/norn
+sudo install -d /usr/local/bin           # missing on a fresh Apple Silicon Mac
+sudo install -m 755 norn-darwin-arm64 /usr/local/bin/norn
 norn --version
 herdr plugin install PruszynskiJakub/norn-next/plugins/herdr     # update later with: herdr plugin update`,
   norn: "On first run the binary unpacks its skills and workflow templates into <code>~/.cache/norn/</code>.",
@@ -514,7 +515,7 @@ rows = [["state_icon", "workspace"], ["$norn"]]`,
 
 { part: "setup", id: "workspace", title: "Open the norn workspace", tags: ["herdr", "watch", "cockpit", "routine"],
   when: "When you sit down, or after a reboot. This is the layout from <a href=\"#rig\">The setup you live in</a>.",
-  steps: ["Open a Herdr workspace in the repository's root (not in a story worktree).", "In its first pane, start the heartbeat with <code>norn watch --human</code>.", "Press your <code>norn.open</code> key: the cockpit opens below. (Without the key: <code>norn cockpit --open</code>.)", "Look at the cockpit's header. <code>tick 8s ago</code> means you are set. A red <code>no heartbeat</code> means watch is not running in this repository."],
+  steps: ["Open a Herdr workspace in the repository's root (not in a story worktree).", "In its first pane, start the heartbeat with <code>norn watch --human</code>.", "Press your <code>norn.open</code> key: the cockpit opens below. (Without the key: <code>norn status --watch --pane</code>.)", "Look at the cockpit's header. <code>tick 8s ago</code> means you are set. A red <code>no heartbeat</code> means watch is not running in this repository."],
   code: `norn watch --human`,
   norn: "Each tick observes the agents, git and the remote again, so a watch you restart behaves the same as one that ran all night. Agents norn starts open as new tabs in this workspace without taking focus.",
   watch: "Ctrl-C on <code>watch</code> finishes the current tick and releases your claims, so a colleague could take your stories. <code>--keep-claims</code> if you will restart right away." },
@@ -528,7 +529,7 @@ rows = [["state_icon", "workspace"], ["$norn"]]`,
 
 { part: "setup", id: "files", title: "Know where things live", tags: ["files", "spec", "handoff"],
   when: "You want to read the spec, edit slices, or see what an agent left behind.",
-  steps: ["The spec is <code>.agents/specs/&lt;id&gt;-&lt;slug&gt;/story.md</code>, in the story's worktree. In the cockpit, <kbd>Enter</kbd> on the story's row opens its orient workspace; <code>norn orient &lt;story&gt;</code> prints where to look.", "Slices are <code>slices/&lt;nn&gt;-&lt;slug&gt;.md</code> next to it. Edit them freely before you approve the plan.", "Run state is under <code>runs/</code>: <code>state.json</code>, numbered receipts, logs of failed checks, QA evidence and <code>handoff.md</code>.", "Config and workflows: <code>.agents/norn/</code>. Skills: <code>.agents/skills/</code>, linked into <code>.claude/skills/</code>."],
+  steps: ["The spec is <code>.agents/specs/&lt;id&gt;-&lt;slug&gt;/story.md</code>, in the story's worktree. In the cockpit, <kbd>Enter</kbd> on the story's row opens its orient workspace; <code>norn story view &lt;story&gt;</code> prints where to look.", "Slices are <code>slices/&lt;nn&gt;-&lt;slug&gt;.md</code> next to it. Edit them freely before you approve the plan.", "Run state is under <code>runs/</code>: <code>state.json</code>, numbered receipts, logs of failed checks, QA evidence and <code>handoff.md</code>.", "Config and workflows: <code>.agents/norn/</code>. Skills: <code>.agents/skills/</code>, linked into <code>.claude/skills/</code>."],
   norn: "norn commits <code>runs/</code> with the agent's work at each step boundary and pushes, so the record travels with the branch. GitHub collapses <code>runs/</code> in the PR diff.",
   watch: "Do not edit files under <code>runs/</code> by hand. Per-tick detail is in <code>.agents/norn/trace/</code>, which is gitignored." },
 
@@ -547,7 +548,7 @@ rows = [["state_icon", "workspace"], ["$norn"]]`,
   steps: ["In the cockpit, select the <code>▶ your turn gh-21 refine</code> row and press <kbd>s</kbd>. A tab <code>gh-21 · refine</code> opens with Claude already started on its brief.", "Answer its questions in that pane. It writes the spec into <code>story.md</code>: problem, solution, numbered Behaviour items with examples, out of scope.", "When the spec is right, tell the agent you agree. It reports <code>done</code>, and <code>plan</code> comes up as your turn the same way."],
   keys: `j / k to ▶ your turn gh-21     # the row refine waits on
 s                               # start the agent refine waits for`,
-  same: "Same as <code>norn open gh-21</code>.",
+  same: "Same as <code>norn story start gh-21</code>.",
   norn: "Open questions go to <code>clarify</code>, another attended step. Then <code>plan</code>, also with you. Attended steps are never nudged or timed out.",
   watch: "Step away mid-conversation and the inbox notices: after <code>limits.attended_wait</code> (2 min) of the agent waiting, it moves back to Your turn and notifies you. <kbd>g</kbd> on its row, or <code>norn.next</code>, returns you to the same session; it never starts a second agent." },
 
@@ -559,7 +560,7 @@ y                               # approve
 x                               # or reject: the footer asks What to change
 Split slice 02: the migration and the endpoint are separate
 Enter                           # sends the reason`,
-  same: "Same as <code>norn approve gh-17 [--reject --reason \"…\"]</code>.",
+  same: "Same as <code>norn story approve gh-17</code>, or <code>norn story reject gh-17 --reason \"…\"</code>.",
   norn: "Approval starts every slice whose dependencies are met, each in its own worktree and tab. A rejection sends the story back to <code>plan</code> with your reason in the brief, counted by <code>plan_loop</code> (max 3).",
   watch: "This is the last cheap moment to change scope. Every slice after this runs on its own." },
 
@@ -579,7 +580,7 @@ Esc                             # back to the preview`,
 a                               # opens the answer line
 Keep it, mark it deprecated in the docs
 Enter                           # sends it`,
-  same: "Same as <code>norn answer gh-18/02 \"…\"</code>.",
+  same: "Same as <code>norn story answer gh-18/02 \"…\"</code>.",
   norn: "The next tick types the answer into the same session, or starts a fresh one from the handoff if the agent is gone.",
   watch: "If the answer needs a conversation, <kbd>g</kbd> takes you to the agent's pane, but say the decision through <kbd>a</kbd> too, or norn has no record of it." },
 
@@ -616,9 +617,9 @@ norn tidy                 # close tabs of done runs; --dry-run first if unsure`,
   watch: "If <code>main</code> moved and conflicts, the story goes back through <code>update</code> before ready asks again. <code>tidy</code> keeps any pane whose agent is still working." },
 
 // ---------------- daily
-{ part: "daily", id: "morning", title: "Start a working day", tags: ["routine", "cockpit", "notes", "orient"],
+{ part: "daily", id: "morning", title: "Start a working day", tags: ["routine", "cockpit", "notes", "orient", "chat", "view"],
   when: "You sit down with stories in flight.",
-  steps: ["Open the norn workspace, or check its header if it stayed open: a recent tick means nothing was missed.", "Work the cockpit top to bottom: Needs you lists Your turn, Answer, Approve, Unblock and Check. Each takes one key.", "Then walk the story rows. Each preview shows the story's slices, PR, what runs and the open notes agents left for you, grouped by unit.", "Lost track of a story? <kbd>Enter</kbd> on its row opens its orient workspace: an agent that summarizes the story and answers your questions. <code>norn orient &lt;story&gt;</code> prints the same report without an agent.", "Then file the issues you want worked on today, and go do your own work."],
+  steps: ["Open the norn workspace, or check its header if it stayed open: a recent tick means nothing was missed.", "Work the cockpit top to bottom: Needs you lists Your turn, Answer, Approve, Unblock and Check. Each takes one key.", "Then walk the story rows. Each preview shows the story's slices, PR, what runs and the open notes agents left for you, grouped by unit.", "Lost track of a story? <kbd>Enter</kbd> on its row opens its orient workspace: an agent that summarizes the story and answers your questions. <code>norn story view &lt;story&gt;</code> prints the same report without an agent.", "Then file the issues you want worked on today, and go do your own work."],
   keys: `j / k                           # down Needs you, one row at a time
 y                               # approve a gate
 j / k to gh-18                  # a story row: preview with its notes
@@ -637,17 +638,17 @@ max_checks: 2`,
 
 { part: "daily", id: "away", title: "Answer from your phone or laptop", tags: ["ntfy", "mailbox", "away", "team"],
   when: "The stories run on your desktop, and you are not at it.",
-  steps: ["An ntfy push tells you an agent asked or a gate waits.", "From any other checkout of the repo (a laptop, or an SSH session), run <code>norn inbox</code>: it shows the same items, each with its command."],
-  code: `norn inbox                                   # on the laptop
-norn answer gh-18/02 "Keep it, mark it deprecated"
-norn approve gh-17`,
+  steps: ["An ntfy push tells you an agent asked or a gate waits.", "From any other checkout of the repo (a laptop, or an SSH session), run <code>norn status</code>: it shows the same items, each with its command."],
+  code: `norn status                                  # on the laptop
+norn story answer gh-18/02 "Keep it, mark it deprecated"
+norn story approve gh-17`,
   norn: "From a checkout that does not hold the claim, the command is pushed as a mailbox ref. The desktop's next tick applies it as a receipt and types the answer into the agent.",
-  watch: "<code>norn update</code> works only on the checkout that holds the claim." },
+  watch: "<code>norn story update-branch</code> works only on the checkout that holds the claim." },
 
-{ part: "daily", id: "manual-story", title: "Drive one story step by step", tags: ["manual", "mode", "open"],
+{ part: "daily", id: "manual-story", title: "Drive one story step by step", tags: ["manual", "mode", "edit", "start"],
   when: "A risky story where you want to start each agent yourself and watch it.",
   steps: ["Switch that story to manual. Each agent step then waits under Your turn.", "Select its row and press <kbd>s</kbd> when you are ready to watch it."],
-  code: `norn mode gh-18 manual       # back with: norn mode gh-18 auto`,
+  code: `norn story edit gh-18 --manual    # back with: norn story edit gh-18 --auto`,
   norn: "Switching does not stop a running agent; only the next step waits. Checks and git steps still run on their own.",
   watch: "A machine without a runner runs every story manual, whatever its mode; <code>norn status</code> says so." },
 
@@ -658,15 +659,15 @@ norn approve gh-17`,
   watch: "Silence notifications you don't want at night in your OS or the ntfy app; norn sends each item once either way." },
 
 // ---------------- wrong
-{ part: "wrong", id: "stuck", title: "A unit is stuck", tags: ["stuck", "unstick", "counter", "unblock"],
+{ part: "wrong", id: "stuck", title: "A unit is stuck", tags: ["stuck", "rerun", "counter", "unblock"],
   when: "<b>Unblock</b> · e.g. <code>review_loop 3/3 at review.changes_requested</code>, or the agent ran <code>norn stuck</code>.",
   steps: ["Select the <code>✖ stuck</code> row and press <kbd>v</kbd>: the trace shows which loop ran out and what each round said.", "Fix the cause if it is outside the agent: a flaky test, a missing secret, an unclear acceptance criterion in the slice file.", "<kbd>u</kbd> resumes at the same step. To give the loop more tries or send the unit elsewhere, use the command line."],
   keys: `j / k to ✖ stuck gh-18/02       # the unit that stopped
 v                               # the trace
 Esc
-u                               # unstick at the same step`,
-  code: `norn unstick gh-18/02 --reset review_loop --reason "Clarified AC2 in the slice file"
-norn unstick gh-18/02 --to implement`,
+u                               # rerun at the same step`,
+  code: `norn run rerun gh-18/02 --reset review_loop --reason "Clarified AC2 in the slice file"
+norn run rerun gh-18/02 --step implement`,
   norn: "Counters never reset on their own. A reset is journaled, so the trace shows who gave the loop more room and why.",
   watch: "Resetting without changing anything usually loops again. Change the input first." },
 
@@ -678,35 +679,35 @@ norn unstick gh-18/02 --to implement`,
 
 { part: "wrong", id: "tests-fail", title: "Tests keep failing", tags: ["test", "check", "test_loop"],
   when: "The trace shows <code>test</code> failing and <code>implement</code> retrying, or <code>test_loop 5/5</code> under Unblock.",
-  steps: ["Press <kbd>v</kbd> on the row, then read the failing output in <code>runs/&lt;unit&gt;/logs/</code>; the next brief quotes its tail.", "Run the check command yourself in the unit's worktree. <code>norn orient &lt;story&gt;</code> says where it is.", "If the failure is environmental (missing install, a port in use, a service down), fix the command in the workflow, then reset the loop."],
-  code: `norn unstick gh-18/02 --reset test_loop --reason "Added bun install to the test step"`,
+  steps: ["Press <kbd>v</kbd> on the row, then read the failing output in <code>runs/&lt;unit&gt;/logs/</code>; the next brief quotes its tail.", "Run the check command yourself in the unit's worktree. <code>norn story view &lt;story&gt;</code> says where it is.", "If the failure is environmental (missing install, a port in use, a service down), fix the command in the workflow, then reset the loop."],
+  code: `norn run rerun gh-18/02 --reset test_loop --reason "Added bun install to the test step"`,
   norn: "A check timeout counts as <code>fail</code> with reason <code>timeout</code>. The full output of a failed check is committed with the run. Before each check, norn stops servers an agent left listening on the slot's ports.",
   watch: "There is no separate setup step per worktree yet. Put setup in the check: <code>bun install --frozen-lockfile && bun test</code>." },
 
-{ part: "wrong", id: "base-moved", title: "main moved under a story", tags: ["update", "conflict", "stale", "resolve", "main"],
+{ part: "wrong", id: "base-moved", title: "main moved under a story", tags: ["update-branch", "conflict", "stale", "resolve", "main"],
   when: "<b>Check</b> · <code>gh-3 conflicts with main in a.ts, b.ts (4 behind)</code>.",
   steps: ["Usually nothing: the <code>update</code> step merges the base in before test, and gates send a stale story back.", "If the story is done, waiting at a gate or stuck, send it back yourself."],
-  code: `norn update gh-3`,
+  code: `norn story update-branch gh-3`,
   norn: "norn merges the base into the story branch, never rebases. Predicted conflicts go to a <code>resolve</code> agent that commits the merge. Repeated conflicts on the same base move stop at <code>base_conflict_loop</code> (max 2).",
-  watch: "Only the checkout that holds the claim can run <code>norn update</code>. A dirty worktree or a diverged story branch parks the story with the reason." },
+  watch: "Only the checkout that holds the claim can run <code>norn story update-branch</code>. A dirty worktree or a diverged story branch parks the story with the reason." },
 
-{ part: "wrong", id: "remote-changed", title: "The issue was closed or unassigned", tags: ["remote", "drop", "unstick", "issue"],
+{ part: "wrong", id: "remote-changed", title: "The issue was closed or unassigned", tags: ["remote", "close", "rerun", "issue"],
   when: "<b>Unblock</b> · <code>remote: issue closed</code>, <code>PR closed</code>, <code>unassigned</code> or <code>unlabelled</code>.",
   steps: ["If you meant it, drop the story. If not, reopen or reassign the issue (<kbd>i</kbd> opens it) and press <kbd>u</kbd> on the row."],
   keys: `j / k to ✖ stuck gh-9           # remote: issue closed
 i                               # open the issue; reopen or reassign it
-u                               # then unstick`,
-  code: `norn drop gh-9        # pushes branches, removes worktrees, local branches and the claim`,
-  norn: "norn never deletes work on its own. <code>drop</code> pushes the branches first; the record stays.",
+u                               # then rerun`,
+  code: `norn story close gh-9  # pushes branches, removes worktrees, local branches and the claim`,
+  norn: "norn never deletes work on its own. <code>story close</code> pushes the branches first; the record stays.",
   watch: "A PR merged into a branch other than the base also parks the story." },
 
-{ part: "wrong", id: "why", title: "Find out why norn did something", tags: ["why", "trace", "debug", "history"],
+{ part: "wrong", id: "why", title: "Find out why norn did something", tags: ["why", "trace", "run", "debug", "history"],
   when: "A step was skipped, repeated, or went somewhere you did not expect.",
-  steps: ["<kbd>v</kbd> on a row in the cockpit shows the step timeline with durations, outcomes, who acted and why.", "<code>norn why</code> replays the decision on the recorded tick and names the rule that fired.", "<code>norn inbox --history</code> shows when items came and went."],
-  code: `norn trace gh-18 --all
-norn why gh-18/02 --step review --attempt 2
-norn inbox --history --since 2h`,
-  norn: "Decide is pure code replayed from recorded facts, so <code>why</code> gives the same answer every time.",
+  steps: ["<kbd>v</kbd> on a row in the cockpit shows the step timeline with durations, outcomes, who acted and why.", "<code>norn run view --why</code> replays the decision on the recorded tick and names the rule that fired.", "<code>norn status --history</code> shows when items came and went."],
+  code: `norn run list gh-18 --events --all
+norn run view gh-18/02 --why --step review --attempt 2
+norn status --history --since 2h`,
+  norn: "Decide is pure code replayed from recorded facts, so <code>--why</code> gives the same answer every time.",
   watch: "Per-tick traces live in <code>.agents/norn/trace/</code> on this machine only." },
 
 { part: "wrong", id: "doctor", title: "norn doctor fails", tags: ["doctor", "setup", "hooks"],
@@ -786,7 +787,7 @@ counters:
   base_conflict_loop: { max: 2, reset_on: update.done }
   stale_loop: { max: 10 }
 base: { stale: conflict }`,
-  same: "Already taken in? <code>norn workflow gh-N quick</code> before it starts.",
+  same: "Already taken in? <code>norn story edit gh-N --workflow quick</code> before it starts.",
   norn: "Workflows are validated before anything runs: every step must reach <code>$done</code>, and every loop needs a counter. A story workflow without a <code>slices</code> step works directly in the story worktree.",
   watch: "<code>open-pr</code> and <code>update</code> run only on a story; <code>integrate</code> only on a slice." },
 
@@ -859,13 +860,13 @@ agents:
   watch: "Your app and tests must read <code>PORT_BASE</code> or the env you set; norn only provides it." },
 
 // ---------------- team
-{ part: "team", id: "handover", title: "Hand a story to someone else", tags: ["release", "take", "team"],
+{ part: "team", id: "handover", title: "Hand a story to someone else", tags: ["handoff", "checkout", "team"],
   when: "You go on leave, or a colleague will finish the story.",
-  steps: ["You: <code>norn release</code> pushes branches and the handoff, then frees the claim.", "They: the story's row in their cockpit shows it unclaimed; <kbd>t</kbd> on that row claims it, checks out the branches and prints the handoff."],
-  code: `norn release gh-12            # on your machine`,
+  steps: ["You: <code>norn story handoff</code> pushes branches and the handoff, then frees the claim.", "They: the story's row in their cockpit shows it unclaimed; <kbd>t</kbd> on that row claims it, checks out the branches and prints the handoff."],
+  code: `norn story handoff gh-12      # on your machine`,
   keys: `j / k to gh-12                 # the story row, in their cockpit
 t                               # take it`,
-  same: "<code>norn take gh-12 --force</code> only if your claim has not expired and you cannot release.",
+  same: "<code>norn story checkout gh-12 --force</code> only if your claim has not expired and you cannot hand it off.",
   norn: "State lives in the repo and in git refs, so a take continues from any commit. Every take writes a receipt naming the previous holder.",
   watch: "Two real machines have only been simulated on one Mac so far. Try it on a low-stakes story first." },
 
@@ -880,7 +881,7 @@ norn uninstall`,
 
 { part: "team", id: "no-herdr", title: "Run norn without Herdr", tags: ["headless", "manual", "fallback", "brief"],
   when: "You don't use Herdr, or you are on a server.",
-  steps: ["Use the <code>headless</code> runner for auto mode: unattended agents run as background processes.", "Run <code>norn watch --human</code> in one terminal and <code>norn cockpit</code> in another. The cockpit works; <kbd>Enter</kbd> shows the <code>norn orient</code> report instead of opening a workspace.", "For attended steps, run the <code>cd … && claude …</code> line the item prints in any terminal. Or open any agent in the unit's worktree and tell it <i>Use the norn skill, then run <code>norn brief</code></i>."],
+  steps: ["Use the <code>headless</code> runner for auto mode: unattended agents run as background processes.", "Run <code>norn watch --human</code> in one terminal and <code>norn status --watch</code> in another. The cockpit works; <kbd>Enter</kbd> shows the <code>norn story view</code> report instead of opening a workspace.", "For attended steps, run the <code>cd … && claude …</code> line the item prints in any terminal. Or open any agent in the unit's worktree and tell it <i>Use the norn skill, then run <code>norn brief</code></i>."],
   code: `# ~/.norn/config.yaml
 runner:
   adapter: headless
@@ -907,7 +908,7 @@ function codeBlock(src) {
   });
   return `<div class="code"><pre><code>${lines.join("\n")}</code></pre><button class="copy" type="button">Copy</button></div>`;
 }
-// The keys you press in norn cockpit, one step per line; the row names are examples, use the ones your cockpit shows.
+// The keys you press in norn status --watch, one step per line; the row names are examples, use the ones your cockpit shows.
 function keysBlock(src) {
   const lines = esc(src).split("\n").map((l) => {
     const m = l.match(/^(.*?)(\s+#.*)$/);

@@ -45,8 +45,8 @@ remote:
 # ---------------------------------------------------------------- You
 # Usually set in ~/.norn/config.yaml. Set one here only to make it the same for everyone.
 
-# Who starts the unattended agent steps of a story: manual (you, with norn open) or auto
-# (the tick, through the runner). A story follows this until `norn mode <story> auto|manual`
+# Who starts the unattended agent steps of a story: manual (you, with `norn story start`) or auto
+# (the tick, through the runner). A story follows this until `norn story edit <story> --auto|--manual`
 # gives it a mode of its own. Gates and attended steps always wait for a person.
 # default_mode: manual
 

@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61ZFE628W680FEP0VTMPD36",
+  "run_id": "01M61YXEJ95NVB77C70M5HVGQT",
+  "step": "implement",
+  "attempt": 3,
+  "at": "2026-10-28T19:23:32.418Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/10",
+  "outcome": "done",
+  "handoff": "Review#2 rework: story close re-reads the remote claim under the tick lock with the same check used before the prompt (claim_held / claim_corrupt), tested by a fake confirm that runs story checkout --force on another clone (refused, nothing changed). confirm resolves N on stdin error; story_corrupt test asserts exit and unchanged remote; CONTRIBUTING and schema comments renamed. F4 skipped (harmless). 1254 pass, typecheck green."
+}

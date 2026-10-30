@@ -271,13 +271,13 @@ export function readTrace(root: string, q: TraceQuery = {}): TraceRead {
   return out;
 }
 
-/** Latest tick that decided something for `unit` (for `norn why`, O5). */
+/** Latest tick that decided something for `unit` (for `norn run view --why`, O5). */
 export function lastTickFor(root: string, unit: string): TickTrace | null {
   const { events } = readTrace(root, { unit, types: ["tick"] });
   return (events.at(-1) as TickTrace | undefined) ?? null;
 }
 
-/** A tick by id (for `norn why --tick`). */
+/** A tick by id (for `norn run view --why --tick`). */
 export function findTick(root: string, tickId: string): TickTrace | null {
   const { events } = readTrace(root, { types: ["tick"] });
   return (events.find((e) => e.type === "tick" && e.tick_id === tickId) as TickTrace | undefined) ?? null;
