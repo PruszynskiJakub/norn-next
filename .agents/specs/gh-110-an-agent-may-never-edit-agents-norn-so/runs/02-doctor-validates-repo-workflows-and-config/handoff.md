@@ -26,6 +26,7 @@
 - AC7 checked by hand in a throwaway repo (dev build, isolated NORN_HOME_DIR): broken workflow (cycle + missing skill) and `max_agents: "two"`; both commands name the file, the step/key and the reason.
 - Still reads workflows and config at the old paths (store's path functions); the new layout is slice 03, layout check slice 05.
 - Note: building ports for `--repo` (to know each agent's skill folder) also constructs the remote and runner adapters; nothing is called on them.
+- implement#1 done: norn doctor gains a repo group: every repo workflow through the tick's own validator (new shared checkedRepoWorkflows, used by observe and doctor; W5, D7) and the repo config layer against its schema, read-only. doctor --repo runs only that group (report is {ok, repo}; no agent/runner/remote check). Plain doctor with a config that does not load runs the repo group and skips the machine checks, naming the file. Tests in housekeeping.test.ts cover AC1-AC6 (incl. a tick refusing the same missing-skill workflow with the same reason); AC7 checked by hand in a throwaway repo. Full suite 1427 pass, typecheck green. Still the old paths (slice 03).
 
 ## Resume
 
