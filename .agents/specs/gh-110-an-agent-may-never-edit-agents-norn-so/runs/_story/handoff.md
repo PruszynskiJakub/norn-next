@@ -32,17 +32,15 @@
 
 ## Goal
 
-Resolve: merge origin/main (21b3cc6f) into the story branch, resolve conflicts by intent, commit the merge.
+QA the whole story: a verdict per Behaviour item B1–B23, observed through the dev CLI.
 
 ## Progress
 
-- The story branch carries rewritten copies of main's commits (main stripped `runs/` from its history), so git's merge base was 83c7fa3c and 99 files "conflicted". The branch's real fork point 2d43e081 equals main's 397a34fd except for runs/ files; merged with `git merge-tree --merge-base=397a34fd` → 15 real conflicts. Worktree set from that tree with MERGE_HEAD=21b3cc6f, so the commit is a true two-parent merge.
-- Main's gh-120 (per-unit hook files, trace retention, chunked ticks) used `traceDir`; the branch replaced the trace dir by the machine dir. Resolution: main's behaviour at the branch's location — every `traceDir` → `machineDir` (store trace.ts, tick-trace.ts, paths.ts hookFilePath/hookBackfillPath, view trace-view.ts, tests, scripts/trace-bench.ts); hook files at `<machine dir>/hooks/<story>/…`.
-- doctor.ts: branch's lines()/repo group/--repo kept, main's trace.retain warning and Hints section added.
-- Main's new tests' `.agents/norn/{config.yaml,workflows,trace}` literals → repoConfigPath/workflowsDir/machineDir. PRD A2/O7 and the backfill schema title name hook files in the machine dir.
-- Typecheck passes; schemas re-emitted (local-hook-backfill added).
-- resolve#1 done: Merged origin/main 21b3cc6f into the story branch (317dd0e1). Main's history drops runs/, so git's merge base was stale (99 false conflicts); merged against the true fork point 397a34fd → 15 real conflicts. Main's gh-120 trace work (hook files, retention, chunked ticks) moved from traceDir to the branch's machineDir; doctor keeps --repo/repo group plus main's retain warning and Hints; main's new tests use store path functions. Typecheck clean, bun test 1528 pass / 0 fail.
+- Ran the dev build (`bun packages/cli/src/main.ts`) in throwaway repos under `$TMPDIR/qa-gh110` (bare remote, `NORN_HOME_DIR` isolated, scripted `gh` on PATH for stories).
+- B1–B22 pass with evidence: init/config at the new paths, `quick` picked from `.agents/workflows/`, pinning (S7), machine dir `<home>/repos/<name>-<hash>`, doctor and `doctor --repo` (broken workflow, broken config, no agents/gh), the old/both layout guard on status/tick/watch/init/brief, hook exits 0 on the old layout, `migrate` (staged renames, heartbeat carried, .gitignore line, rerun, lock held, linked worktree), and old files in unit worktrees ignored.
+- B23 is `person`: the PR body (pr.md) is written in `describe`; check its Release note at `ready`.
+- Side observation: a heartbeat.json with a non-ULID id is silently replaced by the next tick (existing behaviour, outside this story).
 
 ## Resume
 
-Run `bun test`; fix anything the merge broke; `git commit --no-edit` the merge (MERGE_HEAD is set); report `norn done done`.
+qa reported `partial`; a person checks B23 at human-qa. Evidence and criteria.json are in `$TMPDIR/qa-gh110/ev`.
