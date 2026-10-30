@@ -5,11 +5,11 @@
  * filter by unit while reading. Briefings and transcript snapshots are separate files
  * under `briefings/<run_id>/` and `transcripts/<run_id>/`, referenced by trace-relative path.
  */
-import { appendFileSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
 import type { FileError } from "@norn/core";
 import { type HookFact, type TickStartTrace, type TickTrace, type TraceEvent, assertValid, ulid, ulidTime, validate } from "@norn/schema";
-import { appendDurable, atomicWrite, isErrno, readText } from "./fsx.ts";
+import { appendDurable, atomicWrite, isErrno, readText, safeUnlink } from "./fsx.ts";
 import { traceDir } from "./paths.ts";
 
 function eventTime(ev: TraceEvent): string {
@@ -236,6 +236,59 @@ export function blockedHookCount(root: string, runId: string): number {
       if (line.startsWith('{"type":"hook"') && line.includes('"blocked":true') && line.includes(needle)) n++;
   }
   return n;
+}
+
+// ---------------------------------------------------------------- retention (D12): whole day pairs
+
+/** One day of the trace: its day file and, where present, its chunks file (trace-relative, sorted). */
+export interface TraceDay {
+  /** `YYYY-MM-DD` (UTC) */
+  day: string;
+  files: string[];
+  bytes: number;
+}
+
+const DAY_PAIR_FILE = /^(\d{4}-\d{2}-\d{2})(?:\.chunks)?\.jsonl$/;
+
+/**
+ * D12: the day pairs (`<day>.jsonl`, `<day>.chunks.jsonl`) dated before `beforeDay` (`YYYY-MM-DD`),
+ * oldest first, with the bytes each holds. Nothing else in the trace dir is a day pair: `workflows/`,
+ * briefings, transcripts, caches and locks are never listed.
+ */
+export function traceDaysBefore(root: string, beforeDay: string): TraceDay[] {
+  let names: string[];
+  try {
+    names = readdirSync(traceDir(root)).sort();
+  } catch (e) {
+    if (isErrno(e, "ENOENT")) return [];
+    throw e;
+  }
+  const days = new Map<string, TraceDay>();
+  for (const name of names) {
+    const day = DAY_PAIR_FILE.exec(name)?.[1];
+    if (!day || day >= beforeDay) continue;
+    let bytes: number;
+    try {
+      bytes = statSync(join(traceDir(root), name)).size;
+    } catch {
+      continue;
+    }
+    const d = days.get(day) ?? { day, files: [], bytes: 0 };
+    d.files.push(name);
+    d.bytes += bytes;
+    days.set(day, d);
+  }
+  return [...days.values()].sort((a, b) => (a.day < b.day ? -1 : 1));
+}
+
+/** D12: delete the files of these day pairs (deleted wholesale: a day pair is self-contained). */
+export function deleteTraceDays(root: string, days: TraceDay[]): void {
+  for (const d of days) for (const f of d.files) safeUnlink(join(traceDir(root), f));
+}
+
+/** Whether the trace still holds the day file of the UTC day of `at` (D10: a gone day means pruned). */
+export function hasTraceDay(root: string, at: string): boolean {
+  return existsSync(join(traceDir(root), traceFileName(at)));
 }
 
 // ---------------------------------------------------------------- side files (B4, C4)

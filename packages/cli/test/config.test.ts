@@ -49,4 +49,12 @@ describe("norn config", () => {
     expect(bad.exit).toBe(2);
     expect(bad.value).toMatchObject({ code: "unknown_key", do_instead: "norn config" });
   });
+
+  test("trace.retain: a machine setting, 14d by default (B23, D11)", async () => {
+    const r = await h.norn("config", "trace", "--json");
+    expect(r.exit).toBe(0);
+    expect((r.value as { entries: Array<ConfigEntry & { meaning: string }> }).entries).toEqual([
+      expect.objectContaining({ key: "trace.retain", value: "14d", source: "built-in", group: "machine", meaning: expect.stringContaining("norn tidy") }),
+    ]);
+  });
 });

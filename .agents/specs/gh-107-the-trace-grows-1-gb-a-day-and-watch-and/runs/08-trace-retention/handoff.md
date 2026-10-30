@@ -14,6 +14,21 @@
 
 ## Goal
 
+`trace.retain` (default 14d, at least 14d) bounds the trace: `norn tidy [--retain] [--dry-run]` deletes day pairs older than it, `norn doctor` warns on a bad value and hints at days beyond it, `norn why --tick` refuses `tick_pruned` for a pruned tick.
+
 ## Progress
 
+- Schema: `trace: { retain }` in ConfigLayer/ResolvedConfig (machine group, merged per key, default `14d`). `retain` is a plain non-empty string in the schema, not `Duration`: D11 checks form and minimum where used, so a bad value (`7d` or `soon`) never fails config loading and tidy can refuse it naming `14d` (AC3, AC4). JSON schemas re-emitted.
+- Store `trace.ts`: `traceDaysBefore(root, day)` (day pairs with bytes, oldest first, never `workflows/` etc.), `deleteTraceDays`, `hasTraceDay`.
+- cli `runtime/trace-retention.ts`: `checkRetain`, `effectiveRetain`, `retainCutoffDay`, `retainWarning`, `formatBytes` (decimal units).
+- `tidy`: `--retain`, window checked before the lock (exit 3 `retain_too_short`; bad `--retain` form = usage exit 2, bad config form = exit 3 `retain_invalid`); output gains `trace: { retain, days[{day,files,bytes}], bytes }`; deletes day files dated before today minus the window (age 15+ with 14d).
+- `doctor`: warnings for a value that does not apply; new `hints` list (markdown "Hints" section) — never a failed check.
+- `why --tick`: tick not found, ulid older than the window, day file gone → exit 3 `tick_pruned`. `human.test.ts` used a 2016 ulid as an "unknown tick"; it now reads as pruned, which is the intended D10 change, so the expectation moved to `tick_pruned`.
+- PRD: new O7 (trace retention) in §15.
+- Tests: housekeeping.test.ts (trace retention describe, B23–B27, B31–B34), why-version.test.ts (B20), config.test.ts (trace.retain). B34's test passes without new code (it pins that ticks never prune).
+- AC11: ran this branch's build in a throwaway repo with 40 days of hand-made trace: doctor hint "25 days (67.5 MB)", dry-run listed 25 days / 67,536,500 bytes and left the files alone, tidy deleted those 25 and kept 15 days and `workflows/`, the second tidy pruned nothing, doctor showed no hint afterwards; `7d` config → doctor warning, tidy exit 3; `why --tick <2023 ulid>` → tick_pruned.
+- Full suite: 1252/1253 on the first run, the one failure being the human.test.ts expectation above (fixed, file green); typecheck green.
+
 ## Resume
+
+Nothing left in this step. Next is review of the diff against slice 08.

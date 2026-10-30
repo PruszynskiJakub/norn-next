@@ -19,14 +19,18 @@
  * R5.4 (N2): a tick with a `tick.start` but no end died during act. `why` explains it from its
  * recorded decisions ("tick crashed during act") — `--tick <id>` resolves the tick a receipt cites,
  * and without `--tick` a crashed tick newer than the unit's last finished one is the one explained.
+ *
+ * O7, D10 (B20): `--tick <id>` for a tick not in the trace whose ulid time is older than the retention
+ * window and whose day file is gone is refused as `tick_pruned`, never guessed at.
  */
 import { criterionLine, decide, type Decision, legacyAction, type NumberedReceipt, type StoryFacts, type UnitFacts, unitDecision } from "@norn/core";
-import { ExitCode, type Receipt, type TickStartTrace, type TickTrace, type TickUnitRecord, ULID_PATTERN } from "@norn/schema";
-import { crashedTicksFor, decisionUnit, findCrashedTick, findTick, readTrace } from "@norn/store";
+import { ExitCode, type Receipt, type TickStartTrace, type TickTrace, type TickUnitRecord, isUlid, ULID_PATTERN, ulidTime } from "@norn/schema";
+import { crashedTicksFor, decisionUnit, findCrashedTick, findTick, hasTraceDay, readTrace } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import { refuse, usageError, withExit } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
 import { replayInputs } from "../runtime/tick.ts";
+import { effectiveRetain } from "../runtime/trace-retention.ts";
 import { NORN_VERSION } from "../version.ts";
 
 /** An action as compared with its replay; one an older norn recorded drops the fields since removed (O5). */
@@ -229,6 +233,13 @@ export const whyCommand = defineCommand({
       if (!tick) {
         const crashed = findCrashedTick(ctx.root, tickId);
         if (crashed) return crashedExplanation(crashed, key);
+        // D10: older than the window and its day is gone → tidy pruned it (B20)
+        if (isUlid(tickId)) {
+          const window = effectiveRetain(ctx.config);
+          const at = ulidTime(tickId);
+          if (at < ctx.clock.now() - window.ms && !hasTraceDay(ctx.root, new Date(at).toISOString()))
+            throw refuse(`tick ${tickId} is older than the trace retained (${window.retain})`, `norn trace ${key}`, "tick_pruned");
+        }
         throw refuse(`no tick ${tickId} in the trace`, `norn trace ${key}`, "no_tick");
       }
       const d = unitDecision(tick.decisions, key, decisionUnit);
