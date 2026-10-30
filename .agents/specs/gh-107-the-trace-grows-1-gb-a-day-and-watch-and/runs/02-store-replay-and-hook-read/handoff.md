@@ -28,6 +28,9 @@ Prefactors 2 and 3 of gh-107 with no change in output: `why`, the golden harvest
 - Tests: store S2 tests for both reads; agent-protocol B10 test (hooks of two units, brief takes its own session). Golden, transcripts and observe snapshots unchanged; full suite and typecheck green.
 - implement#1 done: Prefactors 2+3: store readTickInputs (why, golden harvest, e2e) replaces cli replayInputs; store readUnitHooks(root, units, since) is the one unit-scoped hook read used by loadLocalFacts (LocalUnit.hooks replaces LocalFacts.hooks), brief and blockedHookCount(root, unit, runId). New S2 tests for both reads and an agent-protocol B10 test; golden, transcripts, observe snapshots unchanged; full suite (1246) and typecheck green.
 
+- review#1: approve, no blocking findings. Minor: blockedHookCount now JSON-parses hook lines (slice 04 reworks it); the per-unit hook selection assumes a hook fact's story/slice match its run. Nit: worktree prefix match without a path separator (same as runHooks). check-run.test.ts flaked once under full-suite load; green on rerun.
+- review#1 approve: Pure prefactor verified: readTickInputs and readUnitHooks in store; golden, transcripts, observe snapshots unchanged; typecheck and full suite green (check-run timing flake once, green on rerun). No blocking findings; 2 minor, 1 nit.
+
 ## Resume
 
-Nothing left in this step. Slice 04 changes `readUnitHooks` to read the per-unit hook files.
+Review approved. Nothing pending from review; slice 04 changes `readUnitHooks` to read the per-unit hook files.
