@@ -1,6 +1,6 @@
 # The process check: every PR to main is a norn story PR, a bypass, or a Dependabot update.
 # Required by branch protection under the check name "process". The rule lives in
-# scripts/process-check.ts (tested in scripts/process-check.test.ts):
+# scripts/process-check.ts (tested in test/repo/process-check.test.ts):
 #   (a) head branch gh-<N>-<slug> and the PR closes #N;
 #   (b) PR labelled `bypass`, closes an issue labelled `bypass` that links another issue;
 #   (c) author dependabot[bot].

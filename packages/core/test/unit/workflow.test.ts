@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { workflowHash } from "../src/hash.ts";
-import { checkWorkflowLevel, elementaryCycles, validateWorkflowDefinition } from "../src/workflow.ts";
-import { SLICE_WF, STORY_WF } from "./fixtures.ts";
+import { workflowHash } from "../../src/hash.ts";
+import { checkWorkflowLevel, elementaryCycles, validateWorkflowDefinition } from "../../src/workflow.ts";
+import { SLICE_WF, STORY_WF } from "../fixtures.ts";
 
 const clone = <T>(v: T): T => structuredClone(v);
 const codes = (v: unknown, skills?: string[]) => {

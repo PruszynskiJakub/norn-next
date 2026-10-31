@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { HEARTBEAT_BEGIN, collapseHeartbeat, renderHandoff, renderHandoffStatus, STATUS_BEGIN, STATUS_END } from "../src/handoff.ts";
-import type { Decision } from "../src/actions.ts";
-import { inboxChanges } from "../src/inbox/history.ts";
-import { buildInbox } from "../src/inbox/items.ts";
-import { startAgentCommand } from "../src/commands.ts";
-import type { StoryFacts } from "../src/facts.ts";
-import type { RemotePullRequest } from "../src/ports.ts";
-import { at, CONFIG, facts, numbered, receipt, SLICE_WF, sliceUnit, STORY_WF, stateFor, storyFacts, storyUnit, T0, unitFacts } from "./fixtures.ts";
+import { HEARTBEAT_BEGIN, collapseHeartbeat, renderHandoff, renderHandoffStatus, STATUS_BEGIN, STATUS_END } from "../../src/handoff.ts";
+import type { Decision } from "../../src/actions.ts";
+import { inboxChanges } from "../../src/inbox/history.ts";
+import { buildInbox } from "../../src/inbox/items.ts";
+import { startAgentCommand } from "../../src/commands.ts";
+import type { StoryFacts } from "../../src/facts.ts";
+import type { RemotePullRequest } from "../../src/ports.ts";
+import { at, CONFIG, facts, numbered, receipt, SLICE_WF, sliceUnit, STORY_WF, stateFor, storyFacts, storyUnit, T0, unitFacts } from "../fixtures.ts";
 
 const SLICE = sliceUnit("gh-1", "02", "form");
 

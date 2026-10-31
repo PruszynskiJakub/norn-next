@@ -5,15 +5,15 @@
  */
 import { describe, expect, test } from "bun:test";
 import { deriveUlid, type Receipt, type UnitState, type Workflow } from "@norn/schema";
-import type { Action, Decision } from "../src/actions.ts";
-import { applyReceipts } from "../src/apply.ts";
-import { renderBrief } from "../src/brief.ts";
-import { decide } from "../src/decide/index.ts";
-import { mergedIntoBase } from "../src/policy.ts";
-import type { NumberedReceipt, StoryBase, StoryFacts } from "../src/facts.ts";
-import { buildInbox } from "../src/inbox/items.ts";
-import { baseUpdateStep, checkWorkflowLevel, isStale, validateWorkflowDefinition } from "../src/workflow.ts";
-import { at, CONFIG, facts, HB, loaded, stateFor, storyFacts, storyUnit, T0, unitFacts } from "./fixtures.ts";
+import type { Action, Decision } from "../../src/actions.ts";
+import { applyReceipts } from "../../src/apply.ts";
+import { renderBrief } from "../../src/brief.ts";
+import { decide } from "../../src/decide/index.ts";
+import { mergedIntoBase } from "../../src/policy.ts";
+import type { NumberedReceipt, StoryBase, StoryFacts } from "../../src/facts.ts";
+import { buildInbox } from "../../src/inbox/items.ts";
+import { baseUpdateStep, checkWorkflowLevel, isStale, validateWorkflowDefinition } from "../../src/workflow.ts";
+import { at, CONFIG, facts, HB, loaded, stateFor, storyFacts, storyUnit, T0, unitFacts } from "../fixtures.ts";
 
 /** §4.4 in small: update → test → ready, with resolve for conflicts and a `stale` route at ready. */
 const BASE_WF: Workflow = {

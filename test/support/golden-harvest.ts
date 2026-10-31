@@ -4,7 +4,7 @@
  * golden case — decide's inputs as `norn why` rebuilds them (O5, store `readTickInputs`) and the decisions
  * the tick's `tick.start` record holds (R5.4) — with the harness's temp paths normalised.
  * `scripts/golden.ts` runs the cli integration tests with it on and writes the corpus that
- * `packages/core/test/golden.test.ts` replays. Off (the default), this does nothing.
+ * `packages/core/test/unit/golden.test.ts` replays. Off (the default), this does nothing.
  *
  * A case is named by its `stableKey`, not by its raw text: harvested facts hold values that change
  * on every run (random ulids, git shas and commit times from the wall clock, pids), so naming and

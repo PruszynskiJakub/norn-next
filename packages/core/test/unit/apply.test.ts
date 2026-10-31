@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Receipt, UnitState, Workflow } from "@norn/schema";
-import { type ApplyContext, applyReceipts, initialState } from "../src/apply.ts";
-import { at, numbered, receipt, SLICE_WF, sliceUnit, SOLO_WF, STORY_WF, stateFor, storyUnit } from "./fixtures.ts";
+import { type ApplyContext, applyReceipts, initialState } from "../../src/apply.ts";
+import { at, numbered, receipt, SLICE_WF, sliceUnit, SOLO_WF, STORY_WF, stateFor, storyUnit } from "../fixtures.ts";
 
 const ctx = (workflow: Workflow = SLICE_WF): ApplyContext => ({ workflow, now: at(), limits: { nudges: 2, retries: 1 } });
 const SLICE = sliceUnit("gh-1", "01", "form");

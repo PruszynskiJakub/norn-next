@@ -4,10 +4,10 @@
  */
 import { describe, expect, test } from "bun:test";
 import type { LeaseFile, UnitState } from "@norn/schema";
-import { applyReceipts, routeOf } from "../src/apply.ts";
-import { decide } from "../src/decide/index.ts";
-import type { Facts, RunFacts, StoryFacts, UnitFacts } from "../src/facts.ts";
-import { at, CONFIG, facts, numbered, receipt, SLICE_WF, SOLO_WF, STORY_WF, sliceFile, sliceUnit, stateFor, storyFacts, storyUnit, T0, unitFacts, WORKFLOWS } from "./fixtures.ts";
+import { applyReceipts, routeOf } from "../../src/apply.ts";
+import { decide } from "../../src/decide/index.ts";
+import type { Facts, RunFacts, StoryFacts, UnitFacts } from "../../src/facts.ts";
+import { at, CONFIG, facts, numbered, receipt, SLICE_WF, SOLO_WF, STORY_WF, sliceFile, sliceUnit, stateFor, storyFacts, storyUnit, T0, unitFacts, WORKFLOWS } from "../fixtures.ts";
 
 const RUN = "01JDDDDDDDDDDDDDDDDDDDDDDD";
 const HEADLESS = { runner: "headless", session_id: RUN };

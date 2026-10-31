@@ -4,10 +4,10 @@ import { cpSync, existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse } from "yaml";
-import { checkWorkflowLevel, validateWorkflowDefinition } from "../packages/core/src/index.ts";
-import { loadConfig, loadWorkflows, repoConfigPath, visibleSkills, workflowsDir } from "../packages/store/src/index.ts";
+import { checkWorkflowLevel, validateWorkflowDefinition } from "../../packages/core/src/index.ts";
+import { loadConfig, loadWorkflows, repoConfigPath, visibleSkills, workflowsDir } from "../../packages/store/src/index.ts";
 
-const ROOT = join(import.meta.dir, "..");
+const ROOT = join(import.meta.dir, "..", "..");
 /**
  * This repo stays on the old layout until a released norn can migrate it (gh-110, out of scope), and
  * store reads only the new one: until then its config and workflows are read from a copy at the new

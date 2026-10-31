@@ -5,10 +5,10 @@
  */
 import { expect, test } from "bun:test";
 import { deriveUlid, type HookFact, type Receipt, type UnitState, type Workflow } from "@norn/schema";
-import type { Decision } from "../src/actions.ts";
-import { decide } from "../src/decide/index.ts";
-import type { NumberedReceipt, RunFacts } from "../src/facts.ts";
-import { at, CONFIG, facts, loaded, stateFor, storyFacts, storyUnit, T0, unitFacts } from "./fixtures.ts";
+import type { Decision } from "../../src/actions.ts";
+import { decide } from "../../src/decide/index.ts";
+import type { NumberedReceipt, RunFacts } from "../../src/facts.ts";
+import { at, CONFIG, facts, loaded, stateFor, storyFacts, storyUnit, T0, unitFacts } from "../fixtures.ts";
 
 const WF: Workflow = {
   name: "loop",

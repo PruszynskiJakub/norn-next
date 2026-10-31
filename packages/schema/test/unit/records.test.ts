@@ -6,7 +6,7 @@ import {
   assertValid,
   SchemaValidationError,
   validate,
-} from "../src/index.ts";
+} from "../../src/index.ts";
 
 const ID = "01JBQ6ZK3E8Y4V5W6X7Y8Z9ABC";
 const ID2 = "01JBQ6ZK3E8Y4V5W6X7Y8Z9ABD";

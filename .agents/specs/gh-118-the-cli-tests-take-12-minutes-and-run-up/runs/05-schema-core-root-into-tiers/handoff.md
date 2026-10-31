@@ -19,7 +19,13 @@
 <!-- norn:heartbeat:end -->
 
 ## Goal
+Schema and core tests into `test/unit/`; repo rules, process test and script tests (process check, golden) into `test/repo/` (AC1, AC2).
 
 ## Progress
+- Moved (git mv, renames only): `packages/schema/test/*.test.ts` → `unit/`; `packages/core/test/*.test.ts` and `__snapshots__/` → `unit/` (fixtures, `fixtures.ts`, `rule-cases.ts`, `golden/` stay at core's test root, D3); `test/repo.test.ts`, `test/process.test.ts`, `scripts/golden.test.ts`, `scripts/process-check.test.ts` → `test/repo/`.
+- Only relative paths changed in the moved files, plus the `.agents/norn` ratchet allowlist key for printed-commands.test and comments/AGENTS.md naming the old paths.
+- Verified: the 668 moved tests pass under the unit guard preload (`bun test --preload ./test/support/unit-guard-preload.ts packages/schema packages/core test/repo`); `bun run golden` runs from the root; `bun run golden -- --update` changes 0 of 93 cases; `bun test` 1104 pass; typecheck green.
+- No new test: AC1/AC2 are proven by the moved tests passing from their new place under the guard; the tier-folder rule that would pin the layout is slice 07.
 
 ## Resume
+Nothing left: report done.

@@ -1,6 +1,6 @@
 /**
  * The golden decisions corpus (refactor Phase 0.1): `packages/core/test/golden/*.json`, replayed by
- * `packages/core/test/golden.test.ts`, which wants each case's recorded decisions exactly. Two modes,
+ * `packages/core/test/unit/golden.test.ts`, which wants each case's recorded decisions exactly. Two modes,
  * so that what changes in the corpus is a diff a reviewer can read:
  *
  *   bun scripts/golden.ts --update

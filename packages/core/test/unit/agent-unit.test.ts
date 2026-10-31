@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { UnitState } from "@norn/schema";
-import { type AgentUnit, agentWorkRefusal, currentRun, cursorStep, implicitAsk, implicitAskOpen, standingReport } from "../src/agent-unit.ts";
-import type { NumberedReceipt } from "../src/facts.ts";
-import { at, numbered, receipt, SLICE_WF, sliceUnit, stateFor } from "./fixtures.ts";
+import { type AgentUnit, agentWorkRefusal, currentRun, cursorStep, implicitAsk, implicitAskOpen, standingReport } from "../../src/agent-unit.ts";
+import type { NumberedReceipt } from "../../src/facts.ts";
+import { at, numbered, receipt, SLICE_WF, sliceUnit, stateFor } from "../fixtures.ts";
 
 const unit = sliceUnit("gh-1", "01", "a");
 const RUN = { run_id: "01JRRRRRRRRRRRRRRRRRRRRRRR", step: "implement", attempt: 1, agent: "claude", started_at: at() } as NonNullable<UnitState["run"]>;

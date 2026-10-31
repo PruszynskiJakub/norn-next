@@ -203,7 +203,7 @@ describe("skills", () => {
     expect(links.filter((l) => !existsSync(join(SKILLS_DIR, name, l)))).toEqual([]);
   });
 
-  /** Banned synonyms (§5), same set as test/repo.test.ts lints in sources. */
+  /** Banned synonyms (§5), same set as test/repo/repo.test.ts lints in sources. */
   const BANNED: Array<[RegExp, string]> = [
     [/\b(task|tasks|job|jobs|ticket|tickets)\b/i, "story / slice"],
     [/\binteractive step/i, "attended step"],

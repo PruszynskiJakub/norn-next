@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { JSON_DIR, renderSchema } from "../scripts/emit.ts";
+import { JSON_DIR, renderSchema } from "../../scripts/emit.ts";
 import {
   DEFAULT_CONFIG,
   explainConfig,
@@ -26,7 +26,7 @@ import {
   ulid,
   ulidTime,
   validate,
-} from "../src/index.ts";
+} from "../../src/index.ts";
 
 describe("ulid", () => {
   test("format, time and monotonic order", () => {

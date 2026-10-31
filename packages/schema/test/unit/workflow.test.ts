@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { parse } from "yaml";
-import { outcomeEdge, validate } from "../src/index.ts";
+import { outcomeEdge, validate } from "../../src/index.ts";
 
 /** PRD §11 slice workflow example, verbatim. */
 export const SLICE_EXAMPLE = `

@@ -2,10 +2,10 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Receipt, UnitState, Workflow } from "@norn/schema";
-import { applyReceipts } from "../src/apply.ts";
-import { type BriefInput, renderBrief, storyRulings } from "../src/brief.ts";
-import type { NumberedReceipt, UnitRef } from "../src/facts.ts";
-import { at, numbered, receipt, SLICE_WF, sliceUnit, STORY_WF, stateFor, storyUnit } from "./fixtures.ts";
+import { applyReceipts } from "../../src/apply.ts";
+import { type BriefInput, renderBrief, storyRulings } from "../../src/brief.ts";
+import type { NumberedReceipt, UnitRef } from "../../src/facts.ts";
+import { at, numbered, receipt, SLICE_WF, sliceUnit, STORY_WF, stateFor, storyUnit } from "../fixtures.ts";
 
 const SLICE = sliceUnit("gh-1", "02", "form");
 const RUN = "01JDDDDDDDDDDDDDDDDDDDDDDD";
@@ -340,7 +340,7 @@ describe("Re-entry, fresh sessions, handoff and criteria (B2, C2, QV1)", () => {
 
 // ------------------------------------------------------------------ golden replays of real runs
 
-const FIX = join(import.meta.dir, "fixtures", "sandbox");
+const FIX = join(import.meta.dir, "..", "fixtures", "sandbox");
 
 /** Replay a copied unit (pinned workflow + receipts) through apply, then brief the cursor. */
 function replay(dir: string, unit: UnitRef, paths: BriefInput["paths"]) {

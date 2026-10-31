@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 
-const ROOT = join(import.meta.dir, "..");
+const ROOT = join(import.meta.dir, "..", "..");
 const PKGS = join(ROOT, "packages");
 
 /** schema ← core ← store ← adapters ← cli; view reads schema/core/store. */
@@ -733,7 +733,7 @@ const NORN_PATH_ALLOW: Record<string, [number, string]> = {
   "packages/cli/test/integration/config.test.ts": [1, "message: the user-or-repo pick"],
   "test/e2e/slice-workflow.test.ts": [1, "message: init's config row"],
   "packages/cli/test/integration/layout.test.ts": [1, "the layout test: the repo config file as a person sees it"],
-  "packages/core/test/printed-commands.test.ts": [1, "not a path read: a string the removed-command matcher must pass"],
+  "packages/core/test/unit/printed-commands.test.ts": [1, "not a path read: a string the removed-command matcher must pass"],
 };
 
 function nornPathLines(): Counts {

@@ -1,6 +1,6 @@
 /** CriteriaReport (QV2), frontmatter `criteria` (QV1), receipt fields `criteria`, `notes`, `acknowledged_notes` (NT1, NT3). */
 import { describe, expect, test } from "bun:test";
-import { validate } from "../src/index.ts";
+import { validate } from "../../src/index.ts";
 
 const ID = "01JBQ6ZK3E8Y4V5W6X7Y8Z9ABC";
 const AT = "2026-10-23T12:00:00.000Z";

@@ -5,14 +5,14 @@
  */
 import { describe, expect, test } from "bun:test";
 import { type AgentStep, type Criterion, type CriterionVerdict, deriveUlid, type Receipt, type UnitState, type Workflow } from "@norn/schema";
-import type { Action } from "../src/actions.ts";
-import { renderBrief } from "../src/brief.ts";
-import { checkReport, openNotes, unverifiedNeeds, verdictCounts, worstVerdict } from "../src/criteria.ts";
-import { decide } from "../src/decide/index.ts";
-import type { NumberedReceipt } from "../src/facts.ts";
-import { buildInbox, INBOX_GROUPS } from "../src/inbox/items.ts";
-import { validateWorkflowDefinition } from "../src/workflow.ts";
-import { at, CONFIG, facts, loaded, numbered, stateFor, storyFacts, storyUnit, T0, unitFacts } from "./fixtures.ts";
+import type { Action } from "../../src/actions.ts";
+import { renderBrief } from "../../src/brief.ts";
+import { checkReport, openNotes, unverifiedNeeds, verdictCounts, worstVerdict } from "../../src/criteria.ts";
+import { decide } from "../../src/decide/index.ts";
+import type { NumberedReceipt } from "../../src/facts.ts";
+import { buildInbox, INBOX_GROUPS } from "../../src/inbox/items.ts";
+import { validateWorkflowDefinition } from "../../src/workflow.ts";
+import { at, CONFIG, facts, loaded, numbered, stateFor, storyFacts, storyUnit, T0, unitFacts } from "../fixtures.ts";
 
 /** QV6 in small: qa → (pass) ready, (partial | unverified) human-qa, (fail) back to qa's fixer. */
 const QA_WF: Workflow = {

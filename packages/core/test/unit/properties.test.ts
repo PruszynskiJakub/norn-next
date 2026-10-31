@@ -35,11 +35,11 @@ import {
   validate,
   type Workflow,
 } from "@norn/schema";
-import { type ApplyContext, type ApplyResult, applyReceipts, routeOf } from "../src/apply.ts";
-import { decide, isSideAction, type RepoWorkflows } from "../src/decide/index.ts";
-import type { Facts, NumberedReceipt, RunFacts, StoryFacts, UnitFacts, UnitRef } from "../src/facts.ts";
-import { checkWorkflowLevel, OVERRIDABLE_ROUTES, reportableOutcomes, stepOf, validateWorkflowDefinition } from "../src/workflow.ts";
-import { at, facts, loaded, numbered, sliceFile, sliceUnit, stateFor, storyFacts, storyUnit, T0, unitFacts } from "./fixtures.ts";
+import { type ApplyContext, type ApplyResult, applyReceipts, routeOf } from "../../src/apply.ts";
+import { decide, isSideAction, type RepoWorkflows } from "../../src/decide/index.ts";
+import type { Facts, NumberedReceipt, RunFacts, StoryFacts, UnitFacts, UnitRef } from "../../src/facts.ts";
+import { checkWorkflowLevel, OVERRIDABLE_ROUTES, reportableOutcomes, stepOf, validateWorkflowDefinition } from "../../src/workflow.ts";
+import { at, facts, loaded, numbered, sliceFile, sliceUnit, stateFor, storyFacts, storyUnit, T0, unitFacts } from "../fixtures.ts";
 
 // ================================================================= PRNG
 

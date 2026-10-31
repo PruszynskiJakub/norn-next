@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import type { HookEventKind, HookFact, UnitState } from "@norn/schema";
-import type { RunFacts } from "../src/facts.ts";
-import { attendedWaitSince, buildInbox } from "../src/inbox/items.ts";
-import type { PaneState } from "../src/ports.ts";
-import { at, CONFIG, facts, SLICE_WF, sliceUnit, STORY_WF, stateFor, storyFacts, storyUnit, T0, unitFacts } from "./fixtures.ts";
+import type { RunFacts } from "../../src/facts.ts";
+import { attendedWaitSince, buildInbox } from "../../src/inbox/items.ts";
+import type { PaneState } from "../../src/ports.ts";
+import { at, CONFIG, facts, SLICE_WF, sliceUnit, STORY_WF, stateFor, storyFacts, storyUnit, T0, unitFacts } from "../fixtures.ts";
 
 const RUN = "01JDDDDDDDDDDDDDDDDDDDDDDD";
 const MIN = 60_000;

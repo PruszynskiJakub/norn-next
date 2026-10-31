@@ -2,10 +2,10 @@
 import { expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { caseName, stableKey } from "../test/support/golden-harvest.ts";
-import { type Candidate, caseBody, decisionChanges, type GoldenCase, harvestCommand, harvestFiles, selectNew } from "./golden.ts";
+import { caseName, stableKey } from "../support/golden-harvest.ts";
+import { type Candidate, caseBody, decisionChanges, type GoldenCase, harvestCommand, harvestFiles, selectNew } from "../../scripts/golden.ts";
 
-const GOLDEN = join(import.meta.dir, "..", "packages", "core", "test", "golden");
+const GOLDEN = join(import.meta.dir, "..", "..", "packages", "core", "test", "golden");
 
 test("stableKey ignores what differs between two runs of one tick and keeps which ids are equal", () => {
   const run = (tick: string, other: string, sha: string, pid: number, start: string, ms: number, date: string) =>

@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import type { LeaseFile, UnitState } from "@norn/schema";
-import { type Action, legacyAction } from "../src/actions.ts";
-import { applyReceipts } from "../src/apply.ts";
-import { decide, isSideAction, unitDecision } from "../src/decide/index.ts";
-import { buildInbox } from "../src/inbox/items.ts";
-import { isIntakeCommit, nornTrailers } from "../src/policy.ts";
-import type { RunFacts, StoryFacts, UnitFacts } from "../src/facts.ts";
-import type { WorktreeStatus } from "../src/ports.ts";
-import { sha256 } from "../src/hash.ts";
+import { type Action, legacyAction } from "../../src/actions.ts";
+import { applyReceipts } from "../../src/apply.ts";
+import { decide, isSideAction, unitDecision } from "../../src/decide/index.ts";
+import { buildInbox } from "../../src/inbox/items.ts";
+import { isIntakeCommit, nornTrailers } from "../../src/policy.ts";
+import type { RunFacts, StoryFacts, UnitFacts } from "../../src/facts.ts";
+import type { WorktreeStatus } from "../../src/ports.ts";
+import { sha256 } from "../../src/hash.ts";
 import {
   at,
   CONFIG,
@@ -28,7 +28,7 @@ import {
   unitFacts,
   WORKFLOWS,
   worktree as worktreeOf,
-} from "./fixtures.ts";
+} from "../fixtures.ts";
 
 const wtStatus = (path: string, branch: string): WorktreeStatus => ({ path, branch, head: "h", clean: true, staged: [], unstaged: [], untracked: [], ahead: 0, behind: 0, upstream: null, rebase_in_progress: false });
 

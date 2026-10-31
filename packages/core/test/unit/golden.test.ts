@@ -13,10 +13,10 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ResolvedConfig } from "@norn/schema";
 import { GitAction, ParkKind } from "@norn/schema";
-import type { Decision } from "../src/actions.ts";
-import { decide, type RepoWorkflows } from "../src/decide/index.ts";
-import type { Facts } from "../src/facts.ts";
-import { RULE_CASES } from "./rule-cases.ts";
+import type { Decision } from "../../src/actions.ts";
+import { decide, type RepoWorkflows } from "../../src/decide/index.ts";
+import type { Facts } from "../../src/facts.ts";
+import { RULE_CASES } from "../rule-cases.ts";
 
 interface GoldenCase {
   source: string;
@@ -27,7 +27,7 @@ interface GoldenCase {
   decisions: Array<{ unit: string; rule: string; action: unknown }>;
 }
 
-const GOLDEN = join(import.meta.dir, "golden");
+const GOLDEN = join(import.meta.dir, "..", "golden");
 const cases: Array<[string, GoldenCase]> = readdirSync(GOLDEN)
   .filter((n) => n.endsWith(".json"))
   .sort()
@@ -49,7 +49,7 @@ describe("golden decisions", () => {
 
 // ---------------------------------------------------------------- rule coverage
 
-const DECIDE_DIR = join(import.meta.dir, "..", "src", "decide");
+const DECIDE_DIR = join(import.meta.dir, "..", "..", "src", "decide");
 /** decide's sources (`src/decide/*.ts`), concatenated: rule ids are read from all of them. */
 const DECIDE_SRC = readdirSync(DECIDE_DIR)
   .filter((f) => f.endsWith(".ts"))

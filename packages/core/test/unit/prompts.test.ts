@@ -9,15 +9,15 @@
  */
 import { describe, expect, test } from "bun:test";
 import type { HookFact, UnitState } from "@norn/schema";
-import type { Action } from "../src/actions.ts";
-import { applyReceipts } from "../src/apply.ts";
-import { AUTO_PROMPT, NUDGE_TEXT } from "../src/commands.ts";
-import { decide } from "../src/decide/index.ts";
-import type { Facts, RunFacts, StoryFacts, UnitFacts } from "../src/facts.ts";
-import { buildInbox } from "../src/inbox/items.ts";
-import type { PanePrompt } from "../src/ports.ts";
-import { optionIndex, promptKeys } from "../src/prompt.ts";
-import { at, CONFIG, facts, numbered, receipt, SOLO_WF, stateFor, storyFacts, storyUnit, T0, unitFacts, WORKFLOWS } from "./fixtures.ts";
+import type { Action } from "../../src/actions.ts";
+import { applyReceipts } from "../../src/apply.ts";
+import { AUTO_PROMPT, NUDGE_TEXT } from "../../src/commands.ts";
+import { decide } from "../../src/decide/index.ts";
+import type { Facts, RunFacts, StoryFacts, UnitFacts } from "../../src/facts.ts";
+import { buildInbox } from "../../src/inbox/items.ts";
+import type { PanePrompt } from "../../src/ports.ts";
+import { optionIndex, promptKeys } from "../../src/prompt.ts";
+import { at, CONFIG, facts, numbered, receipt, SOLO_WF, stateFor, storyFacts, storyUnit, T0, unitFacts, WORKFLOWS } from "../fixtures.ts";
 
 const RUN = "01JDDDDDDDDDDDDDDDDDDDDDDD";
 const SCREEN = " │ rm -rf build\n╌╌╌╌╌╌╌╌╌╌\n Do you want to proceed?\n ❯ 1. Yes\n   2. No\n\n Esc to cancel";
