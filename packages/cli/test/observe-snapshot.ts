@@ -18,7 +18,11 @@ import { ulid } from "@norn/schema";
 import { Context, observe, type Observed } from "../src/index.ts";
 import { projectView } from "../src/runtime/human.ts";
 import { type Harness, T0 } from "./harness.ts";
+import { REPO_ROOT } from "./repo-root.ts";
 import { textNormaliser } from "./transcript.ts";
+
+/** Where the pinned observe snapshots live, named from the repo root (gh-118 B19). */
+export const OBSERVE_SNAPSHOTS_DIR = join(REPO_ROOT, "packages", "cli", "test", "observe-snapshots");
 
 /** Observe the harness repo now, as a tick's observe would without a remote sync. */
 export async function observeNow(h: Harness): Promise<Observed> {
@@ -59,11 +63,10 @@ function processIdentity(o: Record<string, unknown>): Record<string, unknown> {
 
 /** Compare with `test/observe-snapshots/<name>.json`; `NORN_TRANSCRIPT_UPDATE=1` writes it instead. */
 export function expectFactsSnapshot(h: Harness, facts: Facts, name: string): void {
-  const dir = join(import.meta.dir, "observe-snapshots");
-  const file = join(dir, `${name}.json`);
+  const file = join(OBSERVE_SNAPSHOTS_DIR, `${name}.json`);
   const actual = normaliseFacts(h, facts);
   if (process.env.NORN_TRANSCRIPT_UPDATE === "1") {
-    mkdirSync(dir, { recursive: true });
+    mkdirSync(OBSERVE_SNAPSHOTS_DIR, { recursive: true });
     writeFileSync(file, actual);
     return;
   }

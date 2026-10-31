@@ -1,6 +1,6 @@
 /** Repo-wide rules: dependency direction (§17) and banned glossary synonyms (§5). */
 import { describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 
@@ -42,6 +42,40 @@ describe("dependency direction", () => {
         });
       }
     }
+  });
+
+  /** Root test code (`test/`, `scripts/`) may import any package, by name, only when the root declares it (gh-118 B15). */
+  function undeclaredRootImports(root: string): { file: string; dep: string }[] {
+    const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+    const declared = new Set(Object.keys(manifest.devDependencies ?? {}));
+    return ["test", "scripts"].flatMap((d) =>
+      existsSync(join(root, d))
+        ? files(join(root, d)).flatMap((f) =>
+            [...readFileSync(f, "utf8").matchAll(/(?:from|import)\s*\(?\s*["'](@norn\/[a-z-]+)/g)]
+              .map((m) => m[1] as string)
+              .filter((dep) => !declared.has(dep))
+              .map((dep) => ({ file: relative(root, f), dep })),
+          )
+        : [],
+    );
+  }
+  test("the root declares every package as a dev dependency", () => {
+    const declared = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).devDependencies ?? {};
+    for (const pkg of Object.keys(ALLOWED)) expect({ pkg, spec: declared[`@norn/${pkg}`] }).toEqual({ pkg, spec: "workspace:*" });
+  });
+  test("root test/ and scripts/ import only packages the root declares", () => {
+    expect(undeclaredRootImports(ROOT)).toEqual([]);
+  });
+  test("an undeclared import in root test code fails, naming the file and the import", () => {
+    const root = mkdtempSync(join(tmpdir(), "norn-root-deps-"));
+    writeFileSync(join(root, "package.json"), JSON.stringify({ devDependencies: { "@norn/schema": "workspace:*" } }));
+    for (const d of ["test", "scripts"]) mkdirSync(join(root, d));
+    writeFileSync(join(root, "test", "ok.test.ts"), `import { ulid } from "@norn/schema";\n`);
+    writeFileSync(join(root, "scripts", "x.ts"), `import { decide } from "@norn/core";\nconst s = await import("@norn/store");\n`);
+    expect(undeclaredRootImports(root)).toEqual([
+      { file: join("scripts", "x.ts"), dep: "@norn/core" },
+      { file: join("scripts", "x.ts"), dep: "@norn/store" },
+    ]);
   });
 });
 

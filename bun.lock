@@ -5,6 +5,12 @@
     "": {
       "name": "norn-monorepo",
       "devDependencies": {
+        "@norn/adapters": "workspace:*",
+        "@norn/cli": "workspace:*",
+        "@norn/core": "workspace:*",
+        "@norn/schema": "workspace:*",
+        "@norn/store": "workspace:*",
+        "@norn/view": "workspace:*",
         "@types/bun": "1.3.13",
         "typescript": "^5.9.3",
         "yaml": "^2.8.1",
@@ -21,7 +27,7 @@
     },
     "packages/cli": {
       "name": "@norn/cli",
-      "version": "0.0.0",
+      "version": "0.13.0",
       "bin": {
         "norn": "./src/main.ts",
       },

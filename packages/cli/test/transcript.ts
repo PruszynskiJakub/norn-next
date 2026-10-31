@@ -31,6 +31,10 @@ import { setSpawnObserver, machineDir } from "@norn/store";
 import type { CliResult } from "../src/index.ts";
 import { normaliser } from "./golden-harvest.ts";
 import type { Harness } from "./harness.ts";
+import { REPO_ROOT } from "./repo-root.ts";
+
+/** Where the pinned transcripts live, named from the repo root (gh-118 B19). */
+export const TRANSCRIPTS_DIR = join(REPO_ROOT, "packages", "cli", "test", "transcripts");
 
 export interface Transcript {
   /** bracket one command: header line, then its effects, then the runs/ files it touched */
@@ -254,7 +258,7 @@ export function recordTranscript(h: Harness): Transcript {
 /** Compare with `test/transcripts/<name>.txt`; `NORN_TRANSCRIPT_UPDATE=1` writes it instead. */
 export function expectTranscript(t: Transcript, name: string): void {
   t.stop();
-  const file = join(import.meta.dir, "transcripts", `${name}.txt`);
+  const file = join(TRANSCRIPTS_DIR, `${name}.txt`);
   const actual = t.text();
   if (process.env.NORN_TRANSCRIPT_UPDATE === "1") {
     writeFileSync(file, actual);
