@@ -1,8 +1,8 @@
 ---
 id: gh-118/04
 title: Store, adapters and view tests into unit and integration
-depends_on: [gh-118/03]
-status: planned
+depends_on: [ gh-118/03 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
