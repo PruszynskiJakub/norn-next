@@ -21,6 +21,7 @@ Write gh-118's spec (problem, solution, Behaviour B1–B22, out of scope) from t
 
 - Interview settled: unit tier under 30 s (others only measured); plain `bun test` = unit tier; release.yml runs unit + typecheck; spawn guard preload included; shipped workflow templates unchanged, only `norn-implement` skill changes. Person confirmed the summary.
 - Spec written to spec.md; no open questions (plan items listed under Open questions as "left to plan").
+- refine#1 done: Spec written: three test tiers (unit/integration/e2e by folder), B1–B22; unit tier <30 s with spawn guard, plain bun test = unit, release runs unit+typecheck, shipped templates unchanged. No open questions; plan items listed.
 
 ## Resume
 
