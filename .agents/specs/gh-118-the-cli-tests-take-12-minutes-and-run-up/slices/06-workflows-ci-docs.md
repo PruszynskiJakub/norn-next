@@ -2,7 +2,7 @@
 id: gh-118/06
 title: Workflow check, implement instructions, CI, release and docs follow the tiers
 depends_on: [ gh-118/03 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
