@@ -42,17 +42,15 @@
 
 ## Goal
 
-Rework from ready.reject: make CI's package job pass by updating scripts/smoke.sh to the new layout (.agents/norn.config.yaml, .agents/workflows/).
+qa#2: check every Behaviour item (B1–B23) of gh-110 on the current HEAD from the user's side, after the smoke.sh rework from ready.reject.
 
 ## Progress
 
-- Reproduced locally: built dist/npm, `scripts/smoke.sh dist/npm/norn.js 0.12.1` failed with "norn init did not write .agents/norn/config.yaml".
-- smoke.sh now checks .agents/norn.config.yaml and .agents/workflows/{story,slice,bug}.yaml, and fails if init creates the old .agents/norn/ dir. Commit 03cb596a.
-- Passes against dist/npm/norn.js, the npm tarball installed as CI does it, and a darwin-arm64 binary.
-- No other script or CI file references the old layout; in run 41151155663 only the package job failed.
-- Typecheck clean; full suite green (1528 pass, 0 fail).
-- implement#2 done: smoke.sh now checks the new layout (.agents/norn.config.yaml, .agents/workflows/*.yaml) and fails if init creates .agents/norn/. Reproduced the CI failure locally first; after the fix, smoke passes on dist/npm/norn.js, the installed npm tarball and a darwin-arm64 binary. No other script or CI step used the old layout. Typecheck clean, bun test 1528 pass. CI goes green once norn pushes.
+- implement#2 (rework): smoke.sh checks the new layout (.agents/norn.config.yaml, .agents/workflows/) and fails if init creates .agents/norn/ (commit 03cb596a).
+- qa#2: B1–B22 observed passing with the dev build in throwaway repos under $TMPDIR/qa2-gh110 (scripted gh, isolated NORN_HOME_DIR); B23 is `person` (release note is in PR #121's body, line 22).
+- Ruling check: built dist/npm and ran scripts/smoke.sh → smoke ok; PR #121 CI at head 1250d28c is all green (package and the three smoke jobs included).
+- Evidence and criteria.json in $TMPDIR/qa2-gh110/ev.
 
 ## Resume
 
-Nothing left for implement. CI goes green only after norn pushes the branch.
+Nothing left for qa; human-qa/ready start from the evidence pack and B23's note.
