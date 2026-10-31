@@ -64,6 +64,9 @@ implement#2: make the tier checks green after merging main (a39ba10). The person
 - Commit 0654e3fee. `bun run test`: 985 pass, 0 fail. `bun run test:integration`: 511 pass, 0 fail. `bun run typecheck` is green.
 - implement#2 done: After the a39ba10 merge: story-reset.test.ts moved to cli integration with its imports fixed (B14). The #125 ci-check tests spawn sh, so they moved to packages/cli/test/integration/ci-check.test.ts (D6, B4), and the 'same script' rule stays in repo.test. Commit 0654e3fee. Unit 985/0 fail, integration 511/0 fail, typecheck green. The pinned test:fast check is left to the person, as agreed.
 
+- implement#3: the rework is only the pinned `test:fast` check failing with "Script not found", which is exactly what B7 asks for. No code change. Re-ran `bun run test` (985 pass, 0 fail) and `bun run typecheck` (green) on 0654e3fee.
+- implement#3 done: Only rework point is the pinned test:fast check failing with 'Script not found', which B7 requires; per the person's answer it is ignored. No code change. Re-verified on 0654e3fee: unit 985/0 fail, typecheck green (integration was 511/0 on the same commit). The person needs to move the story past the pinned test check by hand.
+
 ## Resume
 
-Nothing left in implement: the story continues at its next check.
+Nothing left in implement. The pinned `test:fast` check will keep failing by design (B7): the person runs `bun run test && bun run test:integration && bun run typecheck` by hand and moves the story past `test`.
