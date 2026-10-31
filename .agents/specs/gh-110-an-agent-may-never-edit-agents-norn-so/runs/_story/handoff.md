@@ -47,8 +47,9 @@ Rework from ready.reject: make CI's package job pass by updating scripts/smoke.s
 - smoke.sh now checks .agents/norn.config.yaml and .agents/workflows/{story,slice,bug}.yaml, and fails if init creates the old .agents/norn/ dir. Commit 03cb596a.
 - Passes against dist/npm/norn.js, the npm tarball installed as CI does it, and a darwin-arm64 binary.
 - No other script or CI file references the old layout; in run 41151155663 only the package job failed.
-- Typecheck and full suite: see Resume.
+- Typecheck clean; full suite green (1528 pass, 0 fail).
+- implement#2 done: smoke.sh now checks the new layout (.agents/norn.config.yaml, .agents/workflows/*.yaml) and fails if init creates .agents/norn/. Reproduced the CI failure locally first; after the fix, smoke passes on dist/npm/norn.js, the installed npm tarball and a darwin-arm64 binary. No other script or CI step used the old layout. Typecheck clean, bun test 1528 pass. CI goes green once norn pushes.
 
 ## Resume
 
-If the full suite and typecheck are green, report `norn done done`. CI goes green only after norn pushes the branch.
+Nothing left for implement. CI goes green only after norn pushes the branch.
