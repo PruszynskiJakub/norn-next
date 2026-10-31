@@ -3,14 +3,15 @@
 - Workflow: release · Step: prepare (attempt 1)
 - Status: running
 - Counters: base_conflict_loop 0/2, ready_loop 0/2, stale_loop 0/10
-- Last outcome: none
+- Last outcome: prepare.died (classified, 2026-10-31T06:35:29.502Z)
 - Next: `norn run list gh-122`
-- Updated: 2026-10-31T06:35:01.230Z
+- Updated: 2026-10-31T06:35:37.549Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - story.start: release at prepare
 - receipts.apply: applied 1
 - agent.start: prepare run 01M68AP6YGTB37B81T6YEH0PVZ
+- agent.died.retry: fresh session
 <!-- norn:heartbeat:end -->
 
 ## Goal
