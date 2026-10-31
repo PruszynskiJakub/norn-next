@@ -11,9 +11,16 @@ labels:
   - norn
   - norn:wf:story
 workflow: story
-status: active
+status: done
 intake_at: 2026-10-30T11:26:29.364Z
 body_hash: bfcbad50e64591e29e5e35aae634c9390637f6426c19a953f8d7498f5aa27d53
+merge:
+  pr: 121
+  url: https://github.com/PruszynskiJakub/norn-next/pull/121
+  head_sha: 9fff8b575bd61cc7e1e6d2025520d12220cfda9f
+  merge_commit_sha: 29e29b1dd2bf9a359ae1fd0770f370f274fb0621
+  merged_by: PruszynskiJakub
+  merged_at: 2026-10-31T01:28:14.000Z
 ---
 
 # Move workflows and config out of .agents/norn/ and the trace into .git/norn/, so agents can change workflows and config
