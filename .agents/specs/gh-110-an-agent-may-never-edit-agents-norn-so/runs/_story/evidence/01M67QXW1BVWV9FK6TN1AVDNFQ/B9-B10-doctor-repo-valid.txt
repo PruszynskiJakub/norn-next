@@ -1,0 +1,12 @@
+# B9/B10: doctor --repo, valid checkout, PATH without claude/gh, GH_TOKEN empty
+claude not found
+gh not found
+$ bun /Users/jakubpruszynski/Projects/norn-worktrees/gh-110-an-agent-may-never-edit-agents-norn-so/packages/cli/src/main.ts doctor --repo
+norn doctor: every check passes
+
+  ok   layout         .agents/workflows/ and .agents/norn.config.yaml
+  ok   workflows      bug, quick, slice, story valid (.agents/workflows/)
+  ok   config         .agents/norn.config.yaml
+exit=0
+# git status after
+(end)

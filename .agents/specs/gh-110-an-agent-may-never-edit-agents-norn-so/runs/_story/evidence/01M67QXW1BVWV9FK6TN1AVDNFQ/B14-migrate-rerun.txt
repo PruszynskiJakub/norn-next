@@ -1,0 +1,15 @@
+# status before
+R  .agents/norn/config.yaml -> .agents/norn.config.yaml
+R  .agents/norn/workflows/bug.yaml -> .agents/workflows/bug.yaml
+R  .agents/norn/workflows/slice.yaml -> .agents/workflows/slice.yaml
+R  .agents/norn/workflows/story.yaml -> .agents/workflows/story.yaml
+$ norn migrate
+# norn migrate
+
+/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old is on the new layout: nothing to move.
+exit=0
+$ norn migrate --json
+{"moves":[],"staged":[],"commit":null}
+exit=0
+# status after (diff vs before):
+identical

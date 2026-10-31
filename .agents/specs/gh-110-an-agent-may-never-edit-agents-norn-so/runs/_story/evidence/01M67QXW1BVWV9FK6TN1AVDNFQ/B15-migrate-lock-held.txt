@@ -1,0 +1,25 @@
+# old tick lock held by a live process (as a running old watch)
+{
+  "holder": {
+    "pid": 98455,
+    "pid_start": "Sat Oct 31 02:10:18 2026"
+  },
+  "acquired_at": "2026-10-31T01:10:18.672Z",
+  "note": "watch (qa)"
+}
+
+$ norn migrate
+**Refused (tick_locked):** a tick is running (pid 98455, watch (qa)); norn migrate never moves the trace under a running tick
+
+Do instead: stop norn watch (and any tick), then run norn migrate again
+exit=3
+$ norn migrate --json
+{"error":"a tick is running (pid 98455, watch (qa)); norn migrate never moves the trace under a running tick","do_instead":"stop norn watch (and any tick), then run norn migrate again","code":"tick_locked"}
+exit=3
+# after: nothing moved
+.agents/norn
+.agents/norn/trace
+.agents/norn/workflows
+.agents/norn/config.yaml
+repo-deabb63b
+repo2-b6132483

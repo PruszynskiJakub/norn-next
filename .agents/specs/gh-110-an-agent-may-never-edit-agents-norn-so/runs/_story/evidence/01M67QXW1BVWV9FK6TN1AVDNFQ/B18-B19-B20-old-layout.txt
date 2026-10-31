@@ -1,0 +1,54 @@
+# before
+      14
+repo-deabb63b
+repo2-b6132483
+$ norn status
+**Refused (old_layout):** /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old is on the old norn layout (config: .agents/norn/config.yaml; workflows: .agents/norn/workflows; machine files: .agents/norn/trace)
+
+Do instead: norn migrate
+exit=3
+$ norn status --json
+{"error":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old is on the old norn layout (config: .agents/norn/config.yaml; workflows: .agents/norn/workflows; machine files: .agents/norn/trace)","do_instead":"norn migrate","code":"old_layout","details":{"layout":"old","root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old","parts":[{"part":"config","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old/.agents/norn/config.yaml","new":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old/.agents/norn.config.yaml","at_old":true,"at_new":false},{"part":"workflows","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old/.agents/norn/workflows","new":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old/.agents/workflows","at_old":true,"at_new":false},{"part":"machine files","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old/.agents/norn/trace","new":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/home/repos/old-7befe792","at_old":true,"at_new":false}]}}
+exit=3
+$ norn tick
+{"error":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old is on the old norn layout (config: .agents/norn/config.yaml; workflows: .agents/norn/workflows; machine files: .agents/norn/trace)","do_instead":"norn migrate","code":"old_layout","details":{"layout":"old","root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old","parts":[{"part":"config","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old/.agents/norn/config.yaml","new":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old/.agents/norn.config.yaml","at_old":true,"at_new":false},{"part":"workflows","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old/.agents/norn/workflows","new":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old/.agents/workflows","at_old":true,"at_new":false},{"part":"machine files","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old/.agents/norn/trace","new":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/home/repos/old-7befe792","at_old":true,"at_new":false}]}}
+exit=3
+$ norn watch
+{"error":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old is on the old norn layout (config: .agents/norn/config.yaml; workflows: .agents/norn/workflows; machine files: .agents/norn/trace)","do_instead":"norn migrate","code":"old_layout","details":{"layout":"old","root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old","parts":[{"part":"config","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old/.agents/norn/config.yaml","new":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old/.agents/norn.config.yaml","at_old":true,"at_new":false},{"part":"workflows","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old/.agents/norn/workflows","new":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old/.agents/workflows","at_old":true,"at_new":false},{"part":"machine files","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old/.agents/norn/trace","new":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/home/repos/old-7befe792","at_old":true,"at_new":false}]}}
+exit=3
+$ norn brief
+**Refused (old_layout):** /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old is on the old norn layout (config: .agents/norn/config.yaml; workflows: .agents/norn/workflows; machine files: .agents/norn/trace)
+
+Do instead: norn migrate
+exit=3
+# B19 init
+$ norn init
+**Refused (old_layout):** /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old is on the old norn layout (config: .agents/norn/config.yaml; workflows: .agents/norn/workflows; machine files: .agents/norn/trace)
+
+Do instead: norn migrate
+exit=3
+# B20 doctor
+$ norn doctor --repo
+norn doctor: 1 check failed (layout)
+
+  FAIL layout         old layout
+                      ! config: .agents/norn/config.yaml
+                      ! workflows: .agents/norn/workflows
+                      ! machine files: .agents/norn/trace
+                      → norn migrate
+
+  · other checks skipped: they read the new layout
+exit=1
+norn doctor: 1 check failed (layout)
+
+  FAIL layout         old layout
+                      ! config: .agents/norn/config.yaml
+                      ! workflows: .agents/norn/workflows
+                      ! machine files: .agents/norn/trace
+                      → norn migrate
+--
+  · other checks skipped: they read the new layout
+# after (nothing moved, nothing written)
+      14
+repo-deabb63b
+repo2-b6132483

@@ -1,0 +1,13 @@
+$ norn config set max_agents 3 --user
+Set `max_agents` to `3` in the user file (`/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/home/config.yaml`).
+exit=0
+config.yaml
+leases
+repos
+max_agents: 3
+$ norn config get max_agents --json
+{"files":{"user":{"path":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/home/config.yaml","exists":true},"repo":{"path":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/repo/.agents/norn.config.yaml","exists":true}},"entries":[{"key":"max_agents","value":3,"source":"user","group":"machine","meaning":"agents running at once on this machine, across repos"}],"notes":[]}
+exit=0
+slot-1.json
+slot-2.json
+slot-3.json

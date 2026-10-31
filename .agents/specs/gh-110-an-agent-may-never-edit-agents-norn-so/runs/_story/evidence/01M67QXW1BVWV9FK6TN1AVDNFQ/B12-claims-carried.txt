@@ -1,0 +1,49 @@
+# claims now held (ls-remote refs/norn)
+8620eee74c7e8414bc55dea8648abdff456dc31f	refs/norn/claims/gh-1
+e1d6ea94dfb7e060f55c1d89b328a29ef04eb008	refs/norn/claims/gh-2
+debb83822bf4d887c20dbaadbeff556ee79de1b2	refs/norn/claims/gh-3
+{
+  "version": 1,
+  "story": "gh-1",
+  "holder": "jakubpruszynski@MacBook-Pro-Jakub-2",
+  "heartbeat_id": "01M60ABCDEFGHJKMNPQRSTVWXY",
+  "acquired_at": "2026-10-31T01:10:38.525Z",
+  "renewed_at": "2026-10-31T01:10:38.525Z",
+  "expires_at": "2026-10-31T01:20:38.525Z",
+  "last_tick_id": "01M67R4E5JRE960W5R7HZ5F4YP"
+}
+
+{
+  "version": 1,
+  "story": "gh-2",
+  "holder": "jakubpruszynski@MacBook-Pro-Jakub-2",
+  "heartbeat_id": "01M60ABCDEFGHJKMNPQRSTVWXY",
+  "acquired_at": "2026-10-31T01:10:38.525Z",
+  "renewed_at": "2026-10-31T01:10:38.525Z",
+  "expires_at": "2026-10-31T01:20:38.525Z",
+  "last_tick_id": "01M67R4E5JRE960W5R7HZ5F4YP"
+# put the repo back on the old layout (trace dir from machine dir; committed files moved back)
+$ norn tick
+{"error":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old is on the old norn layout (config: .agents/norn/config.yaml; workflows: .agents/norn/workflows; machine files: .agents/norn/trace)","do_instead":"norn migrate","code":"old_layout","details":{"layout":"old","root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old","parts":[{"part":"config","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old/.agents/norn/config.yaml","new":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old/.agents/norn.config.yaml","at_old":true,"at_new":false},{"part":"workflows","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old/.agents/norn/workflows","new":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old/.agents/workflows","at_old":true,"at_new":false},{"part":"machine files","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old/.agents/norn/trace","new":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/home/repos/old-7befe792","at_old":true,"at_new":false}]}}
+exit=3
+$ norn migrate
+# norn migrate
+
+Moved /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old to the new layout:
+
+- config: .agents/norn/config.yaml → .agents/norn.config.yaml (staged)
+- workflows: .agents/norn/workflows/bug.yaml → .agents/workflows/bug.yaml (staged)
+- workflows: .agents/norn/workflows/slice.yaml → .agents/workflows/slice.yaml (staged)
+- workflows: .agents/norn/workflows/story.yaml → .agents/workflows/story.yaml (staged)
+- machine files: .agents/norn/trace → /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/home/repos/old-7befe792 (machine-local, outside git)
+
+Review the staged moves with `git status`, then commit them: `git commit -m "Move norn to its new layout (norn migrate)"`
+exit=0
+{
+  "heartbeat_id": "01M60ABCDEFGHJKMNPQRSTVWXY",
+  "created_at": "2026-10-01T10:00:00.000Z",
+  "last_tick_at": "2026-10-31T01:10:40.170Z"
+}
+$ norn tick
+{"tick_id":"01M67R4SK4HPCTCECDVDWC91NB","at":"2026-10-31T01:10:50.212Z","duration_ms":1992,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-1","rule":"story.start","kind":"start_unit","ok":true},{"unit":"gh-2","rule":"story.start","kind":"start_unit","ok":true},{"unit":"gh-3","rule":"story.start","kind":"start_unit","ok":true}],"notified":["your_turn:gh-1:refine#1","your_turn:gh-2:refine#1","your_turn:gh-3:refine#1"],"trace":"2026-10-31.jsonl","failed":0,"orphans":{"worktrees":["/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old-worktrees/gh-12-x"],"branches":[]}}
+exit=0
