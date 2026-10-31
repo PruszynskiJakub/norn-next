@@ -1,5 +1,6 @@
 # The unit tier (gh-118 B1): a plain `bun test` runs everything but the integration and e2e tiers,
-# which run through their own configs (bunfig.integration.toml, bunfig.e2e.toml).
+# which run through their own configs (bunfig.integration.toml, bunfig.e2e.toml). Only this tier preloads
+# the unit guard (B4, D2): a unit test that starts a child process fails.
 [test]
-preload = ["./test/preload.ts"]
+preload = ["./test/preload.ts", "./test/support/unit-guard-preload.ts"]
 pathIgnorePatterns = ["**/integration/**", "test/e2e/**"]

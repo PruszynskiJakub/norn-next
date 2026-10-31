@@ -198,19 +198,56 @@ function relativeImports(root: string, file: string): Array<{ spec: string; path
     .map((spec) => ({ spec, path: relative(root, join(root, file, "..", spec)) }));
 }
 
+/** `seeds` and every test/support/ helper under `root` that imports one of them, transitively. */
+function supportClosure(root: string, seeds: readonly string[]): Set<string> {
+  const closure = new Set(seeds);
+  const support = existsSync(join(root, "test/support")) ? files(join(root, "test/support")).map((f) => relative(root, f)).filter((f) => f.endsWith(".ts")) : [];
+  for (let grew = true; grew; ) {
+    const more = support.filter((f) => !closure.has(f) && relativeImports(root, f).some((i) => closure.has(i.path)));
+    for (const f of more) closure.add(f);
+    grew = more.length > 0;
+  }
+  return closure;
+}
+
+/** gh-118 B15 (D13): the cli harness, which spawns real git; the transcript and observe snapshot helpers import it. */
+const SPAWNING_HELPERS = ["test/support/harness.ts", ...PINNED_HELPERS];
+/** store's git functions: the module, by path, and the names `@norn/store` exports from it that run git. */
+const STORE_GIT = "packages/store/src/git.ts";
+const STORE_GIT_EXPORTS = ["fetchNornRefs", "onlyNornCommitsSince"];
+/** `import { a, b as c } from "@norn/store"`: the names imported */
+const STORE_NAMED = /\bimport\s*(?:type\s+)?\{([^}]*)\}\s*from\s*["']@norn\/store["']/g;
+
+/**
+ * B15: imports in unit tests (packages/<pkg>/test/unit/, test/repo/) under `root` of the cli harness, a
+ * helper that imports it, or store's git functions. Fake herdr and the golden harvest stay allowed.
+ */
+function spawningUnitImports(root: string): Array<{ file: string; import: string }> {
+  const banned = supportClosure(root, SPAWNING_HELPERS);
+  banned.add(STORE_GIT);
+  return testFilesUnder(root)
+    .filter((f) => /^packages\/[^/]+\/test\/unit\//.test(f) || f.startsWith("test/repo/"))
+    // the file holding this rule names the helpers in its own fixtures
+    .filter((f) => f !== THIS_FILE)
+    .flatMap((f) => {
+      const byPath = relativeImports(root, f)
+        .filter((i) => banned.has(i.path))
+        .map((i) => ({ file: f, import: i.spec }));
+      const byName = [...readFileSync(join(root, f), "utf8").matchAll(STORE_NAMED)]
+        .flatMap((m) => (m[1] as string).split(",").map((n) => n.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0] as string))
+        .filter((n) => STORE_GIT_EXPORTS.includes(n))
+        .map((n) => ({ file: f, import: `${n} from @norn/store` }));
+      return [...byPath, ...byName];
+    });
+}
+
 /**
  * B16: imports of the transcript recorder or the observe snapshot helpers outside test/e2e/ (and the
  * helpers' own folder, test/support/), in package tests and root test code under `root`. An import is
  * matched by the path it resolves to; a support helper that imports a pinned one (transitively) is pinned too.
  */
 function pinnedHelperImports(root: string): Array<{ file: string; import: string }> {
-  const pinned = new Set(PINNED_HELPERS);
-  const support = existsSync(join(root, "test/support")) ? files(join(root, "test/support")).map((f) => relative(root, f)).filter((f) => f.endsWith(".ts")) : [];
-  for (let grew = true; grew; ) {
-    const more = support.filter((f) => !pinned.has(f) && relativeImports(root, f).some((i) => pinned.has(i.path)));
-    for (const f of more) pinned.add(f);
-    grew = more.length > 0;
-  }
+  const pinned = supportClosure(root, PINNED_HELPERS);
   const pkgTests = existsSync(join(root, "packages")) ? readdirSync(join(root, "packages")).map((p) => join(root, "packages", p, "test")) : [];
   const dirs = [...pkgTests, join(root, "test")].filter((d) => existsSync(d));
   return dirs
@@ -238,15 +275,14 @@ function adaptersWithoutTests(root: string): string[] {
     .sort();
 }
 
-/** gh-118 B17: the packages whose tests this slice put in tiers (cli has its own rules; schema and core follow). */
-const TIERED_PACKAGES = ["store", "adapters", "view"];
+const TIER_FOLDERS = "unit/, integration/, test/e2e/, test/repo/";
 
-/** `*.test.ts` files of the tiered packages under `root` that sit neither in test/unit/ nor in test/integration/. */
-function untieredPackageTests(root: string): string[] {
-  return TIERED_PACKAGES.flatMap((pkg) => {
-    const dir = join(root, "packages", pkg, "test");
-    return existsSync(dir) ? testFilesUnder(dir).filter((f) => !/^(unit|integration)\//.test(f)).map((f) => `packages/${pkg}/test/${f}`) : [];
-  }).sort();
+/** gh-118 B14: every `*.test.ts` under `root` that sits in no tier folder, as the repo rule's message. */
+function untieredTests(root: string): string[] {
+  const tiered = (f: string) => /^packages\/[^/]+\/test\/(unit|integration)\//.test(f) || /^test\/(e2e|repo)\//.test(f);
+  return testFilesUnder(root)
+    .filter((f) => !tiered(f))
+    .map((f) => `${f} is not in a tier folder (${TIER_FOLDERS})`);
 }
 
 describe("test layout (AGENTS.md)", () => {
@@ -284,11 +320,11 @@ describe("test layout (AGENTS.md)", () => {
     expect(adaptersWithoutTests(root)).toEqual(["none", "old"]);
   });
 
-  test("gh-118 B17: every test file of store, adapters and view sits under test/unit/ or test/integration/", () => {
-    expect(untieredPackageTests(ROOT)).toEqual([]);
+  test("gh-118 B14: every test file sits in a tier folder", () => {
+    expect(untieredTests(ROOT)).toEqual([]);
   });
 
-  test("gh-118 B17: a store, adapters or view test outside a tier folder is named; other packages are not this rule's", () => {
+  test("gh-118 B14: a test file outside a tier folder fails, naming the file", () => {
     const root = mkdtempSync(join(tmpdir(), "norn-tiers-"));
     const put = (rel: string) => {
       mkdirSync(join(root, rel, ".."), { recursive: true });
@@ -296,17 +332,19 @@ describe("test layout (AGENTS.md)", () => {
     };
     put("packages/store/test/unit/a.test.ts");
     put("packages/store/test/integration/b.test.ts");
-    put("packages/store/test/c.test.ts");
     put("packages/adapters/test/unit/gh/gh.test.ts");
-    put("packages/adapters/test/integration/contract/contract.test.ts");
-    put("packages/adapters/test/claude/claude.test.ts");
     put("packages/adapters/test/contract/suite.ts");
-    put("packages/view/test/fixtures/x.test.ts");
-    put("packages/core/test/d.test.ts");
-    expect(untieredPackageTests(root)).toEqual([
-      "packages/adapters/test/claude/claude.test.ts",
-      "packages/store/test/c.test.ts",
-      "packages/view/test/fixtures/x.test.ts",
+    put("test/e2e/c.test.ts");
+    put("test/repo/d.test.ts");
+    put("packages/view/test/foo.test.ts");
+    put("packages/core/test/fixtures/x.test.ts");
+    put("test/support/e.test.ts");
+    put("test/f.test.ts");
+    expect(untieredTests(root)).toEqual([
+      "packages/core/test/fixtures/x.test.ts is not in a tier folder (unit/, integration/, test/e2e/, test/repo/)",
+      "packages/view/test/foo.test.ts is not in a tier folder (unit/, integration/, test/e2e/, test/repo/)",
+      "test/f.test.ts is not in a tier folder (unit/, integration/, test/e2e/, test/repo/)",
+      "test/support/e.test.ts is not in a tier folder (unit/, integration/, test/e2e/, test/repo/)",
     ]);
   });
 
@@ -422,9 +460,10 @@ describe("test layout (AGENTS.md)", () => {
     expect(readme.filter((l) => /all tests/i.test(l))).toEqual([]);
   });
 
-  test("B1, B2: the root bunfig ignores exactly the integration and e2e tiers, and the test script is exactly bun test", () => {
+  test("B1, B2, B4: the root bunfig preloads the unit guard, ignores exactly the integration and e2e tiers, and the test script is exactly bun test", () => {
     const scripts = rootScripts();
     expect(scripts.test).toBe("bun test");
+    expect(bunfig("bunfig.toml").preload).toEqual(["./test/preload.ts", "./test/support/unit-guard-preload.ts"]);
     expect(bunfig("bunfig.toml").pathIgnorePatterns).toEqual(["**/integration/**", "test/e2e/**"]);
     expect(tierSelection("bunfig.toml").filter((f) => f.includes("/integration/") || f.startsWith("test/e2e/"))).toEqual([]);
   });
@@ -436,6 +475,7 @@ describe("test layout (AGENTS.md)", () => {
     const scripts = rootScripts();
     // ends in flags, so `bun run <script> <file>` appends the file as bun test's own path filter
     expect(scripts[script]).toBe(`bun test --config=${config} --parallel --timeout=20000`);
+    // the unit guard is the unit tier's alone (B4)
     expect(bunfig(config).preload).toEqual(["./test/preload.ts"]);
     const all = testFilesUnder(ROOT);
     const selected = tierSelection(config);
@@ -481,6 +521,45 @@ describe("test layout (AGENTS.md)", () => {
       { file: "packages/cli/test/integration/d.test.ts", import: "../../../../test/support/records.ts" },
       { file: "packages/store/test/unit/b.test.ts", import: "../../../../test/support/observe-snapshot.ts" },
       { file: "test/repo/f.test.ts", import: "../support/transcript.ts" },
+    ]);
+  });
+
+  test("B15: no unit test imports the cli harness, a helper that imports it, or store's git functions", () => {
+    expect(spawningUnitImports(ROOT)).toEqual([]);
+  });
+
+  test("B15: a unit test importing the harness, the transcript or snapshot helpers, or store's git functions fails, naming the file and the import", () => {
+    const root = mkdtempSync(join(tmpdir(), "norn-unit-imports-"));
+    const put = (rel: string, text: string) => {
+      mkdirSync(join(root, rel, ".."), { recursive: true });
+      writeFileSync(join(root, rel), text);
+    };
+    put("test/support/harness.ts", `export const h = 1;\n`);
+    put("test/support/transcript.ts", `import { h } from "./harness.ts";\n`);
+    put("test/support/observe-snapshot.ts", `import { h } from "./harness.ts";\n`);
+    put("test/support/stories.ts", `export { h } from "./harness.ts";\n`);
+    put("test/support/fake-herdr.ts", `export const f = 1;\n`);
+    put("test/support/golden-harvest.ts", `export const g = 1;\n`);
+    put("packages/store/src/git.ts", `export const git = 1;\n`);
+    put("packages/cli/test/unit/a.test.ts", `import { h } from "../../../../test/support/harness.ts";\n`);
+    put("packages/cli/test/unit/b.test.ts", `import { t } from "../../../../test/support/transcript.ts";\nimport { s } from "../../../../test/support/observe-snapshot.ts";\n`);
+    put("packages/cli/test/unit/c.test.ts", `import { h } from "../../../../test/support/stories.ts";\n`);
+    put("packages/store/test/unit/d.test.ts", `import { git } from "../../src/git.ts";\n`);
+    put("packages/view/test/unit/e.test.ts", `import { readTrace, fetchNornRefs } from "@norn/store";\nimport {\n  type CasResult,\n  onlyNornCommitsSince as only,\n} from "@norn/store";\n`);
+    put("test/repo/f.test.ts", `import { h } from "../support/harness.ts";\n`);
+    // allowed: the pure helpers, store's pure exports, and every import outside the unit tier
+    put("packages/cli/test/unit/ok.test.ts", `import { f } from "../../../../test/support/fake-herdr.ts";\nimport { g } from "../../../../test/support/golden-harvest.ts";\nimport { gitTimeoutMs } from "@norn/store";\n`);
+    put("packages/cli/test/integration/ok.test.ts", `import { h } from "../../../../test/support/harness.ts";\nimport { fetchNornRefs } from "@norn/store";\n`);
+    put("test/e2e/ok.test.ts", `import { t } from "../support/transcript.ts";\n`);
+    expect(spawningUnitImports(root)).toEqual([
+      { file: "packages/cli/test/unit/a.test.ts", import: "../../../../test/support/harness.ts" },
+      { file: "packages/cli/test/unit/b.test.ts", import: "../../../../test/support/transcript.ts" },
+      { file: "packages/cli/test/unit/b.test.ts", import: "../../../../test/support/observe-snapshot.ts" },
+      { file: "packages/cli/test/unit/c.test.ts", import: "../../../../test/support/stories.ts" },
+      { file: "packages/store/test/unit/d.test.ts", import: "../../src/git.ts" },
+      { file: "packages/view/test/unit/e.test.ts", import: "fetchNornRefs from @norn/store" },
+      { file: "packages/view/test/unit/e.test.ts", import: "onlyNornCommitsSince from @norn/store" },
+      { file: "test/repo/f.test.ts", import: "../support/harness.ts" },
     ]);
   });
 

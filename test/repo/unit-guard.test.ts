@@ -1,6 +1,6 @@
 /**
- * Unit guard self-test (B4, seam S2). The guard is not in the root bunfig yet (slice 07), so this file
- * installs it by hand around each test and takes it off again.
+ * Unit guard self-test (B4, seam S2). The root bunfig already preloads the guard; this file installs a second
+ * one inside it around each test, so it can take the violations itself, and takes it off again.
  */
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { spawn as nodeSpawn } from "node:child_process";
