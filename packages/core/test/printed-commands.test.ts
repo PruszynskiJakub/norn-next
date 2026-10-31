@@ -37,6 +37,7 @@ const today: Record<keyof typeof cmd, [string, ...string[]]> = {
   storyClose: [`norn story close ${S}`, cmd.storyClose(S), `norn story close ${S} --yes`, cmd.storyClose(S, { yes: true }), "norn story close", cmd.storyClose()],
   storyHandoff: [`norn story handoff ${S}`, cmd.storyHandoff(S), "norn story handoff", cmd.storyHandoff()],
   storyReopen: [`norn story reopen ${S}`, cmd.storyReopen(S), "norn story reopen", cmd.storyReopen()],
+  storyReset: [`norn story reset ${S}`, cmd.storyReset(S), `norn story reset ${S} --yes --force`, cmd.storyReset(S, { yes: true, force: true }), "norn story reset", cmd.storyReset()],
   runList: [`norn run list ${U}`, cmd.runList(U), `norn run list ${U} --limit 20`, cmd.runList(U, { limit: 20 })],
   runAttach: [`norn run attach ${U}`, cmd.runAttach(U), "norn run attach --next", cmd.runAttach(undefined, { next: true })],
   runView: [
