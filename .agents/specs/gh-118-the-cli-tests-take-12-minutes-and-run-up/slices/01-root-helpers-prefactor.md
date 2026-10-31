@@ -2,7 +2,7 @@
 id: gh-118/01
 title: Root test code may import @norn packages; helpers name their outputs from the repo root
 depends_on: []
-status: planned
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
