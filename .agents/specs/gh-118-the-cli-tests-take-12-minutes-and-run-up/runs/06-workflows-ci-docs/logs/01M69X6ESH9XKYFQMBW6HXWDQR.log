@@ -1,0 +1,4 @@
+bun install v1.3.13 (bf2e2cec)
+
+Checked 26 installs across 20 packages (no changes) [2.00ms]
+error: Script not found "test:fast"
