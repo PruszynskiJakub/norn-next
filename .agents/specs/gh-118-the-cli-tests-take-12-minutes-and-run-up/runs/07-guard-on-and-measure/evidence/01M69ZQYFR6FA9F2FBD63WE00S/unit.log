@@ -1,0 +1,8 @@
+$ bun test
+bun test v1.3.13 (bf2e2cec)
+
+ 983 pass
+ 0 fail
+ 16 snapshots, 22016 expect() calls
+Ran 983 tests across 55 files. [1.90s]
+bun run test  2.87s user 0.52s system 176% cpu 1.922 total

@@ -1,0 +1,38 @@
+base 1528 head 1560
+added 34 removed 2
++ 1  > the harvest finds the harness test files in cli integration and test/e2e and runs each with its tier's config (gh-118 B19)
++ 1  > the repo root is the workspace root, found from anywhere below it
++ 1  > transcripts and observe snapshots are read from their folders under the repo root
++ 1 dependency direction > an undeclared import in root test code fails, naming the file and the import
++ 1 dependency direction > root test/ and scripts/ import only packages the root declares
++ 1 dependency direction > the root declares every package as a dev dependency
++ 1 test layout (AGENTS.md) > AC1 (B7): the old split scripts are gone from package.json and from every live file
++ 1 test layout (AGENTS.md) > AC2 (B8): the test check of quick, story, slice and bug runs unit, then integration, then the type check, in 15 m
++ 1 test layout (AGENTS.md) > AC3 (B9): the implement step of quick, story, slice and bug names bun run test as the loop, integration in the test check and e2e in CI
++ 1 test layout (AGENTS.md) > AC4 (B10): the shipped norn-implement skill asks for the fast suite after each change, slower tiers in their own check, never the full suite
++ 1 test layout (AGENTS.md) > AC5 (B11, B12): ci.yml runs unit and the type check first; integration, 3 e2e shards with fail-fast, and package need it; git-spawning jobs set an identity
++ 1 test layout (AGENTS.md) > AC6 (B13): release.yml's test step runs exactly the unit tier and the type check
++ 1 test layout (AGENTS.md) > AC7 (B21): AGENTS.md lists the three tier commands, hands back on the unit tier and the type check, and every path it names exists; README's test line is not all tests
++ 1 test layout (AGENTS.md) > AC7: no test source tells a person to rewrite a transcript or snapshot with plain bun test, which skips test/e2e/
++ 1 test layout (AGENTS.md) > B1, B2, B4: the root bunfig preloads the unit guard, ignores exactly the integration and e2e tiers, and the test script is exactly bun test
++ 1 test layout (AGENTS.md) > B15: a unit test importing the harness, the transcript or snapshot helpers, or store's git functions fails, naming the file and the import
++ 1 test layout (AGENTS.md) > B15: no unit test imports the cli harness, a helper that imports it, or store's git functions
++ 1 test layout (AGENTS.md) > B16: an integration or unit test importing them fails, naming the file and the import
++ 1 test layout (AGENTS.md) > B16: only test/e2e/ imports the transcript recorder and the observe snapshot helpers
++ 1 test layout (AGENTS.md) > B5, B6: test:e2e runs bun test with bunfig.e2e.toml, in parallel with a 20 s timeout, passing extra arguments through, and selects only its tier
++ 1 test layout (AGENTS.md) > B5, B6: test:integration runs bun test with bunfig.integration.toml, in parallel with a 20 s timeout, passing extra arguments through, and selects only its tier
++ 1 test layout (AGENTS.md) > an adapter whose tests sit in either tier has tests; one with none, or only outside a tier, is named
++ 1 test layout (AGENTS.md) > every adapter has its tests in packages/adapters/test/unit/<adapter>/ or test/integration/<adapter>/
++ 1 test layout (AGENTS.md) > gh-118 B14: a test file outside a tier folder fails, naming the file
++ 1 test layout (AGENTS.md) > gh-118 B14: every test file sits in a tier folder
++ 1 unit guard (B4) > Bun.spawn throws at once, naming the argv, the test file and test/integration/ (AC1)
++ 1 unit guard (B4) > Bun.spawn with an options object is blocked the same way (AC1)
++ 1 unit guard (B4) > Bun.spawnSync throws at once (AC1)
++ 1 unit guard (B4) > a swallowed error still fails the test at the guard's check (AC2)
++ 1 unit guard (B4) > a test that spawns nothing passes the check
++ 1 unit guard (B4) > in a spawning tier the guard passes every call through, whenever the tier says so (bun --parallel workers load the root preloads too)
++ 1 unit guard (B4) > node's child_process.spawn throws at once (AC1)
++ 1 unit guard (B4) > the message never carries the spawn's environment or options (AC3)
++ 1 unit guard (B4) > uninstall puts the real spawn functions back
+- 1 test layout (AGENTS.md) > every adapter has its tests in packages/adapters/test/<adapter>/
+- 1 test layout (AGENTS.md) > test:fast and test:cli split the suite: fast skips exactly the folder cli runs, and slice, story and quick checks run fast

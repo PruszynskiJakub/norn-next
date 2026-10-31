@@ -1,0 +1,954 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="bun test" tests="553" assertions="7236" failures="1" skipped="0" time="156.108022">
+  <testsuite name="packages/cli/test/story-start.test.ts" file="packages/cli/test/story-start.test.ts" tests="6" assertions="27" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="norn story start (B28, MO5)" file="packages/cli/test/story-start.test.ts" tests="6" assertions="27" failures="0" skipped="0" time="23.465" hostname="mac.home">
+      <testcase name="taken in, not started: refused with the command that starts it; the inbox says so (GR2, O1)" classname="norn story start (B28, MO5)" time="3.396932" file="packages/cli/test/story-start.test.ts" assertions="4" />
+      <testcase name="an attended step, a runner that cannot open terminals: the inbox and open give the start command" classname="norn story start (B28, MO5)" time="5.412277" file="packages/cli/test/story-start.test.ts" assertions="3" />
+      <testcase name="without a target a person picks from the units a person can start only (B28, B57)" classname="norn story start (B28, MO5)" time="1.574796" file="packages/cli/test/story-start.test.ts" assertions="5" />
+      <testcase name="a runner that opens terminals: story start opens one in the worktree; --print prints the command" classname="norn story start (B28, MO5)" time="2.542311" file="packages/cli/test/story-start.test.ts" assertions="6" />
+      <testcase name="a step a person does not start is refused (nothing_to_open); with no target, nothing to pick (B59)" classname="norn story start (B28, MO5)" time="2.890581" file="packages/cli/test/story-start.test.ts" assertions="6" />
+      <testcase name="a manual unit ready at a step that is not an agent step is not offered (B28, B57)" classname="norn story start (B28, MO5)" time="7.651442" file="packages/cli/test/story-start.test.ts" assertions="3" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/story-view.test.ts" file="packages/cli/test/story-view.test.ts" tests="9" assertions="66" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="norn story view" file="packages/cli/test/story-view.test.ts" tests="4" assertions="28" failures="0" skipped="0" time="2.376" hostname="mac.home">
+      <testcase name="shows the slices with their steps, the PR link and state, the open notes and what waits (B16)" classname="norn story view" time="0.502995" file="packages/cli/test/story-view.test.ts" assertions="11" />
+      <testcase name="--json is the orient report extended with the slice steps and PR state (B6, D6)" classname="norn story view" time="0.291584" file="packages/cli/test/story-view.test.ts" assertions="8" />
+      <testcase name="a slice key views its story with the slice in focus; an unknown story or slice is refused" classname="norn story view" time="0.721588" file="packages/cli/test/story-view.test.ts" assertions="3" />
+      <testcase name="--web opens the PR, or the issue when there is none (B17)" classname="norn story view" time="0.862971" file="packages/cli/test/story-view.test.ts" assertions="6" />
+    </testsuite>
+    <testsuite name="norn story chat" file="packages/cli/test/story-view.test.ts" tests="2" assertions="13" failures="0" skipped="0" time="1.219" hostname="mac.home">
+      <testcase name="creates the `&lt;story&gt; orient` workspace with an agent in the story worktree, then focuses it (B29)" classname="norn story chat" time="0.952823" file="packages/cli/test/story-view.test.ts" assertions="7" />
+      <testcase name="the chat agent reads the view with its rules; it is no run: brief and done refuse it, its hooks record nothing" classname="norn story chat" time="0.267445" file="packages/cli/test/story-view.test.ts" assertions="6" />
+    </testsuite>
+    <testsuite name="targets (B55)" file="packages/cli/test/story-view.test.ts" tests="2" assertions="17" failures="0" skipped="0" time="2.013" hostname="mac.home">
+      <testcase name="in a slice worktree, view and chat act on the story" classname="targets (B55)" time="0.505482" file="packages/cli/test/story-view.test.ts" assertions="5" />
+      <testcase name="outside a worktree without a target, a terminal is offered stories only; a script is refused with them" classname="targets (B55)" time="1.508545" file="packages/cli/test/story-view.test.ts" assertions="12" />
+    </testsuite>
+    <testsuite name="norn orient is gone (B5)" file="packages/cli/test/story-view.test.ts" tests="1" assertions="8" failures="0" skipped="0" time="0" hostname="mac.home">
+      <testcase name="any flags: a usage error, Unknown command: orient" classname="norn orient is gone (B5)" time="0.000335" file="packages/cli/test/story-view.test.ts" assertions="8" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/strays.test.ts" file="packages/cli/test/strays.test.ts" tests="2" assertions="4" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="stray listeners on a slot&apos;s ports (K4.1)" file="packages/cli/test/strays.test.ts" tests="2" assertions="4" failures="0" skipped="0" time="1.072" hostname="mac.home">
+      <testcase name="a server started from the worktree, listening on its slot&apos;s ports, is stopped and reported" classname="stray listeners on a slot&amp;apos;s ports (K4.1)" time="0.631158" file="packages/cli/test/strays.test.ts" assertions="2" />
+      <testcase name="a listener started elsewhere is left alone" classname="stray listeners on a slot&amp;apos;s ports (K4.1)" time="0.441374" file="packages/cli/test/strays.test.ts" assertions="2" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/targets.test.ts" file="packages/cli/test/targets.test.ts" tests="8" assertions="82" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="no unit has a run" file="packages/cli/test/targets.test.ts" tests="1" assertions="6" failures="0" skipped="0" time="0.616" hostname="mac.home">
+      <testcase name="refused with the reason, nothing prompted (B59)" classname="no unit has a run" time="0.616901" file="packages/cli/test/targets.test.ts" assertions="6" />
+    </testsuite>
+    <testsuite name="one unit has a run" file="packages/cli/test/targets.test.ts" tests="2" assertions="6" failures="0" skipped="0" time="6.239" hostname="mac.home">
+      <testcase name="the pick-list is shown with it preselected; accepting it acts on it (B58)" classname="one unit has a run" time="5.928943" file="packages/cli/test/targets.test.ts" assertions="3" />
+      <testcase name="leaving the pick-list (Esc, Ctrl-C) acts on nothing" classname="one unit has a run" time="0.311928" file="packages/cli/test/targets.test.ts" assertions="3" />
+    </testsuite>
+    <testsuite name="a story and its slice have runs" file="packages/cli/test/targets.test.ts" tests="5" assertions="70" failures="0" skipped="0" time="18.468" hostname="mac.home">
+      <testcase name="setup: gh-2&apos;s slice parks at its gate in the slice worktree" classname="a story and its slice have runs" time="10.751799" file="packages/cli/test/targets.test.ts" assertions="1" />
+      <testcase name="in the slice worktree, no target means the slice (B54)" classname="a story and its slice have runs" time="0.160219" file="packages/cli/test/targets.test.ts" assertions="5" />
+      <testcase name="an explicit target wins over the worktree (B56)" classname="a story and its slice have runs" time="0.087641" file="packages/cli/test/targets.test.ts" assertions="2" />
+      <testcase name="in the main checkout at a terminal: offered the units with runs in `norn status` order, the pick shown (B57)" classname="a story and its slice have runs" time="1.624315" file="packages/cli/test/targets.test.ts" assertions="8" />
+      <testcase name="a script or an agent is refused (exit 2) with the candidates, never prompted (B60)" classname="a story and its slice have runs" time="5.846284" file="packages/cli/test/targets.test.ts" assertions="54" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/rebase-rewind.test.ts" file="packages/cli/test/rebase-rewind.test.ts" tests="2" assertions="8" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="gh-79: a tick mid-rebase" file="packages/cli/test/rebase-rewind.test.ts" tests="2" assertions="8" failures="0" skipped="0" time="1.629" hostname="mac.home">
+      <testcase name="mid-rebase the tick writes nothing into the rewound runs/" classname="gh-79: a tick mid-rebase" time="1.004918" file="packages/cli/test/rebase-rewind.test.ts" assertions="5" />
+      <testcase name="after `git rebase --abort` the unit is not corrupt" classname="gh-79: a tick mid-rebase" time="0.625092" file="packages/cli/test/rebase-rewind.test.ts" assertions="3" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/runtime.test.ts" file="packages/cli/test/runtime.test.ts" tests="15" assertions="63" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="runtime" file="packages/cli/test/runtime.test.ts" tests="9" assertions="38" failures="0" skipped="0" time="12.956" hostname="mac.home">
+      <testcase name="remote calls are throttled (H5); `norn sync` forces one" classname="runtime" time="4.125922" file="packages/cli/test/runtime.test.ts" assertions="6" />
+      <testcase name="commands work from inside a unit worktree (A3 marker → main checkout)" classname="runtime" time="1.336222" file="packages/cli/test/runtime.test.ts" assertions="3" />
+      <testcase name="outside a repository the command refuses with do_instead (§9.3)" classname="runtime" time="0.03048" file="packages/cli/test/runtime.test.ts" assertions="2" />
+      <testcase name="turn ended without a receipt → silent → nudge into the same session (C1, B2)" classname="runtime" time="1.738587" file="packages/cli/test/runtime.test.ts" assertions="5" />
+      <testcase name="pane gone → died → old session killed, fresh session launched (C1)" classname="runtime" time="1.406423" file="packages/cli/test/runtime.test.ts" assertions="4" />
+      <testcase name="a stale receipt is rejected into the trace (T9); done → $done, waiting for the PR merge (GR6)" classname="runtime" time="1.236664" file="packages/cli/test/runtime.test.ts" assertions="3" />
+      <testcase name="a receipt failing validation marks the unit corrupt and notifies once (S2, O3)" classname="runtime" time="1.566314" file="packages/cli/test/runtime.test.ts" assertions="4" />
+      <testcase name="PR merged → worktree, branches, claim ref and slot removed (GR6)" classname="runtime" time="1.457652" file="packages/cli/test/runtime.test.ts" assertions="5" />
+      <testcase name="uninstall removes norn-owned hooks and skills, keeps config" classname="runtime" time="0.062439" file="packages/cli/test/runtime.test.ts" assertions="6" />
+    </testsuite>
+    <testsuite name="watch" file="packages/cli/test/runtime.test.ts" tests="4" assertions="19" failures="0" skipped="0" time="11.758" hostname="mac.home">
+      <testcase name="loops ticks and releases held claims on a clean exit (T6)" classname="watch" time="6.35322" file="packages/cli/test/runtime.test.ts" assertions="5" />
+      <testcase name="--human prints a line per action and a sentence at exit; --json wins" classname="watch" time="5.363414" file="packages/cli/test/runtime.test.ts" assertions="10" />
+      <testcase name="humanSummary names failed releases and kept claims" classname="watch" time="0.000141" file="packages/cli/test/runtime.test.ts" assertions="3" />
+      <testcase name="bad --interval is a usage error" classname="watch" time="0.042987" file="packages/cli/test/runtime.test.ts" assertions="1" />
+    </testsuite>
+    <testsuite name="check runner (C5)" file="packages/cli/test/runtime.test.ts" tests="2" assertions="6" failures="0" skipped="0" time="0.215" hostname="mac.home">
+      <testcase name="a timeout kills the process group and has no exit code" classname="check runner (C5)" time="0.20406" file="packages/cli/test/runtime.test.ts" assertions="4" />
+      <testcase name="stderr is merged and the exit code kept" classname="check runner (C5)" time="0.011704" file="packages/cli/test/runtime.test.ts" assertions="2" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/segment.test.ts" file="packages/cli/test/segment.test.ts" tests="4" assertions="4011" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="planWorkspaceMoves" file="packages/cli/test/segment.test.ts" tests="2" assertions="4005" failures="0" skipped="0" time="0.017" hostname="mac.home">
+      <testcase name="ours needing you first, inside the slots ours hold; the others stay put; none when the order holds" classname="planWorkspaceMoves" time="0.002922" file="packages/cli/test/segment.test.ts" assertions="5" />
+      <testcase name="holds for any order (random)" classname="planWorkspaceMoves" time="0.015496" file="packages/cli/test/segment.test.ts" assertions="4000" />
+    </testsuite>
+    <testsuite name="norn status --segment" file="packages/cli/test/segment.test.ts" tests="2" assertions="6" failures="0" skipped="0" time="0.501" hostname="mac.home">
+      <testcase name="one plain line; outside a repository an empty one" classname="norn status --segment" time="0.252012" file="packages/cli/test/segment.test.ts" assertions="4" />
+      <testcase name="inside Herdr: a token on each orient workspace of this repo, none on another repo&apos;s" classname="norn status --segment" time="0.249706" file="packages/cli/test/segment.test.ts" assertions="2" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/status-watch.test.ts" file="packages/cli/test/status-watch.test.ts" tests="19" assertions="99" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="norn status --watch --json (CP5)" file="packages/cli/test/status-watch.test.ts" tests="1" assertions="4" failures="0" skipped="0" time="0.597" hostname="mac.home">
+      <testcase name="prints the model once: what needs you, then every story; no places outside Herdr" classname="norn status --watch --json (CP5)" time="0.597044" file="packages/cli/test/status-watch.test.ts" assertions="4" />
+    </testsuite>
+    <testsuite name="keys (CP7)" file="packages/cli/test/status-watch.test.ts" tests="3" assertions="18" failures="0" skipped="0" time="0.523" hostname="mac.home">
+      <testcase name="parseKeys: arrows, pages, enter, esc, backspace, letters, ⌃c" classname="keys (CP7)" time="0.00023" file="packages/cli/test/status-watch.test.ts" assertions="1" />
+      <testcase name="move, filter, a key the row lacks, the prompt of an action that takes text" classname="keys (CP7)" time="0.285892" file="packages/cli/test/status-watch.test.ts" assertions="11" />
+      <testcase name="the frame: rows by section, the preview, the selected row&apos;s keys" classname="keys (CP7)" time="0.238475" file="packages/cli/test/status-watch.test.ts" assertions="6" />
+    </testsuite>
+    <testsuite name="the preview (CP3)" file="packages/cli/test/status-watch.test.ts" tests="3" assertions="17" failures="0" skipped="0" time="0.808" hostname="mac.home">
+      <testcase name="sections, one line per slice, every line within the column; a gate&apos;s notes only under NOTES" classname="the preview (CP3)" time="0.239738" file="packages/cli/test/status-watch.test.ts" assertions="7" />
+      <testcase name="⌃d / ⌃u scroll the preview, kept within what it holds; moving resets it" classname="the preview (CP3)" time="0.274878" file="packages/cli/test/status-watch.test.ts" assertions="5" />
+      <testcase name="the mouse wheel: over the preview it scrolls, over the list it moves the selection; other buttons do nothing" classname="the preview (CP3)" time="0.295306" file="packages/cli/test/status-watch.test.ts" assertions="5" />
+    </testsuite>
+    <testsuite name="norn status --watch (B11, CP6–CP8)" file="packages/cli/test/status-watch.test.ts" tests="7" assertions="31" failures="0" skipped="0" time="5.395" hostname="mac.home">
+      <testcase name="a session: trace shown, answer typed and sent, a refused key, quit; stays open after each action" classname="norn status --watch (B11, CP6–CP8)" time="3.558012" file="packages/cli/test/status-watch.test.ts" assertions="7" />
+      <testcase name="SIGINT/SIGTERM end it (CP6): the abort signal stops the loop while it waits" classname="norn status --watch (B11, CP6–CP8)" time="0.413279" file="packages/cli/test/status-watch.test.ts" assertions="2" />
+      <testcase name="enter orients through Herdr; o and i open links with the platform opener" classname="norn status --watch (B11, CP6–CP8)" time="0.544597" file="packages/cli/test/status-watch.test.ts" assertions="3" />
+      <testcase name="outside a repository it shows the last one a cockpit ran in (CP13)" classname="norn status --watch (B11, CP6–CP8)" time="0.627063" file="packages/cli/test/status-watch.test.ts" assertions="4" />
+      <testcase name="norn pane and norn pick are gone (CP10)" classname="norn status --watch (B11, CP6–CP8)" time="0.000266" file="packages/cli/test/status-watch.test.ts" assertions="2" />
+      <testcase name="status --json stays the inbox (B10); --interval needs a duration" classname="norn status --watch (B11, CP6–CP8)" time="0.25369" file="packages/cli/test/status-watch.test.ts" assertions="5" />
+      <testcase name="norn cockpit, with any flags, is an unknown command (B5)" classname="norn status --watch (B11, CP6–CP8)" time="0.000239" file="packages/cli/test/status-watch.test.ts" assertions="8" />
+    </testsuite>
+    <testsuite name="norn status --watch --pane (B12)" file="packages/cli/test/status-watch.test.ts" tests="3" assertions="7" failures="0" skipped="0" time="0.118" hostname="mac.home">
+      <testcase name="inside Herdr: a pane split below the caller runs the cockpit" classname="norn status --watch --pane (B12)" time="0.075483" file="packages/cli/test/status-watch.test.ts" assertions="4" />
+      <testcase name="outside Herdr: refused with the reason, do_instead norn status --watch" classname="norn status --watch --pane (B12)" time="0.043" file="packages/cli/test/status-watch.test.ts" assertions="2" />
+      <testcase name="--pane is listed in norn help status" classname="norn status --watch --pane (B12)" time="0.001101" file="packages/cli/test/status-watch.test.ts" assertions="1" />
+    </testsuite>
+    <testsuite name="run attach (B46, B47, HC10), labels (HC12) and the agent place (HC6, HC15)" file="packages/cli/test/status-watch.test.ts" tests="2" assertions="22" failures="0" skipped="0" time="5.206" hostname="mac.home">
+      <testcase name="an attended agent waiting for its person: run attach focuses its pane; the cockpit labels it" classname="run attach (B46, B47, HC10), labels (HC12) and the agent place (HC6, HC15)" time="5.206456" file="packages/cli/test/status-watch.test.ts" assertions="19" />
+      <testcase name="placeAgent: the pane, else the one workspace in the worktree; never a guess" classname="run attach (B46, B47, HC10), labels (HC12) and the agent place (HC6, HC15)" time="0.000131" file="packages/cli/test/status-watch.test.ts" assertions="3" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/integrate.test.ts" file="packages/cli/test/integrate.test.ts" tests="12" assertions="52" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="integrate (W2, K6)" file="packages/cli/test/integrate.test.ts" tests="5" assertions="23" failures="0" skipped="0" time="9.841" hostname="mac.home">
+      <testcase name="clean: rebase + fast-forward story branch checked out in a worktree" classname="integrate (W2, K6)" time="1.71583" file="packages/cli/test/integrate.test.ts" assertions="4" />
+      <testcase name="clean: story branch not checked out moves by CAS" classname="integrate (W2, K6)" time="1.830713" file="packages/cli/test/integrate.test.ts" assertions="2" />
+      <testcase name="conflict: rebase aborted cleanly, files reported, branches untouched" classname="integrate (W2, K6)" time="1.723353" file="packages/cli/test/integrate.test.ts" assertions="5" />
+      <testcase name="conflict resolved by merging the story branch stays resolved (gh-80)" classname="integrate (W2, K6)" time="2.236033" file="packages/cli/test/integrate.test.ts" assertions="6" />
+      <testcase name="the resolution stays when the story branch moves on after the merge step (gh-80)" classname="integrate (W2, K6)" time="2.337168" file="packages/cli/test/integrate.test.ts" assertions="6" />
+    </testsuite>
+    <testsuite name="update and remote sync (BS3, BS3.3a)" file="packages/cli/test/integrate.test.ts" tests="7" assertions="29" failures="0" skipped="0" time="19.97" hostname="mac.home">
+      <testcase name="behind with no conflict → one merge commit with the Norn-Tick trailer (acceptance 1)" classname="update and remote sync (BS3, BS3.3a)" time="2.414084" file="packages/cli/test/integrate.test.ts" assertions="7" />
+      <testcase name="conflict → merge aborted, paths reported, worktree clean and head unchanged" classname="update and remote sync (BS3, BS3.3a)" time="2.623682" file="packages/cli/test/integrate.test.ts" assertions="3" />
+      <testcase name="dirty worktree → stuck" classname="update and remote sync (BS3, BS3.3a)" time="1.489144" file="packages/cli/test/integrate.test.ts" assertions="1" />
+      <testcase name="remote story branch fast-forwarded by a person → adopted first; diverged → stuck (acceptance 7)" classname="update and remote sync (BS3, BS3.3a)" time="7.129997" file="packages/cli/test/integrate.test.ts" assertions="8" />
+      <testcase name="BS3.3a: syncRemoteBranch — none, local, adopted, merged" classname="update and remote sync (BS3, BS3.3a)" time="2.952208" file="packages/cli/test/integrate.test.ts" assertions="5" />
+      <testcase name="no remote (host-less, acceptance 11): merges the local base" classname="update and remote sync (BS3, BS3.3a)" time="1.525754" file="packages/cli/test/integrate.test.ts" assertions="1" />
+      <testcase name="H1: update never aborts or concludes a merge in progress" classname="update and remote sync (BS3, BS3.3a)" time="1.838208" file="packages/cli/test/integrate.test.ts" assertions="4" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/team.test.ts" file="packages/cli/test/team.test.ts" tests="14" assertions="119" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="two clones hand a story over through git (§19.3, T5, T6)" file="packages/cli/test/team.test.ts" tests="4" assertions="42" failures="0" skipped="0" time="30.259" hostname="mac.home">
+      <testcase name="clone A: intake → plan → slice implement asks a question and parks" classname="two clones hand a story over through git (§19.3, T5, T6)" time="14.639119" file="packages/cli/test/team.test.ts" assertions="11" />
+      <testcase name="clone A hands over from its slice worktree: handoff committed, branches pushed, then the claim ref deleted (T6, B34, B55)" classname="two clones hand a story over through git (§19.3, T5, T6)" time="2.729284" file="packages/cli/test/team.test.ts" assertions="5" />
+      <testcase name="clone B takes from git alone: claim, worktrees with slots, cursor and handoff printed (T5)" classname="two clones hand a story over through git (§19.3, T5, T6)" time="4.037719" file="packages/cli/test/team.test.ts" assertions="16" />
+      <testcase name="clone B answers, briefs and continues the slice to its gate" classname="two clones hand a story over through git (§19.3, T5, T6)" time="8.854595" file="packages/cli/test/team.test.ts" assertions="10" />
+    </testsuite>
+    <testsuite name="claim races (T3) and forced takes (T5)" file="packages/cli/test/team.test.ts" tests="8" assertions="61" failures="0" skipped="0" time="18.81" hostname="mac.home">
+      <testcase name="after B&apos;s claim expires, two concurrent takes: exactly one wins, the other is told who holds it" classname="claim races (T3) and forced takes (T5)" time="2.525371" file="packages/cli/test/team.test.ts" assertions="6" />
+      <testcase name="before expiry a take needs --force; the forced take is journaled in the claim and the handoff" classname="claim races (T3) and forced takes (T5)" time="2.858562" file="packages/cli/test/team.test.ts" assertions="8" />
+      <testcase name="story close is refused on a story another machine holds, whether this checkout has it or not; nothing changes (B38)" classname="claim races (T3) and forced takes (T5)" time="1.24307" file="packages/cli/test/team.test.ts" assertions="6" />
+      <testcase name="the old take, release and drop are unknown commands; nothing is dropped (B5)" classname="claim races (T3) and forced takes (T5)" time="0.060573" file="packages/cli/test/team.test.ts" assertions="8" />
+      <testcase name="story close without --yes asks; under --json or with no TTY it is refused; N changes nothing (B36, B37)" classname="claim races (T3) and forced takes (T5)" time="1.307938" file="packages/cli/test/team.test.ts" assertions="9" />
+      <testcase name="a claim taken elsewhere while the close question is open is seen under the lock: refused, nothing changed (B38)" classname="claim races (T3) and forced takes (T5)" time="6.970613" file="packages/cli/test/team.test.ts" assertions="9" />
+      <testcase name="story close --yes from the slice worktree pushes first, then removes worktrees, local branches, slots and the claim; the record stays; issue and PRs untouched (GR7, B35, B55)" classname="claim races (T3) and forced takes (T5)" time="3.135593" file="packages/cli/test/team.test.ts" assertions="10" />
+      <testcase name="closing a closed story is refused already_closed; nothing changes (B39)" classname="claim races (T3) and forced takes (T5)" time="0.712057" file="packages/cli/test/team.test.ts" assertions="5" />
+    </testsuite>
+    <testsuite name="story close asks at the terminal (B36)" file="packages/cli/test/team.test.ts" tests="2" assertions="16" failures="0" skipped="0" time="7.735" hostname="mac.home">
+      <testcase name="y closes the story as --yes does" classname="story close asks at the terminal (B36)" time="6.741062" file="packages/cli/test/team.test.ts" assertions="13" />
+      <testcase name="an unreadable pushed spec.md is refused story_corrupt, never taken as open (S2, B39)" classname="story close asks at the terminal (B36)" time="0.994807" file="packages/cli/test/team.test.ts" assertions="3" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/tidy-herdr.test.ts" file="packages/cli/test/tidy-herdr.test.ts" tests="8" assertions="18" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="planHerdrTidy (K7)" file="packages/cli/test/tidy-herdr.test.ts" tests="4" assertions="7" failures="0" skipped="0" time="0.004" hostname="mac.home">
+      <testcase name="a workspace holding only finished runs closes whole" classname="planHerdrTidy (K7)" time="0.004203" file="packages/cli/test/tidy-herdr.test.ts" assertions="1" />
+      <testcase name="a tab holding only the run closes; the workspace stays for what else is in it" classname="planHerdrTidy (K7)" time="0" file="packages/cli/test/tidy-herdr.test.ts" assertions="1" />
+      <testcase name="a tab shared with something else loses only the run&apos;s pane" classname="planHerdrTidy (K7)" time="0.000873" file="packages/cli/test/tidy-herdr.test.ts" assertions="1" />
+      <testcase name="never closes a pane that left the run&apos;s worktree or whose agent still works; a gone pane is skipped" classname="planHerdrTidy (K7)" time="0.000079" file="packages/cli/test/tidy-herdr.test.ts" assertions="4" />
+    </testsuite>
+    <testsuite name="norn tidy closes Herdr panes of runs that reported done (K7)" file="packages/cli/test/tidy-herdr.test.ts" tests="4" assertions="11" failures="0" skipped="0" time="2.953" hostname="mac.home">
+      <testcase name="finds only done runs recorded on this machine" classname="norn tidy closes Herdr panes of runs that reported done (K7)" time="0.001337" file="packages/cli/test/tidy-herdr.test.ts" assertions="1" />
+      <testcase name="another runner: tidy leaves Herdr alone" classname="norn tidy closes Herdr panes of runs that reported done (K7)" time="0.678486" file="packages/cli/test/tidy-herdr.test.ts" assertions="3" />
+      <testcase name="Herdr as the runner: --dry-run lists, tidy closes the done run&apos;s workspace only" classname="norn tidy closes Herdr panes of runs that reported done (K7)" time="1.692464" file="packages/cli/test/tidy-herdr.test.ts" assertions="5" />
+      <testcase name="a Herdr that cannot be reached is reported under kept, and the rest of tidy still runs" classname="norn tidy closes Herdr panes of runs that reported done (K7)" time="0.582735" file="packages/cli/test/tidy-herdr.test.ts" assertions="2" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/trace-free-views.test.ts" file="packages/cli/test/trace-free-views.test.ts" tests="2" assertions="13" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="views that read no trace (B1, B2)" file="packages/cli/test/trace-free-views.test.ts" tests="2" assertions="13" failures="0" skipped="0" time="3.269" hostname="mac.home">
+      <testcase name="norn status --watch --json and a refreshing cockpit open no day file (B1)" classname="views that read no trace (B1, B2)" time="1.077946" file="packages/cli/test/trace-free-views.test.ts" assertions="4" />
+      <testcase name="story list, status --segment, status and story view open no day file and print the same as over an empty trace (B2)" classname="views that read no trace (B1, B2)" time="2.19242" file="packages/cli/test/trace-free-views.test.ts" assertions="9" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/why-version.test.ts" file="packages/cli/test/why-version.test.ts" tests="7" assertions="21" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="norn_version on tick traces (O5)" file="packages/cli/test/why-version.test.ts" tests="4" assertions="15" failures="0" skipped="0" time="0.26" hostname="mac.home">
+      <testcase name="every tick record carries this norn&apos;s package version and stays schema-valid" classname="norn_version on tick traces (O5)" time="0.001534" file="packages/cli/test/why-version.test.ts" assertions="4" />
+      <testcase name="why on a tick this version recorded has no label" classname="norn_version on tick traces (O5)" time="0.043522" file="packages/cli/test/why-version.test.ts" assertions="3" />
+      <testcase name="why on a tick another version recorded still replays, labelled, exit unchanged" classname="norn_version on tick traces (O5)" time="0.1298" file="packages/cli/test/why-version.test.ts" assertions="4" />
+      <testcase name="a mismatch on a tick another version recorded still shows the diff, labelled, and exits 1" classname="norn_version on tick traces (O5)" time="0.087775" file="packages/cli/test/why-version.test.ts" assertions="4" />
+    </testsuite>
+    <testsuite name="why on a tick the trace no longer keeps (B20, D10)" file="packages/cli/test/why-version.test.ts" tests="3" assertions="6" failures="0" skipped="0" time="0.239" hostname="mac.home">
+      <testcase name="a tick older than the window whose day is gone is refused as tick_pruned, pointing at a newer tick" classname="why on a tick the trace no longer keeps (B20, D10)" time="0.041771" file="packages/cli/test/why-version.test.ts" assertions="2" />
+      <testcase name="the window is trace.retain&apos;s" classname="why on a tick the trace no longer keeps (B20, D10)" time="0.076404" file="packages/cli/test/why-version.test.ts" assertions="2" />
+      <testcase name="an unknown tick within the window, or whose day is still kept, is not called pruned" classname="why on a tick the trace no longer keeps (B20, D10)" time="0.122367" file="packages/cli/test/why-version.test.ts" assertions="2" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/rename-continuity.test.ts" file="packages/cli/test/rename-continuity.test.ts" tests="2" assertions="13" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="printed commands renamed, nothing else (B69, B70)" file="packages/cli/test/rename-continuity.test.ts" tests="2" assertions="13" failures="0" skipped="0" time="6.698" hostname="mac.home">
+      <testcase name="why on a tick recorded before the rename is a labelled version mismatch, its diff only the command" classname="printed commands renamed, nothing else (B69, B70)" time="1.790744" file="packages/cli/test/rename-continuity.test.ts" assertions="7" />
+      <testcase name="the unit stuck under the old norn continues after the upgrade with no migration" classname="printed commands renamed, nothing else (B69, B70)" time="4.908698" file="packages/cli/test/rename-continuity.test.ts" assertions="6" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/layout-guard.test.ts" file="packages/cli/test/layout-guard.test.ts" tests="13" assertions="181" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="old layout: every command refuses and names norn migrate (B18, B19)" file="packages/cli/test/layout-guard.test.ts" tests="4" assertions="68" failures="0" skipped="0" time="0.127" hostname="mac.home">
+      <testsuite name="only the config at its old place" file="packages/cli/test/layout-guard.test.ts" tests="1" assertions="21" failures="0" skipped="0" time="0.265" hostname="mac.home">
+        <testcase name="status, tick and watch refuse (exit 3, old_layout) naming the main checkout, do_instead norn migrate; a CliError with --json" classname="only the config at its old place &amp;gt; old layout: every command refuses and names norn migrate (B18, B19)" time="0.26519" file="packages/cli/test/layout-guard.test.ts" assertions="21" />
+      </testsuite>
+      <testsuite name="only the workflows at its old place" file="packages/cli/test/layout-guard.test.ts" tests="1" assertions="21" failures="0" skipped="0" time="0.362" hostname="mac.home">
+        <testcase name="status, tick and watch refuse (exit 3, old_layout) naming the main checkout, do_instead norn migrate; a CliError with --json" classname="only the workflows at its old place &amp;gt; old layout: every command refuses and names norn migrate (B18, B19)" time="0.362887" file="packages/cli/test/layout-guard.test.ts" assertions="21" />
+      </testsuite>
+      <testsuite name="only the machine files at its old place" file="packages/cli/test/layout-guard.test.ts" tests="1" assertions="21" failures="0" skipped="0" time="0.306" hostname="mac.home">
+        <testcase name="status, tick and watch refuse (exit 3, old_layout) naming the main checkout, do_instead norn migrate; a CliError with --json" classname="only the machine files at its old place &amp;gt; old layout: every command refuses and names norn migrate (B18, B19)" time="0.30689" file="packages/cli/test/layout-guard.test.ts" assertions="21" />
+      </testsuite>
+      <testcase name="init refuses with do_instead norn migrate and writes nothing (B19)" classname="old layout: every command refuses and names norn migrate (B18, B19)" time="0.127004" file="packages/cli/test/layout-guard.test.ts" assertions="5" />
+    </testsuite>
+    <testsuite name="both layouts: every command refuses naming both paths, reads and moves nothing (B17)" file="packages/cli/test/layout-guard.test.ts" tests="3" assertions="63" failures="0" skipped="0" time="0.788" hostname="mac.home">
+      <testcase name="the config in both places" classname="both layouts: every command refuses naming both paths, reads and moves nothing (B17)" time="0.263342" file="packages/cli/test/layout-guard.test.ts" assertions="21" />
+      <testcase name="the workflows in both places" classname="both layouts: every command refuses naming both paths, reads and moves nothing (B17)" time="0.260434" file="packages/cli/test/layout-guard.test.ts" assertions="21" />
+      <testcase name="the machine files in both places" classname="both layouts: every command refuses naming both paths, reads and moves nothing (B17)" time="0.265739" file="packages/cli/test/layout-guard.test.ts" assertions="21" />
+    </testsuite>
+    <testsuite name="norn doctor reports the layout as a failed repo check (B20)" file="packages/cli/test/layout-guard.test.ts" tests="2" assertions="22" failures="0" skipped="0" time="0.646" hostname="mac.home">
+      <testcase name="old layout: doctor and doctor --repo fail naming norn migrate and move nothing" classname="norn doctor reports the layout as a failed repo check (B20)" time="0.260077" file="packages/cli/test/layout-guard.test.ts" assertions="11" />
+      <testcase name="both layout: doctor and doctor --repo fail naming norn migrate and move nothing" classname="norn doctor reports the layout as a failed repo check (B20)" time="0.386007" file="packages/cli/test/layout-guard.test.ts" assertions="11" />
+    </testsuite>
+    <testsuite name="old layout in a unit worktree&apos;s session (B18, D5)" file="packages/cli/test/layout-guard.test.ts" tests="2" assertions="21" failures="0" skipped="0" time="0.168" hostname="mac.home">
+      <testcase name="norn hook exits 0, records nothing and blocks nothing" classname="old layout in a unit worktree&amp;apos;s session (B18, D5)" time="0.148691" file="packages/cli/test/layout-guard.test.ts" assertions="5" />
+      <testcase name="brief, done, ask and stuck refuse like any command" classname="old layout in a unit worktree&amp;apos;s session (B18, D5)" time="0.02012" file="packages/cli/test/layout-guard.test.ts" assertions="16" />
+    </testsuite>
+    <testsuite name="a unit worktree&apos;s own old files are ignored (B21)" file="packages/cli/test/layout-guard.test.ts" tests="2" assertions="7" failures="0" skipped="0" time="0.288" hostname="mac.home">
+      <testcase name="brief, done and the agent hooks work, reading config and workflows from the main checkout" classname="a unit worktree&amp;apos;s own old files are ignored (B21)" time="0.221079" file="packages/cli/test/layout-guard.test.ts" assertions="5" />
+      <testcase name="ask works" classname="a unit worktree&amp;apos;s own old files are ignored (B21)" time="0.067427" file="packages/cli/test/layout-guard.test.ts" assertions="2" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/layout.test.ts" file="packages/cli/test/layout.test.ts" tests="8" assertions="21" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="norn init writes the new layout (B1, B2)" file="packages/cli/test/layout.test.ts" tests="2" assertions="11" failures="0" skipped="0" time="0.094" hostname="mac.home">
+      <testcase name="config file and workflows in .agents/workflows/; no folder of norn&apos;s own under .agents/" classname="norn init writes the new layout (B1, B2)" time="0.000182" file="packages/cli/test/layout.test.ts" assertions="8" />
+      <testcase name="norn config shows repo settings as coming from the repo config file" classname="norn init writes the new layout (B1, B2)" time="0.094433" file="packages/cli/test/layout.test.ts" assertions="3" />
+    </testsuite>
+    <testsuite name="messages name the new paths (D11)" file="packages/cli/test/layout.test.ts" tests="3" assertions="5" failures="0" skipped="0" time="0.226" hostname="mac.home">
+      <testcase name="config set asks between the user file and the repo config file; --repo help names it" classname="messages name the new paths (D11)" time="0.05799" file="packages/cli/test/layout.test.ts" assertions="3" />
+      <testcase name="story create refuses an unknown workflow naming .agents/workflows/" classname="messages name the new paths (D11)" time="0.079052" file="packages/cli/test/layout.test.ts" assertions="1" />
+      <testcase name="an adapter that cannot be loaded names the repo config file" classname="messages name the new paths (D11)" time="0.090995" file="packages/cli/test/layout.test.ts" assertions="1" />
+    </testsuite>
+    <testsuite name="workflows in .agents/workflows/ run and stay pinned (B2, B4, S7)" file="packages/cli/test/layout.test.ts" tests="3" assertions="5" failures="0" skipped="0" time="24.121" hostname="mac.home">
+      <testcase name="a story labelled norn:wf:quick runs .agents/workflows/quick.yaml" classname="workflows in .agents/workflows/ run and stay pinned (B2, B4, S7)" time="11.076448" file="packages/cli/test/layout.test.ts" assertions="2" />
+      <testcase name="story edit --workflow refuses an unknown one naming .agents/workflows/" classname="workflows in .agents/workflows/ run and stay pinned (B2, B4, S7)" time="0.759705" file="packages/cli/test/layout.test.ts" assertions="1" />
+      <testcase name="story.yaml changed on the base: gh-7 keeps its pinned copy, a story started afterwards pins the new one" classname="workflows in .agents/workflows/ run and stay pinned (B2, B4, S7)" time="12.286085" file="packages/cli/test/layout.test.ts" assertions="2" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/machine-dir.test.ts" file="packages/cli/test/machine-dir.test.ts" tests="6" assertions="48" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="machine-local files in the norn home (B5, B6)" file="packages/cli/test/machine-dir.test.ts" tests="4" assertions="30" failures="0" skipped="0" time="1.564" hostname="mac.home">
+      <testcase name="after init and a tick: trace, heartbeat and caches under repos/&lt;folder&gt;-&lt;hash8&gt;/ with checkout.json; none in the tree or .git (AC1)" classname="machine-local files in the norn home (B5, B6)" time="0.052922" file="packages/cli/test/machine-dir.test.ts" assertions="10" />
+      <testcase name="the tick lock is taken in the machine dir (AC1)" classname="machine-local files in the norn home (B5, B6)" time="0.054926" file="packages/cli/test/machine-dir.test.ts" assertions="2" />
+      <testcase name="a unit worktree uses the main checkout&apos;s machine dir and writes nothing machine-local of its own; one heartbeat id (AC2)" classname="machine-local files in the norn home (B5, B6)" time="1.428872" file="packages/cli/test/machine-dir.test.ts" assertions="10" />
+      <testcase name="the user config and machine leases stay where they were and are read as before; only repos/ is added (AC4)" classname="machine-local files in the norn home (B5, B6)" time="0.030893" file="packages/cli/test/machine-dir.test.ts" assertions="8" />
+    </testsuite>
+    <testsuite name="two clones of one remote (AC3)" file="packages/cli/test/machine-dir.test.ts" tests="1" assertions="7" failures="0" skipped="0" time="1.032" hostname="mac.home">
+      <testcase name="each clone gets its own machine dir and its own heartbeat id" classname="two clones of one remote (AC3)" time="1.03292" file="packages/cli/test/machine-dir.test.ts" assertions="7" />
+    </testsuite>
+    <testsuite name="norn doctor: an orphaned machine dir (AC5, D3)" file="packages/cli/test/machine-dir.test.ts" tests="1" assertions="11" failures="0" skipped="0" time="3.007" hostname="mac.home">
+      <testcase name="a machine dir whose checkout.json names a vanished path with this folder name: warned, with the command that adopts it; nothing moved until it runs" classname="norn doctor: an orphaned machine dir (AC5, D3)" time="3.007383" file="packages/cli/test/machine-dir.test.ts" assertions="11" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/migrate.test.ts" file="packages/cli/test/migrate.test.ts" tests="13" assertions="77" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="norn migrate on the old layout (B11, B12, B13)" file="packages/cli/test/migrate.test.ts" tests="5" assertions="23" failures="0" skipped="0" time="1.44" hostname="mac.home">
+      <testcase name="the config and workflows are staged git renames, nothing committed; the output lists each move and ends with the commit (B11)" classname="norn migrate on the old layout (B11, B12, B13)" time="0.079903" file="packages/cli/test/migrate.test.ts" assertions="10" />
+      <testcase name="the machine-local files are in the machine dir with the same heartbeat; .agents/norn/ is gone (B12)" classname="norn migrate on the old layout (B11, B12, B13)" time="0.000102" file="packages/cli/test/migrate.test.ts" assertions="3" />
+      <testcase name="norn&apos;s old .gitignore line is gone and staged; the person&apos;s lines are untouched (B13)" classname="norn migrate on the old layout (B11, B12, B13)" time="0.030001" file="packages/cli/test/migrate.test.ts" assertions="2" />
+      <testcase name="the next tick recognises its own claim (ID2)" classname="norn migrate on the old layout (B11, B12, B13)" time="1.039254" file="packages/cli/test/migrate.test.ts" assertions="3" />
+      <testcase name="a second run says nothing to move, exits 0 and changes nothing (B14)" classname="norn migrate on the old layout (B11, B12, B13)" time="0.292181" file="packages/cli/test/migrate.test.ts" assertions="5" />
+    </testsuite>
+    <testsuite name="norn migrate --json (B11)" file="packages/cli/test/migrate.test.ts" tests="1" assertions="5" failures="0" skipped="0" time="0.778" hostname="mac.home">
+      <testcase name="gives {moves, staged, commit}" classname="norn migrate --json (B11)" time="0.778353" file="packages/cli/test/migrate.test.ts" assertions="5" />
+    </testsuite>
+    <testsuite name="norn migrate refuses and moves nothing (B15, B16, B17)" file="packages/cli/test/migrate.test.ts" tests="3" assertions="19" failures="0" skipped="0" time="0.495" hostname="mac.home">
+      <testcase name="with the tick lock held the way watch holds it: exit 3, do_instead to stop watch and run it again (B15)" classname="norn migrate refuses and moves nothing (B15, B16, B17)" time="0.209933" file="packages/cli/test/migrate.test.ts" assertions="6" />
+      <testcase name="in a unit worktree: exit 3, do_instead names the main checkout&apos;s path (B16)" classname="norn migrate refuses and moves nothing (B15, B16, B17)" time="0.110488" file="packages/cli/test/migrate.test.ts" assertions="7" />
+      <testcase name="with one part in both places: exit 3 naming both paths (B17)" classname="norn migrate refuses and moves nothing (B15, B16, B17)" time="0.176076" file="packages/cli/test/migrate.test.ts" assertions="6" />
+    </testsuite>
+    <testsuite name="a rerun finishes an interrupted migration (B11, B12)" file="packages/cli/test/migrate.test.ts" tests="1" assertions="6" failures="0" skipped="0" time="0.561" hostname="mac.home">
+      <testcase name="config and workflows moved, the trace not: migrate moves the trace" classname="a rerun finishes an interrupted migration (B11, B12)" time="0.561729" file="packages/cli/test/migrate.test.ts" assertions="6" />
+    </testsuite>
+    <testsuite name="a rerun finishes a trace move cut short (B12, D6)" file="packages/cli/test/migrate.test.ts" tests="2" assertions="18" failures="0" skipped="0" time="5.659" hostname="mac.home">
+      <testcase name="part of the trace in the machine dir, the rest at its old place: migrate moves the rest" classname="a rerun finishes a trace move cut short (B12, D6)" time="0.536878" file="packages/cli/test/migrate.test.ts" assertions="11" />
+      <testcase name="a file in both places is refused naming both paths" classname="a rerun finishes a trace move cut short (B12, D6)" time="5.123742" file="packages/cli/test/migrate.test.ts" assertions="7" />
+    </testsuite>
+    <testsuite name="an untracked old workflow file (B11)" file="packages/cli/test/migrate.test.ts" tests="1" assertions="6" failures="0" skipped="0" time="0.559" hostname="mac.home">
+      <testcase name="is moved plainly and listed as untracked" classname="an untracked old workflow file (B11)" time="0.559403" file="packages/cli/test/migrate.test.ts" assertions="6" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/human.test.ts" file="packages/cli/test/human.test.ts" tests="23" assertions="211" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="before start" file="packages/cli/test/human.test.ts" tests="2" assertions="12" failures="0" skipped="0" time="12.325" hostname="mac.home">
+      <testcase name="intake; story edit --workflow sets frontmatter (W9, B31) and refuses unknown names and --at" classname="before start" time="5.654371" file="packages/cli/test/human.test.ts" assertions="8" />
+      <testcase name="claims, start (alt pinned for gh-6), launch" classname="before start" time="6.67108" file="packages/cli/test/human.test.ts" assertions="4" />
+    </testsuite>
+    <testsuite name="views (X1)" file="packages/cli/test/human.test.ts" tests="2" assertions="9" failures="0" skipped="0" time="1.121" hostname="mac.home">
+      <testcase name="story list: the table and its JSON, as status printed them (B15)" classname="views (X1)" time="0.842693" file="packages/cli/test/human.test.ts" assertions="7" />
+      <testcase name="status: running items; the rest empty (B9)" classname="views (X1)" time="0.279472" file="packages/cli/test/human.test.ts" assertions="2" />
+    </testsuite>
+    <testsuite name="preconditions refuse with do_instead" file="packages/cli/test/human.test.ts" tests="1" assertions="9" failures="0" skipped="0" time="4.18" hostname="mac.home">
+      <testcase name="approve on a non-gate step, answer when not asking, run rerun when running, unknown unit" classname="preconditions refuse with do_instead" time="4.180754" file="packages/cli/test/human.test.ts" assertions="9" />
+    </testsuite>
+    <testsuite name="story edit --workflow after start (S7, B32)" file="packages/cli/test/human.test.ts" tests="1" assertions="13" failures="0" skipped="0" time="5.198" hostname="mac.home">
+      <testcase name="needs --at; --at must exist; switch journals a receipt, re-pins, and the tick enters --at" classname="story edit --workflow after start (S7, B32)" time="5.198467" file="packages/cli/test/human.test.ts" assertions="13" />
+    </testsuite>
+    <testsuite name="answer (O2, B2)" file="packages/cli/test/human.test.ts" tests="1" assertions="14" failures="0" skipped="0" time="5.903" hostname="mac.home">
+      <testcase name="parked ask shows in the inbox with the exact command; answer → receipt → delivered to the same session" classname="answer (O2, B2)" time="5.903517" file="packages/cli/test/human.test.ts" assertions="14" />
+    </testsuite>
+    <testsuite name="run rerun (W4, B48, B49)" file="packages/cli/test/human.test.ts" tests="1" assertions="10" failures="0" skipped="0" time="7.752" hostname="mac.home">
+      <testcase name="unknown step / counter refused; --step + --reset journaled and applied" classname="run rerun (W4, B48, B49)" time="7.752565" file="packages/cli/test/human.test.ts" assertions="10" />
+    </testsuite>
+    <testsuite name="story edit --auto|--manual (MO1, B30)" file="packages/cli/test/human.test.ts" tests="2" assertions="11" failures="0" skipped="0" time="7.861" hostname="mac.home">
+      <testcase name="both flags, no change flag, or a mode with --workflow are usage errors; nothing is written" classname="story edit --auto|--manual (MO1, B30)" time="0.134336" file="packages/cli/test/human.test.ts" assertions="4" />
+      <testcase name="--manual writes a mode receipt once; the tick stores it; --auto the reverse" classname="story edit --auto|--manual (MO1, B30)" time="7.727902" file="packages/cli/test/human.test.ts" assertions="7" />
+    </testsuite>
+    <testsuite name="approve (gate)" file="packages/cli/test/human.test.ts" tests="1" assertions="17" failures="0" skipped="0" time="13.469" hostname="mac.home">
+      <testcase name="--reject --reason routes back counted; T8: a free claim is acquired for this heartbeat" classname="approve (gate)" time="13.469449" file="packages/cli/test/human.test.ts" assertions="17" />
+    </testsuite>
+    <testsuite name="mailbox (T9): a second clone while this one holds the claim" file="packages/cli/test/human.test.ts" tests="6" assertions="90" failures="0" skipped="0" time="14.364" hostname="mac.home">
+      <testcase name="non-holder approve (with a stale local copy) posts to refs/norn/inbox/&lt;story&gt;/&lt;ulid&gt;; mode refuses" classname="mailbox (T9): a second clone while this one holds the claim" time="7.103416" file="packages/cli/test/human.test.ts" assertions="11" />
+      <testcase name="the holder&apos;s tick imports it, deletes the ref, and the next tick applies it" classname="mailbox (T9): a second clone while this one holds the claim" time="3.707373" file="packages/cli/test/human.test.ts" assertions="3" />
+      <testcase name="run view --why replays decide on the recorded snapshot and equals the recorded decision (O5)" classname="mailbox (T9): a second clone while this one holds the claim" time="0.130918" file="packages/cli/test/human.test.ts" assertions="6" />
+      <testcase name="run list: step rows with who and reasons; --events with every human receipt; --limit; --text" classname="mailbox (T9): a second clone while this one holds the claim" time="0.67297" file="packages/cli/test/human.test.ts" assertions="20" />
+      <testcase name="run list: --all shows the no-op ticks; --full keeps reasons whole and lists receipts (AC3)" classname="mailbox (T9): a second clone while this one holds the claim" time="0.794435" file="packages/cli/test/human.test.ts" assertions="35" />
+      <testcase name="run view: a unit&apos;s latest run, a run by its id; --json is the data (B44, B6)" classname="mailbox (T9): a second clone while this one holds the claim" time="1.958941" file="packages/cli/test/human.test.ts" assertions="15" />
+    </testsuite>
+    <testsuite name="a slice gate in its own worktree (X1: views read slice runs from the slice worktree)" file="packages/cli/test/human.test.ts" tests="6" assertions="26" failures="0" skipped="0" time="24.357" hostname="mac.home">
+      <testcase name="the slice parks at its gate in the slice worktree; the story worktree copy is stale" classname="a slice gate in its own worktree (X1: views read slice runs from the slice worktree)" time="12.228447" file="packages/cli/test/human.test.ts" assertions="3" />
+      <testcase name="story list and status show the gate read from the slice worktree" classname="a slice gate in its own worktree (X1: views read slice runs from the slice worktree)" time="0.55708" file="packages/cli/test/human.test.ts" assertions="2" />
+      <testcase name="run list of the story shows its slices; run view of the slice is its gate (B43, B44)" classname="a slice gate in its own worktree (X1: views read slice runs from the slice worktree)" time="0.324558" file="packages/cli/test/human.test.ts" assertions="7" />
+      <testcase name="in the slice worktree, story edit --auto|--manual acts on the story, --workflow on the slice (B55)" classname="a slice gate in its own worktree (X1: views read slice runs from the slice worktree)" time="5.532701" file="packages/cli/test/human.test.ts" assertions="7" />
+      <testcase name="run rerun of the story key stands for its one slice waiting at a gate" classname="a slice gate in its own worktree (X1: views read slice runs from the slice worktree)" time="3.014965" file="packages/cli/test/human.test.ts" assertions="3" />
+      <testcase name="approve lands in the slice worktree; the next tick finishes the slice and the inbox clears" classname="a slice gate in its own worktree (X1: views read slice runs from the slice worktree)" time="2.702571" file="packages/cli/test/human.test.ts" assertions="4" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/config.test.ts" file="packages/cli/test/config.test.ts" tests="22" assertions="105" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="norn config list and get" file="packages/cli/test/config.test.ts" tests="5" assertions="19" failures="0" skipped="0" time="0.269" hostname="mac.home">
+      <testcase name="list --json lists every setting with its source, and notes what the layering hides" classname="norn config list and get" time="0.103686" file="packages/cli/test/config.test.ts" assertions="8" />
+      <testcase name="list prints markdown grouped by who a setting belongs to" classname="norn config list and get" time="0.032952" file="packages/cli/test/config.test.ts" assertions="4" />
+      <testcase name="get narrows to that setting or everything under it; an unknown key is a usage error" classname="norn config list and get" time="0.099649" file="packages/cli/test/config.test.ts" assertions="4" />
+      <testcase name="get prints the value and the layer that set it" classname="norn config list and get" time="0.035711" file="packages/cli/test/config.test.ts" assertions="2" />
+      <testcase name="the old forms are gone: `config &lt;key&gt;` is a usage error" classname="norn config list and get" time="0.000515" file="packages/cli/test/config.test.ts" assertions="1" />
+    </testsuite>
+    <testsuite name="norn config set and unset" file="packages/cli/test/config.test.ts" tests="17" assertions="86" failures="0" skipped="0" time="1.952" hostname="mac.home">
+      <testcase name="--user writes the user file; get shows it from the user layer (B62)" classname="norn config set and unset" time="0.092226" file="packages/cli/test/config.test.ts" assertions="5" />
+      <testcase name="--repo writes the repo config file (B62)" classname="norn config set and unset" time="0.08288" file="packages/cli/test/config.test.ts" assertions="4" />
+      <testcase name="dotted keys and YAML values; a list is replaced whole (B63)" classname="norn config set and unset" time="0.425209" file="packages/cli/test/config.test.ts" assertions="6" />
+      <testcase name="at a terminal without a file flag it asks which file and writes the chosen one (B64)" classname="norn config set and unset" time="0.043239" file="packages/cli/test/config.test.ts" assertions="4" />
+      <testcase name="leaving the prompt writes nothing" classname="norn config set and unset" time="0.036038" file="packages/cli/test/config.test.ts" assertions="4" />
+      <testcase name="without a file flag under --json or with no TTY: usage error (B65)" classname="norn config set and unset" time="0.128205" file="packages/cli/test/config.test.ts" assertions="8" />
+      <testcase name="an invalid value or an unknown key is refused and the file is left byte-for-byte (B66)" classname="norn config set and unset" time="0.107174" file="packages/cli/test/config.test.ts" assertions="6" />
+      <testcase name="a commented file keeps its comments and key order; only the changed line differs (B67)" classname="norn config set and unset" time="0.039046" file="packages/cli/test/config.test.ts" assertions="3" />
+      <testcase name="setting a key the file lacks adds only its lines; padded comments stay as typed (B67)" classname="norn config set and unset" time="0.172694" file="packages/cli/test/config.test.ts" assertions="8" />
+      <testcase name="replacing a list or map rewrites only that value&apos;s lines; padded comments stay as typed (B63, B67)" classname="norn config set and unset" time="0.178082" file="packages/cli/test/config.test.ts" assertions="7" />
+      <testcase name="a new agents.&lt;name&gt; entry starts from the agent the layers below resolve to" classname="norn config set and unset" time="0.171044" file="packages/cli/test/config.test.ts" assertions="4" />
+      <testcase name="--user and --repo together is a usage error" classname="norn config set and unset" time="0.033994" file="packages/cli/test/config.test.ts" assertions="4" />
+      <testcase name="unset in a commented file removes only the key&apos;s line (B67, B68)" classname="norn config set and unset" time="0.11213" file="packages/cli/test/config.test.ts" assertions="5" />
+      <testcase name="unset removes the key; get shows the next layer&apos;s value (B68)" classname="norn config set and unset" time="0.130408" file="packages/cli/test/config.test.ts" assertions="5" />
+      <testcase name="unsetting a key the file lacks changes nothing, exit 0 (B68)" classname="norn config set and unset" time="0.079344" file="packages/cli/test/config.test.ts" assertions="5" />
+      <testcase name="unset follows the file-flag rules of set (B68)" classname="norn config set and unset" time="0.091142" file="packages/cli/test/config.test.ts" assertions="6" />
+      <testcase name="trace.retain: a machine setting, 14d by default (B23, D11)" classname="norn config set and unset" time="0.034847" file="packages/cli/test/config.test.ts" assertions="2" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/contract-fakes.test.ts" file="packages/cli/test/contract-fakes.test.ts" tests="15" assertions="74" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="RunnerPort contract: harness FakeRunner" file="packages/cli/test/contract-fakes.test.ts" tests="7" assertions="18" failures="0" skipped="0" time="0" hostname="mac.home">
+      <testcase name="name and capabilities are well-formed; openForPerson is present iff capabilities.open (MO5)" classname="RunnerPort contract: harness FakeRunner" time="0.000286" file="packages/cli/test/contract-fakes.test.ts" assertions="5" />
+      <testcase name="available() answers a boolean" classname="RunnerPort contract: harness FakeRunner" time="0.00003" file="packages/cli/test/contract-fakes.test.ts" assertions="1" />
+      <testcase name="launch returns a session of this runner that is alive, and its pane state says so" classname="RunnerPort contract: harness FakeRunner" time="0.000301" file="packages/cli/test/contract-fakes.test.ts" assertions="7" />
+      <testcase name="kill ends the session, and killing it again is harmless [known failure: FakeRunner.kill only records the session; isAlive/paneState keep answering `pane.alive`, which tests set by hand]" classname="RunnerPort contract: harness FakeRunner" time="0.000234" file="packages/cli/test/contract-fakes.test.ts" assertions="1" />
+      <testcase name="send delivers when capabilities.send, else rejects with a PortError (R4.1)" classname="RunnerPort contract: harness FakeRunner" time="0.000261" file="packages/cli/test/contract-fakes.test.ts" assertions="0" />
+      <testcase name="reach and output, when present, answer a string (output: or null)" classname="RunnerPort contract: harness FakeRunner" time="0.000929" file="packages/cli/test/contract-fakes.test.ts" assertions="1" />
+      <testcase name="findSessions, when present, reports only sessions of this runner (R5.1)" classname="RunnerPort contract: harness FakeRunner" time="0.000115" file="packages/cli/test/contract-fakes.test.ts" assertions="3" />
+    </testsuite>
+    <testsuite name="RemotePort contract: harness FakeRemote" file="packages/cli/test/contract-fakes.test.ts" tests="8" assertions="56" failures="0" skipped="0" time="0" hostname="mac.home">
+      <testcase name="provider and whoami" classname="RemotePort contract: harness FakeRemote" time="0" file="packages/cli/test/contract-fakes.test.ts" assertions="2" />
+      <testcase name="listAssignedIssues: open issues assigned to the user with the label, nothing else (GR1)" classname="RemotePort contract: harness FakeRemote" time="0.000645" file="packages/cli/test/contract-fakes.test.ts" assertions="11" />
+      <testcase name="getIssue: the listed issue, closed ones too; null when missing" classname="RemotePort contract: harness FakeRemote" time="0.000041" file="packages/cli/test/contract-fakes.test.ts" assertions="11" />
+      <testcase name="findPullRequest: null for a branch without one" classname="RemotePort contract: harness FakeRemote" time="0.000145" file="packages/cli/test/contract-fakes.test.ts" assertions="1" />
+      <testcase name="openDraftPullRequest opens a draft the branch then finds (GR6)" classname="RemotePort contract: harness FakeRemote" time="0.000093" file="packages/cli/test/contract-fakes.test.ts" assertions="13" />
+      <testcase name="findPullRequest picks the newest of a branch&apos;s PRs" classname="RemotePort contract: harness FakeRemote" time="0" file="packages/cli/test/contract-fakes.test.ts" assertions="1" />
+      <testcase name="createIssue opens an issue with the labels and assignee, which intake then lists (B18)" classname="RemotePort contract: harness FakeRemote" time="0.000227" file="packages/cli/test/contract-fakes.test.ts" assertions="12" />
+      <testcase name="newIssueUrl: the remote&apos;s new-issue page with the labels filled in (B23)" classname="RemotePort contract: harness FakeRemote" time="0.000191" file="packages/cli/test/contract-fakes.test.ts" assertions="5" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/criteria.test.ts" file="packages/cli/test/criteria.test.ts" tests="3" assertions="46" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="criteria reports and notes through norn done" file="packages/cli/test/criteria.test.ts" tests="3" assertions="46" failures="0" skipped="0" time="18.533" hostname="mac.home">
+      <testcase name="refusals: no report, an invalid file, a missing criterion (9), an unknown note criterion" classname="criteria reports and notes through norn done" time="1.460632" file="packages/cli/test/criteria.test.ts" assertions="11" />
+      <testcase name="8: pass with an unverified criterion is refused naming unverified; done unverified → human-qa listing how" classname="criteria reports and notes through norn done" time="2.673761" file="packages/cli/test/criteria.test.ts" assertions="16" />
+      <testcase name="10: reject leaves notes open; a later note joins them; ready.approve acknowledges both" classname="criteria reports and notes through norn done" time="14.400013" file="packages/cli/test/criteria.test.ts" assertions="19" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/defects.test.ts" file="packages/cli/test/defects.test.ts" tests="2" assertions="2" failures="0" skipped="0" time="0.107" hostname="mac.home">
+    <testcase name="BUG-4 remote.json of the wrong shape reads as empty, not as a string timestamp" classname="" time="0.104287" file="packages/cli/test/defects.test.ts" assertions="1" />
+    <testcase name="BUG-4 records.json of the wrong shape reads as empty" classname="" time="0.003211" file="packages/cli/test/defects.test.ts" assertions="1" />
+  </testsuite>
+  <testsuite name="packages/cli/test/check-run.test.ts" file="packages/cli/test/check-run.test.ts" tests="5" assertions="35" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="a long check (gh-77)" file="packages/cli/test/check-run.test.ts" tests="1" assertions="21" failures="0" skipped="0" time="6.282" hostname="mac.home">
+      <testcase name="the tick that starts it returns at once; ticks and the heartbeat go on while it runs; the receipt lands after" classname="a long check (gh-77)" time="6.282035" file="packages/cli/test/check-run.test.ts" assertions="21" />
+    </testsuite>
+    <testsuite name="two long checks (K1, K3)" file="packages/cli/test/check-run.test.ts" tests="1" assertions="8" failures="0" skipped="0" time="6.035" hostname="mac.home">
+      <testcase name="one tick starts both, up to max_checks, and they run at once; a check-run that dies is started again" classname="two long checks (K1, K3)" time="6.035623" file="packages/cli/test/check-run.test.ts" assertions="8" />
+    </testsuite>
+    <testsuite name="a check past its step timeout (C5)" file="packages/cli/test/check-run.test.ts" tests="1" assertions="2" failures="0" skipped="0" time="2.594" hostname="mac.home">
+      <testcase name="norn check-run kills it and writes a fail with reason timeout" classname="a check past its step timeout (C5)" time="2.594267" file="packages/cli/test/check-run.test.ts" assertions="2" />
+    </testsuite>
+    <testsuite name="a check-run that fails on its own side (C5)" file="packages/cli/test/check-run.test.ts" tests="1" assertions="2" failures="0" skipped="0" time="0.06" hostname="mac.home">
+      <testcase name="still writes a fail receipt with the error, so the step ends instead of rerunning" classname="a check-run that fails on its own side (C5)" time="0.060036" file="packages/cli/test/check-run.test.ts" assertions="2" />
+    </testsuite>
+    <testsuite name="a check-run the tick could not identify (K1, K3)" file="packages/cli/test/check-run.test.ts" tests="1" assertions="2" failures="0" skipped="0" time="0.021" hostname="mac.home">
+      <testcase name="takes its run&apos;s lease over itself while it runs, and releases it after" classname="a check-run the tick could not identify (K1, K3)" time="0.021854" file="packages/cli/test/check-run.test.ts" assertions="2" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/chunked-ticks.test.ts" file="packages/cli/test/chunked-ticks.test.ts" tests="6" assertions="41" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="chunked tick facts (O4, O5)" file="packages/cli/test/chunked-ticks.test.ts" tests="6" assertions="41" failures="0" skipped="0" time="4.514" hostname="mac.home">
+      <testcase name="B13: a quiet tick a minute later adds a tick line and no chunk, under 5 KB with its chunks" classname="chunked tick facts (O4, O5)" time="1.25018" file="packages/cli/test/chunked-ticks.test.ts" assertions="3" />
+      <testcase name="B17 (B14): why --tick on a chunked tick with hook blocks rebuilds the observed facts byte for byte and replays its decisions" classname="chunked tick facts (O4, O5)" time="1.187083" file="packages/cli/test/chunked-ticks.test.ts" assertions="5" />
+      <testcase name="B35: a chunked tick line validates as a tick (facts an object) and status --history reads its changes" classname="chunked tick facts (O4, O5)" time="1.518638" file="packages/cli/test/chunked-ticks.test.ts" assertions="22" />
+      <testcase name="B18, B35: full-facts ticks an older norn wrote after chunked ones replay, and so do the chunked ones" classname="chunked tick facts (O4, O5)" time="0.101621" file="packages/cli/test/chunked-ticks.test.ts" assertions="5" />
+      <testcase name="B22: the golden harvest yields the same case names and decisions from chunked ticks as from full ones" classname="chunked tick facts (O4, O5)" time="0.413274" file="packages/cli/test/chunked-ticks.test.ts" assertions="2" />
+      <testcase name="B21: a chunked tick whose chunk is gone is a corrupt trace entry: why exits 4, trace_corrupt, and replays nothing" classname="chunked tick facts (O4, O5)" time="0.045439" file="packages/cli/test/chunked-ticks.test.ts" assertions="4" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/inbox-why.test.ts" file="packages/cli/test/inbox-why.test.ts" tests="9" assertions="47" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="gate item and rulings (F21, F28)" file="packages/cli/test/inbox-why.test.ts" tests="2" assertions="21" failures="0" skipped="0" time="15.813" hostname="mac.home">
+      <testcase name="the human-qa item names the qa report; --details gives it and its evidence folder, absolute" classname="gate item and rulings (F21, F28)" time="6.609063" file="packages/cli/test/inbox-why.test.ts" assertions="8" />
+      <testcase name="a reject reason is a ruling every later brief of the story carries" classname="gate item and rulings (F21, F28)" time="9.204858" file="packages/cli/test/inbox-why.test.ts" assertions="13" />
+    </testsuite>
+    <testsuite name="why by step, attempt, transition and rule (O5, F5)" file="packages/cli/test/inbox-why.test.ts" tests="4" assertions="13" failures="0" skipped="0" time="0.408" hostname="mac.home">
+      <testcase name="--transition finds the tick that applied the reject and quotes the comment" classname="why by step, attempt, transition and rule (O5, F5)" time="0.072547" file="packages/cli/test/inbox-why.test.ts" assertions="2" />
+      <testcase name="--step/--attempt pick the report of that attempt with its handoff in full" classname="why by step, attempt, transition and rule (O5, F5)" time="0.189763" file="packages/cli/test/inbox-why.test.ts" assertions="4" />
+      <testcase name="the intake decision is keyed by the story (F5)" classname="why by step, attempt, transition and rule (O5, F5)" time="0.053651" file="packages/cli/test/inbox-why.test.ts" assertions="3" />
+      <testcase name="bad filters are usage errors; no match is refused" classname="why by step, attempt, transition and rule (O5, F5)" time="0.094326" file="packages/cli/test/inbox-why.test.ts" assertions="4" />
+    </testsuite>
+    <testsuite name="merge PR item and inbox history (F25, Q3)" file="packages/cli/test/inbox-why.test.ts" tests="3" assertions="13" failures="0" skipped="0" time="4.364" hostname="mac.home">
+      <testcase name="open-pr → ready → approve → $done: the open PR is &apos;Merge PR #N&apos; with its URL" classname="merge PR item and inbox history (F25, Q3)" time="3.631571" file="packages/cli/test/inbox-why.test.ts" assertions="4" />
+      <testcase name="--history pairs appeared/resolved with who resolved each item" classname="merge PR item and inbox history (F25, Q3)" time="0.089967" file="packages/cli/test/inbox-why.test.ts" assertions="8" />
+      <testcase name="the PR merge resolves the merge item" classname="merge PR item and inbox history (F25, Q3)" time="0.644267" file="packages/cli/test/inbox-why.test.ts" assertions="1" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/records.test.ts" file="packages/cli/test/records.test.ts" tests="6" assertions="33" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="records: ready head, foreign commits, merged by ancestry, durable status" file="packages/cli/test/records.test.ts" tests="4" assertions="22" failures="0" skipped="0" time="11.048" hostname="mac.home">
+      <testcase name="F35: approving `ready` records the story branch head (ready_head_sha)" classname="records: ready head, foreign commits, merged by ancestry, durable status" time="4.007515" file="packages/cli/test/records.test.ts" assertions="5" />
+      <testcase name="Q6: a commit norn did not make on the story branch is a fact, traced once per sha" classname="records: ready head, foreign commits, merged by ancestry, durable status" time="2.793157" file="packages/cli/test/records.test.ts" assertions="4" />
+      <testcase name="P2 (F34): a PR left open whose head is on origin/main is merged by ancestry and cleaned up" classname="records: ready head, foreign commits, merged by ancestry, durable status" time="3.556667" file="packages/cli/test/records.test.ts" assertions="9" />
+      <testcase name="F36: the story stays in status after its worktree is gone; local main is stale" classname="records: ready head, foreign commits, merged by ancestry, durable status" time="0.692484" file="packages/cli/test/records.test.ts" assertions="4" />
+    </testsuite>
+    <testsuite name="records: PR merge facts from the remote" file="packages/cli/test/records.test.ts" tests="1" assertions="7" failures="0" skipped="0" time="5.252" hostname="mac.home">
+      <testcase name="GR6: cleanup records merge commit, merged_by and merged_at in the done record" classname="records: PR merge facts from the remote" time="5.252312" file="packages/cli/test/records.test.ts" assertions="7" />
+    </testsuite>
+    <testsuite name="C4: an agent&apos;s commit while its unit is parked on an ask is not foreign" file="packages/cli/test/records.test.ts" tests="1" assertions="4" failures="0" skipped="0" time="3.663" hostname="mac.home">
+      <testcase name="inside the run window: not foreign; a commit outside any run of the unit still is (Q6)" classname="C4: an agent&amp;apos;s commit while its unit is parked on an ask is not foreign" time="3.663731" file="packages/cli/test/records.test.ts" assertions="4" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/recovery.test.ts" file="packages/cli/test/recovery.test.ts" tests="7" assertions="37" failures="1" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="a claim lost mid-run (R1.2, R2.3)" file="packages/cli/test/recovery.test.ts" tests="3" assertions="15" failures="0" skipped="0" time="6.552" hostname="mac.home">
+      <testcase name="R1.2: the renewal loses its CAS → the waiting done receipt is skipped, nothing is written or pushed" classname="a claim lost mid-run (R1.2, R2.3)" time="3.130569" file="packages/cli/test/recovery.test.ts" assertions="5" />
+      <testcase name="R2.3: the non-holder reports its unpushed receipt; tidy moves it to orphaned/ locally and pushes nothing" classname="a claim lost mid-run (R1.2, R2.3)" time="3.418749" file="packages/cli/test/recovery.test.ts" assertions="9" />
+      <testcase name="effect transcript: spawns, port calls and runs/ files of both clones (refactor Phase 0.2)" classname="a claim lost mid-run (R1.2, R2.3)" time="0.004301" file="packages/cli/test/recovery.test.ts" assertions="1" />
+    </testsuite>
+    <testsuite name="renewals due together go out in one push (H5, R1.2)" file="packages/cli/test/recovery.test.ts" tests="1" assertions="1" failures="1" skipped="0" time="30.005" hostname="mac.home">
+      <testcase name="(unnamed)" classname="renewals due together go out in one push (H5, R1.2)" time="30.005949" file="packages/cli/test/recovery.test.ts" assertions="1">
+        <failure type="TimeoutError" />
+      </testcase>
+    </testsuite>
+    <testsuite name="intake race and release (R3.1, R3.3)" file="packages/cli/test/recovery.test.ts" tests="3" assertions="21" failures="0" skipped="0" time="11.604" hostname="mac.home">
+      <testcase name="R3.1: both clones intake the issue; the one losing the claim CAS removes its local intake" classname="intake race and release (R3.1, R3.3)" time="4.509721" file="packages/cli/test/recovery.test.ts" assertions="8" />
+      <testcase name="R3.1: an intake commit is read off its trailers — a person&apos;s commit that only looks like one keeps the intake" classname="intake race and release (R3.1, R3.3)" time="5.291585" file="packages/cli/test/recovery.test.ts" assertions="8" />
+      <testcase name="R3.3: release refuses a push that is not a fast-forward; the claim and the remote branch stay" classname="intake race and release (R3.1, R3.3)" time="1.804755" file="packages/cli/test/recovery.test.ts" assertions="5" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/detect.test.ts" file="packages/cli/test/detect.test.ts" tests="4" assertions="19" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="detectTestCommand" file="packages/cli/test/detect.test.ts" tests="3" assertions="18" failures="0" skipped="0" time="0.028" hostname="mac.home">
+      <testcase name="a JS repo installs with its package manager, then runs its test script" classname="detectTestCommand" time="0.005473" file="packages/cli/test/detect.test.ts" assertions="6" />
+      <testcase name="npm&apos;s placeholder script and an unreadable package.json name nothing" classname="detectTestCommand" time="0.013567" file="packages/cli/test/detect.test.ts" assertions="2" />
+      <testcase name="other ecosystems by their build file; a Makefile only with a test target" classname="detectTestCommand" time="0.010945" file="packages/cli/test/detect.test.ts" assertions="10" />
+    </testsuite>
+    <testsuite name="withTestCommand" file="packages/cli/test/detect.test.ts" tests="1" assertions="1" failures="0" skipped="0" time="0" hostname="mac.home">
+      <testcase name="replaces the template&apos;s `run: bun test` lines only, quoted for YAML" classname="withTestCommand" time="0.000437" file="packages/cli/test/detect.test.ts" assertions="1" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/e2e.test.ts" file="packages/cli/test/e2e.test.ts" tests="22" assertions="258" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="norn init" file="packages/cli/test/e2e.test.ts" tests="11" assertions="154" failures="0" skipped="0" time="0.947" hostname="mac.home">
+      <testcase name="writes config, workflows, skills, hooks, .gitignore and .gitattributes; idempotent" classname="norn init" time="0.321142" file="packages/cli/test/e2e.test.ts" assertions="21" />
+      <testcase name="prints a summary for a person; --json prints the data" classname="norn init" time="0.250199" file="packages/cli/test/e2e.test.ts" assertions="14" />
+      <testcase name="help prints the commands grouped for a person, Core first; --json prints the list" classname="norn init" time="0.004766" file="packages/cli/test/e2e.test.ts" assertions="51" />
+      <testcase name="unknown commands and bad options are usage errors with do_instead" classname="norn init" time="0.000319" file="packages/cli/test/e2e.test.ts" assertions="4" />
+      <testcase name="a noun with no verb, and help &lt;noun&gt;, list its verbs in order (B2)" classname="norn init" time="0.000548" file="packages/cli/test/e2e.test.ts" assertions="8" />
+      <testcase name="help &lt;noun&gt; &lt;verb&gt; and &lt;noun&gt; &lt;verb&gt; --help show that verb&apos;s usage and options (B4)" classname="norn init" time="0.000287" file="packages/cli/test/e2e.test.ts" assertions="8" />
+      <testcase name="help with an unknown name, or a word after a plain command, is a usage error (B5)" classname="norn init" time="0" file="packages/cli/test/e2e.test.ts" assertions="4" />
+      <testcase name="help --all adds the hidden tier" classname="norn init" time="0.000616" file="packages/cli/test/e2e.test.ts" assertions="20" />
+      <testcase name="the old trace, why, open, mode, workflow, unstick, take, release and drop are unknown commands, and write nothing (B5)" classname="norn init" time="0.105656" file="packages/cli/test/e2e.test.ts" assertions="19" />
+      <testcase name="every command accepts --json" classname="norn init" time="0.265412" file="packages/cli/test/e2e.test.ts" assertions="3" />
+      <testcase name="--version prints the cli package version" classname="norn init" time="0.00238" file="packages/cli/test/e2e.test.ts" assertions="2" />
+    </testsuite>
+    <testsuite name="a story through the slice workflow" file="packages/cli/test/e2e.test.ts" tests="10" assertions="96" failures="0" skipped="0" time="34.351" hostname="mac.home">
+      <testcase name="setup: repo config and workflows committed on main" classname="a story through the slice workflow" time="1.522551" file="packages/cli/test/e2e.test.ts" assertions="0" />
+      <testcase name="tick 1: sync → intake (GR2): story branch, worktree, spec.md, slot, marker" classname="a story through the slice workflow" time="1.394881" file="packages/cli/test/e2e.test.ts" assertions="11" />
+      <testcase name="tick 2: claim acquired (T3); tick 3: story unit started with pinned workflow (S7)" classname="a story through the slice workflow" time="2.572332" file="packages/cli/test/e2e.test.ts" assertions="8" />
+      <testcase name="tick 4: auto mode launches the agent via the runner with NORN_* env (A6, B5)" classname="a story through the slice workflow" time="2.106529" file="packages/cli/test/e2e.test.ts" assertions="10" />
+      <testcase name="plan done → slices step starts the slice: worktree from the story branch, slot 2, slice active (W2, K4)" classname="a story through the slice workflow" time="3.338545" file="packages/cli/test/e2e.test.ts" assertions="13" />
+      <testcase name="slice implement runs; check fails (C5: receipt tail + committed log) and routes back counted (W4)" classname="a story through the slice workflow" time="6.566735" file="packages/cli/test/e2e.test.ts" assertions="11" />
+      <testcase name="rework passes the check; gate parks and notifies once (O3); approve → integrate (K6)" classname="a story through the slice workflow" time="9.723484" file="packages/cli/test/e2e.test.ts" assertions="12" />
+      <testcase name="slice $done → cleanup (K5): final state on the story branch, worktree + branch removed, integrated" classname="a story through the slice workflow" time="4.420091" file="packages/cli/test/e2e.test.ts" assertions="8" />
+      <testcase name="slices done → open-pr through the RemotePort → story $done; trace replays (O4, O5)" classname="a story through the slice workflow" time="2.710824" file="packages/cli/test/e2e.test.ts" assertions="22" />
+      <testcase name="effect transcript: spawns, port calls and runs/ files of the whole flow (refactor Phase 0.2)" classname="a story through the slice workflow" time="0.000563" file="packages/cli/test/e2e.test.ts" assertions="1" />
+    </testsuite>
+    <testsuite name="norn init in a repository with a test command and no remote" file="packages/cli/test/e2e.test.ts" tests="1" assertions="8" failures="0" skipped="0" time="0.185" hostname="mac.home">
+      <testcase name="writes the detected test command into the workflows and puts adding the remote first" classname="norn init in a repository with a test command and no remote" time="0.185836" file="packages/cli/test/e2e.test.ts" assertions="8" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/help-tree.test.ts" file="packages/cli/test/help-tree.test.ts" tests="23" assertions="183" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="norn help in tiers (B1)" file="packages/cli/test/help-tree.test.ts" tests="2" assertions="11" failures="0" skipped="0" time="0.001" hostname="mac.home">
+      <testcase name="Core, Setup, Background, Agent protocol in that order, then the skills; tick and hook absent" classname="norn help in tiers (B1)" time="0.001159" file="packages/cli/test/help-tree.test.ts" assertions="8" />
+      <testcase name="--json gives the same tree as data" classname="norn help in tiers (B1)" time="0.000755" file="packages/cli/test/help-tree.test.ts" assertions="3" />
+    </testsuite>
+    <testsuite name="noun help (B2)" file="packages/cli/test/help-tree.test.ts" tests="2" assertions="8" failures="0" skipped="0" time="0" hostname="mac.home">
+      <testcase name="norn story and norn help story list the verbs under general, decision, work, team" classname="noun help (B2)" time="0.000392" file="packages/cli/test/help-tree.test.ts" assertions="5" />
+      <testcase name="norn run lists list, view, attach, rerun, cancel" classname="noun help (B2)" time="0.000078" file="packages/cli/test/help-tree.test.ts" assertions="3" />
+    </testsuite>
+    <testsuite name="norn migrate in help (gh-110 B22)" file="packages/cli/test/help-tree.test.ts" tests="1" assertions="6" failures="0" skipped="0" time="0.001" hostname="mac.home">
+      <testcase name="help lists migrate with one line on what it does, and no help text names the old layout&apos;s folder" classname="norn migrate in help (gh-110 B22)" time="0.001162" file="packages/cli/test/help-tree.test.ts" assertions="6" />
+    </testsuite>
+    <testsuite name="norn help --all (B3)" file="packages/cli/test/help-tree.test.ts" tests="1" assertions="22" failures="0" skipped="0" time="0" hostname="mac.home">
+      <testcase name="everything in help plus tick, hook, check-run and status --segment" classname="norn help --all (B3)" time="0.000305" file="packages/cli/test/help-tree.test.ts" assertions="22" />
+    </testsuite>
+    <testsuite name="removed names are unknown commands (B5, B69)" file="packages/cli/test/help-tree.test.ts" tests="17" assertions="136" failures="0" skipped="0" time="1.389" hostname="mac.home">
+      <testcase name="the table of old names covers the B5 list" classname="removed names are unknown commands (B5, B69)" time="0" file="packages/cli/test/help-tree.test.ts" assertions="1" />
+      <testcase name="norn drop is a usage error and changes nothing on disk" classname="removed names are unknown commands (B5, B69)" time="0.091097" file="packages/cli/test/help-tree.test.ts" assertions="8" />
+      <testcase name="norn inbox is a usage error and changes nothing on disk" classname="removed names are unknown commands (B5, B69)" time="0.081782" file="packages/cli/test/help-tree.test.ts" assertions="8" />
+      <testcase name="norn cockpit is a usage error and changes nothing on disk" classname="removed names are unknown commands (B5, B69)" time="0.073444" file="packages/cli/test/help-tree.test.ts" assertions="8" />
+      <testcase name="norn orient is a usage error and changes nothing on disk" classname="removed names are unknown commands (B5, B69)" time="0.103815" file="packages/cli/test/help-tree.test.ts" assertions="8" />
+      <testcase name="norn open is a usage error and changes nothing on disk" classname="removed names are unknown commands (B5, B69)" time="0.094023" file="packages/cli/test/help-tree.test.ts" assertions="8" />
+      <testcase name="norn answer is a usage error and changes nothing on disk" classname="removed names are unknown commands (B5, B69)" time="0.085652" file="packages/cli/test/help-tree.test.ts" assertions="8" />
+      <testcase name="norn approve is a usage error and changes nothing on disk" classname="removed names are unknown commands (B5, B69)" time="0.095651" file="packages/cli/test/help-tree.test.ts" assertions="8" />
+      <testcase name="norn unstick is a usage error and changes nothing on disk" classname="removed names are unknown commands (B5, B69)" time="0.098708" file="packages/cli/test/help-tree.test.ts" assertions="8" />
+      <testcase name="norn update is a usage error and changes nothing on disk" classname="removed names are unknown commands (B5, B69)" time="0.08999" file="packages/cli/test/help-tree.test.ts" assertions="8" />
+      <testcase name="norn mode is a usage error and changes nothing on disk" classname="removed names are unknown commands (B5, B69)" time="0.078469" file="packages/cli/test/help-tree.test.ts" assertions="8" />
+      <testcase name="norn workflow is a usage error and changes nothing on disk" classname="removed names are unknown commands (B5, B69)" time="0.083782" file="packages/cli/test/help-tree.test.ts" assertions="8" />
+      <testcase name="norn take is a usage error and changes nothing on disk" classname="removed names are unknown commands (B5, B69)" time="0.109331" file="packages/cli/test/help-tree.test.ts" assertions="8" />
+      <testcase name="norn release is a usage error and changes nothing on disk" classname="removed names are unknown commands (B5, B69)" time="0.09016" file="packages/cli/test/help-tree.test.ts" assertions="8" />
+      <testcase name="norn trace is a usage error and changes nothing on disk" classname="removed names are unknown commands (B5, B69)" time="0.078671" file="packages/cli/test/help-tree.test.ts" assertions="8" />
+      <testcase name="norn why is a usage error and changes nothing on disk" classname="removed names are unknown commands (B5, B69)" time="0.096231" file="packages/cli/test/help-tree.test.ts" assertions="8" />
+      <testcase name="brief, done, ask, stuck and hook are still commands" classname="removed names are unknown commands (B5, B69)" time="0.046943" file="packages/cli/test/help-tree.test.ts" assertions="15" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/housekeeping.test.ts" file="packages/cli/test/housekeeping.test.ts" tests="31" assertions="197" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="max_agents holds across ticks when the runner reports no process (K1, K3)" file="packages/cli/test/housekeeping.test.ts" tests="1" assertions="11" failures="0" skipped="0" time="13.715" hostname="mac.home">
+      <testcase name="the second story stays queued after the launching tick is gone; it starts when the first run ends" classname="max_agents holds across ticks when the runner reports no process (K1, K3)" time="13.715871" file="packages/cli/test/housekeeping.test.ts" assertions="11" />
+    </testsuite>
+    <testsuite name="orphans (K5): reported by every tick, cleaned by norn tidy" file="packages/cli/test/housekeeping.test.ts" tests="1" assertions="12" failures="0" skipped="0" time="9.934" hostname="mac.home">
+      <testcase name="tick reports orphan branches and worktrees; tidy --dry-run lists, tidy removes only what is safe" classname="orphans (K5): reported by every tick, cleaned by norn tidy" time="9.934181" file="packages/cli/test/housekeeping.test.ts" assertions="12" />
+    </testsuite>
+    <testsuite name="GR6 record on the base branch" file="packages/cli/test/housekeeping.test.ts" tests="3" assertions="11" failures="0" skipped="0" time="3.638" hostname="mac.home">
+      <testcase name="deferred while the spec file is not on the base branch" classname="GR6 record on the base branch" time="0.171147" file="packages/cli/test/housekeeping.test.ts" assertions="1" />
+      <testcase name="after the merge: committed in a throwaway worktree and pushed to the base branch; main checkout untouched (story.md an older norn wrote, GR2)" classname="GR6 record on the base branch" time="2.100723" file="packages/cli/test/housekeeping.test.ts" assertions="7" />
+      <testcase name="GR2: a story intaken as spec.md is marked done in spec.md" classname="GR6 record on the base branch" time="1.367895" file="packages/cli/test/housekeeping.test.ts" assertions="3" />
+    </testsuite>
+    <testsuite name="norn doctor (A7)" file="packages/cli/test/housekeeping.test.ts" tests="3" assertions="23" failures="0" skipped="0" time="4.668" hostname="mac.home">
+      <testcase name="reports agents, hooks (installed and firing through the hook command), remote auth and runner" classname="norn doctor (A7)" time="1.658614" file="packages/cli/test/housekeeping.test.ts" assertions="9" />
+      <testcase name="prints the report for a person, with the same exit code as --json" classname="norn doctor (A7)" time="2.258627" file="packages/cli/test/housekeeping.test.ts" assertions="7" />
+      <testcase name="missing hooks and an unusable hook command fail the check with what to do" classname="norn doctor (A7)" time="0.752326" file="packages/cli/test/housekeeping.test.ts" assertions="7" />
+    </testsuite>
+    <testsuite name="norn doctor: a fresh repository" file="packages/cli/test/housekeeping.test.ts" tests="2" assertions="12" failures="0" skipped="0" time="3.047" hostname="mac.home">
+      <testcase name="no git remote fails the remote check with the command that adds one" classname="norn doctor: a fresh repository" time="1.421356" file="packages/cli/test/housekeeping.test.ts" assertions="5" />
+      <testcase name="in manual mode an unavailable runner is a warning, not a failed check (MO2)" classname="norn doctor: a fresh repository" time="1.626679" file="packages/cli/test/housekeeping.test.ts" assertions="7" />
+    </testsuite>
+    <testsuite name="norn doctor: the cockpit plugin hint (HC11)" file="packages/cli/test/housekeeping.test.ts" tests="1" assertions="2" failures="0" skipped="0" time="0" hostname="mac.home">
+      <testcase name="links this checkout&apos;s plugins/herdr when norn runs from source, else installs it from GitHub" classname="norn doctor: the cockpit plugin hint (HC11)" time="0.000188" file="packages/cli/test/housekeeping.test.ts" assertions="2" />
+    </testsuite>
+    <testsuite name="norn doctor: the repo group (B7–B10, D7)" file="packages/cli/test/housekeeping.test.ts" tests="7" assertions="39" failures="0" skipped="0" time="7.648" hostname="mac.home">
+      <testcase name="a clean checkout: workflows and config valid, exit 0, nothing changed (B9)" classname="norn doctor: the repo group (B7–B10, D7)" time="1.707435" file="packages/cli/test/housekeeping.test.ts" assertions="7" />
+      <testcase name="a workflow with an uncounted cycle is named with the cycle and its path; non-zero (B7)" classname="norn doctor: the repo group (B7–B10, D7)" time="1.003926" file="packages/cli/test/housekeeping.test.ts" assertions="5" />
+      <testcase name="a workflow naming a skill its agent lacks: doctor names it, and a tick refuses it for the same reason (B7)" classname="norn doctor: the repo group (B7–B10, D7)" time="4.638786" file="packages/cli/test/housekeeping.test.ts" assertions="6" />
+      <testcase name="a config value of the wrong type names the file, the key and why; non-zero (B8)" classname="norn doctor: the repo group (B7–B10, D7)" time="0.08377" file="packages/cli/test/housekeeping.test.ts" assertions="7" />
+      <testcase name="a user config that does not load: the repo group still runs, the machine checks are skipped naming that file" classname="norn doctor: the repo group (B7–B10, D7)" time="0.077964" file="packages/cli/test/housekeeping.test.ts" assertions="4" />
+      <testcase name="--repo checks only the repo: no agent on PATH, no remote auth, no runner (B10)" classname="norn doctor: the repo group (B7–B10, D7)" time="0.140709" file="packages/cli/test/housekeeping.test.ts" assertions="8" />
+      <testcase name="norn help doctor lists --repo (B10)" classname="norn doctor: the repo group (B7–B10, D7)" time="0.000257" file="packages/cli/test/housekeeping.test.ts" assertions="2" />
+    </testsuite>
+    <testsuite name="trace retention: norn tidy prunes day pairs older than trace.retain (B23–B27, B31–B34)" file="packages/cli/test/housekeeping.test.ts" tests="9" assertions="62" failures="0" skipped="0" time="7.715" hostname="mac.home">
+      <testcase name="no trace.retain: tidy deletes the 26 oldest of 41 day pairs and keeps the last 14 days and trace/workflows (B23, B27)" classname="trace retention: norn tidy prunes day pairs older than trace.retain (B23–B27, B31–B34)" time="0.318154" file="packages/cli/test/housekeeping.test.ts" assertions="8" />
+      <testcase name="trace.retain: 30d prunes only what is older than 30 days (B23)" classname="trace retention: norn tidy prunes day pairs older than trace.retain (B23–B27, B31–B34)" time="0.335351" file="packages/cli/test/housekeeping.test.ts" assertions="3" />
+      <testcase name="--retain overrides trace.retain for that run (B24)" classname="trace retention: norn tidy prunes day pairs older than trace.retain (B23–B27, B31–B34)" time="0.35126" file="packages/cli/test/housekeeping.test.ts" assertions="3" />
+      <testcase name="a window under 14d, from the flag or the config, is refused and nothing is deleted; doctor warns, config still loads (B25)" classname="trace retention: norn tidy prunes day pairs older than trace.retain (B23–B27, B31–B34)" time="1.583745" file="packages/cli/test/housekeeping.test.ts" assertions="9" />
+      <testcase name="a value that is not a duration is refused naming the expected form, nothing deleted (B26)" classname="trace retention: norn tidy prunes day pairs older than trace.retain (B23–B27, B31–B34)" time="0.099915" file="packages/cli/test/housekeeping.test.ts" assertions="5" />
+      <testcase name="--dry-run lists each day pair with its bytes and the total, and deletes nothing (B31)" classname="trace retention: norn tidy prunes day pairs older than trace.retain (B23–B27, B31–B34)" time="0.278706" file="packages/cli/test/housekeeping.test.ts" assertions="4" />
+      <testcase name="a second tidy prunes nothing from the trace (B32)" classname="trace retention: norn tidy prunes day pairs older than trace.retain (B23–B27, B31–B34)" time="0.533365" file="packages/cli/test/housekeeping.test.ts" assertions="3" />
+      <testcase name="doctor hints, without failing a check, how many days and bytes lie beyond the window; none within it (B33)" classname="trace retention: norn tidy prunes day pairs older than trace.retain (B23–B27, B31–B34)" time="3.137795" file="packages/cli/test/housekeeping.test.ts" assertions="6" />
+      <testcase name="ticks over 30 fake-clock days never delete a day file; only tidy prunes (B34)" classname="trace retention: norn tidy prunes day pairs older than trace.retain (B23–B27, B31–B34)" time="1.08173" file="packages/cli/test/housekeeping.test.ts" assertions="21" />
+    </testsuite>
+    <testsuite name="trace retention: norn tidy prunes old hook files, briefings and transcripts, never a live run&apos;s (B28–B32)" file="packages/cli/test/housekeeping.test.ts" tests="4" assertions="25" failures="0" skipped="0" time="1.688" hostname="mac.home">
+      <testcase name="the hook files of units with no live run and no change within the window are deleted; a live unit&apos;s are kept (B28)" classname="trace retention: norn tidy prunes old hook files, briefings and transcripts, never a live run&amp;apos;s (B28–B32)" time="0.299238" file="packages/cli/test/housekeeping.test.ts" assertions="5" />
+      <testcase name="the briefings and transcripts of a run that ended 20 days ago are deleted, yesterday&apos;s kept (B29)" classname="trace retention: norn tidy prunes old hook files, briefings and transcripts, never a live run&amp;apos;s (B28–B32)" time="0.282544" file="packages/cli/test/housekeeping.test.ts" assertions="6" />
+      <testcase name="a live run 20 days old keeps its hook file, briefings and transcripts; workflows, backfill.json, caches and locks are untouched (B30)" classname="trace retention: norn tidy prunes old hook files, briefings and transcripts, never a live run&amp;apos;s (B28–B32)" time="0.283621" file="packages/cli/test/housekeeping.test.ts" assertions="8" />
+      <testcase name="--dry-run lists the hook files and runs with their bytes and deletes nothing; a second tidy prunes nothing (B31, B32)" classname="trace retention: norn tidy prunes old hook files, briefings and transcripts, never a live run&amp;apos;s (B28–B32)" time="0.824008" file="packages/cli/test/housekeeping.test.ts" assertions="6" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/observe-snapshots.test.ts" file="packages/cli/test/observe-snapshots.test.ts" tests="5" assertions="20" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="observe snapshots and inbox parity (refactor Phase 0.3)" file="packages/cli/test/observe-snapshots.test.ts" tests="5" assertions="20" failures="0" skipped="0" time="35.932" hostname="mac.home">
+      <testcase name="fresh intake: story worktree and story.md, no claim yet" classname="observe snapshots and inbox parity (refactor Phase 0.3)" time="2.556245" file="packages/cli/test/observe-snapshots.test.ts" assertions="4" />
+      <testcase name="running slice: the slice agent runs in its own worktree" classname="observe snapshots and inbox parity (refactor Phase 0.3)" time="10.33577" file="packages/cli/test/observe-snapshots.test.ts" assertions="3" />
+      <testcase name="parked ask: the slice agent asked a question" classname="observe snapshots and inbox parity (refactor Phase 0.3)" time="2.178726" file="packages/cli/test/observe-snapshots.test.ts" assertions="6" />
+      <testcase name="gate waiting: the check passed and the slice waits at human-qa" classname="observe snapshots and inbox parity (refactor Phase 0.3)" time="7.303929" file="packages/cli/test/observe-snapshots.test.ts" assertions="3" />
+      <testcase name="merged: the story&apos;s PR landed on the base branch" classname="observe snapshots and inbox parity (refactor Phase 0.3)" time="13.560942" file="packages/cli/test/observe-snapshots.test.ts" assertions="4" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/pr-body.test.ts" file="packages/cli/test/pr-body.test.ts" tests="2" assertions="12" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="story PR body (GR9)" file="packages/cli/test/pr-body.test.ts" tests="2" assertions="12" failures="0" skipped="0" time="11.868" hostname="mac.home">
+      <testcase name="no pr.md: the draft PR body is the issue link alone" classname="story PR body (GR9)" time="4.522152" file="packages/cli/test/pr-body.test.ts" assertions="4" />
+      <testcase name="after rework the open PR gets the new pr.md with the link under it; no second PR" classname="story PR body (GR9)" time="7.346954" file="packages/cli/test/pr-body.test.ts" assertions="8" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/prompts.test.ts" file="packages/cli/test/prompts.test.ts" tests="10" assertions="75" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="R6.1: the agent&apos;s report while parked on an implicit ask (acceptance 9)" file="packages/cli/test/prompts.test.ts" tests="2" assertions="15" failures="0" skipped="0" time="9.427" hostname="mac.home">
+      <testcase name="the Answer item is the question, the first command line and the options; the screen only with --details" classname="R6.1: the agent&amp;apos;s report while parked on an implicit ask (acceptance 9)" time="8.007706" file="packages/cli/test/prompts.test.ts" assertions="8" />
+      <testcase name="`norn done` is accepted: an answer by the agent closes the ask, then the report applies" classname="R6.1: the agent&amp;apos;s report while parked on an implicit ask (acceptance 9)" time="1.420464" file="packages/cli/test/prompts.test.ts" assertions="7" />
+    </testsuite>
+    <testsuite name="R6.2/R6.3: norn answer types into the prompt (acceptance 9)" file="packages/cli/test/prompts.test.ts" tests="3" assertions="19" failures="0" skipped="0" time="11.965" hostname="mac.home">
+      <testcase name="delivery failure: no receipt, still parked, the Answer item names the pane" classname="R6.2/R6.3: norn answer types into the prompt (acceptance 9)" time="8.28982" file="packages/cli/test/prompts.test.ts" assertions="9" />
+      <testcase name="not an option of the prompt → usage error, nothing typed" classname="R6.2/R6.3: norn answer types into the prompt (acceptance 9)" time="0.98316" file="packages/cli/test/prompts.test.ts" assertions="3" />
+      <testcase name="a choice: option number + enter typed, then the receipt (delivered); the tick types nothing again" classname="R6.2/R6.3: norn answer types into the prompt (acceptance 9)" time="2.69332" file="packages/cli/test/prompts.test.ts" assertions="7" />
+    </testsuite>
+    <testsuite name="B6: the agent&apos;s report after a person&apos;s `norn answer`, before the tick applies it" file="packages/cli/test/prompts.test.ts" tests="1" assertions="9" failures="0" skipped="0" time="7.893" hostname="mac.home">
+      <testcase name="`norn done` is accepted while the answer waits; no second answer; the tick applies both" classname="B6: the agent&amp;apos;s report after a person&amp;apos;s `norn answer`, before the tick applies it" time="7.893493" file="packages/cli/test/prompts.test.ts" assertions="9" />
+    </testsuite>
+    <testsuite name="B11: the tick and the agent resolve the same implicit ask" file="packages/cli/test/prompts.test.ts" tests="1" assertions="9" failures="0" skipped="0" time="5.854" hostname="mac.home">
+      <testcase name="the agent&apos;s answer takes the number first (S6): the tick&apos;s resolution is superseded, not a failure" classname="B11: the tick and the agent resolve the same implicit ask" time="5.8546" file="packages/cli/test/prompts.test.ts" assertions="9" />
+    </testsuite>
+    <testsuite name="R8.1: the launched agent runs this norn (acceptance 11)" file="packages/cli/test/prompts.test.ts" tests="1" assertions="9" failures="0" skipped="0" time="3.595" hostname="mac.home">
+      <testcase name="the shim dir is first on PATH inside the command itself, and NORN_BIN names the shim" classname="R8.1: the launched agent runs this norn (acceptance 11)" time="3.595939" file="packages/cli/test/prompts.test.ts" assertions="9" />
+    </testsuite>
+    <testsuite name="B2: the launch command stays short whatever PATH is" file="packages/cli/test/prompts.test.ts" tests="1" assertions="5" failures="0" skipped="0" time="0.001" hostname="mac.home">
+      <testcase name="a 1.8 kB PATH gives a typed command far below the tty line limit (MAX_CANON 1 024)" classname="B2: the launch command stays short whatever PATH is" time="0.001359" file="packages/cli/test/prompts.test.ts" assertions="5" />
+    </testsuite>
+    <testsuite name="R9.1: launch prompt not received (acceptance 12)" file="packages/cli/test/prompts.test.ts" tests="1" assertions="9" failures="0" skipped="0" time="4.555" hostname="mac.home">
+      <testcase name="SessionStart without a turn start: re-sent once after 60 s, then silent with the launch rule and an inbox line" classname="R9.1: launch prompt not received (acceptance 12)" time="4.555" file="packages/cli/test/prompts.test.ts" assertions="9" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/status.test.ts" file="packages/cli/test/status.test.ts" tests="9" assertions="44" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="norn status (B9, B13)" file="packages/cli/test/status.test.ts" tests="5" assertions="21" failures="0" skipped="0" time="2.699" hostname="mac.home">
+      <testcase name="the first status on a checkout prints the notice on stderr once; stdout is the inbox either way" classname="norn status (B9, B13)" time="0.57605" file="packages/cli/test/status.test.ts" assertions="7" />
+      <testcase name="--json prints the same value with or without the notice, and never the notice" classname="norn status (B9, B13)" time="0.821077" file="packages/cli/test/status.test.ts" assertions="4" />
+      <testcase name="an unreadable notice file shows the notice again rather than failing" classname="norn status (B9, B13)" time="0.766961" file="packages/cli/test/status.test.ts" assertions="6" />
+      <testcase name="status --segment neither shows nor spends the notice" classname="norn status (B9, B13)" time="0.53608" file="packages/cli/test/status.test.ts" assertions="3" />
+      <testcase name="status takes no story key; that view is the story list now" classname="norn status (B9, B13)" time="0.000418" file="packages/cli/test/status.test.ts" assertions="1" />
+    </testsuite>
+    <testsuite name="norn story list (B15, B6)" file="packages/cli/test/status.test.ts" tests="2" assertions="7" failures="0" skipped="0" time="0.562" hostname="mac.home">
+      <testcase name="prints the story table, --json its data" classname="norn story list (B15, B6)" time="0.552652" file="packages/cli/test/status.test.ts" assertions="5" />
+      <testcase name="norn story lists its verbs" classname="norn story list (B15, B6)" time="0.010104" file="packages/cli/test/status.test.ts" assertions="2" />
+    </testsuite>
+    <testsuite name="help and removed names (B5, B14)" file="packages/cli/test/status.test.ts" tests="2" assertions="16" failures="0" skipped="0" time="0.112" hostname="mac.home">
+      <testcase name="norn inbox, with any flags, is an unknown command and writes nothing" classname="help and removed names (B5, B14)" time="0.103292" file="packages/cli/test/status.test.ts" assertions="9" />
+      <testcase name="status --segment is absent from help and listed by help --all" classname="help and removed names (B5, B14)" time="0.009215" file="packages/cli/test/status.test.ts" assertions="7" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/story-create.test.ts" file="packages/cli/test/story-create.test.ts" tests="11" assertions="54" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="with a title (B18)" file="packages/cli/test/story-create.test.ts" tests="3" assertions="11" failures="0" skipped="0" time="6.569" hostname="mac.home">
+      <testcase name="creates the labelled, assigned issue, takes it in and prints its key; nothing starts" classname="with a title (B18)" time="1.588039" file="packages/cli/test/story-create.test.ts" assertions="5" />
+      <testcase name="--json prints the story key and the issue" classname="with a title (B18)" time="2.022117" file="packages/cli/test/story-create.test.ts" assertions="4" />
+      <testcase name="--body-file sets the body" classname="with a title (B18)" time="2.959239" file="packages/cli/test/story-create.test.ts" assertions="2" />
+    </testsuite>
+    <testsuite name="at a terminal without a title (B19)" file="packages/cli/test/story-create.test.ts" tests="2" assertions="7" failures="0" skipped="0" time="4.507" hostname="mac.home">
+      <testcase name="prompts for the title and opens the editor for the body" classname="at a terminal without a title (B19)" time="4.477153" file="packages/cli/test/story-create.test.ts" assertions="4" />
+      <testcase name="an empty title creates nothing (exit 2)" classname="at a terminal without a title (B19)" time="0.030495" file="packages/cli/test/story-create.test.ts" assertions="3" />
+    </testsuite>
+    <testsuite name="a script without a title (B20)" file="packages/cli/test/story-create.test.ts" tests="1" assertions="10" failures="0" skipped="0" time="0.152" hostname="mac.home">
+      <testcase name="--json or no TTY is a usage error naming --title; nothing is prompted" classname="a script without a title (B20)" time="0.15289" file="packages/cli/test/story-create.test.ts" assertions="10" />
+    </testsuite>
+    <testsuite name="an unknown workflow (B21)" file="packages/cli/test/story-create.test.ts" tests="1" assertions="5" failures="0" skipped="0" time="0.044" hostname="mac.home">
+      <testcase name="is refused before anything is created, listing the workflows" classname="an unknown workflow (B21)" time="0.04491" file="packages/cli/test/story-create.test.ts" assertions="5" />
+    </testsuite>
+    <testsuite name="the remote failing (B22)" file="packages/cli/test/story-create.test.ts" tests="1" assertions="6" failures="0" skipped="0" time="0.523" hostname="mac.home">
+      <testcase name="names the failure, points at norn doctor and leaves nothing locally" classname="the remote failing (B22)" time="0.523127" file="packages/cli/test/story-create.test.ts" assertions="6" />
+    </testsuite>
+    <testsuite name="the intake failing after the issue exists (B22)" file="packages/cli/test/story-create.test.ts" tests="1" assertions="8" failures="0" skipped="0" time="0.092" hostname="mac.home">
+      <testcase name="prints the created story with exit 0 and points at norn sync, never at a second create" classname="the intake failing after the issue exists (B22)" time="0.092093" file="packages/cli/test/story-create.test.ts" assertions="8" />
+    </testsuite>
+    <testsuite name="--web (B23)" file="packages/cli/test/story-create.test.ts" tests="2" assertions="7" failures="0" skipped="0" time="0.072" hostname="mac.home">
+      <testcase name="opens the remote&apos;s new-issue page with the norn and workflow labels; creates nothing" classname="--web (B23)" time="0.036091" file="packages/cli/test/story-create.test.ts" assertions="5" />
+      <testcase name="an unknown workflow is refused before the page opens" classname="--web (B23)" time="0.036802" file="packages/cli/test/story-create.test.ts" assertions="2" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/story-decision.test.ts" file="packages/cli/test/story-decision.test.ts" tests="10" assertions="51" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="nothing applies" file="packages/cli/test/story-decision.test.ts" tests="1" assertions="9" failures="0" skipped="0" time="1.281" hostname="mac.home">
+      <testcase name="approve and reject: refused &apos;Nothing waits at a gate&apos;; answer: nothing parked on a question (B59)" classname="nothing applies" time="1.281855" file="packages/cli/test/story-decision.test.ts" assertions="9" />
+    </testsuite>
+    <testsuite name="gh-1 and gh-2 at gates, gh-3 parked on a question, gh-4/01 at its gate in its slice worktree" file="packages/cli/test/story-decision.test.ts" tests="9" assertions="42" failures="0" skipped="0" time="29.953" hostname="mac.home">
+      <testcase name="setup" classname="gh-1 and gh-2 at gates, gh-3 parked on a question, gh-4/01 at its gate in its slice worktree" time="11.649025" file="packages/cli/test/story-decision.test.ts" assertions="2" />
+      <testcase name="the old answer, approve and update are unknown commands; nothing is written (B5)" classname="gh-1 and gh-2 at gates, gh-3 parked on a question, gh-4/01 at its gate in its slice worktree" time="0.00084" file="packages/cli/test/story-decision.test.ts" assertions="10" />
+      <testcase name="in the main checkout at a terminal, approve and reject offer only the units at a gate, answer only the one parked on a question (B57)" classname="gh-1 and gh-2 at gates, gh-3 parked on a question, gh-4/01 at its gate in its slice worktree" time="0.881558" file="packages/cli/test/story-decision.test.ts" assertions="7" />
+      <testcase name="a script is refused with the candidates (B60)" classname="gh-1 and gh-2 at gates, gh-3 parked on a question, gh-4/01 at its gate in its slice worktree" time="0.260702" file="packages/cli/test/story-decision.test.ts" assertions="5" />
+      <testcase name="story reject without --reason is a usage error: do_instead &apos;pass --reason&apos;, nothing written (B26)" classname="gh-1 and gh-2 at gates, gh-3 parked on a question, gh-4/01 at its gate in its slice worktree" time="0.031565" file="packages/cli/test/story-decision.test.ts" assertions="3" />
+      <testcase name="story reject --reason writes the reject receipt with that comment; the next tick routes as reject (B26)" classname="gh-1 and gh-2 at gates, gh-3 parked on a question, gh-4/01 at its gate in its slice worktree" time="4.004137" file="packages/cli/test/story-decision.test.ts" assertions="3" />
+      <testcase name="story approve writes the approve receipt; the next tick moves on (B25)" classname="gh-1 and gh-2 at gates, gh-3 parked on a question, gh-4/01 at its gate in its slice worktree" time="5.020901" file="packages/cli/test/story-decision.test.ts" assertions="3" />
+      <testcase name="story answer delivers the answer into the session, as answer did (B24)" classname="gh-1 and gh-2 at gates, gh-3 parked on a question, gh-4/01 at its gate in its slice worktree" time="4.398739" file="packages/cli/test/story-decision.test.ts" assertions="4" />
+      <testcase name="in the slice worktree, update-branch acts on the story and approve on the slice (B55, B54)" classname="gh-1 and gh-2 at gates, gh-3 parked on a question, gh-4/01 at its gate in its slice worktree" time="3.710622" file="packages/cli/test/story-decision.test.ts" assertions="5" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/story-reopen.test.ts" file="packages/cli/test/story-reopen.test.ts" tests="9" assertions="63" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="story reopen refusals (B42)" file="packages/cli/test/story-reopen.test.ts" tests="4" assertions="21" failures="0" skipped="0" time="5.564" hostname="mac.home">
+      <testcase name="a story that is not closed is refused not_closed; nothing changes" classname="story reopen refusals (B42)" time="0.393752" file="packages/cli/test/story-reopen.test.ts" assertions="4" />
+      <testcase name="a closed issue is refused: reopen the issue first; nothing changes" classname="story reopen refusals (B42)" time="3.764851" file="packages/cli/test/story-reopen.test.ts" assertions="6" />
+      <testcase name="a unit branch missing from the remote is refused naming the branch; nothing changes" classname="story reopen refusals (B42)" time="0.869605" file="packages/cli/test/story-reopen.test.ts" assertions="5" />
+      <testcase name="the story branch missing from the remote is refused naming the branch; nothing changes" classname="story reopen refusals (B42)" time="0.538499" file="packages/cli/test/story-reopen.test.ts" assertions="6" />
+    </testsuite>
+    <testsuite name="story reopen (B40, B41, B55)" file="packages/cli/test/story-reopen.test.ts" tests="4" assertions="31" failures="0" skipped="0" time="16.38" hostname="mac.home">
+      <testcase name="without a target a terminal is offered closed stories only; a script is refused with them" classname="story reopen (B40, B41, B55)" time="0.663092" file="packages/cli/test/story-reopen.test.ts" assertions="5" />
+      <testcase name="restores worktrees and the claim, marks spec.md active in one commit; a running unit comes back stuck (reopened)" classname="story reopen (B40, B41, B55)" time="3.024859" file="packages/cli/test/story-reopen.test.ts" assertions="12" />
+      <testcase name="the next tick resumes the units at their steps; the reopened unit is stuck under Unblock and not started" classname="story reopen (B40, B41, B55)" time="9.60119" file="packages/cli/test/story-reopen.test.ts" assertions="9" />
+      <testcase name="closing again and reopening from a slice worktree that still exists acts on the story (B55)" classname="story reopen (B40, B41, B55)" time="3.09296" file="packages/cli/test/story-reopen.test.ts" assertions="5" />
+    </testsuite>
+    <testsuite name="reopen after the base moved (B40)" file="packages/cli/test/story-reopen.test.ts" tests="1" assertions="11" failures="0" skipped="0" time="6.79" hostname="mac.home">
+      <testcase name="restores the claim and worktrees only; the next ticks go on without error" classname="reopen after the base moved (B40)" time="6.790065" file="packages/cli/test/story-reopen.test.ts" assertions="11" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/agent-protocol.test.ts" file="packages/cli/test/agent-protocol.test.ts" tests="28" assertions="179" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="manual mode: tick → brief → done → tick (MO3, B3, §9.3)" file="packages/cli/test/agent-protocol.test.ts" tests="16" assertions="102" failures="0" skipped="0" time="20.963" hostname="mac.home">
+      <testcase name="the tick marks the agent step ready and never launches (manual)" classname="manual mode: tick → brief → done → tick (MO3, B3, §9.3)" time="7.812503" file="packages/cli/test/agent-protocol.test.ts" assertions="4" />
+      <testcase name="outside a unit worktree the verbs refuse with do_instead" classname="manual mode: tick → brief → done → tick (MO3, B3, §9.3)" time="0.147031" file="packages/cli/test/agent-protocol.test.ts" assertions="8" />
+      <testcase name="done before brief: no run yet → do_instead norn brief" classname="manual mode: tick → brief → done → tick (MO3, B3, §9.3)" time="0.003458" file="packages/cli/test/agent-protocol.test.ts" assertions="6" />
+      <testcase name="hook in a ready step without a run never blocks; the fact lands in the trace (A2)" classname="manual mode: tick → brief → done → tick (MO3, B3, §9.3)" time="0.108769" file="packages/cli/test/agent-protocol.test.ts" assertions="9" />
+      <testcase name="first brief starts the run: started receipt with session + PID; briefing stored (B4)" classname="manual mode: tick → brief → done → tick (MO3, B3, §9.3)" time="0.214034" file="packages/cli/test/agent-protocol.test.ts" assertions="16" />
+      <testcase name="brief again (no tick yet) reuses the run; --json gives the data form" classname="manual mode: tick → brief → done → tick (MO3, B3, §9.3)" time="0.034147" file="packages/cli/test/agent-protocol.test.ts" assertions="4" />
+      <testcase name="Stop in an unattended step whose run has not reported → blocked with the report instruction (A4)" classname="manual mode: tick → brief → done → tick (MO3, B3, §9.3)" time="0.002817" file="packages/cli/test/agent-protocol.test.ts" assertions="3" />
+      <testcase name="B4: `norn run list` prints the same events with lines it does not show added, broken or not; every reader opens day files through the observer" classname="manual mode: tick → brief → done → tick (MO3, B3, §9.3)" time="1.740602" file="packages/cli/test/agent-protocol.test.ts" assertions="7" />
+      <testcase name="the tick applies the started receipt: running, how manual (MO3)" classname="manual mode: tick → brief → done → tick (MO3, B3, §9.3)" time="0.992883" file="packages/cli/test/agent-protocol.test.ts" assertions="1" />
+      <testcase name="done with an undeclared outcome is refused, listing the valid ones" classname="manual mode: tick → brief → done → tick (MO3, B3, §9.3)" time="0.004415" file="packages/cli/test/agent-protocol.test.ts" assertions="4" />
+      <testcase name="done writes the receipt, appends handoff progress and says end your turn; a second report is refused" classname="manual mode: tick → brief → done → tick (MO3, B3, §9.3)" time="0.029039" file="packages/cli/test/agent-protocol.test.ts" assertions="15" />
+      <testcase name="the tick advances to review; the next brief starts a fresh run" classname="manual mode: tick → brief → done → tick (MO3, B3, §9.3)" time="1.508136" file="packages/cli/test/agent-protocol.test.ts" assertions="4" />
+      <testcase name="done --findings/--evidence: findings copied into the receipt, evidence into runs/&lt;unit&gt;/evidence/&lt;run_id&gt;/" classname="manual mode: tick → brief → done → tick (MO3, B3, §9.3)" time="0.009443" file="packages/cli/test/agent-protocol.test.ts" assertions="4" />
+      <testcase name="back in implement, the brief shows the findings as Rework (B3, B6)" classname="manual mode: tick → brief → done → tick (MO3, B3, §9.3)" time="1.968903" file="packages/cli/test/agent-protocol.test.ts" assertions="2" />
+      <testcase name="ask records the question and options; the parked unit refuses brief with norn answer" classname="manual mode: tick → brief → done → tick (MO3, B3, §9.3)" time="4.875143" file="packages/cli/test/agent-protocol.test.ts" assertions="12" />
+      <testcase name="a gate step refuses brief with norn approve" classname="manual mode: tick → brief → done → tick (MO3, B3, §9.3)" time="1.518675" file="packages/cli/test/agent-protocol.test.ts" assertions="3" />
+    </testsuite>
+    <testsuite name="attended steps never block (MO4)" file="packages/cli/test/agent-protocol.test.ts" tests="1" assertions="11" failures="0" skipped="0" time="3.758" hostname="mac.home">
+      <testcase name="brief starts the attended run; Stop is allowed without a report; done completes it" classname="attended steps never block (MO4)" time="3.758828" file="packages/cli/test/agent-protocol.test.ts" assertions="11" />
+    </testsuite>
+    <testsuite name="norn hook robustness (A3)" file="packages/cli/test/agent-protocol.test.ts" tests="7" assertions="47" failures="0" skipped="0" time="8.175" hostname="mac.home">
+      <testcase name="outside a unit worktree: no-op, nothing traced" classname="norn hook robustness (A3)" time="0.002713" file="packages/cli/test/agent-protocol.test.ts" assertions="3" />
+      <testcase name="garbage stdin, unknown events and unknown agents never fail" classname="norn hook robustness (A3)" time="0.006366" file="packages/cli/test/agent-protocol.test.ts" assertions="3" />
+      <testcase name="--agent picks the adapter even when another one also knows the event (A2)" classname="norn hook robustness (A3)" time="0.003612" file="packages/cli/test/agent-protocol.test.ts" assertions="1" />
+      <testcase name="installed hook commands use event names the hook accepts (A1/A2)" classname="norn hook robustness (A3)" time="0.028687" file="packages/cli/test/agent-protocol.test.ts" assertions="22" />
+      <testcase name="blocks are bounded per run (P5)" classname="norn hook robustness (A3)" time="1.661379" file="packages/cli/test/agent-protocol.test.ts" assertions="8" />
+      <testcase name="a Claude permission prompt parks the unit and shows the pending command in norn inbox (§10, O1)" classname="norn hook robustness (A3)" time="3.850215" file="packages/cli/test/agent-protocol.test.ts" assertions="5" />
+      <testcase name="B8 (D4): a tick reads the hook files of units with a live run and of units written within limits.stalled, never a day file" classname="norn hook robustness (A3)" time="2.625198" file="packages/cli/test/agent-protocol.test.ts" assertions="5" />
+    </testsuite>
+    <testsuite name="parseFindings" file="packages/cli/test/agent-protocol.test.ts" tests="1" assertions="3" failures="0" skipped="0" time="0" hostname="mac.home">
+      <testcase name="accepts an array or {findings}; refuses missing severity" classname="parseFindings" time="0.000529" file="packages/cli/test/agent-protocol.test.ts" assertions="3" />
+    </testsuite>
+    <testsuite name="hook backfill on upgrade (B11, B12, D5)" file="packages/cli/test/agent-protocol.test.ts" tests="3" assertions="16" failures="0" skipped="0" time="8.574" hostname="mac.home">
+      <testcase name="AC3: a run started after the backfill&apos;s since never has a day file scanned for it" classname="hook backfill on upgrade (B11, B12, D5)" time="5.386805" file="packages/cli/test/agent-protocol.test.ts" assertions="6" />
+      <testcase name="AC1: the first tick of the new version copies a live run&apos;s hook lines from yesterday&apos;s and today&apos;s day files once" classname="hook backfill on upgrade (B11, B12, D5)" time="2.447246" file="packages/cli/test/agent-protocol.test.ts" assertions="4" />
+      <testcase name="AC2: a backfill left unfinished, with a hook fired meanwhile, completes on the next tick with each event id once" classname="hook backfill on upgrade (B11, B12, D5)" time="0.741634" file="packages/cli/test/agent-protocol.test.ts" assertions="6" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/assets.test.ts" file="packages/cli/test/assets.test.ts" tests="102" assertions="250" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="workflow templates" file="packages/cli/test/assets.test.ts" tests="22" assertions="84" failures="0" skipped="0" time="0" hostname="mac.home">
+      <testcase name="story, slice and bug are shipped" classname="workflow templates" time="0.00003" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testsuite name="bug.yaml" file="packages/cli/test/assets.test.ts" tests="7" assertions="19" failures="0" skipped="0" time="0.168" hostname="mac.home">
+        <testcase name="validates against the workflow schema" classname="bug.yaml &amp;gt; workflow templates" time="0.168617" file="packages/cli/test/assets.test.ts" assertions="1" />
+        <testcase name="name matches the file name" classname="bug.yaml &amp;gt; workflow templates" time="0.000054" file="packages/cli/test/assets.test.ts" assertions="1" />
+        <testcase name="start and every target name an existing step" classname="bug.yaml &amp;gt; workflow templates" time="0" file="packages/cli/test/assets.test.ts" assertions="9" />
+        <testcase name="every step can reach $done (W5)" classname="bug.yaml &amp;gt; workflow templates" time="0.000244" file="packages/cli/test/assets.test.ts" assertions="1" />
+        <testcase name="every cycle has a counter, and every counter is declared and used (W4)" classname="bug.yaml &amp;gt; workflow templates" time="0.000141" file="packages/cli/test/assets.test.ts" assertions="2" />
+        <testcase name="agent outcomes routed to a step carry `means` text (B3)" classname="bug.yaml &amp;gt; workflow templates" time="0" file="packages/cli/test/assets.test.ts" assertions="1" />
+        <testcase name="every referenced skill exists in assets/skills (W5)" classname="bug.yaml &amp;gt; workflow templates" time="0" file="packages/cli/test/assets.test.ts" assertions="4" />
+      </testsuite>
+      <testsuite name="slice.yaml" file="packages/cli/test/assets.test.ts" tests="7" assertions="24" failures="0" skipped="0" time="0" hostname="mac.home">
+        <testcase name="validates against the workflow schema" classname="slice.yaml &amp;gt; workflow templates" time="0.000311" file="packages/cli/test/assets.test.ts" assertions="1" />
+        <testcase name="name matches the file name" classname="slice.yaml &amp;gt; workflow templates" time="0" file="packages/cli/test/assets.test.ts" assertions="1" />
+        <testcase name="start and every target name an existing step" classname="slice.yaml &amp;gt; workflow templates" time="0" file="packages/cli/test/assets.test.ts" assertions="14" />
+        <testcase name="every step can reach $done (W5)" classname="slice.yaml &amp;gt; workflow templates" time="0" file="packages/cli/test/assets.test.ts" assertions="1" />
+        <testcase name="every cycle has a counter, and every counter is declared and used (W4)" classname="slice.yaml &amp;gt; workflow templates" time="0" file="packages/cli/test/assets.test.ts" assertions="2" />
+        <testcase name="agent outcomes routed to a step carry `means` text (B3)" classname="slice.yaml &amp;gt; workflow templates" time="0" file="packages/cli/test/assets.test.ts" assertions="1" />
+        <testcase name="every referenced skill exists in assets/skills (W5)" classname="slice.yaml &amp;gt; workflow templates" time="0" file="packages/cli/test/assets.test.ts" assertions="4" />
+      </testsuite>
+      <testsuite name="story.yaml" file="packages/cli/test/assets.test.ts" tests="7" assertions="40" failures="0" skipped="0" time="0.001" hostname="mac.home">
+        <testcase name="validates against the workflow schema" classname="story.yaml &amp;gt; workflow templates" time="0.001749" file="packages/cli/test/assets.test.ts" assertions="1" />
+        <testcase name="name matches the file name" classname="story.yaml &amp;gt; workflow templates" time="0" file="packages/cli/test/assets.test.ts" assertions="1" />
+        <testcase name="start and every target name an existing step" classname="story.yaml &amp;gt; workflow templates" time="0.00003" file="packages/cli/test/assets.test.ts" assertions="26" />
+        <testcase name="every step can reach $done (W5)" classname="story.yaml &amp;gt; workflow templates" time="0.000085" file="packages/cli/test/assets.test.ts" assertions="1" />
+        <testcase name="every cycle has a counter, and every counter is declared and used (W4)" classname="story.yaml &amp;gt; workflow templates" time="0.000049" file="packages/cli/test/assets.test.ts" assertions="2" />
+        <testcase name="agent outcomes routed to a step carry `means` text (B3)" classname="story.yaml &amp;gt; workflow templates" time="0" file="packages/cli/test/assets.test.ts" assertions="1" />
+        <testcase name="every referenced skill exists in assets/skills (W5)" classname="story.yaml &amp;gt; workflow templates" time="0" file="packages/cli/test/assets.test.ts" assertions="8" />
+      </testsuite>
+    </testsuite>
+    <testsuite name="skills" file="packages/cli/test/assets.test.ts" tests="71" assertions="151" failures="0" skipped="0" time="0.015" hostname="mac.home">
+      <testcase name="exactly the skills of §16 are shipped" classname="skills" time="0.000104" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn has frontmatter with matching name and a description" classname="skills" time="0.000505" file="packages/cli/test/assets.test.ts" assertions="4" />
+      <testcase name="norn-interview has frontmatter with matching name and a description" classname="skills" time="0.00015" file="packages/cli/test/assets.test.ts" assertions="4" />
+      <testcase name="norn-refine has frontmatter with matching name and a description" classname="skills" time="0" file="packages/cli/test/assets.test.ts" assertions="4" />
+      <testcase name="norn-clarify has frontmatter with matching name and a description" classname="skills" time="0" file="packages/cli/test/assets.test.ts" assertions="4" />
+      <testcase name="norn-plan has frontmatter with matching name and a description" classname="skills" time="0" file="packages/cli/test/assets.test.ts" assertions="4" />
+      <testcase name="norn-slice has frontmatter with matching name and a description" classname="skills" time="0.000381" file="packages/cli/test/assets.test.ts" assertions="4" />
+      <testcase name="norn-implement has frontmatter with matching name and a description" classname="skills" time="0" file="packages/cli/test/assets.test.ts" assertions="4" />
+      <testcase name="norn-review has frontmatter with matching name and a description" classname="skills" time="0.0001" file="packages/cli/test/assets.test.ts" assertions="4" />
+      <testcase name="norn-qa has frontmatter with matching name and a description" classname="skills" time="0" file="packages/cli/test/assets.test.ts" assertions="4" />
+      <testcase name="norn-qa-person has frontmatter with matching name and a description" classname="skills" time="0.000334" file="packages/cli/test/assets.test.ts" assertions="4" />
+      <testcase name="norn-diagnose has frontmatter with matching name and a description" classname="skills" time="0.000133" file="packages/cli/test/assets.test.ts" assertions="4" />
+      <testcase name="norn-merge has frontmatter with matching name and a description" classname="skills" time="0" file="packages/cli/test/assets.test.ts" assertions="4" />
+      <testcase name="norn-pr has frontmatter with matching name and a description" classname="skills" time="0.000245" file="packages/cli/test/assets.test.ts" assertions="4" />
+      <testcase name="norn-tdd has frontmatter with matching name and a description" classname="skills" time="0.000119" file="packages/cli/test/assets.test.ts" assertions="4" />
+      <testcase name="norn-codebase-design has frontmatter with matching name and a description" classname="skills" time="0" file="packages/cli/test/assets.test.ts" assertions="4" />
+      <testcase name="norn-prototype has frontmatter with matching name and a description" classname="skills" time="0" file="packages/cli/test/assets.test.ts" assertions="4" />
+      <testcase name="norn-retro has frontmatter with matching name and a description" classname="skills" time="0.00009" file="packages/cli/test/assets.test.ts" assertions="4" />
+      <testcase name="the norn skill stays under 80 lines (SK2)" classname="skills" time="0.00006" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="the norn skill names no step of any template (SK2)" classname="skills" time="0.014377" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="the norn skill states the protocol and hard rules" classname="skills" time="0.000726" file="packages/cli/test/assets.test.ts" assertions="14" />
+      <testcase name="norn-interview is unaware of norn (P7)" classname="skills" time="0" file="packages/cli/test/assets.test.ts" assertions="2" />
+      <testcase name="norn-refine is unaware of norn (P7)" classname="skills" time="0.000442" file="packages/cli/test/assets.test.ts" assertions="2" />
+      <testcase name="norn-clarify is unaware of norn (P7)" classname="skills" time="0" file="packages/cli/test/assets.test.ts" assertions="2" />
+      <testcase name="norn-plan is unaware of norn (P7)" classname="skills" time="0.000301" file="packages/cli/test/assets.test.ts" assertions="2" />
+      <testcase name="norn-slice is unaware of norn (P7)" classname="skills" time="0.00012" file="packages/cli/test/assets.test.ts" assertions="2" />
+      <testcase name="norn-implement is unaware of norn (P7)" classname="skills" time="0.000147" file="packages/cli/test/assets.test.ts" assertions="2" />
+      <testcase name="norn-review is unaware of norn (P7)" classname="skills" time="0" file="packages/cli/test/assets.test.ts" assertions="2" />
+      <testcase name="norn-qa is unaware of norn (P7)" classname="skills" time="0.000139" file="packages/cli/test/assets.test.ts" assertions="2" />
+      <testcase name="norn-qa-person is unaware of norn (P7)" classname="skills" time="0" file="packages/cli/test/assets.test.ts" assertions="2" />
+      <testcase name="norn-diagnose is unaware of norn (P7)" classname="skills" time="0.000244" file="packages/cli/test/assets.test.ts" assertions="2" />
+      <testcase name="norn-merge is unaware of norn (P7)" classname="skills" time="0.000062" file="packages/cli/test/assets.test.ts" assertions="2" />
+      <testcase name="norn-pr is unaware of norn (P7)" classname="skills" time="0.001522" file="packages/cli/test/assets.test.ts" assertions="2" />
+      <testcase name="norn-tdd is unaware of norn (P7)" classname="skills" time="0.000073" file="packages/cli/test/assets.test.ts" assertions="2" />
+      <testcase name="norn-codebase-design is unaware of norn (P7)" classname="skills" time="0.000099" file="packages/cli/test/assets.test.ts" assertions="2" />
+      <testcase name="norn-prototype is unaware of norn (P7)" classname="skills" time="0.000059" file="packages/cli/test/assets.test.ts" assertions="2" />
+      <testcase name="norn-retro is unaware of norn (P7)" classname="skills" time="0.000105" file="packages/cli/test/assets.test.ts" assertions="2" />
+      <testcase name="norn links only to files that exist (whole skill folders, SK1)" classname="skills" time="0.00016" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-interview links only to files that exist (whole skill folders, SK1)" classname="skills" time="0.000013" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-refine links only to files that exist (whole skill folders, SK1)" classname="skills" time="0.000157" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-clarify links only to files that exist (whole skill folders, SK1)" classname="skills" time="0.000055" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-plan links only to files that exist (whole skill folders, SK1)" classname="skills" time="0.00005" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-slice links only to files that exist (whole skill folders, SK1)" classname="skills" time="0.000042" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-implement links only to files that exist (whole skill folders, SK1)" classname="skills" time="0.00004" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-review links only to files that exist (whole skill folders, SK1)" classname="skills" time="0.000029" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-qa links only to files that exist (whole skill folders, SK1)" classname="skills" time="0" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-qa-person links only to files that exist (whole skill folders, SK1)" classname="skills" time="0" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-diagnose links only to files that exist (whole skill folders, SK1)" classname="skills" time="0.000179" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-merge links only to files that exist (whole skill folders, SK1)" classname="skills" time="0.00005" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-pr links only to files that exist (whole skill folders, SK1)" classname="skills" time="0.000143" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-tdd links only to files that exist (whole skill folders, SK1)" classname="skills" time="0.000045" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-codebase-design links only to files that exist (whole skill folders, SK1)" classname="skills" time="0.000063" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-prototype links only to files that exist (whole skill folders, SK1)" classname="skills" time="0" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-retro links only to files that exist (whole skill folders, SK1)" classname="skills" time="0" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn uses no banned glossary synonyms (§5)" classname="skills" time="0.000377" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-interview uses no banned glossary synonyms (§5)" classname="skills" time="0.000129" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-refine uses no banned glossary synonyms (§5)" classname="skills" time="0.000194" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-clarify uses no banned glossary synonyms (§5)" classname="skills" time="0" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-plan uses no banned glossary synonyms (§5)" classname="skills" time="0.000744" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-slice uses no banned glossary synonyms (§5)" classname="skills" time="0.000095" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-implement uses no banned glossary synonyms (§5)" classname="skills" time="0" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-review uses no banned glossary synonyms (§5)" classname="skills" time="0" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-qa uses no banned glossary synonyms (§5)" classname="skills" time="0" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-qa-person uses no banned glossary synonyms (§5)" classname="skills" time="0.000357" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-diagnose uses no banned glossary synonyms (§5)" classname="skills" time="0.000081" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-merge uses no banned glossary synonyms (§5)" classname="skills" time="0.000131" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-pr uses no banned glossary synonyms (§5)" classname="skills" time="0.000077" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-tdd uses no banned glossary synonyms (§5)" classname="skills" time="0.000032" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-codebase-design uses no banned glossary synonyms (§5)" classname="skills" time="0.00009" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-prototype uses no banned glossary synonyms (§5)" classname="skills" time="0.000199" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="norn-retro uses no banned glossary synonyms (§5)" classname="skills" time="0.00013" file="packages/cli/test/assets.test.ts" assertions="1" />
+    </testsuite>
+    <testsuite name="config template" file="packages/cli/test/assets.test.ts" tests="3" assertions="4" failures="0" skipped="0" time="0.006" hostname="mac.home">
+      <testcase name="validates as a config layer (K2)" classname="config template" time="0.006252" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="every commented-out key also validates once uncommented" classname="config template" time="0.00085" file="packages/cli/test/assets.test.ts" assertions="2" />
+      <testcase name="as installed, keeps the built-in agent entries, args included" classname="config template" time="0.000523" file="packages/cli/test/assets.test.ts" assertions="1" />
+    </testsuite>
+    <testsuite name="asset resolution (X3)" file="packages/cli/test/assets.test.ts" tests="6" assertions="11" failures="0" skipped="0" time="0.003" hostname="mac.home">
+      <testcase name="NORN_ASSETS_DIR wins over embedded and on-disk assets" classname="asset resolution (X3)" time="0.000839" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="a NORN_ASSETS_DIR without assets is an error, not a silent fallback" classname="asset resolution (X3)" time="0" file="packages/cli/test/assets.test.ts" assertions="1" />
+      <testcase name="embedded assets are extracted once into a content-hashed cache dir" classname="asset resolution (X3)" time="0.002246" file="packages/cli/test/assets.test.ts" assertions="3" />
+      <testcase name="embedded assets extract under XDG_CACHE_HOME, else HOME/.cache" classname="asset resolution (X3)" time="0.00143" file="packages/cli/test/assets.test.ts" assertions="2" />
+      <testcase name="on disk: the first candidate holding config.yaml (bundle-adjacent before source tree)" classname="asset resolution (X3)" time="0.000821" file="packages/cli/test/assets.test.ts" assertions="3" />
+      <testcase name="the default resolver finds the source tree" classname="asset resolution (X3)" time="0.00012" file="packages/cli/test/assets.test.ts" assertions="1" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/audit.test.ts" file="packages/cli/test/audit.test.ts" tests="4" assertions="22" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="audit: runtime" file="packages/cli/test/audit.test.ts" tests="4" assertions="22" failures="0" skipped="0" time="14.324" hostname="mac.home">
+      <testcase name="O3: an item created by this tick&apos;s act is notified in the same tick" classname="audit: runtime" time="1.190672" file="packages/cli/test/audit.test.ts" assertions="4" />
+      <testcase name="B2: an answer to a gone session resumes the agent session with the answer as the prompt" classname="audit: runtime" time="1.663492" file="packages/cli/test/audit.test.ts" assertions="6" />
+      <testcase name="S7/O2: unstick --to off a live run kills it and releases its agent lease" classname="audit: runtime" time="3.124994" file="packages/cli/test/audit.test.ts" assertions="3" />
+      <testcase name="GR6: a deferred base-branch record is retried on later ticks until it lands" classname="audit: runtime" time="8.347802" file="packages/cli/test/audit.test.ts" assertions="9" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/run-rerun-cancel.test.ts" file="packages/cli/test/run-rerun-cancel.test.ts" tests="13" assertions="71" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="a person&apos;s stuck at the cursor of a running unit (B51, D4)" file="packages/cli/test/run-rerun-cancel.test.ts" tests="1" assertions="5" failures="0" skipped="0" time="8.086" hostname="mac.home">
+      <testcase name="the next tick ends the run there: stuck under Unblock, not relaunched, retried or nudged" classname="a person&amp;apos;s stuck at the cursor of a running unit (B51, D4)" time="8.0864" file="packages/cli/test/run-rerun-cancel.test.ts" assertions="5" />
+    </testsuite>
+    <testsuite name="run rerun (B48, B50)" file="packages/cli/test/run-rerun-cancel.test.ts" tests="2" assertions="10" failures="0" skipped="0" time="7.607" hostname="mac.home">
+      <testcase name="a stuck unit resumes its step in a fresh session; --reset and --reason are journaled" classname="run rerun (B48, B50)" time="6.57849" file="packages/cli/test/run-rerun-cancel.test.ts" assertions="8" />
+      <testcase name="a running unit is refused: stopping it is run cancel" classname="run rerun (B48, B50)" time="1.029013" file="packages/cli/test/run-rerun-cancel.test.ts" assertions="2" />
+    </testsuite>
+    <testsuite name="run cancel (B51–B53)" file="packages/cli/test/run-rerun-cancel.test.ts" tests="5" assertions="34" failures="0" skipped="0" time="17.653" hostname="mac.home">
+      <testcase name="writes the stuck receipt first, then kills the session; everything else stays; rerun resumes" classname="run cancel (B51–B53)" time="6.812468" file="packages/cli/test/run-rerun-cancel.test.ts" assertions="13" />
+      <testcase name="a unit waiting at a gate has nothing to cancel; a unit that is not started either" classname="run cancel (B51–B53)" time="3.159481" file="packages/cli/test/run-rerun-cancel.test.ts" assertions="3" />
+      <testcase name="without a target a terminal is offered only the running units" classname="run cancel (B51–B53)" time="0.340442" file="packages/cli/test/run-rerun-cancel.test.ts" assertions="3" />
+      <testcase name="a claim another machine holds is refused: check the story out first" classname="run cancel (B51–B53)" time="0.88799" file="packages/cli/test/run-rerun-cancel.test.ts" assertions="4" />
+      <testcase name="a session this checkout cannot stop is said, with the receipt, never skipped (B51)" classname="run cancel (B51–B53)" time="6.455082" file="packages/cli/test/run-rerun-cancel.test.ts" assertions="11" />
+    </testsuite>
+    <testsuite name="run rerun --step (B49)" file="packages/cli/test/run-rerun-cancel.test.ts" tests="4" assertions="18" failures="0" skipped="0" time="9.494" hostname="mac.home">
+      <testcase name="a unit stuck at qa moves to implement" classname="run rerun --step (B49)" time="3.909071" file="packages/cli/test/run-rerun-cancel.test.ts" assertions="7" />
+      <testcase name="a gate-waiting unit resumes as unstick resumed it" classname="run rerun --step (B49)" time="1.346997" file="packages/cli/test/run-rerun-cancel.test.ts" assertions="3" />
+      <testcase name="a unit parked on an ask resumes as unstick resumed it" classname="run rerun --step (B49)" time="2.336589" file="packages/cli/test/run-rerun-cancel.test.ts" assertions="4" />
+      <testcase name="a unit that is not stuck, parked or at a gate is refused" classname="run rerun --step (B49)" time="1.903917" file="packages/cli/test/run-rerun-cancel.test.ts" assertions="4" />
+    </testsuite>
+    <testsuite name="the surface (B2, B5)" file="packages/cli/test/run-rerun-cancel.test.ts" tests="1" assertions="4" failures="0" skipped="0" time="0" hostname="mac.home">
+      <testcase name="unstick is an unknown command; run lists rerun and cancel" classname="the surface (B2, B5)" time="0.000132" file="packages/cli/test/run-rerun-cancel.test.ts" assertions="4" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/auto-recovery.test.ts" file="packages/cli/test/auto-recovery.test.ts" tests="10" assertions="60" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="R4: nudges that can be delivered (acceptance 5)" file="packages/cli/test/auto-recovery.test.ts" tests="3" assertions="18" failures="0" skipped="0" time="10.266" hostname="mac.home">
+      <testcase name="R4.3: a send that fails is ok:false, an Unblock item and shown in status" classname="R4: nudges that can be delivered (acceptance 5)" time="8.213789" file="packages/cli/test/auto-recovery.test.ts" assertions="9" />
+      <testcase name="R4.2: a runner without `send` resumes the agent session with the nudge text; the failure clears" classname="R4: nudges that can be delivered (acceptance 5)" time="1.6646" file="packages/cli/test/auto-recovery.test.ts" assertions="8" />
+      <testcase name="R4.4: status shows the run&apos;s last classification, not only liveness" classname="R4: nudges that can be delivered (acceptance 5)" time="0.389073" file="packages/cli/test/auto-recovery.test.ts" assertions="1" />
+    </testsuite>
+    <testsuite name="R5: a launch norn did not see finish (acceptance 6)" file="packages/cli/test/auto-recovery.test.ts" tests="3" assertions="20" failures="0" skipped="0" time="16.833" hostname="mac.home">
+      <testcase name="the runner finds the run → adopted, no second agent" classname="R5: a launch norn did not see finish (acceptance 6)" time="6.378612" file="packages/cli/test/auto-recovery.test.ts" assertions="6" />
+      <testcase name="nothing finds it → waits 2 watch intervals, then died (counted) and a fresh run" classname="R5: a launch norn did not see finish (acceptance 6)" time="5.363385" file="packages/cli/test/auto-recovery.test.ts" assertions="8" />
+      <testcase name="R5.3: no new run while another run of the step shows hook activity" classname="R5: a launch norn did not see finish (acceptance 6)" time="5.092604" file="packages/cli/test/auto-recovery.test.ts" assertions="6" />
+    </testsuite>
+    <testsuite name="R5.4 / R5.5: tick records and the heartbeat (acceptance 7, 8)" file="packages/cli/test/auto-recovery.test.ts" tests="3" assertions="12" failures="0" skipped="0" time="8.091" hostname="mac.home">
+      <testcase name="every tick writes tick.start before act and tick.end after; heartbeat.json records last_tick_at" classname="R5.4 / R5.5: tick records and the heartbeat (acceptance 7, 8)" time="1.502948" file="packages/cli/test/auto-recovery.test.ts" assertions="2" />
+      <testcase name="a tick that died during act: why says so and resolves the receipt that cites it" classname="R5.4 / R5.5: tick records and the heartbeat (acceptance 7, 8)" time="3.60237" file="packages/cli/test/auto-recovery.test.ts" assertions="3" />
+      <testcase name="no heartbeat for 3 watch intervals with auto work held: inbox item, no manual start hint" classname="R5.4 / R5.5: tick records and the heartbeat (acceptance 7, 8)" time="2.987212" file="packages/cli/test/auto-recovery.test.ts" assertions="7" />
+    </testsuite>
+    <testsuite name="R7: a run from another machine (acceptance 10)" file="packages/cli/test/auto-recovery.test.ts" tests="1" assertions="10" failures="0" skipped="0" time="10.152" hostname="mac.home">
+      <testcase name="no pid or pane check; after the take, no hooks for the stalled window → died with the foreign rule" classname="R7: a run from another machine (acceptance 10)" time="10.15272" file="packages/cli/test/auto-recovery.test.ts" assertions="10" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="packages/cli/test/base-sync.test.ts" file="packages/cli/test/base-sync.test.ts" tests="12" assertions="124" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="base sync with real git" file="packages/cli/test/base-sync.test.ts" tests="4" assertions="42" failures="0" skipped="0" time="48.822" hostname="mac.home">
+      <testcase name="1: a sibling merge without conflicts is merged by update — one Norn-Tick merge commit, no foreign item, → test" classname="base sync with real git" time="9.609371" file="packages/cli/test/base-sync.test.ts" assertions="10" />
+      <testcase name="4 + 2: waiting at ready, a conflicting sibling merge → stale → update → conflict → resolve (brief: base sha + paths) → done → update → test" classname="base sync with real git" time="21.827798" file="packages/cli/test/base-sync.test.ts" assertions="11" />
+      <testcase name="6: norn update re-enters a done, unmerged story; refused without the claim and once merged" classname="base sync with real git" time="17.386036" file="packages/cli/test/base-sync.test.ts" assertions="20" />
+      <testcase name="effect transcript: spawns, port calls and runs/ files of cases 1, 4 + 2 and 6 (refactor Phase 0.2)" classname="base sync with real git" time="0.000982" file="packages/cli/test/base-sync.test.ts" assertions="1" />
+    </testsuite>
+    <testsuite name="BS3.3a (dogfood D4): a person&apos;s push to the branch of a $done story" file="packages/cli/test/base-sync.test.ts" tests="1" assertions="7" failures="0" skipped="0" time="10.389" hostname="mac.home">
+      <testcase name="norn&apos;s next commit merges it in (never rebases) and pushes; norn update does not end stuck diverged" classname="BS3.3a (dogfood D4): a person&amp;apos;s push to the branch of a $done story" time="10.389849" file="packages/cli/test/base-sync.test.ts" assertions="7" />
+    </testsuite>
+    <testsuite name="base_branch: develop (BS0, 7b)" file="packages/cli/test/base-sync.test.ts" tests="1" assertions="4" failures="0" skipped="0" time="5.081" hostname="mac.home">
+      <testcase name="intake from develop, update merges develop, open-pr targets develop" classname="base_branch: develop (BS0, 7b)" time="5.081301" file="packages/cli/test/base-sync.test.ts" assertions="4" />
+    </testsuite>
+    <testsuite name="PR items between syncs and in the read model (C1), ready approval voided by norn update (C5)" file="packages/cli/test/base-sync.test.ts" tests="3" assertions="25" failures="0" skipped="0" time="10.136" hostname="mac.home">
+      <testcase name="C1: a done story conflicting with its base keeps its Merge item (norn update) and a retarget item, in every tick and in norn inbox" classname="PR items between syncs and in the read model (C1), ready approval voided by norn update (C5)" time="6.926588" file="packages/cli/test/base-sync.test.ts" assertions="12" />
+      <testcase name="C5: norn&apos;s own commits after the ready approval (its $done commit) are no head change; anyone else&apos;s commit is" classname="PR items between syncs and in the read model (C1), ready approval voided by norn update (C5)" time="1.180415" file="packages/cli/test/base-sync.test.ts" assertions="6" />
+      <testcase name="C5: after norn update from $done, the old ready approval no longer pins the head" classname="PR items between syncs and in the read model (C1), ready approval voided by norn update (C5)" time="2.030727" file="packages/cli/test/base-sync.test.ts" assertions="7" />
+    </testsuite>
+    <testsuite name="H1/BS5: a resolve parked mid-merge — norn never concludes the merge; done is verified" file="packages/cli/test/base-sync.test.ts" tests="2" assertions="36" failures="0" skipped="0" time="10.608" hostname="mac.home">
+      <testcase name="park while the agent&apos;s merge is in progress: no commit, MERGE_HEAD kept, nothing pushed; done refused until the merge is concluded clean" classname="H1/BS5: a resolve parked mid-merge — norn never concludes the merge; done is verified" time="9.668237" file="packages/cli/test/base-sync.test.ts" assertions="31" />
+      <testcase name="a norn commit that would record conflict markers is refused: ok:false, an Unblock item, nothing pushed" classname="H1/BS5: a resolve parked mid-merge — norn never concludes the merge; done is verified" time="0.940001" file="packages/cli/test/base-sync.test.ts" assertions="5" />
+    </testsuite>
+    <testsuite name="BUG-2: an update conflict that exhausts base_conflict_loop, then run rerun --step resolve (BS5, W4)" file="packages/cli/test/base-sync.test.ts" tests="1" assertions="10" failures="0" skipped="0" time="10.508" hostname="mac.home">
+      <testcase name="act records route $stuck and the unit stays stuck at update; after run rerun --step resolve, done without the merge is refused" classname="BUG-2: an update conflict that exhausts base_conflict_loop, then run rerun --step resolve (BS5, W4)" time="10.508509" file="packages/cli/test/base-sync.test.ts" assertions="10" />
+    </testsuite>
+  </testsuite>
+</testsuites>

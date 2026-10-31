@@ -1,0 +1,28 @@
+bun test v1.3.13 (bf2e2cec)
+
+packages/store/test/unit/qa-head.test.ts:
+39 |   let pending: string | undefined;
+40 | 
+41 |   const block = (args: unknown[]): never => {
+42 |     const message = `unit test in ${testFile()} started \`${argvOf(args[0]).join(" ")}\`; a test that spawns belongs in test/integration/`;
+43 |     pending ??= message;
+44 |     throw new Error(message);
+                                ^
+error: unit test in packages/store/test/unit/qa-head.test.ts started `git rev-parse HEAD`; a test that spawns belongs in test/integration/
+      at block (/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh118-07-copy/test/support/unit-guard.ts:44:28)
+      at <anonymous> (/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh118-07-copy/packages/store/test/unit/qa-head.test.ts:3:17)
+49 | 
+50 |   return {
+51 |     check() {
+52 |       const message = pending;
+53 |       pending = undefined;
+54 |       if (message !== undefined) throw new Error(message);
+                                                             ^
+error: unit test in packages/store/test/unit/qa-head.test.ts started `git rev-parse HEAD`; a test that spawns belongs in test/integration/
+      at check (/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh118-07-copy/test/support/unit-guard.ts:54:57)
+(fail) reads the head [0.50ms]
+
+ 0 pass
+ 1 fail
+Ran 1 test across 1 file. [233.00ms]
+exit 1

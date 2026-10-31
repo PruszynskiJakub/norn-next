@@ -1,0 +1,9 @@
+packages/core/test/golden/agent-protocol-aebc90a877f3.json
+packages/core/test/golden/base-sync-3840c46a2ba5.json
+packages/core/test/golden/check-run-0bb8618bb933.json
+packages/core/test/golden/check-run-79e9bb3eaf13.json
+packages/core/test/golden/housekeeping-179f36b22a7d.json
+packages/core/test/golden/rebase-rewind-0a4c2f7ca16d.json
+packages/core/test/golden/run-rerun-cancel-c4951d9aea19.json
+packages/core/test/golden/status-watch-bf9ed6a217f0.json
+packages/core/test/golden/story-reopen-a1feef443f31.json
