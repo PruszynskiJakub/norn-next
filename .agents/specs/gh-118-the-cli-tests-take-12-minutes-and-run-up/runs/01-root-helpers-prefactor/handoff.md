@@ -28,7 +28,9 @@ Prefactors 1 and 2 of the plan, nothing moved: root `test/`/`scripts/` may impor
 - AC3: `NORN_TRANSCRIPT_UPDATE=1 bun test` on base-sync.test.ts and observe-snapshots.test.ts left every pinned file byte-identical.
 - Committed faf4595e2.
 - implement#1 done: AC1: root declares the six @norn packages as workspace dev deps; repo rules fail on an undeclared @norn import in root test/ or scripts/, naming file and import (fixture test + real tree). Same-module-instance spike rechecked. AC2: REPO_ROOT locator; TRANSCRIPTS_DIR / OBSERVE_SNAPSHOTS_DIR named from it, pinned by pinned-outputs.test.ts; golden script already root-relative. AC3: NORN_TRANSCRIPT_UPDATE=1 on base-sync and observe-snapshots leaves files byte-identical. Full suite 1533 pass, typecheck green, pinned files unchanged. bun.lock also picked up the cli version 0.13.0 it had stale.
+- review#1: approve, no blocking findings (one nit: pinned-outputs.test.ts lists exact file names). Repo tests, new test, typecheck green.
+- review#1 approve: AC1–AC3 met: root declares the @norn workspace dev deps and the repo rules name the file and import of an undeclared one; transcript and snapshot dirs are named from REPO_ROOT; golden was already root-relative; pinned files unchanged. Repo tests and typecheck green. One nit: the pinned-outputs test lists exact file names.
 
 ## Resume
 
-Nothing left for this slice; reported done.
+Review done (approve); nothing left for this step.
