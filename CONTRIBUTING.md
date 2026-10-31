@@ -4,7 +4,7 @@ norn is built with norn. Code rules, layout and the agent side of the process ar
 
 ## The loop
 
-1. **Everything is an issue.** Every change to a file in the repo starts as a GitHub issue labelled `norn` and assigned to whoever runs norn on it.
+1. **Everything is an issue.** Every change to a file in the repo starts as a GitHub issue labelled `norn`. It stays unassigned in the backlog; whoever runs norn on it assigns it to themselves when work should begin, because intake cuts the story branch from the base at that moment (GR1, GR2).
 2. **norn picks it up.** `norn sync` turns the issue into story `gh-N` (a branch `gh-N-<slug>`, a worktree, a spec folder).
 3. **Triage or reproduce.** Unless the issue names a workflow, the `triage` workflow runs first: an agent checks the issue still applies, adds the affected code and context, and recommends `quick`, `story` or `close`. A bug (the bug report template sets `norn:wf:reproduce`) runs `reproduce` instead: an agent reproduces it through the real interface, builds a loop that goes red, confirms the cause and posts it on the issue; you switch it to `quick` to fix it or close it. You confirm at the gate and switch the story with `norn story edit gh-N --workflow <name> --at <start step>`; the gate prompt lists the exact command for each workflow. To close instead: `norn story approve gh-N`, `gh issue close N --reason "not planned"`, `norn story close gh-N`, then delete the pushed story branch (`git push origin --delete gh-N-<slug>`).
 4. **The workflow runs.** Agents do the unattended steps; you answer the inbox (`norn status`).

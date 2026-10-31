@@ -1,14 +1,27 @@
 # Quick workflow — repo-local, for refactors, docs, chores, other small changes and the fix of a
 # bug `reproduce` confirmed (W1, W9: label norn:wf:quick). A story workflow without `slices` (W8):
-# every step works in the story worktree. Implement, bring the story up to date with its base, check, review, describe,
+# every step works in the story worktree. Bring the story up to date with its base, implement, bring it up to date again, check, review, describe,
 # open the draft PR (or rewrite the body of the open one), wait for the PR's CI, and wait for a
 # person at `ready`; the person merges the PR. The local check runs test:fast; CI runs the full suite.
 # A story waiting at ready goes back through update when the base moved under it in a way
 # that conflicts (BS6–BS8, base.stale: conflict).
 name: quick
 description: Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR.
-start: implement
+start: sync
 steps:
+  # brings the story branch up to date with its base before any code is written, so implement starts
+  # from the current base and the update after it merges only what moved meanwhile
+  sync:
+    type: git
+    action: update
+    outcomes: { done: implement, conflict: { to: sync-resolve, counter: sync_conflict_loop } }
+  sync-resolve:
+    type: agent
+    skill: norn-merge
+    inputs: [spec, handoff]
+    instructions: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase."
+    outcomes:
+      done: { to: sync, means: "base merged into the story branch, conflicts resolved and committed" }
   implement:
     type: agent
     skill: norn-implement
@@ -84,6 +97,8 @@ counters:
   ready_loop: { max: 2 }
   # resets each time update merges cleanly: only repeated conflicts on one base move count (W4)
   base_conflict_loop: { max: 2, reset_on: update.done }
+  sync_conflict_loop: { max: 2, reset_on: sync.done }
   # a stale re-entry is progress from outside (a sibling merged), bounded by the sibling merges
   stale_loop: { max: 10 }
-base: { stale: conflict }
+# update-branch re-enters update, not sync, the first update step (BS9)
+base: { stale: conflict, step: update }
