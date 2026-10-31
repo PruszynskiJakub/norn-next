@@ -27,7 +27,7 @@ The person names the story: a key such as `gh-123`, or its folder `.agents/specs
   - `logs/<run_id>.log`: the full output of a failed check.
   - `evidence/<run_id>/`: what QA saw.
   - `handoff.md`: a generated header, then Goal, Progress (what was tried and failed) and Resume.
-- **The local trace**, only on the machine that ran the story: `.agents/*/trace/<YYYY-MM-DD>.jsonl`, one JSON object per line. It is not committed; when it is missing, say so in the report and work from the record alone. Keep the lines whose `unit` (or `fact.story`, `fact.slice`) is this story or one of its slices. By `type`:
+- **The local trace**, only on the machine that ran the story: `<YYYY-MM-DD>.jsonl` files in the delivery tool's folder for this checkout, under your home directory (named after the checkout's folder), one JSON object per line. It is not committed; when it is missing, say so in the report and work from the record alone. Keep the lines whose `unit` (or `fact.story`, `fact.slice`) is this story or one of its slices. By `type`:
   - `hook` with `fact.event: "permission_prompt"` and `fact.command`: commands that stopped for a permission prompt;
   - `reject` (`reason`): a report the tool refused;
   - `criteria` (`verdicts`, `unverified_needs`): criteria left unverified, counted per missing capability;
@@ -56,8 +56,8 @@ For each finding, suggest ONE concrete change, small enough to review in a minut
 | File | When |
 |---|---|
 | a skill, `.agents/skills/<name>/SKILL.md` | an agent's craft fell short the same way more than once |
-| a definition, `.agents/*/workflows/<name>.yaml` | a missing check before review (lint, type check), a counter `max`, a check's `run` or `timeout`, a stage's `deadline` or `agent`, where a verdict goes |
-| `.agents/*/config.yaml` | `limits` (`deadline`, `stalled`, `nudges`, `retries`), an agent's `args`, or its `capabilities` matching the criteria's `needs` |
+| a definition, `.agents/workflows/<name>.yaml` | a missing check before review (lint, type check), a counter `max`, a check's `run` or `timeout`, a stage's `deadline` or `agent`, where a verdict goes |
+| the repo config, `.agents/*.config.yaml` | `limits` (`deadline`, `stalled`, `nudges`, `retries`), an agent's `args`, or its `capabilities` matching the criteria's `needs` |
 | contributor docs: `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, coding standards | a repo fact an agent asked for or got wrong; a judgement call review kept finding |
 | the spec template: the refine skill's `SKILL.md` and `EXAMPLE.md` in `.agents/skills/norn-refine/` | asks and rejects that trace back to a gap in how specs are written |
 
@@ -69,7 +69,7 @@ Choose where the change belongs:
 - **A capability gap is fixed where it lives**: give the agent the tool and declare it in `capabilities`, or send those criteria to an agent that has it.
 - **A tight counter is rarely the fix.** Fix what caused the loops; raise a `max` only when the loops were each worth it.
 - **Look for what exists first**: a check that is defined but not wired, a doc that already says it but no agent reads.
-- **Bundled skills are replaced on reinstall.** The skills in `.agents/skills/` that came with the delivery tool are overwritten by its own copy. To change one, suggest a copy under a new name, plus the `skill:` line in `.agents/*/workflows/<name>.yaml` that points at the copy. A skill the repo wrote itself changes in place.
+- **Bundled skills are replaced on reinstall.** The skills in `.agents/skills/` that came with the delivery tool are overwritten by its own copy. To change one, suggest a copy under a new name, plus the `skill:` line in `.agents/workflows/<name>.yaml` that points at the copy. A skill the repo wrote itself changes in place.
 
 Never suggest a change without evidence in the record, and never two changes for one finding: pick the one that removes the cause.
 
