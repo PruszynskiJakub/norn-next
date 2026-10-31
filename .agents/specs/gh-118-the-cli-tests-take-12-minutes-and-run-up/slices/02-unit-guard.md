@@ -2,7 +2,7 @@
 id: gh-118/02
 title: Unit guard preload that fails a test which spawns
 depends_on: []
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
