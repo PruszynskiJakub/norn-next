@@ -26,7 +26,10 @@ The cli tests live in tiers: `bun test` stops running cli harness tests; `bun ru
 - Counts: HEAD baseline (bun test --parallel in an archive copy) 1541 tests / 99 files. Branch: unit 1103/58 + integration 372/37 + e2e 72/7 = 1547/102 = baseline + 6 new rule tests; +3 files from the two splits and herdr-plugin. cli unit under the guard: 114 pass.
 - AC7: `NORN_TRANSCRIPT_UPDATE=1 bun run test:e2e test/e2e/base-sync.test.ts` rewrote only base-sync.txt, byte-identical. `bun run golden -- --update`: 0 of 93 changed.
 - Typecheck green.
+- AC6 golden: `bun run golden` adds 9 cases (agent.timeout.surface, check.running, remote.park, …) of 604 harvested; the same command on a copy of HEAD (before this slice) adds the identical 9 names of 604. So the move changes no harvest; the corpus already under-covers those rules. Not added (out of scope); a person may decide to add them in their own change.
+- AC8: test:integration 3 runs green (114 s, 149 s, 106 s), test:e2e 3 runs green (89 s, 114 s, 81 s), no parallel-only failure seen. One run of the whole old suite in parallel on HEAD (with a golden harvest at once) timed out recovery's "renewals due together" beforeAll at 30 s: load, not a race; it did not recur in the e2e tier.
+- Committed db4b73e56.
 
 ## Resume
 
-Finish AC6/AC8: golden harvest result (no case added), then test:integration and test:e2e three runs each; commit; report done.
+Done; nothing left for implement.
