@@ -15,6 +15,13 @@
 
 ## Goal
 
+Write gh-118's spec (problem, solution, Behaviour B1–B22, out of scope) from the issue's refinement comment and today's interview.
+
 ## Progress
 
+- Interview settled: unit tier under 30 s (others only measured); plain `bun test` = unit tier; release.yml runs unit + typecheck; spawn guard preload included; shipped workflow templates unchanged, only `norn-implement` skill changes. Person confirmed the summary.
+- Spec written to spec.md; no open questions (plan items listed under Open questions as "left to plan").
+
 ## Resume
+
+Person reviews spec.md; on agreement report `norn done done`.
