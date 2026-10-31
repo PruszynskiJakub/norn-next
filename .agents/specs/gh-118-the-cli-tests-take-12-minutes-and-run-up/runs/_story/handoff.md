@@ -62,22 +62,19 @@
 
 ## Goal
 
-qa#1: check B1-B22 on the branch as a user would, with evidence.
+implement#5: fix qa#1's two failures, B21 (stale contract.test.ts path in AGENTS.md) and B20 (integrate.test.ts hook timeout in a parallel integration run).
 
 ## Progress
 
-- The pinned workflow (`runs/_story/workflow.yaml`, S7) still runs `test:fast`, which B7 removes. The person said to ignore it.
-- `packages/cli/test/story-reset.test.ts` (new on main) moved to `packages/cli/test/integration/`, with imports pointing at `../../src/index.ts` and `test/support/harness.ts` (B14).
-- #125 ci-check tests: once `chmodSync` was back they ran, but they spawn `sh`, so the unit guard failed them (B4). Following D6 (as with the herdr plugin test), the three spawning tests moved to `packages/cli/test/integration/ci-check.test.ts`. The no-spawn "same script" test stays in `test/repo/repo.test.ts`, which no longer needs `chmodSync`.
-- Commit 0654e3fee. `bun run test`: 985 pass, 0 fail. `bun run test:integration`: 511 pass, 0 fail. `bun run typecheck` is green.
-- implement#2 done: After the a39ba10 merge: story-reset.test.ts moved to cli integration with its imports fixed (B14). The #125 ci-check tests spawn sh, so they moved to packages/cli/test/integration/ci-check.test.ts (D6, B4), and the 'same script' rule stays in repo.test. Commit 0654e3fee. Unit 985/0 fail, integration 511/0 fail, typecheck green. The pinned test:fast check is left to the person, as agreed.
-
-- implement#3: the rework is only the pinned `test:fast` check failing with "Script not found", which is exactly what B7 asks for. No code change. Re-ran `bun run test` (985 pass, 0 fail) and `bun run typecheck` (green) on 0654e3fee.
-- implement#3 done: Only rework point is the pinned test:fast check failing with 'Script not found', which B7 requires; per the person's answer it is ignored. No code change. Re-verified on 0654e3fee: unit 985/0 fail, typecheck green (integration was 511/0 on the same commit). The person needs to move the story past the pinned test check by hand.
-
-- qa#1 (head 2cf40509f): unit 985/0 in ~2 s x3; e2e 72/0 x3 (~78 s); integration 511/0 twice (~110 s), but run 3 had 1 fail: integrate.test.ts 'clean: rebase + fast-forward story branch checked out in a worktree' hook timed out at 20 s (B20, F1). AGENTS.md:24 still places contract.test.ts in packages/adapters/test/contract/; it now lives in test/integration/contract/ (B21, F2). Probes for B4 and B14-B16 behaved as specified. Unverified: B11/B12/B22 (no PR or CI run yet), B17 (1568 vs 1423 tests not reconciled), B18/B19 (golden and transcript rewrite not run before the deadline). Evidence in $TMPDIR/qa118.
-- qa#1 fail: QA on 2cf40509f: 2 fails. B20: integrate.test.ts 'clean: rebase + fast-forward ... worktree' hook timed out at 20 s in 1 of 3 parallel integration runs (F1). B21: AGENTS.md:24 places contract.test.ts in packages/adapters/test/contract/, but it is now in test/integration/contract/ (F2). Passed: B1-B10, B13-B16 (unit ~2 s x3, e2e 72/0 x3, guard and repo-rule probes). Unverified: B11/B12/B22 (no PR/CI yet), B17-B19 (golden/transcript runs and count reconciliation not done before the deadline).
+- (earlier rounds) Tiers split; unit 985/0, integration 511/0, typecheck green on 0654e3fee. The person said to ignore the pinned `test:fast` check (B7).
+- B21 fixed, commit 4a1fb28de. Red test first: AC7 (B21) in test/repo/repo.test.ts now requires every bare `*.test.ts` AGENTS.md names to also be named by its full path, so the existing-path check covers it. Before the fix it failed on `contract.test.ts`. AGENTS.md now names packages/adapters/test/integration/contract/contract.test.ts. Unit 985/0, typecheck green.
+- B20 investigation, no code change:
+  - integrate.test.ts alone: 12 tests in 12 s. In a 12-worker tier run each test takes ~2 s, and the slowest tests in the tier take 10-15 s (story-reopen, criteria, housekeeping, layout).
+  - The setup's git calls are fast: 12 parallel stress processes made ~17k bunExec git spawns, the slowest 377 ms. No test leaks process.env or the spawn observer.
+  - With setup instrumented, 1 + 3 tier runs (3 of them with 6 extra stress processes) all passed 511/0. No git call took over 2 s.
+  - Red loop: two `bun run test:integration` at once (24 workers on 12 cores), twice. All 4 runs failed: story-decision.test.ts beforeAll timed out at its 30 s limit (502 tests ran, 1 failed).
+  - Conclusion: the failures come from CPU overcommit. When other work loads the machine (QA saw load average 6-11), some heavy hook goes over its limit, and which file it is varies. A fix trades against values the spec pins: B5's repo rule fixes `--parallel --timeout=20000`. The options are fewer workers (`--parallel=N`), longer limits, or accepting that runs on an overloaded machine can fail. I asked the person which.
 
 ## Resume
 
-Implement: fix F1 (make the integrate.test.ts hook stable under the parallel integration tier) and F2 (fix the contract.test.ts path at AGENTS.md:24), then QA again, including the golden/transcript runs (B18, B19) and the B17 reconciliation.
+Apply the person's answer on B20. Fewer workers: change `--parallel` in package.json test:integration/test:e2e and the B5/B6 rule in test/repo/repo.test.ts. Longer limit: change `--timeout` there and in AGENTS.md if it is named. Then rerun the red loop: two `bun run test:integration` at once, twice, plus the tier three times alone. Then `bun run test` and typecheck, commit, `norn done done`.
