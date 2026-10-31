@@ -148,13 +148,13 @@ describe("test layout (AGENTS.md)", () => {
     const cliDir = scripts["test:cli"]?.match(/^bun test \.\/(\S+)$/)?.[1];
     const ignored = scripts["test:fast"]?.match(/^bun test --path-ignore-patterns='(\S+)\/\*\*'$/)?.[1];
     expect({ test: scripts.test, cliDir, ignored }).toEqual({ test: "bun test", cliDir: "packages/cli/test", ignored: "packages/cli" });
-    const run = (wf: string) => readFileSync(join(ROOT, ".agents", "norn", "workflows", `${wf}.yaml`), "utf8").match(/^ {4}run: "(.*)"$/m)?.[1];
+    const run = (wf: string) => readFileSync(join(ROOT, ".agents", "workflows", `${wf}.yaml`), "utf8").match(/^ {4}run: "(.*)"$/m)?.[1];
     expect(["slice", "bug", "story", "quick"].map(run)).toEqual(Array(4).fill("bun install --frozen-lockfile && bun run test:fast && bun run typecheck"));
   });
 
   test("quick and story wait for the PR's CI after open-pr and send a red run back to implement", () => {
     for (const wf of ["quick", "story"]) {
-      const { steps, counters } = Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "norn", "workflows", `${wf}.yaml`), "utf8")) as {
+      const { steps, counters } = Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", `${wf}.yaml`), "utf8")) as {
         steps: Record<string, { type: string; run?: string; outcomes: Record<string, unknown> }>;
         counters: Record<string, unknown>;
       };
@@ -167,7 +167,7 @@ describe("test layout (AGENTS.md)", () => {
   });
 
   test("release goes prepare → open-pr → ci → ready, a red CI goes $stuck, and a base commit makes it stale (BS7)", () => {
-    const { start, steps, counters, base } = Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "norn", "workflows", "release.yaml"), "utf8")) as {
+    const { start, steps, counters, base } = Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", "release.yaml"), "utf8")) as {
       start: string;
       steps: Record<string, { type: string; run?: string; outcomes: Record<string, unknown> }>;
       counters: Record<string, unknown>;
@@ -188,7 +188,7 @@ describe("test layout (AGENTS.md)", () => {
 
 describe("intake by kind (W9)", () => {
   type Wf = { start: string; steps: Record<string, { type: string; skill?: string; instructions?: string; outcomes: Record<string, unknown> }> };
-  const workflow = (wf: string) => Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "norn", "workflows", `${wf}.yaml`), "utf8")) as Wf;
+  const workflow = (wf: string) => Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", `${wf}.yaml`), "utf8")) as Wf;
 
   test("triage recommends quick, story or close, all to its confirm gate", () => {
     const { steps } = workflow("triage");
