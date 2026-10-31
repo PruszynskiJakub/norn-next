@@ -14,6 +14,15 @@
 
 ## Goal
 
+Prefactors 1 and 2 of the plan, nothing moved: root `test/`/`scripts/` may import `@norn/*` by name under the dependency rule (AC1); transcript and observe snapshot helpers name their output folders from the repo root (AC2, AC3).
+
 ## Progress
 
+- AC1: root package.json declares the six packages as `workspace:*` dev dependencies (bun.lock refreshed; it also picked up the cli's version 0.13.0, which the lock had stale at 0.0.0). `test/repo.test.ts` "dependency direction" gained three tests: the root declares every package, root test/ and scripts/ import only declared packages, and a fixture with undeclared imports fails naming file + import.
+- Spike rechecked: a root test importing `@norn/schema` by name gets the same `validate` function as store's node_modules copy (same module instance). Spike removed.
+- AC2: `packages/cli/test/repo-root.ts` (`REPO_ROOT`: nearest folder above with a workspaces package.json); `TRANSCRIPTS_DIR` and `OBSERVE_SNAPSHOTS_DIR` exported from transcript.ts / observe-snapshot.ts and named from it; `pinned-outputs.test.ts` pins both. The golden script already names its corpus and harvest folder from its root (`scripts/golden.ts` ROOT), and golden-harvest.ts writes only to `NORN_GOLDEN_OUT`, so no change there.
+- Typecheck green.
+
 ## Resume
+
+Run full `bun test`, then `NORN_TRANSCRIPT_UPDATE=1 bun test packages/cli/test/base-sync.test.ts` and on observe-snapshots.test.ts, check `git status` shows no transcript/snapshot/golden change, commit, report done.
