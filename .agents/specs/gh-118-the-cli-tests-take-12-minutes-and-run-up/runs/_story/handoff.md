@@ -2,13 +2,14 @@
 - Story: gh-118
 - Workflow: story · Step: refine (attempt 1)
 - Status: parked (attended: attended step refine: work with the agent in the worktree)
-- Counters: base_conflict_loop 0, ci_loop 0, plan_loop 0, qa_loop 0, ready_loop 0, stale_loop 0, test_loop 0
+- Counters: base_conflict_loop 0/2, ci_loop 0/3, plan_loop 0/3, qa_loop 0/2, ready_loop 0/2, stale_loop 0/10, test_loop 0/5
 - Last outcome: none
 - Next: `norn brief`
-- Updated: 2026-10-30T15:04:08.088Z
+- Updated: 2026-10-31T15:01:36.829Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - story.start: story at refine
+- receipts.apply: applied 1
 <!-- norn:heartbeat:end -->
 
 ## Goal
