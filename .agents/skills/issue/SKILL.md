@@ -28,7 +28,7 @@ Show the issue exactly as it will be created:
 ```markdown
 Title: <what is wrong or wanted, in a few words; no prefix>
 Labels: norn[, norn:wf:<name>][, friction]
-Assignee: @me
+Assignee: none
 
 ## Observed
 
@@ -43,21 +43,23 @@ Assignee: @me
 
 Leave out a section with nothing in it. Labels:
 
-- `norn`: always, so norn takes the issue in.
+- `norn`: always, so norn takes the issue in once a person assigns it (GR1).
 - `norn:wf:reproduce`: always for a bug (norn does something wrong), so it starts in `reproduce`, not `triage`.
 - `norn:wf:<name>` (`quick`, `story`): only when the person names the workflow; otherwise the `triage` workflow decides.
 - `friction`: when it is friction with norn itself (a refusal that made no sense, a step that went in circles, a missing command).
+
+Never assign the issue. Intake cuts the story branch from the base the moment norn sees an assigned, labelled issue (GR2), so an issue assigned while it waits in the backlog starts from a base that ages. The person assigns it when work on it should begin.
 
 A fork PR is input: link it in the body, never ask to merge it as is.
 
 Create it only after the person says yes; on any change, show the draft again.
 
 ```sh
-gh issue create --title "<title>" --label norn [--label …] --assignee @me --body-file - <<'EOF'
+gh issue create --title "<title>" --label norn [--label …] --body-file - <<'EOF'
 …
 EOF
 ```
 
 ## 3. Hand over
 
-Print the issue link and: `norn sync` takes it in now (or the next `norn watch` sync does).
+Print the issue link and: assign it when work on it should begin (`gh issue edit <N> --add-assignee @me`); `norn sync` then takes it in (or the next `norn watch` sync does).

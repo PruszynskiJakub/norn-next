@@ -29,7 +29,7 @@ steps:
     type: gate
     prompt: >-
       Read the triage findings and the recommendation in the issue comment (`gh issue view N --comments`). N is the issue number.
-      Switch to a workflow: `norn story edit gh-N --workflow quick --at implement` or `norn story edit gh-N --workflow story --at refine`;
+      Switch to a workflow: `norn story edit gh-N --workflow quick --at sync` or `norn story edit gh-N --workflow story --at refine`;
       a bug: `norn story edit gh-N --workflow reproduce --at reproduce`.
       Close: `norn story approve gh-N --reason "<why>"`, then `gh issue close N --reason "not planned"`,
       then `norn story close gh-N --yes` (a story at $done without a PR otherwise waits for a merge, GR6),
