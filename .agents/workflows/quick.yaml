@@ -58,14 +58,21 @@ steps:
     type: git
     action: open-pr
     outcomes: { done: ci }
-  # waits for the PR's CI (a detached check run, so the tick is not blocked); a red run's failed
+  # waits for the PR's CI (a detached check run, so the tick is not blocked): the ci.yml run of the
+  # PR's head commit, up to 5m for it to appear, else fail (#125); a red run's failed
   # log becomes last_check for implement, whose rework goes back through open-pr to the new head
   ci:
     type: check
     run: |
-      for i in $(seq 1 30); do gh pr checks >/dev/null 2>&1 && break; sleep 10; done
-      gh pr checks --watch --fail-fast --interval 30 && exit 0
-      run=$(gh run list --branch "$(git branch --show-current)" --limit 1 --json databaseId -q '.[0].databaseId')
+      sha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1
+      run=
+      for i in $(seq 1 30); do
+        run=$(gh run list --workflow ci.yml --commit "$sha" --event pull_request --limit 1 --json databaseId -q '.[0].databaseId')
+        [ -n "$run" ] && break
+        sleep 10
+      done
+      [ -n "$run" ] || { echo "no ci.yml run for $sha after 5m"; exit 1; }
+      gh run watch "$run" --exit-status --interval 30 >/dev/null && exit 0
       gh run view "$run" --log-failed | tail -300
       exit 1
     timeout: 30m
