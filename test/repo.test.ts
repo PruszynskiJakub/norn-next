@@ -227,6 +227,28 @@ function pinnedHelperImports(root: string): Array<{ file: string; import: string
     );
 }
 
+/** Adapters (folders of packages/adapters/src under `root`) with no `*.test.ts` in test/unit/<adapter>/ nor test/integration/<adapter>/. */
+function adaptersWithoutTests(root: string): string[] {
+  const test = join(root, "packages", "adapters", "test");
+  const hasTests = (dir: string) => existsSync(dir) && testFilesUnder(dir).length > 0;
+  return readdirSync(join(root, "packages", "adapters", "src"), { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)
+    .filter((a) => !hasTests(join(test, "unit", a)) && !hasTests(join(test, "integration", a)))
+    .sort();
+}
+
+/** gh-118 B17: the packages whose tests this slice put in tiers (cli has its own rules; schema and core follow). */
+const TIERED_PACKAGES = ["store", "adapters", "view"];
+
+/** `*.test.ts` files of the tiered packages under `root` that sit neither in test/unit/ nor in test/integration/. */
+function untieredPackageTests(root: string): string[] {
+  return TIERED_PACKAGES.flatMap((pkg) => {
+    const dir = join(root, "packages", pkg, "test");
+    return existsSync(dir) ? testFilesUnder(dir).filter((f) => !/^(unit|integration)\//.test(f)).map((f) => `packages/${pkg}/test/${f}`) : [];
+  }).sort();
+}
+
 describe("test layout (AGENTS.md)", () => {
   test("tests and fixtures live under packages/<pkg>/test, never in src", () => {
     const inSrc = files(PKGS)
@@ -242,18 +264,50 @@ describe("test layout (AGENTS.md)", () => {
     expect({ inSrc, fixtureDirs }).toEqual({ inSrc: [], fixtureDirs: [] });
   });
 
-  test("every adapter has its tests in packages/adapters/test/<adapter>/", () => {
-    const adapters = readdirSync(join(PKGS, "adapters", "src"), { withFileTypes: true })
-      .filter((d) => d.isDirectory())
-      .map((d) => d.name);
-    const missing = adapters.filter((a) => {
-      try {
-        return !readdirSync(join(PKGS, "adapters", "test", a)).some((f) => f.endsWith(".test.ts"));
-      } catch {
-        return true;
-      }
-    });
-    expect(missing).toEqual([]);
+  test("every adapter has its tests in packages/adapters/test/unit/<adapter>/ or test/integration/<adapter>/", () => {
+    expect(adaptersWithoutTests(ROOT)).toEqual([]);
+  });
+
+  test("an adapter whose tests sit in either tier has tests; one with none, or only outside a tier, is named", () => {
+    const root = mkdtempSync(join(tmpdir(), "norn-adapter-tests-"));
+    const put = (rel: string) => {
+      mkdirSync(join(root, rel, ".."), { recursive: true });
+      writeFileSync(join(root, rel), "");
+    };
+    for (const a of ["pure", "real", "both", "none", "old"]) mkdirSync(join(root, "packages/adapters/src", a), { recursive: true });
+    put("packages/adapters/test/unit/pure/pure.test.ts");
+    put("packages/adapters/test/integration/real/real.test.ts");
+    put("packages/adapters/test/unit/both/both.test.ts");
+    put("packages/adapters/test/integration/both/both.test.ts");
+    put("packages/adapters/test/unit/none/fixtures/x.json");
+    put("packages/adapters/test/old/old.test.ts");
+    expect(adaptersWithoutTests(root)).toEqual(["none", "old"]);
+  });
+
+  test("gh-118 B17: every test file of store, adapters and view sits under test/unit/ or test/integration/", () => {
+    expect(untieredPackageTests(ROOT)).toEqual([]);
+  });
+
+  test("gh-118 B17: a store, adapters or view test outside a tier folder is named; other packages are not this rule's", () => {
+    const root = mkdtempSync(join(tmpdir(), "norn-tiers-"));
+    const put = (rel: string) => {
+      mkdirSync(join(root, rel, ".."), { recursive: true });
+      writeFileSync(join(root, rel), "");
+    };
+    put("packages/store/test/unit/a.test.ts");
+    put("packages/store/test/integration/b.test.ts");
+    put("packages/store/test/c.test.ts");
+    put("packages/adapters/test/unit/gh/gh.test.ts");
+    put("packages/adapters/test/integration/contract/contract.test.ts");
+    put("packages/adapters/test/claude/claude.test.ts");
+    put("packages/adapters/test/contract/suite.ts");
+    put("packages/view/test/fixtures/x.test.ts");
+    put("packages/core/test/d.test.ts");
+    expect(untieredPackageTests(root)).toEqual([
+      "packages/adapters/test/claude/claude.test.ts",
+      "packages/store/test/c.test.ts",
+      "packages/view/test/fixtures/x.test.ts",
+    ]);
   });
 
   test("test:fast and test:cli split the suite: fast skips the cli and the integration and e2e tiers, and slice, story and quick checks run fast", () => {
