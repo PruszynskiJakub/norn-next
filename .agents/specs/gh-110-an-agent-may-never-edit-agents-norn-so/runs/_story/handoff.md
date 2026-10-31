@@ -44,6 +44,7 @@ Write the PR body (pr.md in the spec folder) for the branch as it is now.
 - Wrote `pr.md`: Summary (layout before/after, layout guard call tree), a "Release note" paragraph per D13 (older norn cannot read a migrated repo; upgrade every machine), Evidence B1–B23 linking QA's story evidence (run 01M67JEZR9J71BM8CGQ4GXDATS) on the branch, Merge danger (two-way merge; one-way per repo after migrate; release refuses old-layout repos incl. this one until migrate).
 - B23 left as not shown by QA (person checks the Release note at the release ready gate).
 - describe#1 done: pr.md written: summary with layout picture and guard call tree, Release note paragraph (D13), evidence B1–B22 linked to QA's story evidence, B23 left for the person at release, merge danger notes the release refuses old-layout repos (this one included) until norn migrate.
+- ready#1 reject by jakubpruszynski@MacBook-Pro-Jakub-2: CI package job fails: scripts/smoke.sh still checks the old layout ("norn init did not write .agents/norn/config.yaml"). Update smoke.sh (and any other script/CI step) to the new layout from this story (.agents/norn.config.yaml, .agents/workflows/), run scripts/smoke.sh against a built package locally, and get PR #121's CI green. Run: https://github.com/PruszynskiJakub/norn-next/actions/runs/41151155663
 
 ## Resume
 
