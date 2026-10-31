@@ -1,0 +1,15 @@
+B3-unit-run1 rc=0 2s load=6.16 22.66 31.73
+B3-unit-run2 rc=0 2s load=5.91 22.33 31.56
+B3-unit-run3 rc=0 2s load=5.91 22.33 31.56
+bun-test rc=0 1s load=5.91 22.33 31.56
+typecheck rc=0 5s load=5.91 22.06 31.41
+B5-int-run1 rc=0 112s load=16.81 22.56 30.53
+B5-int-run2 rc=0 111s load=16.46 21.84 29.35
+B5-int-run3 rc=0 110s load=19.54 22.60 28.82
+B6-e2e-run1 rc=0 79s load=15.09 20.57 27.49
+B6-e2e-run2 rc=0 78s load=13.93 19.04 26.33
+B6-e2e-run3 rc=0 80s load=7.45 15.95 24.51
+B18-golden rc=0 197s load=6.58 11.92 21.01
+B18-golden-update rc=0 0s load=6.58 11.92 21.01
+B19-transcript rc=0 71s load=5.30 10.42 19.73
+ALLDONE

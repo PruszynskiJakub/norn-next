@@ -62,24 +62,27 @@
 
 ## Goal
 
-implement#5: fix qa#1's two failures, B21 (stale contract.test.ts path in AGENTS.md) and B20 (integrate.test.ts hook timeout in a parallel integration run).
+qa#2: check every Behaviour item (B1-B22) on the current head, one test tier at a time, including qa#1's two failures (B20, B21) and the criteria it left unverified (B17-B19).
 
 ## Progress
 
-- (earlier rounds) Tiers split; unit 985/0, integration 511/0, typecheck green on 0654e3fee. The person said to ignore the pinned `test:fast` check (B7).
-- B21 fixed, commit 4a1fb28de. Red test first: AC7 (B21) in test/repo/repo.test.ts now requires every bare `*.test.ts` AGENTS.md names to also be named by its full path, so the existing-path check covers it. Before the fix it failed on `contract.test.ts`. AGENTS.md now names packages/adapters/test/integration/contract/contract.test.ts. Unit 985/0, typecheck green.
-- B20 investigation, no code change:
-  - integrate.test.ts alone: 12 tests in 12 s. In a 12-worker tier run each test takes ~2 s, and the slowest tests in the tier take 10-15 s (story-reopen, criteria, housekeeping, layout).
-  - The setup's git calls are fast: 12 parallel stress processes made ~17k bunExec git spawns, the slowest 377 ms. No test leaks process.env or the spawn observer.
-  - With setup instrumented, 1 + 3 tier runs (3 of them with 6 extra stress processes) all passed 511/0. No git call took over 2 s.
-  - Red loop: two `bun run test:integration` at once (24 workers on 12 cores), twice. All 4 runs failed: story-decision.test.ts beforeAll timed out at its 30 s limit (502 tests ran, 1 failed).
-  - Cause (the person's answer): during qa#1 the person was running a second `bun run test:integration` by hand in this worktree, so two tiers shared 12 cores. One tier at a time is green (4 runs above, 511/0), which is what B20 asks. No code change. `--parallel --timeout=20000` stays as B5 pins it.
-- implement#5 done: B21 fixed (4a1fb28de): AGENTS.md names packages/adapters/test/integration/contract/contract.test.ts, and the AC7 repo rule now requires every bare *.test.ts it names to also be named by its full path (red before the fix). B20 needs no code change, per the person: during qa#1 a second integration tier was running by hand, so two tiers shared 12 cores. One tier at a time: 4 runs 511/0 (3 of them with extra stress). Two tiers at once: 4 of 4 failed (story-decision beforeAll at 30 s). That is recorded under Risks in the handoff. --parallel --timeout=20000 stays as B5 pins it. Unit 985/0, typecheck green.
+- (earlier rounds) The tiers are split. implement#5 fixed B21 (4a1fb28de). For B20, the person ruled no code change: qa#1's timeout came from two integration tiers running at once.
+- qa#2 on 2af68a98b, run one tier at a time:
+  - unit: 985/0 x3, ~2 s each.
+  - integration: 511/0 x3, ~111 s each. qa#1's integrate.test.ts timeout did not recur.
+  - e2e: 72/0 x3, ~79 s each.
+  - typecheck: green.
+- Guard and repo-rule probes pass (B4, B14-B16). Static checks pass (B7-B10, B13, B21).
+- B17: 1536 tests on the merge base; every name is in exactly one tier, except 2 old layout tests that were replaced on purpose. 34 tests added. 0 names in more than one tier.
+- B18/B19: transcripts and snapshots are R100 renames. `bun run golden` adds the same 9 cases on this branch and on the merge base a39ba103e (the corpus was already short on main); they differ only in run-specific ids. The 9 files were not kept. `--update` changes 0. A transcript rewrite leaves no diff.
+- Unverified: B11, B12, B20 (CI half) and B22, because no PR or CI run exists yet.
+- qa#2 unverified: QA#2 on 2af68a98b, one tier at a time: unit 985/0 x3 (~2 s), integration 511/0 x3 (~111 s; qa#1's integrate timeout did not recur), e2e 72/0 x3 (~79 s), typecheck green. B21 fixed. B17: every merge-base test is in exactly one tier (2 replaced on purpose, 34 added). B18/B19: renames only; golden --update changes 0; golden adds the same 9 cases on main's layout too. Pass: B1-B10, B13-B19, B21. Unverified: B11, B12, B20 (CI half), B22, because there is no PR or CI run yet.
 
 ## Risks
 
 - Two integration tiers on one machine overcommit the CPU and time out hooks. Measured: two `bun run test:integration` at once (24 workers on 12 cores) failed in all 4 runs, with story-decision.test.ts beforeAll hitting its 30 s limit and 502 tests run. Under one tier, the slowest tests take 10-15 s against the 20 s limit. Run one tier at a time.
+- AGENTS.md:90 still says adapter fixtures are in `packages/adapters/test/<adapter>/`; they are now in `packages/adapters/test/unit/<adapter>/`. This is not one of the paths B21 lists, so it is left as a note.
 
 ## Resume
 
-Nothing left in implement#5. B21 is fixed (4a1fb28de). B20 needs no code change: the cause was two tiers running at once (see Risks). Next, QA reruns B20 with one tier at a time.
+qa#2 has reported `unverified`. To close the CI criteria, open the PR, then check B11, B12, B20 (CI) and B22 against its CI run, as the criteria report describes.
