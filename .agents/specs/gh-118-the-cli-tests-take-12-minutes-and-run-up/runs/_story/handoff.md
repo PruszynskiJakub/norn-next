@@ -5,7 +5,7 @@
 - Counters: base_conflict_loop 0/2, ci_loop 0/3, plan_loop 0/3, qa_loop 0/2, ready_loop 0/2, stale_loop 0/10, test_loop 0/5
 - Last outcome: update.done (classified, 2026-10-31T16:34:05.157Z)
 - Next: `norn brief`
-- Updated: 2026-10-31T16:34:27.356Z
+- Updated: 2026-10-31T16:35:27.359Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - story.start: story at refine
@@ -29,6 +29,7 @@
 - receipts.apply: applied 19
 - receipts.apply: resolve.done → update
 - receipts.apply: update.done → test (reset base_conflict_loop)
+- receipts.apply: applied 22
 <!-- norn:heartbeat:end -->
 
 ## Goal
