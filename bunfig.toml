@@ -1,2 +1,5 @@
+# The unit tier (gh-118 B1): a plain `bun test` runs everything but the integration and e2e tiers,
+# which run through their own configs (bunfig.integration.toml, bunfig.e2e.toml).
 [test]
 preload = ["./test/preload.ts"]
+pathIgnorePatterns = ["**/integration/**", "test/e2e/**"]

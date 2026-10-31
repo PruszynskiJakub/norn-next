@@ -1,0 +1,4 @@
+# The e2e tier (gh-118 B6): `bun run test:e2e` selects only test/e2e/.
+[test]
+preload = ["./test/preload.ts"]
+root = "test/e2e"

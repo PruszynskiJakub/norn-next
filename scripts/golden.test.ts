@@ -2,8 +2,8 @@
 import { expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { caseName, stableKey } from "../packages/cli/test/golden-harvest.ts";
-import { type Candidate, caseBody, decisionChanges, type GoldenCase, selectNew } from "./golden.ts";
+import { caseName, stableKey } from "../test/support/golden-harvest.ts";
+import { type Candidate, caseBody, decisionChanges, type GoldenCase, harvestCommand, harvestFiles, selectNew } from "./golden.ts";
 
 const GOLDEN = join(import.meta.dir, "..", "packages", "core", "test", "golden");
 
@@ -56,4 +56,22 @@ test("decisionChanges lists the decisions that went and came, not those only reo
     came: ['gh-1 c {"kind":"park"}'],
   });
   expect(decisionChanges([d("a"), d("b")], [d("b"), d("a")])).toEqual({ gone: [], came: [] });
+});
+
+test("the harvest finds the harness test files in cli integration and test/e2e and runs each with its tier's config (gh-118 B19)", () => {
+  const found = harvestFiles();
+  expect(found.length).toBeGreaterThan(0);
+  expect(found.filter((f) => !f.startsWith("packages/cli/test/integration/") && !f.startsWith("test/e2e/"))).toEqual([]);
+  expect(found).toContain("test/e2e/slice-workflow.test.ts");
+  expect(found).toContain("packages/cli/test/integration/agent-protocol.test.ts");
+  // a file that builds no harness is not harvested
+  expect(found).not.toContain("test/e2e/pinned-outputs.test.ts");
+  expect(harvestCommand("test/e2e/team.test.ts")).toEqual(["bun", "test", "--config=bunfig.e2e.toml", "--timeout=20000", "./test/e2e/team.test.ts"]);
+  expect(harvestCommand("packages/cli/test/integration/audit.test.ts")).toEqual([
+    "bun",
+    "test",
+    "--config=bunfig.integration.toml",
+    "--timeout=20000",
+    "./packages/cli/test/integration/audit.test.ts",
+  ]);
 });

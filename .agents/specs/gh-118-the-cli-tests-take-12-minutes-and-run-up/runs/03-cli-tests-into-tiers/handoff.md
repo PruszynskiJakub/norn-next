@@ -14,6 +14,19 @@
 
 ## Goal
 
+The cli tests live in tiers: `bun test` stops running cli harness tests; `bun run test:integration` (packages/*/test/integration/) and `bun run test:e2e` (test/e2e/) run them in parallel with a 20 s timeout. Shared helpers in test/support/, golden harvests from the new places.
+
 ## Progress
 
+- Configs: root bunfig ignores `**/integration/**`, `test/e2e/**`; `bunfig.integration.toml` (root `packages`, ignores package test roots' own files and every subfolder but `integration/`, so store/adapters folders not yet in a tier stay out) and `bunfig.e2e.toml` (root `test/e2e`). Scripts `bun test --config=<file> --parallel --timeout=20000`. Bun 1.3.13 facts found: `-c file` (space) is read as a test filter, only `--config=file` works; bunfig `[test] timeout` is ignored, so the 20 s is on the command; a CLI `--path-ignore-patterns` replaces the bunfig ones, so `test:fast` now also ignores `**/integration/**` and `test/e2e/**` (still the workflow check until slice 06; `test:cli` is untouched and now runs only cli unit).
+- Moves (all `git mv`): harness, fake-herdr, transcript, observe-snapshot, golden-harvest, repo-root → test/support/. e2e (D4): e2e.test → test/e2e/slice-workflow.test.ts, base-sync, recovery, auto-recovery, observe-snapshots, team, plus pinned-outputs (it imports the transcript/snapshot helpers, B16). Transcripts and snapshots → test/e2e/{transcripts,observe-snapshots}/ (R100 renames). cli unit (pass under the guard): assets, defects, detect + the pure halves of segment (planWorkspaceMoves) and tidy-herdr (planHerdrTidy); `spot` shared via packages/cli/test/herdr-spot.ts. Everything else → packages/cli/test/integration/, plus the herdr plugin block from repo.test.ts (spawns `sh`, D6).
+- B16 found a real case: integration chunked-ticks imported `observeNow` from observe-snapshot.ts. `observeNow` moved to test/support/observe-now.ts (observe-snapshot.ts re-exports it, so the e2e file is unchanged).
+- Assertions changed on purpose (PR finding candidates): pinned-outputs' expected folders (test/e2e/…) and its REPO_ROOT depth; housekeeping's plugin-hint repo path depth; the test:fast repo rule now expects the three ignore patterns. The ratchet `.agents/norn` lint now also scans test/support and test/e2e, allowlist paths renamed.
+- Rules (S1, test/repo.test.ts): B1/B2 root bunfig + `test` script; B5/B6 per tier: script text, preload, and the selection (bun's root + ignore globs emulated with Bun.Glob) equals exactly the tier's files; B16 real tree + fixture (names file + import). Mutations of bunfig/script turn them red. Golden (S3, scripts/golden.test.ts): `harvestFiles()` / `harvestCommand()`.
+- Counts: HEAD baseline (bun test --parallel in an archive copy) 1541 tests / 99 files. Branch: unit 1103/58 + integration 372/37 + e2e 72/7 = 1547/102 = baseline + 6 new rule tests; +3 files from the two splits and herdr-plugin. cli unit under the guard: 114 pass.
+- AC7: `NORN_TRANSCRIPT_UPDATE=1 bun run test:e2e test/e2e/base-sync.test.ts` rewrote only base-sync.txt, byte-identical. `bun run golden -- --update`: 0 of 93 changed.
+- Typecheck green.
+
 ## Resume
+
+Finish AC6/AC8: golden harvest result (no case added), then test:integration and test:e2e three runs each; commit; report done.

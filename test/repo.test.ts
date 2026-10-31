@@ -1,6 +1,6 @@
 /** Repo-wide rules: dependency direction (§17) and banned glossary synonyms (§5). */
 import { describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 
@@ -148,6 +148,60 @@ describe("glossary", () => {
   });
 });
 
+/** The `[test]` table of a bunfig at the repo root. */
+function bunfig(name: string): { root?: string; preload?: string[]; pathIgnorePatterns?: string[] } {
+  return (Bun.TOML.parse(readFileSync(join(ROOT, name), "utf8")) as { test?: object }).test ?? {};
+}
+
+/** Every `*.test.ts` under `root`, relative to it; skips node_modules and dot folders. */
+function testFilesUnder(root: string, dir = root): string[] {
+  return readdirSync(dir)
+    .flatMap((n) => {
+      const p = join(dir, n);
+      if (statSync(p).isDirectory()) return n === "node_modules" || n.startsWith(".") ? [] : testFilesUnder(root, p);
+      return n.endsWith(".test.ts") ? [relative(root, p)] : [];
+    })
+    .sort();
+}
+
+/**
+ * The test files `bun test --config=<config>` runs, as bun 1.3.13 picks them: under the config's `root`
+ * and matching no `pathIgnorePatterns` glob, where a glob that matches a folder ignores all below it.
+ */
+function tierSelection(config: string): string[] {
+  const { root = ".", pathIgnorePatterns = [] } = bunfig(config);
+  const globs = pathIgnorePatterns.map((p) => new Bun.Glob(p));
+  const ignored = (f: string) => {
+    const parts = f.split("/");
+    return parts.some((_, i) => globs.some((g) => g.match(parts.slice(0, i + 1).join("/"))));
+  };
+  const under = root === "." ? "" : `${root.replace(/^\.\//, "").replace(/\/$/, "")}/`;
+  return testFilesUnder(ROOT).filter((f) => f.startsWith(under) && !ignored(f));
+}
+
+const PINNED_HELPER = /(?:^|\/)(?:transcript|observe-snapshot)\.ts$/;
+
+/**
+ * B16: imports of the transcript recorder or the observe snapshot helpers outside test/e2e/ (and the
+ * helpers' own folder, test/support/), in package tests and root test code under `root`.
+ */
+function pinnedHelperImports(root: string): Array<{ file: string; import: string }> {
+  const pkgTests = existsSync(join(root, "packages")) ? readdirSync(join(root, "packages")).map((p) => join(root, "packages", p, "test")) : [];
+  const dirs = [...pkgTests, join(root, "test")].filter((d) => existsSync(d));
+  return dirs
+    .flatMap((d) => files(d))
+    .map((f) => relative(root, f))
+    // the repo rules name the helpers in their own fixtures
+    .filter((f) => !f.startsWith("test/e2e/") && !f.startsWith("test/support/") && !f.startsWith("test/repo/") && f !== "test/repo.test.ts")
+    .sort()
+    .flatMap((f) =>
+      [...readFileSync(join(root, f), "utf8").matchAll(/(?:from\s+|import\s*\(\s*)["']([^"']+)["']/g)]
+        .map((m) => m[1] as string)
+        .filter((spec) => PINNED_HELPER.test(spec))
+        .map((spec) => ({ file: f, import: spec })),
+    );
+}
+
 describe("test layout (AGENTS.md)", () => {
   test("tests and fixtures live under packages/<pkg>/test, never in src", () => {
     const inSrc = files(PKGS)
@@ -177,13 +231,54 @@ describe("test layout (AGENTS.md)", () => {
     expect(missing).toEqual([]);
   });
 
-  test("test:fast and test:cli split the suite: fast skips exactly the folder cli runs, and slice, story and quick checks run fast", () => {
+  test("test:fast and test:cli split the suite: fast skips the cli and the integration and e2e tiers, and slice, story and quick checks run fast", () => {
     const scripts: Record<string, string> = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).scripts;
     const cliDir = scripts["test:cli"]?.match(/^bun test \.\/(\S+)$/)?.[1];
-    const ignored = scripts["test:fast"]?.match(/^bun test --path-ignore-patterns='(\S+)\/\*\*'$/)?.[1];
-    expect({ test: scripts.test, cliDir, ignored }).toEqual({ test: "bun test", cliDir: "packages/cli/test", ignored: "packages/cli" });
+    const ignored = [...(scripts["test:fast"] ?? "").matchAll(/--path-ignore-patterns='(\S+)'/g)].map((m) => m[1]);
+    expect({ test: scripts.test, cliDir, ignored }).toEqual({ test: "bun test", cliDir: "packages/cli/test", ignored: ["packages/cli/**", "**/integration/**", "test/e2e/**"] });
     const run = (wf: string) => readFileSync(join(ROOT, ".agents", "workflows", `${wf}.yaml`), "utf8").match(/^ {4}run: "(.*)"$/m)?.[1];
     expect(["slice", "bug", "story", "quick"].map(run)).toEqual(Array(4).fill("bun install --frozen-lockfile && bun run test:fast && bun run typecheck"));
+  });
+
+  test("B1, B2: the root bunfig ignores exactly the integration and e2e tiers, and the test script is exactly bun test", () => {
+    const scripts: Record<string, string> = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).scripts;
+    expect(scripts.test).toBe("bun test");
+    expect(bunfig("bunfig.toml").pathIgnorePatterns).toEqual(["**/integration/**", "test/e2e/**"]);
+    expect(tierSelection("bunfig.toml").filter((f) => f.includes("/integration/") || f.startsWith("test/e2e/"))).toEqual([]);
+  });
+
+  test.each([
+    ["test:integration", "bunfig.integration.toml", (f: string) => /^packages\/[^/]+\/test\/integration\//.test(f)],
+    ["test:e2e", "bunfig.e2e.toml", (f: string) => f.startsWith("test/e2e/")],
+  ] as const)("B5, B6: %s runs bun test with %s, in parallel with a 20 s timeout, passing extra arguments through, and selects only its tier", (script, config, inTier) => {
+    const scripts: Record<string, string> = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).scripts;
+    // ends in flags, so `bun run <script> <file>` appends the file as bun test's own path filter
+    expect(scripts[script]).toBe(`bun test --config=${config} --parallel --timeout=20000`);
+    expect(bunfig(config).preload).toEqual(["./test/preload.ts"]);
+    const all = testFilesUnder(ROOT);
+    const selected = tierSelection(config);
+    expect(selected.length).toBeGreaterThan(0);
+    expect(selected).toEqual(all.filter(inTier));
+  });
+
+  test("B16: only test/e2e/ imports the transcript recorder and the observe snapshot helpers", () => {
+    expect(pinnedHelperImports(ROOT)).toEqual([]);
+  });
+
+  test("B16: an integration or unit test importing them fails, naming the file and the import", () => {
+    const root = mkdtempSync(join(tmpdir(), "norn-pinned-"));
+    const put = (rel: string, text: string) => {
+      mkdirSync(join(root, rel, ".."), { recursive: true });
+      writeFileSync(join(root, rel), text);
+    };
+    put("packages/cli/test/integration/a.test.ts", `import { recordTranscript } from "../../../../test/support/transcript.ts";\n`);
+    put("packages/store/test/unit/b.test.ts", `import { snap } from "../../../../test/support/observe-snapshot.ts";\n`);
+    put("test/e2e/ok.test.ts", `import { t } from "../support/transcript.ts";\nimport { s } from "../support/observe-snapshot.ts";\n`);
+    put("test/support/observe-snapshot.ts", `import { t } from "./transcript.ts";\n`);
+    expect(pinnedHelperImports(root)).toEqual([
+      { file: "packages/cli/test/integration/a.test.ts", import: "../../../../test/support/transcript.ts" },
+      { file: "packages/store/test/unit/b.test.ts", import: "../../../../test/support/observe-snapshot.ts" },
+    ]);
   });
 
   test("quick and story wait for the PR's CI after open-pr and send a red run back to implement", () => {
@@ -437,56 +532,6 @@ describe("the new layout in product docs (gh-110 B3, B22)", () => {
   });
 });
 
-describe("herdr plugin (HC9)", () => {
-  test("the manifest parses, has the pick pane and the open/next/pick actions, and names only scripts that exist", () => {
-    const dir = join(ROOT, "plugins", "herdr");
-    const m = Bun.TOML.parse(readFileSync(join(dir, "herdr-plugin.toml"), "utf8")) as {
-      id: string;
-      panes: Array<{ id: string; command: string[] }>;
-      actions: Array<{ id: string; command: string[] }>;
-    };
-    expect(m.id).toBe("norn");
-    expect(m.panes.map((p) => p.id)).toEqual(["pick"]);
-    expect(m.actions.map((a) => a.id)).toEqual(["open", "next", "pick"]);
-    const scripts = [...m.panes, ...m.actions].map((e) => e.command.at(-1) as string);
-    expect(scripts.filter((s) => !existsSync(join(dir, s)))).toEqual([]);
-  });
-
-  test("B8: the actions and panes run the new commands", () => {
-    const run = (script: string) => readFileSync(join(ROOT, "plugins", "herdr", script), "utf8");
-    expect(run("next.sh")).toContain(`"$NORN" run attach --next --json`);
-    expect(run("open.sh")).toContain(`"$NORN" status --watch --pane`);
-    expect(run("pick.sh")).toContain(`"$NORN" status --watch >`);
-  });
-
-  /** Runs next.sh with a stub norn that refuses with `refusal` and a stub herdr that records the toast. */
-  function nextToast(refusal: object): string {
-    const dir = mkdtempSync(join(tmpdir(), "norn-next-"));
-    const stub = (name: string, body: string) => {
-      writeFileSync(join(dir, name), `#!/bin/sh\n${body}\n`);
-      chmodSync(join(dir, name), 0o755);
-      return join(dir, name);
-    };
-    writeFileSync(join(dir, "refusal.json"), JSON.stringify(refusal));
-    const env = {
-      ...process.env,
-      NORN_BIN: stub("norn", `cat "${dir}/refusal.json"; exit 3`),
-      HERDR_BIN_PATH: stub("herdr", `printf '%s|' "$@" > "${dir}/toast"`),
-      HERDR_PLUGIN_CONTEXT_JSON: JSON.stringify({ focused_pane_cwd: dir }),
-    };
-    Bun.spawnSync(["sh", join(ROOT, "plugins", "herdr", "next.sh")], { env });
-    return readFileSync(join(dir, "toast"), "utf8");
-  }
-
-  test("P8: next.sh branches on the refusal's code, not its text, and keeps escaped quotes", () => {
-    const attach = nextToast({ error: 'no live agent pane for "gh-1/01"', do_instead: "norn story start gh-1/01", code: "nothing_to_attach" });
-    expect(attach).toContain('no live agent pane for \\"gh-1/01\\"; run: norn story start gh-1/01|');
-    const other = nextToast({ error: "No agent waits for you", do_instead: "norn status", code: "not_in_herdr" });
-    expect(other).toContain("norn run attach --next failed in ");
-    expect(other).toContain(": No agent waits for you|");
-  });
-});
-
 /**
  * Ratchet lints: each counts hits per file against an allowlist (file → count) that may only shrink.
  * A file over its count is a new hit; a file under it fails too, so the allowlist is lowered in the
@@ -576,26 +621,26 @@ const SPAWN_ALLOW: Counts = {
 
 /**
  * (g) B1, B2, B5: norn's paths under a repo are spelled only by store's path module (paths.ts), so a
- * layout change is a change there. Counts lines of package sources and tests that spell `.agents/norn`
+ * layout change is a change there. Counts lines of package sources and tests (root test/support and test/e2e too) that spell `.agents/norn`
  * (or join `".agents", "norn"`) outside a comment; messages name paths through its `REPO_CONFIG_FILE` and
  * `WORKFLOWS_DIR` (gh-110 D11). Allowed: tests asserting text a person sees.
  */
 const NORN_PATH = /\.agents\/norn\b|["'`]\.agents["'`]\s*,\s*["'`]norn["'`]/;
 const NORN_PATH_ALLOW: Record<string, [number, string]> = {
   "packages/store/src/paths.ts": [5, "the path module, and the old layout's places (gh-110 D4)"],
-  "packages/cli/test/harness.ts": [1, "the old layout's places as a person had them, spelled independently of store (gh-110 S1)"],
-  "packages/cli/test/migrate.test.ts": [6, "the old paths as a person had them and as `git status` and the report show them (gh-110 S1)"],
-  "packages/cli/test/config.test.ts": [1, "message: the user-or-repo pick"],
-  "packages/cli/test/e2e.test.ts": [1, "message: init's config row"],
-  "packages/cli/test/layout.test.ts": [1, "the layout test: the repo config file as a person sees it"],
+  "test/support/harness.ts": [1, "the old layout's places as a person had them, spelled independently of store (gh-110 S1)"],
+  "packages/cli/test/integration/migrate.test.ts": [6, "the old paths as a person had them and as `git status` and the report show them (gh-110 S1)"],
+  "packages/cli/test/integration/config.test.ts": [1, "message: the user-or-repo pick"],
+  "test/e2e/slice-workflow.test.ts": [1, "message: init's config row"],
+  "packages/cli/test/integration/layout.test.ts": [1, "the layout test: the repo config file as a person sees it"],
   "packages/core/test/printed-commands.test.ts": [1, "not a path read: a string the removed-command matcher must pass"],
 };
 
 function nornPathLines(): Counts {
   const out: Counts = {};
-  const all = files(PKGS)
+  const all = [...files(PKGS), ...files(join(ROOT, "test", "support")), ...files(join(ROOT, "test", "e2e"))]
     .map((p) => relative(ROOT, p))
-    .filter((p) => p.includes("/src/") || p.includes("/test/"));
+    .filter((p) => p.includes("/src/") || p.includes("/test/") || p.startsWith("test/"));
   for (const f of all) {
     const n = readFileSync(join(ROOT, f), "utf8")
       .split("\n")

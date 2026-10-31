@@ -10,8 +10,9 @@
  *     dropped, so the diff is exactly the decisions that changed.
  *
  *   bun scripts/golden.ts [--per-rule N] [test-file …]
- *     Adding cases. Runs the cli integration test files that build a harness with `NORN_GOLDEN_OUT`
- *     set, so each harness repo's ticks are harvested on cleanup (`packages/cli/test/golden-harvest.ts`):
+ *     Adding cases. Runs the test files that build a harness (cli integration and test/e2e, each with its
+ *     tier's config) with `NORN_GOLDEN_OUT` set, so each harness repo's ticks are harvested on cleanup
+ *     (`test/support/golden-harvest.ts`):
  *     decide's inputs as `norn why` replays them (O5) and the decisions the tick recorded (R5.4), temp
  *     paths normalised. Existing cases are never touched. A harvested case is added, smallest
  *     `stableKey` first, only when it brings a rule that fewer than `N` (default 2) cases fire —
@@ -24,12 +25,16 @@
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, relative } from "node:path";
-import { caseInputs, stableKey } from "../packages/cli/test/golden-harvest.ts";
+import { caseInputs, stableKey } from "../test/support/golden-harvest.ts";
 import { decide, type RepoWorkflows } from "../packages/core/src/decide/index.ts";
 import type { Facts } from "../packages/core/src/facts.ts";
 
 const ROOT = join(import.meta.dir, "..");
-const CLI_TESTS = join(ROOT, "packages", "cli", "test");
+/** Where the harness test files live (gh-118 D12), each with the config of its tier: the root bunfig ignores both folders. */
+const HARVEST_TIERS: Array<{ dir: string; config: string }> = [
+  { dir: join("packages", "cli", "test", "integration"), config: "bunfig.integration.toml" },
+  { dir: join("test", "e2e"), config: "bunfig.e2e.toml" },
+];
 const OUT = join(ROOT, "packages", "core", "test", "golden");
 
 export interface RecordedDecision {
@@ -130,19 +135,31 @@ function update(): void {
   console.error(`\n${changed} of ${corpus.length} golden case(s) decide differently now; only their decisions were rewritten`);
 }
 
+/** The harness test files the harvest runs, repo-relative: every `*.test.ts` in a harvest tier that calls `createHarness(`. */
+export function harvestFiles(): string[] {
+  return HARVEST_TIERS.flatMap(({ dir }) =>
+    readdirSync(join(ROOT, dir))
+      .filter((n) => n.endsWith(".test.ts") && readFileSync(join(ROOT, dir, n), "utf8").includes("createHarness("))
+      .sort()
+      .map((n) => join(dir, n)),
+  );
+}
+
+/** The command that runs one harvested test file (repo-relative) with its tier's config and the tiers' 20 s timeout (D7). */
+export function harvestCommand(file: string): string[] {
+  const tier = HARVEST_TIERS.find(({ dir }) => file.startsWith(`${dir}/`));
+  if (!tier) throw new Error(`${file} is not in a harvest tier (${HARVEST_TIERS.map((t) => t.dir).join(", ")})`);
+  return ["bun", "test", `--config=${tier.config}`, "--timeout=20000", `./${file}`];
+}
+
 async function add(perRule: number, named: string[]): Promise<void> {
-  const testFiles = named.length
-    ? named.map((f) => join(ROOT, f))
-    : readdirSync(CLI_TESTS)
-        .filter((n) => n.endsWith(".test.ts") && readFileSync(join(CLI_TESTS, n), "utf8").includes("createHarness("))
-        .sort()
-        .map((n) => join(CLI_TESTS, n));
+  const testFiles = (named.length ? named : harvestFiles()).map((f) => join(ROOT, f));
 
   const raw = mkdtempSync(join(tmpdir(), "norn-golden-"));
   const failed: string[] = [];
   const harvest = async (file: string) => {
     const source = basename(file).replace(/\.test\.ts$/, "");
-    const proc = Bun.spawn(["bun", "test", relative(ROOT, file)], {
+    const proc = Bun.spawn(harvestCommand(relative(ROOT, file)), {
       cwd: ROOT,
       env: { ...process.env, NORN_GOLDEN_OUT: join(raw, source), NORN_GOLDEN_SOURCE: source },
       stdout: "ignore",
