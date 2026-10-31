@@ -1,0 +1,73 @@
+ {packages/cli/test => test/e2e}/observe-snapshots/fresh-intake.json  | 0
+ {packages/cli/test => test/e2e}/observe-snapshots/gate-waiting.json  | 0
+ {packages/cli/test => test/e2e}/observe-snapshots/merged.json        | 0
+ {packages/cli/test => test/e2e}/observe-snapshots/parked-ask.json    | 0
+ {packages/cli/test => test/e2e}/observe-snapshots/running-slice.json | 0
+ {packages/cli/test => test/e2e}/transcripts/base-sync.txt            | 0
+ {packages/cli/test => test/e2e}/transcripts/e2e-slice-workflow.txt   | 0
+ {packages/cli/test => test/e2e}/transcripts/recovery-claim-lost.txt  | 0
+ 8 files changed, 0 insertions(+), 0 deletions(-)
+D	packages/cli/test/auto-recovery.test.ts
+D	packages/cli/test/base-sync.test.ts
+D	packages/cli/test/e2e.test.ts
+D	packages/cli/test/fake-herdr.ts
+D	packages/cli/test/golden-harvest.ts
+D	packages/cli/test/harness.ts
+A	packages/cli/test/herdr-spot.ts
+R099	packages/cli/test/agent-protocol.test.ts	packages/cli/test/integration/agent-protocol.test.ts
+R097	packages/cli/test/audit.test.ts	packages/cli/test/integration/audit.test.ts
+R098	packages/cli/test/check-run.test.ts	packages/cli/test/integration/check-run.test.ts
+R097	packages/cli/test/chunked-ticks.test.ts	packages/cli/test/integration/chunked-ticks.test.ts
+A	packages/cli/test/integration/ci-check.test.ts
+R098	packages/cli/test/config.test.ts	packages/cli/test/integration/config.test.ts
+R083	packages/cli/test/contract-fakes.test.ts	packages/cli/test/integration/contract-fakes.test.ts
+R098	packages/cli/test/criteria.test.ts	packages/cli/test/integration/criteria.test.ts
+R099	packages/cli/test/help-tree.test.ts	packages/cli/test/integration/help-tree.test.ts
+A	packages/cli/test/integration/herdr-plugin.test.ts
+R098	packages/cli/test/housekeeping.test.ts	packages/cli/test/integration/housekeeping.test.ts
+R099	packages/cli/test/human.test.ts	packages/cli/test/integration/human.test.ts
+R098	packages/cli/test/inbox-why.test.ts	packages/cli/test/integration/inbox-why.test.ts
+R099	packages/cli/test/integrate.test.ts	packages/cli/test/integration/integrate.test.ts
+R098	packages/cli/test/layout-guard.test.ts	packages/cli/test/integration/layout-guard.test.ts
+R099	packages/cli/test/layout.test.ts	packages/cli/test/integration/layout.test.ts
+R099	packages/cli/test/machine-dir.test.ts	packages/cli/test/integration/machine-dir.test.ts
+R099	packages/cli/test/migrate.test.ts	packages/cli/test/integration/migrate.test.ts
+R096	packages/cli/test/pr-body.test.ts	packages/cli/test/integration/pr-body.test.ts
+R098	packages/cli/test/prompts.test.ts	packages/cli/test/integration/prompts.test.ts
+R096	packages/cli/test/rebase-rewind.test.ts	packages/cli/test/integration/rebase-rewind.test.ts
+R089	packages/cli/test/records.test.ts	packages/cli/test/integration/records.test.ts
+R096	packages/cli/test/rename-continuity.test.ts	packages/cli/test/integration/rename-continuity.test.ts
+R098	packages/cli/test/run-rerun-cancel.test.ts	packages/cli/test/integration/run-rerun-cancel.test.ts
+R097	packages/cli/test/runtime.test.ts	packages/cli/test/integration/runtime.test.ts
+R051	packages/cli/test/segment.test.ts	packages/cli/test/integration/segment.test.ts
+R093	packages/cli/test/status-watch.test.ts	packages/cli/test/integration/status-watch.test.ts
+R098	packages/cli/test/status.test.ts	packages/cli/test/integration/status.test.ts
+R097	packages/cli/test/story-create.test.ts	packages/cli/test/integration/story-create.test.ts
+R098	packages/cli/test/story-decision.test.ts	packages/cli/test/integration/story-decision.test.ts
+R098	packages/cli/test/story-reopen.test.ts	packages/cli/test/integration/story-reopen.test.ts
+R098	packages/cli/test/story-reset.test.ts	packages/cli/test/integration/story-reset.test.ts
+R097	packages/cli/test/story-start.test.ts	packages/cli/test/integration/story-start.test.ts
+R098	packages/cli/test/story-view.test.ts	packages/cli/test/integration/story-view.test.ts
+R096	packages/cli/test/strays.test.ts	packages/cli/test/integration/strays.test.ts
+R097	packages/cli/test/targets.test.ts	packages/cli/test/integration/targets.test.ts
+R064	packages/cli/test/tidy-herdr.test.ts	packages/cli/test/integration/tidy-herdr.test.ts
+R097	packages/cli/test/trace-free-views.test.ts	packages/cli/test/integration/trace-free-views.test.ts
+R098	packages/cli/test/why-version.test.ts	packages/cli/test/integration/why-version.test.ts
+D	packages/cli/test/observe-snapshot.ts
+D	packages/cli/test/observe-snapshots.test.ts
+D	packages/cli/test/recovery.test.ts
+D	packages/cli/test/team.test.ts
+D	packages/cli/test/transcript.ts
+R098	packages/cli/test/assets.test.ts	packages/cli/test/unit/assets.test.ts
+R100	packages/cli/test/defects.test.ts	packages/cli/test/unit/defects.test.ts
+R097	packages/cli/test/detect.test.ts	packages/cli/test/unit/detect.test.ts
+A	packages/cli/test/unit/segment.test.ts
+A	packages/cli/test/unit/tidy-herdr.test.ts
+R100	packages/cli/test/observe-snapshots/fresh-intake.json	test/e2e/observe-snapshots/fresh-intake.json
+R100	packages/cli/test/observe-snapshots/gate-waiting.json	test/e2e/observe-snapshots/gate-waiting.json
+R100	packages/cli/test/observe-snapshots/merged.json	test/e2e/observe-snapshots/merged.json
+R100	packages/cli/test/observe-snapshots/parked-ask.json	test/e2e/observe-snapshots/parked-ask.json
+R100	packages/cli/test/observe-snapshots/running-slice.json	test/e2e/observe-snapshots/running-slice.json
+R100	packages/cli/test/transcripts/base-sync.txt	test/e2e/transcripts/base-sync.txt
+R100	packages/cli/test/transcripts/e2e-slice-workflow.txt	test/e2e/transcripts/e2e-slice-workflow.txt
+R100	packages/cli/test/transcripts/recovery-claim-lost.txt	test/e2e/transcripts/recovery-claim-lost.txt

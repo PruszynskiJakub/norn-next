@@ -1,0 +1,71 @@
+bun test v1.3.13 (bf2e2cec)
+
+test/repo/repo.test.ts:
+319 |     put("packages/adapters/test/old/old.test.ts");
+320 |     expect(adaptersWithoutTests(root)).toEqual(["none", "old"]);
+321 |   });
+322 | 
+323 |   test("gh-118 B14: every test file sits in a tier folder", () => {
+324 |     expect(untieredTests(ROOT)).toEqual([]);
+                                      ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   "packages/view/test/foo.test.ts is not in a tier folder (unit/, integration/, test/e2e/, test/repo/)",
++ ]
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-118-the-cli-tests-take-12-minutes-and-run-up/test/repo/repo.test.ts:324:33)
+(fail) test layout (AGENTS.md) > gh-118 B14: every test file sits in a tier folder [5.53ms]
+482 |     expect(selected.length).toBeGreaterThan(0);
+483 |     expect(selected).toEqual(all.filter(inTier));
+484 |   });
+485 | 
+486 |   test("B16: only test/e2e/ imports the transcript recorder and the observe snapshot helpers", () => {
+487 |     expect(pinnedHelperImports(ROOT)).toEqual([]);
+                                            ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   {
++     "file": "packages/cli/test/integration/qa-y.test.ts",
++     "import": "../../../../test/support/transcript.ts",
++   },
++ ]
+
+- Expected  - 1
++ Received  + 6
+
+      at <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-118-the-cli-tests-take-12-minutes-and-run-up/test/repo/repo.test.ts:487:39)
+(fail) test layout (AGENTS.md) > B16: only test/e2e/ imports the transcript recorder and the observe snapshot helpers [8.43ms]
+523 |       { file: "test/repo/f.test.ts", import: "../support/transcript.ts" },
+524 |     ]);
+525 |   });
+526 | 
+527 |   test("B15: no unit test imports the cli harness, a helper that imports it, or store's git functions", () => {
+528 |     expect(spawningUnitImports(ROOT)).toEqual([]);
+                                            ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   {
++     "file": "packages/cli/test/unit/qa-x.test.ts",
++     "import": "../../../../test/support/harness.ts",
++   },
++ ]
+
+- Expected  - 1
++ Received  + 6
+
+      at <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-118-the-cli-tests-take-12-minutes-and-run-up/test/repo/repo.test.ts:528:39)
+(fail) test layout (AGENTS.md) > B15: no unit test imports the cli harness, a helper that imports it, or store's git functions [8.98ms]
+
+ 55 pass
+ 3 fail
+ 475 expect() calls
+Ran 58 tests across 1 file. [359.00ms]
