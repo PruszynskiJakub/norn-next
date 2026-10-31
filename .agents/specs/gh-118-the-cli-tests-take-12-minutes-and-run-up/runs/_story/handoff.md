@@ -5,10 +5,9 @@
 - Counters: base_conflict_loop 0/2, ci_loop 0/3, plan_loop 0/3, qa_loop 1/2, ready_loop 0/2, stale_loop 0/10, sync_conflict_loop 0/2, test_loop 4/5
 - Last outcome: test.fail (classified, 2026-10-31T23:27:54.411Z)
 - Next: `norn brief`
-- Updated: 2026-10-31T23:30:40.476Z
+- Updated: 2026-10-31T23:31:10.479Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
-- receipts.apply: applied 6
 - receipts.apply: applied 7
 - receipts.apply: applied 8
 - silent: last message snapshot in trace/transcripts/01M699DYZD5XVQ8BDYAQCDDS8Z/01M699Q3RX8SZ456ZCPYWVSADV.txt
@@ -58,6 +57,7 @@
 - receipts.apply: implement.done → test
 - receipts.apply: test.fail → implement
 - receipts.apply: implement.workflow → qa
+- receipts.apply: applied 66
 <!-- norn:heartbeat:end -->
 
 ## Goal
