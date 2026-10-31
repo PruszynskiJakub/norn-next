@@ -1,0 +1,3 @@
+store before: Ran 97 tests across 11 files. [10.25s]
+adapters before: Ran 187 tests across 14 files. [28.92s]
+view before: Ran 38 tests across 3 files. [4.29s]

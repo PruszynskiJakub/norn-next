@@ -12,6 +12,7 @@ criteria:
   - { id: AC6, verifier: test }
   - { id: AC7, verifier: test }
   - { id: AC8, verifier: agent }
+workflow: slice
 ---
 
 ## Goal
