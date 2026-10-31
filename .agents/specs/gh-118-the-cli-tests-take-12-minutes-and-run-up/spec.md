@@ -12,7 +12,7 @@ labels:
 workflow: story
 status: active
 intake_at: 2026-10-30T15:03:08.086Z
-body_hash: 7f5afd51522b48ecf3df760be4ba9ee1a1c7f0478e656583caf712bb4d7ddcb9
+body_hash: bce7c89165ae0fb6c873526503dec04972cfcd6437a50fe8cbd57a7f705db680
 ---
 
 ## Observed
