@@ -17,14 +17,16 @@
 
 ## Goal
 
-Write gh-118's spec (problem, solution, Behaviour B1–B22, out of scope) from the issue's refinement comment and today's interview.
+Write and agree the Plan section of gh-118's spec.md (seams, coverage for B1–B22, prefactoring, decisions, risks).
 
 ## Progress
 
-- Interview settled: unit tier under 30 s (others only measured); plain `bun test` = unit tier; release.yml runs unit + typecheck; spawn guard preload included; shipped workflow templates unchanged, only `norn-implement` skill changes. Person confirmed the summary.
-- Spec written to spec.md; no open questions (plan items listed under Open questions as "left to plan").
-- refine#1 done: Spec written: three test tiers (unit/integration/e2e by folder), B1–B22; unit tier <30 s with spawn guard, plain bun test = unit, release runs unit+typecheck, shipped templates unchanged. No open questions; plan items listed.
+- Spikes (bun 1.3.13): bunfig pathIgnorePatterns selects the unit tier, and an explicit path can't get past it, so integration and e2e need their own `--config`. Bun.spawn/spawnSync can be patched, and node spawn goes through them. A preload `afterEach` fails the right test even when the error is swallowed. There is no current-test-name API. Root devDependencies on the workspace packages give root helpers `@norn/*` with one module instance. Bun has `--parallel` and `--shard`.
+- Baseline: non-cli 948 tests / 52 files, 35.9 s serial; cli 475 / 39 files, 146 s at --parallel=10, with one failure: integrate.test timed out at bun's 5 s default (no harness → no 20 s).
+- Spawn log per file is recorded in the Plan's D5.
+- The person agreed the seams S1–S5, both prefactors, e2e = six story flows, the B4-example and B15 amendments, and D1–D14. The Plan is written; no "proposed" remains.
+- plan#1 done: Plan agreed: seams S1 repo rules, S2 unit-guard preload, S3 golden script, S4 QA tier runs, S5 PR CI; coverage for B1–B22. Prefactors: root devDeps on the @norn packages, helper output dirs from the repo root. D1–D14: bunfig per tier, spawn guard (argv only, afterEach), e2e = six story flows, 20 s timeout for integration/e2e (fixes the parallel 5 s failure in integrate.test), CI unit first then integration + a 3-shard e2e matrix, release runs unit + typecheck. B4 example and B15 amended.
 
 ## Resume
 
-Person reviews spec.md; on agreement report `norn done done`.
+Plan agreed; report `norn done done`.
