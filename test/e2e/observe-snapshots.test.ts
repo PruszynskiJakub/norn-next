@@ -11,7 +11,8 @@ import { join } from "node:path";
 import { repoConfigPath, workflowsDir } from "@norn/store";
 import type { TickReport } from "../../packages/cli/src/index.ts";
 import { createHarness, type Harness, issue, sh } from "../support/harness.ts";
-import { expectFactsSnapshot, inboxParity, observeNow } from "../support/observe-snapshot.ts";
+import { observeNow } from "../support/observe-now.ts";
+import { expectFactsSnapshot, inboxParity } from "../support/observe-snapshot.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);

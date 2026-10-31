@@ -148,6 +148,11 @@ describe("glossary", () => {
   });
 });
 
+/** The root package.json's scripts. */
+function rootScripts(): Record<string, string> {
+  return JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).scripts;
+}
+
 /** The `[test]` table of a bunfig at the repo root. */
 function bunfig(name: string): { root?: string; preload?: string[]; pathIgnorePatterns?: string[] } {
   return (Bun.TOML.parse(readFileSync(join(ROOT, name), "utf8")) as { test?: object }).test ?? {};
@@ -179,6 +184,8 @@ function tierSelection(config: string): string[] {
   return testFilesUnder(ROOT).filter((f) => f.startsWith(under) && !ignored(f));
 }
 
+/** This file, repo-relative: B16 exempts it alone (it names the helpers in fixtures), wherever it lives. */
+const THIS_FILE = relative(ROOT, import.meta.path);
 const PINNED_HELPERS = ["test/support/transcript.ts", "test/support/observe-snapshot.ts"];
 /** `from "x"` (import, export … from), side-effect `import "x"` and dynamic `import("x")` */
 const IMPORT_SPEC = /(?:\bfrom\s+|\bimport\s*\(?\s*)["']([^"']+)["']/g;
@@ -200,8 +207,9 @@ function pinnedHelperImports(root: string): Array<{ file: string; import: string
   const pinned = new Set(PINNED_HELPERS);
   const support = existsSync(join(root, "test/support")) ? files(join(root, "test/support")).map((f) => relative(root, f)).filter((f) => f.endsWith(".ts")) : [];
   for (let grew = true; grew; ) {
-    grew = false;
-    for (const f of support) if (!pinned.has(f) && relativeImports(root, f).some((i) => pinned.has(i.path))) grew = !!pinned.add(f);
+    const more = support.filter((f) => !pinned.has(f) && relativeImports(root, f).some((i) => pinned.has(i.path)));
+    for (const f of more) pinned.add(f);
+    grew = more.length > 0;
   }
   const pkgTests = existsSync(join(root, "packages")) ? readdirSync(join(root, "packages")).map((p) => join(root, "packages", p, "test")) : [];
   const dirs = [...pkgTests, join(root, "test")].filter((d) => existsSync(d));
@@ -209,8 +217,8 @@ function pinnedHelperImports(root: string): Array<{ file: string; import: string
     .flatMap((d) => files(d))
     .map((f) => relative(root, f))
     .filter((f) => f.endsWith(".ts"))
-    // the repo rules name the helpers in their own fixtures
-    .filter((f) => !f.startsWith("test/e2e/") && !f.startsWith("test/support/") && !f.startsWith("test/repo/") && f !== "test/repo.test.ts")
+    // the file holding this rule names the helpers in its own fixtures; test/repo/ is still a unit tier
+    .filter((f) => !f.startsWith("test/e2e/") && !f.startsWith("test/support/") && f !== THIS_FILE)
     .sort()
     .flatMap((f) =>
       relativeImports(root, f)
@@ -249,7 +257,7 @@ describe("test layout (AGENTS.md)", () => {
   });
 
   test("test:fast and test:cli split the suite: fast skips the cli and the integration and e2e tiers, and slice, story and quick checks run fast", () => {
-    const scripts: Record<string, string> = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).scripts;
+    const scripts = rootScripts();
     const cliDir = scripts["test:cli"]?.match(/^bun test \.\/(\S+)$/)?.[1];
     const ignored = [...(scripts["test:fast"] ?? "").matchAll(/--path-ignore-patterns='(\S+)'/g)].map((m) => m[1]);
     expect({ test: scripts.test, cliDir, ignored }).toEqual({ test: "bun test", cliDir: "packages/cli/test", ignored: ["packages/cli/**", "**/integration/**", "test/e2e/**"] });
@@ -258,7 +266,7 @@ describe("test layout (AGENTS.md)", () => {
   });
 
   test("B1, B2: the root bunfig ignores exactly the integration and e2e tiers, and the test script is exactly bun test", () => {
-    const scripts: Record<string, string> = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).scripts;
+    const scripts = rootScripts();
     expect(scripts.test).toBe("bun test");
     expect(bunfig("bunfig.toml").pathIgnorePatterns).toEqual(["**/integration/**", "test/e2e/**"]);
     expect(tierSelection("bunfig.toml").filter((f) => f.includes("/integration/") || f.startsWith("test/e2e/"))).toEqual([]);
@@ -268,7 +276,7 @@ describe("test layout (AGENTS.md)", () => {
     ["test:integration", "bunfig.integration.toml", (f: string) => /^packages\/[^/]+\/test\/integration\//.test(f)],
     ["test:e2e", "bunfig.e2e.toml", (f: string) => f.startsWith("test/e2e/")],
   ] as const)("B5, B6: %s runs bun test with %s, in parallel with a 20 s timeout, passing extra arguments through, and selects only its tier", (script, config, inTier) => {
-    const scripts: Record<string, string> = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).scripts;
+    const scripts = rootScripts();
     // ends in flags, so `bun run <script> <file>` appends the file as bun test's own path filter
     expect(scripts[script]).toBe(`bun test --config=${config} --parallel --timeout=20000`);
     expect(bunfig(config).preload).toEqual(["./test/preload.ts"]);
@@ -280,6 +288,16 @@ describe("test layout (AGENTS.md)", () => {
 
   test("B16: only test/e2e/ imports the transcript recorder and the observe snapshot helpers", () => {
     expect(pinnedHelperImports(ROOT)).toEqual([]);
+  });
+
+  test("AC7: no test source tells a person to rewrite a transcript or snapshot with plain bun test, which skips test/e2e/", () => {
+    const stale = new RegExp(["NORN_TRANSCRIPT_UPDATE=1", "bun test"].join(" "));
+    const dirs = [join(ROOT, "test"), ...readdirSync(PKGS).map((p) => join(PKGS, p, "test"))].filter((d) => existsSync(d));
+    const offenders = dirs
+      .flatMap((d) => files(d))
+      .filter((f) => f.endsWith(".ts") && stale.test(readFileSync(f, "utf8")))
+      .map((f) => relative(ROOT, f));
+    expect(offenders).toEqual([]);
   });
 
   test("B16: an integration or unit test importing them fails, naming the file and the import", () => {
@@ -298,11 +316,14 @@ describe("test layout (AGENTS.md)", () => {
     put("packages/cli/test/integration/d.test.ts", `import { s } from "../../../../test/support/records.ts";\n`);
     // only the support helpers count: an adapter's own transcript.ts is another module
     put("packages/adapters/test/claude/e.test.ts", `import { t } from "../../src/agent-hooks/transcript.ts";\n`);
+    // test/repo/ is a unit tier (D6): only the file holding this rule is exempt, not its folder
+    put("test/repo/f.test.ts", `import { t } from "../support/transcript.ts";\n`);
     expect(pinnedHelperImports(root)).toEqual([
       { file: "packages/cli/test/integration/a.test.ts", import: "../../../../test/support/transcript.ts" },
       { file: "packages/cli/test/integration/c.test.ts", import: "../../../../test/support/transcript.ts" },
       { file: "packages/cli/test/integration/d.test.ts", import: "../../../../test/support/records.ts" },
       { file: "packages/store/test/unit/b.test.ts", import: "../../../../test/support/observe-snapshot.ts" },
+      { file: "test/repo/f.test.ts", import: "../support/transcript.ts" },
     ]);
   });
 

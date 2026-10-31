@@ -1,9 +1,9 @@
 /**
  * Observe snapshots and inbox parity (refactor Phase 0.3). At a fixed point of a harness scenario:
- *   - `observeNow(h)` runs observe as a tick would (no remote sync, so nothing leaves the machine)
+ *   - `observeNow(h)` (observe-now.ts) runs observe as a tick would (no remote sync, so nothing leaves the machine)
  *     and returns its Facts, config and workflows;
  *   - `expectFactsSnapshot(h, facts, name)` compares the normalised Facts with
- *     `test/observe-snapshots/<name>.json` (`NORN_TRANSCRIPT_UPDATE=1` rewrites it), so a refactor of
+ *     `test/e2e/observe-snapshots/<name>.json` (`NORN_TRANSCRIPT_UPDATE=1 bun run test:e2e <file>` rewrites it), so a refactor of
  *     the facts builders (Phase 5) shows it observes the same world;
  *   - `inboxParity(h, obs)` gives the inbox `norn inbox` shows (`loadProjectView`, X1) and the inbox
  *     `buildInbox` makes over observe's Facts (the tick's notifier and history), for the same instant.
@@ -14,7 +14,6 @@ import { expect } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildInbox, type Facts, type Inbox } from "@norn/core";
-import { ulid } from "@norn/schema";
 import { Context, type Observed } from "../../packages/cli/src/index.ts";
 import { projectView } from "../../packages/cli/src/runtime/human.ts";
 import { type Harness, T0 } from "./harness.ts";
@@ -23,8 +22,6 @@ import { textNormaliser } from "./transcript.ts";
 
 /** Where the pinned observe snapshots live, named from the repo root (gh-118 B19). */
 export const OBSERVE_SNAPSHOTS_DIR = join(REPO_ROOT, "test", "e2e", "observe-snapshots");
-
-export { observeNow } from "./observe-now.ts";
 
 /**
  * Facts as stable text: keys sorted, process identity of this test run replaced, epoch ms from the
@@ -56,7 +53,7 @@ function processIdentity(o: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
-/** Compare with `test/observe-snapshots/<name>.json`; `NORN_TRANSCRIPT_UPDATE=1` writes it instead. */
+/** Compare with `test/e2e/observe-snapshots/<name>.json`; `NORN_TRANSCRIPT_UPDATE=1` writes it instead. */
 export function expectFactsSnapshot(h: Harness, facts: Facts, name: string): void {
   const file = join(OBSERVE_SNAPSHOTS_DIR, `${name}.json`);
   const actual = normaliseFacts(h, facts);
@@ -65,7 +62,7 @@ export function expectFactsSnapshot(h: Harness, facts: Facts, name: string): voi
     writeFileSync(file, actual);
     return;
   }
-  if (!existsSync(file)) throw new Error(`no observe snapshot ${file}: run NORN_TRANSCRIPT_UPDATE=1 bun test on this file and review it`);
+  if (!existsSync(file)) throw new Error(`no observe snapshot ${file}: run NORN_TRANSCRIPT_UPDATE=1 bun run test:e2e <this file> and review it`);
   expect(actual).toBe(readFileSync(file, "utf8"));
 }
 

@@ -186,9 +186,16 @@ describe("norn status --watch (B11, CP6–CP8)", () => {
     // abort once the first frame is out and the loop waits — a wall-clock timer raced the first
     // frame on a loaded machine (parallel tier) and stopped the loop before it drew anything
     const log = () => void setTimeout(() => abort.abort(), 0);
-    const r = await runChecked(["status", "--watch", "--interval", "1h"], { ...c.deps, herdr: null, signal: abort.signal, input: waiting(), log });
-    expect(r.exit).toBe(0);
-    expect(r.value).toEqual({ frames: 1, last: null });
+    // fallback: no frame logged (the view threw) still ends the loop well inside the test timeout,
+    // so the frames assertion fails instead of a timeout with the 1h interval timer left behind
+    const fallback = setTimeout(() => abort.abort(), 10_000);
+    try {
+      const r = await runChecked(["status", "--watch", "--interval", "1h"], { ...c.deps, herdr: null, signal: abort.signal, input: waiting(), log });
+      expect(r.exit).toBe(0);
+      expect(r.value).toEqual({ frames: 1, last: null });
+    } finally {
+      clearTimeout(fallback);
+    }
   });
 
   test("enter orients through Herdr; o and i open links with the platform opener", async () => {

@@ -19,7 +19,7 @@
  *
  * Reuse: `const t = recordTranscript(h)` right after `createHarness()`; drive the scenario through
  * `h.norn` / `h.tick` (or `t.command(label, fn)` for another clone); then `expectTranscript(t, name)`.
- * `NORN_TRANSCRIPT_UPDATE=1 bun test <file>` rewrites `test/transcripts/<name>.txt`.
+ * `NORN_TRANSCRIPT_UPDATE=1 bun run test:e2e <file>` rewrites `test/e2e/transcripts/<name>.txt`.
  */
 import { expect } from "bun:test";
 import { createHash } from "node:crypto";
@@ -255,7 +255,7 @@ export function recordTranscript(h: Harness): Transcript {
   };
 }
 
-/** Compare with `test/transcripts/<name>.txt`; `NORN_TRANSCRIPT_UPDATE=1` writes it instead. */
+/** Compare with `test/e2e/transcripts/<name>.txt`; `NORN_TRANSCRIPT_UPDATE=1` writes it instead. */
 export function expectTranscript(t: Transcript, name: string): void {
   t.stop();
   const file = join(TRANSCRIPTS_DIR, `${name}.txt`);
@@ -264,6 +264,6 @@ export function expectTranscript(t: Transcript, name: string): void {
     writeFileSync(file, actual);
     return;
   }
-  if (!existsSync(file)) throw new Error(`no transcript ${file}: run NORN_TRANSCRIPT_UPDATE=1 bun test on this file and review it`);
+  if (!existsSync(file)) throw new Error(`no transcript ${file}: run NORN_TRANSCRIPT_UPDATE=1 bun run test:e2e <this file> and review it`);
   expect(actual).toBe(readFileSync(file, "utf8"));
 }
