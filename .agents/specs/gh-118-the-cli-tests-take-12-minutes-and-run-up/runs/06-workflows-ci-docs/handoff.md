@@ -30,6 +30,8 @@ Make the workflow test check, implement instructions, the shipped norn-implement
 - AGENTS.md Commands, tier paragraph, handback rule, transcript/snapshot/contract paths; README test lines.
 - `bun run test` 1110 pass, typecheck green.
 - implement#2 done: AC1–AC7 each have a repo rule in test/repo.test.ts that went red first. Removed test:fast/test:cli. The quick/story/slice/bug test check now runs unit, integration and typecheck in 15m (slice and bug were 10m). Implement steps and the norn-implement asset now name the fast loop. CI: unit job first, then integration, a 3-shard fail-fast e2e matrix and package, all needing unit, with git identity in the jobs that spawn git. Release tests only unit + typecheck. AGENTS.md and README updated. bun run test (1110 tests) and typecheck pass. AC8 is checked on the PR's CI run.
+- implement#3: the test check failed with `Script not found "test:fast"`: this unit's pinned workflow (runs/…/workflow.yaml, S7) still runs `bun run test:fast`, which AC1/B7 removes. The repo's .agents/workflows/slice.yaml already runs the new command. Re-checked: `bun run test` 1110 pass, typecheck green. No code change; asked the person how to proceed.
+- Friction: a slice that removes a script its own pinned workflow check runs can never pass that check.
 
 ## Resume
-Done; next is the test check. AC8: check the PR's CI run when it exists.
+Wait for the person's answer to the norn ask about the pinned test check (re-pin the unit to the current slice workflow, approve the check by hand, or keep a temporary `test:fast` alias). Then act on it and report.
