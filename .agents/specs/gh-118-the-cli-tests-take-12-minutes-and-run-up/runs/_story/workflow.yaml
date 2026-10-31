@@ -1,6 +1,5 @@
 # Story workflow — example installed by `norn init`; edit freely (W1).
-# Refine and plan with a person, cut slices, approve the plan, bring the story up to date with its
-# base so the slices are cut from the current base, run the slices,
+# Refine and plan with a person, cut slices, approve the plan, run the slices,
 # bring the story up to date with its base, verify the whole story, describe it,
 # open the draft PR (or rewrite the body of the open one), wait for the PR's CI, and wait for a
 # person to call it ready. The local check runs test:fast; CI runs the full suite.
@@ -48,19 +47,7 @@ steps:
   approve-plan:
     type: gate
     prompt: "Review the Plan section in story.md and the slice files (edit them if needed). Approve to start the slices, or reject with what to change."
-    outcomes: { approve: sync, reject: { to: plan, counter: plan_loop } }
-  # brings the story branch up to date with its base before the slices cut their branches from it
-  sync:
-    type: git
-    action: update
-    outcomes: { done: slices, conflict: { to: sync-resolve, counter: sync_conflict_loop } }
-  sync-resolve:
-    type: agent
-    skill: norn-merge
-    inputs: [spec, handoff]
-    instructions: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase."
-    outcomes:
-      done: { to: sync, means: "base merged into the story branch, conflicts resolved and committed" }
+    outcomes: { approve: slices, reject: { to: plan, counter: plan_loop } }
   slices:
     type: slices
     outcomes: { done: update, stuck: $stuck }
@@ -114,21 +101,14 @@ steps:
     type: git
     action: open-pr
     outcomes: { done: ci }
-  # waits for the PR's CI (a detached check run, so the tick is not blocked): the ci.yml run of the
-  # PR's head commit, up to 5m for it to appear, else fail (#125); a red run's failed
+  # waits for the PR's CI (a detached check run, so the tick is not blocked); a red run's failed
   # log becomes last_check for implement, whose rework goes back through open-pr to the new head
   ci:
     type: check
     run: |
-      sha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1
-      run=
-      for i in $(seq 1 30); do
-        run=$(gh run list --workflow ci.yml --commit "$sha" --event pull_request --limit 1 --json databaseId -q '.[0].databaseId')
-        [ -n "$run" ] && break
-        sleep 10
-      done
-      [ -n "$run" ] || { echo "no ci.yml run for $sha after 5m"; exit 1; }
-      gh run watch "$run" --exit-status --interval 30 >/dev/null && exit 0
+      for i in $(seq 1 30); do gh pr checks >/dev/null 2>&1 && break; sleep 10; done
+      gh pr checks --watch --fail-fast --interval 30 && exit 0
+      run=$(gh run list --branch "$(git branch --show-current)" --limit 1 --json databaseId -q '.[0].databaseId')
       gh run view "$run" --log-failed | tail -300
       exit 1
     timeout: 30m
@@ -148,8 +128,6 @@ counters:
   ready_loop: { max: 2 }
   # resets each time update merges cleanly: only repeated conflicts on one base move count (W4)
   base_conflict_loop: { max: 2, reset_on: update.done }
-  sync_conflict_loop: { max: 2, reset_on: sync.done }
   # a stale re-entry is progress from outside (a sibling merged), bounded by the sibling merges
   stale_loop: { max: 10 }
-# update-branch re-enters update, not sync, the first update step (BS9)
-base: { stale: conflict, step: update }
+base: { stale: conflict }
