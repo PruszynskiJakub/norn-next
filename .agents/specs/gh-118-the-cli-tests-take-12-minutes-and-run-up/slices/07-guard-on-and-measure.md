@@ -2,7 +2,7 @@
 id: gh-118/07
 title: Turn the unit guard on, ban spawning imports, and measure the tiers
 depends_on: [ gh-118/04, gh-118/05, gh-118/06 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
