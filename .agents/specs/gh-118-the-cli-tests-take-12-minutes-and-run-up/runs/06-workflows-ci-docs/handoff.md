@@ -53,6 +53,8 @@ Make the workflow test check, implement instructions, the shipped norn-implement
 - review#1 approve: Approve: AC1-AC7 met with repo rules; bun run test 1110 pass, typecheck green, e2e --shard works on bun 1.3.13. One nit (loose AC3 regex). AC8 on the PR's CI run.
 - qa#1: AC1–AC7 pass, observed directly in the files and by running them: the new test check command exits 0 in 139s (unit 1110, integration 372, typecheck); the three e2e shards cover all 7 e2e files, 72 tests green. AC8 unverified: no PR yet. Evidence in $TMPDIR/qa-gh118-06.
 - qa#1 unverified: AC1–AC7 pass, observed directly: scripts gone and unnamed; the 4 workflows' test check (run for real: exit 0, 139s) and implement text; norn-implement asset; ci.yml unit→integration/e2e×3 (fail-fast; shards run locally cover all 7 files, green)/package with git identity; release unit+typecheck; AGENTS.md/README tiers and paths exist. AC8 unverified: no PR or CI run exists yet.
+- merge#1: merged the story branch into this slice (ca73dd57b). One conflict, AGENTS.md: kept this slice's tier wording and paths and took the base's moves (packages/core/test/unit/golden.test.ts, test/repo/repo.test.ts). bun run test 980 pass (base moved some tests out of unit), integration 505 pass, typecheck green.
 
 ## Resume
-QA reported `unverified` (AC8 only). Next: on the story's PR, check that `unit` finishes before integration, the 3 e2e shards and package start, and that the shards show as separate jobs (`gh run view <id> --json jobs`).
+
+Merge done and committed; integrate can rebase this slice onto the story branch again.
