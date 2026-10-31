@@ -5,7 +5,7 @@
 - Counters: base_conflict_loop 0/2, ci_loop 0/3, plan_loop 0/3, qa_loop 0/2, ready_loop 0/2, stale_loop 0/10, test_loop 0/5
 - Last outcome: slice.silent (classified, 2026-10-31T15:37:06.951Z)
 - Next: `norn run list gh-118`
-- Updated: 2026-10-31T15:39:06.956Z
+- Updated: 2026-10-31T15:40:06.961Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - story.start: story at refine
@@ -20,6 +20,7 @@
 - silent: last message snapshot in trace/transcripts/01M699DYZD5XVQ8BDYAQCDDS8Z/01M699Q3RX8SZ456ZCPYWVSADV.txt
 - agent.silent.surface: silent
 - receipts.apply: applied 10, 11
+- receipts.apply: applied 12
 <!-- norn:heartbeat:end -->
 
 ## Goal
