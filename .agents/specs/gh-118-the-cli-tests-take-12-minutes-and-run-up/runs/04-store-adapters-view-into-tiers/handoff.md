@@ -14,6 +14,25 @@
 
 ## Goal
 
+Store, adapters and view tests sit in `test/unit/` or `test/integration/`; their spawning tests leave `bun test` and run in `bun run test:integration`. Mixed files are split; no test lost.
+
 ## Progress
 
+- Classified every file by running it under the unit guard (`--preload ./test/support/unit-guard-preload.ts`; the check's `./test/support/unit-guard.ts` path is the library, the preload is the file to pass). `bun install` was needed first in this worktree.
+- Whole moves (`git mv`, only relative import depth changed): adapters unit: agent-hooks, claude, codex, gemini, gh, glab, herdr (cockpit, herdr), notify, each `unit/<adapter>/` with its fixtures. Adapters integration: `integration/contract/contract.test.ts` (imports the suites from `test/contract/`, which stays at the test root as a shared helper; cli contract-fakes unchanged). Store unit: config-trace, local-json, markdown-unit, skills. Store integration: refs, defects (module-level zombie spawn). View unit: cockpit.
+- Splits (unit + integration, counts before = unit + integration):
+  - adapters git 17 = 5 (parsers, version gate, addedConflictMarkers; the unit file is rewritten without the repo setup beforeEach) + 12
+  - adapters headless 6 = 4 + 2 (real processes); opencode 4 = 3 + 1 (plugin run through sh); process 7 = 6 + 1 (real ps)
+  - store files 10 = 9 + 1 (concurrent appends from processes); leases-lock 8 = 7 + 1 (ps liveness); snapshot 6 = 2 + 4 (git symbolic-ref); spawn 9 = 1 (gitTimeoutMs) + 8; worktree 5 = 3 + 2 (git init)
+  - view steps 16 = 5 (pure pieces, criteria summary) + 11; view 18 = 5 (formatters) + 13
+  Each half lost only the imports and helpers it no longer uses.
+- Fixtures moved with their tests: store `fixtures/append.ts` → `integration/fixtures/`; view `fixtures/gh-1` → `integration/fixtures/` (only integration steps uses it); adapter fixtures under `unit/<adapter>/fixtures/` (all used by the unit halves). `test/helpers.ts` (store) and `test/contract/` (adapters) stay at the package test roots.
+- Rules (S1, test/repo.test.ts): "every adapter has tests" now reads `unit/<adapter>/` and `integration/<adapter>/` (fixture case: either tier counts, none or outside a tier is named); new B17 rule: every store/adapters/view `*.test.ts` sits under `unit/` or `integration/` (fixture case). Both real-tree rules go red on a copy of HEAD, green here.
+- AC3 per package (before → unit + integration): store 97 → 65 + 32; adapters 187 → 110 + 77; view 38 → 14 + 24. Repo rules +3 tests (one rule replaced, four added). `bun test` 974/0 (55 files) = 1104 − 133 moved + 3.
+- Guard check: `bun test --preload ./test/support/unit-guard-preload.ts packages/{store,adapters,view}/test/unit` 189/0.
+- Integration: run 1 had one failure, headless "spawns detached … kills" timed out at 20 s; it passes 3/3 alone and in runs 2 and 3 of the full tier (with timing logs: whole test ~0.4 s). Cause not found (a hang, not slowness: normally 0.4 s). Note for QA/review: watch for it in parallel runs (B20).
+- Not changed (slice 06): AGENTS.md still says `packages/adapters/test/<adapter>/` and names `contract.test.ts` under `test/contract/`.
+
 ## Resume
+
+Commit is done; report `norn done done`. If the headless timeout recurs, diagnose `kill`/`isAlive` under load in packages/adapters/src/headless/index.ts.
