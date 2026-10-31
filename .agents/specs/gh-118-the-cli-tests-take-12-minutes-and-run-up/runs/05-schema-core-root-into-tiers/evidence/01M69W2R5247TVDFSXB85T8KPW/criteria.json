@@ -1,0 +1,4 @@
+[
+ {"id":"AC1","verdict":"pass","evidence":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh118-05/AC1.md — schema/core tests under test/unit (snapshots in core/test/unit/__snapshots__), fixtures/fixtures.ts/rule-cases.ts/golden at core's test root, repo/process/golden/process-check tests under test/repo, 0 test files left at old roots; 668 pass, 0 fail under --preload test/support/unit-guard-preload.ts; full bun test 1104 pass; typecheck green"},
+ {"id":"AC2","verdict":"pass","evidence":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh118-05/AC2.md — test/repo/golden.test.ts (stableKey, selectNew, decisionChanges, harvest discovery) + process-check.test.ts: 24 pass, 0 fail; bun run golden -- --update from root: 0 of 93 changed; bun run golden from root: harvested 604, added 9 into packages/core/test/golden (removed after)"}
+]
