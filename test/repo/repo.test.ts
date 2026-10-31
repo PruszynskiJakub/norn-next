@@ -455,6 +455,9 @@ describe("test layout (AGENTS.md)", () => {
     const paths = [...agents.matchAll(/`((?:packages|test|scripts)\/[\w./*-]+)`/g)].map((m) => (m[1] as string).replace(/\/\*[^/]*$/, ""));
     expect(paths.length).toBeGreaterThan(0);
     expect(paths.filter((p) => !existsSync(join(ROOT, p)))).toEqual([]);
+    // a test file named bare ("`contract.test.ts` there") must also be named by its full path, so the check above sees it
+    const bare = [...agents.matchAll(/`([\w.-]+\.test\.ts)`/g)].map((m) => m[1] as string);
+    expect(bare.filter((name) => !paths.some((p) => p.endsWith(`/${name}`)))).toEqual([]);
     const readme = readFileSync(join(ROOT, "README.md"), "utf8").split("\n").filter((l) => /^bun (run )?test\b/.test(l));
     expect(readme.length).toBeGreaterThan(0);
     expect(readme.filter((l) => /all tests/i.test(l))).toEqual([]);
