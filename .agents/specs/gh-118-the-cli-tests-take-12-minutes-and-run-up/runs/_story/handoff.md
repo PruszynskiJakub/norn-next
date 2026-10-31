@@ -2,10 +2,10 @@
 - Story: gh-118
 - Workflow: story · Step: implement (attempt 4)
 - Status: ready
-- Counters: base_conflict_loop 0/2, ci_loop 0/3, plan_loop 0/3, qa_loop 0/2, ready_loop 0/2, stale_loop 0/10, sync_conflict_loop 0/2, test_loop 3/5
+- Counters: base_conflict_loop 0/2, ci_loop 0/3, plan_loop 0/3, qa_loop 0/2, ready_loop 0/2, stale_loop 0/10, test_loop 3/5
 - Last outcome: test.fail (classified, 2026-10-31T22:44:39.100Z)
 - Next: `norn brief`
-- Updated: 2026-10-31T22:45:06.917Z
+- Updated: 2026-10-31T22:46:36.925Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - story.start: story at refine
@@ -52,6 +52,7 @@
 - agent.start: implement run 01M6A216DK6STVF23CC0PM82D4
 - receipts.apply: implement.done → test
 - receipts.apply: test.fail → implement
+- receipts.apply: applied 52
 <!-- norn:heartbeat:end -->
 
 ## Goal
