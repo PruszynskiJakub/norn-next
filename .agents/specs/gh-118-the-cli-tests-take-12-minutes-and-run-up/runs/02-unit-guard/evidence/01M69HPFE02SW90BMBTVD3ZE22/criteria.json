@@ -1,0 +1,6 @@
+[
+ {"id":"AC1","verdict":"pass","evidence":"AC1.md, AC1-3-run.txt: Bun.spawn, Bun.spawnSync, child_process.spawn each throw at the call via --preload with message naming argv, test file, test/integration/"},
+ {"id":"AC2","verdict":"pass","evidence":"AC2.md: a test swallowing the error still (fail)s from the preload afterEach with the same message"},
+ {"id":"AC3","verdict":"pass","evidence":"AC3.md: spawn with secret env var and cwd; log contains neither value, var name nor cwd"},
+ {"id":"AC4","verdict":"pass","evidence":"AC4.md, AC4-run.txt: (fail) reads the head beside guard message; pure test passed (1 pass 1 fail)"}
+]
