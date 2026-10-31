@@ -154,6 +154,12 @@ export function harvestCommand(file: string): string[] {
 
 async function add(perRule: number, named: string[]): Promise<void> {
   const testFiles = (named.length ? named : harvestFiles()).map((f) => join(ROOT, f));
+  // a named file outside the tiers: refuse before any work, not as a throw inside the harvest pool
+  const outside = testFiles.map((f) => relative(ROOT, f)).filter((f) => !HARVEST_TIERS.some(({ dir }) => f.startsWith(`${dir}/`)));
+  if (outside.length) {
+    console.error(`nothing added: not in a harvest tier (${HARVEST_TIERS.map((t) => t.dir).join(", ")}): ${outside.join(", ")}`);
+    process.exit(1);
+  }
 
   const raw = mkdtempSync(join(tmpdir(), "norn-golden-"));
   const failed: string[] = [];

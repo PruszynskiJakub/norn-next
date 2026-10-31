@@ -21,7 +21,7 @@ describe("norn tidy closes Herdr panes of runs that reported done (K7)", () => {
   const runsDir = () => join(wt(), ".agents/specs/gh-3-third/runs/_story");
 
   /** A fake Herdr: fixed panes, every close recorded. */
-  function fakeHerdr(panes: herdr.HerdrPaneSpot[]) {
+  function paneHerdr(panes: herdr.HerdrPaneSpot[]) {
     const calls: string[] = [];
     const cockpit = {
       listPanes: async () => panes,
@@ -64,7 +64,7 @@ describe("norn tidy closes Herdr panes of runs that reported done (K7)", () => {
   });
 
   test("another runner: tidy leaves Herdr alone", async () => {
-    const f = fakeHerdr([spot("w4:t1.p1", wt())]);
+    const f = paneHerdr([spot("w4:t1.p1", wt())]);
     const r = await runChecked(["tidy"], { ...h.deps, herdr: f.cockpit });
     expect(r.exit).toBe(0);
     expect((r.value as { removed: Record<string, unknown> }).removed.herdr).toBeUndefined();
@@ -74,13 +74,13 @@ describe("norn tidy closes Herdr panes of runs that reported done (K7)", () => {
   test("Herdr as the runner: --dry-run lists, tidy closes the done run's workspace only", async () => {
     h.write(join(h.home, "config.yaml"), "runner: { adapter: herdr }\n");
     const panes = [spot("w4:t1.p1", wt()), spot("w5:t1.p1", wt()), spot("w6:t1.p1", wt(), "working"), spot("w7:t1.p1", wt())];
-    const dry = fakeHerdr(panes);
+    const dry = paneHerdr(panes);
     const d = await runChecked(["tidy", "--dry-run"], { ...h.deps, herdr: dry.cockpit });
     expect(d.exit).toBe(0);
     expect(d.value).toMatchObject({ would_remove: { herdr: { workspaces: ["w4"], tabs: [], panes: [] } } });
     expect(dry.calls).toEqual([]);
 
-    const real = fakeHerdr(panes);
+    const real = paneHerdr(panes);
     const t = await runChecked(["tidy"], { ...h.deps, herdr: real.cockpit });
     expect(t.value).toMatchObject({ removed: { herdr: { workspaces: ["w4"], tabs: [], panes: [] } } });
     expect(real.calls).toEqual(["workspace w4"]);

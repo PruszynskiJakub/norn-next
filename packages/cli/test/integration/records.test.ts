@@ -6,10 +6,10 @@
  * local `main` is stale (F36).
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { StoryFacts } from "@norn/core";
-import { readTickInputs, readTrace, repoConfigPath, workflowsDir } from "@norn/store";
+import { baseCacheDir, baseSpecsRoot, defaultBaseRef, readTickInputs, readTrace, repoConfigPath, workflowsDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
 
@@ -64,6 +64,15 @@ async function bootTo(h: Harness, n: number, title: string, runs: () => string) 
   expect(h.state(runs())?.status).toBe("running");
   h.clock.advance(10_000);
   await h.tick(); // recovery commit of runs/ after the launch
+}
+
+/** What the durable-record read (store/base.ts) sees: the base ref, its specs tree and the machine dir's base copies. */
+function baseDiagnostics(h: Harness): Record<string, unknown> {
+  const ref = defaultBaseRef(h.root, "origin");
+  const tree = ref ? Bun.spawnSync(["git", "rev-parse", "--verify", "--quiet", `${ref}:.agents/specs`], { cwd: h.root }).stdout.toString().trim() : null;
+  const cache = baseCacheDir(h.root);
+  const copies = existsSync(cache) ? readdirSync(cache).map((n) => ({ n, files: existsSync(join(cache, n, ".agents/specs")) ? readdirSync(join(cache, n, ".agents/specs")) : null, complete: existsSync(join(cache, n, ".complete")) })) : null;
+  return { ref, tree, cache, copies, root: ref ? baseSpecsRoot(h.root, ref) : null };
 }
 
 /** Merge `branch` into main from a second clone and push it, as a person on GitHub would. */
@@ -155,6 +164,8 @@ describe("records: ready head, foreign commits, merged by ancestry, durable stat
     const r = await h.norn("story", "list");
     expect(r.exit).toBe(0);
     const keys = (r.value as { stories: Array<{ key: string }> }).stories.map((x) => x.key);
+    // seen empty once in a parallel tier run and never again (gh-118/03): say which read gave nothing
+    if (!keys.includes("gh-5")) console.error("F36 diagnostics", baseDiagnostics(h));
     expect(keys).toContain("gh-5");
     expect(await h.listed("gh-5")).toMatchObject({ key: "gh-5" });
   });

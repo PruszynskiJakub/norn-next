@@ -183,8 +183,10 @@ describe("norn status --watch (B11, CP6–CP8)", () => {
       await new Promise(() => {}); // the person types nothing
       yield "";
     }
-    setTimeout(() => abort.abort(), 50);
-    const r = await runChecked(["status", "--watch", "--interval", "1h"], { ...c.deps, herdr: null, signal: abort.signal, input: waiting(), log: () => {} });
+    // abort once the first frame is out and the loop waits — a wall-clock timer raced the first
+    // frame on a loaded machine (parallel tier) and stopped the loop before it drew anything
+    const log = () => void setTimeout(() => abort.abort(), 0);
+    const r = await runChecked(["status", "--watch", "--interval", "1h"], { ...c.deps, herdr: null, signal: abort.signal, input: waiting(), log });
     expect(r.exit).toBe(0);
     expect(r.value).toEqual({ frames: 1, last: null });
   });

@@ -179,26 +179,43 @@ function tierSelection(config: string): string[] {
   return testFilesUnder(ROOT).filter((f) => f.startsWith(under) && !ignored(f));
 }
 
-const PINNED_HELPER = /(?:^|\/)(?:transcript|observe-snapshot)\.ts$/;
+const PINNED_HELPERS = ["test/support/transcript.ts", "test/support/observe-snapshot.ts"];
+/** `from "x"` (import, export … from), side-effect `import "x"` and dynamic `import("x")` */
+const IMPORT_SPEC = /(?:\bfrom\s+|\bimport\s*\(?\s*)["']([^"']+)["']/g;
+
+/** The relative imports of repo-relative `file` under `root`, resolved to repo-relative paths. */
+function relativeImports(root: string, file: string): Array<{ spec: string; path: string }> {
+  return [...readFileSync(join(root, file), "utf8").matchAll(IMPORT_SPEC)]
+    .map((m) => m[1] as string)
+    .filter((spec) => spec.startsWith("."))
+    .map((spec) => ({ spec, path: relative(root, join(root, file, "..", spec)) }));
+}
 
 /**
  * B16: imports of the transcript recorder or the observe snapshot helpers outside test/e2e/ (and the
- * helpers' own folder, test/support/), in package tests and root test code under `root`.
+ * helpers' own folder, test/support/), in package tests and root test code under `root`. An import is
+ * matched by the path it resolves to; a support helper that imports a pinned one (transitively) is pinned too.
  */
 function pinnedHelperImports(root: string): Array<{ file: string; import: string }> {
+  const pinned = new Set(PINNED_HELPERS);
+  const support = existsSync(join(root, "test/support")) ? files(join(root, "test/support")).map((f) => relative(root, f)).filter((f) => f.endsWith(".ts")) : [];
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const f of support) if (!pinned.has(f) && relativeImports(root, f).some((i) => pinned.has(i.path))) grew = !!pinned.add(f);
+  }
   const pkgTests = existsSync(join(root, "packages")) ? readdirSync(join(root, "packages")).map((p) => join(root, "packages", p, "test")) : [];
   const dirs = [...pkgTests, join(root, "test")].filter((d) => existsSync(d));
   return dirs
     .flatMap((d) => files(d))
     .map((f) => relative(root, f))
+    .filter((f) => f.endsWith(".ts"))
     // the repo rules name the helpers in their own fixtures
     .filter((f) => !f.startsWith("test/e2e/") && !f.startsWith("test/support/") && !f.startsWith("test/repo/") && f !== "test/repo.test.ts")
     .sort()
     .flatMap((f) =>
-      [...readFileSync(join(root, f), "utf8").matchAll(/(?:from\s+|import\s*\(\s*)["']([^"']+)["']/g)]
-        .map((m) => m[1] as string)
-        .filter((spec) => PINNED_HELPER.test(spec))
-        .map((spec) => ({ file: f, import: spec })),
+      relativeImports(root, f)
+        .filter((i) => pinned.has(i.path))
+        .map((i) => ({ file: f, import: i.spec })),
     );
 }
 
@@ -275,8 +292,16 @@ describe("test layout (AGENTS.md)", () => {
     put("packages/store/test/unit/b.test.ts", `import { snap } from "../../../../test/support/observe-snapshot.ts";\n`);
     put("test/e2e/ok.test.ts", `import { t } from "../support/transcript.ts";\nimport { s } from "../support/observe-snapshot.ts";\n`);
     put("test/support/observe-snapshot.ts", `import { t } from "./transcript.ts";\n`);
+    put("test/support/records.ts", `export { s } from "./observe-snapshot.ts";\n`);
+    put("test/support/harness.ts", `export const h = 1;\n`);
+    put("packages/cli/test/integration/c.test.ts", `import "../../../../test/support/transcript.ts";\nimport { h } from "../../../../test/support/harness.ts";\n`);
+    put("packages/cli/test/integration/d.test.ts", `import { s } from "../../../../test/support/records.ts";\n`);
+    // only the support helpers count: an adapter's own transcript.ts is another module
+    put("packages/adapters/test/claude/e.test.ts", `import { t } from "../../src/agent-hooks/transcript.ts";\n`);
     expect(pinnedHelperImports(root)).toEqual([
       { file: "packages/cli/test/integration/a.test.ts", import: "../../../../test/support/transcript.ts" },
+      { file: "packages/cli/test/integration/c.test.ts", import: "../../../../test/support/transcript.ts" },
+      { file: "packages/cli/test/integration/d.test.ts", import: "../../../../test/support/records.ts" },
       { file: "packages/store/test/unit/b.test.ts", import: "../../../../test/support/observe-snapshot.ts" },
     ]);
   });
