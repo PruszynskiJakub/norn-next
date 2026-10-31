@@ -14,6 +14,23 @@
 
 ## Goal
 
+Turn the unit guard on for `bun test` (AC1), ban spawning imports in unit tests (AC2, B15), require every test file to sit in a tier folder (AC9, B14), and leave the measurements (AC3–AC8) ready for QA.
+
 ## Progress
 
+- The root `bunfig.toml` now preloads `test/support/unit-guard-preload.ts`. The unit tier was already clean: no hidden spawns turned up. Unit: 983 tests, about 1.9 s wall clock, three runs green on this machine.
+- Repo rules (`test/repo/repo.test.ts`):
+  - B14 `untieredTests` covers the whole repo and replaces the store/adapters/view-only B17 rule. Its message is "<file> is not in a tier folder (unit/, integration/, test/e2e/, test/repo/)".
+  - B15 `spawningUnitImports`: a unit test (`packages/*/test/unit/`, `test/repo/`) may not import the harness, any `test/support` helper that imports it (transcript, observe snapshot), `packages/store/src/git.ts`, or `fetchNornRefs`/`onlyNornCommitsSince` from `@norn/store`. Fake herdr and the golden harvest stay allowed.
+  - The B1 test now asserts the guard preload.
+  - Each rule was checked red against a real violation.
+- **Bun 1.3.13 bug found:** under `--parallel`, workers load the root bunfig's preloads as well as the `--config` ones, so the guard broke every integration and e2e test. Fix: `allowSpawns()` in `unit-guard.ts` sets a per-process flag that the guard reads on each call. The integration and e2e configs preload `test/support/spawning-tier-preload.ts`, which sets it. Self-test added in `unit-guard.test.ts`.
+- Loophole: a unit test could call `allowSpawns()` itself. It is not banned, because that is outside this slice's criteria.
+- AC3 evidence: a throwaway `packages/store/test/unit/x.test.ts` 'reads the head' printed `(fail) reads the head` with "unit test in packages/store/test/unit/x.test.ts started `git rev-parse HEAD`; a test that spawns belongs in test/integration/". The file was removed.
+- AC7 (local): `test:integration` passed three runs in a row (505 tests in 51 files, 107–109 s). `test:e2e` passed three runs in a row (72 tests in 7 files, about 78 s). The type check is clean.
+- AC5: tier totals are 983 + 505 + 72 = 1,560 against the 1,423 baseline. The +137 are tests added on purpose across the story (repo rules, guard self-tests, …). QA must list them.
+- AC6: transcripts and snapshots differ from the main merge-base by renames only (100% similarity). `observe-snapshots.test.ts` itself changes in 3 lines (its paths). `bun run golden` and `bun run golden -- --update` have not been run yet: QA does that.
+
 ## Resume
+
+Implement is done. QA runs: the golden checks (AC6), the AC5 list of test-count changes, the PR body table (AC8), CI (AC7), and the person runs the 30 s check on the Mac (AC4).
