@@ -2,7 +2,7 @@
 id: gh-118/05
 title: Schema, core and root tests into the unit tier and test/repo
 depends_on: [ gh-118/03 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
