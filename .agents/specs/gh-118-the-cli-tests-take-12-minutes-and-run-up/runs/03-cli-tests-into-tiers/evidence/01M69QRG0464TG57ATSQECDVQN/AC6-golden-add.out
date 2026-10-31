@@ -1,0 +1,37 @@
+exit=0
+ok   packages/cli/test/integration/story-start.test.ts
+ok   packages/cli/test/integration/run-rerun-cancel.test.ts
+ok   packages/cli/test/integration/story-decision.test.ts
+ok   packages/cli/test/integration/tidy-herdr.test.ts
+ok   packages/cli/test/integration/story-view.test.ts
+ok   packages/cli/test/integration/why-version.test.ts
+ok   packages/cli/test/integration/targets.test.ts
+ok   packages/cli/test/integration/trace-free-views.test.ts
+ok   packages/cli/test/integration/story-reopen.test.ts
+ok   test/e2e/observe-snapshots.test.ts
+ok   test/e2e/auto-recovery.test.ts
+ok   test/e2e/recovery.test.ts
+ok   test/e2e/slice-workflow.test.ts
+ok   test/e2e/team.test.ts
+ok   test/e2e/base-sync.test.ts
+added check-run-79e9bb3eaf13.json: check.running
+added base-sync-3840c46a2ba5.json: remote.park
+added check-run-0bb8618bb933.json: leases.reclaim, check.running, check.run
+added housekeeping-179f36b22a7d.json: start.workflow_invalid
+added rebase-rewind-0a4c2f7ca16d.json: claim.renew, unit.rebase_in_progress
+added story-reopen-a1feef443f31.json: slices.slice_stuck, slice.done, unit.stuck
+added run-rerun-cancel-c4951d9aea19.json: receipts.apply, agent.timeout.nudge
+added status-watch-bf9ed6a217f0.json: receipts.apply, agent.attended.running
+added agent-protocol-aebc90a877f3.json: agent.timeout.surface
+9 golden case(s) added of 604 harvested; the 93 existing left as they were → packages/core/test/golden
+?? packages/core/test/golden/agent-protocol-aebc90a877f3.json
+?? packages/core/test/golden/base-sync-3840c46a2ba5.json
+?? packages/core/test/golden/check-run-0bb8618bb933.json
+?? packages/core/test/golden/check-run-79e9bb3eaf13.json
+?? packages/core/test/golden/housekeeping-179f36b22a7d.json
+?? packages/core/test/golden/rebase-rewind-0a4c2f7ca16d.json
+?? packages/core/test/golden/run-rerun-cancel-c4951d9aea19.json
+?? packages/core/test/golden/status-watch-bf9ed6a217f0.json
+?? packages/core/test/golden/story-reopen-a1feef443f31.json
+
+[exited with code 0]

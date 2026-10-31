@@ -1,0 +1,31 @@
+bun test v1.3.13 (bf2e2cec)
+
+test/repo.test.ts:
+285 |     expect(selected.length).toBeGreaterThan(0);
+286 |     expect(selected).toEqual(all.filter(inTier));
+287 |   });
+288 | 
+289 |   test("B16: only test/e2e/ imports the transcript recorder and the observe snapshot helpers", () => {
+290 |     expect(pinnedHelperImports(ROOT)).toEqual([]);
+                                            ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   {
++     "file": "packages/cli/test/integration/zz-qa-probe.test.ts",
++     "import": "../../../../test/support/transcript.ts",
++   },
++ ]
+
+- Expected  - 1
++ Received  + 6
+
+      at <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-118-the-cli-tests-take-12-minutes-and-run-up--03-cli-tests-into-tiers/test/repo.test.ts:290:39)
+(fail) test layout (AGENTS.md) > B16: only test/e2e/ imports the transcript recorder and the observe snapshot helpers [18.87ms]
+
+ 1 pass
+ 44 filtered out
+ 1 fail
+ 2 expect() calls
+Ran 2 tests across 1 file. [78.00ms]

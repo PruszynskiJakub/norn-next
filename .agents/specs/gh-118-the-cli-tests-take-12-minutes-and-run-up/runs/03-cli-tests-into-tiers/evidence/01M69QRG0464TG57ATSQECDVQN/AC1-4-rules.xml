@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="bun test" tests="52" assertions="466" failures="0" skipped="0" time="1.136057">
+  <testsuite name="scripts/golden.test.ts" file="scripts/golden.test.ts" tests="6" assertions="18" failures="0" skipped="0" time="0.201" hostname="mac.home">
+    <testcase name="stableKey ignores what differs between two runs of one tick and keeps which ids are equal" classname="" time="0.000274" file="scripts/golden.test.ts" line="10" assertions="3" />
+    <testcase name="a case is named by decide&apos;s inputs, so new decisions (golden.ts --update) keep its name" classname="" time="0.003959" file="scripts/golden.test.ts" line="22" assertions="2" />
+    <testcase name="every committed golden case is named by its stable key" classname="" time="0.195461" file="scripts/golden.test.ts" line="31" assertions="1" />
+    <testcase name="selectNew adds only new keys that bring an under-covered rule, smallest first, whatever the input order" classname="" time="0.000931" file="scripts/golden.test.ts" line="41" assertions="3" />
+    <testcase name="decisionChanges lists the decisions that went and came, not those only reordered" classname="" time="0.000242" file="scripts/golden.test.ts" line="52" assertions="2" />
+    <testcase name="the harvest finds the harness test files in cli integration and test/e2e and runs each with its tier&apos;s config (gh-118 B19)" classname="" time="0.003084" file="scripts/golden.test.ts" line="61" assertions="7" />
+  </testsuite>
+  <testsuite name="test/repo.test.ts" file="test/repo.test.ts" tests="46" assertions="448" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="dependency direction" file="test/repo.test.ts" line="27" tests="10" assertions="320" failures="0" skipped="0" time="0.028" hostname="mac.home">
+      <testcase name="packages are exactly the known set" classname="dependency direction" time="0.000066" file="test/repo.test.ts" line="28" assertions="1" />
+      <testcase name="@norn/schema imports only allowed packages, all declared" classname="dependency direction" time="0.001168" file="test/repo.test.ts" line="31" assertions="1" />
+      <testcase name="@norn/core imports only allowed packages, all declared" classname="dependency direction" time="0.001992" file="test/repo.test.ts" line="31" assertions="21" />
+      <testcase name="@norn/store imports only allowed packages, all declared" classname="dependency direction" time="0.011152" file="test/repo.test.ts" line="31" assertions="40" />
+      <testcase name="@norn/adapters imports only allowed packages, all declared" classname="dependency direction" time="0.001991" file="test/repo.test.ts" line="31" assertions="36" />
+      <testcase name="@norn/view imports only allowed packages, all declared" classname="dependency direction" time="0.001414" file="test/repo.test.ts" line="31" assertions="24" />
+      <testcase name="@norn/cli imports only allowed packages, all declared" classname="dependency direction" time="0.005935" file="test/repo.test.ts" line="31" assertions="189" />
+      <testcase name="the root declares every package as a dev dependency" classname="dependency direction" time="0.00033" file="test/repo.test.ts" line="62" assertions="6" />
+      <testcase name="root test/ and scripts/ import only packages the root declares" classname="dependency direction" time="0.008422" file="test/repo.test.ts" line="66" assertions="1" />
+      <testcase name="an undeclared import in root test code fails, naming the file and the import" classname="dependency direction" time="0.000997" file="test/repo.test.ts" line="69" assertions="1" />
+    </testsuite>
+    <testsuite name="glossary" file="test/repo.test.ts" line="126" tests="2" assertions="9" failures="0" skipped="0" time="0.093" hostname="mac.home">
+      <testcase name="matcher: word boundaries, URLs and doc code spans are not prose" classname="glossary" time="0.00175" file="test/repo.test.ts" line="127" assertions="8" />
+      <testcase name="no banned synonyms in sources, assets, plugin, JSON schemas, README and AGENTS.md" classname="glossary" time="0.09224" file="test/repo.test.ts" line="138" assertions="1" />
+    </testsuite>
+    <testsuite name="test layout (AGENTS.md)" file="test/repo.test.ts" line="230" tests="11" assertions="38" failures="0" skipped="0" time="0.085" hostname="mac.home">
+      <testcase name="tests and fixtures live under packages/&lt;pkg&gt;/test, never in src" classname="test layout (AGENTS.md)" time="0.008896" file="test/repo.test.ts" line="231" assertions="1" />
+      <testcase name="every adapter has its tests in packages/adapters/test/&lt;adapter&gt;/" classname="test layout (AGENTS.md)" time="0.000602" file="test/repo.test.ts" line="245" assertions="1" />
+      <testcase name="test:fast and test:cli split the suite: fast skips the cli and the integration and e2e tiers, and slice, story and quick checks run fast" classname="test layout (AGENTS.md)" time="0.002521" file="test/repo.test.ts" line="259" assertions="2" />
+      <testcase name="B1, B2: the root bunfig ignores exactly the integration and e2e tiers, and the test script is exactly bun test" classname="test layout (AGENTS.md)" time="0.009279" file="test/repo.test.ts" line="268" assertions="3" />
+      <testcase name="B5, B6: test:integration runs bun test with bunfig.integration.toml, in parallel with a 20 s timeout, passing extra arguments through, and selects only its tier" classname="test layout (AGENTS.md)" time="0.014844" file="test/repo.test.ts" line="278" assertions="4" />
+      <testcase name="B5, B6: test:e2e runs bun test with bunfig.e2e.toml, in parallel with a 20 s timeout, passing extra arguments through, and selects only its tier" classname="test layout (AGENTS.md)" time="0.018932" file="test/repo.test.ts" line="278" assertions="4" />
+      <testcase name="B16: only test/e2e/ imports the transcript recorder and the observe snapshot helpers" classname="test layout (AGENTS.md)" time="0.016539" file="test/repo.test.ts" line="289" assertions="1" />
+      <testcase name="AC7: no test source tells a person to rewrite a transcript or snapshot with plain bun test, which skips test/e2e/" classname="test layout (AGENTS.md)" time="0.012274" file="test/repo.test.ts" line="293" assertions="1" />
+      <testcase name="B16: an integration or unit test importing them fails, naming the file and the import" classname="test layout (AGENTS.md)" time="0.006773" file="test/repo.test.ts" line="303" assertions="1" />
+      <testcase name="quick and story wait for the PR&apos;s CI after open-pr and send a red run back to implement" classname="test layout (AGENTS.md)" time="0.000618" file="test/repo.test.ts" line="330" assertions="10" />
+      <testcase name="release goes prepare → open-pr → ci → ready, a red CI goes $stuck, and a base commit makes it stale (BS7)" classname="test layout (AGENTS.md)" time="0.000336" file="test/repo.test.ts" line="344" assertions="10" />
+    </testsuite>
+    <testsuite name="intake by kind (W9)" file="test/repo.test.ts" line="364" tests="4" assertions="10" failures="0" skipped="0" time="0" hostname="mac.home">
+      <testcase name="triage recommends quick, story or close, all to its confirm gate" classname="intake by kind (W9)" time="0.000303" file="test/repo.test.ts" line="368" assertions="2" />
+      <testcase name="reproduce is one norn-diagnose agent step that reports reproduced or cannot_reproduce to a confirm gate" classname="intake by kind (W9)" time="0.000377" file="test/repo.test.ts" line="374" assertions="6" />
+      <testcase name="quick&apos;s implement turns a red loop from reproduce into a failing test first" classname="intake by kind (W9)" time="0.000138" file="test/repo.test.ts" line="385" assertions="1" />
+      <testcase name="the bug report template applies norn:wf:reproduce" classname="intake by kind (W9)" time="0.00026" file="test/repo.test.ts" line="389" assertions="1" />
+    </testsuite>
+    <testsuite name="release metadata" file="test/repo.test.ts" line="396" tests="1" assertions="2" failures="0" skipped="0" time="0" hostname="mac.home">
+      <testcase name="the README release badge names the cli version, and CHANGELOG.md has its section" classname="release metadata" time="0.000443" file="test/repo.test.ts" line="397" assertions="2" />
+    </testsuite>
+    <testsuite name="removed commands (B5, B8, B71)" file="test/repo.test.ts" line="448" tests="4" assertions="36" failures="0" skipped="0" time="0.258" hostname="mac.home">
+      <testcase name="matcher: commands anywhere in a line; a named thing (`a norn workflow`), new names and other flags are not hits" classname="removed commands (B5, B8, B71)" time="0.000254" file="test/repo.test.ts" line="449" assertions="11" />
+      <testcase name="the list of removed commands is read from core, or the lint fails loudly" classname="removed commands (B5, B8, B71)" time="0" file="test/repo.test.ts" line="463" assertions="3" />
+      <testcase name="no removed command in sources, assets, plugins, skills, README, CONTRIBUTING, AGENTS.md, the PRD and its SPEC files, the cookbook" classname="removed commands (B5, B8, B71)" time="0.258981" file="test/repo.test.ts" line="469" assertions="1" />
+      <testcase name="the PRD&apos;s command table (§15) is the noun tree" classname="removed commands (B5, B8, B71)" time="0.000494" file="test/repo.test.ts" line="483" assertions="21" />
+    </testsuite>
+    <testsuite name="the new layout in product docs (gh-110 B3, B22)" file="test/repo.test.ts" line="530" tests="6" assertions="22" failures="0" skipped="0" time="0.046" hostname="mac.home">
+      <testcase name="matcher: the old folder and its parts are hits; the new config file and other .agents folders are not" classname="the new layout in product docs (gh-110 B3, B22)" time="0.000059" file="test/repo.test.ts" line="531" assertions="8" />
+      <testcase name="AGENTS.md&apos;s sections are found, or the lint fails loudly" classname="the new layout in product docs (gh-110 B3, B22)" time="0.00007" file="test/repo.test.ts" line="536" assertions="2" />
+      <testcase name="README, the PRD, shipped assets, package sources and AGENTS.md&apos;s Layout and contracts name no `.agents/norn/`" classname="the new layout in product docs (gh-110 B3, B22)" time="0.04608" file="test/repo.test.ts" line="541" assertions="1" />
+      <testcase name="README&apos;s Workflows are data and Config paragraphs name the new places" classname="the new layout in product docs (gh-110 B3, B22)" time="0.000109" file="test/repo.test.ts" line="552" assertions="2" />
+      <testcase name="the PRD&apos;s §7 layout and ID2 describe the machine dir and its id" classname="the new layout in product docs (gh-110 B3, B22)" time="0.000192" file="test/repo.test.ts" line="558" assertions="4" />
+      <testcase name="B3: the shipped norn skill puts only runs/ and the generated top of handoff.md off limits" classname="the new layout in product docs (gh-110 B3, B22)" time="0.000463" file="test/repo.test.ts" line="568" assertions="5" />
+    </testsuite>
+    <testsuite name="ratchet lints" file="test/repo.test.ts" line="736" tests="8" assertions="11" failures="0" skipped="0" time="0.182" hostname="mac.home">
+      <testcase name="matcher: a new hit and a stale allowlist entry both fail" classname="ratchet lints" time="0.000181" file="test/repo.test.ts" line="737" assertions="4" />
+      <testcase name="(a) S1: fs writes only in packages/store/src" classname="ratchet lints" time="0.019164" file="test/repo.test.ts" line="744" assertions="1" />
+      <testcase name="(b) cli does not call store&apos;s raw git" classname="ratchet lints" time="0.021402" file="test/repo.test.ts" line="748" assertions="1" />
+      <testcase name="(c) S2: JSON.parse only in store and schema" classname="ratchet lints" time="0.021855" file="test/repo.test.ts" line="752" assertions="1" />
+      <testcase name="(d) Bun.spawn only in store and adapters" classname="ratchet lints" time="0.025904" file="test/repo.test.ts" line="757" assertions="1" />
+      <testcase name="(e) core is pure: no node:fs, Bun.spawn, Date.now, Math.random" classname="ratchet lints" time="0.017187" file="test/repo.test.ts" line="761" assertions="1" />
+      <testcase name="(g) B1, B2, B5: `.agents/norn` paths are spelled only in store&apos;s path module" classname="ratchet lints" time="0.075163" file="test/repo.test.ts" line="765" assertions="1" />
+      <testcase name="(f) act handles exactly the action kinds decide emits" classname="ratchet lints" time="0.004102" file="test/repo.test.ts" line="770" assertions="1" />
+    </testsuite>
+  </testsuite>
+</testsuites>
