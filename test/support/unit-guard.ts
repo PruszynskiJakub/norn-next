@@ -9,6 +9,22 @@
 import { relative, resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dir, "..", "..");
+/** One flag per process, whichever copy of this module set it. */
+const SPAWNS_ALLOWED = Symbol.for("norn.unit-guard.spawns-allowed");
+
+/**
+ * Marks this process as a spawning tier (integration, e2e): the guard passes every call through. Bun 1.3.13's
+ * `--parallel` workers load the root bunfig's preloads as well as the `--config` ones, so the integration and
+ * e2e configs preload `spawning-tier-preload.ts`, which calls this. The guard reads the flag at each call, so
+ * the order the preloads ran in does not matter.
+ */
+export function allowSpawns(on = true): void {
+  (globalThis as Record<symbol, unknown>)[SPAWNS_ALLOWED] = on;
+}
+
+function spawnsAllowed(): boolean {
+  return (globalThis as Record<symbol, unknown>)[SPAWNS_ALLOWED] === true;
+}
 
 export interface UnitGuard {
   /** Throws the pending violation, if any, and clears it. */
@@ -28,8 +44,8 @@ export function installUnitGuard(): UnitGuard {
     throw new Error(message);
   };
   const bun = Bun as unknown as { spawn: unknown; spawnSync: unknown };
-  bun.spawn = (...args: unknown[]) => block(args);
-  bun.spawnSync = (...args: unknown[]) => block(args);
+  bun.spawn = (...args: unknown[]) => (spawnsAllowed() ? (realSpawn as (...a: unknown[]) => unknown)(...args) : block(args));
+  bun.spawnSync = (...args: unknown[]) => (spawnsAllowed() ? (realSpawnSync as (...a: unknown[]) => unknown)(...args) : block(args));
 
   return {
     check() {

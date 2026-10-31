@@ -475,8 +475,8 @@ describe("test layout (AGENTS.md)", () => {
     const scripts = rootScripts();
     // ends in flags, so `bun run <script> <file>` appends the file as bun test's own path filter
     expect(scripts[script]).toBe(`bun test --config=${config} --parallel --timeout=20000`);
-    // the unit guard is the unit tier's alone (B4)
-    expect(bunfig(config).preload).toEqual(["./test/preload.ts"]);
+    // the unit guard is the unit tier's alone (B4); --parallel workers also load the root preloads, so the tier says it spawns
+    expect(bunfig(config).preload).toEqual(["./test/preload.ts", "./test/support/spawning-tier-preload.ts"]);
     const all = testFilesUnder(ROOT);
     const selected = tierSelection(config);
     expect(selected.length).toBeGreaterThan(0);

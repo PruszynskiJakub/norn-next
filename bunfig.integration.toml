@@ -2,6 +2,6 @@
 # A package's own test root and its other subfolders (unit/, fixtures, per-adapter folders not yet in a
 # tier) are ignored, so nothing outside integration/ runs.
 [test]
-preload = ["./test/preload.ts"]
+preload = ["./test/preload.ts", "./test/support/spawning-tier-preload.ts"]
 root = "packages"
 pathIgnorePatterns = ["packages/*/test/*.ts", "packages/*/test/{[!i]*,i[!n]*}/**"]
