@@ -31,7 +31,7 @@ function heldElsewhere(key: string, holder: { holder: string; acquired_at: strin
 }
 
 /** B38: the remote's claim now — another machine's (or an unreadable one) is refused, never taken over here. */
-async function refuseOthers(ctx: Context, key: string, remote?: string | null): Promise<ClaimState> {
+export async function refuseOthers(ctx: Context, key: string, remote?: string | null): Promise<ClaimState> {
   const c = await claimFor(ctx, key, remote !== undefined ? { remote } : {});
   if (c.state === "other") throw heldElsewhere(key, c.blob);
   if (c.state === "corrupt") throw claimCorrupt(key);
@@ -45,7 +45,7 @@ const claimCorrupt = (key: string) => refuse(`claim ref of ${key} is unreadable`
  * another machine ran `story checkout --force`, and the local claim ref can be stale — then keep
  * this heartbeat's claim or take a free one (T7: only the holder pushes).
  */
-async function claimIfFree(ctx: Context, obs: Observed, key: string): Promise<string> {
+export async function claimIfFree(ctx: Context, obs: Observed, key: string): Promise<string> {
   const c = await refuseOthers(ctx, key, obs.remote);
   if ((c.state === "mine" || c.state === "expired") && writtenHere(c, obs.heartbeat_id)) return c.sha;
   const now = obs.facts.now;
