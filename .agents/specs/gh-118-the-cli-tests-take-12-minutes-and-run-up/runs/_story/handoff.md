@@ -73,8 +73,12 @@ implement#5: fix qa#1's two failures, B21 (stale contract.test.ts path in AGENTS
   - The setup's git calls are fast: 12 parallel stress processes made ~17k bunExec git spawns, the slowest 377 ms. No test leaks process.env or the spawn observer.
   - With setup instrumented, 1 + 3 tier runs (3 of them with 6 extra stress processes) all passed 511/0. No git call took over 2 s.
   - Red loop: two `bun run test:integration` at once (24 workers on 12 cores), twice. All 4 runs failed: story-decision.test.ts beforeAll timed out at its 30 s limit (502 tests ran, 1 failed).
-  - Conclusion: the failures come from CPU overcommit. When other work loads the machine (QA saw load average 6-11), some heavy hook goes over its limit, and which file it is varies. A fix trades against values the spec pins: B5's repo rule fixes `--parallel --timeout=20000`. The options are fewer workers (`--parallel=N`), longer limits, or accepting that runs on an overloaded machine can fail. I asked the person which.
+  - Cause (the person's answer): during qa#1 the person was running a second `bun run test:integration` by hand in this worktree, so two tiers shared 12 cores. One tier at a time is green (4 runs above, 511/0), which is what B20 asks. No code change. `--parallel --timeout=20000` stays as B5 pins it.
+
+## Risks
+
+- Two integration tiers on one machine overcommit the CPU and time out hooks. Measured: two `bun run test:integration` at once (24 workers on 12 cores) failed in all 4 runs, with story-decision.test.ts beforeAll hitting its 30 s limit and 502 tests run. Under one tier, the slowest tests take 10-15 s against the 20 s limit. Run one tier at a time.
 
 ## Resume
 
-Apply the person's answer on B20. Fewer workers: change `--parallel` in package.json test:integration/test:e2e and the B5/B6 rule in test/repo/repo.test.ts. Longer limit: change `--timeout` there and in AGENTS.md if it is named. Then rerun the red loop: two `bun run test:integration` at once, twice, plus the tier three times alone. Then `bun run test` and typecheck, commit, `norn done done`.
+Nothing left in implement#5. B21 is fixed (4a1fb28de). B20 needs no code change: the cause was two tiers running at once (see Risks). Next, QA reruns B20 with one tier at a time.
