@@ -8,8 +8,8 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { repoConfigPath, workflowsDir } from "@norn/store";
-import type { TickReport } from "../src/index.ts";
-import { createHarness, FakeInteraction, type Harness, issue, runChecked, sh } from "./harness.ts";
+import type { TickReport } from "../../src/index.ts";
+import { createHarness, FakeInteraction, type Harness, issue, runChecked, sh } from "../../../../test/support/harness.ts";
 
 // whole flows over real git, several ticks each
 setDefaultTimeout(30_000);
