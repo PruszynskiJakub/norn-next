@@ -16,7 +16,16 @@
 <!-- norn:heartbeat:end -->
 
 ## Goal
+Make the workflow test check, implement instructions, the shipped norn-implement skill, CI, release and docs follow the three tiers; remove test:fast/test:cli (AC1–AC7; AC8 is checked on the PR's CI run).
 
 ## Progress
+- New repo rules in `test/repo.test.ts` "test layout" block, AC1–AC7 (they replace the old split test). Each went red first.
+- package.json: dropped the two old scripts. quick/story/slice/bug `test` check = unit && integration && typecheck, 15m (slice and bug were 10m; AC2 asks for 15m). Implement steps carry the tier loop sentence. quick/story header comments rewritten.
+- norn-implement asset: step 4 and Done say fast suite, slower tiers in their own check. The `.agents/skills` copy is left alone (refreshes on `norn init`).
+- ci.yml: `unit` (test + typecheck) → `integration`, `e2e` (3-shard matrix, fail-fast, `--shard=N/3`), `package`, all `needs: unit`; git identity in the three spawning jobs. Job `check` renamed; nothing depends on that name (main has no branch protection).
+- release.yml Test step: `bun run test` + typecheck.
+- AGENTS.md Commands, tier paragraph, handback rule, transcript/snapshot/contract paths; README test lines.
+- `bun run test` 1110 pass, typecheck green.
 
 ## Resume
+Done; next is the test check. AC8: check the PR's CI run when it exists.

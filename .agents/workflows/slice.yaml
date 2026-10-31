@@ -11,11 +11,12 @@ steps:
     type: agent
     skill: norn-implement
     inputs: [slice, spec, handoff, last_check, last_findings]
+    instructions: "Run `bun run test` (the unit tier) after each change, and the type check; the integration tier runs in the `test` check and the e2e tier runs in CI, so do not run them before handing back."
     outcomes: { done: { to: test, means: "every acceptance criterion (or rework point) has a passing test" } }
   test:
     type: check
-    run: "bun install --frozen-lockfile && bun run test:fast && bun run typecheck"
-    timeout: 10m
+    run: "bun install --frozen-lockfile && bun run test && bun run test:integration && bun run typecheck"
+    timeout: 15m
     outcomes: { pass: review, fail: { to: implement, counter: test_loop } }
   review:
     type: agent

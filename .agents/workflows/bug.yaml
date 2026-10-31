@@ -23,13 +23,13 @@ steps:
     type: agent
     skill: norn-implement
     inputs: [slice, spec, handoff, last_check, last_findings]
-    instructions: "Start from the loop and minimised repro in the handoff: turn them into a failing test at the seam named there before changing any code, then fix the cause."
+    instructions: "Start from the loop and minimised repro in the handoff: turn them into a failing test at the seam named there before changing any code, then fix the cause. Run `bun run test` (the unit tier) after each change, and the type check; the integration tier runs in the `test` check and the e2e tier runs in CI, so do not run them before handing back."
     outcomes:
       done: { to: test, means: "the repro (and each rework point) is a passing test" }
   test:
     type: check
-    run: "bun install --frozen-lockfile && bun run test:fast && bun run typecheck"
-    timeout: 10m
+    run: "bun install --frozen-lockfile && bun run test && bun run test:integration && bun run typecheck"
+    timeout: 15m
     outcomes: { pass: review, fail: { to: implement, counter: test_loop } }
   review:
     type: agent

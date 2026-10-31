@@ -256,13 +256,116 @@ describe("test layout (AGENTS.md)", () => {
     expect(missing).toEqual([]);
   });
 
-  test("test:fast and test:cli split the suite: fast skips the cli and the integration and e2e tiers, and slice, story and quick checks run fast", () => {
+  test("AC1 (B7): the old split scripts are gone from package.json and from every live file", () => {
+    // spelled in pieces so this file is not itself a hit
+    const old = [["test", "fast"].join(":"), ["test", "cli"].join(":")];
     const scripts = rootScripts();
-    const cliDir = scripts["test:cli"]?.match(/^bun test \.\/(\S+)$/)?.[1];
-    const ignored = [...(scripts["test:fast"] ?? "").matchAll(/--path-ignore-patterns='(\S+)'/g)].map((m) => m[1]);
-    expect({ test: scripts.test, cliDir, ignored }).toEqual({ test: "bun test", cliDir: "packages/cli/test", ignored: ["packages/cli/**", "**/integration/**", "test/e2e/**"] });
-    const run = (wf: string) => readFileSync(join(ROOT, ".agents", "workflows", `${wf}.yaml`), "utf8").match(/^ {4}run: "(.*)"$/m)?.[1];
-    expect(["slice", "bug", "story", "quick"].map(run)).toEqual(Array(4).fill("bun install --frozen-lockfile && bun run test:fast && bun run typecheck"));
+    expect(old.filter((s) => s in scripts)).toEqual([]);
+    const exts = [...DOCS, ".ts", ".sh", ".toml"];
+    const live = [
+      join(ROOT, "package.json"),
+      join(ROOT, "AGENTS.md"),
+      join(ROOT, "README.md"),
+      join(ROOT, "CONTRIBUTING.md"),
+      ...textFiles(join(ROOT, ".agents", "workflows"), exts),
+      ...textFiles(join(ROOT, ".github"), exts),
+      ...textFiles(join(PKGS, "cli", "assets", "skills"), exts),
+      ...textFiles(join(ROOT, ".agents", "skills"), exts),
+      ...textFiles(join(ROOT, "scripts"), exts),
+      ...textFiles(join(ROOT, "test"), exts),
+      ...readdirSync(PKGS).flatMap((p) => (existsSync(join(PKGS, p, "test")) ? textFiles(join(PKGS, p, "test"), exts) : [])),
+    ];
+    const hits = live.flatMap((f) =>
+      readFileSync(f, "utf8")
+        .split("\n")
+        .flatMap((line, i) => (old.some((o) => new RegExp(`\\b${o}\\b`).test(line)) ? [`${relative(ROOT, f)}:${i + 1}`] : [])),
+    );
+    expect(hits).toEqual([]);
+  });
+
+  type Step = { type: string; run?: string; timeout?: string; instructions?: string };
+  const workflowSteps = (wf: string) =>
+    (Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", `${wf}.yaml`), "utf8")) as { steps: Record<string, Step> }).steps;
+  const DELIVERY = ["quick", "story", "slice", "bug"];
+
+  test("AC2 (B8): the test check of quick, story, slice and bug runs unit, then integration, then the type check, in 15 m", () => {
+    const checks = DELIVERY.map((wf) => ({ wf, run: workflowSteps(wf).test?.run, timeout: workflowSteps(wf).test?.timeout }));
+    expect(checks).toEqual(
+      DELIVERY.map((wf) => ({
+        wf,
+        run: "bun install --frozen-lockfile && bun run test && bun run test:integration && bun run typecheck",
+        timeout: "15m",
+      })),
+    );
+  });
+
+  test("AC3 (B9): the implement step of quick, story, slice and bug names bun run test as the loop, integration in the test check and e2e in CI", () => {
+    const says = DELIVERY.map((wf) => {
+      const text = workflowSteps(wf).implement?.instructions ?? "";
+      return {
+        wf,
+        loop: /`bun run test`[^.]*after each change/.test(text),
+        integration: /integration tier runs in the `test` check/.test(text),
+        e2e: /e2e (tier )?(runs )?in CI/.test(text),
+      };
+    });
+    expect(says).toEqual(DELIVERY.map((wf) => ({ wf, loop: true, integration: true, e2e: true })));
+  });
+
+  test("AC4 (B10): the shipped norn-implement skill asks for the fast suite after each change, slower tiers in their own check, never the full suite", () => {
+    const skill = readFileSync(join(PKGS, "cli", "assets", "skills", "norn-implement", "SKILL.md"), "utf8");
+    expect({
+      fastAfterEachChange: /fast suite after each change/.test(skill),
+      slowerTiers: /slower tiers run in their own check/i.test(skill),
+      fullSuite: /full suite/i.test(skill),
+    }).toEqual({ fastAfterEachChange: true, slowerTiers: true, fullSuite: false });
+  });
+
+  type CiStep = { name?: string; run?: string };
+  type CiJob = { needs?: string | string[]; steps: CiStep[]; strategy?: { "fail-fast"?: boolean; matrix?: { shard?: unknown[] } } };
+  const ciJobs = (file: string) => (Bun.YAML.parse(readFileSync(join(ROOT, ".github", "workflows", file), "utf8")) as { jobs: Record<string, CiJob> }).jobs;
+  const runs = (job: CiJob) => job.steps.flatMap((s) => (s.run ?? "").split("\n").map((l) => l.trim()).filter(Boolean));
+
+  test("AC5 (B11, B12): ci.yml runs unit and the type check first; integration, 3 e2e shards with fail-fast, and package need it; git-spawning jobs set an identity", () => {
+    const jobs = ciJobs("ci.yml");
+    const unit = jobs.unit;
+    expect(unit && runs(unit).filter((r) => r.startsWith("bun run"))).toEqual(["bun run test", "bun run typecheck"]);
+    const needs = (j?: CiJob) => [j?.needs ?? []].flat();
+    expect(["integration", "e2e", "package"].map((n) => ({ n, needs: needs(jobs[n]) }))).toEqual(
+      ["integration", "e2e", "package"].map((n) => ({ n, needs: ["unit"] })),
+    );
+    expect(jobs.integration && runs(jobs.integration)).toContain("bun run test:integration");
+    const e2e = jobs.e2e;
+    expect({ failFast: e2e?.strategy?.["fail-fast"], shards: e2e?.strategy?.matrix?.shard }).toEqual({ failFast: true, shards: [1, 2, 3] });
+    expect(e2e && runs(e2e)).toContain("bun run test:e2e --shard=${{ matrix.shard }}/3");
+    const identity = ["integration", "e2e", "package"].map((n) => ({
+      n,
+      name: runs(jobs[n] as CiJob).some((r) => r.startsWith("git config --global user.name")),
+      email: runs(jobs[n] as CiJob).some((r) => r.startsWith("git config --global user.email")),
+    }));
+    expect(identity).toEqual(["integration", "e2e", "package"].map((n) => ({ n, name: true, email: true })));
+  });
+
+  test("AC6 (B13): release.yml's test step runs exactly the unit tier and the type check", () => {
+    const steps = Object.values(ciJobs("release.yml")).flatMap((j) => j.steps);
+    const testStep = steps.find((s) => s.name === "Test");
+    const commands = (testStep?.run ?? "").split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("git config"));
+    expect(commands).toEqual(["bun run test", "bun run typecheck"]);
+    expect(steps.some((s) => /test:integration|test:e2e/.test(s.run ?? ""))).toBe(false);
+  });
+
+  test("AC7 (B21): AGENTS.md lists the three tier commands, hands back on the unit tier and the type check, and every path it names exists; README's test line is not all tests", () => {
+    const agents = readFileSync(join(ROOT, "AGENTS.md"), "utf8");
+    const commands = section(agents, "Commands");
+    const named = (cmd: string) => new RegExp(`^${cmd.replace(/[:]/g, "\\$&")}\\s+#`, "m").test(commands);
+    expect(["bun run test", "bun run test:integration", "bun run test:e2e"].map(named)).toEqual([true, true, true]);
+    expect(commands).toMatch(/The unit tier \(`bun run test`\) and the type check must pass before you hand work back/);
+    const paths = [...agents.matchAll(/`((?:packages|test|scripts)\/[\w./*-]+)`/g)].map((m) => (m[1] as string).replace(/\/\*[^/]*$/, ""));
+    expect(paths.length).toBeGreaterThan(0);
+    expect(paths.filter((p) => !existsSync(join(ROOT, p)))).toEqual([]);
+    const readme = readFileSync(join(ROOT, "README.md"), "utf8").split("\n").filter((l) => /^bun (run )?test\b/.test(l));
+    expect(readme.length).toBeGreaterThan(0);
+    expect(readme.filter((l) => /all tests/i.test(l))).toEqual([]);
   });
 
   test("B1, B2: the root bunfig ignores exactly the integration and e2e tiers, and the test script is exactly bun test", () => {

@@ -2,7 +2,7 @@
 # Refine and plan with a person, cut slices, approve the plan, run the slices,
 # bring the story up to date with its base, verify the whole story, describe it,
 # open the draft PR (or rewrite the body of the open one), wait for the PR's CI, and wait for a
-# person to call it ready. The local check runs test:fast; CI runs the full suite.
+# person to call it ready. The local check runs the unit and integration tiers and the type check; CI runs every tier, e2e sharded.
 # Rework found by the story-level test, QA or CI is done in the story worktree.
 # QA reports a verdict per acceptance criterion (criteria: required) and may only report the outcome
 # matching its worst verdict; `unverified` (could not check here) goes to a person at human-qa.
@@ -64,7 +64,7 @@ steps:
       done: { to: update, means: "base merged into the story branch, conflicts resolved and committed" }
   test:
     type: check
-    run: "bun install --frozen-lockfile && bun run test:fast && bun run typecheck"
+    run: "bun install --frozen-lockfile && bun run test && bun run test:integration && bun run typecheck"
     timeout: 15m
     outcomes: { pass: qa, fail: { to: implement, counter: test_loop } }
   qa:
@@ -88,6 +88,7 @@ steps:
     type: agent
     skill: norn-implement
     inputs: [spec, handoff, last_check, last_findings]
+    instructions: "Run `bun run test` (the unit tier) after each change, and the type check; the integration tier runs in the `test` check and the e2e tier runs in CI, so do not run them before handing back."
     outcomes:
       done: { to: test, means: "every rework point has a passing test" }
   describe:

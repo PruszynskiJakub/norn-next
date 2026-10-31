@@ -7,8 +7,6 @@
     "test": "bun test",
     "test:integration": "bun test --config=bunfig.integration.toml --parallel --timeout=20000",
     "test:e2e": "bun test --config=bunfig.e2e.toml --parallel --timeout=20000",
-    "test:fast": "bun test --path-ignore-patterns='packages/cli/**' --path-ignore-patterns='**/integration/**' --path-ignore-patterns='test/e2e/**'",
-    "test:cli": "bun test ./packages/cli/test",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p scripts/tsconfig.json",
     "schema:emit": "bun packages/schema/scripts/emit.ts",
     "golden": "bun scripts/golden.ts",
