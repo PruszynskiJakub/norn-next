@@ -1,8 +1,8 @@
 ---
 id: gh-118/03
 title: Tier configs and commands; cli tests into unit, integration and e2e
-depends_on: [gh-118/01, gh-118/02]
-status: planned
+depends_on: [ gh-118/01, gh-118/02 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
