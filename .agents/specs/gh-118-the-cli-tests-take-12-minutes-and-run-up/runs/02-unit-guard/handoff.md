@@ -16,7 +16,13 @@
 <!-- norn:heartbeat:end -->
 
 ## Goal
+A unit guard preload that fails a test which spawns (B4, AC1–AC4), not yet in the root bunfig (slice 07).
 
 ## Progress
+- `test/support/unit-guard.ts`: `installUnitGuard()` wraps `Bun.spawn`/`Bun.spawnSync` (node's `child_process.spawn` goes through them), throws at the call, `check()` rethrows a swallowed violation once; message names argv + test file (from the stack, relative to repo root) + `test/integration/`, never env/options.
+- `test/support/unit-guard-preload.ts`: installs it and registers a global `afterEach(check)`. Load by hand: `bun test --preload ./test/support/unit-guard-preload.ts <folder>`.
+- Self-test `test/repo/unit-guard.test.ts` (AC1–AC3, 8 tests) installs the guard per test.
+- AC4 checked by hand: a throwaway `packages/store/test/unit/x.test.ts` (swallowing the error) showed `(fail) reads the head` beside the message; the pure test passed. File removed.
 
 ## Resume
+Nothing left: report done once `bun test` and `bun run typecheck` are green.
