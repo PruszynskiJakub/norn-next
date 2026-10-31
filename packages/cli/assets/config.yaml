@@ -1,9 +1,9 @@
-# norn repo config: .agents/norn/config.yaml
+# norn repo config: .agents/norn.config.yaml
 #
 # Run `norn config` to see every setting in effect, which file set it and what it does.
 #
 # Two files take these same keys:
-#   .agents/norn/config.yaml   this file, committed: what the team agrees on
+#   .agents/norn.config.yaml   this file, committed: what the team agrees on
 #   ~/.norn/config.yaml        yours, never committed: your machine and your preferences
 # This file wins over yours, except the machine caps (max_agents, max_checks, slots),
 # which it can only lower.
@@ -24,7 +24,7 @@ remote:
 # The branch stories are cut from and PR'd into. Unset: the remote's default branch.
 # base_branch: main
 
-# Workflows in .agents/norn/workflows/. An issue label norn:wf:<name> picks another one per story.
+# Workflows in .agents/workflows/. An issue label norn:wf:<name> picks another one per story.
 # default_workflow: story
 # default_slice_workflow: slice
 

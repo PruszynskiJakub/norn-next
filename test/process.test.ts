@@ -1,13 +1,27 @@
 /** norn's own process setup: the repo's workflows, config and skills load as norn would load them (W5, SK1). */
 import { describe, expect, test } from "bun:test";
-import { lstatSync, mkdtempSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse } from "yaml";
 import { checkWorkflowLevel, validateWorkflowDefinition } from "../packages/core/src/index.ts";
-import { loadConfig, loadWorkflows, visibleSkills } from "../packages/store/src/index.ts";
+import { loadConfig, loadWorkflows, repoConfigPath, visibleSkills, workflowsDir } from "../packages/store/src/index.ts";
 
 const ROOT = join(import.meta.dir, "..");
+/**
+ * This repo stays on the old layout until a released norn can migrate it (gh-110, out of scope), and
+ * store reads only the new one: until then its config and workflows are read from a copy at the new
+ * paths. Once `.agents/norn/` is gone this is ROOT.
+ */
+const OLD_DIR = join(ROOT, ".agents", "norn");
+const CONFIG_ROOT = existsSync(OLD_DIR) ? newLayoutCopy() : ROOT;
+
+function newLayoutCopy(): string {
+  const root = mkdtempSync(join(tmpdir(), "norn-process-"));
+  cpSync(join(OLD_DIR, "config.yaml"), repoConfigPath(root));
+  cpSync(join(OLD_DIR, "workflows"), workflowsDir(root), { recursive: true });
+  return root;
+}
 const AGENTS_SKILLS = join(ROOT, ".agents", "skills");
 const CLAUDE_SKILLS = join(ROOT, ".claude", "skills");
 
@@ -24,13 +38,13 @@ function frontmatter(skill: string): Record<string, unknown> {
 
 describe("repo config", () => {
   test("loads, with triage as the default workflow", () => {
-    const loaded = loadConfig({ repoRoot: ROOT, home: mkdtempSync(join(tmpdir(), "norn-home-")) });
+    const loaded = loadConfig({ repoRoot: CONFIG_ROOT, home: mkdtempSync(join(tmpdir(), "norn-home-")) });
     expect(loaded.ok ? loaded.config.default_workflow : loaded.errors).toBe("triage");
   });
 });
 
 describe("repo workflows", () => {
-  const listing = loadWorkflows(ROOT);
+  const listing = loadWorkflows(CONFIG_ROOT);
   const claude = visibleSkills(CLAUDE_SKILLS);
 
   test("load without errors", () => {

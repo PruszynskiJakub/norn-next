@@ -1,2 +1,0 @@
-Inbox empty — no stories yet.
-Label an issue `norn` (the config's `remote.label`) and assign it to yourself, then run `norn sync`.

@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:tes
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { ConfigEntry } from "@norn/schema";
+import { repoConfigPath } from "@norn/store";
 import { type CliDeps, type CliResult } from "../src/index.ts";
 import { createHarness, FakeInteraction, type Harness } from "./harness.ts";
 import { runChecked } from "./harness.ts";
@@ -14,7 +15,7 @@ describe("norn config list and get", () => {
   beforeAll(async () => {
     h = await createHarness();
     h.write(join(h.home, "config.yaml"), "runner: { adapter: herdr }\ndefault_mode: auto\nmax_agents: 3\n");
-    h.write(join(h.root, ".agents/norn/config.yaml"), "runner: null\nmax_agents: 5\nlimits: { deadline: 30m }\n");
+    h.write(repoConfigPath(h.root), "runner: null\nmax_agents: 5\nlimits: { deadline: 30m }\n");
   });
   afterAll(() => h.cleanup());
 
@@ -72,7 +73,7 @@ describe("norn config list and get", () => {
 describe("norn config set and unset", () => {
   let h: Harness;
   const userFile = () => join(h.home, "config.yaml");
-  const repoFile = () => join(h.root, ".agents/norn/config.yaml");
+  const repoFile = () => repoConfigPath(h.root);
   const read = (path: string) => {
     try {
       return readFileSync(path, "utf8");
@@ -101,7 +102,7 @@ describe("norn config set and unset", () => {
     expect(await get("default_mode")).toMatchObject([{ value: "auto", source: "user" }]);
   });
 
-  test("--repo writes .agents/norn/config.yaml (B62)", async () => {
+  test("--repo writes the repo config file (B62)", async () => {
     const r = await h.norn("config", "set", "default_mode", "auto", "--repo");
     expect(r.exit).toBe(0);
     expect(r.stdout).toContain("default_mode");
@@ -125,7 +126,7 @@ describe("norn config set and unset", () => {
     const r = await norn({ interaction: term }, "config", "set", "default_mode", "auto");
     expect(r.exit).toBe(0);
     expect(term.picks).toMatchObject([
-      { question: "Write to user (~/.norn/config.yaml) or repo (.agents/norn/config.yaml)?", choices: [{ value: "user" }, { value: "repo" }] },
+      { question: "Write to user (~/.norn/config.yaml) or repo (.agents/norn.config.yaml)?", choices: [{ value: "user" }, { value: "repo" }] },
     ]);
     expect(read(repoFile())).toBe("default_mode: auto\n");
     expect(read(userFile())).toBeNull();
@@ -283,5 +284,13 @@ describe("norn config set and unset", () => {
     expect(read(userFile())).toBe("");
     const unknown = await h.norn("config", "unset", "nope", "--user", "--json");
     expect(unknown).toMatchObject({ exit: 3, value: { code: "unknown_key" } });
+  });
+
+  test("trace.retain: a machine setting, 14d by default (B23, D11)", async () => {
+    const r = await h.norn("config", "get", "trace", "--json");
+    expect(r.exit).toBe(0);
+    expect((r.value as { entries: Array<ConfigEntry & { meaning: string }> }).entries).toEqual([
+      expect.objectContaining({ key: "trace.retain", value: "14d", source: "built-in", group: "machine", meaning: expect.stringContaining("norn tidy") }),
+    ]);
   });
 });

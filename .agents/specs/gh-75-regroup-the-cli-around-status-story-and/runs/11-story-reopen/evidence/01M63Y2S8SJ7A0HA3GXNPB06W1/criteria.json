@@ -1,8 +1,0 @@
-[
-  { "id": "AC1", "verdict": "pass", "evidence": "AC1-AC5-tests.md, story-reopen-tests.txt, AC6.md (one 'norn: gh-7 reopened' commit, story.md status: active, claim tester@box, 01 still at review)" },
-  { "id": "AC2", "verdict": "pass", "evidence": "AC1-AC5-tests.md, AC6.md (after 2 ticks: gh-7/02 'implement: reopened' under Unblock, 0 launches; after run rerun: implement #2 running)" },
-  { "id": "AC3", "verdict": "pass", "evidence": "AC1-AC5-tests.md, story-reopen-tests.txt" },
-  { "id": "AC4", "verdict": "pass", "evidence": "AC4.md (reopen does not merge base; build stuck reopened → rerun → done → git:update merged 'Update gh-7 from main', no failed decisions), AC4-control.md, story-reopen-tests.txt" },
-  { "id": "AC5", "verdict": "pass", "evidence": "AC1-AC5-tests.md, story-reopen-tests.txt" },
-  { "id": "AC6", "verdict": "pass", "evidence": "AC6.md: status and story view before close, after close, right after reopen, after 2 ticks, after run rerun (scenario script qa-scenarios.test.ts)" }
-]

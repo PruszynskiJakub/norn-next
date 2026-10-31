@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { RunnerPort } from "@norn/core";
 import { ulid } from "@norn/schema";
-import { acquireTickLock, appendReceipt, readState } from "@norn/store";
+import { acquireTickLock, appendReceipt, readState, repoConfigPath, workflowsDir } from "@norn/store";
 import { type CliDeps, type CliResult, type TickReport } from "../src/index.ts";
 import { createHarness, FakeInteraction, FakeRunner, type Harness, hostEnv, issue, sh } from "./harness.ts";
 import { runChecked } from "./harness.ts";
@@ -141,9 +141,9 @@ afterAll(() => h.cleanup());
 describe("two clones hand a story over through git (§19.3, T5, T6)", () => {
   test("clone A: intake → plan → slice implement asks a question and parks", async () => {
     expect((await A.norn("init")).exit).toBe(0);
-    h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-    h.write(join(h.root, ".agents/norn/workflows/mini.yaml"), MINI);
-    h.write(join(h.root, ".agents/norn/workflows/slice.yaml"), SLICE);
+    h.write(repoConfigPath(h.root), CONFIG);
+    h.write(join(workflowsDir(h.root), "mini.yaml"), MINI);
+    h.write(join(workflowsDir(h.root), "slice.yaml"), SLICE);
     h.git(["add", "-A"]);
     h.git(["commit", "-q", "-m", "norn init"]);
     h.git(["push", "-q", "origin", "main"]);
@@ -386,8 +386,8 @@ describe("story close asks at the terminal (B36)", () => {
 
   test("y closes the story as --yes does", async () => {
     expect((await h2.norn("init")).exit).toBe(0);
-    h2.write(join(h2.root, ".agents/norn/config.yaml"), CONFIG);
-    h2.write(join(h2.root, ".agents/norn/workflows/mini.yaml"), MINI);
+    h2.write(repoConfigPath(h2.root), CONFIG);
+    h2.write(join(workflowsDir(h2.root), "mini.yaml"), MINI);
     h2.git(["add", "-A"]);
     h2.git(["commit", "-q", "-m", "norn init"]);
     h2.git(["push", "-q", "origin", "main"]);

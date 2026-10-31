@@ -1,4 +1,0 @@
-[
-  { "id": "AC1", "verdict": "pass", "evidence": "/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-02/AC1.md, /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-02/AC1-cli-diff.txt, /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-02/out-base.txt, /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-02/out-head.txt, /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-02/bun-test.txt" },
-  { "id": "AC2", "verdict": "pass", "evidence": "/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-02/AC2.md" }
-]

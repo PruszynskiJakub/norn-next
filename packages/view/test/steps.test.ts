@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { NumberedReceipt } from "@norn/core";
 import type { Receipt, UnitState } from "@norn/schema";
+import { baseCacheDir, bindNornHome, machineDir } from "@norn/store";
 import { buildStepTimeline, criteriaSummary, formatDuration, formatStepTimeline, loadTraceView, type StepRow, type TraceView } from "../src/index.ts";
 
 const FIX = join(import.meta.dir, "fixtures/gh-1");
@@ -23,9 +24,10 @@ function seed(opts: { trace?: boolean } = {}): string {
   const repo = mkdtempSync(join(tmpdir(), "norn-steps-"));
   dirs.push(repo);
   cpSync(join(FIX, "spec"), join(repo, SPEC), { recursive: true });
+  bindNornHome(repo, join(repo, ".home"));
   if (opts.trace !== false) {
-    mkdirSync(join(repo, ".agents/norn/trace"), { recursive: true });
-    cpSync(join(FIX, "trace.jsonl"), join(repo, ".agents/norn/trace/2026-10-23.jsonl"));
+    mkdirSync(machineDir(repo), { recursive: true });
+    cpSync(join(FIX, "trace.jsonl"), join(machineDir(repo), "2026-10-23.jsonl"));
   }
   return repo;
 }
@@ -267,8 +269,8 @@ describe("pure pieces", () => {
   });
 
   test("F36: a trace read from the base-branch cache says so", () => {
-    const v = { unit: "gh-9", title: "x", status: "done", step: "$done", intake_at: null, done_at: null, merged_at: null, totals: { wall_clock_ms: null, by_type: {}, human_wait_ms: 0, merge_wait_ms: null }, steps: [], units: [], hidden_events: 0, records: { source: "base_cache", root: "/repo/.agents/norn/trace/base/abc", ref: "refs/remotes/origin/main" } } as unknown as TraceView;
-    expect(formatStepTimeline(v)).toContain("records: no worktree — paths below are a cached copy of origin/main (/repo/.agents/norn/trace/base/abc), refreshed when origin/main moves");
+    const v = { unit: "gh-9", title: "x", status: "done", step: "$done", intake_at: null, done_at: null, merged_at: null, totals: { wall_clock_ms: null, by_type: {}, human_wait_ms: 0, merge_wait_ms: null }, steps: [], units: [], hidden_events: 0, records: { source: "base_cache", root: join(baseCacheDir("/repo"), "abc"), ref: "refs/remotes/origin/main" } } as unknown as TraceView;
+    expect(formatStepTimeline(v)).toContain(`records: no worktree — paths below are a cached copy of origin/main (${join(baseCacheDir("/repo"), "abc")}), refreshed when origin/main moves`);
   });
 });
 

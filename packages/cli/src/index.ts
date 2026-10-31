@@ -13,7 +13,7 @@ export { type Observed, observe, type ObserveOptions, type StoryLoc, type SyncMo
 export { type Interaction, type InteractionChoice, isAgentSession, terminalInteraction } from "./runtime/interaction.ts";
 export { releaseHeldClaims, releaseStory } from "./runtime/release.ts";
 export { runShell, tailLines } from "./runtime/shell.ts";
-export { replayInputs, runTick, type TickOptions, type TickReport, traceRecord } from "./runtime/tick.ts";
+export { runTick, type TickOptions, type TickReport, traceRecord } from "./runtime/tick.ts";
 export { type AssetsSources, assetsDir, resolveAssetsDir } from "./runtime/assets.ts";
 export { agentSkills, bundledSkills, repoWorkflows } from "./runtime/workflows.ts";
 export { buildPorts, defaultRegistry } from "./wiring.ts";

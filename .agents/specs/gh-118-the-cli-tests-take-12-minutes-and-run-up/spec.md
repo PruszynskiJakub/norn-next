@@ -188,7 +188,7 @@ Baseline measured while planning (maintainer's Mac, bun 1.3.13): everything outs
 - **D11 Release.** The release build's test step runs `bun run test` and the typecheck, and nothing else.
 - **D12 Golden and transcripts.** The golden script harvests from the harness test files in cli integration and in `test/e2e/`, and runs each with its tier's config, so the root ignore patterns do not hide them. The corpus stays at core's test root (golden.test is unit). Transcripts and snapshots move to `test/e2e/transcripts/` and `test/e2e/observe-snapshots/`. The documented rewrite becomes `NORN_TRANSCRIPT_UPDATE=1 bun run test:e2e <file>`.
 - **D13 Banned imports in unit tests (B15).** Banned: the cli harness, plus the transcript and observe snapshot helpers, which import it, and store's git functions. Fake herdr and the golden harvest stay allowed, because they are pure. Amend B15 to name the banned list instead of "the shared test helpers".
-- **D14 B7 lint scope.** Live files only: package scripts, AGENTS.md, README, CONTRIBUTING, `.agents/norn/workflows`, `.github`, skill sources and copies, `scripts/`, and tests. Spec folders and `docs/audit-*` are records of past work and are exempt, as in the removed-command lint.
+- **D14 B7 lint scope.** Live files only: package scripts, AGENTS.md, README, CONTRIBUTING, `.agents/workflows`, `.github`, skill sources and copies, `scripts/`, and tests. Spec folders and `docs/audit-*` are records of past work and are exempt, as in the removed-command lint.
 
 ### Testing decisions
 

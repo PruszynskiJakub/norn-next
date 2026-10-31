@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { herdr, proc } from "@norn/adapters";
 import { AUTO_PROMPT, type Inbox } from "@norn/core";
 import { type Receipt, type UnitState, ulid } from "@norn/schema";
-import { appendTrace } from "@norn/store";
+import { appendHookTrace, repoConfigPath, workflowsDir } from "@norn/store";
 import type { TickReport } from "../src/index.ts";
 import { withNornOnPath } from "../src/runtime/shim.ts";
 import { runCli } from "../src/index.ts";
@@ -72,8 +72,8 @@ const receipts = (h: Harness): Receipt[] =>
 
 async function boot(h: Harness): Promise<void> {
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-  h.write(join(h.root, ".agents/norn/workflows/solo.yaml"), SOLO);
+  h.write(repoConfigPath(h.root), CONFIG);
+  h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn"]);
   h.git(["push", "-q", "origin", "main"]);
@@ -307,7 +307,7 @@ describe("R9.1: launch prompt not received (acceptance 12)", () => {
   test("SessionStart without a turn start: re-sent once after 60 s, then silent with the launch rule and an inbox line", async () => {
     const st = await untilRunning(h);
     const runId = st.run?.run_id as string;
-    appendTrace(h.root, { type: "hook", id: ulid(h.clock.now()), fact: { event: "session_start", at: h.clock.iso(), agent: "claude", native: "SessionStart", cwd: wt(h), story: "gh-9", run_id: runId } });
+    appendHookTrace(h.root, { story: "gh-9" }, { type: "hook", id: ulid(h.clock.now()), fact: { event: "session_start", at: h.clock.iso(), agent: "claude", native: "SessionStart", cwd: wt(h), story: "gh-9", run_id: runId } });
     h.clock.advance(30_000);
     expect(acted(await h.tick())).toEqual([]);
     h.clock.advance(31_000);

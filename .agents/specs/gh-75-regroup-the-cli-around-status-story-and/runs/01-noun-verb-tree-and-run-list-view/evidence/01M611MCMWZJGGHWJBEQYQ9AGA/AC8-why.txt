@@ -1,4 +1,0 @@
-$ norn run view gh-5 --why
-{"unit":"gh-5","tick_id":"03PGFNSTZ04P8GWQH5JBFN85AK","at":"2099-01-15T10:13:00.000Z","rule":"unit.parked.gate","action":"noop","reason":"Look at it","trigger":{"source":"fact","kind":"unit.parked.gate","reason":"Look at it"},"result":{"ok":true},"facts":{"claim":"mine","status":"parked","step":"review","attempt":1,"park":{"kind":"gate","reason":"Look at it","since":"2099-01-15T10:05:00.000Z"},"counters":{"loop":0},"unapplied":[],"errors":[]},"decision":{"kind":"noop","unit":{"story":"gh-5","slice":null,"dir":"_story","key":"gh-5"},"rule":"unit.parked.gate","reason":"Look at it"},"replay":{"matches":true,"all_match":true,"rule":"unit.parked.gate"}}
-[exit 0]
-

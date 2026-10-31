@@ -1,3 +1,0 @@
-#!/bin/sh
-echo "herdr $*" >> /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75/herdr-calls.log
-exec /opt/homebrew/bin/herdr "$@"

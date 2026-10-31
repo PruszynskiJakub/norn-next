@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ulid } from "@norn/schema";
-import { appendTrace } from "@norn/store";
+import { appendHookTrace, pendingRecordsPath, repoConfigPath, workflowsDir } from "@norn/store";
 import type { TickReport } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
 
@@ -44,8 +44,8 @@ describe("audit: runtime", () => {
   beforeAll(async () => {
     h = await createHarness();
     expect((await h.norn("init")).exit).toBe(0);
-    h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-    h.write(join(h.root, ".agents/norn/workflows/solo.yaml"), SOLO);
+    h.write(repoConfigPath(h.root), CONFIG);
+    h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
     h.git(["add", "-A"]);
     h.git(["commit", "-q", "-m", "norn"]);
     h.git(["push", "-q", "origin", "main"]);
@@ -72,7 +72,7 @@ describe("audit: runtime", () => {
 
   test("B2: an answer to a gone session resumes the agent session with the answer as the prompt", async () => {
     const st = h.state(runs());
-    appendTrace(h.root, { type: "hook", id: ulid(h.clock.now()), fact: { event: "turn_end", at: h.clock.iso(), agent: "claude", native: "Stop", cwd: wt(), story: "gh-4", run_id: st?.run?.run_id as string, agent_session_id: "cs-1" } });
+    appendHookTrace(h.root, { story: "gh-4" }, { type: "hook", id: ulid(h.clock.now()), fact: { event: "turn_end", at: h.clock.iso(), agent: "claude", native: "Stop", cwd: wt(), story: "gh-4", run_id: st?.run?.run_id as string, agent_session_id: "cs-1" } });
     h.runner.pane = { alive: false, state: "unknown", since: null };
     h.report(runs(), "answer", { answer: "use github oauth" }, "human");
     step();
@@ -117,7 +117,7 @@ describe("audit: runtime", () => {
     step();
     const s = await h.norn("sync");
     expect(acted(s.value as TickReport)).toEqual(["gh-4 cleanup_merged_story"]);
-    const records = join(h.root, ".agents/norn/trace/records.json");
+    const records = pendingRecordsPath(h.root);
     expect(JSON.parse(readFileSync(records, "utf8")).records).toMatchObject([{ story: "gh-4", attempts: 1 }]);
 
     // the merge reaches the base branch on the remote later

@@ -7,6 +7,7 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
 import type { PersonOpenSpec } from "@norn/core";
+import { repoConfigPath, workflowsDir } from "@norn/store";
 import type { CliDeps } from "../src/index.ts";
 import { createHarness, FakeInteraction, type Harness, issue } from "./harness.ts";
 import { runChecked } from "./harness.ts";
@@ -60,10 +61,10 @@ let h: Harness;
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-  h.write(join(h.root, ".agents/norn/workflows/story.yaml"), STORY);
-  h.write(join(h.root, ".agents/norn/workflows/gatefirst.yaml"), GATE_FIRST);
-  h.write(join(h.root, ".agents/norn/workflows/checkfirst.yaml"), CHECK_FIRST);
+  h.write(repoConfigPath(h.root), CONFIG);
+  h.write(join(workflowsDir(h.root), "story.yaml"), STORY);
+  h.write(join(workflowsDir(h.root), "gatefirst.yaml"), GATE_FIRST);
+  h.write(join(workflowsDir(h.root), "checkfirst.yaml"), CHECK_FIRST);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);
   h.git(["push", "-q", "origin", "main"]);

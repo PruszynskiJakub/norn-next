@@ -8,7 +8,7 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { atomicWrite, installSkills, linkSkills, readText, repoConfigPath, workflowsDir } from "@norn/store";
+import { atomicWrite, installSkills, linkSkills, readText, REPO_CONFIG_FILE, repoConfigPath, WORKFLOWS_DIR, workflowsDir } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { rendered } from "../output.ts";
@@ -17,8 +17,8 @@ import { detectTestCommand, gitRemoteUrl, TEMPLATE_TEST_COMMAND, withTestCommand
 import { bundledSkills } from "../runtime/workflows.ts";
 import { cmd } from "@norn/core";
 
-/** Paths that must never be committed (§7.1). */
-const IGNORED = [".agents/norn/trace/", ".env.norn", ".norn-unit"];
+/** Paths that must never be committed (§7.1); the machine-local files live outside the checkout (B5). */
+const IGNORED = [".env.norn", ".norn-unit"];
 
 function ensureGitignore(root: string): string[] {
   const path = join(root, ".gitignore");
@@ -82,7 +82,7 @@ function formatInit(r: InitReport): string {
   const count = (n: number, what: string) => `${n} ${what}`;
   const out = [`norn init in ${r.root}`, ""];
   const row = (label: string, text: string) => out.push(`  ${label.padEnd(15)} ${text}`);
-  row("config", `.agents/norn/config.yaml ${r.config === "created" ? "created" : "kept (exists)"}`);
+  row("config", `${REPO_CONFIG_FILE} ${r.config === "created" ? "created" : "kept (exists)"}`);
   row("workflows", [r.workflows.created.length ? `created ${r.workflows.created.join(", ")}` : "", r.workflows.kept.length ? `kept ${r.workflows.kept.join(", ")}` : ""].filter(Boolean).join("; ") || "none");
   const sk = r.skills;
   row("skills", `${rel(sk.dir)}: ${sk.updated.length ? `updated ${sk.updated.join(", ")}` : "up to date"} (${count(sk.updated.length + sk.unchanged.length, "skills")})`);
@@ -108,8 +108,8 @@ function nextSteps(r: InitReport, changed: boolean): string[] {
   const steps: string[] = [];
   if (!r.remote.url) steps.push(`Add the remote norn syncs issues from and pushes branches to: \`git remote add ${r.remote.git_remote} <url>\`.`);
   const tc = r.test_command;
-  if (tc && !tc.detected_from) steps.push(`Set your test command: the \`test\` steps in .agents/norn/workflows/ run \`${tc.command}\` — change \`run:\` there.`);
-  else if (tc) steps.push(`Check the test command \`${tc.command}\` in the \`test\` steps of .agents/norn/workflows/ (detected from ${tc.detected_from}).`);
+  if (tc && !tc.detected_from) steps.push(`Set your test command: the \`test\` steps in ${WORKFLOWS_DIR}/ run \`${tc.command}\` — change \`run:\` there.`);
+  else if (tc) steps.push(`Check the test command \`${tc.command}\` in the \`test\` steps of ${WORKFLOWS_DIR}/ (detected from ${tc.detected_from}).`);
   if (changed) {
     // each agent folder whole (`.claude`, not `.claude/settings.json`): skills and hooks live there
     const top = (p: string) => rel(p).split("/")[0] as string;

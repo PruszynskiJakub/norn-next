@@ -3,8 +3,8 @@
  * (`refs/remotes/<remote>/<base>`), never the person's possibly stale local `main`. A story whose
  * worktree was removed after its PR merged is still listed from here.
  *
- * The `.agents/specs/` subtree at the ref is materialized once per tree id into the gitignored
- * trace dir (`.agents/norn/trace/base/<tree>/`) so the file-based snapshot readers can load it;
+ * The `.agents/specs/` subtree at the ref is materialized once per tree id into the checkout's
+ * machine dir (`<norn home>/repos/<id>/base/<tree>/`) so the file-based snapshot readers can load it;
  * a new tree id (the base moved) replaces the old copy. Read-only input: nothing writes there.
  */
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";

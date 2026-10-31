@@ -1,8 +1,0 @@
-error: pid 43998 has ps stat "", not Z: this platform cannot make a zombie for the test
-      at <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-75-regroup-the-cli-around-status-story-and--02-one-module-for-printed-commands/packages/adapters/test/contract/process.ts:82:46)
-(fail) ProcessPort contract: process adapter (createProcessPort) > a zombie is not alive (K3) [1143.21ms]
-
- 1228 pass
- 1 fail
- 16 snapshots, 23480 expect() calls
-Ran 1229 tests across 82 files. [410.36s]

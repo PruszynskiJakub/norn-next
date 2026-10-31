@@ -1,6 +1,0 @@
-integrate#1: conflict
-story is ancestor of slice HEAD: yes
-integrate#2: conflict again (RED):
-CONFLICT (content): Merge conflict in f
-Could not apply 8826ec0... # slice
-git version 2.50.1 (Apple Git-155)

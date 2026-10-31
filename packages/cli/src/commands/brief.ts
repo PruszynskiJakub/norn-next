@@ -10,7 +10,7 @@ import { readdirSync } from "node:fs";
 import { basename, join } from "node:path";
 import { cmd, currentRun, cursorStep, type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, standingReport, storyRulings, storyWorktreePath } from "@norn/core";
 import { type AgentStep, type ProcessIdentity, type ReceiptOf, storyBranch, ulid } from "@norn/schema";
-import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readHookFacts, readText, writeBriefing, readRemoteCache, storyFile, traceEvent } from "@norn/store";
+import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readText, readUnitHooks, writeBriefing, readRemoteCache, storyFile, traceEvent } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
@@ -45,7 +45,8 @@ async function agentProcess(ctx: Context, proc: ProcessPort): Promise<ProcessIde
 /** Agent session id and transcript from the hooks that fired in this worktree just before (A2). */
 function recentSession(ctx: Context, s: UnitSession): { agent_session_id?: string; transcript?: string; agent?: string } {
   const since = new Date(ctx.clock.now() - 3_600_000).toISOString();
-  const facts = readHookFacts(s.root, since).filter((f) => f.cwd === s.worktree || f.cwd.startsWith(`${s.worktree}/`));
+  const own = readUnitHooks(s.root, [{ story: s.unit.story, slice: s.unit.slice }], since)[0] ?? [];
+  const facts = own.map((e) => e.fact).filter((f) => f.cwd === s.worktree || f.cwd.startsWith(`${s.worktree}/`));
   const last = facts.findLast((f) => f.agent_session_id);
   const id = last?.agent_session_id ?? ctx.env.NORN_AGENT_SESSION_ID;
   const out: { agent_session_id?: string; transcript?: string; agent?: string } = {};

@@ -88,6 +88,19 @@ export const LimitDefaults = Type.Object(
 );
 export type LimitDefaults = Static<typeof LimitDefaults>;
 
+export const TraceConfig = Type.Object(
+  {
+    /**
+     * D11: how much trace `norn tidy` keeps, a duration like `14d`. A plain string here: the form and
+     * the 14-day minimum are checked where the value is used (`norn tidy` refuses, `norn doctor`
+     * warns), so a bad value never fails config loading.
+     */
+    retain: Type.String({ minLength: 1, description: "Duration like 14d, at least 14d (checked by norn tidy and norn doctor)" }),
+  },
+  { additionalProperties: false },
+);
+export type TraceConfig = Static<typeof TraceConfig>;
+
 /** Fully resolved configuration (both layers merged over defaults). */
 export const ResolvedConfig = Type.Object(
   {
@@ -112,12 +125,14 @@ export const ResolvedConfig = Type.Object(
     watch_interval: Duration,
     claim: Type.Object({ lease: Duration, renew: Duration }, { additionalProperties: false }),
     limits: LimitDefaults,
+    /** machine-local trace retention (D11) */
+    trace: TraceConfig,
   },
   { additionalProperties: false },
 );
 export type ResolvedConfig = Static<typeof ResolvedConfig>;
 
-/** One config layer (`~/.norn/config.yaml` or `.agents/norn/config.yaml`): everything optional. */
+/** One config layer (`~/.norn/config.yaml` or `.agents/norn.config.yaml`): everything optional. */
 export const ConfigLayer = Type.Object(
   {
     $schema: Type.Optional(Type.String()),
@@ -136,6 +151,7 @@ export const ConfigLayer = Type.Object(
     watch_interval: Type.Optional(Duration),
     claim: Type.Optional(Type.Partial(Type.Object({ lease: Duration, renew: Duration }), { additionalProperties: false })),
     limits: Type.Optional(Type.Partial(LimitDefaults, { additionalProperties: false })),
+    trace: Type.Optional(Type.Partial(TraceConfig, { additionalProperties: false })),
   },
   { $id: "https://norn.dev/schema/config.json", title: "norn config layer", additionalProperties: false },
 );
@@ -161,6 +177,7 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
   watch_interval: "30s",
   claim: { lease: "10m", renew: "3m" },
   limits: { deadline: "60m", nudges: 2, retries: 1, stalled: "15m", attended_wait: "2m" },
+  trace: { retain: "14d" },
 };
 
 const minDefined = (a: number, b: number | undefined) => (b === undefined ? a : Math.min(a, b));
@@ -182,6 +199,7 @@ function layer(base: ResolvedConfig, l: ConfigLayer): ResolvedConfig {
     watch_interval: l.watch_interval ?? base.watch_interval,
     claim: { ...base.claim, ...l.claim },
     limits: { ...base.limits, ...l.limits },
+    trace: { ...base.trace, ...l.trace },
   };
 }
 
@@ -225,6 +243,7 @@ const GROUP: Record<keyof ResolvedConfig, ConfigGroup> = {
   max_checks: "machine",
   slots: "machine",
   notifiers: "machine",
+  trace: "machine",
   agents: "person",
   default_agent: "person",
   default_mode: "person",
@@ -238,7 +257,7 @@ const GROUP: Record<keyof ResolvedConfig, ConfigGroup> = {
 };
 
 /** Keys whose layers merge key by key (`agents` per agent name), so each child is its own entry. */
-const MERGED = new Set<keyof ResolvedConfig>(["agents", "remote", "slots", "claim", "limits"]);
+const MERGED = new Set<keyof ResolvedConfig>(["agents", "remote", "slots", "claim", "limits", "trace"]);
 
 function equal(a: unknown, b: unknown): boolean {
   if (a === b) return true;

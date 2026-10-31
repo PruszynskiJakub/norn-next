@@ -1,12 +1,13 @@
 /**
- * O5: every tick trace records the norn that wrote it (`norn_version`), and `norn why` on a tick
+ * O5: every tick trace records the norn that wrote it (`norn_version`), and `norn run view --why` on a tick
  * another version recorded still replays and diffs it, labelled `recorded by norn <X>`, with the
  * same exit code as for a tick this version recorded.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type TickTrace, validate } from "@norn/schema";
+import { repoConfigPath, machineDir as machineDirOf, workflowsDir } from "@norn/store";
 import { version } from "../package.json";
 import { createHarness, type Harness, issue } from "./harness.ts";
 
@@ -30,21 +31,21 @@ notifiers: []
 `;
 
 let h: Harness;
-const traceDir = () => join(h.root, ".agents/norn/trace");
+const machineDir = () => machineDirOf(h.root);
 
 function ticks(): TickTrace[] {
-  return readdirSync(traceDir())
+  return readdirSync(machineDir())
     .filter((f) => f.endsWith(".jsonl"))
     .sort()
-    .flatMap((f) => readFileSync(join(traceDir(), f), "utf8").split("\n").filter(Boolean))
+    .flatMap((f) => readFileSync(join(machineDir(), f), "utf8").split("\n").filter(Boolean))
     .map((l) => JSON.parse(l) as { type: string })
     .filter((e): e is TickTrace => e.type === "tick");
 }
 
 /** Rewrite one tick record in the trace (as an older norn, or an edited trace, would have left it). */
 function editTick(tickId: string, edit: (t: TickTrace) => void): void {
-  for (const f of readdirSync(traceDir()).filter((n) => n.endsWith(".jsonl"))) {
-    const path = join(traceDir(), f);
+  for (const f of readdirSync(machineDir()).filter((n) => n.endsWith(".jsonl"))) {
+    const path = join(machineDir(), f);
     const lines = readFileSync(path, "utf8").split("\n");
     const out = lines.map((l) => {
       if (!l) return l;
@@ -62,8 +63,8 @@ type Why = { tick_id: string; rule: string; replay: { matches: boolean; rule: st
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-  h.write(join(h.root, ".agents/norn/workflows/ship.yaml"), WORKFLOW);
+  h.write(repoConfigPath(h.root), CONFIG);
+  h.write(join(workflowsDir(h.root), "ship.yaml"), WORKFLOW);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn"]);
   h.git(["push", "-q", "origin", "main"]);
@@ -125,5 +126,46 @@ describe("norn_version on tick traces (O5)", () => {
     expect(v.replay.matches).toBe(false);
     expect(v.replay.action).toBeDefined();
     expect(v.replay.label).toBe(`recorded by norn 0.0.1, replayed by norn ${version}`);
+  });
+});
+
+describe("why on a tick the trace no longer keeps (B20, D10)", () => {
+  const DAY = 86_400_000;
+  /** A ulid of time `ms` exactly: `ulid()` is monotonic per process, so it never goes back 40 days. */
+  const ulidAt = (ms: number) => {
+    const A = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+    let time = "";
+    for (let t = ms, i = 0; i < 10; i++, t = Math.floor(t / 32)) time = A[t % 32] + time;
+    return `${time}${"0".repeat(16)}`;
+  };
+
+  test("a tick older than the window whose day is gone is refused as tick_pruned, pointing at a newer tick", async () => {
+    const old = ulidAt(h.clock.now() - 40 * DAY);
+    const r = await h.norn("run", "view", "gh-3", "--why", "--tick", old, "--json");
+    expect(r.exit).toBe(3);
+    expect(r.value).toMatchObject({ code: "tick_pruned", error: `tick ${old} is older than the trace retained (14d)`, do_instead: "norn run list gh-3" });
+  });
+
+  test("the window is trace.retain's", async () => {
+    h.write(join(h.home, "config.yaml"), "trace: { retain: 60d }\n");
+    try {
+      const old = ulidAt(h.clock.now() - 70 * DAY);
+      expect((await h.norn("run", "view", "gh-3", "--why", "--tick", old, "--json")).value).toMatchObject({ code: "tick_pruned", error: `tick ${old} is older than the trace retained (60d)` });
+      // within the window a tick that is not found is just not in the trace
+      expect((await h.norn("run", "view", "gh-3", "--why", "--tick", ulidAt(h.clock.now() - 40 * DAY), "--json")).value).toMatchObject({ code: "no_tick" });
+    } finally {
+      h.write(join(h.home, "config.yaml"), "");
+    }
+  });
+
+  test("an unknown tick within the window, or whose day is still kept, is not called pruned", async () => {
+    expect((await h.norn("run", "view", "gh-3", "--why", "--tick", ulidAt(h.clock.now() - DAY), "--json")).value).toMatchObject({ code: "no_tick" });
+    const day = new Date(h.clock.now() - 40 * DAY).toISOString().slice(0, 10);
+    h.write(join(machineDir(), `${day}.jsonl`), "\n");
+    try {
+      expect((await h.norn("run", "view", "gh-3", "--why", "--tick", ulidAt(h.clock.now() - 40 * DAY), "--json")).value).toMatchObject({ code: "no_tick" });
+    } finally {
+      rmSync(join(machineDir(), `${day}.jsonl`));
+    }
   });
 });

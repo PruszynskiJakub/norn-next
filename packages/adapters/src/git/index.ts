@@ -301,6 +301,14 @@ export function createGit(opts: GitOptions = {}): GitPort {
     async untrack(cwd, paths) {
       await must(cwd, ["rm", "-q", "--cached", "--ignore-unmatch", "--", ...paths]);
     },
+    async move(cwd, from, to) {
+      if (!(await must(cwd, ["ls-files", "-z", "--", from]))) return false;
+      await must(cwd, ["mv", "--", from, to]);
+      return true;
+    },
+    async stage(cwd, paths) {
+      await must(cwd, ["add", "--", ...paths]);
+    },
 
     async branchExists(cwd, branch, where = "local", remote = "origin") {
       if (where === "local") return (await run(cwd, ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`])).code === 0;

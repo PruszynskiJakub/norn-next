@@ -5,6 +5,7 @@
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
+import { repoConfigPath, workflowsDir } from "@norn/store";
 import type { CliDeps, CliResult } from "../src/index.ts";
 import { createHarness, FakeInteraction, type Harness, issue } from "./harness.ts";
 import { runChecked } from "./harness.ts";
@@ -73,10 +74,10 @@ const unitOf = (r: CliResult) => (r.value as { unit?: string }).unit;
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-  h.write(join(h.root, ".agents/norn/workflows/gated.yaml"), GATED);
-  h.write(join(h.root, ".agents/norn/workflows/sliced.yaml"), SLICED);
-  h.write(join(h.root, ".agents/norn/workflows/sliceqa.yaml"), SLICE_QA);
+  h.write(repoConfigPath(h.root), CONFIG);
+  h.write(join(workflowsDir(h.root), "gated.yaml"), GATED);
+  h.write(join(workflowsDir(h.root), "sliced.yaml"), SLICED);
+  h.write(join(workflowsDir(h.root), "sliceqa.yaml"), SLICE_QA);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);
   h.git(["push", "-q", "origin", "main"]);

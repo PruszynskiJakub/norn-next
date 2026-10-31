@@ -12,9 +12,8 @@
  * any workspace) — it shows the repository the last cockpit ran in on this machine (`~/.norn/cockpit.json`).
  */
 import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { parseDuration } from "@norn/schema";
-import { readCockpitFile, writeCockpitFile } from "@norn/store";
+import { isNornRepo, readCockpitFile, writeCockpitFile } from "@norn/store";
 import { type CockpitModel, cockpitModel, inboxItemsInOrder, type ProjectView, withInput } from "@norn/view";
 import { opt, type ParsedArgs } from "../command.ts";
 import { Context } from "../context.ts";
@@ -83,7 +82,7 @@ async function located(ctx: Context): Promise<Context> {
   } catch (e) {
     return elsewhere(e);
   }
-  if (existsSync(join(ctx.root, ".agents", "norn")) || !last) return ctx;
+  if (isNornRepo(ctx.root) || !last) return ctx;
   return elsewhere(null);
 }
 

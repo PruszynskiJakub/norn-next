@@ -1,5 +1,5 @@
 /**
- * Repo workflows for decide (W1, W5): every `.agents/norn/workflows/*` file parsed, schema- and
+ * Repo workflows for decide (W1, W5): every `.agents/workflows/*` file parsed, schema- and
  * graph-validated (incl. that each referenced skill is installed for its agent), with its exact text for pinning (S7).
  */
 import { readdirSync } from "node:fs";
@@ -36,6 +36,14 @@ export function agentSkills(agents: Record<string, AgentAdapter>, root: string):
     }
   }
   return out;
+}
+
+/**
+ * W5 (D7): the repo workflows validated exactly as a tick validates them, against the skills each
+ * configured agent can see. The one validator observe and `norn doctor` share; never copy its rules.
+ */
+export function checkedRepoWorkflows(listing: WorkflowListing, root: string, config: { default_agent: string }, agents: Record<string, AgentAdapter>): RepoWorkflows {
+  return repoWorkflows(listing, { default_agent: config.default_agent, visible: agentSkills(agents, root) });
 }
 
 export function repoWorkflows(listing: WorkflowListing, skills: { default_agent: string; visible: Record<string, string[]> }): RepoWorkflows {

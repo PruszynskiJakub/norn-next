@@ -250,7 +250,7 @@ export const CriteriaTrace = Type.Object(
 export type CriteriaTrace = Static<typeof CriteriaTrace>;
 
 /**
- * S2 (BUG-4): a machine-local file (a cache in the trace dir) was unreadable or of the wrong shape
+ * S2 (BUG-4): a machine-local file (a cache in the machine dir) was unreadable or of the wrong shape
  * and read as empty. Logged once per process per file content; the next write replaces the file.
  */
 export const LocalFileTrace = Type.Object(
@@ -258,7 +258,7 @@ export const LocalFileTrace = Type.Object(
     type: Type.Literal("local_file"),
     id: Ulid,
     at: IsoTime,
-    /** path relative to the repo root, e.g. `.agents/norn/trace/remote.json` */
+    /** D10: absolute path, e.g. `~/.norn/repos/<id>/remote.json` (machine-local files live outside the repo) */
     file: NonEmpty,
     /** the local schema it failed, e.g. `local-remote` */
     schema: NonEmpty,

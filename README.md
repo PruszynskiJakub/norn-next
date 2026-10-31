@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/PruszynskiJakub/norn-next/actions/workflows/ci.yml"><img src="https://github.com/PruszynskiJakub/norn-next/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/PruszynskiJakub/norn-next/releases"><img src="https://img.shields.io/badge/release-v0.12.1-blue" alt="Release v0.12.1"></a>
+  <a href="https://github.com/PruszynskiJakub/norn-next/releases"><img src="https://img.shields.io/badge/release-v0.13.0-blue" alt="Release v0.13.0"></a>
   <img src="https://img.shields.io/badge/bun-%3E%3D1.3-f9f1e1" alt="Bun 1.3 or later">
 </p>
 
@@ -104,13 +104,15 @@ cd your-repo
 norn init
 ```
 
-`norn init` writes the config (`.agents/norn/config.yaml`), three workflows (`story`, `slice`, `bug`), the agent skills and hooks, and its `.gitignore` and `.gitattributes` lines. It reads your test command from your build files, then prints the next steps, which are:
+`norn init` writes the config (`.agents/norn.config.yaml`), three workflows (`story`, `slice`, `bug`) in `.agents/workflows/`, the agent skills and hooks, and its `.gitignore` and `.gitattributes` lines. It reads your test command from your build files, then prints the next steps, which are:
 
 1. Check the test command it wrote into the workflows' `test` steps.
 2. Commit and push the setup.
 3. Run `norn doctor` to check this machine: agents, hooks, remote auth, runner and skills.
 
 GitLab users set `remote.provider: glab` in the config. The label that marks a story is `remote.label` (default `norn`).
+
+**Upgrading a repository set up by an older norn?** It keeps its config, workflows and trace together in one folder under `.agents/`; on that layout every command refuses and names `norn migrate`. Run `norn migrate` in the main checkout, with `norn watch` stopped: it moves the config and workflows to their new places as staged git moves, moves the trace to this machine's folder for the checkout, and prints the commit to make. Once that commit merges, an older norn cannot read the repository: upgrade norn on every machine that works on it.
 
 ### 3. Run your first story
 
@@ -147,7 +149,7 @@ For recipes by situation (a first story, an agent that asks or dies, a moved `ma
 
 In both modes, `check` and `git` steps run on their own. Attended steps (`attended: true`, such as refine and plan) and `gate` steps always wait for a person, even in auto mode. When the agent of an attended step has waited for you longer than `limits.attended_wait` (default 2 minutes), the inbox moves it from Running to Your turn.
 
-**What gets committed.** A story's run state lives in `.agents/specs/<id>-<slug>/runs/`: `state.json`, numbered receipts, the pinned workflow, logs of failed checks, QA evidence and `handoff.md`. norn commits it with the agent's work at each step boundary and pushes the branch, so anyone can take the story over from any commit. `runs/` is marked as generated, so GitHub and GitLab collapse it in the PR diff. Per-tick detail stays in `.agents/norn/trace/`, which is gitignored.
+**What gets committed.** A story's run state lives in `.agents/specs/<id>-<slug>/runs/`: `state.json`, numbered receipts, the pinned workflow, logs of failed checks, QA evidence and `handoff.md`. norn commits it with the agent's work at each step boundary and pushes the branch, so anyone can take the story over from any commit. `runs/` is marked as generated, so GitHub and GitLab collapse it in the PR diff. Per-tick detail (the trace, locks and caches) stays outside the repository, in `~/.norn/repos/<checkout>-<hash>/`, one folder per checkout on each machine.
 
 ## Concepts in a minute
 
@@ -156,7 +158,7 @@ In both modes, `check` and `git` steps run on their own. Attended steps (`attend
 | **story** | a labelled issue assigned to you: one spec folder, one branch, one worktree, one draft PR |
 | **slice** | a piece of a story with its own branch and worktree, merged back into the story |
 | **unit** | a story or a slice: what commands like `story answer`, `run list` and `run view` take, written `gh-18` (a story) or `gh-18/02` (its second slice) |
-| **workflow** | the steps a story or slice goes through, as YAML in `.agents/norn/workflows/` |
+| **workflow** | the steps a story or slice goes through, as YAML in `.agents/workflows/` |
 | **step** | one node of a workflow: an `agent` step, a `check` (a command), a `git` action, or a `gate` (a person approves) |
 | **outcome** | how an agent says a step ended: `norn done <outcome>`, `norn ask` or `norn stuck`; the workflow maps each outcome to the next step |
 | **tick** | one pass of the heartbeat: observe the agents, git and the remote, decide, act; `norn watch` runs ticks in a loop |
@@ -166,7 +168,7 @@ The full glossary is in [PRD §5](.agents/PRD.md#5-glossary).
 
 ## Make it yours
 
-**Workflows are data.** Edit the YAML in `.agents/norn/workflows/` or add your own; `norn story edit <unit> --workflow <name>` picks one for a unit. A step names its skill and its outcomes:
+**Workflows are data.** Edit the YAML in `.agents/workflows/` or add your own; `norn story edit <unit> --workflow <name>` picks one for a unit. A step names its skill and its outcomes:
 
 ```yaml
   test:
@@ -180,7 +182,7 @@ A unit pins its workflow when it starts, so editing a file does not affect stori
 
 **Skills carry the craft.** `norn init` copies norn's skills (`norn`, `norn-refine`, `norn-plan`, `norn-implement`, `norn-review`, `norn-qa`, …) as whole folders into `.agents/skills/` and links them from each configured agent's skill folder: `.claude/skills/`, `.gemini/skills/`, `.opencode/skills/` (Codex reads `.agents/skills/` itself). Commit them. Each `norn init` replaces them with the bundled version and lists what it updated; `git diff .agents/skills/` shows the change. To change how a step is done, write your own skill under another name and name it in the step (`skill: my-review`). `norn doctor` reports skills that are missing, not linked or out of date. After a story's PR merges, ask an agent to use `norn-retro` on it: it reads the story's `runs/` and suggests one change per friction it found, each citing its receipt, without changing any file. Links need a filesystem that supports them (on Windows, developer mode).
 
-**Config** lives in two files with the same keys: `.agents/norn/config.yaml` (committed, what the team agrees on: remote, workflows, limits) and `~/.norn/config.yaml` (yours: runner, machine caps, notifiers, default mode). The repo file wins, except that it can only lower machine caps. The template `norn init` writes groups the keys by who they belong to, with their defaults. `norn config` shows every setting in effect, the file it came from and what it does.
+**Config** lives in two files with the same keys: `.agents/norn.config.yaml` (committed, what the team agrees on: remote, workflows, limits) and `~/.norn/config.yaml` (yours: runner, machine caps, notifiers, default mode). The repo file wins, except that it can only lower machine caps. The template `norn init` writes groups the keys by who they belong to, with their defaults. `norn config` shows every setting in effect, the file it came from and what it does.
 
 ## Plugins
 
@@ -213,7 +215,7 @@ The full spec is in [`.agents/PRD.md`](.agents/PRD.md); the files norn writes in
 | Core | `status [--watch [--pane]]` |
 | `story` | general: `create`, `list`, `view`; decision: `answer`, `approve`, `reject`, `update-branch`; work: `start`, `chat`, `edit`; team: `checkout`, `handoff`, `close`, `reopen` |
 | `run` | `list`, `view [--why \| --receipt]`, `attach [--next]`, `rerun [--step <step>] [--reset <counter>]`, `cancel` |
-| Setup | `init`, `doctor`, `config list\|get\|set\|unset`, `uninstall` |
+| Setup | `init`, `migrate`, `doctor`, `config list\|get\|set\|unset`, `uninstall` |
 | Background | `watch`, `sync`, `tidy` |
 | Agent protocol | `brief`, `done`, `ask`, `stuck` |
 | Only in `help --all` | `tick`, `hook`, `status --segment` |

@@ -1,9 +1,0 @@
-[
-  { "id": "AC1", "verdict": "pass", "evidence": "AC1.md: real CLI, cwd = gh-2/01 slice worktree, `run view` / `run list` / `run view --json` with no target show gh-2/01 (qa#1), exit 0; targets.test.ts B54 test passes" },
-  { "id": "AC2", "verdict": "pass", "evidence": "AC2.md: cwd = gh-2 worktree, `run view gh-1` and `run list gh-1` show gh-1, exit 0; B56 test passes" },
-  { "id": "AC3", "verdict": "pass", "evidence": "AC3.md: main checkout in a pty, pick-list offers gh-2/01, gh-1, gh-2 (the units with runs, inbox order then stories) with the first preselected; Down Down Enter showed gh-2, j Enter on run list showed gh-1; B57 test passes" },
-  { "id": "AC4", "verdict": "pass", "evidence": "AC4.md: fresh repo with only gh-1 running; pty shows the one-item list with `> gh-1` preselected, Enter shows gh-1 (exit 0), Esc refuses cancelled (exit 3); B58 test passes" },
-  { "id": "AC5", "verdict": "pass", "evidence": "AC5.md: fresh repo, no runs; in a pty `run view`/`run list` refused `No unit has a run yet` (no_target, exit 3) with no prompt drawn; --json gives the CliError, exit 3; B59 test passes" },
-  { "id": "AC6", "verdict": "pass", "evidence": "AC6.md: --json inside a pty, no TTY (piped), NORN_RUN set in a pty, NORN_ORIENT=1 in a pty: each exit 2, target_required, do_instead lists `norn run view|list gh-2/01 | gh-1 | gh-2`, no prompt drawn; B60 test passes" },
-  { "id": "AC7", "verdict": "pass", "evidence": "AC7.md: `bun packages/cli/src/main.ts run view|list` under a real pty (script) in a throwaway repo: list drawn with `>` on the preselection, arrows/j/k move and redraw in place, Enter acts on the highlighted unit; Esc, Ctrl-C, q and Down-then-Esc each print `Refused (cancelled): Nothing picked`, exit 3; worktree status and receipts unchanged before/after" }
-]

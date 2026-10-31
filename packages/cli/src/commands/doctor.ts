@@ -15,24 +15,32 @@
  *   - machine: the `user@host` runs are recorded with (R7.1); a warning when NORN_MACHINE overrides it (R7.3)
  *   - skills (SK1): every bundled skill is in `.agents/skills/` and linked from each configured
  *     agent's skill folder; one that differs from the bundled version is a warning (`norn init`)
+ *   - trace (O7; D11, D13): a `trace.retain` that is not a duration of at least 14d is a warning; day
+ *     pairs older than the window are a hint naming `norn tidy` — never a failed check
+ * Repo checks (D7, B7–B9): the layout (D4; an old or mixed one is the only check reported, failed,
+ * naming `norn migrate`, B20), every repo workflow validated exactly as a tick validates it (W5, the
+ * shared `checkedRepoWorkflows`), and the repo config layer against its schema. Read-only.
  * `--live` also runs one cheap headless test turn per agent in a throwaway repo with norn hooks
  * installed, and checks that the agent's own hooks reported to norn.
+ * `--repo` runs only the repo checks: no agent, runner or remote is looked at (B10).
  * Exit 0 when every check passes, else 1 with the same report.
  */
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, extname, join, relative, resolve } from "node:path";
 import { git as gitAdapter, herdr, proc } from "@norn/adapters";
-import type { AgentAdapter, RunnerPort, SessionRef } from "@norn/core";
+import type { AgentAdapter, FileError, RunnerPort, SessionRef, WorkflowIssue } from "@norn/core";
 import { ExitCode, ulid } from "@norn/schema";
-import { machineHolder, noteSpawn, readHookFacts, skillsReport, writeUnitMarker } from "@norn/store";
+import { bindNornHome, type Layout, layoutProblems, loadWorkflows, machineDir, machineHolder, noteSpawn, orphanedMachineDirs, readHookFacts, repoConfigPath, repoLayout, skillsReport, traceDaysBefore, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { rendered, withExit } from "../output.ts";
 import { assetsDir } from "../runtime/assets.ts";
 import { gitRemoteUrl } from "../runtime/detect.ts";
 import { ensureShim, withNornOnPath } from "../runtime/shim.ts";
-import { bundledSkills } from "../runtime/workflows.ts";
+import { effectiveRetain, formatBytes, retainCutoffDay, retainWarning } from "../runtime/trace-retention.ts";
+import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
+import { layoutRefusal } from "../runtime/layout.ts";
 import { hookBinary, hookCommand } from "./init.ts";
 import { cmd } from "@norn/core";
 
@@ -87,19 +95,34 @@ function syntheticEvent(agent: AgentAdapter, cwd: string, env: Record<string, st
   return null;
 }
 
-function scratchUnit(): { dir: string; repo: string } {
+/** A throwaway unit worktree (its own git repo) whose machine dir is in this command's home; `drop` removes both. */
+async function scratchUnit(ctx: Context): Promise<{ repo: string; drop: () => void }> {
   const dir = mkdtempSync(join(tmpdir(), "norn-doctor-"));
   const repo = join(dir, "repo");
-  mkdirSync(join(repo, ".agents", "norn", "trace"), { recursive: true });
-  writeUnitMarker(repo, { repo, story: "gh-1", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-1-norn-doctor" });
-  return { dir, repo };
+  try {
+    await run(["git", "init", "-q", repo], { timeoutMs: 10_000 });
+    bindNornHome(repo, ctx.home);
+    writeUnitMarker(repo, { repo, story: "gh-1", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-1-norn-doctor" });
+  } catch (e) {
+    rmSync(dir, { recursive: true, force: true });
+    throw e;
+  }
+  const machine = machineDir(repo);
+  return {
+    repo,
+    drop: () => {
+      rmSync(machine, { recursive: true, force: true });
+      unbindNornHome(repo);
+      rmSync(dir, { recursive: true, force: true });
+    },
+  };
 }
 
 /** Invoke the installed hook command the way the agent tool would, and look for the recorded fact. */
 async function hookFires(ctx: Context, name: string, agent: AgentAdapter, command: string) {
   const bin = hookBinary(command, ctx.env);
   if (!which(bin, ctx.env)) return { ok: false, command, error: `${bin} not found on PATH (the installed hooks call it)` };
-  const { dir, repo } = scratchUnit();
+  const { repo, drop } = await scratchUnit(ctx);
   try {
     const ev = syntheticEvent(agent, repo, ctx.env);
     if (!ev) return { ok: false, command, error: "adapter recognizes none of its own hook events" };
@@ -109,15 +132,14 @@ async function hookFires(ctx: Context, name: string, agent: AgentAdapter, comman
     const ok = r.code === 0 && facts.length > 0;
     return { ok, command: `${command} ${ev.arg} --agent ${name}`, exit: r.code, recorded: facts.length, ...(ok ? {} : { error: r.error ?? (r.code !== 0 ? firstLine(r.out) || `exit ${r.code}` : `no hook fact recorded (since ${since})`) }) };
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    drop();
   }
 }
 
 /** --live: one cheap headless turn in a throwaway repo with norn hooks installed. */
 async function liveTurn(ctx: Context, name: string, agent: AgentAdapter, command: string) {
-  const { dir, repo } = scratchUnit();
+  const { repo, drop } = await scratchUnit(ctx);
   try {
-    await run(["git", "init", "-q", repo], { timeoutMs: 10_000 });
     if (agent.tier !== "none") await agent.installHooks(repo, command, name);
     const cfg = ctx.config.agents[name];
     const launch = agent.launchCommand({
@@ -132,7 +154,7 @@ async function liveTurn(ctx: Context, name: string, agent: AgentAdapter, command
     const ok = r.code === 0 && (agent.tier === "none" || facts.length > 0);
     return { ok, exit: r.code, timed_out: r.timed_out, hook_events: facts.map((f) => f.event), ...(ok ? {} : { error: r.error ?? (r.code !== 0 ? firstLine(r.out.slice(-500)) : "the agent ran but no hook reported to norn") }) };
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    drop();
   }
 }
 
@@ -197,6 +219,95 @@ interface Check {
   do_instead?: string;
 }
 
+interface RepoReport {
+  ok: boolean;
+  /** D4: reaching the other repo checks means the new layout; an old or mixed one is reported alone (B20) */
+  layout: { ok: true; layout: "new" };
+  workflows: Array<{ name: string; file: string; ok: boolean; issues: WorkflowIssue[] }>;
+  config: { ok: boolean; file: string; present: boolean; errors: FileError["errors"] };
+  /** why a workflow's skills went unchecked (the config does not load, so its agents are unknown) */
+  skills_unchecked?: string;
+}
+
+/**
+ * D7 (B7, B8): the repo workflows through the validator a tick uses, with each configured agent's
+ * visible skills, and the repo config layer against its schema. Reads files only (B9).
+ */
+async function repoGroup(ctx: Context): Promise<RepoReport> {
+  const root = ctx.root;
+  const loaded = ctx.loaded;
+  const listing = loadWorkflows(root);
+  const agents = loaded.ok ? (await ctx.ports()).agents : {};
+  const checked = checkedRepoWorkflows(listing, root, { default_agent: loaded.ok ? loaded.config.default_agent : "" }, agents);
+  const fileOf = (name: string) => {
+    const wf = listing.workflows[name];
+    return wf ? relative(root, wf.file) : (listing.errors.find((e) => basename(e.file, extname(e.file)) === name)?.file ?? name);
+  };
+  const workflows = Object.values(checked)
+    .map((w) => {
+      const file = fileOf(w.name);
+      // schema issues carry their file in the message for a tick's inbox; doctor names it once, on its own line
+      const issues = w.issues.map((i) => (i.message.startsWith(`${file}: `) ? { ...i, message: i.message.slice(file.length + 2) } : i));
+      return { name: w.name, file, ok: issues.length === 0, issues };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const configFile = relative(root, repoConfigPath(root));
+  const configErrors = loaded.ok ? [] : loaded.errors.filter((e) => e.file === configFile).flatMap((e) => e.errors);
+  const config = { ok: configErrors.length === 0, file: configFile, present: existsSync(repoConfigPath(root)), errors: configErrors };
+  return {
+    ok: workflows.every((w) => w.ok) && config.ok,
+    layout: { ok: true, layout: "new" },
+    workflows,
+    config,
+    ...(loaded.ok ? {} : { skills_unchecked: "the config does not load, so no step's skill was checked against its agent" }),
+  };
+}
+
+/** D4, B20: the layout check of the repo group, failed on an old or mixed layout with what to run. */
+function layoutCheck(l: Layout, root: string) {
+  const refusal = layoutRefusal(l, root).body;
+  return { ok: false, layout: l.layout, parts: layoutProblems(l, root), error: refusal.error, do_instead: refusal.do_instead, code: refusal.code };
+}
+
+function formatLayoutOnly(c: ReturnType<typeof layoutCheck>): string {
+  const l = lines();
+  l.line(false, "layout", c.layout === "both" ? "old and new layout both present" : "old layout");
+  for (const p of c.parts) l.sub(`! ${p}`);
+  l.sub(`→ ${c.do_instead}`);
+  return [l.head(false), "", ...l.out, "", "  · other checks skipped: they read the new layout"].join("\n");
+}
+
+/** One line per check: `ok`, `warn` or `FAIL`, a label, the text; failed labels are collected for the head line. */
+function lines() {
+  const out: string[] = [];
+  const failed: string[] = [];
+  const line = (ok: boolean, label: string, text: string, warn = false) => {
+    out.push(`  ${ok ? "ok  " : warn ? "warn" : "FAIL"} ${label.padEnd(14)} ${text}`);
+    if (!ok && !warn) failed.push(label);
+  };
+  const sub = (text: string) => out.push(`       ${"".padEnd(14)} ${text}`);
+  const fix = (c: { error?: unknown; do_instead?: unknown }) => {
+    if (c.error) sub(`! ${short(String(c.error))}`);
+    if (c.do_instead) sub(`→ ${String(c.do_instead)}`);
+  };
+  const head = (ok: boolean) => (ok ? "norn doctor: every check passes" : `norn doctor: ${failed.length} check${failed.length === 1 ? "" : "s"} failed (${failed.join(", ")})`);
+  return { out, line, sub, fix, head };
+}
+
+/** The repo group's lines: the valid workflows on one line, each invalid one with its issues, the config (B7, B8). */
+function formatRepo(r: RepoReport, l: ReturnType<typeof lines>, dir: string): void {
+  const valid = r.workflows.filter((w) => w.ok).map((w) => w.name);
+  l.line(true, "layout", `${dir}/ and ${r.config.file}`);
+  if (valid.length || !r.workflows.length || r.skills_unchecked) l.line(true, "workflows", valid.length ? `${valid.join(", ")} valid (${dir}/)` : `none valid in ${dir}/`);
+  if (r.skills_unchecked) l.sub(`· ${r.skills_unchecked}`);
+  for (const w of r.workflows.filter((x) => !x.ok)) {
+    l.line(false, `workflow ${w.name}`, w.file);
+    for (const i of w.issues) l.sub(`! ${i.path || "/"}: ${i.message}`);
+  }
+  l.line(r.config.ok, "config", r.config.present ? r.config.file : `${r.config.file} (none: built-in defaults)`);
+  for (const e of r.config.errors) l.sub(`! ${e.path || "/"}: ${e.message}`);
+}
+
 /** `norn doctor`: one line per check, then what failed and what to do. */
 function formatDoctor(r: {
   ok: boolean;
@@ -215,19 +326,12 @@ function formatDoctor(r: {
   remote: Record<string, unknown>;
   runner: Record<string, unknown>;
   skills: Check & { dir: string; missing: string[]; drifted: string[]; unlinked: Record<string, string[]> };
+  repo: RepoReport;
   warnings: string[];
-}): string {
-  const out: string[] = [];
-  const failed: string[] = [];
-  const line = (ok: boolean, label: string, text: string, warn = false) => {
-    out.push(`  ${ok ? "ok  " : warn ? "warn" : "FAIL"} ${label.padEnd(14)} ${text}`);
-    if (!ok && !warn) failed.push(label);
-  };
-  const sub = (text: string) => out.push(`       ${"".padEnd(14)} ${text}`);
-  const fix = (c: { error?: unknown; do_instead?: unknown }) => {
-    if (c.error) sub(`! ${short(String(c.error))}`);
-    if (c.do_instead) sub(`→ ${String(c.do_instead)}`);
-  };
+  hints: string[];
+}, dir: string): string {
+  const l = lines();
+  const { out, line, sub, fix } = l;
 
   line(r.git.ok, "git", r.git.version ?? "not found");
   fix(r.git);
@@ -257,20 +361,53 @@ function formatDoctor(r: {
   line(sk.ok, "skills", sk.ok ? "installed and linked" : [sk.missing.length ? `missing ${sk.missing.join(", ")}` : "", ...unlinked.map(([agent, names]) => `not linked for ${agent}: ${names.join(", ")}`)].filter(Boolean).join("; "));
   if (!sk.ok) fix(sk);
   out.push(`       ${"machine".padEnd(14)} ${r.machine.holder}`);
+  formatRepo(r.repo, l, dir);
 
-  const head = r.ok ? "norn doctor: every check passes" : `norn doctor: ${failed.length} check${failed.length === 1 ? "" : "s"} failed (${failed.join(", ")})`;
   const warnings = r.warnings.length ? ["", "Warnings", ...r.warnings.map((w) => `  ! ${w}`)] : [];
-  return [head, "", ...out, ...warnings].join("\n");
+  const hints = r.hints.length ? ["", "Hints", ...r.hints.map((h) => `  · ${h}`)] : [];
+  return [l.head(r.ok), "", ...out, ...warnings, ...hints].join("\n");
+}
+
+/** `norn doctor --repo`, or plain doctor when the config does not load and the machine checks cannot run. */
+function formatRepoOnly(r: { ok: boolean; repo: RepoReport; skipped?: string }, dir: string): string {
+  const l = lines();
+  formatRepo(r.repo, l, dir);
+  const skipped = r.skipped ? ["", `  · ${r.skipped}`] : [];
+  return [l.head(r.ok), "", ...l.out, ...skipped].join("\n");
 }
 
 export const doctorCommand = defineCommand({
   name: "doctor",
-  summary: "Check agents, hooks, skills, remote auth and runner on this machine (A7); --live runs one test turn per agent",
-  usage: "norn doctor [--live] [--json]",
+  summary: "Check agents, hooks, skills, remote auth and runner on this machine, and the repo workflows and config (A7, W5)",
+  usage: "norn doctor [--repo] [--live] [--json]",
   markdown: true,
-  options: { live: { type: "boolean" } },
+  options: { live: { type: "boolean" }, repo: { type: "boolean" } },
+  optionHelp: {
+    "--repo": "check only the repo workflows and config: no agent, runner or remote needed (CI, a test check)",
+    "--live": "also run one cheap headless test turn per agent",
+  },
+  // D5, B20: an old or mixed layout is a failed repo check here, not a refusal
+  layout: false,
   async run(ctx, args) {
     const live = opt.bool(args, "live");
+    const repoOnly = opt.bool(args, "repo");
+    const layout = repoLayout(ctx.root);
+    if (layout.layout !== "new") {
+      // nothing else is read: config and workflows at the new places are not the repo's yet (B20)
+      const report = { ok: false, repo: { ok: false, layout: layoutCheck(layout, ctx.root) } };
+      return withExit(rendered(report, formatLayoutOnly(report.repo.layout)), ExitCode.error);
+    }
+    const repo = await repoGroup(ctx);
+    const dir = relative(ctx.root, workflowsDir(ctx.root));
+    // B10: --repo looks at no agent, runner or remote; a config that does not load leaves the machine checks nothing to run on
+    if (repoOnly || !ctx.loaded.ok) {
+      const others = ctx.loaded.ok ? [] : ctx.loaded.errors.filter((e) => e.file !== repo.config.file);
+      const which = others.map((e) => `${e.file}: ${e.errors.map((x) => `${x.path || "/"} ${x.message}`).join("; ")}`).join(" | ");
+      const skipped = repoOnly ? undefined : `machine checks skipped: they need a config that loads${which ? ` (${which})` : ""}; fix it and run ${cmd.doctor()} again`;
+      const report = { ok: repo.ok && !skipped, repo, ...(skipped ? { skipped } : {}) };
+      const out = rendered(report, formatRepoOnly(report, dir));
+      return report.ok ? out : withExit(out, ExitCode.error);
+    }
     const config = ctx.config;
     const ports = await ctx.ports();
     const command = hookCommand(ctx);
@@ -359,11 +496,29 @@ export const doctorCommand = defineCommand({
     if (machine.override !== null)
       warnings.push(`NORN_MACHINE=${machine.override} overrides this machine's name (a test aid): runs are judged by pid only on the machine they were started on (R7.2), so two hosts must never share a name — unset it outside tests`);
 
+    // D3: a machine dir left behind when this repo folder moved; adopting it keeps the heartbeat (ID2).
+    // The own dir exists already (every traced command makes it), so a plain mv would nest into it.
+    const mine = proc.shellQuote(machineDir(ctx.root));
+    for (const o of orphanedMachineDirs(ctx.home, ctx.root))
+      warnings.push(
+        `orphaned machine dir ${o.dir}: its checkout ${o.checkout} no longer exists — if this repo moved from there, stop norn watch and adopt it (keeps its heartbeat and claims): rm -rf ${mine} && mv ${proc.shellQuote(o.dir)} ${mine}`,
+      );
     if (sk.drifted.length) warnings.push(`skills differ from this norn's bundled version: ${sk.drifted.join(", ")} — run ${cmd.init()} to update them (git diff .agents/skills/ shows the change)`);
 
-    const ok = gitCheck.ok && agents.every((a) => a.ok) && remote.ok === true && (runner.ok === true || runner.required === false) && skillsOk;
-    const report = { ok, live, hook_command: command, machine, git: gitCheck, agents, remote, runner, skills, warnings };
-    const out = rendered(report, formatDoctor(report));
+    // D11, D13: the trace window — a value that does not apply warns; days beyond it are a hint
+    const retainWarn = retainWarning(config.trace.retain);
+    if (retainWarn) warnings.push(retainWarn);
+    const hints: string[] = [];
+    const window = effectiveRetain(config);
+    const beyond = traceDaysBefore(ctx.root, retainCutoffDay(ctx.clock.now(), window.ms));
+    if (beyond.length) {
+      const bytes = beyond.reduce((n, d) => n + d.bytes, 0);
+      hints.push(`trace keeps ${beyond.length} day${beyond.length === 1 ? "" : "s"} (${formatBytes(bytes)}) beyond trace.retain ${window.retain} — run \`norn tidy\` (\`norn tidy --dry-run\` lists them)`);
+    }
+
+    const ok = gitCheck.ok && agents.every((a) => a.ok) && remote.ok === true && (runner.ok === true || runner.required === false) && skillsOk && repo.ok;
+    const report = { ok, live, hook_command: command, machine, git: gitCheck, agents, remote, runner, skills, repo, warnings, hints };
+    const out = rendered(report, formatDoctor(report, dir));
     return ok ? out : withExit(out, ExitCode.error);
   },
 });

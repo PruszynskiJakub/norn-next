@@ -1,4 +1,0 @@
-# AC4 (B47) — run attach --next
-- Real CLI, nothing waiting: `run attach --next` → `{"error":"No agent waits for you","do_instead":"norn status","code":"nothing_to_attach"}` exit 3
-- Two Your turn units (the repo test has only one, so a scratch test on the same harness was run and removed, AC4-two-units.txt): gh-6 stopped at 10:03:01, gh-5 at 10:04:01. `run attach --next --json` → exit 0 `{"focused":"w9:p6","item":"attended:gh-6:…"}`, fake Herdr calls `["focus w9:p6"]`: the older one, no prompt. Without --json it prints the same JSON object (as cockpit --next did).
-- The success shape `{focused, item}` is cockpit --next's. Known change (review note 1): an agent with no live pane is now refused nothing_to_attach (exit 3, start command as do_instead) instead of exit 0 `{focused:null, item, command}`; plugins/herdr/next.sh reads the old shape until slice 15.

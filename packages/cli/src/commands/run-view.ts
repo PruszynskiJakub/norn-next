@@ -23,17 +23,20 @@
  * R5.4 (N2): a tick with a `tick.start` but no end died during act. `--why` explains it from its
  * recorded decisions ("tick crashed during act") — `--tick <id>` resolves the tick a receipt cites,
  * and without `--tick` a crashed tick newer than the unit's last finished one is the one explained.
+ *
+ * O7, D10 (B20): `--tick <id>` for a tick not in the trace whose ulid time is older than the retention
+ * window and whose day file is gone is refused as `tick_pruned`, never guessed at.
  */
 import { cmd, criterionLine, decide, type Decision, legacyAction, type NumberedReceipt, type StoryFacts, type UnitFacts, unitDecision } from "@norn/core";
-import { ExitCode, type Receipt, storyOf, type TickStartTrace, type TickTrace, type TickUnitRecord, ULID_PATTERN } from "@norn/schema";
-import { crashedTicksFor, decisionUnit, findCrashedTick, findTick, readTrace } from "@norn/store";
+import { ExitCode, isUlid, type Receipt, storyOf, type TickStartTrace, type TickTrace, type TickUnitRecord, ULID_PATTERN, ulidTime } from "@norn/schema";
+import { crashedTicksFor, decisionUnit, findCrashedTick, findTick, hasTraceDay, readTrace, type TickReader, tickReader } from "@norn/store";
 import { formatRunView, loadRunView } from "@norn/view";
 import { defineCommand, opt, type ParsedArgs } from "../command.ts";
 import type { Context } from "../context.ts";
-import { refuse, rendered, usageError, withExit } from "../output.ts";
+import { corruptError, refuse, rendered, usageError, withExit } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
 import { hasRun, targetKey } from "../runtime/target.ts";
-import { replayInputs } from "../runtime/tick.ts";
+import { effectiveRetain } from "../runtime/trace-retention.ts";
 import { NORN_VERSION } from "../version.ts";
 
 /** An action as compared with its replay; one an older norn recorded drops the fields since removed (O5). */
@@ -147,8 +150,9 @@ function triggerOf(d: TickUnitRecord, uf: UnitFacts | undefined): Trigger {
   return { source: "fact", kind: d.rule, reason: a.reason ?? a.item?.title ?? null };
 }
 
-function unitIn(tick: TickTrace, story: string, key: string): { sf?: StoryFacts; uf?: UnitFacts } {
-  const sf = (tick.facts as unknown as { stories?: StoryFacts[] }).stories?.find((s) => s.key === story);
+function unitIn(reader: TickReader, tick: TickTrace, story: string, key: string): { sf?: StoryFacts; uf?: UnitFacts } {
+  const read = reader.inputs(tick);
+  const sf = read.ok ? read.inputs.facts.stories.find((s) => s.key === story) : undefined;
   return { sf, uf: sf?.units.find((u) => u.unit.key === key) };
 }
 
@@ -218,13 +222,13 @@ function crashedExplanation(tick: TickStartTrace, key: string) {
 }
 
 /** NT2: the unit of the decision that applied a receipt, for `--receipt` without a unit. */
-function unitOfReceipt(root: string, receiptId: string): string | null {
+function unitOfReceipt(root: string, reader: TickReader, receiptId: string): string | null {
   const { events } = readTrace(root, { types: ["tick"] });
   for (const ev of (events as TickTrace[]).toReversed())
     for (const d of ev.decisions) {
       const key = decisionUnit(d);
       if (key === "*") continue;
-      if (receiptsOf(d, unitIn(ev, storyOf(key), key).uf).some((r) => r.receipt.receipt_id === receiptId)) return key;
+      if (receiptsOf(d, unitIn(reader, ev, storyOf(key), key).uf).some((r) => r.receipt.receipt_id === receiptId)) return key;
     }
   return null;
 }
@@ -233,7 +237,8 @@ function unitOfReceipt(root: string, receiptId: string): string | null {
 async function why(ctx: Context, args: ParsedArgs) {
   const filter = parseFilter(args);
   if (!args.positionals[0] && !filter.receipt) throw usageError("run view --why: expected a unit", cmd.runView(undefined, { why: true }));
-  const raw = args.positionals[0] ?? (filter.receipt ? unitOfReceipt(ctx.root, filter.receipt) : null);
+  const reader = tickReader(ctx.root);
+  const raw = args.positionals[0] ?? (filter.receipt ? unitOfReceipt(ctx.root, reader, filter.receipt) : null);
   if (!raw) throw refuse(`no tick in the trace applied receipt ${filter.receipt}`, cmd.status({ notes: true }), "no_tick");
   const { key, story } = parseUnitKey(raw);
   const tickId = opt.str(args, "tick");
@@ -246,6 +251,13 @@ async function why(ctx: Context, args: ParsedArgs) {
     if (!tick) {
       const crashed = findCrashedTick(ctx.root, tickId);
       if (crashed) return crashedExplanation(crashed, key);
+      // D10: older than the window and its day is gone → tidy pruned it (B20)
+      if (isUlid(tickId)) {
+        const window = effectiveRetain(ctx.config);
+        const at = ulidTime(tickId);
+        if (at < ctx.clock.now() - window.ms && !hasTraceDay(ctx.root, new Date(at).toISOString()))
+          throw refuse(`tick ${tickId} is older than the trace retained (${window.retain})`, cmd.runList(key), "tick_pruned");
+      }
       throw refuse(`no tick ${tickId} in the trace`, cmd.runList(key), "no_tick");
     }
     const d = unitDecision(tick.decisions, key, decisionUnit);
@@ -257,7 +269,7 @@ async function why(ctx: Context, args: ParsedArgs) {
     for (const ev of events as TickTrace[]) {
       // R1.1: by default the unit's own action, not the claim renewal riding along; a filter may pick either
       const d = filtered
-        ? ev.decisions.filter((x) => decisionUnit(x) === key).find((x) => matches(x, unitIn(ev, story, key).uf, filter))
+        ? ev.decisions.filter((x) => decisionUnit(x) === key).find((x) => matches(x, unitIn(reader, ev, story, key).uf, filter))
         : unitDecision(ev.decisions, key, decisionUnit);
       if (d) found.push({ tick: ev, d });
     }
@@ -272,8 +284,11 @@ async function why(ctx: Context, args: ParsedArgs) {
       );
   }
   const { tick, d: recorded } = found.at(-1) as { tick: TickTrace; d: TickUnitRecord };
-  const inputs = replayInputs(ctx.root, tick);
-  if (!inputs) throw refuse(`tick ${tick.tick_id} has no replay block (recorded by an older norn)`, cmd.runList(key), "no_replay");
+  const read = reader.inputs(tick);
+  // D10 (B21, S2): a chunk the tick names is missing; nothing is replayed from a partial snapshot
+  if (!read.ok && read.reason === "corrupt") throw corruptError(`trace entry of tick ${tick.tick_id} is corrupt: ${read.error.errors[0]?.message}`, cmd.runList(key), [read.error], "trace_corrupt");
+  if (!read.ok) throw refuse(`tick ${tick.tick_id} has no replay block (recorded by an older norn)`, cmd.runList(key), "no_replay");
+  const { inputs } = read;
 
   let replayed: Decision[];
   try {
@@ -322,7 +337,7 @@ async function why(ctx: Context, args: ParsedArgs) {
     ...(filtered && !tickId
       ? {
           matches: found.map(({ tick: t, d }) => {
-            const tr = triggerOf(d, unitIn(t, story, key).uf);
+            const tr = triggerOf(d, unitIn(reader, t, story, key).uf);
             return { tick_id: t.tick_id, at: t.at, rule: d.rule, action: d.action.kind, trigger: tr.source === "receipt" ? `${tr.kind}${tr.outcome && tr.outcome !== tr.kind ? ` ${tr.outcome}` : ""} at ${tr.step}#${tr.attempt}` : tr.kind };
           }),
         }

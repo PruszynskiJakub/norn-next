@@ -43,6 +43,8 @@ export interface Command {
   markdown?: boolean;
   /** needs a git repository (default true): `ctx.locate()` runs before `run` */
   repo?: boolean;
+  /** false: reports the repo layout itself instead of refusing an old or mixed one at `locate()` (D5: doctor, migrate) */
+  layout?: boolean;
   run(ctx: Context, args: ParsedArgs): Promise<unknown>;
 }
 

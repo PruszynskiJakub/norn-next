@@ -1,8 +1,0 @@
-# team config — keep notes here
-default_mode: manual   # who starts
-# limits for every step
-limits:
-  deadline: 30m  # long enough
-  nudges: 2
-slots:
-  max: 3

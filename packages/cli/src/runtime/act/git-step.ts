@@ -3,7 +3,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { type Action, type ActionResult, applyReceipts, nornTrailers, routeOf } from "@norn/core";
 import { type ReceiptOf, ulid } from "@norn/schema";
-import { acquireIntegrateLock, appendReceipt, readText, traceDir } from "@norn/store";
+import { acquireIntegrateLock, appendReceipt, machineDir, readText } from "@norn/store";
 import { integrate, update as updateStory } from "../integrate.ts";
 import { type ActEnv, QueueFull } from "./env.ts";
 
@@ -18,7 +18,7 @@ function prBody(cwd: string, pr: NonNullable<Extract<Action, { kind: "run_git" }
 export async function runGit(act: ActEnv, a: Extract<Action, { kind: "run_git" }>): Promise<ActionResult> {
   if (a.action !== "integrate" && a.action !== "update") return runGitLocked(act, a);
   // K6/BS3: slice integrations and base updates of one story never interleave, across processes too
-  mkdirSync(traceDir(act.root), { recursive: true });
+  mkdirSync(machineDir(act.root), { recursive: true });
   const lock = await acquireIntegrateLock(act.root, a.unit.story, { now: () => act.nowIso(), note: `${a.unit.key} ${a.action}` });
   if (!lock.ok) throw new QueueFull(`integrate lock of ${a.unit.story} is held (pid ${lock.holder.holder.pid}); retried next tick (K6)`);
   try {

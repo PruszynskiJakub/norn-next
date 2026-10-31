@@ -1,2 +1,0 @@
-#!/bin/sh
-exec env -u NORN_HOME -u NORN_STORY -u NORN_RUN -u NORN_SLICE -u NORN_BIN NORN_HOME_DIR=/private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-75-regroup-the-cli-around-status-story-and--13-config-list-get-set-unset/d994b8ef-932a-462d-adef-2c45a5be9f60/scratchpad/qa/home bun /Users/jakubpruszynski/Projects/norn-worktrees/gh-75-regroup-the-cli-around-status-story-and--13-config-list-get-set-unset/packages/cli/src/main.ts "$@"

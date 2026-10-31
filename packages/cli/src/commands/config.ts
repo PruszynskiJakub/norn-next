@@ -1,6 +1,6 @@
 /**
  * `norn config <verb>` (K2, B61–B68): `list` the resolved config, each setting with the layer it
- * came from (built-in, `~/.norn/config.yaml` or `.agents/norn/config.yaml`), grouped by who it
+ * came from (built-in, `~/.norn/config.yaml` or `.agents/norn.config.yaml`), grouped by who it
  * belongs to; `get <key>` that setting, or every setting under it (`limits`, `agents`); `set` and
  * `unset` one value in the user or repo file (`config-edit.ts`).
  */
@@ -98,6 +98,7 @@ const MEANING: Record<string, string> = {
   "slots.ports_per_slot": "ports reserved per worktree",
   "slots.env": "extra per-slot env vars ({slot} is replaced)",
   notifiers: "how you are told about new inbox items",
+  "trace.retain": "trace days norn tidy keeps (at least 14d)",
   agents: "a coding agent norn can brief or start",
   default_agent: "agent for steps that do not name one",
   default_mode: "who starts unattended steps of a story with no mode set: manual (you) or auto (the tick)",

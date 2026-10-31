@@ -13,7 +13,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Inbox, NUDGE_TEXT } from "@norn/core";
 import { type TickStartTrace, type UnitState, ulid } from "@norn/schema";
-import { appendTrace, readTrace, writeState } from "@norn/store";
+import { appendHookTrace, appendTrace, heartbeatFilePath, readTrace, repoConfigPath, workflowsDir, writeState } from "@norn/store";
 import type { ProjectView } from "@norn/view";
 import type { TickReport } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
@@ -46,8 +46,8 @@ const rules = (r: TickReport) => r.decisions.filter((d) => d.rule !== "claim.ren
 
 async function boot(h: Harness): Promise<void> {
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-  h.write(join(h.root, ".agents/norn/workflows/solo.yaml"), SOLO);
+  h.write(repoConfigPath(h.root), CONFIG);
+  h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn"]);
   h.git(["push", "-q", "origin", "main"]);
@@ -69,7 +69,7 @@ async function untilRunning(h: Harness): Promise<UnitState> {
 }
 
 function hook(h: Harness, runId: string, event: "turn_end" | "tool_use" | "session_start", extra: Record<string, string> = {}) {
-  appendTrace(h.root, { type: "hook", id: ulid(h.clock.now()), fact: { event, at: h.clock.iso(), agent: "claude", native: event, cwd: wt(h), story: "gh-9", run_id: runId, ...extra } });
+  appendHookTrace(h.root, { story: "gh-9" }, { type: "hook", id: ulid(h.clock.now()), fact: { event, at: h.clock.iso(), agent: "claude", native: event, cwd: wt(h), story: "gh-9", run_id: runId, ...extra } });
 }
 
 describe("R4: nudges that can be delivered (acceptance 5)", () => {
@@ -234,7 +234,7 @@ describe("R5.4 / R5.5: tick records and the heartbeat (acceptance 7, 8)", () => 
     const r = await h.tick();
     const ev = readTrace(h.root, { types: ["tick.start", "tick", "tick.end"] }).events.filter((e) => "tick_id" in e && e.tick_id === r.tick_id);
     expect(ev.map((e) => e.type)).toEqual(["tick.start", "tick", "tick.end"]);
-    const hb = JSON.parse(readFileSync(join(h.root, ".agents/norn/trace/heartbeat.json"), "utf8")) as { heartbeat_id: string; last_tick_at: string };
+    const hb = JSON.parse(readFileSync(heartbeatFilePath(h.root), "utf8")) as { heartbeat_id: string; last_tick_at: string };
     expect(hb).toMatchObject({ heartbeat_id: expect.any(String), last_tick_at: h.clock.iso() });
   });
 

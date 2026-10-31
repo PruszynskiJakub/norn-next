@@ -7,8 +7,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { storyOf, type TraceEvent } from "@norn/schema";
-import { defaultBaseRef, loadSnapshot, readTrace, scanWorktrees, type StorySnapshot, traceDir, type UnitSnapshot, withSliceWorktrees } from "@norn/store";
+import { bindNornHome, defaultBaseRef, loadSnapshot, readTrace, scanWorktrees, type StorySnapshot, machineDir, type UnitSnapshot, withSliceWorktrees } from "@norn/store";
 import { buildStepTimeline, mergeStoryTimeline } from "./steps.ts";
+import { TIMELINE_TYPES } from "./timeline.ts";
 import type { CriteriaSummary, TraceRecords, TraceView } from "./types.ts";
 
 /** QV8: sum the `criteria` trace events of the given units — "we keep failing to verify browser criteria" as data. */
@@ -67,6 +68,7 @@ export interface LoadTraceViewOptions {
 export function loadTraceView(opts: LoadTraceViewOptions): TraceView | null {
   const now = opts.now ?? Date.now();
   const storyKey = storyOf(opts.key);
+  if (opts.home) bindNornHome(opts.repoRoot, opts.home);
   const wts = scanWorktrees(opts.repoRoot);
   const snap = loadSnapshot({
     repoRoot: opts.repoRoot,
@@ -78,8 +80,8 @@ export function loadTraceView(opts: LoadTraceViewOptions): TraceView | null {
   const read = snap.stories.find((s) => s.key === storyKey);
   if (!read) return null;
   const story = withSliceWorktrees(read, (slice) => wts.slices.get(slice), { includeApplied: true });
-  const { events } = readTrace(opts.repoRoot, { unit: storyKey });
-  const tdir = traceDir(opts.repoRoot);
+  const { events } = readTrace(opts.repoRoot, { unit: storyKey, types: TIMELINE_TYPES });
+  const tdir = machineDir(opts.repoRoot);
   const { records, runsDir } = recordsOf(opts.repoRoot, story, snap.config.ok ? snap.config.config.remote.git_remote : "origin");
 
   const build = (u: UnitSnapshot): TraceView => {

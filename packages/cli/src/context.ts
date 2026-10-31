@@ -10,9 +10,10 @@ import { dirname, join } from "node:path";
 import type { herdr } from "@norn/adapters";
 import type { AdapterContext, AdapterRegistry, Clock, GitPort, Ports } from "@norn/core";
 import { DEFAULT_CONFIG, type ResolvedConfig } from "@norn/schema";
-import { type LoadedConfig, loadConfig, nornHome, readUnitMarker, type UnitMarker } from "@norn/store";
+import { bindNornHome, type LoadedConfig, loadConfig, nornHome, readUnitMarker, type UnitMarker } from "@norn/store";
 import { corruptError, refuse } from "./output.ts";
 import { type Interaction, isAgentSession, terminalInteraction } from "./runtime/interaction.ts";
+import { guardLayout } from "./runtime/layout.ts";
 import { buildPorts, defaultRegistry } from "./wiring.ts";
 
 /** Everything a command may get injected; all optional (tests pass fakes). */
@@ -100,6 +101,8 @@ export class Context {
   readonly deps: CliDeps;
   /** lines for a person on stderr (a one-time notice, B13), returned in `CliResult.stderr`; never data */
   readonly stderr: string[] = [];
+  /** D5: `locate()` refuses a main checkout on the old or a mixed layout; false for a command that reports it itself (doctor, migrate) */
+  checksLayout = true;
   private located: Located | null = null;
   private loadedConfig: LoadedConfig | null = null;
   private builtPorts: Ports | null = null;
@@ -123,7 +126,14 @@ export class Context {
 
   /** Resolve the repo; commands with `repo: true` get this before `run`. */
   async locate(): Promise<Located> {
-    if (!this.located) this.located = await locateRepo(this.cwd, this.git);
+    if (!this.located) {
+      const located = await locateRepo(this.cwd, this.git);
+      // B5: the checkout's machine dir lives in this command's norn home, not the process env's
+      bindNornHome(located.root, this.home);
+      // D5, B21: the main checkout's layout, never the unit worktree's own files; before config loads
+      if (this.checksLayout) guardLayout(located.root);
+      this.located = located;
+    }
     return this.located;
   }
 

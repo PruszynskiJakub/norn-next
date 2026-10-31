@@ -1,5 +1,5 @@
 /**
- * Machine-local files of one checkout, kept in the gitignored trace dir (§7.1): caches and
+ * Machine-local files of one checkout, kept in its machine dir `<norn home>/repos/<id>/` (B5): caches and
  * bookkeeping norn writes for itself, never committed. Every read is validated against these
  * (S2); a file that is unreadable or of the wrong shape reads as its empty fallback and leaves a
  * `local_file` trace event (store `readLocalJson`). Unknown properties are allowed so a file
@@ -152,6 +152,22 @@ export type LocalPrFile = Static<typeof LocalPrFile>;
 export const LocalCockpitFile = Type.Object({ last_repo: Type.Optional(Type.String()) }, id("local-cockpit", "memory of norn status --watch (<norn home>/cockpit.json)"));
 export type LocalCockpitFile = Static<typeof LocalCockpitFile>;
 
+/** `checkout.json`: the checkout a machine dir belongs to (D3), so doctor can tell one orphaned by a moved repo folder. */
+export const LocalCheckoutFile = Type.Object(
+  {
+    /** absolute path of the main checkout */
+    checkout: Type.String({ minLength: 1 }),
+  },
+  id("local-checkout", "the checkout a norn machine dir belongs to (<norn home>/repos/<id>/checkout.json)"),
+);
+export type LocalCheckoutFile = Static<typeof LocalCheckoutFile>;
+/** `hooks/backfill.json` in the machine dir (B11, B12, D5): when the first tick of the per-unit hook files ran, and the units whose live runs' hook lines it has copied from the day files. Never pruned. */
+export const LocalHookBackfillFile = Type.Object(
+  { since: Type.String(), done: Type.Array(Type.String()) },
+  id("local-hook-backfill", "norn hook file backfill (<norn home>/repos/<id>/hooks/backfill.json)"),
+);
+export type LocalHookBackfillFile = Static<typeof LocalHookBackfillFile>;
+
 /** `notices.json`: the one-time notices this checkout has shown (B13), by id. */
 export const LocalNoticesFile = Type.Object({ shown: Type.Optional(Type.Array(Type.String())) }, id("local-notices", "norn one-time notices shown (trace/notices.json)"));
 export type LocalNoticesFile = Static<typeof LocalNoticesFile>;
@@ -181,6 +197,8 @@ export const LOCAL_SCHEMA_NAMES = [
   "local-pr",
   "local-cockpit",
   "local-lock",
+  "local-hook-backfill",
   "local-notices",
+  "local-checkout",
 ] as const;
 export type LocalSchemaName = (typeof LOCAL_SCHEMA_NAMES)[number];

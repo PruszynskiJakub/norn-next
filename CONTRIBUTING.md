@@ -12,7 +12,7 @@ norn is built with norn. Code rules, layout and the agent side of the process ar
 
 ## Workflows
 
-Picked by the issue label `norn:wf:<name>` (PRD W9); without one, `triage` runs. They live in `.agents/norn/workflows/`.
+Picked by the issue label `norn:wf:<name>` (PRD W9); without one, `triage` runs. They live in `.agents/workflows/`.
 
 | Label | Workflow | For |
 |---|---|---|

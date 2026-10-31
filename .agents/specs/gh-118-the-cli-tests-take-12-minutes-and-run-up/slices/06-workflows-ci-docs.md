@@ -21,7 +21,7 @@ Everything that runs or names tests follows the tiers: the workflow `test` check
 Behaviour: B7, B8, B9, B10, B11, B12, B13, B21. Seams: S1. Out: the PR measurements (slice 07).
 
 ## Acceptance
-- AC1 (B7) `test:fast` and `test:cli` are not package scripts, and no live file (scripts, AGENTS.md, README, CONTRIBUTING, `.agents/norn/workflows`, `.github`, skill sources and copies, `scripts/`, tests) names them; spec folders and `docs/audit-*` are exempt. This lint replaces the old test:fast/test:cli split test. — verifier: test
+- AC1 (B7) `test:fast` and `test:cli` are not package scripts, and no live file (scripts, AGENTS.md, README, CONTRIBUTING, `.agents/workflows`, `.github`, skill sources and copies, `scripts/`, tests) names them; spec folders and `docs/audit-*` are exempt. This lint replaces the old test:fast/test:cli split test. — verifier: test
 - AC2 (B8) The `test` check of quick, story, slice and bug runs `bun install --frozen-lockfile && bun run test && bun run test:integration && bun run typecheck` with its 15 m timeout; comments naming test:fast are rewritten. — verifier: test
 - AC3 (B9) The implement step of quick, story, slice and bug says to run `bun run test` after each change, that integration runs in the `test` check and e2e in CI. — verifier: test
 - AC4 (B10) The shipped norn-implement skill source asks for the repo's fast suite after each change, says slower tiers run in their own check, and no longer says "full suite". — verifier: test

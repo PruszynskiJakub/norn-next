@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://norn.dev/schema/local-hook-backfill.json",
+  "title": "norn hook file backfill (<norn home>/repos/<id>/hooks/backfill.json)",
+  "type": "object",
+  "required": [
+    "since",
+    "done"
+  ],
+  "properties": {
+    "since": {
+      "type": "string"
+    },
+    "done": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

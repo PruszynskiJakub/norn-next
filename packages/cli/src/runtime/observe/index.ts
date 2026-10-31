@@ -47,7 +47,7 @@ import {
 } from "@norn/store";
 import type { Context } from "../../context.ts";
 import { leaseLiveness } from "../leases.ts";
-import { agentSkills, repoWorkflows } from "../workflows.ts";
+import { checkedRepoWorkflows } from "../workflows.ts";
 import { findOrphanBranches, foreignCommits, intakeOnly, refMap, storyBase, worktreeFacts } from "./git-facts.ts";
 import { gitRemote, mergedByAncestry, readyHead, trackingRef } from "./remote.ts";
 import { duringRun, type LocalRunEnv, runWindows, unitFacts } from "./run-facts.ts";
@@ -61,6 +61,8 @@ export interface ObserveOptions {
   tick_id: string;
   /** remote sync: when due (default), now, or not at all */
   sync?: SyncMode;
+  /** B11, B12 (D5): backfill the live runs' hook files from the day files first (the tick's) */
+  backfillHooks?: boolean;
 }
 
 /** Where a story lives on disk (not part of Facts; used by act). */
@@ -164,9 +166,9 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
 
   // ---- local facts (H2): the snapshot, leases (K1, K3), hook facts, caches, what the receipts say
   const liveness = leaseLiveness((p) => ports.process.isAlive(p));
-  const local = await loadLocalFacts(root, { now, home: ctx.home, env: ctx.env, storyWorktrees: storyWts, sliceWorktrees: sliceWts, baseRef, liveness, stalledMs: parseDuration(config.limits.stalled) });
+  const local = await loadLocalFacts(root, { now, home: ctx.home, env: ctx.env, storyWorktrees: storyWts, sliceWorktrees: sliceWts, baseRef, liveness, stalledMs: parseDuration(config.limits.stalled), backfillHooks: opts.backfillHooks });
   const snapshot = local.snapshot;
-  const workflows = repoWorkflows(snapshot.workflows, { default_agent: config.default_agent, visible: agentSkills(ports.agents, root) });
+  const workflows = checkedRepoWorkflows(snapshot.workflows, root, config, ports.agents);
 
   if (due && ports.remote) {
     sync.ran = true;
@@ -259,7 +261,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       const ownWt = lu.worktree;
       const worktree = await wtFacts(ownWt);
       const unitBranch = u.unit.slice ? (sliceFile ? sliceBranch(s.key, sliceFile.nn, sliceFile.slug) : (worktree?.status?.branch ?? `${s.key}/${u.unit.dir}`)) : branch;
-      const uf = await unitFacts(ports, s, lu, worktree, local.hooks, runEnv);
+      const uf = await unitFacts(ports, s, lu, worktree, lu.hooks, runEnv);
       if (lu.act_failure) uf.act_failure = lu.act_failure;
       // a done slice not yet integrated: is its branch in the story branch (the slice cleanup's delete)
       if (sliceFile && u.state?.status === "done" && sliceFile.frontmatter?.status !== "integrated") {

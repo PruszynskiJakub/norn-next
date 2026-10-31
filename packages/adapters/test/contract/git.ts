@@ -6,7 +6,7 @@
  * and fast-forward, and the reads the runtime makes (4.1): remotes, commonDir, hasRef, hasPath,
  * show, lsTree, listRefs over several prefixes, firstParentLog, revList, quiet fetch, detached
  * worktrees and prune, and what the commands call (4.2): version, remoteBranches, changedPaths,
- * checkoutPaths and untrack. Run against real temp repos with a bare remote. Not covered: rebase, log ranges
+ * checkoutPaths and untrack, and what `norn migrate` calls: move and stage. Run against real temp repos with a bare remote. Not covered: rebase, log ranges
  * beyond the last commit, and the port methods only the runtime's own wiring reaches.
  */
 import { afterAll, describe, expect } from "bun:test";
@@ -40,7 +40,8 @@ export type GitContractTest =
   | "fetch: quiet or not; a missing remote branch fails and says so"
   | "worktreeAddDetached checks out a detached HEAD; worktreePrune forgets removed directories"
   | "version names git; remoteBranches lists the remote's branches matching a pattern"
-  | "changedPaths lists what two revisions change; checkoutPaths and untrack put paths back";
+  | "changedPaths lists what two revisions change; checkoutPaths and untrack put paths back"
+  | "move stages a rename of a tracked file and leaves an untracked one; stage adds paths to the index";
 
 /** Deterministic git for the suite's own setup and for the port under test. */
 export const GIT_ENV = {
@@ -438,6 +439,20 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       await git.untrack(root, ["new file.txt", "not-tracked.txt"]);
       expect(sh(root, "ls-files", "--", "new file.txt")).toBe("");
       expect(readFileSync(join(root, "new file.txt"), "utf8")).toBe("x\n");
+    });
+
+    t("move stages a rename of a tracked file and leaves an untracked one; stage adds paths to the index", async () => {
+      const { root, git } = repo();
+      mkdirSync(join(root, "to"));
+      expect(await git.move(root, "a.txt", "to/a.txt")).toBe(true);
+      expect(readFileSync(join(root, "to/a.txt"), "utf8")).toBe("one\n");
+      expect(sh(root, "status", "--porcelain")).toBe("R  a.txt -> to/a.txt");
+      writeFileSync(join(root, "loose.txt"), "l\n");
+      expect(await git.move(root, "loose.txt", "to/loose.txt")).toBe(false);
+      expect(readFileSync(join(root, "loose.txt"), "utf8")).toBe("l\n");
+      await git.stage(root, ["loose.txt"]);
+      expect(sh(root, "status", "--porcelain")).toBe("A  loose.txt\nR  a.txt -> to/a.txt");
+      expect(sh(root, "rev-list", "--count", "HEAD")).toBe("1");
     });
   });
 }

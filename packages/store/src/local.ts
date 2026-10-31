@@ -1,5 +1,5 @@
 /**
- * Machine-local runtime files of one checkout, kept in the gitignored trace dir (§7.1):
+ * Machine-local runtime files of one checkout, kept in its machine dir `<norn home>/repos/<id>/` (B5):
  * - `heartbeat.json`  this checkout's heartbeat_id (ID2), stable across `tick` runs so a
  *                     claim taken by one tick is "mine" for the next (T4); `last_tick_at` (R5.5)
  *                     (heartbeat.ts)

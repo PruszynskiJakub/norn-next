@@ -29,7 +29,7 @@
 
 ## Goal
 
-Write and agree the Plan section of gh-118's spec.md (seams, coverage for B1–B22, prefactoring, decisions, risks).
+Merge origin/main (b69543f8f6d2) into the story branch, resolve the conflicts, commit the merge, and check it.
 
 ## Progress
 
@@ -39,7 +39,8 @@ Write and agree the Plan section of gh-118's spec.md (seams, coverage for B1–B
 - The person agreed the seams S1–S5, both prefactors, e2e = six story flows, the B4-example and B15 amendments, and D1–D14. The Plan is written; no "proposed" remains.
 - plan#1 done: Plan agreed: seams S1 repo rules, S2 unit-guard preload, S3 golden script, S4 QA tier runs, S5 PR CI; coverage for B1–B22. Prefactors: root devDeps on the @norn packages, helper output dirs from the repo root. D1–D14: bunfig per tier, spawn guard (argv only, afterEach), e2e = six story flows, 20 s timeout for integration/e2e (fixes the parallel 5 s failure in integrate.test), CI unit first then integration + a 3-shard e2e matrix, release runs unit + typecheck. B4 example and B15 amended.
 - slice#1 done: Seven slices agreed: 01 prefactor (root devDeps, helper output dirs from repo root) and 02 unit guard preload, in parallel; 03 tier bunfigs/commands + cli tests into unit/integration/e2e + test/support + golden discovery; then 04 store/adapters/view, 05 schema/core/root to test/repo, 06 workflows/CI/release/docs (B7-B13, B21), in parallel; 07 guard on in root, B14/B15 rules, measurements (B3, B17, B18, B20, B22). Every B1-B22 cited.
+- resolve#1: main's history was rewritten from 83c7fa3c2 on. The rewrite only deleted the runs/ of finished stories (1553 deletions; old "Ignore .idea/" c3aa73125 vs new 75d216dfd). Every conflict came from that stale merge base. The story branch had changed only its own spec folder since c3aa73125, so the merge takes main's tree for every path (main's deletions of finished runs/ and the move from .agents/norn/ to .agents/workflows/ and .agents/norn.config.yaml included) and keeps the gh-118 spec folder. The spec's D14 and slice 06 AC1 now name `.agents/workflows` instead of `.agents/norn/workflows`.
 
 ## Resume
 
-Plan agreed; report `norn done done`.
+Merge committed and checks run; report `norn done done`.
