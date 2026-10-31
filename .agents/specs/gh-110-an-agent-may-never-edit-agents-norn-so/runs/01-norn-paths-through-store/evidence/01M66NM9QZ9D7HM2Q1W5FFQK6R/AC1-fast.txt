@@ -1,7 +1,0 @@
-$ bun test --path-ignore-patterns='packages/cli/**'
-bun test v1.3.13 (bf2e2cec)
-
- 948 pass
- 0 fail
- 16 snapshots, 18146 expect() calls
-Ran 948 tests across 52 files. [51.67s]

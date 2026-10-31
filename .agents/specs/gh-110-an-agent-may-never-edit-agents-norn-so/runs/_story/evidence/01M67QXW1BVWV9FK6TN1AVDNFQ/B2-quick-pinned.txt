@@ -1,4 +1,0 @@
-# B2: gh-1 labelled norn:wf:quick — pinned workflow + state
-11:name: quick
-"workflow":"quick"
-11:name: story

@@ -1,6 +1,0 @@
-$ norn run rerun gh-5 --json   (while running)
-{"error":"gh-5 is running implement#1 (running); stop it first","do_instead":"norn run cancel gh-5","code":"running"}
-exit 3
-$ norn run rerun gh-5   (markdown)
-{"error":"gh-5 is running implement#1 (running); stop it first","do_instead":"norn run cancel gh-5","code":"running"}
-exit 3

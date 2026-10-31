@@ -1,3 +1,0 @@
-# AC2 — no literal .agents/norn path outside store's path module; lint enforces it
-- grep of packages/*/src and packages/*/test (comments stripped), excluding store paths.ts: AC2-grep.txt — every hit is user-facing message text (wiring, config-edit, init, story-create, story-edit), a test asserting that text (e2e, config), or core's printed-commands matcher string; all in the lint's allowlist.
-- Lint red/green: added `packages/core/src/qa-tmp/x.ts` with `".agents/norn/config.yaml"` → `bun test test/repo.test.ts` fails "(g) B1, B2, B5: `.agents/norn` paths are spelled only in store's path module … new hit" (AC2-lint-red.txt); removed → 34 pass (AC2-lint-green.txt).

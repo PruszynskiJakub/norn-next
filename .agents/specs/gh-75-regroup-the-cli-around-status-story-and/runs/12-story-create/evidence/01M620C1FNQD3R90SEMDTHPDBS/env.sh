@@ -1,2 +1,0 @@
-export PATH=/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-12/bin:$PATH FAKE_GH_STATE=/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-12/gh-state.json FAKE_GH_LOG=/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-12/gh-calls.log FAKE_OPEN_LOG=/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-12/open.log
-cd /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh75-12/repo

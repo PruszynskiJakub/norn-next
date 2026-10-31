@@ -1,3 +1,0 @@
-[git rebase story] CONFLICT: CONFLICT (content): Merge conflict in f
-[git rebase --rebase-merges story] clean; f=resolved; linear=no
-[git merge-base --is-ancestor story HEAD] clean; f=resolved; linear=no

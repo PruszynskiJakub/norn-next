@@ -1,6 +1,0 @@
-$ norn migrate   (second run)
-# norn migrate
-
-/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110/old is on the new layout: nothing to move.
-exit=0
-       5

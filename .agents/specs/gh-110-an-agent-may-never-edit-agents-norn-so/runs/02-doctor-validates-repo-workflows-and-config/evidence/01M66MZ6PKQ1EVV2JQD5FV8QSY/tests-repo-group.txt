@@ -1,9 +1,0 @@
- 7 pass
- 0 fail
-  test("a clean checkout: workflows and config valid, exit 0, nothing changed (B9)", async () => {
-  test("a workflow with an uncounted cycle is named with the cycle and its path; non-zero (B7)", async () => {
-  test("a workflow naming a skill its agent lacks: doctor names it, and a tick refuses it for the same reason (B7)", async () => {
-  test("a config value of the wrong type names the file, the key and why; non-zero (B8)", async () => {
-  test("a user config that does not load: the repo group still runs, the machine checks are skipped naming that file", async () => {
-  test("--repo checks only the repo: no agent on PATH, no remote auth, no runner (B10)", async () => {
-  test("norn help doctor lists --repo (B10)", async () => {

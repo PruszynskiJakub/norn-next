@@ -1,8 +1,0 @@
-$ (pty) devnorn story create     # typed: "Typed in terminal⏎"
-**Usage error (title_required):** a title is needed and there is no terminal to ask in
-
-Do instead: pass --title: norn story create --title "…"
-exit 2
---- editor log
---- created
-{"number":102,"title":"Body from file","body":"Steps:\n1. log in\n2. wait 5s\n","assignees":["qa-person"],"labels":["norn"]}

@@ -1,9 +1,0 @@
-bun test v1.3.13 (bf2e2cec)
-
-packages/cli/test/debug-gh77.test.ts:
-[gh77] run_check tick: 452 ms (check 0 ms); acts=run_check; unblock during check=[]; concurrent tick exit=0 {"tick_id":"03PGFN69Z0VSFN45ZXK9BHFDXJ","at":"2099-01-15T10:02:20.000Z","duration_ms":706,"sync":{"ran":false,"ok":true}
-
- 1 pass
- 0 fail
- 4 expect() calls
-Ran 1 test across 1 file. [6.02s]

@@ -1,3 +1,0 @@
-# AC6 (B21) — a worktree's own old files are ignored
-Test (verifier): layout-guard.test.ts — main checkout migrated, unit worktrees gh-9/gh-10 hold broken old config (`default_mode: [not, a, mode]`), an old workflow and old trace; brief, hook stop (trace records hook), done, ask all exit 0. 13/13 pass (layout-guard-test.log).
-By hand: a linked git worktree of the throwaway repo holding a broken `.agents/norn/config.yaml` and `.agents/norn/workflows/bad.yaml`: status --json exit 0, doctor --repo --json reports layout new + main checkout's config/workflows ok, hook `{}` exit 0 (AC6-cli.txt). brief there refuses not_in_unit (no real unit: creating one needs a remote), so brief/done/ask in a real unit are covered by the test only.

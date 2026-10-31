@@ -1,7 +1,0 @@
-# B2: gh-1 labelled norn:wf:quick
-11:name: quick
-{"workflow":"quick","step":"refine"}
-
-# worktree git status
-!! .env.norn
-!! .norn-unit

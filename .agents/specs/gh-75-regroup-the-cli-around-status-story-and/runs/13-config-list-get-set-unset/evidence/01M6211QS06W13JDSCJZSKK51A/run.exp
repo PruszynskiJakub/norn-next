@@ -1,5 +1,0 @@
-set timeout 15
-spawn {*}$argv
-expect { timeout { puts "\nTIMEOUT (prompted, no answer)"; exit 99 } eof }
-catch wait result
-puts "\[exit [lindex $result 3]\]"

@@ -1,8 +1,0 @@
-$ bun test ./packages/cli/test
-bun test v1.3.13 (bf2e2cec)
-
- 475 pass
- 0 fail
- 6686 expect() calls
-Ran 475 tests across 39 files. [587.21s]
-exit=0

@@ -1,2 +1,0 @@
-#!/bin/sh
-exec bun /Users/jakubpruszynski/Projects/norn-worktrees/gh-75-regroup-the-cli-around-status-story-and--12-story-create/packages/cli/src/main.ts "$@"

@@ -1,2 +1,0 @@
-#!/bin/sh
-echo "$@" >> "$FAKE_OPEN_LOG"

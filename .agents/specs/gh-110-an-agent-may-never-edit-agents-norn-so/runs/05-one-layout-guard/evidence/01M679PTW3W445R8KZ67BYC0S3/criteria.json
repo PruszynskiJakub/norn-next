@@ -1,9 +1,0 @@
-[
-  { "id": "AC1", "verdict": "pass", "evidence": "AC1.md, AC1-AC3-AC5-old.txt, AC1-per-part.txt, layout-guard-test.log" },
-  { "id": "AC2", "verdict": "pass", "evidence": "AC2.md, AC2-AC4-both.txt, layout-guard-test.log" },
-  { "id": "AC3", "verdict": "pass", "evidence": "AC3.md, AC1-AC3-AC5-old.txt, old-before.sha, old-after.sha" },
-  { "id": "AC4", "verdict": "pass", "evidence": "AC4.md, AC1-AC3-AC5-old.txt, AC2-AC4-both.txt" },
-  { "id": "AC5", "verdict": "pass", "evidence": "AC5.md, AC1-AC3-AC5-old.txt, layout-guard-test.log" },
-  { "id": "AC6", "verdict": "pass", "evidence": "AC6.md, AC6-cli.txt, layout-guard-test.log" },
-  { "id": "AC7", "verdict": "pass", "evidence": "AC7.md, AC1-AC3-AC5-old.txt, AC2-AC4-both.txt" }
-]

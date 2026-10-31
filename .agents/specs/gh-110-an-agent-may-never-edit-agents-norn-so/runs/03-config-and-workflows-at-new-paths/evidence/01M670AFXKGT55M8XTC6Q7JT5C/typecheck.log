@@ -1,2 +1,0 @@
-$ tsc --noEmit -p tsconfig.json && tsc --noEmit -p scripts/tsconfig.json
-EXIT 0

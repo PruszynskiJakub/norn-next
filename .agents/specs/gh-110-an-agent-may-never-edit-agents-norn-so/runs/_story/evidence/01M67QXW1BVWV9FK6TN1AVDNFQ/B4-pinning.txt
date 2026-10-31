@@ -1,7 +1,0 @@
-# B4: edit quick.yaml on main after gh-1 pinned it
-12:description: QA EDITED quick
-# gh-1 pinned copy:
-0
-description: Default story lifecycle — spec, plan, slices, story-level verification, draft PR.
-# gh-3 pinned copy:
-description: QA EDITED quick

@@ -1,5 +1,0 @@
-norn migrate — Move this repo's config, workflows and trace from the old layout to the new one and stage the moves for you to commit
-
-    norn migrate [--json]
-
-For the person; an agent runs it only when the person asks it to.
