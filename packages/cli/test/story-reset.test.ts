@@ -1,6 +1,6 @@
 /**
  * `norn story reset` (GR7a): a story with no work of its own goes back to before intake — worktree,
- * local and remote branch, record and claim gone, issue untouched — and the next sync takes it in
+ * local and remote branch, record, mailbox and claim gone, issue untouched — and the next sync takes it in
  * again from the current base. A story holding work is refused unless `--force`.
  * Real git: one clone of a bare remote.
  */
@@ -78,20 +78,26 @@ describe("norn story reset (GR7a)", () => {
     expect(remoteHeads()).toBe(before);
   });
 
-  test("a story with no work of its own: worktree, branches, record and claim gone; the issue stays; the next sync takes it in again from the current base", async () => {
+  test("a story with no work of its own: worktree, branches, record, mailbox and claim gone; the issue stays; the next sync takes it in again from the current base", async () => {
     // the base moves on after intake, as it did for the stories cut too early (#126)
     h.write(join(h.root, "later.txt"), "on main after intake\n");
     h.git(["add", "later.txt"]);
     h.git(["commit", "-q", "-m", "later"]);
     h.git(["push", "-q", "origin", "main"]);
+    // a receipt another clone left for the old run (T9)
+    const left = "refs/norn/inbox/gh-8/01JB0000000000000000000000";
+    h.git(["update-ref", left, sh(h.root, ["hash-object", "-w", "--stdin"], "{}")]);
+    h.git(["push", "-q", "origin", `${left}:${left}`]);
+    h.git(["update-ref", "-d", left]);
     const calls = h.remote.calls.length;
     const r = await h.norn("story", "reset", "gh-8", "--yes");
     expect(r.exit).toBe(0);
-    expect(r.value).toMatchObject({ story: "gh-8", reset: true, branches_deleted: ["gh-8-add-logout"], remote_branches_deleted: ["gh-8-add-logout"], claim_deleted: true });
+    expect(r.value).toMatchObject({ story: "gh-8", reset: true, branches_deleted: ["gh-8-add-logout"], remote_branches_deleted: ["gh-8-add-logout"], mailbox_deleted: [left], claim_deleted: true });
     expect(existsSync(wt("gh-8-add-logout"))).toBe(false);
     expect(remoteHeads()).not.toContain("gh-8-add-logout");
     expect(h.git(["branch", "--list", "gh-8*"])).toBe("");
     expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-8"])).toBe("");
+    expect(h.git(["ls-remote", "origin", "refs/norn/inbox/gh-8/*"])).toBe("");
     expect(h.remote.issues.find((i) => i.number === 8)?.state).toBe("open");
     expect(h.remote.calls.slice(calls).filter((c) => c.startsWith("pr+") || c.startsWith("pr~"))).toEqual([]);
 

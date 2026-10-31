@@ -1,7 +1,7 @@
 /**
  * `norn story reset [<story>] [--yes] [--force]` (GR7a): take a story back to before intake —
- * remove its worktrees, its local and remote branches (the record goes with them), leases and the
- * claim. The remote issue is left alone, so the next sync takes it in again from the current base
+ * remove its worktrees, its local and remote branches (the record goes with them), leases, mailbox
+ * refs (T9) and the claim. The remote issue is left alone, so the next sync takes it in again from the current base
  * while it is assigned and labelled (GR1, GR2).
  *
  * Refused first, before anything changes: a claim another machine holds (B38); work a reset would
@@ -9,11 +9,12 @@
  * `--force`. Then consent: `--yes`, or y at the terminal; without a terminal it is refused (B36, B37).
  *
  * Order: claim it if free (T7) → delete the remote branches, stopping on the first failure with
- * everything here still in place → remove worktrees, local branches, leases → delete the claim ref.
+ * everything here still in place → remove worktrees, local branches, leases → delete the mailbox
+ * refs, as GR6 does → delete the claim ref.
  */
 import { existsSync } from "node:fs";
 import { cmd } from "@norn/core";
-import { listLeases, releaseClaim, releaseLease, scanWorktrees } from "@norn/store";
+import { deleteMailbox, fetchNornRefs, listLeases, listMailbox, releaseClaim, releaseLease, scanWorktrees } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import { failure, refuse } from "../output.ts";
 import { withStory } from "../runtime/release.ts";
@@ -96,6 +97,10 @@ export const storyResetCommand = defineCommand({
       const leases: string[] = [];
       for (const e of (await listLeases(ctx.home, () => true)).live)
         if (e.lease.repo === obs.root && e.lease.story === key && releaseLease(ctx.home, e.file)) leases.push(e.file);
+      // a receipt left for the old run would only be rejected later (T9); delete it with the claim, as GR6 does
+      if (obs.remote) await fetchNornRefs(obs.root, obs.remote).catch(() => undefined);
+      const mailbox: string[] = [];
+      for (const m of await listMailbox(obs.root, key).catch(() => [])) if ((await deleteMailbox(obs.root, obs.remote, m.ref, m.sha)).ok) mailbox.push(m.ref);
       const rel = await releaseClaim(obs.root, obs.remote, key, claimSha);
 
       return {
@@ -106,6 +111,7 @@ export const storyResetCommand = defineCommand({
         branches_deleted: deleted,
         remote_branches_deleted: remoteDeleted,
         leases_released: leases,
+        mailbox_deleted: mailbox,
         claim_deleted: rel.ok,
         ...(rel.ok ? {} : { claim_error: rel.message }),
       };
