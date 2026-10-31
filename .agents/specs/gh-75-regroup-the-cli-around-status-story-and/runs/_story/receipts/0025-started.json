@@ -1,0 +1,16 @@
+{
+  "kind": "started",
+  "receipt_id": "01M64W5HMPK98C043X9B1FGSQ3",
+  "run_id": "01M64W5HMPV8NCSDZV9Q76W6SD",
+  "step": "qa",
+  "attempt": 2,
+  "at": "2026-10-29T22:23:25.848Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M64W5HMP9PZQPM0CRDTJ815Q",
+  "how": "auto",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-75-regroup-the-cli-around-status-story-and",
+  "machine": "jakubpruszynski@mac",
+  "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD"
+}

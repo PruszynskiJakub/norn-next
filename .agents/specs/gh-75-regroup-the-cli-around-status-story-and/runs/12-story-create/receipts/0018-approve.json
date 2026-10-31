@@ -1,0 +1,13 @@
+{
+  "kind": "approve",
+  "receipt_id": "01M63J5WR1TJT6SS79SEDEZDW5",
+  "run_id": null,
+  "step": "human-qa",
+  "attempt": 1,
+  "at": "2026-10-29T10:09:37.025Z",
+  "by": "human",
+  "who": "jakubpruszynski@mac",
+  "slice": "gh-75/12",
+  "comment": "AC8 checked against real GitHub (throwaway private repo PruszynskiJakub/norn-qa-story-create, dev build of this slice): story create --title … --workflow story printed gh-1, issue #1 has labels norn + norn:wf:story and is assigned to PruszynskiJakub, status lists gh-1 new / not_started. story create --web --workflow story exited 0 with url …/issues/new?labels=norn%2Cnorn%3Awf%3Astory, created:false, and no issue was created. Prefill on the opened page itself not inspected; both labels exist on the repo.",
+  "head_sha": "af6e5816aa84a74867091ef620a7cd0271bdbf7c"
+}

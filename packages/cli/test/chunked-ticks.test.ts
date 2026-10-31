@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type TickTrace, ulid, validate } from "@norn/schema";
-import { appendHookTrace, appendTrace, readTickInputs, readTrace, sha256, traceDir, writeTraceFile } from "@norn/store";
+import { appendHookTrace, appendTrace, readTickInputs, readTrace, sha256, machineDir, repoConfigPath, workflowsDir, writeTraceFile } from "@norn/store";
 import { harvestGolden } from "./golden-harvest.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
 import { observeNow } from "./observe-snapshot.ts";
@@ -40,7 +40,7 @@ let h: Harness;
 const wt = () => `${h.root}-worktrees/gh-9-fix-the-bug`;
 const runs = () => join(wt(), SPEC, "runs/_story");
 const ticks = () => readTrace(h.root, { types: ["tick"] }).events as TickTrace[];
-const dir = () => traceDir(h.root);
+const dir = () => machineDir(h.root);
 const bytes = () => readdirSync(dir()).filter((n) => n.endsWith(".jsonl")).reduce((sum, n) => sum + statSync(join(dir(), n)).size, 0);
 const chunksFile = () => join(dir(), `${h.clock.iso().slice(0, 10)}.chunks.jsonl`);
 
@@ -60,8 +60,8 @@ function fullTick(root: string, t: TickTrace, tickId: string): TickTrace {
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-  h.write(join(h.root, ".agents/norn/workflows/solo.yaml"), SOLO);
+  h.write(repoConfigPath(h.root), CONFIG);
+  h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn"]);
   h.git(["push", "-q", "origin", "main"]);

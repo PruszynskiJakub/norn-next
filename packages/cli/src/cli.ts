@@ -87,6 +87,7 @@ async function dispatch(command: Command, rest: string[], deps: CliDeps): Promis
   const markdown = command.markdown === true && !json;
   const argvOwn = [...flags.filter((a) => a !== "--json" && (command.markdown !== true || a !== "--text")), ...(end < 0 ? [] : rest.slice(end))];
   const ctx = new Context(deps);
+  ctx.checksLayout = command.layout !== false;
   const withStderr = (r: CliResult): CliResult => (ctx.stderr.length ? { ...r, stderr: ctx.stderr.map((l) => `${l}\n`).join("") } : r);
   try {
     const args = { ...parseCommandArgs(command, argvOwn), json };

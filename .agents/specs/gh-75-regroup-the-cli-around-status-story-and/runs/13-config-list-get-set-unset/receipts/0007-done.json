@@ -1,0 +1,31 @@
+{
+  "kind": "done",
+  "receipt_id": "01M6206ZWZA9PY7VP7WBCS4PKX",
+  "run_id": "01M61Z33MYHVN5G3VJ2NMNG6NQ",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-28T19:36:24.224Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/13",
+  "outcome": "approve",
+  "handoff": "Approve: AC1-AC8 covered by integration tests in packages/cli/test/config.test.ts, AC9 re-checked by hand (one-line git diff for set and unset, comments kept). Tests and typecheck green. Minor: agents.<name> seeded from built-in rather than the user layer's agent; nit: no test for --user+--repo together.",
+  "findings": [
+    {
+      "severity": "minor",
+      "title": "A new agents.<name> entry is seeded from the built-in agent, not from the layer below",
+      "id": "F1",
+      "file": "packages/store/src/config.ts",
+      "line": 113,
+      "detail": "setIn seeds `agents.<name>` from DEFAULT_CONFIG when the edited file lacks it. When the user file defines `agents.claude` with its own args, `config set agents.claude.model opus --repo` writes the built-in args into the repo file, which then replaces the user's agent whole (K2) and silently drops the user's args. Recorded as a decision in the handoff; the spec does not cover it.\nAxis: standards\nSuggestion: Seed from the resolved agent of the lower layers (or say in the set output that the agent entry was created from the built-in one)."
+    },
+    {
+      "severity": "nit",
+      "title": "--user and --repo together has no test",
+      "id": "F2",
+      "file": "packages/cli/src/commands/config-edit.ts",
+      "line": 58,
+      "detail": "layerFile turns both flags into a usage error; no test pins it.\nAxis: spec\nSuggestion: Add one case to the B65 test."
+    }
+  ]
+}

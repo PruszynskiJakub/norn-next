@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "story": "gh-77",
+  "slice": null,
+  "unit_dir": "_story",
+  "workflow": "fix",
+  "workflow_hash": "e782a3ecf7ffb2d0b985a110350c437f6c5e9ecefc558e4c41b66a384999a1b5",
+  "step": "$done",
+  "attempt": 1,
+  "visits": {
+    "reproduce": 1,
+    "implement": 4,
+    "update": 4,
+    "test": 4,
+    "review": 3,
+    "describe": 1,
+    "open-pr": 1,
+    "ready": 1
+  },
+  "step_entered_at": "2026-10-28T21:25:16.504Z",
+  "status": "done",
+  "park": null,
+  "counters": {
+    "test_loop": 1,
+    "review_loop": 2,
+    "ready_loop": 0,
+    "base_conflict_loop": 0,
+    "stale_loop": 0
+  },
+  "nudges_used": 0,
+  "retries_used": 0,
+  "applied_through": 30,
+  "run": null,
+  "last_outcome": {
+    "step": "ready",
+    "outcome": "approve",
+    "source": "human",
+    "at": "2026-10-28T21:26:14.502Z",
+    "receipt_id": "01M626G3Q6V0PBX0H06CT1E4XN"
+  },
+  "created_at": "2026-10-28T14:13:16.910Z",
+  "updated_at": "2026-10-28T21:26:22.135Z",
+  "last_tick_id": "01M626GB5PYXGW8NBF31R22VVZ",
+  "mode": "manual"
+}

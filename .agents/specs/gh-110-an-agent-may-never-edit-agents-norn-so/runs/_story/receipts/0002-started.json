@@ -1,0 +1,18 @@
+{
+  "kind": "started",
+  "receipt_id": "01M669C06P2C616KJWD8X7J711",
+  "run_id": "01M669C06P2C616KJWD8X7J710",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-30T11:33:24.214Z",
+  "by": "agent",
+  "who": "claude",
+  "how": "manual",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-110-an-agent-may-never-edit-agents-norn-so",
+  "agent_session_id": "958ca42b-1cd8-45c8-af34-324f19351a78",
+  "process": {
+    "pid": 20985,
+    "pid_start": "Fri Oct 30 12:33:03 2026"
+  }
+}

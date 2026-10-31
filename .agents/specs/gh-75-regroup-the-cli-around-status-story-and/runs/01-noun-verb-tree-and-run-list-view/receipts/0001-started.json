@@ -1,0 +1,19 @@
+{
+  "kind": "started",
+  "receipt_id": "01M60XSE396EDG8JTG93WCRZXH",
+  "run_id": "01M60XSE396EDG8JTG93WCRZXG",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-28T09:34:48.604Z",
+  "by": "agent",
+  "who": "claude",
+  "how": "manual",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-75-regroup-the-cli-around-status-story-and--01-noun-verb-tree-and-run-list-view",
+  "agent_session_id": "428f0b39-a6db-4765-8153-cdc04b89fe81",
+  "process": {
+    "pid": 49515,
+    "pid_start": "Wed Oct 28 10:34:37 2026"
+  },
+  "slice": "gh-75/01"
+}

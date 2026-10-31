@@ -8,6 +8,7 @@
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
+import { repoConfigPath, workflowsDir } from "@norn/store";
 import type { TickReport } from "../src/index.ts";
 import { createHarness, type Harness, issue, sh } from "./harness.ts";
 import { expectFactsSnapshot, inboxParity, observeNow } from "./observe-snapshot.ts";
@@ -92,9 +93,9 @@ describe("observe snapshots and inbox parity (refactor Phase 0.3)", () => {
   beforeAll(async () => {
     h = await createHarness();
     expect((await h.norn("init")).exit).toBe(0);
-    h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-    h.write(join(h.root, ".agents/norn/workflows/mini.yaml"), MINI);
-    h.write(join(h.root, ".agents/norn/workflows/slice.yaml"), SLICE);
+    h.write(repoConfigPath(h.root), CONFIG);
+    h.write(join(workflowsDir(h.root), "mini.yaml"), MINI);
+    h.write(join(workflowsDir(h.root), "slice.yaml"), SLICE);
     h.git(["add", "-A"]);
     h.git(["commit", "-q", "-m", "norn init"]);
     h.git(["push", "-q", "origin", "main"]);

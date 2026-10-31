@@ -1,0 +1,51 @@
+## AC8a: interrupted after the staged renames, trace still at its old place
+R  .agents/norn/config.yaml -> .agents/norn.config.yaml
+R  .agents/norn/workflows/bug.yaml -> .agents/workflows/bug.yaml
+R  .agents/norn/workflows/slice.yaml -> .agents/workflows/slice.yaml
+R  .agents/norn/workflows/story.yaml -> .agents/workflows/story.yaml
+2026-10-30.jsonl
+heartbeat.json
+inbox.json
+remote.json
+workflows
+heartbeat: "heartbeat_id": "01M67DQA2JBXTKDTPDMRME3X4R"
+$ norn status
+**Refused (old_layout):** /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-migrate/repo2 is on the old norn layout (machine files: .agents/norn/trace)
+
+Do instead: norn migrate
+[exit 3]
+$ norn migrate
+# norn migrate
+
+Moved /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-migrate/repo2 to the new layout:
+
+- machine files: .agents/norn/trace → /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-migrate/home-repo2/repos/repo2-957672c8 (machine-local, outside git)
+- .gitignore: dropped .agents/norn/trace/ (staged)
+
+Review the staged moves with `git status`, then commit them: `git commit -m "Move norn to its new layout (norn migrate)"`
+[exit 0]
+R  .agents/norn/config.yaml -> .agents/norn.config.yaml
+R  .agents/norn/workflows/bug.yaml -> .agents/workflows/bug.yaml
+R  .agents/norn/workflows/slice.yaml -> .agents/workflows/slice.yaml
+R  .agents/norn/workflows/story.yaml -> .agents/workflows/story.yaml
+M  .gitignore
+.
+..
+norn.config.yaml
+skills
+workflows
+2026-10-30.jsonl
+checkout.json
+heartbeat.json
+inbox.json
+remote.json
+workflows
+heartbeat: "heartbeat_id": "01M67DQA2JBXTKDTPDMRME3X4R"
+node_modules/
+# norn (machine-local)
+.env.norn
+.norn-unit
+*.log
+$ norn status
+`norn status` now shows what needs you; the story listing moved to `norn story list`.
+[exit 0]

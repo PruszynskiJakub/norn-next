@@ -1,0 +1,31 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61HJ7EMYPWR3A1G8WXZK4TN",
+  "run_id": "01M61H0Q0SDDTMWSKNR1P5Z20V",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-28T15:20:23.765Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/07",
+  "outcome": "approve",
+  "handoff": "Review approved: AC1–AC7 met with S1 tests, suite+typecheck green; minor F1 (lone unit-key arg to story answer becomes the answer), nit F2 (duplicated BS9 predicate).",
+  "findings": [
+    {
+      "severity": "minor",
+      "title": "One positional that looks like a unit key is taken as the answer text",
+      "id": "F1",
+      "file": "packages/cli/src/commands/story-answer.ts",
+      "line": 31,
+      "detail": "With the unit optional, `norn story answer gh-3` (text forgotten) treats 'gh-3' as the answer: in a unit worktree it is delivered to that worktree's unit as the literal answer 'gh-3'. B24's `[<unit>] …` makes the form ambiguous by design, but a lone positional matching STORY_KEY_PATTERN (or a slice key) is almost certainly a missing answer.\nAxis: standards\nSuggestion: When the only positional is a valid unit key, refuse with a usage error ('the answer is missing', do_instead 'norn story answer gh-3 \"<text>\"')."
+    },
+    {
+      "severity": "nit",
+      "title": "BS9 waiting condition written twice",
+      "id": "F2",
+      "file": "packages/cli/src/commands/story-update-branch.ts",
+      "line": 25,
+      "detail": "`updatable.applies` re-spells the `waiting` predicate (done | stuck | parked at gate) inline on the view instead of sharing it; the two can drift.\nAxis: standards\nSuggestion: Reuse one predicate over the shared status/park fields."
+    }
+  ]
+}

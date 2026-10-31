@@ -9,7 +9,7 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSy
 import { join } from "node:path";
 import type { BriefJson } from "@norn/core";
 import { type HookTrace, type TickTrace, ulid } from "@norn/schema";
-import { appendHookTrace, readTickInputs, readTrace, readTraceFile, setTraceReadObserver, type TraceFileRead, traceDir } from "@norn/store";
+import { appendHookTrace, machineDir, readTickInputs, readTrace, readTraceFile, remoteCachePath, repoConfigPath, setTraceReadObserver, type TraceFileRead, workflowsDir } from "@norn/store";
 import { type CliResult } from "../src/index.ts";
 import { parseFindings } from "../src/commands/done.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
@@ -75,15 +75,15 @@ const hook = (cwd: string, event: string, payload: Record<string, unknown>, ...f
 const stop = (cwd: string) => hook(cwd, "stop", { hook_event_name: "Stop", stop_hook_active: false });
 /** B5 (D3): the lines of a unit's hook file (`_story` for the story unit) */
 const hookFileLines = (story: string, unit = "_story") => {
-  const file = join(traceDir(h.root), "hooks", story, `${unit}.jsonl`);
+  const file = join(machineDir(h.root), "hooks", story, `${unit}.jsonl`);
   return existsSync(file) ? h.read(file).split("\n").filter(Boolean) : [];
 };
 /** every hook line of the day files, as written */
 const dayHookLines = () =>
-  readdirSync(traceDir(h.root))
+  readdirSync(machineDir(h.root))
     .filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n))
     .sort()
-    .flatMap((n) => h.read(join(traceDir(h.root), n)).split("\n"))
+    .flatMap((n) => h.read(join(machineDir(h.root), n)).split("\n"))
     .filter((l) => l.startsWith('{"type":"hook"'));
 /** the trace files `run` opens through the trace-read observer, each once, by kind (B4, B8–B10) */
 async function opened(run: () => Promise<unknown>): Promise<Record<TraceFileRead["kind"], string[]>> {
@@ -112,9 +112,9 @@ async function tickUntil(pred: () => boolean, max = 10) {
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-  h.write(join(h.root, ".agents/norn/workflows/duo.yaml"), DUO);
-  h.write(join(h.root, ".agents/norn/workflows/pair.yaml"), PAIR);
+  h.write(repoConfigPath(h.root), CONFIG);
+  h.write(join(workflowsDir(h.root), "duo.yaml"), DUO);
+  h.write(join(workflowsDir(h.root), "pair.yaml"), PAIR);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);
   h.git(["push", "-q", "origin", "main"]);
@@ -191,8 +191,8 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     expect(linked.at(-1)).toMatchObject({ type: "briefing", unit: "gh-9", run_id: runId, step: "implement", attempt: 1, briefing: v.briefing });
     const timeline = (await h.norn("run", "list", "gh-9", "--events")).value as { steps: Array<{ step: string; paths: { briefings: string[] }; events: Array<{ source: string; ref: string; summary: string }> }> };
     const row = timeline.steps.find((r) => r.step === "implement");
-    expect(row?.paths.briefings).toEqual([join(h.root, ".agents/norn/trace", v.briefing)]);
-    expect(row?.events.find((e) => e.source === "briefing")).toMatchObject({ ref: join(h.root, ".agents/norn/trace", v.briefing), summary: expect.stringContaining(runId) });
+    expect(row?.paths.briefings).toEqual([join(machineDir(h.root), v.briefing)]);
+    expect(row?.events.find((e) => e.source === "briefing")).toMatchObject({ ref: join(machineDir(h.root), v.briefing), summary: expect.stringContaining(runId) });
 
     const added = receipts(runs()).filter((f) => !before.includes(f));
     expect(added).toHaveLength(1);
@@ -222,10 +222,10 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
   test("B4: `norn run list` prints the same events with lines it does not show added, broken or not; every reader opens day files through the observer", async () => {
     const before = await h.norn("run", "list", "gh-9", "--events", "--all", "--json");
     expect(before.exit).toBe(0);
-    const days = () => readdirSync(traceDir(h.root)).filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n)).sort().map((n) => join(traceDir(h.root), n));
+    const days = () => readdirSync(machineDir(h.root)).filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n)).sort().map((n) => join(machineDir(h.root), n));
     const last = days().at(-1) as string;
     appendFileSync(last, '{"type":"tick.start",broken\n');
-    appendFileSync(last, `${JSON.stringify({ type: "local_file", id: "01M5MA3PG0DB4G1MJNV0HKQYSA", at: new Date(h.clock.now()).toISOString(), file: ".agents/norn/trace/remote.json", schema: "local-remote", reason: "unreadable", errors: [] })}\n`);
+    appendFileSync(last, `${JSON.stringify({ type: "local_file", id: "01M5MA3PG0DB4G1MJNV0HKQYSA", at: new Date(h.clock.now()).toISOString(), file: remoteCachePath(h.root), schema: "local-remote", reason: "unreadable", errors: [] })}\n`);
     const after = await h.norn("run", "list", "gh-9", "--events", "--all", "--json");
     expect(after.stdout).toBe(before.stdout);
     // a reader of every type still reports the broken line
@@ -372,7 +372,7 @@ describe("attended steps never block (MO4)", () => {
 describe("norn hook robustness (A3)", () => {
   test("outside a unit worktree: no-op, nothing traced", async () => {
     const before = readTrace(h.root, { types: ["hook"] }).events.length;
-    const hookFiles = () => (existsSync(join(traceDir(h.root), "hooks")) ? readdirSync(join(traceDir(h.root), "hooks"), { recursive: true }).map(String).sort() : []);
+    const hookFiles = () => (existsSync(join(machineDir(h.root), "hooks")) ? readdirSync(join(machineDir(h.root), "hooks"), { recursive: true }).map(String).sort() : []);
     const files = hookFiles();
     const r = await hook(h.root, "stop", { hook_event_name: "Stop" });
     expect(r).toMatchObject({ exit: 0, value: {} });
@@ -469,7 +469,7 @@ describe("norn hook robustness (A3)", () => {
     // hook lines for other units: gh-10's lands in its hook file and the day file, gh-404's (no such unit) too
     appendHookTrace(h.root, { story: "gh-10" }, { type: "hook", id: ulid(h.clock.now()), fact: { event: "tool_use", at: h.clock.iso(), agent: "claude", native: "PostToolUse", cwd: pairWt(), story: "gh-10" } });
     appendHookTrace(h.root, { story: "gh-404" }, { type: "hook", id: ulid(h.clock.now()), fact: { event: "tool_use", at: h.clock.iso(), agent: "claude", native: "PostToolUse", cwd: "/elsewhere", story: "gh-404" } });
-    const file = (story: string) => join(traceDir(h.root), "hooks", story, "_story.jsonl");
+    const file = (story: string) => join(machineDir(h.root), "hooks", story, "_story.jsonl");
     /** one tick: the hook files and day files it opens, and the hook facts of gh-9's run in its facts */
     const tick = async () => {
       const { day: days, hook } = await opened(() => h.tick());
@@ -505,10 +505,10 @@ describe("hook backfill on upgrade (B11, B12, D5)", () => {
   let g: Harness;
   const gWt = () => `${g.root}-worktrees/gh-9-manual-thing`;
   const gRuns = () => join(gWt(), spec, "runs/_story");
-  const backfillFile = () => join(traceDir(g.root), "hooks", "backfill.json");
-  const gHookFile = () => join(traceDir(g.root), "hooks", "gh-9", "_story.jsonl");
+  const backfillFile = () => join(machineDir(g.root), "hooks", "backfill.json");
+  const gHookFile = () => join(machineDir(g.root), "hooks", "gh-9", "_story.jsonl");
   const gHookIds = () => (existsSync(gHookFile()) ? g.read(gHookFile()).split("\n").filter(Boolean).map((l) => (JSON.parse(l) as HookTrace).id) : []);
-  const gDays = () => readdirSync(traceDir(g.root)).filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n));
+  const gDays = () => readdirSync(machineDir(g.root)).filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n));
   let runId = "";
   let runStart = 0;
   /** 400 hook lines of gh-9's run, written only to the day files, the way the previous version wrote them */
@@ -517,8 +517,8 @@ describe("hook backfill on upgrade (B11, B12, D5)", () => {
   beforeAll(async () => {
     g = await createHarness();
     expect((await g.norn("init")).exit).toBe(0);
-    g.write(join(g.root, ".agents/norn/config.yaml"), CONFIG);
-    g.write(join(g.root, ".agents/norn/workflows/duo.yaml"), DUO);
+    g.write(repoConfigPath(g.root), CONFIG);
+    g.write(join(workflowsDir(g.root), "duo.yaml"), DUO);
     g.git(["add", "-A"]);
     g.git(["commit", "-q", "-m", "norn init"]);
     g.git(["push", "-q", "origin", "main"]);
@@ -556,11 +556,11 @@ describe("hook backfill on upgrade (B11, B12, D5)", () => {
       const at = i < 200 ? runStart + (i + 1) * 60_000 : midnight + (i - 200) * 1_000;
       const ev: HookTrace = { type: "hook", id: ulid(at), fact: { event: "tool_use", at: new Date(at).toISOString(), agent: "claude", native: "PostToolUse", cwd: gWt(), story: "gh-9", run_id: runId, tool: "Bash" } };
       old.push(ev);
-      appendFileSync(join(traceDir(g.root), `${ev.fact.at.slice(0, 10)}.jsonl`), `${JSON.stringify(ev)}\n`);
+      appendFileSync(join(machineDir(g.root), `${ev.fact.at.slice(0, 10)}.jsonl`), `${JSON.stringify(ev)}\n`);
     }
     // another unit's hook line in the same day file is never copied into gh-9's
     const other: HookTrace = { type: "hook", id: ulid(midnight), fact: { event: "tool_use", at: new Date(midnight).toISOString(), agent: "claude", native: "PostToolUse", cwd: "/elsewhere", story: "gh-404" } };
-    appendFileSync(join(traceDir(g.root), `${other.fact.at.slice(0, 10)}.jsonl`), `${JSON.stringify(other)}\n`);
+    appendFileSync(join(machineDir(g.root), `${other.fact.at.slice(0, 10)}.jsonl`), `${JSON.stringify(other)}\n`);
     g.clock.t = midnight + 400_000;
     await g.tick();
     expect(gHookIds()).toEqual(old.map((e) => e.id));

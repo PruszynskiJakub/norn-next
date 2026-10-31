@@ -1,6 +1,6 @@
 /**
  * `norn config <verb>` (K2, B61–B68): `list` the resolved config, each setting with the layer it
- * came from (built-in, `~/.norn/config.yaml` or `.agents/norn/config.yaml`), grouped by who it
+ * came from (built-in, `~/.norn/config.yaml` or `.agents/norn.config.yaml`), grouped by who it
  * belongs to; `get <key>` that setting, or every setting under it (`limits`, `agents`); `set` and
  * `unset` one value in the user or repo file (`config-edit.ts`).
  */

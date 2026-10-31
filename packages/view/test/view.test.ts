@@ -7,8 +7,10 @@ import {
   acquireClaim,
   appendHookTrace,
   appendReceipt,
+  bindNornHome,
   appendTrace,
   leasesDir,
+  machineDir,
   pinWorkflow,
   sha256,
   storyDir,
@@ -89,6 +91,7 @@ async function seed() {
   const repo = tmp();
   const home = tmp();
   Bun.spawnSync(["git", "init", "-q", repo], { cwd: repo });
+  bindNornHome(repo, home);
   const spec = storyDir(repo, "gh-12", "fix-login");
   writeStoryFile(
     storyFile(spec),
@@ -266,7 +269,7 @@ describe("loadProjectView", () => {
     const { repo, home } = await seed();
     const old = NOW - 20 * 86_400_000;
     appendTrace(repo, { type: "tick", tick_id: ulid(old), at: new Date(old).toISOString(), heartbeat_id: null, duration_ms: 5, facts: {}, decisions: [{ unit: "gh-12", rule: "old", action: { kind: "wait" }, result: { ok: true } }] });
-    writeFileSync(join(repo, ".agents/norn/trace", "2026-10-22.jsonl"), '{"type":"tick",broken\n');
+    writeFileSync(join(machineDir(repo), "2026-10-22.jsonl"), '{"type":"tick",broken\n');
     const v = await loadProjectView({ repoRoot: repo, home, now: NOW, holder: "me@box", liveness: () => true, env: {} });
     expect(v.errors).toEqual([]);
     const t = loadTimelines({ repoRoot: repo, home, now: NOW, env: {} });

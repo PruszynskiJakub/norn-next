@@ -6,6 +6,7 @@
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
+import { repoConfigPath, workflowsDir } from "@norn/store";
 import { type CliResult } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
 import { runChecked } from "./harness.ts";
@@ -84,8 +85,8 @@ type History = { items: Array<{ id: string; group: string; title: string; appear
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-  h.write(join(h.root, ".agents/norn/workflows/ship.yaml"), SHIP);
+  h.write(repoConfigPath(h.root), CONFIG);
+  h.write(join(workflowsDir(h.root), "ship.yaml"), SHIP);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn"]);
   h.git(["push", "-q", "origin", "main"]);

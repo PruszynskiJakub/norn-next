@@ -8,7 +8,7 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { readTrace } from "@norn/store";
+import { readTrace, repoConfigPath, workflowsDir } from "@norn/store";
 import type { OrientReport } from "@norn/view";
 import type { CliDeps, CliResult } from "../src/index.ts";
 import { fakeHerdr } from "./fake-herdr.ts";
@@ -63,9 +63,9 @@ const slice = (nn: string, title: string) => `---\nid: gh-2/${nn.slice(0, 2)}\nt
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-  h.write(join(h.root, ".agents/norn/workflows/sliced.yaml"), SLICED);
-  h.write(join(h.root, ".agents/norn/workflows/sliceqa.yaml"), SLICE_QA);
+  h.write(repoConfigPath(h.root), CONFIG);
+  h.write(join(workflowsDir(h.root), "sliced.yaml"), SLICED);
+  h.write(join(workflowsDir(h.root), "sliceqa.yaml"), SLICE_QA);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);
   h.git(["push", "-q", "origin", "main"]);

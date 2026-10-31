@@ -1,0 +1,38 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M64PRKDWJXJ2BKB85XZKQEF4",
+  "run_id": "01M64PRDW8QQKJVNNHTENCCH3M",
+  "step": "update",
+  "attempt": 1,
+  "at": "2026-10-29T20:48:58.812Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M64PRDW8SC5GP5RQWYNVMJ1Y",
+  "outcome": "conflict",
+  "rule": "git.update",
+  "detail": "merging main (13e0986a33f7) into gh-75-regroup-the-cli-around-status-story-and conflicts in .agents/PRD.md, .agents/skills/triage/SKILL.md, README.md, packages/adapters/test/contract/zombie.ts, packages/cli/src/commands/brief.ts, packages/cli/src/commands/help.ts, packages/cli/src/commands/index.ts, packages/cli/src/commands/story-close.ts, packages/cli/src/context.ts, packages/cli/src/runtime/act/lifecycle.ts, packages/cli/test/harness.ts, packages/cli/test/human.test.ts, packages/cli/test/recovery.test.ts, packages/cli/test/team.test.ts, packages/core/src/decide/steps.ts, packages/core/src/inbox/items.ts, packages/core/test/golden/runtime-3aec7a560471.json",
+  "route": "resolve",
+  "base": {
+    "ref": "refs/remotes/origin/main",
+    "sha": "13e0986a33f7ac7daecf59e1c319025f12f2260e",
+    "conflicts": [
+      ".agents/PRD.md",
+      ".agents/skills/triage/SKILL.md",
+      "README.md",
+      "packages/adapters/test/contract/zombie.ts",
+      "packages/cli/src/commands/brief.ts",
+      "packages/cli/src/commands/help.ts",
+      "packages/cli/src/commands/index.ts",
+      "packages/cli/src/commands/story-close.ts",
+      "packages/cli/src/context.ts",
+      "packages/cli/src/runtime/act/lifecycle.ts",
+      "packages/cli/test/harness.ts",
+      "packages/cli/test/human.test.ts",
+      "packages/cli/test/recovery.test.ts",
+      "packages/cli/test/team.test.ts",
+      "packages/core/src/decide/steps.ts",
+      "packages/core/src/inbox/items.ts",
+      "packages/core/test/golden/runtime-3aec7a560471.json"
+    ]
+  }
+}

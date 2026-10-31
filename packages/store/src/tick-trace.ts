@@ -10,7 +10,7 @@ import { join } from "node:path";
 import type { Facts, FileError, LoadedWorkflow, RepoWorkflows } from "@norn/core";
 import { type ResolvedConfig, type TickTrace, assertValid } from "@norn/schema";
 import { appendDurable, isErrno, readText } from "./fsx.ts";
-import { traceDir } from "./paths.ts";
+import { machineDir } from "./paths.ts";
 import { appendTrace, readTraceFile, traceFileName } from "./trace.ts";
 import { parseWorkflowText, sha256 } from "./unit.ts";
 
@@ -152,7 +152,7 @@ export function appendTick(root: string, tick: Omit<TickTrace, "type" | "facts">
   const { inbox, ...fields } = tick;
   const line: TickTrace = { type: "tick", ...fields, facts: skeleton, ...(inbox ? { inbox } : {}) };
   assertValid("trace", line);
-  appendChunks(join(traceDir(root), chunksFileName(tick.at)), chunks);
+  appendChunks(join(machineDir(root), chunksFileName(tick.at)), chunks);
   return appendTrace(root, line);
 }
 
@@ -228,7 +228,7 @@ export function tickReader(root: string): TickReader {
   const dayOf = (at: string) => {
     const name = chunksFileName(at);
     let d = days.get(name);
-    if (!d) days.set(name, (d = new DayChunks(join(traceDir(root), name))));
+    if (!d) days.set(name, (d = new DayChunks(join(machineDir(root), name))));
     return { name, chunks: d };
   };
   return {

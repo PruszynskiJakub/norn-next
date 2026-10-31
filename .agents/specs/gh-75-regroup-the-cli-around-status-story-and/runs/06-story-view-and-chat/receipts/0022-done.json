@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61SM48TSSQP0ESYG6SXYWKF",
+  "run_id": "01M61S5BV835GTA0WGJG90T925",
+  "step": "merge",
+  "attempt": 2,
+  "at": "2026-10-28T17:41:14.651Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/06",
+  "outcome": "done",
+  "handoff": "integrate rebases onto the story branch, so merge#1's merge commit still conflicted. Rebased the slice linearly onto the story tip d526a0c, resolving df17c96 with merge#1's resolution (cockpit and orient gone; statusWatch, runAttach, storyChat, storyView kept). Tree identical to the pre-rebase head; typecheck clean; 1268 pass, 0 fail."
+}

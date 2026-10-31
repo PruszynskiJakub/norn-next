@@ -9,22 +9,22 @@ import { expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { traceDir, readPendingRecords, readRemoteCache } from "@norn/store";
+import { machineDir, readPendingRecords, readRemoteCache } from "@norn/store";
 
 function root(): string {
   const r = mkdtempSync(join(tmpdir(), "norn-local-json-"));
-  mkdirSync(traceDir(r), { recursive: true });
+  mkdirSync(machineDir(r), { recursive: true });
   return r;
 }
 
 test("BUG-4 remote.json of the wrong shape reads as empty, not as a string timestamp", () => {
   const r = root();
-  writeFileSync(join(traceDir(r), "remote.json"), JSON.stringify({ attempted_at: "2099-01-01T00:00:00Z", synced_at: "yesterday" }));
+  writeFileSync(join(machineDir(r), "remote.json"), JSON.stringify({ attempted_at: "2099-01-01T00:00:00Z", synced_at: "yesterday" }));
   expect(readRemoteCache(r)).toEqual({ synced_at: null, attempted_at: null, last_error: null, default_branch: null });
 });
 
 test("BUG-4 records.json of the wrong shape reads as empty", () => {
   const r = root();
-  writeFileSync(join(traceDir(r), "records.json"), JSON.stringify({ records: [{ story: 7 }, "junk"] }));
+  writeFileSync(join(machineDir(r), "records.json"), JSON.stringify({ records: [{ story: 7 }, "junk"] }));
   expect(readPendingRecords(r)).toEqual([]);
 });

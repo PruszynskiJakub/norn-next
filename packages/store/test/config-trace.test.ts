@@ -2,7 +2,7 @@ import { describe, expect, spyOn, test } from "bun:test";
 import * as fs from "node:fs";
 import { mkdirSync, writeFileSync, appendFileSync } from "node:fs";
 import { copyFileSync, readdirSync, readFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import type { Facts, LoadedWorkflow } from "@norn/core";
 import { type HookFact, type HookTrace, type ResolvedConfig, type TickTrace, type TraceEvent, ulid } from "@norn/schema";
 import {
@@ -22,10 +22,12 @@ import {
   readTrace,
   readUnitHooks,
   readTraceFile,
+  machineDir,
+  repoConfigPath,
   sha256,
   setTraceReadObserver,
-  traceDir,
   unitHooksChangedAt,
+  workflowsDir,
   writeBriefing,
   writeTraceFile,
 } from "../src/index.ts";
@@ -37,26 +39,26 @@ describe("config (K2)", () => {
     const home = tmp();
     expect(loadConfig({ repoRoot: repo, home })).toMatchObject({ ok: true, config: { max_agents: 2 } });
     writeFileSync(join(home, "config.yaml"), "max_agents: 4\ndefault_mode: auto\n");
-    mkdirSync(join(repo, ".agents/norn"), { recursive: true });
-    writeFileSync(join(repo, ".agents/norn/config.yaml"), "max_agents: 8\nremote: { label: mine }\n");
+    mkdirSync(dirname(repoConfigPath(repo)), { recursive: true });
+    writeFileSync(repoConfigPath(repo), "max_agents: 8\nremote: { label: mine }\n");
     const c = loadConfig({ repoRoot: repo, env: { NORN_HOME_DIR: home } });
     expect(c.ok && c.config).toMatchObject({ max_agents: 4, default_mode: "auto", remote: { label: "mine", provider: "gh" } });
     expect(c.home).toBe(home);
   });
   test("invalid layer → errors with repo-relative path", () => {
     const repo = tmp();
-    mkdirSync(join(repo, ".agents/norn"), { recursive: true });
-    writeFileSync(join(repo, ".agents/norn/config.yaml"), "max_agents: zero\n");
+    mkdirSync(dirname(repoConfigPath(repo)), { recursive: true });
+    writeFileSync(repoConfigPath(repo), "max_agents: zero\n");
     const c = loadConfig({ repoRoot: repo, home: tmp() });
     expect(c.ok).toBe(false);
-    expect(!c.ok && c.errors[0]?.file).toBe(".agents/norn/config.yaml");
+    expect(!c.ok && c.errors[0]?.file).toBe(relative(repo, repoConfigPath(repo)));
   });
 });
 
 describe("workflows (W1)", () => {
   test("loads yaml and json, reports invalid and name mismatch", () => {
     const repo = tmp();
-    const dir = join(repo, ".agents/norn/workflows");
+    const dir = workflowsDir(repo);
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "slice.yaml"), WORKFLOW_YAML);
     writeFileSync(join(dir, "bug.json"), JSON.stringify({ name: "bug", start: "fix", steps: { fix: { type: "gate", outcomes: { approve: "$done" } } } }));
@@ -64,7 +66,7 @@ describe("workflows (W1)", () => {
     writeFileSync(join(dir, "README.md"), "ignored");
     const l = loadWorkflows(repo);
     expect(Object.keys(l.workflows).sort()).toEqual(["bug", "slice"]);
-    expect(l.errors.map((e) => e.file)).toEqual([".agents/norn/workflows/story.yaml"]);
+    expect(l.errors.map((e) => e.file)).toEqual([relative(repo, join(dir, "story.yaml"))]);
     expect(loadWorkflow(repo, "slice")).toMatchObject({ ok: true, value: { name: "slice", workflow: { start: "implement" } } });
     expect(loadWorkflow(repo, "nope")).toEqual({ ok: false, reason: "missing" });
   });
@@ -93,7 +95,7 @@ describe("trace (O4)", () => {
       id: ulid(),
       fact: { event: "turn_end", at: "2026-10-24T00:00:03.000Z", agent: "claude", native: "Stop", cwd: "/w", story: "gh-12", slice: "gh-12/01" },
     });
-    appendFileSync(join(traceDir(repo), "2026-10-24.jsonl"), "garbage\n");
+    appendFileSync(join(machineDir(repo), "2026-10-24.jsonl"), "garbage\n");
     const all = readTrace(repo);
     expect(all.events.length).toBe(4);
     expect(all.errors.map((e) => e.file)).toEqual(["2026-10-24.jsonl:4"]);
@@ -131,7 +133,7 @@ describe("trace (O4)", () => {
   test("B4 (D2): a reader given types skips lines of other types unparsed; a reader of every type reports them", () => {
     const repo = tmp();
     appendTrace(repo, tick("gh-12", AT));
-    const day = join(traceDir(repo), "2026-10-23.jsonl");
+    const day = join(machineDir(repo), "2026-10-23.jsonl");
     appendFileSync(day, '{"type":"tick.start",broken\n');
     // an older norn's line with `type` not first is parsed, not skipped
     const old = tick("gh-12", "2026-10-23T00:00:05.000Z") as Record<string, unknown>;
@@ -161,7 +163,7 @@ describe("trace (O4)", () => {
         read();
         return [...seen];
       };
-      const both = [join(traceDir(repo), "2026-10-23.jsonl"), join(traceDir(repo), "2026-10-24.jsonl")];
+      const both = [join(machineDir(repo), "2026-10-23.jsonl"), join(machineDir(repo), "2026-10-24.jsonl")];
       expect(opened(() => readTrace(repo, { types: ["tick"] }))).toEqual(both);
       expect(opened(() => inboxHistory(repo))).toEqual(both);
       expect(opened(() => readHookFacts(repo, AT))).toEqual(both);
@@ -210,13 +212,13 @@ describe("trace (O4)", () => {
     expect(unitHooksChangedAt(repo, gh10)).toBe(Date.parse("2026-10-24T00:00:03.000Z"));
     // a duplicate line (a backfill overlapping an append) is read once
     appendFileSync(hookFilePath(repo, gh9), `${JSON.stringify(late)}\n`);
-    expect(hookFilePath(repo, gh9)).toBe(join(traceDir(repo), "hooks/gh-9/_story.jsonl"));
-    expect(hookFilePath(repo, gh9s)).toBe(join(traceDir(repo), "hooks/gh-9/01.jsonl"));
+    expect(hookFilePath(repo, gh9)).toBe(join(machineDir(repo), "hooks/gh-9/_story.jsonl"));
+    expect(hookFilePath(repo, gh9s)).toBe(join(machineDir(repo), "hooks/gh-9/01.jsonl"));
     // every line also lands in its day file (B5)
     expect(readTrace(repo, { types: ["hook"] }).events).toHaveLength(6);
 
     const seen: string[] = [];
-    const prev = setTraceReadObserver(({ file, kind }) => seen.push(`${kind} ${file.slice(traceDir(repo).length + 1)}`));
+    const prev = setTraceReadObserver(({ file, kind }) => seen.push(`${kind} ${file.slice(machineDir(repo).length + 1)}`));
     const ats = (units: Parameters<typeof readUnitHooks>[1], since: string) => readUnitHooks(repo, units, since).map((evs) => evs.map((e) => e.fact.at.slice(11, 19)));
     try {
       // the story unit no longer sees its slice's hooks: each unit has its own file
@@ -285,7 +287,7 @@ const tickFields = (at: string, tickId = ulid(Date.parse(at))) => ({
 
 const ticksOf = (repo: string) => readTrace(repo, { types: ["tick"] }).events as TickTrace[];
 const day = (at: string) => at.slice(0, 10);
-const chunksPath = (repo: string, at: string) => join(traceDir(repo), `${day(at)}.chunks.jsonl`);
+const chunksPath = (repo: string, at: string) => join(machineDir(repo), `${day(at)}.chunks.jsonl`);
 const chunkLines = (repo: string, at: string) =>
   (readTraceFile(repo, `${day(at)}.chunks.jsonl`) ?? "")
     .split("\n")
@@ -381,8 +383,8 @@ describe("chunked tick facts (O4, O5)", () => {
     appendTick(repo, tickFields(next), c);
     appendTick(repo, tickFields("2026-10-24T00:01:05.000Z"), setHooks(withRun(), hooks(65)));
     const copy = tmp();
-    mkdirSync(traceDir(copy), { recursive: true });
-    for (const f of ["2026-10-24.jsonl", "2026-10-24.chunks.jsonl"]) copyFileSync(join(traceDir(repo), f), join(traceDir(copy), f));
+    mkdirSync(machineDir(copy), { recursive: true });
+    for (const f of ["2026-10-24.jsonl", "2026-10-24.chunks.jsonl"]) copyFileSync(join(machineDir(repo), f), join(machineDir(copy), f));
     const ticks = ticksOf(copy);
     expect(ticks.length).toBe(2);
     expect(ticks.map((t) => readBack(copy, t))).toEqual([asText(c), asText(setHooks(withRun(), hooks(65)))]);

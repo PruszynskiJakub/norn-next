@@ -1,0 +1,15 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M64PNWFNKJZM91VHP2WQMDFK",
+  "run_id": "01M64PNNZDZYZNSM55FB1SE42M",
+  "step": "integrate",
+  "attempt": 1,
+  "at": "2026-10-29T20:47:29.781Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M64PNNZDGGJHA0PR0K475YHC",
+  "outcome": "done",
+  "rule": "git.integrate",
+  "detail": "gh-75/15-docs-plugin-prd-and-lint integrated into gh-75-regroup-the-cli-around-status-story-and at 6ce153ebe654",
+  "route": "$done"
+}

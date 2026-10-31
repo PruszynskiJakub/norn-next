@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { CriteriaTrace } from "@norn/schema";
-import { readTrace } from "@norn/store";
+import { readTrace, repoConfigPath, workflowsDir } from "@norn/store";
 import { type CliResult } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
 import { runChecked } from "./harness.ts";
@@ -93,8 +93,8 @@ const UNVERIFIED = { id: "AC2", verdict: "unverified", reason: "no browser in th
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-  h.write(join(h.root, ".agents/norn/workflows/qaflow.yaml"), QAFLOW);
+  h.write(repoConfigPath(h.root), CONFIG);
+  h.write(join(workflowsDir(h.root), "qaflow.yaml"), QAFLOW);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);
   h.git(["push", "-q", "origin", "main"]);
@@ -181,7 +181,7 @@ describe("criteria reports and notes through norn done", () => {
     expect(refused.value).toMatchObject({ code: "pass_without_capability", details: { criteria: [{ id: "AC2", missing: ["browser"] }] }, do_instead: expect.stringContaining("norn done unverified") });
     expect(readdirSync(join(runs(), "receipts")).filter((f) => f.endsWith("-done.json"))).toHaveLength(1);
     // an agent configured with a browser may pass it
-    h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG.replace("claude: { adapter: claude }", "claude: { adapter: claude, capabilities: [browser] }"));
+    h.write(repoConfigPath(h.root), CONFIG.replace("claude: { adapter: claude }", "claude: { adapter: claude, capabilities: [browser] }"));
     expect((await inWt("done", "pass", "--handoff", "all observed", "--criteria", pass, "--note", "copy says 'Today', spec says 'today'")).exit).toBe(0);
     await tickUntil(at("ready", "parked"), "ready");
     expect((await notes()).map((i) => i.title)).toEqual(["qa note on gh-4 (AC1): kept whitespace inside backticks", "qa note on gh-4: copy says 'Today', spec says 'today'"]);

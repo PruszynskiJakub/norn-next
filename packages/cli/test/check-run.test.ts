@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type CheckOrder, ulid } from "@norn/schema";
-import { acquireRunLease, leasesDir, listLeases, listReceipts } from "@norn/store";
+import { acquireRunLease, leasesDir, listLeases, listReceipts, repoConfigPath, workflowsDir } from "@norn/store";
 import type { TickReport } from "../src/index.ts";
 import { runCheckOrder } from "../src/runtime/act/check.ts";
 import { createHarness, type Harness, installBundledSkills, issue } from "./harness.ts";
@@ -39,8 +39,8 @@ const rules = (r: TickReport) => r.decisions.map((d) => d.rule);
 /** A harness whose stories (one per title) sit at a check step running `run`. */
 async function atChecks(run: string, timeout: string, titles: string[]): Promise<{ h: Harness; runsDirs: string[] }> {
   const h = await createHarness();
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-  h.write(join(h.root, ".agents/norn/workflows/slow.yaml"), workflow(run, timeout));
+  h.write(repoConfigPath(h.root), CONFIG);
+  h.write(join(workflowsDir(h.root), "slow.yaml"), workflow(run, timeout));
   installBundledSkills(h.root);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);

@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Receipt } from "@norn/schema";
+import { heartbeatFilePath, repoConfigPath, workflowsDir } from "@norn/store";
 import { type CliResult, type TickReport } from "../src/index.ts";
 import { createHarness, type Harness, issue, sh } from "./harness.ts";
 import { runChecked } from "./harness.ts";
@@ -93,11 +94,11 @@ type Verb = { unit: string; receipt: Receipt; delivered: { via: string; claim?: 
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-  h.write(join(h.root, ".agents/norn/workflows/gated.yaml"), GATED);
-  h.write(join(h.root, ".agents/norn/workflows/alt.yaml"), ALT);
-  h.write(join(h.root, ".agents/norn/workflows/sliced.yaml"), SLICED);
-  h.write(join(h.root, ".agents/norn/workflows/sliceqa.yaml"), SLICE_QA);
+  h.write(repoConfigPath(h.root), CONFIG);
+  h.write(join(workflowsDir(h.root), "gated.yaml"), GATED);
+  h.write(join(workflowsDir(h.root), "alt.yaml"), ALT);
+  h.write(join(workflowsDir(h.root), "sliced.yaml"), SLICED);
+  h.write(join(workflowsDir(h.root), "sliceqa.yaml"), SLICE_QA);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);
   h.git(["push", "-q", "origin", "main"]);
@@ -280,7 +281,7 @@ describe("approve (gate)", () => {
     expect(h.state(runs5())).toMatchObject({ step: "work", attempt: 4, counters: { loop: 2 } });
 
     // T8: drop gh-6's claim everywhere; approve takes it for this heartbeat
-    const hb = JSON.parse(h.read(join(h.root, ".agents/norn/trace/heartbeat.json"))).heartbeat_id;
+    const hb = JSON.parse(h.read(heartbeatFilePath(h.root))).heartbeat_id;
     h.git(["push", "-q", "origin", ":refs/norn/claims/gh-6"]);
     h.git(["update-ref", "-d", "refs/norn/claims/gh-6"]);
     const a = await h.norn("story", "approve", "gh-6");

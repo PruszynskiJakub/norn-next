@@ -1,0 +1,13 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61WTRH3CX5Q6KFR9F7XATRC",
+  "run_id": "01M61VP3B1QCCP8PWPVZ3WZEWE",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-28T18:37:17.732Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/12",
+  "outcome": "done",
+  "handoff": "story create (B18–B23): RemotePort.createIssue/newIssueUrl on gh, glab, scripted CLIs and FakeRemote with two new remoteContract tests (AC1); new 'story' noun with 'create' verb, tested in packages/cli/test/story-create.test.ts (AC2–AC7: flags, body-file, terminal prompt + editor, script refusal, unknown workflow before any remote call, remote failure leaves nothing local, --web opens the labelled new-issue page). Interaction gained ask/edit (D2); editor via store editInTerminal; openLink moved to runtime/open-link.ts. Full suite 1264 green, typecheck green. AC8 (real GitHub repo) not run: no writable test remote here — a person checks it."
+}

@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "story": "gh-70",
+  "slice": null,
+  "unit_dir": "_story",
+  "workflow": "quick",
+  "workflow_hash": "e1035bf08337c2d63967792add84270d2c199f94830cec0b60aefd3b34ae39cb",
+  "step": "$done",
+  "attempt": 1,
+  "visits": {
+    "explore": 1,
+    "confirm": 1,
+    "implement": 1,
+    "update": 1,
+    "test": 1,
+    "review": 1,
+    "describe": 1,
+    "open-pr": 1,
+    "ready": 1
+  },
+  "step_entered_at": "2026-10-28T16:04:09.724Z",
+  "status": "done",
+  "park": null,
+  "counters": {
+    "triage_loop": 0
+  },
+  "nudges_used": 0,
+  "retries_used": 0,
+  "applied_through": 15,
+  "run": null,
+  "last_outcome": {
+    "step": "ready",
+    "outcome": "approve",
+    "source": "human",
+    "at": "2026-10-28T16:06:33.639Z",
+    "receipt_id": "01M61M6RD7ZPJ6Z51FYHEAB8Z1"
+  },
+  "created_at": "2026-10-27T22:37:49.730Z",
+  "updated_at": "2026-10-28T16:06:58.728Z",
+  "last_tick_id": "01M61M7GX5V4T0XCN846B8J0J4",
+  "mode": "manual"
+}

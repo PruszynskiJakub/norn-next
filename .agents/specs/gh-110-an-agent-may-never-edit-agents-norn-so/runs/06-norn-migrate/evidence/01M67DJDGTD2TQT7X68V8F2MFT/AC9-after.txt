@@ -1,0 +1,13 @@
+$ norn tick
+{"tick_id":"01M67DPYQ7JZ3GFDFR4R63NZRM","at":"2026-10-30T22:08:30.951Z","duration_ms":202,"sync":{"ran":false,"ok":true},"decisions":[],"notified":[],"trace":"2026-10-30.jsonl","failed":0}
+ [exit 0]
+heartbeat after tick: "heartbeat_id": "01M67DKWR4SF5AY7TQGY9WE0FR"
+$ ls .agents
+norn.config.yaml
+skills
+workflows
+$ norn status
+`norn status` now shows what needs you; the story listing moved to `norn story list`.
+Inbox empty — no stories yet.
+Label an issue `norn` (the config's `remote.label`) and assign it to yourself, then run `norn sync`.
+[exit 0]

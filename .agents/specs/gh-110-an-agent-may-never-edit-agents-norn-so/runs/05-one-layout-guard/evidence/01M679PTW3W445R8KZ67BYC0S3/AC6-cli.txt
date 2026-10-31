@@ -1,0 +1,12 @@
+### norn status --json
+{"at":"2026-10-30T21:00:25.078Z","groups":{"your_turn":[],"answer":[],"approve":[],"unblock":[],"check":[],"unclaimed":[],"running":[],"notes":[],"recently_done":[]},"pending":0}
+[exit 0]
+### norn doctor --repo --json
+{"ok":true,"repo":{"ok":true,"layout":{"ok":true,"layout":"new"},"workflows":[{"name":"bug","file":".agents/workflows/bug.yaml","ok":true,"issues":[]},{"name":"slice","file":".agents/workflows/slice.yaml","ok":true,"issues":[]},{"name":"story","file":".agents/workflows/story.yaml","ok":true,"issues":[]}],"config":{"ok":true,"file":".agents/norn.config.yaml","present":true,"errors":[]}}}
+[exit 0]
+### norn brief --json
+{"error":"norn brief runs only inside a unit worktree (a directory with a .norn-unit marker)","do_instead":"stop: this session is not in a unit worktree. A person starts the agent from the unit's item in `norn status` (`norn story start <unit>` opens or prints it)","code":"not_in_unit"}
+[exit 3]
+### norn hook stop </dev/null
+{}
+[exit 0]

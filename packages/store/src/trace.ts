@@ -1,5 +1,5 @@
 /**
- * Trace (O4, B4, gitignored): `.agents/norn/trace/<YYYY-MM-DD>.jsonl` — one JSONL file
+ * Trace (O4, B4, machine-local): `<norn home>/repos/<id>/<YYYY-MM-DD>.jsonl` — one JSONL file
  * per UTC day holding every event (tick, hook, reject, briefing) in append order. Day files keep
  * appends cheap and let old days be deleted wholesale; `trace <unit>` / `why <unit>`
  * filter by unit while reading. Briefings and transcript snapshots are separate files
@@ -25,7 +25,7 @@ import {
   validate,
 } from "@norn/schema";
 import { appendDurable, atomicWrite, isErrno, readText, safeUnlink } from "./fsx.ts";
-import { hookFilePath, traceDir } from "./paths.ts";
+import { hookFilePath, machineDir } from "./paths.ts";
 
 function eventTime(ev: TraceEvent): string {
   return ev.type === "hook" ? ev.fact.at : ev.at;
@@ -46,7 +46,7 @@ export function traceFileName(at: string): string {
 export function appendTrace(root: string, event: TraceEvent): string {
   assertValid("trace", event);
   const name = traceFileName(eventTime(event));
-  const path = join(traceDir(root), name);
+  const path = join(machineDir(root), name);
   const line = traceLine(event);
   if (event.type === "tick.start") appendDurable(path, line);
   else {
@@ -76,7 +76,7 @@ export function appendHookTrace(root: string, unit: HookUnit, event: HookTrace):
   const before = unitHooksChangedAt(root, unit) ?? Number.NEGATIVE_INFINITY;
   mkdirSync(dirname(file), { recursive: true });
   appendFileSync(file, line);
-  appendFileSync(join(traceDir(root), name), line);
+  appendFileSync(join(machineDir(root), name), line);
   const at = new Date(Math.max(before, Date.parse(event.fact.at)));
   try {
     utimesSync(file, at, at);
@@ -214,7 +214,7 @@ function prefixType(line: string): string | null {
 function* dayFileLines(root: string, opts: { sinceDay?: string | null; types?: readonly string[]; quiet?: boolean } = {}): Generator<DayLine> {
   let names: string[];
   try {
-    names = readdirSync(traceDir(root))
+    names = readdirSync(machineDir(root))
       .filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n))
       .sort();
   } catch (e) {
@@ -223,7 +223,7 @@ function* dayFileLines(root: string, opts: { sinceDay?: string | null; types?: r
   }
   for (const name of names) {
     if (opts.sinceDay && name.slice(0, 10) < opts.sinceDay.slice(0, 10)) continue;
-    const path = join(traceDir(root), name);
+    const path = join(machineDir(root), name);
     observeRead({ file: path, kind: "day" });
     let text: string | null;
     try {
@@ -420,7 +420,7 @@ const DAY_PAIR_FILE = /^(\d{4}-\d{2}-\d{2})(?:\.chunks)?\.jsonl$/;
 export function traceDaysBefore(root: string, beforeDay: string): TraceDay[] {
   let names: string[];
   try {
-    names = readdirSync(traceDir(root)).sort();
+    names = readdirSync(machineDir(root)).sort();
   } catch (e) {
     if (isErrno(e, "ENOENT")) return [];
     throw e;
@@ -431,7 +431,7 @@ export function traceDaysBefore(root: string, beforeDay: string): TraceDay[] {
     if (!day || day >= beforeDay) continue;
     let bytes: number;
     try {
-      bytes = statSync(join(traceDir(root), name)).size;
+      bytes = statSync(join(machineDir(root), name)).size;
     } catch {
       continue;
     }
@@ -445,7 +445,7 @@ export function traceDaysBefore(root: string, beforeDay: string): TraceDay[] {
 
 /** D12: delete the files of these day pairs (deleted wholesale: a day pair is self-contained). */
 export function deleteTraceDays(root: string, days: TraceDay[]): void {
-  for (const d of days) for (const f of d.files) safeUnlink(join(traceDir(root), f));
+  for (const d of days) for (const f of d.files) safeUnlink(join(machineDir(root), f));
 }
 
 // ---------------------------------------------------------------- retention (D12): hook files and run dirs
@@ -466,12 +466,12 @@ const HOOK_FILE = /^(\d+|_story)\.jsonl$/;
 /** D12: every unit hook file under `hooks/`, sorted by path. */
 export function listHookFiles(root: string): HookFileEntry[] {
   const out: HookFileEntry[] = [];
-  for (const story of listDir(join(traceDir(root), "hooks"))) {
-    for (const name of listDir(join(traceDir(root), "hooks", story))) {
+  for (const story of listDir(join(machineDir(root), "hooks"))) {
+    for (const name of listDir(join(machineDir(root), "hooks", story))) {
       const nn = HOOK_FILE.exec(name)?.[1];
       if (!nn) continue;
       const file = `hooks/${story}/${name}`;
-      const st = statOrNull(join(traceDir(root), file));
+      const st = statOrNull(join(machineDir(root), file));
       if (!st?.isFile()) continue;
       out.push({ story, slice: nn === STORY_UNIT_DIR ? null : `${story}/${nn}`, file, bytes: st.size, mtimeMs: st.mtimeMs });
     }
@@ -493,8 +493,8 @@ export interface RunTraceEntry {
 export function listRunTraces(root: string): RunTraceEntry[] {
   const runs = new Map<string, RunTraceEntry>();
   for (const kind of ["briefings", "transcripts"]) {
-    for (const run of listDir(join(traceDir(root), kind))) {
-      const dir = join(traceDir(root), kind, run);
+    for (const run of listDir(join(machineDir(root), kind))) {
+      const dir = join(machineDir(root), kind, run);
       const st = statOrNull(dir);
       if (!st?.isDirectory()) continue;
       const e = runs.get(run) ?? { run_id: run, files: [], bytes: 0, newestMs: Number.NEGATIVE_INFINITY };
@@ -516,9 +516,9 @@ export function listRunTraces(root: string): RunTraceEntry[] {
 /** D12: delete these trace-relative files and dirs, then a story's `hooks/<story>/` left empty. */
 export function deleteTracePaths(root: string, rels: readonly string[]): void {
   for (const rel of rels) {
-    rmSync(join(traceDir(root), safeRel(rel)), { recursive: true, force: true });
-    const parent = dirname(join(traceDir(root), rel));
-    if (dirname(parent) === join(traceDir(root), "hooks") && listDir(parent).length === 0) rmSync(parent, { recursive: true, force: true });
+    rmSync(join(machineDir(root), safeRel(rel)), { recursive: true, force: true });
+    const parent = dirname(join(machineDir(root), rel));
+    if (dirname(parent) === join(machineDir(root), "hooks") && listDir(parent).length === 0) rmSync(parent, { recursive: true, force: true });
   }
 }
 
@@ -541,7 +541,7 @@ function statOrNull(path: string): Stats | null {
 
 /** Whether the trace still holds the day file of the UTC day of `at` (D10: a gone day means pruned). */
 export function hasTraceDay(root: string, at: string): boolean {
-  return existsSync(join(traceDir(root), traceFileName(at)));
+  return existsSync(join(machineDir(root), traceFileName(at)));
 }
 
 // ---------------------------------------------------------------- side files (B4, C4)
@@ -557,11 +557,11 @@ function safeRel(rel: string): string {
 
 /** Write a trace side file atomically; returns its trace-relative path. */
 export function writeTraceFile(root: string, rel: string, text: string): string {
-  atomicWrite(join(traceDir(root), safeRel(rel)), text);
+  atomicWrite(join(machineDir(root), safeRel(rel)), text);
   return rel;
 }
 export function readTraceFile(root: string, rel: string): string | null {
-  return readText(join(traceDir(root), safeRel(rel)));
+  return readText(join(machineDir(root), safeRel(rel)));
 }
 
 /** Store the exact briefing of a run (B4). */

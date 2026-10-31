@@ -1,0 +1,62 @@
+{
+  "kind": "done",
+  "receipt_id": "01M6129TTEM653J08WJ42VHW2Y",
+  "run_id": "01M611MCMWZJGGHWJBEQYQ9AGA",
+  "step": "qa",
+  "attempt": 1,
+  "at": "2026-10-28T10:53:40.046Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/01",
+  "outcome": "pass",
+  "handoff": "QA pass on all 8 criteria: bun test 1208 pass, typecheck green; in a throwaway repo run list is byte-identical to released trace for every flag (text and JSON), run view --why/--receipt identical to why (receipt works without a unit), run view by unit and run id correct, trace/why are exit-2 Unknown command and write nothing, other commands unchanged.",
+  "evidence": "evidence/01M611MCMWZJGGHWJBEQYQ9AGA",
+  "criteria": [
+    {
+      "id": "AC1",
+      "verdict": "pass",
+      "evidence": "/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75/AC1.txt, AC1-help.txt: norn run / norn help run list 'norn run list', 'norn run view' in that order, exit 0"
+    },
+    {
+      "id": "AC2",
+      "verdict": "pass",
+      "evidence": "/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75/AC2.txt: help run view and run view --help print identical usage + Options section, exit 0"
+    },
+    {
+      "id": "AC3",
+      "verdict": "pass",
+      "evidence": "/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75/AC3-parity.txt: run list gh-5 with none/--events/--all/--full/--story-only/--limit 1/combined, text and --json, byte-identical to released 0.10.0 trace gh-5; AC3.txt outputs"
+    },
+    {
+      "id": "AC4",
+      "verdict": "pass",
+      "evidence": "/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75/AC4.txt: run view gh-5 shows review#1 gate with outcome, durations, receipts; run view <run id> shows work#1; --json one value; unknown run exit 3, no target exit 2"
+    },
+    {
+      "id": "AC5",
+      "verdict": "pass",
+      "evidence": "/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75/AC5.txt: run view gh-5 --why (+--tick/--step/--attempt/--transition/--rule) and --receipt with or without unit identical to 0.10.0 why, text and --json; only refusal do_instead differs (norn run list instead of removed norn trace)"
+    },
+    {
+      "id": "AC6",
+      "verdict": "pass",
+      "evidence": "/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75/AC6.txt: trace and why (bare, with unit, --json) exit 2, error 'Unknown command: trace|why', do_instead starts 'norn help'; file snapshot + git status --ignored unchanged"
+    },
+    {
+      "id": "AC7",
+      "verdict": "pass",
+      "evidence": "/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75/tests.txt (1208 pass, typecheck 0); existing test diffs only rename trace/why calls; transcripts and observe snapshots unchanged; AC7-cli.txt status/inbox/config/doctor identical to 0.10.0 except wall-clock at"
+    },
+    {
+      "id": "AC8",
+      "verdict": "pass",
+      "evidence": "/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa75/AC3.txt, AC4.txt, AC8-why.txt, AC8-receipt.txt: timeline, run view, --why and --receipt read correctly in a throwaway repo with 13 ticks"
+    }
+  ],
+  "notes": [
+    {
+      "text": "Without --json, run view --why/--receipt refusals now print markdown while a successful --why still prints one-line JSON (as why did). --json output is identical, except that do_instead now says 'norn run list' where it said 'norn trace'. Is this split what you want, or should --why be rendered for a person in slice 14?",
+      "criterion": "AC5"
+    }
+  ]
+}

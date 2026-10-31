@@ -1,0 +1,6 @@
+[
+  { "id": "AC1", "verdict": "pass", "evidence": "AC1.md" },
+  { "id": "AC2", "verdict": "pass", "evidence": "AC2.md" },
+  { "id": "AC3", "verdict": "pass", "evidence": "AC3.md" },
+  { "id": "AC4", "verdict": "person", "how": "At the story's ready gate, open the story PR and confirm its description has a 'Release note' paragraph: after `norn migrate` an older norn cannot read the repository and must be upgraded on every machine (D13). No PR description exists on this slice branch yet.", "evidence": "AC4.md" }
+]

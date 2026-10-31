@@ -1,0 +1,22 @@
+{
+  "kind": "done",
+  "receipt_id": "01M63WF11T8JH1FGN2Q001DKYE",
+  "run_id": "01M63WCDM6ZJKN46PFB0FDJFM5",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-29T13:09:22.106Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "approve",
+  "handoff": "Diff matches #93 exactly: quick/story test check runs test:fast, ci check after open-pr (fail → implement, ci_loop 3), fix untouched, repo.test + AGENTS.md updated. test:fast and typecheck green. One minor finding: the failed-log lookup may pick a non-failing run.",
+  "findings": [
+    {
+      "severity": "minor",
+      "title": "Failed-log lookup takes the branch's latest run, not the failing one",
+      "id": "F1",
+      "file": ".agents/norn/workflows/quick.yaml",
+      "line": 65,
+      "detail": "`gh run list --branch … --limit 1` returns the most recent run of any workflow on the branch (e.g. the process check), which may not be the one that failed under --fail-fast; implement then gets an empty or unrelated last_check. Same in story.yaml. The script is verbatim from the issue, so not blocking.\nAxis: standards\nSuggestion: Later: add `--status failure` (or filter by commit) to the run lookup."
+    }
+  ]
+}

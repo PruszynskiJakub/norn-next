@@ -1,0 +1,12 @@
+# B8: max_agents: "two" in .agents/norn.config.yaml
+#     options: { topic: my-norn }
+max_agents: "two"
+$ bun /Users/jakubpruszynski/Projects/norn-worktrees/gh-110-an-agent-may-never-edit-agents-norn-so/packages/cli/src/main.ts doctor --repo
+norn doctor: 1 check failed (config)
+
+  ok   layout         .agents/workflows/ and .agents/norn.config.yaml
+  ok   workflows      bug, quick, slice, story valid (.agents/workflows/)
+                      · the config does not load, so no step's skill was checked against its agent
+  FAIL config         .agents/norn.config.yaml
+                      ! /max_agents: must be integer
+exit=1

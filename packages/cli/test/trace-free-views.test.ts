@@ -10,7 +10,7 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { copyFileSync, mkdirSync, readdirSync, renameSync } from "node:fs";
 import { join } from "node:path";
-import { setTraceReadObserver, traceDir } from "@norn/store";
+import { machineDir, repoConfigPath, setTraceReadObserver } from "@norn/store";
 import { runCli } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
 
@@ -25,7 +25,7 @@ notifiers: []
 
 const DAY = 86_400_000;
 let h: Harness;
-const days = () => readdirSync(traceDir(h.root)).filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n));
+const days = () => readdirSync(machineDir(h.root)).filter((n) => /^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n));
 
 /** quits once `drawn()` reaches `n` frames: what is pinned is the count, not wall time */
 async function* quitAfterFrames(n: number, drawn: () => number) {
@@ -48,7 +48,7 @@ async function opened(run: () => Promise<unknown>): Promise<string[]> {
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
+  h.write(repoConfigPath(h.root), CONFIG);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn"]);
   h.git(["push", "-q", "origin", "main"]);
@@ -61,7 +61,7 @@ beforeAll(async () => {
   const [today] = days();
   if (!today) throw new Error("no day file");
   const t0 = Date.parse(today.slice(0, 10));
-  for (const n of [1, 2, 3]) copyFileSync(join(traceDir(h.root), today), join(traceDir(h.root), `${new Date(t0 - n * DAY).toISOString().slice(0, 10)}.jsonl`));
+  for (const n of [1, 2, 3]) copyFileSync(join(machineDir(h.root), today), join(machineDir(h.root), `${new Date(t0 - n * DAY).toISOString().slice(0, 10)}.jsonl`));
   h.clock.advance(2 * DAY);
   expect(days().length).toBe(4);
 });
@@ -98,11 +98,11 @@ describe("views that read no trace (B1, B2)", () => {
 
     const away = join(h.dir, "trace-away");
     mkdirSync(away);
-    for (const n of days()) renameSync(join(traceDir(h.root), n), join(away, n));
+    for (const n of days()) renameSync(join(machineDir(h.root), n), join(away, n));
     try {
       for (const [name, run] of Object.entries(views)) expect([name, (await run()).value]).toEqual([name, full[name]]);
     } finally {
-      for (const n of readdirSync(away)) renameSync(join(away, n), join(traceDir(h.root), n));
+      for (const n of readdirSync(away)) renameSync(join(away, n), join(machineDir(h.root), n));
     }
   });
 });

@@ -1,0 +1,57 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61SP9HBK3MV3EGY82CRXM20",
+  "run_id": "01M61RYVGEDXD7BYXQG72NJTYP",
+  "step": "qa",
+  "attempt": 1,
+  "at": "2026-10-28T17:42:25.580Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/08",
+  "outcome": "pass",
+  "handoff": "QA pass: AC1–AC7 all observed. Suite 1252 pass, typecheck green. Checked by hand in a throwaway repo (fake gh, headless runner, stub claude): unknown open/mode/workflow exit 2; --workflow before start sets frontmatter; after start needs --at, then lands on the step; --auto makes the next tick launch in auto; usage errors exit 2; in a slice worktree mode edits the story and --workflow the slice; pasted --print command runs in the worktree and norn brief finds the unit.",
+  "evidence": "evidence/01M61RYVGEDXD7BYXQG72NJTYP",
+  "criteria": [
+    {
+      "id": "AC1",
+      "verdict": "pass",
+      "evidence": "AC1.md, suite.txt (story-start.test.ts: 'a runner that opens terminals: story start opens one in the worktree; --print prints the command', 'without a target … units a person can start only', 'a manual unit ready at a step that is not an agent step is not offered')"
+    },
+    {
+      "id": "AC2",
+      "verdict": "pass",
+      "evidence": "AC2.md: story edit gh-9 --auto wrote 0002-mode.json; the next tick after the receipt applied launched implement#1 through the headless runner in auto (claude.log); --manual wrote the reverse receipt and status shows manual; --auto --manual and no change flag exit 2 (usage)"
+    },
+    {
+      "id": "AC3",
+      "verdict": "pass",
+      "evidence": "AC3.md: gh-9 not started, story edit gh-9 --workflow fix set story.md frontmatter workflow: fix; status shows fix; repeat is a no-op (changed:false); tick started gh-9 on fix (diagnose)"
+    },
+    {
+      "id": "AC4",
+      "verdict": "pass",
+      "evidence": "AC4.md: started gh-9 without --at refused needs_to, do_instead 'norn story edit gh-9 --workflow quick --at <diagnose|implement|ready>'; with --at implement wrote 0001-workflow.json (to: implement), tick applied it: state.json workflow quick, step implement, commit 'norn: gh-9 diagnose.workflow → implement'"
+    },
+    {
+      "id": "AC5",
+      "verdict": "pass",
+      "evidence": "AC5.md: in slice worktree gh-7--01-form, story edit --auto wrote the mode receipt to gh-7's runs/_story (unit gh-7); story edit --workflow bug --at review wrote to runs/01-form (unit gh-7/01); after a tick gh-7 is auto and gh-7/01 is at review on bug"
+    },
+    {
+      "id": "AC6",
+      "verdict": "pass",
+      "evidence": "AC6.md: norn open, norn mode, norn workflow (and open --json) exit 2 with error 'Unknown command: <name>', code unknown_command"
+    },
+    {
+      "id": "AC7",
+      "verdict": "pass",
+      "evidence": "AC7.md: story start gh-9 --print printed 'cd <worktree> && claude --permission-mode auto -- …'; pasted into a fresh zsh from /, it cd'd into gh-9's worktree and ran claude with the intact prompt (stub claude), which ran norn brief and got gh-9 implement#1; AC4.md shows story edit --workflow quick --at implement landed gh-9 on implement"
+    }
+  ],
+  "notes": [
+    {
+      "text": "The TTY picker could not be driven under script(1) here; picker filtering was observed via the target_required do_instead list (only startable units listed). Real Herdr tab opening covered by the fake-Herdr test only.",
+      "criterion": "AC1"
+    }
+  ]
+}

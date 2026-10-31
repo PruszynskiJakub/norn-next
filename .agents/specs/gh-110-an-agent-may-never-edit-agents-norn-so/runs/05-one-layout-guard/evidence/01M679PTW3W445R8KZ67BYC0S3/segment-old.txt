@@ -1,0 +1,6 @@
+### norn status --segment --json
+{"segment":"","repo":null}
+[exit 0]
+### norn status --segment
+
+[exit 0]

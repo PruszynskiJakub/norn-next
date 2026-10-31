@@ -19,7 +19,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { type HookFact, parseDuration, type UnitState, ulid } from "../packages/schema/src/index.ts";
-import { appendReceipt, pinWorkflow, sha256, storyDir, storyFile, storyUnitDir, traceDir, writeState, writeStoryFile, writeUnitMarker } from "../packages/store/src/index.ts";
+import { appendReceipt, pinWorkflow, sha256, storyDir, storyFile, storyUnitDir, machineDir, writeState, writeStoryFile, writeUnitMarker } from "../packages/store/src/index.ts";
 
 const ROOT = join(import.meta.dir, "..");
 const DAY = 86_400_000;
@@ -118,7 +118,7 @@ const hooks: HookFact[] = Array.from({ length: nHooks }, (_, i) => ({
   tool: "Bash",
   command: `echo ${"x".repeat(1200)} ${i}`,
 }));
-const tdir = traceDir(repo);
+const tdir = machineDir(repo);
 mkdirSync(tdir, { recursive: true });
 const facts = JSON.stringify({ tick_id: "", now: 0, stories: [{ key: "gh-1", units: [{ run: { hooks } }] }] });
 const perDay = totalBytes / nDays;

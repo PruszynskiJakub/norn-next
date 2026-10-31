@@ -1,0 +1,22 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M61EZMTFRW4D0DRCR4HA0BM6",
+  "run_id": "01M61EZFN0YYTNK1WFSGGZQ91G",
+  "step": "update",
+  "attempt": 1,
+  "at": "2026-10-28T14:35:17.711Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M61EZFN0BJ74Z1F7ATEWT1CA",
+  "outcome": "done",
+  "rule": "git.update",
+  "detail": "gh-70-rename-story-md-to-spec-md is up to date with main (2bf94d1e96f8)",
+  "route": "test",
+  "base": {
+    "ref": "refs/remotes/origin/main",
+    "sha": "2bf94d1e96f8437bbee842e7605326625a40c2e7",
+    "conflicts": [],
+    "head": "e8f333c170aa19c3406b7b1157c3f3e5962435d7",
+    "merged": false
+  }
+}

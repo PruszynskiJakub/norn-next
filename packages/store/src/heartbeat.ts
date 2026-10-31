@@ -1,5 +1,5 @@
 /**
- * Machine-local runtime files of one checkout's heartbeat, in the gitignored trace dir (§7.1):
+ * Machine-local runtime files of one checkout's heartbeat, in its machine dir (B5):
  * - `heartbeat.json`  this checkout's heartbeat_id (ID2, see AGENTS.md) and, since R5.5,
  *                     `last_tick_at` — when a tick last finished here (status/inbox show it, N3)
  * - `failures.json`   R4.3: per unit, the last act effect that failed (send, resume, launch, push),
@@ -11,6 +11,7 @@ import type { ActFailure } from "@norn/core";
 import { ulid } from "@norn/schema";
 import { atomicWriteJson } from "./fsx.ts";
 import { readLocalJson } from "./local-json.ts";
+import { ensureCheckoutFile } from "./machine-dir.ts";
 import { actFailuresPath, heartbeatFilePath } from "./paths.ts";
 
 export interface HeartbeatFile {
@@ -30,6 +31,8 @@ function writeHeartbeatFile(root: string, hb: HeartbeatFile): void {
 
 /** This checkout's heartbeat_id; created on first use (keeps `last_tick_at`, R5.5). */
 export function heartbeatId(root: string, now: number): string {
+  // D3: every tick names the checkout its machine dir belongs to
+  ensureCheckoutFile(root);
   const cur = readHeartbeatFile(root);
   if (cur.heartbeat_id && /^[0-9A-HJKMNP-TV-Z]{26}$/.test(cur.heartbeat_id)) return cur.heartbeat_id;
   const id = ulid(now);

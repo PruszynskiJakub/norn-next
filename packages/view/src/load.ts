@@ -38,6 +38,7 @@ import {
   type LeaseEntry,
   type LeaseLiveness,
   type LocalUnit,
+  bindNornHome,
   loadLocalFacts,
   machineHolder,
   onlyNornCommitsSince,
@@ -232,6 +233,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   const errors: FileError[] = [];
 
   // H2/X1: the local facts observe reads, from the worktrees found on disk (GR3, A3)
+  if (opts.home) bindNornHome(opts.repoRoot, opts.home);
   const wts = scanWorktrees(opts.repoRoot);
   const local = await loadLocalFacts(opts.repoRoot, {
     now,

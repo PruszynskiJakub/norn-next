@@ -1,0 +1,19 @@
+$ norn config set max_agents 3 --user
+Set `max_agents` to `3` in the user file (`/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110/home/config.yaml`).
+$ ls $NORN_HOME_DIR
+config.yaml
+repos
+max_agents: 3
+$ norn config get max_agents
+# Config
+
+- user: `/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110/home/config.yaml`
+- repo: `.agents/norn.config.yaml`
+
+The repo file overrides the user file, except machine caps, which it can only lower.
+
+## This machine (usually in the user file)
+
+| Setting | Value | From | What it does |
+|---|---|---|---|
+| `max_agents` | `3` | user | agents running at once on this machine, across repos |

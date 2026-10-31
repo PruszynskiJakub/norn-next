@@ -1,0 +1,26 @@
+{
+  "kind": "started",
+  "receipt_id": "01M61MRX7PG31VCP5XV3XKM1K7",
+  "run_id": "01M61MRPEAMGNFFVZM4Y8D03K2",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-28T16:16:28.406Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M61MRPEABK7CCR0092E9KKKF",
+  "how": "auto",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-75-regroup-the-cli-around-status-story-and--05-status-watch-and-run-attach",
+  "machine": "jakubpruszynski@mac",
+  "heartbeat_id": "01M5TCF2ZJVH8KS2NPJH9PP5SD",
+  "session": {
+    "runner": "herdr",
+    "session_id": "w7A:p1",
+    "pane_id": "w7A:p1",
+    "reach": "herdr agent attach w7A:p1"
+  },
+  "process": {
+    "pid": 90990,
+    "pid_start": "Wed Oct 28 17:16:28 2026"
+  }
+}

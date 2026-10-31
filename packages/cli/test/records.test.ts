@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { StoryFacts } from "@norn/core";
-import { readTickInputs, readTrace } from "@norn/store";
+import { readTickInputs, readTrace, repoConfigPath, workflowsDir } from "@norn/store";
 import type { TickReport } from "../src/index.ts";
 import { createHarness, type Harness, issue } from "./harness.ts";
 
@@ -51,8 +51,8 @@ function lastFacts(h: Harness, key: string): StoryFacts | undefined {
 
 async function bootTo(h: Harness, n: number, title: string, runs: () => string) {
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-  h.write(join(h.root, ".agents/norn/workflows/ready.yaml"), READY);
+  h.write(repoConfigPath(h.root), CONFIG);
+  h.write(join(workflowsDir(h.root), "ready.yaml"), READY);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn"]);
   h.git(["push", "-q", "origin", "main"]);

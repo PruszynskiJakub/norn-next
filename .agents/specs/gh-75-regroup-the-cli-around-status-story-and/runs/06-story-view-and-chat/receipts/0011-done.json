@@ -1,0 +1,31 @@
+{
+  "kind": "done",
+  "receipt_id": "01M61QTG5PVT6PRXXQVQ9N28HY",
+  "run_id": "01M61QB7NEVZF9MYNQ3G8BS2DD",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-28T17:09:46.294Z",
+  "by": "agent",
+  "who": "claude",
+  "slice": "gh-75/06",
+  "outcome": "approve",
+  "handoff": "AC1–AC6 met, each with an integration test (fake shell/Herdr); orient fully removed; suite 1264 pass, typecheck clean. Non-blocking: out-of-scope zombie.ts test fix, cockpit 'orient' labels deferred to slice 14. AC7 left for QA.",
+  "findings": [
+    {
+      "severity": "minor",
+      "title": "Test-only fix outside the slice's scope",
+      "id": "F1",
+      "file": "packages/adapters/test/contract/zombie.ts",
+      "line": 23,
+      "detail": "The zombie ProcessPort contract helper was changed (background `sleep 0.3`, poll 40×50ms) to fix a load race that failed the check. Unrelated to story view/chat, but needed for the slice's checks to pass and test-only.\nAxis: spec\nSuggestion: Mention it in the PR body so a reviewer is not surprised; no rework needed."
+    },
+    {
+      "severity": "nit",
+      "title": "Cockpit still labels the story-chat action and message 'orient'",
+      "id": "F2",
+      "file": "packages/cli/src/commands/cockpit.ts",
+      "line": 135,
+      "detail": "The place action id/label and the `opened gh-N orient` text keep the old name; the handoff defers printed strings to slice 14, and the Herdr workspace label `<story> orient` is intentionally kept.\nAxis: standards\nSuggestion: Leave for slice 14 as planned."
+    }
+  ]
+}

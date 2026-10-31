@@ -1,0 +1,12 @@
+{
+  "kind": "unstick",
+  "receipt_id": "01M6658Z0QKGCX36X862K7HXRY",
+  "run_id": "01M65ZHBVJT17558F1V8B9BQBJ",
+  "step": "implement",
+  "attempt": 2,
+  "at": "2026-10-30T10:21:49.463Z",
+  "by": "human",
+  "who": "jakubpruszynski@mac",
+  "slice": null,
+  "comment": "Agent session lost its Claude login mid-step (pane showed 'Not logged in'); auth is fine again. Resume implement: the cookbook lint line is already committed (red, 52 hits); rename the commands in docs/cookbook.html per the ready rejection."
+}

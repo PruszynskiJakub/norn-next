@@ -1,0 +1,18 @@
+$ norn story chat gh-2 (Herdr, no workspace)
+exit 0
+Opened workspace gh-2 orient with a chat agent.
+
+herdr calls: ["open workspace /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-K4As92/repo-worktrees/gh-2-split-work gh-2 orient focus /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-K4As92/home/orient/launch/7f2cedf1c3253ace.sh env NORN_ORIENT=1 claude 'Run `norn story view gh-2` and follow it.'"]
+
+$ norn story chat gh-2 --json (workspace exists)
+exit 0
+{"story":"gh-2","opened":true,"created":false,"workspace_id":"w4"}
+
+herdr calls: ["focus workspace w4"]
+
+$ norn story chat gh-2 (outside Herdr)
+exit 0
+Not inside Herdr. Start the chat agent yourself:
+
+    cd /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-K4As92/repo-worktrees/gh-2-split-work && NORN_ORIENT=1 claude 'Run `norn story view gh-2` and follow it.'
+

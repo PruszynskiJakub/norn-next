@@ -1,0 +1,7 @@
+# quick.yaml description edited and pushed to main after gh-1 started; then gh-3 (norn:wf:quick) taken in
+$ grep description main .agents/workflows/quick.yaml
+description: QA EDITED quick workflow (merged after gh-1 started)
+$ gh-1 pinned
+description: Default story lifecycle — spec, plan, slices, story-level verification, draft PR.
+$ gh-3 pinned
+description: QA EDITED quick workflow (merged after gh-1 started)

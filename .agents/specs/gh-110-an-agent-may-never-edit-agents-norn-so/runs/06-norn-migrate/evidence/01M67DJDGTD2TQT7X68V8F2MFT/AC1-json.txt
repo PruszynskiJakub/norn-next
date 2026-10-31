@@ -1,0 +1,9 @@
+## AC1 --json on a fresh old-layout clone
+$ norn migrate --json
+{"moves":[{"part":"config","from":".agents/norn/config.yaml","to":".agents/norn.config.yaml","how":"git mv"},{"part":"workflows","from":".agents/norn/workflows/bug.yaml","to":".agents/workflows/bug.yaml","how":"git mv"},{"part":"workflows","from":".agents/norn/workflows/slice.yaml","to":".agents/workflows/slice.yaml","how":"git mv"},{"part":"workflows","from":".agents/norn/workflows/story.yaml","to":".agents/workflows/story.yaml","how":"git mv"},{"part":"machine files","from":".agents/norn/trace","to":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-migrate/home-repo3/repos/repo3-23ad4cc9","how":"moved"}],"staged":[".agents/norn.config.yaml",".agents/workflows/bug.yaml",".agents/workflows/slice.yaml",".agents/workflows/story.yaml",".gitignore"],"commit":"git commit -m \"Move norn to its new layout (norn migrate)\""}
+ [exit 0]
+R  .agents/norn/config.yaml -> .agents/norn.config.yaml
+R  .agents/norn/workflows/bug.yaml -> .agents/workflows/bug.yaml
+R  .agents/norn/workflows/slice.yaml -> .agents/workflows/slice.yaml
+R  .agents/norn/workflows/story.yaml -> .agents/workflows/story.yaml
+M  .gitignore

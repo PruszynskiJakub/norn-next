@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Receipt } from "@norn/schema";
+import { repoConfigPath, workflowsDir } from "@norn/store";
 import { type CliDeps, type CliResult } from "../src/index.ts";
 import { createHarness, FakeInteraction, type Harness, issue, sh } from "./harness.ts";
 import { runChecked } from "./harness.ts";
@@ -63,8 +64,8 @@ type Inbox = { groups: Record<string, Array<{ story: string; slice: string | nul
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-  h.write(join(h.root, ".agents/norn/workflows/flow.yaml"), FLOW);
+  h.write(repoConfigPath(h.root), CONFIG);
+  h.write(join(workflowsDir(h.root), "flow.yaml"), FLOW);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);
   h.git(["push", "-q", "origin", "main"]);

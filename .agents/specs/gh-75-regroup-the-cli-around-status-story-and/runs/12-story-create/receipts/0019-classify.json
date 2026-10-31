@@ -1,0 +1,15 @@
+{
+  "kind": "classify",
+  "receipt_id": "01M63J850FJYQVADNMFREVRY2K",
+  "run_id": "01M63J7ZAHWHAY2BWNNAQMKKTQ",
+  "step": "integrate",
+  "attempt": 1,
+  "at": "2026-10-29T10:10:51.023Z",
+  "by": "norn",
+  "who": "jakubpruszynski@mac",
+  "tick_id": "01M63J7ZAHQSAWCMNBRP9QW7TV",
+  "outcome": "conflict",
+  "rule": "git.integrate",
+  "detail": "rebase onto gh-75-regroup-the-cli-around-status-story-and conflicts in packages/cli/src/commands/story.ts, packages/cli/src/runtime/interaction.ts, packages/cli/src/runtime/open-link.ts, packages/cli/src/runtime/status-watch.ts, packages/cli/test/harness.ts, packages/core/src/commands.ts",
+  "route": "merge"
+}

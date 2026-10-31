@@ -47,7 +47,7 @@ import {
 } from "@norn/store";
 import type { Context } from "../../context.ts";
 import { leaseLiveness } from "../leases.ts";
-import { agentSkills, repoWorkflows } from "../workflows.ts";
+import { checkedRepoWorkflows } from "../workflows.ts";
 import { findOrphanBranches, foreignCommits, intakeOnly, refMap, storyBase, worktreeFacts } from "./git-facts.ts";
 import { gitRemote, mergedByAncestry, readyHead, trackingRef } from "./remote.ts";
 import { duringRun, type LocalRunEnv, runWindows, unitFacts } from "./run-facts.ts";
@@ -168,7 +168,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   const liveness = leaseLiveness((p) => ports.process.isAlive(p));
   const local = await loadLocalFacts(root, { now, home: ctx.home, env: ctx.env, storyWorktrees: storyWts, sliceWorktrees: sliceWts, baseRef, liveness, stalledMs: parseDuration(config.limits.stalled), backfillHooks: opts.backfillHooks });
   const snapshot = local.snapshot;
-  const workflows = repoWorkflows(snapshot.workflows, { default_agent: config.default_agent, visible: agentSkills(ports.agents, root) });
+  const workflows = checkedRepoWorkflows(snapshot.workflows, root, config, ports.agents);
 
   if (due && ports.remote) {
     sync.ran = true;

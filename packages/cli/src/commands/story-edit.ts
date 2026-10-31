@@ -14,7 +14,7 @@
 import { join } from "node:path";
 import { cmd, checkWorkflowLevel, sha256, stepOf } from "@norn/core";
 import type { Mode } from "@norn/schema";
-import { acquireTickLock, patchSliceFile, patchStoryFile, pinWorkflow, storyFile } from "@norn/store";
+import { acquireTickLock, patchSliceFile, patchStoryFile, pinWorkflow, storyFile, WORKFLOWS_DIR } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { busyError, claimHeld, failure, refuse, usageError } from "../output.ts";
@@ -74,7 +74,7 @@ async function editWorkflow(ctx: Context, raw: string, name: string, at: string 
     if (!obs || !sf) throw refuse(`${t.story} is not in this checkout`, cmd.storyCheckout(t.story), "story_not_local");
     const listed = Object.keys(obs.workflows).sort();
     const loaded = obs.workflows[name];
-    if (!loaded) throw refuse(`no workflow '${name}' in .agents/norn/workflows/`, cmd.storyEdit(t.key, { workflow: `<${listed.join("|")}>` }), "unknown_workflow");
+    if (!loaded) throw refuse(`no workflow '${name}' in ${WORKFLOWS_DIR}/`, cmd.storyEdit(t.key, { workflow: `<${listed.join("|")}>` }), "unknown_workflow");
     const level = t.slice ? "slice" : "story";
     const issues = loaded.workflow ? [...loaded.issues, ...checkWorkflowLevel(loaded.workflow, level)] : loaded.issues;
     if (!loaded.workflow || issues.length)

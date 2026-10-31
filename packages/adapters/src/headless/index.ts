@@ -1,7 +1,7 @@
 /**
  * Headless runner (RunnerPort): starts the agent's non-interactive command as a detached
  * background process in the unit worktree, env included (A6), stdout+stderr appended to a log
- * file in the trace dir. Liveness is pid + start time (K3), so a reused pid never counts.
+ * file in the machine dir. Liveness is pid + start time (K3), so a reused pid never counts.
  *
  * There is no pane to type into: `send` throws PortError `unsupported`. Per B2 the caller then
  * continues the same agent session by launching `AgentAdapter.launchCommand({ resume })` through
@@ -14,14 +14,14 @@ import { closeSync, mkdirSync, openSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { AdapterContext, LaunchSpec, PaneState, ProcessPort, RunnerPort, SessionRef } from "@norn/core";
 import type { RunnerConfig } from "@norn/schema";
-import { noteSpawn } from "@norn/store";
+import { noteSpawn, runnerLogDir } from "@norn/store";
 import { portError } from "../exec.ts";
 import { createProcessPort } from "../process/index.ts";
 
 export const RUNNER_NAME = "headless";
 
 export interface HeadlessRunnerOptions {
-  /** directory for `<run_id>.log` (the caller's trace dir) */
+  /** directory for `<run_id>.log` (default: the machine dir's `runs/`, D9) */
   logDir: string;
   process?: ProcessPort;
   /** grace between SIGTERM and SIGKILL (default 3000 ms) */
@@ -147,10 +147,10 @@ function signal(pid: number, sig: NodeJS.Signals): void {
   }
 }
 
-/** RunnerFactory: option `log_dir` (default `<repo>/.agents/norn/trace/runs`). */
+/** RunnerFactory: option `log_dir` (default store's `runnerLogDir`, machine-local). */
 export const headlessFactory = (ctx: AdapterContext, config: RunnerConfig): RunnerPort => {
   const dir = config.options?.log_dir;
   return createHeadlessRunner({
-    logDir: typeof dir === "string" ? dir : join(ctx.repoRoot, ".agents", "norn", "trace", "runs"),
+    logDir: typeof dir === "string" ? dir : runnerLogDir(ctx.repoRoot),
   });
 };

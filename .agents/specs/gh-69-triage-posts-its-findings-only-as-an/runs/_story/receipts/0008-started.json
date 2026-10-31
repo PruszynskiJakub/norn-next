@@ -1,0 +1,18 @@
+{
+  "kind": "started",
+  "receipt_id": "01M61DXA6APYEK3M0QDH5W1HSR",
+  "run_id": "01M61DXA6APYEK3M0QDH5W1HSQ",
+  "step": "review",
+  "attempt": 1,
+  "at": "2026-10-28T14:16:32.905Z",
+  "by": "agent",
+  "who": "claude",
+  "how": "manual",
+  "agent": "claude",
+  "worktree": "/Users/jakubpruszynski/Projects/norn-worktrees/gh-69-triage-posts-its-findings-only-as-an",
+  "agent_session_id": "d13d4e5f-9ef3-46c3-9e7c-d46bd87ae575",
+  "process": {
+    "pid": 16317,
+    "pid_start": "Wed Oct 28 15:16:20 2026"
+  }
+}

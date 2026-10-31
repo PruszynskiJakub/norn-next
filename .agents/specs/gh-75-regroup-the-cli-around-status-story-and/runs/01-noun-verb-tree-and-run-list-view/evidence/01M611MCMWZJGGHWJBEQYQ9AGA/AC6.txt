@@ -1,0 +1,25 @@
+$ norn trace
+{"error":"Unknown command: trace","do_instead":"norn help — commands: init, uninstall, sync, tick, watch, brief, done, ask, stuck, hook, inbox, cockpit, open, orient, status, answer, approve, unstick, update, mode, workflow, take, release, drop, tidy, doctor, config, help, run","code":"unknown_command"}
+[exit 2]
+
+$ norn trace gh-5
+{"error":"Unknown command: trace","do_instead":"norn help — commands: init, uninstall, sync, tick, watch, brief, done, ask, stuck, hook, inbox, cockpit, open, orient, status, answer, approve, unstick, update, mode, workflow, take, release, drop, tidy, doctor, config, help, run","code":"unknown_command"}
+[exit 2]
+
+$ norn trace gh-5 --json
+{"error":"Unknown command: trace","do_instead":"norn help — commands: init, uninstall, sync, tick, watch, brief, done, ask, stuck, hook, inbox, cockpit, open, orient, status, answer, approve, unstick, update, mode, workflow, take, release, drop, tidy, doctor, config, help, run","code":"unknown_command"}
+[exit 2]
+
+$ norn why
+{"error":"Unknown command: why","do_instead":"norn help — commands: init, uninstall, sync, tick, watch, brief, done, ask, stuck, hook, inbox, cockpit, open, orient, status, answer, approve, unstick, update, mode, workflow, take, release, drop, tidy, doctor, config, help, run","code":"unknown_command"}
+[exit 2]
+
+$ norn why gh-5
+{"error":"Unknown command: why","do_instead":"norn help — commands: init, uninstall, sync, tick, watch, brief, done, ask, stuck, hook, inbox, cockpit, open, orient, status, answer, approve, unstick, update, mode, workflow, take, release, drop, tidy, doctor, config, help, run","code":"unknown_command"}
+[exit 2]
+
+$ norn why gh-5 --json
+{"error":"Unknown command: why","do_instead":"norn help — commands: init, uninstall, sync, tick, watch, brief, done, ask, stuck, hook, inbox, cockpit, open, orient, status, answer, approve, unstick, update, mode, workflow, take, release, drop, tidy, doctor, config, help, run","code":"unknown_command"}
+[exit 2]
+
+no file under the throwaway dir (repo, worktrees, remote, NORN_HOME_DIR) added/changed/removed besides git's own .git/index stat refresh from the snapshot's git status; git status --ignored identical

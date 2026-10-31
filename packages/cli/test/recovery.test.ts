@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Inbox, RunnerPort } from "@norn/core";
-import { setSpawnObserver } from "@norn/store";
+import { repoConfigPath, setSpawnObserver, workflowsDir } from "@norn/store";
 import { type CliDeps, type CliResult, type TickReport } from "../src/index.ts";
 import { createHarness, FakeRunner, type Harness, issue, sh } from "./harness.ts";
 import { runChecked } from "./harness.ts";
@@ -84,8 +84,8 @@ const all = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop").map(
 
 async function setup(h: Harness, n: number, title: string): Promise<void> {
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-  h.write(join(h.root, ".agents/norn/workflows/solo.yaml"), SOLO);
+  h.write(repoConfigPath(h.root), CONFIG);
+  h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);
   h.git(["push", "-q", "origin", "main"]);

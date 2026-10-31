@@ -7,6 +7,7 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { noticesPath } from "@norn/store";
 import { createHarness, type Harness } from "./harness.ts";
 
 setDefaultTimeout(30_000);
@@ -14,7 +15,7 @@ setDefaultTimeout(30_000);
 const NOTICE = "`norn status` now shows what needs you; the story listing moved to `norn story list`.\n";
 
 let h: Harness;
-const noticeFile = () => join(h.root, ".agents/norn/trace/notices.json");
+const noticeFile = () => noticesPath(h.root);
 
 beforeAll(async () => {
   h = await createHarness();

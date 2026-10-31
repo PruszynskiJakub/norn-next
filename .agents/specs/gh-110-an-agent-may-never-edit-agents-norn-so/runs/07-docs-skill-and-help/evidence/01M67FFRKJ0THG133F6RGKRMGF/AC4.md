@@ -1,0 +1,2 @@
+# AC4 (B23) Release note in the story PR description — person
+No PR description exists yet on this slice branch (written at the story-level pr step). How to check: at the story's `ready` gate, open the story PR and confirm a "Release note" paragraph says that after `norn migrate` an older norn cannot read the repository and must be upgraded on every machine (D13). README:114 already carries the same message for users.

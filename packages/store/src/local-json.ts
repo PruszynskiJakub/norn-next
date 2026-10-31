@@ -1,11 +1,10 @@
 /**
  * Validated reads of machine-local files (S2, BUG-4): the caches and bookkeeping norn keeps in the
- * gitignored trace dir. A missing file reads as `fallback`; an unreadable one, invalid JSON, or a
+ * checkout's machine dir (B5). A missing file reads as `fallback`; an unreadable one, invalid JSON, or a
  * value of the wrong shape (`@norn/schema` local-* schemas) also reads as `fallback`, never as a
  * cast of whatever was there, and leaves a `local_file` trace event naming the file. The next
  * write replaces the file, so a bad cache heals itself.
  */
-import { relative } from "node:path";
 import { type LocalSchemaName, type SchemaError, type SchemaType, validate } from "@norn/schema";
 import { readText } from "./fsx.ts";
 import { appendTrace, traceEvent } from "./trace.ts";
@@ -34,7 +33,7 @@ function traceBad(root: string, path: string, name: LocalSchemaName, reason: "un
   if (traced.has(key)) return;
   traced.add(key);
   try {
-    appendTrace(root, traceEvent("local_file", Date.now(), { file: relative(root, path) || path, schema: name, reason, errors }));
+    appendTrace(root, traceEvent("local_file", Date.now(), { file: path, schema: name, reason, errors }));
   } catch {
     // diagnostic only: a read never fails because its trace line could not be written
   }

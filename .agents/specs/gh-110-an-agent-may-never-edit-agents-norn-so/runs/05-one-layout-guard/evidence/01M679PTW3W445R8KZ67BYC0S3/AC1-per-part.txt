@@ -1,0 +1,18 @@
+=== part: config only old
+### norn status --json
+{"error":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo is on the old norn layout (config: .agents/norn/config.yaml)","do_instead":"norn migrate","code":"old_layout","details":{"layout":"old","root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo","parts":[{"part":"config","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo/.agents/norn/config.yaml","new":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo/.agents/norn.config.yaml","at_old":true,"at_new":false}]}}
+[exit 3]
+### norn tick --json
+{"error":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo is on the old norn layout (config: .agents/norn/config.yaml)","do_instead":"norn migrate","code":"old_layout","details":{"layout":"old","root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo","parts":[{"part":"config","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo/.agents/norn/config.yaml","new":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo/.agents/norn.config.yaml","at_old":true,"at_new":false}]}}
+[exit 3]
+=== part: workflows only old
+### norn status --json
+{"error":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo is on the old norn layout (workflows: .agents/norn/workflows)","do_instead":"norn migrate","code":"old_layout","details":{"layout":"old","root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo","parts":[{"part":"workflows","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo/.agents/norn/workflows","new":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo/.agents/workflows","at_old":true,"at_new":false}]}}
+[exit 3]
+=== empty .agents/norn/trace (should be new layout, works)
+### norn status --json
+{"at":"2026-10-30T21:00:09.498Z","groups":{"your_turn":[],"answer":[],"approve":[],"unblock":[],"check":[],"unclaimed":[],"running":[],"notes":[],"recently_done":[]},"pending":0
+=== part: machine files only old
+### norn status --json
+{"error":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo is on the old norn layout (machine files: .agents/norn/trace)","do_instead":"norn migrate","code":"old_layout","details":{"layout":"old","root":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo","parts":[{"part":"machine files","old":"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/repo/.agents/norn/trace","new":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh110-05/home/repos/repo-437e861f","at_old":true,"at_new":false}]}}
+[exit 3]

@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type TickTrace, validate } from "@norn/schema";
+import { repoConfigPath, machineDir as machineDirOf, workflowsDir } from "@norn/store";
 import { version } from "../package.json";
 import { createHarness, type Harness, issue } from "./harness.ts";
 
@@ -30,21 +31,21 @@ notifiers: []
 `;
 
 let h: Harness;
-const traceDir = () => join(h.root, ".agents/norn/trace");
+const machineDir = () => machineDirOf(h.root);
 
 function ticks(): TickTrace[] {
-  return readdirSync(traceDir())
+  return readdirSync(machineDir())
     .filter((f) => f.endsWith(".jsonl"))
     .sort()
-    .flatMap((f) => readFileSync(join(traceDir(), f), "utf8").split("\n").filter(Boolean))
+    .flatMap((f) => readFileSync(join(machineDir(), f), "utf8").split("\n").filter(Boolean))
     .map((l) => JSON.parse(l) as { type: string })
     .filter((e): e is TickTrace => e.type === "tick");
 }
 
 /** Rewrite one tick record in the trace (as an older norn, or an edited trace, would have left it). */
 function editTick(tickId: string, edit: (t: TickTrace) => void): void {
-  for (const f of readdirSync(traceDir()).filter((n) => n.endsWith(".jsonl"))) {
-    const path = join(traceDir(), f);
+  for (const f of readdirSync(machineDir()).filter((n) => n.endsWith(".jsonl"))) {
+    const path = join(machineDir(), f);
     const lines = readFileSync(path, "utf8").split("\n");
     const out = lines.map((l) => {
       if (!l) return l;
@@ -62,8 +63,8 @@ type Why = { tick_id: string; rule: string; replay: { matches: boolean; rule: st
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(join(h.root, ".agents/norn/config.yaml"), CONFIG);
-  h.write(join(h.root, ".agents/norn/workflows/ship.yaml"), WORKFLOW);
+  h.write(repoConfigPath(h.root), CONFIG);
+  h.write(join(workflowsDir(h.root), "ship.yaml"), WORKFLOW);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn"]);
   h.git(["push", "-q", "origin", "main"]);
@@ -160,11 +161,11 @@ describe("why on a tick the trace no longer keeps (B20, D10)", () => {
   test("an unknown tick within the window, or whose day is still kept, is not called pruned", async () => {
     expect((await h.norn("run", "view", "gh-3", "--why", "--tick", ulidAt(h.clock.now() - DAY), "--json")).value).toMatchObject({ code: "no_tick" });
     const day = new Date(h.clock.now() - 40 * DAY).toISOString().slice(0, 10);
-    h.write(join(traceDir(), `${day}.jsonl`), "\n");
+    h.write(join(machineDir(), `${day}.jsonl`), "\n");
     try {
       expect((await h.norn("run", "view", "gh-3", "--why", "--tick", ulidAt(h.clock.now() - 40 * DAY), "--json")).value).toMatchObject({ code: "no_tick" });
     } finally {
-      rmSync(join(traceDir(), `${day}.jsonl`));
+      rmSync(join(machineDir(), `${day}.jsonl`));
     }
   });
 });

@@ -1,0 +1,55 @@
+# before
+# norn (machine-local)
+.agents/norn/trace/
+.env.norn
+.norn-unit
+mine-keep.txt
+{
+  "heartbeat_id": "01M60ABCDEFGHJKMNPQRSTVWXY",
+  "created_at": "2026-10-01T10:00:00.000Z",
+  "last_tick_at": "2026-10-30T10:00:00.000Z"
+}
+$ norn migrate
+# norn migrate
+
+Moved /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/old to the new layout:
+
+- config: .agents/norn/config.yaml → .agents/norn.config.yaml (staged)
+- workflows: .agents/norn/workflows/bug.yaml → .agents/workflows/bug.yaml (staged)
+- workflows: .agents/norn/workflows/slice.yaml → .agents/workflows/slice.yaml (staged)
+- workflows: .agents/norn/workflows/story.yaml → .agents/workflows/story.yaml (staged)
+- machine files: .agents/norn/trace → /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa2-gh110/home/repos/old-7befe792 (machine-local, outside git)
+- .gitignore: dropped .agents/norn/trace/ (staged)
+
+Review the staged moves with `git status`, then commit them: `git commit -m "Move norn to its new layout (norn migrate)"`
+exit=0
+$ git status --short
+R  .agents/norn/config.yaml -> .agents/norn.config.yaml
+R  .agents/norn/workflows/bug.yaml -> .agents/workflows/bug.yaml
+R  .agents/norn/workflows/slice.yaml -> .agents/workflows/slice.yaml
+R  .agents/norn/workflows/story.yaml -> .agents/workflows/story.yaml
+M  .gitignore
+exit=0
+HEAD before 20a15dd, after 20a15dd
+20a15dd old layout
+# .gitignore
+# norn (machine-local)
+.env.norn
+.norn-unit
+mine-keep.txt
+diff --git a/.gitignore b/.gitignore
+index a73d171..90dcfcc 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,5 +1,4 @@
+ # norn (machine-local)
+-.agents/norn/trace/
+ .env.norn
+ .norn-unit
+ mine-keep.txt
+# .agents
+.
+..
+norn.config.yaml
+skills
+workflows

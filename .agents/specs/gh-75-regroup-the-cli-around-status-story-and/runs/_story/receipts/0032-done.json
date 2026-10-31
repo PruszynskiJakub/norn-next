@@ -1,0 +1,17 @@
+{
+  "kind": "done",
+  "receipt_id": "01M64XV008EJXYWKF5XRKFJH4B",
+  "run_id": "01M64X3RMWF6VX1ZYRCQ1FVGS8",
+  "step": "resolve",
+  "attempt": 2,
+  "at": "2026-10-29T22:52:37.257Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "done",
+  "handoff": "Merged main b563d55a: kept gh-94's intake by kind (triage+reproduce, fix/spec removed) with this branch's command renames (story edit --workflow/--at, story approve, story close, status) in AGENTS.md, CONTRIBUTING.md, triage SKILL.md. Left .agents/norn/workflows yaml as main has it (old command names; this branch never edits .agents/norn). Typecheck clean, suite 1421/0.",
+  "base_merge": {
+    "sha": "b563d55a178d934ae8fda3bce63d9e68e643e49d",
+    "merge": "f3fcf1844a962982762ac9bdb05a1674616948d3",
+    "head": "f3fcf1844a962982762ac9bdb05a1674616948d3"
+  }
+}

@@ -6,12 +6,12 @@
  * Reuse: `const h = await createHarness(); await h.norn("init"); …; h.cleanup()`.
  */
 import { setDefaultTimeout } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { type Clock, type InboxItem, type LaunchSpec, type NotifierPort, type PaneState, type PromptKey, type RemoteIssue, type RemotePort, type RemotePullRequest, type RunnerCapabilities, type RunnerPort, type RunnerSessionInfo, nameRemoved, type SessionRef } from "@norn/core";
 import { type Receipt, type UnitState, ulid } from "@norn/schema";
-import { appendReceipt, installSkills, linkSkills, readState } from "@norn/store";
+import { appendReceipt, installSkills, linkSkills, machineDir, readState, repoConfigPath, workflowsDir } from "@norn/store";
 import type { ProjectView } from "@norn/view";
 import { bundledSkills, type CliDeps, type CliResult, type Interaction, type InteractionChoice, runCli, type TickReport } from "../src/index.ts";
 import { assetsDir } from "../src/runtime/assets.ts";
@@ -331,6 +331,38 @@ export async function createHarness(): Promise<Harness> {
     },
   };
   return h;
+}
+
+/** gh-110 D4: the three layout parts, each with its old place (spelled out: what a person had) and its new one. */
+export type LayoutPartName = "config" | "workflows" | "machine files";
+export const oldNornDir = (root: string) => join(root, ".agents/norn");
+export function layoutPlaces(root: string): Record<LayoutPartName, { old: string; new: string }> {
+  return {
+    config: { old: join(oldNornDir(root), "config.yaml"), new: repoConfigPath(root) },
+    workflows: { old: join(oldNornDir(root), "workflows"), new: workflowsDir(root) },
+    "machine files": { old: join(oldNornDir(root), "trace"), new: machineDir(root) },
+  };
+}
+
+/** S1: a repo on the old layout, built by moving `init`'s files (and the machine dir) back to their old places. */
+export function toOldLayout(root: string, parts: LayoutPartName[] = ["config", "workflows", "machine files"]): void {
+  const places = layoutPlaces(root);
+  for (const p of parts) {
+    const { old, new: now } = places[p];
+    if (!existsSync(now)) continue;
+    mkdirSync(dirname(old), { recursive: true });
+    renameSync(now, old);
+  }
+}
+
+/** The reverse of `toOldLayout`: every part back at its new place, `.agents/norn/` gone. */
+export function toNewLayout(root: string): void {
+  for (const { old, new: now } of Object.values(layoutPlaces(root))) {
+    if (!existsSync(old)) continue;
+    mkdirSync(dirname(now), { recursive: true });
+    renameSync(old, now);
+  }
+  rmSync(oldNornDir(root), { recursive: true, force: true });
 }
 
 /** What `norn init` does for skills (SK1), for setups that write their own config instead: `.agents/skills/` linked from Claude's folder. */

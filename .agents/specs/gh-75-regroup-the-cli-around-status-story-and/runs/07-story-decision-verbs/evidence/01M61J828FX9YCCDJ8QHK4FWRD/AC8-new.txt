@@ -1,0 +1,17 @@
+### story reject gh-1  (no reason; base only warns)
+exit -1
+(skipped: would write a receipt on base)
+
+### story approve gh-2
+exit 0
+{"unit":"gh-2","receipt":{"kind":"approve","receipt_id":"03PGFN38A0G3C4GRRVRV54W833","run_id":null,"step":"review","attempt":1,"at":"2099-01-15T10:00:40.000Z","by":"human","who":"tester@box","slice":null,"head_sha":"9d2790cbfc79d87414c8142ab3d6da2af43c6ab2"},"delivered":{"via":"local","claim":"mine","n":4,"file":".agents/specs/gh-2-send-receipts/runs/_story/receipts/0004-approve.json"},"next":"norn tick"}
+
+
+### story reject gh-1 --reason misses B4
+exit 0
+{"unit":"gh-1","receipt":{"kind":"reject","receipt_id":"03PGFN38A0G3C4GRRVRV54W835","run_id":null,"step":"review","attempt":1,"at":"2099-01-15T10:00:40.000Z","by":"human","who":"tester@box","slice":null,"comment":"misses B4","head_sha":"5f4050a64726b0cf4f2a3d735818df1cac4f81c8"},"delivered":{"via":"local","claim":"mine","n":4,"file":".agents/specs/gh-1-pay-invoices/runs/_story/receipts/0004-reject.json"},"next":"norn tick"}
+
+
+### after next tick
+gh-1 {"step":"work","status":"ready","attempt":2,"counters":{"loop":1}} 
+gh-2 {"step":"$done","status":"done","attempt":1,"counters":{"loop":0}}

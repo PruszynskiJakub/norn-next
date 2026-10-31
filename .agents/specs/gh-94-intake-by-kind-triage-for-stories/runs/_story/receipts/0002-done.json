@@ -1,0 +1,12 @@
+{
+  "kind": "done",
+  "receipt_id": "01M63Z2APP9NPR06MT8K3Y76BA",
+  "run_id": "01M63YCR3D8PX2EGZFVHG0AXVG",
+  "step": "implement",
+  "attempt": 1,
+  "at": "2026-10-29T13:54:51.734Z",
+  "by": "agent",
+  "who": "claude",
+  "outcome": "done",
+  "handoff": "Added reproduce workflow (norn-diagnose → confirm gate), triage now quick|story|close, quick implement starts from reproduce's red loop, fix.yaml/spec.yaml deleted, bug template applies norn:wf:reproduce, docs and triage/issue/release skills updated; tests in test/process.test.ts and test/repo.test.ts; full suite and typecheck green. Merged origin/main (#93 ci step) first. Person still needs to create the norn:wf:reproduce label (remote write)."
+}

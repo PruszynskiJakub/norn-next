@@ -1,0 +1,18 @@
+# B7: quick.yaml clarify.done → refine (uncounted cycle refine→clarify→refine)
+ .agents/workflows/quick.yaml | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+59:    skill: norn-nonexistent
+$ bun /Users/jakubpruszynski/Projects/norn-worktrees/gh-110-an-agent-may-never-edit-agents-norn-so/packages/cli/src/main.ts doctor --repo
+norn doctor: 2 checks failed (workflow miss, workflow quick)
+
+  ok   layout         .agents/workflows/ and .agents/norn.config.yaml
+  ok   workflows      bug, slice, story valid (.agents/workflows/)
+  FAIL workflow miss  .agents/workflows/miss.yaml
+                      ! /steps/resolve/skill: skill 'norn-nonexistent' is not installed for agent 'claude' (run norn init, or add it to that agent's skill folder)
+  FAIL workflow quick .agents/workflows/quick.yaml
+                      ! /steps/refine: cycle without a counter: refine.questions → clarify.done → refine (W4)
+  ok   config         .agents/norn.config.yaml
+exit=1
+# --json
+{"ok":false,"repo":{"ok":false,"layout":{"ok":true,"layout":"new"},"workflows":[{"name":"bug","file":".agents/workflows/bug.yaml","ok":true,"issues":[]},{"name":"miss","file":".agents/workflows/miss.yaml","ok":false,"issues":[{"code":"unknown_skill","path":"/steps/resolve/skill","message":"skill 'norn-nonexistent' is not installed for agent 'claude' (run norn init, or add it to that agent's skill folder)"}]},{"name":"quick","file":".agents/workflows/quick.yaml","ok":false,"issues":[{"code":"uncounted_cycle","path":"/steps/refine","message":"cycle without a counter: refine.questions → clarify.done → refine (W4)","cycle":["refine","clarify"]}]},{"name":"slice","file":".agents/workflows/slice.yaml","ok":true,"issues":[]},{"name":"story","file":".agents/workflows/story.yaml","ok":true,"issues":[]}],"config":{"ok":true,"file":".agents/norn.config.yaml","present":true,"errors":[]}}}
+

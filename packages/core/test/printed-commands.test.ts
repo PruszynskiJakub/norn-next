@@ -14,6 +14,7 @@ const today: Record<keyof typeof cmd, [string, ...string[]]> = {
   done: [`norn done approve --handoff "…"`, cmd.done("approve"), `norn done pass --criteria <file> --handoff "…"`, cmd.done("pass", { criteria: true })],
   help: ["norn help", cmd.help()],
   init: ["norn init", cmd.init()],
+  migrate: ["norn migrate", cmd.migrate()],
   status: ["norn status", cmd.status(), "norn status --notes", cmd.status({ notes: true }), "norn status --history --since 1d", cmd.status({ since: "1d" })],
   statusWatch: ["norn status --watch", cmd.statusWatch(), "norn status --watch --interval 5s", cmd.statusWatch({ interval: "5s" })],
   storyAnswer: [`norn story answer ${U} "…"`, cmd.storyAnswer(U), `norn story answer ${U} "1"`, cmd.storyAnswer(U, "1")],

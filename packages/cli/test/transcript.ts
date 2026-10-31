@@ -27,7 +27,7 @@ import { existsSync, readdirSync, readFileSync, realpathSync, statSync, writeFil
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import type { NotifierPort, RemotePort, RunnerPort } from "@norn/core";
-import { setSpawnObserver } from "@norn/store";
+import { setSpawnObserver, machineDir } from "@norn/store";
 import type { CliResult } from "../src/index.ts";
 import { normaliser } from "./golden-harvest.ts";
 import type { Harness } from "./harness.ts";
@@ -87,6 +87,7 @@ function numberer(re: RegExp, tag: string): (text: string) => string {
 /** Every file under a `runs/` dir below each of `tops` (skipping `.git` and the trace dir), keyed by its path relative to `dir`, with its content. */
 function runsFiles(dir: string, tops: readonly string[]): Map<string, string> {
   const out = new Map<string, string>();
+  const traces = new Set(tops.map((top) => machineDir(top)));
   const walk = (d: string, inRuns: boolean) => {
     let names: string[];
     try {
@@ -98,7 +99,7 @@ function runsFiles(dir: string, tops: readonly string[]): Map<string, string> {
       if (name === ".git" || name === "node_modules") continue;
       const p = join(d, name);
       // the trace dir holds read-only caches (base/<tree>/ copies of the record), not records norn wrote
-      if (p.endsWith("/.agents/norn/trace")) continue;
+      if (traces.has(p)) continue;
       let st: ReturnType<typeof statSync>;
       try {
         st = statSync(p);
