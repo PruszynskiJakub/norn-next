@@ -1,0 +1,5 @@
+real gh rejected: AdapterError {
+  code: "gh_failed",
+  retryable: false,
+  message: "gh issue view failed (exit 1): GraphQL: Could not resolve to a Repository with the name 'norn-qa-nonexistent-owner-zz9/none'. (repository)",
+}
