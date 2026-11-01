@@ -812,4 +812,31 @@ counters: { back: { max: 2 } }
     // the story ends only when the PR merges: still active
     expect(t.read(join(wt(), spec, "spec.md"))).toContain("status: active");
   });
+
+  test("B35 (AC12): a finished round an older norn kept flat is moved into round 1, and --workflow then starts round 2", async () => {
+    t.remote.issues = [...t.remote.issues, issue(16, "Old flat")];
+    const wt16 = `${t.root}-worktrees/gh-16-old-flat`;
+    const flat = join(wt16, ".agents/specs/gh-16-old-flat/runs/_story");
+    const runs16 = () => storyUnitDir(join(wt16, ".agents/specs/gh-16-old-flat"));
+    t.clock.advance(10_000);
+    await t.tick("--sync");
+    for (let i = 0; i < 8 && t.state(runs16())?.status !== "running"; i++) await next();
+    t.report(runs16(), "done", { outcome: "story", handoff: "a story" });
+    await next();
+    expect((await t.norn("story", "approve", "gh-16")).exit).toBe(0);
+    await next();
+    // lay it out flat, as an older norn wrote it
+    const r1 = join(flat, "rounds/01-triage");
+    for (const name of readdirSync(r1)) t.git(["mv", join(r1, name), join(flat, name)], wt16);
+    t.git(["commit", "-q", "-m", "older norn: flat record"], wt16);
+    expect(t.state(flat)).toMatchObject({ step: "$done", status: "done" });
+    const moved = await next();
+    expect(moved.decisions.filter((d) => d.unit === "gh-16").map((d) => d.rule)).toContain("round.migrate");
+    expect(runs16()).toBe(r1);
+    const r = await t.norn("story", "edit", "gh-16", "--workflow", "story", "--json");
+    expect(r.value).toMatchObject({ round: 2, to: "refine" });
+    await next();
+    expect(runs16()).toBe(join(flat, "rounds/02-story"));
+    expect(t.state(runs16())).toMatchObject({ workflow: "story", round: 2, step: "refine" });
+  });
 });

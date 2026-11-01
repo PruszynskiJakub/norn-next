@@ -507,6 +507,15 @@ describe("mailbox (T9)", () => {
     f.mailbox = [{ ref: "refs/norn/inbox/gh-1/B", sha: "s", id: "B", receipt: { ...r, attempt: 5 }, error: null }];
     expect(only(facts([f]))).toMatchObject({ kind: "reject_receipt", reason: "no unit at ready#5" });
   });
+  test("gh-71 B35 (AC12): a mailbox receipt made for round 1's cursor arriving after round 2 started is rejected as stale", () => {
+    const f = storyAt("refine");
+    f.units[0]!.state = { ...f.units[0]!.state!, round: 2 };
+    f.units[0]!.record = roundRecordPath(2, "story");
+    // round 1 waited at its ready gate when the second clone approved it
+    const r = { ...receipt({ step: "ready", attempt: 1, run: null }, "approve", {}, "human"), slice: null };
+    f.mailbox = [{ ref: "refs/norn/inbox/gh-1/A", sha: "s", id: "A", receipt: r, error: null }];
+    expect(decide(facts([f]), WORKFLOWS, CONFIG).find((x) => x.unit === "gh-1" && x.action.kind !== "claim")?.action).toMatchObject({ kind: "reject_receipt", rule: "mailbox.reject", reason: "stale: gh-1 is not at ready#1" });
+  });
   test("a receipt naming its unit is routed to that unit, even when another unit has the same cursor", () => {
     const gate: Partial<UnitState> = { step: "human-qa", attempt: 1, visits: { "human-qa": 1 }, status: "parked", park: { kind: "gate", reason: "x", since: at() } };
     const story = storyAt("slices", {}, [{ nn: "01", state: gate }, { nn: "02", state: gate }]);
