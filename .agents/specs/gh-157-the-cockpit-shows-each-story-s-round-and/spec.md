@@ -8,7 +8,6 @@ title: The cockpit shows each story's round and workflow
 assignee: PruszynskiJakub
 labels:
   - norn
-  - norn:wf:quick
 workflow: triage
 status: active
 intake_at: 2026-11-01T20:22:43.336Z
