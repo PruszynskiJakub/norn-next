@@ -3,7 +3,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { type Action, type ActionResult, applyReceipts, nornTrailers, routeOf } from "@norn/core";
 import { type ReceiptOf, ulid } from "@norn/schema";
-import { acquireIntegrateLock, appendReceipt, machineDir, readText } from "@norn/store";
+import { acquireIntegrateLock, appendReceipt, machineDir, readPrFacts, readText, writePrFacts } from "@norn/store";
 import { integrate, update as updateStory } from "../integrate.ts";
 import { type ActEnv, QueueFull } from "./env.ts";
 
@@ -112,6 +112,9 @@ async function runGitLocked(act: ActEnv, a: Extract<Action, { kind: "run_git" }>
       }
       outcome = "done";
       extra.pr = pr;
+      // C1, gh-71 B27: the PR open-pr opened (or found) is what this checkout last saw of it, so the
+      // finished round shows its merge item before a sync fetches the PR (never "round done, no PR")
+      writePrFacts(act.root, { ...readPrFacts(act.root), [a.unit.story]: { pr, observed_at: act.ctx.clock.now() } });
       break;
     }
   }

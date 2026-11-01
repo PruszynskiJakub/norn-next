@@ -1,0 +1,13 @@
+gh-7/01 · implement#1 (agent)
+
+run      03PGFN3VV0KTHDP1W5EWHCB19Z
+outcome  (in step)
+entered  2099-01-15T10:00:50.000Z
+left     …
+duration 0s so far
+who      tick 03PGFN3VV0D5TFAEQN22BQ7CS6
+
+Receipts
+  /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-p0gv7z/repo-worktrees/gh-7-add-login-form--01-form/.agents/specs/gh-7-add-login-form/runs/01-form/receipts/0001-started.json
+  /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-p0gv7z/repo-worktrees/gh-7-add-login-form--01-form/.agents/specs/gh-7-add-login-form/runs/01-form/receipts/0002-started.json
+exit 0

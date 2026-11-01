@@ -1,0 +1,43 @@
+# norn brief — gh-7/01 · implement #1
+
+## Where you are
+
+- Story: gh-7
+- Slice: gh-7/01
+- Step: implement (attempt 1)
+- Mode: auto
+- Run: 03PGFN3VV0KTHDP1W5EWHCB19Z
+
+## Your work
+
+Use the `norn-implement` skill.
+
+## Inputs
+
+- Story spec: `.agents/specs/gh-7-add-login-form/spec.md`
+- Slice: `.agents/specs/gh-7-add-login-form/slices/01-form.md`
+- Handoff (text under Context; update it here): `.agents/specs/gh-7-add-login-form/runs/01-form/handoff.md`
+
+## Context
+
+### Goal
+
+### Progress
+
+### Resume
+
+## Finish with exactly one of
+
+- `norn done done --handoff "…"` — tests pass
+- `norn ask "<question>"` — you need a person's answer to continue; the step parks until answered
+- `norn stuck "<reason>"` — you cannot continue; a person unblocks the step
+
+Then end your turn. Never edit `runs/`; never push.
+
+## Limits
+
+- Deadline: 60m (until 2099-01-15T11:01:00.000Z)
+- Nudges left: 2
+- Fresh-session retries left: 1
+- Port slot: 2 (PORT_BASE=4020)
+exit 0

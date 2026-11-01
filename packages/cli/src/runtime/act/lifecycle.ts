@@ -1,8 +1,8 @@
 /** act: unit and story lifecycle — start, done, rejected receipts, claims, intake, mirror, merged clean-up and base records. */
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { cmd, type Action, type ActionResult, nornTrailers, type UnitRef, type WorktreeSpec } from "@norn/core";
-import { type ClaimBlob, parseDuration, STORY_UNIT_DIR } from "@norn/schema";
+import { type ClaimBlob, parseDuration, ROUNDS_DIR, STORY_UNIT_DIR } from "@norn/schema";
 import {
   acquireClaim,
   type ClaimWriteResult,
@@ -20,7 +20,11 @@ import {
   type PendingRecord,
   readPendingRecords,
   writePendingRecords,
+  moveFile,
+  startDir,
+  writeState,
 } from "@norn/store";
+import { closeStory } from "../close.ts";
 import { integrate } from "../integrate.ts";
 import { markStoryOnBase, mergeFacts, type RecordResult } from "../record.ts";
 import { equipWorktree } from "../worktrees.ts";
@@ -68,9 +72,9 @@ export async function startUnit(act: ActEnv, a: Extract<Action, { kind: "start_u
     wtPath = a.worktree.path;
   }
   if (!wtPath) throw new Error(`no worktree for ${a.unit.key}`);
-  const runsDir = join(wtPath, story.spec_dir, "runs", a.unit.dir);
+  const runsDir = startDir(join(wtPath, story.spec_dir), a.unit.dir, a.workflow);
   const pin = pinWorkflow(runsDir, a.workflow_source);
-  if (!pin.ok) throw new Error(`runs/${a.unit.dir}/workflow.yaml is already pinned with different content (S7)`);
+  if (!pin.ok) throw new Error(`${relative(join(wtPath, story.spec_dir), runsDir)}/workflow.yaml is already pinned with different content (S7)`);
   act.obs.units[a.unit.key] = {
     unit: a.unit,
     story: a.unit.story,
@@ -268,6 +272,25 @@ export async function cleanupMerged(act: ActEnv, a: Extract<Action, { kind: "cle
   return errors.length ? { ok: false, error: errors.join("; "), detail } : { ok: true, detail };
 }
 
+/**
+ * GR6b (gh-71 D5, B22): the issue closed on a finished round with no PR — the effects of `norn story
+ * close` (runtime/close.ts: push first, then remove worktrees, local branches, leases and the claim),
+ * then the mailbox refs. A failure before the removals leaves everything in place; the next tick re-decides.
+ */
+export async function closeClosedIssueStory(act: ActEnv, a: Extract<Action, { kind: "close_story" }>): Promise<ActionResult> {
+  const key = a.unit.story;
+  const story = act.obs.facts.stories.find((s) => s.key === key);
+  const claimSha = act.claimed.get(key)?.sha ?? (story?.claim.state === "mine" ? story.claim.sha : null);
+  if (!story || !claimSha) throw new Error(`${key} is not held here; nothing closed`);
+  const r = await closeStory(act.obs, story, { home: act.ctx.home, claimSha });
+  if (!r.ok) return { ok: false, error: r.reason === "push_failed" ? `push ${r.branch} failed (${r.push_reason}): ${r.message}; nothing was removed` : `cannot mark ${r.file} dropped: ${r.message}`, detail: r };
+  act.cleaned.add(key);
+  const deleted: string[] = [];
+  for (const m of a.refs) if ((await deleteMailbox(act.root, act.obs.remote, m.ref, m.sha)).ok) deleted.push(m.ref);
+  const { ok: _ok, story: _story, ...effects } = r;
+  return { ok: true, detail: { ...effects, mailbox_deleted: deleted } };
+}
+
 /** One attempt at a GR6 record; keeps it in `records.json` until it lands (idempotent: `unchanged` counts). */
 async function record(act: ActEnv, p: PendingRecord): Promise<RecordResult | { state: "failed"; reason: string }> {
   const res = await markStoryOnBase({
@@ -298,4 +321,77 @@ export async function retryRecords(act: ActEnv): Promise<Array<{ story: string; 
     out.push({ story: p.story, state: r.state, ...("reason" in r ? { reason: r.reason } : {}) });
   }
   return out;
+}
+
+/**
+ * gh-71 D7 (B34): a flat story record moves into round 1 — every entry of `runs/_story/` but `handoff.md`
+ * (and `rounds/`) by `git mv` (plainly when untracked), in one commit, pushed. Receipt paths are relative
+ * to the round, so they still resolve; slice folders are not touched.
+ * Resumable (S5): `state.json` moves last, so a move that stops partway still reads as flat and the next
+ * round.migrate moves what is left; an entry already in the round is merged into, entry by entry.
+ */
+export async function roundMigrate(act: ActEnv, a: Extract<Action, { kind: "round_migrate" }>): Promise<ActionResult> {
+  const cwd = a.commit.cwd;
+  mkdirSync(join(cwd, a.to), { recursive: true });
+  const moved = readdirSync(join(cwd, a.from))
+    .filter((n) => n !== "handoff.md" && n !== ROUNDS_DIR)
+    .sort((x, y) => Number(x === "state.json") - Number(y === "state.json") || x.localeCompare(y));
+  for (const name of moved) await migrateEntry(act, cwd, `${a.from}/${name}`, `${a.to}/${name}`);
+  const loc = act.obs.units[a.unit.key];
+  if (loc) loc.runsDir = join(cwd, a.to);
+  const commit = await act.commit(a.commit, null, null, null, [a.from]);
+  return { ok: true, detail: { moved, to: a.to, commit } };
+}
+
+/** Move one record entry to the round; into a folder already there (an earlier move that stopped partway), child by child. */
+async function migrateEntry(act: ActEnv, cwd: string, from: string, to: string): Promise<void> {
+  const target = join(cwd, to);
+  if (existsSync(target)) {
+    if (!statSync(target).isDirectory() || !statSync(join(cwd, from)).isDirectory()) throw new Error(`round.migrate: ${to} already exists`);
+    for (const name of readdirSync(join(cwd, from)).sort()) await migrateEntry(act, cwd, `${from}/${name}`, `${to}/${name}`);
+    rmSync(join(cwd, from), { recursive: true, force: true });
+    return;
+  }
+  if (!(await act.git.move(cwd, from, to))) moveFile(join(cwd, from), target);
+}
+
+/**
+ * gh-71 D1 (B1, B30, B31): end the old round in its own folder (its state with the round receipt
+ * applied), then create the new round's folder — workflow pinned, first state written last (S5) —
+ * set the story's `workflow:`, and commit both folders, the shared handoff and spec.md in one commit.
+ */
+export async function roundStart(act: ActEnv, a: Extract<Action, { kind: "round_start" }>): Promise<ActionResult> {
+  const loc = act.unitLoc(a.unit);
+  const story = act.storyLoc(a.unit.story);
+  const wt = a.commit?.cwd ?? loc.worktree;
+  if (!wt) throw new Error(`no worktree for ${a.unit.key}`);
+  const oldDir = loc.runsDir;
+  const dir = join(wt, a.round.dir);
+  const pin = pinWorkflow(dir, a.workflow_source);
+  if (!pin.ok) throw new Error(`${a.round.dir}/workflow.yaml is already pinned with different content (S7)`);
+  // S5: the new round's state is the commit point — a round folder without state.json is not the current
+  // round (store currentRound), so before it the old round stays the record and the next tick applies
+  // the round receipt again; once it exists the story is in round N, whatever happens to the old state after
+  act.obs.units[a.unit.key] = { ...loc, runsDir: dir, state: null, workflow: null };
+  act.writeUnitState(a.unit, dir, a.state);
+  writeState(oldDir, a.ended);
+  for (const r of a.rejected) act.traceReject(a.unit.key, `receipt ${r.n}`, r.reason, { receipt_id: r.receipt_id });
+  const fm = patchStoryFile(storyFile(join(wt, story.spec_dir)), { workflow: a.round.workflow }, wt);
+  const commit = await act.commit(a.commit, a.unit, a.state, `${a.rule}: round ${a.round.n} ${a.round.workflow} at ${a.state.step}`);
+  const label = await swapRoundLabel(act, a.label);
+  return { ok: true, detail: { round: a.round, story_file: fm.ok ? "updated" : fm.reason, commit, ...(label.swapped ? { label: a.label } : {}) }, ...(label.warning ? { warnings: [label.warning] } : {}) };
+}
+
+/** gh-71 D9 (B19, B20): swap the issue's workflow label after the round started; a failure is only a warning. */
+async function swapRoundLabel(act: ActEnv, label: Extract<Action, { kind: "round_start" }>["label"]): Promise<{ swapped: boolean; warning?: string }> {
+  if (!label) return { swapped: false };
+  const remote = act.obs.ports.remote;
+  const what = `issue #${label.number} label ${label.remove} → ${label.add}`;
+  if (!remote) return { swapped: false, warning: `${what} not updated: no remote provider configured` };
+  try {
+    await remote.replaceIssueLabel(label.number, { remove: label.remove, add: label.add });
+    return { swapped: true };
+  } catch (e) {
+    return { swapped: false, warning: `${what} not updated: ${(e as Error).message}` };
+  }
 }

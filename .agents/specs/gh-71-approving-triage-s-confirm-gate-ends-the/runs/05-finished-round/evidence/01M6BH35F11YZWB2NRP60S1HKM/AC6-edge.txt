@@ -1,0 +1,12 @@
+# issue #12 label norn removed
+$ norn sync
+"decisions":[{"unit":"gh-12","rule":"remote.mirror","kind":"update_story_mirror","ok":true}]
+$ norn tick
+"decisions":[{"unit":"gh-12","rule":"story.round_done","kind":"noop","ok":true}]
+$ norn status
+Your turn (1) · work only you can do
+  gh-12      $done: gh-12: triage round done, no PR · 13s
+      or close the issue
+      $ norn story edit gh-12 --workflow <name>
+--- state
+ugrep: warning: /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa71/repo-worktrees/gh-12-triage-me/.agents/specs/gh-12-triage-me/runs/_story/state.json: No such file or directory

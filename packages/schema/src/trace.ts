@@ -46,7 +46,13 @@ export const TickUnitRecord = Type.Object(
     rule: NonEmpty,
     action: Payload,
     result: Type.Object(
-      { ok: Type.Boolean(), error: Type.Optional(Type.String()), detail: Type.Optional(Type.Unknown()) },
+      {
+        ok: Type.Boolean(),
+        error: Type.Optional(Type.String()),
+        detail: Type.Optional(Type.Unknown()),
+        /** gh-71 B20: an effect that failed without failing the action (a label not updated) */
+        warnings: Type.Optional(Type.Array(Type.String())),
+      },
       { additionalProperties: false },
     ),
     /** trace-relative path of the stored briefing (B4) */

@@ -145,6 +145,10 @@ export function createGlab(opts: GlabOptions): RemotePort {
       const action = `/label ${labels.map((l) => `~"${l}"`).join(" ")}`;
       return `${web_url}/-/issues/new?${new URLSearchParams({ "issue[description]": action })}`;
     },
+    async replaceIssueLabel(number, { remove, add }) {
+      // B19: GitLab ignores a label to remove that the issue does not carry
+      okOrThrow(await run(["issue", "update", String(number), ...repo, "--unlabel", remove, "--label", add]), "glab issue update", "glab");
+    },
   };
 }
 

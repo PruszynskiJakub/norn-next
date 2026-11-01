@@ -8,7 +8,7 @@ import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, st
 import { join, relative } from "node:path";
 import { git as gitAdapter } from "@norn/adapters";
 import { type StoryFrontmatter, ulid } from "@norn/schema";
-import { appendReceipt, leasesDir, machineDir, readState, repoConfigPath, safeUnlink, workflowsDir, writeStoryFile } from "@norn/store";
+import { appendReceipt, leasesDir, machineDir, readState, repoConfigPath, safeUnlink, workflowsDir, writeStoryFile, storyUnitDir } from "@norn/store";
 import { pluginLinkHint } from "../../src/commands/doctor.ts";
 import { assetsDir } from "../../src/runtime/assets.ts";
 import { markStoryOnBase } from "../../src/runtime/record.ts";
@@ -66,8 +66,8 @@ describe("max_agents holds across ticks when the runner reports no process (K1, 
       h.clock.advance(10_000);
       await h.tick();
     }
-    const runs1 = join(`${h.root}-worktrees/gh-1-first`, ".agents/specs/gh-1-first/runs/_story");
-    const runs2 = join(`${h.root}-worktrees/gh-2-second`, ".agents/specs/gh-2-second/runs/_story");
+    const runs1 = storyUnitDir(join(`${h.root}-worktrees/gh-1-first`, ".agents/specs/gh-1-first"));
+    const runs2 = storyUnitDir(join(`${h.root}-worktrees/gh-2-second`, ".agents/specs/gh-2-second"));
     expect(readState(runs1).ok && (readState(runs1) as { value: { status: string } }).value.status).toBe("running");
     expect(h.runner.launches).toHaveLength(1);
 
@@ -123,7 +123,7 @@ describe("orphans (K5): reported by every tick, cleaned by norn tidy", () => {
     const orphanWt = `${h.root}-worktrees/gh-97-gone`;
     h.git(["worktree", "add", "-q", "-b", "gh-97-gone", orphanWt, "main"]);
     // a leftover receipt reservation
-    const runs = join(`${h.root}-worktrees/gh-3-third`, ".agents/specs/gh-3-third/runs/_story/receipts");
+    const runs = join(storyUnitDir(join(`${h.root}-worktrees/gh-3-third`, ".agents/specs/gh-3-third")), "receipts");
     const reserve = join(runs, ".0042.reserve");
     h.write(reserve, "01KA0000000000000000000002");
     utimesSync(reserve, new Date(Date.now() - 120_000), new Date(Date.now() - 120_000));
@@ -731,7 +731,7 @@ describe("trace retention: norn tidy prunes old hook files, briefings and transc
       h.clock.advance(10_000);
       await h.tick();
     }
-    const st = readState(join(`${h.root}-worktrees/gh-9-ninth`, ".agents/specs/gh-9-ninth/runs/_story"));
+    const st = readState(storyUnitDir(join(`${h.root}-worktrees/gh-9-ninth`, ".agents/specs/gh-9-ninth")));
     if (!st.ok || st.value.status !== "running" || !st.value.run) throw new Error("gh-9 has no live run");
     liveRun = st.value.run.run_id;
     h.clock.advance(20 * DAY); // the live run started 20 days ago

@@ -7,7 +7,7 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
 import type { PersonOpenSpec } from "@norn/core";
-import { repoConfigPath, workflowsDir } from "@norn/store";
+import { repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
 import type { CliDeps } from "../../src/index.ts";
 import { createHarness, FakeInteraction, type Harness, issue } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";
@@ -129,7 +129,7 @@ describe("norn story start (B28, MO5)", () => {
   });
 
   test("a step a person does not start is refused (nothing_to_open); with no target, nothing to pick (B59)", async () => {
-    const runs = join(wt(), ".agents/specs/gh-7-add-login-form/runs/_story");
+    const runs = storyUnitDir(join(wt(), ".agents/specs/gh-7-add-login-form"));
     h.report(runs, "done", { outcome: "done", handoff: "spec written" });
     h.clock.advance(10_000);
     await h.tick();

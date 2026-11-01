@@ -1,0 +1,16 @@
+#!/usr/bin/env bun
+// fake gh for QA: one seeded issue #1, no PRs; logs every call
+import { readFileSync, appendFileSync } from "node:fs";
+const dir = import.meta.dir + "/..";
+const a = process.argv.slice(2);
+appendFileSync(dir + "/gh-calls.log", a.join(" ") + "\n");
+const issues = JSON.parse(readFileSync(dir + "/issues.json", "utf8"));
+const j = (i) => ({ number: i.number, url: `https://github.com/acme/app/issues/${i.number}`, title: i.title, body: i.body, state: "OPEN", assignees: [{ id: "U", login: "tester", name: "tester" }], labels: i.labels.map((l) => ({ id: "L" + l, name: l, description: "", color: "ededed" })), updatedAt: "2026-11-01T10:00:00Z" });
+const out = (v) => { process.stdout.write(typeof v === "string" ? v : JSON.stringify(v)); process.exit(0); };
+if (a[0] === "api" && a[1] === "user") out("tester\n");
+if (a[0] === "auth") out("");
+if (a[0] === "issue" && a[1] === "list") out(issues.map(j));
+if (a[0] === "issue" && a[1] === "view") { const i = issues.find((x) => x.number === Number(a[2])); if (i) out(j(i)); process.stderr.write("Could not resolve to an issue"); process.exit(1); }
+if (a[0] === "pr" && a[1] === "list") out([]);
+if (a[0] === "repo" && a[1] === "view") out({ url: "https://github.com/acme/app" });
+process.stderr.write("fake gh: unhandled " + a.join(" ")); process.exit(1);

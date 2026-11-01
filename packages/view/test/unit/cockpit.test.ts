@@ -13,6 +13,7 @@ function story(key: string, over: Partial<StoryView> = {}): StoryView {
     title: `Story ${key}`,
     url: `https://github.com/o/r/issues/${key.slice(3)}`,
     workflow: "story",
+    round: 1,
     mode: "manual",
     effective_mode: "manual",
     mode_downgraded: false,

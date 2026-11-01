@@ -125,6 +125,12 @@ export interface ActFailure {
 
 export interface UnitFacts {
   unit: UnitRef;
+  /**
+   * gh-71 D2 (B30): the unit's record folder relative to its spec folder, as the store resolver found it:
+   * `runs/_story/rounds/NN-<wf>` for the story's current round, `runs/<nn>-<slug>` for a slice, `runs/_story`
+   * for a flat story record (B36). Absent = `unitRecordPath(unit.dir)` (facts an older norn recorded).
+   */
+  record?: string;
   /** null = unit not started (no runs/<unit>/state.json) */
   state: UnitState | null;
   /** pinned runs/<unit>/workflow.yaml, parsed + schema-valid; null if not started */
@@ -238,6 +244,12 @@ export interface StoryPrSeen {
   observed_at: number;
 }
 
+/** gh-71 D5: a story issue observation (`null` = not visible to this checkout) and its time (ms epoch). */
+export interface StoryIssueSeen {
+  issue: RemoteIssue | null;
+  observed_at: number;
+}
+
 export interface StoryFacts {
   key: string;
   slug: string;
@@ -252,6 +264,13 @@ export interface StoryFacts {
   mailbox: MailboxItem[] | undefined;
   /** the remote issue as seen now; null = not visible (closed/unassigned/unlabelled), undefined = not fetched */
   issue: RemoteIssue | null | undefined;
+  /**
+   * gh-71 D5: the story issue as the last successful sync of this checkout saw it, with when (ms epoch).
+   * The finished-round Check item (label removed, unassigned, unseen) uses it when `issue` was not
+   * fetched this tick, so it stays between syncs and shows in the read model. Decide never acts on
+   * it. Absent = never seen here.
+   */
+  issue_seen?: StoryIssueSeen;
   /**
    * The story PR; null = none, undefined = not fetched. `number`, `url`, `state`, `is_draft`,
    * `head_sha`, `merge_commit_sha?`, `merged_by?`, `merged_at?`, `head?`, `base_branch?`.

@@ -1,0 +1,2 @@
+
+- review#2: approve. Review #1's F1–F4 are fixed. AC1–AC12 are tested, and AC13 is for QA. Green: unit 1019/0, typecheck, schema fresh, human+runtime 48/0. Minor: the AC12 stale-mailbox case has no S1 test; the AC7 and AC8 fixtures are weaker than the criteria; writes after the commit point (spec workflow:, the trace of rejected receipts) are not repaired if act stops. Flagged: the slice-workflow e2e transcript is red (an extra round_done notify) from slice 05 code, not from this diff.

@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { NUDGE_TEXT } from "@norn/core";
 import { ulid } from "@norn/schema";
-import { appendHookTrace, appendReceipt, readTrace, repoConfigPath, workflowsDir } from "@norn/store";
+import { appendHookTrace, appendReceipt, readTrace, repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
 import { humanSummary, humanTickLines } from "../../src/commands/watch.ts";
 import { runShell, type TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
@@ -51,7 +51,7 @@ async function boot(h: Harness, n: number, title: string) {
 describe("runtime", () => {
   let h: Harness;
   const wt = () => `${h.root}-worktrees/gh-9-fix-the-bug`;
-  const runs = () => join(wt(), ".agents/specs/gh-9-fix-the-bug/runs/_story");
+  const runs = () => storyUnitDir(join(wt(), ".agents/specs/gh-9-fix-the-bug"));
   beforeAll(async () => {
     h = await createHarness();
     await boot(h, 9, "Fix the bug");
@@ -117,7 +117,7 @@ describe("runtime", () => {
     expect(h.state(runs())).toMatchObject({ status: "running", retries_used: 1, run: { session: { session_id: "s-2" } } });
   });
 
-  test("a stale receipt is rejected into the trace (T9); done → $done, waiting for the PR merge (GR6)", async () => {
+  test("a stale receipt is rejected into the trace (T9); done → $done, a finished round (gh-71 D6)", async () => {
     const st = h.state(runs());
     appendReceipt(runs(), { kind: "done", receipt_id: ulid(h.clock.now()), run_id: st?.run?.run_id ?? null, step: "implement", attempt: 7, at: h.clock.iso(), by: "agent", outcome: "done", handoff: "old" });
     h.report(runs(), "done", { outcome: "done", handoff: "fixed" });

@@ -201,6 +201,36 @@ export const storyBranch = storyDirName;
 export function sliceDirName(nn: string, slug: string): string {
   return `${sliceNn(nn)}-${slug}`;
 }
+/** The folder under a spec folder that holds every unit's record. */
+export const RUNS_DIR = "runs";
+/**
+ * gh-71 D2 (B30, B36): a unit's record folder relative to its spec folder, `runs/<unit>` (unit is
+ * `_story` or `<nn>-<slug>`). The one place that names it: store's `unitDir` resolves it under a spec
+ * folder, and pure decide uses it as is. Nothing else builds this path by hand.
+ */
+export function unitRecordPath(unit: string): string {
+  return `${RUNS_DIR}/${unit}`;
+}
+/** gh-71 B30: the folder under `runs/_story/` that holds the story's rounds. */
+export const ROUNDS_DIR = "rounds";
+/** gh-71 B30: a round's folder name, `01-triage` (two digits from 01). */
+export function roundDirName(n: number, workflow: string): string {
+  return `${String(n).padStart(2, "0")}-${workflow}`;
+}
+const ROUND_DIR_RE = /^([0-9]{2,})-(.+)$/;
+export function parseRoundDirName(name: string): { n: number; workflow: string } | null {
+  const m = ROUND_DIR_RE.exec(name);
+  return m ? { n: Number(m[1]), workflow: m[2] as string } : null;
+}
+/** gh-71 B31: a record folder's handoff: the story's one `runs/_story/handoff.md` above its round folders, a slice's in its own folder. */
+export function recordHandoffPath(record: string): string {
+  const m = new RegExp(`^(.*(?:^|/)${STORY_UNIT_DIR})/${ROUNDS_DIR}/[^/]+/?$`).exec(record);
+  return `${m ? m[1] : record.replace(/\/$/, "")}/handoff.md`;
+}
+/** gh-71 B30: a story round's record folder relative to its spec folder, `runs/_story/rounds/01-triage`. */
+export function roundRecordPath(n: number, workflow: string): string {
+  return `${unitRecordPath(STORY_UNIT_DIR)}/${ROUNDS_DIR}/${roundDirName(n, workflow)}`;
+}
 /** Slice branch: `gh-123/03-add-form`. */
 export function sliceBranch(story: string, nn: string, slug: string): string {
   return `${story}/${sliceDirName(nn, slug)}`;

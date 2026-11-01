@@ -1,0 +1,9 @@
+$ norn story approve gh-1
+{"unit":"gh-1","receipt":{"kind":"approve","receipt_id":"01M6BQ4XE78SDZQVV0XKG7Z5RX","run_id":null,"step":"confirm","attempt":1,"at":"2026-11-01T14:10:23.303Z","by":"human","who":"jakubpruszynski@mac","slice":null,"round":1,"head_sha":"a35e03cfc3312a2adee1c664ac37c2fa31df62af"},"delivered":{"via":"local","claim":"mine","n":3,"file":".agents/specs/gh-1-add-a-greeting/runs/_story/rounds/01-triage/receipts/0003-approve.json"},"next":"norn tick"}
+exit 0
+{"tick_id":"01M6BQ4XVJN1PB7FNTJZ7CBZW3","at":"2026-11-01T14:10:23.730Z","duration_ms":630,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-1","rule":"receipts.apply","kind":"apply_receipts","ok":true}],"notified":["round_done:gh-1:runs/_story/rounds/01-triage"],"trace":"2026-11-01.jsonl","failed":0}
+
+Your turn (1) · work only you can do
+  gh-1       $done: gh-1: triage round done, no PR · 0s
+      or close the issue
+      $ norn story edit gh-1 --workflow <name>

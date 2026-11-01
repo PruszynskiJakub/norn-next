@@ -33,6 +33,7 @@ import {
   listMailbox,
   loadLocalFacts,
   machineHolder,
+  type IssueFactsCache,
   type PrFactsCache,
   readLocalClaim,
   readRemoteCache,
@@ -42,6 +43,7 @@ import {
   type UnpushedUnit,
   unpushedRuns,
   writeBaseFacts,
+  writeIssueFacts,
   writePrFacts,
   writeRemoteCache,
 } from "@norn/store";
@@ -205,6 +207,15 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     if (fresh) prSeen[s.key] = fresh;
   }
   if (JSON.stringify(prSeen) !== JSON.stringify(prSeenIn)) writePrFacts(root, prSeen);
+  // gh-71 D5: the last issue seen per story, kept between syncs for the finished-round Check item (`issue_seen`)
+  const issueSeenIn = local.issue_seen;
+  const issueSeen: IssueFactsCache = {};
+  for (const s of snapshot.stories) {
+    if (s.frontmatter?.status === "done" || s.frontmatter?.status === "dropped") continue;
+    const fresh = storyIssues.has(s.key) ? { issue: storyIssues.get(s.key) ?? null, observed_at: now } : issueSeenIn[s.key];
+    if (fresh) issueSeen[s.key] = fresh;
+  }
+  if (JSON.stringify(issueSeen) !== JSON.stringify(issueSeenIn)) writeIssueFacts(root, issueSeen);
 
   // ---- P2 (F34): a PR not saying merged whose head is already on the fetched base is merged
   const byAncestry = new Set<string>();
@@ -310,6 +321,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       issue: storyIssues.has(s.key) ? storyIssues.get(s.key) : undefined,
       pr: storyPrs.has(s.key) ? storyPrs.get(s.key) : undefined,
       ...(prSeen[s.key] ? { pr_seen: prSeen[s.key] } : {}),
+      ...(issueSeen[s.key] ? { issue_seen: issueSeen[s.key] } : {}),
       ...(byAncestry.has(s.key) ? { merged_by_ancestry: true } : {}),
       ...(foreign.length ? { foreign_commits: foreign } : {}),
       ...(await readyHead(root, s.key, ls.ready, (storyPrs.has(s.key) ? storyPrs.get(s.key) : prSeen[s.key]?.pr)?.head_sha)),

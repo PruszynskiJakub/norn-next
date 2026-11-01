@@ -139,6 +139,12 @@ export function createGh(opts: GhOptions): RemotePort {
       const { url } = await json<{ url: string }>(["repo", "view", ...(opts.repo ? [opts.repo] : []), "--json", "url"]);
       return `${url}/issues/new?labels=${encodeURIComponent(labels.join(","))}`;
     },
+    async replaceIssueLabel(number, { remove, add }) {
+      // B19: gh refuses `--remove-label` for a label the repository lacks, so remove only one the issue carries
+      const { labels } = await json<Pick<GhIssue, "labels">>(["issue", "view", String(number), ...repo, "--json", "labels"]);
+      const removing = (labels ?? []).some((l) => l.name === remove) ? ["--remove-label", remove] : [];
+      okOrThrow(await run(["issue", "edit", String(number), ...repo, ...removing, "--add-label", add]), "gh issue edit", "gh");
+    },
   };
 }
 

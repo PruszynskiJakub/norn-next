@@ -1,0 +1,6 @@
+
+ 987 pass
+ 0 fail
+ 16 snapshots, 22034 expect() calls
+Ran 987 tests across 55 files. [1.85s]
+$ tsc --noEmit -p tsconfig.json && tsc --noEmit -p scripts/tsconfig.json

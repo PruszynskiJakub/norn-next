@@ -4,6 +4,7 @@
  * message (D11) — and a unit keeps the workflow it pinned when the file changes on the base (S7).
  * The paths are spelled out here on purpose: this is what a person sees.
  */
+import { storyUnitDir } from "@norn/store";
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -40,7 +41,7 @@ beforeAll(async () => {
 });
 afterAll(() => h.cleanup());
 
-const pinned = (n: number, slug: string) => h.read(join(`${h.root}-worktrees/gh-${n}-${slug}`, `.agents/specs/gh-${n}-${slug}/runs/_story/workflow.yaml`));
+const pinned = (n: number, slug: string) => h.read(join(storyUnitDir(join(`${h.root}-worktrees/gh-${n}-${slug}`, `.agents/specs/gh-${n}-${slug}`)), "workflow.yaml"));
 async function ticks(n = 8) {
   for (let i = 0; i < n; i++) {
     h.clock.advance(10_000);

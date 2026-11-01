@@ -1,0 +1,19 @@
+# issue gone from the remote (unseen)
+$ norn sync
+gh-12 story.round_done noop true
+$ norn tick
+gh-12 story.round_done noop true
+"step":"$done"
+"status":"done"
+"park":null
+"step":"confirm"
+$ norn status
+Your turn (1) · work only you can do
+  gh-12      $done: gh-12: triage round done, no PR · 30s
+      or close the issue
+      $ norn story edit gh-12 --workflow <name>
+
+Check (1) · changed outside norn, worth a look
+  gh-12      $done: gh-12: remote: issue closed, unassigned or unlabelled — the round stays finished · 30s
+      a finished round is not parked for the issue (gh-71 D5)
+      $ norn story view gh-12 --web

@@ -6,10 +6,10 @@
  * local `main` is stale (F36).
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, readdirSync } from "node:fs";
+import { cpSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { StoryFacts } from "@norn/core";
-import { baseCacheDir, baseSpecsRoot, defaultBaseRef, readTickInputs, readTrace, repoConfigPath, workflowsDir } from "@norn/store";
+import { baseCacheDir, baseSpecsRoot, defaultBaseRef, readTickInputs, readTrace, repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
 
@@ -92,7 +92,7 @@ describe("records: ready head, foreign commits, merged by ancestry, durable stat
   const branch = "gh-5-record-me";
   const wt = () => `${h.root}-worktrees/${branch}`;
   const spec = `.agents/specs/${branch}`;
-  const runs = () => join(wt(), spec, "runs/_story");
+  const runs = () => storyUnitDir(join(wt(), spec));
   const step = (ms = 10_000) => h.clock.advance(ms);
   let readyHead = "";
 
@@ -176,7 +176,7 @@ describe("records: PR merge facts from the remote", () => {
   const branch = "gh-6-merge-facts";
   const wt = () => `${h.root}-worktrees/${branch}`;
   const spec = `.agents/specs/${branch}`;
-  const runs = () => join(wt(), spec, "runs/_story");
+  const runs = () => storyUnitDir(join(wt(), spec));
 
   beforeAll(async () => {
     h = await createHarness();
@@ -210,7 +210,7 @@ describe("C4: an agent's commit while its unit is parked on an ask is not foreig
   let h: Harness;
   const branch = "gh-6-ask-and-commit";
   const wt = () => `${h.root}-worktrees/${branch}`;
-  const runs = () => join(wt(), `.agents/specs/${branch}`, "runs/_story");
+  const runs = () => storyUnitDir(join(wt(), `.agents/specs/${branch}`));
   /** commit in the story worktree with the given committer/author date (git's own clock otherwise) */
   const commitAt = (file: string, message: string, date: string, name = "Agent") => {
     h.write(join(wt(), file), `${message}\n`);
@@ -244,5 +244,146 @@ describe("C4: an agent's commit while its unit is parked on an ask is not foreig
     h.clock.advance(10_000);
     await h.tick();
     expect(lastFacts(h, "gh-6")?.foreign_commits).toEqual([{ sha, subject: "by hand", author: "Person", at: expect.any(String), branch }]);
+  });
+});
+
+/** gh-71 B28, B29, B32 (D10): the round a story is in, and how its earlier rounds ended, in every view. */
+describe("rounds in the views: status, story view, the handoff header, run list", () => {
+  const TRIAGE = `name: triage
+start: explore
+steps:
+  explore:
+    type: agent
+    skill: norn-qa
+    outcomes: { story: { to: confirm, means: "deliver it as a story" } }
+  confirm:
+    type: gate
+    prompt: "Confirm the triage"
+    outcomes: { approve: $done, reject: { to: explore, counter: loop } }
+counters: { loop: { max: 2 } }
+`;
+  const STORY = `name: story
+start: refine
+steps:
+  refine:
+    type: agent
+    skill: norn-refine
+    attended: true
+    outcomes: { done: { to: build, means: "spec written" } }
+  build:
+    type: agent
+    skill: norn-implement
+    outcomes: { done: { to: $done, means: "built" } }
+`;
+  const QUICK = `name: quick
+start: work
+steps:
+  work:
+    type: agent
+    skill: norn-implement
+    outcomes: { done: { to: $done, means: "changed" } }
+`;
+  type Item = { story: string; step: string | null; round?: { n: number; workflow: string } };
+  type Inbox = { groups: Record<string, Item[]> };
+  type Rounds = { rounds: Array<{ n: number; workflow: string; ended: { by: string; at: string } | null }>; steps: Array<{ step: string; round?: number }> };
+  let h: Harness;
+  const spec = ".agents/specs/gh-16-rounds-shown";
+  const wt = () => `${h.root}-worktrees/gh-16-rounds-shown`;
+  const runs = () => storyUnitDir(join(wt(), spec));
+  const header = () => h.read(join(wt(), spec, "runs/_story/handoff.md"));
+  const next = () => {
+    h.clock.advance(10_000);
+    return h.tick();
+  };
+  beforeAll(async () => {
+    h = await createHarness();
+    expect((await h.norn("init")).exit).toBe(0);
+    h.write(repoConfigPath(h.root), CONFIG.replace("default_workflow: ready", "default_workflow: triage"));
+    h.write(join(workflowsDir(h.root), "triage.yaml"), TRIAGE);
+    h.write(join(workflowsDir(h.root), "story.yaml"), STORY);
+    h.write(join(workflowsDir(h.root), "quick.yaml"), QUICK);
+    h.git(["add", "-A"]);
+    h.git(["commit", "-q", "-m", "norn"]);
+    h.git(["push", "-q", "origin", "main"]);
+    h.remote.issues = [issue(16, "Rounds shown")];
+  });
+  afterAll(() => h.cleanup());
+
+  test("AC1 (B28): a story with one round shows Round 1 in the handoff header", async () => {
+    for (let i = 0; i < 6 && h.state(runs())?.status !== "running"; i++) await next();
+    expect(h.state(runs())).toMatchObject({ step: "explore", status: "running" });
+    expect(header()).toContain("- Round 1 · Workflow: triage · Step: explore (attempt 1)");
+  });
+
+  test("AC1, AC2 (B28): in round 2 of story at refine, the header, status --json and story view show the round and its workflow next to the step", async () => {
+    h.report(runs(), "done", { outcome: "story", handoff: "deliver it as a story" });
+    await next();
+    expect((await h.norn("story", "approve", "gh-16")).exit).toBe(0);
+    await next();
+    expect(h.state(runs())).toMatchObject({ step: "$done", status: "done" });
+    expect((await h.norn("story", "edit", "gh-16", "--workflow", "story")).exit).toBe(0);
+    await next();
+    expect(h.state(runs())).toMatchObject({ workflow: "story", round: 2, step: "refine" });
+
+    expect(header()).toContain("- Round 2 · Workflow: story · Step: refine (attempt 1)");
+
+    const inbox = (await h.norn("status", "--json")).value as Inbox;
+    const mine = Object.values(inbox.groups).flat().filter((i) => i.story === "gh-16");
+    expect(mine.length).toBeGreaterThan(0);
+    expect(mine).toContainEqual(expect.objectContaining({ step: "refine", round: { n: 2, workflow: "story" } }));
+    for (const i of mine) expect(i.round).toEqual({ n: 2, workflow: "story" });
+    // qa#1 (B28): the markdown a person reads shows the round and its workflow next to the step too
+    const status = (await h.norn("status")).stdout;
+    expect(status).toMatch(/gh-16 +round 2 · story · refine/);
+
+    const json = await h.norn("story", "view", "gh-16", "--json");
+    expect(json.exit).toBe(0);
+    expect((json.value as { unit: unknown }).unit).toMatchObject({ round: 2, workflow: "story", step: "refine", attempt: 1 });
+    const md = await h.norn("story", "view", "gh-16");
+    expect(md.stdout).toContain("- Story: round 2 · story · parked at refine");
+  });
+
+  test("AC3 (B29, B32): run list heads each round and says how it ended — finished, or ended by the person at its step", async () => {
+    const text = (await h.norn("run", "list", "gh-16")).stdout;
+    const r1 = text.indexOf("round 1 · triage · finished");
+    const r2 = text.indexOf("round 2 · story");
+    expect(r1).toBeGreaterThan(-1);
+    expect(r2).toBeGreaterThan(r1);
+    expect(text.slice(r1, r2)).toContain("explore#1");
+    expect(text.slice(r1, r2)).toContain("confirm#1");
+    expect(text.slice(r2)).toContain("refine#1");
+    expect(text.slice(r2)).not.toContain("explore#1");
+
+    // round 2 ended by the person at refine, round 3 of quick started
+    expect((await h.norn("story", "edit", "gh-16", "--workflow", "quick", "--force")).exit).toBe(0);
+    await next();
+    expect(h.state(runs())).toMatchObject({ workflow: "quick", round: 3 });
+    const after = (await h.norn("run", "list", "gh-16")).stdout;
+    const lines = after.split("\n").filter((l) => l.startsWith("round "));
+    expect(lines).toEqual(["round 1 · triage · finished", "round 2 · story · ended by the person at refine", "round 3 · quick"]);
+    const json = (await h.norn("run", "list", "gh-16", "--json")).value as Rounds;
+    expect(json.rounds).toEqual([
+      { n: 1, workflow: "triage", ended: { by: "workflow", at: "$done" } },
+      { n: 2, workflow: "story", ended: { by: "person", at: "refine" } },
+      { n: 3, workflow: "quick", ended: null },
+    ]);
+    expect(json.steps.filter((s) => s.step === "refine").map((s) => s.round)).toEqual([2]);
+    expect(json.steps.filter((s) => s.step === "explore").map((s) => s.round)).toEqual([1]);
+  });
+
+  test("AC4 (B36): a flat record merged into the base shows one heading, round 1 · its workflow, and nothing is written", async () => {
+    const OLD = ".agents/specs/gh-1-projects-and-items";
+    cpSync(join(import.meta.dir, "../../../view/test/integration/fixtures/gh-1/spec"), join(h.root, OLD), { recursive: true });
+    h.git(["add", "-A"]);
+    h.git(["commit", "-q", "-m", "merge gh-1 (older norn)"]);
+    h.git(["push", "-q", "origin", "main"]);
+    const head = h.git(["rev-parse", "HEAD"]).trim();
+    const text = (await h.norn("run", "list", "gh-1")).stdout;
+    expect(text.split("\n").filter((l) => l.startsWith("round "))).toEqual(["round 1 · story · finished"]);
+    const json = (await h.norn("run", "list", "gh-1", "--json")).value as Rounds;
+    expect(json.rounds).toEqual([{ n: 1, workflow: "story", ended: { by: "workflow", at: "$done" } }]);
+    expect(existsSync(join(h.root, OLD, "runs/_story/rounds"))).toBe(false);
+    expect(h.git(["status", "--porcelain", "--", OLD]).trim()).toBe("");
+    expect(h.git(["rev-parse", "HEAD"]).trim()).toBe(head);
   });
 });

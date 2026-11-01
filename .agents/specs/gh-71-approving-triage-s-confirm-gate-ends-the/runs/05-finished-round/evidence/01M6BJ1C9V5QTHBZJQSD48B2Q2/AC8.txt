@@ -1,0 +1,19 @@
+$ norn story approve gh-12
+{"unit":"gh-12","receipt":{"kind":"approve","receipt_id":"01M6BJ7MC6TM4WP8NR2K321WR8","run_id":null,"step":"confirm","attempt":1,"at":"2026-11-01T12:44:29.446Z","by":"human","who":"jakubpruszynski@mac","slice":null,"head_sha":"166b0a21ba73c3255db36accdce8b8d799c244c5"},"delivered":{"via":"local","claim":"mine","n":3,"file":".agents/specs/gh-12-triage-me/runs/_story/rounds/01-triage/receipts/0003-approve.json"},"next":"norn tick"}
+$ norn tick
+gh-12 receipts.apply apply_receipts true
+$ norn tick
+gh-12 story.round_done noop true
+$ norn sync
+gh-12 story.round_done noop true
+state: {"version":1,"story":"gh-12","slice":null,"unit_dir":"_story","workflow":"triage","workflow_hash":"7760c79970ab61d8164cf9f127d8f89145933e35396e9b975c3c2073abe91cf3","step":"$done","attempt":1,"visits":{"explore":1,"confirm":1},"step_entered_at":"2026-11-01T12:44:17.480Z","status":"done","park":null,"counters":{"triage_loop":0},"nudges_used":0,"retries_used":0,"applied_through":3,"run":null,"last_outcome":{"step":"confirm","outcome":"approve","source":"human","at":"2026-11-01T12:44:29.446Z","receipt_id":"01M6BJ7MC6TM4WP8NR2K321WR8"},"created_at":"2026-11-01T12:44:07.131Z","updated_at":"2026-11-01T12:44:29.848Z","last_tick_id":"01M6BJ7MRE2ZKP4V35G5Q760D1","mode":"manual"}
+spec status: status: active
+worktree exists: yes
+claim: 2c59d9f36411420b217023c79382b74e10facb79	refs/norn/claims/gh-12
+$ norn status
+Your turn (1) · work only you can do
+  gh-12      $done: gh-12: triage round done, no PR · 3s
+      or close the issue
+      $ norn story edit gh-12 --workflow <name>
+$ norn status --json
+{"at":"2026-11-01T12:44:33.365Z","groups":{"your_turn":[{"story":"gh-12","slice":null,"url":"https://github.com/acme/app/issues/12","id":"round_done:gh-12:runs/_story/rounds/01-triage","group":"your_turn","step":"$done","title":"gh-12: triage round done, no PR","command":"norn story edit gh-12 --workflow <name>","since":"2026-11-01T12:44:29.848Z","detail":"or close the issue","age":"3s"}],"answer":[],"approve":[],"unblock":[],"check":[],"unclaimed":[],"running":[],"notes":[],"recently_done":[]},"pending":1}

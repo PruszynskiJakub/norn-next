@@ -9,11 +9,11 @@
  */
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { StoryBase, StoryPrSeen } from "@norn/core";
+import type { StoryBase, StoryIssueSeen, StoryPrSeen } from "@norn/core";
 import { SPECS_DIR } from "@norn/schema";
 import { atomicWrite, atomicWriteJson } from "./fsx.ts";
 import { readLocalJson } from "./local-json.ts";
-import { baseCacheDir, baseFactsPath, prFactsPath, remoteCachePath } from "./paths.ts";
+import { baseCacheDir, baseFactsPath, issueFactsPath, prFactsPath, remoteCachePath } from "./paths.ts";
 import { gitSync } from "./git.ts";
 
 /**
@@ -126,4 +126,20 @@ export function readPrFacts(repoRoot: string): PrFactsCache {
 
 export function writePrFacts(repoRoot: string, cache: PrFactsCache): void {
   atomicWriteJson(prFactsPath(repoRoot), { stories: cache });
+}
+
+/**
+ * gh-71 D5: story key → the story issue as the last remote sync of this checkout saw it
+ * (`issue.json`, machine-local), with the observation time. Issues are fetched only on sync ticks;
+ * the ticks between and the read model show the finished-round Check item from this.
+ */
+export type IssueFactsCache = Record<string, StoryIssueSeen>;
+
+export function readIssueFacts(repoRoot: string): IssueFactsCache {
+  // a cache, not a record: a file of an unexpected shape reads as empty (the next sync rewrites it)
+  return readLocalJson("local-issue", issueFactsPath(repoRoot), {}, repoRoot).stories ?? {};
+}
+
+export function writeIssueFacts(repoRoot: string, cache: IssueFactsCache): void {
+  atomicWriteJson(issueFactsPath(repoRoot), { stories: cache });
 }

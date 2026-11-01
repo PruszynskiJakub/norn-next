@@ -132,5 +132,51 @@
    "## Summary\n\nSaves no longer crash.\n\nCloses #15"
   ],
   "stdout": "https://github.com/acme/app/pull/41\n"
+ },
+ {
+  "argv": [
+   "gh",
+   "issue",
+   "view",
+   "12",
+   "--json",
+   "labels"
+  ],
+  "stdout": "{\"labels\": [{\"id\": \"LA_1\", \"name\": \"norn\", \"description\": \"\", \"color\": \"ededed\"}, {\"id\": \"LA_2\", \"name\": \"norn:wf:triage\", \"description\": \"\", \"color\": \"ededed\"}]}"
+ },
+ {
+  "argv": [
+   "gh",
+   "issue",
+   "edit",
+   "12",
+   "--remove-label",
+   "norn:wf:triage",
+   "--add-label",
+   "norn:wf:story"
+  ],
+  "stdout": "https://github.com/acme/app/issues/12\n"
+ },
+ {
+  "argv": [
+   "gh",
+   "issue",
+   "view",
+   "15",
+   "--json",
+   "labels"
+  ],
+  "stdout": "{\"labels\": [{\"id\": \"LA_1\", \"name\": \"norn\", \"description\": \"\", \"color\": \"ededed\"}]}"
+ },
+ {
+  "argv": [
+   "gh",
+   "issue",
+   "edit",
+   "15",
+   "--add-label",
+   "norn:wf:story"
+  ],
+  "stdout": "https://github.com/acme/app/issues/15\n"
  }
 ]

@@ -32,6 +32,11 @@ export interface UnitView {
   url: string | null;
   /** pinned workflow name, else the frontmatter/config workflow the unit would start with */
   workflow: string;
+  /**
+   * gh-71 B28: the story round — on the story, the round it is in (its workflow is `workflow`); on a
+   * slice, the round that started it. null when not started.
+   */
+  round: number | null;
   /** story mode (MO1) */
   mode: Mode;
   /** MO2: manual when the step is attended or no runner is configured */
@@ -206,6 +211,8 @@ export interface StepWho {
 export interface StepRow {
   unit: string;
   slice: string | null;
+  /** gh-71 B29: the story round the row belongs to (a slice's: the round that started it); absent = 1 */
+  round?: number;
   step: string;
   attempt: number;
   type: StepType;
@@ -282,7 +289,17 @@ export interface CriteriaSummary {
   unchecked_coverage: number;
 }
 
+/** gh-71 B29, B32 (D10): one round of a story, as `norn run list` heads its rows. */
+export interface RoundView {
+  n: number;
+  workflow: string;
+  /** how it ended: finished by its workflow (`at: $done`) or by the person with `--force` at a step; null = the round under way */
+  ended: { by: "workflow" | "person"; at: string } | null;
+}
+
 export interface TraceView extends UnitTraceSummary {
+  /** gh-71 B29: a story's rounds, oldest first (set by loadTraceView for a story; a flat record is round 1, B36) */
+  rounds?: RoundView[];
   /** set by loadTraceView */
   records?: TraceRecords;
   /** QV8: set by loadTraceView when the trace holds criteria reports for the units shown */

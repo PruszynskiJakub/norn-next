@@ -113,6 +113,8 @@ function reasonOf(r: Receipt): string | null {
       return r.previous_holder ? `taken from ${r.previous_holder}${r.forced ? " (forced)" : r.expired ? " (expired claim)" : ""}` : "taken (claim was free)";
     case "update":
       return `update from ${r.from} to ${r.to} (${r.reason})`;
+    case "round":
+      return `new round: ${r.workflow} at ${r.to}${r.forced ? " (forced)" : ""}`;
   }
 }
 

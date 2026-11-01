@@ -6,7 +6,7 @@
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
-import { repoConfigPath, workflowsDir } from "@norn/store";
+import { repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
 import { type CliResult } from "../../src/index.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";
@@ -53,7 +53,7 @@ notifiers: []
 let h: Harness;
 const spec = ".agents/specs/gh-7-count-items";
 const wt = () => `${h.root}-worktrees/gh-7-count-items`;
-const runs = () => join(wt(), spec, "runs/_story");
+const runs = () => storyUnitDir(join(wt(), spec));
 const tick = async (...flags: string[]) => {
   h.clock.advance(10_000);
   return h.tick(...flags);
@@ -189,8 +189,12 @@ describe("merge PR item and inbox history (F25, Q3)", () => {
     expect((await h.norn("story", "approve", "gh-7")).exit).toBe(0);
     await tick();
     expect(h.state(runs())).toMatchObject({ step: "$done", status: "done" });
-    await tick("--sync");
     const pr = h.remote.prs[0];
+    // qa#1 (gh-71 B27): before any sync has seen the PR, the PR open-pr opened is the merge item —
+    // never "round done, no PR"
+    const before = (await h.norn("status", "--json")).value as { groups: Record<string, Array<{ story: string; title: string }>> };
+    expect(before.groups.your_turn?.filter((i) => i.story === "gh-7").map((i) => i.title)).toEqual([`Merge PR #${pr?.number} (still a draft)`]);
+    await tick("--sync");
     const hist = (await h.norn("status", "--history")).value as History;
     const merge = hist.items.find((i) => i.id === `merge:gh-7:${pr?.number}`);
     expect(merge).toMatchObject({ group: "your_turn", title: `Merge PR #${pr?.number} (still a draft)`, url: pr?.url, resolved_at: null });

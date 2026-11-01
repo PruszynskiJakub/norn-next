@@ -1,0 +1,5 @@
+[
+  { "id": "AC1", "verdict": "pass", "evidence": "AC1.md, unit.log, integration.log, e2e.log, AC1-check-run-rerun.txt" },
+  { "id": "AC2", "verdict": "pass", "evidence": "AC2.md" },
+  { "id": "AC3", "verdict": "pass", "evidence": "AC3.md, AC3/" }
+]

@@ -14,7 +14,7 @@ import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../cri
 import type { Facts, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
 import { sha256 } from "../hash.ts";
-import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, prBaseBranch, sessionStartedNoTurn, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
+import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, issueProblem, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
 import { optionsLine } from "../prompt.ts";
 import { epoch, formatAge, iso } from "../time.ts";
 import { baseUpdateStep, edgeOf, edgesOf, isStale, stepOf } from "../workflow.ts";
@@ -398,6 +398,35 @@ function staleItem(story: StoryFacts, base: string): InboxItem | null {
   };
 }
 
+/** GR6: the story's work is on its base — merged (PR or ancestry), or spec.md records it done (the durable record when no PR was fetched). */
+const landed = (story: StoryFacts, base: string): boolean => mergedIntoBase(story, base) || story.frontmatter?.status === "done";
+
+/**
+ * gh-71 D5: an issue change on a finished round (label removed, unassigned, unseen) parks nothing;
+ * it is a Check item while the round stays finished, read from `issue_seen` between syncs. A closed
+ * issue there is GR6b's.
+ */
+function finishedRoundRemoteItem(story: StoryFacts, config: ResolvedConfig, base: string): InboxItem | null {
+  const st = storyUnit(story)?.state;
+  if (st?.status !== "done" || landed(story, base)) return null;
+  // between syncs the issue is not fetched: the one the last sync saw keeps the item put
+  const issue = story.issue !== undefined ? story.issue : story.issue_seen?.issue;
+  const reason = issueProblem({ ...story, issue }, config.remote.label);
+  if (!reason) return null;
+  return {
+    id: `remote:${story.key}:${reason}`,
+    group: "check",
+    story: story.key,
+    slice: null,
+    step: st.step,
+    title: `${story.key}: ${reason} — the round stays finished`,
+    detail: "a finished round is not parked for the issue (gh-71 D5)",
+    command: cmd.storyView(story.key, { web: true }),
+    since: st.updated_at,
+    ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
+  };
+}
+
 /** BS11: the story PR targets another branch than the story's base — merging it would skip the base. */
 function retargetItem(story: StoryFacts, base: string): InboxItem | null {
   const pr = knownPr(story);
@@ -540,13 +569,21 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
     }
     case "done": {
       if (uf.unit.slice === null) {
+        // gh-71 D1 (B1): a round receipt rejected because its workflow file changed — the edit again
+        if (park?.kind === "workflow")
+          return item("your_turn", `${story.key}: ${park.reason}`, park.command ?? cmd.storyEdit(story.key, { workflow: "<name>" }), park.since, { id: `round_rejected:${key}:${park.receipt_id ?? park.since}` });
         const merge = mergeItem(story, st, facts.repo.default_branch);
         if (merge) return merge;
+        // gh-71 D6 (B25, B26): a finished round with no PR — the next round or closing the issue is the
+        // person's; generic, never a recommendation read off the last step's outcome
+        if (!landed(story, facts.repo.default_branch) && !knownPr(story))
+          return item("your_turn", `${story.key}: ${st.workflow} round done, no PR`, cmd.storyEdit(story.key, { workflow: "<name>" }), st.updated_at, {
+            id: `round_done:${key}:${uf.record ?? st.workflow}`,
+            detail: "or close the issue",
+          });
       }
       if (facts.now - epoch(st.updated_at) > RECENT_MS) return null;
-      // spec.md says `done` once norn saw the merge (GR6) — the durable record when no PR was fetched
-      const waiting = uf.unit.slice === null && knownPr(story)?.state !== "merged" && !story.merged_by_ancestry && story.frontmatter?.status !== "done";
-      return item("recently_done", waiting ? "workflow done — waiting for the PR merge (GR6)" : "done", cmd.runList(key), st.updated_at);
+      return item("recently_done", "done", cmd.runList(key), st.updated_at);
     }
   }
 }
@@ -676,8 +713,15 @@ function unpushedItems(story: StoryFacts, facts: Facts): InboxItem[] {
 /** Build the whole inbox (O1). Stories held by another heartbeat are not shown (except R2.3 unpushed work). */
 export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   const groups = Object.fromEntries(INBOX_GROUPS.map((g) => [g, [] as InboxEntry[]])) as Record<InboxGroup, InboxEntry[]>;
+  // gh-71 B28: every item of a started story carries its round and the round's workflow
+  const rounds = new Map<string, { n: number; workflow: string }>();
+  for (const story of facts.stories) {
+    const st = storyUnit(story)?.state;
+    if (st) rounds.set(story.key, { n: st.round ?? 1, workflow: st.workflow });
+  }
   const add = (it: InboxItem | null) => {
-    if (it) groups[it.group].push({ ...it, age: formatAge(facts.now - epoch(it.since)) });
+    const round = it ? rounds.get(it.story) : undefined;
+    if (it) groups[it.group].push({ ...it, ...(round ? { round } : {}), age: formatAge(facts.now - epoch(it.since)) });
   };
   for (const story of facts.stories) {
     const claim = story.claim.state;
@@ -707,6 +751,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
     add(headChangedItem(story));
     add(staleItem(story, facts.repo.default_branch));
     add(retargetItem(story, facts.repo.default_branch));
+    add(finishedRoundRemoteItem(story, config, facts.repo.default_branch));
     for (const it of foreignCommitItems(story)) add(it);
     for (const it of noteItems(story)) add(it);
     for (const uf of story.units) {

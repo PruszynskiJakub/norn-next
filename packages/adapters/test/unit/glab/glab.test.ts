@@ -76,6 +76,12 @@ describe("glab adapter", () => {
     expect(stdins).toContain("## Summary\n\nSaves no longer crash.\n\nCloses #4");
   });
 
+  test("replaceIssueLabel unlabels the old label and labels the new one in one update (B19)", async () => {
+    await glab.replaceIssueLabel(3, { remove: "norn:wf:triage", add: "norn:wf:story" });
+    const failing = createGlab({ cwd: "/repo", exec: async () => ({ code: 1, stdout: "", stderr: "ERROR: 500 Internal Server Error" }) });
+    expect(await failing.replaceIssueLabel(3, { remove: "norn:wf:triage", add: "norn:wf:story" }).catch((e) => e.code)).toBe("glab_failed");
+  });
+
   test("failures are typed PortErrors", async () => {
     const missing = createGlab({ cwd: "/repo", exec: async () => ({ code: 127, stdout: "", stderr: "ENOENT" }) });
     expect(await missing.whoami().catch((e) => e.code)).toBe("glab_missing");

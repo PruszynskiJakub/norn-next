@@ -1,0 +1,22 @@
+{
+ "findings": [
+  {
+   "id": "F1",
+   "severity": "blocking",
+   "criterion": "B27",
+   "title": "A finished round whose PR norn opened in that round shows 'round done, no PR' until the next sync",
+   "repro": "Story in a round that opens a PR (quick: work -> open-pr -> ready). Approve `ready` before any sync has seen the new PR (within sync_interval of open-pr). `norn status` shows 'gh-42: quick round done, no PR' / 'or close the issue' / `norn story edit gh-42 --workflow <name>` although PR #100 is open. Expected the 'Merge PR #100' item. After `norn sync` (tick --sync) it shows 'Merge PR #100 (still a draft)'. Seen 2/2 (gh-33 in scenario B, gh-42 in scenario C).",
+   "file": "packages/core/src/inbox/items.ts",
+   "line": 579,
+   "detail": "The done case uses knownPr(story), which only knows PRs a sync has fetched; the round's own open-pr is not counted, so the item offers 'close the issue' on a story with an open PR. Before this change the same window showed 'workflow done \u2014 waiting for the PR merge'. Evidence: B27-C.md (status before and after tick --sync)."
+  },
+  {
+   "id": "F2",
+   "severity": "blocking",
+   "criterion": "B28",
+   "title": "`norn status` (markdown) does not show the round number or workflow",
+   "repro": "Story gh-61 in round 2 (story) at refine. `norn status` (the markdown a person reads) prints 'gh-61  refine is ready (manual): start an agent in the worktree' with no round number or workflow. Expected the round and workflow next to the step, as `story view` ('round 2 \u00b7 story \u00b7 ready at refine') and the handoff header ('Round 2 \u00b7 Workflow: story \u00b7 Step: refine (attempt 1)') show. Only `status --json` carries round {n, workflow}.",
+   "detail": "status --json items carry round {n, workflow}, but the markdown renderer prints neither. Slice 10's AC2 tested only status --json; B28 names `norn status`. Evidence: B28.md, B6.md."
+  }
+ ]
+}

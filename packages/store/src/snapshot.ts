@@ -19,15 +19,17 @@ import { baseSpecsRoot, defaultBaseRef } from "./base.ts";
 import { type LoadedConfig, loadConfig, loadWorkflows, type WorkflowListing } from "./config.ts";
 import { readSliceFile, readStoryFile } from "./frontmatter.ts";
 import { isErrno } from "./fsx.ts";
-import { slicesDir, specsDir, storyFile, unitDir } from "./paths.ts";
+import { isFlatStoryRecord, slicesDir, specRunsDir, specsDir, storyFile, storyRounds, unitDir } from "./paths.ts";
 import { listReceipts } from "./receipts.ts";
 import { type Handoff, type PinnedWorkflow, readHandoff, readPinnedWorkflow, readState } from "./unit.ts";
 import { readUnitMarker } from "./worktree.ts";
 
 export interface UnitSnapshot {
   unit: UnitRef;
-  /** absolute runs/<unit>/ */
+  /** absolute record folder (`unitDir`): runs/<unit>/, the story's current round folder (gh-71 B30) */
   path: string;
+  /** the record folder relative to the spec folder (gh-71 D2), e.g. `runs/_story/rounds/01-story` */
+  record: string;
   /** null = not started (no state.json) or corrupt (see errors) */
   state: UnitState | null;
   workflow: PinnedWorkflow | null;
@@ -90,8 +92,8 @@ function files(path: string): string[] {
   }
 }
 
-export function loadUnit(root: string, specPath: string, unit: UnitRef, opts: { includeApplied?: boolean } = {}): UnitSnapshot {
-  const path = unitDir(specPath, unit.dir);
+export function loadUnit(root: string, specPath: string, unit: UnitRef, opts: { includeApplied?: boolean; path?: string } = {}): UnitSnapshot {
+  const path = opts.path ?? unitDir(specPath, unit.dir);
   const errors: FileError[] = [];
   const st = readState(path, root);
   if (!st.ok && st.reason === "corrupt") errors.push(st.error);
@@ -111,6 +113,7 @@ export function loadUnit(root: string, specPath: string, unit: UnitRef, opts: { 
   return {
     unit,
     path,
+    record: relative(specPath, path),
     state,
     workflow: wf.ok ? wf.value : null,
     unapplied: all.receipts.filter((r) => r.n > after),
@@ -118,6 +121,19 @@ export function loadUnit(root: string, specPath: string, unit: UnitRef, opts: { 
     handoff: readHandoff(path),
     errors,
   };
+}
+
+/**
+ * gh-71 B29, B36: the story's rounds, oldest first, each its own record folder read as a unit snapshot
+ * (every receipt when `includeApplied`). A flat record from an older norn is its one round, round 1;
+ * [] when the story has not started. Read only.
+ */
+export function loadRounds(story: StorySnapshot, opts: { includeApplied?: boolean } = {}): Array<{ n: number; workflow: string; unit: UnitSnapshot }> {
+  const current = story.units[0];
+  if (!current?.state) return [];
+  const rounds = isFlatStoryRecord(story.path) ? [] : storyRounds(story.path);
+  if (!rounds.length) return [{ n: current.state.round ?? 1, workflow: current.state.workflow, unit: current }];
+  return rounds.map((r) => ({ n: r.n, workflow: r.workflow, unit: r.path === current.path ? current : loadUnit(story.root, story.path, current.unit, { ...opts, path: r.path }) }));
 }
 
 /** Read one spec folder (spec.md, slices/, runs/). */
@@ -149,7 +165,7 @@ export function loadStory(root: string, specPath: string, opts: { includeApplied
   }
 
   const units: UnitSnapshot[] = [loadUnit(root, specPath, { story: key, slice: null, dir: STORY_UNIT_DIR, key }, opts)];
-  const runDirs = new Set(dirs(join(specPath, "runs")).filter((d) => d !== STORY_UNIT_DIR));
+  const runDirs = new Set(dirs(specRunsDir(specPath)).filter((d) => d !== STORY_UNIT_DIR));
   for (const s of slices) runDirs.add(`${s.nn}-${s.slug}`);
   for (const d of [...runDirs].sort()) {
     const nn = /^([0-9]{2,3})-/.exec(d)?.[1];

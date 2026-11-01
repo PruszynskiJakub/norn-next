@@ -341,6 +341,59 @@ export interface CleanupMergedStoryAction extends UnitBase {
   story_status: "done";
 }
 
+/**
+ * GR6b (gh-71 D5, B22): the issue was seen `closed` on a finished round with no PR and no unfinished
+ * slice — close the story exactly as `norn story close` does (push first, then remove worktrees, local
+ * branches, leases and the claim; spec.md `dropped`, so `story reopen` brings it back, B23), then remove
+ * the mailbox `refs`.
+ */
+export interface CloseStoryAction extends UnitBase {
+  kind: "close_story";
+  /** the story's mailbox refs, deleted (local + remote) after the close effects */
+  refs: Array<{ ref: string; sha: string }>;
+}
+
+/**
+ * gh-71 D7 (B34): move a flat story record (`runs/_story/state.json` …) into its round 1 folder with
+ * `git mv` — everything under `from` but `handoff.md` and `rounds/` — then commit and push (one commit).
+ */
+export interface RoundMigrateAction extends UnitBase {
+  kind: "round_migrate";
+  /** worktree-relative `runs/_story` */
+  from: string;
+  /** worktree-relative `runs/_story/rounds/01-<workflow>` */
+  to: string;
+  commit: BoundaryCommit;
+}
+
+/**
+ * gh-71 D1 (B1, B3, B5, B6, B30): apply a `round` receipt — the old round's state (the receipt applied,
+ * `$done`) in its own folder, then round `round.n`'s folder with the pinned workflow and its first
+ * state (counters 0, mode carried over, cursor at the receipt's step), the story's `workflow:` set,
+ * one commit. State is written last in each folder (S5).
+ */
+export interface RoundStartAction extends UnitBase {
+  kind: "round_start";
+  /** the round receipt's number in the old round */
+  receipt_n: number;
+  /** the old round's state with the receipt applied and applied_through past the receipts after it */
+  ended: UnitState;
+  /** the receipts after the round receipt, made for the round it ends; act writes each to the trace as a `reject` event */
+  rejected: Rejection[];
+  /** the new round: its number, workflow and worktree-relative folder `runs/_story/rounds/NN-<wf>` */
+  round: { n: number; workflow: string; dir: string };
+  /** exact text pinned as the new round's workflow.yaml (S7) */
+  workflow_source: string;
+  /** the new round's first state */
+  state: UnitState;
+  commit: BoundaryCommit | null;
+  /**
+   * gh-71 D9 (B19): the issue's `norn:wf:<old>` label swapped for `norn:wf:<new>` after the commit, for
+   * visibility only; null when the workflow is the same. A failed swap is a warning, never a failed action (B20).
+   */
+  label: { number: number; remove: string; add: string } | null;
+}
+
 /** Nothing to do; recorded so `why` explains idleness. */
 export interface NoopAction extends UnitBase {
   kind: "noop";
@@ -391,6 +444,9 @@ export type UnitAction =
   | NotifyAction
   | UpdateStoryMirrorAction
   | CleanupMergedStoryAction
+  | CloseStoryAction
+  | RoundMigrateAction
+  | RoundStartAction
   | NoopAction;
 
 export type RepoAction = IntakeStoryAction | ReclaimLeasesAction;
@@ -435,6 +491,8 @@ export interface ActionResult {
   ok: boolean;
   error?: string;
   detail?: unknown;
+  /** gh-71 B20: an effect that failed without failing the action (a label not updated); carried to the trace and the tick's output */
+  warnings?: string[];
   /** trace-relative paths written by act */
   briefing?: string;
   transcript?: string;

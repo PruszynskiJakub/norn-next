@@ -125,6 +125,19 @@
    "-",
    "--yes"
   ],
-  "stdout": "- Updating merge request !9\n✓ updated description\n!9 Fix crash on save (gl-4-fix-crash-on-save)\n https://gitlab.com/acme/app/-/merge_requests/9\n"
+  "stdout": "- Updating merge request !9\n\u2713 updated description\n!9 Fix crash on save (gl-4-fix-crash-on-save)\n https://gitlab.com/acme/app/-/merge_requests/9\n"
+ },
+ {
+  "argv": [
+   "glab",
+   "issue",
+   "update",
+   "3",
+   "--unlabel",
+   "norn:wf:triage",
+   "--label",
+   "norn:wf:story"
+  ],
+  "stdout": "- Updating issue #3\n#3 Add login page (now)\n https://gitlab.com/acme/app/-/issues/3\n"
  }
 ]

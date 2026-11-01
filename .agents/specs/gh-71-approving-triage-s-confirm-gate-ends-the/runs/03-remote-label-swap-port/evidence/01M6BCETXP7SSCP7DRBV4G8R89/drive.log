@@ -1,0 +1,38 @@
+[gh] AC1 #5 labels after: [ "norn", "norn:wf:story" ]
+[gh] AC2 #6 labels after: [ "norn", "norn:wf:story" ]
+[gh] AC3 rejected: AdapterError {
+  code: "gh_network",
+  retryable: true,
+  message: "gh issue edit failed (exit 1): gh: error connecting to the API: Could not resolve host",
+}
+[gh] AC3 #5 labels after failure: [ "norn", "norn:wf:triage" ]
+[gh] argv:
+  gh issue view 5 --json labels
+  gh issue edit 5 --remove-label norn:wf:triage --add-label norn:wf:story
+  gh issue view 5 --json number,url,title,body,state,assignees,labels,updatedAt
+  gh issue view 6 --json labels
+  gh issue edit 6 --add-label norn:wf:story
+  gh issue view 6 --json number,url,title,body,state,assignees,labels,updatedAt
+  gh issue view 5 --json labels
+  gh issue edit 5 --remove-label norn:wf:triage --add-label norn:wf:story
+  gh issue view 5 --json number,url,title,body,state,assignees,labels,updatedAt
+[glab] AC1 #5 labels after: [ "norn", "norn:wf:story" ]
+[glab] AC2 #6 labels after: [ "norn", "norn:wf:story" ]
+[glab] AC3 rejected: AdapterError {
+  code: "glab_network",
+  retryable: true,
+  message: "glab issue update failed (exit 1): glab: error connecting to the API: Could not resolve host",
+}
+[glab] AC3 #5 labels after failure: [ "norn", "norn:wf:triage" ]
+[glab] argv:
+  glab issue update 5 --unlabel norn:wf:triage --label norn:wf:story
+  glab issue view 5 --output json
+  glab issue update 6 --unlabel norn:wf:triage --label norn:wf:story
+  glab issue view 6 --output json
+  glab issue update 5 --unlabel norn:wf:triage --label norn:wf:story
+  glab issue view 5 --output json
+[fake] AC1 labels: [ "norn", "norn:wf:story" ] calls: [ "label 5 -norn:wf:triage +norn:wf:story" ]
+[fake] AC2 labels: [ "norn", "norn:wf:story", "norn:wf:x" ]
+[fake] AC3 rejected: boom labels: [ "norn", "norn:wf:story", "norn:wf:x" ] calls: [ "label 5 -norn:wf:triage +norn:wf:story",
+  "label 5 -norn:wf:triage +norn:wf:x", "label 5 -norn:wf:x +norn:wf:y"
+]

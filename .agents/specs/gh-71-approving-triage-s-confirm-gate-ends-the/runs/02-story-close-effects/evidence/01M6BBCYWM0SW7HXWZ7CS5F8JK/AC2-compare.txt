@@ -1,0 +1,10 @@
+close output key order (branch): ['story', 'dropped', 'killed', 'committed', 'pushed', 'worktrees_removed', 'branches_deleted', 'leases_released', 'claim_deleted', 'record']
+close output key order (base):   ['story', 'dropped', 'killed', 'committed', 'pushed', 'worktrees_removed', 'branches_deleted', 'leases_released', 'claim_deleted', 'record']
+close SAME
+gitLog SAME
+remoteSpecStatus SAME
+sliceFileOnRemote SAME
+wtGone SAME
+localBranches SAME
+normRefsAfterClose SAME
+afterReopen SAME

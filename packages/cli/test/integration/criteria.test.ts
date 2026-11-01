@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { CriteriaTrace } from "@norn/schema";
-import { readTrace, repoConfigPath, workflowsDir } from "@norn/store";
+import { readTrace, repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
 import { type CliResult } from "../../src/index.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";
@@ -49,7 +49,7 @@ notifiers: []
 let h: Harness;
 const spec = ".agents/specs/gh-4-today-view";
 const wt = () => `${h.root}-worktrees/gh-4-today-view`;
-const runs = () => join(wt(), spec, "runs/_story");
+const runs = () => storyUnitDir(join(wt(), spec));
 const env = () => {
   const e: Record<string, string | undefined> = { ...h.deps.env, NORN_AGENT_PID: String(process.pid) };
   for (const k of ["NORN_AGENT", "NORN_RUN", "NORN_STORY", "NORN_SLICE", "NORN_AGENT_SESSION_ID"]) delete e[k];

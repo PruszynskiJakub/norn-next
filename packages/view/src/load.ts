@@ -124,6 +124,7 @@ function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: Uni
     title,
     url: story.frontmatter?.url ?? null,
     workflow: st?.workflow ?? workflow,
+    round: st ? (st.round ?? 1) : null,
     mode: sf.mode,
     effective_mode: eff.mode,
     mode_downgraded: eff.downgraded,
@@ -192,6 +193,7 @@ function unitFacts(lu: LocalUnit, hooks: readonly HookFact[], leaseByRun: Readon
   }
   return {
     unit: u.unit,
+    record: u.record,
     state: st,
     workflow: u.workflow?.workflow ?? null,
     workflow_hash: u.workflow?.hash ?? null,
@@ -322,6 +324,8 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       pr: undefined,
       // C1: the PR as this checkout's last sync saw it — merge (BS10), retarget (BS11), head changed (F35)
       ...(prSeen[story.key] && !finished ? { pr_seen: prSeen[story.key] } : {}),
+      // gh-71 D5: the issue as this checkout's last sync saw it — the finished-round Check item
+      ...(local.issue_seen[story.key] && !finished ? { issue_seen: local.issue_seen[story.key] } : {}),
       ...readyHeads[i],
       units,
       slices: story.slices,

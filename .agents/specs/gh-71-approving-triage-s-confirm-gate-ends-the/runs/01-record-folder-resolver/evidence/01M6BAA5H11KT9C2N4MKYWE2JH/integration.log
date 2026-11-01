@@ -1,0 +1,30 @@
+$ bun test --config=bunfig.integration.toml --parallel --timeout=20000
+bun test v1.3.13 (bf2e2cec) 12x PARALLEL
+
+packages/cli/test/integration/check-run.test.ts:
+141 |     const dead = running.find((e) => e.lease.story === "gh-9")!;
+142 |     process.kill(-dead.lease.holder.pid, "SIGKILL");
+143 |     await new Promise((resolve) => setTimeout(resolve, 200));
+144 |     h.clock.advance(10_000);
+145 |     const again = await h.tick(); // waits for every check-run this tick started and the ones before
+146 |     expect(acts(again)).toEqual(["reclaim_leases", "run_check"]);
+                              ^
+error: expect(received).toEqual(expected)
+
+@@ -3,3 +3,3 @@
+    "run_check",
++   "run_check",
+  ]
+
+- Expected  - 0
++ Received  + 1
+
+      at <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-71-approving-triage-s-confirm-gate-ends-the--01-record-folder-resolver/packages/cli/test/integration/check-run.test.ts:146:25)
+(fail) two long checks (K1, K3) > one tick starts both, up to max_checks, and they run at once; a check-run that dies is started again [5930.60ms]
+
+ 510 pass
+ 1 fail
+ 3084 expect() calls
+Ran 511 tests across 53 files. [113.31s]
+error: script "test:integration" exited with code 1
+exit 1
