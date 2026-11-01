@@ -151,6 +151,13 @@ export const UnitState = Type.Object(
      * story round that started it. Absent = 1.
      */
     round: Type.Optional(PosInt),
+    /**
+     * gh-71 D1 (B32, RD3): a round the person ended unfinished with `norn story edit --force` — the step it
+     * was left at and the `round` receipt that ended it. Absent = the round finished at `$done` (or runs).
+     */
+    ended: Type.Optional(
+      Type.Object({ by: Type.Literal("person"), at: StepName, receipt_id: Ulid }, { additionalProperties: false }),
+    ),
     /** Story unit only: who starts unattended agent steps (MO1). */
     mode: Type.Optional(Mode),
     created_at: IsoTime,

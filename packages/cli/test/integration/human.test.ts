@@ -4,7 +4,7 @@
  * the next tick applies; a non-holder clone posts to the mailbox the holder's tick imports.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Receipt } from "@norn/schema";
 import { heartbeatFilePath, readTrace, repoConfigPath, workflowsDir, storyUnitDir, handoffPath } from "@norn/store";
@@ -90,6 +90,15 @@ const held = (r: CliResult) => {
   expect(r.exit).toBe(5);
   expect(r.value).toMatchObject({ code: "claim_held", do_instead: expect.any(String) });
 };
+/** gh-71 AC8: every file under a story's runs/ (path → content) and the worktree's branch head — a refusal changes neither. */
+const recordSnapshot = (wt: string, spec: string) => {
+  const dir = join(wt, spec, "runs");
+  const files = readdirSync(dir, { recursive: true, withFileTypes: true })
+    .filter((e) => e.isFile())
+    .map((e) => join(e.parentPath, e.name))
+    .sort();
+  return { files: Object.fromEntries(files.map((f) => [f.slice(dir.length + 1), readFileSync(f, "utf8")])), head: sh(wt, ["rev-parse", "HEAD"]) };
+};
 type Verb = { unit: string; receipt: Receipt; delivered: { via: string; claim?: string; n?: number; file?: string; ref?: string; holder?: string } };
 
 beforeAll(async () => {
@@ -168,7 +177,10 @@ describe("story edit --workflow after start: a new round (gh-71 D3, D4, B9, B10)
     refused(unfinished, "round_unfinished");
     expect(unfinished.value).toMatchObject({ error: "gh-6's alt round is not finished; pass --force to end it and start a gated round", do_instead: "norn story edit gh-6 --workflow gated --force --at review" });
     refused(await h.norn("story", "edit", "gh-6", "--workflow", "gated", "--at", "nope"), "unknown_step");
-    expect((await h.norn("story", "edit", "gh-6", "--at", "review")).exit).toBe(2);
+    // gh-71 B15 (D3): --at alone is no longer a usage error; it moves the cursor within the round's own workflow
+    const alone = await h.norn("story", "edit", "gh-6", "--at", "review");
+    refused(alone, "unknown_step");
+    expect(alone.value).toMatchObject({ error: "no step 'review' in gh-6's alt workflow", do_instead: "norn story edit gh-6 --at <draft>" });
     h.report(runs6(), "done", { outcome: "done", handoff: "drafted" });
     await tick();
     expect(h.state(runs6())).toMatchObject({ workflow: "alt", step: "$done", status: "done" });
@@ -524,6 +536,25 @@ describe("a slice gate in its own worktree (X1: views read slice runs from the s
     expect(h.state(join(wt8(), spec8, "runs/01-part"))).toMatchObject({ slice: "gh-8/01", step: "$done" });
     expect(h.state(join(wt8(), spec8, "runs/01-part"))?.round).toBeUndefined();
   });
+
+  test("gh-71 B13 (AC4, AC8): --force is refused while a slice is unfinished; integrated slices don't block it", async () => {
+    const before = recordSnapshot(wt8(), spec8);
+    const r = await h.norn("story", "edit", "gh-8", "--workflow", "alt", "--force", "--json");
+    expect(r.exit).toBe(3);
+    expect(r.value).toMatchObject({ code: "slice_unfinished", error: "slice gh-8/02 is not finished; finish or drop it first", do_instead: "norn story view gh-8/02" });
+    expect(recordSnapshot(wt8(), spec8)).toEqual(before);
+    // manual, so round 3's first step waits for a person instead of running an agent
+    expect((await h.norn("story", "edit", "gh-8", "--manual")).exit).toBe(0);
+    expect((await h.norn("story", "approve", "gh-8/02")).exit).toBe(0);
+    for (let i = 0; i < 8 && h.state(storyRuns())?.step !== "$done"; i++) await tick();
+    expect(h.read(join(wt8(), spec8, "slices/02-more.md"))).toContain("status: integrated");
+    expect((await h.norn("story", "edit", "gh-8", "--workflow", "sliced")).exit).toBe(0);
+    await tick();
+    expect(h.state(storyRuns())).toMatchObject({ round: 3, step: "plan", status: "ready" });
+    const forced = await h.norn("story", "edit", "gh-8", "--workflow", "alt", "--force", "--json");
+    expect(forced.exit).toBe(0);
+    expect((forced.value as Verb).receipt).toMatchObject({ kind: "round", workflow: "alt", forced: true, left_at: "plan" });
+  });
 });
 
 describe("gh-71 B2, B25: approving triage's confirm gate finishes the round, not the story", () => {
@@ -596,8 +627,8 @@ counters: { loop: { max: 2 } }
   });
 });
 
-describe("gh-71 B1, B3–B10, B17, B30, B31: norn story edit --workflow starts the next round", () => {
-  const TRIAGE = `name: triage
+/** gh-71: the workflows the round tests run (triage → story / quick). */
+const ROUND_TRIAGE = `name: triage
 start: explore
 steps:
   explore:
@@ -610,7 +641,7 @@ steps:
     outcomes: { approve: $done, reject: { to: explore, counter: loop } }
 counters: { loop: { max: 2 } }
 `;
-  const STORY = `name: story
+const ROUND_STORY = `name: story
 start: refine
 steps:
   refine:
@@ -624,7 +655,7 @@ steps:
     outcomes: { done: { to: $done, means: "built" }, again: { to: refine, counter: fix, means: "refine again" } }
 counters: { fix: { max: 3 } }
 `;
-  const QUICK = `name: quick
+const ROUND_QUICK = `name: quick
 start: work
 steps:
   work:
@@ -641,6 +672,8 @@ steps:
     outcomes: { approve: $done, reject: { to: work, counter: back } }
 counters: { back: { max: 2 } }
 `;
+
+describe("gh-71 B1, B3–B10, B17, B30, B31: norn story edit --workflow starts the next round", () => {
   let t: Harness;
   const spec = ".agents/specs/gh-14-round-me";
   const wt = () => `${t.root}-worktrees/gh-14-round-me`;
@@ -656,9 +689,9 @@ counters: { back: { max: 2 } }
     t = await createHarness();
     expect((await t.norn("init")).exit).toBe(0);
     t.write(repoConfigPath(t.root), CONFIG.replace("default_workflow: gated", "default_workflow: triage"));
-    t.write(join(workflowsDir(t.root), "triage.yaml"), TRIAGE);
-    t.write(join(workflowsDir(t.root), "story.yaml"), STORY);
-    t.write(join(workflowsDir(t.root), "quick.yaml"), QUICK);
+    t.write(join(workflowsDir(t.root), "triage.yaml"), ROUND_TRIAGE);
+    t.write(join(workflowsDir(t.root), "story.yaml"), ROUND_STORY);
+    t.write(join(workflowsDir(t.root), "quick.yaml"), ROUND_QUICK);
     t.git(["add", "-A"]);
     t.git(["commit", "-q", "-m", "norn init"]);
     t.git(["push", "-q", "origin", "main"]);
@@ -716,14 +749,14 @@ counters: { back: { max: 2 } }
     expect(t.read(join(runs(), "state.json"))).toBe(stateBefore);
     expect(existsSync(join(record(), "rounds/02-story"))).toBe(false);
     // the workflow file changes between the edit and the tick
-    t.write(join(workflowsDir(t.root), "story.yaml"), STORY.replace("max: 3", "max: 4"));
+    t.write(join(workflowsDir(t.root), "story.yaml"), ROUND_STORY.replace("max: 3", "max: 4"));
     const rejected = await next();
     expect(rejected.decisions.filter((d) => d.unit === "gh-14").map((d) => d.rule)).toEqual(["round.workflow_changed"]);
     expect(existsSync(join(record(), "rounds/02-story"))).toBe(false);
     expect(t.state(runs())).toMatchObject({ step: "$done", status: "done", park: { kind: "workflow" } });
     const inbox = (await t.norn("status", "--json")).value as Inbox;
     expect(inbox.groups.your_turn).toContainEqual(expect.objectContaining({ story: "gh-14", title: expect.stringContaining("workflow story changed since norn story edit gh-14 --workflow story --at refine; run it again"), command: "norn story edit gh-14 --workflow story --at refine" }));
-    t.write(join(workflowsDir(t.root), "story.yaml"), STORY);
+    t.write(join(workflowsDir(t.root), "story.yaml"), ROUND_STORY);
   });
 
   test("B1, B3, B5, B6, B30, B31: the next tick starts round 2 at refine in one action and one commit", async () => {
@@ -740,7 +773,7 @@ counters: { back: { max: 2 } }
     // B30: round 1 kept, round 2 in its own folder with the story workflow pinned and a fresh state
     expect(runs()).toBe(join(record(), "rounds/02-story"));
     expect(t.state(join(record(), "rounds/01-triage"))).toMatchObject({ workflow: "triage", step: "$done", status: "done", counters: { loop: 2 } });
-    expect(t.read(join(runs(), "workflow.yaml"))).toBe(STORY);
+    expect(t.read(join(runs(), "workflow.yaml"))).toBe(ROUND_STORY);
     const st = t.state(runs());
     // B3 fresh counters, B5 the mode carried over
     expect(st).toMatchObject({ workflow: "story", round: 2, step: "refine", attempt: 1, counters: { fix: 0 }, applied_through: 0, mode: "manual" });
@@ -911,7 +944,7 @@ counters: { back: { max: 2 } }
     const second = t.report(r1, "mode", { mode: "manual", previous: "auto" }, "human");
     const first = second - 1;
     // S5: a round.start that stopped after pinning round 2 left a folder without state: still round 1
-    t.write(join(flat, "rounds/02-story/workflow.yaml"), STORY);
+    t.write(join(flat, "rounds/02-story/workflow.yaml"), ROUND_STORY);
     expect(runs16()).toBe(r1);
     const started = await next();
     expect(started.decisions.filter((d) => d.unit === "gh-16").map((d) => d.rule)).toEqual(["round.start"]);
@@ -921,5 +954,131 @@ counters: { back: { max: 2 } }
     expect(receiptsIn(r1).at(-2)).toMatch(/-round\.json$/);
     const events = JSON.stringify((await t.norn("run", "list", "gh-16", "--events", "--json")).value);
     expect(events).toContain(`round 1 ended at receipt ${first} (round.start); receipt ${second} (mode) was made for it`);
+  });
+});
+
+describe("gh-71 B11–B17, B32: --force ends an unfinished round, --at alone moves inside one", () => {
+  let t: Harness;
+  const spec21 = ".agents/specs/gh-21-force-me";
+  const spec22 = ".agents/specs/gh-22-stuck-one";
+  const wt21 = () => `${t.root}-worktrees/gh-21-force-me`;
+  const wt22 = () => `${t.root}-worktrees/gh-22-stuck-one`;
+  const record21 = () => join(wt21(), spec21, "runs/_story");
+  const runs21 = () => storyUnitDir(join(wt21(), spec21));
+  const runs22 = () => storyUnitDir(join(wt22(), spec22));
+  const next = () => {
+    t.clock.advance(10_000);
+    return t.tick();
+  };
+  /** AC8: refused with exit 3 and a CliError; the record's files and the branch head unchanged */
+  const refusedUnchanged = async (wt: string, spec: string, argv: string[], code: string) => {
+    const before = recordSnapshot(wt, spec);
+    const r = await t.norn(...argv, "--json");
+    // a copy: toMatchObject with asymmetric matchers may write them into the object it checks
+    const value = structuredClone(r.value) as { error: string; do_instead: string };
+    expect(r.exit).toBe(3);
+    expect(r.value).toMatchObject({ code, error: expect.any(String), do_instead: expect.any(String) });
+    expect(recordSnapshot(wt, spec)).toEqual(before);
+    return value;
+  };
+  beforeAll(async () => {
+    t = await createHarness();
+    expect((await t.norn("init")).exit).toBe(0);
+    t.write(repoConfigPath(t.root), CONFIG.replace("default_workflow: gated", "default_workflow: triage"));
+    t.write(join(workflowsDir(t.root), "triage.yaml"), ROUND_TRIAGE);
+    t.write(join(workflowsDir(t.root), "story.yaml"), ROUND_STORY);
+    t.write(join(workflowsDir(t.root), "quick.yaml"), ROUND_QUICK);
+    t.git(["add", "-A"]);
+    t.git(["commit", "-q", "-m", "norn init"]);
+    t.git(["push", "-q", "origin", "main"]);
+    t.remote.issues = [issue(21, "Force me", ["norn", "norn:wf:triage"]), issue(22, "Stuck one")];
+  });
+  afterAll(() => t.cleanup());
+
+  test("B12 (AC3, AC8): --force while an agent runs explore is refused, pointing to run cancel", async () => {
+    for (let i = 0; i < 8 && (t.state(runs21())?.status !== "running" || t.state(runs22())?.status !== "running"); i++) await next();
+    expect(t.state(runs22())).toMatchObject({ step: "explore", status: "running" });
+    const v = await refusedUnchanged(wt22(), spec22, ["story", "edit", "gh-22", "--workflow", "quick", "--force"], "agent_running");
+    expect(v).toMatchObject({ error: "an agent is running explore of gh-22's triage round; stop it first", do_instead: "norn run cancel gh-22" });
+  });
+
+  test("B11 (AC2): a $stuck round 1 ended with --force --at starts round 2 at that step", async () => {
+    t.report(runs22(), "stuck", { reason: "cannot reproduce" });
+    await next();
+    expect(t.state(runs22())).toMatchObject({ step: "explore", status: "stuck" });
+    const r = await t.norn("story", "edit", "gh-22", "--workflow", "quick", "--force", "--at", "ready", "--json");
+    expect(r.exit).toBe(0);
+    expect((r.value as Verb).receipt).toMatchObject({ kind: "round", workflow: "quick", to: "ready", forced: true, left_at: "explore" });
+    await next();
+    expect(runs22()).toEndWith("/runs/_story/rounds/02-quick");
+    expect(t.state(runs22())).toMatchObject({ workflow: "quick", round: 2, step: "ready", status: "parked", park: { kind: "gate" } });
+  });
+
+  test("B17 (AC5, AC8): an unknown workflow with --force is refused; the unfinished round is untouched", async () => {
+    t.report(runs21(), "done", { outcome: "story", handoff: "a story" });
+    await next();
+    expect(t.state(runs21())).toMatchObject({ step: "confirm", status: "parked", park: { kind: "gate" } });
+    const v = await refusedUnchanged(wt21(), spec21, ["story", "edit", "gh-21", "--workflow", "sotry", "--force"], "unknown_workflow");
+    expect(v.do_instead).toBe("norn story edit gh-21 --workflow <bug|quick|slice|story|triage>");
+  });
+
+  test("B11, B32 (AC1): --force at confirm ends round 1 by the person and starts round 2 at refine", async () => {
+    const r = await t.norn("story", "edit", "gh-21", "--workflow", "story", "--force", "--json");
+    expect(r.exit).toBe(0);
+    const receipt = (r.value as Verb).receipt;
+    expect(receipt).toMatchObject({ kind: "round", workflow: "story", to: "refine", forced: true, left_at: "confirm", step: "confirm" });
+    const tick = await next();
+    expect(tick.decisions.filter((d) => d.unit === "gh-21").map((d) => d.rule)).toEqual(["round.start"]);
+    expect(t.state(join(record21(), "rounds/01-triage"))).toMatchObject({
+      workflow: "triage",
+      step: "$done",
+      status: "done",
+      park: null,
+      ended: { by: "person", at: "confirm", receipt_id: receipt.receipt_id },
+    });
+    expect(runs21()).toBe(join(record21(), "rounds/02-story"));
+    expect(t.state(runs21())).toMatchObject({ workflow: "story", round: 2, step: "refine" });
+    expect(t.state(runs21())?.ended).toBeUndefined();
+  });
+
+  test("B15 (AC6, AC8): --at alone moves the same round's cursor, counters kept; an unknown step names the round's steps", async () => {
+    const v = await refusedUnchanged(wt21(), spec21, ["story", "edit", "gh-21", "--at", "nope"], "unknown_step");
+    expect(v).toMatchObject({ error: "no step 'nope' in gh-21's story workflow", do_instead: "norn story edit gh-21 --at <refine|build>" });
+    const moved = await t.norn("story", "edit", "gh-21", "--at", "build", "--json");
+    expect(moved.exit).toBe(0);
+    const st = t.state(runs21());
+    expect(moved.value).toMatchObject({ unit: "gh-21", workflow: "story", round: 2, to: "build" });
+    expect((moved.value as Verb).receipt).toMatchObject({ kind: "workflow", name: "story", from_hash: st?.workflow_hash, to_hash: st?.workflow_hash, to: "build", step: "refine" });
+    await next();
+    expect(t.state(runs21())).toMatchObject({ round: 2, step: "build", counters: { fix: 0 } });
+    // the build agent sends it back to refine (fix 1); --at build again keeps the counter
+    for (let i = 0; i < 4 && t.state(runs21())?.status !== "running"; i++) await next();
+    t.report(runs21(), "done", { outcome: "again", handoff: "refine again" });
+    await next();
+    expect(t.state(runs21())).toMatchObject({ step: "refine", counters: { fix: 1 } });
+    expect((await t.norn("story", "edit", "gh-21", "--at", "build")).exit).toBe(0);
+    await next();
+    expect(t.state(runs21())).toMatchObject({ round: 2, step: "build", attempt: 2, counters: { fix: 1 } });
+    expect(readdirSync(join(record21(), "rounds")).sort()).toEqual(["01-triage", "02-story"]);
+  });
+
+  test("B16 (AC7, AC8): --at on a finished round is refused and points to --workflow", async () => {
+    for (let i = 0; i < 4 && t.state(runs21())?.status !== "running"; i++) await next();
+    t.report(runs21(), "done", { outcome: "done", handoff: "built" });
+    await next();
+    expect(t.state(runs21())).toMatchObject({ step: "$done", status: "done" });
+    const v = await refusedUnchanged(wt21(), spec21, ["story", "edit", "gh-21", "--at", "refine"], "round_finished");
+    expect(v).toMatchObject({ error: "gh-21's story round is finished; start a new round with norn story edit gh-21 --workflow <name>", do_instead: "norn story edit gh-21 --workflow <name>" });
+  });
+
+  test("B14 (AC5): --force on a finished round is the same edit as without it", async () => {
+    const r = await t.norn("story", "edit", "gh-21", "--workflow", "quick", "--force", "--json");
+    expect(r.exit).toBe(0);
+    expect((r.value as Verb).receipt).toMatchObject({ kind: "round", workflow: "quick", to: "work", forced: false, left_at: "$done" });
+    await next();
+    expect(runs21()).toBe(join(record21(), "rounds/03-quick"));
+    expect(t.state(runs21())).toMatchObject({ workflow: "quick", round: 3, step: "work" });
+    expect(t.state(join(record21(), "rounds/02-story"))).toMatchObject({ step: "$done", status: "done" });
+    expect(t.state(join(record21(), "rounds/02-story"))?.ended).toBeUndefined();
   });
 });

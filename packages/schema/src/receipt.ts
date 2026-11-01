@@ -257,7 +257,7 @@ export const RoundReceipt = receipt("round", {
   workflow_hash: Type.String({ pattern: "^[0-9a-f]{64}$" }),
   /** the step the new round starts at: `--at`, else the workflow's start step */
   to: StepName,
-  /** `--force`: the old round was ended unfinished (gh-71 slice 08) */
+  /** `--force` on an unfinished round: the old round is ended by the person at `left_at` (gh-71 B11, RD3); false on a finished one (B14) */
   forced: Type.Boolean(),
   /** the step the old round is left at */
   left_at: Type.Union([StepName, Type.Literal("$done"), Type.Literal("$stuck")]),

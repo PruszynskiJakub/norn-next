@@ -413,7 +413,10 @@ function roundStart(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, n
   const after = uf.unapplied.filter((x) => x.n > nr.n);
   const rejected = after.map((x) => ({ n: x.n, receipt_id: x.receipt.receipt_id, reason: `round ${st.round ?? 1} ended at receipt ${nr.n} (round.start); receipt ${x.n} (${x.receipt.kind}) was made for it` }));
   const through = { ...moved, applied_through: after.at(-1)?.n ?? nr.n };
-  const ended: UnitState = roundFinished(st) ? { ...through, status: "done", park: null } : through;
+  // gh-71 B32 (D1, RD3): a forced round ends at $done in its own state, recorded as ended by the person at its step
+  const ended: UnitState = roundFinished(st)
+    ? { ...through, status: "done", park: null }
+    : { ...through, step: "$done", status: "done", park: null, run: null, ended: { by: "person", at: st.step as string, receipt_id: r.receipt_id } };
   const mode = st.mode ?? story.mode;
   const state = initialState({ unit: uf.unit, workflow: loaded.workflow, workflowName: r.workflow, workflowHash: r.workflow_hash, now: ctx.nowIso, tick_id: ctx.facts.tick_id, at: r.to, round: n, ...(mode ? { mode } : {}) });
   ctx.emit({

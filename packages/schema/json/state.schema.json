@@ -440,6 +440,30 @@
       "minimum": 1,
       "type": "integer"
     },
+    "ended": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "by",
+        "at",
+        "receipt_id"
+      ],
+      "properties": {
+        "by": {
+          "const": "person",
+          "type": "string"
+        },
+        "at": {
+          "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
+          "type": "string"
+        },
+        "receipt_id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        }
+      }
+    },
     "mode": {
       "anyOf": [
         {
