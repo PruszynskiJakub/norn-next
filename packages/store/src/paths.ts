@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
-import { LEGACY_SPEC_FILE, parseSliceKey, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName } from "@norn/schema";
+import { LEGACY_SPEC_FILE, parseSliceKey, RUNS_DIR, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName, unitRecordPath } from "@norn/schema";
 
 /** gh-110 B1, B2 (D1): the committed repo config and workflows, relative to a root, as messages name them. */
 export const REPO_CONFIG_FILE = ".agents/norn.config.yaml";
@@ -170,13 +170,13 @@ export const slicesDir = (specDir: string) => join(specDir, "slices");
 export const sliceFile = (specDir: string, nn: string, slug: string) => join(slicesDir(specDir), `${sliceDirName(nn, slug)}.md`);
 
 /** A spec folder's `runs/`, the parent of every unit's record folder. */
-export const specRunsDir = (specDir: string) => join(specDir, "runs");
+export const specRunsDir = (specDir: string) => join(specDir, RUNS_DIR);
 /**
- * The one resolver for a unit's record folder (gh-71 D2, B30, B36): `runs/<unit>/` where unit is
- * `_story` or the slice dir name `<nn>-<slug>`. Absolute under an absolute spec folder, repo-relative
- * (as git names it) under a repo-relative one. Nothing else builds this path by hand.
+ * The resolver for a unit's record folder (gh-71 D2, B30, B36): `<spec folder>/runs/<unit>` where unit is
+ * `_story` or the slice dir name `<nn>-<slug>` (`unitRecordPath`). Absolute under an absolute spec folder,
+ * repo-relative (as git names it) under a repo-relative one. Every reader and writer goes through here.
  */
-export const unitDir = (specDir: string, unit: string) => join(specRunsDir(specDir), unit);
+export const unitDir = (specDir: string, unit: string) => join(specDir, unitRecordPath(unit));
 export const storyUnitDir = (specDir: string) => unitDir(specDir, STORY_UNIT_DIR);
 export const statePath = (ud: string) => join(ud, "state.json");
 export const pinnedWorkflowPath = (ud: string) => join(ud, "workflow.yaml");

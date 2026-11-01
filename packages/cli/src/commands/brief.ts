@@ -10,7 +10,7 @@ import { readdirSync } from "node:fs";
 import { basename, join } from "node:path";
 import { cmd, currentRun, cursorStep, type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, standingReport, storyRulings, storyWorktreePath } from "@norn/core";
 import { type AgentStep, type ProcessIdentity, type ReceiptOf, storyBranch, ulid } from "@norn/schema";
-import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readText, readUnitHooks, writeBriefing, readRemoteCache, storyFile, traceEvent } from "@norn/store";
+import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readText, readUnitHooks, writeBriefing, readRemoteCache, storyFile, traceEvent, specRunsDir, unitDir } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
@@ -117,18 +117,18 @@ function evidenceFiles(s: UnitSession): Record<string, string[]> {
 function rulings(s: UnitSession): Ruling[] {
   const slug = s.marker.spec_dir.split("/").at(-1)?.slice(s.unit.story.length + 1) ?? "";
   const storyWt = storyWorktreePath(s.root, s.unit.story, slug);
-  const runsOf = (wt: string) => join(wt, s.marker.spec_dir, "runs");
+  const specOf = (wt: string) => join(wt, s.marker.spec_dir);
   const dirs = new Set<string>();
   for (const wt of [s.worktree, storyWt])
     try {
-      for (const d of readdirSync(runsOf(wt), { withFileTypes: true })) if (d.isDirectory()) dirs.add(d.name);
+      for (const d of readdirSync(specRunsDir(specOf(wt)), { withFileTypes: true })) if (d.isDirectory()) dirs.add(d.name);
     } catch {
       /* no runs/ here */
     }
   const units: Array<{ unit: string; receipts: NumberedReceipt[] }> = [];
   for (const dir of [...dirs].sort()) {
     const unit = dir === "_story" ? s.unit.story : `${s.unit.story}/${dir.split("-")[0]}`;
-    for (const wt of new Set([s.worktree, storyWt, `${storyWt}--${dir}`])) units.push({ unit, receipts: listReceipts(join(runsOf(wt), dir)).receipts });
+    for (const wt of new Set([s.worktree, storyWt, `${storyWt}--${dir}`])) units.push({ unit, receipts: listReceipts(unitDir(specOf(wt), dir)).receipts });
   }
   return storyRulings(units);
 }
@@ -187,7 +187,7 @@ export const briefCommand = defineCommand({
         spec_dir: s.marker.spec_dir,
         story_file: `${s.marker.spec_dir}/${basename(storyFile(s.specPath))}`,
         slice_file: slicePath,
-        unit_dir: `${s.marker.spec_dir}/runs/${s.unit.dir}`,
+        unit_dir: unitDir(s.marker.spec_dir, s.unit.dir),
       },
       diff_range: `${base}...HEAD`,
       // S9: the agent-written part only; the generated header and heartbeat are not for the agent

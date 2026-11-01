@@ -9,6 +9,7 @@ import {
   type StoryFrontmatter,
   type UnitState,
   type Workflow,
+  unitRecordPath,
 } from "@norn/schema";
 import type { RunGitAction, WorktreeSpec } from "../actions.ts";
 import { initialState, routeOf } from "../apply.ts";
@@ -79,7 +80,7 @@ export function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitSta
     cwd,
     timeout_ms,
     env,
-    log_path: `${story.spec_dir}/runs/${ref.dir}/logs/${run_id}.log`,
+    log_path: `${story.spec_dir}/${unitRecordPath(ref.dir)}/logs/${run_id}.log`,
   });
 }
 

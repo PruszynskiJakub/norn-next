@@ -201,6 +201,16 @@ export const storyBranch = storyDirName;
 export function sliceDirName(nn: string, slug: string): string {
   return `${sliceNn(nn)}-${slug}`;
 }
+/** The folder under a spec folder that holds every unit's record. */
+export const RUNS_DIR = "runs";
+/**
+ * gh-71 D2 (B30, B36): a unit's record folder relative to its spec folder, `runs/<unit>` (unit is
+ * `_story` or `<nn>-<slug>`). The one place that names it: store's `unitDir` resolves it under a spec
+ * folder, and pure decide uses it as is. Nothing else builds this path by hand.
+ */
+export function unitRecordPath(unit: string): string {
+  return `${RUNS_DIR}/${unit}`;
+}
 /** Slice branch: `gh-123/03-add-form`. */
 export function sliceBranch(story: string, nn: string, slug: string): string {
   return `${story}/${sliceDirName(nn, slug)}`;

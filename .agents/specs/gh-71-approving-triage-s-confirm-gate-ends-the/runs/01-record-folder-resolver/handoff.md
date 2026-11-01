@@ -15,7 +15,15 @@
 <!-- norn:heartbeat:end -->
 
 ## Goal
+Every reader and writer of a unit's record folder (`runs/<unit>`) goes through one resolver; no behaviour change (prefactor 1 of gh-71).
 
 ## Progress
+- Resolver: `unitRecordPath(unit)` in `@norn/schema` ids.ts (`runs/<unit>`, plus `RUNS_DIR`); store `unitDir(specDir, unit)` (paths.ts) resolves it under a spec folder, `specRunsDir` lists `runs/`.
+- Moved onto it: act env + start (lifecycle), story checkout, leases, the human-verb remote read (`git show` paths), brief (rulings scan + `unit_dir`), reopen, tidy, the unpushed check, observe (run-facts uncommitted prefix), store snapshot. The view already read `UnitSnapshot.path` (from `loadUnit` → `unitDir`), so nothing changed there.
+- Decide (core) uses `unitRecordPath` from schema for its three paths (log_path, own-error match, workflow_missing file); the strings it produces are byte-identical.
+- Decision, differs from the slice Note (D2): I did NOT add a record folder field to the unit reference in Facts in this slice. Every Facts field is pinned by the observe snapshots, and AC1 says they stay unchanged, so a Facts field now would break AC1. While the record folder is a pure function of the dir, decide calls the pure schema name; slice 04 (round folders, which need the filesystem) should add the Facts field and rewrite the snapshots then. Raise it in review if you'd rather have the field now (it's a small change: fill it in snapshot `loadUnit`, read it in the 3 decide sites, rewrite the observe snapshots).
+- AC2: `test/repo/repo.test.ts` "one resolver for a unit's record folder" scans package sources (comments skipped) for `"runs"` literals and `runs/${…}` templates outside ids.ts and paths.ts; checked red on the pre-change code, green now (plus a matcher test).
+- Unit tier (987) and the type check pass; the integration and e2e tiers were not run here (the `test` check runs integration; CI runs e2e). AC3 (comparing output with the released norn) is not checked yet; it's for the qa step.
 
 ## Resume
+Implementation is committed. Next: the `test` check; then review/qa for AC3.

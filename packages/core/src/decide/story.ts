@@ -9,6 +9,7 @@ import {
   SPEC_FILE,
   type StoryFrontmatter,
   type UnitState,
+  unitRecordPath,
 } from "@norn/schema";
 import type { ClaimAction, UpdateStoryMirrorAction } from "../actions.ts";
 import type { StoryFacts, UnitFacts, UnitRef } from "../facts.ts";
@@ -263,7 +264,7 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
     if (uf.state?.status === "corrupt") return ctx.noop(ref, "unit.corrupt", "corrupt; never touched (S2)");
     const notify = unitItem(ctx, story, uf, uf.state as UnitState);
     // S2: only the unit's own runs/ files mark its state corrupt, and only a state.json that reads
-    const own = uf.errors.every((e) => e.file.includes(`/runs/${ref.dir}/`));
+    const own = uf.errors.every((e) => e.file.includes(`/${unitRecordPath(ref.dir)}/`));
     const mark_state = uf.state !== null && own && !uf.errors.some((e) => /(^|\/)state\.json$/.test(e.file));
     return ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "unit.corrupt", errors: uf.errors, mark_state, notify });
   }
@@ -275,7 +276,7 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
   if (st.status === "corrupt") return ctx.noop(ref, "unit.corrupt", "corrupt; never touched (S2)");
   const wf = uf.workflow;
   // S2: a missing pinned workflow is surfaced; the state stays as it is (no file failed validation)
-  if (!wf) return ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "unit.workflow_missing", errors: [{ file: `runs/${ref.dir}/workflow.yaml`, errors: [{ path: "", message: "pinned workflow missing" }] }], mark_state: false, notify: null });
+  if (!wf) return ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "unit.workflow_missing", errors: [{ file: `${unitRecordPath(ref.dir)}/workflow.yaml`, errors: [{ path: "", message: "pinned workflow missing" }] }], mark_state: false, notify: null });
 
   // R5.1: a run whose launch is unknown is looked for before anything else is decided for the unit
   if (uf.run?.launch_unknown) return launchUnknown(ctx, story, uf, st, wf);

@@ -23,7 +23,7 @@ import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { herdr } from "@norn/adapters";
 import { ulid } from "@norn/schema";
-import { acquireTickLock, copyToOrphaned, deleteTraceDays, deleteTracePaths, orphanedDir, reclaimLeases, receiptsDir, safeUnlink, traceDaysBefore } from "@norn/store";
+import { acquireTickLock, copyToOrphaned, deleteTraceDays, deleteTracePaths, orphanedDir, reclaimLeases, receiptsDir, safeUnlink, traceDaysBefore, unitDir } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { busyError, refuse, usageError } from "../output.ts";
@@ -168,15 +168,15 @@ export const tidyCommand = defineCommand({
       const holder = obs.facts.machine.holder;
       for (const [story, units] of Object.entries(obs.unpushed)) {
         for (const u of units) {
-          const unitDir = join(u.cwd, obs.stories[story]?.spec_dir ?? "", "runs", u.dir);
+          const record = unitDir(join(u.cwd, obs.stories[story]?.spec_dir ?? ""), u.dir);
           const moved: Array<{ from: string; to: string }> = [];
           for (const f of u.files) {
             const src = join(u.cwd, f);
             if (dry) {
-              moved.push({ from: f, to: relative(u.cwd, join(orphanedDir(unitDir), `${holder}-${f.split("/").at(-1)}`)) });
+              moved.push({ from: f, to: relative(u.cwd, join(orphanedDir(record), `${holder}-${f.split("/").at(-1)}`)) });
               continue;
             }
-            const dest = copyToOrphaned(unitDir, src, holder);
+            const dest = copyToOrphaned(record, src, holder);
             // back to the record's version of the path: the merge-base copy, or gone when it is new here
             const inBase = await git.hasPath(u.cwd, u.base, f);
             if (inBase) await git.checkoutPaths(u.cwd, u.base, [f]).catch(() => undefined);
@@ -192,7 +192,7 @@ export const tidyCommand = defineCommand({
             : await git.commit(u.cwd, {
                 message: `norn: ${u.unit} work not in the record moved to orphaned/`,
                 trailers: { "Norn-Story": story, ...(u.unit !== story ? { "Norn-Slice": u.unit } : {}), "Norn-Tick": obs.facts.tick_id },
-                paths: [relative(u.cwd, unitDir)],
+                paths: [relative(u.cwd, record)],
               });
           orphaned.push({ story, unit: u.unit, moved, commit });
         }

@@ -1,7 +1,7 @@
 /** observe: a unit's run facts — its run windows (C4), hook facts refined per agent (A2), the live or unknown run (R5.1, R5.3, B3). */
 import type { AgentAdapter, FileError, Ports, RunFacts, UnitFacts, WorktreeFacts } from "@norn/core";
 import type { HookFact } from "@norn/schema";
-import { type LocalUnit, liveRun, receiptsOfKinds, runHooks, type StorySnapshot, type UnitSnapshot } from "@norn/store";
+import { type LocalUnit, liveRun, receiptsOfKinds, runHooks, type StorySnapshot, type UnitSnapshot, unitDir } from "@norn/store";
 import type { DatedCommit } from "./git-facts.ts";
 
 /** A2: each agent adapter's own pass over a run's hook facts (`refineHooks`), once per adapter name. */
@@ -57,7 +57,7 @@ export async function unitFacts(ports: Ports, story: StorySnapshot, lu: LocalUni
   const now = env.now;
   const u = lu.snapshot;
   const st = u.state;
-  const prefix = `${story.spec_dir}/runs/${u.unit.dir}/`;
+  const prefix = `${unitDir(story.spec_dir, u.unit.dir)}/`;
   const dirty = worktree?.status ? [...worktree.status.staged, ...worktree.status.unstaged, ...worktree.status.untracked] : [];
   const uncommitted = dirty.some((p) => p.startsWith(prefix));
 

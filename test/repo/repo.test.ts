@@ -1030,3 +1030,35 @@ describe("ratchet lints", () => {
     }).toEqual({ unhandled: [], notAnAction: [], neverEmitted: [...ACT_ONLY_KINDS].sort() });
   });
 });
+
+describe("one resolver for a unit's record folder (gh-71 D2, B30, B36)", () => {
+  /** Where a unit's record path may be named: the pure name in schema and store's path module. */
+  const RESOLVERS = ["packages/schema/src/ids.ts", "packages/store/src/paths.ts"];
+  /** A `runs` path segment built by hand: the bare literal (`join(…, "runs", …)`) or `runs/${…}` in a template. */
+  const BY_HAND = /["'`]runs["'`]|\bruns\/\$\{/;
+  const isComment = (line: string) => /^\s*(\*|\/\/|\/\*)/.test(line);
+  const byHand = (src: string) =>
+    src
+      .split("\n")
+      .map((l, i) => ({ l, i }))
+      .filter(({ l }) => !isComment(l) && BY_HAND.test(l));
+
+  test("matcher: a joined literal and a template segment are hits; comments and other runs/ text are not", () => {
+    const src = [
+      'const a = join(spec, "runs", dir);',
+      "const b = `${spec}/runs/${dir}/state.json`;",
+      " * `runs/${unit}` in a doc comment",
+      "// join(spec, 'runs', dir)",
+      "const c = `runs/ rewound`;",
+      "const d = unitDir(spec, dir);",
+    ].join("\n");
+    expect(byHand(src).map(({ i }) => i)).toEqual([0, 1]);
+  });
+
+  test("no package source outside the resolvers builds runs/<unit> by hand", () => {
+    const hits = files(PKGS)
+      .filter((p) => p.includes("/src/") && !RESOLVERS.includes(relative(ROOT, p)))
+      .flatMap((p) => byHand(readFileSync(p, "utf8")).map(({ l, i }) => `${relative(ROOT, p)}:${i + 1}: ${l.trim()}`));
+    expect(hits).toEqual([]);
+  });
+});
