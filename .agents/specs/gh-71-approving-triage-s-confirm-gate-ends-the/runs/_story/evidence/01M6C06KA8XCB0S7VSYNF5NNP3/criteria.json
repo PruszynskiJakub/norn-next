@@ -1,0 +1,184 @@
+[
+ {
+  "id": "B1",
+  "verdict": "pass",
+  "evidence": "B6.md, B30.md, B29.md (gh-61: round 1 triage, round 2 story, round 3 triage on branch gh-61-stranded-story)"
+ },
+ {
+  "id": "B2",
+  "verdict": "pass",
+  "evidence": "B2.md: approve at confirm -> round 1 $done, spec status: active, worktree and claim kept"
+ },
+ {
+  "id": "B3",
+  "verdict": "pass",
+  "evidence": "B3.md + B6.md: triage_loop 1 in round 1, round 2 counters {fix: 0}; B8.md triage_loop 0 in round 2"
+ },
+ {
+  "id": "B4",
+  "verdict": "pass",
+  "evidence": "B4.md: round 3 works in the same worktree/branch with round 2's file; remote calls 'pr+' once then 'pr~ 100'; body is round 3's"
+ },
+ {
+  "id": "B5",
+  "verdict": "pass",
+  "evidence": "B5.md + B6.md: round 1 set manual, round 2 state mode manual"
+ },
+ {
+  "id": "B6",
+  "verdict": "pass",
+  "evidence": "B6.md: --workflow story on finished triage round -> commit 'round 2 (story) at refine', state round 2 refine, status shows Your turn for refine"
+ },
+ {
+  "id": "B7",
+  "verdict": "pass",
+  "evidence": "B7.md, B4.md: finished quick round with PR #100 open -> edit started round 3, PR body updated, story ended only at merge (B21-C.md)"
+ },
+ {
+  "id": "B8",
+  "verdict": "pass",
+  "evidence": "B8.md: --workflow triage on finished triage round -> rounds/02-triage at explore, counters 0"
+ },
+ {
+  "id": "B9",
+  "verdict": "pass",
+  "evidence": "B9.md (unknown step refused exit 3, code unknown_step, names quick's steps, record unchanged B17.md); B11.md/B33.md (--at sync, --at slices start round there)"
+ },
+ {
+  "id": "B10",
+  "verdict": "pass",
+  "evidence": "B10.md: at confirm, refused exit 3 with exact message and do_instead 'norn story edit gh-61 --workflow story --force'; state unchanged"
+ },
+ {
+  "id": "B11",
+  "verdict": "pass",
+  "evidence": "B11.md: forced at confirm gate (scenario E), at plan (gh-61) and at work (gh-30, with --at sync) -> old round ended by person, new round started"
+ },
+ {
+  "id": "B12",
+  "verdict": "pass",
+  "evidence": "B12.md: agent running explore -> exit 3 agent_running, do_instead 'norn run cancel gh-31', nothing changed"
+ },
+ {
+  "id": "B13",
+  "verdict": "pass",
+  "evidence": "B13.md: slice gh-32/01 unfinished -> exit 3 slice_unfinished 'slice gh-32/01 is not finished; finish or drop it first'"
+ },
+ {
+  "id": "B14",
+  "verdict": "pass",
+  "evidence": "B14.md + B6.md: --force on a finished round wrote forced:false round receipt, round 2 at refine"
+ },
+ {
+  "id": "B15",
+  "verdict": "pass",
+  "evidence": "B15.md: --at plan alone -> same round 2 folder, step plan, counters kept; --at nope refused exit 3 naming the round's steps"
+ },
+ {
+  "id": "B16",
+  "verdict": "pass",
+  "evidence": "B16.md: --at explore on finished round -> exit 3 round_finished pointing to --workflow <name>"
+ },
+ {
+  "id": "B17",
+  "verdict": "pass",
+  "evidence": "B17.md: --workflow sotry --force -> exit 3 unknown_workflow listing workflows; record unchanged (file list)"
+ },
+ {
+  "id": "B18",
+  "verdict": "pass",
+  "evidence": "B18.md: ana@laptop with the branch checked out -> refused (exit 5 claim_held) naming holder tester@box and 'norn story checkout gh-50 --force'; mailbox and story unchanged"
+ },
+ {
+  "id": "B19",
+  "verdict": "pass",
+  "evidence": "B19.md: label call 'label 61 -norn:wf:triage +norn:wf:story', issue labels updated; a hand-set norn:wf:quick on gh-50 started nothing over 2 syncs"
+ },
+ {
+  "id": "B20",
+  "verdict": "pass",
+  "evidence": "B20.md: label call fails -> round.start ok with warning, tick failed=0, round 2 started, warning in the trace"
+ },
+ {
+  "id": "B21",
+  "verdict": "pass",
+  "evidence": "B21-C.md: gh-42 in round 3, PR #100 merged -> remote.pr_merged, worktree and claim gone"
+ },
+ {
+  "id": "B22",
+  "verdict": "pass",
+  "evidence": "B22-C.md: finished triage round, no PR, issue closed -> on the sync remote.issue_closed: branch pushed with spec status dropped (as story close) and record, worktree/local branch/claim gone, gh-40 left the inbox"
+ },
+ {
+  "id": "B23",
+  "verdict": "pass",
+  "evidence": "B23-C.md: issue reopened -> norn story reopen gh-40 restores round 1 $done (inbox 'triage round done, no PR'); --workflow story then starts round 2 at refine"
+ },
+ {
+  "id": "B24",
+  "verdict": "pass",
+  "evidence": "B24-C.md: gh-41 at confirm, issue closed -> stuck, park remote 'remote: issue closed', under Unblock with norn run rerun"
+ },
+ {
+  "id": "B25",
+  "verdict": "pass",
+  "evidence": "B25.md: Your turn 'gh-61: triage round done, no PR', detail 'or close the issue', command 'norn story edit gh-61 --workflow <name>'; no 'waiting for the PR merge' item"
+ },
+ {
+  "id": "B26",
+  "verdict": "pass",
+  "evidence": "B23-C.md / B22-C.md: gh-40's explore reported 'close', the item still says --workflow <name>"
+ },
+ {
+  "id": "B27",
+  "verdict": "fail",
+  "repro": "Story in a round that opens a PR (quick: work -> open-pr -> ready). Approve `ready` before any sync has seen the new PR (within sync_interval of open-pr). `norn status` shows 'gh-42: quick round done, no PR' / 'or close the issue' / `norn story edit gh-42 --workflow <name>` although PR #100 is open. Expected the 'Merge PR #100' item. After `norn sync` (tick --sync) it shows 'Merge PR #100 (still a draft)'. Seen 2/2 (gh-33 in scenario B, gh-42 in scenario C).",
+  "evidence": "B27-C.md, B27.md, B7.md"
+ },
+ {
+  "id": "B28",
+  "verdict": "fail",
+  "repro": "Story gh-61 in round 2 (story) at refine. `norn status` (the markdown a person reads) prints 'gh-61  refine is ready (manual): start an agent in the worktree' with no round number or workflow. Expected the round and workflow next to the step, as `story view` ('round 2 \u00b7 story \u00b7 ready at refine') and the handoff header ('Round 2 \u00b7 Workflow: story \u00b7 Step: refine (attempt 1)') show. Only `status --json` carries round {n, workflow}.",
+  "evidence": "B28.md, B6.md"
+ },
+ {
+  "id": "B29",
+  "verdict": "pass",
+  "evidence": "B29.md: run list prints 'round 1 \u00b7 triage \u00b7 finished', 'round 2 \u00b7 story \u00b7 ended by the person at plan', 'round 3 \u00b7 triage'; scenario E 'ended by the person at confirm'"
+ },
+ {
+  "id": "B30",
+  "verdict": "pass",
+  "evidence": "B30.md: runs/_story/rounds/01-triage and 02-story, each with state.json, workflow.yaml; round 2 receipts start at 0001 (B15.md delivered n:1/2)"
+ },
+ {
+  "id": "B31",
+  "verdict": "pass",
+  "evidence": "B31.md: one runs/_story/handoff.md, header 'Round 2', person's Goal/Progress/Resume kept across the round change"
+ },
+ {
+  "id": "B32",
+  "verdict": "pass",
+  "evidence": "B32.md: round 2 state ended {by: person, at: plan}; round 1 of scenario E ended {by: person, at: confirm}; shown in run list"
+ },
+ {
+  "id": "B33",
+  "verdict": "pass",
+  "evidence": "B33.md: round 2 slices step started slice gh-32/01 at runs/01-part with state round: 2"
+ },
+ {
+  "id": "B34",
+  "verdict": "pass",
+  "evidence": "B34.md: flat record -> first tick round.migrate, files git-mv'd into rounds/01-triage in one commit 'record moved into round 1', pushed; step/counters/attempt unchanged"
+ },
+ {
+  "id": "B35",
+  "verdict": "pass",
+  "evidence": "B35.md: flat finished round -> inbox 'gh-37: triage round done, no PR'; --workflow story starts rounds/02-story at refine"
+ },
+ {
+  "id": "B36",
+  "verdict": "pass",
+  "evidence": "B36.md: flat record on main -> run list shows 'round 1 \u00b7 triage \u00b7 finished', run view reads it; main HEAD, remote main and tree unchanged, record still flat"
+ }
+]
