@@ -29,26 +29,28 @@ Non-goals:
 
 - CP1 `cockpitModel(view, capabilities)` in `@norn/view` is pure: a `ProjectView` in, a `CockpitModel` out, no IO and no clock beyond `view.at`.
   - `capabilities` says what the front end can do: `{ places: boolean }`. It is true when the front end can focus an agent's pane and open an orient workspace (the terminal inside Herdr).
+  - It may also carry `backlog: { me, issues }`: the open issues with the intake label and the person's login, as the front end read them from the remote (`RemotePort.listLabelledIssues`, `whoami`). The model stays pure; without it the backlog holds no issue rows.
   - The model is plain JSON, like `ProjectView`.
 - CP2 `CockpitModel` holds:
   - `header`: the repo, how many rows the needs-you section holds (so the count matches what is listed; the inbox's `pending` also counts unclaimed stories, which are story rows here) and the heartbeat (`view.heartbeat`).
   - `rows`, in two sections:
     - **needs you**: one row per inbox item of `your_turn`, `answer`, `approve`, `unblock` and `check`, in O1 order;
     - **stories**: one row per story that has no needs-you row (a story that needs you is listed once, under its item), by tab: `now` (in flight, nearest to done first: fewest steps left in its pinned workflow, `steps_left`), `backlog` (not started), `done` (closed: `story_status` done or dropped, whatever its unit says; newest first, by issue number until the model has a `closed_at`).
+    - **issues**: in `backlog`, after its stories, one row per issue in `capabilities.backlog` that is open, not assigned to the person (GR1: assigning is how they choose when intake takes it in) and not taken in already, by number.
 
     Running, Notes and Recently done items are no rows; the story preview shows them.
 
   A row has:
-  - `id`: the inbox item id, or `story:<key>`;
-  - `kind`: `item` or `story`;
-  - `tab`: `now`, `backlog` or `done` (an item is always `now`);
+  - `id`: the inbox item id, `story:<key>`, or `issue:<key>` (the key the story would get);
+  - `kind`: `item`, `story` or `issue`;
+  - `tab`: `now`, `backlog` or `done` (an item is always `now`, an issue `backlog`);
   - `group`: for an item;
   - `story`, `unit`, `step`, `title`, `since`, `age`;
   - `preview`: CP3;
   - `actions`: CP4.
 
   A row's `id` is stable across rebuilds, so a renderer keeps the selection on the same row when the view refreshes.
-- CP3 A row's `preview` is the orient report of its story (OR2): standing, slices, PR, what waits, what runs, and the open notes by unit (full text). An item row's preview also has the item's title, detail and command. The preview is data (`OrientReport` plus the item). Each renderer lays it out itself.
+- CP3 A row's `preview` is the orient report of its story (OR2): standing, slices, PR, what waits, what runs, and the open notes by unit (full text). An item row's preview also has the item's title, detail and command. The preview is data (`OrientReport` plus the item). An issue row has no story yet: its `report` is null and its `issue` holds the number, title, URL, labels and assignees. Each renderer lays it out itself.
 - CP4 Each action of a row is data:
   - `id`, `label`, `key`: the default key, a single letter or `enter`;
   - `input?`: `{ prompt, required }`, when the action needs text from the person;
@@ -69,9 +71,10 @@ Non-goals:
   | reject | x | Approve | input "What to change" → verb `story reject <unit> --reason {input}` |
   | unstick | u | an item whose command is `norn run rerun …` | verb `run rerun <unit>` |
   | take | t | the story row of a story nobody holds (claim `unclaimed`) | verb `story checkout <story>` |
+  | take | t | an issue row | verb `story take <story>`: assigns the issue to the person; the next sync takes it in (GR1) |
   | trace | v | every row | verb `run list <unit>`, shown |
   | pr | o | every row of a story whose PR is known (`StoryView.pr`) | link to the PR URL |
-  | issue | i | every row of a story with an issue URL | link to the issue URL |
+  | issue | i | every row of a story with an issue URL, and every issue row | link to the issue URL |
 
   The model alone decides which rows offer which action: a renderer never infers it from groups or commands. An action a row does not offer is absent, not disabled.
 - CP5 `norn status --watch --json` prints the model once and exits (P8), so a front end outside TypeScript can read it. Running an action needs no extra entry point: its `argv` is a norn command (`norn <argv…> --json`).
@@ -80,9 +83,9 @@ Non-goals:
 
 - CP6 `norn status --watch [--interval 5s]` draws the model full screen: the header, the tab strip, the shown tab's rows on the left (about 60% of the width), the selected row's preview on the right (about 40%; below the rows when the pane is narrower than 100 columns), and a footer. The footer lists the selected row's actions by key, then `1 2 3 tabs · / filter · ? keys · q quit`.
   - The header shows the running norn's version (`norn 0.15.0`, `NORN_VERSION`: a long-running cockpit keeps its binary's version after a new release is installed), the repo and how many rows need you across the repo. While the filter is in use it shows first in the header; there is no filter line.
-  - The tabs: `1 Now` (needs you, then in flight; the default), `2 Backlog` (not started), `3 Done` (closed). The strip carries counts: `1 Now 23 need you · 8 in flight │ 2 Backlog 2 │ 3 Done 35`.
-  - Each section header carries its count (`NEEDS YOU 23`, `IN FLIGHT 8`, `BACKLOG 2`, `DONE 35`).
-  - A needs-you row shows its mark, unit, step, the story's title and its age; the item's instruction stays in the preview. A story row shows its unit, title and standing (`<status> <step>`; a closed story reads `done`), then its slices and PR only when it has them.
+  - The tabs: `1 Now` (needs you, then in flight; the default), `2 Backlog` (not started, then the issues not taken in), `3 Done` (closed). The backlog's issues are read from the remote when the cockpit starts, at most every 5 minutes after, on `r` and after a take; a failed read keeps the last ones and says so in the footer. The strip carries counts: `1 Now 23 need you · 8 in flight │ 2 Backlog 2 │ 3 Done 35`.
+  - Each section header carries its count (`NEEDS YOU 23`, `IN FLIGHT 8`, `BACKLOG 2`, `ISSUES 4`, `DONE 35`).
+  - A needs-you row shows its mark, unit, step, the story's title and its age; the item's instruction stays in the preview. A story row shows its unit, title and standing (`<status> <step>`; a closed story reads `done`), then its slices and PR only when it has them. An issue row shows its key, title, labels and assignees (`unassigned` when none).
   - It reads raw keys (a terminal in raw mode), draws on the alternate screen (frames leave no scrollback) and turns on mouse reporting for the wheel; all of it is restored on exit, SIGINT and SIGTERM included.
   - It redraws on every key and every interval, with a fresh view on the interval and after each action.
   - Frames go to stderr, one JSON summary (the last action taken) to stdout at exit (P8).

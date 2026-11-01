@@ -99,6 +99,15 @@ export function createGh(opts: GhOptions): RemotePort {
       const rows = await json<GhIssue[]>(["issue", "list", ...repo, "--assignee", "@me", "--label", label, "--state", "open", "--limit", "500", "--json", ISSUE_FIELDS]);
       return rows.map(mapIssue);
     },
+    async listLabelledIssues({ label }) {
+      // CP2: the backlog — any assignee or none
+      const rows = await json<GhIssue[]>(["issue", "list", ...repo, "--label", label, "--state", "open", "--limit", "500", "--json", ISSUE_FIELDS]);
+      return rows.map(mapIssue);
+    },
+    async assignIssue(number, assignee) {
+      // GR1
+      okOrThrow(await run(["issue", "edit", String(number), ...repo, "--add-assignee", assignee]), "gh issue edit", "gh");
+    },
     async getIssue(number) {
       const r = await run(["issue", "view", String(number), ...repo, "--json", ISSUE_FIELDS]);
       if (r.code !== 0 && /could not resolve to an issue|not found|no issue/i.test(r.stderr)) return null;

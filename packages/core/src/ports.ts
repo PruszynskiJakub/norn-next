@@ -317,6 +317,10 @@ export interface RemotePort {
   whoami(): Promise<string>;
   /** open issues assigned to the user carrying `label` (GR1) */
   listAssignedIssues(opts: { label: string }): Promise<RemoteIssue[]>;
+  /** CP2: open issues carrying `label`, whoever they are assigned to (none, the user, others) — the backlog */
+  listLabelledIssues(opts: { label: string }): Promise<RemoteIssue[]>;
+  /** GR1: add `assignee` (a login) to issue `number`'s assignees; the next intake lists it */
+  assignIssue(number: number, assignee: string): Promise<void>;
   /** null if not found */
   getIssue(number: number): Promise<RemoteIssue | null>;
   /** latest PR/MR whose head is `branch`, any state; null if none */

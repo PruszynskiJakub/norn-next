@@ -104,6 +104,15 @@ export function createGlab(opts: GlabOptions): RemotePort {
       const rows = await json<GlIssue[]>(["issue", "list", ...repo, "--assignee=@me", "--label", label, "--per-page", "100", "--output", "json"]);
       return rows.map(mapIssue);
     },
+    async listLabelledIssues({ label }) {
+      // CP2: the backlog — any assignee or none; glab lists open issues by default
+      const rows = await json<GlIssue[]>(["issue", "list", ...repo, "--label", label, "--per-page", "100", "--output", "json"]);
+      return rows.map(mapIssue);
+    },
+    async assignIssue(number, assignee) {
+      // GR1: `+` adds to the assignees instead of replacing them
+      okOrThrow(await run(["issue", "update", String(number), ...repo, "--assignee", `+${assignee}`]), "glab issue update", "glab");
+    },
     async getIssue(number) {
       const r = await run(["issue", "view", String(number), ...repo, "--output", "json"]);
       if (r.code !== 0 && notFound(r.stderr)) return null;

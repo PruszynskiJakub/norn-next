@@ -95,4 +95,13 @@ describe("gh adapter", () => {
     await timed.whoami();
     expect(timeouts).toEqual([NETWORK_TIMEOUT_MS]);
   });
+  test("listLabelledIssues lists the label's open issues, any assignee; assignIssue adds one (CP2, GR1)", async () => {
+    const argv: string[][] = [];
+    const port = createGh({ cwd: "/repo", exec: async (a) => (argv.push(a), { code: 0, stdout: a[2] === "list" ? "[]" : "", stderr: "" }) });
+    expect(await port.listLabelledIssues({ label: "norn" })).toEqual([]);
+    await port.assignIssue(7, "me");
+    expect(argv).toEqual([["gh", "issue", "list", "--label", "norn", "--state", "open", "--limit", "500", "--json", "number,url,title,body,state,assignees,labels,updatedAt"], ["gh", "issue", "edit", "7", "--add-assignee", "me"]]);
+    const failing = createGh({ cwd: "/repo", exec: async () => ({ code: 1, stdout: "", stderr: "error connecting: Could not resolve host" }) });
+    expect(await failing.assignIssue(7, "me").catch((e) => e.retryable)).toBe(true);
+  });
 });

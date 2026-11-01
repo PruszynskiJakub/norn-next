@@ -1,12 +1,12 @@
 /**
  * The cockpit model (SPEC-cockpit CP1–CP5): rows — what needs the person, then each other story once, in its
- * tab (now, backlog, done) — each with
+ * tab (now, backlog, done), then the backlog's issues not taken in yet — each with
  * its story's orient preview and the actions it offers, as data. Pure: a ProjectView in, plain JSON
  * out. Renderers (the terminal `norn status --watch`, a web panel later) map actions to keys or buttons and
  * run their effects; they never decide which actions fit a row (CP4). Writes stay CLI verbs (X1).
  */
-import type { InboxGroup, InboxItem } from "@norn/core";
-import type { RemoteProvider } from "@norn/schema";
+import type { InboxGroup, InboxItem, RemoteIssue } from "@norn/core";
+import { type RemoteProvider, storyKey } from "@norn/schema";
 import { inboxItemsInOrder } from "./format.ts";
 import { type OrientReport, orientReport } from "./orient.ts";
 import type { HeartbeatView, InboxEntry, ProjectView, StoryView } from "./types.ts";
@@ -35,11 +35,21 @@ export interface CockpitAction {
 /** CP2: where a row is listed — now (needs you, in flight), backlog (not started), done (closed) */
 export type CockpitTab = "now" | "backlog" | "done";
 
+/** CP2: an open issue with the intake label that is not assigned to the person, as the backlog lists it */
+export interface CockpitIssue {
+  number: number;
+  title: string;
+  url: string;
+  labels: string[];
+  assignees: string[];
+}
+
 export interface CockpitRow {
-  /** the inbox item id, or `story:<key>`; stable across rebuilds */
+  /** the inbox item id, `story:<key>`, or `issue:<key>`; stable across rebuilds */
   id: string;
-  kind: "item" | "story";
-  /** an item is always `now`; a story by its standing */
+  /** `issue`: an issue not taken in yet (no story, no unit) */
+  kind: "item" | "story" | "issue";
+  /** an item is always `now`; a story by its standing; an issue is `backlog` */
   tab: CockpitTab;
   group: InboxGroup | null;
   story: string;
@@ -48,8 +58,8 @@ export interface CockpitRow {
   title: string;
   since: string | null;
   age: string | null;
-  /** CP3: the story's orient report, and the item for an item row */
-  preview: { report: OrientReport; item: { title: string; detail?: string; full?: string; command: string } | null };
+  /** CP3: the story's orient report (null for an issue row), the item for an item row, the issue for an issue row */
+  preview: { report: OrientReport | null; item: { title: string; detail?: string; full?: string; command: string } | null; issue?: CockpitIssue };
   actions: CockpitAction[];
 }
 
@@ -65,6 +75,11 @@ export interface CockpitOptions {
   places: boolean;
   /** shown in the preview's PR command (`config.remote.provider`) */
   provider: RemoteProvider;
+  /**
+   * CP2: what the front end read from the remote — the open issues carrying the intake label, and the
+   * person's login. Those not assigned to `me` and not taken in are backlog rows; absent, there are none.
+   */
+  backlog?: { me: string; issues: readonly RemoteIssue[] };
 }
 
 const ACTION: Record<CockpitActionId, { label: string; key: string }> = {
@@ -178,7 +193,37 @@ export function cockpitModel(view: ProjectView, o: CockpitOptions): CockpitModel
       actions: storyActions(s, s.key, o, true),
     }));
   // the header counts the rows that need you, so it matches what is listed under them
-  return { at: view.at, header: { repo: view.repo, pending: items.length, heartbeat: view.heartbeat }, rows: [...items, ...storyRows] };
+  return { at: view.at, header: { repo: view.repo, pending: items.length, heartbeat: view.heartbeat }, rows: [...items, ...storyRows, ...issueRows(view, o)] };
+}
+
+/**
+ * CP2: the backlog's issues, after its stories, by number — open, not assigned to the person (assigning
+ * is how they choose when intake takes one in, GR1) and not taken in already. Take assigns (CP4).
+ */
+function issueRows(view: ProjectView, o: CockpitOptions): CockpitRow[] {
+  if (!o.backlog) return [];
+  const { me, issues } = o.backlog;
+  const known = new Set(view.stories.map((s) => s.key));
+  return issues
+    .filter((i) => i.state === "open" && !i.assignees.includes(me) && !known.has(storyKey(i.provider, i.number)))
+    .sort((a, b) => a.number - b.number)
+    .map((i) => {
+      const key = storyKey(i.provider, i.number);
+      return {
+        id: `issue:${key}`,
+        kind: "issue" as const,
+        tab: "backlog" as const,
+        group: null,
+        story: key,
+        unit: key,
+        step: null,
+        title: i.title,
+        since: null,
+        age: null,
+        preview: { report: null, item: null, issue: { number: i.number, title: i.title, url: i.url, labels: [...i.labels], assignees: [...i.assignees] } },
+        actions: [action("take", { kind: "verb", argv: ["story", "take", key] }), action("issue", { kind: "link", url: i.url })],
+      };
+    });
 }
 
 /** Fill `{input}` in a verb's argv. */

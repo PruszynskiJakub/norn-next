@@ -89,4 +89,13 @@ describe("glab adapter", () => {
     const err = await net.listAssignedIssues({ label: "norn" }).catch((e) => e);
     expect([err.code, err.retryable]).toEqual(["glab_network", true]);
   });
+  test("listLabelledIssues lists the label's open issues, any assignee; assignIssue adds one (CP2, GR1)", async () => {
+    const argv: string[][] = [];
+    const port = createGlab({ cwd: "/repo", exec: async (a) => (argv.push(a), { code: 0, stdout: a[2] === "list" ? "[]" : "", stderr: "" }) });
+    expect(await port.listLabelledIssues({ label: "norn" })).toEqual([]);
+    await port.assignIssue(7, "me");
+    expect(argv).toEqual([["glab", "issue", "list", "--label", "norn", "--per-page", "100", "--output", "json"], ["glab", "issue", "update", "7", "--assignee", "+me"]]);
+    const failing = createGlab({ cwd: "/repo", exec: async () => ({ code: 1, stdout: "", stderr: "error connecting: Could not resolve host" }) });
+    expect(await failing.assignIssue(7, "me").catch((e) => e.retryable)).toBe(true);
+  });
 });

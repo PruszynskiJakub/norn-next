@@ -50,7 +50,7 @@ describe("norn help in tiers (B1)", () => {
     const s = sections(r.stdout);
     expect(s.map((x) => x.title)).toEqual(["Core", "Setup", "Background", "Agent protocol: the only commands an agent runs"]);
     expect(s.map((x) => x.rows)).toEqual([CORE, SETUP, BACKGROUND, PROTOCOL]);
-    expect(r.stdout).toMatch(/\n  norn story +\S.* \(create, list, view, answer, approve, reject, update-branch, start, chat, edit, checkout, handoff, close, reopen, reset\)\n/);
+    expect(r.stdout).toMatch(/\n  norn story +\S.* \(create, take, list, view, answer, approve, reject, update-branch, start, chat, edit, checkout, handoff, close, reopen, reset\)\n/);
     expect(r.stdout).toMatch(/\n  norn status +\S.+\n  norn story +\S.+\n  norn run +\S.+\n/);
     // the agent preamble and the skills list, as before
     expect(r.stdout).toContain("Agent doing a norn step? Run only `norn brief`");
@@ -73,13 +73,13 @@ describe("noun help (B2)", () => {
     expect(r.exit).toBe(0);
     const s = sections(r.stdout);
     expect(s.map((x) => [x.title, x.rows])).toEqual([
-      ["General", ["story create", "story list", "story view"]],
+      ["General", ["story create", "story take", "story list", "story view"]],
       ["Decision", ["story answer", "story approve", "story reject", "story update-branch"]],
       ["Work", ["story start", "story chat", "story edit"]],
       ["Team", ["story checkout", "story handoff", "story close", "story reopen", "story reset"]],
     ]);
     expect((r.value as NounHelp).groups).toEqual([
-      { title: "general", verbs: ["story create", "story list", "story view"] },
+      { title: "general", verbs: ["story create", "story take", "story list", "story view"] },
       { title: "decision", verbs: ["story answer", "story approve", "story reject", "story update-branch"] },
       { title: "work", verbs: ["story start", "story chat", "story edit"] },
       { title: "team", verbs: ["story checkout", "story handoff", "story close", "story reopen", "story reset"] },

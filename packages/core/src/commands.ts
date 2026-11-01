@@ -81,6 +81,7 @@ export const cmd = {
   storyView: (target?: string, o: { web?: boolean } = {}) => norn("story view", target, o.web && "--web"),
   stuck: (reason = "<reason>") => norn("stuck", `"${reason}"`),
   storyCreate: (o: { title?: string; workflow?: string } = {}) => norn("story create", `--title "${o.title ?? "…"}"`, o.workflow && `--workflow ${o.workflow}`),
+  storyTake: (story: string) => norn("story take", story),
   storyCheckout: (story: string, o: { force?: boolean } = {}) => norn("story checkout", story, o.force && "--force"),
   storyClose: (story?: string, o: { yes?: boolean } = {}) => norn("story close", story, o.yes && "--yes"),
   storyHandoff: (story?: string) => norn("story handoff", story),

@@ -1,6 +1,6 @@
 /** The cockpit model (SPEC-cockpit CP1–CP5): rows, previews and the actions each row offers, as data. */
 import { describe, expect, test } from "bun:test";
-import type { InboxGroup } from "@norn/core";
+import type { InboxGroup, RemoteIssue } from "@norn/core";
 import { type CockpitRow, cockpitModel, type InboxEntry, type ProjectView, type StoryView, withInput } from "../../src/index.ts";
 
 const AT = "2026-10-27T12:00:00.000Z";
@@ -140,8 +140,8 @@ describe("cockpitModel", () => {
   test("the preview is the story's orient report, with the item on an item row; plain JSON", () => {
     const m = cockpitModel(view(), { places: true, provider: "glab" });
     const r = row(m.rows, "approve:gh-4");
-    expect(r?.preview.report.story).toBe("gh-4");
-    expect(r?.preview.report.pr_command).toBe("glab mr view gh-4-x");
+    expect(r?.preview.report?.story).toBe("gh-4");
+    expect(r?.preview.report?.pr_command).toBe("glab mr view gh-4-x");
     expect(r?.preview.item).toEqual({ title: "approve title", command: "norn story approve gh-4" });
     expect(row(m.rows, "story:gh-6")?.preview.item).toBeNull();
     expect(JSON.parse(JSON.stringify(m))).toEqual(m);
@@ -173,5 +173,45 @@ describe("cockpitModel", () => {
       ["done", "gh-4"],
     ]);
     expect(m.header.pending).toBe(0);
+  });
+
+  test("CP2: the backlog lists open norn issues not assigned to me after not-started stories; take assigns (GR1)", () => {
+    const v = view();
+    v.stories = [...v.stories, story("gh-8", { status: "not_started", step: null })];
+    const issue = (number: number, assignees: string[], over: Partial<RemoteIssue> = {}): RemoteIssue => ({
+      provider: "gh",
+      number,
+      url: `https://github.com/o/r/issues/${number}`,
+      title: `Issue ${number}`,
+      body: "",
+      state: "open",
+      assignees,
+      labels: ["norn", "bug"],
+      updated_at: AT,
+      ...over,
+    });
+    const issues = [
+      issue(31, []),
+      issue(12, ["someone-else"]),
+      issue(20, ["me", "someone-else"]), // assigned to me: intake's, not the backlog's
+      issue(6, []), // taken in already: its story row stands for it
+      issue(40, [], { state: "closed" }),
+    ];
+    const m = cockpitModel(v, { places: true, provider: "gh", backlog: { me: "me", issues } });
+    const backlog = m.rows.filter((r) => r.tab === "backlog");
+    expect(backlog.map((r) => [r.kind, r.id])).toEqual([
+      ["story", "story:gh-8"],
+      ["issue", "issue:gh-12"],
+      ["issue", "issue:gh-31"],
+    ]);
+    const r = row(m.rows, "issue:gh-12") as CockpitRow;
+    expect(r).toMatchObject({ story: "gh-12", unit: "gh-12", step: null, title: "Issue 12", group: null });
+    expect(r.preview).toEqual({ report: null, item: null, issue: { number: 12, title: "Issue 12", url: "https://github.com/o/r/issues/12", labels: ["norn", "bug"], assignees: ["someone-else"] } });
+    expect(r.actions.map((a) => [a.id, a.key, a.effect])).toEqual([
+      ["take", "t", { kind: "verb", argv: ["story", "take", "gh-12"] }],
+      ["issue", "i", { kind: "link", url: "https://github.com/o/r/issues/12" }],
+    ]);
+    // without the remote's issues the backlog holds the stories only
+    expect(cockpitModel(v, { places: true, provider: "gh" }).rows.filter((x) => x.kind === "issue")).toEqual([]);
   });
 });

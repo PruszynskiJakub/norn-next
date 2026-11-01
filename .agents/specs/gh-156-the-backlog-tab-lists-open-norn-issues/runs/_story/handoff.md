@@ -16,6 +16,18 @@
 
 ## Goal
 
+The cockpit's Backlog tab lists open `norn` issues not assigned to me (number, title, labels); `t take` on one assigns it to me and the next sync takes it in (GR1, SPEC-cockpit CP2/CP4).
+
 ## Progress
 
+- RemotePort gains `listLabelledIssues({label})` (open, any assignee) and `assignIssue(n, login)`; gh (`issue list --label`, `issue edit --add-assignee`) and glab (`issue list --label`, `issue update --assignee +login`), FakeRemote, scripted CLIs, transcript recorder; two new contract tests run against all three.
+- `cockpitModel` takes `backlog: { me, issues }` in its options (stays pure, CP1) and adds `kind: "issue"` rows in `backlog` after its stories (open, not mine, not taken in), with `take` → `story take <key>` and `issue` link; `preview.report` is null for them, `preview.issue` holds the issue.
+- New verb `norn story take <story>`: refuses taken in / missing / closed / unlabelled, else assigns to `whoami`; writes nothing locally, takes nothing in (the next sync does).
+- `status --watch` reads the backlog from the remote on start, every 5 min, on `r` and after a take (a failed read keeps the last and says so); `--json` reads it once.
+- TUI: ISSUES section, issue row line (labels · assignees/unassigned), issue preview, filter matches labels, new empty text, help for `t`.
+- Docs: PRD GR1 + command table, SPEC-cockpit CP1–CP4, CP6. Help-listing assertions updated in help-tree/status integration tests.
+- Tests: unit tier and typecheck green; touched integration files (story-take, status-watch, status, help-tree, both contract runs) green.
+
 ## Resume
+
+Done; nothing left in this step.
