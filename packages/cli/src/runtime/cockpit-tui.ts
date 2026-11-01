@@ -79,7 +79,7 @@ const GROUP_WORD: Partial<Record<InboxGroup, string>> = { your_turn: "your turn"
 
 /** What the filter matches for a row, lower case. */
 function rowText(r: CockpitRow): string {
-  return [r.group ? GROUP_WORD[r.group] : "story", r.unit, r.step ?? "", r.preview.report.unit.workflow, r.title, r.preview.report.title].join(" ").toLowerCase();
+  return [r.group ? GROUP_WORD[r.group] : r.kind, r.unit, r.step ?? "", r.preview.report?.unit.workflow ?? "", r.title, r.preview.report?.title ?? "", ...(r.preview.issue?.labels ?? [])].join(" ").toLowerCase();
 }
 
 /** CP7: the shown tab's rows where every word of the filter appears. */
@@ -97,15 +97,17 @@ const TABS: ReadonlyArray<{ id: CockpitTab; key: string; label: string }> = [
 /** The list section a row is drawn under. */
 function sectionOf(r: CockpitRow): string {
   if (r.kind === "item") return "NEEDS YOU";
+  if (r.kind === "issue") return "ISSUES";
   return r.tab === "now" ? "IN FLIGHT" : r.tab === "backlog" ? "BACKLOG" : "DONE";
 }
 
 /** What `n` matches: an item's group (the next approve), a story's section and unit status. */
 const likeKey = (r: CockpitRow) => r.group ?? `${sectionOf(r)}:${standing(r)}`;
 
-/** A story's standing word: a closed story reads done (or dropped) whatever its unit says. */
+/** A story's standing word: a closed story reads done (or dropped) whatever its unit says; an issue not taken in reads issue. */
 function standing(r: CockpitRow): string {
   const rep = r.preview.report;
+  if (!rep) return "issue";
   if (rep.story_status === "done" || rep.story_status === "dropped") return rep.story_status;
   return rep.unit.status;
 }
@@ -130,7 +132,7 @@ const HELP = [
   "  a               answer the question (type it, enter sends, esc cancels)",
   "  y  x            approve the gate, or reject it with what to change",
   "  u               unstick a stuck unit",
-  "  t               take an unclaimed story",
+  "  t               take an unclaimed story, or assign a backlog issue to you (sync takes it in)",
   "  v               the unit's trace",
   "  o  i            open the PR, the issue",
   "  r  ?  q         refresh, these keys, quit",
@@ -317,12 +319,26 @@ function hang(text: string, width: number, first: string, rest: string, max = Nu
   return cut.map((l, i) => `${i === 0 ? first : rest}${l}`);
 }
 
+/** CP3: an issue row's preview — the issue, its labels and assignees, its link, and what take does (GR1). */
+function issuePreview(row: CockpitRow, width: number, paint: Paint): string[] {
+  const i = row.preview.issue;
+  const label = (t: string) => paint(t.padEnd(8), ["dim"]);
+  const out: string[] = [paint(fit(`${row.story} — ${row.title}`, width), ["bold"])];
+  out.push(`${paint("·", ["dim"])} ${fit("not taken in: t assigns it to you, and the next sync takes it in", width - 2)}`);
+  if (!i) return out;
+  out.push("", `${label("labels")}${fit(i.labels.join(", ") || "none", width - 8)}`);
+  out.push(`${label("assigned")}${fit(i.assignees.join(", ") || "nobody", width - 8)}`);
+  out.push("", paint("LINKS", ["bold", "dim"]), `${label("issue")}${paint(fit(i.url, width - 8), ["blue"])}`);
+  return out;
+}
+
 /**
  * CP3: the preview, styled, for a column `width` wide — the story, its slices one line each, the PR,
  * the selected item, what waits and runs, and the open notes by unit. Lines never exceed `width`.
  */
 export function previewLines(row: CockpitRow, now: number, width: number, paint: Paint = (t) => t): string[] {
   const r = row.preview.report;
+  if (!r) return issuePreview(row, width, paint);
   const head = (t: string) => paint(t, ["bold", "dim"]);
   const label = (t: string) => paint(t.padEnd(8), ["dim"]);
   const out: string[] = [paint(fit(`${r.story} — ${r.title}`, width), ["bold"])];
@@ -385,9 +401,11 @@ export function previewLines(row: CockpitRow, now: number, width: number, paint:
   return out;
 }
 
-/** A story row's workflow and standing (RD8), then its slices and PR when it has them. */
+/** A story row's workflow and standing (RD8), then its slices and PR when it has them; an issue row's labels and assignees. */
 function storySummary(r: CockpitRow): string {
   const rep = r.preview.report;
+  const issue = r.preview.issue;
+  if (!rep) return issue ? `${issue.labels.join(", ")} · ${issue.assignees.join(", ") || "unassigned"}` : "";
   const done = rep.slices.filter((s) => s.status === "done").length;
   const status = standing(r);
   const where = status === "done" || status === "dropped" ? status : status === "not_started" ? "not started" : `${status} ${rep.unit.step ?? ""}`.trim();
@@ -423,7 +441,7 @@ export function clampScroll(model: CockpitModel, s: TuiState, o: Look): TuiState
   return s.scroll > max ? { ...s, scroll: max } : s;
 }
 
-const EMPTY: Record<CockpitTab, string> = { now: "nothing needs you, nothing in flight", backlog: "no story waits to start", done: "no story closed yet" };
+const EMPTY: Record<CockpitTab, string> = { now: "nothing needs you, nothing in flight", backlog: "no story waits to start, no open issue waits to be taken", done: "no story closed yet" };
 
 /** The tab strip: each tab's key, name and count, the shown one inverse; Now counts what needs you and what is in flight. */
 function tabStrip(model: CockpitModel, tab: CockpitTab, width: number, paint: Paint): string {
@@ -456,14 +474,14 @@ export function renderCockpit(model: CockpitModel, s: TuiState, o: Look): string
 
   // body: list | preview (preview below when narrow)
   const items = rows.filter((r) => r.kind === "item");
-  const stories = rows.filter((r) => r.kind === "story");
+  const stories = rows.filter((r) => r.kind !== "item");
   const w = (f: (r: CockpitRow) => string, max: number) => Math.min(max, Math.max(0, ...items.map((r) => f(r).length)));
   const unitW = Math.max(w((r) => r.unit, 10), Math.min(10, Math.max(0, ...rows.map((r) => r.unit.length))));
   const stepW = w((r) => r.step ?? "", 12);
   const summaryW = Math.min(36, Math.max(0, ...stories.map((r) => storySummary(r).length)));
   const titleW = Math.min(Math.max(0, ...stories.map((r) => r.title.length)), Math.max(16, listW - 2 - unitW - 2 - summaryW - 2));
   const line = (r: CockpitRow, room: number): string => {
-    if (r.kind === "story") {
+    if (r.kind !== "item") {
       const head = `${fit(r.unit, unitW).padEnd(unitW)}  ${fit(r.title, titleW).padEnd(titleW)}  `;
       return `${head}${fit(storySummary(r), room - head.length)}`;
     }
@@ -471,7 +489,7 @@ export function renderCockpit(model: CockpitModel, s: TuiState, o: Look): string
     const g = r.group as InboxGroup;
     const head = `${GROUP_MARK[g] ?? "·"} ${fit(r.unit, unitW).padEnd(unitW)}  ${fit(r.step ?? "", stepW).padEnd(stepW)}  `;
     const age = r.age ?? "";
-    const t = fit(r.preview.report.title, Math.max(0, room - head.length - age.length - 2));
+    const t = fit(r.preview.report?.title ?? r.title, Math.max(0, room - head.length - age.length - 2));
     return `${head}${t}${" ".repeat(Math.max(2, room - head.length - t.length - age.length))}${age}`;
   };
   const counts = new Map<string, number>();

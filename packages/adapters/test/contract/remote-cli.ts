@@ -87,7 +87,10 @@ export function scriptedGh(login = "octocat"): ScriptedRemote {
       const unknown = remove.find((l) => !issues.some((x) => x.labels.includes(l)));
       if (unknown) return { code: 1, stdout: "", stderr: `failed to update https://github.com/acme/app/issues/${i.number}: '${unknown}' not found` };
       const add = flags(argv, "--add-label");
-      issues = issues.map((x) => (x === i ? { ...x, labels: [...x.labels.filter((l) => !remove.includes(l)), ...add.filter((l) => !x.labels.includes(l))] } : x));
+      const assign = flags(argv, "--add-assignee").map((a) => (a === "@me" ? login : a));
+      issues = issues.map((x) =>
+        x === i ? { ...x, labels: [...x.labels.filter((l) => !remove.includes(l)), ...add.filter((l) => !x.labels.includes(l))], assignees: [...x.assignees, ...assign.filter((a) => !x.assignees.includes(a))] } : x,
+      );
       return ok(`https://github.com/acme/app/issues/${i.number}\n`);
     }
     if (a === "pr" && b === "list") {
@@ -152,7 +155,11 @@ export function scriptedGlab(login = "tanuki"): ScriptedRemote {
       // GitLab ignores a label to remove that is not on the issue
       const remove = flags(argv, "--unlabel");
       const add = flags(argv, "--label");
-      issues = issues.map((x) => (x === i ? { ...x, labels: [...x.labels.filter((l) => !remove.includes(l)), ...add.filter((l) => !x.labels.includes(l))] } : x));
+      // `--assignee +a` adds, a bare `--assignee a` replaces (as glab does)
+      const assignee = flags(argv, "--assignee");
+      const assignees = (x: SeedIssue) =>
+        !assignee.length ? x.assignees : assignee.every((a) => a.startsWith("+")) ? [...x.assignees, ...assignee.map((a) => a.slice(1)).filter((a) => !x.assignees.includes(a))] : assignee;
+      issues = issues.map((x) => (x === i ? { ...x, labels: [...x.labels.filter((l) => !remove.includes(l)), ...add.filter((l) => !x.labels.includes(l))], assignees: assignees(x) } : x));
       return ok(`- Updating issue #${i.number}\n#${i.number} ${i.title} (now)\n https://gitlab.com/acme/app/-/issues/${i.number}\n`);
     }
     if (a === "mr" && b === "list") {

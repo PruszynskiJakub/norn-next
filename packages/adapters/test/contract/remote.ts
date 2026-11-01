@@ -18,7 +18,9 @@ export type RemoteContractTest =
   | "newIssueUrl: the remote's new-issue page with the labels filled in (B23)"
   | "replaceIssueLabel swaps one label for another (B19)"
   | "replaceIssueLabel adds the new label when the old one is not on the issue (B19)"
-  | "replaceIssueLabel rejects with a PortError when the provider fails, changing nothing (B20)";
+  | "replaceIssueLabel rejects with a PortError when the provider fails, changing nothing (B20)"
+  | "listLabelledIssues: open issues with the label, whoever they are assigned to (GR1, CP2)"
+  | "assignIssue adds the assignee, and intake then lists the issue (GR1)";
 
 export interface SeedIssue {
   number: number;
@@ -142,6 +144,27 @@ export function remoteContract(name: string, make: () => RemoteSubject, opts: Co
       expect(page).toContain("norn:wf:spec");
       expect(page).toMatch(/\bnorn\b(?!:)/);
       expect((await port.listAssignedIssues({ label: "norn" })).map((i) => i.number)).toEqual([1]); // nothing created
+    });
+
+    t("listLabelledIssues: open issues with the label, whoever they are assigned to (GR1, CP2)", async () => {
+      const { port, seed, me } = await seeded();
+      seed([...world(me), { number: 6, title: "Nobody's yet", body: "", state: "open", assignees: [], labels: ["norn"] }]);
+      const issues = await port.listLabelledIssues({ label: "norn" });
+      expect(issues.map((i) => i.number).sort((a, b) => a - b)).toEqual([1, 4, 6]);
+      for (const i of issues) expectIssueShape(i, port.provider);
+      expect(issues.find((i) => i.number === 4)).toMatchObject({ title: "Someone else's", assignees: ["someone-else"], labels: ["norn"] });
+      expect(issues.find((i) => i.number === 6)?.assignees).toEqual([]);
+      expect(await port.listLabelledIssues({ label: "no-such-label" })).toEqual([]);
+    });
+
+    t("assignIssue adds the assignee, and intake then lists the issue (GR1)", async () => {
+      const { port, seed, me } = await seeded();
+      seed([...world(me), { number: 6, title: "Nobody's yet", body: "", state: "open", assignees: [], labels: ["norn"] }]);
+      await port.assignIssue(6, me);
+      await port.assignIssue(4, me);
+      expect((await port.getIssue(6))!.assignees).toEqual([me]);
+      expect([...(await port.getIssue(4))!.assignees].sort()).toEqual([me, "someone-else"].sort());
+      expect((await port.listAssignedIssues({ label: "norn" })).map((i) => i.number).sort((a, b) => a - b)).toEqual([1, 4, 6]);
     });
 
     const triaged = (me: string): SeedIssue => ({ number: 5, title: "Triaged", body: "", state: "open", assignees: [me], labels: ["norn", "norn:wf:triage"] });

@@ -6,6 +6,8 @@
  * stdout at exit (P8).
  *
  * - `--json`: print the model once (CP5), for a front end outside TypeScript (`status --json` is the inbox, B10).
+ * - The backlog tab also lists the open issues with the intake label not assigned to the person (CP2),
+ *   read from the remote on start, every 5 minutes, on `r` and after a take — not on every frame.
  * - `--pane` (B12): split a Herdr pane below the caller and run the cockpit there.
  *
  * CP13: outside a norn repository — no repository, or one norn was never set up in (a Herdr popup over
@@ -14,7 +16,7 @@
 import { existsSync } from "node:fs";
 import { parseDuration } from "@norn/schema";
 import { isNornRepo, readCockpitFile, writeCockpitFile } from "@norn/store";
-import { type CockpitModel, cockpitModel, inboxItemsInOrder, type ProjectView, withInput } from "@norn/view";
+import { type CockpitModel, type CockpitOptions, cockpitModel, inboxItemsInOrder, type ProjectView, withInput } from "@norn/view";
 import { opt, type ParsedArgs } from "../command.ts";
 import { Context } from "../context.ts";
 import { refuse, usageError } from "../output.ts";
@@ -89,6 +91,19 @@ async function located(ctx: Context): Promise<Context> {
 
 const localClock = (ms: number) => new Date(ms).toTimeString().slice(0, 5);
 
+/** The backlog's issues are read from the remote at most this often (and on `r` and after a take), not every frame. */
+const BACKLOG_EVERY_MS = 5 * 60_000;
+
+type Backlog = NonNullable<CockpitOptions["backlog"]>;
+
+/** CP2: the open issues with the intake label and the person's login, from the remote; null without one. */
+async function readBacklog(ctx: Context): Promise<Backlog | null> {
+  const remote = (await ctx.ports()).remote;
+  if (!remote) return null;
+  const [me, issues] = await Promise.all([remote.whoami(), remote.listLabelledIssues({ label: ctx.config.remote.label })]);
+  return { me, issues };
+}
+
 async function interactive(ctx: Context, interval: number) {
   const cockpit = cockpitHerdr(ctx);
   const options = { places: !!cockpit, provider: ctx.config.remote.provider };
@@ -96,6 +111,9 @@ async function interactive(ctx: Context, interval: number) {
   let state: TuiState = initialState();
   let view: ProjectView | null = null;
   let model: CockpitModel | null = null;
+  let backlog: Backlog | null = null;
+  /** when the backlog was last read; null = read it with the next view */
+  let backlogAt: number | null = null;
   let last: { action: string; unit: string; ok: boolean } | null = null;
   let pending: Promise<IteratorResult<string>> | null = null;
   let frames = 0;
@@ -114,6 +132,7 @@ async function interactive(ctx: Context, interval: number) {
     if (e.kind === "quit") return true;
     if (e.kind === "refresh") {
       view = null;
+      backlogAt = null;
       return false;
     }
     const { row, action } = e;
@@ -127,6 +146,7 @@ async function interactive(ctx: Context, interval: number) {
       if (fx.show && ok) state = { ...state, shown: r.stdout, scroll: 0 };
       text = fx.show && ok ? `norn ${argv.join(" ")} — esc to close` : verbMessage(argv, r.exit, r.value);
       if (!fx.show) view = null; // a verb changed what needs you
+      if (action.id === "take") backlogAt = null; // a taken issue leaves the backlog
     } else if (fx.kind === "link") {
       const r = await openLink(ctx, fx.url);
       ok = r.code === 0;
@@ -151,7 +171,15 @@ async function interactive(ctx: Context, interval: number) {
       if (!view) {
         try {
           view = await projectView(ctx);
-          model = cockpitModel(view, options);
+          if (backlogAt === null || ctx.clock.now() - backlogAt >= BACKLOG_EVERY_MS) {
+            backlogAt = ctx.clock.now();
+            // the remote failing keeps the last backlog: the cockpit still shows what is local
+            backlog = await readBacklog(ctx).catch((err: Error) => {
+              state = { ...state, message: { text: `cannot read the backlog from the remote: ${err.message}`, tone: "error" } };
+              return backlog;
+            });
+          }
+          model = cockpitModel(view, { ...options, ...(backlog ? { backlog } : {}) });
           if (cockpit) await labelPanes(cockpit, inboxItemsInOrder(view), 3 * interval);
         } catch (err) {
           state = { ...state, message: { text: `cannot read the inbox: ${(err as Error).message}`, tone: "error" } };
@@ -207,6 +235,9 @@ export async function statusWatch(raw: Context, args: ParsedArgs) {
     const opened = await herdr.openBelow(ctx.cwd, cmd.statusWatch(opt.str(args, "interval") ? { interval: intervalRaw } : {}), "norn");
     return { opened: true, runner: "herdr", pane_id: opened.pane_id };
   }
-  if (args.json) return cockpitModel(await projectView(ctx), { places: !!cockpitHerdr(ctx), provider: ctx.config.remote.provider });
+  if (args.json) {
+    const backlog = await readBacklog(ctx).catch(() => null);
+    return cockpitModel(await projectView(ctx), { places: !!cockpitHerdr(ctx), provider: ctx.config.remote.provider, ...(backlog ? { backlog } : {}) });
+  }
   return interactive(ctx, interval);
 }

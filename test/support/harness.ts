@@ -49,6 +49,14 @@ export class FakeRemote implements RemotePort {
     this.calls.push(`list ${label}`);
     return this.issues.filter((i) => i.state === "open" && i.labels.includes(label) && i.assignees.includes("tester"));
   }
+  async listLabelledIssues({ label }: { label: string }) {
+    this.calls.push(`list* ${label}`);
+    return this.issues.filter((i) => i.state === "open" && i.labels.includes(label));
+  }
+  async assignIssue(n: number, assignee: string) {
+    this.calls.push(`assign ${n} ${assignee}`);
+    this.issues = this.issues.map((i) => (i.number === n && !i.assignees.includes(assignee) ? { ...i, assignees: [...i.assignees, assignee] } : i));
+  }
   async getIssue(n: number) {
     this.calls.push(`issue ${n}`);
     return this.issues.find((i) => i.number === n) ?? null;

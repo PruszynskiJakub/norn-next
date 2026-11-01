@@ -179,6 +179,30 @@ describe("norn status --watch (B11, CP6–CP8)", () => {
     expect(c.state(runs(6))?.park).toBeNull();
   });
 
+  test("the backlog lists open norn issues not assigned to you; t assigns one and it leaves the backlog (CP2, GR1)", async () => {
+    const before = c.remote.issues;
+    c.remote.issues = [...before, { ...issue(7, "Sort the list"), assignees: [] }, { ...issue(8, "Someone else's"), assignees: ["someone-else"] }, { ...issue(9, "Not ours", ["other"]), assignees: [] }];
+    try {
+      const m = await model();
+      expect(m.rows.filter((r) => r.kind === "issue").map((r) => [r.tab, r.unit, r.actions.map((a) => a.id)])).toEqual([
+        ["backlog", "gh-7", ["take", "issue"]],
+        ["backlog", "gh-8", ["take", "issue"]],
+      ]);
+      const frames: string[] = [];
+      c.remote.calls = [];
+      const r = await runChecked(["status", "--watch", "--interval", "1h"], { ...c.deps, herdr: null, env: { ...c.deps.env, COLUMNS: "160", LINES: "40" }, input: keys("2", "t", "q"), log: (l) => frames.push(l) });
+      expect(r.value).toEqual({ frames: 3, last: { action: "take", unit: "gh-7", ok: true } });
+      expect(frames[1]).toContain("ISSUES 2");
+      expect(frames[2]).toContain("ok: norn story take gh-7");
+      expect(frames[2]).toContain("ISSUES 1");
+      expect(c.remote.issues.find((i) => i.number === 7)?.assignees).toEqual(["tester"]);
+      // read once on start and once after the take, not on every frame
+      expect(c.remote.calls.filter((x) => x.startsWith("list* "))).toHaveLength(2);
+    } finally {
+      c.remote.issues = before;
+    }
+  });
+
   test("SIGINT/SIGTERM end it (CP6): the abort signal stops the loop while it waits", async () => {
     const abort = new AbortController();
     async function* waiting() {

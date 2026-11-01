@@ -60,6 +60,8 @@ const RUNNER_CALLS: Record<string, (...a: never[]) => string> = {
 };
 const REMOTE_CALLS: Record<string, (...a: never[]) => string> = {
   listAssignedIssues: (o: { label: string }) => `listAssignedIssues ${o.label}`,
+  listLabelledIssues: (o: { label: string }) => `listLabelledIssues ${o.label}`,
+  assignIssue: (n: number, assignee: string) => `assignIssue ${n} ${assignee}`,
   getIssue: (n: number) => `getIssue ${n}`,
   findPullRequest: (branch: string) => `findPullRequest ${branch}`,
   openDraftPullRequest: (o: { head: string; base: string; title: string }) => `openDraftPullRequest ${o.head} → ${o.base} ${JSON.stringify(o.title)}`,

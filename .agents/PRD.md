@@ -357,7 +357,7 @@ The chains a person runs: a feature `triage → refinement → story`; a small c
 
 ## 12. Remote and git
 
-- GR1 `norn sync` (also run by `tick`, throttled ~5 min) uses `gh`/`glab` to list issues assigned to the user with the configured label (default `norn`).
+- GR1 `norn sync` (also run by `tick`, throttled ~5 min) uses `gh`/`glab` to list issues assigned to the user with the configured label (default `norn`). Assigning is how the person chooses when an issue is taken in: an open labelled issue not assigned to them is their backlog, which the cockpit lists (SPEC-cockpit CP2). `norn story take <story>` assigns such an issue to them (the cockpit's take on it), so the next sync takes it in; it refuses a closed issue, one without the label, and one taken in already.
 - GR2 Intake: create the story branch and story worktree, write `.agents/specs/<id>-<slug>/spec.md` there mirroring provider, number, URL, title, assignee, body and `workflow` (W9); start the story workflow. A spec folder an older norn wrote holds `story.md` instead: norn reads and writes that file while the folder has no `spec.md`, and never renames it.
 - GR3 Story branch `<id>-<slug>`; slice branches `<id>/<nn>-<slug>` cut from the story branch, each in its own worktree.
 - GR4 Only the CLI rebases, integrates and pushes. Pushes happen at every step boundary (S8), so every step boundary is a handoff point.
@@ -422,7 +422,7 @@ A noun tree modelled on gh: nouns are things a person can see, verbs are shared 
 | Tier | Command | Verbs |
 |---|---|---|
 | Core | `norn status [--details] [--notes] [--history]` | what needs you, across every story (O1); `norn status --watch [--interval] [--pane]` is the cockpit, `--pane` in a Herdr split below |
-| Core | `norn story <verb> [<story\|slice>]` | general: `norn story create`, `norn story list`, `norn story view [--web]`; decision: `norn story answer`, `norn story approve`, `norn story reject --reason`, `norn story update-branch` (BS9); work: `norn story start [--print]` (MO5), `norn story chat`, `norn story edit [--auto\|--manual] [--workflow <name> [--at <step>] [--force]] [--at <step>]` (MO1, S7, RD2–RD4); team: `norn story checkout [--force]` (T5), `norn story handoff` (T6), `norn story close` (GR7), `norn story reopen`, `norn story reset [--yes] [--force]` (GR7a) |
+| Core | `norn story <verb> [<story\|slice>]` | general: `norn story create`, `norn story take` (GR1), `norn story list`, `norn story view [--web]`; decision: `norn story answer`, `norn story approve`, `norn story reject --reason`, `norn story update-branch` (BS9); work: `norn story start [--print]` (MO5), `norn story chat`, `norn story edit [--auto\|--manual] [--workflow <name> [--at <step>] [--force]] [--at <step>]` (MO1, S7, RD2–RD4); team: `norn story checkout [--force]` (T5), `norn story handoff` (T6), `norn story close` (GR7), `norn story reopen`, `norn story reset [--yes] [--force]` (GR7a) |
 | Core | `norn run <verb> [<run\|unit>]` | `norn run list` (O4), `norn run view [--why \| --receipt <id>]` (O5), `norn run attach [--next]`, `norn run rerun [--step <step>] [--reset <counter>]`, `norn run cancel` |
 | Setup | `init`, `migrate` (LY3), `doctor` (M4), `config list\|get\|set\|unset` (K2a), `uninstall` | |
 | Background | `watch`, `sync`, `tidy` | |

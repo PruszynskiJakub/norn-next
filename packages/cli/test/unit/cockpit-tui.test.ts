@@ -4,7 +4,7 @@
  * list takes about 60% of the width.
  */
 import { describe, expect, test } from "bun:test";
-import type { InboxGroup } from "@norn/core";
+import type { InboxGroup, RemoteIssue } from "@norn/core";
 import { type CockpitModel, cockpitModel, type InboxEntry, type ProjectView, type StoryView } from "@norn/view";
 import { handleKey, initialState, parseKeys, renderCockpit, type TuiState } from "../../src/runtime/cockpit-tui.ts";
 
@@ -63,7 +63,19 @@ const entry = (group: InboxGroup, n: number, over: Partial<InboxEntry> = {}): In
   ...over,
 });
 
-function model(): CockpitModel {
+const issue = (number: number, title: string, assignees: string[]): RemoteIssue => ({
+  provider: "gh",
+  number,
+  url: `https://github.com/o/r/issues/${number}`,
+  title,
+  body: "",
+  state: "open",
+  assignees,
+  labels: ["norn", "bug"],
+  updated_at: AT,
+});
+
+function model(backlog?: RemoteIssue[]): CockpitModel {
   const none = { your_turn: [], answer: [], approve: [], unblock: [], check: [], unclaimed: [], running: [], notes: [], recently_done: [] };
   const view: ProjectView = {
     at: AT,
@@ -86,7 +98,7 @@ function model(): CockpitModel {
     recently_done: [],
     errors: [],
   };
-  return cockpitModel(view, { places: false, provider: "gh" });
+  return cockpitModel(view, { places: false, provider: "gh", ...(backlog ? { backlog: { me: "me", issues: backlog } } : {}) });
 }
 
 const look = { width: 150, height: 30, color: false, now: Date.parse(AT), clock: "12:00", version: "0.15.0" };
@@ -177,5 +189,35 @@ describe("the cockpit's tabs (CP6, CP7)", () => {
   test("the list takes about 60% of the width", () => {
     const body = frame(initialState()).split("\n")[4] as string;
     expect(body.indexOf("│")).toBe(Math.floor(150 * 0.6) + 1);
+  });
+
+  test("Backlog lists the open norn issues not assigned to me under ISSUES; t takes one (CP2, GR1)", () => {
+    const m = model([issue(31, "Export to PDF", []), issue(12, "Sort the list", ["someone-else"])]);
+    const s = press(initialState(), "2");
+    const f = frame(s, m);
+    expect(f.split("\n")[1]).toContain("2 Backlog 3");
+    expect(f).toContain("BACKLOG 1");
+    expect(f).toContain("ISSUES 2");
+    expect(f.indexOf("gh-6")).toBeLessThan(f.indexOf("gh-12"));
+    expect(f.indexOf("gh-12")).toBeLessThan(f.indexOf("gh-31"));
+    expect(f).toMatch(/ {2}gh-12 +Sort the list +norn, bug · someone-else/);
+    expect(f).toMatch(/ {2}gh-31 +Export to PDF +norn, bug · unassigned/);
+    const onIssue = handleKey(s, { kind: "char", char: "]" }, m, look).state;
+    expect(onIssue.selected).toBe("issue:gh-12");
+    const shown = frame(onIssue, m);
+    expect(shown).toContain("│ gh-12 — Sort the list");
+    expect(shown).toContain("not taken in: t assigns it to you");
+    expect(shown).toContain("https://github.com/o/r/issues/12");
+    expect(shown).toMatch(/t take · i issue/);
+    const take = handleKey(onIssue, { kind: "char", char: "t" }, m, look).effect;
+    expect(take?.kind === "run" && take.action.effect).toEqual({ kind: "verb", argv: ["story", "take", "gh-12"] });
+    // the filter matches an issue's labels too
+    expect(frame(press(s, "/", "bug", "\r"), m)).not.toContain("gh-6 ");
+  });
+
+  test("an empty Backlog says neither a story nor an issue waits", () => {
+    const m = model([]);
+    m.rows = m.rows.filter((r) => r.tab !== "backlog");
+    expect(frame(press(initialState(), "2"), m)).toContain("no story waits to start, no open issue waits to be taken");
   });
 });
