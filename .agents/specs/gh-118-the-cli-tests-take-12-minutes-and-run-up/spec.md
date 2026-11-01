@@ -10,9 +10,16 @@ labels:
   - norn
   - norn:wf:story
 workflow: story
-status: active
+status: done
 intake_at: 2026-10-30T15:03:08.086Z
 body_hash: bce7c89165ae0fb6c873526503dec04972cfcd6437a50fe8cbd57a7f705db680
+merge:
+  pr: 140
+  url: https://github.com/PruszynskiJakub/norn-next/pull/140
+  head_sha: 1469a2adead769b6490a945ea6efa092752db5e3
+  merge_commit_sha: 1cad40d86e05cc19354ddd41e71af9b3496eb9b7
+  merged_by: PruszynskiJakub
+  merged_at: 2026-11-01T00:14:28.000Z
 ---
 
 # The cli tests take ~12 minutes and run up to three times per story
