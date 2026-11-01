@@ -27,7 +27,7 @@ steps:
     skill: norn-implement
     inputs: [spec, handoff, last_check, last_findings]
     instructions: >-
-      The spec is story.md (the issue) and the triage findings in the issue's latest `## Triage`
+      The spec is spec.md (the issue) and the triage findings in the issue's latest `## Triage`
       comment (`gh issue view <N> --comments`). Keep to what they ask. A change in
       behaviour gets a test first; a change to docs or a pure refactor needs none beyond the suite
       staying green. A bug comes from `reproduce` with a red loop in the handoff's Progress and the
@@ -59,7 +59,7 @@ steps:
     skill: norn-review
     inputs: [spec, diff]
     outcomes:
-      approve:           { to: describe, means: "the change does what story.md asks and nothing else, no blocking findings" }
+      approve:           { to: describe, means: "the change does what spec.md asks and nothing else, no blocking findings" }
       changes_requested: { to: implement, counter: review_loop, means: "blocking findings in the receipt" }
   describe:
     type: agent
