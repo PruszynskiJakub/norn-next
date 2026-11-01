@@ -1,7 +1,7 @@
 ---
 id: gh-71/03
 title: A label-swap method on the remote port
-depends_on: []
+depends_on: [gh-71/02]
 status: planned
 criteria:
   - { id: AC1, verifier: test }

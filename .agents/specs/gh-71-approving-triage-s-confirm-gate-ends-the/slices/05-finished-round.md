@@ -1,7 +1,7 @@
 ---
 id: gh-71/05
 title: $done ends the round, and the inbox says so
-depends_on: []
+depends_on: [gh-71/04]
 status: planned
 criteria:
   - { id: AC1, verifier: test }
@@ -37,4 +37,4 @@ Behaviour: B2, B21, B24, B25, B26, B27, B35 (decide side). Seams: S1, S2. Decisi
 - `bun run typecheck`
 
 ## Notes
-No dependency on 04: a finished round is read from the state as it is today (`$done`), and `round` absent means 1. Until 06 lands, the command in the item is refused on a `$done` story; that is fine on the branch, as nothing ships before the story's PR. The GR7-rewrites-`$done`-to-`stuck` bug is fixed here (D5).
+Ordered after 04 only so the slices run one at a time; it does not need 04: a finished round is read from the state as it is today (`$done`), and `round` absent means 1. Until 06 lands, the command in the item is refused on a `$done` story; that is fine on the branch, as nothing ships before the story's PR. The GR7-rewrites-`$done`-to-`stuck` bug is fixed here (D5).

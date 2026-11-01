@@ -1,7 +1,7 @@
 ---
 id: gh-71/10
 title: Status, story view, handoff header and run list show rounds
-depends_on: [gh-71/08]
+depends_on: [gh-71/08, gh-71/09]
 status: planned
 criteria:
   - { id: AC1, verifier: test }
@@ -32,4 +32,4 @@ Behaviour: B28, B29, B32 (shown), B36 (shown as round 1). Seams: S1. Decision D1
 - `bun run typecheck`
 
 ## Notes
-Built on story facts `rounds: [{n, workflow, ended}]` (D2, added in 04). The brief snapshot and observe snapshots change with the header; regenerate and review. Independent of 07 and 09.
+Built on story facts `rounds: [{n, workflow, ended}]` (D2, added in 04). The brief snapshot and observe snapshots change with the header; regenerate and review. Ordered after 09 only so the slices run one at a time; it does not need 07 or 09.
