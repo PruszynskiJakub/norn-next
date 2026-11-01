@@ -1,8 +1,8 @@
 ---
 id: gh-71/07
 title: The issue's norn:wf label follows the round
-depends_on: [gh-71/03, gh-71/06]
-status: planned
+depends_on: [ gh-71/03, gh-71/06 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
