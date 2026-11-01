@@ -29,7 +29,7 @@ import {
   type UnpushedRuns,
   type WorktreeFacts,
 } from "@norn/core";
-import { DEFAULT_CONFIG, type HookFact, type Mode, type ResolvedConfig, sliceBranch, storyBranch } from "@norn/schema";
+import { DEFAULT_CONFIG, type HookFact, type Mode, type ResolvedConfig, sliceBranch, storyBranch, type Workflow } from "@norn/schema";
 import {
   cachedDefaultBranch,
   classifyClaim,
@@ -106,6 +106,14 @@ interface Ctx {
   heartbeatDown: boolean;
 }
 
+/** Steps after `step` in the workflow's step order; null when there is no such step (not started, `$done`, unknown). */
+function stepsLeft(wf: Workflow | null, step: string | null): number | null {
+  if (!wf || !step) return null;
+  const names = Object.keys(wf.steps);
+  const at = names.indexOf(step);
+  return at < 0 ? null : names.length - 1 - at;
+}
+
 function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: UnitFacts, ctx: Ctx, title: string, workflow: string): UnitView {
   const st = u.state;
   const step = st && u.workflow ? stepOf(u.workflow.workflow, st.step) : null;
@@ -143,6 +151,7 @@ function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: Uni
     updated_at: st?.updated_at ?? null,
     errors: u.errors,
     act_failure: failure ? { effect: failure.effect, reason: failure.reason, at: failure.at, tick_id: failure.tick_id } : null,
+    steps_left: stepsLeft(u.workflow?.workflow ?? null, st?.step ?? null),
   };
 }
 

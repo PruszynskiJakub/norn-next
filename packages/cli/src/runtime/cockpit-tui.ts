@@ -1,12 +1,12 @@
 /**
- * The terminal renderer of the cockpit model (SPEC-cockpit CP6–CP8): raw keys, a filter, a one-line
- * prompt for actions that take text, and a full-screen frame — rows on the left, the selected row's
- * preview on the right. Pure: keys and a model in, the next state, an effect and a frame out. Which
+ * The terminal renderer of the cockpit model (SPEC-cockpit CP6–CP8): raw keys, three tabs (now, backlog,
+ * done) each with its own selection and filter, a one-line prompt for actions that take text, and a
+ * full-screen frame — rows on the left, the selected row's preview on the right. Pure: keys and a model in, the next state, an effect and a frame out. Which
  * actions a row offers is the model's (CP4); keys only look them up.
  */
 import { basename } from "node:path";
 import { cmd, formatAge, type InboxGroup } from "@norn/core";
-import type { CockpitAction, CockpitModel, CockpitRow } from "@norn/view";
+import type { CockpitAction, CockpitModel, CockpitRow, CockpitTab } from "@norn/view";
 import { GROUP_MARK } from "./cockpit.ts";
 
 export type Key =
@@ -18,7 +18,11 @@ export type Key =
 export type Tone = "ok" | "error" | "info";
 
 export interface TuiState {
-  /** id of the selected row; kept across refreshes (CP2) */
+  /** CP7: the tab shown (`1` `2` `3`) */
+  tab: CockpitTab;
+  /** the selection and filter of the tabs not shown, restored when the person goes back to one */
+  saved: Partial<Record<CockpitTab, { selected: string | null; filter: string }>>;
+  /** id of the selected row in the shown tab; kept across refreshes (CP2) */
   selected: string | null;
   filter: string;
   /** typing into the filter (`/`) */
@@ -34,7 +38,7 @@ export interface TuiState {
 
 export type TuiEffect = { kind: "run"; row: CockpitRow; action: CockpitAction; input?: string } | { kind: "refresh" } | { kind: "quit" };
 
-export const initialState = (): TuiState => ({ selected: null, filter: "", filtering: false, prompt: null, message: null, shown: null, scroll: 0 });
+export const initialState = (): TuiState => ({ tab: "now", saved: {}, selected: null, filter: "", filtering: false, prompt: null, message: null, shown: null, scroll: 0 });
 
 /** Raw terminal input → keys. Unknown escape sequences are dropped. */
 export function parseKeys(chunk: string): Key[] {
@@ -78,15 +82,37 @@ function rowText(r: CockpitRow): string {
   return [r.group ? GROUP_WORD[r.group] : "story", r.unit, r.step ?? "", r.title, r.preview.report.title].join(" ").toLowerCase();
 }
 
-/** CP7: every word of the filter appears in the row. */
-function visibleRows(model: CockpitModel, filter: string): CockpitRow[] {
-  const words = filter.toLowerCase().split(/\s+/).filter(Boolean);
-  return model.rows.filter((r) => words.every((w) => rowText(r).includes(w)));
+/** CP7: the shown tab's rows where every word of the filter appears. */
+function visibleRows(model: CockpitModel, s: Pick<TuiState, "tab" | "filter">): CockpitRow[] {
+  const words = s.filter.toLowerCase().split(/\s+/).filter(Boolean);
+  return model.rows.filter((r) => r.tab === s.tab && words.every((w) => rowText(r).includes(w)));
+}
+
+const TABS: ReadonlyArray<{ id: CockpitTab; key: string; label: string }> = [
+  { id: "now", key: "1", label: "Now" },
+  { id: "backlog", key: "2", label: "Backlog" },
+  { id: "done", key: "3", label: "Done" },
+];
+
+/** The list section a row is drawn under. */
+function sectionOf(r: CockpitRow): string {
+  if (r.kind === "item") return "NEEDS YOU";
+  return r.tab === "now" ? "IN FLIGHT" : r.tab === "backlog" ? "BACKLOG" : "DONE";
+}
+
+/** What `n` matches: an item's group (the next approve), a story's section and unit status. */
+const likeKey = (r: CockpitRow) => r.group ?? `${sectionOf(r)}:${standing(r)}`;
+
+/** A story's standing word: a closed story reads done (or dropped) whatever its unit says. */
+function standing(r: CockpitRow): string {
+  const rep = r.preview.report;
+  if (rep.story_status === "done" || rep.story_status === "dropped") return rep.story_status;
+  return rep.unit.status;
 }
 
 /** The selected row: the one with the state's id among the visible rows, else the first. */
 function selectedRow(model: CockpitModel, s: TuiState): CockpitRow | null {
-  const rows = visibleRows(model, s.filter);
+  const rows = visibleRows(model, s);
   return rows.find((r) => r.id === s.selected) ?? rows[0] ?? null;
 }
 
@@ -94,6 +120,9 @@ const HELP = [
   "Keys",
   "  ↑ ↓  j k        move (PgUp PgDn a page)",
   "  ⌃d ⌃u, wheel    scroll the preview (the wheel over the list moves the selection)",
+  "  1 2 3           tabs: now (needs you, in flight), backlog, done",
+  "  ] [             the next, the previous section",
+  "  n               the next row of the same kind (the next approve)",
   "  /               filter: type words, enter keeps it, esc clears it",
   "  enter           orient: the story's workspace with an agent (or its report)",
   "  g               go to the agent's pane",
@@ -106,6 +135,7 @@ const HELP = [
   "  o  i            open the PR, the issue",
   "  r  ?  q         refresh, these keys, quit",
   "",
+  "Each tab keeps its own selection and filter.",
   "Only the keys of the selected row's actions work; the footer lists them.",
 ].join("\n");
 
@@ -151,7 +181,7 @@ export function handleKey(s: TuiState, key: Key, model: CockpitModel, look?: Loo
     if (key.kind === "clear") return { state: { ...s, filter: "", selected: null } };
     if (key.kind === "char") return { state: { ...s, filter: s.filter + key.char, selected: null } };
   }
-  const rows = visibleRows(model, s.filter);
+  const rows = visibleRows(model, s);
   const at = Math.max(0, rows.findIndex((r) => r.id === row?.id));
   const move = (to: number) => ({ state: { ...s, selected: rows[Math.max(0, Math.min(rows.length - 1, to))]?.id ?? null, shown: null, message: null, scroll: 0 } });
   switch (key.kind) {
@@ -183,6 +213,23 @@ export function handleKey(s: TuiState, key: Key, model: CockpitModel, look?: Loo
   if (name === "j") return move(at + 1);
   if (name === "k") return move(at - 1);
   if (name === "/") return { state: { ...s, filtering: true, message: null } };
+  const tab = TABS.find((t) => t.key === name);
+  if (tab) {
+    if (tab.id === s.tab) return { state: s };
+    const back = s.saved[tab.id] ?? { selected: null, filter: "" };
+    return { state: { ...s, tab: tab.id, saved: { ...s.saved, [s.tab]: { selected: s.selected, filter: s.filter } }, ...back, shown: null, message: null, scroll: 0 } };
+  }
+  // ] [: the first row of the next or previous section
+  if ((name === "]" || name === "[") && row) {
+    const sections = [...new Set(rows.map(sectionOf))];
+    const to = sections[sections.indexOf(sectionOf(row)) + (name === "]" ? 1 : -1)];
+    return to ? move(rows.findIndex((r) => sectionOf(r) === to)) : { state: { ...s, message: { text: `no ${name === "]" ? "next" : "previous"} section`, tone: "info" } } };
+  }
+  // n: the next row of the same kind, round to the top
+  if (name === "n" && row) {
+    const like = [...rows.slice(at + 1), ...rows.slice(0, at)].find((r) => likeKey(r) === likeKey(row));
+    return like ? move(rows.indexOf(like)) : { state: { ...s, message: { text: "no other row like this one", tone: "info" } } };
+  }
   if (name === "q") return { state: s, effect: { kind: "quit" } };
   if (name === "r") return { state: { ...s, message: null }, effect: { kind: "refresh" } };
   if (name === "?") return { state: { ...s, shown: HELP, scroll: 0 } };
@@ -207,6 +254,8 @@ export interface Look {
   now: number;
   /** local time of day for the header */
   clock: string;
+  /** the running norn's version (`NORN_VERSION`), for the header */
+  version?: string;
 }
 
 const STYLE = { bold: "1", dim: "2", inverse: "7", red: "31", green: "32", yellow: "33", blue: "34", magenta: "35", cyan: "36" } as const;
@@ -277,8 +326,9 @@ export function previewLines(row: CockpitRow, now: number, width: number, paint:
   const head = (t: string) => paint(t, ["bold", "dim"]);
   const label = (t: string) => paint(t.padEnd(8), ["dim"]);
   const out: string[] = [paint(fit(`${r.story} — ${r.title}`, width), ["bold"])];
-  const [mark, markStyle] = unitMark(r.unit.status);
-  const where = r.unit.status === "done" ? "done" : `${r.unit.status}${r.unit.step ? ` at ${r.unit.step}` : ""}`;
+  const status = standing(row);
+  const [mark, markStyle] = unitMark(status === "dropped" ? "done" : status);
+  const where = status === "done" || status === "dropped" ? status : status === "not_started" ? "not started" : `${status}${r.unit.step ? ` at ${r.unit.step}` : ""}`;
   out.push(`${paint(mark, markStyle)} ${fit(`${where} · ${r.mode} · ${r.claim}`, width - 2)}`);
   if (r.unit.last_outcome) out.push(paint(fit(`  last: ${r.unit.last_outcome.step} → ${r.unit.last_outcome.outcome}`, width), ["dim"]));
 
@@ -333,12 +383,15 @@ export function previewLines(row: CockpitRow, now: number, width: number, paint:
   return out;
 }
 
+/** A story row's standing, then its slices and PR when it has them. */
 function storySummary(r: CockpitRow): string {
   const rep = r.preview.report;
   const done = rep.slices.filter((s) => s.status === "done").length;
-  const where = rep.unit.status === "done" ? "done" : rep.unit.status === "not_started" ? "not started" : `${rep.unit.status} ${rep.unit.step ?? ""}`.trim();
-  const pr = rep.pr ? `PR #${rep.pr.number}${rep.pr.is_draft && rep.pr.state === "open" ? " draft" : rep.pr.state === "open" ? "" : ` ${rep.pr.state}`}` : "no PR";
-  return `${where} · ${rep.slices.length ? `${done}/${rep.slices.length} slices` : "no slices"} · ${pr}`;
+  const status = standing(r);
+  const where = status === "done" || status === "dropped" ? status : status === "not_started" ? "not started" : `${status} ${rep.unit.step ?? ""}`.trim();
+  const slices = rep.slices.length ? `${done}/${rep.slices.length} slices` : "";
+  const pr = rep.pr ? `PR #${rep.pr.number}${rep.pr.is_draft && rep.pr.state === "open" ? " draft" : rep.pr.state === "open" ? "" : ` ${rep.pr.state}`}` : "";
+  return [where, slices, pr].filter(Boolean).join(" · ");
 }
 
 /** The body's geometry for a frame: list and preview widths and heights. */
@@ -348,7 +401,7 @@ function layout(o: Look) {
   // header 3, footer 3, the log's newline 1
   const bodyH = height - 7;
   const wide = width >= 100;
-  const listW = wide ? Math.max(48, Math.floor(width * 0.4)) : width;
+  const listW = wide ? Math.max(64, Math.floor(width * 0.6)) : width;
   const prevW = wide ? width - listW - 3 : width;
   const listH = wide ? bodyH : Math.max(3, Math.floor(bodyH / 2));
   const prevH = wide ? bodyH : bodyH - listH - 1;
@@ -368,48 +421,67 @@ export function clampScroll(model: CockpitModel, s: TuiState, o: Look): TuiState
   return s.scroll > max ? { ...s, scroll: max } : s;
 }
 
+const EMPTY: Record<CockpitTab, string> = { now: "nothing needs you, nothing in flight", backlog: "no story waits to start", done: "no story closed yet" };
+
+/** The tab strip: each tab's key, name and count, the shown one inverse; Now counts what needs you and what is in flight. */
+function tabStrip(model: CockpitModel, tab: CockpitTab, width: number, paint: Paint): string {
+  const strip = TABS.map((t) => {
+    const rows = model.rows.filter((r) => r.tab === t.id);
+    const need = rows.filter((r) => r.kind === "item").length;
+    const count = t.id === "now" ? `${need} need${need === 1 ? "s" : ""} you · ${rows.length - need} in flight` : String(rows.length);
+    return paint(` ${t.key} ${t.label} ${count} `, t.id === tab ? ["inverse", "bold"] : ["dim"]);
+  }).join(paint("│", ["dim"]));
+  return visible(strip) > width ? fit(strip.replace(/\x1b\[[0-9;]*m/g, ""), width) : strip;
+}
+
 export function renderCockpit(model: CockpitModel, s: TuiState, o: Look): string {
   const paint = (t: string, styles: readonly Style[] = []) => (o.color && styles.length && t ? `\x1b[${styles.map((k) => STYLE[k]).join(";")}m${t}\x1b[0m` : t);
   const { width, bodyH, wide, listW, prevW, listH, prevH } = layout(o);
   const rule = paint("─".repeat(width), ["dim"]);
-  const rows = visibleRows(model, s.filter);
+  const rows = visibleRows(model, s);
   const sel = selectedRow(model, s);
 
-  // header
+  // header: the version, the repo and what needs you across it; the filter in front while in use
   const hb = model.header.heartbeat;
   const pending = model.header.pending;
-  const left = `${paint("norn status", ["bold"])} ${paint("·", ["dim"])} ${basename(model.header.repo)}  ${pending ? paint(`${pending} need${pending === 1 ? "s" : ""} you`, ["bold", "yellow"]) : paint("nothing needs you", ["green"])}`;
+  const filter = s.filtering ? `${paint("/", ["bold", "cyan"])} ${s.filter}${paint("▏", ["dim"])}   ` : s.filter ? `${paint("filter:", ["dim"])} ${s.filter} ${paint("(esc clears)", ["dim"])}   ` : "";
+  const left = `${filter}${paint(o.version ? `norn ${o.version}` : "norn", ["bold"])} ${paint("·", ["dim"])} ${basename(model.header.repo)}  ${pending ? paint(`${pending} need${pending === 1 ? "s" : ""} you`, ["bold", "yellow"]) : paint("nothing needs you", ["green"])}`;
   const right = `${hb.down ? paint(`no heartbeat${hb.age ? ` for ${hb.age}` : ""} — ${cmd.watch()}`, ["red"]) : paint(hb.age ? `tick ${hb.age} ago` : "no tick yet", ["dim"])}  ${paint(o.clock, ["dim"])}`;
-  const out = [`${left}${" ".repeat(Math.max(2, width - visible(left) - visible(right)))}${right}`];
-  out.push(s.filtering ? `${paint("/", ["bold", "cyan"])} ${s.filter}${paint("▏", ["dim"])}` : s.filter ? `${paint("filter:", ["dim"])} ${s.filter} ${paint("(esc clears)", ["dim"])}` : paint("/ to filter", ["dim"]));
+  const header = `${left}${" ".repeat(Math.max(2, width - visible(left) - visible(right)))}${right}`;
+  const out = [visible(header) > width ? fit(header.replace(/\x1b\[[0-9;]*m/g, ""), width) : header];
+  out.push(tabStrip(model, s.tab, width, paint));
   out.push(rule);
 
   // body: list | preview (preview below when narrow)
   const items = rows.filter((r) => r.kind === "item");
+  const stories = rows.filter((r) => r.kind === "story");
   const w = (f: (r: CockpitRow) => string, max: number) => Math.min(max, Math.max(0, ...items.map((r) => f(r).length)));
-  const wordW = w((r) => (r.group ? (GROUP_WORD[r.group] ?? r.group) : ""), 9);
   const unitW = Math.max(w((r) => r.unit, 10), Math.min(10, Math.max(0, ...rows.map((r) => r.unit.length))));
   const stepW = w((r) => r.step ?? "", 12);
-  const titleW = Math.min(28, Math.max(0, ...rows.filter((r) => r.kind === "story").map((r) => r.title.length)));
+  const summaryW = Math.min(36, Math.max(0, ...stories.map((r) => storySummary(r).length)));
+  const titleW = Math.min(Math.max(0, ...stories.map((r) => r.title.length)), Math.max(16, listW - 2 - unitW - 2 - summaryW - 2));
   const line = (r: CockpitRow, room: number): string => {
     if (r.kind === "story") {
       const head = `${fit(r.unit, unitW).padEnd(unitW)}  ${fit(r.title, titleW).padEnd(titleW)}  `;
       return `${head}${fit(storySummary(r), room - head.length)}`;
     }
+    // what the story is; the item's instruction stays in the preview
     const g = r.group as InboxGroup;
-    const head = `${GROUP_MARK[g] ?? "·"} ${(GROUP_WORD[g] ?? g).padEnd(wordW)}  ${fit(r.unit, unitW).padEnd(unitW)}  ${fit(r.step ?? "", stepW).padEnd(stepW)}  `;
+    const head = `${GROUP_MARK[g] ?? "·"} ${fit(r.unit, unitW).padEnd(unitW)}  ${fit(r.step ?? "", stepW).padEnd(stepW)}  `;
     const age = r.age ?? "";
-    const t = fit(r.title, Math.max(0, room - head.length - age.length - 2));
+    const t = fit(r.preview.report.title, Math.max(0, room - head.length - age.length - 2));
     return `${head}${t}${" ".repeat(Math.max(2, room - head.length - t.length - age.length))}${age}`;
   };
+  const counts = new Map<string, number>();
+  for (const r of rows) counts.set(sectionOf(r), (counts.get(sectionOf(r)) ?? 0) + 1);
   const list: Array<{ text: string; row?: CockpitRow }> = [];
-  let kind: CockpitRow["kind"] | null = null;
+  let section: string | null = null;
   for (const r of rows) {
-    if (r.kind !== kind) list.push({ text: paint(r.kind === "item" ? "NEEDS YOU" : "STORIES", ["dim"]) });
-    kind = r.kind;
+    if (sectionOf(r) !== section) list.push({ text: `${paint(sectionOf(r), ["bold", "dim"])} ${paint(String(counts.get(sectionOf(r))), ["dim"])}` });
+    section = sectionOf(r);
     list.push({ text: "", row: r });
   }
-  if (!rows.length) list.push({ text: paint(s.filter ? "  no row matches the filter" : "  no stories yet", ["dim"]) });
+  if (!rows.length) list.push({ text: paint(s.filter ? "  no row matches the filter" : `  ${EMPTY[s.tab]}`, ["dim"]) });
   const selAt = Math.max(0, list.findIndex((l) => l.row && l.row.id === sel?.id));
   const start = Math.max(0, Math.min(selAt - Math.floor(listH / 2), list.length - listH));
   const listLines = list.slice(start, start + listH).map((l) => {
@@ -441,7 +513,7 @@ export function renderCockpit(model: CockpitModel, s: TuiState, o: Look): string
     const a = target?.actions.find((x) => x.id === s.prompt?.action);
     out.push(`${paint(`${a?.input?.prompt ?? "Text"} (${a?.label ?? "?"} ${target?.unit ?? ""}):`, ["bold", "yellow"])} ${s.prompt.text}${paint("▏", ["dim"])}`);
   } else out.push(s.message ? paint(fit(s.message.text, width), TONE[s.message.tone]) : "");
-  const keys = [...(sel?.actions.map((a) => `${paint(a.key, ["bold"])} ${paint(a.label, ["dim"])}`) ?? []), ...(overflow ? [`${paint("⌃d/⌃u", ["bold"])} ${paint("scroll", ["dim"])}`] : []), `${paint("/", ["bold"])} ${paint("filter", ["dim"])}`, `${paint("?", ["bold"])} ${paint("keys", ["dim"])}`, `${paint("q", ["bold"])} ${paint("quit", ["dim"])}`];
+  const keys = [...(sel?.actions.map((a) => `${paint(a.key, ["bold"])} ${paint(a.label, ["dim"])}`) ?? []), ...(overflow ? [`${paint("⌃d/⌃u", ["bold"])} ${paint("scroll", ["dim"])}`] : []), `${paint("1 2 3", ["bold"])} ${paint("tabs", ["dim"])}`, `${paint("/", ["bold"])} ${paint("filter", ["dim"])}`, `${paint("?", ["bold"])} ${paint("keys", ["dim"])}`, `${paint("q", ["bold"])} ${paint("quit", ["dim"])}`];
   const footer = s.prompt ? paint("enter sends · esc cancels", ["dim"]) : keys.join(paint(" · ", ["dim"]));
   out.push(visible(footer) > width ? fit(footer.replace(/\x1b\[[0-9;]*m/g, ""), width) : footer);
   return out.join("\n");

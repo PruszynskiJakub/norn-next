@@ -66,6 +66,8 @@ export interface UnitView {
   errors: FileError[];
   /** R4.3: the last act effect that failed for the unit on this checkout, while it still applies */
   act_failure: { effect: string; reason: string; at: string; tick_id: string } | null;
+  /** steps after the cursor in the pinned workflow's step order (0 at the last step); null when not started or unknown. Sorts the cockpit's in-flight stories (O1) */
+  steps_left: number | null;
 }
 
 export interface SliceView extends UnitView {
