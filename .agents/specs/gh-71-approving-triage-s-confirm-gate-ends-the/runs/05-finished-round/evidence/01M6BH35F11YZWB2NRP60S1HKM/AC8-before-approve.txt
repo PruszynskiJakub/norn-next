@@ -1,0 +1,4 @@
+Approve (1) · gates waiting for your decision
+  gh-12      confirm: Read the triage findings and the recommendation in the issue comment (`gh issue view N --comments`). N is the issue number. Switch to a workflow: `norn story edit gh-N --workflow quick --at sync` or `norn story edit gh-N --workflow story --at refine`; a bug: `norn story edit gh-N --workflow reproduce --at reproduce`. Close: `norn story approve gh-N --reason "<why>"`, then `gh issue close N --reason "not planned"`, then `norn story close gh-N --yes` (a story at $done without a PR otherwise waits for a merge, GR6), then `git push origin --delete gh-N-<slug>` (close pushed the story branch; the findings stay on the issue comment). Triage again: `norn story reject gh-N --reason "<what to look at>"`. · 1s
+      step explore#1 reported story (receipt 0002) · or reject: norn story reject gh-12 --reason "…"
+      $ norn story approve gh-12
