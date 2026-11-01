@@ -354,6 +354,27 @@ export interface RoundMigrateAction extends UnitBase {
   commit: BoundaryCommit;
 }
 
+/**
+ * gh-71 D1 (B1, B3, B5, B6, B30): apply a `round` receipt — the old round's state (the receipt applied,
+ * `$done`) in its own folder, then round `round.n`'s folder with the pinned workflow and its first
+ * state (counters 0, mode carried over, cursor at the receipt's step), the story's `workflow:` set,
+ * one commit. State is written last in each folder (S5).
+ */
+export interface RoundStartAction extends UnitBase {
+  kind: "round_start";
+  /** the round receipt's number in the old round */
+  n: number;
+  /** the old round's state with the receipt applied */
+  ended: UnitState;
+  /** the new round: its number, workflow and worktree-relative folder `runs/_story/rounds/NN-<wf>` */
+  round: { n: number; workflow: string; dir: string };
+  /** exact text pinned as the new round's workflow.yaml (S7) */
+  workflow_source: string;
+  /** the new round's first state */
+  state: UnitState;
+  commit: BoundaryCommit | null;
+}
+
 /** Nothing to do; recorded so `why` explains idleness. */
 export interface NoopAction extends UnitBase {
   kind: "noop";
@@ -405,6 +426,7 @@ export type UnitAction =
   | UpdateStoryMirrorAction
   | CleanupMergedStoryAction
   | RoundMigrateAction
+  | RoundStartAction
   | NoopAction;
 
 export type RepoAction = IntakeStoryAction | ReclaimLeasesAction;

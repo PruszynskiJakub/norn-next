@@ -14,7 +14,8 @@ import {
   unitRecordPath,
 } from "@norn/schema";
 import type { ClaimAction, UpdateStoryMirrorAction } from "../actions.ts";
-import type { StoryFacts, UnitFacts, UnitRef } from "../facts.ts";
+import type { NumberedReceipt, StoryFacts, UnitFacts, UnitRef } from "../facts.ts";
+import { initialState } from "../apply.ts";
 import { sha256 } from "../hash.ts";
 import { bodyChangedItem } from "../inbox/items.ts";
 import { issueProblem, mergedIntoBase, prProblem, roundFinished, storyFinished, storyUnit } from "../policy.ts";
@@ -23,7 +24,7 @@ import { epoch, iso } from "../time.ts";
 import { edgeOf, isStale, stepOf } from "../workflow.ts";
 import { applyAction, classifyRun, implicitAskResolved, launchUnknown, resolveImplicitAsk, startRun } from "./agent.ts";
 import { commitFor, type Ctx, gitBusy, nextReceiptNumber, park, rebasing, sliceFileOf, unitItem } from "./receipts.ts";
-import { baseOf, classifyNorn, recordOf, resumeSlices, runCheck, runGit, slicesCanResume, slicesStep, startStoryUnit } from "./steps.ts";
+import { baseOf, classifyNorn, recordOf, resumeSlices, runCheck, runGit, slicesCanResume, slicesStep, startStoryUnit, usableWorkflow } from "./steps.ts";
 import { cmd } from "../commands.ts";
 
 // ================================================================= story level
@@ -298,6 +299,12 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
 
   // R5.1: a run whose launch is unknown is looked for before anything else is decided for the unit
   if (uf.run?.launch_unknown) return launchUnknown(ctx, story, uf, st, wf);
+  // gh-71 D1: a round receipt is applied alone (round.start), after the receipts before it
+  if (ref.slice === null) {
+    const ri = uf.unapplied.findIndex((r) => r.receipt.kind === "round");
+    if (ri === 0) return roundStart(ctx, story, uf, st, uf.unapplied[0] as NumberedReceipt);
+    if (ri > 0) return applyAction(ctx, story, uf, st, wf, uf.unapplied.slice(0, ri), "receipts.apply");
+  }
   // C2: receipts first — they always win over runner facts
   if (uf.unapplied.length) return applyAction(ctx, story, uf, st, wf, uf.unapplied, "receipts.apply");
 
@@ -369,4 +376,45 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
     case "slices":
       return slicesStep(ctx, story, uf, st, wf);
   }
+}
+
+// ================================================================= rounds
+
+/**
+ * gh-71 D1 (B1, B3, B5, B6, B9, B30): apply a `round` receipt — the old round ends in its own state
+ * and round N+1 starts in its own folder with the receipt's workflow pinned, fresh counters, the mode
+ * carried over and the cursor at the receipt's step. Rejected into the trace when the cursor moved
+ * (T9), the round is not finished, or the workflow is gone; a workflow file changed since the edit
+ * leaves the round finished with a `workflow` park that asks for the edit again.
+ */
+function roundStart(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, nr: NumberedReceipt): void {
+  const r = nr.receipt;
+  if (r.kind !== "round") return;
+  const moved: UnitState = { ...st, applied_through: nr.n, updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id };
+  const reject = (reason: string, rule = "round.reject", state: UnitState = moved) => ctx.emit({ kind: "reject_receipt", unit: uf.unit, rule, source: { n: nr.n }, reason, state });
+  if (r.step !== st.step || r.attempt !== st.attempt) return reject(`stale: receipt for ${r.step}#${r.attempt}, cursor at ${st.step}#${st.attempt}`);
+  if (!r.forced && !roundFinished(st)) return reject(`${story.key}'s ${st.workflow} round is not finished`);
+  const loaded = usableWorkflow(ctx, r.workflow, "story");
+  if ("problem" in loaded) return reject(loaded.problem);
+  if (sha256(loaded.source) !== r.workflow_hash) {
+    // gh-71 D1 (B1): the edit judged another workflow file; the round stays finished and the inbox asks again
+    const reason = `workflow ${r.workflow} changed since ${cmd.storyEdit(story.key, { workflow: r.workflow })}; run it again`;
+    return reject(reason, "round.workflow_changed", { ...moved, park: { kind: "workflow", reason, since: ctx.nowIso, receipt_id: r.receipt_id } });
+  }
+  if (!stepOf(loaded.workflow, r.to)) return reject(`workflow ${r.workflow} has no step '${r.to}'`);
+  const n = (st.round ?? 1) + 1;
+  const ended: UnitState = roundFinished(st) ? { ...moved, status: "done", park: null } : moved;
+  const mode = st.mode ?? story.mode;
+  const state = initialState({ unit: uf.unit, workflow: loaded.workflow, workflowName: r.workflow, workflowHash: r.workflow_hash, now: ctx.nowIso, tick_id: ctx.facts.tick_id, at: r.to, round: n, ...(mode ? { mode } : {}) });
+  ctx.emit({
+    kind: "round_start",
+    unit: uf.unit,
+    rule: "round.start",
+    n: nr.n,
+    ended,
+    round: { n, workflow: r.workflow, dir: `${story.spec_dir}/${roundRecordPath(n, r.workflow)}` },
+    workflow_source: loaded.source,
+    state,
+    commit: commitFor(ctx, story, uf, `norn: ${story.key} round ${n} (${r.workflow}) at ${r.to}`, state.step),
+  });
 }

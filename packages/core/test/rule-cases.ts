@@ -135,6 +135,15 @@ function cases(): RuleCase[] {
   out.push(c("a held story with a flat record", "round.migrate", facts([story(STORY_WF, { step: "slices" }, null, {}, { record: "runs/_story" })])));
   // gh-71 D5 (B35): an older norn's remote park on a finished round is dropped by the holder's tick
   out.push(c("a finished round an older norn parked for the issue", "remote.unpark_finished", facts([{ ...story(STORY_WF, { step: "$done", status: "stuck", park: { kind: "remote", reason: "remote: issue closed, unassigned or unlabelled", since: at() } }, null, {}, { record: "runs/_story/rounds/01-story" }), issue: null }])));
+  // gh-71 D1 (B1, B6): a round receipt on a finished round starts the next round; stale or changed ones are rejected
+  {
+    const done = stateFor(storyUnit(), SOLO_WF, { step: "$done", status: "done", park: null });
+    const roundOn = (p: Record<string, unknown>, st: Pick<UnitState, "step" | "attempt" | "run"> = done) =>
+      story(SOLO_WF, { step: "$done", status: "done", park: null }, null, {}, { record: "runs/_story/rounds/01-solo", unapplied: [numbered(1, receipt(st, "round", { workflow: "story", workflow_hash: sha256(JSON.stringify(STORY_WF)), to: "refine", forced: false, left_at: "$done", ...p }, "human"))] });
+    out.push(c("a round receipt on a finished round", "round.start", facts([roundOn({})])));
+    out.push(c("a round receipt for another cursor", "round.reject", facts([roundOn({}, { ...done, step: "implement" })])));
+    out.push(c("a round receipt whose workflow file changed since the edit", "round.workflow_changed", facts([roundOn({ workflow_hash: "b".repeat(64) })])));
+  }
   out.push(c("a stuck unit waits for unstick", "unit.stuck", facts([story(SOLO_WF, { status: "stuck", park: { kind: "exhausted", reason: "nudges 2/2", since: at() } })])));
   {
     const st = stateFor(storyUnit(), SOLO_WF);

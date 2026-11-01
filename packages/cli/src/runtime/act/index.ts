@@ -26,7 +26,7 @@ import { applyReceipts, startRun, nudge, retryFresh, classify } from "./session.
 import { runCheck } from "./check.ts";
 import { runGit } from "./git-step.ts";
 import { startUnit, markDone, rejectReceipt, claim, renewAll, intake, mirror, cleanupMerged,
-  roundMigrate, retryRecords } from "./lifecycle.ts";
+  roundMigrate, roundStart, retryRecords } from "./lifecycle.ts";
 
 export interface ActRecord {
   decision: Decision;
@@ -226,6 +226,8 @@ export class Actor extends ActEnv {
         return cleanupMerged(this, a);
       case "round_migrate":
         return roundMigrate(this, a);
+      case "round_start":
+        return roundStart(this, a);
       case "noop":
         return { ok: true };
       case "intake_story":

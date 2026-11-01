@@ -333,3 +333,25 @@ async function migrateEntry(act: ActEnv, cwd: string, from: string, to: string):
   }
   if (!(await act.git.move(cwd, from, to))) moveFile(join(cwd, from), target);
 }
+
+/**
+ * gh-71 D1 (B1, B30, B31): end the old round in its own folder (its state with the round receipt
+ * applied), then create the new round's folder — workflow pinned, first state written last (S5) —
+ * set the story's `workflow:`, and commit both folders, the shared handoff and spec.md in one commit.
+ */
+export async function roundStart(act: ActEnv, a: Extract<Action, { kind: "round_start" }>): Promise<ActionResult> {
+  const loc = act.unitLoc(a.unit);
+  const story = act.storyLoc(a.unit.story);
+  const wt = a.commit?.cwd ?? loc.worktree;
+  if (!wt) throw new Error(`no worktree for ${a.unit.key}`);
+  act.writeUnitState(a.unit, loc.runsDir, a.ended);
+  const dir = join(wt, a.round.dir);
+  const pin = pinWorkflow(dir, a.workflow_source);
+  if (!pin.ok) throw new Error(`${a.round.dir}/workflow.yaml is already pinned with different content (S7)`);
+  loc.runsDir = dir;
+  act.obs.units[a.unit.key] = { ...loc, runsDir: dir, state: null, workflow: null };
+  act.writeUnitState(a.unit, dir, a.state);
+  const fm = patchStoryFile(storyFile(join(wt, story.spec_dir)), { workflow: a.round.workflow }, wt);
+  const commit = await act.commit(a.commit, a.unit, a.state, `${a.rule}: round ${a.round.n} ${a.round.workflow} at ${a.state.step}`);
+  return { ok: true, detail: { round: a.round, story_file: fm.ok ? "updated" : fm.reason, commit } };
+}

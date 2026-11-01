@@ -143,6 +143,11 @@ export const UnitState = Type.Object(
     applied_through: NonNegInt,
     run: Type.Union([RunInfo, Type.Null()]),
     last_outcome: Type.Union([LastOutcome, Type.Null()]),
+    /**
+     * gh-71 D2 (B1, B33): the story's round — on the story unit, the round this record is; on a slice, the
+     * story round that started it. Absent = 1.
+     */
+    round: Type.Optional(PosInt),
     /** Story unit only: who starts unattended agent steps (MO1). */
     mode: Type.Optional(Mode),
     created_at: IsoTime,

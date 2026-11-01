@@ -436,6 +436,10 @@
         }
       ]
     },
+    "round": {
+      "minimum": 1,
+      "type": "integer"
+    },
     "mode": {
       "anyOf": [
         {

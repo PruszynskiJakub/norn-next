@@ -2114,6 +2114,140 @@
           "type": "string"
         }
       }
+    },
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "kind",
+        "receipt_id",
+        "run_id",
+        "step",
+        "attempt",
+        "at",
+        "by",
+        "workflow",
+        "workflow_hash",
+        "to",
+        "forced",
+        "left_at"
+      ],
+      "properties": {
+        "kind": {
+          "const": "round",
+          "type": "string"
+        },
+        "receipt_id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+              "description": "ULID (ID2)",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "step": {
+          "anyOf": [
+            {
+              "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "const": "$done",
+              "type": "string"
+            },
+            {
+              "const": "$stuck",
+              "type": "string"
+            }
+          ]
+        },
+        "attempt": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "at": {
+          "format": "date-time",
+          "description": "ISO-8601 timestamp, UTC",
+          "type": "string"
+        },
+        "by": {
+          "anyOf": [
+            {
+              "const": "agent",
+              "type": "string"
+            },
+            {
+              "const": "human",
+              "type": "string"
+            },
+            {
+              "const": "norn",
+              "type": "string"
+            }
+          ]
+        },
+        "who": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "tick_id": {
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID (ID2)",
+          "type": "string"
+        },
+        "slice": {
+          "anyOf": [
+            {
+              "pattern": "^(gh|gl)-[1-9][0-9]*/[0-9]{2,3}$",
+              "description": "Slice key, e.g. gh-123/03",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "workflow": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "workflow_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "to": {
+          "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
+          "type": "string"
+        },
+        "forced": {
+          "type": "boolean"
+        },
+        "left_at": {
+          "anyOf": [
+            {
+              "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
+              "type": "string"
+            },
+            {
+              "const": "$done",
+              "type": "string"
+            },
+            {
+              "const": "$stuck",
+              "type": "string"
+            }
+          ]
+        }
+      }
     }
   ],
   "discriminator": {

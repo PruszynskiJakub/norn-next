@@ -189,7 +189,7 @@ export function started(t: Target): UnitState {
 
 // ------------------------------------------------------------------ receipts
 
-type HumanKind = "answer" | "approve" | "reject" | "unstick" | "stuck" | "mode" | "workflow" | "update";
+type HumanKind = "answer" | "approve" | "reject" | "unstick" | "stuck" | "mode" | "workflow" | "update" | "round";
 
 /** A human receipt at the unit's cursor (S6): step + attempt + slice so the tick routes it (T9). */
 export function humanReceipt<K extends HumanKind>(ctx: Context, t: Pick<Target, "slice">, st: UnitState, kind: K, body: Record<string, unknown>): Extract<Receipt, { kind: K }> {

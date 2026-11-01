@@ -241,6 +241,23 @@ export const WorkflowReceipt = receipt("workflow", {
   to: StepName,
 });
 
+/**
+ * gh-71 D1 (B1, B6, B9): `norn story edit <story> --workflow <name> [--at <step>]` on a story whose round is
+ * finished — written into the current round, applied by the next tick (rule `round.start`), which ends
+ * that round and starts round N+1 of `workflow` at `to`. Rejected when the workflow file changed since.
+ */
+export const RoundReceipt = receipt("round", {
+  workflow: NonEmpty,
+  /** sha256 of `.agents/workflows/<workflow>.yaml` when the edit ran */
+  workflow_hash: Type.String({ pattern: "^[0-9a-f]{64}$" }),
+  /** the step the new round starts at: `--at`, else the workflow's start step */
+  to: StepName,
+  /** `--force`: the old round was ended unfinished (gh-71 slice 08) */
+  forced: Type.Boolean(),
+  /** the step the old round is left at */
+  left_at: Type.Union([StepName, Type.Literal("$done"), Type.Literal("$stuck")]),
+});
+
 export const Receipt = TaggedUnion(
   "kind",
   [
@@ -258,6 +275,7 @@ export const Receipt = TaggedUnion(
     WorkflowReceipt,
     TakeReceipt,
     UpdateReceipt,
+    RoundReceipt,
   ],
   { $id: "https://norn.dev/schema/receipt.json", title: "norn receipt" },
 );
@@ -278,6 +296,7 @@ export type ClassifyReceipt = ReceiptOf<"classify">;
 export type WorkflowReceipt = ReceiptOf<"workflow">;
 export type TakeReceipt = ReceiptOf<"take">;
 export type UpdateReceipt = ReceiptOf<"update">;
+export type RoundReceipt = ReceiptOf<"round">;
 
 export const RECEIPT_KINDS = [
   "done",
@@ -294,6 +313,7 @@ export const RECEIPT_KINDS = [
   "workflow",
   "take",
   "update",
+  "round",
 ] as const satisfies readonly ReceiptKind[];
 // RECEIPT_KINDS lists every kind: a kind added to `Receipt` but not here fails typecheck.
 const _allReceiptKinds: [Exclude<ReceiptKind, (typeof RECEIPT_KINDS)[number]>] extends [never] ? true : never = true;

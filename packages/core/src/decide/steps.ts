@@ -50,7 +50,7 @@ export function startStoryUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts): void
   });
 }
 
-function usableWorkflow(ctx: Ctx, name: string, level: UnitLevel): { workflow: Workflow; source: string } | { problem: string } {
+export function usableWorkflow(ctx: Ctx, name: string, level: UnitLevel): { workflow: Workflow; source: string } | { problem: string } {
   const lw = ctx.workflows[name];
   if (!lw) return { problem: `workflow '${name}' not found` };
   const issues = [...lw.issues, ...(lw.workflow ? checkWorkflowLevel(lw.workflow, level) : [])];

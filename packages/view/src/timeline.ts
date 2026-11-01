@@ -58,6 +58,8 @@ export function receiptSummary(r: Receipt, max = MAX): string {
       return oneLine(`taken by ${r.who ?? r.by}${r.previous_holder ? ` from ${r.previous_holder}${r.forced ? " (forced)" : r.expired ? " (expired claim)" : ""}` : " (claim was free)"}`);
     case "update":
       return oneLine(`update by ${r.who ?? r.by}: ${r.from} → ${r.to} (BS9)`);
+    case "round":
+      return oneLine(`new round by ${r.who ?? r.by}: ${r.workflow} at ${r.to}${r.forced ? " (forced)" : ""}`);
   }
 }
 

@@ -160,24 +160,26 @@ describe("preconditions refuse with do_instead", () => {
   });
 });
 
-describe("story edit --workflow after start (S7, B32)", () => {
-  test("needs --at; --at must exist; switch journals a receipt, re-pins, and the tick enters --at", async () => {
-    const needs = await h.norn("story", "edit", "gh-6", "--workflow", "gated");
-    expect((needs.value as { do_instead: string }).do_instead).toBe("norn story edit gh-6 --workflow gated --at <work|review>");
-    refused(needs, "needs_to");
+describe("story edit --workflow after start: a new round (gh-71 D3, D4, B9, B10)", () => {
+  test("an unfinished round is refused; --at must exist; a finished round gets a round receipt the tick applies at --at", async () => {
+    // gh-71 B10: no in-place switch of a story any more — its round is not finished
+    const unfinished = await h.norn("story", "edit", "gh-6", "--workflow", "gated", "--at", "review");
+    refused(unfinished, "round_unfinished");
+    expect(unfinished.value).toMatchObject({ error: "gh-6's alt round is not finished; pass --force to end it and start a gated round", do_instead: "norn story edit gh-6 --workflow gated --force --at review" });
     refused(await h.norn("story", "edit", "gh-6", "--workflow", "gated", "--at", "nope"), "unknown_step");
     expect((await h.norn("story", "edit", "gh-6", "--at", "review")).exit).toBe(2);
+    h.report(runs6(), "done", { outcome: "done", handoff: "drafted" });
+    await tick();
+    expect(h.state(runs6())).toMatchObject({ workflow: "alt", step: "$done", status: "done" });
     const r = await h.norn("story", "edit", "gh-6", "--workflow", "gated", "--at", "review");
     expect(r.exit).toBe(0);
-    const v = r.value as Verb & { previous: string };
-    expect(v.previous).toBe("alt");
-    expect(v.receipt).toMatchObject({ kind: "workflow", name: "gated", to: "review", step: "draft", attempt: 1, slice: null, by: "human" });
-    expect(h.read(join(runs6(), "workflow.yaml"))).toBe(GATED);
-    // the re-pin before the tick is not corruption (S2)
-    const st = (await h.listed("gh-6")) as { status: string };
-    expect(st.status).not.toBe("corrupt");
+    const v = r.value as Verb & { previous: string; round: number };
+    expect(v).toMatchObject({ previous: "alt", round: 2 });
+    expect(v.receipt).toMatchObject({ kind: "round", workflow: "gated", to: "review", forced: false, left_at: "$done", step: "$done", slice: null, by: "human" });
     await tick();
-    expect(h.state(runs6())).toMatchObject({ workflow: "gated", step: "review", status: "parked", park: { kind: "gate" } });
+    expect(runs6()).toEndWith("/runs/_story/rounds/02-gated");
+    expect(h.read(join(runs6(), "workflow.yaml"))).toBe(GATED);
+    expect(h.state(runs6())).toMatchObject({ workflow: "gated", round: 2, step: "review", status: "parked", park: { kind: "gate" } });
     const inbox = (await h.norn("status")).value as { groups: Record<string, Array<{ story: string; command: string }>> };
     expect(inbox.groups.approve).toEqual([expect.objectContaining({ story: "gh-6", command: "norn story approve gh-6" })]);
   });
@@ -326,6 +328,12 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
     // the same decision twice is refused before it reaches the mailbox
     refused(await b("story", "approve", "gh-5"), "already_recorded");
     held(await b("story", "edit", "gh-5", "--auto"));
+    // gh-71 D3 (B18): a new round is refused for the claim first, before the workflow or the unfinished round
+    const round = await b("story", "edit", "gh-5", "--workflow", "sotry", "--json");
+    const why = JSON.stringify(round.value);
+    held(round);
+    expect(why).toContain("held by tester@box");
+    expect(why).toContain("norn story checkout gh-5");
   });
 
   test("the holder's tick imports it, deletes the ref, and the next tick applies it", async () => {
