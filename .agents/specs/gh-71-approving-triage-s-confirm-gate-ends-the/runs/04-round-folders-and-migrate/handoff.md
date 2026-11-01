@@ -41,5 +41,8 @@ The story's record lives in `runs/_story/rounds/01-<workflow>/` with one `runs/_
 - Residual (not fixed): if every entry moved but the commit itself failed, the record reads as round 1 and the flat deletions stay unstaged; round.migrate does not fire again. Rare (git commit failure after all renames).
 - implement#2 done: F1: resolver reads the story as flat while runs/_story/state.json exists; roundMigrate moves state.json last and merges into entries already in the round, so a move stopped partway is finished by the next round.migrate (new integration test, red without fix). F2: AC3 fixture has an untracked logs/ file and a slice folder asserted unchanged. Unit 995/0, integration 529/0, typecheck clean.
 
+- review#2 approve: F1/F2 of review#1 fixed and tested; unit 995/0, integration 526/0, typecheck clean. Minor follow-ups (not blocking): commit failure after all moves leaves migrate unfinished; migrate does not wait for a live session; a file in both places throws every tick instead of mark_corrupt; nits on rmSync, currentRound catch, duplicated latest-round.
+- review#2 approve: AC1–AC6 met and tested; review#1 F1 (resumable migrate) and F2 (logs/ + slice folder fixture) fixed. Unit 995/0, integration 526/0, typecheck clean. Minor only: commit failure after all moves leaves migrate unfinished; migrate ignores a live session; same-name file conflict throws each tick rather than mark_corrupt; nits.
+
 ## Resume
-Hand back to test/review; nothing left for implement.
+Review approved; next is whatever norn routes after review (QA covers AC7).
