@@ -62,7 +62,7 @@
 
 ## Goal
 
-qa#2: check every Behaviour item (B1-B22) on the current head, one test tier at a time, including qa#1's two failures (B20, B21) and the criteria it left unverified (B17-B19).
+describe#1: write pr.md (summary, evidence per B1-B22, merge danger) for the branch as it is at 70032e184.
 
 ## Progress
 
@@ -77,6 +77,8 @@ qa#2: check every Behaviour item (B1-B22) on the current head, one test tier at 
 - B18/B19: transcripts and snapshots are R100 renames. `bun run golden` adds the same 9 cases on this branch and on the merge base a39ba103e (the corpus was already short on main); they differ only in run-specific ids. The 9 files were not kept. `--update` changes 0. A transcript rewrite leaves no diff.
 - Unverified: B11, B12, B20 (CI half) and B22, because no PR or CI run exists yet.
 - qa#2 unverified: QA#2 on 2af68a98b, one tier at a time: unit 985/0 x3 (~2 s), integration 511/0 x3 (~111 s; qa#1's integrate timeout did not recur), e2e 72/0 x3 (~79 s), typecheck green. B21 fixed. B17: every merge-base test is in exactly one tier (2 replaced on purpose, 34 added). B18/B19: renames only; golden --update changes 0; golden adds the same 9 cases on main's layout too. Pass: B1-B10, B13-B19, B21. Unverified: B11, B12, B20 (CI half), B22, because there is no PR or CI run yet.
+- describe#1: wrote `.agents/specs/gh-118-the-cli-tests-take-12-minutes-and-run-up/pr.md` from qa#2's criteria report and evidence (01M6A4VYA1KZW21YKHTGXAQB55). B11, B12, B20 (CI half) and B22's CI push-to-green are marked as not shown, with how to check them on the PR's CI. Timing table: unit ~2 s, test check ~2 min, against the 702 s / 630 s baseline.
+- describe#1 done: pr.md written from qa#2's evidence: three-tier layout + CI picture, timing table (unit ~2 s, test check ~2 min vs 702 s baseline), one entry per B1-B22. B11, B12, B20 CI half and B22 CI push-to-green are marked not shown (no PR yet), with how to check each. Merge danger: two-way, blast radius contributors/CI.
 
 ## Risks
 
@@ -85,4 +87,4 @@ qa#2: check every Behaviour item (B1-B22) on the current head, one test tier at 
 
 ## Resume
 
-qa#2 has reported `unverified`. To close the CI criteria, open the PR, then check B11, B12, B20 (CI) and B22 against its CI run, as the criteria report describes.
+pr.md is done. Once the PR's first CI run is green, add CI push-to-green to the Summary table (B22), and check B11, B12 and B20 on that run.
