@@ -2,7 +2,7 @@
 id: gh-71/10
 title: Status, story view, handoff header and run list show rounds
 depends_on: [ gh-71/08, gh-71/09 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
