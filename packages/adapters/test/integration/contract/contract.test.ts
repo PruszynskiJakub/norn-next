@@ -42,9 +42,9 @@ runnerContract("headless runner", () => {
 
 remoteContract("gh adapter over a scripted gh", () => {
   const cli = scriptedGh();
-  return { port: createGh({ cwd: "/repo", exec: cli.exec }), seed: cli.seed };
+  return { port: createGh({ cwd: "/repo", exec: cli.exec }), seed: cli.seed, failLabelEdits: cli.failLabelEdits };
 });
 remoteContract("glab adapter over a scripted glab", () => {
   const cli = scriptedGlab();
-  return { port: createGlab({ cwd: "/repo", exec: cli.exec }), seed: cli.seed };
+  return { port: createGlab({ cwd: "/repo", exec: cli.exec }), seed: cli.seed, failLabelEdits: cli.failLabelEdits };
 });

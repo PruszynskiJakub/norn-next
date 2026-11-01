@@ -208,9 +208,10 @@ describe("inbox: the person's last actions (F21, F25, F35, Q6)", () => {
 
   test("merged PR or PR not fetched: no merge item", () => {
     expect(buildInbox(facts([doneStory({ pr: pr({ state: "merged" }) })]), CONFIG).groups.your_turn).toEqual([]);
+    // gh-71 D6: no PR known → a finished round (below), never "waiting for the PR merge"
     const notFetched = buildInbox(facts([doneStory({ pr: undefined })]), CONFIG);
-    expect(notFetched.groups.your_turn).toEqual([]);
-    expect(notFetched.groups.recently_done[0]?.title).toBe("workflow done — waiting for the PR merge (GR6)");
+    expect(notFetched.groups.your_turn.map((i) => i.title)).toEqual(["gh-1: story round done, no PR"]);
+    expect(notFetched.groups.recently_done).toEqual([]);
   });
 
   test("branch already in origin/<base> (merged by ancestry): no merge item, not 'waiting for the PR merge'", () => {
@@ -324,5 +325,77 @@ describe("unpushed runs (R2.3)", () => {
     });
     // nothing else of a story held elsewhere is shown
     expect(inbox.pending).toBe(1);
+  });
+});
+
+describe("inbox: a finished round (gh-71 D5, D6; B25–B27, B35)", () => {
+  const unit = storyUnit();
+  const finished = (patch: Partial<StoryFacts> = {}, st: Parameters<typeof stateFor>[2] = {}) =>
+    storyFacts("gh-1", [unitFacts(unit, STORY_WF, stateFor(unit, STORY_WF, { step: "$done", status: "done", updated_at: at(T0 - 60_000), ...st }))], patch);
+  const pr = (over: Partial<RemotePullRequest> = {}): RemotePullRequest => ({ number: 7, url: "https://github.com/o/r/pull/7", state: "open", is_draft: false, head_sha: "a".repeat(40), ...over });
+  const roundDone = expect.objectContaining({
+    group: "your_turn",
+    story: "gh-1",
+    title: "gh-1: story round done, no PR",
+    command: "norn story edit gh-1 --workflow <name>",
+    detail: "or close the issue",
+  });
+
+  test("B25: no PR → a Your turn item with the --workflow command, and no 'waiting for the PR merge'", () => {
+    const inbox = buildInbox(facts([finished({ pr: null })]), CONFIG);
+    expect(inbox.groups.your_turn).toEqual([roundDone]);
+    expect(inbox.groups.recently_done).toEqual([]);
+    expect(inbox.pending).toBe(1);
+    // a PR not fetched this tick and never seen here is no PR either
+    expect(buildInbox(facts([finished({ pr: undefined })]), CONFIG).groups.your_turn).toEqual([roundDone]);
+  });
+
+  test("B26: the item is generic — the last step's outcome never names the workflow", () => {
+    const st = { last_outcome: { step: "explore", outcome: "story", source: "reported" as const, at: at(T0 - 60_000), receipt_id: "01JEEEEEEEEEEEEEEEEEEEEEEE" } };
+    expect(buildInbox(facts([finished({ pr: null }, st)]), CONFIG).groups.your_turn).toEqual([roundDone]);
+  });
+
+  test("B27: an open PR keeps the merge item, and no round-done item", () => {
+    expect(buildInbox(facts([finished({ pr: pr() })]), CONFIG).groups.your_turn).toEqual([expect.objectContaining({ id: "merge:gh-1:7", title: "Merge PR #7" })]);
+  });
+
+  test("a merged PR or a done record: no round-done item", () => {
+    expect(buildInbox(facts([finished({ pr: pr({ state: "merged" }) })]), CONFIG).groups.your_turn).toEqual([]);
+    expect(buildInbox(facts([finished({ pr: pr(), merged_by_ancestry: true })]), CONFIG).groups.your_turn).toEqual([]);
+  });
+
+  test("D5: a missing label, an unassigned or an unseen issue on a finished round is a Check item; the round stays Your turn", () => {
+    const f = finished({ pr: null });
+    const unlabelled = { ...f, issue: { ...f.issue!, labels: [] } };
+    const unassigned = { ...f, issue: { ...f.issue!, assignees: [] } };
+    const unseen = { ...f, issue: null };
+    for (const [s, reason] of [
+      [unlabelled, "remote: label 'norn' removed"],
+      [unassigned, "remote: issue unassigned"],
+      [unseen, "remote: issue closed, unassigned or unlabelled"],
+    ] as const) {
+      const inbox = buildInbox(facts([s]), CONFIG);
+      expect(inbox.groups.check).toEqual([expect.objectContaining({ group: "check", story: "gh-1", title: `gh-1: ${reason} — the round stays finished` })]);
+      expect(inbox.groups.your_turn).toEqual([roundDone]);
+      expect(inbox.groups.unblock).toEqual([]);
+    }
+    expect(buildInbox(facts([f]), CONFIG).groups.check).toEqual([]);
+  });
+
+  test("D5: between syncs (issue not fetched) the Check item comes from the issue the last sync saw (issue_seen)", () => {
+    const f = finished({ pr: null });
+    const seen = (issue: StoryFacts["issue"]) => ({ ...f, issue: undefined, issue_seen: { issue: issue ?? null, observed_at: T0 - 5_000 } });
+    for (const [s, reason] of [
+      [seen({ ...f.issue!, labels: [] }), "remote: label 'norn' removed"],
+      [seen({ ...f.issue!, assignees: [] }), "remote: issue unassigned"],
+      [seen(null), "remote: issue closed, unassigned or unlabelled"],
+    ] as const) {
+      const inbox = buildInbox(facts([s]), CONFIG);
+      expect(inbox.groups.check).toEqual([expect.objectContaining({ group: "check", story: "gh-1", title: `gh-1: ${reason} — the round stays finished` })]);
+      expect(inbox.groups.your_turn).toEqual([roundDone]);
+    }
+    expect(buildInbox(facts([seen(f.issue)]), CONFIG).groups.check).toEqual([]);
+    // a fresh observation wins over the cache
+    expect(buildInbox(facts([{ ...seen({ ...f.issue!, labels: [] }), issue: f.issue }]), CONFIG).groups.check).toEqual([]);
   });
 });

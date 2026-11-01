@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { TickTrace } from "@norn/schema";
-import { loadWorkflows, readTickInputs, readTrace, repoConfigPath, workflowsDir } from "@norn/store";
+import { loadWorkflows, readTickInputs, readTrace, repoConfigPath, workflowsDir, storyUnitDir, handoffPath } from "@norn/store";
 import type { TickReport } from "../../packages/cli/src/index.ts";
 import { decide } from "@norn/core";
 import { createHarness, type Harness, issue } from "../support/harness.ts";
@@ -234,7 +234,7 @@ describe("a story through the slice workflow", () => {
   const storyWt = () => `${h.root}-worktrees/gh-7-add-login-form`;
   const sliceWt = () => `${storyWt()}--01-form`;
   const spec = ".agents/specs/gh-7-add-login-form";
-  const storyRuns = () => join(storyWt(), spec, "runs/_story");
+  const storyRuns = () => storyUnitDir(join(storyWt(), spec));
   const sliceRuns = () => join(sliceWt(), spec, "runs/01-form");
   const step = (ms = 10_000) => h.clock.advance(ms);
   let transcript: Transcript;
@@ -278,7 +278,7 @@ describe("a story through the slice workflow", () => {
     const st = h.state(storyRuns());
     expect(st).toMatchObject({ step: "plan", status: "ready", mode: "auto", workflow: "mini" });
     expect(h.read(join(storyRuns(), "workflow.yaml"))).toBe(MINI);
-    expect(h.read(join(storyRuns(), "handoff.md"))).toContain("Step: plan (attempt 1)");
+    expect(h.read(handoffPath(storyRuns()))).toContain("Step: plan (attempt 1)");
     expect(h.read(join(storyWt(), spec, "spec.md"))).toContain("status: active");
     expect(h.git(["ls-remote", "origin", "refs/heads/gh-7-add-login-form"])).not.toBe("");
   });
@@ -296,7 +296,7 @@ describe("a story through the slice workflow", () => {
     expect(readdirSync(join(storyRuns(), "receipts")).sort()).toEqual(["0001-started.json", "0002-started.json"]);
     expect(readdirSync(join(h.home, "leases")).sort()).toEqual(["agent-1.json", "slot-1.json"]);
     // R2.1 (N6): the started receipts were committed and pushed in the launch tick
-    expect(h.git(["show", `origin/gh-7-add-login-form:${spec}/runs/_story/receipts/0002-started.json`])).toContain('"session"');
+    expect(h.git(["show", `origin/gh-7-add-login-form:${spec}/runs/_story/rounds/01-mini/receipts/0002-started.json`])).toContain('"session"');
     // a live run with nothing new: no action (no recover.commit)
     step();
     expect(kinds(await h.tick())).toEqual([]);

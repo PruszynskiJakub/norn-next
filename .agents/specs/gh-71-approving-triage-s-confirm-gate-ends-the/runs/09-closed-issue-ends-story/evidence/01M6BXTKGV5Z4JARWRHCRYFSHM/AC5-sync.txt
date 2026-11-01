@@ -1,0 +1,5 @@
+## issue #8 closed on the fake gh: {"issues":[{"number":8,"title":"Triage me","body":"please triage","state":"closed","assignees":["octocat"],"labels":["norn"]}]}
+$ norn sync
+{"tick_id":"01M6BY0M9RDA2HWR80CX8B8YQG","at":"2026-11-01T16:10:22.904Z","duration_ms":1363,"sync":{"ran":true,"ok":true},"decisions":[{"unit":"gh-8","rule":"remote.issue_closed","kind":"close_story","ok":true}],"notified":[],"trace":"2026-11-01.jsonl","failed":0,"intake":[]}
+
+exit 0

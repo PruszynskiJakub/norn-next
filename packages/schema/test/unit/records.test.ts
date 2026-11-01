@@ -67,6 +67,7 @@ const receipts: Record<(typeof RECEIPT_KINDS)[number], Receipt> = {
   },
   workflow: { kind: "workflow", ...head, by: "human", name: "bug", from_hash: H, to_hash: "b".repeat(64), to: "implement" },
   update: { kind: "update", ...head, run_id: null, step: "$done", by: "human", who: "jakub@mac", from: "$done", to: "update", reason: "person" },
+  round: { kind: "round", ...head, run_id: null, step: "$done", by: "human", who: "jakub@mac", workflow: "story", workflow_hash: "a".repeat(64), to: "refine", forced: false, left_at: "$done" },
 };
 
 describe("receipt schema", () => {

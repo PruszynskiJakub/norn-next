@@ -1,0 +1,9 @@
+$ bun test --config=bunfig.integration.toml --parallel --timeout=20000
+bun test v1.3.13 (bf2e2cec) 12x PARALLEL
+
+ 554 pass
+ 3 skip
+ 0 fail
+ 3419 expect() calls
+Ran 557 tests across 54 files. [202.34s]
+int exit 0

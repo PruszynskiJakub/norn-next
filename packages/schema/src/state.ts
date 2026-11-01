@@ -56,7 +56,10 @@ export const ParkInfo = Type.Object(
     since: IsoTime,
     /** receipt that caused the park (ask, stuck, classify) */
     receipt_id: Type.Optional(Ulid),
-    /** ask park from a permission prompt: the pending command, e.g. `Bash(rm -rf build)` (§10, O1) */
+    /**
+     * ask park from a permission prompt: the pending command, e.g. `Bash(rm -rf build)` (§10, O1);
+     * a `workflow` park of a rejected round receipt: the edit to run again (gh-71 B1, AC12)
+     */
     command: Type.Optional(NonEmpty),
     /**
      * R6.1 (A14): an implicit ask (classified from facts, not `norn ask`) and the fact that raised it:
@@ -143,6 +146,18 @@ export const UnitState = Type.Object(
     applied_through: NonNegInt,
     run: Type.Union([RunInfo, Type.Null()]),
     last_outcome: Type.Union([LastOutcome, Type.Null()]),
+    /**
+     * gh-71 D2 (B1, B33): the story's round — on the story unit, the round this record is; on a slice, the
+     * story round that started it. Absent = 1.
+     */
+    round: Type.Optional(PosInt),
+    /**
+     * gh-71 D1 (B32, RD3): a round the person ended unfinished with `norn story edit --force` — the step it
+     * was left at and the `round` receipt that ended it. Absent = the round finished at `$done` (or runs).
+     */
+    ended: Type.Optional(
+      Type.Object({ by: Type.Literal("person"), at: StepName, receipt_id: Ulid }, { additionalProperties: false }),
+    ),
     /** Story unit only: who starts unattended agent steps (MO1). */
     mode: Type.Optional(Mode),
     created_at: IsoTime,

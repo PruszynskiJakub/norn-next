@@ -6,7 +6,7 @@ import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { cmd, type GitPort, type StoryFacts } from "@norn/core";
 import { ulid } from "@norn/schema";
-import { acquireTickLock, releaseClaim, writtenHere } from "@norn/store";
+import { acquireTickLock, handoffPath, releaseClaim, writtenHere } from "@norn/store";
 import type { Context } from "../context.ts";
 import { busyError, refuse } from "../output.ts";
 import { type Observed, observe } from "./observe/index.ts";
@@ -43,11 +43,11 @@ async function commitHandoffs(obs: Observed, story: StoryFacts): Promise<string[
   for (const u of story.units) {
     const ul = obs.units[u.unit.key];
     const cwd = ul?.worktree;
-    if (!ul || !cwd || !existsSync(join(ul.runsDir, "handoff.md"))) continue;
+    if (!ul || !cwd || !existsSync(handoffPath(ul.runsDir))) continue;
     const sha = await obs.ports.git.commit(cwd, {
       message: `norn: ${u.unit.key} handoff`,
       trailers: { "Norn-Story": story.key, ...(u.unit.slice ? { "Norn-Slice": u.unit.slice } : {}), "Norn-Step": ul.state?.step ?? "release", "Norn-Tick": obs.facts.tick_id },
-      paths: [relative(cwd, join(ul.runsDir, "handoff.md"))],
+      paths: [relative(cwd, handoffPath(ul.runsDir))],
     });
     if (sha) out.push(u.unit.key);
   }

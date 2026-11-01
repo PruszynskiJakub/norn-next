@@ -18,6 +18,8 @@ export interface OrientUnit {
   status: UnitView["status"];
   /** the unit's workflow (pinned, else the one it would start with) */
   workflow: string;
+  /** gh-71 B28: the story's round (a slice's: the round that started it); null when not started */
+  round: number | null;
   step: string | null;
   attempt: number | null;
   last_outcome: { step: string; outcome: string; at: string } | null;
@@ -92,7 +94,7 @@ function claimLine(c: ClaimView): string {
   return c.state === "corrupt" ? "claim corrupt" : "unclaimed";
 }
 
-const orientUnit = (u: UnitView): OrientUnit => ({ key: u.key, title: u.title, status: u.status, workflow: u.workflow, step: u.step, attempt: u.attempt, last_outcome: u.last_outcome, next: u.next, integrated: false });
+const orientUnit = (u: UnitView): OrientUnit => ({ key: u.key, title: u.title, status: u.status, workflow: u.workflow, round: u.round, step: u.step, attempt: u.attempt, last_outcome: u.last_outcome, next: u.next, integrated: false });
 const orientSlice = (s: SliceView): OrientUnit => ({ ...orientUnit(s), integrated: s.integrated, slice_status: s.slice_status, depends_on: s.depends_on });
 
 function prState(pr: PrView | null): OrientReport["pr_state"] {
@@ -206,7 +208,8 @@ export function formatStoryView(r: OrientReport, now: number, o: { rules?: boole
   if (o.rules) out.push(...ORIENT_RULES.split("\n").map((l) => `> ${l}`), "");
   out.push("## The story", "");
   if (r.url) out.push(`- Issue: ${r.url}`);
-  out.push(`- Story: ${unitStanding(r.unit)} · ${r.unit.workflow} · ${r.mode} · ${r.claim}`);
+  // gh-71 B28 (D10): the round and its workflow next to the step
+  out.push(`- Story: ${r.unit.round ? `round ${r.unit.round} · ` : ""}${r.unit.workflow} · ${unitStanding(r.unit)} · ${r.mode} · ${r.claim}`);
   out.push(`- Worktree: \`${r.root}\` · branch \`${r.branch}\``);
   out.push(`- Spec: \`${r.spec}\``, "");
   out.push("## Slices", "");

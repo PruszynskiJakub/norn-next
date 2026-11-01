@@ -7,7 +7,7 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { repoConfigPath, workflowsDir } from "@norn/store";
+import { repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
 import { type CliResult, runCli, type TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue, sh } from "../../../../test/support/harness.ts";
 
@@ -38,7 +38,7 @@ setDefaultTimeout(30_000);
 
 let h: Harness;
 const wt = () => `${h.root}-worktrees/gh-1-add-widget`;
-const runs = () => join(wt(), ".agents/specs/gh-1-add-widget/runs/_story");
+const runs = () => storyUnitDir(join(wt(), ".agents/specs/gh-1-add-widget"));
 const receipts = () => readdirSync(join(runs(), "receipts")).sort();
 const acted = (r: TickReport) => r.decisions.filter((d) => d.unit === "gh-1" && d.kind !== "noop" && d.rule !== "claim.renew").map((d) => `${d.rule}${d.ok ? "" : ` FAILED ${d.error}`}`);
 function inWt(...argv: string[]): Promise<CliResult> {

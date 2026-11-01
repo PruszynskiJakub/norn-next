@@ -1,0 +1,8 @@
+gh-7/01 · Login form · running at implement
+intake 2099-01-15 10:00:40Z · not done · wall-clock 0s so far
+time in steps: agent 0s · human wait 0s
+(2 no-op/claim-renew tick events hidden — --all shows them)
+
+UNIT     STEP         ENTERED   LEFT  DUR  OUTCOME    WHO
+gh-7/01  implement#1  10:00:50  …     0s+  (in step)  tick 03PGFN3VV0D5TFAEQN22BQ7CS6
+exit 0

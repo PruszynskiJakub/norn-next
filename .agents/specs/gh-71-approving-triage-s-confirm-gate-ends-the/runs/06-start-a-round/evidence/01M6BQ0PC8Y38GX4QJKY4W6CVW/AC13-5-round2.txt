@@ -1,0 +1,40 @@
+$ norn story edit gh-1 --workflow sotry
+{"error":"no workflow 'sotry' in .agents/workflows/","do_instead":"norn story edit gh-1 --workflow <bug|reproduce|slice|story|triage>","code":"unknown_workflow"}
+exit 3
+$ norn story edit gh-1 --workflow story --at nope
+{"error":"no step 'nope' in workflow story","do_instead":"norn story edit gh-1 --workflow story --at <refine|clarify|plan|slice|approve-plan|slices|update|resolve|test|qa|human-qa|implement|describe|open-pr|ready>","code":"unknown_step"}
+exit 3
+$ norn story edit gh-1 --workflow story
+{"unit":"gh-1","workflow":"story","previous":"triage","started":true,"round":2,"to":"refine","receipt":{"kind":"round","receipt_id":"01M6BQ57A4M1SVJP19JFV1PWF3","run_id":null,"step":"$done","attempt":1,"at":"2026-11-01T14:10:33.412Z","by":"human","who":"jakubpruszynski@mac","slice":null,"round":1,"workflow":"story","workflow_hash":"7c5856d5b1ae79c1b46d47395feff6d48d8c13906b59a0f072fcaf7f67e0e081","to":"refine","forced":false,"left_at":"$done"},"delivered":{"via":"local","claim":"mine","n":4,"file":".agents/specs/gh-1-add-a-greeting/runs/_story/rounds/01-triage/receipts/0004-round.json"},"next":"norn tick"}
+exit 0
+0001-started.json
+0002-done.json
+0003-approve.json
+0004-round.json
+{"kind":"round","receipt_id":"01M6BQ57A4M1SVJP19JFV1PWF3","run_id":null,"step":"$done","attempt":1,"at":"2026-11-01T14:10:33.412Z","by":"human","who":"jakubpruszynski@mac","slice":null,"round":1,"workflow":"story","workflow_hash":"7c5856d5b1ae79c1b46d47395feff6d48d8c13906b59a0f072fcaf7f67e0e081","to":"refine","forced":false,"left_at":"$done"}
+
+$ norn tick
+{"tick_id":"01M6BQ57HY5CJ77286NS8KSJ6T","at":"2026-11-01T14:10:33.662Z","duration_ms":761,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-1","rule":"round.start","kind":"round_start","ok":true}],"notified":["your_turn:gh-1:refine#1"],"trace":"2026-11-01.jsonl","failed":0}
+
+$ norn status
+Your turn (1) · work only you can do
+  gh-1       refine: attended step — work with the agent · 1s
+      $ cd /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa71-06/ac13/repo-worktrees/gh-1-add-a-greeting && claude --permission-mode auto -- 'Use the norn skill, then run `norn brief`.'
+$ ls rounds
+ls: /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa71-06/ac13/repo-worktrees/gh-1-add-a-greeting/.agents/specs/gh-1-add-a-greeting/runs/_story/rounds/02-story/receipts: No such file or directory
+/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa71-06/ac13/repo-worktrees/gh-1-add-a-greeting/.agents/specs/gh-1-add-a-greeting/runs/_story/rounds:
+01-triage
+02-story
+
+/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa71-06/ac13/repo-worktrees/gh-1-add-a-greeting/.agents/specs/gh-1-add-a-greeting/runs/_story/rounds/02-story:
+state.json
+workflow.yaml
+{"version":1,"story":"gh-1","slice":null,"unit_dir":"_story","workflow":"story","workflow_hash":"7c5856d5b1ae79c1b46d47395feff6d48d8c13906b59a0f072fcaf7f67e0e081","step":"refine","attempt":1,"visits":{"refine":1},"step_entered_at":"2026-11-01T14:10:33.669Z","status":"parked","park":{"kind":"attended","reason":"attended step refine: work with the agent in the worktree","since":"2026-11-01T14:10:33.669Z"},"counters":{"plan_loop":0,"test_loop":0,"qa_loop":0,"ready_loop":0,"base_conflict_loop":0,"stale_loop":0},"nudges_used":0,"retries_used":0,"applied_through":0,"run":null,"last_outcome":null,"created_at":"2026-11-01T14:10:33.669Z","updated_at":"2026-11-01T14:10:33.669Z","last_tick_id":"01M6BQ57HY5CJ77286NS8KSJ6T","round":2,"mode":"manual"}
+
+fd25afe norn: gh-1 round 2 (story) at refine
+b9d32c8 norn: gh-1 confirm.approve → $done
+a35e03c norn: gh-1 explore.story → confirm
+2212927 norn: start gh-1 (triage)
+51d80de norn: intake gh-1 Add a greeting
+cb802a0 Set up norn
+workflow: story

@@ -4,10 +4,10 @@
  * The checkout's machine-local files live outside it, in the machine dir (B5, D1).
  */
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
-import { LEGACY_SPEC_FILE, parseSliceKey, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName } from "@norn/schema";
+import { LEGACY_SPEC_FILE, parseRoundDirName, parseSliceKey, recordHandoffPath, ROUNDS_DIR, RUNS_DIR, roundDirName, roundRecordPath, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName, unitRecordPath } from "@norn/schema";
 
 /** gh-110 B1, B2 (D1): the committed repo config and workflows, relative to a root, as messages name them. */
 export const REPO_CONFIG_FILE = ".agents/norn.config.yaml";
@@ -141,6 +141,7 @@ export const inboxOpenPath = (root: string) => join(machineDir(root), "inbox.jso
 export const baseFactsPath = (root: string) => join(machineDir(root), "base.json");
 export const noticesPath = (root: string) => join(machineDir(root), "notices.json");
 export const prFactsPath = (root: string) => join(machineDir(root), "pr.json");
+export const issueFactsPath = (root: string) => join(machineDir(root), "issue.json");
 /**
  * B5 (D3): a unit's hook file — `hooks/<story>/_story.jsonl` for the story unit,
  * `hooks/<story>/<nn>.jsonl` for a slice.
@@ -169,15 +170,73 @@ export function storyFile(specDir: string): string {
 export const slicesDir = (specDir: string) => join(specDir, "slices");
 export const sliceFile = (specDir: string, nn: string, slug: string) => join(slicesDir(specDir), `${sliceDirName(nn, slug)}.md`);
 
-/** `runs/<unit>/` where unit is `_story` or the slice dir name `<nn>-<slug>`. */
-export const unitDir = (specDir: string, unit: string) => join(specDir, "runs", unit);
+/** A spec folder's `runs/`, the parent of every unit's record folder. */
+export const specRunsDir = (specDir: string) => join(specDir, RUNS_DIR);
+/**
+ * The resolver for a unit's record folder (gh-71 D2, B30, B36): a slice's `<spec folder>/runs/<nn>-<slug>`;
+ * the story's current round `runs/_story/rounds/NN-<wf>` when the spec folder is absolute and has one, else
+ * `runs/_story` (a flat record from an older norn, read as round 1, or a story not started). A repo-relative
+ * spec folder is not looked at on disk and gets `runs/<unit>`. Every reader and writer goes through here.
+ */
+export function unitDir(specDir: string, unit: string): string {
+  const base = join(specDir, unitRecordPath(unit));
+  // gh-71 D7 (B34, S5): while `runs/_story/state.json` is still flat the record is flat, even when a
+  // round.migrate that stopped partway left some entries in rounds/01-<wf>/: state moves last, so the
+  // next round.migrate finishes the move.
+  if (unit !== STORY_UNIT_DIR || !isAbsolute(specDir) || isFlatStoryRecord(specDir)) return base;
+  const round = currentRound(specDir);
+  return round ? join(base, ROUNDS_DIR, roundDirName(round.n, round.workflow)) : base;
+}
 export const storyUnitDir = (specDir: string) => unitDir(specDir, STORY_UNIT_DIR);
+/**
+ * gh-71 D2 (B30): the story's current round, the highest-numbered `runs/_story/rounds/NN-<wf>/` under an
+ * absolute spec folder that has its state; null = none (a flat record, read as round 1 (B36), or a story
+ * not started). S5: a round folder is the record only once its state.json is written, so a round.start
+ * that stopped after pinning the new round leaves the old round current and the round receipt unapplied.
+ */
+export function currentRound(specDir: string): { n: number; workflow: string } | null {
+  const r = storyRounds(specDir).at(-1);
+  return r ? { n: r.n, workflow: r.workflow } : null;
+}
+/**
+ * gh-71 B29, B30: every round folder `runs/_story/rounds/NN-<wf>/` under an absolute spec folder that has
+ * its state, ascending by number, with its absolute path; [] for a flat record (read as round 1, B36) or
+ * a story not started.
+ */
+export function storyRounds(specDir: string): Array<{ n: number; workflow: string; path: string }> {
+  const out: Array<{ n: number; workflow: string; path: string }> = [];
+  const rounds = join(specDir, unitRecordPath(STORY_UNIT_DIR), ROUNDS_DIR);
+  try {
+    for (const d of readdirSync(rounds, { withFileTypes: true })) {
+      const r = d.isDirectory() && existsSync(join(rounds, d.name, "state.json")) ? parseRoundDirName(d.name) : null;
+      if (r) out.push({ ...r, path: join(rounds, d.name) });
+    }
+  } catch {
+    /* no rounds/ */
+  }
+  return out.sort((a, b) => a.n - b.n);
+}
+/** gh-71 B30: round `n`'s record folder under a spec folder (`runs/_story/rounds/NN-<wf>`). */
+export const roundDir = (specDir: string, n: number, workflow: string) => join(specDir, roundRecordPath(n, workflow));
+/**
+ * Where a unit's record is written when it starts: a slice's own folder; for the story, its current
+ * round, or round 01 of `workflow` when it has neither a round nor a flat record yet (gh-71 B30).
+ */
+export function startDir(specDir: string, unit: string, workflow: string): string {
+  if (unit !== STORY_UNIT_DIR || currentRound(specDir) || isFlatStoryRecord(specDir)) return unitDir(specDir, unit);
+  return roundDir(specDir, 1, workflow);
+}
+/** gh-71 D7 (B34): a story record kept the old flat way, `runs/_story/state.json` directly in the folder. */
+export const isFlatStoryRecord = (specDir: string) => existsSync(join(specDir, unitRecordPath(STORY_UNIT_DIR), "state.json"));
 export const statePath = (ud: string) => join(ud, "state.json");
 export const pinnedWorkflowPath = (ud: string) => join(ud, "workflow.yaml");
 export const receiptsDir = (ud: string) => join(ud, "receipts");
 export const logPath = (ud: string, runId: string) => join(ud, "logs", `${runId}.log`);
 export const evidenceDir = (ud: string, runId: string) => join(ud, "evidence", runId);
-export const handoffPath = (ud: string) => join(ud, "handoff.md");
+/** gh-71 B31: one handoff per story, `runs/_story/handoff.md`, above its round folders; a slice's in its own folder. */
+export const handoffPath = (ud: string) => recordHandoffPath(ud);
+/** What a commit of a unit's record stages: its record folder and its handoff (above the round folder for the story, gh-71 B31). */
+export const recordPaths = (ud: string) => (dirname(handoffPath(ud)) === ud ? [ud] : [ud, handoffPath(ud)]);
 /** R2.3: copies of runs/ files this checkout wrote but never got into the record. */
 export const orphanedDir = (ud: string) => join(ud, "orphaned");
 

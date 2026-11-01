@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { herdr, proc } from "@norn/adapters";
 import { AUTO_PROMPT, type Inbox } from "@norn/core";
 import { type Receipt, type UnitState, ulid } from "@norn/schema";
-import { appendHookTrace, repoConfigPath, workflowsDir } from "@norn/store";
+import { appendHookTrace, repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
 import { withNornOnPath } from "../../src/runtime/shim.ts";
 import { runCli } from "../../src/index.ts";
@@ -63,7 +63,7 @@ const SCREEN = [
 
 const SPEC = ".agents/specs/gh-9-fix-the-bug";
 const wt = (h: Harness) => `${h.root}-worktrees/gh-9-fix-the-bug`;
-const runs = (h: Harness) => join(wt(h), SPEC, "runs/_story");
+const runs = (h: Harness) => storyUnitDir(join(wt(h), SPEC));
 const acted = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop" && d.rule !== "claim.renew").map((d) => `${d.unit} ${d.rule}${d.ok ? "" : ` FAILED ${d.error}`}`);
 const receipts = (h: Harness): Receipt[] =>
   readdirSync(join(runs(h), "receipts"))

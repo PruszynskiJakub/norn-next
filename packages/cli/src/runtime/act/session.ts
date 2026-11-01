@@ -14,6 +14,7 @@ import { type ReceiptOf, type UnitState, type Workflow, ulid } from "@norn/schem
 import {
   acquireRunLease,
   appendHandoffHeartbeat,
+  recordPaths,
   listLeases,
   readEnvNorn,
   releaseLease,
@@ -185,7 +186,7 @@ export async function startRun(act: ActEnv, a: Extract<Action, { kind: "start_ru
   const state = a.state ? recordSession(act, a.unit, loc.runsDir, a.state, a.receipts, session) : null;
   if (state) act.writeUnitState(a.unit, loc.runsDir, state);
   // R2.1 (N6): commit and push the started receipts now — only runs/, never the agent's fresh work
-  const committed = await act.commit(a.commit, a.unit, state, `${a.rule}: ${a.step} run ${a.launch.run_id}`, a.commit ? [relative(a.commit.cwd, loc.runsDir)] : undefined);
+  const committed = await act.commit(a.commit, a.unit, state, `${a.rule}: ${a.step} run ${a.launch.run_id}`, a.commit ? recordPaths(loc.runsDir).map((p) => relative(a.commit?.cwd ?? "", p)) : undefined);
   return { ok: true, detail: { session, lease, ...committed } };
 }
 

@@ -32,7 +32,8 @@ export function renderHandoffStatus(state: UnitState, opts: { workflow?: Workflo
   const lines = [
     STATUS_BEGIN,
     `- Story: ${state.story}${state.slice ? ` · Slice: ${state.slice}` : ""}`,
-    `- Workflow: ${state.workflow} · Step: ${state.step} (attempt ${state.attempt})`,
+    // gh-71 B28 (D10): the story's round next to its workflow; a slice has no rounds of its own
+    `- ${state.slice ? "" : `Round ${state.round ?? 1} · `}Workflow: ${state.workflow} · Step: ${state.step} (attempt ${state.attempt})`,
     `- Status: ${status}`,
     `- Counters: ${counters.length ? counters.join(", ") : "none"}`,
     `- Last outcome: ${last}`,

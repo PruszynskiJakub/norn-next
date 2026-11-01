@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { LeaseFile, UnitState } from "@norn/schema";
+import { type LeaseFile, roundRecordPath, type UnitState } from "@norn/schema";
 import { type Action, legacyAction } from "../../src/actions.ts";
 import { applyReceipts } from "../../src/apply.ts";
 import { decide, isSideAction, unitDecision } from "../../src/decide/index.ts";
@@ -428,6 +428,45 @@ describe("story lifecycle (GR6–GR8)", () => {
   });
 });
 
+describe("gh-71 D7 (B34): a held flat story record moves into round 1 first", () => {
+  const flat = (f: StoryFacts) => {
+    f.units[0]!.record = "runs/_story";
+    return f;
+  };
+  test("round.migrate comes before a receipt and moves runs/_story into rounds/01-<workflow>, in one pushed commit", () => {
+    const s = flat(solo(running(), { process_alive: false }));
+    s.units[0]!.unapplied = [numbered(1, receipt(s.units[0]!.state!, "done", { outcome: "done", handoff: "ok" }))];
+    expect(kinds(facts([s]))).toEqual(["gh-1 round_migrate round.migrate"]);
+    expect(only(facts([s]))).toEqual({
+      kind: "round_migrate",
+      unit: s.units[0]!.unit,
+      rule: "round.migrate",
+      from: `${s.spec_dir}/runs/_story`,
+      to: `${s.spec_dir}/runs/_story/rounds/01-solo`,
+      commit: { cwd: "/r-worktrees/gh-1-login", branch: "gh-1-login", message: "norn: gh-1 record moved into round 1", trailers: { "Norn-Story": "gh-1", "Norn-Step": "implement", "Norn-Tick": TICK }, push: true },
+    });
+  });
+  test("it comes before a remote park and a mirror, and before the story's slices", () => {
+    expect(kinds(facts([flat(storyAt("test", { issue: null }))]))).toEqual(["gh-1 round_migrate round.migrate"]);
+    expect(kinds(facts([flat(storyAt("slices", {}, [{ nn: "01", state: { status: "running" } }]))]))).toEqual(["gh-1 round_migrate round.migrate"]);
+  });
+  test("never during a rebase, never for a story this heartbeat does not hold, never once the PR merged", () => {
+    const rebase = flat(storyAt("test"));
+    rebase.units[0]!.worktree = { ...worktreeOf("/r-worktrees/gh-1-login"), in_progress: { operation: "rebase", unmerged: [] } };
+    expect(kinds(facts([rebase]))).toEqual(["gh-1 noop unit.rebase_in_progress"]);
+    const other = flat(solo({}, null, { claim: { state: "other", sha: "x", blob: { version: 1, story: "gh-1", holder: "ann@pc", heartbeat_id: HB, acquired_at: at(), renewed_at: at(), expires_at: at(T0 + 1), last_tick_id: null } } }));
+    expect(kinds(facts([other]))).toEqual(["gh-1 noop claim.other"]);
+    const merged = flat(storyAt("ready", { pr: { number: 9, url: "u", state: "merged", is_draft: false, head_sha: "abc" } }));
+    expect(kinds(facts([merged]))).toEqual(["gh-1 cleanup_merged_story remote.pr_merged"]);
+  });
+  test("a story already in round folders, or facts with no record, are not moved", () => {
+    const rounds = storyAt("test");
+    rounds.units[0]!.record = "runs/_story/rounds/01-story";
+    expect(kinds(facts([rounds])).join()).not.toContain("round.migrate");
+    expect(kinds(facts([storyAt("test")])).join()).not.toContain("round.migrate");
+  });
+});
+
 describe("gh-79 (H1, S5): a rebasing story worktree holds the story-level writes", () => {
   const rebasingStory = (f: StoryFacts) => {
     f.units[0]!.worktree = { ...worktreeOf("/r-worktrees/gh-1-login"), in_progress: { operation: "rebase", unmerged: [] } };
@@ -467,6 +506,25 @@ describe("mailbox (T9)", () => {
     expect(only(facts([f]))).toMatchObject({ kind: "import_mailbox", receipts: [{ n: 1, receipt: r }], refs: [{ ref: "refs/norn/inbox/gh-1/A", sha: "s" }] });
     f.mailbox = [{ ref: "refs/norn/inbox/gh-1/B", sha: "s", id: "B", receipt: { ...r, attempt: 5 }, error: null }];
     expect(only(facts([f]))).toMatchObject({ kind: "reject_receipt", reason: "no unit at ready#5" });
+  });
+  test("gh-71 B35 (AC12): a mailbox receipt made for round 1's cursor arriving after round 2 started is rejected as stale", () => {
+    const f = storyAt("refine");
+    f.units[0]!.state = { ...f.units[0]!.state!, round: 2 };
+    f.units[0]!.record = roundRecordPath(2, "story");
+    // round 1 waited at its ready gate when the second clone approved it
+    const r = { ...receipt({ step: "ready", attempt: 1, run: null }, "approve", {}, "human"), slice: null, round: 1 };
+    f.mailbox = [{ ref: "refs/norn/inbox/gh-1/A", sha: "s", id: "A", receipt: r, error: null }];
+    expect(decide(facts([f]), WORKFLOWS, CONFIG).find((x) => x.unit === "gh-1" && x.action.kind !== "claim")?.action).toMatchObject({ kind: "reject_receipt", rule: "mailbox.reject", reason: "stale: gh-1 is not at ready#1" });
+  });
+  test("gh-71 AC12: round 2 at the same step#attempt as round 1 (the same workflow again) rejects round 1's receipt, imports its own", () => {
+    const f = storyAt("ready");
+    f.units[0]!.state = { ...f.units[0]!.state!, round: 2, status: "parked", park: { kind: "gate", reason: "x", since: at() } };
+    f.units[0]!.record = roundRecordPath(2, "story");
+    const r = { ...receipt(f.units[0]!.state!, "approve", {}, "human"), slice: null, round: 1 };
+    f.mailbox = [{ ref: "refs/norn/inbox/gh-1/A", sha: "s", id: "A", receipt: r, error: null }];
+    expect(only(facts([f]))).toMatchObject({ kind: "reject_receipt", rule: "mailbox.reject", reason: "stale: gh-1 is in round 2, the receipt was made in round 1" });
+    f.mailbox = [{ ref: "refs/norn/inbox/gh-1/B", sha: "s", id: "B", receipt: { ...r, round: 2 }, error: null }];
+    expect(only(facts([f]))).toMatchObject({ kind: "import_mailbox" });
   });
   test("a receipt naming its unit is routed to that unit, even when another unit has the same cursor", () => {
     const gate: Partial<UnitState> = { step: "human-qa", attempt: 1, visits: { "human-qa": 1 }, status: "parked", park: { kind: "gate", reason: "x", since: at() } };
@@ -663,5 +721,113 @@ describe("trace compatibility (O5)", () => {
     // a non-empty transition on such a kind is a real difference, kept for the replay diff
     const odd = { ...check, receipts: [], state: park.state, commit: null };
     expect(legacyAction(odd)).toBe(odd);
+  });
+});
+
+describe("gh-71 D5/D6: a finished round (B21, B24, B25, B35)", () => {
+  /** The story unit at `$done` (a finished round), in round `round` of the story workflow. */
+  const finished = (extra: Partial<StoryFacts> = {}, patch: Partial<UnitState> = {}, round = 1) => {
+    const f = storyAt("$done", extra);
+    f.units[0]!.state = { ...f.units[0]!.state!, status: "done", ...patch };
+    f.units[0]!.record = roundRecordPath(round, "story");
+    return f;
+  };
+  const issue = (f: StoryFacts) => f.issue!;
+  test("B25: a finished round with no PR is a noop `story.round_done`", () => {
+    expect(kinds(facts([finished()]))).toEqual(["gh-1 noop story.round_done"]);
+  });
+  test("B21: a merged PR in round 3 → remote.pr_merged cleanup as today", () => {
+    const f = finished({ pr: { number: 9, url: "u", state: "merged", is_draft: false, head_sha: "abc", base_branch: "main" } }, {}, 3);
+    expect(kinds(facts([f]))).toEqual(["gh-1 cleanup_merged_story remote.pr_merged"]);
+  });
+  test("B24: an unfinished round with a closed issue parks `remote: issue closed` as today", () => {
+    const f = storyAt("test");
+    f.issue = { ...issue(f), state: "closed" };
+    expect(only(facts([f]))).toMatchObject({ kind: "park", rule: "remote.park", state: { status: "stuck", park: { kind: "remote", reason: "remote: issue closed" } } });
+  });
+  test("D5: a finished round is never parked for a missing label, an unassigned issue or an unseen issue", () => {
+    const label = finished();
+    label.issue = { ...issue(label), labels: [] };
+    const unassigned = finished();
+    unassigned.issue = { ...issue(unassigned), assignees: [] };
+    // the mirror still records the change; the round stays finished
+    expect(kinds(facts([label]))).toEqual(["gh-1 update_story_mirror remote.mirror"]);
+    expect(kinds(facts([unassigned]))).toEqual(["gh-1 update_story_mirror remote.mirror"]);
+    expect(kinds(facts([finished({ issue: null })]))).toEqual(["gh-1 noop story.round_done"]);
+  });
+  test("B22 (GR6b): a closed issue on a finished round with no PR and no unfinished slice closes the story", () => {
+    const closed = (f: StoryFacts) => ({ ...f, issue: { ...issue(f), state: "closed" as const } });
+    const f = closed(finished());
+    f.mailbox = [{ ref: "refs/norn/inbox/gh-1/01JAAAAAAAAAAAAAAAAAAAAAAA", sha: "m1", id: "01JAAAAAAAAAAAAAAAAAAAAAAA", receipt: null, error: null }];
+    expect(only(facts([f]))).toMatchObject({ kind: "close_story", rule: "remote.issue_closed", refs: [{ ref: "refs/norn/inbox/gh-1/01JAAAAAAAAAAAAAAAAAAAAAAA", sha: "m1" }] });
+    // an older norn's remote park at $done reads as finished: closed too
+    const parked = closed(finished({}, { status: "stuck", park: { kind: "remote", reason: "remote: issue closed", since: at(T0 - 60_000) } }));
+    expect(kinds(facts([parked]))).toEqual(["gh-1 close_story remote.issue_closed"]);
+    // integrated and dropped slices are finished; they do not hold it back
+    const sliced = closed(finished({ slices: [sliceFile("gh-1", "01", "s01", [], "integrated"), sliceFile("gh-1", "02", "s02", [], "dropped")] }));
+    expect(kinds(facts([sliced]))).toEqual(["gh-1 close_story remote.issue_closed"]);
+  });
+  test("B22 (GR6b): no close on an unseen or unobserved issue, an open PR, an unfinished slice or an unfinished round", () => {
+    const closed = (f: StoryFacts) => ({ ...f, issue: { ...issue(f), state: "closed" as const } });
+    const noClose = (f: StoryFacts) => expect(kinds(facts([f])).some((k) => k.includes("close_story"))).toBe(false);
+    noClose(finished({ issue: null }));
+    noClose(finished({ issue: undefined }));
+    noClose(closed(finished({ pr: { number: 9, url: "u", state: "open", is_draft: false, head_sha: "abc", base_branch: "main" } })));
+    noClose(closed(finished({ pr: undefined })));
+    noClose(closed(finished({ slices: [sliceFile("gh-1", "01", "s01", [], "planned")] })));
+    noClose(closed(finished({ slices: [sliceFile("gh-1", "01", "s01", [], "active")] })));
+    noClose(closed(storyAt("test")));
+  });
+  test("D5: a finished round whose PR was closed without a merge parks as GR7 says", () => {
+    const f = finished({ pr: { number: 9, url: "u", state: "closed", is_draft: false, head_sha: "abc" } });
+    expect(only(facts([f]))).toMatchObject({ kind: "park", rule: "remote.park", state: { step: "$done", status: "stuck", park: { kind: "remote", reason: "remote: PR closed unmerged" } } });
+  });
+  test("B35: an older norn's remote park at $done is dropped by the holder's tick — the round reads as finished", () => {
+    const old = finished({ issue: null }, { status: "stuck", park: { kind: "remote", reason: "remote: issue closed, unassigned or unlabelled", since: at(T0 - 60_000) } });
+    const a = only(facts([old]));
+    expect(a).toMatchObject({
+      kind: "mark_done",
+      rule: "remote.unpark_finished",
+      cleanup: { worktree: null, branch_local: null, release_slot: false },
+      slice_status: null,
+      state: { step: "$done", status: "done", park: null },
+      commit: { message: "norn: gh-1 round finished (remote park dropped)", trailers: { "Norn-Story": "gh-1", "Norn-Step": "$done" }, push: true },
+    });
+    // the next inbox reads it as a finished round: the Your turn item, nothing to unblock
+    const after = { ...old, units: [{ ...old.units[0]!, state: a.kind === "mark_done" ? a.state : null }] };
+    const inbox = buildInbox(facts([after]), CONFIG);
+    expect(inbox.groups.your_turn.map((i) => [i.title, i.command])).toEqual([["gh-1: story round done, no PR", "norn story edit gh-1 --workflow <name>"]]);
+    expect(inbox.groups.unblock).toEqual([]);
+    // a park for a PR closed unmerged stays: GR7 still holds on a finished round
+    const pr = finished({ pr: { number: 9, url: "u", state: "closed", is_draft: false, head_sha: "abc" } }, { status: "stuck", park: { kind: "remote", reason: "remote: PR closed unmerged", since: at(T0 - 60_000) } });
+    expect(kinds(facts([pr]))).toEqual(["gh-1 noop unit.stuck"]);
+  });
+});
+
+describe("gh-71 D1: round.start and the receipts after the round receipt", () => {
+  const done = (): StoryFacts => {
+    const f = storyAt("$done");
+    f.units[0]!.state = { ...f.units[0]!.state!, status: "done" };
+    f.units[0]!.record = roundRecordPath(1, "story");
+    return f;
+  };
+  const round = (st: UnitState) => receipt(st, "round", { workflow: "story", workflow_hash: sha256(JSON.stringify(STORY_WF)), to: "refine", forced: false, left_at: "$done" }, "human");
+  test("receipts numbered after the round receipt are rejected into the trace with it, never applied to round 2", () => {
+    const f = done();
+    const st = f.units[0]!.state!;
+    f.units[0]!.unapplied = [numbered(3, round(st)), numbered(4, round(st)), numbered(5, receipt(st, "mode", { mode: "manual" }, "human"))];
+    const a = only(facts([f]));
+    expect(a).toMatchObject({ kind: "round_start", rule: "round.start", ended: { applied_through: 5 }, state: { round: 2, step: "refine", applied_through: 0 } });
+    const rejected = (a as Extract<Action, { kind: "round_start" }>).rejected;
+    expect(rejected.map((r) => [r.n, r.reason])).toEqual([
+      [4, "round 1 ended at receipt 3 (round.start); receipt 4 (round) was made for it"],
+      [5, "round 1 ended at receipt 3 (round.start); receipt 5 (mode) was made for it"],
+    ]);
+    expect(rejected.map((r) => r.receipt_id)).toEqual([f.units[0]!.unapplied[1]!.receipt.receipt_id, f.units[0]!.unapplied[2]!.receipt.receipt_id]);
+  });
+  test("a round receipt alone starts round 2 with nothing rejected", () => {
+    const f = done();
+    f.units[0]!.unapplied = [numbered(1, round(f.units[0]!.state!))];
+    expect(only(facts([f]))).toMatchObject({ kind: "round_start", ended: { applied_through: 1 }, rejected: [] });
   });
 });

@@ -1,0 +1,2 @@
+2026-11-01T12:27:18.520Z → 2026-11-01T12:27:31.196Z  gh-12      check     $done: gh-12: remote: label 'norn' removed — the round stays finished (no longer pending)
+      https://github.com/acme/app/issues/12

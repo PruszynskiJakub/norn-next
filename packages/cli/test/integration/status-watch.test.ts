@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { herdr } from "@norn/adapters";
 import { ulid } from "@norn/schema";
-import { appendHookTrace, readCockpitFile } from "@norn/store";
+import { appendHookTrace, readCockpitFile, storyUnitDir } from "@norn/store";
 import type { CockpitModel } from "@norn/view";
 import { placeAgent } from "../../src/runtime/cockpit.ts";
 import { clampScroll, handleKey, initialState, parseKeys, previewLines, renderCockpit, type TuiState, withoutNotes } from "../../src/runtime/cockpit-tui.ts";
@@ -26,7 +26,7 @@ async function* keys(...ks: string[]) {
 
 let c: Harness;
 const wt = (n: 5 | 6) => `${c.root}-worktrees/${n === 5 ? "gh-5-pay-invoices" : "gh-6-export-report"}`;
-const runs = (n: 5 | 6) => join(wt(n), `.agents/specs/${n === 5 ? "gh-5-pay-invoices" : "gh-6-export-report"}/runs/_story`);
+const runs = (n: 5 | 6) => storyUnitDir(join(wt(n), `.agents/specs/${n === 5 ? "gh-5-pay-invoices" : "gh-6-export-report"}`));
 beforeAll(async () => {
   c = await createHarness();
   expect((await c.norn("init")).exit).toBe(0);

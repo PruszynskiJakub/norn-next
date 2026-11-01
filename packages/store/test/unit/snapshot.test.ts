@@ -3,10 +3,13 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   appendReceipt,
+  currentRound,
   loadSnapshot,
   pinWorkflow,
   storyDir,
+  startDir,
   storyFile,
+  storyUnitDir,
   unitDir,
   writeHandoffHeader,
   writeSliceFile,
@@ -65,5 +68,29 @@ describe("storyFile (GR2: spec.md, story.md still read)", () => {
     expect(storyFile(spec)).toBe(join(spec, "story.md"));
     writeFileSync(join(spec, "spec.md"), "");
     expect(storyFile(spec)).toBe(join(spec, "spec.md"));
+  });
+});
+
+describe("the story's current round (gh-71 D2, S5)", () => {
+  test("a round folder without state.json (a round.start that stopped after the pin) is not the current round", () => {
+    const spec = storyDir(tmp(), "gh-12", "fix-login");
+    const r1 = join(spec, "runs/_story/rounds/01-triage");
+    pinWorkflow(r1, WORKFLOW_YAML);
+    writeState(r1, state());
+    expect(currentRound(spec)).toEqual({ n: 1, workflow: "triage" });
+    const r2 = join(spec, "runs/_story/rounds/02-story");
+    pinWorkflow(r2, WORKFLOW_YAML);
+    expect(currentRound(spec)).toEqual({ n: 1, workflow: "triage" });
+    expect(storyUnitDir(spec)).toBe(r1);
+    expect(startDir(spec, "_story", "story")).toBe(r1);
+    writeState(r2, state());
+    expect(currentRound(spec)).toEqual({ n: 2, workflow: "story" });
+    expect(storyUnitDir(spec)).toBe(r2);
+  });
+  test("a story whose round 1 was pinned but never got its state starts in round 1 again", () => {
+    const spec = storyDir(tmp(), "gh-12", "fix-login");
+    pinWorkflow(join(spec, "runs/_story/rounds/01-triage"), WORKFLOW_YAML);
+    expect(currentRound(spec)).toBeNull();
+    expect(startDir(spec, "_story", "triage")).toBe(join(spec, "runs/_story/rounds/01-triage"));
   });
 });

@@ -1,0 +1,22 @@
+## BEFORE close
+$ git ls-remote origin
+a227a75eea9b54975a3b07f35ee204da8934fb59	HEAD
+539d71f4100f9952f40770d1a70ff1c9f501f942	refs/heads/gh-8-triage-me
+a227a75eea9b54975a3b07f35ee204da8934fb59	refs/heads/main
+87a1bcf04ca8adb06ce130e252a346775ca8fdc3	refs/norn/claims/gh-8
+38a42744a6ccd8180040549186c742cfeaca23d3	refs/norn/inbox/gh-8/01JAAAAAAAAAAAAAAAAAAAAAAA
+$ git branch --list; git worktree list; git for-each-ref refs/norn/
++ gh-8-triage-me
+* main
+/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa71-09/work/repo                           a227a75 [main]
+/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa71-09/work/repo-worktrees/gh-8-triage-me  539d71f [gh-8-triage-me]
+87a1bcf04ca8adb06ce130e252a346775ca8fdc3 blob	refs/norn/claims/gh-8
+38a42744a6ccd8180040549186c742cfeaca23d3 blob	refs/norn/inbox/gh-8/01JAAAAAAAAAAAAAAAAAAAAAAA
+$ ls ~/.norn leases/claims
+/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa71-09/work/nornhome/leases
+/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa71-09/work/nornhome/leases/slot-1.json
+$ norn status
+Your turn (1) · work only you can do
+  gh-8       $done: gh-8: tri round done, no PR · 15s
+      or close the issue
+      $ norn story edit gh-8 --workflow <name>

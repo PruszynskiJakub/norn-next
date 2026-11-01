@@ -33,9 +33,10 @@ steps:
     type: gate
     prompt: >-
       Read the reproduce findings in the issue comment (`gh issue view N --comments`). N is the issue number.
-      Fix it: `norn story edit gh-N --workflow quick --at sync` (the branch is brought up to date, then implement starts from the red loop).
+      Approving ends the reproduce round; the next round starts with `norn story edit gh-N --workflow <name>`.
+      Fix it: `norn story approve gh-N`, then `norn story edit gh-N --workflow quick --at sync` (the branch is brought up to date, then implement starts from the red loop).
       Close: `norn story approve gh-N --reason "<why>"`, then `gh issue close N --reason "not planned"`,
-      then `norn story close gh-N --yes` (a story at $done without a PR otherwise waits for a merge, GR6),
+      then `norn story close gh-N --yes`,
       then `git push origin --delete gh-N-<slug>` (close pushed the story branch; the findings stay on the issue comment).
       Reproduce again: `norn story reject gh-N --reason "<what to look at>"`.
     outcomes:

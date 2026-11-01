@@ -82,6 +82,13 @@ export class FakeRemote implements RemotePort {
     this.calls.push(`issue+? ${o.labels.join(",")}`);
     return `https://github.com/o/r/issues/new?labels=${encodeURIComponent(o.labels.join(","))}`;
   }
+  /** set → `replaceIssueLabel` throws it, changing nothing (B20) */
+  labelError: Error | null = null;
+  async replaceIssueLabel(n: number, o: { remove: string; add: string }) {
+    this.calls.push(`label ${n} -${o.remove} +${o.add}`);
+    if (this.labelError) throw this.labelError;
+    this.issues = this.issues.map((i) => (i.number === n ? { ...i, labels: [...i.labels.filter((l) => l !== o.remove && l !== o.add), o.add] } : i));
+  }
 }
 
 export class FakeRunner implements RunnerPort {

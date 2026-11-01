@@ -1,0 +1,38 @@
+# gh-7 — Add login form
+
+## The story
+
+- Issue: https://github.com/o/r/issues/7
+- Story: ready at slices (last: plan → done) · mini · auto · held here
+- Worktree: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-p0gv7z/repo-worktrees/gh-7-add-login-form` · branch `gh-7-add-login-form`
+- Spec: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-p0gv7z/repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form`
+
+## Slices
+
+- gh-7/01 Login form — running at implement · slice
+
+## Pull request
+
+- none seen yet
+- Look: `gh pr view gh-7-add-login-form`; open it in the browser: `norn story view gh-7 --web`
+
+## Waits for the person
+
+Nothing waits for the person.
+
+## Running
+
+- gh-7 (slices), 0s: slices #1 (queued)
+- gh-7/01 (implement), 0s: implement #1 (auto)
+
+## Open notes (0)
+
+No open notes.
+
+## Where to look
+
+- Spec folder: `/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-p0gv7z/repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form`
+- Every step and who acted: `norn run list gh-7/01`
+- Why norn did what it did: `norn run view gh-7/01 --why`
+- Status: `norn story view gh-7/01`
+exit 0

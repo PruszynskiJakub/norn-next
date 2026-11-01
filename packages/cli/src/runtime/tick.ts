@@ -24,7 +24,7 @@ export interface TickReport {
   duration_ms: number;
   sync: SyncReport;
   /** one line per decision: unit, rule, action kind, result */
-  decisions: Array<{ unit: string; rule: string; kind: string; ok: boolean; error?: string; story?: string }>;
+  decisions: Array<{ unit: string; rule: string; kind: string; ok: boolean; error?: string; warnings?: string[]; story?: string }>;
   /** inbox item ids notified this tick (O3) */
   notified: string[];
   /** trace day file the record went to */
@@ -44,7 +44,12 @@ export function traceRecord(obs: Observed, records: ActRecord[], startedAt: numb
     unit: decision.unit,
     rule: decision.rule,
     action: jsonSafe(decision.action) as TickUnitRecord["action"],
-    result: { ok: result.ok, ...(result.error ? { error: result.error } : {}), ...(result.detail === undefined ? {} : { detail: jsonSafe(result.detail) }) },
+    result: {
+      ok: result.ok,
+      ...(result.error ? { error: result.error } : {}),
+      ...(result.detail === undefined ? {} : { detail: jsonSafe(result.detail) }),
+      ...(result.warnings?.length ? { warnings: result.warnings } : {}),
+    },
     ...(result.briefing ? { briefing: result.briefing } : {}),
     ...(result.transcript ? { transcript: result.transcript } : {}),
   }));
@@ -99,6 +104,8 @@ export async function runTick(ctx: Context, opts: TickOptions = {}): Promise<Tic
       kind: decision.action.kind,
       ok: result.ok,
       ...(result.error ? { error: result.error } : {}),
+      // gh-71 B20: the tick's output says what did not happen though the action went on
+      ...(result.warnings?.length ? { warnings: result.warnings } : {}),
       ...(decision.action.kind === "intake_story" ? { story: decision.action.key } : {}),
     }));
     return {

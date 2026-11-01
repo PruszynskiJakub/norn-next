@@ -71,6 +71,10 @@ export function initialState(args: {
   now: string;
   mode?: UnitState["mode"];
   tick_id?: string | null;
+  /** gh-71 B9: the step to enter instead of `workflow.start` */
+  at?: string;
+  /** gh-71 D2: the story round (story unit) or the round that started the slice; omitted = 1 */
+  round?: number;
 }): UnitState {
   const { unit, workflow, now } = args;
   const base: UnitState = {
@@ -96,8 +100,9 @@ export function initialState(args: {
     updated_at: now,
     last_tick_id: args.tick_id ?? null,
   };
+  if (args.round !== undefined && args.round > 1) base.round = args.round;
   if (args.mode) base.mode = args.mode;
-  return enterStep(base, workflow, workflow.start, now);
+  return enterStep(base, workflow, args.at ?? workflow.start, now);
 }
 
 /** Enter `name`: new attempt, within-step limits reset, status by step type (gate/attended park). */
@@ -263,6 +268,9 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
     }
     case "classify":
       return classify(st, r, step, ctx, lastOutcome(r.outcome));
+    case "round":
+      // gh-71 D1: a round receipt starts a new round folder; decide applies it alone (round.start)
+      return { reject: "a round receipt is applied by round.start, not in a round" };
   }
 }
 

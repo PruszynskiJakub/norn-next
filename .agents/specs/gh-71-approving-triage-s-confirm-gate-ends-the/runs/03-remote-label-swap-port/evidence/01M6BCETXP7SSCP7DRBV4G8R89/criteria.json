@@ -1,0 +1,5 @@
+[
+  { "id": "AC1", "verdict": "pass", "evidence": "AC1.md, drive.log, AC-contract-replaceIssueLabel.log" },
+  { "id": "AC2", "verdict": "pass", "evidence": "AC2.md, drive.log, AC-contract-replaceIssueLabel.log" },
+  { "id": "AC3", "verdict": "pass", "evidence": "AC3.md, drive.log, AC3-real-gh.log, AC-contract-replaceIssueLabel.log" }
+]

@@ -9,7 +9,7 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSy
 import { join } from "node:path";
 import type { BriefJson } from "@norn/core";
 import { type HookTrace, type TickTrace, ulid } from "@norn/schema";
-import { appendHookTrace, machineDir, readTickInputs, readTrace, readTraceFile, remoteCachePath, repoConfigPath, setTraceReadObserver, type TraceFileRead, workflowsDir } from "@norn/store";
+import { appendHookTrace, machineDir, readTickInputs, readTrace, readTraceFile, remoteCachePath, repoConfigPath, setTraceReadObserver, type TraceFileRead, workflowsDir, storyUnitDir, handoffPath } from "@norn/store";
 import { type CliResult } from "../../src/index.ts";
 import { parseFindings } from "../../src/commands/done.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
@@ -59,9 +59,9 @@ notifiers: []
 let h: Harness;
 const spec = ".agents/specs/gh-9-manual-thing";
 const wt = () => `${h.root}-worktrees/gh-9-manual-thing`;
-const runs = () => join(wt(), spec, "runs/_story");
+const runs = () => storyUnitDir(join(wt(), spec));
 const pairWt = () => `${h.root}-worktrees/gh-10-pair-on-it`;
-const pairRuns = () => join(pairWt(), ".agents/specs/gh-10-pair-on-it", "runs/_story");
+const pairRuns = () => storyUnitDir(join(pairWt(), ".agents/specs/gh-10-pair-on-it"));
 
 function env() {
   const e: Record<string, string | undefined> = { ...h.deps.env, NORN_AGENT_PID: String(process.pid) };
@@ -260,7 +260,7 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     expect(r.stdout).toEndWith("**End your turn now.** Do not report again; norn routes the work from here.\n");
     const file = receipts(runs()).at(-1) as string;
     expect(readReceipt(runs(), file)).toMatchObject({ kind: "done", outcome: "done", handoff: "form renders; tests added", run_id: runId, by: "agent", who: "claude" });
-    expect(h.read(join(runs(), "handoff.md"))).toMatch(/## Progress\n\n- implement#1 done: form renders; tests added\n\n## Resume/);
+    expect(h.read(handoffPath(runs()))).toMatch(/## Progress\n\n- implement#1 done: form renders; tests added\n\n## Resume/);
 
     for (const argv of [["done", "done", "--handoff", "again"], ["ask", "q?"], ["stuck", "r"], ["brief"]]) {
       const again = await inWt(wt(), ...argv);
@@ -504,7 +504,7 @@ describe("parseFindings", () => {
 describe("hook backfill on upgrade (B11, B12, D5)", () => {
   let g: Harness;
   const gWt = () => `${g.root}-worktrees/gh-9-manual-thing`;
-  const gRuns = () => join(gWt(), spec, "runs/_story");
+  const gRuns = () => storyUnitDir(join(gWt(), spec));
   const backfillFile = () => join(machineDir(g.root), "hooks", "backfill.json");
   const gHookFile = () => join(machineDir(g.root), "hooks", "gh-9", "_story.jsonl");
   const gHookIds = () => (existsSync(gHookFile()) ? g.read(gHookFile()).split("\n").filter(Boolean).map((l) => (JSON.parse(l) as HookTrace).id) : []);

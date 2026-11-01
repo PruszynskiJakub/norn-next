@@ -11,7 +11,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { type ActFailure, type FileError, type NumberedReceipt, openNotes, RE_ENTRY_KINDS, readyApproval, type StepRunFacts, type StoryFacts, storyWorktreePath } from "@norn/core";
 import { DEFAULT_CONFIG, type HookFact, type LeaseFile, parseDuration, parseReceiptFileName, type ReceiptOf, type RunInfo, type UnitState } from "@norn/schema";
-import { type BaseFactsCache, type PrFactsCache, readBaseFacts, readPrFacts } from "./base.ts";
+import { type BaseFactsCache, type IssueFactsCache, type PrFactsCache, readBaseFacts, readIssueFacts, readPrFacts } from "./base.ts";
 import { readActFailures } from "./heartbeat.ts";
 import { type BackfillRun, backfillHookFiles } from "./hook-backfill.ts";
 import { type LeaseListing, type LeaseLiveness, listLeases } from "./leases.ts";
@@ -92,6 +92,8 @@ export interface LocalFacts {
   failures: Record<string, ActFailure>;
   /** C1: the PR cache as the last sync left it */
   pr_seen: PrFactsCache;
+  /** gh-71 D5: the issue cache as the last sync left it */
+  issue_seen: IssueFactsCache;
   /** BS1: the base measurement cache as the last tick left it */
   base: BaseFactsCache;
 }
@@ -146,7 +148,7 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
     const notes = openNotes(s.units.map((u) => ({ unit: u.unit.key, receipts: receiptsOfKinds(s, u, ["done", "approve"]) })));
     return { snapshot: s, worktree: storyWt, units, ...(notes.length ? { notes } : {}), ...(ready ? { ready } : {}) };
   });
-  return { snapshot, stories, leases, failures, pr_seen: readPrFacts(root), base: readBaseFacts(root) };
+  return { snapshot, stories, leases, failures, pr_seen: readPrFacts(root), issue_seen: readIssueFacts(root), base: readBaseFacts(root) };
 }
 
 function localUnit(root: string, story: StorySnapshot, u: UnitSnapshot, worktree: string | null, hooks: HookFact[], leases: LeaseFile[], failures: Record<string, ActFailure>): LocalUnit {

@@ -1,0 +1,7 @@
+`norn status` now shows what needs you; the story listing moved to `norn story list`.
+Running (2) · agents and checks at work
+  gh-7       slices #1 (queued) · 0s
+      $ norn run list gh-7
+  gh-7/01    implement #1 (auto) · 0s
+      $ norn run list gh-7/01
+exit 0

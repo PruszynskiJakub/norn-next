@@ -75,8 +75,8 @@ export const cmd = {
   storyReject: (unit: string) => norn("story reject", unit, `--reason "…"`),
   storyUpdateBranch: (story?: string) => norn("story update-branch", story),
   storyChat: (story?: string) => norn("story chat", story),
-  storyEdit: (unit: string, o: { mode?: "auto" | "manual"; workflow?: string; at?: string } = {}) =>
-    norn("story edit", unit, o.mode && `--${o.mode}`, o.workflow && `--workflow ${o.workflow}`, o.at && `--at ${o.at}`),
+  storyEdit: (unit: string, o: { mode?: "auto" | "manual"; workflow?: string; at?: string; force?: boolean } = {}) =>
+    norn("story edit", unit, o.mode && `--${o.mode}`, o.workflow && `--workflow ${o.workflow}`, o.force && "--force", o.at && `--at ${o.at}`),
   storyStart: (unit?: string, o: { print?: boolean } = {}) => norn("story start", unit, o.print && "--print"),
   storyView: (target?: string, o: { web?: boolean } = {}) => norn("story view", target, o.web && "--web"),
   stuck: (reason = "<reason>") => norn("stuck", `"${reason}"`),

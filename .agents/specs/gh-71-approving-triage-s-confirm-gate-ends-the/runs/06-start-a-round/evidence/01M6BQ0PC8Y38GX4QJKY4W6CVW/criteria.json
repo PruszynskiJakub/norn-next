@@ -1,0 +1,67 @@
+[
+ {
+  "id": "AC1",
+  "verdict": "pass",
+  "evidence": "human.test.ts:728 green; also seen live via CLI in AC13-5-round2.txt (rounds/02-story with workflow.yaml + state at refine, 01-triage kept, same branch, inbox Your turn refine). Logs: AC-tests.md, unit.log, human-runtime.log, integration.log"
+ },
+ {
+  "id": "AC2",
+  "verdict": "pass",
+  "evidence": "human.test.ts:707,:728 + rule case round.start (golden.test green); live: AC13-5-round2.txt shows only 0004-round.json written with workflow, workflow_hash, to, forced:false, left_at; tick decision round.start, one commit 'round 2 (story) at refine'. Logs: AC-tests.md, unit.log, human-runtime.log, integration.log"
+ },
+ {
+  "id": "AC3",
+  "verdict": "pass",
+  "evidence": "human.test.ts:668 (loop at max 2) + :728 green; live AC13-5: round 2 counters all 0. Logs: AC-tests.md, unit.log, human-runtime.log, integration.log"
+ },
+ {
+  "id": "AC4",
+  "verdict": "pass",
+  "evidence": "human.test.ts:690/:728 green (round 1 manual vs default auto \u2192 round 2 manual); live AC13-5: mode manual kept. Logs: AC-tests.md, unit.log, human-runtime.log, integration.log"
+ },
+ {
+  "id": "AC5",
+  "verdict": "pass",
+  "evidence": "human.test.ts:787 green (same branch, body replaced, no 2nd PR, merge ends story). Logs: AC-tests.md, unit.log, human-runtime.log, integration.log"
+ },
+ {
+  "id": "AC6",
+  "verdict": "pass",
+  "evidence": "human.test.ts:764 green. Logs: AC-tests.md, unit.log, human-runtime.log, integration.log"
+ },
+ {
+  "id": "AC7",
+  "verdict": "pass",
+  "evidence": "human.test.ts:764/:690 green (triage\u2192story --at build; harness quick has no sync step); live: --at nope refused exit 3 listing story's steps (AC13-5). Logs: AC-tests.md, unit.log, human-runtime.log, integration.log"
+ },
+ {
+  "id": "AC8",
+  "verdict": "pass",
+  "evidence": "human.test.ts:668 green; live AC13-3-edit-at-confirm.txt: exit 3 round_unfinished, do_instead '... --force', receipts unchanged. Logs: AC-tests.md, unit.log, human-runtime.log, integration.log"
+ },
+ {
+  "id": "AC9",
+  "verdict": "pass",
+  "evidence": "human.test.ts:690 + :163 green; live AC13-5: --workflow sotry \u2192 exit 3 unknown_workflow listing workflows, nothing written. Logs: AC-tests.md, unit.log, human-runtime.log, integration.log"
+ },
+ {
+  "id": "AC10",
+  "verdict": "pass",
+  "evidence": "human.test.ts:690/:728 green (Goal/Progress/Resume kept in runs/_story/handoff.md). Logs: AC-tests.md, unit.log, human-runtime.log, integration.log"
+ },
+ {
+  "id": "AC11",
+  "verdict": "pass",
+  "evidence": "human.test.ts:508 (gh-8, B33) green. Logs: AC-tests.md, unit.log, human-runtime.log, integration.log"
+ },
+ {
+  "id": "AC12",
+  "verdict": "pass",
+  "evidence": "human.test.ts:707 + rule case round.workflow_changed; decide.test.ts:510,:519 stale mailbox; human.test.ts:835 flat $done migration; all green. Logs: AC-tests.md, unit.log, human-runtime.log, integration.log"
+ },
+ {
+  "id": "AC13",
+  "verdict": "pass",
+  "evidence": "Throwaway repo (fake gh, dev build bun packages/cli/src/main.ts, NORN_HOME_DIR in tmp): triage explore \u2192 confirm (AC13-1, AC13-2: gate prompt says 'Approving ends the triage round; the next round starts with norn story edit gh-N --workflow <name>'), approve \u2192 round done (AC13-4), story edit --workflow story + tick \u2192 status 'Your turn gh-1 refine: attended step' in round 2 (AC13-5). reproduce gate prompt carries the same sentence (AC13-6, workflows valid per doctor)."
+ }
+]

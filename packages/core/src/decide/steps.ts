@@ -9,6 +9,7 @@ import {
   type StoryFrontmatter,
   type UnitState,
   type Workflow,
+  unitRecordPath,
 } from "@norn/schema";
 import type { RunGitAction, WorktreeSpec } from "../actions.ts";
 import { initialState, routeOf } from "../apply.ts";
@@ -49,7 +50,7 @@ export function startStoryUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts): void
   });
 }
 
-function usableWorkflow(ctx: Ctx, name: string, level: UnitLevel): { workflow: Workflow; source: string } | { problem: string } {
+export function usableWorkflow(ctx: Ctx, name: string, level: UnitLevel): { workflow: Workflow; source: string } | { problem: string } {
   const lw = ctx.workflows[name];
   if (!lw) return { problem: `workflow '${name}' not found` };
   const issues = [...lw.issues, ...(lw.workflow ? checkWorkflowLevel(lw.workflow, level) : [])];
@@ -58,6 +59,11 @@ function usableWorkflow(ctx: Ctx, name: string, level: UnitLevel): { workflow: W
 }
 
 // ---------------------------------------------------------------- check / git
+
+/** gh-71 D2: the unit's record folder relative to its spec folder, as observe resolved it. */
+export function recordOf(uf: UnitFacts): string {
+  return uf.record ?? unitRecordPath(uf.unit.dir);
+}
 
 export function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, command: string, timeout_ms: number): void {
   const ref = uf.unit;
@@ -79,7 +85,7 @@ export function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitSta
     cwd,
     timeout_ms,
     env,
-    log_path: `${story.spec_dir}/runs/${ref.dir}/logs/${run_id}.log`,
+    log_path: `${story.spec_dir}/${recordOf(uf)}/logs/${run_id}.log`,
   });
 }
 
@@ -239,7 +245,8 @@ export function slicesStep(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitS
     const branch = sliceBranch(story.key, s.nn, s.slug);
     const slot = ctx.slot();
     const worktree: WorktreeSpec = { path, branch, from: story.branch, env: ctx.slotEnv(slot), slot };
-    const state = initialState({ unit: sliceRef, workflow: loaded.workflow, workflowName: name, workflowHash: sha256(loaded.source), now: ctx.nowIso, tick_id: ctx.facts.tick_id });
+    // gh-71 D2 (B33): a slice records the story round that started it
+    const state = initialState({ unit: sliceRef, workflow: loaded.workflow, workflowName: name, workflowHash: sha256(loaded.source), now: ctx.nowIso, tick_id: ctx.facts.tick_id, round: st.round ?? 1 });
     starts.push({
       kind: "start_unit" as const,
       unit: sliceRef,

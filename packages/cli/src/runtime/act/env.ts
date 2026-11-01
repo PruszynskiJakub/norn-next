@@ -26,6 +26,7 @@ import {
   markNotified,
   readNotified,
   traceEvent,
+  unitDir,
 } from "@norn/store";
 import type { Context } from "../../context.ts";
 import { syncRemoteBranch } from "../integrate.ts";
@@ -98,7 +99,7 @@ export class ActEnv {
     // a unit started this tick
     const s = this.storyLoc(unit.story);
     const root = s.worktree ?? s.root;
-    return { unit, story: unit.story, root, runsDir: join(root, s.spec_dir, "runs", unit.dir), worktree: s.worktree, branch: s.branch, state: null, workflow: null };
+    return { unit, story: unit.story, root, runsDir: unitDir(join(root, s.spec_dir), unit.dir), worktree: s.worktree, branch: s.branch, state: null, workflow: null };
   }
 
   liveness() {

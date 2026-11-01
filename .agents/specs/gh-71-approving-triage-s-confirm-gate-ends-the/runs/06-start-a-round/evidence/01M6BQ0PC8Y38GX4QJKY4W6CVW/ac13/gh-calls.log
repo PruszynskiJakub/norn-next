@@ -1,0 +1,4 @@
+issue list --assignee @me --label norn --state open --limit 500 --json number,url,title,body,state,assignees,labels,updatedAt
+api user --jq .login
+api user --jq .login
+api user --jq .login

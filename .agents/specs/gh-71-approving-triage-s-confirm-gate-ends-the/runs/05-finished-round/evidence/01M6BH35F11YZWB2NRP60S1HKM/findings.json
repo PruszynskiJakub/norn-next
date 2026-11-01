@@ -1,0 +1,14 @@
+{
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "blocking",
+      "criterion": "AC6",
+      "title": "The Check item for a lost label, an unassigned or an unseen issue on a finished round exists only on sync ticks; `norn status` never shows it",
+      "repro": "Throwaway repo with a triage story gh-12 at $done (no PR). Remove the `norn` label from issue #12. `norn sync` → `norn tick` → `norn status --json`. Expected a Check item that stays while the label is missing (D5: 'Each of those becomes a Check item'). Observed: check: []; `norn status --history` shows the item opened at the sync tick and closed at the next plain tick.",
+      "file": "packages/core/src/inbox/items.ts",
+      "line": 408,
+      "detail": "finishedRoundRemoteItem reads story.issue through issueProblem (policy.ts:53), which returns null when the issue is undefined (not observed). Only a sync tick observes the issue; plain ticks and loadLocalFacts (status) leave it undefined. Before this slice the GR7 park persisted in state.json, so the person always saw it. The unit test builds facts with the issue observed, so it misses this. A fix needs a persisted or cached issue state (e.g. the story mirror / remote cache) that the inbox reads between syncs, plus a test with the issue unobserved after the change. Evidence: AC6.md, AC6-edge.txt, AC6-history.txt."
+    }
+  ]
+}

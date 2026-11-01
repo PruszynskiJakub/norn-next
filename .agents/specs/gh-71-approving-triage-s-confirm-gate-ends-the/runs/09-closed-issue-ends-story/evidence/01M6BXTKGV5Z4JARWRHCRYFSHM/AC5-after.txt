@@ -1,0 +1,51 @@
+## AFTER sync
+$ git ls-remote origin
+a227a75eea9b54975a3b07f35ee204da8934fb59	HEAD
+58546e967589a8886fa68332a5cee9080c00587e	refs/heads/gh-8-triage-me
+a227a75eea9b54975a3b07f35ee204da8934fb59	refs/heads/main
+$ git branch --list; git worktree list; git for-each-ref refs/norn/
+* main
+/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa71-09/work/repo  a227a75 [main]
+(eval):2: no matches found: /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa71-09/work/repo-worktrees/*
+$ leases
+$ norn status
+Inbox empty — no stories yet.
+Label an issue `norn` (the config's `remote.label`) and assign it to yourself, then run `norn sync`.
+$ norn story list
+No stories. Run `norn sync` to pick up labelled issues.
+heartbeat: last tick 9s ago on jakubpruszynski@mac
+0 items need you — norn status
+$ git fetch; spec.md on origin branch
+---
+id: gh-8
+slug: triage-me
+provider: gh
+number: 8
+url: https://github.com/acme/app/issues/8
+title: Triage me
+assignee: octocat
+labels:
+  - norn
+workflow: tri
+status: dropped
+intake_at: 2026-11-01T16:09:11.788Z
+body_hash: 39b5ed3496729d0df74c44dbe2dd14ec0a4c5abdd7d242e441cc5b7a4229edfb
+---
+$ round 1 state on origin
+{"version":1,"story":"gh-8","slice":null,"unit_dir":"_story","workflow":"tri","workflow_hash":"6b4d4d273ab871c4d97069d5c803383e0365d807a6a7eb17c6c60654cb836b2c","step":"$done","attempt":1,"visits":{"explore":1,"confirm":1},"step_entered_at":"2026-11-01T16:09:56.017Z","status":"done","park":null,"counters":{"loop":0},"nudges_used":0,"retries_used":0,"applied_through":2,"run":null,"last_outcome":{"step":"confirm","outcome":"approve","source":"human","at":"2026-11-01T16:10:06.668Z","receipt_id":"01M6BY04ECQYQB7ZY76P15VMT3"},"created_at":"2026-11-01T16:09:52.352Z","updated_at":"2026-11-01T16:10:07.040Z","last_tick_id":"01M6BY04SR46R72GYYT3B9CBW4","mode":"manual"}
+
+$ git log origin/gh-8-triage-me
+58546e9 norn: gh-8 dropped
+539d71f norn: gh-8 confirm.approve → $done
+dd898c7 norn: gh-8 explore.pass → confirm
+c71a9a0 norn: start gh-8 (tri)
+f0bd43d norn: intake gh-8 Triage me
+$ trace decision detail
+(eval):2: no matches found: /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa71-09/work/nornhome/repos/*/trace/*.jsonl
+
+$ two more ticks
+{"tick_id":"01M6BY0Z0ZGMGGMMS7XMMVD96B","at":"2026-11-01T16:10:33.887Z","duration_ms":220,"sync":{"ran":false,"ok":true},"decisions":[],"notified":[],"trace":"2026-11-01.jsonl","failed":0}
+
+{"tick_id":"01M6BY0ZF6DGKKTEQCE65JQ449","at":"2026-11-01T16:10:34.342Z","duration_ms":214,"sync":{"ran":false,"ok":true},"decisions":[],"notified":[],"trace":"2026-11-01.jsonl","failed":0}
+
+(eval):2: no matches found: /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa71-09/work/repo-worktrees/*

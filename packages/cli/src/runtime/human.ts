@@ -12,6 +12,8 @@ import {
   parseSpecDirName,
   type Receipt,
   SPECS_DIR,
+  parseRoundDirName,
+  ROUNDS_DIR,
   STORY_UNIT_DIR,
   ulid,
   type UnitState,
@@ -32,6 +34,11 @@ import {
   readClaim,
   recordedHeartbeatId,
   machineHolder,
+  pinnedWorkflowPath,
+  specRunsDir,
+  statePath,
+  roundDir,
+  unitDir,
 } from "@norn/store";
 import type { Context } from "../context.ts";
 import { claimHeld, failure, refuse, usageError } from "../output.ts";
@@ -104,17 +111,23 @@ async function remoteTarget(ctx: Context, key: string): Promise<Target | null> {
   const storyRef = refs.find((r) => r.startsWith(prefix) && parseSpecDirName(r.slice(prefix.length))?.story === story);
   if (!storyRef) return null;
   const spec = `${SPECS_DIR}/${storyRef.slice(prefix.length)}`;
-  const candidates: Array<{ ref: string; dir: string }> = [];
+  const candidates: Array<{ ref: string; dir: string; record?: string }> = [];
   if (slice) {
     const nn = slice.split("/")[1] as string;
     const sliceRef = refs.find((r) => r.startsWith(`${prefix}${story}/${nn}-`));
     if (sliceRef) candidates.push({ ref: sliceRef, dir: sliceRef.slice(`${prefix}${story}/`.length) });
-    const listed = (await git.lsTree(root, storyRef, `${spec}/runs/`)) ?? [];
+    const listed = (await git.lsTree(root, storyRef, `${specRunsDir(spec)}/`)) ?? [];
     const dir = listed.find((d) => d.startsWith(`${nn}-`));
     if (dir) candidates.push({ ref: storyRef, dir });
-  } else candidates.push({ ref: storyRef, dir: STORY_UNIT_DIR });
+  } else {
+    // gh-71 D2 (B30, B36): the story's current round, the highest-numbered rounds/NN-<wf>; a flat record is round 1
+    const rounds = ((await git.lsTree(root, storyRef, `${unitDir(spec, STORY_UNIT_DIR)}/${ROUNDS_DIR}/`)) ?? []).map(parseRoundDirName).filter((r) => r !== null);
+    const round = rounds.sort((a, b) => b.n - a.n)[0];
+    candidates.push({ ref: storyRef, dir: STORY_UNIT_DIR, ...(round ? { record: roundDir(spec, round.n, round.workflow) } : {}) });
+  }
   for (const c of candidates) {
-    const raw = await git.show(root, c.ref, `${spec}/runs/${c.dir}/state.json`);
+    const record = c.record ?? unitDir(spec, c.dir);
+    const raw = await git.show(root, c.ref, statePath(record));
     if (raw === null) continue;
     let parsed: unknown;
     try {
@@ -124,8 +137,8 @@ async function remoteTarget(ctx: Context, key: string): Promise<Target | null> {
     }
     const st = validate("state", parsed);
     if (!st.ok) continue;
-    const wfText = await git.show(root, c.ref, `${spec}/runs/${c.dir}/workflow.yaml`);
-    const wf = wfText === null ? null : parseWorkflowText(wfText, `${spec}/runs/${c.dir}/workflow.yaml`);
+    const wfText = await git.show(root, c.ref, pinnedWorkflowPath(record));
+    const wf = wfText === null ? null : parseWorkflowText(wfText, pinnedWorkflowPath(record));
     return { key, story, slice, state: st.value, workflow: wf?.ok ? wf.value : null, runsDir: null, source: "remote", obs: null, story_facts: null };
   }
   return null;
@@ -176,9 +189,9 @@ export function started(t: Target): UnitState {
 
 // ------------------------------------------------------------------ receipts
 
-type HumanKind = "answer" | "approve" | "reject" | "unstick" | "stuck" | "mode" | "workflow" | "update";
+type HumanKind = "answer" | "approve" | "reject" | "unstick" | "stuck" | "mode" | "workflow" | "update" | "round";
 
-/** A human receipt at the unit's cursor (S6): step + attempt + slice so the tick routes it (T9). */
+/** A human receipt at the unit's cursor (S6): step + attempt + slice (+ the story's round) so the tick routes it (T9). */
 export function humanReceipt<K extends HumanKind>(ctx: Context, t: Pick<Target, "slice">, st: UnitState, kind: K, body: Record<string, unknown>): Extract<Receipt, { kind: K }> {
   const r = {
     kind,
@@ -190,6 +203,8 @@ export function humanReceipt<K extends HumanKind>(ctx: Context, t: Pick<Target, 
     by: "human",
     who: machineHolder(ctx.env),
     slice: t.slice,
+    // gh-71 AC12 (T9): the story's round, so a mailbox receipt is not applied to a later round at the same cursor
+    ...(t.slice === null ? { round: st.round ?? 1 } : {}),
     ...body,
   };
   const v = validate("receipt", r);

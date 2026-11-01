@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { herdr } from "@norn/adapters";
-import { inboxOpenPath, repoConfigPath, machineDir, workflowsDir } from "@norn/store";
+import { inboxOpenPath, repoConfigPath, machineDir, workflowsDir, storyUnitDir } from "@norn/store";
 import { type TickReport } from "../../packages/cli/src/index.ts";
 import { createHarness, type Harness, installBundledSkills, issue, sh } from "../support/harness.ts";
 import { runChecked } from "../support/harness.ts";
@@ -75,7 +75,7 @@ function siblingMerge(h: Harness, file: string, text: string, branch = "main"): 
 describe("base sync with real git", () => {
   let h: Harness;
   const wt = () => `${h.root}-worktrees/gh-7-add-login-form`;
-  const runs = () => join(wt(), ".agents/specs/gh-7-add-login-form/runs/_story");
+  const runs = () => storyUnitDir(join(wt(), ".agents/specs/gh-7-add-login-form"));
   const step = () => h.clock.advance(10_000);
   const until = async (pred: () => boolean, label: string, max = 20) => {
     const seen: string[] = [];
@@ -222,7 +222,7 @@ describe("base sync with real git", () => {
 describe("BS3.3a (dogfood D4): a person's push to the branch of a $done story", () => {
   let h: Harness;
   const wt = () => `${h.root}-worktrees/gh-13-take-person-pushes`;
-  const runs = () => join(wt(), ".agents/specs/gh-13-take-person-pushes/runs/_story");
+  const runs = () => storyUnitDir(join(wt(), ".agents/specs/gh-13-take-person-pushes"));
   const until = async (pred: () => boolean, label: string) => {
     const seen: string[] = [];
     for (let i = 0; i < 20 && !pred(); i++) {
@@ -280,17 +280,17 @@ describe("base_branch: develop (BS0, 7b)", () => {
 
   test("intake from develop, update merges develop, open-pr targets develop", async () => {
     const wt = `${h.root}-worktrees/gh-8-use-develop`;
-    const runs = join(wt, ".agents/specs/gh-8-use-develop/runs/_story");
+    const runs = () => storyUnitDir(join(wt, ".agents/specs/gh-8-use-develop"));
     await h.tick();
     const sibling = siblingMerge(h, "d.txt", "d\n", "develop");
     siblingMerge(h, "m.txt", "m\n", "main"); // main moves too: never merged into the story
     h.clock.advance(10_000);
     await h.tick("--sync");
-    for (let i = 0; i < 12 && h.state(runs)?.step !== "ready"; i++) {
+    for (let i = 0; i < 12 && h.state(runs())?.step !== "ready"; i++) {
       h.clock.advance(10_000);
       await h.tick();
     }
-    expect(h.state(runs)).toMatchObject({ step: "ready", status: "parked" });
+    expect(h.state(runs())).toMatchObject({ step: "ready", status: "parked" });
     expect(h.git(["log", "--format=%s"], wt)).toContain(`Update gh-8 from develop (${sibling.slice(0, 7)})`);
     expect(existsSync(join(wt, "m.txt"))).toBe(false);
     expect(h.remote.prs).toMatchObject([{ head: "gh-8-use-develop", base_branch: "develop" }]);
@@ -300,7 +300,7 @@ describe("base_branch: develop (BS0, 7b)", () => {
 describe("PR items between syncs and in the read model (C1), ready approval voided by norn update (C5)", () => {
   let h: Harness;
   const wt = () => `${h.root}-worktrees/gh-9-pay-by-card`;
-  const runs = () => join(wt(), ".agents/specs/gh-9-pay-by-card/runs/_story");
+  const runs = () => storyUnitDir(join(wt(), ".agents/specs/gh-9-pay-by-card"));
   type View = { groups: Record<string, Array<{ id: string; command: string; detail?: string }>> };
   const view = async () => (await h.norn("status")).value as View;
   const ids = (v: View, group: string) => (v.groups[group] ?? []).map((i) => i.id);
@@ -415,7 +415,7 @@ describe("PR items between syncs and in the read model (C1), ready approval void
 describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge; done is verified", () => {
   let h: Harness;
   const wt = () => `${h.root}-worktrees/gh-11-merge-safely`;
-  const runs = () => join(wt(), ".agents/specs/gh-11-merge-safely/runs/_story");
+  const runs = () => storyUnitDir(join(wt(), ".agents/specs/gh-11-merge-safely"));
   /** a Claude Code permission dialog in the agent's pane (as in prompts.test.ts) */
   const SCREEN = [" Bash command", "", " │ python3 fix.py", "╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌", " Do you want to proceed?", " ❯ 1. Yes", "   2. No", "", " Esc to cancel · Tab to amend"].join("\n");
   const inWt = (...argv: string[]) => runChecked(argv, { ...h.deps, cwd: wt() });
@@ -542,7 +542,7 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
 describe("BUG-2: an update conflict that exhausts base_conflict_loop, then run rerun --step resolve (BS5, W4)", () => {
   let h: Harness;
   const wt = () => `${h.root}-worktrees/gh-12-conflict-twice`;
-  const runs = () => join(wt(), ".agents/specs/gh-12-conflict-twice/runs/_story");
+  const runs = () => storyUnitDir(join(wt(), ".agents/specs/gh-12-conflict-twice"));
   const inWt = (...argv: string[]) => runChecked(argv, { ...h.deps, cwd: wt() });
   const lastClassify = () => {
     const file = h.git(["ls-files", "--others", "--cached", "receipts"], runs()).split("\n").filter((f) => f.endsWith("-classify.json")).at(-1) as string;
