@@ -14,6 +14,18 @@
 
 ## Goal
 
+`norn story edit <story> --workflow <name> --force` ends an unfinished round (recorded as ended by the person) and starts the next one, with D3's refusals; `--at <step>` alone moves the cursor inside the current round.
+
 ## Progress
 
+- Schema: `UnitState.ended` `{ by: "person", at, receipt_id }` (B32), schemas re-emitted. decide `roundStart`: a forced, unfinished round is written `$done`/`done` with `ended`, run and park cleared.
+- `story-edit.ts`: `--force` option. Refusal order follows D3: claim → unknown workflow → unknown `--at` → unfinished without `--force` (`round_unfinished`) → running agent (`agent_running`, do_instead `norn run cancel <story>`) → slice not integrated or dropped (`slice_unfinished`). The receipt's `forced` is true only on an unfinished round (B14). `--force` without `--workflow` is a usage error.
+- `--at` alone (`moveCursor`): writes a `workflow` receipt with the same name and hash; the existing apply enters the step and keeps counters. A finished story round is refused with `round_finished`, pointing to `--workflow <name>` (checked before the step is looked up). An unknown step is refused naming the pinned workflow's steps. A slice target also works (same receipt); a done slice is refused with `unit_done`.
+- Tests (S1, `human.test.ts`): a new describe covers AC1, AC2, AC3, AC5, AC6 and AC7. AC4 is a test after B33 in the gh-8 slice describe. AC8 is a `recordSnapshot` (every file under runs/ plus the branch head) taken before and after each refusal. The round workflows were hoisted to module level (`ROUND_*`), and the old "`--at` alone is a usage error" assertion now expects `unknown_step`.
+- PRD §15 command table: `story edit` now lists `--force` and `--at` alone.
+- Green: unit tier, typecheck, human + run-rerun-cancel integration (57 pass), help-tree.
+- Friction: Bun's `toMatchObject` with `expect.any` overwrote fields of the object under test, so the helper clones the value first.
+
 ## Resume
+
+Implementation is done. Next: the test check, then review. AC9 (agent: a throwaway repo with the build of this branch) is QA's job.
