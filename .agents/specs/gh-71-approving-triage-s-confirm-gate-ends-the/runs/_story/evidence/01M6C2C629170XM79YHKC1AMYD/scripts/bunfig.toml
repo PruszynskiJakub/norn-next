@@ -1,0 +1,3 @@
+[test]
+preload = ["/Users/jakubpruszynski/Projects/norn-worktrees/gh-71-approving-triage-s-confirm-gate-ends-the/test/preload.ts", "/Users/jakubpruszynski/Projects/norn-worktrees/gh-71-approving-triage-s-confirm-gate-ends-the/test/support/spawning-tier-preload.ts"]
+root = "/private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-71-approving-triage-s-confirm-gate-ends-the/e8639823-50a7-4871-9f43-a3f7502d8bbb/scratchpad/qa2/scripts"
