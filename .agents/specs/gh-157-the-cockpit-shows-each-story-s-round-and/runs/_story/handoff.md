@@ -5,11 +5,12 @@
 - Counters: none
 - Last outcome: none
 - Next: `norn brief`
-- Updated: 2026-11-01T20:23:26.125Z
+- Updated: 2026-11-01T20:23:40.150Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - story.start: quick at sync
 - round.start: round 2 triage at explore
+- receipts.apply: applied 1
 <!-- norn:heartbeat:end -->
 
 ## Goal
