@@ -7,7 +7,8 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Receipt } from "@norn/schema";
-import { heartbeatFilePath, repoConfigPath, workflowsDir, storyUnitDir, handoffPath } from "@norn/store";
+import { heartbeatFilePath, readTrace, repoConfigPath, workflowsDir, storyUnitDir, handoffPath } from "@norn/store";
+import { humanTickLines } from "../../src/commands/watch.ts";
 import { type CliResult, type TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue, sh } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";
@@ -661,7 +662,7 @@ counters: { back: { max: 2 } }
     t.git(["add", "-A"]);
     t.git(["commit", "-q", "-m", "norn init"]);
     t.git(["push", "-q", "origin", "main"]);
-    t.remote.issues = [issue(14, "Round me"), issue(15, "Triage twice")];
+    t.remote.issues = [issue(14, "Round me", ["norn", "norn:wf:triage"]), issue(15, "Triage twice")];
   });
   afterAll(() => t.cleanup());
 
@@ -761,6 +762,29 @@ counters: { back: { max: 2 } }
     expect(receiptsIn(runs())[0]).toMatch(/^0001-/);
   });
 
+  test("B19 (D9): round 2 swapped the issue's norn:wf:triage label for norn:wf:story, once", () => {
+    expect(t.remote.calls.filter((c) => c.startsWith("label "))).toEqual(["label 14 -norn:wf:triage +norn:wf:story"]);
+    expect(t.remote.issues.find((i) => i.number === 14)?.labels).toEqual(["norn", "norn:wf:story"]);
+  });
+
+  test("B19: a norn:wf label edited on the remote starts no round and changes no workflow", async () => {
+    const at = runs();
+    const st = t.state(at);
+    t.remote.issues = t.remote.issues.map((i) => (i.number === 14 ? { ...i, labels: ["norn", "norn:wf:quick"] } : i));
+    const rules: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      t.clock.advance(10 * 60_000);
+      const r = await t.tick("--sync");
+      rules.push(...r.decisions.filter((d) => d.unit === "gh-14").map((d) => d.rule));
+    }
+    expect(rules).not.toContain("round.start");
+    expect(runs()).toBe(at);
+    expect(t.state(runs())).toMatchObject({ workflow: "story", round: 2, step: st?.step });
+    expect(t.read(join(wt(), spec, "spec.md"))).toContain("workflow: story");
+    expect(t.remote.calls.filter((c) => c.startsWith("label "))).toHaveLength(1);
+    t.remote.issues = t.remote.issues.map((i) => (i.number === 14 ? { ...i, labels: ["norn", "norn:wf:story"] } : i));
+  });
+
   test("B8, B9: the same workflow again as round 2, and --at picks the step it starts at", async () => {
     const runs15 = () => storyUnitDir(join(`${t.root}-worktrees/gh-15-triage-twice`, ".agents/specs/gh-15-triage-twice"));
     for (let i = 0; i < 8 && t.state(runs15())?.status !== "running"; i++) await next();
@@ -782,6 +806,33 @@ counters: { back: { max: 2 } }
     await next();
     expect(runs15()).toEndWith("/runs/_story/rounds/03-story");
     expect(t.state(runs15())).toMatchObject({ workflow: "story", round: 3, step: "build", visits: { build: 1 } });
+  });
+
+  test("B20 (D9): a failed label call warns in the tick's output and the trace; the round starts anyway", async () => {
+    const runs15 = () => storyUnitDir(join(`${t.root}-worktrees/gh-15-triage-twice`, ".agents/specs/gh-15-triage-twice"));
+    t.report(runs15(), "done", { outcome: "done", handoff: "built" });
+    await next();
+    expect(t.state(runs15())).toMatchObject({ round: 3, step: "$done", status: "done" });
+    expect((await t.norn("story", "edit", "gh-15", "--workflow", "quick")).exit).toBe(0);
+    t.remote.labelError = new Error("gh: could not connect");
+    try {
+      const r = await next();
+      const d = r.decisions.find((x) => x.unit === "gh-15" && x.rule === "round.start");
+      expect(d?.ok).toBe(true);
+      expect(d?.warnings).toEqual(["issue #15 label norn:wf:story → norn:wf:quick not updated: gh: could not connect"]);
+      expect(r.failed).toBe(0);
+      expect(t.remote.calls).toContain("label 15 -norn:wf:story +norn:wf:quick");
+      expect(runs15()).toEndWith("/runs/_story/rounds/04-quick");
+      expect(t.state(runs15())).toMatchObject({ workflow: "quick", round: 4, step: "work" });
+      // the trace carries the warning on the action's result
+      const tick = readTrace(t.root, { types: ["tick"] }).events.find((e) => (e as { tick_id?: string }).tick_id === r.tick_id) as { decisions: Array<{ rule: string; result: { ok: boolean; warnings?: string[] } }> };
+      const traced = tick.decisions.find((x) => x.rule === "round.start")?.result;
+      expect([traced?.ok, traced?.warnings]).toEqual([true, d?.warnings]);
+      // watch --human prints it on the action's line
+      expect(humanTickLines(r.decisions, r.at).find((l) => l.includes("round.start"))).toEndWith("round.start → round_start  WARNING: issue #15 label norn:wf:story → norn:wf:quick not updated: gh: could not connect");
+    } finally {
+      t.remote.labelError = null;
+    }
   });
 
   test("B4, B7: a round after a finished round with an open PR works on the same branch and replaces the PR's body", async () => {

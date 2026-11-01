@@ -375,6 +375,11 @@ export interface RoundStartAction extends UnitBase {
   /** the new round's first state */
   state: UnitState;
   commit: BoundaryCommit | null;
+  /**
+   * gh-71 D9 (B19): the issue's `norn:wf:<old>` label swapped for `norn:wf:<new>` after the commit, for
+   * visibility only; null when the workflow is the same. A failed swap is a warning, never a failed action (B20).
+   */
+  label: { number: number; remove: string; add: string } | null;
 }
 
 /** Nothing to do; recorded so `why` explains idleness. */
@@ -473,6 +478,8 @@ export interface ActionResult {
   ok: boolean;
   error?: string;
   detail?: unknown;
+  /** gh-71 B20: an effect that failed without failing the action (a label not updated); carried to the trace and the tick's output */
+  warnings?: string[];
   /** trace-relative paths written by act */
   briefing?: string;
   transcript?: string;

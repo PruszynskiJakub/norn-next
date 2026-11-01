@@ -358,5 +358,20 @@ export async function roundStart(act: ActEnv, a: Extract<Action, { kind: "round_
   for (const r of a.rejected) act.traceReject(a.unit.key, `receipt ${r.n}`, r.reason, { receipt_id: r.receipt_id });
   const fm = patchStoryFile(storyFile(join(wt, story.spec_dir)), { workflow: a.round.workflow }, wt);
   const commit = await act.commit(a.commit, a.unit, a.state, `${a.rule}: round ${a.round.n} ${a.round.workflow} at ${a.state.step}`);
-  return { ok: true, detail: { round: a.round, story_file: fm.ok ? "updated" : fm.reason, commit } };
+  const label = await swapRoundLabel(act, a.label);
+  return { ok: true, detail: { round: a.round, story_file: fm.ok ? "updated" : fm.reason, commit, ...(label.swapped ? { label: a.label } : {}) }, ...(label.warning ? { warnings: [label.warning] } : {}) };
+}
+
+/** gh-71 D9 (B19, B20): swap the issue's workflow label after the round started; a failure is only a warning. */
+async function swapRoundLabel(act: ActEnv, label: Extract<Action, { kind: "round_start" }>["label"]): Promise<{ swapped: boolean; warning?: string }> {
+  if (!label) return { swapped: false };
+  const remote = act.obs.ports.remote;
+  const what = `issue #${label.number} label ${label.remove} → ${label.add}`;
+  if (!remote) return { swapped: false, warning: `${what} not updated: no remote provider configured` };
+  try {
+    await remote.replaceIssueLabel(label.number, { remove: label.remove, add: label.add });
+    return { swapped: true };
+  } catch (e) {
+    return { swapped: false, warning: `${what} not updated: ${(e as Error).message}` };
+  }
 }

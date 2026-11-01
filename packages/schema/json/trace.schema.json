@@ -103,7 +103,13 @@
                   "error": {
                     "type": "string"
                   },
-                  "detail": {}
+                  "detail": {},
+                  "warnings": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
                 }
               },
               "briefing": {

@@ -24,6 +24,7 @@ import type { Decision } from "../actions.ts";
 import { storyWorktreePath } from "../commands.ts";
 import type { Facts, StoryFacts } from "../facts.ts";
 import { sha256 } from "../hash.ts";
+import { WF_LABEL } from "../policy.ts";
 import { epoch } from "../time.ts";
 import type { WorkflowIssue } from "../workflow.ts";
 import { commitFor, Ctx, isSideAction } from "./receipts.ts";
@@ -45,7 +46,7 @@ export interface LoadedWorkflow {
 export type RepoWorkflows = Readonly<Record<string, LoadedWorkflow>>;
 
 /** W9: the issue label that picks a story's workflow at intake (`norn:wf:<name>`). */
-export const WF_LABEL = "norn:wf:";
+export { WF_LABEL };
 
 /** The decision that is the unit's one action this tick (O5), else its side action, else null. */
 export function unitDecision<D extends { unit: string; action: { kind: string; op?: unknown } }>(decisions: readonly D[], unit: string, unitOf: (d: D) => string = (d) => d.unit): D | null {

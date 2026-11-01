@@ -5,6 +5,9 @@
 import { type Mode, parseDuration, type ResolvedConfig, type Step, type UnitState } from "@norn/schema";
 import type { Facts, RunFacts, StoryFacts, UnitFacts } from "./facts.ts";
 
+/** W9: the issue label that picks a story's workflow at intake (`norn:wf:<name>`); B19: it follows the round after. */
+export const WF_LABEL = "norn:wf:";
+
 /** C5: when `norn check-run` holds the unit's check lease at a check step, the lease's time (running since then, not queued); else null. */
 export function checkRunningSince(step: Step | null | undefined, uf: UnitFacts): string | null {
   return step?.type === "check" && uf.lease?.kind === "check" && uf.state && !uf.state.park ? uf.lease.created_at : null;

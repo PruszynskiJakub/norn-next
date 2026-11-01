@@ -30,7 +30,7 @@ const clockTime = (at: string | number) => new Date(at).toTimeString().slice(0, 
 
 /** One line per action of a tick, `HH:MM:SS  gh-12/03  agent.start → start_run`; none for a quiet tick. */
 export function humanTickLines(decisions: TickReport["decisions"], at: string): string[] {
-  return decisions.map((d) => `${clockTime(at)}  ${d.unit}  ${d.rule} → ${d.kind}${d.ok ? "" : `  FAILED: ${d.error ?? "no detail"}`}`);
+  return decisions.map((d) => `${clockTime(at)}  ${d.unit}  ${d.rule} → ${d.kind}${d.ok ? "" : `  FAILED: ${d.error ?? "no detail"}`}${(d.warnings ?? []).map((w) => `  WARNING: ${w}`).join("")}`);
 }
 
 export function humanSummary(s: { ticks: number; failed_actions: number; skipped_busy: number; released: ReleaseResult[] }, kept: boolean): string {

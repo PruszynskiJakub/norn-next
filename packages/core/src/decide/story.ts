@@ -18,7 +18,7 @@ import type { NumberedReceipt, StoryFacts, UnitFacts, UnitRef } from "../facts.t
 import { initialState } from "../apply.ts";
 import { sha256 } from "../hash.ts";
 import { bodyChangedItem } from "../inbox/items.ts";
-import { issueProblem, mergedIntoBase, prProblem, roundFinished, storyFinished, storyUnit } from "../policy.ts";
+import { issueProblem, mergedIntoBase, prProblem, roundFinished, storyFinished, storyUnit, WF_LABEL } from "../policy.ts";
 import type { RemoteIssue } from "../ports.ts";
 import { epoch, iso } from "../time.ts";
 import { edgeOf, isStale, stepOf } from "../workflow.ts";
@@ -427,5 +427,7 @@ function roundStart(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, n
     workflow_source: loaded.source,
     state,
     commit: commitFor(ctx, story, uf, `norn: ${story.key} round ${n} (${r.workflow}) at ${r.to}`, state.step),
+    // gh-71 D9 (B19): the issue label follows the round; it is never read back as a request for one
+    label: story.frontmatter && st.workflow !== r.workflow ? { number: story.frontmatter.number, remove: `${WF_LABEL}${st.workflow}`, add: `${WF_LABEL}${r.workflow}` } : null,
   });
 }
