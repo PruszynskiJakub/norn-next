@@ -2,7 +2,7 @@
 id: gh-71/04
 title: The story record lives in round folders, and flat records move there
 depends_on: [ gh-71/01, gh-71/03 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
