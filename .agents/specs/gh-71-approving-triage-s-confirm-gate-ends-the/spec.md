@@ -179,3 +179,90 @@ None.
 ## PRD
 
 Amended in this step: §5 (core noun *round*), §7 (record layout), S7, W7, W9, the default story workflow sketch, new §11.1 (RD1–RD8), new GR6b, GR7.
+
+## Plan
+
+### Seams
+
+- **S1 The cli harness, through `norn …` commands and `tick` against the fake remote, runner and clock.** Observes B1–B20, B28–B33, B36, and the effects of B22, B23, B34 and B35: command output and refusals (exit code, `code`, `do_instead`), the files under `runs/` (round folders, state, pinned workflow, receipts), the commits on the story branch, `status --json`, `story view`, `run list`, the handoff header, and the calls recorded on the fake remote (label swap, a failing label call).
+  Prior art: the cli integration tests on the shared harness. `story edit` before and after start, mode and approve are in the human-verb tests. The GR6 wait after `$done` is in the runtime tests. Close and reopen are in the story-reopen tests. A flat record for B36 is written by a fixture, the way the view tests keep a flat `_story` record.
+- **S2 `decide` and `buildInbox` over Facts.** Observes B21, B24–B27, and the rules behind B22 (GR6b), B34 (`round.migrate`) and B35 (an old remote park at `$done` read as a finished round). Built with the core fixtures (story, unit and facts builders). Every new rule id also gets a hand-built rule case or a harvested golden case, as the golden test requires.
+  Prior art: the decide unit tests (story finished, GR7 remote park), the handoff and inbox unit tests (the GR6 "waiting for the PR merge" items), and the hand-built rule cases (remote park "issue closed").
+
+The e2e effect transcripts, the observe snapshots, the brief snapshot and the view fixtures change because the story's record moves. They are regenerated and their diffs reviewed. They are not new seams.
+
+### Coverage
+
+| Behaviour | Seam | Test kind | Notes |
+|---|---|---|---|
+| B1 | S1 | integration | triage round then story round on one branch; both folders present |
+| B2 | S1 | integration | approve at `confirm` → round finished, story still active |
+| B3 | S1 | integration | counter at max in round 1 → 0 in round 2 |
+| B4 | S1 | integration | same worktree and branch; a second `open-pr` updates the open PR on the fake remote |
+| B5 | S1 | integration | auto in round 1 → auto in round 2 |
+| B6 | S1 | integration | finished, no PR → round 2 at the start step; the inbox shows Your turn |
+| B7 | S1 | integration | finished with an open PR → round starts; PR body updated, not a second PR |
+| B8 | S1 | integration | same workflow again as round 2 |
+| B9 | S1 | integration | `--at` start step; unknown step refused, nothing written |
+| B10 | S1 | integration | unfinished round, no `--force` → refused exit 3, `do_instead` names the `--force` command |
+| B11 | S1 | integration | at a gate and at `$stuck` → old round ended by the person, new round started |
+| B12 | S1 | integration | running agent step → refused, points to `run cancel` |
+| B13 | S1 | integration | unfinished slice → refused; finished slices don't block |
+| B14 | S1 | integration | `--force` on a finished round = without it |
+| B15 | S1 | integration | `--at` alone moves the cursor in the same round, counters kept; unknown step refused |
+| B16 | S1 | integration | `--at` alone on a finished round → refused, points to `--workflow` |
+| B17 | S1 | integration | unknown workflow with `--force` → refused, round untouched |
+| B18 | S1 | integration | claim held by another clone → refused with holder and checkout |
+| B19 | S1 | integration | fake remote records the label swap; an edited label starts nothing |
+| B20 | S1 | integration | fake remote fails the label call → round starts, warning in output and trace |
+| B21 | S2 | unit | merged PR in round 3 → `remote.pr_merged` cleanup as today |
+| B22 | S2 + S1 | unit + integration | S2: GR6b rule fires only on a seen `closed` issue, no PR, round finished, no unfinished slice. S1: branch pushed, worktree, branch, claim and mailbox refs gone, spec closed, gone from the inbox |
+| B23 | S1 | integration | reopen restores the finished round; `--workflow` then starts round 2 |
+| B24 | S2 | unit | closed issue with an unfinished round → park `remote: issue closed` as today |
+| B25 | S2 | unit | finished round, no PR → Your turn item "<story>: <workflow> round done, no PR" with the `--workflow <name>` command |
+| B26 | S2 | unit | item shows `<name>` whatever outcome the last step reported |
+| B27 | S2 | unit | finished round with an open PR → merge item as today |
+| B28 | S1 | integration | `status --json`, `story view` and the handoff header show round, workflow and step; a one-round story shows "Round 1" |
+| B29 | S1 | integration | `run list` groups runs by round and says how each ended (finished / ended by the person) |
+| B30 | S1 | integration | `rounds/01-triage/` and `rounds/02-story/`, each with state, pin, receipts from 0001, logs, evidence |
+| B31 | S1 | integration | one `runs/_story/handoff.md`; Goal / Progress / Resume survive the round change |
+| B32 | S1 | integration | the forced round's state records ended by the person at its step |
+| B33 | S1 | integration | slices started in round 2 stay at `runs/<nn>-<slug>/` and record round 2 |
+| B34 | S2 + S1 | unit + integration | S2: `round.migrate` comes first for a held flat story and is held during a rebase. S1: files moved with `git mv` in one commit, unit goes on at its step with counters unchanged |
+| B35 | S2 + S1 | unit + integration | S2: an old `$done` story (including one parked `remote` by an older norn) reads as a finished round. S1: after the move the Your turn item shows and `--workflow` starts round 2 |
+| B36 | S1 | integration | `run list` on a flat record from the base shows round 1; nothing is written |
+
+### Prefactoring
+
+1. **One resolver for a unit's record folder.** Every place that builds `runs/<unit>` by hand goes through the store's path module: act's env and start, story checkout, leases, the human-verb remote read, brief's rulings scan, reopen, tidy and the unpushed check. No behaviour change. This puts B30, B34 and B36 in one function instead of about ten.
+2. **Pull `story close`'s effects out of the command** into a runtime function: mark the spec closed, commit, push the story and slice branches, then remove worktrees, local branches, leases, the claim and mailbox refs. The command and a tick action both call it. No behaviour change. This lets B22 do exactly what `story close` does.
+3. **A label-editing method on the remote port** (replace one issue label with another), in the gh and glab adapters and the harness's fake remote, with contract-suite runs, unused for now. No behaviour change. B19 and B20 then need only a call and a warning.
+
+### Implementation decisions
+
+- D1 **A round starts through a receipt, and the tick applies it.** `norn story edit <story> --workflow <name> [--at <step>] [--force]` runs under the tick lock. It checks everything, then writes a new `round` receipt into the current round: workflow name, hash of the workflow file, target step, `forced`, and the step the round is left at. It writes no state. The next tick applies it in one action and one commit. That action ends the old round in its own state: `$done`, and with `ended` recorded as the person at `<step>` when forced. It then creates `rounds/NN-<workflow>/` with the pinned workflow and a fresh state (counters 0, mode carried over, cursor at `--at` or the start step), and swaps the issue label. If the workflow file's hash at the tick differs from the receipt's, the receipt is rejected into the trace with an inbox item to run the edit again. Why: receipts before effects (P6), state last (S5), and decide stays pure and replayable. This is the same pattern as the `workflow` and `mode` receipts. The receipt kinds grow from 14 to 15, and the JSON schemas are re-emitted.
+- D2 **The story keeps its identity, and files are found through a record folder.** The story unit keeps `dir: "_story"`, so hook files, the `.norn-unit` marker and keys don't change. The unit reference gains a record folder field filled by the resolver from P1: `runs/_story/rounds/NN-<wf>` for the story, `runs/<nn>-<slug>` for a slice. Decide, act and view build paths from it, never from `dir`. The story unit is always the current round, meaning the highest-numbered round folder. Story facts gain `rounds: [{n, workflow, ended}]` for `status`, `story view`, `run list` and the handoff header. Unit state gains an optional `round` (absent = 1) and an optional `ended {by: workflow | person, step, at, receipt_id}`. A slice's state records `round`, the story round that started it (B33). The `unit_dir` pattern in state is unchanged. Why: the dir-is-the-round-folder alternative would change the `unit_dir` schema, hook keys and markers for no gain.
+- D3 **What `story edit` refuses, and in what order.** First the claim held elsewhere (T9, B18). Then an unknown or invalid workflow (B17). Then an unknown `--at` step (B9, B15). Then, on an unfinished round without `--force` (B10), it refuses with the `--force` command in `do_instead`. With `--force` it refuses while an agent runs a step of the round, pointing to `norn run cancel` (B12), and while any slice is unfinished, naming it (B13). `--at` alone on a finished round is refused and points to `--workflow` (B16). All refusals exit 3 and write nothing. `--force` on a finished round is ignored (B14). `--at` without `--workflow` stops being a usage error.
+- D4 **On a story, `--workflow X --at s` no longer switches the workflow in place.** It always starts a round. `--at s` alone moves the cursor inside the round, journaled as today's `workflow` receipt with the same workflow and hash (B15). Slices keep today's in-place `--workflow X --at s`, because slices have no rounds. S7's tested phrase stays in the PRD.
+- D5 **Remote changes on a finished round.** GR6b fires only when the issue is seen as `closed` (not `null` or unobserved), with no PR and no unfinished slice. It emits a new close action that calls the effects from P2, so `story reopen` works unchanged (B23). A finished round is never parked by GR7 for a missing label, an unassigned issue or an unseen issue. Each of those becomes a Check item, and the round stays finished. A PR closed without a merge still parks, as GR7 says. A story an older norn parked as `remote` while at `$done` is read as a finished round, and the first tick drops the park (B35). This also fixes the current bug where GR7 rewrites a `$done` story to `stuck`.
+- D6 **Inbox.** A finished round with no PR is a **Your turn** item: "<story>: <workflow> round done, no PR". Its command is `norn story edit <story> --workflow <name>`, with "or close the issue" as detail. It shows no recommendation (B25, B26) and replaces the "workflow done — waiting for the PR merge (GR6)" item. With an open PR the merge item stays (B27). Decide's noop for a finished round is renamed from waiting for the merge to "round done", and its rule id becomes `story.round_done`.
+- D7 **Moving flat records (B34, B35).** A new rule, `round.migrate`, runs first for a story this heartbeat holds whose `runs/_story/state.json` sits directly in the folder. It runs before receipts and anything else, and never during a rebase (H1). Act moves everything under `runs/_story/` except `handoff.md` (state, workflow.yaml, receipts, logs, evidence, orphaned) into `rounds/01-<state.workflow>/` with `git mv`, in one commit, then pushes. Paths stored in receipts are relative to the round, so they stay valid. Slice folders are not touched. Read-only commands (`run list`, `run view`, the view and the trace view) read a flat record as round 1 and never write it (B36).
+- D8 **Slices belong to the whole story.** A later round's `slices` step sees every slice file. Integrated or dropped slices count as finished, and only new or unfinished ones run. Slice numbers keep growing across rounds, as the slice skill already says (append, never renumber).
+- D9 **Label (B19, B20).** The round-start action swaps the issue's `norn:wf:<old>` for `norn:wf:<new>` through the port method from P3. A failure becomes a warning in the action result and the trace, never a failed action. A label edited on the remote is never read as a request to start a round.
+- D10 **The handoff header and views** show "Round N · Workflow: <wf> · Step: <step> (attempt k)". `run list` prints a heading for each round, "round N · <wf>", and how it ended: finished, or ended by the person at <step>.
+- D11 **Prompt text.** Where the `triage` and `reproduce` workflows' gate prompts say a done story without a PR waits for a merge, they are corrected to say that approving ends the round and the next round starts with `norn story edit <story> --workflow <name>`. The gates themselves don't change.
+
+### Testing decisions
+
+- A good test drives a command or a tick through S1, or calls `decide` / `buildInbox` with Facts through S2, and checks only what a person or the next tick sees: output and exit codes, files under `runs/`, commits, inbox items, recorded remote calls. Never internal helpers, never the resolver directly.
+- Only system boundaries are faked: the remote (fake remote, including a failing label call), the runner (fake runner, which stands in for a running agent in B12), and the clock. Real git and real files are used in S1.
+- New rule ids (`round.start`, `round.migrate`, `story.round_done`, the GR6b close rule, the finished-round remote Check item, the rejected-round-receipt case) each get a rule case or a harvested golden case. The existing golden decisions that change (renamed wait rule, finished-round GR7) are rewritten with `golden --update` and reviewed.
+- The prefactors land with the existing suites green and no new tests, except the contract runs for the new port method in P3.
+- Transcripts, observe snapshots, the brief snapshot and the view fixtures are regenerated in the slice that moves the record, and their diffs reviewed as the layout change.
+
+### Risks
+
+- **The path move is wide.** About ten readers and writers, plus many tests, hard-code `runs/_story`. A missed one reads an empty folder and silently treats the story as not started. Mitigation: P1 lands first. The slice that switches the resolver to round folders runs the whole integration and e2e tiers, and the regenerated transcripts show every path that moved.
+- **The move of flat records runs on live stories on every checkout.** Two clones could each try it. Only the claim holder decides it (T7), and it happens in one commit. A clone without the claim keeps reading the flat record as round 1 until it fetches. The B34 test should include a story with receipts, logs and evidence, so the relative paths are checked after the move.
+- **Receipt order across rounds.** The `round` receipt lives in the old round, and the new round's receipts start at 0001. A mailbox receipt made for the old round's cursor must be rejected as stale once round 2 starts. This is covered in S1 with a second clone, using the existing mailbox setup.
+- **GR6b closes a story without a person running a command.** A wrong "closed" fact would close active work. Mitigation: it fires only on an observed `closed` issue with the round finished and no PR. It reuses `story close`'s push-first effects, so nothing is lost and `story reopen` brings the story back.
