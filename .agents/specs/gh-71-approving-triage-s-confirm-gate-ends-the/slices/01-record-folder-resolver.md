@@ -2,7 +2,7 @@
 id: gh-71/01
 title: One resolver for a unit's record folder
 depends_on: []
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
