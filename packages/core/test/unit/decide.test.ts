@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { LeaseFile, UnitState } from "@norn/schema";
+import { type LeaseFile, roundRecordPath, type UnitState } from "@norn/schema";
 import { type Action, legacyAction } from "../../src/actions.ts";
 import { applyReceipts } from "../../src/apply.ts";
 import { decide, isSideAction, unitDecision } from "../../src/decide/index.ts";
@@ -702,5 +702,62 @@ describe("trace compatibility (O5)", () => {
     // a non-empty transition on such a kind is a real difference, kept for the replay diff
     const odd = { ...check, receipts: [], state: park.state, commit: null };
     expect(legacyAction(odd)).toBe(odd);
+  });
+});
+
+describe("gh-71 D5/D6: a finished round (B21, B24, B25, B35)", () => {
+  /** The story unit at `$done` (a finished round), in round `round` of the story workflow. */
+  const finished = (extra: Partial<StoryFacts> = {}, patch: Partial<UnitState> = {}, round = 1) => {
+    const f = storyAt("$done", extra);
+    f.units[0]!.state = { ...f.units[0]!.state!, status: "done", ...patch };
+    f.units[0]!.record = roundRecordPath(round, "story");
+    return f;
+  };
+  const issue = (f: StoryFacts) => f.issue!;
+  test("B25: a finished round with no PR is a noop `story.round_done`", () => {
+    expect(kinds(facts([finished()]))).toEqual(["gh-1 noop story.round_done"]);
+  });
+  test("B21: a merged PR in round 3 → remote.pr_merged cleanup as today", () => {
+    const f = finished({ pr: { number: 9, url: "u", state: "merged", is_draft: false, head_sha: "abc", base_branch: "main" } }, {}, 3);
+    expect(kinds(facts([f]))).toEqual(["gh-1 cleanup_merged_story remote.pr_merged"]);
+  });
+  test("B24: an unfinished round with a closed issue parks `remote: issue closed` as today", () => {
+    const f = storyAt("test");
+    f.issue = { ...issue(f), state: "closed" };
+    expect(only(facts([f]))).toMatchObject({ kind: "park", rule: "remote.park", state: { status: "stuck", park: { kind: "remote", reason: "remote: issue closed" } } });
+  });
+  test("D5: a finished round is never parked for a missing label, an unassigned issue or an unseen issue", () => {
+    const label = finished();
+    label.issue = { ...issue(label), labels: [] };
+    const unassigned = finished();
+    unassigned.issue = { ...issue(unassigned), assignees: [] };
+    // the mirror still records the change; the round stays finished
+    expect(kinds(facts([label]))).toEqual(["gh-1 update_story_mirror remote.mirror"]);
+    expect(kinds(facts([unassigned]))).toEqual(["gh-1 update_story_mirror remote.mirror"]);
+    expect(kinds(facts([finished({ issue: null })]))).toEqual(["gh-1 noop story.round_done"]);
+  });
+  test("D5: a finished round whose PR was closed without a merge parks as GR7 says", () => {
+    const f = finished({ pr: { number: 9, url: "u", state: "closed", is_draft: false, head_sha: "abc" } });
+    expect(only(facts([f]))).toMatchObject({ kind: "park", rule: "remote.park", state: { step: "$done", status: "stuck", park: { kind: "remote", reason: "remote: PR closed unmerged" } } });
+  });
+  test("B35: an older norn's remote park at $done is dropped by the holder's tick — the round reads as finished", () => {
+    const old = finished({ issue: null }, { status: "stuck", park: { kind: "remote", reason: "remote: issue closed, unassigned or unlabelled", since: at(T0 - 60_000) } });
+    const a = only(facts([old]));
+    expect(a).toMatchObject({
+      kind: "mark_done",
+      rule: "remote.unpark_finished",
+      cleanup: { worktree: null, branch_local: null, release_slot: false },
+      slice_status: null,
+      state: { step: "$done", status: "done", park: null },
+      commit: { message: "norn: gh-1 round finished (remote park dropped)", trailers: { "Norn-Story": "gh-1", "Norn-Step": "$done" }, push: true },
+    });
+    // the next inbox reads it as a finished round: the Your turn item, nothing to unblock
+    const after = { ...old, units: [{ ...old.units[0]!, state: a.kind === "mark_done" ? a.state : null }] };
+    const inbox = buildInbox(facts([after]), CONFIG);
+    expect(inbox.groups.your_turn.map((i) => [i.title, i.command])).toEqual([["gh-1: story round done, no PR", "norn story edit gh-1 --workflow <name>"]]);
+    expect(inbox.groups.unblock).toEqual([]);
+    // a park for a PR closed unmerged stays: GR7 still holds on a finished round
+    const pr = finished({ pr: { number: 9, url: "u", state: "closed", is_draft: false, head_sha: "abc" } }, { status: "stuck", park: { kind: "remote", reason: "remote: PR closed unmerged", since: at(T0 - 60_000) } });
+    expect(kinds(facts([pr]))).toEqual(["gh-1 noop unit.stuck"]);
   });
 });

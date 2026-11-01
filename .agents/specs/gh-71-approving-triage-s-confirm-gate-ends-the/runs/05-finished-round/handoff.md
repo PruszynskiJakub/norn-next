@@ -14,6 +14,16 @@
 
 ## Goal
 
+`$done` is a finished round: inbox Your turn item "<story>: <workflow> round done, no PR" (D6), no GR7 park on a finished round except for the PR (D5), old `$done` remote parks dropped (B35).
+
 ## Progress
 
+- policy.ts: `remoteProblem` split into `prProblem` + `issueProblem` (shared by decide and inbox), plus `roundFinished`.
+- decide/story.ts: a finished round parks only for a PR problem; an older `$done` remote park is dropped with `mark_done` rule `remote.unpark_finished` (no act change needed); noop renamed `story.wait_merge` → `story.round_done`.
+- inbox/items.ts: round-done Your turn item (`norn story edit <story> --workflow <name>`, detail "or close the issue") replaces "workflow done — waiting for the PR merge (GR6)"; issue changes on a finished round are a Check item (`finishedRoundRemoteItem`). A closed issue on a finished round is also only a Check item until GR6b (slice 09).
+- Tests: S2 in decide.test.ts / handoff-inbox.test.ts (AC2–AC7), rule case for `remote.unpark_finished`, golden `--update` (4 cases: the rename only), S1 in human.test.ts (AC1 + inbox via `status --json`).
+- AC8 (agent verifier) left for QA.
+
 ## Resume
+
+Nothing left in implement; QA checks AC8 in a throwaway repo.

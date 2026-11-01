@@ -4,7 +4,7 @@
  * the next tick applies; a non-holder clone posts to the mailbox the holder's tick imports.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Receipt } from "@norn/schema";
 import { heartbeatFilePath, repoConfigPath, workflowsDir, storyUnitDir, handoffPath } from "@norn/store";
@@ -490,5 +490,64 @@ describe("a slice gate in its own worktree (X1: views read slice runs from the s
     expect(h.state(sliceRuns())).toMatchObject({ step: "$done", status: "done", last_outcome: { outcome: "approve", source: "human" } });
     const inbox = (await h.norn("status")).value as { groups: Record<string, InboxItem[]> };
     expect(inbox.groups.approve).toEqual([]);
+  });
+});
+
+describe("gh-71 B2, B25: approving triage's confirm gate finishes the round, not the story", () => {
+  const TRIAGE = `name: triage
+start: explore
+steps:
+  explore:
+    type: agent
+    skill: norn-qa
+    outcomes: { story: { to: confirm, means: "deliver it as a story" }, close: { to: confirm, means: "close it" } }
+  confirm:
+    type: gate
+    prompt: "Confirm the triage"
+    outcomes: { approve: $done, reject: { to: explore, counter: loop } }
+counters: { loop: { max: 2 } }
+`;
+  let t: Harness;
+  const spec = ".agents/specs/gh-12-triage-me";
+  const wt = () => `${t.root}-worktrees/gh-12-triage-me`;
+  const runs = () => storyUnitDir(join(wt(), spec));
+  const next = () => {
+    t.clock.advance(10_000);
+    return t.tick();
+  };
+  beforeAll(async () => {
+    t = await createHarness();
+    expect((await t.norn("init")).exit).toBe(0);
+    t.write(repoConfigPath(t.root), CONFIG.replace("default_workflow: gated", "default_workflow: triage"));
+    t.write(join(workflowsDir(t.root), "triage.yaml"), TRIAGE);
+    t.git(["add", "-A"]);
+    t.git(["commit", "-q", "-m", "norn init"]);
+    t.git(["push", "-q", "origin", "main"]);
+    t.remote.issues = [issue(12, "Triage me")];
+  });
+  afterAll(() => t.cleanup());
+
+  test("approve at confirm → $done; spec, worktree and claim kept; the inbox says the round is done", async () => {
+    // intake, claim, start, launch explore
+    for (let i = 0; i < 6 && t.state(runs())?.status !== "running"; i++) await next();
+    expect(t.state(runs())).toMatchObject({ step: "explore", status: "running" });
+    t.report(runs(), "done", { outcome: "story", handoff: "deliver it as a story" });
+    await next();
+    expect(t.state(runs())).toMatchObject({ step: "confirm", status: "parked", park: { kind: "gate" } });
+    expect((await t.norn("story", "approve", "gh-12")).exit).toBe(0);
+    await next();
+    expect(t.state(runs())).toMatchObject({ step: "$done", status: "done" });
+    // the story is still active: spec not closed, worktree and claim kept
+    expect(t.read(join(wt(), spec, "spec.md"))).toContain("status: active");
+    expect(existsSync(wt())).toBe(true);
+    expect(t.git(["ls-remote", "origin", "refs/norn/claims/gh-12"])).toContain("refs/norn/claims/gh-12");
+    // a forced sync later it is still a finished round, never parked (D5), and it needs the person (B25)
+    t.clock.advance(10_000);
+    const s = await t.norn("sync");
+    expect((s.value as TickReport).decisions.filter((d) => d.unit === "gh-12").map((d) => d.rule)).toContain("story.round_done");
+    const inbox = (await t.norn("status", "--json")).value as { pending: number; groups: Record<string, Array<{ title: string; command: string; detail?: string }>> };
+    expect(inbox.groups.your_turn).toEqual([expect.objectContaining({ title: "gh-12: triage round done, no PR", command: "norn story edit gh-12 --workflow <name>", detail: "or close the issue" })]);
+    expect(inbox.groups.recently_done).toEqual([]);
+    expect(inbox.pending).toBeGreaterThanOrEqual(1);
   });
 });

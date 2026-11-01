@@ -17,7 +17,7 @@ import type { ClaimAction, UpdateStoryMirrorAction } from "../actions.ts";
 import type { StoryFacts, UnitFacts, UnitRef } from "../facts.ts";
 import { sha256 } from "../hash.ts";
 import { bodyChangedItem } from "../inbox/items.ts";
-import { mergedIntoBase, prBaseBranch, storyFinished, storyUnit } from "../policy.ts";
+import { issueProblem, mergedIntoBase, prProblem, roundFinished, storyFinished, storyUnit } from "../policy.ts";
 import type { RemoteIssue } from "../ports.ts";
 import { epoch, iso } from "../time.ts";
 import { edgeOf, isStale, stepOf } from "../workflow.ts";
@@ -137,7 +137,7 @@ function claimBlob(ctx: Ctx, story: string, prev: ClaimBlob | null): ClaimBlob {
   };
 }
 
-/** GR6 merged → cleanup; GR7 closed/unassigned/unlabelled → park "remote: …"; GR8 mirror + body change. */
+/** GR6 merged → cleanup; GR7 closed/unassigned/unlabelled → park "remote: …" (a finished round: PR only, gh-71 D5); GR8 mirror + body change. */
 function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: UnitFacts | null): void {
   const ref = storyRef(story);
   // P2 (F34): merged when the PR says so, or when its head is already on the fetched base;
@@ -162,7 +162,26 @@ function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: U
   // mirror written from them would land in the rebased history. Held with the unit (decideUnit)
   if (su && rebasing(su)) return;
   const st = su?.state;
-  const reason = remoteProblem(story, ctx.config.remote.label, ctx.facts.repo.default_branch);
+  const base = ctx.facts.repo.default_branch;
+  const prReason = prProblem(story, base);
+  // gh-71 D5: a finished round parks only for its PR (GR7); the issue's label, assignee or visibility
+  // is a Check item there (inbox), so the round stays finished
+  const finished = roundFinished(st);
+  const reason = prReason ?? (finished ? null : issueProblem(story, ctx.config.remote.label));
+  // gh-71 D5 (B35): an older norn parked a finished round for an issue change — drop that park
+  if (finished && st && su && st.status === "stuck" && !prReason) {
+    const state: UnitState = { ...st, status: "done", park: null, updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id };
+    return ctx.emit({
+      kind: "mark_done",
+      unit: ref,
+      rule: "remote.unpark_finished",
+      cleanup: { worktree: null, branch_local: null, release_slot: false },
+      slice_status: null,
+      receipts: [],
+      state,
+      commit: commitFor(ctx, story, su, `norn: ${story.key} round finished (remote park dropped)`, st.step),
+    });
+  }
   // GR7: a remote problem parks the story unit through the one park path (stuck, kind remote)
   if (reason && st && st.park?.kind !== "remote" && st.status !== "corrupt") return park(ctx, story, su as UnitFacts, st, "remote", reason, "remote.park");
   const refinedHash = story.issue ? sha256(story.issue.body) : fm.body_hash;
@@ -188,19 +207,6 @@ function refineFinished(uf: UnitFacts | null): boolean {
   const wf = uf?.workflow;
   if (!st || !wf) return false;
   return Object.entries(wf.steps).some(([name, step]) => step.type === "agent" && step.skill === "refine" && ((st.visits[name] ?? 0) >= 2 || ((st.visits[name] ?? 0) >= 1 && st.step !== name)));
-}
-
-function remoteProblem(story: StoryFacts, label: string, base: string): string | null {
-  if (story.pr?.state === "closed") return "remote: PR closed unmerged";
-  // BS11 (old norn 0.1.1): a merge into the wrong base skipped story review — park, never clean up
-  if (story.pr?.state === "merged" && !mergedIntoBase(story, base)) return `remote: PR merged into ${prBaseBranch(story.pr)}, not ${base}`;
-  const issue = story.issue;
-  if (issue === undefined) return null;
-  if (issue === null) return "remote: issue closed, unassigned or unlabelled";
-  if (issue.state === "closed") return "remote: issue closed";
-  if (!issue.labels.includes(label)) return `remote: label '${label}' removed`;
-  if (!issue.assignees.length) return "remote: issue unassigned";
-  return null;
 }
 
 function mirror(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: UnitFacts | null, issue: RemoteIssue): void {
@@ -328,7 +334,8 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
           commit: null,
         });
       }
-      return ctx.noop(ref, ref.slice ? "slice.done" : "story.wait_merge", ref.slice ? "integrated" : "workflow done; waiting for the PR merge (GR6)");
+      // gh-71 D6 (B25): the story's round is finished; the next round or the PR merge is the person's
+      return ctx.noop(ref, ref.slice ? "slice.done" : "story.round_done", ref.slice ? "integrated" : "round done (gh-71 D6)");
     case "stuck":
       if (slicesCanResume(story, uf, st, wf)) return resumeSlices(ctx, story, uf, st, wf);
       return ctx.noop(ref, "unit.stuck", `stuck: ${st.park?.reason ?? "?"} — ${cmd.runRerun(ref.key)}`);

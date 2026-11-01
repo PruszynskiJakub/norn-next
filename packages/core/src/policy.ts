@@ -2,7 +2,7 @@
  * Rules decide and the inbox both read off Facts — each defined once here, so the tick that acts
  * and the inbox that tells a person never disagree about them.
  */
-import { type Mode, parseDuration, type ResolvedConfig, type Step } from "@norn/schema";
+import { type Mode, parseDuration, type ResolvedConfig, type Step, type UnitState } from "@norn/schema";
 import type { Facts, RunFacts, StoryFacts, UnitFacts } from "./facts.ts";
 
 /** C5: when `norn check-run` holds the unit's check lease at a check step, the lease's time (running since then, not queued); else null. */
@@ -39,6 +39,34 @@ export function mergedIntoBase(story: StoryFacts, base: string): boolean {
   if (story.pr?.state !== "merged") return false;
   const target = prBaseBranch(story.pr);
   return target === null || target === base;
+}
+
+/** GR7: what is wrong with the story PR on the remote (closed unmerged, merged elsewhere), or null. */
+export function prProblem(story: StoryFacts, base: string): string | null {
+  if (story.pr?.state === "closed") return "remote: PR closed unmerged";
+  // BS11 (old norn 0.1.1): a merge into the wrong base skipped story review — park, never clean up
+  if (story.pr?.state === "merged" && !mergedIntoBase(story, base)) return `remote: PR merged into ${prBaseBranch(story.pr)}, not ${base}`;
+  return null;
+}
+
+/** GR7: what is wrong with the story issue on the remote (closed, unlabelled, unassigned, unseen), or null; undefined issue = not observed. */
+export function issueProblem(story: StoryFacts, label: string): string | null {
+  const issue = story.issue;
+  if (issue === undefined) return null;
+  if (issue === null) return "remote: issue closed, unassigned or unlabelled";
+  if (issue.state === "closed") return "remote: issue closed";
+  if (!issue.labels.includes(label)) return `remote: label '${label}' removed`;
+  if (!issue.assignees.length) return "remote: issue unassigned";
+  return null;
+}
+
+/**
+ * gh-71 D5 (B2, B35): the story's round is finished — its unit reached `$done`, or an older norn
+ * parked it there for a remote change (read as finished; the holder's tick drops that park).
+ */
+export function roundFinished(st: UnitState | null | undefined): boolean {
+  if (st?.step !== "$done") return false;
+  return st.status === "done" || (st.status === "stuck" && st.park?.kind === "remote");
 }
 
 /** R5.5 (N3): this checkout's heartbeat is up — observed, and its last tick within 3 × watch interval. */

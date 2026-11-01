@@ -117,7 +117,7 @@ describe("runtime", () => {
     expect(h.state(runs())).toMatchObject({ status: "running", retries_used: 1, run: { session: { session_id: "s-2" } } });
   });
 
-  test("a stale receipt is rejected into the trace (T9); done → $done, waiting for the PR merge (GR6)", async () => {
+  test("a stale receipt is rejected into the trace (T9); done → $done, a finished round (gh-71 D6)", async () => {
     const st = h.state(runs());
     appendReceipt(runs(), { kind: "done", receipt_id: ulid(h.clock.now()), run_id: st?.run?.run_id ?? null, step: "implement", attempt: 7, at: h.clock.iso(), by: "agent", outcome: "done", handoff: "old" });
     h.report(runs(), "done", { outcome: "done", handoff: "fixed" });

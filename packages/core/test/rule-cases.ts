@@ -133,6 +133,8 @@ function cases(): RuleCase[] {
   out.push(c("a ready unit whose cursor is $done", "unit.no_step", facts([story(SOLO_WF, ready("$done"))])));
   // gh-71 D7 (B34): a held story whose record is still flat moves into round 1 first
   out.push(c("a held story with a flat record", "round.migrate", facts([story(STORY_WF, { step: "slices" }, null, {}, { record: "runs/_story" })])));
+  // gh-71 D5 (B35): an older norn's remote park on a finished round is dropped by the holder's tick
+  out.push(c("a finished round an older norn parked for the issue", "remote.unpark_finished", facts([{ ...story(STORY_WF, { step: "$done", status: "stuck", park: { kind: "remote", reason: "remote: issue closed, unassigned or unlabelled", since: at() } }, null, {}, { record: "runs/_story/rounds/01-story" }), issue: null }])));
   out.push(c("a stuck unit waits for unstick", "unit.stuck", facts([story(SOLO_WF, { status: "stuck", park: { kind: "exhausted", reason: "nudges 2/2", since: at() } })])));
   {
     const st = stateFor(storyUnit(), SOLO_WF);
