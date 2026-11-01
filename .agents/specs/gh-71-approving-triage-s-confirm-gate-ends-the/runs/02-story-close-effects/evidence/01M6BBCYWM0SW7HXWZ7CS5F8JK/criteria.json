@@ -1,0 +1,4 @@
+[
+  { "id": "AC1", "verdict": "pass", "evidence": "AC1.md, AC1-quick.txt, AC1-integration.txt, AC1-e2e.txt" },
+  { "id": "AC2", "verdict": "pass", "evidence": "AC2.md, AC2-run.json, AC2-base-run.json, AC2-compare.txt, AC2-script.test.ts" }
+]

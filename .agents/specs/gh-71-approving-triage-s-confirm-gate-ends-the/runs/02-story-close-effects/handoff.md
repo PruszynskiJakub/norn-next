@@ -28,6 +28,8 @@ Pull `story close`'s effects into one runtime function a tick action can call (p
 - implement#1 done: story close's effects moved into runtime closeStory (packages/cli/src/runtime/close.ts) returning a result union; command maps failures to the same CliErrors and output. No behaviour change: unit, integration, typecheck, story-reopen and e2e team green; transcripts/golden untouched. Mailbox refs are not deleted by today's close, so left out (note for slice 09).
 - review#1: approve. closeStory is a faithful move (same order, same CliErrors, same JSON key order); unit 987 pass, typecheck, story-reopen green. Minor: mailbox refs listed in Plan P2 but not deleted (unchanged behaviour), so slice 09 decides. Nit: double destructuring in story-close.ts output.
 - review#1 approve: closeStory is a faithful move of story close's effects (same order, errors, output); tests and typecheck green. Minor: mailbox refs in Plan P2 not deleted (unchanged behaviour), slice 09 should decide.
+- qa#1: pass. AC1: unit 987, integration 511, e2e 72, typecheck clean, tree unchanged (no transcript or golden rewrite). AC2: real story close + reopen through the cli harness (real git, bare origin): commits, then both pushes, then worktree/branch/claim removal; spec dropped on the remote; uncommitted slice work kept; reopen restores. Identical to the base branch's code, git call sequence included. Evidence in /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa71.
+- qa#1 pass: QA pass: all tiers green and unchanged (unit 987, integration 511, e2e 72, typecheck); hands-on story close/reopen in a temp repo pushes before removing, marks spec dropped, reopen restores, and matches base behaviour exactly including git call order.
 
 ## Resume
-Review done (approve). Next step per workflow; slice 09 should settle mailbox-ref deletion on close.
+QA done (pass). Nothing left for this step; slice 09 should settle mailbox-ref deletion on close.

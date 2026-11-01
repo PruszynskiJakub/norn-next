@@ -1,0 +1,172 @@
+{
+  "close": {
+    "exit": 0,
+    "value": {
+      "story": "gh-7",
+      "dropped": true,
+      "killed": [
+        "gh-7/01"
+      ],
+      "committed": [
+        "gh-7/01",
+        "gh-7"
+      ],
+      "pushed": [
+        "gh-7-add-login-form",
+        "gh-7/01-form"
+      ],
+      "worktrees_removed": [
+        "/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-2sgY3Z/repo-worktrees/gh-7-add-login-form--01-form",
+        "/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-2sgY3Z/repo-worktrees/gh-7-add-login-form"
+      ],
+      "branches_deleted": [
+        "gh-7/01-form",
+        "gh-7-add-login-form"
+      ],
+      "leases_released": [
+        "agent-1.json",
+        "slot-1.json",
+        "slot-2.json"
+      ],
+      "claim_deleted": true,
+      "record": "origin/gh-7-add-login-form"
+    },
+    "stdout": "{\"story\":\"gh-7\",\"dropped\":true,\"killed\":[\"gh-7/01\"],\"committed\":[\"gh-7/01\",\"gh-7\"],\"pushed\":[\"gh-7-add-login-form\",\"gh-7/01-form\"],\"worktrees_removed\":[\"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-2sgY3Z/repo-worktrees/gh-7-add-login-form--01-form\",\"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-2sgY3Z/repo-worktrees/gh-7-add-login-form\"],\"branches_deleted\":[\"gh-7/01-form\",\"gh-7-add-login-form\"],\"leases_released\":[\"agent-1.json\",\"slot-1.json\",\"slot-2.json\"],\"claim_deleted\":true,\"record\":\"origin/gh-7-add-login-form\"}\n"
+  },
+  "gitLog": [
+    "rev-parse --path-format=absolute --git-common-dir",
+    "remote",
+    "ls-remote --heads origin refs/heads/gh-7-*",
+    "fetch --quiet --no-tags origin +refs/heads/gh-7-add-login-form:refs/remotes/origin/gh-7-add-login-form",
+    "show refs/remotes/origin/gh-7-add-login-form:.agents/specs/gh-7-add-login-form/spec.md",
+    "remote",
+    "ls-remote origin refs/norn/claims/gh-7",
+    "rev-parse --verify --quiet refs/norn/claims/gh-7",
+    "cat-file blob d041656d8b154a781569f27eec95709fe79bcecb",
+    "remote",
+    "worktree list --porcelain -z",
+    "rev-parse --verify --quiet refs/remotes/origin/main",
+    "rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs",
+    "for-each-ref --format=%(refname) %(objectname) refs/heads/ refs/remotes/",
+    "rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply",
+    "status --porcelain=v2 --branch -z --untracked-files=all",
+    "log -1 --format=%ct HEAD",
+    "rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD",
+    "diff --name-only --diff-filter=U -z",
+    "rev-parse --verify --quiet refs/norn/claims/gh-7",
+    "cat-file blob d041656d8b154a781569f27eec95709fe79bcecb",
+    "for-each-ref --format=%(objectname) %(refname) refs/norn/inbox/gh-7/",
+    "rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply",
+    "status --porcelain=v2 --branch -z --untracked-files=all",
+    "log -1 --format=%ct HEAD",
+    "rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD",
+    "diff --name-only --diff-filter=U -z",
+    "for-each-ref --format=%(refname) %(objectname) refs/heads/",
+    "ls-remote origin refs/norn/claims/gh-7",
+    "rev-parse --verify --quiet refs/norn/claims/gh-7",
+    "cat-file blob d041656d8b154a781569f27eec95709fe79bcecb",
+    "rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD",
+    "diff --name-only --diff-filter=U -z",
+    "add -A",
+    "diff --cached --quiet",
+    "diff --cached -U0 --no-color --no-ext-diff",
+    "commit -F - --cleanup=strip --trailer Norn-Story: gh-7 --trailer Norn-Slice: gh-7/01 --trailer Norn-Step: drop --trailer Norn-Tick: 03PGFN4FC0CTKVK6SEKX34Z8NT",
+    "rev-parse HEAD",
+    "rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD",
+    "diff --name-only --diff-filter=U -z",
+    "add -A",
+    "diff --cached --quiet",
+    "diff --cached -U0 --no-color --no-ext-diff",
+    "commit -F - --cleanup=strip --trailer Norn-Story: gh-7 --trailer Norn-Step: drop --trailer Norn-Tick: 03PGFN4FC0CTKVK6SEKX34Z8NT",
+    "rev-parse HEAD",
+    "push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form",
+    "push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form",
+    "worktree remove --force /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-2sgY3Z/repo-worktrees/gh-7-add-login-form--01-form",
+    "worktree remove --force /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-2sgY3Z/repo-worktrees/gh-7-add-login-form",
+    "show-ref --verify --quiet refs/heads/gh-7/01-form",
+    "branch -D gh-7/01-form",
+    "show-ref --verify --quiet refs/heads/gh-7-add-login-form",
+    "branch -D gh-7-add-login-form",
+    "push --porcelain --force-with-lease=refs/norn/claims/gh-7:d041656d8b154a781569f27eec95709fe79bcecb origin :refs/norn/claims/gh-7",
+    "update-ref -d refs/norn/claims/gh-7"
+  ],
+  "remoteBefore": "81ac91ac57930e2fdbbbdde4caba30423b0175c9\tHEAD\nf6605397d4450d94af82a47a5006fa67ae976413\trefs/heads/gh-7-add-login-form\nd5a907d7bd011df40313ab4056e7035e87e6d7ec\trefs/heads/gh-7/01-form\n81ac91ac57930e2fdbbbdde4caba30423b0175c9\trefs/heads/main\nd041656d8b154a781569f27eec95709fe79bcecb\trefs/norn/claims/gh-7",
+  "remoteAfter": "81ac91ac57930e2fdbbbdde4caba30423b0175c9\tHEAD\nebb52e3da9f435bdcda7c31c6adecfaf8188a178\trefs/heads/gh-7-add-login-form\n1050e73517cdcc4be98c5543c23908e87537d724\trefs/heads/gh-7/01-form\n81ac91ac57930e2fdbbbdde4caba30423b0175c9\trefs/heads/main",
+  "remoteSpecStatus": "status: dropped",
+  "sliceFileOnRemote": "uncommitted work",
+  "wtGone": {
+    "story": true,
+    "slice": true
+  },
+  "localBranches": "* main",
+  "normRefsAfterClose": "",
+  "reopen": {
+    "exit": 0,
+    "value": {
+      "story": "gh-7",
+      "branch": "gh-7-add-login-form",
+      "claim": {
+        "holder": "tester@box",
+        "heartbeat_id": "03PGFN2B0GFMBXNTXKY9R8GSRN",
+        "acquired_at": "2099-01-15T10:01:20.000Z",
+        "expires_at": "2099-01-15T10:11:20.000Z"
+      },
+      "taken_from": null,
+      "forced": false,
+      "journal": null,
+      "receipt": {
+        "file": "0004-take.json",
+        "commit": "98353f942c4ce535246115984fef82d646b73a04",
+        "pushed": true
+      },
+      "worktrees": [
+        {
+          "unit": "gh-7",
+          "path": "/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-2sgY3Z/repo-worktrees/gh-7-add-login-form",
+          "branch": "gh-7-add-login-form",
+          "local": "created",
+          "created": true,
+          "slot": 1
+        },
+        {
+          "unit": "gh-7/01",
+          "path": "/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-2sgY3Z/repo-worktrees/gh-7-add-login-form--01-form",
+          "branch": "gh-7/01-form",
+          "local": "created",
+          "created": true,
+          "slot": 2
+        }
+      ],
+      "units": [
+        {
+          "unit": "gh-7",
+          "worktree": "/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-2sgY3Z/repo-worktrees/gh-7-add-login-form",
+          "step": "slices",
+          "status": "ready",
+          "park": null,
+          "handoff": "<!-- norn:header:begin — generated by norn from state.json; do not edit -->\n- Story: gh-7\n- Workflow: mini · Step: slices (attempt 1)\n- Status: ready\n- Counters: none\n- Last outcome: plan.done (reported, 2099-01-15T10:00:50.000Z)\n- Next: `norn brief`\n- Updated: 2099-01-15T10:01:00.000Z\n<!-- norn:header:end -->\n<!-- norn:heartbeat:begin — written by norn; do not edit -->\n- story.start: mini at plan\n- agent.start: plan run 03PGFN38A0KAH3KJGW4G6CTE2A\n- receipts.apply: plan.done → slices\n<!-- norn:heartbeat:end -->\n\n## Goal\n\n## Progress\n\n## Resume\n"
+        },
+        {
+          "unit": "gh-7/01",
+          "worktree": "/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-2sgY3Z/repo-worktrees/gh-7-add-login-form--01-form",
+          "step": "implement",
+          "status": "running",
+          "park": null,
+          "handoff": "<!-- norn:header:begin — generated by norn from state.json; do not edit -->\n- Story: gh-7 · Slice: gh-7/01\n- Workflow: slice · Step: implement (attempt 1)\n- Status: running\n- Counters: none\n- Last outcome: none\n- Next: `norn run list gh-7/01`\n- Updated: 2099-01-15T10:01:20.000Z\n<!-- norn:header:end -->\n<!-- norn:heartbeat:begin — written by norn; do not edit -->\n- slice.start: slice at implement\n- agent.start: implement run 03PGFN4FC050ZQZ2E2878MC06Z\n<!-- norn:heartbeat:end -->\n\n## Goal\n\n## Progress\n\n## Resume\n"
+        }
+      ],
+      "reopened": true,
+      "stuck": [
+        "gh-7/01"
+      ],
+      "next": "norn tick"
+    },
+    "stdout": "{\"story\":\"gh-7\",\"branch\":\"gh-7-add-login-form\",\"claim\":{\"holder\":\"tester@box\",\"heartbeat_id\":\"03PGFN2B0GFMBXNTXKY9R8GSRN\",\"acquired_at\":\"2099-01-15T10:01:20.000Z\",\"expires_at\":\"2099-01-15T10:11:20.000Z\"},\"taken_from\":null,\"forced\":false,\"journal\":null,\"receipt\":{\"file\":\"0004-take.json\",\"commit\":\"98353f942c4ce535246115984fef82d646b73a04\",\"pushed\":true},\"worktrees\":[{\"unit\":\"gh-7\",\"path\":\"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-2sgY3Z/repo-worktrees/gh-7-add-login-form\",\"branch\":\"gh-7-add-login-form\",\"local\":\"created\",\"created\":true,\"slot\":1},{\"unit\":\"gh-7/01\",\"path\":\"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-2sgY3Z/repo-worktrees/gh-7-add-login-form--01-form\",\"branch\":\"gh-7/01-form\",\"local\":\"created\",\"created\":true,\"slot\":2}],\"units\":[{\"unit\":\"gh-7\",\"worktree\":\"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-2sgY3Z/repo-worktrees/gh-7-add-login-form\",\"step\":\"slices\",\"status\":\"ready\",\"park\":null,\"handoff\":\"<!-- norn:header:begin — generated by norn from state.json; do not edit -->\\n- Story: gh-7\\n- Workflow: mini · Step: slices (attempt 1)\\n- Status: ready\\n- Counters: none\\n- Last outcome: plan.done (reported, 2099-01-15T10:00:50.000Z)\\n- Next: `norn brief`\\n- Updated: 2099-01-15T10:01:00.000Z\\n<!-- norn:header:end -->\\n<!-- norn:heartbeat:begin — written by norn; do not edit -->\\n- story.start: mini at plan\\n- agent.start: plan run 03PGFN38A0KAH3KJGW4G6CTE2A\\n- receipts.apply: plan.done → slices\\n<!-- norn:heartbeat:end -->\\n\\n## Goal\\n\\n## Progress\\n\\n## Resume\\n\"},{\"unit\":\"gh-7/01\",\"worktree\":\"/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-2sgY3Z/repo-worktrees/gh-7-add-login-form--01-form\",\"step\":\"implement\",\"status\":\"running\",\"park\":null,\"handoff\":\"<!-- norn:header:begin — generated by norn from state.json; do not edit -->\\n- Story: gh-7 · Slice: gh-7/01\\n- Workflow: slice · Step: implement (attempt 1)\\n- Status: running\\n- Counters: none\\n- Last outcome: none\\n- Next: `norn run list gh-7/01`\\n- Updated: 2099-01-15T10:01:20.000Z\\n<!-- norn:header:end -->\\n<!-- norn:heartbeat:begin — written by norn; do not edit -->\\n- slice.start: slice at implement\\n- agent.start: implement run 03PGFN4FC050ZQZ2E2878MC06Z\\n<!-- norn:heartbeat:end -->\\n\\n## Goal\\n\\n## Progress\\n\\n## Resume\\n\"}],\"reopened\":true,\"stuck\":[\"gh-7/01\"],\"next\":\"norn tick\"}\n"
+  },
+  "afterReopen": {
+    "storyWt": true,
+    "sliceWt": true,
+    "sliceFile": "uncommitted work\n",
+    "specStatus": "status: active"
+  }
+}
