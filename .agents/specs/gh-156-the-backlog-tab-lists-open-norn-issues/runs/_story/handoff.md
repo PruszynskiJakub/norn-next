@@ -2,13 +2,14 @@
 - Story: gh-156
 - Round 1 · Workflow: quick · Step: sync (attempt 1)
 - Status: ready
-- Counters: base_conflict_loop 0, ci_loop 0, ready_loop 0, review_loop 0, stale_loop 0, sync_conflict_loop 0, test_loop 0
+- Counters: base_conflict_loop 0/2, ci_loop 0/3, ready_loop 0/2, review_loop 0/3, stale_loop 0/10, sync_conflict_loop 0/2, test_loop 0/5
 - Last outcome: none
 - Next: `norn brief`
-- Updated: 2026-11-01T20:18:56.775Z
+- Updated: 2026-11-01T20:19:07.256Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - story.start: quick at sync
+- receipts.apply: applied 1
 <!-- norn:heartbeat:end -->
 
 ## Goal
