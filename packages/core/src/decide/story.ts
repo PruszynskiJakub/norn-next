@@ -390,7 +390,8 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
  * carried over and the cursor at the receipt's step; the receipts after it in the old round are rejected
  * with it (they were made for the round it ends). Rejected into the trace when the cursor moved
  * (T9), the round is not finished, or the workflow is gone; a workflow file changed since the edit
- * leaves the round finished with a `workflow` park that asks for the edit again.
+ * leaves a finished round with a `workflow` park that asks for the edit again, and an unfinished (forced)
+ * round with its own park (B17).
  */
 function roundStart(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, nr: NumberedReceipt): void {
   const r = nr.receipt;
@@ -402,9 +403,11 @@ function roundStart(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, n
   const loaded = usableWorkflow(ctx, r.workflow, "story");
   if ("problem" in loaded) return reject(loaded.problem);
   if (sha256(loaded.source) !== r.workflow_hash) {
-    // gh-71 D1 (B1): the edit judged another workflow file; the round stays finished and the inbox asks again
+    // gh-71 D1 (B1): the edit judged another workflow file; a finished round stays finished and the inbox asks again
     const again = cmd.storyEdit(story.key, { workflow: r.workflow, at: r.to, force: r.forced });
     const reason = `workflow ${r.workflow} changed since ${again}; run it again`;
+    // gh-71 B17 (AC8): an unfinished (forced) round is untouched — its own gate, ask or stuck park stays
+    if (!roundFinished(st)) return reject(reason, "round.workflow_changed");
     return reject(reason, "round.workflow_changed", { ...moved, park: { kind: "workflow", reason, since: ctx.nowIso, receipt_id: r.receipt_id, command: again } });
   }
   if (!stepOf(loaded.workflow, r.to)) return reject(`workflow ${r.workflow} has no step '${r.to}'`);
@@ -414,9 +417,11 @@ function roundStart(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, n
   const rejected = after.map((x) => ({ n: x.n, receipt_id: x.receipt.receipt_id, reason: `round ${st.round ?? 1} ended at receipt ${nr.n} (round.start); receipt ${x.n} (${x.receipt.kind}) was made for it` }));
   const through = { ...moved, applied_through: after.at(-1)?.n ?? nr.n };
   // gh-71 B32 (D1, RD3): a forced round ends at $done in its own state, recorded as ended by the person at its step
-  const ended: UnitState = roundFinished(st)
-    ? { ...through, status: "done", park: null }
-    : { ...through, step: "$done", status: "done", park: null, run: null, ended: { by: "person", at: st.step as string, receipt_id: r.receipt_id } };
+  const at = st.step;
+  const ended: UnitState =
+    roundFinished(st) || at === "$done"
+      ? { ...through, status: "done", park: null }
+      : { ...through, step: "$done", status: "done", park: null, run: null, ended: { by: "person", at, receipt_id: r.receipt_id } };
   const mode = st.mode ?? story.mode;
   const state = initialState({ unit: uf.unit, workflow: loaded.workflow, workflowName: r.workflow, workflowHash: r.workflow_hash, now: ctx.nowIso, tick_id: ctx.facts.tick_id, at: r.to, round: n, ...(mode ? { mode } : {}) });
   ctx.emit({

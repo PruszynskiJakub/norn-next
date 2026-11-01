@@ -212,7 +212,7 @@ export const storyEditCommand = defineCommand({
     "--manual": "a person starts the story's agent steps (MO1)",
     "--workflow <name>": "the unit's workflow: set before it starts; on a started story, the next round's; on a started slice, switched with --at",
     "--at <step>": "with --workflow: the step the new round (story) or the switched slice lands on (S7); alone: move the current round's cursor to that step",
-    "--force": "with --workflow on a story: end its unfinished round (recorded as ended by you) and start the new one",
+    "--force": "with --workflow on a story (not a slice): end its unfinished round (recorded as ended by you) and start the new one",
   },
   options: { auto: { type: "boolean" }, manual: { type: "boolean" }, workflow: { type: "string" }, at: { type: "string" }, force: { type: "boolean" } },
   positionals: { max: 1 },
@@ -227,6 +227,8 @@ export const storyEditCommand = defineCommand({
     if (force && workflow === undefined) throw usageError("story edit: --force needs --workflow", USAGE);
     if (!auto && !manual && workflow === undefined && at === undefined) throw usageError("story edit: nothing to change (pass --auto, --manual, --workflow <name> or --at <step>)", USAGE);
     const raw = await targetKey(ctx, args.positionals[0], args.json === true, editable(auto || manual ? "mode" : "workflow"));
+    // gh-71 RD3: --force ends a story's round; a slice switches in place (D4) and has no round to end
+    if (force && parseUnitKey(raw).slice !== null) throw usageError("story edit: --force applies to a story, not a slice", USAGE);
     if (workflow !== undefined) return editWorkflow(ctx, raw, workflow, at, force);
     // gh-71 B15 (D3): --at alone moves the cursor inside the current round
     if (at !== undefined) return moveCursor(ctx, raw, at);

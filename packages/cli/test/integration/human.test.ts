@@ -250,6 +250,10 @@ describe("story edit --auto|--manual (MO1, B30)", () => {
       const r = await h.norn("story", "edit", "gh-5", ...flags);
       expect([flags, r.exit]).toEqual([flags, 2]);
     }
+    // gh-71 RD3: --force ends a story's round; on a slice it is a usage error, never silently ignored
+    const slice = await h.norn("story", "edit", "gh-5/01", "--workflow", "alt", "--force", "--json");
+    expect(slice.exit).toBe(2);
+    expect(slice.value).toMatchObject({ error: "story edit: --force applies to a story, not a slice" });
     expect(h.state(runs5())?.mode).toBe("auto");
   });
 
@@ -1020,6 +1024,24 @@ describe("gh-71 B11–B17, B32: --force ends an unfinished round, --at alone mov
     expect(t.state(runs21())).toMatchObject({ step: "confirm", status: "parked", park: { kind: "gate" } });
     const v = await refusedUnchanged(wt21(), spec21, ["story", "edit", "gh-21", "--workflow", "sotry", "--force"], "unknown_workflow");
     expect(v.do_instead).toBe("norn story edit gh-21 --workflow <bug|quick|slice|story|triage>");
+  });
+
+  test("B17, D1 (AC1): a forced round receipt rejected for a changed workflow file leaves the unfinished round's gate park", async () => {
+    const parked = t.state(runs21());
+    expect(parked).toMatchObject({ step: "confirm", status: "parked", park: { kind: "gate" } });
+    const r = await t.norn("story", "edit", "gh-21", "--workflow", "story", "--force", "--json");
+    expect(r.exit).toBe(0);
+    // the workflow file changes between the edit and the tick
+    t.write(join(workflowsDir(t.root), "story.yaml"), ROUND_STORY.replace("max: 3", "max: 4"));
+    const rejected = await next();
+    expect(rejected.decisions.filter((d) => d.unit === "gh-21").map((d) => d.rule)).toEqual(["round.workflow_changed"]);
+    expect(existsSync(join(record21(), "rounds/02-story"))).toBe(false);
+    expect(t.state(runs21())).toMatchObject({ workflow: "triage", step: "confirm", status: "parked", park: parked?.park });
+    expect(t.state(runs21())?.ended).toBeUndefined();
+    // the gate still waits for the person: approve applies to it
+    const inbox = (await t.norn("status", "--json")).value as { groups: Record<string, Array<{ story: string; command: string }>> };
+    expect(inbox.groups.approve).toContainEqual(expect.objectContaining({ story: "gh-21", command: "norn story approve gh-21" }));
+    t.write(join(workflowsDir(t.root), "story.yaml"), ROUND_STORY);
   });
 
   test("B11, B32 (AC1): --force at confirm ends round 1 by the person and starts round 2 at refine", async () => {
