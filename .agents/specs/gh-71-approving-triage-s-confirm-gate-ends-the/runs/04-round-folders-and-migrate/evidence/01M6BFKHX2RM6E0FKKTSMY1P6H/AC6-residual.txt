@@ -1,0 +1,41 @@
+== test/e2e/transcripts/base-sync.txt residual lines: 8
+<   spawn repo-worktrees/gh-7-add-login-form $ git add -A -- .agents/specs/gh-7-add-login-form/runs/_story
+<   spawn repo-worktrees/gh-7-add-login-form $ git diff --cached --quiet -- .agents/specs/gh-7-add-login-form/runs/_story
+<   spawn repo-worktrees/gh-7-add-login-form $ git diff --cached -U0 --no-color --no-ext-diff -- .agents/specs/gh-7-add-login-form/runs/_story
+<   spawn repo-worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Step: resolve" --trailer "Norn-Tick: <ulid:22>" -- .agents/specs/gh-7-add-login-form/runs/_story
+>   spawn repo-worktrees/gh-7-add-login-form $ git add -A -- .agents/specs/gh-7-add-login-form/runs/_story .agents/specs/gh-7-add-login-form/runs/_story/handoff.md
+>   spawn repo-worktrees/gh-7-add-login-form $ git diff --cached --quiet -- .agents/specs/gh-7-add-login-form/runs/_story .agents/specs/gh-7-add-login-form/runs/_story/handoff.md
+>   spawn repo-worktrees/gh-7-add-login-form $ git diff --cached -U0 --no-color --no-ext-diff -- .agents/specs/gh-7-add-login-form/runs/_story .agents/specs/gh-7-add-login-form/runs/_story/handoff.md
+>   spawn repo-worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Step: resolve" --trailer "Norn-Tick: <ulid:22>" -- .agents/specs/gh-7-add-login-form/runs/_story .agents/specs/gh-7-add-login-form/runs/
+== test/e2e/transcripts/e2e-slice-workflow.txt residual lines: 8
+<   spawn repo-worktrees/gh-7-add-login-form $ git add -A -- .agents/specs/gh-7-add-login-form/runs/_story
+<   spawn repo-worktrees/gh-7-add-login-form $ git diff --cached --quiet -- .agents/specs/gh-7-add-login-form/runs/_story
+<   spawn repo-worktrees/gh-7-add-login-form $ git diff --cached -U0 --no-color --no-ext-diff -- .agents/specs/gh-7-add-login-form/runs/_story
+<   spawn repo-worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Step: plan" --trailer "Norn-Tick: <ulid:4>" -- .agents/specs/gh-7-add-login-form/runs/_story
+>   spawn repo-worktrees/gh-7-add-login-form $ git add -A -- .agents/specs/gh-7-add-login-form/runs/_story .agents/specs/gh-7-add-login-form/runs/_story/handoff.md
+>   spawn repo-worktrees/gh-7-add-login-form $ git diff --cached --quiet -- .agents/specs/gh-7-add-login-form/runs/_story .agents/specs/gh-7-add-login-form/runs/_story/handoff.md
+>   spawn repo-worktrees/gh-7-add-login-form $ git diff --cached -U0 --no-color --no-ext-diff -- .agents/specs/gh-7-add-login-form/runs/_story .agents/specs/gh-7-add-login-form/runs/_story/handoff.md
+>   spawn repo-worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Step: plan" --trailer "Norn-Tick: <ulid:4>" -- .agents/specs/gh-7-add-login-form/runs/_story .agents/specs/gh-7-add-login-form/runs/_sto
+== test/e2e/transcripts/recovery-claim-lost.txt residual lines: 8
+<   spawn repo-worktrees/gh-9-add-search $ git add -A -- .agents/specs/gh-9-add-search/runs/_story
+<   spawn repo-worktrees/gh-9-add-search $ git diff --cached --quiet -- .agents/specs/gh-9-add-search/runs/_story
+<   spawn repo-worktrees/gh-9-add-search $ git diff --cached -U0 --no-color --no-ext-diff -- .agents/specs/gh-9-add-search/runs/_story
+<   spawn repo-worktrees/gh-9-add-search $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-9" --trailer "Norn-Step: implement" --trailer "Norn-Tick: <ulid:4>" -- .agents/specs/gh-9-add-search/runs/_story
+>   spawn repo-worktrees/gh-9-add-search $ git add -A -- .agents/specs/gh-9-add-search/runs/_story .agents/specs/gh-9-add-search/runs/_story/handoff.md
+>   spawn repo-worktrees/gh-9-add-search $ git diff --cached --quiet -- .agents/specs/gh-9-add-search/runs/_story .agents/specs/gh-9-add-search/runs/_story/handoff.md
+>   spawn repo-worktrees/gh-9-add-search $ git diff --cached -U0 --no-color --no-ext-diff -- .agents/specs/gh-9-add-search/runs/_story .agents/specs/gh-9-add-search/runs/_story/handoff.md
+>   spawn repo-worktrees/gh-9-add-search $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-9" --trailer "Norn-Step: implement" --trailer "Norn-Tick: <ulid:4>" -- .agents/specs/gh-9-add-search/runs/_story .agents/specs/gh-9-add-search/runs/_story/hand
+== test/e2e/observe-snapshots/fresh-intake.json residual lines: 1
+>           "record": "runs/_story",
+== test/e2e/observe-snapshots/gate-waiting.json residual lines: 2
+>           "record": "runs/_story",
+>           "record": "runs/01-form",
+== test/e2e/observe-snapshots/merged.json residual lines: 2
+>           "record": "runs/_story",
+>           "record": "runs/01-form",
+== test/e2e/observe-snapshots/parked-ask.json residual lines: 2
+>           "record": "runs/_story",
+>           "record": "runs/01-form",
+== test/e2e/observe-snapshots/running-slice.json residual lines: 2
+>           "record": "runs/_story",
+>           "record": "runs/01-form",
