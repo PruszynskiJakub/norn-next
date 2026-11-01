@@ -1,0 +1,69 @@
+# label 'norn' removed on the remote
+$ norn sync
+gh-12 remote.mirror update_story_mirror true
+state: $done done null
+$ norn status (after sync)
+Your turn (1) · work only you can do
+  gh-12      $done: gh-12: triage round done, no PR · 15s
+      or close the issue
+      $ norn story edit gh-12 --workflow <name>
+
+Check (1) · changed outside norn, worth a look
+  gh-12      $done: gh-12: remote: label 'norn' removed — the round stays finished · 15s
+      a finished round is not parked for the issue (gh-71 D5)
+      $ norn story view gh-12 --web
+$ norn tick
+gh-12 story.round_done noop true
+$ norn tick
+gh-12 story.round_done noop true
+state: $done done null
+$ norn status (after 2 plain ticks)
+Your turn (1) · work only you can do
+  gh-12      $done: gh-12: triage round done, no PR · 17s
+      or close the issue
+      $ norn story edit gh-12 --workflow <name>
+
+Check (1) · changed outside norn, worth a look
+  gh-12      $done: gh-12: remote: label 'norn' removed — the round stays finished · 17s
+      a finished round is not parked for the issue (gh-71 D5)
+      $ norn story view gh-12 --web
+$ norn status --json
+{"at":"2026-11-01T12:44:47.633Z","groups":{"your_turn":[{"story":"gh-12","slice":null,"url":"https://github.com/acme/app/issues/12","id":"round_done:gh-12:runs/_story/rounds/01-triage","group":"your_turn","step":"$done","title":"gh-12: triage round done, no PR","command":"norn story edit gh-12 --workflow <name>","since":"2026-11-01T12:44:29.848Z","detail":"or close the issue","age":"17s"}],"answer":[],"approve":[],"unblock":[],"check":[{"id":"remote:gh-12:remote: label 'norn' removed","group":"check","story":"gh-12","slice":null,"step":"$done","title":"gh-12: remote: label 'norn' removed — the round stays finished","detail":"a finished round is not parked for the issue (gh-71 D5)","command":"norn story view gh-12 --web","since":"2026-11-01T12:44:29.848Z","url":"https://github.com/acme/app/issues/12","age":"17s"}],"unclaimed":[],"running":[],"notes":[],"recently_done":[]},"pending":2}
+
+issue.json: {
+  "stories": {
+    "gh-12": {
+      "issue": {
+        "provider": "gh",
+        "number": 12,
+        "url": "https://github.com/acme/app/issues/12",
+        "title": "Triage me",
+        "body": "please triage",
+        "state": "open",
+        "assignees": [
+          "octocat"
+        ],
+        "labels": [],
+        "updated_at": "2026-10-20T09:15:00Z"
+      },
+      "observed_at": 1793537083441
+    }
+  }
+}
+
+# label restored, issue unassigned
+$ norn sync
+gh-12 remote.mirror update_story_mirror true
+$ norn tick
+gh-12 story.round_done noop true
+state: $done done null
+$ norn status
+Your turn (1) · work only you can do
+  gh-12      $done: gh-12: triage round done, no PR · 20s
+      or close the issue
+      $ norn story edit gh-12 --workflow <name>
+
+Check (1) · changed outside norn, worth a look
+  gh-12      $done: gh-12: remote: issue unassigned — the round stays finished · 20s
+      a finished round is not parked for the issue (gh-71 D5)
+      $ norn story view gh-12 --web
