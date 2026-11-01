@@ -79,7 +79,7 @@ const GROUP_WORD: Partial<Record<InboxGroup, string>> = { your_turn: "your turn"
 
 /** What the filter matches for a row, lower case. */
 function rowText(r: CockpitRow): string {
-  return [r.group ? GROUP_WORD[r.group] : "story", r.unit, r.step ?? "", r.title, r.preview.report.title].join(" ").toLowerCase();
+  return [r.group ? GROUP_WORD[r.group] : "story", r.unit, r.step ?? "", r.preview.report.unit.workflow, r.title, r.preview.report.title].join(" ").toLowerCase();
 }
 
 /** CP7: the shown tab's rows where every word of the filter appears. */
@@ -329,7 +329,9 @@ export function previewLines(row: CockpitRow, now: number, width: number, paint:
   const status = standing(row);
   const [mark, markStyle] = unitMark(status === "dropped" ? "done" : status);
   const where = status === "done" || status === "dropped" ? status : status === "not_started" ? "not started" : `${status}${r.unit.step ? ` at ${r.unit.step}` : ""}`;
-  out.push(`${paint(mark, markStyle)} ${fit(`${where} · ${r.mode} · ${r.claim}`, width - 2)}`);
+  // RD8, gh-71 B28 (D10): the round and its workflow before the step, as `story view` writes them
+  const round = r.unit.round ? `round ${r.unit.round} · ` : "";
+  out.push(`${paint(mark, markStyle)} ${fit(`${round}${r.unit.workflow} · ${where} · ${r.mode} · ${r.claim}`, width - 2)}`);
   if (r.unit.last_outcome) out.push(paint(fit(`  last: ${r.unit.last_outcome.step} → ${r.unit.last_outcome.outcome}`, width), ["dim"]));
 
   if (r.slices.length) {
@@ -383,7 +385,7 @@ export function previewLines(row: CockpitRow, now: number, width: number, paint:
   return out;
 }
 
-/** A story row's standing, then its slices and PR when it has them. */
+/** A story row's workflow and standing (RD8), then its slices and PR when it has them. */
 function storySummary(r: CockpitRow): string {
   const rep = r.preview.report;
   const done = rep.slices.filter((s) => s.status === "done").length;
@@ -391,7 +393,7 @@ function storySummary(r: CockpitRow): string {
   const where = status === "done" || status === "dropped" ? status : status === "not_started" ? "not started" : `${status} ${rep.unit.step ?? ""}`.trim();
   const slices = rep.slices.length ? `${done}/${rep.slices.length} slices` : "";
   const pr = rep.pr ? `PR #${rep.pr.number}${rep.pr.is_draft && rep.pr.state === "open" ? " draft" : rep.pr.state === "open" ? "" : ` ${rep.pr.state}`}` : "";
-  return [where, slices, pr].filter(Boolean).join(" · ");
+  return [rep.unit.workflow, where, slices, pr].filter(Boolean).join(" · ");
 }
 
 /** The body's geometry for a frame: list and preview widths and heights. */
