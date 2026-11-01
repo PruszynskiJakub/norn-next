@@ -1,0 +1,12 @@
+
+ 1022 pass
+ 0 fail
+ 16 snapshots, 22116 expect() calls
+Ran 1022 tests across 55 files. [3.35s]
+$ tsc --noEmit -p tsconfig.json && tsc --noEmit -p scripts/tsconfig.json
+bun test v1.3.13 (bf2e2cec)
+
+ 26 pass
+ 0 fail
+ 144 expect() calls
+Ran 26 tests across 2 files. [44.35s]

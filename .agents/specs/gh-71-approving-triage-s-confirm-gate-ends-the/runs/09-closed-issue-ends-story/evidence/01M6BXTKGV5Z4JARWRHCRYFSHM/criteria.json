@@ -1,0 +1,7 @@
+[
+  { "id": "AC1", "verdict": "pass", "evidence": "AC1.md, tests.txt, AC5-sync.txt" },
+  { "id": "AC2", "verdict": "pass", "evidence": "AC2.md, AC5-before.txt, AC5-sync.txt, AC5-after.txt, AC3-cli.txt" },
+  { "id": "AC3", "verdict": "pass", "evidence": "AC3.md, AC3-cli.txt" },
+  { "id": "AC4", "verdict": "pass", "evidence": "AC4.md, tests.txt" },
+  { "id": "AC5", "verdict": "pass", "evidence": "AC5.md, AC5-before.txt, AC5-sync.txt, AC5-after.txt" }
+]
