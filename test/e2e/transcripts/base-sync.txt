@@ -677,7 +677,7 @@
   spawn repo $ git remote
   exit 0
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/rounds/01-based/receipts/0012-approve.json
-      {"kind":"approve","receipt_id":"<ulid:40>","run_id":null,"step":"ready","attempt":2,"at":"<time>","by":"human","who":"tester@box","slice":null,"head_sha":"<sha:18>"}
+      {"kind":"approve","receipt_id":"<ulid:40>","run_id":null,"step":"ready","attempt":2,"at":"<time>","by":"human","who":"tester@box","slice":null,"round":1,"head_sha":"<sha:18>"}
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -734,7 +734,7 @@
   spawn repo $ git cat-file blob <sha:17>
   exit 0
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/rounds/01-based/receipts/0013-update.json
-      {"kind":"update","receipt_id":"<ulid:42>","run_id":null,"step":"$done","attempt":2,"at":"<time>","by":"human","who":"tester@box","slice":null,"from":"$done","to":"update","reason":"person"}
+      {"kind":"update","receipt_id":"<ulid:42>","run_id":null,"step":"$done","attempt":2,"at":"<time>","by":"human","who":"tester@box","slice":null,"round":1,"from":"$done","to":"update","reason":"person"}
 > norn story update-branch gh-7
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -984,7 +984,7 @@
   spawn repo $ git remote
   exit 0
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/rounds/01-based/receipts/0017-approve.json
-      {"kind":"approve","receipt_id":"<ulid:56>","run_id":null,"step":"ready","attempt":3,"at":"<time>","by":"human","who":"tester@box","slice":null,"head_sha":"<sha:23>"}
+      {"kind":"approve","receipt_id":"<ulid:56>","run_id":null,"step":"ready","attempt":3,"at":"<time>","by":"human","who":"tester@box","slice":null,"round":1,"head_sha":"<sha:23>"}
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
