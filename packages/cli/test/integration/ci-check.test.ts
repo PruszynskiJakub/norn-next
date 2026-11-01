@@ -62,3 +62,75 @@ esac
     expect(r.calls.some((c) => c.startsWith("run watch"))).toBe(false);
   });
 });
+
+/** The `ci` check script of a workflow `norn init` ships (packages/cli/assets/workflows/). */
+function bundledCiScript(wf: string): string {
+  const { steps } = Bun.YAML.parse(readFileSync(join(ROOT, "packages", "cli", "assets", "workflows", `${wf}.yaml`), "utf8")) as { steps: Record<string, { run?: string }> };
+  return steps.ci?.run ?? "";
+}
+
+describe("the shipped ci check waits for the checks on the PR (W1, #136)", () => {
+  const SHA = "0123456789abcdef0123456789abcdef01234567";
+  // A fake gh and sleep: PR 7 has checks from the APPEAR-th rollup call on (never when 0).
+  const FAKE_GH = `#!/bin/sh
+echo "$*" >> "$FAKE/calls"
+case "$*" in
+  "pr view --json number -q .number") echo 7 ;;
+  "pr view --json headRefOid -q .headRefOid") echo "${SHA}" ;;
+  "pr view 7 --json statusCheckRollup"*)
+    n=$(($(cat "$FAKE/rollups" 2>/dev/null || echo 0) + 1)); echo $n > "$FAKE/rollups"
+    if [ "$APPEAR" -gt 0 ] && [ $n -ge "$APPEAR" ]; then echo 2; else echo 0; fi ;;
+  "pr checks 7 --watch"*) exit "$WATCH_EXIT" ;;
+  "pr checks 7") echo "build	fail	1m	https://example.test/run/42"; exit 1 ;;
+  "run list --commit ${SHA} --status failure"*) echo 42 ;;
+  "run view 42 --log-failed") echo "failed log of run 42" ;;
+  *) echo "unexpected gh $*" >&2; exit 9 ;;
+esac
+`;
+  const run = (appear: number, watchExit: number, withGh = true) => {
+    const fake = mkdtempSync(join(tmpdir(), "norn-ci-check-"));
+    if (withGh) writeFileSync(join(fake, "gh"), FAKE_GH);
+    writeFileSync(join(fake, "sleep"), `#!/bin/sh\necho "$1" >> "$FAKE/sleeps"\n`);
+    if (withGh) chmodSync(join(fake, "gh"), 0o755);
+    chmodSync(join(fake, "sleep"), 0o755);
+    // without gh, PATH is the fake dir alone: CI runners ship gh in /usr/bin
+    const proc = Bun.spawnSync(["/bin/sh", "-c", `exec 2>&1\n${bundledCiScript("quick")}`], {
+      cwd: fake,
+      env: { PATH: withGh ? `${fake}:/usr/bin:/bin` : fake, FAKE: fake, APPEAR: String(appear), WATCH_EXIT: String(watchExit) },
+    });
+    const read = (f: string) => (existsSync(join(fake, f)) ? readFileSync(join(fake, f), "utf8").trim().split("\n") : []);
+    return { exit: proc.exitCode, out: proc.stdout.toString(), calls: read("calls"), sleeps: read("sleeps") };
+  };
+
+  test("waits for checks that appear late and passes when they go green", () => {
+    const r = run(4, 0);
+    expect(r.exit).toBe(0);
+    expect(r.sleeps).toEqual(["10", "10", "10"]);
+    expect(r.calls.filter((c) => c.startsWith("pr checks"))).toEqual(["pr checks 7 --watch --interval 30"]);
+  });
+
+  test("fails on a red check with the checks and the failed run's log", () => {
+    const r = run(1, 1);
+    expect(r.exit).toBe(1);
+    expect(r.out).toContain("https://example.test/run/42");
+    expect(r.out).toContain("failed log of run 42");
+  });
+
+  test("passes when no check appears within 5 minutes: the repo has no CI", () => {
+    const r = run(0, 0);
+    expect(r.exit).toBe(0);
+    expect(r.sleeps.length).toBe(30);
+    expect(r.out).toContain("no checks on PR #7 after 5m");
+    expect(r.calls.some((c) => c.startsWith("pr checks"))).toBe(false);
+  });
+
+  test("passes without gh, saying there is no CI to wait for", () => {
+    const r = run(1, 0, false);
+    expect(r.exit).toBe(0);
+    expect(r.out).toContain("gh not found");
+  });
+
+  test("story runs the same script as quick", () => {
+    expect(bundledCiScript("story")).toBe(bundledCiScript("quick"));
+  });
+});

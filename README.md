@@ -32,7 +32,7 @@ Answer (1)
       $ norn story answer gh-18/02 "…"
 
 Approve (1)
-  gh-17      approve-plan: Review the Plan section in spec.md and the slice files (edit them if needed). Approve to start the slices, or reject with what to change. · 25m
+  gh-17      approve-slices: Review the slice files in the spec folder (edit them if needed). Approve to start the slices, or reject with what to change. · 25m
       $ norn story approve gh-17
 
 Running (1)
@@ -104,7 +104,7 @@ cd your-repo
 norn init
 ```
 
-`norn init` writes the config (`.agents/norn.config.yaml`), three workflows (`story`, `slice`, `bug`) in `.agents/workflows/`, the agent skills and hooks, and its `.gitignore` and `.gitattributes` lines. It reads your test command from your build files, then prints the next steps, which are:
+`norn init` writes the config (`.agents/norn.config.yaml`), six workflows in `.agents/workflows/` (`triage`, the default; `reproduce`; `refinement`; `story` and its `slice`; `quick`), each doing one thing, that a story goes through one after another,, the agent skills and hooks, and its `.gitignore` and `.gitattributes` lines. It reads your test command from your build files, then prints the next steps, which are:
 
 1. Check the test command it wrote into the workflows' `test` steps.
 2. Commit and push the setup.

@@ -1,10 +1,7 @@
-# Slice workflow — example installed by `norn init`; edit freely (W1).
-# Runs on a slice: build test-first, check, review, QA, then integrate into the story branch.
-# QA reports a verdict per acceptance criterion (criteria: required); each outcome is allowed only
-# when the worst verdict matches it (verdict:) — `unverified` (could not check here) goes to a person.
-# Change `test.run` to your repo's test command.
+# Slice workflow — repo-local copy of the shipped one (W1), with this repo's check command.
+# Build test-first, check, review, integrate; no QA of its own (the story's qa checks every criterion).
 name: slice
-description: Build one slice test-first, verify it, and integrate it into the story branch.
+description: Build one slice test-first, check and review it, and integrate it into the story branch.
 start: implement
 steps:
   implement:
@@ -23,22 +20,8 @@ steps:
     skill: norn-review
     inputs: [slice, spec, diff]
     outcomes:
-      approve:           { to: qa, means: "all criteria met, no blocking findings" }
+      approve:           { to: integrate, means: "all criteria met, no blocking findings" }
       changes_requested: { to: implement, counter: review_loop, means: "blocking findings in the receipt" }
-  qa:
-    type: agent
-    skill: norn-qa
-    inputs: [slice, spec, diff]
-    criteria: required
-    outcomes:
-      pass:       { to: integrate, verdict: pass, means: "every criterion observed with evidence" }
-      fail:       { to: implement, counter: qa_loop, verdict: fail, means: "a criterion fails; repro in findings" }
-      partial:    { to: human-qa, verdict: person, means: "criteria only a person can judge, evidence prepared" }
-      unverified: { to: human-qa, verdict: unverified, means: "criteria this session could not check; how to check each one is in the report" }
-  human-qa:
-    type: gate
-    prompt: "Check the criteria QA could not settle (listed with how to check each). Approve, or reject with what failed."
-    outcomes: { approve: integrate, reject: { to: implement, counter: qa_loop } }
   integrate:
     type: git
     action: integrate
@@ -48,4 +31,4 @@ steps:
     skill: norn-merge
     inputs: [slice, spec]
     outcomes: { done: { to: integrate, means: "conflicts resolved keeping the intent of both sides; tests pass" } }
-counters: { test_loop: { max: 5 }, review_loop: { max: 3 }, qa_loop: { max: 2 }, conflict_loop: { max: 2 } }
+counters: { test_loop: { max: 5 }, review_loop: { max: 3 }, conflict_loop: { max: 2 } }

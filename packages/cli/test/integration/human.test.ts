@@ -735,7 +735,7 @@ describe("gh-71 B1, B3–B10, B17, B30, B31: norn story edit --workflow starts t
     const before = receiptsIn(runs());
     const unknown = await t.norn("story", "edit", "gh-14", "--workflow", "sotry", "--json");
     expect(unknown.exit).toBe(3);
-    expect(unknown.value).toMatchObject({ code: "unknown_workflow", do_instead: "norn story edit gh-14 --workflow <bug|quick|slice|story|triage>" });
+    expect(unknown.value).toMatchObject({ code: "unknown_workflow", do_instead: "norn story edit gh-14 --workflow <quick|refinement|reproduce|slice|story|triage>" });
     const step = await t.norn("story", "edit", "gh-14", "--workflow", "story", "--at", "nope", "--json");
     expect(step.exit).toBe(3);
     expect(step.value).toMatchObject({ code: "unknown_step", error: "no step 'nope' in workflow story", do_instead: "norn story edit gh-14 --workflow story --at <refine|build>" });
@@ -1023,7 +1023,7 @@ describe("gh-71 B11–B17, B32: --force ends an unfinished round, --at alone mov
     await next();
     expect(t.state(runs21())).toMatchObject({ step: "confirm", status: "parked", park: { kind: "gate" } });
     const v = await refusedUnchanged(wt21(), spec21, ["story", "edit", "gh-21", "--workflow", "sotry", "--force"], "unknown_workflow");
-    expect(v.do_instead).toBe("norn story edit gh-21 --workflow <bug|quick|slice|story|triage>");
+    expect(v.do_instead).toBe("norn story edit gh-21 --workflow <quick|refinement|reproduce|slice|story|triage>");
   });
 
   test("B17, D1 (AC1): a forced round receipt rejected for a changed workflow file leaves the unfinished round's gate park", async () => {

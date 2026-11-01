@@ -26,7 +26,7 @@ const AGENTS_SKILLS = join(ROOT, ".agents", "skills");
 const CLAUDE_SKILLS = join(ROOT, ".claude", "skills");
 
 /** Workflows that end in `integrate` run on slices (W8); every other one is a story workflow. */
-const SLICE_WORKFLOWS = new Set(["slice", "bug"]);
+const SLICE_WORKFLOWS = new Set(["slice"]);
 const PERSON_ONLY_SKILLS = ["issue", "release-start"];
 
 function frontmatter(skill: string): Record<string, unknown> {
@@ -50,10 +50,8 @@ describe("repo workflows", () => {
   test("load without errors", () => {
     expect(listing.errors).toEqual([]);
   });
-  test("include the five story workflows of the process, and no fix or spec", () => {
-    const names = Object.keys(listing.workflows);
-    for (const name of ["triage", "reproduce", "story", "quick", "release"]) expect(names).toContain(name);
-    expect(names.filter((n) => n === "fix" || n === "spec")).toEqual([]);
+  test("are the six shipped workflows plus release, and no bug, fix or spec", () => {
+    expect(Object.keys(listing.workflows).sort()).toEqual(["quick", "refinement", "release", "reproduce", "slice", "story", "triage"]);
   });
   test.each(Object.keys(listing.workflows))("%s is valid for claude with the linked skills", (name) => {
     const result = validateWorkflowDefinition(listing.workflows[name]!.workflow, {

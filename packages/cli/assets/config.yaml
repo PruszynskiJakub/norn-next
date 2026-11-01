@@ -25,7 +25,7 @@ remote:
 # base_branch: main
 
 # Workflows in .agents/workflows/. An issue label norn:wf:<name> picks another one per story.
-# default_workflow: story
+# default_workflow: triage
 # default_slice_workflow: slice
 
 # Limits for agent steps that do not set their own.

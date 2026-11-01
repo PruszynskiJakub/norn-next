@@ -5,7 +5,7 @@
  * `norn run attach [<unit>] [--next]` focuses a unit's agent pane (B46, B47, HC10). `cockpit` is gone (B5).
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { appendFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { herdr } from "@norn/adapters";
@@ -30,11 +30,14 @@ const runs = (n: 5 | 6) => storyUnitDir(join(wt(n), `.agents/specs/${n === 5 ? "
 beforeAll(async () => {
   c = await createHarness();
   expect((await c.norn("init")).exit).toBe(0);
+  // stories start in a workflow whose first agent step is attended (refinement: sync → refine);
+  // the ticks take them in, sync them with the base and start refine
+  appendFileSync(join(c.root, ".agents", "norn.config.yaml"), "default_workflow: refinement\n");
   c.git(["add", "-A"]);
   c.git(["commit", "-q", "-m", "norn init"]);
   c.git(["push", "-q", "origin", "main"]);
   c.remote.issues = [issue(5, "Pay invoices"), issue(6, "Export report")];
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 5; i++) {
     c.clock.advance(60_000);
     await c.tick();
   }

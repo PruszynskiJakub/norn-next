@@ -58,7 +58,7 @@ describe("norn init writes the new layout (B1, B2)", () => {
   test("config file and workflows in .agents/workflows/; no folder of norn's own under .agents/", () => {
     expect(init.exit).toBe(0);
     expect(existsSync(join(h.root, CONFIG_FILE))).toBe(true);
-    for (const f of ["story.yaml", "slice.yaml", "bug.yaml"]) expect(existsSync(join(h.root, WORKFLOWS, f))).toBe(true);
+    for (const f of ["triage.yaml", "reproduce.yaml", "refinement.yaml", "story.yaml", "slice.yaml", "quick.yaml"]) expect(existsSync(join(h.root, WORKFLOWS, f))).toBe(true);
     expect(readdirSync(join(h.root, ".agents")).sort()).toEqual(["norn.config.yaml", "skills", "workflows"]);
     expect(init.stdout).toContain(`config          ${CONFIG_FILE} created`);
     expect(init.stdout).toContain("the `test` steps in .agents/workflows/ run");

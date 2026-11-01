@@ -23,7 +23,7 @@ set -e
 
 mkdir repo && cd repo && git init -q
 "$norn" init --json > ../init.json
-for f in norn.config.yaml workflows/story.yaml workflows/slice.yaml workflows/bug.yaml; do
+for f in norn.config.yaml workflows/triage.yaml workflows/reproduce.yaml workflows/refinement.yaml workflows/story.yaml workflows/slice.yaml workflows/quick.yaml; do
   [ -s ".agents/$f" ] || { echo "norn init did not write .agents/$f"; cat ../init.json; exit 1; }
 done
 [ ! -e .agents/norn ] || { echo "norn init wrote the old layout's .agents/norn/"; exit 1; }
