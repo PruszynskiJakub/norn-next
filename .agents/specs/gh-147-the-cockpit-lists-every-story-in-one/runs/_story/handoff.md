@@ -16,6 +16,19 @@
 
 ## Goal
 
+The cockpit (`norn status --watch`) in three tabs (1 Now, 2 Backlog, 3 Done) with each story once, closed stories reading done, story titles on NEEDS YOU rows, a 60% list, section counts, `]` `[` `n`, less clutter and the norn version in the header (#147).
+
 ## Progress
 
+- Model (`packages/view/src/cockpit.ts`, CP2): rows carry `tab`; a story with a needs-you item gets no story row; story rows sort now (fewest `steps_left` first, then issue number), backlog (by issue), done (issue number, newest first). Done = `story_status` done **or dropped** (dropped is closed too; the issue named only done), or a done unit.
+- New `UnitView.steps_left` (`packages/view/src/load.ts`): steps after the cursor in the pinned workflow's step order; used only to sort in-flight stories (the stage display stays `<status> <step>`, per the issue).
+- TUI (`packages/cli/src/runtime/cockpit-tui.ts`): `TuiState.tab` + `saved` (per-tab selection and filter); keys 1/2/3, `]`/`[`, `n` (same group for items, same section and standing for stories); tab strip with counts replaces the "/ to filter" line, the filter shows in the header while in use; section headers with counts; item rows show the story's title, no group word; story rows drop "no slices"/"no PR"; closed stories read done in rows and preview; list `max(64, 60%)`; header `norn <NORN_VERSION>` (status-watch passes it in `Look.version`).
+- Tests: new unit `packages/cli/test/unit/cockpit-tui.test.ts` (hand-built view → model → frame/keys; red before the change, confirmed); `packages/view/test/unit/cockpit.test.ts` updated + a tab/sort test; `packages/cli/test/integration/status-watch.test.ts` expectations updated (ran that file: 19 pass).
+- `.agents/SPEC-cockpit.md` CP2, CP6, CP7 amended.
+- Prototype from the gist committed as the record in `.agents/specs/gh-147-…/prototype/` (as-is; its README explains the layout).
+- Unit tier (1028 pass) and type check green.
+- Not done (out of scope, noted in the issue): gh-124/125/126 stuck without a NEEDS YOU item; `closed_at`; stage display.
+
 ## Resume
+
+Nothing left for implement: the change is committed. Next is the workflow's test check.

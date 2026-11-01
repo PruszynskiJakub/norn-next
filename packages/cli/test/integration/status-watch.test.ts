@@ -50,13 +50,12 @@ afterAll(() => c.cleanup());
 const model = async (h: herdr.HerdrCockpit | null = null) => (await runChecked(["status", "--watch", "--json"], { ...c.deps, herdr: h })).value as CockpitModel;
 
 describe("norn status --watch --json (CP5)", () => {
-  test("prints the model once: what needs you, then every story; no places outside Herdr", async () => {
+  test("prints the model once: what needs you, then each other story once; no places outside Herdr", async () => {
     const m = await model();
-    expect(m.rows.map((r) => [r.kind, r.group, r.unit])).toEqual([
-      ["item", "your_turn", "gh-5"],
-      ["item", "answer", "gh-6"],
-      ["story", null, "gh-5"],
-      ["story", null, "gh-6"],
+    // both stories need you, so neither has a story row of its own (CP2)
+    expect(m.rows.map((r) => [r.kind, r.tab, r.group, r.unit])).toEqual([
+      ["item", "now", "your_turn", "gh-5"],
+      ["item", "now", "answer", "gh-6"],
     ]);
     expect(m.rows[1]?.actions.map((a) => a.key)).toEqual(["enter", "a", "v", "i"]);
     expect(m.rows.flatMap((r) => r.actions).some((a) => a.effect.kind === "place")).toBe(false);
@@ -93,7 +92,7 @@ describe("keys (CP7)", () => {
     // the filter keeps rows where every word appears; enter keeps it, esc clears it
     const f = press(initialState(), "/", "export", "\r").st;
     expect(f.filter).toBe("export");
-    expect(press(f, "j").st.selected).toBe("story:gh-6");
+    expect(press(f, "j").st.selected).toBe(m.rows[1]?.id as string);
     expect(press(f, "\x1b").st.filter).toBe("");
     // y on an Answer item: refused, nothing runs
     const y = press(initialState(), "j", "y");
@@ -109,13 +108,13 @@ describe("keys (CP7)", () => {
     expect(press(initialState(), "q").effect).toEqual({ kind: "quit" });
   });
 
-  test("the frame: rows by section, the preview, the selected row's keys", async () => {
+  test("the frame: the tabs, rows by section, the preview, the selected row's keys", async () => {
     const frame = renderCockpit(await model(), initialState(), { width: 140, height: 24, color: false, now: c.clock.now(), clock: "12:00" });
-    expect(frame).toContain("NEEDS YOU");
-    expect(frame).toContain("STORIES");
-    expect(frame).toMatch(/▸ ▶ your turn {2}gh-5/);
+    expect(frame).toContain("NEEDS YOU 2");
+    expect(frame).toContain(" 1 Now 2 need you · 0 in flight │ 2 Backlog 0 │ 3 Done 0 ");
+    expect(frame).toMatch(/▸ ▶ gh-5 +\S+ +Pay invoices/);
     expect(frame).toContain("│ gh-5 — Pay invoices");
-    expect(frame).toContain("enter orient · v trace · i issue · / filter · ? keys · q quit");
+    expect(frame).toContain("enter orient · v trace · i issue · 1 2 3 tabs · / filter · ? keys · q quit");
     expect(frame.split("\n")).toHaveLength(23);
   });
 });

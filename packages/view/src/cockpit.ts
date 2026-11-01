@@ -1,5 +1,6 @@
 /**
- * The cockpit model (SPEC-cockpit CP1–CP5): rows — what needs the person, then every story — each with
+ * The cockpit model (SPEC-cockpit CP1–CP5): rows — what needs the person, then each other story once, in its
+ * tab (now, backlog, done) — each with
  * its story's orient preview and the actions it offers, as data. Pure: a ProjectView in, plain JSON
  * out. Renderers (the terminal `norn status --watch`, a web panel later) map actions to keys or buttons and
  * run their effects; they never decide which actions fit a row (CP4). Writes stay CLI verbs (X1).
@@ -31,10 +32,15 @@ export interface CockpitAction {
   effect: CockpitEffect;
 }
 
+/** CP2: where a row is listed — now (needs you, in flight), backlog (not started), done (closed) */
+export type CockpitTab = "now" | "backlog" | "done";
+
 export interface CockpitRow {
   /** the inbox item id, or `story:<key>`; stable across rebuilds */
   id: string;
   kind: "item" | "story";
+  /** an item is always `now`; a story by its standing */
+  tab: CockpitTab;
   group: InboxGroup | null;
   story: string;
   unit: string;
@@ -102,6 +108,23 @@ function itemActions(i: InboxEntry, unit: string, o: CockpitOptions): CockpitAct
   return out;
 }
 
+const TAB_ORDER: readonly CockpitTab[] = ["now", "backlog", "done"];
+
+/** A closed story (`story_status` done or dropped) is done whatever its unit says; one never started is backlog. */
+function storyTab(s: StoryView): CockpitTab {
+  if (s.story_status === "done" || s.story_status === "dropped" || s.status === "done") return "done";
+  return s.status === "not_started" ? "backlog" : "now";
+}
+
+const byKey = (a: StoryView, b: StoryView) => a.key.localeCompare(b.key, undefined, { numeric: true });
+
+/** In flight: nearest to done first (fewest steps left), then by issue; backlog by issue; done newest first (no closed_at yet). */
+function storyOrder(tab: CockpitTab, a: StoryView, b: StoryView): number {
+  if (tab === "done") return byKey(b, a);
+  if (tab === "now") return (a.steps_left ?? Number.MAX_SAFE_INTEGER) - (b.steps_left ?? Number.MAX_SAFE_INTEGER) || byKey(a, b);
+  return byKey(a, b);
+}
+
 export function cockpitModel(view: ProjectView, o: CockpitOptions): CockpitModel {
   const reports = new Map<string, OrientReport>();
   const report = (story: string) => {
@@ -122,6 +145,7 @@ export function cockpitModel(view: ProjectView, o: CockpitOptions): CockpitModel
       return {
         id: i.id,
         kind: "item" as const,
+        tab: "now" as const,
         group: i.group,
         story: i.story,
         unit,
@@ -133,19 +157,26 @@ export function cockpitModel(view: ProjectView, o: CockpitOptions): CockpitModel
         actions: [orient as CockpitAction, ...itemActions(i, unit, o), ...rest],
       };
     });
-  const storyRows: CockpitRow[] = view.stories.map((s) => ({
-    id: `story:${s.key}`,
-    kind: "story" as const,
-    group: null,
-    story: s.key,
-    unit: s.key,
-    step: s.step,
-    title: s.title,
-    since: s.since,
-    age: s.age,
-    preview: { report: report(s.key), item: null },
-    actions: storyActions(s, s.key, o, true),
-  }));
+  // CP2: a story that needs you is listed once, under its item
+  const waiting = new Set(items.map((r) => r.story));
+  const storyRows: CockpitRow[] = view.stories
+    .filter((s) => !waiting.has(s.key))
+    .map((s) => ({ s, tab: storyTab(s) }))
+    .sort((a, b) => TAB_ORDER.indexOf(a.tab) - TAB_ORDER.indexOf(b.tab) || storyOrder(a.tab, a.s, b.s))
+    .map(({ s, tab }) => ({
+      id: `story:${s.key}`,
+      kind: "story" as const,
+      tab,
+      group: null,
+      story: s.key,
+      unit: s.key,
+      step: s.step,
+      title: s.title,
+      since: s.since,
+      age: s.age,
+      preview: { report: report(s.key), item: null },
+      actions: storyActions(s, s.key, o, true),
+    }));
   // the header counts the rows that need you, so it matches what is listed under them
   return { at: view.at, header: { repo: view.repo, pending: items.length, heartbeat: view.heartbeat }, rows: [...items, ...storyRows] };
 }

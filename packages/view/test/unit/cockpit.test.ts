@@ -31,6 +31,7 @@ function story(key: string, over: Partial<StoryView> = {}): StoryView {
     updated_at: AT,
     errors: [],
     act_failure: null,
+    steps_left: null,
     branch: `${key}-x`,
     pr: null,
     notes: [],
@@ -94,9 +95,10 @@ const ids = (r: CockpitRow | undefined) => r?.actions.map((a) => a.id);
 const row = (rows: CockpitRow[], id: string) => rows.find((r) => r.id === id);
 
 describe("cockpitModel", () => {
-  test("rows: what needs you in O1 order, then every story; running, notes and unclaimed are no rows", () => {
+  test("rows: what needs you in O1 order, then each story without an item once; running, notes and unclaimed are no rows", () => {
     const m = cockpitModel(view(), { places: true, provider: "gh" });
-    expect(m.rows.map((r) => r.id)).toEqual(["your_turn:gh-1", "attended:gh-2", "answer:gh-3", "approve:gh-4", "unblock:gh-5", "check:gh-4", "story:gh-1", "story:gh-2", "story:gh-3", "story:gh-4", "story:gh-5", "story:gh-6"]);
+    expect(m.rows.map((r) => r.id)).toEqual(["your_turn:gh-1", "attended:gh-2", "answer:gh-3", "approve:gh-4", "unblock:gh-5", "check:gh-4", "story:gh-6"]);
+    expect(m.rows.map((r) => r.tab)).toEqual(["now", "now", "now", "now", "now", "now", "now"]);
     // the header counts the needs-you rows (6), not the inbox's pending items (7: unclaimed gh-6 too)
     expect(m.header).toEqual({ repo: "/repo", pending: 6, heartbeat: view().heartbeat });
     // stable: a rebuild gives the same ids
@@ -112,7 +114,6 @@ describe("cockpitModel", () => {
     expect(ids(row(rows, "unblock:gh-5"))).toEqual(["orient", "unstick", "trace", "issue"]);
     expect(ids(row(rows, "check:gh-4"))).toEqual(["orient", "trace", "pr", "issue"]);
     expect(ids(row(rows, "story:gh-6"))).toEqual(["orient", "trace", "take"]);
-    expect(ids(row(rows, "story:gh-1"))).toEqual(["orient", "trace", "issue"]);
   });
 
   test("effects: verbs with {input}, links, places only when the front end has them", () => {
@@ -126,13 +127,13 @@ describe("cockpitModel", () => {
     expect(row(rows, "approve:gh-4")?.actions.find((a) => a.id === "reject")?.effect).toEqual({ kind: "verb", argv: ["story", "reject", "gh-4", "--reason", "{input}"] });
     // B48: unstick is gone; a stuck unit is rerun
     expect(row(rows, "unblock:gh-5")?.actions.find((a) => a.id === "unstick")?.effect).toEqual({ kind: "verb", argv: ["run", "rerun", "gh-5"] });
-    expect(row(rows, "story:gh-4")?.actions.find((a) => a.id === "pr")?.effect).toEqual({ kind: "link", url: "https://github.com/o/r/pull/7" });
+    expect(row(rows, "approve:gh-4")?.actions.find((a) => a.id === "pr")?.effect).toEqual({ kind: "link", url: "https://github.com/o/r/pull/7" });
     expect(row(rows, "attended:gh-2")?.actions[1]?.effect).toEqual({ kind: "place", place: "agent", story: "gh-2", reach: { worktree: "/repo-worktrees/gh-2-x", agent_session_id: "s2", pane_id: null } });
-    expect(row(rows, "story:gh-1")?.actions[0]?.effect).toEqual({ kind: "place", place: "orient", story: "gh-1" });
+    expect(row(rows, "story:gh-6")?.actions[0]?.effect).toEqual({ kind: "place", place: "orient", story: "gh-6" });
 
     const web = cockpitModel(view(), { places: false, provider: "gh" });
     expect(web.rows.flatMap((r) => r.actions).some((a) => a.effect.kind === "place")).toBe(false);
-    expect(row(web.rows, "story:gh-1")?.actions[0]?.effect).toEqual({ kind: "verb", argv: ["story", "view", "gh-1"], show: true });
+    expect(row(web.rows, "story:gh-6")?.actions[0]?.effect).toEqual({ kind: "verb", argv: ["story", "view", "gh-6"], show: true });
     expect(ids(row(web.rows, "attended:gh-2"))).toEqual(["orient", "trace", "issue"]);
   });
 
@@ -142,7 +143,35 @@ describe("cockpitModel", () => {
     expect(r?.preview.report.story).toBe("gh-4");
     expect(r?.preview.report.pr_command).toBe("glab mr view gh-4-x");
     expect(r?.preview.item).toEqual({ title: "approve title", command: "norn story approve gh-4" });
-    expect(row(m.rows, "story:gh-4")?.preview.item).toBeNull();
+    expect(row(m.rows, "story:gh-6")?.preview.item).toBeNull();
     expect(JSON.parse(JSON.stringify(m))).toEqual(m);
+  });
+
+  test("story rows by tab: in flight nearest to done first, backlog not started, done (closed) newest first", () => {
+    const v = view();
+    v.inbox = { ...v.inbox, groups: { ...v.inbox.groups, your_turn: [], answer: [], approve: [], unblock: [], check: [] } };
+    v.stories = [
+      story("gh-1", { status: "not_started", step: null, steps_left: null }),
+      story("gh-2", { status: "parked", step: "refine", steps_left: 9 }),
+      story("gh-3", { status: "running", step: "ci", steps_left: 1 }),
+      story("gh-4", { status: "parked", step: "ready", story_status: "done", steps_left: 0 }),
+      // a closed story whose unit never ran is done, not backlog
+      story("gh-5", { status: "not_started", step: null, story_status: "done", steps_left: null }),
+      story("gh-6", { status: "stuck", step: "test", steps_left: 3 }),
+      story("gh-10", { status: "parked", step: "plan", steps_left: 9 }),
+      story("gh-7", { status: "not_started", step: null, story_status: "dropped", steps_left: null }),
+    ];
+    const m = cockpitModel(v, { places: true, provider: "gh" });
+    expect(m.rows.map((r) => [r.tab, r.story])).toEqual([
+      ["now", "gh-3"],
+      ["now", "gh-6"],
+      ["now", "gh-2"],
+      ["now", "gh-10"],
+      ["backlog", "gh-1"],
+      ["done", "gh-7"],
+      ["done", "gh-5"],
+      ["done", "gh-4"],
+    ]);
+    expect(m.header.pending).toBe(0);
   });
 });

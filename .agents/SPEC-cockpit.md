@@ -34,13 +34,14 @@ Non-goals:
   - `header`: the repo, how many rows the needs-you section holds (so the count matches what is listed; the inbox's `pending` also counts unclaimed stories, which are story rows here) and the heartbeat (`view.heartbeat`).
   - `rows`, in two sections:
     - **needs you**: one row per inbox item of `your_turn`, `answer`, `approve`, `unblock` and `check`, in O1 order;
-    - **stories**: one row per story.
+    - **stories**: one row per story that has no needs-you row (a story that needs you is listed once, under its item), by tab: `now` (in flight, nearest to done first: fewest steps left in its pinned workflow, `steps_left`), `backlog` (not started), `done` (closed: `story_status` done or dropped, whatever its unit says; newest first, by issue number until the model has a `closed_at`).
 
     Running, Notes and Recently done items are no rows; the story preview shows them.
 
   A row has:
   - `id`: the inbox item id, or `story:<key>`;
   - `kind`: `item` or `story`;
+  - `tab`: `now`, `backlog` or `done` (an item is always `now`);
   - `group`: for an item;
   - `story`, `unit`, `step`, `title`, `since`, `age`;
   - `preview`: CP3;
@@ -77,7 +78,11 @@ Non-goals:
 
 ## 4. The terminal cockpit (replaces HC4, HC5, HC8, HC16)
 
-- CP6 `norn status --watch [--interval 5s]` draws the model full screen: the header, a filter line, the rows on the left (about 40% of the width; the needs-you section, then stories), the selected row's preview on the right (below the rows when the pane is narrower than 100 columns), and a footer. The footer lists the selected row's actions by key, then `/ filter · r refresh · ? help · q quit`.
+- CP6 `norn status --watch [--interval 5s]` draws the model full screen: the header, the tab strip, the shown tab's rows on the left (about 60% of the width), the selected row's preview on the right (about 40%; below the rows when the pane is narrower than 100 columns), and a footer. The footer lists the selected row's actions by key, then `1 2 3 tabs · / filter · ? keys · q quit`.
+  - The header shows the running norn's version (`norn 0.15.0`, `NORN_VERSION`: a long-running cockpit keeps its binary's version after a new release is installed), the repo and how many rows need you across the repo. While the filter is in use it shows first in the header; there is no filter line.
+  - The tabs: `1 Now` (needs you, then in flight; the default), `2 Backlog` (not started), `3 Done` (closed). The strip carries counts: `1 Now 23 need you · 8 in flight │ 2 Backlog 2 │ 3 Done 35`.
+  - Each section header carries its count (`NEEDS YOU 23`, `IN FLIGHT 8`, `BACKLOG 2`, `DONE 35`).
+  - A needs-you row shows its mark, unit, step, the story's title and its age; the item's instruction stays in the preview. A story row shows its unit, title and standing (`<status> <step>`; a closed story reads `done`), then its slices and PR only when it has them.
   - It reads raw keys (a terminal in raw mode), draws on the alternate screen (frames leave no scrollback) and turns on mouse reporting for the wheel; all of it is restored on exit, SIGINT and SIGTERM included.
   - It redraws on every key and every interval, with a fresh view on the interval and after each action.
   - Frames go to stderr, one JSON summary (the last action taken) to stdout at exit (P8).
@@ -86,7 +91,9 @@ Non-goals:
   - ↑↓ or `k`/`j` move; PgUp/PgDn move a page.
   - ⌃d / ⌃u scroll the preview by half a screen, within what it holds; moving to another row scrolls back to its top. The footer offers them when the preview does not fit.
   - The mouse wheel (SGR mouse reporting) scrolls the preview by 3 lines when the pointer is over it, and moves the selection when it is over the list. Other mouse buttons do nothing.
-  - `/` opens the filter: typing narrows the rows to those where every word appears; Enter keeps the filter, Esc clears it.
+  - `1` `2` `3` show a tab. Each tab keeps its own selection and filter.
+  - `]` / `[` go to the first row of the next / previous section; `n` goes to the next row of the same kind (the same inbox group, e.g. the next approve; for a story, the same section and standing), round to the top.
+  - `/` opens the filter: typing narrows the shown tab's rows to those where every word appears; Enter keeps the filter, Esc clears it.
   - An action's key runs it on the selected row. A key the row does not offer shows `no <action> here`; nothing runs.
   - An action with `input` opens a one-line prompt in the footer, labelled with its `prompt`. Enter submits; Esc cancels. Empty text is refused when `required`.
   - `r` refreshes, `?` lists every key, `q` quits.
