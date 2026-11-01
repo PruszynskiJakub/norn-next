@@ -28,18 +28,15 @@
 
 ## Goal
 
-QA gh-71 (rounds): a verdict with evidence for each of B1–B36.
+Fix the two qa#1 failures: B27 (a round that opened its PR showed "round done, no PR" until a sync) and B28 (plain `norn status` did not show round/workflow).
 
 ## Progress
 
-- All tiers green on the branch: unit 1022, integration 554, e2e 72, typecheck.
-- Drove user scenarios through `norn` commands and ticks (runCli in-process, real git, fake remote, runner and clock). Scripts and evidence: /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa71/ev (criteria.json, findings.json, report.md).
-- 34 pass, 2 fail:
-  - B27: a round that opened its PR and finishes before a sync has seen the PR shows "round done, no PR / or close the issue" until the next sync (inbox/items.ts knownPr). Seen 2/2.
-  - B28: plain `norn status` markdown shows no round number or workflow (only `--json` has it).
-- Notes: the B22 Check text in the window before a closing sync; `run list` calls an `--at` move "workflow switched".
-- qa#1 fail: QA: 34/36 pass; B27 fails (a round that opened its PR shows 'round done, no PR' until the next sync), B28 fails (plain norn status shows no round/workflow). All test tiers green.
+- B27: open-pr (act, `packages/cli/src/runtime/act/git-step.ts`) now writes the PR it opened or found into the checkout's PR cache (`pr_seen`, C1), so the finished round shows "Merge PR #N" before any sync. Red test: `packages/cli/test/integration/inbox-why.test.ts` (status before the sync). Effect transcript `test/e2e/transcripts/e2e-slice-workflow.txt` rewritten: it had pinned the bug (notify `round_done:gh-7` → now `merge:gh-7:100`).
+- B28: `formatInbox` (`packages/view/src/format.ts`) prefixes each item with `round N · <workflow> · ` when the item carries a round. Red test: `records.test.ts` AC2 (plain `norn status`). Updated view.test.ts and human.test.ts lines that pinned the old line format.
+- Unit tier, typecheck green; the integration files that read status/view rerun green; e2e observe-snapshots + slice-workflow green.
+- QA notes from qa#1 (not blocking, unchanged): the B22 Check text in the window before a closing sync; `run list` calls an `--at` move "workflow switched".
 
 ## Resume
 
-Rework F1 (B27) and F2 (B28) from findings.json, each as a red test first.
+Nothing left for implement; report done.
