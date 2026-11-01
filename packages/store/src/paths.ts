@@ -172,9 +172,10 @@ export const sliceFile = (specDir: string, nn: string, slug: string) => join(sli
 /** A spec folder's `runs/`, the parent of every unit's record folder. */
 export const specRunsDir = (specDir: string) => join(specDir, RUNS_DIR);
 /**
- * The resolver for a unit's record folder (gh-71 D2, B30, B36): `<spec folder>/runs/<unit>` where unit is
- * `_story` or the slice dir name `<nn>-<slug>` (`unitRecordPath`). Absolute under an absolute spec folder,
- * repo-relative (as git names it) under a repo-relative one. Every reader and writer goes through here.
+ * The resolver for a unit's record folder (gh-71 D2, B30, B36): a slice's `<spec folder>/runs/<nn>-<slug>`;
+ * the story's current round `runs/_story/rounds/NN-<wf>` when the spec folder is absolute and has one, else
+ * `runs/_story` (a flat record from an older norn, read as round 1, or a story not started). A repo-relative
+ * spec folder is not looked at on disk and gets `runs/<unit>`. Every reader and writer goes through here.
  */
 export function unitDir(specDir: string, unit: string): string {
   const base = join(specDir, unitRecordPath(unit));

@@ -22,7 +22,6 @@ import {
   writePendingRecords,
   moveFile,
   startDir,
-  unitDir,
 } from "@norn/store";
 import { integrate } from "../integrate.ts";
 import { markStoryOnBase, mergeFacts, type RecordResult } from "../record.ts";

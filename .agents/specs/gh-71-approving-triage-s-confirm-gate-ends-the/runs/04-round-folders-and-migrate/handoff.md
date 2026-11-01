@@ -13,7 +13,19 @@
 <!-- norn:heartbeat:end -->
 
 ## Goal
+The story's record lives in `runs/_story/rounds/01-<workflow>/` with one `runs/_story/handoff.md` above it; a held flat story is moved there by `round.migrate` (one commit, pushed); flat records on the base stay readable as round 1 (B30, B31, B34, B36).
 
 ## Progress
+- Schema ids: `ROUNDS_DIR`, `roundDirName`/`parseRoundDirName`, `roundRecordPath`, `recordHandoffPath` (pure; core's brief uses it for the handoff input).
+- Store paths: `unitDir(spec, "_story")` is now fs-aware under an absolute spec folder: highest `rounds/NN-<wf>`, else `runs/_story` (flat = round 1, or not started). Repo-relative spec folders are not looked at on disk. `startDir` (story start writes round 01 of its workflow), `currentRound`, `roundDir`, `isFlatStoryRecord`, `handoffPath` (story → `runs/_story/handoff.md`), `recordPaths` (start_run's scoped commit stages the round folder + the story handoff).
+- Facts (D2): `UnitFacts.record` (optional; absent = `unitRecordPath(dir)` for old facts/golden), filled from `UnitSnapshot.record` by observe and the view. Decide's check `log_path` and `workflow_missing` file use it (`recordOf`).
+- Decide (D7): `round.migrate` in decideStory, after claim/renew and the spec-file check, before lifecycle, mailbox and units; only when `record === "runs/_story"` with a state, not mid-rebase (H1), not once merged into base (B36), and only with a story worktree. Emits `round_migrate {from,to,commit}`; act (`roundMigrate`, lifecycle.ts) moves every entry but handoff.md/rounds with `git.move` (plain move if untracked), one commit on the record paths, pushed.
+- Other readers: brief `unit_dir` from the resolved runsDir; human remote read lists `rounds/` on the story ref; release's handoff commit; unpushed check skips `rounds/NN/orphaned/` (found by the recovery e2e).
+- Tests: decide unit tests for AC4 (first, before receipts/park/mirror/slices; not mid-rebase, not other's claim, not merged, not for round or record-less facts) + rule case `round.migrate`. New `packages/cli/test/integration/round-folders.test.ts`: AC1 layout (state, pin, receipts from 0001, evidence; only handoff.md + rounds/ under runs/_story, also on the pushed branch), AC2 handoff Goal/Progress/Resume survive, AC3 flat record → one R100-renames commit, pushed, state equal, evidence paths resolve, story goes on at implement, AC5 an old flat record (view fixture gh-1) on main: run list/view read it, tick writes nothing.
+- AC6: tests' hand-built `runs/_story` helpers now go through `storyUnitDir`/`handoffPath`; transcripts and observe snapshots regenerated. Reviewed: the only differences are moved paths, the new `record` fact, the story handoff named in the start_run commit's paths, and tidy's orphan commit scoped to the round folder. Brief unit snapshot and view fixtures unchanged (they use fixed/flat paths and still pass).
+- All tiers green: unit 995/0, integration 524/0, e2e 72/0, typecheck, schema emit clean.
+- Not covered here: AC1's `logs/` is not asserted in round-folders.test (check logs go to `loc.runsDir`/decide `recordOf`, exercised by check-run tests through the resolver). AC7 (released norn → this build ticks a parked story) is an agent verification for QA.
+- Risk to note for review: receipts written into a story's `runs/_story/receipts/` before it starts (if any command does that) would stay in the flat folder once round 01 is created; no current test shows such a path.
 
 ## Resume
+Implement done; next is the slice's test/review/qa. For AC7 QA: start a story with the released norn in a throwaway repo, park it at a step, then tick with `bun packages/cli/src/main.ts tick` and check `git log`, `runs/_story/rounds/01-<wf>/` and `status`.
