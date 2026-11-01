@@ -24,6 +24,7 @@ const SKILLS = [
   "norn-qa",
   "norn-qa-person",
   "norn-diagnose",
+  "norn-triage",
   "norn-merge",
   "norn-pr",
   "norn-tdd",
@@ -99,8 +100,8 @@ function uncountedCycle(wf: Workflow): string[] | null {
 }
 
 describe("workflow templates", () => {
-  test("story, slice and bug are shipped", () => {
-    expect(workflowFiles.sort()).toEqual(["bug.yaml", "slice.yaml", "story.yaml"]);
+  test("triage, reproduce, refinement, story, slice and quick are shipped", () => {
+    expect(workflowFiles.sort()).toEqual(["quick.yaml", "refinement.yaml", "reproduce.yaml", "slice.yaml", "story.yaml", "triage.yaml"]);
   });
 
   describe.each(workflowFiles)("%s", (file) => {
@@ -158,6 +159,66 @@ describe("workflow templates", () => {
     // @norn/core. Once it is, also assert:
     //   validateWorkflowDefinition(wf, { skills: SKILLS }).issues → []            (W4, W5)
     //   checkWorkflowLevel(wf, file === "story.yaml" ? "story" : "slice") → []   (W8)
+  });
+});
+
+describe("single-purpose workflows (W1, #136)", () => {
+  const wf = (name: string) => loadWorkflow(`${name}.yaml`);
+  const targets = (name: string, step: string) =>
+    Object.fromEntries(Object.entries(wf(name).steps[step]?.outcomes ?? {}).map(([o, e]) => [o, outcomeEdge(e as Parameters<typeof outcomeEdge>[0]).to]));
+  const types = (name: string) => Object.fromEntries(Object.entries(wf(name).steps).map(([s, step]) => [s, step.type]));
+
+  test("triage is the default story workflow and slice the default slice workflow (W9)", () => {
+    expect([DEFAULT_CONFIG.default_workflow, DEFAULT_CONFIG.default_slice_workflow]).toEqual(["triage", "slice"]);
+  });
+
+  test("triage is one norn-triage step that ends the round with done: the recommendation is only in its comment", () => {
+    expect(wf("triage").start).toBe("explore");
+    expect(Object.keys(wf("triage").steps)).toEqual(["explore"]);
+    expect(wf("triage").steps.explore).toMatchObject({ type: "agent", skill: "norn-triage" });
+    expect(targets("triage", "explore")).toEqual({ done: "$done" });
+  });
+
+  test("reproduce is one norn-diagnose step that changes no code and ends the round either way", () => {
+    expect(Object.keys(wf("reproduce").steps)).toEqual(["reproduce"]);
+    expect(wf("reproduce").steps.reproduce).toMatchObject({ type: "agent", skill: "norn-diagnose" });
+    expect(targets("reproduce", "reproduce")).toEqual({ reproduced: "$done", cannot_reproduce: "$done" });
+  });
+
+  test("refinement syncs, then refines and plans with a person, and cuts no slices", () => {
+    expect(wf("refinement").start).toBe("sync");
+    expect(types("refinement")).toEqual({ sync: "git", "sync-resolve": "agent", refine: "agent", clarify: "agent", plan: "agent" });
+    for (const s of ["refine", "clarify", "plan"]) expect(wf("refinement").steps[s]).toMatchObject({ attended: true });
+    expect(targets("refinement", "plan")).toEqual({ done: "$done" });
+  });
+
+  test("story syncs before it slices, a plan that no longer holds goes $stuck, and it ends at ready after CI", () => {
+    expect(wf("story").start).toBe("sync");
+    expect(targets("story", "sync")).toEqual({ done: "slice", conflict: "sync-resolve" });
+    expect(targets("story", "slice")).toEqual({ done: "approve-slices", replan: "$stuck" });
+    expect(targets("story", "approve-slices")).toEqual({ approve: "slices", reject: "slice" });
+    expect(Object.keys(wf("story").steps)).not.toContain("refine");
+    expect(targets("story", "open-pr")).toEqual({ done: "ci" });
+    expect(targets("story", "ci")).toEqual({ pass: "ready", fail: "implement" });
+  });
+
+  test("slice has no QA: implement, test, review, integrate", () => {
+    expect(types("slice")).toEqual({ implement: "agent", test: "check", review: "agent", integrate: "git", merge: "agent" });
+    expect(targets("slice", "review")).toEqual({ approve: "integrate", changes_requested: "implement" });
+  });
+
+  test("quick syncs, then implements, and ends at ready after CI", () => {
+    expect(wf("quick").start).toBe("sync");
+    expect(targets("quick", "sync")).toEqual({ done: "implement", conflict: "sync-resolve" });
+    expect(targets("quick", "open-pr")).toEqual({ done: "ci" });
+    expect(targets("quick", "ci")).toEqual({ pass: "ready", fail: "implement" });
+  });
+
+  test("story and quick wait for CI with the same script, and update-branch re-enters update (BS9)", () => {
+    const run = (name: string) => (wf(name).steps.ci as { run?: string }).run;
+    expect(run("story")).toContain("gh pr checks");
+    expect(run("quick")).toBe(run("story"));
+    for (const name of ["story", "quick"]) expect(wf(name).base).toEqual({ stale: "conflict", step: "update" });
   });
 });
 

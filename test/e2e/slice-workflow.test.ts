@@ -83,7 +83,7 @@ describe("norn init", () => {
     expect(r.exit).toBe(0);
     const v = r.value as { config: string; workflows: { created: string[] }; skills: { updated: string[]; unchanged: string[]; links: Array<{ agent: string; linked: string[] }> }; hooks: Array<{ changed: string[] }>; gitignore: string[]; gitattributes: string[] };
     expect(v.config).toBe("created");
-    expect(v.workflows.created).toEqual(["bug.yaml", "slice.yaml", "story.yaml"]);
+    expect(v.workflows.created).toEqual(["quick.yaml", "refinement.yaml", "reproduce.yaml", "slice.yaml", "story.yaml", "triage.yaml"]);
     expect(v.skills.updated).toContain("norn");
     expect(v.skills.updated).toContain("norn-implement");
     expect(v.skills.links[0]).toMatchObject({ agent: "claude", linked: v.skills.updated });
@@ -91,7 +91,7 @@ describe("norn init", () => {
     expect(v.gitignore).toEqual([".env.norn", ".norn-unit"]);
     expect(v.gitattributes).toEqual([".agents/specs/*/runs/** linguist-generated=true gitlab-generated=true"]);
     // nothing in the repo names a test command: the templates keep theirs, and init says so
-    expect(r.value).toMatchObject({ remote: { provider: "gh", label: "norn", git_remote: "origin", url: h.remoteDir }, test_command: { command: "bun test", detected_from: null, set_in: ["bug.yaml", "slice.yaml", "story.yaml"] } });
+    expect(r.value).toMatchObject({ remote: { provider: "gh", label: "norn", git_remote: "origin", url: h.remoteDir }, test_command: { command: "bun test", detected_from: null, set_in: ["quick.yaml", "slice.yaml", "story.yaml"] } });
     expect(r.stdout).toContain("Next steps\n  1. Set your test command:");
     expect(r.stdout).toContain('`git add .agents .claude .gitignore .gitattributes && git commit -m "Set up norn" && git push`');
     expect(r.stdout).toContain("`gh issue create --label norn --assignee @me --title \"…\"`");
@@ -112,7 +112,7 @@ describe("norn init", () => {
     expect(r.exit).toBe(0);
     expect(r.stdout).toStartWith(`norn init in ${h.root}\n`);
     expect(r.stdout).toContain("config          .agents/norn.config.yaml kept (exists)");
-    expect(r.stdout).toContain("workflows       kept bug.yaml, slice.yaml, story.yaml");
+    expect(r.stdout).toContain("workflows       kept quick.yaml, refinement.yaml, reproduce.yaml, slice.yaml, story.yaml, triage.yaml");
     expect(r.stdout).toMatch(/skills +\.agents\/skills: up to date \(\d+ skills\)/);
     expect(r.stdout).toContain("claude → .claude/skills: all linked");
     expect(r.stdout).toContain("hooks           claude: up to date");
@@ -431,7 +431,7 @@ describe("norn init in a repository with a test command and no remote", () => {
     f.git(["remote", "remove", "origin"]);
     const r = await f.norn("init");
     expect(r.exit).toBe(0);
-    expect(r.value).toMatchObject({ remote: { url: null }, test_command: { command: "npm ci && npm test", detected_from: "package.json", set_in: ["bug.yaml", "slice.yaml", "story.yaml"] } });
+    expect(r.value).toMatchObject({ remote: { url: null }, test_command: { command: "npm ci && npm test", detected_from: "package.json", set_in: ["quick.yaml", "slice.yaml", "story.yaml"] } });
     const story = readFileSync(join(workflowsDir(f.root), "story.yaml"), "utf8");
     expect(story).toContain('run: "npm ci && npm test"');
     expect(story).not.toContain("run: bun test");

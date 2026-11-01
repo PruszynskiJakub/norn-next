@@ -1,10 +1,9 @@
-# Reproduce workflow — repo-local, triage for bugs (W1, W9: label norn:wf:reproduce, set by the bug
-# report template and the `issue` skill). An unattended agent follows the report through the real
-# interface, builds a loop that goes red on the symptom, minimises it, confirms the cause and names
-# the seam for a regression test. It posts all of that as an issue comment and changes no code.
-# A person then decides at `confirm`, as in triage: the fix is delivered by `quick`, switched to with
-# `norn story edit … --workflow quick --at sync` (W9, S7): quick brings the branch up to date, then its implement turns the red loop into a failing test.
-# Reproduce changes no code and opens no PR, so it has no base sync (BS*).
+# Reproduce workflow — repo-local copy of the shipped one (W1, W9: label norn:wf:reproduce, set by
+# the bug report template and the `issue` skill). An unattended agent follows the report through the
+# real interface, builds a loop that goes red on the symptom, minimises it, confirms the cause and
+# names the seam for a regression test. It posts all of that as an issue comment and changes no code.
+# Every outcome ends the round ($done): the fix is a quick round (`norn story edit gh-N --workflow
+# quick`), whose implement turns the red loop into a failing test first.
 name: reproduce
 description: Reproduce a bug through the real interface, confirm its cause and the seam for a regression test; change no code.
 start: reproduce
@@ -14,33 +13,16 @@ steps:
     skill: norn-diagnose
     inputs: [spec, handoff]
     instructions: >-
-      Read the issue mirrored in spec.md and its comments (`gh issue view <N> --comments`). First follow
-      the report as a user, through the real interface (`bun packages/cli/src/main.ts …` after
-      `bun install --frozen-lockfile`, never the installed `norn`), and record what you saw.
-      Run that dev build only in a throwaway git repo under $TMPDIR, never in this worktree: it is a live norn unit (NORN_HOME points at it) and a dev build would act on its runs/, claim and state.json.
-      Then build a loop that goes red on that exact symptom, minimise it and confirm the cause.
-      Read-only on code: fix nothing and change no file, spec.md included, but the handoff.
-      Post the findings as an issue comment that starts with `## Reproduce` (`## Reproduce (updated)` on a rerun),
-      piped into `gh issue comment <N> --body-file -`: the loop command, the minimised repro, what it prints,
-      the confirmed cause (`file:line`, or the ranked hypotheses left), the PRD ids it touches and the seam for
-      a regression test. That one comment is the only remote write this step allows, an exception to the
-      norn skill's rule; never edit the issue, label, assign or close. Write the same under Progress in the
-      handoff (the next agent does not see your Resume).
+      The issue is mirrored in spec.md; read its comments too. First follow the report as a user, through
+      the real interface (`bun packages/cli/src/main.ts …` after `bun install --frozen-lockfile`, never the installed
+      `norn`), and record what you saw. Run that dev build only in a throwaway git repo under $TMPDIR, never in this worktree: it is a live norn unit (NORN_HOME points at it) and a dev build would act on its runs/, claim and state.json. Then build a loop
+      that goes red on that exact symptom, minimise it and confirm the cause. You are told not to fix:
+      change no file, spec.md included, but the handoff.
+      Post the findings as an issue comment that starts with `## Reproduce` (`## Reproduce (updated)` on a rerun):
+      the loop command, the minimised repro, what it prints, the confirmed cause (`file:line`, or the ranked
+      hypotheses left), the PRD ids it touches and the seam for a regression test. That one comment is the only remote write this
+      step allows, an exception to the norn skill's rule; never edit the issue, label, assign or close.
+      Write the same under Progress in the handoff (the next agent does not see your Resume).
     outcomes:
-      reproduced:       { to: confirm, means: "the bug was observed as a user and a loop goes red on it; loop, repro, cause and seam posted and in the handoff" }
-      cannot_reproduce: { to: confirm, means: "followed the report faithfully and the bug did not occur, nor in any loop tried; what was tried posted and in the handoff" }
-  confirm:
-    type: gate
-    prompt: >-
-      Read the reproduce findings in the issue comment (`gh issue view N --comments`). N is the issue number.
-      Approving ends the reproduce round; the next round starts with `norn story edit gh-N --workflow <name>`.
-      Fix it: `norn story approve gh-N`, then `norn story edit gh-N --workflow quick --at sync` (the branch is brought up to date, then implement starts from the red loop).
-      Close: `norn story approve gh-N --reason "<why>"`, then `gh issue close N --reason "not planned"`,
-      then `norn story close gh-N --yes`,
-      then `git push origin --delete gh-N-<slug>` (close pushed the story branch; the findings stay on the issue comment).
-      Reproduce again: `norn story reject gh-N --reason "<what to look at>"`.
-    outcomes:
-      approve: $done
-      reject:  { to: reproduce, counter: reproduce_loop }
-counters:
-  reproduce_loop: { max: 2 }
+      reproduced:       { to: $done, means: "the bug was observed as a user and a loop goes red on it; loop, repro, cause and seam posted and in the handoff" }
+      cannot_reproduce: { to: $done, means: "followed the report faithfully and the bug did not occur, nor in any loop tried; what was tried posted and in the handoff" }
