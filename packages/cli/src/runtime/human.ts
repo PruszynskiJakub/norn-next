@@ -32,6 +32,10 @@ import {
   readClaim,
   recordedHeartbeatId,
   machineHolder,
+  pinnedWorkflowPath,
+  specRunsDir,
+  statePath,
+  unitDir,
 } from "@norn/store";
 import type { Context } from "../context.ts";
 import { claimHeld, failure, refuse, usageError } from "../output.ts";
@@ -109,12 +113,13 @@ async function remoteTarget(ctx: Context, key: string): Promise<Target | null> {
     const nn = slice.split("/")[1] as string;
     const sliceRef = refs.find((r) => r.startsWith(`${prefix}${story}/${nn}-`));
     if (sliceRef) candidates.push({ ref: sliceRef, dir: sliceRef.slice(`${prefix}${story}/`.length) });
-    const listed = (await git.lsTree(root, storyRef, `${spec}/runs/`)) ?? [];
+    const listed = (await git.lsTree(root, storyRef, `${specRunsDir(spec)}/`)) ?? [];
     const dir = listed.find((d) => d.startsWith(`${nn}-`));
     if (dir) candidates.push({ ref: storyRef, dir });
   } else candidates.push({ ref: storyRef, dir: STORY_UNIT_DIR });
   for (const c of candidates) {
-    const raw = await git.show(root, c.ref, `${spec}/runs/${c.dir}/state.json`);
+    const record = unitDir(spec, c.dir);
+    const raw = await git.show(root, c.ref, statePath(record));
     if (raw === null) continue;
     let parsed: unknown;
     try {
@@ -124,8 +129,8 @@ async function remoteTarget(ctx: Context, key: string): Promise<Target | null> {
     }
     const st = validate("state", parsed);
     if (!st.ok) continue;
-    const wfText = await git.show(root, c.ref, `${spec}/runs/${c.dir}/workflow.yaml`);
-    const wf = wfText === null ? null : parseWorkflowText(wfText, `${spec}/runs/${c.dir}/workflow.yaml`);
+    const wfText = await git.show(root, c.ref, pinnedWorkflowPath(record));
+    const wf = wfText === null ? null : parseWorkflowText(wfText, pinnedWorkflowPath(record));
     return { key, story, slice, state: st.value, workflow: wf?.ok ? wf.value : null, runsDir: null, source: "remote", obs: null, story_facts: null };
   }
   return null;

@@ -5,6 +5,7 @@
  */
 import type { UnpushedRuns } from "@norn/core";
 import { git } from "./git.ts";
+import { unitDir } from "./paths.ts";
 
 /** A unit worktree to inspect. */
 export interface UnpushedTarget {
@@ -42,7 +43,7 @@ export async function unpushedRuns(remote: string, baseRef: string | null, spec_
     const mb = await git(t.cwd, ["merge-base", "HEAD", against]);
     if (mb.code !== 0) continue;
     const base = mb.stdout.trim();
-    const dir = `${spec_dir}/runs/${t.dir}/`;
+    const dir = `${unitDir(spec_dir, t.dir)}/`;
     const [changed, untracked] = await Promise.all([
       git(t.cwd, ["diff", "--name-only", "--no-renames", "--diff-filter=AM", base, "--", dir]),
       git(t.cwd, ["ls-files", "--others", "--exclude-standard", "--", dir]),

@@ -19,7 +19,7 @@ import { baseSpecsRoot, defaultBaseRef } from "./base.ts";
 import { type LoadedConfig, loadConfig, loadWorkflows, type WorkflowListing } from "./config.ts";
 import { readSliceFile, readStoryFile } from "./frontmatter.ts";
 import { isErrno } from "./fsx.ts";
-import { slicesDir, specsDir, storyFile, unitDir } from "./paths.ts";
+import { slicesDir, specRunsDir, specsDir, storyFile, unitDir } from "./paths.ts";
 import { listReceipts } from "./receipts.ts";
 import { type Handoff, type PinnedWorkflow, readHandoff, readPinnedWorkflow, readState } from "./unit.ts";
 import { readUnitMarker } from "./worktree.ts";
@@ -149,7 +149,7 @@ export function loadStory(root: string, specPath: string, opts: { includeApplied
   }
 
   const units: UnitSnapshot[] = [loadUnit(root, specPath, { story: key, slice: null, dir: STORY_UNIT_DIR, key }, opts)];
-  const runDirs = new Set(dirs(join(specPath, "runs")).filter((d) => d !== STORY_UNIT_DIR));
+  const runDirs = new Set(dirs(specRunsDir(specPath)).filter((d) => d !== STORY_UNIT_DIR));
   for (const s of slices) runDirs.add(`${s.nn}-${s.slug}`);
   for (const d of [...runDirs].sort()) {
     const nn = /^([0-9]{2,3})-/.exec(d)?.[1];

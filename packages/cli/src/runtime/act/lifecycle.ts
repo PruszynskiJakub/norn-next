@@ -20,6 +20,7 @@ import {
   type PendingRecord,
   readPendingRecords,
   writePendingRecords,
+  unitDir,
 } from "@norn/store";
 import { integrate } from "../integrate.ts";
 import { markStoryOnBase, mergeFacts, type RecordResult } from "../record.ts";
@@ -68,9 +69,9 @@ export async function startUnit(act: ActEnv, a: Extract<Action, { kind: "start_u
     wtPath = a.worktree.path;
   }
   if (!wtPath) throw new Error(`no worktree for ${a.unit.key}`);
-  const runsDir = join(wtPath, story.spec_dir, "runs", a.unit.dir);
+  const runsDir = unitDir(join(wtPath, story.spec_dir), a.unit.dir);
   const pin = pinWorkflow(runsDir, a.workflow_source);
-  if (!pin.ok) throw new Error(`runs/${a.unit.dir}/workflow.yaml is already pinned with different content (S7)`);
+  if (!pin.ok) throw new Error(`${relative(join(wtPath, story.spec_dir), runsDir)}/workflow.yaml is already pinned with different content (S7)`);
   act.obs.units[a.unit.key] = {
     unit: a.unit,
     story: a.unit.story,
