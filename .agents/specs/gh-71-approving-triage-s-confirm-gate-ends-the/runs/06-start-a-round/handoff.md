@@ -13,7 +13,17 @@
 <!-- norn:heartbeat:end -->
 
 ## Goal
+`norn story edit <story> --workflow <name> [--at <step>]` on a finished round starts round N+1 in its own folder (gh-71 slice 06, AC1–AC13).
 
 ## Progress
+- Schema: `round` receipt (15 kinds; workflow, workflow_hash, to, forced, left_at), optional `round` in state (absent = 1); JSON schemas re-emitted.
+- Command (`story-edit.ts`): on a started story, D3 order — claim held elsewhere → unknown/invalid workflow → unknown `--at` step → unfinished round refused `round_unfinished` with the `--force` command; else writes only a `round` receipt (D4: no in-place story switch; slices keep it).
+- Decide (`decide/story.ts` `roundStart`): rule `round.start` → `round_start` action; `round.reject` (stale cursor / unfinished / no step); `round.workflow_changed` (hash differs) leaves the round finished with a `workflow` park that the inbox shows as Your turn with the edit command. Rule cases added. Slices record `round` (D8 already skips integrated slices).
+- Act (`act/lifecycle.ts` `roundStart`): pins the new round, writes its state (commit point) then the old round's ended state, sets spec `workflow:`, one commit.
+- D11: triage/reproduce gate prompts say approving ends the round and the next starts with `norn story edit gh-N --workflow <name>`.
+- Tests: human.test.ts (round block gh-14/15/16: AC1–4, 6–10, 12; AC5 PR body; AC11 on gh-8; AC9 claim-first via the mailbox clone; D4 rework of the old in-place test), decide.test.ts (stale round-1 mailbox receipt).
+- Not done here: AC13 (agent verifier, a manual run with the dev build — for QA). Integration/e2e tiers beyond human/runtime/round-folders/prompts not run locally (the test check runs them); golden cases and transcripts unchanged so far.
+- Friction: bun's `toMatchObject` with `expect.any(String)` mutated the received value in a later assertion (worked around by reading before).
 
 ## Resume
+Run the `test` check; if e2e transcripts/observe snapshots or golden cases move, review and regenerate them as the AGENTS.md commands say.

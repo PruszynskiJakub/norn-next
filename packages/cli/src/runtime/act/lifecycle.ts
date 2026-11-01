@@ -22,6 +22,7 @@ import {
   writePendingRecords,
   moveFile,
   startDir,
+  writeState,
 } from "@norn/store";
 import { integrate } from "../integrate.ts";
 import { markStoryOnBase, mergeFacts, type RecordResult } from "../record.ts";
@@ -344,13 +345,16 @@ export async function roundStart(act: ActEnv, a: Extract<Action, { kind: "round_
   const story = act.storyLoc(a.unit.story);
   const wt = a.commit?.cwd ?? loc.worktree;
   if (!wt) throw new Error(`no worktree for ${a.unit.key}`);
-  act.writeUnitState(a.unit, loc.runsDir, a.ended);
+  const oldDir = loc.runsDir;
   const dir = join(wt, a.round.dir);
   const pin = pinWorkflow(dir, a.workflow_source);
   if (!pin.ok) throw new Error(`${a.round.dir}/workflow.yaml is already pinned with different content (S7)`);
+  // S5: the new round's state is the commit point — once it exists the story is in round N, whatever
+  // happens to the old round's state after; before it, the next tick applies the round receipt again
   loc.runsDir = dir;
   act.obs.units[a.unit.key] = { ...loc, runsDir: dir, state: null, workflow: null };
   act.writeUnitState(a.unit, dir, a.state);
+  writeState(oldDir, a.ended);
   const fm = patchStoryFile(storyFile(join(wt, story.spec_dir)), { workflow: a.round.workflow }, wt);
   const commit = await act.commit(a.commit, a.unit, a.state, `${a.rule}: round ${a.round.n} ${a.round.workflow} at ${a.state.step}`);
   return { ok: true, detail: { round: a.round, story_file: fm.ok ? "updated" : fm.reason, commit } };
