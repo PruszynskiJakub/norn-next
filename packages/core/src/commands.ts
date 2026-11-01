@@ -57,7 +57,7 @@ const norn = (...parts: (string | false | null | undefined)[]) => ["norn", ...pa
 /**
  * Builders for every norn command printed to a person or an agent (inbox items, decide details,
  * `do_instead` hints, handoff headers, briefs, cockpit actions, next steps). B7: renaming a command
- * is a change here and in its pinned table (`packages/core/test/printed-commands.test.ts`), nowhere else.
+ * is a change here and in its pinned table (`packages/core/test/unit/printed-commands.test.ts`), nowhere else.
  */
 export const cmd = {
   config: (key?: string) => norn("config", key ? "get" : "list", key),

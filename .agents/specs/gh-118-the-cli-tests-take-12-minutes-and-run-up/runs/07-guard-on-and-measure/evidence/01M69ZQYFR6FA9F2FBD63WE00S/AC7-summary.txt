@@ -1,0 +1,13 @@
+unit 1 exit 0
+unit 2 exit 0
+unit 3 exit 0
+integration 1 exit 0
+integration 2 exit 0
+integration 3 exit 0
+e2e 1 exit 0
+e2e 2 exit 0
+e2e 3 exit 0
+typecheck exit 0
+golden exit 0
+golden-update exit 0
+ALLDONE

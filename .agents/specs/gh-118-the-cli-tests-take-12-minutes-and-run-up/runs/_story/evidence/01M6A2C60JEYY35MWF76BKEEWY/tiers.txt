@@ -1,0 +1,7 @@
+int 1 exit 0
+int 2 exit 0
+int 3 exit 1
+e2e 1 exit 0
+e2e 2 exit 0
+e2e 3 exit 0
+ALLDONE

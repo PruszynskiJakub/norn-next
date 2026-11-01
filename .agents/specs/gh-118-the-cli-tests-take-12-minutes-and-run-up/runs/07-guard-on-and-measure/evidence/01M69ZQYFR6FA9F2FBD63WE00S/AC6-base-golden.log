@@ -1,0 +1,51 @@
+$ bun scripts/golden.ts
+ok   packages/cli/test/audit.test.ts
+ok   packages/cli/test/agent-protocol.test.ts
+ok   packages/cli/test/auto-recovery.test.ts
+ok   packages/cli/test/config.test.ts
+ok   packages/cli/test/chunked-ticks.test.ts
+ok   packages/cli/test/check-run.test.ts
+ok   packages/cli/test/help-tree.test.ts
+ok   packages/cli/test/criteria.test.ts
+ok   packages/cli/test/e2e.test.ts
+ok   packages/cli/test/inbox-why.test.ts
+ok   packages/cli/test/layout-guard.test.ts
+ok   packages/cli/test/housekeeping.test.ts
+ok   packages/cli/test/layout.test.ts
+ok   packages/cli/test/machine-dir.test.ts
+ok   packages/cli/test/human.test.ts
+ok   packages/cli/test/base-sync.test.ts
+ok   packages/cli/test/pr-body.test.ts
+ok   packages/cli/test/observe-snapshots.test.ts
+ok   packages/cli/test/migrate.test.ts
+ok   packages/cli/test/rebase-rewind.test.ts
+ok   packages/cli/test/rename-continuity.test.ts
+ok   packages/cli/test/records.test.ts
+ok   packages/cli/test/prompts.test.ts
+ok   packages/cli/test/segment.test.ts
+ok   packages/cli/test/recovery.test.ts
+ok   packages/cli/test/runtime.test.ts
+ok   packages/cli/test/status-watch.test.ts
+ok   packages/cli/test/status.test.ts
+ok   packages/cli/test/story-create.test.ts
+ok   packages/cli/test/run-rerun-cancel.test.ts
+ok   packages/cli/test/story-start.test.ts
+ok   packages/cli/test/story-decision.test.ts
+ok   packages/cli/test/story-view.test.ts
+ok   packages/cli/test/tidy-herdr.test.ts
+ok   packages/cli/test/story-reopen.test.ts
+ok   packages/cli/test/targets.test.ts
+ok   packages/cli/test/why-version.test.ts
+ok   packages/cli/test/trace-free-views.test.ts
+ok   packages/cli/test/team.test.ts
+added check-run-79e9bb3eaf13.json: check.running
+added base-sync-3840c46a2ba5.json: remote.park
+added check-run-0bb8618bb933.json: leases.reclaim, check.running, check.run
+added housekeeping-179f36b22a7d.json: start.workflow_invalid
+added rebase-rewind-0a4c2f7ca16d.json: claim.renew, unit.rebase_in_progress
+added story-reopen-a1feef443f31.json: slices.slice_stuck, slice.done, unit.stuck
+added run-rerun-cancel-c4951d9aea19.json: receipts.apply, agent.timeout.nudge
+added status-watch-bf9ed6a217f0.json: receipts.apply, agent.attended.running
+added agent-protocol-aebc90a877f3.json: agent.timeout.surface
+
+9 golden case(s) added of 604 harvested; the 93 existing left as they were → packages/core/test/golden

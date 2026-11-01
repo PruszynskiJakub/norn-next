@@ -5,8 +5,8 @@
   "workspaces": ["packages/*"],
   "scripts": {
     "test": "bun test",
-    "test:fast": "bun test --path-ignore-patterns='packages/cli/**'",
-    "test:cli": "bun test ./packages/cli/test",
+    "test:integration": "bun test --config=bunfig.integration.toml --parallel --timeout=20000",
+    "test:e2e": "bun test --config=bunfig.e2e.toml --parallel --timeout=20000",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p scripts/tsconfig.json",
     "schema:emit": "bun packages/schema/scripts/emit.ts",
     "golden": "bun scripts/golden.ts",
@@ -14,6 +14,12 @@
     "build:bin": "bun scripts/build.ts --bin"
   },
   "devDependencies": {
+    "@norn/schema": "workspace:*",
+    "@norn/core": "workspace:*",
+    "@norn/store": "workspace:*",
+    "@norn/adapters": "workspace:*",
+    "@norn/view": "workspace:*",
+    "@norn/cli": "workspace:*",
     "@types/bun": "1.3.13",
     "typescript": "^5.9.3",
     "yaml": "^2.8.1"

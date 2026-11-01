@@ -1,0 +1,15 @@
+$ bun test --config=bunfig.integration.toml --parallel --timeout=20000
+bun test v1.3.13 (bf2e2cec) 12x PARALLEL
+
+packages/cli/test/integration/integrate.test.ts:
+(fail) integrate (W2, K6) > clean: rebase + fast-forward story branch checked out in a worktree [20081.93ms]
+  ^ a beforeEach/afterEach hook timed out for this test.
+
+ 510 pass
+ 1 fail
+ 3083 expect() calls
+Ran 511 tests across 53 files. [110.03s]
+error: script "test:integration" exited with code 1
+real 110.04
+user 319.93
+sys 441.38

@@ -1,0 +1,7 @@
+$ bun test --config=bunfig.integration.toml --parallel --timeout=20000 "--reporter=junit" "--reporter-outfile=/private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-118-the-cli-tests-take-12-minutes-and-run-up/44f27a8d-c110-495d-a664-bb2e71164e29/scratchpad/qa2/B17-int.xml"
+bun test v1.3.13 (bf2e2cec) 12x PARALLEL
+
+ 511 pass
+ 0 fail
+ 3087 expect() calls
+Ran 511 tests across 53 files. [109.74s]

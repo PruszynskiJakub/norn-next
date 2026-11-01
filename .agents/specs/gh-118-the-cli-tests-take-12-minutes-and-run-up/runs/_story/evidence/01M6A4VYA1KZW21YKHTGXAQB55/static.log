@@ -1,0 +1,75 @@
+## B7
+error: Script not found "test:fast"
+error: Script not found "test:cli"
+grep rc=1
+## B8
+.agents/workflows/bug.yaml:31:    run: "bun install --frozen-lockfile && bun run test && bun run test:integration && bun run typecheck"
+.agents/workflows/slice.yaml:18:    run: "bun install --frozen-lockfile && bun run test && bun run test:integration && bun run typecheck"
+.agents/workflows/quick.yaml:54:    run: "bun install --frozen-lockfile && bun run test && bun run test:integration && bun run typecheck"
+.agents/workflows/story.yaml:80:    run: "bun install --frozen-lockfile && bun run test && bun run test:integration && bun run typecheck"
+## B9
+.agents/workflows/bug.yaml:26:    instructions: "Start from the loop and minimised repro in the handoff: turn them into a failing test at the seam named there before changing any code, then fix the cause. Run `bun run test` (the unit tier) after each change, and the type check; the integration tier runs in the `test` check and the e2e tier runs in CI, so do not run them before handing back."
+.agents/workflows/slice.yaml:14:    instructions: "Run `bun run test` (the unit tier) after each change, and the type check; the integration tier runs in the `test` check and the e2e tier runs in CI, so do not run them before handing back."
+.agents/workflows/quick.yaml:38:      Run `bun run test` (the unit tier) after each change, and the type check; the integration tier runs in the `test` check and the e2e tier runs in CI, so do not run them before handing back.
+.agents/workflows/story.yaml:104:    instructions: "Run `bun run test` (the unit tier) after each change, and the type check; the integration tier runs in the `test` check and the e2e tier runs in CI, so do not run them before handing back."
+## B10
+20:4. Run the type check and the repo's fast suite after each change. Slower tiers (integration, end-to-end) run in their own check; do not run them before handing back.
+30:Done when every acceptance criterion (or every rework point) has a passing test at an agreed seam that would fail without the change, the type check, linters and the repo's fast suite are green (slower tiers run in their own check), the work is committed, and no unrelated changes remain in the diff.
+## B11/B12
+2:# tier, the e2e tier in shards, and the distributables built and smoke-tested as a user would
+8:  push:
+12:  group: ci-${{ github.ref }}
+13:  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+16:  contents: read
+20:  unit:
+29:      - run: bun run test
+30:      - run: bun run typecheck
+32:  integration:
+33:    needs: unit
+47:          bun run test:integration
+49:  # bun shards by file (B12); a red shard cancels the others.
+51:    needs: unit
+55:      fail-fast: true
+57:        shard: [1, 2, 3]
+58:    name: e2e (shard ${{ matrix.shard }}/3)
+65:      - name: e2e tier, one shard
+70:          bun run test:e2e --shard=${{ matrix.shard }}/3
+72:  package:
+73:    needs: unit
+## B13
+143:          bun run test
+144:          bun run typecheck
+## scripts
+7:    "test": "bun test",
+8:    "test:integration": "bun test --config=bunfig.integration.toml --parallel --timeout=20000",
+9:    "test:e2e": "bun test --config=bunfig.e2e.toml --parallel --timeout=20000",
+# The unit tier (gh-118 B1): a plain `bun test` runs everything but the integration and e2e tiers,
+# which run through their own configs (bunfig.integration.toml, bunfig.e2e.toml). Only this tier preloads
+# the unit guard (B4, D2): a unit test that starts a child process fails.
+[test]
+preload = ["./test/preload.ts", "./test/support/unit-guard-preload.ts"]
+pathIgnorePatterns = ["**/integration/**", "test/e2e/**"]
+(eval):10: no matches found: test/*.toml
+## B21
+9:bun run test        # the unit tier, in seconds: your loop after each change; a plain `bun test` runs exactly this
+10:bun run test:integration  # the integration tier (packages/*/test/integration/), in parallel: the workflow's test check runs it
+11:bun run test:e2e    # the e2e tier (test/e2e/), in parallel: CI runs it in shards; `bun run test:e2e <file>` runs one file
+18:`packages/core/test/unit/golden.test.ts` replays every golden case through `decide` and wants exactly the decisions the tick recorded, and checks that every rule id decide can emit fires in a golden case or a hand-built one (`packages/core/test/rule-cases.ts`). A change that keeps behaviour leaves the corpus alone. For an intended change in what decide decides, run `bun run golden -- --update`: it decides each existing case again and rewrites only its `decisions` (names, facts, workflows and config stay), printing the decisions that went and came per case, so the diff is exactly the behaviour change; review it. `bun run golden` alone only adds cases: it runs the harness tests (cli integration and `test/e2e/`, each with its tier's config) with `NORN_GOLDEN_OUT` set and adds, never replaces, harvested cases that bring a rule fewer than two cases fire. Cases are named by a hash of decide's inputs (facts, workflows, config, not the decisions) with run-specific values (ulids, shas, pids, wall-clock times) normalised, so a rerun with nothing new to cover changes nothing and `--update` keeps every name.
+20:Effect transcripts pin what three harness flows do to the world: the child processes norn spawns (store's `setSpawnObserver` hook, off by default: `spawnBounded`, store's git calls and each spawn that calls `noteSpawn`, which includes check commands; the `ps`/`lsof` pid probes are not recorded), every call on the fake ports, and every file under `runs/` that appears, changes or goes away, with the content of each one added or changed (JSON as one line, other text as a hash), normalised (temp dirs, ulids, shas, timestamps). The recorder is `test/support/transcript.ts`; the flows are the last test of `test/e2e/slice-workflow.test.ts` (slice workflow), `test/e2e/base-sync.test.ts` (base sync) and `test/e2e/recovery.test.ts` (claim lost), against `test/e2e/transcripts/*.txt`. A change that keeps behaviour leaves them alone; for an intended change, rewrite them with `NORN_TRANSCRIPT_UPDATE=1 bun run test:e2e <file>` and review the diff.
+22:Observe snapshots pin what `observe` sees at five points of one story in `test/e2e/observe-snapshots.test.ts` (fresh intake, running slice, parked ask, gate waiting, merged): the Facts, normalised the same way, against `test/e2e/observe-snapshots/*.json`. At each point the test also checks inbox parity: the inbox `norn status` shows (`loadProjectView`) must equal `buildInbox` over observe's Facts. The helpers are in `test/support/observe-snapshot.ts`. Rewrite the snapshots with `NORN_TRANSCRIPT_UPDATE=1 bun run test:e2e test/e2e/observe-snapshots.test.ts`, again only for an intended change.
+26:To release: a person runs `/release-start`. It opens the release issue; the `release` workflow rebuilds `CHANGELOG.md` from the squash commits since the last tag, bumps `version` in `packages/cli/package.json` and the README release badge, opens the PR and waits for its CI; the person judges the version and the changelog at `ready`. Merging that PR smokes every binary on its own OS, tags `vX.Y.Z` and publishes in one CI run. See Process.
+28:Tests come in three tiers, by folder: **unit** (`packages/<pkg>/test/unit/`, `test/repo/` and the rest of the root `test/` but `test/e2e/` and `test/support/`; in-process only: a preload fails a unit test that starts a child process), **integration** (`packages/<pkg>/test/integration/`: real git, real processes, the cli harness) and **e2e** (`test/e2e/`: multi-tick stories, effect transcripts, observe snapshots). Shared helpers sit in `test/support/`. The unit tier (`bun run test`) and the type check must pass before you hand work back; a workflow's `test` check runs the unit tier, the integration tier and the type check, and `quick` and `story` then wait for the PR's CI in a `ci` check, which sends a red run back to `implement` (`release` waits for it too, with no local test, and goes `$stuck` on a red run). CI (`.github/workflows/ci.yml`) runs the unit tier and the type check on every PR, then, once they pass, the integration tier, the e2e tier in three shards, and the npm package and a binary built and checked with `scripts/smoke.sh`; the release run tests only the unit tier and the type check, since the release PR's CI ran every tier; a release also smokes each binary on its own OS (macOS arm64/x64, Linux arm64). A test fails if the emitted JSON schemas are stale.
+84:- **Glossary (PRD §5).** Use the core nouns: story, slice, unit, workflow, step, run, claim, receipt, outcome, counter, gate, check, handoff, brief, inbox, tick, mode, worktree, slot, trace, mailbox. Banned synonyms: `task`/`job`/`ticket` → story/slice; state (for a workflow node) → step; lease (for ownership) → claim (machine slot files *are* leases); result/status (for how a step ended) → outcome; `interactive step` → attended step. Outcomes are spelled as typed (`approve`, never `approved`). `test/repo/repo.test.ts` lints the unambiguous ones in package sources, `packages/cli/assets`, `plugins/`, `packages/schema/json`, `README.md`, `CONTRIBUTING.md` and this file — whole words only, URLs skipped, and in docs (not `.ts`) inline code spans skipped, so quote a banned word in backticks only when naming it on purpose.
+90:- Code style: TypeScript strict ESM, `.ts` import suffixes inside a package, `@norn/<pkg>` across packages, no default exports, small modules. Tests sit in their tier's folder under `packages/<pkg>/test/` or the root `test/` (never in `src/`; see Commands for the tiers); adapters are tested against recorded fixtures in `packages/adapters/test/<adapter>/{<adapter>.test.ts,fixtures/}`, core by replaying traces (X4). `test/repo/repo.test.ts` enforces the layout.
+18:> norn is pre-1.0: a minor version can change the machine contract (JSON output, persisted formats), and [`CHANGELOG.md`](CHANGELOG.md) says what changed. It is tested on Claude Code; Codex, OpenCode and Gemini should work but are less exercised.
+20:You give a story to a coding agent and switch to something else. Forty minutes later you look back: the agent has been waiting on a question in a pane you closed. Or it died halfway through. Or it ran the same failing test three times, said it was done, and nothing checked.
+22:**norn delivers stories with coding agents one bounded step at a time and keeps one inbox of everything that needs you.** You label a GitHub or GitLab issue. norn takes it in, gives it a branch and a worktree, and walks it through a workflow: refine the spec with you, plan, implement in slices, test, review, QA, open a draft PR. Agents do the steps. Plain code decides what comes next, notices when an agent asks, dies or stalls, and tells you exactly which command answers it.
+61:**A good fit today:** one person, Claude Code, GitHub, a test suite you trust, and stories big enough to plan. Several stories can run in parallel on one machine, attended by you (manual mode) or started by norn (auto mode).
+66:- GitLab, or an agent other than Claude Code. The `glab`, codex, opencode and gemini adapters exist but are tested only against recorded fixtures, never live.
+69:- Relying on the herdr cockpit or the default `--permission-mode auto`. Both are tested against fixtures only; no real run has used them yet.
+75:You need git ≥ 2.38, an agent CLI (Claude Code is the tested one), and `gh` or `glab` signed in.
+82:curl -fsSLO https://github.com/PruszynskiJakub/norn-next/releases/latest/download/norn-darwin-arm64
+107:`norn init` writes the config (`.agents/norn.config.yaml`), three workflows (`story`, `slice`, `bug`) in `.agents/workflows/`, the agent skills and hooks, and its `.gitignore` and `.gitattributes` lines. It reads your test command from your build files, then prints the next steps, which are:
+109:1. Check the test command it wrote into the workflows' `test` steps.
+## PR/CI
+[]

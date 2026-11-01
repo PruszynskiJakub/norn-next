@@ -1,0 +1,38 @@
+### B4 probe: packages/store/test/unit/qa-probe.test.ts runs git rev-parse HEAD
+      at <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-118-the-cli-tests-take-12-minutes-and-run-up/packages/store/test/unit/qa-probe.test.ts:3:17)
+49 | 
+50 |   return {
+51 |     check() {
+52 |       const message = pending;
+53 |       pending = undefined;
+54 |       if (message !== undefined) throw new Error(message);
+                                                             ^
+error: unit test in packages/store/test/unit/qa-probe.test.ts started `git rev-parse HEAD`; a test that spawns belongs in test/integration/
+      at check (/Users/jakubpruszynski/Projects/norn-worktrees/gh-118-the-cli-tests-take-12-minutes-and-run-up/test/support/unit-guard.ts:54:57)
+(fail) reads the head [1.07ms]
+49 | 
+50 |   return {
+51 |     check() {
+52 |       const message = pending;
+53 |       pending = undefined;
+54 |       if (message !== undefined) throw new Error(message);
+                                                             ^
+error: unit test in packages/store/test/unit/qa-probe.test.ts started `git rev-parse HEAD`; a test that spawns belongs in test/integration/
+      at check (/Users/jakubpruszynski/Projects/norn-worktrees/gh-118-the-cli-tests-take-12-minutes-and-run-up/test/support/unit-guard.ts:54:57)
+(fail) swallows the error [0.09ms]
+
+ 0 pass
+ 2 fail
+Ran 2 tests across 1 file. [36.00ms]
+rc=0
+### B14 probe: packages/view/test/foo.test.ts
+### B15 probe: packages/cli/test/unit/x.test.ts imports the harness
+### B16 probe: integration test imports transcript recorder
++   "packages/view/test/foo.test.ts is not in a tier folder (unit/, integration/, test/e2e/, test/repo/)",
+(fail) test layout (AGENTS.md) > gh-118 B14: every test file sits in a tier folder [24.92ms]
++     "file": "packages/cli/test/integration/qa-y.test.ts",
+(fail) test layout (AGENTS.md) > B16: only test/e2e/ imports the transcript recorder and the observe snapshot helpers [11.62ms]
++     "file": "packages/cli/test/unit/qa-x.test.ts",
+(fail) test layout (AGENTS.md) > B15: no unit test imports the cli harness, a helper that imports it, or store's git functions [26.48ms]
+ 55 pass
+ 3 fail

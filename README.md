@@ -237,7 +237,9 @@ scripts/                           build, golden cases, process check, smoke tes
 
 ```sh
 bun install
-bun test               # all tests
+bun run test           # the unit tier, in seconds (a plain `bun test` runs the same)
+bun run test:integration  # real git and the cli harness
+bun run test:e2e       # multi-tick stories; CI runs it in shards
 bun run typecheck
 bun run schema:emit    # after changing a schema
 bun run build          # dist/npm/: bundled norn.js + assets/ + package.json, ready to pack
