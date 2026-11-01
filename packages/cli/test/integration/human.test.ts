@@ -599,6 +599,23 @@ steps:
     outcomes: { done: { to: $done, means: "built" }, again: { to: refine, counter: fix, means: "refine again" } }
 counters: { fix: { max: 3 } }
 `;
+  const QUICK = `name: quick
+start: work
+steps:
+  work:
+    type: agent
+    skill: norn-implement
+    outcomes: { done: { to: open-pr, means: "changed" } }
+  open-pr:
+    type: git
+    action: open-pr
+    outcomes: { done: ready }
+  ready:
+    type: gate
+    prompt: "Merge the PR"
+    outcomes: { approve: $done, reject: { to: work, counter: back } }
+counters: { back: { max: 2 } }
+`;
   let t: Harness;
   const spec = ".agents/specs/gh-14-round-me";
   const wt = () => `${t.root}-worktrees/gh-14-round-me`;
@@ -616,6 +633,7 @@ counters: { fix: { max: 3 } }
     t.write(repoConfigPath(t.root), CONFIG.replace("default_workflow: gated", "default_workflow: triage"));
     t.write(join(workflowsDir(t.root), "triage.yaml"), TRIAGE);
     t.write(join(workflowsDir(t.root), "story.yaml"), STORY);
+    t.write(join(workflowsDir(t.root), "quick.yaml"), QUICK);
     t.git(["add", "-A"]);
     t.git(["commit", "-q", "-m", "norn init"]);
     t.git(["push", "-q", "origin", "main"]);
@@ -653,7 +671,7 @@ counters: { fix: { max: 3 } }
     const before = receiptsIn(runs());
     const unknown = await t.norn("story", "edit", "gh-14", "--workflow", "sotry", "--json");
     expect(unknown.exit).toBe(3);
-    expect(unknown.value).toMatchObject({ code: "unknown_workflow", do_instead: "norn story edit gh-14 --workflow <bug|slice|story|triage>" });
+    expect(unknown.value).toMatchObject({ code: "unknown_workflow", do_instead: "norn story edit gh-14 --workflow <bug|quick|slice|story|triage>" });
     const step = await t.norn("story", "edit", "gh-14", "--workflow", "story", "--at", "nope", "--json");
     expect(step.exit).toBe(3);
     expect(step.value).toMatchObject({ code: "unknown_step", error: "no step 'nope' in workflow story", do_instead: "norn story edit gh-14 --workflow story --at <refine|build>" });
@@ -734,5 +752,45 @@ counters: { fix: { max: 3 } }
     await next();
     expect(runs15()).toEndWith("/runs/_story/rounds/03-story");
     expect(t.state(runs15())).toMatchObject({ workflow: "story", round: 3, step: "build", visits: { build: 1 } });
+  });
+
+  test("B4, B7: a round after a finished round with an open PR works on the same branch and replaces the PR's body", async () => {
+    // round 2 (story) finishes with no PR; round 3 (quick) opens the PR and finishes at ready
+    t.report(runs(), "done", { outcome: "done", handoff: "built" });
+    await next();
+    expect(t.state(runs())).toMatchObject({ round: 2, step: "$done", status: "done" });
+    const e3 = await t.norn("story", "edit", "gh-14", "--workflow", "quick", "--json");
+    expect([e3.exit, e3.value]).toEqual([0, expect.anything()]);
+    for (let i = 0; i < 4 && t.state(runs())?.status !== "running"; i++) await next();
+    expect(runs()).toEndWith("/rounds/03-quick");
+    t.write(join(wt(), "round3.txt"), "three\n");
+    t.git(["add", "round3.txt"], wt());
+    t.git(["commit", "-q", "-m", "round 3 work"], wt());
+    t.report(runs(), "done", { outcome: "done", handoff: "changed" });
+    for (let i = 0; i < 4 && t.state(runs())?.step !== "ready"; i++) await next();
+    expect(t.remote.calls.filter((c) => c.startsWith("pr+ "))).toEqual(["pr+ gh-14-round-me"]);
+    const pr = t.remote.prs[0] as { number: number };
+    expect((await t.norn("story", "approve", "gh-14")).exit).toBe(0);
+    await next();
+    expect(t.state(runs())).toMatchObject({ round: 3, step: "$done", status: "done" });
+    // B7: the open PR does not stop round 4
+    const r = await t.norn("story", "edit", "gh-14", "--workflow", "quick");
+    expect(r.exit).toBe(0);
+    for (let i = 0; i < 4 && t.state(runs())?.status !== "running"; i++) await next();
+    expect(runs()).toEndWith("/rounds/04-quick");
+    // B4: the same worktree, on top of round 3's commit
+    expect(existsSync(join(wt(), "round3.txt"))).toBe(true);
+    t.write(join(wt(), "round4.txt"), "four\n");
+    t.git(["add", "round4.txt"], wt());
+    t.git(["commit", "-q", "-m", "round 4 work"], wt());
+    t.write(join(wt(), spec, "runs/_story/pr.md"), "round 4 body\n");
+    t.report(runs(), "done", { outcome: "done", handoff: "changed again" });
+    const edits = t.remote.calls.filter((c) => c === `pr~ ${pr.number}`).length;
+    for (let i = 0; i < 4 && t.state(runs())?.step !== "ready"; i++) await next();
+    expect(t.state(runs())).toMatchObject({ round: 4, step: "ready" });
+    expect(t.remote.calls.filter((c) => c.startsWith("pr+ "))).toHaveLength(1);
+    expect(t.remote.calls.filter((c) => c === `pr~ ${pr.number}`).length).toBeGreaterThan(edits);
+    // the story ends only when the PR merges: still active
+    expect(t.read(join(wt(), spec, "spec.md"))).toContain("status: active");
   });
 });
