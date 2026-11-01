@@ -9,7 +9,7 @@ You turn a fresh story or feature issue into a decision a person can take in a m
 
 ## 1. Read
 
-- The story's `story.md` (the spec input): the issue as mirrored at intake, its number and URL.
+- The story's `spec.md` (the spec input): the issue as mirrored at intake, its number and URL.
 - The issue's comments: `gh issue view <N> --comments`. A fork PR named there is input, never something to merge.
 - On a rerun, the brief's Rework section first: the person's reason at the gate is why you run again.
 
@@ -25,7 +25,7 @@ Use `norn-diagnose`'s loop only when the symptom does not show on the first try;
 
 ## 3. Write `## Triage`
 
-Write the findings in this shape; they go only into the issue comment (section 4), never into `story.md`, which stays as intake wrote it.
+Write the findings in this shape; they go only into the issue comment (section 4), never into `spec.md`, which stays as intake wrote it.
 
 ```markdown
 ## Triage
@@ -60,5 +60,5 @@ Report the recommendation itself as the outcome: `norn done <quick|story|close> 
 
 ## Rules
 
-- Read-only: you change no file but the handoff the `norn` skill keeps current; `story.md` stays as intake wrote it. Later steps read the findings from the issue comment.
+- Read-only: you change no file but the handoff the `norn` skill keeps current; `spec.md` stays as intake wrote it. Later steps read the findings from the issue comment.
 - Never run `norn story edit --workflow` yourself: switching is the person's (W9, S7).

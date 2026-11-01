@@ -14,12 +14,12 @@ steps:
     skill: norn-diagnose
     inputs: [spec, handoff]
     instructions: >-
-      Read the issue mirrored in story.md and its comments (`gh issue view <N> --comments`). First follow
+      Read the issue mirrored in spec.md and its comments (`gh issue view <N> --comments`). First follow
       the report as a user, through the real interface (`bun packages/cli/src/main.ts …` after
       `bun install --frozen-lockfile`, never the installed `norn`), and record what you saw.
       Run that dev build only in a throwaway git repo under $TMPDIR, never in this worktree: it is a live norn unit (NORN_HOME points at it) and a dev build would act on its runs/, claim and state.json.
       Then build a loop that goes red on that exact symptom, minimise it and confirm the cause.
-      Read-only on code: fix nothing and change no file, story.md included, but the handoff.
+      Read-only on code: fix nothing and change no file, spec.md included, but the handoff.
       Post the findings as an issue comment that starts with `## Reproduce` (`## Reproduce (updated)` on a rerun),
       piped into `gh issue comment <N> --body-file -`: the loop command, the minimised repro, what it prints,
       the confirmed cause (`file:line`, or the ranked hypotheses left), the PRD ids it touches and the seam for

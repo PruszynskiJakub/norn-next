@@ -1,7 +1,7 @@
 # Triage workflow — norn's own default (config default_workflow: triage), repo-local (W1, W9),
 # for stories and features; a bug starts in `reproduce` instead (label norn:wf:reproduce).
 # An unattended agent checks the issue still holds, posts the repro, the affected code and context
-# as an issue comment (story.md stays as intake wrote it), and reports the workflow it recommends
+# as an issue comment (spec.md stays as intake wrote it), and reports the workflow it recommends
 # as its outcome.
 # A person then decides at `confirm`. A gate has only approve/reject/stale (W2), so the choice of
 # workflow is not a gate outcome: the person switches the story with `norn story edit … --workflow … --at`
@@ -16,10 +16,10 @@ steps:
     skill: triage
     inputs: [spec, handoff]
     instructions: >-
-      Read the issue mirrored in story.md. Check it still occurs or still applies on the base branch.
+      Read the issue mirrored in spec.md. Check it still occurs or still applies on the base branch.
       Post the findings (repro, affected code, PRD ids touched, context) and the recommendation with
       its reason as an issue comment, and only there. Never edit the issue body. Change no file,
-      story.md included. Report the recommendation itself as the outcome:
+      spec.md included. Report the recommendation itself as the outcome:
       `norn done quick|story|close --handoff "<reason>"`.
     outcomes:
       quick: { to: confirm, means: "a small change (refactor, docs, chore): what to change written; recommend the quick workflow" }

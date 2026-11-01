@@ -19,7 +19,7 @@ steps:
     skill: norn-refine
     attended: true
     inputs: [spec, handoff]
-    instructions: "Write the spec into the body of story.md; keep its frontmatter unchanged."
+    instructions: "Write the spec into the body of spec.md; keep its frontmatter unchanged."
     outcomes:
       done:      { to: plan, means: "spec complete: problem, solution, numbered Behaviour items with examples, out of scope; no open questions" }
       questions: { to: clarify, means: "spec written, but open questions are listed that need the person's answers" }
@@ -35,9 +35,9 @@ steps:
     skill: norn-plan
     attended: true
     inputs: [spec, handoff]
-    instructions: "Write the Plan section of story.md."
+    instructions: "Write the Plan section of spec.md."
     outcomes:
-      done: { to: slice, means: "story.md's Plan section has seams, a coverage table for every Behaviour item, prefactoring, decisions and risks" }
+      done: { to: slice, means: "spec.md's Plan section has seams, a coverage table for every Behaviour item, prefactoring, decisions and risks" }
   slice:
     type: agent
     skill: norn-slice
@@ -47,7 +47,7 @@ steps:
       done: { to: approve-plan, means: "slice files written; every Behaviour item is covered by some slice's acceptance" }
   approve-plan:
     type: gate
-    prompt: "Review the Plan section in story.md and the slice files (edit them if needed). Approve to start the slices, or reject with what to change."
+    prompt: "Review the Plan section in spec.md and the slice files (edit them if needed). Approve to start the slices, or reject with what to change."
     outcomes: { approve: sync, reject: { to: plan, counter: plan_loop } }
   # brings the story branch up to date with its base before the slices cut their branches from it
   sync:
