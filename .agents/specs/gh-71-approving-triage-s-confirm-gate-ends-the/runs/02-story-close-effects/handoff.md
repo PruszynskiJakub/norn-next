@@ -13,7 +13,13 @@
 <!-- norn:heartbeat:end -->
 
 ## Goal
+Pull `story close`'s effects into one runtime function a tick action can call (prefactor 2), no behaviour change.
 
 ## Progress
+- `packages/cli/src/runtime/close.ts`: `closeStory(obs, story, { home, claimSha })` runs kill sessions → commit + mark spec dropped → push story/slice branches → remove worktrees, local branches, leases, claim ref. Returns `StoryClosed` or a `spec_corrupt` / `push_failed` failure (no CliError), so a tick action can map failures its own way.
+- `story close` keeps refusals, consent and `claimIfFree`, maps failures to the same CliErrors and returns the same JSON (same keys and order).
+- Mailbox refs: the slice/plan text mentions them, but today's `story close` does not delete them; left out to keep "no behaviour change". Slice 09 (GR6b) may need to decide this.
+- Green: unit tier, typecheck, full integration tier (511), story-reopen, e2e team.test.ts; no transcript/golden changes.
 
 ## Resume
+Done; next is review. AC2 (agent verifier) is covered by the existing story-reopen integration test (pushed branches, slices, close → reopen); a manual throwaway-repo run is left to QA.
