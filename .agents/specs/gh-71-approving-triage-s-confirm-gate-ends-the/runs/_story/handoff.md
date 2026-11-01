@@ -5,7 +5,7 @@
 - Counters: base_conflict_loop 0/2, ci_loop 0/3, plan_loop 0/3, qa_loop 0/2, ready_loop 0/2, stale_loop 0/10, sync_conflict_loop 0/2, test_loop 0/5
 - Last outcome: sync.done (classified, 2026-11-01T09:59:27.481Z)
 - Next: `norn brief`
-- Updated: 2026-11-01T09:59:50.852Z
+- Updated: 2026-11-01T10:01:50.856Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - story.start: story at refine
@@ -17,6 +17,7 @@
 - receipts.apply: slice.done → approve-plan
 - receipts.apply: approve-plan.approve → sync
 - receipts.apply: sync.done → slices
+- receipts.apply: applied 9
 <!-- norn:heartbeat:end -->
 
 ## Goal
