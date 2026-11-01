@@ -755,6 +755,29 @@ describe("gh-71 D5/D6: a finished round (B21, B24, B25, B35)", () => {
     expect(kinds(facts([unassigned]))).toEqual(["gh-1 update_story_mirror remote.mirror"]);
     expect(kinds(facts([finished({ issue: null })]))).toEqual(["gh-1 noop story.round_done"]);
   });
+  test("B22 (GR6b): a closed issue on a finished round with no PR and no unfinished slice closes the story", () => {
+    const closed = (f: StoryFacts) => ({ ...f, issue: { ...issue(f), state: "closed" as const } });
+    const f = closed(finished());
+    f.mailbox = [{ ref: "refs/norn/inbox/gh-1/01JAAAAAAAAAAAAAAAAAAAAAAA", sha: "m1", id: "01JAAAAAAAAAAAAAAAAAAAAAAA", receipt: null, error: null }];
+    expect(only(facts([f]))).toMatchObject({ kind: "close_story", rule: "remote.issue_closed", refs: [{ ref: "refs/norn/inbox/gh-1/01JAAAAAAAAAAAAAAAAAAAAAAA", sha: "m1" }] });
+    // an older norn's remote park at $done reads as finished: closed too
+    const parked = closed(finished({}, { status: "stuck", park: { kind: "remote", reason: "remote: issue closed", since: at(T0 - 60_000) } }));
+    expect(kinds(facts([parked]))).toEqual(["gh-1 close_story remote.issue_closed"]);
+    // integrated and dropped slices are finished; they do not hold it back
+    const sliced = closed(finished({ slices: [sliceFile("gh-1", "01", "s01", [], "integrated"), sliceFile("gh-1", "02", "s02", [], "dropped")] }));
+    expect(kinds(facts([sliced]))).toEqual(["gh-1 close_story remote.issue_closed"]);
+  });
+  test("B22 (GR6b): no close on an unseen or unobserved issue, an open PR, an unfinished slice or an unfinished round", () => {
+    const closed = (f: StoryFacts) => ({ ...f, issue: { ...issue(f), state: "closed" as const } });
+    const noClose = (f: StoryFacts) => expect(kinds(facts([f])).some((k) => k.includes("close_story"))).toBe(false);
+    noClose(finished({ issue: null }));
+    noClose(finished({ issue: undefined }));
+    noClose(closed(finished({ pr: { number: 9, url: "u", state: "open", is_draft: false, head_sha: "abc", base_branch: "main" } })));
+    noClose(closed(finished({ pr: undefined })));
+    noClose(closed(finished({ slices: [sliceFile("gh-1", "01", "s01", [], "planned")] })));
+    noClose(closed(finished({ slices: [sliceFile("gh-1", "01", "s01", [], "active")] })));
+    noClose(closed(storyAt("test")));
+  });
   test("D5: a finished round whose PR was closed without a merge parks as GR7 says", () => {
     const f = finished({ pr: { number: 9, url: "u", state: "closed", is_draft: false, head_sha: "abc" } });
     expect(only(facts([f]))).toMatchObject({ kind: "park", rule: "remote.park", state: { step: "$done", status: "stuck", park: { kind: "remote", reason: "remote: PR closed unmerged" } } });

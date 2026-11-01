@@ -13,7 +13,14 @@
 <!-- norn:heartbeat:end -->
 
 ## Goal
+GR6b (B22–B24): a closed issue on a finished round with no PR and no unfinished slice closes the story as `norn story close` does; reopen brings it back.
 
 ## Progress
+- decide (`packages/core/src/decide/story.ts` storyLifecycle): new `close_story` action, rule `remote.issue_closed`. Fires only on `issue.state === "closed"` (null/undefined never), `pr === null` (an unobserved PR never), no slice file other than integrated/dropped, and a finished round (incl. an older norn's remote park at `$done`). Unit tests in decide.test.ts (positive + every negative); rule case added.
+- act (`lifecycle.ts` `closeClosedIssueStory`): calls `closeStory` (runtime/close.ts, P2 — push first, then remove worktrees, branches, leases, claim; spec `dropped`), then deletes the mailbox refs decide listed (`deleteMailbox`, CAS). `story close` itself is unchanged.
+- AC4 (B24) is the existing decide test "B24: an unfinished round with a closed issue parks…", plus the unfinished-round negative in the new GR6b test.
+- S1 test in `story-reopen.test.ts` ("gh-71 B22, B23 (GR6b)…"): tri round finished → issue closed → sync closes it (record on origin, spec dropped, worktree/branch/claim/inbox ref gone, nothing in status) → issue reopened, `story reopen`, round 1 still `$done`, Your turn item, `--workflow story` starts round 2.
+- AC5 (agent verifier) left to QA.
 
 ## Resume
+Reported done; nothing pending.

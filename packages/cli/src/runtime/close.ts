@@ -1,5 +1,5 @@
 /**
- * What closing a story does to the world (GR7, B35; spec gh-71 prefactor 2, for B22's GR6b later):
+ * What closing a story does to the world (GR7, B35; spec gh-71 prefactor 2; the GR6b `close_story` action calls it too, B22):
  * the effects `norn story close` runs once it holds the claim, in one function a tick action can
  * call too. Refusals, consent and claiming stay with the caller.
  *

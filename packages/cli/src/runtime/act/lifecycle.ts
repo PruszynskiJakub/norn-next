@@ -24,6 +24,7 @@ import {
   startDir,
   writeState,
 } from "@norn/store";
+import { closeStory } from "../close.ts";
 import { integrate } from "../integrate.ts";
 import { markStoryOnBase, mergeFacts, type RecordResult } from "../record.ts";
 import { equipWorktree } from "../worktrees.ts";
@@ -269,6 +270,25 @@ export async function cleanupMerged(act: ActEnv, a: Extract<Action, { kind: "cle
   if (merge) detail.merge = merge;
   detail.record = await record(act, { story: a.unit.story, spec_dir: story.spec_dir, status: a.story_status, attempted_at: 0, attempts: 0, reason: "", ...(merge ? { merge } : {}) });
   return errors.length ? { ok: false, error: errors.join("; "), detail } : { ok: true, detail };
+}
+
+/**
+ * GR6b (gh-71 D5, B22): the issue closed on a finished round with no PR — the effects of `norn story
+ * close` (runtime/close.ts: push first, then remove worktrees, local branches, leases and the claim),
+ * then the mailbox refs. A failure before the removals leaves everything in place; the next tick re-decides.
+ */
+export async function closeClosedIssueStory(act: ActEnv, a: Extract<Action, { kind: "close_story" }>): Promise<ActionResult> {
+  const key = a.unit.story;
+  const story = act.obs.facts.stories.find((s) => s.key === key);
+  const claimSha = act.claimed.get(key)?.sha ?? (story?.claim.state === "mine" ? story.claim.sha : null);
+  if (!story || !claimSha) throw new Error(`${key} is not held here; nothing closed`);
+  const r = await closeStory(act.obs, story, { home: act.ctx.home, claimSha });
+  if (!r.ok) return { ok: false, error: r.reason === "push_failed" ? `push ${r.branch} failed (${r.push_reason}): ${r.message}; nothing was removed` : `cannot mark ${r.file} dropped: ${r.message}`, detail: r };
+  act.cleaned.add(key);
+  const deleted: string[] = [];
+  for (const m of a.refs) if ((await deleteMailbox(act.root, act.obs.remote, m.ref, m.sha)).ok) deleted.push(m.ref);
+  const { ok: _ok, story: _story, ...effects } = r;
+  return { ok: true, detail: { ...effects, mailbox_deleted: deleted } };
 }
 
 /** One attempt at a GR6 record; keeps it in `records.json` until it lands (idempotent: `unchanged` counts). */

@@ -251,3 +251,95 @@ describe("reopen after the base moved (B40)", () => {
     expect(h.state(sliceRuns("02-list"))).toMatchObject({ step: at.slice, status: "stuck", park: { reason: "reopened" } });
   });
 });
+
+describe("gh-71 B22, B23 (GR6b): a closed issue with no PR ends a finished story; reopen brings it back", () => {
+  const TRI = `name: tri
+start: explore
+steps:
+  explore:
+    type: agent
+    skill: norn-plan
+    outcomes: { done: { to: $done, means: "triage posted" } }
+`;
+  const STORY = MINI.replace("name: mini", "name: story");
+  const TCONFIG = CONFIG.replace("default_workflow: mini", "default_workflow: tri");
+  const TBRANCH = "gh-8-triage-me";
+  const TSPEC = `.agents/specs/${TBRANCH}`;
+  let g: Harness;
+  const wt = () => `${g.root}-worktrees/${TBRANCH}`;
+  const round = (n: string) => join(wt(), TSPEC, "runs/_story/rounds", n);
+  const MAILBOX = "refs/norn/inbox/gh-8/01JAAAAAAAAAAAAAAAAAAAAAAA";
+  const gtick = async () => {
+    g.clock.advance(10_000);
+    return g.tick();
+  };
+  const gUntil = async (ok: () => boolean, n = 12) => {
+    for (let i = 0; i < n && !ok(); i++) await gtick();
+    expect(ok()).toBe(true);
+  };
+  type Report = { decisions: Array<{ unit: string; kind: string; rule: string; ok: boolean; error?: string }> };
+
+  beforeAll(async () => {
+    g = await createHarness();
+    expect((await g.norn("init")).exit).toBe(0);
+    g.write(repoConfigPath(g.root), TCONFIG);
+    g.write(join(workflowsDir(g.root), "tri.yaml"), TRI);
+    g.write(join(workflowsDir(g.root), "story.yaml"), STORY);
+    g.git(["add", "-A"]);
+    g.git(["commit", "-q", "-m", "norn init"]);
+    g.git(["push", "-q", "origin", "main"]);
+    g.remote.issues = [issue(8, "Triage me")];
+    await gUntil(() => g.state(round("01-tri"))?.run?.session != null);
+    await gtick();
+    g.report(round("01-tri"), "done", { outcome: "done", handoff: "recommend close" });
+    await gUntil(() => g.state(round("01-tri"))?.status === "done");
+    expect(g.state(round("01-tri"))).toMatchObject({ step: "$done", status: "done" });
+  });
+  afterAll(() => g.cleanup());
+
+  test("AC2: sync with the issue closed pushes the record, then removes worktree, branch, claim and mailbox refs; spec closed; gone from the inbox", async () => {
+    // a mailbox ref left for the story (another clone's)
+    const sha = sh(g.root, ["hash-object", "-w", join(round("01-tri"), "state.json")]);
+    g.git(["update-ref", MAILBOX, sha]);
+    g.git(["push", "-q", "origin", `${MAILBOX}:${MAILBOX}`]);
+    const i = g.remote.issues.find((x) => x.number === 8);
+    if (!i) throw new Error("no issue");
+    i.state = "closed";
+    g.clock.advance(10_000);
+    const s = await g.norn("sync");
+    expect(s.exit).toBe(0);
+    const closed = (s.value as Report).decisions.filter((d) => d.kind === "close_story");
+    expect(closed).toEqual([expect.objectContaining({ unit: "gh-8", rule: "remote.issue_closed", ok: true })]);
+    // the record is on the remote branch, marked closed
+    g.git(["fetch", "-q", "origin"]);
+    expect(g.git(["show", `origin/${TBRANCH}:${TSPEC}/spec.md`])).toContain("status: dropped");
+    expect(JSON.parse(g.git(["show", `origin/${TBRANCH}:${TSPEC}/runs/_story/rounds/01-tri/state.json`]))).toMatchObject({ step: "$done", status: "done" });
+    // this machine is cleaned up
+    expect(existsSync(wt())).toBe(false);
+    expect(g.git(["branch", "--list", TBRANCH])).toBe("");
+    expect(g.git(["for-each-ref", "refs/norn/"])).toBe("");
+    expect(g.git(["ls-remote", "origin", "refs/norn/*"])).toBe("");
+    const inbox = (await g.norn("status", "--json")).value as Inbox;
+    expect(Object.values(inbox.groups).flat().filter((x) => x.story === "gh-8")).toEqual([]);
+    // the next ticks leave it closed
+    await gtick();
+    expect(existsSync(wt())).toBe(false);
+  });
+
+  test("AC3: reopening the issue and `story reopen` brings it back at its finished round; `--workflow story` starts round 2", async () => {
+    const i = g.remote.issues.find((x) => x.number === 8);
+    if (!i) throw new Error("no issue");
+    i.state = "open";
+    const r = await g.norn("story", "reopen", "gh-8");
+    expect(r.exit).toBe(0);
+    expect(r.value).toMatchObject({ story: "gh-8", reopened: true });
+    expect(g.state(round("01-tri"))).toMatchObject({ step: "$done", status: "done" });
+    await gtick();
+    expect(g.state(round("01-tri"))).toMatchObject({ step: "$done", status: "done" });
+    const inbox = (await g.norn("status", "--json")).value as Inbox;
+    expect(inbox.groups.your_turn).toContainEqual(expect.objectContaining({ story: "gh-8" }));
+    expect((await g.norn("story", "edit", "gh-8", "--workflow", "story")).exit).toBe(0);
+    await gUntil(() => g.state(round("02-story"))?.step === "plan");
+    expect(g.state(round("02-story"))).toMatchObject({ round: 2, workflow: "story" });
+  });
+});

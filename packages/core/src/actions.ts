@@ -342,6 +342,18 @@ export interface CleanupMergedStoryAction extends UnitBase {
 }
 
 /**
+ * GR6b (gh-71 D5, B22): the issue was seen `closed` on a finished round with no PR and no unfinished
+ * slice — close the story exactly as `norn story close` does (push first, then remove worktrees, local
+ * branches, leases and the claim; spec.md `dropped`, so `story reopen` brings it back, B23), then remove
+ * the mailbox `refs`.
+ */
+export interface CloseStoryAction extends UnitBase {
+  kind: "close_story";
+  /** the story's mailbox refs, deleted (local + remote) after the close effects */
+  refs: Array<{ ref: string; sha: string }>;
+}
+
+/**
  * gh-71 D7 (B34): move a flat story record (`runs/_story/state.json` …) into its round 1 folder with
  * `git mv` — everything under `from` but `handoff.md` and `rounds/` — then commit and push (one commit).
  */
@@ -432,6 +444,7 @@ export type UnitAction =
   | NotifyAction
   | UpdateStoryMirrorAction
   | CleanupMergedStoryAction
+  | CloseStoryAction
   | RoundMigrateAction
   | RoundStartAction
   | NoopAction;

@@ -138,7 +138,7 @@ function claimBlob(ctx: Ctx, story: string, prev: ClaimBlob | null): ClaimBlob {
   };
 }
 
-/** GR6 merged → cleanup; GR7 closed/unassigned/unlabelled → park "remote: …" (a finished round: PR only, gh-71 D5); GR8 mirror + body change. */
+/** GR6 merged → cleanup; GR6b issue closed on a finished round → close; GR7 closed/unassigned/unlabelled → park "remote: …" (a finished round: PR only, gh-71 D5); GR8 mirror + body change. */
 function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: UnitFacts | null): void {
   const ref = storyRef(story);
   // P2 (F34): merged when the PR says so, or when its head is already on the fetched base;
@@ -168,6 +168,10 @@ function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: U
   // gh-71 D5: a finished round parks only for its PR (GR7); the issue's label, assignee or visibility
   // is a Check item there (inbox), so the round stays finished
   const finished = roundFinished(st);
+  // GR6b (gh-71 D5, B22): only an issue seen `closed` (never null/unobserved), a PR seen absent and
+  // no unfinished slice close a finished round; an unfinished one parks below (GR7, B24)
+  if (finished && !prReason && story.issue?.state === "closed" && story.pr === null && !story.slices.some(sliceUnfinished))
+    return ctx.emit({ kind: "close_story", unit: ref, rule: "remote.issue_closed", refs: (story.mailbox ?? []).map((m) => ({ ref: m.ref, sha: m.sha })) });
   const reason = prReason ?? (finished ? null : issueProblem(story, ctx.config.remote.label));
   // gh-71 D5 (B35): an older norn parked a finished round for an issue change — drop that park
   if (finished && st && su && st.status === "stuck" && !prReason) {
@@ -201,6 +205,9 @@ function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: U
   }
   if (story.issue) mirror(ctx, story, fm, su, story.issue);
 }
+
+/** gh-71 D3/D5: a slice that is neither integrated nor dropped (an unreadable file counts as unfinished). */
+const sliceUnfinished = (s: StoryFacts["slices"][number]): boolean => s.frontmatter?.status !== "integrated" && s.frontmatter?.status !== "dropped";
 
 /** GR8: the story unit has left a step whose skill is `refine` (cursor elsewhere, or re-entered later). */
 function refineFinished(uf: UnitFacts | null): boolean {

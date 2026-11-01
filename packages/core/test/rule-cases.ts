@@ -135,6 +135,11 @@ function cases(): RuleCase[] {
   out.push(c("a held story with a flat record", "round.migrate", facts([story(STORY_WF, { step: "slices" }, null, {}, { record: "runs/_story" })])));
   // gh-71 D5 (B35): an older norn's remote park on a finished round is dropped by the holder's tick
   out.push(c("a finished round an older norn parked for the issue", "remote.unpark_finished", facts([{ ...story(STORY_WF, { step: "$done", status: "stuck", park: { kind: "remote", reason: "remote: issue closed, unassigned or unlabelled", since: at() } }, null, {}, { record: "runs/_story/rounds/01-story" }), issue: null }])));
+  // gh-71 D5 (B22, GR6b): the issue closed on a finished round with no PR closes the story
+  {
+    const s = story(STORY_WF, { step: "$done", status: "done", park: null }, null, {}, { record: "runs/_story/rounds/01-story" });
+    out.push(c("the issue closed on a finished round with no PR", "remote.issue_closed", facts([{ ...s, issue: { ...(s.issue as NonNullable<typeof s.issue>), state: "closed" } }])));
+  }
   // gh-71 D1 (B1, B6): a round receipt on a finished round starts the next round; stale or changed ones are rejected
   {
     const done = stateFor(storyUnit(), SOLO_WF, { step: "$done", status: "done", park: null });
