@@ -11,9 +11,16 @@ labels:
   - norn
   - norn:wf:story
 workflow: story
-status: active
+status: done
 intake_at: 2026-11-01T08:42:30.030Z
 body_hash: 6d64972f8ea9f4a62211dd96a477faf5b35ad809bad3e399a3710a7620086173
+merge:
+  pr: 152
+  url: https://github.com/PruszynskiJakub/norn-next/pull/152
+  head_sha: 88d41ed2c766175187abd1632a9aabb96ca94478
+  merge_commit_sha: d08b9b300e2142971a0d79423584714b4378569d
+  merged_by: PruszynskiJakub
+  merged_at: 2026-11-01T17:40:01.000Z
 ---
 
 # Approving triage's confirm gate ends the story, so the recommended workflow can't be switched to
