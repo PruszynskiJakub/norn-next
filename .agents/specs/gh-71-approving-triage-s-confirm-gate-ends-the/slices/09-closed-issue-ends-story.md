@@ -1,8 +1,8 @@
 ---
 id: gh-71/09
 title: A closed issue with no PR ends a finished story
-depends_on: [gh-71/02, gh-71/05, gh-71/06, gh-71/08]
-status: planned
+depends_on: [ gh-71/02, gh-71/05, gh-71/06, gh-71/08 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
