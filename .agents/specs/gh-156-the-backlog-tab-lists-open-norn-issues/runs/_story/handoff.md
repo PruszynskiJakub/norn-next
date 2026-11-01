@@ -44,7 +44,8 @@ The cockpit's Backlog tab lists open `norn` issues not assigned to me (number, t
 - review#1 approve: Review #1: approve. Backlog issue rows (CP2), story take (GR1), RemotePort listLabelledIssues/assignIssue with contract tests, TUI refresh cadence and docs all match the spec. Unit tier, typecheck, story-take and status-watch integration green. Minor only: --json drops a failed backlog read silently; glab backlog capped at 100; backlog re-read after a story-row take.
 - describe#1: wrote pr.md (summary call tree, evidence from the tests on the branch since no QA step ran, merge danger: CP5 JSON shape and RemotePort additions).
 - describe#1 done: pr.md written: summary call tree of backlog read + story take, evidence from unit/integration/contract tests (no QA step in quick; live gh/glab not shown), merge danger two-way, CP5 JSON preview.report nullable and RemotePort gains two methods.
+- resolve#1: merged main (ab1cb492e, #159 adds the workflow to story rows, RD8) into the branch. Conflict in cockpit-tui.ts resolved by keeping both: rowText filters on the workflow (`report?.unit.workflow`, null-safe for issue rows) plus issue labels; storySummary keeps the issue-row branch and the workflow-first summary. Typecheck, unit (1070) and integration (570) green.
 
 ## Resume
 
-pr.md is written; describe is done. Next: CI and the ready gate (norn routes it).
+Base merged and committed (ed139da16); resolve is done. Next: norn routes it (CI, ready).
