@@ -1,0 +1,24 @@
+# Triage workflow — repo-local copy of the shipped one (W1), norn's own default (config
+# default_workflow: triage), for stories and features; a bug starts in `reproduce` instead (label
+# norn:wf:reproduce). An unattended agent checks the issue still holds, posts its findings as an issue
+# comment (spec.md stays as intake wrote it): the recommendation lives only there, the outcome is plain
+# `done`. That ends the round ($done): the person starts the next one (`norn story edit gh-N --workflow
+# refinement|quick|reproduce`, S7) or closes the issue. Agents never run it.
+name: triage
+description: Check an issue still holds, add its context, and recommend what comes next (refinement, quick, reproduce) or closing it.
+start: explore
+steps:
+  explore:
+    type: agent
+    skill: norn-triage
+    inputs: [spec, handoff]
+    instructions: >-
+      The issue is mirrored in spec.md. Run norn's behaviour from this checkout's code, `bun packages/cli/src/main.ts …`
+      after `bun install --frozen-lockfile`, never the installed `norn`, and only in a throwaway git repo under $TMPDIR:
+      this worktree is a live norn unit. Cite PRD ids exactly as written in .agents/PRD.md under **Rules:**; a PRD rule
+      the issue would change is a `refinement`, unless the change is small and settled. Post the `## Triage` comment on it: that one comment is the only
+      remote write this step allows, an exception to the norn skill's rule. Change no file, spec.md included,
+      but the handoff. The recommendation lives only in that comment:
+      report `norn done done --handoff "<recommendation>: <reason>"`.
+    outcomes:
+      done: { to: $done, means: "the ## Triage comment is posted, with one recommendation (refinement, quick, reproduce or close) and its reason" }

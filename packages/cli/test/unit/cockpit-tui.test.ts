@@ -87,9 +87,9 @@ function model(backlog?: RemoteIssue[]): CockpitModel {
       story(1, "Pay invoices"),
       story(2, "Ship the export"),
       story(3, "Pick a CSV dialect", { step: "refine", step_type: "agent" }),
-      story(4, "Rename the flag", { status: "running", step: "implement", steps_left: 4 }),
+      story(4, "Rename the flag", { status: "running", step: "implement", steps_left: 4, workflow: "refinement", round: 2 }),
       story(5, "Bump the parser", { status: "parked", step: "ci", steps_left: 1, pr: { number: 9, url: "https://github.com/o/r/pull/9", state: "open", is_draft: false, seen_at: AT } }),
-      story(6, "Add a dark theme", { status: "not_started", step: null, steps_left: null }),
+      story(6, "Add a dark theme", { status: "not_started", step: null, steps_left: null, workflow: "triage", round: null }),
       story(7, "Closed before it ran", { status: "not_started", step: null, steps_left: null, story_status: "done" }),
       story(8, "Fix the login", { status: "done", step: "$done", steps_left: null, story_status: "done" }),
     ],
@@ -127,8 +127,8 @@ describe("the cockpit's tabs (CP6, CP7)", () => {
     expect(f).not.toMatch(/approve +gh-1/);
     // nearest to done first; slices and PR only when there are some
     expect(f.indexOf("gh-5")).toBeLessThan(f.indexOf("gh-4"));
-    expect(f).toMatch(/gh-5 +Bump the parser +parked ci · PR #9/);
-    expect(f).toMatch(/gh-4 +Rename the flag +running implement *│/);
+    expect(f).toMatch(/gh-5 +Bump the parser +quick · parked ci · PR #9/);
+    expect(f).toMatch(/gh-4 +Rename the flag +refinement · running implement *│/);
     expect(f).not.toContain("no slices");
     expect(f).not.toContain("no PR");
     expect(f).toContain("1 2 3 tabs");
@@ -137,15 +137,15 @@ describe("the cockpit's tabs (CP6, CP7)", () => {
   test("Backlog holds what has not started; Done the closed stories, newest first, read done", () => {
     const backlog = frame(press(initialState(), "2"));
     expect(backlog).toContain("BACKLOG 1");
-    expect(backlog).toMatch(/▸ gh-6 +Add a dark theme +not started/);
+    expect(backlog).toMatch(/▸ gh-6 +Add a dark theme +triage · not started/);
     expect(backlog).not.toContain("Pay invoices");
     const done = frame(press(initialState(), "3"));
     expect(done).toContain("DONE 2");
     expect(done.indexOf("gh-8")).toBeLessThan(done.indexOf("gh-7"));
-    expect(done).toMatch(/gh-7 +Closed before it ran +done/);
+    expect(done).toMatch(/gh-7 +Closed before it ran +quick · done/);
     expect(done).not.toContain("not started");
     // the preview of a closed story reads done too
-    expect(done).toMatch(/│ ✓ done · auto/);
+    expect(done).toMatch(/│ ✓ round 1 · quick · done · auto/);
   });
 
   test("each tab keeps its own selection and filter", () => {
@@ -162,6 +162,19 @@ describe("the cockpit's tabs (CP6, CP7)", () => {
     // the filter shows in the header while it is in use
     expect(frame(again).split("\n")[0]).toStartWith("filter: login (esc clears)   norn 0.15.0");
     expect(frame(press(again, "/")).split("\n")[0]).toStartWith("/ login▏");
+  });
+
+  test("a story shows its round and workflow: the row before the step, the preview like story view (RD8, gh-71 B28)", () => {
+    const f = frame(press(initialState(), "]", "j"));
+    expect(f).toMatch(/│ ◐ round 2 · refinement · running at implement · auto/);
+    // no round before the story starts
+    expect(frame(press(initialState(), "2"))).toMatch(/│ · triage · not started · auto/);
+  });
+
+  test("the filter matches a story's workflow (CP7)", () => {
+    const f = frame(press(initialState(), "/", "refinement", "\r"));
+    expect(f).toContain("Rename the flag");
+    expect(f).not.toContain("Bump the parser");
   });
 
   test("] and [ jump between sections; n goes to the next row of the same kind, round to the top", () => {
