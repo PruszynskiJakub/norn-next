@@ -1,5 +1,5 @@
 /** act: unit and story lifecycle — start, done, rejected receipts, claims, intake, mirror, merged clean-up and base records. */
-import { existsSync, mkdirSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { cmd, type Action, type ActionResult, nornTrailers, type UnitRef, type WorktreeSpec } from "@norn/core";
 import { type ClaimBlob, parseDuration, ROUNDS_DIR, STORY_UNIT_DIR } from "@norn/schema";
@@ -306,20 +306,30 @@ export async function retryRecords(act: ActEnv): Promise<Array<{ story: string; 
  * gh-71 D7 (B34): a flat story record moves into round 1 — every entry of `runs/_story/` but `handoff.md`
  * (and `rounds/`) by `git mv` (plainly when untracked), in one commit, pushed. Receipt paths are relative
  * to the round, so they still resolve; slice folders are not touched.
+ * Resumable (S5): `state.json` moves last, so a move that stops partway still reads as flat and the next
+ * round.migrate moves what is left; an entry already in the round is merged into, entry by entry.
  */
 export async function roundMigrate(act: ActEnv, a: Extract<Action, { kind: "round_migrate" }>): Promise<ActionResult> {
   const cwd = a.commit.cwd;
   mkdirSync(join(cwd, a.to), { recursive: true });
-  const moved: string[] = [];
-  for (const name of readdirSync(join(cwd, a.from)).sort()) {
-    if (name === "handoff.md" || name === ROUNDS_DIR) continue;
-    const from = `${a.from}/${name}`;
-    const to = `${a.to}/${name}`;
-    if (!(await act.git.move(cwd, from, to))) moveFile(join(cwd, from), join(cwd, to));
-    moved.push(name);
-  }
+  const moved = readdirSync(join(cwd, a.from))
+    .filter((n) => n !== "handoff.md" && n !== ROUNDS_DIR)
+    .sort((x, y) => Number(x === "state.json") - Number(y === "state.json") || x.localeCompare(y));
+  for (const name of moved) await migrateEntry(act, cwd, `${a.from}/${name}`, `${a.to}/${name}`);
   const loc = act.obs.units[a.unit.key];
   if (loc) loc.runsDir = join(cwd, a.to);
   const commit = await act.commit(a.commit, null, null, null, [a.from]);
   return { ok: true, detail: { moved, to: a.to, commit } };
+}
+
+/** Move one record entry to the round; into a folder already there (an earlier move that stopped partway), child by child. */
+async function migrateEntry(act: ActEnv, cwd: string, from: string, to: string): Promise<void> {
+  const target = join(cwd, to);
+  if (existsSync(target)) {
+    if (!statSync(target).isDirectory() || !statSync(join(cwd, from)).isDirectory()) throw new Error(`round.migrate: ${to} already exists`);
+    for (const name of readdirSync(join(cwd, from)).sort()) await migrateEntry(act, cwd, `${from}/${name}`, `${to}/${name}`);
+    rmSync(join(cwd, from), { recursive: true, force: true });
+    return;
+  }
+  if (!(await act.git.move(cwd, from, to))) moveFile(join(cwd, from), target);
 }

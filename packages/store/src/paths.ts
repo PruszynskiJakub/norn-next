@@ -179,7 +179,10 @@ export const specRunsDir = (specDir: string) => join(specDir, RUNS_DIR);
  */
 export function unitDir(specDir: string, unit: string): string {
   const base = join(specDir, unitRecordPath(unit));
-  if (unit !== STORY_UNIT_DIR || !isAbsolute(specDir)) return base;
+  // gh-71 D7 (B34, S5): while `runs/_story/state.json` is still flat the record is flat, even when a
+  // round.migrate that stopped partway left some entries in rounds/01-<wf>/: state moves last, so the
+  // next round.migrate finishes the move.
+  if (unit !== STORY_UNIT_DIR || !isAbsolute(specDir) || isFlatStoryRecord(specDir)) return base;
   const round = currentRound(specDir);
   return round ? join(base, ROUNDS_DIR, roundDirName(round.n, round.workflow)) : base;
 }

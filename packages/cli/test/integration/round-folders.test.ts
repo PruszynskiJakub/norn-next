@@ -119,16 +119,24 @@ function writeFindings(): string {
 describe("a flat record from an older norn moves into round 1 (B34)", () => {
   let flatHead = "";
   let flatState: unknown;
+  const slice = () => join(wt(), spec, "runs", "01-x");
+  const sliceFile = () => join(slice(), "note.md");
 
-  test("setup: the story's record laid out flat, as an older norn wrote it, committed and pushed", () => {
+  test("setup: the story's record laid out flat, as an older norn wrote it, committed and pushed, with a slice folder beside it", () => {
     for (const name of ls(round1())) git("mv", join(round1(), name), join(story(), name));
     rmSync(join(story(), "rounds"), { recursive: true, force: true });
+    mkdirSync(slice(), { recursive: true });
+    writeFileSync(sliceFile(), "slice record\n");
+    git("add", "--", slice());
     git("commit", "-q", "-m", "older norn: flat record");
     git("push", "-q", "origin", BRANCH);
     flatHead = git("rev-parse", "HEAD");
+    // a check log the older norn wrote but never committed: the plain-move path
+    mkdirSync(join(story(), "logs"), { recursive: true });
+    writeFileSync(join(story(), "logs", "01OLDCHECK.log"), "check output\n");
     flatState = h.state(story());
     expect(flatState).toMatchObject({ step: "implement", counters: { review_loop: 1 } });
-    expect(ls(story())).toEqual(["evidence", "handoff.md", "receipts", "state.json", "workflow.yaml"]);
+    expect(ls(story())).toEqual(["evidence", "handoff.md", "logs", "receipts", "state.json", "workflow.yaml"]);
   });
 
   test("AC3: the first tick moves everything but handoff.md into rounds/01-duo/ with git mv, in one pushed commit; the story goes on at its step", async () => {
@@ -141,12 +149,18 @@ describe("a flat record from an older norn moves into round 1 (B34)", () => {
     expect(git("log", "-1", "--format=%s")).toBe("norn: gh-9 record moved into round 1");
     const changes = git("show", "--name-status", "-M", "--format=", "HEAD").split("\n");
     expect(changes.length).toBeGreaterThan(3);
-    for (const c of changes) expect(c).toMatch(new RegExp(`^R100\\t${spec}/runs/_story/[^\\t]+\\t${spec}/runs/_story/rounds/01-duo/`));
+    expect(changes).toContain(`A\t${spec}/runs/_story/rounds/01-duo/logs/01OLDCHECK.log`);
+    for (const c of changes.filter((x) => !x.startsWith("A\t"))) expect(c).toMatch(new RegExp(`^R100\\t${spec}/runs/_story/[^\\t]+\\t${spec}/runs/_story/rounds/01-duo/`));
     expect(git("rev-parse", `origin/${BRANCH}`)).toBe(git("rev-parse", "HEAD"));
     expect(git("status", "--porcelain")).toBe("");
 
     expect(ls(story())).toEqual(["handoff.md", "rounds"]);
     expect(h.state(round1())).toEqual(flatState as never);
+    expect(h.read(join(round1(), "logs", "01OLDCHECK.log"))).toBe("check output\n");
+    // slice folders are untouched
+    expect(ls(slice())).toEqual(["note.md"]);
+    expect(h.read(sliceFile())).toBe("slice record\n");
+    expect(git("diff", "--name-only", flatHead, "HEAD", "--", slice())).toBe("");
     // paths the receipts carry are relative to the round, so they still resolve
     const withEvidence = ls(join(round1(), "receipts"))
       .map((n) => JSON.parse(h.read(join(round1(), "receipts", n))) as { evidence?: string })
@@ -162,6 +176,43 @@ describe("a flat record from an older norn moves into round 1 (B34)", () => {
     expect(h.state(round1())).toMatchObject({ step: "implement", counters: { review_loop: 1 } });
     const status = (await h.norn("status", "--json")).value as { groups: Record<string, Array<{ story: string; step: string | null }>> };
     expect(Object.values(status.groups).flat().find((i) => i.story === "gh-9")).toMatchObject({ step: "implement" });
+  });
+});
+
+describe("a move into round 1 that stopped partway is finished by the next round.migrate (B34, S5)", () => {
+  let flatState: unknown;
+
+  test("setup: flat again, committed, then a move stopped after evidence/ and receipts/, and a file written to the flat evidence/ after", () => {
+    for (const name of ls(round1())) git("mv", join(round1(), name), join(story(), name));
+    rmSync(join(story(), "rounds"), { recursive: true, force: true });
+    git("commit", "-q", "-m", "older norn: flat record again");
+    git("push", "-q", "origin", BRANCH);
+    flatState = h.state(story());
+    mkdirSync(round1(), { recursive: true });
+    for (const name of ["evidence", "receipts"]) git("mv", join(story(), name), join(round1(), name));
+    const run = ls(join(round1(), "evidence"))[0] as string;
+    mkdirSync(join(story(), "evidence", run), { recursive: true });
+    writeFileSync(join(story(), "evidence", run, "late.md"), "written after the stop\n");
+    expect(ls(story())).toEqual(["evidence", "handoff.md", "logs", "rounds", "state.json", "workflow.yaml"]);
+  });
+
+  test("the story still reads as flat at its step, and the next tick moves what is left, state last, in one pushed commit", async () => {
+    const status = (await h.norn("status", "--json")).value as { groups: Record<string, Array<{ story: string; step: string | null }>> };
+    expect(Object.values(status.groups).flat().find((i) => i.story === "gh-9")).toMatchObject({ step: "implement" });
+    const head = git("rev-parse", "HEAD");
+    h.clock.advance(10_000);
+    const r = await h.tick();
+    const mine = r.decisions.filter((d) => d.unit === "gh-9" && d.rule !== "claim.renew");
+    expect(mine.map((d) => d.rule)).toEqual(["round.migrate"]);
+    expect(git("rev-list", "--count", `${head}..HEAD`)).toBe("1");
+    expect(git("rev-parse", `origin/${BRANCH}`)).toBe(git("rev-parse", "HEAD"));
+    expect(git("status", "--porcelain")).toBe("");
+    expect(ls(story())).toEqual(["handoff.md", "rounds"]);
+    expect(ls(round1())).toEqual(["evidence", "logs", "receipts", "state.json", "workflow.yaml"]);
+    expect(h.state(round1())).toEqual(flatState as never);
+    const run = ls(join(round1(), "evidence"))[0] as string;
+    expect(ls(join(round1(), "evidence", run))).toContain("late.md");
+    expect(ls(join(round1(), "evidence", run)).length).toBeGreaterThan(1);
   });
 });
 
