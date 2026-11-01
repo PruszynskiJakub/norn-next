@@ -550,4 +550,15 @@ counters: { loop: { max: 2 } }
     expect(inbox.groups.recently_done).toEqual([]);
     expect(inbox.pending).toBeGreaterThanOrEqual(1);
   });
+
+  test("D5: the label removed on a finished round is a Check item that stays between syncs (the issue the last sync saw)", async () => {
+    t.remote.issues = t.remote.issues.map((i) => (i.number === 12 ? { ...i, labels: [] } : i));
+    t.clock.advance(10_000);
+    expect((await t.norn("sync")).exit).toBe(0);
+    await next();
+    expect(t.state(runs())).toMatchObject({ step: "$done", status: "done" });
+    const inbox = (await t.norn("status", "--json")).value as { groups: Record<string, Array<{ title: string }>> };
+    expect(inbox.groups.check).toEqual([expect.objectContaining({ title: "gh-12: remote: label 'norn' removed — the round stays finished" })]);
+    expect(inbox.groups.your_turn).toEqual([expect.objectContaining({ title: "gh-12: triage round done, no PR" })]);
+  });
 });

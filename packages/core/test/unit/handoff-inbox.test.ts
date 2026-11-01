@@ -381,4 +381,21 @@ describe("inbox: a finished round (gh-71 D5, D6; B25–B27, B35)", () => {
     }
     expect(buildInbox(facts([f]), CONFIG).groups.check).toEqual([]);
   });
+
+  test("D5: between syncs (issue not fetched) the Check item comes from the issue the last sync saw (issue_seen)", () => {
+    const f = finished({ pr: null });
+    const seen = (issue: StoryFacts["issue"]) => ({ ...f, issue: undefined, issue_seen: { issue: issue ?? null, observed_at: T0 - 5_000 } });
+    for (const [s, reason] of [
+      [seen({ ...f.issue!, labels: [] }), "remote: label 'norn' removed"],
+      [seen({ ...f.issue!, assignees: [] }), "remote: issue unassigned"],
+      [seen(null), "remote: issue closed, unassigned or unlabelled"],
+    ] as const) {
+      const inbox = buildInbox(facts([s]), CONFIG);
+      expect(inbox.groups.check).toEqual([expect.objectContaining({ group: "check", story: "gh-1", title: `gh-1: ${reason} — the round stays finished` })]);
+      expect(inbox.groups.your_turn).toEqual([roundDone]);
+    }
+    expect(buildInbox(facts([seen(f.issue)]), CONFIG).groups.check).toEqual([]);
+    // a fresh observation wins over the cache
+    expect(buildInbox(facts([{ ...seen({ ...f.issue!, labels: [] }), issue: f.issue }]), CONFIG).groups.check).toEqual([]);
+  });
 });

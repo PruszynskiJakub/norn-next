@@ -403,12 +403,15 @@ const landed = (story: StoryFacts, base: string): boolean => mergedIntoBase(stor
 
 /**
  * gh-71 D5: an issue change on a finished round (label removed, unassigned, unseen) parks nothing;
- * it is a Check item while the round stays finished. A closed issue there is GR6b's.
+ * it is a Check item while the round stays finished, read from `issue_seen` between syncs. A closed
+ * issue there is GR6b's.
  */
 function finishedRoundRemoteItem(story: StoryFacts, config: ResolvedConfig, base: string): InboxItem | null {
   const st = storyUnit(story)?.state;
   if (st?.status !== "done" || landed(story, base)) return null;
-  const reason = issueProblem(story, config.remote.label);
+  // between syncs the issue is not fetched: the one the last sync saw keeps the item put
+  const issue = story.issue !== undefined ? story.issue : story.issue_seen?.issue;
+  const reason = issueProblem({ ...story, issue }, config.remote.label);
   if (!reason) return null;
   return {
     id: `remote:${story.key}:${reason}`,

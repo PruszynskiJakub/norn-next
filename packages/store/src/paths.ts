@@ -141,6 +141,7 @@ export const inboxOpenPath = (root: string) => join(machineDir(root), "inbox.jso
 export const baseFactsPath = (root: string) => join(machineDir(root), "base.json");
 export const noticesPath = (root: string) => join(machineDir(root), "notices.json");
 export const prFactsPath = (root: string) => join(machineDir(root), "pr.json");
+export const issueFactsPath = (root: string) => join(machineDir(root), "issue.json");
 /**
  * B5 (D3): a unit's hook file — `hooks/<story>/_story.jsonl` for the story unit,
  * `hooks/<story>/<nn>.jsonl` for a slice.

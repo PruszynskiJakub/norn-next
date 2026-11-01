@@ -6,7 +6,7 @@
  * written by a newer norn still reads; the properties norn uses must have the right type.
  */
 import { type Static, Type } from "@sinclair/typebox";
-import { NonNegInt, ProcessIdentity } from "./common.ts";
+import { NonNegInt, ProcessIdentity, RemoteProvider } from "./common.ts";
 import { StoryMerge } from "./frontmatter.ts";
 
 const id = (name: string, title: string) => ({ $id: `https://norn.dev/schema/${name}.json`, title });
@@ -148,6 +148,26 @@ export const LocalPrFile = Type.Object(
 );
 export type LocalPrFile = Static<typeof LocalPrFile>;
 
+/** One story issue as the remote reported it (`RemoteIssue`, `@norn/core` ports). */
+export const IssueEntry = Type.Object({
+  provider: RemoteProvider,
+  number: Type.Number(),
+  url: Type.String(),
+  title: Type.String(),
+  body: Type.String(),
+  state: Type.Union([Type.Literal("open"), Type.Literal("closed")]),
+  assignees: Type.Array(Type.String()),
+  labels: Type.Array(Type.String()),
+  updated_at: Type.String(),
+});
+
+/** `issue.json`: story key → the story issue the last sync saw (`null` = not visible), with when (gh-71 D5). */
+export const LocalIssueFile = Type.Object(
+  { stories: Type.Optional(Type.Record(Type.String(), Type.Object({ issue: Nullable(IssueEntry), observed_at: Type.Number() }))) },
+  id("local-issue", "norn story issues seen (trace/issue.json)"),
+);
+export type LocalIssueFile = Static<typeof LocalIssueFile>;
+
 /** `<norn home>/cockpit.json`: CP13 `last_repo`, the main checkout the last cockpit ran in. */
 export const LocalCockpitFile = Type.Object({ last_repo: Type.Optional(Type.String()) }, id("local-cockpit", "memory of norn status --watch (<norn home>/cockpit.json)"));
 export type LocalCockpitFile = Static<typeof LocalCockpitFile>;
@@ -195,6 +215,7 @@ export const LOCAL_SCHEMA_NAMES = [
   "local-failures",
   "local-base",
   "local-pr",
+  "local-issue",
   "local-cockpit",
   "local-lock",
   "local-hook-backfill",

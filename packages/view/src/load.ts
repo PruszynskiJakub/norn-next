@@ -323,6 +323,8 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       pr: undefined,
       // C1: the PR as this checkout's last sync saw it — merge (BS10), retarget (BS11), head changed (F35)
       ...(prSeen[story.key] && !finished ? { pr_seen: prSeen[story.key] } : {}),
+      // gh-71 D5: the issue as this checkout's last sync saw it — the finished-round Check item
+      ...(local.issue_seen[story.key] && !finished ? { issue_seen: local.issue_seen[story.key] } : {}),
       ...readyHeads[i],
       units,
       slices: story.slices,
