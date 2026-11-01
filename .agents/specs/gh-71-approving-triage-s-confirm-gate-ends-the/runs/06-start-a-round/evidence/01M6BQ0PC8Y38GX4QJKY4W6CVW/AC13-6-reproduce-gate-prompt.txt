@@ -1,0 +1,15 @@
+  confirm:
+    type: gate
+    prompt: >-
+      Read the reproduce findings in the issue comment (`gh issue view N --comments`). N is the issue number.
+      Approving ends the reproduce round; the next round starts with `norn story edit gh-N --workflow <name>`.
+      Fix it: `norn story approve gh-N`, then `norn story edit gh-N --workflow quick --at sync` (the branch is brought up to date, then implement starts from the red loop).
+      Close: `norn story approve gh-N --reason "<why>"`, then `gh issue close N --reason "not planned"`,
+      then `norn story close gh-N --yes`,
+      then `git push origin --delete gh-N-<slug>` (close pushed the story branch; the findings stay on the issue comment).
+      Reproduce again: `norn story reject gh-N --reason "<what to look at>"`.
+    outcomes:
+      approve: $done
+      reject:  { to: reproduce, counter: reproduce_loop }
+  ok   layout         .agents/workflows/ and .agents/norn.config.yaml
+  ok   workflows      bug, reproduce, slice, story, triage valid (.agents/workflows/)

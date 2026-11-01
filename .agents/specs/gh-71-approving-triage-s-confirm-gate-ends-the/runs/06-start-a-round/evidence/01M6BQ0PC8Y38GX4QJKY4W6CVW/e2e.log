@@ -1,0 +1,31 @@
+$ bun test --config=bunfig.e2e.toml --parallel --timeout=20000
+bun test v1.3.13 (bf2e2cec) 12x PARALLEL
+
+test/e2e/slice-workflow.test.ts:
+(fail) a story through the slice workflow > effect transcript: spawns, port calls and runs/ files of the whole flow (refactor Phase 0.2) [0.81ms]
+264 |   if (process.env.NORN_TRANSCRIPT_UPDATE === "1") {
+265 |     writeFileSync(file, actual);
+266 |     return;
+267 |   }
+268 |   if (!existsSync(file)) throw new Error(`no transcript ${file}: run NORN_TRANSCRIPT_UPDATE=1 bun run test:e2e <this file> and review it`);
+269 |   expect(actual).toBe(readFileSync(file, "utf8"));
+                       ^
+error: expect(received).toBe(expected)
+
+@@ -802,3 +802,3 @@
+    spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
++   A.notifier.notify round_done:gh-7:runs/_story/rounds/01-mini
+    ~ repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/handoff.md
+
+- Expected  - 0
++ Received  + 1
+
+      at expectTranscript (/Users/jakubpruszynski/Projects/norn-worktrees/gh-71-approving-triage-s-confirm-gate-ends-the--06-start-a-round/test/support/transcript.ts:269:18)
+      at <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-71-approving-triage-s-confirm-gate-ends-the--06-start-a-round/test/e2e/slice-workflow.test.ts:417:5)
+
+ 71 pass
+ 1 fail
+ 628 expect() calls
+Ran 72 tests across 7 files. [78.99s]
+error: script "test:e2e" exited with code 1
+exit 1

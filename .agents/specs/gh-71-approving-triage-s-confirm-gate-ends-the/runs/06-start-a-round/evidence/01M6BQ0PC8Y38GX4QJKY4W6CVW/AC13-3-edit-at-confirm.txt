@@ -1,0 +1,5 @@
+$ norn story edit gh-1 --workflow story   (at confirm)
+{"error":"gh-1's triage round is not finished; pass --force to end it and start a story round","do_instead":"norn story edit gh-1 --workflow story --force","code":"round_unfinished"}
+exit 3
+0001-started.json
+0002-done.json
