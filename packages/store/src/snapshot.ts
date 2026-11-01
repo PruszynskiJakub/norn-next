@@ -26,8 +26,10 @@ import { readUnitMarker } from "./worktree.ts";
 
 export interface UnitSnapshot {
   unit: UnitRef;
-  /** absolute runs/<unit>/ */
+  /** absolute record folder (`unitDir`): runs/<unit>/, the story's current round folder (gh-71 B30) */
   path: string;
+  /** the record folder relative to the spec folder (gh-71 D2), e.g. `runs/_story/rounds/01-story` */
+  record: string;
   /** null = not started (no state.json) or corrupt (see errors) */
   state: UnitState | null;
   workflow: PinnedWorkflow | null;
@@ -111,6 +113,7 @@ export function loadUnit(root: string, specPath: string, unit: UnitRef, opts: { 
   return {
     unit,
     path,
+    record: relative(specPath, path),
     state,
     workflow: wf.ok ? wf.value : null,
     unapplied: all.receipts.filter((r) => r.n > after),

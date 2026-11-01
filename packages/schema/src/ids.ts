@@ -211,6 +211,21 @@ export const RUNS_DIR = "runs";
 export function unitRecordPath(unit: string): string {
   return `${RUNS_DIR}/${unit}`;
 }
+/** gh-71 B30: the folder under `runs/_story/` that holds the story's rounds. */
+export const ROUNDS_DIR = "rounds";
+/** gh-71 B30: a round's folder name, `01-triage` (two digits from 01). */
+export function roundDirName(n: number, workflow: string): string {
+  return `${String(n).padStart(2, "0")}-${workflow}`;
+}
+const ROUND_DIR_RE = /^([0-9]{2,})-(.+)$/;
+export function parseRoundDirName(name: string): { n: number; workflow: string } | null {
+  const m = ROUND_DIR_RE.exec(name);
+  return m ? { n: Number(m[1]), workflow: m[2] as string } : null;
+}
+/** gh-71 B30: a story round's record folder relative to its spec folder, `runs/_story/rounds/01-triage`. */
+export function roundRecordPath(n: number, workflow: string): string {
+  return `${unitRecordPath(STORY_UNIT_DIR)}/${ROUNDS_DIR}/${roundDirName(n, workflow)}`;
+}
 /** Slice branch: `gh-123/03-add-form`. */
 export function sliceBranch(story: string, nn: string, slug: string): string {
   return `${story}/${sliceDirName(nn, slug)}`;

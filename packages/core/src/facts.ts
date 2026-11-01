@@ -125,6 +125,12 @@ export interface ActFailure {
 
 export interface UnitFacts {
   unit: UnitRef;
+  /**
+   * gh-71 D2 (B30): the unit's record folder relative to its spec folder, as the store resolver found it:
+   * `runs/_story/rounds/NN-<wf>` for the story's current round, `runs/<nn>-<slug>` for a slice, `runs/_story`
+   * for a flat story record (B36). Absent = `unitRecordPath(unit.dir)` (facts an older norn recorded).
+   */
+  record?: string;
   /** null = unit not started (no runs/<unit>/state.json) */
   state: UnitState | null;
   /** pinned runs/<unit>/workflow.yaml, parsed + schema-valid; null if not started */

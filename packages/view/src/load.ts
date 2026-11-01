@@ -192,6 +192,7 @@ function unitFacts(lu: LocalUnit, hooks: readonly HookFact[], leaseByRun: Readon
   }
   return {
     unit: u.unit,
+    record: u.record,
     state: st,
     workflow: u.workflow?.workflow ?? null,
     workflow_hash: u.workflow?.hash ?? null,

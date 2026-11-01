@@ -1,8 +1,8 @@
 /** act: unit and story lifecycle — start, done, rejected receipts, claims, intake, mirror, merged clean-up and base records. */
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { cmd, type Action, type ActionResult, nornTrailers, type UnitRef, type WorktreeSpec } from "@norn/core";
-import { type ClaimBlob, parseDuration, STORY_UNIT_DIR } from "@norn/schema";
+import { type ClaimBlob, parseDuration, ROUNDS_DIR, STORY_UNIT_DIR } from "@norn/schema";
 import {
   acquireClaim,
   type ClaimWriteResult,
@@ -20,6 +20,8 @@ import {
   type PendingRecord,
   readPendingRecords,
   writePendingRecords,
+  moveFile,
+  startDir,
   unitDir,
 } from "@norn/store";
 import { integrate } from "../integrate.ts";
@@ -69,7 +71,7 @@ export async function startUnit(act: ActEnv, a: Extract<Action, { kind: "start_u
     wtPath = a.worktree.path;
   }
   if (!wtPath) throw new Error(`no worktree for ${a.unit.key}`);
-  const runsDir = unitDir(join(wtPath, story.spec_dir), a.unit.dir);
+  const runsDir = startDir(join(wtPath, story.spec_dir), a.unit.dir, a.workflow);
   const pin = pinWorkflow(runsDir, a.workflow_source);
   if (!pin.ok) throw new Error(`${relative(join(wtPath, story.spec_dir), runsDir)}/workflow.yaml is already pinned with different content (S7)`);
   act.obs.units[a.unit.key] = {
@@ -299,4 +301,26 @@ export async function retryRecords(act: ActEnv): Promise<Array<{ story: string; 
     out.push({ story: p.story, state: r.state, ...("reason" in r ? { reason: r.reason } : {}) });
   }
   return out;
+}
+
+/**
+ * gh-71 D7 (B34): a flat story record moves into round 1 — every entry of `runs/_story/` but `handoff.md`
+ * (and `rounds/`) by `git mv` (plainly when untracked), in one commit, pushed. Receipt paths are relative
+ * to the round, so they still resolve; slice folders are not touched.
+ */
+export async function roundMigrate(act: ActEnv, a: Extract<Action, { kind: "round_migrate" }>): Promise<ActionResult> {
+  const cwd = a.commit.cwd;
+  mkdirSync(join(cwd, a.to), { recursive: true });
+  const moved: string[] = [];
+  for (const name of readdirSync(join(cwd, a.from)).sort()) {
+    if (name === "handoff.md" || name === ROUNDS_DIR) continue;
+    const from = `${a.from}/${name}`;
+    const to = `${a.to}/${name}`;
+    if (!(await act.git.move(cwd, from, to))) moveFile(join(cwd, from), join(cwd, to));
+    moved.push(name);
+  }
+  const loc = act.obs.units[a.unit.key];
+  if (loc) loc.runsDir = join(cwd, a.to);
+  const commit = await act.commit(a.commit, null, null, null, [a.from]);
+  return { ok: true, detail: { moved, to: a.to, commit } };
 }

@@ -9,6 +9,8 @@ import {
   SPEC_FILE,
   type StoryFrontmatter,
   type UnitState,
+  roundRecordPath,
+  STORY_UNIT_DIR,
   unitRecordPath,
 } from "@norn/schema";
 import type { ClaimAction, UpdateStoryMirrorAction } from "../actions.ts";
@@ -21,7 +23,7 @@ import { epoch, iso } from "../time.ts";
 import { edgeOf, isStale, stepOf } from "../workflow.ts";
 import { applyAction, classifyRun, implicitAskResolved, launchUnknown, resolveImplicitAsk, startRun } from "./agent.ts";
 import { commitFor, type Ctx, gitBusy, nextReceiptNumber, park, rebasing, sliceFileOf, unitItem } from "./receipts.ts";
-import { baseOf, classifyNorn, resumeSlices, runCheck, runGit, slicesCanResume, slicesStep, startStoryUnit } from "./steps.ts";
+import { baseOf, classifyNorn, recordOf, resumeSlices, runCheck, runGit, slicesCanResume, slicesStep, startStoryUnit } from "./steps.ts";
 import { cmd } from "../commands.ts";
 
 // ================================================================= story level
@@ -101,6 +103,16 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
   }
   const fm = story.frontmatter;
   const halted = su?.state?.park?.kind === "remote";
+
+  // gh-71 D7 (B34): a held story whose record is still flat moves into round 1 before anything else —
+  // never mid-rebase (H1), and never once its PR merged (the base keeps old records flat, B36)
+  if (!ctx.has(ref.key) && su?.state && su.record === unitRecordPath(STORY_UNIT_DIR) && !rebasing(su) && !mergedIntoBase(story, ctx.facts.repo.default_branch)) {
+    const commit = commitFor(ctx, story, su, `norn: ${story.key} record moved into round 1`, su.state.step);
+    if (commit) {
+      const from = `${story.spec_dir}/${unitRecordPath(STORY_UNIT_DIR)}`;
+      return ctx.emit({ kind: "round_migrate", unit: ref, rule: "round.migrate", from, to: `${story.spec_dir}/${roundRecordPath(1, su.state.workflow)}`, commit });
+    }
+  }
 
   if (!ctx.has(ref.key)) storyLifecycle(ctx, story, fm, su);
   if (!ctx.has(ref.key) && story.mailbox?.length) importMailbox(ctx, story);
@@ -276,7 +288,7 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
   if (st.status === "corrupt") return ctx.noop(ref, "unit.corrupt", "corrupt; never touched (S2)");
   const wf = uf.workflow;
   // S2: a missing pinned workflow is surfaced; the state stays as it is (no file failed validation)
-  if (!wf) return ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "unit.workflow_missing", errors: [{ file: `${unitRecordPath(ref.dir)}/workflow.yaml`, errors: [{ path: "", message: "pinned workflow missing" }] }], mark_state: false, notify: null });
+  if (!wf) return ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "unit.workflow_missing", errors: [{ file: `${recordOf(uf)}/workflow.yaml`, errors: [{ path: "", message: "pinned workflow missing" }] }], mark_state: false, notify: null });
 
   // R5.1: a run whose launch is unknown is looked for before anything else is decided for the unit
   if (uf.run?.launch_unknown) return launchUnknown(ctx, story, uf, st, wf);

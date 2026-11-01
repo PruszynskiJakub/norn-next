@@ -428,6 +428,45 @@ describe("story lifecycle (GR6–GR8)", () => {
   });
 });
 
+describe("gh-71 D7 (B34): a held flat story record moves into round 1 first", () => {
+  const flat = (f: StoryFacts) => {
+    f.units[0]!.record = "runs/_story";
+    return f;
+  };
+  test("round.migrate comes before a receipt and moves runs/_story into rounds/01-<workflow>, in one pushed commit", () => {
+    const s = flat(solo(running(), { process_alive: false }));
+    s.units[0]!.unapplied = [numbered(1, receipt(s.units[0]!.state!, "done", { outcome: "done", handoff: "ok" }))];
+    expect(kinds(facts([s]))).toEqual(["gh-1 round_migrate round.migrate"]);
+    expect(only(facts([s]))).toEqual({
+      kind: "round_migrate",
+      unit: s.units[0]!.unit,
+      rule: "round.migrate",
+      from: `${s.spec_dir}/runs/_story`,
+      to: `${s.spec_dir}/runs/_story/rounds/01-solo`,
+      commit: { cwd: "/r-worktrees/gh-1-login", branch: "gh-1-login", message: "norn: gh-1 record moved into round 1", trailers: { "Norn-Story": "gh-1", "Norn-Step": "implement", "Norn-Tick": TICK }, push: true },
+    });
+  });
+  test("it comes before a remote park and a mirror, and before the story's slices", () => {
+    expect(kinds(facts([flat(storyAt("test", { issue: null }))]))).toEqual(["gh-1 round_migrate round.migrate"]);
+    expect(kinds(facts([flat(storyAt("slices", {}, [{ nn: "01", state: { status: "running" } }]))]))).toEqual(["gh-1 round_migrate round.migrate"]);
+  });
+  test("never during a rebase, never for a story this heartbeat does not hold, never once the PR merged", () => {
+    const rebase = flat(storyAt("test"));
+    rebase.units[0]!.worktree = { ...worktreeOf("/r-worktrees/gh-1-login"), in_progress: { operation: "rebase", unmerged: [] } };
+    expect(kinds(facts([rebase]))).toEqual(["gh-1 noop unit.rebase_in_progress"]);
+    const other = flat(solo({}, null, { claim: { state: "other", sha: "x", blob: { version: 1, story: "gh-1", holder: "ann@pc", heartbeat_id: HB, acquired_at: at(), renewed_at: at(), expires_at: at(T0 + 1), last_tick_id: null } } }));
+    expect(kinds(facts([other]))).toEqual(["gh-1 noop claim.other"]);
+    const merged = flat(storyAt("ready", { pr: { number: 9, url: "u", state: "merged", is_draft: false, head_sha: "abc" } }));
+    expect(kinds(facts([merged]))).toEqual(["gh-1 cleanup_merged_story remote.pr_merged"]);
+  });
+  test("a story already in round folders, or facts with no record, are not moved", () => {
+    const rounds = storyAt("test");
+    rounds.units[0]!.record = "runs/_story/rounds/01-story";
+    expect(kinds(facts([rounds])).join()).not.toContain("round.migrate");
+    expect(kinds(facts([storyAt("test")])).join()).not.toContain("round.migrate");
+  });
+});
+
 describe("gh-79 (H1, S5): a rebasing story worktree holds the story-level writes", () => {
   const rebasingStory = (f: StoryFacts) => {
     f.units[0]!.worktree = { ...worktreeOf("/r-worktrees/gh-1-login"), in_progress: { operation: "rebase", unmerged: [] } };

@@ -7,7 +7,7 @@
  * every run is stored in the trace (B4) and linked from it by a `briefing` event (O4).
  */
 import { readdirSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, join, relative } from "node:path";
 import { cmd, currentRun, cursorStep, type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, standingReport, storyRulings, storyWorktreePath } from "@norn/core";
 import { type AgentStep, type ProcessIdentity, type ReceiptOf, storyBranch, ulid } from "@norn/schema";
 import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readText, readUnitHooks, writeBriefing, readRemoteCache, storyFile, traceEvent, specRunsDir, unitDir } from "@norn/store";
@@ -187,7 +187,7 @@ export const briefCommand = defineCommand({
         spec_dir: s.marker.spec_dir,
         story_file: `${s.marker.spec_dir}/${basename(storyFile(s.specPath))}`,
         slice_file: slicePath,
-        unit_dir: unitDir(s.marker.spec_dir, s.unit.dir),
+        unit_dir: join(s.marker.spec_dir, relative(s.specPath, s.runsDir)),
       },
       diff_range: `${base}...HEAD`,
       // S9: the agent-written part only; the generated header and heartbeat are not for the agent

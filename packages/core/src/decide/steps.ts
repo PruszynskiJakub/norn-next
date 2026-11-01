@@ -60,6 +60,11 @@ function usableWorkflow(ctx: Ctx, name: string, level: UnitLevel): { workflow: W
 
 // ---------------------------------------------------------------- check / git
 
+/** gh-71 D2: the unit's record folder relative to its spec folder, as observe resolved it. */
+export function recordOf(uf: UnitFacts): string {
+  return uf.record ?? unitRecordPath(uf.unit.dir);
+}
+
 export function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, command: string, timeout_ms: number): void {
   const ref = uf.unit;
   if (uf.lease?.kind === "check") return ctx.noop(ref, "check.running", `check run ${uf.lease.run_id ?? "?"} in progress`);
@@ -80,7 +85,7 @@ export function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitSta
     cwd,
     timeout_ms,
     env,
-    log_path: `${story.spec_dir}/${unitRecordPath(ref.dir)}/logs/${run_id}.log`,
+    log_path: `${story.spec_dir}/${recordOf(uf)}/logs/${run_id}.log`,
   });
 }
 

@@ -131,6 +131,8 @@ function cases(): RuleCase[] {
   out.push(c("the pinned workflow changed outside norn", "workflow.drift", facts([story(SOLO_WF, {}, null, {}, { workflow_hash: "edited" })])));
   out.push(c("a rebase waits in the unit's worktree past the step's deadline", "unit.rebase_in_progress", facts([story(SOLO_WF, running("implement", 2 * HOUR), null, {}, { worktree: { ...worktree(STORY_WT), in_progress: { operation: "rebase", unmerged: ["X.txt"] } } })])));
   out.push(c("a ready unit whose cursor is $done", "unit.no_step", facts([story(SOLO_WF, ready("$done"))])));
+  // gh-71 D7 (B34): a held story whose record is still flat moves into round 1 first
+  out.push(c("a held story with a flat record", "round.migrate", facts([story(STORY_WF, { step: "slices" }, null, {}, { record: "runs/_story" })])));
   out.push(c("a stuck unit waits for unstick", "unit.stuck", facts([story(SOLO_WF, { status: "stuck", park: { kind: "exhausted", reason: "nudges 2/2", since: at() } })])));
   {
     const st = stateFor(storyUnit(), SOLO_WF);

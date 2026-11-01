@@ -341,6 +341,19 @@ export interface CleanupMergedStoryAction extends UnitBase {
   story_status: "done";
 }
 
+/**
+ * gh-71 D7 (B34): move a flat story record (`runs/_story/state.json` …) into its round 1 folder with
+ * `git mv` — everything under `from` but `handoff.md` and `rounds/` — then commit and push (one commit).
+ */
+export interface RoundMigrateAction extends UnitBase {
+  kind: "round_migrate";
+  /** worktree-relative `runs/_story` */
+  from: string;
+  /** worktree-relative `runs/_story/rounds/01-<workflow>` */
+  to: string;
+  commit: BoundaryCommit;
+}
+
 /** Nothing to do; recorded so `why` explains idleness. */
 export interface NoopAction extends UnitBase {
   kind: "noop";
@@ -391,6 +404,7 @@ export type UnitAction =
   | NotifyAction
   | UpdateStoryMirrorAction
   | CleanupMergedStoryAction
+  | RoundMigrateAction
   | NoopAction;
 
 export type RepoAction = IntakeStoryAction | ReclaimLeasesAction;

@@ -121,6 +121,7 @@ export async function unitFacts(ports: Ports, story: StorySnapshot, lu: LocalUni
   const errors: FileError[] = u.errors;
   return {
     unit: u.unit,
+    record: u.record,
     state: st,
     workflow: u.workflow?.workflow ?? null,
     workflow_hash: u.workflow?.hash ?? null,
