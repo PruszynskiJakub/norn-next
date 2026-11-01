@@ -426,7 +426,7 @@ describe("formatters", () => {
     expect(status).toContain("1 item needs you");
 
     const inbox = formatInbox(v);
-    expect(inbox.split("\n").slice(0, 3)).toEqual(["Answer (1) · agents waiting for your answer", "  gh-12      implement: Which OAuth provider? · 40m", '      $ norn story answer gh-12 "…"']);
+    expect(inbox.split("\n").slice(0, 3)).toEqual(["Answer (1) · agents waiting for your answer", "  gh-12      round 1 · slice · implement: Which OAuth provider? · 40m", '      $ norn story answer gh-12 "…"']);
     expect(inbox).toContain("Running (1) · agents and checks at work");
     expect(inbox).toContain("Recently done (1) · finished in the last 24h");
   });

@@ -153,7 +153,9 @@ export function formatInbox(view: ProjectView, opts: { details?: boolean; home?:
     for (const it of items) {
       const unit = it.slice ?? it.story;
       const num = opts.numbered ? `${`[${++n}]`.padEnd(5)}` : "";
-      out.push(`  ${num}${unit.padEnd(10)} ${stepTitle(it.step, it.title)} · ${it.age}`);
+      // gh-71 B28: the round and its workflow next to the step, as `story view` and the handoff header show them
+      const round = it.round ? `round ${it.round.n} · ${it.round.workflow} · ` : "";
+      out.push(`  ${num}${unit.padEnd(10)} ${round}${stepTitle(it.step, it.title)} · ${it.age}`);
       if (it.detail) out.push(`      ${tilde(it.detail)}`);
       if (opts.details && it.full) out.push(...tilde(it.full).split("\n").map((l) => `      | ${l}`));
       out.push(`      $ ${it.command}`);

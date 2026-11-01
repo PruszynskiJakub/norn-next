@@ -209,8 +209,8 @@ describe("answer (O2, B2)", () => {
     // B9: one gate and one ask → the Approve and Answer groups, each item with its age and command
     const text = await h.norn("status");
     expect(text.exit).toBe(0);
-    expect(text.stdout).toMatch(/^Answer \(1\) · .*\n  gh-5 +work: Which currency\? · \d+[smhd]\S*\n(?: {6}.*\n)*? {6}\$ norn story answer gh-5 "…"\n/m);
-    expect(text.stdout).toMatch(/^Approve \(1\) · .*\n  gh-6 +review: Look at it · \d+[smhd]\S*\n(?: {6}.*\n)*? {6}\$ norn story approve gh-6\n/m);
+    expect(text.stdout).toMatch(/^Answer \(1\) · .*\n  gh-5 +round 1 · gated · work: Which currency\? · \d+[smhd]\S*\n(?: {6}.*\n)*? {6}\$ norn story answer gh-5 "…"\n/m);
+    expect(text.stdout).toMatch(/^Approve \(1\) · .*\n  gh-6 +round 2 · gated · review: Look at it · \d+[smhd]\S*\n(?: {6}.*\n)*? {6}\$ norn story approve gh-6\n/m);
 
     const r = await h.norn("story", "answer", "gh-5", "EUR");
     expect(r.exit).toBe(0);

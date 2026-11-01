@@ -800,7 +800,7 @@
   spawn repo-worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
   spawn repo-worktrees/gh-7-add-login-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7-add-login-form -- .agents/specs/gh-7-add-login-form/runs/_story/handoff.md .agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/receipts/0005-classify.json .agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/state.json
   spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
-  A.notifier.notify round_done:gh-7:runs/_story/rounds/01-mini
+  A.notifier.notify merge:gh-7:100
   ~ repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/handoff.md
       text 23 lines, normalised sha256 ad0695729ae1
   ~ repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/state.json

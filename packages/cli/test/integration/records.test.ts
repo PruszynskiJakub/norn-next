@@ -332,6 +332,9 @@ steps:
     expect(mine.length).toBeGreaterThan(0);
     expect(mine).toContainEqual(expect.objectContaining({ step: "refine", round: { n: 2, workflow: "story" } }));
     for (const i of mine) expect(i.round).toEqual({ n: 2, workflow: "story" });
+    // qa#1 (B28): the markdown a person reads shows the round and its workflow next to the step too
+    const status = (await h.norn("status")).stdout;
+    expect(status).toMatch(/gh-16 +round 2 · story · refine/);
 
     const json = await h.norn("story", "view", "gh-16", "--json");
     expect(json.exit).toBe(0);
