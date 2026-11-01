@@ -14,6 +14,15 @@
 
 ## Goal
 
+Refine gh-71 into a spec: a story goes through numbered rounds (one workflow after another), so `$done` ends a round, not the story.
+
 ## Progress
 
+- Interviewed the person; summary confirmed. Spec written to spec.md (B1–B36, no open questions).
+- Decisions: the noun is *round* (*run* keeps its meaning); `story edit --workflow` starts a round when the last one is finished, and `--force` ends an unfinished one (refused while an agent runs or a slice is unfinished); `--at` jumps inside the current round; counters reset per round; branch, PR, handoff and mode are shared; issue closed + no PR + no unfinished round → norn closes the story like `story close`; generic inbox item "round done, no PR"; label follows the round; record is `runs/_story/rounds/<NN>-<workflow>/`, slices stay at `runs/<nn>-<slug>/`, flat records are moved by the first tick, records on the base stay flat (read as round 1).
+- Triage's and reproduce's confirm gates are not changed (only their prompt text where it says a done story waits for a merge).
+- PRD amended: §5 round, §7 layout, S7, W7, W9, story sketch, new §11.1 RD1–RD8, GR6b, GR7. S7 keeps the phrase `through norn story edit <unit> --workflow <name> --at <step>` that test/repo checks.
+
 ## Resume
+
+Refine is done; next is plan (norn routes it).
