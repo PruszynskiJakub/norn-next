@@ -127,7 +127,7 @@
           "last_check": null,
           "last_findings": null,
           "last_outcome_receipt": {
-            "file": ".agents/specs/gh-7-add-login-form/runs/_story/receipts/0003-done.json",
+            "file": ".agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/receipts/0003-done.json",
             "n": 3,
             "receipt": {
               "at": "<time>",
@@ -143,6 +143,7 @@
             }
           },
           "lease": null,
+          "record": "runs/_story/rounds/01-mini",
           "run": null,
           "state": {
             "applied_through": 3,
@@ -267,6 +268,7 @@
             }
           },
           "lease": null,
+          "record": "runs/01-form",
           "run": null,
           "state": {
             "applied_through": 6,

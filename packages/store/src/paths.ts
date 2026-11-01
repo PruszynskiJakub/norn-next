@@ -219,7 +219,7 @@ export const evidenceDir = (ud: string, runId: string) => join(ud, "evidence", r
 /** gh-71 B31: one handoff per story, `runs/_story/handoff.md`, above its round folders; a slice's in its own folder. */
 export const handoffPath = (ud: string) => recordHandoffPath(ud);
 /** What a commit of a unit's record stages: its record folder and its handoff (above the round folder for the story, gh-71 B31). */
-export const recordPaths = (ud: string) => [...new Set([ud, handoffPath(ud)])];
+export const recordPaths = (ud: string) => (dirname(handoffPath(ud)) === ud ? [ud] : [ud, handoffPath(ud)]);
 /** R2.3: copies of runs/ files this checkout wrote but never got into the record. */
 export const orphanedDir = (ud: string) => join(ud, "orphaned");
 

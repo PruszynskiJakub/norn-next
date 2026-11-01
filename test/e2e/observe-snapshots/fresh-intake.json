@@ -88,6 +88,7 @@
           "last_findings": null,
           "last_outcome_receipt": null,
           "lease": null,
+          "record": "runs/_story",
           "run": null,
           "state": null,
           "unapplied": [],

@@ -4,8 +4,12 @@
  * only; `norn tidy` moves what this finds to `runs/<unit>/orphaned/`.
  */
 import type { UnpushedRuns } from "@norn/core";
+import { ROUNDS_DIR } from "@norn/schema";
 import { git } from "./git.ts";
 import { unitDir } from "./paths.ts";
+
+/** A unit's `orphaned/` copies: in its folder, or in one of the story's round folders (gh-71 B30). */
+const ORPHANED = new RegExp(`^(${ROUNDS_DIR}/[^/]+/)?orphaned/`);
 
 /** A unit worktree to inspect. */
 export interface UnpushedTarget {
@@ -49,7 +53,7 @@ export async function unpushedRuns(remote: string, baseRef: string | null, spec_
       git(t.cwd, ["ls-files", "--others", "--exclude-standard", "--", dir]),
     ]);
     if (changed.code !== 0 || untracked.code !== 0) continue;
-    const files = [...new Set([...changed.stdout.split("\n"), ...untracked.stdout.split("\n")].map((l) => l.trim()).filter((l) => l && !l.slice(dir.length).startsWith("orphaned/")))].sort();
+    const files = [...new Set([...changed.stdout.split("\n"), ...untracked.stdout.split("\n")].map((l) => l.trim()).filter((l) => l && !ORPHANED.test(l.slice(dir.length))))].sort();
     if (files.length) out.push({ unit: t.unit, dir: t.dir, files, cwd: t.cwd, base });
   }
   return out;

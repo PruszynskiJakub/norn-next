@@ -146,8 +146,8 @@ describe("a claim lost mid-run (R1.2, R2.3)", () => {
     const head = remoteHead();
     const t = await A.norn("tidy");
     expect(t.exit).toBe(0);
-    const orphaned = `${SPEC}/runs/_story/orphaned/tester@box-${done}`;
-    expect(t.value).toMatchObject({ orphaned: [{ story: "gh-9", unit: "gh-9", moved: [{ from: `${SPEC}/runs/_story/receipts/${done}`, to: orphaned }], commit: expect.any(String) }] });
+    const orphaned = `${SPEC}/runs/_story/rounds/01-solo/orphaned/tester@box-${done}`;
+    expect(t.value).toMatchObject({ orphaned: [{ story: "gh-9", unit: "gh-9", moved: [{ from: `${SPEC}/runs/_story/rounds/01-solo/receipts/${done}`, to: orphaned }], commit: expect.any(String) }] });
     expect(existsSync(join(storyRuns(A.root), "receipts", done))).toBe(false);
     expect(existsSync(join(`${A.root}-worktrees/${BRANCH}`, orphaned))).toBe(true);
     // committed on the local branch only; the record is untouched

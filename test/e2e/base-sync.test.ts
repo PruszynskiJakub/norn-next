@@ -280,17 +280,17 @@ describe("base_branch: develop (BS0, 7b)", () => {
 
   test("intake from develop, update merges develop, open-pr targets develop", async () => {
     const wt = `${h.root}-worktrees/gh-8-use-develop`;
-    const runs = storyUnitDir(join(wt, ".agents/specs/gh-8-use-develop"));
+    const runs = () => storyUnitDir(join(wt, ".agents/specs/gh-8-use-develop"));
     await h.tick();
     const sibling = siblingMerge(h, "d.txt", "d\n", "develop");
     siblingMerge(h, "m.txt", "m\n", "main"); // main moves too: never merged into the story
     h.clock.advance(10_000);
     await h.tick("--sync");
-    for (let i = 0; i < 12 && h.state(runs)?.step !== "ready"; i++) {
+    for (let i = 0; i < 12 && h.state(runs())?.step !== "ready"; i++) {
       h.clock.advance(10_000);
       await h.tick();
     }
-    expect(h.state(runs)).toMatchObject({ step: "ready", status: "parked" });
+    expect(h.state(runs())).toMatchObject({ step: "ready", status: "parked" });
     expect(h.git(["log", "--format=%s"], wt)).toContain(`Update gh-8 from develop (${sibling.slice(0, 7)})`);
     expect(existsSync(join(wt, "m.txt"))).toBe(false);
     expect(h.remote.prs).toMatchObject([{ head: "gh-8-use-develop", base_branch: "develop" }]);
