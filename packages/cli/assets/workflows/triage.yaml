@@ -1,0 +1,25 @@
+# Triage workflow — example installed by `norn init`, the default for a new story
+# (config default_workflow); edit freely (W1).
+# An unattended agent checks the issue still holds on the base, posts its findings and the
+# recommendation as an issue comment, and reports the recommendation as its outcome. Every outcome
+# ends the round ($done): the person starts the next one with
+# `norn story edit <story> --workflow refinement|quick|reproduce`, or closes the issue.
+# Triage changes no file and opens no PR, so it has no base sync (BS*).
+name: triage
+description: Check an issue still holds, add its context, and recommend what comes next (refinement, quick, reproduce) or closing it.
+start: explore
+steps:
+  explore:
+    type: agent
+    skill: norn-triage
+    inputs: [spec, handoff]
+    instructions: >-
+      The issue is mirrored in spec.md. Post the `## Triage` comment on it: that one comment is the only
+      remote write this step allows, an exception to the norn skill's rule. Change no file, spec.md included,
+      but the handoff. Report the recommendation itself as the outcome:
+      `norn done refinement|quick|reproduce|close --handoff "<reason>"`.
+    outcomes:
+      refinement: { to: $done, means: "new behaviour or a rule to settle: recommend a refinement round for the spec and plan" }
+      quick:      { to: $done, means: "a small change (refactor, docs, chore) with no open design question: recommend a quick round" }
+      reproduce:  { to: $done, means: "a bug: recommend a reproduce round to confirm it and its cause before the fix" }
+      close:      { to: $done, means: "nothing to do (no longer applies, duplicate, out of scope): evidence posted; recommend closing the issue" }

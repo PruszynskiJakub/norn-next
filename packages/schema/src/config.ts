@@ -167,7 +167,7 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
   runner: null,
   remote: { provider: "gh", label: "norn", git_remote: "origin", sync_interval: "5m" },
   base_branch: null,
-  default_workflow: "story",
+  default_workflow: "triage",
   default_slice_workflow: "slice",
   default_mode: "manual",
   max_agents: 2,

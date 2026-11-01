@@ -121,7 +121,7 @@ Three separate concepts decide where a human is involved:
 ```
 .agents/
   norn.config.yaml              # repo config (agents, runner, remote, label, defaults, checks)
-  workflows/                    # story.yaml, slice.yaml, bug.yaml — examples copied by init, editable
+  workflows/                    # triage, reproduce, refinement, story, slice, quick (.yaml) — examples copied by init, editable
   specs/<id>-<slug>/            # id is provider-prefixed: gh-123, gl-45
     spec.md                     # frontmatter mirrors remote issue + workflow + spec body
     slices/<nn>-<slug>.md       # frontmatter: id, title, workflow, depends_on, status, labels?
@@ -268,7 +268,7 @@ Three sources of outcomes:
 - QV4 With frontmatter `criteria`, the report covers exactly those ids, once each; otherwise `invalid_criteria` (exit 3) with the expected ids in `do_instead`. Without frontmatter `criteria`, coverage is not checked and the trace records `criteria.unchecked_coverage`.
 - QV5 An outcome edge may declare `verdict: <v>` (agent steps only, W5). Order `fail` > `unverified` > `person` > `pass`; an outcome with `verdict: v` may be reported only when the worst verdict in the report is `v` — otherwise `outcome_contradicts_verdicts`, and `do_instead` names the outcome that matches.
 - QV5a `pass` means observed in this session. Each agent declares what its sessions can do in config, `agents.<name>.capabilities: [browser, …]` (default none). `norn done` refuses (`pass_without_capability`, exit 3) a `pass` verdict for a criterion whose `needs` are not all among the reporting agent's capabilities; `do_instead` says to report it `unverified` with `reason` and `how`. A person's earlier gate ruling (the brief's Rulings) answers questions but never verifies a criterion on the current code (C2).
-- QV6 Default `qa` steps (story and slice) declare `criteria: required` and `pass` (verdict pass), `fail` (fail, counted), `partial` (person → `human-qa`), `unverified` (unverified → `human-qa`). A workflow may route `unverified` to an agent step whose runner has the capability instead.
+- QV6 Default `qa` steps (the story's; the shipped `slice` has none, and the story's `slice` step lists every slice's criteria in `spec.md`'s frontmatter as `<nn>.<id>` so the story's QA covers them, QV4) declare `criteria: required` and `pass` (verdict pass), `fail` (fail, counted), `partial` (person → `human-qa`), `unverified` (unverified → `human-qa`). A workflow may route `unverified` to an agent step whose runner has the capability instead.
 - QV7 A gate's inbox item lists the `person` and `unverified` criteria of the report that led there, with `reason` and `how` (one line in `detail`, one per line in `full` / `status --details`); a rework brief after a rejection repeats the judged report's criteria not passed.
 - QV8 Each report is a `criteria` trace event (counts per verdict, `unverified` per capability in `needs`); `norn run list <unit>` sums them (`criteria.unverified_needs`).
 - NT1 Every `norn done` accepts `--note "<text>"` (repeatable), each optionally followed by `--note-criterion <id>`; stored in the `done` receipt (`notes`). Notes never block and never change the route.
@@ -280,7 +280,7 @@ Three sources of outcomes:
 
 ## 11. Workflows
 
-- W1 Files in `.agents/workflows/*.{yaml,json}`, validated against a published JSON Schema. No lifecycle is hard-coded; `init` copies `story`, `slice`, `bug` as **examples** with no implied mapping.
+- W1 Files in `.agents/workflows/*.{yaml,json}`, validated against a published JSON Schema. No lifecycle is hard-coded; `init` copies `triage`, `reproduce`, `refinement`, `story`, `slice` and `quick` as **examples** with no implied mapping beyond the built-in `default_workflow: triage` and `default_slice_workflow: slice` (W9). Each does one thing; a story goes through them one after another as rounds (`$done` ends a round, a person merging the PR ends the story), and a person starts the next round (S7).
 - W2 Step types:
 
 | Type | Purpose |
@@ -318,20 +318,8 @@ steps:
     type: agent
     skill: norn-review
     outcomes:
-      approve:           { to: qa, means: "all criteria met, no blocking findings" }
+      approve:           { to: integrate, means: "all criteria met, no blocking findings" }
       changes_requested: { to: implement, counter: review_loop, means: "blocking findings in the receipt" }
-  qa:
-    type: agent
-    skill: norn-qa
-    criteria: required
-    outcomes:
-      pass:       { to: integrate, verdict: pass, means: "every criterion observed with evidence" }
-      fail:       { to: implement, counter: qa_loop, verdict: fail, means: "a criterion fails; repro in findings" }
-      partial:    { to: human-qa, verdict: person, means: "criteria only a person can judge, evidence prepared" }
-      unverified: { to: human-qa, verdict: unverified, means: "criteria this session could not check; how to check each one is in the report" }
-  human-qa:
-    type: gate
-    outcomes: { approve: integrate, reject: { to: implement, counter: qa_loop } }
   integrate:
     type: git
     action: integrate
@@ -340,12 +328,19 @@ steps:
     type: agent
     skill: norn-merge
     outcomes: { done: integrate }
-counters: { test_loop: { max: 5 }, review_loop: { max: 3 }, qa_loop: { max: 2 }, conflict_loop: { max: 2 } }
+counters: { test_loop: { max: 5 }, review_loop: { max: 3 }, conflict_loop: { max: 2 } }
 ```
 
-Default story workflow (sketch): `refine (attended; done → plan, questions → clarify) → clarify (attended) → plan (attended) → slice → approve-plan (gate) → slices → update (git; conflict → resolve, counted) → test (check) → qa → describe (writes pr.md, GR9) → open-pr (git) → ready (gate) → $done`; `human-qa` approve also goes to `describe`; `human-qa` and `ready` route `stale` back to `update` (counted, `stale_loop`), workflow field `base: { stale: conflict }` (BS6–BS8). Rework found by story `test`/`qa` goes to `implement` in the story worktree, counted. After `$done` the story waits for the observed PR merge (GR6) — a fact, not a gate.
+The shipped workflows (sketches; `sync` and `update` are `git: update`, a conflict goes to a `norn-merge` agent step and back, counted):
 
-Example `bug` workflow: `reproduce (agent, norn-diagnose: seen as a user, then a red loop and the cause, no fix; reproduced → implement, cannot_reproduce → $stuck) → implement (the loop becomes the red test) → test → review → integrate`.
+- `triage`: `explore (agent, norn-triage: checks the issue still holds, posts a ## Triage issue comment) → $done`, with outcome `refinement | quick | reproduce | close` as the recommendation.
+- `reproduce`: `reproduce (agent, norn-diagnose: seen as a user, then a red loop and the cause, no fix, posted as a ## Reproduce issue comment; reproduced | cannot_reproduce) → $done`.
+- `refinement`: `sync → refine (attended; done → plan, questions → clarify) → clarify (attended) → plan (attended) → $done`. No gate: starting the next round is the person's approval of the plan.
+- `story`: `sync → slice (done → approve-slices; replan → $stuck when spec.md has no Plan or the base no longer fits it) → approve-slices (gate) → slices → update → test (check) → qa → describe (writes pr.md, GR9) → open-pr (git) → ci (check: waits for the PR's checks) → ready (gate) → $done`; `human-qa` approve also goes to `describe`; `human-qa` and `ready` route `stale` back to `update` (counted, `stale_loop`), workflow fields `base: { stale: conflict, step: update }` (BS6–BS9). Rework found by story `test`/`qa`/`ci` goes to `implement` in the story worktree, counted. After `$done` the story waits for the observed PR merge (GR6) — a fact, not a gate.
+- `slice`: as in the example above; no QA of its own.
+- `quick`: `sync → implement → update → test → review → describe → open-pr → ci → ready → $done`, in the story worktree (no `slices`, W8).
+
+The chains a person runs: a feature `triage → refinement → story`; a small change `triage → quick`, or `triage → refinement → quick` when it needs a spec first; a bug `reproduce → quick`, or `reproduce → refinement → quick` when the fix needs a design.
 
 ## 12. Remote and git
 
@@ -447,7 +442,8 @@ Single-job skills ported from ai-engine (norn v0.11.0): its skill files are the 
 | `norn-qa` | Check each acceptance criterion as a user, with evidence (a screenshot for every `browser` criterion); one verdict per criterion in a criteria report (QV2); never pass what wasn't observed (`unverified` when this session cannot check it); notes when a passed criterion may be read differently (NT4); secrets redacted. | pass / fail / partial / unverified |
 | `norn-qa-person` | Walk a person through QA from the agent's evidence and their own remarks; a repro for every failure. Shipped for attended QA steps; the templates' `human-qa` is a gate. | pass / fail |
 | `norn-pr` | Pull request body from the spec, the diff and QA's criteria reports and evidence: Summary (the smallest picture: pseudocode, call tree, file tree, Mermaid or shape diff), Evidence (before/after per criterion; never claims what was not observed), Merge danger (one-way or two-way door, blast radius). Adapted from mattpocock/skills `pr` (itself after Humanlayer's show-me). | done |
-| `norn-diagnose` | Hard bugs, flaky tests, performance regressions: a tight, deterministic loop that goes red on the reported symptom first (no hypothesis before it has gone red), then minimise, ranked falsifiable hypotheses, instrument, bisect; fix behind a regression test at a correct seam, or hand the loop and cause back when told not to fix. HITL loop template (`scripts/hitl-loop.template.sh`); secrets redacted. Runs the `bug` template's `reproduce`; `norn-implement` turns to it when a rework failure does not reproduce on the first try. | reproduced / cannot_reproduce |
+| `norn-diagnose` | Hard bugs, flaky tests, performance regressions: a tight, deterministic loop that goes red on the reported symptom first (no hypothesis before it has gone red), then minimise, ranked falsifiable hypotheses, instrument, bisect; fix behind a regression test at a correct seam, or hand the loop and cause back when told not to fix. HITL loop template (`scripts/hitl-loop.template.sh`); secrets redacted. Runs the `reproduce` template's `reproduce`; `norn-implement` turns to it when a rework failure does not reproduce on the first try. | reproduced / cannot_reproduce |
+| `norn-triage` | One issue → a `## Triage` issue comment: still applies on the base (tried, not assumed), repro, affected code (`file:line`), the rules it touches, context, and exactly one recommendation with its reason; changes no file. Runs the `triage` template's `explore`. | refinement / quick / reproduce / close |
 | `norn-merge` | Resolve conflicts by intent of both sides; merge the base into a published branch, never rebase; abort and stop if new behaviour is needed. | done |
 | `norn-prototype` | Throwaway prototype that settles one design question with a person: a state model as one shareable HTML file (`LOGIC.md`), or radically different UI variants on one route switched by `?variant=` (`UI.md`). Committed on the branch being worked on, in prototype-named files that nothing in the product reaches (real files it edited go back as they were); the spec links its path next to the decision it settled, with the question and the verdict. Not a step: `norn-refine` and `norn-plan` offer it when a decision turns on look and feel or a state model hard to judge on paper, and only suggest it when no person is present. | — |
 | `norn-tdd` | Reference: red → green at agreed seams, good tests, mocking at boundaries (`tests.md`, `mocking.md`); refactoring stays out of the loop. | — |

@@ -1,12 +1,11 @@
-# Quick workflow — repo-local, for refactors, docs, chores, other small changes and the fix of a
-# bug `reproduce` confirmed (W1, W9: label norn:wf:quick). A story workflow without `slices` (W8):
-# every step works in the story worktree. Bring the story up to date with its base, implement, bring it up to date again, check, review, describe,
-# open the draft PR (or rewrite the body of the open one), wait for the PR's CI, and wait for a
-# person at `ready`; the person merges the PR. The local check runs the unit and integration tiers and the type check; CI runs every tier, e2e sharded.
-# A story waiting at ready goes back through update when the base moved under it in a way
-# that conflicts (BS6–BS8, base.stale: conflict).
+# Quick workflow — repo-local copy of the shipped one (W1, W9: label norn:wf:quick), with this repo's
+# check commands and its ci.yml wait. For refactors, docs, chores, other small changes and the fix of
+# a bug `reproduce` confirmed. A story workflow without `slices` (W8): every step works in the story
+# worktree. Sync, implement, update, check, review, describe, open the draft PR, wait for its CI, and
+# wait for a person at ready; the person merges the PR. The local check runs the unit and integration
+# tiers and the type check; CI runs every tier, e2e sharded.
 name: quick
-description: Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR.
+description: Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.
 start: sync
 steps:
   # brings the story branch up to date with its base before any code is written, so implement starts
@@ -27,11 +26,11 @@ steps:
     skill: norn-implement
     inputs: [spec, handoff, last_check, last_findings]
     instructions: >-
-      The spec is spec.md (the issue) and the triage findings in the issue's latest `## Triage`
-      comment (`gh issue view <N> --comments`). Keep to what they ask. A change in
-      behaviour gets a test first; a change to docs or a pure refactor needs none beyond the suite
-      staying green. A bug comes from `reproduce` with a red loop in the handoff's Progress and the
-      issue's latest `## Reproduce` comment: turn it into a failing test at the seam named there before
+      Work from what the story already holds: the Plan section of spec.md when a refinement round wrote one,
+      otherwise the issue mirrored in spec.md and its latest `## Triage` comment. Keep to what they ask.
+      A change in behaviour gets a test first; a change to docs or a pure refactor needs none beyond the
+      suite staying green. A bug comes from a reproduce round with a red loop in the handoff's Progress and
+      the issue's latest `## Reproduce` comment: turn it into a failing test at the seam named there before
       changing any code, then fix the cause and cite the PRD ids the fix enforces.
       Test your change with `bun packages/cli/src/main.ts …`, never the installed `norn`.
       Run that dev build only in a throwaway git repo under $TMPDIR, never in this worktree: it is a live norn unit (NORN_HOME points at it) and a dev build would act on its runs/, claim and state.json.
@@ -59,7 +58,7 @@ steps:
     skill: norn-review
     inputs: [spec, diff]
     outcomes:
-      approve:           { to: describe, means: "the change does what spec.md asks and nothing else, no blocking findings" }
+      approve:           { to: describe, means: "the change does what the story asks and nothing else, no blocking findings" }
       changes_requested: { to: implement, counter: review_loop, means: "blocking findings in the receipt" }
   describe:
     type: agent
@@ -103,10 +102,10 @@ counters:
   ci_loop: { max: 3 }
   review_loop: { max: 3 }
   ready_loop: { max: 2 }
-  # resets each time update merges cleanly: only repeated conflicts on one base move count (W4)
-  base_conflict_loop: { max: 2, reset_on: update.done }
+  # reset each time their update merges cleanly: only repeated conflicts on one base move count (W4)
   sync_conflict_loop: { max: 2, reset_on: sync.done }
+  base_conflict_loop: { max: 2, reset_on: update.done }
   # a stale re-entry is progress from outside (a sibling merged), bounded by the sibling merges
   stale_loop: { max: 10 }
-# update-branch re-enters update, not sync, the first update step (BS9)
+# update-branch re-enters update, not sync (the default would be the first update step, BS9)
 base: { stale: conflict, step: update }

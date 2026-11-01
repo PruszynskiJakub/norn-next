@@ -6,9 +6,10 @@ norn is built with norn. Code rules, layout and the agent side of the process ar
 
 1. **Everything is an issue.** Every change to a file in the repo starts as a GitHub issue labelled `norn`. It stays unassigned in the backlog; whoever runs norn on it assigns it to themselves when work should begin, because intake cuts the story branch from the base at that moment (GR1, GR2).
 2. **norn picks it up.** `norn sync` turns the issue into story `gh-N` (a branch `gh-N-<slug>`, a worktree, a spec folder).
-3. **Triage or reproduce.** Unless the issue names a workflow, the `triage` workflow runs first: an agent checks the issue still applies, adds the affected code and context, and recommends `quick`, `story` or `close`. A bug (the bug report template sets `norn:wf:reproduce`) runs `reproduce` instead: an agent reproduces it through the real interface, builds a loop that goes red, confirms the cause and posts it on the issue; you switch it to `quick` to fix it or close it. You confirm at the gate and switch the story with `norn story edit gh-N --workflow <name> --at <start step>`; the gate prompt lists the exact command for each workflow. To close instead: `norn story approve gh-N`, `gh issue close N --reason "not planned"`, `norn story close gh-N`, then delete the pushed story branch (`git push origin --delete gh-N-<slug>`).
-4. **The workflow runs.** Agents do the unattended steps; you answer the inbox (`norn status`).
-5. **A person merges.** Every workflow ends at a `ready` gate with a PR. You merge it (squash).
+3. **Triage or reproduce.** Unless the issue names a workflow, the `triage` workflow runs first: an agent checks the issue still applies, adds the affected code and context as an issue comment, and recommends `refinement`, `quick`, `reproduce` or closing it. A bug (the bug report template sets `norn:wf:reproduce`) runs `reproduce` instead: an agent reproduces it through the real interface, builds a loop that goes red, confirms the cause and posts it on the issue. Both end their round on their own; the inbox shows the story as done with no PR.
+4. **You start the next round.** Each workflow does one thing, and a story goes through them one after another on the same branch: `norn story edit gh-N --workflow <name>`. A feature: `triage → refinement → story`. A small change: `triage → quick`. A bug: `reproduce → quick`. To close instead, close the issue: a story with no PR and no unfinished round then ends by itself.
+5. **The workflow runs.** Agents do the unattended steps; you answer the inbox (`norn status`).
+6. **A person merges.** Every delivery workflow (`quick`, `story`, `release`) ends at a `ready` gate with a PR. You merge it (squash).
 
 ## Workflows
 
@@ -16,10 +17,11 @@ Picked by the issue label `norn:wf:<name>` (PRD W9); without one, `triage` runs.
 
 | Label | Workflow | For |
 |---|---|---|
-| `norn:wf:triage` | triage | Default, for stories and features. Check the issue, recommend `quick`, `story` or `close`. |
+| `norn:wf:triage` | triage | Default, for stories and features. Check the issue, recommend `refinement`, `quick`, `reproduce` or close. |
 | `norn:wf:reproduce` | reproduce | Bugs: reproduce read-only, confirm the cause and the seam for a regression test, then `quick` fixes it. |
-| `norn:wf:story` | story | Features, and PRD changes (refine amends `.agents/PRD.md`): refine → plan → slices → test → QA → PR. |
-| `norn:wf:quick` | quick | Refactors, docs, chores, small changes, a reproduced bug's fix: implement → test → review → PR. |
+| `norn:wf:refinement` | refinement | Spec and plan with you, and PRD changes (refine amends `.agents/PRD.md`): sync → refine → clarify → plan. No code, no PR. |
+| `norn:wf:story` | story | A planned feature: sync → slices → test → QA → PR → CI. Each slice: implement → test → review → integrate. |
+| `norn:wf:quick` | quick | Refactors, docs, chores, small changes, a reproduced bug's fix: sync → implement → test → review → PR → CI. |
 | `norn:wf:release` | release | Changelog, version bump → PR, wait for its CI. Started by `/release-start`. |
 
 ## Labels
@@ -75,4 +77,4 @@ The CI process check passes a PR only if it comes from a story branch `gh-N-<slu
 - `main` protected: no direct or force push, required checks `process`, `check` and `package`, branches required to be up to date before merging (so a release's tag never holds a commit its changelog misses), no admin bypass.
 - Squash merges only, with the PR title and description as the commit message; branches deleted on merge.
 - "Allow auto-merge" on: Dependabot patch and minor PRs merge automatically; majors wait for a person.
-- Labels: `norn`, `norn:wf:{triage,reproduce,story,quick,release}`, `friction`, `bypass`, `idea`, `bug`, `enhancement`.
+- Labels: `norn`, `norn:wf:{triage,reproduce,refinement,story,quick,release}`, `friction`, `bypass`, `idea`, `bug`, `enhancement`.

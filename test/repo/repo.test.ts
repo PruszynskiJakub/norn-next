@@ -378,9 +378,9 @@ describe("test layout (AGENTS.md)", () => {
   type Step = { type: string; run?: string; timeout?: string; instructions?: string };
   const workflowSteps = (wf: string) =>
     (Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", `${wf}.yaml`), "utf8")) as { steps: Record<string, Step> }).steps;
-  const DELIVERY = ["quick", "story", "slice", "bug"];
+  const DELIVERY = ["quick", "story", "slice"];
 
-  test("AC2 (B8): the test check of quick, story, slice and bug runs unit, then integration, then the type check, in 15 m", () => {
+  test("AC2 (B8): the test check of quick, story and slice runs unit, then integration, then the type check, in 15 m", () => {
     const checks = DELIVERY.map((wf) => ({ wf, run: workflowSteps(wf).test?.run, timeout: workflowSteps(wf).test?.timeout }));
     expect(checks).toEqual(
       DELIVERY.map((wf) => ({
@@ -391,7 +391,7 @@ describe("test layout (AGENTS.md)", () => {
     );
   });
 
-  test("AC3 (B9): the implement step of quick, story, slice and bug names bun run test as the loop, integration in the test check and e2e in CI", () => {
+  test("AC3 (B9): the implement step of quick, story and slice names bun run test as the loop, integration in the test check and e2e in CI", () => {
     const says = DELIVERY.map((wf) => {
       const text = workflowSteps(wf).implement?.instructions ?? "";
       return {
@@ -617,21 +617,27 @@ describe("intake by kind (W9)", () => {
   type Wf = { start: string; steps: Record<string, { type: string; skill?: string; instructions?: string; outcomes: Record<string, unknown> }> };
   const workflow = (wf: string) => Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", `${wf}.yaml`), "utf8")) as Wf;
 
-  test("triage recommends quick, story or close, all to its confirm gate", () => {
+  const targets = (wf: string, step: string) => Object.fromEntries(Object.entries(workflow(wf).steps[step]?.outcomes ?? {}).map(([k, v]) => [k, (v as { to: string }).to]));
+
+  test("triage is one norn-triage step whose recommendation (refinement, quick, reproduce or close) ends the round", () => {
     const { steps } = workflow("triage");
-    expect(Object.keys(steps.explore?.outcomes ?? {}).sort()).toEqual(["close", "quick", "story"]);
-    expect(steps.confirm?.type).toBe("gate");
+    expect(Object.keys(steps)).toEqual(["explore"]);
+    expect(steps.explore?.skill).toBe("norn-triage");
+    expect(targets("triage", "explore")).toEqual({ refinement: "$done", quick: "$done", reproduce: "$done", close: "$done" });
   });
 
-  test("reproduce is one norn-diagnose agent step that reports reproduced or cannot_reproduce to a confirm gate", () => {
+  test("reproduce is one norn-diagnose agent step whose reproduced or cannot_reproduce ends the round", () => {
     const { start, steps } = workflow("reproduce");
     expect(start).toBe("reproduce");
-    expect(Object.keys(steps).sort()).toEqual(["confirm", "reproduce"]);
+    expect(Object.keys(steps)).toEqual(["reproduce"]);
     expect(steps.reproduce?.skill).toBe("norn-diagnose");
-    const targets = Object.fromEntries(Object.entries(steps.reproduce?.outcomes ?? {}).map(([k, v]) => [k, (v as { to: string }).to]));
-    expect(targets).toEqual({ reproduced: "confirm", cannot_reproduce: "confirm" });
-    expect(steps.confirm?.type).toBe("gate");
-    expect(steps.confirm?.outcomes.approve).toBe("$done");
+    expect(targets("reproduce", "reproduce")).toEqual({ reproduced: "$done", cannot_reproduce: "$done" });
+  });
+
+  test("the repo's copies of the shipped workflows have the same steps and edges (W1)", () => {
+    const shipped = (wf: string) => Bun.YAML.parse(readFileSync(join(PKGS, "cli", "assets", "workflows", `${wf}.yaml`), "utf8")) as Wf;
+    const shape = (w: Wf) => ({ start: w.start, steps: Object.fromEntries(Object.entries(w.steps).map(([s, step]) => [s, { type: step.type, skill: step.skill, outcomes: step.outcomes }])) });
+    for (const wf of ["triage", "reproduce", "refinement", "story", "slice", "quick"]) expect({ wf, ...shape(workflow(wf)) }).toEqual({ wf, ...shape(shipped(wf)) });
   });
 
   test("quick's implement turns a red loop from reproduce into a failing test first", () => {

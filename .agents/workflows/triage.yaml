@@ -1,42 +1,27 @@
-# Triage workflow — norn's own default (config default_workflow: triage), repo-local (W1, W9),
-# for stories and features; a bug starts in `reproduce` instead (label norn:wf:reproduce).
-# An unattended agent checks the issue still holds, posts the repro, the affected code and context
-# as an issue comment (spec.md stays as intake wrote it), and reports the workflow it recommends
-# as its outcome.
-# A person then decides at `confirm`. A gate has only approve/reject/stale (W2), so the choice of
-# workflow is not a gate outcome: the person switches the story with `norn story edit … --workflow … --at`
-# (W9, S7), which works while the unit waits at the gate. Agents never run it.
-# Triage changes no code and opens no PR, so it has no base sync (BS*).
+# Triage workflow — repo-local copy of the shipped one (W1), norn's own default (config
+# default_workflow: triage), for stories and features; a bug starts in `reproduce` instead (label
+# norn:wf:reproduce). An unattended agent checks the issue still holds, posts its findings as an issue
+# comment (spec.md stays as intake wrote it), and reports the recommendation as its outcome. Every
+# outcome ends the round ($done): the person starts the next one (`norn story edit gh-N --workflow
+# refinement|quick|reproduce`, S7) or closes the issue. Agents never run it.
 name: triage
-description: Check a story or feature issue still holds, add context, recommend a workflow (quick, story) or close.
+description: Check an issue still holds, add its context, and recommend what comes next (refinement, quick, reproduce) or closing it.
 start: explore
 steps:
   explore:
     type: agent
-    skill: triage
+    skill: norn-triage
     inputs: [spec, handoff]
     instructions: >-
-      Read the issue mirrored in spec.md. Check it still occurs or still applies on the base branch.
-      Post the findings (repro, affected code, PRD ids touched, context) and the recommendation with
-      its reason as an issue comment, and only there. Never edit the issue body. Change no file,
-      spec.md included. Report the recommendation itself as the outcome:
-      `norn done quick|story|close --handoff "<reason>"`.
+      The issue is mirrored in spec.md. Run norn's behaviour from this checkout's code, `bun packages/cli/src/main.ts …`
+      after `bun install --frozen-lockfile`, never the installed `norn`, and only in a throwaway git repo under $TMPDIR:
+      this worktree is a live norn unit. Cite PRD ids exactly as written in .agents/PRD.md under **Rules:**; a PRD rule
+      the issue would change is a `refinement`, unless the change is small and settled. Post the `## Triage` comment on it: that one comment is the only
+      remote write this step allows, an exception to the norn skill's rule. Change no file, spec.md included,
+      but the handoff. Report the recommendation itself as the outcome:
+      `norn done refinement|quick|reproduce|close --handoff "<reason>"`.
     outcomes:
-      quick: { to: confirm, means: "a small change (refactor, docs, chore): what to change written; recommend the quick workflow" }
-      story: { to: confirm, means: "a feature that needs a spec, a plan and slices: scope written; recommend the story workflow" }
-      close: { to: confirm, means: "nothing to do (no longer occurs, duplicate, out of scope, works as designed): evidence written; recommend closing" }
-  confirm:
-    type: gate
-    prompt: >-
-      Read the triage findings and the recommendation in the issue comment (`gh issue view N --comments`). N is the issue number.
-      Switch to a workflow: `norn story edit gh-N --workflow quick --at sync` or `norn story edit gh-N --workflow story --at refine`;
-      a bug: `norn story edit gh-N --workflow reproduce --at reproduce`.
-      Close: `norn story approve gh-N --reason "<why>"`, then `gh issue close N --reason "not planned"`,
-      then `norn story close gh-N --yes` (a story at $done without a PR otherwise waits for a merge, GR6),
-      then `git push origin --delete gh-N-<slug>` (close pushed the story branch; the findings stay on the issue comment).
-      Triage again: `norn story reject gh-N --reason "<what to look at>"`.
-    outcomes:
-      approve: $done
-      reject:  { to: explore, counter: triage_loop }
-counters:
-  triage_loop: { max: 2 }
+      refinement: { to: $done, means: "new behaviour or a rule to settle: recommend a refinement round for the spec and plan" }
+      quick:      { to: $done, means: "a small change (refactor, docs, chore) with no open design question: recommend a quick round" }
+      reproduce:  { to: $done, means: "a bug: recommend a reproduce round to confirm it and its cause before the fix" }
+      close:      { to: $done, means: "nothing to do (no longer applies, duplicate, out of scope): evidence posted; recommend closing the issue" }
