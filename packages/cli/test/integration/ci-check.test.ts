@@ -93,9 +93,10 @@ esac
     writeFileSync(join(fake, "sleep"), `#!/bin/sh\necho "$1" >> "$FAKE/sleeps"\n`);
     if (withGh) chmodSync(join(fake, "gh"), 0o755);
     chmodSync(join(fake, "sleep"), 0o755);
-    const proc = Bun.spawnSync(["sh", "-c", `exec 2>&1\n${bundledCiScript("quick")}`], {
+    // without gh, PATH is the fake dir alone: CI runners ship gh in /usr/bin
+    const proc = Bun.spawnSync(["/bin/sh", "-c", `exec 2>&1\n${bundledCiScript("quick")}`], {
       cwd: fake,
-      env: { PATH: `${fake}:/usr/bin:/bin`, FAKE: fake, APPEAR: String(appear), WATCH_EXIT: String(watchExit) },
+      env: { PATH: withGh ? `${fake}:/usr/bin:/bin` : fake, FAKE: fake, APPEAR: String(appear), WATCH_EXIT: String(watchExit) },
     });
     const read = (f: string) => (existsSync(join(fake, f)) ? readFileSync(join(fake, f), "utf8").trim().split("\n") : []);
     return { exit: proc.exitCode, out: proc.stdout.toString(), calls: read("calls"), sleeps: read("sleeps") };
