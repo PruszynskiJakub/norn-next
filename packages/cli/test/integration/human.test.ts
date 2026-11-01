@@ -570,3 +570,169 @@ counters: { loop: { max: 2 } }
     expect(inbox.groups.your_turn).toEqual([expect.objectContaining({ title: "gh-12: triage round done, no PR" })]);
   });
 });
+
+describe("gh-71 B1, B3–B10, B17, B30, B31: norn story edit --workflow starts the next round", () => {
+  const TRIAGE = `name: triage
+start: explore
+steps:
+  explore:
+    type: agent
+    skill: norn-qa
+    outcomes: { story: { to: confirm, means: "deliver it as a story" } }
+  confirm:
+    type: gate
+    prompt: "Confirm the triage"
+    outcomes: { approve: $done, reject: { to: explore, counter: loop } }
+counters: { loop: { max: 2 } }
+`;
+  const STORY = `name: story
+start: refine
+steps:
+  refine:
+    type: agent
+    skill: norn-refine
+    attended: true
+    outcomes: { done: { to: build, means: "spec written" } }
+  build:
+    type: agent
+    skill: norn-implement
+    outcomes: { done: { to: $done, means: "built" }, again: { to: refine, counter: fix, means: "refine again" } }
+counters: { fix: { max: 3 } }
+`;
+  let t: Harness;
+  const spec = ".agents/specs/gh-14-round-me";
+  const wt = () => `${t.root}-worktrees/gh-14-round-me`;
+  const record = () => join(wt(), spec, "runs/_story");
+  const runs = () => storyUnitDir(join(wt(), spec));
+  const next = () => {
+    t.clock.advance(10_000);
+    return t.tick();
+  };
+  const receiptsIn = (dir: string) => (existsSync(join(dir, "receipts")) ? readdirSync(join(dir, "receipts")).sort() : []);
+  type Inbox = { groups: Record<string, Array<{ story: string; step: string | null; title: string; command: string }>> };
+  beforeAll(async () => {
+    t = await createHarness();
+    expect((await t.norn("init")).exit).toBe(0);
+    t.write(repoConfigPath(t.root), CONFIG.replace("default_workflow: gated", "default_workflow: triage"));
+    t.write(join(workflowsDir(t.root), "triage.yaml"), TRIAGE);
+    t.write(join(workflowsDir(t.root), "story.yaml"), STORY);
+    t.git(["add", "-A"]);
+    t.git(["commit", "-q", "-m", "norn init"]);
+    t.git(["push", "-q", "origin", "main"]);
+    t.remote.issues = [issue(14, "Round me"), issue(15, "Triage twice")];
+  });
+  afterAll(() => t.cleanup());
+
+  test("B10: at the confirm gate the round is unfinished — refused, nothing written", async () => {
+    for (let i = 0; i < 8 && t.state(runs())?.status !== "running"; i++) await next();
+    // B3: round 1's counter reaches its max — reject twice at confirm
+    for (let loop = 0; loop < 3; loop++) {
+      t.report(runs(), "done", { outcome: "story", handoff: "a story" });
+      await next();
+      expect(t.state(runs())).toMatchObject({ step: "confirm", status: "parked" });
+      if (loop < 2) {
+        expect((await t.norn("story", "reject", "gh-14", "--reason", "look again")).exit).toBe(0);
+        for (let i = 0; i < 4 && t.state(runs())?.status !== "running"; i++) await next();
+      }
+    }
+    expect(t.state(runs())?.counters).toEqual({ loop: 2 });
+    const before = receiptsIn(runs());
+    const r = await t.norn("story", "edit", "gh-14", "--workflow", "story", "--json");
+    expect(r.exit).toBe(3);
+    expect(r.value).toMatchObject({ code: "round_unfinished", error: "gh-14's triage round is not finished; pass --force to end it and start a story round", do_instead: "norn story edit gh-14 --workflow story --force" });
+    expect(receiptsIn(runs())).toEqual(before);
+  });
+
+  test("B17, B9: an unknown workflow or step is refused and writes nothing", async () => {
+    expect((await t.norn("story", "approve", "gh-14")).exit).toBe(0);
+    await next();
+    expect(t.state(runs())).toMatchObject({ step: "$done", status: "done" });
+    // B31: the person's part of the handoff, written in round 1
+    const handoff = handoffPath(runs());
+    t.write(handoff, `${t.read(handoff)}\n## Goal\nDeliver it.\n\n## Progress\n- triaged\n\n## Resume\nRefine the spec.\n`);
+    const before = receiptsIn(runs());
+    const unknown = await t.norn("story", "edit", "gh-14", "--workflow", "sotry", "--json");
+    expect(unknown.exit).toBe(3);
+    expect(unknown.value).toMatchObject({ code: "unknown_workflow", do_instead: "norn story edit gh-14 --workflow <bug|slice|story|triage>" });
+    const step = await t.norn("story", "edit", "gh-14", "--workflow", "story", "--at", "nope", "--json");
+    expect(step.exit).toBe(3);
+    expect(step.value).toMatchObject({ code: "unknown_step", error: "no step 'nope' in workflow story", do_instead: "norn story edit gh-14 --workflow story --at <refine|build>" });
+    expect(receiptsIn(runs())).toEqual(before);
+  });
+
+  test("B1 (D1): the edit writes only a round receipt; a workflow file changed before the tick rejects it and the inbox asks again", async () => {
+    const stateBefore = t.read(join(runs(), "state.json"));
+    const before = receiptsIn(runs());
+    const r = await t.norn("story", "edit", "gh-14", "--workflow", "story", "--json");
+    expect(r.exit).toBe(0);
+    expect(r.value).toMatchObject({ unit: "gh-14", workflow: "story", previous: "triage", started: true, round: 2, to: "refine" });
+    expect((r.value as Verb).receipt).toMatchObject({ kind: "round", workflow: "story", to: "refine", forced: false, left_at: "$done", step: "$done", by: "human" });
+    expect(receiptsIn(runs())).toEqual([...before, expect.stringMatching(/^\d{4}-round\.json$/)]);
+    expect(t.read(join(runs(), "state.json"))).toBe(stateBefore);
+    expect(existsSync(join(record(), "rounds/02-story"))).toBe(false);
+    // the workflow file changes between the edit and the tick
+    t.write(join(workflowsDir(t.root), "story.yaml"), STORY.replace("max: 3", "max: 4"));
+    const rejected = await next();
+    expect(rejected.decisions.filter((d) => d.unit === "gh-14").map((d) => d.rule)).toEqual(["round.workflow_changed"]);
+    expect(existsSync(join(record(), "rounds/02-story"))).toBe(false);
+    expect(t.state(runs())).toMatchObject({ step: "$done", status: "done", park: { kind: "workflow" } });
+    const inbox = (await t.norn("status", "--json")).value as Inbox;
+    expect(inbox.groups.your_turn).toContainEqual(expect.objectContaining({ story: "gh-14", title: expect.stringContaining("workflow story changed since norn story edit gh-14 --workflow story; run it again"), command: "norn story edit gh-14 --workflow <name>" }));
+    t.write(join(workflowsDir(t.root), "story.yaml"), STORY);
+  });
+
+  test("B1, B3, B5, B6, B30, B31: the next tick starts round 2 at refine in one action and one commit", async () => {
+    expect((await t.norn("story", "edit", "gh-14", "--workflow", "story")).exit).toBe(0);
+    const branch = t.git(["rev-parse", "--abbrev-ref", "HEAD"], wt()).trim();
+    const commits = Number(t.git(["rev-list", "--count", "HEAD"], wt()).trim());
+    const r = await next();
+    expect(r.decisions.filter((d) => d.unit === "gh-14").map((d) => d.rule)).toEqual(["round.start"]);
+    expect(Number(t.git(["rev-list", "--count", "HEAD"], wt()).trim())).toBe(commits + 1);
+    expect(t.git(["log", "-1", "--format=%s"], wt()).trim()).toBe("norn: gh-14 round 2 (story) at refine");
+    expect(t.git(["status", "--porcelain"], wt()).trim()).toBe("");
+    // B30: round 1 kept, round 2 in its own folder with the story workflow pinned and a fresh state
+    expect(runs()).toBe(join(record(), "rounds/02-story"));
+    expect(t.state(join(record(), "rounds/01-triage"))).toMatchObject({ workflow: "triage", step: "$done", status: "done", counters: { loop: 2 } });
+    expect(t.read(join(runs(), "workflow.yaml"))).toBe(STORY);
+    const st = t.state(runs());
+    // B3 fresh counters, B5 the mode carried over
+    expect(st).toMatchObject({ workflow: "story", round: 2, step: "refine", attempt: 1, counters: { fix: 0 }, applied_through: 0, mode: "auto" });
+    expect(t.git(["rev-parse", "--abbrev-ref", "HEAD"], wt()).trim()).toBe(branch);
+    expect(t.read(join(wt(), spec, "spec.md"))).toContain("workflow: story");
+    // B31: one handoff, the person's sections kept
+    const handoff = t.read(handoffPath(runs()));
+    expect(handoffPath(runs())).toBe(join(record(), "handoff.md"));
+    expect(handoff).toContain("## Goal\nDeliver it.");
+    expect(handoff).toContain("## Resume\nRefine the spec.");
+    // B6: Your turn for refine
+    const inbox = (await t.norn("status", "--json")).value as Inbox;
+    expect(inbox.groups.your_turn).toContainEqual(expect.objectContaining({ story: "gh-14", step: "refine" }));
+    // round 2's own receipts start at 0001
+    t.report(runs(), "done", { outcome: "done", handoff: "spec written" });
+    await next();
+    expect(receiptsIn(runs())[0]).toMatch(/^0001-/);
+  });
+
+  test("B8, B9: the same workflow again as round 2, and --at picks the step it starts at", async () => {
+    const runs15 = () => storyUnitDir(join(`${t.root}-worktrees/gh-15-triage-twice`, ".agents/specs/gh-15-triage-twice"));
+    for (let i = 0; i < 8 && t.state(runs15())?.status !== "running"; i++) await next();
+    t.report(runs15(), "done", { outcome: "story", handoff: "a story" });
+    await next();
+    expect((await t.norn("story", "approve", "gh-15")).exit).toBe(0);
+    await next();
+    expect((await t.norn("story", "edit", "gh-15", "--workflow", "triage")).exit).toBe(0);
+    await next();
+    expect(runs15()).toEndWith("/runs/_story/rounds/02-triage");
+    expect(t.state(runs15())).toMatchObject({ workflow: "triage", round: 2, step: "explore", counters: { loop: 0 } });
+    // round 2 finishes; round 3 starts at --at
+    for (let i = 0; i < 4 && t.state(runs15())?.status !== "running"; i++) await next();
+    t.report(runs15(), "done", { outcome: "story", handoff: "a story" });
+    await next();
+    expect((await t.norn("story", "approve", "gh-15")).exit).toBe(0);
+    await next();
+    expect((await t.norn("story", "edit", "gh-15", "--workflow", "story", "--at", "build")).exit).toBe(0);
+    await next();
+    expect(runs15()).toEndWith("/runs/_story/rounds/03-story");
+    expect(t.state(runs15())).toMatchObject({ workflow: "story", round: 3, step: "build", visits: { build: 1 } });
+  });
+});
