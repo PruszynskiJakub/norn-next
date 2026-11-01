@@ -1,8 +1,8 @@
 ---
 id: gh-71/08
 title: End an unfinished round with --force, move inside a round with --at
-depends_on: [gh-71/06, gh-71/07]
-status: planned
+depends_on: [ gh-71/06, gh-71/07 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
