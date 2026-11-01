@@ -2,7 +2,7 @@
 id: gh-71/05
 title: $done ends the round, and the inbox says so
 depends_on: [ gh-71/04 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
