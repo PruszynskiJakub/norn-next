@@ -1,8 +1,8 @@
 ---
 id: gh-71/02
 title: Story close's effects as one runtime function
-depends_on: [gh-71/01]
-status: planned
+depends_on: [ gh-71/01 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: agent }
