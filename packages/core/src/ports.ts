@@ -328,6 +328,11 @@ export interface RemotePort {
   createIssue(opts: { title: string; body: string; labels: string[]; assignee: string }): Promise<RemoteIssue>;
   /** B23 (D3): the remote's new-issue page in the browser with `labels` filled in; creates nothing */
   newIssueUrl(opts: { labels: string[] }): Promise<string>;
+  /**
+   * B19: replace label `remove` on issue `number` with `add`; when `remove` is not on the issue,
+   * `add` is still added. Throws PortError when the provider fails (B20: the caller warns).
+   */
+  replaceIssueLabel(number: number, labels: { remove: string; add: string }): Promise<void>;
 }
 
 // ============================================================= Runner

@@ -37,10 +37,15 @@ const nextNumber = (issues: SeedIssue[]) => Math.max(0, ...issues.map((i) => i.n
 export interface ScriptedRemote {
   exec: Exec;
   seed(issues: SeedIssue[]): void;
+  /** from now on every label edit exits non-zero, as an unreachable provider would */
+  failLabelEdits(): void;
 }
+
+const unreachable = (bin: string): ExecResult => ({ code: 1, stdout: "", stderr: `${bin}: error connecting to the API: Could not resolve host` });
 
 export function scriptedGh(login = "octocat"): ScriptedRemote {
   let issues: SeedIssue[] = [];
+  let labelEditsFail = false;
   const prs: Pr[] = [];
   const issueJson = (i: SeedIssue) => ({
     number: i.number,
@@ -73,6 +78,18 @@ export function scriptedGh(login = "octocat"): ScriptedRemote {
       const i = issues.find((x) => x.number === Number(argv[3]));
       return i ? ok(issueJson(i)) : { code: 1, stdout: "", stderr: `GraphQL: Could not resolve to an issue or pull request with the number of ${argv[3]}.` };
     }
+    if (a === "issue" && b === "edit") {
+      if (labelEditsFail) return unreachable("gh");
+      const i = issues.find((x) => x.number === Number(argv[3]));
+      if (!i) return { code: 1, stdout: "", stderr: `GraphQL: Could not resolve to an issue or pull request with the number of ${argv[3]}.` };
+      // like gh, a label to remove must exist in the repository (here: on some issue)
+      const remove = flags(argv, "--remove-label");
+      const unknown = remove.find((l) => !issues.some((x) => x.labels.includes(l)));
+      if (unknown) return { code: 1, stdout: "", stderr: `failed to update https://github.com/acme/app/issues/${i.number}: '${unknown}' not found` };
+      const add = flags(argv, "--add-label");
+      issues = issues.map((x) => (x === i ? { ...x, labels: [...x.labels.filter((l) => !remove.includes(l)), ...add.filter((l) => !x.labels.includes(l))] } : x));
+      return ok(`https://github.com/acme/app/issues/${i.number}\n`);
+    }
     if (a === "pr" && b === "list") {
       const head = flag(argv, "--head");
       const rows = prs.filter((p) => p.head === head).sort((x, y) => y.number - x.number); // newest first
@@ -89,11 +106,12 @@ export function scriptedGh(login = "octocat"): ScriptedRemote {
     }
     throw new Error(`scripted gh: unexpected call: ${argv.join(" ")}`);
   };
-  return { exec, seed: (s) => void (issues = s) };
+  return { exec, seed: (s) => void (issues = s), failLabelEdits: () => void (labelEditsFail = true) };
 }
 
 export function scriptedGlab(login = "tanuki"): ScriptedRemote {
   let issues: SeedIssue[] = [];
+  let labelEditsFail = false;
   const mrs: Pr[] = [];
   const issueJson = (i: SeedIssue) => ({
     iid: i.number,
@@ -127,6 +145,16 @@ export function scriptedGlab(login = "tanuki"): ScriptedRemote {
       const i = issues.find((x) => x.number === Number(argv[3]));
       return i ? ok(issueJson(i)) : { code: 1, stdout: "", stderr: "ERROR: 404 Not Found" };
     }
+    if (a === "issue" && b === "update") {
+      if (labelEditsFail) return unreachable("glab");
+      const i = issues.find((x) => x.number === Number(argv[3]));
+      if (!i) return { code: 1, stdout: "", stderr: "ERROR: 404 Not Found" };
+      // GitLab ignores a label to remove that is not on the issue
+      const remove = flags(argv, "--unlabel");
+      const add = flags(argv, "--label");
+      issues = issues.map((x) => (x === i ? { ...x, labels: [...x.labels.filter((l) => !remove.includes(l)), ...add.filter((l) => !x.labels.includes(l))] } : x));
+      return ok(`- Updating issue #${i.number}\n#${i.number} ${i.title} (now)\n https://gitlab.com/acme/app/-/issues/${i.number}\n`);
+    }
     if (a === "mr" && b === "list") {
       const head = flag(argv, "--source-branch");
       return ok(mrs.filter((m) => m.head === head).map(mrJson)); // glab's order is not the adapter's to trust
@@ -142,5 +170,5 @@ export function scriptedGlab(login = "tanuki"): ScriptedRemote {
     }
     throw new Error(`scripted glab: unexpected call: ${argv.join(" ")}`);
   };
-  return { exec, seed: (s) => void (issues = s) };
+  return { exec, seed: (s) => void (issues = s), failLabelEdits: () => void (labelEditsFail = true) };
 }

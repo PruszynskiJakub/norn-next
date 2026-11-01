@@ -28,5 +28,8 @@ remoteContract("harness FakeRemote", () => {
         (i): RemoteIssue => ({ provider: "gh", url: `https://github.com/o/r/issues/${i.number}`, updated_at: new Date(T0).toISOString(), ...i }),
       );
     },
+    failLabelEdits() {
+      remote.labelError = Object.assign(new Error("gh issue edit failed (exit 1): could not resolve host"), { code: "gh_network", retryable: true });
+    },
   };
 });

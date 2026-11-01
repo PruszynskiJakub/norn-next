@@ -4,7 +4,7 @@
  * installs the world: the issues on the remote, assigned by login (`whoami()` is the user).
  */
 import { describe, expect } from "bun:test";
-import type { RemoteIssue, RemotePort, RemotePullRequest } from "@norn/core";
+import type { PortError, RemoteIssue, RemotePort, RemotePullRequest } from "@norn/core";
 import { type ContractOptions, contractTest } from "./suite.ts";
 
 export type RemoteContractTest =
@@ -15,7 +15,10 @@ export type RemoteContractTest =
   | "openDraftPullRequest opens a draft the branch then finds (GR6)"
   | "findPullRequest picks the newest of a branch's PRs"
   | "createIssue opens an issue with the labels and assignee, which intake then lists (B18)"
-  | "newIssueUrl: the remote's new-issue page with the labels filled in (B23)";
+  | "newIssueUrl: the remote's new-issue page with the labels filled in (B23)"
+  | "replaceIssueLabel swaps one label for another (B19)"
+  | "replaceIssueLabel adds the new label when the old one is not on the issue (B19)"
+  | "replaceIssueLabel rejects with a PortError when the provider fails, changing nothing (B20)";
 
 export interface SeedIssue {
   number: number;
@@ -29,6 +32,8 @@ export interface SeedIssue {
 export interface RemoteSubject {
   port: RemotePort;
   seed(issues: SeedIssue[]): void;
+  /** from now on, the provider fails every label edit (B20) */
+  failLabelEdits(): void;
 }
 
 /** The world every RemotePort is checked against; `me` is the port's `whoami()`. */
@@ -137,6 +142,38 @@ export function remoteContract(name: string, make: () => RemoteSubject, opts: Co
       expect(page).toContain("norn:wf:spec");
       expect(page).toMatch(/\bnorn\b(?!:)/);
       expect((await port.listAssignedIssues({ label: "norn" })).map((i) => i.number)).toEqual([1]); // nothing created
+    });
+
+    const triaged = (me: string): SeedIssue => ({ number: 5, title: "Triaged", body: "", state: "open", assignees: [me], labels: ["norn", "norn:wf:triage"] });
+
+    t("replaceIssueLabel swaps one label for another (B19)", async () => {
+      const { port, seed, me } = await seeded();
+      seed([...world(me), triaged(me)]);
+      await port.replaceIssueLabel(5, { remove: "norn:wf:triage", add: "norn:wf:story" });
+      const labels = (await port.getIssue(5))!.labels;
+      expect(labels).toContain("norn:wf:story");
+      expect(labels).not.toContain("norn:wf:triage");
+      expect(labels).toContain("norn");
+    });
+
+    t("replaceIssueLabel adds the new label when the old one is not on the issue (B19)", async () => {
+      const { port } = await seeded();
+      await port.replaceIssueLabel(1, { remove: "norn:wf:triage", add: "norn:wf:story" });
+      expect([...(await port.getIssue(1))!.labels].sort()).toEqual(["auth", "norn", "norn:wf:story"]);
+    });
+
+    t("replaceIssueLabel rejects with a PortError when the provider fails, changing nothing (B20)", async () => {
+      const { port, seed, failLabelEdits, me } = await seeded();
+      seed([...world(me), triaged(me)]);
+      failLabelEdits();
+      const err = await port.replaceIssueLabel(5, { remove: "norn:wf:triage", add: "norn:wf:story" }).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(err).toBeInstanceOf(Error);
+      expect(typeof (err as PortError).code).toBe("string");
+      expect(typeof (err as PortError).retryable).toBe("boolean");
+      expect((await port.getIssue(5))!.labels).toEqual(["norn", "norn:wf:triage"]);
     });
   });
 }

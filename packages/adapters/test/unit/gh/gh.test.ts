@@ -60,6 +60,26 @@ describe("gh adapter", () => {
     expect(await gh.editPullRequestBody(42, "x").catch((e) => e.code)).toBe("gh_failed");
   });
 
+  test("replaceIssueLabel removes the old label only when the issue carries it (B19)", async () => {
+    const argv: string[][] = [];
+    const recorded = createGh({ cwd: "/repo", exec: fixtureExec(calls as ExecFixture[], argv) });
+    await recorded.replaceIssueLabel(12, { remove: "norn:wf:triage", add: "norn:wf:story" });
+    await recorded.replaceIssueLabel(15, { remove: "norn:wf:triage", add: "norn:wf:story" });
+    expect(argv.filter((a) => a[2] === "edit")).toEqual([
+      ["gh", "issue", "edit", "12", "--remove-label", "norn:wf:triage", "--add-label", "norn:wf:story"],
+      ["gh", "issue", "edit", "15", "--add-label", "norn:wf:story"],
+    ]);
+  });
+
+  test("replaceIssueLabel: a failed edit is a typed PortError (B20)", async () => {
+    const failing = createGh({
+      cwd: "/repo",
+      exec: async (argv) => (argv[2] === "view" ? { code: 0, stdout: '{"labels":[]}', stderr: "" } : { code: 1, stdout: "", stderr: "error connecting to api.github.com" }),
+    });
+    const err = await failing.replaceIssueLabel(12, { remove: "norn:wf:triage", add: "norn:wf:story" }).catch((e) => e);
+    expect([err.code, err.retryable]).toEqual(["gh_network", true]);
+  });
+
   test("failures are typed PortErrors", async () => {
     const missing = createGh({ cwd: "/repo", exec: async () => ({ code: 127, stdout: "", stderr: "ENOENT" }) });
     expect(await missing.whoami().catch((e) => e.code)).toBe("gh_missing");
