@@ -27,7 +27,9 @@
 - Recorded argv fixtures and tests in `packages/adapters/test/unit/{gh,glab}`; transcript recorder knows the method.
 - Unit tier 990 pass, contract runs 85 pass, `bun test packages/adapters` 113 pass, typecheck green. Committed 500bfbba8.
 - implement#1 done: replaceIssueLabel on RemotePort for gh (reads labels, removes only a carried one), glab (one update) and FakeRemote (records the call; labelError makes it throw); 3 new remoteContract tests (AC1-3) green for all three subjects, plus recorded argv unit tests. Unit tier, contract runs, typecheck green.
+- review#1: both axes checked against AC1-3, B19/B20, P3/D9; contract runs 85, adapters 113, unit 990, typecheck all green. No blocking findings; one nit (glab fixture '✓' re-encoded as \u2713). Verdict approve.
+- review#1 approve: Review approve: replaceIssueLabel meets AC1-3 for gh, glab and FakeRemote; all checks green; one nit (glab fixture re-encoded ✓ as \u2713).
 
 ## Resume
 
-Nothing left in this step; next is review.
+Review done (approve); nothing left in this step.
