@@ -534,6 +534,8 @@ export interface InboxItem {
   story: string;
   slice: string | null;
   step: string | null;
+  /** gh-71 B28: the story's round and its workflow, next to the step; absent = the story has not started (or no story) */
+  round?: { n: number; workflow: string };
   /** question, reason or gate prompt */
   title: string;
   detail?: string;

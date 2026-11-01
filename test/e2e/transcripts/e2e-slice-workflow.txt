@@ -78,7 +78,7 @@
   spawn repo-worktrees/gh-7-add-login-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7-add-login-form -- .agents/specs/gh-7-add-login-form/runs/_story/handoff.md .agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/state.json .agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/workflow.yaml .agents/specs/gh-7-add-login-form/spec.md
   spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/handoff.md
-      text 19 lines, normalised sha256 ba15bc782a2b
+      text 19 lines, normalised sha256 6cde536b7024
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/state.json
       {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"mini","workflow_hash":"acbccdf2a34a664138468f747c2f929076ba05cb88f312703c206a6fe42b57cd","step":"plan","attempt":1,"visits":{"plan":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":0,"run":null,"last_outcome":null,"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:2>","mode":"auto"}
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/workflow.yaml
@@ -114,7 +114,7 @@
   spawn repo-worktrees/gh-7-add-login-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7-add-login-form -- .agents/specs/gh-7-add-login-form/runs/_story/handoff.md .agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/receipts/0001-started.json .agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/receipts/0002-started.json .agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/state.json
   spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
   ~ repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/handoff.md
-      text 20 lines, normalised sha256 63ad26b6569b
+      text 20 lines, normalised sha256 bf1de549e001
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/receipts/0001-started.json
       {"kind":"started","receipt_id":"<ulid:5>","run_id":"<ulid:3>","step":"plan","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:4>","how":"auto","agent":"claude","worktree":"<dir>/repo-worktrees/gh-7-add-login-form","machine":"tester@box","heartbeat_id":"<ulid:6>"}
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/receipts/0002-started.json
@@ -168,7 +168,7 @@
   spawn repo-worktrees/gh-7-add-login-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7-add-login-form -- .agents/specs/gh-7-add-login-form/runs/_story/handoff.md .agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/receipts/0003-done.json .agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/state.json .agents/specs/gh-7-add-login-form/slices/01-form.md
   spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
   ~ repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/handoff.md
-      text 21 lines, normalised sha256 3e57b5a20a51
+      text 21 lines, normalised sha256 36e8dc452da7
   ~ repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/state.json
       {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"mini","workflow_hash":"acbccdf2a34a664138468f747c2f929076ba05cb88f312703c206a6fe42b57cd","step":"slices","attempt":1,"visits":{"plan":1,"slices":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":3,"run":null,"last_outcome":{"step":"plan","outcome":"done","source":"reported","at":"<time>","receipt_id":"<ulid:9>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:8>","mode":"auto"}
 > norn tick
@@ -217,7 +217,7 @@
   + repo-worktrees/gh-7-add-login-form--01-form/.agents/specs/gh-7-add-login-form/runs/01-form/workflow.yaml
       text 22 lines, normalised sha256 47f8698e52c6
   + repo-worktrees/gh-7-add-login-form--01-form/.agents/specs/gh-7-add-login-form/runs/_story/handoff.md
-      text 21 lines, normalised sha256 3e57b5a20a51
+      text 21 lines, normalised sha256 36e8dc452da7
   + repo-worktrees/gh-7-add-login-form--01-form/.agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/receipts/0001-started.json
       {"kind":"started","receipt_id":"<ulid:5>","run_id":"<ulid:3>","step":"plan","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:4>","how":"auto","agent":"claude","worktree":"<dir>/repo-worktrees/gh-7-add-login-form","machine":"tester@box","heartbeat_id":"<ulid:6>"}
   + repo-worktrees/gh-7-add-login-form--01-form/.agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/receipts/0002-started.json
@@ -744,7 +744,7 @@
   ~ repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/01-form/state.json
       {"version":1,"story":"gh-7","slice":"gh-7/01","unit_dir":"01-form","workflow":"slice","workflow_hash":"47f8698e52c6920a2b18cac3fbbf902cc8044f1ede2597fb32d6ce86e12d8a8a","step":"$done","attempt":1,"visits":{"implement":2,"test":2,"human-qa":1,"integrate":1},"step_entered_at":"<time>","status":"done","park":null,"counters":{"test_loop":1},"nudges_used":0,"retries_used":0,"applied_through":10,"run":null,"last_outcome":{"step":"integrate","outcome":"done","source":"classified","at":"<time>","receipt_id":"<ulid:33>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:36>"}
   ~ repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/handoff.md
-      text 22 lines, normalised sha256 dd7cba89d789
+      text 22 lines, normalised sha256 168fdf0e6cd5
   + repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/receipts/0004-classify.json
       {"kind":"classify","receipt_id":"<ulid:38>","run_id":null,"step":"slices","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:37>","outcome":"done","rule":"slices.done","detail":"1 slice(s) integrated","route":"open-pr"}
   ~ repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/state.json
@@ -800,7 +800,8 @@
   spawn repo-worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
   spawn repo-worktrees/gh-7-add-login-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7-add-login-form -- .agents/specs/gh-7-add-login-form/runs/_story/handoff.md .agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/receipts/0005-classify.json .agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/state.json
   spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
+  A.notifier.notify round_done:gh-7:runs/_story/rounds/01-mini
   ~ repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/handoff.md
-      text 23 lines, normalised sha256 f425282551df
+      text 23 lines, normalised sha256 ad0695729ae1
   ~ repo-worktrees/gh-7-add-login-form/.agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/state.json
       {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"mini","workflow_hash":"acbccdf2a34a664138468f747c2f929076ba05cb88f312703c206a6fe42b57cd","step":"$done","attempt":1,"visits":{"plan":1,"slices":1,"open-pr":1},"step_entered_at":"<time>","status":"done","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":5,"run":null,"last_outcome":{"step":"open-pr","outcome":"done","source":"classified","at":"<time>","receipt_id":"<ulid:39>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:42>","mode":"auto"}

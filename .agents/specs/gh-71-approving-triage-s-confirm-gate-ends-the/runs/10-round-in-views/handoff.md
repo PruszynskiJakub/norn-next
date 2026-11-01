@@ -13,7 +13,17 @@
 <!-- norn:heartbeat:end -->
 
 ## Goal
+Show the story's round and its workflow in `status`, `story view` and the handoff header, and group `run list` by round with how each round ended (B28, B29, B32, B36; D10).
 
 ## Progress
+- Handoff header (core `renderHandoffStatus`): the story unit's line is `- Round N · Workflow: <wf> · Step: <s> (attempt k)`. Slices keep the old line because they have no rounds of their own.
+- `status --json`: `buildInbox` puts `round: {n, workflow}` (the story's current round) on every item of a started story. The `status` markdown is unchanged.
+- `story view`: `UnitView.round` / `OrientUnit.round` added. The markdown story line reads `- Story: round N · <wf> · <standing> · …`.
+- `run list`: store `storyRounds` + `loadRounds` read each round folder as its own snapshot. `loadTraceView` builds each round with the trace events of its time window (from its `created_at` to the next round's), tags rows with `round`, and adds `rounds: [{n, workflow, ended}]`, where `ended` is `{by: workflow, at: $done}`, `{by: person, at: <step>}` or null. The text prints a `round N · <wf>[ · finished | · ended by the person at <step>]` heading above each round's rows. A flat record gives one round 1 (B36) and writes nothing.
+- Tests: `packages/cli/test/integration/records.test.ts`, describe "rounds in the views", AC1–AC4 (they were written after the code, but each checks output that did not exist before).
+- Regenerated the e2e transcripts (handoff hashes). `e2e-slice-workflow.txt` also gains a `notify round_done` line. That line was already stale at HEAD (seen by running HEAD without this change), from an earlier slice, because the norn `test` check does not run e2e.
+- I did not use story facts `rounds` (the slice notes say slice 04 added them, but it did not). The story unit's state (`round`, `workflow`, `ended`) and the round folders are enough.
+- AC5 (verifier: agent) is left to QA: a throwaway repo with the build of this branch.
 
 ## Resume
+Implement is done and committed. Next: the `test` check, then review.

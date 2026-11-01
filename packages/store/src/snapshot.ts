@@ -19,7 +19,7 @@ import { baseSpecsRoot, defaultBaseRef } from "./base.ts";
 import { type LoadedConfig, loadConfig, loadWorkflows, type WorkflowListing } from "./config.ts";
 import { readSliceFile, readStoryFile } from "./frontmatter.ts";
 import { isErrno } from "./fsx.ts";
-import { slicesDir, specRunsDir, specsDir, storyFile, unitDir } from "./paths.ts";
+import { isFlatStoryRecord, slicesDir, specRunsDir, specsDir, storyFile, storyRounds, unitDir } from "./paths.ts";
 import { listReceipts } from "./receipts.ts";
 import { type Handoff, type PinnedWorkflow, readHandoff, readPinnedWorkflow, readState } from "./unit.ts";
 import { readUnitMarker } from "./worktree.ts";
@@ -92,8 +92,8 @@ function files(path: string): string[] {
   }
 }
 
-export function loadUnit(root: string, specPath: string, unit: UnitRef, opts: { includeApplied?: boolean } = {}): UnitSnapshot {
-  const path = unitDir(specPath, unit.dir);
+export function loadUnit(root: string, specPath: string, unit: UnitRef, opts: { includeApplied?: boolean; path?: string } = {}): UnitSnapshot {
+  const path = opts.path ?? unitDir(specPath, unit.dir);
   const errors: FileError[] = [];
   const st = readState(path, root);
   if (!st.ok && st.reason === "corrupt") errors.push(st.error);
@@ -121,6 +121,19 @@ export function loadUnit(root: string, specPath: string, unit: UnitRef, opts: { 
     handoff: readHandoff(path),
     errors,
   };
+}
+
+/**
+ * gh-71 B29, B36: the story's rounds, oldest first, each its own record folder read as a unit snapshot
+ * (every receipt when `includeApplied`). A flat record from an older norn is its one round, round 1;
+ * [] when the story has not started. Read only.
+ */
+export function loadRounds(story: StorySnapshot, opts: { includeApplied?: boolean } = {}): Array<{ n: number; workflow: string; unit: UnitSnapshot }> {
+  const current = story.units[0];
+  if (!current?.state) return [];
+  const rounds = isFlatStoryRecord(story.path) ? [] : storyRounds(story.path);
+  if (!rounds.length) return [{ n: current.state.round ?? 1, workflow: current.state.workflow, unit: current }];
+  return rounds.map((r) => ({ n: r.n, workflow: r.workflow, unit: r.path === current.path ? current : loadUnit(story.root, story.path, current.unit, { ...opts, path: r.path }) }));
 }
 
 /** Read one spec folder (spec.md, slices/, runs/). */

@@ -713,8 +713,15 @@ function unpushedItems(story: StoryFacts, facts: Facts): InboxItem[] {
 /** Build the whole inbox (O1). Stories held by another heartbeat are not shown (except R2.3 unpushed work). */
 export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   const groups = Object.fromEntries(INBOX_GROUPS.map((g) => [g, [] as InboxEntry[]])) as Record<InboxGroup, InboxEntry[]>;
+  // gh-71 B28: every item of a started story carries its round and the round's workflow
+  const rounds = new Map<string, { n: number; workflow: string }>();
+  for (const story of facts.stories) {
+    const st = storyUnit(story)?.state;
+    if (st) rounds.set(story.key, { n: st.round ?? 1, workflow: st.workflow });
+  }
   const add = (it: InboxItem | null) => {
-    if (it) groups[it.group].push({ ...it, age: formatAge(facts.now - epoch(it.since)) });
+    const round = it ? rounds.get(it.story) : undefined;
+    if (it) groups[it.group].push({ ...it, ...(round ? { round } : {}), age: formatAge(facts.now - epoch(it.since)) });
   };
   for (const story of facts.stories) {
     const claim = story.claim.state;

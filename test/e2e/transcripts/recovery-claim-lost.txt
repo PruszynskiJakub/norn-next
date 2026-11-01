@@ -82,7 +82,7 @@
   spawn repo-worktrees/gh-9-add-search $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-9-add-search -- .agents/specs/gh-9-add-search/runs/_story/handoff.md .agents/specs/gh-9-add-search/runs/_story/rounds/01-solo/state.json .agents/specs/gh-9-add-search/runs/_story/rounds/01-solo/workflow.yaml .agents/specs/gh-9-add-search/spec.md
   spawn repo-worktrees/gh-9-add-search $ git push --porcelain origin refs/heads/gh-9-add-search:refs/heads/gh-9-add-search
   + repo-worktrees/gh-9-add-search/.agents/specs/gh-9-add-search/runs/_story/handoff.md
-      text 19 lines, normalised sha256 0c5e14e469c2
+      text 19 lines, normalised sha256 1230ec8e33b9
   + repo-worktrees/gh-9-add-search/.agents/specs/gh-9-add-search/runs/_story/rounds/01-solo/state.json
       {"version":1,"story":"gh-9","slice":null,"unit_dir":"_story","workflow":"solo","workflow_hash":"51d9743b83bdefcffc2af22c467294a98d957b6a7fca5a1ede44a62a468c618e","step":"implement","attempt":1,"visits":{"implement":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":0,"run":null,"last_outcome":null,"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:2>","mode":"auto"}
   + repo-worktrees/gh-9-add-search/.agents/specs/gh-9-add-search/runs/_story/rounds/01-solo/workflow.yaml
@@ -118,7 +118,7 @@
   spawn repo-worktrees/gh-9-add-search $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-9-add-search -- .agents/specs/gh-9-add-search/runs/_story/handoff.md .agents/specs/gh-9-add-search/runs/_story/rounds/01-solo/receipts/0001-started.json .agents/specs/gh-9-add-search/runs/_story/rounds/01-solo/receipts/0002-started.json .agents/specs/gh-9-add-search/runs/_story/rounds/01-solo/state.json
   spawn repo-worktrees/gh-9-add-search $ git push --porcelain origin refs/heads/gh-9-add-search:refs/heads/gh-9-add-search
   ~ repo-worktrees/gh-9-add-search/.agents/specs/gh-9-add-search/runs/_story/handoff.md
-      text 20 lines, normalised sha256 33ccc4b808c6
+      text 20 lines, normalised sha256 2a91fa8cbe25
   + repo-worktrees/gh-9-add-search/.agents/specs/gh-9-add-search/runs/_story/rounds/01-solo/receipts/0001-started.json
       {"kind":"started","receipt_id":"<ulid:5>","run_id":"<ulid:3>","step":"implement","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:4>","how":"auto","agent":"claude","worktree":"<dir>/repo-worktrees/gh-9-add-search","machine":"tester@box","heartbeat_id":"<ulid:6>"}
   + repo-worktrees/gh-9-add-search/.agents/specs/gh-9-add-search/runs/_story/rounds/01-solo/receipts/0002-started.json
@@ -156,7 +156,7 @@
   spawn repo-b-worktrees/gh-9-add-search $ git rev-parse HEAD
   spawn repo-b-worktrees/gh-9-add-search $ git push --porcelain origin refs/heads/gh-9-add-search:refs/heads/gh-9-add-search
   + repo-b-worktrees/gh-9-add-search/.agents/specs/gh-9-add-search/runs/_story/handoff.md
-      text 21 lines, normalised sha256 3bc16109f43d
+      text 21 lines, normalised sha256 15b938fb8b06
   + repo-b-worktrees/gh-9-add-search/.agents/specs/gh-9-add-search/runs/_story/rounds/01-solo/receipts/0001-started.json
       {"kind":"started","receipt_id":"<ulid:5>","run_id":"<ulid:3>","step":"implement","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:4>","how":"auto","agent":"claude","worktree":"<dir>/repo-worktrees/gh-9-add-search","machine":"tester@box","heartbeat_id":"<ulid:6>"}
   + repo-b-worktrees/gh-9-add-search/.agents/specs/gh-9-add-search/runs/_story/rounds/01-solo/receipts/0002-started.json

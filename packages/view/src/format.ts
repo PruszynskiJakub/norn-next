@@ -5,7 +5,7 @@
 import { cmd, INBOX_ABOUT, INBOX_GROUPS, INBOX_TITLES } from "@norn/core";
 import type { RunDetail } from "./run-view.ts";
 import { oneLine } from "./timeline.ts";
-import type { InboxEntry, ProjectView, SliceView, StepRow, StepWho, StoryView, TimelineEntry, TraceView, UnitView } from "./types.ts";
+import type { InboxEntry, ProjectView, RoundView, SliceView, StepRow, StepWho, StoryView, TimelineEntry, TraceView, UnitView } from "./types.ts";
 
 function counterText(u: UnitView): string {
   const used = u.counters.filter((c) => c.value > 0 || (c.max !== null && u.status !== "done"));
@@ -213,6 +213,12 @@ function outcomeText(r: StepRow): string {
  * entered, left, duration, outcome, who — with the reason beneath (cut to one line unless
  * `full`) and absolute evidence / log paths. Slice rows of a story are indented.
  */
+/** gh-71 B29, B32: ` · finished`, ` · ended by the person at <step>`, or nothing while the round is under way. */
+function roundEndText(r: RoundView): string {
+  if (!r.ended) return "";
+  return r.ended.by === "person" ? ` · ended by the person at ${r.ended.at}` : " · finished";
+}
+
 export function formatStepTimeline(v: TraceView, opts: { full?: boolean } = {}): string {
   const day = (v.intake_at ?? v.steps[0]?.entered_at ?? null)?.slice(0, 10) ?? null;
   const out: string[] = [];
@@ -257,13 +263,22 @@ export function formatStepTimeline(v: TraceView, opts: { full?: boolean } = {}):
   const line = (c: string[]) => c.map((x, i) => (i === c.length - 1 ? x : x.padEnd(width[i] as number))).join("  ").trimEnd();
   const pad = " ".repeat((width[0] as number) + 2);
   out.push(line(head));
-  v.steps.forEach((r, i) => {
+  const row = (i: number) => {
+    const r = v.steps[i] as StepRow;
     out.push(line(cells[i] as string[]));
     if (r.reason) out.push(`${pad}${opts.full ? r.reason : oneLine(r.reason, REASON_MAX)}`);
     for (const p of [...r.paths.evidence, ...r.paths.logs]) out.push(`${pad}${p}`);
     if (opts.full) for (const p of [...r.paths.briefings, ...r.paths.receipts]) out.push(`${pad}${p}`);
     for (const e of r.events ?? []) out.push(`${pad}· ${clock(e.at, day)} ${e.source.padEnd(8)} ${opts.full ? e.summary : oneLine(e.summary, REASON_MAX)}`);
-  });
+  };
+  if (!v.rounds?.length) v.steps.forEach((_, i) => row(i));
+  // gh-71 B29, B32 (D10): a story's rows under a heading per round, with how the round ended
+  for (const rd of v.rounds ?? []) {
+    const rows = v.steps.flatMap((r, i) => ((r.round ?? 1) === rd.n ? [i] : []));
+    if (!rows.length) continue;
+    out.push(`round ${rd.n} · ${rd.workflow}${roundEndText(rd)}`);
+    rows.forEach(row);
+  }
   return `${out.join("\n")}\n`;
 }
 

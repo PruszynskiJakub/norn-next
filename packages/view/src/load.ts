@@ -124,6 +124,7 @@ function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: Uni
     title,
     url: story.frontmatter?.url ?? null,
     workflow: st?.workflow ?? workflow,
+    round: st ? (st.round ?? 1) : null,
     mode: sf.mode,
     effective_mode: eff.mode,
     mode_downgraded: eff.downgraded,
