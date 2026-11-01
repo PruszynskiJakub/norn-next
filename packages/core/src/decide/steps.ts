@@ -245,7 +245,8 @@ export function slicesStep(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitS
     const branch = sliceBranch(story.key, s.nn, s.slug);
     const slot = ctx.slot();
     const worktree: WorktreeSpec = { path, branch, from: story.branch, env: ctx.slotEnv(slot), slot };
-    const state = initialState({ unit: sliceRef, workflow: loaded.workflow, workflowName: name, workflowHash: sha256(loaded.source), now: ctx.nowIso, tick_id: ctx.facts.tick_id });
+    // gh-71 D2 (B33): a slice records the story round that started it
+    const state = initialState({ unit: sliceRef, workflow: loaded.workflow, workflowName: name, workflowHash: sha256(loaded.source), now: ctx.nowIso, tick_id: ctx.facts.tick_id, round: st.round ?? 1 });
     starts.push({
       kind: "start_unit" as const,
       unit: sliceRef,

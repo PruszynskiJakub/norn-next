@@ -499,6 +499,25 @@ describe("a slice gate in its own worktree (X1: views read slice runs from the s
     const inbox = (await h.norn("status")).value as { groups: Record<string, InboxItem[]> };
     expect(inbox.groups.approve).toEqual([]);
   });
+
+  test("gh-71 B33 (D8): a later round's slices step runs only new slices, numbered on, recording round 2", async () => {
+    for (let i = 0; i < 6 && h.state(storyRuns())?.step !== "$done"; i++) await tick();
+    expect(h.state(storyRuns())).toMatchObject({ workflow: "sliced", step: "$done", status: "done" });
+    expect(h.read(join(wt8(), spec8, "slices/01-part.md"))).toContain("status: integrated");
+    expect((await h.norn("story", "edit", "gh-8", "--workflow", "sliced")).exit).toBe(0);
+    for (let i = 0; i < 6 && h.state(storyRuns())?.status !== "running"; i++) await tick();
+    expect(storyRuns()).toEndWith("/runs/_story/rounds/02-sliced");
+    expect(h.state(storyRuns())).toMatchObject({ round: 2, step: "plan", status: "running" });
+    h.write(join(wt8(), spec8, "slices/02-more.md"), "---\nid: gh-8/02\ntitle: More\nworkflow: sliceqa\ndepends_on: [gh-8/01]\nstatus: planned\n---\n\nAcceptance: more works.\n");
+    h.report(storyRuns(), "done", { outcome: "done", handoff: "one more slice" });
+    const slice2 = () => join(`${wt8()}--02-more`, spec8, "runs/02-more");
+    for (let i = 0; i < 6 && h.state(slice2())?.status !== "parked"; i++) await tick();
+    expect(h.state(slice2())).toMatchObject({ slice: "gh-8/02", round: 2, step: "qa", status: "parked" });
+    // slice 01 is not run again: its record stays where round 1 left it
+    expect(existsSync(`${wt8()}--01-part`)).toBe(false);
+    expect(h.state(join(wt8(), spec8, "runs/01-part"))).toMatchObject({ slice: "gh-8/01", step: "$done" });
+    expect(h.state(join(wt8(), spec8, "runs/01-part"))?.round).toBeUndefined();
+  });
 });
 
 describe("gh-71 B2, B25: approving triage's confirm gate finishes the round, not the story", () => {
