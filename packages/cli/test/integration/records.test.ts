@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { StoryFacts } from "@norn/core";
-import { baseCacheDir, baseSpecsRoot, defaultBaseRef, readTickInputs, readTrace, repoConfigPath, workflowsDir } from "@norn/store";
+import { baseCacheDir, baseSpecsRoot, defaultBaseRef, readTickInputs, readTrace, repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
 
@@ -92,7 +92,7 @@ describe("records: ready head, foreign commits, merged by ancestry, durable stat
   const branch = "gh-5-record-me";
   const wt = () => `${h.root}-worktrees/${branch}`;
   const spec = `.agents/specs/${branch}`;
-  const runs = () => join(wt(), spec, "runs/_story");
+  const runs = () => storyUnitDir(join(wt(), spec));
   const step = (ms = 10_000) => h.clock.advance(ms);
   let readyHead = "";
 
@@ -176,7 +176,7 @@ describe("records: PR merge facts from the remote", () => {
   const branch = "gh-6-merge-facts";
   const wt = () => `${h.root}-worktrees/${branch}`;
   const spec = `.agents/specs/${branch}`;
-  const runs = () => join(wt(), spec, "runs/_story");
+  const runs = () => storyUnitDir(join(wt(), spec));
 
   beforeAll(async () => {
     h = await createHarness();
@@ -210,7 +210,7 @@ describe("C4: an agent's commit while its unit is parked on an ask is not foreig
   let h: Harness;
   const branch = "gh-6-ask-and-commit";
   const wt = () => `${h.root}-worktrees/${branch}`;
-  const runs = () => join(wt(), `.agents/specs/${branch}`, "runs/_story");
+  const runs = () => storyUnitDir(join(wt(), `.agents/specs/${branch}`));
   /** commit in the story worktree with the given committer/author date (git's own clock otherwise) */
   const commitAt = (file: string, message: string, date: string, name = "Agent") => {
     h.write(join(wt(), file), `${message}\n`);

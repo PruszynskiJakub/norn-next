@@ -8,7 +8,7 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { readTrace, repoConfigPath, workflowsDir } from "@norn/store";
+import { readTrace, repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
 import type { OrientReport } from "@norn/view";
 import type { CliDeps, CliResult } from "../../src/index.ts";
 import { fakeHerdr } from "../../../../test/support/fake-herdr.ts";
@@ -51,7 +51,7 @@ let h: Harness;
 const spec = ".agents/specs/gh-2-split-work";
 const wt = () => `${h.root}-worktrees/gh-2-split-work`;
 const sliceWt = () => `${wt()}--01-first`;
-const storyRuns = () => join(wt(), spec, "runs/_story");
+const storyRuns = () => storyUnitDir(join(wt(), spec));
 const sliceRuns = (nn: string) => join(`${wt()}--${nn}`, spec, `runs/${nn}`);
 const tick = async () => {
   h.clock.advance(10_000);

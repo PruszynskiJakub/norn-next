@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type CheckOrder, ulid } from "@norn/schema";
-import { acquireRunLease, leasesDir, listLeases, listReceipts, repoConfigPath, workflowsDir } from "@norn/store";
+import { acquireRunLease, leasesDir, listLeases, listReceipts, repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
 import { runCheckOrder } from "../../src/runtime/act/check.ts";
 import { createHarness, type Harness, installBundledSkills, issue } from "../../../../test/support/harness.ts";
@@ -54,7 +54,7 @@ async function atChecks(run: string, timeout: string, titles: string[]): Promise
   if (started < titles.length) throw new Error("stories did not start");
   const runsDirs = titles.map((t, i) => {
     const dir = `gh-${9 + i}-${t.toLowerCase().replaceAll(" ", "-")}`;
-    return join(`${h.root}-worktrees`, `${dir}/.agents/specs/${dir}/runs/_story`);
+    return storyUnitDir(join(`${h.root}-worktrees`, `${dir}/.agents/specs/${dir}`));
   });
   return { h, runsDirs };
 }

@@ -6,7 +6,7 @@
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
-import { repoConfigPath, workflowsDir } from "@norn/store";
+import { repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
 import { type CliResult } from "../../src/index.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";
@@ -53,7 +53,7 @@ notifiers: []
 let h: Harness;
 const spec = ".agents/specs/gh-7-count-items";
 const wt = () => `${h.root}-worktrees/gh-7-count-items`;
-const runs = () => join(wt(), spec, "runs/_story");
+const runs = () => storyUnitDir(join(wt(), spec));
 const tick = async (...flags: string[]) => {
   h.clock.advance(10_000);
   return h.tick(...flags);

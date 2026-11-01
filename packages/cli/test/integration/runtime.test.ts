@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { NUDGE_TEXT } from "@norn/core";
 import { ulid } from "@norn/schema";
-import { appendHookTrace, appendReceipt, readTrace, repoConfigPath, workflowsDir } from "@norn/store";
+import { appendHookTrace, appendReceipt, readTrace, repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
 import { humanSummary, humanTickLines } from "../../src/commands/watch.ts";
 import { runShell, type TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
@@ -51,7 +51,7 @@ async function boot(h: Harness, n: number, title: string) {
 describe("runtime", () => {
   let h: Harness;
   const wt = () => `${h.root}-worktrees/gh-9-fix-the-bug`;
-  const runs = () => join(wt(), ".agents/specs/gh-9-fix-the-bug/runs/_story");
+  const runs = () => storyUnitDir(join(wt(), ".agents/specs/gh-9-fix-the-bug"));
   beforeAll(async () => {
     h = await createHarness();
     await boot(h, 9, "Fix the bug");

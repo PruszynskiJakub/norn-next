@@ -6,7 +6,7 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { repoConfigPath, workflowsDir } from "@norn/store";
+import { repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
 import { type CliResult } from "../../src/index.ts";
 import { createHarness, FakeInteraction, type Harness, issue, sh } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";
@@ -57,7 +57,7 @@ const BRANCH = "gh-7-add-login-form";
 let h: Harness;
 const storyWt = () => `${h.root}-worktrees/${BRANCH}`;
 const sliceWt = (nn: string) => `${storyWt()}--${nn}`;
-const storyRuns = () => join(storyWt(), SPEC, "runs/_story");
+const storyRuns = () => storyUnitDir(join(storyWt(), SPEC));
 const sliceRuns = (nn: string) => join(sliceWt(nn), SPEC, `runs/${nn}`);
 const tick = async () => {
   h.clock.advance(10_000);

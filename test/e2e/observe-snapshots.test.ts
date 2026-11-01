@@ -8,7 +8,7 @@
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
-import { repoConfigPath, workflowsDir } from "@norn/store";
+import { repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
 import type { TickReport } from "../../packages/cli/src/index.ts";
 import { createHarness, type Harness, issue, sh } from "../support/harness.ts";
 import { observeNow } from "../support/observe-now.ts";
@@ -70,7 +70,7 @@ describe("observe snapshots and inbox parity (refactor Phase 0.3)", () => {
   const storyWt = () => `${h.root}-worktrees/gh-7-add-login-form`;
   const sliceWt = () => `${storyWt()}--01-form`;
   const spec = ".agents/specs/gh-7-add-login-form";
-  const storyRuns = () => join(storyWt(), spec, "runs/_story");
+  const storyRuns = () => storyUnitDir(join(storyWt(), spec));
   const sliceRuns = () => join(sliceWt(), spec, "runs/01-form");
   const step = (ms = 10_000) => h.clock.advance(ms);
   const acted = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop" && d.rule !== "claim.renew").map((d) => `${d.unit} ${d.kind}${d.ok ? "" : ` FAILED ${d.error}`}`);

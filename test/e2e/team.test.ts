@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { RunnerPort } from "@norn/core";
 import { ulid } from "@norn/schema";
-import { acquireTickLock, appendReceipt, readState, repoConfigPath, workflowsDir } from "@norn/store";
+import { acquireTickLock, appendReceipt, readState, repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
 import { type CliDeps, type CliResult, type TickReport } from "../../packages/cli/src/index.ts";
 import { createHarness, FakeInteraction, FakeRunner, type Harness, hostEnv, issue, sh } from "../support/harness.ts";
 import { runChecked } from "../support/harness.ts";
@@ -115,7 +115,7 @@ const kinds = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop" && 
 const SPEC = ".agents/specs/gh-7-add-login-form";
 const storyWt = (root: string) => `${root}-worktrees/gh-7-add-login-form`;
 const sliceWt = (root: string) => `${storyWt(root)}--01-form`;
-const storyRuns = (root: string) => join(storyWt(root), SPEC, "runs/_story");
+const storyRuns = (root: string) => storyUnitDir(join(storyWt(root), SPEC));
 const sliceRuns = (root: string) => join(sliceWt(root), SPEC, "runs/01-form");
 const state = (dir: string) => {
   const r = readState(dir);

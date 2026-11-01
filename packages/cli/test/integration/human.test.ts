@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Receipt } from "@norn/schema";
-import { heartbeatFilePath, repoConfigPath, workflowsDir } from "@norn/store";
+import { heartbeatFilePath, repoConfigPath, workflowsDir, storyUnitDir, handoffPath } from "@norn/store";
 import { type CliResult, type TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue, sh } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";
@@ -73,8 +73,8 @@ const spec5 = ".agents/specs/gh-5-pay-invoices";
 const spec6 = ".agents/specs/gh-6-export-report";
 const wt5 = () => `${h.root}-worktrees/gh-5-pay-invoices`;
 const wt6 = () => `${h.root}-worktrees/gh-6-export-report`;
-const runs5 = () => join(wt5(), spec5, "runs/_story");
-const runs6 = () => join(wt6(), spec6, "runs/_story");
+const runs5 = () => storyUnitDir(join(wt5(), spec5));
+const runs6 = () => storyUnitDir(join(wt6(), spec6));
 const step = (ms = 10_000) => h.clock.advance(ms);
 const tick = async (...flags: string[]) => {
   step();
@@ -201,7 +201,7 @@ describe("answer (O2, B2)", () => {
     expect(r.exit).toBe(0);
     const v = r.value as Verb;
     expect(v.delivered).toMatchObject({ via: "local", claim: "mine" });
-    expect(v.delivered.file).toMatch(/^\.agents\/specs\/gh-5-pay-invoices\/runs\/_story\/receipts\/\d{4}-answer\.json$/);
+    expect(v.delivered.file).toMatch(/^\.agents\/specs\/gh-5-pay-invoices\/runs\/_story\/rounds\/01-gated\/receipts\/\d{4}-answer\.json$/);
     expect(v.receipt).toMatchObject({ kind: "answer", answer: "EUR", step: "work", attempt: 1, slice: null, ask_receipt_id: st?.park?.receipt_id, run_id: st?.run?.run_id });
     // a second answer for the same ask while the first is unapplied is refused, not silently dropped later
     const dup = await h.norn("story", "answer", "gh-5", "USD");
@@ -265,7 +265,7 @@ describe("approve (gate)", () => {
     await tick();
     expect(h.state(runs5())).toMatchObject({ step: "work", attempt: 3, counters: { loop: 1 } });
     // O6: the rejection is a milestone in handoff.md, so the next brief's Context carries it
-    expect(h.read(join(runs5(), "handoff.md"))).toContain("- review#1 reject by tester@box: needs tests");
+    expect(h.read(handoffPath(runs5()))).toContain("- review#1 reject by tester@box: needs tests");
     expect(r.value).not.toHaveProperty("warning");
 
     // B26 (B3): a rejection without a reason would leave the agent nothing to fix: a usage error, nothing written
@@ -276,7 +276,7 @@ describe("approve (gate)", () => {
     expect(bare.value).toMatchObject({ do_instead: expect.stringContaining("pass --reason") });
     expect(h.state(runs5())).toMatchObject({ step: "review", attempt: 2, status: "parked" });
     expect((await h.norn("story", "reject", "gh-5", "--reason", "still no tests")).exit).toBe(0);
-    expect(h.read(join(runs5(), "handoff.md"))).toContain("- review#2 reject by tester@box: still no tests");
+    expect(h.read(handoffPath(runs5()))).toContain("- review#2 reject by tester@box: still no tests");
     await tick();
     expect(h.state(runs5())).toMatchObject({ step: "work", attempt: 4, counters: { loop: 2 } });
 
@@ -308,7 +308,7 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
     sh(bRoot, ["worktree", "add", "-q", "-b", "gh-5-pay-invoices", bWt, "origin/gh-5-pay-invoices"]);
     writeFileSync(join(bWt, ".norn-unit"), `repo=${bRoot}\nstory=gh-5\nslice=\nunit=_story\nspec_dir=${spec5}\n`);
     sh(bWt, ["reset", "-q", "--hard", sh(bWt, ["log", "-1", "--format=%H", "--grep=work.unstick"]).trim()]);
-    expect(h.state(join(bWt, spec5, "runs/_story"))).toMatchObject({ step: "work", park: null });
+    expect(h.state(storyUnitDir(join(bWt, spec5)))).toMatchObject({ step: "work", park: null });
 
     h.report(runs5(), "done", { outcome: "done", handoff: "with tests" });
     await tick();
@@ -422,7 +422,7 @@ describe("a slice gate in its own worktree (X1: views read slice runs from the s
   const spec8 = ".agents/specs/gh-8-split-work";
   const wt8 = () => `${h.root}-worktrees/gh-8-split-work`;
   const sliceWt = () => `${wt8()}--01-part`;
-  const storyRuns = () => join(wt8(), spec8, "runs/_story");
+  const storyRuns = () => storyUnitDir(join(wt8(), spec8));
   const sliceRuns = () => join(sliceWt(), spec8, "runs/01-part");
   type InboxItem = { slice: string | null; step: string | null; title: string; command: string };
 
@@ -464,7 +464,7 @@ describe("a slice gate in its own worktree (X1: views read slice runs from the s
     const m = await inSlice("story", "edit", "--manual", "--json");
     expect(m.exit).toBe(0);
     expect(m.value).toMatchObject({ unit: "gh-8", mode: "manual", changed: true, receipt: { kind: "mode", slice: null } });
-    expect(readdirSync(join(wt8(), spec8, "runs/_story/receipts")).filter((f) => f.endsWith("-mode.json"))).toHaveLength(1);
+    expect(readdirSync(join(storyUnitDir(join(wt8(), spec8)), "receipts")).filter((f) => f.endsWith("-mode.json"))).toHaveLength(1);
     const w = await inSlice("story", "edit", "--workflow", "sliceqa", "--json");
     expect(w.exit).toBe(3);
     expect(w.value).toMatchObject({ code: "needs_to", error: expect.stringContaining("gh-8/01"), do_instead: "norn story edit gh-8/01 --workflow sliceqa --at <qa>" });

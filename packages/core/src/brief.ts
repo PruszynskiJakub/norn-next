@@ -17,6 +17,7 @@ import {
   type StepInput,
   type UnitState,
   type Workflow,
+  recordHandoffPath,
 } from "@norn/schema";
 import type { NumberedReceipt, UnitRef } from "./facts.ts";
 import { effectiveMode } from "./policy.ts";
@@ -221,7 +222,7 @@ function inputs(input: BriefInput, step: AgentStep, rw: BriefJson["rework"]): Br
         return input.diff_range ? [{ kind: i, label: "Diff", ref: `git diff ${input.diff_range}` }] : [];
       case "handoff":
         // its text is already under Context: name the file to update, not one to read again
-        return [{ kind: i, label: "Handoff (text under Context; update it here)", ref: `${p.unit_dir}/handoff.md` }];
+        return [{ kind: i, label: "Handoff (text under Context; update it here)", ref: recordHandoffPath(p.unit_dir) }];
       // B6: point at Rework only when it holds something for this input
       case "last_check":
         return [{ kind: i, label: "Last failing check", ref: rw?.check ? "see Rework" : "none" }];

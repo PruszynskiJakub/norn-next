@@ -5,7 +5,7 @@
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
-import { repoConfigPath, workflowsDir } from "@norn/store";
+import { repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
 import type { CliDeps, CliResult } from "../../src/index.ts";
 import { createHarness, FakeInteraction, type Harness, issue } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";
@@ -61,7 +61,7 @@ const spec2 = ".agents/specs/gh-2-split-work";
 const wt1 = () => `${h.root}-worktrees/gh-1-pay-invoices`;
 const wt2 = () => `${h.root}-worktrees/gh-2-split-work`;
 const sliceWt = () => `${wt2()}--01-part`;
-const storyRuns2 = () => join(wt2(), spec2, "runs/_story");
+const storyRuns2 = () => storyUnitDir(join(wt2(), spec2));
 const sliceRuns = () => join(sliceWt(), spec2, "runs/01-part");
 const tick = async () => {
   h.clock.advance(10_000);
@@ -99,7 +99,7 @@ describe("no unit has a run", () => {
 describe("one unit has a run", () => {
   test("the pick-list is shown with it preselected; accepting it acts on it (B58)", async () => {
     h.remote.issues = [issue(1, "Pay invoices")];
-    for (let i = 0; i < 6 && h.state(join(wt1(), ".agents/specs/gh-1-pay-invoices/runs/_story"))?.status !== "running"; i++) await tick();
+    for (let i = 0; i < 6 && h.state(storyUnitDir(join(wt1(), ".agents/specs/gh-1-pay-invoices")))?.status !== "running"; i++) await tick();
     const term = new FakeInteraction();
     const r = await norn({ interaction: term }, "run", "view");
     expect(r.exit).toBe(0);

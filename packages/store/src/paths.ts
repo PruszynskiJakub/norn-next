@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
-import { LEGACY_SPEC_FILE, parseRoundDirName, parseSliceKey, ROUNDS_DIR, RUNS_DIR, roundDirName, roundRecordPath, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName, unitRecordPath } from "@norn/schema";
+import { LEGACY_SPEC_FILE, parseRoundDirName, parseSliceKey, recordHandoffPath, ROUNDS_DIR, RUNS_DIR, roundDirName, roundRecordPath, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName, unitRecordPath } from "@norn/schema";
 
 /** gh-110 B1, B2 (D1): the committed repo config and workflows, relative to a root, as messages name them. */
 export const REPO_CONFIG_FILE = ".agents/norn.config.yaml";
@@ -217,7 +217,9 @@ export const receiptsDir = (ud: string) => join(ud, "receipts");
 export const logPath = (ud: string, runId: string) => join(ud, "logs", `${runId}.log`);
 export const evidenceDir = (ud: string, runId: string) => join(ud, "evidence", runId);
 /** gh-71 B31: one handoff per story, `runs/_story/handoff.md`, above its round folders; a slice's in its own folder. */
-export const handoffPath = (ud: string) => join(basename(dirname(ud)) === ROUNDS_DIR && basename(dirname(dirname(ud))) === STORY_UNIT_DIR ? dirname(dirname(ud)) : ud, "handoff.md");
+export const handoffPath = (ud: string) => recordHandoffPath(ud);
+/** What a commit of a unit's record stages: its record folder and its handoff (above the round folder for the story, gh-71 B31). */
+export const recordPaths = (ud: string) => [...new Set([ud, handoffPath(ud)])];
 /** R2.3: copies of runs/ files this checkout wrote but never got into the record. */
 export const orphanedDir = (ud: string) => join(ud, "orphaned");
 
