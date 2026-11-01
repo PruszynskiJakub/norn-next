@@ -619,11 +619,11 @@ describe("intake by kind (W9)", () => {
 
   const targets = (wf: string, step: string) => Object.fromEntries(Object.entries(workflow(wf).steps[step]?.outcomes ?? {}).map(([k, v]) => [k, (v as { to: string }).to]));
 
-  test("triage is one norn-triage step whose recommendation (refinement, quick, reproduce or close) ends the round", () => {
+  test("triage is one norn-triage step that ends the round with done: the recommendation is only in its comment", () => {
     const { steps } = workflow("triage");
     expect(Object.keys(steps)).toEqual(["explore"]);
     expect(steps.explore?.skill).toBe("norn-triage");
-    expect(targets("triage", "explore")).toEqual({ refinement: "$done", quick: "$done", reproduce: "$done", close: "$done" });
+    expect(targets("triage", "explore")).toEqual({ done: "$done" });
   });
 
   test("reproduce is one norn-diagnose agent step whose reproduced or cannot_reproduce ends the round", () => {

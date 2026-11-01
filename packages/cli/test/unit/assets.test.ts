@@ -172,11 +172,11 @@ describe("single-purpose workflows (W1, #136)", () => {
     expect([DEFAULT_CONFIG.default_workflow, DEFAULT_CONFIG.default_slice_workflow]).toEqual(["triage", "slice"]);
   });
 
-  test("triage is one norn-triage step whose recommendation ends the round", () => {
+  test("triage is one norn-triage step that ends the round with done: the recommendation is only in its comment", () => {
     expect(wf("triage").start).toBe("explore");
     expect(Object.keys(wf("triage").steps)).toEqual(["explore"]);
     expect(wf("triage").steps.explore).toMatchObject({ type: "agent", skill: "norn-triage" });
-    expect(targets("triage", "explore")).toEqual({ refinement: "$done", quick: "$done", reproduce: "$done", close: "$done" });
+    expect(targets("triage", "explore")).toEqual({ done: "$done" });
   });
 
   test("reproduce is one norn-diagnose step that changes no code and ends the round either way", () => {

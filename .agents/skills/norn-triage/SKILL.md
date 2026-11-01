@@ -59,4 +59,4 @@ Pipe the `## Triage` section into `gh issue comment <N> --body-file -` (`glab is
 - Read-only: you change no file. Later work reads the findings from the issue comment.
 - One recommendation, with its reason. Never act on it yourself: a person decides.
 
-Done when the `## Triage` comment is posted and you hand back the recommendation and its reason in one line.
+Done when the `## Triage` comment is posted; the recommendation lives there, and you hand back only a one-line summary of it.
