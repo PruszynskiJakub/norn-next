@@ -1,0 +1,1 @@
+{"kind":"round","receipt_id":"01M6CCFZHES1N68TE58FP610CQ","run_id":null,"step":"sync","attempt":1,"at":"2026-11-01T20:23:25.998Z","by":"human","who":"jakubpruszynski@mac","slice":null,"round":1,"workflow":"triage","workflow_hash":"4a12bc2fa34d0bbe1362141851acb0ca448d9dc4301e3b085ebbe6cea42e0ee2","to":"explore","forced":true,"left_at":"sync"}
