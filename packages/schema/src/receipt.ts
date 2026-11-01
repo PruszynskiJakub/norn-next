@@ -42,6 +42,11 @@ const header = {
    * set on mailbox receipts (T9) so the holder routes them by unit, not by step/attempt alone.
    */
   slice: Type.Optional(Type.Union([SliceKey, Type.Null()])),
+  /**
+   * gh-71 AC12 (T9): the story round whose cursor a person's receipt for the story unit was made at
+   * (absent = not recorded); a mailbox receipt for another round than the story's is stale.
+   */
+  round: Type.Optional(PosInt),
 };
 
 function receipt<K extends string, P extends TProperties>(kind: K, props: P) {

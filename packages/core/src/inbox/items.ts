@@ -571,7 +571,7 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       if (uf.unit.slice === null) {
         // gh-71 D1 (B1): a round receipt rejected because its workflow file changed — the edit again
         if (park?.kind === "workflow")
-          return item("your_turn", `${story.key}: ${park.reason}`, cmd.storyEdit(story.key, { workflow: "<name>" }), park.since, { id: `round_rejected:${key}:${park.receipt_id ?? park.since}` });
+          return item("your_turn", `${story.key}: ${park.reason}`, park.command ?? cmd.storyEdit(story.key, { workflow: "<name>" }), park.since, { id: `round_rejected:${key}:${park.receipt_id ?? park.since}` });
         const merge = mergeItem(story, st, facts.repo.default_branch);
         if (merge) return merge;
         // gh-71 D6 (B25, B26): a finished round with no PR — the next round or closing the issue is the

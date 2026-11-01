@@ -243,7 +243,10 @@ function importMailbox(ctx: Ctx, story: StoryFacts): void {
   const reject = (reason: string) => ctx.emit({ kind: "reject_receipt", unit: ref, rule: "mailbox.reject", source: { ref: item.ref, sha: item.sha }, reason, state: null });
   if (!item.receipt) return reject(item.error ? `invalid receipt: ${item.error.errors.map((e) => e.message).join("; ")}` : "unreadable receipt");
   const r = item.receipt;
-  const atCursor = (u: UnitFacts) => !!u.state && u.state.step === r.step && u.state.attempt === r.attempt && !u.errors.length;
+  // gh-71 AC12: a receipt made in another round is stale even at the same step#attempt (the same workflow again)
+  const otherRound = (u: UnitFacts) => r.round !== undefined && u.unit.slice === null && (u.state?.round ?? 1) !== r.round;
+  const atStep = (u: UnitFacts) => !!u.state && u.state.step === r.step && u.state.attempt === r.attempt && !u.errors.length;
+  const atCursor = (u: UnitFacts) => atStep(u) && !otherRound(u);
   let target: UnitFacts | undefined;
   if (r.slice !== undefined) {
     // routed by unit when the receipt names one (story unit = null)
@@ -251,6 +254,7 @@ function importMailbox(ctx: Ctx, story: StoryFacts): void {
     if (!unit) return reject(`no unit ${r.slice ?? story.key} in story ${story.key}`);
     // gh-79 (H1): its cursor is read from a rewound state.json until the rebase is concluded; wait
     if (rebasing(unit)) return;
+    if (atStep(unit) && otherRound(unit)) return reject(`stale: ${unit.unit.key} is in round ${unit.state?.round ?? 1}, the receipt was made in round ${r.round}`);
     if (!atCursor(unit)) return reject(`stale: ${unit.unit.key} is not at ${r.step}#${r.attempt}`);
     target = unit;
   } else {
@@ -383,7 +387,8 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
 /**
  * gh-71 D1 (B1, B3, B5, B6, B9, B30): apply a `round` receipt — the old round ends in its own state
  * and round N+1 starts in its own folder with the receipt's workflow pinned, fresh counters, the mode
- * carried over and the cursor at the receipt's step. Rejected into the trace when the cursor moved
+ * carried over and the cursor at the receipt's step; the receipts after it in the old round are rejected
+ * with it (they were made for the round it ends). Rejected into the trace when the cursor moved
  * (T9), the round is not finished, or the workflow is gone; a workflow file changed since the edit
  * leaves the round finished with a `workflow` park that asks for the edit again.
  */
@@ -398,20 +403,26 @@ function roundStart(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, n
   if ("problem" in loaded) return reject(loaded.problem);
   if (sha256(loaded.source) !== r.workflow_hash) {
     // gh-71 D1 (B1): the edit judged another workflow file; the round stays finished and the inbox asks again
-    const reason = `workflow ${r.workflow} changed since ${cmd.storyEdit(story.key, { workflow: r.workflow })}; run it again`;
-    return reject(reason, "round.workflow_changed", { ...moved, park: { kind: "workflow", reason, since: ctx.nowIso, receipt_id: r.receipt_id } });
+    const again = cmd.storyEdit(story.key, { workflow: r.workflow, at: r.to, force: r.forced });
+    const reason = `workflow ${r.workflow} changed since ${again}; run it again`;
+    return reject(reason, "round.workflow_changed", { ...moved, park: { kind: "workflow", reason, since: ctx.nowIso, receipt_id: r.receipt_id, command: again } });
   }
   if (!stepOf(loaded.workflow, r.to)) return reject(`workflow ${r.workflow} has no step '${r.to}'`);
   const n = (st.round ?? 1) + 1;
-  const ended: UnitState = roundFinished(st) ? { ...moved, status: "done", park: null } : moved;
+  // the receipts after the round receipt were made for the round it ends: rejected into the trace, never applied to round N+1
+  const after = uf.unapplied.filter((x) => x.n > nr.n);
+  const rejected = after.map((x) => ({ n: x.n, receipt_id: x.receipt.receipt_id, reason: `round ${st.round ?? 1} ended at receipt ${nr.n} (round.start); receipt ${x.n} (${x.receipt.kind}) was made for it` }));
+  const through = { ...moved, applied_through: after.at(-1)?.n ?? nr.n };
+  const ended: UnitState = roundFinished(st) ? { ...through, status: "done", park: null } : through;
   const mode = st.mode ?? story.mode;
   const state = initialState({ unit: uf.unit, workflow: loaded.workflow, workflowName: r.workflow, workflowHash: r.workflow_hash, now: ctx.nowIso, tick_id: ctx.facts.tick_id, at: r.to, round: n, ...(mode ? { mode } : {}) });
   ctx.emit({
     kind: "round_start",
     unit: uf.unit,
     rule: "round.start",
-    n: nr.n,
+    receipt_n: nr.n,
     ended,
+    rejected,
     round: { n, workflow: r.workflow, dir: `${story.spec_dir}/${roundRecordPath(n, r.workflow)}` },
     workflow_source: loaded.source,
     state,

@@ -349,12 +349,13 @@ export async function roundStart(act: ActEnv, a: Extract<Action, { kind: "round_
   const dir = join(wt, a.round.dir);
   const pin = pinWorkflow(dir, a.workflow_source);
   if (!pin.ok) throw new Error(`${a.round.dir}/workflow.yaml is already pinned with different content (S7)`);
-  // S5: the new round's state is the commit point — once it exists the story is in round N, whatever
-  // happens to the old round's state after; before it, the next tick applies the round receipt again
-  loc.runsDir = dir;
+  // S5: the new round's state is the commit point — a round folder without state.json is not the current
+  // round (store currentRound), so before it the old round stays the record and the next tick applies
+  // the round receipt again; once it exists the story is in round N, whatever happens to the old state after
   act.obs.units[a.unit.key] = { ...loc, runsDir: dir, state: null, workflow: null };
   act.writeUnitState(a.unit, dir, a.state);
   writeState(oldDir, a.ended);
+  for (const r of a.rejected) act.traceReject(a.unit.key, `receipt ${r.n}`, r.reason, { receipt_id: r.receipt_id });
   const fm = patchStoryFile(storyFile(join(wt, story.spec_dir)), { workflow: a.round.workflow }, wt);
   const commit = await act.commit(a.commit, a.unit, a.state, `${a.rule}: round ${a.round.n} ${a.round.workflow} at ${a.state.step}`);
   return { ok: true, detail: { round: a.round, story_file: fm.ok ? "updated" : fm.reason, commit } };

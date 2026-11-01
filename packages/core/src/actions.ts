@@ -363,9 +363,11 @@ export interface RoundMigrateAction extends UnitBase {
 export interface RoundStartAction extends UnitBase {
   kind: "round_start";
   /** the round receipt's number in the old round */
-  n: number;
-  /** the old round's state with the receipt applied */
+  receipt_n: number;
+  /** the old round's state with the receipt applied and applied_through past the receipts after it */
   ended: UnitState;
+  /** the receipts after the round receipt, made for the round it ends; act writes each to the trace as a `reject` event */
+  rejected: Rejection[];
   /** the new round: its number, workflow and worktree-relative folder `runs/_story/rounds/NN-<wf>` */
   round: { n: number; workflow: string; dir: string };
   /** exact text pinned as the new round's workflow.yaml (S7) */

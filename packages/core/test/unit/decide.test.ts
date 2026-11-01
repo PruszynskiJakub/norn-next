@@ -512,9 +512,19 @@ describe("mailbox (T9)", () => {
     f.units[0]!.state = { ...f.units[0]!.state!, round: 2 };
     f.units[0]!.record = roundRecordPath(2, "story");
     // round 1 waited at its ready gate when the second clone approved it
-    const r = { ...receipt({ step: "ready", attempt: 1, run: null }, "approve", {}, "human"), slice: null };
+    const r = { ...receipt({ step: "ready", attempt: 1, run: null }, "approve", {}, "human"), slice: null, round: 1 };
     f.mailbox = [{ ref: "refs/norn/inbox/gh-1/A", sha: "s", id: "A", receipt: r, error: null }];
     expect(decide(facts([f]), WORKFLOWS, CONFIG).find((x) => x.unit === "gh-1" && x.action.kind !== "claim")?.action).toMatchObject({ kind: "reject_receipt", rule: "mailbox.reject", reason: "stale: gh-1 is not at ready#1" });
+  });
+  test("gh-71 AC12: round 2 at the same step#attempt as round 1 (the same workflow again) rejects round 1's receipt, imports its own", () => {
+    const f = storyAt("ready");
+    f.units[0]!.state = { ...f.units[0]!.state!, round: 2, status: "parked", park: { kind: "gate", reason: "x", since: at() } };
+    f.units[0]!.record = roundRecordPath(2, "story");
+    const r = { ...receipt(f.units[0]!.state!, "approve", {}, "human"), slice: null, round: 1 };
+    f.mailbox = [{ ref: "refs/norn/inbox/gh-1/A", sha: "s", id: "A", receipt: r, error: null }];
+    expect(only(facts([f]))).toMatchObject({ kind: "reject_receipt", rule: "mailbox.reject", reason: "stale: gh-1 is in round 2, the receipt was made in round 1" });
+    f.mailbox = [{ ref: "refs/norn/inbox/gh-1/B", sha: "s", id: "B", receipt: { ...r, round: 2 }, error: null }];
+    expect(only(facts([f]))).toMatchObject({ kind: "import_mailbox" });
   });
   test("a receipt naming its unit is routed to that unit, even when another unit has the same cursor", () => {
     const gate: Partial<UnitState> = { step: "human-qa", attempt: 1, visits: { "human-qa": 1 }, status: "parked", park: { kind: "gate", reason: "x", since: at() } };
@@ -768,5 +778,33 @@ describe("gh-71 D5/D6: a finished round (B21, B24, B25, B35)", () => {
     // a park for a PR closed unmerged stays: GR7 still holds on a finished round
     const pr = finished({ pr: { number: 9, url: "u", state: "closed", is_draft: false, head_sha: "abc" } }, { status: "stuck", park: { kind: "remote", reason: "remote: PR closed unmerged", since: at(T0 - 60_000) } });
     expect(kinds(facts([pr]))).toEqual(["gh-1 noop unit.stuck"]);
+  });
+});
+
+describe("gh-71 D1: round.start and the receipts after the round receipt", () => {
+  const done = (): StoryFacts => {
+    const f = storyAt("$done");
+    f.units[0]!.state = { ...f.units[0]!.state!, status: "done" };
+    f.units[0]!.record = roundRecordPath(1, "story");
+    return f;
+  };
+  const round = (st: UnitState) => receipt(st, "round", { workflow: "story", workflow_hash: sha256(JSON.stringify(STORY_WF)), to: "refine", forced: false, left_at: "$done" }, "human");
+  test("receipts numbered after the round receipt are rejected into the trace with it, never applied to round 2", () => {
+    const f = done();
+    const st = f.units[0]!.state!;
+    f.units[0]!.unapplied = [numbered(3, round(st)), numbered(4, round(st)), numbered(5, receipt(st, "mode", { mode: "manual" }, "human"))];
+    const a = only(facts([f]));
+    expect(a).toMatchObject({ kind: "round_start", rule: "round.start", ended: { applied_through: 5 }, state: { round: 2, step: "refine", applied_through: 0 } });
+    const rejected = (a as Extract<Action, { kind: "round_start" }>).rejected;
+    expect(rejected.map((r) => [r.n, r.reason])).toEqual([
+      [4, "round 1 ended at receipt 3 (round.start); receipt 4 (round) was made for it"],
+      [5, "round 1 ended at receipt 3 (round.start); receipt 5 (mode) was made for it"],
+    ]);
+    expect(rejected.map((r) => r.receipt_id)).toEqual([f.units[0]!.unapplied[1]!.receipt.receipt_id, f.units[0]!.unapplied[2]!.receipt.receipt_id]);
+  });
+  test("a round receipt alone starts round 2 with nothing rejected", () => {
+    const f = done();
+    f.units[0]!.unapplied = [numbered(1, round(f.units[0]!.state!))];
+    expect(only(facts([f]))).toMatchObject({ kind: "round_start", ended: { applied_through: 1 }, rejected: [] });
   });
 });

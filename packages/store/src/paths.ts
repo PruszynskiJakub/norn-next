@@ -190,13 +190,16 @@ export function unitDir(specDir: string, unit: string): string {
 export const storyUnitDir = (specDir: string) => unitDir(specDir, STORY_UNIT_DIR);
 /**
  * gh-71 D2 (B30): the story's current round, the highest-numbered `runs/_story/rounds/NN-<wf>/` under an
- * absolute spec folder; null = none (a flat record, read as round 1 (B36), or a story not started).
+ * absolute spec folder that has its state; null = none (a flat record, read as round 1 (B36), or a story
+ * not started). S5: a round folder is the record only once its state.json is written, so a round.start
+ * that stopped after pinning the new round leaves the old round current and the round receipt unapplied.
  */
 export function currentRound(specDir: string): { n: number; workflow: string } | null {
   let best: { n: number; workflow: string } | null = null;
+  const rounds = join(specDir, unitRecordPath(STORY_UNIT_DIR), ROUNDS_DIR);
   try {
-    for (const d of readdirSync(join(specDir, unitRecordPath(STORY_UNIT_DIR), ROUNDS_DIR), { withFileTypes: true })) {
-      const r = d.isDirectory() ? parseRoundDirName(d.name) : null;
+    for (const d of readdirSync(rounds, { withFileTypes: true })) {
+      const r = d.isDirectory() && existsSync(join(rounds, d.name, "state.json")) ? parseRoundDirName(d.name) : null;
       if (r && (!best || r.n > best.n)) best = r;
     }
   } catch {

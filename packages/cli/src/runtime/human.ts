@@ -191,7 +191,7 @@ export function started(t: Target): UnitState {
 
 type HumanKind = "answer" | "approve" | "reject" | "unstick" | "stuck" | "mode" | "workflow" | "update" | "round";
 
-/** A human receipt at the unit's cursor (S6): step + attempt + slice so the tick routes it (T9). */
+/** A human receipt at the unit's cursor (S6): step + attempt + slice (+ the story's round) so the tick routes it (T9). */
 export function humanReceipt<K extends HumanKind>(ctx: Context, t: Pick<Target, "slice">, st: UnitState, kind: K, body: Record<string, unknown>): Extract<Receipt, { kind: K }> {
   const r = {
     kind,
@@ -203,6 +203,8 @@ export function humanReceipt<K extends HumanKind>(ctx: Context, t: Pick<Target, 
     by: "human",
     who: machineHolder(ctx.env),
     slice: t.slice,
+    // gh-71 AC12 (T9): the story's round, so a mailbox receipt is not applied to a later round at the same cursor
+    ...(t.slice === null ? { round: st.round ?? 1 } : {}),
     ...body,
   };
   const v = validate("receipt", r);

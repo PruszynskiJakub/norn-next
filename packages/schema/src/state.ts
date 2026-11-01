@@ -56,7 +56,10 @@ export const ParkInfo = Type.Object(
     since: IsoTime,
     /** receipt that caused the park (ask, stuck, classify) */
     receipt_id: Type.Optional(Ulid),
-    /** ask park from a permission prompt: the pending command, e.g. `Bash(rm -rf build)` (§10, O1) */
+    /**
+     * ask park from a permission prompt: the pending command, e.g. `Bash(rm -rf build)` (§10, O1);
+     * a `workflow` park of a rejected round receipt: the edit to run again (gh-71 B1, AC12)
+     */
     command: Type.Optional(NonEmpty),
     /**
      * R6.1 (A14): an implicit ask (classified from facts, not `norn ask`) and the fact that raised it:

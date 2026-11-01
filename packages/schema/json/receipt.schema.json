@@ -102,6 +102,10 @@
             }
           ]
         },
+        "round": {
+          "minimum": 1,
+          "type": "integer"
+        },
         "outcome": {
           "pattern": "^[a-z][a-z0-9_-]*$",
           "type": "string"
@@ -484,6 +488,10 @@
             }
           ]
         },
+        "round": {
+          "minimum": 1,
+          "type": "integer"
+        },
         "question": {
           "minLength": 1,
           "type": "string"
@@ -621,6 +629,10 @@
             }
           ]
         },
+        "round": {
+          "minimum": 1,
+          "type": "integer"
+        },
         "reason": {
           "minLength": 1,
           "type": "string"
@@ -723,6 +735,10 @@
               "type": "null"
             }
           ]
+        },
+        "round": {
+          "minimum": 1,
+          "type": "integer"
         },
         "answer": {
           "minLength": 1,
@@ -833,6 +849,10 @@
               "type": "null"
             }
           ]
+        },
+        "round": {
+          "minimum": 1,
+          "type": "integer"
         },
         "comment": {
           "type": "string"
@@ -948,6 +968,10 @@
             }
           ]
         },
+        "round": {
+          "minimum": 1,
+          "type": "integer"
+        },
         "comment": {
           "type": "string"
         },
@@ -1052,6 +1076,10 @@
               "type": "null"
             }
           ]
+        },
+        "round": {
+          "minimum": 1,
+          "type": "integer"
         },
         "to": {
           "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
@@ -1167,6 +1195,10 @@
               "type": "null"
             }
           ]
+        },
+        "round": {
+          "minimum": 1,
+          "type": "integer"
         },
         "mode": {
           "anyOf": [
@@ -1294,6 +1326,10 @@
               "type": "null"
             }
           ]
+        },
+        "round": {
+          "minimum": 1,
+          "type": "integer"
         },
         "outcome": {
           "anyOf": [
@@ -1435,6 +1471,10 @@
               "type": "null"
             }
           ]
+        },
+        "round": {
+          "minimum": 1,
+          "type": "integer"
         },
         "how": {
           "anyOf": [
@@ -1621,6 +1661,10 @@
               "type": "null"
             }
           ]
+        },
+        "round": {
+          "minimum": 1,
+          "type": "integer"
         },
         "outcome": {
           "pattern": "^[a-z][a-z0-9_-]*$",
@@ -1835,6 +1879,10 @@
             }
           ]
         },
+        "round": {
+          "minimum": 1,
+          "type": "integer"
+        },
         "name": {
           "minLength": 1,
           "type": "string"
@@ -1958,6 +2006,10 @@
               "type": "null"
             }
           ]
+        },
+        "round": {
+          "minimum": 1,
+          "type": "integer"
         },
         "previous_holder": {
           "anyOf": [
@@ -2089,6 +2141,10 @@
             }
           ]
         },
+        "round": {
+          "minimum": 1,
+          "type": "integer"
+        },
         "from": {
           "anyOf": [
             {
@@ -2215,6 +2271,10 @@
               "type": "null"
             }
           ]
+        },
+        "round": {
+          "minimum": 1,
+          "type": "integer"
         },
         "workflow": {
           "minLength": 1,
