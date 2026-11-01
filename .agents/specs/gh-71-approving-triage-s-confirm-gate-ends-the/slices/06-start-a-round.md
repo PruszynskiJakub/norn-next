@@ -2,7 +2,7 @@
 id: gh-71/06
 title: Start the next round with norn story edit --workflow
 depends_on: [ gh-71/04, gh-71/05 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
