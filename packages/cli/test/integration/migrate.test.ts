@@ -302,3 +302,92 @@ describe("an untracked old workflow file (B11)", () => {
     expect(md.stdout).toContain("nothing to move");
   });
 });
+
+describe("norn migrate moves old config keys (gh-64 B40–B45, D13)", () => {
+  let h: Harness;
+  let out: CliResult;
+  const USER_OLD = `# mine
+default_mode: auto        # the tick starts my agents
+notifiers:
+  - adapter: os
+  - adapter: ntfy
+    options: { url: https://ntfy.sh/x }
+`;
+  const TEAM_OLD = `# the team
+remote: { provider: gh, label: norn }
+default_agent: codex
+max_agents: 1
+default_mode: auto
+limits: { deadline: 45m, attended_wait: 5m }
+`;
+  const SLICE = `---
+id: gh-12/02
+title: Two
+depends_on: []
+status: planned
+criteria:
+  - { id: c1, verifier: agent, needs: [browser] }
+  - { id: c2, verifier: test }
+---
+
+Body
+`;
+  const slicePath = () => join(h.root, ".agents/specs/gh-12-x/slices/02-two.md");
+  beforeAll(async () => {
+    h = await createHarness();
+    expect((await h.norn("init")).exit).toBe(0);
+    h.write(join(workflowsDir(h.root), "release.yaml"), `mode: manual\ndefaults: { deadline: 20m }\n${SOLO.replace("name: solo", "name: release")}`);
+    h.write(repoConfigPath(h.root), TEAM_OLD);
+    h.write(slicePath(), SLICE);
+    h.git(["add", "-A"]);
+    h.git(["commit", "-q", "-m", "an older norn's config"]);
+    h.write(join(h.home, "config.yaml"), USER_OLD);
+    out = await h.norn("migrate");
+  });
+  afterAll(() => h.cleanup());
+
+  test("B40: the user file is rewritten in place, comments kept; the team file's remote.provider becomes provider, staged", () => {
+    expect(out.exit).toBe(0);
+    // the comment stays with its key (the YAML writer pads it with one space)
+    expect(h.read(join(h.home, "config.yaml"))).toBe("# mine\n\nmode: auto # the tick starts my agents\nnotify:\n  ntfy: https://ntfy.sh/x\n");
+    const team = h.read(repoConfigPath(h.root));
+    expect(team).toStartWith("# the team\n");
+    expect(team).toContain("provider: gh");
+    expect(team).not.toMatch(/remote|limits|default_|max_agents/);
+    expect(porcelain(h).split("\n")).toContain("M  .agents/norn.config.yaml");
+  });
+
+  test("B41, B42: team limits fill each workflow's defaults: and default_mode each workflow's mode, keeping a workflow's own", () => {
+    const quick = h.read(join(workflowsDir(h.root), "quick.yaml"));
+    expect(quick).toContain("mode: auto");
+    expect(quick).toMatch(/defaults:\n\s+deadline: 45m/);
+    const release = h.read(join(workflowsDir(h.root), "release.yaml"));
+    expect(release).toContain("mode: manual");
+    expect(release).toContain("deadline: 20m");
+    expect(release).not.toContain("attended_wait");
+    const status = porcelain(h).split("\n");
+    expect(status).toContain("M  .agents/workflows/quick.yaml");
+    // release already sets its mode and deadline: untouched
+    expect(status.some((l) => l.includes("release.yaml"))).toBe(false);
+  });
+
+  test("B43: personal and machine keys leave the team file, each listed with its value", () => {
+    expect(out.stdout).toContain("removed `max_agents: 1` from the team file: set it in ~/.norn/config.yaml if you want it");
+    expect(out.stdout).toContain("removed `agent: codex` from the team file: set it in ~/.norn/config.yaml if you want it");
+  });
+
+  test("B44: criteria needs are stripped from every slice, staged", () => {
+    expect(h.read(slicePath())).toBe(SLICE.replace("  - { id: c1, verifier: agent, needs: [browser] }\n", "  - { id: c1, verifier: agent }\n"));
+    expect(porcelain(h).split("\n")).toContain("M  .agents/specs/gh-12-x/slices/02-two.md");
+  });
+
+  test("B45, B55: the config loads again; a second run changes nothing; nothing is committed", async () => {
+    expect((await h.norn("config", "list", "--json")).exit).toBe(0);
+    const before = snapshot(h);
+    const again = await h.norn("migrate", "--json");
+    expect(again.exit).toBe(0);
+    expect(again.value).toMatchObject({ moves: [], config: { changed: [], renamed: [], removed: [] } });
+    expect(snapshot(h)).toEqual(before);
+    expect(sh(h.root, ["log", "-1", "--format=%s"]).trim()).toBe("an older norn's config");
+  });
+});

@@ -84,7 +84,14 @@ describe("norn init", () => {
     expect(v.skills.updated).toContain("norn-implement");
     expect(v.skills.links[0]).toMatchObject({ agent: "claude", linked: v.skills.updated });
     expect(v.hooks[0]?.changed).toEqual([join(h.root, ".claude", "settings.json")]);
-    expect(v.gitignore).toEqual([".env.norn", ".norn-unit"]);
+    // gh-64 B9: the personal config file is never committed
+    expect(v.gitignore).toEqual([".env.norn", ".norn-unit", ".agents/norn.config.local.yaml"]);
+    // gh-64 B49, B50, B55: the commented user file on a first init, and a schema copy next to each config file
+    expect(r.value).toMatchObject({ user_config: "created", schemas: [join(h.root, ".agents/norn.config.schema.json"), join(h.root, ".agents/norn.config.local.schema.json"), join(h.home, "config.schema.json")] });
+    expect(readFileSync(join(h.home, "config.yaml"), "utf8")).toStartWith("# yaml-language-server: $schema=config.schema.json\n");
+    expect(readFileSync(join(h.root, ".agents/norn.config.yaml"), "utf8")).toStartWith("# yaml-language-server: $schema=norn.config.schema.json\n");
+    const teamSchema = JSON.parse(readFileSync(join(h.root, ".agents/norn.config.schema.json"), "utf8")) as { properties: Record<string, unknown> };
+    expect(Object.keys(teamSchema.properties).sort()).toEqual(["$schema", "base_branch", "provider", "slice_workflow", "workflow"]);
     expect(v.gitattributes).toEqual([".agents/specs/*/runs/** linguist-generated=true gitlab-generated=true"]);
     // nothing in the repo names a test command: the templates keep theirs, and init says so
     expect(r.value).toMatchObject({ remote: { provider: "gh", label: "norn", git_remote: "origin", url: h.remoteDir }, test_command: { command: "bun test", detected_from: null, set_in: ["quick.yaml", "slice.yaml", "story.yaml"] } });
@@ -95,8 +102,13 @@ describe("norn init", () => {
     expect(existsSync(join(h.root, ".agents/skills/norn-review/SMELLS.md"))).toBe(true);
     expect(lstatSync(join(h.root, ".claude/skills/norn-implement")).isSymbolicLink()).toBe(true);
     expect(existsSync(join(h.root, ".claude/skills/norn-implement/SKILL.md"))).toBe(true);
-    const again = (await h.norn("init")).value as typeof v;
+    writeFileSync(join(h.home, "config.yaml"), "mode: auto\n");
+    const again = (await h.norn("init")).value as typeof v & { user_config: string; schemas: string[] };
     expect(again.config).toBe("exists");
+    expect(again.user_config).toBe("exists");
+    expect(again.schemas).toEqual([]);
+    expect(readFileSync(join(h.home, "config.yaml"), "utf8")).toBe("mode: auto\n");
+    writeFileSync(join(h.home, "config.yaml"), "");
     expect(again.gitignore).toEqual([]);
     expect(again.gitattributes).toEqual([]);
     expect(again.hooks[0]?.changed).toEqual([]);

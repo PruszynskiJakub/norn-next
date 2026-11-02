@@ -152,11 +152,14 @@ function migrateRepo(r: FileRun): { limits: Record<string, unknown> | null; mode
   const remote = js(r.doc, ["remote"]) as Record<string, unknown> | undefined;
   if (remote !== undefined) {
     const provider = remote?.provider;
-    r.doc.delete("remote");
-    if (provider !== undefined && !r.doc.has("provider")) {
-      r.doc.set("provider", provider);
+    const m = r.doc.contents as Map;
+    const pair = pairOf(m, "remote");
+    if (provider !== undefined && !r.doc.has("provider") && pair && isScalar(pair.key)) {
+      // in place of `remote:`, so the line keeps its position and comment
+      pair.key.value = "provider";
+      pair.value = r.doc.createNode(provider);
       r.out.renamed.push({ file: "repo", from: "remote.provider", to: "provider" });
-    }
+    } else r.doc.delete("remote");
     for (const [k, v] of Object.entries(remote ?? {}))
       if (k !== "provider") r.out.removed.push({ file: "repo", key: `remote.${k}`, value: v, note: k === "label" ? "the label is always norn" : "norn derives or fixes it" });
   }
@@ -269,6 +272,12 @@ export function migrateConfig(opts: { root: string; home: string }): ConfigMigra
     if (raw === null) return;
     const doc = parseDocument(raw);
     if (doc.errors.length || !isMap(doc.contents)) return;
+    // a comment at the top of the file belongs to the file, not to the first key (which may be dropped)
+    const first = doc.contents.items[0];
+    if (first && isScalar(first.key) && first.key.commentBefore && !doc.commentBefore) {
+      doc.commentBefore = first.key.commentBefore;
+      first.key.commentBefore = undefined;
+    }
     fn({ doc, file, out });
     const text = doc.toString();
     if (text === raw || (isMap(doc.contents) && !doc.contents.items.length && raw.trim() === "")) return;
