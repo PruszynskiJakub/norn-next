@@ -7,7 +7,7 @@
  */
 import { readdirSync } from "node:fs";
 import { join, relative } from "node:path";
-import { AGENT_NAMES, isAgentName, SPEC_FILE } from "@norn/schema";
+import { AGENT_NAMES, ATTENDED_WAIT, isAgentName, SPEC_FILE } from "@norn/schema";
 import { type Document, isMap, isScalar, isSeq, type Pair, parseDocument, type YAMLMap } from "yaml";
 import { writeConfigSchemas, WORKFLOW_EXT } from "./config.ts";
 import { atomicWrite, isErrno, readText } from "./fsx.ts";
@@ -35,9 +35,9 @@ export interface ConfigMigration {
 
 const USER_FILE = "~/.norn/config.yaml";
 
-type Map = YAMLMap<unknown, unknown>;
+type YMap = YAMLMap<unknown, unknown>;
 
-const pairOf = (m: Map, key: string): Pair<unknown, unknown> | undefined => m.items.find((p) => isScalar(p.key) && p.key.value === key);
+const pairOf = (m: YMap, key: string): Pair<unknown, unknown> | undefined => m.items.find((p) => isScalar(p.key) && p.key.value === key);
 
 /** Rename a top-level key in place (position and comments kept); drops the old key when the new one exists. */
 function renameKey(doc: Document, from: string, to: string): boolean {
@@ -152,7 +152,7 @@ function migrateRepo(r: FileRun): { limits: Record<string, unknown> | null; mode
   const remote = js(r.doc, ["remote"]) as Record<string, unknown> | undefined;
   if (remote !== undefined) {
     const provider = remote?.provider;
-    const m = r.doc.contents as Map;
+    const m = r.doc.contents as YMap;
     const pair = pairOf(m, "remote");
     if (provider !== undefined && !r.doc.has("provider") && pair && isScalar(pair.key)) {
       // in place of `remote:`, so the line keeps its position and comment
@@ -169,6 +169,9 @@ function migrateRepo(r: FileRun): { limits: Record<string, unknown> | null; mode
   if (limits) {
     r.doc.delete("limits");
     r.out.renamed.push({ file: "repo", from: "limits", to: "each workflow's defaults:" });
+    // B43: a limit no workflow takes is listed with its value
+    for (const [k, v] of Object.entries(limits))
+      if (!WORKFLOW_DEFAULTS.includes(k)) r.out.removed.push({ file: "repo", key: `limits.${k}`, value: v, note: LIMIT_NOTE[k] ?? "norn fixes it" });
   }
   const mode = (js(r.doc, ["default_mode"]) as string | undefined) ?? null;
   if (mode) {
@@ -186,13 +189,33 @@ function migrateRepo(r: FileRun): { limits: Record<string, unknown> | null; mode
   return { limits, mode };
 }
 
+/** The limits a workflow's `defaults:` takes (B41). */
+const WORKFLOW_DEFAULTS = ["deadline", "nudges", "retries", "stalled"];
+const LIMIT_NOTE: Record<string, string> = { attended_wait: `fixed at ${ATTENDED_WAIT}`, max_checks: REMOVED_NOTE.max_checks as string };
+
+/** Fill a workflow's `mode` and `defaults:` from the old team values it does not set; returns whether it changed. */
+function fillWorkflow(doc: Document, wanted: Record<string, unknown>, mode: string | null): boolean {
+  let changed = false;
+  if (mode && !doc.has("mode")) {
+    doc.set("mode", mode);
+    changed = true;
+  }
+  for (const [k, v] of Object.entries(wanted)) {
+    if (doc.hasIn(["defaults", k])) continue;
+    if (!doc.has("defaults")) doc.set("defaults", doc.createNode({}));
+    doc.setIn(["defaults", k], v);
+    changed = true;
+  }
+  return changed;
+}
+
 /** B41, B42: fill each workflow's `defaults:` and `mode` from the old team values it does not set. */
 function migrateWorkflows(root: string, limits: Record<string, unknown> | null, mode: string | null, out: ConfigMigration): void {
   if (!limits && !mode) return;
-  const wanted = Object.fromEntries(Object.entries(limits ?? {}).filter(([k]) => ["deadline", "nudges", "retries", "stalled"].includes(k)));
+  const wanted = Object.fromEntries(Object.entries(limits ?? {}).filter(([k]) => WORKFLOW_DEFAULTS.includes(k)));
   let names: string[];
   try {
-    names = readdirSync(workflowsDir(root)).filter((n) => WORKFLOW_EXT.includes(n.slice(n.lastIndexOf("."))) && !n.endsWith(".json"));
+    names = readdirSync(workflowsDir(root)).filter((n) => WORKFLOW_EXT.includes(n.slice(n.lastIndexOf("."))));
   } catch (e) {
     if (isErrno(e, "ENOENT")) return;
     throw e;
@@ -203,19 +226,9 @@ function migrateWorkflows(root: string, limits: Record<string, unknown> | null, 
     if (raw === null) continue;
     const doc = parseDocument(raw);
     if (doc.errors.length || !isMap(doc.contents)) continue;
-    let changed = false;
-    if (mode && !doc.has("mode")) {
-      doc.set("mode", mode);
-      changed = true;
-    }
-    for (const [k, v] of Object.entries(wanted)) {
-      if (doc.hasIn(["defaults", k])) continue;
-      if (!doc.has("defaults")) doc.set("defaults", doc.createNode({}));
-      doc.setIn(["defaults", k], v);
-      changed = true;
-    }
-    if (!changed) continue;
-    atomicWrite(path, doc.toString());
+    if (!fillWorkflow(doc, wanted, mode)) continue;
+    // a JSON workflow stays JSON
+    atomicWrite(path, n.endsWith(".json") ? `${JSON.stringify(doc.toJSON(), null, 2)}\n` : doc.toString());
     out.changed.push(path);
     out.stage.push(relative(root, path));
   }
@@ -236,8 +249,8 @@ function stripNeeds(root: string, out: ConfigMigration): void {
     files.push(join(dir, SPEC_FILE));
     try {
       for (const f of readdirSync(slicesDir(dir)).sort()) if (f.endsWith(".md")) files.push(join(slicesDir(dir), f));
-    } catch {
-      // no slices
+    } catch (e) {
+      if (!isErrno(e, "ENOENT")) throw e;
     }
   }
   for (const path of files) {

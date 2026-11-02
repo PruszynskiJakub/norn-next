@@ -39,12 +39,14 @@ describe("mode, agent and workflow over ticks (B10, B13, B24, B25, B33)", () => 
     h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
     // B25: a workflow's own mode
     h.write(join(workflowsDir(h.root), "careful.yaml"), `mode: manual\n${SOLO.replace("name: solo", "name: careful")}`);
+    // B13: a step naming a built-in agent that has no entry and is not `agent`
+    h.write(join(workflowsDir(h.root), "gem.yaml"), SOLO.replace("name: solo", "name: gem").replace("skill: norn-implement", "skill: norn-implement\n    agent: gemini"));
     // B24: the team's entry workflow; B10, B13: my mode and agent, no agents entry
     h.config("workflow: solo\nmode: auto\nagent: codex\n");
     h.git(["add", "-A"]);
     h.git(["commit", "-q", "-m", "norn"]);
     h.git(["push", "-q", "origin", "main"]);
-    h.remote.issues = [issue(1, "One"), issue(2, "Two", ["norn", "norn:wf:careful"])];
+    h.remote.issues = [issue(1, "One"), issue(2, "Two", ["norn", "norn:wf:careful"]), issue(3, "Three", ["norn", "norn:wf:gem"])];
     await ticks(4);
   });
   afterAll(() => h.cleanup());
@@ -55,14 +57,18 @@ describe("mode, agent and workflow over ticks (B10, B13, B24, B25, B33)", () => 
   });
 
   test("B10, B13: my mode auto starts gh-1 with the agent I named; the workflow's mode manual holds gh-2", () => {
-    expect(h.runner.launches.map((l) => l.title)).toEqual(["gh-1 implement"]);
-    expect(h.runner.launches[0]?.argv.join(" ")).toContain("codex");
+    expect(h.runner.launches.find((l) => l.title === "gh-1 implement")?.argv.join(" ")).toContain("codex");
+    expect(h.runner.launches.some((l) => l.title === "gh-2 implement")).toBe(false);
+  });
+
+  test("B13: a step naming gemini, with no agents entry, launches Gemini", () => {
+    expect(h.runner.launches.find((l) => l.title === "gh-3 implement")?.argv.join(" ")).toContain("gemini");
   });
 
   test("B10: the story's own mode beats the workflow's", async () => {
     expect((await h.norn("story", "edit", "gh-2", "--auto")).exit).toBe(0);
     await ticks(2);
-    expect(h.runner.launches.map((l) => l.title)).toEqual(["gh-1 implement", "gh-2 implement"]);
+    expect(h.runner.launches.map((l) => l.title)).toContain("gh-2 implement");
   });
 
   test("B33: .env.norn holds only NORN_SLOT and PORT_BASE, slot n from port 4000 + 10·n", () => {

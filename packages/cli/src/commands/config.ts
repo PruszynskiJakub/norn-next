@@ -55,7 +55,7 @@ const configGetCommand = defineCommand({
 
 export const configNoun = defineNoun({
   name: "config",
-  summary: "Show the resolved config; set or unset one value in the user or repo file",
+  summary: "Show the resolved config; set or unset one value in the user, local or team file",
   verbs: [configListCommand, configGetCommand, configSetCommand, configUnsetCommand],
 });
 

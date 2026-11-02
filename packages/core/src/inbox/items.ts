@@ -8,7 +8,7 @@
  * F35, Q6), Unclaimed, Running, Notes (agents' notes for a person, NT2: information, not an
  * action), Recently done.
  */
-import { ATTENDED_WAIT, NEEDS_REMOVED_RE, parseDuration, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
+import { ATTENDED_WAIT, parseDuration, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
 import { cmd, nextCommand, startAgentCommand } from "../commands.ts";
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../criteria.ts";
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
@@ -20,7 +20,7 @@ import { epoch, formatAge, iso } from "../time.ts";
 import { baseUpdateStep, edgeOf, edgesOf, isStale, stepOf } from "../workflow.ts";
 
 /** B38: the `needs` was removed message of a file error, or null. */
-const needsRemoved = (e: FileError): string | null => e.errors.find((x) => NEEDS_REMOVED_RE.test(x.message))?.message ?? null;
+const needsRemoved = (e: FileError): string | null => (e.code === "needs_removed" ? (e.errors[0]?.message ?? null) : null);
 
 export const INBOX_GROUPS: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock", "check", "unclaimed", "running", "notes", "recently_done"];
 

@@ -128,11 +128,12 @@ const GLOSSARY_FILES = (): string[] => [
  * renamed key named in any of them is a hit. The PRD and CHANGELOG keep their history; `norn migrate`'s
  * own messages and the moved-key table name old keys on purpose and live in sources, not here.
  */
-const REMOVED_KEYS = /\b(default_mode|default_agent|default_workflow|default_slice_workflow|notifiers|max_checks|watch_interval|attended_wait|ports_per_slot|sync_interval)\b|\blimits\.(deadline|nudges|retries|stalled)\b|\bremote\.(provider|label|git_remote|host)\b|\bcapabilities: \[/;
+const REMOVED_KEYS = /\bcapability this session lacks\b|\b(default_mode|default_agent|default_workflow|default_slice_workflow|notifiers|max_checks|watch_interval|attended_wait|ports_per_slot|sync_interval)\b|\blimits\.(deadline|nudges|retries|stalled)\b|\bremote\.(provider|label|git_remote|host)\b|\bcapabilities: \[/;
 const CONFIG_DOCS = (): string[] => [
   ...textFiles(join(PKGS, "cli", "assets"), DOCS),
   ...textFiles(join(ROOT, "plugins"), [...DOCS, ".toml", ".sh"]),
   join(PKGS, "cli", "src", "commands", "help.ts"),
+  ...textFiles(join(PKGS, "view", "src"), [".ts"]),
   join(ROOT, "README.md"),
   join(ROOT, "CONTRIBUTING.md"),
   join(ROOT, "AGENTS.md"),
@@ -140,7 +141,7 @@ const CONFIG_DOCS = (): string[] => [
 ];
 
 describe("config docs (gh-64 B52)", () => {
-  test("help, README, the cookbook, the init templates, skills and AGENTS.md name no removed config key", () => {
+  test("help, the view, README, the cookbook, the init templates, skills and AGENTS.md name no removed config key or check", () => {
     const hits: string[] = [];
     for (const f of CONFIG_DOCS())
       readFileSync(f, "utf8")

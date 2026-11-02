@@ -42,7 +42,8 @@ function adapterError(e: unknown, what: string, file: string | null): never {
 export async function buildPorts(registry: AdapterRegistry, actx: AdapterContext, config: ResolvedConfig, overrides: Partial<Ports> = {}, sourceOf: SourceOf = () => null): Promise<Ports> {
   const agents: Record<string, AgentAdapter> = {};
   if (overrides.agents) Object.assign(agents, overrides.agents);
-  for (const name of new Set([config.agent, ...Object.keys(config.agents)])) {
+  // B13: every built-in agent is usable without an entry, so a step may name any of them
+  for (const name of new Set([...Object.keys(registry.agents), config.agent, ...Object.keys(config.agents)])) {
     if (agents[name]) continue;
     const f = registry.agents[name];
     if (!f) adapterError(new Error(`not a built-in agent`), `agent ${name}`, sourceOf("agent"));

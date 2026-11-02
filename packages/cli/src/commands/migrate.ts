@@ -87,17 +87,17 @@ async function migrate(ctx: Context, root: string): Promise<MigrateReport> {
   return { moves, config: NO_CONFIG, staged, commit: staged.length ? COMMIT : null };
 }
 
-/** gh-64 D13 (B40–B45): the config rewrite, under the tick lock; stages what is committed. */
-async function migrateConfigPart(ctx: Context, root: string, report: MigrateReport): Promise<MigrateReport> {
+/** gh-64 B45: the tick lock, taken before anything changes and held through the config part. */
+async function tickLock(ctx: Context, root: string) {
   const lock = await acquireTickLock(root, { note: "norn migrate", now: () => ctx.clock.iso() });
   if (!lock.ok) throw refuse(`a tick is running (pid ${lock.holder.holder.pid}${lock.holder.note ? `, ${lock.holder.note}` : ""}); norn migrate never rewrites config under a running tick`, `stop norn watch (and any tick), then run ${cmd.migrate()} again`, "tick_locked");
-  let c: ConfigMigration;
-  try {
-    c = migrateConfig({ root, home: ctx.home });
-    if (c.stage.length) await ctx.git.stage(root, c.stage);
-  } finally {
-    lock.release();
-  }
+  return lock;
+}
+
+/** gh-64 D13 (B40–B45): the config rewrite, run holding the tick lock; stages what is committed. */
+async function migrateConfigPart(ctx: Context, root: string, report: MigrateReport): Promise<MigrateReport> {
+  const c: ConfigMigration = migrateConfig({ root, home: ctx.home });
+  if (c.stage.length) await ctx.git.stage(root, c.stage);
   const staged = [...report.staged, ...c.stage];
   return { ...report, config: { changed: c.changed, renamed: c.renamed, removed: c.removed }, staged, commit: report.commit ?? (staged.length ? CONFIG_COMMIT : null) };
 }
@@ -135,21 +135,27 @@ export const migrateCommand = defineCommand({
     const l = repoLayout(root);
     if (l.layout === "new") {
       const none: MigrateReport = { moves: [], config: NO_CONFIG, staged: [], commit: null };
-      const report = await migrateConfigPart(ctx, root, none);
-      return rendered(report, markdown(report, root));
+      const tick = await tickLock(ctx, root);
+      try {
+        const report = await migrateConfigPart(ctx, root, none);
+        return rendered(report, markdown(report, root));
+      } finally {
+        tick.release();
+      }
     }
     refuseBoth(root);
+    // B45: on the old layout only an old norn ticks, under the old lock: taken before anything
+    // moves and held through the config part
     const lock = await acquireLock(oldTickLockPath(root), { note: "norn migrate", now: () => ctx.clock.iso() });
     if (!lock.ok) throw refuse(`a tick is running (pid ${lock.holder.holder.pid}${lock.holder.note ? `, ${lock.holder.note}` : ""}); norn migrate never moves the trace under a running tick`, `stop norn watch (and any tick), then run ${cmd.migrate()} again`, "tick_locked");
     let report: MigrateReport;
     try {
-      report = await migrate(ctx, root);
+      report = await migrateConfigPart(ctx, root, await migrate(ctx, root));
     } finally {
       // D6: the old lock file goes last
       lock.release();
     }
     removeOldLayoutDirs(root);
-    report = await migrateConfigPart(ctx, root, report);
     return rendered(report, markdown(report, root));
   },
 });

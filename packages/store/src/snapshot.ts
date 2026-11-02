@@ -146,7 +146,7 @@ export function loadStory(root: string, specPath: string, opts: { includeApplied
   let frontmatter_error: FileError | null = null;
   if (!story.ok)
     frontmatter_error =
-      story.reason === "corrupt" ? story.error : { file: relative(root, storyFile(specPath)), errors: [{ path: "", message: `${SPEC_FILE} missing` }] };
+      story.reason !== "missing" ? story.error : { file: relative(root, storyFile(specPath)), errors: [{ path: "", message: `${SPEC_FILE} missing` }] };
   else if (story.value.frontmatter.id !== key)
     frontmatter_error = { file: relative(root, storyFile(specPath)), errors: [{ path: "/id", message: `must equal folder key '${key}'` }] };
 
@@ -158,7 +158,7 @@ export function loadStory(root: string, specPath: string, opts: { includeApplied
     const file = join(slicesDir(specPath), f);
     const sk = sliceKey(key, nn);
     const r = readSliceFile(file, root);
-    let error: FileError | null = r.ok ? null : r.reason === "corrupt" ? r.error : null;
+    let error: FileError | null = r.ok || r.reason === "missing" ? null : r.error;
     if (r.ok && r.value.frontmatter.id !== sk)
       error = { file: relative(root, file), errors: [{ path: "/id", message: `must equal '${sk}' (from file name)` }] };
     slices.push({ key: sk, file: relative(root, file), nn, slug: sm.slug, frontmatter: r.ok && !error ? r.value.frontmatter : null, error });

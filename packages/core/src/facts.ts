@@ -27,6 +27,8 @@ export interface FileError {
   /** repo-relative path */
   file: string;
   errors: SchemaError[];
+  /** B38 (D12): set when the file failed only because criteria still carry the removed `needs`; `norn migrate` fixes it */
+  code?: "needs_removed";
 }
 
 /** Identifies a unit everywhere (actions, trace, view). */

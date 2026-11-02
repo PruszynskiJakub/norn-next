@@ -164,7 +164,7 @@ export function formatInbox(view: ProjectView, opts: { details?: boolean; home?:
   }
   if (!out.length && !view.stories.length) {
     // a fresh repo: point at the first story instead of a dead end
-    return `Inbox empty — no stories yet.\nLabel an issue \`norn\` (the config's \`remote.label\`) and assign it to yourself, then run \`${cmd.sync()}\`.\n`;
+    return `Inbox empty — no stories yet.\nLabel an issue \`norn\` and assign it to yourself, then run \`${cmd.sync()}\`.\n`;
   }
   if (!out.length) return "Inbox empty — nothing needs you.\n";
   return `${out.join("\n").trimEnd()}\n`;

@@ -3,8 +3,7 @@
  * [--note "…" [--note-criterion <id>]]…` (§9.3, §10): the only way an agent step completes. The
  * outcome must be declared at the pinned step (W3); findings are copied into the receipt, evidence
  * into runs/<unit>/evidence/<run_id>/. The criteria report (QV2) is validated against
- * `CriteriaReport`, its coverage against the unit's frontmatter `criteria` (QV4), its `pass`
- * verdicts against the agent's capabilities (QV5a) and the outcome against its worst verdict (QV5); notes (NT1) never block and never change the route.
+ * `CriteriaReport`, its coverage against the unit's frontmatter `criteria` (QV4), and the outcome against its worst verdict (QV5); notes (NT1) never block and never change the route.
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";

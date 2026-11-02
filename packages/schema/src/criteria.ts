@@ -24,7 +24,6 @@ export type Criterion = Static<typeof Criterion>;
 
 /** B38 (D12): the message a slice or story still carrying criteria `needs` is refused with. */
 export const needsRemovedMessage = (kind: "slice" | "story", key: string) => `${kind} \`${key}\`: \`needs\` was removed; run \`norn migrate\``;
-export const NEEDS_REMOVED_RE = /: `needs` was removed; run `norn migrate`$/;
 
 /**
  * QV2/QV5 verdicts, worst first: `fail` > `unverified` > `person` > `pass`.

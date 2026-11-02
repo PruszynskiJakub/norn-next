@@ -338,6 +338,7 @@ Body
     expect((await h.norn("init")).exit).toBe(0);
     h.write(join(workflowsDir(h.root), "release.yaml"), `mode: manual\ndefaults: { deadline: 20m }\n${SOLO.replace("name: solo", "name: release")}`);
     h.write(repoConfigPath(h.root), TEAM_OLD);
+    h.write(join(workflowsDir(h.root), "plain.json"), `${JSON.stringify({ ...(Bun.YAML.parse(SOLO) as object), name: "plain" }, null, 2)}\n`);
     h.write(slicePath(), SLICE);
     h.git(["add", "-A"]);
     h.git(["commit", "-q", "-m", "an older norn's config"]);
@@ -374,6 +375,15 @@ Body
   test("B43: personal and machine keys leave the team file, each listed with its value", () => {
     expect(out.stdout).toContain("removed `max_agents: 1` from the team file: set it in ~/.norn/config.yaml if you want it");
     expect(out.stdout).toContain("removed `agent: codex` from the team file: set it in ~/.norn/config.yaml if you want it");
+  });
+
+  test("B43: a team limit no workflow takes is listed with its value", () => {
+    expect(out.stdout).toContain("removed `limits.attended_wait: 5m` from the team file: fixed at 2m");
+  });
+
+  test("B41: a workflow stored as JSON gains the defaults and mode too, still JSON", () => {
+    const plain = JSON.parse(h.read(join(workflowsDir(h.root), "plain.json")));
+    expect(plain).toMatchObject({ name: "plain", mode: "auto", defaults: { deadline: "45m" } });
   });
 
   test("B44: criteria needs are stripped from every slice, staged", () => {
