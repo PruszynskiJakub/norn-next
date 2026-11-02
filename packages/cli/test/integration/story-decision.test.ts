@@ -50,13 +50,9 @@ steps:
     outcomes: { approve: $done, reject: $stuck }
 `;
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-runner: { adapter: headless }
-remote: { provider: gh, label: norn }
-default_workflow: gated
-default_mode: auto
-notifiers: []
+const CONFIG = `provider: gh
+workflow: gated
+mode: auto
 `;
 
 let h: Harness;
@@ -80,7 +76,7 @@ const norn = (deps: Partial<CliDeps>, ...argv: string[]): Promise<CliResult> => 
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "gated.yaml"), GATED);
   h.write(join(workflowsDir(h.root), "sliced.yaml"), SLICED);
   h.write(join(workflowsDir(h.root), "sliceqa.yaml"), SLICE_QA);

@@ -38,13 +38,9 @@ steps:
     outcomes: { approve: $done, reject: $stuck }
 `;
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-runner: { adapter: headless }
-remote: { provider: gh, label: norn }
-default_workflow: sliced
-default_mode: auto
-notifiers: []
+const CONFIG = `provider: gh
+workflow: sliced
+mode: auto
 `;
 
 let h: Harness;
@@ -63,7 +59,7 @@ const slice = (nn: string, title: string) => `---\nid: gh-2/${nn.slice(0, 2)}\nt
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "sliced.yaml"), SLICED);
   h.write(join(workflowsDir(h.root), "sliceqa.yaml"), SLICE_QA);
   h.git(["add", "-A"]);

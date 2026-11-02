@@ -16,12 +16,9 @@ import { createHarness, type Harness, issue, layoutPlaces, oldNornDir, runChecke
 // whole flows over real git, several ticks each
 setDefaultTimeout(60_000);
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-remote: { provider: gh, label: norn }
-default_workflow: solo
-default_mode: manual
-notifiers: []
+const CONFIG = `provider: gh
+workflow: solo
+mode: manual
 `;
 
 const SOLO = `name: solo
@@ -58,7 +55,7 @@ interface Migrated {
 async function oldRepo(): Promise<{ h: Harness; workflows: string[] }> {
   const h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
   h.write(join(workflowsDir(h.root), "quick.yaml"), SOLO.replace("name: solo", "name: quick"));
   h.git(["add", "-A"]);

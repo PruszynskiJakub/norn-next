@@ -55,13 +55,9 @@ steps:
 counters: { test_loop: { max: 3 } }
 `;
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-runner: { adapter: headless }
-remote: { provider: gh, label: norn }
-default_workflow: story
-default_mode: auto
-notifiers: []
+const CONFIG = `provider: gh
+workflow: story
+mode: auto
 `;
 
 let h: Harness;
@@ -244,7 +240,7 @@ describe("a story through the slice workflow", () => {
   afterAll(() => transcript.stop());
 
   test("setup: repo config and workflows committed on main", async () => {
-    h.write(repoConfigPath(h.root), CONFIG);
+    h.config(CONFIG);
     h.write(join(workflowsDir(h.root), "mini.yaml"), MINI);
     h.write(join(workflowsDir(h.root), "slice.yaml"), SLICE);
     h.git(["add", "-A"]);

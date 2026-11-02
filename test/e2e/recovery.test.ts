@@ -29,13 +29,9 @@ steps:
     outcomes: { done: { to: $done, means: "implemented" } }
 `;
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-runner: { adapter: headless }
-remote: { provider: gh, label: norn }
-default_workflow: solo
-default_mode: auto
-notifiers: []
+const CONFIG = `provider: gh
+workflow: solo
+mode: auto
 `;
 
 interface Clone {
@@ -84,7 +80,7 @@ const all = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop").map(
 
 async function setup(h: Harness, n: number, title: string): Promise<void> {
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);

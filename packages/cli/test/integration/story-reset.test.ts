@@ -23,13 +23,9 @@ steps:
     outcomes: { done: $done }
 `;
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-runner: { adapter: headless }
-remote: { provider: gh, label: norn }
-default_workflow: mini
-default_mode: auto
-notifiers: []
+const CONFIG = `provider: gh
+workflow: mini
+mode: auto
 `;
 
 const kinds = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop" && d.rule !== "claim.renew").map((d) => `${d.unit} ${d.kind}${d.ok ? "" : ` FAILED ${d.error}`}`);
@@ -52,7 +48,7 @@ async function intake(n: number, title: string, slug: string) {
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "mini.yaml"), MINI);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);

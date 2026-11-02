@@ -182,11 +182,11 @@ export class Context {
     return { repoRoot: root, home: this.home, config, clock: this.clock, env: this.env };
   }
 
-  /** Ports selected by config (X2), built once per context. */
-  async ports(): Promise<Ports> {
-    if (!this.builtPorts) {
+  /** Ports selected by config, built once per context; `overrides` (doctor's fallback, B48) builds them again. */
+  async ports(overrides?: Partial<Ports>): Promise<Ports> {
+    if (!this.builtPorts || overrides) {
       const config = this.config;
-      this.builtPorts = await buildPorts(this.registry, this.adapterContext(this.root, config), config, { git: this.git, ...this.deps.ports }, (k) => this.sourceOf(k));
+      this.builtPorts = await buildPorts(this.registry, this.adapterContext(this.root, config), config, { git: this.git, ...overrides, ...this.deps.ports }, (k) => this.sourceOf(k));
     }
     return this.builtPorts;
   }

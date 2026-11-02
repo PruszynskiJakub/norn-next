@@ -34,7 +34,7 @@ import { ExitCode, ulid } from "@norn/schema";
 import { bindNornHome, type Layout, layoutProblems, loadWorkflows, machineDir, machineHolder, noteSpawn, orphanedMachineDirs, readHookFacts, repoConfigPath, repoLayout, skillsReport, traceDaysBefore, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
-import { rendered, withExit } from "../output.ts";
+import { CliFailure, rendered, withExit } from "../output.ts";
 import { assetsDir } from "../runtime/assets.ts";
 import { gitRemoteUrl } from "../runtime/detect.ts";
 import { ensureShim, withNornOnPath } from "../runtime/shim.ts";
@@ -311,6 +311,7 @@ function formatRepo(r: RepoReport, l: ReturnType<typeof lines>, dir: string): vo
 function formatDoctor(r: {
   ok: boolean;
   machine: { holder: string };
+  config?: { ok: false; error: string; do_instead: string | null };
   git: Check & { version: string | null };
   agents: Array<{
     name: string;
@@ -332,6 +333,10 @@ function formatDoctor(r: {
   const l = lines();
   const { out, line, sub, fix } = l;
 
+  if (r.config) {
+    line(false, "config", r.config.error);
+    fix(r.config);
+  }
   line(r.git.ok, "git", r.git.version ?? "not found");
   fix(r.git);
   for (const a of r.agents) {
@@ -408,7 +413,13 @@ export const doctorCommand = defineCommand({
       return report.ok ? out : withExit(out, ExitCode.error);
     }
     const config = ctx.config;
-    const ports = await ctx.ports();
+    // B48 (D15): an adapter that fails to build is one `FAIL config` line; the other checks still run
+    let configFail: { ok: false; error: string; do_instead: string | null } | null = null;
+    const ports = await ctx.ports().catch(async (e: unknown) => {
+      const body = e instanceof CliFailure ? e.body : { error: (e as Error).message, do_instead: null };
+      configFail = { ok: false, error: body.error, do_instead: body.do_instead };
+      return ctx.ports({ notifiers: [] });
+    });
     const command = hookCommand(ctx);
 
     const g = await run(["git", "--version"], { timeoutMs: 10_000 });
@@ -514,8 +525,8 @@ export const doctorCommand = defineCommand({
       hints.push(`trace keeps ${beyond.length} day${beyond.length === 1 ? "" : "s"} (${formatBytes(bytes)}) beyond trace.retain ${window.retain} — run \`norn tidy\` (\`norn tidy --dry-run\` lists them)`);
     }
 
-    const ok = gitCheck.ok && agents.every((a) => a.ok) && remote.ok === true && (runner.ok === true || runner.required === false) && skillsOk && repo.ok;
-    const report = { ok, live, hook_command: command, machine, git: gitCheck, agents, remote, runner, skills, repo, warnings, hints };
+    const ok = !configFail && gitCheck.ok && agents.every((a) => a.ok) && remote.ok === true && (runner.ok === true || runner.required === false) && skillsOk && repo.ok;
+    const report = { ok, live, hook_command: command, machine, ...(configFail ? { config: configFail } : {}), git: gitCheck, agents, remote, runner, skills, repo, warnings, hints };
     const out = rendered(report, formatDoctor(report, dir));
     return ok ? out : withExit(out, ExitCode.error);
   },

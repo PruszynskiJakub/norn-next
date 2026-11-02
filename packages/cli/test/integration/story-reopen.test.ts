@@ -43,13 +43,9 @@ steps:
 counters: { loop: { max: 3 } }
 `;
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-runner: { adapter: headless }
-remote: { provider: gh, label: norn }
-default_workflow: mini
-default_mode: auto
-notifiers: []
+const CONFIG = `provider: gh
+workflow: mini
+mode: auto
 `;
 
 const SPEC = ".agents/specs/gh-7-add-login-form";
@@ -82,7 +78,7 @@ type Inbox = { groups: Record<string, Array<{ story: string; slice: string | nul
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "mini.yaml"), MINI);
   h.write(join(workflowsDir(h.root), "slice.yaml"), SLICE);
   h.git(["add", "-A"]);
@@ -262,7 +258,7 @@ steps:
     outcomes: { done: { to: $done, means: "triage posted" } }
 `;
   const STORY = MINI.replace("name: mini", "name: story");
-  const TCONFIG = CONFIG.replace("default_workflow: mini", "default_workflow: tri");
+  const TCONFIG = CONFIG.replace("workflow: mini", "workflow: tri");
   const TBRANCH = "gh-8-triage-me";
   const TSPEC = `.agents/specs/${TBRANCH}`;
   let g: Harness;
@@ -282,7 +278,7 @@ steps:
   beforeAll(async () => {
     g = await createHarness();
     expect((await g.norn("init")).exit).toBe(0);
-    g.write(repoConfigPath(g.root), TCONFIG);
+    g.config(TCONFIG);
     g.write(join(workflowsDir(g.root), "tri.yaml"), TRI);
     g.write(join(workflowsDir(g.root), "story.yaml"), STORY);
     g.git(["add", "-A"]);

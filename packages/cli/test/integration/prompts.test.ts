@@ -37,12 +37,9 @@ steps:
     skill: norn-implement
     outcomes: { done: $done }
 `;
-const CONFIG = `agents:
-  claude: { adapter: claude }
-runner: { adapter: herdr }
-remote: { provider: gh, label: norn }
-default_workflow: solo
-default_mode: auto
+const CONFIG = `provider: gh
+workflow: solo
+mode: auto
 `;
 /** A recorded Claude Code permission dialog in a herdr pane (packages/adapters/test/herdr/fixtures), trimmed. */
 const SCREEN = [
@@ -72,7 +69,7 @@ const receipts = (h: Harness): Receipt[] =>
 
 async function boot(h: Harness): Promise<void> {
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn"]);

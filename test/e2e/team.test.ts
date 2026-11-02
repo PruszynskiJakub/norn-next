@@ -57,13 +57,9 @@ steps:
 counters: { test_loop: { max: 3 } }
 `;
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-runner: { adapter: headless }
-remote: { provider: gh, label: norn }
-default_workflow: story
-default_mode: auto
-notifiers: []
+const CONFIG = `provider: gh
+workflow: story
+mode: auto
 `;
 
 interface Clone {
@@ -141,7 +137,7 @@ afterAll(() => h.cleanup());
 describe("two clones hand a story over through git (§19.3, T5, T6)", () => {
   test("clone A: intake → plan → slice implement asks a question and parks", async () => {
     expect((await A.norn("init")).exit).toBe(0);
-    h.write(repoConfigPath(h.root), CONFIG);
+    h.config(CONFIG);
     h.write(join(workflowsDir(h.root), "mini.yaml"), MINI);
     h.write(join(workflowsDir(h.root), "slice.yaml"), SLICE);
     h.git(["add", "-A"]);
@@ -386,7 +382,7 @@ describe("story close asks at the terminal (B36)", () => {
 
   test("y closes the story as --yes does", async () => {
     expect((await h2.norn("init")).exit).toBe(0);
-    h2.write(repoConfigPath(h2.root), CONFIG);
+    h2.config(CONFIG);
     h2.write(join(workflowsDir(h2.root), "mini.yaml"), MINI);
     h2.git(["add", "-A"]);
     h2.git(["commit", "-q", "-m", "norn init"]);

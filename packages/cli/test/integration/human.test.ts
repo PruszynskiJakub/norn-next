@@ -60,13 +60,9 @@ steps:
     outcomes: { approve: $done, reject: $stuck }
 `;
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-runner: { adapter: headless }
-remote: { provider: gh, label: norn }
-default_workflow: gated
-default_mode: auto
-notifiers: []
+const CONFIG = `provider: gh
+workflow: gated
+mode: auto
 `;
 
 let h: Harness;
@@ -104,7 +100,7 @@ type Verb = { unit: string; receipt: Receipt; delivered: { via: string; claim?: 
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "gated.yaml"), GATED);
   h.write(join(workflowsDir(h.root), "alt.yaml"), ALT);
   h.write(join(workflowsDir(h.root), "sliced.yaml"), SLICED);
@@ -586,7 +582,7 @@ counters: { loop: { max: 2 } }
   beforeAll(async () => {
     t = await createHarness();
     expect((await t.norn("init")).exit).toBe(0);
-    t.write(repoConfigPath(t.root), CONFIG.replace("default_workflow: gated", "default_workflow: triage"));
+    t.config(CONFIG.replace("workflow: gated", "workflow: triage"));
     t.write(join(workflowsDir(t.root), "triage.yaml"), TRIAGE);
     t.git(["add", "-A"]);
     t.git(["commit", "-q", "-m", "norn init"]);
@@ -692,7 +688,7 @@ describe("gh-71 B1, B3–B10, B17, B30, B31: norn story edit --workflow starts t
   beforeAll(async () => {
     t = await createHarness();
     expect((await t.norn("init")).exit).toBe(0);
-    t.write(repoConfigPath(t.root), CONFIG.replace("default_workflow: gated", "default_workflow: triage"));
+    t.config(CONFIG.replace("workflow: gated", "workflow: triage"));
     t.write(join(workflowsDir(t.root), "triage.yaml"), ROUND_TRIAGE);
     t.write(join(workflowsDir(t.root), "story.yaml"), ROUND_STORY);
     t.write(join(workflowsDir(t.root), "quick.yaml"), ROUND_QUICK);
@@ -988,7 +984,7 @@ describe("gh-71 B11–B17, B32: --force ends an unfinished round, --at alone mov
   beforeAll(async () => {
     t = await createHarness();
     expect((await t.norn("init")).exit).toBe(0);
-    t.write(repoConfigPath(t.root), CONFIG.replace("default_workflow: gated", "default_workflow: triage"));
+    t.config(CONFIG.replace("workflow: gated", "workflow: triage"));
     t.write(join(workflowsDir(t.root), "triage.yaml"), ROUND_TRIAGE);
     t.write(join(workflowsDir(t.root), "story.yaml"), ROUND_STORY);
     t.write(join(workflowsDir(t.root), "quick.yaml"), ROUND_QUICK);

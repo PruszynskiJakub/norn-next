@@ -32,13 +32,9 @@ steps:
 counters: { loop: { max: 2 } }
 `;
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-runner: { adapter: headless }
-remote: { provider: gh, label: norn }
-default_workflow: flow
-default_mode: auto
-notifiers: []
+const CONFIG = `provider: gh
+workflow: flow
+mode: auto
 `;
 
 let h: Harness;
@@ -64,7 +60,7 @@ type Inbox = { groups: Record<string, Array<{ story: string; slice: string | nul
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "flow.yaml"), FLOW);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);

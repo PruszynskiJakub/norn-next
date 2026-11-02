@@ -23,12 +23,9 @@ steps:
     outcomes: { done: $done }
 `;
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-remote: { provider: gh, label: norn }
-default_workflow: solo
-default_mode: manual
-notifiers: []
+const CONFIG = `provider: gh
+workflow: solo
+mode: manual
 `;
 
 /** D2, computed here independently: `<folder>-<first 8 hex of sha256(real path of the git common dir)>`. */
@@ -44,7 +41,7 @@ const oldTraceDir = (root: string) => join(dirname(workflowsDir(root)), "trace")
 
 async function boot(h: Harness) {
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn"]);

@@ -32,20 +32,17 @@ steps:
     outcomes: { done: $done }
 `;
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-remote: { provider: gh, label: norn }
-default_workflow: solo
-default_mode: auto
+const CONFIG = `provider: gh
+workflow: solo
+mode: auto
 max_agents: 1
-notifiers: []
 `;
 
 const kinds = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop" && d.rule !== "claim.renew").map((d) => `${d.unit} ${d.kind}${d.ok ? "" : ` FAILED ${d.error}`}`);
 
 async function boot(h: Harness) {
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn"]);
@@ -316,7 +313,7 @@ describe("norn doctor: a fresh repository", () => {
       expect(auto.exit).toBe(1);
       expect(auto.value).toMatchObject({ ok: false, runner: { ok: false, required: true } });
       expect(auto.stdout).toMatch(/FAIL runner +fake not available/);
-      h.write(repoConfigPath(h.root), CONFIG.replace("default_mode: auto", "default_mode: manual"));
+      h.config(CONFIG.replace("mode: auto", "mode: manual"));
       const r = await runChecked(["doctor"], { ...h.deps, env });
       const v = r.value as { runner: Record<string, unknown>; agents: Array<{ ok: boolean }> };
       expect(v.runner).toMatchObject({ ok: false, required: false, available: false });
@@ -325,7 +322,7 @@ describe("norn doctor: a fresh repository", () => {
       expect(r.stdout).not.toMatch(/failed \(.*runner/);
     } finally {
       h.runner.availableResult = true;
-      h.write(repoConfigPath(h.root), CONFIG);
+      h.config(CONFIG);
     }
   });
 });
@@ -447,11 +444,11 @@ steps:
 
   test("a user config that does not load: the repo group still runs, the machine checks are skipped naming that file", async () => {
     const file = join(h.home, "config.yaml");
-    h.write(file, 'max_checks: "many"\n');
+    h.write(file, 'max_agents: "many"\n');
     try {
       const r = await runChecked(["doctor"], { ...h.deps, env: env() });
       expect(r.exit).toBe(1);
-      expect(r.value).toMatchObject({ ok: false, repo: { ok: true }, skipped: expect.stringContaining(`${file}: /max_checks`) });
+      expect(r.value).toMatchObject({ ok: false, repo: { ok: true }, skipped: expect.stringContaining("`max_agents` must be 1–9") });
       expect(r.stdout).toContain("machine checks skipped");
       // --repo reads only the repo's files: the person's own config is not its concern
       expect((await runChecked(["doctor", "--repo"], { ...h.deps, env: env() })).exit).toBe(0);

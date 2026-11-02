@@ -27,12 +27,9 @@ steps:
       changes_requested: { to: implement, counter: review_loop, means: "blocking findings" }
 counters: { review_loop: { max: 3 } }
 `;
-const CONFIG = `agents:
-  claude: { adapter: claude }
-remote: { provider: gh, label: norn }
-default_workflow: duo
-default_mode: manual
-notifiers: []
+const CONFIG = `provider: gh
+workflow: duo
+mode: manual
 `;
 
 let h: Harness;
@@ -59,7 +56,7 @@ async function tickUntil(pred: () => boolean, max = 10) {
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "duo.yaml"), DUO);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);

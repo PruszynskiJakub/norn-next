@@ -14,13 +14,9 @@ import { runChecked } from "../../../../test/support/harness.ts";
 
 setDefaultTimeout(30_000);
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-runner: { adapter: headless }
-remote: { provider: gh, label: norn }
-default_workflow: story
-default_mode: manual
-notifiers: []
+const CONFIG = `provider: gh
+workflow: story
+mode: manual
 `;
 
 const STORY = `name: story
@@ -61,7 +57,7 @@ let h: Harness;
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "story.yaml"), STORY);
   h.write(join(workflowsDir(h.root), "gatefirst.yaml"), GATE_FIRST);
   h.write(join(workflowsDir(h.root), "checkfirst.yaml"), CHECK_FIRST);

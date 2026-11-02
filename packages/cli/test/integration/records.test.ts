@@ -31,11 +31,9 @@ counters:
   ready_loop: { max: 2 }
 `;
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-remote: { provider: gh, label: norn, sync_interval: 5m }
-default_workflow: ready
-default_mode: auto
+const CONFIG = `provider: gh
+workflow: ready
+mode: auto
 `;
 
 const acted = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop" && d.rule !== "claim.renew").map((d) => `${d.unit} ${d.kind}${d.ok ? "" : ` FAILED ${d.error}`}`);
@@ -51,7 +49,7 @@ function lastFacts(h: Harness, key: string): StoryFacts | undefined {
 
 async function bootTo(h: Harness, n: number, title: string, runs: () => string) {
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "ready.yaml"), READY);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn"]);
@@ -298,7 +296,7 @@ steps:
   beforeAll(async () => {
     h = await createHarness();
     expect((await h.norn("init")).exit).toBe(0);
-    h.write(repoConfigPath(h.root), CONFIG.replace("default_workflow: ready", "default_workflow: triage"));
+    h.config(CONFIG.replace("workflow: ready", "workflow: triage"));
     h.write(join(workflowsDir(h.root), "triage.yaml"), TRIAGE);
     h.write(join(workflowsDir(h.root), "story.yaml"), STORY);
     h.write(join(workflowsDir(h.root), "quick.yaml"), QUICK);

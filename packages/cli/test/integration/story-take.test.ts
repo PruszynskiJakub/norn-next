@@ -8,13 +8,9 @@ import { repoConfigPath } from "@norn/store";
 import type { RemoteIssue } from "@norn/core";
 import { createHarness, type Harness, T0 } from "../../../../test/support/harness.ts";
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-runner: { adapter: headless }
-remote: { provider: gh, label: norn }
-default_workflow: fix
-default_mode: auto
-notifiers: []
+const CONFIG = `provider: gh
+workflow: fix
+mode: auto
 `;
 
 const issue = (number: number, over: Partial<RemoteIssue> = {}): RemoteIssue => ({
@@ -35,7 +31,7 @@ let h: Harness;
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);
   h.git(["push", "-q", "origin", "main"]);

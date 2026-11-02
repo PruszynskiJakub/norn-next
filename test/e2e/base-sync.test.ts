@@ -48,13 +48,9 @@ steps:
 counters: { base_conflict_loop: { max: 2 }, stale_loop: { max: 3 } }
 `;
 
-const config = (extra = "") => `agents:
-  claude: { adapter: claude }
-runner: { adapter: headless }
-remote: { provider: gh, label: norn }
-default_workflow: based
-default_mode: auto
-notifiers: []
+const config = (extra = "") => `provider: gh
+workflow: based
+mode: auto
 ${extra}`;
 
 const kinds = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop" && d.rule !== "claim.renew").map((d) => `${d.unit} ${d.rule}${d.ok ? "" : ` FAILED ${d.error}`}`);
@@ -89,7 +85,7 @@ describe("base sync with real git", () => {
 
   beforeAll(async () => {
     h = await createHarness();
-    h.write(repoConfigPath(h.root), config());
+    h.config(config());
     h.write(join(workflowsDir(h.root), "based.yaml"), BASED);
     installBundledSkills(h.root);
     writeFileSync(join(h.root, "a.txt"), "one\n");
@@ -235,7 +231,7 @@ describe("BS3.3a (dogfood D4): a person's push to the branch of a $done story", 
 
   beforeAll(async () => {
     h = await createHarness();
-    h.write(repoConfigPath(h.root), config());
+    h.config(config());
     h.write(join(workflowsDir(h.root), "based.yaml"), BASED);
     installBundledSkills(h.root);
     h.git(["add", "-A"]);
@@ -265,7 +261,7 @@ describe("base_branch: develop (BS0, 7b)", () => {
   let h: Harness;
   beforeAll(async () => {
     h = await createHarness();
-    h.write(repoConfigPath(h.root), config("base_branch: develop\n"));
+    h.config(config("base_branch: develop\n"));
     h.write(join(workflowsDir(h.root), "based.yaml"), BASED);
     installBundledSkills(h.root);
     h.git(["add", "-A"]);
@@ -316,7 +312,7 @@ describe("PR items between syncs and in the read model (C1), ready approval void
 
   beforeAll(async () => {
     h = await createHarness();
-    h.write(repoConfigPath(h.root), config());
+    h.config(config());
     h.write(join(workflowsDir(h.root), "based.yaml"), BASED);
     installBundledSkills(h.root);
     writeFileSync(join(h.root, "a.txt"), "one\n");
@@ -431,7 +427,7 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
 
   beforeAll(async () => {
     h = await createHarness();
-    h.write(repoConfigPath(h.root), config().replace("runner: { adapter: headless }", "runner: { adapter: herdr }"));
+    h.config(config().replace("runner: { adapter: headless }", "runner: { adapter: herdr }"));
     h.write(join(workflowsDir(h.root), "based.yaml"), BASED);
     installBundledSkills(h.root);
     writeFileSync(join(h.root, "a.txt"), "one\n");
@@ -565,7 +561,7 @@ describe("BUG-2: an update conflict that exhausts base_conflict_loop, then run r
 
   beforeAll(async () => {
     h = await createHarness();
-    h.write(repoConfigPath(h.root), config());
+    h.config(config());
     h.write(join(workflowsDir(h.root), "based.yaml"), BASED.replace("base_conflict_loop: { max: 2 }", "base_conflict_loop: { max: 1 }"));
     installBundledSkills(h.root);
     writeFileSync(join(h.root, "a.txt"), "one\n");

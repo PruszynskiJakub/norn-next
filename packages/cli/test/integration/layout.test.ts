@@ -15,13 +15,9 @@ setDefaultTimeout(60_000);
 const CONFIG_FILE = ".agents/norn.config.yaml";
 const WORKFLOWS = ".agents/workflows";
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-runner: { adapter: headless }
-remote: { provider: gh, label: norn }
-default_workflow: story
-default_mode: manual
-notifiers: []
+const CONFIG = `provider: gh
+workflow: story
+mode: manual
 `;
 
 const gateFirst = (name: string, prompt: string) => `name: ${name}
@@ -68,17 +64,17 @@ describe("norn init writes the new layout (B1, B2)", () => {
     h.write(join(h.root, CONFIG_FILE), CONFIG);
     const r = await h.norn("config", "list", "--json");
     expect(r.value).toMatchObject({ files: { repo: { path: join(h.root, CONFIG_FILE), exists: true } } });
-    expect((r.value as { entries: Array<{ key: string; source: string }> }).entries.find((e) => e.key === "default_mode")).toMatchObject({ source: "repo" });
+    expect((r.value as { entries: Array<{ key: string; source: string }> }).entries.find((e) => e.key === "workflow")).toMatchObject({ source: "repo" });
     expect((await h.norn("config", "list")).stdout).toContain(CONFIG_FILE);
   });
 });
 
 describe("messages name the new paths (D11)", () => {
-  test("config set asks between the user file and the repo config file; --repo help names it", async () => {
+  test("config set asks between the user, local and repo config files; --repo help names it", async () => {
     const term = new FakeInteraction();
     term.answers = [null];
-    await runChecked(["config", "set", "default_mode", "auto"], { ...h.deps, interaction: term });
-    expect(term.picks[0]?.question).toBe(`Write to user (~/.norn/config.yaml) or repo (${CONFIG_FILE})?`);
+    await runChecked(["config", "set", "mode", "auto"], { ...h.deps, interaction: term });
+    expect(term.picks[0]?.question).toBe("Write to which file?");
     expect(term.picks[0]?.choices.find((c) => c.value === "repo")?.label).toContain(CONFIG_FILE);
     expect((await h.norn("config", "set", "--help")).stdout).toContain(`edit ${CONFIG_FILE}`);
   });

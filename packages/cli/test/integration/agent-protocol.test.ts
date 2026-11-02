@@ -48,12 +48,9 @@ steps:
     outcomes: { done: { to: $done, means: "the person agrees the spec is ready" } }
 `;
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-remote: { provider: gh, label: norn }
-default_workflow: duo
-default_mode: manual
-notifiers: []
+const CONFIG = `provider: gh
+workflow: duo
+mode: manual
 `;
 
 let h: Harness;
@@ -112,7 +109,7 @@ async function tickUntil(pred: () => boolean, max = 10) {
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "duo.yaml"), DUO);
   h.write(join(workflowsDir(h.root), "pair.yaml"), PAIR);
   h.git(["add", "-A"]);
@@ -517,7 +514,7 @@ describe("hook backfill on upgrade (B11, B12, D5)", () => {
   beforeAll(async () => {
     g = await createHarness();
     expect((await g.norn("init")).exit).toBe(0);
-    g.write(repoConfigPath(g.root), CONFIG);
+    g.config(CONFIG);
     g.write(join(workflowsDir(g.root), "duo.yaml"), DUO);
     g.git(["add", "-A"]);
     g.git(["commit", "-q", "-m", "norn init"]);
