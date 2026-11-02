@@ -1,5 +1,5 @@
 /**
- * The cockpit model (SPEC-cockpit CP1–CP5): rows — what needs the person, then each other story once, in its
+ * The cockpit model (CP1–CP5): rows — what needs the person, then each other story once, in its
  * tab (now, backlog, done), then the backlog's issues not taken in yet — each with
  * its story's orient preview and the actions it offers, as data. Pure: a ProjectView in, plain JSON
  * out. Renderers (the terminal `norn status --watch`, a web panel later) map actions to keys or buttons and

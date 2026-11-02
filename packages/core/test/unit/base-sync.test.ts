@@ -1,5 +1,5 @@
 /**
- * Base sync (BS1–BS11, SPEC-base-sync-and-qa §7 cases 1–7b, 11) replayed through the pure decide:
+ * Base sync (BS1–BS11) replayed through the pure decide:
  * scripted facts (`story.base`) in, decisions out, with the effects act would have (the `run_git`
  * classify receipt, the check receipt, an agent report) fed back as receipts (X4).
  */

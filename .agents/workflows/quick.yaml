@@ -31,7 +31,7 @@ steps:
       A change in behaviour gets a test first; a change to docs or a pure refactor needs none beyond the
       suite staying green. A bug comes from a reproduce round with a red loop in the handoff's Progress and
       the issue's latest `## Reproduce` comment: turn it into a failing test at the seam named there before
-      changing any code, then fix the cause and cite the PRD ids the fix enforces.
+      changing any code, then fix the cause and cite the rule ids the fix enforces.
       Test your change with `bun packages/cli/src/main.ts …`, never the installed `norn`.
       Run that dev build only in a throwaway git repo under $TMPDIR, never in this worktree: it is a live norn unit (NORN_HOME points at it) and a dev build would act on its runs/, claim and state.json.
       Run `bun run test` (the unit tier) after each change, and the type check; the integration tier runs in the `test` check and the e2e tier runs in CI, so do not run them before handing back.

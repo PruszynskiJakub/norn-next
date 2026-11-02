@@ -1,5 +1,5 @@
 /**
- * Honest QA and notes through the CLI (QV1–QV8, NT1–NT3; SPEC-base-sync-and-qa §7 cases 8, 9, 10):
+ * Honest QA and notes through the CLI (QV1–QV8, NT1–NT3):
  * a manual-mode story whose qa step requires a criteria report. `norn done` refuses a report that
  * misses a frontmatter criterion, an outcome the worst verdict contradicts, a missing report; an
  * `unverified` report goes to human-qa, whose inbox item says how to check; notes become Check items

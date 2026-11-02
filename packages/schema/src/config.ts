@@ -159,8 +159,8 @@ export type ConfigLayer = Static<typeof ConfigLayer>;
 
 export const DEFAULT_CONFIG: ResolvedConfig = {
   /**
-   * Claude sessions run in Claude Code's `auto` permission mode (AGENTS.md decision; PRD §20 defers
-   * permission profiles). A layer that defines `agents.claude` replaces this entry, args included.
+   * Claude sessions run in Claude Code's `auto` permission mode (AGENTS.md decision; per-step permission
+   * profiles are not built, see docs/limitations.md). A layer that defines `agents.claude` replaces this entry, args included.
    */
   agents: { claude: { adapter: "claude", args: ["--permission-mode", "auto"] } },
   default_agent: "claude",

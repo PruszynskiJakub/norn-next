@@ -1,6 +1,6 @@
 # Contributing to norn
 
-norn is built with norn. Code rules, layout and the agent side of the process are in [`AGENTS.md`](AGENTS.md); the spec is [`.agents/PRD.md`](.agents/PRD.md).
+norn is built with norn. This file is the person's side: how a change gets proposed, built and released. To run the tests and find your way in the code, read [`AGENTS.md`](AGENTS.md): it holds the dev commands, the layout, the code rules and the agent's side of the process. The rules norn follows, with their ids, are in [`.agents/RULES.md`](.agents/RULES.md).
 
 ## The loop
 
@@ -13,13 +13,13 @@ norn is built with norn. Code rules, layout and the agent side of the process ar
 
 ## Workflows
 
-Picked by the issue label `norn:wf:<name>` (PRD W9); without one, `triage` runs. They live in `.agents/workflows/`.
+Picked by the issue label `norn:wf:<name>` (W9); without one, `triage` runs. They live in `.agents/workflows/`.
 
 | Label | Workflow | For |
 |---|---|---|
 | `norn:wf:triage` | triage | Default, for stories and features. Check the issue, recommend `refinement`, `quick`, `reproduce` or close. |
 | `norn:wf:reproduce` | reproduce | Bugs: reproduce read-only, confirm the cause and the seam for a regression test, then `quick` fixes it. |
-| `norn:wf:refinement` | refinement | Spec and plan with you, and PRD changes (refine amends `.agents/PRD.md`): sync → refine → clarify → plan. No code, no PR. |
+| `norn:wf:refinement` | refinement | Spec and plan with you, and rule changes (refine amends `.agents/RULES.md`): sync → refine → clarify → plan. No code, no PR. |
 | `norn:wf:story` | story | A planned feature: sync → slices → test → QA → PR → CI. Each slice: implement → test → review → integrate. |
 | `norn:wf:quick` | quick | Refactors, docs, chores, small changes, a reproduced bug's fix: sync → implement → test → review → PR → CI. |
 | `norn:wf:release` | release | Changelog, version bump → PR, wait for its CI. Started by `/release-start`. |
@@ -38,7 +38,7 @@ Picked by the issue label `norn:wf:<name>` (PRD W9); without one, `triage` runs.
 
 You need write access to the repo.
 
-1. Install the latest released binary as in the [README](README.md#1-install). The process always runs a released `norn`, never a build of this repo.
+1. Install the latest released binary as in the [README](README.md#install). The process always runs a released `norn`, never a build of this repo.
 2. Clone the repo and run `norn doctor`.
 3. Optional, in `~/.norn/config.yaml` (never in the repo):
    ```yaml

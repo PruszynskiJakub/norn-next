@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
+import { allDocs, CODE_SPAN, RULES_FILE, textFiles, URL } from "../support/docs.ts";
 
 const ROOT = join(import.meta.dir, "..", "..");
 const PKGS = join(ROOT, "packages");
@@ -89,9 +90,6 @@ const BANNED: Array<[RegExp, string]> = [
   [/\bapproved\b/i, "approve (outcomes are spelled as typed)"],
 ];
 
-const URL = /\b[a-z][a-z0-9+.-]*:\/\/\S+/gi;
-const CODE_SPAN = /`[^`\n]*`/g;
-
 /**
  * Banned-synonym hits in one line. URLs are never prose. In docs and assets (md/yaml/json), inline
  * code spans quote identifiers or name a banned word on purpose (AGENTS.md's glossary rule); in .ts,
@@ -103,24 +101,14 @@ function glossaryHits(line: string, file: string): string[] {
   return BANNED.filter(([re]) => re.test(text)).map(([, say]) => say);
 }
 
-/** Text files under `dir` (any depth) with one of the extensions; skips node_modules. */
-function textFiles(dir: string, exts: string[]): string[] {
-  return readdirSync(dir).flatMap((n) => {
-    const p = join(dir, n);
-    if (statSync(p).isDirectory()) return n === "node_modules" ? [] : textFiles(p, exts);
-    return exts.some((e) => p.endsWith(e)) ? [p] : [];
-  });
-}
-
 const DOCS = [".md", ".yaml", ".yml", ".json"];
 const GLOSSARY_FILES = (): string[] => [
   ...files(PKGS).filter((p) => p.includes("/src/")),
   ...textFiles(join(PKGS, "cli", "assets"), DOCS),
   ...textFiles(join(ROOT, "plugins"), [...DOCS, ".toml", ".sh"]),
   ...textFiles(join(PKGS, "schema", "json"), DOCS),
-  join(ROOT, "README.md"),
-  join(ROOT, "CONTRIBUTING.md"),
-  join(ROOT, "AGENTS.md"),
+  // gh-162 B7: every doc (README, CONTRIBUTING, docs/, the Herdr plugin README, AGENTS.md, the rules file)
+  ...allDocs(ROOT).filter((f) => !f.includes("/plugins/")),
 ];
 
 describe("glossary", () => {
@@ -135,7 +123,7 @@ describe("glossary", () => {
     expect(glossaryHits("throw refuse(`no job here`)", "a.ts")).toEqual(["story / slice"]);
   });
 
-  test("no banned synonyms in sources, assets, plugin, JSON schemas, README and AGENTS.md", () => {
+  test("no banned synonyms in sources, assets, plugin, JSON schemas and every doc", () => {
     const hits: string[] = [];
     for (const f of GLOSSARY_FILES()) {
       readFileSync(f, "utf8")
@@ -446,7 +434,7 @@ describe("test layout (AGENTS.md)", () => {
     expect(steps.some((s) => /test:integration|test:e2e/.test(s.run ?? ""))).toBe(false);
   });
 
-  test("AC7 (B21): AGENTS.md lists the three tier commands, hands back on the unit tier and the type check, and every path it names exists; README's test line is not all tests", () => {
+  test("AC7 (B21): AGENTS.md lists the three tier commands, hands back on the unit tier and the type check, and every path it names exists; the README names no test command (gh-162 B3: AGENTS.md holds them)", () => {
     const agents = readFileSync(join(ROOT, "AGENTS.md"), "utf8");
     const commands = section(agents, "Commands");
     const named = (cmd: string) => new RegExp(`^${cmd.replace(/[:]/g, "\\$&")}\\s+#`, "m").test(commands);
@@ -459,8 +447,7 @@ describe("test layout (AGENTS.md)", () => {
     const bare = [...agents.matchAll(/`([\w.-]+\.test\.ts)`/g)].map((m) => m[1] as string);
     expect(bare.filter((name) => !paths.some((p) => p.endsWith(`/${name}`)))).toEqual([]);
     const readme = readFileSync(join(ROOT, "README.md"), "utf8").split("\n").filter((l) => /^bun (run )?test\b/.test(l));
-    expect(readme.length).toBeGreaterThan(0);
-    expect(readme.filter((l) => /all tests/i.test(l))).toEqual([]);
+    expect(readme).toEqual([]);
   });
 
   test("B1, B2, B4: the root bunfig preloads the unit guard, ignores exactly the integration and e2e tiers, and the test script is exactly bun test", () => {
@@ -696,11 +683,6 @@ const OLD_COMMAND_ALLOW: Array<[file: string, text: string, why: string]> = [
 const OLD_COMMAND_FILES = (): string[] => [
   ...GLOSSARY_FILES().filter((f) => !f.includes("/schema/json/")),
   ...textFiles(join(ROOT, ".agents", "skills"), DOCS),
-  join(ROOT, ".agents", "PRD.md"),
-  // the SPEC-*.md files the PRD cites for its rules (HC, CP, R, BS, QV, NT), and the limits README points at
-  ...readdirSync(join(ROOT, ".agents")).filter((n) => /^SPEC-.*\.md$/.test(n)).map((n) => join(ROOT, ".agents", n)),
-  join(ROOT, ".agents", "LIMITATIONS.md"),
-  join(ROOT, "docs", "cookbook.html"),
 ];
 
 describe("removed commands (B5, B8, B71)", () => {
@@ -724,7 +706,7 @@ describe("removed commands (B5, B8, B71)", () => {
     expect(() => removedCommands("export const OLD = [];")).toThrow("REMOVED_COMMANDS not found");
   });
 
-  test("no removed command in sources, assets, plugins, skills, README, CONTRIBUTING, AGENTS.md, the PRD and its SPEC files, the cookbook", () => {
+  test("no removed command in sources, assets, plugins, skills, README, CONTRIBUTING, AGENTS.md, docs/ and the rules file", () => {
     const hits: string[] = [];
     for (const f of OLD_COMMAND_FILES()) {
       const rel = relative(ROOT, f);
@@ -738,20 +720,20 @@ describe("removed commands (B5, B8, B71)", () => {
     expect(hits).toEqual([]);
   });
 
-  test("the PRD's command table (§15) is the noun tree", () => {
-    const prd = readFileSync(join(ROOT, ".agents", "PRD.md"), "utf8");
-    const s15 = prd.slice(prd.search(/^## 15\b/m), prd.search(/^## 16\b/m));
+  test("the rules file's command table (§15) is the noun tree", () => {
+    const rules = readFileSync(join(ROOT, RULES_FILE), "utf8");
+    const s15 = rules.slice(rules.search(/^## 15\b/m), rules.search(/^## 16\b/m));
     for (const verb of ["create", "list", "view", "answer", "approve", "reject", "update-branch", "start", "chat", "edit", "checkout", "handoff", "close", "reopen"])
       expect(s15).toContain(`norn story ${verb}`);
     for (const verb of ["list", "view", "attach", "rerun", "cancel"]) expect(s15).toContain(`norn run ${verb}`);
     expect(s15).toContain("norn status");
-    expect(prd).toContain("through `norn story edit <unit> --workflow <name> --at <step>`");
+    expect(rules).toContain("through `norn story edit <unit> --workflow <name> --at <step>`");
   });
 });
 
 /**
  * gh-110 B22 (D12): no product doc or shipped text sends anyone to the old `.agents/norn/` folder. Scanned:
- * README, the PRD, everything under packages/cli/assets, package sources (`norn help` and every message
+ * README, the rules file, everything under packages/cli/assets, package sources (`norn help` and every message
  * are built there), and AGENTS.md's Layout and "Where the contracts live". Not scanned, until the
  * follow-up story migrates this repo: AGENTS.md's other sections, CONTRIBUTING.md and the
  * `.agents/skills/norn*` copies (this repo's own process text).
@@ -774,7 +756,7 @@ function section(text: string, title: string): string {
 function productDocs(): Array<[file: string, text: string]> {
   const agents = readFileSync(join(ROOT, "AGENTS.md"), "utf8");
   return [
-    ...[join(ROOT, "README.md"), join(ROOT, ".agents", "PRD.md"), ...textFiles(join(PKGS, "cli", "assets"), [...DOCS, ".txt"])].map(
+    ...[...allDocs(ROOT).filter((f) => !f.endsWith("AGENTS.md")), ...textFiles(join(PKGS, "cli", "assets"), [...DOCS, ".txt"])].map(
       (f): [string, string] => [relative(ROOT, f), readFileSync(f, "utf8")],
     ),
     ...files(PKGS)
@@ -796,7 +778,7 @@ describe("the new layout in product docs (gh-110 B3, B22)", () => {
     expect(section("# x\n## A\na\n## B\nb", "A")).toBe("\n## A\na");
   });
 
-  test("README, the PRD, shipped assets, package sources and AGENTS.md's Layout and contracts name no `.agents/norn/`", () => {
+  test("the docs, the rules file, shipped assets, package sources and AGENTS.md's Layout and contracts name no `.agents/norn/`", () => {
     const hits: string[] = [];
     for (const [file, text] of productDocs()) {
       text.split("\n").forEach((line, i) => {
@@ -807,19 +789,20 @@ describe("the new layout in product docs (gh-110 B3, B22)", () => {
     expect(hits).toEqual([]);
   });
 
-  test("README's Workflows are data and Config paragraphs name the new places", () => {
-    const readme = readFileSync(join(ROOT, "README.md"), "utf8").split("\n");
-    expect(readme.find((l) => l.startsWith("**Workflows are data.**"))).toContain("`.agents/workflows/`");
-    expect(readme.find((l) => l.startsWith("**Config**"))).toContain("`.agents/norn.config.yaml`");
+  test("Concepts' Workflows are data and Reference's Config paragraphs name the new places", () => {
+    const concepts = readFileSync(join(ROOT, "docs", "concepts.md"), "utf8").split("\n");
+    const reference = readFileSync(join(ROOT, "docs", "reference.md"), "utf8").split("\n");
+    expect(concepts.find((l) => l.startsWith("**Workflows are data.**"))).toContain("`.agents/workflows/`");
+    expect(reference.find((l) => l.startsWith("**Config**"))).toContain("`.agents/norn.config.yaml`");
   });
 
-  test("the PRD's §7 layout and ID2 describe the machine dir and its id", () => {
-    const prd = readFileSync(join(ROOT, ".agents", "PRD.md"), "utf8");
-    const s7 = prd.slice(prd.search(/^## 7\b/m), prd.search(/^## 8\b/m));
+  test("the rules file's §7 layout and ID2 describe the machine dir and its id", () => {
+    const rules = readFileSync(join(ROOT, RULES_FILE), "utf8");
+    const s7 = rules.slice(rules.search(/^## 7\b/m), rules.search(/^## 8\b/m));
     expect(s7).toContain("norn.config.yaml");
     expect(s7).toContain("workflows/");
     expect(s7).toContain("repos/<id>/");
-    const id2 = prd.split("\n").find((l) => l.startsWith("- ID2 ")) ?? "";
+    const id2 = rules.split("\n").find((l) => l.startsWith("- ID2 ")) ?? "";
     expect(id2).toContain("repos/<id>/");
   });
 

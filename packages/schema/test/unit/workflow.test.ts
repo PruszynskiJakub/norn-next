@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { parse } from "yaml";
 import { outcomeEdge, validate } from "../../src/index.ts";
 
-/** PRD §11 slice workflow example, verbatim. */
+/** §11 slice workflow example of the rules, verbatim. */
 export const SLICE_EXAMPLE = `
 name: slice
 start: implement
@@ -50,7 +50,7 @@ const errorsOf = (v: unknown) => {
 };
 
 describe("workflow schema", () => {
-  test("PRD §11 slice example validates", () => {
+  test("§11 slice example of the rules validates", () => {
     const r = validate("workflow", example());
     if (!r.ok) console.error(r.errors);
     expect(r.ok).toBe(true);

@@ -1,5 +1,5 @@
 /**
- * Herdr side of `norn status --watch` (SPEC-cockpit CP8–CP10, HC6, HC12, HC15): which Herdr the cockpit talks
+ * Herdr side of `norn status --watch` (CP8–CP10, HC6, HC12, HC15): which Herdr the cockpit talks
  * to, going to an agent's pane, labelling agent panes, and the oldest Your turn item for `--next`.
  * Presentation only — none of this is a fact for decide (HC13). Verbs run through the CLI dispatcher.
  */

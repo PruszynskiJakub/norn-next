@@ -1,5 +1,5 @@
 /**
- * `norn story take <story>` (GR1, SPEC-cockpit CP4): assign an open issue carrying the intake label to the
+ * `norn story take <story>` (GR1, CP4): assign an open issue carrying the intake label to the
  * person, so the next sync takes it in. Assigning is how the person chooses when intake takes an issue in
  * (GR1, GR2 starts it at once); this is the cockpit backlog's take on an issue row. It writes nothing
  * locally and takes nothing in itself.

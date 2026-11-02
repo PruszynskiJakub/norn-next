@@ -1,5 +1,5 @@
 /**
- * Replayed sequence (X4, §19 criterion 2): a scripted agent, check and act loop over many
+ * Replayed sequence (X4): a scripted agent, check and act loop over many
  * ticks. Proves that no step executes twice for the same attempt (beyond counted retries),
  * counters never exceed their max, and receipts re-applied after a crash change nothing.
  */

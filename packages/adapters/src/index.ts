@@ -1,6 +1,6 @@
 /**
- * @norn/adapters — every built-in adapter in one package (simplification of the PRD's
- * per-adapter `@norn/adapter-*` packages; see AGENTS.md). Each subfolder implements one
+ * @norn/adapters — every built-in adapter in one package (see AGENTS.md: one package
+ * rather than one per adapter). Each subfolder implements one
  * port from @norn/core and is exported as a namespace.
  */
 export * as claude from "./claude/index.ts";
