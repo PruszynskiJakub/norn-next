@@ -29,6 +29,28 @@ export function storyMode(state: { mode?: Mode } | null | undefined, workflow: W
   return state?.mode ?? (workflow as { mode?: Mode } | null | undefined)?.mode ?? config.mode;
 }
 
+/** The limits a step runs under (C1, W2a). */
+export interface StepLimits {
+  deadline: string;
+  nudges: number;
+  retries: number;
+  stalled: string;
+}
+
+/**
+ * W2a (gh-64 B26, D17): a step's limits — its own `deadline`, `nudges`, `retries`, else the
+ * workflow's, else the base; `stalled` is a workflow limit only.
+ */
+export function stepLimits(workflow: Workflow | null | undefined, step: Step | null | undefined, base: StepLimits): StepLimits {
+  const own = step?.type === "agent" ? step : undefined;
+  return {
+    deadline: own?.deadline ?? base.deadline,
+    nudges: own?.nudges ?? base.nudges,
+    retries: own?.retries ?? base.retries,
+    stalled: base.stalled,
+  };
+}
+
 /** The story's own unit (slice null), or null before it has facts. */
 export const storyUnit = (story: StoryFacts): UnitFacts | null => story.units.find((u) => u.unit.slice === null) ?? null;
 

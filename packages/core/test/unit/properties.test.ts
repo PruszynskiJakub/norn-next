@@ -86,7 +86,7 @@ function forSeeds(salt: number, body: (rng: Rng, seed: number) => void): void {
 // ================================================================= random workflows
 
 const STEP_NAMES = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot"];
-const LIMITS = { nudges: 2, retries: 1 };
+const LIMITS = { deadline: "60m", nudges: 2, retries: 1, stalled: "15m" };
 
 /**
  * A valid workflow (W5): steps in a line, each with a forward edge to the next (the last to

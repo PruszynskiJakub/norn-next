@@ -8,7 +8,7 @@
  */
 import { readdirSync } from "node:fs";
 import { basename, join, relative } from "node:path";
-import { cmd, currentRun, cursorStep, type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, standingReport, storyRulings, storyWorktreePath } from "@norn/core";
+import { cmd, currentRun, cursorStep, type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, standingReport, stepLimits, storyRulings, storyWorktreePath } from "@norn/core";
 import { type AgentStep, type ProcessIdentity, type ReceiptOf, storyBranch, ulid } from "@norn/schema";
 import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readText, readUnitHooks, writeBriefing, readRemoteCache, storyFile, traceEvent, specRunsDir, unitDir } from "@norn/store";
 import { defineCommand } from "../command.ts";
@@ -169,6 +169,7 @@ export const briefCommand = defineCommand({
     }
 
     const mode = unitStoryMode(ctx, s, config);
+    const limits = stepLimits(s.workflow, step, config.limits);
     const env = readEnvNorn(s.worktree) ?? {};
     const num = (v: string | undefined) => (v !== undefined && /^\d+$/.test(v) ? Number(v) : null);
     const slicePath = s.unit.slice ? `${s.marker.spec_dir}/slices/${s.unit.dir}.md` : null;
@@ -194,9 +195,9 @@ export const briefCommand = defineCommand({
       handoff: readHandoff(s.runsDir)?.body ?? null,
       receipts: s.receipts,
       limits: {
-        deadline: step.deadline ?? config.limits.deadline,
-        nudges: step.nudges ?? config.limits.nudges,
-        retries: step.retries ?? config.limits.retries,
+        deadline: limits.deadline,
+        nudges: limits.nudges,
+        retries: limits.retries,
         slot: num(env.NORN_SLOT),
         port_base: num(env.PORT_BASE),
       },
