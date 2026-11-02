@@ -20,6 +20,42 @@
     "description": {
       "type": "string"
     },
+    "mode": {
+      "anyOf": [
+        {
+          "const": "manual",
+          "type": "string"
+        },
+        {
+          "const": "auto",
+          "type": "string"
+        }
+      ]
+    },
+    "defaults": {
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "deadline": {
+          "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+          "description": "Duration like 30s, 10m, 1h30m",
+          "type": "string"
+        },
+        "nudges": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retries": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "stalled": {
+          "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+          "description": "Duration like 30s, 10m, 1h30m",
+          "type": "string"
+        }
+      }
+    },
     "start": {
       "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
       "type": "string"

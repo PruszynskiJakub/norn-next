@@ -70,6 +70,25 @@ describe("workflows (W1)", () => {
     expect(loadWorkflow(repo, "slice")).toMatchObject({ ok: true, value: { name: "slice", workflow: { start: "implement" } } });
     expect(loadWorkflow(repo, "nope")).toEqual({ ok: false, reason: "missing" });
   });
+
+  test("B25, B26: a workflow takes a top-level mode and a defaults block", () => {
+    const repo = tmp();
+    mkdirSync(workflowsDir(repo), { recursive: true });
+    writeFileSync(join(workflowsDir(repo), "slice.yaml"), `mode: manual\ndefaults: { deadline: 30m, nudges: 1, retries: 0, stalled: 40m }\n${WORKFLOW_YAML}`);
+    expect(loadWorkflow(repo, "slice")).toMatchObject({ ok: true, value: { workflow: { mode: "manual", defaults: { deadline: "30m", nudges: 1, retries: 0, stalled: "40m" } } } });
+  });
+
+  test("B11, D17: mode and stalled on a step are refused at load, the step named", () => {
+    const repo = tmp();
+    mkdirSync(workflowsDir(repo), { recursive: true });
+    writeFileSync(join(workflowsDir(repo), "slice.yaml"), WORKFLOW_YAML.replace("    skill: implement\n", "    skill: implement\n    mode: auto\n    stalled: 20m\n"));
+    const l = loadWorkflows(repo);
+    expect(l.workflows.slice).toBeUndefined();
+    expect(l.errors[0]?.errors).toEqual([
+      { path: "/steps/implement/mode", message: "`mode` is set on the workflow, not on a step" },
+      { path: "/steps/implement/stalled", message: "`stalled` is set in the workflow's `defaults:`, not on a step" },
+    ]);
+  });
 });
 
 function tick(unit: string, at: string): TraceEvent {

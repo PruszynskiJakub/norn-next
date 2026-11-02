@@ -2,6 +2,7 @@ import { type Static, type TOptional, Type } from "@sinclair/typebox";
 import {
   CounterName,
   Duration,
+  Mode,
   NonEmpty,
   OutcomeName,
   PosInt,
@@ -171,6 +172,20 @@ export const Workflow = Type.Object(
     $schema: Type.Optional(Type.String()),
     name: Type.String({ pattern: "^[a-z][a-z0-9_-]*$" }),
     description: Type.Optional(Type.String()),
+    /** MO1, B25 (W2a): how stories in this workflow run, unless `norn story edit` sets the story's own */
+    mode: Type.Optional(Mode),
+    /** B26, D17 (W2a): limits for every step that does not set its own; `stalled` only here */
+    defaults: Type.Optional(
+      Type.Object(
+        {
+          deadline: Type.Optional(Duration),
+          nudges: Type.Optional(Type.Integer({ minimum: 0 })),
+          retries: Type.Optional(Type.Integer({ minimum: 0 })),
+          stalled: Type.Optional(Duration),
+        },
+        { additionalProperties: false },
+      ),
+    ),
     start: StepName,
     steps: Type.Record(StepName, Step, { minProperties: 1, additionalProperties: false }),
     counters: Type.Optional(Type.Record(CounterName, CounterSpec, { additionalProperties: false })),

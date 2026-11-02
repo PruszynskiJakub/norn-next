@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { type LeaseFile, roundRecordPath, type UnitState } from "@norn/schema";
+import { type AgentStep, type LeaseFile, roundRecordPath, type UnitState, type Workflow } from "@norn/schema";
 import { type Action, legacyAction } from "../../src/actions.ts";
 import { applyReceipts } from "../../src/apply.ts";
 import { decide, isSideAction, unitDecision } from "../../src/decide/index.ts";
 import { buildInbox } from "../../src/inbox/items.ts";
-import { isIntakeCommit, nornTrailers } from "../../src/policy.ts";
+import { hookWindowMs, isIntakeCommit, nornTrailers } from "../../src/policy.ts";
 import type { RunFacts, StoryFacts, UnitFacts } from "../../src/facts.ts";
 import type { WorktreeStatus } from "../../src/ports.ts";
 import { sha256 } from "../../src/hash.ts";
@@ -41,11 +41,11 @@ const only = (f: Parameters<typeof decide>[0], unit = "gh-1"): Action => {
 };
 
 /** A story on the solo workflow (story-level agent step), with its state patched. */
-function solo(patch: Partial<UnitState> = {}, run: Partial<RunFacts> | null = null, story: Partial<StoryFacts> = {}, key = "gh-1", intake = T0 - 3_600_000) {
+function solo(patch: Partial<UnitState> = {}, run: Partial<RunFacts> | null = null, story: Partial<StoryFacts> = {}, key = "gh-1", intake = T0 - 3_600_000, wf: Workflow = SOLO_WF) {
   const unit = storyUnit(key);
-  const st = stateFor(unit, SOLO_WF, patch);
+  const st = stateFor(unit, wf, patch);
   const rf: RunFacts | null = run && { run_id: RUN, session: { runner: "herdr", session_id: "s1" }, process_alive: true, pane: null, hooks: [], last_hook_at: null, last_activity_at: T0, transcript: "/t.jsonl", ...run };
-  return storyFacts(key, [unitFacts(unit, SOLO_WF, st, { run: rf, worktree: { path: `/r-worktrees/${key}-login`, exists: true, status: null, last_commit_at: null, last_file_change_at: null, slot: 1 } })], { ...story, frontmatter: { ...storyFacts(key, []).frontmatter!, workflow: "solo", intake_at: at(intake) } });
+  return storyFacts(key, [unitFacts(unit, wf, st, { run: rf, worktree: { path: `/r-worktrees/${key}-login`, exists: true, status: null, last_commit_at: null, last_file_change_at: null, slot: 1 } })], { ...story, frontmatter: { ...storyFacts(key, []).frontmatter!, workflow: "solo", intake_at: at(intake) } });
 }
 const running = (p: Partial<UnitState> = {}): Partial<UnitState> => ({
   status: "running",
@@ -642,6 +642,29 @@ describe("audit fixes", () => {
     expect(a).toMatchObject({ kind: "classify", rule: "agent.silent.surface", outcome: "silent", state: { nudges_used: 1, status: "running" } });
     const out = only(facts([solo({ ...manual, nudges_used: 2 }, hook, { mode: "manual" })]));
     expect(out).toMatchObject({ kind: "classify", state: { status: "stuck", park: { kind: "exhausted" } } });
+  });
+
+  test("B26, B51 (W2a): a step's own limit, else the workflow's defaults:, else the built-in 60m / 2 / 15m", () => {
+    const startedAgo = (min: number) => running({ run: { ...running().run!, started_at: at(T0 - min * 60_000) }, updated_at: at(T0 - min * 60_000) });
+    const { nudges: _n, retries: _r, ...bare } = SOLO_WF.steps.implement as AgentStep;
+    const withDefaults: Workflow = { ...SOLO_WF, steps: { implement: bare }, defaults: { deadline: "30m", nudges: 0, stalled: "40m" } };
+    const decided = (st: Partial<UnitState>, wf: Workflow, activity = T0) => only(facts([solo(st, { last_activity_at: activity }, {}, "gh-1", T0 - 3_600_000, wf)]));
+    // defaults: deadline 30m, no nudges left → a timeout goes stuck
+    expect(decided(startedAgo(31), withDefaults)).toMatchObject({ kind: "classify", outcome: "timeout", state: { status: "stuck" } });
+    // a step's own deadline wins over defaults
+    const ownDeadline: Workflow = { ...withDefaults, steps: { ...withDefaults.steps, implement: { ...(withDefaults.steps.implement as AgentStep), deadline: "90m" } } };
+    expect(kinds(facts([solo(startedAgo(31), { last_activity_at: T0 }, {}, "gh-1", T0 - 3_600_000, ownDeadline)]))).toEqual(["gh-1 noop agent.running"]);
+    // stalled 40m from defaults: 30 minutes of quiet is not stalled
+    expect(kinds(facts([solo(startedAgo(20), { last_activity_at: T0 - 30 * 60_000 }, {}, "gh-1", T0 - 3_600_000, ownDeadline)]))).toEqual(["gh-1 noop agent.running"]);
+    // B51: a pinned workflow without defaults: takes 60m, 2 nudges, 15m
+    expect(kinds(facts([solo(startedAgo(59), { last_activity_at: T0 }, {})]))).toEqual(["gh-1 noop agent.running"]);
+    expect(decided(startedAgo(61), SOLO_WF)).toMatchObject({ kind: "nudge", rule: "agent.timeout.nudge" });
+    expect(decided(startedAgo(20), SOLO_WF, T0 - 16 * 60_000)).toMatchObject({ kind: "nudge", rule: "agent.stalled.nudge" });
+  });
+
+  test("B28: the hook read window is the longest stalled across the loaded workflows", () => {
+    expect(hookWindowMs([])).toBe(15 * 60_000);
+    expect(hookWindowMs([SOLO_WF, { ...SOLO_WF, defaults: { stalled: "40m" } }, null])).toBe(40 * 60_000);
   });
 
   test("deadline is measured from run.started_at, not the last state write", () => {

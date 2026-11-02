@@ -26,7 +26,7 @@ export function effectiveMode(story: Mode, attended: boolean, runner: string | n
  * built-in `manual`.
  */
 export function storyMode(state: { mode?: Mode } | null | undefined, workflow: Workflow | null | undefined, config: Pick<ResolvedConfig, "mode">): Mode {
-  return state?.mode ?? (workflow as { mode?: Mode } | null | undefined)?.mode ?? config.mode;
+  return state?.mode ?? workflow?.mode ?? config.mode;
 }
 
 /** The limits a step runs under (C1, W2a). */
@@ -43,7 +43,7 @@ export interface StepLimits {
  */
 export function stepLimits(workflow: Workflow | null | undefined, step: Step | null | undefined): StepLimits {
   const own = step?.type === "agent" ? step : undefined;
-  const d = (workflow as { defaults?: Partial<StepLimits> } | null | undefined)?.defaults ?? {};
+  const d = workflow?.defaults ?? {};
   return {
     deadline: own?.deadline ?? d.deadline ?? BUILT_IN_LIMITS.deadline,
     nudges: own?.nudges ?? d.nudges ?? BUILT_IN_LIMITS.nudges,
