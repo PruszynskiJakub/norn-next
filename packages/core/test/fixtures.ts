@@ -12,7 +12,7 @@ export const at = (ms = T0) => new Date(ms).toISOString();
 let rid = 0;
 export const rid_ = () => deriveUlid("01JCCCCCCCCCCCCCCCCCCCCCCC", rid++);
 
-/** PRD §11 slice example. */
+/** §11 slice example of the rules. */
 export const SLICE_WF: Workflow = {
   name: "slice",
   start: "implement",

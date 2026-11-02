@@ -32,7 +32,7 @@ export interface CliDeps {
   signal?: AbortSignal;
   /** stdin text for commands that read it (`norn hook`); else the process stdin */
   stdin?: string;
-  /** SPEC-cockpit CP6: raw key chunks for `norn status --watch`; else the process stdin in raw mode */
+  /** CP6: raw key chunks for `norn status --watch`; else the process stdin in raw mode */
   input?: AsyncIterable<string>;
   /** HC6/HC12: Herdr for the cockpit; null = none; absent = the real one when `HERDR_ENV=1` */
   herdr?: herdr.HerdrCockpit | null;

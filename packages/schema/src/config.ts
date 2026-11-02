@@ -1,5 +1,5 @@
 /**
- * Configuration in three files (PRD K2, gh-64): the user file `~/.norn/config.yaml` (this machine
+ * Configuration in three files (K2, gh-64): the user file `~/.norn/config.yaml` (this machine
  * and your defaults), the local file `.agents/norn.config.local.yaml` (you, in this repo) and the
  * team file `.agents/norn.config.yaml`. Each takes its own keys; everything else is built in,
  * derived or fixed. `resolveConfig` merges them with the derived values into the one
@@ -166,7 +166,7 @@ export type ResolvedConfig = Static<typeof ResolvedConfig>;
 
 /**
  * Built-in agent entries. Claude sessions run in Claude Code's `auto` permission mode (AGENTS.md
- * decision; PRD §20). A file's entry merges over this field by field; `args` replaces whole (B14, B15).
+ * decision; per-step permission profiles are not built, docs/limitations.md). A file's entry merges over this field by field; `args` replaces whole (B14, B15).
  */
 export const BUILT_IN_AGENTS: Record<string, AgentEntry> = { claude: { args: ["--permission-mode", "auto"] } };
 

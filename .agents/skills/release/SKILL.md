@@ -38,7 +38,7 @@ Write the commit → section (or omitted, with why) list under Progress in hando
 
 ## 3. Write the changelog
 
-Read the two latest sections of `CHANGELOG.md` first and write the same way: one bullet per change a user notices, in plain sentences, present tense, commands and keys in backticks, PRD ids where a rule changed; sub-bullets when one change has several parts. Several PRs that make one change are one bullet. Never paste PR titles.
+Read the two latest sections of `CHANGELOG.md` first and write the same way: one bullet per change a user notices, in plain sentences, present tense, commands and keys in backticks, rule ids where a rule changed; sub-bullets when one change has several parts. Several PRs that make one change are one bullet. Never paste PR titles.
 
 Insert `## [X.Y.Z] - <today, YYYY-MM-DD>` above the latest version, with `### Added`, `### Changed`, `### Removed`, `### Fixed` in that order, empty ones left out. Keep the preamble as it is. Never add an `## [Unreleased]` section; remove an empty one left from before. `release.yml` refuses a tag without its `## [X.Y.Z]` section.
 

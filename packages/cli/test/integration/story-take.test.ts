@@ -1,5 +1,5 @@
 /**
- * `norn story take <story>` (GR1, SPEC-cockpit CP4): assign an open issue that carries the intake label
+ * `norn story take <story>` (GR1, CP4): assign an open issue that carries the intake label
  * to the person — the cockpit's backlog take — so the next sync takes it in. Nothing is taken in, and
  * nothing is written locally, by the verb itself.
  */

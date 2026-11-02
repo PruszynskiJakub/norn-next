@@ -15,7 +15,7 @@ steps:
     instructions: >-
       The issue is mirrored in spec.md. Run norn's behaviour from this checkout's code, `bun packages/cli/src/main.ts …`
       after `bun install --frozen-lockfile`, never the installed `norn`, and only in a throwaway git repo under $TMPDIR:
-      this worktree is a live norn unit. Cite PRD ids exactly as written in .agents/PRD.md under **Rules:**; a PRD rule
+      this worktree is a live norn unit. Cite rule ids exactly as written in .agents/RULES.md under **Rules:**; a rule
       the issue would change is a `refinement`, unless the change is small and settled. Post the `## Triage` comment on it: that one comment is the only
       remote write this step allows, an exception to the norn skill's rule. Change no file, spec.md included,
       but the handoff. The recommendation lives only in that comment:

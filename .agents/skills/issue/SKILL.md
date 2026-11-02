@@ -1,6 +1,6 @@
 ---
 name: issue
-description: Turn what the person noticed in this session (a bug, an idea, friction with norn) into a well-formed norn issue — observed and wanted, a repro, the code location and the PRD ids it touches — and create it once they confirm. How an ad-hoc session hands work over to norn. Person-only.
+description: Turn what the person noticed in this session (a bug, an idea, friction with norn) into a well-formed norn issue — observed and wanted, a repro, the code location and the rule ids it touches — and create it once they confirm. How an ad-hoc session hands work over to norn. Person-only.
 disable-model-invocation: true
 argument-hint: "[what you noticed]"
 ---
@@ -17,7 +17,7 @@ From the conversation and the argument, and by reading what you need:
 - **Wanted**: what should happen instead, and for whom.
 - **Repro**: the shortest steps that show it, if there are any. About norn's behaviour, run `bun packages/cli/src/main.ts …` in a throwaway repo, never the installed `norn` against this one.
 - **Where**: `path/to/file.ts:123` for the code involved.
-- **PRD**: the ids in `.agents/PRD.md` it touches (`W9`, `GR8`, …), or that none do.
+- **Rules**: the ids in `.agents/RULES.md` it touches (`W9`, `GR8`, …), or that none do.
 
 Search first for one already open: `gh issue list --state open --search "<words>"`. If one exists, show it and stop unless the person still wants a new one. Ask only for what you cannot find yourself, one question at a time.
 
@@ -38,7 +38,7 @@ Assignee: none
 
 ## Where
 
-## PRD
+## Rules
 ```
 
 Leave out a section with nothing in it. Labels:

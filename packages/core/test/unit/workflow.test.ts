@@ -10,7 +10,7 @@ const codes = (v: unknown, skills?: string[]) => {
 };
 
 describe("validateWorkflowDefinition (W5)", () => {
-  test("PRD slice example and the story fixture are valid", () => {
+  test("rules §11 slice example and the story fixture are valid", () => {
     expect(validateWorkflowDefinition(SLICE_WF, { skills: ["implement", "review", "qa", "merge"] })).toEqual({ ok: true, workflow: SLICE_WF, issues: [] });
     expect(validateWorkflowDefinition(STORY_WF).ok).toBe(true);
   });

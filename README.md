@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/PruszynskiJakub/norn-next/actions/workflows/ci.yml"><img src="https://github.com/PruszynskiJakub/norn-next/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/PruszynskiJakub/norn-next/releases"><img src="https://img.shields.io/badge/release-v0.17.0-blue" alt="Release v0.17.0"></a>
+  <a href="https://github.com/PruszynskiJakub/norn-next/releases"><img src="https://img.shields.io/badge/release-v0.17.0-blue" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/bun-%3E%3D1.3-f9f1e1" alt="Bun 1.3 or later">
 </p>
 
@@ -19,64 +19,19 @@
 
 You give a story to a coding agent and switch to something else. Forty minutes later you look back: the agent has been waiting on a question in a pane you closed. Or it died halfway through. Or it ran the same failing test three times, said it was done, and nothing checked.
 
-**norn delivers stories with coding agents one bounded step at a time and keeps one inbox of everything that needs you.** You label a GitHub or GitLab issue. norn takes it in, gives it a branch and a worktree, and walks it through a workflow: refine the spec with you, plan, implement in slices, test, review, QA, open a draft PR. Agents do the steps. Plain code decides what comes next, notices when an agent asks, dies or stalls, and tells you exactly which command answers it.
-
-```console
-$ norn status
-Your turn (1)
-  gh-21      refine: attended step — work with the agent · 2m
-      $ norn story start gh-21
-
-Answer (1)
-  gh-18/02   implement: Keep the old /export endpoint for API clients, or remove it? · 6m
-      $ norn story answer gh-18/02 "…"
-
-Approve (1)
-  gh-17      approve-slices: Review the slice files in the spec folder (edit them if needed). Approve to start the slices, or reject with what to change. · 25m
-      $ norn story approve gh-17
-
-Running (1)
-  gh-18/01   review #1 (auto) · 3m
-      $ norn run list gh-18/01
-```
-
-## Why not just run Claude Code, or a loop around it?
-
-An agent on its own is good at one step. Delivering a story is many steps, and the parts between them are where work gets lost:
-
-| When… | With an agent alone | With norn |
-|---|---|---|
-| the agent asks a question | it waits in its pane until you happen to look | the question is an inbox item with the command that answers it, and a desktop notification fires |
-| a permission prompt blocks it | same, but quieter | it shows up as a question; `norn story answer` types the key the prompt expects |
-| the agent dies or hangs mid-step | nobody notices | it is classified `died` or `stalled` and retried or nudged; a killed agent was retried within 9 s in the dogfood runs |
-| it loops, drifts or repeats a step | an LLM decides when to stop | code picks every next step; each retry and loop has a counter with a max, and going past it is a visible `stuck` |
-| `main` moves under the story | you merge by hand | an `update` step merges the base in; predicted conflicts go to a `resolve` step |
-| you wonder why something happened | scroll back through a transcript | `norn run list` shows the step timeline; `norn run view --why` replays the decision and names the rule |
-| a colleague takes over | they start from scratch | state lives in the repo and in git refs; `norn story checkout` continues from any commit |
-
-The evidence is in the dogfood audits: [`docs/audit-todoist-dogfood/`](docs/audit-todoist-dogfood/), [`docs/audit-auto-mode/`](docs/audit-auto-mode/) and [`docs/audit-base-sync-qa/`](docs/audit-base-sync-qa/).
+**norn delivers stories with coding agents one bounded step at a time, and keeps one inbox of everything that needs you.** You label a GitHub or GitLab issue. norn takes it in, gives it a branch and a worktree, and walks it through a workflow: triage, refine the spec with you, plan, implement in slices, test, review, QA, open a draft PR. Agents do the steps. Plain code decides what comes next, notices when an agent asks, dies or stalls, and tells you which command answers it.
 
 ## Is norn for you?
 
-**A good fit today:** one person, Claude Code, GitHub, a test suite you trust, and stories big enough to plan. Several stories can run in parallel on one machine, attended by you (manual mode) or started by norn (auto mode).
+**A good fit today:** one person, Claude Code, GitHub, a test suite you trust, and stories big enough to plan. Several stories can run in parallel on one machine, started by you (manual mode) or by norn (auto mode).
 
-**Not yet, or not at all:**
-- Quick interactive edits. norn works per story on a heartbeat, so the overhead is not worth it for a one-line fix.
-- Repos without GitHub or GitLab issues and PRs. Stories come from labelled issues, and there is no local-only mode.
-- GitLab, or an agent other than Claude Code. The `glab`, codex, opencode and gemini adapters exist but are tested only against recorded fixtures, never live.
-- Teams that require linear history on every branch. norn merges the base into story branches and never rebases; squash on merge keeps the base linear.
-- Two machines on one story. It is designed for that, but it has only been simulated on one Mac so far.
-- Relying on the herdr cockpit or the default `--permission-mode auto`. Both are tested against fixtures only; no real run has used them yet.
+**Not yet, or not at all:** quick interactive edits (norn works per story, on a heartbeat), repositories without GitHub or GitLab issues and PRs, and teams that require linear history on every branch (norn merges the base into story branches and never rebases). GitLab, agents other than Claude Code and two machines on one story are built but not proven in real use. [Limitations](docs/limitations.md) lists all of it.
 
-Read [`.agents/LIMITATIONS.md`](.agents/LIMITATIONS.md) before you rely on it: it lists what is proven, what is open and what was never run for real.
-
-## Get started
+## Install
 
 You need git ≥ 2.38, an agent CLI (Claude Code is the tested one), and `gh` or `glab` signed in.
 
-### 1. Install
-
-**Single-file binary** (the quickest: no Bun, no token, no sign-in). Each release carries `norn-darwin-arm64`, `norn-darwin-x64`, `norn-linux-x64`, `norn-linux-arm64` and `SHA256SUMS`:
+**Single-file binary** (no Bun, no token). Each release carries `norn-darwin-arm64`, `norn-darwin-x64`, `norn-linux-x64`, `norn-linux-arm64` and `SHA256SUMS`:
 
 ```sh
 curl -fsSLO https://github.com/PruszynskiJakub/norn-next/releases/latest/download/norn-darwin-arm64
@@ -85,9 +40,7 @@ sudo install -m 755 norn-darwin-arm64 /usr/local/bin/norn
 norn --version
 ```
 
-On first run the binary unpacks its bundled skills and workflow templates into `${XDG_CACHE_HOME:-~/.cache}/norn/`.
-
-**From GitHub Packages** (npm). The package is a Bun bundle, so it needs [Bun](https://bun.sh) ≥ 1.3 on `PATH`. GitHub's npm registry always asks for a token, even to install: create a personal access token (classic) with the `read:packages` scope, then:
+**From GitHub Packages** (npm). The package needs [Bun](https://bun.sh) ≥ 1.3 on `PATH`, and GitHub's npm registry asks for a token even to install: create a personal access token (classic) with the `read:packages` scope, then:
 
 ```sh
 echo "@pruszynskijakub:registry=https://npm.pkg.github.com" >> ~/.npmrc
@@ -95,26 +48,35 @@ echo "//npm.pkg.github.com/:_authToken=<your token>" >> ~/.npmrc
 bun add -g @pruszynskijakub/norn      # or: npm install -g @pruszynskijakub/norn
 ```
 
-Releases are listed in [`CHANGELOG.md`](CHANGELOG.md) and on the [releases page](https://github.com/PruszynskiJakub/norn-next/releases).
-
-### 2. Set up your repository
+## Set up a repository
 
 ```sh
 cd your-repo
 norn init
 ```
 
-`norn init` writes the team config (`.agents/norn.config.yaml`), a commented user config (`~/.norn/config.yaml`) on a machine's first init, six workflows in `.agents/workflows/` (`triage`, the default; `reproduce`; `refinement`; `story` and its `slice`; `quick`), each doing one thing, that a story goes through one after another, the agent skills and hooks, a JSON schema next to each config file for your editor, and its `.gitignore` and `.gitattributes` lines. It reads your test command from your build files, then prints the next steps, which are:
+`norn init` writes the team config (`.agents/norn.config.yaml`), a commented user config (`~/.norn/config.yaml`) on a machine's first init, six workflows in `.agents/workflows/`, the agent skills and hooks, a JSON schema next to each config file for your editor, and its `.gitignore` and `.gitattributes` lines. It reads your test command from your build files and ends with the next steps:
 
-1. Check the test command it wrote into the workflows' `test` steps.
-2. Commit and push the setup.
-3. Run `norn doctor` to check this machine: agents, hooks, remote auth, runner and skills.
+```console
+Next steps
+  1. Check the test command `npm install && npm test` in the `test` steps of .agents/workflows/ (detected from package.json).
+  2. Commit and push the setup: `git add .agents .claude .gitignore .gitattributes && git commit -m "Set up norn" && git push`.
+  3. Check this machine: `norn doctor`.
+  4. Make a first story: an issue labelled `norn` and assigned to you, e.g. `gh label create norn` (once), then `gh issue create --label norn --assignee @me --title "…"`.
+  5. Pick it up: `norn sync`, then `norn status` shows what needs you and the command for each item; `norn watch` keeps norn working.
+```
 
-norn reads GitHub or GitLab from the remote URL; a self-hosted host sets `provider: gh` or `provider: glab` in `.agents/norn.config.yaml`. The label that marks a story is always `norn`.
+Do the first three. `norn status` then has nothing for you yet:
 
-**Upgrading a repository set up by an older norn?** It keeps its config, workflows and trace together in one folder under `.agents/`; on that layout every command refuses and names `norn migrate`, and so does a config written for an older norn, naming each old key and its replacement. Run `norn migrate` in the main checkout, with `norn watch` stopped: it moves the config and workflows to their new places as staged git moves, moves the trace to this machine's folder for the checkout, rewrites old config keys (your user file in place; the team file, workflows and slices staged, listing every key it drops), and prints the commit to make. Once that commit merges, an older norn cannot read the repository: upgrade norn on every machine that works on it.
+```console
+$ norn status
+Inbox empty — no stories yet.
+Label an issue `norn` and assign it to yourself, then run `norn sync`.
+```
 
-### 3. Run your first story
+Config is optional: a solo developer on GitHub with Claude Code writes none. It lives in three files: `~/.norn/config.yaml` (your machine and your defaults), `.agents/norn.config.local.yaml` (yours in this repository, gitignored) and `.agents/norn.config.yaml` (the team's, committed); which keys go where is in [Reference: Config](docs/reference.md#config). norn reads GitHub or GitLab from the remote URL; a self-hosted host sets `provider: gh` or `provider: glab` in the team file. A repository set up by an older norn, or a config written for one, refuses every command and names `norn migrate` (and each old key with its replacement): run it once in the main checkout, with `norn watch` stopped, and commit what it prints.
+
+## Run a first story
 
 ```sh
 gh label create norn                                          # once
@@ -124,139 +86,29 @@ norn watch     # keeps norn working; Ctrl-C finishes the current tick and releas
 norn status    # in another terminal: what needs you, with the command for each item
 ```
 
-The default `story` workflow starts with **refine**, an attended step. Run the command in the inbox (`norn story start gh-N` with Herdr, otherwise a `cd … && claude …` line), then work out the spec with the agent. When you agree, the agent reports and norn moves on to plan, slices, test, QA and the draft PR. You come back when the inbox says so. Your last act is merging the PR. Squash it if you want a linear base: the story branch carries merge commits from `update`, since norn never rebases.
+1. A new story runs the `triage` workflow. In manual mode (the default) `norn status` shows its first agent step as ready, with the command that starts it: `norn story start gh-N` with the Herdr runner, otherwise a line that opens your agent in the story's worktree on its brief.
+2. The triage agent checks the issue against your code and posts its findings and one recommendation as an issue comment. The round ends there.
+3. You start the next round: `norn story edit gh-N --workflow quick` for a small change, `--workflow refinement` to agree a spec and plan with an agent first, then `--workflow story` to build it in slices.
+4. The workflow runs. Whenever an agent asks, a gate waits for your approval or something is stuck, the item appears in `norn status` with the command that resolves it (`norn story answer`, `norn story approve`, `norn run rerun`, …).
+5. A delivery workflow ends at a `ready` gate with a draft PR. Your last act is merging it.
 
-## Everyday use
+`norn help` lists every command and who runs it; `norn help <command>` shows one.
 
-Five commands cover most days:
+## Where to go next
 
-| Command | What it does |
+| Doc | For |
 |---|---|
-| `norn watch` | keeps norn working: observe, decide, act, every 30 s; prints a JSON line per tick, `--human` a line per action |
-| `norn status` | what needs you, grouped as Your turn, Answer, Approve, Unblock, Unclaimed, Running; `--watch` keeps it on screen |
-| `norn story start <story>` | starts an agent on a step that waits for you |
-| `norn story answer` / `norn story approve` / `norn run rerun` | resolves an item; the inbox prints the exact line |
-| `norn story list` | every story, slice, run and claim at a glance |
-
-`norn help` lists every command, grouped, with the ones to start with first, and says who runs each: an agent doing a step runs only `brief`, `done`, `ask` and `stuck`; the rest are yours, and an agent runs one only when you ask it to. It also sorts the bundled skills into the protocol, steps an agent works alone, steps a person works with the agent, and references. `norn help <command>` shows one command's usage, `norn help story reject` one verb's.
-
-For recipes by situation (a first story, an agent that asks or dies, a moved `main`, custom workflows, handing a story over), open [`docs/cookbook.html`](docs/cookbook.html) in a browser.
-
-**Manual and auto mode.** Each story has a mode, taken from, nearest first: the story (`norn story edit <story> --auto|--manual`), its workflow's top-level `mode`, `mode` in `.agents/norn.config.local.yaml`, `mode` in `~/.norn/config.yaml`, then `manual`.
-
-- **manual** (the default): when an agent step is ready, the inbox shows how to start it. With the `herdr` runner, `norn story start <unit>` opens a tab in the unit's worktree with the agent started on the brief. Otherwise, open any agent in the unit's worktree and tell it *"Use the norn skill, then run `norn brief`"*.
-- **auto**: norn starts agents itself through the runner it detects: Herdr when norn runs inside it or it is installed, otherwise headless.
-
-In both modes, `check` and `git` steps run on their own. Attended steps (`attended: true`, such as refine and plan) and `gate` steps always wait for a person, even in auto mode. When the agent of an attended step has waited for you for 2 minutes, the inbox moves it from Running to Your turn.
-
-**What gets committed.** A story's run state lives in `.agents/specs/<id>-<slug>/runs/`: `state.json`, numbered receipts, the pinned workflow, logs of failed checks, QA evidence and `handoff.md`. norn commits it with the agent's work at each step boundary and pushes the branch, so anyone can take the story over from any commit. `runs/` is marked as generated, so GitHub and GitLab collapse it in the PR diff. Per-tick detail (the trace, locks and caches) stays outside the repository, in `~/.norn/repos/<checkout>-<hash>/`, one folder per checkout on each machine.
-
-## Concepts in a minute
-
-| Term | Meaning |
-|---|---|
-| **story** | a labelled issue assigned to you: one spec folder, one branch, one worktree, one draft PR |
-| **slice** | a piece of a story with its own branch and worktree, merged back into the story |
-| **unit** | a story or a slice: what commands like `story answer`, `run list` and `run view` take, written `gh-18` (a story) or `gh-18/02` (its second slice) |
-| **workflow** | the steps a story or slice goes through, as YAML in `.agents/workflows/` |
-| **step** | one node of a workflow: an `agent` step, a `check` (a command), a `git` action, or a `gate` (a person approves) |
-| **outcome** | how an agent says a step ended: `norn done <outcome>`, `norn ask` or `norn stuck`; the workflow maps each outcome to the next step |
-| **tick** | one pass of the heartbeat: observe the agents, git and the remote, decide, act; `norn watch` runs ticks in a loop |
-| **inbox** | everything that needs a person, with the command that resolves each item |
-
-The full glossary is in [PRD §5](.agents/PRD.md#5-glossary).
-
-## Make it yours
-
-**Workflows are data.** Edit the YAML in `.agents/workflows/` or add your own; `norn story edit <unit> --workflow <name>` picks one for a unit. A step names its skill and its outcomes:
-
-```yaml
-  test:
-    type: check
-    run: npm ci && npm test
-    timeout: 15m
-    outcomes: { pass: qa, fail: { to: implement, counter: test_loop } }
-```
-
-A unit pins its workflow when it starts, so editing a file does not affect stories already in flight.
-
-**Skills carry the craft.** `norn init` copies norn's skills (`norn`, `norn-refine`, `norn-plan`, `norn-implement`, `norn-review`, `norn-qa`, …) as whole folders into `.agents/skills/` and links them from each configured agent's skill folder: `.claude/skills/`, `.gemini/skills/`, `.opencode/skills/` (Codex reads `.agents/skills/` itself). Commit them. Each `norn init` replaces them with the bundled version and lists what it updated; `git diff .agents/skills/` shows the change. To change how a step is done, write your own skill under another name and name it in the step (`skill: my-review`). `norn doctor` reports skills that are missing, not linked or out of date. After a story's PR merges, ask an agent to use `norn-retro` on it: it reads the story's `runs/` and suggests one change per friction it found, each citing its receipt, without changing any file. Links need a filesystem that supports them (on Windows, developer mode).
-
-**Config** is optional: a solo developer on GitHub with Claude Code writes none. The team's keys go in `.agents/norn.config.yaml`, yours in `~/.norn/config.yaml` or `.agents/norn.config.local.yaml`; each key belongs in one kind of file:
-
-| File | For | Keys |
-|---|---|---|
-| `~/.norn/config.yaml` | this machine, and your defaults for every repo | machine: `max_agents` (1–9, default 9), `notify` (`os`, `ntfy`, `webhook`), `trace.retain` · yours: `mode`, `agent`, `agents.<name>` (`model`, `args`) |
-| `.agents/norn.config.local.yaml` (gitignored) | you, in this repo | `mode`, `agent`, `agents.<name>`: these override the user file |
-| `.agents/norn.config.yaml` (committed) | the team | `provider`, `base_branch`, `workflow`, `slice_workflow` |
-| a workflow file | the workflow | top-level `mode`; `defaults:` with `deadline`, `nudges`, `retries`, `stalled` |
-
-For your keys the nearer file wins: local over user over built-in. Maps merge key by key; lists and scalars replace, so `agents: {claude: {model: …}}` keeps Claude's built-in `--permission-mode auto`, and `notify: {ntfy: <url>}` keeps OS notifications. Everything else has no key: the runner is detected, the git remote is the one the base branch tracks, claims are timed from the tick interval (`norn watch --interval`, `norn tick --interval`), and slots, the label and the sync are fixed. A key in the wrong file, a typo or an old key is a "Config error" naming the file and the fix. `norn config` shows every setting in effect with its source (`built-in`, `derived`, `user`, `local`, `repo`); `norn config set <key> <value> --user|--local|--repo` edits one.
-
-## Plugins
-
-### Herdr
-
-`plugins/herdr` adds the norn cockpit to Herdr: `norn status --watch` lists what needs you and every story, previews the selected one, and acts on it with one key (`y` approves, `a` answers, `t` takes, Enter opens an orient workspace with an agent that walks you through the story, `?` lists the rest). Every change goes through the same `norn` commands you would type. While it runs, it labels the agent pane of each norn run in Herdr's sidebar (`gh-12 · refine`, `norn: your turn`).
-
-```sh
-herdr plugin install PruszynskiJakub/norn-next/plugins/herdr   # update it with herdr plugin update
-```
-
-Working on norn itself? Link your checkout instead, so the plugin follows `git pull`: `herdr plugin link <checkout>/plugins/herdr`. `norn doctor` suggests whichever fits.
-
-The plugin has three actions you can bind to keys in Herdr's `config.toml`: `norn.pick` opens the cockpit as a popup on any workspace, `norn.open` opens it below the focused pane, and `norn.next` jumps to the agent that waits for you. `plugins/herdr/README.md` has the keys and the config for a tab bar segment (`norn status --segment`) and sidebar row. Inside Herdr, inbox notifications also come as Herdr toasts, with no config.
-
-## How it works
-
-- **Code decides, agents do.** The tick owns every transition. An agent does one step and reports an outcome (`norn done`, `norn ask` or `norn stuck`), and never names the next step.
-- **Pull, don't trust.** Each tick observes the runner, git and the files again. Notifications are never treated as truth, and a restarted heartbeat behaves the same.
-- **Bounded everything.** Every retry, nudge and loop has a counter with a max. Going past it is a visible `stuck`.
-- **Receipts before effects.** Every externally visible action writes an immutable receipt first, so a repeated tick never repeats the action. Every action can be traced (`norn run list`) and explained (`norn run view --why`).
-- **Markdown to read, JSON for code, exit codes for both.** Commands an agent or a person reads print markdown: `brief`, `done`, `ask`, `stuck`, `help`, `init`, `doctor`, `config`, `status`, `story list|view`, `run list|view`. Every command prints one JSON value with `--json`, and the rest always do. Refusals exit with code 3 and print `{error, do_instead}` (as markdown without `--json`).
-
-The full spec is in [`.agents/PRD.md`](.agents/PRD.md); the files norn writes in a repo are described in PRD §7.
-
-### All commands
-
-| Area | Commands |
-|---|---|
-| Core | `status [--watch [--pane]]` |
-| `story` | general: `create`, `list`, `view`; decision: `answer`, `approve`, `reject`, `update-branch`; work: `start`, `chat`, `edit`; team: `checkout`, `handoff`, `close`, `reopen` |
-| `run` | `list`, `view [--why \| --receipt]`, `attach [--next]`, `rerun [--step <step>] [--reset <counter>]`, `cancel` |
-| Setup | `init`, `migrate`, `doctor`, `config list\|get\|set\|unset`, `uninstall` |
-| Background | `watch`, `sync`, `tidy` |
-| Agent protocol | `brief`, `done`, `ask`, `stuck` |
-| Only in `help --all` | `tick`, `hook`, `status --segment` |
+| [Concepts](docs/concepts.md) | how norn works: stories, units, workflows, steps, gates, the inbox, modes, one tick, and the glossary |
+| [Reference](docs/reference.md) | every command, flag and config key, the workflows `norn init` ships and the exit codes |
+| [Recipes](docs/recipes.md) | what to do when an agent asks or dies, the base moves, you want your own workflow, or you hand a story over |
+| [Limitations](docs/limitations.md) | what is not built, not proven in real use, or out of scope by design |
+| [Herdr plugin](plugins/herdr/README.md) | the cockpit (`norn status --watch`) inside Herdr, with keys and a tab bar segment |
+| [Contributing](CONTRIBUTING.md) | how norn is built with norn, and how to propose a change |
 
 ## Contributing
 
-norn is built with norn: how to propose a change, the workflows and the labels are in [`CONTRIBUTING.md`](CONTRIBUTING.md). Code rules and the dependency direction are in [`AGENTS.md`](AGENTS.md).
-
-```
-packages/schema    @norn/schema    JSON Schemas, types, validators, ids, config merge
-packages/core      @norn/core      pure logic: adapter ports, facts, decide, briefing (no IO)
-packages/store     @norn/store     .agents/ files, runs/ JSON, claim and mailbox refs, leases
-packages/adapters  @norn/adapters  git, gh, glab, herdr, headless, claude, codex, opencode, gemini, notify
-packages/view      @norn/view      read model loadProjectView()
-packages/cli       @norn/cli       wiring and commands; assets/ holds skills, workflows, config template
-plugins/                           Herdr plugin (the cockpit)
-scripts/                           build, golden cases, process check, smoke test
-```
-
-```sh
-bun install
-bun run test           # the unit tier, in seconds (a plain `bun test` runs the same)
-bun run test:integration  # real git and the cli harness
-bun run test:e2e       # multi-tick stories; CI runs it in shards
-bun run typecheck
-bun run schema:emit    # after changing a schema
-bun run build          # dist/npm/: bundled norn.js + assets/ + package.json, ready to pack
-bun run build:bin      # dist/bin/norn-{darwin-arm64,darwin-x64,linux-x64,linux-arm64}
-```
-
-`bun run build:bin linux-x64` builds only the targets you name. To run from source, use `bun packages/cli/src/main.ts <command>`. Set `NORN_ASSETS_DIR` to use a different assets folder (skills, workflow templates, config template); otherwise norn uses the assets embedded in the binary, then `assets/` next to `norn.js`, then `packages/cli/assets`.
+norn is built with norn. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Credits
 
-The `norn-codebase-design` and `norn-tdd` skills and the approach of the step skills are adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT), by way of norn v0.11.0; `norn-pr`, `norn-diagnose`, `norn-prototype` and `norn-retro` are adapted from its `pr`, `diagnosing-bugs`, `prototype` and `retro` skills directly.
+The `norn-codebase-design` and `norn-tdd` skills and the approach of the step skills are adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT), by way of the earlier norn; `norn-pr`, `norn-diagnose`, `norn-prototype` and `norn-retro` are adapted from its `pr`, `diagnosing-bugs`, `prototype` and `retro` skills directly.

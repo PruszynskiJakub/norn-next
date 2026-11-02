@@ -1,5 +1,5 @@
 /**
- * Prompts and launches end to end (SPEC-auto-mode-recovery §4 acceptance 9, 11, 12):
+ * Prompts and launches end to end (§13.1):
  *   - R6.1: an implicit ask (a prompt in the agent's pane) does not refuse the agent's report — the
  *     report is accepted behind an `answer` receipt `by: "agent"`
  *   - R6.2: `norn answer` types the option number + enter into the prompt, then writes the receipt

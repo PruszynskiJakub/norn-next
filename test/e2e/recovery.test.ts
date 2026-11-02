@@ -1,5 +1,5 @@
 /**
- * Auto-mode recovery (SPEC-auto-mode-recovery R1–R3): two clones of one bare remote.
+ * Auto-mode recovery (R1–R3): two clones of one bare remote.
  *   - R1.2: a renewal that loses its CAS stops the story's other actions in that tick.
  *   - H5: the renewals due in a tick go out in one claim push; one lost among them fails alone.
  *   - R2.3: the checkout that lost the claim reports its unpushed receipt; `tidy` moves it to

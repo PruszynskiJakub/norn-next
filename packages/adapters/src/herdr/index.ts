@@ -29,7 +29,7 @@
  * - cockpit helpers (agent list, focus, labels, command panes): `./cockpit.ts` (HC6, HC12)
  * - every herdr command runs through `herdrCaller` (`./call.ts`), as do the cockpit's
  *
- * Herdr's agent status is one fact among several (§21, C2): `idle`/`done` never completes a step.
+ * Herdr's agent status is one fact among several (C2): `idle`/`done` never completes a step.
  */
 import type { AdapterContext, LaunchSpec, PaneState, PersonOpenSpec, ProcessPort, RunnerPort, SessionRef } from "@norn/core";
 import type { ProcessIdentity, RunnerConfig } from "@norn/schema";

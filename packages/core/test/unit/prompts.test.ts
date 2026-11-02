@@ -1,5 +1,5 @@
 /**
- * Prompts the agent is blocked on, and launch prompts that never arrive (SPEC-auto-mode-recovery):
+ * Prompts the agent is blocked on, and launch prompts that never arrive (§13.1):
  *   - R6.1: an implicit ask ends when the pane leaves `waiting_input` or a newer hook arrives —
  *     an `answer` receipt `by: "agent"`, nothing typed; explicit asks wait for the person
  *   - R6.2: answers to pane prompts become keystrokes (option number / arrows + enter)

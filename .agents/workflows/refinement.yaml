@@ -1,5 +1,5 @@
 # Refinement workflow — repo-local copy of the shipped one (W1). Brings the story up to date with its
-# base, then refines the spec (a PRD change amends .agents/PRD.md directly), settles its open
+# base, then refines the spec (a rule change amends .agents/RULES.md directly), settles its open
 # questions and plans it, all with a person. No gate: starting the next round (`--workflow story` or
 # `--workflow quick`) is the person's approval of the plan; rework is `--workflow refinement --at plan`.
 name: refinement
@@ -22,7 +22,7 @@ steps:
     skill: norn-refine
     attended: true
     inputs: [spec, handoff]
-    instructions: "Write the spec into the body of spec.md; keep its frontmatter unchanged. A change to a PRD rule amends .agents/PRD.md directly, citing its ids; never add a new SPEC-*.md."
+    instructions: "Write the spec into the body of spec.md; keep its frontmatter unchanged. A rule change amends .agents/RULES.md directly, keeping every id; never add another rules file."
     outcomes:
       done:      { to: plan, means: "spec complete: problem, solution, numbered Behaviour items with examples, out of scope; no open questions" }
       questions: { to: clarify, means: "spec written, but open questions are listed that need the person's answers" }

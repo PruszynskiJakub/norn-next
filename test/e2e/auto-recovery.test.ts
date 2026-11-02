@@ -1,5 +1,5 @@
 /**
- * Auto-mode recovery end to end (SPEC-auto-mode-recovery §4 acceptance 5–8, 10), one clone each:
+ * Auto-mode recovery end to end (§13.1), one clone each:
  *   - R4.2/R4.3: a failed nudge send is `ok: false`, an Unblock item and shown in status; a runner
  *     without `send` resumes the agent session with the nudge text
  *   - R5.1–R5.3: a `started` receipt without state is adopted when the runner finds the run, `died`

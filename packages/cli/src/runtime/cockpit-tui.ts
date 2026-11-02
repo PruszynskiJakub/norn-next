@@ -1,5 +1,5 @@
 /**
- * The terminal renderer of the cockpit model (SPEC-cockpit CP6–CP8): raw keys, three tabs (now, backlog,
+ * The terminal renderer of the cockpit model (CP6–CP8): raw keys, three tabs (now, backlog,
  * done) each with its own selection and filter, a one-line prompt for actions that take text, and a
  * full-screen frame — rows on the left, the selected row's preview on the right. Pure: keys and a model in, the next state, an effect and a frame out. Which
  * actions a row offers is the model's (CP4); keys only look them up.

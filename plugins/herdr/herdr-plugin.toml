@@ -1,4 +1,4 @@
-# norn's Herdr plugin (SPEC-cockpit CP11): the cockpit (`norn status --watch`) as a split (through norn) or as a popup, and three actions.
+# norn's Herdr plugin (CP11): the cockpit (`norn status --watch`) as a split (through norn) or as a popup, and three actions.
 # Config snippet (tab bar segment, sidebar tokens, key bindings): README.md beside this file.
 # Install it once:  herdr plugin install PruszynskiJakub/norn-next/plugins/herdr
 # (from a norn checkout: herdr plugin link <checkout>/plugins/herdr)

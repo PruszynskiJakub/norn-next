@@ -1,5 +1,5 @@
 /**
- * The terminal cockpit over a hand-built view (SPEC-cockpit CP6, CP7): three tabs, each story once, a
+ * The terminal cockpit over a hand-built view (CP6, CP7): three tabs, each story once, a
  * closed story reads done, section counts, `]` `[` `n`, a NEEDS YOU row says what the story is, and the
  * list takes about 60% of the width.
  */

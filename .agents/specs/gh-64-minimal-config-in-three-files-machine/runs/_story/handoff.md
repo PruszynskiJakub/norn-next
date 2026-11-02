@@ -130,6 +130,13 @@ Implement gh-64's whole Plan (B1–B55, docs included) in this quick round, in t
 - describe#1: pr.md written in the spec folder: summary (the four files and the derivations), evidence per B item from the seam tests plus a dev-build `norn config list` and two refusals observed in a temp repo (no QA step in quick), review #4's open minors, merge danger one-way (old configs refused, migrate rewrites files the old release cannot read).
 - describe#1 done: pr.md written: summary of the three config files plus workflow mode/defaults and what is derived; evidence for every B item from the seam tests and a dev-build norn config run (no QA step in quick); review #4 minors listed; merge danger one-way, every user (old configs refused until norn migrate).
 
+- implement#7 (ci.fail rework): the ci check found no ci.yml run because PR #164 conflicted with main (GitHub runs no pull_request workflow on a conflicting PR). main had taken in #163 (gh-162 docs overhaul: PRD + SPEC files folded into `.agents/RULES.md`, README cut down, `docs/{concepts,reference,recipes,limitations}.md`, cookbook deleted, a Reference generator reading the config schema). Merged origin/main (no rebase), resolved by intent:
+  - RULES.md: our PRD edits all carried over (checked line by line); MO4/GR1 keep our wording with main's id-only pointers; HC2 (from SPEC-herdr-cockpit) now says the fixed 2 min; HC14, §7 layout, R8.2, the cockpit's `config.provider` updated for gh-64.
+  - README: main's shorter version, with our init sentence, empty-inbox text and a three-file config paragraph. AGENTS.md, schema config.ts: ours with main's pointer style (no PRD/SPEC names).
+  - Reference generator (`packages/cli/src/reference.ts`): config table now walks the three file schemas (UserConfig/LocalConfig/RepoConfig) with a File column; `integer 1–9`, boolean, URL types; tests rewritten red first (keys per file, defaults, no removed key). docs/reference.md Config prose rewritten for three files; concepts.md and limitations.md no longer name the configured label/runner or the browser capability. Cookbook edits had no target (config recipes now live in Reference).
+  - B52 lint now covers every doc (allDocs incl. RULES.md); `notifiers` matched only as a key, since O3 uses the noun.
+  - Unit 1103/0, typecheck clean, repo tests 166/0, the four auto-merged integration files 37/0.
+
 ## Resume
 
-describe#1 is done; pr.md is the PR body. Nothing left in this step.
+The merge with main is committed; norn pushes it at the step boundary and the ci check reruns. Nothing left in this step.

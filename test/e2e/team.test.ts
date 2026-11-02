@@ -1,5 +1,5 @@
 /**
- * Team handoff (M3, §19.3): clone A runs a slice until it parks on `ask`, hands it over (T6, B34);
+ * Team handoff (M3): clone A runs a slice until it parks on `ask`, hands it over (T6, B34);
  * clone B checks the story out from git alone (T5, B33), briefs and continues. Then a CAS race between
  * two checkouts (T3: one wins, the other gets "held by X since Y"), `story checkout --force` journaled,
  * and `story close` (GR7, B35–B39).
@@ -134,7 +134,7 @@ beforeAll(async () => {
 });
 afterAll(() => h.cleanup());
 
-describe("two clones hand a story over through git (§19.3, T5, T6)", () => {
+describe("two clones hand a story over through git (T5, T6)", () => {
   test("clone A: intake → plan → slice implement asks a question and parks", async () => {
     expect((await A.norn("init")).exit).toBe(0);
     h.config(CONFIG);

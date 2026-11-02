@@ -1,4 +1,4 @@
-/** The cockpit model (SPEC-cockpit CP1–CP5): rows, previews and the actions each row offers, as data. */
+/** The cockpit model (CP1–CP5): rows, previews and the actions each row offers, as data. */
 import { describe, expect, test } from "bun:test";
 import type { InboxGroup, RemoteIssue } from "@norn/core";
 import { type CockpitRow, cockpitModel, type InboxEntry, type ProjectView, type StoryView, withInput } from "../../src/index.ts";

@@ -1,5 +1,5 @@
 /**
- * Honest QA and notes (QV1–QV8, NT1–NT4; SPEC-base-sync-and-qa §7 cases 8, 9, 10): the pure checks
+ * Honest QA and notes (QV1–QV8, NT1–NT4): the pure checks
  * `norn done` runs on a criteria report, and — replayed through decide (X4) — the human-qa gate's
  * inbox item listing what a person checks, note items and their acknowledgement by `approve`.
  */
