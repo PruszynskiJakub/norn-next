@@ -35,7 +35,7 @@ Non-goals:
   - the run's newest hooks, after its last `turn_start` / `tool_use`, are `turn_end`, `waiting_input` or `permission_prompt` — or, with no such hook, its runner pane is `idle`, `done` or `waiting_input` since after the last hook.
 
   The wait starts at the first of those trailing hooks (or the pane's state change). Claude's `idle_prompt` notification (`turn_end`, ~60 s after `Stop`) therefore does not restart it.
-- HC2 After `limits.attended_wait` (default `2m`; `0s` = at once) of waiting, the inbox shows the unit under **Your turn**: `<step>: the agent is waiting for you`, instead of under Running. Its `since` is the wait start, and its id is `attended:<unit>:<run_id>:<wait start>`, so the notifiers (O3) fire once per wait, and a new turn followed by a new wait is a new item. The delay keeps a live back-and-forth from notifying.
+- HC2 After 2 min (fixed, gh-64 B27) of waiting, the inbox shows the unit under **Your turn**: `<step>: the agent is waiting for you`, instead of under Running. Its `since` is the wait start, and its id is `attended:<unit>:<run_id>:<wait start>`, so the notifiers (O3) fire once per wait, and a new turn followed by a new wait is a new item. The delay keeps a live back-and-forth from notifying.
 - HC3 The item's command is how to reach the session: the runner's reach command when the run has a runner session, else `cd <worktree>`. Never the start-agent command (a second agent for the step was the dogfood mistake). Every inbox item of a unit with a current run also carries `reach: {worktree, agent_session_id, pane_id}` (nulls when unknown) so front ends can find the agent's pane (HC6).
 
 MO4 gains one sentence: *an attended run waiting for its person is shown as Your turn (HC1–HC2); this records no outcome.*
