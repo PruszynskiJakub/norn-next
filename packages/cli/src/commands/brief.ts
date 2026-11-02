@@ -14,7 +14,7 @@ import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, 
 import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
-import { agentName, loadUnitSession, refuseUnlessAgentWork, reportCommand, storyMode, type UnitSession, unitCriteria } from "../runtime/agent-unit.ts";
+import { agentName, loadUnitSession, refuseUnlessAgentWork, reportCommand, unitStoryMode, type UnitSession, unitCriteria } from "../runtime/agent-unit.ts";
 
 /** Wrappers between the agent and `norn` that exit right after it (never the run's process). */
 const WRAPPERS = /^-?(sh|bash|zsh|dash|fish|ksh|tcsh|csh|env|bun|bunx|npx|pnpm|timeout|sudo|nice|nohup|xargs|script|login)$/;
@@ -168,7 +168,7 @@ export const briefCommand = defineCommand({
       started = true;
     }
 
-    const mode = storyMode(ctx, s, config);
+    const mode = unitStoryMode(ctx, s, config);
     const env = readEnvNorn(s.worktree) ?? {};
     const num = (v: string | undefined) => (v !== undefined && /^\d+$/.test(v) ? Number(v) : null);
     const slicePath = s.unit.slice ? `${s.marker.spec_dir}/slices/${s.unit.dir}.md` : null;

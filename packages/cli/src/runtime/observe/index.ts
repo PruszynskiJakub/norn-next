@@ -23,6 +23,7 @@ import {
   type UnitFacts,
   type UnitRef,
   type WorktreeFacts,
+  storyMode,
 } from "@norn/core";
 import { parseDuration, type ResolvedConfig, sliceBranch, storyBranch, type UnitState, type Workflow } from "@norn/schema";
 import {
@@ -332,7 +333,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       ...(await storyBase(git, root, remote, base, branch, s.frontmatter?.status, refs, baseCacheIn, baseCache, s.key)),
       units,
       slices: s.slices satisfies SliceFileFacts[],
-      mode: units[0]?.state?.mode ?? config.mode,
+      mode: storyMode(units[0]?.state, units[0]?.workflow, config),
     });
   }
 

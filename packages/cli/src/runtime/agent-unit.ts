@@ -6,9 +6,9 @@
 import { existsSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { AgentUnit, UnitRef } from "@norn/core";
-import { cmd, agentWorkRefusal, cursorStep, storyWorktreePath } from "@norn/core";
+import { cmd, agentWorkRefusal, cursorStep, storyMode, storyWorktreePath } from "@norn/core";
 import type { Criterion, Mode, Receipt, ResolvedConfig } from "@norn/schema";
-import { loadUnit, readSliceFile, readState, readStoryFile, storyFile, type UnitMarker, unitDir } from "@norn/store";
+import { loadUnit, readPinnedWorkflow, readSliceFile, readState, readStoryFile, storyFile, type UnitMarker, unitDir } from "@norn/store";
 import { type Context, findUnitMarker, safeRealpath } from "../context.ts";
 import { corruptError, refuse } from "../output.ts";
 
@@ -76,13 +76,14 @@ export function refuseUnlessAgentWork(s: UnitSession, verb: string): void {
 }
 
 /** The story's mode (MO1): stored in the story unit's state, which lives in the story worktree. */
-export function storyMode(ctx: Context, s: UnitSession, config: ResolvedConfig): Mode {
-  if (s.unit.slice === null) return s.state.mode ?? config.mode;
+export function unitStoryMode(_ctx: Context, s: UnitSession, config: ResolvedConfig): Mode {
+  if (s.unit.slice === null) return storyMode(s.state, s.workflow, config);
   const slug = basename(s.marker.spec_dir).slice(s.unit.story.length + 1);
   const wt = storyWorktreePath(s.root, s.unit.story, slug);
   const dir = unitDir(join(existsSync(wt) ? wt : s.root, s.marker.spec_dir), "_story");
   const st = readState(dir);
-  return (st.ok ? st.value.mode : undefined) ?? config.mode;
+  const wf = readPinnedWorkflow(dir);
+  return storyMode(st.ok ? st.value : null, wf.ok ? wf.value.workflow : null, config);
 }
 
 /** `who` for agent receipts: the run's agent, else the step's, else the default (A6). */

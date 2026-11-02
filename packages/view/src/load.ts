@@ -28,6 +28,7 @@ import {
   type UnitFacts,
   type UnpushedRuns,
   type WorktreeFacts,
+  storyMode,
 } from "@norn/core";
 import { DEFAULT_CONFIG, type HookFact, type Mode, type ResolvedConfig, sliceBranch, storyBranch, type Workflow } from "@norn/schema";
 import {
@@ -315,7 +316,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     let claim = classifyClaim(claims[i] ?? { state: "none" }, me, now);
     if (claim.state === "other" && claim.blob.holder === holder) claim = { ...claim, state: "mine" };
     const storyState = story.units[0]?.state ?? null;
-    const mode: Mode = storyState?.mode ?? config.mode;
+    const mode: Mode = storyMode(storyState, story.units[0]?.workflow?.workflow, config);
     const finished = story.frontmatter?.status === "done" || story.frontmatter?.status === "dropped";
 
     const units: UnitFacts[] = ls.units.map((lu) => unitFacts(lu, lu.hooks, leaseByRun));

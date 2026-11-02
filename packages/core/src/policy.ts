@@ -2,7 +2,7 @@
  * Rules decide and the inbox both read off Facts — each defined once here, so the tick that acts
  * and the inbox that tells a person never disagree about them.
  */
-import { type Mode, parseDuration, type ResolvedConfig, type Step, type UnitState } from "@norn/schema";
+import { type Mode, parseDuration, type ResolvedConfig, type Step, type UnitState, type Workflow } from "@norn/schema";
 import type { Facts, RunFacts, StoryFacts, UnitFacts } from "./facts.ts";
 
 /** W9: the issue label that picks a story's workflow at intake (`norn:wf:<name>`); B19: it follows the round after. */
@@ -18,6 +18,15 @@ export function effectiveMode(story: Mode, attended: boolean, runner: string | n
   if (attended) return { mode: "manual", downgraded: false };
   if (!runner) return { mode: "manual", downgraded: story === "auto" };
   return { mode: story, downgraded: false };
+}
+
+/**
+ * MO1 (gh-64 B10): a story's mode, nearest first: the story (`norn story edit`), the workflow its
+ * story unit runs (top-level `mode`), your config (local file over user file, already merged),
+ * built-in `manual`.
+ */
+export function storyMode(state: { mode?: Mode } | null | undefined, workflow: Workflow | null | undefined, config: Pick<ResolvedConfig, "mode">): Mode {
+  return state?.mode ?? (workflow as { mode?: Mode } | null | undefined)?.mode ?? config.mode;
 }
 
 /** The story's own unit (slice null), or null before it has facts. */
