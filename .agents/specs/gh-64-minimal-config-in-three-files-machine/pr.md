@@ -16,22 +16,23 @@ no key       : runner (Herdr env / on PATH, else headless), provider (remote URL
                claim lease max(10m, 4×interval), renew lease/3 (interval recorded by watch / tick --interval)
 ```
 
-`norn config list` in a fresh repo (dev build, user file `mode: auto` + `agents.claude.model`), abridged:
+`norn config list` at this HEAD in a fresh repo (dev build, remote `git@github.com:acme/app.git`, user file `mode: auto` + `agents.claude.model`), abridged:
 
 ```text
-| `mode`                | `auto`                         | user                 |
-| `agents.claude.model` | `claude-opus-5-5`              | user                 |
-| `agents.claude.args`  | `["--permission-mode","auto"]` | built-in             |
-| `provider`            | `gh`                           | derived: remote URL  |
-| `claim.lease`         | `10m`                          | derived: interval 30s|
-| `claim.renew`         | `3m20s`                        | derived: interval 30s|
+| `max_agents`          | `9`                            | built-in              |
+| `mode`                | `auto`                         | user                  |
+| `agents.claude.model` | `claude-opus-5-5`              | user                  |
+| `agents.claude.args`  | `["--permission-mode","auto"]` | built-in              |
+| `provider`            | `gh`                           | derived: remote URL   |
+| `claim.lease`         | `10m`                          | derived: interval 30s |
+| `claim.renew`         | `3m20s`                        | derived: interval 30s |
 ```
 
 Also gone: criteria `needs` and agent `capabilities` (a slice that still has `needs` points at `norn migrate`, never corrupt).
 
 ## Evidence
 
-This round is `quick`: there is no QA step and no criteria report. The evidence is the tests at the Plan's seams (S1 cli harness, S2 decide, S3 `buildPorts`, S4 workflow load, S5 repo lint), the last full runs (unit 1079/0, typecheck clean; integration and e2e green in the `test` check) and a dev-build run in a temp repo (output quoted). Review #4 approved after checking B1–B55 against the whole diff.
+This round is `quick`: there is no QA step and no criteria report. The evidence is the tests at the Plan's seams (S1 cli harness, S2 decide, S3 `buildPorts`, S4 workflow load, S5 repo lint), the last runs (unit 1103/0, typecheck clean, repo and reference tests 174/0; integration and e2e green in the `test` check) and a dev-build run in a temp repo at this HEAD (output quoted). Review #6 approved after checking the whole diff again, after the merge of main's docs overhaul (#163).
 
 - **B1** works with no config file
   **Before:** a template team file was written; a user file never.
@@ -46,7 +47,7 @@ This round is `quick`: there is no QA step and no criteria report. The evidence 
   **After:** `config.test.ts` "B2, B4, B14"; the emitted team schema's properties are exactly those four (`slice-workflow.test.ts` init test).
 - **B5** key in the wrong file → `config_wrong_file`
   **Before:** `max_agents` in the team file was accepted.
-  **After:** observed: `**Config error (config_wrong_file):** .agents/norn.config.yaml: max_agents belongs in ~/.norn/config.yaml (machine key)`, exit 6. Test: "B5" in `config.test.ts`, one case per file.
+  **After:** observed (`max_agents: 4` in the team file): `**Config error (config_wrong_file):** .agents/norn.config.yaml: max_agents belongs in ~/.norn/config.yaml (machine key)`, exit 6. Test: "B5" in `config.test.ts`, one case per file.
 - **B6, B17, B53** typos and bad values → `config_invalid` naming file, key, problem
   **Before:** adapter `options` typos ignored silently.
   **After:** `config.test.ts` "B6, B17, B19, B53" (`max_agent`, `mode: automatic`, `agent: claud`, `agents.aider`, `max_agents: 12`, `notify.webhook: not-a-url`).
@@ -95,7 +96,7 @@ This round is `quick`: there is no QA step and no criteria report. The evidence 
 - **B36, B37, B38** `needs` and `capabilities` gone
   **After:** core criteria tests "B36", "QV8, B37: counted per verdict, with no split by capability"; `config-runtime.test.ts` "B38: a slice that still has criteria needs shows under Unblock with norn migrate, not as corrupt".
 - **B39** old keys → `config_moved` with replacement and `norn migrate`
-  **After:** observed: `default_mode` in the team file → `**Config error (config_moved):** … default_mode is now mode; run norn migrate`, exit 6. Test: `config.test.ts` "B39", one case per key family.
+  **After:** observed: `default_mode: auto` in the team file → `**Config error (config_moved):** .agents/norn.config.yaml: default_mode is now mode; run norn migrate`, exit 6. Test: `config.test.ts` "B39", one case per key family.
 - **B40–B45** `norn migrate` rewrites config, workflows, slices
   **After:** `migrate.test.ts` "norn migrate moves old config keys": user file in place with comments kept, team file staged (B40); limits → `defaults:`, `default_mode` → workflow `mode`, a workflow's own value kept, JSON workflows too (B41, B42); personal/machine keys and unplaceable limits listed with their values, team `notifiers` offered as `notify:` (B43); slice `needs` stripped (B44); second run changes nothing, nothing committed, new-style files left byte-for-byte (B45).
 - **B46** `norn config` shows every setting with its source
@@ -106,9 +107,9 @@ This round is `quick`: there is no QA step and no criteria report. The evidence 
 - **B49, B50, B55** init starters, modelines, schema copies
   **After:** `slice-workflow.test.ts` init test: commented user file on first init, left alone after; modelines; `.agents/norn.config.schema.json`, `.agents/norn.config.local.schema.json`, `~/.norn/config.schema.json`. `assets.test.ts` "config starters (B49, B50)": every commented key validates in its file once uncommented. Editor completion itself was not observed in an editor; check by opening `.agents/norn.config.yaml` with the YAML language server.
 - **B52** docs name no removed key
-  **After:** `repo.test.ts` "config docs (gh-64 B52)" over help, the view, README, cookbook, templates, skills and AGENTS.md. Not covered: `.agents/SPEC-herdr-cockpit.md` and `.agents/LIMITATIONS.md` still name `notifiers` / `limits.attended_wait` (review #4 note).
+  **After:** `repo.test.ts` "config docs (gh-64 B52)" over every doc (`allDocs`: README, `.agents/RULES.md`, `docs/*.md`, AGENTS.md), help, the view, templates and skills; it also catches "capability gating". The generated Reference config table (`reference.ts`) walks the three file schemas with a File column and shows `provider` and `base_branch` as derived (`reference.test.ts`, red first); `docs/reference.md` regenerated and in sync.
 
-Known, not blocking (review #4): `norn init` on a self-hosted remote refuses before writing anything and its hint names a team file that does not exist yet (recover with `norn config set provider glab --repo`); in the team file `default_mode`'s replacement text says `mode` rather than each workflow's `mode`.
+Known, not blocking (review #6): `norn init` on a self-hosted remote refuses before writing anything and its hint names a team file that does not exist yet (recover with `norn config set provider glab --repo`); `norn config list` labels `base_branch` built-in where Reference says derived; RULES R5.2/R5.5 still say "watch interval" for the recorded tick interval; `norn tick --interval` records the interval outside the tick lock (a racing tick can lose it until the next one); migrate skips an unparsable workflow without listing it; a remote defined in an included git config file is not derived.
 
 ## Merge danger
 
