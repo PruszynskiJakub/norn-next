@@ -1,0 +1,152 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://norn.dev/schema/user-config.json",
+  "title": "norn user config: this machine and your defaults",
+  "additionalProperties": false,
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "max_agents": {
+      "minimum": 1,
+      "maximum": 9,
+      "description": "agent sessions at once on this machine, 1–9 (there are 9 slots)",
+      "type": "integer"
+    },
+    "notify": {
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "os": {
+          "type": "boolean"
+        },
+        "ntfy": {
+          "pattern": "^https?://\\S+$",
+          "description": "http or https URL",
+          "type": "string"
+        },
+        "webhook": {
+          "pattern": "^https?://\\S+$",
+          "description": "http or https URL",
+          "type": "string"
+        }
+      }
+    },
+    "trace": {
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "retain": {
+          "minLength": 1,
+          "description": "Duration like 14d, at least 14d (checked by norn tidy and norn doctor)",
+          "type": "string"
+        }
+      }
+    },
+    "mode": {
+      "anyOf": [
+        {
+          "const": "manual",
+          "type": "string"
+        },
+        {
+          "const": "auto",
+          "type": "string"
+        }
+      ]
+    },
+    "agent": {
+      "description": "claude, codex, opencode or gemini",
+      "anyOf": [
+        {
+          "const": "claude",
+          "type": "string"
+        },
+        {
+          "const": "codex",
+          "type": "string"
+        },
+        {
+          "const": "opencode",
+          "type": "string"
+        },
+        {
+          "const": "gemini",
+          "type": "string"
+        }
+      ]
+    },
+    "agents": {
+      "additionalProperties": false,
+      "description": "per agent: model and args, merged over the built-in entry",
+      "type": "object",
+      "properties": {
+        "claude": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "args": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "codex": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "args": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "opencode": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "args": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "gemini": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "args": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

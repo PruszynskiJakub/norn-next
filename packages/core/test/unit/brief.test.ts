@@ -16,7 +16,7 @@ function history(st: UnitState, wf = SLICE_WF, ...make: Array<(s: UnitState) => 
   for (const m of make) {
     const nr = numbered(rs.length + 1, m(st));
     rs.push(nr);
-    st = applyReceipts(st, [nr], { workflow: wf, now: at(), limits: { nudges: 2, retries: 1 } }).state;
+    st = applyReceipts(st, [nr], { workflow: wf, now: at() }).state;
   }
   return { st, rs };
 }
@@ -295,7 +295,7 @@ describe("Re-entry, fresh sessions, handoff and criteria (B2, C2, QV1)", () => {
   test("a second qa after the code changed: why this attempt, earlier qa is history, review's Resume dropped", () => {
     const { st, rs } = qa2();
     expect(st).toMatchObject({ step: "qa", attempt: 2, retries_used: 1 });
-    const b = renderBrief(input(st, rs, { workflow: QA_WF, handoff: HANDOFF, criteria: [{ id: "AC1", verifier: "agent" }, { id: "AC2", verifier: "agent", needs: ["browser"] }], capabilities: [] }));
+    const b = renderBrief(input(st, rs, { workflow: QA_WF, handoff: HANDOFF, criteria: [{ id: "AC1", verifier: "agent" }, { id: "AC2", verifier: "agent" }] }));
     expect(b.json.rework).toBeNull();
     expect(b.json.history).toEqual({
       retry: { outcome: "qa.died", detail: "launch_unknown", at: at() },
@@ -305,8 +305,8 @@ describe("Re-entry, fresh sessions, handoff and criteria (B2, C2, QV1)", () => {
     expect(b.markdown).not.toContain("Nothing left; report done.");
     expect(b.markdown).toContain("Footer shows the total.");
     expect(b.json.criteria).toEqual([
-      { id: "AC1", verifier: "agent", needs: [], missing: [] },
-      { id: "AC2", verifier: "agent", needs: ["browser"], missing: ["browser"] },
+      { id: "AC1", verifier: "agent" },
+      { id: "AC2", verifier: "agent" },
     ]);
     expect(b.markdown).toMatchSnapshot();
   });
@@ -349,7 +349,7 @@ function replay(dir: string, unit: UnitRef, paths: BriefInput["paths"]) {
     .sort()
     .map((file) => numbered(Number(file.slice(0, 4)), JSON.parse(readFileSync(join(FIX, dir, "receipts", file), "utf8")) as Receipt));
   let st = stateFor(unit, wf);
-  for (const r of receipts) st = applyReceipts(st, [r], { workflow: wf, now: r.receipt.at, limits: { nudges: 2, retries: 1 } }).state;
+  for (const r of receipts) st = applyReceipts(st, [r], { workflow: wf, now: r.receipt.at }).state;
   const evidence_files = JSON.parse(readFileSync(join(FIX, dir, "evidence.json"), "utf8")) as Record<string, string[]>;
   return renderBrief({ ...input(st, receipts), unit, workflow: wf, mode: "manual", runner: null, paths, diff_range: null, evidence_files });
 }
@@ -398,7 +398,7 @@ describe("golden replays (norn-sandbox-todoist)", () => {
       .slice(0, 5)
       .map((file) => numbered(Number(file.slice(0, 4)), JSON.parse(readFileSync(join(FIX, "gh-2-03", "receipts", file), "utf8")) as Receipt));
     let st = stateFor(unit, wf);
-    for (const r of receipts) st = applyReceipts(st, [r], { workflow: wf, now: r.receipt.at, limits: { nudges: 2, retries: 1 } }).state;
+    for (const r of receipts) st = applyReceipts(st, [r], { workflow: wf, now: r.receipt.at }).state;
     expect(st).toMatchObject({ step: "qa" });
     const b = renderBrief({ ...input(st, receipts), unit, workflow: wf });
     expect(b.json.rework).toBeNull();

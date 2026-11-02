@@ -5,7 +5,7 @@
  */
 import { existsSync } from "node:fs";
 import type { GitPort } from "@norn/core";
-import type { ResolvedConfig } from "@norn/schema";
+import { type ResolvedConfig, SLOTS } from "@norn/schema";
 import { acquireLease, ensureExcluded, type LeaseLiveness, slotEnv, writeEnvNorn, writeUnitMarker } from "@norn/store";
 
 export interface WorktreeTarget {
@@ -33,7 +33,7 @@ export async function equipWorktree(
   t: WorktreeTarget,
 ): Promise<number | null> {
   await ensureExcluded(opts.root);
-  const slots = opts.config.slots;
+  const slots = SLOTS;
   const req = {
     kind: "slot" as const,
     repo: opts.root,
@@ -49,7 +49,7 @@ export async function equipWorktree(
   let lease = preferred ? await acquireLease(opts.home, { ...req, range: { min: preferred.slot, max: preferred.slot } }) : null;
   if (!lease?.ok) lease = await acquireLease(opts.home, { ...req, range: { min: slots.min, max: slots.max } });
   const slot = lease.ok ? lease.entry.n : null;
-  writeEnvNorn(t.path, slot === null ? {} : slot === preferred?.slot ? preferred.env : slotEnv(slot, slots));
+  writeEnvNorn(t.path, slot === null ? {} : slot === preferred?.slot ? preferred.env : slotEnv(slot));
   writeUnitMarker(t.path, { repo: opts.root, story: t.story, slice: t.slice, unit: t.unit, spec_dir: t.spec_dir });
   return slot;
 }

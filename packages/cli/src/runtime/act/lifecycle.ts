@@ -312,7 +312,7 @@ async function record(act: ActEnv, p: PendingRecord): Promise<RecordResult | { s
 
 /** GR6: retry owed base-branch records, at most once per `remote.sync_interval` each (H5). */
 export async function retryRecords(act: ActEnv): Promise<Array<{ story: string; state: string; reason?: string }>> {
-  const every = parseDuration(act.config.remote.sync_interval);
+  const every = parseDuration(act.config.sync_interval);
   const now = act.ctx.clock.now();
   const out: Array<{ story: string; state: string; reason?: string }> = [];
   for (const p of readPendingRecords(act.root)) {

@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import { mkdirSync, writeFileSync, appendFileSync } from "node:fs";
 import { copyFileSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
-import type { Facts, LoadedWorkflow } from "@norn/core";
+import { type Facts, hookWindowMs, type LoadedWorkflow } from "@norn/core";
 import { type HookFact, type HookTrace, type ResolvedConfig, type TickTrace, type TraceEvent, ulid } from "@norn/schema";
 import {
   appendHookTrace,
@@ -34,24 +34,24 @@ import {
 import { AT, tmp, WORKFLOW_YAML } from "../helpers.ts";
 
 describe("config (K2)", () => {
-  test("user + repo layers merged; home from param or NORN_HOME_DIR; missing = defaults", () => {
+  test("user, local and team files merged; home from param or NORN_HOME_DIR; missing = built-in", () => {
     const repo = tmp();
     const home = tmp();
-    expect(loadConfig({ repoRoot: repo, home })).toMatchObject({ ok: true, config: { max_agents: 2 } });
-    writeFileSync(join(home, "config.yaml"), "max_agents: 4\ndefault_mode: auto\n");
+    expect(loadConfig({ repoRoot: repo, home })).toMatchObject({ ok: true, config: { max_agents: 9 } });
+    writeFileSync(join(home, "config.yaml"), "max_agents: 4\nmode: auto\n");
     mkdirSync(dirname(repoConfigPath(repo)), { recursive: true });
-    writeFileSync(repoConfigPath(repo), "max_agents: 8\nremote: { label: mine }\n");
+    writeFileSync(repoConfigPath(repo), "workflow: story\n");
+    writeFileSync(join(repo, ".agents", "norn.config.local.yaml"), "mode: manual\n");
     const c = loadConfig({ repoRoot: repo, env: { NORN_HOME_DIR: home } });
-    expect(c.ok && c.config).toMatchObject({ max_agents: 4, default_mode: "auto", remote: { label: "mine", provider: "gh" } });
+    expect(c.ok && c.config).toMatchObject({ max_agents: 4, mode: "manual", workflow: "story", provider: "gh" });
     expect(c.home).toBe(home);
   });
-  test("invalid layer → errors with repo-relative path", () => {
+  test("a key in the wrong file → a config problem naming the file, not corrupt", () => {
     const repo = tmp();
     mkdirSync(dirname(repoConfigPath(repo)), { recursive: true });
-    writeFileSync(repoConfigPath(repo), "max_agents: zero\n");
+    writeFileSync(repoConfigPath(repo), "max_agents: 2\n");
     const c = loadConfig({ repoRoot: repo, home: tmp() });
-    expect(c.ok).toBe(false);
-    expect(!c.ok && c.errors[0]?.file).toBe(relative(repo, repoConfigPath(repo)));
+    expect(!c.ok && c.problems).toEqual([{ code: "config_wrong_file", file: "repo", key: "max_agents", message: "`max_agents` belongs in `~/.norn/config.yaml` (machine key)" }]);
   });
 });
 
@@ -69,6 +69,35 @@ describe("workflows (W1)", () => {
     expect(l.errors.map((e) => e.file)).toEqual([relative(repo, join(dir, "story.yaml"))]);
     expect(loadWorkflow(repo, "slice")).toMatchObject({ ok: true, value: { name: "slice", workflow: { start: "implement" } } });
     expect(loadWorkflow(repo, "nope")).toEqual({ ok: false, reason: "missing" });
+  });
+
+  test("B25, B26: a workflow takes a top-level mode and a defaults block", () => {
+    const repo = tmp();
+    mkdirSync(workflowsDir(repo), { recursive: true });
+    writeFileSync(join(workflowsDir(repo), "slice.yaml"), `mode: manual\ndefaults: { deadline: 30m, nudges: 1, retries: 0, stalled: 40m }\n${WORKFLOW_YAML}`);
+    expect(loadWorkflow(repo, "slice")).toMatchObject({ ok: true, value: { workflow: { mode: "manual", defaults: { deadline: "30m", nudges: 1, retries: 0, stalled: "40m" } } } });
+  });
+
+  test("B28 (S4): the hook read window is the longest stalled across the loaded workflows", () => {
+    const repo = tmp();
+    mkdirSync(workflowsDir(repo), { recursive: true });
+    const window = () => hookWindowMs(Object.values(loadWorkflows(repo).workflows).map((w) => w.workflow));
+    writeFileSync(join(workflowsDir(repo), "slice.yaml"), WORKFLOW_YAML);
+    expect(window()).toBe(15 * 60_000);
+    writeFileSync(join(workflowsDir(repo), "long.yaml"), `defaults: { stalled: 40m }\n${WORKFLOW_YAML.replace(/^name: slice$/m, "name: long")}`);
+    expect(window()).toBe(40 * 60_000);
+  });
+
+  test("B11, D17: mode and stalled on a step are refused at load, the step named", () => {
+    const repo = tmp();
+    mkdirSync(workflowsDir(repo), { recursive: true });
+    writeFileSync(join(workflowsDir(repo), "slice.yaml"), WORKFLOW_YAML.replace("    skill: implement\n", "    skill: implement\n    mode: auto\n    stalled: 20m\n"));
+    const l = loadWorkflows(repo);
+    expect(l.workflows.slice).toBeUndefined();
+    expect(l.errors[0]?.errors).toEqual([
+      { path: "/steps/implement/mode", message: "`mode` is set on the workflow, not on a step" },
+      { path: "/steps/implement/stalled", message: "`stalled` is set in the workflow's `defaults:`, not on a step" },
+    ]);
   });
 });
 
@@ -185,7 +214,11 @@ describe("trace (O4)", () => {
     const read = readTickInputs(repo, t);
     const inputs = read.ok ? read.inputs : null;
     expect(inputs?.facts as unknown).toEqual({ now: Date.parse(AT), tick_id: "T" });
-    expect(inputs?.config).toBe(config);
+    expect(inputs?.config).toEqual(config);
+    // a config recorded under the old names reads back in today's names (gh-64 P1)
+    const old = { ...t, facts: { ...t.facts, replay: { workflows: {}, config: { default_mode: "auto", remote: { label: "x" } } } } } as unknown as TickTrace;
+    const oldRead = readTickInputs(repo, old);
+    expect(oldRead.ok && oldRead.inputs.config).toEqual({ mode: "auto", label: "x" } as unknown as ResolvedConfig);
     expect(inputs?.workflows.slice).toMatchObject({ name: "slice", source: WORKFLOW_YAML, issues, workflow: { name: "slice", start: "implement" } });
     expect(inputs?.workflows.gone).toEqual({ name: "gone", workflow: null, source: "", issues: [] });
     // a tick an older norn recorded without the replay block

@@ -1,11 +1,11 @@
 /**
  * The generated part of docs/reference.md (gh-162 B8–B13): every command and verb with its usage and
- * options, every config key with its type (read off the config schema) and built-in default, the shipped workflows and the exit
+ * options, every config key with the files that take it, its type (read off the file schemas, gh-64) and built-in default, the shipped workflows and the exit
  * codes, rendered from the cli's own registry, the built-in config and the shipped assets. Pure: the
  * caller passes the workflow files' text. `bun run docs:emit` writes it between the markers; a unit
  * test fails when the file is stale.
  */
-import { ConfigLayer, DEFAULT_CONFIG, Duration, ExitCode } from "@norn/schema";
+import { CONFIG_SCHEMAS, type ConfigFileKind, DEFAULT_CONFIG, Duration, ExitCode, Url } from "@norn/schema";
 import type { Command, Noun } from "./command.ts";
 import { HELP_GROUPS, plainSummary } from "./commands/help.ts";
 
@@ -45,7 +45,6 @@ interface ConfigRow {
 }
 
 const props = (s: Schema): Record<string, Schema> | undefined => s.properties as Record<string, Schema> | undefined;
-const record = (s: Schema): Schema | undefined => Object.values((s.patternProperties as Record<string, Schema> | undefined) ?? {})[0];
 
 /** A schema's type in words, read off the schema itself (B9), never off a default value. */
 function typeName(s: Schema): string {
@@ -55,44 +54,65 @@ function typeName(s: Schema): string {
     return branches.map(typeName).join(" or ");
   }
   if (s.type === "null") return "null";
+  if (s.type === "boolean") return "boolean";
+  if (s.type === "string" && s.pattern === Url.pattern) return "URL";
   // trace.retain is a plain string checked where it is used, but holds a duration all the same
   if (s.type === "string") return s.pattern === Duration.pattern || String(s.description).startsWith("Duration") ? "duration" : "string";
-  if (s.type === "integer") return typeof s.minimum === "number" ? `integer ≥ ${s.minimum}` : "integer";
+  if (s.type === "integer") {
+    if (typeof s.minimum === "number" && typeof s.maximum === "number") return `integer ${s.minimum}–${s.maximum}`;
+    return typeof s.minimum === "number" ? `integer ≥ ${s.minimum}` : "integer";
+  }
   if (s.type === "array") return `list of ${typeName(s.items as Schema)}s`;
   if (s.type === "object") return "map";
   return "any";
 }
 
 /**
- * Every key a config layer can hold (B9), walked from the `ConfigLayer` schema: a map's own keys
- * nest (`slots.min`), a map by name nests under `<name>` (`agents.<name>.model`), a list's items
- * under `[]` (`notifiers[].adapter`), and a map-or-null both nests and has a row of its own.
+ * Every key a config file can hold (B9), walked from the file's schema: a map's own keys nest
+ * (`notify.ntfy`, `agents.claude.model`), and a map-or-null both nests and has a row of its own.
  */
 function configRows(s: Schema, path: string[], defaults: unknown): ConfigRow[] {
-  const key = path.join(".").replace(/\.\[\]/g, "[]");
+  const key = path.join(".");
   const here: ConfigRow = { key, type: typeName(s), value: defaults };
   const object = Array.isArray(s.anyOf) ? (s.anyOf as Schema[]).find((b) => props(b)) : s;
   const fields = object && props(object);
-  if (fields) {
-    const own = Object.entries(fields)
-      .filter(([k]) => k !== "$schema")
-      .flatMap(([k, child]) => configRows(child, [...path, k], at(defaults, k)));
-    return path.length && object !== s ? [here, ...own] : own;
-  }
-  const byName = record(s);
-  if (byName && props(byName)) return [here, ...configRows(byName, [...path, "<name>"], undefined)];
-  if (s.type === "array" && props(s.items as Schema)) return [here, ...configRows(s.items as Schema, [...path, "[]"], undefined)];
-  return [here];
+  if (!fields) return [here];
+  const own = Object.entries(fields)
+    .filter(([k]) => k !== "$schema")
+    .flatMap(([k, child]) => configRows(child, [...path, k], at(defaults, k)));
+  return path.length && object !== s ? [here, ...own] : own;
 }
 
 const at = (v: unknown, k: string): unknown => (typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>)[k] : undefined);
 
+/** How the table names each file (gh-64 B1): `~/.norn/config.yaml`, the local file, the team file. */
+export const FILE_LABEL: Record<ConfigFileKind, string> = { user: "user", local: "local", repo: "team" };
+
+/** Keys whose value, when no file sets it, is derived from the repo, not a fixed built-in default (gh-64 B22, B23). */
+const DERIVED_DEFAULT: Record<string, string> = {
+  provider: "derived from the remote URL",
+  base_branch: "derived: the remote's default branch",
+};
+
+function defaultCell(r: ConfigRow): string {
+  const derived = DERIVED_DEFAULT[r.key];
+  if (derived) return cell(derived);
+  return r.value === undefined ? "none" : `\`${cell(JSON.stringify(r.value))}\``;
+}
+
 function renderConfig(): string[] {
-  const rows = configRows(ConfigLayer as unknown as Schema, [], DEFAULT_CONFIG);
+  const rows = new Map<string, ConfigRow & { files: string[] }>();
+  for (const [kind, schema] of Object.entries(CONFIG_SCHEMAS) as Array<[ConfigFileKind, unknown]>) {
+    for (const r of configRows(schema as Schema, [], DEFAULT_CONFIG)) {
+      const row = rows.get(r.key) ?? { ...r, files: [] };
+      row.files.push(FILE_LABEL[kind]);
+      rows.set(r.key, row);
+    }
+  }
   return [
-    "| Key | Type | Built-in default |",
-    "|---|---|---|",
-    ...rows.map((r) => `| \`${r.key}\` | ${cell(r.type)} | ${r.value === undefined ? "none" : `\`${cell(JSON.stringify(r.value))}\``} |`),
+    "| Key | File | Type | Built-in default |",
+    "|---|---|---|---|",
+    ...[...rows.values()].map((r) => `| \`${r.key}\` | ${r.files.join(", ")} | ${cell(r.type)} | ${defaultCell(r)} |`),
   ];
 }
 

@@ -3,12 +3,11 @@
  * [--note "…" [--note-criterion <id>]]…` (§9.3, §10): the only way an agent step completes. The
  * outcome must be declared at the pinned step (W3); findings are copied into the receipt, evidence
  * into runs/<unit>/evidence/<run_id>/. The criteria report (QV2) is validated against
- * `CriteriaReport`, its coverage against the unit's frontmatter `criteria` (QV4), its `pass`
- * verdicts against the agent's capabilities (QV5a) and the outcome against its worst verdict (QV5); notes (NT1) never block and never change the route.
+ * `CriteriaReport`, its coverage against the unit's frontmatter `criteria` (QV4), and the outcome against its worst verdict (QV5); notes (NT1) never block and never change the route.
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
-import { cmd, checkReport, cursorStep, enteringReceipt, reportableOutcomes, unverifiedNeeds, verdictCounts } from "@norn/core";
+import { cmd, checkReport, cursorStep, enteringReceipt, reportableOutcomes, verdictCounts } from "@norn/core";
 import { type AgentStep, type CriterionVerdict, type Finding, type Note, type ReceiptOf, validate } from "@norn/schema";
 import { appendTrace, ensureEvidenceDir, traceEvent } from "@norn/store";
 import { defineCommand, type ParsedArgs, opt } from "../command.ts";
@@ -177,9 +176,7 @@ export const doneCommand = defineCommand({
       report = parseCriteria(readFileSync(p, "utf8"), criteriaFile);
     }
     const declared = report || notes.some((n) => n.criterion !== undefined) || step.criteria === "required" ? unitCriteria(t.s) : null;
-    // QV5a (C2): the reporting agent's declared capabilities bound what it may `pass`
-    const capabilities = ctx.config.agents[t.agent]?.capabilities ?? [];
-    const verdicts = checkReport({ step, step_name: t.s.state.step, outcome, report, criteria: declared, notes, capabilities });
+    const verdicts = checkReport({ step, step_name: t.s.state.step, outcome, report, criteria: declared, notes });
     if (!verdicts.ok) throw refuse(verdicts.refusal.error, verdicts.refusal.do_instead, verdicts.refusal.code, verdicts.refusal.details);
 
     // BS5: a base-mode step reports done only with the base merged and nothing left unresolved
@@ -212,7 +209,6 @@ export const doneCommand = defineCommand({
           outcome,
           rule: verdicts.coverage === "checked" ? "criteria.checked" : "criteria.unchecked_coverage",
           verdicts: verdictCounts(report),
-          unverified_needs: unverifiedNeeds(report, declared),
         }),
       );
     const plural = (n: number, what: string) => `${n} ${what}${n === 1 ? "" : "s"}`;

@@ -86,9 +86,9 @@ describe("criteria summary (QV8)", () => {
   const ev = (unit: string, unverified: number, needs: Record<string, number>, rule: "criteria.checked" | "criteria.unchecked_coverage" = "criteria.checked") =>
     ({ type: "criteria", id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9ABC", at: "2026-10-23T12:00:00.000Z", unit, run_id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9ABD", step: "qa", attempt: 1, receipt_id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9ABE", outcome: "unverified", rule, verdicts: { pass: 1, fail: 0, person: 0, unverified }, unverified_needs: needs }) as const;
 
-  test("unverified per capability summed over the units shown; other units ignored", () => {
+  test("verdicts summed over the units shown, with no split by needs (B37); other units ignored", () => {
     const events = [ev("gh-1/01", 1, { browser: 1 }), ev("gh-1", 2, { browser: 1, none: 1 }, "criteria.unchecked_coverage"), ev("gh-2", 5, { browser: 5 })];
-    expect(criteriaSummary(events, new Set(["gh-1", "gh-1/01"]))).toEqual({ reports: 2, verdicts: { pass: 2, fail: 0, person: 0, unverified: 3 }, unverified_needs: { browser: 2, none: 1 }, unchecked_coverage: 1 });
+    expect(criteriaSummary(events, new Set(["gh-1", "gh-1/01"]))).toEqual({ reports: 2, verdicts: { pass: 2, fail: 0, person: 0, unverified: 3 }, unchecked_coverage: 1 });
     expect(criteriaSummary(events, new Set(["gh-3"]))).toBeNull();
   });
 });

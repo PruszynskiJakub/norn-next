@@ -42,8 +42,7 @@ You need write access to the repo.
 2. Clone the repo and run `norn doctor`.
 3. Optional, in `~/.norn/config.yaml` (never in the repo):
    ```yaml
-   default_mode: auto
-   runner: { adapter: herdr }
+   mode: auto
    max_agents: 2
    ```
 4. `norn watch`, and `norn status` in another terminal.

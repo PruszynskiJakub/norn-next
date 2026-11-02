@@ -111,15 +111,15 @@ describe("leases (K1, K3, K4)", () => {
   test("slot leases: range, port base, worktree liveness by default, reclaim", async () => {
     const home = tmp();
     const wt = tmp();
-    const slots = { ...DEFAULT_CONFIG.slots, min: 3, max: 4 };
-    const s = await acquireSlotLease(home, slots, { ...unit, worktree: wt, holder: A });
-    expect(s).toMatchObject({ ok: true, entry: { n: 3, lease: { slot: 3, port_base: 4030, worktree: wt } } });
-    const same = await acquireSlotLease(home, slots, { ...unit, worktree: wt, holder: B });
+    // B33: slots are fixed at 1–9, slot n from port 4000 + 10·n
+    const s = await acquireSlotLease(home, { ...unit, worktree: wt, holder: A });
+    expect(s).toMatchObject({ ok: true, entry: { n: 1, lease: { slot: 1, port_base: 4010, worktree: wt } } });
+    const same = await acquireSlotLease(home, { ...unit, worktree: wt, holder: B });
     expect(same).toMatchObject({ ok: true, existed: true });
     rmSync(wt, { recursive: true });
     const l = await listLeases(home);
-    expect(l.dead.map((e) => e.file)).toEqual(["slot-3.json"]);
-    expect(await reclaimLeases(home, ["slot-3.json"])).toEqual(["slot-3.json"]);
+    expect(l.dead.map((e) => e.file)).toEqual(["slot-1.json"]);
+    expect(await reclaimLeases(home, ["slot-1.json"])).toEqual(["slot-1.json"]);
     // corrupt lease files are reported and reclaimable
     mkdirSync(leasesDir(home), { recursive: true });
     writeFileSync(join(leasesDir(home), "slot-4.json"), "{}");

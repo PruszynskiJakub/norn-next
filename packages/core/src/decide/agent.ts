@@ -14,7 +14,7 @@ import type { AgentLaunch, NewReceipt, SessionInput } from "../actions.ts";
 import { applyReceipts, routeOf } from "../apply.ts";
 import { AUTO_PROMPT, cmd, NUDGE_TEXT } from "../commands.ts";
 import type { NumberedReceipt, RunFacts, StoryFacts, UnitFacts } from "../facts.ts";
-import { effectiveMode, firstLine, sessionStartedNoTurn, unitWorktree } from "../policy.ts";
+import { effectiveMode, firstLine, sessionStartedNoTurn, stepLimits, unitWorktree } from "../policy.ts";
 import { promptKeys } from "../prompt.ts";
 import type { RunnerCapabilities, SessionRef } from "../ports.ts";
 import { epoch } from "../time.ts";
@@ -81,7 +81,7 @@ function sessionRef(run: NonNullable<UnitState["run"]>): SessionRef {
 // ---------------------------------------------------------------- agent steps
 
 function launchFor(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, step: AgentStep, run_id: string, cwd: string): AgentLaunch {
-  const agent = step.agent ?? ctx.config.default_agent;
+  const agent = step.agent ?? ctx.config.agent;
   const env: Record<string, string> = { NORN_STORY: story.key, NORN_RUN: run_id };
   if (uf.unit.slice) env.NORN_SLICE = uf.unit.slice;
   Object.assign(env, ctx.slotEnv(uf.worktree?.slot ?? null));
@@ -92,7 +92,7 @@ function launchFor(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, st
 }
 
 function startedReceipt(ctx: Ctx, st: UnitState, step: AgentStep, run_id: string, worktree: string, retry: boolean): ReceiptOf<"started"> {
-  const agent = step.agent ?? ctx.config.default_agent;
+  const agent = step.agent ?? ctx.config.agent;
   const r = nornReceipt(ctx, st, "started", {
     run_id,
     how: "auto",
@@ -152,7 +152,7 @@ function runnerCaps(ctx: Ctx): RunnerCapabilities {
  * ending (`session_end`, classified `died`) or observed dead this tick do not count.
  */
 function activeRun(ctx: Ctx, uf: UnitFacts, except: string | null): string | null {
-  const window = parseDuration(ctx.config.limits.stalled);
+  const window = parseDuration(stepLimits(uf.workflow, null).stalled);
   const dead = uf.run && (uf.run.process_alive === false || uf.run.pane?.alive === false) ? uf.run.run_id : null;
   for (const r of uf.step_runs ?? []) {
     if (r.run_id === except || r.run_id === dead || r.ended || r.last_hook_at === null) continue;
@@ -206,7 +206,8 @@ export function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: Unit
   const touched = Math.max(epoch(run.started_at), epoch(st.updated_at));
   const lastHook = rf.hooks.at(-1);
   const hookAt = lastHook ? epoch(lastHook.at) : 0;
-  const stalledMs = parseDuration(ctx.config.limits.stalled);
+  const limits = stepLimits(wf, step);
+  const stalledMs = parseDuration(limits.stalled);
 
   // R7.2: process and pane liveness only for runs started on this machine
   const foreign = foreignRun(ctx, run);
@@ -214,7 +215,7 @@ export function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: Unit
     // the story was taken from the heartbeat that launched it: judged by its hooks and the claim alone
     const takenAt = story.claim.state === "mine" ? epoch(story.claim.blob.acquired_at) : 0;
     if (now - Math.max(touched, hookAt, takenAt) > stalledMs) return routeOutcome(ctx, story, uf, st, wf, step, { outcome: "died", rule: "agent.died.foreign", detail: "foreign run, holder changed" }, []);
-    return ctx.noop(ref, "agent.running.foreign", `run ${run.run_id} started on ${run.machine}; no hook activity yet for ${ctx.config.limits.stalled} after the take (R7.2)`);
+    return ctx.noop(ref, "agent.running.foreign", `run ${run.run_id} started on ${run.machine}; no hook activity yet for ${limits.stalled} after the take (R7.2)`);
   }
   const died = !foreign && (rf.process_alive === false || rf.pane?.alive === false);
   let outcome: string | null = null;
@@ -223,7 +224,7 @@ export function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: Unit
   if (died) [outcome, rule, detail] = ["died", "agent.died", diedDetail(rf, now - epoch(run.started_at))];
   else if (!step.attended) {
     const waiting = (rf.pane?.state === "waiting_input" && (rf.pane.since ?? touched + 1) > touched) || (lastHook && (lastHook.event === "waiting_input" || lastHook.event === "permission_prompt") && hookAt > touched);
-    const deadline = parseDuration(step.deadline ?? ctx.config.limits.deadline);
+    const deadline = parseDuration(limits.deadline);
     const turnEnded =
       (lastHook && (lastHook.event === "turn_end" || lastHook.event === "session_end") && hookAt > touched) ||
       ((rf.pane?.state === "idle" || rf.pane?.state === "done") && (rf.pane.since ?? 0) > touched);
@@ -239,9 +240,9 @@ export function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: Unit
     const overdue = now - started > deadline && (lastTimeout === null || now - lastTimeout > stalledMs);
     if (outcome) {
       // R9.1 classified it
-    } else if (overdue) [outcome, rule, detail] = ["timeout", "agent.timeout", `deadline ${step.deadline ?? ctx.config.limits.deadline} passed`];
+    } else if (overdue) [outcome, rule, detail] = ["timeout", "agent.timeout", `deadline ${limits.deadline} passed`];
     else if (turnEnded) [outcome, rule, detail] = ["silent", "agent.silent", "turn ended without a receipt"];
-    else if (now - Math.max(rf.last_activity_at ?? 0, touched) > stalledMs) [outcome, rule, detail] = ["stalled", "agent.stalled", `no activity for ${ctx.config.limits.stalled}`];
+    else if (now - Math.max(rf.last_activity_at ?? 0, touched) > stalledMs) [outcome, rule, detail] = ["stalled", "agent.stalled", `no activity for ${limits.stalled}`];
   }
   if (!outcome) return ctx.noop(ref, step.attended ? "agent.attended.running" : "agent.running", `run ${run.run_id} in progress`);
   routeOutcome(ctx, story, uf, st, wf, step, { outcome, rule, ...(detail ? { detail } : {}) }, []);
@@ -293,8 +294,8 @@ function routeOutcome(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st0: UnitState
   }
   // §10, W4: the route is where applying the receipt sent the unit (an exhausted counter → $stuck)
   receipt.route = routeOf(res) ?? "park";
-  if (res.route === "nudge") receipt.counter = { name: "nudges", value: res.state.nudges_used, max: step.nudges ?? ctx.config.limits.nudges };
-  if (res.route === "retry") receipt.counter = { name: "retries", value: res.state.retries_used, max: step.retries ?? ctx.config.limits.retries };
+  if (res.route === "nudge") receipt.counter = { name: "nudges", value: res.state.nudges_used, max: stepLimits(wf, step).nudges };
+  if (res.route === "retry") receipt.counter = { name: "retries", value: res.state.retries_used, max: stepLimits(wf, step).retries };
   const commit = commitFor(ctx, story, uf, `norn: ${ref.key} ${st.step} ${outcome} → ${receipt.route}`, st.step);
   const snapshot = outcome === "silent" ? { transcript: rf?.transcript ?? null, cwd: cwd ?? "" } : null;
   const receipts: NewReceipt[] = [{ n, receipt }];
@@ -371,7 +372,7 @@ export function launchUnknown(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: Un
     const found = rf.session ? `session ${rf.session.session_id}` : `${rf.hooks.length} hook fact(s)`;
     return emitApplied(ctx, story, uf, "run.adopt", res, [nr], { message: `norn: ${ref.key} adopted run ${rf.run_id} (${found})`, step: st.step });
   }
-  const grace = 2 * parseDuration(ctx.config.watch_interval);
+  const grace = 2 * parseDuration(ctx.config.interval);
   if (ctx.facts.now - lu.at <= grace) return ctx.noop(ref, "run.launch_unknown.wait", `run ${rf.run_id} has a started receipt but no state; looking for it for 2 watch intervals (R5.1)`);
   const applied = applyReceipts(st, uf.unapplied, applyCtx(ctx, wf));
   const step = stepOf(wf, applied.state.step);
@@ -428,7 +429,7 @@ export function implicitAskResolved(st: UnitState, uf: UnitFacts): string | null
 /** R6.1: write the `answer` receipt (`by: "agent"`) that ends an implicit ask; the run goes on, nothing is typed. */
 export function resolveImplicitAsk(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, why: string): void {
   const run = st.run as NonNullable<UnitState["run"]>;
-  const answer = nornReceipt(ctx, st, "answer", { run_id: run.run_id, by: "agent", who: run.agent ?? ctx.config.default_agent, answer: `the agent moved on: ${why}` });
+  const answer = nornReceipt(ctx, st, "answer", { run_id: run.run_id, by: "agent", who: run.agent ?? ctx.config.agent, answer: `the agent moved on: ${why}` });
   if (st.park?.receipt_id) answer.ask_receipt_id = st.park.receipt_id;
   if (uf.unit.slice) answer.slice = uf.unit.slice;
   const { nr, res } = synth(ctx, st, wf, nextReceiptNumber(uf), answer);

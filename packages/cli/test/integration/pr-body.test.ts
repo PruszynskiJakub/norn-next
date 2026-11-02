@@ -28,12 +28,9 @@ steps:
 counters: { loop: { max: 2 } }
 `;
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-remote: { provider: gh, label: norn }
-default_workflow: ship
-default_mode: manual
-notifiers: []
+const CONFIG = `provider: gh
+workflow: ship
+mode: manual
 `;
 
 let h: Harness;
@@ -65,7 +62,7 @@ async function describeAndOpen(prMd: string | null): Promise<void> {
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "ship.yaml"), SHIP);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn"]);

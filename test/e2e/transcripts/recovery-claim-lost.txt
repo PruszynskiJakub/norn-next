@@ -106,7 +106,7 @@
   spawn repo $ git rev-list --left-right --count <sha:4>...<sha:1> --
   spawn repo $ git merge-base <sha:4> <sha:1>
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
-  A.runner.launch title="gh-9 implement" cwd=<dir>/repo-worktrees/gh-9-add-search argv=["<dir>/home/launch/<hash:1>.sh","claude","--","Use the norn skill, then run `norn brief`."] env={"NORN_BIN":"<dir>/home/bin/norn","NORN_HOME":"<dir>/repo","NORN_RUN":"<ulid:3>","NORN_SLOT":"1","NORN_STORY":"gh-9"}
+  A.runner.launch title="gh-9 implement" cwd=<dir>/repo-worktrees/gh-9-add-search argv=["<dir>/home/launch/<hash:1>.sh","claude","--permission-mode","auto","--","Use the norn skill, then run `norn brief`."] env={"NORN_BIN":"<dir>/home/bin/norn","NORN_HOME":"<dir>/repo","NORN_RUN":"<ulid:3>","NORN_SLOT":"1","NORN_STORY":"gh-9"}
   spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-worktrees/gh-9-add-search $ git diff --name-only --diff-filter=U -z
   spawn repo-worktrees/gh-9-add-search $ git add -A -- .agents/specs/gh-9-add-search/runs/_story/rounds/01-solo .agents/specs/gh-9-add-search/runs/_story/handoff.md

@@ -30,7 +30,7 @@ async function unitHead(ctx: Context, t: Target): Promise<string | null> {
   if (isGitSha(fromWt)) return fromWt;
   const branch = sf?.branch;
   if (!branch) return null;
-  for (const ref of [`refs/heads/${branch}`, `refs/remotes/${ctx.config.remote.git_remote}/${branch}`]) {
+  for (const ref of [`refs/heads/${branch}`, `refs/remotes/${ctx.config.git_remote}/${branch}`]) {
     const sha = await ctx.git.revParse(ctx.root, `${ref}^{commit}`);
     if (sha) return sha;
   }

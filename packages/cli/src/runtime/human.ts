@@ -49,8 +49,11 @@ import { gitRemote, type Observed, observe } from "./observe/index.ts";
 
 /** The read model for this checkout and machine (no writes, no network). */
 export async function projectView(ctx: Context): Promise<ProjectView> {
-  // MO5: the runner's capabilities decide how Your turn says to start an agent; a config that
-  // cannot build ports still gets its view (the errors are in it)
+  // B7: a config file with a problem refuses under "Config error" (exit config), never a view
+  // drawn on fallback values
+  void ctx.config;
+  // MO5: the runner's capabilities decide how Your turn says to start an agent; ports that fail
+  // to build for another reason still leave the view
   const runner = await ctx.ports().then((p) => p.runner, () => null);
   return loadProjectView({
     repoRoot: ctx.root,
@@ -100,7 +103,7 @@ function localTarget(obs: Observed, story: StoryFacts, uf: UnitFacts): Target {
  * a slice reads its slice branch first, then the story branch; the story unit its story branch.
  */
 async function remoteTarget(ctx: Context, key: string): Promise<Target | null> {
-  const remote = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
+  const remote = await gitRemote(ctx.git, ctx.root, ctx.config.git_remote);
   if (!remote) return null;
   const root = ctx.root;
   const git = ctx.git;
@@ -231,7 +234,7 @@ export async function claimFor(
   const unreadable = opts.unreadable ?? ((e: Error) => failure(`cannot read the claim of ${story}: ${e.message}`, "check the network and retry", "claim_unreadable"));
   let read: RemoteClaimRead;
   try {
-    read = await readClaim(ctx.root, opts.remote !== undefined ? opts.remote : await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote), story);
+    read = await readClaim(ctx.root, opts.remote !== undefined ? opts.remote : await gitRemote(ctx.git, ctx.root, ctx.config.git_remote), story);
   } catch (e) {
     throw unreadable(e as Error);
   }
@@ -244,7 +247,7 @@ export async function claimFor(
  * claim (T8); otherwise the mailbox (T9) — or a refusal when `mailbox` is false (mode, workflow).
  */
 async function claimRoute(ctx: Context, t: Target, opts: { mailbox: boolean; verb: string; claim?: ClaimState }): Promise<Route> {
-  const remote = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
+  const remote = await gitRemote(ctx.git, ctx.root, ctx.config.git_remote);
   const c = opts.claim ?? (await claimFor(ctx, t.story));
   if (c.state === "corrupt") throw refuse(`claim ref of ${t.story} is corrupt`, cmd.storyCheckout(t.story, { force: true }), "claim_corrupt", c.error);
   if (c.state === "mine") {
@@ -308,7 +311,7 @@ async function refuseDuplicate(ctx: Context, t: Target, receipt: Receipt, holder
   for (const r of uf?.unapplied ?? []) pending.push({ receipt: r.receipt, where: r.file });
   // a verb that never goes through the mailbox has no receipt of its purpose there
   if (mailbox) {
-    const remote = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
+    const remote = await gitRemote(ctx.git, ctx.root, ctx.config.git_remote);
     if (remote) await fetchNornRefs(ctx.root, remote).catch(() => undefined);
     for (const m of await listMailbox(ctx.root, t.story).catch(() => [])) if (m.receipt) pending.push({ receipt: m.receipt, where: m.ref });
   }
@@ -344,7 +347,7 @@ async function deliver(ctx: Context, t: Target, route: Route, receipt: Receipt):
     const file = rel.startsWith("..") || isAbsolute(rel) ? r.file : rel;
     return { via: "local", claim: route.claim, n: r.n, file };
   }
-  const remote = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
+  const remote = await gitRemote(ctx.git, ctx.root, ctx.config.git_remote);
   const posted = await postMailbox(ctx.root, remote, t.story, receipt);
   if (!posted.ok) throw failure(`mailbox push failed: ${posted.message}`, `norn ${receipt.kind === "reject" ? "approve" : receipt.kind} again`, "mailbox_failed");
   return { via: "mailbox", ref: posted.ref, holder: route.holder.holder };

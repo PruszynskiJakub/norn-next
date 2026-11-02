@@ -23,7 +23,9 @@ function tempDir(): string {
 async function serve(cwd: string, port: number): Promise<Bun.Subprocess> {
   const p = Bun.spawn(["bun", "-e", `Bun.serve({ port: ${port}, fetch: () => new Response("ok") }); setInterval(() => {}, 1e6);`], { cwd, stdout: "ignore", stderr: "ignore" });
   procs.push(p);
-  for (let i = 0; i < 100; i++) {
+  // A cold `bun -e` start can take seconds under the parallel integration tier: wait on a deadline, not a count.
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
     if (await fetch(`http://127.0.0.1:${port}/`).then(() => true, () => false)) return p;
     await Bun.sleep(20);
   }

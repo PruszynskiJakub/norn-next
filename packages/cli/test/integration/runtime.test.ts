@@ -29,18 +29,16 @@ steps:
     outcomes: { done: $done }
 `;
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-remote: { provider: gh, label: norn, sync_interval: 5m }
-default_workflow: solo
-default_mode: auto
+const CONFIG = `provider: gh
+workflow: solo
+mode: auto
 `;
 
 const acted = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop" && d.rule !== "claim.renew").map((d) => `${d.unit} ${d.kind}${d.ok ? "" : ` FAILED ${d.error}`}`);
 
 async function boot(h: Harness, n: number, title: string) {
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn"]);

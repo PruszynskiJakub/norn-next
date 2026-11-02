@@ -146,7 +146,7 @@ export function loadStory(root: string, specPath: string, opts: { includeApplied
   let frontmatter_error: FileError | null = null;
   if (!story.ok)
     frontmatter_error =
-      story.reason === "corrupt" ? story.error : { file: relative(root, storyFile(specPath)), errors: [{ path: "", message: `${SPEC_FILE} missing` }] };
+      story.reason !== "missing" ? story.error : { file: relative(root, storyFile(specPath)), errors: [{ path: "", message: `${SPEC_FILE} missing` }] };
   else if (story.value.frontmatter.id !== key)
     frontmatter_error = { file: relative(root, storyFile(specPath)), errors: [{ path: "/id", message: `must equal folder key '${key}'` }] };
 
@@ -158,7 +158,7 @@ export function loadStory(root: string, specPath: string, opts: { includeApplied
     const file = join(slicesDir(specPath), f);
     const sk = sliceKey(key, nn);
     const r = readSliceFile(file, root);
-    let error: FileError | null = r.ok ? null : r.reason === "corrupt" ? r.error : null;
+    let error: FileError | null = r.ok || r.reason === "missing" ? null : r.error;
     if (r.ok && r.value.frontmatter.id !== sk)
       error = { file: relative(root, file), errors: [{ path: "/id", message: `must equal '${sk}' (from file name)` }] };
     slices.push({ key: sk, file: relative(root, file), nn, slug: sm.slug, frontmatter: r.ok && !error ? r.value.frontmatter : null, error });
@@ -212,7 +212,7 @@ export function loadSnapshot(opts: {
 }): RepoSnapshot {
   const config = loadConfig({ repoRoot: opts.repoRoot, home: opts.home, env: opts.env });
   const workflows = loadWorkflows(opts.repoRoot);
-  const baseRef = opts.baseRef !== undefined ? opts.baseRef : defaultBaseRef(opts.repoRoot, config.ok ? config.config.remote.git_remote : "origin", config.ok ? config.config.base_branch : null);
+  const baseRef = opts.baseRef !== undefined ? opts.baseRef : defaultBaseRef(opts.repoRoot, config.ok ? config.config.git_remote : "origin", config.ok ? config.config.base_branch : null);
   const baseRoot = baseRef ? baseSpecsRoot(opts.repoRoot, baseRef) : null;
   const seen = new Map<string, StorySnapshot>();
   // R3.4: a story worktree is read only for the story its marker names

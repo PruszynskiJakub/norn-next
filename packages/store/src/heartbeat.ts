@@ -19,6 +19,8 @@ export interface HeartbeatFile {
   created_at?: string;
   /** R5.5: ISO time the last tick on this checkout finished */
   last_tick_at?: string;
+  /** B34 (D5): the tick interval recorded by `norn watch` or `norn tick --interval` */
+  interval?: string;
 }
 
 export function readHeartbeatFile(root: string): HeartbeatFile {
@@ -48,6 +50,17 @@ export function recordedHeartbeatId(root: string): string | null {
 /** R5.5: record that a tick finished now (keeps the heartbeat_id). */
 export function markTick(root: string, at: string): void {
   writeHeartbeatFile(root, { ...readHeartbeatFile(root), last_tick_at: at });
+}
+
+/** B34 (D5): record the interval ticks run at on this checkout (keeps everything else). */
+export function recordInterval(root: string, interval: string): void {
+  ensureCheckoutFile(root);
+  writeHeartbeatFile(root, { ...readHeartbeatFile(root), interval });
+}
+
+/** B34: the recorded tick interval; null when none was recorded. */
+export function recordedInterval(root: string): string | null {
+  return readHeartbeatFile(root).interval ?? null;
 }
 
 /** R5.5: `last_tick_at` as ms epoch; null = no tick recorded. */

@@ -11,7 +11,7 @@ import type { herdr } from "@norn/adapters";
 import type { AdapterContext, AdapterRegistry, Clock, GitPort, Ports } from "@norn/core";
 import { DEFAULT_CONFIG, type ResolvedConfig } from "@norn/schema";
 import { bindNornHome, type LoadedConfig, loadConfig, nornHome, readUnitMarker, type UnitMarker } from "@norn/store";
-import { corruptError, refuse } from "./output.ts";
+import { configError, refuse } from "./output.ts";
 import { type Interaction, isAgentSession, terminalInteraction } from "./runtime/interaction.ts";
 import { guardLayout } from "./runtime/layout.ts";
 import { buildPorts, defaultRegistry } from "./wiring.ts";
@@ -157,11 +157,24 @@ export class Context {
     return this.loadedConfig;
   }
 
-  /** Resolved config; refuses with exit `corrupt` when a layer fails validation (S2). */
-  get config(): ResolvedConfig {
+  /** The config that loaded, with its entries; refuses with exit `config` when a file has a problem (B7, D3). */
+  get resolved(): Extract<LoadedConfig, { ok: true }> {
     const l = this.loaded;
-    if (!l.ok) throw corruptError(`config failed validation: ${l.errors.map((e) => `${e.file}: ${e.errors.map((x) => `${x.path || "/"} ${x.message}`).join("; ")}`).join(" | ")}`, "fix the config file(s) listed in details", l.errors);
-    return l.config;
+    if (!l.ok) throw configError(l.problems, { ...l.paths });
+    return l;
+  }
+
+  /** Resolved config; refuses like `resolved` (B7, D3). */
+  get config(): ResolvedConfig {
+    return this.resolved.config;
+  }
+
+  /** D15: the file a setting in effect came from, for adapter errors; null when built in or derived. */
+  sourceOf(key: string): string | null {
+    const l = this.loaded;
+    const entries = l.ok ? l.entries : l.fallback.entries;
+    const e = entries.find((x) => x.key === key || x.key.startsWith(`${key}.`));
+    return e && (e.source === "user" || e.source === "local" || e.source === "repo") ? l.paths[e.source] : null;
   }
 
   /** Forget cached config and ports (after `init` writes config). */
@@ -174,13 +187,15 @@ export class Context {
     return { repoRoot: root, home: this.home, config, clock: this.clock, env: this.env };
   }
 
-  /** Ports selected by config (X2), built once per context. */
+  /** Ports selected by config, built once per context. */
   async ports(): Promise<Ports> {
-    if (!this.builtPorts) {
-      const config = this.config;
-      this.builtPorts = await buildPorts(this.registry, this.adapterContext(this.root, config), config, { git: this.git, ...this.deps.ports });
-    }
+    if (!this.builtPorts) this.builtPorts = await this.portsFor(this.config);
     return this.builtPorts;
+  }
+
+  /** B48: ports for a given config (doctor's fallback), built afresh and not cached for later callers. */
+  portsFor(config: ResolvedConfig, overrides: Partial<Ports> = {}): Promise<Ports> {
+    return buildPorts(this.registry, this.adapterContext(this.root, config), config, { git: this.git, ...this.deps.ports, ...overrides }, (k) => this.sourceOf(k));
   }
 
   /** D2: the terminal to prompt in — a TTY, no `--json`, not an agent session (A6, orient) — else null. */

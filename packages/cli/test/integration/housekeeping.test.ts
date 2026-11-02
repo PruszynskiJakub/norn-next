@@ -32,20 +32,17 @@ steps:
     outcomes: { done: $done }
 `;
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-remote: { provider: gh, label: norn }
-default_workflow: solo
-default_mode: auto
+const CONFIG = `provider: gh
+workflow: solo
+mode: auto
 max_agents: 1
-notifiers: []
 `;
 
 const kinds = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop" && d.rule !== "claim.renew").map((d) => `${d.unit} ${d.kind}${d.ok ? "" : ` FAILED ${d.error}`}`);
 
 async function boot(h: Harness) {
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn"]);
@@ -293,7 +290,8 @@ describe("norn doctor: a fresh repository", () => {
   afterAll(() => h.cleanup());
 
   test("no git remote fails the remote check with the command that adds one", async () => {
-    h.git(["remote", "rename", "origin", "upstream"]);
+    // gh-64 B31: the git remote follows what main tracks, so a renamed remote is still found; remove it
+    h.git(["remote", "remove", "origin"]);
     try {
       const env = { ...h.deps.env, NORN_HOOK_COMMAND: `${process.execPath} ${main} hook` };
       const r = await runChecked(["doctor"], { ...h.deps, env });
@@ -303,7 +301,9 @@ describe("norn doctor: a fresh repository", () => {
       expect(r.stdout).toContain("! this repository has no git remote named origin");
       expect(r.stdout).toContain("→ git remote add origin <url>");
     } finally {
-      h.git(["remote", "rename", "upstream", "origin"]);
+      h.git(["remote", "add", "origin", h.remoteDir]);
+      h.git(["fetch", "-q", "origin"]);
+      h.git(["branch", "-q", "-u", "origin/main", "main"]);
     }
   });
 
@@ -316,7 +316,7 @@ describe("norn doctor: a fresh repository", () => {
       expect(auto.exit).toBe(1);
       expect(auto.value).toMatchObject({ ok: false, runner: { ok: false, required: true } });
       expect(auto.stdout).toMatch(/FAIL runner +fake not available/);
-      h.write(repoConfigPath(h.root), CONFIG.replace("default_mode: auto", "default_mode: manual"));
+      h.config(CONFIG.replace("mode: auto", "mode: manual"));
       const r = await runChecked(["doctor"], { ...h.deps, env });
       const v = r.value as { runner: Record<string, unknown>; agents: Array<{ ok: boolean }> };
       expect(v.runner).toMatchObject({ ok: false, required: false, available: false });
@@ -325,7 +325,7 @@ describe("norn doctor: a fresh repository", () => {
       expect(r.stdout).not.toMatch(/failed \(.*runner/);
     } finally {
       h.runner.availableResult = true;
-      h.write(repoConfigPath(h.root), CONFIG);
+      h.config(CONFIG);
     }
   });
 });
@@ -397,6 +397,20 @@ steps:
     }
   });
 
+  test("B13: doctor checks the agents in use only — a built-in agent named on a workflow step joins them", async () => {
+    const plain = await runChecked(["doctor", "--json"], { ...h.deps, env: env() });
+    expect((plain.value as { agents: Array<{ name: string }> }).agents.map((a) => a.name)).toEqual(["claude"]);
+    const file = join(workflowsDir(h.root), "other.yaml");
+    h.write(file, SOLO.replace("name: solo", "name: other").replace("skill: norn-implement", "skill: norn-implement\n    agent: codex"));
+    try {
+      const r = await runChecked(["doctor", "--json"], { ...h.deps, env: env() });
+      expect((r.value as { agents: Array<{ name: string }> }).agents.map((a) => a.name).sort()).toEqual(["claude", "codex"]);
+      expect(r.exit).toBe(1);
+    } finally {
+      rmSync(file);
+    }
+  });
+
   test("a workflow naming a skill its agent lacks: doctor names it, and a tick refuses it for the same reason (B7)", async () => {
     const file = join(workflowsDir(h.root), "nope.yaml");
     h.write(file, NOPE);
@@ -428,31 +442,53 @@ steps:
 
   test("a config value of the wrong type names the file, the key and why; non-zero (B8)", async () => {
     const file = repoConfigPath(h.root);
-    h.write(file, CONFIG.replace("max_agents: 1", 'max_agents: "two"'));
+    h.write(file, "provider: gh\nworkflow: 7\n");
     try {
       const r = await runChecked(["doctor"], { ...h.deps, env: env() });
       expect(r.exit).toBe(1);
-      expect(r.value).toMatchObject({ ok: false, repo: { ok: false, config: { ok: false, file: relConfig, errors: [expect.objectContaining({ path: "/max_agents" })] } } });
+      expect(r.value).toMatchObject({ ok: false, repo: { ok: false, config: { ok: false, file: relConfig, errors: [expect.objectContaining({ path: "workflow" })] } } });
       expect(r.stdout).toMatch(/^norn doctor: .*failed \(.*config.*\)/);
       expect(r.stdout).toMatch(/FAIL config +\.agents\/norn\.config\.yaml/);
-      expect(r.stdout).toMatch(/! \/max_agents: .*integer/);
+      expect(r.stdout).toMatch(/! workflow: `workflow` must be a workflow name/);
       // --repo needs no config that loads either
       const repo = await runChecked(["doctor", "--repo"], { ...h.deps, env: env() });
       expect(repo.exit).toBe(1);
       expect(repo.stdout).toMatch(/FAIL config +\.agents\/norn\.config\.yaml/);
     } finally {
-      h.write(file, CONFIG);
+      h.config(CONFIG);
     }
   });
 
-  test("a user config that does not load: the repo group still runs, the machine checks are skipped naming that file", async () => {
+  test("gh-64 B48: a notifier that fails to build is one FAIL config line naming its file; the other checks still run", async () => {
     const file = join(h.home, "config.yaml");
-    h.write(file, 'max_checks: "many"\n');
+    h.write(file, "notify: { ntfy: https://ntfy.sh/ }\n");
+    try {
+      // the notifiers built from config, not the harness's fake
+      const r = await runChecked(["doctor"], { ...h.deps, env: env(), ports: { ...h.deps.ports, notifiers: undefined } });
+      expect(r.exit).toBe(1);
+      expect(r.value).toMatchObject({ ok: false, config: { ok: false, error: expect.stringContaining("notify ntfy:"), do_instead: `fix it in ${file}` } });
+      expect(r.stdout).toMatch(/FAIL config +notify ntfy: /);
+      expect(r.stdout).toMatch(/(ok|FAIL) +git /);
+    } finally {
+      rmSync(file);
+    }
+  });
+
+  test("gh-64 B48: a bad notify.webhook is a FAIL config line naming its file, counted; the machine checks still run", async () => {
+    const file = join(h.home, "config.yaml");
+    h.write(file, "notify: { webhook: not-a-url }\n");
     try {
       const r = await runChecked(["doctor"], { ...h.deps, env: env() });
       expect(r.exit).toBe(1);
-      expect(r.value).toMatchObject({ ok: false, repo: { ok: true }, skipped: expect.stringContaining(`${file}: /max_checks`) });
-      expect(r.stdout).toContain("machine checks skipped");
+      expect(r.value).toMatchObject({ ok: false, repo: { ok: true }, config: { ok: false, do_instead: expect.stringContaining("config.yaml") } });
+      const error = (r.value as { config: { error: string } }).config.error;
+      expect(error).toContain("notify.webhook");
+      // the key is named once
+      expect(error.split("notify.webhook").length).toBe(2);
+      expect(r.stdout).toMatch(/^norn doctor: [1-9]\d* checks? failed/);
+      expect(r.stdout).toMatch(/FAIL config +.*notify\.webhook/);
+      expect(r.stdout).toMatch(/(ok|FAIL) +git /);
+      expect(r.stdout).not.toContain("machine checks skipped");
       // --repo reads only the repo's files: the person's own config is not its concern
       expect((await runChecked(["doctor", "--repo"], { ...h.deps, env: env() })).exit).toBe(0);
     } finally {

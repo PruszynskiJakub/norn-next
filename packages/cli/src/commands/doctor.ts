@@ -9,9 +9,9 @@
  *     Codex: project hooks only run once `.codex/` is trusted (`/hooks` in Codex) — noted.
  *   - remote: the configured git remote exists (sync and push need it) and the provider CLI
  *     answers `whoami` (gh/glab auth)
- *   - runner: configured runner available (Herdr server reachable), and `command -v norn` in a
+ *   - runner: the detected runner available (Herdr server reachable), and `command -v norn` in a
  *     throwaway runner session resolves to this norn (R8.2); only auto mode needs a runner (MO2),
- *     so with `default_mode: manual` a failing runner is a warning, not a failed check
+ *     so in manual mode a failing runner is a warning, not a failed check
  *   - machine: the `user@host` runs are recorded with (R7.1); a warning when NORN_MACHINE overrides it (R7.3)
  *   - skills (SK1): every bundled skill is in `.agents/skills/` and linked from each configured
  *     agent's skill folder; one that differs from the bundled version is a warning (`norn init`)
@@ -29,12 +29,13 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:f
 import { tmpdir } from "node:os";
 import { basename, extname, join, relative, resolve } from "node:path";
 import { git as gitAdapter, herdr, proc } from "@norn/adapters";
-import type { AgentAdapter, FileError, RunnerPort, SessionRef, WorkflowIssue } from "@norn/core";
-import { ExitCode, ulid } from "@norn/schema";
+import type { AgentAdapter, FileError, Ports, RunnerPort, SessionRef, WorkflowIssue } from "@norn/core";
+import { type ConfigEntry, ExitCode, type ResolvedConfig, ulid } from "@norn/schema";
 import { bindNornHome, type Layout, layoutProblems, loadWorkflows, machineDir, machineHolder, noteSpawn, orphanedMachineDirs, readHookFacts, repoConfigPath, repoLayout, skillsReport, traceDaysBefore, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
-import { rendered, withExit } from "../output.ts";
+import { CliFailure, configError, rendered, withExit } from "../output.ts";
+import { agentsInUse } from "../runtime/agents-in-use.ts";
 import { assetsDir } from "../runtime/assets.ts";
 import { gitRemoteUrl } from "../runtime/detect.ts";
 import { ensureShim, withNornOnPath } from "../runtime/shim.ts";
@@ -141,13 +142,13 @@ async function liveTurn(ctx: Context, name: string, agent: AgentAdapter, command
   const { repo, drop } = await scratchUnit(ctx);
   try {
     if (agent.tier !== "none") await agent.installHooks(repo, command, name);
-    const cfg = ctx.config.agents[name];
+    const cfg = usableConfig(ctx).config.agents[name];
     const launch = agent.launchCommand({
       cwd: repo,
       prompt: "This is a connectivity test. Reply with the single word OK and do nothing else.",
       headless: true,
       env: { NORN_HOME: repo, NORN_STORY: "gh-1" },
-      config: { ...(cfg?.command ? { command: cfg.command } : {}), ...(cfg?.args ? { args: cfg.args } : {}), ...(cfg?.env ? { env: cfg.env } : {}) },
+      config: { ...(cfg?.args ? { args: cfg.args } : {}) },
     });
     const r = await run(launch.argv, { cwd: repo, env: { ...process.env, ...ctx.env, ...launch.env }, timeoutMs: 180_000 });
     const facts = readHookFacts(repo, "0000");
@@ -205,8 +206,7 @@ const HERDR_PLUGIN_SOURCE = "PruszynskiJakub/norn-next/plugins/herdr";
 
 /** HC11: whether norn's Herdr plugin is linked; a hint when it is not (never an error). */
 async function cockpitPlugin(ctx: Context): Promise<Record<string, unknown>> {
-  const o = ctx.config.runner?.options ?? {};
-  const cockpit = herdr.createHerdrCockpit({ env: ctx.env, ...(typeof o.bin === "string" ? { bin: o.bin } : {}), ...(typeof o.session === "string" ? { session: o.session } : {}) });
+  const cockpit = herdr.createHerdrCockpit({ env: ctx.env });
   const linked = await cockpit.pluginLinked().catch(() => undefined);
   if (linked === undefined) return { linked: null, note: "could not list Herdr plugins" };
   if (!linked) return { linked: false, do_instead: pluginLinkHint(assetsDir(ctx.env)) };
@@ -219,14 +219,53 @@ interface Check {
   do_instead?: string;
 }
 
+type ConfigFail = { ok: false; error: string; do_instead: string | null };
+
+/** B48: the config doctor runs on — the resolved one, or the valid values of one that does not load. */
+function usableConfig(ctx: Context): { config: ResolvedConfig; entries: readonly ConfigEntry[] } {
+  const l = ctx.loaded;
+  return l.ok ? l : l.fallback;
+}
+
+const portsTried = new WeakMap<Context, Promise<{ ports: Ports; fail: ConfigFail | null }>>();
+
+/**
+ * B48 (D15): the ports for the usable config, with an adapter that fails to build recorded as one
+ * failure and the rest built without notifiers. Not cached on the context, so no later caller gets
+ * the fallback ports. Anything other than a config error is a bug and is thrown.
+ */
+function doctorPorts(ctx: Context) {
+  let p = portsTried.get(ctx);
+  if (!p) {
+    const { config } = usableConfig(ctx);
+    p = ctx.portsFor(config).then(
+      (ports) => ({ ports, fail: null }),
+      async (e: unknown) => {
+        if (!(e instanceof CliFailure) || e.exit !== ExitCode.config) throw e;
+        return { ports: await ctx.portsFor(config, { notifiers: [] }), fail: { ok: false as const, error: e.body.error, do_instead: e.body.do_instead } };
+      },
+    );
+    portsTried.set(ctx, p);
+  }
+  return p;
+}
+
+/** B48: a config file that does not load, as one failure; the team file's problems are the repo group's own line. */
+function loadFail(ctx: Context): ConfigFail | null {
+  const l = ctx.loaded;
+  if (l.ok) return null;
+  const machine = l.problems.filter((p) => p.file !== "repo");
+  if (!machine.length) return null;
+  const body = configError(machine, { ...l.paths }).body;
+  return { ok: false, error: body.error, do_instead: body.do_instead };
+}
+
 interface RepoReport {
   ok: boolean;
   /** D4: reaching the other repo checks means the new layout; an old or mixed one is reported alone (B20) */
   layout: { ok: true; layout: "new" };
   workflows: Array<{ name: string; file: string; ok: boolean; issues: WorkflowIssue[] }>;
   config: { ok: boolean; file: string; present: boolean; errors: FileError["errors"] };
-  /** why a workflow's skills went unchecked (the config does not load, so its agents are unknown) */
-  skills_unchecked?: string;
 }
 
 /**
@@ -237,8 +276,9 @@ async function repoGroup(ctx: Context): Promise<RepoReport> {
   const root = ctx.root;
   const loaded = ctx.loaded;
   const listing = loadWorkflows(root);
-  const agents = loaded.ok ? (await ctx.ports()).agents : {};
-  const checked = checkedRepoWorkflows(listing, root, { default_agent: loaded.ok ? loaded.config.default_agent : "" }, agents);
+  // B48: on the valid values of a config that does not load, so its skills are still checked
+  const agents = (await doctorPorts(ctx)).ports.agents;
+  const checked = checkedRepoWorkflows(listing, root, { agent: usableConfig(ctx).config.agent }, agents);
   const fileOf = (name: string) => {
     const wf = listing.workflows[name];
     return wf ? relative(root, wf.file) : (listing.errors.find((e) => basename(e.file, extname(e.file)) === name)?.file ?? name);
@@ -259,7 +299,6 @@ async function repoGroup(ctx: Context): Promise<RepoReport> {
     layout: { ok: true, layout: "new" },
     workflows,
     config,
-    ...(loaded.ok ? {} : { skills_unchecked: "the config does not load, so no step's skill was checked against its agent" }),
   };
 }
 
@@ -298,8 +337,7 @@ function lines() {
 function formatRepo(r: RepoReport, l: ReturnType<typeof lines>, dir: string): void {
   const valid = r.workflows.filter((w) => w.ok).map((w) => w.name);
   l.line(true, "layout", `${dir}/ and ${r.config.file}`);
-  if (valid.length || !r.workflows.length || r.skills_unchecked) l.line(true, "workflows", valid.length ? `${valid.join(", ")} valid (${dir}/)` : `none valid in ${dir}/`);
-  if (r.skills_unchecked) l.sub(`· ${r.skills_unchecked}`);
+  if (valid.length || !r.workflows.length) l.line(true, "workflows", valid.length ? `${valid.join(", ")} valid (${dir}/)` : `none valid in ${dir}/`);
   for (const w of r.workflows.filter((x) => !x.ok)) {
     l.line(false, `workflow ${w.name}`, w.file);
     for (const i of w.issues) l.sub(`! ${i.path || "/"}: ${i.message}`);
@@ -312,6 +350,7 @@ function formatRepo(r: RepoReport, l: ReturnType<typeof lines>, dir: string): vo
 function formatDoctor(r: {
   ok: boolean;
   machine: { holder: string };
+  config?: { ok: false; error: string; do_instead: string | null };
   git: Check & { version: string | null };
   agents: Array<{
     name: string;
@@ -333,6 +372,10 @@ function formatDoctor(r: {
   const l = lines();
   const { out, line, sub, fix } = l;
 
+  if (r.config) {
+    line(false, "config", r.config.error);
+    if (r.config.do_instead) sub(`→ ${r.config.do_instead}`);
+  }
   line(r.git.ok, "git", r.git.version ?? "not found");
   fix(r.git);
   for (const a of r.agents) {
@@ -368,12 +411,11 @@ function formatDoctor(r: {
   return [l.head(r.ok), "", ...out, ...warnings, ...hints].join("\n");
 }
 
-/** `norn doctor --repo`, or plain doctor when the config does not load and the machine checks cannot run. */
-function formatRepoOnly(r: { ok: boolean; repo: RepoReport; skipped?: string }, dir: string): string {
+/** `norn doctor --repo`. */
+function formatRepoOnly(r: { ok: boolean; repo: RepoReport }, dir: string): string {
   const l = lines();
   formatRepo(r.repo, l, dir);
-  const skipped = r.skipped ? ["", `  · ${r.skipped}`] : [];
-  return [l.head(r.ok), "", ...l.out, ...skipped].join("\n");
+  return [l.head(r.ok), "", ...l.out].join("\n");
 }
 
 export const doctorCommand = defineCommand({
@@ -399,17 +441,19 @@ export const doctorCommand = defineCommand({
     }
     const repo = await repoGroup(ctx);
     const dir = relative(ctx.root, workflowsDir(ctx.root));
-    // B10: --repo looks at no agent, runner or remote; a config that does not load leaves the machine checks nothing to run on
-    if (repoOnly || !ctx.loaded.ok) {
-      const others = ctx.loaded.ok ? [] : ctx.loaded.errors.filter((e) => e.file !== repo.config.file);
-      const which = others.map((e) => `${e.file}: ${e.errors.map((x) => `${x.path || "/"} ${x.message}`).join("; ")}`).join(" | ");
-      const skipped = repoOnly ? undefined : `machine checks skipped: they need a config that loads${which ? ` (${which})` : ""}; fix it and run ${cmd.doctor()} again`;
-      const report = { ok: repo.ok && !skipped, repo, ...(skipped ? { skipped } : {}) };
+    // B10: --repo looks at no agent, runner or remote
+    if (repoOnly) {
+      const report = { ok: repo.ok, repo };
       const out = rendered(report, formatRepoOnly(report, dir));
       return report.ok ? out : withExit(out, ExitCode.error);
     }
-    const config = ctx.config;
-    const ports = await ctx.ports();
+    // B48 (D15): a config file that does not load, or an adapter that fails to build, is one
+    // `FAIL config` line; the other checks still run, on the values that are valid
+    const usable = usableConfig(ctx);
+    const config = usable.config;
+    const { ports, fail: buildFail } = await doctorPorts(ctx);
+    const fails = [loadFail(ctx), buildFail].filter((f): f is ConfigFail => f !== null);
+    const configFail: ConfigFail | null = fails.length ? { ok: false, error: fails.map((f) => f.error).join("; "), do_instead: fails.map((f) => f.do_instead).filter(Boolean).join("; ") || null } : null;
     const command = hookCommand(ctx);
 
     const g = await run(["git", "--version"], { timeoutMs: 10_000 });
@@ -423,9 +467,9 @@ export const doctorCommand = defineCommand({
     };
 
     const agents = [];
-    for (const [name, agent] of Object.entries(ports.agents)) {
-      const cfg = config.agents[name];
-      const argv = agent.launchCommand({ cwd: ctx.root, prompt: "x", headless: true, env: {}, config: { ...(cfg?.command ? { command: cfg.command } : {}) } }).argv;
+    const used = agentsInUse(ctx.root, usable, ports);
+    for (const [name, agent] of Object.entries(used)) {
+      const argv = agent.launchCommand({ cwd: ctx.root, prompt: "x", headless: true, env: {}, config: {} }).argv;
       const bin = argv[0] ?? name;
       const path = which(bin, ctx.env);
       const v = path ? await run([path, "--version"], { timeoutMs: 15_000 }) : null;
@@ -434,13 +478,13 @@ export const doctorCommand = defineCommand({
       const turn = live ? await liveTurn(ctx, name, agent, command) : null;
       const notes: string[] = [];
       if (agent.tier === "none") notes.push("no hooks: runner, process and git facts only (A5)");
-      if (cfg?.adapter === "codex" || name === "codex")
+      if (name === "codex")
         notes.push("Codex runs project hooks only once the project's .codex/ layer is trusted and the hooks reviewed via /hooks in Codex");
       if (hooksInstalled === false) notes.push(`run ${cmd.init()} to install hooks`);
       const ok = !!path && hooksInstalled !== false && (fires?.ok ?? true) && (turn?.ok ?? true);
       agents.push({
         name,
-        adapter: cfg?.adapter ?? name,
+        adapter: name,
         tier: agent.tier,
         ok,
         binary: { command: bin, path: path ?? null, version: v && v.code === 0 ? firstLine(v.out) : null },
@@ -452,16 +496,16 @@ export const doctorCommand = defineCommand({
     }
 
     let remote: Record<string, unknown>;
-    if (!ports.remote) remote = { ok: true, provider: config.remote.provider, configured: false };
+    if (!ports.remote) remote = { ok: true, provider: config.provider, configured: false };
     else {
       try {
         remote = { ok: true, provider: ports.remote.provider, user: await ports.remote.whoami() };
       } catch (e) {
-        remote = { ok: false, provider: ports.remote.provider, error: (e as Error).message, do_instead: `${config.remote.provider === "glab" ? "glab" : "gh"} auth login` };
+        remote = { ok: false, provider: ports.remote.provider, error: (e as Error).message, do_instead: `${config.provider === "glab" ? "glab" : "gh"} auth login` };
       }
     }
     // sync reads issues and every step pushes through this remote: without it nothing moves
-    const gitRemote = { name: config.remote.git_remote, url: gitRemoteUrl(ctx.root, config.remote.git_remote) };
+    const gitRemote = { name: config.git_remote, url: gitRemoteUrl(ctx.root, config.git_remote) };
     remote.git_remote = gitRemote;
     if (!gitRemote.url && remote.ok === true)
       remote = { ...remote, ok: false, error: `this repository has no git remote named ${gitRemote.name}`, do_instead: `git remote add ${gitRemote.name} <url>` };
@@ -474,7 +518,7 @@ export const doctorCommand = defineCommand({
         ok: available && (onPath?.ok ?? true),
         configured: true,
         // MO2: only auto mode starts agents through the runner
-        required: config.default_mode === "auto",
+        required: config.mode === "auto",
         name: ports.runner.name,
         available,
         ...(onPath ? { norn_on_path: onPath } : {}),
@@ -485,7 +529,7 @@ export const doctorCommand = defineCommand({
     }
 
     const names = bundledSkills(ctx.env);
-    const sk = skillsReport(ctx.root, join(assetsDir(ctx.env), "skills"), names, Object.fromEntries(Object.entries(ports.agents).map(([n, a]) => [n, a.skillDir(ctx.root)])));
+    const sk = skillsReport(ctx.root, join(assetsDir(ctx.env), "skills"), names, Object.fromEntries(Object.entries(used).map(([n, a]) => [n, a.skillDir(ctx.root)])));
     const skillsOk = sk.missing.length === 0 && Object.keys(sk.unlinked).length === 0;
     const skills = { ok: skillsOk, ...sk, ...(skillsOk ? {} : { do_instead: cmd.init() }) };
 
@@ -516,8 +560,8 @@ export const doctorCommand = defineCommand({
       hints.push(`trace keeps ${beyond.length} day${beyond.length === 1 ? "" : "s"} (${formatBytes(bytes)}) beyond trace.retain ${window.retain} — run \`norn tidy\` (\`norn tidy --dry-run\` lists them)`);
     }
 
-    const ok = gitCheck.ok && agents.every((a) => a.ok) && remote.ok === true && (runner.ok === true || runner.required === false) && skillsOk && repo.ok;
-    const report = { ok, live, hook_command: command, machine, git: gitCheck, agents, remote, runner, skills, repo, warnings, hints };
+    const ok = !configFail && gitCheck.ok && agents.every((a) => a.ok) && remote.ok === true && (runner.ok === true || runner.required === false) && skillsOk && repo.ok;
+    const report = { ok, live, hook_command: command, machine, ...(configFail ? { config: configFail } : {}), git: gitCheck, agents, remote, runner, skills, repo, warnings, hints };
     const out = rendered(report, formatDoctor(report, dir));
     return ok ? out : withExit(out, ExitCode.error);
   },

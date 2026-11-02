@@ -65,7 +65,7 @@ describe("attended wait (HC1)", () => {
 describe("attended wait in the inbox (HC2, HC3)", () => {
   const waiting = refining(runFacts([hook("turn_start", T0), hook("turn_end", T0 + MIN)]));
 
-  test("stays under Running until limits.attended_wait has passed", () => {
+  test("stays under Running until the fixed 2-minute attended wait has passed (B27)", () => {
     const early = inboxAt(T0 + 2 * MIN, waiting);
     expect(early.groups.your_turn).toEqual([]);
     expect(early.groups.running[0]?.title).toBe("refine #1 (manual)");
@@ -93,11 +93,10 @@ describe("attended wait in the inbox (HC2, HC3)", () => {
     expect(item).toMatchObject({ command: "herdr agent attach w1:p2", reach: { pane_id: "w1:p2", agent_session_id: null } });
   });
 
-  test("0s shows it at once; each new wait is a new item (one notification per wait)", () => {
-    const now0 = { ...CONFIG, limits: { ...CONFIG.limits, attended_wait: "0s" } };
-    const first = inboxAt(T0 + MIN, waiting, now0).groups.your_turn[0];
-    const again = refining(runFacts([hook("turn_start", T0), hook("turn_end", T0 + MIN), hook("turn_start", T0 + 2 * MIN), hook("turn_end", T0 + 3 * MIN)]));
-    const second = inboxAt(T0 + 3 * MIN, again, now0).groups.your_turn[0];
+  test("each new wait is a new item (one notification per wait)", () => {
+    const first = inboxAt(T0 + 3 * MIN, waiting).groups.your_turn[0];
+    const again = refining(runFacts([hook("turn_start", T0), hook("turn_end", T0 + MIN), hook("turn_start", T0 + 4 * MIN), hook("turn_end", T0 + 5 * MIN)]));
+    const second = inboxAt(T0 + 7 * MIN, again).groups.your_turn[0];
     expect(first?.id).toBeDefined();
     expect(second?.id).toBeDefined();
     expect(second?.id).not.toBe(first?.id);

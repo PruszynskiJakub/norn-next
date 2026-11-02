@@ -12,7 +12,7 @@ norn splits delivering a story into steps. An agent does one step at a time and 
 
 ## Stories, slices and units
 
-A **story** is a GitHub or GitLab issue that carries the configured label (default `norn`) and is assigned to you. `norn sync` takes it in: one spec folder (`.agents/specs/gh-N-<slug>/`), one story branch, one worktree, and later one draft PR. Its key is `gh-N` (`gl-N` on GitLab).
+A **story** is a GitHub or GitLab issue that carries the label `norn` and is assigned to you. `norn sync` takes it in: one spec folder (`.agents/specs/gh-N-<slug>/`), one story branch, one worktree, and later one draft PR. Its key is `gh-N` (`gl-N` on GitLab).
 
 A **slice** is a piece of a story, cut from the story's plan. It has its own branch and worktree and is merged back into the story branch when it is done. Its key is the story's plus a number: `gh-18/02`.
 
@@ -42,7 +42,7 @@ Three things decide where a person comes in:
 
 - An **attended step** (`attended: true`, such as refine and plan) is an agent step done *with* a person in the agent's pane. A person always starts it.
 - A **gate** is a step with no agent: a person approves it or rejects it with what to change. The `ready` gate at the end of a delivery workflow is where you look at the PR before you merge it.
-- The **mode** of a story says who starts its other agent steps. In **manual** mode (the default) the inbox shows the step as ready and how to start it. In **auto** mode norn starts the agent itself through the configured runner (`herdr` or `headless`). A machine with no runner runs every story in manual mode. `norn story edit <story> --auto|--manual` switches it.
+- The **mode** of a story says who starts its other agent steps. In **manual** mode (the default) the inbox shows the step as ready and how to start it. In **auto** mode norn starts the agent itself through the runner it detects: Herdr when norn runs inside Herdr or `herdr` is installed, otherwise headless. A story's mode is, nearest first: its own (`norn story edit <story> --auto|--manual` switches it), its workflow's `mode`, `mode` in your local or user config, then `manual`.
 
 `check` and `git` steps always run on their own. Gates and attended steps always wait for a person, in either mode.
 
@@ -87,7 +87,7 @@ A step's craft is in a skill: `norn init` copies norn's skills into `.agents/ski
 
 | Term | Meaning |
 |---|---|
-| story | A remote issue (GitHub or GitLab) assigned to you with the configured label. One spec folder, one story branch, one story worktree, one draft PR. |
+| story | A remote issue (GitHub or GitLab) assigned to you with the label `norn`. One spec folder, one story branch, one story worktree, one draft PR. |
 | slice | A piece of a story with its own branch and worktree, merged back into the story. |
 | unit | A story or a slice: anything that runs a workflow and owns a `runs/<unit>/` folder. |
 | workflow | A YAML (or JSON) graph of steps, in `.agents/workflows/`. |

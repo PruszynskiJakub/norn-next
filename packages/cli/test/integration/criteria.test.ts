@@ -38,12 +38,9 @@ steps:
 counters: { qa_loop: { max: 3 } }
 `;
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-remote: { provider: gh, label: norn }
-default_workflow: qaflow
-default_mode: manual
-notifiers: []
+const CONFIG = `provider: gh
+workflow: qaflow
+mode: manual
 `;
 
 let h: Harness;
@@ -93,7 +90,7 @@ const UNVERIFIED = { id: "AC2", verdict: "unverified", reason: "no browser in th
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "qaflow.yaml"), QAFLOW);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);
@@ -102,7 +99,7 @@ beforeAll(async () => {
   await tickUntil(at("qa", "ready"), "intake");
   // QV1: story-level criteria in spec.md frontmatter (the slice skill's job), committed like agent work
   const file = join(wt(), spec, "spec.md");
-  h.write(file, h.read(file).replace(/\n---\n/, "\ncriteria:\n  - { id: AC1, verifier: test }\n  - { id: AC2, verifier: agent, needs: [browser] }\n  - { id: AC3, verifier: person }\n---\n"));
+  h.write(file, h.read(file).replace(/\n---\n/, "\ncriteria:\n  - { id: AC1, verifier: test }\n  - { id: AC2, verifier: agent }\n  - { id: AC3, verifier: person }\n---\n"));
   h.git(["add", "-A"], wt());
   h.git(["commit", "-q", "-m", "story criteria", "--trailer", "Norn-Tick: 01JBQ6ZK3E8Y4V5W6X7Y8Z9ABC"], wt());
 });
@@ -144,10 +141,11 @@ describe("criteria reports and notes through norn done", () => {
     expect(done.criteria.map((c: { id: string; verdict: string }) => `${c.id} ${c.verdict}`)).toEqual(["AC1 pass", "AC2 unverified", "AC3 person"]);
     expect(done.notes).toEqual([{ text: "kept whitespace inside backticks", criterion: "AC1" }]);
 
-    // QV8: the trace counts unverified per capability; norn trace sums it
+    // QV8, B37: the trace counts per verdict, with no split by capability; norn run list sums it
     const ev = readTrace(h.root, { unit: "gh-4", types: ["criteria"] }).events as CriteriaTrace[];
-    expect(ev.at(-1)).toMatchObject({ unit: "gh-4", rule: "criteria.checked", outcome: "unverified", verdicts: { pass: 1, fail: 0, person: 1, unverified: 1 }, unverified_needs: { browser: 1 } });
-    expect(((await h.norn("run", "list", "gh-4")).value as { criteria: unknown }).criteria).toEqual({ reports: 1, verdicts: { pass: 1, fail: 0, person: 1, unverified: 1 }, unverified_needs: { browser: 1 }, unchecked_coverage: 0 });
+    expect(ev.at(-1)).toMatchObject({ unit: "gh-4", rule: "criteria.checked", outcome: "unverified", verdicts: { pass: 1, fail: 0, person: 1, unverified: 1 } });
+    expect(ev.at(-1)?.unverified_needs).toBeUndefined();
+    expect(((await h.norn("run", "list", "gh-4")).value as { criteria: unknown }).criteria).toEqual({ reports: 1, verdicts: { pass: 1, fail: 0, person: 1, unverified: 1 }, unchecked_coverage: 0 });
 
     await tickUntil(at("human-qa", "parked"), "human-qa");
     const g = await inbox();
@@ -175,13 +173,7 @@ describe("criteria reports and notes through norn done", () => {
     expect(await notes()).toHaveLength(1);
 
     const pass = report("pass", [PASS("AC1"), PASS("AC2"), PASS("AC3")]);
-    // QV5a (C2): AC2 needs a browser; claude declares no capabilities — the person's human-qa ruling does not make it pass
-    const refused = await inWt("done", "pass", "--handoff", "AC2 settled by the person's ruling", "--criteria", pass);
-    expect(refused.exit).toBe(3);
-    expect(refused.value).toMatchObject({ code: "pass_without_capability", details: { criteria: [{ id: "AC2", missing: ["browser"] }] }, do_instead: expect.stringContaining("norn done unverified") });
-    expect(readdirSync(join(runs(), "receipts")).filter((f) => f.endsWith("-done.json"))).toHaveLength(1);
-    // an agent configured with a browser may pass it
-    h.write(repoConfigPath(h.root), CONFIG.replace("claude: { adapter: claude }", "claude: { adapter: claude, capabilities: [browser] }"));
+    // B36: done accepts a pass on any criterion from any agent
     expect((await inWt("done", "pass", "--handoff", "all observed", "--criteria", pass, "--note", "copy says 'Today', spec says 'today'")).exit).toBe(0);
     await tickUntil(at("ready", "parked"), "ready");
     expect((await notes()).map((i) => i.title)).toEqual(["qa note on gh-4 (AC1): kept whitespace inside backticks", "qa note on gh-4: copy says 'Today', spec says 'today'"]);

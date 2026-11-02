@@ -36,7 +36,24 @@ export function parseWorkflowText(text: string, path: string, root?: string): Re
   } catch (e) {
     return { ok: false, reason: "corrupt", error: fileError(path, [{ path: "", message: `YAML: ${(e as Error).message}` }], root) };
   }
+  // B11, D17 (W5): the step-level keys that belong to the workflow get their own message
+  const misplaced = workflowLevelKeysOnSteps(value);
+  if (misplaced.length) return { ok: false, reason: "corrupt", error: fileError(path, misplaced, root) };
   return validated("workflow", value, path, text, root);
+}
+
+const WORKFLOW_LEVEL: Record<string, string> = {
+  mode: "`mode` is set on the workflow, not on a step",
+  stalled: "`stalled` is set in the workflow's `defaults:`, not on a step",
+};
+
+function workflowLevelKeysOnSteps(value: unknown): Array<{ path: string; message: string }> {
+  const steps = (value as { steps?: unknown } | null)?.steps;
+  if (typeof steps !== "object" || steps === null) return [];
+  const out: Array<{ path: string; message: string }> = [];
+  for (const [name, step] of Object.entries(steps))
+    if (typeof step === "object" && step !== null) for (const k of Object.keys(WORKFLOW_LEVEL)) if (k in step) out.push({ path: `/steps/${name}/${k}`, message: WORKFLOW_LEVEL[k] as string });
+  return out;
 }
 
 export interface PinnedWorkflow {

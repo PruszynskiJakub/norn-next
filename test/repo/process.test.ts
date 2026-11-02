@@ -39,7 +39,7 @@ function frontmatter(skill: string): Record<string, unknown> {
 describe("repo config", () => {
   test("loads, with triage as the default workflow", () => {
     const loaded = loadConfig({ repoRoot: CONFIG_ROOT, home: mkdtempSync(join(tmpdir(), "norn-home-")) });
-    expect(loaded.ok ? loaded.config.default_workflow : loaded.errors).toBe("triage");
+    expect(loaded.ok ? loaded.config.workflow : loaded.errors).toBe("triage");
   });
 });
 
@@ -55,7 +55,7 @@ describe("repo workflows", () => {
   });
   test.each(Object.keys(listing.workflows))("%s is valid for claude with the linked skills", (name) => {
     const result = validateWorkflowDefinition(listing.workflows[name]!.workflow, {
-      agentSkills: { default_agent: "claude", visible: { claude } },
+      agentSkills: { agent: "claude", visible: { claude } },
     });
     expect(result.ok ? [] : result.issues).toEqual([]);
     if (result.ok) expect(checkWorkflowLevel(result.workflow, SLICE_WORKFLOWS.has(name) ? "slice" : "story")).toEqual([]);

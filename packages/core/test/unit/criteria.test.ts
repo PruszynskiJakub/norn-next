@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test";
 import { type AgentStep, type Criterion, type CriterionVerdict, deriveUlid, type Receipt, type UnitState, type Workflow } from "@norn/schema";
 import type { Action } from "../../src/actions.ts";
 import { renderBrief } from "../../src/brief.ts";
-import { checkReport, openNotes, unverifiedNeeds, verdictCounts, worstVerdict } from "../../src/criteria.ts";
+import { checkReport, openNotes, verdictCounts, worstVerdict } from "../../src/criteria.ts";
 import { decide } from "../../src/decide/index.ts";
 import type { NumberedReceipt } from "../../src/facts.ts";
 import { buildInbox, INBOX_GROUPS } from "../../src/inbox/items.ts";
@@ -39,32 +39,20 @@ const QA = QA_WF.steps.qa as AgentStep;
 
 const CRITERIA: Criterion[] = [
   { id: "AC1", verifier: "test" },
-  { id: "AC2", verifier: "agent", needs: ["browser"] },
+  { id: "AC2", verifier: "agent" },
   { id: "AC3", verifier: "person" },
 ];
 const PASS = (id: string): CriterionVerdict => ({ id, verdict: "pass", evidence: `evidence/${id}.txt` });
 const UNVERIFIED: CriterionVerdict = { id: "AC2", verdict: "unverified", reason: "no browser in this session", how: "open /today, add 'buy milk p1', expect red flag" };
 const PERSON: CriterionVerdict = { id: "AC3", verdict: "person", how: "compare against Figma frame 12" };
 
-const check = (outcome: string, report: CriterionVerdict[] | null, criteria: Criterion[] | null = CRITERIA, notes: Array<{ text: string; criterion?: string }> = [], step: AgentStep = QA, capabilities: string[] = ["browser"]) =>
-  checkReport({ step, step_name: "qa", outcome, report, criteria, notes, capabilities });
+const check = (outcome: string, report: CriterionVerdict[] | null, criteria: Criterion[] | null = CRITERIA, notes: Array<{ text: string; criterion?: string }> = [], step: AgentStep = QA) =>
+  checkReport({ step, step_name: "qa", outcome, report, criteria, notes });
 
 describe("criteria report checks (QV3–QV5, NT1)", () => {
-  test("QV5a (C2): pass for a criterion whose needs the agent lacks is refused — report unverified with how", () => {
-    const all = [PASS("AC1"), PASS("AC2"), PASS("AC3")];
-    const r = check("pass", all, CRITERIA, [], QA, []);
-    expect(r).toMatchObject({ ok: false, refusal: { code: "pass_without_capability", details: { criteria: [{ id: "AC2", missing: ["browser"] }], capabilities: [] } } });
-    if (r.ok) throw new Error("unreachable");
-    expect(r.refusal.error).toContain("AC2 (needs browser)");
-    expect(r.refusal.error).toContain("earlier ruling does not verify");
-    expect(r.refusal.do_instead).toContain('report AC2 as {"verdict": "unverified"');
-    expect(r.refusal.do_instead).toContain('norn done unverified --criteria <file> --handoff "…"');
-    // another capability does not cover it; the declared one does; unverified needs nothing
-    expect(check("pass", all, CRITERIA, [], QA, ["shell"])).toMatchObject({ ok: false, refusal: { code: "pass_without_capability" } });
-    expect(check("pass", all, CRITERIA, [], QA, ["browser"])).toEqual({ ok: true, worst: "pass", coverage: "checked" });
-    expect(check("unverified", [PASS("AC1"), UNVERIFIED, PASS("AC3")], CRITERIA, [], QA, [])).toEqual({ ok: true, worst: "unverified", coverage: "checked" });
-    // checked before the outcome gate: a pass on AC2 inside an unverified report is still refused
-    expect(check("partial", [PASS("AC1"), PASS("AC2"), PERSON], CRITERIA, [], QA, [])).toMatchObject({ ok: false, refusal: { code: "pass_without_capability" } });
+  test("B36: criteria carry id and verifier only; a pass is accepted from any agent", () => {
+    expect(check("pass", [PASS("AC1"), PASS("AC2"), PASS("AC3")])).toEqual({ ok: true, worst: "pass", coverage: "checked" });
+    expect(check("unverified", [PASS("AC1"), UNVERIFIED, PASS("AC3")])).toEqual({ ok: true, worst: "unverified", coverage: "checked" });
   });
 
   test("8: pass with an unverified criterion is refused; do_instead names unverified", () => {
@@ -115,9 +103,8 @@ describe("criteria report checks (QV3–QV5, NT1)", () => {
     expect(check("pass", [PASS("AC1"), PASS("AC2"), PASS("AC3")], CRITERIA, [{ text: "x", criterion: "AC7" }])).toMatchObject({ ok: false, refusal: { code: "invalid_criteria", details: { unknown: ["AC7"] } } });
   });
 
-  test("QV8: unverified counted per capability in needs", () => {
+  test("QV8, B37: counted per verdict, with no split by capability", () => {
     const report = [PASS("AC1"), UNVERIFIED, { id: "AC3", verdict: "unverified", reason: "no device", how: "on a phone" } as CriterionVerdict];
-    expect(unverifiedNeeds(report, CRITERIA)).toEqual({ browser: 1, none: 1 });
     expect(verdictCounts(report)).toEqual({ pass: 1, fail: 0, person: 0, unverified: 2 });
   });
 

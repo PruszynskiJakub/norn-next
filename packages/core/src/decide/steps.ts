@@ -70,7 +70,7 @@ export function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitSta
   if (uf.lease?.kind === "check") return ctx.noop(ref, "check.running", `check run ${uf.lease.run_id ?? "?"} in progress`);
   const cwd = unitWorktree(story, uf);
   if (!cwd) return ctx.noop(ref, "check.no_worktree", "unit worktree missing");
-  if (ctx.checksFree <= 0) return ctx.noop(ref, "check.queued", `queued: max_checks ${ctx.config.max_checks} in use (K1)`);
+  if (ctx.checksFree <= 0) return ctx.noop(ref, "check.queued", `queued: max_agents ${ctx.config.max_agents} in use (K1)`);
   ctx.checksFree--;
   const run_id = ctx.id();
   const env: Record<string, string> = { NORN_STORY: story.key, NORN_RUN: run_id, ...ctx.slotEnv(uf.worktree?.slot ?? null) };
@@ -236,7 +236,7 @@ export function slicesStep(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitS
   const starts = [];
   for (const s of startable.sort((a, b) => a.nn.localeCompare(b.nn))) {
     const fm = s.frontmatter;
-    const name = fm.workflow ?? ctx.config.default_slice_workflow;
+    const name = fm.workflow ?? ctx.config.slice_workflow;
     const loaded = usableWorkflow(ctx, name, "slice");
     if ("problem" in loaded) return park(ctx, story, uf, st, "workflow", `slice ${s.key}: ${loaded.problem}`, "slices.workflow_invalid");
     const sliceRef: UnitRef = { story: story.key, slice: s.key, dir: sliceDirName(s.nn, s.slug), key: s.key };

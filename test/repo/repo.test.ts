@@ -111,6 +111,35 @@ const GLOSSARY_FILES = (): string[] => [
   ...allDocs(ROOT).filter((f) => !f.includes("/plugins/")),
 ];
 
+/**
+ * gh-64 B52 (S5): the docs a person reads describe only the new config keys and files. A removed or
+ * renamed key named in any of them is a hit. CHANGELOG and story specs keep their history; `norn migrate`'s
+ * own messages and the moved-key table name old keys on purpose and live in sources, not here.
+ */
+// `notifiers` only as the key (`notifiers:`, `notifiers[]`, in backticks): as a noun it names the O3 concept
+const REMOVED_KEYS = /\bcapability this session lacks\b|\bcapability gating\b|\bnotifiers(?=[:[`])|`notifiers\b|\b(default_mode|default_agent|default_workflow|default_slice_workflow|max_checks|watch_interval|attended_wait|ports_per_slot|sync_interval)\b|\blimits\.(deadline|nudges|retries|stalled)\b|\bremote\.(provider|label|git_remote|host)\b|\bcapabilities: \[/;
+const CONFIG_DOCS = (): string[] => [
+  ...textFiles(join(PKGS, "cli", "assets"), DOCS),
+  ...textFiles(join(ROOT, "plugins"), [...DOCS, ".toml", ".sh"]),
+  join(PKGS, "cli", "src", "commands", "help.ts"),
+  ...textFiles(join(PKGS, "view", "src"), [".ts"]),
+  // gh-162 B7: the README, CONTRIBUTING, docs/, the Herdr plugin README, AGENTS.md and the rules file
+  ...allDocs(ROOT),
+];
+
+describe("config docs (gh-64 B52)", () => {
+  test("help, the view, every doc, the init templates and skills name no removed config key or check", () => {
+    const hits: string[] = [];
+    for (const f of CONFIG_DOCS())
+      readFileSync(f, "utf8")
+        .split("\n")
+        .forEach((line, i) => {
+          if (REMOVED_KEYS.test(line)) hits.push(`${relative(ROOT, f)}:${i + 1}: ${line.trim().slice(0, 120)}`);
+        });
+    expect(hits).toEqual([]);
+  });
+});
+
 describe("glossary", () => {
   test("matcher: word boundaries, URLs and doc code spans are not prose", () => {
     expect(glossaryHits("pick the next job", "README.md")).toEqual(["story / slice"]);
@@ -793,7 +822,7 @@ describe("the new layout in product docs (gh-110 B3, B22)", () => {
     const concepts = readFileSync(join(ROOT, "docs", "concepts.md"), "utf8").split("\n");
     const reference = readFileSync(join(ROOT, "docs", "reference.md"), "utf8").split("\n");
     expect(concepts.find((l) => l.startsWith("**Workflows are data.**"))).toContain("`.agents/workflows/`");
-    expect(reference.find((l) => l.startsWith("**Config**"))).toContain("`.agents/norn.config.yaml`");
+    expect(reference.find((l) => l.startsWith("| `.agents/norn.config.yaml`"))).toBeDefined();
   });
 
   test("the rules file's §7 layout and ID2 describe the machine dir and its id", () => {
@@ -914,11 +943,12 @@ const SPAWN_ALLOW: Counts = {
  */
 const NORN_PATH = /\.agents\/norn\b|["'`]\.agents["'`]\s*,\s*["'`]norn["'`]/;
 const NORN_PATH_ALLOW: Record<string, [number, string]> = {
-  "packages/store/src/paths.ts": [5, "the path module, and the old layout's places (gh-110 D4)"],
+  "packages/store/src/paths.ts": [8, "the path module, and the old layout's places (gh-110 D4)"],
+  "packages/schema/src/config.ts": [2, "the config files as messages name them (gh-64 B5: an error names the right file)"],
   "test/support/harness.ts": [1, "the old layout's places as a person had them, spelled independently of store (gh-110 S1)"],
-  "packages/cli/test/integration/migrate.test.ts": [6, "the old paths as a person had them and as `git status` and the report show them (gh-110 S1)"],
-  "packages/cli/test/integration/config.test.ts": [1, "message: the user-or-repo pick"],
-  "test/e2e/slice-workflow.test.ts": [1, "message: init's config row"],
+  "packages/cli/test/integration/migrate.test.ts": [7, "the old paths as a person had them and as `git status` and the report show them (gh-110 S1, gh-64 B40)"],
+  "packages/cli/test/integration/config.test.ts": [9, "messages: the config errors and `norn config` name the files as a person sees them (gh-64 B5–B7, B39, B54)"],
+  "test/e2e/slice-workflow.test.ts": [5, "message: init's config row; the files init writes, as a person sees them (gh-64 B9, B50, B55)"],
   "packages/cli/test/integration/layout.test.ts": [1, "the layout test: the repo config file as a person sees it"],
   "packages/core/test/unit/printed-commands.test.ts": [1, "not a path read: a string the removed-command matcher must pass"],
 };

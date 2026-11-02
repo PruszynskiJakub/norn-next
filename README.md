@@ -55,7 +55,7 @@ cd your-repo
 norn init
 ```
 
-`norn init` writes the config (`.agents/norn.config.yaml`), six workflows in `.agents/workflows/`, the agent skills and hooks, and its `.gitignore` and `.gitattributes` lines. It reads your test command from your build files and ends with the next steps:
+`norn init` writes the team config (`.agents/norn.config.yaml`), a commented user config (`~/.norn/config.yaml`) on a machine's first init, six workflows in `.agents/workflows/`, the agent skills and hooks, a JSON schema next to each config file for your editor, and its `.gitignore` and `.gitattributes` lines. It reads your test command from your build files and ends with the next steps:
 
 ```console
 Next steps
@@ -71,10 +71,10 @@ Do the first three. `norn status` then has nothing for you yet:
 ```console
 $ norn status
 Inbox empty — no stories yet.
-Label an issue `norn` (the config's `remote.label`) and assign it to yourself, then run `norn sync`.
+Label an issue `norn` and assign it to yourself, then run `norn sync`.
 ```
 
-Config lives in `.agents/norn.config.yaml` (the repository's, committed) and `~/.norn/config.yaml` (your machine's); which one wins and the keys you will touch are in [Reference: Config](docs/reference.md#config). On GitLab, set `remote.provider: glab` there. A repository set up by an older norn refuses every command and names `norn migrate`: run it once in the main checkout, with `norn watch` stopped, and commit what it prints.
+Config is optional: a solo developer on GitHub with Claude Code writes none. It lives in three files: `~/.norn/config.yaml` (your machine and your defaults), `.agents/norn.config.local.yaml` (yours in this repository, gitignored) and `.agents/norn.config.yaml` (the team's, committed); which keys go where is in [Reference: Config](docs/reference.md#config). norn reads GitHub or GitLab from the remote URL; a self-hosted host sets `provider: gh` or `provider: glab` in the team file. A repository set up by an older norn, or a config written for one, refuses every command and names `norn migrate` (and each old key with its replacement): run it once in the main checkout, with `norn watch` stopped, and commit what it prints.
 
 ## Run a first story
 

@@ -8,13 +8,13 @@
  */
 import { readdirSync } from "node:fs";
 import { basename, join, relative } from "node:path";
-import { cmd, currentRun, cursorStep, type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, standingReport, storyRulings, storyWorktreePath } from "@norn/core";
+import { cmd, currentRun, cursorStep, type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, standingReport, stepLimits, storyRulings, storyWorktreePath } from "@norn/core";
 import { type AgentStep, type ProcessIdentity, type ReceiptOf, storyBranch, ulid } from "@norn/schema";
 import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readText, readUnitHooks, writeBriefing, readRemoteCache, storyFile, traceEvent, specRunsDir, unitDir } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
-import { agentName, loadUnitSession, refuseUnlessAgentWork, reportCommand, storyMode, type UnitSession, unitCriteria } from "../runtime/agent-unit.ts";
+import { agentName, loadUnitSession, refuseUnlessAgentWork, reportCommand, unitStoryMode, type UnitSession, unitCriteria } from "../runtime/agent-unit.ts";
 
 /** Wrappers between the agent and `norn` that exit right after it (never the run's process). */
 const WRAPPERS = /^-?(sh|bash|zsh|dash|fish|ksh|tcsh|csh|env|bun|bunx|npx|pnpm|timeout|sudo|nice|nohup|xargs|script|login)$/;
@@ -137,7 +137,7 @@ function rulings(s: UnitSession): Ruling[] {
 function storyDiffBase(ctx: Context, root: string): string {
   // BS0: config `base_branch` when set, else the discovered default branch
   const branch = ctx.config.base_branch ?? readRemoteCache(root).default_branch ?? "main";
-  const ref = defaultBaseRef(root, ctx.config.remote.git_remote, branch);
+  const ref = defaultBaseRef(root, ctx.config.git_remote, branch);
   return ref ? ref.slice("refs/remotes/".length) : branch;
 }
 
@@ -168,7 +168,8 @@ export const briefCommand = defineCommand({
       started = true;
     }
 
-    const mode = storyMode(ctx, s, config);
+    const mode = unitStoryMode(ctx, s, config);
+    const limits = stepLimits(s.workflow, step);
     const env = readEnvNorn(s.worktree) ?? {};
     const num = (v: string | undefined) => (v !== undefined && /^\d+$/.test(v) ? Number(v) : null);
     const slicePath = s.unit.slice ? `${s.marker.spec_dir}/slices/${s.unit.dir}.md` : null;
@@ -194,9 +195,9 @@ export const briefCommand = defineCommand({
       handoff: readHandoff(s.runsDir)?.body ?? null,
       receipts: s.receipts,
       limits: {
-        deadline: step.deadline ?? config.limits.deadline,
-        nudges: step.nudges ?? config.limits.nudges,
-        retries: step.retries ?? config.limits.retries,
+        deadline: limits.deadline,
+        nudges: limits.nudges,
+        retries: limits.retries,
         slot: num(env.NORN_SLOT),
         port_base: num(env.PORT_BASE),
       },
@@ -205,7 +206,6 @@ export const briefCommand = defineCommand({
       rulings: rulings(s),
       criteria: unitCriteria(s),
       // QV5a: what this run's agent may `pass`
-      capabilities: config.agents[agentName(s, config)]?.capabilities ?? [],
     });
     // B4: the exact briefing of every run, in the trace
     const id = ulid(ctx.clock.now());

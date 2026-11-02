@@ -57,7 +57,7 @@ async function launchSession(act: ActEnv, unit: UnitRef, launch: AgentLaunch): P
       prompt: launch.prompt,
       env,
       headless: runner.name === "headless",
-      config: { ...(cfg?.command ? { command: cfg.command } : {}), ...(cfg?.args ? { args: cfg.args } : {}), ...(cfg?.env ? { env: cfg.env } : {}) },
+      config: { ...(cfg?.args ? { args: cfg.args } : {}) },
       ...(launch.model ? { model: launch.model } : {}),
       ...(launch.resume ? { resume: launch.resume } : {}),
     });
@@ -94,7 +94,7 @@ function recordSession(act: ActEnv, unit: UnitRef, runsDir: string, decided: Uni
   const n = Math.max(...receipts.map((x) => x.n)) + 1;
   const res = writeReceiptAt(runsDir, n, r);
   if (!res.ok) throw new Error(`receipt number ${n} is taken (S6)`);
-  return applyToState(decided, [{ n, file: "", receipt: r }], { workflow: wf, now: act.nowIso(), limits: act.config.limits, tick_id: act.tick }).state;
+  return applyToState(decided, [{ n, file: "", receipt: r }], { workflow: wf, now: act.nowIso(), tick_id: act.tick }).state;
 }
 
 /** R6.3, R9.1: how a person reaches the session, recorded with it for the inbox */
@@ -284,7 +284,7 @@ export async function classify(act: ActEnv, a: Extract<Action, { kind: "classify
 async function snapshotRun(act: ActEnv, unit: UnitRef, runId: string, req: { transcript: string | null; cwd: string } | null): Promise<string | null> {
   if (!req) return null;
   const loc = act.unitLoc(unit);
-  const agentName = loc.state?.run?.agent ?? act.config.default_agent;
+  const agentName = loc.state?.run?.agent ?? act.config.agent;
   const agent = act.obs.ports.agents[agentName];
   const last = req.transcript && agent ? await agent.lastAssistantMessage(req.transcript).catch(() => null) : null;
   const head = req.cwd ? await act.git.revParse(req.cwd, "HEAD").catch(() => null) : null;

@@ -3,7 +3,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DEFAULT_CONFIG, type Workflow, outcomeEdge, resolveConfig, validate } from "@norn/schema";
+import { DEFAULT_CONFIG, type Workflow, outcomeEdge, validate } from "@norn/schema";
 import { parse } from "yaml";
 import { type AssetsSources, assetsDir, resolveAssetsDir } from "../../src/runtime/assets.ts";
 
@@ -169,7 +169,7 @@ describe("single-purpose workflows (W1, #136)", () => {
   const types = (name: string) => Object.fromEntries(Object.entries(wf(name).steps).map(([s, step]) => [s, step.type]));
 
   test("triage is the default story workflow and slice the default slice workflow (W9)", () => {
-    expect([DEFAULT_CONFIG.default_workflow, DEFAULT_CONFIG.default_slice_workflow]).toEqual(["triage", "slice"]);
+    expect([DEFAULT_CONFIG.workflow, DEFAULT_CONFIG.slice_workflow]).toEqual(["triage", "slice"]);
   });
 
   test("triage is one norn-triage step that ends the round with done: the recommendation is only in its comment", () => {
@@ -281,26 +281,25 @@ describe("skills", () => {
   });
 });
 
-describe("config template", () => {
-  test("validates as a config layer (K2)", () => {
-    const value = parse(readFileSync(join(ASSETS, "config.yaml"), "utf8")) ?? {};
-    const r = validate("config", value);
-    expect(r.ok ? [] : r.errors).toEqual([]);
+describe("config starters (B49, B50)", () => {
+  const STARTERS = [
+    ["config.yaml", "repo"],
+    ["user-config.yaml", "user"],
+  ] as const;
+
+  test.each(STARTERS)("%s sets nothing as installed and carries a schema modeline", (file, kind) => {
+    const text = readFileSync(join(ASSETS, file), "utf8");
+    expect(text.split("\n")[0]).toMatch(/^# yaml-language-server: \$schema=\S+\.schema\.json$/);
+    expect(parse(text) ?? null).toBeNull();
   });
 
-  test("every commented-out key also validates once uncommented", () => {
-    const text = readFileSync(join(ASSETS, "config.yaml"), "utf8");
-    // Uncomment lines that hold a lowercase YAML key or list item (`# key:`, `#   - key:`); prose comments start uppercase.
-    const uncommented = text.replace(/^(\s*)# ( *(?:- )?[a-z_]+:)/gm, "$1$2");
+  test.each(STARTERS)("every commented-out key in %s is valid in its file once uncommented", (file, kind) => {
+    const text = readFileSync(join(ASSETS, file), "utf8");
+    // Uncomment lines that hold a lowercase YAML key (`# key:`); prose comments start uppercase.
+    const uncommented = text.replace(/^(\s*)# ( *[a-z_]+:.*)$/gm, "$1$2").replace(/<[^>]+>/g, "x");
     const value = parse(uncommented) as Record<string, unknown>;
-    const r = validate("config", value);
-    expect(r.ok ? [] : r.errors).toEqual([]);
-    expect(Object.keys(value)).toContain("limits");
-  });
-
-  test("as installed, keeps the built-in agent entries, args included", () => {
-    const value = parse(readFileSync(join(ASSETS, "config.yaml"), "utf8")) ?? {};
-    expect(resolveConfig({}, value).agents).toEqual(DEFAULT_CONFIG.agents);
+    // D2: the file's schema is what norn checks it with
+    expect(validate(`${kind}-config`, value)).toMatchObject({ ok: true });
   });
 });
 

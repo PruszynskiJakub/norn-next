@@ -15,13 +15,9 @@ setDefaultTimeout(60_000);
 const CONFIG_FILE = ".agents/norn.config.yaml";
 const WORKFLOWS = ".agents/workflows";
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-runner: { adapter: headless }
-remote: { provider: gh, label: norn }
-default_workflow: story
-default_mode: manual
-notifiers: []
+const CONFIG = `provider: gh
+workflow: story
+mode: manual
 `;
 
 const gateFirst = (name: string, prompt: string) => `name: ${name}
@@ -59,26 +55,26 @@ describe("norn init writes the new layout (B1, B2)", () => {
     expect(init.exit).toBe(0);
     expect(existsSync(join(h.root, CONFIG_FILE))).toBe(true);
     for (const f of ["triage.yaml", "reproduce.yaml", "refinement.yaml", "story.yaml", "slice.yaml", "quick.yaml"]) expect(existsSync(join(h.root, WORKFLOWS, f))).toBe(true);
-    expect(readdirSync(join(h.root, ".agents")).sort()).toEqual(["norn.config.yaml", "skills", "workflows"]);
+    expect(readdirSync(join(h.root, ".agents")).sort()).toEqual(["norn.config.local.schema.json", "norn.config.schema.json", "norn.config.yaml", "skills", "workflows"]);
     expect(init.stdout).toContain(`config          ${CONFIG_FILE} created`);
     expect(init.stdout).toContain("the `test` steps in .agents/workflows/ run");
   });
 
   test("norn config shows repo settings as coming from the repo config file", async () => {
-    h.write(join(h.root, CONFIG_FILE), CONFIG);
+    h.config(CONFIG);
     const r = await h.norn("config", "list", "--json");
     expect(r.value).toMatchObject({ files: { repo: { path: join(h.root, CONFIG_FILE), exists: true } } });
-    expect((r.value as { entries: Array<{ key: string; source: string }> }).entries.find((e) => e.key === "default_mode")).toMatchObject({ source: "repo" });
+    expect((r.value as { entries: Array<{ key: string; source: string }> }).entries.find((e) => e.key === "workflow")).toMatchObject({ source: "repo" });
     expect((await h.norn("config", "list")).stdout).toContain(CONFIG_FILE);
   });
 });
 
 describe("messages name the new paths (D11)", () => {
-  test("config set asks between the user file and the repo config file; --repo help names it", async () => {
+  test("config set asks between the user, local and repo config files; --repo help names it", async () => {
     const term = new FakeInteraction();
     term.answers = [null];
-    await runChecked(["config", "set", "default_mode", "auto"], { ...h.deps, interaction: term });
-    expect(term.picks[0]?.question).toBe(`Write to user (~/.norn/config.yaml) or repo (${CONFIG_FILE})?`);
+    await runChecked(["config", "set", "mode", "auto"], { ...h.deps, interaction: term });
+    expect(term.picks[0]?.question).toBe("Write to which file?");
     expect(term.picks[0]?.choices.find((c) => c.value === "repo")?.label).toContain(CONFIG_FILE);
     expect((await h.norn("config", "set", "--help")).stdout).toContain(`edit ${CONFIG_FILE}`);
   });
@@ -88,11 +84,11 @@ describe("messages name the new paths (D11)", () => {
     expect(created.value).toMatchObject({ code: "unknown_workflow", error: expect.stringContaining(`no workflow 'nope' in ${WORKFLOWS}/`) });
   });
 
-  test("an adapter that cannot be loaded names the repo config file", async () => {
-    h.write(join(h.root, CONFIG_FILE), CONFIG.replace("agents:\n", "agents:\n  other: { adapter: no-such-agent-pkg }\n"));
+  test("a team key in the wrong place names the repo config file (gh-64 B5)", async () => {
+    h.write(join(h.root, CONFIG_FILE), "mode: auto\n");
     const r = await h.norn("tick");
-    expect(r.value).toMatchObject({ code: "unknown_adapter", do_instead: expect.stringContaining(CONFIG_FILE) });
-    h.write(join(h.root, CONFIG_FILE), CONFIG);
+    expect(r.value).toMatchObject({ code: "config_wrong_file", error: expect.stringContaining(CONFIG_FILE) });
+    h.config(CONFIG);
   });
 });
 

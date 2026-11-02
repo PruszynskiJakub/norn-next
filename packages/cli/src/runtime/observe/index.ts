@@ -23,6 +23,7 @@ import {
   type UnitFacts,
   type UnitRef,
   type WorktreeFacts,
+  storyMode,
 } from "@norn/core";
 import { parseDuration, type ResolvedConfig, sliceBranch, storyBranch, type UnitState, type Workflow } from "@norn/schema";
 import {
@@ -128,7 +129,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   const ports = await ctx.ports();
   const git = ports.git;
   const hb = heartbeatId(root, now);
-  const remoteName = config.remote.git_remote;
+  const remoteName = config.git_remote;
   const remote = await gitRemote(git, root, remoteName);
 
   // ---- worktrees (A3 markers tell story and slice worktrees apart)
@@ -150,7 +151,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   // ---- remote sync (GR1, H5): throttled; failures leave remote facts unobserved
   const cache = readRemoteCache(root);
   const mode = opts.sync ?? "auto";
-  const due = mode === "force" || (mode === "auto" && (cache.attempted_at === null || now - cache.attempted_at >= parseDuration(config.remote.sync_interval)));
+  const due = mode === "force" || (mode === "auto" && (cache.attempted_at === null || now - cache.attempted_at >= parseDuration(config.sync_interval)));
   const sync: SyncReport = { ran: false, ok: true };
   let issues: RemoteIssue[] | undefined;
   const storyIssues = new Map<string, RemoteIssue | null>();
@@ -168,7 +169,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
 
   // ---- local facts (H2): the snapshot, leases (K1, K3), hook facts, caches, what the receipts say
   const liveness = leaseLiveness((p) => ports.process.isAlive(p));
-  const local = await loadLocalFacts(root, { now, home: ctx.home, env: ctx.env, storyWorktrees: storyWts, sliceWorktrees: sliceWts, baseRef, liveness, stalledMs: parseDuration(config.limits.stalled), backfillHooks: opts.backfillHooks });
+  const local = await loadLocalFacts(root, { now, home: ctx.home, env: ctx.env, storyWorktrees: storyWts, sliceWorktrees: sliceWts, baseRef, liveness, backfillHooks: opts.backfillHooks });
   const snapshot = local.snapshot;
   const workflows = checkedRepoWorkflows(snapshot.workflows, root, config, ports.agents);
 
@@ -177,7 +178,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     cache.attempted_at = now;
     try {
       if (remote) await fetchNornRefs(root, remote).catch(() => undefined);
-      const label = config.remote.label;
+      const label = config.label;
       issues = await ports.remote.listAssignedIssues({ label });
       for (const s of snapshot.stories) {
         const fm = s.frontmatter;
@@ -332,7 +333,8 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       ...(await storyBase(git, root, remote, base, branch, s.frontmatter?.status, refs, baseCacheIn, baseCache, s.key)),
       units,
       slices: s.slices satisfies SliceFileFacts[],
-      mode: units[0]?.state?.mode ?? config.default_mode,
+      // B10, B25: before its story unit pins a workflow, a story runs in the one it will start (MO1)
+      mode: storyMode(units[0]?.state, units[0]?.workflow ?? workflows[s.frontmatter?.workflow ?? config.workflow]?.workflow, config),
     });
   }
 

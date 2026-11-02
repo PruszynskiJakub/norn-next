@@ -16,6 +16,7 @@ import type { ProjectView } from "@norn/view";
 import { bundledSkills, type CliDeps, type CliResult, type Interaction, type InteractionChoice, runCli, type TickReport } from "../../packages/cli/src/index.ts";
 import { assetsDir } from "../../packages/cli/src/runtime/assets.ts";
 import { harvestGolden } from "./golden-harvest.ts";
+import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 // Every tick shells out to git (worktrees, status, refs) several times, so the multi-tick
 // integration tests take 2–3.5 s each on an idle laptop — too close to bun's 5 s default on a
@@ -206,8 +207,19 @@ export class FakeInteraction implements Interaction {
 }
 
 /** A6 launch env and the orient env: the env of the agent session a test may run in is not the harness's. */
-const AGENT_ENV = ["NORN_HOME", "NORN_STORY", "NORN_SLICE", "NORN_RUN", "NORN_BIN", "NORN_ORIENT"];
-export const hostEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !AGENT_ENV.includes(k)));
+const AGENT_ENV = ["NORN_HOME", "NORN_STORY", "NORN_SLICE", "NORN_RUN", "NORN_BIN", "NORN_ORIENT", "HERDR_ENV", "HERDR_SOCKET_PATH"];
+
+/**
+ * gh-64 (Plan, Risks): runner detection reads HERDR_ENV and PATH, so the harness pins both — no
+ * HERDR_ENV, and a PATH without any directory that holds `herdr` — and a machine with Herdr
+ * installed gives the same results as CI.
+ */
+const pathWithoutHerdr = (path: string | undefined) =>
+  (path ?? "")
+    .split(":")
+    .filter((d) => d && !existsSync(join(d, "herdr")))
+    .join(":");
+export const hostEnv = () => ({ ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !AGENT_ENV.includes(k))), PATH: pathWithoutHerdr(process.env.PATH) });
 
 export function sh(cwd: string, args: string[], input?: string): string {
   const r = Bun.spawnSync(["git", ...args], { cwd, stdin: input === undefined ? "ignore" : new TextEncoder().encode(input), stdout: "pipe", stderr: "pipe" });
@@ -237,6 +249,13 @@ export interface Harness {
   checksDone(): Promise<void>;
   git(args: string[], cwd?: string): string;
   write(path: string, text: string): void;
+  /**
+   * gh-64: write config the way a person splits it — the team keys (`provider`, `base_branch`,
+   * `workflow`, `slice_workflow`) into `.agents/norn.config.yaml`, your keys (`mode`, `agent`,
+   * `agents`) into `.agents/norn.config.local.yaml`, machine keys into the user file. A repo file
+   * left without keys is removed; the user file is only written, never removed.
+   */
+  config(yaml: string): void;
   read(path: string): string;
   state(runsDir: string): UnitState | null;
   /** simulate a reporting verb: append a receipt at the unit's cursor */
@@ -323,6 +342,16 @@ export async function createHarness(): Promise<Harness> {
       while (checks.length) await checks.shift();
     },
     git: (args, cwd = root) => sh(cwd, args),
+    config(yaml) {
+      const value = (parseYaml(yaml) ?? {}) as Record<string, unknown>;
+      const files: Record<string, Record<string, unknown>> = { team: {}, local: {}, user: {} };
+      for (const [k, v] of Object.entries(value)) files[["mode", "agent", "agents"].includes(k) ? "local" : ["max_agents", "notify", "trace"].includes(k) ? "user" : "team"]![k] = v;
+      const paths = { team: repoConfigPath(root), local: join(root, ".agents", "norn.config.local.yaml"), user: join(home, "config.yaml") };
+      for (const [f, keys] of Object.entries(files) as Array<[keyof typeof paths, Record<string, unknown>]>) {
+        if (Object.keys(keys).length) h.write(paths[f], stringifyYaml(keys));
+        else if (f !== "user") rmSync(paths[f], { force: true });
+      }
+    },
     write(path, text) {
       mkdirSync(dirname(path), { recursive: true });
       writeFileSync(path, text);

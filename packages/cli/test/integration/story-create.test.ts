@@ -24,13 +24,9 @@ steps:
     outcomes: { done: $done }
 `;
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-runner: { adapter: headless }
-remote: { provider: gh, label: norn }
-default_workflow: fix
-default_mode: auto
-notifiers: []
+const CONFIG = `provider: gh
+workflow: fix
+mode: auto
 `;
 
 let h: Harness;
@@ -46,7 +42,7 @@ const local = () => [join(h.root, ".agents/specs"), `${h.root}-worktrees`].flatM
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   for (const name of ["fix", "spec"]) h.write(join(workflowsDir(h.root), `${name}.yaml`), workflow(name));
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);

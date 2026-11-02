@@ -6,7 +6,8 @@
  * nothing; the cockpit shows the last tick) and a sentence instead of the summary. `--json` wins.
  */
 import { git as gitAdapter } from "@norn/adapters";
-import { ExitCode, parseDuration } from "@norn/schema";
+import { DEFAULT_INTERVAL, ExitCode, parseDuration } from "@norn/schema";
+import { recordInterval } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import { CliFailure, refuse, rendered, usageError, withExit } from "../output.ts";
 import { type ReleaseResult, releaseHeldClaims } from "../runtime/release.ts";
@@ -48,13 +49,16 @@ export const watchCommand = defineCommand({
   usage: "norn watch [--interval 30s] [--max-ticks N] [--keep-claims] [--human]",
   options: { interval: { type: "string" }, "max-ticks": { type: "string" }, "keep-claims": { type: "boolean" }, human: { type: "boolean" } },
   async run(ctx, args) {
-    const raw = opt.str(args, "interval") ?? ctx.config.watch_interval;
+    const raw = opt.str(args, "interval") ?? DEFAULT_INTERVAL;
     let interval: number;
     try {
       interval = parseDuration(raw);
     } catch {
       throw usageError(`bad --interval '${raw}' (use e.g. 30s, 2m)`, cmd.watch({ interval: "30s" }));
     }
+    // B34 (D5): watch always records the interval it runs at (liveness, claim timing)
+    recordInterval(ctx.root, raw);
+    ctx.reload();
     const maxRaw = opt.str(args, "max-ticks");
     const max = maxRaw === undefined ? Number.POSITIVE_INFINITY : Number(maxRaw);
     if (!(max > 0)) throw usageError(`bad --max-ticks '${maxRaw}'`, cmd.watch({ maxTicks: 10 }));

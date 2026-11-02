@@ -71,16 +71,18 @@ Three separate concepts decide where a human is involved:
 "Semi-automatic" = auto mode plus gates and attended steps placed in the workflow.
 
 - MO1 *(assumption, revisit)* Mode is stored in `runs/_story/state.json`, changed only by `norn story edit --auto|--manual` (which writes a `mode` receipt) and travels with the story on takeover.
-- MO2 *(assumption)* The **effective mode** is computed each tick: `manual` if the step is attended or this machine has no runner configured, otherwise the story's mode. A downgrade is shown in `status` and `story list` ("auto requested, no runner; running manual").
+- MO2 *(assumption)* The **effective mode** is computed each tick: `manual` if the step is attended, otherwise the story's mode. A story's mode is, nearest first: the story's own (MO1, `norn story edit --auto|--manual`), its workflow's top-level `mode`, `mode` in `.agents/norn.config.local.yaml`, `mode` in `~/.norn/config.yaml`, built-in `manual` (gh-64 B10). A step never sets `mode` (W5). The runner is detected, never configured: Herdr when running inside Herdr or when `herdr` is on PATH, otherwise headless (gh-64 B29), so auto mode never downgrades for lack of a runner.
 - MO3 *(assumption)* A run starts with the first `norn brief` in the worktree (manual) or the launch (auto); it creates the `run_id` and a `started` receipt recording session and PID. The tick never launches an agent for a step that has a live run. Switching auto → manual does not stop a running agent; only the next step waits.
 - MO5 `norn story start <unit>` opens an agent on a step a person starts (an attended step, or a ready agent step in effective manual mode). When this machine's runner can open a terminal for a person (the optional `open` capability; Herdr: a focused tab in the unit worktree, in the workspace already on that worktree, else the caller's) it opens one running the start command; otherwise, or with `--print`, it prints that command. It records nothing: the agent's `norn brief` starts the run (MO3). Any other step is refused (`nothing_to_open`); a unit not started yet is refused with `norn tick`.
-- MO4 Attended steps relax the unattended machinery: no `silent`, nudges, deadline or `stalled`; the `Stop` hook does not block turn end. Only `died` and an explicit `done` / `stuck` count. The agent reports `done` once the person agrees. An attended run waiting for its person is shown as Your turn after `limits.attended_wait`; this records no outcome (HC1–HC3).
+- MO4 Attended steps relax the unattended machinery: no `silent`, nudges, deadline or `stalled`; the `Stop` hook does not block turn end. Only `died` and an explicit `done` / `stuck` count. The agent reports `done` once the person agrees. An attended run waiting for its person is shown as Your turn after 2 minutes (W2a); this records no outcome (HC1–HC3).
 
 ## 7. Repository layout
 
 ```
 .agents/
-  norn.config.yaml              # repo config (agents, runner, remote, label, defaults, checks)
+  norn.config.yaml              # team config, committed: provider, base_branch, workflow, slice_workflow (K2)
+  norn.config.local.yaml        # your config for this repo, gitignored: mode, agent, agents (K2)
+  norn.config*.schema.json      # JSON schema copies for editors, written by init
   workflows/                    # triage, reproduce, refinement, story, slice, quick (.yaml) — examples copied by init, editable
   specs/<id>-<slug>/            # id is provider-prefixed: gh-123, gl-45
     spec.md                     # frontmatter mirrors remote issue + workflow + spec body
@@ -98,7 +100,7 @@ refs/norn/claims/<story-id>     # git ref: claim blob (holder, heartbeat_id, exp
 refs/norn/inbox/<story-id>/<ulid> # git ref: receipt from a non-holder (M3)
 
 ~/.norn/
-  config.yaml                   # user layer, same schema as repo config; machine caps live here
+  config.yaml                   # user config: machine keys (max_agents, notify, trace) and your defaults (K2)
   leases/                       # runtime only: agent and port slot leases
   repos/<id>/                   # machine dir, one per checkout (ID2): trace (JSONL per tick, hook events, briefings,
                                 #   transcripts), tick and integrate locks, heartbeat.json, caches, runner logs; never committed
@@ -142,12 +144,12 @@ Launch crashes, orphans and heartbeat liveness are in [R5](#r5-launch-crash-orph
 - H2 **Observe** collects facts: frontmatter, `runs/` state and unapplied receipts, git refs (local and remote, incl. mailbox), worktree status, runner pane state, hook events, process liveness (PID + start time).
 - H3 **Decide** is a pure function `(facts, pinned workflows, config) → actions`, at most one action per unit per tick. It records which rule fired.
 - H4 **Act** performs actions, writing receipts first (P6); every action and its result is appended to the trace.
-- H5 `norn watch --interval 30s` runs ticks in a loop; cron/launchd may be used instead. Remote calls (sync, claim beats, mailbox fetch) are throttled and never block local reads.
+- H5 `norn watch --interval 30s` runs ticks in a loop; cron/launchd may be used instead, with `norn tick --interval <d>` naming the interval it is run at (default 30s). Each tick records its interval in `heartbeat.json`; liveness checks (H10) and claim timing (T4) use the recorded interval (gh-64 B34). There is no interval key. Remote calls (sync, claim beats, mailbox fetch) are throttled and never block local reads.
 - H6 Performance: `tick`, `brief`, `status`, `story list` complete in < 1 s on local state.
 - H7 Claim renewal is a **side action** (R1): decide emits it beside a story's one unit action; act renews first and, when the renewal's CAS is lost, skips the story's other actions this tick (`skipped: claim lost`), so merge cleanup and receipt application never starve.
 - H8 Act failures are never `ok: true` (R4.3): an action whose effect failed (send, resume, launch, push, answer delivery) reports `ok: false`; the unit's last failure is kept machine-local, shown in `status` and as an Unblock item until an effect of the same kind succeeds.
 - H9 Every tick writes `tick.start` before act and `tick.end` after (R5.4); `norn run view --why` shows a tick with no end as "tick crashed during act".
-- H10 `heartbeat.json` records `last_tick_at` (R5.5). Older than 3 × watch interval while a held story has auto work → Unblock item "no heartbeat on <holder> for 7m — run `norn watch`", and auto steps lose their manual start hint.
+- H10 `heartbeat.json` records `last_tick_at` (R5.5). Older than 3 × the recorded interval (H5) while a held story has auto work → Unblock item "no heartbeat on <holder> for 7m — run `norn watch`", and auto steps lose their manual start hint.
 - H11 Every call that reaches a remote (`git fetch`/`push`/`ls-remote`/`pull`/`clone`, every `gh` and `glab` call) has a timeout (2 min). On timeout its whole process group is killed (git and the `ssh` it started) and the call fails as a retryable network error, so a connection dropped while the machine slept never holds the tick lock (H1). Local git calls have no timeout: a commit runs hooks.
 
 ## 9. Agent integration
@@ -157,7 +159,7 @@ Prompts the agent is blocked on are in [R6](#r6-prompts-the-agent-is-blocked-on)
 ### 9.1 Hooks
 
 - A1 `norn init` appends norn hooks into each configured agent tool's repo config (e.g. `.claude/settings.json`), marked as norn-owned; re-running updates them in place; `norn uninstall` removes them.
-- A2 Hooks call `"${NORN_BIN:-norn}" hook <event>` (R8.1) and report lifecycle facts: turn start/end, tool use, waiting for input (incl. permission prompts), session end, transcript path. Each fact is appended to the unit's own hook file (`hooks/<story>/_story.jsonl` or `<nn>.jsonl` in the machine dir, the unit of the worktree it fired in, with or without a run id) and to the trace day file. Ticks, `norn hook` and `norn brief` read a unit's hook facts from its hook file only, never from the day files; a tick reads the hook files of units with a live run or an unknown launch (R5.1) and of units whose hook file was written within `limits.stalled` (R5.3). The first tick of a norn with hook files copies each live run's hook lines from the day files into its unit's hook file once, deduplicated by event id, and records it in `hooks/backfill.json` there (`since`, the units `done`; never pruned); runs begun after `since` need no copy.
+- A2 Hooks call `"${NORN_BIN:-norn}" hook <event>` (R8.1) and report lifecycle facts: turn start/end, tool use, waiting for input (incl. permission prompts), session end, transcript path. Each fact is appended to the unit's own hook file (`hooks/<story>/_story.jsonl` or `<nn>.jsonl` in the machine dir, the unit of the worktree it fired in, with or without a run id) and to the trace day file. Ticks, `norn hook` and `norn brief` read a unit's hook facts from its hook file only, never from the day files; a tick reads the hook files of units with a live run or an unknown launch (R5.1) and of units whose hook file was written within the hook read window, the longest `stalled` across the loaded workflows (R5.3, W2a). The first tick of a norn with hook files copies each live run's hook lines from the day files into its unit's hook file once, deduplicated by event id, and records it in `hooks/backfill.json` there (`since`, the units `done`; never pruned); runs begun after `since` need no copy.
 - A3 Hooks are no-ops outside worktrees containing `.norn-unit`.
 - A4 Where the agent supports blocking (e.g. Claude Code `Stop`), ending a turn without a receipt is refused with an instruction to report — in unattended steps only (MO4). The refusals already given to a run are counted from its unit's hook file (A2).
 - A5 Agents without hooks are a lower tier: runner, process and git facts only.
@@ -227,15 +229,15 @@ Three sources of outcomes:
 
 ### 10.1 Criteria, verdicts and notes
 
-- QV1 Slice frontmatter (and story frontmatter, for story-level QA) may list `criteria: [{ id, verifier: test | agent | person, needs?: [capability] }]`, written by the `slice` skill next to the prose Acceptance section. Decide never reads the prose (P8).
+- QV1 Slice frontmatter (and story frontmatter, for story-level QA) may list `criteria: [{ id, verifier: test | agent | person }]` (gh-64 B36 removed `needs`; a slice still carrying it is refused, pointing at `norn migrate`), written by the `slice` skill next to the prose Acceptance section. Decide never reads the prose (P8).
 - QV2 `norn done --criteria <file>` takes a JSON array validated against the `CriteriaReport` schema: one entry per criterion with a verdict — `pass` (`evidence` required), `fail` (`repro` required), `person` (`how` required), `unverified` (`reason` and `how` required: a machine could check it, this session could not). The report is stored in the `done` receipt (`criteria`).
 - QV3 An agent step with `criteria: required` refuses `norn done` without a report (`criteria_required`); so does an outcome gated by a `verdict`.
 - QV4 With frontmatter `criteria`, the report covers exactly those ids, once each; otherwise `invalid_criteria` (exit 3) with the expected ids in `do_instead`. Without frontmatter `criteria`, coverage is not checked and the trace records `criteria.unchecked_coverage`.
 - QV5 An outcome edge may declare `verdict: <v>` (agent steps only, W5). Order `fail` > `unverified` > `person` > `pass`; an outcome with `verdict: v` may be reported only when the worst verdict in the report is `v` — otherwise `outcome_contradicts_verdicts`, and `do_instead` names the outcome that matches.
-- QV5a `pass` means observed in this session. Each agent declares what its sessions can do in config, `agents.<name>.capabilities: [browser, …]` (default none). `norn done` refuses (`pass_without_capability`, exit 3) a `pass` verdict for a criterion whose `needs` are not all among the reporting agent's capabilities; `do_instead` says to report it `unverified` with `reason` and `how`. A person's earlier gate ruling (the brief's Rulings) answers questions but never verifies a criterion on the current code (C2).
-- QV6 Default `qa` steps (the story's; the shipped `slice` has none, and the story's `slice` step lists every slice's criteria in `spec.md`'s frontmatter as `<nn>.<id>` so the story's QA covers them, QV4) declare `criteria: required` and `pass` (verdict pass), `fail` (fail, counted), `partial` (person → `human-qa`), `unverified` (unverified → `human-qa`). A workflow may route `unverified` to an agent step whose runner has the capability instead.
+- QV5a `pass` means observed in this session; an agent that could not observe a criterion reports it `unverified` with `reason` and `how`. Agents declare no capabilities and criteria no `needs` (gh-64 B36), so `norn done` makes no capability check. A person's earlier gate ruling (the brief's Rulings) answers questions but never verifies a criterion on the current code (C2).
+- QV6 Default `qa` steps (the story's; the shipped `slice` has none, and the story's `slice` step lists every slice's criteria in `spec.md`'s frontmatter as `<nn>.<id>` so the story's QA covers them, QV4) declare `criteria: required` and `pass` (verdict pass), `fail` (fail, counted), `partial` (person → `human-qa`), `unverified` (unverified → `human-qa`). A workflow may route `unverified` to another agent step instead.
 - QV7 A gate's inbox item lists the `person` and `unverified` criteria of the report that led there, with `reason` and `how` (one line in `detail`, one per line in `full` / `status --details`); a rework brief after a rejection repeats the judged report's criteria not passed.
-- QV8 Each report is a `criteria` trace event (counts per verdict, `unverified` per capability in `needs`); `norn run list <unit>` sums them (`criteria.unverified_needs`).
+- QV8 Each report is a `criteria` trace event (counts per verdict); `norn run list <unit>` sums them.
 - NT1 Every `norn done` accepts `--note "<text>"` (repeatable), each optionally followed by `--note-criterion <id>`; stored in the `done` receipt (`notes`). Notes never block and never change the route.
 - NT2 Each open note is a Notes item `note:<receipt_id>:<n>` (`qa note on gh-4/01 (AC3): …`, command `norn run view gh-4/01 --receipt <id>`). Notes are information, not an action: the Notes group sits below Running, does not count as needing a person, and its items refuse approve/reject.
 - NT3 Every story-level gate lists the story's open notes in its inbox item. Approving it records them in the `approve` receipt (`acknowledged_notes`), and they leave the inbox; rejecting leaves them open.
@@ -245,24 +247,25 @@ Three sources of outcomes:
 
 ## 11. Workflows
 
-- W1 Files in `.agents/workflows/*.{yaml,json}`, validated against a published JSON Schema. No lifecycle is hard-coded; `init` copies `triage`, `reproduce`, `refinement`, `story`, `slice` and `quick` as **examples** with no implied mapping beyond the built-in `default_workflow: triage` and `default_slice_workflow: slice` (W9). Each does one thing; a story goes through them one after another as rounds (`$done` ends a round, RD1; a person merging the PR ends the story), and a person starts the next round (RD2).
+- W1 Files in `.agents/workflows/*.{yaml,json}`, validated against a published JSON Schema. No lifecycle is hard-coded; `init` copies `triage`, `reproduce`, `refinement`, `story`, `slice` and `quick` as **examples** with no implied mapping beyond the built-in `workflow: triage` and `slice_workflow: slice` (W9). Each does one thing; a story goes through them one after another as rounds (`$done` ends a round, RD1; a person merging the PR ends the story), and a person starts the next round (RD2).
 - W2 Step types:
 
 | Type | Purpose |
 |---|---|
-| `agent` | Run a skill in a fresh session; fields: `skill`, `instructions?`, `inputs`, `agent?`, `model?`, `attended?`, `criteria?: required` (QV3), limits (`deadline`, `nudges`, `retries`), `outcomes`. |
+| `agent` | Run a skill in a fresh session; fields: `skill`, `instructions?`, `inputs`, `agent?`, `model?`, `attended?`, `criteria?: required` (QV3), limits (`deadline`, `nudges`, `retries`; `stalled` is set only in the workflow's `defaults:`), `outcomes`. |
 | `check` | Run a shell command in the unit worktree with `.env.norn` loaded and a `timeout`; exit code decides `pass`/`fail`; writes a check receipt (C5). |
 | `gate` | Wait for a human `approve`/`reject` (or `answer`). |
 | `git` | Built-in actions: `integrate` (slice into story branch: rebase + fast-forward, serialized per story), `push`, `open-pr` (draft story PR into the base branch, BS0; body per GR9, and an open PR gets the new body), `update` (merge the base into the story branch, BS3). |
 | `slices` | Story-level bridge: start each slice's workflow when its `depends_on` are done, within caps; `done` when all slices are integrated; picks up slice files added mid-flight. |
 
+- W2a A workflow file may set a top-level `mode: manual | auto` (MO2) and a `defaults:` block with `deadline`, `nudges`, `retries` and `stalled`. A step's own limit wins over `defaults:`, which wins over the built-in 60m / 2 / 1 / 15m. The tick's hook read window covers the longest `stalled` across the loaded workflows. The attended wait (HC2) is fixed at 2 min (gh-64 B25–B28).
 - W3 Transitions are keyed on outcomes: `review.changes_requested → implement`. Conditions are expressed only as outcomes (e.g. `refine` reports `done` or `questions`); there is no `when:` guard in v1. An edge is `{ to, counter?, means?, verdict? }`; `verdict` (agent steps only) gates which outcome a criteria report allows (QV5).
 - W4 Every **elementary cycle** (a path back to its start visiting no step twice) must include at least one edge with a `counter`. Taking a counted edge increments it; if it would exceed `max`, the edge is not taken and the outcome becomes `exhausted` → `$stuck` with the reason (e.g. "review_loop 3/3 at review.changes_requested"). Counters are per unit and never reset by themselves, except a counter declaring `reset_on: <step>.<outcome>`: taking that edge resets it to 0, journaled with the advance (trace, commit, handoff line) — e.g. `base_conflict_loop` resets on `update.done`, so only repeated conflicts on one base move count (C3). Otherwise only `norn run rerun --reset <counter>` resets one, journaled. `reset_on` must name a declared edge (W5); it never exempts a cycle from needing a counter.
-- W5 Load-time validation: schema; every step can reach `$done`; every elementary cycle has a counter (the validator lists each uncounted cycle with its path); every referenced skill is installed for the agent that runs the step (SK1); no step uses a reserved name; `verdict` only on outcomes an agent reports (QV5). Invalid workflows are refused before anything runs.
+- W5 Load-time validation: schema; every step can reach `$done`; every elementary cycle has a counter (the validator lists each uncounted cycle with its path); every referenced skill is installed for the agent that runs the step (SK1); no step uses a reserved name; no step sets `mode` (W2a); `verdict` only on outcomes an agent reports (QV5). Invalid workflows are refused before anything runs.
 - W6 v1 has no `fork/join`; parallelism comes from independent slices.
 - W7 **Reserved targets** start with `$`: `$done` (unit finished; on a story it ends the round, not the story, RD1) and `$stuck` (park in inbox under Unblock with the reason). `$stuck` is always an implicit target of `exhausted`, `stuck` reports and C1 routes. Step names may not start with `$` nor be a reserved word: `done`, `stuck`, `ask`, `exhausted`, `silent`, `died`, `timeout`, `stalled`, `stale`.
 - W8 **Workflows are not tied to a level.** Any workflow may run on a story or a slice; constraints are checked at unit start: `slices`, `git: open-pr` and `git: update` only on a story, `git: integrate` only on a slice. A story workflow without `slices` works directly in the story worktree.
-- W9 **Workflow selection.** A story's workflow is `workflow:` in `spec.md`, set at intake from a remote label `norn:wf:<name>` if present, else `config.default_workflow`; changeable before start with `norn story edit <story> --workflow <name>`; after start, `--workflow` starts a new round (RD2–RD4). The issue's `norn:wf:<name>` label follows the current round's workflow, for visibility only; a label change never starts or changes a round, and a failed label write warns and does not stop the round (RD5). A slice's workflow is `workflow:` in its frontmatter, proposed by the `slice` skill, editable at the plan gate, default `config.default_slice_workflow`.
+- W9 **Workflow selection.** A story's workflow is `workflow:` in `spec.md`, set at intake from a remote label `norn:wf:<name>` if present, else the team config's `workflow` (default `triage`); changeable before start with `norn story edit <story> --workflow <name>`; after start, `--workflow` starts a new round (RD2–RD4). The issue's `norn:wf:<name>` label follows the current round's workflow, for visibility only; a label change never starts or changes a round, and a failed label write warns and does not stop the round (RD5). A slice's workflow is `workflow:` in its frontmatter, proposed by the `slice` skill, editable at the plan gate, default the team config's `slice_workflow` (default `slice`).
 
 ### 11.1 Rounds
 
@@ -320,7 +323,7 @@ The chains a person runs: a feature `triage → refinement → story`; a small c
 
 ## 12. Remote and git
 
-- GR1 `norn sync` (also run by `tick`, throttled ~5 min) uses `gh`/`glab` to list issues assigned to the user with the configured label (default `norn`). Assigning is how the person chooses when an issue is taken in: an open labelled issue not assigned to them is their backlog, which the cockpit lists (CP2). `norn story take <story>` assigns such an issue to them (the cockpit's take on it), so the next sync takes it in; it refuses a closed issue, one without the label, and one taken in already.
+- GR1 `norn sync` (also run by `tick`, throttled ~5 min) uses `gh`/`glab` to list issues assigned to the user with the label `norn` (fixed, gh-64 B30); the sync runs about every 5 min and is not configurable. Assigning is how the person chooses when an issue is taken in: an open labelled issue not assigned to them is their backlog, which the cockpit lists (CP2). `norn story take <story>` assigns such an issue to them (the cockpit's take on it), so the next sync takes it in; it refuses a closed issue, one without the label, and one taken in already.
 - GR2 Intake: create the story branch and story worktree, write `.agents/specs/<id>-<slug>/spec.md` there mirroring provider, number, URL, title, assignee, body and `workflow` (W9); start the story workflow. A spec folder an older norn wrote holds `story.md` instead: norn reads and writes that file while the folder has no `spec.md`, and never renames it.
 - GR3 Story branch `<id>-<slug>`; slice branches `<id>/<nn>-<slug>` cut from the story branch, each in its own worktree.
 - GR4 Only the CLI rebases, integrates and pushes. Pushes happen at every step boundary (S8), so every step boundary is a handoff point.
@@ -335,7 +338,7 @@ The chains a person runs: a feature `triage → refinement → story`; a small c
 
 ### 12.1 Base sync
 
-- BS0 The **base branch** is config `base_branch` when set, otherwise the remote's default branch as discovered — never assumed to be `main`. A story's **base ref** is `refs/remotes/<git_remote>/<base>` when the git remote exists, else `refs/heads/<base>`. Intake cuts story branches from it; `open-pr` targets it.
+- BS0 The **base branch** is the team config's `base_branch` when set, otherwise the remote's default branch as discovered — never assumed to be `main`. The **git remote** is derived: the remote the base branch tracks, else `origin` (gh-64 B31). A story's **base ref** is `refs/remotes/<git_remote>/<base>` when the git remote exists, else `refs/heads/<base>`. Intake cuts story branches from it; `open-pr` targets it.
 - BS1 Observe adds per story `story.base {ref, sha, head, merge_base, behind, ahead, conflicts}`. `conflicts` comes from `git merge-tree --write-tree --name-only --no-messages <story head> <base sha>`, computed only when the pair (story head, base sha) changed since the last measurement (cache `base.json` in the machine dir); the facts are in the trace, so `norn run view --why` replays them.
 - BS2 `norn doctor` requires git ≥ 2.38 (`merge-tree --write-tree`); `norn watch` refuses to start a heartbeat otherwise.
 - BS3 `git: update` (story units only, W8), in the story worktree: a dirty worktree → `$stuck` (`worktree dirty`); takes the story's integrate lock (K6); adopts the remote story branch when it is a fast-forward of the local one (a person pressed "Update branch"), `$stuck` (`story branch diverged from <remote>`) when they diverged; `behind == 0` → `done`, no commit; else `git merge --no-ff <base sha>` with message `Update <story> from <base> (<short sha>)` and the `Norn-Tick` trailer (Q6), pushed at the step boundary (S8, T7) → `done`; a conflicting merge is aborted → `conflict`, with the base sha and the conflicting paths in the classify receipt (`base`).
@@ -358,7 +361,7 @@ The chains a person runs: a feature `triage → refinement → story`; a small c
 - T1 Claims are per **story**: one heartbeat drives a whole story; slices are scheduled locally by it.
 - T2 Claim ref `refs/norn/claims/<story-id>` holds a blob: holder (`user@machine`), `heartbeat_id`, `expires_at`, last `tick_id`.
 - T3 Acquire and renew via compare-and-swap: `git push --force-with-lease=<ref>:<expected>`. Losing the race fails with "held by X since Y".
-- T4 **Beat lease**: each live tick renews (e.g. 10 min lease, renewed ~3 min). Liveness is the beat, never the claim age.
+- T4 **Beat lease**: each live tick renews. The lease is the larger of 10 min and 4 × the recorded tick interval (H5), renewed every third of the lease; neither is configurable (gh-64 B35). Each claim carries its own `expires_at`. Liveness is the beat, never the claim age.
 - T5 `norn story checkout <story>` succeeds after expiry, pulls the story and slice branches and resumes from `runs/` + `handoff.md`. Before expiry it requires `--force`. Every take, forced or not, writes a `take` trace event and a `take` receipt `{previous_holder, previous_heartbeat_id, expired}` on the story unit before any other effect; `run list` and `run view --why` show it (R10).
 - T6 **Parked is not released.** A story parked on `ask`, `stuck` or a gate keeps its claim and the heartbeat keeps renewing it. The claim is released only by `norn story handoff <story>` (pushes branches and handoff first, then deletes the ref), a clean `watch` exit, or lease expiry.
 - T6a `story handoff` (incl. a `watch` exit) pushes a story branch only while this heartbeat holds the claim and the push is a fast-forward; otherwise it deletes nothing and says why (R3.3).
@@ -421,7 +424,7 @@ The chains a person runs: a feature `triage → refinement → story`; a small c
 #### R8 Agents in runner panes run the right norn
 
 - R8.1 In every runner-started agent, `command -v norn` resolves to the norn that launched it. Act puts a shim directory (`$NORN_HOME/bin/norn` → the current norn entry point) first on `PATH` **inside the launched command itself**, so a login shell in the pane cannot reset it, and exports `NORN_BIN` with the absolute path. The command runs the agent through a launcher file (`$NORN_HOME/launch/<hash>.sh`) that sets both and execs it, so the typed command stays short whatever `PATH` is (B2: a pane truncates a line over the tty limit). Hooks installed by `init`/plugin use `NORN_BIN` when set.
-- R8.2 `norn doctor` runs `command -v norn` through the configured runner (one throwaway session) and fails when it resolves elsewhere.
+- R8.2 `norn doctor` runs `command -v norn` through the detected runner (one throwaway session) and fails when it resolves elsewhere.
 
 #### R9 Launch prompt not received
 
@@ -433,12 +436,17 @@ The chains a person runs: a feature `triage → refinement → story`; a small c
 
 ## 14. Concurrency and resources
 
-- K1 `max_agents` (default 2) and `max_checks` are **per machine**, across all repositories and stories. Extra ready steps queue: oldest story (by intake time) first, then slice number.
-- K2 Configuration has one schema in two layers: `~/.norn/config.yaml` (user) and `.agents/norn.config.yaml` (repo). The repo overrides the user layer, except that machine caps (`max_agents`, `max_checks`, slot range) can only be lowered by a repo.
-- K2a `norn config list` (`norn config get <key>` for one) prints the resolved configuration: each setting with its value, the layer it came from (built-in, user, repo), a repo value a machine cap ignores, and a note where the layering hides something (a repo setting a machine key, `default_mode: auto` with no runner, an agent's own permission mode). Read only.
+- K1 `max_agents` (default 9, 1–9: one per slot) caps agent sessions **per machine**, across all repositories and stories; check commands share the same cap, with no key of their own (gh-64 B18, B53). Extra ready steps queue: oldest story (by intake time) first, then slice number.
+- K2 Configuration lives in three files, each with its own schema, every key optional (gh-64):
+  - `~/.norn/config.yaml` (user): machine keys `max_agents`, `notify`, `trace.retain`; personal keys `mode`, `agent`, `agents.<name>` (`model`, `args`).
+  - `.agents/norn.config.local.yaml` (local, gitignored by `norn init`): `mode`, `agent`, `agents.<name>`; overrides the user file for this repo.
+  - `.agents/norn.config.yaml` (repo, committed): `provider` (detected from the remote URL; refused when unset and the URL names neither GitHub nor GitLab), `base_branch`, `workflow`, `slice_workflow`.
+
+  A key in the wrong file is refused with `config_wrong_file`, naming the file that takes it; a moved or removed key with `config_moved`, naming its replacement and `norn migrate`, which rewrites the files (user in place, repo staged) and moves team limits and mode into the workflows. Maps merge key by key, lists and scalars replace: an `agents` entry merges field by field over the built-in one, `notify` (`{os, ntfy: <url>, webhook: <url>}`, `os` on by default, Herdr on by itself inside Herdr) merges over the built-in map. `agent` and `agents` take only the built-in agents. Config errors are `config_invalid`, `config_wrong_file` or `config_moved` under a "Config error" title with their own exit code, never S2 `corrupt`. Everything without a key is built in or derived (MO2, H5, T4, GR1, BS0, K4, W2a).
+- K2a `norn config list` (`norn config get <key>` for one) prints the resolved configuration: each setting, with a key or without, with its value and its source (`built-in`, `derived` with the reason, `user`, `local`, `repo`). Read only.
 - K3 Agent and port slots are lease files in `~/.norn/leases/`, created atomically (`O_EXCL`) with repo, unit, `run_id`, PID and start time. Dead holders are reclaimed by PID + start-time check. Leases are not committed; another machine allocates its own.
-- K4 Each worktree gets a slot (`NORN_SLOT`, `PORT_BASE`, optional extra per-slot resources from config) in `.env.norn`.
-- K4.1 Before a check runs, every process listening on the worktree's slot ports (`PORT_BASE` … `PORT_BASE + ports_per_slot - 1`) whose working directory is inside that worktree is stopped (SIGTERM, then SIGKILL after 2 s) and named at the top of the check output: a server an agent left running must not fail the check with "address in use". Listeners started elsewhere are left alone; without `lsof` nothing is stopped.
+- K4 Each worktree gets a slot (`NORN_SLOT`, `PORT_BASE`) in `.env.norn`. Slots are fixed at 1–9 with 10 ports each, slot `n` starting at `4000 + 10·n`; there are no slot keys (gh-64 B33).
+- K4.1 Before a check runs, every process listening on the worktree's slot ports (`PORT_BASE` … `PORT_BASE + 9`) whose working directory is inside that worktree is stopped (SIGTERM, then SIGKILL after 2 s) and named at the top of the check output: a server an agent left running must not fail the check with "address in use". Listeners started elsewhere are left alone; without `lsof` nothing is stopped.
 - K5 The tick creates slice worktrees when a slice starts and removes them after integration. `norn tidy [--dry-run]` reports or cleans orphans; each tick reports them.
 - K6 Integration into the story branch is serialized per story — slice `integrate` and the story's base `update` (BS3) take the same integrate lock (`integrate-<story>.lock` in the machine dir); a non-clean rebase or merge yields `conflict` and routes via the workflow.
 - K7 With Herdr as the runner, `norn tidy` also closes what runs that reported `done` left in Herdr: the run's tab, or only its pane when the tab holds something else, and its workspace when nothing else is left in it. A run counts only when its `started` receipt recorded a Herdr pane on this machine; the pane is found by that id and must still work in the run's worktree, and one whose agent is still working is kept. Runs that ended any other way (ask, stuck, died) are left alone. `--dry-run` lists them; a Herdr that cannot be reached is reported under `kept`, and the rest of tidy still runs. Closing happens only in `tidy`, never after a run on its own.
@@ -463,7 +471,7 @@ A removed command name (`drop`, `inbox`, `orient`, …) is an unknown command (u
 
 - O1 `norn status` (and the cockpit, `norn status --watch`) groups by action: **Your turn** (attended steps), **Answer**, **Approve**, **Unblock**, **Check**, **Unclaimed**, **Running**, **Notes** (NT2), **Recently done**; each group title carries a few words on what it holds, and each item shows question/reason, age and the exact command to resolve it. A person's start of an agent step (Your turn) shows `norn story start <unit>` when the runner can open a terminal (MO5), with the start command to type by hand in the detail; otherwise the start command itself. A story taken in on this checkout that no tick has started yet is listed too: under Running while the heartbeat is up, else under Your turn with `norn watch`. `norn status --watch` acts on the items through CLI verbs (CP6–CP8).
 - O2 `story answer`, `story approve`, `story reject`, `run rerun`, `run cancel` and `story edit` (mode, workflow) write receipts; the next tick applies them and delivers answers into the same session or a fresh one from the handoff. Typing directly into an agent pane is also allowed.
-- O3 Notifiers are optional plugins (OS default; ntfy, webhook, herdr) and fire once per new inbox item, receipt-first.
+- O3 Notifiers are built in, set by the user config's `notify` map (OS on by default; ntfy and webhook by URL; herdr on by itself inside Herdr, K2), and fire once per new inbox item, receipt-first.
 - O4 Trace: one JSONL record per tick with facts snapshot, rule fired, action, result, briefing and transcript pointers. The record keeps its decisions inline and stores the facts snapshot as a skeleton marked `"$chunked": 1`: each story's facts, the machine facts, the remote issues, the replay config and each workflow source are chunks addressed by the sha256 of their JSON, and each run's hook facts are blocks of 64 cut by position, written once. Chunks live once in the day's `<day>.chunks.jsonl` beside the day file, appended and fsynced before the tick line that names them, so no tick line names an unwritten chunk and one day's two files replay every tick of that day. A record without the marker is a full-facts snapshot and is read as before.
 - O5 `norn run view <unit> --why` replays the pure decide function on the recorded snapshot and shows the rule that fired; `--receipt <id>` picks the decision that applied that receipt (the command of a note item, NT2). A chunked snapshot is rebuilt byte for byte as observe produced it; a chunk missing from its day makes the record a corrupt trace entry (exit 4, code `trace_corrupt`, naming the hash) and nothing is replayed.
 - O6 `handoff.md`: generated status header (S9); tool writes heartbeat lines (repeats collapsed, e.g. "(×3)"); agents write milestones.
@@ -479,7 +487,7 @@ A removed command name (`drop`, `inbox`, `orient`, …) is an unknown command (u
   - the run's newest hooks, after its last `turn_start` / `tool_use`, are `turn_end`, `waiting_input` or `permission_prompt` — or, with no such hook, its runner pane is `idle`, `done` or `waiting_input` since after the last hook.
 
   The wait starts at the first of those trailing hooks (or the pane's state change). Claude's `idle_prompt` notification (`turn_end`, ~60 s after `Stop`) therefore does not restart it.
-- HC2 After `limits.attended_wait` (default `2m`; `0s` = at once) of waiting, the inbox shows the unit under **Your turn**: `<step>: the agent is waiting for you`, instead of under Running. Its `since` is the wait start, and its id is `attended:<unit>:<run_id>:<wait start>`, so the notifiers (O3) fire once per wait, and a new turn followed by a new wait is a new item. The delay keeps a live back-and-forth from notifying.
+- HC2 After 2 min (fixed, gh-64 B27) of waiting, the inbox shows the unit under **Your turn**: `<step>: the agent is waiting for you`, instead of under Running. Its `since` is the wait start, and its id is `attended:<unit>:<run_id>:<wait start>`, so the notifiers (O3) fire once per wait, and a new turn followed by a new wait is a new item. The delay keeps a live back-and-forth from notifying.
 - HC3 The item's command is how to reach the session: the runner's reach command when the run has a runner session, else `cd <worktree>`. Never the start-agent command (a second agent for the step was the dogfood mistake). Every inbox item of a unit with a current run also carries `reach: {worktree, agent_session_id, pane_id}` (nulls when unknown) so front ends can find the agent's pane (HC6).
 
 #### Cockpit commands (replaced)
@@ -503,7 +511,7 @@ A removed command name (`drop`, `inbox`, `orient`, …) is an unknown command (u
 
 #### Herdr notifier
 
-- HC14 Notifier adapter `herdr` shows each new inbox item as `herdr notification show <title> --body <body>`, with sound `request` for Your turn, Answer and Approve and `none` otherwise. It needs `HERDR_ENV=1` or a reachable Herdr socket. Outside Herdr it fails with `unsupported`, and the other configured notifiers still run. Opt in with `notifiers: [{adapter: os}, {adapter: herdr}]`.
+- HC14 Notifier adapter `herdr` shows each new inbox item as `herdr notification show <title> --body <body>`, with sound `request` for Your turn, Answer and Approve and `none` otherwise. It needs `HERDR_ENV=1` or a reachable Herdr socket. Outside Herdr it fails with `unsupported`, and the other notifiers still run. It is on inside Herdr, with no config (gh-64 B20).
 
 #### Workspaces
 
@@ -616,7 +624,7 @@ A removed command name (`drop`, `inbox`, `orient`, …) is an unknown command (u
   - the story's title, issue URL, standing, mode and claim;
   - each slice's standing and last outcome;
   - the worktree, branch and spec path;
-  - the PR as last seen, and the `gh pr view <branch>` / `glab mr view <branch>` command (`config.remote.provider`);
+  - the PR as last seen, and the `gh pr view <branch>` / `glab mr view <branch>` command (`config.provider`);
   - the inbox items of the story that wait for the person, with their commands, and those running;
   - the open notes, grouped by unit, the unit with the newest note first;
   - where to look: the spec, `norn run list`, `norn run view --why`, `norn status`.
@@ -650,7 +658,7 @@ Single-purpose skills ported from ai-engine (the earlier norn): its skill files 
 | `norn-refine` | Story → spec in `spec.md`: Problem, Solution, numbered Behaviour items (`B1`…, each with an example; edges walked as items), Out of scope, Open questions. Owns the spec layout. | done / questions |
 | `norn-clarify` | Sort the open questions, settle them with the person, fold each answer into the section it changes. | done |
 | `norn-plan` | The `## Plan` section of `spec.md`: seams, coverage table (Behaviour → seam), prefactoring, implementation and testing decisions, risks. Reference: `norn-codebase-design`. | done |
-| `norn-slice` | Plan → tracer-bullet slice files (`workflow`, `depends_on`, acceptance citing Behaviour numbers, frontmatter `criteria` with verifier and `needs` (QV1), check commands); expand–contract for wide refactors. | done |
+| `norn-slice` | Plan → tracer-bullet slice files (`workflow`, `depends_on`, acceptance citing Behaviour numbers, frontmatter `criteria` with id and verifier (QV1), check commands); expand–contract for wide refactors. | done |
 | `norn-implement` | Test-first build of one slice or story at the Plan's agreed seams, then a review pass. On rework, the points from the brief's Rework section come first: each is a red test, a QA failure gives its repro. Reference: `norn-tdd`. | done |
 | `norn-review` | Spec and Standards axes kept apart (a subagent per axis when the agent has them); smells baseline (`SMELLS.md`); findings as structured data. | approve / changes_requested |
 | `norn-qa` | Check each acceptance criterion as a user, with evidence (a screenshot for every `browser` criterion); one verdict per criterion in a criteria report (QV2); never pass what wasn't observed (`unverified` when this session cannot check it); notes when a passed criterion may be read differently (NT4); secrets redacted. | pass / fail / partial / unverified |
@@ -670,7 +678,7 @@ Single-purpose skills ported from ai-engine (the earlier norn): its skill files 
 ## 17. Architecture
 
 - X1 Front ends (web cockpit, Herdr pane, TUI) read only via `@norn/view` and write only via CLI verbs. The project view (`loadProjectView`) carries no timeline and reads no trace day file; a front end that shows timelines asks for them with a separate timeline read (`loadTimelines`, or `loadTraceView` for one unit's step timeline).
-- X2 Adapters are selected in config by package name; third-party adapters implement interfaces from `@norn/core`.
+- X2 *(deferred, gh-64)* Adapters are built in; config selects no package (no `adapter` or `runner` key). Third-party adapters may return later by implementing interfaces from `@norn/core`.
 - X3 Distribution: npm package plus `bun build --compile` single-file binaries. Agent plugins (Claude Code first) are thin wrappers with a `/norn` command; skills come from the repo (SK1), and no logic lives in plugins.
 - X4 Core is tested by replaying recorded traces as snapshots (chunked and full-facts records alike, rebuilt by the store's tick read); adapters against recorded fixtures.
 

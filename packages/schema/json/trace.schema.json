@@ -697,8 +697,7 @@
         "receipt_id",
         "outcome",
         "rule",
-        "verdicts",
-        "unverified_needs"
+        "verdicts"
       ],
       "properties": {
         "type": {

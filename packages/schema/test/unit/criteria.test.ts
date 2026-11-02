@@ -36,9 +36,10 @@ describe("CriteriaReport (QV2)", () => {
 });
 
 describe("frontmatter criteria (QV1) and receipt fields (NT1, NT3)", () => {
-  test("slice and story frontmatter take criteria with verifier and needs", () => {
-    const slice = { id: "gh-4/01", title: "t", depends_on: [], status: "planned", criteria: [{ id: "AC1", verifier: "test" }, { id: "AC2", verifier: "agent", needs: ["browser"] }] };
+  test("slice and story frontmatter take criteria with id and verifier only (B36)", () => {
+    const slice = { id: "gh-4/01", title: "t", depends_on: [], status: "planned", criteria: [{ id: "AC1", verifier: "test" }, { id: "AC2", verifier: "agent" }] };
     expect(validate("slice", slice).ok).toBe(true);
+    expect(validate("slice", { ...slice, criteria: [{ id: "AC2", verifier: "agent", needs: ["browser"] }] }).ok).toBe(false);
     expect(validate("slice", { ...slice, criteria: [{ id: "AC1", verifier: "robot" }] }).ok).toBe(false);
     expect(validate("slice", { ...slice, criteria: [{ id: "AC 1", verifier: "test" }] }).ok).toBe(false);
   });

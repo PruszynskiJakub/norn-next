@@ -2,7 +2,7 @@
  * Machine-wide leases in `~/.norn/leases/` (K1, K3). Worktree env files (K4) live in worktree.ts.
  *
  * Every lease is a numbered file `<kind>-<n>.json` created exclusively, so caps are
- * enforced atomically: agent/check leases use n ∈ 1..max_agents / 1..max_checks; slot
+ * enforced atomically: agent/check leases use n ∈ 1..max_agents (checks follow max_agents, gh-64); slot
  * leases use n = slot number ∈ slots.min..slots.max. A file whose holder is dead is
  * reclaimed (moved aside only if unchanged since judged dead).
  *
@@ -13,7 +13,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { FileError } from "@norn/core";
-import type { LeaseFile, LeaseKind, ProcessIdentity, SlotConfig } from "@norn/schema";
+import { type LeaseFile, type LeaseKind, type ProcessIdentity, SLOTS } from "@norn/schema";
 import { assertValid } from "@norn/schema";
 import { atomicWriteJson, createExclusive, isErrno, json, readJsonFile, readText, safeUnlink } from "./fsx.ts";
 import { removeIfUnchanged, replaceIfUnchanged } from "./lock.ts";
@@ -146,15 +146,14 @@ export function acquireRunLease(
 /** Port slot for a worktree (K4): slot ∈ [min, max], port_base = base + slot × ports_per_slot. */
 export function acquireSlotLease(
   home: string,
-  slots: SlotConfig,
   req: Omit<LeaseRequest, "kind" | "range" | "portBase" | "run_id"> & { run_id?: string | null },
 ): Promise<LeaseResult> {
   return acquireLease(home, {
     ...req,
     run_id: req.run_id ?? null,
     kind: "slot",
-    range: { min: slots.min, max: slots.max },
-    portBase: (n) => slots.port_base + n * slots.ports_per_slot,
+    range: { min: SLOTS.min, max: SLOTS.max },
+    portBase: (n) => SLOTS.port_base + n * SLOTS.ports_per_slot,
   });
 }
 

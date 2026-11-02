@@ -26,12 +26,9 @@ steps:
     outcomes: { done: { to: $done, means: "merged" } }
 `;
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-remote: { provider: gh, label: norn }
-default_workflow: rr
-default_mode: manual
-notifiers: []
+const CONFIG = `provider: gh
+workflow: rr
+mode: manual
 `;
 
 setDefaultTimeout(30_000);
@@ -51,7 +48,7 @@ describe("gh-79: a tick mid-rebase", () => {
   beforeAll(async () => {
     h = await createHarness();
     expect((await h.norn("init")).exit).toBe(0);
-    h.write(repoConfigPath(h.root), CONFIG);
+    h.config(CONFIG);
     h.write(join(workflowsDir(h.root), "rr.yaml"), RR);
     h.write(join(h.root, "X.txt"), "base\n");
     h.git(["add", "-A"]);

@@ -23,14 +23,9 @@ steps:
     timeout: ${timeout}
     outcomes: { pass: $done, fail: $stuck }
 `;
-const CONFIG = `agents:
-  claude: { adapter: claude }
-runner: { adapter: headless }
-remote: { provider: gh, label: norn }
-default_workflow: slow
-default_mode: auto
-notifiers: []
-watch_interval: 30s
+const CONFIG = `provider: gh
+workflow: slow
+mode: auto
 `;
 
 const acts = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop" && d.rule !== "claim.renew").map((d) => d.kind);
@@ -39,7 +34,7 @@ const rules = (r: TickReport) => r.decisions.map((d) => d.rule);
 /** A harness whose stories (one per title) sit at a check step running `run`. */
 async function atChecks(run: string, timeout: string, titles: string[]): Promise<{ h: Harness; runsDirs: string[] }> {
   const h = await createHarness();
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "slow.yaml"), workflow(run, timeout));
   installBundledSkills(h.root);
   h.git(["add", "-A"]);

@@ -2,7 +2,7 @@
  * Rules decide and the inbox both read off Facts — each defined once here, so the tick that acts
  * and the inbox that tells a person never disagree about them.
  */
-import { type Mode, parseDuration, type ResolvedConfig, type Step, type UnitState } from "@norn/schema";
+import { BUILT_IN_LIMITS, type Mode, parseDuration, type ResolvedConfig, type Step, type UnitState, type Workflow } from "@norn/schema";
 import type { Facts, RunFacts, StoryFacts, UnitFacts } from "./facts.ts";
 
 /** W9: the issue label that picks a story's workflow at intake (`norn:wf:<name>`); B19: it follows the round after. */
@@ -18,6 +18,45 @@ export function effectiveMode(story: Mode, attended: boolean, runner: string | n
   if (attended) return { mode: "manual", downgraded: false };
   if (!runner) return { mode: "manual", downgraded: story === "auto" };
   return { mode: story, downgraded: false };
+}
+
+/**
+ * MO1 (gh-64 B10): a story's mode, nearest first: the story (`norn story edit`), the workflow its
+ * story unit runs (top-level `mode`), your config (local file over user file, already merged),
+ * built-in `manual`.
+ */
+export function storyMode(state: { mode?: Mode } | null | undefined, workflow: Workflow | null | undefined, config: Pick<ResolvedConfig, "mode">): Mode {
+  return state?.mode ?? workflow?.mode ?? config.mode;
+}
+
+/** The limits a step runs under (C1, W2a). */
+export interface StepLimits {
+  deadline: string;
+  nudges: number;
+  retries: number;
+  stalled: string;
+}
+
+/**
+ * W2a (gh-64 B26, D17): a step's limits — its own `deadline`, `nudges`, `retries`, else the
+ * workflow's, else the base; `stalled` is a workflow limit only.
+ */
+export function stepLimits(workflow: Workflow | null | undefined, step: Step | null | undefined): StepLimits {
+  const own = step?.type === "agent" ? step : undefined;
+  const d = workflow?.defaults ?? {};
+  return {
+    deadline: own?.deadline ?? d.deadline ?? BUILT_IN_LIMITS.deadline,
+    nudges: own?.nudges ?? d.nudges ?? BUILT_IN_LIMITS.nudges,
+    retries: own?.retries ?? d.retries ?? BUILT_IN_LIMITS.retries,
+    stalled: d.stalled ?? BUILT_IN_LIMITS.stalled,
+  };
+}
+
+/** B28 (W2a): the hook read window — the longest `stalled` across the loaded workflows (built-in when none). */
+export function hookWindowMs(workflows: Iterable<Workflow | null | undefined>): number {
+  let ms = parseDuration(BUILT_IN_LIMITS.stalled);
+  for (const wf of workflows) if (wf) ms = Math.max(ms, parseDuration(stepLimits(wf, null).stalled));
+  return ms;
 }
 
 /** The story's own unit (slice null), or null before it has facts. */
@@ -75,7 +114,7 @@ export function roundFinished(st: UnitState | null | undefined): boolean {
 /** R5.5 (N3): this checkout's heartbeat is up — observed, and its last tick within 3 × watch interval. */
 export function heartbeatUp(facts: Facts, config: ResolvedConfig): boolean {
   const hb = facts.heartbeat;
-  return !!hb && hb.last_tick_at !== null && facts.now - hb.last_tick_at <= 3 * parseDuration(config.watch_interval);
+  return !!hb && hb.last_tick_at !== null && facts.now - hb.last_tick_at <= 3 * parseDuration(config.interval);
 }
 
 /** R9.1 (M6): the run's newest `session_start` hook when no turn came after it, else null. */

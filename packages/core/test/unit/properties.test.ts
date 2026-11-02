@@ -86,7 +86,7 @@ function forSeeds(salt: number, body: (rng: Rng, seed: number) => void): void {
 // ================================================================= random workflows
 
 const STEP_NAMES = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot"];
-const LIMITS = { nudges: 2, retries: 1 };
+const LIMITS = { deadline: "60m", nudges: 2, retries: 1, stalled: "15m" };
 
 /**
  * A valid workflow (W5): steps in a line, each with a forward edge to the next (the last to
@@ -280,7 +280,7 @@ interface Episode {
   steps: { before: UnitState; nr: NumberedReceipt; res: ApplyResult }[];
 }
 
-const ctxFor = (wf: Workflow): ApplyContext => ({ workflow: wf, now: at(), limits: LIMITS, tick_id: "01JAAAAAAAAAAAAAAAAAAAAAAA" });
+const ctxFor = (wf: Workflow): ApplyContext => ({ workflow: wf, now: at(), tick_id: "01JAAAAAAAAAAAAAAAAAAAAAAA" });
 
 /** A random unit history: a workflow and receipts applied one at a time, each built on the state before it. */
 function episode(rng: Rng, seed: number, unit: UnitRef = sliceUnit("gh-1", "01", "form"), level: "story" | "slice" = "slice", wfName = "prop"): Episode {
@@ -529,7 +529,7 @@ function randomFacts(rng: Rng, seed: number): { f: Facts; workflows: RepoWorkflo
     runner_capabilities: runner === "herdr" ? { send: true, resume: false } : { send: false, resume: true },
     leases,
   };
-  const config: ResolvedConfig = { ...DEFAULT_CONFIG, runner: { adapter: runner }, max_agents: rng.range(1, 3), max_checks: rng.range(1, 2) };
+  const config: ResolvedConfig = { ...DEFAULT_CONFIG, runner: { adapter: runner === "herdr" ? "herdr" : "headless" }, max_agents: rng.range(1, 3) };
   return { f: { ...f, machine }, workflows, config };
 }
 

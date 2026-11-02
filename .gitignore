@@ -6,4 +6,5 @@ dist/
 # norn (machine-local)
 .env.norn
 .norn-unit
+.agents/norn.config.local.yaml
 .claude/worktrees/

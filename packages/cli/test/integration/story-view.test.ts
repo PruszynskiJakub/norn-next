@@ -38,13 +38,9 @@ steps:
     outcomes: { approve: $done, reject: $stuck }
 `;
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-runner: { adapter: headless }
-remote: { provider: gh, label: norn }
-default_workflow: sliced
-default_mode: auto
-notifiers: []
+const CONFIG = `provider: gh
+workflow: sliced
+mode: auto
 `;
 
 let h: Harness;
@@ -63,7 +59,7 @@ const slice = (nn: string, title: string) => `---\nid: gh-2/${nn.slice(0, 2)}\nt
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "sliced.yaml"), SLICED);
   h.write(join(workflowsDir(h.root), "sliceqa.yaml"), SLICE_QA);
   h.git(["add", "-A"]);
@@ -153,7 +149,7 @@ describe("norn story chat", () => {
     const f = fakeHerdr();
     const opened = await norn({ herdr: f.cockpit }, "story", "chat", "gh-2", "--json");
     expect(opened.value).toMatchObject({ story: "gh-2", opened: true, created: true, workspace_id: "w9" });
-    expect(f.calls).toEqual([expect.stringMatching(new RegExp(`^open workspace ${wt()} gh-2 orient focus ${h.home}/orient/launch/[0-9a-f]{16}\\.sh env NORN_ORIENT=1 claude 'Run \`norn story view gh-2\` and follow it\\.'$`))]);
+    expect(f.calls).toEqual([expect.stringMatching(new RegExp(`^open workspace ${wt()} gh-2 orient focus ${h.home}/orient/launch/[0-9a-f]{16}\\.sh env NORN_ORIENT=1 claude --permission-mode auto -- 'Run \`norn story view gh-2\` and follow it\\.'$`))]);
     // its own shim: the launch shim the launched agents' hooks share is untouched
     expect(existsSync(join(h.home, "orient", "bin", "norn"))).toBe(true);
     expect(existsSync(launchShim) ? h.read(launchShim) : null).toBe(launchBefore);
@@ -168,7 +164,7 @@ describe("norn story chat", () => {
     expect(again.calls).toEqual(["focus workspace w4"]);
 
     const outside = await norn({ herdr: null }, "story", "chat", "gh-2", "--json");
-    expect(outside.value).toEqual({ story: "gh-2", opened: false, command: `cd ${wt()} && NORN_ORIENT=1 claude 'Run \`norn story view gh-2\` and follow it.'` });
+    expect(outside.value).toEqual({ story: "gh-2", opened: false, command: `cd ${wt()} && NORN_ORIENT=1 claude --permission-mode auto -- 'Run \`norn story view gh-2\` and follow it.'` });
   });
 
   test("the chat agent reads the view with its rules; it is no run: brief and done refuse it, its hooks record nothing", async () => {

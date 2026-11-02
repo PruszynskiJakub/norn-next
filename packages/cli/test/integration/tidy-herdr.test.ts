@@ -72,7 +72,8 @@ describe("norn tidy closes Herdr panes of runs that reported done (K7)", () => {
   });
 
   test("Herdr as the runner: --dry-run lists, tidy closes the done run's workspace only", async () => {
-    h.write(join(h.home, "config.yaml"), "runner: { adapter: herdr }\n");
+    // gh-64 B29: Herdr is the runner when norn runs inside it
+    (h.deps.env as Record<string, string>).HERDR_ENV = "1";
     const panes = [spot("w4:t1.p1", wt()), spot("w5:t1.p1", wt()), spot("w6:t1.p1", wt(), "working"), spot("w7:t1.p1", wt())];
     const dry = paneHerdr(panes);
     const d = await runChecked(["tidy", "--dry-run"], { ...h.deps, herdr: dry.cockpit });

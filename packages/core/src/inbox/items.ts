@@ -8,16 +8,19 @@
  * F35, Q6), Unclaimed, Running, Notes (agents' notes for a person, NT2: information, not an
  * action), Recently done.
  */
-import { parseDuration, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
+import { ATTENDED_WAIT, parseDuration, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
 import { cmd, nextCommand, startAgentCommand } from "../commands.ts";
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../criteria.ts";
-import type { Facts, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
+import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
 import { sha256 } from "../hash.ts";
 import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, issueProblem, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
 import { optionsLine } from "../prompt.ts";
 import { epoch, formatAge, iso } from "../time.ts";
 import { baseUpdateStep, edgeOf, edgesOf, isStale, stepOf } from "../workflow.ts";
+
+/** B38: the `needs` was removed message of a file error, or null. */
+const needsRemoved = (e: FileError): string | null => (e.code === "needs_removed" ? (e.errors[0]?.message ?? null) : null);
 
 export const INBOX_GROUPS: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock", "check", "unclaimed", "running", "notes", "recently_done"];
 
@@ -182,10 +185,10 @@ function launchPromptMissed(uf: UnitFacts, st: UnitState): { since: string; pane
  */
 export function startCommandFor(uf: UnitFacts, story: StoryFacts, config: ResolvedConfig): string {
   const step = uf.workflow && uf.state ? stepOf(uf.workflow, uf.state.step) : null;
-  const name = (step?.type === "agent" && step.agent) || config.default_agent;
+  const name = (step?.type === "agent" && step.agent) || config.agent;
   const agent = config.agents[name];
   const worktree = unitWorktree(story, uf);
-  return startAgentCommand(worktree, agent?.command ?? agent?.adapter ?? name, agent?.args);
+  return startAgentCommand(worktree, name, agent?.args);
 }
 
 /**
@@ -411,7 +414,7 @@ function finishedRoundRemoteItem(story: StoryFacts, config: ResolvedConfig, base
   if (st?.status !== "done" || landed(story, base)) return null;
   // between syncs the issue is not fetched: the one the last sync saw keeps the item put
   const issue = story.issue !== undefined ? story.issue : story.issue_seen?.issue;
-  const reason = issueProblem({ ...story, issue }, config.remote.label);
+  const reason = issueProblem({ ...story, issue }, config.label);
   if (!reason) return null;
   return {
     id: `remote:${story.key}:${reason}`,
@@ -540,7 +543,7 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       if (nudge && !heartbeatDown(facts, config)) return item("your_turn", `agent ended its turn without reporting — reopen the agent and run ${cmd.brief()}`, startCommandFor(uf, story, config), nudge.at, { id: `${nudge.outcome}:${key}:${st.step}#${st.attempt}:${st.nudges_used}` });
       // HC2: an attended agent waiting for its person past `attended_wait`; one item (and notification) per wait
       const waiting = attendedWaitSince(uf);
-      if (waiting !== null && st.run && facts.now - waiting >= parseDuration(config.limits.attended_wait)) {
+      if (waiting !== null && st.run && facts.now - waiting >= parseDuration(ATTENDED_WAIT)) {
         // HC3: reach the session that waits — never start a second agent for the step
         const worktree = reach?.worktree ?? null;
         const command = st.run.session?.reach ?? (worktree ? `cd ${worktree}` : cmd.runList(key));
@@ -743,8 +746,23 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
       continue;
     }
     if (story.frontmatter_error) {
-      add({ id: `corrupt:${story.key}:spec.md`, group: "unblock", story: story.key, slice: null, step: null, title: `corrupt: ${story.frontmatter_error.file} failed validation (S2)`, command: cmd.runView(story.key, { why: true }), since: iso(facts.now) });
+      const needs = needsRemoved(story.frontmatter_error);
+      add({
+        id: `corrupt:${story.key}:spec.md`,
+        group: "unblock",
+        story: story.key,
+        slice: null,
+        step: null,
+        title: needs ?? `corrupt: ${story.frontmatter_error.file} failed validation (S2)`,
+        command: needs ? cmd.migrate() : cmd.runView(story.key, { why: true }),
+        since: iso(facts.now),
+      });
       continue;
+    }
+    // B38 (D12): a slice file that still has criteria `needs` is not corrupt: `norn migrate` fixes it
+    for (const s of story.slices) {
+      const needs = s.error && needsRemoved(s.error);
+      if (needs) add({ id: `needs:${s.key}`, group: "unblock", story: story.key, slice: s.key, step: null, title: needs, command: cmd.migrate(), since: iso(facts.now) });
     }
     add(notStartedItem(story, facts, config));
     add(bodyChangedItem(story));

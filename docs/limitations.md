@@ -55,14 +55,14 @@ Two-machine operation was only simulated on one Mac (`NORN_MACHINE`). Everything
   - exhausting `base_conflict_loop`;
   - an agent that dies with no retries left;
   - killing a herdr pane mid-merge.
-- **An agent with the `browser` capability.** Nobody ever checked a browser criterion live; every such approval says so.
+- **A browser criterion checked live.** Nobody has yet had an agent with a browser pass a criterion seen in a web page.
 - **The herdr cockpit (HC1–HC15).** The attended wait, the cockpit (`norn status --watch`), the Herdr plugin (`plugins/herdr`), pane labels and the `herdr` notifier are tested against fixtures and a fake runner only. No dogfood run has used them yet.
-- **The auto permission mode default** (`--permission-mode auto` for `agents.claude`). Every live run used configs that replace it.
+- **The auto permission mode default** (`--permission-mode auto` for `agents.claude`). Every live run set `agents.claude.args`, which replaces the list and the permission mode with it.
 - **codex, opencode, gemini and glab adapters.** They are tested only against recorded fixtures. Only claude, git, gh, herdr and headless ran live.
 
 ## Limits of the design
 
-- **Agents report their own work.** A receipt records what the agent claimed. Gates and checks are only as strong as the commands you configure, and a weak check config lets anything through. Capability gating stops a QA agent from claiming what it cannot check, not from lying.
+- **Agents report their own work.** A receipt records what the agent claimed. Gates and checks are only as strong as the commands you configure, and a weak check config lets anything through.
 - **Decide never reads prose (P8).** Anything that lives only in a spec body, `handoff.md` or a review comment does not influence the next step unless an agent turns it into a typed outcome.
 - **Corrupt means stopped (S2).** A state file that fails validation marks the unit `corrupt`, by design. Hand edits to `.agents/` files or merge conflicts in them block the unit until a person repairs it.
 - **No host-less mode.** Story keys must be `gh-N`/`gl-N`, and intake reads issues from GitHub or GitLab (GR1, GR2). A repo with only local files and branches cannot run norn today. Business tracking in Jira stays outside norn by choice.

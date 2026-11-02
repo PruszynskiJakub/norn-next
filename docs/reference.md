@@ -6,22 +6,22 @@ Every command and flag, every config key, the workflows `norn init` ships and th
 
 Commands a person or an agent reads (`brief`, `done`, `ask`, `stuck`, `help`, `init`, `doctor`, `config`, `status`, `story list`, `story view`, `run list`, `run view`) print markdown. Every command prints one JSON value instead with `--json`, and the commands a program reads (`tick`, `watch`, `hook`, `sync`, …) always do. Code should branch on the exit code and the `--json` data, never on the markdown.
 
-A refusal prints `{error, do_instead}` (as markdown without `--json`): what was refused and what to do instead. The exit code says why: `refused` (3) when a rule says no, `usage` (2) for bad arguments, `corrupt` (4) when a state file fails validation, `busy` (5) when another process holds the lock or the claim. The full list is under [Exit codes](#exit-codes).
+A refusal prints `{error, do_instead}` (as markdown without `--json`): what was refused and what to do instead. The exit code says why: `refused` (3) when a rule says no, `usage` (2) for bad arguments, `corrupt` (4) when a state file fails validation, `busy` (5) when another process holds the lock or the claim, `config` (6) when a config file is wrong. The full list is under [Exit codes](#exit-codes).
 
 ## Config
 
-**Config** lives in two files with the same keys: `.agents/norn.config.yaml` in the repository (committed: what the team agrees on, such as the remote, workflows and limits) and `~/.norn/config.yaml` on your machine (yours: the runner, machine caps, notifiers, the default mode). Over the built-in defaults, your file applies first and the repository's file wins over it, except that the repository can only lower the machine caps. `norn config` lists every setting in effect, the file it came from and what it does; `norn config set <key> <value>` changes one.
+**Config** is optional: a solo developer on GitHub with Claude Code writes none. Each key belongs in one kind of file:
 
-The keys a newcomer touches:
+| File | For | Keys |
+|---|---|---|
+| `~/.norn/config.yaml` | this machine, and your defaults for every repository | machine: `max_agents`, `notify`, `trace.retain` · yours: `mode`, `agent`, `agents.<name>` |
+| `.agents/norn.config.local.yaml` (gitignored) | you, in this repository | `mode`, `agent`, `agents.<name>`: these override the user file |
+| `.agents/norn.config.yaml` (committed) | the team | `provider`, `base_branch`, `workflow`, `slice_workflow` |
+| a workflow file | the workflow | top-level `mode`; `defaults:` with `deadline`, `nudges`, `retries`, `stalled` |
 
-- `default_mode`: `manual` (you start agent steps) or `auto` (norn starts them through the runner).
-- `runner`: how norn opens agents: `{ adapter: herdr }` or `{ adapter: headless }`; unset, every story runs in manual mode.
-- `remote.provider` and `remote.label`: `gh` or `glab`, and the issue label that makes a story.
-- `default_workflow`: the workflow a new story starts with, when its issue names none (`norn:wf:<name>`).
-- `max_agents`: how many agents run at once on this machine, across repositories.
-- `notifiers`: how you hear about new inbox items, for example `[{ adapter: os }, { adapter: herdr }]`.
-- `agents.<name>`: the agent CLIs norn can start. A layer that defines `agents.claude` replaces the whole entry, its `args` (`--permission-mode auto` by default) included.
-- `limits.*`: deadlines, nudges and the attended wait.
+For your keys the nearer file wins: local over user over built-in. Maps merge key by key; lists and scalars replace, so `agents: {claude: {model: …}}` keeps Claude's built-in `--permission-mode auto`, while setting `agents.claude.args` replaces that list, and `notify: {ntfy: <url>}` keeps OS notifications. A story's mode is, nearest first: the story's own (`norn story edit --auto|--manual`), its workflow's `mode`, the local file, the user file, then `manual`. A key in the wrong file, or one an older norn used, is refused with the file and key to use instead; `norn migrate` rewrites old files. `norn config` lists every setting in effect and the file it came from; `norn config set <key> <value>` changes one in the file you name with `--user`, `--local` or `--repo`.
+
+Everything else has no key. The runner is detected: Herdr when norn runs inside Herdr or `herdr` is installed, otherwise headless. GitHub or GitLab is read from the remote URL (`provider` is only for a self-hosted host). The git remote is the one the base branch tracks, else `origin`. Claims are timed from the tick interval (`norn watch --interval`, `norn tick --interval`). The label `norn`, the sync about every 5 minutes, slots 1–9 with ten ports each from 4010, and the 2-minute attended wait are fixed.
 
 ## Generated reference
 
@@ -285,7 +285,7 @@ norn init [--json] [--hook-command <cmd>]
 
 ##### `norn migrate`
 
-Move this repo's config, workflows and trace from the old layout to the new one and stage the moves for you to commit
+Move this repo to the new layout and its config to the new keys, and stage the changes for you to commit
 
 ```sh
 norn migrate [--json]
@@ -304,7 +304,7 @@ norn doctor [--repo] [--live] [--json]
 
 ##### `norn config` (noun)
 
-Show the resolved config; set or unset one value in the user or repo file
+Show the resolved config; set or unset one value in the user, local or team file
 
 ##### `norn config list`
 
@@ -324,24 +324,26 @@ norn config get <key> [--json]
 
 ##### `norn config set`
 
-Set one value in the user or repo config file
+Set one value in the user, local or repo config file
 
 ```sh
-norn config set <key> <value> [--user|--repo] [--json]
+norn config set <key> <value> [--user|--local|--repo] [--json]
 ```
 
-- `--user`: edit ~/.norn/config.yaml (yours, this machine)
+- `--user`: edit ~/.norn/config.yaml (this machine, your defaults)
+- `--local`: edit .agents/norn.config.local.yaml (you, in this repo)
 - `--repo`: edit .agents/norn.config.yaml (the team's, committed)
 
 ##### `norn config unset`
 
-Remove one value from the user or repo config file
+Remove one value from the user, local or repo config file
 
 ```sh
-norn config unset <key> [--user|--repo] [--json]
+norn config unset <key> [--user|--local|--repo] [--json]
 ```
 
-- `--user`: edit ~/.norn/config.yaml (yours, this machine)
+- `--user`: edit ~/.norn/config.yaml (this machine, your defaults)
+- `--local`: edit .agents/norn.config.local.yaml (you, in this repo)
 - `--repo`: edit .agents/norn.config.yaml (the team's, committed)
 
 ##### `norn uninstall`
@@ -393,9 +395,10 @@ norn tidy [--dry-run] [--retain <duration>]
 One heartbeat pass: observe, decide, act, log
 
 ```sh
-norn tick [--sync | --offline]
+norn tick [--sync | --offline] [--interval 30s]
 ```
 
+- `--interval`: how often this tick runs (cron): recorded for liveness and claim timing
 - `--sync`
 - `--offline`
 
@@ -478,47 +481,27 @@ norn help [--all] [<command> | <noun> [<verb>]]
 
 ### Config keys
 
-| Key | Type | Built-in default |
-|---|---|---|
-| `agents` | map | `{"claude":{"adapter":"claude","args":["--permission-mode","auto"]}}` |
-| `agents.<name>.adapter` | string | none |
-| `agents.<name>.command` | string | none |
-| `agents.<name>.args` | list of strings | none |
-| `agents.<name>.model` | string | none |
-| `agents.<name>.env` | map | none |
-| `agents.<name>.capabilities` | list of strings | none |
-| `default_agent` | string | `"claude"` |
-| `runner` | map or null | `null` |
-| `runner.adapter` | string | none |
-| `runner.options` | map | none |
-| `remote.provider` | `"gh"` or `"glab"` | `"gh"` |
-| `remote.label` | string | `"norn"` |
-| `remote.host` | string | none |
-| `remote.git_remote` | string | `"origin"` |
-| `remote.sync_interval` | duration | `"5m"` |
-| `base_branch` | string or null | `null` |
-| `default_workflow` | string | `"triage"` |
-| `default_slice_workflow` | string | `"slice"` |
-| `default_mode` | `"manual"` or `"auto"` | `"manual"` |
-| `max_agents` | integer ≥ 1 | `2` |
-| `max_checks` | integer ≥ 1 | `2` |
-| `slots.min` | integer ≥ 0 | `1` |
-| `slots.max` | integer ≥ 0 | `9` |
-| `slots.port_base` | integer ≥ 1 | `4000` |
-| `slots.ports_per_slot` | integer ≥ 1 | `10` |
-| `slots.env` | map | none |
-| `notifiers` | list of maps | `[{"adapter":"os"}]` |
-| `notifiers[].adapter` | string | none |
-| `notifiers[].options` | map | none |
-| `watch_interval` | duration | `"30s"` |
-| `claim.lease` | duration | `"10m"` |
-| `claim.renew` | duration | `"3m"` |
-| `limits.deadline` | duration | `"60m"` |
-| `limits.nudges` | integer ≥ 0 | `2` |
-| `limits.retries` | integer ≥ 0 | `1` |
-| `limits.stalled` | duration | `"15m"` |
-| `limits.attended_wait` | duration | `"2m"` |
-| `trace.retain` | duration | `"14d"` |
+| Key | File | Type | Built-in default |
+|---|---|---|---|
+| `max_agents` | user | integer 1–9 | `9` |
+| `notify.os` | user | boolean | `true` |
+| `notify.ntfy` | user | URL | none |
+| `notify.webhook` | user | URL | none |
+| `trace.retain` | user | duration | `"14d"` |
+| `mode` | user, local | `"manual"` or `"auto"` | `"manual"` |
+| `agent` | user, local | `"claude"` or `"codex"` or `"opencode"` or `"gemini"` | `"claude"` |
+| `agents.claude.model` | user, local | string | none |
+| `agents.claude.args` | user, local | list of strings | `["--permission-mode","auto"]` |
+| `agents.codex.model` | user, local | string | none |
+| `agents.codex.args` | user, local | list of strings | none |
+| `agents.opencode.model` | user, local | string | none |
+| `agents.opencode.args` | user, local | list of strings | none |
+| `agents.gemini.model` | user, local | string | none |
+| `agents.gemini.args` | user, local | list of strings | none |
+| `provider` | team | `"gh"` or `"glab"` | derived from the remote URL |
+| `base_branch` | team | string or null | derived: the remote's default branch |
+| `workflow` | team | string | `"triage"` |
+| `slice_workflow` | team | string | `"slice"` |
 
 ### Shipped workflows
 
@@ -539,5 +522,6 @@ norn help [--all] [<command> | <noun> [<verb>]]
 | 3 | `refused` |
 | 4 | `corrupt` |
 | 5 | `busy` |
+| 6 | `config` |
 
 <!-- norn:reference:end -->

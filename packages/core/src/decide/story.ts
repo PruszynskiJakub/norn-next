@@ -172,7 +172,7 @@ function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: U
   // no unfinished slice close a finished round; an unfinished one parks below (GR7, B24)
   if (finished && !prReason && story.issue?.state === "closed" && story.pr === null && !story.slices.some(sliceUnfinished))
     return ctx.emit({ kind: "close_story", unit: ref, rule: "remote.issue_closed", refs: (story.mailbox ?? []).map((m) => ({ ref: m.ref, sha: m.sha })) });
-  const reason = prReason ?? (finished ? null : issueProblem(story, ctx.config.remote.label));
+  const reason = prReason ?? (finished ? null : issueProblem(story, ctx.config.label));
   // gh-71 D5 (B35): an older norn parked a finished round for an issue change — drop that park
   if (finished && st && su && st.status === "stuck" && !prReason) {
     const state: UnitState = { ...st, status: "done", park: null, updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id };

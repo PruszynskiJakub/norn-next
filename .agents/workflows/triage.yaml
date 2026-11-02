@@ -1,5 +1,5 @@
 # Triage workflow — repo-local copy of the shipped one (W1), norn's own default (config
-# default_workflow: triage), for stories and features; a bug starts in `reproduce` instead (label
+# `workflow`: triage), for stories and features; a bug starts in `reproduce` instead (label
 # norn:wf:reproduce). An unattended agent checks the issue still holds, posts its findings as an issue
 # comment (spec.md stays as intake wrote it): the recommendation lives only there, the outcome is plain
 # `done`. That ends the round ($done): the person starts the next one (`norn story edit gh-N --workflow

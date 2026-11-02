@@ -16,12 +16,9 @@ import { createHarness, type Harness, issue, layoutPlaces, oldNornDir, runChecke
 // whole flows over real git, several ticks each
 setDefaultTimeout(60_000);
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-remote: { provider: gh, label: norn }
-default_workflow: solo
-default_mode: manual
-notifiers: []
+const CONFIG = `provider: gh
+workflow: solo
+mode: manual
 `;
 
 const SOLO = `name: solo
@@ -58,7 +55,7 @@ interface Migrated {
 async function oldRepo(): Promise<{ h: Harness; workflows: string[] }> {
   const h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
   h.write(join(workflowsDir(h.root), "quick.yaml"), SOLO.replace("name: solo", "name: quick"));
   h.git(["add", "-A"]);
@@ -154,7 +151,7 @@ describe("norn migrate on the old layout (B11, B12, B13)", () => {
     expect(md.stdout).toContain("nothing to move");
     const json = await h.norn("migrate", "--json");
     expect(json.exit).toBe(0);
-    expect(json.value).toEqual({ moves: [], staged: [], commit: null });
+    expect(json.value).toEqual({ moves: [], config: { changed: [], renamed: [], removed: [] }, staged: [], commit: null });
     expect(snapshot(h)).toEqual(before);
   });
 });
@@ -169,7 +166,7 @@ describe("norn migrate --json (B11)", () => {
     const r = await h.norn("migrate", "--json");
     expect(r.exit).toBe(0);
     const v = r.value as Migrated;
-    expect(Object.keys(v).sort()).toEqual(["commit", "moves", "staged"]);
+    expect(Object.keys(v).sort()).toEqual(["commit", "config", "moves", "staged"]);
     const machine = layoutPlaces(h.root)["machine files"];
     expect(v.moves).toEqual([
       { part: "config", from: OLD_CONFIG, to: NEW_CONFIG, how: "git mv" },
@@ -303,5 +300,160 @@ describe("an untracked old workflow file (B11)", () => {
     expect(porcelain(h)).toContain(`?? ${NEW_WORKFLOWS}/draft.yaml`);
     const md = await h.norn("migrate");
     expect(md.stdout).toContain("nothing to move");
+  });
+});
+
+describe("norn migrate moves old config keys (gh-64 B40–B45, D13)", () => {
+  let h: Harness;
+  let out: CliResult;
+  const USER_OLD = `# mine
+default_mode: auto        # the tick starts my agents
+notifiers:
+  - adapter: os
+  - adapter: ntfy
+    options: { url: https://ntfy.sh/x }
+`;
+  const TEAM_OLD = `# the team
+remote: { provider: gh, label: norn }
+default_agent: codex
+max_agents: 1
+default_mode: auto
+limits: { deadline: 45m, attended_wait: 5m }
+notifiers: [{ adapter: ntfy, options: { url: https://ntfy.sh/team } }]
+`;
+  const SLICE = `---
+id: gh-12/02
+title: Two
+depends_on: []
+status: planned
+criteria:
+  - { id: c1, verifier: agent, needs: [browser] }
+  - { id: c2, verifier: test }
+---
+
+Body
+`;
+  const slicePath = () => join(h.root, ".agents/specs/gh-12-x/slices/02-two.md");
+  beforeAll(async () => {
+    h = await createHarness();
+    expect((await h.norn("init")).exit).toBe(0);
+    h.write(join(workflowsDir(h.root), "release.yaml"), `mode: manual\ndefaults: { deadline: 20m }\n${SOLO.replace("name: solo", "name: release")}`);
+    h.write(repoConfigPath(h.root), TEAM_OLD);
+    h.write(join(workflowsDir(h.root), "plain.json"), `${JSON.stringify({ ...(Bun.YAML.parse(SOLO) as object), name: "plain" }, null, 2)}\n`);
+    h.write(slicePath(), SLICE);
+    h.git(["add", "-A"]);
+    h.git(["commit", "-q", "-m", "an older norn's config"]);
+    h.write(join(h.home, "config.yaml"), USER_OLD);
+    out = await h.norn("migrate");
+  });
+  afterAll(() => h.cleanup());
+
+  test("B40: the user file is rewritten in place, comments kept; the team file's remote.provider becomes provider, staged", () => {
+    expect(out.exit).toBe(0);
+    // the comment stays with its key (the YAML writer pads it with one space)
+    expect(h.read(join(h.home, "config.yaml"))).toBe("# mine\n\nmode: auto # the tick starts my agents\nnotify:\n  ntfy: https://ntfy.sh/x\n");
+    const team = h.read(repoConfigPath(h.root));
+    expect(team).toStartWith("# the team\n");
+    expect(team).toContain("provider: gh");
+    expect(team).not.toMatch(/remote|limits|default_|max_agents/);
+    expect(porcelain(h).split("\n")).toContain("M  .agents/norn.config.yaml");
+  });
+
+  test("B41, B42: team limits fill each workflow's defaults: and default_mode each workflow's mode, keeping a workflow's own", () => {
+    const quick = h.read(join(workflowsDir(h.root), "quick.yaml")).trimEnd();
+    // D13: only the added lines differ; the rest of the file keeps its text (no reflow)
+    const before = sh(h.root, ["show", "HEAD:.agents/workflows/quick.yaml"]).trimEnd();
+    const added = quick.split("\n").filter((l) => !before.split("\n").includes(l));
+    expect(added).toEqual(["mode: auto", "defaults:", "  deadline: 45m"]);
+    expect(quick.split("\n").filter((l) => !added.includes(l)).join("\n")).toBe(before);
+    const release = h.read(join(workflowsDir(h.root), "release.yaml"));
+    expect(release).toContain("mode: manual");
+    expect(release).toContain("deadline: 20m");
+    expect(release).not.toContain("attended_wait");
+    const status = porcelain(h).split("\n");
+    expect(status).toContain("M  .agents/workflows/quick.yaml");
+    // release already sets its mode and deadline: untouched
+    expect(status.some((l) => l.includes("release.yaml"))).toBe(false);
+  });
+
+  test("B43: personal and machine keys leave the team file, each listed with its value", () => {
+    expect(out.stdout).toContain("removed `max_agents: 1` from the team file: set it in ~/.norn/config.yaml if you want it");
+    expect(out.stdout).toContain("removed `agent: codex` from the team file: set it in ~/.norn/config.yaml if you want it");
+  });
+
+  test("B43: a team notifiers list is offered in the user file's new shape, not the old key", () => {
+    expect(out.stdout).toContain('set it in ~/.norn/config.yaml if you want it: `notify: {"ntfy":"https://ntfy.sh/team","os":false}`');
+    expect(out.stdout).not.toContain("if you want it: `notifiers");
+  });
+
+  test("B43: a team limit no workflow takes is listed with its value", () => {
+    expect(out.stdout).toContain("removed `limits.attended_wait: 5m` from the team file: fixed at 2m");
+  });
+
+  test("B41: a workflow stored as JSON gains the defaults and mode too, still JSON", () => {
+    const plain = JSON.parse(h.read(join(workflowsDir(h.root), "plain.json")));
+    expect(plain).toMatchObject({ name: "plain", mode: "auto", defaults: { deadline: "45m" } });
+  });
+
+  test("B44: criteria needs are stripped from every slice, staged", () => {
+    expect(h.read(slicePath())).toBe(SLICE.replace("  - { id: c1, verifier: agent, needs: [browser] }\n", "  - { id: c1, verifier: agent }\n"));
+    expect(porcelain(h).split("\n")).toContain("M  .agents/specs/gh-12-x/slices/02-two.md");
+  });
+
+  test("B45, B55: the config loads again; a second run changes nothing; nothing is committed", async () => {
+    expect((await h.norn("config", "list", "--json")).exit).toBe(0);
+    const before = snapshot(h);
+    const again = await h.norn("migrate", "--json");
+    expect(again.exit).toBe(0);
+    expect(again.value).toMatchObject({ moves: [], config: { changed: [], renamed: [], removed: [] } });
+    expect(snapshot(h)).toEqual(before);
+    expect(sh(h.root, ["log", "-1", "--format=%s"]).trim()).toBe("an older norn's config");
+  });
+});
+
+describe("norn migrate leaves a new-style config alone (gh-64 B45)", () => {
+  test("B45: a user and team file with no old key, in odd formatting, are neither rewritten nor staged", async () => {
+    const h = await createHarness();
+    try {
+      expect((await h.norn("init")).exit).toBe(0);
+      const team = "# the team\nprovider:    gh   # ours\nworkflow: quick\n";
+      const user = "mode:    auto   # mine\n";
+      h.write(repoConfigPath(h.root), team);
+      h.git(["add", "-A"]);
+      h.git(["commit", "-q", "-m", "new-style config"]);
+      h.write(join(h.home, "config.yaml"), user);
+      const out = await h.norn("migrate", "--json");
+      expect(out.exit).toBe(0);
+      expect(out.value).toMatchObject({ config: { changed: [], renamed: [], removed: [] } });
+      expect(h.read(join(h.home, "config.yaml"))).toBe(user);
+      expect(h.read(repoConfigPath(h.root))).toBe(team);
+      expect(porcelain(h)).toBe("");
+    } finally {
+      h.cleanup();
+    }
+  });
+});
+
+describe("norn migrate on old team values of the wrong shape (gh-64 B43)", () => {
+  test("B43: a scalar remote, limits or default_mode is removed and listed once with its value", async () => {
+    const h = await createHarness();
+    try {
+      expect((await h.norn("init")).exit).toBe(0);
+      h.write(repoConfigPath(h.root), "remote: origin\nlimits: 5m\ndefault_mode: sometimes\n");
+      h.git(["add", "-A"]);
+      h.git(["commit", "-q", "-m", "odd old config"]);
+      const out = await h.norn("migrate", "--json");
+      expect(out.exit).toBe(0);
+      const removed = (out.value as { config: { removed: Array<{ key: string; value: unknown }> } }).config.removed;
+      expect(removed.map(({ key, value }) => ({ key, value }))).toEqual([
+        { key: "remote", value: "origin" },
+        { key: "limits", value: "5m" },
+        { key: "default_mode", value: "sometimes" },
+      ]);
+      expect(h.read(repoConfigPath(h.root))).not.toMatch(/remote|limits|default_mode/);
+      expect((await h.norn("config", "list", "--json")).exit).toBe(0);
+    } finally {
+      h.cleanup();
+    }
   });
 });

@@ -14,12 +14,9 @@ import { createHarness, type Harness, issue, type LayoutPartName, layoutPlaces, 
 
 setDefaultTimeout(60_000);
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-remote: { provider: gh, label: norn }
-default_workflow: duo
-default_mode: manual
-notifiers: []
+const CONFIG = `provider: gh
+workflow: duo
+mode: manual
 `;
 
 const DUO = `name: duo
@@ -40,7 +37,7 @@ let h: Harness;
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "duo.yaml"), DUO);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);
@@ -205,7 +202,7 @@ describe("a unit worktree's own old files are ignored (B21)", () => {
     // each worktree still holds the old layout's files, as a branch cut before the migration does
     for (const w of [wtOf(9, "started-before"), wtOf(10, "asks-first")]) {
       const old = layoutPlaces(w);
-      h.write(old.config.old, "default_mode: [not, a, mode]\n");
+      h.write(old.config.old, "mode: [not, a, mode]\n");
       h.write(join(old.workflows.old, "duo.yaml"), "name: duo\n");
       h.write(join(old["machine files"].old, "heartbeat.json"), "{}\n");
     }

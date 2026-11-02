@@ -1,0 +1,1 @@
+{"kind":"classify","receipt_id":"01M6E4RQ40F34E2X4V3ZX3SQS3","run_id":"01M6E4RHMS7S0DXGY69NVZM3AR","step":"open-pr","attempt":2,"at":"2026-11-02T12:46:52.544Z","by":"norn","who":"jakubpruszynski@mac","tick_id":"01M6E4RHMSSY1WKCH8QPK7J2Z6","outcome":"done","rule":"git.open-pr","detail":"PR #164 body updated https://github.com/PruszynskiJakub/norn-next/pull/164","route":"ci"}

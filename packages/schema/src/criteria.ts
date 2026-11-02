@@ -11,17 +11,19 @@ export type Verifier = Static<typeof Verifier>;
 
 /**
  * QV1: one acceptance criterion as data, in slice (or story) frontmatter `criteria`, next to the
- * prose Acceptance section. `needs` names capabilities the check requires (free strings, e.g. `browser`).
+ * prose Acceptance section: its id and who verifies it (gh-64 B36: `needs` was removed).
  */
 export const Criterion = Type.Object(
   {
     id: CriterionId,
     verifier: Verifier,
-    needs: Type.Optional(Type.Array(NonEmpty, { uniqueItems: true })),
   },
   { additionalProperties: false },
 );
 export type Criterion = Static<typeof Criterion>;
+
+/** B38 (D12): the message a slice or story still carrying criteria `needs` is refused with. */
+export const needsRemovedMessage = (kind: "slice" | "story", key: string) => `${kind} \`${key}\`: \`needs\` was removed; run \`norn migrate\``;
 
 /**
  * QV2/QV5 verdicts, worst first: `fail` > `unverified` > `person` > `pass`.

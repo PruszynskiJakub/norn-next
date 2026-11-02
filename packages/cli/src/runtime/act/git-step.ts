@@ -137,7 +137,7 @@ async function runGitLocked(act: ActEnv, a: Extract<Action, { kind: "run_git" }>
   // §10, W4: the route is where applying this receipt sends the unit — an exhausted counter
   // (e.g. integrate.conflict past conflict_loop's max) records `$stuck`, not the edge's target.
   // A receipt apply would refuse moves nothing; it keeps `$stuck`.
-  const applied = applyReceipts(st, [{ n: st.applied_through + 1, file: "", receipt }], { workflow: wf, now: receipt.at, limits: act.config.limits, tick_id: act.tick });
+  const applied = applyReceipts(st, [{ n: st.applied_through + 1, file: "", receipt }], { workflow: wf, now: receipt.at, tick_id: act.tick });
   receipt.route = routeOf(applied) ?? "$stuck";
   const written = appendReceipt(loc.runsDir, receipt);
   return { ok: true, detail: { outcome, detail, receipt: written.n, ...extra } };

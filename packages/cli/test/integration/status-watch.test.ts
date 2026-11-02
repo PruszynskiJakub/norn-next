@@ -32,7 +32,7 @@ beforeAll(async () => {
   expect((await c.norn("init")).exit).toBe(0);
   // stories start in a workflow whose first agent step is attended (refinement: sync → refine);
   // the ticks take them in, sync them with the base and start refine
-  appendFileSync(join(c.root, ".agents", "norn.config.yaml"), "default_workflow: refinement\n");
+  appendFileSync(join(c.root, ".agents", "norn.config.yaml"), "workflow: refinement\n");
   c.git(["add", "-A"]);
   c.git(["commit", "-q", "-m", "norn init"]);
   c.git(["push", "-q", "origin", "main"]);

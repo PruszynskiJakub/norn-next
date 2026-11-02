@@ -25,7 +25,7 @@ export type LeaseKind = Static<typeof LeaseKind>;
 
 /**
  * Machine-wide lease file in `~/.norn/leases/` (K3), created with O_EXCL.
- * Agent/check leases count against max_agents/max_checks; slot leases reserve
+ * Agent/check leases count against max_agents (checks too, gh-64); slot leases reserve
  * a port slot for a worktree. Dead holders are reclaimed by pid + start time.
  */
 export const LeaseFile = Type.Object(

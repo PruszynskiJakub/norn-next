@@ -16,11 +16,8 @@ import { createHarness, type Harness, issue } from "../../../../test/support/har
 
 setDefaultTimeout(30_000);
 
-const CONFIG = `agents:
-  claude: { adapter: claude }
-remote: { provider: gh, label: norn }
-default_mode: manual
-notifiers: []
+const CONFIG = `provider: gh
+mode: manual
 `;
 
 const DAY = 86_400_000;
@@ -48,7 +45,7 @@ async function opened(run: () => Promise<unknown>): Promise<string[]> {
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.write(repoConfigPath(h.root), CONFIG);
+  h.config(CONFIG);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn"]);
   h.git(["push", "-q", "origin", "main"]);

@@ -3,7 +3,7 @@
  * exits with an `ExitCode`. Failures and refusals are `CliError` `{error, do_instead, code?}`.
  * Commands return a value (exit 0) or `withExit(value, code)`, and throw `CliFailure` to refuse.
  */
-import { type ClaimBlob, type CliError, ExitCode } from "@norn/schema";
+import { type ClaimBlob, type CliError, CONFIG_FILES, type ConfigProblem, ExitCode, problemText } from "@norn/schema";
 import { cmd } from "@norn/core";
 
 export class CliFailure extends Error {
@@ -32,6 +32,18 @@ export const usageError = (error: string, do_instead: string | null = cmd.help()
 /** A state or config file failed validation (S2, exit 4). */
 export const corruptError = (error: string, do_instead: string | null, details?: unknown, code = "corrupt") =>
   new CliFailure(body(error, do_instead, code, details), ExitCode.corrupt);
+/**
+ * B7 (D3): config files a person wrote need fixing (exit 6, "Config error"): code
+ * `config_invalid`, `config_wrong_file` or `config_moved`, the files in `details`. Never corrupt.
+ */
+export function configError(problems: readonly ConfigProblem[], paths?: Record<string, string>): CliFailure {
+  const first = problems[0];
+  const code = first?.code ?? "config_invalid";
+  const error = problems.map(problemText).join("; ");
+  const moved = problems.some((p) => p.code === "config_moved");
+  const details = problems.map((p) => ({ ...p, path: paths?.[p.file] ?? CONFIG_FILES[p.file] }));
+  return new CliFailure(body(error || "config is invalid", moved ? cmd.migrate() : `fix ${CONFIG_FILES[first?.file ?? "repo"]}`, code, details), ExitCode.config);
+}
 /** Another process holds the lock or claim (exit 5). */
 export const busyError = (error: string, do_instead: string | null, code = "busy", details?: unknown) =>
   new CliFailure(body(error, do_instead, code, details), ExitCode.busy);
@@ -90,6 +102,7 @@ const FAILURE_TITLE: Partial<Record<ExitCode, string>> = {
   [ExitCode.usage]: "Usage error",
   [ExitCode.corrupt]: "Corrupt state",
   [ExitCode.busy]: "Busy",
+  [ExitCode.config]: "Config error",
 };
 
 /** A `CliError` as markdown, for commands that print markdown; the exit code still says which kind. */

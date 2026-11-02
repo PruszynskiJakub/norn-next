@@ -8,7 +8,7 @@
 import { closeSync, openSync, readSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { Facts, FileError, LoadedWorkflow, RepoWorkflows } from "@norn/core";
-import { type ResolvedConfig, type TickTrace, assertValid } from "@norn/schema";
+import { type ResolvedConfig, type TickTrace, assertValid, legacyConfig } from "@norn/schema";
 import { appendDurable, isErrno, readText } from "./fsx.ts";
 import { machineDir } from "./paths.ts";
 import { appendTrace, readTraceFile, traceFileName } from "./trace.ts";
@@ -253,7 +253,7 @@ export function tickReader(root: string): TickReader {
         const parsed = source ? parseWorkflowText(source, label) : null;
         workflows[name] = { name, workflow: parsed?.ok ? parsed.value : null, source, issues: ref.issues };
       }
-      return { ok: true, inputs: { facts: facts as Facts, workflows, config: replay.config } };
+      return { ok: true, inputs: { facts: facts as Facts, workflows, config: legacyConfig(replay.config) } };
     },
   };
 }

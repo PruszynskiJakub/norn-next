@@ -28,6 +28,7 @@ import {
   type UnitFacts,
   type UnpushedRuns,
   type WorktreeFacts,
+  storyMode,
 } from "@norn/core";
 import { DEFAULT_CONFIG, type HookFact, type Mode, type ResolvedConfig, sliceBranch, storyBranch, type Workflow } from "@norn/schema";
 import {
@@ -276,7 +277,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   const me = { heartbeat_id: opts.heartbeatId ?? null };
 
   // R2.3: on a story not held here, local runs/ work that never reached the record (an inbox Check item)
-  const remoteName = config.remote.git_remote;
+  const remoteName = config.git_remote;
   const baseRef = defaultBaseRef(opts.repoRoot, remoteName, config.base_branch);
   const prSeen = local.pr_seen;
   const unpushed = await Promise.all(
@@ -315,7 +316,8 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     let claim = classifyClaim(claims[i] ?? { state: "none" }, me, now);
     if (claim.state === "other" && claim.blob.holder === holder) claim = { ...claim, state: "mine" };
     const storyState = story.units[0]?.state ?? null;
-    const mode: Mode = storyState?.mode ?? config.default_mode;
+    // B10, B25: before its story unit pins a workflow, a story runs in the one it will start (MO1)
+    const mode: Mode = storyMode(storyState, story.units[0]?.workflow?.workflow ?? snap.workflows.workflows[story.frontmatter?.workflow ?? config.workflow]?.workflow, config);
     const finished = story.frontmatter?.status === "done" || story.frontmatter?.status === "dropped";
 
     const units: UnitFacts[] = ls.units.map((lu) => unitFacts(lu, lu.hooks, leaseByRun));
@@ -381,11 +383,11 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     views.push(() => {
       const storyTitle = story.frontmatter?.title ?? story.key;
       const storyUnit = story.units[0] as UnitSnapshot;
-      const base = unitView(storyUnit, story, sf, units[0] as UnitFacts, ctx, storyTitle, story.frontmatter?.workflow ?? config.default_workflow);
+      const base = unitView(storyUnit, story, sf, units[0] as UnitFacts, ctx, storyTitle, story.frontmatter?.workflow ?? config.workflow);
       const slices: SliceView[] = story.units.slice(1).map((u, k) => {
         const file = story.slices.find((s) => s.key === u.unit.slice);
         const fm = file?.frontmatter ?? null;
-        const v = unitView(u, story, sf, units[k + 1] as UnitFacts, ctx, fm?.title ?? u.unit.key, fm?.workflow ?? config.default_slice_workflow);
+        const v = unitView(u, story, sf, units[k + 1] as UnitFacts, ctx, fm?.title ?? u.unit.key, fm?.workflow ?? config.slice_workflow);
         return {
           ...v,
           slice: u.unit.slice as string,
@@ -415,7 +417,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   const facts: Facts = {
     tick_id: "view",
     now,
-    repo: { root: opts.repoRoot, default_branch: config.base_branch ?? cachedDefaultBranch(opts.repoRoot) ?? "main", remote: config.remote.git_remote },
+    repo: { root: opts.repoRoot, default_branch: config.base_branch ?? cachedDefaultBranch(opts.repoRoot) ?? "main", remote: config.git_remote },
     machine: {
       holder,
       heartbeat_id: opts.heartbeatId ?? null,

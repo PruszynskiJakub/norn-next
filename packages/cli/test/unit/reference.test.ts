@@ -2,10 +2,10 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ExitCode, explainConfig } from "@norn/schema";
+import { CONFIG_SCHEMAS, ExitCode } from "@norn/schema";
 import { freshReference, ROOT } from "../../scripts/docs-emit.ts";
 import { COMMANDS, NOUNS } from "../../src/commands/index.ts";
-import { currentReference, REFERENCE_END, REFERENCE_FILE, REFERENCE_START, replaceReference } from "../../src/reference.ts";
+import { currentReference, FILE_LABEL, REFERENCE_END, REFERENCE_FILE, REFERENCE_START, replaceReference } from "../../src/reference.ts";
 
 const fresh = freshReference();
 
@@ -23,22 +23,35 @@ describe("Reference render (B8, B9, B13)", () => {
     expect(fresh).not.toMatch(/\(B30–B32, MO1, W9, S7\)/);
   });
 
-  test("every config key of the built-in config appears with its type and default", () => {
-    for (const e of explainConfig()) {
-      const key = e.key.startsWith("agents.") ? "agents" : e.key;
-      expect(fresh).toContain(`| \`${key}\` |`);
+  test("every key of the three config files appears with the files that take it (gh-64 B1, B2)", () => {
+    const keys = (schema: unknown, prefix = ""): string[] =>
+      Object.entries((schema as { properties?: Record<string, unknown> }).properties ?? {})
+        .filter(([k]) => k !== "$schema")
+        .flatMap(([k, child]) => {
+          const nested = keys(child, `${prefix}${k}.`);
+          return nested.length ? nested : [`${prefix}${k}`];
+        });
+    for (const [kind, schema] of Object.entries(CONFIG_SCHEMAS)) {
+      for (const key of keys(schema)) expect(fresh).toMatch(new RegExp(`^\\| \`${key.replace(/\./g, "\\.")}\` \\| [^|\n]*${FILE_LABEL[kind as keyof typeof FILE_LABEL]}`, "m"));
     }
-    expect(fresh).toContain('| `default_mode` | `"manual"` or `"auto"` | `"manual"` |');
   });
 
-  test("types come from the config schema, nested keys included (B9)", () => {
-    expect(fresh).toContain("| `runner` | map or null | `null` |");
-    expect(fresh).toContain("| `base_branch` | string or null | `null` |");
-    expect(fresh).toContain("| `max_agents` | integer ≥ 1 | `2` |");
-    expect(fresh).toContain("| `limits.deadline` | duration | `\"60m\"` |");
-    for (const k of ["adapter", "command", "args", "model", "env", "capabilities"]) expect(fresh).toContain(`| \`agents.<name>.${k}\` |`);
-    for (const k of ["runner.adapter", "runner.options", "notifiers[].adapter", "notifiers[].options", "slots.env"]) expect(fresh).toContain(`| \`${k}\` |`);
+  test("types and defaults come from the file schemas and the built-in config (B9)", () => {
+    expect(fresh).toContain('| `mode` | user, local | `"manual"` or `"auto"` | `"manual"` |');
+    expect(fresh).toContain("| `max_agents` | user | integer 1–9 | `9` |");
+    expect(fresh).toContain('| `agents.claude.args` | user, local | list of strings | `["--permission-mode","auto"]` |');
+    // B22, B23: derived when unset, never a fixed default
+    expect(fresh).toContain('| `provider` | team | `"gh"` or `"glab"` | derived from the remote URL |');
+    expect(fresh).toContain("| `base_branch` | team | string or null | derived: the remote's default branch |");
+    expect(fresh).toContain('| `trace.retain` | user | duration | `"14d"` |');
+    expect(fresh).toContain("| `notify.os` | user | boolean | `true` |");
+    expect(fresh).toContain("| `notify.ntfy` | user | URL | none |");
     expect(fresh).not.toContain("$schema");
+  });
+
+  test("no key gh-64 removed is listed (B52)", () => {
+    for (const k of ["runner", "remote.", "default_mode", "default_agent", "default_workflow", "default_slice_workflow", "limits.", "slots.", "notifiers", "claim.", "watch_interval", "max_checks", "capabilities"])
+      expect(fresh).not.toMatch(new RegExp(`^\\| \`${k.replace(/\./g, "\\.")}`, "m"));
   });
 
   test("the shipped workflows and every exit code", () => {
