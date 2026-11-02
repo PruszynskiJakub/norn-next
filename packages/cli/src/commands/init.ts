@@ -8,7 +8,7 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { atomicWrite, installSkills, linkSkills, readText, REPO_CONFIG_FILE, repoConfigPath, WORKFLOWS_DIR, workflowsDir } from "@norn/store";
+import { atomicWrite, installSkills, LOCAL_CONFIG_FILE, linkSkills, readText, REPO_CONFIG_FILE, repoConfigPath, userConfigPath, WORKFLOWS_DIR, workflowsDir, writeConfigSchemas } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { rendered } from "../output.ts";
@@ -17,8 +17,8 @@ import { detectTestCommand, gitRemoteUrl, TEMPLATE_TEST_COMMAND, withTestCommand
 import { bundledSkills } from "../runtime/workflows.ts";
 import { cmd } from "@norn/core";
 
-/** Paths that must never be committed (§7.1); the machine-local files live outside the checkout (B5). */
-const IGNORED = [".env.norn", ".norn-unit"];
+/** Paths that must never be committed (§7.1, gh-64 B9); the machine-local files live outside the checkout (B5). */
+const IGNORED = [".env.norn", ".norn-unit", LOCAL_CONFIG_FILE];
 
 function ensureGitignore(root: string): string[] {
   const path = join(root, ".gitignore");
@@ -64,6 +64,10 @@ export function hookBinary(command: string, env: Record<string, string | undefin
 export interface InitReport {
   root: string;
   config: "exists" | "created";
+  /** B49: `~/.norn/config.yaml` */
+  user_config: "exists" | "created";
+  /** B50, B55: schema copies written or refreshed */
+  schemas: string[];
   workflows: { created: string[]; kept: string[] };
   skills: { dir: string; updated: string[]; unchanged: string[]; links: Array<{ agent: string; dir: string; linked: string[]; unchanged: string[]; kept: string[] }> };
   hooks: Array<{ agent: string; tier: string; changed: string[] }>;
@@ -83,6 +87,8 @@ function formatInit(r: InitReport): string {
   const out = [`norn init in ${r.root}`, ""];
   const row = (label: string, text: string) => out.push(`  ${label.padEnd(15)} ${text}`);
   row("config", `${REPO_CONFIG_FILE} ${r.config === "created" ? "created" : "kept (exists)"}`);
+  row("user config", `~/.norn/config.yaml ${r.user_config === "created" ? "created" : "kept (exists)"}`);
+  if (r.schemas.length) row("schemas", `wrote ${r.schemas.map((p) => (p.startsWith(r.root) ? rel(p) : p)).join(", ")}`);
   row("workflows", [r.workflows.created.length ? `created ${r.workflows.created.join(", ")}` : "", r.workflows.kept.length ? `kept ${r.workflows.kept.join(", ")}` : ""].filter(Boolean).join("; ") || "none");
   const sk = r.skills;
   row("skills", `${rel(sk.dir)}: ${sk.updated.length ? `updated ${sk.updated.join(", ")}` : "up to date"} (${count(sk.updated.length + sk.unchanged.length, "skills")})`);
@@ -94,7 +100,7 @@ function formatInit(r: InitReport): string {
   row("hook command", r.hook_command);
   row(".gitignore", r.gitignore.length ? `added ${r.gitignore.join(", ")}` : "up to date");
   row(".gitattributes", r.gitattributes.length ? `added ${r.gitattributes.join(", ")}` : "up to date");
-  const changed = r.config === "created" || r.workflows.created.length || sk.updated.length || sk.links.some((l) => l.linked.length) || r.hooks.some((h) => h.changed.length) || r.gitignore.length || r.gitattributes.length;
+  const changed = r.config === "created" || r.schemas.some((p) => p.startsWith(r.root)) || r.workflows.created.length || sk.updated.length || sk.links.some((l) => l.linked.length) || r.hooks.some((h) => h.changed.length) || r.gitignore.length || r.gitattributes.length;
   if (r.test_command) row("test command", `${r.test_command.command} (${r.test_command.detected_from ? `from ${r.test_command.detected_from}` : "not detected: the template's default"})`);
   row("remote", r.remote.url ? `${r.remote.git_remote} → ${r.remote.url}` : `no git remote named ${r.remote.git_remote}`);
   if (!changed) out.push("", "Nothing changed: norn is set up here.");
@@ -139,6 +145,11 @@ export const initCommand = defineCommand({
     const assets = assetsDir(ctx.env);
     const configPath = repoConfigPath(root);
     const config = existsSync(configPath) ? "exists" : (atomicWrite(configPath, readFileSync(join(assets, "config.yaml"), "utf8")), "created");
+    // B49: the commented user file on a machine's first init, never overwritten
+    const userPath = userConfigPath(ctx.home);
+    const user_config = existsSync(userPath) ? "exists" : (atomicWrite(userPath, readFileSync(join(assets, "user-config.yaml"), "utf8")), "created");
+    // B50, B55 (D14): the schema copies the starters' modelines point at
+    const schemas = writeConfigSchemas({ repoRoot: root, home: ctx.home });
 
     // W1: the templates' `test` checks get the repo's own test command when its build files name one
     const detected = detectTestCommand(root);
@@ -180,7 +191,7 @@ export const initCommand = defineCommand({
       hooks.push({ agent: name, tier: agent.tier, changed: r.changed });
     }
 
-    const report: InitReport = { root, config, workflows, skills, hooks, hook_command: command, gitignore: ensureGitignore(root), gitattributes: ensureGitattributes(root), remote: { provider: ctx.config.provider, label: ctx.config.label, git_remote: ctx.config.git_remote, url: gitRemoteUrl(root, ctx.config.git_remote) }, test_command };
+    const report: InitReport = { root, config, user_config, schemas, workflows, skills, hooks, hook_command: command, gitignore: ensureGitignore(root), gitattributes: ensureGitattributes(root), remote: { provider: ctx.config.provider, label: ctx.config.label, git_remote: ctx.config.git_remote, url: gitRemoteUrl(root, ctx.config.git_remote) }, test_command };
     return rendered(report, formatInit(report));
   },
 });

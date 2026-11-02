@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://norn.dev/schema/repo-config.json",
+  "title": "norn team config",
+  "additionalProperties": false,
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "provider": {
+      "description": "Issue provider CLI: gh (GitHub) or glab (GitLab)",
+      "anyOf": [
+        {
+          "const": "gh",
+          "type": "string"
+        },
+        {
+          "const": "glab",
+          "type": "string"
+        }
+      ]
+    },
+    "base_branch": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "workflow": {
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "workflow a new story starts in (default triage)",
+      "type": "string"
+    },
+    "slice_workflow": {
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "workflow a new slice starts in (default slice)",
+      "type": "string"
+    }
+  }
+}

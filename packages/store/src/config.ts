@@ -17,11 +17,12 @@ import {
   problemText,
   type ResolvedConfig,
   resolveConfig,
+  toJsonSchema,
 } from "@norn/schema";
 import { type Document, isCollection, isMap, isScalar, parseDocument, parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { atomicWrite, fileError, isErrno, readText, type ReadResult } from "./fsx.ts";
 import { recordedInterval } from "./heartbeat.ts";
-import { checkoutOf, LOCAL_CONFIG_FILE, nornHome, REPO_CONFIG_FILE, repoConfigPath, userConfigPath, workflowsDir } from "./paths.ts";
+import { checkoutOf, LOCAL_CONFIG_FILE, LOCAL_CONFIG_SCHEMA_FILE, nornHome, REPO_CONFIG_SCHEMA_FILE, REPO_CONFIG_FILE, repoConfigPath, userConfigPath, workflowsDir } from "./paths.ts";
 import { type PinnedWorkflow, parseWorkflowText, sha256 } from "./unit.ts";
 
 /** B8: a missing or empty file sets nothing; a file that is not YAML is `config_invalid`. */
@@ -121,6 +122,27 @@ export function loadConfig(opts: { repoRoot: string; home?: string; env?: Record
     return { ok: false, problems, errors, home, paths };
   }
   return { ok: true, config: r.config, entries: r.entries, files, home, paths };
+}
+
+/**
+ * B50, B55 (D14): write the JSON schema of each config file next to it — the team and local
+ * schemas in `.agents/` (committed), the user schema in the norn home — when missing or stale.
+ * Returns the paths written.
+ */
+export function writeConfigSchemas(opts: { repoRoot: string; home: string }): string[] {
+  const targets: Array<[string, "repo-config" | "local-config" | "user-config"]> = [
+    [join(opts.repoRoot, REPO_CONFIG_SCHEMA_FILE), "repo-config"],
+    [join(opts.repoRoot, LOCAL_CONFIG_SCHEMA_FILE), "local-config"],
+    [join(opts.home, "config.schema.json"), "user-config"],
+  ];
+  const written: string[] = [];
+  for (const [path, name] of targets) {
+    const text = `${JSON.stringify(toJsonSchema(name), null, 2)}\n`;
+    if (readText(path) === text) continue;
+    atomicWrite(path, text);
+    written.push(path);
+  }
+  return written;
 }
 
 // ---------------------------------------------------------------- editing a file (B62–B68, D4)
