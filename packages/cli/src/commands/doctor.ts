@@ -221,6 +221,18 @@ interface Check {
 const portsTried = new WeakMap<Context, Promise<{ ports: Ports; fail: { ok: false; error: string; do_instead: string | null } | null }>>();
 
 /** B48 (D15): the ports, with an adapter that fails to build recorded as one failure and the rest built without notifiers. */
+/**
+ * B13: wiring builds every built-in agent so a step may name any of them; doctor checks only the
+ * ones in use — the default agent, each configured entry and each agent a repo workflow step names —
+ * so an agent nobody uses never fails it for not being installed.
+ */
+function agentsInUse(ctx: Context, ports: Ports): Record<string, AgentAdapter> {
+  const names = new Set<string>([ctx.config.agent, ...Object.keys(ctx.config.agents)]);
+  for (const wf of Object.values(loadWorkflows(ctx.root).workflows))
+    for (const step of Object.values(wf.workflow.steps)) if (step.type === "agent" && step.agent) names.add(step.agent);
+  return Object.fromEntries(Object.entries(ports.agents).filter(([n]) => names.has(n)));
+}
+
 function doctorPorts(ctx: Context) {
   let p = portsTried.get(ctx);
   if (!p) {
@@ -446,7 +458,8 @@ export const doctorCommand = defineCommand({
     };
 
     const agents = [];
-    for (const [name, agent] of Object.entries(ports.agents)) {
+    const used = agentsInUse(ctx, ports);
+    for (const [name, agent] of Object.entries(used)) {
       const argv = agent.launchCommand({ cwd: ctx.root, prompt: "x", headless: true, env: {}, config: {} }).argv;
       const bin = argv[0] ?? name;
       const path = which(bin, ctx.env);
@@ -507,7 +520,7 @@ export const doctorCommand = defineCommand({
     }
 
     const names = bundledSkills(ctx.env);
-    const sk = skillsReport(ctx.root, join(assetsDir(ctx.env), "skills"), names, Object.fromEntries(Object.entries(ports.agents).map(([n, a]) => [n, a.skillDir(ctx.root)])));
+    const sk = skillsReport(ctx.root, join(assetsDir(ctx.env), "skills"), names, Object.fromEntries(Object.entries(used).map(([n, a]) => [n, a.skillDir(ctx.root)])));
     const skillsOk = sk.missing.length === 0 && Object.keys(sk.unlinked).length === 0;
     const skills = { ok: skillsOk, ...sk, ...(skillsOk ? {} : { do_instead: cmd.init() }) };
 

@@ -397,6 +397,20 @@ steps:
     }
   });
 
+  test("B13: doctor checks the agents in use only — a built-in agent named on a workflow step joins them", async () => {
+    const plain = await runChecked(["doctor", "--json"], { ...h.deps, env: env() });
+    expect((plain.value as { agents: Array<{ name: string }> }).agents.map((a) => a.name)).toEqual(["claude"]);
+    const file = join(workflowsDir(h.root), "other.yaml");
+    h.write(file, SOLO.replace("name: solo", "name: other").replace("skill: norn-implement", "skill: norn-implement\n    agent: codex"));
+    try {
+      const r = await runChecked(["doctor", "--json"], { ...h.deps, env: env() });
+      expect((r.value as { agents: Array<{ name: string }> }).agents.map((a) => a.name).sort()).toEqual(["claude", "codex"]);
+      expect(r.exit).toBe(1);
+    } finally {
+      rmSync(file);
+    }
+  });
+
   test("a workflow naming a skill its agent lacks: doctor names it, and a tick refuses it for the same reason (B7)", async () => {
     const file = join(workflowsDir(h.root), "nope.yaml");
     h.write(file, NOPE);
