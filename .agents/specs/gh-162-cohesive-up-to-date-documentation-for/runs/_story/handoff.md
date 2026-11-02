@@ -22,16 +22,19 @@
 
 ## Goal
 
-Plan gh-162: seams, coverage, prefactoring and decisions, buildable in one branch (quick workflow, no slices).
+Build gh-162's plan in one branch: the rules file, the generated Reference, the rewritten docs and the docs lint, with the unit tier and type check green.
 
 ## Progress
 
-- Plan written and confirmed by the person.
-- Seams: S1 is a docs lint (pure matchers plus sweeps, unit tier) for B7, B23, B24, B27, B31, B34–B38. S2 is a Reference render plus `bun run docs:emit` with a stale test (like schema:emit) for B8–B13. S3 is review/QA for the written content.
-- Prefactor: shared doc-text helpers and one doc set for every lint.
-- Decisions: D1 the rules file keeps the PRD's § numbers (about 120 citations), and citations to dropped sections are rewritten. D2 R rules go to §8/§9/§12/§13; HC/CP/OR/SG go to a new §15.1; the 4 uncopied BS rules are added. D8 pins every current rule id in the test. D11 output examples come from the released norn. D12 sets the work order.
-- plan#1 done: Plan written and confirmed: S1 docs lint (glossary over new docs, PRD/SPEC gone, rule ids pinned once, handoff, command/flag mentions, links+anchors, versions), S2 generated Reference via docs:emit with a stale test, S3 review/QA for content. Coverage for B1–B40, one prefactor (shared doc helpers), D1–D12, risks. One branch, no slices.
+- S2: `packages/cli/src/reference.ts` (pure render + marker replace), `packages/cli/scripts/docs-emit.ts`, `bun run docs:emit`; `packages/cli/test/unit/reference.test.ts` covers B8–B13 and the stale check. `HELP_GROUPS`/`plainSummary` exported from help.ts.
+- Rules: `.agents/RULES.md` built from the PRD + four SPEC files (all 228 pinned ids defined once). §1, §2, §18–§22 dropped; §3 keeps G1–G6 only; §17 keeps X1–X4 only (the ids are pinned, so the section stays, without the package narrative). Deviation from D2: R rules sit together in a new §13.1 "Claim loss and recovery" (one subsection per R group) rather than spread over §8/§9/§12/§13. HC/CP/OR/SG in §15.1; HC4, HC5, HC8, HC16 rewritten as "Replaced by CP…" (the cockpit spec replaced them); O1 and NT6 now cite CP. The 6 uncopied BS rules appended to §12.1. Version strings in BS11, CP6, §16 neutralised. "(dogfood Dn)" tags still cite the removed audits by id.
+- Pointers: source/test comments, workflows (refinement, quick, triage, reproduce), issue + release skills, AGENTS, CONTRIBUTING now name the rules file. Repo tests read RULES.md.
+- Removed: PRD, SPEC-*, cookbook.html, three audit folders, root handoff.md. LIMITATIONS moved to docs/limitations.md and rewritten (no version, no "Fixed since", a "Not built yet" section from the old §20).
+- Docs: README rewritten (pitch, fit, install, set up, first story, map); docs/concepts.md (with glossary), docs/recipes.md, Reference prose (output/exit codes, config layers and keys). README outputs of `norn init` next steps and `norn status` captured from released norn 0.17.0 in a scratch repo (status's one-time "listing moved" hint line left out).
+- S1: `test/repo/docs.test.ts` (rule ids, PRD/SPEC names, stray handoff, versions, links + anchors, commands + flags read from Reference's generated block, since root tests cannot import the cli), doc set shared via `test/support/docs.ts` with the glossary and removed-command lints. Mutation-checked: each sweep fails on an injected bad line.
+- Not done by automation, for review/QA: B17 (each listed limitation re-checked against current code), B39/B40 rerun of examples, B25 placement of R rules (see deviation above).
+- `bun run test` 1090 pass, typecheck green.
 
 ## Resume
 
-Plan complete; the next round (quick) builds it in the order of D12.
+Implementation committed; next is the quick workflow's test/review steps.

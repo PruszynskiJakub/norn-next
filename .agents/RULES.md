@@ -8,7 +8,6 @@ Every id'd rule norn follows, and nothing else: how norn works for a person is i
 
 ## 3. Goals
 
-**Goals**
 - G1 Every agent run ends in a known, classified outcome (R1).
 - G2 All "what next" decisions are made by deterministic code; agents only do one step and report (R2).
 - G3 Any story can be continued by a fresh agent or another person from git alone (R3).
