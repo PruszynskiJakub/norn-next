@@ -5,7 +5,7 @@
  * caller passes the workflow files' text. `bun run docs:emit` writes it between the markers; a unit
  * test fails when the file is stale.
  */
-import { CONFIG_SCHEMAS, type ConfigFileKind, DEFAULT_CONFIG, Duration, ExitCode } from "@norn/schema";
+import { CONFIG_SCHEMAS, type ConfigFileKind, DEFAULT_CONFIG, Duration, ExitCode, Url } from "@norn/schema";
 import type { Command, Noun } from "./command.ts";
 import { HELP_GROUPS, plainSummary } from "./commands/help.ts";
 
@@ -55,7 +55,7 @@ function typeName(s: Schema): string {
   }
   if (s.type === "null") return "null";
   if (s.type === "boolean") return "boolean";
-  if (s.type === "string" && s.description === "http or https URL") return "URL";
+  if (s.type === "string" && s.pattern === Url.pattern) return "URL";
   // trace.retain is a plain string checked where it is used, but holds a duration all the same
   if (s.type === "string") return s.pattern === Duration.pattern || String(s.description).startsWith("Duration") ? "duration" : "string";
   if (s.type === "integer") {
@@ -88,6 +88,18 @@ const at = (v: unknown, k: string): unknown => (typeof v === "object" && v !== n
 /** How the table names each file (gh-64 B1): `~/.norn/config.yaml`, the local file, the team file. */
 export const FILE_LABEL: Record<ConfigFileKind, string> = { user: "user", local: "local", repo: "team" };
 
+/** Keys whose value, when no file sets it, is derived from the repo, not a fixed built-in default (gh-64 B22, B23). */
+const DERIVED_DEFAULT: Record<string, string> = {
+  provider: "derived from the remote URL",
+  base_branch: "derived: the remote's default branch",
+};
+
+function defaultCell(r: ConfigRow): string {
+  const derived = DERIVED_DEFAULT[r.key];
+  if (derived) return cell(derived);
+  return r.value === undefined ? "none" : `\`${cell(JSON.stringify(r.value))}\``;
+}
+
 function renderConfig(): string[] {
   const rows = new Map<string, ConfigRow & { files: string[] }>();
   for (const [kind, schema] of Object.entries(CONFIG_SCHEMAS) as Array<[ConfigFileKind, unknown]>) {
@@ -100,7 +112,7 @@ function renderConfig(): string[] {
   return [
     "| Key | File | Type | Built-in default |",
     "|---|---|---|---|",
-    ...[...rows.values()].map((r) => `| \`${r.key}\` | ${r.files.join(", ")} | ${cell(r.type)} | ${r.value === undefined ? "none" : `\`${cell(JSON.stringify(r.value))}\``} |`),
+    ...[...rows.values()].map((r) => `| \`${r.key}\` | ${r.files.join(", ")} | ${cell(r.type)} | ${defaultCell(r)} |`),
   ];
 }
 

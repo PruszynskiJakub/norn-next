@@ -6,7 +6,7 @@ Every command and flag, every config key, the workflows `norn init` ships and th
 
 Commands a person or an agent reads (`brief`, `done`, `ask`, `stuck`, `help`, `init`, `doctor`, `config`, `status`, `story list`, `story view`, `run list`, `run view`) print markdown. Every command prints one JSON value instead with `--json`, and the commands a program reads (`tick`, `watch`, `hook`, `sync`, …) always do. Code should branch on the exit code and the `--json` data, never on the markdown.
 
-A refusal prints `{error, do_instead}` (as markdown without `--json`): what was refused and what to do instead. The exit code says why: `refused` (3) when a rule says no, `usage` (2) for bad arguments, `corrupt` (4) when a state file fails validation, `busy` (5) when another process holds the lock or the claim. The full list is under [Exit codes](#exit-codes).
+A refusal prints `{error, do_instead}` (as markdown without `--json`): what was refused and what to do instead. The exit code says why: `refused` (3) when a rule says no, `usage` (2) for bad arguments, `corrupt` (4) when a state file fails validation, `busy` (5) when another process holds the lock or the claim, `config` (6) when a config file is wrong. The full list is under [Exit codes](#exit-codes).
 
 ## Config
 
@@ -398,7 +398,7 @@ One heartbeat pass: observe, decide, act, log
 norn tick [--sync | --offline] [--interval 30s]
 ```
 
-- `--interval`: how often this tick runs (cron): recorded for liveness and claim timing (B34)
+- `--interval`: how often this tick runs (cron): recorded for liveness and claim timing
 - `--sync`
 - `--offline`
 
@@ -498,8 +498,8 @@ norn help [--all] [<command> | <noun> [<verb>]]
 | `agents.opencode.args` | user, local | list of strings | none |
 | `agents.gemini.model` | user, local | string | none |
 | `agents.gemini.args` | user, local | list of strings | none |
-| `provider` | team | `"gh"` or `"glab"` | `"gh"` |
-| `base_branch` | team | string or null | `null` |
+| `provider` | team | `"gh"` or `"glab"` | derived from the remote URL |
+| `base_branch` | team | string or null | derived: the remote's default branch |
 | `workflow` | team | string | `"triage"` |
 | `slice_workflow` | team | string | `"slice"` |
 

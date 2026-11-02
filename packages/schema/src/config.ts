@@ -40,7 +40,7 @@ export type ConfigFileKind = keyof typeof CONFIG_FILES;
 
 // ---------------------------------------------------------------- the three file schemas
 
-const Url = Type.String({ pattern: "^https?://\\S+$", description: "http or https URL" });
+export const Url = Type.String({ pattern: "^https?://\\S+$", description: "http or https URL" });
 
 export const AgentEntry = Type.Object(
   {

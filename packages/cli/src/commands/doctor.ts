@@ -9,9 +9,9 @@
  *     Codex: project hooks only run once `.codex/` is trusted (`/hooks` in Codex) — noted.
  *   - remote: the configured git remote exists (sync and push need it) and the provider CLI
  *     answers `whoami` (gh/glab auth)
- *   - runner: configured runner available (Herdr server reachable), and `command -v norn` in a
+ *   - runner: the detected runner available (Herdr server reachable), and `command -v norn` in a
  *     throwaway runner session resolves to this norn (R8.2); only auto mode needs a runner (MO2),
- *     so with `default_mode: manual` a failing runner is a warning, not a failed check
+ *     so in manual mode a failing runner is a warning, not a failed check
  *   - machine: the `user@host` runs are recorded with (R7.1); a warning when NORN_MACHINE overrides it (R7.3)
  *   - skills (SK1): every bundled skill is in `.agents/skills/` and linked from each configured
  *     agent's skill folder; one that differs from the bundled version is a warning (`norn init`)

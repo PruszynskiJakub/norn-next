@@ -117,7 +117,7 @@ const GLOSSARY_FILES = (): string[] => [
  * own messages and the moved-key table name old keys on purpose and live in sources, not here.
  */
 // `notifiers` only as the key (`notifiers:`, `notifiers[]`, in backticks): as a noun it names the O3 concept
-const REMOVED_KEYS = /\bcapability this session lacks\b|\bnotifiers(?=[:[`])|`notifiers\b|\b(default_mode|default_agent|default_workflow|default_slice_workflow|max_checks|watch_interval|attended_wait|ports_per_slot|sync_interval)\b|\blimits\.(deadline|nudges|retries|stalled)\b|\bremote\.(provider|label|git_remote|host)\b|\bcapabilities: \[/;
+const REMOVED_KEYS = /\bcapability this session lacks\b|\bcapability gating\b|\bnotifiers(?=[:[`])|`notifiers\b|\b(default_mode|default_agent|default_workflow|default_slice_workflow|max_checks|watch_interval|attended_wait|ports_per_slot|sync_interval)\b|\blimits\.(deadline|nudges|retries|stalled)\b|\bremote\.(provider|label|git_remote|host)\b|\bcapabilities: \[/;
 const CONFIG_DOCS = (): string[] => [
   ...textFiles(join(PKGS, "cli", "assets"), DOCS),
   ...textFiles(join(ROOT, "plugins"), [...DOCS, ".toml", ".sh"]),

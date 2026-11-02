@@ -11,7 +11,7 @@ export const tickCommand = defineCommand({
   summary: "One heartbeat pass: observe, decide, act, log (H1)",
   usage: "norn tick [--sync | --offline] [--interval 30s]",
   options: { sync: { type: "boolean" }, offline: { type: "boolean" }, interval: { type: "string" } },
-  optionHelp: { "--interval": "how often this tick runs (cron): recorded for liveness and claim timing (B34)" },
+  optionHelp: { "--interval": "how often this tick runs (cron): recorded for liveness and claim timing" }, // B34
   async run(ctx, args) {
     if (opt.bool(args, "sync") && opt.bool(args, "offline")) throw usageError("--sync and --offline exclude each other", cmd.tick());
     // B34 (D5): only an explicit --interval is recorded, so a tick run by hand keeps the interval cron recorded

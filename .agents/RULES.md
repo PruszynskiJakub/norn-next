@@ -252,7 +252,7 @@ Three sources of outcomes:
 
 | Type | Purpose |
 |---|---|
-| `agent` | Run a skill in a fresh session; fields: `skill`, `instructions?`, `inputs`, `agent?`, `model?`, `attended?`, `criteria?: required` (QV3), limits (`deadline`, `nudges`, `retries`, `stalled`), `outcomes`. |
+| `agent` | Run a skill in a fresh session; fields: `skill`, `instructions?`, `inputs`, `agent?`, `model?`, `attended?`, `criteria?: required` (QV3), limits (`deadline`, `nudges`, `retries`; `stalled` is set only in the workflow's `defaults:`), `outcomes`. |
 | `check` | Run a shell command in the unit worktree with `.env.norn` loaded and a `timeout`; exit code decides `pass`/`fail`; writes a check receipt (C5). |
 | `gate` | Wait for a human `approve`/`reject` (or `answer`). |
 | `git` | Built-in actions: `integrate` (slice into story branch: rebase + fast-forward, serialized per story), `push`, `open-pr` (draft story PR into the base branch, BS0; body per GR9, and an open PR gets the new body), `update` (merge the base into the story branch, BS3). |

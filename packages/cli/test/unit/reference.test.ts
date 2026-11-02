@@ -40,8 +40,9 @@ describe("Reference render (B8, B9, B13)", () => {
     expect(fresh).toContain('| `mode` | user, local | `"manual"` or `"auto"` | `"manual"` |');
     expect(fresh).toContain("| `max_agents` | user | integer 1–9 | `9` |");
     expect(fresh).toContain('| `agents.claude.args` | user, local | list of strings | `["--permission-mode","auto"]` |');
-    expect(fresh).toContain('| `provider` | team | `"gh"` or `"glab"` | `"gh"` |');
-    expect(fresh).toContain("| `base_branch` | team | string or null | `null` |");
+    // B22, B23: derived when unset, never a fixed default
+    expect(fresh).toContain('| `provider` | team | `"gh"` or `"glab"` | derived from the remote URL |');
+    expect(fresh).toContain("| `base_branch` | team | string or null | derived: the remote's default branch |");
     expect(fresh).toContain('| `trace.retain` | user | duration | `"14d"` |');
     expect(fresh).toContain("| `notify.os` | user | boolean | `true` |");
     expect(fresh).toContain("| `notify.ntfy` | user | URL | none |");
