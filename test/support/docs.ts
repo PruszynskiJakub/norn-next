@@ -1,0 +1,32 @@
+/**
+ * The doc set and the doc-text helpers the repo lints share (gh-162 prefactor): which files are docs,
+ * and how a line's prose is told from its URLs and inline code.
+ */
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+
+export const URL = /\b[a-z][a-z0-9+.-]*:\/\/\S+/gi;
+export const CODE_SPAN = /`[^`\n]*`/g;
+
+/** Text files under `dir` (any depth) with one of the extensions; skips node_modules and .git. */
+export function textFiles(dir: string, exts: string[]): string[] {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir).flatMap((n) => {
+    const p = join(dir, n);
+    if (statSync(p).isDirectory()) return n === "node_modules" || n === ".git" ? [] : textFiles(p, exts);
+    return exts.some((e) => p.endsWith(e)) ? [p] : [];
+  });
+}
+
+/** The rules file: every id'd rule. */
+export const RULES_FILE = ".agents/RULES.md";
+
+/** Docs for people: the README, CONTRIBUTING, everything under docs/ and the Herdr plugin's README. */
+export function userDocs(root: string): string[] {
+  return [join(root, "README.md"), join(root, "CONTRIBUTING.md"), ...textFiles(join(root, "docs"), [".md"]), join(root, "plugins", "herdr", "README.md")];
+}
+
+/** Every doc a person or agent reads about norn: the user docs, AGENTS.md and the rules file. */
+export function allDocs(root: string): string[] {
+  return [...userDocs(root), join(root, "AGENTS.md"), join(root, RULES_FILE)];
+}

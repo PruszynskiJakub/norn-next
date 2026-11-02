@@ -1,12 +1,6 @@
-# norn — known limitations
+# Limitations
 
-Where norn breaks or is not proven yet, as of release 0.5.0: v1, plus auto-mode recovery (`SPEC-auto-mode-recovery.md`, PR #6), base sync with honest QA (`SPEC-base-sync-and-qa.md`, PR #7) and the herdr cockpit (`SPEC-herdr-cockpit.md`, PR #23, released in 0.3.0, with workspace jumps (HC15) in 0.4.0). The evidence comes from the dogfood runs on the Todoist sandbox:
-
-- `docs/audit-todoist-dogfood/` — v1, finding ids F*.
-- `docs/audit-auto-mode/` — auto mode, ids H*/M*, with a rerun using ids B*.
-- `docs/audit-base-sync-qa/` — base sync and QA, ids C*, D* and the run-3 F1–F3.
-
-Read this next to [`PRD.md`](PRD.md) before relying on norn for anything beyond the proven envelope below.
+What norn does not do yet, what has not been proven in real use, and the limits of its design. What was fixed is in the [changelog](../CHANGELOG.md). Read this before relying on norn beyond the envelope below.
 
 ## Proven envelope
 
@@ -18,31 +12,15 @@ Trustworthy today:
 
 Two-machine operation was only simulated on one Mac (`NORN_MACHINE`). Everything else below is either a known gap or unproven.
 
-## Fixed since v1
+## Not built yet
 
-The rules each fix maps to are in its spec.
-
-- **Stale story branches (F8).** The `update` step merges the base into the story branch, never by rebasing.
-  - Conflicts are predicted and routed to a `resolve` agent step.
-  - Gates send a story back with `stale`, and `norn story update-branch <story>` re-enters the update step.
-  - `status` and `story list` show how far behind each story is and which files conflict.
-  - In the dogfood, every story reached `ready` up to date with no manual merge.
-- **Conflict markers.** norn does not commit while a merge is open, and refuses a push whose head has markers in the outgoing files (BS5.2). A resolve agent's `norn done` is refused until its merge is concluded.
-- **A person's push to a story branch** is merged in by `update` or by a rejected push, and is never lost (BS3.3a).
-- **Honest QA (F30, F37).** QA reports a verdict per criterion: pass, fail, person or unverified.
-  - `unverified` goes to `human-qa` with how to check it.
-  - `--note` leaves a Notes item for a person.
-  - `pass` is refused for a criterion that needs a capability the agent lacks, such as `browser`, and a person's earlier ruling never counts as verification.
-- **One action per unit per tick (F13).** Claim renewal is a side action and no longer delays a receipt or a cleanup (R1).
-- **Crash and hang recovery.** This is now proven live on herdr and headless:
-  - An agent killed mid-step or mid-merge is classified `died` and retried within seconds.
-  - A hung headless agent is nudged through `--resume`.
-  - A launch crash is adopted or classified (R4, R5).
-- **Prompts the agent is blocked on.** Permission prompts show up as implicit asks, including mid-merge. `norn story answer` types the right keystroke, and the agent's own report is accepted afterwards (R6).
-- **Agents run the right norn.** A PATH shim and a launcher script do this (R8). Failed actions are reported `ok:false` and never as success (R4.3).
-- **`watch` survives a sleeping laptop (H11).** Every call that reaches a remote (`git fetch`/`push`/…, `gh`, `glab`) times out after 2 minutes and fails as a retryable network error, so a dead SSH connection no longer holds the tick lock for good.
-- **An attended agent waiting for its person is visible (HC1–HC3).** After `limits.attended_wait` (default `2m`) the inbox moves it from Running to Your turn, and notifiers fire once per wait. Its command reaches the waiting session and never starts a second agent, which was the dogfood mistake.
-- **Brief inputs (F16).** On a first attempt, Last failing check and Last findings say `none` instead of pointing at a Rework section that does not exist. A Resume written by another step or attempt is dropped from Context, and a fresh session after `died` keeps its Rework (B2, C2).
+- **Secrets in committed text.** Check output, receipts, logs, evidence and handoff are committed unredacted. Keep secrets out of check output and evidence.
+- **No write-back to GitHub or GitLab** beyond pushes and the draft PR: no status comment edited in place, no `norn:stuck` label.
+- **No permission profiles per step.** Claude runs in its `auto` permission mode by default; a permission prompt the agent is blocked on shows up as an Answer item.
+- **No hard-deny hook.** Pushing, writing to the remote with `gh`/`glab` and editing `runs/` are forbidden by the `norn` skill, not blocked by a hook.
+- **No guards on transitions** (`when:`), no per-slice mode, no `fork`/`join` steps: conditions are outcomes, a person's QA is a gate, and `attended: true` on a step covers the precise cases.
+- **One remote and project per repository.**
+- **No web cockpit, and no command that mines the trace for workflow changes.**
 
 ## Gaps still open
 
@@ -69,7 +47,7 @@ The rules each fix maps to are in its spec.
    - No per-worktree setup step and no config key for checks (F3): check commands must prepend their own setup, such as `bun install --frozen-lockfile`.
 9. **Cost per story** is not tracked; it is postponed.
 
-## Built but never run for real
+## Not yet proven in real use
 
 - **Two real machines.** Claims and mailboxes are git refs with compare-and-swap, which is sound on paper. They were exercised only as simulated machines on one Mac.
 - **These recovery paths:**
@@ -78,7 +56,7 @@ The rules each fix maps to are in its spec.
   - an agent that dies with no retries left;
   - killing a herdr pane mid-merge.
 - **An agent with the `browser` capability.** Nobody ever checked a browser criterion live; every such approval says so.
-- **The herdr cockpit (HC1–HC15).** The attended wait, the cockpit (`norn status --watch`, SPEC-cockpit), the Herdr plugin (`plugins/herdr`), pane labels and the `herdr` notifier are tested against fixtures and a fake runner only. No dogfood run has used them yet.
+- **The herdr cockpit (HC1–HC15).** The attended wait, the cockpit (`norn status --watch`), the Herdr plugin (`plugins/herdr`), pane labels and the `herdr` notifier are tested against fixtures and a fake runner only. No dogfood run has used them yet.
 - **The auto permission mode default** (`--permission-mode auto` for `agents.claude`). Every live run used configs that replace it.
 - **codex, opencode, gemini and glab adapters.** They are tested only against recorded fixtures. Only claude, git, gh, herdr and headless ran live.
 
@@ -91,7 +69,7 @@ The rules each fix maps to are in its spec.
 - **No fork contributions.** norn works only for collaborators with write access to the repo: it needs to push story branches and claim refs to the remote. A PR from a fork cannot run through a workflow; in norn's own repo it is read as input to an issue, never merged as is.
 - **GitHub/GitLab-style flows only.** norn assumes PRs, branches and git refs. Trunk-based work without PRs, many teams sharing one `.agents/`, and non-git VCS are out of scope.
 - **Merge, never rebase.** Story branches gain merge commits from the base. Teams that require linear history must squash on merge; the base then stays linear.
-- **The cockpit takes keys, not the mouse.** `norn status --watch` is full screen with raw keys; there is no mouse support and no web panel yet (SPEC-cockpit §8 says how one would plug in).
+- **The cockpit takes keys, not the mouse.** `norn status --watch` is full screen with raw keys; there is no mouse support and no web panel yet (it would read `@norn/view` and act through the CLI verbs, X1).
 - **Coarse grain.** norn works per story and slice on a heartbeat. It is the wrong tool for quick interactive edits, and the overhead is not worth it for tiny changes.
 - **Local environment must stay healthy.**
   - It needs Bun, git ≥ 2.38 (for `merge-tree --write-tree`), git worktrees (disk plus per-worktree setup), an authenticated `gh`, and herdr for attended panes. The cockpit needs Herdr ≥ 0.9, and its plugin is installed by hand (`herdr plugin install PruszynskiJakub/norn-next/plugins/herdr`, HC11); `norn init` does not install it.

@@ -170,7 +170,7 @@ The story worktree is on the story branch and holds `.agents/specs/<id>-<slug>/`
 | Section | Source |
 |---|---|
 | Where you are (story, slice, step, attempt, effective mode, attended) | `state.json` |
-| Your job (skill, optional instructions) | pinned workflow step |
+| Your work (skill, optional instructions) | pinned workflow step |
 | Inputs (spec, slice file, diff range) | step `inputs` + frontmatter |
 | Rework (when entered from a failure) | latest failing `check` receipt + log, or findings from the `review`/`qa` receipt that sent it back |
 | Context (handoff, answer to previous ask) | `handoff.md` + receipts |
@@ -238,7 +238,7 @@ Three sources of outcomes:
 - NT3 Every story-level gate lists the story's open notes in its inbox item. Approving it records them in the `approve` receipt (`acknowledged_notes`), and they leave the inbox; rejecting leaves them open.
 - NT4 The `qa` skill uses a note, not `person`, when a criterion passed as written but a person may read it differently.
 - NT5 The Notes header says when its notes clear: `cleared by <story> <gate> approval`, naming the nearest story-level gate ahead of the story unit's step (its own when it waits at one), else `cleared when the story is done`. A slice gate's item lists that slice's open notes too; approving a slice gate does not acknowledge them.
-- NT6 `norn status` shows Notes as their header line only, with `norn status --notes` beneath; `--notes` lists them. The JSON always carries every note. The cockpit shows them as an accordion (HC16).
+- NT6 `norn status` shows Notes as their header line only, with `norn status --notes` beneath; `--notes` lists them. The JSON always carries every note. The cockpit shows them in its preview (CP3).
 
 ## 11. Workflows
 
@@ -348,7 +348,7 @@ The chains a person runs: a feature `triage → refinement → story`; a small c
 - BS5.2 **Nothing with conflict markers is published** (dogfood D5). Before any push of a story or slice branch, norn looks at the files changed by the commits not yet on any `<remote>` ref (merge commits against their first parent). If one still holds both an opening `<<<<<<< ` and a closing `>>>>>>> ` marker line (with the label; a lone `=======` is a setext heading) at the head being pushed, the push is held: a failed `push` effect (`ok: false`, Unblock item) naming each file and the newest outgoing commit that changed it. A follow-up commit that removes the markers releases it; norn never rewrites the branch.
 - BS10.1 (dogfood D1): the `stale:*` item appears only where `norn story update-branch` is the next thing to do — the story unit parked at a gate without a `stale` route, or stuck in a step other than an `update` step and the step its `conflict` routes to (resolve). Never for an ask (a permission prompt parks the unit in any step), nor while the story is in update or resolve.
 - BS10.2 (dogfood D6): the F35 head-changed item compares the ready approval's head only with a PR fetched this tick or one seen after the approval; a PR remembered from before the approval is not compared.
-- BS11 **Merged means merged into the base.** GR6 cleanup fires only when the PR's base branch equals the story's base branch (BS0). A PR merged into any other branch parks the story with reason `remote: PR merged into <branch>, not <base>` (GR7) — the lesson from old norn 0.1.1, where a merge into the wrong base skipped story review. Retargeting a PR is reported as a Check item.
+- BS11 **Merged means merged into the base.** GR6 cleanup fires only when the PR's base branch equals the story's base branch (BS0). A PR merged into any other branch parks the story with reason `remote: PR merged into <branch>, not <base>` (GR7) — the lesson from the earlier norn, where a merge into the wrong base skipped story review. Retargeting a PR is reported as a Check item.
 
 ## 13. Claims and team handoff
 
@@ -458,7 +458,7 @@ A noun tree modelled on gh: nouns are things a person can see, verbs are shared 
 
 A removed command name (`drop`, `inbox`, `orient`, …) is an unknown command (usage error, exit 2).
 
-- O1 `norn status` (and the cockpit, `norn status --watch`) groups by action: **Your turn** (attended steps), **Answer**, **Approve**, **Unblock**, **Check**, **Unclaimed**, **Running**, **Notes** (NT2), **Recently done**; each group title carries a few words on what it holds, and each item shows question/reason, age and the exact command to resolve it. A person's start of an agent step (Your turn) shows `norn story start <unit>` when the runner can open a terminal (MO5), with the start command to type by hand in the detail; otherwise the start command itself. A story taken in on this checkout that no tick has started yet is listed too: under Running while the heartbeat is up, else under Your turn with `norn watch`. `norn status --watch` acts on the items through CLI verbs (HC4–HC8).
+- O1 `norn status` (and the cockpit, `norn status --watch`) groups by action: **Your turn** (attended steps), **Answer**, **Approve**, **Unblock**, **Check**, **Unclaimed**, **Running**, **Notes** (NT2), **Recently done**; each group title carries a few words on what it holds, and each item shows question/reason, age and the exact command to resolve it. A person's start of an agent step (Your turn) shows `norn story start <unit>` when the runner can open a terminal (MO5), with the start command to type by hand in the detail; otherwise the start command itself. A story taken in on this checkout that no tick has started yet is listed too: under Running while the heartbeat is up, else under Your turn with `norn watch`. `norn status --watch` acts on the items through CLI verbs (CP6–CP8).
 - O2 `story answer`, `story approve`, `story reject`, `run rerun`, `run cancel` and `story edit` (mode, workflow) write receipts; the next tick applies them and delivers answers into the same session or a fresh one from the handoff. Typing directly into an agent pane is also allowed.
 - O3 Notifiers are optional plugins (OS default; ntfy, webhook, herdr) and fire once per new inbox item, receipt-first.
 - O4 Trace: one JSONL record per tick with facts snapshot, rule fired, action, result, briefing and transcript pointers. The record keeps its decisions inline and stores the facts snapshot as a skeleton marked `"$chunked": 1`: each story's facts, the machine facts, the remote issues, the replay config and each workflow source are chunks addressed by the sha256 of their JSON, and each run's hook facts are blocks of 64 cut by position, written once. Chunks live once in the day's `<day>.chunks.jsonl` beside the day file, appended and fsynced before the tick line that names them, so no tick line names an unwritten chunk and one day's two files replay every tick of that day. A record without the marker is a full-facts snapshot and is read as before.
@@ -567,7 +567,7 @@ A removed command name (`drop`, `inbox`, `orient`, …) is an unknown command (u
 #### The terminal cockpit
 
 - CP6 `norn status --watch [--interval 5s]` draws the model full screen: the header, the tab strip, the shown tab's rows on the left (about 60% of the width), the selected row's preview on the right (about 40%; below the rows when the pane is narrower than 100 columns), and a footer. The footer lists the selected row's actions by key, then `1 2 3 tabs · / filter · ? keys · q quit`.
-  - The header shows the running norn's version (`norn 0.15.0`, `NORN_VERSION`: a long-running cockpit keeps its binary's version after a new release is installed), the repo and how many rows need you across the repo. While the filter is in use it shows first in the header; there is no filter line.
+  - The header shows the running norn's version (`norn <version>`, `NORN_VERSION`: a long-running cockpit keeps its binary's version after a new release is installed), the repo and how many rows need you across the repo. While the filter is in use it shows first in the header; there is no filter line.
   - The tabs: `1 Now` (needs you, then in flight; the default), `2 Backlog` (not started, then the issues not taken in), `3 Done` (closed). The backlog's issues are read from the remote when the cockpit starts, at most every 5 minutes after, on `r` and after a take; a failed read keeps the last ones and says so in the footer. The strip carries counts: `1 Now 23 need you · 8 in flight │ 2 Backlog 2 │ 3 Done 35`.
   - Each section header carries its count (`NEEDS YOU 23`, `IN FLIGHT 8`, `BACKLOG 2`, `ISSUES 4`, `DONE 35`).
   - A needs-you row shows its mark, unit, step, the story's title and its age; the item's instruction stays in the preview. A story row shows its unit, title and standing (`<status> <step>`; a closed story reads `done`), then its slices and PR only when it has them. An issue row shows its key, title, labels and assignees (`unassigned` when none).
@@ -638,9 +638,9 @@ A removed command name (`drop`, `inbox`, `orient`, …) is an unknown command (u
 
 ## 16. Skills
 
-Single-job skills ported from ai-engine (norn v0.11.0): its skill files are the base, edited only where norn's contracts differ (files in the repo instead of issues and comments; no push, no remote writes; verdicts and findings as structured data; the person's say at gates when no person works with the agent). One skill = one job = one kind of step; reference skills hold the craft several step skills share. Outcomes are declared only in workflows; the "Typical outcomes" column is a suggestion for template authors, not a contract. Every name but `norn` carries the `norn-` prefix so the skills stay apart from a project's own.
+Single-purpose skills ported from ai-engine (the earlier norn): its skill files are the base, edited only where norn's contracts differ (files in the repo instead of issues and comments; no push, no remote writes; verdicts and findings as structured data; the person's say at gates when no person works with the agent). One skill = one kind of step; reference skills hold the craft several step skills share. Outcomes are declared only in workflows; the "Typical outcomes" column is a suggestion for template authors, not a contract. Every name but `norn` carries the `norn-` prefix so the skills stay apart from a project's own.
 
-| Skill | Job | Typical outcomes |
+| Skill | Does | Typical outcomes |
 |---|---|---|
 | `norn` | One-step protocol: brief, work in scope, keep handoff, report once, end turn, follow refusals. Only skill aware of norn. | — |
 | `norn-interview` | One question per turn until shared understanding; only talks. | done |
