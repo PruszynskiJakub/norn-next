@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import { mkdirSync, writeFileSync, appendFileSync } from "node:fs";
 import { copyFileSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
-import type { Facts, LoadedWorkflow } from "@norn/core";
+import { type Facts, hookWindowMs, type LoadedWorkflow } from "@norn/core";
 import { type HookFact, type HookTrace, type ResolvedConfig, type TickTrace, type TraceEvent, ulid } from "@norn/schema";
 import {
   appendHookTrace,
@@ -76,6 +76,16 @@ describe("workflows (W1)", () => {
     mkdirSync(workflowsDir(repo), { recursive: true });
     writeFileSync(join(workflowsDir(repo), "slice.yaml"), `mode: manual\ndefaults: { deadline: 30m, nudges: 1, retries: 0, stalled: 40m }\n${WORKFLOW_YAML}`);
     expect(loadWorkflow(repo, "slice")).toMatchObject({ ok: true, value: { workflow: { mode: "manual", defaults: { deadline: "30m", nudges: 1, retries: 0, stalled: "40m" } } } });
+  });
+
+  test("B28 (S4): the hook read window is the longest stalled across the loaded workflows", () => {
+    const repo = tmp();
+    mkdirSync(workflowsDir(repo), { recursive: true });
+    const window = () => hookWindowMs(Object.values(loadWorkflows(repo).workflows).map((w) => w.workflow));
+    writeFileSync(join(workflowsDir(repo), "slice.yaml"), WORKFLOW_YAML);
+    expect(window()).toBe(15 * 60_000);
+    writeFileSync(join(workflowsDir(repo), "long.yaml"), `defaults: { stalled: 40m }\n${WORKFLOW_YAML.replace(/^name: slice$/m, "name: long")}`);
+    expect(window()).toBe(40 * 60_000);
   });
 
   test("B11, D17: mode and stalled on a step are refused at load, the step named", () => {

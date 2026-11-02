@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ConfigEntry } from "@norn/schema";
-import { workflowsDir } from "@norn/store";
+import { readTrace, workflowsDir } from "@norn/store";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
 
 setDefaultTimeout(60_000);
@@ -130,6 +130,34 @@ describe("the agent command a launch runs (B14, B15)", () => {
     const argv = argvOf("gh-2 implement");
     expect(argv.join(" ")).toContain("claude");
     expect(argv).not.toContain("--permission-mode");
+  });
+});
+
+describe("a notification that fails to send (B47)", () => {
+  let h: Harness;
+  beforeAll(async () => {
+    h = await createHarness();
+    expect((await h.norn("init")).exit).toBe(0);
+    h.notifier.notify = async () => {
+      throw new Error("notify ntfy: fetch failed; fix it in ~/.norn/config.yaml");
+    };
+    h.git(["add", "-A"]);
+    h.git(["commit", "-q", "-m", "norn"]);
+    h.git(["push", "-q", "origin", "main"]);
+    h.remote.issues = [issue(1, "One")];
+    for (let i = 0; i < 3; i++) {
+      h.clock.advance(10_000);
+      await h.tick();
+    }
+    // past the attended wait: the ready step is notified
+    h.clock.advance(3 * 60_000);
+    await h.tick();
+  });
+  afterAll(() => h.cleanup());
+
+  test("B47: the tick goes on and the trace keeps the error naming the file", async () => {
+    const rejects = readTrace(h.root, { types: ["reject"] }).events as Array<{ source: string; reason: string }>;
+    expect(rejects.filter((e) => e.source === "notify").map((e) => e.reason)).toContain("notify ntfy: fetch failed; fix it in ~/.norn/config.yaml");
   });
 });
 

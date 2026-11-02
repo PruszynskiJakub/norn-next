@@ -2,7 +2,7 @@
  * Machine-wide leases in `~/.norn/leases/` (K1, K3). Worktree env files (K4) live in worktree.ts.
  *
  * Every lease is a numbered file `<kind>-<n>.json` created exclusively, so caps are
- * enforced atomically: agent/check leases use n ∈ 1..max_agents / 1..max_checks; slot
+ * enforced atomically: agent/check leases use n ∈ 1..max_agents (checks follow max_agents, gh-64); slot
  * leases use n = slot number ∈ slots.min..slots.max. A file whose holder is dead is
  * reclaimed (moved aside only if unchanged since judged dead).
  *

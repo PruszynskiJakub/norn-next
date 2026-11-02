@@ -11,7 +11,13 @@ function recording() {
   const notifier = (_: AdapterContext, c: NotifierConfig): NotifierPort => {
     if (c.adapter === "ntfy" && c.options?.url === "https://broken") throw new Error("bad ntfy url");
     built.notifiers.push(c);
-    return { name: c.adapter, notify: async () => {} };
+    const unreachable = c.options?.url === "https://unreachable";
+    return {
+      name: c.adapter,
+      notify: async () => {
+        if (unreachable) throw new Error("fetch failed");
+      },
+    };
   };
   const registry = {
     git: () => ({}),
@@ -55,5 +61,13 @@ describe("buildPorts (S3)", () => {
     const err = await buildPorts(registry, actx(config), config, {}, (k) => (k === "notify.ntfy" ? "/home/me/.norn/config.yaml" : null)).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(CliFailure);
     expect((err as CliFailure).body).toMatchObject({ error: "notify ntfy: bad ntfy url", do_instead: "fix it in /home/me/.norn/config.yaml", code: "config_invalid" });
+  });
+
+  test("B47 (D15): an unreachable ntfy URL fails at send time naming the file it came from", async () => {
+    const { registry } = recording();
+    const config = { ...DEFAULT_CONFIG, notify: { os: false, ntfy: "https://unreachable" } };
+    const ports = await buildPorts(registry, actx(config), config, {}, (k) => (k === "notify.ntfy" ? "/home/me/.norn/config.yaml" : null));
+    const err = await ports.notifiers[0]?.notify({} as never).catch((e: unknown) => e);
+    expect((err as Error).message).toBe("notify ntfy: fetch failed; fix it in /home/me/.norn/config.yaml");
   });
 });

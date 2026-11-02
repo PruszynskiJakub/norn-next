@@ -235,8 +235,9 @@ export class ActEnv {
     for (const n of this.obs.ports.notifiers) {
       try {
         await n.notify(item);
-      } catch {
-        /* notifiers are best-effort; the inbox is the truth */
+      } catch (e) {
+        // notifiers are best-effort, the inbox is the truth; the trace keeps why, naming the file (B47)
+        this.traceReject(item.slice ?? (item.story || "repo"), "notify", (e as Error).message || `notify ${n.name} failed`, { item: item.id });
       }
     }
   }

@@ -33,6 +33,20 @@ function adapterError(e: unknown, what: string, file: string | null): never {
   throw failure(message, file ? `fix it in ${file}` : "check the setting with `norn config`", "config_invalid");
 }
 
+/** B47 (D15): a notifier whose send fails (an unreachable URL) says which file set it. */
+function namingFile(n: NotifierPort, file: string | null): NotifierPort {
+  return {
+    name: n.name,
+    async notify(item) {
+      try {
+        await n.notify(item);
+      } catch (e) {
+        throw new Error(`notify ${n.name}: ${(e as Error).message}${file ? `; fix it in ${file}` : ""}`);
+      }
+    },
+  };
+}
+
 /**
  * Build every port (X2: built-in adapters only). The runner is the detected one (B29); notifiers
  * come from `notify` (D9: `os` unless false, `ntfy`, `webhook`) plus Herdr's inside Herdr (B20).
@@ -67,11 +81,13 @@ export async function buildPorts(registry: AdapterRegistry, actx: AdapterContext
     for (const n of wanted) {
       const f = registry.notifiers[n.adapter];
       if (!f) continue;
+      let built: NotifierPort;
       try {
-        notifiers.push(f(actx, { adapter: n.adapter, ...(n.options ? { options: n.options } : {}) }));
+        built = f(actx, { adapter: n.adapter, ...(n.options ? { options: n.options } : {}) });
       } catch (e) {
         adapterError(e, `notify ${n.adapter}`, sourceOf(n.key));
       }
+      notifiers.push(namingFile(built, n.adapter === "herdr" ? null : sourceOf(n.key)));
     }
   }
   let remote = overrides.remote;
