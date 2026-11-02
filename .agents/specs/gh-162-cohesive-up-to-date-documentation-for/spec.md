@@ -163,3 +163,93 @@ Behaviour does not change.
 ## Open questions
 
 ## Plan
+
+Built in one branch (the `quick` workflow, no slices). Behaviour does not change, so the tests are all repo tests over the docs and one generator; the rest is written content, checked by review and QA.
+
+### Seams
+
+- **S1 The docs lint, through pure matchers over a line or a file's text, run over the doc set.** A new repo test module beside the existing glossary and removed-command lints, in the unit tier (reads files, starts no process). Each check is a pure function (text in, hits out) tested on strings first, then run over the real doc set and expected to return no hits, each hit naming file, line and what to fix. Observes B7, B23, B24, B27, B31, B34–B38.
+  Prior art: the glossary lint (`glossaryHits`: matcher cases, then a sweep over the files) and the removed-command lint (`oldCommandHits`, with an allowlist of file + line + why) in the repo tests.
+- **S2 The Reference generator, through one pure render function: the cli's command registry and the built-in config in, the generated block's markdown out.** A regenerate script writes it into Reference between markers, and a unit test compares the block in the file with a fresh render. Observes B8–B13.
+  Prior art: the published JSON schemas (`schema:emit` and the "json/… is up to date" test that compares the file with `renderSchema`).
+- **S3 The written docs, through a person or agent reading them and running the commands they show.** Nothing automated can observe "the README gets me to a first story". These items are checked in review against the spec and in QA by following the docs in a throwaway repo with the released `norn`. Observes B1–B6, B14–B22, B25, B26, B28–B30, B32, B33, B39, B40.
+  Prior art: none (no doc has been QA'd this way before).
+
+### Coverage
+| Behaviour | Seam | Test kind | Notes |
+|---|---|---|---|
+| B1 | S3 | QA (agent) | follow the README from nothing to a first story in a throwaway repo |
+| B2 | S3 | review | the README map names each doc once; its links are checked by B36 |
+| B3 | S3 | review | |
+| B4 | S3 | review | check for topics told twice across the doc set |
+| B5 | S3 | review | |
+| B6 | S3 | review | the rules file's §5 is a link plus banned synonyms and §5.1 identifiers |
+| B7 | S1 | unit | the glossary lint's file list takes every doc under the docs folder and the rules file |
+| B8 | S2 | unit | every command and verb of the registry appears in the render |
+| B9 | S2 | unit | every key of the built-in config appears with type and default |
+| B10 | S2 | unit | the regenerate command writes the block; the render is tested, not the script |
+| B11 | S2 | unit | the stale test fails naming the regenerate command |
+| B12 | S2 | unit | the render replaces only the text between markers (tested on a string with prose around them) |
+| B13 | S2 | unit | the shipped workflows are read from the cli's assets; exit codes from the schema's ExitCode |
+| B14 | S3 | review | |
+| B15 | S3 | review | the file's absence is also covered by B36 (the README link to it would be dead) |
+| B16 | S3 | review | the "as of" line is also covered by B38 |
+| B17 | S3 | QA (agent) | each listed gap is checked against the current code |
+| B18 | S3 | review | |
+| B19 | S3 | review | the old location's absence is covered by B31 |
+| B20 | S3 | review | |
+| B21 | S3 | review | |
+| B22 | S3 | review | |
+| B23 | S1 | unit | no PRD or `SPEC-*` file exists; the rules file does |
+| B24 | S1 | unit | every rule id the old PRD and SPEC files defined (a list pinned in the test, taken once from them before they are deleted) is defined in the rules file |
+| B25 | S3 | review | |
+| B26 | S3 | review | |
+| B27 | S1 | unit | each rule id is defined exactly once in the rules file |
+| B28 | S3 | review | |
+| B29 | S3 | review | |
+| B30 | S3 | review | |
+| B31 | S1 | unit | no tracked file names the PRD file or a `SPEC-*` file, except CHANGELOG and story specs |
+| B32 | S3 | review | the folders' absence is visible in the diff |
+| B33 | S3 | review | the file's absence; B34 then keeps it away |
+| B34 | S1 | unit | |
+| B35 | S1 | unit | |
+| B36 | S1 | unit | |
+| B37 | S1 | unit | matcher case: an https link is skipped |
+| B38 | S1 | unit | |
+| B39 | S3 | QA (agent) | each output example rerun with the released `norn` and compared, names and ids aside |
+| B40 | S3 | QA (agent) | B35 covers commands and flags automatically; output examples by B39 |
+
+### Prefactoring
+
+1. Move the doc-text helpers of the repo tests (code-span and URL stripping, the walk over doc files) into a small shared test-support module, and make the lists of doc files come from one place. This changes no test outcome. It lets the new docs lint (S1) and the existing glossary and removed-command lints share one doc set, so adding a doc under the docs folder brings it under every check at once (B7, B35–B38).
+
+### Implementation decisions
+
+- D1 **The rules file keeps the PRD's section numbers.** Code cites sections (§9.3, §10, §7…) about 120 times. Kept sections keep their number; dropped ones (§17–§19, §21, §22) leave a gap rather than renumbering. The handful of citations to a dropped section (§17, §19, §20, §21, about a dozen) are rewritten to cite the rule or the doc that now holds the point. The alternative, renumbering, would rewrite every § citation for no reader's benefit.
+- D2 **Where the former SPEC rules land.** R1–R10 go to §8 (heartbeat), §9 (agent integration), §12 (remote and git) and §13 (claims), each sub-rule (R5.1…) in the section it governs. HC, CP, OR and SG go to a new §15.1 "Cockpit and Herdr". BS, QV and NT stay in §12.1 and §10.1, with the base-sync rules the PRD did not copy (15 in the spec vs 11 in the PRD) added there. Every "(SPEC-x …)" pointer becomes the plain id.
+- D3 **Reference generation is a root script, `bun run docs:emit`, next to `schema:emit`.** The render takes the command registry (every command and noun verb: usage, summary with spec ids stripped as `norn help` does, and the option help lines) in `norn help --all` order, the hidden ones under a "run by norn, not by hand" heading. It takes the config keys from the built-in config's explain output (key, type, default), and the shipped workflow names from the cli's assets. Hand-written prose sits outside two marker comments that say the block is generated and name the command. The stale test lives in the unit tier next to the other repo tests. Config keys get no generated descriptions (the config schema has none); the prose sections explain the keys a newcomer touches.
+- D4 **Command-mention check (B35).** It scans inline code spans and fenced code blocks of the README, every doc under the docs folder except Reference's generated block, CONTRIBUTING and the Herdr plugin README. A mention is `norn` followed by words: the longest prefix that names a command or a noun verb must exist, and every `--flag` after it on that span or line must be one of that command's options, `--json` or `--help`. Placeholders (`<unit>`, `…`) are ignored. Prose outside code is not scanned, so "a norn workflow" is never a hit.
+- D5 **Link check (B36, B37).** It covers every markdown file in the repo, except dependencies, story specs and their runs (their links point at code as it was) and CHANGELOG (historic). For each relative link it resolves the path from the linking file and requires that it exists. When the link has an `#anchor` and points at a markdown file, the anchor must match a heading slug of that file, computed the way GitHub does (lowercase, punctuation dropped, spaces to hyphens, repeated headings numbered). Links with a scheme (`https:`, `mailto:`) are skipped.
+- D6 **Version check (B38).** It covers the README, CONTRIBUTING, AGENTS, every doc under the docs folder, the rules file and the Herdr plugin README. A hit is a three-part version (`0.17.0`, `v1.2.3`) or the words "as of release". It allows the README's release badge line and nothing else, and CHANGELOG is not scanned. Two-part tool requirements (git ≥ 2.38) are not hits.
+- D7 **Tracked handoff check (B34).** A walk over the repo, excluding dependencies, fails on any file named handoff.md that is not inside a `runs/` folder of a story spec. It walks the file system, since the unit tier may not start git. An untracked stray file would fail locally too, which is what we want.
+- D8 **Rule id pins (B24, B27).** A rule is defined by a list line starting with its id (`- S5 …`, `- R5.1 …`). The test pins, as a literal list, every id defined by the PRD and the four SPEC files at the start of the story. The rules file must define each one exactly once, and may define new ones only through a later story. The list is generated once while the old files still exist and committed in the test.
+- D9 **Where the docs live.** The README stays at the root. Concepts, Reference, Recipes and Limitations go in the docs folder (with the logo asset that is already there). The rules file sits in `.agents/` where the PRD was. Limitations moves out of `.agents/`.
+- D10 **Pointer updates (B31).** AGENTS.md's opening and Decisions, this repo's workflow instructions (refinement, quick, triage, reproduce), the `issue` skill (its "PRD" section of the issue body becomes "Rules") and the `release` skill, source comments, and the repo tests that read the PRD (the §15 command-table test reads the rules file). Shipped assets name no PRD and stay untouched.
+- D11 **Output examples (B39) are captured from the released `norn`** in a throwaway repo under the temp dir, never a dev build and never in the unit worktree. Ids and paths are kept as they came out.
+- D12 **Work order in the branch.** Prefactor, then the S1 checks with their matcher tests (most go red on today's docs, which shows they bite). Then the rules file and the deletions, then Reference and its generator, then README, Concepts, Recipes, Limitations, CONTRIBUTING and AGENTS. The branch ends green with every S1 sweep at zero hits.
+
+### Testing decisions
+
+- A good test here drives a matcher or the render with a small string and checks the hits or markdown it returns, then sweeps the real files expecting none. No test reads git, spawns `norn` or touches the network: everything is the unit tier.
+- Nothing is mocked. The only system boundary is the file system, which the sweeps read for real; the matchers take strings.
+- Each sweep's failure message names the file, the line and the fix (the regenerate command, the missing anchor, the unknown flag), as the existing lints do.
+- An allowlist entry, where one is needed, carries file, line text and why, like the removed-command lint's.
+- Content items (S3) are verified in review against the spec, and in QA by an agent following the README and each recipe with the released `norn`, rerunning every output example.
+
+### Risks
+
+- **The SPEC fold loses or garbles a rule.** This is the biggest risk: about 70 rules move, and amended ones are rewritten. D8's pinned id list catches a lost or duplicated id, but not a rule whose meaning changed. Review compares each moved rule with its source.
+- **Command-mention false positives.** Doc code blocks include shell lines that are not norn commands, `$NORN` variables and placeholders. The matcher's string cases go first, and the allowlist stays small and justified.
+- **GitHub's anchor slugs** differ from a naive slug for headings with backticks, punctuation or repeats. The matcher's string cases pin the cases the docs use.
+- **Size of the diff.** A docs rewrite of this size is hard to review. The work order (D12) and keeping each doc's move and rewrite in its own commit help the reviewer.
+- **Rules file name in the running unit.** This unit's pinned workflow still says "amend the PRD". Only later rounds read the new instruction, which is expected (S7).
