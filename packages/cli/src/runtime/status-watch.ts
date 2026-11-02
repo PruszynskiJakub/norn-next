@@ -1,5 +1,5 @@
 /**
- * `norn status --watch [--interval 5s] [--json] [--pane]` (B11, B12, SPEC-cockpit CP5–CP13): the cockpit
+ * `norn status --watch [--interval 5s] [--json] [--pane]` (B11, B12, CP5–CP13): the cockpit
  * model (@norn/view cockpitModel) drawn full screen with raw keys — what needs you, then every
  * story, the selected row's preview, its actions by key. It writes only through CLI verbs run by the
  * dispatcher (X1, HC7) and stays open until q or Esc. Frames go to stderr, one JSON summary to

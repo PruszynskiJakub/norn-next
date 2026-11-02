@@ -1,6 +1,5 @@
 /**
- * Base sync through the CLI runtime with real git (BS0–BS11, SPEC-base-sync-and-qa §7 cases 1, 2, 4,
- * 6, 7b): a sibling merge into main is merged into the story branch by `git: update` with a
+ * Base sync through the CLI runtime with real git (BS0–BS11): a sibling merge into main is merged into the story branch by `git: update` with a
  * `Norn-Tick` merge commit; a conflicting one goes to `resolve` and back; a story waiting at `ready`
  * goes back through update when the base moves into a conflict; `norn update` re-enters a done story;
  * a PR merged into another branch parks the story; `base_branch: develop` is used throughout.

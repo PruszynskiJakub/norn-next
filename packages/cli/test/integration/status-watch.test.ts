@@ -1,5 +1,5 @@
 /**
- * `norn status --watch` (B11, SPEC-cockpit CP5–CP13): raw keys over the cockpit model, every action a CLI
+ * `norn status --watch` (B11, CP5–CP13): raw keys over the cockpit model, every action a CLI
  * verb (X1), stays open until q; `--json` prints the model, `--pane` splits a Herdr pane for it (B12),
  * labels agent panes inside Herdr (HC12); outside a repository it shows the last one (CP13).
  * `norn run attach [<unit>] [--next]` focuses a unit's agent pane (B46, B47, HC10). `cockpit` is gone (B5).
