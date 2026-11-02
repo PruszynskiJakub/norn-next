@@ -26,7 +26,7 @@ const SEGMENT = {
  * here lands in "Other" (for a person). A `hidden` tier only with `--all` (B3): what norn, Herdr or the
  * hooks run, never a person by hand. `help` itself is the footer, not a row.
  */
-const HELP_GROUPS: ReadonlyArray<{ title: string; for: CommandFor; commands: readonly string[]; hidden?: boolean }> = [
+export const HELP_GROUPS: ReadonlyArray<{ title: string; for: CommandFor; commands: readonly string[]; hidden?: boolean }> = [
   { title: "Core", for: "person", commands: ["status", "story", "run"] },
   { title: "Setup", for: "person", commands: ["init", "migrate", "doctor", "config", "uninstall"] },
   { title: "Background", for: "person", commands: ["watch", "sync", "tidy"] },
@@ -57,7 +57,7 @@ const AGENT_NOTE = [
 ];
 
 /** Spec ids such as `(A1, SK1, W1)` or `(§9.3)` mean nothing to a newcomer; the JSON keeps them. */
-const plainSummary = (summary: string): string =>
+export const plainSummary = (summary: string): string =>
   summary.replace(/\s*\((?:(?:§[\d.]+|[A-Z]{1,3}\d+(?:\.\d+)?[a-z]?)(?:[–-][A-Z]{0,3}\d+)?(?:,\s*)?)+\)/g, "");
 
 /** A verb is for whoever its noun is for. */
