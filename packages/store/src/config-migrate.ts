@@ -11,7 +11,7 @@ import { AGENT_NAMES, isAgentName, SPEC_FILE } from "@norn/schema";
 import { type Document, isMap, isScalar, isSeq, type Pair, parseDocument, type YAMLMap } from "yaml";
 import { writeConfigSchemas, WORKFLOW_EXT } from "./config.ts";
 import { atomicWrite, isErrno, readText } from "./fsx.ts";
-import { LOCAL_CONFIG_SCHEMA_FILE, REPO_CONFIG_SCHEMA_FILE, repoConfigPath, slicesDir, specsDir, userConfigPath, workflowsDir } from "./paths.ts";
+import { LOCAL_CONFIG_SCHEMA_FILE, REPO_CONFIG_FILE, REPO_CONFIG_SCHEMA_FILE, repoConfigPath, slicesDir, specsDir, userConfigPath, workflowsDir } from "./paths.ts";
 
 export interface ConfigMigrationRemoved {
   file: "user" | "repo";
@@ -107,7 +107,7 @@ function migrateUser(r: FileRun): void {
   }
   agentsEntries(r);
   if (r.doc.has("remote")) drop(r, "remote", `team settings: \`provider\` goes in the team file; the label, git remote and sync are fixed or derived`);
-  for (const k of ["default_workflow", "default_slice_workflow", "base_branch"]) if (r.doc.has(k)) drop(r, k, "a team setting: set it in .agents/norn.config.yaml if you want it");
+  for (const k of ["default_workflow", "default_slice_workflow", "base_branch"]) if (r.doc.has(k)) drop(r, k, `a team setting: set it in ${REPO_CONFIG_FILE} if you want it`);
   if (r.doc.has("limits")) drop(r, "limits", "set limits in a workflow's `defaults:`");
   for (const k of ["runner", "max_checks", "slots", "watch_interval", "claim"]) if (r.doc.has(k)) drop(r, k, REMOVED_NOTE[k] as string);
   const max = js(r.doc, ["max_agents"]);
