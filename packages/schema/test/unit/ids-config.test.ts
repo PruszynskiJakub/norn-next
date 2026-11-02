@@ -15,7 +15,6 @@ import {
   parseSpecDirName,
   parseStoryKey,
   receiptFileName,
-  resolveConfig,
   sliceBranch,
   sliceKey,
   slugify,
@@ -100,9 +99,8 @@ describe("keys and names", () => {
 });
 
 describe("config", () => {
-  test("the built-in values are a valid resolved config, and resolving no files gives them", () => {
+  test("the built-in values are a valid resolved config", () => {
     expect(validate("resolved-config", DEFAULT_CONFIG).ok).toBe(true);
-    expect(resolveConfig().config).toEqual(DEFAULT_CONFIG);
   });
 });
 

@@ -93,6 +93,46 @@ describe("mode, agent and workflow over ticks (B10, B13, B24, B25, B33)", () => 
   });
 });
 
+describe("the agent command a launch runs (B14, B15)", () => {
+  let h: Harness;
+  const argvOf = (title: string) => h.runner.launches.find((l) => l.title === title)?.argv ?? [];
+  beforeAll(async () => {
+    h = await createHarness();
+    expect((await h.norn("init")).exit).toBe(0);
+    h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
+    h.config("workflow: solo\nmode: auto\nagents: { claude: { model: claude-opus-5-5 } }\n");
+    h.git(["add", "-A"]);
+    h.git(["commit", "-q", "-m", "norn"]);
+    h.git(["push", "-q", "origin", "main"]);
+    h.remote.issues = [issue(1, "One")];
+    for (let i = 0; i < 4; i++) {
+      h.clock.advance(10_000);
+      await h.tick();
+    }
+    // B15: an empty args list replaces the built-in one whole
+    h.config("workflow: solo\nmode: auto\nagents: { claude: { args: [] } }\n");
+    h.remote.issues = [issue(1, "One"), issue(2, "Two")];
+    h.clock.advance(6 * 60_000); // past the next sync
+    for (let i = 0; i < 4; i++) {
+      h.clock.advance(10_000);
+      await h.tick();
+    }
+  });
+  afterAll(() => h.cleanup());
+
+  test("B14: setting a model keeps the built-in --permission-mode auto, and the model is passed", () => {
+    const argv = argvOf("gh-1 implement").join(" ");
+    expect(argv).toContain("--permission-mode auto");
+    expect(argv).toContain("claude-opus-5-5");
+  });
+
+  test("B15: args: [] launches claude with no permission mode", () => {
+    const argv = argvOf("gh-2 implement");
+    expect(argv.join(" ")).toContain("claude");
+    expect(argv).not.toContain("--permission-mode");
+  });
+});
+
 describe("the tick interval and claim timing (B34, B35)", () => {
   let h: Harness;
   const get = async (key: string) => ((await h.norn("config", "get", key, "--json")).value as { entries: ConfigEntry[] }).entries;

@@ -8,6 +8,7 @@
 import { type Static, type TSchema, Type } from "@sinclair/typebox";
 import { Duration, Mode, NonEmpty, RemoteProvider } from "./common.ts";
 import { parseDuration } from "./ids.ts";
+import { check, type SchemaError } from "./check.ts";
 
 // ---------------------------------------------------------------- names and fixed values
 
@@ -273,12 +274,11 @@ function rightFile(key: string): string | null {
 }
 
 const isMap = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
-const isUrl = (v: unknown) => typeof v === "string" && /^https?:\/\/\S+$/.test(v);
-const NAME_RE = /^[a-z][a-z0-9_-]*$/;
 
 /**
  * B5–B8, B17, B19, B39, B53 (D2): the problems of one file's parsed YAML, in order moved, wrong
- * file, invalid. `null` / empty means the file sets nothing. Pure.
+ * file, invalid. `null` / empty means the file sets nothing. What the moved and wrong-file passes
+ * leave is checked against the file's own schema (the one an editor uses, B50). Pure.
  */
 export function checkConfigFile(file: ConfigFileKind, value: unknown): ConfigProblem[] {
   if (value === null || value === undefined) return [];
@@ -288,8 +288,8 @@ export function checkConfigFile(file: ConfigFileKind, value: unknown): ConfigPro
     add("config_invalid", "", "the file must be a map of keys");
     return out;
   }
+  const rest: Record<string, unknown> = {};
   for (const [key, v] of Object.entries(value)) {
-    if (key === "$schema") continue;
     if (key === "remote" && isMap(v)) {
       const children = Object.keys(v);
       for (const c of children.length ? children : [""]) {
@@ -302,84 +302,83 @@ export function checkConfigFile(file: ConfigFileKind, value: unknown): ConfigPro
       add("config_moved", key, `${MOVED[key]}${MIGRATE}`);
       continue;
     }
-    if (!FILE_KEYS[file].includes(key)) {
+    if (key !== "$schema" && !FILE_KEYS[file].includes(key)) {
       const right = rightFile(key);
       if (right) add("config_wrong_file", key, `\`${key}\` belongs in ${right}`);
       else add("config_invalid", key, `unknown key \`${key}\``);
       continue;
     }
-    checkValue(key, v, add);
+    rest[key] = key === "agents" ? withoutMovedAgentFields(v, add) : v;
+  }
+  const r = check(CONFIG_SCHEMAS[file], rest);
+  if (r.ok) return out;
+  const seen = new Set<string>();
+  for (const e of r.errors) {
+    const { key, message } = invalidProblem(e);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    add("config_invalid", key, message);
   }
   return out;
 }
 
-function checkValue(key: string, v: unknown, add: (code: ConfigProblemCode, key: string, message: string) => void): void {
-  const invalid = (k: string, m: string) => add("config_invalid", k, m);
-  switch (key) {
-    case "mode":
-      if (v !== "manual" && v !== "auto") invalid(key, "`mode` must be manual or auto");
-      return;
-    case "agent":
-      if (!isAgentName(v)) invalid(key, `\`agent\` must be one of ${AGENT_NAMES.join(", ")}`);
-      return;
-    case "agents":
-      if (v === null) return;
-      if (!isMap(v)) return invalid(key, "`agents` must be a map of agent names");
-      for (const [name, entry] of Object.entries(v)) {
-        if (!isAgentName(name)) {
-          invalid(`agents.${name}`, `unknown agent \`${name}\`: \`agents\` takes ${AGENT_NAMES.join(", ")}`);
-          continue;
-        }
-        if (entry === null) continue;
-        if (!isMap(entry)) {
-          invalid(`agents.${name}`, `\`agents.${name}\` must be a map with \`model\` and \`args\``);
-          continue;
-        }
-        for (const [field, fv] of Object.entries(entry)) {
-          const k = `agents.${name}.${field}`;
-          if (MOVED_AGENT_FIELD[field]) add("config_moved", k, `\`${k}\` ${MOVED_AGENT_FIELD[field]}${MIGRATE}`);
-          else if (field === "model") {
-            if (typeof fv !== "string" || !fv) invalid(k, `\`${k}\` must be a model name`);
-          } else if (field === "args") {
-            if (!Array.isArray(fv) || fv.some((a) => typeof a !== "string")) invalid(k, `\`${k}\` must be a list of strings`);
-          } else invalid(k, `unknown key \`${k}\``);
-        }
-      }
-      return;
-    case "max_agents":
-      if (!Number.isInteger(v) || (v as number) < 1 || (v as number) > 9) invalid(key, "`max_agents` must be 1–9 (there are 9 slots)");
-      return;
-    case "notify":
-      if (v === null) return;
-      if (!isMap(v)) return invalid(key, "`notify` must be a map with `os`, `ntfy`, `webhook`");
-      for (const [c, cv] of Object.entries(v)) {
-        const k = `notify.${c}`;
-        if (c === "os") {
-          if (typeof cv !== "boolean") invalid(k, "`notify.os` must be true or false");
-        } else if (c === "ntfy" || c === "webhook") {
-          if (!isUrl(cv)) invalid(k, `\`${k}\` must be an http or https URL`);
-        } else invalid(k, `unknown key \`${k}\``);
-      }
-      return;
-    case "trace":
-      if (v === null) return;
-      if (!isMap(v)) return invalid(key, "`trace` must be a map with `retain`");
-      for (const [c, cv] of Object.entries(v)) {
-        if (c !== "retain") invalid(`trace.${c}`, `unknown key \`trace.${c}\``);
-        else if (typeof cv !== "string" || !cv) invalid("trace.retain", "`trace.retain` must be a duration like 14d");
-      }
-      return;
-    case "provider":
-      if (v !== "gh" && v !== "glab") invalid(key, "`provider` must be gh or glab");
-      return;
-    case "base_branch":
-      if (v !== null && (typeof v !== "string" || !v)) invalid(key, "`base_branch` must be a branch name");
-      return;
-    case "workflow":
-    case "slice_workflow":
-      if (typeof v !== "string" || !NAME_RE.test(v)) invalid(key, `\`${key}\` must be a workflow name`);
-      return;
+/** B39: an agent entry's removed fields are moved problems; the rest goes on to the schema. */
+function withoutMovedAgentFields(v: unknown, add: (code: ConfigProblemCode, key: string, message: string) => void): unknown {
+  if (!isMap(v)) return v;
+  const agents: Record<string, unknown> = {};
+  for (const [name, entry] of Object.entries(v)) {
+    if (!isMap(entry)) {
+      agents[name] = entry;
+      continue;
+    }
+    const kept: Record<string, unknown> = {};
+    for (const [field, fv] of Object.entries(entry)) {
+      const k = `agents.${name}.${field}`;
+      if (MOVED_AGENT_FIELD[field]) add("config_moved", k, `\`${k}\` ${MOVED_AGENT_FIELD[field]}${MIGRATE}`);
+      else kept[field] = fv;
+    }
+    agents[name] = kept;
   }
+  return agents;
+}
+
+/** What a person reads for each key the schema rejects (`*` stands for an agent name). */
+const INVALID: Record<string, string> = {
+  mode: "`mode` must be manual or auto",
+  agent: `\`agent\` must be one of ${AGENT_NAMES.join(", ")}`,
+  agents: "`agents` must be a map of agent names",
+  "agents.*": "`agents.*` must be a map with `model` and `args`",
+  "agents.*.model": "`agents.*.model` must be a model name",
+  "agents.*.args": "`agents.*.args` must be a list of strings",
+  max_agents: "`max_agents` must be 1–9 (there are 9 slots)",
+  notify: "`notify` must be a map with `os`, `ntfy`, `webhook`",
+  "notify.os": "`notify.os` must be true or false",
+  "notify.ntfy": "`notify.ntfy` must be an http or https URL",
+  "notify.webhook": "`notify.webhook` must be an http or https URL",
+  trace: "`trace` must be a map with `retain`",
+  "trace.retain": "`trace.retain` must be a duration like 14d",
+  provider: "`provider` must be gh or glab",
+  base_branch: "`base_branch` must be a branch name",
+  workflow: "`workflow` must be a workflow name",
+  slice_workflow: "`slice_workflow` must be a workflow name",
+  $schema: "`$schema` must be a path or URL",
+};
+
+/** D2: one schema error as a config_invalid problem on the key it names, in a person's words. */
+function invalidProblem(e: SchemaError): { key: string; message: string } {
+  const segs = e.path.split("/").filter(Boolean);
+  const unknown = /^unknown property '(.+)'$/.exec(e.message)?.[1];
+  if (unknown !== undefined) {
+    const key = [...segs, unknown].join(".");
+    if (segs.length === 1 && segs[0] === "agents") return { key, message: `unknown agent \`${unknown}\`: \`agents\` takes ${AGENT_NAMES.join(", ")}` };
+    return { key, message: `unknown key \`${key}\`` };
+  }
+  // an element of a list is the list's problem (`agents.claude.args.0` → `agents.claude.args`)
+  while (segs.length && /^\d+$/.test(segs.at(-1) as string)) segs.pop();
+  const key = segs.join(".");
+  const pattern = segs[0] === "agents" && segs[1] ? ["agents", "*", ...segs.slice(2)].join(".") : key;
+  const message = INVALID[pattern]?.replace("*", segs[1] ?? "*") ?? `\`${key}\` ${e.message}`;
+  return { key, message };
 }
 
 // ---------------------------------------------------------------- resolving and explaining

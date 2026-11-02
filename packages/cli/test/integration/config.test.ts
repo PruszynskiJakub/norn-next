@@ -97,6 +97,11 @@ describe("three files and where keys belong (B1–B8)", () => {
       ["agents: { aider: {} }\n", "`~/.norn/config.yaml`: unknown agent `aider`: `agents` takes claude, codex, opencode, gemini"],
       ["max_agents: 12\n", "`~/.norn/config.yaml`: `max_agents` must be 1–9 (there are 9 slots)"],
       ["notify: { webhook: not-a-url }\n", "`~/.norn/config.yaml`: `notify.webhook` must be an http or https URL"],
+      // D2: the file's own schema decides, the one an editor checks it with (B50)
+      ["notify:\n", "`~/.norn/config.yaml`: `notify` must be a map with `os`, `ntfy`, `webhook`"],
+      ["agents: { claude: null }\n", "`~/.norn/config.yaml`: `agents.claude` must be a map with `model` and `args`"],
+      ["agents: { codex: { args: [1] } }\n", "`~/.norn/config.yaml`: `agents.codex.args` must be a list of strings"],
+      ["agents: { claude: { flags: [] } }\n", "`~/.norn/config.yaml`: unknown key `agents.claude.flags`"],
     ];
     for (const [text, error] of cases) {
       h.write(userFile(h), text);
@@ -202,6 +207,27 @@ describe("three files and where keys belong (B1–B8)", () => {
     expect(bad.exit).toBe(2);
     expect(bad.value).toMatchObject({ code: "unknown_key", do_instead: "norn config list" });
     expect((await h.norn("config", "mode", "--json")).exit).toBe(2);
+  });
+});
+
+describe("two repos, one user home (B3)", () => {
+  let a: Harness;
+  let b: Harness;
+  beforeAll(async () => {
+    [a, b] = await Promise.all([createHarness(), createHarness()]);
+  });
+  afterAll(() => {
+    a.cleanup();
+    b.cleanup();
+  });
+
+  test("B3: my local file sets mode auto in one repo; in another the user file's manual holds", async () => {
+    a.write(userFile(a), "mode: manual\n");
+    a.write(localFile(a), "mode: auto\n");
+    // b runs with a's home: the same user file, no local file of its own
+    const inB = { ...b.deps, env: { ...b.deps.env, NORN_HOME_DIR: a.home } };
+    expect(by(await entries(a), "mode")).toMatchObject({ value: "auto", source: "local" });
+    expect(by(await entries(b, inB), "mode")).toMatchObject({ value: "manual", source: "user" });
   });
 });
 

@@ -71,6 +71,16 @@ describe("claims (T1–T10)", () => {
     const a = decide(facts([solo()], {}, later), WORKFLOWS, CONFIG)[0]?.action;
     expect(a).toMatchObject({ kind: "claim", op: "renew", expected: "c1", blob: { renewed_at: at(later), acquired_at: at() } });
   });
+  test("gh-64 B35: the claim renews at the period derived from the tick interval, not before", () => {
+    const renews = (config: typeof CONFIG, ms: number) => decide(facts([solo()], {}, T0 + ms), WORKFLOWS, config).some((d) => d.action.kind === "claim" && d.action.op === "renew");
+    // interval 30s → renew every 3m20s (the built-in config)
+    expect(renews(CONFIG, 199_000)).toBe(false);
+    expect(renews(CONFIG, 200_000)).toBe(true);
+    // interval 5m → lease 20m, renew every 6m40s
+    const slow = { ...CONFIG, interval: "5m", claim: { lease: "20m", renew: "6m40s" } };
+    expect(renews(slow, 399_000)).toBe(false);
+    expect(renews(slow, 400_000)).toBe(true);
+  });
   test("R1.1/R1.3: renewal is a side action — a merged PR is cleaned up in the same tick", () => {
     const later = T0 + 4 * 60_000;
     const s = solo({}, null, { pr: { number: 9, url: "u", state: "merged", is_draft: false, head_sha: "abc" } });

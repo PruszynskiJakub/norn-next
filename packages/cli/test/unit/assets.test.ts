@@ -3,7 +3,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checkConfigFile, DEFAULT_CONFIG, type Workflow, outcomeEdge, validate } from "@norn/schema";
+import { DEFAULT_CONFIG, type Workflow, outcomeEdge, validate } from "@norn/schema";
 import { parse } from "yaml";
 import { type AssetsSources, assetsDir, resolveAssetsDir } from "../../src/runtime/assets.ts";
 
@@ -290,7 +290,6 @@ describe("config starters (B49, B50)", () => {
   test.each(STARTERS)("%s sets nothing as installed and carries a schema modeline", (file, kind) => {
     const text = readFileSync(join(ASSETS, file), "utf8");
     expect(text.split("\n")[0]).toMatch(/^# yaml-language-server: \$schema=\S+\.schema\.json$/);
-    expect(checkConfigFile(kind, parse(text))).toEqual([]);
     expect(parse(text) ?? null).toBeNull();
   });
 
@@ -299,7 +298,7 @@ describe("config starters (B49, B50)", () => {
     // Uncomment lines that hold a lowercase YAML key (`# key:`); prose comments start uppercase.
     const uncommented = text.replace(/^(\s*)# ( *[a-z_]+:.*)$/gm, "$1$2").replace(/<[^>]+>/g, "x");
     const value = parse(uncommented) as Record<string, unknown>;
-    expect(checkConfigFile(kind, value)).toEqual([]);
+    // D2: the file's schema is what norn checks it with
     expect(validate(`${kind}-config`, value)).toMatchObject({ ok: true });
   });
 });
