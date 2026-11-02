@@ -170,8 +170,9 @@ export function editConfigLayer(opts: {
   edit: { set: string } | { unset: true };
 }): ConfigEditResult {
   const { key, edit } = opts;
-  // unsetting is always allowed, so a moved or misplaced key can be removed by hand
-  const misplaced = "unset" in edit ? null : configKeyProblem(opts.file, key);
+  // a moved or misplaced key can still be unset, so it can be removed by hand
+  const problem = configKeyProblem(opts.file, key);
+  const misplaced = problem && ("set" in edit || problem.code === "config_invalid") ? problem : null;
   if (misplaced) return { ok: false, code: misplaced.code === "config_invalid" ? "unknown_key" : misplaced.code, error: problemText(misplaced) };
   const home = nornHome(opts.home, opts.env);
   const paths = { user: userConfigPath(home), local: localConfigPath(opts.repoRoot), repo: repoConfigPath(opts.repoRoot) };

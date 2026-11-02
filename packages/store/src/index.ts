@@ -6,6 +6,7 @@
 export * from "./base.ts";
 export * from "./cockpit.ts";
 export * from "./config.ts";
+export * from "./config-migrate.ts";
 export * from "./frontmatter.ts";
 export * from "./fsx.ts";
 // raw git (`git`, `gitSync`, blob and ref plumbing) stays inside store: everyone else goes through GitPort (X2)

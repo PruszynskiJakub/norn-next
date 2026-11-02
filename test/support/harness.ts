@@ -206,8 +206,19 @@ export class FakeInteraction implements Interaction {
 }
 
 /** A6 launch env and the orient env: the env of the agent session a test may run in is not the harness's. */
-const AGENT_ENV = ["NORN_HOME", "NORN_STORY", "NORN_SLICE", "NORN_RUN", "NORN_BIN", "NORN_ORIENT"];
-export const hostEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !AGENT_ENV.includes(k)));
+const AGENT_ENV = ["NORN_HOME", "NORN_STORY", "NORN_SLICE", "NORN_RUN", "NORN_BIN", "NORN_ORIENT", "HERDR_ENV", "HERDR_SOCKET_PATH"];
+
+/**
+ * gh-64 (Plan, Risks): runner detection reads HERDR_ENV and PATH, so the harness pins both — no
+ * HERDR_ENV, and a PATH without any directory that holds `herdr` — and a machine with Herdr
+ * installed gives the same results as CI.
+ */
+const pathWithoutHerdr = (path: string | undefined) =>
+  (path ?? "")
+    .split(":")
+    .filter((d) => d && !existsSync(join(d, "herdr")))
+    .join(":");
+export const hostEnv = () => ({ ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !AGENT_ENV.includes(k))), PATH: pathWithoutHerdr(process.env.PATH) });
 
 export function sh(cwd: string, args: string[], input?: string): string {
   const r = Bun.spawnSync(["git", ...args], { cwd, stdin: input === undefined ? "ignore" : new TextEncoder().encode(input), stdout: "pipe", stderr: "pipe" });
