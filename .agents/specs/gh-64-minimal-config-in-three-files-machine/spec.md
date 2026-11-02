@@ -8,7 +8,7 @@ title: "Minimal config in three files: machine, you in this repo (config.local.y
 assignee: PruszynskiJakub
 labels:
   - norn
-  - norn:wf:refinement
+  - norn:wf:quick
 workflow: quick
 status: active
 intake_at: 2026-11-02T07:08:29.386Z
