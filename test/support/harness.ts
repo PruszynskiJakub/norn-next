@@ -252,8 +252,8 @@ export interface Harness {
   /**
    * gh-64: write config the way a person splits it — the team keys (`provider`, `base_branch`,
    * `workflow`, `slice_workflow`) into `.agents/norn.config.yaml`, your keys (`mode`, `agent`,
-   * `agents`) into `.agents/norn.config.local.yaml`, machine keys into the user file. A file left
-   * without keys is removed.
+   * `agents`) into `.agents/norn.config.local.yaml`, machine keys into the user file. A repo file
+   * left without keys is removed; the user file is only written, never removed.
    */
   config(yaml: string): void;
   read(path: string): string;
@@ -349,7 +349,7 @@ export async function createHarness(): Promise<Harness> {
       const paths = { team: repoConfigPath(root), local: join(root, ".agents", "norn.config.local.yaml"), user: join(home, "config.yaml") };
       for (const [f, keys] of Object.entries(files) as Array<[keyof typeof paths, Record<string, unknown>]>) {
         if (Object.keys(keys).length) h.write(paths[f], stringifyYaml(keys));
-        else rmSync(paths[f], { force: true });
+        else if (f !== "user") rmSync(paths[f], { force: true });
       }
     },
     write(path, text) {

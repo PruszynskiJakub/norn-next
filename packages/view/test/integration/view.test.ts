@@ -22,6 +22,7 @@ import {
   writeStoryFile,
   writePrFacts,
   writeUnitMarker,
+  markTick,
 } from "@norn/store";
 import { formatInbox, formatStatus, formatStoryView, formatTimeline, loadProjectView, loadTimelines, orientReport, prCommand } from "../../src/index.ts";
 
@@ -161,6 +162,8 @@ async function seed() {
   const blob: ClaimBlob = { version: 1, story: "gh-12", holder: "me@box", heartbeat_id: ulid(NOW), acquired_at: ago(100), renewed_at: ago(2), expires_at: ago(-8), last_tick_id: null };
   const c = await acquireClaim(repo, null, blob, { now: NOW });
   if (!c.ok) throw new Error("claim");
+  // the heartbeat is up: auto stories here wait on their runs, not on `norn watch` (R5.5, gh-64 B12)
+  markTick(repo, new Date(NOW).toISOString());
   return { repo, home };
 }
 
@@ -192,8 +195,9 @@ describe("loadProjectView", () => {
       url: "https://x/12",
       workflow: "slice",
       mode: "auto",
-      effective_mode: "manual",
-      mode_downgraded: true,
+      // gh-64 B12: auto mode runs on the detected runner; it is never downgraded for lack of one
+      effective_mode: "auto",
+      mode_downgraded: false,
       status: "parked",
       step: "implement",
       attempt: 1,
@@ -418,7 +422,7 @@ describe("formatters", () => {
     const v = await loadProjectView({ repoRoot: repo, home, now: NOW, holder: "me@box", liveness: () => true, env: {} });
     const status = formatStatus(v);
     expect(status).toContain("gh-12 Fix login");
-    expect(status).toContain("slice · auto→manual · mine · parked implement#1 (ask: Which OAuth provider?) 40m [test_loop 0/3]");
+    expect(status).toContain("slice · auto · mine · parked implement#1 (ask: Which OAuth provider?) 40m [test_loop 0/3]");
     expect(status).toContain('→ norn story answer gh-12 "…"');
     expect(status).toContain("gh-12/01   Add form — running implement#2 30m [test_loop 1/3]");
     expect(status).toContain("gh-12/02   Wire API — done 1h integrated after 01");

@@ -55,13 +55,13 @@ describe("norn init writes the new layout (B1, B2)", () => {
     expect(init.exit).toBe(0);
     expect(existsSync(join(h.root, CONFIG_FILE))).toBe(true);
     for (const f of ["triage.yaml", "reproduce.yaml", "refinement.yaml", "story.yaml", "slice.yaml", "quick.yaml"]) expect(existsSync(join(h.root, WORKFLOWS, f))).toBe(true);
-    expect(readdirSync(join(h.root, ".agents")).sort()).toEqual(["norn.config.yaml", "skills", "workflows"]);
+    expect(readdirSync(join(h.root, ".agents")).sort()).toEqual(["norn.config.local.schema.json", "norn.config.schema.json", "norn.config.yaml", "skills", "workflows"]);
     expect(init.stdout).toContain(`config          ${CONFIG_FILE} created`);
     expect(init.stdout).toContain("the `test` steps in .agents/workflows/ run");
   });
 
   test("norn config shows repo settings as coming from the repo config file", async () => {
-    h.write(join(h.root, CONFIG_FILE), CONFIG);
+    h.config(CONFIG);
     const r = await h.norn("config", "list", "--json");
     expect(r.value).toMatchObject({ files: { repo: { path: join(h.root, CONFIG_FILE), exists: true } } });
     expect((r.value as { entries: Array<{ key: string; source: string }> }).entries.find((e) => e.key === "workflow")).toMatchObject({ source: "repo" });
@@ -84,11 +84,11 @@ describe("messages name the new paths (D11)", () => {
     expect(created.value).toMatchObject({ code: "unknown_workflow", error: expect.stringContaining(`no workflow 'nope' in ${WORKFLOWS}/`) });
   });
 
-  test("an adapter that cannot be loaded names the repo config file", async () => {
-    h.write(join(h.root, CONFIG_FILE), CONFIG.replace("agents:\n", "agents:\n  other: { adapter: no-such-agent-pkg }\n"));
+  test("a team key in the wrong place names the repo config file (gh-64 B5)", async () => {
+    h.write(join(h.root, CONFIG_FILE), "mode: auto\n");
     const r = await h.norn("tick");
-    expect(r.value).toMatchObject({ code: "unknown_adapter", do_instead: expect.stringContaining(CONFIG_FILE) });
-    h.write(join(h.root, CONFIG_FILE), CONFIG);
+    expect(r.value).toMatchObject({ code: "config_wrong_file", error: expect.stringContaining(CONFIG_FILE) });
+    h.config(CONFIG);
   });
 });
 

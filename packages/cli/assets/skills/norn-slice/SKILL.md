@@ -1,6 +1,6 @@
 ---
 name: norn-slice
-description: Break a planned spec into tracer-bullet slice files, each with its dependencies, acceptance criteria citing Behaviour numbers (also listed as frontmatter `criteria` with verifier and needs), check commands and a verifier per criterion. Use when asked to slice, split or break a planned spec into deliverable pieces.
+description: Break a planned spec into tracer-bullet slice files, each with its dependencies, acceptance criteria citing Behaviour numbers (also listed as frontmatter `criteria` with id and verifier), check commands and a verifier per criterion. Use when asked to slice, split or break a planned spec into deliverable pieces.
 ---
 
 # Slice
@@ -36,7 +36,7 @@ depends_on: [gh-123/01]   # full slice keys of the same story; [] when none
 status: planned
 criteria:                 # one entry per Acceptance item below, same ids and verifiers
   - { id: AC1, verifier: test }
-  - { id: AC2, verifier: agent, needs: [browser] }
+  - { id: AC2, verifier: agent }
   - { id: AC3, verifier: person }
 ---
 
@@ -48,7 +48,7 @@ Behaviour: B3, B4. Seams: S2. Out: anything another slice covers.
 
 ## Acceptance
 - AC1 (B3) Given <context>, when <action>, then <observable effect>. — verifier: test
-- AC2 (B4) … — verifier: agent (needs: browser)
+- AC2 (B4) … — verifier: agent
 - AC3 (B4) … — verifier: person, because <what only a person can check, and why>
 
 ## Checks
@@ -63,7 +63,6 @@ Pointers to plan decisions (D1), traps, and any call left for the person.
 - Never renumber or rename existing slice files; their keys are permanent. Append new numbers.
 - Every acceptance criterion cites the Behaviour item(s) it proves and is observable at an agreed seam, not a code detail.
 - **Frontmatter `criteria`** repeats the Acceptance section as data: one `{ id, verifier }` per item, the same ids in the same order, nothing more and nothing less. Whoever verifies the slice gives one verdict per id listed here, so a criterion missing from the list is never checked.
-- **`needs`** names what checking a criterion takes beyond a shell: `browser` for anything seen in a web page, or e.g. `device`, `email`. Omit it when a terminal is enough. It lets a criterion that could not be checked be traced to the missing capability.
 - When the story spec itself has acceptance criteria checked across slices (story-level verification), add the same `criteria` list to the story file's frontmatter, with the ids its Behaviour or acceptance items use; leave every other frontmatter field as it is.
 - Checks are commands that run in the repository and exit non-zero on failure.
 - Behaviour and interfaces, not file paths: the slice may wait while the code moves.

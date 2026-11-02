@@ -151,7 +151,7 @@ describe("norn migrate on the old layout (B11, B12, B13)", () => {
     expect(md.stdout).toContain("nothing to move");
     const json = await h.norn("migrate", "--json");
     expect(json.exit).toBe(0);
-    expect(json.value).toEqual({ moves: [], staged: [], commit: null });
+    expect(json.value).toEqual({ moves: [], config: { changed: [], renamed: [], removed: [] }, staged: [], commit: null });
     expect(snapshot(h)).toEqual(before);
   });
 });
@@ -166,7 +166,7 @@ describe("norn migrate --json (B11)", () => {
     const r = await h.norn("migrate", "--json");
     expect(r.exit).toBe(0);
     const v = r.value as Migrated;
-    expect(Object.keys(v).sort()).toEqual(["commit", "moves", "staged"]);
+    expect(Object.keys(v).sort()).toEqual(["commit", "config", "moves", "staged"]);
     const machine = layoutPlaces(h.root)["machine files"];
     expect(v.moves).toEqual([
       { part: "config", from: OLD_CONFIG, to: NEW_CONFIG, how: "git mv" },

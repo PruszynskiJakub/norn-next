@@ -123,6 +123,35 @@ const GLOSSARY_FILES = (): string[] => [
   join(ROOT, "AGENTS.md"),
 ];
 
+/**
+ * gh-64 B52 (S5): the docs a person reads describe only the new config keys and files. A removed or
+ * renamed key named in any of them is a hit. The PRD and CHANGELOG keep their history; `norn migrate`'s
+ * own messages and the moved-key table name old keys on purpose and live in sources, not here.
+ */
+const REMOVED_KEYS = /\b(default_mode|default_agent|default_workflow|default_slice_workflow|notifiers|max_checks|watch_interval|attended_wait|ports_per_slot|sync_interval)\b|\blimits\.(deadline|nudges|retries|stalled)\b|\bremote\.(provider|label|git_remote|host)\b|\bcapabilities: \[/;
+const CONFIG_DOCS = (): string[] => [
+  ...textFiles(join(PKGS, "cli", "assets"), DOCS),
+  ...textFiles(join(ROOT, "plugins"), [...DOCS, ".toml", ".sh"]),
+  join(PKGS, "cli", "src", "commands", "help.ts"),
+  join(ROOT, "README.md"),
+  join(ROOT, "CONTRIBUTING.md"),
+  join(ROOT, "AGENTS.md"),
+  join(ROOT, "docs", "cookbook.html"),
+];
+
+describe("config docs (gh-64 B52)", () => {
+  test("help, README, the cookbook, the init templates, skills and AGENTS.md name no removed config key", () => {
+    const hits: string[] = [];
+    for (const f of CONFIG_DOCS())
+      readFileSync(f, "utf8")
+        .split("\n")
+        .forEach((line, i) => {
+          if (REMOVED_KEYS.test(line)) hits.push(`${relative(ROOT, f)}:${i + 1}: ${line.trim().slice(0, 120)}`);
+        });
+    expect(hits).toEqual([]);
+  });
+});
+
 describe("glossary", () => {
   test("matcher: word boundaries, URLs and doc code spans are not prose", () => {
     expect(glossaryHits("pick the next job", "README.md")).toEqual(["story / slice"]);

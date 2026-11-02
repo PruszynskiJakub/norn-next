@@ -400,7 +400,7 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--rule)
   <div class="table"><table>
     <thead><tr><th>Group</th><th>What it means</th><th>Usual key</th></tr></thead>
     <tbody>
-      <tr><td><span class="pill y">Your turn</span> <code>▶</code></td><td>an attended step to start or continue, a manual-mode step ready to start, or an attended agent waiting for you longer than <code>limits.attended_wait</code></td><td><kbd>s</kbd>, or <kbd>g</kbd> when its agent runs</td></tr>
+      <tr><td><span class="pill y">Your turn</span> <code>▶</code></td><td>an attended step to start or continue, a manual-mode step ready to start, or an attended agent waiting for you for 2 minutes</td><td><kbd>s</kbd>, or <kbd>g</kbd> when its agent runs</td></tr>
       <tr><td><span class="pill y">Answer</span> <code>◆</code></td><td>an agent asked (<code>norn ask</code>), or is blocked on a prompt in its pane</td><td><kbd>a</kbd></td></tr>
       <tr><td><span class="pill y">Approve</span> <code>●</code></td><td>a gate: approve-plan, human-qa, ready</td><td><kbd>y</kbd> · <kbd>x</kbd></td></tr>
       <tr><td><span class="pill r">Unblock</span> <code>✖ stuck</code></td><td>stuck: a counter ran out, an agent reported <code>stuck</code>, or the remote changed (issue closed, PR closed)</td><td><kbd>v</kbd>, then <kbd>u</kbd></td></tr>
@@ -470,23 +470,21 @@ git add .agents .claude .gitignore .gitattributes && git commit -m "Set up norn"
 gh label create norn
 norn doctor`,
   norn: "<code>init</code> reads the test command from <code>package.json</code>, <code>Cargo.toml</code>, <code>go.mod</code>, Python files, Gradle, Maven or a Makefile. <code>doctor</code> prints one line per check (git, agent, remote, runner, skills, cockpit plugin) and the fix for each failure.",
-  watch: "A check runs in a fresh worktree, so the test command must install first (<code>npm install && npm test</code>). GitLab: set <code>remote.provider: glab</code> in <code>.agents/norn/config.yaml</code>." },
+  watch: "A check runs in a fresh worktree, so the test command must install first (<code>npm install && npm test</code>). norn reads GitHub or GitLab from the remote URL; a self-hosted host sets <code>provider: glab</code> (or <code>gh</code>) in <code>.agents/norn.config.yaml</code>." },
 
-{ part: "setup", id: "machine", title: "Tell norn how you work on this machine", tags: ["config", "auto", "runner", "notifiers"],
-  when: "Once per machine. These are your settings, not the team's, so they go in <code>~/.norn/config.yaml</code>, never in the repo.",
-  steps: ["Make Herdr the runner, so norn can open agent tabs.", "Make <code>auto</code> your default mode: norn then starts implement, review and QA itself. Refine, plan and the gates still wait for you.", "Pick how you hear about new items: Herdr toasts at the desk, desktop notifications, <code>ntfy</code> on your phone.", "Run <code>norn config</code> to see every setting in effect and which file it came from."],
+{ part: "setup", id: "machine", title: "Tell norn how you work on this machine", tags: ["config", "auto", "runner", "notify"],
+  when: "Once per machine, if the defaults do not suit you. These are your settings, not the team's, so they go in <code>~/.norn/config.yaml</code> (every repo) or <code>.agents/norn.config.local.yaml</code> (this repo only, gitignored), never in the team file.",
+  steps: ["Make <code>auto</code> your mode: norn then starts implement, review and QA itself. Refine, plan and the gates still wait for you. A workflow's own <code>mode</code> wins over yours.", "Pick how you hear about new items: desktop notifications are on; add <code>ntfy</code> for your phone. Inside Herdr, toasts come on their own.", "Run <code>norn config</code> to see every setting in effect and where it came from."],
   code: `# ~/.norn/config.yaml
-runner:
-  adapter: herdr
-default_mode: auto
-max_agents: 3            # agents at once, across every repo on this machine
-notifiers:
-  - adapter: herdr       # toasts inside Herdr
-  - adapter: os          # desktop notifications
-  - adapter: ntfy        # your phone: install the ntfy app, subscribe to the topic
-    options: { topic: norn-jakub-7f3k }`,
-  norn: "The repo file wins over yours, except that it can only lower machine caps. Claude sessions start in <code>--permission-mode auto</code>, so unattended agents park on prompts far less.",
-  watch: "An ntfy topic is public to anyone who guesses it: make it long and random. If you define <code>agents.claude</code> yourself, keep its <code>args</code>, or the permission mode goes with them." },
+mode: auto
+max_agents: 3            # agents at once, across every repo on this machine (1–9, default 9)
+notify:
+  ntfy: https://ntfy.sh/norn-jakub-7f3k   # your phone: install the ntfy app, subscribe to the topic
+agents:
+  claude:
+    model: claude-opus-5-5               # keeps the built-in --permission-mode auto`,
+  norn: "norn detects the runner: Herdr when it runs inside Herdr or Herdr is installed, otherwise headless. Claude sessions start in <code>--permission-mode auto</code>, so unattended agents park on prompts far less; setting a <code>model</code> keeps it.",
+  watch: "An ntfy topic is public to anyone who guesses it: make it long and random. Setting <code>agents.claude.args</code> replaces the built-in list, permission mode included." },
 
 { part: "setup", id: "keys", title: "Bind the cockpit to keys", tags: ["herdr", "keys", "cockpit", "segment"],
   when: "Once, in Herdr's <code>config.toml</code>. Run <code>herdr server reload-config</code> after.",
@@ -524,7 +522,7 @@ rows = [["state_icon", "workspace"], ["$norn"]]`,
   when: "A desktop that stays on, and you would rather not depend on a Herdr pane staying open.",
   steps: ["Run <code>norn tick</code> from cron every minute in the repository. The cockpit works the same; its header shows the ticks."],
   code: `* * * * * cd /path/to/repo && /usr/local/bin/norn tick >> /tmp/norn-tick.log 2>&1`,
-  norn: "Ticks share one heartbeat id per checkout, so each tick recognises the claim the previous one renewed. A tick looks for new issues about every 5 minutes (<code>remote.sync_interval</code>).",
+  norn: "Ticks share one heartbeat id per checkout, so each tick recognises the claim the previous one renewed. A tick looks for new issues about every 5 minutes; <code>norn sync</code> forces one.",
   watch: "cron has a minimal <code>PATH</code>: give full paths to <code>norn</code>, <code>gh</code>, <code>herdr</code> and <code>claude</code>, or set <code>PATH</code> in the crontab. A cron tick runs outside Herdr, so it opens agents in new workspaces rather than your norn one." },
 
 { part: "setup", id: "files", title: "Know where things live", tags: ["files", "spec", "handoff"],
@@ -550,7 +548,7 @@ rows = [["state_icon", "workspace"], ["$norn"]]`,
 s                               # start the agent refine waits for`,
   same: "Same as <code>norn story start gh-21</code>.",
   norn: "Open questions go to <code>clarify</code>, another attended step. Then <code>plan</code>, also with you. Attended steps are never nudged or timed out.",
-  watch: "Step away mid-conversation and the inbox notices: after <code>limits.attended_wait</code> (2 min) of the agent waiting, it moves back to Your turn and notifies you. <kbd>g</kbd> on its row, or <code>norn.next</code>, returns you to the same session; it never starts a second agent." },
+  watch: "Step away mid-conversation and the inbox notices: after 2 minutes of the agent waiting, it moves back to Your turn and notifies you. <kbd>g</kbd> on its row, or <code>norn.next</code>, returns you to the same session; it never starts a second agent." },
 
 { part: "story", id: "approve-plan", title: "Approve the plan", tags: ["gate", "approve", "plan", "slices"],
   when: "<b>Approve</b> · <code>approve-plan</code>, right after the plan conversation.",
@@ -630,9 +628,8 @@ Enter                           # orient on gh-18`,
 { part: "daily", id: "parallel", title: "Run several stories in parallel", tags: ["parallel", "max_agents", "slots"],
   when: "You have two or more labelled issues and want them moving at once.",
   steps: ["Label and assign each issue; norn takes them all in.", "Do the attended parts (refine, plan) one story at a time. The rest overlaps on its own.", "Raise <code>max_agents</code> in your machine config if your machine and budget allow."],
-  code: `# ~/.norn/config.yaml  (machine caps; a repo can only lower them)
-max_agents: 3
-max_checks: 2`,
+  code: `# ~/.norn/config.yaml  (this machine, across every repo)
+max_agents: 3            # sessions and checks at once, 1–9`,
   norn: "Caps count across all repositories on the machine. Queued steps start oldest story first, then by slice number. One cockpit per repository; <code>norn.next</code> and <code>norn.open</code> use the repository of the pane you press them in.",
   watch: "More agents means more tokens. Cost per story is not tracked yet, so raise <code>max_agents</code> one at a time. Parallel slices that share ports or a database need <a href=\"#slots\">slots</a>." },
 
@@ -674,7 +671,7 @@ norn run rerun gh-18/02 --step implement`,
 { part: "wrong", id: "died", title: "An agent died, hung or went quiet", tags: ["died", "stalled", "silent", "timeout", "recovery"],
   when: "You closed a tab by accident, the laptop slept, or an agent stopped without reporting.",
   steps: ["Usually nothing. Select the story's row and press <kbd>v</kbd> to see what norn did about it."],
-  norn: "<ul><li><code>died</code> (process gone): retried in a fresh session, <code>limits.retries</code> times (default 1). A killed agent was retried within 9 s in dogfood.</li><li><code>silent</code> (turn ended without a report), <code>stalled</code> (no activity for 15 min), <code>timeout</code> (past the 60 min deadline): nudged in the same session, <code>limits.nudges</code> times (default 2).</li><li>Past those limits the unit is <code>stuck</code> and shows under Unblock.</li></ul>",
+  norn: "<ul><li><code>died</code> (process gone): retried in a fresh session, <code>retries</code> times (default 1, set in a workflow's <code>defaults:</code> or on the step). A killed agent was retried within 9 s in dogfood.</li><li><code>silent</code> (turn ended without a report), <code>stalled</code> (no activity for 15 min), <code>timeout</code> (past the 60 min deadline): nudged in the same session, <code>nudges</code> times (default 2).</li><li>Past those limits the unit is <code>stuck</code> and shows under Unblock.</li></ul>",
   watch: "Attended steps are never nudged or timed out; only <code>died</code> and an explicit report count there." },
 
 { part: "wrong", id: "tests-fail", title: "Tests keep failing", tags: ["test", "check", "test_loop"],
@@ -793,7 +790,7 @@ base: { stale: conflict }`,
 
 { part: "shape", id: "bug-slice", title: "Fix a bug reproduce-first", tags: ["bug", "workflow", "slice"],
   when: "A slice is a bug fix and you want a repro before any code changes.",
-  steps: ["At the plan gate, set <code>workflow: bug</code> in that slice file's frontmatter.", "Or make it the default for slices with <code>default_slice_workflow: bug</code>."],
+  steps: ["At the plan gate, set <code>workflow: bug</code> in that slice file's frontmatter.", "Or make it the default for slices with <code>slice_workflow: bug</code> in <code>.agents/norn.config.yaml</code>."],
   code: `---
 workflow: bug
 ---`,
@@ -802,14 +799,13 @@ workflow: bug
 
 { part: "shape", id: "limits", title: "Tune loops and limits", tags: ["counters", "limits", "deadline"],
   when: "Agents get too few or too many tries, steps time out too early, or Your turn nags too soon.",
-  steps: ["Loop bounds live in each workflow's <code>counters</code>.", "Agent defaults live in <code>limits</code> in the config; a step can set its own <code>deadline</code>, <code>nudges</code> and <code>retries</code>."],
-  code: `# .agents/norn/config.yaml
-limits:
+  steps: ["Loop bounds live in each workflow's <code>counters</code>.", "Agent limits live in each workflow's <code>defaults:</code>; a step can set its own <code>deadline</code>, <code>nudges</code> and <code>retries</code>. An attended agent waiting 2 minutes moves to Your turn."],
+  code: `# .agents/workflows/story.yaml
+defaults:
   deadline: 90m       # unattended step deadline (default 60m)
   nudges: 2
   retries: 1
-  stalled: 20m        # no activity for this long → stalled (default 15m)
-  attended_wait: 5m   # attended agent waiting → Your turn (default 2m)`,
+  stalled: 20m        # no activity for this long → stalled (default 15m)`,
   norn: "Every limit has a counter, and going past one is always a visible <code>stuck</code>, never a silent loop." },
 
 { part: "shape", id: "skill", title: "Change how a step is done", tags: ["skills", "review", "custom"],
@@ -824,11 +820,10 @@ limits:
 
 { part: "shape", id: "agents", title: "Use a different agent for a step", tags: ["agents", "codex", "gemini", "model"],
   when: "You want, say, Codex for review or a cheaper model for slicing.",
-  steps: ["Declare the agent in config, then set <code>agent:</code> (and optionally <code>model:</code>) on the step."],
-  code: `# .agents/norn/config.yaml
+  steps: ["Name the agent in your config (an empty entry is enough), then set <code>agent:</code> (and optionally <code>model:</code>) on the step. To switch every step, set <code>agent:</code> in your config instead."],
+  code: `# ~/.norn/config.yaml (or .agents/norn.config.local.yaml)
 agents:
-  claude: { adapter: claude, args: ["--permission-mode", "auto"] }
-  codex:  { adapter: codex }
+  codex: {}              # claude, codex, opencode or gemini; model and args are optional
 
 # workflow step
   review:
@@ -838,26 +833,24 @@ agents:
   norn: "<code>init</code> links skills into each configured agent's skill folder; Codex reads <code>.agents/skills/</code> itself.",
   watch: "Codex, OpenCode and Gemini are less exercised than Claude Code." },
 
-{ part: "shape", id: "browser", title: "Let QA verify browser criteria", tags: ["qa", "capabilities", "browser"],
-  when: "Your QA agent can drive a browser and you want it to pass criteria that need one.",
-  steps: ["Declare the capability on the agent.", "Criteria that need it are written in slice frontmatter as <code>needs: [browser]</code>."],
-  code: `agents:
-  claude:
-    adapter: claude
-    args: ["--permission-mode", "auto"]
-    capabilities: [browser]`,
-  norn: "Without the capability, <code>norn done</code> refuses a <code>pass</code> for such a criterion and asks for <code>unverified</code>, which comes to you at human-qa.",
+{ part: "shape", id: "browser", title: "Let QA verify browser criteria", tags: ["qa", "browser"],
+  when: "Your QA agent can drive a browser and you want it to pass criteria seen in a web page.",
+  steps: ["Give the agent a browser (a browser MCP server, or Claude in Chrome).", "The <code>norn-qa</code> skill wants a screenshot for every criterion seen in a web page; without a browser it reports them <code>unverified</code>, which comes to you at human-qa."],
+  code: `# a criterion in slice frontmatter: id and verifier only
+criteria:
+  - { id: AC2, verifier: agent }`,
+  norn: "<code>norn done</code> accepts a <code>pass</code> from any agent; the evidence it lists is what you judge at human-qa.",
   watch: "No browser criterion has been verified live yet (LIMITATIONS)." },
 
 { part: "shape", id: "slots", title: "Give each worktree its own ports or database", tags: ["slots", "ports", "env"],
   when: "Parallel slices fight over port 3000 or one database.",
-  steps: ["Configure slots; each worktree gets <code>NORN_SLOT</code>, <code>PORT_BASE</code> and your extra variables in <code>.env.norn</code>."],
-  code: `slots:
-  port_base: 4000
-  ports_per_slot: 10
-  env: { DATABASE_URL: "postgres://localhost/app_{slot}" }`,
+  steps: ["Each worktree gets a slot from 1 to 9 and <code>NORN_SLOT</code> and <code>PORT_BASE</code> in <code>.env.norn</code>: slot <code>n</code> owns ports <code>4000 + 10·n</code> to <code>4009 + 10·n</code>.", "Build your own names from them in your app or test setup."],
+  code: `# .env.norn in a worktree on slot 2
+NORN_SLOT=2
+PORT_BASE=4020
+# your test setup: DATABASE_URL=postgres://localhost/app_$NORN_SLOT`,
   norn: "Slots are lease files in <code>~/.norn/leases/</code>, reclaimed when their process is gone.",
-  watch: "Your app and tests must read <code>PORT_BASE</code> or the env you set; norn only provides it." },
+  watch: "Your app and tests must read <code>PORT_BASE</code> or <code>NORN_SLOT</code>; norn only provides them." },
 
 // ---------------- team
 { part: "team", id: "handover", title: "Hand a story to someone else", tags: ["handoff", "checkout", "team"],
@@ -881,13 +874,9 @@ norn uninstall`,
 
 { part: "team", id: "no-herdr", title: "Run norn without Herdr", tags: ["headless", "manual", "fallback", "brief"],
   when: "You don't use Herdr, or you are on a server.",
-  steps: ["Use the <code>headless</code> runner for auto mode: unattended agents run as background processes.", "Run <code>norn watch --human</code> in one terminal and <code>norn status --watch</code> in another. The cockpit works; <kbd>Enter</kbd> shows the <code>norn story view</code> report instead of opening a workspace.", "For attended steps, run the <code>cd … && claude …</code> line the item prints in any terminal. Or open any agent in the unit's worktree and tell it <i>Use the norn skill, then run <code>norn brief</code></i>."],
+  steps: ["Without Herdr, norn runs unattended agents headless, as background processes: nothing to configure.", "Run <code>norn watch --human</code> in one terminal and <code>norn status --watch</code> in another. The cockpit works; <kbd>Enter</kbd> shows the <code>norn story view</code> report instead of opening a workspace.", "For attended steps, run the <code>cd … && claude …</code> line the item prints in any terminal. Or open any agent in the unit's worktree and tell it <i>Use the norn skill, then run <code>norn brief</code></i>."],
   code: `# ~/.norn/config.yaml
-runner:
-  adapter: headless
-default_mode: auto
-notifiers:
-  - adapter: os`,
+mode: auto`,
   norn: "The agent's <code>norn brief</code> starts the run and tells it the step, inputs and allowed outcomes. Its <code>norn done</code> ends the step.",
   watch: "Start the agent inside the unit's worktree. <code>norn brief</code> anywhere else tells the agent to stop." },
 

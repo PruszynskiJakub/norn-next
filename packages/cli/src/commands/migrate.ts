@@ -104,7 +104,7 @@ async function migrateConfigPart(ctx: Context, root: string, report: MigrateRepo
 
 function markdown(r: MigrateReport, root: string): string {
   const config = r.config.changed.length || r.config.removed.length || r.config.renamed.length;
-  if (!r.moves.length && !r.staged.length && !config) return `# norn migrate\n\n${root} is on the new layout and its config on the new keys: nothing to change.`;
+  if (!r.moves.length && !r.staged.length && !config) return `# norn migrate\n\n${root} is on the new layout and its config on the new keys: nothing to move.`;
   const how = { "git mv": "staged", untracked: "untracked: moved, not staged", moved: "machine-local, outside git" };
   const out = ["# norn migrate", ""];
   if (r.moves.length) out.push(`Moved ${root} to the new layout:`, "");

@@ -89,7 +89,8 @@ describe("norn story start (B28, MO5)", () => {
     h.clock.advance(10_000);
     await h.tick();
     const inbox = (await h.norn("status")).value as { groups: { your_turn: Array<{ story: string; command: string; detail?: string }> } };
-    const start = `cd ${wt()} && claude 'Use the norn skill, then run \`norn brief\`.'`;
+    // gh-64 B14: claude's built-in args stay
+    const start = `cd ${wt()} && claude --permission-mode auto -- 'Use the norn skill, then run \`norn brief\`.'`;
     expect(inbox.groups.your_turn).toMatchObject([{ story: "gh-7", command: start }]);
     const r = await h.norn("story", "start", "gh-7", "--json");
     expect(r.exit).toBe(0);

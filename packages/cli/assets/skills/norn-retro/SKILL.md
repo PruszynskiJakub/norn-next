@@ -12,7 +12,7 @@ A person asks for this after a story's pull request merges. You read what the de
 
 The person names the story: a key such as `gh-123`, or its folder `.agents/specs/<key>-<slug>/`. Ask if they did not. Read only: never edit anything under `runs/`, and run no command that changes the repository or the remote.
 
-- **The spec**: `spec.md` (Behaviour items, Plan) and each `slices/<nn>-<slug>.md` (acceptance, frontmatter `criteria` with `verifier` and `needs`).
+- **The spec**: `spec.md` (Behaviour items, Plan) and each `slices/<nn>-<slug>.md` (acceptance, frontmatter `criteria` with `id` and `verifier`).
 - **The delivery record**: one folder per unit under `runs/`, `runs/_story/` for the story and `runs/<nn>-<slug>/` for each slice. In each:
   - `state.json`: `counters` (name: times its loop was taken), `visits` (stage name: entries), `attempt`, `status`, `park` (`kind`, `reason`), `nudges_used`, `retries_used`.
   - `workflow.yaml`: the definition this unit ran, pinned when it began. Its `counters` give each `max`; each edge with a `counter` is a loop.
@@ -30,7 +30,7 @@ The person names the story: a key such as `gh-123`, or its folder `.agents/specs
 - **The local trace**, only on the machine that ran the story: `<YYYY-MM-DD>.jsonl` files in the delivery tool's folder for this checkout, under your home directory (named after the checkout's folder), one JSON object per line. It is not committed; when it is missing, say so in the report and work from the record alone. Keep the lines whose `unit` (or `fact.story`, `fact.slice`) is this story or one of its slices. By `type`:
   - `hook` with `fact.event: "permission_prompt"` and `fact.command`: commands that stopped for a permission prompt;
   - `reject` (`reason`): a report the tool refused;
-  - `criteria` (`verdicts`, `unverified_needs`): criteria left unverified, counted per missing capability;
+  - `criteria` (`verdicts`): criteria reports, counted per verdict;
   - `tick` (`decisions[].rule`, `decisions[].result.ok`, `decisions[].result.error`): actions that failed.
 
   Next to the day files, `briefings/<run_id>/` holds what each agent was told and `transcripts/<run_id>/` what it said last.
@@ -43,7 +43,7 @@ Go through every unit. For each finding, keep the evidence as you go: the file a
 2. **Repeated rejects.** Two or more `reject` at the same gate, or rejects in different slices whose `comment` says the same thing.
 3. **Stuck and lost sessions.** `stuck` reasons; `classify` with `died`, `silent`, `stalled` or `timeout`; `started` with `retry: true`; a high `nudges_used`. Read `snapshot.last_message` and the handoff's Progress for why.
 4. **Asks a better spec or skill would have answered.** Pair each `ask` with its `answer`. Would the spec, the plan, the contributor docs or a skill have held that answer? An implicit `ask` with a `command` is a permission prompt: name the command.
-5. **Criteria a machine could not check.** `unverified` verdicts, their `reason` and the criterion's `needs` (the trace's `unverified_needs` counts them): a missing capability. `person` verdicts on criteria an agent could check given a tool, a seed script or a fixture.
+5. **Criteria a machine could not check.** `unverified` verdicts and their `reason`: a missing capability. `person` verdicts on criteria an agent could check given a tool, a seed script or a fixture.
 6. **Checks that failed for environment reasons**, not code: `exit_code` 126 or 127, `reason: "timeout"`, a service not running, a port in use, a missing secret, or a flaky test that passed on the next run with no change in between. Read `output_tail` and the `log`.
 7. **Review findings that recur.** The same `title`, file or rule across slices' `findings`, or found again after rework.
 
@@ -57,7 +57,7 @@ For each finding, suggest ONE concrete change, small enough to review in a minut
 |---|---|
 | a skill, `.agents/skills/<name>/SKILL.md` | an agent's craft fell short the same way more than once |
 | a definition, `.agents/workflows/<name>.yaml` | a missing check before review (lint, type check), a counter `max`, a check's `run` or `timeout`, a stage's `deadline` or `agent`, where a verdict goes |
-| the repo config, `.agents/*.config.yaml` | `limits` (`deadline`, `stalled`, `nudges`, `retries`), an agent's `args`, or its `capabilities` matching the criteria's `needs` |
+| a definition's `defaults:`, or the person's own config | the limits (`deadline`, `stalled`, `nudges`, `retries`) in the definition; an agent's `model` or `args` in the person's config |
 | contributor docs: `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, coding standards | a repo fact an agent asked for or got wrong; a judgement call review kept finding |
 | the spec template: the refine skill's `SKILL.md` and `EXAMPLE.md` in `.agents/skills/norn-refine/` | asks and rejects that trace back to a gap in how specs are written |
 
@@ -66,7 +66,7 @@ Choose where the change belongs:
 - **A mechanical mistake gets an automated check, not prose.** A fixed pattern, a banned API, an import shape or a file-location rule belongs in the repo's linter, a pre-commit hook or a check before review. Prose rules are for judgement calls.
 - **Standards belong to review.** The implementing agent carries the most context; the reviewing agent gets a diff. Put a rule a reviewer can enforce where review reads it.
 - **Contributor docs load into every agent.** Add a pointer to a doc, not the doc itself.
-- **A capability gap is fixed where it lives**: give the agent the tool and declare it in `capabilities`, or send those criteria to an agent that has it.
+- **A capability gap is fixed where it lives**: give the agent the tool (a browser MCP, a device), or send those criteria to a person.
 - **A tight counter is rarely the fix.** Fix what caused the loops; raise a `max` only when the loops were each worth it.
 - **Look for what exists first**: a check that is defined but not wired, a doc that already says it but no agent reads.
 - **Bundled skills are replaced on reinstall.** The skills in `.agents/skills/` that came with the delivery tool are overwritten by its own copy. To change one, suggest a copy under a new name, plus the `skill:` line in `.agents/workflows/<name>.yaml` that points at the copy. A skill the repo wrote itself changes in place.

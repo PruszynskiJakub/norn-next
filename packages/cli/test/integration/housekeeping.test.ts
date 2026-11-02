@@ -290,7 +290,8 @@ describe("norn doctor: a fresh repository", () => {
   afterAll(() => h.cleanup());
 
   test("no git remote fails the remote check with the command that adds one", async () => {
-    h.git(["remote", "rename", "origin", "upstream"]);
+    // gh-64 B31: the git remote follows what main tracks, so a renamed remote is still found; remove it
+    h.git(["remote", "remove", "origin"]);
     try {
       const env = { ...h.deps.env, NORN_HOOK_COMMAND: `${process.execPath} ${main} hook` };
       const r = await runChecked(["doctor"], { ...h.deps, env });
@@ -300,7 +301,9 @@ describe("norn doctor: a fresh repository", () => {
       expect(r.stdout).toContain("! this repository has no git remote named origin");
       expect(r.stdout).toContain("→ git remote add origin <url>");
     } finally {
-      h.git(["remote", "rename", "upstream", "origin"]);
+      h.git(["remote", "add", "origin", h.remoteDir]);
+      h.git(["fetch", "-q", "origin"]);
+      h.git(["branch", "-q", "-u", "origin/main", "main"]);
     }
   });
 
@@ -425,20 +428,20 @@ steps:
 
   test("a config value of the wrong type names the file, the key and why; non-zero (B8)", async () => {
     const file = repoConfigPath(h.root);
-    h.write(file, CONFIG.replace("max_agents: 1", 'max_agents: "two"'));
+    h.write(file, "provider: gh\nworkflow: 7\n");
     try {
       const r = await runChecked(["doctor"], { ...h.deps, env: env() });
       expect(r.exit).toBe(1);
-      expect(r.value).toMatchObject({ ok: false, repo: { ok: false, config: { ok: false, file: relConfig, errors: [expect.objectContaining({ path: "/max_agents" })] } } });
+      expect(r.value).toMatchObject({ ok: false, repo: { ok: false, config: { ok: false, file: relConfig, errors: [expect.objectContaining({ path: "workflow" })] } } });
       expect(r.stdout).toMatch(/^norn doctor: .*failed \(.*config.*\)/);
       expect(r.stdout).toMatch(/FAIL config +\.agents\/norn\.config\.yaml/);
-      expect(r.stdout).toMatch(/! \/max_agents: .*integer/);
+      expect(r.stdout).toMatch(/! workflow: `workflow` must be a workflow name/);
       // --repo needs no config that loads either
       const repo = await runChecked(["doctor", "--repo"], { ...h.deps, env: env() });
       expect(repo.exit).toBe(1);
       expect(repo.stdout).toMatch(/FAIL config +\.agents\/norn\.config\.yaml/);
     } finally {
-      h.write(file, CONFIG);
+      h.config(CONFIG);
     }
   });
 

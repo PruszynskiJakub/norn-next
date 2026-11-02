@@ -104,15 +104,15 @@ cd your-repo
 norn init
 ```
 
-`norn init` writes the config (`.agents/norn.config.yaml`), six workflows in `.agents/workflows/` (`triage`, the default; `reproduce`; `refinement`; `story` and its `slice`; `quick`), each doing one thing, that a story goes through one after another,, the agent skills and hooks, and its `.gitignore` and `.gitattributes` lines. It reads your test command from your build files, then prints the next steps, which are:
+`norn init` writes the team config (`.agents/norn.config.yaml`), a commented user config (`~/.norn/config.yaml`) on a machine's first init, six workflows in `.agents/workflows/` (`triage`, the default; `reproduce`; `refinement`; `story` and its `slice`; `quick`), each doing one thing, that a story goes through one after another, the agent skills and hooks, a JSON schema next to each config file for your editor, and its `.gitignore` and `.gitattributes` lines. It reads your test command from your build files, then prints the next steps, which are:
 
 1. Check the test command it wrote into the workflows' `test` steps.
 2. Commit and push the setup.
 3. Run `norn doctor` to check this machine: agents, hooks, remote auth, runner and skills.
 
-GitLab users set `remote.provider: glab` in the config. The label that marks a story is `remote.label` (default `norn`).
+norn reads GitHub or GitLab from the remote URL; a self-hosted host sets `provider: gh` or `provider: glab` in `.agents/norn.config.yaml`. The label that marks a story is always `norn`.
 
-**Upgrading a repository set up by an older norn?** It keeps its config, workflows and trace together in one folder under `.agents/`; on that layout every command refuses and names `norn migrate`. Run `norn migrate` in the main checkout, with `norn watch` stopped: it moves the config and workflows to their new places as staged git moves, moves the trace to this machine's folder for the checkout, and prints the commit to make. Once that commit merges, an older norn cannot read the repository: upgrade norn on every machine that works on it.
+**Upgrading a repository set up by an older norn?** It keeps its config, workflows and trace together in one folder under `.agents/`; on that layout every command refuses and names `norn migrate`, and so does a config written for an older norn, naming each old key and its replacement. Run `norn migrate` in the main checkout, with `norn watch` stopped: it moves the config and workflows to their new places as staged git moves, moves the trace to this machine's folder for the checkout, rewrites old config keys (your user file in place; the team file, workflows and slices staged, listing every key it drops), and prints the commit to make. Once that commit merges, an older norn cannot read the repository: upgrade norn on every machine that works on it.
 
 ### 3. Run your first story
 
@@ -142,12 +142,12 @@ Five commands cover most days:
 
 For recipes by situation (a first story, an agent that asks or dies, a moved `main`, custom workflows, handing a story over), open [`docs/cookbook.html`](docs/cookbook.html) in a browser.
 
-**Manual and auto mode.** Each story has a mode. The repo default is `default_mode` in the config, and `norn story edit <story> --auto|--manual` switches it.
+**Manual and auto mode.** Each story has a mode, taken from, nearest first: the story (`norn story edit <story> --auto|--manual`), its workflow's top-level `mode`, `mode` in `.agents/norn.config.local.yaml`, `mode` in `~/.norn/config.yaml`, then `manual`.
 
 - **manual** (the default): when an agent step is ready, the inbox shows how to start it. With the `herdr` runner, `norn story start <unit>` opens a tab in the unit's worktree with the agent started on the brief. Otherwise, open any agent in the unit's worktree and tell it *"Use the norn skill, then run `norn brief`"*.
-- **auto**: norn starts agents itself through the configured `runner` (`herdr` or `headless`). A machine with no runner runs its stories in manual mode.
+- **auto**: norn starts agents itself through the runner it detects: Herdr when norn runs inside it or it is installed, otherwise headless.
 
-In both modes, `check` and `git` steps run on their own. Attended steps (`attended: true`, such as refine and plan) and `gate` steps always wait for a person, even in auto mode. When the agent of an attended step has waited for you longer than `limits.attended_wait` (default 2 minutes), the inbox moves it from Running to Your turn.
+In both modes, `check` and `git` steps run on their own. Attended steps (`attended: true`, such as refine and plan) and `gate` steps always wait for a person, even in auto mode. When the agent of an attended step has waited for you for 2 minutes, the inbox moves it from Running to Your turn.
 
 **What gets committed.** A story's run state lives in `.agents/specs/<id>-<slug>/runs/`: `state.json`, numbered receipts, the pinned workflow, logs of failed checks, QA evidence and `handoff.md`. norn commits it with the agent's work at each step boundary and pushes the branch, so anyone can take the story over from any commit. `runs/` is marked as generated, so GitHub and GitLab collapse it in the PR diff. Per-tick detail (the trace, locks and caches) stays outside the repository, in `~/.norn/repos/<checkout>-<hash>/`, one folder per checkout on each machine.
 
@@ -182,7 +182,16 @@ A unit pins its workflow when it starts, so editing a file does not affect stori
 
 **Skills carry the craft.** `norn init` copies norn's skills (`norn`, `norn-refine`, `norn-plan`, `norn-implement`, `norn-review`, `norn-qa`, …) as whole folders into `.agents/skills/` and links them from each configured agent's skill folder: `.claude/skills/`, `.gemini/skills/`, `.opencode/skills/` (Codex reads `.agents/skills/` itself). Commit them. Each `norn init` replaces them with the bundled version and lists what it updated; `git diff .agents/skills/` shows the change. To change how a step is done, write your own skill under another name and name it in the step (`skill: my-review`). `norn doctor` reports skills that are missing, not linked or out of date. After a story's PR merges, ask an agent to use `norn-retro` on it: it reads the story's `runs/` and suggests one change per friction it found, each citing its receipt, without changing any file. Links need a filesystem that supports them (on Windows, developer mode).
 
-**Config** lives in two files with the same keys: `.agents/norn.config.yaml` (committed, what the team agrees on: remote, workflows, limits) and `~/.norn/config.yaml` (yours: runner, machine caps, notifiers, default mode). The repo file wins, except that it can only lower machine caps. The template `norn init` writes groups the keys by who they belong to, with their defaults. `norn config` shows every setting in effect, the file it came from and what it does.
+**Config** is optional: a solo developer on GitHub with Claude Code writes none. The team's keys go in `.agents/norn.config.yaml`, yours in `~/.norn/config.yaml` or `.agents/norn.config.local.yaml`; each key belongs in one kind of file:
+
+| File | For | Keys |
+|---|---|---|
+| `~/.norn/config.yaml` | this machine, and your defaults for every repo | machine: `max_agents` (1–9, default 9), `notify` (`os`, `ntfy`, `webhook`), `trace.retain` · yours: `mode`, `agent`, `agents.<name>` (`model`, `args`) |
+| `.agents/norn.config.local.yaml` (gitignored) | you, in this repo | `mode`, `agent`, `agents.<name>`: these override the user file |
+| `.agents/norn.config.yaml` (committed) | the team | `provider`, `base_branch`, `workflow`, `slice_workflow` |
+| a workflow file | the workflow | top-level `mode`; `defaults:` with `deadline`, `nudges`, `retries`, `stalled` |
+
+For your keys the nearer file wins: local over user over built-in. Maps merge key by key; lists and scalars replace, so `agents: {claude: {model: …}}` keeps Claude's built-in `--permission-mode auto`, and `notify: {ntfy: <url>}` keeps OS notifications. Everything else has no key: the runner is detected, the git remote is the one the base branch tracks, claims are timed from the tick interval (`norn watch --interval`, `norn tick --interval`), and slots, the label and the sync are fixed. A key in the wrong file, a typo or an old key is a "Config error" naming the file and the fix. `norn config` shows every setting in effect with its source (`built-in`, `derived`, `user`, `local`, `repo`); `norn config set <key> <value> --user|--local|--repo` edits one.
 
 ## Plugins
 
@@ -196,7 +205,7 @@ herdr plugin install PruszynskiJakub/norn-next/plugins/herdr   # update it with 
 
 Working on norn itself? Link your checkout instead, so the plugin follows `git pull`: `herdr plugin link <checkout>/plugins/herdr`. `norn doctor` suggests whichever fits.
 
-The plugin has three actions you can bind to keys in Herdr's `config.toml`: `norn.pick` opens the cockpit as a popup on any workspace, `norn.open` opens it below the focused pane, and `norn.next` jumps to the agent that waits for you. `plugins/herdr/README.md` has the keys and the config for a tab bar segment (`norn status --segment`) and sidebar row. To get inbox notifications as Herdr toasts, add `{adapter: herdr}` to `notifiers` in the config.
+The plugin has three actions you can bind to keys in Herdr's `config.toml`: `norn.pick` opens the cockpit as a popup on any workspace, `norn.open` opens it below the focused pane, and `norn.next` jumps to the agent that waits for you. `plugins/herdr/README.md` has the keys and the config for a tab bar segment (`norn status --segment`) and sidebar row. Inside Herdr, inbox notifications also come as Herdr toasts, with no config.
 
 ## How it works
 
