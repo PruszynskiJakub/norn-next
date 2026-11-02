@@ -10,9 +10,16 @@ labels:
   - norn
   - norn:wf:quick
 workflow: quick
-status: active
+status: done
 intake_at: 2026-11-02T07:08:29.386Z
 body_hash: 370f9e0ab73a2c566c1d86a8df111f353b89a83c1c1f1f5ff728d896fa778abe
+merge:
+  pr: 164
+  url: https://github.com/PruszynskiJakub/norn-next/pull/164
+  head_sha: e36a5e410a1d4d87b4f20d090cedababbbe8f205
+  merge_commit_sha: 79be1ec1e08d99eceba449cec55a96e83f057117
+  merged_by: PruszynskiJakub
+  merged_at: 2026-11-02T12:50:15.000Z
 ---
 
 # Minimal config in three files: machine, you in this repo (config.local.yaml), the team
