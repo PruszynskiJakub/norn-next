@@ -41,7 +41,7 @@ Configuration shrinks to the keys a person actually needs, each legal in exactly
 | `~/.norn/config.yaml` | this machine, and your defaults for every repo | machine: `max_agents`, `notify`, `trace.retain` · yours: `mode`, `agent`, `agents.<name>` (`model`, `args`) |
 | `.agents/norn.config.local.yaml` (new, gitignored) | you, in this repo | `mode`, `agent`, `agents.<name>` (`model`, `args`): these override the user file |
 | `.agents/norn.config.yaml` (committed) | the team | `provider`, `base_branch`, `workflow`, `slice_workflow` |
-| a workflow file | the workflow | top-level `mode`; `defaults:` with `deadline`, `nudges`, `retries`, `stalled` (steps keep their own four) |
+| a workflow file | the workflow | top-level `mode`; `defaults:` with `deadline`, `nudges`, `retries`, `stalled` (steps keep their own three: `deadline`, `nudges`, `retries`) |
 
 The rules a person must know:
 
@@ -215,4 +215,117 @@ None.
 
 ## Plan
 
-Written by the `norn-plan` skill.
+### Seams
+
+- **S1 The CLI, through the cli harness (`runCli` with the fake clock, `FakeRemote`, `FakeRunner`, an injected `env` and a temp `NORN_HOME_DIR`).** Observes what a person sees from a command: `norn config list|get --json` values and sources, refusals (title, exit code, `CliError` code), files `init` and `migrate` write or stage, what a `tick` launches and queues, the brief, `done`, `run list`, `doctor` lines. Observes B1–B10, B13–B17, B21–B25, B29–B34, B36–B50, B53–B55.
+  Prior art: the cli integration tests for `norn config` (list/get/set), `norn migrate`, criteria, story-start and runtime; `test/support/harness.ts`.
+- **S2 Core decide and the inbox, through `decide(facts, workflows, config)` and `buildInbox`.** Observes the timing and counting rules that need many minutes of fake time or many running units: limits from a workflow's `defaults:`, the fixed attended wait, the `max_agents` cap on sessions and checks, claim renewal on the derived period, an old pinned workflow taking the built-in limits. Observes B18, B26, B27, B35, B51.
+  Prior art: core unit tests of decide (`decide`, `attended-wait`, `apply`), `rule-cases.ts` and the golden corpus.
+- **S3 Port wiring, through `buildPorts(registry, adapterContext, config)` with a recording registry and an injected `env`.** Observes which runner and which notifiers a resolved config builds, which the harness cannot see because it injects both ports. Observes B12, B19, B20.
+  Prior art: none for `buildPorts` directly; the notify adapter unit tests show the option shapes.
+- **S4 Workflow load, through store `loadWorkflows` and core workflow validation (W5).** Observes B11's refusal and that `mode` and `defaults:` load. Observes B28 (the hook read window is computed from the loaded workflows).
+  Prior art: core and schema workflow unit tests.
+- **S5 The repo lint, `test/repo/repo.test.ts`.** Observes B52: no doc, help text, template or bundled skill names a removed key.
+  Prior art: its banned-words lint.
+
+### Coverage
+
+| Behaviour | Seam | Test kind | Notes |
+|---|---|---|---|
+| B1 | S1 | integration | fresh repo, `init`, no config: `config` sources built-in/derived; a tick takes a labelled issue on `triage` |
+| B2 | S1 | integration | |
+| B3 | S1 | integration | two repos, one user home |
+| B4 | S1 | integration | |
+| B5 | S1 | integration | one case per file |
+| B6 | S1 | integration | |
+| B7 | S1 | integration | exit code and title; no unit marked corrupt |
+| B8 | S1 | integration | |
+| B9 | S1 | integration | `init` twice |
+| B10 | S1 | integration | tick launches or holds; `story edit --auto` overrides the workflow |
+| B11 | S4 | unit | |
+| B12 | S3 | unit | no runner key, no Herdr → headless built |
+| B13 | S1 | integration | the launched session's agent in `FakeRunner` |
+| B14 | S1 | integration | resolved `agents.claude` with per-field sources |
+| B15 | S1 | integration | |
+| B16 | S1 | integration | |
+| B17 | S1 | integration | |
+| B18 | S2 | unit | sessions and checks queued at the cap |
+| B19 | S3 | unit | |
+| B20 | S3 | unit | `HERDR_ENV` in the injected env |
+| B21 | S1 | integration | wrong file; tidy and doctor behaviour unchanged |
+| B22 | S1 | integration | remote URL set in the harness clone |
+| B23 | S1 | integration | existing BS0 tests keep passing |
+| B24 | S1 | integration | intake with and without a `norn:wf:` label |
+| B25 | S1 | integration | |
+| B26 | S2 | unit | |
+| B27 | S2 | unit | |
+| B28 | S4 | unit | window = longest `stalled` |
+| B29 | S1 | integration | fake `herdr` on the injected PATH |
+| B30 | S1 | integration | `remote.label` → `config_moved` |
+| B31 | S1 | integration | clone with `upstream` tracking |
+| B32 | S1 | integration | sync due after 5m, forced by `norn sync` (existing tests) |
+| B33 | S1 | integration | `.env.norn` content |
+| B34 | S1 | integration | `tick --interval 2m` then `status`: no "no heartbeat" item |
+| B35 | S2 | unit | renew period; `config` shows `derived` under S1 |
+| B36 | S1 | integration | brief and `done` |
+| B37 | S1 | integration | `run list` counts; the skill text by S5 |
+| B38 | S1 | integration | tick and brief on a slice with `needs` |
+| B39 | S1 | integration | one case per moved key family |
+| B40 | S1 | integration | |
+| B41 | S1 | integration | |
+| B42 | S1 | integration | |
+| B43 | S1 | integration | |
+| B44 | S1 | integration | |
+| B45 | S1 | integration | |
+| B46 | S1 | integration | |
+| B47 | S1 | integration | bad ntfy URL in the user file |
+| B48 | S1 | integration | `doctor` |
+| B49 | S1 | integration | |
+| B50 | S1 | integration | modelines and schema copies written; the copies validate sample files with ajv |
+| B51 | S2 | unit | pinned workflow without `defaults:` |
+| B52 | S5 | unit | |
+| B53 | S1 | integration | |
+| B54 | S1 | integration | |
+| B55 | S1 | integration | |
+
+### Prefactoring
+
+1. **Effective settings speak the new names.** Rename the fields of the resolved config every reader uses to the new keys (`agent`, `mode`, `workflow`, `slice_workflow`, `provider`, …) while the files still take the old ones, mapped in the layer merge; convert the golden corpus's `config` once with a script. No behaviour changes. Buys: every later slice and `norn config` speak one vocabulary; no old name spreads (B2–B4, B46).
+2. **One function for a story's mode.** Replace the five places that compute `state.mode ?? default_mode` (agent unit, observe, view, `story edit`, doctor) with one core function. Buys: B10 and B25 change one place.
+3. **One function for a step's limits.** Replace every read of the global limits (decide, apply, brief, observe, inbox) with one core function of the workflow and the step. Buys: B26–B28 and B51 change one place.
+
+### Implementation decisions
+
+- D1 **Files and settings are two types.** The config files stay YAML. Three file schemas (user, local, repo), each emitted as a JSON schema (the format editors read through the modeline, B50, B55); the resolved config stays the one value decide, views and commands read, built by a pure resolver from the three files plus a `derived` input (runner detected, remote URL, tracking remote, recorded tick interval) that the cli context gathers before resolving. Limits and the attended wait leave the resolved config (workflow `defaults:` and a constant); slots become constants; claim lease and renew stay as fields, derived.
+- D2 **Error order per file: moved, then wrong file, then invalid.** A table of moved and removed keys with their replacement is checked first, so an old key is `config_moved` rather than an unknown key; a key another file takes is `config_wrong_file`; anything else failing the file's schema is `config_invalid`. Cross-file checks (`agent` names a built-in agent, `max_agents` 1–9) run after the merge and name the file that set the value.
+- D3 **A new exit code `config` (6) with the title "Config error".** Loading config throws it in place of today's `corrupt`, with `CliError.code` `config_invalid`, `config_wrong_file` or `config_moved` and the file path in `details`.
+- D4 **`norn config set|unset` gains `--local`** and checks the key against the target file's schema, refusing a key that belongs elsewhere with `config_wrong_file`. The seeding of a new `agents.<name>` entry from the layer below goes, since entries now merge field by field.
+- D5 **The heartbeat records the tick interval.** `heartbeat.json` gains `interval` (absent → 30s). `norn watch` always writes its interval (`--interval`, default 30s); `norn tick` writes it only when given `--interval`, so a tick run by hand never overwrites the interval cron recorded. Liveness (3 × interval) and claim timing read it.
+- D6 **Runner detection:** inside Herdr means `HERDR_ENV=1` in the env; installed means `herdr` resolves on the env's PATH. Detected once per command in the cli context, from the injected env, so tests control it.
+- D7 **Provider derivation:** the remote URL's host containing `github` → `gh`, `gitlab` → `glab`; a URL with any other host and no `provider` key → refused (B54). A remote that is a local path, or no remote, keeps `gh` (today's behaviour; the harness clones from a local path).
+- D8 **Git remote derivation:** with `base_branch` set, the remote its local branch tracks; unset, the remote the branch checked out in the main checkout tracks (normally `main`); else `origin`. This settles B31's "base branch" when `base_branch` is unset, since the remote's default branch needs a remote first.
+- D9 **`notify` builds the notifier list in wiring:** `os` unless `os: false`, `ntfy` and `webhook` from their URL (http or https, checked by the schema), `herdr` when inside Herdr. The ntfy adapter takes the one URL.
+- D10 **Agent names are an enum of the four built-ins** for `agent` and the keys of `agents`; an entry takes only `model` and `args`, merged field by field over the built-in entry and then the user's, `args` replacing whole.
+- D11 **`needs` and agent `capabilities` go:** criteria schema, QV5a's check in `done`, the brief's needs column, the capability split in QA counts, and the skill text. Runner capabilities (send, resume, open) are a different thing and stay.
+- D12 **A slice that still has `needs`** fails its frontmatter load with its own reason (not corrupt): the unit shows under Unblock with "run `norn migrate`", and commands that load it refuse with exit `refused`, code `needs_removed`.
+- D13 **`norn migrate` does the config rewrite after the layout move,** under the same preconditions (main checkout, tick lock), editing YAML as documents so comments stay. Mapping: `default_*` → new names; `notifiers` → `notify` (ntfy topic or server+topic → URL; unknown adapters dropped and listed); team `limits` → each workflow's `defaults:` (B41); team `default_mode` → each workflow's `mode` (B42); everything removed or now personal is dropped and listed with its value (B43); slice `needs` stripped (B44). The team file, the workflows, the slices and the schema copy are staged; the user file is rewritten in place.
+- D14 **Schema copies:** the user schema at `~/.norn/config.schema.json` (written by `init`, refreshed by `init` and `migrate`); the team and local schemas committed beside their files in `.agents/` (B55); the starters carry a modeline to their copy.
+- D15 **Adapter errors name their file:** wiring builds each agent and notifier from a config key and attaches that key's source file (from the explain entries) to the error; `doctor` catches each failure into one `FAIL config` line and runs the rest.
+- D16 **`max_agents` defaults to 9, range 1–9, and checks keep their own count under the same cap** (two counts, one number), so sessions and checks queue separately as today.
+- D17 **`stalled` is a workflow limit only.** It is set in `defaults:` (or built in, 15m), never on a step; steps keep `deadline`, `nudges`, `retries`. The hook read window is the longest `stalled` across the loaded workflows (B26, B28). The spec's file table was amended to say so.
+
+### Testing decisions
+
+- Tests drive the seams above only; none reaches into the resolver, the moved-key table or the YAML rewriting directly.
+- Faked, at system boundaries only: the clock, the remote (`FakeRemote`), the runner (`FakeRunner`), the notifiers (`FakeNotifier`, a recording registry under S3), and the environment (PATH with a fake `herdr`, `HERDR_ENV`, `NORN_HOME_DIR`). Git and the file system are real.
+- The harness pins an env without `HERDR_ENV` and with a PATH that has no `herdr`, so a developer machine with Herdr installed gives the same results as CI.
+- The harness and every test that writes old keys move to the new files (mode in the user or local file, limits in workflows) in the step of the order (Risks) that removes the old key.
+
+### Risks
+
+The next round is `quick` (no slices), so this Plan is built in one implement pass, in this order: prefactors 1–3; the three file schemas, the resolver with derived values and the config errors (D1–D3, D6–D8, D10, D16); workflow `mode` and `defaults:` (D17); notify and wiring (D9, D15); heartbeat interval (D5); `needs` removal (D11, D12); `config set --local` (D4); `init` starters and schema copies (D14); `norn migrate` (D13); docs last (B52). The risks below say where in that order each risk is met.
+
+- **Test churn.** About fifty test files and the 93 golden cases write or embed old keys. Prefactor 1 converts the corpus by script; each later step of the order moves only the tests of the keys it removes, and lands green before the next, so the one pass stays reviewable commit by commit.
+- **Detection leaking from the host.** Runner detection reads PATH and `HERDR_ENV`; unpinned, tests would pass or fail by machine. The harness pins both in the first step that detects (the resolver step).
+- **`norn migrate` rewriting YAML with comments.** The YAML document API keeps comments on edits but can reflow flow maps; the migrate step starts with tests of commented user and team files before the mapping grows.
+- **Effect transcripts and observe snapshots.** Facts that carry mode or config, and the heartbeat's new field, may change them; rewrite them only in the step that changes that behaviour, and review the diff.
