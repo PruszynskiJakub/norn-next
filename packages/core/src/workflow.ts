@@ -42,9 +42,9 @@ export interface ValidateOptions {
   skills?: Iterable<string>;
   /**
    * W5: skills each configured agent can see (its installed skill folder). A step's skill must be
-   * visible to the agent that runs it (`step.agent ?? default_agent`); an agent not listed is not checked.
+   * visible to the agent that runs it (`step.agent ?? agent`); an agent not listed is not checked.
    */
-  agentSkills?: { default_agent: string; visible: Readonly<Record<string, Iterable<string>>> };
+  agentSkills?: { agent: string; visible: Readonly<Record<string, Iterable<string>>> };
 }
 
 /** Outcomes an agent step may declare to override a classified route (C1). `exhausted` always goes to `$stuck` (W7). */
@@ -116,7 +116,7 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
     if (step.type === "agent") {
       if (skills && !skills.has(step.skill))
         issues.push({ code: "unknown_skill", path: `/steps/${name}/skill`, message: `skill '${step.skill}' is not installed` });
-      const agent = step.agent ?? opts.agentSkills?.default_agent;
+      const agent = step.agent ?? opts.agentSkills?.agent;
       const seen = agent === undefined ? undefined : visible?.get(agent);
       if (seen && !seen.has(step.skill))
         issues.push({

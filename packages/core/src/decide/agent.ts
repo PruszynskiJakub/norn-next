@@ -81,7 +81,7 @@ function sessionRef(run: NonNullable<UnitState["run"]>): SessionRef {
 // ---------------------------------------------------------------- agent steps
 
 function launchFor(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, step: AgentStep, run_id: string, cwd: string): AgentLaunch {
-  const agent = step.agent ?? ctx.config.default_agent;
+  const agent = step.agent ?? ctx.config.agent;
   const env: Record<string, string> = { NORN_STORY: story.key, NORN_RUN: run_id };
   if (uf.unit.slice) env.NORN_SLICE = uf.unit.slice;
   Object.assign(env, ctx.slotEnv(uf.worktree?.slot ?? null));
@@ -92,7 +92,7 @@ function launchFor(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, st
 }
 
 function startedReceipt(ctx: Ctx, st: UnitState, step: AgentStep, run_id: string, worktree: string, retry: boolean): ReceiptOf<"started"> {
-  const agent = step.agent ?? ctx.config.default_agent;
+  const agent = step.agent ?? ctx.config.agent;
   const r = nornReceipt(ctx, st, "started", {
     run_id,
     how: "auto",
@@ -428,7 +428,7 @@ export function implicitAskResolved(st: UnitState, uf: UnitFacts): string | null
 /** R6.1: write the `answer` receipt (`by: "agent"`) that ends an implicit ask; the run goes on, nothing is typed. */
 export function resolveImplicitAsk(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, why: string): void {
   const run = st.run as NonNullable<UnitState["run"]>;
-  const answer = nornReceipt(ctx, st, "answer", { run_id: run.run_id, by: "agent", who: run.agent ?? ctx.config.default_agent, answer: `the agent moved on: ${why}` });
+  const answer = nornReceipt(ctx, st, "answer", { run_id: run.run_id, by: "agent", who: run.agent ?? ctx.config.agent, answer: `the agent moved on: ${why}` });
   if (st.park?.receipt_id) answer.ask_receipt_id = st.park.receipt_id;
   if (uf.unit.slice) answer.slice = uf.unit.slice;
   const { nr, res } = synth(ctx, st, wf, nextReceiptNumber(uf), answer);

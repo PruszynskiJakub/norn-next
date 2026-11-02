@@ -34,7 +34,7 @@ async function restorable(ctx: Context, key: string): Promise<PushedStory> {
     throw failure(`cannot read issue #${s.frontmatter.number}: ${(e as Error).message}`, `retry: ${cmd.storyReopen(key)}`, "network");
   }) : null;
   if (issue && issue.state !== "open") throw refuse(`issue #${s.frontmatter.number} of ${key} is closed`, "reopen the issue first", "issue_closed");
-  const origin = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
+  const origin = await gitRemote(ctx.git, ctx.root, ctx.config.git_remote);
   if (!origin) return s;
   const listed = await ctx.git.remoteBranches(ctx.root, origin, `refs/heads/${key}/*`).catch((e: unknown) => {
     throw failure(`cannot list ${origin} branches: ${(e as Error).message}`, `retry: ${cmd.storyReopen(key)}`, "network");
@@ -53,7 +53,7 @@ async function noStoryBranch(ctx: Context, key: string): Promise<CliFailure> {
   const unknown = refuse(`no story branch for ${key}`, "check the story key", "unknown_story");
   const n = parseStoryKey(key)?.number;
   const remote = (await ctx.ports()).remote;
-  const origin = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
+  const origin = await gitRemote(ctx.git, ctx.root, ctx.config.git_remote);
   if (n == null || !remote || !origin) return unknown;
   const issue = await remote.getIssue(n).catch(() => null);
   if (!issue) return unknown;

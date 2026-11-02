@@ -131,7 +131,7 @@ export function loadTraceView(opts: LoadTraceViewOptions): TraceView | null {
   const story = withSliceWorktrees(read, (slice) => wts.slices.get(slice), { includeApplied: true });
   const { events } = readTrace(opts.repoRoot, { unit: storyKey, types: TIMELINE_TYPES });
   const tdir = machineDir(opts.repoRoot);
-  const { records, runsDir } = recordsOf(opts.repoRoot, story, snap.config.ok ? snap.config.config.remote.git_remote : "origin");
+  const { records, runsDir } = recordsOf(opts.repoRoot, story, snap.config.ok ? snap.config.config.git_remote : "origin");
 
   const build = (u: UnitSnapshot, evs: TraceEvent[] = events): TraceView => {
     const file = u.unit.slice ? story.slices.find((s) => s.key === u.unit.slice) : null;

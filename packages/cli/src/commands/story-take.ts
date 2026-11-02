@@ -18,11 +18,11 @@ export const storyTakeCommand = defineCommand({
   positionals: { max: 1 },
   async run(ctx, args) {
     const raw = args.positionals[0];
-    const provider = ctx.config.remote.provider;
+    const provider = ctx.config.provider;
     const parts = raw ? parseStoryKey(raw) : null;
     if (!raw || !parts || parts.provider !== provider) throw usageError(`name the issue's story key${raw ? `, not '${raw}'` : ""} (e.g. ${provider === "gh" ? "gh" : "gl"}-123)`, cmd.storyTake("<story>"));
     const key = raw;
-    const label = ctx.config.remote.label;
+    const label = ctx.config.label;
     if ((await projectView(ctx)).stories.some((s) => s.key === key)) throw refuse(`${key} is taken in already`, cmd.storyView(key), "taken_in");
     const remote = (await ctx.ports()).remote;
     if (!remote) throw refuse("no remote is configured", cmd.doctor(), "no_remote");

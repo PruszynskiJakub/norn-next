@@ -182,7 +182,7 @@ function launchPromptMissed(uf: UnitFacts, st: UnitState): { since: string; pane
  */
 export function startCommandFor(uf: UnitFacts, story: StoryFacts, config: ResolvedConfig): string {
   const step = uf.workflow && uf.state ? stepOf(uf.workflow, uf.state.step) : null;
-  const name = (step?.type === "agent" && step.agent) || config.default_agent;
+  const name = (step?.type === "agent" && step.agent) || config.agent;
   const agent = config.agents[name];
   const worktree = unitWorktree(story, uf);
   return startAgentCommand(worktree, agent?.command ?? agent?.adapter ?? name, agent?.args);
@@ -411,7 +411,7 @@ function finishedRoundRemoteItem(story: StoryFacts, config: ResolvedConfig, base
   if (st?.status !== "done" || landed(story, base)) return null;
   // between syncs the issue is not fetched: the one the last sync saw keeps the item put
   const issue = story.issue !== undefined ? story.issue : story.issue_seen?.issue;
-  const reason = issueProblem({ ...story, issue }, config.remote.label);
+  const reason = issueProblem({ ...story, issue }, config.label);
   if (!reason) return null;
   return {
     id: `remote:${story.key}:${reason}`,

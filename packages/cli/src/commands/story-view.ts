@@ -27,7 +27,7 @@ export const storyViewCommand = defineCommand({
     const raw = await targetKey(ctx, args.positionals[0], args.json === true, aStory("story view", cmd.storyView));
     const { key, story, slice } = parseUnitKey(raw);
     const view = await projectView(ctx);
-    const report = orientReport(view, key, ctx.config.remote.provider);
+    const report = orientReport(view, key, ctx.config.provider);
     if (!report) throw refuse(`unknown story ${story}`, cmd.status(), "unknown_unit");
     if (slice && !report.slices.some((s) => s.key === slice)) throw refuse(`no slice ${slice} in story ${story}`, cmd.storyView(story), "unknown_unit");
     if (!opt.bool(args, "web")) return rendered(report, formatStoryView(report, ctx.clock.now(), { rules: ctx.env[ORIENT_ENV] === "1" }));

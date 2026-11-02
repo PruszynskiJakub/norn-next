@@ -101,22 +101,30 @@ export const TraceConfig = Type.Object(
 );
 export type TraceConfig = Static<typeof TraceConfig>;
 
-/** Fully resolved configuration (both layers merged over defaults). */
+/** Fully resolved configuration (the layers merged over defaults), in the new key names (gh-64). */
 export const ResolvedConfig = Type.Object(
   {
     agents: Type.Record(Name, AgentConfig),
-    default_agent: Name,
+    /** the agent for steps that name none */
+    agent: Name,
     /** null: no runner on this machine → effective mode manual (MO2) */
     runner: Type.Union([RunnerConfig, Type.Null()]),
-    remote: RemoteConfig,
+    provider: RemoteProvider,
+    /** label marking issues norn picks up (GR1) */
+    label: NonEmpty,
+    /** GitHub Enterprise / self-hosted GitLab host */
+    host: Type.Optional(NonEmpty),
+    /** git remote name */
+    git_remote: NonEmpty,
+    sync_interval: Duration,
     /**
      * BS0: the branch stories are cut from, updated from (`git: update`) and PR'd into. null =
      * the remote's default branch, discovered as before. Never assumed to be `main`.
      */
     base_branch: Type.Union([NonEmpty, Type.Null()]),
-    default_workflow: Name,
-    default_slice_workflow: Name,
-    default_mode: Mode,
+    workflow: Name,
+    slice_workflow: Name,
+    mode: Mode,
     /** machine caps (K1); a repo layer can only lower them (K2) */
     max_agents: PosInt,
     max_checks: PosInt,
@@ -163,13 +171,16 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
    * permission profiles). A layer that defines `agents.claude` replaces this entry, args included.
    */
   agents: { claude: { adapter: "claude", args: ["--permission-mode", "auto"] } },
-  default_agent: "claude",
+  agent: "claude",
   runner: null,
-  remote: { provider: "gh", label: "norn", git_remote: "origin", sync_interval: "5m" },
+  provider: "gh",
+  label: "norn",
+  git_remote: "origin",
+  sync_interval: "5m",
   base_branch: null,
-  default_workflow: "triage",
-  default_slice_workflow: "slice",
-  default_mode: "manual",
+  workflow: "triage",
+  slice_workflow: "slice",
+  mode: "manual",
   max_agents: 2,
   max_checks: 2,
   slots: { min: 1, max: 9, port_base: 4000, ports_per_slot: 10 },
@@ -185,13 +196,17 @@ const minDefined = (a: number, b: number | undefined) => (b === undefined ? a : 
 function layer(base: ResolvedConfig, l: ConfigLayer): ResolvedConfig {
   return {
     agents: { ...base.agents, ...l.agents },
-    default_agent: l.default_agent ?? base.default_agent,
+    agent: l.default_agent ?? base.agent,
     runner: l.runner === undefined ? base.runner : l.runner,
-    remote: { ...base.remote, ...l.remote },
+    provider: l.remote?.provider ?? base.provider,
+    label: l.remote?.label ?? base.label,
+    ...((l.remote?.host ?? base.host) !== undefined ? { host: (l.remote?.host ?? base.host) as string } : {}),
+    git_remote: l.remote?.git_remote ?? base.git_remote,
+    sync_interval: l.remote?.sync_interval ?? base.sync_interval,
     base_branch: l.base_branch === undefined ? base.base_branch : l.base_branch,
-    default_workflow: l.default_workflow ?? base.default_workflow,
-    default_slice_workflow: l.default_slice_workflow ?? base.default_slice_workflow,
-    default_mode: l.default_mode ?? base.default_mode,
+    workflow: l.default_workflow ?? base.workflow,
+    slice_workflow: l.default_slice_workflow ?? base.slice_workflow,
+    mode: l.default_mode ?? base.mode,
     max_agents: l.max_agents ?? base.max_agents,
     max_checks: l.max_checks ?? base.max_checks,
     slots: { ...base.slots, ...l.slots },
@@ -239,25 +254,42 @@ export interface ConfigEntry {
 
 const GROUP: Record<keyof ResolvedConfig, ConfigGroup> = {
   runner: "machine",
+  provider: "team",
+  label: "team",
+  host: "team",
+  git_remote: "team",
+  sync_interval: "team",
   max_agents: "machine",
   max_checks: "machine",
   slots: "machine",
   notifiers: "machine",
   trace: "machine",
   agents: "person",
-  default_agent: "person",
-  default_mode: "person",
-  remote: "team",
+  agent: "person",
+  mode: "person",
   base_branch: "team",
-  default_workflow: "team",
-  default_slice_workflow: "team",
+  workflow: "team",
+  slice_workflow: "team",
   watch_interval: "team",
   claim: "team",
   limits: "team",
 };
 
 /** Keys whose layers merge key by key (`agents` per agent name), so each child is its own entry. */
-const MERGED = new Set<keyof ResolvedConfig>(["agents", "remote", "slots", "claim", "limits", "trace"]);
+const MERGED = new Set<keyof ResolvedConfig>(["agents", "slots", "claim", "limits", "trace"]);
+
+/** Where a resolved setting sits in a layer file, when the names differ (prefactor: files keep the old keys). */
+const LAYER_PATH: Partial<Record<keyof ResolvedConfig, string[]>> = {
+  agent: ["default_agent"],
+  mode: ["default_mode"],
+  workflow: ["default_workflow"],
+  slice_workflow: ["default_slice_workflow"],
+  provider: ["remote", "provider"],
+  label: ["remote", "label"],
+  host: ["remote", "host"],
+  git_remote: ["remote", "git_remote"],
+  sync_interval: ["remote", "sync_interval"],
+};
 
 function equal(a: unknown, b: unknown): boolean {
   if (a === b) return true;
@@ -284,9 +316,10 @@ export function explainConfig(user: ConfigLayer = {}, repo: ConfigLayer = {}): C
   const entries: ConfigEntry[] = [];
   const add = (path: string[], group: ConfigGroup) => {
     const value = at(resolved, path);
-    const r = at(repo, path);
-    const u = at(user, path);
-    const entry: ConfigEntry = { key: path.join("."), value, source: "built-in", group };
+    const file = LAYER_PATH[path[0] as keyof ResolvedConfig] ?? path;
+    const r = at(repo, file);
+    const u = at(user, file);
+    const entry: ConfigEntry = { key: file.join("."), value, source: "built-in", group };
     if (r !== undefined && equal(r, value)) entry.source = "repo";
     else if (u !== undefined && equal(u, value)) entry.source = "user";
     if (r !== undefined && !equal(r, value)) entry.repo_ignored = r;
@@ -331,4 +364,27 @@ function childSchema(s: Record<string, unknown>, seg: string): Record<string, un
   if (patterns) return Object.entries(patterns).find(([p]) => new RegExp(p).test(seg))?.[1];
   // an open value (`options`: anything) holds any key; a scalar or a list holds none
   return s.type === undefined ? s : undefined;
+}
+
+/**
+ * A resolved config an older norn recorded in a tick's replay block, in today's names, so
+ * `norn run view --why` replays it (O5). Fields already in today's names pass through. Pure.
+ */
+export function legacyConfig(recorded: unknown): ResolvedConfig {
+  const c = { ...(recorded as Record<string, unknown>) };
+  const rename = (from: string, to: string) => {
+    if (from in c) {
+      if (!(to in c)) c[to] = c[from];
+      delete c[from];
+    }
+  };
+  rename("default_agent", "agent");
+  rename("default_mode", "mode");
+  rename("default_workflow", "workflow");
+  rename("default_slice_workflow", "slice_workflow");
+  if (typeof c.remote === "object" && c.remote !== null) {
+    for (const [k, v] of Object.entries(c.remote)) if (!(k in c)) c[k] = v;
+    delete c.remote;
+  }
+  return c as ResolvedConfig;
 }

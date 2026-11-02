@@ -132,9 +132,9 @@ describe("config", () => {
     expect(c.max_agents).toBe(3);
     expect(c.max_checks).toBe(1);
     expect(c.slots).toMatchObject({ min: 2, max: 6, port_base: 5000 });
-    expect(c.remote).toMatchObject({ provider: "glab", label: "mine", git_remote: "origin" });
+    expect(c).toMatchObject({ provider: "glab", label: "mine", git_remote: "origin" });
     expect(c.runner).toEqual({ adapter: "herdr" });
-    expect(c.default_mode).toBe("auto");
+    expect(c.mode).toBe("auto");
     expect(resolveConfig({ runner: { adapter: "herdr" } }, { runner: null }).runner).toBeNull();
   });
 });

@@ -100,13 +100,13 @@ type Backlog = NonNullable<CockpitOptions["backlog"]>;
 async function readBacklog(ctx: Context): Promise<Backlog | null> {
   const remote = (await ctx.ports()).remote;
   if (!remote) return null;
-  const [me, issues] = await Promise.all([remote.whoami(), remote.listLabelledIssues({ label: ctx.config.remote.label })]);
+  const [me, issues] = await Promise.all([remote.whoami(), remote.listLabelledIssues({ label: ctx.config.label })]);
   return { me, issues };
 }
 
 async function interactive(ctx: Context, interval: number) {
   const cockpit = cockpitHerdr(ctx);
-  const options = { places: !!cockpit, provider: ctx.config.remote.provider };
+  const options = { places: !!cockpit, provider: ctx.config.provider };
   const { chunks, close } = keyChunks(ctx);
   let state: TuiState = initialState();
   let view: ProjectView | null = null;
@@ -237,7 +237,7 @@ export async function statusWatch(raw: Context, args: ParsedArgs) {
   }
   if (args.json) {
     const backlog = await readBacklog(ctx).catch(() => null);
-    return cockpitModel(await projectView(ctx), { places: !!cockpitHerdr(ctx), provider: ctx.config.remote.provider, ...(backlog ? { backlog } : {}) });
+    return cockpitModel(await projectView(ctx), { places: !!cockpitHerdr(ctx), provider: ctx.config.provider, ...(backlog ? { backlog } : {}) });
   }
   return interactive(ctx, interval);
 }

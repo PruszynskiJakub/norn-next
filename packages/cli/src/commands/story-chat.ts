@@ -22,7 +22,7 @@ import { aStory, targetKey } from "../runtime/target.ts";
 
 /** The chat agent: the default agent with its configured args, its first prompt `norn story view <story>`. */
 function chatAgentCommand(config: ResolvedConfig, story: string): string {
-  const name = config.default_agent;
+  const name = config.agent;
   const agent = config.agents[name];
   return `${ORIENT_ENV}=1 ${startAgentCommand(null, agent?.command ?? agent?.adapter ?? name, agent?.args, `Run \`${cmd.storyView(story)}\` and follow it.`)}`;
 }
@@ -36,7 +36,7 @@ export const storyChatCommand = defineCommand({
   async run(ctx, args) {
     const raw = await targetKey(ctx, args.positionals[0], args.json === true, aStory("story chat", cmd.storyChat));
     const { story } = parseUnitKey(raw);
-    const report = orientReport(await projectView(ctx), story, ctx.config.remote.provider);
+    const report = orientReport(await projectView(ctx), story, ctx.config.provider);
     if (!report) throw refuse(`unknown story ${story}`, cmd.status(), "unknown_unit");
 
     const label = `${story} orient`;

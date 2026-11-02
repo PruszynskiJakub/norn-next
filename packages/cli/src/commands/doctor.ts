@@ -238,7 +238,7 @@ async function repoGroup(ctx: Context): Promise<RepoReport> {
   const loaded = ctx.loaded;
   const listing = loadWorkflows(root);
   const agents = loaded.ok ? (await ctx.ports()).agents : {};
-  const checked = checkedRepoWorkflows(listing, root, { default_agent: loaded.ok ? loaded.config.default_agent : "" }, agents);
+  const checked = checkedRepoWorkflows(listing, root, { agent: loaded.ok ? loaded.config.agent : "" }, agents);
   const fileOf = (name: string) => {
     const wf = listing.workflows[name];
     return wf ? relative(root, wf.file) : (listing.errors.find((e) => basename(e.file, extname(e.file)) === name)?.file ?? name);
@@ -452,16 +452,16 @@ export const doctorCommand = defineCommand({
     }
 
     let remote: Record<string, unknown>;
-    if (!ports.remote) remote = { ok: true, provider: config.remote.provider, configured: false };
+    if (!ports.remote) remote = { ok: true, provider: config.provider, configured: false };
     else {
       try {
         remote = { ok: true, provider: ports.remote.provider, user: await ports.remote.whoami() };
       } catch (e) {
-        remote = { ok: false, provider: ports.remote.provider, error: (e as Error).message, do_instead: `${config.remote.provider === "glab" ? "glab" : "gh"} auth login` };
+        remote = { ok: false, provider: ports.remote.provider, error: (e as Error).message, do_instead: `${config.provider === "glab" ? "glab" : "gh"} auth login` };
       }
     }
     // sync reads issues and every step pushes through this remote: without it nothing moves
-    const gitRemote = { name: config.remote.git_remote, url: gitRemoteUrl(ctx.root, config.remote.git_remote) };
+    const gitRemote = { name: config.git_remote, url: gitRemoteUrl(ctx.root, config.git_remote) };
     remote.git_remote = gitRemote;
     if (!gitRemote.url && remote.ok === true)
       remote = { ...remote, ok: false, error: `this repository has no git remote named ${gitRemote.name}`, do_instead: `git remote add ${gitRemote.name} <url>` };
@@ -474,7 +474,7 @@ export const doctorCommand = defineCommand({
         ok: available && (onPath?.ok ?? true),
         configured: true,
         // MO2: only auto mode starts agents through the runner
-        required: config.default_mode === "auto",
+        required: config.mode === "auto",
         name: ports.runner.name,
         available,
         ...(onPath ? { norn_on_path: onPath } : {}),

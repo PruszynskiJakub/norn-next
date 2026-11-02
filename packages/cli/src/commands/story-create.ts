@@ -43,7 +43,7 @@ export const storyCreateCommand = defineCommand({
       if (!listed.includes(workflow))
         throw refuse(`no workflow '${workflow}' in ${WORKFLOWS_DIR}/ (available: ${listed.join(", ") || "none"})`, cmd.storyCreate({ workflow: `<${listed.join("|")}>` }), "unknown_workflow", { workflows: listed });
     }
-    const labels = [ctx.config.remote.label, ...(workflow ? [`${WF_LABEL}${workflow}`] : [])];
+    const labels = [ctx.config.label, ...(workflow ? [`${WF_LABEL}${workflow}`] : [])];
     const remote = (await ctx.ports()).remote;
     if (!remote) throw refuse("no remote is configured", cmd.doctor(), "no_remote");
     const remoteFailed = (e: unknown) => failure(`the remote failed: ${(e as Error).message}`, cmd.doctor(), "remote_failed");

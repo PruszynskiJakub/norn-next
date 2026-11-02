@@ -284,7 +284,7 @@ export async function classify(act: ActEnv, a: Extract<Action, { kind: "classify
 async function snapshotRun(act: ActEnv, unit: UnitRef, runId: string, req: { transcript: string | null; cwd: string } | null): Promise<string | null> {
   if (!req) return null;
   const loc = act.unitLoc(unit);
-  const agentName = loc.state?.run?.agent ?? act.config.default_agent;
+  const agentName = loc.state?.run?.agent ?? act.config.agent;
   const agent = act.obs.ports.agents[agentName];
   const last = req.transcript && agent ? await agent.lastAssistantMessage(req.transcript).catch(() => null) : null;
   const head = req.cwd ? await act.git.revParse(req.cwd, "HEAD").catch(() => null) : null;

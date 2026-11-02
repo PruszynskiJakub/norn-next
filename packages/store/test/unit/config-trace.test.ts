@@ -42,7 +42,7 @@ describe("config (K2)", () => {
     mkdirSync(dirname(repoConfigPath(repo)), { recursive: true });
     writeFileSync(repoConfigPath(repo), "max_agents: 8\nremote: { label: mine }\n");
     const c = loadConfig({ repoRoot: repo, env: { NORN_HOME_DIR: home } });
-    expect(c.ok && c.config).toMatchObject({ max_agents: 4, default_mode: "auto", remote: { label: "mine", provider: "gh" } });
+    expect(c.ok && c.config).toMatchObject({ max_agents: 4, mode: "auto", label: "mine", provider: "gh" });
     expect(c.home).toBe(home);
   });
   test("invalid layer → errors with repo-relative path", () => {
@@ -185,7 +185,11 @@ describe("trace (O4)", () => {
     const read = readTickInputs(repo, t);
     const inputs = read.ok ? read.inputs : null;
     expect(inputs?.facts as unknown).toEqual({ now: Date.parse(AT), tick_id: "T" });
-    expect(inputs?.config).toBe(config);
+    expect(inputs?.config).toEqual(config);
+    // a config recorded under the old names reads back in today's names (gh-64 P1)
+    const old = { ...t, facts: { ...t.facts, replay: { workflows: {}, config: { default_mode: "auto", remote: { label: "x" } } } } } as unknown as TickTrace;
+    const oldRead = readTickInputs(repo, old);
+    expect(oldRead.ok && oldRead.inputs.config).toEqual({ mode: "auto", label: "x" } as unknown as ResolvedConfig);
     expect(inputs?.workflows.slice).toMatchObject({ name: "slice", source: WORKFLOW_YAML, issues, workflow: { name: "slice", start: "implement" } });
     expect(inputs?.workflows.gone).toEqual({ name: "gone", workflow: null, source: "", issues: [] });
     // a tick an older norn recorded without the replay block

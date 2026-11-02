@@ -77,7 +77,7 @@ export async function buildPorts(registry: AdapterRegistry, actx: AdapterContext
   }
   let remote = overrides.remote;
   if (remote === undefined) {
-    const f = registry.remotes[config.remote.provider] ?? (await external<RemoteFactory>("remote", config.remote.provider));
+    const f = registry.remotes[config.provider] ?? (await external<RemoteFactory>("remote", config.provider));
     remote = f(actx);
   }
   return {

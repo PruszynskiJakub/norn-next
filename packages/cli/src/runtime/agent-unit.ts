@@ -77,18 +77,18 @@ export function refuseUnlessAgentWork(s: UnitSession, verb: string): void {
 
 /** The story's mode (MO1): stored in the story unit's state, which lives in the story worktree. */
 export function storyMode(ctx: Context, s: UnitSession, config: ResolvedConfig): Mode {
-  if (s.unit.slice === null) return s.state.mode ?? config.default_mode;
+  if (s.unit.slice === null) return s.state.mode ?? config.mode;
   const slug = basename(s.marker.spec_dir).slice(s.unit.story.length + 1);
   const wt = storyWorktreePath(s.root, s.unit.story, slug);
   const dir = unitDir(join(existsSync(wt) ? wt : s.root, s.marker.spec_dir), "_story");
   const st = readState(dir);
-  return (st.ok ? st.value.mode : undefined) ?? config.default_mode;
+  return (st.ok ? st.value.mode : undefined) ?? config.mode;
 }
 
 /** `who` for agent receipts: the run's agent, else the step's, else the default (A6). */
 export function agentName(s: UnitSession, config: ResolvedConfig): string {
   const step = cursorStep(s);
-  return s.state.run?.agent ?? (step?.type === "agent" ? step.agent : undefined) ?? config.default_agent;
+  return s.state.run?.agent ?? (step?.type === "agent" ? step.agent : undefined) ?? config.agent;
 }
 
 /** QV1/QV4: the unit's frontmatter `criteria` — its slice file, or spec.md for the story unit; null = none declared. */

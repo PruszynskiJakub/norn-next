@@ -49,7 +49,7 @@ async function editMode(ctx: Context, raw: string, mode: Mode) {
   const t = await resolveTarget(ctx, parseUnitKey(raw).story);
   // T9: refused before anything (even a no-op) is computed from a possibly stale local copy
   const claim = await refuseIfHeldElsewhere(ctx, t.story, "story edit");
-  let current: Mode = ctx.config.default_mode;
+  let current: Mode = ctx.config.mode;
   const out = await runHumanVerb(ctx, t, {
     verb: "story edit",
     mailbox: false,
@@ -60,7 +60,7 @@ async function editMode(ctx: Context, raw: string, mode: Mode) {
       if (st.status === "done") throw refuse(`${t.key} is done`, cmd.storyView(t.story), "unit_done");
     },
     noop(t, st) {
-      const previous: Mode = st.mode ?? ctx.config.default_mode;
+      const previous: Mode = st.mode ?? ctx.config.mode;
       // a pending, not yet applied mode receipt wins over state.json
       const uf = t.story_facts?.units.find((u) => u.unit.key === t.key);
       const pending = uf?.unapplied.filter((r) => r.receipt.kind === "mode").at(-1)?.receipt;

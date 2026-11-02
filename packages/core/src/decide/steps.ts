@@ -236,7 +236,7 @@ export function slicesStep(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitS
   const starts = [];
   for (const s of startable.sort((a, b) => a.nn.localeCompare(b.nn))) {
     const fm = s.frontmatter;
-    const name = fm.workflow ?? ctx.config.default_slice_workflow;
+    const name = fm.workflow ?? ctx.config.slice_workflow;
     const loaded = usableWorkflow(ctx, name, "slice");
     if ("problem" in loaded) return park(ctx, story, uf, st, "workflow", `slice ${s.key}: ${loaded.problem}`, "slices.workflow_invalid");
     const sliceRef: UnitRef = { story: story.key, slice: s.key, dir: sliceDirName(s.nn, s.slug), key: s.key };

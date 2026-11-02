@@ -69,7 +69,7 @@ export const AgentStep = Type.Object(
     skill: NonEmpty,
     instructions: Type.Optional(Type.String()),
     inputs: Type.Optional(Type.Array(StepInput, { uniqueItems: true })),
-    agent: Type.Optional(Type.String({ minLength: 1, description: "Name from config.agents; default config.default_agent" })),
+    agent: Type.Optional(Type.String({ minLength: 1, description: "Name from config.agents; default config.agent" })),
     model: Type.Optional(NonEmpty),
     attended: Type.Optional(Type.Boolean({ description: "Worked with a person; always started by a person (MO4)" })),
     deadline: Type.Optional(Duration),

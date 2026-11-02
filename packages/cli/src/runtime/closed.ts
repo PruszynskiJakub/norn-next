@@ -21,7 +21,7 @@ export interface PushedStory {
 
 /** The story's record as pushed, fetched first; null when it has no story branch. `again` is the command to retry. */
 export async function pushedStory(ctx: Context, key: string, again: string): Promise<PushedStory | null> {
-  const remote = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
+  const remote = await gitRemote(ctx.git, ctx.root, ctx.config.git_remote);
   const branch = await findStoryBranch(ctx, key, remote);
   if (!branch) return null;
   let rev = `refs/heads/${branch}`;
@@ -49,7 +49,7 @@ export const isClosed = (s: PushedStory | null): boolean => s?.frontmatter.statu
 
 /** B55: the closed stories, from the story branches on the remote (local ones without a remote), by key. */
 export async function closedStories(ctx: Context, again: (key: string) => string): Promise<string[]> {
-  const remote = await gitRemote(ctx.git, ctx.root, ctx.config.remote.git_remote);
+  const remote = await gitRemote(ctx.git, ctx.root, ctx.config.git_remote);
   const re = new RegExp(`${STORY_KEY_PATTERN.slice(0, -1)}-[a-z0-9][a-z0-9-]*$`);
   const names = remote
     ? await ctx.git.remoteBranches(ctx.root, remote, "refs/heads/*").catch((e: unknown) => {

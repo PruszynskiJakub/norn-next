@@ -83,7 +83,7 @@ function intake(ctx: Ctx): void {
     const branch = storyBranch(key, slug);
     const path = storyWorktreePath(facts.repo.root, key, slug);
     const labelled = issue.labels.find((l) => l.startsWith(WF_LABEL))?.slice(WF_LABEL.length);
-    const workflow = labelled && ctx.workflows[labelled] ? labelled : config.default_workflow;
+    const workflow = labelled && ctx.workflows[labelled] ? labelled : config.workflow;
     const frontmatter: StoryFrontmatter = {
       id: key,
       slug,

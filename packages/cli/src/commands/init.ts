@@ -180,7 +180,7 @@ export const initCommand = defineCommand({
       hooks.push({ agent: name, tier: agent.tier, changed: r.changed });
     }
 
-    const report: InitReport = { root, config, workflows, skills, hooks, hook_command: command, gitignore: ensureGitignore(root), gitattributes: ensureGitattributes(root), remote: { provider: ctx.config.remote.provider, label: ctx.config.remote.label, git_remote: ctx.config.remote.git_remote, url: gitRemoteUrl(root, ctx.config.remote.git_remote) }, test_command };
+    const report: InitReport = { root, config, workflows, skills, hooks, hook_command: command, gitignore: ensureGitignore(root), gitattributes: ensureGitattributes(root), remote: { provider: ctx.config.provider, label: ctx.config.label, git_remote: ctx.config.git_remote, url: gitRemoteUrl(root, ctx.config.git_remote) }, test_command };
     return rendered(report, formatInit(report));
   },
 });

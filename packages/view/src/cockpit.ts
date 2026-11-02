@@ -73,7 +73,7 @@ export interface CockpitModel {
 export interface CockpitOptions {
   /** CP1: the front end can focus an agent's pane and open an orient workspace (the terminal inside Herdr) */
   places: boolean;
-  /** shown in the preview's PR command (`config.remote.provider`) */
+  /** shown in the preview's PR command (`config.provider`) */
   provider: RemoteProvider;
   /**
    * CP2: what the front end read from the remote — the open issues carrying the intake label, and the

@@ -169,7 +169,7 @@ describe("single-purpose workflows (W1, #136)", () => {
   const types = (name: string) => Object.fromEntries(Object.entries(wf(name).steps).map(([s, step]) => [s, step.type]));
 
   test("triage is the default story workflow and slice the default slice workflow (W9)", () => {
-    expect([DEFAULT_CONFIG.default_workflow, DEFAULT_CONFIG.default_slice_workflow]).toEqual(["triage", "slice"]);
+    expect([DEFAULT_CONFIG.workflow, DEFAULT_CONFIG.slice_workflow]).toEqual(["triage", "slice"]);
   });
 
   test("triage is one norn-triage step that ends the round with done: the recommendation is only in its comment", () => {

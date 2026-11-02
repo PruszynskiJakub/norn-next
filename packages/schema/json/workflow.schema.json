@@ -114,7 +114,7 @@
                 },
                 "agent": {
                   "minLength": 1,
-                  "description": "Name from config.agents; default config.default_agent",
+                  "description": "Name from config.agents; default config.agent",
                   "type": "string"
                 },
                 "model": {

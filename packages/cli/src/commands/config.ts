@@ -74,7 +74,7 @@ function within(entries: ConfigEntry[], key: string): ConfigEntry[] {
 /** Hints for the mistakes the layering makes easy; one line each, no decisions. */
 function configNotes(config: ResolvedConfig, entries: ConfigEntry[]): string[] {
   const notes: string[] = [];
-  if (config.runner === null && config.default_mode === "auto")
+  if (config.runner === null && config.mode === "auto")
     notes.push("`default_mode` is auto but this machine has no `runner`: every story runs manual (MO2). Set `runner` in ~/.norn/config.yaml.");
   for (const e of entries) {
     if (e.repo_ignored !== undefined) notes.push(`\`${e.key}\`: the repo's ${show(e.repo_ignored)} does not apply; a repo can only lower a machine cap (K2).`);

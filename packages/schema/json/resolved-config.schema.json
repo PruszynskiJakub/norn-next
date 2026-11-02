@@ -4,13 +4,16 @@
   "type": "object",
   "required": [
     "agents",
-    "default_agent",
+    "agent",
     "runner",
-    "remote",
+    "provider",
+    "label",
+    "git_remote",
+    "sync_interval",
     "base_branch",
-    "default_workflow",
-    "default_slice_workflow",
-    "default_mode",
+    "workflow",
+    "slice_workflow",
+    "mode",
     "max_agents",
     "max_checks",
     "slots",
@@ -69,7 +72,7 @@
         }
       }
     },
-    "default_agent": {
+    "agent": {
       "pattern": "^[a-z][a-z0-9_-]*$",
       "type": "string"
     },
@@ -99,47 +102,35 @@
         }
       ]
     },
-    "remote": {
-      "additionalProperties": false,
-      "type": "object",
-      "required": [
-        "provider",
-        "label",
-        "git_remote",
-        "sync_interval"
-      ],
-      "properties": {
-        "provider": {
-          "description": "Issue provider CLI: gh (GitHub) or glab (GitLab)",
-          "anyOf": [
-            {
-              "const": "gh",
-              "type": "string"
-            },
-            {
-              "const": "glab",
-              "type": "string"
-            }
-          ]
-        },
-        "label": {
-          "minLength": 1,
+    "provider": {
+      "description": "Issue provider CLI: gh (GitHub) or glab (GitLab)",
+      "anyOf": [
+        {
+          "const": "gh",
           "type": "string"
         },
-        "host": {
-          "minLength": 1,
-          "type": "string"
-        },
-        "git_remote": {
-          "minLength": 1,
-          "type": "string"
-        },
-        "sync_interval": {
-          "pattern": "^([0-9]+(ms|s|m|h|d))+$",
-          "description": "Duration like 30s, 10m, 1h30m",
+        {
+          "const": "glab",
           "type": "string"
         }
-      }
+      ]
+    },
+    "label": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "host": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "git_remote": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "sync_interval": {
+      "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+      "description": "Duration like 30s, 10m, 1h30m",
+      "type": "string"
     },
     "base_branch": {
       "anyOf": [
@@ -152,15 +143,15 @@
         }
       ]
     },
-    "default_workflow": {
+    "workflow": {
       "pattern": "^[a-z][a-z0-9_-]*$",
       "type": "string"
     },
-    "default_slice_workflow": {
+    "slice_workflow": {
       "pattern": "^[a-z][a-z0-9_-]*$",
       "type": "string"
     },
-    "default_mode": {
+    "mode": {
       "anyOf": [
         {
           "const": "manual",
