@@ -46,7 +46,15 @@ export interface ConfigPaths {
 
 export type LoadedConfig =
   | { ok: true; config: ResolvedConfig; entries: ConfigEntry[]; files: ConfigFiles; home: string; paths: ConfigPaths }
-  | { ok: false; problems: ConfigProblem[]; errors: FileError[]; home: string; paths: ConfigPaths };
+  | {
+      ok: false;
+      problems: ConfigProblem[];
+      errors: FileError[];
+      home: string;
+      paths: ConfigPaths;
+      /** B48: the config with the failing keys left out, so doctor still runs the checks one bad value does not hide */
+      fallback: { config: ResolvedConfig; entries: ConfigEntry[] };
+    };
 
 const executableOnPath = (name: string, path: string | undefined): boolean =>
   (path ?? "").split(":").some((dir) => {
@@ -119,7 +127,7 @@ export function loadConfig(opts: { repoRoot: string; home?: string; env?: Record
   const problems = [...read.user.problems, ...read.local.problems, ...read.repo.problems, ...r.problems];
   if (problems.length) {
     const errors: FileError[] = problems.map((p) => ({ file: p.file === "user" ? paths.user : p.file === "local" ? LOCAL_CONFIG_FILE : REPO_CONFIG_FILE, errors: [{ path: p.key, message: p.message }] }));
-    return { ok: false, problems, errors, home, paths };
+    return { ok: false, problems, errors, home, paths, fallback: { config: r.config, entries: r.entries } };
   }
   return { ok: true, config: r.config, entries: r.entries, files, home, paths };
 }

@@ -401,3 +401,26 @@ Body
     expect(sh(h.root, ["log", "-1", "--format=%s"]).trim()).toBe("an older norn's config");
   });
 });
+
+describe("norn migrate leaves a new-style config alone (gh-64 B45)", () => {
+  test("B45: a user and team file with no old key, in odd formatting, are neither rewritten nor staged", async () => {
+    const h = await createHarness();
+    try {
+      expect((await h.norn("init")).exit).toBe(0);
+      const team = "# the team\nprovider:    gh   # ours\nworkflow: quick\n";
+      const user = "mode:    auto   # mine\n";
+      h.write(repoConfigPath(h.root), team);
+      h.git(["add", "-A"]);
+      h.git(["commit", "-q", "-m", "new-style config"]);
+      h.write(join(h.home, "config.yaml"), user);
+      const out = await h.norn("migrate", "--json");
+      expect(out.exit).toBe(0);
+      expect(out.value).toMatchObject({ config: { changed: [], renamed: [], removed: [] } });
+      expect(h.read(join(h.home, "config.yaml"))).toBe(user);
+      expect(h.read(repoConfigPath(h.root))).toBe(team);
+      expect(porcelain(h)).toBe("");
+    } finally {
+      h.cleanup();
+    }
+  });
+});

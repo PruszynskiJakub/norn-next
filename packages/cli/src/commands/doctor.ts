@@ -30,11 +30,12 @@ import { tmpdir } from "node:os";
 import { basename, extname, join, relative, resolve } from "node:path";
 import { git as gitAdapter, herdr, proc } from "@norn/adapters";
 import type { AgentAdapter, FileError, Ports, RunnerPort, SessionRef, WorkflowIssue } from "@norn/core";
-import { ExitCode, ulid } from "@norn/schema";
+import { type ConfigEntry, ExitCode, type ResolvedConfig, ulid } from "@norn/schema";
 import { bindNornHome, type Layout, layoutProblems, loadWorkflows, machineDir, machineHolder, noteSpawn, orphanedMachineDirs, readHookFacts, repoConfigPath, repoLayout, skillsReport, traceDaysBefore, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
-import { CliFailure, rendered, withExit } from "../output.ts";
+import { CliFailure, configError, rendered, withExit } from "../output.ts";
+import { agentsInUse } from "../runtime/agents-in-use.ts";
 import { assetsDir } from "../runtime/assets.ts";
 import { gitRemoteUrl } from "../runtime/detect.ts";
 import { ensureShim, withNornOnPath } from "../runtime/shim.ts";
@@ -141,7 +142,7 @@ async function liveTurn(ctx: Context, name: string, agent: AgentAdapter, command
   const { repo, drop } = await scratchUnit(ctx);
   try {
     if (agent.tier !== "none") await agent.installHooks(repo, command, name);
-    const cfg = ctx.config.agents[name];
+    const cfg = usableConfig(ctx).config.agents[name];
     const launch = agent.launchCommand({
       cwd: repo,
       prompt: "This is a connectivity test. Reply with the single word OK and do nothing else.",
@@ -218,34 +219,45 @@ interface Check {
   do_instead?: string;
 }
 
-const portsTried = new WeakMap<Context, Promise<{ ports: Ports; fail: { ok: false; error: string; do_instead: string | null } | null }>>();
+type ConfigFail = { ok: false; error: string; do_instead: string | null };
 
-/** B48 (D15): the ports, with an adapter that fails to build recorded as one failure and the rest built without notifiers. */
-/**
- * B13: wiring builds every built-in agent so a step may name any of them; doctor checks only the
- * ones in use — the default agent, each configured entry and each agent a repo workflow step names —
- * so an agent nobody uses never fails it for not being installed.
- */
-function agentsInUse(ctx: Context, ports: Ports): Record<string, AgentAdapter> {
-  const names = new Set<string>([ctx.config.agent, ...Object.keys(ctx.config.agents)]);
-  for (const wf of Object.values(loadWorkflows(ctx.root).workflows))
-    for (const step of Object.values(wf.workflow.steps)) if (step.type === "agent" && step.agent) names.add(step.agent);
-  return Object.fromEntries(Object.entries(ports.agents).filter(([n]) => names.has(n)));
+/** B48: the config doctor runs on — the resolved one, or the valid values of one that does not load. */
+function usableConfig(ctx: Context): { config: ResolvedConfig; entries: readonly ConfigEntry[] } {
+  const l = ctx.loaded;
+  return l.ok ? l : l.fallback;
 }
 
+const portsTried = new WeakMap<Context, Promise<{ ports: Ports; fail: ConfigFail | null }>>();
+
+/**
+ * B48 (D15): the ports for the usable config, with an adapter that fails to build recorded as one
+ * failure and the rest built without notifiers. Not cached on the context, so no later caller gets
+ * the fallback ports. Anything other than a config error is a bug and is thrown.
+ */
 function doctorPorts(ctx: Context) {
   let p = portsTried.get(ctx);
   if (!p) {
-    p = ctx.ports().then(
+    const { config } = usableConfig(ctx);
+    p = ctx.portsFor(config).then(
       (ports) => ({ ports, fail: null }),
       async (e: unknown) => {
-        const body = e instanceof CliFailure ? e.body : { error: (e as Error).message, do_instead: null };
-        return { ports: await ctx.ports({ notifiers: [] }), fail: { ok: false as const, error: body.error, do_instead: body.do_instead } };
+        if (!(e instanceof CliFailure) || e.exit !== ExitCode.config) throw e;
+        return { ports: await ctx.portsFor(config, { notifiers: [] }), fail: { ok: false as const, error: e.body.error, do_instead: e.body.do_instead } };
       },
     );
     portsTried.set(ctx, p);
   }
   return p;
+}
+
+/** B48: a config file that does not load, as one failure; the team file's problems are the repo group's own line. */
+function loadFail(ctx: Context): ConfigFail | null {
+  const l = ctx.loaded;
+  if (l.ok) return null;
+  const machine = l.problems.filter((p) => p.file !== "repo");
+  if (!machine.length) return null;
+  const body = configError(machine, { ...l.paths }).body;
+  return { ok: false, error: body.error, do_instead: body.do_instead };
 }
 
 interface RepoReport {
@@ -254,8 +266,6 @@ interface RepoReport {
   layout: { ok: true; layout: "new" };
   workflows: Array<{ name: string; file: string; ok: boolean; issues: WorkflowIssue[] }>;
   config: { ok: boolean; file: string; present: boolean; errors: FileError["errors"] };
-  /** why a workflow's skills went unchecked (the config does not load, so its agents are unknown) */
-  skills_unchecked?: string;
 }
 
 /**
@@ -266,8 +276,9 @@ async function repoGroup(ctx: Context): Promise<RepoReport> {
   const root = ctx.root;
   const loaded = ctx.loaded;
   const listing = loadWorkflows(root);
-  const agents = loaded.ok ? (await doctorPorts(ctx)).ports.agents : {};
-  const checked = checkedRepoWorkflows(listing, root, { agent: loaded.ok ? loaded.config.agent : "" }, agents);
+  // B48: on the valid values of a config that does not load, so its skills are still checked
+  const agents = (await doctorPorts(ctx)).ports.agents;
+  const checked = checkedRepoWorkflows(listing, root, { agent: usableConfig(ctx).config.agent }, agents);
   const fileOf = (name: string) => {
     const wf = listing.workflows[name];
     return wf ? relative(root, wf.file) : (listing.errors.find((e) => basename(e.file, extname(e.file)) === name)?.file ?? name);
@@ -288,7 +299,6 @@ async function repoGroup(ctx: Context): Promise<RepoReport> {
     layout: { ok: true, layout: "new" },
     workflows,
     config,
-    ...(loaded.ok ? {} : { skills_unchecked: "the config does not load, so no step's skill was checked against its agent" }),
   };
 }
 
@@ -327,8 +337,7 @@ function lines() {
 function formatRepo(r: RepoReport, l: ReturnType<typeof lines>, dir: string): void {
   const valid = r.workflows.filter((w) => w.ok).map((w) => w.name);
   l.line(true, "layout", `${dir}/ and ${r.config.file}`);
-  if (valid.length || !r.workflows.length || r.skills_unchecked) l.line(true, "workflows", valid.length ? `${valid.join(", ")} valid (${dir}/)` : `none valid in ${dir}/`);
-  if (r.skills_unchecked) l.sub(`· ${r.skills_unchecked}`);
+  if (valid.length || !r.workflows.length) l.line(true, "workflows", valid.length ? `${valid.join(", ")} valid (${dir}/)` : `none valid in ${dir}/`);
   for (const w of r.workflows.filter((x) => !x.ok)) {
     l.line(false, `workflow ${w.name}`, w.file);
     for (const i of w.issues) l.sub(`! ${i.path || "/"}: ${i.message}`);
@@ -365,7 +374,7 @@ function formatDoctor(r: {
 
   if (r.config) {
     line(false, "config", r.config.error);
-    fix(r.config);
+    if (r.config.do_instead) sub(`→ ${r.config.do_instead}`);
   }
   line(r.git.ok, "git", r.git.version ?? "not found");
   fix(r.git);
@@ -402,12 +411,11 @@ function formatDoctor(r: {
   return [l.head(r.ok), "", ...out, ...warnings, ...hints].join("\n");
 }
 
-/** `norn doctor --repo`, or plain doctor when the config does not load and the machine checks cannot run. */
-function formatRepoOnly(r: { ok: boolean; repo: RepoReport; skipped?: string }, dir: string): string {
+/** `norn doctor --repo`. */
+function formatRepoOnly(r: { ok: boolean; repo: RepoReport }, dir: string): string {
   const l = lines();
   formatRepo(r.repo, l, dir);
-  const skipped = r.skipped ? ["", `  · ${r.skipped}`] : [];
-  return [l.head(r.ok), "", ...l.out, ...skipped].join("\n");
+  return [l.head(r.ok), "", ...l.out].join("\n");
 }
 
 export const doctorCommand = defineCommand({
@@ -433,18 +441,19 @@ export const doctorCommand = defineCommand({
     }
     const repo = await repoGroup(ctx);
     const dir = relative(ctx.root, workflowsDir(ctx.root));
-    // B10: --repo looks at no agent, runner or remote; a config that does not load leaves the machine checks nothing to run on
-    if (repoOnly || !ctx.loaded.ok) {
-      const others = ctx.loaded.ok ? [] : ctx.loaded.errors.filter((e) => e.file !== repo.config.file);
-      const which = others.map((e) => `${e.file}: ${e.errors.map((x) => `${x.path || "/"} ${x.message}`).join("; ")}`).join(" | ");
-      const skipped = repoOnly ? undefined : `machine checks skipped: they need a config that loads${which ? ` (${which})` : ""}; fix it and run ${cmd.doctor()} again`;
-      const report = { ok: repo.ok && !skipped, repo, ...(skipped ? { skipped } : {}) };
+    // B10: --repo looks at no agent, runner or remote
+    if (repoOnly) {
+      const report = { ok: repo.ok, repo };
       const out = rendered(report, formatRepoOnly(report, dir));
       return report.ok ? out : withExit(out, ExitCode.error);
     }
-    const config = ctx.config;
-    // B48 (D15): an adapter that fails to build is one `FAIL config` line; the other checks still run
-    const { ports, fail: configFail } = await doctorPorts(ctx);
+    // B48 (D15): a config file that does not load, or an adapter that fails to build, is one
+    // `FAIL config` line; the other checks still run, on the values that are valid
+    const usable = usableConfig(ctx);
+    const config = usable.config;
+    const { ports, fail: buildFail } = await doctorPorts(ctx);
+    const fails = [loadFail(ctx), buildFail].filter((f): f is ConfigFail => f !== null);
+    const configFail: ConfigFail | null = fails.length ? { ok: false, error: fails.map((f) => f.error).join("; "), do_instead: fails.map((f) => f.do_instead).filter(Boolean).join("; ") || null } : null;
     const command = hookCommand(ctx);
 
     const g = await run(["git", "--version"], { timeoutMs: 10_000 });
@@ -458,7 +467,7 @@ export const doctorCommand = defineCommand({
     };
 
     const agents = [];
-    const used = agentsInUse(ctx, ports);
+    const used = agentsInUse(ctx.root, usable, ports);
     for (const [name, agent] of Object.entries(used)) {
       const argv = agent.launchCommand({ cwd: ctx.root, prompt: "x", headless: true, env: {}, config: {} }).argv;
       const bin = argv[0] ?? name;

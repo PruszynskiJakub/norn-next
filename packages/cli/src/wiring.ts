@@ -11,8 +11,8 @@ import type {
   Ports,
   RunnerPort,
 } from "@norn/core";
-import type { ResolvedConfig } from "@norn/schema";
-import { failure } from "./output.ts";
+import { ExitCode, type ResolvedConfig } from "@norn/schema";
+import { CliFailure } from "./output.ts";
 
 export function defaultRegistry(): AdapterRegistry {
   return {
@@ -30,7 +30,8 @@ export type SourceOf = (key: string) => string | null;
 
 function adapterError(e: unknown, what: string, file: string | null): never {
   const message = `${what}: ${(e as Error).message}`;
-  throw failure(message, file ? `fix it in ${file}` : "check the setting with `norn config`", "config_invalid");
+  // B7: a config error, so exit 6 under the title "Config error"
+  throw new CliFailure({ error: message, do_instead: file ? `fix it in ${file}` : "check the setting with `norn config`", code: "config_invalid" }, ExitCode.config);
 }
 
 /** B47 (D15): a notifier whose send fails (an unreachable URL) says which file set it. */

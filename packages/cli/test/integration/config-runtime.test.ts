@@ -5,7 +5,7 @@
  * from it (B34, B35), and a slice that still has criteria `needs` under Unblock (B38).
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ConfigEntry } from "@norn/schema";
 import { readTrace, workflowsDir } from "@norn/store";
@@ -35,7 +35,6 @@ describe("mode, agent and workflow over ticks (B10, B13, B24, B25, B33)", () => 
   };
   beforeAll(async () => {
     h = await createHarness();
-    expect((await h.norn("init")).exit).toBe(0);
     h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
     // B25: a workflow's own mode
     h.write(join(workflowsDir(h.root), "careful.yaml"), `mode: manual\n${SOLO.replace("name: solo", "name: careful")}`);
@@ -43,6 +42,8 @@ describe("mode, agent and workflow over ticks (B10, B13, B24, B25, B33)", () => 
     h.write(join(workflowsDir(h.root), "gem.yaml"), SOLO.replace("name: solo", "name: gem").replace("skill: norn-implement", "skill: norn-implement\n    agent: gemini"));
     // B24: the team's entry workflow; B10, B13: my mode and agent, no agents entry
     h.config("workflow: solo\nmode: auto\nagent: codex\n");
+    // B1, B13: init sets up the agents in use, so it runs once the workflows name them
+    expect((await h.norn("init")).exit).toBe(0);
     h.git(["add", "-A"]);
     h.git(["commit", "-q", "-m", "norn"]);
     h.git(["push", "-q", "origin", "main"]);
@@ -199,5 +200,34 @@ describe("the tick interval and claim timing (B34, B35)", () => {
 
   test("a bad --interval is a usage error", async () => {
     expect((await h.norn("tick", "--interval", "soon", "--json")).exit).toBe(2);
+  });
+});
+
+describe("norn init sets up the agents in use only (B1, B13)", () => {
+  const AGENT_DIRS = [".claude", ".codex", ".gemini", ".opencode"];
+  const present = (h: Harness) => AGENT_DIRS.filter((d) => existsSync(join(h.root, d)));
+
+  test("B1: a plain init installs hooks and skills for Claude only", async () => {
+    const h = await createHarness();
+    try {
+      const r = await h.norn("init", "--json");
+      expect(r.exit).toBe(0);
+      expect(present(h)).toEqual([".claude"]);
+      expect((r.value as { hooks: Array<{ agent: string }> }).hooks.map((x) => x.agent)).toEqual(["claude"]);
+    } finally {
+      h.cleanup();
+    }
+  });
+
+  test("B13: an agent in use — the default agent or one a workflow step names — is set up too", async () => {
+    const h = await createHarness();
+    try {
+      h.write(join(h.root, ".agents", "norn.config.local.yaml"), "agent: codex\n");
+      h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO.replace("type: agent\n", "type: agent\n    agent: gemini\n"));
+      expect((await h.norn("init")).exit).toBe(0);
+      expect(present(h)).toEqual([".codex", ".gemini"]);
+    } finally {
+      h.cleanup();
+    }
   });
 });

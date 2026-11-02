@@ -291,7 +291,11 @@ export function migrateConfig(opts: { root: string; home: string }): ConfigMigra
       doc.commentBefore = first.key.commentBefore;
       first.key.commentBefore = undefined;
     }
+    const before = { value: JSON.stringify(doc.toJS()), notes: out.removed.length + out.renamed.length };
     fn({ doc, file, out });
+    // B45: write only what the migration changed; the YAML writer's own reformatting is no change
+    const dirty = JSON.stringify(doc.toJS()) !== before.value || out.removed.length + out.renamed.length !== before.notes;
+    if (!dirty) return;
     const text = doc.toString();
     if (text === raw || (isMap(doc.contents) && !doc.contents.items.length && raw.trim() === "")) return;
     atomicWrite(path, isMap(doc.contents) && !doc.contents.items.length ? text.replace(/^\{\}\n$/m, "") : text);

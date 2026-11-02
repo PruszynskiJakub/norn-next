@@ -474,14 +474,21 @@ steps:
     }
   });
 
-  test("a user config that does not load: the repo group still runs, the machine checks are skipped naming that file", async () => {
+  test("gh-64 B48: a bad notify.webhook is a FAIL config line naming its file, counted; the machine checks still run", async () => {
     const file = join(h.home, "config.yaml");
-    h.write(file, 'max_agents: "many"\n');
+    h.write(file, "notify: { webhook: not-a-url }\n");
     try {
       const r = await runChecked(["doctor"], { ...h.deps, env: env() });
       expect(r.exit).toBe(1);
-      expect(r.value).toMatchObject({ ok: false, repo: { ok: true }, skipped: expect.stringContaining("`max_agents` must be 1–9") });
-      expect(r.stdout).toContain("machine checks skipped");
+      expect(r.value).toMatchObject({ ok: false, repo: { ok: true }, config: { ok: false, do_instead: expect.stringContaining("config.yaml") } });
+      const error = (r.value as { config: { error: string } }).config.error;
+      expect(error).toContain("notify.webhook");
+      // the key is named once
+      expect(error.split("notify.webhook").length).toBe(2);
+      expect(r.stdout).toMatch(/^norn doctor: [1-9]\d* checks? failed/);
+      expect(r.stdout).toMatch(/FAIL config +.*notify\.webhook/);
+      expect(r.stdout).toMatch(/(ok|FAIL) +git /);
+      expect(r.stdout).not.toContain("machine checks skipped");
       // --repo reads only the repo's files: the person's own config is not its concern
       expect((await runChecked(["doctor", "--repo"], { ...h.deps, env: env() })).exit).toBe(0);
     } finally {

@@ -1,7 +1,7 @@
 /** gh-64 S3: which runner and notifiers a resolved config builds (B12, B19, B20, D9, D15), through `buildPorts` with a recording registry. */
 import { describe, expect, test } from "bun:test";
 import type { AdapterContext, AdapterRegistry, NotifierPort, RunnerPort } from "@norn/core";
-import { DEFAULT_CONFIG, type NotifierConfig, type ResolvedConfig, type RunnerConfig } from "@norn/schema";
+import { DEFAULT_CONFIG, ExitCode, type NotifierConfig, type ResolvedConfig, type RunnerConfig } from "@norn/schema";
 import { CliFailure } from "../../src/output.ts";
 import { buildPorts } from "../../src/wiring.ts";
 
@@ -61,6 +61,8 @@ describe("buildPorts (S3)", () => {
     const err = await buildPorts(registry, actx(config), config, {}, (k) => (k === "notify.ntfy" ? "/home/me/.norn/config.yaml" : null)).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(CliFailure);
     expect((err as CliFailure).body).toMatchObject({ error: "notify ntfy: bad ntfy url", do_instead: "fix it in /home/me/.norn/config.yaml", code: "config_invalid" });
+    // B7: an adapter config error is a config error: its own exit code and the "Config error" title
+    expect((err as CliFailure).exit).toBe(ExitCode.config);
   });
 
   test("B47 (D15): an unreachable ntfy URL fails at send time naming the file it came from", async () => {

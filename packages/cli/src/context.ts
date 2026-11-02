@@ -167,8 +167,8 @@ export class Context {
   /** D15: the file a setting in effect came from, for adapter errors; null when built in or derived. */
   sourceOf(key: string): string | null {
     const l = this.loaded;
-    if (!l.ok) return null;
-    const e = l.entries.find((x) => x.key === key || x.key.startsWith(`${key}.`));
+    const entries = l.ok ? l.entries : l.fallback.entries;
+    const e = entries.find((x) => x.key === key || x.key.startsWith(`${key}.`));
     return e && (e.source === "user" || e.source === "local" || e.source === "repo") ? l.paths[e.source] : null;
   }
 
@@ -182,13 +182,15 @@ export class Context {
     return { repoRoot: root, home: this.home, config, clock: this.clock, env: this.env };
   }
 
-  /** Ports selected by config, built once per context; `overrides` (doctor's fallback, B48) builds them again. */
-  async ports(overrides?: Partial<Ports>): Promise<Ports> {
-    if (!this.builtPorts || overrides) {
-      const config = this.config;
-      this.builtPorts = await buildPorts(this.registry, this.adapterContext(this.root, config), config, { git: this.git, ...this.deps.ports, ...overrides }, (k) => this.sourceOf(k));
-    }
+  /** Ports selected by config, built once per context. */
+  async ports(): Promise<Ports> {
+    if (!this.builtPorts) this.builtPorts = await this.portsFor(this.config);
     return this.builtPorts;
+  }
+
+  /** B48: ports for a given config (doctor's fallback), built afresh and not cached for later callers. */
+  portsFor(config: ResolvedConfig, overrides: Partial<Ports> = {}): Promise<Ports> {
+    return buildPorts(this.registry, this.adapterContext(this.root, config), config, { git: this.git, ...this.deps.ports, ...overrides }, (k) => this.sourceOf(k));
   }
 
   /** D2: the terminal to prompt in — a TTY, no `--json`, not an agent session (A6, orient) — else null. */

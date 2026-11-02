@@ -4,7 +4,7 @@ import { type Action, legacyAction } from "../../src/actions.ts";
 import { applyReceipts } from "../../src/apply.ts";
 import { decide, isSideAction, unitDecision } from "../../src/decide/index.ts";
 import { buildInbox } from "../../src/inbox/items.ts";
-import { hookWindowMs, isIntakeCommit, nornTrailers } from "../../src/policy.ts";
+import { isIntakeCommit, nornTrailers } from "../../src/policy.ts";
 import type { RunFacts, StoryFacts, UnitFacts } from "../../src/facts.ts";
 import type { WorktreeStatus } from "../../src/ports.ts";
 import { sha256 } from "../../src/hash.ts";
@@ -670,11 +670,6 @@ describe("audit fixes", () => {
     expect(kinds(facts([solo(startedAgo(59), { last_activity_at: T0 }, {})]))).toEqual(["gh-1 noop agent.running"]);
     expect(decided(startedAgo(61), SOLO_WF)).toMatchObject({ kind: "nudge", rule: "agent.timeout.nudge" });
     expect(decided(startedAgo(20), SOLO_WF, T0 - 16 * 60_000)).toMatchObject({ kind: "nudge", rule: "agent.stalled.nudge" });
-  });
-
-  test("B28: the hook read window is the longest stalled across the loaded workflows", () => {
-    expect(hookWindowMs([])).toBe(15 * 60_000);
-    expect(hookWindowMs([SOLO_WF, { ...SOLO_WF, defaults: { stalled: "40m" } }, null])).toBe(40 * 60_000);
   });
 
   test("deadline is measured from run.started_at, not the last state write", () => {

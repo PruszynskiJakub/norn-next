@@ -12,6 +12,7 @@ import { atomicWrite, installSkills, LOCAL_CONFIG_FILE, linkSkills, readText, RE
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { rendered } from "../output.ts";
+import { agentsInUse } from "../runtime/agents-in-use.ts";
 import { assetsDir } from "../runtime/assets.ts";
 import { detectTestCommand, gitRemoteUrl, TEMPLATE_TEST_COMMAND, withTestCommand } from "../runtime/detect.ts";
 import { bundledSkills } from "../runtime/workflows.ts";
@@ -171,12 +172,14 @@ export const initCommand = defineCommand({
     const test_command = workflows.created.length ? { command: testCommand, detected_from: detected?.from ?? null, set_in: setIn } : null;
 
     ctx.reload();
-    const ports = await ctx.ports(); // validates the config (exit 4 when invalid)
+    const ports = await ctx.ports(); // validates the config (exit 6 when invalid)
+    const loaded = ctx.loaded;
+    const agents = agentsInUse(root, loaded.ok ? loaded : loaded.fallback, ports); // B1, B13
     const names = bundledSkills(ctx.env);
     const installed = installSkills(root, join(assets, "skills"), names);
     const links: Array<{ agent: string; dir: string; linked: string[]; unchanged: string[]; kept: string[] }> = [];
     const seen = new Set<string>();
-    for (const [name, agent] of Object.entries(ports.agents)) {
+    for (const [name, agent] of Object.entries(agents)) {
       const dir = agent.skillDir(root);
       if (seen.has(dir)) continue;
       seen.add(dir);
@@ -186,7 +189,7 @@ export const initCommand = defineCommand({
 
     const command = hookCommand(ctx, opt.str(args, "hook-command"));
     const hooks: Array<{ agent: string; tier: string; changed: string[] }> = [];
-    for (const [name, agent] of Object.entries(ports.agents)) {
+    for (const [name, agent] of Object.entries(agents)) {
       const r = agent.tier === "none" ? { changed: [] } : await agent.installHooks(root, command, name);
       hooks.push({ agent: name, tier: agent.tier, changed: r.changed });
     }
