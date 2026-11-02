@@ -1,62 +1,143 @@
 /**
- * Config layers (K2) and workflow files (W1). Reads only; the merge rule lives in
- * `resolveConfig` (@norn/schema) and workflow graph checks in @norn/core.
+ * Config files (K2) and workflow files (W1). The merge rule lives in `resolveConfig` (@norn/schema)
+ * and workflow graph checks in @norn/core.
  */
-import { readdirSync } from "node:fs";
+import { readdirSync, statSync } from "node:fs";
 import { extname, join } from "node:path";
 import type { FileError } from "@norn/core";
-import { type ConfigLayer, DEFAULT_CONFIG, isConfigKey, type ResolvedConfig, resolveConfig, validate } from "@norn/schema";
+import {
+  type ConfigDerived,
+  type ConfigEntry,
+  type ConfigFileKind,
+  type ConfigFiles,
+  type ConfigProblem,
+  type ConfigProblemCode,
+  checkConfigFile,
+  configKeyProblem,
+  problemText,
+  type ResolvedConfig,
+  resolveConfig,
+} from "@norn/schema";
 import { type Document, isCollection, isMap, isScalar, parseDocument, parse as parseYaml, stringify as stringifyYaml } from "yaml";
-import { atomicWrite, fileError, isErrno, readText, type ReadResult, validated } from "./fsx.ts";
-import { nornHome, repoConfigPath, userConfigPath, workflowsDir } from "./paths.ts";
+import { atomicWrite, fileError, isErrno, readText, type ReadResult } from "./fsx.ts";
+import { recordedInterval } from "./heartbeat.ts";
+import { checkoutOf, LOCAL_CONFIG_FILE, nornHome, REPO_CONFIG_FILE, repoConfigPath, userConfigPath, workflowsDir } from "./paths.ts";
 import { type PinnedWorkflow, parseWorkflowText, sha256 } from "./unit.ts";
 
-/** Read one config layer; a missing file is an empty layer. */
-function readConfigLayer(path: string, root?: string): ReadResult<ConfigLayer> {
+/** B8: a missing or empty file sets nothing; a file that is not YAML is `config_invalid`. */
+function readConfigFile(kind: ConfigFileKind, path: string): { value: unknown; problems: ConfigProblem[] } {
   const raw = readText(path);
-  if (raw === null) return { ok: true, value: {}, raw: "" };
-  let value: unknown;
+  if (raw === null) return { value: undefined, problems: [] };
   try {
-    value = parseYaml(raw) ?? {};
+    return { value: parseYaml(raw) ?? undefined, problems: [] };
   } catch (e) {
-    return { ok: false, reason: "corrupt", error: fileError(path, [{ path: "", message: `YAML: ${(e as Error).message}` }], root) };
+    return { value: undefined, problems: [{ code: "config_invalid", file: kind, key: "", message: `not valid YAML: ${(e as Error).message.split("\n")[0]}` }] };
   }
-  return validated("config", value, path, raw, root);
+}
+
+export const localConfigPath = (root: string) => join(root, LOCAL_CONFIG_FILE);
+
+export interface ConfigPaths {
+  user: string;
+  local: string;
+  repo: string;
 }
 
 export type LoadedConfig =
-  | { ok: true; config: ResolvedConfig; user: ConfigLayer; repo: ConfigLayer; home: string }
-  | { ok: false; errors: FileError[]; home: string };
+  | { ok: true; config: ResolvedConfig; entries: ConfigEntry[]; files: ConfigFiles; home: string; paths: ConfigPaths }
+  | { ok: false; problems: ConfigProblem[]; errors: FileError[]; home: string; paths: ConfigPaths };
 
-/**
- * `~/.norn/config.yaml` (user; home from `home` arg, else NORN_HOME_DIR, else ~/.norn)
- * merged with `<repoRoot>/.agents/norn.config.yaml` via resolveConfig (K2).
- */
-export function loadConfig(opts: { repoRoot: string; home?: string; env?: Record<string, string | undefined> }): LoadedConfig {
-  const home = nornHome(opts.home, opts.env);
-  const user = readConfigLayer(userConfigPath(home));
-  const repo = readConfigLayer(repoConfigPath(opts.repoRoot), opts.repoRoot);
-  const errors: FileError[] = [];
-  if (!user.ok && user.reason === "corrupt") errors.push(user.error);
-  if (!repo.ok && repo.reason === "corrupt") errors.push(repo.error);
-  if (errors.length || !user.ok || !repo.ok) return { ok: false, errors, home };
-  return { ok: true, config: resolveConfig(user.value, repo.value), user: user.value, repo: repo.value, home };
+const executableOnPath = (name: string, path: string | undefined): boolean =>
+  (path ?? "").split(":").some((dir) => {
+    if (!dir) return false;
+    try {
+      const st = statSync(join(dir, name));
+      return st.isFile() && (st.mode & 0o111) !== 0;
+    } catch {
+      return false;
+    }
+  });
+
+/** The `[section "name"]` keys of a git config file (no git process: config loads in every command). */
+function gitConfigValue(text: string, section: string, name: string, key: string): string | null {
+  let inSection = false;
+  for (const line of text.split("\n")) {
+    const head = /^\s*\[\s*([A-Za-z0-9.-]+)(?:\s+"((?:[^"\\]|\\.)*)")?\s*\]/.exec(line);
+    if (head) {
+      inSection = head[1]?.toLowerCase() === section && head[2] === name;
+      continue;
+    }
+    if (!inSection) continue;
+    const kv = /^\s*([A-Za-z0-9-]+)\s*=\s*(.*?)\s*$/.exec(line);
+    if (kv && kv[1]?.toLowerCase() === key) return (kv[2] as string).replace(/^"(.*)"$/, "$1");
+  }
+  return null;
 }
 
-// ---------------------------------------------------------------- editing a layer (B62–B68)
+/**
+ * B29, B31, B34 (D6, D8): what norn derives — the runner (inside Herdr: `HERDR_ENV=1`; installed:
+ * `herdr` on the env's PATH; else headless), the git remote (the remote the base branch tracks, or
+ * with no `base_branch` the branch checked out in the main checkout, else `origin`) and its URL, and
+ * the interval the heartbeat records. Reads files only.
+ */
+export function deriveConfig(opts: { repoRoot: string; env?: Record<string, string | undefined>; baseBranch?: string | null }): ConfigDerived {
+  const env = opts.env ?? process.env;
+  const runner: ConfigDerived["runner"] =
+    env.HERDR_ENV === "1"
+      ? { adapter: "herdr", reason: "inside Herdr" }
+      : executableOnPath("herdr", env.PATH)
+        ? { adapter: "herdr", reason: "herdr on PATH" }
+        : { adapter: "headless", reason: "herdr not on PATH" };
+  const common = checkoutOf(opts.repoRoot).common;
+  const gitConfig = readText(join(common, "config")) ?? "";
+  let branch = opts.baseBranch ?? null;
+  if (!branch) {
+    const head = /^ref: refs\/heads\/(.+)$/m.exec(readText(join(common, "HEAD")) ?? "");
+    branch = head?.[1]?.trim() ?? null;
+  }
+  const tracked = branch ? gitConfigValue(gitConfig, "branch", branch, "remote") : null;
+  const git_remote = tracked && tracked !== "." ? { name: tracked, reason: `tracked by ${branch}` } : { name: "origin", reason: branch ? `${branch} tracks no remote` : "no branch checked out" };
+  const remote_url = gitConfigValue(gitConfig, "remote", git_remote.name, "url");
+  return { runner, remote_url, git_remote, interval: recordedInterval(opts.repoRoot) };
+}
 
-export type ConfigLayerName = "user" | "repo";
+/**
+ * The three config files (K2: `~/.norn/config.yaml`, home from `home`, else NORN_HOME_DIR, else
+ * ~/.norn; `.agents/norn.config.local.yaml`; `.agents/norn.config.yaml`) resolved with what norn
+ * derives. Any problem in any file fails the load (B7: config errors, never corrupt state).
+ */
+export function loadConfig(opts: { repoRoot: string; home?: string; env?: Record<string, string | undefined>; derived?: ConfigDerived }): LoadedConfig {
+  const home = nornHome(opts.home, opts.env);
+  const paths: ConfigPaths = { user: userConfigPath(home), local: localConfigPath(opts.repoRoot), repo: repoConfigPath(opts.repoRoot) };
+  const read = { user: readConfigFile("user", paths.user), local: readConfigFile("local", paths.local), repo: readConfigFile("repo", paths.repo) };
+  const files = { user: read.user.value, local: read.local.value, repo: read.repo.value } as ConfigFiles;
+  const repo = files.repo as { base_branch?: unknown } | undefined;
+  const baseBranch = repo && typeof repo === "object" && typeof repo.base_branch === "string" ? repo.base_branch : null;
+  const derived = opts.derived ?? deriveConfig({ repoRoot: opts.repoRoot, env: opts.env ?? process.env, baseBranch });
+  const r = resolveConfig(files, derived);
+  const problems = [...read.user.problems, ...read.local.problems, ...read.repo.problems, ...r.problems];
+  if (problems.length) {
+    const errors: FileError[] = problems.map((p) => ({ file: p.file === "user" ? paths.user : p.file === "local" ? LOCAL_CONFIG_FILE : REPO_CONFIG_FILE, errors: [{ path: p.key, message: p.message }] }));
+    return { ok: false, problems, errors, home, paths };
+  }
+  return { ok: true, config: r.config, entries: r.entries, files, home, paths };
+}
+
+// ---------------------------------------------------------------- editing a file (B62–B68, D4)
+
+export type ConfigLayerName = ConfigFileKind;
 
 export type ConfigEditResult =
   | { ok: true; path: string; changed: boolean; value?: unknown }
-  | { ok: false; code: "unknown_key" | "invalid_value"; error: string };
+  | { ok: false; code: "unknown_key" | "invalid_value" | ConfigProblemCode; error: string };
 
 /**
- * Set (`set`: a YAML value as typed, `auto`, `90m`, `[{adapter: os}]`) or remove (`unset`) one
- * dotted key in the user or repo config file (D8). The file is edited as a YAML document; a list is
- * replaced whole (B63). The edited layer and the merged result are validated before anything is
- * written (B66), and the write is atomic (S1). A changed value, a new key or a removed key touches
- * only its own lines, so comments and key order stay (B67). Removing a key the file lacks writes nothing.
+ * Set (`set`: a YAML value as typed, `auto`, `90m`) or remove (`unset`) one dotted key in the user,
+ * local or team config file (D4). A key the file does not take is refused (`config_wrong_file`,
+ * `config_moved`). The file is edited as a YAML document; a list is replaced whole. The edited file
+ * is checked before anything is written, and the write is atomic (S1). A changed value, a new key or
+ * a removed key touches only its own lines, so comments and key order stay (B67). Removing a key
+ * the file lacks writes nothing.
  */
 export function editConfigLayer(opts: {
   repoRoot: string;
@@ -67,16 +148,16 @@ export function editConfigLayer(opts: {
   edit: { set: string } | { unset: true };
 }): ConfigEditResult {
   const { key, edit } = opts;
-  if (!isConfigKey(key)) return { ok: false, code: "unknown_key", error: `no setting '${key}'` };
+  // unsetting is always allowed, so a moved or misplaced key can be removed by hand
+  const misplaced = "unset" in edit ? null : configKeyProblem(opts.file, key);
+  if (misplaced) return { ok: false, code: misplaced.code === "config_invalid" ? "unknown_key" : misplaced.code, error: problemText(misplaced) };
   const home = nornHome(opts.home, opts.env);
-  const paths = { user: userConfigPath(home), repo: repoConfigPath(opts.repoRoot) };
+  const paths = { user: userConfigPath(home), local: localConfigPath(opts.repoRoot), repo: repoConfigPath(opts.repoRoot) };
   const path = paths[opts.file];
   const raw = readText(path) ?? "";
   const doc = parseDocument(raw);
   if (doc.errors.length) return { ok: false, code: "invalid_value", error: `${path}: YAML: ${doc.errors[0]?.message}` };
   const segs = key.split(".");
-  const otherFile = opts.file === "user" ? "repo" : "user";
-  const other = readConfigLayer(paths[otherFile]);
   let value: unknown;
   let spliced: string | null;
   try {
@@ -87,35 +168,21 @@ export function editConfigLayer(opts: {
     } else {
       value = parseYaml(edit.set);
       spliced = withScalar(raw, doc, segs, value) ?? withValueLines(raw, doc, segs, value);
-      setIn(doc, segs, value, opts.file === "repo" ? other : undefined);
+      doc.setIn(segs, doc.createNode(value));
       spliced ??= withNewKey(raw, doc, segs);
     }
   } catch (e) {
     return { ok: false, code: "invalid_value", error: `${key}: ${(e as Error).message}` };
   }
   const layer = (doc.toJS() ?? {}) as unknown;
-  const checked = validate("config", layer);
-  if (!checked.ok) return { ok: false, code: "invalid_value", error: problems(opts.file, checked.errors) };
-  const layers = { [opts.file]: checked.value, [otherFile]: other.ok ? other.value : {} } as Record<ConfigLayerName, ConfigLayer>;
-  const merged = validate("resolved-config", resolveConfig(layers.user, layers.repo));
-  if (!merged.ok) return { ok: false, code: "invalid_value", error: problems("merged config", merged.errors) };
+  // a set is checked against the whole file; an unset only removes, so it never makes a file worse
+  const checked = "set" in edit ? checkConfigFile(opts.file, layer) : [];
+  if (checked.length) return { ok: false, code: "invalid_value", error: checked.map(problemText).join("; ") };
   // B67: the original text with only the changed lines touched, as long as it means the same as the edited document
   const text = spliced !== null && JSON.stringify(parseYaml(spliced) ?? {}) === JSON.stringify(layer) ? spliced : rendered(doc);
   if (text === raw) return { ok: true, path, changed: false, value };
   atomicWrite(path, text);
   return { ok: true, path, changed: true, value };
-}
-
-const problems = (where: string, errors: Array<{ path: string; message: string }>) =>
-  `${where}: ${errors.map((e) => `${e.path || "/"} ${e.message}`).join("; ")}`;
-
-function setIn(doc: Document, segs: string[], value: unknown, below?: ReadResult<ConfigLayer>): void {
-  // a layer's `agents.<name>` replaces the agent whole (K2), so a new entry starts from the agent the
-  // layers below resolve to: the user file's for the repo file, else the built-in one
-  const name = segs[1] as string;
-  const agent = segs[0] === "agents" && segs.length > 2 ? ((below?.ok ? below.value.agents?.[name] : undefined) ?? DEFAULT_CONFIG.agents[name]) : undefined;
-  if (agent && !doc.hasIn(segs.slice(0, 2))) doc.setIn(segs.slice(0, 2), doc.createNode(structuredClone(agent)));
-  doc.setIn(segs, doc.createNode(value));
 }
 
 /** The whole document re-rendered; a layer left empty is an empty file, not `{}`. */

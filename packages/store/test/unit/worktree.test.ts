@@ -8,8 +8,9 @@ import { tmp } from "../helpers.ts";
 describe("worktree files (A3, K4)", () => {
   test(".env.norn and .norn-unit", () => {
     const wt = tmp();
-    const env = slotEnv(2, { ...DEFAULT_CONFIG.slots, env: { DB_NAME: "app_{slot}", API: "http://localhost:{port_base}" } });
-    expect(env).toEqual({ NORN_SLOT: "2", PORT_BASE: "4020", DB_NAME: "app_2", API: "http://localhost:4020" });
+    // B33: only NORN_SLOT and PORT_BASE
+    const env = slotEnv(2);
+    expect(env).toEqual({ NORN_SLOT: "2", PORT_BASE: "4020" });
     writeEnvNorn(wt, { ...env, ODD: 'a "b" c' });
     expect(readEnvNorn(wt)).toEqual({ ...env, ODD: 'a "b" c' });
     writeUnitMarker(wt, { repo: "/r", story: "gh-12", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-12-x" });

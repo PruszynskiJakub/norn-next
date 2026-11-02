@@ -147,7 +147,7 @@ async function liveTurn(ctx: Context, name: string, agent: AgentAdapter, command
       prompt: "This is a connectivity test. Reply with the single word OK and do nothing else.",
       headless: true,
       env: { NORN_HOME: repo, NORN_STORY: "gh-1" },
-      config: { ...(cfg?.command ? { command: cfg.command } : {}), ...(cfg?.args ? { args: cfg.args } : {}), ...(cfg?.env ? { env: cfg.env } : {}) },
+      config: { ...(cfg?.args ? { args: cfg.args } : {}) },
     });
     const r = await run(launch.argv, { cwd: repo, env: { ...process.env, ...ctx.env, ...launch.env }, timeoutMs: 180_000 });
     const facts = readHookFacts(repo, "0000");
@@ -205,8 +205,7 @@ const HERDR_PLUGIN_SOURCE = "PruszynskiJakub/norn-next/plugins/herdr";
 
 /** HC11: whether norn's Herdr plugin is linked; a hint when it is not (never an error). */
 async function cockpitPlugin(ctx: Context): Promise<Record<string, unknown>> {
-  const o = ctx.config.runner?.options ?? {};
-  const cockpit = herdr.createHerdrCockpit({ env: ctx.env, ...(typeof o.bin === "string" ? { bin: o.bin } : {}), ...(typeof o.session === "string" ? { session: o.session } : {}) });
+  const cockpit = herdr.createHerdrCockpit({ env: ctx.env });
   const linked = await cockpit.pluginLinked().catch(() => undefined);
   if (linked === undefined) return { linked: null, note: "could not list Herdr plugins" };
   if (!linked) return { linked: false, do_instead: pluginLinkHint(assetsDir(ctx.env)) };
@@ -424,8 +423,7 @@ export const doctorCommand = defineCommand({
 
     const agents = [];
     for (const [name, agent] of Object.entries(ports.agents)) {
-      const cfg = config.agents[name];
-      const argv = agent.launchCommand({ cwd: ctx.root, prompt: "x", headless: true, env: {}, config: { ...(cfg?.command ? { command: cfg.command } : {}) } }).argv;
+      const argv = agent.launchCommand({ cwd: ctx.root, prompt: "x", headless: true, env: {}, config: {} }).argv;
       const bin = argv[0] ?? name;
       const path = which(bin, ctx.env);
       const v = path ? await run([path, "--version"], { timeoutMs: 15_000 }) : null;
@@ -434,13 +432,13 @@ export const doctorCommand = defineCommand({
       const turn = live ? await liveTurn(ctx, name, agent, command) : null;
       const notes: string[] = [];
       if (agent.tier === "none") notes.push("no hooks: runner, process and git facts only (A5)");
-      if (cfg?.adapter === "codex" || name === "codex")
+      if (name === "codex")
         notes.push("Codex runs project hooks only once the project's .codex/ layer is trusted and the hooks reviewed via /hooks in Codex");
       if (hooksInstalled === false) notes.push(`run ${cmd.init()} to install hooks`);
       const ok = !!path && hooksInstalled !== false && (fires?.ok ?? true) && (turn?.ok ?? true);
       agents.push({
         name,
-        adapter: cfg?.adapter ?? name,
+        adapter: name,
         tier: agent.tier,
         ok,
         binary: { command: bin, path: path ?? null, version: v && v.code === 0 ? firstLine(v.out) : null },

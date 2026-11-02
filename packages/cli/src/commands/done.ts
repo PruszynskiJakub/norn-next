@@ -178,7 +178,7 @@ export const doneCommand = defineCommand({
     }
     const declared = report || notes.some((n) => n.criterion !== undefined) || step.criteria === "required" ? unitCriteria(t.s) : null;
     // QV5a (C2): the reporting agent's declared capabilities bound what it may `pass`
-    const capabilities = ctx.config.agents[t.agent]?.capabilities ?? [];
+    const capabilities: string[] = [];
     const verdicts = checkReport({ step, step_name: t.s.state.step, outcome, report, criteria: declared, notes, capabilities });
     if (!verdicts.ok) throw refuse(verdicts.refusal.error, verdicts.refusal.do_instead, verdicts.refusal.code, verdicts.refusal.details);
 

@@ -8,7 +8,7 @@
  * F35, Q6), Unclaimed, Running, Notes (agents' notes for a person, NT2: information, not an
  * action), Recently done.
  */
-import { parseDuration, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
+import { ATTENDED_WAIT, parseDuration, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
 import { cmd, nextCommand, startAgentCommand } from "../commands.ts";
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../criteria.ts";
 import type { Facts, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
@@ -185,7 +185,7 @@ export function startCommandFor(uf: UnitFacts, story: StoryFacts, config: Resolv
   const name = (step?.type === "agent" && step.agent) || config.agent;
   const agent = config.agents[name];
   const worktree = unitWorktree(story, uf);
-  return startAgentCommand(worktree, agent?.command ?? agent?.adapter ?? name, agent?.args);
+  return startAgentCommand(worktree, name, agent?.args);
 }
 
 /**
@@ -540,7 +540,7 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       if (nudge && !heartbeatDown(facts, config)) return item("your_turn", `agent ended its turn without reporting — reopen the agent and run ${cmd.brief()}`, startCommandFor(uf, story, config), nudge.at, { id: `${nudge.outcome}:${key}:${st.step}#${st.attempt}:${st.nudges_used}` });
       // HC2: an attended agent waiting for its person past `attended_wait`; one item (and notification) per wait
       const waiting = attendedWaitSince(uf);
-      if (waiting !== null && st.run && facts.now - waiting >= parseDuration(config.limits.attended_wait)) {
+      if (waiting !== null && st.run && facts.now - waiting >= parseDuration(ATTENDED_WAIT)) {
         // HC3: reach the session that waits — never start a second agent for the step
         const worktree = reach?.worktree ?? null;
         const command = st.run.session?.reach ?? (worktree ? `cd ${worktree}` : cmd.runList(key));

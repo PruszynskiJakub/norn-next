@@ -4,7 +4,7 @@
  */
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import type { SlotConfig } from "@norn/schema";
+import { SLOTS } from "@norn/schema";
 import { isSliceKey, isStoryKey, parseSliceFileName, parseSpecDirName, sliceDirName, sliceKey, storyDirName } from "@norn/schema";
 import { atomicWrite, readText } from "./fsx.ts";
 import { git } from "./git.ts";
@@ -28,13 +28,9 @@ export async function ensureExcluded(root: string): Promise<void> {
   atomicWrite(path, `${text}${text && !text.endsWith("\n") ? "\n" : ""}# norn (machine-local worktree files)\n${missing.join("\n")}\n`);
 }
 
-/** `.env.norn` values for a slot: NORN_SLOT, PORT_BASE and config extras with `{slot}`/`{port_base}` substituted. */
-export function slotEnv(slot: number, slots: SlotConfig): Record<string, string> {
-  const portBase = slots.port_base + slot * slots.ports_per_slot;
-  const env: Record<string, string> = { NORN_SLOT: String(slot), PORT_BASE: String(portBase) };
-  for (const [k, v] of Object.entries(slots.env ?? {}))
-    env[k] = v.replaceAll("{slot}", String(slot)).replaceAll("{port_base}", String(portBase));
-  return env;
+/** B33: `.env.norn` values for a slot, only NORN_SLOT and PORT_BASE (slot `n` from port `4000 + 10·n`). */
+export function slotEnv(slot: number): Record<string, string> {
+  return { NORN_SLOT: String(slot), PORT_BASE: String(SLOTS.port_base + slot * SLOTS.ports_per_slot) };
 }
 
 const ENV_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;

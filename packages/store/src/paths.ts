@@ -11,6 +11,8 @@ import { LEGACY_SPEC_FILE, parseRoundDirName, parseSliceKey, recordHandoffPath, 
 
 /** gh-110 B1, B2 (D1): the committed repo config and workflows, relative to a root, as messages name them. */
 export const REPO_CONFIG_FILE = ".agents/norn.config.yaml";
+/** gh-64 B3: your settings for this repo (gitignored). */
+export const LOCAL_CONFIG_FILE = ".agents/norn.config.local.yaml";
 export const WORKFLOWS_DIR = ".agents/workflows";
 
 /** gh-110 D4: the old layout's places, relative to the main checkout; only refused and moved from, never read. */

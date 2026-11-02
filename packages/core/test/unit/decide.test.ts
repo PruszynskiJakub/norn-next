@@ -186,7 +186,8 @@ describe("agent steps: modes and caps (§6, MO2, K1)", () => {
     const busy: LeaseFile = { version: 1, kind: "agent", repo: "/x", story: "gh-9", slice: null, run_id: null, holder: { pid: 1, pid_start: "1" }, created_at: at() };
     const f = facts([solo({}, null, {}, "gh-3", T0 - 10), solo({}, null, {}, "gh-2", T0 - 20)]);
     f.machine.leases = [busy];
-    expect(kinds(f)).toEqual(["gh-2 start_run agent.start", "gh-3 noop agent.queued"]);
+    const capped = decide(f, WORKFLOWS, { ...CONFIG, max_agents: 2 }).map((d) => `${d.unit} ${d.action.kind} ${d.rule}`);
+    expect(capped).toEqual(["gh-2 start_run agent.start", "gh-3 noop agent.queued"]);
   });
   test("a running step is never launched again (MO3)", () => {
     expect(kinds(facts([solo(running(), {})]))).toEqual(["gh-1 noop agent.running"]);
@@ -592,7 +593,7 @@ describe("determinism (O5)", () => {
     const s = solo(running(), { process_alive: false });
     const a = only(facts([s]));
     if (a.kind !== "retry_fresh") throw new Error(a.kind);
-    const re = applyReceipts(s.units[0]!.state!, a.receipts.map((r) => numbered(r.n, r.receipt)), { workflow: SOLO_WF, now: at(), limits: CONFIG.limits, tick_id: facts([]).tick_id });
+    const re = applyReceipts(s.units[0]!.state!, a.receipts.map((r) => numbered(r.n, r.receipt)), { workflow: SOLO_WF, now: at(), tick_id: facts([]).tick_id });
     expect(re.state).toEqual(a.state!);
   });
 });

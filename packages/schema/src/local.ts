@@ -89,6 +89,8 @@ export const LocalHeartbeatFile = Type.Object(
     created_at: Type.Optional(Type.String()),
     /** R5.5: ISO time the last tick on this checkout finished */
     last_tick_at: Type.Optional(Type.String()),
+    /** B34 (D5): the tick interval `norn watch` or `norn tick --interval` runs at; absent = 30s */
+    interval: Type.Optional(Type.String({ pattern: "^([0-9]+(ms|s|m|h|d))+$" })),
   },
   id("local-heartbeat", "norn checkout heartbeat (trace/heartbeat.json)"),
 );

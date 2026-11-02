@@ -9,8 +9,8 @@
  * tick's hook-file backfill (`backfillHooks`, D5).
  */
 import { existsSync, readdirSync } from "node:fs";
-import { type ActFailure, type FileError, type NumberedReceipt, openNotes, RE_ENTRY_KINDS, readyApproval, type StepRunFacts, type StoryFacts, storyWorktreePath } from "@norn/core";
-import { DEFAULT_CONFIG, type HookFact, type LeaseFile, parseDuration, parseReceiptFileName, type ReceiptOf, type RunInfo, type UnitState } from "@norn/schema";
+import { type ActFailure, type FileError, hookWindowMs, type NumberedReceipt, openNotes, RE_ENTRY_KINDS, readyApproval, type StepRunFacts, type StoryFacts, storyWorktreePath } from "@norn/core";
+import { type HookFact, type LeaseFile, parseDuration, parseReceiptFileName, type ReceiptOf, type RunInfo, type UnitState } from "@norn/schema";
 import { type BaseFactsCache, type IssueFactsCache, type PrFactsCache, readBaseFacts, readIssueFacts, readPrFacts } from "./base.ts";
 import { readActFailures } from "./heartbeat.ts";
 import { type BackfillRun, backfillHookFiles } from "./hook-backfill.ts";
@@ -107,7 +107,7 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
     return { live: [], dead: [], errors: [{ file: "leases", errors: [{ path: "", message: (e as Error).message }] } satisfies FileError] };
   });
   const live = leases.live.map((e) => e.lease);
-  const stalledMs = opts.stalledMs ?? parseDuration((snapshot.config.ok ? snapshot.config.config : DEFAULT_CONFIG).limits.stalled);
+  const stalledMs = opts.stalledMs ?? hookWindowMs(Object.values(snapshot.workflows.workflows).map((w) => w.workflow));
 
   const starts: string[] = [new Date(now - stalledMs).toISOString()];
   // units with a live run or an unknown launch (R5.1): their hook files are always read (D4)

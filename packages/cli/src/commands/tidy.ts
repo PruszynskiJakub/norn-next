@@ -39,10 +39,9 @@ const RESERVE = /^\.\d{4,}\.reserve$/;
 
 /** K7: Herdr when it is the runner — injected, else the real one; null = another runner. */
 function tidyHerdr(ctx: Context): herdr.HerdrCockpit | null {
-  if (ctx.config.runner?.adapter !== herdr.RUNNER_NAME) return null;
+  if (ctx.config.runner.adapter !== herdr.RUNNER_NAME) return null;
   if (ctx.deps.herdr !== undefined) return ctx.deps.herdr;
-  const o = ctx.config.runner.options ?? {};
-  return herdr.createHerdrCockpit({ env: ctx.env, ...(typeof o.bin === "string" ? { bin: o.bin } : {}), ...(typeof o.session === "string" ? { session: o.session } : {}) });
+  return herdr.createHerdrCockpit({ env: ctx.env });
 }
 
 /** K7: close (or, dry, list) what runs that reported done left in Herdr; a Herdr that fails is kept, not fatal. */

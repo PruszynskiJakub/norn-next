@@ -1,23 +1,17 @@
 /**
- * Adapter wiring (X2): the built-in registry from @norn/adapters, plus third-party adapters
- * selected in config by package name. Ports are built from the resolved config; tests inject
- * replacements through `CliDeps.ports`.
+ * Adapter wiring: the built-in registry from @norn/adapters (gh-64: no third-party adapters).
+ * Ports are built from the resolved config; tests inject replacements through `CliDeps.ports`.
  */
 import { claude, codex, gemini, gh, git, glab, headless, herdr, notify, opencode, proc } from "@norn/adapters";
 import type {
   AdapterContext,
   AdapterRegistry,
   AgentAdapter,
-  AgentFactory,
-  NotifierFactory,
   NotifierPort,
   Ports,
-  RemoteFactory,
-  RunnerFactory,
   RunnerPort,
 } from "@norn/core";
 import type { ResolvedConfig } from "@norn/schema";
-import { REPO_CONFIG_FILE } from "@norn/store";
 import { failure } from "./output.ts";
 
 export function defaultRegistry(): AdapterRegistry {
@@ -31,53 +25,58 @@ export function defaultRegistry(): AdapterRegistry {
   };
 }
 
-type Kind = "agent" | "runner" | "notifier" | "remote";
-const EXPORT_NAMES: Record<Kind, string[]> = {
-  agent: ["createAgent", "agentFactory"],
-  runner: ["runnerFactory", "createRunner"],
-  notifier: ["notifierFactory", "createNotifier"],
-  remote: ["remoteFactory", "factory"],
-};
+/** D15: the file a setting came from, for an adapter error ("built-in" and "derived" name none). */
+export type SourceOf = (key: string) => string | null;
 
-/** X2: an adapter id not built in is imported as a package exporting a factory by a known name. */
-async function external<T>(kind: Kind, id: string): Promise<T> {
-  let mod: Record<string, unknown>;
-  try {
-    mod = (await import(id)) as Record<string, unknown>;
-  } catch (e) {
-    throw failure(`unknown ${kind} adapter '${id}': not built in and not importable (${(e as Error).message})`, `install the package '${id}' or fix ${REPO_CONFIG_FILE}`, "unknown_adapter");
-  }
-  for (const name of EXPORT_NAMES[kind]) if (typeof mod[name] === "function") return mod[name] as T;
-  throw failure(`package '${id}' exports none of ${EXPORT_NAMES[kind].join(", ")}`, `fix the ${kind} adapter in ${REPO_CONFIG_FILE}`, "unknown_adapter");
+function adapterError(e: unknown, what: string, file: string | null): never {
+  const message = `${what}: ${(e as Error).message}`;
+  throw failure(message, file ? `fix it in ${file}` : "check the setting with `norn config`", "config_invalid");
 }
 
-/** Build every port the config selects. `overrides` replace whole ports (tests, embedding). */
-export async function buildPorts(registry: AdapterRegistry, actx: AdapterContext, config: ResolvedConfig, overrides: Partial<Ports> = {}): Promise<Ports> {
+/**
+ * Build every port (X2: built-in adapters only). The runner is the detected one (B29); notifiers
+ * come from `notify` (D9: `os` unless false, `ntfy`, `webhook`) plus Herdr's inside Herdr (B20).
+ * An adapter that fails to build names the file its setting came from (D15). `overrides` replace
+ * whole ports (tests, embedding).
+ */
+export async function buildPorts(registry: AdapterRegistry, actx: AdapterContext, config: ResolvedConfig, overrides: Partial<Ports> = {}, sourceOf: SourceOf = () => null): Promise<Ports> {
   const agents: Record<string, AgentAdapter> = {};
   if (overrides.agents) Object.assign(agents, overrides.agents);
-  for (const [name, a] of Object.entries(config.agents)) {
+  for (const name of new Set([config.agent, ...Object.keys(config.agents)])) {
     if (agents[name]) continue;
-    const f = registry.agents[a.adapter] ?? (await external<AgentFactory>("agent", a.adapter));
+    const f = registry.agents[name];
+    if (!f) adapterError(new Error(`not a built-in agent`), `agent ${name}`, sourceOf("agent"));
     agents[name] = f(actx);
   }
   let runner: RunnerPort | null = null;
   if ("runner" in overrides) runner = overrides.runner ?? null;
-  else if (config.runner) {
-    const f = registry.runners[config.runner.adapter] ?? (await external<RunnerFactory>("runner", config.runner.adapter));
-    runner = f(actx, config.runner);
+  else {
+    const f = registry.runners[config.runner.adapter];
+    runner = f ? f(actx, { adapter: config.runner.adapter }) : null;
   }
   let notifiers: NotifierPort[];
   if (overrides.notifiers) notifiers = overrides.notifiers;
   else {
     notifiers = [];
-    for (const n of config.notifiers) {
-      const f = registry.notifiers[n.adapter] ?? (await external<NotifierFactory>("notifier", n.adapter));
-      notifiers.push(f(actx, n));
+    const wanted: Array<{ adapter: string; options?: Record<string, unknown>; key: string }> = [];
+    if (config.notify.os) wanted.push({ adapter: "os", key: "notify.os" });
+    if (config.notify.ntfy) wanted.push({ adapter: "ntfy", options: { url: config.notify.ntfy }, key: "notify.ntfy" });
+    if (config.notify.webhook) wanted.push({ adapter: "webhook", options: { url: config.notify.webhook }, key: "notify.webhook" });
+    if (actx.env.HERDR_ENV === "1") wanted.push({ adapter: "herdr", key: "notify" });
+    for (const n of wanted) {
+      const f = registry.notifiers[n.adapter];
+      if (!f) continue;
+      try {
+        notifiers.push(f(actx, { adapter: n.adapter, ...(n.options ? { options: n.options } : {}) }));
+      } catch (e) {
+        adapterError(e, `notify ${n.adapter}`, sourceOf(n.key));
+      }
     }
   }
   let remote = overrides.remote;
   if (remote === undefined) {
-    const f = registry.remotes[config.provider] ?? (await external<RemoteFactory>("remote", config.provider));
+    const f = registry.remotes[config.provider];
+    if (!f) adapterError(new Error("not a built-in provider"), `provider ${config.provider}`, sourceOf("provider"));
     remote = f(actx);
   }
   return {

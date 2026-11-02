@@ -152,7 +152,7 @@ function runnerCaps(ctx: Ctx): RunnerCapabilities {
  * ending (`session_end`, classified `died`) or observed dead this tick do not count.
  */
 function activeRun(ctx: Ctx, uf: UnitFacts, except: string | null): string | null {
-  const window = parseDuration(stepLimits(uf.workflow, null, ctx.config.limits).stalled);
+  const window = parseDuration(stepLimits(uf.workflow, null).stalled);
   const dead = uf.run && (uf.run.process_alive === false || uf.run.pane?.alive === false) ? uf.run.run_id : null;
   for (const r of uf.step_runs ?? []) {
     if (r.run_id === except || r.run_id === dead || r.ended || r.last_hook_at === null) continue;
@@ -206,7 +206,7 @@ export function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: Unit
   const touched = Math.max(epoch(run.started_at), epoch(st.updated_at));
   const lastHook = rf.hooks.at(-1);
   const hookAt = lastHook ? epoch(lastHook.at) : 0;
-  const limits = stepLimits(wf, step, ctx.config.limits);
+  const limits = stepLimits(wf, step);
   const stalledMs = parseDuration(limits.stalled);
 
   // R7.2: process and pane liveness only for runs started on this machine
@@ -294,8 +294,8 @@ function routeOutcome(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st0: UnitState
   }
   // §10, W4: the route is where applying the receipt sent the unit (an exhausted counter → $stuck)
   receipt.route = routeOf(res) ?? "park";
-  if (res.route === "nudge") receipt.counter = { name: "nudges", value: res.state.nudges_used, max: stepLimits(wf, step, ctx.config.limits).nudges };
-  if (res.route === "retry") receipt.counter = { name: "retries", value: res.state.retries_used, max: stepLimits(wf, step, ctx.config.limits).retries };
+  if (res.route === "nudge") receipt.counter = { name: "nudges", value: res.state.nudges_used, max: stepLimits(wf, step).nudges };
+  if (res.route === "retry") receipt.counter = { name: "retries", value: res.state.retries_used, max: stepLimits(wf, step).retries };
   const commit = commitFor(ctx, story, uf, `norn: ${ref.key} ${st.step} ${outcome} → ${receipt.route}`, st.step);
   const snapshot = outcome === "silent" ? { transcript: rf?.transcript ?? null, cwd: cwd ?? "" } : null;
   const receipts: NewReceipt[] = [{ n, receipt }];
@@ -372,7 +372,7 @@ export function launchUnknown(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: Un
     const found = rf.session ? `session ${rf.session.session_id}` : `${rf.hooks.length} hook fact(s)`;
     return emitApplied(ctx, story, uf, "run.adopt", res, [nr], { message: `norn: ${ref.key} adopted run ${rf.run_id} (${found})`, step: st.step });
   }
-  const grace = 2 * parseDuration(ctx.config.watch_interval);
+  const grace = 2 * parseDuration(ctx.config.interval);
   if (ctx.facts.now - lu.at <= grace) return ctx.noop(ref, "run.launch_unknown.wait", `run ${rf.run_id} has a started receipt but no state; looking for it for 2 watch intervals (R5.1)`);
   const applied = applyReceipts(st, uf.unapplied, applyCtx(ctx, wf));
   const step = stepOf(wf, applied.state.step);

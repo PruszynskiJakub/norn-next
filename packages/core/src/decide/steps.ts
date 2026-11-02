@@ -70,7 +70,7 @@ export function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitSta
   if (uf.lease?.kind === "check") return ctx.noop(ref, "check.running", `check run ${uf.lease.run_id ?? "?"} in progress`);
   const cwd = unitWorktree(story, uf);
   if (!cwd) return ctx.noop(ref, "check.no_worktree", "unit worktree missing");
-  if (ctx.checksFree <= 0) return ctx.noop(ref, "check.queued", `queued: max_checks ${ctx.config.max_checks} in use (K1)`);
+  if (ctx.checksFree <= 0) return ctx.noop(ref, "check.queued", `queued: max_agents ${ctx.config.max_agents} in use (K1)`);
   ctx.checksFree--;
   const run_id = ctx.id();
   const env: Record<string, string> = { NORN_STORY: story.key, NORN_RUN: run_id, ...ctx.slotEnv(uf.worktree?.slot ?? null) };

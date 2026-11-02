@@ -24,7 +24,7 @@ import { aStory, targetKey } from "../runtime/target.ts";
 function chatAgentCommand(config: ResolvedConfig, story: string): string {
   const name = config.agent;
   const agent = config.agents[name];
-  return `${ORIENT_ENV}=1 ${startAgentCommand(null, agent?.command ?? agent?.adapter ?? name, agent?.args, `Run \`${cmd.storyView(story)}\` and follow it.`)}`;
+  return `${ORIENT_ENV}=1 ${startAgentCommand(null, name, agent?.args, `Run \`${cmd.storyView(story)}\` and follow it.`)}`;
 }
 
 export const storyChatCommand = defineCommand({

@@ -214,7 +214,7 @@ function cases(): RuleCase[] {
   // ---- checks
   out.push(c("a check is already running", "check.running", facts([story(STORY_WF, ready("test"), null, {}, { lease: checkLease() })])));
   out.push(c("a check with no worktree", "check.no_worktree", facts([story(STORY_WF, ready("test"), null, { worktree: null }, noWorktree)])));
-  out.push(c("max_checks in use", "check.queued", facts([story(STORY_WF, ready("test"))], machine({ leases: [checkLease()] })), config({ max_checks: 1 })));
+  out.push(c("max_agents in use by checks", "check.queued", facts([story(STORY_WF, ready("test"))], machine({ leases: [checkLease()] })), config({ max_agents: 1 })));
 
   // ---- gates and git steps
   out.push(c("a ready unit at a gate step", "gate.wait", facts([story(STORY_WF, ready("ready"))])));

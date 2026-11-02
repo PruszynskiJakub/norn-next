@@ -55,7 +55,7 @@ const field = (payload: unknown, key: string): string | undefined => {
 function pickAdapter(ctx: Context, root: string, config: ResolvedConfig, flag: string | undefined, event: string, payload: unknown, at: string): AgentAdapter | null {
   const actx = ctx.adapterContext(root, config);
   const make = (name: string): AgentAdapter | null => {
-    const f = ctx.registry.agents[config.agents[name]?.adapter ?? name];
+    const f = ctx.registry.agents[name];
     return f ? f(actx) : null;
   };
   const named = flag ?? ctx.env.NORN_AGENT;

@@ -112,7 +112,7 @@ describe("R6.1: an implicit ask resolved by a later fact", () => {
   test("an explicit `norn ask` is never resolved by facts", () => {
     const st0 = stateFor(storyUnit(), SOLO_WF, running());
     const ask = numbered(1, receipt(st0, "ask", { question: "which db?" }));
-    const st = applyReceipts(st0, [ask], { workflow: SOLO_WF, now: at(), limits: CONFIG.limits }).state;
+    const st = applyReceipts(st0, [ask], { workflow: SOLO_WF, now: at() }).state;
     expect(st.park?.implicit).toBeUndefined();
     const a = only(facts([solo(st, { pane: { alive: true, state: "working", since: null }, hooks: [hook("tool_use", T0 + 10_000)] })], {}, T0 + 60_000));
     expect(a).toMatchObject({ kind: "noop", rule: "unit.parked.ask" });
@@ -120,7 +120,7 @@ describe("R6.1: an implicit ask resolved by a later fact", () => {
 
   test("apply: an agent's answer and an answer `norn answer` already typed are never delivered again", () => {
     const st = parkedOnPrompt();
-    const ctx = { workflow: SOLO_WF, now: at(T0 + 1000), limits: CONFIG.limits };
+    const ctx = { workflow: SOLO_WF, now: at(T0 + 1000) };
     const byAgent = applyReceipts(st, [numbered(st.applied_through + 1, receipt(st, "answer", { answer: "moved on" }, "agent"))], ctx);
     expect(byAgent).toMatchObject({ deliver: null, state: { status: "running", park: null } });
     const typed = applyReceipts(st, [numbered(st.applied_through + 1, receipt(st, "answer", { answer: "1", delivered: true }, "human"))], ctx);

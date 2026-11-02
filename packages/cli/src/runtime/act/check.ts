@@ -12,7 +12,7 @@ import { spawn } from "node:child_process";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { type Action, type ActionResult } from "@norn/core";
-import { assertValid, type CheckOrder, type ReceiptOf, ulid } from "@norn/schema";
+import { assertValid, type CheckOrder, type ReceiptOf, SLOTS, ulid } from "@norn/schema";
 import {
   acquireRunLease,
   appendReceipt,
@@ -41,7 +41,7 @@ export async function runCheck(act: ActEnv, a: Extract<Action, { kind: "run_chec
   const loc = act.unitLoc(a.unit);
   const attempt = loc.state?.attempt;
   if (!attempt) throw new Error(`${a.unit.key} has no state`);
-  const lease = await acquireRunLease(act.ctx.home, "check", act.config.max_checks, {
+  const lease = await acquireRunLease(act.ctx.home, "check", act.config.max_agents, {
     repo: act.root,
     story: a.unit.story,
     slice: a.unit.slice,
@@ -49,7 +49,7 @@ export async function runCheck(act: ActEnv, a: Extract<Action, { kind: "run_chec
     now: act.nowIso(),
     liveness: act.liveness(),
   });
-  if (!lease.ok) throw new QueueFull(`queued: max_checks ${act.config.max_checks} in use (K1)`);
+  if (!lease.ok) throw new QueueFull(`queued: max_agents ${act.config.max_agents} in use (K1)`);
   await sweepCheckOrders(act);
   // the process env is inherited by `norn check-run`, not written: the order holds only `.env.norn`, the step env and NORN_HOME
   const env = definedOnly({ ...(readEnvNorn(a.cwd) ?? {}), ...a.env, NORN_HOME: act.root });
@@ -68,7 +68,7 @@ export async function runCheck(act: ActEnv, a: Extract<Action, { kind: "run_chec
     cwd: a.cwd,
     env,
     timeout_ms: a.timeout_ms,
-    ports: Number.isInteger(portBase) && portBase > 0 ? { from: portBase, to: portBase + act.config.slots.ports_per_slot - 1 } : null,
+    ports: Number.isInteger(portBase) && portBase > 0 ? { from: portBase, to: portBase + SLOTS.ports_per_slot - 1 } : null,
   };
   const path = checkOrderPath(act.ctx.home, a.run_id);
   let started = false;

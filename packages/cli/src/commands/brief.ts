@@ -169,7 +169,7 @@ export const briefCommand = defineCommand({
     }
 
     const mode = unitStoryMode(ctx, s, config);
-    const limits = stepLimits(s.workflow, step, config.limits);
+    const limits = stepLimits(s.workflow, step);
     const env = readEnvNorn(s.worktree) ?? {};
     const num = (v: string | undefined) => (v !== undefined && /^\d+$/.test(v) ? Number(v) : null);
     const slicePath = s.unit.slice ? `${s.marker.spec_dir}/slices/${s.unit.dir}.md` : null;
@@ -206,7 +206,7 @@ export const briefCommand = defineCommand({
       rulings: rulings(s),
       criteria: unitCriteria(s),
       // QV5a: what this run's agent may `pass`
-      capabilities: config.agents[agentName(s, config)]?.capabilities ?? [],
+      capabilities: [],
     });
     // B4: the exact briefing of every run, in the trace
     const id = ulid(ctx.clock.now());

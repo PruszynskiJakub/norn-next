@@ -18,15 +18,13 @@ import {
 import type { NumberedReceipt, UnitRef } from "./facts.ts";
 import { edgeOf, OVERRIDABLE_ROUTES, stepOf } from "./workflow.ts";
 import { cmd } from "./commands.ts";
-import { type StepLimits, stepLimits } from "./policy.ts";
+import { stepLimits } from "./policy.ts";
 
 export interface ApplyContext {
   /** the unit's pinned workflow (S7) */
   workflow: Workflow;
   /** ISO time of this tick (facts.now) */
   now: string;
-  /** the limits a step without its own takes (C1, W2a; `stepLimits`) */
-  limits: StepLimits;
   tick_id?: string | null;
 }
 
@@ -400,7 +398,7 @@ function agentRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ct
       // R4.2: no way to deliver a nudge (runner neither types nor resumes) — decide routed it to a
       // fresh session, counted as a retry, not a nudge
       if (r.route === "retry") return retryRoute(st, step, r, ctx, withLast, o);
-      const max = stepLimits(ctx.workflow, step, ctx.limits).nudges;
+      const max = stepLimits(ctx.workflow, step).nudges;
       if (st.nudges_used < max)
         return {
           state: withLast({ ...st, nudges_used: st.nudges_used + 1, status: "running" }),
@@ -423,7 +421,7 @@ function agentRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ct
 
 /** C1 retry: a fresh session for the same step while retries last, else exhausted. */
 function retryRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ctx: ApplyContext, withLast: (s: UnitState) => UnitState, o: string): Step1 {
-  const max = stepLimits(ctx.workflow, step, ctx.limits).retries;
+  const max = stepLimits(ctx.workflow, step).retries;
   if (st.retries_used < max)
     return {
       state: withLast({ ...st, retries_used: st.retries_used + 1, status: "ready", run: null }),

@@ -10,6 +10,7 @@ import {
   sliceBranch,
   type UnitState,
   type Workflow,
+  SLOTS,
 } from "@norn/schema";
 import type { Action, BoundaryCommit, Decision, Delivery, NewReceipt } from "../actions.ts";
 import { type ApplyResult, applyReceipts } from "../apply.ts";
@@ -46,7 +47,7 @@ export class Ctx {
     this.heartbeat = facts.machine.heartbeat_id ?? facts.tick_id;
     const leases = facts.machine.leases;
     this.agentsFree = config.max_agents - leases.filter((l) => l.kind === "agent").length;
-    this.checksFree = config.max_checks - leases.filter((l) => l.kind === "check").length;
+    this.checksFree = config.max_agents - leases.filter((l) => l.kind === "check").length;
     this.slotsUsed = new Set(leases.filter((l) => l.kind === "slot" && l.slot !== undefined).map((l) => l.slot as number));
   }
 
@@ -72,7 +73,7 @@ export class Ctx {
   }
   /** Next free port slot (K4), or null when the range is exhausted. */
   slot(): number | null {
-    for (let s = this.config.slots.min; s <= this.config.slots.max; s++)
+    for (let s = SLOTS.min; s <= SLOTS.max; s++)
       if (!this.slotsUsed.has(s)) {
         this.slotsUsed.add(s);
         return s;
@@ -81,11 +82,8 @@ export class Ctx {
   }
   slotEnv(slot: number | null): Record<string, string> {
     if (slot === null) return {};
-    const { port_base, ports_per_slot, env } = this.config.slots;
-    const base = port_base + slot * ports_per_slot;
-    const out: Record<string, string> = { NORN_SLOT: String(slot), PORT_BASE: String(base) };
-    for (const [k, v] of Object.entries(env ?? {})) out[k] = v.replaceAll("{slot}", String(slot)).replaceAll("{port_base}", String(base));
-    return out;
+    // B33: only NORN_SLOT and PORT_BASE
+    return { NORN_SLOT: String(slot), PORT_BASE: String(SLOTS.port_base + slot * SLOTS.ports_per_slot) };
   }
 }
 
@@ -142,7 +140,7 @@ export function unitItem(ctx: Ctx, story: StoryFacts, uf: UnitFacts, state: Unit
 }
 
 export function applyCtx(ctx: Ctx, wf: Workflow) {
-  return { workflow: wf, now: ctx.nowIso, limits: ctx.config.limits, tick_id: ctx.facts.tick_id };
+  return { workflow: wf, now: ctx.nowIso, tick_id: ctx.facts.tick_id };
 }
 
 /** The receipt header fields `nornReceipt` fills in; `run_id`, `by` and `who` may be overridden. */

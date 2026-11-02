@@ -280,7 +280,7 @@ describe("base sync replay", () => {
     s.tick();
     expect(s.state.status).toBe("done");
     const apply = (st: UnitState, extra: Partial<Receipt> = {}) =>
-      applyReceipts(st, [{ n: st.applied_through + 1, file: "", receipt: { kind: "update", receipt_id: deriveUlid("01JFFFFFFFFFFFFFFFFFFFFFFF", 1), run_id: null, step: st.step, attempt: st.attempt, at: at(), by: "human", who: "jakub@mac", from: st.step, to: "update", reason: "person", ...extra } as Receipt }], { workflow: BASE_WF, now: at(), limits: CONFIG.limits });
+      applyReceipts(st, [{ n: st.applied_through + 1, file: "", receipt: { kind: "update", receipt_id: deriveUlid("01JFFFFFFFFFFFFFFFFFFFFFFF", 1), run_id: null, step: st.step, attempt: st.attempt, at: at(), by: "human", who: "jakub@mac", from: st.step, to: "update", reason: "person", ...extra } as Receipt }], { workflow: BASE_WF, now: at() });
     const fromDone = apply(s.state);
     expect(fromDone.rejected).toEqual([]);
     expect(fromDone.state).toMatchObject({ step: "update", status: "ready" });
@@ -383,7 +383,7 @@ describe("base sync replay", () => {
     const s = run(wf);
     expect(s.state).toMatchObject({ step: "ready", status: "parked", counters: { base_conflict_loop: 0, stale_loop: 3 } });
     // journaled: every clean update after a conflict carries the reset in its advance (trace, commit, handoff line)
-    const res = applyReceipts({ ...s.state, step: "update", status: "running", counters: { base_conflict_loop: 1, stale_loop: 0 } }, [{ n: s.state.applied_through + 1, file: "", receipt: { kind: "classify", receipt_id: deriveUlid("01JGGGGGGGGGGGGGGGGGGGGGGG", 1), run_id: null, step: "update", attempt: s.state.attempt, at: at(), by: "norn", outcome: "done", rule: "git.update", route: "test" } }], { workflow: wf, now: at(), limits: CONFIG.limits });
+    const res = applyReceipts({ ...s.state, step: "update", status: "running", counters: { base_conflict_loop: 1, stale_loop: 0 } }, [{ n: s.state.applied_through + 1, file: "", receipt: { kind: "classify", receipt_id: deriveUlid("01JGGGGGGGGGGGGGGGGGGGGGGG", 1), run_id: null, step: "update", attempt: s.state.attempt, at: at(), by: "norn", outcome: "done", rule: "git.update", route: "test" } }], { workflow: wf, now: at() });
     expect(res.advance).toEqual({ from: "update", outcome: "done", to: "test", reset: ["base_conflict_loop"] });
     expect(res.log.at(-1)).toContain("(reset base_conflict_loop)");
     // a repeated conflict on one base move still exhausts it

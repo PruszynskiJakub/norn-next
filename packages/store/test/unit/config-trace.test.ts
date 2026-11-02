@@ -34,24 +34,24 @@ import {
 import { AT, tmp, WORKFLOW_YAML } from "../helpers.ts";
 
 describe("config (K2)", () => {
-  test("user + repo layers merged; home from param or NORN_HOME_DIR; missing = defaults", () => {
+  test("user, local and team files merged; home from param or NORN_HOME_DIR; missing = built-in", () => {
     const repo = tmp();
     const home = tmp();
-    expect(loadConfig({ repoRoot: repo, home })).toMatchObject({ ok: true, config: { max_agents: 2 } });
-    writeFileSync(join(home, "config.yaml"), "max_agents: 4\ndefault_mode: auto\n");
+    expect(loadConfig({ repoRoot: repo, home })).toMatchObject({ ok: true, config: { max_agents: 9 } });
+    writeFileSync(join(home, "config.yaml"), "max_agents: 4\nmode: auto\n");
     mkdirSync(dirname(repoConfigPath(repo)), { recursive: true });
-    writeFileSync(repoConfigPath(repo), "max_agents: 8\nremote: { label: mine }\n");
+    writeFileSync(repoConfigPath(repo), "workflow: story\n");
+    writeFileSync(join(repo, ".agents", "norn.config.local.yaml"), "mode: manual\n");
     const c = loadConfig({ repoRoot: repo, env: { NORN_HOME_DIR: home } });
-    expect(c.ok && c.config).toMatchObject({ max_agents: 4, mode: "auto", label: "mine", provider: "gh" });
+    expect(c.ok && c.config).toMatchObject({ max_agents: 4, mode: "manual", workflow: "story", provider: "gh" });
     expect(c.home).toBe(home);
   });
-  test("invalid layer → errors with repo-relative path", () => {
+  test("a key in the wrong file → a config problem naming the file, not corrupt", () => {
     const repo = tmp();
     mkdirSync(dirname(repoConfigPath(repo)), { recursive: true });
-    writeFileSync(repoConfigPath(repo), "max_agents: zero\n");
+    writeFileSync(repoConfigPath(repo), "max_agents: 2\n");
     const c = loadConfig({ repoRoot: repo, home: tmp() });
-    expect(c.ok).toBe(false);
-    expect(!c.ok && c.errors[0]?.file).toBe(relative(repo, repoConfigPath(repo)));
+    expect(!c.ok && c.problems).toEqual([{ code: "config_wrong_file", file: "repo", key: "max_agents", message: "`max_agents` belongs in `~/.norn/config.yaml` (machine key)" }]);
   });
 });
 

@@ -16,7 +16,7 @@ function history(st: UnitState, wf = SLICE_WF, ...make: Array<(s: UnitState) => 
   for (const m of make) {
     const nr = numbered(rs.length + 1, m(st));
     rs.push(nr);
-    st = applyReceipts(st, [nr], { workflow: wf, now: at(), limits: { deadline: "60m", nudges: 2, retries: 1, stalled: "15m" } }).state;
+    st = applyReceipts(st, [nr], { workflow: wf, now: at() }).state;
   }
   return { st, rs };
 }
@@ -349,7 +349,7 @@ function replay(dir: string, unit: UnitRef, paths: BriefInput["paths"]) {
     .sort()
     .map((file) => numbered(Number(file.slice(0, 4)), JSON.parse(readFileSync(join(FIX, dir, "receipts", file), "utf8")) as Receipt));
   let st = stateFor(unit, wf);
-  for (const r of receipts) st = applyReceipts(st, [r], { workflow: wf, now: r.receipt.at, limits: { deadline: "60m", nudges: 2, retries: 1, stalled: "15m" } }).state;
+  for (const r of receipts) st = applyReceipts(st, [r], { workflow: wf, now: r.receipt.at }).state;
   const evidence_files = JSON.parse(readFileSync(join(FIX, dir, "evidence.json"), "utf8")) as Record<string, string[]>;
   return renderBrief({ ...input(st, receipts), unit, workflow: wf, mode: "manual", runner: null, paths, diff_range: null, evidence_files });
 }
@@ -398,7 +398,7 @@ describe("golden replays (norn-sandbox-todoist)", () => {
       .slice(0, 5)
       .map((file) => numbered(Number(file.slice(0, 4)), JSON.parse(readFileSync(join(FIX, "gh-2-03", "receipts", file), "utf8")) as Receipt));
     let st = stateFor(unit, wf);
-    for (const r of receipts) st = applyReceipts(st, [r], { workflow: wf, now: r.receipt.at, limits: { deadline: "60m", nudges: 2, retries: 1, stalled: "15m" } }).state;
+    for (const r of receipts) st = applyReceipts(st, [r], { workflow: wf, now: r.receipt.at }).state;
     expect(st).toMatchObject({ step: "qa" });
     const b = renderBrief({ ...input(st, receipts), unit, workflow: wf });
     expect(b.json.rework).toBeNull();

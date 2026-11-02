@@ -30,5 +30,7 @@ export const ExitCode = {
   corrupt: 4,
   /** another process holds the lock or claim */
   busy: 5,
+  /** a config file a person wrote needs fixing (gh-64 B7, D3); no unit is broken */
+  config: 6,
 } as const;
 export type ExitCode = (typeof ExitCode)[keyof typeof ExitCode];

@@ -4,7 +4,7 @@ import addFormatsModule from "ajv-formats";
 import { CheckOrder, ClaimBlob, LeaseFile } from "./claim.ts";
 import { CliError } from "./cli.ts";
 import { CriteriaReport } from "./criteria.ts";
-import { ConfigLayer, ResolvedConfig } from "./config.ts";
+import { LocalConfig, RepoConfig, ResolvedConfig, UserConfig } from "./config.ts";
 import { SliceFrontmatter, StoryFrontmatter } from "./frontmatter.ts";
 import {
   LocalBaseFile,
@@ -40,7 +40,9 @@ export const SCHEMAS = {
   claim: ClaimBlob,
   lease: LeaseFile,
   "check-order": CheckOrder,
-  config: ConfigLayer,
+  "user-config": UserConfig,
+  "local-config": LocalConfig,
+  "repo-config": RepoConfig,
   "resolved-config": ResolvedConfig,
   "cli-error": CliError,
   "criteria-report": CriteriaReport,
