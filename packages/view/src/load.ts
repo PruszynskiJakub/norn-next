@@ -316,7 +316,8 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     let claim = classifyClaim(claims[i] ?? { state: "none" }, me, now);
     if (claim.state === "other" && claim.blob.holder === holder) claim = { ...claim, state: "mine" };
     const storyState = story.units[0]?.state ?? null;
-    const mode: Mode = storyMode(storyState, story.units[0]?.workflow?.workflow, config);
+    // B10, B25: before its story unit pins a workflow, a story runs in the one it will start (MO1)
+    const mode: Mode = storyMode(storyState, story.units[0]?.workflow?.workflow ?? snap.workflows.workflows[story.frontmatter?.workflow ?? config.workflow]?.workflow, config);
     const finished = story.frontmatter?.status === "done" || story.frontmatter?.status === "dropped";
 
     const units: UnitFacts[] = ls.units.map((lu) => unitFacts(lu, lu.hooks, leaseByRun));

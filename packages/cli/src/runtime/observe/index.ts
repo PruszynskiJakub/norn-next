@@ -333,7 +333,8 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       ...(await storyBase(git, root, remote, base, branch, s.frontmatter?.status, refs, baseCacheIn, baseCache, s.key)),
       units,
       slices: s.slices satisfies SliceFileFacts[],
-      mode: storyMode(units[0]?.state, units[0]?.workflow, config),
+      // B10, B25: before its story unit pins a workflow, a story runs in the one it will start (MO1)
+      mode: storyMode(units[0]?.state, units[0]?.workflow ?? workflows[s.frontmatter?.workflow ?? config.workflow]?.workflow, config),
     });
   }
 
