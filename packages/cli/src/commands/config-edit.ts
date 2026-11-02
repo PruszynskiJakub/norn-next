@@ -6,7 +6,7 @@
  * is asked which file (B64); anywhere else it is a usage error (B65).
  */
 import { relative } from "node:path";
-import { CONFIG_FILES } from "@norn/schema";
+import { CONFIG_FILES, configKeyProblem } from "@norn/schema";
 import { type ConfigLayerName, editConfigLayer } from "@norn/store";
 import { defineCommand, opt, type ParsedArgs } from "../command.ts";
 import type { Context } from "../context.ts";
@@ -76,8 +76,16 @@ async function layerFile(ctx: Context, args: ParsedArgs, verb: string): Promise<
 
 function edit(ctx: Context, file: ConfigLayerName, key: string, change: { set: string } | { unset: true }) {
   const r = editConfigLayer({ repoRoot: ctx.root, home: ctx.home, file, key, edit: change });
-  if (!r.ok) throw refuse(r.error, cmd.config(), r.code);
+  if (!r.ok) throw refuse(r.error, r.code === "config_wrong_file" ? inRightFile(key, change) : cmd.config(), r.code);
   return r;
+}
+
+/** D4: the same edit in the file that takes the key, so the refusal says where it goes. */
+function inRightFile(key: string, change: { set: string } | { unset: true }): string {
+  const right = (["user", "local", "repo"] as const).find((f) => configKeyProblem(f, key) === null);
+  if (!right) return cmd.config();
+  const value = "set" in change ? ` ${/^[\w.:/@-]+$/.test(change.set) ? change.set : JSON.stringify(change.set)}` : "";
+  return `norn config ${"set" in change ? "set" : "unset"} ${key}${value} --${right}`;
 }
 
 const shown = (ctx: Context, path: string) => (path.startsWith(ctx.root) ? relative(ctx.root, path) : path);

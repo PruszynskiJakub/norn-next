@@ -104,6 +104,18 @@ Implement gh-64's whole Plan (B1–B55, docs included) in this quick round, in t
 - review#3: changes_requested at a64bcffb5. Review #2's F1–F4 are verified fixed (dev build run in temp repos). Unit 1079/0, typecheck clean. Blocking: F1 `norn status`/`story list` hide a config error (exit 0, no Config error title; B7, human.ts:51), raised as minor in review #2 and left; F2 migrate's note for a dropped team `notifiers`/`trace` repeats the old key, which the new norn refuses with config_moved (B43, config-migrate.ts:148). Minor: init writes half its setup before failing on an old user file; `config set --local` writes no schema modeline (B50); migrate reflows workflow files; blind casts in migrateRepo; raw base_branch read and unvalidated legacyConfig; fallback drops a whole top-level key. Friction: a stray root handoff.md from another story is on main (#152).
 - review#3 changes_requested: Review #3: changes requested, with 2 blocking findings. Review #2's F1–F4 are fixed. Unit 1079/0, typecheck clean. F1: norn status and story list hide a config error and exit 0, with no Config error title (B7). F2: migrate's note for a dropped team notifiers/trace repeats the old key, which the new norn refuses (B43). Minor: init half setup on an old user file, no modeline in the local file, migrate reflows workflows, blind casts, unvalidated legacyConfig, fallback drops whole keys.
 
+- implement#6 (review#3 rework), each red first:
+  - F1 (B7): `projectView` reads `ctx.config` first, so `status`, `story list` (and the other view commands) refuse a config problem with "Config error", exit 6, `config_invalid` under `--json`; `status --segment` keeps its one-line `norn ! …`. S1 test in config.test.ts (user file `max_agent: 4`).
+  - F2 (B43): a team `notifiers` list is offered in the user file's shape (`notify: {…}`), dropped adapters named. S1 migrate test.
+  - Minor 3/10: init checks config before writing anything (S1: old user file → exit 6, no team file, no workflows); new `ctx.resolved` getter replaces init's unreachable fallback.
+  - Minor 4 (B50): a config file `config set` creates starts with its schema modeline (`USER_CONFIG_SCHEMA_FILE` added to paths).
+  - Minor 5 (D13): migrate splices `mode`/`defaults:` lines after `name:`; falls back to a no-wrap render. Test: only the added lines differ in quick.yaml.
+  - Nit 7 (D4): config_wrong_file's do_instead is the same edit with the right file flag.
+  - Minor 8: scalar `remote`/`limits`/bad `default_mode` in the team file are removed and listed once (S1 test).
+  - Minor 11: fallback comment now says a whole top-level key is left out. Nit 6: B47 S1 fake no longer throws the asserted file text.
+  - Not done: 9 (raw base_branch read; validating legacyConfig risks breaking `run view --why` on older ticks), 12 duplication nits.
+  - Unit 1079/0, typecheck clean; 16 touched integration files 217/0.
+
 ## Resume
 
-review#3 changes_requested: implement fixes F1 (status config error, B7) and F2 (migrate notify advice, B43) red-first, then the minor findings worth it.
+implement#6 is done; nothing left in this step.

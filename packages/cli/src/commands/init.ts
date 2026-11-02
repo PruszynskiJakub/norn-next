@@ -142,6 +142,8 @@ export const initCommand = defineCommand({
   options: { "hook-command": { type: "string" } },
   async run(ctx, args) {
     const root = ctx.root;
+    // B7: a config file with a problem refuses before init writes anything, so no half setup
+    void ctx.config;
 
     const assets = assetsDir(ctx.env);
     const configPath = repoConfigPath(root);
@@ -172,9 +174,8 @@ export const initCommand = defineCommand({
     const test_command = workflows.created.length ? { command: testCommand, detected_from: detected?.from ?? null, set_in: setIn } : null;
 
     ctx.reload();
-    const ports = await ctx.ports(); // validates the config (exit 6 when invalid)
-    const loaded = ctx.loaded;
-    const agents = agentsInUse(root, loaded.ok ? loaded : loaded.fallback, ports); // B1, B13
+    const ports = await ctx.ports(); // validates the config again with the written files (exit 6 when invalid)
+    const agents = agentsInUse(root, ctx.resolved, ports); // B1, B13
     const names = bundledSkills(ctx.env);
     const installed = installSkills(root, join(assets, "skills"), names);
     const links: Array<{ agent: string; dir: string; linked: string[]; unchanged: string[]; kept: string[] }> = [];

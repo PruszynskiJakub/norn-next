@@ -16,6 +16,8 @@ export const LOCAL_CONFIG_FILE = ".agents/norn.config.local.yaml";
 /** gh-64 B50, B55 (D14): the JSON schema copies editors read through the starters' modelines. */
 export const REPO_CONFIG_SCHEMA_FILE = ".agents/norn.config.schema.json";
 export const LOCAL_CONFIG_SCHEMA_FILE = ".agents/norn.config.local.schema.json";
+/** under the norn home, next to `config.yaml` */
+export const USER_CONFIG_SCHEMA_FILE = "config.schema.json";
 export const WORKFLOWS_DIR = ".agents/workflows";
 
 /** gh-110 D4: the old layout's places, relative to the main checkout; only refused and moved from, never read. */

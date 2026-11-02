@@ -121,6 +121,17 @@ describe("three files and where keys belong (B1–B8)", () => {
     expect(r.stdout).not.toContain("Corrupt");
   });
 
+  test("B7: status and story list refuse a config error with its title and exit code", async () => {
+    h.write(userFile(h), "max_agent: 4\n");
+    for (const argv of [["status"], ["story", "list"]]) {
+      const json = await h.norn(...argv, "--json");
+      expect(json).toMatchObject({ exit: ExitCode.config, value: { code: "config_invalid" } });
+      const r = await h.norn(...argv);
+      expect(r.exit).toBe(ExitCode.config);
+      expect(r.stdout).toContain("**Config error (config_invalid):**");
+    }
+  });
+
   test("B8: an empty or missing file sets nothing", async () => {
     h.write(localFile(h), "");
     h.write(userFile(h), "# only comments\n");
@@ -253,17 +264,18 @@ describe("norn config set and unset (B62–B68, D4)", () => {
 
   test("--user, --local and --repo write their file; get shows the source (B62, D4)", async () => {
     expect((await h.norn("config", "set", "mode", "auto", "--user", "--json")).value).toMatchObject({ file: "user", key: "mode", value: "auto" });
-    expect(read(userFile(h))).toBe("mode: auto\n");
+    // B50: a file config set creates starts with the modeline naming its schema copy
+    expect(read(userFile(h))).toBe("# yaml-language-server: $schema=config.schema.json\nmode: auto\n");
     expect((await h.norn("config", "set", "mode", "manual", "--local")).exit).toBe(0);
-    expect(read(localFile(h))).toBe("mode: manual\n");
+    expect(read(localFile(h))).toBe("# yaml-language-server: $schema=norn.config.local.schema.json\nmode: manual\n");
     expect(await get("mode")).toMatchObject([{ value: "manual", source: "local" }]);
     expect((await h.norn("config", "set", "workflow", "story", "--repo")).exit).toBe(0);
-    expect(read(repoConfigPath(h.root))).toBe("workflow: story\n");
+    expect(read(repoConfigPath(h.root))).toBe("# yaml-language-server: $schema=norn.config.schema.json\nworkflow: story\n");
   });
 
   test("D4: a key the file does not take is refused with config_wrong_file or config_moved; nothing written", async () => {
     const wrong = await h.norn("config", "set", "max_agents", "4", "--repo", "--json");
-    expect(wrong).toMatchObject({ exit: 3, value: { code: "config_wrong_file", error: "`.agents/norn.config.yaml`: `max_agents` belongs in `~/.norn/config.yaml` (machine key)" } });
+    expect(wrong).toMatchObject({ exit: 3, value: { code: "config_wrong_file", error: "`.agents/norn.config.yaml`: `max_agents` belongs in `~/.norn/config.yaml` (machine key)", do_instead: "norn config set max_agents 4 --user" } });
     const moved = await h.norn("config", "set", "default_mode", "auto", "--user", "--json");
     expect(moved).toMatchObject({ exit: 3, value: { code: "config_moved" } });
     expect(read(repoConfigPath(h.root))).toBeNull();
@@ -288,7 +300,7 @@ describe("norn config set and unset (B62–B68, D4)", () => {
     const r = await norn({ interaction: term }, "config", "set", "mode", "auto");
     expect(r.exit).toBe(0);
     expect(term.picks).toMatchObject([{ question: "Write to which file?", choices: [{ value: "user" }, { value: "local" }, { value: "repo" }] }]);
-    expect(read(localFile(h))).toBe("mode: auto\n");
+    expect(read(localFile(h))).toBe("# yaml-language-server: $schema=norn.config.local.schema.json\nmode: auto\n");
   });
 
   test("leaving the prompt writes nothing", async () => {

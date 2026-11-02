@@ -3,7 +3,7 @@
  * and workflow graph checks in @norn/core.
  */
 import { readdirSync, statSync } from "node:fs";
-import { extname, join } from "node:path";
+import { basename, extname, join } from "node:path";
 import type { FileError } from "@norn/core";
 import {
   type ConfigDerived,
@@ -22,7 +22,7 @@ import {
 import { type Document, isCollection, isMap, isScalar, parseDocument, parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { atomicWrite, fileError, isErrno, readText, type ReadResult } from "./fsx.ts";
 import { recordedInterval } from "./heartbeat.ts";
-import { checkoutOf, LOCAL_CONFIG_FILE, LOCAL_CONFIG_SCHEMA_FILE, nornHome, REPO_CONFIG_SCHEMA_FILE, REPO_CONFIG_FILE, repoConfigPath, userConfigPath, workflowsDir } from "./paths.ts";
+import { checkoutOf, LOCAL_CONFIG_FILE, LOCAL_CONFIG_SCHEMA_FILE, nornHome, REPO_CONFIG_SCHEMA_FILE, REPO_CONFIG_FILE, repoConfigPath, USER_CONFIG_SCHEMA_FILE, userConfigPath, workflowsDir } from "./paths.ts";
 import { type PinnedWorkflow, parseWorkflowText, sha256 } from "./unit.ts";
 
 /** B8: a missing or empty file sets nothing; a file that is not YAML is `config_invalid`. */
@@ -52,7 +52,7 @@ export type LoadedConfig =
       errors: FileError[];
       home: string;
       paths: ConfigPaths;
-      /** B48: the config with the failing keys left out, so doctor still runs the checks one bad value does not hide */
+      /** B48: the config with each top-level key that has a problem left out whole (one bad `agents.codex.model` drops all of `agents`), so doctor still runs the checks it does not hide */
       fallback: { config: ResolvedConfig; entries: ConfigEntry[] };
     };
 
@@ -137,11 +137,14 @@ export function loadConfig(opts: { repoRoot: string; home?: string; env?: Record
  * schemas in `.agents/` (committed), the user schema in the norn home — when missing or stale.
  * Returns the paths written.
  */
+/** B50, B55 (D14): each config file's schema copy, as the path under its root (repo or norn home). */
+const SCHEMA_COPY: Record<ConfigLayerName, string> = { user: USER_CONFIG_SCHEMA_FILE, local: LOCAL_CONFIG_SCHEMA_FILE, repo: REPO_CONFIG_SCHEMA_FILE };
+
 export function writeConfigSchemas(opts: { repoRoot: string; home: string }): string[] {
   const targets: Array<[string, "repo-config" | "local-config" | "user-config"]> = [
     [join(opts.repoRoot, REPO_CONFIG_SCHEMA_FILE), "repo-config"],
     [join(opts.repoRoot, LOCAL_CONFIG_SCHEMA_FILE), "local-config"],
-    [join(opts.home, "config.schema.json"), "user-config"],
+    [join(opts.home, USER_CONFIG_SCHEMA_FILE), "user-config"],
   ];
   const written: string[] = [];
   for (const [path, name] of targets) {
@@ -185,7 +188,8 @@ export function editConfigLayer(opts: {
   const home = nornHome(opts.home, opts.env);
   const paths = { user: userConfigPath(home), local: localConfigPath(opts.repoRoot), repo: repoConfigPath(opts.repoRoot) };
   const path = paths[opts.file];
-  const raw = readText(path) ?? "";
+  const existing = readText(path);
+  const raw = existing ?? "";
   const doc = parseDocument(raw);
   if (doc.errors.length) return { ok: false, code: "invalid_value", error: `${path}: YAML: ${doc.errors[0]?.message}` };
   const segs = key.split(".");
@@ -210,7 +214,9 @@ export function editConfigLayer(opts: {
   const checked = "set" in edit ? checkConfigFile(opts.file, layer) : [];
   if (checked.length) return { ok: false, code: "invalid_value", error: checked.map(problemText).join("; ") };
   // B67: the original text with only the changed lines touched, as long as it means the same as the edited document
-  const text = spliced !== null && JSON.stringify(parseYaml(spliced) ?? {}) === JSON.stringify(layer) ? spliced : rendered(doc);
+  const edited = spliced !== null && JSON.stringify(parseYaml(spliced) ?? {}) === JSON.stringify(layer) ? spliced : rendered(doc);
+  // B50: a file this creates starts with the modeline its editor reads the schema copy through
+  const text = existing === null ? `# yaml-language-server: $schema=${basename(SCHEMA_COPY[opts.file])}\n${edited}` : edited;
   if (text === raw) return { ok: true, path, changed: false, value };
   atomicWrite(path, text);
   return { ok: true, path, changed: true, value };

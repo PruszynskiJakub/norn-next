@@ -319,6 +319,7 @@ default_agent: codex
 max_agents: 1
 default_mode: auto
 limits: { deadline: 45m, attended_wait: 5m }
+notifiers: [{ adapter: ntfy, options: { url: https://ntfy.sh/team } }]
 `;
   const SLICE = `---
 id: gh-12/02
@@ -359,9 +360,12 @@ Body
   });
 
   test("B41, B42: team limits fill each workflow's defaults: and default_mode each workflow's mode, keeping a workflow's own", () => {
-    const quick = h.read(join(workflowsDir(h.root), "quick.yaml"));
-    expect(quick).toContain("mode: auto");
-    expect(quick).toMatch(/defaults:\n\s+deadline: 45m/);
+    const quick = h.read(join(workflowsDir(h.root), "quick.yaml")).trimEnd();
+    // D13: only the added lines differ; the rest of the file keeps its text (no reflow)
+    const before = sh(h.root, ["show", "HEAD:.agents/workflows/quick.yaml"]).trimEnd();
+    const added = quick.split("\n").filter((l) => !before.split("\n").includes(l));
+    expect(added).toEqual(["mode: auto", "defaults:", "  deadline: 45m"]);
+    expect(quick.split("\n").filter((l) => !added.includes(l)).join("\n")).toBe(before);
     const release = h.read(join(workflowsDir(h.root), "release.yaml"));
     expect(release).toContain("mode: manual");
     expect(release).toContain("deadline: 20m");
@@ -375,6 +379,11 @@ Body
   test("B43: personal and machine keys leave the team file, each listed with its value", () => {
     expect(out.stdout).toContain("removed `max_agents: 1` from the team file: set it in ~/.norn/config.yaml if you want it");
     expect(out.stdout).toContain("removed `agent: codex` from the team file: set it in ~/.norn/config.yaml if you want it");
+  });
+
+  test("B43: a team notifiers list is offered in the user file's new shape, not the old key", () => {
+    expect(out.stdout).toContain('set it in ~/.norn/config.yaml if you want it: `notify: {"ntfy":"https://ntfy.sh/team","os":false}`');
+    expect(out.stdout).not.toContain("if you want it: `notifiers");
   });
 
   test("B43: a team limit no workflow takes is listed with its value", () => {
@@ -419,6 +428,30 @@ describe("norn migrate leaves a new-style config alone (gh-64 B45)", () => {
       expect(h.read(join(h.home, "config.yaml"))).toBe(user);
       expect(h.read(repoConfigPath(h.root))).toBe(team);
       expect(porcelain(h)).toBe("");
+    } finally {
+      h.cleanup();
+    }
+  });
+});
+
+describe("norn migrate on old team values of the wrong shape (gh-64 B43)", () => {
+  test("B43: a scalar remote, limits or default_mode is removed and listed once with its value", async () => {
+    const h = await createHarness();
+    try {
+      expect((await h.norn("init")).exit).toBe(0);
+      h.write(repoConfigPath(h.root), "remote: origin\nlimits: 5m\ndefault_mode: sometimes\n");
+      h.git(["add", "-A"]);
+      h.git(["commit", "-q", "-m", "odd old config"]);
+      const out = await h.norn("migrate", "--json");
+      expect(out.exit).toBe(0);
+      const removed = (out.value as { config: { removed: Array<{ key: string; value: unknown }> } }).config.removed;
+      expect(removed.map(({ key, value }) => ({ key, value }))).toEqual([
+        { key: "remote", value: "origin" },
+        { key: "limits", value: "5m" },
+        { key: "default_mode", value: "sometimes" },
+      ]);
+      expect(h.read(repoConfigPath(h.root))).not.toMatch(/remote|limits|default_mode/);
+      expect((await h.norn("config", "list", "--json")).exit).toBe(0);
     } finally {
       h.cleanup();
     }

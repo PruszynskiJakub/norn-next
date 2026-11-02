@@ -7,8 +7,8 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { ConfigEntry } from "@norn/schema";
-import { readTrace, workflowsDir } from "@norn/store";
+import { type ConfigEntry, ExitCode } from "@norn/schema";
+import { readTrace, repoConfigPath, workflowsDir } from "@norn/store";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
 
 setDefaultTimeout(60_000);
@@ -140,7 +140,7 @@ describe("a notification that fails to send (B47)", () => {
     h = await createHarness();
     expect((await h.norn("init")).exit).toBe(0);
     h.notifier.notify = async () => {
-      throw new Error("notify ntfy: fetch failed; fix it in ~/.norn/config.yaml");
+      throw new Error("notify ntfy: fetch failed");
     };
     h.git(["add", "-A"]);
     h.git(["commit", "-q", "-m", "norn"]);
@@ -156,9 +156,10 @@ describe("a notification that fails to send (B47)", () => {
   });
   afterAll(() => h.cleanup());
 
-  test("B47: the tick goes on and the trace keeps the error naming the file", async () => {
+  // the error naming its file is wiring's (S3, wiring.test.ts); here the tick goes on and traces it
+  test("B47: the tick goes on and the trace keeps the send error", async () => {
     const rejects = readTrace(h.root, { types: ["reject"] }).events as Array<{ source: string; reason: string }>;
-    expect(rejects.filter((e) => e.source === "notify").map((e) => e.reason)).toContain("notify ntfy: fetch failed; fix it in ~/.norn/config.yaml");
+    expect(rejects.filter((e) => e.source === "notify").map((e) => e.reason)).toContain("notify ntfy: fetch failed");
   });
 });
 
@@ -226,6 +227,20 @@ describe("norn init sets up the agents in use only (B1, B13)", () => {
       h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO.replace("type: agent\n", "type: agent\n    agent: gemini\n"));
       expect((await h.norn("init")).exit).toBe(0);
       expect(present(h)).toEqual([".codex", ".gemini"]);
+    } finally {
+      h.cleanup();
+    }
+  });
+
+  test("B1, B7: an old key in the user file refuses init before it writes anything", async () => {
+    const h = await createHarness();
+    try {
+      h.write(join(h.home, "config.yaml"), "default_mode: auto\n");
+      const r = await h.norn("init", "--json");
+      expect(r).toMatchObject({ exit: ExitCode.config, value: { code: "config_moved" } });
+      expect(present(h)).toEqual([]);
+      expect(existsSync(repoConfigPath(h.root))).toBe(false);
+      expect(existsSync(workflowsDir(h.root))).toBe(false);
     } finally {
       h.cleanup();
     }

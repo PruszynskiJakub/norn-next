@@ -49,8 +49,11 @@ import { gitRemote, type Observed, observe } from "./observe/index.ts";
 
 /** The read model for this checkout and machine (no writes, no network). */
 export async function projectView(ctx: Context): Promise<ProjectView> {
-  // MO5: the runner's capabilities decide how Your turn says to start an agent; a config that
-  // cannot build ports still gets its view (the errors are in it)
+  // B7: a config file with a problem refuses under "Config error" (exit config), never a view
+  // drawn on fallback values
+  void ctx.config;
+  // MO5: the runner's capabilities decide how Your turn says to start an agent; ports that fail
+  // to build for another reason still leave the view
   const runner = await ctx.ports().then((p) => p.runner, () => null);
   return loadProjectView({
     repoRoot: ctx.root,

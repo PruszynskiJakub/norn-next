@@ -7,8 +7,9 @@
  */
 import { readdirSync } from "node:fs";
 import { join, relative } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { AGENT_NAMES, ATTENDED_WAIT, isAgentName, SPEC_FILE } from "@norn/schema";
-import { type Document, isMap, isScalar, isSeq, type Pair, parseDocument, type YAMLMap } from "yaml";
+import { Document, isMap, isScalar, isSeq, type Pair, parseDocument, type YAMLMap } from "yaml";
 import { writeConfigSchemas, WORKFLOW_EXT } from "./config.ts";
 import { atomicWrite, isErrno, readText } from "./fsx.ts";
 import { LOCAL_CONFIG_SCHEMA_FILE, REPO_CONFIG_FILE, REPO_CONFIG_SCHEMA_FILE, repoConfigPath, slicesDir, specsDir, userConfigPath, workflowsDir } from "./paths.ts";
@@ -76,6 +77,9 @@ function notifyOf(list: unknown): { notify: Record<string, unknown>; dropped: st
   if (!os) notify.os = false;
   return { notify, dropped };
 }
+
+/** A YAML map's plain value, or null for a scalar, a list or nothing (old values are never trusted). */
+const asRecord = (v: unknown): Record<string, unknown> | null => (v !== null && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
 
 /** One migration of one file's document; returns whether it changed. */
 interface FileRun {
@@ -149,8 +153,9 @@ const PERSONAL_NOTE = (key: string, value: unknown) => `set it in ${USER_FILE} i
 
 /** B40–B43: the team file; returns the limits and mode it hands to the workflows. */
 function migrateRepo(r: FileRun): { limits: Record<string, unknown> | null; mode: string | null } {
-  const remote = js(r.doc, ["remote"]) as Record<string, unknown> | undefined;
-  if (remote !== undefined) {
+  const rawRemote = js(r.doc, ["remote"]);
+  if (rawRemote !== undefined) {
+    const remote = asRecord(rawRemote);
     const provider = remote?.provider;
     const m = r.doc.contents as YMap;
     const pair = pairOf(m, "remote");
@@ -160,12 +165,15 @@ function migrateRepo(r: FileRun): { limits: Record<string, unknown> | null; mode
       pair.value = r.doc.createNode(provider);
       r.out.renamed.push({ file: "repo", from: "remote.provider", to: "provider" });
     } else r.doc.delete("remote");
+    if (!remote) r.out.removed.push({ file: "repo", key: "remote", value: rawRemote, note: "norn derives or fixes it" });
     for (const [k, v] of Object.entries(remote ?? {}))
       if (k !== "provider") r.out.removed.push({ file: "repo", key: `remote.${k}`, value: v, note: k === "label" ? "the label is always norn" : "norn derives or fixes it" });
   }
   rename(r, "default_workflow", "workflow");
   rename(r, "default_slice_workflow", "slice_workflow");
-  const limits = (js(r.doc, ["limits"]) as Record<string, unknown> | undefined) ?? null;
+  const rawLimits = js(r.doc, ["limits"]);
+  const limits = asRecord(rawLimits);
+  if (rawLimits !== undefined && !limits) drop(r, "limits", "set limits in a workflow's `defaults:`");
   if (limits) {
     r.doc.delete("limits");
     r.out.renamed.push({ file: "repo", from: "limits", to: "each workflow's defaults:" });
@@ -173,7 +181,9 @@ function migrateRepo(r: FileRun): { limits: Record<string, unknown> | null; mode
     for (const [k, v] of Object.entries(limits))
       if (!WORKFLOW_DEFAULTS.includes(k)) r.out.removed.push({ file: "repo", key: `limits.${k}`, value: v, note: LIMIT_NOTE[k] ?? "norn fixes it" });
   }
-  const mode = (js(r.doc, ["default_mode"]) as string | undefined) ?? null;
+  const rawMode = js(r.doc, ["default_mode"]);
+  const mode = rawMode === "manual" || rawMode === "auto" ? rawMode : null;
+  if (rawMode !== undefined && !mode) drop(r, "default_mode", "set `mode` in each workflow: manual or auto");
   if (mode) {
     r.doc.delete("default_mode");
     r.out.renamed.push({ file: "repo", from: "default_mode", to: "each workflow's mode" });
@@ -184,7 +194,13 @@ function migrateRepo(r: FileRun): { limits: Record<string, unknown> | null; mode
     r.out.removed.push({ file: "repo", key: "agent", value: agent, note: PERSONAL_NOTE("agent", agent) });
     r.doc.delete("default_agent");
   }
-  for (const k of ["agents", "max_agents", "notifiers", "trace"]) if (r.doc.has(k)) drop(r, k, PERSONAL_NOTE(k, js(r.doc, [k])));
+  for (const k of ["agents", "max_agents", "trace"]) if (r.doc.has(k)) drop(r, k, PERSONAL_NOTE(k, js(r.doc, [k])));
+  if (r.doc.has("notifiers")) {
+    // B43: offered in the user file's shape (`notify`), since the old key is refused there
+    const { notify, dropped } = notifyOf(js(r.doc, ["notifiers"]));
+    const lost = dropped.length ? `; ${dropped.join(", ")} no longer supported: use notify.webhook` : "";
+    drop(r, "notifiers", `${PERSONAL_NOTE("notify", notify)}${lost}`);
+  }
   for (const k of ["runner", "max_checks", "slots", "watch_interval", "claim"]) if (r.doc.has(k)) drop(r, k, REMOVED_NOTE[k] as string);
   return { limits, mode };
 }
@@ -209,6 +225,26 @@ function fillWorkflow(doc: Document, wanted: Record<string, unknown>, mode: stri
   return changed;
 }
 
+/**
+ * D13: the filled workflow as text. New top-level keys are spliced in as lines after `name:`, so the
+ * rest of the file keeps its text; when that cannot be done (a `defaults:` it adds to, no `name:`),
+ * the document is re-rendered without wrapping long lines.
+ */
+function workflowText(raw: string, doc: Document): string {
+  const before = parseDocument(raw);
+  // a key the migration set is a plain string, a parsed one a Scalar
+  const keyOf = (p: Pair<unknown, unknown>) => String(isScalar(p.key) ? p.key.value : p.key);
+  const added = (doc.contents as YMap).items.filter((p) => !before.has(keyOf(p)));
+  const name = pairOf(before.contents as YMap, "name")?.value;
+  const end = isScalar(name) && name.range ? raw.indexOf("\n", name.range[1]) : -1;
+  if (end >= 0 && added.length === (doc.contents as YMap).items.length - (before.contents as YMap).items.length) {
+    const lines = new Document(Object.fromEntries(added.map((p) => [keyOf(p), (p.value as { toJSON?: () => unknown })?.toJSON?.() ?? p.value]))).toString({ lineWidth: 0 });
+    const text = `${raw.slice(0, end + 1)}${lines}${raw.slice(end + 1)}`;
+    if (isDeepStrictEqual(parseDocument(text).toJSON(), doc.toJSON())) return text;
+  }
+  return doc.toString({ lineWidth: 0, flowCollectionPadding: false });
+}
+
 /** B41, B42: fill each workflow's `defaults:` and `mode` from the old team values it does not set. */
 function migrateWorkflows(root: string, limits: Record<string, unknown> | null, mode: string | null, out: ConfigMigration): void {
   if (!limits && !mode) return;
@@ -228,7 +264,7 @@ function migrateWorkflows(root: string, limits: Record<string, unknown> | null, 
     if (doc.errors.length || !isMap(doc.contents)) continue;
     if (!fillWorkflow(doc, wanted, mode)) continue;
     // a JSON workflow stays JSON
-    atomicWrite(path, n.endsWith(".json") ? `${JSON.stringify(doc.toJSON(), null, 2)}\n` : doc.toString());
+    atomicWrite(path, n.endsWith(".json") ? `${JSON.stringify(doc.toJSON(), null, 2)}\n` : workflowText(raw, doc));
     out.changed.push(path);
     out.stage.push(relative(root, path));
   }

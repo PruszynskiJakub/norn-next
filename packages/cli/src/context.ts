@@ -157,11 +157,16 @@ export class Context {
     return this.loadedConfig;
   }
 
-  /** Resolved config; refuses with exit `config` when a file has a problem (B7, D3). */
-  get config(): ResolvedConfig {
+  /** The config that loaded, with its entries; refuses with exit `config` when a file has a problem (B7, D3). */
+  get resolved(): Extract<LoadedConfig, { ok: true }> {
     const l = this.loaded;
     if (!l.ok) throw configError(l.problems, { ...l.paths });
-    return l.config;
+    return l;
+  }
+
+  /** Resolved config; refuses like `resolved` (B7, D3). */
+  get config(): ResolvedConfig {
+    return this.resolved.config;
   }
 
   /** D15: the file a setting in effect came from, for adapter errors; null when built in or derived. */
