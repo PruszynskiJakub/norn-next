@@ -14,7 +14,7 @@ const read = (f: string) => readFileSync(f, "utf8");
 // ---------------------------------------------------------------------------------------------- rules
 
 /** A rule is defined by a list line starting with its id (`- S5 …`, `  - BS10.1 …`, `- **X1** …`). */
-export function definedIds(text: string): string[] {
+function definedIds(text: string): string[] {
   return [...text.matchAll(/^\s*-\s+\**([A-Z]{1,3}\d+(?:\.\d+)?[a-z]?)\b/gm)].map((m) => m[1] as string);
 }
 
@@ -51,7 +51,7 @@ describe("rules file (B23, B24, B27, B31)", () => {
 // ------------------------------------------------------------------------------------------- handoff
 
 /** B34 (D7): a handoff.md outside a story spec's runs/ folder. */
-export function strayHandoff(relPath: string): boolean {
+function strayHandoff(relPath: string): boolean {
   return relPath.split("/").at(-1) === "handoff.md" && !/^\.agents\/specs\/[^/]+\/(?:.*\/)?runs\//.test(relPath);
 }
 
@@ -74,7 +74,7 @@ describe("no stray handoff (B34)", () => {
 const VERSION = /\bv?\d+\.\d+\.\d+\b|\bas of release\b/i;
 
 /** B38 (D6): a norn version named in a doc line; the README's release badge is the one allowed. */
-export function versionHit(line: string): boolean {
+function versionHit(line: string): boolean {
   if (line.includes("badge/release-v")) return false;
   return VERSION.test(line.replace(URL, " "));
 }
@@ -97,7 +97,7 @@ describe("no version in the docs (B38)", () => {
 // ---------------------------------------------------------------------------------------------- links
 
 /** GitHub's heading anchor: lowercase, punctuation dropped, spaces to hyphens. */
-export function slug(heading: string): string {
+function slug(heading: string): string {
   return heading
     .trim()
     .toLowerCase()
@@ -106,7 +106,7 @@ export function slug(heading: string): string {
 }
 
 /** Every anchor a markdown text offers, repeated headings numbered as GitHub does. */
-export function anchors(text: string): Set<string> {
+function anchors(text: string): Set<string> {
   const seen = new Map<string, number>();
   const out = new Set<string>();
   let fence = false;
@@ -123,13 +123,13 @@ export function anchors(text: string): Set<string> {
 }
 
 /** The relative links of one line: `[text](target)`, skipping URLs with a scheme (B37) and code spans. */
-export function relativeLinks(line: string): string[] {
+function relativeLinks(line: string): string[] {
   const prose = line.replace(CODE_SPAN, " ");
   return [...prose.matchAll(/\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)].map((m) => m[1] as string).filter((t) => !/^[a-z][a-z0-9+.-]*:/i.test(t));
 }
 
 /** B36: what is wrong with one link from `from`, or undefined. */
-export function linkProblem(from: string, target: string, readText: (path: string) => string | undefined): string | undefined {
+function linkProblem(from: string, target: string, readText: (path: string) => string | undefined): string | undefined {
   const [path, anchor] = target.split("#") as [string, string | undefined];
   const file = path === "" ? from : resolve(dirname(from), decodeURIComponent(path));
   const text = readText(file);
@@ -163,6 +163,7 @@ describe("links resolve (B36, B37)", () => {
 
   test("every relative link in the repo's markdown resolves", () => {
     const readText = (p: string) => (existsSync(p) ? (statSync(p).isDirectory() ? "" : read(p)) : undefined);
+    let checked = 0;
     const hits = linkedDocs().flatMap((f) => {
       let fence = false;
       return read(f)
@@ -171,23 +172,26 @@ describe("links resolve (B36, B37)", () => {
           if (/^\s*```/.test(l)) fence = !fence;
           if (fence) return [];
           return relativeLinks(l).flatMap((t) => {
+            checked++;
             const problem = linkProblem(f, t, readText);
             return problem ? [`${rel(f)}:${i + 1} → ${problem}`] : [];
           });
         });
     });
     expect(hits).toEqual([]);
+    expect(checked).toBeGreaterThan(0);
   });
 });
 
 // ------------------------------------------------------------------------------------------- commands
 
 const REFERENCE = join(ROOT, "docs", "reference.md");
+/** The generated block's markers: copies of REFERENCE_START/END in packages/cli/src/reference.ts (root tests cannot import the cli); the table test below fails if they drift. */
 const GEN_START = "<!-- norn:reference:start";
 const GEN_END = "<!-- norn:reference:end -->";
 
 /** The commands and their flags, read from Reference's generated block (itself kept equal to the cli). */
-export function commandTable(reference: string): Map<string, Set<string>> {
+function commandTable(reference: string): Map<string, Set<string>> {
   const table = new Map<string, Set<string>>();
   let current: Set<string> | undefined;
   for (const line of reference.split("\n")) {
@@ -204,7 +208,7 @@ export function commandTable(reference: string): Map<string, Set<string>> {
 }
 
 /** B35 (D4): the problems of the `norn …` commands in one piece of code (an inline span or a code line). */
-export function commandHits(code: string, table: Map<string, Set<string>>): string[] {
+function commandHits(code: string, table: Map<string, Set<string>>): string[] {
   const hits: string[] = [];
   for (const m of code.matchAll(/(?:^|[\s($"'])norn((?:\s+[^\s|;&]+)*)/g)) {
     const words = (m[1] as string).trim().split(/\s+/).filter(Boolean);
@@ -222,6 +226,11 @@ export function commandHits(code: string, table: Map<string, Set<string>>): stri
       if (/^[a-z][a-z-]*$/.test(words[0] as string)) hits.push(`norn ${words[0]} is not a command`);
       continue;
     }
+    const verb = words[1];
+    if (!name.includes(" ") && verb && /^[a-z][a-z-]*$/.test(verb) && [...table.keys()].some((k) => k.startsWith(`${name} `))) {
+      hits.push(`norn ${name} ${verb} is not a command`);
+      continue;
+    }
     const flags = table.get(name) as Set<string>;
     for (const w of words) {
       const f = /^--([\w-]+)/.exec(w)?.[1];
@@ -232,7 +241,7 @@ export function commandHits(code: string, table: Map<string, Set<string>>): stri
 }
 
 /** The code of a doc: inline spans of prose lines and whole lines of fenced blocks, with line numbers; Reference's generated block left out. */
-export function codeOf(text: string): Array<[line: number, code: string]> {
+function codeOf(text: string): Array<[line: number, code: string]> {
   const out: Array<[number, string]> = [];
   let fence = false;
   let generated = false;
@@ -263,6 +272,7 @@ describe("commands and flags the docs name exist (B35)", () => {
     expect(commandHits("norn status --watch --json", t)).toEqual([]);
     expect(commandHits("norn story approve <unit>", t)).toEqual([]);
     expect(commandHits("norn pane --open", t)).toEqual(["norn pane is not a command"]);
+    expect(commandHits("norn story bogus gh-1", t)).toEqual(["norn story bogus is not a command"]);
     expect(commandHits("cd norn-next && bun install", t)).toEqual([]);
     expect(commandHits("$NORN_BIN", t)).toEqual([]);
     expect(codeOf("run `norn status`\n```sh\nnorn status --watch   # live\n```")).toEqual([[1, "norn status"], [3, "norn status --watch"]]);
@@ -274,7 +284,9 @@ describe("commands and flags the docs name exist (B35)", () => {
   });
 
   test("every norn command and flag in the user docs exists", () => {
-    const hits = userDocs(ROOT).flatMap((f) => codeOf(read(f)).flatMap(([n, code]) => commandHits(code, table).map((h) => `${rel(f)}:${n} → ${h}: ${code.trim()}`)));
+    const mentions = userDocs(ROOT).flatMap((f) => codeOf(read(f)).map(([n, code]) => [f, n, code] as const));
+    const hits = mentions.flatMap(([f, n, code]) => commandHits(code, table).map((h) => `${rel(f)}:${n} → ${h}: ${code.trim()}`));
     expect(hits).toEqual([]);
+    expect(mentions.length).toBeGreaterThan(0);
   });
 });

@@ -8,10 +8,10 @@ Every id'd rule norn follows, and nothing else: how norn works for a person is i
 
 ## 3. Goals
 
-- G1 Every agent run ends in a known, classified outcome (R1).
-- G2 All "what next" decisions are made by deterministic code; agents only do one step and report (R2).
-- G3 Any story can be continued by a fresh agent or another person from git alone (R3).
-- G4 Every action is traceable and explainable; one view shows what needs a human (R4).
+- G1 Every agent run ends in a known, classified outcome.
+- G2 All "what next" decisions are made by deterministic code; agents only do one step and report.
+- G3 Any story can be continued by a fresh agent or another person from git alone.
+- G4 Every action is traceable and explainable; one view shows what needs a human.
 - G5 Agent-agnostic and remote-agnostic (GitHub and GitLab).
 - G6 Workflows are data (JSON/YAML), editable per repository, validated before use, and applicable to any story or slice.
 
@@ -136,6 +136,8 @@ The story worktree is on the story branch and holds `.agents/specs/<id>-<slug>/`
 
 ## 8. Heartbeat
 
+Launch crashes, orphans and heartbeat liveness are in [R5](#r5-launch-crash-orphans-and-heartbeat-liveness) (§13.1).
+
 - H1 `norn tick` is one idempotent pass: **observe → decide → act → log**, under a local lock.
 - H2 **Observe** collects facts: frontmatter, `runs/` state and unapplied receipts, git refs (local and remote, incl. mailbox), worktree status, runner pane state, hook events, process liveness (PID + start time).
 - H3 **Decide** is a pure function `(facts, pinned workflows, config) → actions`, at most one action per unit per tick. It records which rule fired.
@@ -149,6 +151,8 @@ The story worktree is on the story branch and holds `.agents/specs/<id>-<slug>/`
 - H11 Every call that reaches a remote (`git fetch`/`push`/`ls-remote`/`pull`/`clone`, every `gh` and `glab` call) has a timeout (2 min). On timeout its whole process group is killed (git and the `ssh` it started) and the call fails as a retryable network error, so a connection dropped while the machine slept never holds the tick lock (H1). Local git calls have no timeout: a commit runs hooks.
 
 ## 9. Agent integration
+
+Prompts the agent is blocked on are in [R6](#r6-prompts-the-agent-is-blocked-on) (§13.1).
 
 ### 9.1 Hooks
 
@@ -342,11 +346,11 @@ The chains a person runs: a feature `triage → refinement → story`; a small c
 - BS8 Taking a `stale` route writes a `classify` receipt `{outcome: stale, rule: "base moved", detail: "<n> behind, conflicts: …", base}`; the edge back carries a counter (W4; default `stale_loop: { max: 10 }` — a stale re-entry is progress from outside, bounded by the sibling merges). The default `base_conflict_loop: { max: 2, reset_on: update.done }` counts conflicts per base move, not per story (C3).
 - BS9 `norn story update-branch <story>` re-enters the step named by workflow field `base.step` (default: the first `git: update` step) when the story unit is done with an unmerged PR, parked at a gate, or stuck, and only while this checkout holds the claim (T7; never through the mailbox); refused otherwise with `do_instead`. It writes a receipt `update {from, to, reason: "person"}` before the state change (P6, S5). Re-entering from `$done` passes the ready gate again (F35): `ready_head_sha` comes only from an `approve` receipt newer than the unit's last re-entry (`update`, `workflow`), so the old approval raises no "head changed" item (C5). The tick never moves a done unit by itself.
 - BS10 Inbox: a Check item per stale story (BS7) waiting at a gate without a `stale` route or stuck — `gh-3 conflicts with main in a.ts, b.ts (4 behind)`, command `norn story update-branch gh-3`, id `stale:<story>:<base sha>`; the "Merge PR #N" item shows `behind <base> by N` and, when conflicting, its command is `norn story update-branch <story>`. PRs are fetched only on sync ticks, so each checkout keeps the last PR it saw per story with its observation time (`pr.json` in the machine dir, `story.pr_seen`); the PR items (merge, retarget GR6a, head changed F35) use it on the ticks between syncs and in `norn status`/`status`, and stay put instead of flickering. Decide acts only on a freshly fetched `pr` (C1).
-- BS3.3a **A person's push to the story branch is taken in, never lost** (dogfood D4). A person may push to the story branch at any time (a `$done` story included) while norn keeps committing locally. When a push of the story branch is rejected because the remote moved, and when `update` finds the branches diverged, norn fetches `<remote>/<branch>` and fast-forwards to it if it can, else merges it (`git merge --no-ff`, message `Merge <remote>/<branch> into <branch>`, norn's trailers incl. `Norn-Tick`), then pushes. A conflicting merge is aborted: the push stays a failed effect (Unblock item naming the paths) and `update` goes `$stuck`. Never rebase (BS4). The person's commit still moves the head the ready gate let through (F35 item).
-- BS5.1 **A deferred commit never takes the unit's turn** (dogfood D3). Observe reports the operation in progress per worktree (`worktree.in_progress`). While one is, the owed recovery commit is not decided at all (act could only defer it): the unit's other rules run as usual — an implicit ask on a second prompt mid-merge, `died`, `silent`, `stalled`, `timeout`. The commit follows once the merge is concluded.
-- BS5.2 **Nothing with conflict markers is published** (dogfood D5). Before any push of a story or slice branch, norn looks at the files changed by the commits not yet on any `<remote>` ref (merge commits against their first parent). If one still holds both an opening `<<<<<<< ` and a closing `>>>>>>> ` marker line (with the label; a lone `=======` is a setext heading) at the head being pushed, the push is held: a failed `push` effect (`ok: false`, Unblock item) naming each file and the newest outgoing commit that changed it. A follow-up commit that removes the markers releases it; norn never rewrites the branch.
-- BS10.1 (dogfood D1): the `stale:*` item appears only where `norn story update-branch` is the next thing to do — the story unit parked at a gate without a `stale` route, or stuck in a step other than an `update` step and the step its `conflict` routes to (resolve). Never for an ask (a permission prompt parks the unit in any step), nor while the story is in update or resolve.
-- BS10.2 (dogfood D6): the F35 head-changed item compares the ready approval's head only with a PR fetched this tick or one seen after the approval; a PR remembered from before the approval is not compared.
+- BS3.3a **A person's push to the story branch is taken in, never lost**. A person may push to the story branch at any time (a `$done` story included) while norn keeps committing locally. When a push of the story branch is rejected because the remote moved, and when `update` finds the branches diverged, norn fetches `<remote>/<branch>` and fast-forwards to it if it can, else merges it (`git merge --no-ff`, message `Merge <remote>/<branch> into <branch>`, norn's trailers incl. `Norn-Tick`), then pushes. A conflicting merge is aborted: the push stays a failed effect (Unblock item naming the paths) and `update` goes `$stuck`. Never rebase (BS4). The person's commit still moves the head the ready gate let through (F35 item).
+- BS5.1 **A deferred commit never takes the unit's turn**. Observe reports the operation in progress per worktree (`worktree.in_progress`). While one is, the owed recovery commit is not decided at all (act could only defer it): the unit's other rules run as usual — an implicit ask on a second prompt mid-merge, `died`, `silent`, `stalled`, `timeout`. The commit follows once the merge is concluded.
+- BS5.2 **Nothing with conflict markers is published**. Before any push of a story or slice branch, norn looks at the files changed by the commits not yet on any `<remote>` ref (merge commits against their first parent). If one still holds both an opening `<<<<<<< ` and a closing `>>>>>>> ` marker line (with the label; a lone `=======` is a setext heading) at the head being pushed, the push is held: a failed `push` effect (`ok: false`, Unblock item) naming each file and the newest outgoing commit that changed it. A follow-up commit that removes the markers releases it; norn never rewrites the branch.
+- BS10.1: the `stale:*` item appears only where `norn story update-branch` is the next thing to do — the story unit parked at a gate without a `stale` route, or stuck in a step other than an `update` step and the step its `conflict` routes to (resolve). Never for an ask (a permission prompt parks the unit in any step), nor while the story is in update or resolve.
+- BS10.2: the F35 head-changed item compares the ready approval's head only with a PR fetched this tick or one seen after the approval; a PR remembered from before the approval is not compared.
 - BS11 **Merged means merged into the base.** GR6 cleanup fires only when the PR's base branch equals the story's base branch (BS0). A PR merged into any other branch parks the story with reason `remote: PR merged into <branch>, not <base>` (GR7) — the lesson from the earlier norn, where a merge into the wrong base skipped story review. Retargeting a PR is reported as a Check item.
 
 ## 13. Claims and team handoff

@@ -90,7 +90,6 @@ const BANNED: Array<[RegExp, string]> = [
   [/\bapproved\b/i, "approve (outcomes are spelled as typed)"],
 ];
 
-
 /**
  * Banned-synonym hits in one line. URLs are never prose. In docs and assets (md/yaml/json), inline
  * code spans quote identifiers or name a banned word on purpose (AGENTS.md's glossary rule); in .ts,
@@ -101,7 +100,6 @@ function glossaryHits(line: string, file: string): string[] {
   if (!file.endsWith(".ts")) text = text.replace(CODE_SPAN, " ");
   return BANNED.filter(([re]) => re.test(text)).map(([, say]) => say);
 }
-
 
 const DOCS = [".md", ".yaml", ".yml", ".json"];
 const GLOSSARY_FILES = (): string[] => [
@@ -723,13 +721,13 @@ describe("removed commands (B5, B8, B71)", () => {
   });
 
   test("the rules file's command table (§15) is the noun tree", () => {
-    const prd = readFileSync(join(ROOT, RULES_FILE), "utf8");
-    const s15 = prd.slice(prd.search(/^## 15\b/m), prd.search(/^## 16\b/m));
+    const rules = readFileSync(join(ROOT, RULES_FILE), "utf8");
+    const s15 = rules.slice(rules.search(/^## 15\b/m), rules.search(/^## 16\b/m));
     for (const verb of ["create", "list", "view", "answer", "approve", "reject", "update-branch", "start", "chat", "edit", "checkout", "handoff", "close", "reopen"])
       expect(s15).toContain(`norn story ${verb}`);
     for (const verb of ["list", "view", "attach", "rerun", "cancel"]) expect(s15).toContain(`norn run ${verb}`);
     expect(s15).toContain("norn status");
-    expect(prd).toContain("through `norn story edit <unit> --workflow <name> --at <step>`");
+    expect(rules).toContain("through `norn story edit <unit> --workflow <name> --at <step>`");
   });
 });
 
@@ -799,12 +797,12 @@ describe("the new layout in product docs (gh-110 B3, B22)", () => {
   });
 
   test("the rules file's §7 layout and ID2 describe the machine dir and its id", () => {
-    const prd = readFileSync(join(ROOT, RULES_FILE), "utf8");
-    const s7 = prd.slice(prd.search(/^## 7\b/m), prd.search(/^## 8\b/m));
+    const rules = readFileSync(join(ROOT, RULES_FILE), "utf8");
+    const s7 = rules.slice(rules.search(/^## 7\b/m), rules.search(/^## 8\b/m));
     expect(s7).toContain("norn.config.yaml");
     expect(s7).toContain("workflows/");
     expect(s7).toContain("repos/<id>/");
-    const id2 = prd.split("\n").find((l) => l.startsWith("- ID2 ")) ?? "";
+    const id2 = rules.split("\n").find((l) => l.startsWith("- ID2 ")) ?? "";
     expect(id2).toContain("repos/<id>/");
   });
 

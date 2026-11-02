@@ -45,7 +45,6 @@ describe("the generated block in the file (B10, B11, B12)", () => {
 
   test(`${REFERENCE_FILE} is up to date (bun run docs:emit)`, () => {
     const block = currentReference(readFileSync(join(ROOT, REFERENCE_FILE), "utf8"));
-    if (block !== fresh) throw new Error(`${REFERENCE_FILE} is stale: run \`bun run docs:emit\` and commit the result`);
-    expect(block).toBe(fresh);
+    expect(block, `${REFERENCE_FILE} is stale: run \`bun run docs:emit\` and commit the result`).toBe(fresh);
   });
 });

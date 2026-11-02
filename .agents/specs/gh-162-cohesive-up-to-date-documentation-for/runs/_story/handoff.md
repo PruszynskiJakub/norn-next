@@ -47,6 +47,8 @@ Build gh-162's plan in one branch: the rules file, the generated Reference, the 
 - review#1: changes_requested. Rule fold verified faithful; tests, typecheck and docs:emit clean. Blocking: G1–G4 '(R1)–(R4)' now point at recovery rules (F1); §19/§21 citations left in team.test.ts, replay.test.ts, herdr/index.ts (F2); audit ids in docs/limitations.md (F3); garbled AGENTS.md:53 (F4); README lacks config pointer to Reference (B4, F5). Minor: B25 placement, lint gaps (unknown verbs, vacuous sweeps, walk follows symlinks).
 - review#1 changes_requested: Rule fold faithful, tests/typecheck/docs:emit green. Blocking: G1–G4 cite R1–R4 now meaning recovery rules; §19/§21 citations not rewritten (D1); Limitations cites deleted audit ids; garbled AGENTS.md:53; README lacks config link to Reference (B4). Minor lint gaps listed.
 
+- implement#2 (review#1 rework): G1–G4 drop the (R1)–(R4) problem-table refs (H7's (R1) is the recovery R1, correct); §19/§21 citations rewritten to rule ids (replay.test.ts, herdr/index.ts, team.test.ts); audit ids and "Unchanged from v1" removed from docs/limitations.md, and "(dogfood Dn)" tags dropped from RULES.md; AGENTS.md:53 fixed; README links Reference's #config; AGENTS Process "Workflows" trimmed to a link to CONTRIBUTING plus what an agent must follow; §8 and §9 point to R5/R6 in §13.1. Lints: unknown verb of a real noun flagged (`norn story bogus`), link and command sweeps assert they scanned something, textFiles skips dist/coverage/worktrees and symlinked dirs. Nits tidied (unexported docs.test helpers, `rules` naming, blank lines, GEN marker comment, stale-test throw). Left: "F35" (an audit id) is still cited in RULES.md BS4/BS9/BS10 and in code comments; it was not in the review and has no rule to point to. Unit tier 1090 pass, typecheck green.
+
 ## Resume
 
-implement: fix F1–F5 from the review findings, then consider minors F6–F9.
+Nothing left for implement: report done, then review re-checks the rework points.

@@ -74,7 +74,7 @@ Inbox empty — no stories yet.
 Label an issue `norn` (the config's `remote.label`) and assign it to yourself, then run `norn sync`.
 ```
 
-On GitLab, set `remote.provider: glab` in the config. A repository set up by an older norn refuses every command and names `norn migrate`: run it once in the main checkout, with `norn watch` stopped, and commit what it prints.
+Config lives in `.agents/norn.config.yaml` (the repository's, committed) and `~/.norn/config.yaml` (your machine's); which one wins and the keys you will touch are in [Reference: Config](docs/reference.md#config). On GitLab, set `remote.provider: glab` there. A repository set up by an older norn refuses every command and names `norn migrate`: run it once in the main checkout, with `norn watch` stopped, and commit what it prints.
 
 ## Run a first story
 

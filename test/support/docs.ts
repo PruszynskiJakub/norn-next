@@ -8,13 +8,17 @@ import { join } from "node:path";
 export const URL = /\b[a-z][a-z0-9+.-]*:\/\/\S+/gi;
 export const CODE_SPAN = /`[^`\n]*`/g;
 
-/** Text files under `dir` (any depth) with one of the extensions; skips node_modules and .git. */
+/** Folders never walked: dependencies, git, build output, coverage and agent worktrees. */
+const SKIPPED_DIRS = new Set(["node_modules", ".git", "dist", "coverage", "worktrees"]);
+
+/** Text files under `dir` (any depth) with one of the extensions; skips SKIPPED_DIRS and never follows a symlinked folder. */
 export function textFiles(dir: string, exts: string[]): string[] {
   if (!existsSync(dir)) return [];
-  return readdirSync(dir).flatMap((n) => {
-    const p = join(dir, n);
-    if (statSync(p).isDirectory()) return n === "node_modules" || n === ".git" ? [] : textFiles(p, exts);
-    return exts.some((e) => p.endsWith(e)) ? [p] : [];
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const p = join(dir, e.name);
+    if (e.isDirectory()) return SKIPPED_DIRS.has(e.name) ? [] : textFiles(p, exts);
+    if (e.isSymbolicLink() && (!existsSync(p) || statSync(p).isDirectory())) return [];
+    return exts.some((x) => p.endsWith(x)) ? [p] : [];
   });
 }
 
