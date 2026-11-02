@@ -29,7 +29,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:f
 import { tmpdir } from "node:os";
 import { basename, extname, join, relative, resolve } from "node:path";
 import { git as gitAdapter, herdr, proc } from "@norn/adapters";
-import type { AgentAdapter, FileError, RunnerPort, SessionRef, WorkflowIssue } from "@norn/core";
+import type { AgentAdapter, FileError, Ports, RunnerPort, SessionRef, WorkflowIssue } from "@norn/core";
 import { ExitCode, ulid } from "@norn/schema";
 import { bindNornHome, type Layout, layoutProblems, loadWorkflows, machineDir, machineHolder, noteSpawn, orphanedMachineDirs, readHookFacts, repoConfigPath, repoLayout, skillsReport, traceDaysBefore, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
@@ -218,6 +218,24 @@ interface Check {
   do_instead?: string;
 }
 
+const portsTried = new WeakMap<Context, Promise<{ ports: Ports; fail: { ok: false; error: string; do_instead: string | null } | null }>>();
+
+/** B48 (D15): the ports, with an adapter that fails to build recorded as one failure and the rest built without notifiers. */
+function doctorPorts(ctx: Context) {
+  let p = portsTried.get(ctx);
+  if (!p) {
+    p = ctx.ports().then(
+      (ports) => ({ ports, fail: null }),
+      async (e: unknown) => {
+        const body = e instanceof CliFailure ? e.body : { error: (e as Error).message, do_instead: null };
+        return { ports: await ctx.ports({ notifiers: [] }), fail: { ok: false as const, error: body.error, do_instead: body.do_instead } };
+      },
+    );
+    portsTried.set(ctx, p);
+  }
+  return p;
+}
+
 interface RepoReport {
   ok: boolean;
   /** D4: reaching the other repo checks means the new layout; an old or mixed one is reported alone (B20) */
@@ -236,7 +254,7 @@ async function repoGroup(ctx: Context): Promise<RepoReport> {
   const root = ctx.root;
   const loaded = ctx.loaded;
   const listing = loadWorkflows(root);
-  const agents = loaded.ok ? (await ctx.ports()).agents : {};
+  const agents = loaded.ok ? (await doctorPorts(ctx)).ports.agents : {};
   const checked = checkedRepoWorkflows(listing, root, { agent: loaded.ok ? loaded.config.agent : "" }, agents);
   const fileOf = (name: string) => {
     const wf = listing.workflows[name];
@@ -414,12 +432,7 @@ export const doctorCommand = defineCommand({
     }
     const config = ctx.config;
     // B48 (D15): an adapter that fails to build is one `FAIL config` line; the other checks still run
-    let configFail: { ok: false; error: string; do_instead: string | null } | null = null;
-    const ports = await ctx.ports().catch(async (e: unknown) => {
-      const body = e instanceof CliFailure ? e.body : { error: (e as Error).message, do_instead: null };
-      configFail = { ok: false, error: body.error, do_instead: body.do_instead };
-      return ctx.ports({ notifiers: [] });
-    });
+    const { ports, fail: configFail } = await doctorPorts(ctx);
     const command = hookCommand(ctx);
 
     const g = await run(["git", "--version"], { timeoutMs: 10_000 });

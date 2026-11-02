@@ -445,6 +445,21 @@ steps:
     }
   });
 
+  test("gh-64 B48: a notifier that fails to build is one FAIL config line naming its file; the other checks still run", async () => {
+    const file = join(h.home, "config.yaml");
+    h.write(file, "notify: { ntfy: https://ntfy.sh/ }\n");
+    try {
+      // the notifiers built from config, not the harness's fake
+      const r = await runChecked(["doctor"], { ...h.deps, env: env(), ports: { ...h.deps.ports, notifiers: undefined } });
+      expect(r.exit).toBe(1);
+      expect(r.value).toMatchObject({ ok: false, config: { ok: false, error: expect.stringContaining("notify ntfy:"), do_instead: `fix it in ${file}` } });
+      expect(r.stdout).toMatch(/FAIL config +notify ntfy: /);
+      expect(r.stdout).toMatch(/(ok|FAIL) +git /);
+    } finally {
+      rmSync(file);
+    }
+  });
+
   test("a user config that does not load: the repo group still runs, the machine checks are skipped naming that file", async () => {
     const file = join(h.home, "config.yaml");
     h.write(file, 'max_agents: "many"\n');

@@ -186,7 +186,7 @@ export class Context {
   async ports(overrides?: Partial<Ports>): Promise<Ports> {
     if (!this.builtPorts || overrides) {
       const config = this.config;
-      this.builtPorts = await buildPorts(this.registry, this.adapterContext(this.root, config), config, { git: this.git, ...overrides, ...this.deps.ports }, (k) => this.sourceOf(k));
+      this.builtPorts = await buildPorts(this.registry, this.adapterContext(this.root, config), config, { git: this.git, ...this.deps.ports, ...overrides }, (k) => this.sourceOf(k));
     }
     return this.builtPorts;
   }
