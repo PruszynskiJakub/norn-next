@@ -1,11 +1,11 @@
 /**
  * The generated part of docs/reference.md (gh-162 B8–B13): every command and verb with its usage and
- * options, every config key with its type and built-in default, the shipped workflows and the exit
+ * options, every config key with its type (read off the config schema) and built-in default, the shipped workflows and the exit
  * codes, rendered from the cli's own registry, the built-in config and the shipped assets. Pure: the
  * caller passes the workflow files' text. `bun run docs:emit` writes it between the markers; a unit
  * test fails when the file is stale.
  */
-import { type ConfigEntry, ExitCode, explainConfig } from "@norn/schema";
+import { ConfigLayer, DEFAULT_CONFIG, Duration, ExitCode } from "@norn/schema";
 import type { Command, Noun } from "./command.ts";
 import { HELP_GROUPS, plainSummary } from "./commands/help.ts";
 
@@ -34,14 +34,65 @@ function renderCommand(c: Command): string[] {
   return [`##### \`norn ${c.name}\``, "", plainSummary(c.summary), "", "```sh", c.usage, "```", "", ...(options.length ? [...options, ""] : [])];
 }
 
-const typeOf = (v: unknown): string => (Array.isArray(v) ? "list" : v === null ? "null" : typeof v === "object" ? "map" : typeof v);
 const cell = (s: string): string => s.replace(/\|/g, "\\|");
 
-function renderConfig(entries: readonly ConfigEntry[]): string[] {
+type Schema = Record<string, unknown>;
+interface ConfigRow {
+  key: string;
+  type: string;
+  /** the built-in default at this key; undefined when there is none */
+  value: unknown;
+}
+
+const props = (s: Schema): Record<string, Schema> | undefined => s.properties as Record<string, Schema> | undefined;
+const record = (s: Schema): Schema | undefined => Object.values((s.patternProperties as Record<string, Schema> | undefined) ?? {})[0];
+
+/** A schema's type in words, read off the schema itself (B9), never off a default value. */
+function typeName(s: Schema): string {
+  if (Array.isArray(s.anyOf)) {
+    const branches = s.anyOf as Schema[];
+    if (branches.every((b) => "const" in b)) return branches.map((b) => `\`${JSON.stringify(b.const)}\``).join(" or ");
+    return branches.map(typeName).join(" or ");
+  }
+  if (s.type === "null") return "null";
+  // trace.retain is a plain string checked where it is used, but holds a duration all the same
+  if (s.type === "string") return s.pattern === Duration.pattern || String(s.description).startsWith("Duration") ? "duration" : "string";
+  if (s.type === "integer") return typeof s.minimum === "number" ? `integer ≥ ${s.minimum}` : "integer";
+  if (s.type === "array") return `list of ${typeName(s.items as Schema)}s`;
+  if (s.type === "object") return "map";
+  return "any";
+}
+
+/**
+ * Every key a config layer can hold (B9), walked from the `ConfigLayer` schema: a map's own keys
+ * nest (`slots.min`), a map by name nests under `<name>` (`agents.<name>.model`), a list's items
+ * under `[]` (`notifiers[].adapter`), and a map-or-null both nests and has a row of its own.
+ */
+function configRows(s: Schema, path: string[], defaults: unknown): ConfigRow[] {
+  const key = path.join(".").replace(/\.\[\]/g, "[]");
+  const here: ConfigRow = { key, type: typeName(s), value: defaults };
+  const object = Array.isArray(s.anyOf) ? (s.anyOf as Schema[]).find((b) => props(b)) : s;
+  const fields = object && props(object);
+  if (fields) {
+    const own = Object.entries(fields)
+      .filter(([k]) => k !== "$schema")
+      .flatMap(([k, child]) => configRows(child, [...path, k], at(defaults, k)));
+    return path.length && object !== s ? [here, ...own] : own;
+  }
+  const byName = record(s);
+  if (byName && props(byName)) return [here, ...configRows(byName, [...path, "<name>"], undefined)];
+  if (s.type === "array" && props(s.items as Schema)) return [here, ...configRows(s.items as Schema, [...path, "[]"], undefined)];
+  return [here];
+}
+
+const at = (v: unknown, k: string): unknown => (typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>)[k] : undefined);
+
+function renderConfig(): string[] {
+  const rows = configRows(ConfigLayer as unknown as Schema, [], DEFAULT_CONFIG);
   return [
     "| Key | Type | Built-in default |",
     "|---|---|---|",
-    ...entries.map((e) => `| \`${e.key}\` | ${typeOf(e.value)} | \`${cell(JSON.stringify(e.value))}\` |`),
+    ...rows.map((r) => `| \`${r.key}\` | ${cell(r.type)} | ${r.value === undefined ? "none" : `\`${cell(JSON.stringify(r.value))}\``} |`),
   ];
 }
 
@@ -71,7 +122,7 @@ export function renderReference(input: ReferenceInput): string {
       } else out.push(...renderCommand(item));
     }
   }
-  out.push("### Config keys", "", ...renderConfig(explainConfig()), "");
+  out.push("### Config keys", "", ...renderConfig(), "");
   out.push("### Shipped workflows", "", ...input.workflows.map(workflowLine).sort(), "");
   out.push("### Exit codes", "", "| Code | Name |", "|---|---|", ...Object.entries(ExitCode).map(([k, v]) => `| ${v} | \`${k}\` |`), "");
   out.push(REFERENCE_END);

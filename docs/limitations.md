@@ -42,10 +42,10 @@ Two-machine operation was only simulated on one Mac (`NORN_MACHINE`). Everything
 7. **Nothing stops a person or tool typing into an agent's pane.** Answers typed there bypass norn's record, and on one checkout 7 of 30 prompts were answered in the pane.
 8. **Attended steps and handoff guidance.**
    - `handoff.md` guidance. The `norn` skill says to keep handoff.md current, but its hard rules also say never to edit anything under `runs/`, where handoff.md lives (`runs/<unit>/handoff.md`).
-   - Attended steps with nobody in the pane. The inbox now says when the agent waits (HC1–HC3), but "report once the person agrees" still cannot be met when no person comes, and nothing ends the wait.
-   - No backfill of history from before norn first observed a repo.
+   - Attended steps with nobody in the pane. The inbox says when the agent waits (HC1–HC3), but "report once the person agrees" still cannot be met when no person comes, and nothing ends the wait.
    - No per-worktree setup step and no config key for checks: check commands must prepend their own setup, such as `bun install --frozen-lockfile`.
-9. **Cost per story** is not tracked; it is postponed.
+9. **No backfill of history** from before norn first observed a repo.
+10. **Cost per story** is not tracked; it is postponed.
 
 ## Not yet proven in real use
 

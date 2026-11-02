@@ -18,12 +18,18 @@ function definedIds(text: string): string[] {
   return [...text.matchAll(/^\s*-\s+\**([A-Z]{1,3}\d+(?:\.\d+)?[a-z]?)\b/gm)].map((m) => m[1] as string);
 }
 
+/** Every id defined more than once, each named once (B27: an id has one definition). */
+function duplicateIds(ids: readonly string[]): string[] {
+  return [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
+}
+
 /** B24 (D8): every rule id the PRD and the four SPEC files defined when gh-162 folded them. */
 const PINNED_IDS = "G1 G2 G3 G4 G5 G6 P1 P2 P3 P4 P5 P6 P7 P8 ID1 ID2 MO1 MO2 MO3 MO5 MO4 LY1 LY2 LY3 S1 S2 S3 S4 S5 S6 S7 S8 S9 S10 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 A1 A2 A3 A4 A5 A6 A7 B1 B2 B3 B4 B5 B6 B7 B8 B9 C1 C2 C3 C4 C5 QV1 QV2 QV3 QV4 QV5 QV5a QV6 QV7 QV8 NT1 NT2 NT3 NT4 NT5 NT6 W1 W2 W3 W4 W5 W6 W7 W8 W9 RD1 RD2 RD3 RD4 RD5 RD6 RD7 RD8 GR1 GR2 GR3 GR4 GR5 GR6 GR6b GR7 GR7a GR6a GR8 GR9 BS0 BS1 BS2 BS3 BS4 BS5 BS6 BS7 BS8 BS9 BS10 T1 T2 T3 T4 T5 T6 T6a T7 T7a T7b T7c T8 T9 T10 K1 K2 K2a K3 K4 K4.1 K5 K6 K7 O1 O2 O3 O4 O5 O6 O7 SK1 SK2 X1 X2 X3 X4 R1.1 R1.2 R1.3 R2.1 R2.2 R2.3 R3.1 R3.2 R3.3 R3.4 R4.1 R4.2 R4.3 R4.4 R5.1 R5.2 R5.3 R5.4 R5.5 R6.1 R6.2 R6.3 R7.1 R7.2 R7.3 R8.1 R8.2 R9.1 R10.1 BS3.3a BS5.1 BS5.2 BS10.1 BS10.2 BS11 CP1 CP2 CP3 CP4 CP5 CP6 CP7 CP8 CP9 CP10 CP11 CP13 CP12 OR1 OR2 OR3 OR4 SG1 SG2 SG3 HC1 HC2 HC3 HC4 HC5 HC6 HC7 HC8 HC9 HC10 HC11 HC12 HC13 HC14 HC15 HC16".split(" ");
 
 describe("rules file (B23, B24, B27, B31)", () => {
   test("matcher: ids at the start of a list line, nested or bold", () => {
     expect(definedIds("- S5 state last\n  - BS10.1 nested\n- **X1** bold\ntext R5.1 is cited, not defined")).toEqual(["S5", "BS10.1", "X1"]);
+    expect(duplicateIds(["S5", "Z9", "S6", "Z9", "Z9"])).toEqual(["Z9"]);
   });
 
   test("the rules file exists; the PRD and SPEC files do not", () => {
@@ -36,6 +42,12 @@ describe("rules file (B23, B24, B27, B31)", () => {
     const ids = definedIds(read(join(ROOT, RULES_FILE)));
     const count = (id: string) => ids.filter((i) => i === id).length;
     expect(PINNED_IDS.filter((id) => count(id) !== 1).map((id) => `${id} is defined ${count(id)} times in ${RULES_FILE}`)).toEqual([]);
+  });
+
+  test("no rule id, pinned or new, is defined twice", () => {
+    const ids = definedIds(read(join(ROOT, RULES_FILE)));
+    expect(duplicateIds(ids).map((id) => `${id} is defined more than once in ${RULES_FILE}: keep one definition`)).toEqual([]);
+    expect(ids.length).toBeGreaterThanOrEqual(PINNED_IDS.length);
   });
 
   test("no file names the old PRD or a SPEC file, outside CHANGELOG and story specs", () => {
@@ -71,7 +83,7 @@ describe("no stray handoff (B34)", () => {
 
 // ------------------------------------------------------------------------------------------- versions
 
-const VERSION = /\bv?\d+\.\d+\.\d+\b|\bas of release\b/i;
+const VERSION = /\bv?\d+\.\d+\.\d+\b|\bas of (?:release\b|v?\d+\.\d+\b)/i;
 
 /** B38 (D6): a norn version named in a doc line; the README's release badge is the one allowed. */
 function versionHit(line: string): boolean {
@@ -84,6 +96,7 @@ describe("no version in the docs (B38)", () => {
     expect(versionHit("Where norn breaks, as of 0.17.0")).toBe(true);
     expect(versionHit("tagged v1.2.3")).toBe(true);
     expect(versionHit("as of release")).toBe(true);
+    expect(versionHit("as of 0.17")).toBe(true);
     expect(versionHit("[![release](https://img.shields.io/badge/release-v0.17.0-blue)](x)")).toBe(false);
     expect(versionHit("needs git ≥ 2.38 and Herdr ≥ 0.9")).toBe(false);
   });
@@ -186,7 +199,7 @@ describe("links resolve (B36, B37)", () => {
 // ------------------------------------------------------------------------------------------- commands
 
 const REFERENCE = join(ROOT, "docs", "reference.md");
-/** The generated block's markers: copies of REFERENCE_START/END in packages/cli/src/reference.ts (root tests cannot import the cli); the table test below fails if they drift. */
+/** The generated block's markers: copies of REFERENCE_START/END in packages/cli/src/reference.ts (root tests cannot import the cli); the marker test below fails if they drift. */
 const GEN_START = "<!-- norn:reference:start";
 const GEN_END = "<!-- norn:reference:end -->";
 
@@ -195,6 +208,8 @@ function commandTable(reference: string): Map<string, Set<string>> {
   const table = new Map<string, Set<string>>();
   let current: Set<string> | undefined;
   for (const line of reference.split("\n")) {
+    // a heading above command level ends the last command: a flag bullet under it is not that command's
+    if (/^#{1,4} /.test(line)) current = undefined;
     const h = /^#{5} `norn ([a-z -]+)`/.exec(line);
     if (h) {
       current = new Set(["json", "help"]);
@@ -207,12 +222,23 @@ function commandTable(reference: string): Map<string, Set<string>> {
   return table;
 }
 
+/** The flags norn takes with no command (cli.ts). */
+const GLOBAL_FLAGS = new Set(["version", "help", "json"]);
+
 /** B35 (D4): the problems of the `norn …` commands in one piece of code (an inline span or a code line). */
 function commandHits(code: string, table: Map<string, Set<string>>): string[] {
   const hits: string[] = [];
-  for (const m of code.matchAll(/(?:^|[\s($"'])norn((?:\s+[^\s|;&]+)*)/g)) {
+  // each `norn` starts its own mention: a second one on the line is checked on its own
+  for (const m of code.matchAll(/(?:^|[\s($"'])norn((?:\s+(?!norn\b)[^\s|;&]+)*)/g)) {
     const words = (m[1] as string).trim().split(/\s+/).filter(Boolean);
     if (words.length === 0) continue;
+    // `--label norn`: a flag's value, not a command
+    if (/(?:^|\s)-[\w-]+$/.test(code.slice(0, m.index + 1).trimEnd())) continue;
+    const top = /^--([\w-]+)/.exec(words[0] as string)?.[1];
+    if (top) {
+      if (!GLOBAL_FLAGS.has(top)) hits.push(`norn --${top} is not a flag of norn`);
+      continue;
+    }
     const plain = words.filter((w) => /^[a-z][a-z-]*$/.test(w));
     let name: string | undefined;
     for (let n = Math.min(2, plain.length); n >= 1; n--) {
@@ -275,7 +301,17 @@ describe("commands and flags the docs name exist (B35)", () => {
     expect(commandHits("norn story bogus gh-1", t)).toEqual(["norn story bogus is not a command"]);
     expect(commandHits("cd norn-next && bun install", t)).toEqual([]);
     expect(commandHits("$NORN_BIN", t)).toEqual([]);
+    expect(commandHits("norn status then norn pane", t)).toEqual(["norn pane is not a command"]);
+    expect(commandHits("norn --version", t)).toEqual([]);
+    expect(commandHits("norn --bogus", t)).toEqual(["norn --bogus is not a flag of norn"]);
+    expect(commandHits("gh issue create --label norn --assignee @me", t)).toEqual([]);
+    expect([...(commandTable("##### `norn status`\n- `--watch`\n#### Other\n- `--stray`").get("status") ?? [])]).not.toContain("stray");
     expect(codeOf("run `norn status`\n```sh\nnorn status --watch   # live\n```")).toEqual([[1, "norn status"], [3, "norn status --watch"]]);
+  });
+
+  test("Reference holds each generated-block marker exactly once", () => {
+    const text = read(REFERENCE);
+    for (const marker of [GEN_START, GEN_END]) expect(text.split(marker).length - 1, marker).toBe(1);
   });
 
   test("the table read from Reference has the noun verbs and their flags", () => {

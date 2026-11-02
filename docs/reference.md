@@ -480,33 +480,45 @@ norn help [--all] [<command> | <noun> [<verb>]]
 
 | Key | Type | Built-in default |
 |---|---|---|
-| `agents.claude` | map | `{"adapter":"claude","args":["--permission-mode","auto"]}` |
+| `agents` | map | `{"claude":{"adapter":"claude","args":["--permission-mode","auto"]}}` |
+| `agents.<name>.adapter` | string | none |
+| `agents.<name>.command` | string | none |
+| `agents.<name>.args` | list of strings | none |
+| `agents.<name>.model` | string | none |
+| `agents.<name>.env` | map | none |
+| `agents.<name>.capabilities` | list of strings | none |
 | `default_agent` | string | `"claude"` |
-| `runner` | null | `null` |
-| `remote.provider` | string | `"gh"` |
+| `runner` | map or null | `null` |
+| `runner.adapter` | string | none |
+| `runner.options` | map | none |
+| `remote.provider` | `"gh"` or `"glab"` | `"gh"` |
 | `remote.label` | string | `"norn"` |
+| `remote.host` | string | none |
 | `remote.git_remote` | string | `"origin"` |
-| `remote.sync_interval` | string | `"5m"` |
-| `base_branch` | null | `null` |
+| `remote.sync_interval` | duration | `"5m"` |
+| `base_branch` | string or null | `null` |
 | `default_workflow` | string | `"triage"` |
 | `default_slice_workflow` | string | `"slice"` |
-| `default_mode` | string | `"manual"` |
-| `max_agents` | number | `2` |
-| `max_checks` | number | `2` |
-| `slots.min` | number | `1` |
-| `slots.max` | number | `9` |
-| `slots.port_base` | number | `4000` |
-| `slots.ports_per_slot` | number | `10` |
-| `notifiers` | list | `[{"adapter":"os"}]` |
-| `watch_interval` | string | `"30s"` |
-| `claim.lease` | string | `"10m"` |
-| `claim.renew` | string | `"3m"` |
-| `limits.deadline` | string | `"60m"` |
-| `limits.nudges` | number | `2` |
-| `limits.retries` | number | `1` |
-| `limits.stalled` | string | `"15m"` |
-| `limits.attended_wait` | string | `"2m"` |
-| `trace.retain` | string | `"14d"` |
+| `default_mode` | `"manual"` or `"auto"` | `"manual"` |
+| `max_agents` | integer ≥ 1 | `2` |
+| `max_checks` | integer ≥ 1 | `2` |
+| `slots.min` | integer ≥ 0 | `1` |
+| `slots.max` | integer ≥ 0 | `9` |
+| `slots.port_base` | integer ≥ 1 | `4000` |
+| `slots.ports_per_slot` | integer ≥ 1 | `10` |
+| `slots.env` | map | none |
+| `notifiers` | list of maps | `[{"adapter":"os"}]` |
+| `notifiers[].adapter` | string | none |
+| `notifiers[].options` | map | none |
+| `watch_interval` | duration | `"30s"` |
+| `claim.lease` | duration | `"10m"` |
+| `claim.renew` | duration | `"3m"` |
+| `limits.deadline` | duration | `"60m"` |
+| `limits.nudges` | integer ≥ 0 | `2` |
+| `limits.retries` | integer ≥ 0 | `1` |
+| `limits.stalled` | duration | `"15m"` |
+| `limits.attended_wait` | duration | `"2m"` |
+| `trace.retain` | duration | `"14d"` |
 
 ### Shipped workflows
 

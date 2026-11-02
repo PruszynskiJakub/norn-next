@@ -370,7 +370,7 @@ The chains a person runs: a feature `triage → refinement → story`; a small c
 - T9 **Mailbox (M3).** A non-holder's `story approve` / `story answer` / `run rerun` is pushed as a blob to `refs/norn/inbox/<story-id>/<ulid>`. The holder's tick fetches mailbox refs during sync, copies each into `runs/<unit>/receipts/` as the next numbered receipt, commits, pushes, and deletes the ref. A receipt whose `step`/`attempt` no longer matches is rejected into the trace. Before M3 the CLI refuses with `do_instead`.
 - T10 Stories are never picked up automatically except at intake; unclaimed stories show in `status`/`story list` as "Unclaimed — `norn story checkout <story>`".
 
-### 13.1 Claim loss and recovery
+### 13.1 Recovery: claim loss, nudges, prompts, launches
 
 #### R1 Claim renewal is not a unit action
 
@@ -494,7 +494,7 @@ A removed command name (`drop`, `inbox`, `orient`, …) is an unknown command (u
 
 - HC9 norn ships a Herdr plugin at `plugins/herdr/` (id `norn`): an `open` action that opens the cockpit as a split below the focused pane without taking focus (`norn status --watch --pane`); a `pick` action and pane that show it as a popup (`norn status --watch`); a `next` action that focuses the agent pane of the oldest Your turn item with a run (`norn run attach --next`) or shows a toast when there is none.
 - HC10 `norn run attach --next` is a one-shot: it builds the view once, takes the oldest Your turn item **with a run** (manual starts are skipped: it never starts an agent), focuses its agent pane (HC6) and prints `{focused: <pane_id>, item: <id>}`. With no such item, or no live pane for it, it refuses `nothing_to_attach` (exit 3) with the item's command, else `norn status`, as `do_instead`. `norn status --watch --pane` opens the cockpit pane.
-- HC11 The plugin's commands call `$NORN_BIN` when set, else `norn` from `PATH`, else the launch shim `~/.norn/bin/norn`. The plugin ships in the repo, not in the package or binary, so the README documents `herdr plugin install PruszynskiJakub/norn-next/plugins/herdr` (or `herdr plugin link <checkout>/plugins/herdr` from a checkout), and the actions `norn.open` and `norn.next`. `norn doctor` reports under `runner.cockpit_plugin`, informationally (never failing doctor), whether the plugin is linked when Herdr is the runner; when it is not, `do_instead` is `herdr plugin link` with this checkout's `plugins/herdr` when norn runs from source, else `herdr plugin install`.
+- HC11 The plugin's commands call `$NORN_BIN` when set, else `norn` from `PATH`, else the launch shim `~/.norn/bin/norn`. The plugin ships in the repo, not in the package or binary, so its README (`plugins/herdr/README.md`) documents `herdr plugin install PruszynskiJakub/norn-next/plugins/herdr` (or `herdr plugin link <checkout>/plugins/herdr` from a checkout), and the actions `norn.open` and `norn.next`. `norn doctor` reports under `runner.cockpit_plugin`, informationally (never failing doctor), whether the plugin is linked when Herdr is the runner; when it is not, `do_instead` is `herdr plugin link` with this checkout's `plugins/herdr` when norn runs from source, else `herdr plugin install`.
 
 #### Pane labels
 

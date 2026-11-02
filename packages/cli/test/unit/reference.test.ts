@@ -14,7 +14,7 @@ describe("Reference render (B8, B9, B13)", () => {
     for (const c of [...COMMANDS, ...NOUNS.flatMap((n) => n.verbs)]) {
       expect(fresh).toContain(`##### \`norn ${c.name}\`\n`);
       expect(fresh).toContain(c.usage);
-      for (const k of Object.keys(c.options ?? {})) expect(fresh).toMatch(new RegExp(`^- \`[^\`\n]*--${k}\\b`, "m"));
+      for (const k of Object.keys(c.options ?? {})) expect(fresh).toMatch(new RegExp(`^- \`[^\`\n]*--${k}(?![\\w-])`, "m"));
     }
     for (const n of NOUNS) expect(fresh).toContain(`##### \`norn ${n.name}\` (noun)`);
   });
@@ -24,8 +24,21 @@ describe("Reference render (B8, B9, B13)", () => {
   });
 
   test("every config key of the built-in config appears with its type and default", () => {
-    for (const e of explainConfig()) expect(fresh).toContain(`| \`${e.key}\` |`);
-    expect(fresh).toMatch(/\| `default_mode` \| string \| `"\w+"` \|/);
+    for (const e of explainConfig()) {
+      const key = e.key.startsWith("agents.") ? "agents" : e.key;
+      expect(fresh).toContain(`| \`${key}\` |`);
+    }
+    expect(fresh).toContain('| `default_mode` | `"manual"` or `"auto"` | `"manual"` |');
+  });
+
+  test("types come from the config schema, nested keys included (B9)", () => {
+    expect(fresh).toContain("| `runner` | map or null | `null` |");
+    expect(fresh).toContain("| `base_branch` | string or null | `null` |");
+    expect(fresh).toContain("| `max_agents` | integer ≥ 1 | `2` |");
+    expect(fresh).toContain("| `limits.deadline` | duration | `\"60m\"` |");
+    for (const k of ["adapter", "command", "args", "model", "env", "capabilities"]) expect(fresh).toContain(`| \`agents.<name>.${k}\` |`);
+    for (const k of ["runner.adapter", "runner.options", "notifiers[].adapter", "notifiers[].options", "slots.env"]) expect(fresh).toContain(`| \`${k}\` |`);
+    expect(fresh).not.toContain("$schema");
   });
 
   test("the shipped workflows and every exit code", () => {
