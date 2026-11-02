@@ -110,8 +110,7 @@ export function traceEntries(ev: TraceEvent, unit: string, max = MAX): TimelineE
       // QV8: a criteria report, counted
       if (ev.unit !== unit) return [];
       const v = ev.verdicts;
-      const needs = Object.entries(ev.unverified_needs).map(([n, c]) => `${n} ${c}`).join(", ");
-      const summary = `criteria at ${ev.step}#${ev.attempt} (${ev.outcome}): ${v.pass} pass, ${v.fail} fail, ${v.person} person, ${v.unverified} unverified${needs ? ` (unverified needs: ${needs})` : ""}${ev.rule === "criteria.unchecked_coverage" ? " · coverage unchecked: no frontmatter criteria" : ""}`;
+      const summary = `criteria at ${ev.step}#${ev.attempt} (${ev.outcome}): ${v.pass} pass, ${v.fail} fail, ${v.person} person, ${v.unverified} unverified${ev.rule === "criteria.unchecked_coverage" ? " · coverage unchecked: no frontmatter criteria" : ""}`;
       return [{ at: ev.at, source: "criteria", kind: ev.rule, summary: oneLine(summary), ref: ev.receipt_id }];
     }
     case "tick.start":

@@ -7,6 +7,7 @@
  */
 import { git as gitAdapter } from "@norn/adapters";
 import { DEFAULT_INTERVAL, ExitCode, parseDuration } from "@norn/schema";
+import { recordInterval } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import { CliFailure, refuse, rendered, usageError, withExit } from "../output.ts";
 import { type ReleaseResult, releaseHeldClaims } from "../runtime/release.ts";
@@ -55,6 +56,9 @@ export const watchCommand = defineCommand({
     } catch {
       throw usageError(`bad --interval '${raw}' (use e.g. 30s, 2m)`, cmd.watch({ interval: "30s" }));
     }
+    // B34 (D5): watch always records the interval it runs at (liveness, claim timing)
+    recordInterval(ctx.root, raw);
+    ctx.reload();
     const maxRaw = opt.str(args, "max-ticks");
     const max = maxRaw === undefined ? Number.POSITIVE_INFINITY : Number(maxRaw);
     if (!(max > 0)) throw usageError(`bad --max-ticks '${maxRaw}'`, cmd.watch({ maxTicks: 10 }));

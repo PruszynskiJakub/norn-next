@@ -12,14 +12,13 @@ import { buildStepTimeline, mergeStoryTimeline } from "./steps.ts";
 import { TIMELINE_TYPES } from "./timeline.ts";
 import type { CriteriaSummary, RoundView, TraceRecords, TraceView, UnitTraceSummary } from "./types.ts";
 
-/** QV8: sum the `criteria` trace events of the given units — "we keep failing to verify browser criteria" as data. */
+/** QV8: sum the `criteria` trace events of the given units, per verdict (B37: no split by `needs`). */
 export function criteriaSummary(events: readonly TraceEvent[], units: ReadonlySet<string>): CriteriaSummary | null {
-  const out: CriteriaSummary = { reports: 0, verdicts: { pass: 0, fail: 0, person: 0, unverified: 0 }, unverified_needs: {}, unchecked_coverage: 0 };
+  const out: CriteriaSummary = { reports: 0, verdicts: { pass: 0, fail: 0, person: 0, unverified: 0 }, unchecked_coverage: 0 };
   for (const ev of events) {
     if (ev.type !== "criteria" || !units.has(ev.unit)) continue;
     out.reports++;
     for (const k of ["pass", "fail", "person", "unverified"] as const) out.verdicts[k] += ev.verdicts[k];
-    for (const [need, n] of Object.entries(ev.unverified_needs)) out.unverified_needs[need] = (out.unverified_needs[need] ?? 0) + n;
     if (ev.rule === "criteria.unchecked_coverage") out.unchecked_coverage++;
   }
   return out.reports ? out : null;

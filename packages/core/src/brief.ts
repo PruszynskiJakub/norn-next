@@ -51,8 +51,6 @@ export interface BriefInput {
   rulings?: readonly Ruling[];
   /** QV1: the unit's frontmatter `criteria` (slice file, or spec.md for the story unit), when the caller read them */
   criteria?: readonly Criterion[] | null;
-  /** QV5a: what this run's agent can do to verify criteria (config `agents.<name>.capabilities`) */
-  capabilities?: readonly string[];
 }
 
 /**
@@ -146,8 +144,8 @@ export interface BriefJson {
   };
   /** `verdict`: QV5 — reportable only when the worst verdict of the criteria report is this one */
   finish: Array<{ command: string; means: string; verdict?: string }>;
-  /** QV1: the criteria the `--criteria` report must cover, when declared; `missing` = needs this agent cannot do (QV5a) */
-  criteria: Array<{ id: string; verifier: string; needs: string[]; missing: string[] }> | null;
+  /** QV1: the criteria the `--criteria` report must cover, when declared */
+  criteria: Array<{ id: string; verifier: string }> | null;
   limits: { attended: boolean; deadline: string | null; deadline_at: string | null; nudges_left: number | null; retries_left: number | null; slot: number | null; port_base: number | null };
 }
 
@@ -341,10 +339,10 @@ function dropSection(md: string, title: string, note: string): string {
   return [...lines.slice(0, start + 1), note, ...(end < lines.length ? [""] : []), ...lines.slice(end)].join("\n");
 }
 
-/** QV1/QV5a: the declared criteria, each with the needs this run's agent cannot do. */
-function criteriaFor({ criteria, capabilities = [] }: BriefInput): BriefJson["criteria"] {
+/** QV1: the declared criteria (B36: id and verifier only). */
+function criteriaFor({ criteria }: BriefInput): BriefJson["criteria"] {
   if (!criteria?.length) return null;
-  return criteria.map((c) => ({ id: c.id, verifier: c.verifier, needs: [...(c.needs ?? [])], missing: (c.needs ?? []).filter((n) => !capabilities.includes(n)) }));
+  return criteria.map((c) => ({ id: c.id, verifier: c.verifier }));
 }
 
 /**
@@ -613,11 +611,7 @@ function markdown(b: BriefJson): string {
     );
     if (b.criteria) {
       out.push("One entry for each of these criteria, and no other id:", "");
-      for (const c of b.criteria) {
-        const needs = c.needs.length ? `, needs ${c.needs.join(", ")}` : "";
-        const lacking = c.missing.length ? ` — this session lacks ${c.missing.join(", ")}: report it \`unverified\` with \`reason\` and \`how\`, never \`pass\`` : "";
-        out.push(`- \`${c.id}\` (verifier: ${c.verifier}${needs})${lacking}`);
-      }
+      for (const c of b.criteria) out.push(`- \`${c.id}\` (verifier: ${c.verifier})`);
       out.push("", "```json", `[\n${b.criteria.map((c) => `  { "id": "${c.id}", "verdict": "…" }`).join(",\n")}\n]`, "```", "");
     } else out.push("The story spec's Acceptance section names the criteria; use its ids.", "");
     out.push("Add `--note \"<text>\"` (and `--note-criterion <id>`) for a question a person should see without blocking the work.");

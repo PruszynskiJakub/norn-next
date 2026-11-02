@@ -8,16 +8,19 @@
  * F35, Q6), Unclaimed, Running, Notes (agents' notes for a person, NT2: information, not an
  * action), Recently done.
  */
-import { ATTENDED_WAIT, parseDuration, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
+import { ATTENDED_WAIT, NEEDS_REMOVED_RE, parseDuration, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
 import { cmd, nextCommand, startAgentCommand } from "../commands.ts";
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../criteria.ts";
-import type { Facts, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
+import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
 import { sha256 } from "../hash.ts";
 import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, issueProblem, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
 import { optionsLine } from "../prompt.ts";
 import { epoch, formatAge, iso } from "../time.ts";
 import { baseUpdateStep, edgeOf, edgesOf, isStale, stepOf } from "../workflow.ts";
+
+/** B38: the `needs` was removed message of a file error, or null. */
+const needsRemoved = (e: FileError): string | null => e.errors.find((x) => NEEDS_REMOVED_RE.test(x.message))?.message ?? null;
 
 export const INBOX_GROUPS: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock", "check", "unclaimed", "running", "notes", "recently_done"];
 
@@ -743,8 +746,23 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
       continue;
     }
     if (story.frontmatter_error) {
-      add({ id: `corrupt:${story.key}:spec.md`, group: "unblock", story: story.key, slice: null, step: null, title: `corrupt: ${story.frontmatter_error.file} failed validation (S2)`, command: cmd.runView(story.key, { why: true }), since: iso(facts.now) });
+      const needs = needsRemoved(story.frontmatter_error);
+      add({
+        id: `corrupt:${story.key}:spec.md`,
+        group: "unblock",
+        story: story.key,
+        slice: null,
+        step: null,
+        title: needs ?? `corrupt: ${story.frontmatter_error.file} failed validation (S2)`,
+        command: needs ? cmd.migrate() : cmd.runView(story.key, { why: true }),
+        since: iso(facts.now),
+      });
       continue;
+    }
+    // B38 (D12): a slice file that still has criteria `needs` is not corrupt: `norn migrate` fixes it
+    for (const s of story.slices) {
+      const needs = s.error && needsRemoved(s.error);
+      if (needs) add({ id: `needs:${s.key}`, group: "unblock", story: story.key, slice: s.key, step: null, title: needs, command: cmd.migrate(), since: iso(facts.now) });
     }
     add(notStartedItem(story, facts, config));
     add(bodyChangedItem(story));

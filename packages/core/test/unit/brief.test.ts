@@ -295,7 +295,7 @@ describe("Re-entry, fresh sessions, handoff and criteria (B2, C2, QV1)", () => {
   test("a second qa after the code changed: why this attempt, earlier qa is history, review's Resume dropped", () => {
     const { st, rs } = qa2();
     expect(st).toMatchObject({ step: "qa", attempt: 2, retries_used: 1 });
-    const b = renderBrief(input(st, rs, { workflow: QA_WF, handoff: HANDOFF, criteria: [{ id: "AC1", verifier: "agent" }, { id: "AC2", verifier: "agent", needs: ["browser"] }], capabilities: [] }));
+    const b = renderBrief(input(st, rs, { workflow: QA_WF, handoff: HANDOFF, criteria: [{ id: "AC1", verifier: "agent" }, { id: "AC2", verifier: "agent" }] }));
     expect(b.json.rework).toBeNull();
     expect(b.json.history).toEqual({
       retry: { outcome: "qa.died", detail: "launch_unknown", at: at() },
@@ -305,8 +305,8 @@ describe("Re-entry, fresh sessions, handoff and criteria (B2, C2, QV1)", () => {
     expect(b.markdown).not.toContain("Nothing left; report done.");
     expect(b.markdown).toContain("Footer shows the total.");
     expect(b.json.criteria).toEqual([
-      { id: "AC1", verifier: "agent", needs: [], missing: [] },
-      { id: "AC2", verifier: "agent", needs: ["browser"], missing: ["browser"] },
+      { id: "AC1", verifier: "agent" },
+      { id: "AC2", verifier: "agent" },
     ]);
     expect(b.markdown).toMatchSnapshot();
   });

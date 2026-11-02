@@ -8,7 +8,7 @@
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
-import { cmd, checkReport, cursorStep, enteringReceipt, reportableOutcomes, unverifiedNeeds, verdictCounts } from "@norn/core";
+import { cmd, checkReport, cursorStep, enteringReceipt, reportableOutcomes, verdictCounts } from "@norn/core";
 import { type AgentStep, type CriterionVerdict, type Finding, type Note, type ReceiptOf, validate } from "@norn/schema";
 import { appendTrace, ensureEvidenceDir, traceEvent } from "@norn/store";
 import { defineCommand, type ParsedArgs, opt } from "../command.ts";
@@ -177,9 +177,7 @@ export const doneCommand = defineCommand({
       report = parseCriteria(readFileSync(p, "utf8"), criteriaFile);
     }
     const declared = report || notes.some((n) => n.criterion !== undefined) || step.criteria === "required" ? unitCriteria(t.s) : null;
-    // QV5a (C2): the reporting agent's declared capabilities bound what it may `pass`
-    const capabilities: string[] = [];
-    const verdicts = checkReport({ step, step_name: t.s.state.step, outcome, report, criteria: declared, notes, capabilities });
+    const verdicts = checkReport({ step, step_name: t.s.state.step, outcome, report, criteria: declared, notes });
     if (!verdicts.ok) throw refuse(verdicts.refusal.error, verdicts.refusal.do_instead, verdicts.refusal.code, verdicts.refusal.details);
 
     // BS5: a base-mode step reports done only with the base merged and nothing left unresolved
@@ -212,7 +210,6 @@ export const doneCommand = defineCommand({
           outcome,
           rule: verdicts.coverage === "checked" ? "criteria.checked" : "criteria.unchecked_coverage",
           verdicts: verdictCounts(report),
-          unverified_needs: unverifiedNeeds(report, declared),
         }),
       );
     const plural = (n: number, what: string) => `${n} ${what}${n === 1 ? "" : "s"}`;

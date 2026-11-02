@@ -3,7 +3,7 @@
  * The body is preserved byte for byte; patches touch only the given keys and keep
  * the rest of the YAML (order, comments) as written by humans and skills.
  */
-import type { SchemaError, SliceFrontmatter, StoryFrontmatter } from "@norn/schema";
+import { needsRemovedMessage, type SchemaError, type SliceFrontmatter, type StoryFrontmatter } from "@norn/schema";
 import { parseDocument, stringify } from "yaml";
 import { atomicWrite, fileError, readText, type ReadResult, validated } from "./fsx.ts";
 
@@ -76,6 +76,11 @@ function parseMarkdown<N extends "story" | "slice">(name: N, raw: string, path: 
     } as ReadResult<MarkdownDoc<T>>;
   const y = parseYaml(split.yaml);
   if (!y.ok) return { ok: false, reason: "corrupt", error: fileError(path, y.errors, root) } as ReadResult<MarkdownDoc<T>>;
+  // B38 (D12): criteria `needs` was removed; its own message, pointing at `norn migrate`
+  const fm = y.value as { id?: unknown; criteria?: unknown };
+  const withNeeds = Array.isArray(fm.criteria) ? fm.criteria.findIndex((c) => typeof c === "object" && c !== null && "needs" in c) : -1;
+  if (withNeeds >= 0)
+    return { ok: false, reason: "corrupt", error: fileError(path, [{ path: `/criteria/${withNeeds}/needs`, message: needsRemovedMessage(name, String(fm.id ?? "?")) }], root) } as ReadResult<MarkdownDoc<T>>;
   const v = validated(name, y.value, path, raw, root);
   if (!v.ok) return v as ReadResult<MarkdownDoc<T>>;
   return { ok: true, value: { frontmatter: v.value as T, body: split.body }, raw } as ReadResult<MarkdownDoc<T>>;

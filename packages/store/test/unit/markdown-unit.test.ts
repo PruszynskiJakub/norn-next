@@ -90,6 +90,12 @@ Body ---
     }
     expect(readSliceFile(join(d, "none.md"))).toEqual({ ok: false, reason: "missing" });
   });
+  test("B38 (D12): a slice with criteria needs is refused with a message pointing at norn migrate", () => {
+    const d = tmp();
+    writeFileSync(join(d, "02-x.md"), "---\nid: gh-12/02\ntitle: t\ndepends_on: []\nstatus: planned\ncriteria:\n  - { id: c1, verifier: agent, needs: [browser] }\n---\n");
+    const r = readSliceFile(join(d, "02-x.md"), d);
+    expect(r.ok === false && r.reason === "corrupt" && r.error.errors).toEqual([{ path: "/criteria/0/needs", message: "slice `gh-12/02`: `needs` was removed; run `norn migrate`" }]);
+  });
 });
 
 describe("unit files", () => {

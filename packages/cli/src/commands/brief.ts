@@ -206,7 +206,6 @@ export const briefCommand = defineCommand({
       rulings: rulings(s),
       criteria: unitCriteria(s),
       // QV5a: what this run's agent may `pass`
-      capabilities: [],
     });
     // B4: the exact briefing of every run, in the trace
     const id = ulid(ctx.clock.now());

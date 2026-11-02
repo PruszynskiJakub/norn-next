@@ -285,8 +285,6 @@ export interface TraceRecords {
 export interface CriteriaSummary {
   reports: number;
   verdicts: { pass: number; fail: number; person: number; unverified: number };
-  /** `unverified` criteria per capability in their `needs`; `none` = no needs declared */
-  unverified_needs: Record<string, number>;
   /** reports whose unit declared no frontmatter `criteria` (QV4: coverage not checked) */
   unchecked_coverage: number;
 }
