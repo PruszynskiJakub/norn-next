@@ -23,7 +23,7 @@ Order what is left by dependency: a question whose answer changes others comes f
 
 ## 2. Interview
 
-Invoke the `norn-interview` skill on the questions that are the person's. Give each with its context (what it bears on, the options, your recommendation), so they do not have to reread the spec to answer.
+Invoke the `norn-interview` skill on the questions that are the person's. Give each with its context (what it bears on, the options, your recommendation), so they do not have to reread the spec to answer. When an answer is terse, state in one line how you read it and fold it in that way; the person corrects it if it is wrong.
 
 An answer often opens new branches: an edge nobody thought of, a Behaviour item it now contradicts, a term it puts in doubt. The interview follows them to the end; they are part of this work, not the next. When an answer contradicts a decision already in the spec, say so and let the person choose which stands.
 

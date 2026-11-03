@@ -33,6 +33,7 @@ When the shape of that interface is itself in question (how deep the module is, 
 
 ## Rules of the loop
 
+- **Read before you write the test.** Read the existing test helpers, fixtures and fakes at the seam, and the shape of the state or output you assert on as the code produces it, not as you expect it. Reuse what is there; a guessed helper, prefix or field makes the test fail for the wrong reason.
 - **Red before green.** Write the failing test first, run it, and watch it fail for the right reason (an assertion, not a typo or an import error). Then write only enough code to pass it. Don't anticipate future tests or add speculative features.
 - **One slice at a time.** One seam, one test, one minimal implementation per cycle.
 - **Refactoring is not part of the loop.** It belongs to the review pass that closes implementation (see the `norn-implement` skill), not the red → green cycle.
