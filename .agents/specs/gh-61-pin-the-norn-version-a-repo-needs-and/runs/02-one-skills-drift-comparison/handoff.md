@@ -27,6 +27,9 @@ Prefactor 2: one store function, `skillsDrift(skillsFolder, sourceDir, names)`, 
 - `bun run test` and `bun run typecheck` green.
 - implement#1 done: skillsDrift(skillsFolder, sourceDir, names) in store/skills.ts (sizes before bytes); skillsReport/doctor use it. AC1 unit test in store skills.test.ts, AC2 doctor integration test in housekeeping.test.ts (mutation-checked). Unit tier + typecheck green.
 
+- implement#2 (rework of test.fail): the failing tests were `human.test.ts` gh-71 "story edit --workflow starts the next round". B10 hit the 30s test timeout and the rest were knock-on `tick_locked` errors from the tick that timed out. This change only touches doctor's skills comparison, which those tests never call. `human.test.ts` passed twice on its own (45/45), so this was a timeout under the parallel integration run's load, not this slice. No code changed.
+- Friction: `human.test.ts` gh-71 tests run a long chain of ticks under a 30s timeout. Under `--parallel` load one test can time out and leave its tick lock behind, which turns the rest of the describe red. File it as a flaky-test issue.
+
 ## Resume
 
 Nothing left in this slice; report done.
