@@ -279,6 +279,40 @@ describe("Rework only when sent back (B3, B6, W4)", () => {
   });
 });
 
+describe("Checks since the last report (B3, gh-170)", () => {
+  const UNIT = "/r-worktrees/gh-1-login--02-form/.agents/specs/gh-1-login/runs/02-form";
+  const check = (outcome: "pass" | "fail", extra: Record<string, unknown> = {}) => (s: UnitState) =>
+    receipt(s, "check", { outcome, command: "bun test", exit_code: outcome === "pass" ? 0 : 1, duration_ms: 83_400, output_tail: "ok", ...extra }, "norn");
+
+  test("review after a passing check lists it: step, command, outcome, duration and where its output is", () => {
+    const { st, rs } = history(stateFor(SLICE, SLICE_WF), SLICE_WF, started, done("done"), check("pass"));
+    expect(st).toMatchObject({ step: "review" });
+    const b = renderBrief(input(st, rs));
+    expect(b.json.checks).toEqual({ since: "implement#1", items: [{ step: "test", attempt: 1, command: "bun test", outcome: "pass", exit_code: 0, duration_ms: 83_400, reason: null, log: `${UNIT}/receipts/0003-check.json` }] });
+    expect(b.markdown).toContain(
+      "## Checks since the last report\n\nThese checks ran on the code since implement#1 reported; nothing else has run on it yet.\n\n- test#1 `pass` in 1m 23s — `bun test` — output: `" + `${UNIT}/receipts/0003-check.json` + "`\n",
+    );
+    expect(b.markdown).toMatchSnapshot();
+  });
+
+  test("only checks after the last report count; the failing check under Rework is not repeated", () => {
+    const { st, rs } = history(stateFor(SLICE, SLICE_WF), SLICE_WF, started, done("done"), check("fail", { log: `logs/${RUN}.log` }), started, done("done"), check("fail", { exit_code: null, reason: "timeout", duration_ms: 600_000, log: "logs/second.log" }), started, done("done"), check("pass", { duration_ms: 2_100 }));
+    expect(st).toMatchObject({ step: "review" });
+    const b = renderBrief(input(st, rs));
+    expect(b.json.checks?.items.map((c) => [c.outcome, c.duration_ms])).toEqual([["pass", 2_100]]);
+    const { st: st2, rs: rs2 } = history(stateFor(SLICE, SLICE_WF), SLICE_WF, started, done("done"), check("fail", { exit_code: null, reason: "timeout", duration_ms: 600_000, log: "logs/second.log" }));
+    expect(renderBrief(input(st2, rs2)).json.checks).toBeNull(); // implement: the failing check is under Rework already
+  });
+
+  test("no check since the last report: no section", () => {
+    const { st, rs } = history(stateFor(SLICE, SLICE_WF), SLICE_WF, started, done("done"), check("pass"), started, done("approve"));
+    expect(st).toMatchObject({ step: "qa" });
+    const b = renderBrief(input(st, rs));
+    expect(b.json.checks).toBeNull();
+    expect(b.markdown).not.toContain("## Checks");
+  });
+});
+
 describe("Re-entry, fresh sessions, handoff and criteria (B2, C2, QV1)", () => {
   const died = (s: UnitState) => receipt(s, "classify", { outcome: "died", rule: "agent.died", route: "retry", detail: "launch_unknown" }, "norn");
   const pass = (s: UnitState) => receipt(s, "check", { outcome: "pass", command: "bun test", exit_code: 0, duration_ms: 1, output_tail: "" }, "norn");

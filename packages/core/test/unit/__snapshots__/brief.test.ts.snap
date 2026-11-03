@@ -802,3 +802,51 @@ Then end your turn. Never edit \`runs/\`; never push.
 - Port slot: 3 (PORT_BASE=4030)
 "
 `;
+
+exports[`Checks since the last report (B3, gh-170) review after a passing check lists it: step, command, outcome, duration and where its output is 1`] = `
+"# norn brief — gh-1/02 · review #1
+
+## Where you are
+
+- Story: gh-1
+- Slice: gh-1/02
+- Step: review (attempt 1)
+- Mode: auto
+
+## Your work
+
+Use the \`review\` skill.
+
+## Inputs
+
+- Story spec: \`.agents/specs/gh-1-login/story.md\`
+- Slice: \`.agents/specs/gh-1-login/slices/02-form.md\`
+- Handoff (text under Context; update it here): \`.agents/specs/gh-1-login/runs/02-form/handoff.md\`
+
+## Checks since the last report
+
+These checks ran on the code since implement#1 reported; nothing else has run on it yet.
+
+- test#1 \`pass\` in 1m 23s — \`bun test\` — output: \`/r-worktrees/gh-1-login--02-form/.agents/specs/gh-1-login/runs/02-form/receipts/0003-check.json\`
+
+## Context
+
+No handoff yet — you are the first run of this unit.
+
+## Finish with exactly one of
+
+- \`norn done approve --handoff "…"\` — all criteria met, no blocking findings
+- \`norn done changes_requested --handoff "…"\` — blocking findings in the receipt
+- \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
+- \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
+
+Then end your turn. Never edit \`runs/\`; never push.
+
+## Limits
+
+- Deadline: 60m (until 2026-10-23T11:00:00.000Z)
+- Nudges left: 2
+- Fresh-session retries left: 1
+- Port slot: 3 (PORT_BASE=4030)
+"
+`;

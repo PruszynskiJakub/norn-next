@@ -14,6 +14,7 @@ import {
   type Receipt,
   outcomeEdge,
   parseDuration,
+  receiptFileName,
   type StepInput,
   type UnitState,
   type Workflow,
@@ -103,6 +104,18 @@ export interface BriefReport {
   criteria?: CriterionVerdict[];
 }
 
+/** A check that ran since the last report, as the brief lists it. */
+export interface BriefCheck {
+  step: string;
+  attempt: number;
+  command: string;
+  outcome: "pass" | "fail";
+  exit_code: number | null;
+  duration_ms: number;
+  reason: string | null;
+  log: string;
+}
+
 export interface BriefJson {
   where: { story: string; slice: string | null; step: string; attempt: number; mode: Mode; mode_note: string | null; attended: boolean; run_id: string | null };
   /** why this run is not a first entry of the step; null when it is, or when Rework already says why */
@@ -132,6 +145,13 @@ export interface BriefJson {
      */
     base?: { ref: string; sha: string; conflicts: string[] };
   } | null;
+  /**
+   * B3 (gh-170): checks recorded since the last `done` report — what ran on the code that report
+   * left, so a reviewer knows which checks have run and which have not. `log`: the full log when the
+   * check kept one, else its receipt (which holds the output tail). The failing check shown under
+   * Rework is not repeated. `since`: that report, `<step>#<attempt>`. null when none.
+   */
+  checks: { since: string; items: BriefCheck[] } | null;
   /** F28: gate rulings of the story, oldest first (the one shown under Rework excepted) */
   rulings: Ruling[];
   context: {
@@ -181,6 +201,7 @@ export function renderBrief(input: BriefInput): Briefing {
     work: { skill: step.skill, instructions: step.instructions ?? null, description: step.description ?? null },
     inputs: inputs(input, step, rw),
     rework: rw,
+    checks: checksSince(input, step),
     rulings: rulingsFor(input),
     context: { handoff: handoff.text, resume_dropped: handoff.resume_dropped, answers: answers(input), notes: rw ? null : notes(input) },
     finish: finish(step),
@@ -363,7 +384,7 @@ function rework(input: BriefInput, step: AgentStep): BriefJson["rework"] {
   const edge = edgeOf(wf, from.step, from.outcome);
   const counter = edge?.counter ? { name: edge.counter, value: st.counters[edge.counter] ?? 0, max: wf.counters?.[edge.counter]?.max ?? 0 } : null;
 
-  const checkR = isFailingCheck(entering) ? entering : declared.has("last_check") ? live.check : undefined;
+  const checkR = reworkCheck(input, step);
   const doneR = isDone(entering) ? entering : declared.has("last_findings") ? live.done : undefined;
   let decision: NonNullable<BriefJson["rework"]>["decision"] = null;
   if (r.kind === "reject") {
@@ -393,6 +414,29 @@ function rework(input: BriefInput, step: AgentStep): BriefJson["rework"] {
     // BS5: the base the update could not merge, as data (never parsed from `detail`, P8)
     ...(r.kind === "classify" && r.outcome === "conflict" && r.base ? { base: { ref: r.base.ref, sha: r.base.sha, conflicts: [...r.base.conflicts] } } : {}),
   };
+}
+
+/** B3 (gh-170): the checks recorded after the unit's last `done` report, oldest first; the one under Rework left out. */
+function checksSince(input: BriefInput, step: AgentStep): BriefJson["checks"] {
+  const { receipts } = input;
+  const from = receipts.findLastIndex(isDone);
+  const report = receipts[from]?.receipt;
+  if (!report) return null;
+  const shown = reworkCheck(input, step)?.receipt.receipt_id;
+  const out = receipts.slice(from + 1).flatMap(({ n, receipt: r }): BriefCheck[] => {
+    if (r.kind !== "check" || r.receipt_id === shown) return [];
+    const log = `${unitDirAbs(input)}/${r.log ?? `receipts/${receiptFileName(n, "check")}`}`;
+    return [{ step: r.step, attempt: r.attempt, command: r.command, outcome: r.outcome, exit_code: r.exit_code, duration_ms: r.duration_ms, reason: r.reason ?? null, log }];
+  });
+  return out.length ? { since: `${report.step}#${report.attempt}`, items: out } : null;
+}
+
+/** The failing check Rework shows: the one that sent the work back, or a declared `last_check` still live (B6). */
+function reworkCheck(input: BriefInput, step: AgentStep): (NumberedReceipt & { receipt: CheckReceipt }) | undefined {
+  const entering = enteringReceipt(input);
+  if (!entering || !sendsBack(input.workflow, entering.receipt)) return undefined;
+  if (isFailingCheck(entering)) return entering;
+  return (step.inputs ?? []).includes("last_check") ? unsettled(input.workflow, sincePreviousAttempt(input)).check : undefined;
 }
 
 /** The story's rulings, minus the rejection that sent this unit back (Rework quotes it already). */
@@ -455,6 +499,14 @@ function limits(input: BriefInput, step: AgentStep): BriefJson["limits"] {
 }
 
 // ---------------------------------------------------------------- markdown
+
+/** `83400` → `1m 23s`; under a minute `2.1s`. */
+function duration(ms: number): string {
+  if (ms < 60_000) return `${Math.round(ms / 100) / 10}s`;
+  const s = Math.round(ms / 1000);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return [h && `${h}h`, (h || m) && `${m}m`, `${sec}s`].filter(Boolean).join(" ");
+}
 
 const quote = (text: string) => text.trim().split("\n").map((l) => (l ? `> ${l}` : ">")).join("\n");
 
@@ -574,6 +626,15 @@ function markdown(b: BriefJson): string {
       out.push(`Conflicting paths: ${bs.conflicts.length ? bs.conflicts.map((p) => `\`${p}\``).join(", ") : "(not reported)"}`, "");
       out.push("Resolve each conflict by intent; resolve to existing behaviour only. When no resolution fits without new behaviour, run `git merge --abort` (the worktree stays clean) and report `" + cmd.stuck("<why>") + "`. Otherwise commit the merge, run the checks, and report done. Do not push.", "");
     }
+  }
+
+  if (b.checks) {
+    out.push("## Checks since the last report", "", `These checks ran on the code since ${b.checks.since} reported; nothing else has run on it yet.`, "");
+    for (const c of b.checks.items) {
+      const exit = c.outcome === "fail" ? ` (exit ${c.exit_code ?? "none"}${c.reason ? `, ${c.reason}` : ""})` : "";
+      out.push(`- ${c.step}#${c.attempt} \`${c.outcome}\`${exit} in ${duration(c.duration_ms)} — \`${c.command}\` — output: \`${c.log}\``);
+    }
+    out.push("");
   }
 
   if (b.rulings.length) {
