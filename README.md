@@ -55,7 +55,7 @@ cd your-repo
 norn init
 ```
 
-`norn init` writes the team config (`.agents/norn.config.yaml`), a commented user config (`~/.norn/config.yaml`) on a machine's first init, six workflows in `.agents/workflows/`, the agent skills and hooks, a JSON schema next to each config file for your editor, and its `.gitignore` and `.gitattributes` lines. It reads your test command from your build files and ends with the next steps:
+`norn init` writes the team config (`.agents/norn.config.yaml`, with the norn version the repo now needs), a commented user config (`~/.norn/config.yaml`) on a machine's first init, six workflows in `.agents/workflows/`, the agent skills and hooks, a JSON schema next to each config file for your editor, and its `.gitignore` and `.gitattributes` lines. It reads your test command from your build files and ends with the next steps:
 
 ```console
 Next steps
@@ -74,7 +74,7 @@ Inbox empty — no stories yet.
 Label an issue `norn` and assign it to yourself, then run `norn sync`.
 ```
 
-Config is optional: a solo developer on GitHub with Claude Code writes none. It lives in three files: `~/.norn/config.yaml` (your machine and your defaults), `.agents/norn.config.local.yaml` (yours in this repository, gitignored) and `.agents/norn.config.yaml` (the team's, committed); which keys go where is in [Reference: Config](docs/reference.md#config). norn reads GitHub or GitLab from the remote URL; a self-hosted host sets `provider: gh` or `provider: glab` in the team file. A repository set up by an older norn, or a config written for one, refuses every command and names `norn upgrade` (and each old key with its replacement): run it once in the main checkout, with `norn watch` stopped, and commit what it prints.
+Config is optional: a solo developer on GitHub with Claude Code writes none. It lives in three files: `~/.norn/config.yaml` (your machine and your defaults), `.agents/norn.config.local.yaml` (yours in this repository, gitignored) and `.agents/norn.config.yaml` (the team's, committed); which keys go where is in [Reference: Config](docs/reference.md#config). norn reads GitHub or GitLab from the remote URL; a self-hosted host sets `provider: gh` or `provider: glab` in the team file. A repository set up by an older norn, or a config written for one, refuses every command and names `norn upgrade` (and each old key with its replacement): run it once in the main checkout, with `norn watch` stopped, and commit what it prints. A repository records the norn version it needs (`norn_version`): a binary of another minor refuses to act on it and names the norn to install. Moving a team to a new norn is in [Recipes: Roll out a new norn to a team](docs/recipes.md#roll-out-a-new-norn-to-a-team).
 
 ## Run a first story
 
@@ -100,7 +100,7 @@ norn status    # in another terminal: what needs you, with the command for each 
 |---|---|
 | [Concepts](docs/concepts.md) | how norn works: stories, units, workflows, steps, gates, the inbox, modes, one tick, and the glossary |
 | [Reference](docs/reference.md) | every command, flag and config key, the workflows `norn init` ships and the exit codes |
-| [Recipes](docs/recipes.md) | what to do when an agent asks or dies, the base moves, you want your own workflow, or you hand a story over |
+| [Recipes](docs/recipes.md) | what to do when an agent asks or dies, the base moves, you want your own workflow, you hand a story over, or you roll out a new norn |
 | [Limitations](docs/limitations.md) | what is not built, not proven in real use, or out of scope by design |
 | [Herdr plugin](plugins/herdr/README.md) | the cockpit (`norn status --watch`) inside Herdr, with keys and a tab bar segment |
 | [Contributing](CONTRIBUTING.md) | how norn is built with norn, and how to propose a change |

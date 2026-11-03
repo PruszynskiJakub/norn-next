@@ -14,6 +14,15 @@
 
 ## Goal
 
+Docs for the repo's norn version (B26) and the release step sets `norn_version` and refreshes the bundled skill copies (B27).
+
 ## Progress
 
+- AC1 (test): `packages/cli/test/unit/reference.test.ts` › "the repo's norn version key and norn upgrade are listed, norn migrate as deprecated (gh-61 B26)"; the stale-reference test and the docs lint (`test/repo/docs.test.ts`) pass; `bun run docs:emit` leaves the generated block unchanged.
+- AC2 (agent): `docs/concepts.md` new section "The repo's norn version" (key, match rule, refused / reads / exempt commands, B12 main checkout) and drift in "Skills"; `docs/recipes.md` new recipe "Roll out a new norn to a team" (install, stop watch, `norn upgrade`, review, commit; teammates pull and install; watch pauses; `init` never moves the version; `migrate` rename; in-flight units B22; what an older norn prints, from slice 04's AC6: `config_invalid` "unknown key `norn_version`", exit 6; CI snippet for `doctor --repo`); `docs/reference.md` Config table + one paragraph; README setup paragraph and docs table. The docs lint bans version numbers, so examples use `X.Y.Z`.
+- AC3 (agent): `.agents/skills/release/SKILL.md` §5 sets `norn_version: X.Y.Z` in the team file by hand (D13, not `norn upgrade`), new §6 copies `packages/cli/assets/skills/norn*` over `.agents/skills/norn*` (links new ones, names ones no longer bundled), Rules list the new files; `.agents/workflows/release.yaml` `prepare` instructions and `done.means` say the same, in the same diff as the bump.
+- Follow-up to file (D15): an issue to add a `norn doctor --repo` CI job to this repo's `ci.yml`, once a release with the check is out.
+
 ## Resume
+
+Nothing left: report done.

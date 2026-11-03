@@ -16,10 +16,12 @@ A refusal prints `{error, do_instead}` (as markdown without `--json`): what was 
 |---|---|---|
 | `~/.norn/config.yaml` | this machine, and your defaults for every repository | machine: `max_agents`, `notify`, `trace.retain` · yours: `mode`, `agent`, `agents.<name>` |
 | `.agents/norn.config.local.yaml` (gitignored) | you, in this repository | `mode`, `agent`, `agents.<name>`: these override the user file |
-| `.agents/norn.config.yaml` (committed) | the team | `provider`, `base_branch`, `workflow`, `slice_workflow` |
+| `.agents/norn.config.yaml` (committed) | the team | `provider`, `base_branch`, `workflow`, `slice_workflow`, `norn_version` |
 | a workflow file | the workflow | top-level `mode`; `defaults:` with `deadline`, `nudges`, `retries`, `stalled` |
 
 For your keys the nearer file wins: local over user over built-in. Maps merge key by key; lists and scalars replace, so `agents: {claude: {model: …}}` keeps Claude's built-in `--permission-mode auto`, while setting `agents.claude.args` replaces that list, and `notify: {ntfy: <url>}` keeps OS notifications. A story's mode is, nearest first: the story's own (`norn story edit --auto|--manual`), its workflow's `mode`, the local file, the user file, then `manual`. A key in the wrong file, or one an older norn used, is refused with the file and key to use instead; `norn upgrade` rewrites old files. `norn config` lists every setting in effect and the file it came from; `norn config set <key> <value>` changes one in the file you name with `--user`, `--local` or `--repo`.
+
+`norn_version` is the repo's norn version: `norn init` records it on a repo without one, and only `norn upgrade` moves it (`norn config set|unset` refuse it). A binary of another minor, or an earlier patch, is refused by every command that acts; see [Concepts: the repo's norn version](concepts.md#the-repos-norn-version) and [Recipes: Roll out a new norn to a team](recipes.md#roll-out-a-new-norn-to-a-team).
 
 Everything else has no key. The runner is detected: Herdr when norn runs inside Herdr or `herdr` is installed, otherwise headless. GitHub or GitLab is read from the remote URL (`provider` is only for a self-hosted host). The git remote is the one the base branch tracks, else `origin`. Claims are timed from the tick interval (`norn watch --interval`, `norn tick --interval`). The label `norn`, the sync about every 5 minutes, slots 1–9 with ten ports each from 4010, and the 2-minute attended wait are fixed.
 

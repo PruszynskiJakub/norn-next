@@ -81,7 +81,21 @@ Per-tick detail (the trace, locks and caches) stays outside the repository, in o
 
 ## Skills
 
-A step's craft is in a skill: `norn init` copies norn's skills into `.agents/skills/` and links them from each agent's skill folder. The `norn` skill is the protocol every step follows (read the brief, work in scope, report once); the others do one kind of step each. To change how a step is done, write your own skill under another name and name it in the step (`skill: my-review`). `norn doctor` reports skills that are missing, not linked or out of date.
+A step's craft is in a skill: `norn init` copies norn's skills into `.agents/skills/` and links them from each agent's skill folder. The `norn` skill is the protocol every step follows (read the brief, work in scope, report once); the others do one kind of step each. To change how a step is done, write your own skill under another name and name it in the step (`skill: my-review`). `norn doctor` reports skills that are missing or not linked, and fails on a bundled skill that differs from the running norn's copy.
+
+A bundled skill (a `norn`-prefixed folder in `.agents/skills/`) that differs from the running norn's copy is **drift**: norn starts no agent step in a unit whose worktree holds drifted skills, so an agent never follows a protocol from another norn than the one it reports to. Gates, checks, base syncs and merges of that unit go on; `norn brief`, `norn story start` and `norn story chat` refuse there, and the inbox names the fix (`norn story update-branch <story>` for a unit, `norn upgrade` and a commit when the main checkout drifted). Your own skills, without the `norn-` prefix, are never checked.
+
+## The repo's norn version
+
+The team config records **the repo's norn version** (`norn_version: X.Y.Z` in `.agents/norn.config.yaml`): the norn the repo was set up with or last upgraded to. A binary matches it when it is the same minor (before 1.0; the same major from 1.0 on) and at least that patch: a repo at `X.Y.Z` takes `X.Y.Z` and any later patch of `X.Y`, never an earlier patch, never another minor. A patch upgrade of the binary needs no commit; a new minor, which may change how norn reads the config, the workflows or `runs/`, needs `norn upgrade` and a commit.
+
+The version is read from the main checkout's team config, so it changes for you when you pull the base branch, not before. With a binary that does not match:
+
+- every command that acts is refused with exit code 3 (`refused`) and the norn to install, or `norn upgrade` when your binary is newer: `tick`, `watch` (each tick), `sync`, `brief`, `tidy`, `config set|unset`, every `story` verb that changes something, and `run rerun|cancel|attach`. Nothing is written, launched or pushed.
+- the commands that only read run and show the mismatch: `help`, `--version`, `doctor`, `status` (a top Unblock item, and the tab bar line), `story list|view|wait`, `run list|view`, `config list|get`.
+- `init`, `upgrade`, `uninstall`, and the reports an agent already in a step makes (`done`, `ask`, `stuck`, `hook`, and the check runs a tick started), are never refused for it, so a session already started can always report.
+
+A repo without the key works as before; `doctor` and `status` hint to run `norn upgrade`. How to move a team to a new norn is in [Recipes: Roll out a new norn to a team](recipes.md#roll-out-a-new-norn-to-a-team).
 
 ## Glossary
 
@@ -107,7 +121,7 @@ A step's craft is in a skill: `norn init` copies norn's skills into `.agents/ski
 | inbox | Everything that needs a person, with the command that resolves each item (`norn status`). |
 | tick | One pass of the heartbeat: observe, decide, act. |
 | worktree | The git worktree a unit works in. |
-| norn version | The norn version a repo was set up with (`norn_version` in the team config); a binary of another minor refuses to act on the repo. |
+| norn version | The norn version a repo was set up with or last upgraded to (`norn_version` in the team config); a binary of another minor, or an earlier patch, refuses to act on the repo. |
 | slot | A numbered port range a running unit gets, so parallel units do not collide. |
 | trace | The per-tick record of facts and decisions, kept outside the repository. |
 | mailbox | A git ref through which another checkout sends an answer or approval to the one that holds the claim. |

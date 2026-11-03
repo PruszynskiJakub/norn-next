@@ -49,6 +49,12 @@ describe("Reference render (B8, B9, B13)", () => {
     expect(fresh).not.toContain("$schema");
   });
 
+  test("the repo's norn version key and norn upgrade are listed, norn migrate as deprecated (gh-61 B26)", () => {
+    expect(fresh).toContain("| `norn_version` | team | string | `null` |");
+    expect(fresh).toContain("##### `norn upgrade`\n");
+    expect(fresh).toMatch(/##### `norn migrate`\n\nDeprecated: the old name of norn upgrade/);
+  });
+
   test("no key gh-64 removed is listed (B52)", () => {
     for (const k of ["runner", "remote.", "default_mode", "default_agent", "default_workflow", "default_slice_workflow", "limits.", "slots.", "notifiers", "claim.", "watch_interval", "max_checks", "capabilities"])
       expect(fresh).not.toMatch(new RegExp(`^\\| \`${k.replace(/\./g, "\\.")}`, "m"));
