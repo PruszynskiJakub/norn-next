@@ -9,7 +9,7 @@ assignee: PruszynskiJakub
 labels:
   - friction
   - norn
-  - norn:wf:refinement
+  - norn:wf:quick
 workflow: quick
 status: active
 intake_at: 2026-11-03T11:42:41.614Z
