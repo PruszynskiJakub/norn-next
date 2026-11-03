@@ -99,7 +99,7 @@ Bundled skills that differ from the running binary's copies stop being a warning
 ### Drifted skills
 
 - B18 As a person, I want norn to start no agent step in a unit whose worktree holds bundled skills that differ from the running binary's copies, so that agents never follow a protocol from another version.
-  Example: binary 0.19.0 matches the repo; slice gh-61-02's worktree still holds 0.18.0's `norn` skill → `norn tick` launches no agent step for gh-61-02. Its gates, checks, base sync and merges still run, and every other unit with matching skills launches as usual.
+  Example: binary 0.19.0 matches the repo; slice gh-61-02's worktree still holds 0.18.0's `norn` skill → `norn tick` launches no agent step for gh-61-02. Its gates, checks, base sync and merges still run, and every other unit with matching skills launches as usual. A unit worktree whose own team file records a `norn_version` newer than the running binary is not checked: its skills belong to the version that branch moves to (the release branch after `prepare`, B27); the main checkout still decides the mismatch (B12).
 
 - B19 As a person, I want a unit held back by drifted skills to show in the inbox with the command that fixes it, so that I know why it does not move.
   Example: gh-61-02 is held back by B18 → `norn status` lists it under Unblock: "skills differ from norn 0.19.0 (norn, norn-implement): bring the base in with `norn story update-branch gh-61`". When the main checkout itself holds drifted skills, one repo-level item says "skills differ from norn 0.19.0: run `norn upgrade` and commit".
@@ -146,4 +146,87 @@ Bundled skills that differ from the running binary's copies stop being a warning
 
 ## Plan
 
-Written by the `norn-plan` skill.
+Agreed with the person (attended), including D14's amendment of B18.
+
+### Seams
+
+- **S1 The CLI, through `runCli` on the cli harness.** A temp repo with a bare remote, the fake clock and the fake ports; a new `version` dependency makes the run act as a binary of any version, so one test can be 0.18.1 against a repo at 0.19.0. Observes B1, B3–B13, B15–B17, B20, B23–B25, B28–B30.
+  Prior art: the layout guard tests (every command refused on an old layout, `doctor` reporting it, `hook` left alone, a unit worktree never classified), the `migrate` tests (main checkout only, tick lock, rerun, staged moves), the `config` tests (wrong file, invalid key), `story-start`, `status` and `segment` tests.
+- **S2 The version match rule, through the one pure function that compares the recorded version with a running one.** Observes B2.
+  Prior art: the schema package's unit tests of `parseDuration` and the id parsers.
+- **S3 decide and the inbox, through `decide(facts, workflows, config)` and `buildInbox(facts, config)` with hand-built Facts.** Observes B18, B19, B21.
+  Prior art: the core decide tests and the inbox tests (hand-built Facts); the hand-built rule cases that make every rule id fire (the new hold rule needs one there).
+- **S4 A multi-tick story, through the e2e harness.** Observes B22: a story in flight, the base moves to a newer version and newer skills, the agent step is held, the base sync brings the skills in, the step launches.
+  Prior art: the base-sync e2e story.
+- **S5 The docs lint and the generated reference.** Observes B26: the reference lists `norn_version` and `upgrade`; the lint fails on a `norn` command the CLI does not have, so every renamed `migrate` mention is caught.
+  Prior art: the docs lint and the stale-reference test.
+- **B27 has no test seam:** it changes the repo-local `release` skill and workflow instructions; the release story's own review and the next release check it (verifier: agent).
+
+### Coverage
+
+| Behaviour | Seam | Test kind | Notes |
+|---|---|---|---|
+| B1 | S1 | integration | `init` in a repo without the key |
+| B2 | S2 | unit | the examples as a table |
+| B3 | S1 | integration | also the schema's wrong-file and invalid paths |
+| B4 | S1 | integration | `config get` with and without the key |
+| B5 | S1 | integration | no key: commands run, `doctor` warns, `status` hints |
+| B6 | S1 | integration | one test per command class; a table test that every command declares its class |
+| B7 | S1 | integration | newer binary: `do_instead` names `norn upgrade` |
+| B8 | S1 | integration | `status`, `status --segment`, the read commands |
+| B9 | S1 | integration | |
+| B10 | S1 | integration | `done`, `ask`, `stuck`, `hook` (and `check-run`, D1) on a mismatch |
+| B11 | S1 | integration | `watch --max-ticks` with the team file edited between ticks; the fake notifier sees one notification |
+| B12 | S1 | integration | key on the remote's base but not pulled: not refused |
+| B13 | S1 | integration | version, skills and a moved config key in one staged diff |
+| B15 | S1 | integration | |
+| B16 | S1 | integration | |
+| B17 | S1 | integration | |
+| B18 | S3 | unit | hold rule; gates, checks, syncs of the same unit still decided |
+| B19 | S3 | unit | unit item and repo-level item |
+| B20 | S1 | integration | `brief`, `story start`, `story chat` |
+| B21 | S3 | unit | a repo-local skill that differs is not drift |
+| B22 | S4 | e2e | |
+| B23 | S1 | integration | |
+| B24 | S1 | integration | |
+| B25 | S1 | integration | `doctor --repo` with no agent, runner or remote |
+| B26 | S5 | unit | docs lint + generated reference |
+| B27 | — | — | verifier agent: the release skill and workflow say it |
+| B28 | S1 | integration | |
+| B29 | S1 | integration | copies the `migrate` refusal tests |
+| B30 | S1 | integration | plus the printed-commands test for the renamed command helper |
+
+### Prefactoring
+
+1. **The binary's version becomes a command dependency.** The running version is read from the context, defaulting to the package version, instead of a module constant used directly. No behaviour change; it lets S1 act as any binary, which every refusal, `upgrade` and `doctor` test (B6–B17, B23–B25, B28) needs.
+2. **One drift comparison in store.** The bundled-skill comparison doctor uses today becomes one store function: given a skills folder, the bundled source and the bundled names, the names that differ (a missing skill is not drift). `doctor`, `init`, `upgrade`, observe and `brief` then share it (B18, B20, B24, B28).
+3. **`migrate` is renamed `upgrade` with no other change:** command, printed-command helper, docs and refusals, with `migrate` kept as an alias. It lands green on its own and leaves B13 a change to one command instead of a rename and a feature at once (B30).
+
+### Implementation decisions
+
+- **D1 Every command declares its version class:** `acts` (refused on a mismatch), `reads` (runs, shows the mismatch) or `exempt` (never checked). The field is required, so a new command cannot forget it, and one table test pins the class of every command. Classes: `acts`: `tick`, `watch` (per tick, D6), `sync`, `brief`, `tidy`, `config set|unset`, every `story` verb that changes something (`start`, `approve`, `reject`, `answer`, `edit`, `take`, `create`, `close`, `reopen`, `reset`, `checkout`, `update-branch`, `chat`, `handoff`), `run rerun|cancel|attach`. `reads`: `help`, `--version`, `doctor`, `status` (and `--segment`), `story list|view|wait`, `run list|view`, `config list|get`. `exempt`: `init`, `upgrade`, `migrate`, `uninstall`, `done`, `ask`, `stuck`, `hook`, `check-run`. Not named by the spec, agreed: `story reject` and `story handoff` as `acts` (handing a claim over pushes; B22 lets claims expire instead), `check-run` as `exempt` (a check a tick already started is in flight, like `hook`).
+- **D2 The guard sits where the layout guard sits:** in the dispatcher, after the repo is located and the config loads, before the command runs. It reads `norn_version` from the main checkout's resolved team config (B12), so a config error comes first (B3) and a unit worktree's own team file is never read for it.
+- **D3 One match function in the schema package:** compares a recorded `X.Y.Z` with the running version and returns match, older or newer; the guard, `doctor`, the inbox and `upgrade` all use it. The refusal texts and `do_instead` lines (B6, B7, B17) are built once in core next to the printed commands.
+- **D4 Schema:** `norn_version` is a team-file key (pattern `X.Y.Z`); in the user or local file it is `config_wrong_file` by the existing team-key list; the resolved config carries it as a string or null with source `repo`. `config set|unset norn_version` is refused with `do_instead` `norn upgrade`: only `upgrade` and `init` write it (K8), and hand-editing stays the escape hatch (B17). The JSON schemas and the reference are regenerated.
+- **D5 Facts:** a repo-level part `norn: { running, repo, skills_drift }` (the main checkout's drift) and a per-unit `skills_drift` (the unit worktree's bundled skills that differ; absent when not observed). Observed with the local facts from files only; the bundled skills folder is passed in by the cli, so core stays pure. A mismatch never reaches decide: the tick is refused first (B6); the view and `status` read it from these facts (B8).
+- **D6 decide holds an agent start on drift:** a new noop rule (`agent.skills_drift`) in the agent start path, before the mode check, so a manual unit is not offered a start `brief` would refuse (B20). Running runs, gates, checks, syncs and merges are untouched (B18). The inbox shows an Unblock item for the held unit naming `norn story update-branch <story>` (B19), and a repo-level Unblock item when the main checkout drifted (`norn upgrade` and commit).
+- **D7 A version mismatch in the inbox:** a repo-level Unblock item at the top when the repo's version and the binary differ (B8), shown by `status`, the cockpit and the segment line; the no-key hint (B5) is a Check item, so it never notifies.
+- **D8 `watch`:** each tick runs the guard again with the config reloaded, so a pull mid-watch is seen. A refused tick is logged as one JSON line with the refusal and skipped. One notification goes through the notifier per mismatch; a later mismatch with another version notifies again, and matching again clears it. The memory is in the watch process; `watch` never exits for it (B11). A cron `tick` just exits 3.
+- **D9 `upgrade` order:** main checkout only and the tick lock first, as `migrate` does today (B29); then the backward check before any write (B17); then the layout moves and config rewrite as today, the bundled skills rewritten and relinked, and `norn_version` written last, editing the team file in place so its comments stay; all staged, never committed. Nothing to do → "already on norn X.Y.Z" (B15). `migrate` runs the same code and adds one line for a person on stderr (B30).
+- **D10 `init`:** writes `norn_version` only when the key is absent (B1). Skills: missing ones are always copied in; with the key equal to the binary's version, or newly written, drifted ones are rewritten as today; otherwise they are left alone and named in the "run `norn upgrade`" line (B28).
+- **D11 Refusing `brief`, `story start`, `story chat` on drift:** each compares the skills of the worktree the agent would run in (for `brief` the one it runs in; for `start` and `chat` the unit's) and refuses with code `skills_drift`, exit 3, and the same `do_instead` as the inbox item (B20).
+- **D12 `doctor`:** a `norn version` check line (pass, FAIL, or warn when no key, B23, B5) and the skills check failing on drift with `norn upgrade` as the fix (B24). `doctor --repo` adds the version check and the drift part of the skills check; missing skills and links stay machine checks in the full `doctor` (B25).
+- **D13 The release step (B27):** the `release` skill and the `prepare` instructions set `norn_version` to X.Y.Z by editing the team file and copy the bundled skill sources over `.agents/skills/norn*` in the release branch. Not `norn upgrade`: that runs only in the main checkout, and the binary running the step is older than the version being released.
+- **D14 A unit branch that moves the version forward is not drift (amends B18, agreed).** After `prepare`, the release worktree holds the new version's skill copies, which differ from the released binary running it. Without an exception every later agent step of the release story (`prepare` again after a reject at `ready`, `resolve` after a stale base) would be held with no way out. Proposal: a unit worktree whose own team file records a `norn_version` newer than the running binary is not checked for drift; its skills belong to the version it moves to. The main checkout still decides the mismatch (B12). The alternative is no exception, which leaves a rejected release stuck until the base is fixed by hand.
+- **D15 This repo's CI:** B25 is built and documented with a CI snippet; adding a `norn doctor --repo` job to this repo's CI, with the released norn installed, waits for the first release that has the check. A follow-up issue, not this story.
+
+### Testing decisions
+
+A test drives the CLI as a person or a program does, through `runCli` with the harness, and asserts what comes out (the JSON value, the exit code, the files staged, the notifications) and what did not happen (no receipt, no launch, no push). Core tests build Facts by hand and assert decisions and inbox items, never the observe internals. Faked: the remote, the runner, the notifier, the clock and the binary's version (a dependency, Prefactor 1). Real: git, the files, the skills on disk. No test reads a module's internals to check a refusal.
+
+### Risks
+
+- **Old binaries hit a config error, not the friendly refusal.** A norn without this change reads the team file with a key it does not know and fails with `config_invalid`, exit 6. It still refuses, so nothing is written, but the message names the key, not the version. The docs say so; the first slice should check that this is exactly what happens.
+- **The effect transcripts and golden cases move.** `init` writes a new key and the facts gain fields, so transcripts, observe snapshots and some golden cases change. The slices expect it and review each diff (`--update` only for the intended change).
+- **Observe cost.** Comparing every unit worktree's skills to the bundled ones on every tick reads about twenty folders per unit. If the trace bench shows it costs, compare sizes first and bytes only when the sizes agree.
+- **Self-hosting rollout.** This repo gets its key in the next release PR (B27), and from that merge every machine needs the released binary. The release that ships this feature runs its `prepare` with the binary before it, so D13's skill text, not the feature, does the work that first time.
