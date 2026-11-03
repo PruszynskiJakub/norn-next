@@ -309,6 +309,14 @@ export function createGit(opts: GitOptions = {}): GitPort {
     async stage(cwd, paths) {
       await must(cwd, ["add", "--", ...paths]);
     },
+    async ignored(cwd, paths) {
+      if (!paths.length) return [];
+      // exit 1: none of them is ignored
+      const r = await run(cwd, ["check-ignore", "-z", "--stdin"], paths.map((p) => `${p}\0`).join(""));
+      if (r.code === 1) return [];
+      okOrThrow(r, "git check-ignore", "git");
+      return r.stdout.split("\0").filter((p) => p.length > 0);
+    },
 
     async branchExists(cwd, branch, where = "local", remote = "origin") {
       if (where === "local") return (await run(cwd, ["show-ref", "--verify", "--quiet", `refs/heads/${branch}`])).code === 0;

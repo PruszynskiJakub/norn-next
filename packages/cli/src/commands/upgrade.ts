@@ -148,6 +148,7 @@ async function versionPart(ctx: Context, root: string, report: UpgradeReport, v:
   const installed = installSkills(root, join(assetsDir(ctx.env), "skills"), names);
   const stage = installed.updated.map((n) => `${SKILLS_DIR}/${n}`);
   const linked = new Set<string>();
+  const links: string[] = [];
   const seen = new Set<string>();
   for (const agent of Object.values(agentsInUse(root, ctx.resolved, await ctx.ports()))) {
     const dir = agent.skillDir(root);
@@ -155,13 +156,17 @@ async function versionPart(ctx: Context, root: string, report: UpgradeReport, v:
     seen.add(dir);
     for (const n of linkSkills(root, dir, names).linked) {
       linked.add(n);
-      stage.push(relative(root, join(dir, n)));
+      links.push(relative(root, join(dir, n)));
     }
   }
+  // a link in a folder the repo ignores (`.claude/` in .gitignore) is relinked but never committed: `git add` would refuse it
+  const ignored = new Set(await ctx.git.ignored(root, links));
+  stage.push(...links.filter((l) => !ignored.has(l)));
   const changed = v.to !== null && v.from !== v.to;
   if (changed) {
     const w = writeNornVersion(root, v.to as string);
-    if (!w.ok) throw new Error(`norn upgrade: writing norn_version: ${w.error}`);
+    // P8: a refusal, not a crash; the skills are rewritten, nothing staged yet, and a rerun finishes it
+    if (!w.ok) throw refuse(`norn upgrade could not write norn_version to ${REPO_CONFIG_FILE}: ${w.error}`, `fix ${REPO_CONFIG_FILE} and run \`${cmd.upgrade()}\` again`, "config_invalid");
     stage.push(REPO_CONFIG_FILE);
   }
   if (stage.length) await ctx.git.stage(root, stage);

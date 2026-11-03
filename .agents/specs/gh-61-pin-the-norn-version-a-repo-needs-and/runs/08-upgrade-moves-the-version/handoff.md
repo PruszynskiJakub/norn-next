@@ -42,6 +42,8 @@
 | B29 (kept) | test | `packages/cli/test/integration/upgrade.test.ts` (main checkout and tick lock refusals, unchanged) |
 - review#1 changes_requested: Changes requested. AC1–AC4 proven at S1, tests and typecheck green, AC5 is QA (agent). Blocking F1: upgrade runs git add on each relinked agent skill link by explicit path, so a repo that gitignores .claude/ fails midway (skills rewritten unstaged, no norn_version written). Minor F2: plain Error on a failed norn_version write. Nits F3 (unused import), F4 (backward check before the tick lock).
 
+- implement#2 (rework of review#1): F1 fixed: new GitPort method `ignored(cwd, paths)` (`git check-ignore -z --stdin`; a tracked path never is), with a contract case in `packages/adapters/test/contract/git.ts`; `versionPart` relinks every link but stages only those git does not ignore. New S1 test "AC1: an agent folder the repo ignores → the link is recreated and not staged, the rest staged". F2: a failed `writeNornVersion` is now a `refuse(…, "config_invalid")` CliError. F3: unused import dropped. F4: kept the order (read-only check before the lock) and noted it in spec D9. Unit tier 1137 pass, typecheck green, upgrade/version-guard/contract integration files 134 pass.
+
 ## Resume
 
-Review done: changes requested (F1 blocking). Next implement: fix F1 first as a red S1 test (`.claude/` gitignored, a missing link → upgrade exits 0, nothing ignored staged), then F2/F3.
+Rework done; next step reviews the fix (F1–F4 above).

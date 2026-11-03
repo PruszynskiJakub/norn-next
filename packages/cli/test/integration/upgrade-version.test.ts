@@ -5,7 +5,7 @@
  * back, and refuses before any write (`norn migrate` too).
  */
 import { describe, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, lstatSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { appendFileSync, lstatSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { validate } from "@norn/schema";
 import { REPO_CONFIG_FILE, repoConfigPath } from "@norn/store";
