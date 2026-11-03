@@ -4,7 +4,7 @@ slug: release
 provider: gh
 number: 190
 url: https://github.com/PruszynskiJakub/norn-next/issues/190
-title: Release
+title: Release 0.19.0
 assignee: PruszynskiJakub
 labels:
   - norn
