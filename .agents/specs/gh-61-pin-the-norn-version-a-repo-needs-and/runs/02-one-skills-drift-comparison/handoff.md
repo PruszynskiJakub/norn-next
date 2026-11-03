@@ -14,6 +14,15 @@
 
 ## Goal
 
+Prefactor 2: one store function, `skillsDrift(skillsFolder, sourceDir, names)`, names the bundled skills that differ from the binary's copies; doctor goes through it. No behaviour change.
+
 ## Progress
 
+- `packages/store/src/skills.ts`: added `skillsDrift` (only `names` compared, so repo-local skills are never named; a missing skill is not drift). `skillsReport` (doctor) now calls it instead of its own filter. `sameFolder` compares file sizes before bytes (cheap enough for observe per tick).
+- AC1: `packages/store/test/unit/skills.test.ts` `skillsDrift` tests (edited / missing / repo-local `release`; same size other bytes; extra file).
+- AC2: `packages/cli/test/integration/housekeeping.test.ts` "a drifted bundled skill keeps the skills line…" pins doctor's skills line, JSON `drifted` and the warning text; checked it goes red when `skillsDrift` returns nothing.
+- `bun run test` and `bun run typecheck` green.
+
 ## Resume
+
+Nothing left in this slice; report done.
