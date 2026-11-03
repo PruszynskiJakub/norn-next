@@ -252,6 +252,21 @@ describe("skills", () => {
       expect(text).toContain(s);
   });
 
+  test("norn-review traces every Behaviour item and criterion to a test, and writes the table into the handoff (gh-169)", () => {
+    const text = readSkill("norn-review");
+    // the Spec axis builds the table, one row per item, a test or UNTRACED
+    for (const s of ["traceability table", "| Item | Verifier | Proven by |", "UNTRACED"]) expect(text).toContain(s);
+    // an UNTRACED row blocks, unless the verifier is agent or person: those point at QA
+    expect(text).toMatch(/`UNTRACED` row is a blocking Spec finding, unless the criterion's `verifier`[^.]*`agent` or `person`/);
+    for (const s of ["QA (agent)", "QA (person)", "counts as `verifier: test`"]) expect(text).toContain(s);
+    // the table goes into the handoff's Progress section
+    expect(text).toMatch(/Write the table into the handoff\*\* \(the Progress section/);
+    // a craft skill does not cite the rule ids of norn's own rules file (P7)
+    expect(text).not.toMatch(/\bQV\d/);
+    // this repo's installed copy matches the bundled source
+    expect(readFileSync(join(ASSETS, "..", "..", "..", ".agents", "skills", "norn-review", "SKILL.md"), "utf8")).toBe(text);
+  });
+
   test.each(CRAFT)("%s is unaware of norn (P7)", (name) => {
     // skill names carry the `norn-` prefix (SK1); any other mention of norn is a leak
     const text = readSkill(name).replace(/\bnorn-[a-z-]+/g, "");
