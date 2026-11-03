@@ -27,6 +27,16 @@
 - Decision: the line marker stays doctor's existing `ok` (the AC writes "PASS"); the text after the label matches the AC. Texts are local to doctor.ts: slice 05 (refusals, D3 "texts built once in core") had no code yet; once it lands, the `install norn X.Y.x` / B7 wording could share its helper.
 - implement#1 done: doctor and doctor --repo now report the repo's norn_version vs the binary (match ok, older/newer FAIL with install/upgrade fix, no key = warn) and fail on drifted bundled skills with the norn upgrade fix; tests per AC in housekeeping.test.ts; unit tier + typecheck green. Marker stays 'ok' not 'PASS' (doctor convention).
 
+- review#1: approve. Unit tier (1126 pass), typecheck and housekeeping integration (38 pass) green. No blocking findings; nits: the AC's "PASS" is rendered as doctor's `ok` marker (documented decision); the version/upgrade texts are local to doctor.ts until slice 05's shared helper exists.
+
+| Item | Verifier | Proven by |
+| --- | --- | --- |
+| B23 / AC1 | test | `packages/cli/test/integration/housekeeping.test.ts` › "B23: a matching binary passes the version line; an older one fails it with what to install, exit 1" |
+| B7 (newer binary) | test | `packages/cli/test/integration/housekeeping.test.ts` › "B7, B23: a newer binary fails the version line and names `norn upgrade`" |
+| B5 / AC2 | test | `packages/cli/test/integration/housekeeping.test.ts` › "B5: no version recorded is a warning naming `norn upgrade`, not a failure" |
+| B24, B21 / AC3 | test | `packages/cli/test/integration/housekeeping.test.ts` › "B24, B21: a drifted bundled skill fails the skills check with `norn upgrade`; a repo-local skill is never named" |
+| B25 / AC4 | test | `packages/cli/test/integration/housekeeping.test.ts` › "B25: --repo with no agent, runner or remote fails on drift or an older repo version, passes a clean repo; missing skills stay out" |
+
 ## Resume
 
-Done: unit tier, typecheck and the doctor integration tests are green; work committed. Nothing left for this step.
+Review done (approve). Next is norn's routing; nothing left for this step.
