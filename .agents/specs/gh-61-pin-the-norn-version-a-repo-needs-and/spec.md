@@ -8,7 +8,7 @@ title: Pin the norn version a repo needs, and refuse a mismatched binary or drif
 assignee: PruszynskiJakub
 labels:
   - norn
-  - norn:wf:refinement
+  - norn:wf:story
 workflow: story
 status: active
 intake_at: 2026-11-03T12:15:39.840Z
