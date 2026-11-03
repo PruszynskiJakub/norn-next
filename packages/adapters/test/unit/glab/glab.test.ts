@@ -114,4 +114,11 @@ describe("glab adapter", () => {
       ["glab", "label", "create", "--name", "norn:wf:quick", "--color", "#5319E7", "--description", "Make a small change"],
     ]);
   });
+  test("createLabel: only a conflict means the label exists; a failure that merely mentions 409 stays a failure (GR10)", async () => {
+    const failing = (stderr: string) => createGlab({ cwd: "/repo", exec: async () => ({ code: 1, stdout: "", stderr }) });
+    const label = { name: "norn:wf:quick", color: "5319E7", description: "Make a small change" };
+    expect(await failing("ERROR: 409 Conflict: {message: Label already exists}").createLabel(label).catch((e) => e.code)).toBe("glab_exists");
+    expect(await failing("POST https://gitlab.com/api/v4/projects/409/labels: 400 {name: [has already been taken]}").createLabel(label).catch((e) => e.code)).toBe("glab_exists");
+    expect(await failing("POST https://gitlab.com/api/v4/projects/409/labels: 500 Internal Server Error").createLabel(label).catch((e) => e.code)).toBe("glab_failed");
+  });
 });

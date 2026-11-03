@@ -77,17 +77,17 @@ export function planLabels(input: { intake: string; workflows: readonly Workflow
   };
 }
 
-/** A double-quoted shell word: safe for any description. */
-const quoted = (s: string) => `"${s.replace(/(["\\$`])/g, "\\$1")}"`;
+/** A shell word: bare when it holds only safe characters, else single-quoted (no `$`, backtick or `!` expansion when pasted). */
+const quoted = (s: string) => (/^[\w:./@%+=,-]+$/.test(s) ? s : `'${s.replace(/'/g, "'\\''")}'`);
 
 /** B13: the command a person runs to create a label norn could not. */
 export function labelCreateCommand(provider: RemoteProvider, label: RemoteLabel): string {
   return provider === "glab"
-    ? `glab label create --name ${label.name} --color ${quoted(`#${label.color}`)} --description ${quoted(label.description)}`
-    : `gh label create ${label.name} --color ${label.color} --description ${quoted(label.description)}`;
+    ? `glab label create --name ${quoted(label.name)} --color ${quoted(`#${label.color}`)} --description ${quoted(label.description)}`
+    : `gh label create ${quoted(label.name)} --color ${label.color} --description ${quoted(label.description)}`;
 }
 
 /** B10: the command a person runs to delete an unused label; norn never runs it. */
 export function labelDeleteCommand(provider: RemoteProvider, name: string): string {
-  return `${provider === "glab" ? "glab" : "gh"} label delete ${name}`;
+  return `${provider === "glab" ? "glab" : "gh"} label delete ${quoted(name)}`;
 }

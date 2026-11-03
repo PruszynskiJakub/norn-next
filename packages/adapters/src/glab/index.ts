@@ -166,7 +166,7 @@ export function createGlab(opts: GlabOptions): RemotePort {
     async createLabel({ name, color, description }) {
       // GR10
       const r = await run(["label", "create", ...repo, "--name", name, "--color", `#${color}`, "--description", description]);
-      if (r.code !== 0 && /already exists|409|has already been taken/i.test(`${r.stderr}${r.stdout}`)) throw portError("glab_exists", `glab label create: label ${name} already exists`);
+      if (r.code !== 0 && /already exists|\b409 Conflict\b|HTTP 409\b|has already been taken/i.test(`${r.stderr}${r.stdout}`)) throw portError("glab_exists", `glab label create: label ${name} already exists`);
       okOrThrow(r, "glab label create", "glab");
     },
   };

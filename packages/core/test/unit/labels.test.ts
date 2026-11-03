@@ -74,11 +74,17 @@ describe("planLabels (GR10)", () => {
 describe("label commands (B10, B13)", () => {
   const label = { name: "norn:wf:triage", color: NORN_LABEL_COLOR, description: 'Check an issue "still" holds' };
   test("gh", () => {
-    expect(labelCreateCommand("gh", label)).toBe('gh label create norn:wf:triage --color 5319E7 --description "Check an issue \\"still\\" holds"');
+    expect(labelCreateCommand("gh", label)).toBe("gh label create norn:wf:triage --color 5319E7 --description 'Check an issue \"still\" holds'");
     expect(labelDeleteCommand("gh", "norn:wf:fix")).toBe("gh label delete norn:wf:fix");
   });
   test("glab", () => {
-    expect(labelCreateCommand("glab", label)).toBe('glab label create --name norn:wf:triage --color "#5319E7" --description "Check an issue \\"still\\" holds"');
+    expect(labelCreateCommand("glab", label)).toBe("glab label create --name norn:wf:triage --color '#5319E7' --description 'Check an issue \"still\" holds'");
     expect(labelDeleteCommand("glab", "norn:wf:fix")).toBe("glab label delete norn:wf:fix");
+  });
+  test("a name or description a shell would split or expand is single-quoted", () => {
+    const odd = { name: "needs triage!", color: NORN_LABEL_COLOR, description: "it's $HOME `x` !1" };
+    expect(labelCreateCommand("gh", odd)).toBe(`gh label create 'needs triage!' --color 5319E7 --description 'it'\\''s $HOME \`x\` !1'`);
+    expect(labelCreateCommand("glab", odd)).toBe(`glab label create --name 'needs triage!' --color '#5319E7' --description 'it'\\''s $HOME \`x\` !1'`);
+    expect(labelDeleteCommand("gh", "needs triage!")).toBe("gh label delete 'needs triage!'");
   });
 });

@@ -26,41 +26,19 @@
 
 ## Goal
 
-Review gh-67 (quick round): the change against spec B1–B30 (Spec axis) and the repo's standards (Standards axis).
+Implement #2 (gh-67): fix review#1's points — B20 traced (a tick creates no label), plus the minor/nit findings worth doing.
 
 ## Progress
 
-- Earlier rounds: spec B1–B30 agreed (round 1). implement#1 built GR10/GR11 (RemotePort listLabels/createLabel; init/upgrade create, doctor warns; triage skill and workflows set the labels; docs). test#1 pass.
-- review#1: both axes run. Unit, integration and typecheck green (test#1). The labels integration tests and the e2e transcript and observe-snapshot suites pass locally.
-- Verdict: changes_requested. One blocking point: B20 is UNTRACED. Minor points: F2 (doctor `ok` not asserted for B16/B18), F3 (B3 GitLab covered only at port/command level, as decided), F5 (label names unquoted in printed commands), F6 (loose glab 409 match). Nits F4, F7. Findings: the review receipt.
-
-| Item | Verifier | Proven by |
-| --- | --- | --- |
-| B1 | test | `packages/cli/test/integration/labels.test.ts` › "B1, B6, B9, B15: every label is created…"; `packages/core/test/unit/labels.test.ts` › "B1, B6: a bare remote…" |
-| B2 | test | labels.test.ts › "B2, B4, B7: a new workflow's label is created even with nothing else to upgrade…" |
-| B3 | test | `packages/adapters/test/contract/remote.ts` › listLabels/createLabel contract (scripted glab); core labels.test.ts › "label commands › glab" (no CLI test on GitLab, F3) |
-| B4 | test | labels.test.ts › "B2, B4, B7…" |
-| B5 | test | labels.test.ts › "B5: an invalid workflow gets no label…"; core › "B5" |
-| B6 | test | labels.test.ts › "B1, B6…"; core › "B1, B6" |
-| B7 | test | labels.test.ts › "B2, B4, B7…" (second run) |
-| B8 | test | labels.test.ts › "B8, B10: an existing label is left as it is…" |
-| B9 | test | labels.test.ts › "B1, B6, B9, B15"; core › "B9: descriptions…" |
-| B10 | test | labels.test.ts › "B8, B10…"; "B16, B17…" (doctor) |
-| B11 | test | labels.test.ts › "B11: no git remote…" |
-| B12 | test | labels.test.ts › "B12: gh not logged in…" |
-| B13 | test | labels.test.ts › "B13: no permission…"; core › "label commands (B10, B13)" |
-| B14 | test | labels.test.ts › "B14: a failed listing…" (rest of upgrade not asserted, F4) |
-| B15 | test | labels.test.ts › "B1, B6, B9, B15", "B13" (--json; not-checked/unused JSON not asserted, F4) |
-| B16 | test | labels.test.ts › "B16, B17…" (`ok` not asserted, F2) |
-| B17 | test | labels.test.ts › "B16, B17…" |
-| B18 | test | labels.test.ts › "B18: labels not checked is a warning…" (`ok` not asserted, F2) |
-| B19 | test | labels.test.ts › "B19: doctor --repo never lists…" |
-| B20 | test | UNTRACED (F1, blocking) |
-| B21–B28 | agent | QA (agent): `packages/cli/assets/skills/norn-triage/SKILL.md` §3–4, `packages/cli/assets/workflows/triage.yaml`, `.agents/workflows/triage.yaml` instruct it correctly |
-| B29 | test | labels.test.ts › "B1, B6, B9, B15" (`not.toContain("gh label create")`) |
-| B30 | person | QA (person): README.md, docs/concepts.md#labels, docs/recipes.md, CONTRIBUTING.md labels table, all present |
-- review#1 changes_requested: B20 (a tick never creates a label) is untraced: add a tick test asserting no label+/labels? calls. Minor: doctor ok not asserted (B16/B18), label names unquoted in printed commands, loose glab 409 match. Everything else traced and green.
+- Earlier rounds: spec B1–B30 agreed; implement#1 built GR10/GR11; test#1 pass; review#1 changes_requested (B20 untraced, blocking).
+- F1 (blocking, B20): `packages/cli/test/integration/labels.test.ts` › "B20: norn:wf:reproduce missing and a reproduce round starts…" — inited repo, issue taken in on triage, `norn:wf:reproduce` removed from the remote, `story edit --workflow reproduce --force`, the swap fails as gh does for an undefined label; asserts the RD5 warning on round.start, the round starts, and the tick made no `label+`/`labels?` call.
+- F2 (B16, B18): doctor's `ok` asserted equal to a run where every label is present.
+- F4 (B14, B15): B14 checks upgrade still restores a removed skill copy and the `checked: false` JSON; B11 asserts the no-remote JSON; B8/B10 asserts `unused` JSON.
+- F5: label names and descriptions are now shell-quoted in printed create/delete commands — bare when only safe chars, else single-quoted (`'` → `'\''`), so no `$`/backtick/`!` expansion; `#color` is quoted (a bare leading `#` starts a comment). Unit test in `packages/core/test/unit/labels.test.ts`.
+- F6: glab `_exists` matches `409 Conflict`/`HTTP 409`/`already exists`/`has already been taken`, not a bare 409; unit test in `packages/adapters/test/unit/glab/glab.test.ts`.
+- F7(1): runtime/labels.ts uses `WF_LABEL`. Other F7 nits and F3 (GitLab CLI-level init test) left as they were: optional, recorded.
+- Unit tier and typecheck green; labels integration file green.
 
 ## Resume
 
-Rework for implement: add a CLI-seam test for B20. Remove `norn:wf:reproduce` from the remote, start a reproduce round, tick, then assert the RD5 warning and that FakeRemote calls hold no `label+`/`labels?` from the tick. Optionally fix F2, F5 and F6 in the same round.
+Nothing left in implement; next is the `test` check.

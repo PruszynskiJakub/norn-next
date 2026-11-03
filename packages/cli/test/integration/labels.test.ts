@@ -4,10 +4,10 @@
  * `norn doctor` warns about missing and unused ones and `doctor --repo` never looks (A7).
  */
 import { describe, expect, setDefaultTimeout, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { workflowsDir } from "@norn/store";
-import { createHarness, type Harness, runChecked, sh } from "../../../../test/support/harness.ts";
+import { storyUnitDir, workflowsDir } from "@norn/store";
+import { createHarness, type Harness, issue, runChecked, sh } from "../../../../test/support/harness.ts";
 import type { LabelsReport } from "../../src/runtime/labels.ts";
 
 setDefaultTimeout(60_000);
@@ -85,6 +85,8 @@ describe("norn init creates the labels norn uses (GR10)", () => {
       expect(h.remote.calls.filter((c) => c === "label+ norn")).toEqual([]);
       expect(r.stdout).toContain("norn:wf:fix unused");
       expect(r.stdout).toContain("`gh label delete norn:wf:fix`");
+      const json = (await h.norn("init", "--json")).value as { labels: LabelsReport & { checked: true } };
+      expect(json.labels.unused).toEqual([{ name: "norn:wf:fix", command: "gh label delete norn:wf:fix" }]);
     } finally {
       h.cleanup();
     }
@@ -98,6 +100,8 @@ describe("norn init creates the labels norn uses (GR10)", () => {
       expect(r.exit).toBe(0);
       expect(text(r)).toContain("labels: not checked — no git remote");
       expect(h.remote.calls).not.toContain("labels?");
+      const json = (await h.norn("init", "--json")).value as { labels: LabelsReport };
+      expect(json.labels).toEqual({ checked: false, reason: "no git remote", fix: null, do_instead: null });
     } finally {
       h.cleanup();
     }
@@ -121,7 +125,7 @@ describe("norn init creates the labels norn uses (GR10)", () => {
       h.remote.createLabelError = portError("gh_auth", "gh label create failed (exit 1): HTTP 403: Resource not accessible by integration");
       const r = await h.norn("init");
       expect(r.exit).toBe(0);
-      expect(r.stdout).toMatch(/norn:wf:triage not created: permission denied — `gh label create norn:wf:triage --color 5319E7 --description "Check an issue still holds[^`]*"`/);
+      expect(r.stdout).toMatch(/norn:wf:triage not created: permission denied — `gh label create norn:wf:triage --color 5319E7 --description 'Check an issue still holds[^`]*'`/);
       const json = (await h.norn("init", "--json")).value as { labels: LabelsReport & { checked: true } };
       expect(json.labels.not_created.map((n) => n.name)).toEqual(ALL);
     } finally {
@@ -165,9 +169,14 @@ describe("norn upgrade creates what is missing, on every run (GR10)", () => {
     const h = await inited();
     try {
       h.remote.listLabelsError = portError("gh_network", "gh label list failed (exit 1): error connecting to api.github.com");
+      rmSync(join(h.root, ".agents", "skills", "norn-qa"), { recursive: true });
       const r = await h.norn("upgrade");
       expect(r.exit).toBe(0);
       expect(r.stdout).toContain("labels: not checked — gh label list failed (exit 1): error connecting to api.github.com: run norn upgrade again");
+      // the skill copy upgrade rewrites is still rewritten
+      expect(existsSync(join(h.root, ".agents", "skills", "norn-qa", "SKILL.md"))).toBe(true);
+      const json = (await h.norn("upgrade", "--json")).value as { labels: LabelsReport };
+      expect(json.labels).toEqual({ checked: false, reason: "gh label list failed (exit 1): error connecting to api.github.com", fix: null, do_instead: "run norn upgrade again" });
     } finally {
       h.cleanup();
     }
@@ -175,15 +184,18 @@ describe("norn upgrade creates what is missing, on every run (GR10)", () => {
 });
 
 describe("norn doctor checks the labels (A7, GR10)", () => {
-  type Doctor = { warnings: string[]; labels?: LabelsReport };
+  type Doctor = { ok: boolean; warnings: string[]; labels?: LabelsReport };
   const doctor = (h: Harness, ...args: string[]) => runChecked(["doctor", "--json", ...args], h.deps);
 
   test("B16, B17: a missing label and an unused one are warnings, never a failure of their own", async () => {
     const h = await inited();
     try {
+      const all = (await doctor(h)).value as Doctor;
+      expect(all.warnings.filter((w) => w.includes("label"))).toEqual([]);
       h.remote.labels = [...h.remote.labels.filter((l) => l.name !== "norn:wf:reproduce"), { name: "norn:wf:fix", color: "EDEDED", description: "" }];
       const before = h.remote.labels.length;
       const v = (await doctor(h)).value as Doctor;
+      expect(v.ok).toBe(all.ok); // the labels warnings alone do not change the result
       expect(v.warnings).toContain("label norn:wf:reproduce is missing on the remote: run `norn upgrade`");
       expect(v.warnings).toContain("label norn:wf:fix is unused (names no workflow): `gh label delete norn:wf:fix` deletes it");
       expect(h.remote.labels).toHaveLength(before); // doctor creates nothing
@@ -196,9 +208,11 @@ describe("norn doctor checks the labels (A7, GR10)", () => {
   test("B18: labels not checked is a warning naming the fix", async () => {
     const h = await inited();
     try {
+      const all = (await doctor(h)).value as Doctor;
       h.remote.listLabelsError = portError("gh_auth", "gh label list failed (exit 4): gh auth login");
       const v = (await doctor(h)).value as Doctor;
       expect(v.warnings).toContain("labels not checked: gh is not logged in (gh auth login)");
+      expect(v.ok).toBe(all.ok);
     } finally {
       h.cleanup();
     }
@@ -211,6 +225,34 @@ describe("norn doctor checks the labels (A7, GR10)", () => {
       const v = (await doctor(h, "--repo")).value as Doctor;
       expect(v.labels).toBeUndefined();
       expect(h.remote.calls.slice(calls)).not.toContain("labels?");
+    } finally {
+      h.cleanup();
+    }
+  });
+});
+
+describe("a tick never creates a label (GR10)", () => {
+  test("B20: norn:wf:reproduce missing and a reproduce round starts → the label swap warns (RD5); the tick creates no label", async () => {
+    const h = await inited();
+    try {
+      sh(h.root, ["push", "-q", "origin", "main"]);
+      h.remote.issues = [issue(7, "Seven")];
+      const runs = () => storyUnitDir(join(`${h.root}-worktrees/gh-7-seven`, ".agents/specs/gh-7-seven"));
+      for (let i = 0; i < 6 && !h.state(runs()); i++) await h.tick();
+      expect(h.state(runs())).toMatchObject({ workflow: "triage" });
+      h.remote.labels = h.remote.labels.filter((l) => l.name !== "norn:wf:reproduce");
+      expect((await h.norn("story", "edit", "gh-7", "--workflow", "reproduce", "--force")).exit).toBe(0);
+      // gh refuses to add a label the repository does not define
+      h.remote.labelError = new Error("gh issue edit failed (exit 1): 'norn:wf:reproduce' not found");
+      const calls = h.remote.calls.length;
+      const r = await h.tick();
+      const d = r.decisions.find((x) => x.unit === "gh-7" && x.rule === "round.start");
+      expect(d?.ok).toBe(true);
+      expect(d?.warnings?.[0]).toStartWith("issue #7 label norn:wf:triage → norn:wf:reproduce not updated");
+      expect(h.state(runs())).toMatchObject({ workflow: "reproduce" });
+      const ticked = h.remote.calls.slice(calls);
+      expect(ticked.filter((c) => c.startsWith("label+") || c === "labels?")).toEqual([]);
+      expect(h.remote.labels.map((l) => l.name)).not.toContain("norn:wf:reproduce");
     } finally {
       h.cleanup();
     }

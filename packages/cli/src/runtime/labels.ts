@@ -5,7 +5,7 @@
  * comes back as `checked: false` with the reason (B11, B12, B14), a failed create as `not_created`
  * with its command (B13). A tick never calls this (B20).
  */
-import { cmd, labelCreateCommand, labelDeleteCommand, NORN_LABEL_COLOR, type PortError, planLabels, type RemotePort, type RepoWorkflows } from "@norn/core";
+import { cmd, labelCreateCommand, labelDeleteCommand, NORN_LABEL_COLOR, type PortError, planLabels, type RemotePort, type RepoWorkflows, WF_LABEL } from "@norn/core";
 
 export interface LabelsChecked {
   checked: true;
@@ -74,7 +74,7 @@ export async function remoteLabels(opts: { remote: RemotePort | null; gitRemoteU
     }
   }
   // B5: a workflow that fails validation gets no label
-  for (const w of plan.invalid) not_created.push({ name: `norn:wf:${w}`, reason: `workflow ${w} is invalid`, command: cmd.doctor() });
+  for (const w of plan.invalid) not_created.push({ name: `${WF_LABEL}${w}`, reason: `workflow ${w} is invalid`, command: cmd.doctor() });
   return { checked: true, created, existing, missing: [], not_created, unused };
 }
 
