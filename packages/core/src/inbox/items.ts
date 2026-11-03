@@ -14,7 +14,7 @@ import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../cri
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
 import { sha256 } from "../hash.ts";
-import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, issueProblem, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
+import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, heldBySkillsDrift, issueProblem, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
 import { optionsLine } from "../prompt.ts";
 import { epoch, formatAge, iso } from "../time.ts";
 import { baseUpdateStep, edgeOf, edgesOf, isStale, stepOf } from "../workflow.ts";
@@ -597,7 +597,7 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
     case "ready": {
       const step = uf.workflow ? stepOf(uf.workflow, st.step) : null;
       // gh-61 B19 (D6): decide holds the agent start on drifted skills; say why and how to fix it
-      if (step?.type === "agent" && uf.skills_drift?.length && facts.norn)
+      if (heldBySkillsDrift(uf) && uf.skills_drift && facts.norn)
         return item("unblock", skillsDriftHint.held(facts.norn.running, uf.skills_drift, story.key), cmd.storyUpdateBranch(story.key), st.step_entered_at, {
           id: `skills_drift:${key}:${st.step}#${st.attempt}:${uf.skills_drift.join(",")}`,
         });

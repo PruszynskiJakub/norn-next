@@ -307,13 +307,15 @@ function unstick(st: UnitState, r: ReceiptOf<"unstick">, ctx: ApplyContext): Ste
 
 /**
  * BS9: a person sends the story unit back to its base-update step — from `$done` (the PR is not
- * merged), a gate, or stuck. Counters are unchanged; the ready gate is passed again later (F35).
+ * merged), a gate, or stuck; gh-61 B22: or from an agent step held by drifted skills (the receipt names
+ * them, so a replay decides the same). Counters are unchanged; the ready gate is passed again later (F35).
  */
 function updateFrom(st: UnitState, r: ReceiptOf<"update">, ctx: ApplyContext): Step1 {
   if (st.slice !== null) return { reject: `${cmd.storyUpdateBranch()} is for the story unit` };
   if (r.step !== st.step || r.attempt !== st.attempt) return { reject: `stale: receipt for ${r.step}#${r.attempt}, cursor at ${st.step}#${st.attempt}` };
-  const waiting = st.status === "done" || st.status === "stuck" || (st.status === "parked" && st.park?.kind === "gate");
-  if (!waiting) return { reject: `unit is ${st.status}${st.park ? ` (${st.park.kind})` : ""}; update needs it done, at a gate or stuck` };
+  const held = st.status === "ready" && !!r.skills_drift?.length && stepOf(ctx.workflow, st.step)?.type === "agent";
+  const waiting = st.status === "done" || st.status === "stuck" || (st.status === "parked" && st.park?.kind === "gate") || held;
+  if (!waiting) return { reject: `unit is ${st.status}${st.park ? ` (${st.park.kind})` : ""}; update needs it done, at a gate, stuck or held by drifted skills` };
   if (!stepOf(ctx.workflow, r.to)) return { reject: `no step '${r.to}' in workflow ${ctx.workflow.name}` };
   const next = enterStep(st, ctx.workflow, r.to, ctx.now);
   return { state: next, log: `update by ${r.who ?? r.by}: ${st.step} → ${r.to}`, advance: { from: st.step, outcome: "update", to: r.to } };

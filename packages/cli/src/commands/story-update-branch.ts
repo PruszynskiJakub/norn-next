@@ -6,7 +6,7 @@
  * applies it (S5). The tick never moves a done unit by itself — only a person does, with this verb.
  * Without a story: the worktree's story, a slice worktree's too (B55), else a pick of the waiting stories (B57).
  */
-import { cmd, baseUpdateStep, storyUnit } from "@norn/core";
+import { cmd, baseUpdateStep, heldBySkillsDrift, storyUnit, type UnitFacts } from "@norn/core";
 import type { UnitState } from "@norn/schema";
 import { defineCommand } from "../command.ts";
 import { refuse } from "../output.ts";
@@ -14,8 +14,9 @@ import { at, humanReceipt, resolveTarget, runHumanVerb } from "../runtime/human.
 import { storyArg } from "../runtime/args.ts";
 import { targetKey, type TargetRule } from "../runtime/target.ts";
 
-/** BS9: done (PR unmerged), at a gate, or stuck. */
-const waiting = (st: UnitState) => st.status === "done" || st.status === "stuck" || (st.status === "parked" && st.park?.kind === "gate");
+/** BS9: done (PR unmerged), at a gate, or stuck; gh-61 B22: or held by drifted skills until the base brings them in. */
+const waiting = (st: UnitState, uf: UnitFacts | null) =>
+  st.status === "done" || st.status === "stuck" || (st.status === "parked" && st.park?.kind === "gate") || (uf !== null && heldBySkillsDrift(uf));
 
 /** B57: the stories the pick offers — waiting (BS9) and not finished. */
 const updatable: TargetRule = {
@@ -52,8 +53,8 @@ export const storyUpdateBranchCommand = defineCommand({
         if (fm?.status === "done" || sf?.pr?.state === "merged" || sf?.merged_by_ancestry)
           throw refuse(`${t.story} is merged; nothing to update`, cmd.storyView(t.story), "story_merged");
         if (fm?.status === "dropped") throw refuse(`${t.story} is dropped`, cmd.storyView(t.story), "story_dropped");
-        if (!waiting(st))
-          throw refuse(`${t.story} is not waiting: it is at ${at(st)}; update re-enters a story that is done, at a gate or stuck`, cmd.storyView(t.story), "not_waiting");
+        if (!waiting(st, sf ? storyUnit(sf) : null))
+          throw refuse(`${t.story} is not waiting: it is at ${at(st)}; update re-enters a story that is done, at a gate, stuck or held by drifted skills`, cmd.storyView(t.story), "not_waiting");
         const wf = t.workflow;
         if (!wf) throw refuse(`${t.story} has no readable pinned workflow`, cmd.runView(t.story, { why: true }), "workflow_missing");
         const step = baseUpdateStep(wf);
@@ -66,7 +67,12 @@ export const storyUpdateBranchCommand = defineCommand({
         if (pending) throw refuse(`an update of ${t.story} is already recorded (${pending.file}) and not applied yet`, cmd.tick(), "already_recorded");
       },
       // P6: the receipt first; the tick applies it and writes state.json last (S5)
-      build: (t, st) => humanReceipt(ctx, t, st, "update", { from: st.step, to, reason: "person" }),
+      build: (t, st) => {
+        // gh-61 B22: name the drift that held the unit, so apply takes the update from its agent step
+        const su = t.story_facts ? storyUnit(t.story_facts) : null;
+        const held = su && heldBySkillsDrift(su) ? su.skills_drift : undefined;
+        return humanReceipt(ctx, t, st, "update", { from: st.step, to, reason: "person", ...(held ? { skills_drift: held } : {}) });
+      },
     });
     return { unit: t.story, receipt: out.receipt, delivered: out.delivered, next: out.next };
   },

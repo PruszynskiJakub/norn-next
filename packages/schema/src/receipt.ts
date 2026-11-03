@@ -229,7 +229,8 @@ export const TakeReceipt = receipt("take", {
 });
 /**
  * BS9: `norn story update-branch <story>` — a person sends the story unit back to its base-update step (from a
- * gate, from stuck, or from `$done` while the PR is unmerged). Written before the state change (P6).
+ * gate, from stuck, from `$done` while the PR is unmerged, or from an agent step held by drifted skills (gh-61 B22).
+ * Written before the state change (P6).
  */
 export const UpdateReceipt = receipt("update", {
   /** the step left, or `$done` */
@@ -237,6 +238,8 @@ export const UpdateReceipt = receipt("update", {
   /** the step entered (the workflow's `base.step`) */
   to: StepName,
   reason: Type.Literal("person"),
+  /** gh-61 B22: the bundled skills that differed when the unit was held at an agent step (B18); the base brings them in */
+  skills_drift: Type.Optional(Type.Array(NonEmpty, { minItems: 1 })),
 });
 /** Journaled workflow switch (`norn story edit <unit> --workflow <name> --at <step>`, S7). */
 export const WorkflowReceipt = receipt("workflow", {
