@@ -2,7 +2,7 @@
 id: gh-61/12
 title: "`brief`, `story start` and `story chat` refuse on drifted skills"
 depends_on: [ gh-61/01, gh-61/02, gh-61/04 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
