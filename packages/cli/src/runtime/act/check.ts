@@ -8,7 +8,6 @@
  * the lease over itself as it starts, so one the tick could not identify still holds it. One that dies
  * leaves a dead lease: it is reclaimed (K3) and the check runs again.
  */
-import { spawn } from "node:child_process";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { type Action, type ActionResult } from "@norn/core";
@@ -29,6 +28,7 @@ import {
   releaseLease,
   releaseRunLease,
   safeUnlink,
+  spawnDetached,
   writeLog,
 } from "@norn/store";
 import { nornEntry } from "../shim.ts";
@@ -77,19 +77,10 @@ export async function runCheck(act: ActEnv, a: Extract<Action, { kind: "run_chec
     atomicWriteJson(path, order, 0o600);
     const [cmd, ...args] = nornEntry();
     noteSpawn(["norn", "check-run", a.run_id], a.cwd); // effect transcripts: it runs the command
-    const child = spawn(cmd!, [...args, "check-run", a.run_id], {
-      cwd: a.cwd,
-      env: { ...process.env, ...act.ctx.env } as NodeJS.ProcessEnv,
-      detached: true, // own process group: outlives the tick
-      stdio: "ignore",
-    });
-    const pid = await new Promise<number | undefined>((resolve, reject) => {
-      child.once("spawn", () => resolve(child.pid));
-      child.once("error", reject);
-    });
+    const child = spawnDetached([cmd!, ...args, "check-run", a.run_id], { cwd: a.cwd, env: { ...process.env, ...act.ctx.env } });
+    const pid: number | undefined = child.pid;
     started = true;
-    const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
-    child.unref();
+    const exited = child.exited;
     act.ctx.deps.onCheckStarted?.(exited);
     // K1/K3: the lease lives as long as `norn check-run` does. It takes the lease over itself as it starts;
     // handing it over here only closes the gap before that. An unidentified pid (a failed probe) leaves

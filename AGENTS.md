@@ -9,6 +9,7 @@ bun install
 bun run test        # the unit tier, in seconds: your loop after each change; a plain `bun test` runs exactly this
 bun run test:integration  # the integration tier (packages/*/test/integration/), in parallel: the workflow's test check runs it
 bun run test:e2e    # the e2e tier (test/e2e/), in parallel: CI runs it in shards; `bun run test:e2e <file>` runs one file
+bun run test:stress [N]  # the three tiers N times (default 10), side by side; prints each failing test and its pass rate (--tier, --serial, --limit)
 bun run typecheck   # tsc --noEmit over every package
 bun run schema:emit # regenerate packages/schema/json/*.schema.json after changing a schema
 bun run docs:emit   # regenerate docs/reference.md's generated block after changing a command, flag, config key or shipped workflow

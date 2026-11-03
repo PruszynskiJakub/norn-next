@@ -8,13 +8,14 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { spawnSyncCaptured } from "../../src/spawn.ts";
 import { acquireIntegrateLock, acquireLock, acquireTickLock } from "../../src/lock.ts";
 import { integrateLockPath, tickLockPath } from "../../src/paths.ts";
 import { localProcess, processStart } from "../../src/proc.ts";
 
 /** What `ps -o lstart=` prints for `pid`: the start time a holder recorded while it was alive. */
 function rawStart(pid: number): string {
-  return Bun.spawnSync(["ps", "-o", "lstart=", "-p", String(pid)], { env: { ...process.env, LC_ALL: "C", LANG: "C" } })
+  return spawnSyncCaptured(["ps", "-o", "lstart=", "-p", String(pid)], { env: { ...process.env, LC_ALL: "C", LANG: "C" } })
     .stdout.toString()
     .trim()
     .replace(/\s+/g, " ");
@@ -34,7 +35,7 @@ async function zombie(): Promise<{ pid: number; lstart: string; stop: () => void
     if (!Number.isInteger(pid) || pid <= 0) return (stop(), null);
     const deadline = Date.now() + 5000;
     while (Date.now() < deadline) {
-      const stat = Bun.spawnSync(["ps", "-o", "stat=", "-p", String(pid)]).stdout.toString().trim();
+      const stat = spawnSyncCaptured(["ps", "-o", "stat=", "-p", String(pid)]).stdout.toString().trim();
       if (stat.startsWith("Z")) {
         const lstart = rawStart(pid);
         if (lstart) return { pid, lstart, stop };

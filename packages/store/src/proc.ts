@@ -7,6 +7,7 @@
  */
 import type { ProcessPort } from "@norn/core";
 import type { ProcessIdentity } from "@norn/schema";
+import { spawnSyncCaptured } from "./spawn.ts";
 
 /** Liveness check injected into leases and the tick lock. */
 export type LivenessCheck = (proc: ProcessIdentity) => Promise<boolean> | boolean;
@@ -29,8 +30,12 @@ export function parseStart(stdout: string, code: number): string | null {
 /** A process's start time, or null when it is gone, a zombie, or `pid` is not a pid. */
 export function processStart(pid: number): string | null {
   if (!Number.isInteger(pid) || pid < 1) return null;
-  const r = Bun.spawnSync(psStartArgv(pid), { stdout: "pipe", stderr: "ignore", env: PS_ENV });
-  return parseStart(r.stdout.toString(), r.exitCode ?? 1);
+  try {
+    const r = spawnSyncCaptured(psStartArgv(pid), { env: PS_ENV }); // not a pipe: see spawnSyncCaptured
+    return parseStart(r.stdout.toString(), r.exitCode ?? 1);
+  } catch {
+    return null;
+  }
 }
 
 /**
