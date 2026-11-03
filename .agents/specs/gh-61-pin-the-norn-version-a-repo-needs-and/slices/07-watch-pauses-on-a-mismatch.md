@@ -1,8 +1,8 @@
 ---
 id: gh-61/07
 title: "`norn watch` pauses ticks on a mismatch and notifies once"
-depends_on: [gh-61/05]
-status: planned
+depends_on: [ gh-61/05 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
