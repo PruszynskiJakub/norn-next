@@ -32,6 +32,8 @@ While interviewing, hold the language and the claims to account:
 - **Sharpen fuzzy words.** When a word could mean two things (*user*, *done*, *sync*), propose the precise term and ask which is meant.
 - **Invent scenarios.** Stress the boundaries with specific cases: the empty list, the second run, two people at once, the item deleted halfway through.
 - **Cross-check with the code.** When the person says how something works today, check it. "The code closes the whole order, but you said partial closing is possible. Which is right?"
+- **Back your own claims with the code.** Before you tell the person what code or config does, find the `file:line` usages that consume it, not only where it is defined. Never infer behaviour from a schema, a type or the docs alone; say "defined but never read" of a key nothing consumes. Your answers feed the spec, so a wrong one becomes a wrong Behaviour item.
+- **Read a terse answer out loud.** When an answer is terse ("remove these", "X can go"), state in one line how you read it ("Read as: drop B3 and B4, keep B5.") and carry on; the person corrects it if it is wrong.
 
 When a decision turns on how something looks or feels, or on a state model that is hard to judge on paper, offer the person a prototype (the `norn-prototype` skill) before they decide. Its verdict is the decision.
 
