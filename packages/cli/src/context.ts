@@ -14,6 +14,7 @@ import { bindNornHome, type LoadedConfig, loadConfig, nornHome, readUnitMarker, 
 import { configError, refuse } from "./output.ts";
 import { type Interaction, isAgentSession, terminalInteraction } from "./runtime/interaction.ts";
 import { guardLayout } from "./runtime/layout.ts";
+import { abortableSleep } from "./runtime/tick-lock.ts";
 import { buildPorts, defaultRegistry } from "./wiring.ts";
 
 /** Everything a command may get injected; all optional (tests pass fakes). */
@@ -42,6 +43,8 @@ export interface CliDeps {
   interaction?: Interaction | null;
   /** a tick started a detached `norn check-run` (C5); `exited` settles when it ends (tests wait on it) */
   onCheckStarted?: (exited: Promise<void>) => void;
+  /** gh-174: a pause while a person command waits for a running tick (H1); default a real timer, ended early by `signal` */
+  sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
 }
 
 export const systemClock: Clock = {
@@ -206,5 +209,10 @@ export class Context {
 
   log(line: string): void {
     this.deps.log?.(line);
+  }
+
+  /** Pause `ms` (an injected sleep in tests, which advances a fake clock); ends early when `signal` aborts. */
+  sleep(ms: number, signal?: AbortSignal): Promise<void> {
+    return (this.deps.sleep ?? abortableSleep)(ms, signal);
   }
 }

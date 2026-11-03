@@ -23,10 +23,11 @@ import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { herdr } from "@norn/adapters";
 import { ulid } from "@norn/schema";
-import { acquireTickLock, copyToOrphaned, deleteTraceDays, deleteTracePaths, orphanedDir, reclaimLeases, receiptsDir, safeUnlink, traceDaysBefore, unitDir } from "@norn/store";
+import { copyToOrphaned, deleteTraceDays, deleteTracePaths, orphanedDir, reclaimLeases, receiptsDir, safeUnlink, traceDaysBefore, unitDir } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
-import { busyError, refuse, usageError } from "../output.ts";
+import { refuse, usageError } from "../output.ts";
+import { waitForTickLock } from "../runtime/tick-lock.ts";
 import { leaseLiveness } from "../runtime/leases.ts";
 import { type Observed, observe } from "../runtime/observe/index.ts";
 import { doneHerdrRuns, planHerdrTidy } from "../runtime/tidy-herdr.ts";
@@ -93,8 +94,7 @@ export const tidyCommand = defineCommand({
   async run(ctx, args) {
     const dry = opt.bool(args, "dry-run");
     const window = retainWindow(ctx, opt.str(args, "retain"));
-    const lock = await acquireTickLock(ctx.root, { note: "norn tidy", now: () => ctx.clock.iso() });
-    if (!lock.ok) throw busyError(`a tick is running (pid ${lock.holder.holder.pid})`, `retry: ${cmd.tidy()}`, "tick_locked");
+    const lock = await waitForTickLock(ctx, "norn tidy", `retry: ${cmd.tidy()}`);
     try {
       const obs = await observe(ctx, { tick_id: ulid(ctx.clock.now()), sync: "never" });
       const git = obs.ports.git;
