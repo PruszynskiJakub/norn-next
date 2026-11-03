@@ -10,7 +10,7 @@ labels:
   - norn
   - norn:wf:story
 workflow: story
-status: active
+status: done
 intake_at: 2026-11-03T12:15:39.840Z
 body_hash: 3eaa09aea6f4416e7f61f26ce4e67f08fa771ecccc1f9a64797b88f6ff0e714d
 criteria:
@@ -65,6 +65,13 @@ criteria:
   - { id: "14.AC1", verifier: test }
   - { id: "14.AC2", verifier: agent }
   - { id: "14.AC3", verifier: agent }
+merge:
+  pr: 189
+  url: https://github.com/PruszynskiJakub/norn-next/pull/189
+  head_sha: bec491771cf2efe1bf61c4dba767eab73fbaa0ca
+  merge_commit_sha: 190974e8f7b4a245ffe81a673e1bd79a17796bf2
+  merged_by: PruszynskiJakub
+  merged_at: 2026-11-03T16:49:11.000Z
 ---
 
 # Pin the norn version a repo needs, and refuse a mismatched binary or drifted skills
