@@ -16,6 +16,14 @@
 
 ## Goal
 
+The brief of a step after a check lists the checks that ran since the last report (step, command, outcome, duration, pointer to the log), so a reviewer knows what has not run (e.g. e2e).
+
 ## Progress
 
+- `packages/core/src/brief.ts`: new `checks: { since, items: BriefCheck[] } | null` in BriefJson and a "## Checks since the last report" markdown section after Rework. Window = `check` receipts after the unit's last `done` receipt (the "last implement" of the issue, generalised: any agent report). Pointer = the full log when the check kept one (fail), else the check's receipt file (it holds the output tail). The failing check already under Rework is not repeated (`reworkCheck` factored out of `rework`).
+- RULES.md B3 table gains the row.
+- Tests: `packages/core/test/unit/brief.test.ts` "Checks since the last report (B3, gh-170)", 3 tests + 1 snapshot. Unit tier and typecheck green.
+
 ## Resume
+
+Done; reported `done`.

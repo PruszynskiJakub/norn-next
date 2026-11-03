@@ -178,6 +178,7 @@ Prompts the agent is blocked on are in [R6](#r6-prompts-the-agent-is-blocked-on)
 | Your work (skill, optional instructions) | pinned workflow step |
 | Inputs (spec, slice file, diff range) | step `inputs` + frontmatter |
 | Rework (when entered from a failure) | latest failing `check` receipt + log, or findings from the `review`/`qa` receipt that sent it back |
+| Checks since the last report (step, command, outcome, duration, log; the failing one under Rework left out) | `check` receipts after the unit's last `done` receipt |
 | Context (handoff, answer to previous ask) | `handoff.md` + receipts |
 | Finish with exactly one of (outcomes + `means`, `ask`, `stuck`) | step `outcomes` + universal reports |
 | Limits (deadline, nudges left, port slot) | step limits + slot + config |
