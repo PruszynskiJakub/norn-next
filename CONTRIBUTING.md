@@ -73,7 +73,7 @@ The CI process check passes a PR only if it comes from a story branch `gh-N-<slu
 
 ## GitHub settings the repo relies on
 
-- `main` protected: no direct or force push, required checks `process`, `check` and `package`, branches required to be up to date before merging (so a release's tag never holds a commit its changelog misses), no admin bypass.
+- `main` protected: no direct or force push, required checks `process` and CI's `unit`, `integration`, `e2e (shard 1/3)` to `(shard 3/3)` and `package`, branches required to be up to date before merging (so a release's tag never holds a commit its changelog misses), no admin bypass.
 - Squash merges only, with the PR title and description as the commit message; branches deleted on merge.
 - "Allow auto-merge" on: Dependabot patch and minor PRs merge automatically; majors wait for a person.
 - Labels: `norn`, `norn:wf:{triage,reproduce,refinement,story,quick,release}`, `friction`, `bypass`, `idea`, `bug`, `enhancement`.
