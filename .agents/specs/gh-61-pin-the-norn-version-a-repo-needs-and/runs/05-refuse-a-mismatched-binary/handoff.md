@@ -60,6 +60,7 @@ A binary that does not match the main checkout's `norn_version` is refused (exit
 
 - review#1: I read each test named in the table above and checked that it asserts its item; every row is traced, none UNTRACED. Unit tier 1130/0, typecheck green, version-guard.test.ts 11/0. Verdict: approve. Two minor findings and two nits, none blocking: (F1) with a broken config the guard steps aside, so `config set|unset` runs on a mismatch (on purpose, so a broken file can still be fixed); (F2) the AC7 'no key' test runs only tick, config set and brief.
 - review#1 approve: Review approve: AC1-AC7 (B3, B5-B10, B12) each traced to a test that asserts it; unit tier 1130/0, typecheck green, version-guard integration 11/0. No blocking findings; minor: a broken config lets config set run on a mismatch (on purpose), and the no-key AC7 test is thin; two nits.
+- merge#1: merged the story branch (no rebase; published branch) in 53fa8685b. Textual conflict in `packages/core/src/commands.ts`: both sides added a helper after `cmd` (versionMismatch here, skillsDriftHint from slice 12): kept both. Semantic conflict: slice 10 (B23) makes `doctor` exit 1 on a version mismatch; AC4's test expected doctor's exit to equal a matching binary's. Doctor is still not refused by the guard (AC4's intent); the test now expects B23's exit 1 for doctor. Unit 1130/0, typecheck green, integration 647/0 (one earlier run hit the known 30s load timeout), e2e 72/0.
 
 ## Resume
-Review approved; the next step is QA of AC1–AC7 (the table above maps each one to its test).
+Merge done; the slice goes back to integrate on the merged branch.
