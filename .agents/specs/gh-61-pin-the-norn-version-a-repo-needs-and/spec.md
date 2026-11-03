@@ -9,7 +9,7 @@ assignee: PruszynskiJakub
 labels:
   - norn
   - norn:wf:refinement
-workflow: refinement
+workflow: story
 status: active
 intake_at: 2026-11-03T12:15:39.840Z
 body_hash: 3eaa09aea6f4416e7f61f26ce4e67f08fa771ecccc1f9a64797b88f6ff0e714d
