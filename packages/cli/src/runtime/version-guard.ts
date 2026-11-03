@@ -4,7 +4,7 @@
  * the dispatcher after the repo is located, before the command, so a refused command writes,
  * launches and pushes nothing.
  */
-import { versionMismatch } from "@norn/core";
+import { versionRefusal } from "@norn/core";
 import { versionMatch } from "@norn/schema";
 import type { Context } from "../context.ts";
 import { refuse } from "../output.ts";
@@ -24,7 +24,7 @@ export function guardVersion(ctx: Context): void {
   if (repo === null || running === null) return; // B5: no key, no check
   const match = versionMatch(repo, running);
   if (match === "match") return;
-  const { error, do_instead } = versionMismatch(repo, ctx.version, match);
+  const { error, do_instead } = versionRefusal(repo, ctx.version, match);
   throw refuse(error, do_instead, "version_mismatch", { repo, running: ctx.version });
 }
 
