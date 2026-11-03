@@ -1,8 +1,8 @@
 ---
 id: gh-61/14
 title: Docs for the repo's norn version, and the release step sets it
-depends_on: [gh-61/05, gh-61/07, gh-61/08, gh-61/09, gh-61/10, gh-61/11, gh-61/12]
-status: planned
+depends_on: [ gh-61/05, gh-61/07, gh-61/08, gh-61/09, gh-61/10, gh-61/11, gh-61/12 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: agent }
