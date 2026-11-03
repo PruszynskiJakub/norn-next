@@ -2,7 +2,7 @@
 id: gh-61/11
 title: Drifted skills hold a unit's agent steps, and the inbox says why
 depends_on: [ gh-61/02, gh-61/06 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
