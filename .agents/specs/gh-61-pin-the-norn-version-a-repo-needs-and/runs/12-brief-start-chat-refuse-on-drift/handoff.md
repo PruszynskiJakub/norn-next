@@ -13,7 +13,14 @@
 <!-- norn:heartbeat:end -->
 
 ## Goal
+`norn brief`, `norn story start`, `norn story chat` refuse (`skills_drift`, exit 3) when the agent's worktree holds drifted bundled skills (B20, B21, D14).
 
 ## Progress
+- store `worktreeSkillsDrift(root, sourceDir, names, running)` (skills.ts): `skillsDrift` on the worktree, empty when its own team file records a newer `norn_version` (D14). Slice 11's observe can reuse it.
+- core `skillsDriftHint.text/fix` (commands.ts): "skills differ from norn X: a, b" / "bring the base in with `norn story update-branch <story>`" — slice 11's inbox item should use `.fix`.
+- cli `runtime/skills-drift.ts` `refuseOnSkillsDrift`, called in brief (after refuseUnlessAgentWork, before the run starts), story start (unit worktree), story chat (story worktree, report.root).
+- Test: `packages/cli/test/integration/skills-drift-refusal.test.ts` (S1) covers AC1–AC3; D14 case confirmed red without the exception. Unit tier, typecheck green.
+- implement#1 done: brief, story start and story chat refuse with skills_drift (exit 3, do_instead names norn story update-branch <story>) when the agent's worktree has drifted bundled skills; repo-local skills and a worktree recording a newer norn_version are not refused. Store worktreeSkillsDrift + core skillsDriftHint are reusable by slice 11. Integration test skills-drift-refusal.test.ts covers AC1-AC3.
 
 ## Resume
+Done; nothing left in this step.
