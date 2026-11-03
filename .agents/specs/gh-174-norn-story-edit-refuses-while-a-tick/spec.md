@@ -10,7 +10,7 @@ labels:
   - friction
   - norn
   - norn:wf:refinement
-workflow: refinement
+workflow: quick
 status: active
 intake_at: 2026-11-03T11:42:41.614Z
 body_hash: 0613bb82769d8103269fb82e44a96ae1d532e97c7760831755cebbc55812564e
