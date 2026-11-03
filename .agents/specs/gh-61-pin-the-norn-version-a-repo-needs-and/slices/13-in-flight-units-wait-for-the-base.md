@@ -1,8 +1,8 @@
 ---
 id: gh-61/13
 title: In-flight units wait for the base to bring the new skills in
-depends_on: [gh-61/11]
-status: planned
+depends_on: [ gh-61/11 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
 ---
