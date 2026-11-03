@@ -107,7 +107,7 @@ It claims the story, checks out its branches and prints the handoff, and their h
 Run a tick from cron every minute in the repository:
 
 ```sh
-* * * * * cd /path/to/repo && /usr/local/bin/norn tick >> /tmp/norn-tick.log 2>&1
+* * * * * cd /path/to/repo && /usr/local/bin/norn tick --interval 1m >> /tmp/norn-tick.log 2>&1
 ```
 
-Every tick on one checkout shares one heartbeat id, so each recognises the claim the previous one renewed. cron has a minimal `PATH`: give full paths to `norn`, `gh` and your agent, or set `PATH` in the crontab.
+`--interval` tells norn how often the tick runs: it is recorded for the checkout and sets when the heartbeat counts as down and how long a claim lasts. Match it to the cron schedule; without it, norn assumes 30 seconds. Every tick on one checkout shares one heartbeat id, so each recognises the claim the previous one renewed. cron has a minimal `PATH`: give full paths to `norn`, `gh` and your agent, or set `PATH` in the crontab.
