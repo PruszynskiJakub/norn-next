@@ -14,6 +14,15 @@
 
 ## Goal
 
+`norn doctor` and `doctor --repo` report the repo's `norn_version` against the binary and fail on a mismatch or on drifted bundled skills (B5, B23–B25, D12).
+
 ## Progress
 
+- `packages/cli/src/commands/doctor.ts`: the repo group gains `version` (`versionCheck`: match passes, older → "install norn X.Y.x", newer → B7's `norn upgrade` text, no key → a `warn norn` line) and `skills` (drift via store `skillsDrift`, fix "run `norn upgrade` and commit (git diff .agents/skills/ shows the change)"). `--repo` prints its own `skills` line; the full doctor folds drift into its one skills line (no double-count in the head line). The old drift *warning* is gone.
+- Tests (S1, integration): new describe "norn doctor: the repo's norn version and drifted skills (gh-61 …)" in `packages/cli/test/integration/housekeeping.test.ts`, one test per AC plus the newer-binary case. The old "drifted skill is a warning" test was removed (superseded; its repo-local-skill check moved into the B24 test).
+- `--repo`'s help text names the new checks; `docs/reference.md` regenerated.
+- Decision: the line marker stays doctor's existing `ok` (the AC writes "PASS"); the text after the label matches the AC. Texts are local to doctor.ts: slice 05 (refusals, D3 "texts built once in core") had no code yet; once it lands, the `install norn X.Y.x` / B7 wording could share its helper.
+
 ## Resume
+
+Done: unit tier, typecheck and the doctor integration tests are green; work committed. Nothing left for this step.
