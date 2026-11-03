@@ -1,14 +1,16 @@
 /**
  * `norn init` (A1, SK1, W1): repo config from the template if absent, workflow examples if
- * absent, the bundled skills into `.agents/skills/` (whole folders, always the bundled version)
- * linked from each configured agent's skill folder, agent hooks (norn-owned, updated in place),
+ * absent, the bundled skills into `.agents/skills/` (whole folders, the bundled version) linked
+ * from each configured agent's skill folder, agent hooks (norn-owned, updated in place),
  * machine-local paths in .gitignore, and `runs/` marked generated in .gitattributes. Idempotent: re-running updates norn-owned files only.
+ * gh-61 B1, B28 (D10): `norn_version` is recorded only in a repo that has none; on a repo set up
+ * for another version, a differing bundled skill is left as it is and `norn upgrade` named instead.
  * Workflows created now get the repo's test command when its build files name one (`runtime/detect.ts`).
  * Prints a summary for a person, ending in the next steps to a first story; `--json` for data.
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { atomicWrite, installSkills, LOCAL_CONFIG_FILE, linkSkills, readText, REPO_CONFIG_FILE, repoConfigPath, userConfigPath, WORKFLOWS_DIR, workflowsDir, writeConfigSchemas } from "@norn/store";
+import { atomicWrite, installSkills, LOCAL_CONFIG_FILE, linkSkills, readText, REPO_CONFIG_FILE, repoConfigPath, SKILLS_DIR, skillsDrift, userConfigPath, WORKFLOWS_DIR, workflowsDir, writeConfigSchemas, writeNornVersion } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { rendered } from "../output.ts";
@@ -79,20 +81,28 @@ export interface InitReport {
   remote: { provider: string; label: string; git_remote: string; url: string | null };
   /** the `test` check command written into the workflows created now (null when none were created) */
   test_command: { command: string; detected_from: string | null; set_in: string[] } | null;
+  /**
+   * gh-61 B1, B28 (D10): the repo's `norn_version` after init and the running norn's; `recorded`
+   * when this init wrote it; `skills_kept`: bundled skills that differ and were left alone because
+   * the repo is on another version (`norn upgrade` moves both)
+   */
+  norn_version: { repo: string; running: string; recorded: boolean; skills_kept: string[] };
 }
 
 /** `norn init`: what changed, one line per part; names are listed only for what changed. */
 function formatInit(r: InitReport): string {
   const rel = (p: string) => relative(r.root, p) || ".";
   const count = (n: number, what: string) => `${n} ${what}`;
-  const out = [`norn init in ${r.root}`, ""];
+  const v = r.norn_version;
+  const out = [`norn init in ${r.root}`, "", `norn version: ${v.repo}${v.recorded ? " (recorded)" : ""}`, ""];
   const row = (label: string, text: string) => out.push(`  ${label.padEnd(15)} ${text}`);
   row("config", `${REPO_CONFIG_FILE} ${r.config === "created" ? "created" : "kept (exists)"}`);
   row("user config", `~/.norn/config.yaml ${r.user_config === "created" ? "created" : "kept (exists)"}`);
   if (r.schemas.length) row("schemas", `wrote ${r.schemas.map((p) => (p.startsWith(r.root) ? rel(p) : p)).join(", ")}`);
   row("workflows", [r.workflows.created.length ? `created ${r.workflows.created.join(", ")}` : "", r.workflows.kept.length ? `kept ${r.workflows.kept.join(", ")}` : ""].filter(Boolean).join("; ") || "none");
   const sk = r.skills;
-  row("skills", `${rel(sk.dir)}: ${sk.updated.length ? `updated ${sk.updated.join(", ")}` : "up to date"} (${count(sk.updated.length + sk.unchanged.length, "skills")})`);
+  const kept = v.skills_kept.length ? `; kept ${v.skills_kept.join(", ")} (norn ${v.repo}'s to change)` : "";
+  row("skills", `${rel(sk.dir)}: ${sk.updated.length ? `updated ${sk.updated.join(", ")}` : "up to date"}${kept} (${count(sk.updated.length + sk.unchanged.length + v.skills_kept.length, "skills")})`);
   for (const l of sk.links) {
     const parts = [l.linked.length ? `linked ${l.linked.join(", ")}` : "", l.kept.length ? `not linked, a folder of yours is in the way: ${l.kept.join(", ")}` : ""].filter(Boolean);
     row("", `${l.agent} → ${rel(l.dir)}: ${parts.join("; ") || "all linked"}`);
@@ -101,9 +111,13 @@ function formatInit(r: InitReport): string {
   row("hook command", r.hook_command);
   row(".gitignore", r.gitignore.length ? `added ${r.gitignore.join(", ")}` : "up to date");
   row(".gitattributes", r.gitattributes.length ? `added ${r.gitattributes.join(", ")}` : "up to date");
-  const changed = r.config === "created" || r.schemas.some((p) => p.startsWith(r.root)) || r.workflows.created.length || sk.updated.length || sk.links.some((l) => l.linked.length) || r.hooks.some((h) => h.changed.length) || r.gitignore.length || r.gitattributes.length;
+  const changed = r.config === "created" || r.norn_version.recorded || r.schemas.some((p) => p.startsWith(r.root)) || r.workflows.created.length || sk.updated.length || sk.links.some((l) => l.linked.length) || r.hooks.some((h) => h.changed.length) || r.gitignore.length || r.gitattributes.length;
   if (r.test_command) row("test command", `${r.test_command.command} (${r.test_command.detected_from ? `from ${r.test_command.detected_from}` : "not detected: the template's default"})`);
   row("remote", r.remote.url ? `${r.remote.git_remote} → ${r.remote.url}` : `no git remote named ${r.remote.git_remote}`);
+  if (v.repo !== v.running) {
+    const differ = v.skills_kept.length ? `, with the bundled skills that differ: ${v.skills_kept.join(", ")}` : "";
+    out.push("", `this repo is on norn ${v.repo}, you run ${v.running}: \`${cmd.upgrade()}\` moves it${differ}`);
+  }
   if (!changed) out.push("", "Nothing changed: norn is set up here.");
   out.push("", "Next steps", ...nextSteps(r, !!changed).map((s, i) => `  ${i + 1}. ${s}`));
   return out.join("\n");
@@ -173,11 +187,22 @@ export const initCommand = defineCommand({
     }
     const test_command = workflows.created.length ? { command: testCommand, detected_from: detected?.from ?? null, set_in: setIn } : null;
 
+    // B1 (D10): the version is written only into a repo that has none; init never moves it (B28)
     ctx.reload();
+    const recorded = ctx.config.norn_version === null;
+    if (recorded) {
+      const w = writeNornVersion(root, ctx.version);
+      if (!w.ok) throw new Error(`norn init: writing norn_version: ${w.error}`);
+      ctx.reload();
+    }
+    const repoVersion = ctx.config.norn_version ?? ctx.version;
     const ports = await ctx.ports(); // validates the config again with the written files (exit 6 when invalid)
     const agents = agentsInUse(root, ctx.resolved, ports); // B1, B13
     const names = bundledSkills(ctx.env);
-    const installed = installSkills(root, join(assets, "skills"), names);
+    // B28 (D10): on another version's repo, a missing skill is copied in and one that differs stays
+    const source = join(assets, "skills");
+    const skills_kept = repoVersion === ctx.version ? [] : skillsDrift(join(root, SKILLS_DIR), source, names);
+    const installed = installSkills(root, source, names.filter((n) => !skills_kept.includes(n)));
     const links: Array<{ agent: string; dir: string; linked: string[]; unchanged: string[]; kept: string[] }> = [];
     const seen = new Set<string>();
     for (const [name, agent] of Object.entries(agents)) {
@@ -195,7 +220,7 @@ export const initCommand = defineCommand({
       hooks.push({ agent: name, tier: agent.tier, changed: r.changed });
     }
 
-    const report: InitReport = { root, config, user_config, schemas, workflows, skills, hooks, hook_command: command, gitignore: ensureGitignore(root), gitattributes: ensureGitattributes(root), remote: { provider: ctx.config.provider, label: ctx.config.label, git_remote: ctx.config.git_remote, url: gitRemoteUrl(root, ctx.config.git_remote) }, test_command };
+    const report: InitReport = { root, config, user_config, schemas, workflows, skills, hooks, hook_command: command, gitignore: ensureGitignore(root), gitattributes: ensureGitattributes(root), remote: { provider: ctx.config.provider, label: ctx.config.label, git_remote: ctx.config.git_remote, url: gitRemoteUrl(root, ctx.config.git_remote) }, test_command, norn_version: { repo: repoVersion, running: ctx.version, recorded, skills_kept } };
     return rendered(report, formatInit(report));
   },
 });

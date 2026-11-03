@@ -14,6 +14,16 @@
 
 ## Goal
 
+`norn init` records `norn_version` only in a repo without one (B1); on a repo at another version it sets up the machine, copies in missing skills, leaves the version and differing skills alone and names `norn upgrade` (B28, D10).
+
 ## Progress
 
+- `writeNornVersion` in `packages/store/src/config.ts`: edits the team file in place through `editConfigLayer`, so comments stay. Slice 08 (`upgrade`) should reuse it.
+- `packages/cli/src/commands/init.ts`: records the key when it is absent, prints `norn version: X (recorded)`, and keeps drifted skills when the repo's version is not exactly the binary's (`skillsDrift`). The hint `this repo is on norn X, you run Y: \`norn upgrade\` moves it` names the kept skills. `--json` has `norn_version: { repo, running, recorded, skills_kept }`.
+- Tests: `packages/cli/test/integration/init-version.test.ts` (AC1–AC3, plus comments kept).
+- `test/e2e/slice-workflow.test.ts`: the init test's team-schema key list now includes `norn_version` (added by slice 04). No effect transcript or observe snapshot records init's team file, so none changed.
+- Unit tier, type check, integration tier and the transcript e2e files are green. `recovery.test.ts` once timed out under parallel load, then passed on its own both with and without this change.
+
 ## Resume
+
+Done. Report `norn done done`.
