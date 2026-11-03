@@ -8,8 +8,8 @@ import { versionMismatch } from "@norn/core";
 import type { Context } from "../context.ts";
 import { type CliFailure, refuse } from "../output.ts";
 
-/** The refusal when the repo records a version the running norn does not match, else null. */
-export function versionRefusal(ctx: Context): CliFailure | null {
+/** The refusal, with the version the repo records and the line it needs, when the running norn does not match it; else null. */
+export function versionRefusal(ctx: Context): { failure: CliFailure; repo: string; needs: string } | null {
   // B3: a config with problems is the command's own config error (exit 6), never a version refusal;
   // a command that does not read config (config set) can still fix it
   const loaded = ctx.loaded;
@@ -19,11 +19,11 @@ export function versionRefusal(ctx: Context): CliFailure | null {
   if (repo === null) return null; // B5: no key, no check
   const mismatch = versionMismatch(repo, ctx.version);
   if (!mismatch) return null;
-  return refuse(mismatch.error, mismatch.do_instead, "version_mismatch", { repo, running: ctx.version });
+  return { failure: refuse(mismatch.error, mismatch.do_instead, "version_mismatch", { repo, running: ctx.version }), repo, needs: mismatch.needs };
 }
 
 /** Throws the refusal when the repo records a version the running norn does not match. */
 export function guardVersion(ctx: Context): void {
   const refusal = versionRefusal(ctx);
-  if (refusal) throw refusal;
+  if (refusal) throw refusal.failure;
 }

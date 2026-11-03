@@ -123,7 +123,7 @@ export function nameRemoved(text: string): string | null {
  * (`0.19.0-dev.3`) is compared by its core. The versions that fit `repo` are its line (`0.19.x` before
  * 1.0, `1.x` from 1.0 on), from `repo` itself up (B2). Null when it fits, or `running` has no `X.Y.Z`.
  */
-export function versionMismatch(repo: string, running: string): { match: "older" | "newer"; error: string; do_instead: string } | null {
+export function versionMismatch(repo: string, running: string): { match: "older" | "newer"; needs: string; error: string; do_instead: string } | null {
   const core = /^\d+\.\d+\.\d+/.exec(running)?.[0];
   if (!core) return null;
   const match = versionMatch(repo, core);
@@ -135,8 +135,11 @@ export function versionMismatch(repo: string, running: string): { match: "older"
   const install = `install norn ${fits}`;
   // B7: a newer binary moves the repo forward with a commit, not a downgrade
   const do_instead = match === "newer" ? `run \`${cmd.upgrade()}\` to move this repo to norn ${running} and commit the change, or ${install}` : install;
-  return { match, error: `this repo needs norn ${fits} (you run ${running})`, do_instead };
+  return { match, needs: fits, error: `this repo needs norn ${fits} (you run ${running})`, do_instead };
 }
+
+/** gh-61 B11 (D8): the one notification `norn watch` sends when it pauses ticks on a mismatch. */
+export const ticksPausedTitle = (needs: string): string => `this repo needs norn ${needs}; ticks paused`;
 
 /** gh-61 B5: the hint when the team file records no `norn_version` (`doctor`, `status`). */
 export const NO_VERSION_HINT = `no norn version recorded: run \`${cmd.upgrade()}\``;

@@ -91,8 +91,8 @@ describe("printed commands (B7)", () => {
 
 describe("the version refusal (gh-61 B6, B7, D3)", () => {
   test("an older binary is told which norn to install", () => {
-    expect(versionMismatch("0.19.0", "0.18.1")).toEqual({ match: "older", error: "this repo needs norn 0.19.x (you run 0.18.1)", do_instead: "install norn 0.19.x" });
-    expect(versionMismatch("0.18.2", "0.18.1")).toEqual({ match: "older", error: "this repo needs norn 0.18.2 or a later 0.18.x (you run 0.18.1)", do_instead: "install norn 0.18.2 or a later 0.18.x" });
+    expect(versionMismatch("0.19.0", "0.18.1")).toEqual({ match: "older", needs: "0.19.x", error: "this repo needs norn 0.19.x (you run 0.18.1)", do_instead: "install norn 0.19.x" });
+    expect(versionMismatch("0.18.2", "0.18.1")).toEqual({ match: "older", needs: "0.18.2 or a later 0.18.x", error: "this repo needs norn 0.18.2 or a later 0.18.x (you run 0.18.1)", do_instead: "install norn 0.18.2 or a later 0.18.x" });
     expect(versionMismatch("1.2.0", "1.1.9")?.do_instead).toBe("install norn 1.2.0 or a later 1.x");
     expect(versionMismatch("2.0.0", "1.5.0")?.do_instead).toBe("install norn 2.x");
   });
@@ -100,6 +100,7 @@ describe("the version refusal (gh-61 B6, B7, D3)", () => {
   test("a newer binary is told to run norn upgrade and commit, or to install the repo's norn", () => {
     expect(versionMismatch("0.18.0", "0.19.0")).toEqual({
       match: "newer",
+      needs: "0.18.x",
       error: "this repo needs norn 0.18.x (you run 0.19.0)",
       do_instead: "run `norn upgrade` to move this repo to norn 0.19.0 and commit the change, or install norn 0.18.x",
     });
