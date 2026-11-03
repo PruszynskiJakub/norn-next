@@ -11,9 +11,16 @@ labels:
   - norn
   - norn:wf:quick
 workflow: quick
-status: active
+status: done
 intake_at: 2026-11-03T11:42:41.614Z
 body_hash: 0613bb82769d8103269fb82e44a96ae1d532e97c7760831755cebbc55812564e
+merge:
+  pr: 185
+  url: https://github.com/PruszynskiJakub/norn-next/pull/185
+  head_sha: e59cb390c9b419819e35059ed5497f9c3837f5c0
+  merge_commit_sha: 55fe2db2ece2cf0f53ad83ff3b815c285fb8d701
+  merged_by: PruszynskiJakub
+  merged_at: 2026-11-03T13:18:25.000Z
 ---
 
 # Person commands wait for a running tick instead of refusing
