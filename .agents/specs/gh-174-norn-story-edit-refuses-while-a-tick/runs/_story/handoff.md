@@ -5,7 +5,7 @@
 - Counters: base_conflict_loop 0/2, ci_loop 0/3, ready_loop 0/2, review_loop 0/3, stale_loop 0/10, sync_conflict_loop 0/2, test_loop 0/5
 - Last outcome: sync.done (classified, 2026-11-03T12:09:13.145Z)
 - Next: `norn brief`
-- Updated: 2026-11-03T12:09:34.936Z
+- Updated: 2026-11-03T12:12:34.946Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - story.start: refinement at sync
@@ -16,6 +16,7 @@
 - receipts.apply: plan.done → $done
 - round.start: round 2 quick at sync
 - receipts.apply: sync.done → implement
+- receipts.apply: applied 2
 <!-- norn:heartbeat:end -->
 
 ## Goal
