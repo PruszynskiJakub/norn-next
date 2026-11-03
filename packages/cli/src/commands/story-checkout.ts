@@ -1,8 +1,7 @@
 /** `norn story checkout [<story>] [--force]` (B33, T5, M3): continue a story on this machine from git alone (`runtime/checkout.ts`). */
 import { cmd } from "@norn/core";
-import { acquireTickLock } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
-import { busyError } from "../output.ts";
+import { waitForTickLock } from "../runtime/tick-lock.ts";
 import { checkoutStory } from "../runtime/checkout.ts";
 import { aStory, resolveStory } from "../runtime/target.ts";
 
@@ -16,8 +15,7 @@ export const storyCheckoutCommand = defineCommand({
   async run(ctx, args) {
     const key = await resolveStory(ctx, args.positionals[0], args.json === true, aStory("story checkout", cmd.storyCheckout));
     const force = opt.bool(args, "force");
-    const lock = await acquireTickLock(ctx.root, { note: "norn story checkout", now: () => ctx.clock.iso() });
-    if (!lock.ok) throw busyError(`a tick is running (pid ${lock.holder.holder.pid})`, `retry: ${cmd.storyCheckout(key)}`, "tick_locked");
+    const lock = await waitForTickLock(ctx, "norn story checkout", `retry: ${cmd.storyCheckout(key)}`);
     try {
       return await checkoutStory(ctx, key, force);
     } finally {

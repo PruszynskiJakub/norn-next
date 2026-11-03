@@ -21,19 +21,6 @@ import { projectView } from "../runtime/human.ts";
 
 const DEFAULT_POLL = "5s";
 
-function timerSleep(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve) => {
-    if (signal?.aborted) return resolve();
-    const t = setTimeout(done, ms);
-    function done() {
-      clearTimeout(t);
-      signal?.removeEventListener("abort", done);
-      resolve();
-    }
-    signal?.addEventListener("abort", done, { once: true });
-  });
-}
-
 function duration(args: Parameters<typeof opt.str>[0], name: string, fallback: string | undefined, example: string): number | null {
   const raw = opt.str(args, name) ?? fallback;
   if (raw === undefined) return null;
@@ -68,7 +55,6 @@ export const storyWaitCommand = defineCommand({
     if (!until) throw usageError(raw === undefined ? "--until is required" : `bad --until '${raw}' (use ${WAIT_CONDITIONS.join(", ")})`, cmd.storyWait(key, "gate"));
     const timeout = duration(args, "timeout", undefined, cmd.storyWait(key, formatWaitCondition(until), { timeout: "30m" }));
     const interval = duration(args, "interval", DEFAULT_POLL, cmd.storyWait(key, formatWaitCondition(until))) as number;
-    const sleep = ctx.deps.sleep ?? timerSleep;
     const signal = ctx.deps.signal;
     const started = ctx.clock.now();
     for (;;) {
@@ -79,7 +65,7 @@ export const storyWaitCommand = defineCommand({
       if (matched !== null) return out;
       const left = timeout === null ? interval : timeout - waited_ms;
       if (left <= 0 || signal?.aborted) return withExit(out, ExitCode.timeout);
-      await sleep(Math.min(interval, left), signal);
+      await ctx.sleep(Math.min(interval, left), signal);
     }
   },
 });

@@ -16,7 +16,6 @@ import { cmd, sliceWorktreePath, storyWorktreePath } from "@norn/core";
 import { ExitCode, type ReceiptOf, sliceBranch, specDir, STORY_UNIT_DIR, ulid } from "@norn/schema";
 import {
   acquireClaim,
-  acquireTickLock,
   appendHandoffHeartbeat,
   appendReceipt,
   appendTrace,
