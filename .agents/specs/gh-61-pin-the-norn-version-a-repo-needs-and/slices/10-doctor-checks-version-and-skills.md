@@ -2,7 +2,7 @@
 id: gh-61/10
 title: "`norn doctor` and `doctor --repo` fail on a mismatch or drifted skills"
 depends_on: [ gh-61/01, gh-61/02, gh-61/04, gh-61/03 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
