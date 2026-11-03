@@ -14,3 +14,4 @@ export * from "./timeline.ts";
 export * from "./timeline-read.ts";
 export * from "./trace-view.ts";
 export type * from "./types.ts";
+export * from "./wait.ts";

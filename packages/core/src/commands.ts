@@ -79,6 +79,7 @@ export const cmd = {
     norn("story edit", unit, o.mode && `--${o.mode}`, o.workflow && `--workflow ${o.workflow}`, o.force && "--force", o.at && `--at ${o.at}`),
   storyStart: (unit?: string, o: { print?: boolean } = {}) => norn("story start", unit, o.print && "--print"),
   storyView: (target?: string, o: { web?: boolean } = {}) => norn("story view", target, o.web && "--web"),
+  storyWait: (unit: string, until: string, o: { timeout?: string } = {}) => norn("story wait", unit, `--until ${until}`, o.timeout && `--timeout ${o.timeout}`),
   stuck: (reason = "<reason>") => norn("stuck", `"${reason}"`),
   storyCreate: (o: { title?: string; workflow?: string } = {}) => norn("story create", `--title "${o.title ?? "…"}"`, o.workflow && `--workflow ${o.workflow}`),
   storyTake: (story: string) => norn("story take", story),
