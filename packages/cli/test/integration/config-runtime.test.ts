@@ -83,13 +83,13 @@ describe("mode, agent and workflow over ticks (B10, B13, B24, B25, B33)", () => 
     expect(env).toMatch(new RegExp(`PORT_BASE="?${4000 + 10 * slot}`));
   });
 
-  test("B38: a slice that still has criteria needs shows under Unblock with norn migrate, not as corrupt", async () => {
+  test("B38: a slice that still has criteria needs shows under Unblock with norn upgrade, not as corrupt", async () => {
     h.write(
       join(wt("gh-1", "one"), ".agents/specs/gh-1-one/slices/02-two.md"),
       "---\nid: gh-1/02\ntitle: Two\ndepends_on: []\nstatus: planned\ncriteria:\n  - { id: c1, verifier: agent, needs: [browser] }\n---\n",
     );
     const items = ((await h.norn("status", "--json")).value as { groups: { unblock: Item[] } }).groups.unblock;
-    expect(items).toContainEqual(expect.objectContaining({ slice: "gh-1/02", title: "slice `gh-1/02`: `needs` was removed; run `norn migrate`", command: "norn migrate" }));
+    expect(items).toContainEqual(expect.objectContaining({ slice: "gh-1/02", title: "slice `gh-1/02`: `needs` was removed; run `norn upgrade`", command: "norn upgrade" }));
     expect(items.some((i) => i.title.startsWith("corrupt"))).toBe(false);
   });
 });

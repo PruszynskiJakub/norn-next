@@ -76,7 +76,7 @@ function parseMarkdown<N extends "story" | "slice">(name: N, raw: string, path: 
     } as ReadResult<MarkdownDoc<T>>;
   const y = parseYaml(split.yaml);
   if (!y.ok) return { ok: false, reason: "corrupt", error: fileError(path, y.errors, root) } as ReadResult<MarkdownDoc<T>>;
-  // B38 (D12): criteria `needs` was removed; its own message, pointing at `norn migrate`
+  // B38 (D12): criteria `needs` was removed; its own message, pointing at `norn upgrade`
   const fm = y.value as { id?: unknown; criteria?: unknown };
   const withNeeds = Array.isArray(fm.criteria) ? fm.criteria.findIndex((c) => typeof c === "object" && c !== null && "needs" in c) : -1;
   if (withNeeds >= 0)

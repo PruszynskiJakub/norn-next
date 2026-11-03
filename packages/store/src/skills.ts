@@ -39,11 +39,12 @@ const isLink = (path: string) => {
   }
 };
 
-/** True when two skill folders hold the same files with the same bytes. */
+/** True when two skill folders hold the same files with the same bytes (sizes first, so a changed file rarely costs a read). */
 function sameFolder(a: string, b: string): boolean {
   const fa = filesUnder(a);
   const fb = filesUnder(b);
   if (fa.join("\n") !== fb.join("\n")) return false;
+  if (fa.some((f) => statSync(join(a, f)).size !== statSync(join(b, f)).size)) return false;
   return fa.every((f) => readFileSync(join(a, f)).equals(readFileSync(join(b, f))));
 }
 
@@ -156,6 +157,14 @@ export function visibleSkills(dir: string): string[] {
   }
 }
 
+/**
+ * The bundled skills in `skillsFolder` that differ from this norn's copies in `sourceDir` (B21).
+ * Only `names` are compared, so a repo-local skill is never named; a missing skill is not drift.
+ */
+export function skillsDrift(skillsFolder: string, sourceDir: string, names: readonly string[]): string[] {
+  return names.filter((n) => existsSync(join(skillsFolder, n, "SKILL.md")) && !sameFolder(join(sourceDir, n), join(skillsFolder, n)));
+}
+
 export interface SkillsReport {
   dir: string;
   /** bundled skills absent from `.agents/skills/` */
@@ -170,7 +179,7 @@ export interface SkillsReport {
 export function skillsReport(root: string, sourceDir: string, names: readonly string[], agentDirs: Record<string, string>): SkillsReport {
   const dir = skillsDir(root);
   const missing = names.filter((n) => !existsSync(join(dir, n, "SKILL.md")));
-  const drifted = names.filter((n) => !missing.includes(n) && !sameFolder(join(sourceDir, n), join(dir, n)));
+  const drifted = skillsDrift(dir, sourceDir, names);
   const unlinked: Record<string, string[]> = {};
   for (const [agent, agentDir] of Object.entries(agentDirs)) {
     if (resolve(agentDir) === resolve(dir)) continue;

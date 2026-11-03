@@ -99,6 +99,6 @@ export function unitCriteria(s: UnitSession): Criterion[] | null {
   if (r.ok) return r.value.frontmatter.criteria ?? null;
   if (r.reason === "missing") return null;
   // B38 (D12): a slice or story still carrying criteria `needs` is refused, not corrupt
-  if (r.reason === "needs_removed") throw refuse(r.error.errors[0]?.message ?? "`needs` was removed", cmd.migrate(), "needs_removed");
+  if (r.reason === "needs_removed") throw refuse(r.error.errors[0]?.message ?? "`needs` was removed", cmd.upgrade(), "needs_removed");
   throw corruptError(`${file} failed validation (S2): its criteria cannot be checked`, `stop and tell the person: ${cmd.runView(s.unit.key, { why: true })}`, r.error ? [r.error] : []);
 }

@@ -39,7 +39,7 @@ function sections(stdout: string): Array<{ title: string; rows: string[] }> {
 }
 
 const CORE = ["status", "story", "run"];
-const SETUP = ["init", "migrate", "doctor", "config", "uninstall"];
+const SETUP = ["init", "upgrade", "doctor", "config", "uninstall", "migrate"];
 const BACKGROUND = ["watch", "sync", "tidy"];
 const PROTOCOL = ["brief", "done", "ask", "stuck"];
 
@@ -97,15 +97,24 @@ describe("noun help (B2)", () => {
   });
 });
 
-describe("norn migrate in help (gh-110 B22)", () => {
-  test("help lists migrate with one line on what it does, and no help text names the old layout's folder", async () => {
+describe("norn upgrade in help (gh-110 B22, gh-61 B30)", () => {
+  test("help lists upgrade with one line on what it does, and no help text names the old layout's folder", async () => {
     const v = (await h.norn("help")).value as Help;
-    const migrate = v.commands.find((c) => c.command === "migrate");
-    expect(migrate?.summary).toMatch(/^Move .*layout.*stage/);
-    expect(migrate?.summary).not.toContain("\n");
+    const upgrade = v.commands.find((c) => c.command === "upgrade");
+    expect(upgrade?.summary).toMatch(/^Move .*layout.*stage/);
+    expect(upgrade?.summary).not.toContain("\n");
     for (const args of [["help"], ["help", "--all"], ["help", "--json"], ["help", "--all", "--json"]]) {
       expect((await h.norn(...args)).stdout).not.toContain(`${OLD_NORN_DIR}/`);
     }
+  });
+});
+
+describe("norn migrate in help (gh-61 B30)", () => {
+  test("help marks migrate deprecated, naming norn upgrade", async () => {
+    const r = await h.norn("help");
+    const migrate = (r.value as Help).commands.find((c) => c.command === "migrate");
+    expect(migrate?.summary).toMatch(/^Deprecated: .*norn upgrade/);
+    expect(r.stdout).toMatch(/norn migrate +Deprecated: .*norn upgrade/);
   });
 });
 

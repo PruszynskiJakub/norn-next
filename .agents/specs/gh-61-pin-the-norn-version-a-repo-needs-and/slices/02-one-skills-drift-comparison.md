@@ -2,7 +2,7 @@
 id: gh-61/02
 title: One bundled-skills drift comparison in store
 depends_on: []
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }

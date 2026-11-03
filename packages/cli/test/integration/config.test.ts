@@ -138,19 +138,19 @@ describe("three files and where keys belong (B1–B8)", () => {
     expect(by(await entries(h), "mode")).toMatchObject({ value: "manual", source: "built-in" });
   });
 
-  test("B39: an old key is config_moved naming its replacement and norn migrate", async () => {
+  test("B39: an old key is config_moved naming its replacement and norn upgrade", async () => {
     const cases: Array<[string, string, string]> = [
-      [userFile(h), "default_agent: codex\n", "`~/.norn/config.yaml`: `default_agent` is now `agent`; run `norn migrate`"],
-      [repoConfigPath(h.root), "remote: { label: x }\n", "`.agents/norn.config.yaml`: `remote.label` is gone: the label is always `norn`; run `norn migrate`"],
-      [userFile(h), "runner: { adapter: herdr }\n", "`~/.norn/config.yaml`: `runner` is gone: norn detects it; run `norn migrate`"],
-      [userFile(h), "agents: { claude: { capabilities: [browser] } }\n", "`~/.norn/config.yaml`: `agents.claude.capabilities` is gone, with criteria `needs`; run `norn migrate`"],
-      [repoConfigPath(h.root), "limits: { deadline: 45m }\n", "`.agents/norn.config.yaml`: `limits` moved to each workflow's `defaults:`; run `norn migrate`"],
+      [userFile(h), "default_agent: codex\n", "`~/.norn/config.yaml`: `default_agent` is now `agent`; run `norn upgrade`"],
+      [repoConfigPath(h.root), "remote: { label: x }\n", "`.agents/norn.config.yaml`: `remote.label` is gone: the label is always `norn`; run `norn upgrade`"],
+      [userFile(h), "runner: { adapter: herdr }\n", "`~/.norn/config.yaml`: `runner` is gone: norn detects it; run `norn upgrade`"],
+      [userFile(h), "agents: { claude: { capabilities: [browser] } }\n", "`~/.norn/config.yaml`: `agents.claude.capabilities` is gone, with criteria `needs`; run `norn upgrade`"],
+      [repoConfigPath(h.root), "limits: { deadline: 45m }\n", "`.agents/norn.config.yaml`: `limits` moved to each workflow's `defaults:`; run `norn upgrade`"],
     ];
     for (const [file, text, error] of cases) {
       h.write(file, text);
       const r = await h.norn("config", "list", "--json");
       expect(r.exit).toBe(ExitCode.config);
-      expect(r.value).toMatchObject({ code: "config_moved", error, do_instead: "norn migrate" });
+      expect(r.value).toMatchObject({ code: "config_moved", error, do_instead: "norn upgrade" });
       rmSync(file);
     }
   });

@@ -6,7 +6,7 @@
  * and fast-forward, and the reads the runtime makes (4.1): remotes, commonDir, hasRef, hasPath,
  * show, lsTree, listRefs over several prefixes, firstParentLog, revList, quiet fetch, detached
  * worktrees and prune, and what the commands call (4.2): version, remoteBranches, changedPaths,
- * checkoutPaths and untrack, and what `norn migrate` calls: move and stage. Run against real temp repos with a bare remote. Not covered: rebase, log ranges
+ * checkoutPaths and untrack, and what `norn upgrade` calls: move and stage. Run against real temp repos with a bare remote. Not covered: rebase, log ranges
  * beyond the last commit, and the port methods only the runtime's own wiring reaches.
  */
 import { afterAll, describe, expect } from "bun:test";

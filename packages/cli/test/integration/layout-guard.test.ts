@@ -1,6 +1,6 @@
 /**
  * gh-110 B17–B21 (D4, D5): the code knows one layout. On a main checkout still on the old layout every
- * command refuses and names `norn migrate`; with a part in both places it refuses naming both paths;
+ * command refuses and names `norn upgrade`; with a part in both places it refuses naming both paths;
  * `doctor` reports it as a failed check; `hook` stays out of the agent's way; and a unit worktree's own
  * old files are never looked at. The old paths are spelled out in the harness: what a person had.
  */
@@ -64,36 +64,36 @@ function expectRefused(r: CliResult, code: "old_layout" | "both_layouts") {
   expect(validate("cli-error", r.value).ok).toBe(true);
 }
 
-describe("old layout: every command refuses and names norn migrate (B18, B19)", () => {
+describe("old layout: every command refuses and names norn upgrade (B18, B19)", () => {
   for (const part of PARTS) {
     describe(`only the ${part} at its old place`, () => {
       beforeAll(() => toOldLayout(h.root, [part]));
       afterAll(() => toNewLayout(h.root));
 
-      test("status, tick and watch refuse (exit 3, old_layout) naming the main checkout, do_instead norn migrate; a CliError with --json", async () => {
+      test("status, tick and watch refuse (exit 3, old_layout) naming the main checkout, do_instead norn upgrade; a CliError with --json", async () => {
         const before = snapshot();
         for (const r of [await norn("status", "--json"), await norn("tick"), await watchOnce()]) {
           expectRefused(r, "old_layout");
           const { error, do_instead } = r.value as { error: string; do_instead: string };
-          expect(do_instead).toBe("norn migrate");
+          expect(do_instead).toBe("norn upgrade");
           expect(error).toContain(h.root);
           expect(error).toContain(relative(h.root, layoutPlaces(h.root)[part].old));
         }
         const md = await norn("status");
         expect(md.exit).toBe(3);
-        expect(md.stdout).toContain("norn migrate");
+        expect(md.stdout).toContain("norn upgrade");
         expect(snapshot()).toEqual(before);
       });
     });
   }
 
-  test("init refuses with do_instead norn migrate and writes nothing (B19)", async () => {
+  test("init refuses with do_instead norn upgrade and writes nothing (B19)", async () => {
     toOldLayout(h.root);
     try {
       const before = snapshot();
       const r = await norn("init", "--json");
       expectRefused(r, "old_layout");
-      expect(r.value).toMatchObject({ do_instead: "norn migrate" });
+      expect(r.value).toMatchObject({ do_instead: "norn upgrade" });
       expect(snapshot()).toEqual(before);
     } finally {
       toNewLayout(h.root);
@@ -126,7 +126,7 @@ describe("both layouts: every command refuses naming both paths, reads and moves
 
 describe("norn doctor reports the layout as a failed repo check (B20)", () => {
   for (const kind of ["old", "both"] as const) {
-    test(`${kind} layout: doctor and doctor --repo fail naming norn migrate and move nothing`, async () => {
+    test(`${kind} layout: doctor and doctor --repo fail naming norn upgrade and move nothing`, async () => {
       if (kind === "old") toOldLayout(h.root);
       else {
         const { old, new: now } = layoutPlaces(h.root).config;
@@ -138,11 +138,11 @@ describe("norn doctor reports the layout as a failed repo check (B20)", () => {
         for (const flags of [[], ["--repo"]]) {
           const json = await norn("doctor", ...flags, "--json");
           expect(json.exit).toBe(1);
-          expect(json.value).toMatchObject({ ok: false, repo: { ok: false, layout: { ok: false, layout: kind, do_instead: expect.stringContaining("norn migrate") } } });
+          expect(json.value).toMatchObject({ ok: false, repo: { ok: false, layout: { ok: false, layout: kind, do_instead: expect.stringContaining("norn upgrade") } } });
           const md = await norn("doctor", ...flags);
           expect(md.exit).toBe(1);
           expect(md.stdout).toContain("FAIL layout");
-          expect(md.stdout).toContain("norn migrate");
+          expect(md.stdout).toContain("norn upgrade");
         }
         expect(snapshot()).toEqual(before);
       } finally {
@@ -179,7 +179,7 @@ describe("old layout in a unit worktree's session (B18, D5)", () => {
     for (const argv of [["brief"], ["done", "done", "--handoff", "x"], ["ask", "q?"], ["stuck", "r"]]) {
       const r = await runChecked([...argv, "--json"], { ...h.deps, cwd: wt });
       expectRefused(r, "old_layout");
-      expect(r.value).toMatchObject({ do_instead: "norn migrate" });
+      expect(r.value).toMatchObject({ do_instead: "norn upgrade" });
     }
   });
 });

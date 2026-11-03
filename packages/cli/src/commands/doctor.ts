@@ -18,7 +18,7 @@
  *   - trace (O7; D11, D13): a `trace.retain` that is not a duration of at least 14d is a warning; day
  *     pairs older than the window are a hint naming `norn tidy` — never a failed check
  * Repo checks (D7, B7–B9): the layout (D4; an old or mixed one is the only check reported, failed,
- * naming `norn migrate`, B20), every repo workflow validated exactly as a tick validates it (W5, the
+ * naming `norn upgrade`, B20), every repo workflow validated exactly as a tick validates it (W5, the
  * shared `checkedRepoWorkflows`), and the repo config layer against its schema. Read-only.
  * `--live` also runs one cheap headless test turn per agent in a throwaway repo with norn hooks
  * installed, and checks that the agent's own hooks reported to norn.

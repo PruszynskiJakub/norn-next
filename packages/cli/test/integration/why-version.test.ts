@@ -126,6 +126,40 @@ describe("norn_version on tick traces (O5)", () => {
   });
 });
 
+describe("the running version is a dependency (gh-61 B6, Prefactor 1)", () => {
+  test("without the option, --version prints the package version", async () => {
+    const r = await h.norn("--version");
+    expect(r.exit).toBe(0);
+    expect(r.value).toEqual({ version });
+  });
+
+  test("a harness built as norn 0.18.1 prints 0.18.1 for --version and records it on its tick traces", async () => {
+    const other = await createHarness({ version: "0.18.1" });
+    try {
+      expect((await other.norn("--version")).value).toEqual({ version: "0.18.1" });
+      expect((await other.norn("init")).exit).toBe(0);
+      other.config(CONFIG);
+      other.write(join(workflowsDir(other.root), "ship.yaml"), WORKFLOW);
+      other.git(["add", "-A"]);
+      other.git(["commit", "-q", "-m", "norn"]);
+      other.git(["push", "-q", "origin", "main"]);
+      other.remote.issues = [issue(3, "Add totals")];
+      other.clock.advance(10_000);
+      await other.tick();
+      const dir = machineDirOf(other.root);
+      const recorded = readdirSync(dir)
+        .filter((f) => f.endsWith(".jsonl"))
+        .flatMap((f) => readFileSync(join(dir, f), "utf8").split("\n").filter(Boolean))
+        .map((l) => JSON.parse(l) as TickTrace)
+        .filter((e) => e.type === "tick");
+      expect(recorded.length).toBeGreaterThan(0);
+      for (const t of recorded) expect(t.norn_version).toBe("0.18.1");
+    } finally {
+      other.cleanup();
+    }
+  });
+});
+
 describe("why on a tick the trace no longer keeps (B20, D10)", () => {
   const DAY = 86_400_000;
   /** A ulid of time `ms` exactly: `ulid()` is monotonic per process, so it never goes back 40 days. */

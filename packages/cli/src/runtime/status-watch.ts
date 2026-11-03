@@ -20,7 +20,6 @@ import { type CockpitModel, type CockpitOptions, cockpitModel, inboxItemsInOrder
 import { opt, type ParsedArgs } from "../command.ts";
 import { Context } from "../context.ts";
 import { refuse, usageError } from "../output.ts";
-import { NORN_VERSION } from "../version.ts";
 import { cockpitHerdr, labelPanes, placeAgent, verbMessage } from "./cockpit.ts";
 import { clampScroll, handleKey, initialState, parseKeys, renderCockpit, type TuiEffect, type TuiState } from "./cockpit-tui.ts";
 import { projectView } from "./human.ts";
@@ -124,7 +123,7 @@ async function interactive(ctx: Context, interval: number) {
     now: ctx.clock.now(),
     clock: localClock(ctx.clock.now()),
     // a long-running cockpit keeps its binary's version after a new release is installed
-    version: NORN_VERSION,
+    version: ctx.version,
   });
 
   /** One effect; true = the cockpit is done. */
