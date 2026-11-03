@@ -6,9 +6,10 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { type ConfigEntry, ExitCode } from "@norn/schema";
+import { CONFIG_FILES, type ConfigEntry, ExitCode } from "@norn/schema";
 import { repoConfigPath } from "@norn/store";
 import { type CliDeps, type CliResult } from "../../src/index.ts";
+import { version } from "../../package.json";
 import { createHarness, FakeInteraction, type Harness, runChecked, sh } from "../../../../test/support/harness.ts";
 
 type Listed = { entries: Array<ConfigEntry & { meaning: string }> };
@@ -138,19 +139,19 @@ describe("three files and where keys belong (B1–B8)", () => {
     expect(by(await entries(h), "mode")).toMatchObject({ value: "manual", source: "built-in" });
   });
 
-  test("B39: an old key is config_moved naming its replacement and norn migrate", async () => {
+  test("B39: an old key is config_moved naming its replacement and norn upgrade", async () => {
     const cases: Array<[string, string, string]> = [
-      [userFile(h), "default_agent: codex\n", "`~/.norn/config.yaml`: `default_agent` is now `agent`; run `norn migrate`"],
-      [repoConfigPath(h.root), "remote: { label: x }\n", "`.agents/norn.config.yaml`: `remote.label` is gone: the label is always `norn`; run `norn migrate`"],
-      [userFile(h), "runner: { adapter: herdr }\n", "`~/.norn/config.yaml`: `runner` is gone: norn detects it; run `norn migrate`"],
-      [userFile(h), "agents: { claude: { capabilities: [browser] } }\n", "`~/.norn/config.yaml`: `agents.claude.capabilities` is gone, with criteria `needs`; run `norn migrate`"],
-      [repoConfigPath(h.root), "limits: { deadline: 45m }\n", "`.agents/norn.config.yaml`: `limits` moved to each workflow's `defaults:`; run `norn migrate`"],
+      [userFile(h), "default_agent: codex\n", "`~/.norn/config.yaml`: `default_agent` is now `agent`; run `norn upgrade`"],
+      [repoConfigPath(h.root), "remote: { label: x }\n", "`.agents/norn.config.yaml`: `remote.label` is gone: the label is always `norn`; run `norn upgrade`"],
+      [userFile(h), "runner: { adapter: herdr }\n", "`~/.norn/config.yaml`: `runner` is gone: norn detects it; run `norn upgrade`"],
+      [userFile(h), "agents: { claude: { capabilities: [browser] } }\n", "`~/.norn/config.yaml`: `agents.claude.capabilities` is gone, with criteria `needs`; run `norn upgrade`"],
+      [repoConfigPath(h.root), "limits: { deadline: 45m }\n", "`.agents/norn.config.yaml`: `limits` moved to each workflow's `defaults:`; run `norn upgrade`"],
     ];
     for (const [file, text, error] of cases) {
       h.write(file, text);
       const r = await h.norn("config", "list", "--json");
       expect(r.exit).toBe(ExitCode.config);
-      expect(r.value).toMatchObject({ code: "config_moved", error, do_instead: "norn migrate" });
+      expect(r.value).toMatchObject({ code: "config_moved", error, do_instead: "norn upgrade" });
       rmSync(file);
     }
   });
@@ -369,5 +370,75 @@ describe("norn config set and unset (B62–B68, D4)", () => {
     expect(read(userFile(h))).toBe("max_agents: 2\n");
     expect((await h.norn("config", "unset", "limits.deadline", "--user", "--json")).value).toMatchObject({ removed: false });
     expect(await h.norn("config", "unset", "nope", "--user", "--json")).toMatchObject({ exit: 3, value: { code: "unknown_key" } });
+  });
+});
+
+describe("the team's norn version (gh-61 B3, B4, D4)", () => {
+  let h: Harness;
+  const read = (path: string) => {
+    try {
+      return readFileSync(path, "utf8");
+    } catch {
+      return null;
+    }
+  };
+  beforeAll(async () => {
+    h = await createHarness();
+  });
+  beforeEach(() => {
+    for (const f of [userFile(h), localFile(h), repoConfigPath(h.root)]) rmSync(f, { force: true });
+  });
+  afterAll(() => h.cleanup());
+
+  test("B3: a malformed norn_version in the team file is config_invalid naming the file and the key, exit 6", async () => {
+    h.write(repoConfigPath(h.root), "norn_version: banana\n");
+    const r = await h.norn("tick", "--json");
+    expect(r.exit).toBe(ExitCode.config);
+    expect(r.value).toMatchObject({ code: "config_invalid", error: `\`${CONFIG_FILES.repo}\`: \`norn_version\` must be a version like 0.19.0` });
+  });
+
+  test("B3: norn_version in the local or user file is config_wrong_file naming the team file", async () => {
+    for (const file of [localFile(h), userFile(h)]) {
+      h.write(file, "norn_version: 0.19.0\n");
+      const r = await h.norn("tick", "--json");
+      expect(r.exit).toBe(ExitCode.config);
+      expect(r.value).toMatchObject({ code: "config_wrong_file" });
+      expect((r.value as { error: string }).error).toContain(`\`norn_version\` belongs in \`${CONFIG_FILES.repo}\` (team key)`);
+      rmSync(file);
+    }
+  });
+
+  test("B4: config get shows the recorded version from repo; list includes it", async () => {
+    h.write(repoConfigPath(h.root), "norn_version: 0.19.0\n");
+    const got = await h.norn("config", "get", "norn_version", "--json");
+    expect((got.value as Listed).entries).toMatchObject([{ key: "norn_version", value: "0.19.0", source: "repo" }]);
+    expect(by(await entries(h), "norn_version")).toMatchObject({ value: "0.19.0", source: "repo" });
+    const md = await h.norn("config", "get", "norn_version");
+    expect(md.stdout).toContain("| `norn_version` | `0.19.0` | repo |");
+  });
+
+  test("B4: without the key, get shows no value and that norn upgrade records it", async () => {
+    const got = await h.norn("config", "get", "norn_version", "--json");
+    expect((got.value as Listed).entries).toMatchObject([{ key: "norn_version", value: null, source: "built-in" }]);
+    const md = await h.norn("config", "get", "norn_version");
+    expect(md.exit).toBe(0);
+    expect(md.stdout).toContain("| `norn_version` | not recorded: `norn upgrade` records it |");
+  });
+
+  test("D4, K8: config set and unset of norn_version are refused, exit 3, naming norn upgrade; the file is unchanged", async () => {
+    // the version this norn runs, so the gh-61 D2 version guard lets the command reach its own refusal
+    const before = `# team\nnorn_version: ${version}\n`;
+    h.write(repoConfigPath(h.root), before);
+    for (const argv of [
+      ["config", "set", "norn_version", "0.20.0", "--repo"],
+      ["config", "set", "norn_version", "0.20.0"],
+      ["config", "unset", "norn_version", "--repo"],
+      ["config", "unset", "norn_version", "--user"],
+    ]) {
+      const r = await h.norn(...argv, "--json");
+      expect(r.exit).toBe(ExitCode.refused);
+      expect(r.value).toMatchObject({ do_instead: "norn upgrade" });
+      expect(read(repoConfigPath(h.root))).toBe(before);
+    }
   });
 });

@@ -2,7 +2,7 @@
  * Compact terminal text for `norn story list` / `norn status` human mode. Pure: a ProjectView
  * in, a string out (no colour, no clock). The CLI's default output stays JSON (P8).
  */
-import { cmd, INBOX_ABOUT, INBOX_GROUPS, INBOX_TITLES } from "@norn/core";
+import { cmd, INBOX_ABOUT, INBOX_GROUPS, INBOX_TITLES, isVersionMismatchItem } from "@norn/core";
 import type { RunDetail } from "./run-view.ts";
 import { oneLine } from "./timeline.ts";
 import type { InboxEntry, ProjectView, RoundView, SliceView, StepRow, StepWho, StoryView, TimelineEntry, TraceView, UnitView } from "./types.ts";
@@ -121,7 +121,9 @@ function groupAbout(g: keyof typeof INBOX_ABOUT, items: readonly InboxEntry[]): 
 
 /** HC4: the inbox items in display order (O1 group order) — item `n` of the cockpit is `[n - 1]`. */
 export function inboxItemsInOrder(view: ProjectView): InboxEntry[] {
-  return INBOX_GROUPS.flatMap((g) => view.inbox.groups[g]);
+  const all = INBOX_GROUPS.flatMap((g) => view.inbox.groups[g]);
+  // gh-61 D7: a version mismatch shows on top of the inbox, above every group
+  return [...all.filter(isVersionMismatchItem), ...all.filter((it) => !isVersionMismatchItem(it))];
 }
 
 /** An inbox item's line text: its step first, once — many titles already start with the step (F4). */
@@ -142,8 +144,13 @@ export function formatInbox(view: ProjectView, opts: { details?: boolean; home?:
   const tilde = (t: string) => (home ? t.replaceAll(`${home}/`, "~/") : t);
   const out: string[] = [];
   let n = 0;
+  // gh-61 D7 (B8): a binary that does not fit the repo's norn version comes first, above every group
+  for (const it of view.inbox.groups.unblock.filter(isVersionMismatchItem)) {
+    const num = opts.numbered ? `${`[${++n}]`.padEnd(5)}` : "";
+    out.push(`! ${num}${it.title}`, `      $ ${it.command}`, "");
+  }
   for (const g of INBOX_GROUPS) {
-    const items = view.inbox.groups[g];
+    const items = view.inbox.groups[g].filter((it) => !isVersionMismatchItem(it));
     if (!items.length) continue;
     out.push(`${INBOX_TITLES[g]} (${items.length}) · ${groupAbout(g, items)}`);
     if (g === "notes" && !opts.notes) {

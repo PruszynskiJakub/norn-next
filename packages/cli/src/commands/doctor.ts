@@ -14,15 +14,18 @@
  *     so in manual mode a failing runner is a warning, not a failed check
  *   - machine: the `user@host` runs are recorded with (R7.1); a warning when NORN_MACHINE overrides it (R7.3)
  *   - skills (SK1): every bundled skill is in `.agents/skills/` and linked from each configured
- *     agent's skill folder; one that differs from the bundled version is a warning (`norn init`)
+ *     agent's skill folder; one that differs from this norn's copy fails it (gh-61 B24: `norn upgrade`)
  *   - trace (O7; D11, D13): a `trace.retain` that is not a duration of at least 14d is a warning; day
  *     pairs older than the window are a hint naming `norn tidy` — never a failed check
  * Repo checks (D7, B7–B9): the layout (D4; an old or mixed one is the only check reported, failed,
- * naming `norn migrate`, B20), every repo workflow validated exactly as a tick validates it (W5, the
- * shared `checkedRepoWorkflows`), and the repo config layer against its schema. Read-only.
+ * naming `norn upgrade`, B20), the repo's norn version against this binary (gh-61 B23, B5: no key is a
+ * warning), the bundled skills against this norn's copies (gh-61 B24, B21), every repo workflow
+ * validated exactly as a tick validates it (W5, the shared `checkedRepoWorkflows`), and the repo
+ * config layer against its schema. Read-only.
  * `--live` also runs one cheap headless test turn per agent in a throwaway repo with norn hooks
  * installed, and checks that the agent's own hooks reported to norn.
- * `--repo` runs only the repo checks: no agent, runner or remote is looked at (B10).
+ * `--repo` runs only the repo checks: no agent, runner or remote is looked at (B10); missing or unlinked
+ * skills stay machine checks (gh-61 B25, D12).
  * Exit 0 when every check passes, else 1 with the same report.
  */
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -30,8 +33,8 @@ import { tmpdir } from "node:os";
 import { basename, extname, join, relative, resolve } from "node:path";
 import { git as gitAdapter, herdr, proc } from "@norn/adapters";
 import type { AgentAdapter, FileError, Ports, RunnerPort, SessionRef, WorkflowIssue } from "@norn/core";
-import { type ConfigEntry, ExitCode, type ResolvedConfig, ulid } from "@norn/schema";
-import { bindNornHome, type Layout, layoutProblems, loadWorkflows, machineDir, machineHolder, noteSpawn, orphanedMachineDirs, readHookFacts, repoConfigPath, repoLayout, skillsReport, traceDaysBefore, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
+import { type ConfigEntry, ExitCode, type ResolvedConfig, ulid, type VersionMatch, versionMatch } from "@norn/schema";
+import { bindNornHome, type Layout, layoutProblems, loadWorkflows, machineDir, machineHolder, noteSpawn, orphanedMachineDirs, readHookFacts, repoConfigPath, repoLayout, SKILLS_DIR, skillsDrift, skillsReport, traceDaysBefore, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { CliFailure, configError, rendered, withExit } from "../output.ts";
@@ -260,10 +263,42 @@ function loadFail(ctx: Context): ConfigFail | null {
   return { ok: false, error: body.error, do_instead: body.do_instead };
 }
 
+/** gh-61 B23, B5: the repo's `norn_version` against this binary; no key is a warning, never a failure. */
+interface VersionCheck extends Check {
+  running: string;
+  repo: string | null;
+  match: VersionMatch | null;
+  warning?: string;
+}
+
+function versionCheck(running: string, repo: string | null): VersionCheck {
+  if (repo === null) return { ok: true, running, repo, match: null, warning: `no norn version recorded: run \`${cmd.upgrade()}\`` };
+  const match = versionMatch(repo, running);
+  if (match === "match") return { ok: true, running, repo, match };
+  const line = `${repo.split(".").slice(0, 2).join(".")}.x`;
+  // B7: a newer binary moves the repo forward with a commit; an older one installs the repo's line
+  const do_instead = match === "newer" ? `run \`${cmd.upgrade()}\` to move this repo to norn ${running} and commit the change, or install norn ${line}` : `install norn ${line}`;
+  return { ok: false, running, repo, match, error: `norn ${running} does not match this repo's norn version ${repo}`, do_instead };
+}
+
+/** gh-61 B24, B21: the bundled skills in `.agents/skills/` that differ from this norn's copies; a repo-local one is never compared. */
+interface SkillsDriftCheck extends Check {
+  drifted: string[];
+}
+
+function driftCheck(drifted: string[]): SkillsDriftCheck {
+  if (!drifted.length) return { ok: true, drifted };
+  return { ok: false, drifted, do_instead: `run \`${cmd.upgrade()}\` and commit (git diff ${SKILLS_DIR}/ shows the change)` };
+}
+
+const driftText = (drifted: string[], running: string) => `${drifted.join(", ")} ${drifted.length === 1 ? "differs" : "differ"} from norn ${running}'s copy`;
+
 interface RepoReport {
   ok: boolean;
   /** D4: reaching the other repo checks means the new layout; an old or mixed one is reported alone (B20) */
   layout: { ok: true; layout: "new" };
+  version: VersionCheck;
+  skills: SkillsDriftCheck;
   workflows: Array<{ name: string; file: string; ok: boolean; issues: WorkflowIssue[] }>;
   config: { ok: boolean; file: string; present: boolean; errors: FileError["errors"] };
 }
@@ -294,9 +329,13 @@ async function repoGroup(ctx: Context): Promise<RepoReport> {
   const configFile = relative(root, repoConfigPath(root));
   const configErrors = loaded.ok ? [] : loaded.errors.filter((e) => e.file === configFile).flatMap((e) => e.errors);
   const config = { ok: configErrors.length === 0, file: configFile, present: existsSync(repoConfigPath(root)), errors: configErrors };
+  const version = versionCheck(ctx.version, usableConfig(ctx).config.norn_version);
+  const skills = driftCheck(skillsDrift(join(root, SKILLS_DIR), join(assetsDir(ctx.env), "skills"), bundledSkills(ctx.env)));
   return {
-    ok: workflows.every((w) => w.ok) && config.ok,
+    ok: version.ok && skills.ok && workflows.every((w) => w.ok) && config.ok,
     layout: { ok: true, layout: "new" },
+    version,
+    skills,
     workflows,
     config,
   };
@@ -333,8 +372,23 @@ function lines() {
   return { out, line, sub, fix, head };
 }
 
-/** The repo group's lines: the valid workflows on one line, each invalid one with its issues, the config (B7, B8). */
-function formatRepo(r: RepoReport, l: ReturnType<typeof lines>, dir: string): void {
+/** gh-61 B23, B5: the version line — matches, does not match (with what to do), or no version recorded. */
+function formatVersion(v: VersionCheck, l: ReturnType<typeof lines>): void {
+  if (v.repo === null) return l.line(false, "norn", v.warning ?? "", true);
+  l.line(v.ok, "norn", `${v.running} ${v.ok ? "matches" : "does not match"} this repo's norn version ${v.repo}`);
+  if (v.do_instead) l.sub(`→ ${v.do_instead}`);
+}
+
+/**
+ * The repo group's lines: the norn version, drifted skills (`--repo` only: the full doctor folds them
+ * into its one skills line), the valid workflows on one line, each invalid one with its issues, the config (B7, B8).
+ */
+function formatRepo(r: RepoReport, l: ReturnType<typeof lines>, dir: string, o: { skills: boolean }): void {
+  formatVersion(r.version, l);
+  if (o.skills && !r.skills.ok) {
+    l.line(false, "skills", driftText(r.skills.drifted, r.version.running));
+    l.fix(r.skills);
+  }
   const valid = r.workflows.filter((w) => w.ok).map((w) => w.name);
   l.line(true, "layout", `${dir}/ and ${r.config.file}`);
   if (valid.length || !r.workflows.length) l.line(true, "workflows", valid.length ? `${valid.join(", ")} valid (${dir}/)` : `none valid in ${dir}/`);
@@ -401,10 +455,24 @@ function formatDoctor(r: {
   if (plugin) sub(plugin.linked ? "· cockpit plugin linked" : `· cockpit plugin not linked${plugin.do_instead ? ` → ${plugin.do_instead}` : ""}`);
   const sk = r.skills;
   const unlinked = Object.entries(sk.unlinked);
-  line(sk.ok, "skills", sk.ok ? "installed and linked" : [sk.missing.length ? `missing ${sk.missing.join(", ")}` : "", ...unlinked.map(([agent, names]) => `not linked for ${agent}: ${names.join(", ")}`)].filter(Boolean).join("; "));
-  if (!sk.ok) fix(sk);
+  line(
+    sk.ok,
+    "skills",
+    sk.ok
+      ? "installed and linked"
+      : [
+          sk.drifted.length ? driftText(sk.drifted, r.repo.version.running) : "",
+          sk.missing.length ? `missing ${sk.missing.join(", ")}` : "",
+          ...unlinked.map(([agent, names]) => `not linked for ${agent}: ${names.join(", ")}`),
+        ]
+          .filter(Boolean)
+          .join("; "),
+  );
+  // gh-61 B24: drift is fixed by `norn upgrade`, a missing or unlinked skill by `norn init`
+  if (!r.repo.skills.ok) fix(r.repo.skills);
+  if (sk.missing.length || unlinked.length) sub(`→ ${cmd.init()}`);
   out.push(`       ${"machine".padEnd(14)} ${r.machine.holder}`);
-  formatRepo(r.repo, l, dir);
+  formatRepo(r.repo, l, dir, { skills: false });
 
   const warnings = r.warnings.length ? ["", "Warnings", ...r.warnings.map((w) => `  ! ${w}`)] : [];
   const hints = r.hints.length ? ["", "Hints", ...r.hints.map((h) => `  · ${h}`)] : [];
@@ -414,18 +482,19 @@ function formatDoctor(r: {
 /** `norn doctor --repo`. */
 function formatRepoOnly(r: { ok: boolean; repo: RepoReport }, dir: string): string {
   const l = lines();
-  formatRepo(r.repo, l, dir);
+  formatRepo(r.repo, l, dir, { skills: true });
   return [l.head(r.ok), "", ...l.out].join("\n");
 }
 
 export const doctorCommand = defineCommand({
   name: "doctor",
+  version: "reads",
   summary: "Check agents, hooks, skills, remote auth and runner on this machine, and the repo workflows and config (A7, W5)",
   usage: "norn doctor [--repo] [--live] [--json]",
   markdown: true,
   options: { live: { type: "boolean" }, repo: { type: "boolean" } },
   optionHelp: {
-    "--repo": "check only the repo workflows and config: no agent, runner or remote needed (CI, a test check)",
+    "--repo": "check only the repo: its norn version, bundled skills, workflows and config; no agent, runner or remote needed (CI, a test check)",
     "--live": "also run one cheap headless test turn per agent",
   },
   // D5, B20: an old or mixed layout is a failed repo check here, not a refusal
@@ -530,8 +599,11 @@ export const doctorCommand = defineCommand({
 
     const names = bundledSkills(ctx.env);
     const sk = skillsReport(ctx.root, join(assetsDir(ctx.env), "skills"), names, Object.fromEntries(Object.entries(used).map(([n, a]) => [n, a.skillDir(ctx.root)])));
-    const skillsOk = sk.missing.length === 0 && Object.keys(sk.unlinked).length === 0;
-    const skills = { ok: skillsOk, ...sk, ...(skillsOk ? {} : { do_instead: cmd.init() }) };
+    // gh-61 B24: drift fails the one skills line too (fixed by `norn upgrade`); missing or unlinked ones by `norn init`
+    const setup = sk.missing.length === 0 && Object.keys(sk.unlinked).length === 0;
+    const skillsOk = setup && repo.skills.ok;
+    const fixes = [repo.skills.do_instead, setup ? undefined : cmd.init()].filter(Boolean).join("; ");
+    const skills = { ok: skillsOk, ...sk, ...(skillsOk ? {} : { do_instead: fixes }) };
 
     // R7.3: NORN_MACHINE overrides the machine name — a test aid (single-host dogfood), never a
     // setup for real teams: two checkouts claiming one machine name defeat R7.2's liveness rules
@@ -547,7 +619,6 @@ export const doctorCommand = defineCommand({
       warnings.push(
         `orphaned machine dir ${o.dir}: its checkout ${o.checkout} no longer exists — if this repo moved from there, stop norn watch and adopt it (keeps its heartbeat and claims): rm -rf ${mine} && mv ${proc.shellQuote(o.dir)} ${mine}`,
       );
-    if (sk.drifted.length) warnings.push(`skills differ from this norn's bundled version: ${sk.drifted.join(", ")} — run ${cmd.init()} to update them (git diff .agents/skills/ shows the change)`);
 
     // D11, D13: the trace window — a value that does not apply warns; days beyond it are a hint
     const retainWarn = retainWarning(config.trace.retain);

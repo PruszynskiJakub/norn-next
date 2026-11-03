@@ -44,6 +44,7 @@ import type { Context } from "../context.ts";
 import { claimHeld, failure, refuse, usageError } from "../output.ts";
 import { parseUnitKey } from "./args.ts";
 import { gitRemote, type Observed, observe } from "./observe/index.ts";
+import { bundledSkillSet } from "./skills-drift.ts";
 
 // ------------------------------------------------------------------ views (X1)
 
@@ -62,6 +63,8 @@ export async function projectView(ctx: Context): Promise<ProjectView> {
     env: ctx.env,
     holder: machineHolder(ctx.env),
     heartbeatId: recordedHeartbeatId(ctx.root),
+    version: ctx.version,
+    bundledSkills: bundledSkillSet(ctx.env),
     ...(runner ? { runnerCapabilities: runner.capabilities } : {}),
   });
 }

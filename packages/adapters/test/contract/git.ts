@@ -6,7 +6,7 @@
  * and fast-forward, and the reads the runtime makes (4.1): remotes, commonDir, hasRef, hasPath,
  * show, lsTree, listRefs over several prefixes, firstParentLog, revList, quiet fetch, detached
  * worktrees and prune, and what the commands call (4.2): version, remoteBranches, changedPaths,
- * checkoutPaths and untrack, and what `norn migrate` calls: move and stage. Run against real temp repos with a bare remote. Not covered: rebase, log ranges
+ * checkoutPaths and untrack, and what `norn upgrade` calls: move, stage and ignored. Run against real temp repos with a bare remote. Not covered: rebase, log ranges
  * beyond the last commit, and the port methods only the runtime's own wiring reaches.
  */
 import { afterAll, describe, expect } from "bun:test";
@@ -42,7 +42,8 @@ export type GitContractTest =
   | "worktreeAddDetached checks out a detached HEAD; worktreePrune forgets removed directories"
   | "version names git; remoteBranches lists the remote's branches matching a pattern"
   | "changedPaths lists what two revisions change; checkoutPaths and untrack put paths back"
-  | "move stages a rename of a tracked file and leaves an untracked one; stage adds paths to the index";
+  | "move stages a rename of a tracked file and leaves an untracked one; stage adds paths to the index"
+  | "ignored names the paths git ignores, never a tracked one";
 
 /** Deterministic git for the suite's own setup and for the port under test. */
 export const GIT_ENV = {
@@ -454,6 +455,19 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       await git.stage(root, ["loose.txt"]);
       expect(sh(root, "status", "--porcelain")).toBe("A  loose.txt\nR  a.txt -> to/a.txt");
       expect(sh(root, "rev-list", "--count", "HEAD")).toBe("1");
+    });
+
+    t("ignored names the paths git ignores, never a tracked one", async () => {
+      const { root, git } = repo();
+      writeFileSync(join(root, ".gitignore"), "skip/\n");
+      mkdirSync(join(root, "skip"));
+      writeFileSync(join(root, "skip/x.txt"), "x\n");
+      writeFileSync(join(root, "kept.txt"), "k\n");
+      expect(await git.ignored(root, [])).toEqual([]);
+      expect(await git.ignored(root, ["kept.txt", "a.txt"])).toEqual([]);
+      expect(await git.ignored(root, ["kept.txt", "skip/x.txt"])).toEqual(["skip/x.txt"]);
+      sh(root, "add", "-f", "skip/x.txt");
+      expect(await git.ignored(root, ["skip/x.txt"])).toEqual([]);
     });
   });
 }

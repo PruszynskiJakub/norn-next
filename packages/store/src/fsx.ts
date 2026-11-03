@@ -13,7 +13,7 @@ export type ReadResult<T> =
   | { ok: true; value: T; raw: string }
   | { ok: false; reason: "missing" }
   | { ok: false; reason: "corrupt"; error: FileError }
-  /** B38 (D12): a story or slice whose criteria still carry the removed `needs`; not corrupt, `norn migrate` fixes it */
+  /** B38 (D12): a story or slice whose criteria still carry the removed `needs`; not corrupt, `norn upgrade` fixes it */
   | { ok: false; reason: "needs_removed"; error: FileError };
 
 let tmpSeq = 0;

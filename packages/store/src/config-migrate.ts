@@ -1,5 +1,5 @@
 /**
- * gh-64 `norn migrate`, the config part (D13, B40–B45): rewrite old config keys into the three-file
+ * gh-64 `norn upgrade`, the config part (D13, B40–B45): rewrite old config keys into the three-file
  * shape. The user file is rewritten in place; the team file, the workflows it hands limits and mode
  * to, the slices and specs that lose criteria `needs`, and the team schema copy are returned for the
  * caller to stage. Files are edited as YAML documents, so comments and key order stay. Every step

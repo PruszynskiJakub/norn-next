@@ -1,6 +1,6 @@
 ---
 name: release
-description: Prepare a norn release on the release story's branch — rebuild the changelog from the squash commits on main since the last tag, propose the version with its reason (or apply the one the person gave), bump packages/cli/package.json and the README release badge, and rename the release issue to "Release X.Y.Z". Use in the `release` workflow's `prepare` step.
+description: Prepare a norn release on the release story's branch — rebuild the changelog from the squash commits on main since the last tag, propose the version with its reason (or apply the one the person gave), bump packages/cli/package.json, the README release badge and the repo's norn_version, refresh the bundled skill copies in .agents/skills/, and rename the release issue to "Release X.Y.Z". Use in the `release` workflow's `prepare` step.
 ---
 
 # Release: prepare
@@ -50,18 +50,41 @@ In this order: the version from Rework, else the one in `## Version`, else your 
 
 - `version` in `packages/cli/package.json`.
 - The README release badge: `badge/release-vX.Y.Z-blue` and its alt text `Release vX.Y.Z`.
+- The repo's norn version: `norn_version: X.Y.Z` in `.agents/norn.config.yaml` (gh-61 B27). Edit the line in place so the file's comments stay; add it under the header comments when the file has none. Once the PR merges, `main` asks for exactly the binary it publishes.
 
 On a rework with another version, change the section heading and every bump to it; leave no old version behind (`git grep` the old one in these files).
 
-## 6. Rename the issue
+Do this by hand, never with `norn upgrade` (gh-61 D13): `upgrade` runs only in the main checkout, and the norn running this step is the release before the one you prepare.
+
+## 6. Refresh the bundled skills
+
+The bundled skills in `.agents/skills/norn*` are copies of `packages/cli/assets/skills/norn*`; the release ships the sources, so the copies must match them in the same diff as the bump (B27). From the worktree root:
+
+```sh
+for src in packages/cli/assets/skills/norn*/; do
+  name=$(basename "$src")
+  rm -rf ".agents/skills/$name" && cp -R "$src" ".agents/skills/$name"
+  [ -e ".claude/skills/$name" ] || ln -s "../../.agents/skills/$name" ".claude/skills/$name"
+done
+for dst in .agents/skills/norn*/; do
+  [ -d "packages/cli/assets/skills/$(basename "$dst")" ] || echo "no longer bundled: $dst"
+done
+git status --short .agents/skills .claude/skills
+```
+
+Copy only `norn`-prefixed folders: `release`, `release-start` and `issue` are this repo's own skills, never touched here. A folder the second loop names was bundled once and is not any more: remove it and its `.claude/skills/` link. Name the skills that changed in the handoff (none is fine: the copies already matched).
+
+The worktree now holds the new version's skills while the norn running the step is older; norn does not hold this unit's later agent steps for that (gh-61 D14), because its team file records the newer `norn_version`.
+
+## 7. Rename the issue
 
 `gh issue edit <N> --title "Release X.Y.Z"`. The story mirrors the title (GR8) and the PR takes it, so the squash commit on main reads `Release X.Y.Z`. This is the only remote write this skill allows, an exception to the `norn` skill's rule; never edit the issue body.
 
-## 7. Report
+## 8. Report
 
 `norn done done --handoff "Propose X.Y.Z: <reason>. <a> Added, <c> Changed, <f> Fixed; omitted #.., #.."`. With a version from the person: `"Apply X.Y.Z (from <Rework | issue>). …"`.
 
 ## Rules
 
-- Change only `CHANGELOG.md`, `packages/cli/package.json`, `README.md` and `pr.md` in the spec folder (the PR body: the version, its reason and the new changelog section).
+- Change only `CHANGELOG.md`, `packages/cli/package.json`, `README.md`, the `norn_version` line of `.agents/norn.config.yaml`, the `norn*` folders of `.agents/skills/` (and their `.claude/skills/` links), and `pr.md` in the spec folder (the PR body: the version, its reason and the new changelog section).
 - Never tag, publish or push: the merge of the release PR does that in CI.

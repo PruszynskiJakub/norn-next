@@ -12,8 +12,10 @@ import { defineCommand, opt } from "../command.ts";
 import { CliFailure, refuse, rendered, usageError, withExit } from "../output.ts";
 import { type ReleaseResult, releaseHeldClaims } from "../runtime/release.ts";
 import { runTick, type TickReport } from "../runtime/tick.ts";
+import { versionRefusal } from "../runtime/version-guard.ts";
 import { abortableSleep } from "../runtime/tick-lock.ts";
-import { cmd } from "@norn/core";
+import { cmd, type InboxItem, ticksPausedTitle } from "@norn/core";
+import type { Context } from "../context.ts";
 
 const clockTime = (at: string | number) => new Date(at).toTimeString().slice(0, 8);
 
@@ -22,8 +24,12 @@ export function humanTickLines(decisions: TickReport["decisions"], at: string): 
   return decisions.map((d) => `${clockTime(at)}  ${d.unit}  ${d.rule} → ${d.kind}${d.ok ? "" : `  FAILED: ${d.error ?? "no detail"}`}${(d.warnings ?? []).map((w) => `  WARNING: ${w}`).join("")}`);
 }
 
-export function humanSummary(s: { ticks: number; failed_actions: number; skipped_busy: number; released: ReleaseResult[] }, kept: boolean): string {
-  const counts = [`${s.failed_actions} failed action${s.failed_actions === 1 ? "" : "s"}`, ...(s.skipped_busy ? [`${s.skipped_busy} skipped while another tick ran`] : [])];
+export function humanSummary(s: { ticks: number; failed_actions: number; skipped_busy: number; skipped_version?: number; released: ReleaseResult[] }, kept: boolean): string {
+  const counts = [
+    `${s.failed_actions} failed action${s.failed_actions === 1 ? "" : "s"}`,
+    ...(s.skipped_busy ? [`${s.skipped_busy} skipped while another tick ran`] : []),
+    ...(s.skipped_version ? [`${s.skipped_version} skipped on a norn version mismatch`] : []),
+  ];
   const lines = [`Stopped after ${s.ticks} tick${s.ticks === 1 ? "" : "s"} (${counts.join(", ")}).`];
   for (const r of s.released)
     lines.push(r.ok ? `Released ${r.story}${r.pushed.length ? ` (pushed ${r.pushed.join(", ")})` : ""}.` : `Could not release ${r.story}: ${r.error ?? "no detail"}.`);
@@ -31,8 +37,46 @@ export function humanSummary(s: { ticks: number; failed_actions: number; skipped
   return lines.join("\n");
 }
 
+/**
+ * gh-61 B11 (D8): the version guard again before a tick, with the config reloaded so a pull mid-watch
+ * is seen. A mismatch skips the tick and notifies once per repo version it pauses on; a match clears
+ * that memory, so the same mismatch coming back notifies again. The memory lives in this watch
+ * process only, and watch never exits for a mismatch (a cron tick just exits 3, B6).
+ */
+async function pausedOnVersion(ctx: Context, state: { notified: string | null }) {
+  ctx.reload();
+  const refusal = versionRefusal(ctx);
+  if (!refusal) {
+    state.notified = null;
+    return null;
+  }
+  if (state.notified !== refusal.repo) {
+    state.notified = refusal.repo;
+    const item: InboxItem = {
+      id: `watch-paused:${refusal.repo}:${ctx.version}`,
+      group: "unblock",
+      story: "*",
+      slice: null,
+      step: null,
+      title: ticksPausedTitle(refusal.needs),
+      detail: refusal.failure.body.error,
+      command: cmd.doctor(),
+      since: new Date(ctx.clock.now()).toISOString(),
+    };
+    for (const n of (await ctx.ports()).notifiers) {
+      try {
+        await n.notify(item);
+      } catch (e) {
+        ctx.log(JSON.stringify({ error: (e as Error).message })); // best-effort, like the inbox's notifications (O3)
+      }
+    }
+  }
+  return refusal.failure;
+}
+
 export const watchCommand = defineCommand({
   name: "watch",
+  version: "acts",
   summary: "Run ticks in a loop (H5); a clean exit releases held claims (T6)",
   usage: "norn watch [--interval 30s] [--max-ticks N] [--keep-claims] [--human]",
   options: { interval: { type: "string" }, "max-ticks": { type: "string" }, "keep-claims": { type: "boolean" }, human: { type: "boolean" } },
@@ -60,14 +104,23 @@ export const watchCommand = defineCommand({
     let ticks = 0;
     let failed = 0;
     let busy = 0;
+    let skippedVersion = 0;
+    const version = { notified: null as string | null };
     while (ticks < max && !signal?.aborted) {
       const started = ctx.clock.now();
       try {
-        const r = await runTick(ctx);
-        failed += r.failed;
-        const decisions = r.decisions.filter((d) => d.kind !== "noop");
-        if (human) for (const line of humanTickLines(decisions, r.at)) ctx.log(line);
-        else ctx.log(JSON.stringify({ tick_id: r.tick_id, at: r.at, duration_ms: r.duration_ms, decisions, failed: r.failed }));
+        const refused = await pausedOnVersion(ctx, version);
+        if (refused) {
+          skippedVersion++;
+          if (human) ctx.log(`${clockTime(started)}  tick skipped: ${refused.body.error}`);
+          else ctx.log(JSON.stringify({ at: new Date(started).toISOString(), ...refused.body }));
+        } else {
+          const r = await runTick(ctx);
+          failed += r.failed;
+          const decisions = r.decisions.filter((d) => d.kind !== "noop");
+          if (human) for (const line of humanTickLines(decisions, r.at)) ctx.log(line);
+          else ctx.log(JSON.stringify({ tick_id: r.tick_id, at: r.at, duration_ms: r.duration_ms, decisions, failed: r.failed }));
+        }
       } catch (e) {
         if (e instanceof CliFailure && e.exit === ExitCode.busy) busy++;
         else ctx.log(human ? `${clockTime(started)}  tick failed: ${(e as Error).message}` : JSON.stringify({ error: (e as Error).message }));
@@ -78,7 +131,7 @@ export const watchCommand = defineCommand({
     }
     const kept = opt.bool(args, "keep-claims");
     const released = kept ? [] : await releaseHeldClaims(ctx);
-    const summary = { ticks, failed_actions: failed, skipped_busy: busy, interval: raw, released };
+    const summary = { ticks, failed_actions: failed, skipped_busy: busy, skipped_version: skippedVersion, interval: raw, released };
     const out = human ? rendered(summary, humanSummary(summary, kept), { asked: true }) : summary;
     return released.some((r) => !r.ok) ? withExit(out, ExitCode.error) : out;
   },

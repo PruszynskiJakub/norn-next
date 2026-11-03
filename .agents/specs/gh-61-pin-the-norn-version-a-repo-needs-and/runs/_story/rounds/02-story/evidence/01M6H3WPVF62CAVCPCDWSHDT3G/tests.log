@@ -1,0 +1,24 @@
+$ tsc --noEmit -p tsconfig.json && tsc --noEmit -p scripts/tsconfig.json
+$ bun test
+bun test v1.3.13 (bf2e2cec)
+
+ 1151 pass
+ 0 fail
+ 17 snapshots, 22715 expect() calls
+Ran 1151 tests across 64 files. [2.10s]
+$ bun test --config=bunfig.integration.toml --parallel --timeout=20000
+bun test v1.3.13 (bf2e2cec) 12x PARALLEL
+
+ 686 pass
+ 3 skip
+ 0 fail
+ 4124 expect() calls
+Ran 689 tests across 66 files. [148.89s]
+$ bun test --config=bunfig.e2e.toml --parallel --timeout=20000
+bun test v1.3.13 (bf2e2cec) 12x PARALLEL
+
+ 73 pass
+ 0 fail
+ 651 expect() calls
+Ran 73 tests across 7 files. [65.57s]
+exit 0

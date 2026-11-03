@@ -10,6 +10,7 @@ import { bundledSkills } from "../runtime/workflows.ts";
 
 export const uninstallCommand = defineCommand({
   name: "uninstall",
+  version: "exempt",
   summary: "Remove norn-owned hooks and skills; keep config, workflows and specs",
   usage: "norn uninstall",
   async run(ctx) {

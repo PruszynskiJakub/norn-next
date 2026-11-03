@@ -222,6 +222,14 @@ export function editConfigLayer(opts: {
   return { ok: true, path, changed: true, value };
 }
 
+/**
+ * gh-61 D9, D10 (K8): write `norn_version` into the team file, edited in place so its comments and
+ * key order stay. `norn init` (when the key is absent) and `norn upgrade` are its only writers.
+ */
+export function writeNornVersion(repoRoot: string, version: string): ConfigEditResult {
+  return editConfigLayer({ repoRoot, file: "repo", key: "norn_version", edit: { set: version } });
+}
+
 /** The whole document re-rendered; a layer left empty is an empty file, not `{}`. */
 const rendered = (doc: Document) => (isMap(doc.contents) && !doc.contents.items.length ? doc.toString().replace(/^\{\}\n$/m, "") : doc.toString());
 

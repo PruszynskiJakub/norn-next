@@ -111,3 +111,40 @@ Run a tick from cron every minute in the repository:
 ```
 
 `--interval` tells norn how often the tick runs: it is recorded for the checkout and sets when the heartbeat counts as down and how long a claim lasts. Match it to the cron schedule; without it, norn assumes 30 seconds. Every tick on one checkout shares one heartbeat id, so each recognises the claim the previous one renewed. cron has a minimal `PATH`: give full paths to `norn`, `gh` and your agent, or set `PATH` in the crontab.
+
+## Roll out a new norn to a team
+
+The repo's norn version (`norn_version` in `.agents/norn.config.yaml`, see [Concepts](concepts.md#the-repos-norn-version)) says which norn every machine runs. Moving it is one commit by one person; everyone else pulls and installs.
+
+**The person who upgrades**, in the main checkout:
+
+1. Install the new norn ([README: Install](../README.md#install)) and check it with `norn --version`.
+2. Stop `norn watch` (and any cron tick) on this checkout: `norn upgrade` refuses while a tick runs.
+3. Run `norn upgrade`. It moves `norn_version` to the running binary's version, rewrites the bundled `norn*` skills in `.agents/skills/` to its copies, and makes any layout or config move the new version needs, all staged and nothing committed. It prints what moved; with nothing to move it says so and changes nothing.
+4. Review `git diff --staged`, commit it and push it to the base branch (through a PR if your base branch takes only PRs).
+
+`norn upgrade` never moves the version backward: a binary older than the repo's version is refused with the norn to install. To really go back, edit the key in the team file by hand, where review sees it. `norn migrate` is the old name of `norn upgrade` and still works, with a one-line notice, until the next minor.
+
+**Teammates**, once the commit is on the base branch: pull it into the main checkout, install the same minor (any patch at or after the recorded one), and restart `norn watch`. Until they install, the commands that act refuse with `this repo needs norn X.Y.x (you run …)` and the norn to install; `norn status` shows the same at the top. A `norn watch` started before the pull keeps running: it skips each tick it may not run, sends one notification ("ticks paused"), and resumes by itself once the version matches again. A tick run from cron exits 3 each time instead.
+
+**`norn init` is for a new repo or a new machine**, never for moving the version. On a repo without the key it records the running norn's version. On a repo that has one it sets up your machine and leaves `norn_version` and the bundled skills alone; when they differ from your binary it says so and points at `norn upgrade`. A missing bundled skill is copied in either way.
+
+**Units in flight** wait for their branch to take in the base. A story branch cut before the upgrade still holds the old skills, so after you install the new norn its next agent step is held as drift (the inbox names `norn story update-branch <story>`) until the next base sync, or that command, brings the new skills in; then it launches. Its pinned workflow does not change. A claim held by a machine that is now refused is not handed over: it expires as when a machine stops ticking, and a matching machine takes it over.
+
+**A norn from before this check** does not know the key: on a repo that records a `norn_version` it refuses every command with a config error, `` unknown key `norn_version` ``, exit code 6 (`config`), and writes nothing. The fix is the same: install the norn the repo records.
+
+**Check it in CI.** `norn doctor --repo` checks the repo's norn version against the installed norn, the bundled skills against its copies, and the workflows and config, with no agent, runner or remote. Installing the latest release makes a PR red when the repo is behind it or when someone hand-edited a bundled skill:
+
+```yaml
+  norn:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the latest norn
+        run: |
+          curl -fsSLO https://github.com/PruszynskiJakub/norn-next/releases/latest/download/norn-linux-x64
+          sudo install -m 755 norn-linux-x64 /usr/local/bin/norn
+      - run: norn doctor --repo
+```
+
+To check only the skills, workflows and config, and not lag behind the latest release, install the version the repo records instead: `releases/download/v$(sed -n 's/^norn_version: *//p' .agents/norn.config.yaml)/norn-linux-x64`.

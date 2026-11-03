@@ -10,6 +10,7 @@ import { cmd } from "@norn/core";
 
 export const stuckCommand = defineCommand({
   name: "stuck",
+  version: "exempt",
   summary: "Report that the step cannot continue (§9.3); then end your turn",
   usage: 'norn stuck "<reason>"',
   positionals: { min: 1, max: 1 },

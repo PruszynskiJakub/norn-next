@@ -4,6 +4,7 @@
  */
 import { BUILT_IN_LIMITS, type Mode, parseDuration, type ResolvedConfig, type Step, type UnitState, type Workflow } from "@norn/schema";
 import type { Facts, RunFacts, StoryFacts, UnitFacts } from "./facts.ts";
+import { stepOf } from "./workflow.ts";
 
 /** W9: the issue label that picks a story's workflow at intake (`norn:wf:<name>`); B19: it follows the round after. */
 export const WF_LABEL = "norn:wf:";
@@ -11,6 +12,16 @@ export const WF_LABEL = "norn:wf:";
 /** C5: when `norn check-run` holds the unit's check lease at a check step, the lease's time (running since then, not queued); else null. */
 export function checkRunningSince(step: Step | null | undefined, uf: UnitFacts): string | null {
   return step?.type === "check" && uf.lease?.kind === "check" && uf.state && !uf.state.park ? uf.lease.created_at : null;
+}
+
+/**
+ * gh-61 B18, B22 (D6): the unit waits at an agent step decide does not start, because its worktree's
+ * bundled skills differ from the running norn's; the inbox names the fix (B19) and
+ * `norn story update-branch` takes it (BS9).
+ */
+export function heldBySkillsDrift(uf: UnitFacts): boolean {
+  const st = uf.state;
+  return st?.status === "ready" && !!uf.skills_drift?.length && !!uf.workflow && stepOf(uf.workflow, st.step)?.type === "agent";
 }
 
 /** MO2: manual if the step is attended or no runner is configured; else the story's mode. */

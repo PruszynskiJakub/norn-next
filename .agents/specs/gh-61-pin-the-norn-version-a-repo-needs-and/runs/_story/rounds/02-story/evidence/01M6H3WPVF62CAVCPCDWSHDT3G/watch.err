@@ -1,0 +1,5 @@
+{"tick_id":"01M6H41XFSRQ0ME4PJ4STM7JCY","at":"2026-11-03T16:32:08.697Z","duration_ms":151,"decisions":[],"failed":0}
+{"at":"2026-11-03T16:32:11.697Z","error":"this repo needs norn 0.20.x (you run 0.19.2)","do_instead":"install norn 0.20.x","code":"version_mismatch","details":{"repo":"0.20.0","running":"0.19.2"}}
+{"at":"2026-11-03T16:32:14.700Z","error":"this repo needs norn 0.20.x (you run 0.19.2)","do_instead":"install norn 0.20.x","code":"version_mismatch","details":{"repo":"0.20.0","running":"0.19.2"}}
+{"tick_id":"01M6H42697WPT7CYF9YYE24YWF","at":"2026-11-03T16:32:17.703Z","duration_ms":86,"decisions":[],"failed":0}
+{"tick_id":"01M6H42973F759CCDXZ6VF0EJK","at":"2026-11-03T16:32:20.707Z","duration_ms":173,"decisions":[],"failed":0}

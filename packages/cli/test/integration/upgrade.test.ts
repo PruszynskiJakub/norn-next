@@ -1,5 +1,5 @@
 /**
- * gh-110 B11–B17 (D6): `norn migrate` moves a main checkout from the old layout to the new one. The
+ * gh-110 B11–B17 (D6), gh-61 B29, B30: `norn upgrade` (once `norn migrate`) moves a main checkout from the old layout to the new one. The
  * config and workflows move as staged git renames, the machine-local files into the machine dir,
  * norn's old `.gitignore` line goes; nothing is committed. It refuses outside the main checkout, with
  * a part in both places, or while the tick lock is held; it does nothing on a migrated repo, and a
@@ -9,8 +9,8 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { cpSync, existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join, relative } from "node:path";
 import { type ClaimBlob, validate } from "@norn/schema";
-import { acquireLock, readLocalClaim, repoConfigPath, workflowsDir } from "@norn/store";
-import type { CliResult } from "../../src/index.ts";
+import { acquireLock, acquireTickLock, readLocalClaim, repoConfigPath, workflowsDir } from "@norn/store";
+import { type CliResult, runningVersion } from "../../src/index.ts";
 import { createHarness, type Harness, issue, layoutPlaces, oldNornDir, runChecked, sh, toOldLayout } from "../../../../test/support/harness.ts";
 
 // whole flows over real git, several ticks each
@@ -90,7 +90,7 @@ function expectRefused(r: CliResult, code: string) {
   expect(validate("cli-error", r.value).ok).toBe(true);
 }
 
-describe("norn migrate on the old layout (B11, B12, B13)", () => {
+describe("norn upgrade on the old layout (B11, B12, B13)", () => {
   let h: Harness;
   let workflows: string[];
   let heartbeat: string;
@@ -104,7 +104,7 @@ describe("norn migrate on the old layout (B11, B12, B13)", () => {
     if (c.state !== "present") throw new Error(`no claim on gh-4: ${c.state}`);
     claimBefore = c.blob;
     headBefore = head(h);
-    out = await h.norn("migrate");
+    out = await h.norn("upgrade");
   });
   afterAll(() => h.cleanup());
 
@@ -146,27 +146,49 @@ describe("norn migrate on the old layout (B11, B12, B13)", () => {
 
   test("a second run says nothing to move, exits 0 and changes nothing (B14)", async () => {
     const before = snapshot(h);
-    const md = await h.norn("migrate");
+    const md = await h.norn("upgrade");
     expect(md.exit).toBe(0);
-    expect(md.stdout).toContain("nothing to move");
-    const json = await h.norn("migrate", "--json");
+    expect(md.stdout).toContain("nothing to upgrade");
+    const json = await h.norn("upgrade", "--json");
     expect(json.exit).toBe(0);
-    expect(json.value).toEqual({ moves: [], config: { changed: [], renamed: [], removed: [] }, staged: [], commit: null });
+    const version = runningVersion(h.deps);
+    expect(json.value).toEqual({ moves: [], config: { changed: [], renamed: [], removed: [] }, norn_version: { from: version, to: version, changed: false }, skills: { updated: [], linked: [] }, staged: [], commit: null });
     expect(snapshot(h)).toEqual(before);
   });
 });
 
-describe("norn migrate --json (B11)", () => {
+describe("norn migrate is a deprecated alias of norn upgrade (gh-61 B30)", () => {
+  test("it stages the same moves upgrade stages, with the same JSON value, and says on stderr that it is now norn upgrade", async () => {
+    const a = await oldRepo();
+    const b = await oldRepo();
+    try {
+      const up = await a.h.norn("upgrade", "--json");
+      const mig = await b.h.norn("migrate", "--json");
+      expect(up.exit).toBe(0);
+      expect(mig.exit).toBe(0);
+      const rel = (h: Harness, v: unknown) => JSON.parse(JSON.stringify(v).replaceAll(layoutPlaces(h.root)["machine files"].new, "<machine>"));
+      expect(rel(b.h, mig.value)).toEqual(rel(a.h, up.value));
+      expect(porcelain(b.h)).toBe(porcelain(a.h));
+      expect(mig.stderr).toBe("`norn migrate` is now `norn upgrade`; the old name goes in the next minor\n");
+      expect(up.stderr).toBeUndefined();
+    } finally {
+      a.h.cleanup();
+      b.h.cleanup();
+    }
+  });
+});
+
+describe("norn upgrade --json (B11)", () => {
   let h: Harness;
   let workflows: string[];
   beforeAll(async () => ({ h, workflows } = await oldRepo()));
   afterAll(() => h.cleanup());
 
   test("gives {moves, staged, commit}", async () => {
-    const r = await h.norn("migrate", "--json");
+    const r = await h.norn("upgrade", "--json");
     expect(r.exit).toBe(0);
     const v = r.value as Migrated;
-    expect(Object.keys(v).sort()).toEqual(["commit", "config", "moves", "staged"]);
+    expect(Object.keys(v).sort()).toEqual(["commit", "config", "moves", "norn_version", "skills", "staged"]);
     const machine = layoutPlaces(h.root)["machine files"];
     expect(v.moves).toEqual([
       { part: "config", from: OLD_CONFIG, to: NEW_CONFIG, how: "git mv" },
@@ -178,7 +200,7 @@ describe("norn migrate --json (B11)", () => {
   });
 });
 
-describe("norn migrate refuses and moves nothing (B15, B16, B17)", () => {
+describe("norn upgrade refuses and moves nothing (B15, B16, B17)", () => {
   let h: Harness;
   beforeAll(async () => ({ h } = await oldRepo()));
   afterAll(() => h.cleanup());
@@ -188,10 +210,12 @@ describe("norn migrate refuses and moves nothing (B15, B16, B17)", () => {
     if (!lock.ok) throw new Error("could not take the tick lock");
     try {
       const before = snapshot(h);
-      const r = await h.norn("migrate", "--json");
+      const r = await h.norn("upgrade", "--json");
       expectRefused(r, "tick_locked");
-      expect((r.value as { do_instead: string }).do_instead).toContain("stop norn watch");
-      expect((r.value as { do_instead: string }).do_instead).toContain("norn migrate");
+      expect((r.value as { do_instead: string }).do_instead).toBe("stop `norn watch` and run it again");
+      expect(snapshot(h)).toEqual(before);
+      // gh-61 B29: a rerun under the same lock is refused the same way and still changes nothing
+      expect((await h.norn("upgrade", "--json")).value).toEqual(r.value);
       expect(snapshot(h)).toEqual(before);
     } finally {
       lock.release();
@@ -202,10 +226,10 @@ describe("norn migrate refuses and moves nothing (B15, B16, B17)", () => {
     const wt = `${h.root}-worktrees/gh-4-four`;
     expect(existsSync(wt)).toBe(true);
     const before = [...snapshot(h), ...(readdirSync(wt, { recursive: true }) as string[]).filter((p) => !p.startsWith(".git"))];
-    const r = await runChecked(["migrate", "--json"], { ...h.deps, cwd: wt });
+    const r = await runChecked(["upgrade", "--json"], { ...h.deps, cwd: wt });
     expectRefused(r, "not_main_checkout");
     expect((r.value as { do_instead: string }).do_instead).toContain(h.root);
-    expect((r.value as { do_instead: string }).do_instead).toContain("norn migrate");
+    expect((r.value as { do_instead: string }).do_instead).toContain("norn upgrade");
     expect([...snapshot(h), ...(readdirSync(wt, { recursive: true }) as string[]).filter((p) => !p.startsWith(".git"))]).toEqual(before);
   });
 
@@ -214,7 +238,7 @@ describe("norn migrate refuses and moves nothing (B15, B16, B17)", () => {
     cpSync(old, now);
     try {
       const before = snapshot(h);
-      const r = await h.norn("migrate", "--json");
+      const r = await h.norn("upgrade", "--json");
       expectRefused(r, "both_layouts");
       const error = (r.value as { error: string }).error;
       expect(error).toContain(relative(h.root, old));
@@ -237,7 +261,7 @@ describe("a rerun finishes an interrupted migration (B11, B12)", () => {
     h.git(["mv", OLD_CONFIG, NEW_CONFIG]);
     h.git(["mv", OLD_WORKFLOWS, NEW_WORKFLOWS]);
     const heartbeat = JSON.parse(h.read(join(places["machine files"].old, "heartbeat.json"))).heartbeat_id;
-    const r = await h.norn("migrate", "--json");
+    const r = await h.norn("upgrade", "--json");
     expect(r.exit).toBe(0);
     expect((r.value as Migrated).moves.map((m) => m.part)).toEqual(["machine files"]);
     expect(JSON.parse(h.read(join(places["machine files"].new, "heartbeat.json"))).heartbeat_id).toBe(heartbeat);
@@ -259,7 +283,7 @@ describe("a rerun finishes a trace move cut short (B12, D6)", () => {
     rmSync(join(old, "heartbeat.json"));
     const rest = readdirSync(old).sort();
     expect(rest.length).toBeGreaterThan(0);
-    const r = await h.norn("migrate", "--json");
+    const r = await h.norn("upgrade", "--json");
     expect(r.exit).toBe(0);
     for (const n of rest) expect(existsSync(join(machine, n))).toBe(true);
     expect(h.read(join(machine, "heartbeat.json"))).toBe(heartbeat);
@@ -272,7 +296,7 @@ describe("a rerun finishes a trace move cut short (B12, D6)", () => {
       const { old, new: machine } = layoutPlaces(h2.h.root)["machine files"];
       cpSync(join(old, "heartbeat.json"), join(machine, "heartbeat.json"));
       const before = snapshot(h2.h);
-      const r = await h2.h.norn("migrate", "--json");
+      const r = await h2.h.norn("upgrade", "--json");
       expectRefused(r, "both_layouts");
       const error = (r.value as { error: string }).error;
       expect(error).toContain(relative(h2.h.root, join(old, "heartbeat.json")));
@@ -291,19 +315,19 @@ describe("an untracked old workflow file (B11)", () => {
 
   test("is moved plainly and listed as untracked", async () => {
     h.write(join(h.root, OLD_WORKFLOWS, "draft.yaml"), SOLO.replace("name: solo", "name: draft"));
-    const r = await h.norn("migrate", "--json");
+    const r = await h.norn("upgrade", "--json");
     expect(r.exit).toBe(0);
     const v = r.value as Migrated;
     expect(v.moves).toContainEqual({ part: "workflows", from: `${OLD_WORKFLOWS}/draft.yaml`, to: `${NEW_WORKFLOWS}/draft.yaml`, how: "untracked" });
     expect(v.staged).not.toContain(`${NEW_WORKFLOWS}/draft.yaml`);
     expect(existsSync(join(h.root, NEW_WORKFLOWS, "draft.yaml"))).toBe(true);
     expect(porcelain(h)).toContain(`?? ${NEW_WORKFLOWS}/draft.yaml`);
-    const md = await h.norn("migrate");
-    expect(md.stdout).toContain("nothing to move");
+    const md = await h.norn("upgrade");
+    expect(md.stdout).toContain("nothing to upgrade");
   });
 });
 
-describe("norn migrate moves old config keys (gh-64 B40–B45, D13)", () => {
+describe("norn upgrade moves old config keys (gh-64 B40–B45, D13)", () => {
   let h: Harness;
   let out: CliResult;
   const USER_OLD = `# mine
@@ -344,7 +368,7 @@ Body
     h.git(["add", "-A"]);
     h.git(["commit", "-q", "-m", "an older norn's config"]);
     h.write(join(h.home, "config.yaml"), USER_OLD);
-    out = await h.norn("migrate");
+    out = await h.norn("upgrade");
   });
   afterAll(() => h.cleanup());
 
@@ -403,7 +427,7 @@ Body
   test("B45, B55: the config loads again; a second run changes nothing; nothing is committed", async () => {
     expect((await h.norn("config", "list", "--json")).exit).toBe(0);
     const before = snapshot(h);
-    const again = await h.norn("migrate", "--json");
+    const again = await h.norn("upgrade", "--json");
     expect(again.exit).toBe(0);
     expect(again.value).toMatchObject({ moves: [], config: { changed: [], renamed: [], removed: [] } });
     expect(snapshot(h)).toEqual(before);
@@ -411,7 +435,7 @@ Body
   });
 });
 
-describe("norn migrate leaves a new-style config alone (gh-64 B45)", () => {
+describe("norn upgrade leaves a new-style config alone (gh-64 B45)", () => {
   test("B45: a user and team file with no old key, in odd formatting, are neither rewritten nor staged", async () => {
     const h = await createHarness();
     try {
@@ -422,19 +446,45 @@ describe("norn migrate leaves a new-style config alone (gh-64 B45)", () => {
       h.git(["add", "-A"]);
       h.git(["commit", "-q", "-m", "new-style config"]);
       h.write(join(h.home, "config.yaml"), user);
-      const out = await h.norn("migrate", "--json");
+      const out = await h.norn("upgrade", "--json");
       expect(out.exit).toBe(0);
       expect(out.value).toMatchObject({ config: { changed: [], renamed: [], removed: [] } });
       expect(h.read(join(h.home, "config.yaml"))).toBe(user);
-      expect(h.read(repoConfigPath(h.root))).toBe(team);
-      expect(porcelain(h)).toBe("");
+      // gh-61 B13: the only change is the norn_version a repo without one gets
+      expect(h.read(repoConfigPath(h.root))).toBe(`${team}norn_version: ${runningVersion(h.deps)}\n`);
+      expect(porcelain(h)).toBe(`M  ${NEW_CONFIG}`);
     } finally {
       h.cleanup();
     }
   });
 });
 
-describe("norn migrate on old team values of the wrong shape (gh-64 B43)", () => {
+describe("norn upgrade on the new layout while watch holds the tick lock (gh-61 B29)", () => {
+  test("exit 3, do_instead to stop watch and run it again; a rerun is refused the same way and nothing changes", async () => {
+    const h = await createHarness();
+    try {
+      expect((await h.norn("init")).exit).toBe(0);
+      h.git(["add", "-A"]);
+      h.git(["commit", "-q", "-m", "norn init"]);
+      const lock = await acquireTickLock(h.root, { note: "norn watch" });
+      if (!lock.ok) throw new Error("could not take the tick lock");
+      try {
+        const before = snapshot(h);
+        const r = await h.norn("upgrade", "--json");
+        expectRefused(r, "tick_locked");
+        expect((r.value as { do_instead: string }).do_instead).toBe("stop `norn watch` and run it again");
+        expect((await h.norn("upgrade", "--json")).value).toEqual(r.value);
+        expect(snapshot(h)).toEqual(before);
+      } finally {
+        lock.release();
+      }
+    } finally {
+      h.cleanup();
+    }
+  });
+});
+
+describe("norn upgrade on old team values of the wrong shape (gh-64 B43)", () => {
   test("B43: a scalar remote, limits or default_mode is removed and listed once with its value", async () => {
     const h = await createHarness();
     try {
@@ -442,7 +492,7 @@ describe("norn migrate on old team values of the wrong shape (gh-64 B43)", () =>
       h.write(repoConfigPath(h.root), "remote: origin\nlimits: 5m\ndefault_mode: sometimes\n");
       h.git(["add", "-A"]);
       h.git(["commit", "-q", "-m", "odd old config"]);
-      const out = await h.norn("migrate", "--json");
+      const out = await h.norn("upgrade", "--json");
       expect(out.exit).toBe(0);
       const removed = (out.value as { config: { removed: Array<{ key: string; value: unknown }> } }).config.removed;
       expect(removed.map(({ key, value }) => ({ key, value }))).toEqual([

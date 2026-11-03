@@ -15,6 +15,7 @@ import { cmd } from "@norn/core";
 
 export const runListCommand = defineCommand({
   name: "run list",
+  version: "reads",
   summary: "Step timeline of a unit: durations, outcomes, who, reasons; a story with its slices (O4)",
   usage: "norn run list [<unit>] [--json] [--full] [--events] [--all] [--story-only] [--limit N]",
   markdown: true,

@@ -1,0 +1,34 @@
+# Slice workflow — repo-local copy of the shipped one (W1), with this repo's check command.
+# Build test-first, check, review, integrate; no QA of its own (the story's qa checks every criterion).
+name: slice
+description: Build one slice test-first, check and review it, and integrate it into the story branch.
+start: implement
+steps:
+  implement:
+    type: agent
+    skill: norn-implement
+    inputs: [slice, spec, handoff, last_check, last_findings]
+    instructions: "Run `bun run test` (the unit tier) after each change, and the type check; the integration tier runs in the `test` check and the e2e tier runs in CI, so do not run them before handing back."
+    outcomes: { done: { to: test, means: "every acceptance criterion (or rework point) has a passing test" } }
+  test:
+    type: check
+    run: "bun install --frozen-lockfile && bun run test && bun run test:integration && bun run typecheck"
+    timeout: 15m
+    outcomes: { pass: review, fail: { to: implement, counter: test_loop } }
+  review:
+    type: agent
+    skill: norn-review
+    inputs: [slice, spec, diff]
+    outcomes:
+      approve:           { to: integrate, means: "all criteria met, no blocking findings" }
+      changes_requested: { to: implement, counter: review_loop, means: "blocking findings in the receipt" }
+  integrate:
+    type: git
+    action: integrate
+    outcomes: { done: $done, conflict: { to: merge, counter: conflict_loop } }
+  merge:
+    type: agent
+    skill: norn-merge
+    inputs: [slice, spec]
+    outcomes: { done: { to: integrate, means: "conflicts resolved keeping the intent of both sides; tests pass" } }
+counters: { test_loop: { max: 5 }, review_loop: { max: 3 }, conflict_loop: { max: 2 } }

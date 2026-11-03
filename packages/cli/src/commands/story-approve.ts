@@ -71,6 +71,7 @@ async function decideGate(ctx: Context, args: ParsedArgs, kind: "approve" | "rej
 
 export const storyApproveCommand = defineCommand({
   name: "story approve",
+  version: "acts",
   summary: "Approve the gate a unit waits at (B25, O2)",
   usage: 'norn story approve [<story|slice>] [--reason "…"]',
   optionHelp: { "--reason <text>": "a comment kept on the approve receipt" },
@@ -81,6 +82,7 @@ export const storyApproveCommand = defineCommand({
 
 export const storyRejectCommand = defineCommand({
   name: "story reject",
+  version: "acts",
   summary: "Reject the gate a unit waits at, with the reason the next attempt gets (B26, O2)",
   usage: 'norn story reject [<story|slice>] --reason "…"',
   optionHelp: { "--reason <text>": "required: what failed; the agent sent back gets it" },

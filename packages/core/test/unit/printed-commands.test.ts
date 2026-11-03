@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { cmd, nameRemoved } from "@norn/core";
+import { cmd, nameRemoved, upgradeBackward, versionMismatch } from "@norn/core";
 
 // B7: every command norn prints is built by one `cmd` builder. This table pins each builder's
 // string for a sample unit, so renaming a command is one reviewed diff of this table and the module.
@@ -14,7 +14,7 @@ const today: Record<keyof typeof cmd, [string, ...string[]]> = {
   done: [`norn done approve --handoff "…"`, cmd.done("approve"), `norn done pass --criteria <file> --handoff "…"`, cmd.done("pass", { criteria: true })],
   help: ["norn help", cmd.help()],
   init: ["norn init", cmd.init()],
-  migrate: ["norn migrate", cmd.migrate()],
+  upgrade: ["norn upgrade", cmd.upgrade()],
   status: ["norn status", cmd.status(), "norn status --notes", cmd.status({ notes: true }), "norn status --history --since 1d", cmd.status({ since: "1d" })],
   statusWatch: ["norn status --watch", cmd.statusWatch(), "norn status --watch --interval 5s", cmd.statusWatch({ interval: "5s" })],
   storyAnswer: [`norn story answer ${U} "…"`, cmd.storyAnswer(U), `norn story answer ${U} "1"`, cmd.storyAnswer(U, "1")],
@@ -86,5 +86,27 @@ describe("printed commands (B7)", () => {
     for (const old of ["drop gh-1", "inbox", "cockpit --next", "orient --open", "open gh-1", `answer gh-1 "x"`, "approve gh-1", "unstick gh-1 --to qa", "update gh-1", "mode auto", "workflow gh-1 fix", "take gh-1", "release gh-1", "trace gh-1", "why gh-1"])
       expect(nameRemoved(`run \`norn ${old}\` now`)).toBe(`norn ${old.split(" ")[0]}`);
     for (const ok of ["norn story update-branch gh-1", "norn done approve", "norn story approve gh-1", "norn status --watch", ".agents/norn/trace/x"]) expect(nameRemoved(ok)).toBeNull();
+  });
+});
+
+describe("the version refusal (gh-61 B6, B7, D3)", () => {
+  test("an older binary is told which norn to install", () => {
+    expect(versionMismatch("0.19.0", "0.18.1")).toEqual({ match: "older", needs: "0.19.x", error: "this repo needs norn 0.19.x (you run 0.18.1)", do_instead: "install norn 0.19.x" });
+    expect(versionMismatch("0.18.2", "0.18.1")).toEqual({ match: "older", needs: "0.18.2 or a later 0.18.x", error: "this repo needs norn 0.18.2 or a later 0.18.x (you run 0.18.1)", do_instead: "install norn 0.18.2 or a later 0.18.x" });
+    expect(versionMismatch("1.2.0", "1.1.9")?.do_instead).toBe("install norn 1.2.0 or a later 1.x");
+    expect(versionMismatch("2.0.0", "1.5.0")?.do_instead).toBe("install norn 2.x");
+  });
+
+  test("a newer binary is told to run norn upgrade and commit, or to install the repo's norn", () => {
+    expect(versionMismatch("0.18.0", "0.19.0")).toEqual({
+      match: "newer",
+      needs: "0.18.x",
+      error: "this repo needs norn 0.18.x (you run 0.19.0)",
+      do_instead: "run `norn upgrade` to move this repo to norn 0.19.0 and commit the change, or install norn 0.18.x",
+    });
+  });
+
+  test("norn upgrade run by an older binary is told it will not move the repo back, and which norn to install (B17)", () => {
+    expect(upgradeBackward("0.19.0", "0.18.1")).toEqual({ error: "this repo is set up for norn 0.19.0; upgrade will not move it back", do_instead: "install norn 0.19.x" });
   });
 });

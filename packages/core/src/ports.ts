@@ -194,6 +194,8 @@ export interface GitPort {
   move(cwd: string, from: string, to: string): Promise<boolean>;
   /** Stage `paths` (`git add -- <paths>`). */
   stage(cwd: string, paths: string[]): Promise<void>;
+  /** Those of `paths` git ignores (`git check-ignore -z --stdin`); a tracked path never is. */
+  ignored(cwd: string, paths: string[]): Promise<string[]>;
 
   branchExists(cwd: string, branch: string, where?: "local" | "remote", remote?: string): Promise<boolean>;
   createBranch(cwd: string, branch: string, from: string): Promise<void>;

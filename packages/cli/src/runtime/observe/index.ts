@@ -50,6 +50,7 @@ import {
 } from "@norn/store";
 import type { Context } from "../../context.ts";
 import { leaseLiveness } from "../leases.ts";
+import { bundledSkillSet } from "../skills-drift.ts";
 import { checkedRepoWorkflows } from "../workflows.ts";
 import { findOrphanBranches, foreignCommits, intakeOnly, refMap, storyBase, worktreeFacts } from "./git-facts.ts";
 import { gitRemote, mergedByAncestry, readyHead, trackingRef } from "./remote.ts";
@@ -169,7 +170,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
 
   // ---- local facts (H2): the snapshot, leases (K1, K3), hook facts, caches, what the receipts say
   const liveness = leaseLiveness((p) => ports.process.isAlive(p));
-  const local = await loadLocalFacts(root, { now, home: ctx.home, env: ctx.env, storyWorktrees: storyWts, sliceWorktrees: sliceWts, baseRef, liveness, backfillHooks: opts.backfillHooks });
+  const local = await loadLocalFacts(root, { now, home: ctx.home, env: ctx.env, storyWorktrees: storyWts, sliceWorktrees: sliceWts, baseRef, liveness, backfillHooks: opts.backfillHooks, running: ctx.version, bundledSkills: bundledSkillSet(ctx.env) });
   const snapshot = local.snapshot;
   const workflows = checkedRepoWorkflows(snapshot.workflows, root, config, ports.agents);
 
@@ -275,6 +276,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       const unitBranch = u.unit.slice ? (sliceFile ? sliceBranch(s.key, sliceFile.nn, sliceFile.slug) : (worktree?.status?.branch ?? `${s.key}/${u.unit.dir}`)) : branch;
       const uf = await unitFacts(ports, s, lu, worktree, lu.hooks, runEnv);
       if (lu.act_failure) uf.act_failure = lu.act_failure;
+      if (lu.skills_drift) uf.skills_drift = lu.skills_drift;
       // a done slice not yet integrated: is its branch in the story branch (the slice cleanup's delete)
       if (sliceFile && u.state?.status === "done" && sliceFile.frontmatter?.status !== "integrated") {
         const head = refs.get(`refs/heads/${unitBranch}`);
@@ -363,6 +365,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     stories,
     // R5.5: this tick is the checkout's heartbeat
     heartbeat: { last_tick_at: now },
+    ...(local.norn ? { norn: local.norn } : {}),
     orphans: { worktrees: orphanWts.sort(), branches: orphanBranches },
   };
   return { facts, workflows, config, ports, root, remote, heartbeat_id: hb, stories: storyLocs, units: unitLocs, sync, unpushed };

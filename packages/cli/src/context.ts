@@ -15,6 +15,7 @@ import { configError, refuse } from "./output.ts";
 import { type Interaction, isAgentSession, terminalInteraction } from "./runtime/interaction.ts";
 import { guardLayout } from "./runtime/layout.ts";
 import { abortableSleep } from "./runtime/tick-lock.ts";
+import { NORN_VERSION } from "./version.ts";
 import { buildPorts, defaultRegistry } from "./wiring.ts";
 
 /** Everything a command may get injected; all optional (tests pass fakes). */
@@ -43,9 +44,14 @@ export interface CliDeps {
   interaction?: Interaction | null;
   /** a tick started a detached `norn check-run` (C5); `exited` settles when it ends (tests wait on it) */
   onCheckStarted?: (exited: Promise<void>) => void;
+  /** the running norn's version (`X.Y.Z`); default this package's version. Tests run the CLI as any binary */
+  version?: string;
   /** the pause between polls of `story wait`, and while a person command waits for a running tick (gh-174, H1); default a real timer ended early by `signal` (tests advance a fake clock) */
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
 }
+
+/** The running norn's version: the injected one, else the package's (`NORN_VERSION`). The one reader of that constant. */
+export const runningVersion = (deps: CliDeps): string => deps.version ?? NORN_VERSION;
 
 export const systemClock: Clock = {
   now: () => Date.now(),
@@ -101,10 +107,12 @@ export class Context {
   readonly clock: Clock;
   readonly home: string;
   readonly registry: AdapterRegistry;
+  /** the running norn's version (`runningVersion`): `--version`, tick traces, replay labels */
+  readonly version: string;
   readonly deps: CliDeps;
   /** lines for a person on stderr (a one-time notice, B13), returned in `CliResult.stderr`; never data */
   readonly stderr: string[] = [];
-  /** D5: `locate()` refuses a main checkout on the old or a mixed layout; false for a command that reports it itself (doctor, migrate) */
+  /** D5: `locate()` refuses a main checkout on the old or a mixed layout; false for a command that reports it itself (doctor, upgrade, migrate) */
   checksLayout = true;
   private located: Located | null = null;
   private loadedConfig: LoadedConfig | null = null;
@@ -118,6 +126,7 @@ export class Context {
     this.clock = deps.clock ?? systemClock;
     this.home = nornHome(deps.home, this.env);
     this.registry = deps.registry ?? defaultRegistry();
+    this.version = runningVersion(deps);
   }
 
   /** Git before config is known (root discovery, init). */

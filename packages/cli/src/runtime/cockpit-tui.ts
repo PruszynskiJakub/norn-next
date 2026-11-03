@@ -256,7 +256,7 @@ export interface Look {
   now: number;
   /** local time of day for the header */
   clock: string;
-  /** the running norn's version (`NORN_VERSION`), for the header */
+  /** the running norn's version (`ctx.version`), for the header */
   version?: string;
 }
 
@@ -466,7 +466,13 @@ export function renderCockpit(model: CockpitModel, s: TuiState, o: Look): string
   const pending = model.header.pending;
   const filter = s.filtering ? `${paint("/", ["bold", "cyan"])} ${s.filter}${paint("▏", ["dim"])}   ` : s.filter ? `${paint("filter:", ["dim"])} ${s.filter} ${paint("(esc clears)", ["dim"])}   ` : "";
   const left = `${filter}${paint(o.version ? `norn ${o.version}` : "norn", ["bold"])} ${paint("·", ["dim"])} ${basename(model.header.repo)}  ${pending ? paint(`${pending} need${pending === 1 ? "s" : ""} you`, ["bold", "yellow"]) : paint("nothing needs you", ["green"])}`;
-  const right = `${hb.down ? paint(`no heartbeat${hb.age ? ` for ${hb.age}` : ""} — ${cmd.watch()}`, ["red"]) : paint(hb.age ? `tick ${hb.age} ago` : "no tick yet", ["dim"])}  ${paint(o.clock, ["dim"])}`;
+  // gh-61 D7 (B8): a binary that does not fit the repo's norn version takes the heartbeat's place (its ticks are refused)
+  const beat = model.header.version
+    ? paint(`! ${model.header.version}`, ["bold", "red"])
+    : hb.down
+      ? paint(`no heartbeat${hb.age ? ` for ${hb.age}` : ""} — ${cmd.watch()}`, ["red"])
+      : paint(hb.age ? `tick ${hb.age} ago` : "no tick yet", ["dim"]);
+  const right = `${beat}  ${paint(o.clock, ["dim"])}`;
   const header = `${left}${" ".repeat(Math.max(2, width - visible(left) - visible(right)))}${right}`;
   const out = [visible(header) > width ? fit(header.replace(/\x1b\[[0-9;]*m/g, ""), width) : header];
   out.push(tabStrip(model, s.tab, width, paint));

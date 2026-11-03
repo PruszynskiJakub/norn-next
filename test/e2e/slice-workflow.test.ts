@@ -91,7 +91,7 @@ describe("norn init", () => {
     expect(readFileSync(join(h.home, "config.yaml"), "utf8")).toStartWith("# yaml-language-server: $schema=config.schema.json\n");
     expect(readFileSync(join(h.root, ".agents/norn.config.yaml"), "utf8")).toStartWith("# yaml-language-server: $schema=norn.config.schema.json\n");
     const teamSchema = JSON.parse(readFileSync(join(h.root, ".agents/norn.config.schema.json"), "utf8")) as { properties: Record<string, unknown> };
-    expect(Object.keys(teamSchema.properties).sort()).toEqual(["$schema", "base_branch", "provider", "slice_workflow", "workflow"]);
+    expect(Object.keys(teamSchema.properties).sort()).toEqual(["$schema", "base_branch", "norn_version", "provider", "slice_workflow", "workflow"]);
     expect(v.gitattributes).toEqual([".agents/specs/*/runs/** linguist-generated=true gitlab-generated=true"]);
     // nothing in the repo names a test command: the templates keep theirs, and init says so
     expect(r.value).toMatchObject({ remote: { provider: "gh", label: "norn", git_remote: "origin", url: h.remoteDir }, test_command: { command: "bun test", detected_from: null, set_in: ["quick.yaml", "slice.yaml", "story.yaml"] } });

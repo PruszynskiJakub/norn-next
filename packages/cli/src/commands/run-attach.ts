@@ -29,6 +29,7 @@ async function next(items: readonly InboxEntry[], cockpit: herdr.HerdrCockpit | 
 
 export const runAttachCommand = defineCommand({
   name: "run attach",
+  version: "acts",
   summary: "Focus the Herdr agent pane of a unit's live run; --next: the oldest one waiting for you (B46, B47)",
   usage: "norn run attach [<unit>] | norn run attach --next",
   optionHelp: { "--next": "the agent pane of the oldest Your turn item, without prompting" },

@@ -13,7 +13,7 @@ import { type Clock, type InboxItem, type LaunchSpec, type NotifierPort, type Pa
 import { type Receipt, type UnitState, ulid } from "@norn/schema";
 import { appendReceipt, installSkills, linkSkills, machineDir, readState, repoConfigPath, spawnSyncCaptured, workflowsDir } from "@norn/store";
 import type { ProjectView } from "@norn/view";
-import { bundledSkills, type CliDeps, type CliResult, type Interaction, type InteractionChoice, runCli, type TickReport } from "../../packages/cli/src/index.ts";
+import { bundledSkills, type CliDeps, type CliResult, type Interaction, type InteractionChoice, runCli, runningVersion, type TickReport } from "../../packages/cli/src/index.ts";
 import { assetsDir } from "../../packages/cli/src/runtime/assets.ts";
 import { harvestGolden } from "./golden-harvest.ts";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
@@ -257,6 +257,8 @@ export interface Harness {
    * left without keys is removed; the user file is only written, never removed.
    */
   config(yaml: string): void;
+  /** gh-61: record the running binary's version as the team file's `norn_version`, keeping its other keys (a repo set up with this norn) */
+  recordVersion(): void;
   read(path: string): string;
   state(runsDir: string): UnitState | null;
   /** simulate a reporting verb: append a receipt at the unit's cursor */
@@ -285,7 +287,12 @@ export function printsNoRemovedCommand(argv: readonly string[], r: CliResult): C
 /** `runCli` with the B7 check: what a suite that passes its own deps calls instead. */
 export const runChecked = async (argv: string[], deps: CliDeps): Promise<CliResult> => printsNoRemovedCommand(argv, await runCli(argv, deps));
 
-export async function createHarness(): Promise<Harness> {
+export interface HarnessOptions {
+  /** run every command as a norn binary of this version (`X.Y.Z`); default the package version */
+  version?: string;
+}
+
+export async function createHarness(opts: HarnessOptions = {}): Promise<Harness> {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "norn-cli-")));
   const remoteDir = join(dir, "remote.git");
   const seed = join(dir, "seed");
@@ -317,6 +324,7 @@ export async function createHarness(): Promise<Harness> {
     clock,
     ports: { remote, runner, notifiers: [notifier] },
     interaction: null,
+    ...(opts.version ? { version: opts.version } : {}),
   };
   const h: Harness = {
     dir,
@@ -352,6 +360,11 @@ export async function createHarness(): Promise<Harness> {
         if (Object.keys(keys).length) h.write(paths[f], stringifyYaml(keys));
         else if (f !== "user") rmSync(paths[f], { force: true });
       }
+    },
+    recordVersion() {
+      const file = repoConfigPath(root);
+      const team = existsSync(file) ? ((parseYaml(readFileSync(file, "utf8")) ?? {}) as Record<string, unknown>) : {};
+      h.write(file, stringifyYaml({ ...team, norn_version: runningVersion(deps) }));
     },
     write(path, text) {
       mkdirSync(dirname(path), { recursive: true });

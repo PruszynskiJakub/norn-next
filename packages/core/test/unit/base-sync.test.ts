@@ -295,7 +295,12 @@ describe("base sync replay", () => {
     expect(buildInbox(s.facts(), CONFIG).groups.your_turn[0]).toMatchObject({ command: "gh pr merge 7", detail: "https://github.com/o/r/pull/7 · behind main by 5" });
     // running: refused
     const running = { ...s.state, step: "update", status: "running" as const };
-    expect(apply(running).rejected[0]?.reason).toContain("update needs it done, at a gate or stuck");
+    expect(apply(running).rejected[0]?.reason).toContain("update needs it done, at a gate, stuck or held by drifted skills");
+    // gh-61 B22: ready at an agent step — only when the receipt names the drifted skills that held it
+    const held = { ...s.state, step: "resolve", status: "ready" as const };
+    expect(apply(held).rejected[0]?.reason).toContain("update needs it done");
+    expect(apply(held, { skills_drift: ["norn"] } as Partial<Receipt>).state).toMatchObject({ step: "update", status: "ready" });
+    expect(apply({ ...held, step: "test" }, { skills_drift: ["norn"] } as Partial<Receipt>).rejected[0]?.reason).toContain("update needs it done");
     // stuck
     expect(apply({ ...running, status: "stuck", park: { kind: "stuck", reason: "x", since: at() } }).state).toMatchObject({ step: "update", status: "ready", park: null });
   });

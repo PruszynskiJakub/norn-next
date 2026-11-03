@@ -23,6 +23,7 @@ const PASS_FILE = "pass --user, --local or --repo";
 
 export const configSetCommand = defineCommand({
   name: "config set",
+  version: "acts",
   summary: "Set one value in the user, local or repo config file",
   usage: "norn config set <key> <value> [--user|--local|--repo] [--json]",
   markdown: true,
@@ -31,6 +32,7 @@ export const configSetCommand = defineCommand({
   positionals: { min: 2, max: 2 },
   async run(ctx, args) {
     const [key, text] = args.positionals as [string, string];
+    refuseWrittenByNorn(key);
     const file = await layerFile(ctx, args, "Write to");
     const r = edit(ctx, file, key, { set: text });
     const where = `the ${file} file (\`${shown(ctx, r.path)}\`)`;
@@ -41,6 +43,7 @@ export const configSetCommand = defineCommand({
 
 export const configUnsetCommand = defineCommand({
   name: "config unset",
+  version: "acts",
   summary: "Remove one value from the user, local or repo config file",
   usage: "norn config unset <key> [--user|--local|--repo] [--json]",
   markdown: true,
@@ -49,6 +52,7 @@ export const configUnsetCommand = defineCommand({
   positionals: { min: 1, max: 1 },
   async run(ctx, args) {
     const key = args.positionals[0] as string;
+    refuseWrittenByNorn(key);
     const file = await layerFile(ctx, args, "Remove from");
     const r = edit(ctx, file, key, { unset: true });
     const where = `the ${file} file (\`${shown(ctx, r.path)}\`)`;
@@ -56,6 +60,11 @@ export const configUnsetCommand = defineCommand({
     return rendered({ file, path: r.path, key, removed: r.changed }, md);
   },
 });
+
+/** gh-61 D4, K8: `norn_version` is written by `norn upgrade` and `norn init` only; hand-editing stays the escape hatch (B17). */
+function refuseWrittenByNorn(key: string): void {
+  if (key === "norn_version") throw refuse("`norn_version` is written by norn upgrade, which moves the skills and files with it", cmd.upgrade(), "written_by_norn");
+}
 
 /** The file flag, else the person's pick at a terminal (B64), else a usage error (B65). */
 async function layerFile(ctx: Context, args: ParsedArgs, verb: string): Promise<ConfigLayerName> {

@@ -28,7 +28,7 @@ const SEGMENT = {
  */
 export const HELP_GROUPS: ReadonlyArray<{ title: string; for: CommandFor; commands: readonly string[]; hidden?: boolean }> = [
   { title: "Core", for: "person", commands: ["status", "story", "run"] },
-  { title: "Setup", for: "person", commands: ["init", "migrate", "doctor", "config", "uninstall"] },
+  { title: "Setup", for: "person", commands: ["init", "upgrade", "doctor", "config", "uninstall", "migrate"] },
   { title: "Background", for: "person", commands: ["watch", "sync", "tidy"] },
   { title: "Run by watch, cron or Herdr, not by hand", for: "person", commands: ["tick", SEGMENT.name], hidden: true },
   { title: "Agent protocol: the only commands an agent runs", for: "agent", commands: ["brief", "done", "ask", "stuck"] },
@@ -124,6 +124,7 @@ function formatNounHelp(n: Noun): string {
 
 export const helpCommand = defineCommand({
   name: "help",
+  version: "reads",
   summary: "List commands, and who runs each: a person or the agent",
   usage: "norn help [--all] [<command> | <noun> [<verb>]]",
   options: { all: { type: "boolean" } },

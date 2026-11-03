@@ -11,10 +11,10 @@ import { parseArgs } from "node:util";
 import { ExitCode } from "@norn/schema";
 import type { Command, Noun, ParsedArgs } from "./command.ts";
 import { COMMANDS, findCommand, findNoun, NOUNS } from "./commands/index.ts";
-import { type CliDeps, Context } from "./context.ts";
+import { type CliDeps, Context, runningVersion } from "./context.ts";
 import { CliFailure, failureMarkdown, isRendered, isWithExit, render, toFailure, usageError } from "./output.ts";
-import { NORN_VERSION } from "./version.ts";
 import { cmd } from "@norn/core";
+import { guardVersion } from "./runtime/version-guard.ts";
 
 export interface CliResult {
   exit: ExitCode;
@@ -62,7 +62,7 @@ export async function runCli(argv: string[], deps: CliDeps = {}): Promise<CliRes
   // `norn`, `norn --help` and `norn <command> --help` are `norn help`: markdown unless --json
   if (!first || first === "--help" || first === "-h") return runCli(["help", ...jsonOnly(more)], deps);
   const [name, ...rest] = argv as [string, ...string[]];
-  if (name === "--version" || name === "-v") return done({ version: NORN_VERSION });
+  if (name === "--version" || name === "-v") return done({ version: runningVersion(deps) });
   const noun = findNoun(name);
   if (noun) {
     // B2: `norn run` (and `norn run --help`) lists the verbs
@@ -92,6 +92,7 @@ async function dispatch(command: Command, rest: string[], deps: CliDeps): Promis
   try {
     const args = { ...parseCommandArgs(command, argvOwn), json };
     if (command.repo !== false) await ctx.locate();
+    if (command.version === "acts") guardVersion(ctx); // gh-61 D1, D2: after locate and config, before the command
     const out = await command.run(ctx, args);
     const [value, exit] = isWithExit(out) ? [out.value, out.exit] : [out ?? { ok: true }, ExitCode.ok];
     if (isRendered(value)) return withStderr(markdown || (value.asked && !json) ? { exit, value: value.value, stdout: value.markdown } : done(value.value, exit));

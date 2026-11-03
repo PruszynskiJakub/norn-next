@@ -3,7 +3,8 @@
  * `<story> orient` workspace and needs-you-first order among them, moving only norn's workspaces.
  */
 import { describe, expect, test } from "bun:test";
-import { planWorkspaceMoves } from "../../src/runtime/segment.ts";
+import type { ProjectView } from "@norn/view";
+import { planWorkspaceMoves, segmentLine } from "../../src/runtime/segment.ts";
 
 /** Apply moves the way Herdr's `workspace.move` does: `index` is a gap in the order with the workspace still in it. */
 function apply(order: string[], moves: Array<{ workspace_id: string; index: number }>): string[] {
@@ -40,5 +41,18 @@ describe("planWorkspaceMoves", () => {
       const oursNow = after.filter((id) => mine.has(id));
       expect(oursNow).toEqual([...oursNow.filter((id) => needs.has(id)), ...oursNow.filter((id) => !needs.has(id))]);
     }
+  });
+});
+
+describe("segmentLine: a norn version mismatch (gh-61 B8, D7)", () => {
+  const none = { your_turn: [], answer: [], approve: [], unblock: [], check: [], unclaimed: [], running: [], notes: [], recently_done: [] };
+  const item = (id: string, group: "unblock" | "approve", title: string) => ({ id, group, story: "*", slice: null, step: null, title, command: "norn doctor", since: "2026-10-27T12:00:00.000Z", age: "0s" });
+  const view = (groups: Partial<ProjectView["inbox"]["groups"]>) => ({ repo: "/x/todo", inbox: { groups: { ...none, ...groups } } }) as unknown as ProjectView;
+  const mismatch = item("norn-version:0.19.0:0.18.1", "unblock", "this repo needs norn 0.19.x (you run 0.18.1): install norn 0.19.x");
+
+  test("names the mismatch first and does not count it as stuck", () => {
+    expect(segmentLine(view({ unblock: [mismatch] }))).toBe("norn·todo ! this repo needs norn 0.19.x (you run 0.18.1)");
+    expect(segmentLine(view({ unblock: [mismatch], approve: [item("a", "approve", "ready")] }))).toBe("norn·todo ! this repo needs norn 0.19.x (you run 0.18.1) · ● 1 approve");
+    expect(segmentLine(view({}))).toBe("norn·todo ✓ nothing waits");
   });
 });

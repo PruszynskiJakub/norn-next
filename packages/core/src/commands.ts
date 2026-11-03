@@ -1,5 +1,5 @@
 /** Exact commands shown to people (O1, S9) and naming conventions shared by decide, inbox and handoff. */
-import { sliceDirName, storyDirName, type UnitState } from "@norn/schema";
+import { sliceDirName, storyDirName, type UnitState, versionMatch } from "@norn/schema";
 
 /** B5: the whole first prompt of an auto-mode agent session. */
 export const AUTO_PROMPT = "Use the norn skill, then run `norn brief`.";
@@ -67,7 +67,7 @@ export const cmd = {
   done: (outcome: string, o: { criteria?: boolean } = {}) => norn("done", outcome, o.criteria && "--criteria <file>", `--handoff "…"`),
   help: () => norn("help"),
   init: () => norn("init"),
-  migrate: () => norn("migrate"),
+  upgrade: () => norn("upgrade"),
   status: (o: { notes?: boolean; since?: string } = {}) => norn("status", o.notes && "--notes", o.since && `--history --since ${o.since}`),
   statusWatch: (o: { interval?: string } = {}) => norn("status --watch", o.interval && `--interval ${o.interval}`),
   storyAnswer: (unit: string, text = "…") => norn("story answer", unit, `"${text}"`),
@@ -100,6 +100,16 @@ export const cmd = {
   watch: (o: { interval?: string; maxTicks?: number } = {}) => norn("watch", o.interval && `--interval ${o.interval}`, o.maxTicks !== undefined && `--max-ticks ${o.maxTicks}`),
 };
 
+/** gh-61 B20 (D11): what a session started on drifted skills is told; B19's inbox item names the same fix. */
+export const skillsDriftHint = {
+  text: (running: string, names: readonly string[]) => `skills differ from norn ${running}: ${names.join(", ")}`,
+  fix: (story: string) => `bring the base in with \`${cmd.storyUpdateBranch(story)}\``,
+  /** B19: the Unblock item of a unit decide holds (D6) */
+  held: (running: string, names: readonly string[], story: string) => `skills differ from norn ${running} (${names.join(", ")}): ${skillsDriftHint.fix(story)}`,
+  /** B19: the repo-level item when the main checkout itself drifted */
+  repo: (running: string) => `skills differ from norn ${running}: run \`${cmd.upgrade()}\` and commit`,
+};
+
 /** B5: the top-level commands this release removed; no printed command names one (B7). */
 export const REMOVED_COMMANDS = ["drop", "inbox", "cockpit", "orient", "open", "answer", "approve", "unstick", "update", "mode", "workflow", "take", "release", "trace", "why"] as const;
 
@@ -110,3 +120,35 @@ export function nameRemoved(text: string): string | null {
   const m = REMOVED.exec(text);
   return m ? `norn ${m[1]}` : null;
 }
+
+/**
+ * gh-61 D3 (B6, B7, B8): what a running binary that does not fit the repo's recorded `X.Y.Z` is told —
+ * the refusal's `error` and `do_instead`, and the inbox item. A dev or pre-release build
+ * (`0.19.0-dev.3`) is compared by its core. The versions that fit `repo` are its line (`0.19.x` before
+ * 1.0, `1.x` from 1.0 on), from `repo` itself up (B2). Null when it fits, or `running` has no `X.Y.Z`.
+ */
+export function versionMismatch(repo: string, running: string): { match: "older" | "newer"; needs: string; error: string; do_instead: string } | null {
+  const core = /^\d+\.\d+\.\d+/.exec(running)?.[0];
+  if (!core) return null;
+  const match = versionMatch(repo, core);
+  if (match === "match") return null;
+  const [maj, min, pat] = repo.split(".");
+  const line = maj === "0" ? `0.${min}.x` : `${maj}.x`;
+  const base = maj === "0" ? pat === "0" : min === "0" && pat === "0";
+  const fits = base ? line : `${repo} or a later ${line}`;
+  const install = `install norn ${fits}`;
+  // B7: a newer binary moves the repo forward with a commit, not a downgrade
+  const do_instead = match === "newer" ? `run \`${cmd.upgrade()}\` to move this repo to norn ${running} and commit the change, or ${install}` : install;
+  return { match, needs: fits, error: `this repo needs norn ${fits} (you run ${running})`, do_instead };
+}
+
+/** gh-61 B17 (D9): `norn upgrade` run by a binary older than the repo's version; no flag overrides it. */
+export function upgradeBackward(repo: string, running: string): { error: string; do_instead: string } {
+  return { error: `this repo is set up for norn ${repo}; upgrade will not move it back`, do_instead: versionMismatch(repo, running)?.do_instead ?? `install norn ${repo}` };
+}
+
+/** gh-61 B11 (D8): the one notification `norn watch` sends when it pauses ticks on a mismatch. */
+export const ticksPausedTitle = (needs: string): string => `this repo needs norn ${needs}; ticks paused`;
+
+/** gh-61 B5: the hint when the team file records no `norn_version` (`doctor`, `status`). */
+export const NO_VERSION_HINT = `no norn version recorded: run \`${cmd.upgrade()}\``;

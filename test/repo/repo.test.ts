@@ -113,7 +113,7 @@ const GLOSSARY_FILES = (): string[] => [
 
 /**
  * gh-64 B52 (S5): the docs a person reads describe only the new config keys and files. A removed or
- * renamed key named in any of them is a hit. CHANGELOG and story specs keep their history; `norn migrate`'s
+ * renamed key named in any of them is a hit. CHANGELOG and story specs keep their history; `norn upgrade`'s
  * own messages and the moved-key table name old keys on purpose and live in sources, not here.
  */
 // `notifiers` only as the key (`notifiers:`, `notifiers[]`, in backticks): as a noun it names the O3 concept
@@ -944,7 +944,7 @@ const NORN_PATH_ALLOW: Record<string, [number, string]> = {
   "packages/store/src/paths.ts": [8, "the path module, and the old layout's places (gh-110 D4)"],
   "packages/schema/src/config.ts": [2, "the config files as messages name them (gh-64 B5: an error names the right file)"],
   "test/support/harness.ts": [1, "the old layout's places as a person had them, spelled independently of store (gh-110 S1)"],
-  "packages/cli/test/integration/migrate.test.ts": [7, "the old paths as a person had them and as `git status` and the report show them (gh-110 S1, gh-64 B40)"],
+  "packages/cli/test/integration/upgrade.test.ts": [7, "the old paths as a person had them and as `git status` and the report show them (gh-110 S1, gh-64 B40)"],
   "packages/cli/test/integration/config.test.ts": [9, "messages: the config errors and `norn config` name the files as a person sees them (gh-64 B5–B7, B39, B54)"],
   "test/e2e/slice-workflow.test.ts": [5, "message: init's config row; the files init writes, as a person sees them (gh-64 B9, B50, B55)"],
   "packages/cli/test/integration/layout.test.ts": [1, "the layout test: the repo config file as a person sees it"],
@@ -1076,6 +1076,26 @@ describe("one resolver for a unit's record folder (gh-71 D2, B30, B36)", () => {
     const hits = files(PKGS)
       .filter((p) => p.includes("/src/") && !RESOLVERS.includes(relative(ROOT, p)))
       .flatMap((p) => byHand(readFileSync(p, "utf8")).map(({ l, i }) => `${relative(ROOT, p)}:${i + 1}: ${l.trim()}`));
+    expect(hits).toEqual([]);
+  });
+});
+
+describe("the running version is a dependency (gh-61 B6, Prefactor 1)", () => {
+  // only the default wiring reads the package version; every command takes `ctx.version`, so a test can run the CLI as any binary
+  const WIRING = "packages/cli/src/context.ts";
+  const readsConstant = (text: string) => /\bNORN_VERSION\b|["']\.{1,2}\/(?:\.\.\/)*version\.ts["']|["'](?:\.\.\/)+package\.json["']/.test(text);
+
+  test("matcher: an import of version.ts, of the cli package.json or the constant itself is a read", () => {
+    expect(readsConstant(`import { NORN_VERSION } from "../version.ts";`)).toBe(true);
+    expect(readsConstant(`import { version } from "../package.json";`)).toBe(true);
+    expect(readsConstant(`const v = ctx.version;`)).toBe(false);
+  });
+
+  test("no cli source but the default wiring and version.ts reads the version constant", () => {
+    const hits = files(join(PKGS, "cli", "src"))
+      .map((p) => relative(ROOT, p))
+      .filter((p) => p !== WIRING && p !== "packages/cli/src/version.ts")
+      .filter((p) => readsConstant(readFileSync(join(ROOT, p), "utf8")));
     expect(hits).toEqual([]);
   });
 });

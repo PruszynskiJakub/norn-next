@@ -11,6 +11,7 @@ import { defineCommand, opt } from "../command.ts";
 import { refuse } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
 import { refuseIfHeldElsewhere, resolveTarget, started } from "../runtime/human.ts";
+import { refuseOnSkillsDrift } from "../runtime/skills-drift.ts";
 import { targetKey, type TargetRule } from "../runtime/target.ts";
 
 /** B28: the units a person starts — parked at an attended step, or a ready agent step that waits for a person (manual). */
@@ -25,6 +26,7 @@ const startable: TargetRule = {
 
 export const storyStartCommand = defineCommand({
   name: "story start",
+  version: "acts",
   summary: "Open an agent on the step a person starts: a Herdr tab in the unit worktree, or the command to run (B28, MO5)",
   usage: "norn story start [<story|slice>] [--print]",
   optionHelp: { "--print": "print the start command instead of opening a terminal" },
@@ -48,6 +50,7 @@ export const storyStartCommand = defineCommand({
     }
     const worktree = uf.worktree?.path ?? null;
     if (!worktree) throw refuse(`${t.key} has no worktree on this checkout`, cmd.tidy({ dryRun: true }), "no_worktree");
+    refuseOnSkillsDrift(ctx, worktree, t.story); // gh-61 B20 (D11)
     const command = startCommandFor(uf, sf, ctx.config);
     const out = { unit: t.key, step: st.step, worktree, command };
     const runner = opt.bool(args, "print") ? null : (await ctx.ports()).runner;

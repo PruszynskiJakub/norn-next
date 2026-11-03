@@ -14,6 +14,7 @@
     "base_branch",
     "workflow",
     "slice_workflow",
+    "norn_version",
     "max_agents",
     "notify",
     "interval",
@@ -123,6 +124,17 @@
     "slice_workflow": {
       "minLength": 1,
       "type": "string"
+    },
+    "norn_version": {
+      "anyOf": [
+        {
+          "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "max_agents": {
       "minimum": 1,

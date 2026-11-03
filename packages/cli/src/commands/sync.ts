@@ -4,6 +4,7 @@ import { runTick } from "../runtime/tick.ts";
 
 export const syncCommand = defineCommand({
   name: "sync",
+  version: "acts",
   summary: "Sync the remote now and take in new stories (GR1, GR2)",
   usage: "norn sync",
   async run(ctx) {

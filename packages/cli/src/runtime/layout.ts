@@ -20,9 +20,9 @@ export function layoutRefusal(l: Layout, root: string) {
   if (l.layout === "both")
     return refuse(
       `${root} has norn files in both the old and the new layout (${parts.join("; ")}); norn reads neither`,
-      `keep one of each pair and remove the other, then run ${cmd.migrate()} in ${root}`,
+      `keep one of each pair and remove the other, then run ${cmd.upgrade()} in ${root}`,
       "both_layouts",
       details,
     );
-  return refuse(`${root} is on the old norn layout (${parts.join("; ")})`, cmd.migrate(), "old_layout", details);
+  return refuse(`${root} is on the old norn layout (${parts.join("; ")})`, cmd.upgrade(), "old_layout", details);
 }

@@ -39,6 +39,7 @@ async function stateOf(ctx: Context, key: string) {
 
 export const storyWaitCommand = defineCommand({
   name: "story wait",
+  version: "reads",
   summary: "Block until a story reaches a step, a gate, an ask, stuck, done or merged; exit 0 met, 7 timed out",
   usage: "norn story wait <story|slice> --until <step=<name>|gate|ask|stuck|done|merged> [--timeout <d>] [--interval <d>]",
   optionHelp: {

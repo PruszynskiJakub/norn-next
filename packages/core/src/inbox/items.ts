@@ -9,12 +9,12 @@
  * action), Recently done.
  */
 import { ATTENDED_WAIT, parseDuration, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
-import { cmd, nextCommand, startAgentCommand } from "../commands.ts";
+import { cmd, NO_VERSION_HINT, nextCommand, skillsDriftHint, startAgentCommand, versionMismatch } from "../commands.ts";
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../criteria.ts";
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
 import { sha256 } from "../hash.ts";
-import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, issueProblem, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
+import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, heldBySkillsDrift, issueProblem, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
 import { optionsLine } from "../prompt.ts";
 import { epoch, formatAge, iso } from "../time.ts";
 import { baseUpdateStep, edgeOf, edgesOf, isStale, stepOf } from "../workflow.ts";
@@ -112,6 +112,46 @@ function heartbeatItem(facts: Facts, config: ResolvedConfig): InboxItem | null {
     detail: "auto steps start, and agents are classified, only while a heartbeat runs on the checkout that holds the story",
     command: cmd.watch(),
     since: down.since ?? iso(facts.now),
+  };
+}
+
+/** gh-61 D7: the id of the repo-level version item, kept first in Unblock. */
+const VERSION_ITEM = "norn-version:";
+
+/** gh-61 D7: the repo-level item for a binary that does not fit the repo's norn version; front ends show it on top. */
+export const isVersionMismatchItem = (it: Pick<InboxItem, "id" | "group">): boolean => it.group === "unblock" && it.id.startsWith(VERSION_ITEM);
+
+/**
+ * gh-61 D7 (B8, B5): the running binary against the repo's norn version. A mismatch is a repo-level
+ * Unblock item (first in its group); no recorded version is a Check item, so it never notifies.
+ * Null when they match or the version was not observed.
+ */
+function versionItem(facts: Facts): InboxItem | null {
+  const v = facts.norn;
+  if (!v) return null;
+  const base = { story: "*", slice: null, step: null, command: cmd.upgrade(), since: iso(facts.now) };
+  if (v.repo === null) return { ...base, id: `${VERSION_ITEM}none`, group: "check", title: NO_VERSION_HINT };
+  const mismatch = versionMismatch(v.repo, v.running);
+  if (!mismatch) return null;
+  // an older binary's way out is outside norn (install the repo's line); `doctor` runs on a mismatch (B8) and shows it
+  const command = mismatch.match === "newer" ? cmd.upgrade() : cmd.doctor();
+  return { ...base, id: `${VERSION_ITEM}${v.repo}:${v.running}`, group: "unblock", title: `${mismatch.error}: ${mismatch.do_instead}`, command };
+}
+
+/** gh-61 B19: the main checkout holds bundled skills that differ from the running norn's — one repo-level Unblock item. */
+function repoSkillsDriftItem(facts: Facts): InboxItem | null {
+  const v = facts.norn;
+  if (!v?.skills_drift?.length) return null;
+  return {
+    id: `skills_drift:*:${v.running}:${v.skills_drift.join(",")}`,
+    group: "unblock",
+    story: "*",
+    slice: null,
+    step: null,
+    title: skillsDriftHint.repo(v.running),
+    detail: v.skills_drift.join(", "),
+    command: cmd.upgrade(),
+    since: iso(facts.now),
   };
 }
 
@@ -556,6 +596,11 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       return item("running", `${st.step} #${st.attempt}${st.run ? ` (${st.run.how})` : ""}`, cmd.runList(key), st.run?.started_at ?? st.step_entered_at);
     case "ready": {
       const step = uf.workflow ? stepOf(uf.workflow, st.step) : null;
+      // gh-61 B19 (D6): decide holds the agent start on drifted skills; say why and how to fix it
+      if (heldBySkillsDrift(uf) && uf.skills_drift && facts.norn)
+        return item("unblock", skillsDriftHint.held(facts.norn.running, uf.skills_drift, story.key), cmd.storyUpdateBranch(story.key), st.step_entered_at, {
+          id: `skills_drift:${key}:${st.step}#${st.attempt}:${uf.skills_drift.join(",")}`,
+        });
       if (step?.type === "agent") {
         const { mode, downgraded } = effectiveMode(story.mode, !!step.attended, facts.machine.runner);
         if (mode === "manual") {
@@ -754,15 +799,15 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
         slice: null,
         step: null,
         title: needs ?? `corrupt: ${story.frontmatter_error.file} failed validation (S2)`,
-        command: needs ? cmd.migrate() : cmd.runView(story.key, { why: true }),
+        command: needs ? cmd.upgrade() : cmd.runView(story.key, { why: true }),
         since: iso(facts.now),
       });
       continue;
     }
-    // B38 (D12): a slice file that still has criteria `needs` is not corrupt: `norn migrate` fixes it
+    // B38 (D12): a slice file that still has criteria `needs` is not corrupt: `norn upgrade` fixes it
     for (const s of story.slices) {
       const needs = s.error && needsRemoved(s.error);
-      if (needs) add({ id: `needs:${s.key}`, group: "unblock", story: story.key, slice: s.key, step: null, title: needs, command: cmd.migrate(), since: iso(facts.now) });
+      if (needs) add({ id: `needs:${s.key}`, group: "unblock", story: story.key, slice: s.key, step: null, title: needs, command: cmd.upgrade(), since: iso(facts.now) });
     }
     add(notStartedItem(story, facts, config));
     add(bodyChangedItem(story));
@@ -778,7 +823,11 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
     }
   }
   add(heartbeatItem(facts, config));
-  for (const g of INBOX_GROUPS) groups[g].sort((a, b) => epoch(a.since) - epoch(b.since) || a.id.localeCompare(b.id));
+  add(versionItem(facts));
+  add(repoSkillsDriftItem(facts));
+  // gh-61 D7: the version item comes first, whatever its age
+  const pinned = (it: InboxEntry) => (it.id.startsWith(VERSION_ITEM) ? 0 : 1);
+  for (const g of INBOX_GROUPS) groups[g].sort((a, b) => pinned(a) - pinned(b) || epoch(a.since) - epoch(b.since) || a.id.localeCompare(b.id));
   const pending = INBOX_GROUPS.filter((g) => g !== "running" && g !== "notes" && g !== "recently_done").reduce((n, g) => n + groups[g].length, 0);
   return { at: iso(facts.now), groups, pending };
 }

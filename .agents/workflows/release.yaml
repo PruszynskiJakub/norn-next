@@ -21,10 +21,14 @@ steps:
       Write the changelog section, the version bumps and the proposed version with its reason as the
       skill says; a version given in the issue's `## Version` or by the person in Rework wins over
       your proposal. Also write the PR body to pr.md in the spec folder: the proposed version, its
-      reason and the new changelog section; norn puts the issue link under it. Rename the issue to
-      "Release X.Y.Z" with `gh issue edit`, the one remote write this step allows. Change no code.
+      reason and the new changelog section; norn puts the issue link under it. In the same diff as
+      the bump, set `norn_version: X.Y.Z` in .agents/norn.config.yaml by editing the file (not with
+      `norn upgrade`, which runs only in the main checkout) and copy packages/cli/assets/skills/norn*
+      over .agents/skills/norn* as the skill says, so that once the PR merges the published binary is
+      the one main asks for. Rename the issue to "Release X.Y.Z" with `gh issue edit`, the one remote
+      write this step allows. Change no code.
     outcomes:
-      done: { to: open-pr, means: "CHANGELOG.md, packages/cli/package.json and the README badge carry version X.Y.Z; pr.md and the handoff name it with its reason" }
+      done: { to: open-pr, means: "CHANGELOG.md, packages/cli/package.json, the README badge and norn_version in .agents/norn.config.yaml carry version X.Y.Z, .agents/skills/norn* match the bundled sources; pr.md and the handoff name it with its reason" }
   update:
     type: git
     action: update

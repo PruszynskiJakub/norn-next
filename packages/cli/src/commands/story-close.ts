@@ -60,6 +60,7 @@ export async function claimIfFree(ctx: Context, obs: Observed, key: string): Pro
 
 export const storyCloseCommand = defineCommand({
   name: "story close",
+  version: "acts",
   summary: "Close a story: push its branches, then remove worktrees, local branches and the claim; the record, issue and PR stay (B35, GR7)",
   usage: "norn story close [<story>] [--yes]",
   options: { yes: { type: "boolean" } },

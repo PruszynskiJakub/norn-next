@@ -204,6 +204,7 @@ async function moveCursor(ctx: Context, raw: string, at: string) {
 
 export const storyEditCommand = defineCommand({
   name: "story edit",
+  version: "acts",
   summary: "Switch a story between auto and manual mode, or choose a unit's workflow (B30–B32, MO1, W9, S7)",
   usage: USAGE,
   optionHelp: {
