@@ -9,6 +9,7 @@ import { type Static, type TSchema, Type } from "@sinclair/typebox";
 import { Duration, Mode, NonEmpty, RemoteProvider } from "./common.ts";
 import { parseDuration } from "./ids.ts";
 import { check, type SchemaError } from "./check.ts";
+import { VERSION_PATTERN } from "./version.ts";
 
 // ---------------------------------------------------------------- names and fixed values
 
@@ -118,6 +119,8 @@ export const RepoConfig = Type.Object(
     base_branch: Type.Optional(Type.Union([NonEmpty, Type.Null()])),
     workflow: Type.Optional(Type.String({ pattern: "^[a-z][a-z0-9_-]*$", description: "workflow a new story starts in (default triage)" })),
     slice_workflow: Type.Optional(Type.String({ pattern: "^[a-z][a-z0-9_-]*$", description: "workflow a new slice starts in (default slice)" })),
+    /** gh-61 B1–B4 (D4, K8): the norn version the repo needs; written by `norn upgrade` and `norn init` only */
+    norn_version: Type.Optional(Type.String({ pattern: VERSION_PATTERN, description: "the norn version this repo needs, X.Y.Z (written by norn upgrade and norn init)" })),
   },
   { $id: "https://norn.dev/schema/repo-config.json", title: "norn team config", additionalProperties: false },
 );
@@ -152,6 +155,8 @@ export const ResolvedConfig = Type.Object(
     base_branch: Type.Union([NonEmpty, Type.Null()]),
     workflow: NonEmpty,
     slice_workflow: NonEmpty,
+    /** gh-61 B4 (D4): the team file's `norn_version`; null when none is recorded */
+    norn_version: Type.Union([Type.String({ pattern: VERSION_PATTERN }), Type.Null()]),
     max_agents: Type.Integer({ minimum: 1, maximum: 9 }),
     notify: Type.Object({ os: Type.Boolean(), ntfy: Type.Optional(Url), webhook: Type.Optional(Url) }, { additionalProperties: false }),
     /** B34: the tick interval the checkout's heartbeat records */
@@ -200,6 +205,7 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
   base_branch: null,
   workflow: "triage",
   slice_workflow: "slice",
+  norn_version: null,
   max_agents: 9,
   notify: { os: true },
   interval: DEFAULT_INTERVAL,
@@ -262,7 +268,7 @@ const MOVED_AGENT_FIELD: Record<string, string> = {
 
 const MACHINE_KEYS = ["max_agents", "notify", "trace"];
 const PERSON_KEYS = ["mode", "agent", "agents"];
-const TEAM_KEYS = ["provider", "base_branch", "workflow", "slice_workflow"];
+const TEAM_KEYS = ["provider", "base_branch", "workflow", "slice_workflow", "norn_version"];
 const FILE_KEYS: Record<ConfigFileKind, string[]> = { user: [...MACHINE_KEYS, ...PERSON_KEYS], local: PERSON_KEYS, repo: TEAM_KEYS };
 
 /** The file a top-level key belongs in, as a person reads it; null for an unknown key. */
@@ -361,6 +367,7 @@ const INVALID: Record<string, string> = {
   base_branch: "`base_branch` must be a branch name",
   workflow: "`workflow` must be a workflow name",
   slice_workflow: "`slice_workflow` must be a workflow name",
+  norn_version: "`norn_version` must be a version like 0.19.0",
   $schema: "`$schema` must be a path or URL",
 };
 
@@ -527,6 +534,7 @@ export function resolveConfig(files: ConfigFiles = {}, derived: ConfigDerived = 
   const base_branch = team<string | null>("base_branch", null);
   const workflow = team<string>("workflow", "triage");
   const slice_workflow = team<string>("slice_workflow", "slice");
+  const norn_version = team<string | null>("norn_version", null);
 
   const max_agents = machine<number>("max_agents", 9);
   const notifyFile = (clean.user.notify ?? {}) as Notify;
@@ -558,6 +566,7 @@ export function resolveConfig(files: ConfigFiles = {}, derived: ConfigDerived = 
     base_branch,
     workflow,
     slice_workflow,
+    norn_version,
     max_agents,
     notify,
     interval,

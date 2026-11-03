@@ -10,4 +10,5 @@ export * from "./receipt.ts";
 export * from "./state.ts";
 export * from "./trace.ts";
 export * from "./validate.ts";
+export * from "./version.ts";
 export * from "./workflow.ts";

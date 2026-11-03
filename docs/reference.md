@@ -514,6 +514,7 @@ norn help [--all] [<command> | <noun> [<verb>]]
 | `base_branch` | team | string or null | derived: the remote's default branch |
 | `workflow` | team | string | `"triage"` |
 | `slice_workflow` | team | string | `"slice"` |
+| `norn_version` | team | string | `null` |
 
 ### Shipped workflows
 
