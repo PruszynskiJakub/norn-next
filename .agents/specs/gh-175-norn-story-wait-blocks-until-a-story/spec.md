@@ -11,7 +11,7 @@ labels:
   - norn
   - norn:wf:quick
 workflow: quick
-status: new
+status: active
 intake_at: 2026-11-03T11:42:41.614Z
 body_hash: cecf73e8284fca723f50065c69bdc3977a9286657cd992f60e6f261049ad3ebb
 ---
