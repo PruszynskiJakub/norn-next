@@ -107,6 +107,7 @@ A step's craft is in a skill: `norn init` copies norn's skills into `.agents/ski
 | inbox | Everything that needs a person, with the command that resolves each item (`norn status`). |
 | tick | One pass of the heartbeat: observe, decide, act. |
 | worktree | The git worktree a unit works in. |
+| norn version | The norn version a repo was set up with (`norn_version` in the team config); a binary of another minor refuses to act on the repo. |
 | slot | A numbered port range a running unit gets, so parallel units do not collide. |
 | trace | The per-tick record of facts and decisions, kept outside the repository. |
 | mailbox | A git ref through which another checkout sends an answer or approval to the one that holds the claim. |
