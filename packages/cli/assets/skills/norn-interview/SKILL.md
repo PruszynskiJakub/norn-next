@@ -13,6 +13,8 @@ Before the first question, explore the project (and the spec, slice or diff bein
 
 Walk down each branch of the design tree, resolving decisions one by one. Ask **one question per turn** — never lettered sub-questions — in plain text, each with your recommended answer, and wait for the reply before continuing. When showing is easier than describing, the caller may build a prototype; the interview itself enacts nothing.
 
+When an answer is terse ("remove these", "X can go"), state your interpretation in one line ("Read as: drop B3 and B4, keep B5.") and carry on with the next question; the person corrects it if it is wrong. Do not spend a turn asking what they meant.
+
 Chase vagueness: "fast", "simple", "secure", "like X" get a concrete number, example or rule. Name a contradiction the moment it appears, and ask which side wins. Never re-ask a settled question.
 
 When no branch remains open, post a summary of decisions in chat — one line each, grouped by branch, assumptions marked — and ask for confirmation. A correction reopens only its branch. Confirmation ends the interview; it does not approve the work. If another skill called this one (refine, clarify, plan), hand back to it: it folds the decisions into its own document. A "go ahead" to the summary is not a request to do anything else.
