@@ -100,23 +100,6 @@ export const cmd = {
   watch: (o: { interval?: string; maxTicks?: number } = {}) => norn("watch", o.interval && `--interval ${o.interval}`, o.maxTicks !== undefined && `--max-ticks ${o.maxTicks}`),
 };
 
-/**
- * gh-61 B6, B7 (D3): what a binary that does not match the repo's `norn_version` is told. `repo` and
- * `running` are `X.Y.Z`; `match` is `versionMatch(repo, running)` when it is not a match. The versions
- * that fit `repo` are its line (`0.19.x` before 1.0, `1.x` from 1.0 on), from `repo` itself up (B2).
- */
-export function versionMismatch(repo: string, running: string, match: "older" | "newer"): { error: string; do_instead: string } {
-  const [maj, min, pat] = repo.split(".");
-  const line = maj === "0" ? `0.${min}.x` : `${maj}.x`;
-  const base = maj === "0" ? pat === "0" : min === "0" && pat === "0";
-  const fits = base ? line : `${repo} or a later ${line}`;
-  const install = `install norn ${fits}`;
-  return {
-    error: `this repo needs norn ${fits} (you run ${running})`,
-    do_instead: match === "older" ? install : `run \`${cmd.upgrade()}\` to move this repo to norn ${running} and commit the change, or ${install}`,
-  };
-}
-
 /** gh-61 B20 (D11): what a session started on drifted skills is told; B19's inbox item names the same fix. */
 export const skillsDriftHint = {
   text: (running: string, names: readonly string[]) => `skills differ from norn ${running}: ${names.join(", ")}`,
@@ -134,24 +117,25 @@ export function nameRemoved(text: string): string | null {
   return m ? `norn ${m[1]}` : null;
 }
 
-/** gh-61 B2: the releases that fit a recorded version, for a person: `0.19.x` before 1.0, `1.x` from 1.0 on. */
-const versionLine = (v: string): string => {
-  const [maj, min] = v.split(".");
-  return maj === "0" ? `0.${min}.x` : `${maj}.x`;
-};
-
 /**
- * gh-61 D3 (B6, B7, B8): what a running binary that does not fit the repo's recorded version is
- * told — the refusal's `error` and `do_instead`, and the inbox item. Null when it fits.
+ * gh-61 D3 (B6, B7, B8): what a running binary that does not fit the repo's recorded `X.Y.Z` is told —
+ * the refusal's `error` and `do_instead`, and the inbox item. A dev or pre-release build
+ * (`0.19.0-dev.3`) is compared by its core. The versions that fit `repo` are its line (`0.19.x` before
+ * 1.0, `1.x` from 1.0 on), from `repo` itself up (B2). Null when it fits, or `running` has no `X.Y.Z`.
  */
 export function versionMismatch(repo: string, running: string): { match: "older" | "newer"; error: string; do_instead: string } | null {
-  const match = versionMatch(repo, running);
+  const core = /^\d+\.\d+\.\d+/.exec(running)?.[0];
+  if (!core) return null;
+  const match = versionMatch(repo, core);
   if (match === "match") return null;
-  const error = `this repo needs norn ${versionLine(repo)} (you run ${running})`;
-  const install = `install norn ${versionLine(repo)}`;
+  const [maj, min, pat] = repo.split(".");
+  const line = maj === "0" ? `0.${min}.x` : `${maj}.x`;
+  const base = maj === "0" ? pat === "0" : min === "0" && pat === "0";
+  const fits = base ? line : `${repo} or a later ${line}`;
+  const install = `install norn ${fits}`;
   // B7: a newer binary moves the repo forward with a commit, not a downgrade
   const do_instead = match === "newer" ? `run \`${cmd.upgrade()}\` to move this repo to norn ${running} and commit the change, or ${install}` : install;
-  return { match, error, do_instead };
+  return { match, error: `this repo needs norn ${fits} (you run ${running})`, do_instead };
 }
 
 /** gh-61 B5: the hint when the team file records no `norn_version` (`doctor`, `status`). */
