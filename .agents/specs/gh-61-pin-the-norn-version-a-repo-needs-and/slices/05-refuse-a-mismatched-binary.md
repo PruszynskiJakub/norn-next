@@ -2,7 +2,7 @@
 id: gh-61/05
 title: Commands that act refuse a mismatched binary
 depends_on: [ gh-61/01, gh-61/04 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
