@@ -1,6 +1,6 @@
 /**
- * `norn migrate [--json]` (gh-110 B11–B17, D6): move the main checkout from the old layout to the new
- * one (D1) and stage the moves for the person to commit. A report for a person; `--json` for data
+ * `norn upgrade [--json]` (gh-110 B11–B17, D6; `norn migrate` before gh-61 B30): move the main
+ * checkout from the old layout to the new one (D1) and stage the moves for the person to commit. A report for a person; `--json` for data
  * (`{moves, staged, commit}`).
  *
  * Checks first, nothing moved on a refusal (exit 3): the main checkout only (B16), no part in both
@@ -10,6 +10,9 @@
  * norn's old trace line out of `.gitignore` (staged), the old folder removed, the old lock last.
  * Every step can run again, so a rerun finishes an interrupted run; no rollback. On the new layout:
  * nothing to move (B14). Never commits, pushes, or touches a unit worktree.
+ *
+ * gh-61 B30 (D9): `norn migrate` is a deprecated alias that runs the same code and adds one line for a
+ * person on stderr; it goes in the next minor.
  */
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -20,7 +23,7 @@ import { type Context, safeRealpath } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
 import { layoutRefusal } from "../runtime/layout.ts";
 
-export interface MigrateMove {
+export interface UpgradeMove {
   part: "config" | "workflows" | "machine files";
   /** relative to the main checkout */
   from: string;
@@ -30,8 +33,8 @@ export interface MigrateMove {
   how: "git mv" | "untracked" | "moved";
 }
 
-export interface MigrateReport {
-  moves: MigrateMove[];
+export interface UpgradeReport {
+  moves: UpgradeMove[];
   /** gh-64 D13: the config rewrite (renamed and removed keys, files changed) */
   config: { changed: string[]; renamed: ConfigMigration["renamed"]; removed: ConfigMigration["removed"] };
   /** paths staged by this run, relative to the main checkout */
@@ -40,14 +43,16 @@ export interface MigrateReport {
   commit: string | null;
 }
 
-const COMMIT = `git commit -m "Move norn to its new layout (norn migrate)"`;
-const CONFIG_COMMIT = `git commit -m "Move norn config to its new keys (norn migrate)"`;
-const NO_CONFIG: MigrateReport["config"] = { changed: [], renamed: [], removed: [] };
+const COMMIT = `git commit -m "Move norn to its new layout (norn upgrade)"`;
+const CONFIG_COMMIT = `git commit -m "Move norn config to its new keys (norn upgrade)"`;
+/** gh-61 B29: a tick (or `norn watch`) holds the lock */
+const STOP_WATCH = "stop `norn watch` and run it again";
+const NO_CONFIG: UpgradeReport["config"] = { changed: [], renamed: [], removed: [] };
 
 /** B16: refuse anywhere but the main checkout (a unit worktree, or any linked worktree). */
 async function mainCheckoutOnly(ctx: Context, root: string): Promise<void> {
   const top = ctx.worktree ?? safeRealpath((await ctx.git.status(ctx.cwd)).path);
-  if (top !== root) throw refuse(`${top} is not the main checkout; norn migrate moves the main checkout only, so the move never lands in a story's branch`, `cd ${root} && ${cmd.migrate()}`, "not_main_checkout", { main_checkout: root });
+  if (top !== root) throw refuse(`${top} is not the main checkout; norn upgrade moves the main checkout only, so the move never lands in a story's branch`, `cd ${root} && ${cmd.upgrade()}`, "not_main_checkout", { main_checkout: root });
 }
 
 /**
@@ -64,12 +69,12 @@ function refuseBoth(root: string): void {
     throw layoutRefusal({ layout: "both", parts: clash.map((n) => ({ part: "machine files", old: join(root, OLD_TRACE_DIR, n), new: join(machineDir(root), n), at_old: true, at_new: true })) }, root);
 }
 
-async function migrate(ctx: Context, root: string): Promise<MigrateReport> {
-  const moves: MigrateMove[] = [];
+async function moveLayout(ctx: Context, root: string): Promise<UpgradeReport> {
+  const moves: UpgradeMove[] = [];
   const staged: string[] = [];
   const at = (rel: string) => join(root, rel);
   /** a repo file by `git mv`, or plainly when untracked */
-  const gitMove = async (part: MigrateMove["part"], from: string, to: string) => {
+  const gitMove = async (part: UpgradeMove["part"], from: string, to: string) => {
     mkdirSync(dirname(at(to)), { recursive: true });
     const isStaged = await ctx.git.move(root, from, to);
     if (!isStaged) moveFile(at(from), at(to));
@@ -89,24 +94,24 @@ async function migrate(ctx: Context, root: string): Promise<MigrateReport> {
 
 /** gh-64 B45: the tick lock, taken before anything changes and held through the config part. */
 async function tickLock(ctx: Context, root: string) {
-  const lock = await acquireTickLock(root, { note: "norn migrate", now: () => ctx.clock.iso() });
-  if (!lock.ok) throw refuse(`a tick is running (pid ${lock.holder.holder.pid}${lock.holder.note ? `, ${lock.holder.note}` : ""}); norn migrate never rewrites config under a running tick`, `stop norn watch (and any tick), then run ${cmd.migrate()} again`, "tick_locked");
+  const lock = await acquireTickLock(root, { note: "norn upgrade", now: () => ctx.clock.iso() });
+  if (!lock.ok) throw refuse(`a tick is running (pid ${lock.holder.holder.pid}${lock.holder.note ? `, ${lock.holder.note}` : ""}); norn upgrade never rewrites config under a running tick`, STOP_WATCH, "tick_locked");
   return lock;
 }
 
 /** gh-64 D13 (B40–B45): the config rewrite, run holding the tick lock; stages what is committed. */
-async function migrateConfigPart(ctx: Context, root: string, report: MigrateReport): Promise<MigrateReport> {
+async function migrateConfigPart(ctx: Context, root: string, report: UpgradeReport): Promise<UpgradeReport> {
   const c: ConfigMigration = migrateConfig({ root, home: ctx.home });
   if (c.stage.length) await ctx.git.stage(root, c.stage);
   const staged = [...report.staged, ...c.stage];
   return { ...report, config: { changed: c.changed, renamed: c.renamed, removed: c.removed }, staged, commit: report.commit ?? (staged.length ? CONFIG_COMMIT : null) };
 }
 
-function markdown(r: MigrateReport, root: string): string {
+function markdown(r: UpgradeReport, root: string): string {
   const config = r.config.changed.length || r.config.removed.length || r.config.renamed.length;
-  if (!r.moves.length && !r.staged.length && !config) return `# norn migrate\n\n${root} is on the new layout and its config on the new keys: nothing to move.`;
+  if (!r.moves.length && !r.staged.length && !config) return `# norn upgrade\n\n${root} is on the new layout and its config on the new keys: nothing to move.`;
   const how = { "git mv": "staged", untracked: "untracked: moved, not staged", moved: "machine-local, outside git" };
-  const out = ["# norn migrate", ""];
+  const out = ["# norn upgrade", ""];
   if (r.moves.length) out.push(`Moved ${root} to the new layout:`, "");
   for (const m of r.moves) out.push(`- ${m.part}: ${m.from} → ${m.to} (${how[m.how]})`);
   if (config) {
@@ -123,39 +128,56 @@ function markdown(r: MigrateReport, root: string): string {
   return out.join("\n");
 }
 
+async function upgrade(ctx: Context) {
+  const root = ctx.root;
+  await mainCheckoutOnly(ctx, root);
+  const l = repoLayout(root);
+  if (l.layout === "new") {
+    const none: UpgradeReport = { moves: [], config: NO_CONFIG, staged: [], commit: null };
+    const tick = await tickLock(ctx, root);
+    try {
+      const report = await migrateConfigPart(ctx, root, none);
+      return rendered(report, markdown(report, root));
+    } finally {
+      tick.release();
+    }
+  }
+  refuseBoth(root);
+  // B45: on the old layout only an old norn ticks, under the old lock: taken before anything
+  // moves and held through the config part
+  const lock = await acquireLock(oldTickLockPath(root), { note: "norn upgrade", now: () => ctx.clock.iso() });
+  if (!lock.ok) throw refuse(`a tick is running (pid ${lock.holder.holder.pid}${lock.holder.note ? `, ${lock.holder.note}` : ""}); norn upgrade never moves the trace under a running tick`, STOP_WATCH, "tick_locked");
+  let report: UpgradeReport;
+  try {
+    report = await migrateConfigPart(ctx, root, await moveLayout(ctx, root));
+  } finally {
+    // D6: the old lock file goes last
+    lock.release();
+  }
+  removeOldLayoutDirs(root);
+  return rendered(report, markdown(report, root));
+}
+
+export const upgradeCommand = defineCommand({
+  name: "upgrade",
+  summary: "Move this repo to the new layout and its config to the new keys, and stage the changes for you to commit",
+  usage: "norn upgrade [--json]",
+  markdown: true,
+  layout: false,
+  run: (ctx) => upgrade(ctx),
+});
+
+/** gh-61 B30: the old name, kept for one minor; the same code, one line on stderr. */
+export const MIGRATE_RENAMED = "`norn migrate` is now `norn upgrade`; the old name goes in the next minor";
+
 export const migrateCommand = defineCommand({
   name: "migrate",
-  summary: "Move this repo to the new layout and its config to the new keys, and stage the changes for you to commit",
+  summary: "Deprecated: the old name of norn upgrade, removed in the next minor",
   usage: "norn migrate [--json]",
   markdown: true,
   layout: false,
-  async run(ctx) {
-    const root = ctx.root;
-    await mainCheckoutOnly(ctx, root);
-    const l = repoLayout(root);
-    if (l.layout === "new") {
-      const none: MigrateReport = { moves: [], config: NO_CONFIG, staged: [], commit: null };
-      const tick = await tickLock(ctx, root);
-      try {
-        const report = await migrateConfigPart(ctx, root, none);
-        return rendered(report, markdown(report, root));
-      } finally {
-        tick.release();
-      }
-    }
-    refuseBoth(root);
-    // B45: on the old layout only an old norn ticks, under the old lock: taken before anything
-    // moves and held through the config part
-    const lock = await acquireLock(oldTickLockPath(root), { note: "norn migrate", now: () => ctx.clock.iso() });
-    if (!lock.ok) throw refuse(`a tick is running (pid ${lock.holder.holder.pid}${lock.holder.note ? `, ${lock.holder.note}` : ""}); norn migrate never moves the trace under a running tick`, `stop norn watch (and any tick), then run ${cmd.migrate()} again`, "tick_locked");
-    let report: MigrateReport;
-    try {
-      report = await migrateConfigPart(ctx, root, await migrate(ctx, root));
-    } finally {
-      // D6: the old lock file goes last
-      lock.release();
-    }
-    removeOldLayoutDirs(root);
-    return rendered(report, markdown(report, root));
+  run(ctx) {
+    ctx.stderr.push(MIGRATE_RENAMED);
+    return upgrade(ctx);
   },
 });

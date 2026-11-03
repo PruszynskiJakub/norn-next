@@ -14,6 +14,16 @@
 
 ## Goal
 
+Rename `norn migrate` to `norn upgrade` with no behaviour change (Prefactor 3, B29, B30); keep `migrate` as a deprecated alias that prints one line on stderr.
+
 ## Progress
 
+- `packages/cli/src/commands/migrate.ts` → `upgrade.ts`: `upgradeCommand` and `migrateCommand` run the same `upgrade(ctx)`; `migrate` pushes "`norn migrate` is now `norn upgrade`; the old name goes in the next minor" to `ctx.stderr` (D9). Tick-lock refusal `do_instead` is now exactly "stop `norn watch` and run it again" (B29), on both layouts.
+- `cmd.migrate` → `cmd.upgrade` (printed-commands table updated); old-layout refusal, moved-config-key error (`config_moved`), the slice-with-`needs` message and inbox item all name `norn upgrade`. The suggested commit messages say "(norn upgrade)".
+- Help: Setup lists `upgrade`, and `migrate` last with summary "Deprecated: the old name of norn upgrade, removed in the next minor".
+- Tests: `migrate.test.ts` moved to `upgrade.test.ts` (not duplicated), plus an alias test (same JSON, same staged files, the stderr line), a new-layout tick-lock test, and a rerun-under-lock check; help-tree test for the deprecated mark. README, docs/reference.md (handwritten line + `docs:emit`) name `norn upgrade`.
+- Unit tier and typecheck green. Integration tier: every touched file passes; the full parallel run showed 2–4 timeouts that differ between runs (human.test.ts round tests, a checks test). human.test.ts passes alone (45/45), so they look like load flakiness, not this change.
+
 ## Resume
+
+Nothing left for this step; the review comes next.

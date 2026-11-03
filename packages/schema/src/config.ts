@@ -231,7 +231,7 @@ export interface ConfigProblem {
 /** `` `file`: message `` */
 export const problemText = (p: ConfigProblem) => `\`${CONFIG_FILES[p.file]}\`: ${p.message}`;
 
-const MIGRATE = "; run `norn migrate`";
+const UPGRADE = "; run `norn upgrade`";
 
 /** B39: every old or moved key and what replaced it (D2: checked first). */
 const MOVED: Record<string, string> = {
@@ -294,12 +294,12 @@ export function checkConfigFile(file: ConfigFileKind, value: unknown): ConfigPro
       const children = Object.keys(v);
       for (const c of children.length ? children : [""]) {
         const k = c ? `remote.${c}` : "remote";
-        add("config_moved", k, `${MOVED[k] ?? MOVED.remote}${MIGRATE}`);
+        add("config_moved", k, `${MOVED[k] ?? MOVED.remote}${UPGRADE}`);
       }
       continue;
     }
     if (MOVED[key]) {
-      add("config_moved", key, `${MOVED[key]}${MIGRATE}`);
+      add("config_moved", key, `${MOVED[key]}${UPGRADE}`);
       continue;
     }
     if (key !== "$schema" && !FILE_KEYS[file].includes(key)) {
@@ -334,7 +334,7 @@ function withoutMovedAgentFields(v: unknown, add: (code: ConfigProblemCode, key:
     const kept: Record<string, unknown> = {};
     for (const [field, fv] of Object.entries(entry)) {
       const k = `agents.${name}.${field}`;
-      if (MOVED_AGENT_FIELD[field]) add("config_moved", k, `\`${k}\` ${MOVED_AGENT_FIELD[field]}${MIGRATE}`);
+      if (MOVED_AGENT_FIELD[field]) add("config_moved", k, `\`${k}\` ${MOVED_AGENT_FIELD[field]}${UPGRADE}`);
       else kept[field] = fv;
     }
     agents[name] = kept;
@@ -578,7 +578,7 @@ export function configKeyProblem(file: ConfigFileKind, key: string): ConfigProbl
   const unknown = () => problem("config_invalid", `unknown key \`${key}\``);
   if (segs.some((s) => !s)) return unknown();
   const moved = MOVED[segs.slice(0, 2).join(".")] ?? MOVED[top];
-  if (moved) return problem("config_moved", `${moved}${MIGRATE}`);
+  if (moved) return problem("config_moved", `${moved}${UPGRADE}`);
   if (!FILE_KEYS[file].includes(top)) {
     const right = rightFile(top);
     return right ? problem("config_wrong_file", `\`${top}\` belongs in ${right}`) : unknown();
@@ -588,7 +588,7 @@ export function configKeyProblem(file: ConfigFileKind, key: string): ConfigProbl
       if (name === undefined) return null;
       if (!isAgentName(name)) return problem("config_invalid", `unknown agent \`${name}\`: \`agents\` takes ${AGENT_NAMES.join(", ")}`);
       if (field === undefined) return null;
-      if (MOVED_AGENT_FIELD[field]) return problem("config_moved", `\`agents.${name}.${field}\` ${MOVED_AGENT_FIELD[field]}${MIGRATE}`);
+      if (MOVED_AGENT_FIELD[field]) return problem("config_moved", `\`agents.${name}.${field}\` ${MOVED_AGENT_FIELD[field]}${UPGRADE}`);
       return (field === "model" || field === "args") && !more.length ? null : unknown();
     },
     notify: ([c, ...more]) => (c === undefined || (["os", "ntfy", "webhook"].includes(c) && !more.length) ? null : unknown()),

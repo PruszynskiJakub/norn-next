@@ -74,7 +74,7 @@ Inbox empty — no stories yet.
 Label an issue `norn` and assign it to yourself, then run `norn sync`.
 ```
 
-Config is optional: a solo developer on GitHub with Claude Code writes none. It lives in three files: `~/.norn/config.yaml` (your machine and your defaults), `.agents/norn.config.local.yaml` (yours in this repository, gitignored) and `.agents/norn.config.yaml` (the team's, committed); which keys go where is in [Reference: Config](docs/reference.md#config). norn reads GitHub or GitLab from the remote URL; a self-hosted host sets `provider: gh` or `provider: glab` in the team file. A repository set up by an older norn, or a config written for one, refuses every command and names `norn migrate` (and each old key with its replacement): run it once in the main checkout, with `norn watch` stopped, and commit what it prints.
+Config is optional: a solo developer on GitHub with Claude Code writes none. It lives in three files: `~/.norn/config.yaml` (your machine and your defaults), `.agents/norn.config.local.yaml` (yours in this repository, gitignored) and `.agents/norn.config.yaml` (the team's, committed); which keys go where is in [Reference: Config](docs/reference.md#config). norn reads GitHub or GitLab from the remote URL; a self-hosted host sets `provider: gh` or `provider: glab` in the team file. A repository set up by an older norn, or a config written for one, refuses every command and names `norn upgrade` (and each old key with its replacement): run it once in the main checkout, with `norn watch` stopped, and commit what it prints.
 
 ## Run a first story
 

@@ -19,7 +19,7 @@ A refusal prints `{error, do_instead}` (as markdown without `--json`): what was 
 | `.agents/norn.config.yaml` (committed) | the team | `provider`, `base_branch`, `workflow`, `slice_workflow` |
 | a workflow file | the workflow | top-level `mode`; `defaults:` with `deadline`, `nudges`, `retries`, `stalled` |
 
-For your keys the nearer file wins: local over user over built-in. Maps merge key by key; lists and scalars replace, so `agents: {claude: {model: …}}` keeps Claude's built-in `--permission-mode auto`, while setting `agents.claude.args` replaces that list, and `notify: {ntfy: <url>}` keeps OS notifications. A story's mode is, nearest first: the story's own (`norn story edit --auto|--manual`), its workflow's `mode`, the local file, the user file, then `manual`. A key in the wrong file, or one an older norn used, is refused with the file and key to use instead; `norn migrate` rewrites old files. `norn config` lists every setting in effect and the file it came from; `norn config set <key> <value>` changes one in the file you name with `--user`, `--local` or `--repo`.
+For your keys the nearer file wins: local over user over built-in. Maps merge key by key; lists and scalars replace, so `agents: {claude: {model: …}}` keeps Claude's built-in `--permission-mode auto`, while setting `agents.claude.args` replaces that list, and `notify: {ntfy: <url>}` keeps OS notifications. A story's mode is, nearest first: the story's own (`norn story edit --auto|--manual`), its workflow's `mode`, the local file, the user file, then `manual`. A key in the wrong file, or one an older norn used, is refused with the file and key to use instead; `norn upgrade` rewrites old files. `norn config` lists every setting in effect and the file it came from; `norn config set <key> <value>` changes one in the file you name with `--user`, `--local` or `--repo`.
 
 Everything else has no key. The runner is detected: Herdr when norn runs inside Herdr or `herdr` is installed, otherwise headless. GitHub or GitLab is read from the remote URL (`provider` is only for a self-hosted host). The git remote is the one the base branch tracks, else `origin`. Claims are timed from the tick interval (`norn watch --interval`, `norn tick --interval`). The label `norn`, the sync about every 5 minutes, slots 1–9 with ten ports each from 4010, and the 2-minute attended wait are fixed.
 
@@ -295,12 +295,12 @@ norn init [--json] [--hook-command <cmd>]
 
 - `--hook-command`
 
-##### `norn migrate`
+##### `norn upgrade`
 
 Move this repo to the new layout and its config to the new keys, and stage the changes for you to commit
 
 ```sh
-norn migrate [--json]
+norn upgrade [--json]
 ```
 
 ##### `norn doctor`
@@ -364,6 +364,14 @@ Remove norn-owned hooks and skills; keep config, workflows and specs
 
 ```sh
 norn uninstall
+```
+
+##### `norn migrate`
+
+Deprecated: the old name of norn upgrade, removed in the next minor
+
+```sh
+norn migrate [--json]
 ```
 
 #### Background

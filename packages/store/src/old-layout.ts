@@ -1,5 +1,5 @@
 /**
- * gh-110 D6: the file moves of `norn migrate`, from the old layout's places (D4) to the new ones (D1).
+ * gh-110 D6: the file moves of `norn upgrade`, from the old layout's places (D4) to the new ones (D1).
  * Each one can run again: a rerun moves what an interrupted run left and leaves the rest.
  */
 import { cpSync, existsSync, mkdirSync, readdirSync, renameSync, rmdirSync, rmSync } from "node:fs";
@@ -28,7 +28,7 @@ export function moveFile(from: string, to: string): void {
   }
 }
 
-/** The old trace dir's entries to move, without the tick lock `norn migrate` holds there. */
+/** The old trace dir's entries to move, without the tick lock `norn upgrade` holds there. */
 export const oldTraceEntries = (root: string): string[] => entries(join(root, OLD_TRACE_DIR)).filter((n) => n !== basename(oldTickLockPath(root)));
 
 /** Entries of the old workflows folder, relative to the root. */
