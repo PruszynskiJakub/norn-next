@@ -14,6 +14,17 @@
 
 ## Goal
 
+Drifted bundled skills hold a unit's agent steps (B18, D6), observe records them per unit and for the main checkout (D5, D14, B21), and the inbox names the fix (B19).
+
 ## Progress
 
+- Facts: `UnitFacts.skills_drift?` and `Facts.norn.skills_drift?` (`packages/core/src/facts.ts`).
+- decide: `agent.skills_drift` noop at the top of `startRun` (`packages/core/src/decide/agent.ts`), before the mode check; hand-built rule case in `packages/core/test/rule-cases.ts`.
+- inbox: Unblock item for a ready agent step with drift (`skillsDriftHint.held`), repo-level item `skillsDriftHint.repo` (`packages/core/src/inbox/items.ts`, `commands.ts`).
+- observe: `loadLocalFacts` takes `bundledSkills` (source + names, from cli `bundledSkillSet`), compares each non-done unit worktree once per load with `worktreeSkillsDrift` (D14) and the main checkout; observe and the view map it.
+- Tests: `packages/core/test/unit/skills-drift.test.ts` (AC1, AC3, B21 inbox), `packages/cli/test/integration/skills-drift-hold.test.ts` (AC2, AC4, AC5 + parity). `version-status.test.ts` expects `skills_drift: []` on `facts.norn` now.
+- Only the agent start path (`startRun`) is held; a fresh retry after `died`, nudge resumes and answer resumes are not (D6 names the start path only).
+
 ## Resume
+
+Run `NORN_TRANSCRIPT_UPDATE=1 bun run test:e2e test/e2e/observe-snapshots.test.ts` if the observe snapshots moved (facts gained `skills_drift`), review the diff, commit, then `norn done done`.
