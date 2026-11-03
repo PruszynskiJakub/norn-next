@@ -20,6 +20,7 @@ const noticeFile = () => noticesPath(h.root);
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
+  h.recordVersion(); // gh-61 B5: a repo without a version shows a hint; this one is set up with this norn
 });
 afterAll(() => h.cleanup());
 

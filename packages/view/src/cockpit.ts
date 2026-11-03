@@ -10,7 +10,7 @@ import { type RemoteProvider, storyKey } from "@norn/schema";
 import { inboxItemsInOrder } from "./format.ts";
 import { type OrientReport, orientReport } from "./orient.ts";
 import type { HeartbeatView, InboxEntry, ProjectView, StoryView } from "./types.ts";
-import { cmd } from "@norn/core";
+import { cmd, isVersionMismatchItem } from "@norn/core";
 
 /** CP2: inbox groups that are rows, in O1 order; running, notes and recently done live in the preview. */
 const COCKPIT_GROUPS: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock", "check"];
@@ -66,7 +66,8 @@ export interface CockpitRow {
 export interface CockpitModel {
   at: string;
   /** `pending`: how many rows the needs-you section holds */
-  header: { repo: string; pending: number; heartbeat: HeartbeatView };
+  /** `version`: gh-61 D7, the version mismatch item's text when the binary does not fit the repo's norn version */
+  header: { repo: string; pending: number; heartbeat: HeartbeatView; version?: string };
   rows: CockpitRow[];
 }
 
@@ -193,7 +194,8 @@ export function cockpitModel(view: ProjectView, o: CockpitOptions): CockpitModel
       actions: storyActions(s, s.key, o, true),
     }));
   // the header counts the rows that need you, so it matches what is listed under them
-  return { at: view.at, header: { repo: view.repo, pending: items.length, heartbeat: view.heartbeat }, rows: [...items, ...storyRows, ...issueRows(view, o)] };
+  const mismatch = view.inbox.groups.unblock.find(isVersionMismatchItem);
+  return { at: view.at, header: { repo: view.repo, pending: items.length, heartbeat: view.heartbeat, ...(mismatch ? { version: mismatch.title } : {}) }, rows: [...items, ...storyRows, ...issueRows(view, o)] };
 }
 
 /**

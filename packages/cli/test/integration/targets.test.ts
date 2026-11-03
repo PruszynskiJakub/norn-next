@@ -146,7 +146,7 @@ describe("a story and its slice have runs", () => {
     type Stories = { stories: Array<{ key: string; slices: Array<{ slice: string }> }> };
     const inbox = (await h.norn("status", "--json")).value as Inbox;
     const stories = (await h.norn("story", "list", "--json")).value as Stories;
-    const order = [...new Set([...Object.values(inbox.groups).flat().map((i) => i.slice ?? i.story), ...stories.stories.flatMap((s) => [s.key, ...s.slices.map((x) => x.slice)])])];
+    const order = [...new Set([...Object.values(inbox.groups).flat().filter((i) => i.story !== "*").map((i) => i.slice ?? i.story), ...stories.stories.flatMap((s) => [s.key, ...s.slices.map((x) => x.slice)])])];
     expect([...order].sort()).toEqual(["gh-1", "gh-2", "gh-2/01"]);
 
     const term = new FakeInteraction();

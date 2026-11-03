@@ -5,7 +5,7 @@
  */
 import { basename } from "node:path";
 import { herdr } from "@norn/adapters";
-import type { InboxGroup } from "@norn/core";
+import { type InboxGroup, isVersionMismatchItem } from "@norn/core";
 import { inboxItemsInOrder, type ProjectView } from "@norn/view";
 import { GROUP_MARK } from "./cockpit.ts";
 
@@ -24,12 +24,16 @@ const NEEDS: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock
 
 /** e.g. `norn·todoist-app ● 1 approve ◐ 2 running`; calm when nothing waits: `norn·todoist-app ✓ nothing waits`. */
 export function segmentLine(view: ProjectView): string {
-  const head = `norn·${basename(view.repo)}`;
+  // gh-61 D7 (B8): a binary that does not fit the repo's norn version is named first, not counted
+  const mismatch = view.inbox.groups.unblock.find(isVersionMismatchItem);
+  const count = (g: InboxGroup) => view.inbox.groups[g].filter((i) => !isVersionMismatchItem(i)).length;
+  const head = `norn·${basename(view.repo)}${mismatch ? ` ! ${mismatch.title.split(": ")[0]}` : ""}`;
   const parts = COUNTED.flatMap(([g, word]) => {
-    const n = view.inbox.groups[g].length;
+    const n = count(g);
     return n ? [`${GROUP_MARK[g]} ${n} ${word}`] : [];
   });
-  const waiting = NEEDS.some((g) => view.inbox.groups[g].length > 0);
+  if (mismatch) return parts.length ? `${head} · ${parts.join(" ")}` : head;
+  const waiting = NEEDS.some((g) => count(g) > 0);
   return waiting ? `${head} ${parts.join(" ")}` : `${head} ✓ nothing waits${parts.length ? ` · ${parts.join(" ")}` : ""}`;
 }
 

@@ -5,7 +5,7 @@
 export { type CliResult, helpFor, nounHelp, parseCommandArgs, runCli } from "./cli.ts";
 export { type Command, defineCommand, opt, type OptionSpec, type ParsedArgs } from "./command.ts";
 export { COMMANDS, findCommand, findNoun, NOUNS } from "./commands/index.ts";
-export { type CliDeps, Context, findUnitMarker, type Located, locateRepo, systemClock } from "./context.ts";
+export { type CliDeps, Context, findUnitMarker, type Located, locateRepo, runningVersion, systemClock } from "./context.ts";
 export { busyError, CliFailure, corruptError, failure, isRendered, isWithExit, refuse, render, rendered, toFailure, usageError, withExit } from "./output.ts";
 export { type ActRecord, Actor } from "./runtime/act/index.ts";
 export { heartbeatId, markNotified, readNotified, readRemoteCache } from "@norn/store";

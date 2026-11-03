@@ -1,5 +1,5 @@
 /** Exact commands shown to people (O1, S9) and naming conventions shared by decide, inbox and handoff. */
-import { sliceDirName, storyDirName, type UnitState } from "@norn/schema";
+import { sliceDirName, storyDirName, type UnitState, versionMatch } from "@norn/schema";
 
 /** B5: the whole first prompt of an auto-mode agent session. */
 export const AUTO_PROMPT = "Use the norn skill, then run `norn brief`.";
@@ -133,3 +133,26 @@ export function nameRemoved(text: string): string | null {
   const m = REMOVED.exec(text);
   return m ? `norn ${m[1]}` : null;
 }
+
+/** gh-61 B2: the releases that fit a recorded version, for a person: `0.19.x` before 1.0, `1.x` from 1.0 on. */
+const versionLine = (v: string): string => {
+  const [maj, min] = v.split(".");
+  return maj === "0" ? `0.${min}.x` : `${maj}.x`;
+};
+
+/**
+ * gh-61 D3 (B6, B7, B8): what a running binary that does not fit the repo's recorded version is
+ * told — the refusal's `error` and `do_instead`, and the inbox item. Null when it fits.
+ */
+export function versionMismatch(repo: string, running: string): { match: "older" | "newer"; error: string; do_instead: string } | null {
+  const match = versionMatch(repo, running);
+  if (match === "match") return null;
+  const error = `this repo needs norn ${versionLine(repo)} (you run ${running})`;
+  const install = `install norn ${versionLine(repo)}`;
+  // B7: a newer binary moves the repo forward with a commit, not a downgrade
+  const do_instead = match === "newer" ? `run \`${cmd.upgrade()}\` to move this repo to norn ${running} and commit the change, or ${install}` : install;
+  return { match, error, do_instead };
+}
+
+/** gh-61 B5: the hint when the team file records no `norn_version` (`doctor`, `status`). */
+export const NO_VERSION_HINT = `no norn version recorded: run \`${cmd.upgrade()}\``;

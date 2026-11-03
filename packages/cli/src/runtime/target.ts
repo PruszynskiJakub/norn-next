@@ -35,6 +35,7 @@ export interface TargetRule {
 function unitsInStatusOrder(view: ProjectView): InteractionChoice[] {
   const out = new Map<string, string>();
   for (const i of inboxItemsInOrder(view)) {
+    if (i.story === "*") continue; // a repo-level item (heartbeat, gh-61 norn version) names no unit
     const key = i.slice ?? i.story;
     if (!out.has(key)) out.set(key, `${key}  ${stepTitle(i.step, i.title)}`);
   }

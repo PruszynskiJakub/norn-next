@@ -164,6 +164,15 @@ describe("the cockpit's tabs (CP6, CP7)", () => {
     expect(frame(press(again, "/")).split("\n")[0]).toStartWith("/ login▏");
   });
 
+  test("gh-61 D7 (B8): a norn version mismatch shows in the header, in the heartbeat's place", () => {
+    const m = model();
+    const version = "this repo needs norn 0.19.x (you run 0.18.1): install norn 0.19.x";
+    const head = renderCockpit({ ...m, header: { ...m.header, version } }, initialState(), look).split("\n")[0];
+    expect(head).toEndWith(`! ${version}  12:00`);
+    expect(head).not.toContain("tick 0s ago");
+    expect(frame(initialState()).split("\n")[0]).toEndWith("tick 0s ago  12:00");
+  });
+
   test("a story shows its round and workflow: the row before the step, the preview like story view (RD8, gh-71 B28)", () => {
     const f = frame(press(initialState(), "]", "j"));
     expect(f).toMatch(/│ ◐ round 2 · refinement · running at implement · auto/);

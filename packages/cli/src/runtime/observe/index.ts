@@ -169,7 +169,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
 
   // ---- local facts (H2): the snapshot, leases (K1, K3), hook facts, caches, what the receipts say
   const liveness = leaseLiveness((p) => ports.process.isAlive(p));
-  const local = await loadLocalFacts(root, { now, home: ctx.home, env: ctx.env, storyWorktrees: storyWts, sliceWorktrees: sliceWts, baseRef, liveness, backfillHooks: opts.backfillHooks });
+  const local = await loadLocalFacts(root, { now, home: ctx.home, env: ctx.env, storyWorktrees: storyWts, sliceWorktrees: sliceWts, baseRef, liveness, backfillHooks: opts.backfillHooks, running: ctx.version });
   const snapshot = local.snapshot;
   const workflows = checkedRepoWorkflows(snapshot.workflows, root, config, ports.agents);
 
@@ -363,6 +363,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     stories,
     // R5.5: this tick is the checkout's heartbeat
     heartbeat: { last_tick_at: now },
+    ...(local.norn ? { norn: local.norn } : {}),
     orphans: { worktrees: orphanWts.sort(), branches: orphanBranches },
   };
   return { facts, workflows, config, ports, root, remote, heartbeat_id: hb, stories: storyLocs, units: unitLocs, sync, unpushed };

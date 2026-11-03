@@ -19,6 +19,7 @@ describe("norn status --segment", () => {
   beforeAll(async () => {
     c = await createHarness();
     expect((await c.norn("init")).exit).toBe(0);
+    c.recordVersion(); // gh-61 B5: a repo set up with this norn shows no version hint
     c.git(["add", "-A"]);
     c.git(["commit", "-q", "-m", "norn init"]);
     c.git(["push", "-q", "origin", "main"]);

@@ -9,7 +9,7 @@
  * action), Recently done.
  */
 import { ATTENDED_WAIT, parseDuration, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
-import { cmd, nextCommand, startAgentCommand } from "../commands.ts";
+import { cmd, NO_VERSION_HINT, nextCommand, startAgentCommand, versionMismatch } from "../commands.ts";
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../criteria.ts";
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
@@ -113,6 +113,29 @@ function heartbeatItem(facts: Facts, config: ResolvedConfig): InboxItem | null {
     command: cmd.watch(),
     since: down.since ?? iso(facts.now),
   };
+}
+
+/** gh-61 D7: the id of the repo-level version item, kept first in Unblock. */
+const VERSION_ITEM = "norn-version:";
+
+/** gh-61 D7: the repo-level item for a binary that does not fit the repo's norn version; front ends show it on top. */
+export const isVersionMismatchItem = (it: Pick<InboxItem, "id" | "group">): boolean => it.group === "unblock" && it.id.startsWith(VERSION_ITEM);
+
+/**
+ * gh-61 D7 (B8, B5): the running binary against the repo's norn version. A mismatch is a repo-level
+ * Unblock item (first in its group); no recorded version is a Check item, so it never notifies.
+ * Null when they match or the version was not observed.
+ */
+function versionItem(facts: Facts): InboxItem | null {
+  const v = facts.norn;
+  if (!v) return null;
+  const base = { story: "*", slice: null, step: null, command: cmd.upgrade(), since: iso(facts.now) };
+  if (v.repo === null) return { ...base, id: `${VERSION_ITEM}none`, group: "check", title: NO_VERSION_HINT };
+  const mismatch = versionMismatch(v.repo, v.running);
+  if (!mismatch) return null;
+  // an older binary's way out is outside norn (install the repo's line); `doctor` runs on a mismatch (B8) and shows it
+  const command = mismatch.match === "newer" ? cmd.upgrade() : cmd.doctor();
+  return { ...base, id: `${VERSION_ITEM}${v.repo}:${v.running}`, group: "unblock", title: `${mismatch.error}: ${mismatch.do_instead}`, command };
 }
 
 /**
@@ -778,7 +801,10 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
     }
   }
   add(heartbeatItem(facts, config));
-  for (const g of INBOX_GROUPS) groups[g].sort((a, b) => epoch(a.since) - epoch(b.since) || a.id.localeCompare(b.id));
+  add(versionItem(facts));
+  // gh-61 D7: the version item comes first, whatever its age
+  const pinned = (it: InboxEntry) => (it.id.startsWith(VERSION_ITEM) ? 0 : 1);
+  for (const g of INBOX_GROUPS) groups[g].sort((a, b) => pinned(a) - pinned(b) || epoch(a.since) - epoch(b.since) || a.id.localeCompare(b.id));
   const pending = INBOX_GROUPS.filter((g) => g !== "running" && g !== "notes" && g !== "recently_done").reduce((n, g) => n + groups[g].length, 0);
   return { at: iso(facts.now), groups, pending };
 }

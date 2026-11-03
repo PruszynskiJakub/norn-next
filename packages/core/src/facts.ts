@@ -374,6 +374,13 @@ export interface Facts {
    * A tick observes its own start; views read `heartbeat.json`. Absent = not observed.
    */
   heartbeat?: { last_tick_at: number | null };
+  /**
+   * gh-61 D5: the running binary's version and the one the main checkout's team config records
+   * (`norn_version`, null = not recorded, B5). Absent = not observed (no running version given, or
+   * the config failed to load). A mismatch never reaches decide (the tick is refused first, B6);
+   * the inbox shows it (B8, D7).
+   */
+  norn?: { running: string; repo: string | null };
   /** worktrees/branches with no matching unit (K5) */
   orphans: { worktrees: string[]; branches: string[] };
 }
