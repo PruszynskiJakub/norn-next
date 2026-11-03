@@ -2,7 +2,7 @@
 id: gh-61/03
 title: Rename `norn migrate` to `norn upgrade`, alias kept
 depends_on: []
-status: planned
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
