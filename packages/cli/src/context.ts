@@ -31,8 +31,6 @@ export interface CliDeps {
   log?: (line: string) => void;
   /** stops `watch` after the current tick, and `story wait` */
   signal?: AbortSignal;
-  /** the pause between polls of `story wait`; default a timer (tests advance a fake clock) */
-  sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
   /** stdin text for commands that read it (`norn hook`); else the process stdin */
   stdin?: string;
   /** CP6: raw key chunks for `norn status --watch`; else the process stdin in raw mode */
@@ -45,7 +43,7 @@ export interface CliDeps {
   interaction?: Interaction | null;
   /** a tick started a detached `norn check-run` (C5); `exited` settles when it ends (tests wait on it) */
   onCheckStarted?: (exited: Promise<void>) => void;
-  /** gh-174: a pause while a person command waits for a running tick (H1); default a real timer, ended early by `signal` */
+  /** the pause between polls of `story wait`, and while a person command waits for a running tick (gh-174, H1); default a real timer ended early by `signal` (tests advance a fake clock) */
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
 }
 
