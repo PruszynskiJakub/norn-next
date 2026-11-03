@@ -5,6 +5,7 @@
  * before its exec, and under load that left no zombie. Some platforms (or sandboxes) cannot make
  * one; `zombieUnsupported` says so once, with the reason, so suites skip instead.
  */
+import { spawnSyncCaptured } from "@norn/store";
 
 export interface Zombie {
   pid: number;
@@ -14,7 +15,7 @@ export interface Zombie {
 }
 
 function ps(fields: string, pid: number): string {
-  return Bun.spawnSync(["ps", "-o", fields, "-p", String(pid)], { env: { ...process.env, LC_ALL: "C", LANG: "C" } })
+  return spawnSyncCaptured(["ps", "-o", fields, "-p", String(pid)], { env: { ...process.env, LC_ALL: "C", LANG: "C" } })
     .stdout.toString()
     .trim();
 }

@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { cpSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { StoryFacts } from "@norn/core";
-import { baseCacheDir, baseSpecsRoot, defaultBaseRef, readTickInputs, readTrace, repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
+import { baseCacheDir, baseSpecsRoot, defaultBaseRef, readTickInputs, readTrace, repoConfigPath, spawnSyncCaptured, storyUnitDir, workflowsDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
 
@@ -67,7 +67,7 @@ async function bootTo(h: Harness, n: number, title: string, runs: () => string) 
 /** What the durable-record read (store/base.ts) sees: the base ref, its specs tree and the machine dir's base copies. */
 function baseDiagnostics(h: Harness): Record<string, unknown> {
   const ref = defaultBaseRef(h.root, "origin");
-  const tree = ref ? Bun.spawnSync(["git", "rev-parse", "--verify", "--quiet", `${ref}:.agents/specs`], { cwd: h.root }).stdout.toString().trim() : null;
+  const tree = ref ? spawnSyncCaptured(["git", "rev-parse", "--verify", "--quiet", `${ref}:.agents/specs`], { cwd: h.root }).stdout.toString().trim() : null;
   const cache = baseCacheDir(h.root);
   const copies = existsSync(cache) ? readdirSync(cache).map((n) => ({ n, files: existsSync(join(cache, n, ".agents/specs")) ? readdirSync(join(cache, n, ".agents/specs")) : null, complete: existsSync(join(cache, n, ".complete")) })) : null;
   return { ref, tree, cache, copies, root: ref ? baseSpecsRoot(h.root, ref) : null };

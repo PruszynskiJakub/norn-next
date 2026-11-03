@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawnSyncCaptured } from "@norn/store";
 import { REPO_ROOT as ROOT } from "../../../../test/support/repo-root.ts";
 
 /** The `ci` check script of a repo workflow, as norn runs it (`sh -c`, packages/cli/src/runtime/shell.ts). */
@@ -33,7 +34,7 @@ esac
     writeFileSync(join(fake, "sleep"), `#!/bin/sh\necho "$1" >> "$FAKE/sleeps"\n`);
     chmodSync(join(fake, "gh"), 0o755);
     chmodSync(join(fake, "sleep"), 0o755);
-    const proc = Bun.spawnSync(["sh", "-c", `exec 2>&1\n${ciScript("quick")}`], {
+    const proc = spawnSyncCaptured(["sh", "-c", `exec 2>&1\n${ciScript("quick")}`], {
       cwd: fake,
       env: { ...process.env, PATH: `${fake}:${process.env.PATH}`, FAKE: fake, APPEAR: String(appear), WATCH_EXIT: String(watchExit) },
     });
@@ -94,7 +95,7 @@ esac
     if (withGh) chmodSync(join(fake, "gh"), 0o755);
     chmodSync(join(fake, "sleep"), 0o755);
     // without gh, PATH is the fake dir alone: CI runners ship gh in /usr/bin
-    const proc = Bun.spawnSync(["/bin/sh", "-c", `exec 2>&1\n${bundledCiScript("quick")}`], {
+    const proc = spawnSyncCaptured(["/bin/sh", "-c", `exec 2>&1\n${bundledCiScript("quick")}`], {
       cwd: fake,
       env: { PATH: withGh ? `${fake}:/usr/bin:/bin` : fake, FAKE: fake, APPEAR: String(appear), WATCH_EXIT: String(watchExit) },
     });
