@@ -81,6 +81,34 @@ describe("norn upgrade moves the version, the skills and the config in one stage
     }
   });
 
+  test("AC1: an agent folder the repo ignores → the link is recreated and not staged, the rest staged", async () => {
+    const h = await setUpAt("0.17.0", "0.19.0");
+    try {
+      appendFileSync(join(h.root, ".gitignore"), ".claude/\n");
+      sh(h.root, ["rm", "-r", "-q", "--cached", ".claude"]);
+      sh(h.root, ["add", "-A"]);
+      sh(h.root, ["commit", "-q", "-m", "ignore the agent folder"]);
+      const bundled = readFileSync(skill(h, "norn-plan"), "utf8");
+      rmSync(link(h, "norn-plan"));
+      h.write(skill(h, "norn-plan"), "# 0.17.0's protocol\n");
+      sh(h.root, ["commit", "-q", "-am", "drift"]);
+
+      const r = await upgradeAs(h, "0.19.0", "--json");
+      expect(r.exit).toBe(0);
+      expect(lstatSync(link(h, "norn-plan")).isSymbolicLink()).toBe(true);
+      expect(readFileSync(skill(h, "norn-plan"), "utf8")).toBe(bundled);
+      expect(teamFile(h)).toMatch(/^norn_version: 0\.19\.0$/m);
+      expectAllStaged(h);
+      expect(porcelain(h)).toContain("M  .agents/skills/norn-plan/SKILL.md");
+      expect(porcelain(h)).toContain(`M  ${REPO_CONFIG_FILE}`);
+      expect(porcelain(h)).not.toContain(".claude/");
+      expect(r.value).toMatchObject({ skills: { updated: ["norn-plan"], linked: ["norn-plan"] } });
+      expect((r.value as { staged: string[] }).staged.some((p) => p.startsWith(".claude/"))).toBe(false);
+    } finally {
+      h.cleanup();
+    }
+  });
+
   test("AC1: a repo without the key gets it written and staged", async () => {
     const h = await setUpAt("0.19.0", "0.19.0");
     try {

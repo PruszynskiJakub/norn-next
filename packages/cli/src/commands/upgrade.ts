@@ -197,12 +197,13 @@ function markdown(r: UpgradeReport, root: string): string {
   if (!r.moves.length && !r.staged.length && !config && !skills && !r.norn_version.changed)
     return `# norn upgrade\n\nalready on norn ${r.norn_version.from ?? r.norn_version.to}: nothing to upgrade (${root} is on the new layout, its config on the new keys and its skills match).`;
   const how = { "git mv": "staged", untracked: "untracked: moved, not staged", moved: "machine-local, outside git" };
-  const out = ["# norn upgrade", "", summary(r), ""];
-  if (r.moves.length) out.push(`Moved ${root} to the new layout:`, "");
+  // every section below starts with its own blank line
+  const out = ["# norn upgrade", "", summary(r)];
+  if (r.moves.length) out.push("", `Moved ${root} to the new layout:`, "");
   for (const m of r.moves) out.push(`- ${m.part}: ${m.from} → ${m.to} (${how[m.how]})`);
   if (config) {
     const file = (f: "user" | "repo") => (f === "user" ? "the user file" : "the team file");
-    out.push(...(r.moves.length ? [""] : []), "Config moved to its new keys:", "");
+    out.push("", "Config moved to its new keys:", "");
     for (const n of r.config.renamed) out.push(`- ${file(n.file)}: \`${n.from}\` → ${n.to.includes(" ") ? n.to : `\`${n.to}\``}`);
     for (const d of r.config.removed) out.push(`- removed \`${d.key}: ${typeof d.value === "object" ? JSON.stringify(d.value) : String(d.value)}\` from ${file(d.file)}: ${d.note}`);
     for (const p of r.config.changed) out.push(`- rewrote ${p.startsWith(root) ? p.slice(root.length + 1) : p}`);
