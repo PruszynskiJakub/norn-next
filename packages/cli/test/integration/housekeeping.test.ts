@@ -328,6 +328,23 @@ describe("norn doctor: a fresh repository", () => {
       h.config(CONFIG);
     }
   });
+  test("a drifted bundled skill keeps the skills line and is a warning naming it; a repo-local skill is never named (B21)", async () => {
+    const skill = join(h.root, ".agents/skills/norn-implement/SKILL.md");
+    const before = readFileSync(skill, "utf8");
+    h.write(join(h.root, ".agents/skills/release/SKILL.md"), "---\nname: release\n---\nthe repo's own\n");
+    h.write(skill, `${before}\nedited here\n`);
+    try {
+      const env = { ...h.deps.env, NORN_HOOK_COMMAND: `${process.execPath} ${main} hook` };
+      const r = await runChecked(["doctor"], { ...h.deps, env });
+      expect(r.value).toMatchObject({ skills: { ok: true, missing: [], drifted: ["norn-implement"], unlinked: {} } });
+      expect(r.stdout).toMatch(/ok {3}skills +installed and linked\n/);
+      expect(r.stdout).toContain("! skills differ from this norn's bundled version: norn-implement — run norn init to update them (git diff .agents/skills/ shows the change)");
+      expect(r.stdout).not.toMatch(/failed \(.*skills/);
+    } finally {
+      h.write(skill, before);
+      rmSync(join(h.root, ".agents/skills/release"), { recursive: true, force: true });
+    }
+  });
 });
 
 describe("norn doctor: the cockpit plugin hint (HC11)", () => {

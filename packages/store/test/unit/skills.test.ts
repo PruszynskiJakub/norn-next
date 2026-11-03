@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { LEGACY_SKILL_MARKER, installSkills, linkSkills, removeSkills, skillsReport, visibleSkills } from "../../src/index.ts";
+import { LEGACY_SKILL_MARKER, installSkills, linkSkills, removeSkills, skillsDrift, skillsReport, visibleSkills } from "../../src/index.ts";
 import { tmp } from "../helpers.ts";
 
 function write(path: string, text: string) {
@@ -83,6 +83,29 @@ describe("skillsReport and visibleSkills", () => {
     expect(skillsReport(root, src, ["norn-a", "norn-b"], { claude, codex })).toEqual({ dir: codex, missing: [], drifted: ["norn-b"], unlinked: { claude: ["norn-b"] } });
     expect(visibleSkills(claude)).toEqual(["norn-a"]);
     expect(visibleSkills(join(root, "nope"))).toEqual([]);
+  });
+});
+
+describe("skillsDrift", () => {
+  test("names only the bundled skills that differ: a missing one is not drift, a repo-local one is never named (B21)", () => {
+    const src = bundle();
+    write(join(src, "norn-c", "SKILL.md"), "---\nname: norn-c\n---\nC v1\n");
+    const root = tmp();
+    const dir = join(root, ".agents/skills");
+    installSkills(root, src, ["norn-a", "norn-b"]);
+    writeFileSync(join(dir, "norn-a/ref/tests.md"), "tests, edited\n");
+    write(join(dir, "release", "SKILL.md"), "---\nname: release\n---\nthe repo's own\n");
+    expect(skillsDrift(dir, src, ["norn-a", "norn-b", "norn-c"])).toEqual(["norn-a"]);
+  });
+
+  test("same size, other bytes is drift; an extra file is drift", () => {
+    const src = bundle();
+    const root = tmp();
+    const dir = join(root, ".agents/skills");
+    installSkills(root, src, ["norn-a", "norn-b"]);
+    writeFileSync(join(dir, "norn-b/SKILL.md"), "---\nname: norn-b\n---\nB v2\n");
+    write(join(dir, "norn-a", "extra.md"), "x\n");
+    expect(skillsDrift(dir, src, ["norn-a", "norn-b"])).toEqual(["norn-a", "norn-b"]);
   });
 });
 
