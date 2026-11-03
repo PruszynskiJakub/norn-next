@@ -311,7 +311,7 @@ Check agents, hooks, skills, remote auth and runner on this machine, and the rep
 norn doctor [--repo] [--live] [--json]
 ```
 
-- `--repo`: check only the repo workflows and config: no agent, runner or remote needed (CI, a test check)
+- `--repo`: check only the repo: its norn version, bundled skills, workflows and config; no agent, runner or remote needed (CI, a test check)
 - `--live`: also run one cheap headless test turn per agent
 
 ##### `norn config` (noun)

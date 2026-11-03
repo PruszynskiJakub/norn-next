@@ -18,6 +18,7 @@ import { cockpitHerdr } from "../runtime/cockpit.ts";
 import { projectView } from "../runtime/human.ts";
 import { isOrientWorkspace } from "../runtime/segment.ts";
 import { ensureShim, nornEntry, withNornOnPath } from "../runtime/shim.ts";
+import { refuseOnSkillsDrift } from "../runtime/skills-drift.ts";
 import { aStory, targetKey } from "../runtime/target.ts";
 
 /** The chat agent: the default agent with its configured args, its first prompt `norn story view <story>`. */
@@ -39,6 +40,7 @@ export const storyChatCommand = defineCommand({
     const { story } = parseUnitKey(raw);
     const report = orientReport(await projectView(ctx), story, ctx.config.provider);
     if (!report) throw refuse(`unknown story ${story}`, cmd.status(), "unknown_unit");
+    refuseOnSkillsDrift(ctx, report.root, story); // gh-61 B20 (D11): the story worktree the chat agent runs in
 
     const label = `${story} orient`;
     const command = chatAgentCommand(ctx.config, story);

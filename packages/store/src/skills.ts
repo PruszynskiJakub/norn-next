@@ -5,7 +5,10 @@
  */
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
-import { atomicWrite, safeUnlink } from "./fsx.ts";
+import { VERSION_PATTERN, versionMatch } from "@norn/schema";
+import { parse as parseYaml } from "yaml";
+import { atomicWrite, readText, safeUnlink } from "./fsx.ts";
+import { repoConfigPath } from "./paths.ts";
 
 export const SKILLS_DIR = ".agents/skills";
 const skillsDir = (root: string) => join(root, SKILLS_DIR);
@@ -163,6 +166,29 @@ export function visibleSkills(dir: string): string[] {
  */
 export function skillsDrift(skillsFolder: string, sourceDir: string, names: readonly string[]): string[] {
   return names.filter((n) => existsSync(join(skillsFolder, n, "SKILL.md")) && !sameFolder(join(sourceDir, n), join(skillsFolder, n)));
+}
+
+/** The `norn_version` a worktree's own team file records, or null (none, unreadable, not a version). */
+function recordedVersion(root: string): string | null {
+  const raw = readText(repoConfigPath(root));
+  if (raw === null) return null;
+  try {
+    const v = (parseYaml(raw) as { norn_version?: unknown } | null)?.norn_version;
+    return typeof v === "string" && new RegExp(VERSION_PATTERN).test(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * gh-61 B20, D14: the bundled skills in a worktree that differ from the running norn's (`skillsDrift`
+ * on its `.agents/skills/`) — none when the worktree's own team file records a `norn_version` newer
+ * than `running`: its skills belong to the version that branch moves to.
+ */
+export function worktreeSkillsDrift(root: string, sourceDir: string, names: readonly string[], running: string): string[] {
+  const recorded = recordedVersion(root);
+  if (recorded && versionMatch(recorded, running) === "older") return [];
+  return skillsDrift(skillsDir(root), sourceDir, names);
 }
 
 export interface SkillsReport {

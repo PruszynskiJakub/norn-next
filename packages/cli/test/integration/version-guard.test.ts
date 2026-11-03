@@ -184,7 +184,9 @@ describe("commands that act refuse a mismatched binary (B6, B7, D1, D2)", () => 
     for (const a of argv) {
       const matching = await as(h, "0.19.0", [...a, "--json"]);
       const mismatched = await as(h, "0.18.1", [...a, "--json"]);
-      expect({ a, exit: mismatched.exit }).toEqual({ a, exit: matching.exit });
+      // doctor runs, but its own version check fails on a mismatch and exits 1 (B23)
+      const expected = a[0] === "doctor" ? 1 : matching.exit;
+      expect({ a, exit: mismatched.exit }).toEqual({ a, exit: expected });
       expect((mismatched.value as { code?: string } | null)?.code).not.toBe("version_mismatch");
     }
     // story wait was met, so the exit codes compared above were real runs

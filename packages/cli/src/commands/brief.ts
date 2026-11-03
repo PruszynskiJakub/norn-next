@@ -14,6 +14,7 @@ import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, 
 import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
+import { refuseOnSkillsDrift } from "../runtime/skills-drift.ts";
 import { agentName, loadUnitSession, refuseUnlessAgentWork, reportCommand, unitStoryMode, type UnitSession, unitCriteria } from "../runtime/agent-unit.ts";
 
 /** Wrappers between the agent and `norn` that exit right after it (never the run's process). */
@@ -161,6 +162,7 @@ export const briefCommand = defineCommand({
     const pending = s.unapplied.filter((r) => r.receipt.kind !== "started" && r.receipt.kind !== "mode");
     if (pending.length) throw refuse(`unit ${key} has receipts the heartbeat has not applied yet (${pending.map((r) => r.receipt.kind).join(", ")})`, `${cmd.tick()}, then run ${cmd.brief()} again`, "pending_receipts");
     refuseUnlessAgentWork(s, "brief");
+    refuseOnSkillsDrift(ctx, s.worktree, s.unit.story); // gh-61 B20 (D11): the worktree it runs in
     const step = cursorStep(s) as AgentStep;
 
     let started = false;

@@ -1,8 +1,8 @@
 ---
 id: gh-61/06
 title: The inbox shows a version mismatch and a missing version
-depends_on: [gh-61/01, gh-61/04]
-status: planned
+depends_on: [ gh-61/01, gh-61/04 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }

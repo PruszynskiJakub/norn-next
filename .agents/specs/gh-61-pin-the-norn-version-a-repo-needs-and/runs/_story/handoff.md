@@ -5,7 +5,7 @@
 - Counters: base_conflict_loop 0/2, ci_loop 0/3, qa_loop 0/2, ready_loop 0/2, slice_loop 0/3, stale_loop 0/10, sync_conflict_loop 0/2, test_loop 0/5
 - Last outcome: approve-slices.approve (human, 2026-11-03T13:05:49.808Z)
 - Next: `norn brief`
-- Updated: 2026-11-03T13:06:05.260Z
+- Updated: 2026-11-03T14:52:47.549Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - story.start: refinement at sync
@@ -20,6 +20,8 @@
 - agent.start: slice run 01M6GQYHH3VT44GMTEQHKQPEZD
 - receipts.apply: slice.done → approve-slices
 - receipts.apply: approve-slices.approve → slices
+- receipts.apply: applied 7
+- receipts.apply: applied 8
 <!-- norn:heartbeat:end -->
 
 ## Goal

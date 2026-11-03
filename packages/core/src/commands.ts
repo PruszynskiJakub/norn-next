@@ -117,6 +117,12 @@ export function versionMismatch(repo: string, running: string, match: "older" | 
   };
 }
 
+/** gh-61 B20 (D11): what a session started on drifted skills is told; B19's inbox item names the same fix. */
+export const skillsDriftHint = {
+  text: (running: string, names: readonly string[]) => `skills differ from norn ${running}: ${names.join(", ")}`,
+  fix: (story: string) => `bring the base in with \`${cmd.storyUpdateBranch(story)}\``,
+};
+
 /** B5: the top-level commands this release removed; no printed command names one (B7). */
 export const REMOVED_COMMANDS = ["drop", "inbox", "cockpit", "orient", "open", "answer", "approve", "unstick", "update", "mode", "workflow", "take", "release", "trace", "why"] as const;
 
