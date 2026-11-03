@@ -5,7 +5,7 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { noteSpawn } from "@norn/store";
+import { noteSpawn, spawnSyncCaptured } from "@norn/store";
 
 export interface DetectedTestCommand {
   command: string;
@@ -69,6 +69,11 @@ export function withTestCommand(yaml: string, command: string): string {
 /** The fetch URL of the named git remote, or null when the repository has no such remote. */
 export function gitRemoteUrl(root: string, name: string): string | null {
   noteSpawn(["git", "remote", "get-url", name], root);
-  const r = Bun.spawnSync(["git", "remote", "get-url", name], { cwd: root, stdout: "pipe", stderr: "pipe" });
+  let r: ReturnType<typeof spawnSyncCaptured>;
+  try {
+    r = spawnSyncCaptured(["git", "remote", "get-url", name], { cwd: root });
+  } catch {
+    return null;
+  }
   return r.exitCode === 0 ? r.stdout.toString().trim() || null : null;
 }

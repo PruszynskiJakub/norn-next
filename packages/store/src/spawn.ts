@@ -4,7 +4,7 @@
  * A connection dropped while the machine slept otherwise never errors and holds the tick lock.
  */
 import { spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -155,6 +155,65 @@ export async function spawnBounded(argv: string[], opts: BoundedOptions): Promis
     return { code: 124, stdout, stderr, timed_out: true };
   }
   return { code: child.exitCode ?? 1, stdout, stderr, timed_out: false };
+}
+
+export interface SyncCaptured {
+  /** exit code; null when killed by a signal (the timeout included) */
+  exitCode: number | null;
+  stdout: Buffer;
+  stderr: Buffer;
+  exitedDueToTimeout: boolean;
+}
+
+let captureSeq = 0;
+
+/** A fresh file for a child's output, created with O_EXCL, open for reading and writing. */
+function captureFile(): { path: string; fd: number } {
+  for (;;) {
+    const path = join(tmpdir(), `norn-out-${process.pid}-${++captureSeq}-${Math.random().toString(36).slice(2, 8)}`);
+    try {
+      return { path, fd: openSync(path, "wx+", 0o600) };
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
+    }
+  }
+}
+
+/**
+ * `Bun.spawnSync` with stdout and stderr written to temp files, not pipes. Under load (bun 1.3.13)
+ * `spawnSync` with `stdout: "pipe"` now and then returns exit 0 with an empty stdout (about 1 call in
+ * 20 000). A `ps` probe then reads a live process as gone, and a `git rev-parse` reads a ref as empty.
+ * Output written to a file was never lost (0 in 90 000 under the same load). Throws like
+ * `Bun.spawnSync` when the executable cannot be started. Tells nobody: callers call `noteSpawn`.
+ */
+export function spawnSyncCaptured(
+  argv: string[],
+  opts: { cwd?: string; env?: Record<string, string | undefined>; stdin?: Uint8Array; timeoutMs?: number } = {},
+): SyncCaptured {
+  const out = captureFile();
+  let err: { path: string; fd: number } | undefined;
+  try {
+    err = captureFile();
+    const p = Bun.spawnSync(argv, {
+      ...(opts.cwd === undefined ? {} : { cwd: opts.cwd }),
+      ...(opts.env === undefined ? {} : { env: definedEnv(opts.env) }),
+      stdin: opts.stdin ?? "ignore",
+      stdout: out.fd,
+      stderr: err.fd,
+      ...(opts.timeoutMs === undefined ? {} : { timeout: opts.timeoutMs, killSignal: "SIGKILL" as const }),
+    });
+    return { exitCode: p.exitCode, stdout: readFileSync(out.path), stderr: readFileSync(err.path), exitedDueToTimeout: p.exitedDueToTimeout === true };
+  } finally {
+    for (const f of [out, err]) {
+      if (!f) continue;
+      closeSync(f.fd);
+      try {
+        unlinkSync(f.path);
+      } catch {
+        // already gone: nothing to clean up
+      }
+    }
+  }
 }
 
 /** A child started by `spawnDetached`: its pid and a promise that settles when it exits. */

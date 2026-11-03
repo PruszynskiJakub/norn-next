@@ -1,10 +1,10 @@
 /** Bounded child processes (H11): a hung network call is killed with its whole process group. */
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { git, gitSync } from "../../src/git.ts";
-import { type SpawnRecord, setSpawnObserver, spawnBounded } from "../../src/index.ts";
+import { type SpawnRecord, setSpawnObserver, spawnBounded, spawnSyncCaptured } from "../../src/index.ts";
 
 const alive = (pid: number) => {
   try {
@@ -113,5 +113,28 @@ describe("spawn observer (refactor Phase 0.2: effect transcripts)", () => {
     }
     await spawnBounded(["sh", "-c", "exit 0"], {});
     expect(seen).toHaveLength(2);
+  });
+});
+
+describe("spawnSyncCaptured (gh-181: output through temp files, not pipes)", () => {
+  test("binary-safe stdout, stdin bytes, stderr apart, the exit code kept, no temp file left", () => {
+    const before = readdirSync(tmpdir()).filter((n) => n.startsWith(`norn-out-${process.pid}-`));
+    const r = spawnSyncCaptured(["sh", "-c", "cat; printf err >&2; exit 3"], { stdin: new Uint8Array([0, 255, 10]) });
+    expect([...r.stdout]).toEqual([0, 255, 10]);
+    expect(r.stderr.toString()).toBe("err");
+    expect(r).toMatchObject({ exitCode: 3, exitedDueToTimeout: false });
+    expect(readdirSync(tmpdir()).filter((n) => n.startsWith(`norn-out-${process.pid}-`))).toEqual(before);
+  });
+
+  test("a timeout kills the child and keeps what it wrote", () => {
+    const t0 = Date.now();
+    const r = spawnSyncCaptured(["sh", "-c", "echo start; sleep 5; echo never"], { timeoutMs: 300 });
+    expect(Date.now() - t0).toBeLessThan(3_000);
+    expect(r).toMatchObject({ exitCode: null, exitedDueToTimeout: true });
+    expect(r.stdout.toString()).toBe("start\n");
+  });
+
+  test("a missing executable throws, like Bun.spawnSync", () => {
+    expect(() => spawnSyncCaptured(["norn-no-such-binary-xyz"])).toThrow();
   });
 });

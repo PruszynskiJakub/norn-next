@@ -10,7 +10,7 @@ import { readdirSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 import { cmd, currentRun, cursorStep, type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, standingReport, stepLimits, storyRulings, storyWorktreePath } from "@norn/core";
 import { type AgentStep, type ProcessIdentity, type ReceiptOf, storyBranch, ulid } from "@norn/schema";
-import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readText, readUnitHooks, writeBriefing, readRemoteCache, storyFile, traceEvent, specRunsDir, unitDir } from "@norn/store";
+import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readText, readUnitHooks, writeBriefing, readRemoteCache, spawnSyncCaptured, storyFile, traceEvent, specRunsDir, unitDir } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
@@ -20,7 +20,12 @@ import { agentName, loadUnitSession, refuseUnlessAgentWork, reportCommand, unitS
 const WRAPPERS = /^-?(sh|bash|zsh|dash|fish|ksh|tcsh|csh|env|bun|bunx|npx|pnpm|timeout|sudo|nice|nohup|xargs|script|login)$/;
 
 function parentOf(pid: number): { ppid: number; comm: string } | null {
-  const r = Bun.spawnSync(["ps", "-o", "ppid=,comm=", "-p", String(pid)], { stdout: "pipe", stderr: "ignore" });
+  let r: ReturnType<typeof spawnSyncCaptured>;
+  try {
+    r = spawnSyncCaptured(["ps", "-o", "ppid=,comm=", "-p", String(pid)]);
+  } catch {
+    return null;
+  }
   const m = /^\s*(\d+)\s+(.+)$/.exec(r.stdout.toString().trim());
   return r.exitCode === 0 && m ? { ppid: Number(m[1]), comm: (m[2] as string).trim().split("/").at(-1) ?? "" } : null;
 }

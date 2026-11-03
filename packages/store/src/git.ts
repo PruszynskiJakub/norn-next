@@ -1,5 +1,5 @@
 /** Minimal git plumbing for claim and mailbox refs (§13). Not a GitPort; adapters own that. */
-import { noteSpawn, spawnBounded } from "./spawn.ts";
+import { noteSpawn, spawnBounded, spawnSyncCaptured } from "./spawn.ts";
 
 export interface GitRun {
   code: number;
@@ -49,20 +49,18 @@ export function gitSync(cwd: string, args: string[], input?: Uint8Array, opts: {
   const timeoutMs = opts.timeoutMs ?? gitTimeoutMs(args);
   noteSpawn(["git", ...args], cwd);
   try {
-    const p = Bun.spawnSync(["git", ...args], {
+    const p = spawnSyncCaptured(["git", ...args], {
       cwd,
-      stdin: input ?? "ignore",
-      stdout: "pipe",
-      stderr: "pipe",
       env: { ...process.env, GIT_TERMINAL_PROMPT: "0", LC_ALL: "C" },
-      ...(timeoutMs === undefined ? {} : { timeout: timeoutMs, killSignal: "SIGKILL" as const }),
+      ...(input === undefined ? {} : { stdin: input }),
+      ...(timeoutMs === undefined ? {} : { timeoutMs }),
     });
-    const stderr = Buffer.from(p.stderr ?? new Uint8Array()).toString("utf8");
+    const stderr = p.stderr.toString("utf8");
     if (p.exitedDueToTimeout) {
       const note = `${["git", ...args].slice(0, 2).join(" ")} timed out after ${(timeoutMs ?? 0) / 1000}s (killed)\n`;
-      return { code: 124, stdout: Buffer.from(p.stdout ?? new Uint8Array()), stderr: `${stderr}${stderr && !stderr.endsWith("\n") ? "\n" : ""}${note}` };
+      return { code: 124, stdout: p.stdout, stderr: `${stderr}${stderr && !stderr.endsWith("\n") ? "\n" : ""}${note}` };
     }
-    return { code: p.exitCode ?? 1, stdout: Buffer.from(p.stdout ?? new Uint8Array()), stderr };
+    return { code: p.exitCode ?? 1, stdout: p.stdout, stderr };
   } catch (e) {
     return { code: 127, stdout: Buffer.alloc(0), stderr: e instanceof Error ? e.message : String(e) };
   }
