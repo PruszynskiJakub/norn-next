@@ -35,6 +35,13 @@ Prefactor 1: the running norn's version is a command dependency (`CliDeps.versio
 - Friction: the integration tier's 30s timeouts flake when several units run tests on one machine at once.
 - implement#2 done: Rework of test.fail: every failure was a 30s timeout under machine load (load avg ~117 on 12 cores), in human.test.ts plus tests in the same describe blocks that failed after it (tick_locked left by the timed-out tick). human.test.ts alone: 45/45 pass. A full rerun failed on a different single timeout (story-decision.test.ts beforeEach). The diff only passes a version string through, so no code change. Unit tier and typecheck green. Friction: integration-tier timeouts flake when several units test at once.
 
+- review#1: approve, no findings. Unit tier (1115) and typecheck green; why-version.test.ts 9/9.
+
+| Item | Verifier | Proven by |
+| --- | --- | --- |
+| B6 / AC1 | test | `packages/cli/test/integration/why-version.test.ts` › "a harness built as norn 0.18.1 prints 0.18.1 for --version and records it on its tick traces", "without the option, --version prints the package version", and "norn_version on tick traces (O5)" › "every tick record carries this norn's package version and stays schema-valid" |
+| B6 / AC2 | test | `test/repo/repo.test.ts` › "no cli source but the default wiring and version.ts reads the version constant", plus the existing suites, which pass unchanged |
+
 ## Resume
 
-Nothing left for this slice; report `done`. If `test` fails again only on timeouts, rerun it when the machine is less loaded.
+Review approved; the next step continues from the PR/QA side.
