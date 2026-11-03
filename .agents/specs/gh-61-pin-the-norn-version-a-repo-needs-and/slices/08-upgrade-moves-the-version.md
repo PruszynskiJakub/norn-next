@@ -1,8 +1,8 @@
 ---
 id: gh-61/08
 title: "`norn upgrade` moves the version, the skills and the files in one staged diff"
-depends_on: [gh-61/02, gh-61/03, gh-61/05]
-status: planned
+depends_on: [ gh-61/02, gh-61/03, gh-61/05 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
