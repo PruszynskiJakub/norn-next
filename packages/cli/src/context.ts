@@ -28,8 +28,10 @@ export interface CliDeps {
   registry?: AdapterRegistry;
   /** progress lines for long-running commands (watch); never stdout */
   log?: (line: string) => void;
-  /** stops `watch` after the current tick */
+  /** stops `watch` after the current tick, and `story wait` */
   signal?: AbortSignal;
+  /** the pause between polls of `story wait`; default a timer (tests advance a fake clock) */
+  sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
   /** stdin text for commands that read it (`norn hook`); else the process stdin */
   stdin?: string;
   /** CP6: raw key chunks for `norn status --watch`; else the process stdin in raw mode */

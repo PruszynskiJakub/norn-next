@@ -32,6 +32,7 @@ const today: Record<keyof typeof cmd, [string, ...string[]]> = {
   ],
   storyStart: [`norn story start ${U}`, cmd.storyStart(U), "norn story start", cmd.storyStart(), `norn story start ${U} --print`, cmd.storyStart(U, { print: true })],
   storyView: [`norn story view ${U}`, cmd.storyView(U), `norn story view ${S} --web`, cmd.storyView(S, { web: true })],
+  storyWait: [`norn story wait ${S} --until gate`, cmd.storyWait(S, "gate"), `norn story wait ${U} --until step=review --timeout 30m`, cmd.storyWait(U, "step=review", { timeout: "30m" })],
   stuck: [`norn stuck "<reason>"`, cmd.stuck(), `norn stuck "<why>"`, cmd.stuck("<why>")],
   storyTake: [`norn story take ${S}`, cmd.storyTake(S)],
   storyCheckout: [`norn story checkout ${S}`, cmd.storyCheckout(S), `norn story checkout ${S} --force`, cmd.storyCheckout(S, { force: true })],

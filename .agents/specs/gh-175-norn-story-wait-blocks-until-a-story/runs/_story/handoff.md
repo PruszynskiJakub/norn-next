@@ -16,6 +16,16 @@
 
 ## Goal
 
+Add `norn story wait <story|slice> --until <condition> [--timeout <d>]` that blocks until the condition holds and prints the state as JSON, with exit codes telling met / timed out / refused apart (P8).
+
 ## Progress
 
+- Pure part in `@norn/view` (`packages/view/src/wait.ts`): `parseWaitCondition` (`step=<name>`, `gate`, `ask`, `stuck`, `done`, `merged`; anything else, e.g. `sync.done`, is rejected), `waitState`, `waitMet`. On a story, gate/ask/stuck also hold for its slices; step= and done look at the unit asked for; merged = PR merged or story status done.
+- Command `packages/cli/src/commands/story-wait.ts`: read only (ticks nothing), polls the project view every `--interval` (default 5s); prints `{met, until, matched, waited_ms, state}`. Exit 0 met; new `ExitCode.timeout` = 7 on timeout or a stop signal (state printed all the same); 2 bad condition/duration; 3 unknown story/slice.
+- `CliDeps.sleep` injectable so tests advance the fake clock; `cmd.storyWait` added (printed-commands test).
+- Tests: view unit `packages/view/test/unit/wait.test.ts`, cli integration `packages/cli/test/integration/story-wait.test.ts`; help listings updated in help-tree and status integration tests; `docs/reference.md` regenerated.
+- Not done (out of scope): refusing a `step=` that the unit's workflow does not have.
+
 ## Resume
+
+Done; nothing left in this step.

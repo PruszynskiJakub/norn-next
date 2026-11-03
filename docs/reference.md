@@ -92,6 +92,18 @@ norn story view [<story|slice>] [--web] [--json]
 
 - `--web`
 
+##### `norn story wait`
+
+Block until a story reaches a step, a gate, an ask, stuck, done or merged; exit 0 met, 7 timed out
+
+```sh
+norn story wait <story|slice> --until <step=<name>|gate|ask|stuck|done|merged> [--timeout <d>] [--interval <d>]
+```
+
+- `--until <condition>`: what to wait for: step=<name>, gate, ask, stuck, done, merged; gate, ask and stuck on a story also hold for its slices
+- `--timeout <d>`: give up after this long (e.g. 30m) and exit 7; default: wait until it holds
+- `--interval <d>`: how often to look again (default 5s)
+
 ##### `norn story answer`
 
 Answer the question a unit is parked on; a prompt in an agent's pane gets the keys it expects
@@ -523,5 +535,6 @@ norn help [--all] [<command> | <noun> [<verb>]]
 | 4 | `corrupt` |
 | 5 | `busy` |
 | 6 | `config` |
+| 7 | `timeout` |
 
 <!-- norn:reference:end -->
