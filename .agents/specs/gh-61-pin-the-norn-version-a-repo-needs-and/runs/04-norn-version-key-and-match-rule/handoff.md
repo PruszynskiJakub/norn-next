@@ -14,6 +14,17 @@
 
 ## Goal
 
+The team file takes `norn_version` (X.Y.Z); a bad or misplaced value is an ordinary config error; `config list|get` shows it; `config set|unset` refuse it; one pure `versionMatch` (schema) says match/older/newer.
+
 ## Progress
 
+- `packages/schema/src/version.ts`: `VERSION_PATTERN`, `versionMatch(repo, running)` (D3). Unit table test `packages/schema/test/unit/version.test.ts` (AC1).
+- `config.ts`: `norn_version` in `RepoConfig` and `TEAM_KEYS` (so the user/local file gives `config_wrong_file`), an `INVALID` message, `ResolvedConfig.norn_version` string|null (source `repo` when set, `built-in` null otherwise). `legacyConfig` left alone: recorded configs must replay byte for byte.
+- cli `config`: team group, meaning, null shown as "not recorded: `norn upgrade` records it"; `config set|unset norn_version` refused (exit 3, code `written_by_norn`, `do_instead` `norn upgrade`) before any file is picked or read.
+- Added `cmd.upgrade()` (core printed commands + its pinned table). Slice 03 renames `migrate` to `upgrade` and will add the same builder: expect a trivial merge conflict there; keep one `upgrade` entry.
+- Integration tests in `packages/cli/test/integration/config.test.ts` ("the team's norn version") cover AC2–AC5. Schemas and `docs/reference.md` regenerated.
+- AC6 (risk check, for the docs in slice 14): released norn 0.18.0, in a throwaway repo under `$TMPDIR` whose team file has `norn_version: 0.19.0`, `norn tick --json` → `{"error":"`.agents/norn.config.yaml`: unknown key `norn_version`","do_instead":"fix .agents/norn.config.yaml","code":"config_invalid",...}`, exit 6; the repo (files, git status, refs) and the machine dir were unchanged. So an old binary refuses as the plan expected, but the message says "unknown key", not the version.
+
 ## Resume
+
+Done: report `norn done done`. Nothing left for this slice.
