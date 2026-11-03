@@ -9,12 +9,11 @@
  * (R4.1). `findSessions` looks for a run's process by its `NORN_RUN` env (R5.1). `output` is the head
  * of the run's log (B3).
  */
-import { spawn } from "node:child_process";
 import { closeSync, mkdirSync, openSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { AdapterContext, LaunchSpec, PaneState, ProcessPort, RunnerPort, SessionRef } from "@norn/core";
 import type { RunnerConfig } from "@norn/schema";
-import { noteSpawn, runnerLogDir } from "@norn/store";
+import { definedEnv, noteSpawn, runnerLogDir } from "@norn/store";
 import { portError } from "../exec.ts";
 import { createProcessPort } from "../process/index.ts";
 
@@ -62,16 +61,14 @@ export function createHeadlessRunner(opts: HeadlessRunnerOptions): RunnerPort {
       let pid: number | undefined;
       try {
         noteSpawn(spec.argv, spec.cwd);
-        const child = spawn(cmd, args, {
+        // Bun.spawn, not child_process: under `bun test --parallel` a child_process event can be lost (store spawnBounded)
+        const child = Bun.spawn([cmd, ...args], {
           cwd: spec.cwd,
-          env: { ...process.env, ...spec.env },
+          env: definedEnv({ ...process.env, ...spec.env }),
           detached: true, // own process group: survives the tick, killable as a group
           stdio: ["ignore", fd, fd],
         });
-        pid = await new Promise<number | undefined>((resolve, reject) => {
-          child.once("spawn", () => resolve(child.pid));
-          child.once("error", reject);
-        });
+        pid = child.pid;
         child.unref();
       } catch (err) {
         throw portError("launch_failed", `cannot start ${cmd}: ${err instanceof Error ? err.message : String(err)}`);

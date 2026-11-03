@@ -2,8 +2,7 @@
  * Run a check command (W2, C5): `sh -c` in the unit worktree with env, stdout+stderr merged,
  * killed as a process group on timeout (a timeout is a `fail` with reason `timeout`).
  */
-import { spawn } from "node:child_process";
-import { noteSpawn } from "@norn/store";
+import { noteSpawn, spawnBounded } from "@norn/store";
 
 export interface ShellResult {
   /** null when killed by timeout */
@@ -16,43 +15,20 @@ export interface ShellResult {
 /** Output kept in memory; the head is dropped beyond this (the tail matters, C5). */
 const MAX_OUTPUT = 4 * 1024 * 1024;
 
-export function runShell(command: string, opts: { cwd: string; env: Record<string, string | undefined>; timeoutMs: number }): Promise<ShellResult> {
+export async function runShell(command: string, opts: { cwd: string; env: Record<string, string | undefined>; timeoutMs: number }): Promise<ShellResult> {
   const started = Date.now();
-  return new Promise((resolve) => {
-    let out = "";
-    let timedOut = false;
-    noteSpawn(["sh", "-c", command], opts.cwd); // effect transcripts (refactor Phase 0.2)
-    const child = spawn("sh", ["-c", `exec 2>&1\n${command}`], {
-      cwd: opts.cwd,
-      env: opts.env as NodeJS.ProcessEnv,
-      detached: true,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    const add = (b: Buffer) => {
-      out += b.toString("utf8");
-      if (out.length > MAX_OUTPUT) out = out.slice(out.length - MAX_OUTPUT);
-    };
-    child.stdout?.on("data", add);
-    child.stderr?.on("data", add);
-    const kill = () => {
-      try {
-        if (child.pid) process.kill(-child.pid, "SIGKILL");
-      } catch {
-        child.kill("SIGKILL");
-      }
-    };
-    const timer = setTimeout(() => {
-      timedOut = true;
-      kill();
-    }, opts.timeoutMs);
-    const finish = (code: number | null, err?: Error) => {
-      clearTimeout(timer);
-      if (err) out += `\n${err.message}\n`;
-      resolve({ exit_code: timedOut ? null : (code ?? 127), output: out, duration_ms: Date.now() - started, timed_out: timedOut });
-    };
-    child.on("error", (e) => finish(127, e));
-    child.on("close", (code) => finish(code));
+  noteSpawn(["sh", "-c", command], opts.cwd); // effect transcripts (refactor Phase 0.2)
+  // `exec 2>&1`: the command's stderr goes to stdout, so `out` keeps both in order; stderr only
+  // carries a failure to start sh and spawnBounded's own timeout note, which a check's output never showed
+  const r = await spawnBounded(["sh", "-c", `exec 2>&1\n${command}`], {
+    cwd: opts.cwd,
+    env: opts.env,
+    timeoutMs: opts.timeoutMs,
+    maxOutputChars: MAX_OUTPUT,
+    unobserved: true,
   });
+  const output = r.timed_out ? r.stdout : r.code === 127 && !r.stdout ? `\n${r.stderr}\n` : r.stdout + r.stderr;
+  return { exit_code: r.timed_out ? null : r.code, output, duration_ms: Date.now() - started, timed_out: r.timed_out };
 }
 
 export function tailLines(text: string, n = 200): string {
