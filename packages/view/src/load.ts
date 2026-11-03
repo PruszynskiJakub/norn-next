@@ -69,6 +69,8 @@ export interface LoadProjectViewOptions {
   runnerCapabilities?: RunnerCapabilities;
   /** lease liveness check (default: holder pid + start time) */
   liveness?: LeaseLiveness;
+  /** gh-61 D5: the running norn's version; given = the inbox shows a mismatch with the repo's (B8) */
+  version?: string;
 }
 
 /** A worktree as the view sees it: on disk and its slot; git status is not read (no git, X1). Null when absent, as observe. */
@@ -256,6 +258,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     liveness: opts.liveness,
     includeApplied: true,
     reportLeaseErrors: true,
+    ...(opts.version !== undefined ? { running: opts.version } : {}),
   });
   const snap = local.snapshot;
   let config = DEFAULT_CONFIG;
@@ -428,6 +431,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     remote: { issues: undefined },
     stories: storyFacts,
     heartbeat: { last_tick_at: lastTick },
+    ...(local.norn ? { norn: local.norn } : {}),
     orphans: { worktrees: [], branches: [] },
   };
   // R5.5 (N3): is this checkout's heartbeat down while it holds auto work?

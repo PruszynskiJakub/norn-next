@@ -43,6 +43,8 @@ export interface LocalFactsOptions {
   reportLeaseErrors?: boolean;
   /** B11, B12 (D5): first copy the live runs' hook lines from the day files into their hook files (the tick's, under its lock) */
   backfillHooks?: boolean;
+  /** gh-61 D5: the running binary's version; given = `norn` is observed */
+  running?: string;
 }
 
 /** R5.3 + R5.1: the runs of a unit's cursor step/attempt, and every session id its `started` receipts recorded. */
@@ -96,6 +98,11 @@ export interface LocalFacts {
   issue_seen: IssueFactsCache;
   /** BS1: the base measurement cache as the last tick left it */
   base: BaseFactsCache;
+  /**
+   * gh-61 D5: the running version and the one this checkout's team config records (null = none,
+   * B5); absent when no running version was given or the config failed to load.
+   */
+  norn?: { running: string; repo: string | null };
 }
 
 export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Promise<LocalFacts> {
@@ -148,7 +155,9 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
     const notes = openNotes(s.units.map((u) => ({ unit: u.unit.key, receipts: receiptsOfKinds(s, u, ["done", "approve"]) })));
     return { snapshot: s, worktree: storyWt, units, ...(notes.length ? { notes } : {}), ...(ready ? { ready } : {}) };
   });
-  return { snapshot, stories, leases, failures, pr_seen: readPrFacts(root), issue_seen: readIssueFacts(root), base: readBaseFacts(root) };
+  // gh-61 D5, B12: the version the main checkout's team config records
+  const norn = opts.running !== undefined && snapshot.config.ok ? { running: opts.running, repo: snapshot.config.config.norn_version ?? null } : undefined;
+  return { snapshot, stories, leases, failures, pr_seen: readPrFacts(root), issue_seen: readIssueFacts(root), base: readBaseFacts(root), ...(norn ? { norn } : {}) };
 }
 
 function localUnit(root: string, story: StorySnapshot, u: UnitSnapshot, worktree: string | null, hooks: HookFact[], leases: LeaseFile[], failures: Record<string, ActFailure>): LocalUnit {

@@ -62,6 +62,7 @@ export async function projectView(ctx: Context): Promise<ProjectView> {
     env: ctx.env,
     holder: machineHolder(ctx.env),
     heartbeatId: recordedHeartbeatId(ctx.root),
+    version: ctx.version,
     ...(runner ? { runnerCapabilities: runner.capabilities } : {}),
   });
 }

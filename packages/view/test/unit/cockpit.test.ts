@@ -1,7 +1,7 @@
 /** The cockpit model (CP1–CP5): rows, previews and the actions each row offers, as data. */
 import { describe, expect, test } from "bun:test";
 import type { InboxGroup, RemoteIssue } from "@norn/core";
-import { type CockpitRow, cockpitModel, type InboxEntry, type ProjectView, type StoryView, withInput } from "../../src/index.ts";
+import { type CockpitRow, cockpitModel, formatInbox, type InboxEntry, inboxItemsInOrder, type ProjectView, type StoryView, withInput } from "../../src/index.ts";
 
 const AT = "2026-10-27T12:00:00.000Z";
 
@@ -213,5 +213,25 @@ describe("cockpitModel", () => {
     ]);
     // without the remote's issues the backlog holds the stories only
     expect(cockpitModel(v, { places: true, provider: "gh" }).rows.filter((x) => x.kind === "issue")).toEqual([]);
+  });
+});
+
+describe("a norn version mismatch (gh-61 B8, D7)", () => {
+  const TITLE = "this repo needs norn 0.19.x (you run 0.18.1): install norn 0.19.x";
+  const withMismatch = (): ProjectView => {
+    const v = view();
+    const item = entry("unblock", "*", { id: "norn-version:0.19.0:0.18.1", slice: null, step: null, title: TITLE, command: "norn doctor" });
+    return { ...v, inbox: { ...v.inbox, groups: { ...v.inbox.groups, unblock: [item, ...v.inbox.groups.unblock] } } };
+  };
+
+  test("status prints it on top, once, above every group; the order and the cockpit header put it first too", () => {
+    const text = formatInbox(withMismatch());
+    expect(text.split("\n").slice(0, 3)).toEqual([`! ${TITLE}`, "      $ norn doctor", ""]);
+    expect(text.split(TITLE)).toHaveLength(2);
+    expect(text).toContain("Unblock (1) ·");
+    expect(inboxItemsInOrder(withMismatch())[0]?.title).toBe(TITLE);
+    const m = cockpitModel(withMismatch(), { places: true, provider: "gh" });
+    expect(m.header.version).toBe(TITLE);
+    expect(cockpitModel(view(), { places: true, provider: "gh" }).header.version).toBeUndefined();
   });
 });

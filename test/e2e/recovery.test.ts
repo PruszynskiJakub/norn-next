@@ -81,6 +81,7 @@ const all = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop").map(
 async function setup(h: Harness, n: number, title: string): Promise<void> {
   expect((await h.norn("init")).exit).toBe(0);
   h.config(CONFIG);
+  h.recordVersion(); // gh-61 B5: set up with this norn, so no version hint
   h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);

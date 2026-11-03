@@ -101,6 +101,7 @@ beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
   h.config(CONFIG);
+  h.recordVersion(); // gh-61 B5: set up with this norn, so no version hint
   h.write(join(workflowsDir(h.root), "gated.yaml"), GATED);
   h.write(join(workflowsDir(h.root), "alt.yaml"), ALT);
   h.write(join(workflowsDir(h.root), "sliced.yaml"), SLICED);
@@ -583,6 +584,7 @@ counters: { loop: { max: 2 } }
     t = await createHarness();
     expect((await t.norn("init")).exit).toBe(0);
     t.config(CONFIG.replace("workflow: gated", "workflow: triage"));
+    t.recordVersion(); // gh-61 B5: set up with this norn, so no version hint
     t.write(join(workflowsDir(t.root), "triage.yaml"), TRIAGE);
     t.git(["add", "-A"]);
     t.git(["commit", "-q", "-m", "norn init"]);

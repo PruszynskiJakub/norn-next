@@ -46,6 +46,10 @@
       "send": true
     }
   },
+  "norn": {
+    "repo": "0.19.0",
+    "running": "0.19.0"
+  },
   "now": 4072154520000,
   "orphans": {
     "branches": [],
