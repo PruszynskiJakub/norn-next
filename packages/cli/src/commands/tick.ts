@@ -8,6 +8,7 @@ import { cmd } from "@norn/core";
 
 export const tickCommand = defineCommand({
   name: "tick",
+  version: "acts",
   summary: "One heartbeat pass: observe, decide, act, log (H1)",
   usage: "norn tick [--sync | --offline] [--interval 30s]",
   options: { sync: { type: "boolean" }, offline: { type: "boolean" }, interval: { type: "string" } },

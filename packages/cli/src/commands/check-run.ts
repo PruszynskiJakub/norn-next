@@ -8,6 +8,7 @@ import { refuse } from "../output.ts";
 
 export const checkRunCommand = defineCommand({
   name: "check-run",
+  version: "exempt",
   summary: "Run a check step a tick started, and write its receipt (C5); a tick starts it",
   usage: "norn check-run <run_id>",
   positionals: { min: 1, max: 1 },

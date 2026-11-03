@@ -87,6 +87,7 @@ function retainWindow(ctx: Context, flag: string | undefined): { retain: string;
 
 export const tidyCommand = defineCommand({
   name: "tidy",
+  version: "acts",
   summary: "Report or clean orphan worktrees, branches, stale leases, receipt reservations (K5), runs/ work not in the record (R2.3), Herdr panes of runs that reported done (K7) and trace days, hook files, briefings and transcripts older than trace.retain (D12)",
   usage: "norn tidy [--dry-run] [--retain <duration>]",
   options: { "dry-run": { type: "boolean" }, retain: { type: "string" } },

@@ -10,6 +10,7 @@ import { cmd } from "@norn/core";
 
 export const askCommand = defineCommand({
   name: "ask",
+  version: "exempt",
   summary: "Report that the step needs a person's answer to continue (§9.3); then end your turn",
   usage: 'norn ask "<question>" [--option "<a>" --option "<b>"]',
   options: { option: { type: "string", multiple: true } },

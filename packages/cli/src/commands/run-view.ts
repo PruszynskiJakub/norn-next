@@ -352,6 +352,7 @@ const WHY_ONLY = ["tick", "step", "attempt", "transition", "rule"] as const;
 
 export const runViewCommand = defineCommand({
   name: "run view",
+  version: "reads",
   summary: "One run of a unit: step, attempt, outcome, durations, receipts; --why replays the decision (B44, O5)",
   usage: "norn run view [<run|unit>] [--why [--tick <tick_id>] [--step <step>] [--attempt <n>] [--transition <step>.<outcome>] [--rule <prefix>]] | norn run view [<unit>] --receipt <receipt_id>",
   markdown: true,

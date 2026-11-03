@@ -23,6 +23,7 @@ const PASS_FILE = "pass --user, --local or --repo";
 
 export const configSetCommand = defineCommand({
   name: "config set",
+  version: "acts",
   summary: "Set one value in the user, local or repo config file",
   usage: "norn config set <key> <value> [--user|--local|--repo] [--json]",
   markdown: true,
@@ -42,6 +43,7 @@ export const configSetCommand = defineCommand({
 
 export const configUnsetCommand = defineCommand({
   name: "config unset",
+  version: "acts",
   summary: "Remove one value from the user, local or repo config file",
   usage: "norn config unset <key> [--user|--local|--repo] [--json]",
   markdown: true,

@@ -25,6 +25,7 @@ const startable: TargetRule = {
 
 export const storyStartCommand = defineCommand({
   name: "story start",
+  version: "acts",
   summary: "Open an agent on the step a person starts: a Herdr tab in the unit worktree, or the command to run (B28, MO5)",
   usage: "norn story start [<story|slice>] [--print]",
   optionHelp: { "--print": "print the start command instead of opening a terminal" },

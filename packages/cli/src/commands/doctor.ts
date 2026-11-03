@@ -420,6 +420,7 @@ function formatRepoOnly(r: { ok: boolean; repo: RepoReport }, dir: string): stri
 
 export const doctorCommand = defineCommand({
   name: "doctor",
+  version: "reads",
   summary: "Check agents, hooks, skills, remote auth and runner on this machine, and the repo workflows and config (A7, W5)",
   usage: "norn doctor [--repo] [--live] [--json]",
   markdown: true,

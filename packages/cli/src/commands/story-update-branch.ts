@@ -29,6 +29,7 @@ const updatable: TargetRule = {
 
 export const storyUpdateBranchCommand = defineCommand({
   name: "story update-branch",
+  version: "acts",
   summary: "Send a waiting story back through its base update: done with an unmerged PR, at a gate, or stuck (B27, BS9)",
   usage: "norn story update-branch [<story>]",
   positionals: { max: 1 },

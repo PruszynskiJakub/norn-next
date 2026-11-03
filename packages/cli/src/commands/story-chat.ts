@@ -29,6 +29,7 @@ function chatAgentCommand(config: ResolvedConfig, story: string): string {
 
 export const storyChatCommand = defineCommand({
   name: "story chat",
+  version: "acts",
   summary: "Give a story its own Herdr workspace with an agent to talk it over",
   usage: "norn story chat [<story>] [--json]",
   markdown: true,

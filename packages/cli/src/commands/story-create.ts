@@ -18,6 +18,7 @@ import { runTick } from "../runtime/tick.ts";
 
 export const storyCreateCommand = defineCommand({
   name: "story create",
+  version: "acts",
   summary: "Create a story's issue on the remote, assigned to you, and take it in (GR1)",
   usage: `norn story create [--title "…"] [--body "…" | --body-file <f>] [--workflow <name>] [--web]`,
   markdown: true,

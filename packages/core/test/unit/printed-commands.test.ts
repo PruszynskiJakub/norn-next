@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { cmd, nameRemoved } from "@norn/core";
+import { cmd, nameRemoved, versionMismatch } from "@norn/core";
 
 // B7: every command norn prints is built by one `cmd` builder. This table pins each builder's
 // string for a sample unit, so renaming a command is one reviewed diff of this table and the module.
@@ -86,5 +86,21 @@ describe("printed commands (B7)", () => {
     for (const old of ["drop gh-1", "inbox", "cockpit --next", "orient --open", "open gh-1", `answer gh-1 "x"`, "approve gh-1", "unstick gh-1 --to qa", "update gh-1", "mode auto", "workflow gh-1 fix", "take gh-1", "release gh-1", "trace gh-1", "why gh-1"])
       expect(nameRemoved(`run \`norn ${old}\` now`)).toBe(`norn ${old.split(" ")[0]}`);
     for (const ok of ["norn story update-branch gh-1", "norn done approve", "norn story approve gh-1", "norn status --watch", ".agents/norn/trace/x"]) expect(nameRemoved(ok)).toBeNull();
+  });
+});
+
+describe("the version refusal (gh-61 B6, B7, D3)", () => {
+  test("an older binary is told which norn to install", () => {
+    expect(versionMismatch("0.19.0", "0.18.1", "older")).toEqual({ error: "this repo needs norn 0.19.x (you run 0.18.1)", do_instead: "install norn 0.19.x" });
+    expect(versionMismatch("0.18.2", "0.18.1", "older")).toEqual({ error: "this repo needs norn 0.18.2 or a later 0.18.x (you run 0.18.1)", do_instead: "install norn 0.18.2 or a later 0.18.x" });
+    expect(versionMismatch("1.2.0", "1.1.9", "older").do_instead).toBe("install norn 1.2.0 or a later 1.x");
+    expect(versionMismatch("2.0.0", "1.5.0", "older").do_instead).toBe("install norn 2.x");
+  });
+
+  test("a newer binary is told to run norn upgrade and commit, or to install the repo's norn", () => {
+    expect(versionMismatch("0.18.0", "0.19.0", "newer")).toEqual({
+      error: "this repo needs norn 0.18.x (you run 0.19.0)",
+      do_instead: "run `norn upgrade` to move this repo to norn 0.19.0 and commit the change, or install norn 0.18.x",
+    });
   });
 });

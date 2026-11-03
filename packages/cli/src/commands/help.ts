@@ -124,6 +124,7 @@ function formatNounHelp(n: Noun): string {
 
 export const helpCommand = defineCommand({
   name: "help",
+  version: "reads",
   summary: "List commands, and who runs each: a person or the agent",
   usage: "norn help [--all] [<command> | <noun> [<verb>]]",
   options: { all: { type: "boolean" } },

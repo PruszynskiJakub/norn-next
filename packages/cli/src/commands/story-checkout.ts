@@ -8,6 +8,7 @@ import { aStory, resolveStory } from "../runtime/target.ts";
 
 export const storyCheckoutCommand = defineCommand({
   name: "story checkout",
+  version: "acts",
   summary: "Take a story over on this machine: claim it, check out its branches, print the handoff (B33, T5)",
   usage: "norn story checkout [<story>] [--force]",
   options: { force: { type: "boolean" } },

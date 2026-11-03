@@ -17,6 +17,7 @@ const CANCEL_REASON = "cancelled by person";
 
 export const runCancelCommand = defineCommand({
   name: "run cancel",
+  version: "acts",
   summary: "Stop a unit's running agent session; the story and its work stay (rerun resumes it)",
   usage: "norn run cancel [<unit>]",
   positionals: { max: 1 },

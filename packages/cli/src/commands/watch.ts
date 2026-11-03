@@ -45,6 +45,7 @@ export function humanSummary(s: { ticks: number; failed_actions: number; skipped
 
 export const watchCommand = defineCommand({
   name: "watch",
+  version: "acts",
   summary: "Run ticks in a loop (H5); a clean exit releases held claims (T6)",
   usage: "norn watch [--interval 30s] [--max-ticks N] [--keep-claims] [--human]",
   options: { interval: { type: "string" }, "max-ticks": { type: "string" }, "keep-claims": { type: "boolean" }, human: { type: "boolean" } },

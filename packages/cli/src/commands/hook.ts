@@ -110,6 +110,7 @@ function answer(r: HookResponse): unknown {
 
 export const hookEventCommand = defineCommand({
   name: "hook",
+  version: "exempt",
   summary: "Agent hook entry point: record a lifecycle fact; refuse an unreported turn end (A2–A4)",
   usage: "norn hook <event> [--agent claude]  (payload JSON on stdin)",
   options: { agent: { type: "string" } },

@@ -131,6 +131,7 @@ async function verifyBaseMerge(ctx: Context, s: UnitSession, base: NonNullable<R
 
 export const doneCommand = defineCommand({
   name: "done",
+  version: "exempt",
   summary: "Report that the current step finished with a declared outcome (§9.3); then end your turn",
   usage: 'norn done <outcome> --handoff "…" [--findings <file>] [--evidence <dir>] [--criteria <file>] [--note "…" [--note-criterion <id>]]…',
   markdown: true,

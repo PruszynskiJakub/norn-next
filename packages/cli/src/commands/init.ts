@@ -136,6 +136,7 @@ function nextSteps(r: InitReport, changed: boolean): string[] {
 
 export const initCommand = defineCommand({
   name: "init",
+  version: "exempt",
   summary: "Set up norn in this repository: config, workflows, skills, hooks (A1, SK1, W1)",
   usage: "norn init [--json] [--hook-command <cmd>]",
   markdown: true,

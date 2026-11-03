@@ -143,6 +143,7 @@ function storyDiffBase(ctx: Context, root: string): string {
 
 export const briefCommand = defineCommand({
   name: "brief",
+  version: "acts",
   summary: "Brief the agent on the current step of this worktree's unit; starts the run in manual mode (B3, MO3)",
   usage: "norn brief [--json]",
   markdown: true,

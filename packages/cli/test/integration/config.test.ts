@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { CONFIG_FILES, type ConfigEntry, ExitCode } from "@norn/schema";
 import { repoConfigPath } from "@norn/store";
 import { type CliDeps, type CliResult } from "../../src/index.ts";
+import { version } from "../../package.json";
 import { createHarness, FakeInteraction, type Harness, runChecked, sh } from "../../../../test/support/harness.ts";
 
 type Listed = { entries: Array<ConfigEntry & { meaning: string }> };
@@ -425,7 +426,8 @@ describe("the team's norn version (gh-61 B3, B4, D4)", () => {
   });
 
   test("D4, K8: config set and unset of norn_version are refused, exit 3, naming norn upgrade; the file is unchanged", async () => {
-    const before = "# team\nnorn_version: 0.19.0\n";
+    // the version this norn runs, so the gh-61 D2 version guard lets the command reach its own refusal
+    const before = `# team\nnorn_version: ${version}\n`;
     h.write(repoConfigPath(h.root), before);
     for (const argv of [
       ["config", "set", "norn_version", "0.20.0", "--repo"],

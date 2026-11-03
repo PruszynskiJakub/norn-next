@@ -24,6 +24,7 @@ const asks = (st: UnitState) => st.status === "parked" && st.park?.kind === "ask
 
 export const storyAnswerCommand = defineCommand({
   name: "story answer",
+  version: "acts",
   summary: "Answer the question a unit is parked on (B24, O2); a prompt in an agent's pane gets the keys it expects (R6.2)",
   usage: 'norn story answer [<story|unit>] "<text>"   (a choice prompt: the option number, e.g. "1")',
   positionals: { min: 1, max: 2 },

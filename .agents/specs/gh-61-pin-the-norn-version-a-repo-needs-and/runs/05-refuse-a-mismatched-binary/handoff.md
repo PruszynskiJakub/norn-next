@@ -13,7 +13,25 @@
 <!-- norn:heartbeat:end -->
 
 ## Goal
+A binary that does not match the main checkout's `norn_version` is refused (exit 3, `version_mismatch`) by every `acts` command; `reads` and `exempt` commands run; no key works as today; a config error comes first.
 
 ## Progress
+- `Command.version: VersionClass` (`acts`|`reads`|`exempt`), required by the type, set on all 44 commands as D1 lists them (`packages/cli/src/command.ts`, `commands/*.ts`).
+- Guard `guardVersion` (`packages/cli/src/runtime/version-guard.ts`), called in `dispatch` (`cli.ts`) after `locate()`, before `run`, for `acts` only. Reads `ctx.loaded` (the main checkout's config, B12). Decisions: when the config has problems the guard steps aside, so the command's own config error (exit 6) comes first (B3) and `config set` can still fix a broken file; a running version that is not plain X.Y.Z (dev/pre-release) is compared by its X.Y.Z core, none → no check (settles slice 04's review note).
+- Refusal texts in core `versionMismatch(repo, running, match)` next to `cmd` (D3): older → "this repo needs norn 0.19.x (you run 0.18.1)" / "install norn 0.19.x"; a repo at 0.18.2 → "0.18.2 or a later 0.18.x"; newer → "run `norn upgrade` to move this repo to norn X and commit the change, or install norn 0.18.x". Details `{repo, running}`.
+- `watch` is refused outright for now (slice 07 makes it pause per tick).
+- Tests: `packages/cli/test/unit/version-class.test.ts` (AC2 table: every command's class); `packages/core/test/unit/printed-commands.test.ts` (refusal texts); `packages/cli/test/integration/version-guard.test.ts` (AC1–AC7 at S1). `config.test.ts` D4/K8 test now records the running version so it still reaches its `written_by_norn` refusal.
+- Unit tier (1130) and typecheck green; version-guard, config, why-version, rename-continuity, upgrade integration files green.
+
+| Item | Verifier | Proven by |
+| --- | --- | --- |
+| B6 / AC1 | test | version-guard.test.ts › "AC1: tick as 0.18.1 in a repo at 0.19.0 is refused…" |
+| B6 / AC2 | test | version-class.test.ts › "every command declares the class D1 gives it…"; version-guard.test.ts › "AC2: every acts command is refused the same way…", "AC2: a person reads the same refusal as markdown" |
+| B7 / AC3 | test | version-guard.test.ts › "AC3: a binary newer than the repo…"; printed-commands.test.ts › "the version refusal" |
+| B8, B9 / AC4 | test | version-guard.test.ts › "AC4: reading, setup and repair commands run on a mismatch…" |
+| B10 / AC5 | test | version-guard.test.ts › "AC5: done, ask, stuck and hook are accepted…", "AC5: a check-run a tick started writes its receipt…" |
+| B12 / AC6 | test | version-guard.test.ts › "AC6: a version on the remote's base does not count until the main checkout pulls it", "AC6: a unit worktree's own team file is never what the guard reads" |
+| B5, B3 / AC7 | test | version-guard.test.ts › "AC7: without the key every command runs as before", "AC7: an invalid key, or a mismatch beside another config problem, is the config error (exit 6)…" |
 
 ## Resume
+Implement done and committed; the next step is norn's.

@@ -12,6 +12,7 @@ import { projectView } from "../runtime/human.ts";
 
 export const storyTakeCommand = defineCommand({
   name: "story take",
+  version: "acts",
   summary: "Assign a labelled issue to you, so the next sync takes it in (GR1)",
   usage: "norn story take <story>",
   markdown: true,

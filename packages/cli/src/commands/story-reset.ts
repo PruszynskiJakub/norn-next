@@ -24,6 +24,7 @@ import { claimIfFree, refuseOthers } from "./story-close.ts";
 
 export const storyResetCommand = defineCommand({
   name: "story reset",
+  version: "acts",
   summary: "Reset a story to before intake: remove its worktrees, local and remote branches, record and claim; the issue stays (GR7a)",
   usage: "norn story reset [<story>] [--yes] [--force]",
   options: { yes: { type: "boolean" }, force: { type: "boolean" } },

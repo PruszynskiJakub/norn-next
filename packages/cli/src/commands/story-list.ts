@@ -9,6 +9,7 @@ import { projectView } from "../runtime/human.ts";
 
 export const storyListCommand = defineCommand({
   name: "story list",
+  version: "reads",
   summary: "Stories, slices, runs and claims at a glance",
   usage: "norn story list [--json]",
   markdown: true,

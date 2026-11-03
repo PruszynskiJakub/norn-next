@@ -63,6 +63,7 @@ async function noStoryBranch(ctx: Context, key: string): Promise<CliFailure> {
 
 export const storyReopenCommand = defineCommand({
   name: "story reopen",
+  version: "acts",
   summary: "Undo a close: claim the story here, restore its worktrees and put each unit back at its step (B40)",
   usage: "norn story reopen [<story>]",
   positionals: { max: 1 },

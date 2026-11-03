@@ -18,6 +18,7 @@ import { aStory, targetKey } from "../runtime/target.ts";
 
 export const storyViewCommand = defineCommand({
   name: "story view",
+  version: "reads",
   summary: "One story: slices with their steps, the PR, open notes, what waits for you; --web opens the PR or issue",
   usage: "norn story view [<story|slice>] [--web] [--json]",
   markdown: true,

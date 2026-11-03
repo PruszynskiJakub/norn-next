@@ -28,8 +28,17 @@ export interface ParsedArgs {
   json?: boolean;
 }
 
+/**
+ * gh-61 D1: how a binary that does not match the repo's `norn_version` treats a command. `acts`: refused
+ * (B6, B7); `reads`: runs, as does the mismatch it shows (B8); `exempt`: never checked (setup and repair
+ * commands, B9; an agent's reports and hooks and a tick's check-run, so a step in flight can finish, B10).
+ */
+export type VersionClass = "acts" | "reads" | "exempt";
+
 export interface Command {
   name: string;
+  /** D1: required, so a new command cannot leave its version class out */
+  version: VersionClass;
   /** one line, shown by `norn help` */
   summary: string;
   /** e.g. `norn watch [--interval 30s]` */

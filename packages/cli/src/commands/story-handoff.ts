@@ -11,6 +11,7 @@ import { aStory, resolveStory } from "../runtime/target.ts";
 
 export const storyHandoffCommand = defineCommand({
   name: "story handoff",
+  version: "acts",
   summary: "Hand a story over: push branches and handoff, then delete the claim (B34, T6)",
   usage: "norn story handoff [<story>]",
   positionals: { max: 1 },

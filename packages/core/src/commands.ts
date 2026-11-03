@@ -100,6 +100,23 @@ export const cmd = {
   watch: (o: { interval?: string; maxTicks?: number } = {}) => norn("watch", o.interval && `--interval ${o.interval}`, o.maxTicks !== undefined && `--max-ticks ${o.maxTicks}`),
 };
 
+/**
+ * gh-61 B6, B7 (D3): what a binary that does not match the repo's `norn_version` is told. `repo` and
+ * `running` are `X.Y.Z`; `match` is `versionMatch(repo, running)` when it is not a match. The versions
+ * that fit `repo` are its line (`0.19.x` before 1.0, `1.x` from 1.0 on), from `repo` itself up (B2).
+ */
+export function versionMismatch(repo: string, running: string, match: "older" | "newer"): { error: string; do_instead: string } {
+  const [maj, min, pat] = repo.split(".");
+  const line = maj === "0" ? `0.${min}.x` : `${maj}.x`;
+  const base = maj === "0" ? pat === "0" : min === "0" && pat === "0";
+  const fits = base ? line : `${repo} or a later ${line}`;
+  const install = `install norn ${fits}`;
+  return {
+    error: `this repo needs norn ${fits} (you run ${running})`,
+    do_instead: match === "older" ? install : `run \`${cmd.upgrade()}\` to move this repo to norn ${running} and commit the change, or ${install}`,
+  };
+}
+
 /** B5: the top-level commands this release removed; no printed command names one (B7). */
 export const REMOVED_COMMANDS = ["drop", "inbox", "cockpit", "orient", "open", "answer", "approve", "unstick", "update", "mode", "workflow", "take", "release", "trace", "why"] as const;
 

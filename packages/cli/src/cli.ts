@@ -14,6 +14,7 @@ import { COMMANDS, findCommand, findNoun, NOUNS } from "./commands/index.ts";
 import { type CliDeps, Context, runningVersion } from "./context.ts";
 import { CliFailure, failureMarkdown, isRendered, isWithExit, render, toFailure, usageError } from "./output.ts";
 import { cmd } from "@norn/core";
+import { guardVersion } from "./runtime/version-guard.ts";
 
 export interface CliResult {
   exit: ExitCode;
@@ -91,6 +92,7 @@ async function dispatch(command: Command, rest: string[], deps: CliDeps): Promis
   try {
     const args = { ...parseCommandArgs(command, argvOwn), json };
     if (command.repo !== false) await ctx.locate();
+    if (command.version === "acts") guardVersion(ctx); // gh-61 D1, D2: after locate and config, before the command
     const out = await command.run(ctx, args);
     const [value, exit] = isWithExit(out) ? [out.value, out.exit] : [out ?? { ok: true }, ExitCode.ok];
     if (isRendered(value)) return withStderr(markdown || (value.asked && !json) ? { exit, value: value.value, stdout: value.markdown } : done(value.value, exit));

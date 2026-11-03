@@ -39,6 +39,7 @@ const groupOf = (key: string): Group => GROUP_OF[key.split(".")[0] as string] ??
 
 const configListCommand = defineCommand({
   name: "config list",
+  version: "reads",
   summary: "Show the resolved config and which file set each value",
   usage: "norn config list [--json]",
   markdown: true,
@@ -47,6 +48,7 @@ const configListCommand = defineCommand({
 
 const configGetCommand = defineCommand({
   name: "config get",
+  version: "reads",
   summary: "Show one setting, or every setting under a key, and which file set it",
   usage: "norn config get <key> [--json]",
   markdown: true,

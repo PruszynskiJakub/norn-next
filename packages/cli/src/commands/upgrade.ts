@@ -160,6 +160,7 @@ async function upgrade(ctx: Context) {
 
 export const upgradeCommand = defineCommand({
   name: "upgrade",
+  version: "exempt",
   summary: "Move this repo to the new layout and its config to the new keys, and stage the changes for you to commit",
   usage: "norn upgrade [--json]",
   markdown: true,
@@ -172,6 +173,7 @@ export const MIGRATE_RENAMED = "`norn migrate` is now `norn upgrade`; the old na
 
 export const migrateCommand = defineCommand({
   name: "migrate",
+  version: "exempt",
   summary: "Deprecated: the old name of norn upgrade, removed in the next minor",
   usage: "norn migrate [--json]",
   markdown: true,

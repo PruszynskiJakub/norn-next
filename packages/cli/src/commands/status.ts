@@ -119,6 +119,7 @@ async function segment(ctx: Context, ttlRaw: string) {
 
 export const statusCommand = defineCommand({
   name: "status",
+  version: "reads",
   summary: "What needs you, grouped by action, with the command to resolve each item; --history for when items came and went (O1)",
   usage: "norn status [--json] [--details] [--notes] [--history [--since <iso|duration>]] | norn status --watch [--interval 5s] [--pane]",
   markdown: true,

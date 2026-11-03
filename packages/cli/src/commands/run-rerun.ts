@@ -15,6 +15,7 @@ const blocked = (st: { status: string }) => st.status === "stuck" || st.status =
 
 export const runRerunCommand = defineCommand({
   name: "run rerun",
+  version: "acts",
   summary: "Resume a stuck, parked or gate-waiting unit in a fresh session, optionally --step elsewhere and --reset counters",
   usage: 'norn run rerun [<unit>] [--step <step>] [--reset <counter>]… [--reason "…"]',
   options: { step: { type: "string" }, reset: { type: "string", multiple: true }, reason: { type: "string" } },
