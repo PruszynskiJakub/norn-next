@@ -312,6 +312,13 @@ export interface RemotePullRequest {
   base_branch?: string;
 }
 
+/** GR10: a label defined on the remote repository (not one on an issue). `color` is hex without `#`. */
+export interface RemoteLabel {
+  name: string;
+  color: string;
+  description: string;
+}
+
 /** `gh` / `glab` for one repository. */
 export interface RemotePort {
   readonly provider: RemoteProvider;
@@ -339,6 +346,13 @@ export interface RemotePort {
    * `add` is still added. Throws PortError when the provider fails (B20: the caller warns).
    */
   replaceIssueLabel(number: number, labels: { remove: string; add: string }): Promise<void>;
+  /** GR10: every label defined on the repository. Throws PortError when the provider fails. */
+  listLabels(): Promise<RemoteLabel[]>;
+  /**
+   * GR10: define a new label on the repository (`color` hex without `#`). Never edits an existing
+   * one: a name already taken rejects with a PortError whose code ends in `_exists`.
+   */
+  createLabel(label: RemoteLabel): Promise<void>;
 }
 
 // ============================================================= Runner
