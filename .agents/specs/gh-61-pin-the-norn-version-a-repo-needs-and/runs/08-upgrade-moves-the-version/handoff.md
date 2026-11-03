@@ -14,6 +14,16 @@
 
 ## Goal
 
+`norn upgrade` moves the repo to the running norn (B13, B15–B17, D9): `norn_version`, the bundled skills (rewritten and relinked) and the layout/config moves in one staged diff; never backward; nothing to do changes nothing.
+
 ## Progress
 
+- Fixed a leftover from merging slices 05 and 06: `packages/core/src/commands.ts` had two `versionMismatch` functions (typecheck red on the base). Kept one text builder `versionRefusal(repo, running, match)` (slice 05's text, used by the guard) and `versionMismatch(repo, running)` (slice 06's, used by the inbox) wrapping it. Separate commit.
+- `upgrade.ts`: `versions()` reads the recorded version (new or old team file) and refuses an older binary with `version_backward` right after the main-checkout check, before the tick lock or any write. `versionPart()` runs inside the tick lock after the config part: `installSkills` + `linkSkills` for the agents in use (as `init` does), then `writeNornVersion` last, all staged. Report gains `norn_version {from,to,changed}` and `skills {updated,linked}`; markdown starts with the summary line "norn version A → B; skills updated: …; config: …"; nothing to do → "already on norn X.Y.Z: nothing to upgrade".
+- Core: `upgradeBackward` text next to `versionRefusal`. Store: `recordedNornVersion(teamFile)` exported. cli: `comparableVersion` exported from the version guard.
+- Tests: new `packages/cli/test/integration/upgrade-version.test.ts` (AC1–AC4, migrate included in AC4). Updated `upgrade.test.ts` (new report fields, "nothing to upgrade", a repo with no key now gets it) and `version-guard.test.ts` (upgrade/migrate with an older binary is now refused with `version_backward`, by B17). `docs/reference.md` regenerated (summary).
+- AC5 checked by hand: dev build in a throwaway repo under the scratchpad (temp HOME). Output's first line and `git diff --staged` (team file: version + moved key, one skill) read as one change; rerun says nothing to upgrade; a repo at a newer version is refused, exit 3, nothing changed. Note: the existing config-key rewrite adds a blank line before the rewritten keys (pre-existing, not this slice).
+
 ## Resume
+
+Done; reported `done`. Next run: the `test` check (integration tier).
