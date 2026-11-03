@@ -13,6 +13,58 @@ workflow: story
 status: active
 intake_at: 2026-11-03T12:15:39.840Z
 body_hash: 3eaa09aea6f4416e7f61f26ce4e67f08fa771ecccc1f9a64797b88f6ff0e714d
+criteria:
+  - { id: "01.AC1", verifier: test }
+  - { id: "01.AC2", verifier: test }
+  - { id: "02.AC1", verifier: test }
+  - { id: "02.AC2", verifier: test }
+  - { id: "03.AC1", verifier: test }
+  - { id: "03.AC2", verifier: test }
+  - { id: "03.AC3", verifier: test }
+  - { id: "03.AC4", verifier: test }
+  - { id: "04.AC1", verifier: test }
+  - { id: "04.AC2", verifier: test }
+  - { id: "04.AC3", verifier: test }
+  - { id: "04.AC4", verifier: test }
+  - { id: "04.AC5", verifier: test }
+  - { id: "04.AC6", verifier: agent }
+  - { id: "05.AC1", verifier: test }
+  - { id: "05.AC2", verifier: test }
+  - { id: "05.AC3", verifier: test }
+  - { id: "05.AC4", verifier: test }
+  - { id: "05.AC5", verifier: test }
+  - { id: "05.AC6", verifier: test }
+  - { id: "05.AC7", verifier: test }
+  - { id: "06.AC1", verifier: test }
+  - { id: "06.AC2", verifier: test }
+  - { id: "06.AC3", verifier: test }
+  - { id: "06.AC4", verifier: agent }
+  - { id: "07.AC1", verifier: test }
+  - { id: "07.AC2", verifier: test }
+  - { id: "08.AC1", verifier: test }
+  - { id: "08.AC2", verifier: test }
+  - { id: "08.AC3", verifier: test }
+  - { id: "08.AC4", verifier: test }
+  - { id: "08.AC5", verifier: agent }
+  - { id: "09.AC1", verifier: test }
+  - { id: "09.AC2", verifier: test }
+  - { id: "09.AC3", verifier: test }
+  - { id: "10.AC1", verifier: test }
+  - { id: "10.AC2", verifier: test }
+  - { id: "10.AC3", verifier: test }
+  - { id: "10.AC4", verifier: test }
+  - { id: "11.AC1", verifier: test }
+  - { id: "11.AC2", verifier: test }
+  - { id: "11.AC3", verifier: test }
+  - { id: "11.AC4", verifier: test }
+  - { id: "11.AC5", verifier: test }
+  - { id: "12.AC1", verifier: test }
+  - { id: "12.AC2", verifier: test }
+  - { id: "12.AC3", verifier: test }
+  - { id: "13.AC1", verifier: test }
+  - { id: "14.AC1", verifier: test }
+  - { id: "14.AC2", verifier: agent }
+  - { id: "14.AC3", verifier: agent }
 ---
 
 # Pin the norn version a repo needs, and refuse a mismatched binary or drifted skills
