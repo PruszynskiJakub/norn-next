@@ -9,7 +9,7 @@ import { setDefaultTimeout } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { type Clock, type InboxItem, type LaunchSpec, type NotifierPort, type PaneState, type PromptKey, type RemoteIssue, type RemotePort, type RemotePullRequest, type RunnerCapabilities, type RunnerPort, type RunnerSessionInfo, nameRemoved, type SessionRef } from "@norn/core";
+import { type Clock, type InboxItem, type LaunchSpec, type NotifierPort, type PaneState, type PromptKey, type RemoteIssue, type RemoteLabel, type RemotePort, type RemotePullRequest, type RunnerCapabilities, type RunnerPort, type RunnerSessionInfo, nameRemoved, type SessionRef } from "@norn/core";
 import { type Receipt, type UnitState, ulid } from "@norn/schema";
 import { appendReceipt, installSkills, linkSkills, machineDir, readState, repoConfigPath, spawnSyncCaptured, workflowsDir } from "@norn/store";
 import type { ProjectView } from "@norn/view";
@@ -97,6 +97,25 @@ export class FakeRemote implements RemotePort {
     this.calls.push(`label ${n} -${o.remove} +${o.add}`);
     if (this.labelError) throw this.labelError;
     this.issues = this.issues.map((i) => (i.number === n ? { ...i, labels: [...i.labels.filter((l) => l !== o.remove && l !== o.add), o.add] } : i));
+  }
+  /** GR10: the labels defined on the repository */
+  labels: RemoteLabel[] = [];
+  /** set → `listLabels` throws it (GR10: init, upgrade and doctor report labels not checked) */
+  listLabelsError: Error | null = null;
+  /** set → `createLabel` throws it, creating nothing (GR10: not created, with the command) */
+  createLabelError: Error | null = null;
+  async listLabels() {
+    this.calls.push("labels?");
+    const e = this.listLabelsError ?? this.labelError;
+    if (e) throw e;
+    return this.labels.map((l) => ({ ...l }));
+  }
+  async createLabel(l: RemoteLabel) {
+    this.calls.push(`label+ ${l.name}`);
+    const e = this.createLabelError ?? this.labelError;
+    if (e) throw e;
+    if (this.labels.some((x) => x.name === l.name)) throw Object.assign(new Error(`label ${l.name} already exists`), { code: "gh_exists", retryable: false });
+    this.labels.push({ ...l });
   }
 }
 

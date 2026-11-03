@@ -6,18 +6,21 @@
  * gh-61 B1, B28 (D10): `norn_version` is recorded only in a repo that has none; on a repo set up
  * for another version, a differing bundled skill is left as it is and `norn upgrade` named instead.
  * Workflows created now get the repo's test command when its build files name one (`runtime/detect.ts`).
+ * gh-67 GR10: last, the labels norn uses are created on the remote (`runtime/labels.ts`); a remote it
+ * cannot reach or write is reported, never a failure.
  * Prints a summary for a person, ending in the next steps to a first story; `--json` for data.
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { atomicWrite, installSkills, LOCAL_CONFIG_FILE, linkSkills, readText, REPO_CONFIG_FILE, repoConfigPath, SKILLS_DIR, skillsDrift, userConfigPath, WORKFLOWS_DIR, workflowsDir, writeConfigSchemas, writeNornVersion } from "@norn/store";
+import { atomicWrite, installSkills, LOCAL_CONFIG_FILE, linkSkills, loadWorkflows, readText, REPO_CONFIG_FILE, repoConfigPath, SKILLS_DIR, skillsDrift, userConfigPath, WORKFLOWS_DIR, workflowsDir, writeConfigSchemas, writeNornVersion } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { rendered } from "../output.ts";
 import { agentsInUse } from "../runtime/agents-in-use.ts";
 import { assetsDir } from "../runtime/assets.ts";
 import { detectTestCommand, gitRemoteUrl, TEMPLATE_TEST_COMMAND, withTestCommand } from "../runtime/detect.ts";
-import { bundledSkills } from "../runtime/workflows.ts";
+import { type LabelsReport, labelsLines, remoteLabels } from "../runtime/labels.ts";
+import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
 import { cmd } from "@norn/core";
 
 /** Paths that must never be committed (§7.1, gh-64 B9); the machine-local files live outside the checkout (B5). */
@@ -87,6 +90,8 @@ export interface InitReport {
    * the repo is on another version (`norn upgrade` moves both)
    */
   norn_version: { repo: string; running: string; recorded: boolean; skills_kept: string[] };
+  /** gh-67 GR10, B15: the labels created, already there, unused and not created, or why they were not checked */
+  labels: LabelsReport;
 }
 
 /** `norn init`: what changed, one line per part; names are listed only for what changed. */
@@ -114,11 +119,15 @@ function formatInit(r: InitReport): string {
   const changed = r.config === "created" || r.norn_version.recorded || r.schemas.some((p) => p.startsWith(r.root)) || r.workflows.created.length || sk.updated.length || sk.links.some((l) => l.linked.length) || r.hooks.some((h) => h.changed.length) || r.gitignore.length || r.gitattributes.length;
   if (r.test_command) row("test command", `${r.test_command.command} (${r.test_command.detected_from ? `from ${r.test_command.detected_from}` : "not detected: the template's default"})`);
   row("remote", r.remote.url ? `${r.remote.git_remote} → ${r.remote.url}` : `no git remote named ${r.remote.git_remote}`);
+  // B15, B29: the labels line says what norn did on the remote, or what to run
+  const [labelsHead = "", ...labelsRest] = labelsLines(r.labels);
+  row("labels", labelsHead.replace(/^labels: /, ""));
+  for (const l of labelsRest) row("", l.trim());
   if (v.repo !== v.running) {
     const differ = v.skills_kept.length ? `, with the bundled skills that differ: ${v.skills_kept.join(", ")}` : "";
     out.push("", `this repo is on norn ${v.repo}, you run ${v.running}: \`${cmd.upgrade()}\` moves it${differ}`);
   }
-  if (!changed) out.push("", "Nothing changed: norn is set up here.");
+  if (!changed && !(r.labels.checked && r.labels.created.length)) out.push("", "Nothing changed: norn is set up here.");
   out.push("", "Next steps", ...nextSteps(r, !!changed).map((s, i) => `  ${i + 1}. ${s}`));
   return out.join("\n");
 }
@@ -139,9 +148,10 @@ function nextSteps(r: InitReport, changed: boolean): string[] {
   }
   steps.push(`Check this machine: \`${cmd.doctor()}\`.`);
   const label = r.remote.label;
+  // B29: the labels line above says how to get a label norn could not create
   steps.push(
     r.remote.provider === "gh"
-      ? `Make a first story: an issue labelled \`${label}\` and assigned to you, e.g. \`gh label create ${label}\` (once), then \`gh issue create --label ${label} --assignee @me --title "…"\`.`
+      ? `Make a first story: an issue labelled \`${label}\` and assigned to you, e.g. \`gh issue create --label ${label} --assignee @me --title "…"\`.`
       : `Make a first story: an issue labelled \`${label}\` and assigned to you.`,
   );
   steps.push(`Pick it up: \`${cmd.sync()}\`, then \`${cmd.status()}\` shows what needs you and the command for each item; \`${cmd.watch()}\` keeps norn working.`);
@@ -221,7 +231,10 @@ export const initCommand = defineCommand({
       hooks.push({ agent: name, tier: agent.tier, changed: r.changed });
     }
 
-    const report: InitReport = { root, config, user_config, schemas, workflows, skills, hooks, hook_command: command, gitignore: ensureGitignore(root), gitattributes: ensureGitattributes(root), remote: { provider: ctx.config.provider, label: ctx.config.label, git_remote: ctx.config.git_remote, url: gitRemoteUrl(root, ctx.config.git_remote) }, test_command, norn_version: { repo: repoVersion, running: ctx.version, recorded, skills_kept } };
+    const url = gitRemoteUrl(root, ctx.config.git_remote);
+    // GR10: after every file is in place, so the workflows (and the skills they name) are the repo's
+    const labels = await remoteLabels({ remote: ports.remote, gitRemoteUrl: url, intake: ctx.config.label, workflows: checkedRepoWorkflows(loadWorkflows(root), root, ctx.config, ports.agents), create: true });
+    const report: InitReport = { root, config, user_config, schemas, workflows, skills, hooks, hook_command: command, gitignore: ensureGitignore(root), gitattributes: ensureGitattributes(root), remote: { provider: ctx.config.provider, label: ctx.config.label, git_remote: ctx.config.git_remote, url }, test_command, norn_version: { repo: repoVersion, running: ctx.version, recorded, skills_kept }, labels };
     return rendered(report, formatInit(report));
   },
 });

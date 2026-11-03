@@ -98,4 +98,20 @@ describe("glab adapter", () => {
     const failing = createGlab({ cwd: "/repo", exec: async () => ({ code: 1, stdout: "", stderr: "error connecting: Could not resolve host" }) });
     expect(await failing.assignIssue(7, "me").catch((e) => e.retryable)).toBe(true);
   });
+  test("listLabels and createLabel: the project's labels, colours without # (GR10)", async () => {
+    const argv: string[][] = [];
+    const port = createGlab({
+      cwd: "/repo",
+      exec: async (a) => (argv.push(a), { code: 0, stdout: a[2] === "list" ? '[{"id":1,"name":"norn","color":"#D93F0B","description":"pick me"},{"id":2,"name":"bug","color":"#d73a4a","description":null}]' : "", stderr: "" }),
+    });
+    expect(await port.listLabels()).toEqual([
+      { name: "norn", color: "D93F0B", description: "pick me" },
+      { name: "bug", color: "D73A4A", description: "" },
+    ]);
+    await port.createLabel({ name: "norn:wf:quick", color: "5319E7", description: "Make a small change" });
+    expect(argv).toEqual([
+      ["glab", "label", "list", "--per-page", "100", "--output", "json"],
+      ["glab", "label", "create", "--name", "norn:wf:quick", "--color", "#5319E7", "--description", "Make a small change"],
+    ]);
+  });
 });

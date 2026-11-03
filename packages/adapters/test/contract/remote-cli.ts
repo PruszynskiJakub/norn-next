@@ -5,6 +5,7 @@
  * `--assignee`/`--label`/`--state`/`--draft` shows up as a contract failure. An unknown command throws.
  */
 import type { Exec, ExecResult } from "../../src/exec.ts";
+import type { RemoteLabel } from "@norn/core";
 import type { SeedIssue } from "./remote.ts";
 
 interface Pr {
@@ -37,14 +38,16 @@ const nextNumber = (issues: SeedIssue[]) => Math.max(0, ...issues.map((i) => i.n
 export interface ScriptedRemote {
   exec: Exec;
   seed(issues: SeedIssue[]): void;
-  /** from now on every label edit exits non-zero, as an unreachable provider would */
+  /** from now on every label edit (label listings and creations included) exits non-zero, as an unreachable provider would */
   failLabelEdits(): void;
+  seedLabels(labels: RemoteLabel[]): void;
 }
 
 const unreachable = (bin: string): ExecResult => ({ code: 1, stdout: "", stderr: `${bin}: error connecting to the API: Could not resolve host` });
 
 export function scriptedGh(login = "octocat"): ScriptedRemote {
   let issues: SeedIssue[] = [];
+  let labels: RemoteLabel[] = [];
   let labelEditsFail = false;
   const prs: Pr[] = [];
   const issueJson = (i: SeedIssue) => ({
@@ -93,6 +96,18 @@ export function scriptedGh(login = "octocat"): ScriptedRemote {
       );
       return ok(`https://github.com/acme/app/issues/${i.number}\n`);
     }
+    if (a === "label" && b === "list") {
+      if (labelEditsFail) return unreachable("gh");
+      // gh reports colours in lower case
+      return ok(labels.slice(0, Number(flag(argv, "--limit") ?? 30)).map((l) => ({ name: l.name, color: l.color.toLowerCase(), description: l.description })));
+    }
+    if (a === "label" && b === "create") {
+      if (labelEditsFail) return unreachable("gh");
+      const name = argv[3]!;
+      if (labels.some((l) => l.name.toLowerCase() === name.toLowerCase())) return { code: 1, stdout: "", stderr: `label with name "${name}" already exists; use \`--force\` to update its color and description` };
+      labels = [...labels, { name, color: flag(argv, "--color") ?? "ededed", description: flag(argv, "--description") ?? "" }];
+      return ok(`✓ Label "${name}" created in acme/app\n`);
+    }
     if (a === "pr" && b === "list") {
       const head = flag(argv, "--head");
       const rows = prs.filter((p) => p.head === head).sort((x, y) => y.number - x.number); // newest first
@@ -109,11 +124,12 @@ export function scriptedGh(login = "octocat"): ScriptedRemote {
     }
     throw new Error(`scripted gh: unexpected call: ${argv.join(" ")}`);
   };
-  return { exec, seed: (s) => void (issues = s), failLabelEdits: () => void (labelEditsFail = true) };
+  return { exec, seed: (s) => void (issues = s), failLabelEdits: () => void (labelEditsFail = true), seedLabels: (l) => void (labels = l) };
 }
 
 export function scriptedGlab(login = "tanuki"): ScriptedRemote {
   let issues: SeedIssue[] = [];
+  let labels: RemoteLabel[] = [];
   let labelEditsFail = false;
   const mrs: Pr[] = [];
   const issueJson = (i: SeedIssue) => ({
@@ -162,6 +178,18 @@ export function scriptedGlab(login = "tanuki"): ScriptedRemote {
       issues = issues.map((x) => (x === i ? { ...x, labels: [...x.labels.filter((l) => !remove.includes(l)), ...add.filter((l) => !x.labels.includes(l))], assignees: assignees(x) } : x));
       return ok(`- Updating issue #${i.number}\n#${i.number} ${i.title} (now)\n https://gitlab.com/acme/app/-/issues/${i.number}\n`);
     }
+    if (a === "label" && b === "list") {
+      if (labelEditsFail) return unreachable("glab");
+      // GitLab's label objects: colour with `#`
+      return ok(labels.slice(0, Number(flag(argv, "--per-page") ?? 20)).map((l, i) => ({ id: i + 1, name: l.name, color: `#${l.color}`, description: l.description || null, text_color: "#FFFFFF" })));
+    }
+    if (a === "label" && b === "create") {
+      if (labelEditsFail) return unreachable("glab");
+      const name = flag(argv, "--name")!;
+      if (labels.some((l) => l.name === name)) return { code: 1, stdout: "", stderr: "ERROR: 409 Conflict: {message: Label already exists}" };
+      labels = [...labels, { name, color: (flag(argv, "--color") ?? "#428BCA").replace(/^#/, ""), description: flag(argv, "--description") ?? "" }];
+      return ok(`Created label: ${name}\nWith color: ${flag(argv, "--color")}\n`);
+    }
     if (a === "mr" && b === "list") {
       const head = flag(argv, "--source-branch");
       return ok(mrs.filter((m) => m.head === head).map(mrJson)); // glab's order is not the adapter's to trust
@@ -177,5 +205,5 @@ export function scriptedGlab(login = "tanuki"): ScriptedRemote {
     }
     throw new Error(`scripted glab: unexpected call: ${argv.join(" ")}`);
   };
-  return { exec, seed: (s) => void (issues = s), failLabelEdits: () => void (labelEditsFail = true) };
+  return { exec, seed: (s) => void (issues = s), failLabelEdits: () => void (labelEditsFail = true), seedLabels: (l) => void (labels = l) };
 }

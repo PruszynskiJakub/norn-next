@@ -30,9 +30,12 @@ Picked by the issue label `norn:wf:<name>` (W9); without one, `triage` runs. The
 |---|---|
 | `norn` | norn picks the issue up. |
 | `norn:wf:<name>` | Selects the workflow (above). |
+| `norn:kind:*`, `norn:risk:*`, `norn:priority:*` | Set by triage, one of each: the issue's kind, risk and priority ([Concepts: Labels](docs/concepts.md#labels)). Change one by hand when you disagree; triage keeps it. |
 | `friction` | Friction with norn itself, found while using it here. |
 | `bypass` | A change norn cannot deliver (see below). |
 | `idea`, `bug`, `enhancement` | Hints for triage; they select nothing. |
+
+`norn init` and `norn upgrade` create every `norn` label above that is missing on the remote; `norn doctor` warns about a missing one. `friction` and `bypass` are this repo's own and created by hand.
 
 ## Set up a collaborator machine
 

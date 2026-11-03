@@ -17,6 +17,10 @@
  * and relinked, and `norn_version` written last (the team file edited in place, comments kept), all
  * staged, never committed. Nothing to do: "already on norn X.Y.Z" and no change (B15).
  *
+ * gh-67 GR10 (B2, B7): on every run, even with nothing else to move, last: the labels norn uses
+ * created on the remote where missing (`runtime/labels.ts`); never edited or deleted, and a remote it
+ * cannot reach or write is reported, never a refusal or a changed exit code.
+ *
  * gh-61 B30 (D9): `norn migrate` is a deprecated alias that runs the same code and adds one line for a
  * person on stderr; it goes in the next minor.
  */
@@ -24,15 +28,17 @@ import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { cmd, upgradeBackward } from "@norn/core";
 import { versionMatch } from "@norn/schema";
-import { acquireLock, acquireTickLock, type ConfigMigration, dropOldIgnoreLine, installSkills, linkSkills, migrateConfig, machineDir, moveFile, moveOldTrace, OLD_CONFIG_FILE, OLD_TRACE_DIR, OLD_WORKFLOWS_DIR, oldTickLockPath, oldWorkflowEntries, REPO_CONFIG_FILE, recordedNornVersion, removeOldLayoutDirs, repoConfigPath, repoLayout, SKILLS_DIR, traceClashes, WORKFLOWS_DIR, writeNornVersion } from "@norn/store";
+import { acquireLock, acquireTickLock, type ConfigMigration, dropOldIgnoreLine, installSkills, linkSkills, loadWorkflows, migrateConfig, machineDir, moveFile, moveOldTrace, OLD_CONFIG_FILE, OLD_TRACE_DIR, OLD_WORKFLOWS_DIR, oldTickLockPath, oldWorkflowEntries, REPO_CONFIG_FILE, recordedNornVersion, removeOldLayoutDirs, repoConfigPath, repoLayout, SKILLS_DIR, traceClashes, WORKFLOWS_DIR, writeNornVersion } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import { type Context, safeRealpath } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
 import { agentsInUse } from "../runtime/agents-in-use.ts";
 import { assetsDir } from "../runtime/assets.ts";
+import { gitRemoteUrl } from "../runtime/detect.ts";
+import { type LabelsReport, labelsLines, remoteLabels } from "../runtime/labels.ts";
 import { layoutRefusal } from "../runtime/layout.ts";
 import { comparableVersion } from "../runtime/version-guard.ts";
-import { bundledSkills } from "../runtime/workflows.ts";
+import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
 
 export interface UpgradeMove {
   part: "config" | "workflows" | "machine files";
@@ -56,6 +62,8 @@ export interface UpgradeReport {
   staged: string[];
   /** the commit the person makes; null when nothing was staged */
   commit: string | null;
+  /** gh-67 GR10, B15: the labels created, already there, unused and not created, or why they were not checked */
+  labels?: LabelsReport;
 }
 
 const COMMIT = `git commit -m "Move norn to its new layout (norn upgrade)"`;
@@ -175,6 +183,15 @@ async function versionPart(ctx: Context, root: string, report: UpgradeReport, v:
   return { ...report, norn_version: { ...v, changed }, skills: { updated: installed.updated, linked: [...linked].sort() }, staged, commit };
 }
 
+/** gh-67 GR10 (B2): the labels, after every move, so the workflows are read from their new place. */
+async function labelsPart(ctx: Context, root: string, report: UpgradeReport): Promise<UpgradeReport> {
+  ctx.reload();
+  const ports = await ctx.ports();
+  const workflows = checkedRepoWorkflows(loadWorkflows(root), root, ctx.config, ports.agents);
+  const labels = await remoteLabels({ remote: ports.remote, gitRemoteUrl: gitRemoteUrl(root, ctx.config.git_remote), intake: ctx.config.label, workflows, create: true });
+  return { ...report, labels };
+}
+
 /** gh-61 B13: the one line that says what moved: the version, the skills, the config. */
 function summary(r: UpgradeReport): string {
   const v = r.norn_version;
@@ -193,9 +210,10 @@ function summary(r: UpgradeReport): string {
 function markdown(r: UpgradeReport, root: string): string {
   const config = r.config.changed.length || r.config.removed.length || r.config.renamed.length;
   const skills = r.skills.updated.length || r.skills.linked.length;
-  // B15
+  const labels = r.labels ? ["", ...labelsLines(r.labels)] : [];
+  // B15; gh-67 B2: the labels line still shows what upgrade did on the remote
   if (!r.moves.length && !r.staged.length && !config && !skills && !r.norn_version.changed)
-    return `# norn upgrade\n\nalready on norn ${r.norn_version.from ?? r.norn_version.to}: nothing to upgrade (${root} is on the new layout, its config on the new keys and its skills match).`;
+    return [`# norn upgrade\n\nalready on norn ${r.norn_version.from ?? r.norn_version.to}: nothing to upgrade (${root} is on the new layout, its config on the new keys and its skills match).`, ...labels].join("\n");
   const how = { "git mv": "staged", untracked: "untracked: moved, not staged", moved: "machine-local, outside git" };
   // every section below starts with its own blank line
   const out = ["# norn upgrade", "", summary(r)];
@@ -213,6 +231,7 @@ function markdown(r: UpgradeReport, root: string): string {
   if (untracked.length) out.push("", `Untracked before, so not staged: ${untracked.join(", ")}. Add them yourself if they belong in the repo.`);
   if (r.skills.updated.length) out.push("", `Skills rewritten from norn ${r.norn_version.to}'s copies (\`git diff --staged ${SKILLS_DIR}/\` shows how): ${r.skills.updated.join(", ")}`);
   if (r.norn_version.changed) out.push("", `${REPO_CONFIG_FILE}: \`norn_version: ${r.norn_version.to}\` (staged)`);
+  out.push(...labels);
   out.push("", r.commit ? `Review the staged moves with \`git status\`, then commit them: \`${r.commit}\`` : "Nothing to commit: only machine-local files moved.");
   return out.join("\n");
 }
@@ -227,7 +246,7 @@ async function upgrade(ctx: Context) {
     const none: UpgradeReport = { moves: [], config: NO_CONFIG, norn_version: { ...v, changed: false }, skills: NO_SKILLS, staged: [], commit: null };
     const tick = await tickLock(ctx, root);
     try {
-      const report = await versionPart(ctx, root, await migrateConfigPart(ctx, root, none), v);
+      const report = await labelsPart(ctx, root, await versionPart(ctx, root, await migrateConfigPart(ctx, root, none), v));
       return rendered(report, markdown(report, root));
     } finally {
       tick.release();
@@ -246,6 +265,7 @@ async function upgrade(ctx: Context) {
     lock.release();
   }
   removeOldLayoutDirs(root);
+  report = await labelsPart(ctx, root, report);
   return rendered(report, markdown(report, root));
 }
 
