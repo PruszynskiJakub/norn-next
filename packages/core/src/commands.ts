@@ -104,6 +104,10 @@ export const cmd = {
 export const skillsDriftHint = {
   text: (running: string, names: readonly string[]) => `skills differ from norn ${running}: ${names.join(", ")}`,
   fix: (story: string) => `bring the base in with \`${cmd.storyUpdateBranch(story)}\``,
+  /** B19: the Unblock item of a unit decide holds (D6) */
+  held: (running: string, names: readonly string[], story: string) => `skills differ from norn ${running} (${names.join(", ")}): ${skillsDriftHint.fix(story)}`,
+  /** B19: the repo-level item when the main checkout itself drifted */
+  repo: (running: string) => `skills differ from norn ${running}: run \`${cmd.upgrade()}\` and commit`,
 };
 
 /** B5: the top-level commands this release removed; no printed command names one (B7). */

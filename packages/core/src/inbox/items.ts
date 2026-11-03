@@ -9,7 +9,7 @@
  * action), Recently done.
  */
 import { ATTENDED_WAIT, parseDuration, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
-import { cmd, NO_VERSION_HINT, nextCommand, startAgentCommand, versionMismatch } from "../commands.ts";
+import { cmd, NO_VERSION_HINT, nextCommand, skillsDriftHint, startAgentCommand, versionMismatch } from "../commands.ts";
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../criteria.ts";
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
@@ -136,6 +136,23 @@ function versionItem(facts: Facts): InboxItem | null {
   // an older binary's way out is outside norn (install the repo's line); `doctor` runs on a mismatch (B8) and shows it
   const command = mismatch.match === "newer" ? cmd.upgrade() : cmd.doctor();
   return { ...base, id: `${VERSION_ITEM}${v.repo}:${v.running}`, group: "unblock", title: `${mismatch.error}: ${mismatch.do_instead}`, command };
+}
+
+/** gh-61 B19: the main checkout holds bundled skills that differ from the running norn's — one repo-level Unblock item. */
+function repoSkillsDriftItem(facts: Facts): InboxItem | null {
+  const v = facts.norn;
+  if (!v?.skills_drift?.length) return null;
+  return {
+    id: `skills_drift:*:${v.running}:${v.skills_drift.join(",")}`,
+    group: "unblock",
+    story: "*",
+    slice: null,
+    step: null,
+    title: skillsDriftHint.repo(v.running),
+    detail: v.skills_drift.join(", "),
+    command: cmd.upgrade(),
+    since: iso(facts.now),
+  };
 }
 
 /**
@@ -579,6 +596,11 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       return item("running", `${st.step} #${st.attempt}${st.run ? ` (${st.run.how})` : ""}`, cmd.runList(key), st.run?.started_at ?? st.step_entered_at);
     case "ready": {
       const step = uf.workflow ? stepOf(uf.workflow, st.step) : null;
+      // gh-61 B19 (D6): decide holds the agent start on drifted skills; say why and how to fix it
+      if (step?.type === "agent" && uf.skills_drift?.length && facts.norn)
+        return item("unblock", skillsDriftHint.held(facts.norn.running, uf.skills_drift, story.key), cmd.storyUpdateBranch(story.key), st.step_entered_at, {
+          id: `skills_drift:${key}:${st.step}#${st.attempt}:${uf.skills_drift.join(",")}`,
+        });
       if (step?.type === "agent") {
         const { mode, downgraded } = effectiveMode(story.mode, !!step.attended, facts.machine.runner);
         if (mode === "manual") {
@@ -802,6 +824,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   }
   add(heartbeatItem(facts, config));
   add(versionItem(facts));
+  add(repoSkillsDriftItem(facts));
   // gh-61 D7: the version item comes first, whatever its age
   const pinned = (it: InboxEntry) => (it.id.startsWith(VERSION_ITEM) ? 0 : 1);
   for (const g of INBOX_GROUPS) groups[g].sort((a, b) => pinned(a) - pinned(b) || epoch(a.since) - epoch(b.since) || a.id.localeCompare(b.id));

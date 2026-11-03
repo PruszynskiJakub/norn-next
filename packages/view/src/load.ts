@@ -71,6 +71,8 @@ export interface LoadProjectViewOptions {
   liveness?: LeaseLiveness;
   /** gh-61 D5: the running norn's version; given = the inbox shows a mismatch with the repo's (B8) */
   version?: string;
+  /** gh-61 D5 (B19): this norn's bundled skills; given with `version` = the inbox shows drifted skills */
+  bundledSkills?: { source: string; names: readonly string[] };
 }
 
 /** A worktree as the view sees it: on disk and its slot; git status is not read (no git, X1). Null when absent, as observe. */
@@ -220,6 +222,7 @@ function unitFacts(lu: LocalUnit, hooks: readonly HookFact[], leaseByRun: Readon
     uncommitted: false,
     ...(lu.step_runs ? { step_runs: lu.step_runs } : {}),
     ...(lu.act_failure ? { act_failure: lu.act_failure } : {}),
+    ...(lu.skills_drift ? { skills_drift: lu.skills_drift } : {}),
   };
 }
 
@@ -259,6 +262,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     includeApplied: true,
     reportLeaseErrors: true,
     ...(opts.version !== undefined ? { running: opts.version } : {}),
+    ...(opts.bundledSkills ? { bundledSkills: opts.bundledSkills } : {}),
   });
   const snap = local.snapshot;
   let config = DEFAULT_CONFIG;

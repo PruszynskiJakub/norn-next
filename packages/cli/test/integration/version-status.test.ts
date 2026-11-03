@@ -48,7 +48,7 @@ describe("the norn version in status (gh-61 B8, B5)", () => {
 
   test("inbox parity holds on a mismatch: the view's inbox is buildInbox over observe's Facts", async () => {
     const obs = await observeNow(h);
-    expect(obs.facts.norn).toEqual({ running: "0.18.1", repo: "0.19.0" });
+    expect(obs.facts.norn).toEqual({ running: "0.18.1", repo: "0.19.0", skills_drift: [] });
     const ctx = new Context(h.deps);
     await ctx.locate();
     const observed = buildInbox(obs.facts, obs.config);

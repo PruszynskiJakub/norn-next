@@ -168,6 +168,13 @@ export interface UnitFacts {
    * done slice) — decide then keeps the branch unless the cleanup integrates its worktree first.
    */
   branch_in_story?: boolean;
+  /**
+   * gh-61 D5 (B18, B21): the bundled skills in the unit's worktree that differ from the running
+   * norn's, by name; empty = none differ. Absent = not observed (no worktree, no bundled skills given,
+   * or the worktree's own team file records a newer `norn_version`, D14). decide starts no agent step
+   * while it is non-empty (D6).
+   */
+  skills_drift?: string[];
 }
 
 export interface SliceFileFacts {
@@ -378,9 +385,10 @@ export interface Facts {
    * gh-61 D5: the running binary's version and the one the main checkout's team config records
    * (`norn_version`, null = not recorded, B5). Absent = not observed (no running version given, or
    * the config failed to load). A mismatch never reaches decide (the tick is refused first, B6);
-   * the inbox shows it (B8, D7).
+   * the inbox shows it (B8, D7). `skills_drift`: the main checkout's bundled skills that differ from
+   * the running norn's (B19); absent = not observed.
    */
-  norn?: { running: string; repo: string | null };
+  norn?: { running: string; repo: string | null; skills_drift?: string[] };
   /** worktrees/branches with no matching unit (K5) */
   orphans: { worktrees: string[]; branches: string[] };
 }

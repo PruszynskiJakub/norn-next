@@ -18,6 +18,7 @@ import { type LeaseListing, type LeaseLiveness, listLeases } from "./leases.ts";
 import { receiptsDir } from "./paths.ts";
 import { readReceipt } from "./receipts.ts";
 import { loadSnapshot, type RepoSnapshot, type StorySnapshot, type UnitSnapshot, withSliceWorktrees } from "./snapshot.ts";
+import { worktreeSkillsDrift } from "./skills.ts";
 import { readUnitHooks, unitHooksChangedAt } from "./trace.ts";
 import { readUnitMarker } from "./worktree.ts";
 
@@ -45,6 +46,11 @@ export interface LocalFactsOptions {
   backfillHooks?: boolean;
   /** gh-61 D5: the running binary's version; given = `norn` is observed */
   running?: string;
+  /**
+   * gh-61 D5 (B18, B21): this norn's bundled skills (the source folder and their names), passed in by
+   * the cli; given with `running` = each unit worktree's and the main checkout's `skills_drift` is observed
+   */
+  bundledSkills?: { source: string; names: readonly string[] };
 }
 
 /** R5.3 + R5.1: the runs of a unit's cursor step/attempt, and every session id its `started` receipts recorded. */
@@ -72,6 +78,8 @@ export interface LocalUnit {
   /** R5.3: runs of the cursor step and their hook activity */
   step_runs?: StepRunFacts[];
   act_failure?: ActFailure;
+  /** gh-61 D5: the worktree's bundled skills that differ from the running norn's; absent = not observed */
+  skills_drift?: string[];
 }
 
 export interface LocalStory {
@@ -102,7 +110,7 @@ export interface LocalFacts {
    * gh-61 D5: the running version and the one this checkout's team config records (null = none,
    * B5); absent when no running version was given or the config failed to load.
    */
-  norn?: { running: string; repo: string | null };
+  norn?: { running: string; repo: string | null; skills_drift?: string[] };
 }
 
 export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Promise<LocalFacts> {
@@ -149,15 +157,39 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
   });
   const unitHooks = readUnitHooks(root, hooked.map((u) => u.unit), starts.sort()[0] as string);
   const hooksOf = new Map(hooked.map((u, i) => [u, (unitHooks[i] ?? []).map((e) => e.fact)]));
+  const drift = skillsDriftOf(opts);
   const stories = placed.map(({ s, storyWt, units: us }): LocalStory => {
-    const units = us.map(({ u, worktree }) => localUnit(root, s, u, worktree, hooksOf.get(u) ?? [], live, failures));
+    const units = us.map(({ u, worktree }) => {
+      const lu = localUnit(root, s, u, worktree, hooksOf.get(u) ?? [], live, failures);
+      // a finished unit starts no agent step: its skills are not compared (observe cost)
+      const skills_drift = worktree && u.state?.status !== "done" ? drift(worktree) : undefined;
+      return skills_drift ? { ...lu, skills_drift } : lu;
+    });
     const ready = readyOf(s, s.units[0]);
     const notes = openNotes(s.units.map((u) => ({ unit: u.unit.key, receipts: receiptsOfKinds(s, u, ["done", "approve"]) })));
     return { snapshot: s, worktree: storyWt, units, ...(notes.length ? { notes } : {}), ...(ready ? { ready } : {}) };
   });
   // gh-61 D5, B12: the version the main checkout's team config records
-  const norn = opts.running !== undefined && snapshot.config.ok ? { running: opts.running, repo: snapshot.config.config.norn_version ?? null } : undefined;
+  const mainDrift = drift(root);
+  const norn =
+    opts.running !== undefined && snapshot.config.ok ? { running: opts.running, repo: snapshot.config.config.norn_version ?? null, ...(mainDrift ? { skills_drift: mainDrift } : {}) } : undefined;
   return { snapshot, stories, leases, failures, pr_seen: readPrFacts(root), issue_seen: readIssueFacts(root), base: readBaseFacts(root), ...(norn ? { norn } : {}) };
+}
+
+/**
+ * gh-61 D5, D14: a worktree's drifted bundled skills (`worktreeSkillsDrift`), each folder compared
+ * once per load (a story worktree serves the story unit and every slice without its own); undefined
+ * when not observed (no running version or bundled skills given, or no such folder).
+ */
+function skillsDriftOf(opts: LocalFactsOptions): (worktree: string) => string[] | undefined {
+  const { running, bundledSkills: bundled } = opts;
+  const seen = new Map<string, string[]>();
+  return (worktree) => {
+    if (running === undefined || !bundled || !existsSync(worktree)) return undefined;
+    let names = seen.get(worktree);
+    if (!names) seen.set(worktree, (names = worktreeSkillsDrift(worktree, bundled.source, bundled.names, running)));
+    return names;
+  };
 }
 
 function localUnit(root: string, story: StorySnapshot, u: UnitSnapshot, worktree: string | null, hooks: HookFact[], leases: LeaseFile[], failures: Record<string, ActFailure>): LocalUnit {
