@@ -19,6 +19,7 @@ You work on the current base. Try what the issue describes there.
 
 - About behaviour: run it the way a user would (the command, the request, the page), from this checkout's code, never from an installed release. Run it somewhere disposable (a throwaway directory or repository), never somewhere your run could change real state.
 - About code, docs or tests: read them, and run the test that covers it.
+- Back every claim about what code or config does with the `file:line` usages that consume it, not only where it is defined. Never infer behaviour from a schema, a type or the docs alone: a key can be defined and documented yet never read. Name any such key as defined but never read.
 - Record the exact commands and what you saw. Say plainly when it no longer applies, or when it could not be tried here and why.
 
 Use the `norn-diagnose` loop only when the symptom does not show on the first try; stop at a repro, never at a cause you guessed.
@@ -32,7 +33,7 @@ Write the findings in this shape:
 
 **Still applies:** yes | no | not checked — <one line, base commit>
 **Repro:** <commands and what they print, minimal>
-**Affected code:** `path/to/file.ts:123` — <what it does there>
+**Affected code:** `path/to/file.ts:123` — <what it does there, read at the usage that consumes it>
 **Rules:** <ids or sections of the project's docs it touches; "none" if no doc covers it>
 **Context:** <related issues, PRs, earlier decisions; only what changes the decision>
 

@@ -15,7 +15,13 @@
 <!-- norn:heartbeat:end -->
 
 ## Goal
+Add the three rules of gh-171 to the bundled skills (sources in packages/cli/assets/skills/).
 
 ## Progress
+- norn-triage, norn-refine: back claims about code/config with the consuming file:line usages; flag keys defined but never read.
+- norn-implement, norn-tdd: read existing test helpers, fixtures, fakes and the real state shape before writing a test.
+- norn-interview, norn-refine, norn-clarify: on a terse answer, state the interpretation in one line and carry on.
+- Docs only: no new test; unit tier and typecheck green. `.agents/skills/` copies left alone (written by `norn init`).
 
 ## Resume
+Nothing left; reported done.

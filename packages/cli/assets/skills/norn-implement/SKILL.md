@@ -7,7 +7,7 @@ description: Build a slice or story test-first at the seams its plan agreed — 
 
 Make every acceptance criterion true, each proven by a test that failed before the code existed.
 
-1. **Read.** The acceptance criteria, the spec items they cite, and the spec's Plan: its Seams and Testing decisions above all. Run the existing tests once so you know the baseline. Beyond that, read only the code and contributor docs the criteria touch, as you reach them; no tour of the repository.
+1. **Read.** The acceptance criteria, the spec items they cite, and the spec's Plan: its Seams and Testing decisions above all. Run the existing tests once so you know the baseline. Beyond that, read only the code and contributor docs the criteria touch, as you reach them; no tour of the repository. Before writing a test, read the existing test helpers, fixtures and fakes at that seam, and the actual shape of the state or output the test asserts on (a real instance, not only its type): a test built on a guessed helper, prefix or field fails for the wrong reason.
 2. **Rework first.** When you are given rework points (a Rework section: failing check output, review findings, a QA repro), they come before anything else, and each is a test to make red before you touch code:
    - failing check: reproduce the failure locally and read the full output;
    - review finding: write the test that exposes the problem;
