@@ -2,7 +2,7 @@
 id: gh-61/04
 title: The `norn_version` team key and the match rule
 depends_on: []
-status: planned
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
