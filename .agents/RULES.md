@@ -140,7 +140,7 @@ The story worktree is on the story branch and holds `.agents/specs/<id>-<slug>/`
 
 Launch crashes, orphans and heartbeat liveness are in [R5](#r5-launch-crash-orphans-and-heartbeat-liveness) (§13.1).
 
-- H1 `norn tick` is one idempotent pass: **observe → decide → act → log**, under a local lock.
+- H1 `norn tick` is one idempotent pass: **observe → decide → act → log**, under a local lock. A person command that needs that lock and finds a live tick holding it waits for it, up to 60 seconds, saying so on stderr, then runs; still held after that, it refuses (`tick_locked`). `norn tick` and `norn migrate` refuse at once.
 - H2 **Observe** collects facts: frontmatter, `runs/` state and unapplied receipts, git refs (local and remote, incl. mailbox), worktree status, runner pane state, hook events, process liveness (PID + start time).
 - H3 **Decide** is a pure function `(facts, pinned workflows, config) → actions`, at most one action per unit per tick. It records which rule fired.
 - H4 **Act** performs actions, writing receipts first (P6); every action and its result is appended to the trace.
