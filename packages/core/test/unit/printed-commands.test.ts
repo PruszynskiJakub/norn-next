@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { cmd, nameRemoved, versionRefusal } from "@norn/core";
+import { cmd, nameRemoved, upgradeBackward, versionMismatch } from "@norn/core";
 
 // B7: every command norn prints is built by one `cmd` builder. This table pins each builder's
 // string for a sample unit, so renaming a command is one reviewed diff of this table and the module.
@@ -91,16 +91,22 @@ describe("printed commands (B7)", () => {
 
 describe("the version refusal (gh-61 B6, B7, D3)", () => {
   test("an older binary is told which norn to install", () => {
-    expect(versionRefusal("0.19.0", "0.18.1", "older")).toEqual({ error: "this repo needs norn 0.19.x (you run 0.18.1)", do_instead: "install norn 0.19.x" });
-    expect(versionRefusal("0.18.2", "0.18.1", "older")).toEqual({ error: "this repo needs norn 0.18.2 or a later 0.18.x (you run 0.18.1)", do_instead: "install norn 0.18.2 or a later 0.18.x" });
-    expect(versionRefusal("1.2.0", "1.1.9", "older").do_instead).toBe("install norn 1.2.0 or a later 1.x");
-    expect(versionRefusal("2.0.0", "1.5.0", "older").do_instead).toBe("install norn 2.x");
+    expect(versionMismatch("0.19.0", "0.18.1")).toEqual({ match: "older", needs: "0.19.x", error: "this repo needs norn 0.19.x (you run 0.18.1)", do_instead: "install norn 0.19.x" });
+    expect(versionMismatch("0.18.2", "0.18.1")).toEqual({ match: "older", needs: "0.18.2 or a later 0.18.x", error: "this repo needs norn 0.18.2 or a later 0.18.x (you run 0.18.1)", do_instead: "install norn 0.18.2 or a later 0.18.x" });
+    expect(versionMismatch("1.2.0", "1.1.9")?.do_instead).toBe("install norn 1.2.0 or a later 1.x");
+    expect(versionMismatch("2.0.0", "1.5.0")?.do_instead).toBe("install norn 2.x");
   });
 
   test("a newer binary is told to run norn upgrade and commit, or to install the repo's norn", () => {
-    expect(versionRefusal("0.18.0", "0.19.0", "newer")).toEqual({
+    expect(versionMismatch("0.18.0", "0.19.0")).toEqual({
+      match: "newer",
+      needs: "0.18.x",
       error: "this repo needs norn 0.18.x (you run 0.19.0)",
       do_instead: "run `norn upgrade` to move this repo to norn 0.19.0 and commit the change, or install norn 0.18.x",
     });
+  });
+
+  test("norn upgrade run by an older binary is told it will not move the repo back, and which norn to install (B17)", () => {
+    expect(upgradeBackward("0.19.0", "0.18.1")).toEqual({ error: "this repo is set up for norn 0.19.0; upgrade will not move it back", do_instead: "install norn 0.19.x" });
   });
 });

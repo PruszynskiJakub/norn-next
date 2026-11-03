@@ -83,6 +83,8 @@
 | B29 (kept) | test | `packages/cli/test/integration/upgrade.test.ts` (main checkout and tick lock refusals, unchanged) |
 - review#3 approve: Approve, nothing blocking. Tests prove AC1–AC4 at the S1 seam (upgrade-version.test.ts), including the ignored-agent-folder test review#2 asked for. The markdown double blank line is gone. Unit 1137 pass, typecheck green, and the related integration files (115) pass. AC5 goes to QA (agent).
 
+- merge#1 (integrate.conflict): merged the story branch (slice 07 in) with `git merge --no-ff`. 07 and this slice had each fixed the 05/06 duplicate `versionMismatch` differently. Kept 07's shape: core `versionMismatch(repo, running)` (parses the running core itself, adds `needs`) and cli `versionRefusal(ctx)` + `guardVersion` (used by watch). Dropped this slice's core `versionRefusal(repo, running, match)`; `upgradeBackward` now takes its `do_instead` from `versionMismatch`. cli `comparableVersion` is kept (upgrade.ts uses it). printed-commands test takes 07's cases, plus a new `upgradeBackward` case. Typecheck green, unit 1138 pass, integration 660 pass.
+
 ## Resume
 
-Review approved; nothing to do in review. Next: QA (agent) of AC5 — dev build in a throwaway repo, `norn upgrade` output and `git diff --staged` read as one change.
+Merge done. Next: QA (agent) of AC5: run the dev build in a throwaway repo and check that the `norn upgrade` output and `git diff --staged` read as one change.
