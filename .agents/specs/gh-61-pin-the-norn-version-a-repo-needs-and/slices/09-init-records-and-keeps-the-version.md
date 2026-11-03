@@ -2,7 +2,7 @@
 id: gh-61/09
 title: "`norn init` records the version once and never moves it"
 depends_on: [ gh-61/01, gh-61/02, gh-61/04 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
