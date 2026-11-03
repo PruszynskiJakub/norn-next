@@ -14,6 +14,15 @@
 
 ## Goal
 
+AC1 (B22, S4): an e2e story where a story in flight on 0.18.0's skills is held at its next agent step after the base moves to 0.19.0, takes the base in, then launches on the same pinned workflow.
+
 ## Progress
 
+- New describe "gh-61 B22 …" at the end of `test/e2e/base-sync.test.ts`. The binary plays 0.18.0 (`deps.version` plus `NORN_ASSETS_DIR` pointing at a copy of the assets with an edited norn skill), then 0.19.0 (this build's assets). The base moves via a sibling clone that installs the new skills and bumps `norn_version`; the person pulls, rejects at `ready` → `work` is held (noop `agent.skills_drift`, Unblock item) → `norn story update-branch gh-7` → `git: update` merges main → `work` launches; the pinned workflow is byte-identical.
+- Gap found and fixed: update-branch (BS9) refused a unit held at an agent step (`not_waiting`), even though the B19 item names it as the fix. Now: core `heldBySkillsDrift(uf)` (policy.ts) is shared by the inbox item and update-branch. The `update` receipt gets an optional `skills_drift` field (schema plus emitted JSON), and apply takes an update from a `ready` agent step only when the receipt names the drift, so apply stays pure and replayable. BS9 in RULES.md is amended to match. A core unit test is added in `packages/core/test/unit/base-sync.test.ts` (case 6).
+- The base-sync transcript did not move. The unit tier, typecheck and `test/e2e/base-sync.test.ts` are green.
+- Not done (out of scope): the no-argument pick of `update-branch` (`updatable.applies`, on Listed) does not offer a held unit; you have to name it, as the inbox command does. A held *slice* unit's item names update-branch of the story, which re-enters the story unit, not the slice.
+
 ## Resume
+
+Nothing left for implement; the `test` check runs the integration and e2e tiers next.
