@@ -284,7 +284,12 @@ export function printsNoRemovedCommand(argv: readonly string[], r: CliResult): C
 /** `runCli` with the B7 check: what a suite that passes its own deps calls instead. */
 export const runChecked = async (argv: string[], deps: CliDeps): Promise<CliResult> => printsNoRemovedCommand(argv, await runCli(argv, deps));
 
-export async function createHarness(): Promise<Harness> {
+export interface HarnessOptions {
+  /** run every command as a norn binary of this version (`X.Y.Z`); default the package version */
+  version?: string;
+}
+
+export async function createHarness(opts: HarnessOptions = {}): Promise<Harness> {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "norn-cli-")));
   const remoteDir = join(dir, "remote.git");
   const seed = join(dir, "seed");
@@ -316,6 +321,7 @@ export async function createHarness(): Promise<Harness> {
     clock,
     ports: { remote, runner, notifiers: [notifier] },
     interaction: null,
+    ...(opts.version ? { version: opts.version } : {}),
   };
   const h: Harness = {
     dir,

@@ -256,7 +256,7 @@ export interface Look {
   now: number;
   /** local time of day for the header */
   clock: string;
-  /** the running norn's version (`NORN_VERSION`), for the header */
+  /** the running norn's version (`ctx.version`), for the header */
   version?: string;
 }
 

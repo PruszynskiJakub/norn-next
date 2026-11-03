@@ -11,9 +11,8 @@ import { parseArgs } from "node:util";
 import { ExitCode } from "@norn/schema";
 import type { Command, Noun, ParsedArgs } from "./command.ts";
 import { COMMANDS, findCommand, findNoun, NOUNS } from "./commands/index.ts";
-import { type CliDeps, Context } from "./context.ts";
+import { type CliDeps, Context, runningVersion } from "./context.ts";
 import { CliFailure, failureMarkdown, isRendered, isWithExit, render, toFailure, usageError } from "./output.ts";
-import { NORN_VERSION } from "./version.ts";
 import { cmd } from "@norn/core";
 
 export interface CliResult {
@@ -62,7 +61,7 @@ export async function runCli(argv: string[], deps: CliDeps = {}): Promise<CliRes
   // `norn`, `norn --help` and `norn <command> --help` are `norn help`: markdown unless --json
   if (!first || first === "--help" || first === "-h") return runCli(["help", ...jsonOnly(more)], deps);
   const [name, ...rest] = argv as [string, ...string[]];
-  if (name === "--version" || name === "-v") return done({ version: NORN_VERSION });
+  if (name === "--version" || name === "-v") return done({ version: runningVersion(deps) });
   const noun = findNoun(name);
   if (noun) {
     // B2: `norn run` (and `norn run --help`) lists the verbs

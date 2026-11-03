@@ -37,7 +37,6 @@ import { corruptError, refuse, rendered, usageError, withExit } from "../output.
 import { parseUnitKey } from "../runtime/args.ts";
 import { hasRun, targetKey } from "../runtime/target.ts";
 import { effectiveRetain } from "../runtime/trace-retention.ts";
-import { NORN_VERSION } from "../version.ts";
 
 /** An action as compared with its replay; one an older norn recorded drops the fields since removed (O5). */
 const canon = (v: unknown) => JSON.stringify(JSON.parse(JSON.stringify(legacyAction(v ?? null))));
@@ -334,7 +333,7 @@ async function why(ctx: Context, args: ParsedArgs) {
       rule: mine?.rule ?? null,
       ...(same ? {} : { action: mine?.action ?? null }),
       // O5: decide may have changed since; say whose decision the replay is compared with
-      ...(tick.norn_version && tick.norn_version !== NORN_VERSION ? { label: `recorded by norn ${tick.norn_version}, replayed by norn ${NORN_VERSION}` } : {}),
+      ...(tick.norn_version && tick.norn_version !== ctx.version ? { label: `recorded by norn ${tick.norn_version}, replayed by norn ${ctx.version}` } : {}),
     },
     ...(filtered && !tickId
       ? {

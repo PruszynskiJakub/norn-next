@@ -14,6 +14,16 @@
 
 ## Goal
 
+Prefactor 1: the running norn's version is a command dependency (`CliDeps.version`, `ctx.version`), defaulting to the package version, so tests can run the CLI as any binary. No behaviour change.
+
 ## Progress
 
+- `CliDeps.version` + `runningVersion(deps)` in `packages/cli/src/context.ts` (the one reader of `NORN_VERSION`); `Context.version`.
+- `--version` (cli.ts), the tick trace (`traceRecord` takes the version), `run view --why`'s replay label and the cockpit header read it.
+- Harness: `createHarness({ version: "0.18.1" })`.
+- AC1: `packages/cli/test/integration/why-version.test.ts` "the running version is a dependency" (red without the dep, green with it).
+- AC2: lint in `test/repo/repo.test.ts`: no cli source but context.ts/version.ts reads the constant (the four old readers would fail it). Unit tier, integration tier and typecheck green.
+
 ## Resume
+
+Nothing left for this slice; report `done`.

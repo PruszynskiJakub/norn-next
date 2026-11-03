@@ -1081,3 +1081,23 @@ describe("one resolver for a unit's record folder (gh-71 D2, B30, B36)", () => {
     expect(hits).toEqual([]);
   });
 });
+
+describe("the running version is a dependency (gh-61 B6, Prefactor 1)", () => {
+  // only the default wiring reads the package version; every command takes `ctx.version`, so a test can run the CLI as any binary
+  const WIRING = "packages/cli/src/context.ts";
+  const readsConstant = (text: string) => /\bNORN_VERSION\b|["']\.{1,2}\/(?:\.\.\/)*version\.ts["']|["'](?:\.\.\/)+package\.json["']/.test(text);
+
+  test("matcher: an import of version.ts, of the cli package.json or the constant itself is a read", () => {
+    expect(readsConstant(`import { NORN_VERSION } from "../version.ts";`)).toBe(true);
+    expect(readsConstant(`import { version } from "../package.json";`)).toBe(true);
+    expect(readsConstant(`const v = ctx.version;`)).toBe(false);
+  });
+
+  test("no cli source but the default wiring and version.ts reads the version constant", () => {
+    const hits = files(join(PKGS, "cli", "src"))
+      .map((p) => relative(ROOT, p))
+      .filter((p) => p !== WIRING && p !== "packages/cli/src/version.ts")
+      .filter((p) => readsConstant(readFileSync(join(ROOT, p), "utf8")));
+    expect(hits).toEqual([]);
+  });
+});

@@ -10,7 +10,6 @@ import { type TickTrace, type TickUnitRecord, ulid } from "@norn/schema";
 import { acquireTickLock, appendTick, appendTrace, markTick, trackInbox } from "@norn/store";
 import type { Context } from "../context.ts";
 import { busyError } from "../output.ts";
-import { NORN_VERSION } from "../version.ts";
 import { type ActRecord, Actor } from "./act/index.ts";
 import { type Observed, observe, type SyncMode, type SyncReport } from "./observe/index.ts";
 
@@ -39,7 +38,7 @@ export interface TickReport {
 const jsonSafe = <T>(v: T): T => JSON.parse(JSON.stringify(v ?? null)) as T;
 
 /** The tick record's fields beside its facts; store `appendTick` records the facts and replay inputs as chunks (O4). */
-export function traceRecord(obs: Observed, records: ActRecord[], startedAt: number, duration: number): Omit<TickTrace, "type" | "facts"> {
+export function traceRecord(obs: Observed, records: ActRecord[], startedAt: number, duration: number, version: string): Omit<TickTrace, "type" | "facts"> {
   const decisions: TickUnitRecord[] = records.map(({ decision, result }) => ({
     unit: decision.unit,
     rule: decision.rule,
@@ -58,7 +57,7 @@ export function traceRecord(obs: Observed, records: ActRecord[], startedAt: numb
     at: new Date(startedAt).toISOString(),
     heartbeat_id: obs.heartbeat_id,
     // O5: `norn run view --why` labels a replay of a tick another norn recorded
-    norn_version: NORN_VERSION,
+    norn_version: version,
     duration_ms: Math.max(0, Math.round(duration)),
     decisions,
   };
@@ -90,7 +89,7 @@ export async function runTick(ctx: Context, opts: TickOptions = {}): Promise<Tic
     await actor.notifyInbox(post);
     // O1 history: items needing a person that appeared or were resolved this tick, in the tick record
     const inbox = trackInbox(ctx.root, post, obs.facts, decisions, obs.config);
-    const record = traceRecord(obs, records, startedAt, performance.now() - t0);
+    const record = traceRecord(obs, records, startedAt, performance.now() - t0, ctx.version);
     if (inbox.changes.length) record.inbox = inbox.changes;
     const file = appendTick(ctx.root, record, { facts: obs.facts, workflows: obs.workflows, config: obs.config });
     const failed = records.filter((r) => !r.result.ok).length;
