@@ -14,6 +14,18 @@
 
 ## Goal
 
+Observe records the running and the repo's norn version (D5); `status`, the cockpit and the segment show a mismatch on top of the inbox and a hint when no version is recorded (B8, B5, D7).
+
 ## Progress
 
+- core: `Facts.norn?: { running, repo }` (slice 11 adds `skills_drift`); `versionMismatch(repo, running)` → `{ match, error, do_instead }` and `NO_VERSION_HINT` in `commands.ts` (D3: built once next to the printed commands — slice 05's refusal and slice 10's doctor line should reuse them). `buildInbox`: mismatch = repo-level (`story: "*"`) Unblock item, always first; no key = Check item (never notified). Command: `norn upgrade` for a newer binary, `norn doctor` for an older one (its way out, installing, is not a norn command).
+- store `loadLocalFacts({ running })` returns `norn` from the main checkout's team config (B12); observe and `loadProjectView({ version })` copy it into Facts, so inbox parity holds.
+- view: `formatInbox` prints the mismatch as a `! …` line above every group (not repeated under Unblock); `inboxItemsInOrder` puts it first; cockpit header carries `version` and the TUI shows it in the heartbeat's place (an extra line would break the frame height). Segment: `norn·repo ! this repo needs norn 0.19.x (you run 0.18.1)`, not counted as stuck.
+- Fix: the target picker (`unitsInStatusOrder`) skipped no repo-level item; it now skips `story: "*"` (heartbeat too).
+- Tests: `packages/core/test/unit/version-inbox.test.ts` (S3, AC1, AC2), `packages/cli/test/integration/version-status.test.ts` (S1, AC3 incl. parity), unit tests for format/cockpit/segment/TUI.
+- Tests set up without a version now see the B5 Check item: status, segment, human tests call the new harness helper `h.recordVersion()` (idempotent: sets the key, keeps the rest — safe once slice 09's `init` writes it). Observe snapshots run as binary 0.19.0 with the repo at 0.19.0, so they do not move with releases; the snapshot diff is only the new `norn` part.
+- AC4 observed with the dev build in a throwaway repo (team file `norn_version: 0.99.0`): first line `! this repo needs norn 0.99.x (you run 0.18.0): install norn 0.99.x`, exit 0; segment shows it.
+
 ## Resume
+
+Done unless review sends it back. Note for review: the segment takes the item title up to its first `: ` (the error part) — the title is built in `versionItem` from `versionMismatch`.
