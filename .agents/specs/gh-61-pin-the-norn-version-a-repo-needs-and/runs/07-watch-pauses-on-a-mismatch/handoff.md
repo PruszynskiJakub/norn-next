@@ -14,6 +14,16 @@
 
 ## Goal
 
+`norn watch` re-checks the repo's norn version before every tick, skips refused ticks with one JSON line, notifies once per mismatch, never exits for it, resumes on a match (B11, D8).
+
 ## Progress
 
+- Baseline was red: the merge of slices 05 and 06 left two `versionMismatch` exports in `packages/core/src/commands.ts` (typecheck failed). I folded them into one, `versionMismatch(repo, running)`: it returns `{match, needs, error, do_instead}`, or null when the versions match. It uses 05's texts ("0.18.2 or a later 0.18.x") and compares a dev build by its X.Y.Z core. The guard (`runtime/version-guard.ts`) now has `versionRefusal(ctx)`, which returns the refusal; `guardVersion` throws it.
+- `watch` (`commands/watch.ts`, `pausedOnVersion`) runs `ctx.reload()` and the guard before each tick. On a refusal it logs `{at, ...CliError}` and skips the tick. It notifies through the notifier ports once per repo version (memory kept in the watch process); a match clears that memory. The summary gains `skipped_version`, and `--human` prints a "tick skipped" line.
+- The startup guard is unchanged: `watch` started on a mismatch is still refused, exit 3 (slice 05's AC2 test).
+- Tests: `packages/cli/test/integration/watch-version.test.ts` (AC1, AC2 and the clear-then-same-version case). Unit tier and typecheck green.
+- Note for review: a clean exit still releases held claims (pushes) during a mismatch, as after a normal run ("exits as after a normal run").
+
 ## Resume
+
+Nothing left: report done.
