@@ -297,7 +297,7 @@ norn init [--json] [--hook-command <cmd>]
 
 ##### `norn upgrade`
 
-Move this repo to the new layout and its config to the new keys, and stage the changes for you to commit
+Move this repo to this norn: its norn_version, the bundled skills, the layout and config keys, staged for you to commit
 
 ```sh
 norn upgrade [--json]

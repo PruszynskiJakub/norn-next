@@ -143,5 +143,10 @@ export function versionMismatch(repo: string, running: string): { match: "older"
   return match === "match" ? null : { match, ...versionRefusal(repo, running, match) };
 }
 
+/** gh-61 B17 (D9): `norn upgrade` run by a binary older than the repo's version; no flag overrides it. */
+export function upgradeBackward(repo: string, running: string): { error: string; do_instead: string } {
+  return { error: `this repo is set up for norn ${repo}; upgrade will not move it back`, do_instead: versionRefusal(repo, running, "older").do_instead };
+}
+
 /** gh-61 B5: the hint when the team file records no `norn_version` (`doctor`, `status`). */
 export const NO_VERSION_HINT = `no norn version recorded: run \`${cmd.upgrade()}\``;

@@ -10,7 +10,7 @@ import type { Context } from "../context.ts";
 import { refuse } from "../output.ts";
 
 /** The `X.Y.Z` a running version is compared by: a dev or pre-release build (`0.19.0-dev.3`) by its core. */
-const comparable = (running: string): string | null => /^\d+\.\d+\.\d+/.exec(running)?.[0] ?? null;
+export const comparableVersion = (running: string): string | null => /^\d+\.\d+\.\d+/.exec(running)?.[0] ?? null;
 
 /** Throws the refusal when the repo records a version the running norn does not match. */
 export function guardVersion(ctx: Context): void {
@@ -20,7 +20,7 @@ export function guardVersion(ctx: Context): void {
   if (!loaded.ok) return;
   // B12: `ctx.loaded` is the main checkout's config, never a unit worktree's own team file
   const repo = loaded.config.norn_version;
-  const running = comparable(ctx.version);
+  const running = comparableVersion(ctx.version);
   if (repo === null || running === null) return; // B5: no key, no check
   const match = versionMatch(repo, running);
   if (match === "match") return;

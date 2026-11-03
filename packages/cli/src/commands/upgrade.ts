@@ -9,19 +9,30 @@
  * dir's contents into the machine dir (copy then delete across filesystems) with its `checkout.json`,
  * norn's old trace line out of `.gitignore` (staged), the old folder removed, the old lock last.
  * Every step can run again, so a rerun finishes an interrupted run; no rollback. On the new layout:
- * nothing to move (B14). Never commits, pushes, or touches a unit worktree.
+ * nothing to move (B14; gh-61 B15: nothing to upgrade). Never commits, pushes, or touches a unit worktree.
+ *
+ * gh-61 B13, B15–B17 (D9): it also moves the repo to the running norn. In order: the main checkout and
+ * the tick lock, the backward check before any write (B17: a binary older than the recorded
+ * `norn_version` is refused, no override), the layout and config moves, the bundled skills rewritten
+ * and relinked, and `norn_version` written last (the team file edited in place, comments kept), all
+ * staged, never committed. Nothing to do: "already on norn X.Y.Z" and no change (B15).
  *
  * gh-61 B30 (D9): `norn migrate` is a deprecated alias that runs the same code and adds one line for a
  * person on stderr; it goes in the next minor.
  */
 import { existsSync, mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { cmd } from "@norn/core";
-import { acquireLock, acquireTickLock, type ConfigMigration, dropOldIgnoreLine, migrateConfig, machineDir, moveFile, moveOldTrace, OLD_CONFIG_FILE, OLD_TRACE_DIR, OLD_WORKFLOWS_DIR, oldTickLockPath, oldWorkflowEntries, REPO_CONFIG_FILE, removeOldLayoutDirs, repoLayout, traceClashes, WORKFLOWS_DIR } from "@norn/store";
+import { dirname, join, relative } from "node:path";
+import { cmd, upgradeBackward } from "@norn/core";
+import { versionMatch } from "@norn/schema";
+import { acquireLock, acquireTickLock, type ConfigMigration, dropOldIgnoreLine, installSkills, linkSkills, migrateConfig, machineDir, moveFile, moveOldTrace, OLD_CONFIG_FILE, OLD_TRACE_DIR, OLD_WORKFLOWS_DIR, oldTickLockPath, oldWorkflowEntries, REPO_CONFIG_FILE, recordedNornVersion, removeOldLayoutDirs, repoConfigPath, repoLayout, SKILLS_DIR, traceClashes, WORKFLOWS_DIR, writeNornVersion } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import { type Context, safeRealpath } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
+import { agentsInUse } from "../runtime/agents-in-use.ts";
+import { assetsDir } from "../runtime/assets.ts";
 import { layoutRefusal } from "../runtime/layout.ts";
+import { comparableVersion } from "../runtime/version-guard.ts";
+import { bundledSkills } from "../runtime/workflows.ts";
 
 export interface UpgradeMove {
   part: "config" | "workflows" | "machine files";
@@ -37,6 +48,10 @@ export interface UpgradeReport {
   moves: UpgradeMove[];
   /** gh-64 D13: the config rewrite (renamed and removed keys, files changed) */
   config: { changed: string[]; renamed: ConfigMigration["renamed"]; removed: ConfigMigration["removed"] };
+  /** gh-61 B13, B16: the repo's `norn_version` before and after; `changed` when this run wrote it */
+  norn_version: { from: string | null; to: string | null; changed: boolean };
+  /** gh-61 B13: bundled skills rewritten in `.agents/skills/`, and those an agent's skill folder was relinked to */
+  skills: { updated: string[]; linked: string[] };
   /** paths staged by this run, relative to the main checkout */
   staged: string[];
   /** the commit the person makes; null when nothing was staged */
@@ -48,6 +63,9 @@ const CONFIG_COMMIT = `git commit -m "Move norn config to its new keys (norn upg
 /** gh-61 B29: a tick (or `norn watch`) holds the lock */
 const STOP_WATCH = "stop `norn watch` and run it again";
 const NO_CONFIG: UpgradeReport["config"] = { changed: [], renamed: [], removed: [] };
+const NO_SKILLS: UpgradeReport["skills"] = { updated: [], linked: [] };
+const versionCommit = (v: string) => `git commit -m "Upgrade norn to ${v} (norn upgrade)"`;
+const SKILLS_COMMIT = `git commit -m "Refresh norn's skills (norn upgrade)"`;
 
 /** B16: refuse anywhere but the main checkout (a unit worktree, or any linked worktree). */
 async function mainCheckoutOnly(ctx: Context, root: string): Promise<void> {
@@ -89,7 +107,7 @@ async function moveLayout(ctx: Context, root: string): Promise<UpgradeReport> {
     await ctx.git.stage(root, [".gitignore"]);
     staged.push(".gitignore");
   }
-  return { moves, config: NO_CONFIG, staged, commit: staged.length ? COMMIT : null };
+  return { moves, config: NO_CONFIG, norn_version: { from: null, to: null, changed: false }, skills: NO_SKILLS, staged, commit: staged.length ? COMMIT : null };
 }
 
 /** gh-64 B45: the tick lock, taken before anything changes and held through the config part. */
@@ -107,11 +125,74 @@ async function migrateConfigPart(ctx: Context, root: string, report: UpgradeRepo
   return { ...report, config: { changed: c.changed, renamed: c.renamed, removed: c.removed }, staged, commit: report.commit ?? (staged.length ? CONFIG_COMMIT : null) };
 }
 
+/**
+ * gh-61 B17 (D9): the repo's recorded version (the team file at whichever place the layout keeps it)
+ * and the running one; refuses before any write when the binary is older than the repo.
+ */
+function versions(ctx: Context, root: string): { from: string | null; to: string | null } {
+  const team = existsSync(repoConfigPath(root)) ? repoConfigPath(root) : join(root, OLD_CONFIG_FILE);
+  const from = recordedNornVersion(team);
+  const to = comparableVersion(ctx.version);
+  if (from && to && versionMatch(from, to) === "older") {
+    const { error, do_instead } = upgradeBackward(from, to);
+    throw refuse(error, do_instead, "version_backward", { repo: from, running: ctx.version });
+  }
+  return { from, to };
+}
+
+/** gh-61 B13 (D9): the bundled skills rewritten from this norn's copies and relinked, then `norn_version` last; all staged. */
+async function versionPart(ctx: Context, root: string, report: UpgradeReport, v: { from: string | null; to: string | null }): Promise<UpgradeReport> {
+  // the layout and config moves are done: the config loads from its new place and keys
+  ctx.reload();
+  const names = bundledSkills(ctx.env);
+  const installed = installSkills(root, join(assetsDir(ctx.env), "skills"), names);
+  const stage = installed.updated.map((n) => `${SKILLS_DIR}/${n}`);
+  const linked = new Set<string>();
+  const seen = new Set<string>();
+  for (const agent of Object.values(agentsInUse(root, ctx.resolved, await ctx.ports()))) {
+    const dir = agent.skillDir(root);
+    if (seen.has(dir)) continue;
+    seen.add(dir);
+    for (const n of linkSkills(root, dir, names).linked) {
+      linked.add(n);
+      stage.push(relative(root, join(dir, n)));
+    }
+  }
+  const changed = v.to !== null && v.from !== v.to;
+  if (changed) {
+    const w = writeNornVersion(root, v.to as string);
+    if (!w.ok) throw new Error(`norn upgrade: writing norn_version: ${w.error}`);
+    stage.push(REPO_CONFIG_FILE);
+  }
+  if (stage.length) await ctx.git.stage(root, stage);
+  const staged = [...new Set([...report.staged, ...stage])];
+  const commit = changed ? versionCommit(v.to as string) : (report.commit ?? (stage.length ? SKILLS_COMMIT : null));
+  return { ...report, norn_version: { ...v, changed }, skills: { updated: installed.updated, linked: [...linked].sort() }, staged, commit };
+}
+
+/** gh-61 B13: the one line that says what moved: the version, the skills, the config. */
+function summary(r: UpgradeReport): string {
+  const v = r.norn_version;
+  const parts = [v.changed ? `norn version ${v.from ?? "(none)"} → ${v.to}` : `norn version ${v.from ?? v.to}`];
+  if (r.skills.updated.length) parts.push(`skills updated: ${r.skills.updated.join(", ")}`);
+  if (r.skills.linked.length) parts.push(`skills relinked: ${r.skills.linked.join(", ")}`);
+  const config = [
+    ...(r.moves.length ? ["moved to the new layout"] : []),
+    ...r.config.renamed.map((n) => `\`${n.from}\` → ${n.to.includes(" ") ? n.to : `\`${n.to}\``}`),
+    ...r.config.removed.map((d) => `\`${d.key}\` removed`),
+  ];
+  if (config.length) parts.push(`config: ${config.join(", ")}`);
+  return parts.join("; ");
+}
+
 function markdown(r: UpgradeReport, root: string): string {
   const config = r.config.changed.length || r.config.removed.length || r.config.renamed.length;
-  if (!r.moves.length && !r.staged.length && !config) return `# norn upgrade\n\n${root} is on the new layout and its config on the new keys: nothing to move.`;
+  const skills = r.skills.updated.length || r.skills.linked.length;
+  // B15
+  if (!r.moves.length && !r.staged.length && !config && !skills && !r.norn_version.changed)
+    return `# norn upgrade\n\nalready on norn ${r.norn_version.from ?? r.norn_version.to}: nothing to upgrade (${root} is on the new layout, its config on the new keys and its skills match).`;
   const how = { "git mv": "staged", untracked: "untracked: moved, not staged", moved: "machine-local, outside git" };
-  const out = ["# norn upgrade", ""];
+  const out = ["# norn upgrade", "", summary(r), ""];
   if (r.moves.length) out.push(`Moved ${root} to the new layout:`, "");
   for (const m of r.moves) out.push(`- ${m.part}: ${m.from} → ${m.to} (${how[m.how]})`);
   if (config) {
@@ -124,6 +205,8 @@ function markdown(r: UpgradeReport, root: string): string {
   if (r.staged.includes(".gitignore")) out.push(`- .gitignore: dropped ${OLD_TRACE_DIR}/ (staged)`);
   const untracked = r.moves.filter((m) => m.how === "untracked").map((m) => m.to);
   if (untracked.length) out.push("", `Untracked before, so not staged: ${untracked.join(", ")}. Add them yourself if they belong in the repo.`);
+  if (r.skills.updated.length) out.push("", `Skills rewritten from norn ${r.norn_version.to}'s copies (\`git diff --staged ${SKILLS_DIR}/\` shows how): ${r.skills.updated.join(", ")}`);
+  if (r.norn_version.changed) out.push("", `${REPO_CONFIG_FILE}: \`norn_version: ${r.norn_version.to}\` (staged)`);
   out.push("", r.commit ? `Review the staged moves with \`git status\`, then commit them: \`${r.commit}\`` : "Nothing to commit: only machine-local files moved.");
   return out.join("\n");
 }
@@ -131,12 +214,14 @@ function markdown(r: UpgradeReport, root: string): string {
 async function upgrade(ctx: Context) {
   const root = ctx.root;
   await mainCheckoutOnly(ctx, root);
+  // B17: before any write, the tick lock included
+  const v = versions(ctx, root);
   const l = repoLayout(root);
   if (l.layout === "new") {
-    const none: UpgradeReport = { moves: [], config: NO_CONFIG, staged: [], commit: null };
+    const none: UpgradeReport = { moves: [], config: NO_CONFIG, norn_version: { ...v, changed: false }, skills: NO_SKILLS, staged: [], commit: null };
     const tick = await tickLock(ctx, root);
     try {
-      const report = await migrateConfigPart(ctx, root, none);
+      const report = await versionPart(ctx, root, await migrateConfigPart(ctx, root, none), v);
       return rendered(report, markdown(report, root));
     } finally {
       tick.release();
@@ -144,12 +229,12 @@ async function upgrade(ctx: Context) {
   }
   refuseBoth(root);
   // B45: on the old layout only an old norn ticks, under the old lock: taken before anything
-  // moves and held through the config part
+  // moves and held through the config, skills and version parts
   const lock = await acquireLock(oldTickLockPath(root), { note: "norn upgrade", now: () => ctx.clock.iso() });
   if (!lock.ok) throw refuse(`a tick is running (pid ${lock.holder.holder.pid}${lock.holder.note ? `, ${lock.holder.note}` : ""}); norn upgrade never moves the trace under a running tick`, STOP_WATCH, "tick_locked");
   let report: UpgradeReport;
   try {
-    report = await migrateConfigPart(ctx, root, await moveLayout(ctx, root));
+    report = await versionPart(ctx, root, await migrateConfigPart(ctx, root, await moveLayout(ctx, root)), v);
   } finally {
     // D6: the old lock file goes last
     lock.release();
@@ -161,7 +246,7 @@ async function upgrade(ctx: Context) {
 export const upgradeCommand = defineCommand({
   name: "upgrade",
   version: "exempt",
-  summary: "Move this repo to the new layout and its config to the new keys, and stage the changes for you to commit",
+  summary: "Move this repo to this norn: its norn_version, the bundled skills, the layout and config keys, staged for you to commit",
   usage: "norn upgrade [--json]",
   markdown: true,
   layout: false,

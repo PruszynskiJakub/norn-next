@@ -184,10 +184,12 @@ describe("commands that act refuse a mismatched binary (B6, B7, D1, D2)", () => 
     for (const a of argv) {
       const matching = await as(h, "0.19.0", [...a, "--json"]);
       const mismatched = await as(h, "0.18.1", [...a, "--json"]);
-      // doctor runs, but its own version check fails on a mismatch and exits 1 (B23)
-      const expected = a[0] === "doctor" ? 1 : matching.exit;
+      // doctor runs, but its own version check fails on a mismatch and exits 1 (B23); upgrade (and
+      // migrate) is not guarded, but never moves the version back, so an older binary is refused by it (B17)
+      const expected = a[0] === "doctor" ? 1 : a[0] === "upgrade" || a[0] === "migrate" ? 3 : matching.exit;
       expect({ a, exit: mismatched.exit }).toEqual({ a, exit: expected });
       expect((mismatched.value as { code?: string } | null)?.code).not.toBe("version_mismatch");
+      if (a[0] === "upgrade" || a[0] === "migrate") expect(mismatched.value).toMatchObject({ code: "version_backward" });
     }
     // story wait was met, so the exit codes compared above were real runs
     expect((await as(h, "0.18.1", ["story", "wait", "gh-3", "--until", "step=implement"])).exit).toBe(0);

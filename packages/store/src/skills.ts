@@ -168,9 +168,9 @@ export function skillsDrift(skillsFolder: string, sourceDir: string, names: read
   return names.filter((n) => existsSync(join(skillsFolder, n, "SKILL.md")) && !sameFolder(join(sourceDir, n), join(skillsFolder, n)));
 }
 
-/** The `norn_version` a worktree's own team file records, or null (none, unreadable, not a version). */
-function recordedVersion(root: string): string | null {
-  const raw = readText(repoConfigPath(root));
+/** The `norn_version` a team file records, or null (none, unreadable, not a version). */
+export function recordedNornVersion(teamFile: string): string | null {
+  const raw = readText(teamFile);
   if (raw === null) return null;
   try {
     const v = (parseYaml(raw) as { norn_version?: unknown } | null)?.norn_version;
@@ -186,7 +186,7 @@ function recordedVersion(root: string): string | null {
  * than `running`: its skills belong to the version that branch moves to.
  */
 export function worktreeSkillsDrift(root: string, sourceDir: string, names: readonly string[], running: string): string[] {
-  const recorded = recordedVersion(root);
+  const recorded = recordedNornVersion(repoConfigPath(root));
   if (recorded && versionMatch(recorded, running) === "older") return [];
   return skillsDrift(skillsDir(root), sourceDir, names);
 }

@@ -10,7 +10,7 @@ import { cpSync, existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join, relative } from "node:path";
 import { type ClaimBlob, validate } from "@norn/schema";
 import { acquireLock, acquireTickLock, readLocalClaim, repoConfigPath, workflowsDir } from "@norn/store";
-import type { CliResult } from "../../src/index.ts";
+import { type CliResult, runningVersion } from "../../src/index.ts";
 import { createHarness, type Harness, issue, layoutPlaces, oldNornDir, runChecked, sh, toOldLayout } from "../../../../test/support/harness.ts";
 
 // whole flows over real git, several ticks each
@@ -148,10 +148,11 @@ describe("norn upgrade on the old layout (B11, B12, B13)", () => {
     const before = snapshot(h);
     const md = await h.norn("upgrade");
     expect(md.exit).toBe(0);
-    expect(md.stdout).toContain("nothing to move");
+    expect(md.stdout).toContain("nothing to upgrade");
     const json = await h.norn("upgrade", "--json");
     expect(json.exit).toBe(0);
-    expect(json.value).toEqual({ moves: [], config: { changed: [], renamed: [], removed: [] }, staged: [], commit: null });
+    const version = runningVersion(h.deps);
+    expect(json.value).toEqual({ moves: [], config: { changed: [], renamed: [], removed: [] }, norn_version: { from: version, to: version, changed: false }, skills: { updated: [], linked: [] }, staged: [], commit: null });
     expect(snapshot(h)).toEqual(before);
   });
 });
@@ -187,7 +188,7 @@ describe("norn upgrade --json (B11)", () => {
     const r = await h.norn("upgrade", "--json");
     expect(r.exit).toBe(0);
     const v = r.value as Migrated;
-    expect(Object.keys(v).sort()).toEqual(["commit", "config", "moves", "staged"]);
+    expect(Object.keys(v).sort()).toEqual(["commit", "config", "moves", "norn_version", "skills", "staged"]);
     const machine = layoutPlaces(h.root)["machine files"];
     expect(v.moves).toEqual([
       { part: "config", from: OLD_CONFIG, to: NEW_CONFIG, how: "git mv" },
@@ -322,7 +323,7 @@ describe("an untracked old workflow file (B11)", () => {
     expect(existsSync(join(h.root, NEW_WORKFLOWS, "draft.yaml"))).toBe(true);
     expect(porcelain(h)).toContain(`?? ${NEW_WORKFLOWS}/draft.yaml`);
     const md = await h.norn("upgrade");
-    expect(md.stdout).toContain("nothing to move");
+    expect(md.stdout).toContain("nothing to upgrade");
   });
 });
 
@@ -449,8 +450,9 @@ describe("norn upgrade leaves a new-style config alone (gh-64 B45)", () => {
       expect(out.exit).toBe(0);
       expect(out.value).toMatchObject({ config: { changed: [], renamed: [], removed: [] } });
       expect(h.read(join(h.home, "config.yaml"))).toBe(user);
-      expect(h.read(repoConfigPath(h.root))).toBe(team);
-      expect(porcelain(h)).toBe("");
+      // gh-61 B13: the only change is the norn_version a repo without one gets
+      expect(h.read(repoConfigPath(h.root))).toBe(`${team}norn_version: ${runningVersion(h.deps)}\n`);
+      expect(porcelain(h)).toBe(`M  ${NEW_CONFIG}`);
     } finally {
       h.cleanup();
     }
