@@ -56,7 +56,8 @@ The team file takes `norn_version` (X.Y.Z); a bad or misplaced value is an ordin
 
   Non-blocking note: `versionMatch` throws on a non-X.Y.Z running version (e.g. a pre-release or dev build); slice 05 should decide how a dev build's version is compared.
 - review#1 approve: Review approve: AC1–AC5 each proven by a test at the agreed seam (versionMatch table; config_invalid/config_wrong_file; config get/list; set/unset refused exit 3 with norn upgrade, file unchanged); AC6 agent-verified in handoff. Unit tier and typecheck green. One minor note: versionMatch throws on non-X.Y.Z running versions, for slice 05 to settle.
+- merge#1: merged the story branch (slice 01 and 03, which renamed `migrate` to `upgrade`) into this slice with `git merge --no-ff` (0c9f2dc81). Conflicts only in `packages/core/src/commands.ts` and `printed-commands.test.ts`: both sides had added `upgrade`; dropped the stale `migrate` entry so one `upgrade` remains (no `cmd.migrate` users left). Typecheck and unit tier (1126) green; config integration tests 33 pass.
 
 ## Resume
 
-Review done (approve); the next step is norn's.
+Merge done; the next step is norn's.
