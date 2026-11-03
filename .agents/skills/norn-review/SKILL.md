@@ -15,10 +15,21 @@ Two axes, kept apart so one cannot mask the other:
 1. **Pin the diff** against the branch the change targets, or the range you were given: `git diff <base>...HEAD` and `git log <base>..HEAD --oneline`. An empty diff stops the review: report it instead.
 2. **Gather the sources.** Spec: the acceptance criteria, the spec's Behaviour items they cite, and its Plan (reviewing a whole story covers the whole spec). Standards: whatever the repo documents about how code is written (`CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, coding-standard docs, lint and type config), plus [SMELLS.md](SMELLS.md). Run the tests and the type check if you can; a red suite is a blocking finding.
 3. **Run each axis in its own subagent**, in parallel, each given the diff command, the commit list and its sources in full. When you cannot start subagents, check both axes yourself.
-   - Spec: "Report (a) acceptance criteria or Behaviour items missing or partial, or met for the happy path only; (b) behaviour in the diff nobody asked for, or that the spec lists as out of scope; (c) criteria that look implemented but wrongly; (d) criteria without a test at a seam the Plan agreed, and tests that check internals or recompute their expected value. Quote the spec line for each finding. Under 400 words."
+   - Spec: "First build the traceability table (below): one row per Behaviour item and acceptance criterion, with the test file and test name that proves it, or `UNTRACED`; name a test only after reading it and seeing it assert that item. Then report (a) acceptance criteria or Behaviour items missing or partial, or met for the happy path only; (b) behaviour in the diff nobody asked for, or that the spec lists as out of scope; (c) criteria that look implemented but wrongly; (d) every `UNTRACED` row, tests not at a seam the Plan agreed, and tests that check internals or recompute their expected value. Quote the spec line for each finding. Return the table, then the findings in under 400 words."
    - Standards: "Report (a) every breach of a documented standard, citing the file and the rule; (b) bugs: off-by-one, null paths, races, resource leaks, wrong units, injection, silent catches, leaked secrets, debug leftovers; (c) each smell from the baseline you spot, named, with the hunk quoted. Breaches of documented standards and bugs can be hard; smells are always judgement calls, and a documented standard overrides the baseline. Skip what tooling enforces. Under 400 words."
-4. **Decide.** Every Spec finding, every bug and every hard Standards breach is blocking. Add a smell only when it is worth a round of rework on its own; otherwise it is minor or a nit.
-5. **Write the findings** as JSON to a file outside the repository (e.g. under `$TMPDIR`) unless told where. Keep the axes separate; do not merge or rerank them.
+4. **Decide.** Every Spec finding, every bug and every hard Standards breach is blocking. An `UNTRACED` row is a blocking Spec finding, unless the criterion's `verifier` in the slice (or story) frontmatter `criteria` is `agent` or `person`: no test is expected for those, so the row reads `QA (agent)` or `QA (person)` and points at QA, which gives its verdict in the criteria report. A Behaviour item or criterion with no frontmatter entry counts as `verifier: test`. Add a smell only when it is worth a round of rework on its own; otherwise it is minor or a nit.
+5. **Write the table into the handoff** (the Progress section of the handoff.md you were given), so QA and the PR body can reuse it:
+
+```markdown
+| Item | Verifier | Proven by |
+| --- | --- | --- |
+| B1 / AC1 | test | `packages/core/test/unit/invites.test.ts` › "rejects an expired invite" |
+| B2 / AC2 | test | UNTRACED |
+| B3 / AC3 | person | QA (person) |
+```
+
+   One row per Behaviour item and acceptance criterion; an item a criterion cites shares its row. Every `UNTRACED` row has its finding.
+6. **Write the findings** as JSON to a file outside the repository (e.g. under `$TMPDIR`) unless told where. Keep the axes separate; do not merge or rerank them.
 
 ```json
 {
@@ -43,4 +54,4 @@ Two axes, kept apart so one cannot mask the other:
 - Each finding is a concrete, checkable point: where, what, why, and how to verify the fix. No vague taste comments.
 - Do not repeat a finding; group repeated occurrences into one with all locations in `detail`.
 
-Done when both axes have reported, every criterion was checked, every finding is either in the file or consciously dropped, and the findings file exists (an empty `findings` list is valid) with a summary that says whether any finding is blocking. The verdict is approve, or changes requested with the points.
+Done when both axes have reported, every criterion was checked, the traceability table is in the handoff with a row for every Behaviour item and criterion, every finding is either in the file or consciously dropped, and the findings file exists (an empty `findings` list is valid) with a summary that says whether any finding is blocking. The verdict is approve, or changes requested with the points.
