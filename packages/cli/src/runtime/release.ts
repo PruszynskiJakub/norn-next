@@ -6,15 +6,15 @@ import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { cmd, type GitPort, type StoryFacts } from "@norn/core";
 import { ulid } from "@norn/schema";
-import { acquireTickLock, handoffPath, releaseClaim, writtenHere } from "@norn/store";
+import { handoffPath, releaseClaim, writtenHere } from "@norn/store";
 import type { Context } from "../context.ts";
-import { busyError, refuse } from "../output.ts";
+import { refuse } from "../output.ts";
+import { waitForTickLock } from "./tick-lock.ts";
 import { type Observed, observe } from "./observe/index.ts";
 
 /** Observe under the tick lock (no remote sync) and find the story, or refuse. */
 export async function withStory<T>(ctx: Context, key: string, note: string, f: (obs: Observed, story: Observed["facts"]["stories"][number]) => Promise<T>): Promise<T> {
-  const lock = await acquireTickLock(ctx.root, { note, now: () => ctx.clock.iso() });
-  if (!lock.ok) throw busyError(`a tick is running (pid ${lock.holder.holder.pid})`, `retry: ${note}`, "tick_locked");
+  const lock = await waitForTickLock(ctx, note, `retry: ${note}`);
   try {
     const obs = await observe(ctx, { tick_id: ulid(ctx.clock.now()), sync: "never" });
     const story = obs.facts.stories.find((s) => s.key === key);
@@ -101,8 +101,8 @@ async function fastForwardOf(git: GitPort, root: string, remote: string, branch:
 
 /** Release every claim this heartbeat holds (clean `watch` exit, T6). */
 export async function releaseHeldClaims(ctx: Context): Promise<ReleaseResult[]> {
-  const lock = await acquireTickLock(ctx.root, { note: "norn story handoff", now: () => ctx.clock.iso() });
-  if (!lock.ok) throw busyError("a tick is running", "retry when it finishes", "tick_locked");
+  // T6, H1: the clean-exit release waits for a running tick too; its abort signal has already fired (D5)
+  const lock = await waitForTickLock(ctx, "norn story handoff", "retry when it finishes", null);
   try {
     const obs = await observe(ctx, { tick_id: ulid(ctx.clock.now()), sync: "never" });
     const out: ReleaseResult[] = [];

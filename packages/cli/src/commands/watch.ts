@@ -13,21 +13,9 @@ import { CliFailure, refuse, rendered, usageError, withExit } from "../output.ts
 import { type ReleaseResult, releaseHeldClaims } from "../runtime/release.ts";
 import { runTick, type TickReport } from "../runtime/tick.ts";
 import { versionRefusal } from "../runtime/version-guard.ts";
+import { abortableSleep } from "../runtime/tick-lock.ts";
 import { cmd, type InboxItem, ticksPausedTitle } from "@norn/core";
 import type { Context } from "../context.ts";
-
-function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve) => {
-    if (signal?.aborted) return resolve();
-    const t = setTimeout(done, ms);
-    function done() {
-      clearTimeout(t);
-      signal?.removeEventListener("abort", done);
-      resolve();
-    }
-    signal?.addEventListener("abort", done, { once: true });
-  });
-}
 
 const clockTime = (at: string | number) => new Date(at).toTimeString().slice(0, 8);
 
@@ -139,7 +127,7 @@ export const watchCommand = defineCommand({
       }
       ticks++;
       if (ticks >= max || signal?.aborted) break;
-      await sleep(Math.max(0, interval - (ctx.clock.now() - started)), signal);
+      await abortableSleep(Math.max(0, interval - (ctx.clock.now() - started)), signal);
     }
     const kept = opt.bool(args, "keep-claims");
     const released = kept ? [] : await releaseHeldClaims(ctx);

@@ -14,6 +14,7 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { GitPort } from "@norn/core";
+import { spawnSyncCaptured } from "@norn/store";
 import { type ContractOptions, contractTest } from "./suite.ts";
 
 export type GitContractTest =
@@ -63,7 +64,7 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       for (const d of dirs) rmSync(d, { recursive: true, force: true });
     });
     const sh = (cwd: string, ...args: string[]): string => {
-      const r = Bun.spawnSync(["git", ...args], { cwd, env: { ...process.env, ...GIT_ENV }, stdout: "pipe", stderr: "pipe" });
+      const r = spawnSyncCaptured(["git", ...args], { cwd, env: { ...process.env, ...GIT_ENV } });
       if (r.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr.toString()}`);
       return r.stdout.toString().trim();
     };

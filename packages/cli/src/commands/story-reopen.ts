@@ -12,10 +12,11 @@
 import { join, relative } from "node:path";
 import { cmd } from "@norn/core";
 import { parseStoryKey, STORY_UNIT_DIR, slugify, storyBranch } from "@norn/schema";
-import { acquireTickLock, appendReceipt, patchStoryFile, readState, storyFile, unitDir } from "@norn/store";
+import { appendReceipt, patchStoryFile, readState, storyFile, unitDir } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
-import { busyError, type CliFailure, failure, refuse } from "../output.ts";
+import { type CliFailure, failure, refuse } from "../output.ts";
+import { waitForTickLock } from "../runtime/tick-lock.ts";
 import { checkoutStory } from "../runtime/checkout.ts";
 import { closedStories, isClosed, type PushedStory, pushedStory, startedSliceBranches } from "../runtime/closed.ts";
 import { humanReceipt } from "../runtime/human.ts";
@@ -78,8 +79,7 @@ export const storyReopenCommand = defineCommand({
       applies: () => false,
     });
     const record = await restorable(ctx, key);
-    const lock = await acquireTickLock(ctx.root, { note: "norn story reopen", now: () => ctx.clock.iso() });
-    if (!lock.ok) throw busyError(`a tick is running (pid ${lock.holder.holder.pid})`, `retry: ${cmd.storyReopen(key)}`, "tick_locked");
+    const lock = await waitForTickLock(ctx, "norn story reopen", `retry: ${cmd.storyReopen(key)}`);
     try {
       return await checkoutStory(ctx, key, false, ({ storyWt, spec_dir, worktrees }) => {
         const file = storyFile(join(storyWt, spec_dir));

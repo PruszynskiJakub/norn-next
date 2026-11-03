@@ -4,6 +4,7 @@
  */
 import { afterAll, describe, expect, test } from "bun:test";
 import type { ProcessPort } from "@norn/core";
+import { spawnSyncCaptured } from "@norn/store";
 import { type ContractOptions, contractTest } from "./suite.ts";
 import { makeZombie, zombieUnsupported } from "./zombie.ts";
 
@@ -18,7 +19,7 @@ export type ProcessContractTest =
 /** Does `ps` show this pid's environment to us (BSD `-E`, procps `e`)? Hardened systems hide it. */
 function envVisible(pid: number, token: string): boolean {
   const argv = process.platform === "linux" ? ["ps", "eww", "-o", "pid=,args=", "-p", String(pid)] : ["ps", "-E", "-ww", "-o", "pid=,command=", "-p", String(pid)];
-  return Bun.spawnSync(argv).stdout.toString().split(/\s+/).includes(token);
+  return spawnSyncCaptured(argv).stdout.toString().split(/\s+/).includes(token);
 }
 
 export function processContract(name: string, make: () => ProcessPort, opts: ContractOptions<ProcessContractTest> = {}): void {

@@ -14,6 +14,7 @@ import { bindNornHome, type LoadedConfig, loadConfig, nornHome, readUnitMarker, 
 import { configError, refuse } from "./output.ts";
 import { type Interaction, isAgentSession, terminalInteraction } from "./runtime/interaction.ts";
 import { guardLayout } from "./runtime/layout.ts";
+import { abortableSleep } from "./runtime/tick-lock.ts";
 import { NORN_VERSION } from "./version.ts";
 import { buildPorts, defaultRegistry } from "./wiring.ts";
 
@@ -31,8 +32,6 @@ export interface CliDeps {
   log?: (line: string) => void;
   /** stops `watch` after the current tick, and `story wait` */
   signal?: AbortSignal;
-  /** the pause between polls of `story wait`; default a timer (tests advance a fake clock) */
-  sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
   /** stdin text for commands that read it (`norn hook`); else the process stdin */
   stdin?: string;
   /** CP6: raw key chunks for `norn status --watch`; else the process stdin in raw mode */
@@ -47,6 +46,8 @@ export interface CliDeps {
   onCheckStarted?: (exited: Promise<void>) => void;
   /** the running norn's version (`X.Y.Z`); default this package's version. Tests run the CLI as any binary */
   version?: string;
+  /** the pause between polls of `story wait`, and while a person command waits for a running tick (gh-174, H1); default a real timer ended early by `signal` (tests advance a fake clock) */
+  sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
 }
 
 /** The running norn's version: the injected one, else the package's (`NORN_VERSION`). The one reader of that constant. */
@@ -217,5 +218,10 @@ export class Context {
 
   log(line: string): void {
     this.deps.log?.(line);
+  }
+
+  /** Pause `ms` (an injected sleep in tests, which advances a fake clock); ends early when `signal` aborts. */
+  sleep(ms: number, signal?: AbortSignal): Promise<void> {
+    return (this.deps.sleep ?? abortableSleep)(ms, signal);
   }
 }

@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { herdr, proc } from "@norn/adapters";
 import { AUTO_PROMPT, type Inbox } from "@norn/core";
 import { type Receipt, type UnitState, ulid } from "@norn/schema";
-import { appendHookTrace, repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
+import { appendHookTrace, repoConfigPath, spawnSyncCaptured, storyUnitDir, workflowsDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
 import { withNornOnPath } from "../../src/runtime/shim.ts";
 import { runCli } from "../../src/index.ts";
@@ -262,7 +262,7 @@ describe("R8.1: the launched agent runs this norn (acceptance 11)", () => {
     expect(readFileSync(launcher, "utf8")).toContain(`NORN_BIN=${proc.shellQuote(shim)}; export NORN_BIN`);
     expect(launch?.env).toMatchObject({ NORN_BIN: shim, PATH: expect.stringMatching(new RegExp(`^${join(h.home, "bin")}:`)) });
     // a login shell in the pane reset PATH: the launcher still puts this norn first
-    const which = Bun.spawnSync([launcher, "sh", "-c", 'command -v norn; printf %s "$NORN_BIN"'], { env: { HOME: process.env.HOME ?? "/", PATH: "/usr/bin:/bin" } });
+    const which = spawnSyncCaptured([launcher, "sh", "-c", 'command -v norn; printf %s "$NORN_BIN"'], { env: { HOME: process.env.HOME ?? "/", PATH: "/usr/bin:/bin" } });
     expect(which.stdout.toString()).toBe(`${shim}\n${shim}`);
     // the shim execs this norn's entry point
     expect(statSync(shim).mode & 0o111).not.toBe(0);

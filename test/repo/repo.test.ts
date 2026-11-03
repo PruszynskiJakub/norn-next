@@ -929,9 +929,7 @@ const JSON_PARSE_ALLOW: Record<string, [number, string]> = {
 
 /** (d) processes are spawned by store and adapters only (ports perform effects). */
 const SPAWN_ALLOW: Counts = {
-  "packages/cli/src/commands/brief.ts": 1,
   "packages/cli/src/commands/doctor.ts": 1,
-  "packages/cli/src/runtime/detect.ts": 1,
   "packages/cli/src/runtime/strays.ts": 1,
 };
 

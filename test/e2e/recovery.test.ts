@@ -169,10 +169,16 @@ describe("renewals due together go out in one push (H5, R1.2)", () => {
     A = wrap(h.root, h.deps);
     await setup(h, 1, "Story 1");
     h.remote.issues = Array.from({ length: N }, (_, i) => issue(i + 1, `Story ${i + 1}`));
-    for (let i = 0; i < 6 * N; i++) {
+    // tick only until every story's agent runs, then once more: 6 * N fixed ticks ran ~14 of them as
+    // no-ops and kept this hook near its 30 s limit on a loaded machine (gh-181)
+    const allRunning = () => Array.from({ length: N }, (_, i) => h.state(storyRuns(i + 1))?.status).every((s) => s === "running");
+    for (let i = 0; i < 6 * N && !allRunning(); i++) {
       await A.tick();
       h.clock.advance(5_000);
     }
+    expect(allRunning()).toBe(true);
+    await A.tick();
+    h.clock.advance(5_000);
     expect(h.git(["ls-remote", "origin", "refs/norn/claims/*"]).split("\n").filter(Boolean)).toHaveLength(N);
   });
   afterAll(() => h.cleanup());

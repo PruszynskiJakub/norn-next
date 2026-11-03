@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { type Clock, type InboxItem, type LaunchSpec, type NotifierPort, type PaneState, type PromptKey, type RemoteIssue, type RemotePort, type RemotePullRequest, type RunnerCapabilities, type RunnerPort, type RunnerSessionInfo, nameRemoved, type SessionRef } from "@norn/core";
 import { type Receipt, type UnitState, ulid } from "@norn/schema";
-import { appendReceipt, installSkills, linkSkills, machineDir, readState, repoConfigPath, workflowsDir } from "@norn/store";
+import { appendReceipt, installSkills, linkSkills, machineDir, readState, repoConfigPath, spawnSyncCaptured, workflowsDir } from "@norn/store";
 import type { ProjectView } from "@norn/view";
 import { bundledSkills, type CliDeps, type CliResult, type Interaction, type InteractionChoice, runCli, runningVersion, type TickReport } from "../../packages/cli/src/index.ts";
 import { assetsDir } from "../../packages/cli/src/runtime/assets.ts";
@@ -222,7 +222,8 @@ const pathWithoutHerdr = (path: string | undefined) =>
 export const hostEnv = () => ({ ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !AGENT_ENV.includes(k))), PATH: pathWithoutHerdr(process.env.PATH) });
 
 export function sh(cwd: string, args: string[], input?: string): string {
-  const r = Bun.spawnSync(["git", ...args], { cwd, stdin: input === undefined ? "ignore" : new TextEncoder().encode(input), stdout: "pipe", stderr: "pipe" });
+  // not Bun.spawnSync with pipes: under load it now and then returns exit 0 with an empty stdout (spawnSyncCaptured)
+  const r = spawnSyncCaptured(["git", ...args], { cwd, ...(input === undefined ? {} : { stdin: new TextEncoder().encode(input) }) });
   if (r.exitCode !== 0) throw new Error(`git ${args.join(" ")} (${cwd}): ${r.stderr.toString()}`);
   return r.stdout.toString().trim();
 }

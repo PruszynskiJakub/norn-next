@@ -22,10 +22,11 @@
 import { join } from "node:path";
 import { cmd, checkWorkflowLevel, roundFinished, sha256, stepOf, type StoryFacts, storyMode } from "@norn/core";
 import type { Mode, UnitState } from "@norn/schema";
-import { acquireTickLock, patchSliceFile, patchStoryFile, pinWorkflow, storyFile, WORKFLOWS_DIR } from "@norn/store";
+import { patchSliceFile, patchStoryFile, pinWorkflow, storyFile, WORKFLOWS_DIR } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
-import { busyError, claimHeld, failure, refuse, usageError } from "../output.ts";
+import { claimHeld, failure, refuse, usageError } from "../output.ts";
+import { waitForTickLock } from "../runtime/tick-lock.ts";
 import { parseUnitKey } from "../runtime/args.ts";
 import { humanReceipt, refuseIfHeldElsewhere, resolveTarget, runHumanVerb } from "../runtime/human.ts";
 import { targetKey, type TargetRule } from "../runtime/target.ts";
@@ -86,8 +87,7 @@ function refuseWhileWorking(story: StoryFacts, st: UnitState): void {
 
 async function editWorkflow(ctx: Context, raw: string, name: string, at: string | undefined, force: boolean) {
   const key = parseUnitKey(raw);
-  const lock = await acquireTickLock(ctx.root, { note: "norn story edit --workflow", now: () => ctx.clock.iso() });
-  if (!lock.ok) throw busyError("a tick is running", "retry when it finishes", "tick_locked");
+  const lock = await waitForTickLock(ctx, "norn story edit --workflow", "retry when it finishes");
   try {
     const t = await resolveTarget(ctx, key.key);
     const obs = t.obs;
@@ -171,8 +171,7 @@ async function editWorkflow(ctx: Context, raw: string, name: string, at: string 
 
 async function moveCursor(ctx: Context, raw: string, at: string) {
   const key = parseUnitKey(raw);
-  const lock = await acquireTickLock(ctx.root, { note: "norn story edit --at", now: () => ctx.clock.iso() });
-  if (!lock.ok) throw busyError("a tick is running", "retry when it finishes", "tick_locked");
+  const lock = await waitForTickLock(ctx, "norn story edit --at", "retry when it finishes");
   try {
     const t = await resolveTarget(ctx, key.key);
     if (!t.state) throw refuse(`${t.key} has not started; --at applies only to a running unit (S7)`, cmd.storyEdit(t.key, { workflow: "<name>" }), "not_started");
