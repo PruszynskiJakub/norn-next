@@ -1,5 +1,5 @@
 /**
- * `norn story <verb>` (B2, B15–B42): the stories of this repository — `list`, `view`, `chat`, `create`, `take`,
+ * `norn story <verb>` (B2, B15–B42): the stories of this repository — `list`, `view`, `wait`, `chat`, `create`, `take`,
  * the decisions `answer`, `approve`, `reject`, `update-branch`, `start` an attended step, `edit` mode or
  * workflow, and the team verbs `checkout`, `handoff`, `close`, `reopen`, `reset`.
  */
@@ -19,13 +19,14 @@ import { storyTakeCommand } from "./story-take.ts";
 import { storyStartCommand } from "./story-start.ts";
 import { storyUpdateBranchCommand } from "./story-update-branch.ts";
 import { storyViewCommand } from "./story-view.ts";
+import { storyWaitCommand } from "./story-wait.ts";
 
 export const storyNoun = defineNoun({
   name: "story",
   summary: "The stories of this repository",
-  verbs: [storyCreateCommand, storyTakeCommand, storyListCommand, storyViewCommand, storyAnswerCommand, storyApproveCommand, storyRejectCommand, storyUpdateBranchCommand, storyStartCommand, storyChatCommand, storyEditCommand, storyCheckoutCommand, storyHandoffCommand, storyCloseCommand, storyReopenCommand, storyResetCommand],
+  verbs: [storyCreateCommand, storyTakeCommand, storyListCommand, storyViewCommand, storyWaitCommand, storyAnswerCommand, storyApproveCommand, storyRejectCommand, storyUpdateBranchCommand, storyStartCommand, storyChatCommand, storyEditCommand, storyCheckoutCommand, storyHandoffCommand, storyCloseCommand, storyReopenCommand, storyResetCommand],
   groups: [
-    { title: "general", verbs: ["create", "take", "list", "view"] },
+    { title: "general", verbs: ["create", "take", "list", "view", "wait"] },
     { title: "decision", verbs: ["answer", "approve", "reject", "update-branch"] },
     { title: "work", verbs: ["start", "chat", "edit"] },
     { title: "team", verbs: ["checkout", "handoff", "close", "reopen", "reset"] },
