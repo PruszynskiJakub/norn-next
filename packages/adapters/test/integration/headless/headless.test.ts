@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createHeadlessRunner, logPath } from "../../../src/headless/index.ts";
+import type { AdapterContext } from "@norn/core";
+import { machineDir } from "@norn/store";
+import { createHeadlessRunner, headlessFactory, logPath } from "../../../src/headless/index.ts";
 
 describe("headless runner (real processes)", () => {
   test("spawns detached with env + log, tracks liveness by pid + start time, kills", async () => {
@@ -38,5 +40,19 @@ describe("headless runner (real processes)", () => {
       .launch({ cwd: tmpdir(), argv: ["/nonexistent/agent-bin"], env: {}, title: "t", run_id: "01JX" })
       .catch((e) => e);
     expect(err).toMatchObject({ code: "launch_failed" });
+  });
+
+  test("without log_dir, a session's log is written at <machine dir>/sessions/<run_id>.log and nothing under runs/ (gh-195 B2, D1)", async () => {
+    const root = mkdtempSync(join(tmpdir(), "norn-headless-"));
+    const runner = headlessFactory({ repoRoot: root } as AdapterContext, { adapter: "headless" });
+    const session = await runner.launch({ cwd: root, argv: ["sh", "-c", 'echo "run=$NORN_RUN"; exec sleep 30'], env: { NORN_RUN: "01JSESS" }, title: "t", run_id: "01JSESS" });
+    try {
+      await Bun.sleep(200);
+      expect(readFileSync(join(machineDir(root), "sessions", "01JSESS.log"), "utf8")).toContain("run=01JSESS");
+      expect(existsSync(join(machineDir(root), "runs"))).toBe(false);
+      expect(await runner.output?.(session)).toContain("run=01JSESS");
+    } finally {
+      await runner.kill(session);
+    }
   });
 });

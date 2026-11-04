@@ -24,6 +24,7 @@ export * from "./machine.ts";
 export * from "./machine-dir.ts";
 export * from "./old-layout.ts";
 export * from "./paths.ts";
+export * from "./run-state.ts";
 export * from "./proc.ts";
 export * from "./spawn.ts";
 export * from "./receipts.ts";

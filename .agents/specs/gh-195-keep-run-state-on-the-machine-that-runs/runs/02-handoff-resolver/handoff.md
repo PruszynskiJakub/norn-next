@@ -20,7 +20,7 @@
 
 ## Goal
 
-Review: give a unit's handoff its own resolver keyed by the unit (prefactor 2), location unchanged (AC1, AC2).
+Merge: take the story branch (gh-195/01, 03, 04 integrated) into this slice, keeping both the run-state resolver and the handoff resolver and both repo lints.
 
 ## Progress
 
@@ -38,6 +38,9 @@ Review: give a unit's handoff its own resolver keyed by the unit (prefactor 2), 
 | AC2 (B6, B39) | test | `test/repo/repo.test.ts` > "one resolver for a unit's handoff" (matcher + "no package source outside the resolvers derives a handoff path from a record folder"); `packages/store/test/unit/snapshot.test.ts` > "keyed by the unit, not by its record folder..." |
 - review#1 approve: AC1, AC2 met: handoff resolved by unit via handoffPath(specDir, unit); record-keyed helpers removed and linted; all tiers green, no golden/transcript/snapshot change. 3 non-blocking findings.
 
+- merge#1: merged the story branch (`git merge --no-ff`, never rebase: the slice is published; integrate merges again after a merge step, gh-80). Conflicts: paths.ts (import: 01's moved spec-folder helpers out, kept `unitHandoffPath` + `RUNS_DIR`), snapshot.ts (01's `loadUnit(root, story, unit)`; handoff via `handoffPath(join(root, story.spec_dir), unit.dir)`), checkout.ts, act/env.ts, act/lifecycle.ts (01's `runStateDir`/`runStateStartDir` for the record, our `handoffPath` for the handoff). Handoff resolver stays in paths.ts keyed by (spec folder, unit), beside 01's run-state resolver (gh-195/07 moves handoffs separately). Semantic fixes: store snapshot unit test calls the new `loadUnit` signature; the story tip itself was red (04's `oldRunnerLogDir` used `RUNS_DIR` without importing it, and 01's run-state lint allowlist still named the old `join(machineDir(root), "runs")` line) — imported `RUNS_DIR` and pointed the allowlist at the new line (same exemption, the machine dir's old log folder). Both lints unchanged in strength and green.
+- Friction: the story branch tip after integrating gh-195/04 failed typecheck and the run-state lint; integrate does not run checks, so it surfaced only here.
+
 ## Resume
 
-Review reported approve; nothing left for this step.
+Run the integration and e2e tiers if not yet green, then `norn done done`.

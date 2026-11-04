@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import {
   appendReceipt,
   currentRound,
@@ -108,7 +108,7 @@ describe("a unit's handoff has its own resolver (gh-195 prefactor 2, B6, B39)", 
     expect(handoffPath(spec, "01-add-form")).toBe(join(spec, "runs/01-add-form/handoff.md"));
     writeHandoffHeader(handoffPath(spec, "_story"), "story header");
     const root = spec.slice(0, spec.indexOf("/.agents/"));
-    const u = loadUnit(root, spec, { story: "gh-12", slice: null, dir: "_story", key: "gh-12" });
+    const u = loadUnit(root, { key: "gh-12", spec_dir: relative(root, spec) }, { story: "gh-12", slice: null, dir: "_story", key: "gh-12" });
     expect(u.path).toBe(r2);
     expect(u.handoffFile).toBe(join(spec, "runs/_story/handoff.md"));
     expect(u.handoff?.header).toBe("story header");

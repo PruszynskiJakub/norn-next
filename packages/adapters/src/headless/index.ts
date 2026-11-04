@@ -20,7 +20,7 @@ import { createProcessPort } from "../process/index.ts";
 export const RUNNER_NAME = "headless";
 
 export interface HeadlessRunnerOptions {
-  /** directory for `<run_id>.log` (default: the machine dir's `runs/`, D9) */
+  /** directory for `<run_id>.log` (default: the machine dir's `sessions/`, D9, gh-195 D1) */
   logDir: string;
   process?: ProcessPort;
   /** grace between SIGTERM and SIGKILL (default 3000 ms) */

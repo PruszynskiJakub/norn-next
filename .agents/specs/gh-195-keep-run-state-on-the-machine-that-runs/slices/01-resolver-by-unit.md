@@ -2,7 +2,7 @@
 id: gh-195/01
 title: Resolve run state by checkout, story and unit
 depends_on: []
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }

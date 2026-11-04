@@ -1,4 +1,5 @@
 /** Minimal git plumbing for claim and mailbox refs (§13). Not a GitPort; adapters own that. */
+import { claimRef, mailboxPrefix } from "@norn/schema";
 import { noteSpawn, spawnBounded, spawnSyncCaptured } from "./spawn.ts";
 
 export interface GitRun {
@@ -177,9 +178,15 @@ function casFailReason(text: string): Extract<CasResult, { ok: false }>["reason"
         : "other";
 }
 
-/** Fetch `refs/norn/*` from the remote, pruning local norn refs gone remotely (T9, H2). */
+/**
+ * Fetch the claim and mailbox refs from the remote by prefix, pruning local ones gone remotely
+ * (T9, H2). Named prefixes, never all of `refs/norn/*`, so archive refs stay off every sync (gh-195 B30);
+ * `--prune` only touches refs under these refspecs' destinations.
+ */
 export async function fetchNornRefs(cwd: string, remote: string): Promise<void> {
-  await gitOk(cwd, ["fetch", "--quiet", "--prune", "--no-tags", remote, "+refs/norn/*:refs/norn/*"]);
+  // a refspec takes one `*`, and it spans `/`: `refs/norn/inbox/*` covers `<story>/<id>`
+  const patterns = [claimRef("*"), mailboxPrefix("*").replace(/\/$/, "")];
+  await gitOk(cwd, ["fetch", "--quiet", "--prune", "--no-tags", remote, ...patterns.map((p) => `+${p}:${p}`)]);
 }
 
 /**

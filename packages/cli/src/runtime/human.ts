@@ -14,7 +14,11 @@ import {
   SPECS_DIR,
   parseRoundDirName,
   ROUNDS_DIR,
+  type RunStory,
+  roundRunStatePath,
+  runStatePath,
   STORY_UNIT_DIR,
+  storyRunStatePath,
   ulid,
   type UnitState,
   validate,
@@ -35,10 +39,7 @@ import {
   recordedHeartbeatId,
   machineHolder,
   pinnedWorkflowPath,
-  specRunsDir,
   statePath,
-  roundDir,
-  unitDir,
 } from "@norn/store";
 import type { Context } from "../context.ts";
 import { claimHeld, failure, refuse, usageError } from "../output.ts";
@@ -119,23 +120,23 @@ async function remoteTarget(ctx: Context, key: string): Promise<Target | null> {
   const prefix = `refs/remotes/${remote}/`;
   const storyRef = refs.find((r) => r.startsWith(prefix) && parseSpecDirName(r.slice(prefix.length))?.story === story);
   if (!storyRef) return null;
-  const spec = `${SPECS_DIR}/${storyRef.slice(prefix.length)}`;
+  const run: RunStory = { key: story, spec_dir: `${SPECS_DIR}/${storyRef.slice(prefix.length)}` };
   const candidates: Array<{ ref: string; dir: string; record?: string }> = [];
   if (slice) {
     const nn = slice.split("/")[1] as string;
     const sliceRef = refs.find((r) => r.startsWith(`${prefix}${story}/${nn}-`));
     if (sliceRef) candidates.push({ ref: sliceRef, dir: sliceRef.slice(`${prefix}${story}/`.length) });
-    const listed = (await git.lsTree(root, storyRef, `${specRunsDir(spec)}/`)) ?? [];
+    const listed = (await git.lsTree(root, storyRef, `${storyRunStatePath(run)}/`)) ?? [];
     const dir = listed.find((d) => d.startsWith(`${nn}-`));
     if (dir) candidates.push({ ref: storyRef, dir });
   } else {
     // gh-71 D2 (B30, B36): the story's current round, the highest-numbered rounds/NN-<wf>; a flat record is round 1
-    const rounds = ((await git.lsTree(root, storyRef, `${unitDir(spec, STORY_UNIT_DIR)}/${ROUNDS_DIR}/`)) ?? []).map(parseRoundDirName).filter((r) => r !== null);
+    const rounds = ((await git.lsTree(root, storyRef, `${runStatePath(run, STORY_UNIT_DIR)}/${ROUNDS_DIR}/`)) ?? []).map(parseRoundDirName).filter((r) => r !== null);
     const round = rounds.sort((a, b) => b.n - a.n)[0];
-    candidates.push({ ref: storyRef, dir: STORY_UNIT_DIR, ...(round ? { record: roundDir(spec, round.n, round.workflow) } : {}) });
+    candidates.push({ ref: storyRef, dir: STORY_UNIT_DIR, ...(round ? { record: roundRunStatePath(run, round.n, round.workflow) } : {}) });
   }
   for (const c of candidates) {
-    const record = c.record ?? unitDir(spec, c.dir);
+    const record = c.record ?? runStatePath(run, c.dir);
     const raw = await git.show(root, c.ref, statePath(record));
     if (raw === null) continue;
     let parsed: unknown;

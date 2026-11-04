@@ -12,7 +12,7 @@
 import { join, relative } from "node:path";
 import { cmd } from "@norn/core";
 import { parseStoryKey, STORY_UNIT_DIR, slugify, storyBranch } from "@norn/schema";
-import { appendReceipt, patchStoryFile, readState, storyFile, unitDir } from "@norn/store";
+import { appendReceipt, patchStoryFile, readState, runStateDir, storyFile } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
 import { type CliFailure, failure, refuse } from "../output.ts";
@@ -90,7 +90,7 @@ export const storyReopenCommand = defineCommand({
         const stuck: string[] = [];
         for (const w of worktrees) {
           const slice = w.unit === key ? null : w.unit;
-          const runsDir = unitDir(join(w.path, spec_dir), slice ? w.branch.slice(key.length + 1) : STORY_UNIT_DIR);
+          const runsDir = runStateDir(w.path, { key, spec_dir }, slice ? w.branch.slice(key.length + 1) : STORY_UNIT_DIR);
           const st = readState(runsDir);
           if (!st.ok || st.value.status !== "running" || !st.value.run) continue;
           const written = appendReceipt(runsDir, humanReceipt(ctx, { slice }, st.value, "stuck", { reason: REOPEN_REASON }));

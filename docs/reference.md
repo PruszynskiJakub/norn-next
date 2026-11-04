@@ -403,7 +403,7 @@ norn sync
 
 ##### `norn tidy`
 
-Report or clean orphan worktrees, branches, stale leases, receipt reservations, runs/ work not in the record, Herdr panes of runs that reported done and trace days, hook files, briefings and transcripts older than trace.retain
+Report or clean orphan worktrees, branches, stale leases, receipt reservations, runs/ work not in the record, Herdr panes of runs that reported done and trace days, hook files, briefings, transcripts and old session logs older than trace.retain (D12, gh-195 D1)
 
 ```sh
 norn tidy [--dry-run] [--retain <duration>]

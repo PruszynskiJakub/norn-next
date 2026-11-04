@@ -5,9 +5,8 @@
  * worktree as a marker and stays live while that unit's `state.json` still shows the same run
  * running. The cap then holds across ticks until the run ends (apply/classify release it).
  */
-import { join } from "node:path";
 import { type LeaseFile, STORY_UNIT_DIR } from "@norn/schema";
-import { defaultLeaseLiveness, type LeaseLiveness, readState, readUnitMarker, unitDir } from "@norn/store";
+import { defaultLeaseLiveness, type LeaseLiveness, readState, readUnitMarker, runStateDir } from "@norn/store";
 import type { ProcessIdentity } from "@norn/schema";
 
 /** true while the unit run named by an agent lease is still `running` in its worktree. */
@@ -15,7 +14,7 @@ function leaseRunActive(lease: LeaseFile): boolean {
   if (lease.kind !== "agent" || !lease.worktree || !lease.run_id) return false;
   const m = readUnitMarker(lease.worktree).marker;
   if (!m || m.story !== lease.story || m.slice !== lease.slice) return false;
-  const st = readState(unitDir(join(lease.worktree, m.spec_dir), m.unit || STORY_UNIT_DIR));
+  const st = readState(runStateDir(lease.worktree, { key: m.story, spec_dir: m.spec_dir }, m.unit || STORY_UNIT_DIR));
   return st.ok && st.value.status === "running" && st.value.run?.run_id === lease.run_id;
 }
 

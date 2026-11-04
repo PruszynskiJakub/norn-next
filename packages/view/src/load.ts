@@ -299,7 +299,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
         const file = read.slices.find((f) => f.key === u.unit.slice);
         if (u.unit.slice && lu.worktree && file) targets.push({ unit: u.unit.key, dir: u.unit.dir, cwd: lu.worktree, branch: sliceBranch(read.key, file.nn, file.slug) });
       }
-      const found = await unpushedRuns(remoteName, baseRef, read.spec_dir, targets).catch(() => []);
+      const found = await unpushedRuns(remoteName, baseRef, read, targets).catch(() => []);
       return found.map((f) => ({ unit: f.unit, files: f.files }));
     }),
   );
