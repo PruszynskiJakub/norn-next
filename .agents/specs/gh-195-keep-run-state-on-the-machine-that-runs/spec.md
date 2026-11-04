@@ -16,6 +16,76 @@ workflow: story
 status: active
 intake_at: 2026-11-04T08:34:16.652Z
 body_hash: daab49a1f6e19f9adece43a08de2e7ee1559163b2e979cbaa5e838e337c7bb9f
+criteria:
+  - { id: "01.AC1", verifier: test }
+  - { id: "01.AC2", verifier: test }
+  - { id: "02.AC1", verifier: test }
+  - { id: "02.AC2", verifier: test }
+  - { id: "03.AC1", verifier: test }
+  - { id: "03.AC2", verifier: test }
+  - { id: "04.AC1", verifier: test }
+  - { id: "04.AC2", verifier: test }
+  - { id: "05.AC1", verifier: test }
+  - { id: "05.AC2", verifier: test }
+  - { id: "05.AC3", verifier: test }
+  - { id: "05.AC4", verifier: test }
+  - { id: "05.AC5", verifier: test }
+  - { id: "05.AC6", verifier: test }
+  - { id: "05.AC7", verifier: test }
+  - { id: "05.AC8", verifier: test }
+  - { id: "05.AC9", verifier: test }
+  - { id: "06.AC1", verifier: test }
+  - { id: "06.AC2", verifier: test }
+  - { id: "06.AC3", verifier: test }
+  - { id: "06.AC4", verifier: test }
+  - { id: "06.AC5", verifier: test }
+  - { id: "06.AC6", verifier: test }
+  - { id: "07.AC1", verifier: test }
+  - { id: "07.AC2", verifier: test }
+  - { id: "07.AC3", verifier: test }
+  - { id: "07.AC4", verifier: test }
+  - { id: "07.AC5", verifier: test }
+  - { id: "07.AC6", verifier: test }
+  - { id: "08.AC1", verifier: test }
+  - { id: "08.AC2", verifier: test }
+  - { id: "08.AC3", verifier: test }
+  - { id: "08.AC4", verifier: test }
+  - { id: "09.AC1", verifier: test }
+  - { id: "09.AC2", verifier: test }
+  - { id: "09.AC3", verifier: test }
+  - { id: "09.AC4", verifier: test }
+  - { id: "10.AC1", verifier: test }
+  - { id: "10.AC2", verifier: test }
+  - { id: "10.AC3", verifier: test }
+  - { id: "10.AC4", verifier: test }
+  - { id: "11.AC1", verifier: test }
+  - { id: "11.AC2", verifier: test }
+  - { id: "11.AC3", verifier: test }
+  - { id: "11.AC4", verifier: test }
+  - { id: "11.AC5", verifier: test }
+  - { id: "12.AC1", verifier: test }
+  - { id: "12.AC2", verifier: test }
+  - { id: "12.AC3", verifier: test }
+  - { id: "12.AC4", verifier: test }
+  - { id: "13.AC1", verifier: test }
+  - { id: "13.AC2", verifier: test }
+  - { id: "13.AC3", verifier: test }
+  - { id: "14.AC1", verifier: test }
+  - { id: "14.AC2", verifier: test }
+  - { id: "14.AC3", verifier: test }
+  - { id: "14.AC4", verifier: test }
+  - { id: "14.AC5", verifier: person }
+  - { id: "15.AC1", verifier: test }
+  - { id: "15.AC2", verifier: test }
+  - { id: "15.AC3", verifier: test }
+  - { id: "15.AC4", verifier: test }
+  - { id: "15.AC5", verifier: test }
+  - { id: "16.AC1", verifier: test }
+  - { id: "16.AC2", verifier: test }
+  - { id: "16.AC3", verifier: test }
+  - { id: "16.AC4", verifier: test }
+  - { id: "17.AC1", verifier: test }
+  - { id: "17.AC2", verifier: agent }
 ---
 
 # Keep run state on the machine that runs it, and hand it over only when asked
