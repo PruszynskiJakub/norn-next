@@ -1,7 +1,7 @@
 ---
-id: gh-195/11
+id: gh-195/12
 title: Other machines see a story from its ref or its branch
-depends_on: [gh-195/03, gh-195/07]
+depends_on: [gh-195/03, gh-195/08]
 status: planned
 criteria:
   - { id: AC1, verifier: test }
@@ -15,7 +15,7 @@ criteria:
 On a machine that does not hold a story, `story view` and `status` show step, attempt and counters from the story's ref under `remote`, labelled with its age once it is no longer kept current, and under `local` show the claim, the branch, the last boundary step, the PR and CI, and where the record is.
 
 ## Scope
-Behaviour: B10 (the other clone's view), B13, B17, B18, B19, B30 (the tick's fetch). Seams: S1. Out: the mailbox (gh-195/12), finished stories (gh-195/15).
+Behaviour: B10 (the other clone's view), B13, B17, B18, B19, B30 (the tick's fetch). Seams: S1. Out: the mailbox (gh-195/13), finished stories (gh-195/16).
 
 ## Acceptance
 - AC1 (B17, B10) Given gh-9 under `remote` held by clone A, when A finishes implement and clone B ticks, then `norn story view gh-9` and `norn status` on B show "Step: review (attempt 1)" and the counters, read from `refs/norn/runs/gh-9`. — verifier: test

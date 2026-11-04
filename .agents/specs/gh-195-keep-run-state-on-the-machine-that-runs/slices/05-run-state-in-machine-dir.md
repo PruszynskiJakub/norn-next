@@ -19,7 +19,7 @@ criteria:
 The tracer: a story's state, receipts, pinned workflow, logs and evidence live at `<machine dir>/runs/<story>/<unit>/` and never in a worktree or on a branch; a boundary commit carries only the agent's work and the handoff; an open story that still has `runs/` on its branch moves off it at the holder's first tick and goes on where it was. Every test, golden case, transcript and snapshot that named a worktree `runs/` path is rewritten once here.
 
 ## Scope
-Behaviour: B2, B3, B4, B5, B34. Seams: S1, S2. Out: the handoff's move to `handoffs/` and the prose-only handoff (gh-195/06; the handoff stays at its current path in the worktree for now and is committed as today), the ref and the policy (gh-195/07), how other machines see the story (gh-195/11), the base branch's record and `upgrade` (gh-195/15, gh-195/16).
+Behaviour: B2, B3, B4, B5, B34. Seams: S1, S2. Out: the handoff's move to `handoffs/` and the prose-only handoff (gh-195/07; the handoff stays at its current path in the worktree for now and is committed as today), the ref and the policy (gh-195/08), how other machines see the story (gh-195/12), the base branch's record and `upgrade` (gh-195/16, gh-195/17).
 
 ## Acceptance
 - AC1 (B2) Given gh-9 running through implement and review, when `git status` runs in its worktree at any point, then no state, receipt, workflow, log or evidence file shows, and those files are under `<machine dir>/runs/gh-9/_story/` (and `<nn>-<slug>/` for a slice). — verifier: test
@@ -39,6 +39,6 @@ Behaviour: B2, B3, B4, B5, B34. Seams: S1, S2. Out: the handoff's move to `hando
 - `bun run test:e2e`
 
 ## Notes
-D1, D7 (snapshot reads run state from the machine dir; spec and frontmatter still from worktrees, base and main checkout), D8, D13 (steps 1, 3, 4; step 2, the handoff move, comes with gh-195/06; the ref push under `remote` comes with gh-195/07). New action `move_record`; harvest golden cases for S12 with `bun run golden`.
-Finished stories on the base branch still carry `runs/` in its tree until gh-195/15 and gh-195/16; readers of a finished story keep reading the base tree in this slice.
+D1, D7 (snapshot reads run state from the machine dir; spec and frontmatter still from worktrees, base and main checkout), D8, D13 (steps 1, 3, 4; step 2, the handoff move, comes with gh-195/07; the ref push under `remote` comes with gh-195/08). New action `move_record`; harvest golden cases for S12 with `bun run golden`.
+Finished stories on the base branch still carry `runs/` in its tree until gh-195/16 and gh-195/17; readers of a finished story keep reading the base tree in this slice.
 This is the slice the plan's blast-radius risk is about (about 35 test files, 56 golden cases, 3 transcripts, 5 snapshots). If it does not fit one session, the person's call is to split the open-story migration (AC7, AC8) into its own slice after this one; until then a story begun under the old layout cannot run on this branch's build, which is acceptable only because nothing releases in between.

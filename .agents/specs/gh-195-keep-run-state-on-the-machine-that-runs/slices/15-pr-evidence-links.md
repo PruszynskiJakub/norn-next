@@ -1,7 +1,7 @@
 ---
-id: gh-195/14
+id: gh-195/15
 title: open-pr pushes the record and links the PR's evidence to it
-depends_on: [gh-195/07]
+depends_on: [gh-195/08]
 status: planned
 criteria:
   - { id: AC1, verifier: test }

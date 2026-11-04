@@ -1,5 +1,5 @@
 ---
-id: gh-195/07
+id: gh-195/08
 title: The record ref and the record policy
 depends_on: [gh-195/05]
 status: planned
@@ -16,7 +16,7 @@ criteria:
 A team picks `local` (default) or `remote` in its team config. Under `remote`, every step boundary pushes the story's record, packed into one commit, to `refs/norn/runs/<story>` right after the branch; under `local`, a normal step pushes no ref. A failed ref push is retried at the next tick.
 
 ## Scope
-Behaviour: B9, B10 (the push; the other clone's view is gh-195/11), B11 (the boundary half), B12, B14. Seams: S1. Out: release pushes (gh-195/08), reading the ref elsewhere (gh-195/09, gh-195/11), open-pr (gh-195/14), the archive (gh-195/15).
+Behaviour: B9, B10 (the push; the other clone's view is gh-195/12), B11 (the boundary half), B12, B14. Seams: S1. Out: release pushes (gh-195/09), reading the ref elsewhere (gh-195/10, gh-195/12), open-pr (gh-195/15), the archive (gh-195/16).
 
 ## Acceptance
 - AC1 (B9) Given a team config without the policy key, when a story runs, then it behaves as `local`; `norn config set <key> remote --repo` writes the team file, `norn config get <key>` names the file the value came from, and `norn doctor` reports an unknown value as a failed check; the emitted config schema and the reference docs are regenerated. — verifier: test
@@ -33,5 +33,5 @@ Behaviour: B9, B10 (the push; the other clone's view is gh-195/11), B11 (the bou
 - `bun run schema:emit && git diff --exit-code packages/schema/json`
 
 ## Notes
-D2 (record commit shape, lease), D3 (pack and unpack in store with git plumbing: temp index, `write-tree`, `commit-tree`; unpack to a temp folder, validate every JSON, rename), D4 (observe reports the record's local tree id and the last pushed one, machine-local; decide emits `push_record` after the branch push when the tree changed). Build unpack here too, with its own test through the harness, since gh-195/09 and gh-195/11 read it.
+D2 (record commit shape, lease), D3 (pack and unpack in store with git plumbing: temp index, `write-tree`, `commit-tree`; unpack to a temp folder, validate every JSON, rename), D4 (observe reports the record's local tree id and the last pushed one, machine-local; decide emits `push_record` after the branch push when the tree changed). Build unpack here too, with its own test through the harness, since gh-195/10 and gh-195/12 read it.
 The key's name is not fixed by the spec or the plan (B9 writes `<key>`): pick one in the config's existing style and say it in the handoff, or ask the person. New rule ids S11, S12 get golden cases (`bun run golden`).

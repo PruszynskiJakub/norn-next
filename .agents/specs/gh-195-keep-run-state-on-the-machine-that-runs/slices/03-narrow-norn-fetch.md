@@ -12,7 +12,7 @@ criteria:
 A sync fetches `refs/norn/claims/*` and `refs/norn/inbox/*` by name instead of all of `refs/norn/*`, so archive refs added later never ride along with every sync.
 
 ## Scope
-Behaviour: B30 (the sync half). Seams: S1. Out: fetching one story's record on demand (gh-195/11, gh-195/15).
+Behaviour: B30 (the sync half). Seams: S1. Out: fetching one story's record on demand (gh-195/12, gh-195/16).
 
 ## Acceptance
 - AC1 (B30) Given a bare remote that holds a claim ref, a mailbox ref and a ref under another `refs/norn/` prefix (for example `refs/norn/runs/gh-9`), when a clone runs a tick, then its local refs hold the claim and the mailbox ref and not the other one. — verifier: test

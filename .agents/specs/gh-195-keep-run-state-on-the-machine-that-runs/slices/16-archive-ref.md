@@ -1,7 +1,7 @@
 ---
-id: gh-195/15
+id: gh-195/16
 title: A finished story's record is archived on its ref, never on the base
-depends_on: [gh-195/03, gh-195/07]
+depends_on: [gh-195/03, gh-195/08]
 status: planned
 criteria:
   - { id: AC1, verifier: test }
@@ -15,7 +15,7 @@ criteria:
 When a story's PR merges (GR6) or it closes without a PR (GR6b), its final record is pushed to its ref before any cleanup, and the base branch gains no run state; `run list`, `run view` and `story reopen` read the record from the ref on any machine, fetched on demand, and `tidy` never touches the refs.
 
 ## Scope
-Behaviour: B29, B30 (fresh clones), B31, B32. Seams: S1. Out: moving the base's existing run state (gh-195/16).
+Behaviour: B29, B30 (fresh clones), B31, B32. Seams: S1. Out: moving the base's existing run state (gh-195/17).
 
 ## Acceptance
 - AC1 (B29) Given gh-9's PR merges, when the holder's tick runs GR6, then `refs/norn/runs/gh-9` holds the final record before the cleanup, the base branch gains no run-state file, and a rejected archive push leaves the cleanup owed and retried at the next tick. — verifier: test
@@ -30,4 +30,4 @@ Behaviour: B29, B30 (fresh clones), B31, B32. Seams: S1. Out: moving the base's 
 - `bun run test:integration`
 
 ## Notes
-D7 (finished stories' run state from the archive ref, not the base tree), D15. Today GR6 writes the record onto the base (the base record, `records` and `housekeeping` tests); that path goes away here. Readers of a finished story whose run state is still on the base tree from an older norn keep working until gh-195/16 moves it.
+D7 (finished stories' run state from the archive ref, not the base tree), D15. Today GR6 writes the record onto the base (the base record, `records` and `housekeeping` tests); that path goes away here. Readers of a finished story whose run state is still on the base tree from an older norn keep working until gh-195/17 moves it.

@@ -1,7 +1,7 @@
 ---
-id: gh-195/08
+id: gh-195/09
 title: A claim release pushes the record first, or releases nothing
-depends_on: [gh-195/07]
+depends_on: [gh-195/08]
 status: planned
 criteria:
   - { id: AC1, verifier: test }
@@ -14,7 +14,7 @@ criteria:
 `norn story handoff`, a clean `watch` exit and `norn story close` push the story's branches and its record ref before the claim goes, under either policy; if the ref push fails, the claim stays and nothing is deleted.
 
 ## Scope
-Behaviour: B15, B16, B33 (the release half), B11 (the release push under `local`). Seams: S1. Out: reading the record on the other machine (gh-195/09).
+Behaviour: B15, B16, B33 (the release half), B11 (the release push under `local`). Seams: S1. Out: reading the record on the other machine (gh-195/10).
 
 ## Acceptance
 - AC1 (B15, B11) Given gh-9 under `local` with no ref yet, when `norn story handoff gh-9` runs, then the remote has the story branch, the slice branches and `refs/norn/runs/gh-9` whose `Norn-Branch-Commit` is the pushed story branch head, the claim ref is deleted after them, and the reply says "handed over gh-9: record at <commit>, matches story branch <sha>". — verifier: test

@@ -1,7 +1,7 @@
 ---
-id: gh-195/12
+id: gh-195/13
 title: Mailbox from a non-holder, and rejected receipts shown on the holder
-depends_on: [gh-195/11]
+depends_on: [gh-195/12]
 status: planned
 criteria:
   - { id: AC1, verifier: test }
