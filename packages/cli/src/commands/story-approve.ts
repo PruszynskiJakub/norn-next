@@ -65,7 +65,7 @@ async function decideGate(ctx: Context, args: ParsedArgs, kind: "approve" | "rej
   });
   // the rejection is a milestone of the unit, like `done` (O6): the next brief's Context carries it;
   // through the mailbox the holder's tick appends it when it imports the receipt (T9)
-  if (kind === "reject" && out.delivered.via === "local" && t.runsDir) appendProgress(t.runsDir, rejectProgress(out.receipt));
+  if (kind === "reject" && out.delivered.via === "local" && t.handoffFile) appendProgress(t.handoffFile, rejectProgress(out.receipt));
   return out;
 }
 

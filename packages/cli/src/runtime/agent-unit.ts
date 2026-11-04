@@ -21,6 +21,8 @@ export interface UnitSession extends AgentUnit {
   specPath: string;
   /** absolute runs/<unit>/ inside the worktree */
   runsDir: string;
+  /** the unit's handoff, from its own resolver (gh-195 prefactor 2) */
+  handoffFile: string;
 }
 
 const unitRefOf = (m: UnitMarker): UnitRef => ({ story: m.story, slice: m.slice, dir: m.unit, key: m.slice ?? m.story });
@@ -60,6 +62,7 @@ export function loadUnitSession(ctx: Context, verb: string, at?: { worktree: str
     unit,
     specPath,
     runsDir: snap.path,
+    handoffFile: snap.handoffFile,
     state: snap.state,
     workflow: snap.workflow.workflow,
     receipts: snap.receipts ?? [],

@@ -223,10 +223,13 @@ export function parseRoundDirName(name: string): { n: number; workflow: string }
   const m = ROUND_DIR_RE.exec(name);
   return m ? { n: Number(m[1]), workflow: m[2] as string } : null;
 }
-/** gh-71 B31: a record folder's handoff: the story's one `runs/_story/handoff.md` above its round folders, a slice's in its own folder. */
-export function recordHandoffPath(record: string): string {
-  const m = new RegExp(`^(.*(?:^|/)${STORY_UNIT_DIR})/${ROUNDS_DIR}/[^/]+/?$`).exec(record);
-  return `${m ? m[1] : record.replace(/\/$/, "")}/handoff.md`;
+/**
+ * gh-195 prefactor 2 (B6, B39): a unit's handoff relative to its spec folder, keyed by the unit, never by
+ * its record folder: `runs/<unit>/handoff.md` (the story's one `runs/_story/handoff.md`, above its round
+ * folders, gh-71 B31). The one place that names it: store's `handoffPath` resolves it under a spec folder.
+ */
+export function unitHandoffPath(unit: string): string {
+  return `${unitRecordPath(unit)}/handoff.md`;
 }
 /** gh-71 B30: a story round's record folder relative to its spec folder, `runs/_story/rounds/01-triage`. */
 export function roundRecordPath(n: number, workflow: string): string {

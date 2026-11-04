@@ -1,6 +1,6 @@
 /** act's environment (ActEnv): the context, the observed facts and this tick's effect bookkeeping, shared by every act module. */
 import { existsSync } from "node:fs";
-import { relative } from "node:path";
+import { join, relative } from "node:path";
 import {
   type ActFailure,
   type ActionResult,
@@ -23,6 +23,7 @@ import {
   writeHandoffHeader,
   writeReceiptAt,
   writeState,
+  handoffPath,
   markNotified,
   readNotified,
   traceEvent,
@@ -99,7 +100,8 @@ export class ActEnv {
     // a unit started this tick
     const s = this.storyLoc(unit.story);
     const root = s.worktree ?? s.root;
-    return { unit, story: unit.story, root, runsDir: runStateDir(root, { key: unit.story, spec_dir: s.spec_dir }, unit.dir), worktree: s.worktree, branch: s.branch, state: null, workflow: null };
+    const specDir = join(root, s.spec_dir);
+    return { unit, story: unit.story, root, runsDir: runStateDir(root, { key: unit.story, spec_dir: s.spec_dir }, unit.dir), handoffFile: handoffPath(specDir, unit.dir), worktree: s.worktree, branch: s.branch, state: null, workflow: null };
   }
 
   liveness() {
@@ -151,8 +153,8 @@ export class ActEnv {
           .split("\n")
           .filter((l) => !l.startsWith("<!--"))
           .join("\n");
-        writeHandoffHeader(loc.runsDir, header);
-        if (heartbeat) appendHandoffHeartbeat(loc.runsDir, `- ${heartbeat}`);
+        writeHandoffHeader(loc.handoffFile, header);
+        if (heartbeat) appendHandoffHeartbeat(loc.handoffFile, `- ${heartbeat}`);
       }
     }
     let sha: string | null;

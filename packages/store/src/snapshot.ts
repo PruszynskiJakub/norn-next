@@ -19,7 +19,7 @@ import { baseSpecsRoot, defaultBaseRef } from "./base.ts";
 import { type LoadedConfig, loadConfig, loadWorkflows, type WorkflowListing } from "./config.ts";
 import { readSliceFile, readStoryFile } from "./frontmatter.ts";
 import { isErrno } from "./fsx.ts";
-import { slicesDir, specsDir, storyFile } from "./paths.ts";
+import { handoffPath, slicesDir, specsDir, storyFile } from "./paths.ts";
 import { isFlatRunState, runStateDir, runStateRecord, runStateRounds, storyRunStateDir } from "./run-state.ts";
 import { listReceipts } from "./receipts.ts";
 import { type Handoff, type PinnedWorkflow, readHandoff, readPinnedWorkflow, readState } from "./unit.ts";
@@ -38,6 +38,8 @@ export interface UnitSnapshot {
   unapplied: NumberedReceipt[];
   /** every valid receipt, when `includeApplied` */
   receipts?: NumberedReceipt[];
+  /** absolute path of the unit's handoff, from its own resolver (`handoffPath`, gh-195 prefactor 2), not from `path` */
+  handoffFile: string;
   handoff: Handoff | null;
   /** files of this unit failing validation → unit is corrupt (S2) */
   errors: FileError[];
@@ -96,6 +98,7 @@ function files(path: string): string[] {
 /** One unit's run state in `root` (gh-195 prefactor 1: found through the resolver, `runStateDir`). */
 export function loadUnit(root: string, story: RunStory, unit: UnitRef, opts: { includeApplied?: boolean; path?: string } = {}): UnitSnapshot {
   const path = opts.path ?? runStateDir(root, story, unit.dir);
+  const handoffFile = handoffPath(join(root, story.spec_dir), unit.dir);
   const errors: FileError[] = [];
   const st = readState(path, root);
   if (!st.ok && st.reason === "corrupt") errors.push(st.error);
@@ -120,7 +123,8 @@ export function loadUnit(root: string, story: RunStory, unit: UnitRef, opts: { i
     workflow: wf.ok ? wf.value : null,
     unapplied: all.receipts.filter((r) => r.n > after),
     ...(opts.includeApplied ? { receipts: all.receipts } : {}),
-    handoff: readHandoff(path),
+    handoffFile,
+    handoff: readHandoff(handoffFile),
     errors,
   };
 }

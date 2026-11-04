@@ -82,6 +82,8 @@ export interface Target {
   workflow: Workflow | null;
   /** absolute runs/<unit>/ in this checkout; null when read from the remote branch only */
   runsDir: string | null;
+  /** the unit's handoff in this checkout, from its own resolver (gh-195 prefactor 2); null with `runsDir` */
+  handoffFile: string | null;
   /** where the cursor was read from */
   source: "local" | "remote";
   obs: Observed | null;
@@ -96,6 +98,7 @@ function localTarget(obs: Observed, story: StoryFacts, uf: UnitFacts): Target {
     state: uf.state,
     workflow: uf.workflow,
     runsDir: obs.units[uf.unit.key]?.runsDir ?? null,
+    handoffFile: obs.units[uf.unit.key]?.handoffFile ?? null,
     source: "local",
     obs,
     story_facts: story,
@@ -146,7 +149,7 @@ async function remoteTarget(ctx: Context, key: string): Promise<Target | null> {
     if (!st.ok) continue;
     const wfText = await git.show(root, c.ref, pinnedWorkflowPath(record));
     const wf = wfText === null ? null : parseWorkflowText(wfText, pinnedWorkflowPath(record));
-    return { key, story, slice, state: st.value, workflow: wf?.ok ? wf.value : null, runsDir: null, source: "remote", obs: null, story_facts: null };
+    return { key, story, slice, state: st.value, workflow: wf?.ok ? wf.value : null, runsDir: null, handoffFile: null, source: "remote", obs: null, story_facts: null };
   }
   return null;
 }

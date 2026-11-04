@@ -1,8 +1,8 @@
 /** act: unit and story lifecycle — start, done, rejected receipts, claims, intake, mirror, merged clean-up and base records. */
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
 import { cmd, type Action, type ActionResult, nornTrailers, type UnitRef, type WorktreeSpec } from "@norn/core";
-import { type ClaimBlob, parseDuration, ROUNDS_DIR, STORY_UNIT_DIR } from "@norn/schema";
+import { type ClaimBlob, parseDuration, ROUNDS_DIR, STORY_UNIT_DIR, unitHandoffPath } from "@norn/schema";
 import {
   acquireClaim,
   type ClaimWriteResult,
@@ -21,6 +21,7 @@ import {
   readPendingRecords,
   writePendingRecords,
   moveFile,
+  handoffPath,
   runStateRecord,
   runStateStartDir,
   writeState,
@@ -82,6 +83,7 @@ export async function startUnit(act: ActEnv, a: Extract<Action, { kind: "start_u
     story: a.unit.story,
     root: wtPath,
     runsDir,
+    handoffFile: handoffPath(join(wtPath, story.spec_dir), a.unit.dir),
     worktree: wtPath,
     branch: a.worktree?.branch ?? story.branch,
     state: null,
@@ -335,8 +337,10 @@ export async function retryRecords(act: ActEnv): Promise<Array<{ story: string; 
 export async function roundMigrate(act: ActEnv, a: Extract<Action, { kind: "round_migrate" }>): Promise<ActionResult> {
   const cwd = a.commit.cwd;
   mkdirSync(join(cwd, a.to), { recursive: true });
+  // gh-71 B31: the story's handoff stays above its rounds; its name comes from its resolver (gh-195 prefactor 2)
+  const handoff = basename(unitHandoffPath(STORY_UNIT_DIR));
   const moved = readdirSync(join(cwd, a.from))
-    .filter((n) => n !== "handoff.md" && n !== ROUNDS_DIR)
+    .filter((n) => n !== handoff && n !== ROUNDS_DIR)
     .sort((x, y) => Number(x === "state.json") - Number(y === "state.json") || x.localeCompare(y));
   for (const name of moved) await migrateEntry(act, cwd, `${a.from}/${name}`, `${a.to}/${name}`);
   const loc = act.obs.units[a.unit.key];

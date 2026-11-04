@@ -6,7 +6,7 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { TickTrace } from "@norn/schema";
+import { STORY_UNIT_DIR, type TickTrace } from "@norn/schema";
 import { loadWorkflows, readTickInputs, readTrace, repoConfigPath, workflowsDir, storyUnitDir, handoffPath } from "@norn/store";
 import type { TickReport } from "../../packages/cli/src/index.ts";
 import { decide } from "@norn/core";
@@ -286,7 +286,7 @@ describe("a story through the slice workflow", () => {
     const st = h.state(storyRuns());
     expect(st).toMatchObject({ step: "plan", status: "ready", mode: "auto", workflow: "mini" });
     expect(h.read(join(storyRuns(), "workflow.yaml"))).toBe(MINI);
-    expect(h.read(handoffPath(storyRuns()))).toContain("Step: plan (attempt 1)");
+    expect(h.read(handoffPath(join(storyWt(), spec), STORY_UNIT_DIR))).toContain("Step: plan (attempt 1)");
     expect(h.read(join(storyWt(), spec, "spec.md"))).toContain("status: active");
     expect(h.git(["ls-remote", "origin", "refs/heads/gh-7-add-login-form"])).not.toBe("");
   });

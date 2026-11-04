@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { appendFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { BriefJson } from "@norn/core";
-import { type HookTrace, type TickTrace, ulid } from "@norn/schema";
+import { type HookTrace, STORY_UNIT_DIR, type TickTrace, ulid } from "@norn/schema";
 import { appendHookTrace, machineDir, readTickInputs, readTrace, readTraceFile, remoteCachePath, repoConfigPath, setTraceReadObserver, type TraceFileRead, workflowsDir, storyUnitDir, handoffPath } from "@norn/store";
 import { type CliResult } from "../../src/index.ts";
 import { parseFindings } from "../../src/commands/done.ts";
@@ -257,7 +257,7 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     expect(r.stdout).toEndWith("**End your turn now.** Do not report again; norn routes the work from here.\n");
     const file = receipts(runs()).at(-1) as string;
     expect(readReceipt(runs(), file)).toMatchObject({ kind: "done", outcome: "done", handoff: "form renders; tests added", run_id: runId, by: "agent", who: "claude" });
-    expect(h.read(handoffPath(runs()))).toMatch(/## Progress\n\n- implement#1 done: form renders; tests added\n\n## Resume/);
+    expect(h.read(handoffPath(join(wt(), spec), STORY_UNIT_DIR))).toMatch(/## Progress\n\n- implement#1 done: form renders; tests added\n\n## Resume/);
 
     for (const argv of [["done", "done", "--handoff", "again"], ["ask", "q?"], ["stuck", "r"], ["brief"]]) {
       const again = await inWt(wt(), ...argv);

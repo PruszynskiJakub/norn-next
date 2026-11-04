@@ -8,7 +8,7 @@ import type { UnitState, Workflow } from "@norn/schema";
 import { assertValid } from "@norn/schema";
 import { parse as parseYaml } from "yaml";
 import { atomicCopyDir, atomicWrite, createExclusive, fileError, jsonLine, readJsonFile, readText, type ReadResult, validated } from "./fsx.ts";
-import { evidenceDir, handoffPath, logPath, orphanedDir, pinnedWorkflowPath, statePath } from "./paths.ts";
+import { evidenceDir, logPath, orphanedDir, pinnedWorkflowPath, statePath } from "./paths.ts";
 
 // ---------------------------------------------------------------- state.json
 
@@ -166,8 +166,9 @@ export function renderHandoff(h: Pick<Handoff, "header" | "heartbeat" | "body">)
   return `${parts.join("\n")}\n${h.body}`;
 }
 
-export function readHandoff(unitDir: string): Handoff | null {
-  const raw = readText(handoffPath(unitDir));
+/** A unit's handoff at `file`, the path its resolver gives (`handoffPath`, gh-195 prefactor 2). */
+export function readHandoff(file: string): Handoff | null {
+  const raw = readText(file);
   return raw === null ? null : parseHandoff(raw);
 }
 
@@ -175,19 +176,19 @@ export function readHandoff(unitDir: string): Handoff | null {
  * Replace the generated header (rendered by the caller from state.json, S9) and keep
  * everything else verbatim. A new file gets the Goal / Progress / Resume skeleton.
  */
-export function writeHandoffHeader(unitDir: string, header: string): Handoff {
-  const cur = readHandoff(unitDir);
+export function writeHandoffHeader(file: string, header: string): Handoff {
+  const cur = readHandoff(file);
   const next = { header: header.replace(/\n+$/, ""), heartbeat: cur?.heartbeat ?? [], body: cur ? cur.body : HANDOFF_SKELETON };
   const raw = renderHandoff(next);
-  atomicWrite(handoffPath(unitDir), raw);
+  atomicWrite(file, raw);
   return { ...next, raw };
 }
 
 const REPEAT = /^(.*?)(?: \(×(\d+)\))?$/;
 
 /** Append a heartbeat line (O6); a repeat of the last line collapses into "(×N)". Keeps the last `keep` lines. */
-export function appendHandoffHeartbeat(unitDir: string, line: string, keep = 50): Handoff {
-  const cur = readHandoff(unitDir) ?? { header: "", heartbeat: [], body: HANDOFF_SKELETON, raw: "" };
+export function appendHandoffHeartbeat(file: string, line: string, keep = 50): Handoff {
+  const cur = readHandoff(file) ?? { header: "", heartbeat: [], body: HANDOFF_SKELETON, raw: "" };
   const text = line.replace(/\s*\n\s*/g, " ").trim();
   const lines = [...cur.heartbeat];
   const last = lines.at(-1);
@@ -196,16 +197,16 @@ export function appendHandoffHeartbeat(unitDir: string, line: string, keep = 50)
   else lines.push(text);
   const next = { header: cur.header, heartbeat: lines.slice(-keep), body: cur.body };
   const raw = renderHandoff(next);
-  atomicWrite(handoffPath(unitDir), raw);
+  atomicWrite(file, raw);
   return { ...next, raw };
 }
 
 /** Replace the agent-written body (tests, `norn done --handoff` if it chooses to). Generated blocks are kept. */
-export function writeHandoffBody(unitDir: string, body: string): Handoff {
-  const cur = readHandoff(unitDir) ?? { header: "", heartbeat: [], body: "", raw: "" };
+export function writeHandoffBody(file: string, body: string): Handoff {
+  const cur = readHandoff(file) ?? { header: "", heartbeat: [], body: "", raw: "" };
   const next = { header: cur.header, heartbeat: cur.heartbeat, body };
   const raw = renderHandoff(next);
-  atomicWrite(handoffPath(unitDir), raw);
+  atomicWrite(file, raw);
   return { ...next, raw };
 }
 

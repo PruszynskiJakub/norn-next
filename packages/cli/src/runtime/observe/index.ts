@@ -92,6 +92,8 @@ export interface UnitLoc {
   root: string;
   /** absolute runs/<unit>/ */
   runsDir: string;
+  /** absolute path of the unit's handoff, from its own resolver (`handoffPath`, gh-195 prefactor 2) */
+  handoffFile: string;
   /** the unit's own worktree (slice) or the story worktree (story unit) */
   worktree: string | null;
   branch: string;
@@ -299,6 +301,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
         story: s.key,
         root: ownWt && existsSync(ownWt) ? ownWt : s.root,
         runsDir: u.path,
+        handoffFile: u.handoffFile,
         worktree: ownWt,
         branch: unitBranch,
         state: u.state,

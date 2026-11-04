@@ -164,13 +164,13 @@ describe("unit files", () => {
     expect(readdirSync(join(u, "evidence"))).toEqual(["R1"]);
   });
   test("handoff: header replaced, agent sections preserved, heartbeat collapses", () => {
-    const u = tmp();
+    const u = join(tmp(), "handoff.md");
     writeHandoffHeader(u, "story gh-12 · step implement · attempt 1");
     let h = readHandoff(u);
     expect(h?.body).toContain("## Goal");
     // agent edits its sections
-    const raw = readFileSync(join(u, "handoff.md"), "utf8").replace("## Progress\n", "## Progress\n- wrote the form\n");
-    writeFileSync(join(u, "handoff.md"), raw);
+    const raw = readFileSync(u, "utf8").replace("## Progress\n", "## Progress\n- wrote the form\n");
+    writeFileSync(u, raw);
     appendHandoffHeartbeat(u, "nudged (silent)");
     appendHandoffHeartbeat(u, "nudged (silent)");
     appendHandoffHeartbeat(u, "nudged (silent)");
@@ -180,7 +180,7 @@ describe("unit files", () => {
     expect(h?.header).toBe("story gh-12 · step test · attempt 1");
     expect(h?.heartbeat).toEqual(["nudged (silent) (×3)", "resumed"]);
     expect(h?.body).toContain("- wrote the form");
-    expect(readFileSync(join(u, "handoff.md"), "utf8").startsWith(HANDOFF_HEADER_BEGIN)).toBe(true);
+    expect(readFileSync(u, "utf8").startsWith(HANDOFF_HEADER_BEGIN)).toBe(true);
   });
   test("handoff without norn blocks is all body", () => {
     expect(parseHandoff("# mine\n")).toMatchObject({ header: "", heartbeat: [], body: "# mine\n" });

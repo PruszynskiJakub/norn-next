@@ -200,7 +200,7 @@ export const briefCommand = defineCommand({
       },
       diff_range: `${base}...HEAD`,
       // S9: the agent-written part only; the generated header and heartbeat are not for the agent
-      handoff: readHandoff(s.runsDir)?.body ?? null,
+      handoff: readHandoff(s.handoffFile)?.body ?? null,
       receipts: s.receipts,
       limits: {
         deadline: limits.deadline,

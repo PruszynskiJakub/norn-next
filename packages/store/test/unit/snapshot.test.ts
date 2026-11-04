@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import {
   appendReceipt,
   currentRound,
   loadSnapshot,
+  loadUnit,
   pinWorkflow,
   storyDir,
   startDir,
@@ -12,6 +13,7 @@ import {
   storyUnitDir,
   unitDir,
   writeHandoffHeader,
+  handoffPath,
   writeSliceFile,
   writeState,
   writeStoryFile,
@@ -31,7 +33,7 @@ function seed(root: string, title = "Fix login") {
   appendReceipt(u1, receipt());
   appendReceipt(u1, receipt());
   writeState(u1, state({ applied_through: 1 }));
-  writeHandoffHeader(u1, "header");
+  writeHandoffHeader(handoffPath(spec, "01-add-form"), "header");
   return spec;
 }
 
@@ -92,5 +94,23 @@ describe("the story's current round (gh-71 D2, S5)", () => {
     pinWorkflow(join(spec, "runs/_story/rounds/01-triage"), WORKFLOW_YAML);
     expect(currentRound(spec)).toBeNull();
     expect(startDir(spec, "_story", "triage")).toBe(join(spec, "runs/_story/rounds/01-triage"));
+  });
+});
+
+describe("a unit's handoff has its own resolver (gh-195 prefactor 2, B6, B39)", () => {
+  test("keyed by the unit, not by its record folder: the story's stays above its rounds, a slice's is in its folder", () => {
+    const spec = storyDir(tmp(), "gh-12", "fix-login");
+    const r2 = join(spec, "runs/_story/rounds/02-story");
+    pinWorkflow(r2, WORKFLOW_YAML);
+    writeState(r2, state());
+    expect(storyUnitDir(spec)).toBe(r2);
+    expect(handoffPath(spec, "_story")).toBe(join(spec, "runs/_story/handoff.md"));
+    expect(handoffPath(spec, "01-add-form")).toBe(join(spec, "runs/01-add-form/handoff.md"));
+    writeHandoffHeader(handoffPath(spec, "_story"), "story header");
+    const root = spec.slice(0, spec.indexOf("/.agents/"));
+    const u = loadUnit(root, { key: "gh-12", spec_dir: relative(root, spec) }, { story: "gh-12", slice: null, dir: "_story", key: "gh-12" });
+    expect(u.path).toBe(r2);
+    expect(u.handoffFile).toBe(join(spec, "runs/_story/handoff.md"));
+    expect(u.handoff?.header).toBe("story header");
   });
 });

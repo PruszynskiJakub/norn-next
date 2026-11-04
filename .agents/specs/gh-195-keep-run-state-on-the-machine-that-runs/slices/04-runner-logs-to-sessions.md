@@ -2,7 +2,7 @@
 id: gh-195/04
 title: Headless session logs move to the machine dir's sessions/
 depends_on: []
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }

@@ -14,7 +14,6 @@ import { type ReceiptOf, type UnitState, type Workflow, ulid } from "@norn/schem
 import {
   acquireRunLease,
   appendHandoffHeartbeat,
-  recordPaths,
   listLeases,
   readEnvNorn,
   releaseLease,
@@ -24,6 +23,7 @@ import {
 } from "@norn/store";
 import { ensureShim, withNornOnPath } from "../shim.ts";
 import { type ActEnv, QueueFull, ReceiptTaken } from "./env.ts";
+import type { UnitLoc } from "../observe/index.ts";
 
 // ------------------------------------------------------------ runner
 
@@ -179,6 +179,12 @@ export async function applyReceipts(act: ActEnv, a: Extract<Action, { kind: "app
   return { ok: true, detail: { ...committed, released, delivered, ...(a.kill ? { killed } : {}), ...(resumed ? { session: resumed } : {}) } };
 }
 
+/**
+ * What the session-start commit stages (R2.1): the unit's record folder and its handoff, each from its own
+ * resolver (gh-195 prefactor 2); the handoff once when it sits inside the record folder (a slice's).
+ */
+const startedPaths = (loc: UnitLoc) => (loc.handoffFile.startsWith(`${loc.runsDir}/`) ? [loc.runsDir] : [loc.runsDir, loc.handoffFile]);
+
 export async function startRun(act: ActEnv, a: Extract<Action, { kind: "start_run" }>): Promise<ActionResult> {
   const loc = act.unitLoc(a.unit);
   const { session, lease } = await launchAfterReceipts(act, a.unit, loc.runsDir, a.receipts, a.launch);
@@ -186,7 +192,7 @@ export async function startRun(act: ActEnv, a: Extract<Action, { kind: "start_ru
   const state = a.state ? recordSession(act, a.unit, loc.runsDir, a.state, a.receipts, session) : null;
   if (state) act.writeUnitState(a.unit, loc.runsDir, state);
   // R2.1 (N6): commit and push the started receipts now — only runs/, never the agent's fresh work
-  const committed = await act.commit(a.commit, a.unit, state, `${a.rule}: ${a.step} run ${a.launch.run_id}`, a.commit ? recordPaths(loc.runsDir).map((p) => relative(a.commit?.cwd ?? "", p)) : undefined);
+  const committed = await act.commit(a.commit, a.unit, state, `${a.rule}: ${a.step} run ${a.launch.run_id}`, a.commit ? startedPaths(loc).map((p) => relative(a.commit?.cwd ?? "", p)) : undefined);
   return { ok: true, detail: { session, lease, ...committed } };
 }
 
@@ -291,6 +297,6 @@ async function snapshotRun(act: ActEnv, unit: UnitRef, runId: string, req: { tra
   const diff = req.cwd ? await act.git.diffStat(req.cwd, "HEAD").catch(() => "") : "";
   const text = [`# snapshot ${unit.key} run ${runId}`, `head: ${head ?? "?"}`, "", "## last assistant message", last ?? "(none)", "", "## diff --stat HEAD", diff || "(clean)"].join("\n");
   const rel = writeTranscriptSnapshot(act.root, /^[0-9A-Z]{26}$/.test(runId) ? runId : "unknown", ulid(act.ctx.clock.now()), text);
-  if (existsSync(loc.runsDir)) appendHandoffHeartbeat(loc.runsDir, `- silent: last message snapshot in trace/${rel}`);
+  if (existsSync(loc.runsDir)) appendHandoffHeartbeat(loc.handoffFile, `- silent: last message snapshot in trace/${rel}`);
   return rel;
 }

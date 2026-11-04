@@ -187,7 +187,7 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
 
   const snapshot = loadStory(storyWt, join(storyWt, spec_dir));
   const units: UnitView[] = [];
-  const view = (unit: string, wt: string | null, runsDir: string): UnitView => {
+  const view = (unit: string, wt: string | null, runsDir: string, handoff: string): UnitView => {
     const st = readState(runsDir);
     return {
       unit,
@@ -195,10 +195,11 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
       step: st.ok ? st.value.step : null,
       status: st.ok ? st.value.status : null,
       park: st.ok ? (st.value.park ?? null) : null,
-      handoff: readText(handoffPath(runsDir)),
+      handoff: readText(handoff),
     };
   };
-  units.push(view(key, storyWt, storyRuns));
+  const storyHandoff = handoffPath(join(storyWt, spec_dir), STORY_UNIT_DIR);
+  units.push(view(key, storyWt, storyRuns, storyHandoff));
   const sliceRefs = new Set(
     (await git.listRefs(root, remote ? `refs/remotes/${remote}/${key}/` : `refs/heads/${key}/`)).map((r) => r.ref.replace(remote ? `refs/remotes/${remote}/` : "refs/heads/", "")),
   );
@@ -212,7 +213,7 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
       if (await checkout({ path, branch: sb, story: key, slice: s.key, unit: dir, spec_dir }, s.key)) wt = wtByBranch.get(sb) ?? path;
     }
     const runs = runStateDir(wt ?? storyWt, run, dir);
-    if (existsSync(runs)) units.push(view(s.key, wt, runs));
+    if (existsSync(runs)) units.push(view(s.key, wt, runs, handoffPath(join(wt ?? storyWt, spec_dir), dir)));
   }
 
   // ---- commit the take receipt (R10.1) and journal a forced take (T5): claim blob `forced_from` +
@@ -221,12 +222,12 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
   let committed: { commit: string | null; pushed: boolean | null } | null = null;
   const runsDir = storyRuns;
   const line = forced ? `- ${nowIso} take --force by ${holder} from ${blob.forced_from}` : null;
-  if (line && existsSync(runsDir)) appendHandoffHeartbeat(runsDir, line);
+  if (line && existsSync(runsDir)) appendHandoffHeartbeat(storyHandoff, line);
   const extra = more?.({ storyWt, spec_dir, worktrees });
   if (record.receipt || (line && existsSync(runsDir)) || extra?.paths.length) {
     const paths = [
       ...(record.receipt ? [relative(storyWt, join(runsDir, "receipts", record.receipt))] : []),
-      ...(line ? [relative(storyWt, handoffPath(runsDir))] : []),
+      ...(line ? [relative(storyWt, storyHandoff)] : []),
       ...(extra?.paths ?? []),
     ];
     const message = extra?.message ?? (forced ? `norn: ${key} taken with --force by ${holder}` : `norn: ${key} taken by ${holder}`);
