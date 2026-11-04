@@ -2,7 +2,7 @@
 id: gh-195/02
 title: Give a unit's handoff its own resolver
 depends_on: []
-status: planned
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
