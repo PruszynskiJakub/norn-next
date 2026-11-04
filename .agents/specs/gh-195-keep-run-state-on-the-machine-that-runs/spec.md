@@ -37,7 +37,7 @@ Run state lives on the machine that runs the story, in that checkout's machine d
 
 A team picks one of two **record policies** in its team config:
 
-- **local** (the default): the record leaves the machine only when the claim is released (`story handoff`, a clean `watch` exit, `story close`), from the PR step until merge (so the PR can link evidence), and once at the end as the archive.
+- **local** (the default): the record leaves the machine only when the claim is released (`story handoff`, a clean `watch` exit, `story close`), each time `open-pr` opens or updates the PR (so the PR can link evidence), and once at the end as the archive.
 - **remote**: the record is pushed to the ref at every step boundary as well, so another machine can always see the current step and take over with the full record even if the holder dies.
 
 Taking over reads the ref when there is one. When there is none (a local-policy holder that died without releasing), `story checkout` restarts the last step from the branch's code with fresh counters, and says the record was lost. When a story finishes, its record stays on the ref for `run list`, `run view` and `norn-retro`; the base branch never receives it. Open stories and the run state already on main are moved over by the next tick and by `norn upgrade`.
@@ -80,8 +80,8 @@ Taking over reads the ref when there is one. When there is none (a local-policy 
 - B10 As a team under `remote`, I want the record pushed to `refs/norn/runs/<story>` at every step boundary right after the branch push, so that any machine can see and take over the current state.
   Example: gh-9 under `remote` finishes implement; the branch and then the ref are pushed; on another machine `story view gh-9` shows "Step: review (attempt 1)".
 
-- B11 As a team under `local`, I want the record pushed only on a claim release, from the PR step until merge (B28) and at the end (B29), so that a normal step costs no extra push.
-  Example: gh-9 under `local` runs implement, review and qa; `git ls-remote origin 'refs/norn/runs/*'` lists no ref for gh-9 until a claim release or the PR step.
+- B11 As a team under `local`, I want the record pushed only on a claim release, when `open-pr` runs (B28) and at the end (B29), so that a normal step costs no extra push.
+  Example: gh-9 under `local` runs implement, review and qa; `git ls-remote origin 'refs/norn/runs/*'` lists no ref for gh-9 until a claim release or `open-pr`.
 
 - B12 As a team that changes its policy while stories are open, I want the new policy to apply from each story's next boundary, so that open stories follow without waiting.
   Example: a team switches `local` → `remote` while gh-9 is in review; gh-9's next boundary pushes its ref, and every boundary after it does too.
@@ -117,7 +117,7 @@ Taking over reads the ref when there is one. When there is none (a local-policy 
   Example: `norn story answer gh-9 "use option b"` on a non-holder posts to the mailbox and replies "sent to kuba@laptop; the holder checks it against the step it is at (last boundary: refine)". Under `remote` the sender stamps step and attempt from the ref, as it does from the branch today.
 
 - B21 As the holder, I want a mailbox receipt whose step or attempt no longer matches to show as a Check item in my inbox, besides the trace, so that a stale answer never vanishes silently.
-  Example: an answer stamped for refine arrives after gh-9 moved to plan; the holder's tick rejects it, and `norn status` on the holder shows a Check item "answer from ana@desk for gh-9 was rejected: gh-9 is at plan now". The item clears when the person dismisses it or the story finishes.
+  Example: an answer stamped for refine arrives after gh-9 moved to plan; the holder's tick rejects it, and `norn status` on the holder shows a Check item "answer from ana@desk for gh-9 was rejected: gh-9 is at plan now". The item clears on its own when a later answer or approval for gh-9 is accepted, or when the story finishes; there is no dismiss command.
 
 ### Takeover
 
@@ -142,7 +142,7 @@ Taking over reads the ref when there is one. When there is none (a local-policy 
 ### PR evidence
 
 - B28 As a reviewer of a PR, I want the QA evidence the PR body cites to render inline, so that I see the screenshots without the evidence being on the branch.
-  Example: the PR step pushes gh-9's record to its ref before it writes `pr.md`; the body links each evidence file by the ref's commit, and on GitHub `![B2 after](…)` shows the image in the PR. Under `local`, each boundary from the PR step until merge pushes the ref again so the links stay valid.
+  Example: the describe agent writes `![B2 after](evidence/01-parser/01ABC/shot.png)` in `pr.md`, a path inside the story's record; `open-pr` pushes gh-9's record to its ref, rewrites each such link to that record commit's URL on GitHub or GitLab, and then opens or updates the PR, where the image shows inline. A later `open-pr` after rework pushes and rewrites again; links in an older body stay valid, since every record commit stays reachable from the ref.
 
 ### The archive
 
@@ -197,4 +197,113 @@ Taking over reads the ref when there is one. When there is none (a local-policy 
 None. One fact to verify first in planning: that GitHub and GitLab render an image linked from a commit reachable only through a `refs/norn/runs/*` ref (B28). If they do not, the fallback in Out of scope comes back as a decision for the person.
 
 ## Plan
-Written by the `norn-plan` skill.
+
+Every seam, prefactor and decision below was agreed with the person in the plan interview (2026-11-04).
+
+### Seams
+
+- **S1 The cli harness, through `runCli` and the tick, on clones of one bare remote (agreed).** A second machine is a second clone of the same bare remote with its own norn home, user and machine name; the remote's refs (`git ls-remote`), the branch trees, command output, `norn status`/`story view`/`brief` and the machine dir are what a test observes. Only the issue/PR provider, the runner and the clock are faked (`FakeRemote`, `FakeRunner`, `FakeClock`); git, the remote's refs and the file system are real. Observes B2–B27, B29–B37, B39.
+  Prior art: the cli integration tests of handoff/checkout across clones (`team`), claim lost and recovery (`recovery`), mailbox from another machine (`human`), merge cleanup and the base record (`records`, `housekeeping`), upgrade from an older layout (`upgrade`, `round-folders`), the machine dir (`machine-dir`), config edits and doctor (`config`, `doctor`).
+- **S2 Multi-tick stories in the e2e tier, through the same harness (agreed).** A whole story driven tick by tick, with the effect transcripts and the observe snapshots. Observes B1 (no run-state path in any branch or PR), and pins the new effects (ref pushes, machine-dir writes) in the rewritten transcripts.
+  Prior art: the slice-workflow, base-sync and recovery transcripts; the observe snapshots; the team story.
+- **S3 The docs lint, through the unit tier (agreed).** Observes B38: no rule id lost or defined twice (S10 kept as retired), links and anchors resolve, commands and flags exist.
+  Prior art: the docs lint and the glossary lint in the repo tests.
+- **S4 A person on a real GitHub and GitLab PR (agreed).** Observes B28's inline rendering, which no harness can observe. S1 observes the rest of B28: `open-pr` pushes the ref, then sends a body whose record paths are rewritten to that commit's URLs.
+
+### Coverage
+
+| Behaviour | Seam | Test kind | Notes |
+|---|---|---|---|
+| B1 | S2 | e2e | slice-workflow story to PR: no `runs/` in any branch tree or PR file list |
+| B2 | S1 | integration | `git status` clean of run state; `git clean -fdx` then tick goes on at the same step and attempt |
+| B3 | S1 | integration | remove the story worktree while parked on an ask; `story start` recreates it; same ask, same attempt |
+| B4 | S1 | integration | a bad receipt in the machine dir marks the unit corrupt; parallel slices write only their own folder; crash between receipt and state re-applies |
+| B5 | S1 | integration | boundary commit holds the agent's files and the handoff, S4 trailers, no run-state file |
+| B6 | S1 | integration | a boundary with no handoff edit leaves the handoff out of the commit; no generated block in the file |
+| B7 | S1 | integration | `brief` and `story checkout` print the status block above the handoff text |
+| B8 | S1 | integration | an old handoff with header and heartbeat blocks loses them at the first boundary, prose kept |
+| B9 | S1 | integration | absent key = local; `config set --repo`; `config get` names the file; doctor fails an unknown value |
+| B10 | S1 | integration | under remote, branch then ref pushed at a boundary; other clone's `story view` shows the new step |
+| B11 | S1 | integration | under local, no ref on the remote through implement, review, qa |
+| B12 | S1 | integration | switch local → remote mid-story; next boundary pushes the ref |
+| B13 | S1 | integration | after remote → local, the other clone labels the ref "record as of …" |
+| B14 | S1 | integration | ref push rejected once (remote hook), step goes on, next tick pushes it |
+| B15 | S1 | integration | `story handoff` pushes branches and ref, then deletes the claim; message names both commits |
+| B16 | S1 | integration | ref push rejected: claim kept, refusal exit 3; `watch` exit keeps the claim and says so |
+| B17 | S1 | integration | non-holder view of a remote story: step, attempt, counters from the ref |
+| B18 | S1 | integration | non-holder view of a local story: claim, branch, last boundary step, PR and CI, where the record is |
+| B19 | S1 | integration | no boundary commit yet: "no boundary pushed yet" |
+| B20 | S1 | integration | non-holder answer stamped from the last boundary (local) or the ref (remote); reply names the holder |
+| B21 | S1 | integration | stale mailbox receipt rejected and shown as a Check item on the holder |
+| B22 | S1 | integration | handoff then checkout on the other clone resumes the same step, attempt and counters |
+| B23 | S1 | integration | branch ahead of the record's commit: checkout continues |
+| B24 | S1 | integration | branch force-pushed: record kept, step restarted as a new attempt with the reason in the brief |
+| B25 | S1 | integration | holder gone, no ref: forced checkout starts a new round at the last boundary's step, `take` says `record_lost` |
+| B26 | S1 | integration | machine dir deleted on the holder: `checkout --force` on the same clone recovers |
+| B27 | S1 | integration | old holder's next tick sets its record aside as superseded, one Check item; tidy removes it after retain |
+| B28 | S4 | person | S1 checks that `open-pr` pushes the ref and rewrites record paths in the body sent to `FakeRemote` to that commit's URLs; a person checks rendering on GitHub and GitLab |
+| B29 | S1 | integration | merge: final record on the ref, base branch gains no run state; `run list` on a fresh clone reads the ref |
+| B30 | S1 | integration | a fresh clone and a sync fetch no `refs/norn/runs/*` but the one a command needs |
+| B31 | S1 | integration | `tidy` lists and deletes no run-state ref |
+| B32 | S1 | integration | close without PR, reopen issue, `story reopen` unpacks and is at `$done` |
+| B33 | S1 | integration | a story without a branch is handed over and checked out without the ancestry check |
+| B34 | S1 | integration | a story with `runs/` on its branch (older layout fixture) moves at the first tick, one commit, same step and attempt |
+| B35 | S1 | integration | `upgrade` on a base with run state: refs pushed, removal staged, `.gitattributes` line removed, nothing committed; rerun pushes only missing refs |
+| B36 | S1 | integration | one ref push rejected: that story's run state stays, others staged, the story named |
+| B37 | S1 | integration | `init` writes no `.gitattributes` norn line |
+| B38 | S3 | unit | docs lint; content checked in review |
+| B39 | S1 | integration | story handoff on the story branch, slice handoff on the slice branch under `handoffs/`; old handoff moved at the first boundary |
+
+### Prefactoring
+
+1. **The run-state resolver takes the checkout, the story and the unit, not a spec folder in a worktree (agreed).** Today every caller joins a worktree path with the spec folder and hands the result to the resolver, and each caller picks its own worktree. After this change every reader and writer asks the resolver for `(checkout, story, unit)`, and the folder is unchanged. The move to the machine dir then changes one function instead of about thirty callers (B2–B4, B34).
+2. **One resolver for a unit's handoff, independent of its record folder (agreed).** The handoff path is derived from the record folder today (it sits above the round folders). Giving it its own resolver, location unchanged, lets B39 move it to `handoffs/<unit>.md` without touching record readers (B6, B8, B39).
+3. **The sync fetch names the claim and mailbox prefixes instead of all of `refs/norn/*` (agreed).** No other norn ref exists yet, so behaviour is unchanged; without it every sync would fetch every archive (B30).
+4. **The headless runner's session logs move from the machine dir's `runs/` to `sessions/` (agreed).** S12 puts run state at `runs/<story>/<unit>/` in the machine dir, where the runner's logs sit today. The logs are machine-local and disposable; old ones are left for `tidy` (D1).
+
+### Implementation decisions
+
+- D1 **Run state lives at `<machine dir>/runs/<story>/<unit>/` as S12 says; the runner's session logs move out to `sessions/` (agreed).** The rules already name the path, so the runner's logs give way rather than the rules. The alternative, a different name for run state such as `records/`, would mean amending S12 and §7.
+- D2 **A record is one commit whose tree is the story's run-state folder as it is in the machine dir (agreed).** That means `_story/rounds/NN-<wf>/…` and each slice's `<nn>-<slug>/…`, with no wrapper folder. Its parent is the previous record commit of the ref, so the ref's history is the story's push history and blobs dedupe. Its trailers are `Norn-Story`, `Norn-Branch-Commit` (absent for a story without a branch, B33) and `Norn-Holder`. The commit time is what "record as of" shows (B13). It is pushed with a lease on the sha this checkout last saw, as claims are, so two holders never overwrite each other. The alternative, a parentless snapshot force-pushed each time, beat on simplicity but loses the push history and the lease.
+- D3 **Pack and unpack live in store, next to claims and mailbox, using git plumbing directly (agreed).** Pack uses a temporary index over the folder, `write-tree` and `commit-tree`. Unpack extracts into a temp folder, validates every JSON file against the schema (S2), then renames into place, so S1 holds. Claims and mailbox already do their ref work in store, so the git port stays as it is. The alternative was new git port methods with a contract run; it would add a second home for ref plumbing.
+- D4 **When the record is owed is decided by decide, from facts (agreed).** Observe reports per held story the record's local tree id and the last pushed one, kept machine-local, plus the policy read from the team config at every tick (B12). Under `remote`, decide emits a new `push_record` action after the branch push when the tree changed. A failed push leaves the record owed, so the next tick retries it (B14). Claim releases (B15, B16) and the archive (B29) call the same store push synchronously and stop on failure. The alternative was a flag on the boundary commit. It would not retry on its own and would bind the push to a commit.
+- D5 **The PR's evidence links are made by `open-pr`, not by the agent (agreed).** The describe agent links evidence in `pr.md` by a path inside the story's record: `evidence/<unit>/<run_id>/<file>`, where `<unit>` is `_story` or `<nn>-<slug>`. Before it opens or updates the PR, `open-pr` pushes the story's record (synchronously; a failed push fails the git step, which is retried as git steps are). It then rewrites each such link to the file's URL at that record commit: `…/blob/<commit>/<path>?raw=true` on GitHub, `…/-/raw/<commit>/<path>` on GitLab, where `<path>` is the file's real path in the record (the story's current round for `_story`). A link to a file the record does not hold is left as written and named in the step's output. Since every record commit stays reachable from the ref (D2), an older body's links stay valid, and no boundary between `open-pr` and merge pushes the record for the PR's sake (S11, GR9 and B11, B28 amended).
+  The describe step still needs to know where the QA reports and evidence sit, since its `{ file: runs/ }` input names a folder no longer in the worktree. A new input kind, `record`, lists each unit's receipts and evidence folders in the machine dir in the brief, and replaces that input in the shipped and repo-local `story` workflows. It changes the workflow schema, so `schema:emit` and the reference docs are regenerated. The norn-pr skill's linking rule changes to record paths. The alternative, a workflow-declared "PR step" that pushes before its session and at every boundary until merge, beat nothing once `open-pr` does it.
+- D6 **Non-holders read other machines' records from local refs, fetched by the tick (agreed).** A tick fetches `refs/norn/runs/<story>` only for open stories this checkout shows and another heartbeat holds. `run list`, `run view`, `story reopen`, `story checkout` and `story answer|approve` fetch the one story they need. The view and status never touch the network: they read the local ref, unpacked once per record commit into a cache in the machine dir, the way the base branch's specs are cached today. A local-policy story with no ref falls back to the claim, the remote-tracking story branch and its last `Norn-Step` trailer (B18, B19).
+- D7 **The snapshot reads run state from the machine dir for every story; spec and frontmatter still come from worktrees, the base and the main checkout (agreed).** A finished story's run state is read from its archive ref, fetched on demand, instead of the base branch's tree (B29). `UnitFacts.record` becomes the unit's path inside the story record (`_story/rounds/02-story`, `01-parser`). Golden cases change only in that path and in commit path lists, rewritten with `golden --update`.
+- D8 **A boundary commit stages the agent's work and the unit's handoff, never run state (agreed).** It still uses `git add -A` over the worktree, which no longer holds run state. `commit_push`, session start and checkout stop passing record paths. The `uncommitted` fact covers the handoff and the agent's files only (B5, B6).
+- D9 **Handoffs live at `<spec folder>/handoffs/<unit>.md` (agreed).** `_story.md` is on the story branch; `<nn>-<slug>.md` is on the slice branch and reaches the story branch with the slice's integration. The status block is rendered from `state.json` by `brief` and `story checkout` (`renderHandoffStatus`, kept). Nothing writes into the file but agents, people, and the one-time removal of an old header or heartbeat block (B6–B8, B39).
+- D10 **Takeover (agreed).** Checkout fetches the ref.
+  - **A ref exists.** Unpack it, then compare `Norn-Branch-Commit` with the story branch head:
+    - an ancestor: continue (B23);
+    - not an ancestor: keep the record and restart the cursor's step as a new attempt, with the reason in "Why this attempt" (B24);
+    - no branch: skip the check (B33).
+  - **No ref.** Start a new round from the frontmatter's workflow, pinned from the branch, at the last `Norn-Step` trailer's step or the first step (B25).
+  The `take` receipt gains `record_lost: boolean`, a schema change (R10.1). A forced checkout on the holder's own clone after its machine dir was wiped goes the same way (B26).
+- D11 **Superseded records replace `unpushed_runs` and `orphaned/` (agreed).** Observe reports, per story held by another heartbeat, a local record under `runs/<story>/`. The tick moves it to `<machine dir>/superseded/<story>-<ulid>/` and never pushes it. One Check item `superseded:<story>:<last receipt>` shows until `tidy` deletes the copy older than `trace.retain` (B27).
+- D12 **A rejected mailbox receipt is kept machine-local with its reason and shown as a Check item (agreed).** Kept next to the notices; the trace keeps it too. It clears on its own when a later answer or approval for the story is accepted, or when the story finishes. There is no dismiss command (B21 and T9 amended).
+- D13 **Open-story migration is decided, not hard-wired (agreed).** Observe reports `runs/` still on a held unit's branch. decide emits `move_record` per unit. Its act:
+  1. copies the files into a temp folder in the machine dir, validates them and renames into place;
+  2. moves the old `runs/<unit>/handoff.md` to `handoffs/<unit>.md` with the generated blocks stripped;
+  3. removes `runs/` from the branch in one commit "norn: move gh-9 run state off the branch";
+  4. pushes the branch, then the ref under `remote`.
+  A machine dir that already holds the record with `runs/` still on the branch only finishes the removal (S5, B34). A flat record (RD7) is moved into `rounds/01-<wf>/` in the same step.
+- D14 **`norn upgrade` packs each finished story from the base tree without unpacking (agreed).** The `runs/` subtree of each spec folder on the base is already a tree object, so its record commit is `commit-tree` of that subtree. The refs are pushed in one batch with a lease of "absent" each. A story whose push is rejected keeps its run state; for every other story the removal is staged, and the `.gitattributes` line removal too (B35–B37, LY3).
+- D15 **GR6 and GR6b push the final record first and clean up only after it is on the remote (agreed).** A failed archive push leaves the cleanup owed and retried, as an owed base record is today (B29).
+
+### Testing decisions
+
+- A test drives what a person or the tick does (`runCli`, `h.tick()`) and checks what anyone can see: the remote's refs and their trees, branch trees and commit trailers, command output, `norn status`, the machine dir's files. Never the store's functions or decide's actions directly.
+- Faked: only the system boundaries the harness already fakes: the issue and PR provider, the runner and the clock. git, the bare remote and its refs, and the file system are real. A rejected ref push is a real `pre-receive` hook on the bare remote, not a fake.
+- A second machine is a second clone with its own norn home, user and machine name, sharing the fake remote and clock (the team and recovery tests' `cloneOf`).
+- The golden corpus is rewritten with `golden --update`, its diff reviewed as the behaviour change (record paths, commit paths, the new `push_record` and `move_record` actions); `bun run golden` harvests cases for the new rule ids (S11, S12, T5a, T5b, T7a, T7d).
+- The three effect transcripts and the five observe snapshots are rewritten once, and the diff is reviewed: run state disappears from the branch, and the machine-dir writes and ref pushes appear.
+- Older-layout fixtures (`runs/` on a branch, on the base, a flat record) are built with the harness's layout helpers, not by hand.
+
+### Risks
+
+- **B28 on GitHub is verified; on GitLab it is not.** Verified 2026-11-04 on this repository. A throwaway commit holding one PNG, reachable only through `refs/norn/spike/gh-195`, was served at `…/blob/<commit>/<path>?raw=true` (a 302 to raw.githubusercontent.com, `image/png`). GitHub's markdown renderer turned it into an inline `<img>` exactly as it does for a branch link. The ref was then deleted. GitLab (`/-/raw/<commit>/<path>`) is checked by a person in QA (S4); if it fails there, the fallback in Out of scope comes back for GitLab only.
+- **Blast radius.** About 35 test files, 56 golden cases, 3 transcripts and 5 snapshots name `runs/` paths. The slicing should land the prefactors first, then a tracer slice that moves the location with the open-story migration (B2–B5, B34) and rewrites these once. Every later slice then adds behaviour on a green base.
+- **Packing while a detached check-run writes a receipt.** Receipts are written atomically and state last, so a pack can only catch a receipt ahead of its state, which S6 re-applies on unpack. The tracer slice's test should pack in the middle of a check.
+- **Record size under `remote`.** Every boundary pushes evidence again. Unchanged blobs dedupe, so only new evidence costs a push, and the chain of commits (D2) keeps that true.
+- **This repository migrates itself.** Its open stories move at the first tick of the released norn that has this change. Run the migration on a copy of this repo's base before release.
