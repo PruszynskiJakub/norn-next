@@ -853,7 +853,7 @@ describe("trace retention: norn tidy prunes old hook files, briefings and transc
   const exists = (rel: string) => existsSync(join(trace(), rel));
   /** gh-3 merged 30 days ago, gh-4 touched two days ago, gh-9 live since 20 days ago; runs that ended 20 days ago and yesterday. */
   const stage = () => {
-    for (const d of ["hooks", "briefings", "transcripts"]) rmSync(join(trace(), d), { recursive: true, force: true });
+    for (const d of ["hooks", "briefings", "transcripts", "runs"]) rmSync(join(trace(), d), { recursive: true, force: true });
     for (const n of readdirSync(trace())) if (/^\d{4}-\d{2}-\d{2}(\.chunks)?\.jsonl$/.test(n)) safeUnlink(join(trace(), n)); // the ticks' day pairs, pruned by 08's tests
     put("hooks/gh-3/_story.jsonl", 30, "a".repeat(40));
     put("hooks/gh-3/01.jsonl", 30, "b".repeat(10));
@@ -937,5 +937,23 @@ describe("trace retention: norn tidy prunes old hook files, briefings and transc
     const again = await h.norn("tidy");
     expect(again.exit).toBe(0);
     expect((again.value as Tidy).trace).toEqual({ retain: "14d", days: [], hook_files: [], runs: [], bytes: 0 });
+  });
+
+  test("gh-195 B2: session logs an older norn left in the machine dir's runs/ go with their run once past the window; newer and live ones stay", async () => {
+    stage();
+    const OLD_LOG = ulid(T0 - 21 * DAY);
+    put(`runs/${OLD_LOG}.log`, 20, "e".repeat(25));
+    put(`runs/${RECENT}.log`, 1);
+    put(`runs/${liveRun}.log`, 20);
+    const dry = await h.norn("tidy", "--dry-run");
+    expect(dry.exit).toBe(0);
+    const old = { run_id: OLD_LOG, files: [`runs/${OLD_LOG}.log`], bytes: 25 };
+    expect((dry.value as Tidy).trace.runs).toEqual([...RUNS, old].sort((a, b) => (a.run_id < b.run_id ? -1 : 1)));
+    expect(exists(`runs/${OLD_LOG}.log`)).toBe(true);
+    const r = await h.norn("tidy");
+    expect((r.value as Tidy).trace.runs).toContainEqual(old);
+    expect(exists(`runs/${OLD_LOG}.log`)).toBe(false);
+    expect(exists(`runs/${RECENT}.log`)).toBe(true);
+    expect(exists(`runs/${liveRun}.log`)).toBe(true);
   });
 });

@@ -39,9 +39,9 @@ describe("headless runner (real processes)", () => {
     expect(await runner.output?.({ runner: "headless", session_id: "01JNONE" })).toBeNull();
   });
 
-  test("without log_dir, logs go to store's runner log dir for the checkout: the trace dir's runs/, as before", async () => {
+  test("without log_dir, logs go to store's runner log dir for the checkout: the machine dir's sessions/ (gh-195 B2, D1)", async () => {
     const root = mkdtempSync(join(tmpdir(), "norn-headless-"));
-    expect(runnerLogDir(root)).toBe(join(machineDir(root), "runs"));
+    expect(runnerLogDir(root)).toBe(join(machineDir(root), "sessions"));
     mkdirSync(runnerLogDir(root), { recursive: true });
     copyFileSync(join(import.meta.dir, "fixtures", "claude-prompt-swallowed.log"), logPath(runnerLogDir(root), "01JRUN"));
     const runner = headlessFactory({ repoRoot: root } as AdapterContext, { adapter: "headless" });

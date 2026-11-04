@@ -128,8 +128,10 @@ export const machineDir = (root: string) => join(machineReposDir(machineHomeOf(r
 export const machineReposDir = (home: string) => join(home, "repos");
 /** D3: names the checkout a machine dir belongs to, so doctor can tell an orphan after a repo folder moved. */
 export const checkoutFilePath = (dir: string) => join(dir, "checkout.json");
-/** D9: the headless runner's default session log dir: machine-local, in the machine dir. */
-export const runnerLogDir = (root: string) => join(machineDir(root), "runs");
+/** D9, gh-195 D1: the headless runner's default session log dir, the machine dir's `sessions/` (`runs/` holds run state, S12). */
+export const runnerLogDir = (root: string) => join(machineDir(root), "sessions");
+/** gh-195 D1: where an older norn wrote the headless runner's session logs (`<run_id>.log`); left for `tidy`. */
+export const oldRunnerLogDir = (root: string) => join(machineDir(root), RUNS_DIR);
 /** Local tick lock (H1); in the machine dir. */
 export const tickLockPath = (root: string) => join(machineDir(root), "tick.lock");
 /** D6: where an older norn took the tick lock; `norn upgrade` takes it there. */

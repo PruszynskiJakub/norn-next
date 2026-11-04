@@ -14,6 +14,16 @@
 
 ## Goal
 
+Headless runner session logs go to `<machine dir>/sessions/<run_id>.log` instead of `runs/` (gh-195 D1, B2); `norn tidy` prunes old `runs/*.log` past `trace.retain`.
+
 ## Progress
 
+- AC1: store `runnerLogDir` now `machineDir/sessions`; new `oldRunnerLogDir` (`machineDir/runs`). Tests: unit `packages/adapters/test/unit/headless/headless.test.ts` (default dir), integration `packages/adapters/test/integration/headless/headless.test.ts` (factory launch writes sessions/<run>.log, no runs/, `output` reads it). `run attach`/`run view` read the log through the runner port, so unchanged.
+- AC2: store `listRunTraces` also lists `runs/<run_id>.log` files as part of their run, so tidy's existing D12 run pruning (not live, newest older than window) lists and deletes them; output shape unchanged (`trace.runs[].files` may hold `runs/<run>.log`). Test in `packages/cli/test/integration/housekeeping.test.ts` (B28–B32 describe).
+- Decision: new `sessions/*.log` are not pruned by tidy (out of this slice's AC; logs were never pruned before). Candidate follow-up.
+- tidy summary updated; `docs:emit` regenerated docs/reference.md.
+- Slice 01's runs/ lint exception is not on this branch (no exception to update here); when merged, the exception `join(machineDir(root), "runs")` no longer exists: paths.ts now uses `RUNS_DIR` in `oldRunnerLogDir`.
+
 ## Resume
+
+Done: run integration and e2e tiers, then `norn done done`.
