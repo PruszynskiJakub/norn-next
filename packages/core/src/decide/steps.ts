@@ -10,6 +10,7 @@ import {
   type UnitState,
   type Workflow,
   recordRunStatePath,
+  normalRecord,
   unitRecordPath,
 } from "@norn/schema";
 import type { RunGitAction, WorktreeSpec } from "../actions.ts";
@@ -61,9 +62,9 @@ export function usableWorkflow(ctx: Ctx, name: string, level: UnitLevel): { work
 
 // ---------------------------------------------------------------- check / git
 
-/** gh-71 D2: the unit's record folder relative to its spec folder, as observe resolved it. */
+/** gh-71 D2, gh-195 D7: the unit's record folder relative to the story's run-state folder, as observe resolved it. */
 export function recordOf(uf: UnitFacts): string {
-  return uf.record ?? unitRecordPath(uf.unit.dir);
+  return uf.record !== undefined ? normalRecord(uf.record) : unitRecordPath(uf.unit.dir);
 }
 
 export function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, command: string, timeout_ms: number): void {

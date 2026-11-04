@@ -39,6 +39,7 @@ function sameFile(a: string, b: string): boolean {
  * shown instead; otherwise the cache path is shown and flagged, with the ref to `git show`.
  */
 function recordsOf(repoRoot: string, story: StorySnapshot, remote: string): { records: TraceRecords; runsDir: (u: UnitSnapshot) => string } {
+  if (!story.run_state.tree) return { records: { source: "machine", root: story.run_state.base }, runsDir: (u) => u.path };
   if (!story.from_base) return { records: { source: story.root === repoRoot ? "checkout" : "worktree", root: story.root }, runsDir: (u) => u.path };
   const live = (u: UnitSnapshot) => join(repoRoot, relative(story.root, u.path));
   const pulled = story.units.every((u) => !existsSync(join(u.path, "state.json")) || sameFile(join(u.path, "state.json"), join(live(u), "state.json")));

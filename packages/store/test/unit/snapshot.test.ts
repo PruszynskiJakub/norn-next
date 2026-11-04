@@ -1,17 +1,21 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import {
   appendReceipt,
+  bindNornHome,
   currentRound,
   loadSnapshot,
   loadUnit,
+  machineDir,
   pinWorkflow,
+  runStateDir,
+  runStateStartDir,
+  storyRunStateDir,
   storyDir,
   startDir,
   storyFile,
   storyUnitDir,
-  unitDir,
   writeHandoffHeader,
   handoffPath,
   writeSliceFile,
@@ -28,7 +32,7 @@ function seed(root: string, title = "Fix login") {
   }, "\nspec\n");
   writeSliceFile(join(spec, "slices/01-add-form.md"), { id: "gh-12/01", title: "Add form", depends_on: [], status: "active" }, "");
   writeSliceFile(join(spec, "slices/02-wire-api.md"), { id: "gh-12/02", title: "Wire", depends_on: ["gh-12/01"], status: "planned" }, "");
-  const u1 = unitDir(spec, "01-add-form");
+  const u1 = runStateDir(root, { key: "gh-12", spec_dir: relative(root, spec) }, "01-add-form");
   pinWorkflow(u1, WORKFLOW_YAML);
   appendReceipt(u1, receipt());
   appendReceipt(u1, receipt());
@@ -75,42 +79,65 @@ describe("storyFile (GR2: spec.md, story.md still read)", () => {
 
 describe("the story's current round (gh-71 D2, S5)", () => {
   test("a round folder without state.json (a round.start that stopped after the pin) is not the current round", () => {
-    const spec = storyDir(tmp(), "gh-12", "fix-login");
-    const r1 = join(spec, "runs/_story/rounds/01-triage");
+    const base = tmp(); // a story's run-state folder (S12: `<machine dir>/runs/<story>`)
+    const r1 = join(base, "_story/rounds/01-triage");
     pinWorkflow(r1, WORKFLOW_YAML);
     writeState(r1, state());
-    expect(currentRound(spec)).toEqual({ n: 1, workflow: "triage" });
-    const r2 = join(spec, "runs/_story/rounds/02-story");
+    expect(currentRound(base)).toEqual({ n: 1, workflow: "triage" });
+    const r2 = join(base, "_story/rounds/02-story");
     pinWorkflow(r2, WORKFLOW_YAML);
-    expect(currentRound(spec)).toEqual({ n: 1, workflow: "triage" });
-    expect(storyUnitDir(spec)).toBe(r1);
-    expect(startDir(spec, "_story", "story")).toBe(r1);
+    expect(currentRound(base)).toEqual({ n: 1, workflow: "triage" });
+    expect(storyUnitDir(base)).toBe(r1);
+    expect(startDir(base, "_story", "story")).toBe(r1);
     writeState(r2, state());
-    expect(currentRound(spec)).toEqual({ n: 2, workflow: "story" });
-    expect(storyUnitDir(spec)).toBe(r2);
+    expect(currentRound(base)).toEqual({ n: 2, workflow: "story" });
+    expect(storyUnitDir(base)).toBe(r2);
   });
   test("a story whose round 1 was pinned but never got its state starts in round 1 again", () => {
-    const spec = storyDir(tmp(), "gh-12", "fix-login");
-    pinWorkflow(join(spec, "runs/_story/rounds/01-triage"), WORKFLOW_YAML);
-    expect(currentRound(spec)).toBeNull();
-    expect(startDir(spec, "_story", "triage")).toBe(join(spec, "runs/_story/rounds/01-triage"));
+    const base = tmp();
+    pinWorkflow(join(base, "_story/rounds/01-triage"), WORKFLOW_YAML);
+    expect(currentRound(base)).toBeNull();
+    expect(startDir(base, "_story", "triage")).toBe(join(base, "_story/rounds/01-triage"));
   });
 });
 
-describe("a unit's handoff has its own resolver (gh-195 prefactor 2, B6, B39)", () => {
-  test("keyed by the unit, not by its record folder: the story's stays above its rounds, a slice's is in its folder", () => {
-    const spec = storyDir(tmp(), "gh-12", "fix-login");
-    const r2 = join(spec, "runs/_story/rounds/02-story");
+describe("run state lives in the checkout's machine dir, the handoff in the worktree (S12, gh-195/05, B2, B5)", () => {
+  const story = { key: "gh-12", spec_dir: ".agents/specs/gh-12-fix-login" };
+  test("a unit's run state is `<machine dir>/runs/<story>/<unit>`, the story's current round under `_story/rounds/`", () => {
+    const root = tmp();
+    bindNornHome(root, tmp());
+    expect(storyRunStateDir(root, story)).toBe(join(machineDir(root), "runs/gh-12"));
+    expect(runStateDir(root, story, "01-add-form")).toBe(join(machineDir(root), "runs/gh-12/01-add-form"));
+    expect(runStateStartDir(root, story, "_story", "story")).toBe(join(machineDir(root), "runs/gh-12/_story/rounds/01-story"));
+  });
+  test("keyed by the unit, not by its record folder: the story's handoff stays above its rounds in the worktree, a slice's is in its folder", () => {
+    const root = tmp();
+    bindNornHome(root, tmp());
+    const spec = join(root, story.spec_dir);
+    const r2 = join(storyRunStateDir(root, story), "_story/rounds/02-story");
     pinWorkflow(r2, WORKFLOW_YAML);
     writeState(r2, state());
-    expect(storyUnitDir(spec)).toBe(r2);
+    expect(runStateDir(root, story, "_story")).toBe(r2);
     expect(handoffPath(spec, "_story")).toBe(join(spec, "runs/_story/handoff.md"));
     expect(handoffPath(spec, "01-add-form")).toBe(join(spec, "runs/01-add-form/handoff.md"));
     writeHandoffHeader(handoffPath(spec, "_story"), "story header");
-    const root = spec.slice(0, spec.indexOf("/.agents/"));
-    const u = loadUnit(root, { key: "gh-12", spec_dir: relative(root, spec) }, { story: "gh-12", slice: null, dir: "_story", key: "gh-12" });
+    const u = loadUnit(root, story, { story: "gh-12", slice: null, dir: "_story", key: "gh-12" });
     expect(u.path).toBe(r2);
+    expect(u.record).toBe("_story/rounds/02-story");
     expect(u.handoffFile).toBe(join(spec, "runs/_story/handoff.md"));
     expect(u.handoff?.header).toBe("story header");
+    expect(existsSync(join(spec, "runs/_story/rounds"))).toBe(false);
+  });
+  test("S2: a receipt failing validation is named from the machine dir and marks only its unit", () => {
+    const root = tmp();
+    bindNornHome(root, tmp());
+    const dir = runStateDir(root, story, "01-add-form");
+    pinWorkflow(dir, WORKFLOW_YAML);
+    writeState(dir, state());
+    mkdirSync(join(dir, "receipts"), { recursive: true });
+    writeFileSync(join(dir, "receipts/0001-done.json"), "{}");
+    const u = loadUnit(root, story, { story: "gh-12", slice: "gh-12/01", dir: "01-add-form", key: "gh-12/01" });
+    expect(u.errors.map((e) => e.file)).toEqual(["runs/gh-12/01-add-form/receipts/0001-done.json"]);
+    expect(loadUnit(root, story, { story: "gh-12", slice: null, dir: "_story", key: "gh-12" }).errors).toEqual([]);
   });
 });

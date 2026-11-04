@@ -1,8 +1,8 @@
 /** act: unit and story lifecycle — start, done, rejected receipts, claims, intake, mirror, merged clean-up and base records. */
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
-import { basename, dirname, join, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { cmd, type Action, type ActionResult, nornTrailers, type UnitRef, type WorktreeSpec } from "@norn/core";
-import { type ClaimBlob, parseDuration, ROUNDS_DIR, STORY_UNIT_DIR, unitHandoffPath } from "@norn/schema";
+import { type ClaimBlob, parseDuration, ROUNDS_DIR, STORY_UNIT_DIR } from "@norn/schema";
 import {
   acquireClaim,
   type ClaimWriteResult,
@@ -22,6 +22,7 @@ import {
   writePendingRecords,
   moveFile,
   handoffPath,
+  runStateFile,
   runStateRecord,
   runStateStartDir,
   writeState,
@@ -328,43 +329,42 @@ export async function retryRecords(act: ActEnv): Promise<Array<{ story: string; 
 }
 
 /**
- * gh-71 D7 (B34): a flat story record moves into round 1 — every entry of `runs/_story/` but `handoff.md`
- * (and `rounds/`) by `git mv` (plainly when untracked), in one commit, pushed. Receipt paths are relative
- * to the round, so they still resolve; slice folders are not touched.
- * Resumable (S5): `state.json` moves last, so a move that stops partway still reads as flat and the next
- * round.migrate moves what is left; an entry already in the round is merged into, entry by entry.
+ * gh-71 D7 (B34): a flat story record moves into round 1 — every entry of `_story/` but `rounds/` —
+ * inside the machine dir (S12, gh-195/05), so nothing is committed: the worktree holds only the handoff,
+ * which stays where it is. Receipt paths are relative to the round, so they still resolve; slice folders
+ * are not touched. Resumable (S5): `state.json` moves last, so a move that stops partway still reads as
+ * flat and the next round.migrate moves what is left; an entry already in the round is merged into,
+ * entry by entry. (Moving an older norn's record off the branch is gh-195/06.)
  */
 export async function roundMigrate(act: ActEnv, a: Extract<Action, { kind: "round_migrate" }>): Promise<ActionResult> {
-  const cwd = a.commit.cwd;
-  mkdirSync(join(cwd, a.to), { recursive: true });
-  // gh-71 B31: the story's handoff stays above its rounds; its name comes from its resolver (gh-195 prefactor 2)
-  const handoff = basename(unitHandoffPath(STORY_UNIT_DIR));
-  const moved = readdirSync(join(cwd, a.from))
-    .filter((n) => n !== handoff && n !== ROUNDS_DIR)
+  const from = runStateFile(act.root, a.from);
+  const to = runStateFile(act.root, a.to);
+  mkdirSync(to, { recursive: true });
+  const moved = readdirSync(from)
+    .filter((n) => n !== ROUNDS_DIR)
     .sort((x, y) => Number(x === "state.json") - Number(y === "state.json") || x.localeCompare(y));
-  for (const name of moved) await migrateEntry(act, cwd, `${a.from}/${name}`, `${a.to}/${name}`);
+  for (const name of moved) migrateEntry(join(from, name), join(to, name), `${a.to}/${name}`);
   const loc = act.obs.units[a.unit.key];
-  if (loc) loc.runsDir = join(cwd, a.to);
-  const commit = await act.commit(a.commit, null, null, null, [a.from]);
-  return { ok: true, detail: { moved, to: a.to, commit } };
+  if (loc) loc.runsDir = to;
+  return { ok: true, detail: { moved, to: a.to } };
 }
 
 /** Move one record entry to the round; into a folder already there (an earlier move that stopped partway), child by child. */
-async function migrateEntry(act: ActEnv, cwd: string, from: string, to: string): Promise<void> {
-  const target = join(cwd, to);
+function migrateEntry(from: string, target: string, name: string): void {
   if (existsSync(target)) {
-    if (!statSync(target).isDirectory() || !statSync(join(cwd, from)).isDirectory()) throw new Error(`round.migrate: ${to} already exists`);
-    for (const name of readdirSync(join(cwd, from)).sort()) await migrateEntry(act, cwd, `${from}/${name}`, `${to}/${name}`);
-    rmSync(join(cwd, from), { recursive: true, force: true });
+    if (!statSync(target).isDirectory() || !statSync(from).isDirectory()) throw new Error(`round.migrate: ${name} already exists`);
+    for (const child of readdirSync(from).sort()) migrateEntry(join(from, child), join(target, child), `${name}/${child}`);
+    rmSync(from, { recursive: true, force: true });
     return;
   }
-  if (!(await act.git.move(cwd, from, to))) moveFile(join(cwd, from), target);
+  moveFile(from, target);
 }
 
 /**
  * gh-71 D1 (B1, B30, B31): end the old round in its own folder (its state with the round receipt
  * applied), then create the new round's folder — workflow pinned, first state written last (S5) —
- * set the story's `workflow:`, and commit both folders, the shared handoff and spec.md in one commit.
+ * set the story's `workflow:`, and commit the shared handoff and spec.md in one commit (the round
+ * folders are in the machine dir, S12).
  */
 export async function roundStart(act: ActEnv, a: Extract<Action, { kind: "round_start" }>): Promise<ActionResult> {
   const loc = act.unitLoc(a.unit);
@@ -372,7 +372,7 @@ export async function roundStart(act: ActEnv, a: Extract<Action, { kind: "round_
   const wt = a.commit?.cwd ?? loc.worktree;
   if (!wt) throw new Error(`no worktree for ${a.unit.key}`);
   const oldDir = loc.runsDir;
-  const dir = join(wt, a.round.dir);
+  const dir = runStateFile(act.root, a.round.dir);
   const pin = pinWorkflow(dir, a.workflow_source);
   if (!pin.ok) throw new Error(`${a.round.dir}/workflow.yaml is already pinned with different content (S7)`);
   // S5: the new round's state is the commit point — a round folder without state.json is not the current

@@ -93,8 +93,8 @@ export const storyReopenCommand = defineCommand({
           const runsDir = runStateDir(w.path, { key, spec_dir }, slice ? w.branch.slice(key.length + 1) : STORY_UNIT_DIR);
           const st = readState(runsDir);
           if (!st.ok || st.value.status !== "running" || !st.value.run) continue;
-          const written = appendReceipt(runsDir, humanReceipt(ctx, { slice }, st.value, "stuck", { reason: REOPEN_REASON }));
-          if (!slice) paths.push(relative(storyWt, written.file));
+          // S12 (gh-195 D8): the stuck receipt stays in the machine dir, never in the reopen commit
+          appendReceipt(runsDir, humanReceipt(ctx, { slice }, st.value, "stuck", { reason: REOPEN_REASON }));
           stuck.push(w.unit);
         }
         return { paths, message: `norn: ${key} reopened`, value: { reopened: true, stuck } };

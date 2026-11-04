@@ -4,7 +4,7 @@
  * only; `norn tidy` moves what this finds to `runs/<unit>/orphaned/`.
  */
 import type { UnpushedRuns } from "@norn/core";
-import { ROUNDS_DIR, type RunStory, runStatePath } from "@norn/schema";
+import { ROUNDS_DIR, type RunStory, treeRunStatePath } from "@norn/schema";
 import { git } from "./git.ts";
 
 /** A unit's `orphaned/` copies: in its folder, or in one of the story's round folders (gh-71 B30). */
@@ -32,7 +32,7 @@ export interface UnpushedUnit extends UnpushedRuns {
 }
 
 /**
- * Per unit, files under the unit's run state (`runStatePath`) that the worktree has (committed, changed or
+ * Per unit, files under the unit's `runs/` folder in its worktree (`treeRunStatePath`: an older norn's record; gh-195/05 leaves only the handoff there) that the worktree has (committed, changed or
  * untracked) but `<remote>/<branch>` does not: everything changed since the merge-base of HEAD and
  * that ref (the fetched base `baseRef` when the branch is gone). Files already under `orphaned/` are
  * not reported again.
@@ -46,7 +46,7 @@ export async function unpushedRuns(remote: string, baseRef: string | null, story
     const mb = await git(t.cwd, ["merge-base", "HEAD", against]);
     if (mb.code !== 0) continue;
     const base = mb.stdout.trim();
-    const dir = `${runStatePath(story, t.dir)}/`;
+    const dir = `${treeRunStatePath(story, t.dir)}/`;
     const [changed, untracked] = await Promise.all([
       git(t.cwd, ["diff", "--name-only", "--no-renames", "--diff-filter=AM", base, "--", dir]),
       git(t.cwd, ["ls-files", "--others", "--exclude-standard", "--", dir]),

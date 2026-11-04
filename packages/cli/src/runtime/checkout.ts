@@ -224,12 +224,9 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
   const line = forced ? `- ${nowIso} take --force by ${holder} from ${blob.forced_from}` : null;
   if (line && existsSync(runsDir)) appendHandoffHeartbeat(storyHandoff, line);
   const extra = more?.({ storyWt, spec_dir, worktrees });
-  if (record.receipt || (line && existsSync(runsDir)) || extra?.paths.length) {
-    const paths = [
-      ...(record.receipt ? [relative(storyWt, join(runsDir, "receipts", record.receipt))] : []),
-      ...(line ? [relative(storyWt, storyHandoff)] : []),
-      ...(extra?.paths ?? []),
-    ];
+  // gh-195 D8 (S12): the take receipt stays in the machine dir; only the handoff line and the caller's files are committed
+  if ((line && existsSync(runsDir)) || extra?.paths.length) {
+    const paths = [...(line ? [relative(storyWt, storyHandoff)] : []), ...(extra?.paths ?? [])];
     const message = extra?.message ?? (forced ? `norn: ${key} taken with --force by ${holder}` : `norn: ${key} taken by ${holder}`);
     const sha = await git.commit(storyWt, { message, trailers: { "Norn-Story": key, "Norn-Step": "take", "Norn-Tick": ulid(now) }, paths });
     const pushed = remote && sha ? await git.push(storyWt, remote, `refs/heads/${branch}:refs/heads/${branch}`) : null;

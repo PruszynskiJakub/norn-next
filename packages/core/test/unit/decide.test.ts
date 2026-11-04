@@ -309,7 +309,7 @@ describe("check, git, gate steps (W2)", () => {
     expect(a).toMatchObject({ kind: "run_check", command: "bun test", timeout_ms: 300_000, cwd: "/r-worktrees/gh-1-login" });
     // a check carries no Transition: act writes its receipt after the effect
     expect(a).not.toHaveProperty("state");
-    expect(a.kind === "run_check" && a.log_path).toBe(`.agents/specs/gh-1-login/runs/_story/logs/${a.kind === "run_check" ? a.run_id : ""}.log`);
+    expect(a.kind === "run_check" && a.log_path).toBe(`runs/gh-1/_story/logs/${a.kind === "run_check" ? a.run_id : ""}.log`); // S12: machine-dir-relative
     const leased = storyAt("test");
     leased.units[0]!.lease = { version: 1, kind: "check", repo: "/r", story: "gh-1", slice: null, run_id: RUN, holder: { pid: 1, pid_start: "1" }, created_at: at() };
     expect(kinds(facts([leased]))).toEqual(["gh-1 noop check.running"]);
@@ -441,10 +441,15 @@ describe("story lifecycle (GR6–GR8)", () => {
 
 describe("gh-71 D7 (B34): a held flat story record moves into round 1 first", () => {
   const flat = (f: StoryFacts) => {
-    f.units[0]!.record = "runs/_story";
+    f.units[0]!.record = "_story";
     return f;
   };
-  test("round.migrate comes before a receipt and moves runs/_story into rounds/01-<workflow>, in one pushed commit", () => {
+  test("gh-195 D7: a record an older norn named from the spec folder (`runs/_story`) reads as the same flat record", () => {
+    const s = solo(running(), { process_alive: false });
+    s.units[0]!.record = "runs/_story";
+    expect(kinds(facts([s]))).toEqual(["gh-1 round_migrate round.migrate"]);
+  });
+  test("round.migrate comes before a receipt and moves _story into rounds/01-<workflow> in the machine dir (S12), with no commit", () => {
     const s = flat(solo(running(), { process_alive: false }));
     s.units[0]!.unapplied = [numbered(1, receipt(s.units[0]!.state!, "done", { outcome: "done", handoff: "ok" }))];
     expect(kinds(facts([s]))).toEqual(["gh-1 round_migrate round.migrate"]);
@@ -452,9 +457,8 @@ describe("gh-71 D7 (B34): a held flat story record moves into round 1 first", ()
       kind: "round_migrate",
       unit: s.units[0]!.unit,
       rule: "round.migrate",
-      from: `${s.spec_dir}/runs/_story`,
-      to: `${s.spec_dir}/runs/_story/rounds/01-solo`,
-      commit: { cwd: "/r-worktrees/gh-1-login", branch: "gh-1-login", message: "norn: gh-1 record moved into round 1", trailers: { "Norn-Story": "gh-1", "Norn-Step": "implement", "Norn-Tick": TICK }, push: true },
+      from: "runs/gh-1/_story",
+      to: "runs/gh-1/_story/rounds/01-solo",
     });
   });
   test("it comes before a remote park and a mirror, and before the story's slices", () => {

@@ -2,71 +2,97 @@
  * gh-195 prefactor 1 (B2, B4): the run-state resolver. Every reader and writer of a unit's run state
  * (state.json, receipts, pinned workflow, logs, evidence) asks here for `(root, story, unit)`: `root` is
  * a checkout or worktree of the repository, `story` its key and spec folder, `unit` `_story` or
- * `<nn>-<slug>`. Today the folder is `<root>/<spec folder>/runs/<unit>` (the story's current round);
- * moving it (S12, gh-195/05) changes this module only. Nothing outside it and schema's `ids.ts` joins a
- * spec folder with `runs/` (test/repo/repo.test.ts).
+ * `<nn>-<slug>`. S12 (gh-195/05, D1): the folder is `<machine dir>/runs/<story>/<unit>` (the story's
+ * current round under `_story/rounds/`), the same for every worktree of one checkout and never in a
+ * worktree or on a branch. Nothing outside this module and schema's `ids.ts` joins a story or a spec
+ * folder with `runs/` (test/repo/repo.test.ts).
  *
- * The spec-folder primitives below (`unitDir`, `startDir`, …) are the resolver's own; tests use them to
- * name a fixture's files, package sources use the `(root, story, unit)` functions.
+ * The run-state-folder primitives below (`unitDir`, `startDir`, …) take the folder holding a story's
+ * units (`storyRunStateDir`); tests use them to name a fixture's files, package sources use the
+ * `(root, story, unit)` functions.
  */
 import { existsSync, readdirSync } from "node:fs";
-import { isAbsolute, join, relative } from "node:path";
-import { parseRoundDirName, ROUNDS_DIR, RUNS_DIR, type RunStory, roundDirName, roundRecordPath, STORY_UNIT_DIR, unitRecordPath } from "@norn/schema";
+import { join, relative } from "node:path";
+import {
+  parseRoundDirName,
+  ROUNDS_DIR,
+  RUNS_DIR,
+  type RunStory,
+  roundDirName,
+  roundRecordPath,
+  STORY_UNIT_DIR,
+  storyRunStatePath,
+  treeRunStatePath,
+  treeStoryRunStatePath,
+  unitRecordPath,
+} from "@norn/schema";
+import { machineDir } from "./paths.ts";
 
-const specFolder = (root: string, story: RunStory) => join(root, story.spec_dir);
+/** S12: the machine dir's `runs/`, holding every story's run state of the checkout `root` belongs to. */
+export const machineRunsDir = (root: string): string => join(machineDir(root), RUNS_DIR);
+/** gh-195 D1: where an older norn wrote the headless runner's session logs (`<run_id>.log`), next to run state; left for `tidy`. */
+export const oldRunnerLogDir = machineRunsDir;
+/** S12: a path decide names relative to the machine dir (`runs/<story>/…`, schema's `runStatePath`) under `root`'s checkout. */
+export const runStateFile = (root: string, rel: string): string => join(machineDir(root), rel);
 
-/** A unit's run-state folder in `root`: a slice's own, the story's current round (or its flat record, or round-less before it starts). */
-export const runStateDir = (root: string, story: RunStory, unit: string): string => unitDir(specFolder(root, story), unit);
+/** S12: the folder holding every unit's run-state folder of a story, `<machine dir>/runs/<story>`. */
+export const storyRunStateDir = (root: string, story: RunStory): string => runStateFile(root, storyRunStatePath(story));
+/** A unit's run-state folder: a slice's own, the story's current round (or its flat record, or round-less before it starts). */
+export const runStateDir = (root: string, story: RunStory, unit: string): string => unitDir(storyRunStateDir(root, story), unit);
 /** Where a unit's run state is written when it starts (`startDir`): for the story, round 01 of `workflow` when it has none yet. */
-export const runStateStartDir = (root: string, story: RunStory, unit: string, workflow: string): string => startDir(specFolder(root, story), unit, workflow);
-/** The folder in `root` holding every unit's run-state folder of a story (`runs/`). */
-export const storyRunStateDir = (root: string, story: RunStory): string => specRunsDir(specFolder(root, story));
+export const runStateStartDir = (root: string, story: RunStory, unit: string, workflow: string): string => startDir(storyRunStateDir(root, story), unit, workflow);
 /**
- * gh-195 prefactor 1 (review F2): a run-state folder's record, its path inside the story's run state
- * (`runs/<nn>-<slug>`, `runs/_story/rounds/01-story`): what facts and messages name it by.
+ * gh-195 prefactor 1 (review F2), D7: a run-state folder's record, its path inside the story's run state
+ * (`<nn>-<slug>`, `_story/rounds/01-story`): what facts and messages name it by.
  */
-export const runStateRecord = (root: string, story: RunStory, dir: string): string => relative(specFolder(root, story), dir);
-/** gh-71 B29, B30: the story's rounds in `root`, ascending; [] for a flat record or a story not started. */
-export const runStateRounds = (root: string, story: RunStory) => storyRounds(specFolder(root, story));
-/** gh-71 D7 (B34): whether the story's run state in `root` is still the flat record of an older norn. */
-export const isFlatRunState = (root: string, story: RunStory): boolean => isFlatStoryRecord(specFolder(root, story));
+export const runStateRecord = (root: string, story: RunStory, dir: string): string => relative(storyRunStateDir(root, story), dir);
+/** gh-71 B29, B30: the story's rounds, ascending; [] for a flat record or a story not started. */
+export const runStateRounds = (root: string, story: RunStory) => storyRounds(storyRunStateDir(root, story));
+/** gh-71 D7 (B34): whether the story's run state is still the flat record of an older norn. */
+export const isFlatRunState = (root: string, story: RunStory): boolean => isFlatStoryRecord(storyRunStateDir(root, story));
+/**
+ * gh-195/05: the folder of an older norn's tree (`root` a checkout or the base cache) that held a story's
+ * records, `<spec folder>/runs`: finished stories are read from there until gh-195/16 (D16).
+ */
+export const treeRunStateDir = (root: string, story: RunStory): string => join(root, treeStoryRunStatePath(story));
+/** gh-195/05: a unit's folder in an older norn's tree (`<spec folder>/runs/<unit>`, R2.3's `orphaned/` copies of what it left there). */
+export const treeUnitRunStateDir = (root: string, story: RunStory, unit: string): string => join(root, treeRunStatePath(story, unit));
 
-/** A spec folder's `runs/`, the parent of every unit's record folder. */
-export const specRunsDir = (specDir: string) => join(specDir, RUNS_DIR);
 /**
- * The resolver for a unit's record folder (gh-71 D2, B30, B36): a slice's `<spec folder>/runs/<nn>-<slug>`;
- * the story's current round `runs/_story/rounds/NN-<wf>` when the spec folder is absolute and has one, else
- * `runs/_story` (a flat record from an older norn, read as round 1, or a story not started). A repo-relative
- * spec folder is not looked at on disk and gets `runs/<unit>`. Every reader and writer goes through here.
+ * The resolver for a unit's record folder under a story's run-state folder `base` (gh-71 D2, B30,
+ * B36): a slice's `<base>/<nn>-<slug>`; the story's current round `<base>/_story/rounds/NN-<wf>` when it
+ * has one, else `<base>/_story` (a flat record from an older norn, read as round 1, or a story not
+ * started). Every reader and writer goes through here.
  */
-export function unitDir(specDir: string, unit: string): string {
-  const base = join(specDir, unitRecordPath(unit));
-  // gh-71 D7 (B34, S5): while `runs/_story/state.json` is still flat the record is flat, even when a
+export function unitDir(base: string, unit: string): string {
+  const dir = join(base, unitRecordPath(unit));
+  // gh-71 D7 (B34, S5): while `_story/state.json` is still flat the record is flat, even when a
   // round.migrate that stopped partway left some entries in rounds/01-<wf>/: state moves last, so the
   // next round.migrate finishes the move.
-  if (unit !== STORY_UNIT_DIR || !isAbsolute(specDir) || isFlatStoryRecord(specDir)) return base;
-  const round = currentRound(specDir);
-  return round ? join(base, ROUNDS_DIR, roundDirName(round.n, round.workflow)) : base;
+  if (unit !== STORY_UNIT_DIR || isFlatStoryRecord(base)) return dir;
+  const round = currentRound(base);
+  return round ? join(dir, ROUNDS_DIR, roundDirName(round.n, round.workflow)) : dir;
 }
-export const storyUnitDir = (specDir: string) => unitDir(specDir, STORY_UNIT_DIR);
+export const storyUnitDir = (base: string) => unitDir(base, STORY_UNIT_DIR);
 /**
- * gh-71 D2 (B30): the story's current round, the highest-numbered `runs/_story/rounds/NN-<wf>/` under an
- * absolute spec folder that has its state; null = none (a flat record, read as round 1 (B36), or a story
- * not started). S5: a round folder is the record only once its state.json is written, so a round.start
- * that stopped after pinning the new round leaves the old round current and the round receipt unapplied.
+ * gh-71 D2 (B30): the story's current round, the highest-numbered `_story/rounds/NN-<wf>/` under a
+ * story's run-state folder that has its state; null = none (a flat record, read as round 1 (B36), or a
+ * story not started). S5: a round folder is the record only once its state.json is written, so a
+ * round.start that stopped after pinning the new round leaves the old round current and the round
+ * receipt unapplied.
  */
-export function currentRound(specDir: string): { n: number; workflow: string } | null {
-  const r = storyRounds(specDir).at(-1);
+export function currentRound(base: string): { n: number; workflow: string } | null {
+  const r = storyRounds(base).at(-1);
   return r ? { n: r.n, workflow: r.workflow } : null;
 }
 /**
- * gh-71 B29, B30: every round folder `runs/_story/rounds/NN-<wf>/` under an absolute spec folder that has
+ * gh-71 B29, B30: every round folder `_story/rounds/NN-<wf>/` under a story's run-state folder that has
  * its state, ascending by number, with its absolute path; [] for a flat record (read as round 1, B36) or
  * a story not started.
  */
-export function storyRounds(specDir: string): Array<{ n: number; workflow: string; path: string }> {
+export function storyRounds(base: string): Array<{ n: number; workflow: string; path: string }> {
   const out: Array<{ n: number; workflow: string; path: string }> = [];
-  const rounds = join(specDir, unitRecordPath(STORY_UNIT_DIR), ROUNDS_DIR);
+  const rounds = join(base, unitRecordPath(STORY_UNIT_DIR), ROUNDS_DIR);
   try {
     for (const d of readdirSync(rounds, { withFileTypes: true })) {
       const r = d.isDirectory() && existsSync(join(rounds, d.name, "state.json")) ? parseRoundDirName(d.name) : null;
@@ -77,15 +103,32 @@ export function storyRounds(specDir: string): Array<{ n: number; workflow: strin
   }
   return out.sort((a, b) => a.n - b.n);
 }
-/** gh-71 B30: round `n`'s record folder under a spec folder (`runs/_story/rounds/NN-<wf>`). */
-export const roundDir = (specDir: string, n: number, workflow: string) => join(specDir, roundRecordPath(n, workflow));
+/** gh-71 B30: round `n`'s record folder under a story's run-state folder (`_story/rounds/NN-<wf>`). */
+export const roundDir = (base: string, n: number, workflow: string) => join(base, roundRecordPath(n, workflow));
 /**
  * Where a unit's record is written when it starts: a slice's own folder; for the story, its current
  * round, or round 01 of `workflow` when it has neither a round nor a flat record yet (gh-71 B30).
  */
-export function startDir(specDir: string, unit: string, workflow: string): string {
-  if (unit !== STORY_UNIT_DIR || currentRound(specDir) || isFlatStoryRecord(specDir)) return unitDir(specDir, unit);
-  return roundDir(specDir, 1, workflow);
+export function startDir(base: string, unit: string, workflow: string): string {
+  if (unit !== STORY_UNIT_DIR || currentRound(base) || isFlatStoryRecord(base)) return unitDir(base, unit);
+  return roundDir(base, 1, workflow);
 }
-/** gh-71 D7 (B34): a story record kept the old flat way, `runs/_story/state.json` directly in the folder. */
-export const isFlatStoryRecord = (specDir: string) => existsSync(join(specDir, unitRecordPath(STORY_UNIT_DIR), "state.json"));
+/** gh-71 D7 (B34): a story record kept the old flat way, `_story/state.json` directly in the folder. */
+export const isFlatStoryRecord = (base: string) => existsSync(join(base, unitRecordPath(STORY_UNIT_DIR), "state.json"));
+
+/**
+ * gh-195/05: where a story's run state is read from — the machine dir of `checkout` (S12), or, for a
+ * finished story an older norn recorded in a tree (`root` the main checkout or the base cache) and this
+ * machine holds no run state of, that tree's `<spec folder>/runs` (until gh-195/16, D16). `name` is the
+ * root a file error names a path from.
+ */
+export function runStateSource(root: string, story: RunStory, opts: { checkout?: string; tree?: boolean } = {}): { base: string; name: string; tree: boolean } {
+  const checkout = opts.checkout ?? root;
+  const machine = storyRunStateDir(checkout, story);
+  if (opts.tree && !existsSync(machine) && existsSync(treeRunStateDir(root, story))) return { base: treeRunStateDir(root, story), name: root, tree: true };
+  return { base: machine, name: machineDir(checkout), tree: false };
+}
+/** A unit's run-state folder under a source's `base` (`runStateSource`). */
+export const runStateDirIn = (base: string, unit: string): string => unitDir(base, unit);
+/** The story's rounds under a source's `base`, ascending; [] for a flat record or a story not started. */
+export const runStateRoundsIn = (base: string) => (isFlatStoryRecord(base) ? [] : storyRounds(base));

@@ -7,8 +7,8 @@
  * every run is stored in the trace (B4) and linked from it by a `briefing` event (O4).
  */
 import { readdirSync } from "node:fs";
-import { basename, join, relative } from "node:path";
-import { cmd, currentRun, cursorStep, type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, standingReport, stepLimits, storyRulings, storyWorktreePath } from "@norn/core";
+import { basename, join } from "node:path";
+import { cmd, currentRun, cursorStep, type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, standingReport, stepLimits, storyRulings } from "@norn/core";
 import { type AgentStep, type ProcessIdentity, type ReceiptOf, storyBranch, ulid } from "@norn/schema";
 import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readText, readUnitHooks, writeBriefing, readRemoteCache, spawnSyncCaptured, storyFile, traceEvent, runStateDir, storyRunStateDir } from "@norn/store";
 import { defineCommand } from "../command.ts";
@@ -116,25 +116,22 @@ function evidenceFiles(s: UnitSession): Record<string, string[]> {
 }
 
 /**
- * F28/O2: the story's gate rulings, from the receipts of every unit of the story this machine can
- * see — this worktree, the story worktree and each slice worktree beside it (a slice still running
- * keeps its live runs/ there, §7). The gate receipt is the record; renderBrief stays pure.
+ * F28/O2: the story's gate rulings, from the receipts of every unit of the story this machine holds
+ * (S12: all in the checkout's machine dir). The gate receipt is the record; renderBrief stays pure.
  */
 function rulings(s: UnitSession): Ruling[] {
-  const slug = s.marker.spec_dir.split("/").at(-1)?.slice(s.unit.story.length + 1) ?? "";
-  const storyWt = storyWorktreePath(s.root, s.unit.story, slug);
   const run = { key: s.unit.story, spec_dir: s.marker.spec_dir };
+  // S12 (gh-195/05): every unit's run state of the story is in this checkout's machine dir, whichever worktree
   const dirs = new Set<string>();
-  for (const wt of [s.worktree, storyWt])
-    try {
-      for (const d of readdirSync(storyRunStateDir(wt, run), { withFileTypes: true })) if (d.isDirectory()) dirs.add(d.name);
-    } catch {
-      /* no runs/ here */
-    }
+  try {
+    for (const d of readdirSync(storyRunStateDir(s.root, run), { withFileTypes: true })) if (d.isDirectory()) dirs.add(d.name);
+  } catch {
+    /* no run state yet */
+  }
   const units: Array<{ unit: string; receipts: NumberedReceipt[] }> = [];
   for (const dir of [...dirs].sort()) {
     const unit = dir === "_story" ? s.unit.story : `${s.unit.story}/${dir.split("-")[0]}`;
-    for (const wt of new Set([s.worktree, storyWt, `${storyWt}--${dir}`])) units.push({ unit, receipts: listReceipts(runStateDir(wt, run, dir)).receipts });
+    units.push({ unit, receipts: listReceipts(runStateDir(s.root, run, dir)).receipts });
   }
   return storyRulings(units);
 }
@@ -196,7 +193,7 @@ export const briefCommand = defineCommand({
         spec_dir: s.marker.spec_dir,
         story_file: `${s.marker.spec_dir}/${basename(storyFile(s.specPath))}`,
         slice_file: slicePath,
-        unit_dir: relative(s.worktree, s.runsDir),
+        unit_dir: s.runsDir,
       },
       diff_range: `${base}...HEAD`,
       // S9: the agent-written part only; the generated header and heartbeat are not for the agent

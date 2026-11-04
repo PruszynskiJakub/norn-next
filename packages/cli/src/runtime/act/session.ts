@@ -180,10 +180,10 @@ export async function applyReceipts(act: ActEnv, a: Extract<Action, { kind: "app
 }
 
 /**
- * What the session-start commit stages (R2.1): the unit's record folder and its handoff, each from its own
- * resolver (gh-195 prefactor 2); the handoff once when it sits inside the record folder (a slice's).
+ * What the session-start commit stages (R2.1): the unit's handoff only (gh-195 D8, B5): its run state is
+ * in the machine dir (S12), and the agent's fresh work waits for its own boundary.
  */
-const startedPaths = (loc: UnitLoc) => (loc.handoffFile.startsWith(`${loc.runsDir}/`) ? [loc.runsDir] : [loc.runsDir, loc.handoffFile]);
+const startedPaths = (loc: UnitLoc) => [loc.handoffFile];
 
 export async function startRun(act: ActEnv, a: Extract<Action, { kind: "start_run" }>): Promise<ActionResult> {
   const loc = act.unitLoc(a.unit);
@@ -191,7 +191,7 @@ export async function startRun(act: ActEnv, a: Extract<Action, { kind: "start_ru
   act.effectsOk.add("launch");
   const state = a.state ? recordSession(act, a.unit, loc.runsDir, a.state, a.receipts, session) : null;
   if (state) act.writeUnitState(a.unit, loc.runsDir, state);
-  // R2.1 (N6): commit and push the started receipts now — only runs/, never the agent's fresh work
+  // R2.1 (N6): commit and push the handoff's started header now — never the agent's fresh work
   const committed = await act.commit(a.commit, a.unit, state, `${a.rule}: ${a.step} run ${a.launch.run_id}`, a.commit ? startedPaths(loc).map((p) => relative(a.commit?.cwd ?? "", p)) : undefined);
   return { ok: true, detail: { session, lease, ...committed } };
 }

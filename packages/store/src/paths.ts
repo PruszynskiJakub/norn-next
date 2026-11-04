@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
-import { LEGACY_SPEC_FILE, parseSliceKey, RUNS_DIR, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName, unitHandoffPath } from "@norn/schema";
+import { LEGACY_SPEC_FILE, parseSliceKey, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName, unitHandoffPath } from "@norn/schema";
 
 /** gh-110 B1, B2 (D1): the committed repo config and workflows, relative to a root, as messages name them. */
 export const REPO_CONFIG_FILE = ".agents/norn.config.yaml";
@@ -130,8 +130,6 @@ export const machineReposDir = (home: string) => join(home, "repos");
 export const checkoutFilePath = (dir: string) => join(dir, "checkout.json");
 /** D9, gh-195 D1: the headless runner's default session log dir, the machine dir's `sessions/` (`runs/` holds run state, S12). */
 export const runnerLogDir = (root: string) => join(machineDir(root), "sessions");
-/** gh-195 D1: where an older norn wrote the headless runner's session logs (`<run_id>.log`); left for `tidy`. */
-export const oldRunnerLogDir = (root: string) => join(machineDir(root), RUNS_DIR);
 /** Local tick lock (H1); in the machine dir. */
 export const tickLockPath = (root: string) => join(machineDir(root), "tick.lock");
 /** D6: where an older norn took the tick lock; `norn upgrade` takes it there. */

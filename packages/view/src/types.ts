@@ -272,7 +272,8 @@ export interface UnitTraceSummary {
  * base branch in the machine dir (replaced when `origin/<base>` moves; `ref` is the live source).
  */
 export interface TraceRecords {
-  source: "worktree" | "checkout" | "base_cache";
+  /** gh-195/05 (S12): `machine` = the checkout's machine dir holds the run state (`root` its story folder) */
+  source: "machine" | "worktree" | "checkout" | "base_cache";
   root: string;
   /** checkout records identical to the base branch copy */
   same_as_base?: boolean;

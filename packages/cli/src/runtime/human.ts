@@ -15,10 +15,10 @@ import {
   parseRoundDirName,
   ROUNDS_DIR,
   type RunStory,
-  roundRunStatePath,
-  runStatePath,
+  treeRoundRunStatePath,
+  treeRunStatePath,
   STORY_UNIT_DIR,
-  storyRunStatePath,
+  treeStoryRunStatePath,
   ulid,
   type UnitState,
   validate,
@@ -108,6 +108,7 @@ function localTarget(obs: Observed, story: StoryFacts, uf: UnitFacts): Target {
 /**
  * The unit's cursor from the pushed branches (T7: the holder pushes at step boundaries):
  * a slice reads its slice branch first, then the story branch; the story unit its story branch.
+ * gh-195/05: a record an older norn kept on the branch (`<spec folder>/runs/`); slice gh-195/13 reads the ref.
  */
 async function remoteTarget(ctx: Context, key: string): Promise<Target | null> {
   const remote = await gitRemote(ctx.git, ctx.root, ctx.config.git_remote);
@@ -126,17 +127,17 @@ async function remoteTarget(ctx: Context, key: string): Promise<Target | null> {
     const nn = slice.split("/")[1] as string;
     const sliceRef = refs.find((r) => r.startsWith(`${prefix}${story}/${nn}-`));
     if (sliceRef) candidates.push({ ref: sliceRef, dir: sliceRef.slice(`${prefix}${story}/`.length) });
-    const listed = (await git.lsTree(root, storyRef, `${storyRunStatePath(run)}/`)) ?? [];
+    const listed = (await git.lsTree(root, storyRef, `${treeStoryRunStatePath(run)}/`)) ?? [];
     const dir = listed.find((d) => d.startsWith(`${nn}-`));
     if (dir) candidates.push({ ref: storyRef, dir });
   } else {
     // gh-71 D2 (B30, B36): the story's current round, the highest-numbered rounds/NN-<wf>; a flat record is round 1
-    const rounds = ((await git.lsTree(root, storyRef, `${runStatePath(run, STORY_UNIT_DIR)}/${ROUNDS_DIR}/`)) ?? []).map(parseRoundDirName).filter((r) => r !== null);
+    const rounds = ((await git.lsTree(root, storyRef, `${treeRunStatePath(run, STORY_UNIT_DIR)}/${ROUNDS_DIR}/`)) ?? []).map(parseRoundDirName).filter((r) => r !== null);
     const round = rounds.sort((a, b) => b.n - a.n)[0];
-    candidates.push({ ref: storyRef, dir: STORY_UNIT_DIR, ...(round ? { record: roundRunStatePath(run, round.n, round.workflow) } : {}) });
+    candidates.push({ ref: storyRef, dir: STORY_UNIT_DIR, ...(round ? { record: treeRoundRunStatePath(run, round.n, round.workflow) } : {}) });
   }
   for (const c of candidates) {
-    const record = c.record ?? runStatePath(run, c.dir);
+    const record = c.record ?? treeRunStatePath(run, c.dir);
     const raw = await git.show(root, c.ref, statePath(record));
     if (raw === null) continue;
     let parsed: unknown;

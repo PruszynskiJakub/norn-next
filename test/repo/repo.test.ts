@@ -1098,11 +1098,6 @@ describe("the run-state resolver takes the checkout, the story and the unit (gh-
    */
   const TEMPLATE = new RegExp(String.raw`\$\{[^{}]*\}/(?:\$\{[^{}]*(?:${NAMES})|runs\b)|\$\{[^{}]*${SPEC}[^{}]*\}/\$\{[^{}]*\brecord`);
   const RELATIVE = new RegExp(String.raw`\brelative\(\s*(?:join\([^()]*${SPEC}[^()]*\)|[\w.]*${SPEC})\s*,`);
-  /**
-   * Hits that are no unit's run state: the machine dir's `runs/`, where an older norn wrote the headless
-   * runner's session logs (plan prefactor 4 moved them to `sessions/`; `oldRunnerLogDir` names it for `tidy`).
-   */
-  const NOT_RUN_STATE: Record<string, string> = { "packages/store/src/paths.ts": "join(machineDir(root), RUNS_DIR)" };
   const PRIMITIVE = /\b(?:unitDir|storyUnitDir|startDir|roundDir|specRunsDir|storyRounds|currentRound|isFlatStoryRecord)\s*\(/;
 
   /** `src` with every comment blanked out (strings and templates kept, newlines kept for line numbers). */
@@ -1223,16 +1218,25 @@ describe("the run-state resolver takes the checkout, the story and the unit (gh-
     expect(builds(src)).toEqual([0, 4, 10]);
   });
 
+  test("matcher (S12, gh-195/05): the machine dir joined with runs/ is a hit; the resolver's machine-dir calls are not", () => {
+    const src = [
+      'const a = join(machineDir(root), "runs");',
+      "const b = join(machineDir(root), RUNS_DIR, story);",
+      "const c = `${machineDir(root)}/runs/${key}`;",
+      "const d = storyRunStateDir(root, story);",
+      "const e = runStateFile(root, a.log_path);",
+    ].join("\n");
+    expect(builds(src)).toEqual([0, 1, 2]);
+  });
+
   test("no package source outside the resolver builds a unit's run-state path from a spec folder", () => {
     const hits = files(PKGS)
       .filter((p) => p.includes("/src/") && !RESOLVER.includes(relative(ROOT, p)))
       .flatMap((p) => {
         const src = readFileSync(p, "utf8");
         const lines = src.split("\n");
-        const allowed = NOT_RUN_STATE[relative(ROOT, p)];
-        return builds(src)
-          .filter((i) => !(allowed && lines[i]?.includes(allowed)))
-          .map((i) => `${relative(ROOT, p)}:${i + 1}: ${lines[i]?.trim()}`);
+        // S12 (gh-195/05): the machine dir's `runs/` is run state too, so no exception remains
+        return builds(src).map((i) => `${relative(ROOT, p)}:${i + 1}: ${lines[i]?.trim()}`);
       });
     expect(hits).toEqual([]);
   });

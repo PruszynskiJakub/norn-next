@@ -354,16 +354,15 @@ export interface CloseStoryAction extends UnitBase {
 }
 
 /**
- * gh-71 D7 (B34): move a flat story record (`runs/_story/state.json` …) into its round 1 folder with
- * `git mv` — everything under `from` but `handoff.md` and `rounds/` — then commit and push (one commit).
+ * gh-71 D7 (B34): move a flat story record (`_story/state.json` …) into its round 1 folder — everything
+ * under `from` but `rounds/` — inside the machine dir (S12, gh-195/05): nothing to commit.
  */
 export interface RoundMigrateAction extends UnitBase {
   kind: "round_migrate";
-  /** worktree-relative `runs/_story` */
+  /** machine-dir-relative `runs/<story>/_story` */
   from: string;
-  /** worktree-relative `runs/_story/rounds/01-<workflow>` */
+  /** machine-dir-relative `runs/<story>/_story/rounds/01-<workflow>` */
   to: string;
-  commit: BoundaryCommit;
 }
 
 /**

@@ -12,6 +12,7 @@ import {
   roundRunStatePath,
   runStatePath,
   STORY_UNIT_DIR,
+  normalRecord,
   unitRecordPath,
 } from "@norn/schema";
 import type { ClaimAction, UpdateStoryMirrorAction } from "../actions.ts";
@@ -108,12 +109,9 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
 
   // gh-71 D7 (B34): a held story whose record is still flat moves into round 1 before anything else —
   // never mid-rebase (H1), and never once its PR merged (the base keeps old records flat, B36)
-  if (!ctx.has(ref.key) && su?.state && su.record === unitRecordPath(STORY_UNIT_DIR) && !rebasing(su) && !mergedIntoBase(story, ctx.facts.repo.default_branch)) {
-    const commit = commitFor(ctx, story, su, `norn: ${story.key} record moved into round 1`, su.state.step);
-    if (commit) {
-      const from = runStatePath(story, STORY_UNIT_DIR);
-      return ctx.emit({ kind: "round_migrate", unit: ref, rule: "round.migrate", from, to: roundRunStatePath(story, 1, su.state.workflow), commit });
-    }
+  if (!ctx.has(ref.key) && su?.state && su.record !== undefined && normalRecord(su.record) === unitRecordPath(STORY_UNIT_DIR) && !rebasing(su) && !mergedIntoBase(story, ctx.facts.repo.default_branch)) {
+    const from = runStatePath(story, STORY_UNIT_DIR);
+    return ctx.emit({ kind: "round_migrate", unit: ref, rule: "round.migrate", from, to: roundRunStatePath(story, 1, su.state.workflow) });
   }
 
   if (!ctx.has(ref.key)) storyLifecycle(ctx, story, fm, su);

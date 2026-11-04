@@ -20,16 +20,16 @@ import { type LoadedConfig, loadConfig, loadWorkflows, type WorkflowListing } fr
 import { readSliceFile, readStoryFile } from "./frontmatter.ts";
 import { isErrno } from "./fsx.ts";
 import { handoffPath, slicesDir, specsDir, storyFile } from "./paths.ts";
-import { isFlatRunState, runStateDir, runStateRecord, runStateRounds, storyRunStateDir } from "./run-state.ts";
+import { runStateDirIn, runStateRoundsIn, runStateSource } from "./run-state.ts";
 import { listReceipts } from "./receipts.ts";
 import { type Handoff, type PinnedWorkflow, readHandoff, readPinnedWorkflow, readState } from "./unit.ts";
 import { readUnitMarker } from "./worktree.ts";
 
 export interface UnitSnapshot {
   unit: UnitRef;
-  /** absolute record folder (`runStateDir`): runs/<unit>/, the story's current round folder (gh-71 B30) */
+  /** absolute record folder (`runStateDir`): `<machine dir>/runs/<story>/<unit>/`, the story's current round folder (gh-71 B30, S12) */
   path: string;
-  /** the record folder relative to the spec folder (gh-71 D2), e.g. `runs/_story/rounds/01-story` */
+  /** the record folder relative to the story's run-state folder (gh-71 D2, gh-195 D7), e.g. `_story/rounds/01-story` */
   record: string;
   /** null = not started (no state.json) or corrupt (see errors) */
   state: UnitState | null;
@@ -54,6 +54,10 @@ export interface StorySnapshot {
   path: string;
   /** root-relative spec folder `.agents/specs/<id>-<slug>` */
   spec_dir: string;
+  /** gh-195/05 (S12): the checkout whose machine dir holds the story's run state */
+  checkout: string;
+  /** gh-195/05: where the story's units' run state was read from (`runStateSource`) */
+  run_state: RunStateAt;
   frontmatter: StoryFrontmatter | null;
   frontmatter_error: FileError | null;
   slices: SliceFileFacts[];
@@ -95,30 +99,45 @@ function files(path: string): string[] {
   }
 }
 
-/** One unit's run state in `root` (gh-195 prefactor 1: found through the resolver, `runStateDir`). */
-export function loadUnit(root: string, story: RunStory, unit: UnitRef, opts: { includeApplied?: boolean; path?: string } = {}): UnitSnapshot {
-  const path = opts.path ?? runStateDir(root, story, unit.dir);
+/** Where a story's run state is read from, as `loadUnit` takes it (gh-195/05, `runStateSource`). */
+export interface RunStateAt {
+  /** the folder holding the story's units' run state */
+  base: string;
+  /** the root a file error names a path from */
+  name: string;
+  /** an older norn's record in a tree (gh-195/05), not the machine dir */
+  tree: boolean;
+}
+
+/**
+ * One unit's run state (gh-195 prefactor 1: found through the resolver; S12: in the machine dir of the
+ * checkout `root` belongs to), with its handoff from the worktree `root`.
+ */
+export function loadUnit(root: string, story: RunStory, unit: UnitRef, opts: { includeApplied?: boolean; path?: string; at?: RunStateAt } = {}): UnitSnapshot {
+  const at = opts.at ?? runStateSource(root, story);
+  const path = opts.path ?? runStateDirIn(at.base, unit.dir);
+  const name = at.name;
   const handoffFile = handoffPath(join(root, story.spec_dir), unit.dir);
   const errors: FileError[] = [];
-  const st = readState(path, root);
+  const st = readState(path, name);
   if (!st.ok && st.reason === "corrupt") errors.push(st.error);
-  const wf = readPinnedWorkflow(path, root);
+  const wf = readPinnedWorkflow(path, name);
   if (!wf.ok && wf.reason === "corrupt") errors.push(wf.error);
   const state = st.ok ? st.value : null;
-  const all = listReceipts(path, { root });
+  const all = listReceipts(path, { root: name });
   errors.push(...all.errors);
   const after = state?.applied_through ?? 0;
   // S7: `norn story edit --workflow --at` re-pins workflow.yaml right after journaling a workflow receipt;
   // until the tick applies it, the new pin matching that receipt's to_hash is expected.
   const switching = (hash: string) => all.receipts.some((r) => r.n > after && r.receipt.kind === "workflow" && r.receipt.to_hash === hash);
   if (state && wf.ok && state.workflow_hash !== wf.value.hash && !switching(wf.value.hash))
-    errors.push({ file: relative(root, join(path, "workflow.yaml")), errors: [{ path: "", message: "hash differs from state.workflow_hash" }] });
+    errors.push({ file: relative(name, join(path, "workflow.yaml")), errors: [{ path: "", message: "hash differs from state.workflow_hash" }] });
   if (st.ok && !wf.ok && wf.reason === "missing")
-    errors.push({ file: relative(root, join(path, "workflow.yaml")), errors: [{ path: "", message: "pinned workflow missing" }] });
+    errors.push({ file: relative(name, join(path, "workflow.yaml")), errors: [{ path: "", message: "pinned workflow missing" }] });
   return {
     unit,
     path,
-    record: runStateRecord(root, story, path),
+    record: relative(at.base, path),
     state,
     workflow: wf.ok ? wf.value : null,
     unapplied: all.receipts.filter((r) => r.n > after),
@@ -137,13 +156,17 @@ export function loadUnit(root: string, story: RunStory, unit: UnitRef, opts: { i
 export function loadRounds(story: StorySnapshot, opts: { includeApplied?: boolean } = {}): Array<{ n: number; workflow: string; unit: UnitSnapshot }> {
   const current = story.units[0];
   if (!current?.state) return [];
-  const rounds = isFlatRunState(story.root, story) ? [] : runStateRounds(story.root, story);
+  const rounds = runStateRoundsIn(story.run_state.base);
   if (!rounds.length) return [{ n: current.state.round ?? 1, workflow: current.state.workflow, unit: current }];
-  return rounds.map((r) => ({ n: r.n, workflow: r.workflow, unit: r.path === current.path ? current : loadUnit(story.root, story, current.unit, { ...opts, path: r.path }) }));
+  return rounds.map((r) => ({ n: r.n, workflow: r.workflow, unit: r.path === current.path ? current : loadUnit(story.root, story, current.unit, { ...opts, path: r.path, at: story.run_state }) }));
 }
 
-/** Read one spec folder (spec.md, slices/, runs/). */
-export function loadStory(root: string, specPath: string, opts: { includeApplied?: boolean } = {}): StorySnapshot | null {
+/**
+ * Read one spec folder (spec.md, slices/) and its units' run state (S12: in the machine dir of
+ * `checkout`, default `root`; `tree`: or, when this machine holds none, an older norn's record in the
+ * tree, gh-195/05).
+ */
+export function loadStory(root: string, specPath: string, opts: { includeApplied?: boolean; checkout?: string; tree?: boolean } = {}): StorySnapshot | null {
   const name = specPath.split("/").at(-1) ?? "";
   const m = parseSpecDirName(name);
   if (!m) return null;
@@ -171,14 +194,17 @@ export function loadStory(root: string, specPath: string, opts: { includeApplied
   }
 
   const run: RunStory = { key, spec_dir: relative(root, specPath) };
-  const units: UnitSnapshot[] = [loadUnit(root, run, { story: key, slice: null, dir: STORY_UNIT_DIR, key }, opts)];
-  const runDirs = new Set(dirs(storyRunStateDir(root, run)).filter((d) => d !== STORY_UNIT_DIR));
+  const checkout = opts.checkout ?? root;
+  const at = runStateSource(root, run, { checkout, ...(opts.tree ? { tree: true } : {}) });
+  const unitOpts = { ...(opts.includeApplied ? { includeApplied: true } : {}), at };
+  const units: UnitSnapshot[] = [loadUnit(root, run, { story: key, slice: null, dir: STORY_UNIT_DIR, key }, unitOpts)];
+  const runDirs = new Set(dirs(at.base).filter((d) => d !== STORY_UNIT_DIR));
   for (const s of slices) runDirs.add(`${s.nn}-${s.slug}`);
   for (const d of [...runDirs].sort()) {
     const nn = /^([0-9]{2,3})-/.exec(d)?.[1];
     if (!nn) continue;
     const sk = sliceKey(key, nn);
-    units.push(loadUnit(root, run, { story: key, slice: sk, dir: d, key: sk }, opts));
+    units.push(loadUnit(root, run, { story: key, slice: sk, dir: d, key: sk }, unitOpts));
   }
   return {
     key,
@@ -186,6 +212,8 @@ export function loadStory(root: string, specPath: string, opts: { includeApplied
     root,
     path: specPath,
     spec_dir: run.spec_dir,
+    checkout,
+    run_state: at,
     frontmatter: story.ok && !frontmatter_error ? story.value.frontmatter : null,
     frontmatter_error,
     slices,
@@ -194,11 +222,11 @@ export function loadStory(root: string, specPath: string, opts: { includeApplied
 }
 
 /** Every story under `<root>/.agents/specs/` (only `only`'s spec folder when given). */
-function loadStories(root: string, opts: { includeApplied?: boolean; only?: string } = {}): StorySnapshot[] {
+function loadStories(root: string, opts: { includeApplied?: boolean; only?: string; checkout?: string; tree?: boolean } = {}): StorySnapshot[] {
   const out: StorySnapshot[] = [];
   for (const d of dirs(specsDir(root))) {
     if (opts.only !== undefined && parseSpecDirName(d)?.story !== opts.only) continue;
-    const s = loadStory(root, join(specsDir(root), d), opts);
+    const s = loadStory(root, join(specsDir(root), d), { ...(opts.includeApplied ? { includeApplied: true } : {}), ...(opts.checkout ? { checkout: opts.checkout } : {}), ...(opts.tree ? { tree: true } : {}) });
     if (s) out.push(s);
   }
   return out;
@@ -229,9 +257,10 @@ export function loadSnapshot(opts: {
     for (const s of loadStories(root, { includeApplied: opts.includeApplied, only: m.story })) if (!seen.has(s.key)) seen.set(s.key, s);
   }
   const base = new Map<string, StorySnapshot>();
-  if (baseRoot) for (const s of loadStories(baseRoot, { includeApplied: opts.includeApplied })) base.set(s.key, s);
+  // gh-195/05: the base cache is no checkout: its stories' run state is the repo's machine dir, or the base tree's record of an older norn
+  if (baseRoot) for (const s of loadStories(baseRoot, { includeApplied: opts.includeApplied, checkout: opts.repoRoot, tree: true })) base.set(s.key, s);
   for (const [key, s] of base) if (!seen.has(key)) seen.set(key, { ...s, from_base: true });
-  for (const s of loadStories(opts.repoRoot, { includeApplied: opts.includeApplied })) if (!seen.has(s.key)) seen.set(s.key, s);
+  for (const s of loadStories(opts.repoRoot, { includeApplied: opts.includeApplied, tree: true })) if (!seen.has(s.key)) seen.set(s.key, s);
   const stories = [...seen.values()]
     .map((s) => (baseRoot ? { ...s, base_status: base.get(s.key)?.frontmatter?.status ?? null } : s))
     .sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }));
@@ -239,9 +268,9 @@ export function loadSnapshot(opts: {
 }
 
 /**
- * A slice runs in its own worktree (§7, GR3), so its live `runs/<unit>/` is there, not in the
- * story root the snapshot read. Each slice unit for which `sliceWorktree` names a worktree is
- * re-read from that worktree's copy of the spec folder; other units are kept as read.
+ * A slice runs in its own worktree (§7, GR3), so its handoff is there, not in the story root the
+ * snapshot read (its run state is in the machine dir either way, S12). Each slice unit for which
+ * `sliceWorktree` names a worktree is re-read with that worktree's handoff; other units are kept as read.
  */
 export function withSliceWorktrees(
   story: StorySnapshot,
@@ -250,7 +279,7 @@ export function withSliceWorktrees(
 ): StorySnapshot {
   const units = story.units.map((u) => {
     const wt = u.unit.slice ? sliceWorktree(u.unit.slice) : null;
-    return wt ? loadUnit(wt, story, u.unit, opts) : u;
+    return wt ? loadUnit(wt, story, u.unit, { ...opts, at: story.run_state }) : u;
   });
   return { ...story, units };
 }

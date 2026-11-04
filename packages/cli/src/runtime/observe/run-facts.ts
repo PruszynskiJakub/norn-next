@@ -1,6 +1,6 @@
 /** observe: a unit's run facts — its run windows (C4), hook facts refined per agent (A2), the live or unknown run (R5.1, R5.3, B3). */
 import type { AgentAdapter, FileError, Ports, RunFacts, UnitFacts, WorktreeFacts } from "@norn/core";
-import { type HookFact, runStatePath } from "@norn/schema";
+import { type HookFact, unitHandoffPath } from "@norn/schema";
 import { type LocalUnit, liveRun, receiptsOfKinds, runHooks, type StorySnapshot, type UnitSnapshot } from "@norn/store";
 import type { DatedCommit } from "./git-facts.ts";
 
@@ -57,9 +57,10 @@ export async function unitFacts(ports: Ports, story: StorySnapshot, lu: LocalUni
   const now = env.now;
   const u = lu.snapshot;
   const st = u.state;
-  const prefix = `${runStatePath(story, u.unit.dir)}/`;
+  // gh-195 D8 (B5): norn's one file in the worktree is the unit's handoff; its run state is in the machine dir (S12)
+  const handoff = `${story.spec_dir}/${unitHandoffPath(u.unit.dir)}`;
   const dirty = worktree?.status ? [...worktree.status.staged, ...worktree.status.unstaged, ...worktree.status.untracked] : [];
-  const uncommitted = dirty.some((p) => p.startsWith(prefix));
+  const uncommitted = dirty.some((p) => p === handoff || (p.endsWith("/") && handoff.startsWith(p)));
 
   const cursor = lu.cursor;
   const unknown = lu.unknown_launch;

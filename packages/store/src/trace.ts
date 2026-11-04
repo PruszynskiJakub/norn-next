@@ -26,7 +26,8 @@ import {
   validate,
 } from "@norn/schema";
 import { appendDurable, atomicWrite, isErrno, readText, safeUnlink } from "./fsx.ts";
-import { hookFilePath, machineDir, oldRunnerLogDir } from "./paths.ts";
+import { hookFilePath, machineDir } from "./paths.ts";
+import { oldRunnerLogDir } from "./run-state.ts";
 
 function eventTime(ev: TraceEvent): string {
   return ev.type === "hook" ? ev.fact.at : ev.at;
