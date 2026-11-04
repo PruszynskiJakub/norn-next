@@ -180,6 +180,9 @@ Taking over reads the ref when there is one. When there is none (a local-policy 
 - B38 As a reader of the rules and docs, I want them to say where run state lives and when it leaves the machine, so that the docs match what norn does.
   Example: G3 reads that a story can be continued from git in full after a handoff or under `remote`, and from the branch alone with the record lost otherwise; S8, S9, §7 and §7.1, GR6, GR6b, T5, T6, T6a, R3.3, T9, R10.1, C5, RD6, RD7, H2, O6 and MO1 say the same; T7a and R2.3 describe superseded records instead of `orphaned/`; new rules state the record policy and where run state lives; S10 is marked retired with its id kept.
 
+- B39 As an agent or person working a unit, I want each unit's handoff kept as its own file under the spec folder's `handoffs/` (`_story.md` for the story, `<nn>-<slug>.md` for a slice) and committed on that unit's branch, so that the handoff travels with the work while run state does not.
+  Example: gh-9 with slice `01-parser` has `handoffs/_story.md` on the story branch and `handoffs/01-parser.md` on the slice branch; the first boundary after the upgrade moves an open story's old `runs/<unit>/handoff.md` there with Goal, Progress and Resume unchanged (B8, B34); the story's handoff stays one file across rounds.
+
 ## Out of scope
 
 - #92's second-session check (a second session joining a live run) — needs its own issue.
