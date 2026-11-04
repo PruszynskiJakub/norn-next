@@ -11,9 +11,16 @@ labels:
   - norn
   - norn:wf:quick
 workflow: quick
-status: active
+status: done
 intake_at: 2026-11-03T17:17:58.227Z
 body_hash: 48c57d21d27a9cff37c69c2aa2e9116ff62e73a4ca7983a0f3316e393355e194
+merge:
+  pr: 192
+  url: https://github.com/PruszynskiJakub/norn-next/pull/192
+  head_sha: 2a3e380e7a88de5d7fc3c7fc93a3839b019676cf
+  merge_commit_sha: 1c818629b434ed3f3836d82336170354e3d11f2a
+  merged_by: PruszynskiJakub
+  merged_at: 2026-11-04T07:21:59.000Z
 ---
 
 # norn creates the labels it reads, and triage sets kind, risk and priority labels
