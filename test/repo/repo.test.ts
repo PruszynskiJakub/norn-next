@@ -1083,25 +1083,89 @@ describe("one resolver for a unit's record folder (gh-71 D2, B30, B36)", () => {
 describe("the run-state resolver takes the checkout, the story and the unit (gh-195 prefactor 1, B2, B4)", () => {
   /** The resolver: its pure half in schema (paths relative to a root), its on-disk half in store. */
   const RESOLVER = ["packages/schema/src/ids.ts", "packages/store/src/run-state.ts"];
+  /** The record's names: the folder, the unit's and round's record paths, decide's observed record. */
+  const NAMES = String.raw`\b(?:RUNS_DIR|unitRecordPath|roundRecordPath|recordOf)\b|["'\x60]runs["'\x60/]`;
+  /** A spec folder: `spec_dir`, `specDir`, `specPath`, `spec`, as a name or a field. */
+  const SPEC = String.raw`\bspec(?:_dir|Dir|Path)?\b`;
   /**
-   * A unit's run-state path built outside the resolver: a spec folder joined with the record's names
-   * (`${spec}/${unitRecordPath(…)}`, `join(spec, RUNS_DIR)`), or a call of the resolver's spec-folder
-   * primitives (`unitDir(join(wt, spec_dir), unit)` and friends), which leave the caller to pick the folder.
+   * A unit's run-state path built outside the resolver, matched over the whole source with comments
+   * removed (so a call wrapped over lines counts):
+   * - a template that joins something with the record's names (`${spec}/${unitRecordPath(…)}`), or a spec
+   *   folder with a record (`${story.spec_dir}/${recordOf(uf)}`, `${spec}/runs/…`);
+   * - a `join(…)` whose arguments name the record (`join(spec, RUNS_DIR)`);
+   * - a path taken relative to a spec folder (`relative(join(root, spec_dir), dir)`): a record's name;
+   * - a call of the resolver's spec-folder primitives (`unitDir(join(wt, spec_dir), unit)` and friends).
    */
-  const NAMES = "RUNS_DIR|unitRecordPath|roundRecordPath";
-  const BY_HAND = new RegExp(
-    [
-      `\\$\\{[^}]+\\}/\\$\\{(?:${NAMES})\\b`,
-      `\\bjoin\\([^;]*\\b(?:${NAMES})\\b`,
-      `\\b(?:unitDir|storyUnitDir|startDir|roundDir|specRunsDir|storyRounds|currentRound|isFlatStoryRecord)\\s*\\(`,
-    ].join("|"),
-  );
-  const code = (line: string) => (/^\s*(\*|\/\/|\/\*)/.test(line) ? "" : line.replace(/\/\*.*?\*\//g, "").replace(/\s\/\/\s.*$/, ""));
-  const builds = (src: string) =>
-    src
-      .split("\n")
-      .map((l, i) => ({ l, i }))
-      .filter(({ l }) => BY_HAND.test(code(l)));
+  const TEMPLATE = new RegExp(String.raw`\$\{[^{}]*\}/(?:\$\{[^{}]*(?:${NAMES})|runs\b)|\$\{[^{}]*${SPEC}[^{}]*\}/\$\{[^{}]*\brecord`);
+  const RELATIVE = new RegExp(String.raw`\brelative\(\s*(?:join\([^()]*${SPEC}[^()]*\)|[\w.]*${SPEC})\s*,`);
+  /**
+   * Hits that are no unit's run state: the headless runner's session logs sit in the machine dir's
+   * `runs/` (plan prefactor 4 moves them to `sessions/`).
+   */
+  const NOT_RUN_STATE: Record<string, string> = { "packages/store/src/paths.ts": 'join(machineDir(root), "runs")' };
+  const PRIMITIVE = /\b(?:unitDir|storyUnitDir|startDir|roundDir|specRunsDir|storyRounds|currentRound|isFlatStoryRecord)\s*\(/;
+
+  /** `src` with every comment blanked out (strings and templates kept, newlines kept for line numbers). */
+  function stripComments(src: string): string {
+    let out = "";
+    const stack: string[] = []; // open template literals / `${` braces
+    for (let i = 0; i < src.length; i++) {
+      const c = src[i] as string;
+      const top = stack.at(-1);
+      if (top === "`") {
+        out += c;
+        if (c === "\\") out += src[++i] ?? "";
+        else if (c === "`") stack.pop();
+        else if (c === "$" && src[i + 1] === "{") (out += src[++i]), stack.push("{");
+        continue;
+      }
+      if (c === "/" && src[i + 1] === "/") {
+        while (i < src.length && src[i] !== "\n") i++;
+        out += "\n";
+        continue;
+      }
+      if (c === "/" && src[i + 1] === "*") {
+        const end = src.indexOf("*/", i + 2);
+        const stop = end < 0 ? src.length : end + 2;
+        out += src.slice(i, stop).replace(/[^\n]/g, " ");
+        i = stop - 1;
+        continue;
+      }
+      if (c === '"' || c === "'") {
+        let j = i + 1;
+        while (j < src.length && src[j] !== c && src[j] !== "\n") j += src[j] === "\\" ? 2 : 1;
+        out += src.slice(i, j + 1);
+        i = j;
+        continue;
+      }
+      out += c;
+      if (c === "`") stack.push("`");
+      else if (c === "{" && stack.length) stack.push("{");
+      else if (c === "}" && top === "{") stack.pop();
+    }
+    return out;
+  }
+  /** The text of each balanced `join(…)` call's arguments, with where it starts. */
+  function joinCalls(src: string): Array<{ at: number; args: string }> {
+    const out: Array<{ at: number; args: string }> = [];
+    for (const m of src.matchAll(/\bjoin\(/g)) {
+      const start = (m.index ?? 0) + m[0].length;
+      let depth = 1;
+      let j = start;
+      while (j < src.length && depth) depth += src[j] === "(" ? 1 : src[j] === ")" ? -1 : 0, j++;
+      out.push({ at: m.index ?? 0, args: src.slice(start, j - 1) });
+    }
+    return out;
+  }
+  /** Line numbers (0-based) where `src` builds a unit's run-state path by hand. */
+  const builds = (src: string): number[] => {
+    const code = stripComments(src);
+    const lineOf = (at: number) => code.slice(0, at).split("\n").length - 1;
+    const at = new Set<number>();
+    for (const re of [TEMPLATE, RELATIVE, PRIMITIVE]) for (const m of code.matchAll(new RegExp(re.source, "g"))) at.add(lineOf(m.index ?? 0));
+    for (const j of joinCalls(code)) if (new RegExp(NAMES).test(j.args)) at.add(lineOf(j.at));
+    return [...at].sort((a, b) => a - b);
+  };
 
   test("matcher: a spec folder joined with runs/ or a spec-folder primitive is a hit; the resolver's calls, comments and bare names are not", () => {
     const src = [
@@ -1112,17 +1176,64 @@ describe("the run-state resolver takes the checkout, the story and the unit (gh-
       "const e = startDir(join(wt, spec_dir), dir, wf);",
       "const f = runStateDir(wt, { key, spec_dir }, dir);",
       "const g = runStatePath(story, dir);",
-      " * `unitDir(join(wt, spec_dir), unit)` in a doc comment",
+      "/** `unitDir(join(wt, spec_dir), unit)` in a doc comment */",
       "const h = su.record === unitRecordPath(STORY_UNIT_DIR); // join(spec, RUNS_DIR)",
       "export function readState(unitDir: string): void {}",
     ].join("\n");
-    expect(builds(src).map(({ i }) => i)).toEqual([0, 1, 2, 3, 4]);
+    expect(builds(src)).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  test("matcher (review F1): a spec folder joined with decide's observed record is a hit; a record path through the resolver is not", () => {
+    const src = [
+      "log_path: `${story.spec_dir}/${recordOf(uf)}/logs/${run_id}.log`,",
+      "const p = `${s.spec_dir}/${uf.record}/state.json`;",
+      "const q = `${specDir}/runs/${dir}`;",
+      "log_path: `${recordRunStatePath(story, recordOf(uf))}/logs/${run_id}.log`,",
+      "const r = `${recordOf(uf)}/workflow.yaml`;",
+    ].join("\n");
+    expect(builds(src)).toEqual([0, 1, 2]);
+  });
+
+  test("matcher (review F2): a path taken relative to a spec folder is a hit; one relative to a root is not", () => {
+    const src = [
+      "record: relative(join(root, story.spec_dir), path),",
+      "const m = `${relative(join(wtPath, story.spec_dir), runsDir)}/workflow.yaml`;",
+      "const n = relative(s.specPath, s.runsDir);",
+      "spec_dir: relative(root, specPath),",
+      "record: runStateRecord(root, story, path),",
+    ].join("\n");
+    expect(builds(src)).toEqual([0, 1, 2]);
+  });
+
+  test("matcher (review F3): a join or a template wrapped over lines is a hit, at the line it starts; a comment over lines is not", () => {
+    const src = [
+      "const a = join(",
+      "  wt,",
+      "  RUNS_DIR,",
+      ");",
+      "const b = unitDir(",
+      "  spec, dir);",
+      "/*",
+      " * join(spec,",
+      " *   RUNS_DIR)",
+      " */",
+      "const c = `x ${y} // not a comment ${join(z,",
+      "  unitRecordPath(u))}`;",
+    ].join("\n");
+    expect(builds(src)).toEqual([0, 4, 10]);
   });
 
   test("no package source outside the resolver builds a unit's run-state path from a spec folder", () => {
     const hits = files(PKGS)
       .filter((p) => p.includes("/src/") && !RESOLVER.includes(relative(ROOT, p)))
-      .flatMap((p) => builds(readFileSync(p, "utf8")).map(({ l, i }) => `${relative(ROOT, p)}:${i + 1}: ${l.trim()}`));
+      .flatMap((p) => {
+        const src = readFileSync(p, "utf8");
+        const lines = src.split("\n");
+        const allowed = NOT_RUN_STATE[relative(ROOT, p)];
+        return builds(src)
+          .filter((i) => !(allowed && lines[i]?.includes(allowed)))
+          .map((i) => `${relative(ROOT, p)}:${i + 1}: ${lines[i]?.trim()}`);
+      });
     expect(hits).toEqual([]);
   });
 });

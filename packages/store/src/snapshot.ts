@@ -20,7 +20,7 @@ import { type LoadedConfig, loadConfig, loadWorkflows, type WorkflowListing } fr
 import { readSliceFile, readStoryFile } from "./frontmatter.ts";
 import { isErrno } from "./fsx.ts";
 import { slicesDir, specsDir, storyFile } from "./paths.ts";
-import { isFlatRunState, runStateDir, runStateRounds, storyRunStateDir } from "./run-state.ts";
+import { isFlatRunState, runStateDir, runStateRecord, runStateRounds, storyRunStateDir } from "./run-state.ts";
 import { listReceipts } from "./receipts.ts";
 import { type Handoff, type PinnedWorkflow, readHandoff, readPinnedWorkflow, readState } from "./unit.ts";
 import { readUnitMarker } from "./worktree.ts";
@@ -115,7 +115,7 @@ export function loadUnit(root: string, story: RunStory, unit: UnitRef, opts: { i
   return {
     unit,
     path,
-    record: relative(join(root, story.spec_dir), path),
+    record: runStateRecord(root, story, path),
     state,
     workflow: wf.ok ? wf.value : null,
     unapplied: all.receipts.filter((r) => r.n > after),

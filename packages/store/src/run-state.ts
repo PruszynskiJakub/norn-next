@@ -10,7 +10,7 @@
  * name a fixture's files, package sources use the `(root, story, unit)` functions.
  */
 import { existsSync, readdirSync } from "node:fs";
-import { isAbsolute, join } from "node:path";
+import { isAbsolute, join, relative } from "node:path";
 import { parseRoundDirName, ROUNDS_DIR, RUNS_DIR, type RunStory, roundDirName, roundRecordPath, STORY_UNIT_DIR, unitRecordPath } from "@norn/schema";
 
 const specFolder = (root: string, story: RunStory) => join(root, story.spec_dir);
@@ -21,6 +21,11 @@ export const runStateDir = (root: string, story: RunStory, unit: string): string
 export const runStateStartDir = (root: string, story: RunStory, unit: string, workflow: string): string => startDir(specFolder(root, story), unit, workflow);
 /** The folder in `root` holding every unit's run-state folder of a story (`runs/`). */
 export const storyRunStateDir = (root: string, story: RunStory): string => specRunsDir(specFolder(root, story));
+/**
+ * gh-195 prefactor 1 (review F2): a run-state folder's record, its path inside the story's run state
+ * (`runs/<nn>-<slug>`, `runs/_story/rounds/01-story`): what facts and messages name it by.
+ */
+export const runStateRecord = (root: string, story: RunStory, dir: string): string => relative(specFolder(root, story), dir);
 /** gh-71 B29, B30: the story's rounds in `root`, ascending; [] for a flat record or a story not started. */
 export const runStateRounds = (root: string, story: RunStory) => storyRounds(specFolder(root, story));
 /** gh-71 D7 (B34): whether the story's run state in `root` is still the flat record of an older norn. */

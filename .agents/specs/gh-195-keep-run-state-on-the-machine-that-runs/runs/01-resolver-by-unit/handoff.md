@@ -28,12 +28,6 @@ Plan prefactor 1: every reader and writer of run state asks one resolver for `(r
 - Callers moved: store snapshot (`loadUnit(root, story, unit)`), unpushed (`unpushedRuns(remote, baseRef, story, targets)`); cli checkout, human, agent-unit, leases, act/env, act/lifecycle, observe/run-facts, observe/index, brief, tidy, story-reopen; view load; core decide/story (round paths).
 - AC2: `test/repo/repo.test.ts` "the run-state resolver takes the checkout, the story and the unit": flags `${spec}/${unitRecordPath|roundRecordPath|RUNS_DIR}`, `join(… RUNS_DIR|unitRecordPath|roundRecordPath …)`, and calls of the spec-folder primitives in package sources outside ids.ts and run-state.ts; a matcher test; red on the old tree (stash), green now.
 - AC1: no test, golden case, transcript or snapshot changed. unit 1165 pass; typecheck green; integration 710 pass / 3 skip / 0 fail; e2e 73 pass / 0 fail.
-- Review #1 rework (implement #2):
-  - F1 (blocking): decide's check log path now goes through schema `recordRunStatePath(story, recordOf(uf))`; the lint flags `${spec…}/${…record…}` templates and `recordOf` in joins (matcher case F1).
-  - F2: store `runStateRecord(root, story, dir)` gives a folder's record; snapshot's `record` and lifecycle's S7 pin message use it; the lint flags `relative(<spec folder>, …)` (matcher case F2).
-  - F3: the lint now strips comments with a small scanner (strings and templates kept) and matches the whole source, `join(…)` by balanced parens, so wrapped calls are caught (matcher case F3). The runner's session logs (`join(machineDir(root), "runs")` in paths.ts) are named as not run state (prefactor 4 moves them).
-  - The real-tree lint test went red on exactly steps.ts:88, lifecycle.ts:77, snapshot.ts:118 (plus the runner log dir) before the fixes; green after.
-  - unit 1168 pass; typecheck green; integration 713 pass / 0 fail; e2e see report.
 - Flakes: none.
 - implement#1 done: Prefactor 1: run state resolved by (root, story, unit) in store run-state.ts (pure half in schema ids.ts); all callers moved, folder unchanged; repo lint (AC2) fails a source outside the resolver that joins a spec folder with runs/ or calls the spec-folder primitives. Unit 1165 pass, typecheck green, integration 710/3 skip/0 fail, e2e 73/0 fail; no golden, transcript or snapshot change.
 
@@ -46,15 +40,15 @@ Plan prefactor 1: every reader and writer of run state asks one resolver for `(r
 
 - Verdict: changes_requested. F1 (blocking): `packages/core/src/decide/steps.ts:88` still builds the run log path as `${story.spec_dir}/${recordOf(uf)}/logs/…` (spec folder + `runs/…`), outside the resolver; the AC2 lint does not catch it because `recordOf` is not in its name list. F2 (minor): spec-folder-relative record derivations in `snapshot.ts:118` and `lifecycle.ts:77`. F3 (minor): the lint matches one line only.
 - Checks run here: `bun run test` 1165 pass / 0 fail; `bun run typecheck` green; `bun run test:e2e` 73 pass / 0 fail.
+- review#1 changes_requested: AC1 met (unit 1165, e2e 73, integration green, no test/golden/transcript change). AC2 partial: decide steps.ts:88 builds the log path as spec_dir + recordOf (runs/…) outside the resolver and the lint misses it (F1 blocking); F2/F3 minor.
+
 - Review #1 rework (implement #2):
   - F1 (blocking): decide's check log path now goes through schema `recordRunStatePath(story, recordOf(uf))`; the lint flags `${spec…}/${…record…}` templates and `recordOf` in joins (matcher case F1).
   - F2: store `runStateRecord(root, story, dir)` gives a folder's record; snapshot's `record` and lifecycle's S7 pin message use it; the lint flags `relative(<spec folder>, …)` (matcher case F2).
-  - F3: the lint now strips comments with a small scanner (strings and templates kept) and matches the whole source, `join(…)` by balanced parens, so wrapped calls are caught (matcher case F3). The runner's session logs (`join(machineDir(root), "runs")` in paths.ts) are named as not run state (prefactor 4 moves them).
+  - F3: the lint strips comments with a small scanner (strings and templates kept) and matches the whole source, `join(…)` by balanced parens, so wrapped calls are caught (matcher case F3). The runner's session logs (`join(machineDir(root), "runs")` in paths.ts) are named as not run state (prefactor 4 moves them).
   - The real-tree lint test went red on exactly steps.ts:88, lifecycle.ts:77, snapshot.ts:118 (plus the runner log dir) before the fixes; green after.
-  - unit 1168 pass; typecheck green; integration 713 pass / 0 fail; e2e see report.
-- Flakes: none.
-- review#1 changes_requested: AC1 met (unit 1165, e2e 73, integration green, no test/golden/transcript change). AC2 partial: decide steps.ts:88 builds the log path as spec_dir + recordOf (runs/…) outside the resolver and the lint misses it (F1 blocking); F2/F3 minor.
+  - unit 1168 pass; typecheck green; integration 713 pass / 0 fail; e2e 73 pass / 0 fail. Flakes: none.
 
 ## Resume
 
-review#1 reported changes_requested; implement fixes F1 (and F2/F3 if cheap), see findings in the review receipt.
+Rework F1–F3 done and committed; report `norn done done`.

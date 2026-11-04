@@ -248,6 +248,11 @@ export interface RunStory {
  * folder with `runs/` (test/repo/repo.test.ts).
  */
 export const runStatePath = (story: RunStory, unit: string): string => `${story.spec_dir}/${unitRecordPath(unit)}`;
+/**
+ * gh-195 prefactor 1 (review F1): a unit's run-state folder relative to a root from its record, the unit's
+ * path inside the story's run state as observe resolved it (`UnitFacts.record`, e.g. `runs/_story/rounds/01-story`).
+ */
+export const recordRunStatePath = (story: RunStory, record: string): string => `${story.spec_dir}/${record}`;
 /** gh-195 prefactor 1: round `n`'s run-state folder relative to a root (`<spec folder>/runs/_story/rounds/NN-<wf>`). */
 export const roundRunStatePath = (story: RunStory, n: number, workflow: string): string => `${story.spec_dir}/${roundRecordPath(n, workflow)}`;
 /** gh-195 prefactor 1: the folder relative to a root that holds every unit's run state of a story (`<spec folder>/runs`). */

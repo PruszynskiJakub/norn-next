@@ -21,6 +21,7 @@ import {
   readPendingRecords,
   writePendingRecords,
   moveFile,
+  runStateRecord,
   runStateStartDir,
   writeState,
 } from "@norn/store";
@@ -72,9 +73,10 @@ export async function startUnit(act: ActEnv, a: Extract<Action, { kind: "start_u
     wtPath = a.worktree.path;
   }
   if (!wtPath) throw new Error(`no worktree for ${a.unit.key}`);
-  const runsDir = runStateStartDir(wtPath, { key: a.unit.story, spec_dir: story.spec_dir }, a.unit.dir, a.workflow);
+  const run = { key: a.unit.story, spec_dir: story.spec_dir };
+  const runsDir = runStateStartDir(wtPath, run, a.unit.dir, a.workflow);
   const pin = pinWorkflow(runsDir, a.workflow_source);
-  if (!pin.ok) throw new Error(`${relative(join(wtPath, story.spec_dir), runsDir)}/workflow.yaml is already pinned with different content (S7)`);
+  if (!pin.ok) throw new Error(`${runStateRecord(wtPath, run, runsDir)}/workflow.yaml is already pinned with different content (S7)`);
   act.obs.units[a.unit.key] = {
     unit: a.unit,
     story: a.unit.story,
