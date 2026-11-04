@@ -8,6 +8,10 @@ title: Keep run state on the machine that runs it, and hand it over only when as
 assignee: PruszynskiJakub
 labels:
   - norn
+  - norn:kind:feature
+  - norn:priority:medium
+  - norn:risk:high
+  - norn:wf:refinement
 workflow: refinement
 status: active
 intake_at: 2026-11-04T08:34:16.652Z
