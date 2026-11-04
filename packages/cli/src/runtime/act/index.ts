@@ -206,7 +206,7 @@ export class Actor extends ActEnv {
         const loc = this.unitLoc(a.unit);
         this.writeReceipts(loc.runsDir, a.receipts);
         // a gate rejection is a milestone in handoff.md, as when it is written locally (O6)
-        for (const r of a.receipts) if (r.receipt.kind === "reject") appendProgress(loc.runsDir, rejectProgress(r.receipt));
+        for (const r of a.receipts) if (r.receipt.kind === "reject") appendProgress(loc.handoffFile, rejectProgress(r.receipt));
         const committed = await this.commit(a.commit, a.unit, loc.state, `${a.rule}: ${a.receipts.map((r) => r.receipt.kind).join(", ")}`);
         const deleted: string[] = [];
         for (const r of a.refs) {

@@ -195,7 +195,7 @@ export const doneCommand = defineCommand({
     // evidence sits beside the receipt it belongs to; copied before the receipt lands (P6)
     if (evidencePath) ensureEvidenceDir(t.s.runsDir, t.run_id, evidencePath);
     const written = writeReport(t, receipt);
-    appendProgress(t.s.runsDir, `${t.s.state.step}#${t.s.state.attempt} ${outcome}: ${handoff}`);
+    appendProgress(t.s.handoffFile, `${t.s.state.step}#${t.s.state.attempt} ${outcome}: ${handoff}`);
     // QV4/QV8: the report counted in the trace — unverified per capability, unchecked coverage
     if (report)
       appendTrace(

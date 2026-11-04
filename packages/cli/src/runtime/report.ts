@@ -76,14 +76,14 @@ export function rejectProgress(r: Receipt): string {
 }
 
 /** The agent's milestone (O6): one line appended to the Progress section of handoff.md. */
-export function appendProgress(runsDir: string, line: string): void {
-  const cur = readHandoff(runsDir);
+export function appendProgress(handoffFile: string, line: string): void {
+  const cur = readHandoff(handoffFile);
   const body = cur?.body ?? "\n## Goal\n\n## Progress\n\n## Resume\n";
   const text = `- ${line.replace(/\s*\n\s*/g, " ").trim()}`;
   const lines = body.split("\n");
   const at = lines.findIndex((l) => /^##\s+Progress\s*$/.test(l));
   if (at < 0) {
-    writeHandoffBody(runsDir, `${body.replace(/\n*$/, "\n")}\n## Progress\n\n${text}\n`);
+    writeHandoffBody(handoffFile, `${body.replace(/\n*$/, "\n")}\n## Progress\n\n${text}\n`);
     return;
   }
   let end = lines.findIndex((l, i) => i > at && /^##\s/.test(l));
@@ -95,7 +95,7 @@ export function appendProgress(runsDir: string, line: string): void {
   // keep one blank line before the next section
   const next = insert + block.length;
   if (next < lines.length && (lines[next] ?? "").trim() !== "") lines.splice(next, 0, "");
-  writeHandoffBody(runsDir, lines.join("\n"));
+  writeHandoffBody(handoffFile, lines.join("\n"));
 }
 
 /** What every successful report answers (§9.3): the receipt, then "end your turn". */

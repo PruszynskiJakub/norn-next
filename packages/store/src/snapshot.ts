@@ -19,7 +19,7 @@ import { baseSpecsRoot, defaultBaseRef } from "./base.ts";
 import { type LoadedConfig, loadConfig, loadWorkflows, type WorkflowListing } from "./config.ts";
 import { readSliceFile, readStoryFile } from "./frontmatter.ts";
 import { isErrno } from "./fsx.ts";
-import { isFlatStoryRecord, slicesDir, specRunsDir, specsDir, storyFile, storyRounds, unitDir } from "./paths.ts";
+import { handoffPath, isFlatStoryRecord, slicesDir, specRunsDir, specsDir, storyFile, storyRounds, unitDir } from "./paths.ts";
 import { listReceipts } from "./receipts.ts";
 import { type Handoff, type PinnedWorkflow, readHandoff, readPinnedWorkflow, readState } from "./unit.ts";
 import { readUnitMarker } from "./worktree.ts";
@@ -37,6 +37,8 @@ export interface UnitSnapshot {
   unapplied: NumberedReceipt[];
   /** every valid receipt, when `includeApplied` */
   receipts?: NumberedReceipt[];
+  /** absolute path of the unit's handoff, from its own resolver (`handoffPath`, gh-195 prefactor 2), not from `path` */
+  handoffFile: string;
   handoff: Handoff | null;
   /** files of this unit failing validation → unit is corrupt (S2) */
   errors: FileError[];
@@ -118,7 +120,8 @@ export function loadUnit(root: string, specPath: string, unit: UnitRef, opts: { 
     workflow: wf.ok ? wf.value : null,
     unapplied: all.receipts.filter((r) => r.n > after),
     ...(opts.includeApplied ? { receipts: all.receipts } : {}),
-    handoff: readHandoff(path),
+    handoffFile: handoffPath(specPath, unit.dir),
+    handoff: readHandoff(handoffPath(specPath, unit.dir)),
     errors,
   };
 }

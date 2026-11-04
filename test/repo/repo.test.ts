@@ -1099,3 +1099,45 @@ describe("the running version is a dependency (gh-61 B6, Prefactor 1)", () => {
     expect(hits).toEqual([]);
   });
 });
+
+describe("one resolver for a unit's handoff (gh-195 prefactor 2, B6, B39)", () => {
+  /** Where a unit's handoff path may be named: the pure name in schema and store's path module. */
+  const RESOLVERS = ["packages/schema/src/ids.ts", "packages/store/src/paths.ts"];
+  /**
+   * A handoff path derived from a record folder: the bare `handoff.md` literal (`join(record, "handoff.md")`),
+   * the old record-keyed helpers, or a `dirname` of a handoff path (the story's handoff sat above its round folders).
+   */
+  const FROM_RECORD = /["'`/]handoff\.md["'`]|\brecordHandoffPath\b|\brecordPaths\b|\bdirname\([^)]*handoff/i;
+  const isComment = (line: string) => /^\s*(\*|\/\/|\/\*)/.test(line);
+  const fromRecord = (src: string) =>
+    src
+      .split("\n")
+      .map((l, i) => ({ l, i }))
+      .filter(({ l }) => !isComment(l) && FROM_RECORD.test(l));
+
+  test("matcher: a joined literal, the record-keyed helpers and a dirname of a handoff are hits; comments and the resolver are not", () => {
+    const src = [
+      'const a = join(runsDir, "handoff.md");',
+      "const b = `${record}/handoff.md`;",
+      "const c = recordHandoffPath(p.unit_dir);",
+      "const d = recordPaths(loc.runsDir);",
+      "const e = dirname(handoffPath(ud)) === ud;",
+      " * the story's `handoff.md` in a doc comment",
+      "// join(runsDir, 'handoff.md')",
+      "const f = handoffPath(specDir, unit.dir);",
+    ].join("\n");
+    expect(fromRecord(src).map(({ i }) => i)).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  test("no package source outside the resolvers derives a handoff path from a record folder", () => {
+    const hits = files(PKGS)
+      .filter((p) => p.includes("/src/") && !RESOLVERS.includes(relative(ROOT, p)))
+      .flatMap((p) => fromRecord(readFileSync(p, "utf8")).map(({ l, i }) => `${relative(ROOT, p)}:${i + 1}: ${l.trim()}`));
+    expect(hits).toEqual([]);
+  });
+
+  test("the resolvers key the handoff by the unit, never by a record folder", () => {
+    const keyedByRecord = RESOLVERS.filter((f) => /\brecordHandoffPath\b|\brecordPaths\b/.test(readFileSync(join(ROOT, f), "utf8")));
+    expect(keyedByRecord).toEqual([]);
+  });
+});

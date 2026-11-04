@@ -6,7 +6,7 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Receipt } from "@norn/schema";
+import { type Receipt, STORY_UNIT_DIR } from "@norn/schema";
 import { heartbeatFilePath, readTrace, repoConfigPath, workflowsDir, storyUnitDir, handoffPath } from "@norn/store";
 import { humanTickLines } from "../../src/commands/watch.ts";
 import { type CliResult, type TickReport } from "../../src/index.ts";
@@ -281,7 +281,7 @@ describe("approve (gate)", () => {
     await tick();
     expect(h.state(runs5())).toMatchObject({ step: "work", attempt: 3, counters: { loop: 1 } });
     // O6: the rejection is a milestone in handoff.md, so the next brief's Context carries it
-    expect(h.read(handoffPath(runs5()))).toContain("- review#1 reject by tester@box: needs tests");
+    expect(h.read(handoffPath(join(wt5(), spec5), STORY_UNIT_DIR))).toContain("- review#1 reject by tester@box: needs tests");
     expect(r.value).not.toHaveProperty("warning");
 
     // B26 (B3): a rejection without a reason would leave the agent nothing to fix: a usage error, nothing written
@@ -292,7 +292,7 @@ describe("approve (gate)", () => {
     expect(bare.value).toMatchObject({ do_instead: expect.stringContaining("pass --reason") });
     expect(h.state(runs5())).toMatchObject({ step: "review", attempt: 2, status: "parked" });
     expect((await h.norn("story", "reject", "gh-5", "--reason", "still no tests")).exit).toBe(0);
-    expect(h.read(handoffPath(runs5()))).toContain("- review#2 reject by tester@box: still no tests");
+    expect(h.read(handoffPath(join(wt5(), spec5), STORY_UNIT_DIR))).toContain("- review#2 reject by tester@box: still no tests");
     await tick();
     expect(h.state(runs5())).toMatchObject({ step: "work", attempt: 4, counters: { loop: 2 } });
 
@@ -728,7 +728,7 @@ describe("gh-71 B1, B3–B10, B17, B30, B31: norn story edit --workflow starts t
     await next();
     expect(t.state(runs())).toMatchObject({ step: "$done", status: "done" });
     // B31: the person's part of the handoff, written in round 1
-    const handoff = handoffPath(runs());
+    const handoff = handoffPath(join(wt(), spec), STORY_UNIT_DIR);
     t.write(handoff, `${t.read(handoff)}\n## Goal\nDeliver it.\n\n## Progress\n- triaged\n\n## Resume\nRefine the spec.\n`);
     const before = receiptsIn(runs());
     const unknown = await t.norn("story", "edit", "gh-14", "--workflow", "sotry", "--json");
@@ -782,8 +782,8 @@ describe("gh-71 B1, B3–B10, B17, B30, B31: norn story edit --workflow starts t
     expect(t.git(["rev-parse", "--abbrev-ref", "HEAD"], wt()).trim()).toBe(branch);
     expect(t.read(join(wt(), spec, "spec.md"))).toContain("workflow: story");
     // B31: one handoff, the person's sections kept
-    const handoff = t.read(handoffPath(runs()));
-    expect(handoffPath(runs())).toBe(join(record(), "handoff.md"));
+    const handoff = t.read(handoffPath(join(wt(), spec), STORY_UNIT_DIR));
+    expect(handoffPath(join(wt(), spec), STORY_UNIT_DIR)).toBe(join(record(), "handoff.md"));
     expect(handoff).toContain("## Goal\nDeliver it.");
     expect(handoff).toContain("## Resume\nRefine the spec.");
     // B6: Your turn for refine

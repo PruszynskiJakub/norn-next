@@ -10,6 +10,7 @@ import {
   storyUnitDir,
   unitDir,
   writeHandoffHeader,
+  handoffPath,
   writeSliceFile,
   writeState,
   writeStoryFile,
@@ -29,7 +30,7 @@ function seed(root: string, title = "Fix login") {
   appendReceipt(u1, receipt());
   appendReceipt(u1, receipt());
   writeState(u1, state({ applied_through: 1 }));
-  writeHandoffHeader(u1, "header");
+  writeHandoffHeader(handoffPath(spec, "01-add-form"), "header");
   return spec;
 }
 
