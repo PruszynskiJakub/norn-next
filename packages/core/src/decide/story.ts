@@ -9,7 +9,8 @@ import {
   SPEC_FILE,
   type StoryFrontmatter,
   type UnitState,
-  roundRecordPath,
+  roundRunStatePath,
+  runStatePath,
   STORY_UNIT_DIR,
   unitRecordPath,
 } from "@norn/schema";
@@ -110,8 +111,8 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
   if (!ctx.has(ref.key) && su?.state && su.record === unitRecordPath(STORY_UNIT_DIR) && !rebasing(su) && !mergedIntoBase(story, ctx.facts.repo.default_branch)) {
     const commit = commitFor(ctx, story, su, `norn: ${story.key} record moved into round 1`, su.state.step);
     if (commit) {
-      const from = `${story.spec_dir}/${unitRecordPath(STORY_UNIT_DIR)}`;
-      return ctx.emit({ kind: "round_migrate", unit: ref, rule: "round.migrate", from, to: `${story.spec_dir}/${roundRecordPath(1, su.state.workflow)}`, commit });
+      const from = runStatePath(story, STORY_UNIT_DIR);
+      return ctx.emit({ kind: "round_migrate", unit: ref, rule: "round.migrate", from, to: roundRunStatePath(story, 1, su.state.workflow), commit });
     }
   }
 
@@ -438,7 +439,7 @@ function roundStart(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, n
     receipt_n: nr.n,
     ended,
     rejected,
-    round: { n, workflow: r.workflow, dir: `${story.spec_dir}/${roundRecordPath(n, r.workflow)}` },
+    round: { n, workflow: r.workflow, dir: roundRunStatePath(story, n, r.workflow) },
     workflow_source: loaded.source,
     state,
     commit: commitFor(ctx, story, uf, `norn: ${story.key} round ${n} (${r.workflow}) at ${r.to}`, state.step),

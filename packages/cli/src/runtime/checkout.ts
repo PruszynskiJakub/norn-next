@@ -28,7 +28,7 @@ import {
   writtenHere,
   machineHolder,
   traceEvent,
-  unitDir,
+  runStateDir,
 } from "@norn/store";
 import type { Context } from "../context.ts";
 import { claimHeld, corruptError, failure, refuse, withExit } from "../output.ts";
@@ -181,7 +181,8 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
   if (!(await checkout({ path: storyWt, branch, story: key, slice: null, unit: STORY_UNIT_DIR, spec_dir }, key)))
     throw failure(problems.join("; "), `fix the story branch, then ${cmd.storyCheckout(key)} again (the claim is held by you now)`, "branch_diverged", { claim: blob });
 
-  const storyRuns = unitDir(join(storyWt, spec_dir), STORY_UNIT_DIR);
+  const run = { key, spec_dir };
+  const storyRuns = runStateDir(storyWt, run, STORY_UNIT_DIR);
   const record = takeReceipt(storyRuns, { holder, now: nowIso, ...takeFacts });
 
   const snapshot = loadStory(storyWt, join(storyWt, spec_dir));
@@ -210,7 +211,7 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
       const path = wtByBranch.get(sb) ?? sliceWorktreePath(storyWt, s.nn, s.slug);
       if (await checkout({ path, branch: sb, story: key, slice: s.key, unit: dir, spec_dir }, s.key)) wt = wtByBranch.get(sb) ?? path;
     }
-    const runs = unitDir(join(wt ?? storyWt, spec_dir), dir);
+    const runs = runStateDir(wt ?? storyWt, run, dir);
     if (existsSync(runs)) units.push(view(s.key, wt, runs));
   }
 

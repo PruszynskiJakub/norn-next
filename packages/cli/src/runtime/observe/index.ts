@@ -308,7 +308,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
 
     // R2.3: a checkout without the claim reports its local runs/ work that is not in the record
     const heldHere = claim.state === "mine" || (claim.state === "expired" && claim.blob.heartbeat_id === hb);
-    const lost = remote && !heldHere && claim.state !== "corrupt" ? await unpushedRuns(remote, baseRef, s.spec_dir, targets) : [];
+    const lost = remote && !heldHere && claim.state !== "corrupt" ? await unpushedRuns(remote, baseRef, s, targets) : [];
     if (lost.length) unpushed[s.key] = lost;
 
     stories.push({

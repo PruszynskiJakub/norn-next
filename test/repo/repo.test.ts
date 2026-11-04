@@ -1080,6 +1080,53 @@ describe("one resolver for a unit's record folder (gh-71 D2, B30, B36)", () => {
   });
 });
 
+describe("the run-state resolver takes the checkout, the story and the unit (gh-195 prefactor 1, B2, B4)", () => {
+  /** The resolver: its pure half in schema (paths relative to a root), its on-disk half in store. */
+  const RESOLVER = ["packages/schema/src/ids.ts", "packages/store/src/run-state.ts"];
+  /**
+   * A unit's run-state path built outside the resolver: a spec folder joined with the record's names
+   * (`${spec}/${unitRecordPath(…)}`, `join(spec, RUNS_DIR)`), or a call of the resolver's spec-folder
+   * primitives (`unitDir(join(wt, spec_dir), unit)` and friends), which leave the caller to pick the folder.
+   */
+  const NAMES = "RUNS_DIR|unitRecordPath|roundRecordPath";
+  const BY_HAND = new RegExp(
+    [
+      `\\$\\{[^}]+\\}/\\$\\{(?:${NAMES})\\b`,
+      `\\bjoin\\([^;]*\\b(?:${NAMES})\\b`,
+      `\\b(?:unitDir|storyUnitDir|startDir|roundDir|specRunsDir|storyRounds|currentRound|isFlatStoryRecord)\\s*\\(`,
+    ].join("|"),
+  );
+  const code = (line: string) => (/^\s*(\*|\/\/|\/\*)/.test(line) ? "" : line.replace(/\/\*.*?\*\//g, "").replace(/\s\/\/\s.*$/, ""));
+  const builds = (src: string) =>
+    src
+      .split("\n")
+      .map((l, i) => ({ l, i }))
+      .filter(({ l }) => BY_HAND.test(code(l)));
+
+  test("matcher: a spec folder joined with runs/ or a spec-folder primitive is a hit; the resolver's calls, comments and bare names are not", () => {
+    const src = [
+      "const a = `${story.spec_dir}/${unitRecordPath(unit)}`;",
+      "const b = join(specDir, RUNS_DIR);",
+      "const c = join(wt, spec_dir, roundRecordPath(1, wf));",
+      "const d = unitDir(join(wt, m.spec_dir), m.unit);",
+      "const e = startDir(join(wt, spec_dir), dir, wf);",
+      "const f = runStateDir(wt, { key, spec_dir }, dir);",
+      "const g = runStatePath(story, dir);",
+      " * `unitDir(join(wt, spec_dir), unit)` in a doc comment",
+      "const h = su.record === unitRecordPath(STORY_UNIT_DIR); // join(spec, RUNS_DIR)",
+      "export function readState(unitDir: string): void {}",
+    ].join("\n");
+    expect(builds(src).map(({ i }) => i)).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  test("no package source outside the resolver builds a unit's run-state path from a spec folder", () => {
+    const hits = files(PKGS)
+      .filter((p) => p.includes("/src/") && !RESOLVER.includes(relative(ROOT, p)))
+      .flatMap((p) => builds(readFileSync(p, "utf8")).map(({ l, i }) => `${relative(ROOT, p)}:${i + 1}: ${l.trim()}`));
+    expect(hits).toEqual([]);
+  });
+});
+
 describe("the running version is a dependency (gh-61 B6, Prefactor 1)", () => {
   // only the default wiring reads the package version; every command takes `ctx.version`, so a test can run the CLI as any binary
   const WIRING = "packages/cli/src/context.ts";

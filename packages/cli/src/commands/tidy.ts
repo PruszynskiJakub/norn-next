@@ -23,7 +23,7 @@ import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { herdr } from "@norn/adapters";
 import { ulid } from "@norn/schema";
-import { copyToOrphaned, deleteTraceDays, deleteTracePaths, orphanedDir, reclaimLeases, receiptsDir, safeUnlink, traceDaysBefore, unitDir } from "@norn/store";
+import { copyToOrphaned, deleteTraceDays, deleteTracePaths, orphanedDir, reclaimLeases, receiptsDir, safeUnlink, traceDaysBefore, runStateDir } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, usageError } from "../output.ts";
@@ -168,7 +168,7 @@ export const tidyCommand = defineCommand({
       const holder = obs.facts.machine.holder;
       for (const [story, units] of Object.entries(obs.unpushed)) {
         for (const u of units) {
-          const record = unitDir(join(u.cwd, obs.stories[story]?.spec_dir ?? ""), u.dir);
+          const record = runStateDir(u.cwd, { key: story, spec_dir: obs.stories[story]?.spec_dir ?? "" }, u.dir);
           const moved: Array<{ from: string; to: string }> = [];
           for (const f of u.files) {
             const src = join(u.cwd, f);

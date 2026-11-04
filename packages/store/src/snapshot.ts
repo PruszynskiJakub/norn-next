@@ -14,19 +14,20 @@
 import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { FileError, NumberedReceipt, SliceFileFacts, UnitRef } from "@norn/core";
-import { SPEC_FILE, STORY_UNIT_DIR, type StoryFrontmatter, type UnitState, parseSliceFileName, parseSpecDirName, sliceKey } from "@norn/schema";
+import { type RunStory, SPEC_FILE, STORY_UNIT_DIR, type StoryFrontmatter, type UnitState, parseSliceFileName, parseSpecDirName, sliceKey } from "@norn/schema";
 import { baseSpecsRoot, defaultBaseRef } from "./base.ts";
 import { type LoadedConfig, loadConfig, loadWorkflows, type WorkflowListing } from "./config.ts";
 import { readSliceFile, readStoryFile } from "./frontmatter.ts";
 import { isErrno } from "./fsx.ts";
-import { isFlatStoryRecord, slicesDir, specRunsDir, specsDir, storyFile, storyRounds, unitDir } from "./paths.ts";
+import { slicesDir, specsDir, storyFile } from "./paths.ts";
+import { isFlatRunState, runStateDir, runStateRounds, storyRunStateDir } from "./run-state.ts";
 import { listReceipts } from "./receipts.ts";
 import { type Handoff, type PinnedWorkflow, readHandoff, readPinnedWorkflow, readState } from "./unit.ts";
 import { readUnitMarker } from "./worktree.ts";
 
 export interface UnitSnapshot {
   unit: UnitRef;
-  /** absolute record folder (`unitDir`): runs/<unit>/, the story's current round folder (gh-71 B30) */
+  /** absolute record folder (`runStateDir`): runs/<unit>/, the story's current round folder (gh-71 B30) */
   path: string;
   /** the record folder relative to the spec folder (gh-71 D2), e.g. `runs/_story/rounds/01-story` */
   record: string;
@@ -92,8 +93,9 @@ function files(path: string): string[] {
   }
 }
 
-export function loadUnit(root: string, specPath: string, unit: UnitRef, opts: { includeApplied?: boolean; path?: string } = {}): UnitSnapshot {
-  const path = opts.path ?? unitDir(specPath, unit.dir);
+/** One unit's run state in `root` (gh-195 prefactor 1: found through the resolver, `runStateDir`). */
+export function loadUnit(root: string, story: RunStory, unit: UnitRef, opts: { includeApplied?: boolean; path?: string } = {}): UnitSnapshot {
+  const path = opts.path ?? runStateDir(root, story, unit.dir);
   const errors: FileError[] = [];
   const st = readState(path, root);
   if (!st.ok && st.reason === "corrupt") errors.push(st.error);
@@ -113,7 +115,7 @@ export function loadUnit(root: string, specPath: string, unit: UnitRef, opts: { 
   return {
     unit,
     path,
-    record: relative(specPath, path),
+    record: relative(join(root, story.spec_dir), path),
     state,
     workflow: wf.ok ? wf.value : null,
     unapplied: all.receipts.filter((r) => r.n > after),
@@ -131,9 +133,9 @@ export function loadUnit(root: string, specPath: string, unit: UnitRef, opts: { 
 export function loadRounds(story: StorySnapshot, opts: { includeApplied?: boolean } = {}): Array<{ n: number; workflow: string; unit: UnitSnapshot }> {
   const current = story.units[0];
   if (!current?.state) return [];
-  const rounds = isFlatStoryRecord(story.path) ? [] : storyRounds(story.path);
+  const rounds = isFlatRunState(story.root, story) ? [] : runStateRounds(story.root, story);
   if (!rounds.length) return [{ n: current.state.round ?? 1, workflow: current.state.workflow, unit: current }];
-  return rounds.map((r) => ({ n: r.n, workflow: r.workflow, unit: r.path === current.path ? current : loadUnit(story.root, story.path, current.unit, { ...opts, path: r.path }) }));
+  return rounds.map((r) => ({ n: r.n, workflow: r.workflow, unit: r.path === current.path ? current : loadUnit(story.root, story, current.unit, { ...opts, path: r.path }) }));
 }
 
 /** Read one spec folder (spec.md, slices/, runs/). */
@@ -164,21 +166,22 @@ export function loadStory(root: string, specPath: string, opts: { includeApplied
     slices.push({ key: sk, file: relative(root, file), nn, slug: sm.slug, frontmatter: r.ok && !error ? r.value.frontmatter : null, error });
   }
 
-  const units: UnitSnapshot[] = [loadUnit(root, specPath, { story: key, slice: null, dir: STORY_UNIT_DIR, key }, opts)];
-  const runDirs = new Set(dirs(specRunsDir(specPath)).filter((d) => d !== STORY_UNIT_DIR));
+  const run: RunStory = { key, spec_dir: relative(root, specPath) };
+  const units: UnitSnapshot[] = [loadUnit(root, run, { story: key, slice: null, dir: STORY_UNIT_DIR, key }, opts)];
+  const runDirs = new Set(dirs(storyRunStateDir(root, run)).filter((d) => d !== STORY_UNIT_DIR));
   for (const s of slices) runDirs.add(`${s.nn}-${s.slug}`);
   for (const d of [...runDirs].sort()) {
     const nn = /^([0-9]{2,3})-/.exec(d)?.[1];
     if (!nn) continue;
     const sk = sliceKey(key, nn);
-    units.push(loadUnit(root, specPath, { story: key, slice: sk, dir: d, key: sk }, opts));
+    units.push(loadUnit(root, run, { story: key, slice: sk, dir: d, key: sk }, opts));
   }
   return {
     key,
     slug,
     root,
     path: specPath,
-    spec_dir: relative(root, specPath),
+    spec_dir: run.spec_dir,
     frontmatter: story.ok && !frontmatter_error ? story.value.frontmatter : null,
     frontmatter_error,
     slices,
@@ -243,7 +246,7 @@ export function withSliceWorktrees(
 ): StorySnapshot {
   const units = story.units.map((u) => {
     const wt = u.unit.slice ? sliceWorktree(u.unit.slice) : null;
-    return wt ? loadUnit(wt, join(wt, story.spec_dir), u.unit, opts) : u;
+    return wt ? loadUnit(wt, story, u.unit, opts) : u;
   });
   return { ...story, units };
 }

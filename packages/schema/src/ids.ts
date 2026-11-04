@@ -205,8 +205,9 @@ export function sliceDirName(nn: string, slug: string): string {
 export const RUNS_DIR = "runs";
 /**
  * gh-71 D2 (B30, B36): a unit's record folder relative to its spec folder, `runs/<unit>` (unit is
- * `_story` or `<nn>-<slug>`). The one place that names it: store's `unitDir` resolves it under a spec
- * folder, and pure decide uses it as is. Nothing else builds this path by hand.
+ * `_story` or `<nn>-<slug>`). The one place that names it: store's run-state resolver (`run-state.ts`)
+ * resolves it under a root, `runStatePath` below joins it to a spec folder, and pure decide compares
+ * against it as is. Nothing else builds this path by hand (gh-195 prefactor 1).
  */
 export function unitRecordPath(unit: string): string {
   return `${RUNS_DIR}/${unit}`;
@@ -231,6 +232,26 @@ export function recordHandoffPath(record: string): string {
 export function roundRecordPath(n: number, workflow: string): string {
   return `${unitRecordPath(STORY_UNIT_DIR)}/${ROUNDS_DIR}/${roundDirName(n, workflow)}`;
 }
+/**
+ * gh-195 prefactor 1: the story a unit's run state belongs to, as the run-state resolver takes it: its
+ * key and its root-relative spec folder (`.agents/specs/<id>-<slug>`).
+ */
+export interface RunStory {
+  key: string;
+  spec_dir: string;
+}
+/**
+ * gh-195 prefactor 1 (B2, B4): the pure half of the run-state resolver — where a unit's run state sits
+ * relative to a root (a git tree, or decide's worktree-relative paths), for a story and a unit. A
+ * relative path is not looked at on disk, so the story unit is `runs/_story` here, not its round
+ * (store's `runStateDir` resolves that). Nothing outside here and store's `run-state.ts` joins a spec
+ * folder with `runs/` (test/repo/repo.test.ts).
+ */
+export const runStatePath = (story: RunStory, unit: string): string => `${story.spec_dir}/${unitRecordPath(unit)}`;
+/** gh-195 prefactor 1: round `n`'s run-state folder relative to a root (`<spec folder>/runs/_story/rounds/NN-<wf>`). */
+export const roundRunStatePath = (story: RunStory, n: number, workflow: string): string => `${story.spec_dir}/${roundRecordPath(n, workflow)}`;
+/** gh-195 prefactor 1: the folder relative to a root that holds every unit's run state of a story (`<spec folder>/runs`). */
+export const storyRunStatePath = (story: RunStory): string => `${story.spec_dir}/${RUNS_DIR}`;
 /** Slice branch: `gh-123/03-add-form`. */
 export function sliceBranch(story: string, nn: string, slug: string): string {
   return `${story}/${sliceDirName(nn, slug)}`;

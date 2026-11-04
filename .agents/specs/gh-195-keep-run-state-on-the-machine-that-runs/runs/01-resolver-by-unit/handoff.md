@@ -14,6 +14,17 @@
 
 ## Goal
 
+Plan prefactor 1: every reader and writer of run state asks one resolver for `(root, story, unit)` instead of joining a worktree with a spec folder itself; folder unchanged (AC1), and a repo lint keeps new callers from bypassing it (AC2).
+
 ## Progress
 
+- New `packages/store/src/run-state.ts`: the on-disk resolver `runStateDir`, `runStateStartDir`, `storyRunStateDir`, `runStateRounds`, `isFlatRunState`, all `(root, story: RunStory, …)`. The spec-folder primitives (`unitDir`, `startDir`, `roundDir`, `specRunsDir`, `storyUnitDir`, `storyRounds`, `currentRound`, `isFlatStoryRecord`) moved there from `paths.ts`, still exported because tests name fixture files with them (AC1: tests unchanged).
+- Pure half in `packages/schema/src/ids.ts`: `RunStory { key, spec_dir }`, `runStatePath`, `roundRunStatePath`, `storyRunStatePath` (root-relative, for git-tree readers and decide).
+- Callers moved: store snapshot (`loadUnit(root, story, unit)`), unpushed (`unpushedRuns(remote, baseRef, story, targets)`); cli checkout, human, agent-unit, leases, act/env, act/lifecycle, observe/run-facts, observe/index, brief, tidy, story-reopen; view load; core decide/story (round paths).
+- AC2: `test/repo/repo.test.ts` "the run-state resolver takes the checkout, the story and the unit": flags `${spec}/${unitRecordPath|roundRecordPath|RUNS_DIR}`, `join(… RUNS_DIR|unitRecordPath|roundRecordPath …)`, and calls of the spec-folder primitives in package sources outside ids.ts and run-state.ts; a matcher test; red on the old tree (stash), green now.
+- AC1: no test, golden case, transcript or snapshot changed. unit 1165 pass; typecheck green; integration 710 pass / 3 skip / 0 fail; e2e 73 pass / 0 fail.
+- Flakes: none.
+
 ## Resume
+
+Done: report `norn done done`. Next slice (02) gives the handoff its own resolver.
