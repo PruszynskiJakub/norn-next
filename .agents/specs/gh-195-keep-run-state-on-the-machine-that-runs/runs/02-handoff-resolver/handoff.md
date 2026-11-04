@@ -14,6 +14,16 @@
 
 ## Goal
 
+Give a unit's handoff its own resolver keyed by the unit (prefactor 2), location unchanged (AC1, AC2).
+
 ## Progress
 
+- Resolver: `unitHandoffPath(unit)` in schema ids.ts (spec-relative `runs/<unit>/handoff.md`) and `handoffPath(specDir, unit)` in store paths.ts. Removed `recordHandoffPath`, the record-keyed `handoffPath(ud)` and `recordPaths`.
+- `readHandoff`/`writeHandoffHeader`/`appendHandoffHeartbeat`/`writeHandoffBody`/`appendProgress` take the resolved handoff file. `UnitSnapshot.handoffFile`, `UnitLoc.handoffFile`, `UnitSession.handoffFile` and the human `Target.handoffFile` carry it; brief, checkout, the boundary commit (act env), session start (`startedPaths`), release and round.migrate use it.
+- AC2: repo lint "one resolver for a unit's handoff" in test/repo/repo.test.ts (bare `handoff.md` literal, `recordHandoffPath`, `recordPaths`, `dirname(...handoff`) over package sources, with a matcher test. Resolver unit test in packages/store/test/unit/snapshot.test.ts.
+- AC1: no golden, transcript or snapshot changes; unit, typecheck, integration and e2e tiers run (see results in the report).
+- Merge note for gh-195/01: both slices touch paths.ts and the end of repo.test.ts.
+
 ## Resume
+
+Nothing left for this step; report `norn done done`.
