@@ -12,7 +12,7 @@ labels:
   - norn:priority:medium
   - norn:risk:high
   - norn:wf:refinement
-workflow: refinement
+workflow: story
 status: active
 intake_at: 2026-11-04T08:34:16.652Z
 body_hash: daab49a1f6e19f9adece43a08de2e7ee1559163b2e979cbaa5e838e337c7bb9f
