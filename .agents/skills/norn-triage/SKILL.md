@@ -1,6 +1,6 @@
 ---
 name: norn-triage
-description: Triage one issue — check it still applies on the current base by trying it, add the repro, the affected code (file:line) and the context, and recommend exactly one next move (refinement, quick, reproduce) or closing it, with the reason. Posts the findings as a `## Triage` issue comment, the one place they live; changes no file. Use when asked to triage an issue, or to check whether an issue is still valid and what should happen to it.
+description: Triage one issue — check it still applies on the current base by trying it, add the repro, the affected code (file:line) and the context, judge its kind, risk and priority, and recommend exactly one next move (refinement, quick, reproduce) or closing it, with the reason. Posts the findings as a `## Triage` issue comment, the one place they live, and puts one kind, one risk and one priority label on the issue, never replacing one already there; changes no file. Use when asked to triage an issue, or to check whether an issue is still valid and what should happen to it.
 ---
 
 # Triage
@@ -37,6 +37,10 @@ Write the findings in this shape:
 **Rules:** <ids or sections of the project's docs it touches; "none" if no doc covers it>
 **Context:** <related issues, PRs, earlier decisions; only what changes the decision>
 
+**Kind:** <kind label> — <reason in one line>
+**Risk:** <risk label> — <reason in one line>
+**Priority:** <priority label> — <reason in one line>
+
 **Recommend:** <refinement | quick | reproduce | close> — <reason in one or two lines>
 ```
 
@@ -49,15 +53,30 @@ Pick exactly one:
 | `reproduce` | it is a bug: something that should work does not. It is reproduced and its cause confirmed before anyone fixes it |
 | `close` | it no longer applies, is a duplicate, or is out of scope (name the issue, PR or rule that says so) |
 
+Judge one of each set. Your instructions name the label for each value (for example `<prefix>kind:bug`); without them, write the bare value (`bug`) and add no label.
+
+| Set | Pick |
+|---|---|
+| kind | `bug`: something that should work does not · `feature`: new or changed behaviour for users · `security`: a vulnerability or hardening · `chore`: maintenance (dependencies, tooling, CI, refactors) · `docs`: documentation only |
+| risk | how much the change could break: `low` a two-way door with a small blast radius · `medium` a two-way door touching shared code or behaviour · `high` a one-way door (data, formats, public interfaces) or a wide blast radius |
+| priority | `low` can wait · `medium` soon, in the normal flow · `high` next: it blocks or hurts work now · `extreme` drop other work (broken main, data loss, a security hole) |
+
+When the issue already carries a label from a set (a person's, or an earlier triage's), keep it: write `**Kind:** <the label there>, kept as set; triage would say <your pick> — <reason>`, and add nothing to that set.
+
 A rule the issue would change is a `refinement`, unless the change is small and settled, then `quick`. A bug you could not make happen is a `close` with what you tried, or a `reproduce` when the report is specific enough that a deeper loop may still catch it.
 
-## 4. Post it as an issue comment
+## 4. Label the issue and post the comment
 
-Pipe the `## Triage` section into `gh issue comment <N> --body-file -` (`glab issue note <N> --message "$(cat)"` on GitLab); write no temp file in the checkout. This one comment is your only remote write: never edit the issue body or title, never label, assign or close. On a rerun, post a new comment that starts with `## Triage (updated)`.
+1. For each set with no label on the issue yet, add the one you picked: `gh issue edit <N> --add-label <label>` (`glab issue update <N> --label <label>` on GitLab). When adding a label fails because the repository does not have it, do not create it: note it for the comment.
+2. When a label could not be set, end the `## Triage` section with `Labels not set: <label> is missing on the remote; <what your instructions say creates it>` (one entry per label).
+3. Pipe the `## Triage` section into `gh issue comment <N> --body-file -` (`glab issue note <N> --message "$(cat)"` on GitLab); write no temp file in the checkout.
+
+The comment and adding these labels are your only remote writes: never create, edit or delete a label definition, never remove a label from the issue (the one that took the issue in included), never edit the issue body or title, assign or close. On a rerun, post a new comment that starts with `## Triage (updated)`; the labels already on the issue stay, and the comment says where your judgement now differs.
 
 ## Rules
 
 - Read-only: you change no file. Later work reads the findings from the issue comment.
 - One recommendation, with its reason. Never act on it yourself: a person decides.
+- One label per set on the issue, never two: a label already there wins over your judgement, which goes in the comment.
 
-Done when the `## Triage` comment is posted; the recommendation lives there, and you hand back only a one-line summary of it.
+Done when the labels you could set are on the issue and the `## Triage` comment is posted; the recommendation lives there, and you hand back only a one-line summary of it.
