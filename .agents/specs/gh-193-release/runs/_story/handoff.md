@@ -2,13 +2,14 @@
 - Story: gh-193
 - Round 1 · Workflow: release · Step: prepare (attempt 1)
 - Status: ready
-- Counters: base_conflict_loop 0, ready_loop 0, stale_loop 0
+- Counters: base_conflict_loop 0/2, ready_loop 0/2, stale_loop 0/10
 - Last outcome: none
 - Next: `norn brief`
-- Updated: 2026-11-04T08:11:50.761Z
+- Updated: 2026-11-04T08:12:08.635Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - story.start: release at prepare
+- receipts.apply: applied 1
 <!-- norn:heartbeat:end -->
 
 ## Goal
