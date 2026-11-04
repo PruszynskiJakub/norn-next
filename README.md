@@ -55,14 +55,14 @@ cd your-repo
 norn init
 ```
 
-`norn init` writes the team config (`.agents/norn.config.yaml`, with the norn version the repo now needs), a commented user config (`~/.norn/config.yaml`) on a machine's first init, six workflows in `.agents/workflows/`, the agent skills and hooks, a JSON schema next to each config file for your editor, and its `.gitignore` and `.gitattributes` lines. It reads your test command from your build files and ends with the next steps:
+`norn init` writes the team config (`.agents/norn.config.yaml`, with the norn version the repo now needs), a commented user config (`~/.norn/config.yaml`) on a machine's first init, six workflows in `.agents/workflows/`, the agent skills and hooks, a JSON schema next to each config file for your editor, and its `.gitignore` and `.gitattributes` lines. On the remote it creates the labels norn uses (see [Concepts: Labels](docs/concepts.md#labels)); when it cannot, it says why and what to run. It reads your test command from your build files and ends with the next steps:
 
 ```console
 Next steps
   1. Check the test command `npm install && npm test` in the `test` steps of .agents/workflows/ (detected from package.json).
   2. Commit and push the setup: `git add .agents .claude .gitignore .gitattributes && git commit -m "Set up norn" && git push`.
   3. Check this machine: `norn doctor`.
-  4. Make a first story: an issue labelled `norn` and assigned to you, e.g. `gh label create norn` (once), then `gh issue create --label norn --assignee @me --title "…"`.
+  4. Make a first story: an issue labelled `norn` and assigned to you, e.g. `gh issue create --label norn --assignee @me --title "…"`.
   5. Pick it up: `norn sync`, then `norn status` shows what needs you and the command for each item; `norn watch` keeps norn working.
 ```
 
@@ -79,7 +79,6 @@ Config is optional: a solo developer on GitHub with Claude Code writes none. It 
 ## Run a first story
 
 ```sh
-gh label create norn                                          # once
 gh issue create --label norn --assignee @me --title "Add CSV export of orders"
 norn sync      # the issue becomes story gh-N: a branch, a worktree, a spec folder
 norn watch     # keeps norn working; Ctrl-C finishes the current tick and releases claims
@@ -87,7 +86,7 @@ norn status    # in another terminal: what needs you, with the command for each 
 ```
 
 1. A new story runs the `triage` workflow. In manual mode (the default) `norn status` shows its first agent step as ready, with the command that starts it: `norn story start gh-N` with the Herdr runner, otherwise a line that opens your agent in the story's worktree on its brief.
-2. The triage agent checks the issue against your code and posts its findings and one recommendation as an issue comment. The round ends there.
+2. The triage agent checks the issue against your code, posts its findings and one recommendation as an issue comment, and labels the issue's kind, risk and priority. The round ends there.
 3. You start the next round: `norn story edit gh-N --workflow quick` for a small change, `--workflow refinement` to agree a spec and plan with an agent first, then `--workflow story` to build it in slices.
 4. The workflow runs. Whenever an agent asks, a gate waits for your approval or something is stuck, the item appears in `norn status` with the command that resolves it (`norn story answer`, `norn story approve`, `norn run rerun`, …).
 5. A delivery workflow ends at a `ready` gate with a draft PR. Your last act is merging it.

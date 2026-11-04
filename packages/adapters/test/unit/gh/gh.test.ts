@@ -104,4 +104,22 @@ describe("gh adapter", () => {
     const failing = createGh({ cwd: "/repo", exec: async () => ({ code: 1, stdout: "", stderr: "error connecting: Could not resolve host" }) });
     expect(await failing.assignIssue(7, "me").catch((e) => e.retryable)).toBe(true);
   });
+  test("listLabels and createLabel: the repository's labels, a new one never forced (GR10)", async () => {
+    const argv: string[][] = [];
+    const port = createGh({
+      cwd: "/repo",
+      exec: async (a) => (argv.push(a), { code: 0, stdout: a[2] === "list" ? '[{"name":"norn","color":"d93f0b","description":"pick me"},{"name":"bug","color":"d73a4a","description":""}]' : "", stderr: "" }),
+    });
+    expect(await port.listLabels()).toEqual([
+      { name: "norn", color: "D93F0B", description: "pick me" },
+      { name: "bug", color: "D73A4A", description: "" },
+    ]);
+    await port.createLabel({ name: "norn:wf:quick", color: "5319E7", description: "Make a small change" });
+    expect(argv).toEqual([
+      ["gh", "label", "list", "--limit", "1000", "--json", "name,color,description"],
+      ["gh", "label", "create", "norn:wf:quick", "--color", "5319E7", "--description", "Make a small change"],
+    ]);
+    const denied = createGh({ cwd: "/repo", exec: async () => ({ code: 1, stdout: "", stderr: "HTTP 403: Resource not accessible by integration" }) });
+    expect(await denied.createLabel({ name: "x", color: "5319E7", description: "" }).catch((e) => e.code)).toBe("gh_auth");
+  });
 });

@@ -36,6 +36,20 @@ A **step** is one node of a workflow. There are five kinds:
 
 An **outcome** is how a step ended (`done`, `pass`, `fail`, `approve`, `stuck`, …). The workflow maps each outcome to the next step. A route back (a failed test sends the story back to `implement`) carries a **counter** with a max.
 
+## Labels
+
+norn reads and writes a few labels on your issues. `norn init` and `norn upgrade` create each one that is missing on the remote, in norn's colour (`#5319E7`) with a description; they never change or delete a label that is there. `norn doctor` warns about a missing one and names `norn upgrade`. A `norn:wf:<name>` label that names no workflow is listed as unused, with the command to delete it: norn deletes nothing, because deleting a label strips it from every issue. When the remote cannot be reached or written (no git remote, `gh`/`glab` missing or logged out, no permission), `init` and `upgrade` still finish and say what to run.
+
+| Label | Meaning |
+|---|---|
+| `norn` | norn takes in the issue once it is assigned to you |
+| `norn:wf:<name>` | the first workflow the story runs; one per valid workflow in `.agents/workflows/` |
+| `norn:kind:bug`, `feature`, `security`, `chore`, `docs` | what the issue is: something broken, new or changed behaviour, a vulnerability or hardening, maintenance, documentation only |
+| `norn:risk:low`, `medium`, `high` | how much the change could break: a two-way door with a small blast radius, one touching shared code or behaviour, a one-way door or a wide blast radius |
+| `norn:priority:low`, `medium`, `high`, `extreme` | can wait, soon, next (it blocks work now), drop other work |
+
+The kind, risk and priority labels are for you, to filter and sort the backlog: the triage agent puts one of each on the issue and gives its reasons in the `## Triage` comment, and keeps a label that is already there (yours, or an earlier triage's), saying in the comment what it would pick instead. norn itself never reads them.
+
 ## Who does what: attended steps, gates and modes
 
 Three things decide where a person comes in:

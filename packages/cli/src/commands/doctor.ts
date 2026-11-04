@@ -9,6 +9,8 @@
  *     Codex: project hooks only run once `.codex/` is trusted (`/hooks` in Codex) — noted.
  *   - remote: the configured git remote exists (sync and push need it) and the provider CLI
  *     answers `whoami` (gh/glab auth)
+ *   - labels (GR10, gh-67 B16–B18): the labels norn uses against the remote's; a missing or unused one,
+ *     or a remote it cannot reach, is a warning naming the fix, never a failed check
  *   - runner: the detected runner available (Herdr server reachable), and `command -v norn` in a
  *     throwaway runner session resolves to this norn (R8.2); only auto mode needs a runner (MO2),
  *     so in manual mode a failing runner is a warning, not a failed check
@@ -41,6 +43,7 @@ import { CliFailure, configError, rendered, withExit } from "../output.ts";
 import { agentsInUse } from "../runtime/agents-in-use.ts";
 import { assetsDir } from "../runtime/assets.ts";
 import { gitRemoteUrl } from "../runtime/detect.ts";
+import { type LabelsReport, labelsWarnings, remoteLabels } from "../runtime/labels.ts";
 import { ensureShim, withNornOnPath } from "../runtime/shim.ts";
 import { effectiveRetain, formatBytes, retainCutoffDay, retainWarning } from "../runtime/trace-retention.ts";
 import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
@@ -579,6 +582,9 @@ export const doctorCommand = defineCommand({
     if (!gitRemote.url && remote.ok === true)
       remote = { ...remote, ok: false, error: `this repository has no git remote named ${gitRemote.name}`, do_instead: `git remote add ${gitRemote.name} <url>` };
 
+    // GR10, B16–B18: checked, never created; a warning at most
+    const labels: LabelsReport = await remoteLabels({ remote: ports.remote, gitRemoteUrl: gitRemote.url, intake: config.label, workflows: checkedRepoWorkflows(loadWorkflows(ctx.root), ctx.root, { agent: config.agent }, ports.agents), create: false });
+
     let runner: Record<string, unknown> = { ok: true, configured: false, note: "manual mode only: a person starts agents (MO2)" };
     if (ports.runner) {
       const available = await ports.runner.available().catch(() => false);
@@ -620,6 +626,8 @@ export const doctorCommand = defineCommand({
         `orphaned machine dir ${o.dir}: its checkout ${o.checkout} no longer exists — if this repo moved from there, stop norn watch and adopt it (keeps its heartbeat and claims): rm -rf ${mine} && mv ${proc.shellQuote(o.dir)} ${mine}`,
       );
 
+    warnings.push(...labelsWarnings(labels));
+
     // D11, D13: the trace window — a value that does not apply warns; days beyond it are a hint
     const retainWarn = retainWarning(config.trace.retain);
     if (retainWarn) warnings.push(retainWarn);
@@ -632,7 +640,7 @@ export const doctorCommand = defineCommand({
     }
 
     const ok = !configFail && gitCheck.ok && agents.every((a) => a.ok) && remote.ok === true && (runner.ok === true || runner.required === false) && skillsOk && repo.ok;
-    const report = { ok, live, hook_command: command, machine, ...(configFail ? { config: configFail } : {}), git: gitCheck, agents, remote, runner, skills, repo, warnings, hints };
+    const report = { ok, live, hook_command: command, machine, ...(configFail ? { config: configFail } : {}), git: gitCheck, agents, remote, labels, runner, skills, repo, warnings, hints };
     const out = rendered(report, formatDoctor(report, dir));
     return ok ? out : withExit(out, ExitCode.error);
   },

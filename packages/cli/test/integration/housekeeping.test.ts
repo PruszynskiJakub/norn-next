@@ -246,7 +246,7 @@ describe("norn doctor (A7)", () => {
     const shim = join(h.home, "bin", "norn");
     expect(v.runner).toMatchObject({ norn_on_path: { ok: true, expected: shim, resolved: shim } });
     // R7.3: the harness names its machine with NORN_MACHINE — a test aid doctor warns about
-    expect(r.value).toMatchObject({ machine: { holder: "tester@box", override: "box" }, warnings: [expect.stringContaining("NORN_MACHINE=box")] });
+    expect(r.value).toMatchObject({ machine: { holder: "tester@box", override: "box" }, warnings: expect.arrayContaining([expect.stringContaining("NORN_MACHINE=box")]) });
   });
 
   test("prints the report for a person, with the same exit code as --json", async () => {

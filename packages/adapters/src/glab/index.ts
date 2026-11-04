@@ -3,7 +3,7 @@
  * `glab` CLI's JSON output, run in the repository directory. Story key for issue iid n is
  * `gl-<n>` (§5.1); "pull request" in the port means merge request here.
  */
-import type { RemoteFactory, RemoteIssue, RemotePort, RemotePullRequest } from "@norn/core";
+import type { RemoteFactory, RemoteIssue, RemoteLabel, RemotePort, RemotePullRequest } from "@norn/core";
 import { storyKey } from "@norn/schema";
 import { NETWORK_TIMEOUT_MS } from "@norn/store";
 import { bunExec, okOrThrow, parseJson, portError, type Exec } from "../exec.ts";
@@ -157,6 +157,17 @@ export function createGlab(opts: GlabOptions): RemotePort {
     async replaceIssueLabel(number, { remove, add }) {
       // B19: GitLab ignores a label to remove that the issue does not carry
       okOrThrow(await run(["issue", "update", String(number), ...repo, "--unlabel", remove, "--label", add]), "glab issue update", "glab");
+    },
+    async listLabels() {
+      // GR10: GitLab's colours carry `#`; one page of 100 (a label beyond it shows up as `_exists` on create)
+      const rows = await json<Array<{ name: string; color?: string; description?: string | null }>>(["label", "list", ...repo, "--per-page", "100", "--output", "json"]);
+      return rows.map((l): RemoteLabel => ({ name: l.name, color: (l.color ?? "").replace(/^#/, "").toUpperCase(), description: l.description ?? "" }));
+    },
+    async createLabel({ name, color, description }) {
+      // GR10
+      const r = await run(["label", "create", ...repo, "--name", name, "--color", `#${color}`, "--description", description]);
+      if (r.code !== 0 && /already exists|\b409 Conflict\b|HTTP 409\b|has already been taken/i.test(`${r.stderr}${r.stdout}`)) throw portError("glab_exists", `glab label create: label ${name} already exists`);
+      okOrThrow(r, "glab label create", "glab");
     },
   };
 }

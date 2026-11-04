@@ -4,7 +4,7 @@
  * installs the world: the issues on the remote, assigned by login (`whoami()` is the user).
  */
 import { describe, expect } from "bun:test";
-import type { PortError, RemoteIssue, RemotePort, RemotePullRequest } from "@norn/core";
+import type { PortError, RemoteIssue, RemoteLabel, RemotePort, RemotePullRequest } from "@norn/core";
 import { type ContractOptions, contractTest } from "./suite.ts";
 
 export type RemoteContractTest =
@@ -20,7 +20,11 @@ export type RemoteContractTest =
   | "replaceIssueLabel adds the new label when the old one is not on the issue (B19)"
   | "replaceIssueLabel rejects with a PortError when the provider fails, changing nothing (B20)"
   | "listLabelledIssues: open issues with the label, whoever they are assigned to (GR1, CP2)"
-  | "assignIssue adds the assignee, and intake then lists the issue (GR1)";
+  | "assignIssue adds the assignee, and intake then lists the issue (GR1)"
+  | "listLabels: the repository's labels with colour and description (GR10)"
+  | "createLabel defines a label that listLabels then lists, leaving the others alone (GR10)"
+  | "createLabel rejects a name already taken with an _exists PortError, editing nothing (GR10)"
+  | "listLabels and createLabel reject with a PortError when the provider fails (GR10)";
 
 export interface SeedIssue {
   number: number;
@@ -34,8 +38,10 @@ export interface SeedIssue {
 export interface RemoteSubject {
   port: RemotePort;
   seed(issues: SeedIssue[]): void;
-  /** from now on, the provider fails every label edit (B20) */
+  /** from now on, the provider fails every label edit (B20), label listings and creations included (GR10) */
   failLabelEdits(): void;
+  /** the labels defined on the repository (GR10), replacing any seeded before */
+  seedLabels(labels: RemoteLabel[]): void;
 }
 
 /** The world every RemotePort is checked against; `me` is the port's `whoami()`. */
@@ -165,6 +171,53 @@ export function remoteContract(name: string, make: () => RemoteSubject, opts: Co
       expect((await port.getIssue(6))!.assignees).toEqual([me]);
       expect([...(await port.getIssue(4))!.assignees].sort()).toEqual([me, "someone-else"].sort());
       expect((await port.listAssignedIssues({ label: "norn" })).map((i) => i.number).sort((a, b) => a - b)).toEqual([1, 4, 6]);
+    });
+
+    const defined: RemoteLabel[] = [
+      { name: "norn", color: "D93F0B", description: "pick me" },
+      { name: "auth", color: "EDEDED", description: "" },
+    ];
+
+    t("listLabels: the repository's labels with colour and description (GR10)", async () => {
+      const { port, seedLabels } = await seeded();
+      seedLabels(defined);
+      const labels = await port.listLabels();
+      expect([...labels].sort((a, b) => a.name.localeCompare(b.name))).toEqual([...defined].sort((a, b) => a.name.localeCompare(b.name)));
+    });
+
+    t("createLabel defines a label that listLabels then lists, leaving the others alone (GR10)", async () => {
+      const { port, seedLabels } = await seeded();
+      seedLabels(defined);
+      await port.createLabel({ name: "norn:wf:quick", color: "5319E7", description: "Make a small change" });
+      const labels = await port.listLabels();
+      expect(labels.find((l) => l.name === "norn:wf:quick")).toEqual({ name: "norn:wf:quick", color: "5319E7", description: "Make a small change" });
+      expect(labels.find((l) => l.name === "norn")).toEqual(defined[0]!);
+      expect(labels).toHaveLength(3);
+    });
+
+    t("createLabel rejects a name already taken with an _exists PortError, editing nothing (GR10)", async () => {
+      const { port, seedLabels } = await seeded();
+      seedLabels(defined);
+      const err = await port.createLabel({ name: "norn", color: "5319E7", description: "other" }).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect((err as PortError).code).toEndWith("_exists");
+      expect((await port.listLabels()).find((l) => l.name === "norn")).toEqual(defined[0]!);
+    });
+
+    t("listLabels and createLabel reject with a PortError when the provider fails (GR10)", async () => {
+      const { port, seedLabels, failLabelEdits } = await seeded();
+      seedLabels(defined);
+      failLabelEdits();
+      for (const call of [() => port.listLabels(), () => port.createLabel({ name: "x", color: "5319E7", description: "" })]) {
+        const err = await call().then(
+          () => null,
+          (e: unknown) => e,
+        );
+        expect(err).toBeInstanceOf(Error);
+        expect(typeof (err as PortError).code).toBe("string");
+      }
     });
 
     const triaged = (me: string): SeedIssue => ({ number: 5, title: "Triaged", body: "", state: "open", assignees: [me], labels: ["norn", "norn:wf:triage"] });

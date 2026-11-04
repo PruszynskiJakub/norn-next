@@ -31,5 +31,8 @@ remoteContract("harness FakeRemote", () => {
     failLabelEdits() {
       remote.labelError = Object.assign(new Error("gh issue edit failed (exit 1): could not resolve host"), { code: "gh_network", retryable: true });
     },
+    seedLabels(labels) {
+      remote.labels = labels.map((l) => ({ ...l }));
+    },
   };
 });

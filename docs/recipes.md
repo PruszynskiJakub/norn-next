@@ -82,7 +82,7 @@ The story goes back through its update step; you approve the `ready` gate again 
 ```
 
 3. Commit it. norn validates a workflow before a unit uses it and refuses one that does not hold together, naming what is wrong.
-4. Use it: label an issue `norn:wf:docs`, or start the next round of a story with `norn story edit gh-12 --workflow docs`.
+4. Run `norn upgrade` once: it creates the `norn:wf:docs` label on the remote. Then use it: label an issue `norn:wf:docs`, or start the next round of a story with `norn story edit gh-12 --workflow docs`.
 
 A unit pins its workflow when it starts, so your edit applies to rounds that start after it.
 

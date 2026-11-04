@@ -98,4 +98,27 @@ describe("glab adapter", () => {
     const failing = createGlab({ cwd: "/repo", exec: async () => ({ code: 1, stdout: "", stderr: "error connecting: Could not resolve host" }) });
     expect(await failing.assignIssue(7, "me").catch((e) => e.retryable)).toBe(true);
   });
+  test("listLabels and createLabel: the project's labels, colours without # (GR10)", async () => {
+    const argv: string[][] = [];
+    const port = createGlab({
+      cwd: "/repo",
+      exec: async (a) => (argv.push(a), { code: 0, stdout: a[2] === "list" ? '[{"id":1,"name":"norn","color":"#D93F0B","description":"pick me"},{"id":2,"name":"bug","color":"#d73a4a","description":null}]' : "", stderr: "" }),
+    });
+    expect(await port.listLabels()).toEqual([
+      { name: "norn", color: "D93F0B", description: "pick me" },
+      { name: "bug", color: "D73A4A", description: "" },
+    ]);
+    await port.createLabel({ name: "norn:wf:quick", color: "5319E7", description: "Make a small change" });
+    expect(argv).toEqual([
+      ["glab", "label", "list", "--per-page", "100", "--output", "json"],
+      ["glab", "label", "create", "--name", "norn:wf:quick", "--color", "#5319E7", "--description", "Make a small change"],
+    ]);
+  });
+  test("createLabel: only a conflict means the label exists; a failure that merely mentions 409 stays a failure (GR10)", async () => {
+    const failing = (stderr: string) => createGlab({ cwd: "/repo", exec: async () => ({ code: 1, stdout: "", stderr }) });
+    const label = { name: "norn:wf:quick", color: "5319E7", description: "Make a small change" };
+    expect(await failing("ERROR: 409 Conflict: {message: Label already exists}").createLabel(label).catch((e) => e.code)).toBe("glab_exists");
+    expect(await failing("POST https://gitlab.com/api/v4/projects/409/labels: 400 {name: [has already been taken]}").createLabel(label).catch((e) => e.code)).toBe("glab_exists");
+    expect(await failing("POST https://gitlab.com/api/v4/projects/409/labels: 500 Internal Server Error").createLabel(label).catch((e) => e.code)).toBe("glab_failed");
+  });
 });

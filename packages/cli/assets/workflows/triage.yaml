@@ -14,9 +14,12 @@ steps:
     skill: norn-triage
     inputs: [spec, handoff]
     instructions: >-
-      The issue is mirrored in spec.md. Post the `## Triage` comment on it: that one comment is the only
-      remote write this step allows, an exception to the norn skill's rule. Change no file, spec.md included,
+      The issue is mirrored in spec.md. Post the `## Triage` comment on it and add the kind, risk and priority
+      labels (GR11): `norn:kind:bug|feature|security|chore|docs`, `norn:risk:low|medium|high`,
+      `norn:priority:low|medium|high|extreme`; a label missing on the remote is named in the comment with
+      "norn upgrade creates it". That comment and those labels are the only remote writes this step allows,
+      an exception to the norn skill's rule; never remove a label, the intake label `norn` included. Change no file, spec.md included,
       but the handoff. The recommendation lives only in that comment:
       report `norn done done --handoff "<recommendation>: <reason>"`.
     outcomes:
-      done: { to: $done, means: "the ## Triage comment is posted, with one recommendation (refinement, quick, reproduce or close) and its reason" }
+      done: { to: $done, means: "the ## Triage comment is posted, with one recommendation (refinement, quick, reproduce or close) and its reason, and the kind, risk and priority labels that could be set are on the issue" }

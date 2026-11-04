@@ -2,7 +2,7 @@
  * gh adapter — implements RemotePort (packages/core/src/ports.ts) over the GitHub `gh` CLI's
  * JSON output, run in the repository directory. Story key for issue n is `gh-<n>` (§5.1).
  */
-import type { RemoteFactory, RemoteIssue, RemotePort, RemotePullRequest } from "@norn/core";
+import type { RemoteFactory, RemoteIssue, RemoteLabel, RemotePort, RemotePullRequest } from "@norn/core";
 import { storyKey } from "@norn/schema";
 import { NETWORK_TIMEOUT_MS } from "@norn/store";
 import { bunExec, okOrThrow, parseJson, portError, type Exec } from "../exec.ts";
@@ -153,6 +153,17 @@ export function createGh(opts: GhOptions): RemotePort {
       const { labels } = await json<Pick<GhIssue, "labels">>(["issue", "view", String(number), ...repo, "--json", "labels"]);
       const removing = (labels ?? []).some((l) => l.name === remove) ? ["--remove-label", remove] : [];
       okOrThrow(await run(["issue", "edit", String(number), ...repo, ...removing, "--add-label", add]), "gh issue edit", "gh");
+    },
+    async listLabels() {
+      // GR10: gh lists 30 by default
+      const rows = await json<Array<{ name: string; color?: string; description?: string | null }>>(["label", "list", ...repo, "--limit", "1000", "--json", "name,color,description"]);
+      return rows.map((l): RemoteLabel => ({ name: l.name, color: (l.color ?? "").replace(/^#/, "").toUpperCase(), description: l.description ?? "" }));
+    },
+    async createLabel({ name, color, description }) {
+      // GR10: never `--force`, which would restyle an existing label
+      const r = await run(["label", "create", name, ...repo, "--color", color, "--description", description]);
+      if (r.code !== 0 && /already exists/i.test(r.stderr)) throw portError("gh_exists", `gh label create: label ${name} already exists`);
+      okOrThrow(r, "gh label create", "gh");
     },
   };
 }
