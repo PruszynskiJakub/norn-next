@@ -2,7 +2,7 @@
 id: gh-195/03
 title: Sync fetches only claim and mailbox refs
 depends_on: []
-status: planned
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
