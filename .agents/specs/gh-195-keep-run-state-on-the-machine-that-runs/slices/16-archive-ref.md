@@ -9,13 +9,14 @@ criteria:
   - { id: AC3, verifier: test }
   - { id: AC4, verifier: test }
   - { id: AC5, verifier: test }
+  - { id: AC6, verifier: test }
 ---
 
 ## Goal
-When a story's PR merges (GR6) or it closes without a PR (GR6b), its final record is pushed to its ref before any cleanup, and the base branch gains no run state; `run list`, `run view` and `story reopen` read the record from the ref on any machine, fetched on demand, and `tidy` never touches the refs.
+When a story's PR merges (GR6) or it closes without a PR (GR6b), its final record is pushed to its ref before any cleanup, and the base branch gains no run state; `run list`, `run view` and `story reopen` read the record from the ref on any machine, fetched on demand, and `tidy` never touches the refs. Nothing reads run state from `runs/` in the base tree any more; a repository that still has it there is pointed to `norn upgrade`.
 
 ## Scope
-Behaviour: B29, B30 (fresh clones), B31, B32. Seams: S1. Out: moving the base's existing run state (gh-195/17).
+Behaviour: B29, B30 (fresh clones), B31, B32, B35 (the pointer to `upgrade`). Seams: S1. Out: moving the base's existing run state (gh-195/17).
 
 ## Acceptance
 - AC1 (B29) Given gh-9's PR merges, when the holder's tick runs GR6, then `refs/norn/runs/gh-9` holds the final record before the cleanup, the base branch gains no run-state file, and a rejected archive push leaves the cleanup owed and retried at the next tick. — verifier: test
@@ -24,10 +25,12 @@ Behaviour: B29, B30 (fresh clones), B31, B32. Seams: S1. Out: moving the base's 
 - AC4 (B31) Given archive refs on the remote and locally, when `norn tidy` runs, then it neither lists nor deletes any `refs/norn/runs/*` ref. — verifier: test
 - AC5 (B32) Given gh-9 closed by GR6b and its issue reopened, when `norn story reopen gh-9` runs on any clone, then it unpacks the record from the ref and gh-9 is at its last round's `$done`, ready for a new round. — verifier: test
 
+- AC6 (B29, B35) Given a base whose tree still holds a finished story's `runs/` from an older norn and no ref for it, when `norn run list <story>` and `norn status` run, then neither reads that run state (the run list is empty for it), `norn status` shows one item and `norn doctor` one failed check, each saying run state is still on the base and to run `norn upgrade`; with no `runs/` left on the base, neither appears. — verifier: test
+
 ## Checks
 - `bun run test`
 - `bun run typecheck`
 - `bun run test:integration`
 
 ## Notes
-D7 (finished stories' run state from the archive ref, not the base tree), D15. Today GR6 writes the record onto the base (the base record, `records` and `housekeeping` tests); that path goes away here. Readers of a finished story whose run state is still on the base tree from an older norn keep working until gh-195/17 moves it.
+D7 (finished stories' run state from the archive ref, not the base tree), D15. Today GR6 writes the record onto the base (the base record, `records` and `housekeeping` tests); that path goes away here. D16 (person's decision at the first slice gate): no fallback reads `runs/` from the base tree; only the archive ref is read, and a repository that has not run `norn upgrade` is pointed to it (AC6). The base-tree reader is deleted here, not kept beside the ref reader.

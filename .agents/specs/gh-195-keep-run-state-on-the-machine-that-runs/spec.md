@@ -32,14 +32,10 @@ criteria:
   - { id: "05.AC5", verifier: test }
   - { id: "05.AC6", verifier: test }
   - { id: "05.AC7", verifier: test }
-  - { id: "05.AC8", verifier: test }
-  - { id: "05.AC9", verifier: test }
   - { id: "06.AC1", verifier: test }
   - { id: "06.AC2", verifier: test }
   - { id: "06.AC3", verifier: test }
   - { id: "06.AC4", verifier: test }
-  - { id: "06.AC5", verifier: test }
-  - { id: "06.AC6", verifier: test }
   - { id: "07.AC1", verifier: test }
   - { id: "07.AC2", verifier: test }
   - { id: "07.AC3", verifier: test }
@@ -50,6 +46,9 @@ criteria:
   - { id: "08.AC2", verifier: test }
   - { id: "08.AC3", verifier: test }
   - { id: "08.AC4", verifier: test }
+  - { id: "08.AC5", verifier: test }
+  - { id: "08.AC6", verifier: test }
+  - { id: "08.AC7", verifier: test }
   - { id: "09.AC1", verifier: test }
   - { id: "09.AC2", verifier: test }
   - { id: "09.AC3", verifier: test }
@@ -62,30 +61,36 @@ criteria:
   - { id: "11.AC2", verifier: test }
   - { id: "11.AC3", verifier: test }
   - { id: "11.AC4", verifier: test }
-  - { id: "11.AC5", verifier: test }
   - { id: "12.AC1", verifier: test }
   - { id: "12.AC2", verifier: test }
   - { id: "12.AC3", verifier: test }
   - { id: "12.AC4", verifier: test }
+  - { id: "12.AC5", verifier: test }
   - { id: "13.AC1", verifier: test }
   - { id: "13.AC2", verifier: test }
   - { id: "13.AC3", verifier: test }
+  - { id: "13.AC4", verifier: test }
   - { id: "14.AC1", verifier: test }
   - { id: "14.AC2", verifier: test }
   - { id: "14.AC3", verifier: test }
   - { id: "14.AC4", verifier: test }
-  - { id: "14.AC5", verifier: person }
   - { id: "15.AC1", verifier: test }
   - { id: "15.AC2", verifier: test }
   - { id: "15.AC3", verifier: test }
   - { id: "15.AC4", verifier: test }
-  - { id: "15.AC5", verifier: test }
+  - { id: "15.AC5", verifier: person }
   - { id: "16.AC1", verifier: test }
   - { id: "16.AC2", verifier: test }
   - { id: "16.AC3", verifier: test }
   - { id: "16.AC4", verifier: test }
+  - { id: "16.AC5", verifier: test }
+  - { id: "16.AC6", verifier: test }
   - { id: "17.AC1", verifier: test }
-  - { id: "17.AC2", verifier: agent }
+  - { id: "17.AC2", verifier: test }
+  - { id: "17.AC3", verifier: test }
+  - { id: "17.AC4", verifier: test }
+  - { id: "18.AC1", verifier: test }
+  - { id: "18.AC2", verifier: agent }
 ---
 
 # Keep run state on the machine that runs it, and hand it over only when asked
@@ -144,8 +149,8 @@ Taking over reads the ref when there is one. When there is none (a local-policy 
 
 ### The record policy
 
-- B9 As a team, I want to choose the record policy, `local` or `remote`, in the team config, with `local` as the default, so that each team decides whether takeover without a handoff keeps the full record.
-  Example: a team config without the key behaves as `local`; `norn config set <key> remote --repo` (the team file) makes every machine of the team push the record at each boundary; `norn config get` shows which file the value came from; `norn doctor` reports an unknown value as a failed check.
+- B9 As a team, I want to choose the record policy with the team config key `record.policy`, `local` or `remote`, with `local` as the default, so that each team decides whether takeover without a handoff keeps the full record.
+  Example: a team config without `record.policy` behaves as `local`; `norn config set record.policy remote --repo` (the team file) makes every machine of the team push the record at each boundary; `norn config get record.policy` shows which file the value came from; `norn doctor` reports an unknown value as a failed check.
 
 - B10 As a team under `remote`, I want the record pushed to `refs/norn/runs/<story>` at every step boundary right after the branch push, so that any machine can see and take over the current state.
   Example: gh-9 under `remote` finishes implement; the branch and then the ref are pushed; on another machine `story view gh-9` shows "Step: review (attempt 1)".
@@ -206,8 +211,8 @@ Taking over reads the ref when there is one. When there is none (a local-policy 
 - B26 As a person whose machine dir was wiped while it held a story, I want `story checkout --force` on that same machine to recover it as any takeover does, so that a wiped home is not a dead end.
   Example: `~/.norn` was deleted; the next tick no longer recognises the claim as this checkout's; `norn story checkout gh-9 --force` takes it, as B22 when a ref exists, else as B25.
 
-- B27 As the person on the old holder's machine after someone else took the story over, I want my local copy of its record set aside as superseded, never pushed, with one Check item, so that I know work of mine may not be in the new record.
-  Example: the laptop wakes after the desktop took gh-9; its next tick sees the claim is the desktop's, moves its record of gh-9 aside and shows "your record of gh-9 was superseded when ana@desk took it over (last local receipt 0035-done)"; nothing is merged into the new holder's record; `norn tidy` deletes the superseded copy once it is older than `trace.retain`.
+- B27 As the person on the old holder's machine after someone else took the story over without a release from me, I want my local copy of its record set aside as superseded, never pushed, with one Check item, so that I know work of mine may not be in the new record; after I handed it over cleanly, I want my copy removed quietly, since the ref already holds it.
+  Example: the laptop wakes after the desktop took gh-9 over after the claim expired; its next tick sees the claim is the desktop's, moves its record of gh-9 aside and shows "your record of gh-9 was superseded when ana@desk took it over (last local receipt 0035-done)"; nothing is merged into the new holder's record; `norn tidy` deletes the superseded copy once it is older than `trace.retain`. Had the laptop run `norn story handoff gh-9` first, its copy would be gone after its next tick, with no Check item.
 
 ### PR evidence
 
@@ -292,7 +297,7 @@ Every seam, prefactor and decision below was agreed with the person in the plan 
 | B6 | S1 | integration | a boundary with no handoff edit leaves the handoff out of the commit; no generated block in the file |
 | B7 | S1 | integration | `brief` and `story checkout` print the status block above the handoff text |
 | B8 | S1 | integration | an old handoff with header and heartbeat blocks loses them at the first boundary, prose kept |
-| B9 | S1 | integration | absent key = local; `config set --repo`; `config get` names the file; doctor fails an unknown value |
+| B9 | S1 | integration | absent `record.policy` = local; `config set record.policy remote --repo`; `config get` names the file; doctor fails an unknown value |
 | B10 | S1 | integration | under remote, branch then ref pushed at a boundary; other clone's `story view` shows the new step |
 | B11 | S1 | integration | under local, no ref on the remote through implement, review, qa |
 | B12 | S1 | integration | switch local → remote mid-story; next boundary pushes the ref |
@@ -310,7 +315,7 @@ Every seam, prefactor and decision below was agreed with the person in the plan 
 | B24 | S1 | integration | branch force-pushed: record kept, step restarted as a new attempt with the reason in the brief |
 | B25 | S1 | integration | holder gone, no ref: forced checkout starts a new round at the last boundary's step, `take` says `record_lost` |
 | B26 | S1 | integration | machine dir deleted on the holder: `checkout --force` on the same clone recovers |
-| B27 | S1 | integration | old holder's next tick sets its record aside as superseded, one Check item; tidy removes it after retain |
+| B27 | S1 | integration | old holder's next tick after a takeover without a release sets its record aside as superseded, one Check item; tidy removes it after retain; after a clean handoff the copy is removed quietly |
 | B28 | S4 | person | S1 checks that `open-pr` pushes the ref and rewrites record paths in the body sent to `FakeRemote` to that commit's URLs; a person checks rendering on GitHub and GitLab |
 | B29 | S1 | integration | merge: final record on the ref, base branch gains no run state; `run list` on a fresh clone reads the ref |
 | B30 | S1 | integration | a fresh clone and a sync fetch no `refs/norn/runs/*` but the one a command needs |
@@ -350,7 +355,7 @@ Every seam, prefactor and decision below was agreed with the person in the plan 
     - no branch: skip the check (B33).
   - **No ref.** Start a new round from the frontmatter's workflow, pinned from the branch, at the last `Norn-Step` trailer's step or the first step (B25).
   The `take` receipt gains `record_lost: boolean`, a schema change (R10.1). A forced checkout on the holder's own clone after its machine dir was wiped goes the same way (B26).
-- D11 **Superseded records replace `unpushed_runs` and `orphaned/` (agreed).** Observe reports, per story held by another heartbeat, a local record under `runs/<story>/`. The tick moves it to `<machine dir>/superseded/<story>-<ulid>/` and never pushes it. One Check item `superseded:<story>:<last receipt>` shows until `tidy` deletes the copy older than `trace.retain` (B27).
+- D11 **Superseded records replace `unpushed_runs` and `orphaned/` (agreed; narrowed by the person at the first slice gate).** Observe reports, per story held by another heartbeat, a local record under `runs/<story>/`. When the story was taken over without a release from this checkout, the tick moves it to `<machine dir>/superseded/<story>-<ulid>/` and never pushes it. When this checkout released the claim cleanly (`norn story handoff`, which pushed the record first, B15), the copy is already on the ref and is deleted quietly, with no Check item. One Check item `superseded:<story>:<last receipt>` shows until `tidy` deletes the copy older than `trace.retain` (B27).
 - D12 **A rejected mailbox receipt is kept machine-local with its reason and shown as a Check item (agreed).** Kept next to the notices; the trace keeps it too. It clears on its own when a later answer or approval for the story is accepted, or when the story finishes. There is no dismiss command (B21 and T9 amended).
 - D13 **Open-story migration is decided, not hard-wired (agreed).** Observe reports `runs/` still on a held unit's branch. decide emits `move_record` per unit. Its act:
   1. copies the files into a temp folder in the machine dir, validates them and renames into place;
@@ -360,6 +365,7 @@ Every seam, prefactor and decision below was agreed with the person in the plan 
   A machine dir that already holds the record with `runs/` still on the branch only finishes the removal (S5, B34). A flat record (RD7) is moved into `rounds/01-<wf>/` in the same step.
 - D14 **`norn upgrade` packs each finished story from the base tree without unpacking (agreed).** The `runs/` subtree of each spec folder on the base is already a tree object, so its record commit is `commit-tree` of that subtree. The refs are pushed in one batch with a lease of "absent" each. A story whose push is rejected keeps its run state; for every other story the removal is staged, and the `.gitattributes` line removal too (B35–B37, LY3).
 - D15 **GR6 and GR6b push the final record first and clean up only after it is on the remote (agreed).** A failed archive push leaves the cleanup owed and retried, as an owed base record is today (B29).
+- D16 **No fallback reads run state from the base tree (person's decision at the first slice gate).** After the archive lands, a finished story's run state is read only from its archive ref; the reader of `runs/` in the base tree is deleted, not kept beside it. A repository whose base still holds run state from an older norn is pointed to `norn upgrade` by one `norn status` item and one failed `norn doctor` check, until the removal `upgrade` stages is committed (B29, B35).
 
 ### Testing decisions
 

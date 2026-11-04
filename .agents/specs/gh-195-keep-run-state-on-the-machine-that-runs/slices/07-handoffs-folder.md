@@ -1,7 +1,7 @@
 ---
 id: gh-195/07
 title: Handoffs move to handoffs/<unit>.md, prose only
-depends_on: [gh-195/02, gh-195/05]
+depends_on: [gh-195/02, gh-195/05, gh-195/06]
 status: planned
 criteria:
   - { id: AC1, verifier: test }
@@ -16,7 +16,7 @@ criteria:
 Each unit's handoff is `<spec folder>/handoffs/_story.md` or `handoffs/<nn>-<slug>.md`, on that unit's branch, holding only Goal, Progress and Resume; the status it used to carry is printed by `brief` and `story checkout`. With this, no branch and no PR carries a `runs/` path.
 
 ## Scope
-Behaviour: B1, B6, B7, B8, B39. Seams: S1, S2. Out: run state (gh-195/05), PR evidence (gh-195/15).
+Behaviour: B1, B6, B7, B8, B39. Seams: S1, S2. Out: run state (gh-195/05, gh-195/06), PR evidence (gh-195/15).
 
 ## Acceptance
 - AC1 (B39) Given gh-9 with slice `01-parser`, when both run a step, then `handoffs/_story.md` is on the story branch and `handoffs/01-parser.md` on the slice branch (reaching the story branch with the slice's integration), and the story's handoff stays one file across rounds. — verifier: test
