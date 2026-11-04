@@ -6,7 +6,7 @@
   spawn repo $ git fetch --quiet --no-tags origin +refs/heads/main:refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
-  spawn repo $ git fetch --quiet --prune --no-tags origin "+refs/norn/*:refs/norn/*"
+  spawn repo $ git fetch --quiet --prune --no-tags origin "+refs/norn/claims/*:refs/norn/claims/*" "+refs/norn/inbox/*:refs/norn/inbox/*"
   A.remote.listAssignedIssues norn
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
@@ -30,7 +30,7 @@
   spawn repo $ git fetch --quiet --no-tags origin +refs/heads/main:refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
-  spawn repo $ git fetch --quiet --prune --no-tags origin "+refs/norn/*:refs/norn/*"
+  spawn repo $ git fetch --quiet --prune --no-tags origin "+refs/norn/claims/*:refs/norn/claims/*" "+refs/norn/inbox/*:refs/norn/inbox/*"
   A.remote.listAssignedIssues norn
   A.remote.findPullRequest gh-7-add-login-form
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
@@ -300,7 +300,7 @@
   spawn repo $ git fetch --quiet --no-tags origin +refs/heads/main:refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
-  spawn repo $ git fetch --quiet --prune --no-tags origin "+refs/norn/*:refs/norn/*"
+  spawn repo $ git fetch --quiet --prune --no-tags origin "+refs/norn/claims/*:refs/norn/claims/*" "+refs/norn/inbox/*:refs/norn/inbox/*"
   A.remote.listAssignedIssues norn
   A.remote.findPullRequest gh-7-add-login-form
   spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
@@ -669,7 +669,7 @@
   spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-7
   spawn repo $ git cat-file blob <sha:4>
   spawn repo $ git remote
-  spawn repo $ git fetch --quiet --prune --no-tags origin "+refs/norn/*:refs/norn/*"
+  spawn repo $ git fetch --quiet --prune --no-tags origin "+refs/norn/claims/*:refs/norn/claims/*" "+refs/norn/inbox/*:refs/norn/inbox/*"
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/inbox/gh-7/
   spawn repo $ git remote
   exit 0
@@ -979,7 +979,7 @@
   spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-7
   spawn repo $ git cat-file blob <sha:19>
   spawn repo $ git remote
-  spawn repo $ git fetch --quiet --prune --no-tags origin "+refs/norn/*:refs/norn/*"
+  spawn repo $ git fetch --quiet --prune --no-tags origin "+refs/norn/claims/*:refs/norn/claims/*" "+refs/norn/inbox/*:refs/norn/inbox/*"
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/inbox/gh-7/
   spawn repo $ git remote
   exit 0
@@ -1103,7 +1103,7 @@
   spawn repo $ git fetch --quiet --no-tags origin +refs/heads/main:refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
-  spawn repo $ git fetch --quiet --prune --no-tags origin "+refs/norn/*:refs/norn/*"
+  spawn repo $ git fetch --quiet --prune --no-tags origin "+refs/norn/claims/*:refs/norn/claims/*" "+refs/norn/inbox/*:refs/norn/inbox/*"
   A.remote.listAssignedIssues norn
   A.remote.findPullRequest gh-7-add-login-form
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
@@ -1143,7 +1143,7 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git ls-tree -r -z <sha:27>
   spawn repo $ git cat-file --batch
-  spawn repo $ git fetch --quiet --prune --no-tags origin "+refs/norn/*:refs/norn/*"
+  spawn repo $ git fetch --quiet --prune --no-tags origin "+refs/norn/claims/*:refs/norn/claims/*" "+refs/norn/inbox/*:refs/norn/inbox/*"
   A.remote.listAssignedIssues norn
   A.remote.findPullRequest gh-7-add-login-form
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
