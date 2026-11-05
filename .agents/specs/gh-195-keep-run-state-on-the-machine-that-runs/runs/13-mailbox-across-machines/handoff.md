@@ -91,6 +91,8 @@ B20, B21: a non-holder's mailbox receipt is stamped from the last boundary (loca
 - Tests: unit 1221 pass, typecheck clean, mailbox-across-machines + human 56/56. Flakes: none.
 - review#2 changes_requested: review#2: review#1 F1-F8 fixed; blocking R2-F1 duplicate refusal prints <step>#undefined for step-only receipts, R2-F2 AC4 'finishes' clause not proven on its own, R2-F3 AC2 tested with approve not answer; minors R2-F4..F8
 
+- Implement #4 (review#2): R2-F1 one `stepLabel` (step, or step#attempt) for the duplicate refusal, the reject reason and the Check item detail (refusal text tested); R2-F3 remote-policy answer from B tested (step and attempt from the ref, applied); R2-F8 decide carries the kept record on `reject_receipt.keep` (golden --update: the 2 mailbox.reject cases gain it); R2-F4/F5 cleared only by an answer or approval numbered past `seen` (each unit's last receipt number at rejection, holder-side), a gate rejection does not clear (tested); R2-F7 the title names the unit's current step (tested); R2-F6 tidy drops only cleared/finished ones older than trace.retain, open ones stay (tested); R2-F2 a story finishing with no later answer/approval clears it (duo workflow, gh-27); R2-F9 the step-only builder passed to resolveTarget is the one flag (on Target); R2-F10 step-only `story reject` from B tested.
+
 ## Resume
 
-Fix R2-F1 (shared step label helper + assert the refusal text), add the AC2 answer-under-remote test and an AC4 finish-without-acceptance test; then minors R2-F4..F8.
+Full integration + e2e running; then harvest (`bun run golden`), then `norn done done`.
