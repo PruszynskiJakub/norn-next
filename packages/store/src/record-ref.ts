@@ -342,7 +342,14 @@ export async function archiveBaseRunState(root: string, remote: string | null, o
   const existing = new Map<string, string>();
   if (remote === null) for (const [k, sha] of localRecordRefs(root)) existing.set(k, sha);
   else {
-    const fetched = new Set(await fetchRecords(root, remote, stories.map((s) => s.key)));
+    let fetched: Set<string>;
+    try {
+      fetched = new Set(await fetchRecords(root, remote, stories.map((s) => s.key)));
+    } catch (e) {
+      // offline: nothing is pushed, so nothing is removed (P6)
+      const reason = `the remote's archive refs could not be read: ${(e as Error).message}`;
+      return stories.map((s) => ({ story: s.key, path: treeStoryRunStatePath(s), done: "failed", ref: recordRef(s.key), reason }));
+    }
     const local = localRecordRefs(root);
     for (const s of stories) if (fetched.has(recordRef(s.key)) && local.has(s.key)) existing.set(s.key, local.get(s.key) as string);
   }
