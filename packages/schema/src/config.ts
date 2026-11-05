@@ -90,6 +90,21 @@ export const TraceConfig = Type.Object(
   { additionalProperties: false },
 );
 
+/** gh-195 B9 (S11): where a story's record goes at each step boundary: kept on the holder's machine, or pushed to `refs/norn/runs/<story>`. */
+export const RECORD_POLICIES = ["local", "remote"] as const;
+export type RecordPolicy = (typeof RECORD_POLICIES)[number];
+export const RecordConfig = Type.Object(
+  {
+    policy: Type.Optional(
+      Type.Union(
+        RECORD_POLICIES.map((p) => Type.Literal(p)),
+        { description: "local (default): the record stays on the holder's machine between claim releases; remote: every step boundary pushes it to refs/norn/runs/<story>" },
+      ),
+    ),
+  },
+  { additionalProperties: false },
+);
+
 /** `~/.norn/config.yaml`: this machine and your defaults for every repo. */
 export const UserConfig = Type.Object(
   {
@@ -121,6 +136,8 @@ export const RepoConfig = Type.Object(
     slice_workflow: Type.Optional(Type.String({ pattern: "^[a-z][a-z0-9_-]*$", description: "workflow a new slice starts in (default slice)" })),
     /** gh-61 B1–B4 (D4, K8): the norn version the repo needs; written by `norn upgrade` and `norn init` only */
     norn_version: Type.Optional(Type.String({ pattern: VERSION_PATTERN, description: "the norn version this repo needs, X.Y.Z (written by norn upgrade and norn init)" })),
+    /** gh-195 B9 (S11): the team's record policy */
+    record: Type.Optional(RecordConfig),
   },
   { $id: "https://norn.dev/schema/repo-config.json", title: "norn team config", additionalProperties: false },
 );
@@ -164,6 +181,8 @@ export const ResolvedConfig = Type.Object(
     /** B35: derived from `interval` */
     claim: Type.Object({ lease: Duration, renew: Duration }, { additionalProperties: false }),
     trace: Type.Object({ retain: Type.String({ minLength: 1 }) }, { additionalProperties: false }),
+    /** gh-195 B9, B12: the team's record policy, read at every tick */
+    record: Type.Object({ policy: Type.Union(RECORD_POLICIES.map((p) => Type.Literal(p))) }, { additionalProperties: false }),
   },
   { additionalProperties: false },
 );
@@ -211,6 +230,7 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
   interval: DEFAULT_INTERVAL,
   claim: { lease: "10m", renew: "3m20s" },
   trace: { retain: "14d" },
+  record: { policy: "local" },
 };
 
 /** How wiring selects one built-in runner or notifier adapter (not a config file key). */
@@ -268,7 +288,7 @@ const MOVED_AGENT_FIELD: Record<string, string> = {
 
 const MACHINE_KEYS = ["max_agents", "notify", "trace"];
 const PERSON_KEYS = ["mode", "agent", "agents"];
-const TEAM_KEYS = ["provider", "base_branch", "workflow", "slice_workflow", "norn_version"];
+const TEAM_KEYS = ["provider", "base_branch", "workflow", "slice_workflow", "norn_version", "record"];
 const FILE_KEYS: Record<ConfigFileKind, string[]> = { user: [...MACHINE_KEYS, ...PERSON_KEYS], local: PERSON_KEYS, repo: TEAM_KEYS };
 
 /** The file a top-level key belongs in, as a person reads it; null for an unknown key. */
@@ -368,6 +388,8 @@ const INVALID: Record<string, string> = {
   workflow: "`workflow` must be a workflow name",
   slice_workflow: "`slice_workflow` must be a workflow name",
   norn_version: "`norn_version` must be a version like 0.19.0",
+  record: "`record` must be a map with `policy`",
+  "record.policy": "`record.policy` must be local or remote",
   $schema: "`$schema` must be a path or URL",
 };
 
@@ -535,6 +557,9 @@ export function resolveConfig(files: ConfigFiles = {}, derived: ConfigDerived = 
   const workflow = team<string>("workflow", "triage");
   const slice_workflow = team<string>("slice_workflow", "slice");
   const norn_version = team<string | null>("norn_version", null);
+  // gh-195 B9: the record policy, a team key; local unless the team file says remote
+  const recordPolicy = ((clean.repo.record as { policy?: RecordPolicy } | undefined)?.policy ?? undefined) as RecordPolicy | undefined;
+  entry("record.policy", recordPolicy ?? "local", recordPolicy === undefined ? "built-in" : "repo");
 
   const max_agents = machine<number>("max_agents", 9);
   const notifyFile = (clean.user.notify ?? {}) as Notify;
@@ -572,6 +597,7 @@ export function resolveConfig(files: ConfigFiles = {}, derived: ConfigDerived = 
     interval,
     claim,
     trace: { retain: retain ?? "14d" },
+    record: { policy: recordPolicy ?? "local" },
   };
   return { config, entries, problems };
 }
@@ -602,6 +628,7 @@ export function configKeyProblem(file: ConfigFileKind, key: string): ConfigProbl
     },
     notify: ([c, ...more]) => (c === undefined || (["os", "ntfy", "webhook"].includes(c) && !more.length) ? null : unknown()),
     trace: ([c, ...more]) => (c === undefined || (c === "retain" && !more.length) ? null : unknown()),
+    record: ([c, ...more]) => (c === undefined || (c === "policy" && !more.length) ? null : unknown()),
   };
   const child = children[top];
   if (child) return child(rest);

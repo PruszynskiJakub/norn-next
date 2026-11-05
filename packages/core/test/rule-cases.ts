@@ -144,6 +144,15 @@ function cases(): RuleCase[] {
   out.push(
     c("a story's branch run state waits out a merge in its worktree (H1)", "record.move_waits", facts([story(STORY_WF, { step: "slices" }, null, {}, { ...onBranch, worktree: { ...worktree(STORY_WT), in_progress: { operation: "merge", unmerged: [] } } })])),
   );
+  // gh-195/08 (B10, D4): under record.policy remote, a held story whose record changed since the ref it last saw
+  out.push(
+    c(
+      "a held story's record changed under the remote policy: push it after the branch",
+      "record.push",
+      facts([{ ...story(SOLO_WF, running("implement", MIN)), record: { tree: "b".repeat(40), pushed: { sha: "c".repeat(40), tree: "a".repeat(40) } } }]),
+      { ...CONFIG, record: { policy: "remote" } },
+    ),
+  );
   out.push(c("a held story with a flat record", "round.migrate", facts([story(STORY_WF, { step: "slices" }, null, {}, { record: "runs/_story" })])));
   // gh-71 D5 (B35): an older norn's remote park on a finished round is dropped by the holder's tick
   out.push(c("a finished round an older norn parked for the issue", "remote.unpark_finished", facts([{ ...story(STORY_WF, { step: "$done", status: "stuck", park: { kind: "remote", reason: "remote: issue closed, unassigned or unlabelled", since: at() } }, null, {}, { record: "runs/_story/rounds/01-story" }), issue: null }])));

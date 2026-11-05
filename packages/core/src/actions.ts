@@ -7,6 +7,8 @@
  *   action. Decide emits it before every other action of the story; act performs it first and, if
  *   its CAS loses (the claim is gone or held by another heartbeat), skips every other action of
  *   that story this tick, reporting each as `skipped: claim lost` (R1.2). See decide's `isSideAction`.
+ * - Side action (gh-195 D4): a story's `push_record` does not occupy its unit's one action either;
+ *   act performs it after every other action of the tick (after the branch push, B10).
  * - Decide is pure and replayable: it uses `facts.now` for every timestamp and
  *   `deriveUlid(facts.tick_id, i)` (from @norn/schema) for every new id (receipt_id, run_id).
  * - Every action is a plain JSON value (it is written to the trace verbatim).
@@ -435,6 +437,21 @@ export interface MoveRecordAction extends UnitBase {
   commit: BoundaryCommit;
 }
 
+/**
+ * gh-195 D2, D4 (B10, B14): pack the story's record and push it to `refs/norn/runs/<story>` with a
+ * lease on `expected` (the sha observe saw; null = none yet). A side action of the story unit that act
+ * performs after every other action of the tick, so after the branch push; a tree unchanged from
+ * `expected`'s pushes nothing, and a failed push leaves the record owed for the next tick.
+ */
+export interface PushRecordAction extends UnitBase {
+  kind: "push_record";
+  /** the story branch; its pushed head is the commit's `Norn-Branch-Commit` */
+  branch: string;
+  expected: string | null;
+  /** `Norn-Holder`: the claim holder (`user@host`) */
+  holder: string;
+}
+
 /** gh-195/05 (B2): write back the `.norn-unit` of unit worktrees `git clean -fdx` took it from. */
 export interface RestoreMarkersAction extends RepoBase {
   kind: "restore_markers";
@@ -472,6 +489,7 @@ export type UnitAction =
   | RoundMigrateAction
   | RoundStartAction
   | MoveRecordAction
+  | PushRecordAction
   | NoopAction;
 
 export type RepoAction = IntakeStoryAction | ReclaimLeasesAction | RestoreMarkersAction;

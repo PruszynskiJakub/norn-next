@@ -5,6 +5,7 @@ import { cmd, type Action, type ActionResult, nornTrailers, type UnitRef, type W
 import { type ClaimBlob, parseDuration, ROUNDS_DIR, STORY_UNIT_DIR } from "@norn/schema";
 import {
   acquireClaim,
+  pushRecord as pushStoryRecord,
   type ClaimWriteResult,
   deleteMailbox,
   listLeases,
@@ -427,4 +428,19 @@ async function swapRoundLabel(act: ActEnv, label: Extract<Action, { kind: "round
   } catch (e) {
     return { swapped: false, warning: `${what} not updated: ${(e as Error).message}` };
   }
+}
+
+/**
+ * gh-195 D2, D4 (B10, B14): push the story's record to `refs/norn/runs/<story>` after the tick's
+ * branch pushes, its `Norn-Branch-Commit` the story branch as pushed (the remote-tracking head; the
+ * local head without a remote). A lease that no longer holds or a rejected push leaves the record
+ * owed: the next tick tries again.
+ */
+export async function pushRecord(act: ActEnv, a: Extract<Action, { kind: "push_record" }>): Promise<ActionResult> {
+  const story = act.storyLoc(a.unit.story);
+  const remote = act.obs.remote;
+  const head = await act.git.revParse(act.root, remote ? `refs/remotes/${remote}/${a.branch}` : `refs/heads/${a.branch}`).catch(() => null);
+  const r = await pushStoryRecord(act.root, remote, story, { expected: a.expected, holder: a.holder, branch_commit: head, at: act.nowIso() });
+  if (!r.ok) return { ok: false, error: `record push for ${a.unit.story} failed (${r.reason}); the next tick tries again (B14): ${r.message}` };
+  return { ok: true, detail: r };
 }

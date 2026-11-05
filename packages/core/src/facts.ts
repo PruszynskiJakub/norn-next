@@ -348,6 +348,13 @@ export interface StoryFacts {
   /** BS1: the story branch against its base; absent = not observed (no story branch or base ref) */
   base?: StoryBase;
   /**
+   * gh-195 D4 (B10, B12): under `record.policy: remote`, on the checkout that holds the claim, the
+   * tree a pack of the story's run-state folder would write (`tree`, null = no file yet) and the record
+   * ref as this checkout last saw it (`pushed`: its commit and tree; null = none). Machine-local.
+   * Absent = not observed (another holder, or the policy is local).
+   */
+  record?: { tree: string | null; pushed: { sha: string; tree: string } | null };
+  /**
    * NT2/NT3: notes for a person from `done` receipts of any unit of the story that no story-level
    * gate `approve` acknowledged yet, oldest first. Absent = none (or not observed).
    */

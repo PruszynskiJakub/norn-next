@@ -306,6 +306,11 @@ export function mailboxPrefix(story: string): string {
 export function mailboxRef(story: string, id: string): string {
   return `${mailboxPrefix(story)}${id}`;
 }
+/** gh-195 D2 (B10): the ref holding a story's record, one commit per push whose tree is its run-state folder. */
+export const RECORD_REF_PREFIX = "refs/norn/runs/";
+export function recordRef(story: string): string {
+  return `${RECORD_REF_PREFIX}${story}`;
+}
 
 /** Receipt file name `NNNN-<kind>.json` (S6). */
 export function receiptFileName(n: number, kind: string): string {

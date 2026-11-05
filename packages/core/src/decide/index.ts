@@ -31,7 +31,7 @@ import { commitFor, Ctx, isSideAction } from "./receipts.ts";
 import { decideStory } from "./story.ts";
 
 export { LAUNCH_PROMPT_MS } from "./agent.ts";
-export { isSideAction } from "./receipts.ts";
+export { isSideAction, isTailAction } from "./receipts.ts";
 
 /** A repo workflow as loaded by the caller: parsed + validated (W5) with the exact file text. */
 export interface LoadedWorkflow {

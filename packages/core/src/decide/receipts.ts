@@ -21,9 +21,13 @@ import type { InboxItem } from "../ports.ts";
 import { iso } from "../time.ts";
 import type { RepoWorkflows } from "./index.ts";
 
-/** R1.1: a side action rides along with its unit's one action this tick — only a claim renewal. */
+/** R1.1: a side action rides along with its unit's one action this tick — a claim renewal, or a record push (gh-195 D4). */
 export function isSideAction(a: { kind: string; op?: unknown }): boolean {
-  return a.kind === "claim" && a.op === "renew";
+  return (a.kind === "claim" && a.op === "renew") || isTailAction(a);
+}
+/** gh-195 D4 (B10): a side action act performs after every other action of the tick: the record push. */
+export function isTailAction(a: { kind: string }): boolean {
+  return a.kind === "push_record";
 }
 
 export class Ctx {

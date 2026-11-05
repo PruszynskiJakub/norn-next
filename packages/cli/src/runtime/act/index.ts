@@ -15,6 +15,7 @@ import {
   type ActionResult,
   buildInbox,
   isSideAction,
+  isTailAction,
   type Decision,
   type Facts,
   type InboxGroup,
@@ -26,7 +27,7 @@ import { applyReceipts, startRun, nudge, retryFresh, classify } from "./session.
 import { runCheck } from "./check.ts";
 import { runGit } from "./git-step.ts";
 import { startUnit, markDone, rejectReceipt, claim, renewAll, intake, mirror, cleanupMerged, closeClosedIssueStory,
-  moveRecord, roundMigrate, roundStart, retryRecords } from "./lifecycle.ts";
+  moveRecord, pushRecord, roundMigrate, roundStart, retryRecords } from "./lifecycle.ts";
 
 export interface ActRecord {
   decision: Decision;
@@ -72,9 +73,11 @@ export class Actor extends ActEnv {
     const out: ActRecord[] = [];
     // R1.2: a story's renewal runs before its other actions; once it loses the CAS, nothing else of
     // that story is done this tick (R2.2: a checkout without the claim writes and pushes nothing)
-    const order = [...decisions.filter((d) => isSideAction(d.action)), ...decisions.filter((d) => !isSideAction(d.action))];
+    // gh-195 D4 (B10): a record push comes after everything else, so after the tick's branch pushes
+    const renewals = decisions.filter((d) => isSideAction(d.action) && !isTailAction(d.action));
+    const order = [...renewals, ...decisions.filter((d) => !isSideAction(d.action)), ...decisions.filter((d) => isTailAction(d.action))];
     const lost = new Set<string>();
-    const renewed = await this.renewals(order.filter((d) => isSideAction(d.action)));
+    const renewed = await this.renewals(renewals);
     for (const d of order) {
       const story = d.action.unit?.story;
       let result: ActionResult;
@@ -94,7 +97,7 @@ export class Actor extends ActEnv {
           counted = !(e instanceof QueueFull);
           result = e instanceof QueueFull ? { ok: false, error: e.message, detail: { queued: true } } : { ok: false, error: (e as Error).message };
         }
-      if (story && isSideAction(d.action) && !result.ok && claimLost(result)) lost.add(story);
+      if (story && isSideAction(d.action) && !isTailAction(d.action) && !result.ok && claimLost(result)) lost.add(story);
       if (counted) this.recordFailure(d, result);
       out.push({ decision: d, result });
     }
@@ -121,7 +124,8 @@ export class Actor extends ActEnv {
    */
   private recordFailure(d: Decision, result: ActionResult): void {
     const a = d.action;
-    if (!a.unit || a.kind === "claim" || a.kind === "noop") return;
+    // gh-195 B14: a failed record push is owed, not a failure of the unit: the next tick pushes it
+    if (!a.unit || a.kind === "claim" || a.kind === "noop" || a.kind === "push_record") return;
     const key = a.unit.key;
     const prev = this.failures[key];
     if (!result.ok) {
@@ -232,6 +236,8 @@ export class Actor extends ActEnv {
         return roundStart(this, a);
       case "move_record":
         return moveRecord(this, a);
+      case "push_record":
+        return pushRecord(this, a);
       case "noop":
         return { ok: true };
       case "intake_story":

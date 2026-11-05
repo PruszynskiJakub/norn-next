@@ -527,6 +527,7 @@ norn help [--all] [<command> | <noun> [<verb>]]
 | `workflow` | team | string | `"triage"` |
 | `slice_workflow` | team | string | `"slice"` |
 | `norn_version` | team | string | `null` |
+| `record.policy` | team | `"local"` or `"remote"` | `"local"` |
 
 ### Shipped workflows
 

@@ -30,6 +30,8 @@ import { parseDuration, type ResolvedConfig, sliceBranch, storyBranch, type Unit
 import {
   type BaseFactsCache,
   classifyClaim,
+  readRecordRef,
+  recordTreeId,
   fetchNornRefs,
   heartbeatId,
   listMailbox,
@@ -321,6 +323,12 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     const heldHere = claim.state === "mine" || (claim.state === "expired" && claim.blob.heartbeat_id === hb);
     const lost = remote && !heldHere && claim.state !== "corrupt" ? await unpushedRuns(remote, baseRef, s, targets) : [];
     if (lost.length) unpushed[s.key] = lost;
+    // gh-195 D4 (B10, B12): under remote, what the holder's record would pack to and what it last pushed
+    let record: StoryFacts["record"];
+    if (heldHere && config.record.policy === "remote") {
+      const pushed = await readRecordRef(root, s.key);
+      record = { tree: recordTreeId(root, s, pushed?.sha.length === 64 ? "sha256" : "sha1"), pushed };
+    }
 
     stories.push({
       key: s.key,
@@ -344,6 +352,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       ...(lost.length ? { unpushed_runs: lost.map((l) => ({ unit: l.unit, files: l.files })) } : {}),
       ...(claim.state === "none" && s.frontmatter?.status === "new" ? await intakeOnly(git, root, remote ? baseRef : `refs/heads/${base}`, branch, s.key, refs) : {}),
       ...(await storyBase(git, root, remote, base, branch, s.frontmatter?.status, refs, baseCacheIn, baseCache, s.key)),
+      ...(record ? { record } : {}),
       units,
       slices: s.slices satisfies SliceFileFacts[],
       // B10, B25: before its story unit pins a workflow, a story runs in the one it will start (MO1)

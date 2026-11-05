@@ -23,11 +23,11 @@ export function gitTimeoutMs(args: readonly string[]): number | undefined {
   return NETWORK_SUBCOMMANDS.has(args[i] ?? "") ? NETWORK_TIMEOUT_MS : undefined;
 }
 
-export async function git(cwd: string, args: string[], input?: string, opts: { timeoutMs?: number } = {}): Promise<GitRun> {
+export async function git(cwd: string, args: string[], input?: string, opts: { timeoutMs?: number; env?: Record<string, string> } = {}): Promise<GitRun> {
   const timeoutMs = opts.timeoutMs ?? gitTimeoutMs(args);
   const r = await spawnBounded(["git", ...args], {
     cwd,
-    env: { ...process.env, GIT_TERMINAL_PROMPT: "0", LC_ALL: "C" },
+    env: { ...process.env, GIT_TERMINAL_PROMPT: "0", LC_ALL: "C", ...opts.env },
     ...(input === undefined ? {} : { stdin: input }),
     ...(timeoutMs === undefined ? {} : { timeoutMs }),
   });

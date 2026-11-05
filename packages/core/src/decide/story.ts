@@ -124,6 +124,22 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
     if (ctx.has(uf.unit.key)) continue;
     decideUnit(ctx, story, uf, halted);
   }
+  pushRecord(ctx, story, ref);
+}
+
+/**
+ * gh-195 D4 (B10–B12, B14, S11): under `record.policy: remote` (read at every tick, B12), the holder
+ * pushes the story's record once its tree differs from the one on the record ref it last saw, after
+ * the tick's branch pushes (a side action act performs last). A push that failed leaves the tree
+ * different, so the next tick pushes again (B14). A move off the branch this tick (B34, D13) brings the
+ * record into the machine dir as it acts, so the push rides along with it. Under `local`, nothing (B11).
+ */
+function pushRecord(ctx: Ctx, story: StoryFacts, ref: UnitRef): void {
+  if ((ctx.config.record?.policy ?? "local") !== "remote" || !story.record) return;
+  const { tree, pushed } = story.record;
+  const moved = ctx.decisions.some((d) => d.action.kind === "move_record" && d.action.unit?.story === story.key);
+  if (!moved && (tree === null || tree === pushed?.tree)) return;
+  ctx.emit({ kind: "push_record", unit: ref, rule: "record.push", branch: story.branch, expected: pushed?.sha ?? null, holder: ctx.facts.machine.holder });
 }
 
 /**
