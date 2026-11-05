@@ -2,7 +2,7 @@
 id: gh-195/13
 title: Mailbox from a non-holder, and rejected receipts shown on the holder
 depends_on: [ gh-195/12 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
