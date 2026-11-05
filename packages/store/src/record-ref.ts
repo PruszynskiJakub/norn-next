@@ -16,6 +16,7 @@ import { basename, dirname, join, resolve, sep } from "node:path";
 import type { FileError } from "@norn/core";
 import { type RunStory, recordRef } from "@norn/schema";
 import { fsyncTree, isErrno } from "./fsx.ts";
+import { archiveCacheDir } from "./paths.ts";
 import { casRef, git, gitOk, gitSync, readLocalRef } from "./git.ts";
 import { recordErrors } from "./record-move.ts";
 import { storyRunStateDir } from "./run-state.ts";
@@ -151,13 +152,22 @@ export async function pushRecord(
  * Only then is the temp folder renamed into place, replacing `dest` whole (review F3). A record that
  * fails puts nothing in place: its errors are returned instead.
  */
-export async function unpackRecord(root: string, sha: string, dest: string): Promise<{ ok: true; files: number } | { ok: false; errors: FileError[] }> {
+export async function unpackRecord(root: string, sha: string, dest: string): Promise<UnpackResult> {
+  return unpackRecordSync(root, sha, dest);
+}
+
+export type UnpackResult = { ok: true; files: number } | { ok: false; errors: FileError[] };
+
+/** `unpackRecord` for a synchronous reader (the snapshot's archive cache, gh-195/16): the same checks and the same rename into place. */
+export function unpackRecordSync(root: string, sha: string, dest: string): UnpackResult {
   const staging = join(dirname(dest), `.${basename(dest)}.unpack-${process.pid}`);
   const fail = (path: string, message: string): FileError => ({ file: join(dest, path), errors: [{ path: "", message }] });
   const entries: Array<{ path: string; blob: string }> = [];
   const refused: FileError[] = [];
   // -z: a name with a tab or a newline is read whole; the path is what follows the first tab
-  for (const line of (await gitOk(root, ["ls-tree", "-r", "-z", "--full-tree", sha])).split("\0").filter(Boolean)) {
+  const ls = gitSync(root, ["ls-tree", "-r", "-z", "--full-tree", sha]);
+  if (ls.code !== 0) return { ok: false, errors: [fail("", `git ls-tree ${sha} failed: ${ls.stderr.trim()}`)] };
+  for (const line of ls.stdout.toString("utf8").split("\0").filter(Boolean)) {
     const tab = line.indexOf("\t");
     const [mode, type, blob] = line.slice(0, tab).split(" ") as [string, string, string];
     const path = line.slice(tab + 1);
@@ -211,4 +221,44 @@ export async function unpackRecord(root: string, sha: string, dest: string): Pro
   } finally {
     rmSync(staging, { recursive: true, force: true });
   }
+}
+
+/**
+ * gh-195 D6, D7, D16 (B29, B30): the folder holding a finished story's record as its archive ref
+ * `refs/norn/runs/<story>` has it here (local refs only: never the network, H2), unpacked once per
+ * record commit into the machine dir's `archive/<story>/<commit>/` (`unpackRecordSync`: hostile
+ * entries refused, every file validated, renamed into place), older commits' copies dropped. Null when
+ * there is no such ref here, or its record does not unpack (nothing is guessed, S2). Read-only input.
+ */
+export function archivedRecordDir(root: string, story: string): string | null {
+  const r = gitSync(root, ["rev-parse", "--verify", "--quiet", `${recordRef(story)}^{commit}`]);
+  const sha = r.code === 0 ? r.stdout.toString().trim() : "";
+  if (!/^[0-9a-f]{40,64}$/.test(sha)) return null;
+  const cache = archiveCacheDir(root, story);
+  const dir = join(cache, sha);
+  if (existsSync(dir)) return dir;
+  mkdirSync(cache, { recursive: true });
+  if (!unpackRecordSync(root, sha, dir).ok) return null;
+  for (const n of readdirSync(cache)) if (n !== sha && !n.startsWith(".")) rmSync(join(cache, n), { recursive: true, force: true });
+  return dir;
+}
+
+/**
+ * gh-195 D6 (B29, B30): fetch the archive refs of `stories` alone from `remote` into the same local
+ * refs, for a command that needs those stories' records (`run list`, `run view`, `story reopen`); a
+ * story the remote has no ref of is skipped. Returns the refs fetched; never touches another ref.
+ */
+export async function fetchRecords(root: string, remote: string, stories: readonly string[]): Promise<string[]> {
+  if (!stories.length) return [];
+  const wanted = new Set(stories.map(recordRef));
+  const listed = await git(root, ["ls-remote", remote, ...wanted]);
+  if (listed.code !== 0) throw new Error(`git ls-remote ${remote} failed: ${listed.stderr.trim()}`);
+  const refs = listed.stdout
+    .split("\n")
+    .map((l) => l.split("\t")[1]?.trim())
+    .filter((ref): ref is string => !!ref && wanted.has(ref));
+  if (!refs.length) return [];
+  const f = await git(root, ["fetch", "--quiet", "--no-tags", remote, ...refs.map((ref) => `+${ref}:${ref}`)]);
+  if (f.code !== 0) throw new Error(`git fetch ${remote} failed: ${f.stderr.trim()}`);
+  return refs;
 }

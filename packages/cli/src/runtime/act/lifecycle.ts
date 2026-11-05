@@ -6,6 +6,7 @@ import { type ClaimBlob, HANDOFFS_DIR, parseDuration, recordRef, ROUNDS_DIR, RUN
 import {
   acquireClaim,
   pushRecord as pushStoryRecord,
+  readRecordRef,
   type ClaimWriteResult,
   deleteMailbox,
   listLeases,
@@ -246,8 +247,31 @@ export async function mirror(act: ActEnv, a: Extract<Action, { kind: "update_sto
   return { ok: true, detail: await act.commit(a.commit, null, null) };
 }
 
+/**
+ * gh-195 D15 (B29): GR6 and GR6b push the story's final record to its archive ref
+ * `refs/norn/runs/<story>` before any cleanup, with a lease on the sha this checkout last saw (D2),
+ * its `Norn-Branch-Commit` the story branch as the remote has it (the local one without a remote, or
+ * none once it is gone, B33). An unchanged or empty record pushes nothing; a failure says why the cleanup waits.
+ */
+async function archiveRecord(act: ActEnv, key: string): Promise<{ archive: Record<string, unknown> } | { error: string; detail: Record<string, unknown> }> {
+  const story = act.storyLoc(key);
+  const remote = act.obs.remote;
+  const branch = act.obs.facts.stories.find((s) => s.key === key)?.branch ?? null;
+  const head = branch ? ((remote ? await act.git.revParse(act.root, `refs/remotes/${remote}/${branch}`) : null) ?? (await act.git.revParse(act.root, `refs/heads/${branch}`))) : null;
+  const expected = (await readRecordRef(act.root, key))?.sha ?? null;
+  const r = await pushStoryRecord(act.root, remote, { key, spec_dir: story.spec_dir }, { expected, holder: act.obs.facts.machine.holder, branch_commit: head, at: act.nowIso() });
+  if (r.ok) return { archive: { ref: recordRef(key), ...r } };
+  return {
+    error: `archive ${recordRef(key)} on ${remote ?? "this checkout"} failed (${r.reason}): ${r.message}; nothing was cleaned up, the next tick tries again (D15)`,
+    detail: { archive: { ref: recordRef(key), reason: r.reason, message: r.message } },
+  };
+}
+
 export async function cleanupMerged(act: ActEnv, a: Extract<Action, { kind: "cleanup_merged_story" }>): Promise<ActionResult> {
-  const detail: Record<string, unknown> = {};
+  // D15 (B29): the final record is on its archive ref before anything is removed; a failed push leaves the cleanup owed
+  const archived = await archiveRecord(act, a.unit.story);
+  if ("error" in archived) return { ok: false, error: archived.error, detail: archived.detail };
+  const detail: Record<string, unknown> = { ...archived };
   const errors: string[] = [];
   act.cleaned.add(a.unit.story);
   const tryDo = async (what: string, f: () => Promise<unknown>) => {
@@ -291,13 +315,16 @@ export async function closeClosedIssueStory(act: ActEnv, a: Extract<Action, { ki
   const story = act.obs.facts.stories.find((s) => s.key === key);
   const claimSha = act.claimed.get(key)?.sha ?? (story?.claim.state === "mine" ? story.claim.sha : null);
   if (!story || !claimSha) throw new Error(`${key} is not held here; nothing closed`);
+  // D15 (B29): the final record is on its archive ref before the close removes anything
+  const archived = await archiveRecord(act, key);
+  if ("error" in archived) return { ok: false, error: archived.error, detail: archived.detail };
   const r = await closeStory(act.obs, story, { home: act.ctx.home, claimSha });
   if (!r.ok) return { ok: false, error: r.reason === "push_failed" ? `push ${r.branch} failed (${r.push_reason}): ${r.message}; nothing was removed` : `cannot mark ${r.file} dropped: ${r.message}`, detail: r };
   act.cleaned.add(key);
   const deleted: string[] = [];
   for (const m of a.refs) if ((await deleteMailbox(act.root, act.obs.remote, m.ref, m.sha)).ok) deleted.push(m.ref);
   const { ok: _ok, story: _story, ...effects } = r;
-  return { ok: true, detail: { ...effects, mailbox_deleted: deleted } };
+  return { ok: true, detail: { ...archived, ...effects, mailbox_deleted: deleted } };
 }
 
 /** One attempt at a GR6 record; keeps it in `records.json` until it lands (idempotent: `unchanged` counts). */

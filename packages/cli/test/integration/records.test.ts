@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { renderHandoffStatus, type StoryFacts } from "@norn/core";
 import { baseCacheDir, baseSpecsRoot, defaultBaseRef, readTickInputs, readTrace, repoConfigPath, spawnSyncCaptured, workflowsDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
-import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
+import { archiveTreeRunState, createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
 import { runStateOf } from "../../../../test/support/run-state.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
@@ -381,6 +381,8 @@ steps:
     h.git(["add", "-A"]);
     h.git(["commit", "-q", "-m", "merge gh-1 (older norn)"]);
     h.git(["push", "-q", "origin", "main"]);
+    // gh-195 D16: read from its archive ref, as `norn upgrade` leaves it (D14), never from the base tree
+    archiveTreeRunState(h.root, "HEAD", OLD);
     const head = h.git(["rev-parse", "HEAD"]).trim();
     const text = (await h.norn("run", "list", "gh-1")).stdout;
     expect(text.split("\n").filter((l) => l.startsWith("round "))).toEqual(["round 1 · story · finished"]);

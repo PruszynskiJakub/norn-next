@@ -6,7 +6,6 @@ import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import type { NumberedReceipt } from "@norn/core";
 import type { Receipt, UnitState } from "@norn/schema";
-import { baseCacheDir } from "@norn/store";
 import { buildStepTimeline, criteriaSummary, formatDuration, formatStepTimeline, type TraceView } from "../../src/index.ts";
 
 describe("pure pieces", () => {
@@ -76,9 +75,10 @@ describe("pure pieces", () => {
     }
   });
 
-  test("F36: a trace read from the base-branch cache says so", () => {
-    const v = { unit: "gh-9", title: "x", status: "done", step: "$done", intake_at: null, done_at: null, merged_at: null, totals: { wall_clock_ms: null, by_type: {}, human_wait_ms: 0, merge_wait_ms: null }, steps: [], units: [], hidden_events: 0, records: { source: "base_cache", root: join(baseCacheDir("/repo"), "abc"), ref: "refs/remotes/origin/main" } } as unknown as TraceView;
-    expect(formatStepTimeline(v)).toContain(`records: no worktree — paths below are a cached copy of origin/main (${join(baseCacheDir("/repo"), "abc")}), refreshed when origin/main moves`);
+  test("gh-195 D7 (B29): a finished story's trace read from its archive ref says so", () => {
+    const root = join("/machine", "archive", "gh-9", "c0ffee0123456789");
+    const v = { unit: "gh-9", title: "x", status: "done", step: "$done", intake_at: null, done_at: null, merged_at: null, totals: { wall_clock_ms: null, by_type: {}, human_wait_ms: 0, merge_wait_ms: null }, steps: [], units: [], hidden_events: 0, records: { source: "archive", root, ref: "refs/norn/runs/gh-9", commit: "c0ffee0123456789" } } as unknown as TraceView;
+    expect(formatStepTimeline(v)).toContain(`records: from refs/norn/runs/gh-9 at c0ffee012345 — paths below are its copy in ${root}`);
   });
 });
 

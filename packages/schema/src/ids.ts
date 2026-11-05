@@ -285,7 +285,7 @@ export const storyRunStatePath = (story: RunStory): string => `${RUNS_DIR}/${sto
 /**
  * gh-195/05: where an older norn kept a unit's record in a git tree, relative to its root
  * (`<spec folder>/runs/<unit>`): what is read from a branch or base tree an older norn wrote (the
- * mailbox's step stamp, finished stories on the base until gh-195/16) and what `unpushed_runs` measures.
+ * mailbox's step stamp, the run state `norn upgrade` moves off the base, gh-195 D16) and what `unpushed_runs` measures.
  */
 export const treeRunStatePath = (story: RunStory, unit: string): string => `${treeStoryRunStatePath(story)}/${unitRecordPath(unit)}`;
 /** gh-195/05: round `n`'s record folder in an older norn's tree (`<spec folder>/runs/_story/rounds/NN-<wf>`). */

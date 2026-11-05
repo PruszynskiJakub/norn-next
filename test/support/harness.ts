@@ -10,7 +10,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { type Clock, type InboxItem, type LaunchSpec, type NotifierPort, type PaneState, type PromptKey, type RemoteIssue, type RemoteLabel, type RemotePort, type RemotePullRequest, type RunnerCapabilities, type RunnerPort, type RunnerSessionInfo, nameRemoved, type SessionRef } from "@norn/core";
-import { parseSpecDirName, type Receipt, ROUNDS_DIR, STORY_UNIT_DIR, type UnitState, ulid } from "@norn/schema";
+import { parseSpecDirName, type Receipt, recordRef, ROUNDS_DIR, STORY_UNIT_DIR, treeStoryRunStatePath, type UnitState, ulid } from "@norn/schema";
 import { appendReceipt, bindNornHome, HANDOFF_HEADER_BEGIN, HANDOFF_HEADER_END, HANDOFF_LOG_BEGIN, HANDOFF_LOG_END, installSkills, linkSkills, machineDir, readState, repoConfigPath, handoffPath, runStateDir, spawnSyncCaptured, storyRunStateDir, treeHandoffFile, treeRunStateDir, treeUnitRunStateDir, workflowsDir } from "@norn/store";
 import type { ProjectView } from "@norn/view";
 import { bundledSkills, type CliDeps, type CliResult, type Interaction, type InteractionChoice, runCli, runningVersion, type TickReport } from "../../packages/cli/src/index.ts";
@@ -491,6 +491,20 @@ export function toBranchRunState(
     rmSync(treeRunStateDir(worktree, story), { recursive: true, force: true });
     if (prose !== null) writeFileSync(handoff, prose);
   }
+}
+
+/**
+ * gh-195 D14 (B35): what `norn upgrade` does to a finished story an older norn left on the base: the
+ * `<spec folder>/runs` subtree at `rev` in `root` committed as is (no unpacking) and pushed to the
+ * story's archive ref on `remote`. Returns the record commit.
+ */
+export function archiveTreeRunState(root: string, rev: string, specDir: string, remote = "origin"): string {
+  const key = parseSpecDirName(basename(specDir))?.story;
+  if (!key) throw new Error(`not a spec folder: ${specDir}`);
+  const tree = sh(root, ["rev-parse", `${rev}:${treeStoryRunStatePath({ key, spec_dir: specDir })}`]);
+  const commit = sh(root, ["commit-tree", tree, "-m", `norn: record ${key}\n\nNorn-Story: ${key}`]);
+  sh(root, ["push", "-q", remote, `${commit}:${recordRef(key)}`]);
+  return commit;
 }
 
 /** The generated header and heartbeat blocks an older norn kept at the top of a unit's handoff (S9, O6; gone since gh-195/07). */
