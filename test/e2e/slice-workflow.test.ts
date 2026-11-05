@@ -6,7 +6,7 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { STORY_UNIT_DIR, type TickTrace } from "@norn/schema";
+import { STORY_UNIT_DIR, type TickTrace, unitHandoffPath } from "@norn/schema";
 import { loadWorkflows, readTickInputs, readTrace, repoConfigPath, workflowsDir, handoffPath } from "@norn/store";
 import type { TickReport } from "../../packages/cli/src/index.ts";
 import { decide } from "@norn/core";
@@ -287,7 +287,8 @@ describe("a story through the slice workflow", () => {
     const st = h.state(storyRuns());
     expect(st).toMatchObject({ step: "plan", status: "ready", mode: "auto", workflow: "mini" });
     expect(h.read(join(storyRuns(), "workflow.yaml"))).toBe(MINI);
-    expect(h.read(handoffPath(join(storyWt(), spec), STORY_UNIT_DIR))).toContain("Step: plan (attempt 1)");
+    // gh-195/07 (B6): the story's handoff starts as the skeleton, prose only; its status is in the brief
+    expect(h.read(handoffPath(join(storyWt(), spec), STORY_UNIT_DIR))).toBe("## Goal\n\n## Progress\n\n## Resume\n");
     expect(h.read(join(storyWt(), spec, "spec.md"))).toContain("status: active");
     expect(h.git(["ls-remote", "origin", "refs/heads/gh-7-add-login-form"])).not.toBe("");
   });
@@ -306,7 +307,8 @@ describe("a story through the slice workflow", () => {
     expect(readdirSync(join(h.home, "leases")).sort()).toEqual(["agent-1.json", "slot-1.json"]);
     // R2.1 (N6): the started receipt records the session; S12 (gh-195/05, B1): it stays in the machine dir, never on the branch
     expect(h.read(join(storyRuns(), "receipts/0002-started.json"))).toContain('"session"');
-    expect(h.git(["ls-tree", "-r", "--name-only", "origin/gh-7-add-login-form", "--", `${spec}/runs`]).trim()).toBe(`${spec}/runs/_story/handoff.md`);
+    expect(h.git(["ls-tree", "-r", "--name-only", "origin/gh-7-add-login-form", "--", `${spec}/runs`]).trim()).toBe("");
+    expect(h.git(["ls-tree", "-r", "--name-only", "origin/gh-7-add-login-form", "--", `${spec}/handoffs`]).trim()).toBe(`${spec}/${unitHandoffPath(STORY_UNIT_DIR)}`);
     // a live run with nothing new: no action (no recover.commit)
     step();
     expect(kinds(await h.tick())).toEqual([]);
@@ -384,6 +386,11 @@ describe("a story through the slice workflow", () => {
     expect(kinds(await h.tick())).toEqual(["gh-7/01 run_git"]);
     expect(h.git(["log", "--format=%s", "gh-7-add-login-form"])).toContain("norn: gh-7/01 implement.done → test");
     expect(existsSync(join(storyWt(), "pass.flag"))).toBe(true);
+    // gh-195/07 (B1, B39): the slice branch carries its handoff under handoffs/, and no runs/
+    h.git(["fetch", "-q", "origin"]);
+    const slice = h.git(["ls-tree", "-r", "--name-only", "origin/gh-7/01-form", "--", spec]).split("\n");
+    expect(slice).toContain(`${spec}/${unitHandoffPath("01-form")}`);
+    expect(slice.filter((p) => p.includes("/runs/"))).toEqual([]);
   });
 
   test("slice $done → cleanup (K5): final state on the story branch, worktree + branch removed, integrated", async () => {
@@ -422,6 +429,15 @@ describe("a story through the slice workflow", () => {
       expect(replayed.map((d) => d.rule)).toEqual(t.decisions.map((d) => d.rule));
       expect(JSON.parse(JSON.stringify(replayed.map((d) => d.action)))).toEqual(t.decisions.map((d) => d.action));
     }
+  });
+
+  test("AC6 (gh-195 B1): the PR's changed files and every branch tree hold the code, the spec and the handoffs, and no runs/ path", () => {
+    h.git(["fetch", "-q", "--prune", "origin"]);
+    const changed = h.git(["diff", "--name-only", "origin/main...origin/gh-7-add-login-form"]).split("\n").filter(Boolean).sort();
+    expect(changed).toEqual(["form.txt", "pass.flag", `${spec}/${unitHandoffPath("01-form")}`, `${spec}/${unitHandoffPath(STORY_UNIT_DIR)}`, `${spec}/slices/01-form.md`, `${spec}/spec.md`].sort());
+    const branches = h.git(["for-each-ref", "--format=%(refname)", "refs/remotes/origin/"]).split("\n").filter((r) => r && !r.endsWith("/HEAD"));
+    expect(branches.length).toBeGreaterThan(0);
+    for (const ref of branches) expect(h.git(["ls-tree", "-r", "--name-only", ref]).split("\n").filter((p) => /(^|\/)runs\//.test(p))).toEqual([]);
   });
 
   test("effect transcript: spawns, port calls and runs/ files of the whole flow (refactor Phase 0.2)", () => {

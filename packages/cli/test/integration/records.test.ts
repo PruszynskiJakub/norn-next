@@ -8,7 +8,7 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { cpSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import type { StoryFacts } from "@norn/core";
+import { renderHandoffStatus, type StoryFacts } from "@norn/core";
 import { baseCacheDir, baseSpecsRoot, defaultBaseRef, readTickInputs, readTrace, repoConfigPath, spawnSyncCaptured, workflowsDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
@@ -289,7 +289,12 @@ steps:
   const spec = ".agents/specs/gh-16-rounds-shown";
   const wt = () => `${h.root}-worktrees/gh-16-rounds-shown`;
   const runs = () => runStateOf(join(wt(), spec));
-  const header = () => h.read(join(wt(), spec, "runs/_story/handoff.md"));
+  // gh-195 D9 (B7): the status block `story checkout` prints above the handoff, rendered from state.json
+  const header = () => {
+    const st = h.state(runs());
+    if (!st) throw new Error("no state");
+    return renderHandoffStatus(st);
+  };
   const next = () => {
     h.clock.advance(10_000);
     return h.tick();

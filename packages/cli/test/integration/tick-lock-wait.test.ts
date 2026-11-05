@@ -11,7 +11,7 @@ import { acquireTickLock, tickLockPath, workflowsDir } from "@norn/store";
 import type { CliDeps } from "../../src/context.ts";
 import type { CliResult } from "../../src/index.ts";
 import { createHarness, type Harness, issue, runChecked } from "../../../../test/support/harness.ts";
-import { runStateOf } from "../../../../test/support/run-state.ts";
+import { runStateOf, storyRunStateOf } from "../../../../test/support/run-state.ts";
 
 setDefaultTimeout(30_000);
 
@@ -82,7 +82,8 @@ async function run(argv: string[], opts: { onSleep?: (n: number) => Promise<void
 }
 
 const runsSnapshot = () => {
-  const dir = join(wt6(), spec6, "runs");
+  // S12: the story's run state, in the machine dir
+  const dir = storyRunStateOf(join(wt6(), spec6));
   return readdirSync(dir, { recursive: true, withFileTypes: true })
     .filter((e) => e.isFile())
     .map((e) => join(e.parentPath, e.name))

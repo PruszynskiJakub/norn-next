@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { type Clock, type InboxItem, type LaunchSpec, type NotifierPort, type PaneState, type PromptKey, type RemoteIssue, type RemoteLabel, type RemotePort, type RemotePullRequest, type RunnerCapabilities, type RunnerPort, type RunnerSessionInfo, nameRemoved, type SessionRef } from "@norn/core";
 import { parseSpecDirName, type Receipt, ROUNDS_DIR, STORY_UNIT_DIR, type UnitState, ulid } from "@norn/schema";
-import { appendReceipt, bindNornHome, installSkills, linkSkills, machineDir, readState, repoConfigPath, handoffPath, runStateDir, spawnSyncCaptured, storyRunStateDir, treeRunStateDir, treeUnitRunStateDir, workflowsDir } from "@norn/store";
+import { appendReceipt, bindNornHome, HANDOFF_HEADER_BEGIN, HANDOFF_HEADER_END, HANDOFF_LOG_BEGIN, HANDOFF_LOG_END, installSkills, linkSkills, machineDir, readState, repoConfigPath, handoffPath, runStateDir, spawnSyncCaptured, storyRunStateDir, treeHandoffFile, treeRunStateDir, treeUnitRunStateDir, workflowsDir } from "@norn/store";
 import type { ProjectView } from "@norn/view";
 import { bundledSkills, type CliDeps, type CliResult, type Interaction, type InteractionChoice, runCli, runningVersion, type TickReport } from "../../packages/cli/src/index.ts";
 import { assetsDir } from "../../packages/cli/src/runtime/assets.ts";
@@ -446,13 +446,14 @@ export function toNewLayout(root: string): void {
 
 /**
  * gh-195/06 (B34): a unit as an older norn left it: its run state moved from the machine dir back into
- * `<spec folder>/runs/<unit>` in `worktree` (next to its handoff) and committed on the worktree's
- * branch with norn's trailers, then pushed to `push` (a remote name) when given.
+ * `<spec folder>/runs/<unit>` in `worktree`, and its handoff from `handoffs/<unit>.md` to
+ * `runs/<unit>/handoff.md` under an older norn's generated header and heartbeat blocks (gh-195/07, B8),
+ * committed on the worktree's branch with norn's trailers, then pushed to `push` (a remote name) when given.
  * - `flat`: the story's one round folded back into `_story/` itself, the record of a norn before rounds (RD7).
  * - `broken`: a receipt that fails validation committed with it (S2).
  * - `interrupted`: a move that stopped partway, its copy already in the machine dir: `"after copy"`
- *   with runs/ still in the worktree, `"after removal"` with runs/ deleted from the worktree but the
- *   removal not committed (S1).
+ *   with runs/ still in the worktree, `"after removal"` with runs/ deleted from the worktree and the
+ *   handoff back at `handoffs/<unit>.md` but neither committed (S1).
  */
 export function toBranchRunState(
   worktree: string,
@@ -471,6 +472,12 @@ export function toBranchRunState(
     if (rounds.length !== 1) throw new Error(`flat: ${unit} has ${rounds.length} rounds`);
     cpSync(join(machine, ROUNDS_DIR, rounds[0] as string), tree, { recursive: true });
   } else cpSync(machine, tree, { recursive: true });
+  const handoff = handoffPath(join(worktree, specDir), unit);
+  const prose = existsSync(handoff) ? readFileSync(handoff, "utf8") : null;
+  if (prose !== null) {
+    writeFileSync(treeHandoffFile(join(worktree, specDir), unit), `${olderNornHandoffBlocks(key, unit)}\n\n${prose}`);
+    rmSync(handoff);
+  }
   if (opts.broken) {
     const record = opts.flat || unit !== STORY_UNIT_DIR ? tree : join(tree, ROUNDS_DIR, rounds.at(-1) as string);
     mkdirSync(join(record, "receipts"), { recursive: true });
@@ -481,10 +488,14 @@ export function toBranchRunState(
   sh(worktree, ["commit", "-q", "-m", `norn: ${key} run state (older norn)`, "--trailer", `Norn-Story: ${key}`, "--trailer", "Norn-Tick: 01OLDERNORN0000000000000000"]);
   if (opts.push) sh(worktree, ["push", "-q", "--force", opts.push, "HEAD"]);
   if (opts.interrupted === "after removal") {
-    const handoffs = new Set(readdirSync(treeRunStateDir(worktree, story)).map((d) => handoffPath(join(worktree, specDir), d)));
-    const files = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? files(join(dir, d.name)) : [join(dir, d.name)]));
-    for (const f of files(treeRunStateDir(worktree, story))) if (!handoffs.has(f)) rmSync(f);
+    rmSync(treeRunStateDir(worktree, story), { recursive: true, force: true });
+    if (prose !== null) writeFileSync(handoff, prose);
   }
+}
+
+/** The generated header and heartbeat blocks an older norn kept at the top of a unit's handoff (S9, O6; gone since gh-195/07). */
+export function olderNornHandoffBlocks(story: string, unit: string): string {
+  return [HANDOFF_HEADER_BEGIN, `- Story: ${story} · Unit: ${unit}`, "- Step: implement (attempt 1)", HANDOFF_HEADER_END, HANDOFF_LOG_BEGIN, "- story.start: story at implement", HANDOFF_LOG_END].join("\n");
 }
 
 /** What `norn init` does for skills (SK1), for setups that write their own config instead: `.agents/skills/` linked from Claude's folder. */

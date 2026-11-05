@@ -16,7 +16,7 @@ import {
   startDir,
   storyFile,
   storyUnitDir,
-  writeHandoffHeader,
+  tidyHandoff,
   handoffPath,
   writeSliceFile,
   writeState,
@@ -37,7 +37,7 @@ function seed(root: string, title = "Fix login") {
   appendReceipt(u1, receipt());
   appendReceipt(u1, receipt());
   writeState(u1, state({ applied_through: 1 }));
-  writeHandoffHeader(handoffPath(spec, "01-add-form"), "header");
+  tidyHandoff(handoffPath(spec, "01-add-form"));
   return spec;
 }
 
@@ -118,14 +118,16 @@ describe("run state lives in the checkout's machine dir, the handoff in the work
     pinWorkflow(r2, WORKFLOW_YAML);
     writeState(r2, state());
     expect(runStateDir(root, story, "_story")).toBe(r2);
-    expect(handoffPath(spec, "_story")).toBe(join(spec, "runs/_story/handoff.md"));
-    expect(handoffPath(spec, "01-add-form")).toBe(join(spec, "runs/01-add-form/handoff.md"));
-    writeHandoffHeader(handoffPath(spec, "_story"), "story header");
+    // gh-195/07 (D9, B39): one file per unit under handoffs/, never under a record folder
+    expect(handoffPath(spec, "_story")).toBe(join(spec, "handoffs/_story.md"));
+    expect(handoffPath(spec, "01-add-form")).toBe(join(spec, "handoffs/01-add-form.md"));
+    mkdirSync(join(spec, "handoffs"), { recursive: true });
+    writeFileSync(handoffPath(spec, "_story"), "## Goal\n\nstory goal\n");
     const u = loadUnit(root, story, { story: "gh-12", slice: null, dir: "_story", key: "gh-12" });
     expect(u.path).toBe(r2);
     expect(u.record).toBe("_story/rounds/02-story");
-    expect(u.handoffFile).toBe(join(spec, "runs/_story/handoff.md"));
-    expect(u.handoff?.header).toBe("story header");
+    expect(u.handoffFile).toBe(join(spec, "handoffs/_story.md"));
+    expect(u.handoff?.body).toBe("## Goal\n\nstory goal\n");
     expect(existsSync(join(spec, "runs/_story/rounds"))).toBe(false);
   });
   test("S2: a receipt failing validation is named by its absolute path in the machine dir and marks only its unit", () => {

@@ -2,7 +2,7 @@
 id: gh-195/06
 title: Open stories move their run state off the branch at the first tick
 depends_on: [ gh-195/05 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }

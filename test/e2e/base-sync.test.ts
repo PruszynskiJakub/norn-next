@@ -8,7 +8,8 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { cpSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { herdr } from "@norn/adapters";
-import { inboxOpenPath, installSkills, linkSkills, machineDir, pinnedWorkflowPath, repoConfigPath, workflowsDir } from "@norn/store";
+import { STORY_UNIT_DIR } from "@norn/schema";
+import { handoffPath, inboxOpenPath, installSkills, linkSkills, machineDir, pinnedWorkflowPath, repoConfigPath, workflowsDir } from "@norn/store";
 import { bundledSkills, type TickReport } from "../../packages/cli/src/index.ts";
 import { assetsDir } from "../../packages/cli/src/runtime/assets.ts";
 import { createHarness, type Harness, installBundledSkills, issue, sh } from "../support/harness.ts";
@@ -67,6 +68,15 @@ function siblingMerge(h: Harness, file: string, text: string, branch = "main"): 
   sh(dir, ["commit", "-q", "-m", `sibling: ${file}`]);
   sh(dir, ["push", "-q", "origin", branch]);
   return sh(dir, ["rev-parse", "HEAD"]);
+}
+
+/**
+ * gh-195/07 (B6): a person's note in the story's handoff, uncommitted, so norn's next boundary commit has
+ * something of its own to carry (norn writes nothing into the handoff any more).
+ */
+function noteInHandoff(wt: string, specDir: string, note: string): void {
+  const file = handoffPath(join(wt, specDir), STORY_UNIT_DIR);
+  writeFileSync(file, `${readFileSync(file, "utf8")}\n- ${note}\n`);
 }
 
 describe("base sync with real git", () => {
@@ -247,6 +257,7 @@ describe("BS3.3a (dogfood D4): a person's push to the branch of a $done story", 
     expect((await h.norn("story", "approve", "gh-13")).exit).toBe(0);
     await until(() => h.state(runs())?.status === "done", "done");
     const person = siblingMerge(h, "README.md", "a line from a person\n", "gh-13-take-person-pushes");
+    noteInHandoff(wt(), ".agents/specs/gh-13-take-person-pushes", "pushed README.md from another clone");
     expect((await h.norn("story", "update-branch", "gh-13")).exit).toBe(0);
     const seen = await until(() => h.state(runs())?.step === "ready" && h.state(runs())?.status === "parked", "ready again");
     expect(seen.filter((k) => k.includes("FAILED"))).toEqual([]);
@@ -332,6 +343,8 @@ describe("PR items between syncs and in the read model (C1), ready approval void
     writeFileSync(join(wt(), "a.txt"), "story side\n");
     h.git(["add", "-A"], wt());
     h.git(["commit", "-q", "-m", "story edits a", "--trailer", "Norn-Tick: 01JBQ6ZK3E8Y4V5W6X7Y8Z9ABC"], wt());
+    // C5: the $done commit after the approval carries this note
+    noteInHandoff(wt(), ".agents/specs/gh-9-pay-by-card", "approved with a.txt as it is");
     expect((await h.norn("story", "approve", "gh-9")).exit).toBe(0);
     await until(() => h.state(runs())?.status === "done", "done");
     siblingMerge(h, "a.txt", "base side\n");
@@ -495,6 +508,8 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
     // BS5.2 (dogfood D5): norn's owed commit is clean, but pushing it would publish the agent's merge
     // commit with markers — the push is held: ok:false, an Unblock item naming file and commit
     expect((await h.norn("story", "answer", "gh-11", "1")).exit).toBe(0);
+    // the agent's note in its handoff is what norn's owed commit carries (gh-195/07, B6)
+    noteInHandoff(wt(), ".agents/specs/gh-11-merge-safely", "merged main; markers left in a.txt");
     h.runner.pane = { alive: true, state: "working", since: null };
     h.clock.advance(10_000);
     const held = await h.tick();

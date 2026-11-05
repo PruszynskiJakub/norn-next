@@ -312,7 +312,7 @@ steps:
     g.git(["fetch", "-q", "origin"]);
     expect(g.git(["show", `origin/${TBRANCH}:${TSPEC}/spec.md`])).toContain("status: dropped");
     // gh-195/05 (B1, B2): the branch carries no run state; this machine keeps it in its machine dir
-    expect(g.git(["ls-tree", "-r", "--name-only", `origin/${TBRANCH}`, "--", `${TSPEC}/runs`]).trim()).toBe(`${TSPEC}/runs/_story/handoff.md`);
+    expect(g.git(["ls-tree", "-r", "--name-only", `origin/${TBRANCH}`, "--", `${TSPEC}/runs`]).trim()).toBe("");
     expect(g.state(round("01-tri"))).toMatchObject({ step: "$done", status: "done" });
     // this machine is cleaned up
     expect(existsSync(wt())).toBe(false);

@@ -835,14 +835,14 @@ describe("the new layout in product docs (gh-110 B3, B22)", () => {
     expect(id2).toContain("repos/<id>/");
   });
 
-  test("B3: the shipped norn skill puts only runs/ and the generated top of handoff.md off limits", () => {
+  test("B3: the shipped norn skill puts only runs/ off limits (gh-195/07: the handoff has no generated top)", () => {
     const skill = readFileSync(join(PKGS, "cli", "assets", "skills", "norn", "SKILL.md"), "utf8");
     const rules = section(skill, "Hard rules");
     const never = rules.split("\n").filter((l) => /\bnever edit\b/i.test(l));
     expect(never).toHaveLength(1);
     const offLimits = (never[0] as string).split(/\.\s/)[0] as string;
     expect([...offLimits.matchAll(CODE_SPAN)].map((m) => m[0])).toEqual(["`runs/`"]);
-    expect(offLimits).toContain("the generated top of handoff.md");
+    expect(offLimits).not.toContain("handoff");
     expect(rules).toContain("`.agents/workflows/`");
     expect(rules).toContain("`.agents/norn.config.yaml`");
   });

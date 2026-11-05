@@ -348,6 +348,8 @@ describe("a moved open story pushes its record under remote (B34)", () => {
     const rec = recordOnRemote("gh-13");
     expect(rec.files).toEqual(filesOf(s.record()));
     expect(rec.files).toContain("_story/rounds/01-trio/state.json");
+    // the handoff moved to handoffs/ on the branch (gh-195/07): it is no part of the record
+    expect(rec.files.filter((f) => f.endsWith("handoff.md") || f.startsWith("handoffs/"))).toEqual([]);
     expect(sh(s.wt, ["log", "-1", "--format=%s", rec.trailers["Norn-Branch-Commit"] as string])).toBe("norn: move gh-13 run state off the branch");
     expect(remoteBranch(s.branch)).toBe(rec.trailers["Norn-Branch-Commit"] as string);
   });

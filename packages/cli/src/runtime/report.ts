@@ -4,7 +4,7 @@
  */
 import { relative } from "node:path";
 import { type Receipt, type ReceiptOf, ulid } from "@norn/schema";
-import { appendReceipt, readHandoff, writeHandoffBody } from "@norn/store";
+import { appendReceipt, handoffProse, readText, writeHandoffBody } from "@norn/store";
 import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
 import { cmd, currentRun, implicitAskOpen, standingReport } from "@norn/core";
@@ -77,8 +77,8 @@ export function rejectProgress(r: Receipt): string {
 
 /** The agent's milestone (O6): one line appended to the Progress section of handoff.md. */
 export function appendProgress(handoffFile: string, line: string): void {
-  const cur = readHandoff(handoffFile);
-  const body = cur?.body ?? "\n## Goal\n\n## Progress\n\n## Resume\n";
+  const raw = readText(handoffFile);
+  const body = raw === null ? "## Goal\n\n## Progress\n\n## Resume\n" : handoffProse(raw);
   const text = `- ${line.replace(/\s*\n\s*/g, " ").trim()}`;
   const lines = body.split("\n");
   const at = lines.findIndex((l) => /^##\s+Progress\s*$/.test(l));

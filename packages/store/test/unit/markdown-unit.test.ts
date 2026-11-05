@@ -3,9 +3,9 @@ import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileS
 import { join } from "node:path";
 import type { StoryFrontmatter } from "@norn/schema";
 import {
-  appendHandoffHeartbeat,
   ensureEvidenceDir,
   HANDOFF_HEADER_BEGIN,
+  HANDOFF_LOG_BEGIN,
   parseHandoff,
   patchSliceFile,
   patchStoryFile,
@@ -17,7 +17,7 @@ import {
   readState,
   readStoryFile,
   sha256,
-  writeHandoffHeader,
+  tidyHandoff,
   writeLog,
   writeState,
   writeStoryFile,
@@ -163,24 +163,21 @@ describe("unit files", () => {
     expect(readdirSync(join(u, "evidence/R1"))).toEqual(["keep.txt"]);
     expect(readdirSync(join(u, "evidence"))).toEqual(["R1"]);
   });
-  test("handoff: header replaced, agent sections preserved, heartbeat collapses", () => {
-    const u = join(tmp(), "handoff.md");
-    writeHandoffHeader(u, "story gh-12 · step implement · attempt 1");
-    let h = readHandoff(u);
-    expect(h?.body).toContain("## Goal");
-    // agent edits its sections
-    const raw = readFileSync(u, "utf8").replace("## Progress\n", "## Progress\n- wrote the form\n");
-    writeFileSync(u, raw);
-    appendHandoffHeartbeat(u, "nudged (silent)");
-    appendHandoffHeartbeat(u, "nudged (silent)");
-    appendHandoffHeartbeat(u, "nudged (silent)");
-    appendHandoffHeartbeat(u, "resumed");
-    writeHandoffHeader(u, "story gh-12 · step test · attempt 1\n");
-    h = readHandoff(u);
-    expect(h?.header).toBe("story gh-12 · step test · attempt 1");
-    expect(h?.heartbeat).toEqual(["nudged (silent) (×3)", "resumed"]);
-    expect(h?.body).toContain("- wrote the form");
-    expect(readFileSync(u, "utf8").startsWith(HANDOFF_HEADER_BEGIN)).toBe(true);
+  test("tidyHandoff (gh-195 D9, B6, B8): a new handoff gets the skeleton, an old one loses its generated blocks once, prose is never touched", () => {
+    const u = join(tmp(), "handoffs", "_story.md");
+    expect(tidyHandoff(u)).toBe(true);
+    expect(readFileSync(u, "utf8")).toBe("## Goal\n\n## Progress\n\n## Resume\n");
+    // an agent's own text: nothing to do, the file is untouched
+    writeFileSync(u, "## Goal\n\nship it\n\n## Progress\n\n## Resume\n");
+    expect(tidyHandoff(u)).toBe(false);
+    expect(readFileSync(u, "utf8")).toBe("## Goal\n\nship it\n\n## Progress\n\n## Resume\n");
+    // an older norn's header and heartbeat blocks go, the prose stays as written
+    const prose = "## Goal\n\nform\n\n## Progress\n\n- wrote the form\n\n## Resume\n\nrun tests\n";
+    writeFileSync(u, `${HANDOFF_HEADER_BEGIN}\n- Step: implement\n<!-- norn:header:end -->\n${HANDOFF_LOG_BEGIN}\n- slice.start\n<!-- norn:heartbeat:end -->\n\n${prose}`);
+    expect(readHandoff(u)).toMatchObject({ header: "- Step: implement", heartbeat: ["- slice.start"] });
+    expect(tidyHandoff(u)).toBe(true);
+    expect(readFileSync(u, "utf8")).toBe(prose);
+    expect(tidyHandoff(u)).toBe(false);
   });
   test("handoff without norn blocks is all body", () => {
     expect(parseHandoff("# mine\n")).toMatchObject({ header: "", heartbeat: [], body: "# mine\n" });

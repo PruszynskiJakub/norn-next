@@ -229,14 +229,22 @@ export function parseRoundDirName(name: string): { n: number; workflow: string }
   const m = ROUND_DIR_RE.exec(name);
   return m ? { n: Number(m[1]), workflow: m[2] as string } : null;
 }
+/** gh-195 D9 (B39): the folder of a spec that holds its units' handoffs, `<spec folder>/handoffs/`. */
+export const HANDOFFS_DIR = "handoffs";
 /**
  * gh-195 prefactor 2 (B6, B39): a unit's handoff relative to its spec folder, keyed by the unit, never by
- * its record folder: `runs/<unit>/handoff.md` (the story's one `runs/_story/handoff.md`, above its round
- * folders, gh-71 B31). The one place that names it: store's `handoffPath` resolves it under a spec folder.
- * gh-195/05 (B5): the one file of a unit's `runs/` that stays in its worktree and on its branch (gh-195/07
- * moves it to `handoffs/`); its run state is in the machine dir (S12).
+ * its record folder. The one place that names it: store's `handoffPath` resolves it under a spec folder.
+ * gh-195/07 (D9, B39): `handoffs/_story.md` for the story (one file across rounds), `handoffs/<nn>-<slug>.md`
+ * for a slice, each on its unit's branch; prose only (B6), its run state is in the machine dir (S12).
  */
 export function unitHandoffPath(unit: string): string {
+  return `${HANDOFFS_DIR}/${unit}.md`;
+}
+/**
+ * gh-195/07 (B8, B34, D13 step 2): where an older norn kept a unit's handoff in its tree, `runs/<unit>/handoff.md`
+ * (the story's above its round folders, gh-71 B31); read only by the move that takes it to `unitHandoffPath`.
+ */
+export function treeHandoffPath(unit: string): string {
   return `${RUNS_DIR}/${unit}/handoff.md`;
 }
 /** gh-71 B30: a story round's record folder relative to the story's run-state folder, `_story/rounds/01-triage`. */

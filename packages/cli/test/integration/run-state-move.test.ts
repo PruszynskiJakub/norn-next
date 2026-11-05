@@ -1,12 +1,15 @@
 /**
  * gh-195/06 (B34, D13): an open story an older norn ran keeps its run state in `<spec folder>/runs/` on
  * its branches; the holder's first tick moves each unit's record into the machine dir and removes it
- * from each branch in one move commit, and the story goes on at the same step and attempt.
+ * from each branch in one move commit, and the story goes on at the same step and attempt. gh-195/07
+ * (B8, B39, D13 step 2): each unit's old `runs/<unit>/handoff.md` moves to `handoffs/<unit>.md` in that
+ * commit, its generated blocks gone and its prose as written.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { chmodSync, existsSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { workflowsDir } from "@norn/store";
+import { STORY_UNIT_DIR, unitHandoffPath } from "@norn/schema";
+import { handoffPath, workflowsDir } from "@norn/store";
 import type { CliResult, TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue, runChecked, sh, toBranchRunState } from "../../../../test/support/harness.ts";
 import { runStateOf, storyRunStateOf } from "../../../../test/support/run-state.ts";
@@ -69,6 +72,8 @@ const treeRuns = (cwd: string, ref: string, spec: string) =>
     .split("\n")
     .filter(Boolean);
 const subject = (cwd: string, ref = "HEAD") => sh(cwd, ["log", "-1", "--format=%s", ref]);
+/** a unit's handoff as a ref's tree holds it (gh-195/07: `handoffs/<unit>.md`) */
+const handoffAt = (cwd: string, ref: string, spec: string, unit: string = STORY_UNIT_DIR) => sh(cwd, ["show", `${ref}:${spec}/${unitHandoffPath(unit)}`]);
 
 /** A duo story taken to implement attempt 2 (a review sent it back once: review_loop 1). */
 async function storyAtRework(n: number, slug: string, title: string) {
@@ -108,6 +113,7 @@ describe("an open story's run state moves off its branch at the holder's first t
   test("AC1: gh-9's runs/ on its branch moves into the machine dir in one pushed commit; same step, attempt and counters", async () => {
     const s = await storyAtRework(9, "keep-it-local", "Keep it local");
     const before = h.state(s.runs());
+    const prose = h.read(handoffPath(join(s.wt, s.spec), STORY_UNIT_DIR));
     const receipts = readdirSync(join(s.runs(), "receipts")).sort();
     toBranchRunState(s.wt, s.spec, "_story", { push: "origin" });
     expect(existsSync(storyRunStateOf(join(s.wt, s.spec)))).toBe(true);
@@ -121,13 +127,19 @@ describe("an open story's run state moves off its branch at the holder's first t
     expect(h.state(s.runs())).toEqual(before);
     expect(s.runs()).toEndWith("runs/gh-9/_story/rounds/01-duo");
     expect(readdirSync(join(s.runs(), "receipts")).sort()).toEqual(receipts);
-    // one commit removes runs/ from the branch (the handoff stays there until gh-195/07), pushed
+    // one commit removes runs/ from the branch and moves the handoff to handoffs/ (gh-195/07, AC5), pushed
     expect(sh(s.wt, ["rev-list", "--count", `${old}..HEAD`])).toBe("1");
     expect(subject(s.wt)).toBe("norn: move gh-9 run state off the branch");
-    const handoff = `${s.spec}/runs/_story/handoff.md`;
-    expect(treeRuns(s.wt, "HEAD", s.spec)).toEqual([handoff]);
+    expect(treeRuns(s.wt, "HEAD", s.spec)).toEqual([]);
     const changed = sh(s.wt, ["show", "--name-status", "--format=", "HEAD"]).split("\n").filter(Boolean);
-    expect(changed.every((l) => l.startsWith("D\t") && l.includes(`${s.spec}/runs/_story/`))).toBe(true);
+    const handoff = `${s.spec}/${unitHandoffPath(STORY_UNIT_DIR)}`;
+    expect(changed.filter((l) => !l.startsWith("D\t"))).toEqual([`A\t${handoff}`]);
+    expect(changed.filter((l) => l.startsWith("D\t")).every((l) => l.includes(`${s.spec}/runs/_story/`))).toBe(true);
+    expect(changed).toContain(`D\t${s.spec}/runs/_story/handoff.md`);
+    // B8: the older norn's header and heartbeat blocks are gone, Goal / Progress / Resume as written
+    expect(prose).toContain("- implement#1 done: built it");
+    expect(handoffAt(s.wt, "HEAD", s.spec)).toBe(prose.trimEnd());
+    expect(sh(s.wt, ["show", `${old}:${s.spec}/runs/_story/handoff.md`])).toContain("norn:header:begin");
     expect(sh(s.wt, ["status", "--porcelain", "--untracked-files=all"])).toBe("");
     h.git(["fetch", "-q", "origin"]);
     expect(h.git(["rev-parse", `origin/${s.branch}`])).toBe(sh(s.wt, ["rev-parse", "HEAD"]));
@@ -155,7 +167,8 @@ describe("an open story's run state moves off its branch at the holder's first t
     expect(h.read(join(s.runs(), "marker.txt"))).toBe("the copy\n");
     expect(sh(s.wt, ["rev-list", "--count", `${old}..HEAD`])).toBe("1");
     expect(subject(s.wt)).toBe("norn: move gh-13 run state off the branch");
-    expect(treeRuns(s.wt, "HEAD", s.spec)).toEqual([`${s.spec}/runs/_story/handoff.md`]);
+    expect(treeRuns(s.wt, "HEAD", s.spec)).toEqual([]);
+    expect(handoffAt(s.wt, "HEAD", s.spec)).not.toContain("norn:");
   });
 
   test("AC3: a file in the branch's runs/ that fails validation makes the unit corrupt (S2) and removes nothing", async () => {
@@ -184,7 +197,9 @@ describe("an open story's run state moves off its branch at the holder's first t
   const finished = (s: Awaited<ReturnType<typeof storyAtRework>>, key: string, old: string, before: unknown) => {
     expect(sh(s.wt, ["rev-list", "--count", `${old}..HEAD`])).toBe("1");
     expect(subject(s.wt)).toBe(`norn: move ${key} run state off the branch`);
-    expect(treeRuns(s.wt, "HEAD", s.spec)).toEqual([`${s.spec}/runs/_story/handoff.md`]);
+    expect(treeRuns(s.wt, "HEAD", s.spec)).toEqual([]);
+    expect(handoffAt(s.wt, "HEAD", s.spec)).toContain("## Resume");
+    expect(handoffAt(s.wt, "HEAD", s.spec)).not.toContain("norn:");
     expect(sh(s.wt, ["status", "--porcelain", "--untracked-files=all"])).toBe("");
     h.git(["fetch", "-q", "origin"]);
     expect(h.git(["rev-parse", `origin/${s.branch}`])).toBe(sh(s.wt, ["rev-parse", "HEAD"]));
@@ -257,7 +272,7 @@ describe("an open story's run state moves off its branch at the holder's first t
     expect(readdirSync(join(story, "_story/rounds"))).toEqual(["01-duo"]);
     expect(s.runs()).toEndWith("runs/gh-15/_story/rounds/01-duo");
     expect(h.state(s.runs())).toEqual(before);
-    expect(treeRuns(s.wt, "HEAD", s.spec)).toEqual([`${s.spec}/runs/_story/handoff.md`]);
+    expect(treeRuns(s.wt, "HEAD", s.spec)).toEqual([]);
     const next = await tick();
     expect(rulesOf(next, "gh-15")).not.toContain("round.migrate");
     expect(h.state(s.runs())).toMatchObject({ step: "implement", attempt: 2, counters: { review_loop: 1 } });
@@ -297,12 +312,15 @@ describe("a story with slices: each unit's record moves off its own branch (B34)
     SLICES.forEach(([nn, slug], i) => expect(h.state(part(nn, slug))).toEqual(before.parts[i] as NonNullable<(typeof before.parts)[number]>));
     expect(subject(wt())).toBe("norn: move gh-11 run state off the branch");
     expect(sh(wt(), ["rev-list", "--count", `${heads[0]}..HEAD`])).toBe("1");
-    expect(treeRuns(wt(), "HEAD", SPEC)).toEqual([`${SPEC}/runs/_story/handoff.md`]);
+    expect(treeRuns(wt(), "HEAD", SPEC)).toEqual([]);
+    expect(handoffAt(wt(), "HEAD", SPEC)).toContain("## Progress");
     SLICES.forEach(([nn, slug], i) => {
       const w = sliceWt(nn, slug);
       expect(subject(w)).toBe(`norn: move gh-11/${nn} run state off the branch`);
       expect(sh(w, ["rev-list", "--count", `${heads[i + 1]}..HEAD`])).toBe("1");
-      expect(treeRuns(w, "HEAD", SPEC).filter((f) => !f.endsWith("/handoff.md"))).toEqual([]);
+      expect(treeRuns(w, "HEAD", SPEC)).toEqual([]);
+      // B39: the slice's handoff is on its own branch, under handoffs/
+      expect(handoffAt(w, "HEAD", SPEC, `${nn}-${slug}`)).toContain("## Goal");
       expect(existsSync(join(part(nn, slug), "state.json"))).toBe(true);
     });
     h.git(["fetch", "-q", "origin"]);

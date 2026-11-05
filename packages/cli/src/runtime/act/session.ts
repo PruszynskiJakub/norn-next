@@ -1,5 +1,4 @@
 /** act: agent sessions — launch, resume, nudge, kill, classify and transcript snapshots (A6, B2, K1, R4.2, C4). */
-import { existsSync } from "node:fs";
 import { relative } from "node:path";
 import {
   type Action,
@@ -13,7 +12,6 @@ import {
 import { type ReceiptOf, type UnitState, type Workflow, ulid } from "@norn/schema";
 import {
   acquireRunLease,
-  appendHandoffHeartbeat,
   listLeases,
   readEnvNorn,
   releaseLease,
@@ -157,8 +155,7 @@ export async function applyReceipts(act: ActEnv, a: Extract<Action, { kind: "app
       : a.kill && prevRun
         ? await act.releaseRunLeases(a.unit, ["agent"], prevRun)
         : [];
-  const summary = a.advance ? `${a.advance.from}.${a.advance.outcome} → ${a.advance.to}${a.advance.reset ? ` (reset ${a.advance.reset.join(", ")})` : ""}` : `applied ${a.applied.join(", ") || "none"}`;
-  const committed = await act.commit(a.commit, a.unit, state, `${a.rule}: ${summary}`);
+  const committed = await act.commit(a.commit, a.unit, state);
   let delivered: boolean | string = resumed ? "resumed" : keyed;
   if (resumed) act.effectsOk.add("resume");
   if (a.input && !keyed) {
@@ -191,8 +188,8 @@ export async function startRun(act: ActEnv, a: Extract<Action, { kind: "start_ru
   act.effectsOk.add("launch");
   const state = a.state ? recordSession(act, a.unit, loc.runsDir, a.state, a.receipts, session) : null;
   if (state) act.writeUnitState(a.unit, loc.runsDir, state);
-  // R2.1 (N6): commit and push the handoff's started header now — never the agent's fresh work
-  const committed = await act.commit(a.commit, a.unit, state, `${a.rule}: ${a.step} run ${a.launch.run_id}`, a.commit ? startedPaths(loc).map((p) => relative(a.commit?.cwd ?? "", p)) : undefined);
+  // R2.1 (N6): commit and push the handoff now when it is new (gh-195 D9: its skeleton) — never the agent's fresh work
+  const committed = await act.commit(a.commit, a.unit, state, a.commit ? startedPaths(loc).map((p) => relative(a.commit?.cwd ?? "", p)) : undefined);
   return { ok: true, detail: { session, lease, ...committed } };
 }
 
@@ -251,7 +248,7 @@ export async function nudge(act: ActEnv, a: Extract<Action, { kind: "nudge" }>):
   let state = a.state;
   if (state && resumed) state = recordSession(act, a.unit, loc.runsDir, state, a.receipts, resumed);
   if (state) act.writeUnitState(a.unit, loc.runsDir, state);
-  const committed = await act.commit(a.commit, a.unit, state, `${a.rule}: nudged ${state?.nudges_used ?? "?"}${resumed ? " (resumed)" : ""}`);
+  const committed = await act.commit(a.commit, a.unit, state);
   return { ok: true, detail: { ...committed, ...(resumed ? { session: resumed } : {}) }, ...(snapshot ? { transcript: snapshot } : {}) };
 }
 
@@ -270,7 +267,7 @@ export async function retryFresh(act: ActEnv, a: Extract<Action, { kind: "retry_
     await killSession(act, a.kill);
   }
   if (state) act.writeUnitState(a.unit, loc.runsDir, state);
-  const committed = await act.commit(a.commit, a.unit, state, `${a.rule}: fresh session${session ? "" : " (ready)"}`);
+  const committed = await act.commit(a.commit, a.unit, state);
   return { ok: true, detail: { session, ...committed } };
 }
 
@@ -282,7 +279,7 @@ export async function classify(act: ActEnv, a: Extract<Action, { kind: "classify
   const transcript = await snapshotRun(act, a.unit, runId, a.snapshot);
   if (a.state) act.writeUnitState(a.unit, loc.runsDir, a.state);
   const released = a.state && a.state.status !== "running" ? await act.releaseRunLeases(a.unit, ["agent"]) : [];
-  const committed = await act.commit(a.commit, a.unit, a.state, `${a.rule}: ${a.outcome}`);
+  const committed = await act.commit(a.commit, a.unit, a.state);
   return { ok: true, detail: { killed, released, ...committed }, ...(transcript ? { transcript } : {}) };
 }
 
@@ -297,6 +294,5 @@ async function snapshotRun(act: ActEnv, unit: UnitRef, runId: string, req: { tra
   const diff = req.cwd ? await act.git.diffStat(req.cwd, "HEAD").catch(() => "") : "";
   const text = [`# snapshot ${unit.key} run ${runId}`, `head: ${head ?? "?"}`, "", "## last assistant message", last ?? "(none)", "", "## diff --stat HEAD", diff || "(clean)"].join("\n");
   const rel = writeTranscriptSnapshot(act.root, /^[0-9A-Z]{26}$/.test(runId) ? runId : "unknown", ulid(act.ctx.clock.now()), text);
-  if (existsSync(loc.runsDir)) appendHandoffHeartbeat(loc.handoffFile, `- silent: last message snapshot in trace/${rel}`);
   return rel;
 }

@@ -6,7 +6,8 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { machineDir, unitMarkerPath, workflowsDir } from "@norn/store";
+import { STORY_UNIT_DIR, unitHandoffPath } from "@norn/schema";
+import { handoffPath, machineDir, unitMarkerPath, workflowsDir } from "@norn/store";
 import type { CliResult, TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue, runChecked, sh } from "../../../../test/support/harness.ts";
 import { observeNow } from "../../../../test/support/observe-now.ts";
@@ -66,7 +67,7 @@ const status = (cwd: string) =>
     .map((l) => l.replace(/^\s*\S{1,2}\s+/, ""));
 /** S12: nothing but the agent's own files and the unit's handoff ever shows in git */
 const onlyWorkAndHandoff = (cwd: string, handoff: string) => {
-  expect(status(cwd).filter((p) => p !== handoff && p.includes("/runs/"))).toEqual([]);
+  expect(status(cwd).filter((p) => p !== handoff && (p.includes("/runs/") || p.endsWith("/runs")))).toEqual([]);
 };
 const inWt = (cwd: string, ...argv: string[]): Promise<CliResult> => {
   const env: Record<string, string | undefined> = { ...h.deps.env, NORN_AGENT_PID: String(process.pid) };
@@ -97,7 +98,7 @@ beforeAll(async () => {
 afterAll(() => h.cleanup());
 
 describe("gh-9 runs with its run state in the machine dir (S12, B2, B5)", () => {
-  const HANDOFF = `${SPEC}/runs/_story/handoff.md`;
+  const HANDOFF = `${SPEC}/${unitHandoffPath(STORY_UNIT_DIR)}`;
 
   test("AC1: through implement and review, git status never shows a run-state file; they are under <machine dir>/runs/gh-9/_story/", async () => {
     await tickUntil(() => h.state(runs())?.step === "implement");
@@ -119,12 +120,13 @@ describe("gh-9 runs with its run state in the machine dir (S12, B2, B5)", () => 
     expect((await inWt(wt(), "done", "approve", "--handoff", "looks right")).exit).toBe(0);
     await tickUntil(() => h.state(runs())?.step === "$done");
     onlyWorkAndHandoff(wt(), HANDOFF);
-    // every kind of run-state file, in the machine dir; the worktree's and the branch's runs/ hold the handoff only
+    // every kind of run-state file, in the machine dir; no runs/ in the worktree or on the branch, the handoff under handoffs/ (gh-195/07)
     expect(readdirSync(runs()).sort()).toEqual(["evidence", "receipts", "state.json", "workflow.yaml"]);
     expect(readdirSync(join(runs(), "receipts")).some((f) => f.endsWith("-check.json"))).toBe(true);
-    expect(readdirSync(join(wt(), SPEC, "runs/_story"))).toEqual(["handoff.md"]);
+    expect(existsSync(join(wt(), SPEC, "runs"))).toBe(false);
     h.git(["fetch", "-q", "origin"]);
-    expect(h.git(["ls-tree", "-r", "--name-only", "origin/gh-9-keep-it-local", "--", `${SPEC}/runs`]).trim()).toBe(HANDOFF);
+    expect(h.git(["ls-tree", "-r", "--name-only", "origin/gh-9-keep-it-local", "--", `${SPEC}/runs`]).trim()).toBe("");
+    expect(h.git(["ls-tree", "-r", "--name-only", "origin/gh-9-keep-it-local", "--", `${SPEC}/handoffs`]).trim()).toBe(HANDOFF);
   });
 
   test("AC6: the boundary after `norn done done` holds exactly the agent's files and the handoff, with the S4 trailers", async () => {
@@ -143,7 +145,7 @@ describe("gh-9 runs with its run state in the machine dir (S12, B2, B5)", () => 
     expect(trailers).not.toContain("Norn-Slice:");
     // no commit on the branch ever carried a run-state file
     const all = sh(wt(), ["log", "--name-only", "--format=", "origin/main..HEAD"]).split("\n").filter(Boolean);
-    expect(all.filter((p) => p.includes("/runs/") && p !== HANDOFF)).toEqual([]);
+    expect(all.filter((p) => p.includes("/runs/"))).toEqual([]);
   });
 });
 
@@ -195,7 +197,7 @@ describe("a worktree is disposable (B2, B3)", () => {
     // the agent's work is dirty all through a session; recover.commit must not commit it under the agent
     h.write(join(wt10(), "src/wip.ts"), "export const wip = 1;\n");
     expect(await uncommitted()).toBe(false);
-    const handoff = join(wt10(), SPEC10, "runs/_story/handoff.md");
+    const handoff = handoffPath(join(wt10(), SPEC10), STORY_UNIT_DIR);
     const text = h.read(handoff);
     writeFileSync(handoff, `${text}\nmore\n`);
     expect(await uncommitted()).toBe(true);
@@ -260,7 +262,7 @@ describe("parallel slices and a crash between a receipt and state (B4: S3, S6)",
     for (const [nn, added] of [["01", a], ["02", b]] as const)
       for (const f of added) expect(JSON.parse(h.read(join(part(nn), "receipts", f)))).toMatchObject({ slice: `gh-11/${nn}` });
     // the slice worktrees carry only their handoffs
-    for (const nn of ["01", "02"]) onlyWorkAndHandoff(sliceWt(nn), `${SPEC11}/runs/${nn}-part-${nn === "01" ? "a" : "b"}/handoff.md`);
+    for (const nn of ["01", "02"]) onlyWorkAndHandoff(sliceWt(nn), `${SPEC11}/${unitHandoffPath(`${nn}-part-${nn === "01" ? "a" : "b"}`)}`);
   });
 
   test("AC5: a receipt written but its state.json not (a crash between them) is re-applied by the next tick (S6)", async () => {
