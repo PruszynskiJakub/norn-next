@@ -378,6 +378,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       ...(foreign.length ? { foreign_commits: foreign } : {}),
       ...(await readyHead(root, s.key, ls.ready, (storyPrs.has(s.key) ? storyPrs.get(s.key) : prSeen[s.key]?.pr)?.head_sha)),
       ...(ls.notes ? { notes: ls.notes } : {}),
+      ...(ls.rejected ? { rejected_mailbox: ls.rejected } : {}),
       ...(s.base_status !== undefined ? { base_status: s.base_status } : {}),
       ...(lost.length ? { unpushed_runs: lost.map((l) => ({ unit: l.unit, files: l.files })) } : {}),
       ...(claim.state === "none" && s.frontmatter?.status === "new" ? await intakeOnly(git, root, remote ? baseRef : `refs/heads/${base}`, branch, s.key, refs) : {}),

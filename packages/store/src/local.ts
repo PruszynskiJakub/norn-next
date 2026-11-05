@@ -10,14 +10,15 @@
  * - `foreign.json`    commit shas already traced as `foreign_commits` (Q6: once per sha)
  * - `base.json`       per story, the last `story.base` measured (BS1; base.ts)
  * - `notices.json`    one-time notices already shown on this checkout (B13)
+ * - `rejected.json`   mailbox receipts this checkout's ticks rejected (gh-195 D12, B21)
  * Every read is validated (S2, BUG-4): a file that is unreadable or of the wrong shape reads as
  * empty through `readLocalJson`, never as a cast of what was there. Paths are in paths.ts.
  */
 import type { StoryFacts } from "@norn/core";
-import type { StoryMerge } from "@norn/schema";
+import type { RejectedMailboxReceipt, StoryMerge } from "@norn/schema";
 import { atomicWriteJson } from "./fsx.ts";
 import { readLocalJson } from "./local-json.ts";
-import { foreignCommitsPath, noticesPath, notifiedPath, pendingRecordsPath, remoteCachePath } from "./paths.ts";
+import { foreignCommitsPath, noticesPath, notifiedPath, pendingRecordsPath, rejectedReceiptsPath, remoteCachePath } from "./paths.ts";
 import { appendTrace, traceEvent } from "./trace.ts";
 
 export interface RemoteCache {
@@ -63,6 +64,18 @@ export function firstNotice(root: string, id: string): boolean {
     // presentation only: shown again next time
   }
   return true;
+}
+
+/** gh-195 D12 (B21): the mailbox receipts this checkout's ticks rejected, oldest first. */
+export function readRejectedReceipts(root: string): RejectedMailboxReceipt[] {
+  return readLocalJson("local-rejected", rejectedReceiptsPath(root), { receipts: [] }, root).receipts;
+}
+
+/** gh-195 D12 (B21): keep one rejected mailbox receipt (once per receipt id). */
+export function addRejectedReceipt(root: string, entry: RejectedMailboxReceipt): void {
+  const all = readRejectedReceipts(root);
+  if (all.some((r) => r.receipt_id === entry.receipt_id)) return;
+  atomicWriteJson(rejectedReceiptsPath(root), { receipts: [...all, entry] });
 }
 
 /** GR6: a merged story whose `status: done` record on the base branch is still owed (deferred or failed). */

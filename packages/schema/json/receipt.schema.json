@@ -647,7 +647,6 @@
         "receipt_id",
         "run_id",
         "step",
-        "attempt",
         "at",
         "by",
         "answer"
@@ -762,7 +761,6 @@
         "receipt_id",
         "run_id",
         "step",
-        "attempt",
         "at",
         "by"
       ],
@@ -880,7 +878,6 @@
         "receipt_id",
         "run_id",
         "step",
-        "attempt",
         "at",
         "by"
       ],
@@ -989,7 +986,6 @@
         "receipt_id",
         "run_id",
         "step",
-        "attempt",
         "at",
         "by"
       ],

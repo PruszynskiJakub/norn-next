@@ -13,6 +13,7 @@ import type {
   LeaseFile,
   Mode,
   Receipt,
+  RejectedMailboxReceipt,
   ResolvedConfig,
   SchemaError,
   SliceFrontmatter,
@@ -361,6 +362,11 @@ export interface StoryFacts {
    * gate `approve` acknowledged yet, oldest first. Absent = none (or not observed).
    */
   notes?: import("./criteria.ts").StoryNote[];
+  /**
+   * gh-195 D12 (B21): mailbox receipts this checkout's ticks rejected that no later accepted answer or
+   * approval of the story cleared, oldest first. Absent = none.
+   */
+  rejected_mailbox?: RejectedMailboxReceipt[];
   /** units: the story unit first, then slices ascending by nn */
   units: UnitFacts[];
   slices: SliceFileFacts[];

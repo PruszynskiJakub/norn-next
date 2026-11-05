@@ -10,9 +10,10 @@
  */
 import { existsSync, readdirSync } from "node:fs";
 import { type ActFailure, type FileError, hookWindowMs, type NumberedReceipt, openNotes, RE_ENTRY_KINDS, readyApproval, type StepRunFacts, type StoryFacts, storyWorktreePath } from "@norn/core";
-import { type HookFact, type LeaseFile, parseDuration, parseReceiptFileName, type ReceiptOf, type RunInfo, type UnitState } from "@norn/schema";
+import { type HookFact, type LeaseFile, parseDuration, parseReceiptFileName, type ReceiptOf, type RejectedMailboxReceipt, type RunInfo, type UnitState } from "@norn/schema";
 import { type BaseFactsCache, type IssueFactsCache, type PrFactsCache, readBaseFacts, readIssueFacts, readPrFacts } from "./base.ts";
 import { readActFailures } from "./heartbeat.ts";
+import { readRejectedReceipts } from "./local.ts";
 import { type BackfillRun, backfillHookFiles } from "./hook-backfill.ts";
 import { type LeaseListing, type LeaseLiveness, listLeases } from "./leases.ts";
 import { receiptsDir } from "./paths.ts";
@@ -92,6 +93,8 @@ export interface LocalStory {
   notes?: StoryFacts["notes"];
   /** F35/C5: the story unit's ready approval (`readyApproval`) */
   ready?: { sha: string; at: string };
+  /** gh-195 D12 (B21): mailbox receipts this checkout rejected that no later accepted answer or approval cleared */
+  rejected?: RejectedMailboxReceipt[];
 }
 
 export interface LocalFacts {
@@ -139,6 +142,7 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
     return story;
   });
   const failures = readActFailures(root);
+  const rejected = readRejectedReceipts(root);
 
   const placed = read.map((s) => {
     const conventional = storyWorktreePath(root, s.key, s.slug);
@@ -167,7 +171,8 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
     });
     const ready = readyOf(s, s.units[0]);
     const notes = openNotes(s.units.map((u) => ({ unit: u.unit.key, receipts: receiptsOfKinds(s, u, ["done", "approve"]) })));
-    return { snapshot: s, worktree: storyWt, units, ...(notes.length ? { notes } : {}), ...(ready ? { ready } : {}) };
+    const open = openRejections(s, rejected);
+    return { snapshot: s, worktree: storyWt, units, ...(notes.length ? { notes } : {}), ...(ready ? { ready } : {}), ...(open.length ? { rejected: open } : {}) };
   });
   // gh-61 D5, B12: the version the main checkout's team config records
   const mainDrift = drift(root);
@@ -253,6 +258,17 @@ function unknownLaunch(unapplied: readonly NumberedReceipt[]): (NumberedReceipt 
   if (!last || last.receipt.session) return null;
   if (unapplied.some((r) => r.n > last.n && r.receipt.by === "agent")) return null;
   return last;
+}
+
+/**
+ * gh-195 D12 (B21): the story's rejected mailbox receipts still to show — those no answer or gate
+ * decision applied to any unit of the story since (made after the rejection) has cleared.
+ */
+function openRejections(story: StorySnapshot, rejected: readonly RejectedMailboxReceipt[]): RejectedMailboxReceipt[] {
+  const mine = rejected.filter((r) => r.story === story.key);
+  if (!mine.length) return [];
+  const accepted = story.units.flatMap((u) => receiptsOfKinds(story, u, ["answer", "approve", "reject"]).filter((r) => r.n <= (u.state?.applied_through ?? 0)));
+  return mine.filter((x) => !accepted.some((r) => r.receipt.receipt_id !== x.receipt_id && r.receipt.at > x.rejected_at));
 }
 
 /** Receipts of the given kinds in a unit's runs dir, ascending — read by file name, the others never opened. */

@@ -1,0 +1,256 @@
+/**
+ * gh-195/13 (B20, B21; D12, T9): the mailbox between machines once run state stays on the holder's. Clone A
+ * holds the stories; clone B, another clone of the same bare remote with its own norn home, user and
+ * machine name, answers and approves them. Under `local` B stamps its receipt with the step the last
+ * boundary commit led to (`Norn-Next`) and no attempt, and says the holder checks it; under `remote` it
+ * stamps step and attempt from the record ref. On A, a receipt that no longer matches is rejected into
+ * the trace and shows as a Check item until a later answer or approval is accepted or the story finishes.
+ */
+import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
+import type { RunnerPort } from "@norn/core";
+import { mailboxPrefix, type Receipt } from "@norn/schema";
+import { readTrace, repoConfigPath, workflowsDir } from "@norn/store";
+import type { CliDeps, CliResult } from "../../src/index.ts";
+import { createHarness, FakeRunner, type Harness, hostEnv, issue, runChecked, sh } from "../../../../test/support/harness.ts";
+import { runStateOf } from "../../../../test/support/run-state.ts";
+
+setDefaultTimeout(120_000);
+
+const QUAD = `name: quad
+start: implement
+steps:
+  implement:
+    type: agent
+    skill: norn-implement
+    outcomes: { done: { to: review, means: "every criterion has a passing test" } }
+  review:
+    type: agent
+    skill: norn-review
+    outcomes:
+      approve: { to: ready, means: "no blocking findings" }
+      changes_requested: { to: implement, counter: review_loop, means: "blocking findings" }
+  ready:
+    type: gate
+    prompt: "Merge it?"
+    outcomes: { approve: $done, reject: { to: implement, counter: review_loop } }
+counters: { review_loop: { max: 3 } }
+`;
+const CONFIG = "provider: gh\nworkflow: quad\nmode: manual\n";
+const teamConfig = (policy: "local" | "remote") => `provider: gh\nworkflow: quad\nrecord:\n  policy: ${policy}\n`;
+
+interface Clone {
+  root: string;
+  norn(...argv: string[]): Promise<CliResult>;
+}
+interface Verb {
+  receipt: Receipt;
+  delivered: { via: string; ref?: string; holder?: string };
+  next: string;
+}
+type InboxItem = { id: string; story: string; title: string };
+
+let h: Harness;
+let B: Clone;
+
+const tick = (...argv: string[]) => {
+  h.clock.advance(10_000);
+  return h.tick(...argv);
+};
+const inWt = (cwd: string, ...argv: string[]): Promise<CliResult> => {
+  const env: Record<string, string | undefined> = { ...h.deps.env, NORN_AGENT_PID: String(process.pid) };
+  for (const k of ["NORN_AGENT", "NORN_RUN", "NORN_STORY", "NORN_SLICE", "NORN_AGENT_SESSION_ID"]) delete env[k];
+  return runChecked(argv, { ...h.deps, cwd, env });
+};
+function cloneOf(name: string, user: string, machine: string): Clone {
+  const root = join(h.dir, name);
+  sh(h.dir, ["clone", "-q", h.remoteDir, root]);
+  sh(root, ["config", "user.email", `${user}@example.com`]);
+  sh(root, ["config", "user.name", user]);
+  const home = join(h.dir, `home-${name}`);
+  mkdirSync(home);
+  const deps: CliDeps = {
+    cwd: root,
+    env: { ...hostEnv(), NORN_HOME_DIR: home, USER: user, NORN_MACHINE: machine, NORN_HOOK_COMMAND: "norn hook" },
+    clock: h.clock,
+    ports: { remote: h.remote, runner: new FakeRunner() as RunnerPort, notifiers: [] },
+  };
+  return { root, norn: (...argv) => runChecked(argv, deps) };
+}
+/** The team switches its record policy: committed and pushed on A, pulled on B (B12). */
+function setPolicy(policy: "local" | "remote") {
+  h.write(repoConfigPath(h.root), teamConfig(policy));
+  h.git(["commit", "-q", "-am", `record.policy ${policy}`]);
+  h.git(["push", "-q", "origin", "main"]);
+  sh(B.root, ["pull", "-q", "--ff-only", "origin", "main"]);
+}
+
+/** A quad story held by A at review (implement's boundary pushed), review's session started. */
+async function atReview(n: number, slug: string) {
+  const spec = `.agents/specs/gh-${n}-${slug}`;
+  const wt = `${h.root}-worktrees/gh-${n}-${slug}`;
+  const runs = () => runStateOf(join(wt, spec));
+  h.remote.issues = [...h.remote.issues, issue(n, slug)];
+  await h.tick("--sync");
+  for (let i = 0; i < 10 && h.state(runs())?.step !== "implement"; i++) await tick();
+  expect((await inWt(wt, "brief")).exit).toBe(0);
+  await tick();
+  h.write(join(wt, "src", `gh-${n}.ts`), "export const x = 1;\n");
+  expect((await inWt(wt, "done", "done", "--handoff", "implemented")).exit).toBe(0);
+  for (let i = 0; i < 10 && h.state(runs())?.step !== "review"; i++) await tick();
+  expect((await inWt(wt, "brief")).exit).toBe(0);
+  await tick();
+  return { key: `gh-${n}`, wt, runs };
+}
+/** …and review's agent asks; the ask parks it. */
+async function askingAtReview(n: number, slug: string) {
+  const s = await atReview(n, slug);
+  expect((await inWt(s.wt, "ask", "Which option?")).exit).toBe(0);
+  await tick();
+  expect(h.state(s.runs())).toMatchObject({ step: "review", status: "parked", park: { kind: "ask" } });
+  return s;
+}
+/** …and review approves: the story waits at the ready gate. */
+async function atReadyGate(n: number, slug: string) {
+  const s = await atReview(n, slug);
+  expect((await inWt(s.wt, "done", "approve", "--handoff", "looks good")).exit).toBe(0);
+  for (let i = 0; i < 10 && h.state(s.runs())?.park?.kind !== "gate"; i++) await tick();
+  expect(h.state(s.runs())).toMatchObject({ step: "ready", status: "parked", park: { kind: "gate" } });
+  return s;
+}
+
+const mailbox = (story: string) => sh(h.dir, ["ls-remote", h.remoteDir, `${mailboxPrefix(story)}*`]);
+/** The receipt a mailbox ref holds on the bare remote. */
+const posted = (ref: string): Record<string, unknown> => JSON.parse(sh(h.dir, ["--git-dir", h.remoteDir, "cat-file", "blob", ref]));
+const checkItems = async (story: string): Promise<InboxItem[]> => {
+  const r = await h.norn("status", "--json");
+  expect(r.exit).toBe(0);
+  return ((r.value as { groups: Record<string, InboxItem[]> }).groups.check ?? []).filter((i) => i.story === story);
+};
+
+beforeAll(async () => {
+  h = await createHarness();
+  expect((await h.norn("init")).exit).toBe(0);
+  h.config(CONFIG);
+  h.write(repoConfigPath(h.root), teamConfig("remote"));
+  h.write(join(workflowsDir(h.root), "quad.yaml"), QUAD);
+  h.git(["add", "-A"]);
+  h.git(["commit", "-q", "-m", "norn init"]);
+  h.git(["push", "-q", "origin", "main"]);
+  B = cloneOf("repo-b", "bob", "repo-b");
+});
+afterAll(() => h.cleanup());
+
+describe("under remote (B20)", () => {
+  test("AC2: B's approval is stamped with the step and attempt of the fetched record ref", async () => {
+    const s = await atReadyGate(20, "remote-gate");
+    const r = await B.norn("story", "approve", "gh-20", "--json");
+    expect(r.exit).toBe(0);
+    const v = r.value as Verb;
+    expect(v.delivered).toMatchObject({ via: "mailbox", holder: "tester@box" });
+    expect(v.receipt).toMatchObject({ kind: "approve", step: "ready", attempt: 1, who: "bob@repo-b" });
+    expect(posted(v.delivered.ref as string)).toMatchObject({ kind: "approve", step: "ready", attempt: 1 });
+    await tick("--sync");
+    await tick();
+    expect(h.state(s.runs())).toMatchObject({ step: "$done", status: "done", last_outcome: { outcome: "approve", source: "human" } });
+  });
+});
+
+describe("under local (B20)", () => {
+  beforeAll(() => setPolicy("local"));
+
+  test("AC1: B's answer is stamped with the step the last boundary led to and no attempt; the reply names the holder", async () => {
+    const s = await askingAtReview(21, "local-ask");
+    const r = await B.norn("story", "answer", "gh-21", "use option b", "--json");
+    expect(r.exit).toBe(0);
+    const v = r.value as Verb;
+    expect(v.delivered).toMatchObject({ via: "mailbox", holder: "tester@box" });
+    expect(v.delivered.ref).toStartWith(mailboxPrefix("gh-21"));
+    expect(v.receipt).toMatchObject({ kind: "answer", step: "review", answer: "use option b", who: "bob@repo-b" });
+    expect(v.receipt).not.toHaveProperty("attempt");
+    expect(v.next).toBe("sent to tester@box; the holder checks it against the step it is at (last boundary: implement -> review)");
+    const blob = posted(v.delivered.ref as string);
+    expect(blob).toMatchObject({ kind: "answer", step: "review" });
+    expect(blob).not.toHaveProperty("attempt");
+
+    // the holder matches it by step alone, and keeps it with the attempt it matched (S6)
+    await tick("--sync");
+    expect(mailbox("gh-21")).toBe("");
+    await tick();
+    expect(h.state(s.runs())).toMatchObject({ step: "review", attempt: 1, park: null });
+    const answer = readTrace(h.root, { unit: "gh-21", types: ["reject"] }).events;
+    expect(answer).toEqual([]);
+  });
+
+  test("AC1: story approve behaves the same", async () => {
+    const s = await atReadyGate(22, "local-gate");
+    const r = await B.norn("story", "approve", "gh-22", "--reason", "ship it", "--json");
+    expect(r.exit).toBe(0);
+    const v = r.value as Verb;
+    expect(v.receipt).toMatchObject({ kind: "approve", step: "ready", comment: "ship it" });
+    expect(v.receipt).not.toHaveProperty("attempt");
+    expect(v.next).toBe("sent to tester@box; the holder checks it against the step it is at (last boundary: review -> ready)");
+    // the same decision twice is refused before it reaches the mailbox
+    const again = await B.norn("story", "approve", "gh-22", "--json");
+    expect(again.exit).toBe(3);
+    expect(again.value).toMatchObject({ code: "already_recorded" });
+    await tick("--sync");
+    await tick();
+    expect(h.state(s.runs())).toMatchObject({ step: "$done", status: "done", last_outcome: { outcome: "approve", source: "human" } });
+  });
+});
+
+describe("a receipt the holder rejects (B21)", () => {
+  let gh23: Awaited<ReturnType<typeof askingAtReview>>;
+  let gh24: Awaited<ReturnType<typeof askingAtReview>>;
+  const title = (key: string, at: string) => `answer from bob@repo-b for ${key} was rejected: ${key} is at ${at} now`;
+
+  test("AC3: an answer stamped for review reaches A after it moved to implement: rejected, traced, and a Check item on A", async () => {
+    gh23 = await askingAtReview(23, "moved-on");
+    // A moves the cursor by hand: no boundary commit, so B still sees review as the step it is at
+    expect((await h.norn("run", "rerun", "gh-23", "--step", "implement")).exit).toBe(0);
+    await tick();
+    expect(h.state(gh23.runs())).toMatchObject({ step: "implement" });
+    const r = await B.norn("story", "answer", "gh-23", "use option b", "--json");
+    expect(r.exit).toBe(0);
+    expect((r.value as Verb).receipt).toMatchObject({ step: "review" });
+
+    await tick("--sync");
+    expect(mailbox("gh-23")).toBe("");
+    const rejects = readTrace(h.root, { unit: "gh-23", types: ["reject"] }).events as Array<{ source: string; reason: string }>;
+    expect(rejects).toContainEqual(expect.objectContaining({ source: expect.stringContaining(mailboxPrefix("gh-23")), reason: expect.stringContaining("gh-23 is not at review") }));
+    expect((await checkItems("gh-23")).map((i) => i.title)).toEqual([title("gh-23", "implement")]);
+    expect((await h.norn("status")).stdout).toContain(title("gh-23", "implement"));
+    // it stays: nothing accepted since
+    await tick();
+    expect((await checkItems("gh-23")).map((i) => i.title)).toEqual([title("gh-23", "implement")]);
+  });
+
+  test("AC4: a later answer accepted for the story clears it; there is no dismiss command", async () => {
+    expect((await inWt(gh23.wt, "brief")).exit).toBe(0);
+    await tick();
+    expect((await inWt(gh23.wt, "ask", "Which file?")).exit).toBe(0);
+    await tick();
+    expect(h.state(gh23.runs())).toMatchObject({ step: "implement", park: { kind: "ask" } });
+    expect((await h.norn("story", "answer", "gh-23", "src/a.ts")).exit).toBe(0);
+    await tick();
+    expect(h.state(gh23.runs())?.park).toBeNull();
+    expect(await checkItems("gh-23")).toEqual([]);
+    expect((await h.norn("help", "--json")).stdout).not.toContain("dismiss");
+  });
+
+  test("AC4: the story finishing clears it", async () => {
+    gh24 = await askingAtReview(24, "finishes");
+    expect((await h.norn("run", "rerun", "gh-24", "--step", "ready")).exit).toBe(0);
+    await tick();
+    expect(h.state(gh24.runs())).toMatchObject({ step: "ready", park: { kind: "gate" } });
+    expect((await B.norn("story", "answer", "gh-24", "use option b")).exit).toBe(0);
+    await tick("--sync");
+    expect((await checkItems("gh-24")).map((i) => i.title)).toEqual([title("gh-24", "ready")]);
+    expect((await h.norn("story", "approve", "gh-24")).exit).toBe(0);
+    await tick();
+    expect(h.state(gh24.runs())).toMatchObject({ step: "$done", status: "done" });
+    expect(await checkItems("gh-24")).toEqual([]);
+  });
+});

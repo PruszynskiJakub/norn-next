@@ -89,7 +89,7 @@ export function storyRulings(units: ReadonlyArray<{ unit: string; receipts: read
       const comment = r.comment?.trim();
       if (!comment) continue;
       seen.add(r.receipt_id);
-      out.push({ unit: u.unit, step: r.step, attempt: r.attempt, decision: r.kind, by: r.who ?? null, at: r.at, comment, receipt_id: r.receipt_id, head_sha: r.head_sha ?? null });
+      out.push({ unit: u.unit, step: r.step, attempt: r.attempt ?? 1, decision: r.kind, by: r.who ?? null, at: r.at, comment, receipt_id: r.receipt_id, head_sha: r.head_sha ?? null });
     }
   return out.sort((a, b) => epoch(a.at) - epoch(b.at) || a.receipt_id.localeCompare(b.receipt_id));
 }

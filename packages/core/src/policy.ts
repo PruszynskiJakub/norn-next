@@ -148,17 +148,28 @@ export function unitWorktree(story: StoryFacts, uf: UnitFacts | null): string | 
   return wt?.exists ? wt.path : null;
 }
 
+/** gh-195 B18–B20: how a step ended — the outcome whose edge moved the cursor on, and the step it moved to. */
+export interface StepEnd {
+  outcome: string;
+  next: string;
+}
+
 /**
  * S4: the trailers of every commit norn makes for a unit — Norn-Story, Norn-Slice for a slice,
  * Norn-Step when the unit has a cursor (none before the story unit starts), Norn-Tick. A commit
  * that ends a step (its outcome moved the cursor on) also carries Norn-Outcome, so a step boundary
- * is told apart from the other commits made at that step (gh-195 B18, B19: "last boundary").
+ * is told apart from the other commits made at that step (gh-195 B18, B19: "last boundary"), and
+ * Norn-Next, the step that outcome moved the cursor to (gh-195 B20: what a non-holder stamps a mailbox
+ * receipt with under `local`).
  */
-export function nornTrailers(tick: string, story: string, slice: string | null, step: string | null, outcome?: string): Record<string, string> {
+export function nornTrailers(tick: string, story: string, slice: string | null, step: string | null, ended?: StepEnd): Record<string, string> {
   const trailers: Record<string, string> = { "Norn-Story": story };
   if (slice) trailers["Norn-Slice"] = slice;
   if (step !== null) trailers["Norn-Step"] = step;
-  if (outcome !== undefined && step !== null) trailers["Norn-Outcome"] = outcome;
+  if (ended !== undefined && step !== null) {
+    trailers["Norn-Outcome"] = ended.outcome;
+    trailers["Norn-Next"] = ended.next;
+  }
   trailers["Norn-Tick"] = tick;
   return trailers;
 }

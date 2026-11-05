@@ -96,7 +96,7 @@ const recordSnapshot = (wt: string, spec: string) => {
     .sort();
   return { files: Object.fromEntries(files.map((f) => [f.slice(dir.length + 1), readFileSync(f, "utf8")])), head: sh(wt, ["rev-parse", "HEAD"]) };
 };
-type Verb = { unit: string; receipt: Receipt; delivered: { via: string; claim?: string; n?: number; file?: string; ref?: string; holder?: string } };
+type Verb = { unit: string; receipt: Receipt; delivered: { via: string; claim?: string; n?: number; file?: string; ref?: string; holder?: string }; next?: string };
 
 beforeAll(async () => {
   h = await createHarness();
@@ -312,10 +312,7 @@ describe("approve (gate)", () => {
   });
 });
 
-// gh-195/05 (S12): run state no longer travels on the branch, so a second clone has no step to stamp a
-// mailbox receipt with until gh-195/13 (B20: the last boundary commit's step, or the ref under `remote`)
-// rewrites this block for it (its holder-side import and the run list/view checks come back with it).
-describe.skip("mailbox (T9): a second clone while this one holds the claim", () => {
+describe("mailbox (T9): a second clone while this one holds the claim", () => {
   let b: (...argv: string[]) => Promise<CliResult>;
   let importTick: TickReport;
 
@@ -328,8 +325,6 @@ describe.skip("mailbox (T9): a second clone while this one holds the claim", () 
     const bWt = `${bRoot}-worktrees/gh-5-pay-invoices`;
     sh(bRoot, ["worktree", "add", "-q", "-b", "gh-5-pay-invoices", bWt, "origin/gh-5-pay-invoices"]);
     writeFileSync(join(bWt, ".norn-unit"), `repo=${bRoot}\nstory=gh-5\nslice=\nunit=_story\nspec_dir=${spec5}\n`);
-    sh(bWt, ["reset", "-q", "--hard", sh(bWt, ["log", "-1", "--format=%H", "--grep=work.unstick"]).trim()]);
-    expect(h.state(runStateOf(join(bWt, spec5)))).toMatchObject({ step: "work", park: null });
 
     h.report(runs5(), "done", { outcome: "done", handoff: "with tests" });
     await tick();
@@ -342,20 +337,24 @@ describe.skip("mailbox (T9): a second clone while this one holds the claim", () 
     const v = r.value as Verb;
     expect(v.delivered).toMatchObject({ via: "mailbox", holder: "tester@box" });
     expect(v.delivered.ref).toMatch(/^refs\/norn\/inbox\/gh-5\/[0-9A-Z]{26}$/);
-    expect(v.receipt).toMatchObject({ kind: "approve", step: "review", attempt: 3, slice: null, who: "colleague@laptop", comment: "lgtm" });
+    // gh-195 B20 (S12): run state stays on the holder's machine, so the colleague has no copy of it, stale or
+    // not; under `local` the receipt is stamped with the step the last boundary led to, and no attempt
+    expect(existsSync(runStateOf(join(bWt, spec5)))).toBe(false);
+    expect(v.receipt).toMatchObject({ kind: "approve", step: "review", slice: null, who: "colleague@laptop", comment: "lgtm" });
+    expect(v.receipt).not.toHaveProperty("attempt");
+    expect(v.next).toBe("sent to tester@box; the holder checks it against the step it is at (last boundary: work -> review)");
     expect(h.git(["ls-remote", "origin", "refs/norn/inbox/*"])).toContain("refs/norn/inbox/gh-5/");
     // the same decision twice is refused before it reaches the mailbox
     refused(await b("story", "approve", "gh-5"), "already_recorded");
     held(await b("story", "edit", "gh-5", "--auto"));
     // gh-71 D3 (B18): a new round is refused for the claim first, before the workflow or the unfinished round
     const mailbox = h.git(["ls-remote", "origin", "refs/norn/inbox/*"]);
-    const local = readdirSync(join(runStateOf(join(bWt, spec5)), "receipts")).sort();
     const round = await b("story", "edit", "gh-5", "--workflow", "sotry", "--json");
     const why = JSON.stringify(round.value);
     held(round);
     // AC9: nothing written, locally or to the mailbox
     expect(h.git(["ls-remote", "origin", "refs/norn/inbox/*"])).toBe(mailbox);
-    expect(readdirSync(join(runStateOf(join(bWt, spec5)), "receipts")).sort()).toEqual(local);
+    expect(existsSync(runStateOf(join(bWt, spec5)))).toBe(false);
     expect(why).toContain("held by tester@box");
     expect(why).toContain("norn story checkout gh-5");
   });

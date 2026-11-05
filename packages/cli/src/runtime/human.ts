@@ -22,6 +22,9 @@ import {
   classifyClaim,
   fetchElsewhere,
   fetchNornRefs,
+  lastBoundary,
+  type LastBoundary,
+  remoteStoryBranch,
   readStoryRecord,
   heartbeatId,
   listMailbox,
@@ -76,8 +79,22 @@ export interface Target {
   handoffFile: string | null;
   /** where the cursor was read from */
   source: "local" | "remote";
+  /**
+   * gh-195 B20: a `local` story another machine holds — the only cursor known here is the step its last
+   * boundary commit led to (`Norn-Next`); the receipt is stamped with that step and no attempt, and the
+   * holder checks it. Absent = the cursor is `state`.
+   */
+  boundary?: LastBoundary & { next: string };
   obs: Observed | null;
   story_facts: StoryFacts | null;
+}
+
+/**
+ * gh-195 B20: the stand-in cursor of a `boundary` target: the step only. The verb's own checks are not
+ * run against it (the holder checks the receipt, T9), and `humanReceipt` stamps no attempt from it.
+ */
+function boundaryCursor(next: string): UnitState {
+  return { step: next, run: null, park: null } as unknown as UnitState;
 }
 
 function localTarget(obs: Observed, story: StoryFacts, uf: UnitFacts): Target {
@@ -96,10 +113,11 @@ function localTarget(obs: Observed, story: StoryFacts, uf: UnitFacts): Target {
 }
 
 /**
- * The unit's cursor from the story's record ref (gh-195 D6): the one record this verb needs is
- * fetched, then read from the local ref's git objects (validated, S2; a failed fetch refuses). Run
- * state is never on a branch (S12); a story with no record ref (`local`, never released) has none
- * to read here.
+ * The unit's cursor as a non-holder knows it (gh-195 D6, B20): the one record ref and story branch this
+ * verb needs are fetched (a failed fetch refuses). Under `remote` the cursor is read from the record
+ * ref's git objects (validated, S2). Under `local` the story unit's cursor is the step its last boundary
+ * commit led to (`Norn-Next`), with no attempt; null when no boundary is pushed (or an older norn made
+ * it), or for a slice. Run state is never on a branch (S12).
  */
 async function remoteTarget(ctx: Context, key: string): Promise<Target | null> {
   const remote = await gitRemote(ctx.git, ctx.root, ctx.config.git_remote);
@@ -109,10 +127,16 @@ async function remoteTarget(ctx: Context, key: string): Promise<Target | null> {
   await fetchElsewhere(ctx.root, remote, [story]).catch((e: Error) => {
     throw failure(`cannot fetch the record of ${story}: ${e.message}`, "check the network and retry", "record_unreachable");
   });
+  const base = { key, story, slice, runsDir: null, handoffFile: null, source: "remote" as const, obs: null, story_facts: null };
+  if (ctx.config.record.policy === "local") {
+    const branch = slice ? null : await remoteStoryBranch(ctx.root, remote, story);
+    const b = branch ? await lastBoundary(ctx.root, `refs/remotes/${remote}/${branch}`, story, null) : null;
+    if (b?.next) return { ...base, state: boundaryCursor(b.next), workflow: null, boundary: { ended: b.ended, next: b.next } };
+  }
   const record = await readStoryRecord(ctx.root, story);
   const u = record?.units.find((x) => x.key === key);
   if (!u) return null;
-  return { key, story, slice, state: u.state, workflow: u.workflow, runsDir: null, handoffFile: null, source: "remote", obs: null, story_facts: null };
+  return { ...base, state: u.state, workflow: u.workflow };
 }
 
 /** Observe this checkout without touching the network. */
@@ -163,19 +187,21 @@ export function started(t: Target): UnitState {
 type HumanKind = "answer" | "approve" | "reject" | "unstick" | "stuck" | "mode" | "workflow" | "update" | "round";
 
 /** A human receipt at the unit's cursor (S6): step + attempt + slice (+ the story's round) so the tick routes it (T9). */
-export function humanReceipt<K extends HumanKind>(ctx: Context, t: Pick<Target, "slice">, st: UnitState, kind: K, body: Record<string, unknown>): Extract<Receipt, { kind: K }> {
+export function humanReceipt<K extends HumanKind>(ctx: Context, t: Pick<Target, "slice" | "boundary">, st: UnitState, kind: K, body: Record<string, unknown>): Extract<Receipt, { kind: K }> {
+  // gh-195 B20: from a `local` story's last boundary only the step is known: no attempt, run or round
+  const known = !t.boundary;
   const r = {
     kind,
     receipt_id: ulid(ctx.clock.now()),
     run_id: st.run?.run_id ?? null,
     step: st.step,
-    attempt: st.attempt,
+    ...(known ? { attempt: st.attempt } : {}),
     at: ctx.clock.iso(),
     by: "human",
     who: machineHolder(ctx.env),
     slice: t.slice,
     // gh-71 AC12 (T9): the story's round, so a mailbox receipt is not applied to a later round at the same cursor
-    ...(t.slice === null ? { round: st.round ?? 1 } : {}),
+    ...(t.slice === null && known ? { round: st.round ?? 1 } : {}),
     ...body,
   };
   const v = validate("receipt", r);
@@ -369,8 +395,9 @@ export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptio
   let claim = opts.claim ?? (opts.mailbox ? await claimFor(ctx, t.story) : null);
   let target = t;
   if (opts.mailbox && t.source === "local" && claim && heldElsewhere(claim)) target = (await remoteTarget(ctx, t.key)) ?? t;
-  opts.check(target, started(target));
-  if (opts.noop?.(target, started(target))) return null;
+  // gh-195 B20: a step known only from the last boundary is checked by the holder (T9), not here
+  if (!target.boundary) opts.check(target, started(target));
+  if (!target.boundary && opts.noop?.(target, started(target))) return null;
   let receipt = opts.build(target, started(target));
   let held: Route | null = null;
   if (opts.requireHolder) {
@@ -388,7 +415,12 @@ export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptio
   }
   if (opts.before) receipt = await opts.before(target, started(target), route, receipt);
   const delivered = await deliver(ctx, target, route, receipt);
-  const next = route.via === "local" ? cmd.tick() : `${route.holder.holder}'s next tick imports it (T9)`;
+  const next =
+    route.via === "local"
+      ? cmd.tick()
+      : target.boundary
+        ? `sent to ${route.holder.holder}; the holder checks it against the step it is at (last boundary: ${target.boundary.ended} -> ${target.boundary.next})`
+        : `${route.holder.holder}'s next tick imports it (T9)`;
   return { unit: target.key, receipt, delivered, next };
 }
 

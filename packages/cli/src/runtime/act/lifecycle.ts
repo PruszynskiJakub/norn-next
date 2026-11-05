@@ -5,6 +5,7 @@ import { cmd, type Action, type ActionResult, nornTrailers, type UnitRef, type W
 import { type ClaimBlob, HANDOFFS_DIR, parseDuration, recordRef, ROUNDS_DIR, RUNS_DIR, STORY_UNIT_DIR } from "@norn/schema";
 import {
   acquireClaim,
+  addRejectedReceipt,
   pushRecord as pushStoryRecord,
   type ClaimWriteResult,
   deleteMailbox,
@@ -149,12 +150,37 @@ export async function rejectReceipt(act: ActEnv, a: Extract<Action, { kind: "rej
   if ("ref" in a.source) {
     const res = await deleteMailbox(act.root, act.obs.remote, a.source.ref, a.source.sha);
     act.traceReject(a.unit.key, a.source.ref, a.reason, { sha: a.source.sha });
+    keepRejected(act, a.unit.story, a.source.ref, a.reason);
     return { ok: true, detail: { deleted: res.ok } };
   }
   const loc = act.unitLoc(a.unit);
   if (a.state) act.writeUnitState(a.unit, loc.runsDir, a.state);
   act.traceReject(a.unit.key, `receipt ${a.source.n}`, a.reason);
   return { ok: true };
+}
+
+/**
+ * gh-195 D12 (B21, T9): keep a rejected mailbox receipt machine-local, next to the notices, so the holder's
+ * inbox shows it as a Check item ("answer from X for gh-9 was rejected: gh-9 is at plan now"). An
+ * unreadable blob has no sender or step to show: the trace alone keeps it.
+ */
+function keepRejected(act: ActEnv, story: string, ref: string, reason: string): void {
+  const sf = act.obs.facts.stories.find((s) => s.key === story);
+  const r = sf?.mailbox?.find((m) => m.ref === ref)?.receipt;
+  if (!sf || !r) return;
+  const unit = sf.units.find((u) => (r.slice === undefined ? u.unit.slice === null : u.unit.slice === r.slice));
+  addRejectedReceipt(act.root, {
+    story,
+    unit: r.slice ?? story,
+    receipt_id: r.receipt_id,
+    kind: r.kind,
+    who: r.who ?? null,
+    step: r.step,
+    ...(r.attempt !== undefined ? { attempt: r.attempt } : {}),
+    at_step: unit?.state?.step ?? null,
+    reason,
+    rejected_at: new Date(act.obs.facts.now).toISOString(),
+  });
 }
 
 // ------------------------------------------------------------ claims (T3–T6)

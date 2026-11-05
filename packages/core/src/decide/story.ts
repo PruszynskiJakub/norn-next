@@ -318,7 +318,9 @@ function importMailbox(ctx: Ctx, story: StoryFacts): void {
   const r = item.receipt;
   // gh-71 AC12: a receipt made in another round is stale even at the same step#attempt (the same workflow again)
   const otherRound = (u: UnitFacts) => r.round !== undefined && u.unit.slice === null && (u.state?.round ?? 1) !== r.round;
-  const atStep = (u: UnitFacts) => !!u.state && u.state.step === r.step && u.state.attempt === r.attempt && !u.errors.length;
+  // gh-195 B20: a receipt without an attempt (a non-holder's, for a `local` story) matches by step alone
+  const atStep = (u: UnitFacts) => !!u.state && u.state.step === r.step && (r.attempt === undefined || u.state.attempt === r.attempt) && !u.errors.length;
+  const at = r.attempt === undefined ? r.step : `${r.step}#${r.attempt}`;
   const atCursor = (u: UnitFacts) => atStep(u) && !otherRound(u);
   let target: UnitFacts | undefined;
   if (r.slice !== undefined) {
@@ -328,20 +330,21 @@ function importMailbox(ctx: Ctx, story: StoryFacts): void {
     // gh-79 (H1): its cursor is read from a rewound state.json until the rebase is concluded; wait
     if (rebasing(unit)) return;
     if (atStep(unit) && otherRound(unit)) return reject(`stale: ${unit.unit.key} is in round ${unit.state?.round ?? 1}, the receipt was made in round ${r.round}`);
-    if (!atCursor(unit)) return reject(`stale: ${unit.unit.key} is not at ${r.step}#${r.attempt}`);
+    if (!atCursor(unit)) return reject(`stale: ${unit.unit.key} is not at ${at}`);
     target = unit;
   } else {
     if (story.units.some(rebasing)) return;
     const matches = story.units.filter(atCursor);
     target = matches.find((u) => u.state?.status === "parked" || u.state?.status === "stuck") ?? matches[0];
   }
-  if (!target || ctx.has(target.unit.key)) return target ? undefined : reject(`no unit at ${r.step}#${r.attempt}`);
+  if (!target || ctx.has(target.unit.key)) return target ? undefined : reject(`no unit at ${at}`);
   ctx.emit({
     kind: "import_mailbox",
     unit: target.unit,
     rule: "mailbox.import",
     refs: [{ ref: item.ref, sha: item.sha }],
-    receipts: [{ n: nextReceiptNumber(target), receipt: r }],
+    // a step-only receipt is copied with the attempt it matched, so the unit's receipts are all stamped (S6)
+    receipts: [{ n: nextReceiptNumber(target), receipt: r.attempt === undefined && target.state ? { ...r, attempt: target.state.attempt } : r }],
     state: null,
     commit: commitFor(ctx, story, target, `norn: ${target.unit.key} ${r.kind} from mailbox`, r.step),
   });

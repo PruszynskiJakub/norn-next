@@ -775,6 +775,27 @@ function unpushedItems(story: StoryFacts, facts: Facts): InboxItem[] {
     });
 }
 
+/**
+ * gh-195 D12 (B21, T9): a mailbox receipt this holder's tick rejected, one Check item each, so a stale
+ * answer never vanishes silently. Gone once a later answer or approval of the story is accepted (observe
+ * leaves it out) or the story finishes; there is no dismiss command.
+ */
+function rejectedItems(story: StoryFacts): InboxItem[] {
+  if (storyFinished(story)) return [];
+  return (story.rejected_mailbox ?? []).map((r) => ({
+    id: `rejected:${r.receipt_id}`,
+    group: "check" as const,
+    story: story.key,
+    slice: r.unit === story.key ? null : r.unit,
+    step: null,
+    title: `${r.kind} from ${r.who ?? "another machine"} for ${r.unit} was rejected: ${r.at_step ? `${r.unit} is at ${r.at_step} now` : r.reason}`,
+    detail: `stamped for ${r.attempt === undefined ? r.step : `${r.step}#${r.attempt}`}; ${r.reason}`,
+    command: cmd.runList(r.unit),
+    since: r.rejected_at,
+    ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
+  }));
+}
+
 /** Build the whole inbox (O1). Stories held by another heartbeat are not shown (except R2.3 unpushed work). */
 export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   const groups = Object.fromEntries(INBOX_GROUPS.map((g) => [g, [] as InboxEntry[]])) as Record<InboxGroup, InboxEntry[]>;
@@ -833,6 +854,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
     add(retargetItem(story, facts.repo.default_branch));
     add(finishedRoundRemoteItem(story, config, facts.repo.default_branch));
     for (const it of foreignCommitItems(story)) add(it);
+    for (const it of rejectedItems(story)) add(it);
     for (const it of noteItems(story)) add(it);
     for (const uf of story.units) {
       add(unitInboxItem(story, uf, facts, config));
