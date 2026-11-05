@@ -21,9 +21,14 @@ B20, B21: a non-holder's mailbox receipt is stamped from the last boundary (loca
 
 ## Progress
 
-- Read slice 13, spec B20/B21/D6/D12, T9, slice 12's elsewhere.ts (`lastBoundary` = the step a boundary commit ENDED: `Norn-Step` of a commit with `Norn-Outcome`) and human.ts `remoteTarget`.
-- Ambiguity found: stamping a local story's receipt with the step the last boundary ended means the holder (already at the next step) rejects every non-holder answer/approval; the restored test (approve at review#3 gate, then import -> $done) needs the step the boundary led to. Asked the person (norn ask) which step to stamp and how a non-holder learns it.
+- Asked and answered (D17, folded into spec.md B20 + D17, slice 13 AC1/AC3, slice 18 scope): boundary commits carry `Norn-Next: <to-step>` (set with `Norn-Outcome`, `endedWith` now returns `{ outcome, next }`); a `local` non-holder stamps the step only; `attempt` optional on answer/approve/reject/unstick receipts (`mailboxReceipt` in schema receipt.ts); holder matches by step alone and copies the receipt with the attempt it matched.
+- Boundary commits are made with `allowEmpty` (act env `commit`): without it a step the agent ended without changing files left no boundary on the branch, so the non-holder stamped an older step (found by the restored human block).
+- human.ts `remoteTarget`: under `local` the story unit's cursor is the last boundary's `Norn-Next` (`boundary` on Target; checks skipped, the holder checks); reply `sent to X; the holder checks it against the step it is at (last boundary: a -> b)`. Under `remote` unchanged (ref). Slices under local: no cursor (unknown unit), as before.
+- B21: act `rejectReceipt` keeps a rejected mailbox receipt in `<machine dir>/rejected.json` (schema `local-rejected`); `loadLocalFacts` gives `StoryFacts.rejected_mailbox` (dropping ones a later applied answer/approve/reject cleared), shared by observe and the view (parity); `buildInbox` adds a Check item `rejected:<receipt_id>` unless the story finished.
+- story edit: a claim seen held elsewhere is checked first even with no local run state (restored block, gh-71 B18).
+- Tests: new packages/cli/test/integration/mailbox-across-machines.test.ts (AC1–AC4); restored human.test mailbox block, 45/45 pass. Changed in it: the stale-local-copy setup (reset to the `work.unstick` commit, which no longer exists, and the assertion on B's local state.json) became "B has no run state of gh-5" (S12); the receipt expectation `attempt: 3` became no attempt plus the reply text (B20 AC1); "nothing written locally" checks B's run-state folder does not exist instead of comparing its receipts listing.
+- Golden: `--update` added only `Norn-Next` to 10 cases (checked by stripping it: identical).
 
 ## Resume
 
-Wait for the answer to the ask; then implement B20 (stamp + reply), B21 (rejected receipt kept machine-local, Check item, clears on accept/finish), restore the skipped block.
+Run integration + e2e tiers; regenerate transcripts (NORN_TRANSCRIPT_UPDATE=1) and snapshots if the empty boundary commits / Norn-Next changed them; `bun run golden` harvest; then `norn done done`.
