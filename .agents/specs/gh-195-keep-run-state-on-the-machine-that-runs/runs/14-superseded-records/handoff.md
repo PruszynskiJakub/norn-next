@@ -3,13 +3,14 @@
 - Workflow: slice · Step: implement (attempt 1)
 - Status: running
 - Counters: conflict_loop 0/2, review_loop 0/3, test_loop 0/5
-- Last outcome: none
+- Last outcome: implement.timeout (classified, 2026-11-05T12:45:09.878Z)
 - Next: `norn run list gh-195/14`
-- Updated: 2026-11-05T11:45:09.651Z
+- Updated: 2026-11-05T12:45:09.878Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - slice.start: slice at implement
 - receipts.apply: applied 1
+- agent.timeout.surface: timeout
 <!-- norn:heartbeat:end -->
 
 ## Goal
