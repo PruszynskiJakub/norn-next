@@ -18,17 +18,18 @@ GR6/GR6b push the final record to `refs/norn/runs/<story>` before cleanup; `run 
 
 ## Progress
 
-- act/lifecycle.ts `archiveRecord`: GR6 `cleanupMerged` and GR6b `closeClosedIssueStory` push the record (store `pushRecord`, lease on the local ref) before anything is removed; a failed push returns not-ok with nothing removed, so the next tick re-decides the cleanup (D15). decide skips the `push_record` side action on a story cleaned up that tick.
+- One archive push, `archiveStoryRecord` in runtime/close.ts (store `pushRecord`, lease on the local ref, Norn-Branch-Commit = the pushed story branch): GR6 `cleanupMerged` calls it before removing anything; `closeStory` (GR6b's `close_story` and `norn story close`) calls it after the branch pushes and before removals, failing with `record_push_failed` (the supervisor's note: slice 09's 796d5037b does the same in closeStory — reconcile to one push at merge). A failed push removes nothing; the next tick re-decides the cleanup (D15). decide skips the `push_record` side action on a story cleaned up that tick.
 - store: `unpackRecordSync` (same checks as `unpackRecord`, which now wraps it), `archivedRecordDir` (local ref unpacked once per commit into `<machine dir>/archive/<story>/<sha>/`), `fetchRecords` (ls-remote + fetch of the named archive refs only). `runStateSource` reads a finished story (status done/dropped) from the archive when the machine dir has none; the base/main-checkout tree reader is gone (D16).
 - `baseRunStateStories` (snapshot) -> `Facts.base_run_state` -> one repo-level Check item (`base_run_state:*:...`) and the doctor repo check `run_state` (FAIL "run state"). Hook for gh-195/17: once upgrade's removal is committed, `baseRunStateStories` finds nothing and both disappear.
 - cli runtime/archive.ts `fetchArchived`: `run list` / `run view <unit>` fetch the story's ref when this clone has neither run state nor the ref; `run view <run id>` not found -> fetch for the snapshot's stories lacking a record, then retry. `story reopen` unpacks the ref into the machine dir when it holds none.
 - trace view: `records.source` "archive" (ref + commit) replaces "base_cache".
 - Tests: new packages/cli/test/integration/archive-ref.test.ts (AC1–AC6); B36 tests in records/round-folders now archive the base's runs/ subtree first (`archiveTreeRunState` in test/support/harness.ts, as upgrade D14 will); view steps fixture copied into the machine dir; story-reopen GR6b AC2 now expects only `refs/norn/runs/gh-8` left.
-- golden --update: 0 of 124 changed.
+- golden --update: 0 of 124 changed. base-sync transcript rewritten: the archive push (hash-object … push refs/norn/runs/gh-7) appears before the GR6 cleanup — intended. Archive refs are listed lazily (one for-each-ref only when a finished story lacks machine-dir run state) so other transcripts stay unchanged.
+- Integration tier: 760 pass, 6 skip, 0 fail (first commit); affected files rerun after the closeStory change: green.
 
 ### Flakes
 
-- packages/store/test/integration/record-ref.test.ts "F1" (25 git repos in one test, 20 s timeout) timed out in the tier and in 1 of 3 isolated runs at load average ~90 (parallel slices); untouched code (pack). See Resume.
+- packages/store/test/integration/record-ref.test.ts "F1" (25 git repos in one test, 20 s timeout) timed out in the tier and in 1 of 3 isolated runs at load average ~90 (parallel slices); untouched code (pack); passed in the second full tier run.
 
 ## Resume
 
