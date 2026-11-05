@@ -96,6 +96,7 @@ function model(backlog?: RemoteIssue[]): CockpitModel {
     inbox: { at: AT, groups: { ...none, answer: [entry("answer", 3, { step: "refine" })], approve: [entry("approve", 1), entry("approve", 2)] }, pending: 3 },
     runs: [],
     recently_done: [],
+    elsewhere: [],
     errors: [],
   };
   return cockpitModel(view, { places: false, provider: "gh", ...(backlog ? { backlog: { me: "me", issues: backlog } } : {}) });

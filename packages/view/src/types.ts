@@ -191,8 +191,47 @@ export interface ProjectView {
   runs: RunView[];
   /** units finished within the last 24 h, newest first */
   recently_done: RecentDone[];
+  /** gh-195 D6 (B17–B19): stories another heartbeat holds that this checkout has no copy of */
+  elsewhere: ElsewhereView[];
   /** config, workflow or lease files that failed to read */
   errors: FileError[];
+}
+
+/** A unit's standing from a story's record ref (B17). */
+export interface RecordUnitView {
+  key: string;
+  slice: string | null;
+  step: string;
+  attempt: number;
+  status: string;
+  counters: CounterView[];
+}
+
+/**
+ * gh-195 D6 (B10, B13, B17–B19): a story held by another heartbeat, read from local refs only: its
+ * claim, the remote-tracking story branch and the record ref as the last tick fetched them.
+ */
+export interface ElsewhereView {
+  key: string;
+  title: string;
+  url: string | null;
+  holder: string;
+  /** the claim's last renewal (the holder's heartbeat) and expiry */
+  renewed_at: string;
+  expires_at: string;
+  expired: boolean;
+  /** the team's record policy as this checkout's config has it */
+  policy: "local" | "remote";
+  branch: string | null;
+  /** the remote-tracking story branch's head */
+  head: { sha: string; subject: string; at: string } | null;
+  /** B18, B19: the step of the story's last boundary commit; null = no boundary pushed yet */
+  last_boundary: string | null;
+  /** the record ref: its commit, time and units; null = none here */
+  record: { sha: string; at: string; holder: string | null; current: boolean; units: RecordUnitView[]; error?: string } | null;
+  pr: PrView | null;
+  /** B13, B18: where the record is, for a person ("record as of …", "run state is on …"); [] = the ref is kept current */
+  where: string[];
 }
 
 export type { Inbox, InboxEntry };

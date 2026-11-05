@@ -54,6 +54,7 @@ describe("formatters", () => {
       inbox: { at: "", pending: 0, groups: { your_turn: [], answer: [], approve: [], unblock: [], check: [], unclaimed: [], running: [], notes: [], recently_done: [] } },
       runs: [],
       recently_done: [],
+      elsewhere: [],
       errors: [],
     };
     expect(formatInbox(empty)).toBe("Inbox empty — no stories yet.\nLabel an issue `norn` and assign it to yourself, then run `norn sync`.\n");

@@ -5,7 +5,7 @@
 import { cmd, INBOX_ABOUT, INBOX_GROUPS, INBOX_TITLES, isVersionMismatchItem } from "@norn/core";
 import type { RunDetail } from "./run-view.ts";
 import { oneLine } from "./timeline.ts";
-import type { InboxEntry, ProjectView, RoundView, SliceView, StepRow, StepWho, StoryView, TimelineEntry, TraceView, UnitView } from "./types.ts";
+import type { ElsewhereView, InboxEntry, ProjectView, RoundView, SliceView, StepRow, StepWho, StoryView, TimelineEntry, TraceView, UnitView } from "./types.ts";
 
 function counterText(u: UnitView): string {
   const used = u.counters.filter((c) => c.value > 0 || (c.max !== null && u.status !== "done"));
@@ -169,12 +169,53 @@ export function formatInbox(view: ProjectView, opts: { details?: boolean; home?:
     }
     out.push("");
   }
+  // gh-195 D6 (B17, B18): stories another machine holds, from local refs only
+  if (view.elsewhere?.length) {
+    out.push(`Held elsewhere (${view.elsewhere.length}) · on another machine`);
+    for (const e of view.elsewhere) out.push(`  ${e.key.padEnd(10)} ${e.title} · ${elsewhereStanding(e)}`, `      $ ${cmd.storyView(e.key)}`);
+    out.push("");
+  }
   if (!out.length && !view.stories.length) {
     // a fresh repo: point at the first story instead of a dead end
     return `Inbox empty — no stories yet.\nLabel an issue \`norn\` and assign it to yourself, then run \`${cmd.sync()}\`.\n`;
   }
   if (!out.length) return "Inbox empty — nothing needs you.\n";
   return `${out.join("\n").trimEnd()}\n`;
+}
+
+const minute = (iso: string) => iso.slice(0, 16).replace("T", " ");
+
+/** The story unit's standing from its record (B17), else its last boundary (B18, B19). */
+function elsewhereStanding(e: ElsewhereView): string {
+  const u = e.record?.units.find((x) => x.slice === null);
+  const counters = u?.counters.length ? ` [${u.counters.map((c) => `${c.name} ${c.value}${c.max !== null ? `/${c.max}` : ""}`).join(", ")}]` : "";
+  const step = u ? `Step: ${u.step} (attempt ${u.attempt})${counters}` : null;
+  const asOf = e.record && !e.record.current ? ` — record as of ${minute(e.record.at)}` : "";
+  if (step) return `held by ${e.holder} · ${step}${asOf}`;
+  return `held by ${e.holder} · ${e.last_boundary ? `last boundary: ${e.last_boundary}` : "no boundary pushed yet"}`;
+}
+
+/**
+ * `norn story view` of a story another machine holds (gh-195 D6, B10, B13, B17–B19): the claim, the
+ * branch, the PR, then the step, attempt and counters from the record ref when it is here, or the
+ * last boundary step when it is not, and where the run state is.
+ */
+export function formatElsewhere(e: ElsewhereView): string {
+  const out = [`# ${e.key} — ${e.title}`, ""];
+  out.push(`- Held by: ${e.holder} (heartbeat ${minute(e.renewed_at)}, ${e.expired ? "expired" : "expires"} ${minute(e.expires_at)})`);
+  out.push(`- Branch: ${e.branch ?? "not fetched here"}${e.head ? ` at ${e.head.sha.slice(0, 7)} "${e.head.subject}" (${minute(e.head.at)})` : ""}`);
+  if (e.policy === "local" || !e.record) out.push(`- ${e.last_boundary ? `last boundary: ${e.last_boundary}` : "no boundary pushed yet"}`);
+  out.push(`- PR: ${e.pr ? `#${e.pr.number} ${e.pr.is_draft && e.pr.state === "open" ? "draft, open" : e.pr.state} — ${e.pr.url} (seen ${minute(e.pr.seen_at)})` : "none seen yet"}`);
+  if (e.record) {
+    out.push("", e.record.current ? `Record: ${e.record.sha.slice(0, 7)} (${minute(e.record.at)})` : `Record as of ${minute(e.record.at)}:`);
+    if (e.record.error) out.push(`- unreadable: ${e.record.error}`);
+    for (const u of e.record.units) {
+      const counters = u.counters.map((c) => `${c.name} ${c.value}${c.max !== null ? `/${c.max}` : ""}`).join(", ");
+      out.push(`- ${u.key}: Step: ${u.step} (attempt ${u.attempt}), ${u.status}${counters ? ` · counters: ${counters}` : ""}`);
+    }
+  }
+  if (e.where.length) out.push("", ...e.where);
+  return `${out.join("\n")}\n`;
 }
 
 /** `norn run list <unit>` human mode: one line per timeline entry. */

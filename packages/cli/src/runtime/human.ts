@@ -1,6 +1,6 @@
 /**
  * Shared plumbing of the human verbs (§15, O2): unit addressing (ID1), reading a unit's cursor
- * locally or from the pushed branch, receipt building, and delivery — locally under the claim
+ * locally or from the story's record ref (gh-195 D6), receipt building, and delivery — locally under the claim
  * (T8: acquired for this heartbeat when free) or through the mailbox when another heartbeat
  * holds it (T9). Views read through @norn/view only (X1).
  */
@@ -9,16 +9,7 @@ import { cmd, type ClaimState, type StoryFacts, storyUnit, type UnitFacts } from
 import { loadProjectView, type ProjectView } from "@norn/view";
 import {
   type ClaimBlob,
-  parseSpecDirName,
   type Receipt,
-  SPECS_DIR,
-  parseRoundDirName,
-  ROUNDS_DIR,
-  type RunStory,
-  treeRoundRunStatePath,
-  treeRunStatePath,
-  STORY_UNIT_DIR,
-  treeStoryRunStatePath,
   ulid,
   type UnitState,
   validate,
@@ -29,17 +20,16 @@ import {
   appendReceipt,
   type RemoteClaimRead,
   classifyClaim,
+  fetchElsewhere,
   fetchNornRefs,
+  readStoryRecord,
   heartbeatId,
   listMailbox,
   newClaimBlob,
-  parseWorkflowText,
   postMailbox,
   readClaim,
   recordedHeartbeatId,
   machineHolder,
-  pinnedWorkflowPath,
-  statePath,
 } from "@norn/store";
 import type { Context } from "../context.ts";
 import { claimHeld, failure, refuse, usageError } from "../output.ts";
@@ -106,53 +96,20 @@ function localTarget(obs: Observed, story: StoryFacts, uf: UnitFacts): Target {
 }
 
 /**
- * The unit's cursor from the pushed branches (T7: the holder pushes at step boundaries):
- * a slice reads its slice branch first, then the story branch; the story unit its story branch.
- * gh-195/05: a record an older norn kept on the branch (`<spec folder>/runs/`); slice gh-195/13 reads the ref.
+ * The unit's cursor from the story's record ref (gh-195 D6): the one record this verb needs is
+ * fetched, then read from the local ref through the record cache (unpacked and validated, S2). Run
+ * state is never on a branch (S12); a story with no record ref (`local`, never released) has none
+ * to read here.
  */
 async function remoteTarget(ctx: Context, key: string): Promise<Target | null> {
   const remote = await gitRemote(ctx.git, ctx.root, ctx.config.git_remote);
   if (!remote) return null;
-  const root = ctx.root;
-  const git = ctx.git;
-  await git.fetch(root, remote, [], { quiet: true }).catch(() => undefined);
   const { story, slice } = parseUnitKey(key);
-  const refs = (await git.listRefs(root, `refs/remotes/${remote}/`).catch(() => [])).map((r) => r.ref);
-  const prefix = `refs/remotes/${remote}/`;
-  const storyRef = refs.find((r) => r.startsWith(prefix) && parseSpecDirName(r.slice(prefix.length))?.story === story);
-  if (!storyRef) return null;
-  const run: RunStory = { key: story, spec_dir: `${SPECS_DIR}/${storyRef.slice(prefix.length)}` };
-  const candidates: Array<{ ref: string; dir: string; record?: string }> = [];
-  if (slice) {
-    const nn = slice.split("/")[1] as string;
-    const sliceRef = refs.find((r) => r.startsWith(`${prefix}${story}/${nn}-`));
-    if (sliceRef) candidates.push({ ref: sliceRef, dir: sliceRef.slice(`${prefix}${story}/`.length) });
-    const listed = (await git.lsTree(root, storyRef, `${treeStoryRunStatePath(run)}/`)) ?? [];
-    const dir = listed.find((d) => d.startsWith(`${nn}-`));
-    if (dir) candidates.push({ ref: storyRef, dir });
-  } else {
-    // gh-71 D2 (B30, B36): the story's current round, the highest-numbered rounds/NN-<wf>; a flat record is round 1
-    const rounds = ((await git.lsTree(root, storyRef, `${treeRunStatePath(run, STORY_UNIT_DIR)}/${ROUNDS_DIR}/`)) ?? []).map(parseRoundDirName).filter((r) => r !== null);
-    const round = rounds.sort((a, b) => b.n - a.n)[0];
-    candidates.push({ ref: storyRef, dir: STORY_UNIT_DIR, ...(round ? { record: treeRoundRunStatePath(run, round.n, round.workflow) } : {}) });
-  }
-  for (const c of candidates) {
-    const record = c.record ?? treeRunStatePath(run, c.dir);
-    const raw = await git.show(root, c.ref, statePath(record));
-    if (raw === null) continue;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      continue;
-    }
-    const st = validate("state", parsed);
-    if (!st.ok) continue;
-    const wfText = await git.show(root, c.ref, pinnedWorkflowPath(record));
-    const wf = wfText === null ? null : parseWorkflowText(wfText, pinnedWorkflowPath(record));
-    return { key, story, slice, state: st.value, workflow: wf?.ok ? wf.value : null, runsDir: null, handoffFile: null, source: "remote", obs: null, story_facts: null };
-  }
-  return null;
+  await fetchElsewhere(ctx.root, remote, [story]).catch(() => undefined);
+  const record = await readStoryRecord(ctx.root, story);
+  const u = record?.units.find((x) => x.key === key);
+  if (!u) return null;
+  return { key, story, slice, state: u.state, workflow: u.workflow, runsDir: null, handoffFile: null, source: "remote", obs: null, story_facts: null };
 }
 
 /** Observe this checkout without touching the network. */
@@ -405,7 +362,7 @@ export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptio
 export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptions): Promise<HumanVerbResult | null>;
 export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptions): Promise<HumanVerbResult | null> {
   // T9: read the claim first — a non-holder's local copy may be stale, so when another heartbeat
-  // holds the story the cursor comes from the pushed branch before any precondition is checked
+  // holds the story the cursor comes from its record ref before any precondition is checked
   let claim = opts.claim ?? (opts.mailbox ? await claimFor(ctx, t.story) : null);
   let target = t;
   if (opts.mailbox && t.source === "local" && claim && heldElsewhere(claim)) target = (await remoteTarget(ctx, t.key)) ?? t;

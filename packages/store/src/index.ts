@@ -38,3 +38,4 @@ export * from "./trace.ts";
 export * from "./unit.ts";
 export * from "./unpushed.ts";
 export * from "./worktree.ts";
+export * from "./elsewhere.ts";

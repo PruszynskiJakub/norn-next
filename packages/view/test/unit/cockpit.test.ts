@@ -87,6 +87,7 @@ function view(): ProjectView {
     inbox: { at: AT, groups, pending: 7 },
     runs: [],
     recently_done: [],
+    elsewhere: [],
     errors: [],
   };
 }

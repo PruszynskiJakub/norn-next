@@ -32,8 +32,11 @@ import {
   classifyClaim,
   readRecordRef,
   recordTreeId,
+  fetchElsewhere,
   fetchNornRefs,
   heartbeatId,
+  heldElsewhereKeys,
+  remoteStoryBranch,
   listMailbox,
   loadLocalFacts,
   machineHolder,
@@ -169,6 +172,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   let issues: RemoteIssue[] | undefined;
   const storyIssues = new Map<string, RemoteIssue | null>();
   const storyPrs = new Map<string, RemotePullRequest | null>();
+  let elsewhere: Awaited<ReturnType<typeof heldElsewhereKeys>> = [];
   if (!cache.default_branch) {
     cache.default_branch = remote ? await git.defaultBranch(root, remote).catch(() => null) : null;
     cache.default_branch ??= (await git.status(root).catch(() => null))?.branch ?? "main";
@@ -191,6 +195,9 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     cache.attempted_at = now;
     try {
       if (remote) await fetchNornRefs(root, remote).catch(() => undefined);
+      // gh-195 D6 (B30): of the record refs, only those of the stories another heartbeat holds that this checkout has no copy of
+      elsewhere = await heldElsewhereKeys(root, { heartbeat_id: hb, holder: machineHolder(ctx.env) }, now, new Set(snapshot.stories.map((s) => s.key)));
+      if (remote) await fetchElsewhere(root, remote, elsewhere.map((e) => e.key)).catch(() => undefined);
       const label = config.label;
       issues = await ports.remote.listAssignedIssues({ label });
       for (const s of snapshot.stories) {
@@ -199,6 +206,11 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
         const listed = issues.find((i) => i.number === fm.number && i.provider === fm.provider);
         storyIssues.set(s.key, listed ?? (await ports.remote.getIssue(fm.number)));
         storyPrs.set(s.key, await ports.remote.findPullRequest(storyBranch(s.key, s.slug)));
+      }
+      // B18: the PR of a story held elsewhere, for the view (its branch as the fetch just found it)
+      for (const e of elsewhere) {
+        const branch = remote ? await remoteStoryBranch(root, remote, e.key) : null;
+        if (branch) storyPrs.set(e.key, await ports.remote.findPullRequest(branch));
       }
       cache.synced_at = now;
       cache.last_error = null;
@@ -220,6 +232,10 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     const fresh = storyPrs.has(s.key) ? { pr: storyPrs.get(s.key) ?? null, observed_at: now } : prSeenIn[s.key];
     if (fresh) prSeen[s.key] = fresh;
   }
+  // B18: a story held elsewhere keeps its last PR seen while its claim is here (never a fact of decide's)
+  const snapshotKeys = new Set(snapshot.stories.map((s) => s.key));
+  for (const [key, seen] of Object.entries(prSeenIn)) if (!snapshotKeys.has(key) && !storyPrs.has(key) && (await readLocalClaim(root, key).catch(() => ({ state: "none" }))).state !== "none") prSeen[key] = seen;
+  for (const e of elsewhere) if (storyPrs.has(e.key)) prSeen[e.key] = { pr: storyPrs.get(e.key) ?? null, observed_at: now };
   if (JSON.stringify(prSeen) !== JSON.stringify(prSeenIn)) writePrFacts(root, prSeen);
   // gh-71 D5: the last issue seen per story, kept between syncs for the finished-round Check item (`issue_seen`)
   const issueSeenIn = local.issue_seen;

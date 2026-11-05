@@ -26,6 +26,10 @@ Other machines see a story they do not hold: under `remote` step/attempt/counter
 - Decision: "CI" in B18/AC3 — no port reports CI status (RemotePullRequest has none); the view shows the PR (number, state, draft, url). Flagged for review.
 - For slices 10–11 (08-F4): this fetch covers only stories held elsewhere, so the holder whose record ref another checkout pushed still fails its push silently; not surfaced here.
 
+- Transcripts rewritten (`NORN_TRANSCRIPT_UPDATE=1`): the only change is one `git for-each-ref refs/norn/claims/` per sync tick (finding stories held elsewhere). Golden and observe snapshots unchanged (no decide or Facts change).
+- Tiers: unit 1211 pass; integration 763 pass / 6 skip (pre-existing story skips) after the flake; e2e 72 pass / 2 skip.
+- Flakes: `packages/store/test/integration/record-ref.test.ts` "F1 … autocrlf and a clean filter" timed out (20 s) under the parallel integration tier; it passed 3/3 alone and the file is not touched by this slice.
+
 ## Resume
 
-Run the integration and e2e tiers; regenerate transcripts/snapshots if the extra `for-each-ref refs/norn/claims/` per sync changes them; commit; `norn done done`.
+Implementation committed; next is the test check, then review.

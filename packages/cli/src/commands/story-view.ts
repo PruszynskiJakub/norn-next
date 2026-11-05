@@ -4,10 +4,11 @@
  * (@norn/view orientReport, X1). Read only: no receipt, run or claim. Markdown by default, `--json`
  * for data (P8): the orient report extended with the slice steps and PR state. In a slice worktree
  * it views that slice's story (B55). The chat agent (`norn story chat`, `NORN_ORIENT=1`) sees its
- * rules first. `--web` opens the story's PR in the browser, or its issue when there is no PR.
+ * rules first. `--web` opens the story's PR in the browser, or its issue when there is no PR. A story
+ * another machine holds shows its claim, branch, PR and record (gh-195 D6, B17–B19).
  */
 import { cmd } from "@norn/core";
-import { formatStoryView, orientReport } from "@norn/view";
+import { formatElsewhere, formatStoryView, orientReport } from "@norn/view";
 import { defineCommand, opt } from "../command.ts";
 import { failure, refuse, rendered } from "../output.ts";
 import { ORIENT_ENV } from "../runtime/agent-unit.ts";
@@ -29,6 +30,9 @@ export const storyViewCommand = defineCommand({
     const { key, story, slice } = parseUnitKey(raw);
     const view = await projectView(ctx);
     const report = orientReport(view, key, ctx.config.provider);
+    // gh-195 D6 (B17–B19): a story another machine holds, from its claim, branch and record ref as fetched last
+    const elsewhere = report ? null : view.elsewhere.find((e) => e.key === story);
+    if (elsewhere && !opt.bool(args, "web")) return rendered(elsewhere, formatElsewhere(elsewhere));
     if (!report) throw refuse(`unknown story ${story}`, cmd.status(), "unknown_unit");
     if (slice && !report.slices.some((s) => s.key === slice)) throw refuse(`no slice ${slice} in story ${story}`, cmd.storyView(story), "unknown_unit");
     if (!opt.bool(args, "web")) return rendered(report, formatStoryView(report, ctx.clock.now(), { rules: ctx.env[ORIENT_ENV] === "1" }));
