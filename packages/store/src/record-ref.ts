@@ -14,7 +14,7 @@ import { type Dirent, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileS
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import type { FileError } from "@norn/core";
-import { type RunStory, recordRef } from "@norn/schema";
+import { RECORD_REF_PREFIX, type RunStory, recordRef } from "@norn/schema";
 import { fsyncTree, isErrno } from "./fsx.ts";
 import { archiveCacheDir } from "./paths.ts";
 import { casRef, git, gitOk, gitSync, readLocalRef } from "./git.ts";
@@ -223,6 +223,18 @@ export function unpackRecordSync(root: string, sha: string, dest: string): Unpac
   }
 }
 
+/** gh-195 D7: story key → record commit of every archive ref this checkout has (one `for-each-ref`, local only). */
+export function localRecordRefs(root: string): Map<string, string> {
+  const r = gitSync(root, ["for-each-ref", "--format=%(objectname) %(refname)", RECORD_REF_PREFIX]);
+  const out = new Map<string, string>();
+  if (r.code !== 0) return out;
+  for (const line of r.stdout.toString().split("\n").filter(Boolean)) {
+    const [sha, ref] = line.split(" ") as [string, string];
+    out.set(ref.slice(RECORD_REF_PREFIX.length), sha);
+  }
+  return out;
+}
+
 /**
  * gh-195 D6, D7, D16 (B29, B30): the folder holding a finished story's record as its archive ref
  * `refs/norn/runs/<story>` has it here (local refs only: never the network, H2), unpacked once per
@@ -230,10 +242,8 @@ export function unpackRecordSync(root: string, sha: string, dest: string): Unpac
  * entries refused, every file validated, renamed into place), older commits' copies dropped. Null when
  * there is no such ref here, or its record does not unpack (nothing is guessed, S2). Read-only input.
  */
-export function archivedRecordDir(root: string, story: string): string | null {
-  const r = gitSync(root, ["rev-parse", "--verify", "--quiet", `${recordRef(story)}^{commit}`]);
-  const sha = r.code === 0 ? r.stdout.toString().trim() : "";
-  if (!/^[0-9a-f]{40,64}$/.test(sha)) return null;
+export function archivedRecordDir(root: string, story: string, sha: string | undefined = localRecordRefs(root).get(story)): string | null {
+  if (!sha || !/^[0-9a-f]{40,64}$/.test(sha)) return null;
   const cache = archiveCacheDir(root, story);
   const dir = join(cache, sha);
   if (existsSync(dir)) return dir;

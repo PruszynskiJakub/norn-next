@@ -83,6 +83,8 @@ export const storyCloseCommand = defineCommand({
       const claimSha = await claimIfFree(ctx, obs, key);
       const r = await closeStory(obs, story, { home: ctx.home, claimSha });
       if (!r.ok && r.reason === "spec_corrupt") throw failure(`cannot mark ${r.file} dropped: ${r.message}`, `fix spec.md, then ${cmd.storyClose(key)} again`, "story_corrupt");
+      if (!r.ok && r.reason === "record_push_failed")
+        throw failure(`archive ${r.ref} failed (${r.push_reason}): ${r.message}`, `check the remote, then ${cmd.storyClose(key, { yes: true })} again; nothing was removed`, "record_push_failed", { pushed: r.pushed });
       if (!r.ok)
         throw failure(`push ${r.branch} failed (${r.push_reason}): ${r.message}`, `fix the push problem, then ${cmd.storyClose(key, { yes: true })} again; nothing was removed`, "push_failed", { pushed: r.pushed });
       const { ok: _ok, story: _story, branches_kept, record, ...effects } = r;

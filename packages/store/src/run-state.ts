@@ -144,17 +144,22 @@ export const isFlatStoryRecord = (base: string) => existsSync(join(base, unitRec
 
 /**
  * gh-195/05, D7, D16 (B29): where a story's run state is read from — the machine dir of `checkout`
- * (S12), or, for a finished story (`archive`) this machine holds no run state of, the record on its
- * archive ref here, unpacked into the machine dir's cache (`archivedRecordDir`). Never an older norn's
+ * (S12), or, for a finished story this machine holds no run state of, the record on its archive ref
+ * here (`archive`: the checkout's archive refs, `localRecordRefs`, read only when needed), unpacked into the machine dir's cache (`archivedRecordDir`). Never an older norn's
  * `<spec folder>/runs` in a base or checkout tree: a repository still holding those is pointed to
  * `norn upgrade` instead (`baseRunStateStories`). `name` is the root a file error or a receipt names a
  * path from: none (absolute) for both.
  */
-export function runStateSource(root: string, story: RunStory, opts: { checkout?: string; archive?: boolean } = {}): { base: string; name?: string; tree: boolean; archive?: string } {
+export function runStateSource(
+  root: string,
+  story: RunStory,
+  opts: { checkout?: string; archive?: () => ReadonlyMap<string, string> } = {},
+): { base: string; name?: string; tree: boolean; archive?: string } {
   const checkout = opts.checkout ?? root;
   const machine = storyRunStateDir(checkout, story);
-  if (opts.archive && !existsSync(machine)) {
-    const dir = archivedRecordDir(checkout, story.key);
+  const sha = opts.archive && !existsSync(machine) ? opts.archive().get(story.key) : undefined;
+  if (sha) {
+    const dir = archivedRecordDir(checkout, story.key, sha);
     if (dir) return { base: dir, tree: false, archive: basename(dir) };
   }
   return { base: machine, tree: false };
