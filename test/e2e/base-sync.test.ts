@@ -5,7 +5,7 @@
  * a PR merged into another branch parks the story; `base_branch: develop` is used throughout.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { cpSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { herdr } from "@norn/adapters";
 import { inboxOpenPath, installSkills, linkSkills, machineDir, pinnedWorkflowPath, repoConfigPath, workflowsDir } from "@norn/store";
@@ -138,7 +138,7 @@ describe("base sync with real git", () => {
     expect(r).toContain("gh-7 gate.stale");
     const st = h.state(runs());
     expect(st).toMatchObject({ step: "update", counters: { stale_loop: 1 } });
-    const stale = JSON.parse(readFileSync(join(runs(), "receipts", (h.git(["ls-files", "--others", "--cached", "receipts"], runs()).split("\n").filter((f) => f.endsWith("-classify.json")).at(-1) as string).replace(/^receipts\//, "")), "utf8"));
+    const stale = JSON.parse(readFileSync(join(runs(), "receipts", readdirSync(join(runs(), "receipts")).sort().filter((f) => f.endsWith("-classify.json")).at(-1) as string), "utf8"));
     expect(stale).toMatchObject({ outcome: "stale", rule: "base moved", route: "update", base: { sha: sibling, conflicts: ["a.txt"], behind: 1 } });
 
     await until(() => h.state(runs())?.step === "resolve" && h.state(runs())?.status === "running", "resolve running");
@@ -542,7 +542,8 @@ describe("BUG-2: an update conflict that exhausts base_conflict_loop, then run r
   const runs = () => runStateOf(join(wt(), ".agents/specs/gh-12-conflict-twice"));
   const inWt = (...argv: string[]) => runChecked(argv, { ...h.deps, cwd: wt() });
   const lastClassify = () => {
-    const file = h.git(["ls-files", "--others", "--cached", "receipts"], runs()).split("\n").filter((f) => f.endsWith("-classify.json")).at(-1) as string;
+    // S12: the receipts are in the machine dir, not in git
+    const file = `receipts/${readdirSync(join(runs(), "receipts")).sort().filter((f) => f.endsWith("-classify.json")).at(-1) as string}`;
     return JSON.parse(readFileSync(join(runs(), file), "utf8"));
   };
   const until = async (pred: () => boolean, label: string) => {

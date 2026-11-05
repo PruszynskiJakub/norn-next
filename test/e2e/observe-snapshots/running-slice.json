@@ -146,7 +146,7 @@
           "last_check": null,
           "last_findings": null,
           "last_outcome_receipt": {
-            "file": ".agents/specs/gh-7-add-login-form/runs/_story/rounds/01-mini/receipts/0003-done.json",
+            "file": "<dir>/home/repos/repo-<id>/runs/gh-7/_story/rounds/01-mini/receipts/0003-done.json",
             "n": 3,
             "receipt": {
               "at": "<time>",
@@ -162,7 +162,7 @@
             }
           },
           "lease": null,
-          "record": "runs/_story/rounds/01-mini",
+          "record": "_story/rounds/01-mini",
           "run": null,
           "skills_drift": [],
           "state": {
@@ -282,7 +282,7 @@
             "version": 1,
             "worktree": "<dir>/repo-worktrees/gh-7-add-login-form--01-form"
           },
-          "record": "runs/01-form",
+          "record": "01-form",
           "run": {
             "hooks": [],
             "last_activity_at": "<wall-ms>",

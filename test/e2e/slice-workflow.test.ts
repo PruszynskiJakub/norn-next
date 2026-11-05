@@ -304,8 +304,9 @@ describe("a story through the slice workflow", () => {
     expect(st?.run?.session).toEqual({ runner: "fake", session_id: "s-1", pane_id: "p-1", reach: "fake attach p-1" });
     expect(readdirSync(join(storyRuns(), "receipts")).sort()).toEqual(["0001-started.json", "0002-started.json"]);
     expect(readdirSync(join(h.home, "leases")).sort()).toEqual(["agent-1.json", "slot-1.json"]);
-    // R2.1 (N6): the started receipts were committed and pushed in the launch tick
-    expect(h.git(["show", `origin/gh-7-add-login-form:${spec}/runs/_story/rounds/01-mini/receipts/0002-started.json`])).toContain('"session"');
+    // R2.1 (N6): the started receipt records the session; S12 (gh-195/05, B1): it stays in the machine dir, never on the branch
+    expect(h.read(join(storyRuns(), "receipts/0002-started.json"))).toContain('"session"');
+    expect(h.git(["ls-tree", "-r", "--name-only", "origin/gh-7-add-login-form", "--", `${spec}/runs`]).trim()).toBe(`${spec}/runs/_story/handoff.md`);
     // a live run with nothing new: no action (no recover.commit)
     step();
     expect(kinds(await h.tick())).toEqual([]);
@@ -353,7 +354,8 @@ describe("a story through the slice workflow", () => {
     step();
     expect(kinds(await h.tick())).toEqual(["gh-7/01 apply_receipts"]);
     expect(h.state(sliceRuns())).toMatchObject({ step: "implement", attempt: 2, counters: { test_loop: 1 } });
-    expect(h.git(["show", "--stat", "--format=", "HEAD"], sliceWt())).toContain(check.log.slice(5));
+    // S12 (gh-195/05, B5): the check log stays in the machine dir; the boundary commit carries the handoff only
+    expect(h.git(["show", "--stat", "--format=", "HEAD"], sliceWt())).not.toContain(check.log.slice(5));
   });
 
   test("rework passes the check; gate parks and notifies once (O3); approve → integrate (K6)", async () => {

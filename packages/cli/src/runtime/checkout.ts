@@ -220,19 +220,20 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
   // a handoff heartbeat line, in the same commit, pushed (this heartbeat holds the claim now)
   let journal: unknown = null;
   let committed: { commit: string | null; pushed: boolean | null } | null = null;
-  const runsDir = storyRuns;
   const line = forced ? `- ${nowIso} take --force by ${holder} from ${blob.forced_from}` : null;
-  if (line && existsSync(runsDir)) appendHandoffHeartbeat(storyHandoff, line);
+  // gh-195/05 (S12): the forced take is journaled in the story's handoff when the branch has one (its run
+  // state may be on another machine), and the take receipt stays in the machine dir (D8)
+  const journaled = line !== null && existsSync(storyHandoff);
+  if (journaled) appendHandoffHeartbeat(storyHandoff, line);
   const extra = more?.({ storyWt, spec_dir, worktrees });
-  // gh-195 D8 (S12): the take receipt stays in the machine dir; only the handoff line and the caller's files are committed
-  if ((line && existsSync(runsDir)) || extra?.paths.length) {
-    const paths = [...(line ? [relative(storyWt, storyHandoff)] : []), ...(extra?.paths ?? [])];
+  if (journaled || extra?.paths.length) {
+    const paths = [...(journaled ? [relative(storyWt, storyHandoff)] : []), ...(extra?.paths ?? [])];
     const message = extra?.message ?? (forced ? `norn: ${key} taken with --force by ${holder}` : `norn: ${key} taken by ${holder}`);
     const sha = await git.commit(storyWt, { message, trailers: { "Norn-Story": key, "Norn-Step": "take", "Norn-Tick": ulid(now) }, paths });
     const pushed = remote && sha ? await git.push(storyWt, remote, `refs/heads/${branch}:refs/heads/${branch}`) : null;
     committed = { commit: sha, pushed: pushed ? pushed.ok : null };
   }
-  if (line) journal = existsSync(runsDir) ? { line, ...committed } : { line, commit: null, note: "story unit not started; journaled in the claim blob (forced_from)" };
+  if (line) journal = journaled ? { line, ...committed } : { line, commit: null, note: "story has no handoff yet; journaled in the claim blob (forced_from)" };
 
   const value = {
     story: key,
@@ -241,7 +242,8 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
     taken_from: prev && !mine ? { holder: prev.holder, since: prev.acquired_at, expires_at: prev.expires_at, expired: Date.parse(prev.expires_at) <= now } : null,
     forced,
     journal,
-    receipt: record.receipt ? { file: record.receipt, ...committed } : { file: null, note: record.note },
+    // S12: the take receipt is in the machine dir, never committed or pushed (D8)
+    receipt: record.receipt ? { file: record.receipt } : { file: null, note: record.note },
     worktrees,
     units,
     ...(problems.length ? { problems } : {}),

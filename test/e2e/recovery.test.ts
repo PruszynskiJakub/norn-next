@@ -131,7 +131,9 @@ describe("a claim lost mid-run (R1.2, R2.3)", () => {
     expect(remoteHead()).toBe(head);
   });
 
-  test("R2.3: the non-holder reports its unpushed receipt; tidy moves it to orphaned/ locally and pushes nothing", async () => {
+  // S12 (gh-195/05): the receipt A wrote is in A's machine dir, not in its worktree, so there is no unpushed
+  // tree file to report; gh-195/14 (D11, B27) replaces this with A's record set aside as superseded
+  test.skip("R2.3: the non-holder reports its unpushed receipt; tidy moves it to orphaned/ locally and pushes nothing", async () => {
     step();
     const r = await A.tick("--sync");
     expect(r.decisions.filter((d) => d.unit === "gh-9")).toEqual([{ unit: "gh-9", rule: "claim.other", kind: "noop", ok: true }]);

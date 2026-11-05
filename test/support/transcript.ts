@@ -91,7 +91,11 @@ function numberer(re: RegExp, tag: string): (text: string) => string {
     });
 }
 
-/** Every file under a `runs/` dir below each of `tops` (skipping `.git` and the trace dir), keyed by its path relative to `dir`, with its content. */
+/**
+ * Every file under a `runs/` dir below each of `tops` (skipping `.git` and the trace dir) and, S12
+ * (gh-195/05), under each top's machine dir `runs/` (the run state), keyed by its path relative to
+ * `dir`, with its content.
+ */
 function runsFiles(dir: string, tops: readonly string[]): Map<string, string> {
   const out = new Map<string, string>();
   const traces = new Set(tops.map((top) => machineDir(top)));
@@ -118,6 +122,7 @@ function runsFiles(dir: string, tops: readonly string[]): Map<string, string> {
     }
   };
   for (const top of tops) walk(top, false);
+  for (const trace of traces) walk(join(trace, "runs"), true);
   return out;
 }
 
@@ -138,7 +143,8 @@ export function textNormaliser(dir: string): (text: string) => string {
   const tmp = [...new Set([tmpdir(), realpathSync(tmpdir()), tmpdir().replace(/^\/private\//, "/")])].map((d) => d.replace(/\/$/, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const tmpRe = new RegExp(`(?:${tmp.join("|")})/([\\w.-]*-)[A-Za-z0-9]{6}\\b`, "g");
   return (text: string): string => {
-    let t = dirNorm(text).replace(tmpRe, "<tmp>/$1<rand>");
+    // a checkout's machine dir `repos/<folder>-<8 hex of its common dir>` (ID2) differs per temp dir: S12 run state sits there
+    let t = dirNorm(text).replace(tmpRe, "<tmp>/$1<rand>").replace(/\brepos\/([\w.-]+?)-[0-9a-f]{8}\b/g, "repos/$1-<id>");
     for (const m of t.match(SHA) ?? []) fullShas.add(m);
     t = t.replace(/\b[0-9a-f]{7,12}\b/g, (m) => {
       if (shorts.has(m)) return shorts.get(m) as string;
