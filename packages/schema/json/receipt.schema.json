@@ -2057,6 +2057,9 @@
               "type": "string"
             }
           }
+        },
+        "record_lost": {
+          "type": "boolean"
         }
       }
     },

@@ -98,7 +98,11 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
   if (facts.now >= renewAt)
     ctx.emit({ kind: "claim", unit: ref, rule: "claim.renew", op: "renew", expected: claim.sha, blob: claimBlob(ctx, story.key, claim.blob) });
 
-  if (story.record_only) return recordOnly(ctx, story, ref);
+  if (story.record_only) {
+    recordOnly(ctx, story, ref);
+    // 10-R3-F2 (D4, B10): a story held from its record alone still owes its record under `remote`
+    return pushRecord(ctx, story, ref);
+  }
 
   // ---- story file corrupt: never touch anything of the story (S2)
   if (story.frontmatter_error || !story.frontmatter) {
@@ -133,7 +137,8 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
  * gh-195 B33 (review#2 F1): a story held here with its record in the machine dir and no branch (taken
  * over from its record alone) goes on from that record: its claim is renewed above, its story unit's
  * receipts applied (the take among them), never intaken again. Nothing runs in it until it has a
- * branch to work on: no worktree, no session.
+ * branch to work on: no worktree, no session. Under `remote` its record is pushed as any held story's
+ * (`pushRecord`, without a `Norn-Branch-Commit`, B33).
  */
 function recordOnly(ctx: Ctx, story: StoryFacts, ref: UnitRef): void {
   if (ctx.has(ref.key)) return;

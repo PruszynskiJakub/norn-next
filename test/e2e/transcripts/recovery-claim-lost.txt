@@ -132,6 +132,11 @@
   spawn repo-b $ git fetch --quiet --no-tags origin +refs/heads/gh-9-add-search:refs/remotes/origin/gh-9-add-search "+refs/heads/gh-9/*:refs/remotes/origin/gh-9/*"
   spawn repo-b $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-9-add-search
   spawn repo-b $ git rev-parse --verify --quiet --end-of-options refs/remotes/origin/gh-9-add-search
+  spawn repo-b $ git rev-parse --verify --quiet --end-of-options refs/remotes/origin/gh-9-add-search
+  spawn repo-b $ git show <sha:4>:.agents/specs/gh-9-add-search/spec.md
+  spawn repo-b $ git cat-file -e <sha:4>:.agents/specs/gh-9-add-search/runs
+  spawn repo-b $ git show <sha:4>:.agents/workflows/solo.yaml
+  spawn repo-b $ git log "--format=%x1e%(trailers:only,unfold)" "--grep=^Norn-Step: " refs/remotes/origin/gh-9-add-search
   spawn repo-b $ git ls-remote origin refs/norn/claims/gh-9
   spawn repo-b $ git rev-parse --verify --quiet refs/norn/claims/gh-9
   spawn repo-b $ git cat-file blob <sha:3>
@@ -153,6 +158,12 @@
   spawn repo-b-worktrees/gh-9-add-search $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-9" --trailer "Norn-Step: take" --trailer "Norn-Tick: <ulid:8>" -- .agents/specs/gh-9-add-search/handoffs/_story.md
   spawn repo-b-worktrees/gh-9-add-search $ git rev-parse HEAD
   spawn repo-b-worktrees/gh-9-add-search $ git push --porcelain origin refs/heads/gh-9-add-search:refs/heads/gh-9-add-search
+  + home-repo-b/repos/repo-b-<id>/runs/gh-9/_story/rounds/01-solo/receipts/0001-take.json
+      {"kind":"take","receipt_id":"<ulid:9>","run_id":null,"step":"implement","attempt":1,"at":"<time>","by":"human","who":"bob@repo-b","previous_holder":"tester@box","previous_heartbeat_id":"<ulid:6>","expired":false,"forced":true,"record_lost":true}
+  + home-repo-b/repos/repo-b-<id>/runs/gh-9/_story/rounds/01-solo/state.json
+      {"version":1,"story":"gh-9","slice":null,"unit_dir":"_story","workflow":"solo","workflow_hash":"51d9743b83bdefcffc2af22c467294a98d957b6a7fca5a1ede44a62a468c618e","step":"implement","attempt":1,"visits":{"implement":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":0,"run":null,"last_outcome":null,"created_at":"<time>","updated_at":"<time>","last_tick_id":null}
+  + home-repo-b/repos/repo-b-<id>/runs/gh-9/_story/rounds/01-solo/workflow.yaml
+      text 8 lines, normalised sha256 51d9743b83bd
 > [A] norn tick --offline
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote

@@ -50,6 +50,29 @@ export const branchRewrittenLine = (story: string, gone: string, step: string, a
   `the branch of ${story} was rewritten since the record (${gone} is gone); restarting ${step} as attempt ${attempt}`;
 
 /**
+ * gh-195 B25 (D10): what a takeover with the record lost says — in `norn story checkout`'s output, the
+ * take's log and the brief's "Why this attempt". `holder` is the claim's holder the record was on
+ * (null: the claim was free, its holder unknown).
+ */
+export const recordLostLine = (story: string, holder: string | null, step: string): string =>
+  `the run record of ${story} was on ${holder ?? "the machine that last held it"} and is lost; restarting ${step} from the branch`;
+
+/**
+ * T5b (gh-195 B25, D10): the step a takeover with the record lost restarts, from the story unit's commits on
+ * the branch (newest first, `Norn-Step` with the `Norn-Outcome`/`Norn-Next` of a boundary): the step the
+ * newest of them left the cursor at — a boundary's `Norn-Next`, else the step its outcome's edge leads to
+ * in `wf`; a commit made at a step, that step — skipping any that name no step of `wf` (another round's
+ * workflow, `$done`, the take's journal). None: the workflow's first step.
+ */
+export function restartStepOf(wf: Workflow, commits: ReadonlyArray<{ step: string; outcome: string | null; next: string | null }>): string {
+  for (const c of commits) {
+    const at = c.next ?? (c.outcome !== null ? (edgeOf(wf, c.step, c.outcome)?.to ?? null) : c.step);
+    if (at !== null && stepOf(wf, at)) return at;
+  }
+  return wf.start;
+}
+
+/**
  * T5a (gh-195 B24): what applying take receipt `r` at cursor `st` does about a rewritten branch.
  * `restart`: the cursor is the one the record was written at, or one a session already ran in — it
  * judged code that is gone, so the step is entered again as a new attempt. `fresh`: the record's own
@@ -193,7 +216,8 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
   if (r.kind === "take") {
     // R10.1: a takeover is a record, not a cursor move — applied at any cursor, like mode
     const from = r.previous_holder ? ` from ${r.previous_holder}${r.forced ? " (forced)" : r.expired ? " (expired)" : ""}` : "";
-    const log = `taken by ${r.who ?? r.by}${from}`;
+    // gh-195 B25: a take whose record was lost already is the new round's first entry: nothing to move
+    const log = `taken by ${r.who ?? r.by}${from}${r.record_lost ? `; ${recordLostLine(st.story, r.previous_holder, r.step)}` : ""}`;
     // T5a (gh-195 B24): the record judged code that is gone — the step the cursor is at when the take
     // applies (after the record's own unapplied receipts, review F3) starts again as a new attempt,
     // counters and history kept; never at `$done` or stuck (`rewriteRestart`)

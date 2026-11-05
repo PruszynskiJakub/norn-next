@@ -166,5 +166,7 @@ export function runStateSource(
 }
 /** A unit's run-state folder under a source's `base` (`runStateSource`). */
 export const runStateDirIn = (base: string, unit: string): string => unitDir(base, unit);
+/** Where a unit's run state is written when it starts, under `base` (`startDir`): a record staged empty takes round 01 of `workflow` (gh-195/11, B25). */
+export const runStateStartDirIn = (base: string, unit: string, workflow: string): string => startDir(base, unit, workflow);
 /** The story's rounds under a source's `base`, ascending; [] for a flat record or a story not started. */
 export const runStateRoundsIn = (base: string) => (isFlatStoryRecord(base) ? [] : storyRounds(base));

@@ -291,24 +291,38 @@ export function stageRecordSync(root: string, sha: string, dest: string): Staged
     discard();
     throw err;
   }
-  const place = () => {
-    // into an empty place: one rename (S1)
-    if (!existsSync(dest)) return renameSync(staging, dest);
-    // rename cannot replace a non-empty folder: the old one goes aside under a fixed name, the new one
-    // in, then the old one is dropped; a crash between the two renames is undone by the next stage
-    // (`recoverPlace`), so `dest` is never lost
-    const aside = asideOf(dest);
-    rmSync(aside, { recursive: true, force: true });
-    renameSync(dest, aside);
-    try {
-      renameSync(staging, dest);
-    } catch (err) {
-      renameSync(aside, dest);
-      throw err;
-    }
-    rmSync(aside, { recursive: true, force: true });
-  };
-  return { ok: true, files: entries.length, dir: staging, place, discard };
+  return { ok: true, files: entries.length, dir: staging, place: () => placeStaged(staging, dest), discard };
+}
+
+/**
+ * gh-195/11 (B25, D10): an empty record staged beside `dest`, for a takeover whose record is lost: the
+ * caller writes the new round into `dir`, then `place()` puts it in place as `stageRecordSync`'s does,
+ * replacing whatever `dest` held (S1).
+ */
+export function stageEmptyRecord(dest: string): Extract<StagedRecord, { ok: true }> {
+  const staging = join(dirname(dest), `.${basename(dest)}.unpack-${process.pid}`);
+  recoverPlace(dest);
+  mkdirSync(staging, { recursive: true });
+  return { ok: true, files: 0, dir: staging, place: () => placeStaged(staging, dest), discard: () => rmSync(staging, { recursive: true, force: true }) };
+}
+
+/** Rename the staged folder `staging` into `dest` (S1), replacing `dest` whole; never loses `dest` (`recoverPlace`). */
+function placeStaged(staging: string, dest: string): void {
+  // into an empty place: one rename (S1)
+  if (!existsSync(dest)) return renameSync(staging, dest);
+  // rename cannot replace a non-empty folder: the old one goes aside under a fixed name, the new one
+  // in, then the old one is dropped; a crash between the two renames is undone by the next stage
+  // (`recoverPlace`), so `dest` is never lost
+  const aside = asideOf(dest);
+  rmSync(aside, { recursive: true, force: true });
+  renameSync(dest, aside);
+  try {
+    renameSync(staging, dest);
+  } catch (err) {
+    renameSync(aside, dest);
+    throw err;
+  }
+  rmSync(aside, { recursive: true, force: true });
 }
 
 /** gh-195 D7: story key → record commit of every archive ref this checkout has (one `for-each-ref`, local only). */

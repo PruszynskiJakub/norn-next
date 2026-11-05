@@ -232,6 +232,12 @@ export const TakeReceipt = receipt("take", {
    * is not an ancestor of `head`): applied at the cursor it names, the step restarts as a new attempt
    */
   rewritten: Type.Optional(Type.Object({ gone: GitSha, head: GitSha }, { additionalProperties: false })),
+  /**
+   * gh-195 B25 (D10): no record to take over (no `refs/norn/runs/<story>`, none here): the take is the first
+   * receipt of a new round started from the branch, fresh counters; false on a takeover from a record.
+   * Absent on a take an older norn wrote.
+   */
+  record_lost: Type.Optional(Type.Boolean()),
 });
 /**
  * BS9: `norn story update-branch <story>` — a person sends the story unit back to its base-update step (from a

@@ -7,13 +7,13 @@
  * stale record lease (another checkout pushed the ref) is one Check item, never a push every tick.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import type { RunnerPort } from "@norn/core";
 import { claimRef, recordRef, STORY_UNIT_DIR, ulid } from "@norn/schema";
-import { appendReceipt, bindNornHome, handoffPath, machineDir, readState, repoConfigPath, workflowsDir } from "@norn/store";
-import type { CliDeps, CliResult, TickReport } from "../../src/index.ts";
-import { createHarness, FakeRunner, type Harness, hostEnv, issue, runChecked, sh } from "../../../../test/support/harness.ts";
+import { appendReceipt, handoffPath, machineDir, readState, repoConfigPath, workflowsDir } from "@norn/store";
+import type { CliResult, TickReport } from "../../src/index.ts";
+import { createHarness, type Harness, issue, sh } from "../../../../test/support/harness.ts";
+import { type Clone, cloneOf } from "../../../../test/support/clone.ts";
 import { runStateOf, storyRunStateOf } from "../../../../test/support/run-state.ts";
 
 setDefaultTimeout(120_000);
@@ -36,44 +36,6 @@ counters: { review_loop: { max: 3 } }
 const CONFIG = "provider: gh\nworkflow: rv\nmode: auto\n";
 
 let h: Harness;
-
-interface Clone {
-  root: string;
-  home: string;
-  norn(...argv: string[]): Promise<CliResult>;
-  at(cwd: string, ...argv: string[]): Promise<CliResult>;
-  tick(...flags: string[]): Promise<TickReport>;
-}
-
-/** Another machine: its own clone, norn home, user@machine and runner; same remote, issues and clock. */
-function cloneOf(name: string, user: string): Clone {
-  const root = join(h.dir, name);
-  sh(h.dir, ["clone", "-q", h.remoteDir, root]);
-  sh(root, ["config", "user.email", `${user}@example.com`]);
-  sh(root, ["config", "user.name", user]);
-  const home = join(h.dir, `home-${name}`);
-  mkdirSync(home);
-  bindNornHome(root, home);
-  const runner = new FakeRunner();
-  (runner as { name: string }).name = `fake-${name}`;
-  const deps: CliDeps = {
-    cwd: root,
-    env: { ...hostEnv(), NORN_HOME_DIR: home, USER: user, NORN_MACHINE: name, NORN_HOOK_COMMAND: "norn hook" },
-    clock: h.clock,
-    ports: { remote: h.remote, runner: runner as RunnerPort, notifiers: [] },
-  };
-  return {
-    root,
-    home,
-    norn: (...argv) => runChecked(argv, deps),
-    at: (cwd, ...argv) => runChecked(argv, { ...deps, cwd }),
-    async tick(...flags) {
-      const r = await runChecked(["tick", ...flags], deps);
-      if (r.exit !== 0) throw new Error(`tick failed: ${r.stdout}`);
-      return r.value as TickReport;
-    },
-  };
-}
 
 const state = (dir: string) => {
   const r = readState(dir);
@@ -194,7 +156,7 @@ describe("checkout unpacks the record from the ref and continues (B22, T5)", () 
 
   test("AC1: after A's handoff at review#2, B holds the claim, the branches and the record, prints status and handoff, and its next tick resumes review#2 with the same counters", async () => {
     const s = await handedOverAtReview2(9, "parser");
-    const B = cloneOf("b-ac1", "bob");
+    const B = cloneOf(h, "b-ac1", "bob");
     h.clock.advance(10_000);
     const r = await B.norn("story", "checkout", s.key);
     expect(r.exit).toBe(0);
@@ -238,7 +200,7 @@ describe("checkout unpacks the record from the ref and continues (B22, T5)", () 
     sh(s.wt(h.root), ["push", "-q", "origin", s.branch]);
     const head = remoteRef(`refs/heads/${s.branch}`) as string;
 
-    const B = cloneOf("b-ac2", "bob");
+    const B = cloneOf(h, "b-ac2", "bob");
     h.clock.advance(10_000);
     const r = await B.norn("story", "checkout", s.key);
     expect(r.exit).toBe(0);
@@ -255,7 +217,7 @@ describe("checkout unpacks the record from the ref and continues (B22, T5)", () 
     const s = await handedOverAtReview2(11, "rewritten");
     const gone = rewriteBranch(s);
     const head = remoteRef(`refs/heads/${s.branch}`) as string;
-    const B = cloneOf("b-ac3", "bob");
+    const B = cloneOf(h, "b-ac3", "bob");
 
     h.clock.advance(10_000);
     const r = await B.norn("story", "checkout", s.key);
@@ -287,7 +249,7 @@ describe("checkout unpacks the record from the ref and continues (B22, T5)", () 
     // review#2 reported `rework` just before the handoff: the record carries it unapplied
     const s = await handedOverAtReview2(17, "moved-first", (runs) => report(runs, "rework"));
     const gone = rewriteBranch(s);
-    const B = cloneOf("b-ac3b", "bob");
+    const B = cloneOf(h, "b-ac3b", "bob");
     h.clock.advance(10_000);
     const r = await B.norn("story", "checkout", s.key);
     expect(r.exit).toBe(0);
@@ -309,7 +271,7 @@ describe("checkout unpacks the record from the ref and continues (B22, T5)", () 
     sh(h.root, ["push", "-q", "origin", `:refs/heads/${s.branch}`]);
     expect(remoteRef(`refs/heads/${s.branch}`)).toBeNull();
 
-    const B = cloneOf("b-ac4", "bob");
+    const B = cloneOf(h, "b-ac4", "bob");
     h.clock.advance(10_000);
     const r = await B.norn("story", "checkout", s.key);
     expect(r.exit).toBe(0);
@@ -334,13 +296,57 @@ describe("checkout unpacks the record from the ref and continues (B22, T5)", () 
     const bare = sh(h.root, ["commit-tree", tree, "-p", s.sha, "-m", `norn: record ${s.key}\n\nNorn-Story: ${s.key}\nNorn-Holder: tester@box`]);
     sh(h.root, ["push", "-q", "-f", "origin", `${bare}:${recordRef(s.key)}`]);
     sh(h.root, ["push", "-q", "origin", `:refs/heads/${s.branch}`]);
-    const B = cloneOf("b-ac4b", "bob");
+    const B = cloneOf(h, "b-ac4b", "bob");
     h.clock.advance(10_000);
     const r = await B.norn("story", "checkout", s.key);
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ branch: null, record: { sha: bare, branch_commit: null, unpacked: true } });
     expect((r.value as { restarted?: string }).restarted).toBeUndefined();
     await continuesBranchless(B, s);
+  });
+});
+
+describe("a story held only from its record (B33, 10-R3-F2)", () => {
+  withHarness();
+
+  test("under remote, B's tick pushes the record of a branchless story it holds (no Norn-Branch-Commit); status lists it; B hands it over with the record pushed and the claim released", async () => {
+    const s = await handedOverAtReview2(21, "record-only-remote");
+    sh(h.root, ["push", "-q", "origin", `:refs/heads/${s.branch}`]);
+    const B = cloneOf(h, "b-ro", "bob");
+    h.write(repoConfigPath(B.root), "provider: gh\nworkflow: rv\nrecord:\n  policy: remote\n");
+    h.clock.advance(10_000);
+    expect((await B.norn("story", "checkout", s.key)).exit).toBe(0);
+
+    h.clock.advance(10_000);
+    const t = await B.tick();
+    expect(t.decisions.filter((d) => d.unit === s.key && d.kind === "push_record").map((d) => `${d.ok}${d.error ? ` ${d.error}` : ""}`)).toEqual(["true"]);
+    const pushed = remoteRef(recordRef(s.key)) as string;
+    expect(sh(B.root, ["rev-parse", `${pushed}^`])).toBe(s.sha);
+    const trailers = sh(B.root, ["log", "-1", "--format=%(trailers:only,unfold)", pushed]);
+    expect(trailers).toContain(`Norn-Story: ${s.key}`);
+    expect(trailers).toContain("Norn-Holder: bob@b-ro");
+    expect(trailers).not.toContain("Norn-Branch-Commit");
+    // the record pushed holds B's take
+    expect(remoteFiles(pushed).some((f) => f.endsWith("-take.json"))).toBe(true);
+    // nothing new to push: the next tick pushes nothing
+    h.clock.advance(10_000);
+    const t2 = await B.tick();
+    expect(t2.decisions.filter((d) => d.unit === s.key && d.kind === "push_record")).toEqual([]);
+
+    // status on B shows the story it holds at review#2, as the record has it (the run its holder started)
+    const status = await B.norn("status", "--json");
+    const groups = (status.value as { groups: Record<string, Array<{ story: string; title: string }>> }).groups;
+    expect(Object.values(groups).flat().filter((i) => i.story === s.key).map((i) => i.title)).toEqual(["review #2 (auto)"]);
+    const listed = ((await B.norn("story", "list", "--json")).value as { stories: Array<{ key: string; step: string; attempt: number; claim: { state: string } }> }).stories.find((x) => x.key === s.key);
+    expect(listed).toMatchObject({ step: "review", attempt: 2, claim: { state: "mine" } });
+
+    // handing it over pushes the record and releases the claim
+    h.clock.advance(10_000);
+    const back = await B.norn("story", "handoff", s.key);
+    expect(back.exit).toBe(0);
+    expect(remoteRef(claimRef(s.key))).toBeNull();
+    const after = remoteRef(recordRef(s.key)) as string;
+    expect([pushed, sh(B.root, ["rev-parse", `${after}^`])]).toContain(pushed);
   });
 });
 
@@ -382,7 +388,7 @@ describe("a record checkout cannot take takes nothing: no claim, no worktree, no
   test("a record that fails validation is refused before the claim", async () => {
     const s = await handedOverAtReview2(15, "corrupt-record");
     badRecord(s.key);
-    const B = cloneOf("b-corrupt", "bob");
+    const B = cloneOf(h, "b-corrupt", "bob");
     h.clock.advance(10_000);
     const r = await B.norn("story", "checkout", s.key);
     await expectNothingTaken(B, s, r, "record_corrupt");
@@ -391,7 +397,7 @@ describe("a record checkout cannot take takes nothing: no claim, no worktree, no
 
   test("a record that cannot be fetched is refused before the claim", async () => {
     const s = await handedOverAtReview2(16, "unfetchable-record");
-    const B = cloneOf("b-nofetch", "bob");
+    const B = cloneOf(h, "b-nofetch", "bob");
     // the remote lists the ref but cannot send it: the record's tree names a blob the bare repo never had
     // (built in the bare repo itself, so nothing depends on loose or packed objects)
     const remoteGit = (args: string[], input?: string) => sh(h.dir, ["--git-dir", h.remoteDir, ...args], input);
@@ -412,7 +418,7 @@ describe("checkout is one transaction: every remote check before the claim (revi
 
   test("a rewritten branch meeting a diverged local branch: refused before the claim; once reconciled, checkout still restarts the step", async () => {
     const s = await handedOverAtReview2(19, "diverged-rewrite");
-    const B = cloneOf("b-div", "bob");
+    const B = cloneOf(h, "b-div", "bob");
     // B has an old local copy of the story branch, then A's side force-pushes a rewrite
     sh(B.root, ["fetch", "-q", "origin", `${s.branch}:${s.branch}`]);
     const gone = rewriteBranch(s);
@@ -445,7 +451,7 @@ describe("checkout is one transaction: every remote check before the claim (revi
 
   test("the record ref moving while the claim is taken (a still-running holder pushed): the claim is given back and nothing is placed", async () => {
     const s = await handedOverAtReview2(20, "moved-record");
-    const B = cloneOf("b-moved", "bob");
+    const B = cloneOf(h, "b-moved", "bob");
     // the remote moves the record ref the moment a claim for the story lands
     const later = sh(h.root, ["commit-tree", sh(h.root, ["rev-parse", `${s.sha}^{tree}`]), "-p", s.sha, "-m", `norn: record ${s.key}`]);
     sh(h.root, ["push", "-q", "origin", `${later}:refs/norn/spare/${s.key}`]);
@@ -477,7 +483,7 @@ describe("a record lease another checkout broke is one Check item, not a push ev
 
   test("under remote: B's push is refused as stale once; later ticks do not retry; checkout here re-reads the ref and the next tick pushes on top of it", async () => {
     const s = await handedOverAtReview2(13, "stale-lease");
-    const B = cloneOf("b-stale", "bob");
+    const B = cloneOf(h, "b-stale", "bob");
     h.write(repoConfigPath(B.root), "provider: gh\nworkflow: rv\nrecord:\n  policy: remote\n");
     h.clock.advance(10_000);
     expect((await B.norn("story", "checkout", s.key)).exit).toBe(0);
