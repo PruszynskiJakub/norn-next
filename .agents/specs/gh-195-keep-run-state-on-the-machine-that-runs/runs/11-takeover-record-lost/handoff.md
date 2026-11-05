@@ -14,6 +14,17 @@
 
 ## Goal
 
+Takeover with the record lost (B25, B26; D10, T5b): with no record ref, `story checkout` starts a new round from the branch at the last boundary's step with fresh counters; `take` carries `record_lost`; a wiped machine dir recovers the same way. Carried 10-R3-F2: a `record_only` story is pushed under `remote`.
+
 ## Progress
 
+- Built into the one checkout transaction (`packages/cli/src/runtime/checkout.ts`): after the branch fetch, before the claim, `lostRecord` decides "record lost" when there is no ref, no run state of this checkout's own, the branch's frontmatter is `active` (not started: the tick starts it as before) and no older-layout `runs/` is on the branch (the tick moves it, B34). It reads the frontmatter's workflow from the branch head (missing/invalid → refused `workflow_invalid`, nothing taken) and the restart step (`restartStepOf`, core): the newest story-unit commit with `Norn-Step` — a boundary's `Norn-Next` (slice 13, not on this branch yet) or its outcome's edge `to` in the workflow; a plain commit at a step, that step; skipping names not in the workflow; none → `start`. After the claim: a new round staged empty (`stageEmptyRecord`, store, shares `placeStaged` with `stageRecordSync`): workflow pinned, take receipt (`record_lost: true`), state (round 1, attempt 1, counters 0) last, then placed. Output: `record: null, record_lost: true, restarted: "<line>"`. Ref takeovers write `record_lost: false`.
+- Schema: `TakeReceipt.record_lost` optional boolean (older takes lack it); `schema:emit` re-run. Brief history gains `record_lost {holder, line}` and "Why this attempt" says the record was lost and to check the branch first. Take's apply log carries the line.
+- 10-R3-F2: decide's `record_only` path now also runs `pushRecord` (no `Norn-Branch-Commit`); tests cover the push, `norn status`/`story list` for it, and `story handoff` of it.
+- Tests: `packages/cli/test/integration/takeover-record-lost.test.ts` (AC1–AC4 + forced take), record_only test in `takeover-record.test.ts`; `cloneOf` moved to `test/support/clone.ts`. e2e transcript `recovery-claim-lost` rewritten (the forced take now writes a new round: take with `record_lost`, state, pinned workflow) — reviewed.
+- Spec ambiguity (noted, not asked): T5b/D10 say "the step of the last boundary commit's `Norn-Step` trailer", but a boundary's `Norn-Step` is the step that *ended*; B25's example (held at implement → "restarting implement") needs the step the boundary led to. Implemented the example's meaning, robust with or without slice 13's `Norn-Next`.
+- Observations (not changed): a stale local copy of the story's run state on a non-holder is replaced by the new round (as a ref takeover replaces it; setting it aside is gh-195/14). Slice units' run state is not rebuilt (out of scope). For a `record_only` story, `story list` shows `branch: "gh-21-"` and status shows the record's old run as running on the new holder.
+
 ## Resume
+
+Run the integration and e2e tiers; if green, `norn done done`.
