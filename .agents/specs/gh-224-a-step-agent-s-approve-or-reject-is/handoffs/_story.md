@@ -17,7 +17,9 @@ A step agent (unit worktree, `NORN_RUN` set) can no longer approve or reject a g
 | W2 delegated supervision from the main checkout unchanged | test | `packages/cli/test/integration/delegated.test.ts` › "delegated decisions are recorded apart from the person's (B21, B22, B34)" (existing, still green) |
 | W3 a person in a unit worktree without `NORN_RUN` unchanged | test | `packages/cli/test/integration/delegated.test.ts` › "gh-224: a person in a unit worktree (no NORN_RUN) is not refused as an agent" |
 - review#1 approve: review#1: approve, no findings; story approve/reject refused for a step agent (gate_by_agent, exit 3), delegated-from-main and person-without-NORN_RUN unchanged, all traced to tests in delegated.test.ts
+- describe#1: wrote pr.md (summary diff of decideGate, evidence W1–W3 from delegated.test.ts, no QA run in quick; merge danger two-way, step agents).
+- describe#1 done: pr.md written: refusal shape of decideGate, evidence W1–W3 from delegated.test.ts integration tests (no QA in quick), merge danger two-way, blast radius step agents
 
 ## Resume
 
-Review approved; next is the workflow's following step (QA / PR), nothing to rework.
+pr.md is written; nothing left for describe. Next step is norn's to route.
