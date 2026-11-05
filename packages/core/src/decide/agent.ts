@@ -299,7 +299,7 @@ function routeOutcome(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st0: UnitState
   receipt.route = routeOf(res) ?? "park";
   if (res.route === "nudge") receipt.counter = { name: "nudges", value: res.state.nudges_used, max: stepLimits(wf, step).nudges };
   if (res.route === "retry") receipt.counter = { name: "retries", value: res.state.retries_used, max: stepLimits(wf, step).retries };
-  const commit = commitFor(ctx, story, uf, `norn: ${ref.key} ${st.step} ${outcome} → ${receipt.route}`, st.step, undefined, endedWith(res));
+  const commit = commitFor(ctx, story, uf, `norn: ${ref.key} ${st.step} ${outcome} → ${receipt.route}`, st.step, { outcome: endedWith(res) });
   const snapshot = outcome === "silent" ? { transcript: rf?.transcript ?? null, cwd: cwd ?? "" } : null;
   const receipts: NewReceipt[] = [{ n, receipt }];
 

@@ -164,7 +164,7 @@ export function classifyNorn(
     snapshot: null,
     receipts: [nr],
     state: res.state,
-    commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${st.step} ${outcome} → ${receipt.route}`, st.step, undefined, endedWith(res)),
+    commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${st.step} ${outcome} → ${receipt.route}`, st.step, { outcome: endedWith(res) }),
   });
 }
 
@@ -262,7 +262,7 @@ export function slicesStep(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitS
       slice_status: "active" as const,
       receipts: [],
       state,
-      commit: commitFor(ctx, story, null, `norn: start ${s.key} (${name})`, state.step, { path, branch, slice: s.key, push: true }),
+      commit: commitFor(ctx, story, null, `norn: start ${s.key} (${name})`, state.step, { fresh: { path, branch, slice: s.key, push: true } }),
     });
   }
   if (starts.length)

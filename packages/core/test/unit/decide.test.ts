@@ -358,6 +358,11 @@ describe("slices step (W2)", () => {
   test("done when every slice is integrated; stuck when none can ever start", () => {
     expect(only(facts([storyAt("slices", {}, [{ nn: "01", status: "integrated" }, { nn: "02", state: { step: "$done", status: "done" } }])]))).toMatchObject({ kind: "classify", outcome: "done", state: { step: "test" } });
     expect(only(facts([storyAt("slices", {}, [{ nn: "01", deps: ["gh-1/09"] }])]))).toMatchObject({ kind: "classify", outcome: "stuck", state: { status: "stuck" } });
+    // gh-195 B18 (S4): moving on to the next step is a boundary; `$stuck` parks the step, which an unstick resumes: none
+    const done = only(facts([storyAt("slices", {}, [{ nn: "01", status: "integrated" }, { nn: "02", state: { step: "$done", status: "done" } }])]));
+    expect(done.kind === "classify" && done.commit?.trailers).toMatchObject({ "Norn-Step": "slices", "Norn-Outcome": "done" });
+    const stuck = only(facts([storyAt("slices", {}, [{ nn: "01", deps: ["gh-1/09"] }])]));
+    expect(stuck.kind === "classify" && stuck.commit?.trailers).not.toHaveProperty("Norn-Outcome");
   });
   test("gh-79: every slice stuck — a corrupt one is pointed at run view --why, since run rerun refuses a corrupt unit", () => {
     const stuck = (state: Partial<UnitState>) => {
@@ -636,6 +641,8 @@ describe("audit fixes", () => {
     const st2 = sw.units[0]!.state!;
     sw.units[0]!.unapplied = [numbered(1, receipt(st2, "workflow", { name: "solo", previous: "solo", to: "implement", to_hash: st2.workflow_hash }, "human"))];
     expect(only(facts([sw]))).toMatchObject({ kind: "apply_receipts", kill: { runner: "herdr", session_id: "s1" } });
+    // gh-195 B18, B19 (S4): a person moving the cursor (unstick, workflow) ends no step: no Norn-Outcome
+    for (const moved of [only(facts([s])), only(facts([sw]))]) expect(moved.kind === "apply_receipts" && moved.commit?.trailers).not.toHaveProperty("Norn-Outcome");
     // a plain done receipt does not kill
     const d = solo(running(), {});
     d.units[0]!.unapplied = [numbered(1, receipt(d.units[0]!.state!, "done", { outcome: "done", handoff: "" }))];

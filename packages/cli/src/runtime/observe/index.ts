@@ -216,7 +216,9 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       for (const e of elsewhere) {
         const branch = remote ? await remoteStoryBranch(root, remote, e.key) : null;
         const pr = branch ? await ports.remote.findPullRequest(branch) : null;
-        elsewherePrs.set(e.key, { pr, observed_at: now, ...(pr ? { ci: await ports.remote.pullRequestCi(pr.number) } : {}) });
+        // a CI read that fails leaves the CI unknown for this story only, and the sync says so
+        const ci = pr ? await ports.remote.pullRequestCi(pr.number).catch((err: Error) => void (elsewhereError ??= `CI of ${e.key}'s PR #${pr.number}: ${err.message}`)) : undefined;
+        elsewherePrs.set(e.key, { pr, observed_at: now, ...(ci ? { ci } : {}) });
       }
       cache.synced_at = now;
       cache.last_error = elsewhereError;

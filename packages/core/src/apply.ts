@@ -35,6 +35,11 @@ export interface Advance {
   counter?: { name: string; value: number; max: number };
   /** W4 (C3): counters reset to 0 by taking this edge (their `reset_on`), journaled with the advance */
   reset?: string[];
+  /**
+   * gh-195 B18, B19: a person's receipt moved the cursor (a workflow switch, an unstick, an update),
+   * not a step's outcome: no step ended, so its commit is no boundary (no `Norn-Outcome`). Absent = an outcome's edge.
+   */
+  moved?: true;
 }
 
 export interface Rejection {
@@ -183,7 +188,7 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
   if (r.kind === "workflow") {
     if (!stepOf(wf, r.to)) return { reject: `workflow ${r.name} has no step '${r.to}'` };
     const next = enterStep({ ...st, workflow: r.name, workflow_hash: r.to_hash }, wf, r.to, ctx.now);
-    return { state: next, log: `workflow → ${r.name} at ${r.to}`, advance: { from: st.step, outcome: "workflow", to: r.to } };
+    return { state: next, log: `workflow → ${r.name} at ${r.to}`, advance: { from: st.step, outcome: "workflow", to: r.to, moved: true } };
   }
   if (r.kind === "unstick") return unstick(st, r, ctx);
   if (!step) return { reject: `step '${st.step}' no longer exists (S7); use ${cmd.runRerun(undefined, { step: "<step>" })}` };
@@ -302,7 +307,7 @@ function unstick(st: UnitState, r: ReceiptOf<"unstick">, ctx: ApplyContext): Ste
   for (const c of r.reset ?? []) counters[c] = 0;
   const next = enterStep({ ...st, counters }, ctx.workflow, to, ctx.now);
   const resets = r.reset?.length ? ` (reset ${r.reset.join(", ")})` : "";
-  return { state: next, log: `unstick → ${to}${resets}`, advance: { from: st.step, outcome: "unstick", to } };
+  return { state: next, log: `unstick → ${to}${resets}`, advance: { from: st.step, outcome: "unstick", to, moved: true } };
 }
 
 /**
@@ -318,7 +323,7 @@ function updateFrom(st: UnitState, r: ReceiptOf<"update">, ctx: ApplyContext): S
   if (!waiting) return { reject: `unit is ${st.status}${st.park ? ` (${st.park.kind})` : ""}; update needs it done, at a gate, stuck or held by drifted skills` };
   if (!stepOf(ctx.workflow, r.to)) return { reject: `no step '${r.to}' in workflow ${ctx.workflow.name}` };
   const next = enterStep(st, ctx.workflow, r.to, ctx.now);
-  return { state: next, log: `update by ${r.who ?? r.by}: ${st.step} → ${r.to}`, advance: { from: st.step, outcome: "update", to: r.to } };
+  return { state: next, log: `update by ${r.who ?? r.by}: ${st.step} → ${r.to}`, advance: { from: st.step, outcome: "update", to: r.to, moved: true } };
 }
 
 /** Take the declared edge for `outcome` at the cursor (W3), counting it (W4). */

@@ -271,18 +271,25 @@ export async function readRecordObjects(root: string, story: string, sha: string
   // the text files a reader needs: states, pinned workflows, receipts (never evidence or logs)
   const wanted = entries.filter((e) => /(^|\/)(state\.json|workflow\.yaml)$/.test(e.path) || /(^|\/)receipts\/[^/]+\.json$/.test(e.path));
   const texts = new Map<string, string>();
+  const missing: FileError[] = [];
   if (wanted.length) {
     const out = gitSync(root, ["cat-file", "--batch"], new TextEncoder().encode(`${wanted.map((e) => e.blob).join("\n")}\n`));
     if (out.code !== 0) return { units: [], errors: [fail("", `git cat-file failed: ${out.stderr.toString().trim()}`)] };
+    // one reply per object, in order: `<sha> blob <size>\n<content>\n`, or `<sha> missing\n` with no content
     let pos = 0;
     for (const e of wanted) {
       const nl = out.stdout.indexOf(0x0a, pos);
-      const size = Number(out.stdout.subarray(pos, nl).toString().split(" ")[2]);
-      texts.set(e.path, out.stdout.subarray(nl + 1, nl + 1 + size).toString("utf8"));
-      pos = nl + 1 + size + 1;
+      const [, type, size] = out.stdout.subarray(pos, nl).toString().split(" ");
+      if (type !== "blob") {
+        missing.push(fail(e.path, `object ${e.blob} ${type === "missing" ? "missing from the repository" : `is a ${type}, not a blob`}`));
+        pos = nl + 1;
+        continue;
+      }
+      texts.set(e.path, out.stdout.subarray(nl + 1, nl + 1 + Number(size)).toString("utf8"));
+      pos = nl + 1 + Number(size) + 1;
     }
   }
-  const errors = jsonErrors([...texts].map(([path, text]) => ({ path, text })), fail);
+  const errors = [...missing, ...jsonErrors([...texts].map(([path, text]) => ({ path, text })), fail)];
   const bad = new Set(errors.map((e) => e.file));
   for (const [path, text] of texts) {
     if (bad.has(name(path)) || !/(^|\/)receipts\/[^/]+\.json$/.test(path)) continue;

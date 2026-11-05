@@ -93,6 +93,14 @@ Other machines see a story they do not hold: under `remote` step/attempt/counter
 - Flakes: `packages/cli/test/integration/human.test.ts` (gh-71 "story edit --workflow starts the next round" timeouts in the parallel tier) passed 3/3 isolated (39 pass / 6 skip, none new). It is a flake (load).
 - review#2 changes_requested: Review #2: F1-F14 resolved. 1 blocking — F15 endedWith sets Norn-Outcome on same-step advances (implement.unstick → implement in golden), so a resumed step shows as last boundary (B18/B19). Minor: F16 CI read failure fails whole sync; F17 cat-file --batch missing reply misparsed. Nit F18. human.test flake confirmed 3/3 isolated.
 
+
+### Rework (review#2)
+
+- F15: `Norn-Outcome` only when a step's outcome edge takes the cursor to another step: not on a person's move (`Advance.moved`, set by workflow switch, unstick and update in apply.ts), not on an edge back into the same step, not on `$stuck` (a park an unstick resumes). Decide tests (unstick, workflow, `$stuck` vs `done`); non-holder test: review stuck, `run rerun`, last boundary stays `implement`. Golden `--update`: 4 cases — the two unstick ones lose `Norn-Outcome: unstick` and gain `moved: true`, the two story-reopen `$stuck` ones lose `Norn-Outcome: stuck` (checked mechanically).
+- F16: a failing `pullRequestCi` leaves that story's CI unknown ("CI: not seen yet") and is reported in the sync (error, ok false); PR seen kept. Test with `FakeRemote.ciError`.
+- F17: `readRecordObjects` handles `<sha> missing` (and a non-blob) from `cat-file --batch`: reported for that file, stream kept aligned. Test: `packages/store/test/integration/record-objects.test.ts`.
+- F18: `commitFor(..., { fresh?, outcome? })`.
+
 ## Resume
 
-Review #2 requested changes: fix F15 first (Norn-Outcome only when the cursor moves to another step; add tests; re-run golden --update), then F16 and F17 if worth it.
+Run integration and e2e; regenerate transcripts if they change; commit; `norn done done`.

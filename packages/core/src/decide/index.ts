@@ -112,7 +112,7 @@ function intake(ctx: Ctx): void {
       story_file: `${specDir(key, slug)}/${SPEC_FILE}`,
       frontmatter,
       body: issue.body,
-      commit: commitFor(ctx, key, null, `norn: intake ${key} ${issue.title}`, null, { path, branch, slice: null, push: false }),
+      commit: commitFor(ctx, key, null, `norn: intake ${key} ${issue.title}`, null, { fresh: { path, branch, slice: null, push: false } }),
     });
   }
 }

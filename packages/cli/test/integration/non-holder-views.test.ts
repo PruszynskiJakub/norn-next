@@ -242,6 +242,43 @@ describe("a story held elsewhere under local (B18, B19)", () => {
     expect(await markdown("gh-11")).toContain("last boundary: implement");
   });
 
+  test("F16: a CI read that fails leaves the PR seen and the CI unknown, and the sync says so", async () => {
+    h.remote.ciError = Object.assign(new Error("gh pr checks failed (exit 1): HTTP 502"), { code: "gh_failed", retryable: true });
+    try {
+      h.clock.advance(10_000);
+      const r = await B.norn("tick", "--sync");
+      expect(r.exit).toBe(0);
+      const report = r.value as { sync: { ran: boolean; ok: boolean; error?: string } };
+      expect(report.sync).toMatchObject({ ran: true, ok: false });
+      expect(report.sync.error).toContain("CI of gh-11's PR #111");
+      const v = await view("gh-11");
+      expect(v.pr).toMatchObject({ number: 111 });
+      expect(v.ci).toBeNull();
+      expect(await markdown("gh-11")).toContain("CI: not seen yet");
+    } finally {
+      h.remote.ciError = null;
+    }
+  });
+
+  test("F15: a step parked on $stuck and resumed by run rerun ends no step: the last boundary stays", async () => {
+    const t = await storyOnA(13, "stuck-one", true);
+    const before = remoteSha(`refs/heads/${t.branch}`) as string;
+    h.write(join(t.wt, "notes", "stuck.md"), "blocked\n");
+    expect((await inWt(t.wt, "stuck", "the fixture is gone")).exit).toBe(0);
+    await tick();
+    expect(h.state(t.runs())?.status).toBe("stuck");
+    expect((await h.norn("run", "rerun", "gh-13", "--reason", "fixture restored")).exit).toBe(0);
+    h.write(join(t.wt, "notes", "stuck.md"), "unblocked\n");
+    await tick();
+    expect(h.state(t.runs())).toMatchObject({ step: "review", status: "ready" });
+    const after = commitsSince(t.branch, before);
+    expect(after).toContain("unstick");
+    expect(after).not.toContain("Norn-Outcome");
+
+    await tickOn(B);
+    expect((await view("gh-13")).last_boundary).toBe("implement");
+  });
+
   test("AC4: no boundary commit yet (the start, a mirror and an ask commit are none): 'no boundary pushed yet'", async () => {
     const t = await storyOnA(12, "not-yet", false);
     h.remote.issues = h.remote.issues.map((i) => (i.number === 12 ? { ...i, labels: [...i.labels, "ui"] } : i));

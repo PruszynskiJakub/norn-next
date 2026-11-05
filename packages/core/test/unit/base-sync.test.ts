@@ -284,7 +284,7 @@ describe("base sync replay", () => {
     const fromDone = apply(s.state);
     expect(fromDone.rejected).toEqual([]);
     expect(fromDone.state).toMatchObject({ step: "update", status: "ready" });
-    expect(fromDone.advance).toEqual({ from: "$done", outcome: "update", to: "update" });
+    expect(fromDone.advance).toEqual({ from: "$done", outcome: "update", to: "update", moved: true });
     // the merge item shows the gap and, when conflicting, sends the person to norn update
     s.pr = { number: 7, url: "https://github.com/o/r/pull/7", state: "open", is_draft: false, head_sha: SHA("h"), base_branch: "main" };
     s.base = base({ behind: 5, conflicts: ["a.ts"] });

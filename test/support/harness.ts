@@ -68,8 +68,11 @@ export class FakeRemote implements RemotePort {
   }
   /** gh-195 B18: PR number → the CI state of its head; unset = none */
   ci = new Map<number, PullRequestCi>();
+  /** set → `pullRequestCi` throws it */
+  ciError: Error | null = null;
   async pullRequestCi(n: number) {
     this.calls.push(`ci? ${n}`);
+    if (this.ciError) throw this.ciError;
     return this.ci.get(n) ?? "none";
   }
   async openDraftPullRequest(o: { head: string; base: string; title: string; body: string }) {
