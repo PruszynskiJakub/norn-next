@@ -97,7 +97,7 @@ function localTarget(obs: Observed, story: StoryFacts, uf: UnitFacts): Target {
 
 /**
  * The unit's cursor from the story's record ref (gh-195 D6): the one record this verb needs is
- * fetched, then read from the local ref through the record cache (unpacked and validated, S2). Run
+ * fetched, then read from the local ref's git objects (validated, S2; a failed fetch refuses). Run
  * state is never on a branch (S12); a story with no record ref (`local`, never released) has none
  * to read here.
  */
@@ -105,7 +105,10 @@ async function remoteTarget(ctx: Context, key: string): Promise<Target | null> {
   const remote = await gitRemote(ctx.git, ctx.root, ctx.config.git_remote);
   if (!remote) return null;
   const { story, slice } = parseUnitKey(key);
-  await fetchElsewhere(ctx.root, remote, [story]).catch(() => undefined);
+  // a verb never acts on a record it could not refresh (D6: it fetches the one story it needs)
+  await fetchElsewhere(ctx.root, remote, [story]).catch((e: Error) => {
+    throw failure(`cannot fetch the record of ${story}: ${e.message}`, "check the network and retry", "record_unreachable");
+  });
   const record = await readStoryRecord(ctx.root, story);
   const u = record?.units.find((x) => x.key === key);
   if (!u) return null;

@@ -4,7 +4,7 @@
  * installs the world: the issues on the remote, assigned by login (`whoami()` is the user).
  */
 import { describe, expect } from "bun:test";
-import type { PortError, RemoteIssue, RemoteLabel, RemotePort, RemotePullRequest } from "@norn/core";
+import type { PortError, PullRequestCi, RemoteIssue, RemoteLabel, RemotePort, RemotePullRequest } from "@norn/core";
 import { type ContractOptions, contractTest } from "./suite.ts";
 
 export type RemoteContractTest =
@@ -14,6 +14,7 @@ export type RemoteContractTest =
   | "findPullRequest: null for a branch without one"
   | "openDraftPullRequest opens a draft the branch then finds (GR6)"
   | "findPullRequest picks the newest of a branch's PRs"
+  | "pullRequestCi: none, pending, failure and success of a PR's head (B18)"
   | "createIssue opens an issue with the labels and assignee, which intake then lists (B18)"
   | "newIssueUrl: the remote's new-issue page with the labels filled in (B23)"
   | "replaceIssueLabel swaps one label for another (B19)"
@@ -42,6 +43,8 @@ export interface RemoteSubject {
   failLabelEdits(): void;
   /** the labels defined on the repository (GR10), replacing any seeded before */
   seedLabels(labels: RemoteLabel[]): void;
+  /** gh-195 B18: the CI state the provider reports for PR `number`'s head from now on */
+  setCi(number: number, ci: PullRequestCi): void;
 }
 
 /** The world every RemotePort is checked against; `me` is the port's `whoami()`. */
@@ -122,6 +125,16 @@ export function remoteContract(name: string, make: () => RemoteSubject, opts: Co
       const found = await port.findPullRequest("gh-1-add-login");
       expectPrShape(found!);
       expect(found).toMatchObject({ number: pr.number, url: pr.url, state: "open", is_draft: true, base_branch: "main" });
+    });
+
+    t("pullRequestCi: none, pending, failure and success of a PR's head (B18)", async () => {
+      const s = await seeded();
+      const pr = await s.port.openDraftPullRequest({ head: "gh-1-add-login", base: "main", title: "Add login", body: "" });
+      expect(await s.port.pullRequestCi(pr.number)).toBe("none");
+      for (const ci of ["pending", "failure", "success"] as const) {
+        s.setCi(pr.number, ci);
+        expect(await s.port.pullRequestCi(pr.number)).toBe(ci);
+      }
     });
 
     t("findPullRequest picks the newest of a branch's PRs", async () => {

@@ -150,12 +150,15 @@ export function unitWorktree(story: StoryFacts, uf: UnitFacts | null): string | 
 
 /**
  * S4: the trailers of every commit norn makes for a unit — Norn-Story, Norn-Slice for a slice,
- * Norn-Step when the unit has a cursor (none before the story unit starts), Norn-Tick.
+ * Norn-Step when the unit has a cursor (none before the story unit starts), Norn-Tick. A commit
+ * that ends a step (its outcome moved the cursor on) also carries Norn-Outcome, so a step boundary
+ * is told apart from the other commits made at that step (gh-195 B18, B19: "last boundary").
  */
-export function nornTrailers(tick: string, story: string, slice: string | null, step: string | null): Record<string, string> {
+export function nornTrailers(tick: string, story: string, slice: string | null, step: string | null, outcome?: string): Record<string, string> {
   const trailers: Record<string, string> = { "Norn-Story": story };
   if (slice) trailers["Norn-Slice"] = slice;
   if (step !== null) trailers["Norn-Step"] = step;
+  if (outcome !== undefined && step !== null) trailers["Norn-Outcome"] = outcome;
   trailers["Norn-Tick"] = tick;
   return trailers;
 }

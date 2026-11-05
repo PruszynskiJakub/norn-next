@@ -153,7 +153,7 @@
   spawn repo-worktrees/gh-7-add-login-form $ git add -A
   spawn repo-worktrees/gh-7-add-login-form $ git diff --cached --quiet
   spawn repo-worktrees/gh-7-add-login-form $ git diff --cached -U0 --no-color --no-ext-diff
-  spawn repo-worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Step: plan" --trailer "Norn-Tick: <ulid:8>"
+  spawn repo-worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Step: plan" --trailer "Norn-Outcome: done" --trailer "Norn-Tick: <ulid:8>"
   spawn repo-worktrees/gh-7-add-login-form $ git rev-parse HEAD
   spawn repo-worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
   spawn repo-worktrees/gh-7-add-login-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7-add-login-form -- .agents/specs/gh-7-add-login-form/slices/01-form.md
@@ -268,7 +268,7 @@
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git add -A
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --cached -U0 --no-color --no-ext-diff
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Slice: gh-7/01" --trailer "Norn-Step: implement" --trailer "Norn-Tick: <ulid:15>"
+  spawn repo-worktrees/gh-7-add-login-form--01-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Slice: gh-7/01" --trailer "Norn-Step: implement" --trailer "Norn-Outcome: done" --trailer "Norn-Tick: <ulid:15>"
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse HEAD
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7/01-form -- form.txt
@@ -392,7 +392,7 @@
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git add -A
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --cached -U0 --no-color --no-ext-diff
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Slice: gh-7/01" --trailer "Norn-Step: implement" --trailer "Norn-Tick: <ulid:25>"
+  spawn repo-worktrees/gh-7-add-login-form--01-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Slice: gh-7/01" --trailer "Norn-Step: implement" --trailer "Norn-Outcome: done" --trailer "Norn-Tick: <ulid:25>"
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse HEAD
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7/01-form -- pass.flag

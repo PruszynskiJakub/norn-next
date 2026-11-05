@@ -14,11 +14,12 @@ import { type Dirent, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileS
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import type { FileError } from "@norn/core";
-import { type RunStory, recordRef } from "@norn/schema";
+import { parseRoundDirName, ROUNDS_DIR, type RunStory, recordRef, STORY_UNIT_DIR, type UnitState, validate, type Workflow } from "@norn/schema";
 import { fsyncTree, isErrno } from "./fsx.ts";
 import { casRef, git, gitOk, gitSync, readLocalRef } from "./git.ts";
 import { recordErrors } from "./record-move.ts";
 import { storyRunStateDir } from "./run-state.ts";
+import { parseWorkflowText } from "./unit.ts";
 
 /**
  * Every regular file of a folder, relative and sorted (git's order is applied when trees are built).
@@ -151,21 +152,57 @@ export async function pushRecord(
  * Only then is the temp folder renamed into place, replacing `dest` whole (review F3). A record that
  * fails puts nothing in place: its errors are returned instead.
  */
-export async function unpackRecord(root: string, sha: string, dest: string): Promise<{ ok: true; files: number } | { ok: false; errors: FileError[] }> {
-  const staging = join(dirname(dest), `.${basename(dest)}.unpack-${process.pid}`);
-  const fail = (path: string, message: string): FileError => ({ file: join(dest, path), errors: [{ path: "", message }] });
-  const entries: Array<{ path: string; blob: string }> = [];
+/** A record commit's tree entry that may be written: a plain file whose path stays inside the record. */
+interface RecordEntry {
+  path: string;
+  blob: string;
+}
+
+/**
+ * D3 (review F2): the entries of the record commit `sha`, checked before anything is read or written —
+ * every entry must be a plain file (mode 100644 or 100755) whose path stays inside `base` (the folder
+ * it would land in): an absolute path, an empty, `.` or `..` segment, a symlink or a submodule is
+ * refused, since a record may come from another machine. `fail` names a refused entry's file.
+ */
+async function recordEntries(root: string, sha: string, base: string, fail: (path: string, message: string) => FileError): Promise<{ entries: RecordEntry[]; refused: FileError[] }> {
+  const entries: RecordEntry[] = [];
   const refused: FileError[] = [];
   // -z: a name with a tab or a newline is read whole; the path is what follows the first tab
   for (const line of (await gitOk(root, ["ls-tree", "-r", "-z", "--full-tree", sha])).split("\0").filter(Boolean)) {
     const tab = line.indexOf("\t");
     const [mode, type, blob] = line.slice(0, tab).split(" ") as [string, string, string];
     const path = line.slice(tab + 1);
-    const inside = resolve(staging, path).startsWith(`${staging}${sep}`);
+    const inside = resolve(base, path).startsWith(`${base}${sep}`);
     if (type !== "blob" || (mode !== "100644" && mode !== "100755")) refused.push(fail(path, `not a plain file in the record (${mode} ${type})`));
-    else if (path.startsWith("/") || path.split("/").some((s) => s === "" || s === "." || s === "..") || !inside) refused.push(fail(path, "a path outside the record"));
+    else if (path.startsWith("/") || path.split("/").some((x) => x === "" || x === "." || x === "..") || !inside) refused.push(fail(path, "a path outside the record"));
     else entries.push({ path, blob });
   }
+  return { entries, refused };
+}
+
+/** D3 (S2): every JSON file of a record must parse; `fail` names the file. */
+function jsonErrors(files: ReadonlyArray<{ path: string; text: string }>, fail: (path: string, message: string) => FileError): FileError[] {
+  const errors: FileError[] = [];
+  for (const f of files.filter((x) => x.path.endsWith(".json")))
+    try {
+      JSON.parse(f.text);
+    } catch (err) {
+      errors.push(fail(f.path, `invalid JSON: ${(err as Error).message}`));
+    }
+  return errors;
+}
+
+/**
+ * D3 (S1, S2): extract the record commit `sha` into `dest` (a story's run-state folder). Its entries
+ * are checked first (`recordEntries`); the files are written into a temp folder beside `dest`; every
+ * JSON file must parse, and each state, pinned workflow and receipt must pass its schema. Only then is
+ * the temp folder renamed into place, replacing `dest` whole (review F3). A record that fails puts
+ * nothing in place: its errors are returned instead.
+ */
+export async function unpackRecord(root: string, sha: string, dest: string): Promise<{ ok: true; files: number } | { ok: false; errors: FileError[] }> {
+  const staging = join(dirname(dest), `.${basename(dest)}.unpack-${process.pid}`);
+  const fail = (path: string, message: string): FileError => ({ file: join(dest, path), errors: [{ path: "", message }] });
+  const { entries, refused } = await recordEntries(root, sha, staging, fail);
   if (refused.length) return { ok: false, errors: refused };
   rmSync(staging, { recursive: true, force: true });
   try {
@@ -177,13 +214,10 @@ export async function unpackRecord(root: string, sha: string, dest: string): Pro
       mkdirSync(dirname(join(staging, e.path)), { recursive: true });
       writeFileSync(join(staging, e.path), out.stdout);
     }
-    const errors: FileError[] = [];
-    for (const e of entries.filter((x) => x.path.endsWith(".json")))
-      try {
-        JSON.parse(readFileSync(join(staging, e.path), "utf8"));
-      } catch (err) {
-        errors.push(fail(e.path, `invalid JSON: ${(err as Error).message}`));
-      }
+    const errors = jsonErrors(
+      entries.filter((x) => x.path.endsWith(".json")).map((e) => ({ path: e.path, text: readFileSync(join(staging, e.path), "utf8") })),
+      fail,
+    );
     const named = new Set(errors.map((e) => e.file));
     for (const d of readdirSync(staging, { withFileTypes: true }))
       if (d.isDirectory())
@@ -211,4 +245,80 @@ export async function unpackRecord(root: string, sha: string, dest: string): Pro
   } finally {
     rmSync(staging, { recursive: true, force: true });
   }
+}
+
+/** A unit of a record read from git objects: its key and its validated state and pinned workflow. */
+export interface RecordObjectUnit {
+  key: string;
+  /** null = the story unit */
+  slice: string | null;
+  state: UnitState;
+  workflow: Workflow | null;
+}
+
+/**
+ * gh-195 D6 (B10, B17; S2): the record commit `sha` read from git objects into memory, writing
+ * nothing — what a view of a story held elsewhere reads. Its entries pass the same checks as an
+ * unpack (`recordEntries`, `jsonErrors`); each unit's state (the story's current round), pinned
+ * workflow and receipts are validated against their schemas, and a file that fails is reported in
+ * `errors` (its unit is left out), never skipped silently.
+ */
+export async function readRecordObjects(root: string, story: string, sha: string): Promise<{ units: RecordObjectUnit[]; errors: FileError[] }> {
+  const name = (path: string) => `${recordRef(story)}:${path}`;
+  const fail = (path: string, message: string): FileError => ({ file: name(path), errors: [{ path: "", message }] });
+  const { entries, refused } = await recordEntries(root, sha, "/record", fail);
+  if (refused.length) return { units: [], errors: refused };
+  // the text files a reader needs: states, pinned workflows, receipts (never evidence or logs)
+  const wanted = entries.filter((e) => /(^|\/)(state\.json|workflow\.yaml)$/.test(e.path) || /(^|\/)receipts\/[^/]+\.json$/.test(e.path));
+  const texts = new Map<string, string>();
+  if (wanted.length) {
+    const out = gitSync(root, ["cat-file", "--batch"], new TextEncoder().encode(`${wanted.map((e) => e.blob).join("\n")}\n`));
+    if (out.code !== 0) return { units: [], errors: [fail("", `git cat-file failed: ${out.stderr.toString().trim()}`)] };
+    let pos = 0;
+    for (const e of wanted) {
+      const nl = out.stdout.indexOf(0x0a, pos);
+      const size = Number(out.stdout.subarray(pos, nl).toString().split(" ")[2]);
+      texts.set(e.path, out.stdout.subarray(nl + 1, nl + 1 + size).toString("utf8"));
+      pos = nl + 1 + size + 1;
+    }
+  }
+  const errors = jsonErrors([...texts].map(([path, text]) => ({ path, text })), fail);
+  const bad = new Set(errors.map((e) => e.file));
+  for (const [path, text] of texts) {
+    if (bad.has(name(path)) || !/(^|\/)receipts\/[^/]+\.json$/.test(path)) continue;
+    const v = validate("receipt", JSON.parse(text));
+    if (!v.ok) errors.push({ file: name(path), errors: v.errors });
+  }
+  // a unit's folder: `_story` (its current round: the highest `rounds/NN-<wf>` holding a state; a flat
+  // record's `_story` itself) or a slice's `<nn>-<slug>`
+  const folders = new Map<string, string>();
+  for (const path of texts.keys()) {
+    if (!path.endsWith("/state.json")) continue;
+    const dir = path.slice(0, -"/state.json".length);
+    const [top, sub, round] = dir.split("/");
+    if (top === STORY_UNIT_DIR) {
+      const r = sub === ROUNDS_DIR && round ? parseRoundDirName(round) : null;
+      if (sub !== undefined && !r) continue;
+      const held = folders.get(STORY_UNIT_DIR);
+      const heldRound = held ? parseRoundDirName(held.split("/")[2] ?? "") : null;
+      if (!held || (r && (!heldRound || r.n > heldRound.n))) folders.set(STORY_UNIT_DIR, dir);
+    } else if (top && sub === undefined && /^[0-9]{2,3}-/.test(top)) folders.set(top, dir);
+  }
+  const units: RecordObjectUnit[] = [];
+  for (const unit of [...folders.keys()].sort((a, b) => (a === STORY_UNIT_DIR ? -1 : b === STORY_UNIT_DIR ? 1 : a.localeCompare(b)))) {
+    const dir = folders.get(unit) as string;
+    const statePath_ = `${dir}/state.json`;
+    if (bad.has(name(statePath_))) continue;
+    const st = validate("state", JSON.parse(texts.get(statePath_) as string));
+    if (!st.ok) {
+      errors.push({ file: name(statePath_), errors: st.errors });
+      continue;
+    }
+    const wfText = texts.get(`${dir}/workflow.yaml`);
+    const wf = wfText === undefined ? null : parseWorkflowText(wfText, name(`${dir}/workflow.yaml`));
+    if (wf && !wf.ok && wf.reason === "corrupt") errors.push(wf.error);
+    const nn = unit === STORY_UNIT_DIR ? null : (unit.split("-")[0] as string);
+    units.push({ key: nn === null ? story : `${story}/${nn}`, slice: nn === null ? null : `${story}/${nn}`, state: st.value, workflow: wf?.ok ? wf.value : null });
+  }
+  return { units, errors };
 }

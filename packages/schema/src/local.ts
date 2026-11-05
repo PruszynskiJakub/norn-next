@@ -145,7 +145,19 @@ export const PullRequestEntry = Type.Object({
 
 /** `pr.json`: story key → the story PR the last sync saw, with when (C1). */
 export const LocalPrFile = Type.Object(
-  { stories: Type.Optional(Type.Record(Type.String(), Type.Object({ pr: Nullable(PullRequestEntry), observed_at: Type.Number() }))) },
+  {
+    stories: Type.Optional(
+      Type.Record(
+        Type.String(),
+        Type.Object({
+          pr: Nullable(PullRequestEntry),
+          observed_at: Type.Number(),
+          /** gh-195 B18: the CI state of the PR's head, observed for a story held elsewhere (core `PullRequestCi`) */
+          ci: Type.Optional(Type.Union([Type.Literal("pending"), Type.Literal("success"), Type.Literal("failure"), Type.Literal("none")])),
+        }),
+      ),
+    ),
+  },
   id("local-pr", "norn story PRs seen (trace/pr.json)"),
 );
 export type LocalPrFile = Static<typeof LocalPrFile>;

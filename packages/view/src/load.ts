@@ -30,7 +30,7 @@ import {
   type WorktreeFacts,
   storyMode,
 } from "@norn/core";
-import { DEFAULT_CONFIG, type HookFact, type Mode, type ResolvedConfig, sliceBranch, storyBranch, type Workflow } from "@norn/schema";
+import { DEFAULT_CONFIG, type HookFact, type Mode, type ResolvedConfig, sliceBranch, storyBranch, type UnitState, type Workflow } from "@norn/schema";
 import {
   cachedDefaultBranch,
   classifyClaim,
@@ -99,8 +99,13 @@ function claimView(c: ClaimState): ClaimView {
 }
 
 function counters(u: UnitSnapshot): CounterView[] {
-  const max = u.workflow?.workflow.counters ?? {};
-  const live = u.state?.counters ?? {};
+  return counterViews(u.workflow?.workflow ?? null, u.state);
+}
+
+/** A unit's counters with their W4 limits from its pinned workflow. */
+function counterViews(wf: Workflow | null, st: UnitState | null): CounterView[] {
+  const max = wf?.counters ?? {};
+  const live = st?.counters ?? {};
   return Object.keys({ ...max, ...live })
     .sort()
     .map((name) => ({ name, value: live[name] ?? 0, max: max[name]?.max ?? null }));
@@ -242,27 +247,17 @@ function baseSync(sf: StoryFacts, receipts: readonly NumberedReceipt[], branch: 
   return { branch: b ? b.ref.replace(/^refs\/(remotes\/[^/]+|heads)\//, "") : branch, behind: b?.behind ?? null, ahead: b?.ahead ?? null, conflicts: b?.conflicts ?? [], last_update: last };
 }
 
-/** `2026-11-02 14:10` (UTC) from an ISO time. */
-const minute = (iso: string) => iso.slice(0, 16).replace("T", " ");
-
 /**
  * gh-195 D6 (B10, B13, B17–B19): a story held elsewhere as this checkout's local refs have it. Under
- * `remote` its record ref is kept current: step, attempt and counters come from it. Under `local` the
- * ref, when there is one, is labelled with its age (B13), and the view says where the run state is
- * and how to get it (B18); without a ref there is no attempt or counter to show.
+ * `remote` its record ref is kept current; under `local` a ref shows the record as of its commit (B13)
+ * and the view says where the run state is (B18). Data only: `formatElsewhere` writes the sentences.
  */
-function elsewhereView(e: ElsewhereStory, policy: "local" | "remote", seen: StoryFacts["pr_seen"]): ElsewhereView {
-  const holder = e.claim.blob.holder;
-  const current = policy === "remote";
-  const where: string[] = [];
-  if (e.record && !current) where.push(`record as of ${minute(e.record.at)} — ${e.key} now keeps its record on ${holder}'s machine`);
-  if (!current || !e.record)
-    where.push(`run state is on ${holder}'s machine — ask them to run ${cmd.storyHandoff(e.key)}, or take it over after the claim expires (${minute(e.claim.blob.expires_at)})`);
+function elsewhereView(e: ElsewhereStory, policy: ResolvedConfig["record"]["policy"], seen: StoryFacts["pr_seen"]): ElsewhereView {
   return {
     key: e.key,
     title: e.frontmatter?.title ?? e.key,
     url: e.frontmatter?.url ?? null,
-    holder,
+    holder: e.claim.blob.holder,
     renewed_at: e.claim.blob.renewed_at,
     expires_at: e.claim.blob.expires_at,
     expired: e.claim.state === "expired",
@@ -275,20 +270,13 @@ function elsewhereView(e: ElsewhereStory, policy: "local" | "remote", seen: Stor
           sha: e.record.sha,
           at: e.record.at,
           holder: e.record.holder,
-          current,
-          units: e.record.units.map((u) => {
-            const max = u.workflow?.counters ?? {};
-            const live = u.state.counters ?? {};
-            const counters = Object.keys({ ...max, ...live })
-              .sort()
-              .map((name) => ({ name, value: live[name] ?? 0, max: max[name]?.max ?? null }));
-            return { key: u.key, slice: u.slice, step: u.state.step, attempt: u.state.attempt, status: u.state.status, counters };
-          }),
-          ...(e.record.error ? { error: e.record.error } : {}),
+          current: policy === "remote",
+          units: e.record.units.map((u) => ({ key: u.key, slice: u.slice, step: u.state.step, attempt: u.state.attempt, status: u.state.status, counters: counterViews(u.workflow, u.state) })),
+          errors: e.record.errors,
         }
       : null,
     pr: prView(seen),
-    where,
+    ci: seen?.ci ?? null,
   };
 }
 
@@ -506,8 +494,11 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   runs.sort((a, b) => Date.parse(a.started_at) - Date.parse(b.started_at) || a.unit.localeCompare(b.unit));
 
   // gh-195 D6: stories another heartbeat holds that this checkout has no copy of, from local refs only
-  const held = await heldElsewhereKeys(opts.repoRoot, { ...me, holder }, now, new Set(local.stories.map((s) => s.snapshot.key))).catch(() => []);
-  const elsewhere = await Promise.all(held.map(async (e) => elsewhereView(await loadElsewhereStory(opts.repoRoot, remoteName, e.key, e.claim), config.record.policy, prSeen[e.key])));
+  const held = await heldElsewhereKeys(opts.repoRoot, me, now, new Set(local.stories.map((s) => s.snapshot.key))).catch((e: Error) => {
+    errors.push({ file: "refs/norn/claims/", errors: [{ path: "", message: `cannot list the claims held elsewhere: ${e.message}` }] });
+    return [];
+  });
+  const elsewhere = await Promise.all(held.map(async (e) => elsewhereView(await loadElsewhereStory(opts.repoRoot, remoteName, e.key, e.claim, baseRef), config.record.policy, prSeen[e.key])));
 
   return {
     at: new Date(now).toISOString(),

@@ -165,7 +165,8 @@ describe("receipts first (C2)", () => {
     s.units[0]!.unapplied = [numbered(1, receipt(st, "done", { outcome: "done", handoff: "ok" }))];
     const a = only(facts([s]));
     expect(a).toMatchObject({ kind: "apply_receipts", applied: [1], advance: { to: "$done" }, state: { status: "done", applied_through: 1 } });
-    expect(a.kind === "apply_receipts" && a.commit?.trailers).toEqual({ "Norn-Story": "gh-1", "Norn-Step": "implement", "Norn-Tick": facts([]).tick_id });
+    // gh-195 B18 (S4): the commit that ends a step names its outcome, so a boundary is told apart by its trailers
+    expect(a.kind === "apply_receipts" && a.commit?.trailers).toEqual({ "Norn-Story": "gh-1", "Norn-Step": "implement", "Norn-Outcome": "done", "Norn-Tick": facts([]).tick_id });
   });
   test("answer delivered into the live session", () => {
     const s = solo(running({ status: "parked", park: { kind: "ask", reason: "Q?", since: at() } }));
@@ -185,6 +186,8 @@ describe("agent steps: modes and caps (§6, MO2, K1)", () => {
     expect(a.state).toMatchObject({ status: "running", applied_through: 1, run: { run_id: a.launch.run_id, how: "auto" } });
     // R2.1 (N6): the started receipts are committed and pushed in the launch tick
     expect(a.commit).toMatchObject({ cwd: "/r-worktrees/gh-1-login", branch: "gh-1-login", push: true, trailers: { "Norn-Story": "gh-1", "Norn-Step": "implement" } });
+    // gh-195 B18: a session start ends no step: no outcome trailer
+    expect(a.commit?.trailers).not.toHaveProperty("Norn-Outcome");
   });
   test("manual mode, attended steps and missing runner wait for a person", () => {
     expect(kinds(facts([solo({}, null, { mode: "manual" })]))).toEqual(["gh-1 noop agent.ready.manual"]);
@@ -732,6 +735,7 @@ describe("commit trailers (S4, R3.1)", () => {
   test("nornTrailers builds them; isIntakeCommit reads an intake off them, never off a subject", () => {
     expect(nornTrailers(TICK, "gh-1", null, null)).toEqual({ "Norn-Story": "gh-1", "Norn-Tick": TICK });
     expect(nornTrailers(TICK, "gh-1", "gh-1/01", "$done")).toEqual({ "Norn-Story": "gh-1", "Norn-Slice": "gh-1/01", "Norn-Step": "$done", "Norn-Tick": TICK });
+    expect(nornTrailers(TICK, "gh-1", null, "review", "approve")).toEqual({ "Norn-Story": "gh-1", "Norn-Step": "review", "Norn-Outcome": "approve", "Norn-Tick": TICK });
     expect(isIntakeCommit(nornTrailers(TICK, "gh-1", null, null), "gh-1")).toBe(true);
     expect(isIntakeCommit(nornTrailers(TICK, "gh-1", null, null), "gh-2")).toBe(false);
     expect(isIntakeCommit(nornTrailers(TICK, "gh-1", null, "plan"), "gh-1")).toBe(false);

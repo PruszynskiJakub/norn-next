@@ -2,7 +2,7 @@
  * gh adapter — implements RemotePort (packages/core/src/ports.ts) over the GitHub `gh` CLI's
  * JSON output, run in the repository directory. Story key for issue n is `gh-<n>` (§5.1).
  */
-import type { RemoteFactory, RemoteIssue, RemoteLabel, RemotePort, RemotePullRequest } from "@norn/core";
+import type { PullRequestCi, RemoteFactory, RemoteIssue, RemoteLabel, RemotePort, RemotePullRequest } from "@norn/core";
 import { storyKey } from "@norn/schema";
 import { NETWORK_TIMEOUT_MS } from "@norn/store";
 import { bunExec, okOrThrow, parseJson, portError, type Exec } from "../exec.ts";
@@ -78,6 +78,17 @@ function mapPr(p: GhPr): RemotePullRequest {
   };
 }
 
+/**
+ * gh-195 B18: `gh pr checks --json bucket` buckets (pass, fail, pending, skipping, cancel) folded into
+ * one state: a failed or cancelled check wins, then a pending one; no check at all is `none`.
+ */
+export function ciOf(buckets: readonly string[]): PullRequestCi {
+  if (!buckets.length) return "none";
+  if (buckets.some((b) => b === "fail" || b === "cancel")) return "failure";
+  if (buckets.some((b) => b === "pending")) return "pending";
+  return "success";
+}
+
 export function createGh(opts: GhOptions): RemotePort {
   const exec = opts.exec ?? bunExec;
   const bin = opts.bin ?? "gh";
@@ -117,6 +128,14 @@ export function createGh(opts: GhOptions): RemotePort {
       // gh lists newest first
       const rows = await json<GhPr[]>(["pr", "list", ...repo, "--head", branch, "--state", "all", "--limit", "1", "--json", PR_FIELDS]);
       return rows[0] ? mapPr(rows[0]) : null;
+    },
+    async pullRequestCi(number) {
+      // gh exits 8 while checks are pending and 1 when one failed, printing the JSON either way;
+      // with no check at all it exits 1 saying so
+      const r = await run(["pr", "checks", String(number), ...repo, "--json", "bucket"]);
+      if (r.code !== 0 && /no checks reported/i.test(r.stderr)) return "none";
+      const out = r.code === 1 || r.code === 8 ? (r.stdout.trim() ? r.stdout : okOrThrow(r, "gh pr checks", "gh")) : okOrThrow(r, "gh pr checks", "gh");
+      return ciOf(parseJson<Array<{ bucket: string }>>(out, "gh pr checks", "gh").map((c) => c.bucket));
     },
     async openDraftPullRequest({ head, base, title, body }) {
       const out = okOrThrow(

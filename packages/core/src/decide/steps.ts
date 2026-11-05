@@ -21,7 +21,7 @@ import type { SliceFileFacts, StoryFacts, UnitFacts, UnitRef } from "../facts.ts
 import { sha256 } from "../hash.ts";
 import { unitWorktree } from "../policy.ts";
 import { checkWorkflowLevel, stepOf, type UnitLevel } from "../workflow.ts";
-import { commitFor, type Ctx, emitApplied, nextReceiptNumber, nornReceipt, park, rebasing, synth, trailersFor, unitBranch } from "./receipts.ts";
+import { commitFor, type Ctx, emitApplied, endedWith, nextReceiptNumber, nornReceipt, park, rebasing, synth, trailersFor, unitBranch } from "./receipts.ts";
 
 // ---------------------------------------------------------------- start
 
@@ -164,7 +164,7 @@ export function classifyNorn(
     snapshot: null,
     receipts: [nr],
     state: res.state,
-    commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${st.step} ${outcome} → ${receipt.route}`, st.step),
+    commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${st.step} ${outcome} → ${receipt.route}`, st.step, undefined, endedWith(res)),
   });
 }
 

@@ -20,7 +20,7 @@ import type {
   UnitState,
   Workflow,
 } from "@norn/schema";
-import type { GitInProgress, PaneState, RemoteIssue, RemotePullRequest, RunnerCapabilities, SessionRef, WorktreeStatus } from "./ports.ts";
+import type { GitInProgress, PaneState, PullRequestCi, RemoteIssue, RemotePullRequest, RunnerCapabilities, SessionRef, WorktreeStatus } from "./ports.ts";
 
 /** A file that failed to read or validate (S2). */
 export interface FileError {
@@ -263,6 +263,8 @@ export interface StoryBase {
 export interface StoryPrSeen {
   pr: RemotePullRequest | null;
   observed_at: number;
+  /** gh-195 B18: the CI state of the PR's head, observed only for a story another heartbeat holds; absent = not observed */
+  ci?: PullRequestCi;
 }
 
 /** gh-71 D5: a story issue observation (`null` = not visible to this checkout) and its time (ms epoch). */

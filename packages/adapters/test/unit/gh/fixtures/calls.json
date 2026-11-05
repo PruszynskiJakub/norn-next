@@ -178,5 +178,64 @@
    "norn:wf:story"
   ],
   "stdout": "https://github.com/acme/app/issues/15\n"
+ },
+ {
+  "argv": [
+   "gh",
+   "pr",
+   "checks",
+   "40",
+   "--json",
+   "bucket"
+  ],
+  "stdout": "[{\"bucket\": \"pass\"}, {\"bucket\": \"skipping\"}]\n"
+ },
+ {
+  "argv": [
+   "gh",
+   "pr",
+   "checks",
+   "41",
+   "--json",
+   "bucket"
+  ],
+  "code": 8,
+  "stdout": "[{\"bucket\": \"pass\"}, {\"bucket\": \"pending\"}]\n"
+ },
+ {
+  "argv": [
+   "gh",
+   "pr",
+   "checks",
+   "43",
+   "--json",
+   "bucket"
+  ],
+  "code": 1,
+  "stdout": "[{\"bucket\": \"fail\"}, {\"bucket\": \"pass\"}, {\"bucket\": \"cancel\"}]\n"
+ },
+ {
+  "argv": [
+   "gh",
+   "pr",
+   "checks",
+   "44",
+   "--json",
+   "bucket"
+  ],
+  "code": 1,
+  "stderr": "no checks reported on the 'gh-15-fix-crash-on-save' branch\n"
+ },
+ {
+  "argv": [
+   "gh",
+   "pr",
+   "checks",
+   "45",
+   "--json",
+   "bucket"
+  ],
+  "code": 1,
+  "stderr": "HTTP 502: Bad Gateway (https://api.github.com/graphql)\n"
  }
 ]

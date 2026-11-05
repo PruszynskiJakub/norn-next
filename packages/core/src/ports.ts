@@ -312,6 +312,13 @@ export interface RemotePullRequest {
   base_branch?: string;
 }
 
+/**
+ * gh-195 B18: the CI state of a PR's head as the provider reports it — `pending` while any check or
+ * the pipeline still runs, `failure` when one failed or was cancelled, `success` when all passed
+ * (skipped ones count as passed), `none` when no check or pipeline reports on it.
+ */
+export type PullRequestCi = "pending" | "success" | "failure" | "none";
+
 /** GR10: a label defined on the remote repository (not one on an issue). `color` is hex without `#`. */
 export interface RemoteLabel {
   name: string;
@@ -334,6 +341,8 @@ export interface RemotePort {
   getIssue(number: number): Promise<RemoteIssue | null>;
   /** latest PR/MR whose head is `branch`, any state; null if none */
   findPullRequest(branch: string): Promise<RemotePullRequest | null>;
+  /** gh-195 B18: the CI state of PR `number`'s head (checks on GitHub, the head pipeline on GitLab) */
+  pullRequestCi(number: number): Promise<PullRequestCi>;
   openDraftPullRequest(opts: { head: string; base: string; title: string; body: string }): Promise<RemotePullRequest>;
   /** GR9: replace the body of an open PR/MR */
   editPullRequestBody(number: number, body: string): Promise<void>;

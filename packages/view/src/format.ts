@@ -183,22 +183,28 @@ export function formatInbox(view: ProjectView, opts: { details?: boolean; home?:
   return `${out.join("\n").trimEnd()}\n`;
 }
 
+/** `2026-11-02 14:10` (UTC) from an ISO time. */
 const minute = (iso: string) => iso.slice(0, 16).replace("T", " ");
+
+/** `review_loop 0/3` */
+const counterLine = (c: { name: string; value: number; max: number | null }) => `${c.name} ${c.value}${c.max !== null ? `/${c.max}` : ""}`;
 
 /** The story unit's standing from its record (B17), else its last boundary (B18, B19). */
 function elsewhereStanding(e: ElsewhereView): string {
   const u = e.record?.units.find((x) => x.slice === null);
-  const counters = u?.counters.length ? ` [${u.counters.map((c) => `${c.name} ${c.value}${c.max !== null ? `/${c.max}` : ""}`).join(", ")}]` : "";
-  const step = u ? `Step: ${u.step} (attempt ${u.attempt})${counters}` : null;
-  const asOf = e.record && !e.record.current ? ` — record as of ${minute(e.record.at)}` : "";
-  if (step) return `held by ${e.holder} · ${step}${asOf}`;
-  return `held by ${e.holder} · ${e.last_boundary ? `last boundary: ${e.last_boundary}` : "no boundary pushed yet"}`;
+  if (u) {
+    const counters = u.counters.length ? ` [${u.counters.map(counterLine).join(", ")}]` : "";
+    const asOf = e.record && !e.record.current ? ` — record as of ${minute(e.record.at)}` : "";
+    return `held by ${e.holder} · Step: ${u.step} (attempt ${u.attempt})${counters}${asOf}`;
+  }
+  const ci = e.ci ? ` · CI: ${e.ci}` : "";
+  return `held by ${e.holder} · ${e.last_boundary ? `last boundary: ${e.last_boundary}` : "no boundary pushed yet"}${e.pr ? ` · PR #${e.pr.number}${ci}` : ""}`;
 }
 
 /**
  * `norn story view` of a story another machine holds (gh-195 D6, B10, B13, B17–B19): the claim, the
- * branch, the PR, then the step, attempt and counters from the record ref when it is here, or the
- * last boundary step when it is not, and where the run state is.
+ * branch, the PR and its CI, then the step, attempt and counters from the record ref when it is here,
+ * or the last boundary step when it is not, and where the run state is.
  */
 export function formatElsewhere(e: ElsewhereView): string {
   const out = [`# ${e.key} — ${e.title}`, ""];
@@ -206,15 +212,17 @@ export function formatElsewhere(e: ElsewhereView): string {
   out.push(`- Branch: ${e.branch ?? "not fetched here"}${e.head ? ` at ${e.head.sha.slice(0, 7)} "${e.head.subject}" (${minute(e.head.at)})` : ""}`);
   if (e.policy === "local" || !e.record) out.push(`- ${e.last_boundary ? `last boundary: ${e.last_boundary}` : "no boundary pushed yet"}`);
   out.push(`- PR: ${e.pr ? `#${e.pr.number} ${e.pr.is_draft && e.pr.state === "open" ? "draft, open" : e.pr.state} — ${e.pr.url} (seen ${minute(e.pr.seen_at)})` : "none seen yet"}`);
-  if (e.record) {
-    out.push("", e.record.current ? `Record: ${e.record.sha.slice(0, 7)} (${minute(e.record.at)})` : `Record as of ${minute(e.record.at)}:`);
-    if (e.record.error) out.push(`- unreadable: ${e.record.error}`);
-    for (const u of e.record.units) {
-      const counters = u.counters.map((c) => `${c.name} ${c.value}${c.max !== null ? `/${c.max}` : ""}`).join(", ");
-      out.push(`- ${u.key}: Step: ${u.step} (attempt ${u.attempt}), ${u.status}${counters ? ` · counters: ${counters}` : ""}`);
-    }
+  if (e.pr) out.push(`- CI: ${e.ci ?? "not seen yet"}`);
+  const r = e.record;
+  if (r) {
+    out.push("", r.current ? `Record: ${r.sha.slice(0, 7)} (${minute(r.at)})` : `Record as of ${minute(r.at)}:`);
+    for (const u of r.units) out.push(`- ${u.key}: Step: ${u.step} (attempt ${u.attempt}), ${u.status}${u.counters.length ? ` · counters: ${u.counters.map(counterLine).join(", ")}` : ""}`);
+    for (const err of r.errors) out.push(`- failed validation (S2): ${err.file}: ${err.errors.map((x) => `${x.path || "/"} ${x.message}`).join("; ")}`);
   }
-  if (e.where.length) out.push("", ...e.where);
+  const lines: string[] = [];
+  if (r && !r.current) lines.push(`record as of ${minute(r.at)} — ${e.key} now keeps its record on ${e.holder}'s machine`);
+  if (!r || !r.current) lines.push(`run state is on ${e.holder}'s machine — ask them to run ${cmd.storyHandoff(e.key)}, or take it over after the claim expires (${minute(e.expires_at)})`);
+  if (lines.length) out.push("", ...lines);
   return `${out.join("\n")}\n`;
 }
 

@@ -9,7 +9,7 @@ import { setDefaultTimeout } from "bun:test";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
-import { type Clock, type InboxItem, type LaunchSpec, type NotifierPort, type PaneState, type PromptKey, type RemoteIssue, type RemoteLabel, type RemotePort, type RemotePullRequest, type RunnerCapabilities, type RunnerPort, type RunnerSessionInfo, nameRemoved, type SessionRef } from "@norn/core";
+import { type Clock, type InboxItem, type LaunchSpec, type NotifierPort, type PaneState, type PromptKey, type PullRequestCi, type RemoteIssue, type RemoteLabel, type RemotePort, type RemotePullRequest, type RunnerCapabilities, type RunnerPort, type RunnerSessionInfo, nameRemoved, type SessionRef } from "@norn/core";
 import { parseSpecDirName, type Receipt, ROUNDS_DIR, STORY_UNIT_DIR, type UnitState, ulid } from "@norn/schema";
 import { appendReceipt, bindNornHome, HANDOFF_HEADER_BEGIN, HANDOFF_HEADER_END, HANDOFF_LOG_BEGIN, HANDOFF_LOG_END, installSkills, linkSkills, machineDir, readState, repoConfigPath, handoffPath, runStateDir, spawnSyncCaptured, storyRunStateDir, treeHandoffFile, treeRunStateDir, treeUnitRunStateDir, workflowsDir } from "@norn/store";
 import type { ProjectView } from "@norn/view";
@@ -65,6 +65,12 @@ export class FakeRemote implements RemotePort {
   async findPullRequest(branch: string) {
     this.calls.push(`pr? ${branch}`);
     return [...this.prs].reverse().find((p) => p.head === branch) ?? null;
+  }
+  /** gh-195 B18: PR number → the CI state of its head; unset = none */
+  ci = new Map<number, PullRequestCi>();
+  async pullRequestCi(n: number) {
+    this.calls.push(`ci? ${n}`);
+    return this.ci.get(n) ?? "none";
   }
   async openDraftPullRequest(o: { head: string; base: string; title: string; body: string }) {
     this.calls.push(`pr+ ${o.head}`);

@@ -2,8 +2,8 @@
  * ProjectView: the read model front ends consume (X1). Plain JSON — no functions,
  * Dates or Maps — so `norn story list --json`, a web cockpit and a Herdr pane share it.
  */
-import type { FileError, Inbox, InboxEntry, StoryNote } from "@norn/core";
-import type { LeaseKind, Mode, ParkKind, SliceStatus, StoryStatus, UnitStatus } from "@norn/schema";
+import type { FileError, Inbox, InboxEntry, PullRequestCi, StoryNote } from "@norn/core";
+import type { LeaseKind, Mode, ParkKind, ResolvedConfig, SliceStatus, StoryStatus, UnitStatus } from "@norn/schema";
 
 export interface CounterView {
   name: string;
@@ -209,29 +209,34 @@ export interface RecordUnitView {
 
 /**
  * gh-195 D6 (B10, B13, B17–B19): a story held by another heartbeat, read from local refs only: its
- * claim, the remote-tracking story branch and the record ref as the last tick fetched them.
+ * claim, the remote-tracking story branch and the record ref as the last tick fetched them. Data only
+ * (P8): `formatElsewhere` writes the sentences.
  */
 export interface ElsewhereView {
   key: string;
   title: string;
   url: string | null;
+  /** the claim's holder: the machine the run state is on */
   holder: string;
   /** the claim's last renewal (the holder's heartbeat) and expiry */
   renewed_at: string;
   expires_at: string;
   expired: boolean;
   /** the team's record policy as this checkout's config has it */
-  policy: "local" | "remote";
+  policy: ResolvedConfig["record"]["policy"];
   branch: string | null;
   /** the remote-tracking story branch's head */
   head: { sha: string; subject: string; at: string } | null;
-  /** B18, B19: the step of the story's last boundary commit; null = no boundary pushed yet */
+  /** B18, B19: the step the story's last boundary commit ended; null = no boundary pushed yet */
   last_boundary: string | null;
-  /** the record ref: its commit, time and units; null = none here */
-  record: { sha: string; at: string; holder: string | null; current: boolean; units: RecordUnitView[]; error?: string } | null;
+  /**
+   * the record ref: its commit and time, and its units. `current`: kept current by the holder (the
+   * policy is `remote`); false = it shows the record as of `at` (B13). Null = no ref here.
+   */
+  record: { sha: string; at: string; holder: string | null; current: boolean; units: RecordUnitView[]; errors: FileError[] } | null;
   pr: PrView | null;
-  /** B13, B18: where the record is, for a person ("record as of …", "run state is on …"); [] = the ref is kept current */
-  where: string[];
+  /** B18: the CI state of the PR's head as the last sync saw it; null = not observed */
+  ci: PullRequestCi | null;
 }
 
 export type { Inbox, InboxEntry };
