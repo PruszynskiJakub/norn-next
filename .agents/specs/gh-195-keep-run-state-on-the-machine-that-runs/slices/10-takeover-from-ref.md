@@ -2,7 +2,7 @@
 id: gh-195/10
 title: Takeover unpacks the record from the ref
 depends_on: [ gh-195/09 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
