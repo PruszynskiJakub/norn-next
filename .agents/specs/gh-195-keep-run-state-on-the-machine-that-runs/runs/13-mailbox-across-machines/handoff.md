@@ -60,6 +60,14 @@ B20, B21: a non-holder's mailbox receipt is stamped from the last boundary (loca
 - Flakes: none.
 - review#1 changes_requested: review#1: AC1-AC4 proven by tests; blocking F1: a local non-holder's update-branch gets a schema usage error (naming removed 'norn update') instead of its refusal, since boundary targets skip check for every verb; minors F2-F5, F8 (confirm D17 empty commits), nits F6-F7
 
+- Implement #3 (review#1 changes_requested):
+  - F1/F6: the step-only target is given only to the mailbox verbs (`resolveTarget(..., { stepOnly: true })` in answer, approve/reject, run rerun); they build it with `stepOnlyReceipt` through `HumanVerbOptions.stepOnly` (no stand-in UnitState; `humanReceipt` always stamps attempt). Other verbs keep their refusal (update-branch, edit --auto/--workflow: unknown_unit; run cancel: not_holder): tested.
+  - F2: `run rerun --step/--reset` from a local non-holder is refused (story_not_local: the pinned workflow is on the holder); a plain rerun goes step-only and the holder applies it (attempt 2 at the gate): tested.
+  - F4: keepRejected before deleteMailbox; tested with rejected.json unwritable for one tick (ref kept, next tick keeps it once and deletes the ref).
+  - F3: `norn tidy` drops rejected receipts older than trace.retain (`removed.rejected_receipts`); tested.
+  - F5: `BoundaryCommit.allow_empty`, set by decide's commitFor for a story unit's boundary only; act reads that flag. Golden --update (only allow_empty added, verified) and slice-workflow transcript (slice boundaries no longer empty) rewritten.
+  - F7: base-sync noteInHandoff comments fixed. F8: D17 marks the empty-commit clause for the person to confirm at the ready gate.
+
 ## Resume
 
-Fix F1 first (red test: update-branch and run rerun from a local non-holder), then F4, F5, F3; the findings file of review#1 lists each with its fix.
+Full integration + e2e tiers running; if green, `bun run golden` harvest, then `norn done done`.
