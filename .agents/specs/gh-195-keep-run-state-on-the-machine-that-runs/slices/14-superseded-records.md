@@ -1,8 +1,8 @@
 ---
 id: gh-195/14
 title: An old holder's record is set aside as superseded
-depends_on: [gh-195/11]
-status: planned
+depends_on: [ gh-195/11 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
