@@ -42,6 +42,21 @@ B20, B21: a non-holder's mailbox receipt is stamped from the last boundary (loca
 - Attempt 1 ran past its 60m deadline (the ask parked it about an hour before the answer came); after both nudges it went `$stuck` and refused `norn done` (unit_stuck). The person ran `norn run rerun gh-195/13`: attempt 2 changes no code, only confirms unit 1221 pass / 0 fail and typecheck clean on this head, and reports.
 - implement#2 done: B20/B21 built in attempt 1 (D17: Norn-Next on boundary commits, made even when empty; local non-holder stamps the step only; attempt optional on mailbox receipts; rejected mailbox receipts in rejected.json shown as a Check item until a later answer/approval is accepted or the story finishes). mailbox-across-machines integration test (AC1-AC4); human.test mailbox (T9) block restored 45/45. Attempt 2 after timeout + rerun: no code change; unit 1221 pass, typecheck clean. Attempt 1 full tiers: integration 810 pass/3 env skips, e2e 72 pass/2 story skips.
 
+
+### review#1 (changes_requested)
+
+| Item | Verifier | Proven by |
+| --- | --- | --- |
+| B20 / AC1 | test | `packages/cli/test/integration/mailbox-across-machines.test.ts` › "AC1: B's answer is stamped with the step the last boundary led to and no attempt; the reply names the holder", "AC1: story approve behaves the same"; `human.test.ts` › "mailbox (T9)" block |
+| B20 / AC2 | test | `mailbox-across-machines.test.ts` › "AC2: B's approval is stamped with the step and attempt of the fetched record ref" |
+| B21 / AC3 | test | `mailbox-across-machines.test.ts` › "AC3: an answer stamped for review reaches A after it moved to implement: rejected, traced, and a Check item on A" |
+| B21 / AC4 | test | `mailbox-across-machines.test.ts` › "AC4: a later answer accepted for the story clears it; there is no dismiss command", "AC4: the story finishing clears it" |
+
+- Blocking F1: `remoteTarget` gives a step-only `boundary` target to every `resolveTarget` caller and `runHumanVerb` skips `check` for it; `norn story update-branch gh-N` on a local non-holder prints a usage error (`invalid update: / must have required property 'attempt'`, do_instead `norn update --help`) instead of its refusal (reproduced with a scratch copy of mailbox-across-machines.test.ts). Minor: F2 run rerun unvalidated from a non-holder; F3 rejected.json never pruned; F4 keep the rejection before deleting the ref; F5 empty commits for slices are unneeded; F8 confirm D17's empty-commit clause with the person. Nits F6, F7.
+- Empty boundary commits (D17): required for the story unit (check/gate steps change no file), same cadence as main before gh-195; narrow them to story-unit boundaries. story edit claim-first: in scope (restores gh-71 B18 after S12).
+- Tests on this head: unit 1221 pass, typecheck clean, mailbox-across-machines + human 51/51, e2e base-sync + slice-workflow 36/36.
+- Flakes: none.
+
 ## Resume
 
-Done: reported `norn done done` at implement #2. Next is the slice's test check.
+Fix F1 first (red test: update-branch and run rerun from a local non-holder), then F4, F5, F3; the findings file of review#1 lists each with its fix.
