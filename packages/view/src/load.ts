@@ -17,6 +17,7 @@ import {
   type FileError,
   formatAge,
   heartbeatDown,
+  heartbeatUp,
   nextCommand,
   type NumberedReceipt,
   RECENT_MS,
@@ -40,6 +41,7 @@ import {
   type LocalUnit,
   bindNornHome,
   loadLocalFacts,
+  loadRounds,
   machineHolder,
   onlyNornCommitsSince,
   readEnvNorn,
@@ -52,7 +54,34 @@ import {
   heldElsewhereKeys,
   loadElsewhereStory,
 } from "@norn/store";
-import type { BaseSyncView, ClaimView, CounterView, ElsewhereView, PrView, ProjectView, RecentDone, RunView, SliceView, StoryView, UnitView } from "./types.ts";
+import type { BaseSyncView, ClaimView, CounterView, DelegatedDecision, DelegatedKind, ElsewhereView, PrView, ProjectView, RecentDone, RunView, SliceView, StoryView, UnitView } from "./types.ts";
+
+const DELEGATED_KINDS: readonly string[] = ["approve", "reject", "answer", "unstick", "round"] satisfies DelegatedKind[];
+const isDelegatedKind = (k: string): k is DelegatedKind => DELEGATED_KINDS.includes(k);
+
+/**
+ * gh-196 D5 (B21, B22, B34): the decisions a supervisor made on the person's behalf, over every round of
+ * the story unit (store `loadRounds`: the current round from the snapshot, each earlier round read from
+ * its folder) and its slices, oldest first. An earlier round's failing file is reported, never skipped (S2).
+ */
+function delegatedDecisions(story: StorySnapshot): { decisions: DelegatedDecision[]; errors: FileError[] } {
+  const decisions: DelegatedDecision[] = [];
+  const errors: FileError[] = [];
+  const add = (unit: string, round: number | null, receipts: readonly NumberedReceipt[]) => {
+    for (const { receipt: r } of receipts) {
+      if (!r.delegated || !isDelegatedKind(r.kind)) continue;
+      const reason = "comment" in r && typeof r.comment === "string" ? r.comment : "";
+      decisions.push({ unit, round, step: r.step, kind: r.kind, ...(r.kind === "round" ? { workflow: r.workflow } : {}), reason, at: r.at, who: r.who ?? null });
+    }
+  };
+  const current = story.units[0];
+  for (const rd of loadRounds(story, { includeApplied: true })) {
+    add(story.key, rd.n, rd.unit.receipts ?? []);
+    if (rd.unit !== current) errors.push(...rd.unit.errors);
+  }
+  for (const u of story.units.slice(1)) add(u.unit.key, null, u.receipts ?? []);
+  return { decisions: decisions.sort((a, b) => Date.parse(a.at) - Date.parse(b.at)), errors };
+}
 
 export interface LoadProjectViewOptions {
   repoRoot: string;
@@ -430,6 +459,9 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
           errors: file?.error ? [file.error, ...v.errors] : v.errors,
         };
       });
+      // gh-196 D5 (B22): reads each earlier round's receipts on every load, `status --segment` included (HC13);
+      // accepted: a story has few rounds, and a cache across loads went stale
+      const delegated = delegatedDecisions(story);
       stories.push({
         ...base,
         slice: null,
@@ -437,12 +469,13 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
         branch: sf.record_only ? null : sf.branch,
         pr: prView(prSeen[story.key]),
         notes: sf.notes ?? [],
+        delegated: delegated.decisions,
         base_sync: baseSync(sf, storyUnit.receipts ?? [], config.base_branch ?? cachedDefaultBranch(opts.repoRoot) ?? "main"),
         story_status: story.frontmatter?.status ?? null,
         spec_dir: story.spec_dir,
         root: story.root,
         slices,
-        errors: story.frontmatter_error ? [story.frontmatter_error, ...base.errors] : base.errors,
+        errors: [...(story.frontmatter_error ? [story.frontmatter_error] : []), ...base.errors, ...delegated.errors],
       });
     });
   });
@@ -472,7 +505,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   const down = heartbeatDown(facts, config);
   ctx.heartbeatDown = !!down;
   for (const build of views) build();
-  const heartbeat = { holder, last_tick_at: lastTick === null ? null : new Date(lastTick).toISOString(), age: lastTick === null ? null : formatAge(now - lastTick), down: !!down };
+  const heartbeat = { holder, last_tick_at: lastTick === null ? null : new Date(lastTick).toISOString(), age: lastTick === null ? null : formatAge(now - lastTick), down: !!down, up: heartbeatUp(facts, config) };
 
   const recently_done: RecentDone[] = stories
     .flatMap((s) => [s, ...s.slices])

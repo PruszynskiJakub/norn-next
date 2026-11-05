@@ -102,8 +102,29 @@ export interface PrView {
   seen_at: string;
 }
 
+/** gh-196 D1: the receipt kinds a `--delegated` command writes (approve, reject, answer, run rerun, a new round). */
+export type DelegatedKind = "approve" | "reject" | "answer" | "unstick" | "round";
+
+/** gh-196 D5 (B21, B22, B34): a decision a supervisor made on the person's behalf (a `delegated` receipt). */
+export interface DelegatedDecision {
+  /** story or slice key */
+  unit: string;
+  /** the story round it was made in (story unit); null for a slice */
+  round: number | null;
+  step: string;
+  /** approve, reject, answer, unstick (rerun) or round (a new round) */
+  kind: DelegatedKind;
+  /** the workflow of the round it started (kind round) */
+  workflow?: string;
+  reason: string;
+  at: string;
+  who: string | null;
+}
+
 export interface StoryView extends UnitView {
   slice: null;
+  /** gh-196 D5: the story's delegated decisions over its rounds and slices, oldest first */
+  delegated: DelegatedDecision[];
   /** story branch (GR3); null for a story held from its record alone, which has none (B33) */
   branch: string | null;
   /** the story PR as last seen here; null = none seen (or no sync yet) */
@@ -155,6 +176,11 @@ export interface HeartbeatView {
   age: string | null;
   /** older than 3 × watch interval (or never) while a held story has a unit in auto mode */
   down: boolean;
+  /**
+   * gh-196 (B8, B9): a tick ran here within 3 × watch interval, whatever mode the stories are in:
+   * a supervisor checks the watch before any story is in auto, where `down` cannot fire yet
+   */
+  up: boolean;
 }
 
 export type TimelineSource = "receipt" | "tick" | "hook" | "reject" | "briefing" | "foreign" | "take" | "criteria";
@@ -277,6 +303,8 @@ export interface StepRow {
   who: StepWho[];
   /** full reason text: handoff, check result, gate comment, classify detail */
   reason: string | null;
+  /** gh-196 D5 (B21): a person's decision in this row was made by a supervisor on their behalf */
+  delegated?: true;
   /** time a person was waited on: the whole step for gates, ask → answer otherwise */
   wait_ms: number;
   paths: { receipts: string[]; evidence: string[]; logs: string[]; briefings: string[] };
@@ -341,6 +369,8 @@ export interface RoundView {
   workflow: string;
   /** how it ended: finished by its workflow (`at: $done`) or by the person with `--force` at a step; null = the round under way */
   ended: { by: "workflow" | "person"; at: string } | null;
+  /** gh-196 D5 (B34): the reason of a supervisor's `--delegated` decision that started this round; absent = the person's own */
+  delegated_reason?: string;
 }
 
 export interface TraceView extends UnitTraceSummary {

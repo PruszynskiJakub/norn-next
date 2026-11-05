@@ -94,7 +94,12 @@ function storyTimeline(story: StorySnapshot, build: (u: UnitSnapshot, evs?: Trac
     units: [summary],
     steps: views.flatMap((v) => v.steps),
     hidden_events: views.reduce((n, v) => n + v.hidden_events, 0),
-    rounds: rounds.map((r) => ({ n: r.n, workflow: r.workflow, ended: roundEnd(r.unit.state) })),
+    rounds: rounds.map((r, i) => {
+      // gh-196 D5 (B34): the round receipt that started round i sits in round i-1's record
+      const start = (rounds[i - 1]?.unit.receipts ?? []).findLast((x) => x.receipt.kind === "round")?.receipt;
+      const delegated = start?.kind === "round" && start.delegated ? { delegated_reason: start.comment ?? "" } : {};
+      return { n: r.n, workflow: r.workflow, ended: roundEnd(r.unit.state), ...delegated };
+    }),
   };
 }
 

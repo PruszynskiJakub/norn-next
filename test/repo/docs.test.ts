@@ -347,4 +347,14 @@ describe("commands and flags the docs name exist (B35)", () => {
     expect(hits).toEqual([]);
     expect(mentions.length).toBeGreaterThan(0);
   });
+
+  // gh-196 prefactor (B16): the bundled skills print commands an agent runs as written
+  test("every norn command and flag in the bundled skills exists", () => {
+    const dir = join(ROOT, "packages/cli/assets/skills");
+    const files = readdirSync(dir).flatMap((s) => readdirSync(join(dir, s)).filter((f) => f.endsWith(".md")).map((f) => join(dir, s, f)));
+    const mentions = files.flatMap((f) => codeOf(read(f)).map(([n, code]) => [f, n, code] as const));
+    const hits = mentions.flatMap(([f, n, code]) => commandHits(code, table).map((h) => `${rel(f)}:${n} → ${h}: ${code.trim()}`));
+    expect(hits).toEqual([]);
+    expect(mentions.length).toBeGreaterThan(0);
+  });
 });

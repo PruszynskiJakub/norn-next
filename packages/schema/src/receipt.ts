@@ -47,6 +47,12 @@ const header = {
    * (absent = not recorded); a mailbox receipt for another round than the story's is stale.
    */
   round: Type.Optional(PosInt),
+  /**
+   * gh-196 D2 (B21, SK3): the receipt a supervisor sent on the person's behalf (`--delegated`). The cli
+   * writes it only on a human receipt and keeps `by` human, so decide reads it as the person's; the
+   * schema does not check `by`. Absent = the person's own.
+   */
+  delegated: Type.Optional(Type.Literal(true)),
 };
 
 function receipt<K extends string, P extends TProperties>(kind: K, props: P) {
@@ -125,6 +131,8 @@ export const AnswerReceipt = mailboxReceipt("answer", {
    * receipt, so the tick does not deliver it again. (`by: "agent"` answers, R6.1, are never delivered.)
    */
   delivered: Type.Optional(Type.Boolean()),
+  /** gh-196 D3: why (`--reason`); the cli refuses `--delegated` without it (reason_required), the schema does not require it */
+  comment: Type.Optional(Type.String()),
 });
 export const ApproveReceipt = mailboxReceipt("approve", {
   comment: Type.Optional(Type.String()),
@@ -285,6 +293,8 @@ export const RoundReceipt = receipt("round", {
   forced: Type.Boolean(),
   /** the step the old round is left at */
   left_at: Type.Union([StepName, Type.Literal("$done"), Type.Literal("$stuck")]),
+  /** gh-196 D3 (B34): why this workflow (`--reason`); the cli refuses `--delegated` without it, the schema does not require it */
+  comment: Type.Optional(Type.String()),
 });
 
 export const Receipt = TaggedUnion(

@@ -7,7 +7,7 @@
 import { cmd, formatAge, type InboxGroup } from "@norn/core";
 import type { RemoteProvider, StoryStatus } from "@norn/schema";
 import { inboxItemsInOrder } from "./format.ts";
-import type { ClaimView, PrView, ProjectView, SliceView, StoryView, UnitView } from "./types.ts";
+import type { ClaimView, DelegatedDecision, PrView, ProjectView, SliceView, StoryView, UnitView } from "./types.ts";
 
 /** Inbox groups that wait for the person (O1), in order. */
 const WAITING: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock", "check", "unclaimed"];
@@ -80,6 +80,8 @@ export interface OrientReport {
   /** open notes grouped by unit, the unit with the newest note first */
   notes: Array<{ unit: string; notes: OrientNote[] }>;
   note_count: number;
+  /** gh-196 D5 (B22): decisions a supervisor made on the person's behalf, oldest first */
+  delegated: DelegatedDecision[];
   look: { spec: string; trace: string; why: string; status: string };
 }
 
@@ -149,9 +151,13 @@ export function orientReport(view: ProjectView, key: string, provider: RemotePro
     running: items.filter((i) => i.group === "running").map(toItem),
     notes,
     note_count: story.notes.length,
+    delegated: story.delegated,
     look: { spec, trace: cmd.runList(focus), why: cmd.runView(focus, { why: true }), status: cmd.storyView(focus) },
   };
 }
+
+/** What a delegated decision did, e.g. `approve`, `rerun`, `round quick`. */
+const delegatedWhat = (d: DelegatedDecision): string => (d.kind === "round" ? `round ${d.workflow ?? ""}`.trim() : d.kind === "unstick" ? "rerun" : d.kind);
 
 /** One line for a unit: where it stands and how its last step ended. */
 function unitStanding(u: OrientUnit): string {
@@ -240,6 +246,11 @@ export function formatStoryView(r: OrientReport, now: number, o: { rules?: boole
     out.push("");
   }
   if (r.note_count) out.pop();
+  // gh-196 D5 (B22): what a supervisor decided on the person's behalf; none → no section
+  if (r.delegated.length) {
+    out.push("", `## Delegated (${r.delegated.length})`, "", "A supervisor decided these on the person's behalf (SK3); review what it let through.", "");
+    for (const d of r.delegated) out.push(`- ${d.unit}${d.round ? ` round ${d.round}` : ""} · ${d.step}: ${delegatedWhat(d)} — ${d.reason}`);
+  }
   out.push("", "## Where to look", "");
   out.push(`- Spec folder: \`${r.look.spec}\``, `- Every step and who acted: \`${r.look.trace}\``, `- Why norn did what it did: \`${r.look.why}\``, `- Status: \`${r.look.status}\``);
   return `${out.join("\n")}\n`;

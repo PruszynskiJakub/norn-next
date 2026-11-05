@@ -106,6 +106,10 @@
           "minimum": 1,
           "type": "integer"
         },
+        "delegated": {
+          "const": true,
+          "type": "boolean"
+        },
         "outcome": {
           "pattern": "^[a-z][a-z0-9_-]*$",
           "type": "string"
@@ -492,6 +496,10 @@
           "minimum": 1,
           "type": "integer"
         },
+        "delegated": {
+          "const": true,
+          "type": "boolean"
+        },
         "question": {
           "minLength": 1,
           "type": "string"
@@ -633,6 +641,10 @@
           "minimum": 1,
           "type": "integer"
         },
+        "delegated": {
+          "const": true,
+          "type": "boolean"
+        },
         "reason": {
           "minLength": 1,
           "type": "string"
@@ -739,6 +751,10 @@
           "minimum": 1,
           "type": "integer"
         },
+        "delegated": {
+          "const": true,
+          "type": "boolean"
+        },
         "answer": {
           "minLength": 1,
           "type": "string"
@@ -750,6 +766,9 @@
         },
         "delivered": {
           "type": "boolean"
+        },
+        "comment": {
+          "type": "string"
         }
       }
     },
@@ -851,6 +870,10 @@
         "round": {
           "minimum": 1,
           "type": "integer"
+        },
+        "delegated": {
+          "const": true,
+          "type": "boolean"
         },
         "comment": {
           "type": "string"
@@ -969,6 +992,10 @@
           "minimum": 1,
           "type": "integer"
         },
+        "delegated": {
+          "const": true,
+          "type": "boolean"
+        },
         "comment": {
           "type": "string"
         },
@@ -1076,6 +1103,10 @@
         "round": {
           "minimum": 1,
           "type": "integer"
+        },
+        "delegated": {
+          "const": true,
+          "type": "boolean"
         },
         "to": {
           "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
@@ -1195,6 +1226,10 @@
         "round": {
           "minimum": 1,
           "type": "integer"
+        },
+        "delegated": {
+          "const": true,
+          "type": "boolean"
         },
         "mode": {
           "anyOf": [
@@ -1326,6 +1361,10 @@
         "round": {
           "minimum": 1,
           "type": "integer"
+        },
+        "delegated": {
+          "const": true,
+          "type": "boolean"
         },
         "outcome": {
           "anyOf": [
@@ -1471,6 +1510,10 @@
         "round": {
           "minimum": 1,
           "type": "integer"
+        },
+        "delegated": {
+          "const": true,
+          "type": "boolean"
         },
         "how": {
           "anyOf": [
@@ -1661,6 +1704,10 @@
         "round": {
           "minimum": 1,
           "type": "integer"
+        },
+        "delegated": {
+          "const": true,
+          "type": "boolean"
         },
         "outcome": {
           "pattern": "^[a-z][a-z0-9_-]*$",
@@ -1879,6 +1926,10 @@
           "minimum": 1,
           "type": "integer"
         },
+        "delegated": {
+          "const": true,
+          "type": "boolean"
+        },
         "name": {
           "minLength": 1,
           "type": "string"
@@ -2006,6 +2057,10 @@
         "round": {
           "minimum": 1,
           "type": "integer"
+        },
+        "delegated": {
+          "const": true,
+          "type": "boolean"
         },
         "previous_holder": {
           "anyOf": [
@@ -2162,6 +2217,10 @@
           "minimum": 1,
           "type": "integer"
         },
+        "delegated": {
+          "const": true,
+          "type": "boolean"
+        },
         "from": {
           "anyOf": [
             {
@@ -2301,6 +2360,10 @@
           "minimum": 1,
           "type": "integer"
         },
+        "delegated": {
+          "const": true,
+          "type": "boolean"
+        },
         "workflow": {
           "minLength": 1,
           "type": "string"
@@ -2331,6 +2394,9 @@
               "type": "string"
             }
           ]
+        },
+        "comment": {
+          "type": "string"
         }
       }
     }

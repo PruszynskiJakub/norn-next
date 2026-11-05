@@ -16,6 +16,14 @@ function cut(text: string, max: number): string {
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
 
+/** gh-196 D5 (B21): how a receipt a supervisor sent on the person's behalf is marked. */
+export const DELEGATED_MARK = "delegated (supervisor)";
+export const delegatedMark = (r: Receipt): string => (r.delegated ? ` — ${DELEGATED_MARK}` : "");
+/** A decision's tail: its delegated mark, then its reason (`--reason`) when it has one. */
+export const decisionSuffix = (r: Receipt & { comment?: string }): string => `${delegatedMark(r)}${r.comment ? `: ${r.comment}` : ""}`;
+/** An answer receipt's line: its delegated mark, the answer, then its reason in brackets (one text for timeline and steps). */
+export const answerText = (r: Extract<Receipt, { kind: "answer" }>): string => `answer${delegatedMark(r)}: ${r.answer}${r.comment ? ` (${r.comment})` : ""}`;
+
 const at = (r: Receipt) => `${r.step}#${r.attempt}`;
 
 /** One-line summary of a receipt (cut to `max` chars; `Infinity` keeps it whole). */
@@ -31,14 +39,14 @@ export function receiptSummary(r: Receipt, max = MAX): string {
     case "stuck":
       return oneLine(`stuck at ${at(r)}: ${r.reason}`);
     case "answer":
-      return oneLine(`answer: ${r.answer}`);
+      return oneLine(answerText(r));
     case "approve":
-      return oneLine(`approve ${r.step}${r.comment ? `: ${r.comment}` : ""}`);
+      return oneLine(`approve ${r.step}${decisionSuffix(r)}`);
     case "reject":
-      return oneLine(`reject ${r.step}${r.comment ? `: ${r.comment}` : ""}`);
+      return oneLine(`reject ${r.step}${decisionSuffix(r)}`);
     case "unstick": {
       const parts = [r.to ? `to ${r.to}` : null, r.reset?.length ? `reset ${r.reset.join(", ")}` : null].filter(Boolean);
-      return oneLine(`unstick${parts.length ? ` ${parts.join(", ")}` : ""}${r.comment ? `: ${r.comment}` : ""}`);
+      return oneLine(`unstick${parts.length ? ` ${parts.join(", ")}` : ""}${decisionSuffix(r)}`);
     }
     case "mode":
       return `mode ${r.previous} → ${r.mode}`;
@@ -59,7 +67,7 @@ export function receiptSummary(r: Receipt, max = MAX): string {
     case "update":
       return oneLine(`update by ${r.who ?? r.by}: ${r.from} → ${r.to} (BS9)`);
     case "round":
-      return oneLine(`new round by ${r.who ?? r.by}: ${r.workflow} at ${r.to}${r.forced ? " (forced)" : ""}`);
+      return oneLine(`new round by ${r.who ?? r.by}: ${r.workflow} at ${r.to}${r.forced ? " (forced)" : ""}${decisionSuffix(r)}`);
   }
 }
 

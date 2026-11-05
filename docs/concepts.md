@@ -135,7 +135,8 @@ A repo without the key works as before; `doctor` and `status` hint to run `norn 
 | run | One attempt at a step; it produces receipts. |
 | outcome | How a step ended, spelled as its reporter types it (`done`, `approve`, `stuck`, …). |
 | counter | A named bound on a retry, nudge or loop; past its max the unit is stuck. |
-| gate | A step where a person approves or rejects. |
+| gate | A step where a person approves or rejects, or a supervisor they delegated to. |
+| supervisor | An agent in the main checkout that takes the stories a person names through their rounds with norn's commands only (`norn-fsd-round`, `norn-fsd`); its gate decisions, answers and round starts are recorded as delegated, with their reason. |
 | check | A step that runs a command; its exit code is the outcome. |
 | attended step | An agent step done with a person in the pane. |
 | mode | Who starts a story's unattended agent steps: a person (`manual`) or norn (`auto`). |

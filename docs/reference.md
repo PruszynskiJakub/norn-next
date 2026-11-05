@@ -113,28 +113,33 @@ norn story wait <story|slice> --until <step=<name>|gate|ask|stuck|done|merged> [
 Answer the question a unit is parked on; a prompt in an agent's pane gets the keys it expects
 
 ```sh
-norn story answer [<story|unit>] "<text>"   (a choice prompt: the option number, e.g. "1")
+norn story answer [<story|unit>] "<text>" [--reason "…" --delegated]   (a choice prompt: the option number, e.g. "1")
 ```
+
+- `--reason "…"`: why this answer, kept on the answer receipt
+- `--delegated`: a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason (SK3)
 
 ##### `norn story approve`
 
 Approve the gate a unit waits at
 
 ```sh
-norn story approve [<story|slice>] [--reason "…"]
+norn story approve [<story|slice>] [--reason "…"] [--delegated]
 ```
 
 - `--reason <text>`: a comment kept on the approve receipt
+- `--delegated`: a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason (SK3)
 
 ##### `norn story reject`
 
 Reject the gate a unit waits at, with the reason the next attempt gets
 
 ```sh
-norn story reject [<story|slice>] --reason "…"
+norn story reject [<story|slice>] --reason "…" [--delegated]
 ```
 
 - `--reason <text>`: required: what failed; the agent sent back gets it
+- `--delegated`: a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason (SK3)
 
 ##### `norn story update-branch`
 
@@ -167,7 +172,7 @@ norn story chat [<story>] [--json]
 Switch a story between auto and manual mode, or choose a unit's workflow
 
 ```sh
-norn story edit [<story|slice>] --auto|--manual | --workflow <name> [--at <step>] [--force] | --at <step>
+norn story edit [<story|slice>] --auto|--manual | --workflow <name> [--at <step>] [--force] [--reason "…" --delegated] | --at <step>
 ```
 
 - `--auto`: the heartbeat starts the story's agent steps (MO1)
@@ -175,6 +180,8 @@ norn story edit [<story|slice>] --auto|--manual | --workflow <name> [--at <step>
 - `--workflow <name>`: the unit's workflow: set before it starts; on a started story, the next round's; on a started slice, switched with --at
 - `--at <step>`: with --workflow: the step the new round (story) or the switched slice lands on (S7); alone: move the current round's cursor to that step
 - `--force`: with --workflow on a story (not a slice): end its unfinished round (recorded as ended by you) and start the new one
+- `--reason "…"`: with --workflow on a started story: why this workflow, kept on the round receipt
+- `--delegated`: a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason (SK3)
 
 ##### `norn story checkout`
 
@@ -272,12 +279,13 @@ norn run attach [<unit>] | norn run attach --next
 Resume a stuck, parked or gate-waiting unit in a fresh session, optionally --step elsewhere and --reset counters
 
 ```sh
-norn run rerun [<unit>] [--step <step>] [--reset <counter>]… [--reason "…"]
+norn run rerun [<unit>] [--step <step>] [--reset <counter>]… [--reason "…"] [--delegated]
 ```
 
 - `--step <step>`: move the unit to another step of its pinned workflow
 - `--reset <counter>`: reset a workflow counter to 0 (repeatable)
 - `--reason "…"`: why, journaled in the receipt
+- `--delegated`: a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason (SK3)
 
 ##### `norn run cancel`
 

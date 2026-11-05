@@ -17,7 +17,7 @@ import { machineHolder, readActFailures, writeActFailures } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
 import { failure, refuse, usageError } from "../output.ts";
-import { at, humanReceipt, stepOnlyReceipt, resolveTarget, type Route, runHumanVerb, type Target } from "../runtime/human.ts";
+import { at, DELEGATED_HELP, DELEGATED_OPTION, delegatedFields, delegation, humanReceipt, stepOnlyReceipt, resolveTarget, type Route, runHumanVerb, type Target } from "../runtime/human.ts";
 import { parkedOn, targetKey } from "../runtime/target.ts";
 
 const asks = (st: UnitState) => st.status === "parked" && st.park?.kind === "ask";
@@ -26,15 +26,18 @@ export const storyAnswerCommand = defineCommand({
   name: "story answer",
   version: "acts",
   summary: "Answer the question a unit is parked on (B24, O2); a prompt in an agent's pane gets the keys it expects (R6.2)",
-  usage: 'norn story answer [<story|unit>] "<text>"   (a choice prompt: the option number, e.g. "1")',
+  usage: 'norn story answer [<story|unit>] "<text>" [--reason "…" --delegated]   (a choice prompt: the option number, e.g. "1")',
+  options: { reason: { type: "string" }, ...DELEGATED_OPTION },
+  optionHelp: { '--reason "…"': "why this answer, kept on the answer receipt", ...DELEGATED_HELP },
   positionals: { min: 1, max: 2 },
   async run(ctx, args) {
     const [unit, raw] = args.positionals.length === 2 ? (args.positionals as [string, string]) : [undefined, args.positionals[0] as string];
     const text = raw.trim();
     if (!text) throw usageError("the answer is empty", 'norn story answer <unit> "<text>"');
+    const d = delegation(ctx, args, "story answer");
     const key = await targetKey(ctx, unit, args.json === true, parkedOn("ask", "story answer", "Nothing waits for an answer", (k) => cmd.storyAnswer(k)));
     // gh-195 B20: a `local` story held elsewhere: the step its last boundary led to, checked by the holder
-    const t = await resolveTarget(ctx, key, asks, { stepOnly: (t, step) => stepOnlyReceipt(ctx, t, step, "answer", { answer: text }) });
+    const t = await resolveTarget(ctx, key, asks, { stepOnly: (t, step) => stepOnlyReceipt(ctx, t, step, "answer", { answer: text, ...delegatedFields(d) }) });
     const out = await runHumanVerb(ctx, t, {
       verb: "story answer",
       mailbox: true,
@@ -42,7 +45,7 @@ export const storyAnswerCommand = defineCommand({
         if (!asks(st))
           throw refuse(`${t.key} is not waiting for an answer: it is at ${at(st)}`, nextCommand(t.key, st) ?? cmd.storyView(t.story), "not_parked_on_ask");
       },
-      build: (t, st) => humanReceipt(ctx, t, st, "answer", { answer: text, ...(st.park?.receipt_id ? { ask_receipt_id: st.park.receipt_id } : {}) }),
+      build: (t, st) => humanReceipt(ctx, t, st, "answer", { answer: text, ...delegatedFields(d), ...(st.park?.receipt_id ? { ask_receipt_id: st.park.receipt_id } : {}) }),
       before: (t, st, route, receipt) => typeIntoPrompt(ctx, t, st, route, receipt, text),
     });
     return out;
