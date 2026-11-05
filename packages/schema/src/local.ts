@@ -209,7 +209,7 @@ export type LocalNoticesFile = Static<typeof LocalNoticesFile>;
 /**
  * gh-195 D12 (B21, T9): one mailbox receipt this holder's tick rejected, kept next to the notices so a
  * stale answer or approval shows as a Check item. It clears on its own (a later answer or approval of
- * the story accepted, or the story finished); nothing deletes an entry but `norn tidy`'s age.
+ * the story accepted, or the story finished); `norn tidy` drops the ones older than `trace.retain`.
  */
 export const RejectedMailboxReceipt = Type.Object(
   {

@@ -319,5 +319,20 @@ describe("a receipt the holder rejects (B21)", () => {
     expect((await checkItems("gh-26")).map((i) => i.title)).toEqual([title("gh-26", "implement")]);
     expect(h.state(s26.runs())).toMatchObject({ step: "implement" });
   });
+
+  test("F3: norn tidy drops the rejected receipts older than trace.retain", async () => {
+    const ids = JSON.parse(h.read(rejectedReceiptsPath(h.root))).receipts.map((r: { receipt_id: string }) => r.receipt_id);
+    expect(ids.length).toBeGreaterThanOrEqual(3);
+    const kept = await h.norn("tidy", "--json");
+    expect(kept.value).toMatchObject({ removed: { rejected_receipts: [] } });
+    h.clock.advance(15 * 86_400_000);
+    const dry = await h.norn("tidy", "--dry-run", "--json");
+    expect(dry.value).toMatchObject({ would_remove: { rejected_receipts: ids } });
+    expect(JSON.parse(h.read(rejectedReceiptsPath(h.root))).receipts).toHaveLength(ids.length);
+    const r = await h.norn("tidy", "--json");
+    expect(r.value).toMatchObject({ removed: { rejected_receipts: ids } });
+    expect(JSON.parse(h.read(rejectedReceiptsPath(h.root))).receipts).toEqual([]);
+    expect(await checkItems("gh-26")).toEqual([]);
+  });
 });
 

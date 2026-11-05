@@ -78,6 +78,17 @@ export function addRejectedReceipt(root: string, entry: RejectedMailboxReceipt):
   atomicWriteJson(rejectedReceiptsPath(root), { receipts: [...all, entry] });
 }
 
+/**
+ * gh-195 D12: drop the rejected mailbox receipts rejected before `before` (ISO), as `norn tidy` ages the
+ * trace out (`trace.retain`); returns the ones dropped (`dry`: only lists them).
+ */
+export function pruneRejectedReceipts(root: string, before: string, dry: boolean): RejectedMailboxReceipt[] {
+  const all = readRejectedReceipts(root);
+  const old = all.filter((r) => r.rejected_at < before);
+  if (old.length && !dry) atomicWriteJson(rejectedReceiptsPath(root), { receipts: all.filter((r) => r.rejected_at >= before) });
+  return old;
+}
+
 /** GR6: a merged story whose `status: done` record on the base branch is still owed (deferred or failed). */
 export interface PendingRecord {
   story: string;
