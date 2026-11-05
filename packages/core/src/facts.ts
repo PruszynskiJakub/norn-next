@@ -124,6 +124,8 @@ export interface ActFailure {
   attempt: number;
   /** the session a failed delivery targeted, so the inbox can say how to reach it */
   session?: { runner: string; session_id: string; pane_id?: string };
+  /** gh-195 (08-F4): a record push refused as stale (`StoryFacts.record.refused`): the sha it leased on (null = none) */
+  lease?: string | null;
 }
 
 export interface UnitFacts {
@@ -357,6 +359,22 @@ export interface StoryFacts {
    * Absent = not observed (another holder, or the policy is local).
    */
   record?: { tree: string | null; pushed: { sha: string; tree: string } | null };
+  /**
+   * gh-195 (08-F4, review F2): the last record push of this holder refused as stale (another checkout
+   * pushed the ref), kept machine-local in the story's own slot of `failures.json` apart from the story
+   * unit's act failure (`lease`: the sha it leased on, null = none); dropped by the tick once the claim
+   * is not here or the policy is `local`. While `record` is observed, decide pushes again only once the
+   * record ref here is another one; the inbox shows one Check item meanwhile. Absent = none.
+   */
+  record_refused?: ActFailure;
+  /**
+   * gh-195 (review#2 F3): this checkout has the story's record ref (`refs/norn/runs/<story>`, this commit)
+   * but its story unit has no run state: the record was not put in place (a checkout cut short). decide
+   * starts nothing over then. Absent = no such ref, or the story unit has run state.
+   */
+  record_unplaced?: string;
+  /** gh-195 B33 (review#2 F1): held here, read from its record in the machine dir alone — no branch, no spec in any tree */
+  record_only?: boolean;
   /**
    * NT2/NT3: notes for a person from `done` receipts of any unit of the story that no story-level
    * gate `approve` acknowledged yet, oldest first. Absent = none (or not observed).

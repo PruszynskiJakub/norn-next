@@ -9,7 +9,7 @@
  * tick's hook-file backfill (`backfillHooks`, D5).
  */
 import { existsSync, readdirSync } from "node:fs";
-import { type ActFailure, type FileError, hookWindowMs, type NumberedReceipt, openNotes, RE_ENTRY_KINDS, readyApproval, type StepRunFacts, type StoryFacts, storyWorktreePath } from "@norn/core";
+import { type ActFailure, type FileError, hookWindowMs, type NumberedReceipt, openNotes, RE_ENTRY_KINDS, readyApproval, recordPushSlot, type StepRunFacts, type StoryFacts, storyWorktreePath } from "@norn/core";
 import { type HookFact, type LeaseFile, parseDuration, parseReceiptFileName, type ReceiptOf, type RejectedMailboxReceipt, type RunInfo, type UnitState } from "@norn/schema";
 import { type BaseFactsCache, type IssueFactsCache, type PrFactsCache, readBaseFacts, readIssueFacts, readPrFacts } from "./base.ts";
 import { readActFailures } from "./heartbeat.ts";
@@ -18,6 +18,7 @@ import { type BackfillRun, backfillHookFiles } from "./hook-backfill.ts";
 import { type LeaseListing, type LeaseLiveness, listLeases } from "./leases.ts";
 import { receiptsDir } from "./paths.ts";
 import { readReceipt } from "./receipts.ts";
+import { localRecordRefs } from "./record-ref.ts";
 import { loadSnapshot, type RepoSnapshot, type StorySnapshot, type UnitSnapshot, withSliceWorktrees } from "./snapshot.ts";
 import { worktreeSkillsDrift } from "./skills.ts";
 import { readUnitHooks, unitHooksChangedAt } from "./trace.ts";
@@ -93,6 +94,10 @@ export interface LocalStory {
   notes?: StoryFacts["notes"];
   /** F35/C5: the story unit's ready approval (`readyApproval`) */
   ready?: { sha: string; at: string };
+  /** gh-195 (08-F4, review F2): the story's refused record push, from its own slot of failures.json (`StoryFacts.record_refused`) */
+  record_refused?: ActFailure;
+  /** gh-195 (review#2 F3): the local record ref's commit while the story unit has no run state (`StoryFacts.record_unplaced`) */
+  record_unplaced?: string;
   /** gh-195 D12 (B21): mailbox receipts this checkout rejected that no later accepted answer or approval cleared */
   rejected?: RejectedMailboxReceipt[];
 }
@@ -162,6 +167,7 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
   const unitHooks = readUnitHooks(root, hooked.map((u) => u.unit), starts.sort()[0] as string);
   const hooksOf = new Map(hooked.map((u, i) => [u, (unitHooks[i] ?? []).map((e) => e.fact)]));
   const drift = skillsDriftOf(opts);
+  let refs: Map<string, string> | undefined;
   const stories = placed.map(({ s, storyWt, units: us }): LocalStory => {
     const units = us.map(({ u, worktree }) => {
       const lu = localUnit(root, s, u, worktree, hooksOf.get(u) ?? [], live, failures);
@@ -171,8 +177,20 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
     });
     const ready = readyOf(s, s.units[0]);
     const notes = openNotes(s.units.map((u) => ({ unit: u.unit.key, receipts: receiptsOfKinds(s, u, ["done", "approve"]) })));
+    const refused = failures[recordPushSlot(s.key)];
+    // review#2 F3: a record ref here while the story unit has no run state — the record is not in place
+    const unplaced = !s.units[0]?.state ? (refs ??= localRecordRefs(root)).get(s.key) : undefined;
     const open = openRejections(s, rejected);
-    return { snapshot: s, worktree: storyWt, units, ...(notes.length ? { notes } : {}), ...(ready ? { ready } : {}), ...(open.length ? { rejected: open } : {}) };
+    return {
+      snapshot: s,
+      worktree: storyWt,
+      units,
+      ...(notes.length ? { notes } : {}),
+      ...(ready ? { ready } : {}),
+      ...(refused ? { record_refused: refused } : {}),
+      ...(unplaced ? { record_unplaced: unplaced } : {}),
+      ...(open.length ? { rejected: open } : {}),
+    };
   });
   // gh-61 D5, B12: the version the main checkout's team config records
   const mainDrift = drift(root);

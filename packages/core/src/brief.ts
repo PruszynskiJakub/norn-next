@@ -26,6 +26,7 @@ import { epoch, iso } from "./time.ts";
 import { edgeOf, reportableOutcomes, stepOf } from "./workflow.ts";
 import { cmd } from "./commands.ts";
 import { handoffCounters, handoffLastOutcome } from "./handoff.ts";
+import { branchRewrittenLine } from "./apply.ts";
 
 export interface BriefInput {
   unit: UnitRef;
@@ -132,6 +133,8 @@ export interface BriefJson {
     retry: { outcome: string; detail: string | null; at: string } | null;
     /** C2: an earlier attempt of this step reported on older code, and the outcomes recorded since */
     earlier: { attempt: number; outcome: string; since: string[] } | null;
+    /** T5a (gh-195 B24): a takeover restarted the step because the story branch was rewritten since the record */
+    rewritten?: { gone: string; head: string; line: string } | null;
   } | null;
   work: { skill: string; instructions: string | null; description: string | null };
   inputs: Array<{ kind: string; label: string; ref: string }>;
@@ -349,7 +352,14 @@ function history(input: BriefInput, rw: BriefJson["rework"]): BriefJson["history
   const idx = rw ? -1 : receipts.findLastIndex(({ receipt: r }) => r.kind === "done" && r.step === st.step && r.attempt !== st.attempt);
   const prev = receipts[idx]?.receipt;
   const earlier = prev?.kind === "done" ? { attempt: prev.attempt, outcome: prev.outcome, since: movesAfter(receipts, idx) } : null;
-  return retry || earlier ? { retry, earlier } : null;
+  // T5a (gh-195 B24): this attempt is the one a takeover started because the branch was rewritten —
+  // the last such take, with every receipt after it written at this cursor (review F3: the step it
+  // restarted may be another than the one it was written at)
+  const at = receipts.findLastIndex(({ receipt: r }) => r.kind === "take" && !!r.rewritten);
+  const take = at >= 0 && receipts.slice(at + 1).every(({ receipt: r }) => r.step === st.step && r.attempt === st.attempt) ? receipts[at]?.receipt : undefined;
+  const rewritten = take?.kind === "take" && take.rewritten ? { gone: take.rewritten.gone, head: take.rewritten.head, line: branchRewrittenLine(st.story, take.rewritten.gone, st.step, st.attempt) } : null;
+  if (!retry && !earlier && !rewritten) return null;
+  return rewritten ? { retry, earlier, rewritten } : { retry, earlier };
 }
 
 /**
@@ -575,6 +585,11 @@ function markdown(b: BriefJson): string {
   const h = b.history;
   if (h) {
     out.push("## Why this attempt", "");
+    if (h.rewritten)
+      out.push(
+        `${h.rewritten.line[0]?.toUpperCase()}${h.rewritten.line.slice(1)}. The record judged code that is no longer on the branch: do this step again in full on the current HEAD (\`${h.rewritten.head.slice(0, 12)}\`).`,
+        "",
+      );
     if (h.retry)
       out.push(
         `A previous session of this attempt ended without reporting (\`${h.retry.outcome}\`${h.retry.detail ? `: ${h.retry.detail}` : ""}). This is a fresh session: nothing it did counts as reported. Look at \`git status\`, \`git log\` and the handoff's Progress for partial work, then finish the step.`,

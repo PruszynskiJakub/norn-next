@@ -2,7 +2,7 @@
 id: gh-195/10
 title: Takeover unpacks the record from the ref
 depends_on: [ gh-195/09 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
@@ -29,3 +29,5 @@ Behaviour: B22, B23, B24, B33 (the checkout half). Seams: S1. Out: no ref at all
 
 ## Notes
 D10 (a ref exists branch), D6 (checkout fetches the one ref it needs). Unpack validates every JSON before renaming into place (S1, S2).
+
+Known limits (review#2 F7): a rewritten story branch restarts only the story unit's step (D10: "the cursor's step"). In a sliced story the story cursor sits at `slices`, so the slices — on their own branches — keep their cursors, and a stuck or `$done` unit gets no notice beyond the take receipt's `rewritten`.

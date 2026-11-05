@@ -225,7 +225,8 @@ export const ClassifyReceipt = receipt("classify", {
 });
 /**
  * R10.1 (M8): a `norn story checkout` of the story, forced or not, recorded on the story unit. Informational:
- * applied at any cursor (like `mode`), it moves nothing; `norn run list` / `why` show it.
+ * applied at any cursor (like `mode`), it moves nothing, unless it says the branch was `rewritten` (T5a);
+ * `norn run list` / `why` show it.
  */
 export const TakeReceipt = receipt("take", {
   /** `user@machine` of the claim taken over; null when the claim was free */
@@ -235,6 +236,11 @@ export const TakeReceipt = receipt("take", {
   expired: Type.Boolean(),
   /** `take --force` over an unexpired or corrupt claim (T5) */
   forced: Type.Optional(Type.Boolean()),
+  /**
+   * T5a (gh-195 B24): the story branch was rewritten since the record (`gone`, its `Norn-Branch-Commit`,
+   * is not an ancestor of `head`): applied at the cursor it names, the step restarts as a new attempt
+   */
+  rewritten: Type.Optional(Type.Object({ gone: GitSha, head: GitSha }, { additionalProperties: false })),
 });
 /**
  * BS9: `norn story update-branch <story>` — a person sends the story unit back to its base-update step (from a

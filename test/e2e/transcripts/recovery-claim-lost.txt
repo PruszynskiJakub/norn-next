@@ -34,6 +34,7 @@
   spawn repo $ git worktree list --porcelain -z
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
+  spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/runs/
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
   spawn repo-worktrees/gh-9-add-search $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
   spawn repo-worktrees/gh-9-add-search $ git status --porcelain=v2 --branch -z --untracked-files=all
@@ -62,6 +63,7 @@
   spawn repo $ git worktree list --porcelain -z
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
+  spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/runs/
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
   spawn repo-worktrees/gh-9-add-search $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
   spawn repo-worktrees/gh-9-add-search $ git status --porcelain=v2 --branch -z --untracked-files=all
@@ -126,13 +128,16 @@
   spawn repo-b $ git rev-parse --verify --quiet refs/norn/claims/gh-9
   spawn repo-b $ git fetch --quiet --no-tags origin +refs/norn/claims/gh-9:refs/norn/claims/gh-9
   spawn repo-b $ git cat-file blob <sha:3>
+  spawn repo-b $ git ls-remote origin refs/norn/runs/gh-9
+  spawn repo-b $ git fetch --quiet --no-tags origin +refs/heads/gh-9-add-search:refs/remotes/origin/gh-9-add-search "+refs/heads/gh-9/*:refs/remotes/origin/gh-9/*"
+  spawn repo-b $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-9-add-search
+  spawn repo-b $ git rev-parse --verify --quiet --end-of-options refs/remotes/origin/gh-9-add-search
   spawn repo-b $ git ls-remote origin refs/norn/claims/gh-9
   spawn repo-b $ git rev-parse --verify --quiet refs/norn/claims/gh-9
   spawn repo-b $ git cat-file blob <sha:3>
   spawn repo-b $ git hash-object -w --stdin
   spawn repo-b $ git push --porcelain --force-with-lease=refs/norn/claims/gh-9:<sha:3> origin <sha:5>:refs/norn/claims/gh-9
   spawn repo-b $ git update-ref refs/norn/claims/gh-9 <sha:5>
-  spawn repo-b $ git fetch --quiet --no-tags origin +refs/heads/gh-9-add-search:refs/remotes/origin/gh-9-add-search "+refs/heads/gh-9/*:refs/remotes/origin/gh-9/*"
   spawn repo-b $ git worktree list --porcelain -z
   spawn repo-b $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-9-add-search
   spawn repo-b $ git rev-parse --verify --quiet --end-of-options refs/remotes/origin/gh-9-add-search

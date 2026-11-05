@@ -8,7 +8,7 @@
  * F35, Q6), Unclaimed, Running, Notes (agents' notes for a person, NT2: information, not an
  * action), Recently done.
  */
-import { ATTENDED_WAIT, parseDuration, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
+import { ATTENDED_WAIT, parseDuration, recordRef, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
 import { baseRunStateHint, cmd, NO_VERSION_HINT, nextCommand, skillsDriftHint, startAgentCommand, versionMismatch } from "../commands.ts";
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../criteria.ts";
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
@@ -169,6 +169,35 @@ function baseRunStateItem(facts: Facts): InboxItem | null {
     detail: stories.join(", "),
     command: cmd.upgrade(),
     since: iso(facts.now),
+  };
+}
+
+/**
+/** gh-195 (08-F4): the act failure effect of a record push refused as stale (`ActFailure.lease`) */
+export const RECORD_PUSH_EFFECT = "record_push";
+/** gh-195 (review F2): the machine-local failures slot of a story's refused record push, apart from every unit's */
+export const recordPushSlot = (story: string): string => `record:${story}`;
+
+/**
+ * gh-195 (08-F4): this checkout holds the story under `remote`, but its record push was refused as
+ * stale: another checkout pushed `refs/norn/runs/<story>`. One Check item, whatever the cursor, until a
+ * push lands (the tick drops it once the claim is not here or the policy is `local`, review F2);
+ * `norn story checkout` here fetches the ref (this checkout's run state kept), so the next push goes on top.
+ */
+function recordPushItem(story: StoryFacts): InboxItem | null {
+  const f = story.record_refused;
+  if (!f) return null;
+  return {
+    id: `record-push:${story.key}:${f.lease ?? "none"}`,
+    group: "check",
+    story: story.key,
+    slice: null,
+    step: null,
+    title: `record push to ${recordRef(story.key)} refused: another checkout pushed it since this one last saw it (${f.lease ? short(f.lease) : "none"}); pushes wait`,
+    detail: `${f.reason} · tick ${f.tick_id}`,
+    command: cmd.storyCheckout(story.key),
+    since: f.at,
+    ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
   };
 }
 
@@ -858,6 +887,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
     add(retargetItem(story, facts.repo.default_branch));
     add(finishedRoundRemoteItem(story, config, facts.repo.default_branch));
     for (const it of foreignCommitItems(story)) add(it);
+    add(recordPushItem(story));
     for (const it of rejectedItems(story)) add(it);
     for (const it of noteItems(story)) add(it);
     for (const uf of story.units) {

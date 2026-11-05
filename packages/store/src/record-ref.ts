@@ -113,7 +113,7 @@ async function writeRecordTree(root: string, story: RunStory): Promise<string | 
 }
 
 /** The `Norn-Branch-Commit` a record commit names; null = none (a story without a branch, B33). */
-async function branchCommitOf(root: string, sha: string): Promise<string | null> {
+export async function recordBranchCommit(root: string, sha: string): Promise<string | null> {
   const r = await git(root, ["log", "-1", "--format=%(trailers:key=Norn-Branch-Commit,valueonly)", sha]);
   return r.code === 0 ? r.stdout.trim() || null : null;
 }
@@ -140,7 +140,7 @@ export async function pushRecord(
 ): Promise<RecordPushResult> {
   const tree = await writeRecordTree(root, story);
   if (tree === null) return { ok: true, pushed: false, reason: "empty", sha: o.expected };
-  if (o.expected !== null && (await readLocalRef(root, `${o.expected}^{tree}`)) === tree && (await branchCommitOf(root, o.expected)) === o.branch_commit)
+  if (o.expected !== null && (await readLocalRef(root, `${o.expected}^{tree}`)) === tree && (await recordBranchCommit(root, o.expected)) === o.branch_commit)
     return { ok: true, pushed: false, reason: "unchanged", sha: o.expected };
   const trailers = [`Norn-Story: ${story.key}`, ...(o.branch_commit ? [`Norn-Branch-Commit: ${o.branch_commit}`] : []), `Norn-Holder: ${o.holder}`];
   const message = `norn: record ${story.key}\n\n${trailers.join("\n")}\n`;
@@ -213,11 +213,55 @@ export type UnpackResult = { ok: true; files: number } | { ok: false; errors: Fi
 
 /** `unpackRecord` for a synchronous reader (the snapshot's archive cache, gh-195/16): the same checks and the same rename into place. */
 export function unpackRecordSync(root: string, sha: string, dest: string): UnpackResult {
+  const staged = stageRecordSync(root, sha, dest);
+  if (!staged.ok) return staged;
+  try {
+    staged.place();
+    return { ok: true, files: staged.files };
+  } finally {
+    staged.discard();
+  }
+}
+
+/**
+ * A record extracted and validated beside its destination, not in place yet (`dir`: the staged folder,
+ * laid out as `dest` will be, so a caller may add a file to it first): `place()` renames it into place,
+ * replacing `dest` whole (S1); `discard()` drops what is left (a no-op once placed).
+ */
+export type StagedRecord = { ok: true; files: number; dir: string; place(): void; discard(): void } | { ok: false; errors: FileError[] };
+
+/**
+ * review#2 F3: a `dest` an interrupted `place()` moved aside and never swapped back is put back, and the
+ * staging folders a killed process left beside it are dropped, before anything is staged there again.
+ */
+function recoverPlace(dest: string): void {
+  const parent = dirname(dest);
+  const aside = asideOf(dest);
+  if (!existsSync(dest) && existsSync(aside)) renameSync(aside, dest);
+  else rmSync(aside, { recursive: true, force: true });
+  let names: string[] = [];
+  try {
+    names = readdirSync(parent);
+  } catch (e) {
+    if (!isErrno(e, "ENOENT")) throw e;
+  }
+  for (const n of names) if (n.startsWith(`.${basename(dest)}.unpack-`)) rmSync(join(parent, n), { recursive: true, force: true });
+}
+const asideOf = (dest: string): string => join(dirname(dest), `.${basename(dest)}.replaced`);
+
+/**
+ * D3 (S1, S2): the checks of `unpackRecord` — hostile entries refused, every file extracted into a temp
+ * folder beside `dest`, every JSON parsed and each state, pinned workflow and receipt validated — with
+ * the rename left to the caller, so a command can check a record before it changes anything else
+ * (gh-195/10 review F1: `story checkout` validates before it claims). A failing record leaves nothing.
+ */
+export function stageRecordSync(root: string, sha: string, dest: string): StagedRecord {
   const staging = join(dirname(dest), `.${basename(dest)}.unpack-${process.pid}`);
   const fail = (path: string, message: string): FileError => ({ file: join(dest, path), errors: [{ path: "", message }] });
   const { entries, refused } = recordEntries(root, sha, staging, fail);
   if (refused.length) return { ok: false, errors: refused };
-  rmSync(staging, { recursive: true, force: true });
+  const discard = () => rmSync(staging, { recursive: true, force: true });
+  recoverPlace(dest);
   try {
     mkdirSync(staging, { recursive: true });
     for (const e of entries) {
@@ -238,26 +282,33 @@ export function unpackRecordSync(root: string, sha: string, dest: string): Unpac
           const file = e.file.replace(staging, dest);
           if (!named.has(file)) errors.push({ ...e, file });
         }
-    if (errors.length) return { ok: false, errors };
-    fsyncTree(staging);
-    if (!existsSync(dest)) renameSync(staging, dest);
-    else {
-      // rename cannot replace a non-empty folder: move the old one aside, swap, then drop it
-      const old = `${staging}.old`;
-      rmSync(old, { recursive: true, force: true });
-      renameSync(dest, old);
-      try {
-        renameSync(staging, dest);
-      } catch (err) {
-        renameSync(old, dest);
-        throw err;
-      }
-      rmSync(old, { recursive: true, force: true });
+    if (errors.length) {
+      discard();
+      return { ok: false, errors };
     }
-    return { ok: true, files: entries.length };
-  } finally {
-    rmSync(staging, { recursive: true, force: true });
+    fsyncTree(staging);
+  } catch (err) {
+    discard();
+    throw err;
   }
+  const place = () => {
+    // into an empty place: one rename (S1)
+    if (!existsSync(dest)) return renameSync(staging, dest);
+    // rename cannot replace a non-empty folder: the old one goes aside under a fixed name, the new one
+    // in, then the old one is dropped; a crash between the two renames is undone by the next stage
+    // (`recoverPlace`), so `dest` is never lost
+    const aside = asideOf(dest);
+    rmSync(aside, { recursive: true, force: true });
+    renameSync(dest, aside);
+    try {
+      renameSync(staging, dest);
+    } catch (err) {
+      renameSync(aside, dest);
+      throw err;
+    }
+    rmSync(aside, { recursive: true, force: true });
+  };
+  return { ok: true, files: entries.length, dir: staging, place, discard };
 }
 
 /** gh-195 D7: story key → record commit of every archive ref this checkout has (one `for-each-ref`, local only). */
@@ -288,6 +339,35 @@ export function archivedRecordDir(root: string, story: string, sha: string | und
   if (!unpackRecordSync(root, sha, dir).ok) return null;
   for (const n of readdirSync(cache)) if (n !== sha && !n.startsWith(".")) rmSync(join(cache, n), { recursive: true, force: true });
   return dir;
+}
+
+/**
+ * gh-195/10 (review F1): the commit `refs/norn/runs/<story>` has on `remote`, its objects fetched here
+ * but no local ref written, so a record is checked before it counts; null = the remote has no such ref.
+ * `setRecordRef` then makes it this checkout's (the lease of its next record push, 09-F4).
+ */
+export async function fetchRecordCommit(root: string, remote: string, story: string): Promise<string | null> {
+  const ref = recordRef(story);
+  const sha = await remoteRecordSha(root, remote, story);
+  if (!sha) return null;
+  const f = await git(root, ["fetch", "--quiet", "--no-tags", remote, ref]);
+  if (f.code !== 0) throw new Error(`git fetch ${remote} ${ref} failed: ${f.stderr.trim()}`);
+  // the ref moved between the listing and the fetch: the listed commit may not have come along
+  if ((await readLocalRef(root, `${sha}^{commit}`)) === null) throw new Error(`${ref} moved on ${remote} while it was fetched; retry`);
+  return sha;
+}
+
+/** gh-195/10 (review#2 F5): the commit `refs/norn/runs/<story>` has on `remote` now (`ls-remote`, nothing fetched); null = none. */
+export async function remoteRecordSha(root: string, remote: string, story: string): Promise<string | null> {
+  const ref = recordRef(story);
+  const listed = await git(root, ["ls-remote", remote, ref]);
+  if (listed.code !== 0) throw new Error(`git ls-remote ${remote} failed: ${listed.stderr.trim()}`);
+  return listed.stdout.split("\n").map((l) => l.split("\t")).find((p) => p[1]?.trim() === ref)?.[0]?.trim() || null;
+}
+
+/** gh-195/10: point this checkout's `refs/norn/runs/<story>` at `sha` (a record already fetched and checked). */
+export async function setRecordRef(root: string, story: string, sha: string): Promise<void> {
+  await gitOk(root, ["update-ref", recordRef(story), sha]);
 }
 
 /**

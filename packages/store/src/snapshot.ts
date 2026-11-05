@@ -14,13 +14,15 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { FileError, NumberedReceipt, SliceFileFacts, UnitRef } from "@norn/core";
-import { type RunStory, SPEC_FILE, STORY_UNIT_DIR, type StoryFrontmatter, type UnitState, parseSliceFileName, parseSpecDirName, sliceKey, treeStoryRunStatePath } from "@norn/schema";
+import { claimRef, isStoryKey, type RunStory, SPEC_FILE, validate, STORY_UNIT_DIR, type StoryFrontmatter, type UnitState, parseSliceFileName, parseSpecDirName, sliceKey, treeStoryRunStatePath } from "@norn/schema";
 import { baseSpecsRoot, defaultBaseRef } from "./base.ts";
 import { type LoadedConfig, loadConfig, loadWorkflows, type WorkflowListing } from "./config.ts";
 import { readSliceFile, readStoryFile } from "./frontmatter.ts";
 import { displayPath, isErrno } from "./fsx.ts";
 import { handoffPath, slicesDir, specsDir, statePath, storyFile } from "./paths.ts";
-import { runStateDirIn, runStateRoundsIn, runStateSource, treeRunStateDir, treeRunStateFiles } from "./run-state.ts";
+import { gitSync } from "./git.ts";
+import { recordedHeartbeatId } from "./heartbeat.ts";
+import { machineRunsDir, runStateDirIn, runStateRoundsIn, runStateSource, treeRunStateDir, treeRunStateFiles } from "./run-state.ts";
 import { listReceipts } from "./receipts.ts";
 import { localRecordRefs } from "./record-ref.ts";
 import { type Handoff, type PinnedWorkflow, readHandoff, readPinnedWorkflow, readState } from "./unit.ts";
@@ -90,6 +92,11 @@ export interface StorySnapshot {
   units: UnitSnapshot[];
   /** read from the fetched base branch copy (no worktree, not in the main checkout): `root` is read-only */
   from_base?: boolean;
+  /**
+   * gh-195 B33 (review#2 F1): a story this checkout holds whose record is in its machine dir but whose
+   * spec is in no tree here — it has no branch. No frontmatter, no spec folder; its units are its run state.
+   */
+  record_only?: boolean;
   /**
    * R3.2: `status` of the story's record on the fetched base branch, whatever root it was read from;
    * null = not on the base; absent = no base ref.
@@ -344,10 +351,45 @@ export function loadSnapshot(opts: {
   if (baseRoot) for (const s of loadStories(baseRoot, { includeApplied: opts.includeApplied, checkout: opts.repoRoot, archive })) base.set(s.key, s);
   for (const [key, s] of base) if (!seen.has(key)) seen.set(key, { ...s, from_base: true });
   for (const s of loadStories(opts.repoRoot, { includeApplied: opts.includeApplied, archive })) if (!seen.has(s.key)) seen.set(s.key, s);
+  for (const s of recordOnlyStories(opts.repoRoot, seen, { includeApplied: opts.includeApplied })) seen.set(s.key, s);
   const stories = [...seen.values()]
     .map((s) => (baseRoot ? { ...s, base_status: base.get(s.key)?.frontmatter?.status ?? null } : s))
     .sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }));
   return { root: opts.repoRoot, home: config.home, config, workflows, stories, base_run_state: baseRunStateStories(baseRoot ?? opts.repoRoot) };
+}
+
+/**
+ * gh-195 B33 (review#2 F1): the stories this checkout holds (its local claim ref names this checkout's
+ * heartbeat, ID2) with run state in the machine dir and a spec in no tree here: a story without a
+ * branch, taken over from its record. Read from the run state alone (`record_only`).
+ */
+function recordOnlyStories(root: string, seen: ReadonlyMap<string, StorySnapshot>, opts: { includeApplied?: boolean }): StorySnapshot[] {
+  const hb = recordedHeartbeatId(root);
+  if (!hb) return [];
+  const out: StorySnapshot[] = [];
+  for (const key of dirs(machineRunsDir(root))) {
+    if (seen.has(key) || !isStoryKey(key)) continue;
+    const claim = gitSync(root, ["cat-file", "blob", claimRef(key)]);
+    if (claim.code !== 0) continue;
+    let blob: unknown;
+    try {
+      blob = JSON.parse(claim.stdout.toString("utf8"));
+    } catch {
+      continue;
+    }
+    if (!validate("claim", blob).ok || (blob as { heartbeat_id: string }).heartbeat_id !== hb) continue;
+    const run: RunStory = { key, spec_dir: "" };
+    const at = runStateSource(root, run, { checkout: root });
+    const unitOpts = opts.includeApplied ? { includeApplied: true } : {};
+    const units: UnitSnapshot[] = [readUnit(root, run, { story: key, slice: null, dir: STORY_UNIT_DIR, key }, unitOpts, at, false)];
+    if (!units[0]?.state) continue;
+    for (const d of dirs(at.base).filter((x) => x !== STORY_UNIT_DIR).sort()) {
+      const nn = /^([0-9]{2,3})-/.exec(d)?.[1];
+      if (nn) units.push(readUnit(root, run, { story: key, slice: sliceKey(key, nn), dir: d, key: sliceKey(key, nn) }, unitOpts, at, false));
+    }
+    out.push({ key, slug: "", root, path: "", spec_dir: "", checkout: root, run_state: at, frontmatter: null, frontmatter_error: null, slices: [], units, record_only: true });
+  }
+  return out;
 }
 
 /**

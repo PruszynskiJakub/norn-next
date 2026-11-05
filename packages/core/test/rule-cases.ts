@@ -126,6 +126,10 @@ function cases(): RuleCase[] {
     };
     out.push(c("the story names a workflow that does not exist", "start.workflow_invalid", facts([fresh("nope")])));
     out.push(c("the story worktree is missing at start", "start.no_worktree", facts([fresh("solo", noWorktree, { worktree: null })])));
+    // gh-195/10 review#2 F3: a checkout cut short left the record on its ref but not in the machine dir
+    // gh-195/10 review#2 F1 (B33): a story held here from its record alone, nothing pending
+    out.push(c("a story held from its record without a branch", "story.record_only", facts([story(SOLO_WF, ready("implement"), null, { record_only: true, frontmatter: null, worktree: null })])));
+    out.push(c("the story's record ref is here but its run state is not", "start.record_unplaced", facts([fresh("solo", {}, { record_unplaced: "0123456789abcdef0123456789abcdef01234567" })])));
   }
 
   // ---- unit guards
