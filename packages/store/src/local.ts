@@ -79,13 +79,15 @@ export function addRejectedReceipt(root: string, entry: RejectedMailboxReceipt):
 }
 
 /**
- * gh-195 D12: drop the rejected mailbox receipts rejected before `before` (ISO), as `norn tidy` ages the
- * trace out (`trace.retain`); returns the ones dropped (`dry`: only lists them).
+ * gh-195 D12: drop the rejected mailbox receipts rejected before `before` (ISO) that are not `open` (by
+ * receipt id: their Check item still shows), as `norn tidy` ages the trace out (`trace.retain`); returns
+ * the ones dropped (`dry`: only lists them).
  */
-export function pruneRejectedReceipts(root: string, before: string, dry: boolean): RejectedMailboxReceipt[] {
+export function pruneRejectedReceipts(root: string, before: string, open: ReadonlySet<string>, dry: boolean): RejectedMailboxReceipt[] {
   const all = readRejectedReceipts(root);
-  const old = all.filter((r) => r.rejected_at < before);
-  if (old.length && !dry) atomicWriteJson(rejectedReceiptsPath(root), { receipts: all.filter((r) => r.rejected_at >= before) });
+  const drop = (r: RejectedMailboxReceipt) => r.rejected_at < before && !open.has(r.receipt_id);
+  const old = all.filter(drop);
+  if (old.length && !dry) atomicWriteJson(rejectedReceiptsPath(root), { receipts: all.filter((r) => !drop(r)) });
   return old;
 }
 

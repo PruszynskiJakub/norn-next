@@ -208,8 +208,9 @@ export type LocalNoticesFile = Static<typeof LocalNoticesFile>;
 
 /**
  * gh-195 D12 (B21, T9): one mailbox receipt this holder's tick rejected, kept next to the notices so a
- * stale answer or approval shows as a Check item. It clears on its own (a later answer or approval of
- * the story accepted, or the story finished); `norn tidy` drops the ones older than `trace.retain`.
+ * stale answer or approval shows as a Check item. It clears on its own: an answer or approval of the
+ * story accepted after it (in the holder's own receipt order, `seen`), or the story finished. `norn
+ * tidy` drops only cleared ones older than `trace.retain`; an open one stays.
  */
 export const RejectedMailboxReceipt = Type.Object(
   {
@@ -228,6 +229,8 @@ export const RejectedMailboxReceipt = Type.Object(
     reason: Type.String(),
     /** ISO time of the rejecting tick */
     rejected_at: Type.String({ minLength: 1 }),
+    /** each unit's last receipt number on the holder when it was rejected: a later answer or approval is numbered past it */
+    seen: Type.Record(Type.String(), Type.Integer({ minimum: 0 })),
   },
   { additionalProperties: false },
 );

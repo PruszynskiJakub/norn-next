@@ -33,6 +33,7 @@ import type {
   ClaimBlob,
   GitAction,
   Receipt,
+  RejectedMailboxReceipt,
   StoryFrontmatter,
   UnitState,
 } from "@norn/schema";
@@ -298,6 +299,11 @@ export interface RejectReceiptAction extends UnitBase {
   reason: string;
   /** state with applied_through moved past a rejected numbered receipt */
   state: UnitState | null;
+  /**
+   * gh-195 D12 (B21): a rejected mailbox receipt to keep machine-local for its Check item, kept before the
+   * ref is deleted. Absent = none (a numbered receipt, or a mailbox blob that could not be read).
+   */
+  keep?: RejectedMailboxReceipt;
 }
 
 /** A unit file failed validation (S2): mark corrupt and surface it; never guess. */

@@ -44,7 +44,8 @@ async function decideGate(ctx: Context, args: ParsedArgs, kind: "approve" | "rej
   // B26 (B3): the agent sent back gets only what the reason says, so a rejection needs one
   if (kind === "reject" && !reason) throw usageError("story reject: the reason is required", 'pass --reason "what failed": norn story reject <unit> --reason "…"', "reason_required");
   const key = await targetKey(ctx, args.positionals[0], args.json === true, parkedOn("gate", verb, "Nothing waits at a gate", (k) => (kind === "reject" ? cmd.storyReject(k) : cmd.storyApprove(k))));
-  const t = await resolveTarget(ctx, key, atGate, { stepOnly: true });
+  // gh-195 B20: a `local` story held elsewhere: the step its last boundary led to, checked by the holder
+  const t = await resolveTarget(ctx, key, atGate, { stepOnly: (t, step) => stepOnlyReceipt(ctx, t, step, kind, reason ? { comment: reason } : {}) });
   const head = await unitHead(ctx, t).catch(() => null);
   // NT3: approving a story-level gate acknowledges the story's open notes listed at it; reject leaves them open
   const acknowledged = kind === "approve" && t.slice === null ? (t.story_facts?.notes ?? []).map((n) => n.id) : [];
@@ -62,8 +63,6 @@ async function decideGate(ctx: Context, args: ParsedArgs, kind: "approve" | "rej
     },
     build: (t, st) =>
       humanReceipt(ctx, t, st, kind, { ...(reason ? { comment: reason } : {}), ...(head ? { head_sha: head } : {}), ...(acknowledged.length ? { acknowledged_notes: acknowledged } : {}) }),
-    // gh-195 B20: a `local` story held elsewhere: the step its last boundary led to, checked by the holder
-    stepOnly: (t, step) => stepOnlyReceipt(ctx, t, step, kind, { ...(reason ? { comment: reason } : {}), ...(head ? { head_sha: head } : {}) }),
   });
   // the rejection is a milestone of the unit, like `done` (O6): the next brief's Context carries it;
   // through the mailbox the holder's tick appends it when it imports the receipt (T9)

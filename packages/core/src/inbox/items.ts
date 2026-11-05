@@ -782,18 +782,22 @@ function unpushedItems(story: StoryFacts, facts: Facts): InboxItem[] {
  */
 function rejectedItems(story: StoryFacts): InboxItem[] {
   if (storyFinished(story)) return [];
-  return (story.rejected_mailbox ?? []).map((r) => ({
-    id: `rejected:${r.receipt_id}`,
-    group: "check" as const,
-    story: story.key,
-    slice: r.unit === story.key ? null : r.unit,
-    step: null,
-    title: `${r.kind} from ${r.who ?? "another machine"} for ${r.unit} was rejected: ${r.at_step ? `${r.unit} is at ${r.at_step} now` : r.reason}`,
-    detail: `stamped for ${stepLabel(r.step, r.attempt)}; ${r.reason}`,
-    command: cmd.runList(r.unit),
-    since: r.rejected_at,
-    ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
-  }));
+  return (story.rejected_mailbox ?? []).map((r) => {
+    // the step the unit is at now (the story is held here), else where it was when the receipt was rejected
+    const now = story.units.find((u) => u.unit.key === r.unit)?.state?.step ?? r.at_step;
+    return {
+      id: `rejected:${r.receipt_id}`,
+      group: "check" as const,
+      story: story.key,
+      slice: r.unit === story.key ? null : r.unit,
+      step: null,
+      title: `${r.kind} from ${r.who ?? "another machine"} for ${r.unit} was rejected: ${now ? `${r.unit} is at ${now} now` : r.reason}`,
+      detail: `stamped for ${stepLabel(r.step, r.attempt)}; ${r.reason}`,
+      command: cmd.runList(r.unit),
+      since: r.rejected_at,
+      ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
+    };
+  });
 }
 
 /** Build the whole inbox (O1). Stories held by another heartbeat are not shown (except R2.3 unpushed work). */

@@ -8,7 +8,7 @@
 import { cmd, nextCommand, stepOf } from "@norn/core";
 import { defineCommand, opt } from "../command.ts";
 import { refuse } from "../output.ts";
-import { at, humanReceipt, stepOnlyReceipt, resolveTarget as resolveUnit, runHumanVerb } from "../runtime/human.ts";
+import { at, humanReceipt, type StepOnlyBuild, stepOnlyReceipt, resolveTarget as resolveUnit, runHumanVerb } from "../runtime/human.ts";
 import { inState, targetKey } from "../runtime/target.ts";
 
 const blocked = (st: { status: string }) => st.status === "stuck" || st.status === "parked";
@@ -30,7 +30,14 @@ export const runRerunCommand = defineCommand({
     const reset = [...new Set(opt.list(args, "reset"))];
     const reason = opt.str(args, "reason")?.trim();
     const key = await targetKey(ctx, args.positionals[0], args.json === true, inState("run rerun", (k) => cmd.runRerun(k), "Nothing is stuck, parked or at a gate", blocked));
-    const t = await resolveUnit(ctx, key, blocked, { stepOnly: true });
+    // gh-195 B20: a `local` story held elsewhere: resume the step its last boundary led to, checked by the
+    // holder; --step and --reset are checked against the pinned workflow, which only the holder has
+    const stepOnly: StepOnlyBuild = (t, step) => {
+      if (to !== undefined || reset.length)
+        throw refuse(`${t.key}'s pinned workflow is on the machine that holds it: --step and --reset are checked there`, `${cmd.runRerun(t.key)} without --step and --reset, or ${cmd.storyCheckout(t.story, { force: true })}`, "story_not_local");
+      return stepOnlyReceipt(ctx, t, step, "unstick", reason ? { comment: reason } : {});
+    };
+    const t = await resolveUnit(ctx, key, blocked, { stepOnly });
     return runHumanVerb(ctx, t, {
       verb: "run rerun",
       mailbox: true,
@@ -56,13 +63,6 @@ export const runRerunCommand = defineCommand({
       },
       build: (t, st) =>
         humanReceipt(ctx, t, st, "unstick", { ...(to ? { to } : {}), ...(reset.length ? { reset } : {}), ...(reason ? { comment: reason } : {}) }),
-      // gh-195 B20: a `local` story held elsewhere: resume the step its last boundary led to, checked by the
-      // holder; --step and --reset are checked against the pinned workflow, which only the holder has
-      stepOnly(t, step) {
-        if (to !== undefined || reset.length)
-          throw refuse(`${t.key}'s pinned workflow is on the machine that holds it: --step and --reset are checked there`, `${cmd.runRerun(t.key)} without --step and --reset, or ${cmd.storyCheckout(t.story, { force: true })}`, "story_not_local");
-        return stepOnlyReceipt(ctx, t, step, "unstick", reason ? { comment: reason } : {});
-      },
     });
   },
 });

@@ -37,6 +37,18 @@ steps:
     outcomes: { approve: $done, reject: { to: implement, counter: review_loop } }
 counters: { review_loop: { max: 3 } }
 `;
+const DUO = `name: duo
+start: draft
+steps:
+  draft:
+    type: agent
+    skill: norn-implement
+    outcomes: { done: { to: implement, means: "drafted" } }
+  implement:
+    type: agent
+    skill: norn-implement
+    outcomes: { done: { to: $done, means: "implemented" } }
+`;
 const CONFIG = "provider: gh\nworkflow: quad\nmode: manual\n";
 const teamConfig = (policy: "local" | "remote") => `provider: gh\nworkflow: quad\nrecord:\n  policy: ${policy}\n`;
 
@@ -135,6 +147,7 @@ beforeAll(async () => {
   h.config(CONFIG);
   h.write(repoConfigPath(h.root), teamConfig("remote"));
   h.write(join(workflowsDir(h.root), "quad.yaml"), QUAD);
+  h.write(join(workflowsDir(h.root), "duo.yaml"), DUO);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);
   h.git(["push", "-q", "origin", "main"]);
@@ -258,6 +271,17 @@ describe("under local, what needs the holder's run state (B20, F1, F2)", () => {
     expect(h.state(gh25.runs())).toMatchObject({ step: "ready", attempt: 2, status: "parked", park: { kind: "gate" } });
     expect(await checkItems("gh-25")).toEqual([]);
   });
+
+  test("R2-F10: a step-only story reject from a non-holder: the holder routes it back", async () => {
+    const r = await B.norn("story", "reject", "gh-25", "--reason", "not like this", "--json");
+    expect(r.exit).toBe(0);
+    const v = r.value as Verb;
+    expect(v.receipt).toMatchObject({ kind: "reject", step: "ready", comment: "not like this", who: "bob@repo-b" });
+    expect(v.receipt).not.toHaveProperty("attempt");
+    await tick("--sync");
+    await tick();
+    expect(h.state(gh25.runs())).toMatchObject({ step: "implement", counters: { review_loop: 1 } });
+  });
 });
 
 describe("a receipt the holder rejects (B21)", () => {
@@ -299,18 +323,52 @@ describe("a receipt the holder rejects (B21)", () => {
     expect((await h.norn("help", "--json")).stdout).not.toContain("dismiss");
   });
 
-  test("AC4: the story finishing clears it", async () => {
-    gh24 = await askingAtReview(24, "finishes");
+  test("B21: a gate rejection accepted later does not clear it; the item names the step the unit is at now", async () => {
+    gh24 = await askingAtReview(24, "gate-reject");
     expect((await h.norn("run", "rerun", "gh-24", "--step", "ready")).exit).toBe(0);
     await tick();
     expect(h.state(gh24.runs())).toMatchObject({ step: "ready", park: { kind: "gate" } });
     expect((await B.norn("story", "answer", "gh-24", "use option b")).exit).toBe(0);
     await tick("--sync");
     expect((await checkItems("gh-24")).map((i) => i.title)).toEqual([title("gh-24", "ready")]);
-    expect((await h.norn("story", "approve", "gh-24")).exit).toBe(0);
+    expect((await h.norn("story", "reject", "gh-24", "--reason", "redo it")).exit).toBe(0);
     await tick();
-    expect(h.state(gh24.runs())).toMatchObject({ step: "$done", status: "done" });
-    expect(await checkItems("gh-24")).toEqual([]);
+    expect(h.state(gh24.runs())).toMatchObject({ step: "implement" });
+    expect((await checkItems("gh-24")).map((i) => i.title)).toEqual([title("gh-24", "implement")]);
+  });
+
+  test("AC4: the story finishing clears it, with no answer or approval accepted since", async () => {
+    const spec = ".agents/specs/gh-27-finish-alone";
+    const wt = `${h.root}-worktrees/gh-27-finish-alone`;
+    const runs = () => runStateOf(join(wt, spec));
+    h.remote.issues = [...h.remote.issues, issue(27, "finish-alone", ["norn", "norn:wf:duo"])];
+    await h.tick("--sync");
+    const finishStep = async (step: string) => {
+      for (let i = 0; i < 10 && h.state(runs())?.step !== step; i++) await tick();
+      expect((await inWt(wt, "brief")).exit).toBe(0);
+      await tick();
+      h.write(join(wt, "src", `gh-27-${step}.ts`), "export const x = 1;\n");
+      expect((await inWt(wt, "done", "done", "--handoff", step)).exit).toBe(0);
+    };
+    await finishStep("draft");
+    for (let i = 0; i < 10 && h.state(runs())?.step !== "implement"; i++) await tick();
+    expect((await inWt(wt, "brief")).exit).toBe(0);
+    await tick();
+    expect((await inWt(wt, "ask", "Which option?")).exit).toBe(0);
+    await tick();
+    expect(h.state(runs())).toMatchObject({ step: "implement", park: { kind: "ask" } });
+    // the cursor moves by hand: B still sees implement as the step it is at
+    expect((await h.norn("run", "rerun", "gh-27", "--step", "draft")).exit).toBe(0);
+    await tick();
+    expect((await B.norn("story", "answer", "gh-27", "use option b")).exit).toBe(0);
+    await tick("--sync");
+    expect((await checkItems("gh-27")).map((i) => i.title)).toEqual([title("gh-27", "draft")]);
+    // no answer or approval from here on: draft and implement end with their agents' outcomes
+    await finishStep("draft");
+    await finishStep("implement");
+    for (let i = 0; i < 10 && h.state(runs())?.status !== "done"; i++) await tick();
+    expect(h.state(runs())).toMatchObject({ step: "$done", status: "done" });
+    expect(await checkItems("gh-27")).toEqual([]);
   });
 
   test("F4: the rejection is kept before the mailbox ref goes: a failed keep leaves the ref for the next tick", async () => {
@@ -335,21 +393,34 @@ describe("a receipt the holder rejects (B21)", () => {
     expect(mailbox("gh-26")).toBe("");
     expect((await checkItems("gh-26")).map((i) => i.title)).toEqual([title("gh-26", "implement")]);
     expect(h.state(s26.runs())).toMatchObject({ step: "implement" });
+    // the unit moves on without an answer or approval: the item stays and names the step it is at now
+    expect((await inWt(s26.wt, "brief")).exit).toBe(0);
+    await tick();
+    expect((await inWt(s26.wt, "done", "done", "--handoff", "implemented again")).exit).toBe(0);
+    for (let i = 0; i < 10 && h.state(s26.runs())?.step !== "review"; i++) await tick();
+    expect((await checkItems("gh-26")).map((i) => i.title)).toEqual([title("gh-26", "review")]);
   });
 
-  test("F3: norn tidy drops the rejected receipts older than trace.retain", async () => {
-    const ids = JSON.parse(h.read(rejectedReceiptsPath(h.root))).receipts.map((r: { receipt_id: string }) => r.receipt_id);
-    expect(ids.length).toBeGreaterThanOrEqual(3);
-    const kept = await h.norn("tidy", "--json");
-    expect(kept.value).toMatchObject({ removed: { rejected_receipts: [] } });
+  test("F3: norn tidy drops cleared rejected receipts older than trace.retain; an open one stays", async () => {
+    type Kept = { story: string; receipt_id: string };
+    const kept = () => (JSON.parse(h.read(rejectedReceiptsPath(h.root))).receipts as Kept[]).map((r) => r.story).sort();
+    const idOf = (story: string) => (JSON.parse(h.read(rejectedReceiptsPath(h.root))).receipts as Kept[]).filter((r) => r.story === story).map((r) => r.receipt_id);
+    expect(kept()).toEqual(["gh-23", "gh-24", "gh-26", "gh-27"]);
+    // gh-23 was cleared by a later answer, gh-27 finished; gh-24 and gh-26 still show
+    const cleared = [...idOf("gh-23"), ...idOf("gh-27")].sort();
+    const young = await h.norn("tidy", "--json");
+    expect(young.value).toMatchObject({ removed: { rejected_receipts: [] } });
     h.clock.advance(15 * 86_400_000);
-    const dry = await h.norn("tidy", "--dry-run", "--json");
-    expect(dry.value).toMatchObject({ would_remove: { rejected_receipts: ids } });
-    expect(JSON.parse(h.read(rejectedReceiptsPath(h.root))).receipts).toHaveLength(ids.length);
-    const r = await h.norn("tidy", "--json");
-    expect(r.value).toMatchObject({ removed: { rejected_receipts: ids } });
-    expect(JSON.parse(h.read(rejectedReceiptsPath(h.root))).receipts).toEqual([]);
-    expect(await checkItems("gh-26")).toEqual([]);
+    const dry = (await h.norn("tidy", "--dry-run", "--json")).value as { would_remove: { rejected_receipts: string[] } };
+    expect([...dry.would_remove.rejected_receipts].sort()).toEqual(cleared);
+    expect(kept()).toEqual(["gh-23", "gh-24", "gh-26", "gh-27"]);
+    const r = (await h.norn("tidy", "--json")).value as { removed: { rejected_receipts: string[] } };
+    expect([...r.removed.rejected_receipts].sort()).toEqual(cleared);
+    expect(kept()).toEqual(["gh-24", "gh-26"]);
+    // fifteen days on, the claims are renewed by the next tick; the open items still show
+    await tick("--sync");
+    expect((await checkItems("gh-26")).map((i) => i.title)).toEqual([title("gh-26", "review")]);
+    expect((await checkItems("gh-24")).map((i) => i.title)).toEqual([title("gh-24", "implement")]);
   });
 });
 

@@ -33,7 +33,8 @@ export const storyAnswerCommand = defineCommand({
     const text = raw.trim();
     if (!text) throw usageError("the answer is empty", 'norn story answer <unit> "<text>"');
     const key = await targetKey(ctx, unit, args.json === true, parkedOn("ask", "story answer", "Nothing waits for an answer", (k) => cmd.storyAnswer(k)));
-    const t = await resolveTarget(ctx, key, asks, { stepOnly: true });
+    // gh-195 B20: a `local` story held elsewhere: the step its last boundary led to, checked by the holder
+    const t = await resolveTarget(ctx, key, asks, { stepOnly: (t, step) => stepOnlyReceipt(ctx, t, step, "answer", { answer: text }) });
     const out = await runHumanVerb(ctx, t, {
       verb: "story answer",
       mailbox: true,
@@ -42,8 +43,6 @@ export const storyAnswerCommand = defineCommand({
           throw refuse(`${t.key} is not waiting for an answer: it is at ${at(st)}`, nextCommand(t.key, st) ?? cmd.storyView(t.story), "not_parked_on_ask");
       },
       build: (t, st) => humanReceipt(ctx, t, st, "answer", { answer: text, ...(st.park?.receipt_id ? { ask_receipt_id: st.park.receipt_id } : {}) }),
-      // gh-195 B20: a `local` story held elsewhere: the step its last boundary led to, checked by the holder
-      stepOnly: (t, step) => stepOnlyReceipt(ctx, t, step, "answer", { answer: text }),
       before: (t, st, route, receipt) => typeIntoPrompt(ctx, t, st, route, receipt, text),
     });
     return out;

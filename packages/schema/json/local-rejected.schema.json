@@ -21,7 +21,8 @@
           "step",
           "at_step",
           "reason",
-          "rejected_at"
+          "rejected_at",
+          "seen"
         ],
         "properties": {
           "story": {
@@ -74,6 +75,15 @@
           "rejected_at": {
             "minLength": 1,
             "type": "string"
+          },
+          "seen": {
+            "type": "object",
+            "patternProperties": {
+              "^(.*)$": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            }
           }
         }
       }

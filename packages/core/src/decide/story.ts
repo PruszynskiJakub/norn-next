@@ -5,6 +5,8 @@
 import {
   type ClaimBlob,
   parseDuration,
+  type Receipt,
+  type RejectedMailboxReceipt,
   sliceBranch,
   SPEC_FILE,
   type StoryFrontmatter,
@@ -313,9 +315,10 @@ function importMailbox(ctx: Ctx, story: StoryFacts): void {
   const item = (story.mailbox ?? [])[0];
   if (!item) return;
   const ref = storyRef(story);
-  const reject = (reason: string) => ctx.emit({ kind: "reject_receipt", unit: ref, rule: "mailbox.reject", source: { ref: item.ref, sha: item.sha }, reason, state: null });
-  if (!item.receipt) return reject(item.error ? `invalid receipt: ${item.error.errors.map((e) => e.message).join("; ")}` : "unreadable receipt");
   const r = item.receipt;
+  const reject = (reason: string) =>
+    ctx.emit({ kind: "reject_receipt", unit: ref, rule: "mailbox.reject", source: { ref: item.ref, sha: item.sha }, reason, state: null, ...(r ? { keep: keptRejection(ctx, story, r, reason) } : {}) });
+  if (!r) return reject(item.error ? `invalid receipt: ${item.error.errors.map((e) => e.message).join("; ")}` : "unreadable receipt");
   // gh-71 AC12: a receipt made in another round is stale even at the same step#attempt (the same workflow again)
   const otherRound = (u: UnitFacts) => r.round !== undefined && u.unit.slice === null && (u.state?.round ?? 1) !== r.round;
   // gh-195 B20: a receipt without an attempt (a non-holder's, for a `local` story) matches by step alone
@@ -348,6 +351,28 @@ function importMailbox(ctx: Ctx, story: StoryFacts): void {
     state: null,
     commit: commitFor(ctx, story, target, `norn: ${target.unit.key} ${r.kind} from mailbox`, r.step),
   });
+}
+
+/**
+ * gh-195 D12 (B21): what the holder keeps of a mailbox receipt it rejects, for its Check item — who sent
+ * what for which step, the step the unit is at, and each unit's last receipt number now, so only an
+ * answer or approval numbered past it clears the item (the holder's own order, never the sender's clock).
+ */
+function keptRejection(ctx: Ctx, story: StoryFacts, r: Receipt, reason: string): RejectedMailboxReceipt {
+  const unit = story.units.find((u) => (r.slice === undefined ? u.unit.slice === null : u.unit.slice === r.slice));
+  return {
+    story: story.key,
+    unit: r.slice ?? story.key,
+    receipt_id: r.receipt_id,
+    kind: r.kind,
+    who: r.who ?? null,
+    step: r.step,
+    ...(r.attempt !== undefined ? { attempt: r.attempt } : {}),
+    at_step: unit?.state?.step ?? null,
+    reason,
+    rejected_at: ctx.nowIso,
+    seen: Object.fromEntries(story.units.map((u) => [u.unit.key, nextReceiptNumber(u) - 1])),
+  };
 }
 
 // ================================================================= unit level

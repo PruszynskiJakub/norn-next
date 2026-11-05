@@ -18,7 +18,7 @@
  *     briefings, transcripts and old `runs/<run_id>.log` session logs (gh-195 D1) of runs that are not
  *     live whose newest file is older than the window;
  *     never a live run's, nor `backfill.json`, the caches or the locks.
- *   - gh-195 D12: rejected mailbox receipts (`rejected.json`) rejected before the window
+ *   - gh-195 D12: rejected mailbox receipts (`rejected.json`) cleared and rejected before the window
  * Nothing with unique work is removed; such items are listed under `kept` with the reason.
  */
 import { readdirSync, statSync } from "node:fs";
@@ -34,7 +34,7 @@ import { leaseLiveness } from "../runtime/leases.ts";
 import { type Observed, observe } from "../runtime/observe/index.ts";
 import { doneHerdrRuns, planHerdrTidy } from "../runtime/tidy-herdr.ts";
 import { checkRetain, MIN_TRACE_RETAIN, retainCutoffDay, unitTracesBefore } from "../runtime/trace-retention.ts";
-import { cmd } from "@norn/core";
+import { cmd, storyFinished } from "@norn/core";
 
 /** A reservation lives only while a receipt is being written; older ones are crash leftovers. */
 const RESERVE_STALE_MS = 60_000;
@@ -213,8 +213,10 @@ export const tidyCommand = defineCommand({
         deleteTraceDays(root, days);
         deleteTracePaths(root, [...hook_files.map((f) => f.file), ...runs.flatMap((r) => r.files)]);
       }
-      // gh-195 D12: rejected mailbox receipts age out with the trace that also records them
-      const rejected = pruneRejectedReceipts(root, new Date(ctx.clock.now() - window.ms).toISOString(), dry).map((r) => r.receipt_id);
+      // gh-195 D12: cleared rejected mailbox receipts age out with the trace that also records them; an open
+      // one (its Check item still shown: no answer or approval since, story not finished) stays
+      const open = new Set(obs.facts.stories.filter((s) => !storyFinished(s)).flatMap((s) => (s.rejected_mailbox ?? []).map((r) => r.receipt_id)));
+      const rejected = pruneRejectedReceipts(root, new Date(ctx.clock.now() - window.ms).toISOString(), open, dry).map((r) => r.receipt_id);
       const bytes = [...days, ...hook_files, ...runs].reduce((n, d) => n + d.bytes, 0);
       const trace = { retain: window.retain, days, hook_files, runs, bytes };
 

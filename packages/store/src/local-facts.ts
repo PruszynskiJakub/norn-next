@@ -261,14 +261,20 @@ function unknownLaunch(unapplied: readonly NumberedReceipt[]): (NumberedReceipt 
 }
 
 /**
- * gh-195 D12 (B21): the story's rejected mailbox receipts still to show — those no answer or gate
- * decision applied to any unit of the story since (made after the rejection) has cleared.
+ * gh-195 D12 (B21): the story's rejected mailbox receipts still to show — those no answer or approval
+ * applied to a unit of the story since has cleared. "Since" is the holder's own receipt order: a receipt
+ * numbered past the unit's last one when the receipt was rejected (`seen`; a unit not seen then, any).
+ * A gate rejection does not clear it.
  */
 function openRejections(story: StorySnapshot, rejected: readonly RejectedMailboxReceipt[]): RejectedMailboxReceipt[] {
   const mine = rejected.filter((r) => r.story === story.key);
   if (!mine.length) return [];
-  const accepted = story.units.flatMap((u) => receiptsOfKinds(story, u, ["answer", "approve", "reject"]).filter((r) => r.n <= (u.state?.applied_through ?? 0)));
-  return mine.filter((x) => !accepted.some((r) => r.receipt.receipt_id !== x.receipt_id && r.receipt.at > x.rejected_at));
+  const accepted = story.units.flatMap((u) =>
+    receiptsOfKinds(story, u, ["answer", "approve"])
+      .filter((r) => r.n <= (u.state?.applied_through ?? 0))
+      .map((r) => ({ unit: u.unit.key, n: r.n })),
+  );
+  return mine.filter((x) => !accepted.some((r) => r.n > (x.seen[r.unit] ?? 0)));
 }
 
 /** Receipts of the given kinds in a unit's runs dir, ascending — read by file name, the others never opened. */
