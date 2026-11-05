@@ -23,7 +23,9 @@
  *   its transitions in its `starts`.
  * - Traces written by an older norn carry `receipts: []`, `state: null`, `commit: null` on those three
  *   kinds and a `park` copy of `state.park` on `park`; `legacyAction` drops them so `norn run view --why` still
- *   compares an old recorded decision with its replay.
+ *   compares an old recorded decision with its replay. An older `round_migrate` (before gh-195/05, S12)
+ *   also carries a `commit` and names its folders from the spec folder (`<spec>/runs/_story…`):
+ *   `legacyAction` drops the commit and names them as decide does now (`runs/<story>/_story…`).
  */
 import type {
   ClaimBlob,
@@ -32,8 +34,9 @@ import type {
   StoryFrontmatter,
   UnitState,
 } from "@norn/schema";
+import { recordRunStatePath } from "@norn/schema";
 import type { Rejection } from "./apply.ts";
-import type { FileError, UnitRef } from "./facts.ts";
+import type { FileError, UnitRef, UnmarkedWorktree } from "./facts.ts";
 import type { InboxItem, PromptKey, RemoteIssue, SessionRef } from "./ports.ts";
 
 /** A receipt decide wants written, with its number (S6). */
@@ -416,6 +419,12 @@ export interface IntakeStoryAction extends RepoBase {
   commit: BoundaryCommit;
 }
 
+/** gh-195/05 (B2): write back the `.norn-unit` of unit worktrees `git clean -fdx` took it from. */
+export interface RestoreMarkersAction extends RepoBase {
+  kind: "restore_markers";
+  worktrees: UnmarkedWorktree[];
+}
+
 /** Reclaim leases whose holder process is dead (K3). */
 export interface ReclaimLeasesAction extends RepoBase {
   kind: "reclaim_leases";
@@ -448,7 +457,7 @@ export type UnitAction =
   | RoundStartAction
   | NoopAction;
 
-export type RepoAction = IntakeStoryAction | ReclaimLeasesAction;
+export type RepoAction = IntakeStoryAction | ReclaimLeasesAction | RestoreMarkersAction;
 
 export type Action = UnitAction | RepoAction;
 
@@ -476,6 +485,16 @@ export function legacyAction(action: unknown): unknown {
     if (!empty) return action;
     const { receipts: _r, state: _s, commit: _c, ...rest } = a;
     return rest;
+  }
+  if (a.kind === "round_migrate" && "commit" in a) {
+    const { commit: _c, ...rest } = a;
+    const story = (a.unit as { story?: unknown } | undefined)?.story;
+    // `<spec>/runs/_story…` was the record from the spec folder; decide names it from the machine dir now
+    const moved = (p: unknown) => {
+      const m = typeof p === "string" && typeof story === "string" ? /^(.*)\/runs\/(_story(?:\/.*)?)$/.exec(p) : null;
+      return m ? recordRunStatePath({ key: story as string, spec_dir: m[1] as string }, m[2] as string) : p;
+    };
+    return { ...rest, from: moved(a.from), to: moved(a.to) };
   }
   if (a.kind === "park" && "park" in a) {
     const { park: _p, ...rest } = a;

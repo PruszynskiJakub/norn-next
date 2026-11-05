@@ -4,12 +4,13 @@
  * boundary commit carries only the agent's work and the handoff.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { machineDir, workflowsDir } from "@norn/store";
+import { machineDir, unitMarkerPath, workflowsDir } from "@norn/store";
 import type { CliResult, TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue, runChecked, sh } from "../../../../test/support/harness.ts";
-import { runStateOf, storyRunStateOf } from "../../../../test/support/run-state.ts";
+import { observeNow } from "../../../../test/support/observe-now.ts";
+import { runStateOf } from "../../../../test/support/run-state.ts";
 
 setDefaultTimeout(60_000);
 
@@ -135,8 +136,11 @@ describe("gh-9 runs with its run state in the machine dir (S12, B2, B5)", () => 
     const files = sh(wt(), ["show", "--name-only", "--format=", sha]).split("\n").filter(Boolean).sort();
     expect(files).toEqual([HANDOFF, "src/feature.ts"]);
     const trailers = sh(wt(), ["show", "-s", "--format=%(trailers:only,unfold)", sha]);
+    // S4: the story's trailers (no Norn-Slice on a story unit)
     expect(trailers).toContain("Norn-Story: gh-9");
     expect(trailers).toContain("Norn-Step: implement");
+    expect(trailers).toMatch(/^Norn-Tick: [0-9A-HJKMNP-TV-Z]{26}$/m);
+    expect(trailers).not.toContain("Norn-Slice:");
     // no commit on the branch ever carried a run-state file
     const all = sh(wt(), ["log", "--name-only", "--format=", "origin/main..HEAD"]).split("\n").filter(Boolean);
     expect(all.filter((p) => p.includes("/runs/") && p !== HANDOFF)).toEqual([]);
@@ -168,9 +172,37 @@ describe("a worktree is disposable (B2, B3)", () => {
   test("AC2: after `git clean -fdx` in its worktree and a tick, the story is at the same step, attempt and counters", async () => {
     const before = h.state(runs10());
     sh(wt10(), ["clean", "-fdx", "-q"]);
-    await tick();
+    expect(existsSync(unitMarkerPath(wt10()))).toBe(false);
+    // H2: observe reads the unit by the marker its folder and branch name, and writes nothing
+    const obs = await observeNow(h);
+    expect(obs.facts.unmarked?.map((w) => w.path)).toEqual([wt10()]);
+    expect(obs.facts.stories.find((s) => s.key === "gh-10")?.units[0]?.state).toMatchObject({ step: "implement", status: "parked" });
+    expect(existsSync(unitMarkerPath(wt10()))).toBe(false);
+    // act writes it back, as a traced decision
+    const r = await tick();
+    expect(r.decisions.filter((d) => d.rule === "worktree.marker")).toMatchObject([{ unit: "*", kind: "restore_markers", ok: true }]);
+    expect(h.read(unitMarkerPath(wt10()))).toContain("story=gh-10");
+    expect((await tick()).decisions.map((d) => d.rule)).not.toContain("worktree.marker");
     const after = h.state(runs10());
     expect(after).toMatchObject({ step: before?.step, attempt: before?.attempt, counters: before?.counters ?? {}, status: "parked", park: { kind: "ask" } });
+  });
+
+  test("AC6: `uncommitted` counts the unit's handoff only: never a run-state file, never the agent's files of a live session (D8)", async () => {
+    const uncommitted = async () => (await observeNow(h)).facts.stories.find((s) => s.key === "gh-10")?.units[0]?.uncommitted;
+    expect(await uncommitted()).toBe(false);
+    // run state in the machine dir is never in git
+    writeFileSync(join(runs10(), "evidence-note.txt"), "x\n");
+    // the agent's work is dirty all through a session; recover.commit must not commit it under the agent
+    h.write(join(wt10(), "src/wip.ts"), "export const wip = 1;\n");
+    expect(await uncommitted()).toBe(false);
+    const handoff = join(wt10(), SPEC10, "runs/_story/handoff.md");
+    const text = h.read(handoff);
+    writeFileSync(handoff, `${text}\nmore\n`);
+    expect(await uncommitted()).toBe(true);
+    writeFileSync(handoff, text);
+    rmSync(join(runs10(), "evidence-note.txt"));
+    rmSync(join(wt10(), "src"), { recursive: true });
+    expect(await uncommitted()).toBe(false);
   });
 
   test("AC3: the story worktree removed while parked on an ask, `norn story start` recreates it: status shows the same ask, same attempt", async () => {
@@ -239,10 +271,53 @@ describe("parallel slices and a crash between a receipt and state (B4: S3, S6)",
     expect(h.state(part("01"))?.applied_through).toBeGreaterThan(st?.applied_through ?? 0);
   });
 
-  test("AC5: the receipt a detached check run wrote apart from the ticks around it was applied by a later tick (S6)", async () => {
-    // gh-9's test step ran its check in a detached process (AC1): ticks ran while it wrote its receipt in the machine dir
-    expect(h.state(runs())).toMatchObject({ step: "$done", last_outcome: { outcome: "pass" } });
-    expect(readdirSync(join(runs(), "receipts")).some((f) => f.endsWith("-check.json"))).toBe(true);
-    expect(storyRunStateOf(join(h.root, SPEC))).toBe(join(machineDir(h.root), "runs/gh-9"));
+  test("AC5: a tick while a detached check run is writing its receipt waits; a crash's leftovers are ignored; the next tick applies the receipt once (S1, S6)", async () => {
+    const SPEC12 = ".agents/specs/gh-12-held-check";
+    const runs12 = () => runStateOf(join(h.root, SPEC12));
+    const go = join(h.dir, "go-12");
+    h.write(join(workflowsDir(h.root), "held.yaml"), `name: held\nstart: test\nsteps:\n  test:\n    type: check\n    run: "while [ ! -f '${go}' ]; do sleep 0.05; done"\n    timeout: 1m\n    outcomes: { pass: $done, fail: $stuck }\n`);
+    h.git(["add", "-A"]);
+    h.git(["commit", "-q", "-m", "held workflow"]);
+    h.git(["push", "-q", "origin", "main"]);
+    h.remote.issues = [...h.remote.issues, issue(12, "Held check", ["norn", "norn:wf:held"])];
+    await h.tick("--sync");
+    const rules12 = (r: TickReport) => r.decisions.filter((d) => d.unit === "gh-12").map((d) => d.rule);
+    // a tick that does not wait for the check runs it started (h.tick does): the check stays running
+    const tickNow = async (): Promise<TickReport> => {
+      h.clock.advance(10_000);
+      const r = await h.norn("tick");
+      expect(r.exit).toBe(0);
+      return r.value as TickReport;
+    };
+    let seen: string[] = [];
+    for (let i = 0; i < 8 && !seen.includes("check.running"); i++) seen = rules12(await tickNow());
+    expect(seen).toContain("check.running");
+    const st = h.state(runs12());
+    expect(st).toMatchObject({ step: "test", status: "ready" });
+    const n = String((st?.applied_through ?? 0) + 1).padStart(4, "0");
+    const receipts = join(runs12(), "receipts");
+    mkdirSync(receipts, { recursive: true });
+    // the check run mid-write: its reservation taken, its receipt not there yet (S6); a crashed earlier
+    // writer left a half-written temp receipt and a half-written temp state.json (S1)
+    writeFileSync(join(receipts, `.${n}.reserve`), "01M6CRASHED0000000000000000\n");
+    writeFileSync(join(receipts, `.${n}-check.json.1.1.0.tmp`), '{"kind":"che');
+    writeFileSync(join(runs12(), ".state.json.1.1.0.tmp"), '{"version":1,"st');
+    expect(rules12(await tickNow())).toEqual(["check.running"]);
+    expect(h.state(runs12())).toMatchObject({ step: "test", status: "ready", applied_through: st?.applied_through });
+    rmSync(join(receipts, `.${n}.reserve`));
+    // the check finishes: its receipt lands in the machine dir, state.json not yet past it
+    writeFileSync(go, "");
+    const checkReceipts = () => readdirSync(receipts).filter((f) => /^\d{4}-check\.json$/.test(f));
+    await h.checksDone();
+    expect(checkReceipts()).toEqual([`${n}-check.json`]);
+    expect(h.state(runs12())).toMatchObject({ step: "test", applied_through: st?.applied_through });
+    await tickUntil(() => h.state(runs12())?.step === "$done");
+    const done = h.state(runs12());
+    expect(done).toMatchObject({ last_outcome: { outcome: "pass" }, applied_through: Number(n) });
+    // applied once: a later tick neither applies it again nor runs the check again
+    const later = await tick();
+    expect(rules12(later)).not.toContain("check.run");
+    expect(h.state(runs12())?.applied_through).toBe(Number(n));
+    expect(checkReceipts()).toEqual([`${n}-check.json`]);
   });
 });

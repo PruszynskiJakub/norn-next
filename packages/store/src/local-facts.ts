@@ -116,7 +116,7 @@ export interface LocalFacts {
 export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Promise<LocalFacts> {
   const now = opts.now;
   const includeApplied = opts.includeApplied;
-  const snapshot = loadSnapshot({ repoRoot: root, storyRoots: [...opts.storyWorktrees.values()], home: opts.home, env: opts.env, baseRef: opts.baseRef, includeApplied });
+  const snapshot = loadSnapshot({ repoRoot: root, storyRoots: [...opts.storyWorktrees].map(([story, path]) => ({ story, path })), home: opts.home, env: opts.env, baseRef: opts.baseRef, includeApplied });
   const leases = await listLeases(snapshot.home, opts.liveness).catch((e: unknown): LeaseListing => {
     if (!opts.reportLeaseErrors) throw e;
     return { live: [], dead: [], errors: [{ file: "leases", errors: [{ path: "", message: (e as Error).message }] } satisfies FileError] };

@@ -156,7 +156,11 @@ export interface UnitFacts {
   run: RunFacts | null;
   /** this machine's lease for the unit's run, if any */
   lease: LeaseFile | null;
-  /** runs/<unit>/ or handoff.md have uncommitted changes (crash between write and commit) */
+  /**
+   * gh-195 D8 (B5): the unit's handoff has uncommitted changes (a crash between write and commit).
+   * Run state is in the machine dir, never in git (S12); the agent's own files are not counted, since
+   * they are dirty all through a live session.
+   */
   uncommitted: boolean;
   /** R5.3: runs of the cursor step/attempt with their hook activity; absent = not observed */
   step_runs?: StepRunFacts[];
@@ -391,5 +395,17 @@ export interface Facts {
   norn?: { running: string; repo: string | null; skills_drift?: string[] };
   /** worktrees/branches with no matching unit (K5) */
   orphans: { worktrees: string[]; branches: string[] };
+  /**
+   * gh-195/05 (B2, H2): unit worktrees whose `.norn-unit` is gone (`git clean -fdx`), each with the
+   * marker observe inferred from its folder and branch and read the unit by; act writes it back
+   * (`restore_markers`). Observe writes nothing. Absent = none.
+   */
+  unmarked?: UnmarkedWorktree[];
+}
+
+/** A unit worktree without its `.norn-unit`, and the marker its folder and branch name (B2). */
+export interface UnmarkedWorktree {
+  path: string;
+  marker: { repo: string; story: string; slice: string | null; unit: string; spec_dir: string };
 }
 

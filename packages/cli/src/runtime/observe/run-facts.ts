@@ -1,7 +1,7 @@
 /** observe: a unit's run facts — its run windows (C4), hook facts refined per agent (A2), the live or unknown run (R5.1, R5.3, B3). */
 import type { AgentAdapter, FileError, Ports, RunFacts, UnitFacts, WorktreeFacts } from "@norn/core";
-import { type HookFact, unitHandoffPath } from "@norn/schema";
-import { type LocalUnit, liveRun, receiptsOfKinds, runHooks, type StorySnapshot, type UnitSnapshot } from "@norn/store";
+import type { HookFact } from "@norn/schema";
+import { handoffPath, type LocalUnit, liveRun, receiptsOfKinds, runHooks, type StorySnapshot, type UnitSnapshot } from "@norn/store";
 import type { DatedCommit } from "./git-facts.ts";
 
 /** A2: each agent adapter's own pass over a run's hook facts (`refineHooks`), once per adapter name. */
@@ -57,8 +57,10 @@ export async function unitFacts(ports: Ports, story: StorySnapshot, lu: LocalUni
   const now = env.now;
   const u = lu.snapshot;
   const st = u.state;
-  // gh-195 D8 (B5): norn's one file in the worktree is the unit's handoff; its run state is in the machine dir (S12)
-  const handoff = `${story.spec_dir}/${unitHandoffPath(u.unit.dir)}`;
+  // gh-195 D8 (B5): norn's one file in the worktree is the unit's handoff; its run state is in the machine dir
+  // (S12). The agent's own files are not counted: they are dirty all through a live session, and
+  // recover.commit would commit them under it
+  const handoff = handoffPath(story.spec_dir, u.unit.dir);
   const dirty = worktree?.status ? [...worktree.status.staged, ...worktree.status.unstaged, ...worktree.status.untracked] : [];
   const uncommitted = dirty.some((p) => p === handoff || (p.endsWith("/") && handoff.startsWith(p)));
 

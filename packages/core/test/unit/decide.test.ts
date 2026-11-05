@@ -755,6 +755,23 @@ describe("trace compatibility (O5)", () => {
     const odd = { ...check, receipts: [], state: park.state, commit: null };
     expect(legacyAction(odd)).toBe(odd);
   });
+  test("an older round_migrate (a commit, folders named from the spec folder) reads as the one decide emits now (gh-195/05)", () => {
+    const s = solo(running(), { process_alive: false });
+    s.units[0]!.record = "runs/_story";
+    const now = only(facts([s]));
+    expect(now.kind).toBe("round_migrate");
+    // as a norn before gh-195/05 recorded it in a trace
+    const old = {
+      kind: "round_migrate",
+      unit: now.unit,
+      rule: "round.migrate",
+      from: `${s.spec_dir}/runs/_story`,
+      to: `${s.spec_dir}/runs/_story/rounds/01-solo`,
+      commit: { cwd: "/r-worktrees/gh-1-login", branch: "gh-1-login", message: "norn: gh-1 record moved into round 1", trailers: { "Norn-Story": "gh-1", "Norn-Step": "implement", "Norn-Tick": TICK }, push: true },
+    };
+    expect(legacyAction(old)).toEqual(now);
+    expect(legacyAction(now)).toBe(now);
+  });
 });
 
 describe("gh-71 D5/D6: a finished round (B21, B24, B25, B35)", () => {

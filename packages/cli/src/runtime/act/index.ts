@@ -19,7 +19,7 @@ import {
   type Facts,
   type InboxGroup,
 } from "@norn/core";
-import { deleteMailbox, reclaimLeases, writeActFailures, writeState } from "@norn/store";
+import { deleteMailbox, reclaimLeases, writeActFailures, writeState, writeUnitMarker } from "@norn/store";
 import { appendProgress, rejectProgress } from "../report.ts";
 import { ActEnv, QueueFull, claimLost } from "./env.ts";
 import { applyReceipts, startRun, nudge, retryFresh, classify } from "./session.ts";
@@ -234,6 +234,10 @@ export class Actor extends ActEnv {
         return { ok: true };
       case "intake_story":
         return intake(this, a);
+      case "restore_markers": {
+        for (const w of a.worktrees) writeUnitMarker(w.path, w.marker);
+        return { ok: true, detail: { restored: a.worktrees.map((w) => w.path) } };
+      }
       case "reclaim_leases": {
         const removed = await reclaimLeases(this.ctx.home, a.files, this.liveness());
         return { ok: true, detail: { removed } };

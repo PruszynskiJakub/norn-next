@@ -94,6 +94,12 @@ function cases(): RuleCase[] {
 
   // ---- repo and claims
   out.push(c("dead lease files are reclaimed", "leases.reclaim", facts([], machine({ dead_lease_files: ["agent-1.json"] }))));
+  out.push(
+    c("a unit worktree lost its .norn-unit: act writes it back (gh-195/05, B2)", "worktree.marker", {
+      ...facts([story(SOLO_WF)]),
+      unmarked: [{ path: "/r-worktrees/gh-1-login", marker: { repo: "/r", story: "gh-1", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-1-login" } }],
+    }),
+  );
   out.push(c("an unreadable claim ref", "claim.corrupt", facts([story(SOLO_WF, {}, null, { claim: { state: "corrupt", sha: "c9", error: { file: "refs/norn/claims/gh-1", errors: [{ path: "", message: "invalid JSON" }] } } })])));
   out.push(c("a story file that failed validation", "story.corrupt", facts([story(SOLO_WF, {}, null, { frontmatter: null, frontmatter_error: { file: ".agents/specs/gh-1-login/story.md", errors: [{ path: "/id", message: "bad" }] } })])));
 

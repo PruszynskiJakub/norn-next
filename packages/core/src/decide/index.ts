@@ -58,6 +58,8 @@ export function decide(facts: Facts, workflows: RepoWorkflows, config: ResolvedC
   const ctx = new Ctx(facts, workflows, config);
   const deadFiles = facts.machine.dead_lease_files ?? [];
   if (deadFiles.length) ctx.emit({ kind: "reclaim_leases", unit: null, rule: "leases.reclaim", files: [...deadFiles] });
+  // gh-195/05 (B2, H2): observe read these units by an inferred marker; act writes it back, traced
+  if (facts.unmarked?.length) ctx.emit({ kind: "restore_markers", unit: null, rule: "worktree.marker", worktrees: structuredClone(facts.unmarked) });
   for (const story of queueOrder(facts.stories)) decideStory(ctx, story);
   intake(ctx);
   return ctx.decisions;

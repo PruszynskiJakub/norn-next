@@ -234,8 +234,12 @@ function loadStories(root: string, opts: { includeApplied?: boolean; only?: stri
 
 export function loadSnapshot(opts: {
   repoRoot: string;
-  /** story worktrees, scanned before repoRoot */
-  storyRoots?: string[];
+  /**
+   * story worktrees, scanned before repoRoot: a path (read for the story its marker names) or a story
+   * key and the path the caller already matched it to (gh-195/05, B2: observe read a marker `git clean`
+   * took from the worktree's folder and branch, and writes nothing, H2)
+   */
+  storyRoots?: Array<string | { story: string; path: string }>;
   home?: string;
   env?: Record<string, string | undefined>;
   includeApplied?: boolean;
@@ -251,8 +255,9 @@ export function loadSnapshot(opts: {
   const baseRoot = baseRef ? baseSpecsRoot(opts.repoRoot, baseRef) : null;
   const seen = new Map<string, StorySnapshot>();
   // R3.4: a story worktree is read only for the story its marker names
-  for (const root of opts.storyRoots ?? []) {
-    const m = readUnitMarker(root).marker;
+  for (const entry of opts.storyRoots ?? []) {
+    const root = typeof entry === "string" ? entry : entry.path;
+    const m = typeof entry === "string" ? readUnitMarker(root).marker : { story: entry.story, slice: null };
     if (!m || m.slice !== null) continue;
     for (const s of loadStories(root, { includeApplied: opts.includeApplied, only: m.story })) if (!seen.has(s.key)) seen.set(s.key, s);
   }

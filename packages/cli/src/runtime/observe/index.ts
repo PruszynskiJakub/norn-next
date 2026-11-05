@@ -22,6 +22,7 @@ import {
   type StoryFacts,
   type UnitFacts,
   type UnitRef,
+  type UnmarkedWorktree,
   type WorktreeFacts,
   storyMode,
 } from "@norn/core";
@@ -40,7 +41,6 @@ import {
   readRemoteCache,
   inferUnitMarker,
   readUnitMarker,
-  writeUnitMarker,
   traceForeignCommits,
   type UnpushedTarget,
   type UnpushedUnit,
@@ -141,14 +141,16 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   const storyWts = new Map<string, string>();
   const sliceWts = new Map<string, string>();
   const orphanWts: string[] = [];
+  const unmarked: UnmarkedWorktree[] = [];
   const wtList = await git.worktreeList(root).catch(() => []);
   for (const w of wtList) {
     if (w.path === root) continue;
     let marker = readUnitMarker(w.path).marker;
-    // gh-195/05 (B2): a unit worktree whose marker `git clean -fdx` took gets it back from its folder and
-    // branch, so the unit is read again (its run state is in the machine dir, S12)
+    // gh-195/05 (B2): a unit worktree whose marker `git clean -fdx` took is read by the marker its folder
+    // and branch name (its run state is in the machine dir, S12); observe writes nothing (H2), act
+    // writes the marker back (`restore_markers`)
     const inferred = marker ? null : inferUnitMarker(root, w.path, w.branch);
-    if (inferred) writeUnitMarker(w.path, (marker = inferred));
+    if (inferred) unmarked.push({ path: w.path, marker: (marker = inferred) });
     if (!marker) {
       if (w.path.startsWith(`${root}-worktrees/`)) orphanWts.push(w.path);
       continue;
@@ -376,6 +378,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     heartbeat: { last_tick_at: now },
     ...(local.norn ? { norn: local.norn } : {}),
     orphans: { worktrees: orphanWts.sort(), branches: orphanBranches },
+    ...(unmarked.length ? { unmarked } : {}),
   };
   return { facts, workflows, config, ports, root, remote, heartbeat_id: hb, stories: storyLocs, units: unitLocs, sync, unpushed };
 }
