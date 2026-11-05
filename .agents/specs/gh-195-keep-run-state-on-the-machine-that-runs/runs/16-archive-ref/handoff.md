@@ -25,7 +25,7 @@ GR6/GR6b push the final record to `refs/norn/runs/<story>` before cleanup; `run 
 - trace view: `records.source` "archive" (ref + commit) replaces "base_cache".
 - Tests: new packages/cli/test/integration/archive-ref.test.ts (AC1–AC6); B36 tests in records/round-folders now archive the base's runs/ subtree first (`archiveTreeRunState` in test/support/harness.ts, as upgrade D14 will); view steps fixture copied into the machine dir; story-reopen GR6b AC2 now expects only `refs/norn/runs/gh-8` left.
 - golden --update: 0 of 124 changed. base-sync transcript rewritten: the archive push (hash-object … push refs/norn/runs/gh-7) appears before the GR6 cleanup — intended. Archive refs are listed lazily (one for-each-ref only when a finished story lacks machine-dir run state) so other transcripts stay unchanged.
-- Integration tier: 760 pass, 6 skip, 0 fail (first commit); affected files rerun after the closeStory change: green.
+- Final head: unit 1211 pass / 0 fail, typecheck green, integration 760 pass / 6 skip / 0 fail, e2e 72 pass / 2 skip / 0 fail. `bun run golden` (harvest) not run: no new rule id.
 
 ### Flakes
 
@@ -33,4 +33,4 @@ GR6/GR6b push the final record to `refs/norn/runs/<story>` before cleanup; `run 
 
 ## Resume
 
-Run the integration and e2e tiers; if green, `norn done done`.
+Done: reported `norn done done`. Next step is review; at merge reconcile closeStory's record push with slice 09 (keep one push, its `record_push_failed`).
