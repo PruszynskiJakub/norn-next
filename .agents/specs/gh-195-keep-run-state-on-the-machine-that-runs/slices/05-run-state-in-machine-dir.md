@@ -2,7 +2,7 @@
 id: gh-195/05
 title: Run state of new units lives in the machine dir
 depends_on: [ gh-195/01, gh-195/04 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
