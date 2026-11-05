@@ -2,7 +2,7 @@
 id: gh-195/16
 title: A finished story's record is archived on its ref, never on the base
 depends_on: [ gh-195/03, gh-195/08 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
