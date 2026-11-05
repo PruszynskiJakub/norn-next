@@ -14,6 +14,16 @@
 
 ## Goal
 
+Every claim release (`story handoff`, clean `watch` exit, `story close`) pushes branches, then the record ref, then deletes the claim; a rejected record push releases nothing (B15, B16, B33, B11).
+
 ## Progress
 
+- `releaseStory` (packages/cli/src/runtime/release.ts) calls new `pushReleaseRecord` after the branch pushes and before `releaseClaim`; a failure returns `failed: "record"` and keeps the claim. `closeStory` (runtime/close.ts) calls it after its branch pushes, before any removal (new failure `record_push_failed`; GR6b `close_story` act reports it too).
+- `story handoff` is now a markdown command: "handed over <story>: record at <commit>, matches story branch <sha>" (or "with no story branch", B33); a record failure refuses with exit 3, `record_push_failed`, do_instead "check the remote, then run norn story handoff <story> again". `story close` refuses the same way. `watch` exit prints "Could not release …; the claim is kept".
+- store `pushRecord`: a tree unchanged from the last push is pushed again when the branch commit moved (the release's handoff commit), so the record always names the branch as pushed.
+- State left for gh-195/14: after a clean release the local `refs/norn/runs/<story>` equals the remote's and its tree equals the local run-state folder's (`recordTreeId`); the local copy is not removed here.
+- Tests: packages/cli/test/integration/release-record.test.ts (post-receive hook logs the order the remote took updates; pre-receive hook rejects the record). docs:emit regenerated (handoff summary).
+
 ## Resume
+
+Run the integration and e2e tiers; if green, commit and `norn done done`.
