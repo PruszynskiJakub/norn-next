@@ -1304,12 +1304,18 @@ describe("one resolver for a unit's handoff (gh-195 prefactor 2, B6, B39)", () =
 });
 
 describe("superseded records replace unpushed runs and orphaned/ (gh-195 D11, B27, AC4)", () => {
-  test("no package source, golden case, rule case, shipped asset or generated reference names unpushed_runs, orphaned/ or work not in the record", () => {
+  test("no package source, golden case, rule case, shipped asset, plugin, emitted schema or doc but the rules names unpushed_runs, orphaned/ or work not in the record", () => {
     const GONE = /unpushed_runs|unpushedRuns|UnpushedRuns|orphaned\/|copyToOrphaned|orphanedDir\b|work (?:on \S+ is )?not in the record/;
     const scanned = [
       ...files(PKGS).filter((p) => p.includes("/src/") || p.endsWith("/test/rule-cases.ts")),
       ...readdirSync(join(PKGS, "core", "test", "golden")).map((n) => join(PKGS, "core", "test", "golden", n)),
       join(ROOT, "docs", "reference.md"),
+      // the shipped assets (skills, workflows), the plugins and the emitted schemas a person or agent reads
+      ...textFiles(join(PKGS, "cli", "assets"), DOCS),
+      ...textFiles(join(ROOT, "plugins"), [...DOCS, ".toml", ".sh"]),
+      ...textFiles(join(PKGS, "schema", "json"), DOCS),
+      // and every doc but the rules file, whose T7a and R2.3 name what gh-195 replaced on purpose
+      ...allDocs(ROOT).filter((f) => !f.endsWith(RULES_FILE)),
     ];
     const hits = scanned.flatMap((p) =>
       readFileSync(p, "utf8")

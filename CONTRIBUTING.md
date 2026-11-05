@@ -9,7 +9,7 @@ norn is built with norn. This file is the person's side: how a change gets propo
 3. **Triage or reproduce.** Unless the issue names a workflow, the `triage` workflow runs first: an agent checks the issue still applies, adds the affected code and context as an issue comment, and recommends `refinement`, `quick`, `reproduce` or closing it. A bug (the bug report template sets `norn:wf:reproduce`) runs `reproduce` instead: an agent reproduces it through the real interface, builds a loop that goes red, confirms the cause and posts it on the issue. Both end their round on their own; the inbox shows the story as done with no PR.
 4. **You start the next round.** Each workflow does one thing, and a story goes through them one after another on the same branch: `norn story edit gh-N --workflow <name>`. A feature: `triage → refinement → story`. A small change: `triage → quick`. A bug: `reproduce → quick`. To close instead, close the issue: a story with no PR and no unfinished round then ends by itself.
 5. **The workflow runs.** Agents do the unattended steps; you answer the inbox (`norn status`).
-6. **A person merges.** Every delivery workflow (`quick`, `story`, `release`) ends at a `ready` gate with a PR. You merge it (squash).
+6. **A person merges.** Every delivery workflow (`quick`, `story`, `release`) ends at a `ready` gate with a PR. You merge it (squash). The PR holds the code, the spec and the handoffs (`handoffs/<unit>.md`); norn's run state stays in the machine dir of the checkout that ran the story, and the merge archives it on `refs/norn/runs/gh-N`, never on `main` ([Concepts](docs/concepts.md#what-gets-committed-and-where-run-state-lives)).
 
 ## Workflows
 

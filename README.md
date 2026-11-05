@@ -89,7 +89,7 @@ norn status    # in another terminal: what needs you, with the command for each 
 2. The triage agent checks the issue against your code, posts its findings and one recommendation as an issue comment, and labels the issue's kind, risk and priority. The round ends there.
 3. You start the next round: `norn story edit gh-N --workflow quick` for a small change, `--workflow refinement` to agree a spec and plan with an agent first, then `--workflow story` to build it in slices.
 4. The workflow runs. Whenever an agent asks, a gate waits for your approval or something is stuck, the item appears in `norn status` with the command that resolves it (`norn story answer`, `norn story approve`, `norn run rerun`, …).
-5. A delivery workflow ends at a `ready` gate with a draft PR. Your last act is merging it.
+5. A delivery workflow ends at a `ready` gate with a draft PR. Your last act is merging it. The PR holds your code, the spec and the handoffs; norn's run state stays on your machine and is archived on a ref of its own, never on your base branch ([Concepts: What gets committed](docs/concepts.md#what-gets-committed-and-where-run-state-lives)).
 
 `norn help` lists every command and who runs it; `norn help <command>` shows one.
 

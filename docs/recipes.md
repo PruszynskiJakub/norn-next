@@ -94,13 +94,17 @@ On your machine, when you stop working on the story:
 norn story handoff gh-12
 ```
 
-It pushes the branches and the handoff and releases the claim. On the colleague's machine:
+It pushes the branches (with the handoffs on them), then the story's record to `refs/norn/runs/gh-12`, and only then releases the claim; it names the record commit and the story branch commit it matches. If the record push fails, nothing is released: check the remote and run it again. A clean `norn watch` exit and `norn story close` push the record the same way before they release a claim. On the colleague's machine:
 
 ```sh
 norn story checkout gh-12
 ```
 
-It claims the story, checks out its branches and prints the handoff, and their heartbeat drives it from there. If your machine is gone and still holds the claim, `norn story checkout gh-12 --force` takes it over; the takeover is recorded.
+It claims the story, checks out its branches, fetches the record into their machine dir and prints the status and the handoff, and their heartbeat drives it from there at the same step, attempt and counters. Commits pushed on top of the branch after the record are fine. If the branch was rewritten since the record (the commit it matches is gone), the record is kept and the current step restarts as a new attempt, with the reason in the brief.
+
+If your machine is gone and still holds the claim, wait for the claim to expire or run `norn story checkout gh-12 --force`; the takeover is recorded. Without a record on the ref (your team uses the `local` record policy and your machine never released the claim), checkout says the record was lost and starts a new round of the story's workflow, pinned from the branch, at the step its last boundary commit led to, with fresh counters; the brief tells the agent to check the branch for what is already done. Under the `remote` policy (`norn config set record.policy remote --repo`) the record is on the ref after every boundary, so nothing is lost. The same `--force` checkout recovers a story on your own machine after its `~/.norn` was wiped.
+
+When your machine comes back after a takeover without a release, its next tick sets its copy of the record aside as superseded (`~/.norn/repos/<id>/superseded/`), never pushes it, and shows one Check item; `norn tidy` deletes it after `trace.retain`. After a clean `norn story handoff` your copy is already on the ref and is removed quietly.
 
 ## Keep the heartbeat alive without a terminal
 
@@ -120,7 +124,7 @@ The repo's norn version (`norn_version` in `.agents/norn.config.yaml`, see [Conc
 
 1. Install the new norn ([README: Install](../README.md#install)) and check it with `norn --version`.
 2. Stop `norn watch` (and any cron tick) on this checkout: `norn upgrade` refuses while a tick runs.
-3. Run `norn upgrade`. It moves `norn_version` to the running binary's version, rewrites the bundled `norn*` skills in `.agents/skills/` to its copies, and makes any layout or config move the new version needs, all staged and nothing committed. It prints what moved; with nothing to move it says so and changes nothing.
+3. Run `norn upgrade`. It moves `norn_version` to the running binary's version, rewrites the bundled `norn*` skills in `.agents/skills/` to its copies, and makes any layout or config move the new version needs, all staged and nothing committed. Run state an older norn committed to the base branch (each spec folder's `runs/`) is packed into one `refs/norn/runs/<story>` per finished story and pushed; only a story whose ref is on the remote gets its removal staged, along with norn's `runs/**` line in `.gitattributes`. A story whose push fails keeps its run state and is named with the reason; a rerun pushes only the refs still missing. Until that removal is committed, `norn status` and `norn doctor` point to `norn upgrade`. It prints what moved; with nothing to move it says so and changes nothing.
 4. Review `git diff --staged`, commit it and push it to the base branch (through a PR if your base branch takes only PRs).
 
 `norn upgrade` never moves the version backward: a binary older than the repo's version is refused with the norn to install. To really go back, edit the key in the team file by hand, where review sees it. `norn migrate` is the old name of `norn upgrade` and still works, with a one-line notice, until the next minor.

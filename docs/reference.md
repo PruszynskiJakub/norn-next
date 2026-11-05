@@ -18,7 +18,7 @@ A command a person runs that needs the tick lock (`norn story edit --workflow`, 
 |---|---|---|
 | `~/.norn/config.yaml` | this machine, and your defaults for every repository | machine: `max_agents`, `notify`, `trace.retain` · yours: `mode`, `agent`, `agents.<name>` |
 | `.agents/norn.config.local.yaml` (gitignored) | you, in this repository | `mode`, `agent`, `agents.<name>`: these override the user file |
-| `.agents/norn.config.yaml` (committed) | the team | `provider`, `base_branch`, `workflow`, `slice_workflow`, `norn_version` |
+| `.agents/norn.config.yaml` (committed) | the team | `provider`, `base_branch`, `workflow`, `slice_workflow`, `record.policy`, `norn_version` |
 | a workflow file | the workflow | top-level `mode`; `defaults:` with `deadline`, `nudges`, `retries`, `stalled` |
 
 For your keys the nearer file wins: local over user over built-in. Maps merge key by key; lists and scalars replace, so `agents: {claude: {model: …}}` keeps Claude's built-in `--permission-mode auto`, while setting `agents.claude.args` replaces that list, and `notify: {ntfy: <url>}` keeps OS notifications. A story's mode is, nearest first: the story's own (`norn story edit --auto|--manual`), its workflow's `mode`, the local file, the user file, then `manual`. A key in the wrong file, or one an older norn used, is refused with the file and key to use instead; `norn upgrade` rewrites old files. `norn config` lists every setting in effect and the file it came from; `norn config set <key> <value>` changes one in the file you name with `--user`, `--local` or `--repo`.

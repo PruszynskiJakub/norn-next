@@ -14,10 +14,10 @@ Two-machine operation was only simulated on one Mac (`NORN_MACHINE`). Everything
 
 ## Not built yet
 
-- **Secrets in committed text.** Check output, receipts, logs, evidence and handoff are committed unredacted. Keep secrets out of check output and evidence.
+- **Secrets in pushed text.** Handoffs are committed, and check output, receipts, logs and evidence are pushed to the story's record ref (`refs/norn/runs/<story>`), unredacted. Keep secrets out of check output and evidence.
 - **No write-back to GitHub or GitLab** beyond pushes and the draft PR: no status comment edited in place, no `norn:stuck` label.
 - **No permission profiles per step.** Claude runs in its `auto` permission mode by default; a permission prompt the agent is blocked on shows up as an Answer item.
-- **No hard-deny hook.** Pushing, writing to the remote with `gh`/`glab` and editing `runs/` are forbidden by the `norn` skill, not blocked by a hook.
+- **No hard-deny hook.** Pushing, writing to the remote with `gh`/`glab` and editing norn's run state are forbidden by the `norn` skill, not blocked by a hook.
 - **No guards on transitions** (`when:`), no per-slice mode, no `fork`/`join` steps: conditions are outcomes, a person's QA is a gate, and `attended: true` on a step covers the precise cases.
 - **One remote and project per repository.**
 - **No web cockpit, and no command that mines the trace for workflow changes.**
@@ -25,23 +25,22 @@ Two-machine operation was only simulated on one Mac (`NORN_MACHINE`). Everything
 ## Gaps still open
 
 1. **Cross-machine handoff edges.**
+   - Under the `local` record policy, a holder that dies without releasing its claim loses the story's run record: a takeover restarts the last boundary's step from the branch with fresh counters (`record.policy: remote` pushes the record at every boundary instead).
    - After a `story checkout`, a foreign run parked on a prompt is never judged.
-   - An approve followed by a merge within one tick leaves main's record at the gate.
+   - An approve followed by a merge within one tick leaves the archived record at the gate.
    - A merged story stays offered for `story checkout` on a checkout that once worked on it, and `norn tidy` does not remove leaked intake worktrees or slot leases.
 2. **A machine-specific hook command is committed as is.** The default hook command, `"${NORN_BIN:-norn}" hook`, is portable. But `norn init --hook-command` or `NORN_HOOK_COMMAND` with an absolute path writes that path into the committed `.claude/settings.json`, as the dogfood sandbox did, and a second machine then gets no hook facts. Without hook facts, `silent`, stalled, adoption and implicit asks are all lost. Neither `init` nor `doctor` flags it: `doctor` tests the hook command this machine would install, not the one committed.
 3. **Implicit asks flicker.** When an agent sends several tool calls at once, its Answer item can vanish for one tick and return with a new id. A notifier fires twice, and a `norn story answer` sent in the gap is refused.
    - After an accepted answer, `status` and `story view` show the old question until the next tick, which takes 20–40 s.
    - If a runner kept reporting `waiting_input` from before the last answer, a second prompt would not be raised.
 4. **Agents' housekeeping.**
-   - An agent's `git add -A` can sweep norn's pending `runs/` files into its own merge commit.
    - QA agents commit evidence files at the repo root.
 5. **Marker check covers the pushed head only.** A marker commit that a later commit fixed is still published, because norn never rewrites history.
 6. **Commits made outside norn are blurred in two cases.**
    - A person's commit made while an agent run is active is not flagged as made outside norn.
    - A person's commit merged in by `update` no longer shows up as made outside norn; only the head-changed item reports it.
 7. **Nothing stops a person or tool typing into an agent's pane.** Answers typed there bypass norn's record, and on one checkout 7 of 30 prompts were answered in the pane.
-8. **Attended steps and handoff guidance.**
-   - `handoff.md` guidance. The `norn` skill says to keep handoff.md current, but its hard rules also say never to edit anything under `runs/`, where handoff.md lives (`runs/<unit>/handoff.md`).
+8. **Attended steps and per-worktree setup.**
    - Attended steps with nobody in the pane. The inbox says when the agent waits (HC1–HC3), but "report once the person agrees" still cannot be met when no person comes, and nothing ends the wait.
    - No per-worktree setup step and no config key for checks: check commands must prepend their own setup, such as `bun install --frozen-lockfile`.
 9. **No backfill of history** from before norn first observed a repo.

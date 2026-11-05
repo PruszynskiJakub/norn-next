@@ -98,7 +98,7 @@ export interface ApplyResult {
   route: "nudge" | "retry" | null;
   /** answer text to type into the live session (B2), set when the last receipt was an answer */
   deliver: string | null;
-  /** one line per applied receipt, for handoff.md heartbeat lines (O6) */
+  /** one line per applied receipt, for the commit message (O6: never written into the handoff) */
   log: string[];
 }
 

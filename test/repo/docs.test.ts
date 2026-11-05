@@ -62,22 +62,34 @@ describe("rules file (B23, B24, B27, B31)", () => {
 
 // ------------------------------------------------------------------------------------------- handoff
 
-/** B34 (D7): a handoff.md outside a story spec's runs/ folder. */
+/** gh-195 B39 (D9): a unit's handoff, `<spec folder>/handoffs/_story.md` or `handoffs/<nn>-<slug>.md`. */
+const UNIT_HANDOFF = /^\.agents\/specs\/[^/]+\/handoffs\/(?:_story|[0-9]{2,}-[^/]+)\.md$/;
+/** An older norn's handoff, `runs/<unit>/handoff.md` in a spec folder: moved to `handoffs/` at the unit's next boundary (B34). */
+const OLD_HANDOFF = /^\.agents\/specs\/[^/]+\/(?:.*\/)?runs\//;
+
+/** gh-34 B34, gh-195 B39: a handoff tracked anywhere but a spec folder's `handoffs/` (or an older norn's `runs/`). */
 function strayHandoff(relPath: string): boolean {
-  return relPath.split("/").at(-1) === "handoff.md" && !/^\.agents\/specs\/[^/]+\/(?:.*\/)?runs\//.test(relPath);
+  const parts = relPath.split("/");
+  if (parts.at(-2) === "handoffs") return !UNIT_HANDOFF.test(relPath);
+  return parts.at(-1) === "handoff.md" && !OLD_HANDOFF.test(relPath);
 }
 
-describe("no stray handoff (B34)", () => {
+describe("no stray handoff (B34, gh-195 B39)", () => {
   test("matcher", () => {
     expect(strayHandoff("handoff.md")).toBe(true);
     expect(strayHandoff("docs/handoff.md")).toBe(true);
+    expect(strayHandoff(".agents/specs/gh-1-x/handoffs/_story.md")).toBe(false);
+    expect(strayHandoff(".agents/specs/gh-1-x/handoffs/01-a.md")).toBe(false);
+    expect(strayHandoff(".agents/specs/gh-1-x/handoffs/handoff.md")).toBe(true);
+    expect(strayHandoff("docs/handoffs/_story.md")).toBe(true);
+    expect(strayHandoff(".agents/specs/gh-1-x/handoff.md")).toBe(true);
     expect(strayHandoff(".agents/specs/gh-1-x/runs/_story/handoff.md")).toBe(false);
     expect(strayHandoff(".agents/specs/gh-1-x/runs/01-a/handoff.md")).toBe(false);
     expect(strayHandoff("packages/core/src/handoff.ts")).toBe(false);
   });
 
-  test("no handoff.md in the repo outside a unit's runs/", () => {
-    expect(textFiles(ROOT, [".md"]).map(rel).filter(strayHandoff).map((f) => `${f}: a handoff is tracked outside runs/; delete it`)).toEqual([]);
+  test("no handoff in the repo outside a spec folder's handoffs/ (or an older norn's runs/)", () => {
+    expect(textFiles(ROOT, [".md"]).map(rel).filter(strayHandoff).map((f) => `${f}: a handoff is tracked outside a spec folder's handoffs/; delete it`)).toEqual([]);
   });
 });
 
