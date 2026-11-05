@@ -24,9 +24,12 @@
 - Schema: `record` input kind (`packages/schema/src/workflow.ts`), JSON emitted; brief renders receipts/ and evidence/ of every unit of the story in the machine dir with the link prefix. docs:emit: no change (reference does not list input kinds).
 - Workflows: story describe `inputs: [spec, diff, record]` in shipped and repo-local copies. norn-pr skill source updated.
 - Tests: `packages/cli/test/integration/pr-evidence.test.ts` (AC1–AC4 at S1, plus the remote-policy double-push case), `packages/cli/test/unit/record-links.test.ts`, assets test for both workflow copies + skill.
+- Regenerated: `test/e2e/transcripts/{e2e-slice-workflow,base-sync}.txt` (open-pr's record push spawns before the PR calls, later shas renumbered; reviewed); `bun run golden` added 2 harvested cases (check-run, housekeeping; unrelated rules). Observe snapshots unchanged.
+- Tiers: unit 1215 pass; integration 760 pass / 6 skip (pre-existing skipIf + human.test mailbox → 13); e2e 72 pass / 2 skip (recovery R2.3 → 14, team clone B → 10–11). No flakes seen.
+- Note: under `local` after a takeover the local record ref can lag the remote; open-pr's lease then fails until the ref is fetched (takeover slices fetch it, D10).
 - AC5 is a person check (see Resume).
 
 ## Resume
 
-Run the integration and e2e tiers; regenerate transcripts if open-pr's record push shows up in them (intended); commit; `norn done done`.
+Done: report `norn done done`. Next step (test/review) checks this.
 AC5 how-to: on a real GitHub PR and a GitLab MR opened by this build, a `pr.md` with `![x](evidence/_story/<run_id>/shot.png)` must show the image inline; the link points at `…/blob/<record sha>/…?raw=true` (GitHub) or `…/-/raw/<record sha>/…` (GitLab), the sha reachable only via `refs/norn/runs/<story>` (`git ls-remote origin 'refs/norn/runs/*'`).

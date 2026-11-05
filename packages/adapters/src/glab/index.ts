@@ -6,7 +6,7 @@
 import type { RemoteFactory, RemoteIssue, RemoteLabel, RemotePort, RemotePullRequest } from "@norn/core";
 import { storyKey } from "@norn/schema";
 import { NETWORK_TIMEOUT_MS } from "@norn/store";
-import { bunExec, okOrThrow, parseJson, portError, type Exec } from "../exec.ts";
+import { bunExec, encodePath, okOrThrow, parseJson, portError, type Exec } from "../exec.ts";
 
 export interface GlabOptions {
   /** repository checkout to run `glab` in */
@@ -153,6 +153,11 @@ export function createGlab(opts: GlabOptions): RemotePort {
       const { web_url } = await json<{ web_url: string }>(["repo", "view", ...(opts.repo ? [opts.repo] : []), "--output", "json"]);
       const action = `/label ${labels.map((l) => `~"${l}"`).join(" ")}`;
       return `${web_url}/-/issues/new?${new URLSearchParams({ "issue[description]": action })}`;
+    },
+    async rawFileUrl({ commit, path }) {
+      // gh-195 D5 (B28): GitLab serves a commit's file raw under `/-/raw/`
+      const { web_url } = await json<{ web_url: string }>(["repo", "view", ...(opts.repo ? [opts.repo] : []), "--output", "json"]);
+      return `${web_url}/-/raw/${commit}/${encodePath(path)}`;
     },
     async replaceIssueLabel(number, { remove, add }) {
       // B19: GitLab ignores a label to remove that the issue does not carry

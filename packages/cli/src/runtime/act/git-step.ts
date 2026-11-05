@@ -1,17 +1,40 @@
 /** act: git steps — integrate, update, push, open-pr (W2, K6, BS3, GR9). */
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { type Action, type ActionResult, applyReceipts, nornTrailers, routeOf } from "@norn/core";
-import { type ReceiptOf, ulid } from "@norn/schema";
-import { acquireIntegrateLock, appendReceipt, machineDir, readPrFacts, readText, writePrFacts } from "@norn/store";
+import { type Action, type ActionResult, applyReceipts, nornTrailers, type RemotePort, routeOf } from "@norn/core";
+import { type ReceiptOf, recordRef, ulid } from "@norn/schema";
+import { acquireIntegrateLock, appendReceipt, machineDir, pushRecord, readPrFacts, readRecordRef, readText, writePrFacts } from "@norn/store";
 import { integrate, update as updateStory } from "../integrate.ts";
 import { type ActEnv, QueueFull } from "./env.ts";
+import { recordLinkResolver, rewriteRecordLinks } from "./record-links.ts";
 
 /** GR9: the agent's PR body file, if written, with the issue link under it; otherwise the link alone. */
-function prBody(cwd: string, pr: NonNullable<Extract<Action, { kind: "run_git" }>["pr"]>): string {
-  const path = pr.body_file ? join(cwd, pr.body_file) : null;
-  const text = path ? (readText(path) ?? "").trim() : "";
+function prBody(text: string, pr: NonNullable<Extract<Action, { kind: "run_git" }>["pr"]>): string {
   return text ? `${text}\n\n---\n\n${pr.body}` : pr.body;
+}
+
+/** GR9: the agent's PR body file as written, trimmed; "" when there is none. */
+function prText(cwd: string, pr: NonNullable<Extract<Action, { kind: "run_git" }>["pr"]>): string {
+  return pr.body_file ? (readText(join(cwd, pr.body_file)) ?? "").trim() : "";
+}
+
+/**
+ * gh-195 D5 (B11, B28): before the PR is opened or updated, push the story's record to its ref (under
+ * `local` too) with a lease on the sha this checkout last saw, its `Norn-Branch-Commit` the branch just
+ * pushed; a refused push fails the git step (retried as git steps are), so no PR call is made. Then
+ * rewrite `text`'s record links to the files' URLs at that record commit.
+ */
+async function linkRecord(act: ActEnv, a: Extract<Action, { kind: "run_git" }>, text: string, remote: RemotePort): Promise<{ text: string; record: string | null; missing: string[] }> {
+  const story = act.storyLoc(a.unit.story);
+  const expected = (await readRecordRef(act.root, story.key))?.sha ?? null;
+  const branch_commit = await act.git.revParse(act.root, `refs/heads/${a.branch}`);
+  const r = await pushRecord(act.root, act.obs.remote, story, { expected, holder: act.obs.facts.machine.holder, branch_commit, at: act.nowIso() });
+  if (!r.ok) throw new Error(`push of ${recordRef(story.key)} failed (${r.reason}), so no PR was opened or updated: ${r.message}`);
+  // an empty record (no run state yet) holds no file to link to
+  const record = r.sha;
+  const resolve = record === null ? () => null : recordLinkResolver(act.root, story);
+  const out = await rewriteRecordLinks(text, resolve, (path) => remote.rawFileUrl({ commit: record as string, path }));
+  return { text: out.text, record, missing: out.missing };
 }
 
 /** W2 git steps (K6, open-pr, BS3 update); the outcome is a `classify` receipt written after the effect. */
@@ -100,7 +123,8 @@ async function runGitLocked(act: ActEnv, a: Extract<Action, { kind: "run_git" }>
       if (!a.pr) throw new Error("open-pr without PR details");
       const pushed = await act.pushBranch(a.cwd, a.branch);
       if (!pushed.ok) throw new Error(`push failed: ${pushed.message}`);
-      const body = prBody(a.cwd, a.pr);
+      const linked = await linkRecord(act, a, prText(a.cwd, a.pr), remote);
+      const body = prBody(linked.text, a.pr);
       let pr = await remote.findPullRequest(a.branch);
       if (pr && pr.state === "open") {
         // GR9: the open PR describes the branch as it is now
@@ -110,8 +134,12 @@ async function runGitLocked(act: ActEnv, a: Extract<Action, { kind: "run_git" }>
         pr = await remote.openDraftPullRequest({ head: a.branch, base: a.pr.base, title: a.pr.title, body });
         detail = `draft PR #${pr.number} ${pr.url}`;
       }
+      // B28: a link to a file the record does not hold is left as written, and named here
+      if (linked.missing.length) detail += `; left as written, not in the record ${linked.record?.slice(0, 12) ?? "(empty)"}: ${linked.missing.join(", ")}`;
       outcome = "done";
       extra.pr = pr;
+      extra.record = linked.record;
+      if (linked.missing.length) extra.unlinked = linked.missing;
       // C1, gh-71 B27: the PR open-pr opened (or found) is what this checkout last saw of it, so the
       // finished round shows its merge item before a sync fetches the PR (never "round done, no PR")
       writePrFacts(act.root, { ...readPrFacts(act.root), [a.unit.story]: { pr, observed_at: act.ctx.clock.now() } });

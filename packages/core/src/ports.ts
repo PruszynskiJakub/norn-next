@@ -342,6 +342,12 @@ export interface RemotePort {
   /** B23 (D3): the remote's new-issue page in the browser with `labels` filled in; creates nothing */
   newIssueUrl(opts: { labels: string[] }): Promise<string>;
   /**
+   * gh-195 D5 (B28): the URL of file `path` of commit `commit` on the repository, served raw so a PR
+   * body's markdown renders an image inline (GitHub `<repo>/blob/<commit>/<path>?raw=true`, GitLab
+   * `<repo>/-/raw/<commit>/<path>`). Each path segment is URL-encoded. Changes nothing.
+   */
+  rawFileUrl(opts: { commit: string; path: string }): Promise<string>;
+  /**
    * B19: replace label `remove` on issue `number` with `add`; when `remove` is not on the issue,
    * `add` is still added. Throws PortError when the provider fails (B20: the caller warns).
    */

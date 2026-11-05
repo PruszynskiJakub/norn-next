@@ -133,12 +133,14 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
  * the tick's branch pushes (a side action act performs last). A push that failed leaves the tree
  * different, so the next tick pushes again (B14). A move off the branch this tick (B34, D13) brings the
  * record into the machine dir as it acts, so the push rides along with it. Under `local`, nothing (B11).
+ * An `open-pr` this tick pushes the record itself before the PR (D5, B28): no second push beside it.
  */
 function pushRecord(ctx: Ctx, story: StoryFacts, ref: UnitRef): void {
   if ((ctx.config.record?.policy ?? "local") !== "remote" || !story.record) return;
   const { tree, pushed } = story.record;
   const moved = ctx.decisions.some((d) => d.action.kind === "move_record" && d.action.unit?.story === story.key);
   if (!moved && (tree === null || tree === pushed?.tree)) return;
+  if (ctx.decisions.some((d) => d.action.kind === "run_git" && d.action.action === "open-pr" && d.action.unit?.story === story.key)) return;
   ctx.emit({ kind: "push_record", unit: ref, rule: "record.push", branch: story.branch, expected: pushed?.sha ?? null, holder: ctx.facts.machine.holder });
 }
 
