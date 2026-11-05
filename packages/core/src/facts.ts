@@ -367,6 +367,14 @@ export interface StoryFacts {
    */
   record_refused?: ActFailure;
   /**
+   * gh-195 (review#2 F3): this checkout has the story's record ref (`refs/norn/runs/<story>`, this commit)
+   * but its story unit has no run state: the record was not put in place (a checkout cut short). decide
+   * starts nothing over then. Absent = no such ref, or the story unit has run state.
+   */
+  record_unplaced?: string;
+  /** gh-195 B33 (review#2 F1): held here, read from its record in the machine dir alone — no branch, no spec in any tree */
+  record_only?: boolean;
+  /**
    * NT2/NT3: notes for a person from `done` receipts of any unit of the story that no story-level
    * gate `approve` acknowledged yet, oldest first. Absent = none (or not observed).
    */

@@ -98,6 +98,8 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
   if (facts.now >= renewAt)
     ctx.emit({ kind: "claim", unit: ref, rule: "claim.renew", op: "renew", expected: claim.sha, blob: claimBlob(ctx, story.key, claim.blob) });
 
+  if (story.record_only) return recordOnly(ctx, story, ref);
+
   // ---- story file corrupt: never touch anything of the story (S2)
   if (story.frontmatter_error || !story.frontmatter) {
     const errors = story.frontmatter_error ? [story.frontmatter_error] : [{ file: `${story.spec_dir}/${SPEC_FILE}`, errors: [{ path: "", message: "missing" }] }];
@@ -125,6 +127,20 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
     decideUnit(ctx, story, uf, halted);
   }
   pushRecord(ctx, story, ref);
+}
+
+/**
+ * gh-195 B33 (review#2 F1): a story held here with its record in the machine dir and no branch (taken
+ * over from its record alone) goes on from that record: its claim is renewed above, its story unit's
+ * receipts applied (the take among them), never intaken again. Nothing runs in it until it has a
+ * branch to work on: no worktree, no session.
+ */
+function recordOnly(ctx: Ctx, story: StoryFacts, ref: UnitRef): void {
+  if (ctx.has(ref.key)) return;
+  const su = storyUnit(story);
+  const st = su?.state;
+  if (su && st && su.workflow && st.status !== "corrupt" && !su.errors.length && su.unapplied.length) return applyAction(ctx, story, su, st, su.workflow, su.unapplied, "receipts.apply");
+  return ctx.noop(ref, "story.record_only", `held here from its record; ${story.key} has no branch (B33), so nothing runs until it has one`);
 }
 
 /**
@@ -372,6 +388,10 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
   const st = uf.state;
   if (!st) {
     if (ref.slice !== null) return ctx.noop(ref, "slice.not_started", "started by the story's slices step (W2)");
+    // review#2 F3 (S2): the story's record is on its ref here but not in the machine dir (a checkout cut
+    // short): never start it over, the checkout puts it in place
+    if (story.record_unplaced)
+      return ctx.noop(ref, "start.record_unplaced", `${story.key}'s record (${story.record_unplaced}) is not in place here; never started over — run ${cmd.storyCheckout(story.key)}`);
     return startStoryUnit(ctx, story, uf);
   }
   if (st.status === "corrupt") return ctx.noop(ref, "unit.corrupt", "corrupt; never touched (S2)");

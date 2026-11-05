@@ -143,19 +143,20 @@ export class Actor extends ActEnv {
    * one refused as stale (another checkout pushed the ref) would fail the same way every tick, so it is
    * remembered with the lease it used (effect `record_push`) in the story's own slot, never the story
    * unit's (review F2): decide holds the push until the record ref here changes, and the inbox shows one
-   * Check item. A push that lands clears it.
+   * Check item. A push that lands, or one that fails another way (its lease was another, review#2 F6),
+   * clears it.
    */
   private recordPushFailure(a: Extract<Action, { kind: "push_record" }>, rule: string, result: ActionResult): void {
     const key = recordPushSlot(a.unit.story);
     const prev = this.failures[key];
-    if (result.ok) {
+    if (result.ok || (result.detail as { reason?: string } | undefined)?.reason !== "stale") {
       if (prev?.effect !== RECORD_PUSH_EFFECT) return;
       delete this.failures[key];
       this.failuresChanged = true;
       return;
     }
-    if ((result.detail as { reason?: string } | undefined)?.reason !== "stale") return;
-    const st = this.written.get(key) ?? this.obs.units[key]?.state;
+    // the story unit's cursor when it was refused (the slot is the story's, not a unit's)
+    const st = this.written.get(a.unit.key) ?? this.obs.units[a.unit.key]?.state;
     this.failures[key] = { effect: RECORD_PUSH_EFFECT, rule, reason: result.error ?? "record push refused as stale", at: this.nowIso(), tick_id: this.tick, step: st?.step ?? "?", attempt: st?.attempt ?? 1, lease: a.expected };
     this.failuresChanged = true;
   }

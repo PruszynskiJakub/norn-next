@@ -49,9 +49,17 @@ export interface Advance {
 export const branchRewrittenLine = (story: string, gone: string, step: string, attempt: number): string =>
   `the branch of ${story} was rewritten since the record (${gone} is gone); restarting ${step} as attempt ${attempt}`;
 
-/** T5a: does applying take receipt `r` at cursor `st` restart the step (the branch was rewritten, the step can be entered again)? */
-export const rewriteRestarts = (st: UnitState, r: Receipt, wf: Workflow): boolean =>
-  r.kind === "take" && !!r.rewritten && st.status !== "stuck" && st.status !== "corrupt" && stepOf(wf, st.step) !== null;
+/**
+ * T5a (gh-195 B24): what applying take receipt `r` at cursor `st` does about a rewritten branch.
+ * `restart`: the cursor is the one the record was written at, or one a session already ran in — it
+ * judged code that is gone, so the step is entered again as a new attempt. `fresh`: the record's own
+ * receipts just entered this attempt and nothing ran in it yet, so it is the restart as it is (review#2
+ * F4: attempts and visits count once, GR8). `null`: nothing to restart (no rewrite, `$done`, stuck).
+ */
+export function rewriteRestart(st: UnitState, r: Receipt, wf: Workflow): "restart" | "fresh" | null {
+  if (r.kind !== "take" || !r.rewritten || st.status === "stuck" || st.status === "corrupt" || stepOf(wf, st.step) === null) return null;
+  return (st.step === r.step && st.attempt === r.attempt) || st.run ? "restart" : "fresh";
+}
 
 export interface Rejection {
   n: number;
@@ -188,12 +196,12 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
     const log = `taken by ${r.who ?? r.by}${from}`;
     // T5a (gh-195 B24): the record judged code that is gone — the step the cursor is at when the take
     // applies (after the record's own unapplied receipts, review F3) starts again as a new attempt,
-    // counters and history kept; never at `$done` or stuck
-    if (r.rewritten && rewriteRestarts(st, r, wf)) {
-      const next = enterStep(st, wf, st.step, ctx.now);
-      return { state: next, log: `${log}; ${branchRewrittenLine(st.story, r.rewritten.gone, st.step, next.attempt)}`, advance: { from: st.step, outcome: "take", to: st.step } };
-    }
-    return { state: st, log };
+    // counters and history kept; never at `$done` or stuck (`rewriteRestart`)
+    const how = rewriteRestart(st, r, wf);
+    if (!how || !r.rewritten) return { state: st, log };
+    const next = how === "restart" ? enterStep(st, wf, st.step, ctx.now) : st;
+    const line = `${log}; ${branchRewrittenLine(st.story, r.rewritten.gone, next.step, next.attempt)}`;
+    return how === "restart" ? { state: next, log: line, advance: { from: st.step, outcome: "take", to: st.step } } : { state: next, log: line };
   }
   if (st.status === "corrupt") return { reject: "unit is corrupt (S2)" };
   if (r.slice !== undefined && r.slice !== st.slice) return { reject: `receipt for unit ${r.slice ?? st.story}, not ${st.slice ?? st.story}` };

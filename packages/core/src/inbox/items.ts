@@ -173,10 +173,6 @@ function baseRunStateItem(facts: Facts): InboxItem | null {
 }
 
 /**
- * R4.3: an action's effect failed for the unit (a nudge or answer not delivered, a launch or resume
- * that failed, a push refused) — an Unblock item until an effect of the same kind succeeds, the
- * cursor moves, or (for deliveries) the agent shows activity again. R6.3 reuses it for prompts.
- */
 /** gh-195 (08-F4): the act failure effect of a record push refused as stale (`ActFailure.lease`) */
 export const RECORD_PUSH_EFFECT = "record_push";
 /** gh-195 (review F2): the machine-local failures slot of a story's refused record push, apart from every unit's */
@@ -185,7 +181,7 @@ export const recordPushSlot = (story: string): string => `record:${story}`;
 /**
  * gh-195 (08-F4): this checkout holds the story under `remote`, but its record push was refused as
  * stale: another checkout pushed `refs/norn/runs/<story>`. One Check item, whatever the cursor, until a
- * push lands (observe reports it only while the claim is here and the policy remote, review F2);
+ * push lands (the tick drops it once the claim is not here or the policy is `local`, review F2);
  * `norn story checkout` here fetches the ref (this checkout's run state kept), so the next push goes on top.
  */
 function recordPushItem(story: StoryFacts): InboxItem | null {
@@ -205,6 +201,11 @@ function recordPushItem(story: StoryFacts): InboxItem | null {
   };
 }
 
+/**
+ * R4.3: an action's effect failed for the unit (a nudge or answer not delivered, a launch or resume
+ * that failed, a push refused) — an Unblock item until an effect of the same kind succeeds, the
+ * cursor moves, or (for deliveries) the agent shows activity again. R6.3 reuses it for prompts.
+ */
 export function actFailureItem(story: StoryFacts, uf: UnitFacts): InboxItem | null {
   const f = uf.act_failure;
   const st = uf.state;

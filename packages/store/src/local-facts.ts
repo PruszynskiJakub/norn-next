@@ -17,6 +17,7 @@ import { type BackfillRun, backfillHookFiles } from "./hook-backfill.ts";
 import { type LeaseListing, type LeaseLiveness, listLeases } from "./leases.ts";
 import { receiptsDir } from "./paths.ts";
 import { readReceipt } from "./receipts.ts";
+import { localRecordRefs } from "./record-ref.ts";
 import { loadSnapshot, type RepoSnapshot, type StorySnapshot, type UnitSnapshot, withSliceWorktrees } from "./snapshot.ts";
 import { worktreeSkillsDrift } from "./skills.ts";
 import { readUnitHooks, unitHooksChangedAt } from "./trace.ts";
@@ -94,6 +95,8 @@ export interface LocalStory {
   ready?: { sha: string; at: string };
   /** gh-195 (08-F4, review F2): the story's refused record push, from its own slot of failures.json (`StoryFacts.record_refused`) */
   record_refused?: ActFailure;
+  /** gh-195 (review#2 F3): the local record ref's commit while the story unit has no run state (`StoryFacts.record_unplaced`) */
+  record_unplaced?: string;
 }
 
 export interface LocalFacts {
@@ -160,6 +163,7 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
   const unitHooks = readUnitHooks(root, hooked.map((u) => u.unit), starts.sort()[0] as string);
   const hooksOf = new Map(hooked.map((u, i) => [u, (unitHooks[i] ?? []).map((e) => e.fact)]));
   const drift = skillsDriftOf(opts);
+  let refs: Map<string, string> | undefined;
   const stories = placed.map(({ s, storyWt, units: us }): LocalStory => {
     const units = us.map(({ u, worktree }) => {
       const lu = localUnit(root, s, u, worktree, hooksOf.get(u) ?? [], live, failures);
@@ -170,7 +174,17 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
     const ready = readyOf(s, s.units[0]);
     const notes = openNotes(s.units.map((u) => ({ unit: u.unit.key, receipts: receiptsOfKinds(s, u, ["done", "approve"]) })));
     const refused = failures[recordPushSlot(s.key)];
-    return { snapshot: s, worktree: storyWt, units, ...(notes.length ? { notes } : {}), ...(ready ? { ready } : {}), ...(refused ? { record_refused: refused } : {}) };
+    // review#2 F3: a record ref here while the story unit has no run state — the record is not in place
+    const unplaced = !s.units[0]?.state ? (refs ??= localRecordRefs(root)).get(s.key) : undefined;
+    return {
+      snapshot: s,
+      worktree: storyWt,
+      units,
+      ...(notes.length ? { notes } : {}),
+      ...(ready ? { ready } : {}),
+      ...(refused ? { record_refused: refused } : {}),
+      ...(unplaced ? { record_unplaced: unplaced } : {}),
+    };
   });
   // gh-61 D5, B12: the version the main checkout's team config records
   const mainDrift = drift(root);
