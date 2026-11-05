@@ -159,17 +159,31 @@ export async function addRejectedReceipt(root: string, entry: RejectedMailboxRec
 
 /**
  * gh-195 D12: drop the rejected mailbox receipts rejected before `before` (ISO) that are not `open` (by
- * receipt id: their Check item still shows), as `norn tidy` ages the trace out (`trace.retain`); returns
- * the ones dropped (`dry`: only lists them). Under the lock; an entry of the wrong shape is kept (S2).
+ * receipt id: their Check item still shows), as `norn tidy` ages the trace out (`trace.retain`). Under
+ * the lock; an entry of the wrong shape is kept (S2). `dry` only lists them: no lock, nothing written.
+ * Never throws (review#1 F2): a file that cannot be read as one, or a lock that cannot be had, is
+ * returned as `error` with the file left as it was, so tidy reports it and goes on.
  */
-export async function pruneRejectedReceipts(root: string, before: string, open: ReadonlySet<string>, dry: boolean): Promise<RejectedMailboxReceipt[]> {
-  return withRejectedLock(root, () => {
-    const f = rejectedForWrite(root);
-    const drop = (r: RejectedMailboxReceipt) => r.rejected_at < before && !open.has(r.receipt_id);
+export async function pruneRejectedReceipts(
+  root: string,
+  before: string,
+  open: ReadonlySet<string>,
+  dry: boolean,
+): Promise<{ removed: RejectedMailboxReceipt[]; error: string | null }> {
+  const drop = (r: RejectedMailboxReceipt) => r.rejected_at < before && !open.has(r.receipt_id);
+  const prune = (): { removed: RejectedMailboxReceipt[]; error: string | null } => {
+    const f = readRejectedFile(root);
+    if (!f.ok) return { removed: [], error: `${f.message}: left as it is (S2); fix or remove the file` };
     const old = f.receipts.filter(drop);
     if (old.length && !dry) atomicWriteJson(rejectedReceiptsPath(root), { receipts: f.raw.filter((e) => !(e.valid && drop(e.valid))).map((e) => e.entry) });
-    return old;
-  });
+    return { removed: old, error: null };
+  };
+  if (dry) return prune();
+  try {
+    return await withRejectedLock(root, prune);
+  } catch (e) {
+    return { removed: [], error: (e as Error).message };
+  }
 }
 
 /** GR6: a merged story whose `status: done` record on the base branch is still owed (deferred or failed). */

@@ -4,7 +4,7 @@
  * one at all is never written over, and a write waits for the lock another holder has.
  */
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { RejectedMailboxReceipt } from "@norn/schema";
 import { acquireLock, addRejectedReceipt, bindNornHome, pruneRejectedReceipts, readRejectedReceipts, rejectedLockPath, rejectedReceiptsPath } from "../../src/index.ts";
@@ -39,6 +39,22 @@ const write = (root: string, text: string) => {
 const onDisk = (root: string) => JSON.parse(readFileSync(rejectedReceiptsPath(root), "utf8")).receipts as unknown[];
 
 describe("rejected.json (13-R3-F2)", () => {
+  test("review#1 F2: a dry prune takes no lock and writes nothing, even while another holder has the lock", async () => {
+    const root = checkout();
+    const text = JSON.stringify({ receipts: [entry("A")] });
+    write(root, text);
+    const lock = await acquireLock(rejectedLockPath(root));
+    expect(lock.ok).toBe(true);
+    try {
+      const r = await pruneRejectedReceipts(root, "2026-11-01T00:00:00.000Z", new Set(), true);
+      expect(r).toEqual({ removed: [entry("A")], error: null });
+      expect(readFileSync(rejectedReceiptsPath(root), "utf8")).toBe(text);
+    } finally {
+      if (lock.ok) lock.release();
+    }
+    expect(existsSync(rejectedLockPath(root))).toBe(false);
+  });
+
   test("an entry of the wrong shape is left out of the read and kept by the next write; the others stay open", async () => {
     const root = checkout();
     const bad = { story: "gh-9", receipt_id: "X" };
@@ -47,7 +63,7 @@ describe("rejected.json (13-R3-F2)", () => {
     await addRejectedReceipt(root, entry("B"));
     expect(onDisk(root)).toEqual([entry("A"), bad, entry("B")]);
     // tidy's prune keeps it too, dropping only the cleared old entries it can read
-    expect((await pruneRejectedReceipts(root, "2026-11-01T00:00:00.000Z", new Set(["B"]), false)).map((r) => r.receipt_id)).toEqual(["A"]);
+    expect((await pruneRejectedReceipts(root, "2026-11-01T00:00:00.000Z", new Set(["B"]), false)).removed.map((r) => r.receipt_id)).toEqual(["A"]);
     expect(onDisk(root)).toEqual([bad, entry("B")]);
   });
 
@@ -56,7 +72,8 @@ describe("rejected.json (13-R3-F2)", () => {
     write(root, "{ not json");
     expect(readRejectedReceipts(root)).toEqual([]);
     await expect(addRejectedReceipt(root, entry("B"))).rejects.toThrow(/not written over/);
-    await expect(pruneRejectedReceipts(root, "2026-11-01T00:00:00.000Z", new Set(), false)).rejects.toThrow(/not written over/);
+    // review#1 F2: tidy's prune reports it and touches nothing, dry or not
+    for (const dry of [true, false]) expect(await pruneRejectedReceipts(root, "2026-11-01T00:00:00.000Z", new Set(), dry)).toEqual({ removed: [], error: expect.stringContaining("left as it is") });
     expect(readFileSync(rejectedReceiptsPath(root), "utf8")).toBe("{ not json");
   });
 

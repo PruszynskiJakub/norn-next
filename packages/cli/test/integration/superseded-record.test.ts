@@ -7,11 +7,11 @@
  * Two clones of one bare remote (seam S1).
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { claimRef, recordRef, ulid } from "@norn/schema";
 import type { Inbox } from "@norn/core";
-import { acquireClaim, appendReceipt, heartbeatId, listReceipts, machineDir, newClaimBlob, readState, workflowsDir } from "@norn/store";
+import { acquireClaim, appendReceipt, heartbeatId, listReceipts, machineDir, newClaimBlob, readState, rejectedReceiptsPath, workflowsDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue, sh } from "../../../../test/support/harness.ts";
 import { cloneOf } from "../../../../test/support/clone.ts";
@@ -156,11 +156,18 @@ describe("a takeover without a release supersedes the old holder's record (B27, 
     expect(young.value).toMatchObject({ removed: { superseded: [] } });
     expect(supersededOf(s.key)).toHaveLength(1);
     h.clock.advance(15 * 24 * 3600_000);
+    // review#1 F2: a rejected.json that cannot be read is one kept item, left as it is; tidy goes on
+    const broken = "{ not json";
+    writeFileSync(rejectedReceiptsPath(h.root), broken);
+    const keptBroken = { item: rejectedReceiptsPath(h.root), reason: expect.stringContaining("left as it is") };
     const dry = await h.norn("tidy", "--dry-run", "--json");
-    expect(dry.value).toMatchObject({ would_remove: { superseded: names } });
+    expect(dry.exit).toBe(0);
+    expect(dry.value).toMatchObject({ would_remove: { superseded: names }, kept: expect.arrayContaining([keptBroken]) });
     expect(supersededOf(s.key)).toHaveLength(1);
     const old = await h.norn("tidy", "--json");
-    expect(old.value).toMatchObject({ removed: { superseded: names } });
+    expect(old.exit).toBe(0);
+    expect(old.value).toMatchObject({ removed: { superseded: names }, kept: expect.arrayContaining([keptBroken]) });
+    expect(readFileSync(rejectedReceiptsPath(h.root), "utf8")).toBe(broken);
     expect(supersededOf(s.key)).toEqual([]);
     expect(await checkItems(s.key)).toEqual([]);
   });

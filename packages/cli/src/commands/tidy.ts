@@ -24,7 +24,7 @@ import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { herdr } from "@norn/adapters";
 import { ulid } from "@norn/schema";
-import { deleteTraceDays, pruneRejectedReceipts, pruneSuperseded, deleteTracePaths, reclaimLeases, receiptsDir, safeUnlink, traceDaysBefore } from "@norn/store";
+import { deleteTraceDays, pruneRejectedReceipts, pruneSuperseded, rejectedReceiptsPath, deleteTracePaths, reclaimLeases, receiptsDir, safeUnlink, traceDaysBefore } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, usageError } from "../output.ts";
@@ -179,7 +179,10 @@ export const tidyCommand = defineCommand({
       // gh-195 D12: cleared rejected mailbox receipts age out with the trace that also records them; an open
       // one (its Check item still shown: no answer or approval since, story not finished) stays
       const open = new Set(obs.facts.stories.filter((s) => !storyFinished(s)).flatMap((s) => (s.rejected_mailbox ?? []).map((r) => r.receipt_id)));
-      const rejected = (await pruneRejectedReceipts(root, new Date(ctx.clock.now() - window.ms).toISOString(), open, dry)).map((r) => r.receipt_id);
+      // review#1 F2: a rejected.json that cannot be pruned is one kept item; the rest of tidy goes on
+      const pruned = await pruneRejectedReceipts(root, new Date(ctx.clock.now() - window.ms).toISOString(), open, dry);
+      if (pruned.error) kept.push({ item: rejectedReceiptsPath(root), reason: pruned.error });
+      const rejected = pruned.removed.map((r) => r.receipt_id);
       // gh-195 D11 (B27, T7a): records set aside as superseded go once older than the window; their Check item with them
       const superseded = pruneSuperseded(root, new Date(ctx.clock.now() - window.ms).toISOString(), dry).map((c) => c.name);
       const bytes = [...days, ...hook_files, ...runs].reduce((n, d) => n + d.bytes, 0);
