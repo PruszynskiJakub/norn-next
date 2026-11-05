@@ -24,8 +24,11 @@
 - Observe: under remote, on the holder, `StoryFacts.record = { tree, pushed }`. Decide: `push_record` (rule `record.push`) when the tree differs from the pushed one, or a `move_record` of the story lands this tick (D13 step 4). It is a side action (`isTailAction`) act performs after every other action, so after the branch push. A failed push is not recorded as a unit act failure: the next tick sees the tree still differs and retries (B14).
 - Tests: `packages/cli/test/integration/record-ref.test.ts` (AC1–AC7 plus unpack through a clone); rule case for `record.push` in `packages/core/test/rule-cases.ts`. `golden --update`: 0 of 121 cases changed (golden configs have no record key → local).
 - Decision: decide reads `config.record?.policy ?? "local"` because older traces' configs (golden, `run view --why`) carry no `record`; `legacyConfig` is left alone so traces still round-trip byte for byte.
+- `bun run golden`: kept the two harvested `record-ref-*` cases (receipts.apply, record.push); dropped three unrelated harvests (check-run, housekeeping, agent-protocol) to stay in scope. Transcripts and observe snapshots: no diff (default policy local). The e2e init test now expects `record` in the team schema's keys.
+- Tiers: unit 1211 pass / 0 fail; integration 739 pass, 6 skip, 0 fail; e2e 71 pass, 2 skip, 0 fail (the skips were there before this slice). No flakes.
 - Known limit (later slices): a holder whose lease went stale (another checkout pushed the ref) retries every tick and fails until a takeover/fetch slice settles it.
+- implement#1 done: record.policy (local|remote, default local) team key; store pack/push (lease, parent chain, trailers) and validated unpack in record-ref.ts; observe reports record tree vs last pushed ref under remote; decide push_record (record.push) as a tail side action after branch pushes; failed push retried next tick. AC1-AC7 in packages/cli/test/integration/record-ref.test.ts; all tiers green.
 
 ## Resume
 
-Run the integration and e2e tiers if not yet green, then `norn done done`.
+Done: every AC has a passing test in `packages/cli/test/integration/record-ref.test.ts`. Next is the test check and review.
