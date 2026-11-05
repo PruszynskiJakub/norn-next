@@ -60,6 +60,25 @@ export function dropOldIgnoreLine(root: string): boolean {
   return true;
 }
 
+/** gh-195 S10 (retired, B35, B37): the `.gitattributes` line and its comment an older `norn init` added to collapse `runs/` in PR diffs. */
+export const OLD_RUNS_ATTRIBUTE_LINES = ["# norn (machine state, collapsed in diffs)", ".agents/specs/*/runs/** linguist-generated=true gitlab-generated=true"];
+
+/**
+ * gh-195 S10 (retired, B35): drop an older norn's `runs/**` line (and its comment) from `.gitattributes`,
+ * the person's lines kept; a file left with nothing in it is deleted. True when the file changed.
+ */
+export function dropRunsAttribute(root: string): boolean {
+  const path = join(root, ".gitattributes");
+  const text = readText(path);
+  if (text === null) return false;
+  const lines = text.split("\n");
+  const kept = lines.filter((l) => !OLD_RUNS_ATTRIBUTE_LINES.includes(l.trim()));
+  if (kept.length === lines.length) return false;
+  if (kept.every((l) => l.trim() === "")) rmSync(path);
+  else atomicWrite(path, kept.join("\n"));
+  return true;
+}
+
 /** Remove the old layout's folders once they are empty (the lock already dropped). */
 export function removeOldLayoutDirs(root: string): void {
   for (const d of [OLD_WORKFLOWS_DIR, OLD_TRACE_DIR, OLD_NORN_DIR]) {

@@ -75,10 +75,10 @@ beforeAll(async () => {
 afterAll(() => h.cleanup());
 
 describe("norn init", () => {
-  test("writes config, workflows, skills, hooks, .gitignore and .gitattributes; idempotent", async () => {
+  test("writes config, workflows, skills, hooks and .gitignore, no .gitattributes (gh-195 B37); idempotent", async () => {
     const r = await h.norn("init");
     expect(r.exit).toBe(0);
-    const v = r.value as { config: string; workflows: { created: string[] }; skills: { updated: string[]; unchanged: string[]; links: Array<{ agent: string; linked: string[] }> }; hooks: Array<{ changed: string[] }>; gitignore: string[]; gitattributes: string[] };
+    const v = r.value as { config: string; workflows: { created: string[] }; skills: { updated: string[]; unchanged: string[]; links: Array<{ agent: string; linked: string[] }> }; hooks: Array<{ changed: string[] }>; gitignore: string[] };
     expect(v.config).toBe("created");
     expect(v.workflows.created).toEqual(["quick.yaml", "refinement.yaml", "reproduce.yaml", "slice.yaml", "story.yaml", "triage.yaml"]);
     expect(v.skills.updated).toContain("norn");
@@ -93,11 +93,13 @@ describe("norn init", () => {
     expect(readFileSync(join(h.root, ".agents/norn.config.yaml"), "utf8")).toStartWith("# yaml-language-server: $schema=norn.config.schema.json\n");
     const teamSchema = JSON.parse(readFileSync(join(h.root, ".agents/norn.config.schema.json"), "utf8")) as { properties: Record<string, unknown> };
     expect(Object.keys(teamSchema.properties).sort()).toEqual(["$schema", "base_branch", "norn_version", "provider", "record", "slice_workflow", "workflow"]);
-    expect(v.gitattributes).toEqual([".agents/specs/*/runs/** linguist-generated=true gitlab-generated=true"]);
+    // gh-195 B37 (S10 retired): no runs/** line, and no .gitattributes created for norn alone
+    expect(existsSync(join(h.root, ".gitattributes"))).toBe(false);
+    expect(r.value).not.toHaveProperty("gitattributes");
     // nothing in the repo names a test command: the templates keep theirs, and init says so
     expect(r.value).toMatchObject({ remote: { provider: "gh", label: "norn", git_remote: "origin", url: h.remoteDir }, test_command: { command: "bun test", detected_from: null, set_in: ["quick.yaml", "slice.yaml", "story.yaml"] } });
     expect(r.stdout).toContain("Next steps\n  1. Set your test command:");
-    expect(r.stdout).toContain('`git add .agents .claude .gitignore .gitattributes && git commit -m "Set up norn" && git push`');
+    expect(r.stdout).toContain('`git add .agents .claude .gitignore && git commit -m "Set up norn" && git push`');
     expect(r.stdout).toContain("`gh issue create --label norn --assignee @me --title \"…\"`");
     // SK1: one copy in .agents/skills (whole folders), linked from the agent's skill folder
     expect(existsSync(join(h.root, ".agents/skills/norn-review/SMELLS.md"))).toBe(true);
@@ -111,7 +113,7 @@ describe("norn init", () => {
     expect(readFileSync(join(h.home, "config.yaml"), "utf8")).toBe("mode: auto\n");
     writeFileSync(join(h.home, "config.yaml"), "");
     expect(again.gitignore).toEqual([]);
-    expect(again.gitattributes).toEqual([]);
+    expect(existsSync(join(h.root, ".gitattributes"))).toBe(false);
     expect(again.hooks[0]?.changed).toEqual([]);
     expect(again.skills.updated).toEqual([]);
   });

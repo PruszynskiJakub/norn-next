@@ -10,8 +10,8 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { type Clock, type InboxItem, type LaunchSpec, type NotifierPort, type PaneState, type PromptKey, type RemoteIssue, type RemoteLabel, type RemotePort, type RemotePullRequest, type RunnerCapabilities, type RunnerPort, type RunnerSessionInfo, nameRemoved, type SessionRef } from "@norn/core";
-import { parseSpecDirName, type Receipt, recordRef, ROUNDS_DIR, STORY_UNIT_DIR, treeStoryRunStatePath, type UnitState, ulid } from "@norn/schema";
-import { appendReceipt, bindNornHome, HANDOFF_HEADER_BEGIN, HANDOFF_HEADER_END, HANDOFF_LOG_BEGIN, HANDOFF_LOG_END, installSkills, linkSkills, machineDir, readState, repoConfigPath, handoffPath, runStateDir, spawnSyncCaptured, storyRunStateDir, treeHandoffFile, treeRunStateDir, treeUnitRunStateDir, workflowsDir } from "@norn/store";
+import { parseSpecDirName, type Receipt, recordRef, ROUNDS_DIR, STORY_UNIT_DIR, type UnitState, ulid } from "@norn/schema";
+import { appendReceipt, bindNornHome, HANDOFF_HEADER_BEGIN, HANDOFF_HEADER_END, HANDOFF_LOG_BEGIN, HANDOFF_LOG_END, installSkills, linkSkills, machineDir, readState, repoConfigPath, handoffPath, runStateDir, spawnSyncCaptured, storyRunStateDir, treeHandoffFile, treeRecordCommit, treeRunStateDir, treeUnitRunStateDir, workflowsDir } from "@norn/store";
 import type { ProjectView } from "@norn/view";
 import { bundledSkills, type CliDeps, type CliResult, type Interaction, type InteractionChoice, runCli, runningVersion, type TickReport } from "../../packages/cli/src/index.ts";
 import { assetsDir } from "../../packages/cli/src/runtime/assets.ts";
@@ -499,16 +499,28 @@ export function toBranchRunState(
 
 /**
  * gh-195 D14 (B35): what `norn upgrade` does to a finished story an older norn left on the base: the
- * `<spec folder>/runs` subtree at `rev` in `root` committed as is (no unpacking) and pushed to the
- * story's archive ref on `remote`. Returns the record commit.
+ * `<spec folder>/runs` subtree at `rev` in `root` packed as is by store's `treeRecordCommit` (the
+ * code `norn upgrade` packs with) and pushed to the story's archive ref on `remote`, nothing removed.
+ * Returns the record commit.
  */
 export function archiveTreeRunState(root: string, rev: string, specDir: string, remote = "origin"): string {
   const key = parseSpecDirName(basename(specDir))?.story;
   if (!key) throw new Error(`not a spec folder: ${specDir}`);
-  const tree = sh(root, ["rev-parse", `${rev}:${treeStoryRunStatePath({ key, spec_dir: specDir })}`]);
-  const commit = sh(root, ["commit-tree", tree, "-m", `norn: record ${key}\n\nNorn-Story: ${key}`]);
-  sh(root, ["push", "-q", remote, `${commit}:${recordRef(key)}`]);
-  return commit;
+  const packed = treeRecordCommit(root, rev, { key, spec_dir: specDir }, { holder: "older-norn@machine", at: new Date(T0).toISOString() });
+  if (!packed.ok) throw new Error(`${specDir}: ${JSON.stringify(packed.errors)}`);
+  sh(root, ["push", "-q", remote, `${packed.sha}:${recordRef(key)}`]);
+  return packed.sha;
+}
+
+/**
+ * gh-195 D16 (B35): finished stories as an older norn merged them into the base: the gh-1 fixture's
+ * spec, slices and `runs/` copied into each of `specDirs` in `root`, committed and pushed to `main`.
+ */
+export function toBaseRunState(root: string, specDirs: readonly string[], remote = "origin"): void {
+  for (const d of specDirs) cpSync(join(import.meta.dir, "../../packages/view/test/integration/fixtures/gh-1/spec"), join(root, d), { recursive: true });
+  sh(root, ["add", "-A"]);
+  sh(root, ["commit", "-q", "-m", "merge finished stories (older norn)"]);
+  sh(root, ["push", "-q", remote, "main"]);
 }
 
 /** The generated header and heartbeat blocks an older norn kept at the top of a unit's handoff (S9, O6; gone since gh-195/07). */

@@ -14,6 +14,17 @@
 
 ## Goal
 
+`norn upgrade` packs each finished story's run state in the base's tree into `refs/norn/runs/<story>` (D14), pushes the refs, then stages (never commits, LY3) the removal of `runs/` and of the S10 `.gitattributes` line; `norn init` adds no `.gitattributes` line (B35–B37).
+
 ## Progress
 
+- store `record-ref.ts`: `treeRecordCommit` (commit-tree of `HEAD:<spec>/runs`, validated by a throwaway `unpackRecordSync`, S2) and `archiveBaseRunState` (stories = `runs/` in HEAD and still in the index; existing remote refs fetched with `fetchRecords` and compared by tree; missing refs pushed in one `casRefs` batch with an absent lease; a batch-rejected ref retried alone, since a `pre-receive` hook rejects a whole push; `git rm -r` only after the pushes, P6). `gitSync` takes `env`.
+- store `old-layout.ts`: `dropRunsAttribute` (S10 retired). cli `upgrade.ts`: `runStatePart` under the tick lock on both layouts; report gains `run_state`; markdown lists each story; "nothing to upgrade" also says no run state is left.
+- `init.ts`: `.gitattributes` writing removed (and from the report); README init text updated.
+- harness: `archiveTreeRunState` now uses `treeRecordCommit`; new `toBaseRunState` (gh-1 fixture into several spec folders, pushed).
+- Tests: `packages/cli/test/integration/upgrade-records.test.ts` (AC1–AC4 + S2); expectations in upgrade, upgrade-version and e2e slice-workflow updated for `run_state` / no `.gitattributes`.
+- Decision: removal is staged, not committed (spec B35, LY3).
+
 ## Resume
+
+Run the full integration and e2e tiers, then `norn done done`.

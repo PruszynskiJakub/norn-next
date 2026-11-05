@@ -46,13 +46,13 @@ export interface GitSyncRun {
  * `git` for callers that must stay synchronous (the base records snapshot, GR6). Same environment
  * and H11 timeout rule as `git`; on timeout the child is killed and the code is 124. Never throws.
  */
-export function gitSync(cwd: string, args: string[], input?: Uint8Array, opts: { timeoutMs?: number } = {}): GitSyncRun {
+export function gitSync(cwd: string, args: string[], input?: Uint8Array, opts: { timeoutMs?: number; env?: Record<string, string> } = {}): GitSyncRun {
   const timeoutMs = opts.timeoutMs ?? gitTimeoutMs(args);
   noteSpawn(["git", ...args], cwd);
   try {
     const p = spawnSyncCaptured(["git", ...args], {
       cwd,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: "0", LC_ALL: "C" },
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0", LC_ALL: "C", ...opts.env },
       ...(input === undefined ? {} : { stdin: input }),
       ...(timeoutMs === undefined ? {} : { timeoutMs }),
     });

@@ -152,7 +152,7 @@ describe("norn upgrade on the old layout (B11, B12, B13)", () => {
     const json = await h.norn("upgrade", "--json");
     expect(json.exit).toBe(0);
     const version = runningVersion(h.deps);
-    expect(json.value).toEqual({ moves: [], config: { changed: [], renamed: [], removed: [] }, norn_version: { from: version, to: version, changed: false }, skills: { updated: [], linked: [] }, staged: [], commit: null, labels: expect.objectContaining({ checked: true, created: [] }) });
+    expect(json.value).toEqual({ moves: [], config: { changed: [], renamed: [], removed: [] }, norn_version: { from: version, to: version, changed: false }, skills: { updated: [], linked: [] }, run_state: [], staged: [], commit: null, labels: expect.objectContaining({ checked: true, created: [] }) });
     expect(snapshot(h)).toEqual(before);
   });
 });
@@ -188,7 +188,7 @@ describe("norn upgrade --json (B11)", () => {
     const r = await h.norn("upgrade", "--json");
     expect(r.exit).toBe(0);
     const v = r.value as Migrated;
-    expect(Object.keys(v).sort()).toEqual(["commit", "config", "labels", "moves", "norn_version", "skills", "staged"]);
+    expect(Object.keys(v).sort()).toEqual(["commit", "config", "labels", "moves", "norn_version", "run_state", "skills", "staged"]);
     const machine = layoutPlaces(h.root)["machine files"];
     expect(v.moves).toEqual([
       { part: "config", from: OLD_CONFIG, to: NEW_CONFIG, how: "git mv" },
