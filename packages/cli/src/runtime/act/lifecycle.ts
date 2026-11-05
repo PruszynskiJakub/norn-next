@@ -21,7 +21,9 @@ import {
   readPendingRecords,
   writePendingRecords,
   moveFile,
+  copyTreeRecord,
   handoffPath,
+  removeTreeRunState,
   runStateFile,
   runStateRecord,
   runStateStartDir,
@@ -347,6 +349,23 @@ export async function roundMigrate(act: ActEnv, a: Extract<Action, { kind: "roun
   const loc = act.obs.units[a.unit.key];
   if (loc) loc.runsDir = to;
   return { ok: true, detail: { moved, to: a.to } };
+}
+
+/**
+ * gh-195/06 (B34, D13): copy each record off the unit's branch into the machine dir — validated and put
+ * in place atomically, one the machine dir already holds skipped (a move that stopped after the copy,
+ * S5) — then remove the branch's run state but the handoffs from the worktree and commit that removal
+ * alone, pushed. A copy that fails removes nothing (S2); state was never in git, so nothing is
+ * written past the copies.
+ */
+export async function moveRecord(act: ActEnv, a: Extract<Action, { kind: "move_record" }>): Promise<ActionResult> {
+  const wt = a.commit.cwd;
+  const story = act.storyLoc(a.unit.story);
+  const copied = a.copy.filter((c) => copyTreeRecord(join(wt, c.from), runStateFile(act.root, c.to), handoffPath(join(wt, story.spec_dir), c.unit))).map((c) => c.to);
+  const removed = removeTreeRunState(wt, story);
+  // only the removal: an agent's work and the handoffs stay out of the move commit
+  const committed = await act.commit(a.commit, null, null, null, [a.path, `:(exclude)${handoffPath(story.spec_dir, "*")}`]);
+  return { ok: true, detail: { copied, removed: removed.length, ...committed } };
 }
 
 /** Move one record entry to the round; into a folder already there (an earlier move that stopped partway), child by child. */

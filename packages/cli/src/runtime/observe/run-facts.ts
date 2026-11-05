@@ -138,5 +138,6 @@ export async function unitFacts(ports: Ports, story: StorySnapshot, lu: LocalUni
     lease: lu.lease,
     uncommitted,
     ...(lu.step_runs ? { step_runs: lu.step_runs } : {}),
+    ...(u.branch_record ? { branch_record: structuredClone(u.branch_record) } : {}),
   };
 }

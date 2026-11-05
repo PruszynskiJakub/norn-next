@@ -419,6 +419,22 @@ export interface IntakeStoryAction extends RepoBase {
   commit: BoundaryCommit;
 }
 
+/**
+ * gh-195/06 (B34, D13): move the run state an older norn left on the unit's branch into the machine dir:
+ * copy each record in `copy` (`from` relative to the worktree, `to` to the machine dir; a flat record,
+ * RD7, goes to the story's round 1), validated and put in place atomically (S1, S2), skipping one the
+ * machine dir already holds (S5); then remove `path` but the handoffs from the worktree and commit that
+ * removal alone in `commit`, pushed.
+ */
+export interface MoveRecordAction extends UnitBase {
+  kind: "move_record";
+  /** `<spec folder>/runs`, relative to the worktree (`commit.cwd`) */
+  path: string;
+  /** each unit's folder (`_story`, `<nn>-<slug>`), where it is on the branch and where it goes */
+  copy: Array<{ unit: string; from: string; to: string }>;
+  commit: BoundaryCommit;
+}
+
 /** gh-195/05 (B2): write back the `.norn-unit` of unit worktrees `git clean -fdx` took it from. */
 export interface RestoreMarkersAction extends RepoBase {
   kind: "restore_markers";
@@ -455,6 +471,7 @@ export type UnitAction =
   | CloseStoryAction
   | RoundMigrateAction
   | RoundStartAction
+  | MoveRecordAction
   | NoopAction;
 
 export type RepoAction = IntakeStoryAction | ReclaimLeasesAction | RestoreMarkersAction;

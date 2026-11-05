@@ -179,6 +179,13 @@ export interface UnitFacts {
    * while it is non-empty (D6).
    */
   skills_drift?: string[];
+  /**
+   * gh-195/06 (B34, D13): run state an older norn left on this unit's own branch, in `path`
+   * (`<spec folder>/runs`, relative to the unit's worktree). `copy`: the units' folders there (`_story`,
+   * `<nn>-<slug>`) read as their run state, the machine dir holding none of it yet (their `state` and
+   * `errors` are the branch's); [] = only the removal is left. Absent = none.
+   */
+  branch_record?: { path: string; copy: string[] };
 }
 
 export interface SliceFileFacts {

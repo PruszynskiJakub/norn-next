@@ -138,6 +138,12 @@ function cases(): RuleCase[] {
   out.push(c("a rebase waits in the unit's worktree past the step's deadline", "unit.rebase_in_progress", facts([story(SOLO_WF, running("implement", 2 * HOUR), null, {}, { worktree: { ...worktree(STORY_WT), in_progress: { operation: "rebase", unmerged: ["X.txt"] } } })])));
   out.push(c("a ready unit whose cursor is $done", "unit.no_step", facts([story(SOLO_WF, ready("$done"))])));
   // gh-71 D7 (B34): a held story whose record is still flat moves into round 1 first
+  // gh-195/06 (B34, D13): run state an older norn left on a held unit's branch
+  const onBranch = { branch_record: { path: ".agents/specs/gh-1-login/runs", copy: ["_story"] }, record: "_story" };
+  out.push(c("a held story's flat record still on its branch moves into round 1 of the machine dir", "record.move", facts([story(STORY_WF, { step: "slices" }, null, {}, onBranch)])));
+  out.push(
+    c("a story's branch run state waits out a merge in its worktree (H1)", "record.move_waits", facts([story(STORY_WF, { step: "slices" }, null, {}, { ...onBranch, worktree: { ...worktree(STORY_WT), in_progress: { operation: "merge", unmerged: [] } } })])),
+  );
   out.push(c("a held story with a flat record", "round.migrate", facts([story(STORY_WF, { step: "slices" }, null, {}, { record: "runs/_story" })])));
   // gh-71 D5 (B35): an older norn's remote park on a finished round is dropped by the holder's tick
   out.push(c("a finished round an older norn parked for the issue", "remote.unpark_finished", facts([{ ...story(STORY_WF, { step: "$done", status: "stuck", park: { kind: "remote", reason: "remote: issue closed, unassigned or unlabelled", since: at() } }, null, {}, { record: "runs/_story/rounds/01-story" }), issue: null }])));

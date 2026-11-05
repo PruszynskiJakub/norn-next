@@ -13,6 +13,7 @@ import {
   runStatePath,
   STORY_UNIT_DIR,
   normalRecord,
+  treeRunStatePath,
   unitRecordPath,
 } from "@norn/schema";
 import type { ClaimAction, UpdateStoryMirrorAction } from "../actions.ts";
@@ -25,7 +26,7 @@ import type { RemoteIssue } from "../ports.ts";
 import { epoch, iso } from "../time.ts";
 import { edgeOf, isStale, stepOf } from "../workflow.ts";
 import { applyAction, classifyRun, implicitAskResolved, launchUnknown, resolveImplicitAsk, startRun } from "./agent.ts";
-import { commitFor, type Ctx, gitBusy, nextReceiptNumber, park, rebasing, sliceFileOf, unitItem } from "./receipts.ts";
+import { commitFor, type Ctx, gitBusy, nextReceiptNumber, park, rebasing, sliceFileOf, unitBranch, unitItem } from "./receipts.ts";
 import { baseOf, classifyNorn, recordOf, resumeSlices, runCheck, runGit, slicesCanResume, slicesStep, startStoryUnit, usableWorkflow } from "./steps.ts";
 import { cmd } from "../commands.ts";
 
@@ -107,6 +108,8 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
   const fm = story.frontmatter;
   const halted = su?.state?.park?.kind === "remote";
 
+  moveRecords(ctx, story);
+
   // gh-71 D7 (B34): a held story whose record is still flat moves into round 1 before anything else —
   // never mid-rebase (H1), and never once its PR merged (the base keeps old records flat, B36)
   if (!ctx.has(ref.key) && su?.state && su.record !== undefined && normalRecord(su.record) === unitRecordPath(STORY_UNIT_DIR) && !rebasing(su) && !mergedIntoBase(story, ctx.facts.repo.default_branch)) {
@@ -120,6 +123,45 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
   for (const uf of story.units) {
     if (ctx.has(uf.unit.key)) continue;
     decideUnit(ctx, story, uf, halted);
+  }
+}
+
+/**
+ * gh-195/06 (B34, D13): run state an older norn left on a held unit's branch moves into the machine dir
+ * before anything else is decided for the units it holds, one `move_record` per branch (the story's,
+ * each slice's): the units read from there were read from the branch, so nothing else may act on them
+ * this tick. A record whose files fail validation is not moved: the unit is marked corrupt (S2) and its
+ * branch keeps its runs/. Never mid-merge or mid-rebase (H1): the removal would land in that commit.
+ */
+function moveRecords(ctx: Ctx, story: StoryFacts): void {
+  for (const uf of story.units) {
+    const br = uf.branch_record;
+    if (!br || ctx.has(uf.unit.key)) continue;
+    const moving = br.copy.map((dir) => story.units.find((u) => u.unit.dir === dir)).filter((u): u is UnitFacts => !!u && u.unit.key !== uf.unit.key && !ctx.has(u.unit.key));
+    const busy = uf.worktree?.in_progress?.operation ?? (uf.worktree?.in_progress?.unmerged.length ? "a merge" : null);
+    const wait = (why: string) => {
+      for (const u of [uf, ...moving]) if (!u.errors.length && !ctx.has(u.unit.key)) ctx.noop(u.unit, "record.move_waits", why);
+    };
+    if (busy) {
+      wait(`${busy} in progress in ${uf.worktree?.path}: the run state on ${unitBranch(story, uf)} moves once it is concluded (H1)`);
+      continue;
+    }
+    const bad = [uf, ...moving].filter((u) => br.copy.includes(u.unit.dir) && u.errors.length);
+    // S2: decideUnit marks each broken unit corrupt; nothing moves off this branch
+    if (bad.length) {
+      wait(`${bad.map((u) => u.unit.key).join(", ")} failed validation on ${unitBranch(story, uf)}: nothing moves (S2)`);
+      continue;
+    }
+    const copy = br.copy.map((dir) => {
+      const u = story.units.find((x) => x.unit.dir === dir);
+      // RD7: a flat story record lands in round 1 of its workflow
+      const flat = dir === STORY_UNIT_DIR && u?.state && u.record !== undefined && normalRecord(u.record) === unitRecordPath(STORY_UNIT_DIR);
+      return { unit: dir, from: treeRunStatePath(story, dir), to: flat && u?.state ? roundRunStatePath(story, 1, u.state.workflow) : runStatePath(story, dir) };
+    });
+    const commit = commitFor(ctx, story, uf, `norn: move ${uf.unit.key} run state off the branch`, uf.state?.step ?? null);
+    if (!commit) continue;
+    ctx.emit({ kind: "move_record", unit: uf.unit, rule: "record.move", path: br.path, copy, commit });
+    for (const u of moving) ctx.noop(u.unit, "record.move", `moving with ${uf.unit.key} off ${commit.branch}`);
   }
 }
 

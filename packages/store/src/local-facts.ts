@@ -195,8 +195,9 @@ function skillsDriftOf(opts: LocalFactsOptions): (worktree: string) => string[] 
 function localUnit(root: string, story: StorySnapshot, u: UnitSnapshot, worktree: string | null, hooks: HookFact[], leases: LeaseFile[], failures: Record<string, ActFailure>): LocalUnit {
   const st = u.state;
   // S12 (gh-195/05): receipts in the machine dir display absolute; an older norn's record in a tree
-  // relative to the unit's worktree when it is there, else the story's checkout
-  const at = !story.run_state.tree ? undefined : worktree && existsSync(worktree) ? worktree : story.root;
+  // relative to the unit's worktree when it is there, else the story's checkout; gh-195/06: a record
+  // read from a unit worktree's branch (an older norn's), relative to that worktree
+  const at = u.tree_root ?? (!story.run_state.tree ? undefined : worktree && existsSync(worktree) ? worktree : story.root);
   const lo = st ? lastOutcomeReceipt(u.path, st, at) : null;
   const cursor = st ? cursorRuns(u.path, st, at) : null;
   const mine = leases.filter((l) => l.repo === root && l.story === u.unit.story && l.slice === u.unit.slice);
