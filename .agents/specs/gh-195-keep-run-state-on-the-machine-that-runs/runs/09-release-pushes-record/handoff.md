@@ -57,6 +57,8 @@ Every claim release (`story handoff`, clean `watch` exit, `story close`) pushes 
 | B33 / AC4 | test | `release-record.test.ts` › "AC4: its ref is pushed with no Norn-Branch-Commit trailer …" |
 - review#1 approve: Review #1: approve. AC1-AC4 traced to release-record.test.ts; no blocking findings. Minor: F1 the branch commit comes from the local head, F2 a stale push_record after a GR6b close under remote, F3 no test for a rejected record at the tick close, F4 the lease is the local ref (gh-195/10). Unit, typecheck and touched integration files green.
 
+- Merge #1 (integrate.conflict): merged the story branch (slice 16, archive ref) with `--no-ff` in commit 0333670a6. Conflicts were in story-close.ts, close.ts, act/lifecycle.ts and story-reopen.test.ts. There is now one record push, `pushHeldRecord` in runtime/close.ts (slice 16's `archiveStoryRecord`, renamed; it also returns the branch commit). Release, closeStory and GR6 all use it, and `Norn-Branch-Commit` is the remote-tracking head (this settles 09-F1). One failure wording (`recordPushError`) and one exit-3 refusal (`recordPushRefused`, record_push_failed) for handoff and close. 09's pushRecord skip change is kept. 09-F2: slice 16's suppression already covers close_story. A new release-record test checks that a GR6b tick under remote acts close_story alone; it fails without the suppression. story-reopen AC2 keeps 16's check plus the sha equality.
+
 ## Resume
 
-Review #1 done (approve). Next: whatever norn routes after review.
+Integration and e2e tiers after the merge; if green, `norn done done`.
