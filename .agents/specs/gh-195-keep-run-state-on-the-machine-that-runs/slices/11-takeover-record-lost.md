@@ -2,7 +2,7 @@
 id: gh-195/11
 title: Takeover with no record restarts from the branch
 depends_on: [ gh-195/10 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
