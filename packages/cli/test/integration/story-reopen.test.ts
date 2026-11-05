@@ -6,6 +6,7 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { recordRef } from "@norn/schema";
 import { repoConfigPath, workflowsDir } from "@norn/store";
 import { type CliResult } from "../../src/index.ts";
 import { createHarness, FakeInteraction, type Harness, issue, sh } from "../../../../test/support/harness.ts";
@@ -317,8 +318,10 @@ steps:
     // this machine is cleaned up
     expect(existsSync(wt())).toBe(false);
     expect(g.git(["branch", "--list", TBRANCH])).toBe("");
-    expect(g.git(["for-each-ref", "refs/norn/"])).toBe("");
-    expect(g.git(["ls-remote", "origin", "refs/norn/*"])).toBe("");
+    // gh-195/09 (B15): claim and mailbox refs are gone; the record went to its ref before the claim, and stays (B31)
+    expect(g.git(["for-each-ref", "--format=%(refname)", "refs/norn/"])).toBe(recordRef("gh-8"));
+    expect(g.git(["ls-remote", "origin", "refs/norn/*"]).split("\t")[1]).toBe(recordRef("gh-8"));
+    expect(g.git(["ls-remote", "origin", "refs/norn/*"]).split("\t")[0]).toBe(g.git(["rev-parse", recordRef("gh-8")]));
     const inbox = (await g.norn("status", "--json")).value as Inbox;
     expect(Object.values(inbox.groups).flat().filter((x) => x.story === "gh-8")).toEqual([]);
     // the next ticks leave it closed

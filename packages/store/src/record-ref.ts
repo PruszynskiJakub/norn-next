@@ -110,6 +110,12 @@ async function writeRecordTree(root: string, story: RunStory): Promise<string | 
   }
 }
 
+/** The `Norn-Branch-Commit` a record commit names; null = none (a story without a branch, B33). */
+async function branchCommitOf(root: string, sha: string): Promise<string | null> {
+  const r = await git(root, ["log", "-1", "--format=%(trailers:key=Norn-Branch-Commit,valueonly)", sha]);
+  return r.code === 0 ? r.stdout.trim() || null : null;
+}
+
 export type RecordPushResult =
   | { ok: true; pushed: false; reason: "unchanged" | "empty"; sha: string | null }
   | { ok: true; pushed: true; sha: string; tree: string }
@@ -119,8 +125,10 @@ export type RecordPushResult =
  * D2 (B10, B14): pack the story's record and push it to `refs/norn/runs/<story>` with a lease on
  * `expected` (the sha this checkout last saw; null = the ref must not exist), its parent that commit.
  * Trailers `Norn-Story`, `Norn-Branch-Commit` (when the story has a branch, B33) and `Norn-Holder`; the
- * commit time is `at` (what "record as of" shows, B13). A tree unchanged from `expected`'s pushes
- * nothing. Without a remote the local ref is the record (solo).
+ * commit time is `at` (what "record as of" shows, B13). A tree unchanged from `expected`'s, matching
+ * the same branch commit, pushes nothing; the same tree for a branch that moved on (a release's
+ * handoff commit, gh-195/09) is pushed again, so the record names the branch as pushed. Without a
+ * remote the local ref is the record (solo).
  */
 export async function pushRecord(
   root: string,
@@ -130,7 +138,8 @@ export async function pushRecord(
 ): Promise<RecordPushResult> {
   const tree = await writeRecordTree(root, story);
   if (tree === null) return { ok: true, pushed: false, reason: "empty", sha: o.expected };
-  if (o.expected !== null && (await readLocalRef(root, `${o.expected}^{tree}`)) === tree) return { ok: true, pushed: false, reason: "unchanged", sha: o.expected };
+  if (o.expected !== null && (await readLocalRef(root, `${o.expected}^{tree}`)) === tree && (await branchCommitOf(root, o.expected)) === o.branch_commit)
+    return { ok: true, pushed: false, reason: "unchanged", sha: o.expected };
   const trailers = [`Norn-Story: ${story.key}`, ...(o.branch_commit ? [`Norn-Branch-Commit: ${o.branch_commit}`] : []), `Norn-Holder: ${o.holder}`];
   const message = `norn: record ${story.key}\n\n${trailers.join("\n")}\n`;
   const env = { GIT_AUTHOR_DATE: o.at, GIT_COMMITTER_DATE: o.at };

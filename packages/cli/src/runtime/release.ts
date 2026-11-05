@@ -1,12 +1,15 @@
 /**
- * Claim release (T6): push the story and slice branches first, then delete the claim ref by
- * CAS. Only by the heartbeat holding the claim, and only fast-forward pushes (R3.3). Edited handoff.md files are committed first. Used by a clean `watch` exit and `norn story handoff` (B34).
+ * Claim release (T6): push the story and slice branches first, then the story's record to its ref
+ * (gh-195 B15, under either policy), then delete the claim ref by CAS. Only by the heartbeat holding
+ * the claim, and only fast-forward pushes (R3.3). Edited handoff.md files are committed first. A failed
+ * record push releases nothing (B16). Used by a clean `watch` exit and `norn story handoff` (B34);
+ * `norn story close` pushes the record the same way (runtime/close.ts).
  */
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { cmd, type GitPort, type StoryFacts } from "@norn/core";
-import { ulid } from "@norn/schema";
-import { releaseClaim, writtenHere } from "@norn/store";
+import { recordRef, ulid } from "@norn/schema";
+import { pushRecord, readRecordRef, releaseClaim, writtenHere } from "@norn/store";
 import type { Context } from "../context.ts";
 import { refuse } from "../output.ts";
 import { waitForTickLock } from "./tick-lock.ts";
@@ -29,7 +32,30 @@ export interface ReleaseResult {
   story: string;
   ok: boolean;
   pushed: string[];
+  /** the record on the story's ref once released: its commit and the story branch commit it matches (null: no branch, B33); null: no run state */
+  record?: { sha: string; branch_commit: string | null } | null;
+  /** `record`: the record push failed, so the claim is kept (B16) */
+  failed?: "record";
   error?: string;
+}
+
+export type ReleaseRecord = { ok: true; record: { sha: string; branch_commit: string | null } | null } | { ok: false; error: string };
+
+/**
+ * gh-195 D4 (B15, B16, B33): push the story's record to `refs/norn/runs/<story>` synchronously, after its
+ * branches, before the claim goes. Its `Norn-Branch-Commit` is the story branch as pushed (the local
+ * head), none for a story without a branch (B33); the lease is on the ref as this checkout last saw it
+ * (D2). A record unchanged since that push is already there. Once pushed, the local ref and the local
+ * run-state folder pack to the same tree: a clean release, which gh-195/14 tells from a takeover.
+ */
+export async function pushReleaseRecord(obs: Observed, story: StoryFacts): Promise<ReleaseRecord> {
+  const seen = await readRecordRef(obs.root, story.key);
+  const branch = obs.stories[story.key]?.branch ?? story.branch;
+  const head = branch ? await obs.ports.git.revParse(obs.root, `refs/heads/${branch}`) : null;
+  const r = await pushRecord(obs.root, obs.remote, story, { expected: seen?.sha ?? null, holder: obs.facts.machine.holder, branch_commit: head, at: new Date(obs.facts.now).toISOString() });
+  if (!r.ok) return { ok: false, error: `record push to ${recordRef(story.key)} failed (${r.reason}): ${r.message}` };
+  if (!r.pushed && r.reason === "empty") return { ok: true, record: null };
+  return { ok: true, record: r.sha === null ? null : { sha: r.sha, branch_commit: head } };
 }
 
 /** A claim this heartbeat may release: held now, or expired but last written by this heartbeat. */
@@ -81,8 +107,11 @@ export async function releaseStory(obs: Observed, story: StoryFacts): Promise<Re
       pushed.push(b.branch);
     }
   }
+  // B15, B16: the record goes before the claim; a failed push keeps the claim and deletes nothing
+  const rec = await pushReleaseRecord(obs, story);
+  if (!rec.ok) return { story: story.key, ok: false, pushed, failed: "record", error: `${rec.error}; the claim is kept` };
   const r = await releaseClaim(obs.root, obs.remote, story.key, sha);
-  return r.ok ? { story: story.key, ok: true, pushed } : { story: story.key, ok: false, pushed, error: r.message };
+  return r.ok ? { story: story.key, ok: true, pushed, record: rec.record } : { story: story.key, ok: false, pushed, record: rec.record, error: r.message };
 }
 
 /** R3.3: is local `branch` a fast-forward of the remote one (fetched now; absent remotely counts)? */

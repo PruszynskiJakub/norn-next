@@ -292,7 +292,15 @@ export async function closeClosedIssueStory(act: ActEnv, a: Extract<Action, { ki
   const claimSha = act.claimed.get(key)?.sha ?? (story?.claim.state === "mine" ? story.claim.sha : null);
   if (!story || !claimSha) throw new Error(`${key} is not held here; nothing closed`);
   const r = await closeStory(act.obs, story, { home: act.ctx.home, claimSha });
-  if (!r.ok) return { ok: false, error: r.reason === "push_failed" ? `push ${r.branch} failed (${r.push_reason}): ${r.message}; nothing was removed` : `cannot mark ${r.file} dropped: ${r.message}`, detail: r };
+  if (!r.ok) {
+    const error =
+      r.reason === "push_failed"
+        ? `push ${r.branch} failed (${r.push_reason}): ${r.message}; nothing was removed`
+        : r.reason === "record_push_failed"
+          ? `${r.message}; nothing was removed (B16)`
+          : `cannot mark ${r.file} dropped: ${r.message}`;
+    return { ok: false, error, detail: r };
+  }
   act.cleaned.add(key);
   const deleted: string[] = [];
   for (const m of a.refs) if ((await deleteMailbox(act.root, act.obs.remote, m.ref, m.sha)).ok) deleted.push(m.ref);

@@ -903,6 +903,14 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/gh-7-add-login-form
   spawn repo $ git merge-base --is-ancestor refs/remotes/origin/gh-7-add-login-form refs/heads/gh-7-add-login-form
   spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
+  spawn repo $ git rev-parse --verify --quiet refs/norn/runs/gh-7
+  spawn repo $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-7-add-login-form
+  spawn repo $ git hash-object -w --no-filters --stdin-paths
+  spawn repo $ git update-index --add --index-info
+  spawn repo $ git write-tree
+  spawn repo $ git commit-tree <sha:11>
+  spawn repo $ git push --porcelain --force-with-lease=refs/norn/runs/gh-7: origin <sha:12>:refs/norn/runs/gh-7
+  spawn repo $ git update-ref refs/norn/runs/gh-7 <sha:12>
   spawn repo $ git push --porcelain --force-with-lease=refs/norn/claims/gh-7:<sha:10> origin :refs/norn/claims/gh-7
   spawn repo $ git update-ref -d refs/norn/claims/gh-7
   exit 0
@@ -938,8 +946,8 @@
   spawn repo $ git ls-remote origin refs/norn/claims/gh-7
   spawn repo $ git update-ref -d refs/norn/claims/gh-7
   spawn repo $ git hash-object -w --stdin
-  spawn repo $ git push --porcelain --force-with-lease=refs/norn/claims/gh-7: origin <sha:11>:refs/norn/claims/gh-7
-  spawn repo $ git update-ref refs/norn/claims/gh-7 <sha:11>
+  spawn repo $ git push --porcelain --force-with-lease=refs/norn/claims/gh-7: origin <sha:13>:refs/norn/claims/gh-7
+  spawn repo $ git update-ref refs/norn/claims/gh-7 <sha:13>
   spawn repo $ git fetch --quiet --no-tags origin +refs/heads/gh-7-add-login-form:refs/remotes/origin/gh-7-add-login-form "+refs/heads/gh-7/*:refs/remotes/origin/gh-7/*"
   spawn repo $ git worktree list --porcelain -z
   spawn repo $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-7-add-login-form
@@ -966,7 +974,7 @@
   spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-7
-  spawn repo $ git cat-file blob <sha:11>
+  spawn repo $ git cat-file blob <sha:13>
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/inbox/gh-7/
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
   A.notifier.notify unblock:gh-7:$done#3
@@ -985,7 +993,7 @@
   spawn repo $ git fetch --quiet --no-tags origin +refs/heads/main:refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
-  spawn repo $ git ls-tree -r -z <sha:12>
+  spawn repo $ git ls-tree -r -z <sha:14>
   spawn repo $ git cat-file --batch
   spawn repo $ git fetch --quiet --prune --no-tags origin "+refs/norn/claims/*:refs/norn/claims/*" "+refs/norn/inbox/*:refs/norn/inbox/*"
   A.remote.listAssignedIssues norn
@@ -997,12 +1005,12 @@
   spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-7
-  spawn repo $ git cat-file blob <sha:11>
+  spawn repo $ git cat-file blob <sha:13>
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/inbox/gh-7/
-  spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:9> "^<sha:13>" --
-  spawn repo $ git rev-list --left-right --count <sha:9>...<sha:13> --
-  spawn repo $ git merge-base <sha:9> <sha:13>
-  spawn repo $ git merge-tree --write-tree --name-only --no-messages <sha:9> <sha:13>
+  spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:9> "^<sha:15>" --
+  spawn repo $ git rev-list --left-right --count <sha:9>...<sha:15> --
+  spawn repo $ git merge-base <sha:9> <sha:15>
+  spawn repo $ git merge-tree --write-tree --name-only --no-messages <sha:9> <sha:15>
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
   spawn repo $ git worktree remove --force <dir>/repo-worktrees/gh-7-add-login-form
   spawn repo $ git show-ref --verify --quiet refs/heads/gh-7-add-login-form
@@ -1020,7 +1028,7 @@
   spawn <tmp>/norn-record-<rand>/wt $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Tick: <ulid:60>" -- .agents/specs/gh-7-add-login-form/spec.md
   spawn <tmp>/norn-record-<rand>/wt $ git rev-parse HEAD
   spawn <tmp>/norn-record-<rand>/wt $ git push --porcelain origin HEAD:refs/heads/main
-  spawn repo $ git update-ref refs/remotes/origin/main <sha:14>
+  spawn repo $ git update-ref refs/remotes/origin/main <sha:16>
   spawn repo $ git worktree remove --force <tmp>/norn-record-<rand>/wt
   spawn repo $ git worktree prune
 > norn story update-branch gh-7
@@ -1029,11 +1037,11 @@
   spawn repo $ git worktree list --porcelain -z
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
-  spawn repo $ git ls-tree -r -z <sha:15>
+  spawn repo $ git ls-tree -r -z <sha:17>
   spawn repo $ git cat-file --batch
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
   spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-7
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/inbox/gh-7/
-  spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:9> "^<sha:14>" --
+  spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:9> "^<sha:16>" --
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
   exit 3

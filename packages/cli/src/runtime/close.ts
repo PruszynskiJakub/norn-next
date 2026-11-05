@@ -4,16 +4,17 @@
  * call too. Refusals, consent and claiming stay with the caller.
  *
  * Order (nothing is lost, T6/GR7): stop this machine's live sessions → commit every unit
- * worktree's changes and mark `spec.md` `status: dropped` → push the story and slice branches →
- * only then remove worktrees, local branches, leases and the claim ref. A failure before the
- * removals returns with everything still in place. Without a git remote the local branches are
- * the only copy of the record, so they are kept.
+ * worktree's changes and mark `spec.md` `status: dropped` → push the story and slice branches → push
+ * the story's record to its ref (gh-195 B15) → only then remove worktrees, local branches, leases and
+ * the claim ref. A failure before the removals returns with everything still in place (B16). Without
+ * a git remote the local branches are the only copy of the work, so they are kept.
  */
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { StoryFacts } from "@norn/core";
 import { listLeases, patchStoryFile, releaseClaim, releaseLease, storyFile } from "@norn/store";
 import type { Observed } from "./observe/index.ts";
+import { pushReleaseRecord } from "./release.ts";
 
 export interface StoryClosed {
   ok: true;
@@ -34,7 +35,8 @@ export interface StoryClosed {
 /** Why closing stopped; nothing was removed. */
 export type StoryCloseFailure =
   | { ok: false; reason: "spec_corrupt"; story: string; file: string; message: string; committed: string[] }
-  | { ok: false; reason: "push_failed"; story: string; branch: string; push_reason: string; message: string; pushed: string[] };
+  | { ok: false; reason: "push_failed"; story: string; branch: string; push_reason: string; message: string; pushed: string[] }
+  | { ok: false; reason: "record_push_failed"; story: string; message: string; pushed: string[] };
 
 export interface CloseStoryOptions {
   /** the norn home whose lease files are released */
@@ -87,6 +89,10 @@ export async function closeStory(obs: Observed, story: StoryFacts, opts: CloseSt
       pushed.push(b.branch);
     }
   }
+
+  // 3b. the record before the claim goes (B15); a rejected push removes nothing (B16)
+  const rec = await pushReleaseRecord(obs, story);
+  if (!rec.ok) return { ok: false, reason: "record_push_failed", story: key, message: rec.error, pushed };
 
   // 4. clean up this machine
   const removed: string[] = [];
