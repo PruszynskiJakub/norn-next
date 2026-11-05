@@ -351,10 +351,11 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
   const prev = cur.state === "none" || cur.state === "corrupt" ? null : cur.blob;
 
   // ---- 2. the record, fetched and staged (review F1); the holder keeps its own run state unless the
-  // remote record is newer than it — one that continues from the record this checkout last had (or any,
-  // when it had none) — which an older copy a crashed or failed checkout left behind must never be pushed
-  // over (10-R3-F1). A ref someone moved elsewhere under the holder (08-F4) is not newer: the holder's
-  // run state is kept and its next push goes on top.
+  // remote record is newer than it (10-R3-F1), so an older copy a crashed or failed checkout left behind
+  // is never pushed over a newer record. Newer: the remote record continues from the record ref this
+  // checkout last had, or this checkout had none and the remote now has one (someone else pushed it:
+  // the copy here is set aside as superseded in step 5, never lost). A ref moved off the holder's line
+  // (08-F4: not a descendant of its own) is not newer: the holder's run state is kept, its next push on top.
   const localCopy = existsSync(storyRunStateDir(root, run));
   const ownRef = mine && localCopy ? await readRecordRef(root, key) : null;
   const remoteSha =
@@ -363,7 +364,15 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
           throw failure(`cannot fetch ${recordRef(key)}: ${(e as Error).message}; nothing was taken`, `check the network, then ${again} again`, "network");
         })
       : null;
-  const newer = remoteSha !== null && remoteSha !== (ownRef?.sha ?? null) && (ownRef === null || (await git.isAncestor(root, ownRef.sha, remoteSha).catch(() => false)));
+  const continues = async (own: string, theirs: string): Promise<boolean> => {
+    try {
+      return await git.isAncestor(root, own, theirs);
+    } catch (e) {
+      // a git failure is no answer: refused before the claim, never read as "not newer"
+      throw failure(`cannot tell whether ${recordRef(key)} on ${remote} continues from ${own.slice(0, 12)}: ${(e as Error).message}; nothing was taken`, `retry: ${again}`, "git_failed");
+    }
+  };
+  const newer = remoteSha !== null && remoteSha !== (ownRef?.sha ?? null) && (ownRef === null || (await continues(ownRef.sha, remoteSha)));
   const keepLocal = mine && localCopy && !newer;
   const before = keepLocal ? ownRef : null;
   // gh-195 D11 (B27; 10-R3-F1, 11-S2): a local copy not kept is never replaced whole: set aside as
