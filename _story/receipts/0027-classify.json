@@ -1,0 +1,1 @@
+{"kind":"classify","receipt_id":"01M69GJG1J0RFG8TP66BBKYGFP","run_id":null,"step":"slices","attempt":1,"at":"2026-10-31T17:36:59.443Z","by":"norn","who":"jakubpruszynski@mac","tick_id":"01M69GJG1JCVR0KH0V521NP69G","outcome":"stuck","rule":"slices.slice_stuck","detail":"slice gh-118/02 stuck: cancelled by person — norn run rerun gh-118/02","route":"$stuck"}

@@ -1,0 +1,11 @@
+[
+  { "id": "AC1", "verdict": "pass", "evidence": "AC1.md, AC7-unit-1.log, AC3.log" },
+  { "id": "AC2", "verdict": "pass", "evidence": "AC2.md, AC2.log" },
+  { "id": "AC3", "verdict": "pass", "evidence": "AC3.md, AC3.log" },
+  { "id": "AC4", "verdict": "person", "evidence": "AC4.md, AC4-unit-files.txt, AC7-unit-{1,2,3}.log", "how": "On the maintainer's Mac, in a clean checkout of the branch: bun install, then `for i in 1 2 3; do time bun run test; done`. Expect 983 pass, 0 fail and under 30 s each (the agent saw 1.89–1.95 s on an M2 Max, 12 cores, bun 1.3.13), with only unit/ and test/repo/ files (55, listed in AC4-unit-files.txt)." },
+  { "id": "AC5", "verdict": "pass", "evidence": "AC5.md, AC5-diff.txt, AC5-base-fast.xml, AC5-base-cli.xml, AC5-head-unit.xml, AC5-head-int.xml, AC5-head-e2e.xml" },
+  { "id": "AC6", "verdict": "person", "evidence": "AC6.md, AC6-diff.md, AC6-golden.log, AC6-golden-update.log, AC6-base-golden.log", "how": "Renames only (8 files at 100%, golden corpus untouched); `golden -- --update` changes 0 of 102. But `bun run golden` adds 9 cases, and an untouched copy of main base 6b77e395b adds the identical 9. Slice 03's human-qa approved this same finding on an older head. Confirm on this head: accept as met in intent (amend B18/AC6 or file a follow-up for the 9 cases), or send it back to commit them." },
+  { "id": "AC7", "verdict": "unverified", "evidence": "AC7.md, AC7-summary.txt, AC7-{unit,integration,e2e}-{1,2,3}.log", "reason": "Local part observed: unit 983, integration 505 and e2e 72 each passed three runs in a row, and typecheck is clean. CI cannot be observed: no PR exists for gh-118 yet, and this step may not open one.", "how": "After norn opens the story PR: `gh pr checks <N>` shows unit+typecheck, integration, the 3 e2e shards and package green." },
+  { "id": "AC8", "verdict": "unverified", "evidence": "AC8.md, AC8-test-check.log", "reason": "No PR exists yet, and this step may not write a PR body. The table numbers are measured in AC8.md except CI push-to-green, which needs a CI run.", "how": "Once the story PR's CI is green, put the AC8.md table plus the CI wall clock (`gh run view <id> --json createdAt,updatedAt`) into the PR body, then check the body has it." },
+  { "id": "AC9", "verdict": "pass", "evidence": "AC9.md, AC9.log" }
+]

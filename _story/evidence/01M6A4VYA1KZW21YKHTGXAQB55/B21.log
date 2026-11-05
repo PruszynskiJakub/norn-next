@@ -1,0 +1,33 @@
+## B21 paths named in AGENTS.md
+glob-MISSING packages/<pkg>/test/
+glob-MISSING packages/<pkg>/test/integration/
+glob-MISSING packages/<pkg>/test/unit/
+glob-MISSING packages/adapters/test/<adapter>/{<adapter>.test.ts,fixtures/}
+ok packages/adapters/test/contract/
+ok packages/adapters/test/integration/contract/contract.test.ts
+ok packages/cli/test/integration/contract-fakes.test.ts
+ok packages/core/test/rule-cases.ts
+ok packages/core/test/unit/golden.test.ts
+ok test
+MISSING test.failing
+ok test/
+ok test/e2e/
+ok test/e2e/base-sync.test.ts
+ok test/e2e/observe-snapshots.test.ts
+glob-ok test/e2e/observe-snapshots/*.json
+ok test/e2e/recovery.test.ts
+ok test/e2e/slice-workflow.test.ts
+glob-ok test/e2e/transcripts/*.txt
+ok test/repo/
+ok test/repo/repo.test.ts
+ok test/support/
+ok test/support/observe-snapshot.ts
+ok test/support/transcript.ts
+## contract line
+24:Port contract suites state what every implementation of a port must do, in `packages/adapters/test/contract/` (`processContract`, `gitContract`, `runnerContract`, `remoteContract`). `packages/adapters/test/integration/contract/contract.test.ts` runs them against the real adapters offline: real processes (a real zombie included), real git repos, the headless runner, gh and glab over scripted CLI
+74:## Where the contracts live
+80:Change a contract only together with its tests and every user of it.
+## README test line
+README.md:240:bun run test           # the unit tier, in seconds (a plain `bun test` runs the same)
+README.md:241:bun run test:integration  # real git and the cli harness
+README.md:242:bun run test:e2e       # multi-tick stories; CI runs it in shards

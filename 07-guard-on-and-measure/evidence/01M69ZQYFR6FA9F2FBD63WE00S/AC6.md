@@ -1,0 +1,7 @@
+# AC6 (B18) — person
+- Transcripts, observe snapshots and the golden corpus against main base 6b77e395b (`git diff -M`, AC6-diff.md): 3 transcripts and 5 snapshots are renames at 100%, with 0 content lines changed. The golden corpus (packages/core/test/golden, 93 files) is unchanged.
+- `bun run golden -- --update`: "0 of 102 golden case(s) decide differently now" (AC6-golden-update.log). It ran after the harvest, so it covers the 93 cases plus the 9 just added.
+- `bun run golden` **adds 9 cases** of 604 harvested (AC6-golden.log): check.running, remote.park, leases.reclaim/check.run, start.workflow_invalid, claim.renew/unit.rebase_in_progress, slices.slice_stuck/slice.done/unit.stuck, receipts.apply/agent.timeout.nudge, agent.attended.running, agent.timeout.surface. I deleted them from the worktree afterwards, which is left clean.
+- The same command on an untouched copy of **main base 6b77e395b** adds the **identical 9** (AC6-base-golden.log; the `added` lines diff empty). So this branch changes no harvest. The corpus already under-covered these rules on main.
+As written, "adds no case" fails, on main as well. Slice 03's QA found the same and the person approved it at human-qa then. That approval was on an older head; please confirm it for this head.
+How: accept AC6 as met in intent (and amend B18/AC6 or file a follow-up to commit the 9 cases), or send it back to commit them here.

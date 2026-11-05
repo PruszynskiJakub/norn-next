@@ -1,0 +1,73 @@
+bun test v1.3.13 (bf2e2cec)
+
+test/repo/repo.test.ts:
+482 |     expect(selected.length).toBeGreaterThan(0);
+483 |     expect(selected).toEqual(all.filter(inTier));
+484 |   });
+485 | 
+486 |   test("B16: only test/e2e/ imports the transcript recorder and the observe snapshot helpers", () => {
+487 |     expect(pinnedHelperImports(ROOT)).toEqual([]);
+                                            ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   {
++     "file": "packages/view/test/unit/qa-snapshot.test.ts",
++     "import": "../../../../test/support/observe-snapshot.ts",
++   },
++   {
++     "file": "packages/view/test/unit/qa-transcript.test.ts",
++     "import": "../../../../test/support/transcript.ts",
++   },
++ ]
+
+- Expected  - 1
++ Received  + 10
+
+      at <anonymous> (/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh118-07-copy/test/repo/repo.test.ts:487:39)
+(fail) test layout (AGENTS.md) > B16: only test/e2e/ imports the transcript recorder and the observe snapshot helpers [49.47ms]
+523 |       { file: "test/repo/f.test.ts", import: "../support/transcript.ts" },
+524 |     ]);
+525 |   });
+526 | 
+527 |   test("B15: no unit test imports the cli harness, a helper that imports it, or store's git functions", () => {
+528 |     expect(spawningUnitImports(ROOT)).toEqual([]);
+                                            ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   {
++     "file": "packages/view/test/unit/qa-harness.test.ts",
++     "import": "../../../../test/support/harness.ts",
++   },
++   {
++     "file": "packages/view/test/unit/qa-snapshot.test.ts",
++     "import": "../../../../test/support/observe-snapshot.ts",
++   },
++   {
++     "file": "packages/view/test/unit/qa-storegit.test.ts",
++     "import": "../../../store/src/git.ts",
++   },
++   {
++     "file": "packages/view/test/unit/qa-storegit.test.ts",
++     "import": "fetchNornRefs from @norn/store",
++   },
++   {
++     "file": "packages/view/test/unit/qa-transcript.test.ts",
++     "import": "../../../../test/support/transcript.ts",
++   },
++ ]
+
+- Expected  - 1
++ Received  + 22
+
+      at <anonymous> (/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh118-07-copy/test/repo/repo.test.ts:528:39)
+(fail) test layout (AGENTS.md) > B15: no unit test imports the cli harness, a helper that imports it, or store's git functions [26.20ms]
+
+ 55 pass
+ 2 fail
+ 471 expect() calls
+Ran 57 tests across 1 file. [1300.00ms]
+exit 1

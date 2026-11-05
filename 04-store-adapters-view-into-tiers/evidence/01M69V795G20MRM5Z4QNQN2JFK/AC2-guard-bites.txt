@@ -1,0 +1,4 @@
+ 27 fail
+ 1 error
+ 26 expect() calls
+Ran 27 tests across 7 files. [330.00ms]

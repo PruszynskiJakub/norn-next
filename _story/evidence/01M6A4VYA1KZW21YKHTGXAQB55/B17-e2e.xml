@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="bun test" tests="72" assertions="628" failures="0" skipped="0" time="78.090144">
+  <testsuite name="test/e2e/pinned-outputs.test.ts" file="test/e2e/pinned-outputs.test.ts" tests="2" assertions="6" failures="0" skipped="0" time="0.001" hostname="mac.home">
+    <testcase name="the repo root is the workspace root, found from anywhere below it" classname="" time="0.000958" file="test/e2e/pinned-outputs.test.ts" assertions="2" />
+    <testcase name="transcripts and observe snapshots are read from their folders under the repo root" classname="" time="0.00151" file="test/e2e/pinned-outputs.test.ts" assertions="4" />
+  </testsuite>
+  <testsuite name="test/e2e/slice-workflow.test.ts" file="test/e2e/slice-workflow.test.ts" tests="22" assertions="258" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="norn init" file="test/e2e/slice-workflow.test.ts" tests="11" assertions="154" failures="0" skipped="0" time="0.488" hostname="mac.home">
+      <testcase name="writes config, workflows, skills, hooks, .gitignore and .gitattributes; idempotent" classname="norn init" time="0.15803" file="test/e2e/slice-workflow.test.ts" assertions="21" />
+      <testcase name="prints a summary for a person; --json prints the data" classname="norn init" time="0.126126" file="test/e2e/slice-workflow.test.ts" assertions="14" />
+      <testcase name="help prints the commands grouped for a person, Core first; --json prints the list" classname="norn init" time="0.002942" file="test/e2e/slice-workflow.test.ts" assertions="51" />
+      <testcase name="unknown commands and bad options are usage errors with do_instead" classname="norn init" time="0.000334" file="test/e2e/slice-workflow.test.ts" assertions="4" />
+      <testcase name="a noun with no verb, and help &lt;noun&gt;, list its verbs in order (B2)" classname="norn init" time="0.000532" file="test/e2e/slice-workflow.test.ts" assertions="8" />
+      <testcase name="help &lt;noun&gt; &lt;verb&gt; and &lt;noun&gt; &lt;verb&gt; --help show that verb&apos;s usage and options (B4)" classname="norn init" time="0.000322" file="test/e2e/slice-workflow.test.ts" assertions="8" />
+      <testcase name="help with an unknown name, or a word after a plain command, is a usage error (B5)" classname="norn init" time="0.000169" file="test/e2e/slice-workflow.test.ts" assertions="4" />
+      <testcase name="help --all adds the hidden tier" classname="norn init" time="0.000363" file="test/e2e/slice-workflow.test.ts" assertions="20" />
+      <testcase name="the old trace, why, open, mode, workflow, unstick, take, release and drop are unknown commands, and write nothing (B5)" classname="norn init" time="0.051186" file="test/e2e/slice-workflow.test.ts" assertions="19" />
+      <testcase name="every command accepts --json" classname="norn init" time="0.150027" file="test/e2e/slice-workflow.test.ts" assertions="3" />
+      <testcase name="--version prints the cli package version" classname="norn init" time="0.001062" file="test/e2e/slice-workflow.test.ts" assertions="2" />
+    </testsuite>
+    <testsuite name="a story through the slice workflow" file="test/e2e/slice-workflow.test.ts" tests="10" assertions="96" failures="0" skipped="0" time="18.479" hostname="mac.home">
+      <testcase name="setup: repo config and workflows committed on main" classname="a story through the slice workflow" time="0.761582" file="test/e2e/slice-workflow.test.ts" assertions="0" />
+      <testcase name="tick 1: sync → intake (GR2): story branch, worktree, spec.md, slot, marker" classname="a story through the slice workflow" time="1.082927" file="test/e2e/slice-workflow.test.ts" assertions="11" />
+      <testcase name="tick 2: claim acquired (T3); tick 3: story unit started with pinned workflow (S7)" classname="a story through the slice workflow" time="1.514112" file="test/e2e/slice-workflow.test.ts" assertions="8" />
+      <testcase name="tick 4: auto mode launches the agent via the runner with NORN_* env (A6, B5)" classname="a story through the slice workflow" time="1.084513" file="test/e2e/slice-workflow.test.ts" assertions="10" />
+      <testcase name="plan done → slices step starts the slice: worktree from the story branch, slot 2, slice active (W2, K4)" classname="a story through the slice workflow" time="1.723434" file="test/e2e/slice-workflow.test.ts" assertions="13" />
+      <testcase name="slice implement runs; check fails (C5: receipt tail + committed log) and routes back counted (W4)" classname="a story through the slice workflow" time="3.287822" file="test/e2e/slice-workflow.test.ts" assertions="11" />
+      <testcase name="rework passes the check; gate parks and notifies once (O3); approve → integrate (K6)" classname="a story through the slice workflow" time="5.250424" file="test/e2e/slice-workflow.test.ts" assertions="12" />
+      <testcase name="slice $done → cleanup (K5): final state on the story branch, worktree + branch removed, integrated" classname="a story through the slice workflow" time="2.333648" file="test/e2e/slice-workflow.test.ts" assertions="8" />
+      <testcase name="slices done → open-pr through the RemotePort → story $done; trace replays (O4, O5)" classname="a story through the slice workflow" time="1.445882" file="test/e2e/slice-workflow.test.ts" assertions="22" />
+      <testcase name="effect transcript: spawns, port calls and runs/ files of the whole flow (refactor Phase 0.2)" classname="a story through the slice workflow" time="0.000655" file="test/e2e/slice-workflow.test.ts" assertions="1" />
+    </testsuite>
+    <testsuite name="norn init in a repository with a test command and no remote" file="test/e2e/slice-workflow.test.ts" tests="1" assertions="8" failures="0" skipped="0" time="0.094" hostname="mac.home">
+      <testcase name="writes the detected test command into the workflows and puts adding the remote first" classname="norn init in a repository with a test command and no remote" time="0.094437" file="test/e2e/slice-workflow.test.ts" assertions="8" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="test/e2e/observe-snapshots.test.ts" file="test/e2e/observe-snapshots.test.ts" tests="5" assertions="20" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="observe snapshots and inbox parity (refactor Phase 0.3)" file="test/e2e/observe-snapshots.test.ts" tests="5" assertions="20" failures="0" skipped="0" time="19.504" hostname="mac.home">
+      <testcase name="fresh intake: story worktree and story.md, no claim yet" classname="observe snapshots and inbox parity (refactor Phase 0.3)" time="1.65481" file="test/e2e/observe-snapshots.test.ts" assertions="4" />
+      <testcase name="running slice: the slice agent runs in its own worktree" classname="observe snapshots and inbox parity (refactor Phase 0.3)" time="5.621345" file="test/e2e/observe-snapshots.test.ts" assertions="3" />
+      <testcase name="parked ask: the slice agent asked a question" classname="observe snapshots and inbox parity (refactor Phase 0.3)" time="1.219237" file="test/e2e/observe-snapshots.test.ts" assertions="6" />
+      <testcase name="gate waiting: the check passed and the slice waits at human-qa" classname="observe snapshots and inbox parity (refactor Phase 0.3)" time="3.579433" file="test/e2e/observe-snapshots.test.ts" assertions="3" />
+      <testcase name="merged: the story&apos;s PR landed on the base branch" classname="observe snapshots and inbox parity (refactor Phase 0.3)" time="7.431165" file="test/e2e/observe-snapshots.test.ts" assertions="4" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="test/e2e/auto-recovery.test.ts" file="test/e2e/auto-recovery.test.ts" tests="10" assertions="60" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="R4: nudges that can be delivered (acceptance 5)" file="test/e2e/auto-recovery.test.ts" tests="3" assertions="18" failures="0" skipped="0" time="5.603" hostname="mac.home">
+      <testcase name="R4.3: a send that fails is ok:false, an Unblock item and shown in status" classname="R4: nudges that can be delivered (acceptance 5)" time="4.631314" file="test/e2e/auto-recovery.test.ts" assertions="9" />
+      <testcase name="R4.2: a runner without `send` resumes the agent session with the nudge text; the failure clears" classname="R4: nudges that can be delivered (acceptance 5)" time="0.846503" file="test/e2e/auto-recovery.test.ts" assertions="8" />
+      <testcase name="R4.4: status shows the run&apos;s last classification, not only liveness" classname="R4: nudges that can be delivered (acceptance 5)" time="0.126791" file="test/e2e/auto-recovery.test.ts" assertions="1" />
+    </testsuite>
+    <testsuite name="R5: a launch norn did not see finish (acceptance 6)" file="test/e2e/auto-recovery.test.ts" tests="3" assertions="20" failures="0" skipped="0" time="9.027" hostname="mac.home">
+      <testcase name="the runner finds the run → adopted, no second agent" classname="R5: a launch norn did not see finish (acceptance 6)" time="3.343139" file="test/e2e/auto-recovery.test.ts" assertions="6" />
+      <testcase name="nothing finds it → waits 2 watch intervals, then died (counted) and a fresh run" classname="R5: a launch norn did not see finish (acceptance 6)" time="2.96047" file="test/e2e/auto-recovery.test.ts" assertions="8" />
+      <testcase name="R5.3: no new run while another run of the step shows hook activity" classname="R5: a launch norn did not see finish (acceptance 6)" time="2.724878" file="test/e2e/auto-recovery.test.ts" assertions="6" />
+    </testsuite>
+    <testsuite name="R5.4 / R5.5: tick records and the heartbeat (acceptance 7, 8)" file="test/e2e/auto-recovery.test.ts" tests="3" assertions="12" failures="0" skipped="0" time="4.074" hostname="mac.home">
+      <testcase name="every tick writes tick.start before act and tick.end after; heartbeat.json records last_tick_at" classname="R5.4 / R5.5: tick records and the heartbeat (acceptance 7, 8)" time="0.875442" file="test/e2e/auto-recovery.test.ts" assertions="2" />
+      <testcase name="a tick that died during act: why says so and resolves the receipt that cites it" classname="R5.4 / R5.5: tick records and the heartbeat (acceptance 7, 8)" time="1.821147" file="test/e2e/auto-recovery.test.ts" assertions="3" />
+      <testcase name="no heartbeat for 3 watch intervals with auto work held: inbox item, no manual start hint" classname="R5.4 / R5.5: tick records and the heartbeat (acceptance 7, 8)" time="1.378876" file="test/e2e/auto-recovery.test.ts" assertions="7" />
+    </testsuite>
+    <testsuite name="R7: a run from another machine (acceptance 10)" file="test/e2e/auto-recovery.test.ts" tests="1" assertions="10" failures="0" skipped="0" time="4.599" hostname="mac.home">
+      <testcase name="no pid or pane check; after the take, no hooks for the stalled window → died with the foreign rule" classname="R7: a run from another machine (acceptance 10)" time="4.599146" file="test/e2e/auto-recovery.test.ts" assertions="10" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="test/e2e/team.test.ts" file="test/e2e/team.test.ts" tests="14" assertions="119" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="two clones hand a story over through git (§19.3, T5, T6)" file="test/e2e/team.test.ts" tests="4" assertions="42" failures="0" skipped="0" time="16.092" hostname="mac.home">
+      <testcase name="clone A: intake → plan → slice implement asks a question and parks" classname="two clones hand a story over through git (§19.3, T5, T6)" time="7.836925" file="test/e2e/team.test.ts" assertions="11" />
+      <testcase name="clone A hands over from its slice worktree: handoff committed, branches pushed, then the claim ref deleted (T6, B34, B55)" classname="two clones hand a story over through git (§19.3, T5, T6)" time="1.62892" file="test/e2e/team.test.ts" assertions="5" />
+      <testcase name="clone B takes from git alone: claim, worktrees with slots, cursor and handoff printed (T5)" classname="two clones hand a story over through git (§19.3, T5, T6)" time="2.064051" file="test/e2e/team.test.ts" assertions="16" />
+      <testcase name="clone B answers, briefs and continues the slice to its gate" classname="two clones hand a story over through git (§19.3, T5, T6)" time="4.564495" file="test/e2e/team.test.ts" assertions="10" />
+    </testsuite>
+    <testsuite name="claim races (T3) and forced takes (T5)" file="test/e2e/team.test.ts" tests="8" assertions="61" failures="0" skipped="0" time="9.415" hostname="mac.home">
+      <testcase name="after B&apos;s claim expires, two concurrent takes: exactly one wins, the other is told who holds it" classname="claim races (T3) and forced takes (T5)" time="1.469706" file="test/e2e/team.test.ts" assertions="6" />
+      <testcase name="before expiry a take needs --force; the forced take is journaled in the claim and the handoff" classname="claim races (T3) and forced takes (T5)" time="1.593411" file="test/e2e/team.test.ts" assertions="8" />
+      <testcase name="story close is refused on a story another machine holds, whether this checkout has it or not; nothing changes (B38)" classname="claim races (T3) and forced takes (T5)" time="0.714639" file="test/e2e/team.test.ts" assertions="6" />
+      <testcase name="the old take, release and drop are unknown commands; nothing is dropped (B5)" classname="claim races (T3) and forced takes (T5)" time="0.028639" file="test/e2e/team.test.ts" assertions="8" />
+      <testcase name="story close without --yes asks; under --json or with no TTY it is refused; N changes nothing (B36, B37)" classname="claim races (T3) and forced takes (T5)" time="0.652718" file="test/e2e/team.test.ts" assertions="9" />
+      <testcase name="a claim taken elsewhere while the close question is open is seen under the lock: refused, nothing changed (B38)" classname="claim races (T3) and forced takes (T5)" time="3.109577" file="test/e2e/team.test.ts" assertions="9" />
+      <testcase name="story close --yes from the slice worktree pushes first, then removes worktrees, local branches, slots and the claim; the record stays; issue and PRs untouched (GR7, B35, B55)" classname="claim races (T3) and forced takes (T5)" time="1.489279" file="test/e2e/team.test.ts" assertions="10" />
+      <testcase name="closing a closed story is refused already_closed; nothing changes (B39)" classname="claim races (T3) and forced takes (T5)" time="0.361645" file="test/e2e/team.test.ts" assertions="5" />
+    </testsuite>
+    <testsuite name="story close asks at the terminal (B36)" file="test/e2e/team.test.ts" tests="2" assertions="16" failures="0" skipped="0" time="3.233" hostname="mac.home">
+      <testcase name="y closes the story as --yes does" classname="story close asks at the terminal (B36)" time="2.83231" file="test/e2e/team.test.ts" assertions="13" />
+      <testcase name="an unreadable pushed spec.md is refused story_corrupt, never taken as open (S2, B39)" classname="story close asks at the terminal (B36)" time="0.401965" file="test/e2e/team.test.ts" assertions="3" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="test/e2e/recovery.test.ts" file="test/e2e/recovery.test.ts" tests="7" assertions="41" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="a claim lost mid-run (R1.2, R2.3)" file="test/e2e/recovery.test.ts" tests="3" assertions="15" failures="0" skipped="0" time="3.484" hostname="mac.home">
+      <testcase name="R1.2: the renewal loses its CAS → the waiting done receipt is skipped, nothing is written or pushed" classname="a claim lost mid-run (R1.2, R2.3)" time="1.686574" file="test/e2e/recovery.test.ts" assertions="5" />
+      <testcase name="R2.3: the non-holder reports its unpushed receipt; tidy moves it to orphaned/ locally and pushes nothing" classname="a claim lost mid-run (R1.2, R2.3)" time="1.798058" file="test/e2e/recovery.test.ts" assertions="9" />
+      <testcase name="effect transcript: spawns, port calls and runs/ files of both clones (refactor Phase 0.2)" classname="a claim lost mid-run (R1.2, R2.3)" time="0.000485" file="test/e2e/recovery.test.ts" assertions="1" />
+    </testsuite>
+    <testsuite name="renewals due together go out in one push (H5, R1.2)" file="test/e2e/recovery.test.ts" tests="1" assertions="5" failures="0" skipped="0" time="2.476" hostname="mac.home">
+      <testcase name="one renewal lost among several: one claim push, only that story fails and its actions are skipped" classname="renewals due together go out in one push (H5, R1.2)" time="2.476135" file="test/e2e/recovery.test.ts" assertions="5" />
+    </testsuite>
+    <testsuite name="intake race and release (R3.1, R3.3)" file="test/e2e/recovery.test.ts" tests="3" assertions="21" failures="0" skipped="0" time="6.079" hostname="mac.home">
+      <testcase name="R3.1: both clones intake the issue; the one losing the claim CAS removes its local intake" classname="intake race and release (R3.1, R3.3)" time="2.023804" file="test/e2e/recovery.test.ts" assertions="8" />
+      <testcase name="R3.1: an intake commit is read off its trailers — a person&apos;s commit that only looks like one keeps the intake" classname="intake race and release (R3.1, R3.3)" time="2.89482" file="test/e2e/recovery.test.ts" assertions="8" />
+      <testcase name="R3.3: release refuses a push that is not a fast-forward; the claim and the remote branch stay" classname="intake race and release (R3.1, R3.3)" time="1.162025" file="test/e2e/recovery.test.ts" assertions="5" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="test/e2e/base-sync.test.ts" file="test/e2e/base-sync.test.ts" tests="12" assertions="124" failures="0" skipped="0" time="0" hostname="mac.home">
+    <testsuite name="base sync with real git" file="test/e2e/base-sync.test.ts" tests="4" assertions="42" failures="0" skipped="0" time="27.502" hostname="mac.home">
+      <testcase name="1: a sibling merge without conflicts is merged by update — one Norn-Tick merge commit, no foreign item, → test" classname="base sync with real git" time="4.989743" file="test/e2e/base-sync.test.ts" assertions="10" />
+      <testcase name="4 + 2: waiting at ready, a conflicting sibling merge → stale → update → conflict → resolve (brief: base sha + paths) → done → update → test" classname="base sync with real git" time="11.311558" file="test/e2e/base-sync.test.ts" assertions="11" />
+      <testcase name="6: norn update re-enters a done, unmerged story; refused without the claim and once merged" classname="base sync with real git" time="11.201673" file="test/e2e/base-sync.test.ts" assertions="20" />
+      <testcase name="effect transcript: spawns, port calls and runs/ files of cases 1, 4 + 2 and 6 (refactor Phase 0.2)" classname="base sync with real git" time="0.001792" file="test/e2e/base-sync.test.ts" assertions="1" />
+    </testsuite>
+    <testsuite name="BS3.3a (dogfood D4): a person&apos;s push to the branch of a $done story" file="test/e2e/base-sync.test.ts" tests="1" assertions="7" failures="0" skipped="0" time="9.417" hostname="mac.home">
+      <testcase name="norn&apos;s next commit merges it in (never rebases) and pushes; norn update does not end stuck diverged" classname="BS3.3a (dogfood D4): a person&amp;apos;s push to the branch of a $done story" time="9.417248" file="test/e2e/base-sync.test.ts" assertions="7" />
+    </testsuite>
+    <testsuite name="base_branch: develop (BS0, 7b)" file="test/e2e/base-sync.test.ts" tests="1" assertions="4" failures="0" skipped="0" time="5.115" hostname="mac.home">
+      <testcase name="intake from develop, update merges develop, open-pr targets develop" classname="base_branch: develop (BS0, 7b)" time="5.115122" file="test/e2e/base-sync.test.ts" assertions="4" />
+    </testsuite>
+    <testsuite name="PR items between syncs and in the read model (C1), ready approval voided by norn update (C5)" file="test/e2e/base-sync.test.ts" tests="3" assertions="25" failures="0" skipped="0" time="10.115" hostname="mac.home">
+      <testcase name="C1: a done story conflicting with its base keeps its Merge item (norn update) and a retarget item, in every tick and in norn inbox" classname="PR items between syncs and in the read model (C1), ready approval voided by norn update (C5)" time="6.823349" file="test/e2e/base-sync.test.ts" assertions="12" />
+      <testcase name="C5: norn&apos;s own commits after the ready approval (its $done commit) are no head change; anyone else&apos;s commit is" classname="PR items between syncs and in the read model (C1), ready approval voided by norn update (C5)" time="1.136757" file="test/e2e/base-sync.test.ts" assertions="6" />
+      <testcase name="C5: after norn update from $done, the old ready approval no longer pins the head" classname="PR items between syncs and in the read model (C1), ready approval voided by norn update (C5)" time="2.156468" file="test/e2e/base-sync.test.ts" assertions="7" />
+    </testsuite>
+    <testsuite name="H1/BS5: a resolve parked mid-merge — norn never concludes the merge; done is verified" file="test/e2e/base-sync.test.ts" tests="2" assertions="36" failures="0" skipped="0" time="10.322" hostname="mac.home">
+      <testcase name="park while the agent&apos;s merge is in progress: no commit, MERGE_HEAD kept, nothing pushed; done refused until the merge is concluded clean" classname="H1/BS5: a resolve parked mid-merge — norn never concludes the merge; done is verified" time="9.481269" file="test/e2e/base-sync.test.ts" assertions="31" />
+      <testcase name="a norn commit that would record conflict markers is refused: ok:false, an Unblock item, nothing pushed" classname="H1/BS5: a resolve parked mid-merge — norn never concludes the merge; done is verified" time="0.84171" file="test/e2e/base-sync.test.ts" assertions="5" />
+    </testsuite>
+    <testsuite name="BUG-2: an update conflict that exhausts base_conflict_loop, then run rerun --step resolve (BS5, W4)" file="test/e2e/base-sync.test.ts" tests="1" assertions="10" failures="0" skipped="0" time="10.412" hostname="mac.home">
+      <testcase name="act records route $stuck and the unit stays stuck at update; after run rerun --step resolve, done without the merge is refused" classname="BUG-2: an update conflict that exhausts base_conflict_loop, then run rerun --step resolve (BS5, W4)" time="10.412568" file="test/e2e/base-sync.test.ts" assertions="10" />
+    </testsuite>
+  </testsuite>
+</testsuites>

@@ -1,0 +1,28 @@
+bun test v1.3.13 (bf2e2cec) 12x PARALLEL
+
+test/e2e/recovery.test.ts:
+killed 1 dangling process
+(fail) renewals due together go out in one push (H5, R1.2) > (unnamed) [30004.40ms]
+  ^ a beforeEach/afterEach hook timed out for this test.
+
+# Unhandled error between tests
+-------------------------------
+52 |   return {
+53 |     root,
+54 |     norn: (...argv) => run(`norn ${argv.join(" ")}`, () => runChecked(argv, deps)),
+55 |     async tick(...flags) {
+56 |       const r = await run(["norn tick", ...flags].join(" "), () => runChecked(["tick", ...flags], deps));
+57 |       if (r.exit !== 0) throw new Error(`tick failed: ${r.stdout}`);
+                                       ^
+error: tick failed: {"error":"not inside a git repository: /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-NmHR68/repo","do_instead":"cd into your repository (or a norn worktree) and run the command again","code":"not_in_repo"}
+
+      at tick (/Users/jakubpruszynski/Projects/norn-worktrees/gh-118-the-cli-tests-take-12-minutes-and-run-up--07-guard-on-and-measure/test/e2e/recovery.test.ts:57:35)
+      at async <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-118-the-cli-tests-take-12-minutes-and-run-up--07-guard-on-and-measure/test/e2e/recovery.test.ts:176:15)
+-------------------------------
+
+
+ 71 pass
+ 1 fail
+ 1 error
+ 624 expect() calls
+Ran 72 tests across 7 files. [145.61s]

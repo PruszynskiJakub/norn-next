@@ -1,0 +1,32 @@
+bun test v1.3.13 (bf2e2cec) 12x PARALLEL
+
+packages/cli/test/recovery.test.ts:
+killed 1 dangling process
+(fail) renewals due together go out in one push (H5, R1.2) > (unnamed) [30005.95ms]
+  ^ a beforeEach/afterEach hook timed out for this test.
+
+# Unhandled error between tests
+-------------------------------
+193 | /** A6 launch env and the orient env: the env of the agent session a test may run in is not the harness's. */
+194 | const AGENT_ENV = ["NORN_HOME", "NORN_STORY", "NORN_SLICE", "NORN_RUN", "NORN_BIN", "NORN_ORIENT"];
+195 | export const hostEnv = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !AGENT_ENV.includes(k)));
+196 | 
+197 | export function sh(cwd: string, args: string[], input?: string): string {
+198 |   const r = Bun.spawnSync(["git", ...args], { cwd, stdin: input === undefined ? "ignore" : new TextEncoder().encode(input), stdout: "pipe", stderr: "pipe" });
+                      ^
+ENOENT: no such file or directory, posix_spawn 'git'
+    path: "git",
+ syscall: "posix_spawn",
+   errno: -2,
+    code: "ENOENT"
+
+      at sh (/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh118-07-base/packages/cli/test/harness.ts:198:17)
+      at <anonymous> (/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh118-07-base/packages/cli/test/recovery.test.ts:179:14)
+-------------------------------
+
+
+ 552 pass
+ 1 fail
+ 1 error
+ 7236 expect() calls
+Ran 553 tests across 45 files. [156.11s]

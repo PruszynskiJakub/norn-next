@@ -1,0 +1,8 @@
+# Static checks on HEAD (B7-B13, B21). Raw output: static.log, B21.log
+B7: `bun run test:fast` → `error: Script not found "test:fast"`; same for test:cli. `git grep -E 'test:fast|test:cli'` over package.json files, AGENTS.md, README, CONTRIBUTING, .agents/workflows, .github, skills, packages/cli/assets, scripts, test, packages → no match (rc=1). Only records under .agents/specs name them (exempt, D14).
+B8: bug/quick/slice/story.yaml test check: `bun install --frozen-lockfile && bun run test && bun run test:integration && bun run typecheck`.
+B9: implement instructions in all four: "Run `bun run test` (the unit tier) after each change, and the type check; the integration tier runs in the `test` check and the e2e tier runs in CI, so do not run them before handing back."
+B10: packages/cli/assets/skills/norn-implement/SKILL.md:20 and :30: the repo's fast suite after each change; slower tiers run in their own check. No "full suite".
+B11/B12: ci.yml: job unit (bun run test + typecheck); integration, e2e and package `needs: unit`; e2e matrix shard [1,2,3], fail-fast: true, `bun run test:e2e --shard=N/3`. No PR and no CI run for the branch yet (gh pr list / gh run list empty), so not observed.
+B13: release.yml:143-144 runs `bun run test` and `bun run typecheck` only.
+B21: AGENTS.md Commands list the three scripts (lines 9-11), the handback rule asks for the unit tier and the type check (line 28). Every golden, transcript, snapshot and contract path it names exists (B21.log), including packages/adapters/test/integration/contract/contract.test.ts (QA#1's F2, fixed). README:240-242 lists the three tiers; no "all tests".

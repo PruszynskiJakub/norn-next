@@ -1,0 +1,1 @@
+{"kind":"workflow","receipt_id":"01M69D26DGKK9R93XXNVEQ244D","run_id":null,"step":"test","attempt":1,"at":"2026-10-31T16:35:39.568Z","by":"human","who":"jakubpruszynski@mac","slice":null,"name":"story","from_hash":"3348b793a3dcf7b2d5de9c16017f75434dda0aab2e5deac1ba8ed57063bd4f2f","to_hash":"3348b793a3dcf7b2d5de9c16017f75434dda0aab2e5deac1ba8ed57063bd4f2f","to":"approve-plan"}

@@ -1,0 +1,88 @@
+bun test v1.3.13 (bf2e2cec)
+
+guard-qa.test.ts:
+23 |   let pending: string | undefined;
+24 | 
+25 |   const block = (args: unknown[]): never => {
+26 |     const message = `unit test in ${testFile()} started \`${argvOf(args[0]).join(" ")}\`; a test that spawns belongs in test/integration/`;
+27 |     pending ??= message;
+28 |     throw new Error(message);
+                                ^
+error: unit test in ../../../../../private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-118-the-cli-tests-take-12-minutes-and-run-up--02-unit-guard/20cd068f-2b5c-48ed-a3c0-2dc04aa56550/scratchpad/qa/t/guard-qa.test.ts started `git rev-parse HEAD`; a test that spawns belongs in test/integration/
+      at block (/Users/jakubpruszynski/Projects/norn-worktrees/gh-118-the-cli-tests-take-12-minutes-and-run-up--02-unit-guard/test/support/unit-guard.ts:28:28)
+      at <anonymous> (/private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-118-the-cli-tests-take-12-minutes-and-run-up--02-unit-guard/20cd068f-2b5c-48ed-a3c0-2dc04aa56550/scratchpad/qa/t/guard-qa.test.ts:3:35)
+33 | 
+34 |   return {
+35 |     check() {
+36 |       const message = pending;
+37 |       pending = undefined;
+38 |       if (message !== undefined) throw new Error(message);
+                                                             ^
+error: unit test in ../../../../../private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-118-the-cli-tests-take-12-minutes-and-run-up--02-unit-guard/20cd068f-2b5c-48ed-a3c0-2dc04aa56550/scratchpad/qa/t/guard-qa.test.ts started `git rev-parse HEAD`; a test that spawns belongs in test/integration/
+      at check (/Users/jakubpruszynski/Projects/norn-worktrees/gh-118-the-cli-tests-take-12-minutes-and-run-up--02-unit-guard/test/support/unit-guard.ts:38:57)
+(fail) AC1 Bun.spawn [0.48ms]
+23 |   let pending: string | undefined;
+24 | 
+25 |   const block = (args: unknown[]): never => {
+26 |     const message = `unit test in ${testFile()} started \`${argvOf(args[0]).join(" ")}\`; a test that spawns belongs in test/integration/`;
+27 |     pending ??= message;
+28 |     throw new Error(message);
+                                ^
+error: unit test in ../../../../../private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-118-the-cli-tests-take-12-minutes-and-run-up--02-unit-guard/20cd068f-2b5c-48ed-a3c0-2dc04aa56550/scratchpad/qa/t/guard-qa.test.ts started `git rev-parse HEAD`; a test that spawns belongs in test/integration/
+      at block (/Users/jakubpruszynski/Projects/norn-worktrees/gh-118-the-cli-tests-take-12-minutes-and-run-up--02-unit-guard/test/support/unit-guard.ts:28:28)
+      at <anonymous> (/private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-118-the-cli-tests-take-12-minutes-and-run-up--02-unit-guard/20cd068f-2b5c-48ed-a3c0-2dc04aa56550/scratchpad/qa/t/guard-qa.test.ts:4:39)
+33 | 
+34 |   return {
+35 |     check() {
+36 |       const message = pending;
+37 |       pending = undefined;
+38 |       if (message !== undefined) throw new Error(message);
+                                                             ^
+error: unit test in ../../../../../private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-118-the-cli-tests-take-12-minutes-and-run-up--02-unit-guard/20cd068f-2b5c-48ed-a3c0-2dc04aa56550/scratchpad/qa/t/guard-qa.test.ts started `git rev-parse HEAD`; a test that spawns belongs in test/integration/
+      at check (/Users/jakubpruszynski/Projects/norn-worktrees/gh-118-the-cli-tests-take-12-minutes-and-run-up--02-unit-guard/test/support/unit-guard.ts:38:57)
+(fail) AC1 Bun.spawnSync [0.08ms]
+1 | import { test, expect } from "bun:test";
+2 | import { spawn } from "node:child_process";
+3 | test("AC1 Bun.spawn", () => { Bun.spawn(["git","rev-parse","HEAD"]); });
+4 | test("AC1 Bun.spawnSync", () => { Bun.spawnSync(["git","rev-parse","HEAD"]); });
+5 | test("AC1 node spawn", () => { spawn("git",["rev-parse","HEAD"]); });
+                                   ^
+error: unit test in ../../../../../private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-118-the-cli-tests-take-12-minutes-and-run-up--02-unit-guard/20cd068f-2b5c-48ed-a3c0-2dc04aa56550/scratchpad/qa/t/guard-qa.test.ts started `git rev-parse HEAD`; a test that spawns belongs in test/integration/
+      at spawn (node:child_process:710:17)
+      at spawn (node:child_process:14:39)
+      at <anonymous> (/private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-118-the-cli-tests-take-12-minutes-and-run-up--02-unit-guard/20cd068f-2b5c-48ed-a3c0-2dc04aa56550/scratchpad/qa/t/guard-qa.test.ts:5:32)
+33 | 
+34 |   return {
+35 |     check() {
+36 |       const message = pending;
+37 |       pending = undefined;
+38 |       if (message !== undefined) throw new Error(message);
+                                                             ^
+error: unit test in ../../../../../private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-118-the-cli-tests-take-12-minutes-and-run-up--02-unit-guard/20cd068f-2b5c-48ed-a3c0-2dc04aa56550/scratchpad/qa/t/guard-qa.test.ts started `git rev-parse HEAD`; a test that spawns belongs in test/integration/
+      at check (/Users/jakubpruszynski/Projects/norn-worktrees/gh-118-the-cli-tests-take-12-minutes-and-run-up--02-unit-guard/test/support/unit-guard.ts:38:57)
+(fail) AC1 node spawn [0.96ms]
+33 | 
+34 |   return {
+35 |     check() {
+36 |       const message = pending;
+37 |       pending = undefined;
+38 |       if (message !== undefined) throw new Error(message);
+                                                             ^
+error: unit test in ../../../../../private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-118-the-cli-tests-take-12-minutes-and-run-up--02-unit-guard/20cd068f-2b5c-48ed-a3c0-2dc04aa56550/scratchpad/qa/t/guard-qa.test.ts started `git rev-parse HEAD`; a test that spawns belongs in test/integration/
+      at check (/Users/jakubpruszynski/Projects/norn-worktrees/gh-118-the-cli-tests-take-12-minutes-and-run-up--02-unit-guard/test/support/unit-guard.ts:38:57)
+(fail) AC2 swallowed [0.08ms]
+33 | 
+34 |   return {
+35 |     check() {
+36 |       const message = pending;
+37 |       pending = undefined;
+38 |       if (message !== undefined) throw new Error(message);
+                                                             ^
+error: unit test in ../../../../../private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-118-the-cli-tests-take-12-minutes-and-run-up--02-unit-guard/20cd068f-2b5c-48ed-a3c0-2dc04aa56550/scratchpad/qa/t/guard-qa.test.ts started `git rev-parse HEAD`; a test that spawns belongs in test/integration/
+      at check (/Users/jakubpruszynski/Projects/norn-worktrees/gh-118-the-cli-tests-take-12-minutes-and-run-up--02-unit-guard/test/support/unit-guard.ts:38:57)
+(fail) AC3 secret env [0.03ms]
+
+ 1 pass
+ 5 fail
+ 2 expect() calls
+Ran 6 tests across 1 file. [14.00ms]

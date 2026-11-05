@@ -1,0 +1,7 @@
+$ bun test --config=bunfig.e2e.toml --parallel --timeout=20000 "test/e2e/base-sync.test.ts"
+bun test v1.3.13 (bf2e2cec) 12x PARALLEL
+
+ 12 pass
+ 0 fail
+ 123 expect() calls
+Ran 12 tests across 1 file. [70.43s]

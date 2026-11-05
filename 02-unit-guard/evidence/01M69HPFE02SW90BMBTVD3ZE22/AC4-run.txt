@@ -1,0 +1,28 @@
+bun test v1.3.13 (bf2e2cec)
+
+packages/store/test/unit/qa-throwaway.test.ts:
+23 |   let pending: string | undefined;
+24 | 
+25 |   const block = (args: unknown[]): never => {
+26 |     const message = `unit test in ${testFile()} started \`${argvOf(args[0]).join(" ")}\`; a test that spawns belongs in test/integration/`;
+27 |     pending ??= message;
+28 |     throw new Error(message);
+                                ^
+error: unit test in packages/store/test/unit/qa-throwaway.test.ts started `git rev-parse HEAD`; a test that spawns belongs in test/integration/
+      at block (/Users/jakubpruszynski/Projects/norn-worktrees/gh-118-the-cli-tests-take-12-minutes-and-run-up--02-unit-guard/test/support/unit-guard.ts:28:28)
+      at <anonymous> (/Users/jakubpruszynski/Projects/norn-worktrees/gh-118-the-cli-tests-take-12-minutes-and-run-up--02-unit-guard/packages/store/test/unit/qa-throwaway.test.ts:2:36)
+33 | 
+34 |   return {
+35 |     check() {
+36 |       const message = pending;
+37 |       pending = undefined;
+38 |       if (message !== undefined) throw new Error(message);
+                                                             ^
+error: unit test in packages/store/test/unit/qa-throwaway.test.ts started `git rev-parse HEAD`; a test that spawns belongs in test/integration/
+      at check (/Users/jakubpruszynski/Projects/norn-worktrees/gh-118-the-cli-tests-take-12-minutes-and-run-up--02-unit-guard/test/support/unit-guard.ts:38:57)
+(fail) reads the head [0.49ms]
+
+ 1 pass
+ 1 fail
+ 1 expect() calls
+Ran 2 tests across 1 file. [20.00ms]

@@ -1,0 +1,28 @@
+bun test v1.3.13 (bf2e2cec)
+
+test/repo/repo.test.ts:
+319 |     put("packages/adapters/test/old/old.test.ts");
+320 |     expect(adaptersWithoutTests(root)).toEqual(["none", "old"]);
+321 |   });
+322 | 
+323 |   test("gh-118 B14: every test file sits in a tier folder", () => {
+324 |     expect(untieredTests(ROOT)).toEqual([]);
+                                      ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   "packages/view/test/foo.test.ts is not in a tier folder (unit/, integration/, test/e2e/, test/repo/)",
++ ]
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa-gh118-07-copy/test/repo/repo.test.ts:324:33)
+(fail) test layout (AGENTS.md) > gh-118 B14: every test file sits in a tier folder [10.68ms]
+
+ 56 pass
+ 1 fail
+ 471 expect() calls
+Ran 57 tests across 1 file. [983.00ms]
+exit 1

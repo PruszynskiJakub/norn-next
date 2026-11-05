@@ -1,0 +1,5 @@
+[
+ {"id":"AC1","verdict":"pass","evidence":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh118-01/AC1.md"},
+ {"id":"AC2","verdict":"pass","evidence":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh118-01/AC2.md, /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh118-01/full-suite.log"},
+ {"id":"AC3","verdict":"pass","evidence":"/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh118-01/AC3.md"}
+]

@@ -1,0 +1,19 @@
+bun install v1.3.13 (bf2e2cec)
+
+Checked 26 installs across 20 packages (no changes) [3.00ms]
+$ bun test
+bun test v1.3.13 (bf2e2cec)
+
+ 1110 pass
+ 0 fail
+ 16 snapshots, 22702 expect() calls
+Ran 1110 tests across 58 files. [33.93s]
+$ bun test --config=bunfig.integration.toml --parallel --timeout=20000
+bun test v1.3.13 (bf2e2cec) 12x PARALLEL
+
+ 372 pass
+ 0 fail
+ 2345 expect() calls
+Ran 372 tests across 37 files. [100.42s]
+$ tsc --noEmit -p tsconfig.json && tsc --noEmit -p scripts/tsconfig.json
+exit 0 in 139s

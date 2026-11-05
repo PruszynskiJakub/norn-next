@@ -1,0 +1,6 @@
+integration run1 exit=0 105s  372 pass  0 fail 
+integration run2 exit=0 105s  372 pass  0 fail 
+integration run3 exit=0 104s  372 pass  0 fail 
+e2e run1 exit=0 80s  72 pass  0 fail 
+e2e run2 exit=0 84s  72 pass  0 fail 
+e2e run3 exit=0 79s  72 pass  0 fail 

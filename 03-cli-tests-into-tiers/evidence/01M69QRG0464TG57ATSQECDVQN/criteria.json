@@ -1,0 +1,10 @@
+[
+  { "id": "AC1", "verdict": "pass", "evidence": "AC1.md, AC1-files.txt, AC1-4-rules.txt, unit-run.txt" },
+  { "id": "AC2", "verdict": "pass", "evidence": "AC2.md, AC8-summary.txt, AC7-run.log, AC1-4-rules.txt" },
+  { "id": "AC3", "verdict": "pass", "evidence": "AC3.md, AC3-probe.txt, AC1-4-rules.txt" },
+  { "id": "AC4", "verdict": "pass", "evidence": "AC4.md, AC6-golden-add.out, AC1-4-rules.txt" },
+  { "id": "AC5", "verdict": "pass", "evidence": "AC5.md, AC5-guard.txt, AC5-guard-negative.txt" },
+  { "id": "AC6", "verdict": "person", "evidence": "AC6.md, AC6-golden-update.log, AC6-golden-add.out, AC6-base-golden-add.log, AC6-branch-added.txt, AC6-base-added.txt", "how": "As written AC6 fails: `bun run golden` adds 9 cases. But the same command on an untouched copy of the base branch adds the identical 9 names (diff of the two lists is empty), so the split changes no harvest; the corpus already under-covers those rules (B18's goal holds). Renames are R100 (8 files, 0 lines) and `golden -- --update` changes 0 of 93. Decide: accept AC6 as met in intent and amend B18/AC6 or file a follow-up to add the 9 cases, or send it back to add them here (out of this slice's scope)." },
+  { "id": "AC7", "verdict": "pass", "evidence": "AC7.md, AC7-run.log" },
+  { "id": "AC8", "verdict": "pass", "evidence": "AC8.md, AC8-summary.txt, AC8-integration-run{1,2,3}.log, AC8-e2e-run{1,2,3}.log" }
+]
