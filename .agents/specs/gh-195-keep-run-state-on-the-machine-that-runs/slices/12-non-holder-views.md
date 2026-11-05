@@ -1,8 +1,8 @@
 ---
 id: gh-195/12
 title: Other machines see a story from its ref or its branch
-depends_on: [gh-195/03, gh-195/08]
-status: planned
+depends_on: [ gh-195/03, gh-195/08 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
