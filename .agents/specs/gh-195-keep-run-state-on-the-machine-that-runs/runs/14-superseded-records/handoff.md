@@ -58,6 +58,16 @@ Slice 14 (B27, D11): after a takeover without a release the old holder's tick se
 - Flakes: none.
 - review#1 changes_requested: Blocking F1 (AC4): the tidy summary (tidy.ts:93) and the generated docs/reference.md:406 still describe the removed 'runs/ work not in the record (R2.3)' clean-up and do not mention the superseded prune. Minors: F2, a malformed rejected.json aborts tidy after its removals (dry run included); F3, the no-ref comment at checkout.ts:352 and a silent catch; F4, no --force test for AC1. Nits: F5, F6. Mechanism verified sound.
 
+### Review #1 rework (implement #2)
+
+- F1: tidy's summary names what tidy does now (cleared rejected receipts, superseded records older than trace.retain); docs:emit. New repo lint (test/repo/repo.test.ts): no package source, rule case, golden case or docs/reference.md names unpushed_runs, orphaned/ or "work not in the record" (red on the old docs).
+- F2: `pruneRejectedReceipts` never throws; returns `{removed, error}`; dry takes no lock and writes nothing; tidy lists a rejected.json it cannot prune as one `kept` item and goes on (superseded prune still runs). Tests in rejected-file.test.ts and superseded-record AC2.
+- F3: checkout comment states the no-ref case; an isAncestor failure refuses before the claim (`git_failed`). Not reproducible in the harness, so no red test.
+- F4: --force takeover tests: under local, superseded with its Check item; under remote with everything pushed, removed quietly (flagged for the person in spec.md D11).
+- F5: stale comments in observe/index.ts and act/lifecycle.ts fixed.
+- F6: `.drop` leftovers swept by the next set-aside, quiet removal or tidy prune (store test); Check item id per copy `superseded:<story>:<ulid>`; superseded.json read with parseLocalJson (no cast sentinel).
+- Friction: norn's "implement#2 started" commit (cf5e688c6) picked up my first uncommitted F1/F5 edits; a transient index.lock from a norn process blocked one commit.
+
 ## Resume
 
-Rework F1: fix tidy's summary, then run `bun run docs:emit`. Then the minors F2–F4 at the implementer's judgement. Open for the person: RULES T7a/R2.3 (slice 18).
+Done once the integration and e2e tiers are green; report `norn done done`. Open for the person: the remote all-pushed edge (D11), RULES T7a/R2.3 wording (slice 18).
