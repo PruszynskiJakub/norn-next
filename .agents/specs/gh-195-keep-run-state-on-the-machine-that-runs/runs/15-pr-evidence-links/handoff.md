@@ -14,6 +14,19 @@
 
 ## Goal
 
+`open-pr` pushes the story's record and rewrites `pr.md`'s record links (`evidence/<unit>/<run_id>/<file>`) to that record commit's raw URLs before opening/updating the PR; the describe step's input becomes the new `record` kind; norn-pr links by record path (B28, B11, D5).
+
 ## Progress
 
+- Port: `RemotePort.rawFileUrl({ commit, path })` (gh: `<repo>/blob/<commit>/<path>?raw=true`, glab: `<repo>/-/raw/<commit>/<path>`, segments encoded); contract case added to `remoteContract`; FakeRemote + transcript call map updated.
+- act (`packages/cli/src/runtime/act/git-step.ts` + new `record-links.ts`): after the branch push, open-pr pushes the record with `pushRecord` (lease on the local `recordRef` sha, under `local` too); a refused push throws (git step fails, retried), no PR call; links resolved against the machine dir's run-state (story's current round for `_story`), missing ones left as written and named in the classify receipt detail (`extra.unlinked`).
+- decide (`decide/story.ts` pushRecord): under `remote`, no `push_record` in a tick whose `open-pr` pushes the record (it would lose its lease and log a spurious failure). Golden: 0 of 124 cases changed.
+- Schema: `record` input kind (`packages/schema/src/workflow.ts`), JSON emitted; brief renders receipts/ and evidence/ of every unit of the story in the machine dir with the link prefix. docs:emit: no change (reference does not list input kinds).
+- Workflows: story describe `inputs: [spec, diff, record]` in shipped and repo-local copies. norn-pr skill source updated.
+- Tests: `packages/cli/test/integration/pr-evidence.test.ts` (AC1–AC4 at S1, plus the remote-policy double-push case), `packages/cli/test/unit/record-links.test.ts`, assets test for both workflow copies + skill.
+- AC5 is a person check (see Resume).
+
 ## Resume
+
+Run the integration and e2e tiers; regenerate transcripts if open-pr's record push shows up in them (intended); commit; `norn done done`.
+AC5 how-to: on a real GitHub PR and a GitLab MR opened by this build, a `pr.md` with `![x](evidence/_story/<run_id>/shot.png)` must show the image inline; the link points at `…/blob/<record sha>/…?raw=true` (GitHub) or `…/-/raw/<record sha>/…` (GitLab), the sha reachable only via `refs/norn/runs/<story>` (`git ls-remote origin 'refs/norn/runs/*'`).
