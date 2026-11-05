@@ -14,6 +14,29 @@
 
 ## Goal
 
+Bring the rules, docs, docs lint and bundled skills in line with what gh-195 built (B38; AC1 by the docs lint, AC2 agent-checked).
+
 ## Progress
 
+- AC1: docs lint `strayHandoff` now allows a handoff only at `.agents/specs/<spec>/handoffs/(_story|<nn>-<slug>).md` or an older norn's `runs/.../handoff.md` (new matcher cases went red under the old rule). The `unpushed_runs` / `orphaned/` / "work not in the record" lint in test/repo/repo.test.ts now also scans packages/cli/assets, plugins/, packages/schema/json and every doc but RULES.md (whose T7a/R2.3 name them as history). `docs:emit` and `schema:emit` produce no change.
+- Rule amendments (scoped into this slice by the spec, said in the commit message): S4 (Norn-Outcome, Norn-Next; allow_empty story boundary marked as awaiting the person at the ready gate, D17), S6 (step-only mailbox receipt has no attempt), T5 (take receipt lists record_lost), T5b and T9 (Norn-Next, not Norn-Step), T7a and R2.3 (supersede only after a takeover without a release; clean release removed quietly; id `superseded:<story>:<ulid>`), T7b/R3.2/R3.4 (the base's spec, not "the base record"; run state from the machine dir or the ref), W4 (no handoff line), §7 (record.policy in team config, sessions/ logs, superseded line). S10 kept as retired, no id lost or duplicated.
+- Spec D10 (Norn-Next) and D11 (per-copy id) fixed.
+- AC2 checklist (rule/doc, what changed):
+  - [x] G3, S8, S9, S11, S12, GR6, GR6b, T6, T6a, R3.3, R10.1, C5, RD6, RD7, H2, O6, MO1, §7.1: read against code, already correct (refine/slices), unchanged.
+  - [x] S4, S6, T5, T5b, T7a, T7b, T9, R2.3, R3.2, R3.4, W4, §7: amended (above).
+  - [x] AGENTS.md: transcripts record machine-dir run state; docs-lint handoff sentence; store row (run state, record-ref.ts, handoffs); hard rule (run state off limits, no generated top); dev build acts on machine-dir run state; R8.1 decision names the launcher; trace/run state line.
+  - [x] docs/concepts.md: "What gets committed, and where run state lives" rewritten (machine dir, handoffs, boundary trailers, record ref, both policies, non-holder views, mailbox rejection, upgrade pointer); glossary unit/handoff, new rows run state and record; version paragraph.
+  - [x] docs/recipes.md: Hand a story over (record push before release, refusal, checkout from ref, ahead/rewritten branch, record lost under local, remote policy, wiped home, superseded vs quiet removal); upgrade step 3 (archive refs, staged removal, .gitattributes line, rerun, status/doctor pointer).
+  - [x] docs/limitations.md: secrets now pushed to the record ref; skill forbids editing run state; record lost under local added; removed the fixed `git add -A` sweep and handoff-under-runs/ gaps; "main's record" -> "the archived record" (not re-verified by a run).
+  - [x] docs/reference.md: team row lists record.policy (generated block already current).
+  - [x] README.md, CONTRIBUTING.md: what a PR holds, run state archived on refs/norn/runs, never on main.
+  - [x] packages/cli/assets/skills/norn-retro: reads the record ref (norn-unaware wording, P7), handoffs/, unit folder layout. norn and norn-review skills were already right (asset tests pin their text).
+  - [x] Built norn in a throwaway repo: `init` writes no .gitattributes; `config set record.policy remote --repo` writes the team file; an unknown value is refused. Ref name, handoff path, superseded folder and record-lost message checked against code (ids.ts, paths.ts, apply.ts) and the integration tier.
+
+### Flakes
+
+(none yet)
+
 ## Resume
+
+Integration and e2e tiers running; when green, report `norn done done`.
