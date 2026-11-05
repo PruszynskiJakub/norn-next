@@ -148,6 +148,9 @@ export function unitWorktree(story: StoryFacts, uf: UnitFacts | null): string | 
   return wt?.exists ? wt.path : null;
 }
 
+/** A cursor as people read it: `step#attempt`, or the step alone for a step-only receipt (gh-195 B20). */
+export const stepLabel = (step: string, attempt?: number): string => (attempt === undefined ? step : `${step}#${attempt}`);
+
 /** gh-195 B18–B20: how a step ended — the outcome whose edge moved the cursor on, and the step it moved to. */
 export interface StepEnd {
   outcome: string;

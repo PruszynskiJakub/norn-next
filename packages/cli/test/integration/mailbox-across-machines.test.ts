@@ -194,7 +194,10 @@ describe("under local (B20)", () => {
     // the same decision twice is refused before it reaches the mailbox
     const again = await B.norn("story", "approve", "gh-22", "--json");
     expect(again.exit).toBe(3);
-    expect(again.value).toMatchObject({ code: "already_recorded" });
+    expect(again.value).toMatchObject({ code: "already_recorded", error: expect.stringContaining("approve already recorded for ready (refs/norn/inbox/gh-22/") });
+    // a rejection decides the same gate: refused alike, before it reaches the mailbox
+    const reject = await B.norn("story", "reject", "gh-22", "--reason", "not yet", "--json");
+    expect(reject.value).toMatchObject({ code: "already_recorded", error: expect.stringContaining("approve already recorded for ready (") });
     await tick("--sync");
     await tick();
     expect(h.state(s.runs())).toMatchObject({ step: "$done", status: "done", last_outcome: { outcome: "approve", source: "human" } });

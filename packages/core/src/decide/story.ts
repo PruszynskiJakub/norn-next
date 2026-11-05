@@ -21,7 +21,7 @@ import type { NumberedReceipt, StoryFacts, UnitFacts, UnitRef } from "../facts.t
 import { initialState } from "../apply.ts";
 import { sha256 } from "../hash.ts";
 import { bodyChangedItem } from "../inbox/items.ts";
-import { issueProblem, mergedIntoBase, prProblem, roundFinished, storyFinished, storyUnit, WF_LABEL } from "../policy.ts";
+import { issueProblem, mergedIntoBase, prProblem, roundFinished, stepLabel, storyFinished, storyUnit, WF_LABEL } from "../policy.ts";
 import type { RemoteIssue } from "../ports.ts";
 import { epoch, iso } from "../time.ts";
 import { edgeOf, isStale, stepOf } from "../workflow.ts";
@@ -320,7 +320,7 @@ function importMailbox(ctx: Ctx, story: StoryFacts): void {
   const otherRound = (u: UnitFacts) => r.round !== undefined && u.unit.slice === null && (u.state?.round ?? 1) !== r.round;
   // gh-195 B20: a receipt without an attempt (a non-holder's, for a `local` story) matches by step alone
   const atStep = (u: UnitFacts) => !!u.state && u.state.step === r.step && (r.attempt === undefined || u.state.attempt === r.attempt) && !u.errors.length;
-  const at = r.attempt === undefined ? r.step : `${r.step}#${r.attempt}`;
+  const at = stepLabel(r.step, r.attempt);
   const atCursor = (u: UnitFacts) => atStep(u) && !otherRound(u);
   let target: UnitFacts | undefined;
   if (r.slice !== undefined) {

@@ -5,7 +5,7 @@
  * holds it (T9). Views read through @norn/view only (X1).
  */
 import { isAbsolute, relative } from "node:path";
-import { cmd, type ClaimState, type StoryFacts, storyUnit, type UnitFacts } from "@norn/core";
+import { cmd, type ClaimState, stepLabel, type StoryFacts, storyUnit, type UnitFacts } from "@norn/core";
 import { loadProjectView, type ProjectView } from "@norn/view";
 import {
   type ClaimBlob,
@@ -320,7 +320,7 @@ async function refuseDuplicate(ctx: Context, t: Target, receipt: Receipt, holder
   if (!dup) return;
   const next = holder ? `wait for ${holder.holder}'s next tick to import it (T9)` : cmd.tick();
   throw refuse(
-    `${dup.receipt.kind} already recorded for ${receipt.step}#${receipt.attempt} (${dup.where}) and not applied yet`,
+    `${dup.receipt.kind} already recorded for ${stepLabel(receipt.step, receipt.attempt)} (${dup.where}) and not applied yet`,
     next,
     "already_recorded",
     { receipt_id: dup.receipt.receipt_id },

@@ -14,7 +14,7 @@ import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../cri
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
 import { sha256 } from "../hash.ts";
-import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, heldBySkillsDrift, issueProblem, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
+import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, heldBySkillsDrift, issueProblem, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, stepLabel, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
 import { optionsLine } from "../prompt.ts";
 import { epoch, formatAge, iso } from "../time.ts";
 import { baseUpdateStep, edgeOf, edgesOf, isStale, stepOf } from "../workflow.ts";
@@ -789,7 +789,7 @@ function rejectedItems(story: StoryFacts): InboxItem[] {
     slice: r.unit === story.key ? null : r.unit,
     step: null,
     title: `${r.kind} from ${r.who ?? "another machine"} for ${r.unit} was rejected: ${r.at_step ? `${r.unit} is at ${r.at_step} now` : r.reason}`,
-    detail: `stamped for ${r.attempt === undefined ? r.step : `${r.step}#${r.attempt}`}; ${r.reason}`,
+    detail: `stamped for ${stepLabel(r.step, r.attempt)}; ${r.reason}`,
     command: cmd.runList(r.unit),
     since: r.rejected_at,
     ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
