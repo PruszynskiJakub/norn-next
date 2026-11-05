@@ -64,6 +64,9 @@ Other machines see a story they do not hold: under `remote` step/attempt/counter
 - F5: `where` removed; sentences built in `formatElsewhere`. F6: walk bounded. F7/F8 fixed. F10: heartbeat-only (same user@host other clone counts; test); a claim is the open-story signal (claims go at GR6/GR6b). F11: gh-10 has a remote ref, claim times from the bare remote, status asserted for AC3, config switch pushed and pulled. F12: test that `story answer` on B reads the cursor from the record (`review#1`).
 - F13: cherry-picked afb441ddb (shared fix from slice 09).
 
+- Rework tiers: unit 1213 pass; integration 765 pass / 6 skip (run 1, before a one-line observe tweak), 758 pass / 6 skip / 7 fail (run 2, final code: human.test.ts "story edit --workflow starts the next round", 30 s timeouts under load); e2e 72 pass / 2 skip. Transcripts: only `Norn-Outcome` added to three boundary commits (slice-workflow).
+- Flakes (rework): `packages/cli/test/integration/human.test.ts` "gh-71 … starts the next round" — timed out (30 s) in the parallel tier, passed 3/3 isolated and in the earlier full run; this slice's code does not touch the round path.
+
 ## Resume
 
-Run integration and e2e; regenerate transcripts if needed; commit; `norn done done`.
+Reported `norn done done`; next is the test check, then review#2.
