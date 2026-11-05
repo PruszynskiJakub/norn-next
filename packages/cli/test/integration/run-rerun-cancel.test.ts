@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Receipt } from "@norn/schema";
-import { repoConfigPath, workflowsDir, } from "@norn/store";
+import { repoConfigPath, workflowsDir } from "@norn/store";
 import { type CliDeps, type CliResult } from "../../src/index.ts";
 import { createHarness, FakeInteraction, type Harness, issue, sh } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";
@@ -183,9 +183,7 @@ describe("run cancel (B51–B53)", () => {
     const deps = { cwd: bRoot, env: { ...h.deps.env, NORN_HOME_DIR: bHome, USER: "colleague", NORN_MACHINE: "laptop" } };
     const killed = h.runner.killed.length;
     const r = await norn(deps, "run", "cancel", "gh-5");
-    // S12 (gh-195/05): the other clone has no run state of gh-5 (it is on this machine only), so it refuses
-    // before it gets to the claim; gh-195/12 shows it the story again from the claim and the branch
-    expect(r.exit).toBe(3);
+    refused(r, "not_holder", "norn story checkout gh-5");
     expect(h.runner.killed.length).toBe(killed);
     expect(h.state(runs5())).toMatchObject({ status: "running" });
   });

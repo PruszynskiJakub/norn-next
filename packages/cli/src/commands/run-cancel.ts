@@ -6,7 +6,7 @@
  * resumes the step. Only the claim holder cancels: the session runs on its machine.
  */
 import { cmd, type SessionRef } from "@norn/core";
-import type { UnitState } from "@norn/schema";
+import { storyOf, type UnitState } from "@norn/schema";
 import { machineHolder } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import { failure, refuse } from "../output.ts";
@@ -23,15 +23,17 @@ export const runCancelCommand = defineCommand({
   positionals: { max: 1 },
   async run(ctx, args) {
     const key = await targetKey(ctx, args.positionals[0], args.json === true, inState("run cancel", (k) => cmd.runCancel(k), "Nothing is running", (u) => u.status === "running"));
-    const t = await resolveUnit(ctx, key, (st) => st.status === "running");
-    const st = started(t);
-    // B53: the session runs on the claim holder's machine; this checkout's copy may be stale (T9)
-    const claim = await claimFor(ctx, t.story);
+    // B53: the session runs on the claim holder's machine, and its run state lives there only (S12):
+    // the claim is checked before the unit is resolved, so a non-holder hears who holds it
+    const story = storyOf(key);
+    const claim = await claimFor(ctx, story);
     const notHolder = () => {
       const who = claim.state === "other" ? `held by ${claim.blob.holder}` : "not held by this checkout";
-      return refuse(`${t.story}'s claim is ${who}; only the claim holder stops its runs`, cmd.storyCheckout(t.story), "not_holder");
+      return refuse(`${story}'s claim is ${who}; only the claim holder stops its runs`, cmd.storyCheckout(story), "not_holder");
     };
     if (claim.state === "other") throw notHolder();
+    const t = await resolveUnit(ctx, key, (st) => st.status === "running");
+    const st = started(t);
     const done = await runHumanVerb(ctx, t, {
       verb: "run cancel",
       mailbox: false,
