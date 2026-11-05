@@ -13,6 +13,15 @@ stdout carries the whole value through a pipe, past the 64 KiB pipe buffer, so `
 - implement#2 (rework after test.fail): the one failing test was `check-run.test.ts` "two long checks (K1, K3)", which wants the tick's `duration_ms` under 2500 and got 3622 in the parallel integration run. That figure is measured inside the tick (`runtime/tick.ts`), before main.ts writes anything, so this change cannot move it; the file passed 3/3 run alone. A timing flake under load, not a regression. No code change. Friction: that wall-clock bound is flaky under `--parallel` and worth its own issue.
 - implement#2 done: Rework: the one failing test (check-run.test.ts K1/K3, tick duration_ms 3622 against a 2500 bound) is a timing flake under the parallel integration load. duration_ms is measured inside the tick before main.ts writes anything, so the gh-139 change cannot move it, and the file passed 3/3 run alone. No code change; unit tier and typecheck green.
 
+- review#1: approve. Verified by hand: old main.ts piped through `wc -c` gives 65536, new gives 100237; the new test passes; a reader that closes early (`| head -c 10`) does not hang the exit. No blocking findings; one nit (the test runs main.ts from source, not the built binary the issue named; same code path).
+
+| Item | Verifier | Proven by |
+| --- | --- | --- |
+| Wanted: whole value through a pipe, `--json` parses (P8) | test | `packages/cli/test/integration/stdout-pipe.test.ts` › "a refusal over 64 KiB reaches the reader complete and parses" |
+| Wanted: file / TTY stdout unchanged | test | existing cli tests (stdout to file/pipe in harness); unchanged path |
+| Where: `watch` and signal path exit the same way | review (by reading) | `watch` returns through the same flushed path in main.ts; the second-signal hard stop writes nothing (no output to lose) |
+- review#1 approve: Approve: main.ts waits for stderr/stdout write callbacks before exit; verified old 65536 vs new 100237 bytes through a pipe, early-closing reader does not hang; stdout-pipe.test.ts proves it. One nit (test runs source, not built binary).
+
 ## Resume
 
-Nothing left in implement; the `test` check reruns the integration tier. If check-run's duration bound fails again, it is the same load flake.
+Review approved; next is whatever norn routes after review (no action for this step).
