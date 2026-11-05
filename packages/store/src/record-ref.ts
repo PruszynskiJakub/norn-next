@@ -2,22 +2,29 @@
  * gh-195 D2, D3 (B10, B14): a story's record on `refs/norn/runs/<story>`. Pack writes the story's
  * run-state folder in the machine dir (S12) as one commit with git plumbing (blobs, a temporary index,
  * `write-tree`, `commit-tree`), its parent the previous record commit, pushed with a lease on the sha
- * this checkout last saw (as claims are, T3). Unpack extracts a record commit into a temp folder,
- * validates every JSON file (S2) and only then puts it in place (S1). `recordTreeId` names the tree a
- * pack would write without writing anything, so observe stays effect-free (H2).
+ * this checkout last saw (as claims are, T3). The blobs are the files' bytes as they are: no filter
+ * or line-ending conversion of the repository's config applies (review F1). Unpack extracts a record
+ * commit into a temp folder (refusing any entry that is not a plain file inside it), parses every JSON
+ * file and validates each state, pinned workflow and receipt against its schema (S2), and only then
+ * renames it into place, replacing what was there (S1). `recordTreeId` names the tree a pack would
+ * write without writing anything, so observe stays effect-free (H2).
  */
 import { createHash } from "node:crypto";
-import { type Dirent, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { type Dirent, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import type { FileError } from "@norn/core";
 import { type RunStory, recordRef } from "@norn/schema";
-import { atomicCopyDir, isErrno } from "./fsx.ts";
+import { fsyncTree, isErrno } from "./fsx.ts";
 import { casRef, git, gitOk, gitSync, readLocalRef } from "./git.ts";
 import { recordErrors } from "./record-move.ts";
 import { storyRunStateDir } from "./run-state.ts";
 
-/** Every file of a folder, relative and sorted (git's order is applied when trees are built). */
+/**
+ * Every regular file of a folder, relative and sorted (git's order is applied when trees are built).
+ * A dot-named entry is a staging or temp folder of an atomic write or a move (`.x.move-<pid>`,
+ * `.x.<pid>.….tmp`), never part of the record (review F7); a symlink is no part of it either.
+ */
 function filesUnder(base: string): string[] {
   const out: string[] = [];
   const walk = (dir: string, rel: string) => {
@@ -29,6 +36,7 @@ function filesUnder(base: string): string[] {
       throw e;
     }
     for (const d of list) {
+      if (d.name.startsWith(".")) continue;
       const r = rel ? `${rel}/${d.name}` : d.name;
       if (d.isDirectory()) walk(join(dir, d.name), r);
       else if (d.isFile()) out.push(r);
@@ -87,7 +95,7 @@ async function writeRecordTree(root: string, story: RunStory): Promise<string | 
   const base = storyRunStateDir(root, story);
   const files = filesUnder(base);
   if (!files.length) return null;
-  const shas = (await gitOk(root, ["hash-object", "-w", "--stdin-paths"], `${files.map((f) => join(base, f)).join("\n")}\n`)).trim().split("\n");
+  const shas = (await gitOk(root, ["hash-object", "-w", "--no-filters", "--stdin-paths"], `${files.map((f) => join(base, f)).join("\n")}\n`)).trim().split("\n");
   const tmp = mkdtempSync(join(tmpdir(), "norn-record-"));
   try {
     const env = { GIT_INDEX_FILE: join(tmp, "index") };
@@ -135,33 +143,71 @@ export async function pushRecord(
 }
 
 /**
- * D3 (S1, S2): extract the record commit `sha` into `dest` (a story's run-state folder): written into
- * a temp folder beside it, every unit folder's JSON validated, and only then put in place. A record
- * that fails validation is not put in place: its errors are returned instead.
+ * D3 (S1, S2): extract the record commit `sha` into `dest` (a story's run-state folder). Every entry
+ * must be a plain file (mode 100644 or 100755) whose path stays inside `dest`: an absolute path, an
+ * empty, `.` or `..` segment, a symlink or a submodule is refused before anything is written (review
+ * F2), since a record may come from another machine. The files are written into a temp folder beside
+ * `dest`; every JSON file must parse, and each state, pinned workflow and receipt must pass its schema.
+ * Only then is the temp folder renamed into place, replacing `dest` whole (review F3). A record that
+ * fails puts nothing in place: its errors are returned instead.
  */
 export async function unpackRecord(root: string, sha: string, dest: string): Promise<{ ok: true; files: number } | { ok: false; errors: FileError[] }> {
-  const list = (await gitOk(root, ["ls-tree", "-r", "-z", "--full-tree", sha])).split("\0").filter(Boolean);
   const staging = join(dirname(dest), `.${basename(dest)}.unpack-${process.pid}`);
+  const fail = (path: string, message: string): FileError => ({ file: join(dest, path), errors: [{ path: "", message }] });
+  const entries: Array<{ path: string; blob: string }> = [];
+  const refused: FileError[] = [];
+  // -z: a name with a tab or a newline is read whole; the path is what follows the first tab
+  for (const line of (await gitOk(root, ["ls-tree", "-r", "-z", "--full-tree", sha])).split("\0").filter(Boolean)) {
+    const tab = line.indexOf("\t");
+    const [mode, type, blob] = line.slice(0, tab).split(" ") as [string, string, string];
+    const path = line.slice(tab + 1);
+    const inside = resolve(staging, path).startsWith(`${staging}${sep}`);
+    if (type !== "blob" || (mode !== "100644" && mode !== "100755")) refused.push(fail(path, `not a plain file in the record (${mode} ${type})`));
+    else if (path.startsWith("/") || path.split("/").some((s) => s === "" || s === "." || s === "..") || !inside) refused.push(fail(path, "a path outside the record"));
+    else entries.push({ path, blob });
+  }
+  if (refused.length) return { ok: false, errors: refused };
   rmSync(staging, { recursive: true, force: true });
   try {
-    for (const line of list) {
-      const [meta, path] = line.split("\t") as [string, string];
-      const [, type, blob] = meta.split(" ") as [string, string, string];
-      if (type !== "blob") continue;
-      // binary-safe: evidence holds images
-      const out = gitSync(root, ["cat-file", "blob", blob]);
-      if (out.code !== 0) throw new Error(`git cat-file ${blob} failed: ${out.stderr.trim()}`);
-      mkdirSync(dirname(join(staging, path)), { recursive: true });
-      writeFileSync(join(staging, path), out.stdout);
-    }
     mkdirSync(staging, { recursive: true });
-    const errors = readdirSync(staging, { withFileTypes: true })
-      .filter((d) => d.isDirectory())
-      .flatMap((d) => recordErrors(join(staging, d.name)))
-      .map((e) => ({ ...e, file: e.file.replace(staging, dest) }));
+    for (const e of entries) {
+      // binary-safe: evidence holds images
+      const out = gitSync(root, ["cat-file", "blob", e.blob]);
+      if (out.code !== 0) throw new Error(`git cat-file ${e.blob} failed: ${out.stderr.trim()}`);
+      mkdirSync(dirname(join(staging, e.path)), { recursive: true });
+      writeFileSync(join(staging, e.path), out.stdout);
+    }
+    const errors: FileError[] = [];
+    for (const e of entries.filter((x) => x.path.endsWith(".json")))
+      try {
+        JSON.parse(readFileSync(join(staging, e.path), "utf8"));
+      } catch (err) {
+        errors.push(fail(e.path, `invalid JSON: ${(err as Error).message}`));
+      }
+    const named = new Set(errors.map((e) => e.file));
+    for (const d of readdirSync(staging, { withFileTypes: true }))
+      if (d.isDirectory())
+        for (const e of recordErrors(join(staging, d.name))) {
+          const file = e.file.replace(staging, dest);
+          if (!named.has(file)) errors.push({ ...e, file });
+        }
     if (errors.length) return { ok: false, errors };
-    atomicCopyDir(staging, dest);
-    return { ok: true, files: list.length };
+    fsyncTree(staging);
+    if (!existsSync(dest)) renameSync(staging, dest);
+    else {
+      // rename cannot replace a non-empty folder: move the old one aside, swap, then drop it
+      const old = `${staging}.old`;
+      rmSync(old, { recursive: true, force: true });
+      renameSync(dest, old);
+      try {
+        renameSync(staging, dest);
+      } catch (err) {
+        renameSync(old, dest);
+        throw err;
+      }
+      rmSync(old, { recursive: true, force: true });
+    }
+    return { ok: true, files: entries.length };
   } finally {
     rmSync(staging, { recursive: true, force: true });
   }

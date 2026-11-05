@@ -2,7 +2,7 @@
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { cmd, type Action, type ActionResult, nornTrailers, type UnitRef, type WorktreeSpec } from "@norn/core";
-import { type ClaimBlob, parseDuration, ROUNDS_DIR, STORY_UNIT_DIR } from "@norn/schema";
+import { type ClaimBlob, parseDuration, recordRef, ROUNDS_DIR, STORY_UNIT_DIR } from "@norn/schema";
 import {
   acquireClaim,
   pushRecord as pushStoryRecord,
@@ -432,15 +432,24 @@ async function swapRoundLabel(act: ActEnv, label: Extract<Action, { kind: "round
 
 /**
  * gh-195 D2, D4 (B10, B14): push the story's record to `refs/norn/runs/<story>` after the tick's
- * branch pushes, its `Norn-Branch-Commit` the story branch as pushed (the remote-tracking head; the
- * local head without a remote). A lease that no longer holds or a rejected push leaves the record
- * owed: the next tick tries again.
+ * branch pushes, its `Norn-Branch-Commit` the story branch as pushed (the local head without a
+ * remote). While the story branch is not on the remote as it is here (its push failed this tick, or
+ * has not happened yet), the record waits: it would describe work the remote does not hold (review
+ * F5). A lease that no longer holds (another checkout pushed the ref) or a rejected push leaves the
+ * record owed, the reason in the trace: the next tick tries again.
  */
 export async function pushRecord(act: ActEnv, a: Extract<Action, { kind: "push_record" }>): Promise<ActionResult> {
   const story = act.storyLoc(a.unit.story);
   const remote = act.obs.remote;
-  const head = await act.git.revParse(act.root, remote ? `refs/remotes/${remote}/${a.branch}` : `refs/heads/${a.branch}`).catch(() => null);
+  const local = await act.git.revParse(act.root, `refs/heads/${a.branch}`);
+  const head = remote ? await act.git.revParse(act.root, `refs/remotes/${remote}/${a.branch}`) : local;
+  if (local !== null && head !== local)
+    return { ok: false, error: `record push for ${a.unit.story} waits: ${a.branch} is not on ${remote} as it is here (${remote} has ${head ?? "no such branch"}); the next tick pushes it after the branch (B10)` };
   const r = await pushStoryRecord(act.root, remote, story, { expected: a.expected, holder: a.holder, branch_commit: head, at: act.nowIso() });
-  if (!r.ok) return { ok: false, error: `record push for ${a.unit.story} failed (${r.reason}); the next tick tries again (B14): ${r.message}` };
-  return { ok: true, detail: r };
+  if (r.ok) return { ok: true, detail: r };
+  const why =
+    r.reason === "stale" || r.reason === "rejected"
+      ? `${recordRef(a.unit.story)} on ${remote} is not the record this checkout last saw (${a.expected ?? "none"}): another checkout pushed it, or the remote refused it; nothing overwritten (D2)`
+      : `${r.reason}: ${r.message}`;
+  return { ok: false, error: `record push for ${a.unit.story} failed, owed to the next tick (B14): ${why}`, detail: { reason: r.reason, message: r.message } };
 }

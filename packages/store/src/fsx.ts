@@ -80,7 +80,8 @@ export function appendDurable(path: string, data: string): void {
   if (created) fsyncDir(dirname(path));
 }
 
-function fsyncTree(dir: string): void {
+/** fsync every file under `dir`, and the folders (S1: what a rename puts in place is on disk first). */
+export function fsyncTree(dir: string): void {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const p = join(dir, e.name);
     if (e.isDirectory()) fsyncTree(p);

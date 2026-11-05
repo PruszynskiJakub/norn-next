@@ -143,6 +143,14 @@ describe("record.policy (B9)", () => {
     expect(bad.exit).not.toBe(0);
     policy(null);
   });
+
+  test("AC1 (review F8): a story run without the key behaves as local: no ref leaves the machine", async () => {
+    policy(null);
+    const s = await storyAt(8, "no-key", "implement");
+    const reports = await finish(s, "done", "review");
+    expect(reports.flatMap((r) => pushes(r, "gh-8"))).toEqual([]);
+    expect(remoteRecord("gh-8")).toBeNull();
+  });
 });
 
 describe("under remote, every boundary pushes the record after the branch (B10)", () => {
@@ -272,6 +280,55 @@ describe("a failed ref push is retried at the next tick (B14)", () => {
     } finally {
       rmSync(hook, { force: true });
     }
+  });
+});
+
+describe("the record follows the branch (review F1, F5)", () => {
+  test("F1: under core.autocrlf=input a CRLF file in the record is packed as it is; the next tick pushes nothing", async () => {
+    policy("remote");
+    h.git(["config", "core.autocrlf", "input"]);
+    try {
+      const s = await storyAt(14, "crlf", "implement");
+      h.write(join(s.record(), "_story", "notes.txt"), "line one\r\nline two\r\n");
+      await finish(s, "done", "review");
+      const rec = recordOnRemote("gh-14");
+      expect(rec.files).toEqual(filesOf(s.record()));
+      expect(sh(h.dir, ["--git-dir", h.remoteDir, "cat-file", "blob", `${rec.sha}:_story/notes.txt`])).toBe("line one\r\nline two");
+      const r = await tick();
+      expect(pushes(r, "gh-14")).toEqual([]);
+      expect(remoteRecord("gh-14")).toBe(rec.sha);
+    } finally {
+      h.git(["config", "--unset", "core.autocrlf"]);
+    }
+  });
+
+  test("F5: while this tick's branch push fails the record waits; it follows the branch once that is pushed", async () => {
+    policy("remote");
+    const s = await storyAt(15, "branch-first", "implement");
+    const before = remoteRecord("gh-15");
+    const hook = join(h.remoteDir, "hooks", "pre-receive");
+    writeFileSync(hook, `#!/bin/sh\nwhile read old new ref; do\n  case "$ref" in refs/heads/${s.branch}) echo "branch refused" >&2; exit 1;; esac\ndone\nexit 0\n`);
+    chmodSync(hook, 0o755);
+    try {
+      h.write(join(s.wt, "src", "first.ts"), "export const x = 1;\n");
+      expect((await inWt(s.wt, "done", "done", "--handoff", "built")).exit).toBe(0);
+      const r = await tick();
+      expect(remoteBranch(s.branch)).not.toBe(sh(s.wt, ["rev-parse", "HEAD"]));
+      const tried = pushes(r, "gh-15");
+      expect(tried.map((d) => d.ok)).toEqual([false]);
+      expect(tried[0]?.error).toContain("is not on origin as it is here");
+      expect(remoteRecord("gh-15")).toBe(before);
+    } finally {
+      rmSync(hook, { force: true });
+    }
+    // the branch goes out with the story's next boundary commit, and the record right after it
+    expect((await inWt(s.wt, "brief")).exit).toBe(0);
+    await tick();
+    await finish(s, "approve", "qa");
+    expect(remoteBranch(s.branch)).toBe(sh(s.wt, ["rev-parse", s.branch]));
+    const rec = recordOnRemote("gh-15");
+    expect(rec.sha).not.toBe(before);
+    expect(rec.trailers["Norn-Branch-Commit"]).toBe(remoteBranch(s.branch) as string);
   });
 });
 
