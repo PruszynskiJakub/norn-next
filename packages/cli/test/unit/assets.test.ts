@@ -286,7 +286,7 @@ describe("skills", () => {
       // B37: stops at the round's end; B13, B27 (review#3 F1): a stuck unit does not end the round (RD1, W7)
       "Never start another round", "The round ends at `$done`", "A stuck unit does not end the round",
       // B19, B20, B39 (review#3 F2): a gate left parked on purpose is never waited on with `--until gate` (it returns at once)
-      "Never loop on `--until gate` while you leave a gate parked", "norn story wait <story> --until done --timeout 5m", "gh run watch <run-id> --exit-status",
+      "Never loop on `--until gate` while you leave a gate parked", "norn story wait <story> --until merged --timeout 5m", "(`--until merged`, not `--until gate`)", "gh run watch <run-id> --exit-status",
       // B44, B45: the report
       "One report", "delegated decisions with their reasons", "suspected flakes", "waiting: your answer to",
     ];

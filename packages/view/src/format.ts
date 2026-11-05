@@ -217,11 +217,6 @@ function outcomeText(r: StepRow): string {
   return `${r.outcome ?? "-"}${c}`;
 }
 
-/**
- * `norn run list <unit> --text`: a header with the totals, then one row per (step, attempt) —
- * entered, left, duration, outcome, who — with the reason beneath (cut to one line unless
- * `full`) and absolute evidence / log paths. Slice rows of a story are indented.
- */
 /** gh-196 D5 (B21, B34): the mark of a supervisor's decision, with its reason; nothing for the person's own. */
 export const delegatedText = (reason: string | undefined): string => (reason === undefined ? "" : ` — ${DELEGATED_MARK}: ${reason}`);
 
@@ -231,6 +226,11 @@ function roundEndText(r: RoundView): string {
   return r.ended.by === "person" ? ` · ended by the person at ${r.ended.at}` : " · finished";
 }
 
+/**
+ * `norn run list <unit> --text`: a header with the totals, then one row per (step, attempt) —
+ * entered, left, duration, outcome, who — with the reason beneath (cut to one line unless
+ * `full`) and absolute evidence / log paths. Slice rows of a story are indented.
+ */
 export function formatStepTimeline(v: TraceView, opts: { full?: boolean } = {}): string {
   const day = (v.intake_at ?? v.steps[0]?.entered_at ?? null)?.slice(0, 10) ?? null;
   const out: string[] = [];
