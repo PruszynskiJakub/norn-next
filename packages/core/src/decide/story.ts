@@ -334,9 +334,11 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
   if (uf.errors.length) {
     if (uf.state?.status === "corrupt") return ctx.noop(ref, "unit.corrupt", "corrupt; never touched (S2)");
     const notify = unitItem(ctx, story, uf, uf.state as UnitState);
-    // S2: only the unit's own runs/ files mark its state corrupt, and only a state.json that reads
+    // S2: only the unit's own runs/ files mark its state corrupt, and only a state.json that reads —
+    // never one read from an older norn's branch (gh-195/06): nothing is written there
     const own = uf.errors.every((e) => e.file.includes(`/${unitRecordPath(ref.dir)}/`));
-    const mark_state = uf.state !== null && own && !uf.errors.some((e) => /(^|\/)state\.json$/.test(e.file));
+    const onBranch = story.units.some((u) => u.branch_record?.copy.includes(ref.dir));
+    const mark_state = uf.state !== null && own && !onBranch && !uf.errors.some((e) => /(^|\/)state\.json$/.test(e.file));
     return ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "unit.corrupt", errors: uf.errors, mark_state, notify });
   }
   const st = uf.state;

@@ -182,6 +182,8 @@ describe("an open story's run state moves off its branch at the holder's first t
     expect(sh(s.wt, ["rev-parse", "HEAD"])).toBe(head);
     expect(treeRuns(s.wt, "HEAD", s.spec)).toEqual(files);
     expect(existsSync(join(round, "receipts", "0099-done.json"))).toBe(true);
+    // nothing is written into the branch's record either
+    expect(sh(s.wt, ["status", "--porcelain", "--untracked-files=all"])).toBe("");
     expect(h.state(s.runs())).toBeNull();
     const inbox = (await h.norn("status", "--json")).value as { groups: Record<string, Array<{ story: string; title: string }>> };
     expect(
