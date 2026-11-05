@@ -14,6 +14,19 @@ When a counter runs out (W4), the way out norn offers is the exhausted edge's ta
 - Unit tier, type check and the run-rerun integration file are green; golden corpus untouched.
 - implement#1 done: Exhausted park records counter/max/outcome/target (ParkInfo.counter, W4); inbox, nextCommand and cockpit u offer run rerun --step <to> --reset <counter>; run rerun returns a warning when the counter is not reset. Unit, typecheck and run-rerun integration green.
 
+- review#1 (approve): traceability
+
+| Item | Verifier | Proven by |
+| --- | --- | --- |
+| Wanted 1: the way out of a run-out counter is the outcome's target with the counter reset | test | `packages/core/test/unit/handoff-inbox.test.ts` › "leads to the edge's target with the counter reset", "a reserved target reruns the step with the counter reset", inbox (O1) unblock row; `packages/view/test/unit/cockpit.test.ts` › cockpitModel (u keeps --step/--reset); `packages/cli/test/integration/run-rerun-cancel.test.ts` › "the way out is the edge's target with the counter reset; …" (status inbox command) |
+| Wanted 2: a plain rerun warns it will end the same way | test | `packages/core/test/unit/handoff-inbox.test.ts` › "a rerun that leaves the counter at its max warns …"; `run-rerun-cancel.test.ts` › same test (warning field) |
+| Park records counter/max/outcome/target (W4) | test | `packages/core/test/unit/apply.test.ts` › transitions (W3, W4) exhausted case |
+| Other stuck reasons keep the plain rerun | test | `handoff-inbox.test.ts` › "nudges, retries and other stuck reasons keep the plain rerun" |
+| Repro (review_loop max, two changes_requested, rerun) | test | `run-rerun-cancel.test.ts` › gh-212 describe (gate reject past `loop` max) |
+
+- Review findings: none blocking; F1 minor: `docs/recipes.md:40` still says a counter at its max shows a plain `norn run rerun <unit>`.
+- review#1 approve: Approve: ParkInfo.counter recorded on an exhausted counted edge; inbox/nextCommand/cockpit u offer run rerun --step <to> --reset <counter>; run rerun warns when the counter stays at max. All Wanted items traced to tests; checks green. One minor: docs/recipes.md:40 still shows the plain rerun for a counter at its max.
+
 ## Resume
 
-Nothing left for implement: report `done`.
+Review approved; next is the workflow's following step. Optional: update `docs/recipes.md:40` for the new way out (F1, minor).
