@@ -12,7 +12,8 @@
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { StoryFacts } from "@norn/core";
-import { listLeases, patchStoryFile, releaseClaim, releaseLease, storyFile } from "@norn/store";
+import { recordRef } from "@norn/schema";
+import { listLeases, patchStoryFile, pushRecord, readRecordRef, type RecordPushResult, releaseClaim, releaseLease, storyFile } from "@norn/store";
 import type { Observed } from "./observe/index.ts";
 
 export interface StoryClosed {
@@ -34,7 +35,8 @@ export interface StoryClosed {
 /** Why closing stopped; nothing was removed. */
 export type StoryCloseFailure =
   | { ok: false; reason: "spec_corrupt"; story: string; file: string; message: string; committed: string[] }
-  | { ok: false; reason: "push_failed"; story: string; branch: string; push_reason: string; message: string; pushed: string[] };
+  | { ok: false; reason: "push_failed"; story: string; branch: string; push_reason: string; message: string; pushed: string[] }
+  | { ok: false; reason: "record_push_failed"; story: string; ref: string; push_reason: string; message: string; pushed: string[] };
 
 export interface CloseStoryOptions {
   /** the norn home whose lease files are released */
@@ -88,6 +90,11 @@ export async function closeStory(obs: Observed, story: StoryFacts, opts: CloseSt
     }
   }
 
+  // 3b. gh-195 D15 (B29): the final record on its archive ref, its `Norn-Branch-Commit` the story branch
+  // as pushed; a failed push stops here with everything still in place
+  const record = await archiveStoryRecord(obs, key, loc?.branch ?? null);
+  if (!record.ok) return { ok: false, reason: "record_push_failed", story: key, ref: recordRef(key), push_reason: record.reason, message: record.message, pushed };
+
   // 4. clean up this machine
   const removed: string[] = [];
   for (const w of [...sliceWts.map((x) => x.path), ...(storyWt ? [storyWt] : [])]) {
@@ -125,4 +132,20 @@ export async function closeStory(obs: Observed, story: StoryFacts, opts: CloseSt
     ...(rel.ok ? {} : { claim_error: rel.message }),
     record: obs.remote && loc ? `${obs.remote}/${loc.branch}` : (loc?.branch ?? null),
   };
+}
+
+/**
+ * gh-195 D15 (B29): push the story's record to `refs/norn/runs/<story>` with a lease on the sha this
+ * checkout last saw (D2), its `Norn-Branch-Commit` the story branch as the remote has it (the local one
+ * without a remote; none without a branch, B33). The one push GR6 (`cleanup_merged_story`) and closing
+ * (`closeStory`, GR6b) make before they remove anything; an unchanged or empty record pushes nothing.
+ */
+export async function archiveStoryRecord(obs: Observed, key: string, branch: string | null): Promise<RecordPushResult> {
+  const git = obs.ports.git;
+  const loc = obs.stories[key];
+  const remoteHead = branch && obs.remote ? await git.revParse(obs.root, `refs/remotes/${obs.remote}/${branch}`) : null;
+  const head = remoteHead ?? (branch ? await git.revParse(obs.root, `refs/heads/${branch}`) : null);
+  const expected = (await readRecordRef(obs.root, key))?.sha ?? null;
+  const spec_dir = loc?.spec_dir ?? obs.facts.stories.find((s) => s.key === key)?.spec_dir ?? "";
+  return pushRecord(obs.root, obs.remote, { key, spec_dir }, { expected, holder: obs.facts.machine.holder, branch_commit: head, at: new Date(obs.facts.now).toISOString() });
 }

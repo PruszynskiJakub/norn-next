@@ -162,6 +162,8 @@ export function hookFilePath(root: string, unit: { story: string; slice?: string
 export const hookBackfillPath = (root: string) => join(machineDir(root), "hooks", "backfill.json");
 /** GR6: the base branch's `.agents/specs/` materialized per tree id (store/base.ts). */
 export const baseCacheDir = (root: string) => join(machineDir(root), "base");
+/** gh-195 D6, D7 (B29): finished stories' records unpacked from their archive ref, one folder per record commit (`archive/<story>/<commit>/`, record-ref.ts). */
+export const archiveCacheDir = (root: string, story: string) => join(machineDir(root), "archive", story);
 
 export const specsDir = (root: string) => join(root, SPECS_DIR);
 export const storyDir = (root: string, story: string, slug: string) => join(specsDir(root), storyDirName(story, slug));

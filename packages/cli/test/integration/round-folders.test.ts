@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { STORY_UNIT_DIR, unitHandoffPath } from "@norn/schema";
 import { handoffPath, repoConfigPath, workflowsDir } from "@norn/store";
 import type { CliResult } from "../../src/index.ts";
-import { createHarness, type Harness, issue, runChecked } from "../../../../test/support/harness.ts";
+import { archiveTreeRunState, createHarness, type Harness, issue, runChecked } from "../../../../test/support/harness.ts";
 import { runStateOf, storyRunStateOf } from "../../../../test/support/run-state.ts";
 
 setDefaultTimeout(30_000);
@@ -215,6 +215,8 @@ describe("an old flat record merged into the base stays flat and reads as round 
     h.git(["add", "-A"]);
     h.git(["commit", "-q", "-m", "merge gh-1 (older norn)"]);
     h.git(["push", "-q", "origin", "main"]);
+    // gh-195 D16: read from its archive ref, as `norn upgrade` leaves it (D14), never from the base tree
+    archiveTreeRunState(h.root, "HEAD", OLD);
     head = h.git(["rev-parse", "HEAD"]).trim();
   });
 

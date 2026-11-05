@@ -4,7 +4,8 @@
  * duration, outcome, who and the reason; a story shows its slices interleaved plus totals
  * (wall-clock intake → $done → merge, time per step type, human wait). No-op ticks are hidden
  * unless `--all`; `--events` attaches the remaining events to each row. Text for a person, `--json` for data;
- * `--full` keeps reasons whole in text (JSON is never cut). Paths are absolute.
+ * `--full` keeps reasons whole in text (JSON is never cut). Paths are absolute. A finished story whose
+ * record this clone does not hold is read from its archive ref, fetched first (gh-195 D6, B29).
  */
 import { formatStepTimeline, loadTraceView } from "@norn/view";
 import { defineCommand, opt } from "../command.ts";
@@ -12,6 +13,8 @@ import { refuse, rendered, usageError } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
 import { hasRun, targetKey } from "../runtime/target.ts";
 import { cmd } from "@norn/core";
+import { storyOf } from "@norn/schema";
+import { fetchArchived } from "../runtime/archive.ts";
 
 export const runListCommand = defineCommand({
   name: "run list",
@@ -39,6 +42,8 @@ export const runListCommand = defineCommand({
     const rawLimit = opt.str(args, "limit");
     const limit = rawLimit === undefined ? null : Number(rawLimit);
     if (limit !== null && !(Number.isInteger(limit) && limit > 0)) throw usageError(`bad --limit '${rawLimit}'`, cmd.runList(key, { limit: 20 }));
+    // gh-195 D6 (B29, B30): a finished story's record on a clone that has none is fetched from its archive ref
+    await fetchArchived(ctx, [storyOf(key)]);
     const view = loadTraceView({
       repoRoot: ctx.root,
       home: ctx.home,
