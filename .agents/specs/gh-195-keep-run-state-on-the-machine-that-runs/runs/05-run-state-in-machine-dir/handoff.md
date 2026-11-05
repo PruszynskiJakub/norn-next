@@ -56,6 +56,19 @@ Traceability (T = `packages/cli/test/integration/run-state-machine-dir.test.ts`)
 | B2, B5 / AC7 | test | golden (3 updated, 20 harvested), 3 transcripts, 5 observe snapshots; tiers green |
 - review#1 changes_requested: 5 blocking: run cancel non-holder loosening not covered by slice 12 (F1); observe writes .norn-unit (F2, H2); round_migrate commit drop missing from legacyAction (F3, O5); AC6 uncommitted untested (F4); AC5 detached-check tick not staged (F5). Other skips verified against slices 10/11/13/14. e2e 71 pass/2 skip.
 
+
+### implement#2 (rework of review#1)
+
+- F1: `run cancel` reads the claim (by `storyOf(key)`) before it resolves the unit, so a clone without gh-5's run state is refused `not_holder` naming the holder and `norn story checkout gh-5`; the original assertion in run-rerun-cancel.test.ts is back, no loosening left.
+- F2 (H2): observe no longer writes `.norn-unit`. It reads the unit by the marker inferred from folder and branch (passed to store's snapshot as `{story, path}` roots, so nothing re-reads the missing file) and reports it as `Facts.unmarked`; decide emits the repo-level `restore_markers` (rule `worktree.marker`), act writes the marker back (traced). Hand-built rule case added; AC2 test asserts observe writes nothing, the tick's `worktree.marker` decision, the marker back, and no repeat.
+- F3 (O5): `legacyAction` drops `commit` from an older `round_migrate` and names its `<spec>/runs/_story…` folders as decide does now (`runs/<story>/_story…`, via `recordRunStatePath`); header note updated; unit case replays the older decision.
+- F4: `uncommitted` counts the handoff only (agent files are dirty through a live session; recover.commit would commit them): comment in run-facts.ts and facts.ts:159 fixed; the handoff path now comes from store's `handoffPath` (F11). New test "AC6: `uncommitted` counts the unit's handoff only…" (machine-dir file and agent file → false, dirty handoff → true).
+- F5: new test "AC5: a tick while a detached check run is writing its receipt…": gh-12's check blocks on a file; ticks taken without waiting see `check.running`; with the receipt's reservation taken and half-written temp receipt and state.json left (S1 crash leftovers) a tick still waits, not corrupt; the check finishes, its receipt is in the machine dir with state.json not past it; the next tick applies it once (applied_through = its number, `$done` pass), a later tick neither re-applies nor re-runs it.
+- F9: AC6 asserts every S4 trailer (Norn-Story, Norn-Step, Norn-Tick, no Norn-Slice). Counters/attempt-via-status left as they were (time).
+- F6/F7: left as noted (name them in the PR; B34 flat tests are mechanics only until gh-195/06). F10 stays until gh-195/10–11.
+- Golden `--update`: 0 of 113 changed.
+- Friction: the `implement#2 started` commit (released norn) swept my uncommitted F1 edit (run-cancel.ts and its test) into norn's own commit 232519cab.
+
 ## Resume
 
-review#1 reported changes_requested with findings F1–F5 blocking. Next implement: fix F1–F5 (see the findings in the review receipt), then the minor ones as cheap.
+All blocking findings addressed and committed; if anything is left it is listed above. Next: the test check.
