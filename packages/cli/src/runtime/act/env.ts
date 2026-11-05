@@ -150,7 +150,10 @@ export class ActEnv {
     }
     let sha: string | null;
     try {
-      sha = await this.git.commit(c.cwd, { message: c.message, trailers: c.trailers, ...(paths ? { paths } : {}) });
+      // gh-195 B18–B20 (S4, S12): a commit that ends a step is made even when the agent changed nothing, so the
+      // branch always carries the last boundary (`Norn-Outcome`, `Norn-Next`) a non-holder reads the step from
+      const boundary = "Norn-Outcome" in c.trailers;
+      sha = await this.git.commit(c.cwd, { message: c.message, trailers: c.trailers, ...(paths ? { paths } : {}), ...(boundary ? { allowEmpty: true } : {}) });
     } catch (e) {
       const code = (e as { code?: string }).code;
       // H1: an agent's merge or rebase is in progress in the worktree — norn's files wait there

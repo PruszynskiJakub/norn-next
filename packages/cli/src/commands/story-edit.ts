@@ -95,7 +95,8 @@ async function editWorkflow(ctx: Context, raw: string, name: string, at: string 
     if (!obs || !sf) throw refuse(`${t.story} is not in this checkout`, cmd.storyCheckout(t.story), "story_not_local");
     // gh-71 D3 (B18): a new round is refused first while another clone holds the story's claim
     const round = !t.slice && !!t.state;
-    const claim = round ? await refuseIfHeldElsewhere(ctx, t.story, "story edit") : undefined;
+    // gh-195 S12: a non-holder has no run state of the story, so a claim seen held elsewhere is checked first too
+    const claim = round || (!t.slice && sf.claim.state === "other") ? await refuseIfHeldElsewhere(ctx, t.story, "story edit") : undefined;
     const listed = Object.keys(obs.workflows).sort();
     const loaded = obs.workflows[name];
     if (!loaded) throw refuse(`no workflow '${name}' in ${WORKFLOWS_DIR}/`, cmd.storyEdit(t.key, { workflow: `<${listed.join("|")}>` }), "unknown_workflow");
