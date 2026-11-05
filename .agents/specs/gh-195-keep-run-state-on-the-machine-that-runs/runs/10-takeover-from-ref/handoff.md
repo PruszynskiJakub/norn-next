@@ -3,9 +3,9 @@
 - Workflow: slice · Step: implement (attempt 4)
 - Status: running
 - Counters: conflict_loop 0/2, review_loop 2/3, test_loop 1/5
-- Last outcome: test.fail (classified, 2026-11-05T09:46:55.940Z)
+- Last outcome: implement.stalled (classified, 2026-11-05T10:10:09.269Z)
 - Next: `norn run list gh-195/10`
-- Updated: 2026-11-05T09:54:09.222Z
+- Updated: 2026-11-05T10:10:09.269Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - slice.start: slice at implement
@@ -23,6 +23,7 @@
 - receipts.apply: implement.done → test
 - receipts.apply: test.fail → implement
 - receipts.apply: applied 14
+- agent.stalled.surface: stalled
 <!-- norn:heartbeat:end -->
 
 ## Goal
