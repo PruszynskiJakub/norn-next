@@ -392,9 +392,15 @@ describe("a record checkout cannot take takes nothing: no claim, no worktree, no
   test("a record that cannot be fetched is refused before the claim", async () => {
     const s = await handedOverAtReview2(16, "unfetchable-record");
     const B = cloneOf("b-nofetch", "bob");
-    // the remote lists the ref but cannot send it: one of its objects is gone from the bare repo
-    const { blob } = badRecord(s.key);
-    rmSync(join(h.remoteDir, "objects", blob.slice(0, 2), blob.slice(2)));
+    // the remote lists the ref but cannot send it: the record's tree names a blob the bare repo never had
+    // (built in the bare repo itself, so nothing depends on loose or packed objects)
+    const remoteGit = (args: string[], input?: string) => sh(h.dir, ["--git-dir", h.remoteDir, ...args], input);
+    const missing = "0123456789abcdef0123456789abcdef01234567";
+    const tree = remoteGit(["mktree", "--missing"], `100644 blob ${missing}\tstate.json\n`);
+    const commit = remoteGit(["commit-tree", tree, "-m", "record with a missing blob"]);
+    remoteGit(["update-ref", recordRef(s.key), commit]);
+    expect(remoteRef(recordRef(s.key))).toBe(commit);
+    expect(() => remoteGit(["cat-file", "-e", missing])).toThrow();
     h.clock.advance(10_000);
     const r = await B.norn("story", "checkout", s.key);
     await expectNothingTaken(B, s, r, "network");
