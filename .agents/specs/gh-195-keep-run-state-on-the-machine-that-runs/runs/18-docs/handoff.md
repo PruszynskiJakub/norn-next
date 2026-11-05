@@ -38,6 +38,14 @@ Bring the rules, docs, docs lint and bundled skills in line with what gh-195 bui
   - [x] packages/cli/assets/skills/norn-retro: reads the record ref (norn-unaware wording, P7), handoffs/, unit folder layout. norn and norn-review skills were already right (asset tests pin their text).
   - [x] Built norn in a throwaway repo: `init` writes no .gitattributes; `config set record.policy remote --repo` writes the team file; an unknown value is refused. Ref name, handoff path, superseded folder and record-lost message checked against code (ids.ts, paths.ts, apply.ts) and the integration tier.
 
+- Rework review#1 (implement #2), each sentence re-read against the code:
+  - [x] F1 T9: cursor by record policy (human.ts remoteTarget): local = Norn-Next step-only for a story unit (answer/approve/rerun), ref as fallback and for slices; remote = ref only. remoteTarget's comment fixed too.
+  - [x] F2 T5b + spec D10: Norn-Next if the workflow has it, else Norn-Step if it has that, else first step (restartStepOf, code kept); its JSDoc fixed.
+  - [x] F3 R3.4: spec from the worktree tree, fetched base or main checkout; run state from machine dir, archive ref, or once from an older norn's branch runs/ (B34). T7b points to R3.4.
+  - [x] F4 limitations + recipes: local loses only what came after the last record push (release or open-pr); takeover resumes from that older record; restart from branch only when never pushed.
+  - [x] F5 concepts: run state on no branch / in no worktree; leaves the machine only as the record (body + glossary).
+  - [x] F6 R3.2/T7b: done or dropped. F7 S4: stand-in Norn-Step start/release/take/drop. F8 concepts: remote pushes whenever the record changed. F9 recipes upgrade sentence (HEAD's spec folders, per story, validation/other-record failures, .gitattributes once any moved, pointer until removal reaches base). F10 .agents/workflows quick/reproduce (shipped copies don't have the sentence). F11 T7a/R2.3 "this machine" + D11 remote caveat. F12 AGENTS launchers per PATH. F13 retro: older records may lack rounds/ and hold handoff.md. F14 slug `[0-9]{2,3}-[a-z0-9-]+` + matcher cases. F15 test title.
+
 ### Flakes
 
 None. Tiers: unit 1241 pass / 0 fail; integration 857 pass / 0 fail; e2e 74 pass / 0 fail; 0 skips.
