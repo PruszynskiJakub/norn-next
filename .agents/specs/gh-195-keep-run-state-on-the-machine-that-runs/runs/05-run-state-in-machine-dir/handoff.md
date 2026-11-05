@@ -15,6 +15,21 @@
 
 ## Goal
 
+Run state of units started on this build lives at `<machine dir>/runs/<story>/<unit>/` (S12, B2–B5); boundary commits carry only the agent's work and the handoff; golden, transcripts and snapshots rewritten (AC1–AC7).
+
 ## Progress
 
+- Merged slice gh-195/02's branch (89de4c5e1) first, on the coordinator's word, to build on its `handoffPath(specDir, unit)` instead of a parallel handoff path; that merge also fixed the story tip's typecheck (RUNS_DIR import) and the stale lint exemption.
+- Resolver (`packages/store/src/run-state.ts`, pure half `packages/schema/src/ids.ts`): `runStateDir(root, story, unit)` = `<machine dir>/runs/<key>/<unit>` (story's round under `_story/rounds/`); `UnitFacts.record` is now relative to the story's run-state folder (`_story/rounds/01-x`, `01-x`); decide reads an older `runs/…` record via `normalRecord`. decide's paths (check `log_path`, round dirs, `round_migrate`) are machine-dir-relative (`runs/<key>/…`), resolved by `runStateFile`. `round_migrate` no longer carries a commit (nothing in git moves). Tree paths of an older norn (`tree*RunStatePath`) stay for the mailbox's branch read (human.ts), `unpushed_runs` and tidy's orphaned copies. The lint exemption for the machine dir's `runs/` is gone (it is run state now) and a matcher case pins that.
+- Snapshot: run state from the machine dir; finished stories an older norn recorded in the base or main-checkout tree are still read from that tree when this machine holds none (until gh-195/16). Machine-dir receipts and file errors are named by absolute path.
+- Boundary commits: session start commits the handoff only; `story checkout` no longer commits the take receipt (journals a forced take into the handoff whenever the branch has one); `story reopen` no longer commits its stuck receipt; `uncommitted` = the unit's handoff dirty.
+- B2: observe restores a `.norn-unit` that `git clean -fdx` removed, from the worktree's folder and branch (`inferUnitMarker`). B3: `story start` remakes a story worktree this heartbeat's claim still holds but that is gone (via `checkoutStory`).
+- New tests: `packages/cli/test/integration/run-state-machine-dir.test.ts` (AC1–AC6); helper `test/support/run-state.ts` (`runStateOf`, `storyRunStateOf`); harness binds the norn home for its checkout.
+- Golden: `golden --update` changed 3 cases, only `log_path` (`.agents/specs/<x>/runs/_story/logs/…` → `runs/<key>/_story/logs/…`) and the rebase noop reason (dropped "runs/ rewound", no longer true); `bun run golden` added 20 harvested cases.
+- Transcripts (3): run-state files now appear under `home/repos/repo-<id>/runs/<story>/…` (machine-dir id normalised in transcript.ts), boundary commits and conflict-marker greps list only the handoff (+ agent files), the recovery transcript loses the R2.3 tidy part. Snapshots (5): `record` paths and receipt `file` paths only.
+- Left for later slices, with skips naming them: human.test "mailbox (T9): a second clone…" (gh-195/13), recovery R2.3 (gh-195/14), team "clone B answers…" and B's cursor/take receipt asserts (gh-195/10–11); run cancel on a non-holder now refuses `unknown_unit` (gh-195/12).
+- Flakes: none seen (one whole-tier integration run hung on a CPU-bound worker while my new test file was mis-configured; the file alone and two later full runs were green).
+
 ## Resume
+
+Done: report `norn done done`. Reviewer: check the skipped cross-machine tests against slices 10–14.

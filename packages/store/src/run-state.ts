@@ -46,10 +46,6 @@ export const runStateStartDir = (root: string, story: RunStory, unit: string, wo
  * (`<nn>-<slug>`, `_story/rounds/01-story`): what facts and messages name it by.
  */
 export const runStateRecord = (root: string, story: RunStory, dir: string): string => relative(storyRunStateDir(root, story), dir);
-/** gh-71 B29, B30: the story's rounds, ascending; [] for a flat record or a story not started. */
-export const runStateRounds = (root: string, story: RunStory) => storyRounds(storyRunStateDir(root, story));
-/** gh-71 D7 (B34): whether the story's run state is still the flat record of an older norn. */
-export const isFlatRunState = (root: string, story: RunStory): boolean => isFlatStoryRecord(storyRunStateDir(root, story));
 /**
  * gh-195/05: the folder of an older norn's tree (`root` a checkout or the base cache) that held a story's
  * records, `<spec folder>/runs`: finished stories are read from there until gh-195/16 (D16).
