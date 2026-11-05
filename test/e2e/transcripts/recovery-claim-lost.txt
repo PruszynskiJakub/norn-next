@@ -143,6 +143,7 @@
   spawn repo-b $ git hash-object -w --stdin
   spawn repo-b $ git push --porcelain --force-with-lease=refs/norn/claims/gh-9:<sha:3> origin <sha:5>:refs/norn/claims/gh-9
   spawn repo-b $ git update-ref refs/norn/claims/gh-9 <sha:5>
+  spawn repo-b $ git ls-remote origin refs/norn/runs/gh-9
   spawn repo-b $ git worktree list --porcelain -z
   spawn repo-b $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-9-add-search
   spawn repo-b $ git rev-parse --verify --quiet --end-of-options refs/remotes/origin/gh-9-add-search
