@@ -10,6 +10,7 @@ Fix gap 2 of gh-73: GR8's "issue body changed since refine" item never fired bec
 - Left the core fixture (`skill: "refine"`) as is so the golden corpus stays unchanged; the new test uses the real name.
 - Gap 1 (edits before refine finishes) is out of scope, to be filed separately.
 - `bun run test` and `bun run typecheck` green.
+- implement#1 done: refineFinished now matches skill norn-refine as well as refine (story.ts), so GR8's refined_body_hash is recorded with shipped workflows and the body-changed inbox item appears; test in decide.test.ts covers the real skill name and a later round without refine. Unit tier and typecheck green.
 
 ## Resume
 
