@@ -61,6 +61,18 @@ Bring the rules, docs, docs lint and bundled skills in line with what gh-195 bui
   - [x] G2 T5b, spec D10, restartStepOf JSDoc (apply.ts:60-67): lastBoundary needs Norn-Outcome (elsewhere.ts:109,118); Norn-Step fallback only when wf lacks the Norn-Next step; older-norn-only branch -> first step; one line in limitations.md.
   - [x] G3 T9: run rerun --step/--reset refused story_not_local (run-rerun.ts:33-37). G4/G5 concepts: stale-refused push waits (decide/story.ts:184-185, act/index.ts:150-161); glossary "whenever it changed" (story.ts:181). G6 lint slug `[a-z0-9]+(?:-[a-z0-9]+)*` (ids.ts:150-160,182) + cases. G7 recipes: .gitattributes dropped with no run state (upgrade.ts:210-211); no remote base -> until staged. G8 R3.4 "files ... on disk". G9 AGENTS launcher hash of PATH and NORN_BIN (shim.ts:57-67).
 
+- Rework review#3 (implement #4), commit be941ba5a:
+  - [x] H1 T9: story_not_local only when the branch has a Norn-Next boundary (human.ts:132-135, 421-424); else checked against the ref's pinned workflow (human.ts:138-141, run-rerun.ts:45-63).
+  - [x] H2/H8 S4: GR6 base-record commit Norn-Story + Norn-Tick + merge trailers (record.ts:40-45, lifecycle.ts:342); story reopen's journal commit carries take (story-reopen.ts:128, checkout.ts:546-550).
+  - [x] H3/H4 S4 now describes them as they are (no code change): cursor-less decide commits (decide/story.ts:226,309,347; policy.ts:168-176) and the merge after a rejected push (env.ts:169,182,191,214; git-step.ts:56,109,114,124).
+  - [x] H5 limitations: the reachable case, no boundary since the move off the branch (checkout.ts:252 returns null while runs/ is still in the tree).
+  - [x] H6 AGENTS: orient launchers in ~/.norn/orient/launch/ (shim.ts:50-55). H7 recipes "no fetched base ref" (base.ts:24-48). H9 lint slice number from SLICE_NN_PATTERN (common.ts:21).
+
+### Follow-ups for the person
+
+- The merge commit `takeRemoteBranch` makes after a rejected push carries only `Norn-Tick` when a git step pushed: `act.pushBranch` is called without the unit's trailers at packages/cli/src/runtime/act/git-step.ts:56,109,114,124, and the merge adds only `Norn-Tick` (packages/cli/src/runtime/act/env.ts:191,214). It has no `Norn-Story`/`Norn-Step`. Suggest passing the unit's trailers.
+- Decide's commits for a story unit with no cursor (mirror packages/core/src/decide/story.ts:347, refine-finished :309, run-state move :226) pass `step ?? null`, so they carry no `Norn-Step` or `Norn-Slice`. `isIntakeCommit` (packages/core/src/policy.ts:184-185) then matches them too. `story reset` takes the first match in `git log` order, so the newest (packages/cli/src/runtime/reset.ts:32), and may treat a later mirror commit as the intake commit.
+
 ### Flakes
 
 - Implement #1: none. Unit 1241/0; integration 857 pass, 0 fail, 0 skip; e2e 74/0.
