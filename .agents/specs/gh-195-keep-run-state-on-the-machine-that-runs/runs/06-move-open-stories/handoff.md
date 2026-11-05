@@ -30,7 +30,7 @@ An open story whose branches still hold `runs/` from an older norn moves each un
 - Golden: `golden --update` 0 of 117 changed (and 0 of 119 after); `bun run golden` added 2 harvested cases (run-state-move-80f5f3cf87f4: record.move with a copy; run-state-move-48bb90e87146: record.move with copy []). Transcripts and observe snapshots: untouched (no older-layout story in those flows).
 - Out of scope, untouched: the handoff's move (gh-195/07), the ref push under `remote` (gh-195/08), finished stories on the base (gh-195/17). The three story-carried skips are as they were.
 - Flakes: none. Tiers at the end: unit 1206 pass; integration 726 pass / 6 skip (human T9 → gh-195/13) / 0 fail; e2e 71 pass / 2 skip (recovery R2.3 → 14, team clone B → 10–11) / 0 fail; typecheck green.
-- Note for later: an interruption between deleting the files and the commit (a crash in that window) leaves the deletions unstaged; the next boundary commit (`git add -A`) carries them instead of a separate move commit.
+- (implement#1's note on a crash between delete and commit is fixed by implement#2, F1.)
 - implement#1 done: B34/D13: held units' runs/ on their branches move into the machine dir at the first tick (move_record, rule record.move; record.move_waits mid-merge or on a record failing validation, which is marked corrupt without writing into the branch record). Copy validated+atomic, resumable (skips a target with state), flat record into rounds/01-<wf>, one pushed removal commit per branch with handoffs kept. AC1-AC4 in packages/cli/test/integration/run-state-move.test.ts; golden 0 changed, 2 harvested; transcripts/snapshots unchanged. unit 1206, integration 726/6 skip, e2e 71/2 skip, all green.
 
 
@@ -50,5 +50,12 @@ An open story whose branches still hold `runs/` from an older norn moves each un
 - Flakes: none.
 - review#1 changes_requested: Blocking F1: observe reads the work tree, not the branch's HEAD tree, so if the files are deleted but the move commit never lands (crash, thrown or deferred commit), the move is never finished and the deletions ride into an unrelated later commit (D13, AC3). Minor F2-F4: bare catches, a story move deleting an uncopied slice copy, hand-built AC3 fixtures. Unit 1206, integration 726/6 skip, typecheck green.
 
+### implement#2 (rework of review#1)
+
+- F1: a move is done only once its commit lands. Observe (run-facts `branchRecord`, effect-free: the worktree's git status it already reads) reports `branch_record {copy: []}` when the worktree no longer holds the files but staged/unstaged deletions under `<spec>/runs/` (not handoffs) are uncommitted. `moveRecord` re-checks `inProgress` before removing anything, and returns ok:false on a deferred or refused commit; a throwing commit fails the action too. The next tick then commits the removal as the one "norn: move … off the branch" commit. New S1 tests: crash after the delete; a failing commit (pre-commit hook) → ok:false, next tick ok with one commit; a merge in progress over leftover deletions → `record.move_waits`, then after `merge --abort` one commit. I chose status over `git ls-tree` because observe already has the status, so there is no extra git call per tick (transcripts unchanged).
+- F2: `treeRunStateFiles` catches only ENOENT. F3: `branch_record.holds` (every unit folder on that branch); the move waits while any of those units fails validation. New test "S2: the story's move waits…" (slice 01 broken on its branch, its copy on the story branch kept). F4: `toBranchRunState` gained `broken` and `interrupted: "after copy" | "after removal"`; AC3 tests no longer build fixtures by hand or assert facts. F5: `hasFlatRecord` (steps.ts) shared with round.migrate; loadStories passes its options through; `Dirent` imported.
+- Golden: the 2 cases harvested in implement#1 recorded the old facts shape (no `holds`), so I dropped them and harvested again (see below).
+
 ## Resume
+
 Implement: fix F1 first, with a red S1 test for the crash point (tree files deleted without a commit; the next tick makes exactly one move commit, pushed), then F2–F4.
