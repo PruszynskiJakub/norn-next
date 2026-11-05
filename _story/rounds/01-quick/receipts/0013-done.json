@@ -1,0 +1,1 @@
+{"kind":"done","receipt_id":"01M6PA1NQ9B6ZA62MWJ64JK50P","run_id":"01M6P9ZQ9DYSAS1TRE9HYDZ3X5","step":"describe","attempt":1,"at":"2026-11-05T16:53:04.361Z","by":"agent","who":"claude","outcome":"done","handoff":"pr.md written: slice test check drops the integration tier; evidence from repo.test AC2/AC3; two-way door, low blast radius."}
