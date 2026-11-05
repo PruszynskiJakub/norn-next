@@ -14,6 +14,18 @@
 
 ## Goal
 
+`record.policy` (local | remote, default local) as a team key; under remote every step boundary pushes the story's record, packed into one commit, to `refs/norn/runs/<story>` after the branch, retried at the next tick when it fails (B9–B12, B14, B34; D2–D4).
+
 ## Progress
 
+- Config: `record.policy` in RepoConfig / ResolvedConfig (`packages/schema/src/config.ts`), team key, config get/set and doctor via the existing config checks; schema:emit and docs:emit rerun.
+- Ref name: `recordRef(story)` in `packages/schema/src/ids.ts` (`refs/norn/runs/<story>`).
+- Store `packages/store/src/record-ref.ts`: `pushRecord` (hash-object, temp index, write-tree, commit-tree; parent = last seen sha; trailers Norn-Story / Norn-Branch-Commit / Norn-Holder; commit time = tick time; CAS push with lease), `unpackRecord` (temp folder, recordErrors per unit folder, atomic rename), `recordTreeId` (git tree id computed in JS from the files, so observe writes nothing, H2), `readRecordRef`.
+- Observe: under remote, on the holder, `StoryFacts.record = { tree, pushed }`. Decide: `push_record` (rule `record.push`) when the tree differs from the pushed one, or a `move_record` of the story lands this tick (D13 step 4). It is a side action (`isTailAction`) act performs after every other action, so after the branch push. A failed push is not recorded as a unit act failure: the next tick sees the tree still differs and retries (B14).
+- Tests: `packages/cli/test/integration/record-ref.test.ts` (AC1–AC7 plus unpack through a clone); rule case for `record.push` in `packages/core/test/rule-cases.ts`. `golden --update`: 0 of 121 cases changed (golden configs have no record key → local).
+- Decision: decide reads `config.record?.policy ?? "local"` because older traces' configs (golden, `run view --why`) carry no `record`; `legacyConfig` is left alone so traces still round-trip byte for byte.
+- Known limit (later slices): a holder whose lease went stale (another checkout pushed the ref) retries every tick and fails until a takeover/fetch slice settles it.
+
 ## Resume
+
+Run the integration and e2e tiers if not yet green, then `norn done done`.
