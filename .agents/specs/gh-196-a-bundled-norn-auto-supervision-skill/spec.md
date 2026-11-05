@@ -10,9 +10,16 @@ labels:
   - norn
   - norn:wf:quick
 workflow: quick
-status: active
+status: done
 intake_at: 2026-11-05T09:19:57.086Z
 body_hash: a24d5b1a99594de075c2d340bff0e2a3ccff3f6bf637cc6fcc4a169b852db014
+merge:
+  pr: 210
+  url: https://github.com/PruszynskiJakub/norn-next/pull/210
+  head_sha: 45600516e880b8a856db00c54d8de949ad19f990
+  merge_commit_sha: c99447d4065cce5ea226286733efb4d30e2e3ddc
+  merged_by: PruszynskiJakub
+  merged_at: 2026-11-05T13:18:26.000Z
 ---
 
 # Supervised delivery: norn-fsd and norn-fsd-round
