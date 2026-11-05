@@ -50,6 +50,12 @@ Takeover with the record lost (B25, B26; D10, T5b): with no record ref, `story c
 - Tests: check test#1 pass (unit, integration, typecheck); e2e 73 pass / 1 skip (R2.3 -> 14) / 0 fail. Flakes: none.
 - review#1 changes_requested: Two blocking: lost path skips the post-claim record-ref re-read (race hides a pushed record, checkout.ts:378); no test proves the restart step comes from the last boundary (AC1/AC3 both expect the start step). Fetch failure vs absent ref is handled correctly. 8 minor/nit.
 
+- Review#1 rework (implement #2):
+  - S1: on the lost path the remote record ref is re-read after the claim; if it now exists (or cannot be read) the claim goes back (when not already ours) and checkout refuses `record_moved`, nothing written. Test: a post-receive hook pushes a record when B's claim lands.
+  - F1: integration case A dies at review (boundary implement.done, `Norn-Next: review`) → B restarts review; core unit tests of `restartStepOf` (Norn-Next, ended fallback, step missing, no boundary).
+  - S3: a story file on the branch that fails validation is refused `corrupt` (S2). S4: `lastBoundary(…, { strict: true })` throws on a failing `git log`; checkout refuses `git_failed` before the claim (no test: hard to make `git log` fail on a fetched ref). S5: tests for missing/invalid workflow (`workflow_invalid`) and a not-started story (frontmatter `new`: no record lost, the tick starts it). S6: `stageEmptyRecord` sweeps leftovers (already did via `recoverPlace`) and now creates its folder exclusively; store unit test. S7: handoff of a record_only story asserts the ref equals the pushed record. S8: record_only story: `story list`/orient show `branch: null`, status shows a Check item "review #2: held here from its record; gh-N has no branch, so nothing runs (B33)" instead of running. S9: branch head rev-parsed once.
+  - S2 (stale local copy on a non-holder replaced whole, lost path included) is left to gh-195/14.
+
 ## Resume
 
-implement: fix S1 (re-read the record ref after the claim on the lost path, refuse record_moved) and F1 (restart-at-review test, restartStepOf unit tests); then the minor points as judged.
+Full integration and e2e tiers after review#1 rework; if green, `norn done done`.
