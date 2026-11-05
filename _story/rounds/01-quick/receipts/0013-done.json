@@ -1,0 +1,1 @@
+{"kind":"done","receipt_id":"01M6Q0KXKWR93G21A3GY61C6A3","run_id":"01M6Q0HXPD4YMQK9D4WE9QYWF0","step":"describe","attempt":1,"at":"2026-11-05T23:27:30.940Z","by":"agent","who":"claude","outcome":"done","handoff":"pr.md written: refusal shape of decideGate, evidence W1–W3 from delegated.test.ts integration tests (no QA in quick), merge danger two-way, blast radius step agents"}
