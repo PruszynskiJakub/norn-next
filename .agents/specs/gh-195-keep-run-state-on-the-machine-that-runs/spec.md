@@ -13,7 +13,7 @@ labels:
   - norn:risk:high
   - norn:wf:story
 workflow: story
-status: active
+status: done
 intake_at: 2026-11-04T08:34:16.652Z
 body_hash: daab49a1f6e19f9adece43a08de2e7ee1559163b2e979cbaa5e838e337c7bb9f
 criteria:
@@ -91,6 +91,13 @@ criteria:
   - { id: "17.AC4", verifier: test }
   - { id: "18.AC1", verifier: test }
   - { id: "18.AC2", verifier: agent }
+merge:
+  pr: 216
+  url: https://github.com/PruszynskiJakub/norn-next/pull/216
+  head_sha: 13540716f90109f03aa462879989da663d855044
+  merge_commit_sha: 3ba417502b79aba55cf071c959fc73a264f3573b
+  merged_by: PruszynskiJakub
+  merged_at: 2026-11-05T16:10:14.000Z
 ---
 
 # Keep run state on the machine that runs it, and hand it over only when asked
