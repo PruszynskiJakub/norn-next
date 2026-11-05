@@ -67,6 +67,8 @@ Every claim release (`story handoff`, clean `watch` exit, `story close`) pushes 
 - Coordinator heads-up: slice 15 unifies the suppression as `pushesRecordItself`. Here 09-F2 adds no second mechanism, only the GR6b-under-remote test.
 - merge#1 done: Merged the story branch (slice 16) with --no-ff (0333670a6), plus a transcript commit 2f618c285. Conflicts in story-close.ts, close.ts, act/lifecycle.ts, story-reopen.test.ts. One record push: pushHeldRecord (16's archiveStoryRecord renamed, also returns the branch commit), used by release, closeStory and GR6. One exit-3 record_push_failed refusal for handoff and close. 09's pushRecord skip change kept. 09-F2 is covered by 16's close_story suppression and a new GR6b-under-remote test. Unit 1211, integration 769/6 skip, e2e 72/2 skip green. Flake: story-view hook timeout once, 3/3 isolated passes.
 
+- Merge #2 (slice 15 landed after merge #1): only test/e2e/transcripts/base-sync.txt conflicted. I took the story branch's copy and regenerated it, in 1008db4f4. Reviewed: open-pr's record push (15), then the release's push before the claim goes (09, leased on open-pr's record), then GR6's archive push (16, leased on the release's). open-pr keeps its own pushRecord call: it uses the local head of the branch it just pushed and the act clock. pushHeldRecord uses the remote-tracking head and the observed time, so converging would change open-pr's semantics. The 09-F2 GR6b test passes against `pushesRecordItself`.
+
 ## Resume
 
-Merge done and green; report `norn done done`. Next: test check.
+Tiers after merge #2; if green, `norn done done`.
