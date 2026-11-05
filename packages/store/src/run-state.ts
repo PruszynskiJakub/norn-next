@@ -81,7 +81,7 @@ export function treeRunStateFiles(root: string, story: RunStory): string[] {
   walk(base, entries(base));
   return out.sort();
 }
-/** gh-195/05: a unit's folder in an older norn's tree (`<spec folder>/runs/<unit>`, R2.3's `orphaned/` copies of what it left there). */
+/** gh-195/05: a unit's folder in an older norn's tree (`<spec folder>/runs/<unit>`). */
 export const treeUnitRunStateDir = (root: string, story: RunStory, unit: string): string => join(root, treeRunStatePath(story, unit));
 
 /**

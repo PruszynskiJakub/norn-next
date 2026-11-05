@@ -3,12 +3,11 @@
  * workflow (S7), logs (C5), evidence and handoff.md (S9).
  */
 import { mkdirSync } from "node:fs";
-import { join } from "node:path";
 import type { UnitState, Workflow } from "@norn/schema";
 import { assertValid } from "@norn/schema";
 import { parse as parseYaml } from "yaml";
 import { atomicCopyDir, atomicWrite, createExclusive, fileError, jsonLine, readJsonFile, readText, type ReadResult, validated } from "./fsx.ts";
-import { evidenceDir, logPath, orphanedDir, pinnedWorkflowPath, statePath } from "./paths.ts";
+import { evidenceDir, logPath, pinnedWorkflowPath, statePath } from "./paths.ts";
 
 // ---------------------------------------------------------------- state.json
 
@@ -191,28 +190,4 @@ export function tidyHandoff(file: string): boolean {
 export function writeHandoffBody(file: string, body: string): Handoff {
   atomicWrite(file, body);
   return { header: "", heartbeat: [], body, raw: body };
-}
-
-// ---------------------------------------------------------------- orphaned runs (R2.3)
-
-/**
- * R2.3: keep a copy of a runs/ file this checkout wrote but never got into the record, as
- * `runs/<unit>/orphaned/<holder>-<file name>` (a numeric suffix when taken). Receipt numbers under
- * `receipts/` are thereby freed and never reused or pushed. Returns the new path, or null when the
- * source file is gone.
- */
-export function copyToOrphaned(unitDir: string, file: string, holder: string): string | null {
-  const text = readText(file);
-  if (text === null) return null;
-  const name = `${holder}-${file.split("/").at(-1) ?? "file"}`.replace(/[\s/]/g, "_");
-  for (let i = 0; i < 100; i++) {
-    const dest = join(orphanedDir(unitDir), i ? name.replace(/(\.[^.]*)?$/, (ext) => `-${i}${ext}`) : name);
-    const prev = readText(dest);
-    if (prev === text) return dest;
-    if (prev !== null) continue;
-    mkdirSync(orphanedDir(unitDir), { recursive: true });
-    atomicWrite(dest, text);
-    return dest;
-  }
-  throw new Error(`too many orphaned copies of ${name} in ${orphanedDir(unitDir)}`);
 }

@@ -472,6 +472,17 @@ export interface PushRecordAction extends UnitBase {
   holder: string;
 }
 
+/**
+ * gh-195 D11 (B27, T7a, R2.3): this checkout's own record of a story another heartbeat holds leaves its
+ * machine dir's `runs/<story>/`. `superseded`: taken over without a release — moved whole to
+ * `superseded/<name>/` (never pushed, never merged), shown as one Check item until `norn tidy` deletes it
+ * after `trace.retain`. null: released cleanly, the record already on the ref (B15) — removed quietly.
+ */
+export interface SetAsideRecordAction extends UnitBase {
+  kind: "set_aside_record";
+  superseded: { name: string; holder: string; last_receipt: string | null } | null;
+}
+
 /** gh-195/05 (B2): write back the `.norn-unit` of unit worktrees `git clean -fdx` took it from. */
 export interface RestoreMarkersAction extends RepoBase {
   kind: "restore_markers";
@@ -509,6 +520,7 @@ export type UnitAction =
   | RoundMigrateAction
   | RoundStartAction
   | MoveRecordAction
+  | SetAsideRecordAction
   | PushRecordAction
   | NoopAction;
 

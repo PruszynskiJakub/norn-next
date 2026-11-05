@@ -242,6 +242,25 @@ export type RejectedMailboxReceipt = Static<typeof RejectedMailboxReceipt>;
 export const LocalRejectedFile = Type.Object({ receipts: Type.Array(RejectedMailboxReceipt) }, id("local-rejected", "norn mailbox receipts rejected on this checkout (<norn home>/repos/<id>/rejected.json)"));
 export type LocalRejectedFile = Static<typeof LocalRejectedFile>;
 
+/**
+ * gh-195 D11 (B27, T7a): `superseded.json` at the top of a record set aside in the machine dir's
+ * `superseded/<story>-<ulid>/`: whose takeover superseded it and the newest receipt it holds, for its
+ * Check item until `norn tidy` deletes it after `trace.retain`.
+ */
+export const LocalSupersededFile = Type.Object(
+  {
+    story: Type.String({ minLength: 1 }),
+    /** `user@machine` holding the claim when the record was set aside */
+    holder: Type.String({ minLength: 1 }),
+    /** the record's newest receipt, `NNNN-<kind>`; null = none */
+    last_receipt: Nullable(Type.String({ minLength: 1 })),
+    /** ISO time of the tick that set it aside */
+    superseded_at: Type.String({ minLength: 1 }),
+  },
+  { additionalProperties: false, ...id("local-superseded", "a norn record set aside as superseded (<norn home>/repos/<id>/superseded/<story>-<ulid>/superseded.json)") },
+);
+export type LocalSupersededFile = Static<typeof LocalSupersededFile>;
+
 /** A lock file (H1 tick lock, K6 integrate lock): the holder process and when it took the lock. */
 export const LocalLockFile = Type.Object(
   {
@@ -271,6 +290,7 @@ export const LOCAL_SCHEMA_NAMES = [
   "local-hook-backfill",
   "local-notices",
   "local-rejected",
+  "local-superseded",
   "local-checkout",
 ] as const;
 export type LocalSchemaName = (typeof LOCAL_SCHEMA_NAMES)[number];

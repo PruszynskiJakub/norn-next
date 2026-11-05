@@ -118,6 +118,14 @@ function cases(): RuleCase[] {
     out.push(c("an unreadable mailbox receipt", "mailbox.reject", facts([{ ...s, mailbox: [{ ref: "refs/norn/mailbox/gh-1/01JFFFFFFFFFFFFFFFFFFFFFFF", sha: "m1", id: "01JFFFFFFFFFFFFFFFFFFFFFFF", receipt: null, error: null }] }])));
   }
 
+  // ---- superseded records (gh-195 D11, B27, R2.3)
+  {
+    const s = story(SOLO_WF);
+    const other = { state: "other" as const, sha: "c2", blob: { ...(s.claim as Extract<StoryFacts["claim"], { state: "mine" }>).blob, holder: "ann@pc", heartbeat_id: OTHER_RUN } };
+    out.push(c("taken over without a release: the local record is set aside", "record.superseded", facts([{ ...s, claim: other, local_record: { last_receipt: "0003-done", on_ref: false } }])));
+    out.push(c("released cleanly: the local record on the ref is removed quietly", "record.released", facts([{ ...s, claim: other, local_record: { last_receipt: "0003-done", on_ref: true } }])));
+  }
+
   // ---- story start
   {
     const fresh = (wfName: string, uf: Partial<UnitFacts> = {}, sf: Partial<StoryFacts> = {}) => {

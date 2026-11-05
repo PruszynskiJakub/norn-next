@@ -68,6 +68,8 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
   const { facts } = ctx;
 
   // ---- claims (T1–T6, T10): act only on stories this heartbeat holds
+  // gh-195 D11 (B27, R2.3): this checkout's own record of a story another heartbeat holds leaves runs/
+  if (story.local_record && (claim.state === "other" || (claim.state === "expired" && claim.blob.heartbeat_id !== ctx.heartbeat))) return setAsideRecord(ctx, story, ref, claim.blob.holder);
   if (claim.state === "other") return ctx.noop(ref, "claim.other", `held by ${claim.blob.holder} until ${claim.blob.expires_at}`);
   if (claim.state === "corrupt") return ctx.noop(ref, "claim.corrupt", `claim ref ${claim.sha} is unreadable`);
   if (claim.state === "none" || claim.state === "expired") {
@@ -133,6 +135,18 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
     decideUnit(ctx, story, uf, halted);
   }
   pushRecord(ctx, story, ref);
+}
+
+/**
+ * gh-195 D11 (B27, T7a): a local record whose tree this machine pushed to the story's ref went there with
+ * a clean release (B15): removed quietly. Any other was superseded by a takeover without a release: set
+ * aside under `superseded/<story>-<ulid>/`, never pushed, never merged, one Check item (R2.3).
+ */
+function setAsideRecord(ctx: Ctx, story: StoryFacts, ref: UnitRef, holder: string): void {
+  const local = story.local_record;
+  if (!local) return;
+  if (local.on_ref) return ctx.emit({ kind: "set_aside_record", unit: ref, rule: "record.released", superseded: null });
+  ctx.emit({ kind: "set_aside_record", unit: ref, rule: "record.superseded", superseded: { name: `${story.key}-${ctx.id()}`, holder, last_receipt: local.last_receipt } });
 }
 
 /**

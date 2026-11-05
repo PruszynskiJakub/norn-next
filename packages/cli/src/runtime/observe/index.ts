@@ -31,6 +31,7 @@ import { parseDuration, type ResolvedConfig, sliceBranch, storyBranch, type Unit
 import {
   type BaseFactsCache,
   classifyClaim,
+  localRecordOf,
   readRecordRef,
   recordTreeId,
   fetchElsewhere,
@@ -48,9 +49,6 @@ import {
   inferUnitMarker,
   readUnitMarker,
   traceForeignCommits,
-  type UnpushedTarget,
-  type UnpushedUnit,
-  unpushedRuns,
   writeBaseFacts,
   writeIssueFacts,
   writePrFacts,
@@ -128,7 +126,6 @@ export interface Observed {
   units: Record<string, UnitLoc>;
   sync: SyncReport;
   /** R2.3: per story not held here, local runs/ work not on the remote (facts carry `{unit, files}`) */
-  unpushed: Record<string, UnpushedUnit[]>;
 }
 
 // ------------------------------------------------------------ observe
@@ -292,7 +289,6 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   // BS1: last measurements; stories not seen this tick drop out of the cache
   const baseCacheIn = local.base;
   const baseCache: BaseFactsCache = {};
-  const unpushed: Record<string, UnpushedUnit[]> = {};
   const stories: StoryFacts[] = [];
   const storyLocs: Record<string, StoryLoc> = {};
   const unitLocs: Record<string, UnitLoc> = {};
@@ -309,7 +305,6 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
 
     const units: UnitFacts[] = [];
     const foreign: ForeignCommit[] = [];
-    const targets: UnpushedTarget[] = [];
     for (const lu of ls.units) {
       const u = lu.snapshot;
       const sliceFile = u.unit.slice ? s.slices.find((f) => f.key === u.unit.slice) : undefined;
@@ -335,7 +330,6 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
         const windows = found.length ? runWindows(s, u) : [];
         foreign.push(...found.filter((c) => !duringRun(c, windows)).map(({ committed_at: _, ...c }) => c));
       }
-      if (ownWt && worktree?.exists) targets.push({ unit: u.unit.key, dir: u.unit.dir, cwd: ownWt, branch: unitBranch });
       unitLocs[u.unit.key] = {
         unit: u.unit,
         story: s.key,
@@ -349,10 +343,10 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       };
     }
 
-    // R2.3: a checkout without the claim reports its local runs/ work that is not in the record
     const heldHere = claim.state === "mine" || (claim.state === "expired" && claim.blob.heartbeat_id === hb);
-    const lost = remote && !heldHere && claim.state !== "corrupt" ? await unpushedRuns(remote, baseRef, s, targets) : [];
-    if (lost.length) unpushed[s.key] = lost;
+    // gh-195 D11 (B27, R2.3): this checkout's own record of a story another heartbeat holds (read only, H2)
+    const heldElsewhere = claim.state === "other" || (claim.state === "expired" && claim.blob.heartbeat_id !== hb);
+    const localRecord = heldElsewhere ? await localRecordOf(root, s, holder) : null;
     // gh-195 D4 (B10, B12): under remote, what the holder's record would pack to and what it last pushed
     let record: StoryFacts["record"];
     if (heldHere && config.record.policy === "remote") {
@@ -383,7 +377,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       ...(ls.record_unplaced ? { record_unplaced: ls.record_unplaced } : {}),
       ...(ls.snapshot.record_only ? { record_only: true } : {}),
       ...(s.base_status !== undefined ? { base_status: s.base_status } : {}),
-      ...(lost.length ? { unpushed_runs: lost.map((l) => ({ unit: l.unit, files: l.files })) } : {}),
+      ...(localRecord ? { local_record: localRecord } : {}),
       ...(claim.state === "none" && s.frontmatter?.status === "new" ? await intakeOnly(git, root, remote ? baseRef : `refs/heads/${base}`, branch, s.key, refs) : {}),
       ...(await storyBase(git, root, remote, base, branch, s.frontmatter?.status, refs, baseCacheIn, baseCache, s.key)),
       ...(record ? { record } : {}),
@@ -422,8 +416,9 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     ...(local.norn ? { norn: local.norn } : {}),
     // gh-195 D16: run state an older norn left on the base, pointed to `norn upgrade`
     ...(local.snapshot.base_run_state.length ? { base_run_state: local.snapshot.base_run_state } : {}),
+    ...(local.superseded.length ? { superseded: local.superseded } : {}),
     orphans: { worktrees: orphanWts.sort(), branches: orphanBranches },
     ...(unmarked.length ? { unmarked } : {}),
   };
-  return { facts, workflows, config, ports, root, remote, heartbeat_id: hb, stories: storyLocs, units: unitLocs, sync, unpushed };
+  return { facts, workflows, config, ports, root, remote, heartbeat_id: hb, stories: storyLocs, units: unitLocs, sync };
 }

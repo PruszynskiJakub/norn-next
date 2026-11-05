@@ -234,12 +234,32 @@ export interface ForeignCommit {
   branch: string;
 }
 
-/** R2.3: local runs/ work of one unit that is not in the record (the remote unit branch). */
-export interface UnpushedRuns {
-  /** unit key */
-  unit: string;
-  /** worktree-relative paths under `<spec_dir>/runs/<unit dir>/`, sorted */
-  files: string[];
+/**
+ * gh-195 D11 (B27, R2.3): this checkout's own record of a story another heartbeat holds, still in its
+ * machine dir's `runs/<story>/`.
+ */
+export interface LocalRecord {
+  /** its newest receipt, `NNNN-<kind>` (the story unit's, else a slice's); null = none */
+  last_receipt: string | null;
+  /**
+   * its tree is the tree of a record commit this machine pushed (`Norn-Holder`) in the history of the
+   * story's record ref here: everything in it is on the ref, as after a clean release (B15)
+   */
+  on_ref: boolean;
+}
+
+/** gh-195 D11 (B27, T7a): a record this checkout set aside as superseded, `<machine dir>/superseded/<name>/`. */
+export interface SupersededRecord {
+  /** `<story>-<ulid>` */
+  name: string;
+  story: string;
+  /** who held the claim when it was set aside; null = not recorded */
+  holder: string | null;
+  last_receipt: string | null;
+  /** ISO time it was set aside */
+  at: string;
+  /** absolute folder */
+  dir: string;
 }
 
 /**
@@ -339,11 +359,10 @@ export interface StoryFacts {
    */
   base_status?: StoryFrontmatter["status"] | null;
   /**
-   * R2.3: on a checkout that does not hold the claim, runs/ files (receipts, state) changed locally
-   * but not on the remote unit branch, per unit; paths are relative to the unit's worktree. Absent =
-   * none, held here, or not observed.
+   * gh-195 D11 (B27, R2.3): on a checkout whose story another heartbeat holds, its own record of the
+   * story still in its machine dir. Absent = none, held here, or not observed.
    */
-  unpushed_runs?: UnpushedRuns[];
+  local_record?: LocalRecord;
   /**
    * R3.1: an unclaimed new story — its local branch holds nothing beyond the intake commit: no
    * commit past the base ref, or one whose trailers are the story's intake (`isIntakeCommit`, never
@@ -440,6 +459,8 @@ export interface Facts {
    * Absent = none.
    */
   base_run_state?: string[];
+  /** gh-195 D11 (B27, T7a): records this checkout set aside as superseded, by name. Absent = none. */
+  superseded?: SupersededRecord[];
   /** worktrees/branches with no matching unit (K5) */
   orphans: { worktrees: string[]; branches: string[] };
   /**

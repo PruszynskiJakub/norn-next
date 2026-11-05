@@ -26,11 +26,10 @@ import {
   type StoryFacts,
   stepOf,
   type UnitFacts,
-  type UnpushedRuns,
   type WorktreeFacts,
   storyMode,
 } from "@norn/core";
-import { DEFAULT_CONFIG, type HookFact, type Mode, type ResolvedConfig, sliceBranch, storyBranch, type UnitState, type Workflow } from "@norn/schema";
+import { DEFAULT_CONFIG, type HookFact, type Mode, type ResolvedConfig, storyBranch, type UnitState, type Workflow } from "@norn/schema";
 import {
   cachedDefaultBranch,
   classifyClaim,
@@ -49,8 +48,6 @@ import {
   scanWorktrees,
   type StorySnapshot,
   type UnitSnapshot,
-  type UnpushedTarget,
-  unpushedRuns,
   type ElsewhereStory,
   heldElsewhereKeys,
   loadElsewhereStory,
@@ -324,26 +321,9 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
 
   const me = { heartbeat_id: opts.heartbeatId ?? null };
 
-  // R2.3: on a story not held here, local runs/ work that never reached the record (an inbox Check item)
   const remoteName = config.git_remote;
   const baseRef = defaultBaseRef(opts.repoRoot, remoteName, config.base_branch);
   const prSeen = local.pr_seen;
-  const unpushed = await Promise.all(
-    local.stories.map(async (ls, i): Promise<UnpushedRuns[]> => {
-      const read = ls.snapshot;
-      const c = classifyClaim(claims[i] ?? { state: "none" }, me, now);
-      if (c.state === "mine" || c.state === "corrupt" || ((c.state === "other" || c.state === "expired") && (c.blob.holder === holder || c.blob.heartbeat_id === me.heartbeat_id))) return [];
-      if (!ls.worktree) return [];
-      const targets: UnpushedTarget[] = [{ unit: read.key, dir: read.units[0]?.unit.dir ?? "_story", cwd: ls.worktree, branch: storyBranch(read.key, read.slug) }];
-      for (const lu of ls.units) {
-        const u = lu.snapshot;
-        const file = read.slices.find((f) => f.key === u.unit.slice);
-        if (u.unit.slice && lu.worktree && file) targets.push({ unit: u.unit.key, dir: u.unit.dir, cwd: lu.worktree, branch: sliceBranch(read.key, file.nn, file.slug) });
-      }
-      const found = await unpushedRuns(remoteName, baseRef, read, targets).catch(() => []);
-      return found.map((f) => ({ unit: f.unit, files: f.files }));
-    }),
-  );
   // F35/C5: the ready approval's head, voided by a later re-entry; and whether only norn moved the PR head since
   const readyHeads = await Promise.all(
     local.stories.map(async (ls): Promise<{ ready_head_sha?: string; ready_approved_at?: string; ready_head_norn?: string }> => {
@@ -389,7 +369,6 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       units,
       slices: story.slices,
       mode,
-      ...(unpushed[i]?.length ? { unpushed_runs: unpushed[i] } : {}),
       // NT2/NT3: open notes of the story (loadLocalFacts, as observe)
       ...(ls.notes ? { notes: ls.notes } : {}),
       // gh-195 D12 (B21): mailbox receipts this checkout rejected (loadLocalFacts, as observe)
@@ -485,6 +464,8 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     ...(local.norn ? { norn: local.norn } : {}),
     // gh-195 D16: run state an older norn left on the base, pointed to `norn upgrade`
     ...(local.snapshot.base_run_state.length ? { base_run_state: local.snapshot.base_run_state } : {}),
+    // gh-195 D11 (B27): records set aside as superseded (loadLocalFacts, as observe)
+    ...(local.superseded.length ? { superseded: local.superseded } : {}),
     orphans: { worktrees: [], branches: [] },
   };
   // R5.5 (N3): is this checkout's heartbeat down while it holds auto work?

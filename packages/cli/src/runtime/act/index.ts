@@ -29,7 +29,7 @@ import { applyReceipts, startRun, nudge, retryFresh, classify } from "./session.
 import { runCheck } from "./check.ts";
 import { runGit } from "./git-step.ts";
 import { startUnit, markDone, rejectReceipt, claim, renewAll, intake, mirror, cleanupMerged, closeClosedIssueStory,
-  moveRecord, pushRecord, roundMigrate, roundStart, retryRecords } from "./lifecycle.ts";
+  moveRecord, pushRecord, setAsideRecordAct, roundMigrate, roundStart, retryRecords } from "./lifecycle.ts";
 
 export interface ActRecord {
   decision: Decision;
@@ -261,6 +261,8 @@ export class Actor extends ActEnv {
         return roundStart(this, a);
       case "move_record":
         return moveRecord(this, a);
+      case "set_aside_record":
+        return setAsideRecordAct(this, a);
       case "push_record":
         return pushRecord(this, a);
       case "noop":

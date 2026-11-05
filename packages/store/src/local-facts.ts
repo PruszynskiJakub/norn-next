@@ -14,6 +14,7 @@ import { type HookFact, type LeaseFile, parseDuration, parseReceiptFileName, typ
 import { type BaseFactsCache, type IssueFactsCache, type PrFactsCache, readBaseFacts, readIssueFacts, readPrFacts } from "./base.ts";
 import { readActFailures } from "./heartbeat.ts";
 import { readRejectedReceipts } from "./local.ts";
+import { listSuperseded, type SupersededCopy } from "./superseded.ts";
 import { type BackfillRun, backfillHookFiles } from "./hook-backfill.ts";
 import { type LeaseListing, type LeaseLiveness, listLeases } from "./leases.ts";
 import { receiptsDir } from "./paths.ts";
@@ -119,6 +120,8 @@ export interface LocalFacts {
    * B5); absent when no running version was given or the config failed to load.
    */
   norn?: { running: string; repo: string | null; skills_drift?: string[] };
+  /** gh-195 D11 (B27): records this checkout set aside as superseded (`Facts.superseded`) */
+  superseded: SupersededCopy[];
 }
 
 export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Promise<LocalFacts> {
@@ -196,7 +199,7 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
   const mainDrift = drift(root);
   const norn =
     opts.running !== undefined && snapshot.config.ok ? { running: opts.running, repo: snapshot.config.config.norn_version ?? null, ...(mainDrift ? { skills_drift: mainDrift } : {}) } : undefined;
-  return { snapshot, stories, leases, failures, pr_seen: readPrFacts(root), issue_seen: readIssueFacts(root), base: readBaseFacts(root), ...(norn ? { norn } : {}) };
+  return { snapshot, stories, leases, failures, pr_seen: readPrFacts(root), issue_seen: readIssueFacts(root), base: readBaseFacts(root), ...(norn ? { norn } : {}), superseded: listSuperseded(root) };
 }
 
 /**

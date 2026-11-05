@@ -6,6 +6,8 @@ import { type ClaimBlob, HANDOFFS_DIR, parseDuration, recordRef, ROUNDS_DIR, RUN
 import {
   acquireClaim,
   addRejectedReceipt,
+  dropLocalRecord,
+  setAsideRecord,
   pushRecord as pushStoryRecord,
   type ClaimWriteResult,
   deleteMailbox,
@@ -404,6 +406,22 @@ export async function moveRecord(act: ActEnv, a: Extract<Action, { kind: "move_r
   const notDone = committed?.deferred ?? committed?.refused;
   if (notDone) return { ok: false, error: `the removal of ${a.path} is not committed: ${notDone}`, detail };
   return { ok: true, detail };
+}
+
+/**
+ * gh-195 D11 (B27, T7a, R2.3): this checkout's own record of a story another heartbeat holds leaves
+ * `runs/<story>/` in one rename (S1): set aside whole under `superseded/<name>/` with its
+ * `superseded.json`, or, already on the ref after a clean release, removed quietly. Nothing is pushed.
+ */
+export async function setAsideRecordAct(act: ActEnv, a: Extract<Action, { kind: "set_aside_record" }>): Promise<ActionResult> {
+  const story = act.storyLoc(a.unit.story);
+  const run = { key: story.key, spec_dir: story.spec_dir };
+  if (!a.superseded) {
+    dropLocalRecord(act.root, run, act.obs.facts.tick_id);
+    return { ok: true, detail: { removed: true } };
+  }
+  const dir = setAsideRecord(act.root, run, a.superseded.name, { story: story.key, holder: a.superseded.holder, last_receipt: a.superseded.last_receipt, superseded_at: new Date(act.obs.facts.now).toISOString() });
+  return { ok: true, detail: { superseded: dir } };
 }
 
 /**

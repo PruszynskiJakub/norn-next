@@ -149,6 +149,8 @@ export const baseFactsPath = (root: string) => join(machineDir(root), "base.json
 export const noticesPath = (root: string) => join(machineDir(root), "notices.json");
 /** gh-195 D12 (B21): the mailbox receipts this checkout's ticks rejected, next to the notices */
 export const rejectedReceiptsPath = (root: string) => join(machineDir(root), "rejected.json");
+/** gh-195 D11 (B27): records set aside as superseded, `superseded/<story>-<ulid>/` in the machine dir */
+export const supersededDir = (root: string) => join(machineDir(root), "superseded");
 /** gh-195 13-R3-F2: the lock around a read-modify-write of `rejected.json` (a tick's keep, tidy's prune). */
 export const rejectedLockPath = (root: string) => join(machineDir(root), "rejected.lock");
 export const prFactsPath = (root: string) => join(machineDir(root), "pr.json");
@@ -196,8 +198,6 @@ export const evidenceDir = (ud: string, runId: string) => join(ud, "evidence", r
 export const handoffPath = (specDir: string, unit: string) => join(specDir, unitHandoffPath(unit));
 /** gh-195/07 (B34, D13 step 2): an older norn's handoff of `unit` in a tree's spec folder, `runs/<unit>/handoff.md`; only the record move reads it. */
 export const treeHandoffFile = (specDir: string, unit: string) => join(specDir, treeHandoffPath(unit));
-/** R2.3: copies of runs/ files this checkout wrote but never got into the record. */
-export const orphanedDir = (ud: string) => join(ud, "orphaned");
 
 /** Worktree marker files (A3, K4). */
 export const unitMarkerPath = (worktree: string) => join(worktree, ".norn-unit");
