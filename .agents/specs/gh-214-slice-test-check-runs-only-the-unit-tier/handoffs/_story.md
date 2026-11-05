@@ -22,6 +22,9 @@ The slice workflow's `test` check runs only the unit tier and the type check; th
 | W5 shipped `packages/cli/assets/workflows/slice.yaml` decided | person | unchanged on purpose: already runs only `bun test` |
 - review#1 approve: Review approved, no findings: the slice test check runs unit + typecheck only, the story check keeps the integration tier, the instructions and AGENTS.md say so, and repo.test AC2/AC3 pin it.
 
+- describe#1: wrote `pr.md` in the spec folder (summary diff of the check command, evidence per Wanted item from repo.test AC2/AC3, merge danger two-way / norn's own slices).
+- describe#1 done: pr.md written: slice test check drops the integration tier; evidence from repo.test AC2/AC3; two-way door, low blast radius.
+
 ## Resume
 
-Review approved; nothing left for review. The next step is norn's to route.
+None for describe: pr.md is written; norn opens/updates the PR.
