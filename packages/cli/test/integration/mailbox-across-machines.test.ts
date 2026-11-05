@@ -155,6 +155,20 @@ describe("under remote (B20)", () => {
     await tick();
     expect(h.state(s.runs())).toMatchObject({ step: "$done", status: "done", last_outcome: { outcome: "approve", source: "human" } });
   });
+
+  test("AC2: B's answer is stamped with the step and attempt of the fetched record ref; the holder applies it", async () => {
+    const s = await askingAtReview(28, "remote-ask");
+    const r = await B.norn("story", "answer", "gh-28", "use option b", "--json");
+    expect(r.exit).toBe(0);
+    const v = r.value as Verb;
+    expect(v.delivered).toMatchObject({ via: "mailbox", holder: "tester@box" });
+    expect(v.receipt).toMatchObject({ kind: "answer", step: "review", attempt: 1, answer: "use option b", who: "bob@repo-b" });
+    expect(posted(v.delivered.ref as string)).toMatchObject({ kind: "answer", step: "review", attempt: 1 });
+    await tick("--sync");
+    expect(mailbox("gh-28")).toBe("");
+    await tick();
+    expect(h.state(s.runs())).toMatchObject({ step: "review", attempt: 1, park: null });
+  });
 });
 
 describe("under local (B20)", () => {
