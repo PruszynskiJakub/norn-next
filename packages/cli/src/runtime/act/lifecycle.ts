@@ -148,9 +148,11 @@ export async function markDone(act: ActEnv, a: Extract<Action, { kind: "mark_don
 
 export async function rejectReceipt(act: ActEnv, a: Extract<Action, { kind: "reject_receipt" }>): Promise<ActionResult> {
   if ("ref" in a.source) {
+    // gh-195 D12 (P6): kept before the ref goes, so a failed keep leaves the receipt for the next tick
+    // (kept once per receipt id); kept after, a failure would lose it for good
+    keepRejected(act, a.unit.story, a.source.ref, a.reason);
     const res = await deleteMailbox(act.root, act.obs.remote, a.source.ref, a.source.sha);
     act.traceReject(a.unit.key, a.source.ref, a.reason, { sha: a.source.sha });
-    keepRejected(act, a.unit.story, a.source.ref, a.reason);
     return { ok: true, detail: { deleted: res.ok } };
   }
   const loc = act.unitLoc(a.unit);

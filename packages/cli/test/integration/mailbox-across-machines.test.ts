@@ -7,11 +7,11 @@
  * the trace and shows as a Check item until a later answer or approval is accepted or the story finishes.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { RunnerPort } from "@norn/core";
 import { mailboxPrefix, type Receipt } from "@norn/schema";
-import { readTrace, repoConfigPath, workflowsDir } from "@norn/store";
+import { readTrace, rejectedReceiptsPath, repoConfigPath, workflowsDir } from "@norn/store";
 import type { CliDeps, CliResult } from "../../src/index.ts";
 import { createHarness, FakeRunner, type Harness, hostEnv, issue, runChecked, sh } from "../../../../test/support/harness.ts";
 import { runStateOf } from "../../../../test/support/run-state.ts";
@@ -295,4 +295,29 @@ describe("a receipt the holder rejects (B21)", () => {
     expect(h.state(gh24.runs())).toMatchObject({ step: "$done", status: "done" });
     expect(await checkItems("gh-24")).toEqual([]);
   });
+
+  test("F4: the rejection is kept before the mailbox ref goes: a failed keep leaves the ref for the next tick", async () => {
+    const s26 = await askingAtReview(26, "kept-first");
+    expect((await h.norn("run", "rerun", "gh-26", "--step", "implement")).exit).toBe(0);
+    await tick();
+    expect((await B.norn("story", "answer", "gh-26", "use option b")).exit).toBe(0);
+    // rejected.json cannot be written this tick: a folder (not empty) stands where the file goes
+    const file = rejectedReceiptsPath(h.root);
+    const aside = `${file}.aside`;
+    renameSync(file, aside);
+    mkdirSync(file);
+    writeFileSync(join(file, "x"), "");
+    try {
+      await tick("--sync");
+      expect(mailbox("gh-26")).toContain(mailboxPrefix("gh-26"));
+    } finally {
+      rmSync(file, { recursive: true });
+      renameSync(aside, file);
+    }
+    await tick("--sync");
+    expect(mailbox("gh-26")).toBe("");
+    expect((await checkItems("gh-26")).map((i) => i.title)).toEqual([title("gh-26", "implement")]);
+    expect(h.state(s26.runs())).toMatchObject({ step: "implement" });
+  });
 });
+
