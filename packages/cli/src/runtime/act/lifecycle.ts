@@ -5,6 +5,7 @@ import { cmd, type Action, type ActionResult, nornTrailers, type UnitRef, type W
 import { type ClaimBlob, HANDOFFS_DIR, parseDuration, recordRef, ROUNDS_DIR, RUNS_DIR, STORY_UNIT_DIR } from "@norn/schema";
 import {
   acquireClaim,
+  addRejectedReceipt,
   pushRecord as pushStoryRecord,
   type ClaimWriteResult,
   deleteMailbox,
@@ -147,6 +148,9 @@ export async function markDone(act: ActEnv, a: Extract<Action, { kind: "mark_don
 
 export async function rejectReceipt(act: ActEnv, a: Extract<Action, { kind: "reject_receipt" }>): Promise<ActionResult> {
   if ("ref" in a.source) {
+    // gh-195 D12 (P6): kept before the ref goes, so a failed keep leaves the receipt for the next tick
+    // (kept once per receipt id); kept after, a failure would lose it for good
+    if (a.keep) addRejectedReceipt(act.root, a.keep);
     const res = await deleteMailbox(act.root, act.obs.remote, a.source.ref, a.source.sha);
     act.traceReject(a.unit.key, a.source.ref, a.reason, { sha: a.source.sha });
     return { ok: true, detail: { deleted: res.ok } };

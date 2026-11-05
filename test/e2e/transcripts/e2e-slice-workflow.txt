@@ -155,7 +155,7 @@
   spawn repo-worktrees/gh-7-add-login-form $ git add -A
   spawn repo-worktrees/gh-7-add-login-form $ git diff --cached --quiet
   spawn repo-worktrees/gh-7-add-login-form $ git diff --cached -U0 --no-color --no-ext-diff
-  spawn repo-worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Step: plan" --trailer "Norn-Outcome: done" --trailer "Norn-Tick: <ulid:8>"
+  spawn repo-worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --allow-empty --trailer "Norn-Story: gh-7" --trailer "Norn-Step: plan" --trailer "Norn-Outcome: done" --trailer "Norn-Next: slices" --trailer "Norn-Tick: <ulid:8>"
   spawn repo-worktrees/gh-7-add-login-form $ git rev-parse HEAD
   spawn repo-worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
   spawn repo-worktrees/gh-7-add-login-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7-add-login-form -- .agents/specs/gh-7-add-login-form/slices/01-form.md
@@ -270,7 +270,7 @@
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git add -A
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --cached -U0 --no-color --no-ext-diff
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Slice: gh-7/01" --trailer "Norn-Step: implement" --trailer "Norn-Outcome: done" --trailer "Norn-Tick: <ulid:15>"
+  spawn repo-worktrees/gh-7-add-login-form--01-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Slice: gh-7/01" --trailer "Norn-Step: implement" --trailer "Norn-Outcome: done" --trailer "Norn-Next: test" --trailer "Norn-Tick: <ulid:15>"
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse HEAD
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7/01-form -- form.txt
@@ -394,7 +394,7 @@
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git add -A
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --cached -U0 --no-color --no-ext-diff
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Slice: gh-7/01" --trailer "Norn-Step: implement" --trailer "Norn-Outcome: done" --trailer "Norn-Tick: <ulid:25>"
+  spawn repo-worktrees/gh-7-add-login-form--01-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Slice: gh-7/01" --trailer "Norn-Step: implement" --trailer "Norn-Outcome: done" --trailer "Norn-Next: test" --trailer "Norn-Tick: <ulid:25>"
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse HEAD
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7/01-form -- pass.flag
@@ -596,6 +596,8 @@
   spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo-worktrees/gh-7-add-login-form $ git add -A
   spawn repo-worktrees/gh-7-add-login-form $ git diff --cached --quiet
+  spawn repo-worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --allow-empty --trailer "Norn-Story: gh-7" --trailer "Norn-Step: slices" --trailer "Norn-Outcome: done" --trailer "Norn-Next: open-pr" --trailer "Norn-Tick: <ulid:37>"
+  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse HEAD
   spawn repo-worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
   spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-list --left-right --count HEAD...gh-7-add-login-form --
@@ -603,7 +605,7 @@
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-list --merges --ancestry-path --reverse <sha:9>..HEAD --
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git rebase gh-7-add-login-form
   spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git merge --ff-only --no-edit <sha:9>
+  spawn repo-worktrees/gh-7-add-login-form $ git merge --ff-only --no-edit <sha:10>
   spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo-worktrees/gh-7-add-login-form $ git add -A -- .agents/specs/gh-7-add-login-form/slices/01-form.md
@@ -636,9 +638,9 @@
   spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-7
   spawn repo $ git cat-file blob <sha:3>
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/inbox/gh-7/
-  spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:10> "^<sha:1>" --
-  spawn repo $ git rev-list --left-right --count <sha:10>...<sha:1> --
-  spawn repo $ git merge-base <sha:10> <sha:1>
+  spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:11> "^<sha:1>" --
+  spawn repo $ git rev-list --left-right --count <sha:11>...<sha:1> --
+  spawn repo $ git merge-base <sha:11> <sha:1>
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
   spawn repo-worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
   spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
@@ -647,9 +649,9 @@
   spawn repo $ git hash-object -w --no-filters --stdin-paths
   spawn repo $ git update-index --add --index-info
   spawn repo $ git write-tree
-  spawn repo $ git commit-tree <sha:11>
-  spawn repo $ git push --porcelain --force-with-lease=refs/norn/runs/gh-7: origin <sha:12>:refs/norn/runs/gh-7
-  spawn repo $ git update-ref refs/norn/runs/gh-7 <sha:12>
+  spawn repo $ git commit-tree <sha:12>
+  spawn repo $ git push --porcelain --force-with-lease=refs/norn/runs/gh-7: origin <sha:13>:refs/norn/runs/gh-7
+  spawn repo $ git update-ref refs/norn/runs/gh-7 <sha:13>
   A.remote.findPullRequest gh-7-add-login-form
   A.remote.openDraftPullRequest gh-7-add-login-form → main "Add login form"
   + home/repos/repo-<id>/runs/gh-7/_story/rounds/01-mini/receipts/0005-classify.json
@@ -671,12 +673,14 @@
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/inbox/gh-7/
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
   spawn repo $ git hash-object -w --stdin
-  spawn repo $ git push --porcelain --force-with-lease=refs/norn/claims/gh-7:<sha:3> origin <sha:13>:refs/norn/claims/gh-7
-  spawn repo $ git update-ref refs/norn/claims/gh-7 <sha:13>
+  spawn repo $ git push --porcelain --force-with-lease=refs/norn/claims/gh-7:<sha:3> origin <sha:14>:refs/norn/claims/gh-7
+  spawn repo $ git update-ref refs/norn/claims/gh-7 <sha:14>
   spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo-worktrees/gh-7-add-login-form $ git add -A
   spawn repo-worktrees/gh-7-add-login-form $ git diff --cached --quiet
+  spawn repo-worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --allow-empty --trailer "Norn-Story: gh-7" --trailer "Norn-Step: open-pr" --trailer "Norn-Outcome: done" --trailer "Norn-Next: $done" --trailer "Norn-Tick: <ulid:42>"
+  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse HEAD
   spawn repo-worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
   spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
   A.notifier.notify merge:gh-7:100

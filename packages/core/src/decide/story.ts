@@ -5,6 +5,8 @@
 import {
   type ClaimBlob,
   parseDuration,
+  type Receipt,
+  type RejectedMailboxReceipt,
   sliceBranch,
   SPEC_FILE,
   type StoryFrontmatter,
@@ -21,7 +23,7 @@ import type { NumberedReceipt, StoryFacts, UnitFacts, UnitRef } from "../facts.t
 import { initialState } from "../apply.ts";
 import { sha256 } from "../hash.ts";
 import { bodyChangedItem } from "../inbox/items.ts";
-import { issueProblem, mergedIntoBase, prProblem, roundFinished, storyFinished, storyUnit, WF_LABEL } from "../policy.ts";
+import { issueProblem, mergedIntoBase, prProblem, roundFinished, stepLabel, storyFinished, storyUnit, WF_LABEL } from "../policy.ts";
 import type { RemoteIssue } from "../ports.ts";
 import { epoch, iso } from "../time.ts";
 import { edgeOf, isStale, stepOf } from "../workflow.ts";
@@ -337,12 +339,15 @@ function importMailbox(ctx: Ctx, story: StoryFacts): void {
   const item = (story.mailbox ?? [])[0];
   if (!item) return;
   const ref = storyRef(story);
-  const reject = (reason: string) => ctx.emit({ kind: "reject_receipt", unit: ref, rule: "mailbox.reject", source: { ref: item.ref, sha: item.sha }, reason, state: null });
-  if (!item.receipt) return reject(item.error ? `invalid receipt: ${item.error.errors.map((e) => e.message).join("; ")}` : "unreadable receipt");
   const r = item.receipt;
+  const reject = (reason: string) =>
+    ctx.emit({ kind: "reject_receipt", unit: ref, rule: "mailbox.reject", source: { ref: item.ref, sha: item.sha }, reason, state: null, ...(r ? { keep: keptRejection(ctx, story, r, reason) } : {}) });
+  if (!r) return reject(item.error ? `invalid receipt: ${item.error.errors.map((e) => e.message).join("; ")}` : "unreadable receipt");
   // gh-71 AC12: a receipt made in another round is stale even at the same step#attempt (the same workflow again)
   const otherRound = (u: UnitFacts) => r.round !== undefined && u.unit.slice === null && (u.state?.round ?? 1) !== r.round;
-  const atStep = (u: UnitFacts) => !!u.state && u.state.step === r.step && u.state.attempt === r.attempt && !u.errors.length;
+  // gh-195 B20: a receipt without an attempt (a non-holder's, for a `local` story) matches by step alone
+  const atStep = (u: UnitFacts) => !!u.state && u.state.step === r.step && (r.attempt === undefined || u.state.attempt === r.attempt) && !u.errors.length;
+  const at = stepLabel(r.step, r.attempt);
   const atCursor = (u: UnitFacts) => atStep(u) && !otherRound(u);
   let target: UnitFacts | undefined;
   if (r.slice !== undefined) {
@@ -352,23 +357,46 @@ function importMailbox(ctx: Ctx, story: StoryFacts): void {
     // gh-79 (H1): its cursor is read from a rewound state.json until the rebase is concluded; wait
     if (rebasing(unit)) return;
     if (atStep(unit) && otherRound(unit)) return reject(`stale: ${unit.unit.key} is in round ${unit.state?.round ?? 1}, the receipt was made in round ${r.round}`);
-    if (!atCursor(unit)) return reject(`stale: ${unit.unit.key} is not at ${r.step}#${r.attempt}`);
+    if (!atCursor(unit)) return reject(`stale: ${unit.unit.key} is not at ${at}`);
     target = unit;
   } else {
     if (story.units.some(rebasing)) return;
     const matches = story.units.filter(atCursor);
     target = matches.find((u) => u.state?.status === "parked" || u.state?.status === "stuck") ?? matches[0];
   }
-  if (!target || ctx.has(target.unit.key)) return target ? undefined : reject(`no unit at ${r.step}#${r.attempt}`);
+  if (!target || ctx.has(target.unit.key)) return target ? undefined : reject(`no unit at ${at}`);
   ctx.emit({
     kind: "import_mailbox",
     unit: target.unit,
     rule: "mailbox.import",
     refs: [{ ref: item.ref, sha: item.sha }],
-    receipts: [{ n: nextReceiptNumber(target), receipt: r }],
+    // a step-only receipt is copied with the attempt it matched, so the unit's receipts are all stamped (S6)
+    receipts: [{ n: nextReceiptNumber(target), receipt: r.attempt === undefined && target.state ? { ...r, attempt: target.state.attempt } : r }],
     state: null,
     commit: commitFor(ctx, story, target, `norn: ${target.unit.key} ${r.kind} from mailbox`, r.step),
   });
+}
+
+/**
+ * gh-195 D12 (B21): what the holder keeps of a mailbox receipt it rejects, for its Check item — who sent
+ * what for which step, the step the unit is at, and each unit's last receipt number now, so only an
+ * answer or approval numbered past it clears the item (the holder's own order, never the sender's clock).
+ */
+function keptRejection(ctx: Ctx, story: StoryFacts, r: Receipt, reason: string): RejectedMailboxReceipt {
+  const unit = story.units.find((u) => (r.slice === undefined ? u.unit.slice === null : u.unit.slice === r.slice));
+  return {
+    story: story.key,
+    unit: r.slice ?? story.key,
+    receipt_id: r.receipt_id,
+    kind: r.kind,
+    who: r.who ?? null,
+    step: r.step,
+    ...(r.attempt !== undefined ? { attempt: r.attempt } : {}),
+    at_step: unit?.state?.step ?? null,
+    reason,
+    rejected_at: ctx.nowIso,
+    seen: Object.fromEntries(story.units.map((u) => [u.unit.key, nextReceiptNumber(u) - 1])),
+  };
 }
 
 // ================================================================= unit level

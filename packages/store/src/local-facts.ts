@@ -10,9 +10,10 @@
  */
 import { existsSync, readdirSync } from "node:fs";
 import { type ActFailure, type FileError, hookWindowMs, type NumberedReceipt, openNotes, RE_ENTRY_KINDS, readyApproval, recordPushSlot, type StepRunFacts, type StoryFacts, storyWorktreePath } from "@norn/core";
-import { type HookFact, type LeaseFile, parseDuration, parseReceiptFileName, type ReceiptOf, type RunInfo, type UnitState } from "@norn/schema";
+import { type HookFact, type LeaseFile, parseDuration, parseReceiptFileName, type ReceiptOf, type RejectedMailboxReceipt, type RunInfo, type UnitState } from "@norn/schema";
 import { type BaseFactsCache, type IssueFactsCache, type PrFactsCache, readBaseFacts, readIssueFacts, readPrFacts } from "./base.ts";
 import { readActFailures } from "./heartbeat.ts";
+import { readRejectedReceipts } from "./local.ts";
 import { type BackfillRun, backfillHookFiles } from "./hook-backfill.ts";
 import { type LeaseListing, type LeaseLiveness, listLeases } from "./leases.ts";
 import { receiptsDir } from "./paths.ts";
@@ -97,6 +98,8 @@ export interface LocalStory {
   record_refused?: ActFailure;
   /** gh-195 (review#2 F3): the local record ref's commit while the story unit has no run state (`StoryFacts.record_unplaced`) */
   record_unplaced?: string;
+  /** gh-195 D12 (B21): mailbox receipts this checkout rejected that no later accepted answer or approval cleared */
+  rejected?: RejectedMailboxReceipt[];
 }
 
 export interface LocalFacts {
@@ -144,6 +147,7 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
     return story;
   });
   const failures = readActFailures(root);
+  const rejected = readRejectedReceipts(root);
 
   const placed = read.map((s) => {
     const conventional = storyWorktreePath(root, s.key, s.slug);
@@ -176,6 +180,7 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
     const refused = failures[recordPushSlot(s.key)];
     // review#2 F3: a record ref here while the story unit has no run state — the record is not in place
     const unplaced = !s.units[0]?.state ? (refs ??= localRecordRefs(root)).get(s.key) : undefined;
+    const open = openRejections(s, rejected);
     return {
       snapshot: s,
       worktree: storyWt,
@@ -184,6 +189,7 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
       ...(ready ? { ready } : {}),
       ...(refused ? { record_refused: refused } : {}),
       ...(unplaced ? { record_unplaced: unplaced } : {}),
+      ...(open.length ? { rejected: open } : {}),
     };
   });
   // gh-61 D5, B12: the version the main checkout's team config records
@@ -270,6 +276,23 @@ function unknownLaunch(unapplied: readonly NumberedReceipt[]): (NumberedReceipt 
   if (!last || last.receipt.session) return null;
   if (unapplied.some((r) => r.n > last.n && r.receipt.by === "agent")) return null;
   return last;
+}
+
+/**
+ * gh-195 D12 (B21): the story's rejected mailbox receipts still to show — those no answer or approval
+ * applied to a unit of the story since has cleared. "Since" is the holder's own receipt order: a receipt
+ * numbered past the unit's last one when the receipt was rejected (`seen`; a unit not seen then, any).
+ * A gate rejection does not clear it.
+ */
+function openRejections(story: StorySnapshot, rejected: readonly RejectedMailboxReceipt[]): RejectedMailboxReceipt[] {
+  const mine = rejected.filter((r) => r.story === story.key);
+  if (!mine.length) return [];
+  const accepted = story.units.flatMap((u) =>
+    receiptsOfKinds(story, u, ["answer", "approve"])
+      .filter((r) => r.n <= (u.state?.applied_through ?? 0))
+      .map((r) => ({ unit: u.unit.key, n: r.n })),
+  );
+  return mine.filter((x) => !accepted.some((r) => r.n > (x.seen[r.unit] ?? 0)));
 }
 
 /** Receipts of the given kinds in a unit's runs dir, ascending — read by file name, the others never opened. */

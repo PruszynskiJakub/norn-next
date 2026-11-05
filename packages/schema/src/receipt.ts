@@ -53,6 +53,15 @@ function receipt<K extends string, P extends TProperties>(kind: K, props: P) {
   return Type.Object({ kind: Type.Literal(kind), ...header, ...props }, { additionalProperties: false });
 }
 
+/**
+ * gh-195 B20 (T9): a receipt a person may send through the mailbox (answer, approve, reject, unstick).
+ * `attempt` is absent only when a non-holder made it for a `local` story: stamped with the step its last
+ * boundary led to (`Norn-Next`), the holder matches it by step alone.
+ */
+function mailboxReceipt<K extends string, P extends TProperties>(kind: K, props: P) {
+  return Type.Object({ kind: Type.Literal(kind), ...header, attempt: Type.Optional(PosInt), ...props }, { additionalProperties: false });
+}
+
 export const Finding = Type.Object(
   {
     id: Type.Optional(NonEmpty),
@@ -107,7 +116,7 @@ export const AskReceipt = receipt("ask", {
   screen: Type.Optional(NonEmpty),
 });
 export const StuckReceipt = receipt("stuck", { reason: NonEmpty });
-export const AnswerReceipt = receipt("answer", {
+export const AnswerReceipt = mailboxReceipt("answer", {
   answer: NonEmpty,
   /** receipt_id of the ask being answered */
   ask_receipt_id: Type.Optional(Ulid),
@@ -117,19 +126,19 @@ export const AnswerReceipt = receipt("answer", {
    */
   delivered: Type.Optional(Type.Boolean()),
 });
-export const ApproveReceipt = receipt("approve", {
+export const ApproveReceipt = mailboxReceipt("approve", {
   comment: Type.Optional(Type.String()),
   /** The unit's branch head at the moment of `approve` (story unit: observe's `ready_head_sha`); the ruling's head (C2). */
   head_sha: Type.Optional(GitSha),
   /** NT3: open notes of the story listed at this story-level gate at `approve`; they leave the inbox */
   acknowledged_notes: Type.Optional(Type.Array(NoteId, { uniqueItems: true })),
 });
-export const RejectReceipt = receipt("reject", {
+export const RejectReceipt = mailboxReceipt("reject", {
   comment: Type.Optional(Type.String()),
   /** C2: the unit's branch head the person judged — a ruling is tied to it */
   head_sha: Type.Optional(GitSha),
 });
-export const UnstickReceipt = receipt("unstick", {
+export const UnstickReceipt = mailboxReceipt("unstick", {
   to: Type.Optional(StepName),
   reset: Type.Optional(Type.Array(CounterName, { uniqueItems: true })),
   comment: Type.Optional(Type.String()),

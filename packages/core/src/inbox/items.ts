@@ -14,7 +14,7 @@ import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../cri
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
 import { sha256 } from "../hash.ts";
-import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, heldBySkillsDrift, issueProblem, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
+import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, heldBySkillsDrift, issueProblem, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, stepLabel, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
 import { optionsLine } from "../prompt.ts";
 import { epoch, formatAge, iso } from "../time.ts";
 import { baseUpdateStep, edgeOf, edgesOf, isStale, stepOf } from "../workflow.ts";
@@ -804,6 +804,31 @@ function unpushedItems(story: StoryFacts, facts: Facts): InboxItem[] {
     });
 }
 
+/**
+ * gh-195 D12 (B21, T9): a mailbox receipt this holder's tick rejected, one Check item each, so a stale
+ * answer never vanishes silently. Gone once a later answer or approval of the story is accepted (observe
+ * leaves it out) or the story finishes; there is no dismiss command.
+ */
+function rejectedItems(story: StoryFacts): InboxItem[] {
+  if (storyFinished(story)) return [];
+  return (story.rejected_mailbox ?? []).map((r) => {
+    // the step the unit is at now (the story is held here), else where it was when the receipt was rejected
+    const now = story.units.find((u) => u.unit.key === r.unit)?.state?.step ?? r.at_step;
+    return {
+      id: `rejected:${r.receipt_id}`,
+      group: "check" as const,
+      story: story.key,
+      slice: r.unit === story.key ? null : r.unit,
+      step: null,
+      title: `${r.kind} from ${r.who ?? "another machine"} for ${r.unit} was rejected: ${now ? `${r.unit} is at ${now} now` : r.reason}`,
+      detail: `stamped for ${stepLabel(r.step, r.attempt)}; ${r.reason}`,
+      command: cmd.runList(r.unit),
+      since: r.rejected_at,
+      ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
+    };
+  });
+}
+
 /** Build the whole inbox (O1). Stories held by another heartbeat are not shown (except R2.3 unpushed work). */
 export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   const groups = Object.fromEntries(INBOX_GROUPS.map((g) => [g, [] as InboxEntry[]])) as Record<InboxGroup, InboxEntry[]>;
@@ -863,6 +888,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
     add(finishedRoundRemoteItem(story, config, facts.repo.default_branch));
     for (const it of foreignCommitItems(story)) add(it);
     add(recordPushItem(story));
+    for (const it of rejectedItems(story)) add(it);
     for (const it of noteItems(story)) add(it);
     for (const uf of story.units) {
       add(unitInboxItem(story, uf, facts, config));

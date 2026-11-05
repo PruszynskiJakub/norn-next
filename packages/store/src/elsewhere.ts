@@ -92,19 +92,26 @@ function trailers(block: string): Array<[string, string]> {
     .map((m) => [m[1] as string, m[2] as string]);
 }
 
+/** A story unit's last boundary commit: the step it ended and, from its `Norn-Next` (gh-195 B20), the step it led to (null = a commit an older norn made). */
+export interface LastBoundary {
+  ended: string;
+  next: string | null;
+}
+
 /**
- * B18, B19 (S4): the step the story unit's last boundary commit ended — the newest commit on `ref`
- * (past `base`, when given) with `Norn-Story: <key>`, no `Norn-Slice` and a `Norn-Outcome`, which only a
- * commit that ends a step carries (not a start, a session start, a mirror, a wait for input or a round
- * start). Null = no boundary pushed yet.
+ * B18–B20 (S4): the story unit's last boundary commit — the newest commit on `ref` (past `base`, when
+ * given) with `Norn-Story: <key>`, no `Norn-Slice` and a `Norn-Outcome`, which only a commit that ends a
+ * step carries (not a start, a session start, a mirror, a wait for input or a round start). Null = no
+ * boundary pushed yet.
  */
-async function lastBoundary(root: string, ref: string, key: string, base: string | null): Promise<string | null> {
+export async function lastBoundary(root: string, ref: string, key: string, base: string | null): Promise<LastBoundary | null> {
   const r = await git(root, ["log", "--format=%x1e%(trailers:only,unfold)", "--grep=^Norn-Outcome: ", ref, ...(base ? ["--not", base] : [])]);
   if (r.code !== 0) return null;
   for (const block of r.stdout.split("\x1e")) {
     const t = trailers(block);
     const one = (k: string) => t.find(([n]) => n === k)?.[1];
-    if (one("Norn-Story") === key && one("Norn-Slice") === undefined && one("Norn-Outcome") !== undefined && one("Norn-Step")) return one("Norn-Step") as string;
+    const ended = one("Norn-Step");
+    if (one("Norn-Story") === key && one("Norn-Slice") === undefined && one("Norn-Outcome") !== undefined && ended) return { ended, next: one("Norn-Next") ?? null };
   }
   return null;
 }
@@ -163,7 +170,7 @@ export async function loadElsewhereStory(root: string, remote: string | null, ke
     const h = await git(root, ["log", "-1", "--format=%H%n%cI%n%s", ref]);
     const [sha = "", at = "", subject = ""] = h.stdout.split("\n");
     if (h.code === 0 && sha) head = { sha, subject, at: new Date(at).toISOString() };
-    last = await lastBoundary(root, ref, key, base);
+    last = (await lastBoundary(root, ref, key, base))?.ended ?? null;
   }
   return { key, claim, branch, frontmatter, head, last_boundary: last, record: await readStoryRecord(root, key) };
 }

@@ -284,7 +284,8 @@ export function buildStepTimeline(input: StepTimelineInput, opts: StepTimelineOp
   for (const nr of receipts) {
     const r = nr.receipt;
     if (r.step === "$done" || r.step === "$stuck") continue;
-    seg(r.step, r.attempt).receipts.push(nr);
+    // a step-only mailbox receipt (gh-195 B20) is stamped with the attempt it matched when imported (T9)
+    seg(r.step, r.attempt ?? 1).receipts.push(nr);
   }
   // The cursor step, entered but not yet reported on.
   if (state && state.step !== "$done" && state.step !== "$stuck") {

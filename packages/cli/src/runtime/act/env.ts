@@ -150,7 +150,8 @@ export class ActEnv {
     }
     let sha: string | null;
     try {
-      sha = await this.git.commit(c.cwd, { message: c.message, trailers: c.trailers, ...(paths ? { paths } : {}) });
+      // gh-195 D17: decide asks for a story unit's boundary even when nothing changed (`allow_empty`)
+      sha = await this.git.commit(c.cwd, { message: c.message, trailers: c.trailers, ...(paths ? { paths } : {}), ...(c.allow_empty ? { allowEmpty: true } : {}) });
     } catch (e) {
       const code = (e as { code?: string }).code;
       // H1: an agent's merge or rebase is in progress in the worktree — norn's files wait there

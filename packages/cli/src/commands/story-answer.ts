@@ -17,7 +17,7 @@ import { machineHolder, readActFailures, writeActFailures } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
 import { failure, refuse, usageError } from "../output.ts";
-import { at, humanReceipt, resolveTarget, type Route, runHumanVerb, type Target } from "../runtime/human.ts";
+import { at, humanReceipt, stepOnlyReceipt, resolveTarget, type Route, runHumanVerb, type Target } from "../runtime/human.ts";
 import { parkedOn, targetKey } from "../runtime/target.ts";
 
 const asks = (st: UnitState) => st.status === "parked" && st.park?.kind === "ask";
@@ -33,7 +33,8 @@ export const storyAnswerCommand = defineCommand({
     const text = raw.trim();
     if (!text) throw usageError("the answer is empty", 'norn story answer <unit> "<text>"');
     const key = await targetKey(ctx, unit, args.json === true, parkedOn("ask", "story answer", "Nothing waits for an answer", (k) => cmd.storyAnswer(k)));
-    const t = await resolveTarget(ctx, key, asks);
+    // gh-195 B20: a `local` story held elsewhere: the step its last boundary led to, checked by the holder
+    const t = await resolveTarget(ctx, key, asks, { stepOnly: (t, step) => stepOnlyReceipt(ctx, t, step, "answer", { answer: text }) });
     const out = await runHumanVerb(ctx, t, {
       verb: "story answer",
       mailbox: true,

@@ -165,8 +165,10 @@ describe("receipts first (C2)", () => {
     s.units[0]!.unapplied = [numbered(1, receipt(st, "done", { outcome: "done", handoff: "ok" }))];
     const a = only(facts([s]));
     expect(a).toMatchObject({ kind: "apply_receipts", applied: [1], advance: { to: "$done" }, state: { status: "done", applied_through: 1 } });
-    // gh-195 B18 (S4): the commit that ends a step names its outcome, so a boundary is told apart by its trailers
-    expect(a.kind === "apply_receipts" && a.commit?.trailers).toEqual({ "Norn-Story": "gh-1", "Norn-Step": "implement", "Norn-Outcome": "done", "Norn-Tick": facts([]).tick_id });
+    // gh-195 B18, B20 (S4): the commit that ends a step names its outcome and the step it led to, so a boundary is told apart by its trailers
+    expect(a.kind === "apply_receipts" && a.commit?.trailers).toEqual({ "Norn-Story": "gh-1", "Norn-Step": "implement", "Norn-Outcome": "done", "Norn-Next": "$done", "Norn-Tick": facts([]).tick_id });
+    // gh-195 D17: a story unit's boundary is committed even when nothing changed, so the branch always carries it
+    expect(a.kind === "apply_receipts" && a.commit?.allow_empty).toBe(true);
   });
   test("answer delivered into the live session", () => {
     const s = solo(running({ status: "parked", park: { kind: "ask", reason: "Q?", since: at() } }));
@@ -751,7 +753,8 @@ describe("commit trailers (S4, R3.1)", () => {
   test("nornTrailers builds them; isIntakeCommit reads an intake off them, never off a subject", () => {
     expect(nornTrailers(TICK, "gh-1", null, null)).toEqual({ "Norn-Story": "gh-1", "Norn-Tick": TICK });
     expect(nornTrailers(TICK, "gh-1", "gh-1/01", "$done")).toEqual({ "Norn-Story": "gh-1", "Norn-Slice": "gh-1/01", "Norn-Step": "$done", "Norn-Tick": TICK });
-    expect(nornTrailers(TICK, "gh-1", null, "review", "approve")).toEqual({ "Norn-Story": "gh-1", "Norn-Step": "review", "Norn-Outcome": "approve", "Norn-Tick": TICK });
+    // gh-195 B20: a boundary names the step its outcome moved the cursor to
+    expect(nornTrailers(TICK, "gh-1", null, "review", { outcome: "approve", next: "ready" })).toEqual({ "Norn-Story": "gh-1", "Norn-Step": "review", "Norn-Outcome": "approve", "Norn-Next": "ready", "Norn-Tick": TICK });
     expect(isIntakeCommit(nornTrailers(TICK, "gh-1", null, null), "gh-1")).toBe(true);
     expect(isIntakeCommit(nornTrailers(TICK, "gh-1", null, null), "gh-2")).toBe(false);
     expect(isIntakeCommit(nornTrailers(TICK, "gh-1", null, "plan"), "gh-1")).toBe(false);

@@ -164,7 +164,7 @@ export function classifyNorn(
     snapshot: null,
     receipts: [nr],
     state: res.state,
-    commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${st.step} ${outcome} → ${receipt.route}`, st.step, { outcome: endedWith(res) }),
+    commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${st.step} ${outcome} → ${receipt.route}`, st.step, { ended: endedWith(res) }),
   });
 }
 

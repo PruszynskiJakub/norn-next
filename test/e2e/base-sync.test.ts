@@ -71,8 +71,9 @@ function siblingMerge(h: Harness, file: string, text: string, branch = "main"): 
 }
 
 /**
- * gh-195/07 (B6): a person's note in the story's handoff, uncommitted, so norn's next boundary commit has
- * something of its own to carry (norn writes nothing into the handoff any more).
+ * gh-195/07 (B6): a person's note in the story's handoff, uncommitted, so a norn commit that is not a step's
+ * boundary (an update, an answer) has something of its own to carry: norn writes nothing into the handoff
+ * any more, and only a story unit's boundary is committed with nothing changed (gh-195 D17).
  */
 function noteInHandoff(wt: string, specDir: string, note: string): void {
   const file = handoffPath(join(wt, specDir), STORY_UNIT_DIR);
@@ -343,7 +344,7 @@ describe("PR items between syncs and in the read model (C1), ready approval void
     writeFileSync(join(wt(), "a.txt"), "story side\n");
     h.git(["add", "-A"], wt());
     h.git(["commit", "-q", "-m", "story edits a", "--trailer", "Norn-Tick: 01JBQ6ZK3E8Y4V5W6X7Y8Z9ABC"], wt());
-    // C5: the $done commit after the approval carries this note
+    // C5: the $done commit after the approval carries this note (a boundary: it would be made without it too, D17)
     noteInHandoff(wt(), ".agents/specs/gh-9-pay-by-card", "approved with a.txt as it is");
     expect((await h.norn("story", "approve", "gh-9")).exit).toBe(0);
     await until(() => h.state(runs())?.status === "done", "done");

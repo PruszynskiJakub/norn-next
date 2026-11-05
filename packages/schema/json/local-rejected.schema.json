@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://norn.dev/schema/local-rejected.json",
+  "title": "norn mailbox receipts rejected on this checkout (<norn home>/repos/<id>/rejected.json)",
+  "type": "object",
+  "required": [
+    "receipts"
+  ],
+  "properties": {
+    "receipts": {
+      "type": "array",
+      "items": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "story",
+          "unit",
+          "receipt_id",
+          "kind",
+          "who",
+          "step",
+          "at_step",
+          "reason",
+          "rejected_at",
+          "seen"
+        ],
+        "properties": {
+          "story": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "unit": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "receipt_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "kind": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "who": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "step": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "attempt": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "at_step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "rejected_at": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "seen": {
+            "type": "object",
+            "patternProperties": {
+              "^(.*)$": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

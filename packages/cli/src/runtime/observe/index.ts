@@ -378,6 +378,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       ...(foreign.length ? { foreign_commits: foreign } : {}),
       ...(await readyHead(root, s.key, ls.ready, (storyPrs.has(s.key) ? storyPrs.get(s.key) : prSeen[s.key]?.pr)?.head_sha)),
       ...(ls.notes ? { notes: ls.notes } : {}),
+      ...(ls.rejected ? { rejected_mailbox: ls.rejected } : {}),
       ...(ls.record_refused ? { record_refused: ls.record_refused } : {}),
       ...(ls.record_unplaced ? { record_unplaced: ls.record_unplaced } : {}),
       ...(ls.snapshot.record_only ? { record_only: true } : {}),

@@ -166,7 +166,7 @@ function randomReceipt(g: Gen, st: UnitState, wf: Workflow): Receipt {
   const { rng } = g;
   const head = (by: "agent" | "human" | "norn") => ({ receipt_id: g.id(), run_id: st.run?.run_id ?? null, step: st.step, attempt: st.attempt, at: atK(g), by });
   const r = pickReceipt(g, st, wf, head);
-  if (rng.chance(0.05) && r.kind !== "mode" && r.kind !== "take") return { ...r, attempt: r.attempt + 1 } as Receipt; // stale (T9)
+  if (rng.chance(0.05) && r.kind !== "mode" && r.kind !== "take") return { ...r, attempt: (r.attempt ?? st.attempt) + 1 } as Receipt; // stale (T9)
   return r;
 }
 

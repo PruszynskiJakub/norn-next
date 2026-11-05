@@ -18,13 +18,14 @@
  *     briefings, transcripts and old `runs/<run_id>.log` session logs (gh-195 D1) of runs that are not
  *     live whose newest file is older than the window;
  *     never a live run's, nor `backfill.json`, the caches or the locks.
+ *   - gh-195 D12: rejected mailbox receipts (`rejected.json`) cleared and rejected before the window
  * Nothing with unique work is removed; such items are listed under `kept` with the reason.
  */
 import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { herdr } from "@norn/adapters";
 import { ulid } from "@norn/schema";
-import { copyToOrphaned, deleteTraceDays, deleteTracePaths, orphanedDir, reclaimLeases, receiptsDir, safeUnlink, traceDaysBefore, treeUnitRunStateDir } from "@norn/store";
+import { copyToOrphaned, deleteTraceDays, pruneRejectedReceipts, deleteTracePaths, orphanedDir, reclaimLeases, receiptsDir, safeUnlink, traceDaysBefore, treeUnitRunStateDir } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, usageError } from "../output.ts";
@@ -33,7 +34,7 @@ import { leaseLiveness } from "../runtime/leases.ts";
 import { type Observed, observe } from "../runtime/observe/index.ts";
 import { doneHerdrRuns, planHerdrTidy } from "../runtime/tidy-herdr.ts";
 import { checkRetain, MIN_TRACE_RETAIN, retainCutoffDay, unitTracesBefore } from "../runtime/trace-retention.ts";
-import { cmd } from "@norn/core";
+import { cmd, storyFinished } from "@norn/core";
 
 /** A reservation lives only while a receipt is being written; older ones are crash leftovers. */
 const RESERVE_STALE_MS = 60_000;
@@ -212,13 +213,17 @@ export const tidyCommand = defineCommand({
         deleteTraceDays(root, days);
         deleteTracePaths(root, [...hook_files.map((f) => f.file), ...runs.flatMap((r) => r.files)]);
       }
+      // gh-195 D12: cleared rejected mailbox receipts age out with the trace that also records them; an open
+      // one (its Check item still shown: no answer or approval since, story not finished) stays
+      const open = new Set(obs.facts.stories.filter((s) => !storyFinished(s)).flatMap((s) => (s.rejected_mailbox ?? []).map((r) => r.receipt_id)));
+      const rejected = pruneRejectedReceipts(root, new Date(ctx.clock.now() - window.ms).toISOString(), open, dry).map((r) => r.receipt_id);
       const bytes = [...days, ...hook_files, ...runs].reduce((n, d) => n + d.bytes, 0);
       const trace = { retain: window.retain, days, hook_files, runs, bytes };
 
       const verb = dry ? "would_remove" : "removed";
       return {
         dry_run: dry,
-        [verb]: { worktrees, stale_worktree_records: prunable, branches, leases, reserve_files: reserves, ...(herdrClosed ? { herdr: herdrClosed } : {}) },
+        [verb]: { worktrees, stale_worktree_records: prunable, branches, leases, reserve_files: reserves, rejected_receipts: rejected, ...(herdrClosed ? { herdr: herdrClosed } : {}) },
         [dry ? "would_orphan" : "orphaned"]: orphaned,
         trace,
         kept,

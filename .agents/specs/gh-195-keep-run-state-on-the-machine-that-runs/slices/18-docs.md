@@ -12,7 +12,7 @@ criteria:
 The README, `docs/`, CONTRIBUTING, AGENTS.md and the bundled skills describe run state in the machine dir, the record ref, the two record policies, takeover with and without a record, and superseded records, matching the rules refine already amended.
 
 ## Scope
-Behaviour: B38. Seams: S3. Out: `.agents/RULES.md` beyond what the slice gate decided (amended in refine; touch it only to fix what a behaviour slice found wrong, and to bring T7a and R2.3 in line with D11 as amended: only a takeover without a release supersedes a local record).
+Behaviour: B38. Seams: S3. Out: `.agents/RULES.md` beyond what the slice gate decided (amended in refine; touch it only to fix what a behaviour slice found wrong, and to bring T7a and R2.3 in line with D11 as amended: only a takeover without a release supersedes a local record; and to add `Norn-Outcome` and `Norn-Next` to S4's trailer list, D17).
 
 ## Acceptance
 - AC1 (B38) The docs lint passes: no rule id lost or defined twice (S10 kept, marked retired), every link and anchor resolves, every `norn` command and flag named exists, and no `handoff.md` path outside a unit's run state is named; the generated block of `docs/reference.md` is current. — verifier: test

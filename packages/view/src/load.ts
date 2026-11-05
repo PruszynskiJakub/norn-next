@@ -392,6 +392,8 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       ...(unpushed[i]?.length ? { unpushed_runs: unpushed[i] } : {}),
       // NT2/NT3: open notes of the story (loadLocalFacts, as observe)
       ...(ls.notes ? { notes: ls.notes } : {}),
+      // gh-195 D12 (B21): mailbox receipts this checkout rejected (loadLocalFacts, as observe)
+      ...(ls.rejected ? { rejected_mailbox: ls.rejected } : {}),
       ...(ls.record_refused ? { record_refused: ls.record_refused } : {}),
       ...(ls.record_unplaced ? { record_unplaced: ls.record_unplaced } : {}),
       ...(ls.snapshot.record_only ? { record_only: true } : {}),

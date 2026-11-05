@@ -208,6 +208,40 @@ export type LocalHookBackfillFile = Static<typeof LocalHookBackfillFile>;
 export const LocalNoticesFile = Type.Object({ shown: Type.Optional(Type.Array(Type.String())) }, id("local-notices", "norn one-time notices shown (trace/notices.json)"));
 export type LocalNoticesFile = Static<typeof LocalNoticesFile>;
 
+/**
+ * gh-195 D12 (B21, T9): one mailbox receipt this holder's tick rejected, kept next to the notices so a
+ * stale answer or approval shows as a Check item. It clears on its own: an answer or approval of the
+ * story accepted after it (in the holder's own receipt order, `seen`), or the story finished. `norn
+ * tidy` drops only cleared ones older than `trace.retain`; an open one stays.
+ */
+export const RejectedMailboxReceipt = Type.Object(
+  {
+    story: Type.String({ minLength: 1 }),
+    /** the unit the receipt was for: the story key or a slice key */
+    unit: Type.String({ minLength: 1 }),
+    receipt_id: Type.String({ minLength: 1 }),
+    kind: Type.String({ minLength: 1 }),
+    /** `user@machine` of the sender; null = not recorded */
+    who: Nullable(Type.String()),
+    /** the step (and attempt) the sender stamped */
+    step: Type.String({ minLength: 1 }),
+    attempt: Type.Optional(Type.Integer({ minimum: 1 })),
+    /** the step the unit was at when the receipt was rejected; null = no such unit */
+    at_step: Nullable(Type.String()),
+    reason: Type.String(),
+    /** ISO time of the rejecting tick */
+    rejected_at: Type.String({ minLength: 1 }),
+    /** each unit's last receipt number on the holder when it was rejected: a later answer or approval is numbered past it */
+    seen: Type.Record(Type.String(), Type.Integer({ minimum: 0 })),
+  },
+  { additionalProperties: false },
+);
+export type RejectedMailboxReceipt = Static<typeof RejectedMailboxReceipt>;
+
+/** `rejected.json` in the machine dir (gh-195 D12): the mailbox receipts this checkout's ticks rejected. */
+export const LocalRejectedFile = Type.Object({ receipts: Type.Array(RejectedMailboxReceipt) }, id("local-rejected", "norn mailbox receipts rejected on this checkout (<norn home>/repos/<id>/rejected.json)"));
+export type LocalRejectedFile = Static<typeof LocalRejectedFile>;
+
 /** A lock file (H1 tick lock, K6 integrate lock): the holder process and when it took the lock. */
 export const LocalLockFile = Type.Object(
   {
@@ -236,6 +270,7 @@ export const LOCAL_SCHEMA_NAMES = [
   "local-lock",
   "local-hook-backfill",
   "local-notices",
+  "local-rejected",
   "local-checkout",
 ] as const;
 export type LocalSchemaName = (typeof LOCAL_SCHEMA_NAMES)[number];
