@@ -126,7 +126,8 @@ export const storyReopenCommand = defineCommand({
           stuck.push(w.unit);
         }
         return { paths, message: `norn: ${key} reopened`, value: { reopened: true, stuck } };
-      });
+        // B32: the record was restored above (a clone holding the run state keeps its own)
+      }, { record: false });
     } finally {
       lock.release();
     }

@@ -8,17 +8,25 @@
  * 2. Fetch the story branch and its slice branches; check them out into worktrees here with
  *    slots, `.env.norn` and `.norn-unit` (K4, A3). Local branches are only created or moved
  *    forward, never reset.
- * 3. Print each unit's cursor, and its status (S9, rendered from state.json) above its handoff's
+ * 3. Fetch the story's record from `refs/norn/runs/<story>` alone (gh-195 D6) into the same local ref, so
+ *    this checkout's next record push leases on what it unpacked, and unpack it into the machine dir
+ *    (hostile entries refused, every file validated, then renamed into place: S1, S2). A checkout
+ *    that already holds the claim and the run state keeps its own. The record's `Norn-Branch-Commit`
+ *    must be an ancestor of the story branch head (T5a, B23); when it is not (the branch was
+ *    rewritten, B24) the take receipt says so and the step restarts as a new attempt when the tick
+ *    applies it. A story without a branch skips the check (B33).
+ * 4. Print each unit's cursor, and its status (S9, rendered from state.json) above its handoff's
  *    written part (gh-195 D9, B7). The next `norn tick` resumes from the run state.
  */
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
-import { cmd, renderHandoffWithStatus, sliceWorktreePath, storyWorktreePath } from "@norn/core";
-import { ExitCode, type ReceiptOf, sliceBranch, specDir, STORY_UNIT_DIR, ulid } from "@norn/schema";
+import { branchRewrittenLine, cmd, type GitPort, renderHandoffWithStatus, sliceWorktreePath, storyWorktreePath } from "@norn/core";
+import { ExitCode, type ReceiptOf, recordRef, type RunStory, sliceBranch, specDir, STORY_UNIT_DIR, ulid } from "@norn/schema";
 import {
   acquireClaim,
   appendReceipt,
   appendTrace,
+  fetchRecords,
   handoffPath,
   loadStory,
   newClaimBlob,
@@ -29,7 +37,11 @@ import {
   writtenHere,
   machineHolder,
   traceEvent,
+  readRecordRef,
+  recordBranchCommit,
   runStateDir,
+  storyRunStateDir,
+  unpackRecord,
 } from "@norn/store";
 import type { Context } from "../context.ts";
 import { claimHeld, corruptError, failure, refuse, withExit } from "../output.ts";
@@ -60,8 +72,8 @@ export async function findStoryBranch(ctx: Context, key: string, remote: string 
  */
 function takeReceipt(
   runsDir: string,
-  t: { holder: string; now: string; previous_holder: string | null; previous_heartbeat_id: string | null; expired: boolean; forced: boolean },
-): { receipt: string | null; note?: string } {
+  t: { holder: string; now: string; previous_holder: string | null; previous_heartbeat_id: string | null; expired: boolean; forced: boolean; rewritten: { gone: string; head: string } | null },
+): { receipt: string | null; note?: string; restarted?: string } {
   const st = readState(runsDir);
   if (!st.ok) return { receipt: null, note: st.reason === "missing" ? "story unit not started; the take is in the trace" : "story state unreadable (S2); the take is in the trace" };
   const r: ReceiptOf<"take"> = {
@@ -78,8 +90,66 @@ function takeReceipt(
     expired: t.expired,
     ...(t.forced ? { forced: true } : {}),
   };
+  // T5a: only a step the tick can enter again restarts; a finished or stuck unit keeps its cursor
+  const s = st.value;
+  const restarts = t.rewritten !== null && !s.step.startsWith("$") && s.status !== "stuck" && s.status !== "corrupt";
+  if (restarts && t.rewritten) r.rewritten = t.rewritten;
   const w = appendReceipt(runsDir, r);
-  return { receipt: w.file.split("/").at(-1) as string };
+  const restarted = restarts && t.rewritten ? branchRewrittenLine(s.story, t.rewritten.gone, s.step, (s.visits[s.step] ?? s.attempt) + 1) : undefined;
+  return { receipt: w.file.split("/").at(-1) as string, ...(restarted ? { restarted } : {}) };
+}
+
+/** D6: `refs/norn/runs/<story>` fetched from `remote` alone into the same local ref, then read (without a remote: this checkout's own). */
+async function fetchRecord(ctx: Context, remote: string | null, key: string, retry: string) {
+  if (remote)
+    await fetchRecords(ctx.root, remote, [key]).catch((e: unknown) => {
+      throw failure(`cannot fetch ${recordRef(key)}: ${(e as Error).message}`, retry, "network");
+    });
+  return readRecordRef(ctx.root, key);
+}
+
+/** What checkout did with the story's record (T5, T5a). */
+interface TakenRecord {
+  /** the record commit on `refs/norn/runs/<story>` */
+  sha: string;
+  /** its `Norn-Branch-Commit`; null = recorded without a branch (B33) */
+  branch_commit: string | null;
+  /** unpacked into the machine dir (false: this checkout holds the claim and keeps its own run state) */
+  unpacked: boolean;
+  /** B24: the record's branch commit is not in the story branch any more */
+  rewritten: { gone: string; head: string } | null;
+}
+
+/**
+ * gh-195 D6, D10 (B22–B24, B33; 09-F4): fetch `refs/norn/runs/<story>` alone into the same local ref
+ * (the lease of this checkout's next record push is then the record it took over), unpack it into the
+ * machine dir unless `keepLocal` and the machine dir already holds the story's run state, and compare
+ * its `Norn-Branch-Commit` with the story branch `head` (none: no branch, B33, no check). Null when
+ * there is no record ref (gh-195/11). A record that does not unpack is refused, nothing replaced.
+ */
+async function takeRecord(ctx: Context, git: GitPort, remote: string | null, story: RunStory, head: string | null, keepLocal: boolean): Promise<TakenRecord | null> {
+  const key = story.key;
+  const ref = await fetchRecord(ctx, remote, key, `retry: ${cmd.storyCheckout(key)} (the claim is held by you now)`);
+  if (!ref) return null;
+  const dir = storyRunStateDir(ctx.root, story);
+  const unpacked = !(keepLocal && existsSync(dir));
+  if (unpacked) {
+    const r = await unpackRecord(ctx.root, ref.sha, dir);
+    if (!r.ok)
+      throw failure(
+        `${recordRef(key)} at ${ref.sha} does not unpack: ${r.errors.map((e) => `${e.file}: ${e.errors.map((x) => x.message).join(", ")}`).join("; ")}`,
+        `fix or delete ${recordRef(key)} on ${remote ?? "this checkout"}, then ${cmd.storyCheckout(key)}`,
+        "record_corrupt",
+      );
+  }
+  const branch_commit = await recordBranchCommit(ctx.root, ref.sha);
+  let rewritten: TakenRecord["rewritten"] = null;
+  if (unpacked && branch_commit && head) {
+    // B23: a branch that moved ahead is fine; B24: a commit no longer in it (or not here at all) is gone
+    const known = await git.revParse(ctx.root, `${branch_commit}^{commit}`);
+    if (!known || !(await git.isAncestor(ctx.root, branch_commit, head))) rewritten = { gone: branch_commit, head };
+  }
+  return { sha: ref.sha, branch_commit, unpacked, rewritten };
 }
 
 interface UnitView {
@@ -102,8 +172,11 @@ export type CheckoutRecord = (restored: { storyWt: string; spec_dir: string; wor
   value: Record<string, unknown>;
 };
 
-/** T5: claim `key` here (`force` takes a live claim over) and restore its worktrees from the pushed branches. */
-export async function checkoutStory(ctx: Context, key: string, force: boolean, more?: CheckoutRecord) {
+/**
+ * T5: claim `key` here (`force` takes a live claim over), restore its worktrees from the pushed branches
+ * and its record from its ref. `record: false`: the caller restored the record itself (`story reopen`).
+ */
+export async function checkoutStory(ctx: Context, key: string, force: boolean, more?: CheckoutRecord, opts: { record?: boolean } = {}) {
   const root = ctx.root;
   const config = ctx.config;
   const ports = await ctx.ports();
@@ -113,9 +186,10 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
   const remote = await gitRemote(ctx.git, ctx.root, ctx.config.git_remote);
 
   const branch = await findStoryBranch(ctx, key, remote);
-  if (!branch) throw refuse(`no story branch for ${key}${remote ? ` on ${remote}` : ""}`, `${cmd.sync()} (intake creates it) or check the story key`, "unknown_story");
-  const slug = branch.slice(key.length + 1);
-  const spec_dir = specDir(key, slug);
+  // B33: a story without a branch is taken over from its record alone
+  if (!branch && !(opts.record !== false && (await fetchRecord(ctx, remote, key, `retry: ${cmd.storyCheckout(key)}`))))
+    throw refuse(`no story branch for ${key}${remote ? ` on ${remote}` : ""}`, `${cmd.sync()} (intake creates it) or check the story key`, "unknown_story");
+  const spec_dir = branch ? specDir(key, branch.slice(key.length + 1)) : "";
 
   // ---- 1. claim (T3, T5)
   const hb = heartbeatId(root, now);
@@ -150,7 +224,7 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
 
   // ---- 2. branches → worktrees (T5, K4)
   const problems: string[] = [];
-  if (remote) {
+  if (remote && branch) {
     const f = await git
       .fetch(root, remote, [`+refs/heads/${branch}:refs/remotes/${remote}/${branch}`, `+refs/heads/${key}/*:refs/remotes/${remote}/${key}/*`], { quiet: true })
       .catch((e: unknown) => e as Error);
@@ -179,20 +253,23 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
     return true;
   };
 
-  const storyWt = wtByBranch.get(branch) ?? storyWorktreePath(root, key, slug);
-  if (!(await checkout({ path: storyWt, branch, story: key, slice: null, unit: STORY_UNIT_DIR, spec_dir }, key)))
+  const storyWt = branch ? (wtByBranch.get(branch) ?? storyWorktreePath(root, key, branch.slice(key.length + 1))) : null;
+  if (branch && storyWt && !(await checkout({ path: storyWt, branch, story: key, slice: null, unit: STORY_UNIT_DIR, spec_dir }, key)))
     throw failure(problems.join("; "), `fix the story branch, then ${cmd.storyCheckout(key)} again (the claim is held by you now)`, "branch_diverged", { claim: blob });
 
+  // ---- 3. the record from its ref (T5, T5a; gh-195 D10), before the take receipt is written into it
   const run = { key, spec_dir };
-  const storyRuns = runStateDir(storyWt, run, STORY_UNIT_DIR);
-  const record = takeReceipt(storyRuns, { holder, now: nowIso, ...takeFacts });
+  const head = branch ? await git.revParse(root, remote ? `refs/remotes/${remote}/${branch}` : `refs/heads/${branch}`) : null;
+  const taken = opts.record === false ? null : await takeRecord(ctx, git, remote, run, head, mine);
+  const storyRuns = runStateDir(root, run, STORY_UNIT_DIR);
+  const record = takeReceipt(storyRuns, { holder, now: nowIso, ...takeFacts, rewritten: taken?.rewritten ?? null });
 
-  const snapshot = loadStory(storyWt, join(storyWt, spec_dir));
+  const snapshot = storyWt ? loadStory(storyWt, join(storyWt, spec_dir)) : null;
   const units: UnitView[] = [];
-  const view = (unit: string, wt: string | null, runsDir: string, handoff: string): UnitView => {
+  const view = (unit: string, wt: string | null, runsDir: string, handoff: string | null): UnitView => {
     const st = readState(runsDir);
     const wf = readPinnedWorkflow(runsDir);
-    const prose = readHandoff(handoff)?.body ?? null;
+    const prose = handoff ? (readHandoff(handoff)?.body ?? null) : null;
     return {
       unit,
       worktree: wt,
@@ -203,7 +280,7 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
       handoff: st.ok ? renderHandoffWithStatus(st.value, prose, { workflow: wf.ok ? wf.value.workflow : null }) : prose,
     };
   };
-  const storyHandoff = handoffPath(join(storyWt, spec_dir), STORY_UNIT_DIR);
+  const storyHandoff = storyWt ? handoffPath(join(storyWt, spec_dir), STORY_UNIT_DIR) : null;
   units.push(view(key, storyWt, storyRuns, storyHandoff));
   const sliceRefs = new Set(
     (await git.listRefs(root, remote ? `refs/remotes/${remote}/${key}/` : `refs/heads/${key}/`)).map((r) => r.ref.replace(remote ? `refs/remotes/${remote}/` : "refs/heads/", "")),
@@ -213,12 +290,13 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
     const dir = `${s.nn}-${s.slug}`;
     const status = s.frontmatter?.status;
     let wt: string | null = null;
-    if (sliceRefs.has(sb) && status !== "integrated" && status !== "dropped") {
+    if (storyWt && sliceRefs.has(sb) && status !== "integrated" && status !== "dropped") {
       const path = wtByBranch.get(sb) ?? sliceWorktreePath(storyWt, s.nn, s.slug);
       if (await checkout({ path, branch: sb, story: key, slice: s.key, unit: dir, spec_dir }, s.key)) wt = wtByBranch.get(sb) ?? path;
     }
-    const runs = runStateDir(wt ?? storyWt, run, dir);
-    if (existsSync(runs)) units.push(view(s.key, wt, runs, handoffPath(join(wt ?? storyWt, spec_dir), dir)));
+    const runs = runStateDir(root, run, dir);
+    const handoffRoot = wt ?? storyWt;
+    if (existsSync(runs)) units.push(view(s.key, wt, runs, handoffRoot ? handoffPath(join(handoffRoot, spec_dir), dir) : null));
   }
 
   // ---- commit the take receipt (R10.1) and journal a forced take (T5): claim blob `forced_from` +
@@ -228,11 +306,11 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
   const line = forced ? `${nowIso} take --force by ${holder} from ${blob.forced_from}` : null;
   // gh-195/05 (S12): the forced take is journaled in the story's handoff when the branch has one (its run
   // state may be on another machine), and the take receipt stays in the machine dir (D8)
-  const journaled = line !== null && existsSync(storyHandoff);
+  const journaled = line !== null && storyHandoff !== null && existsSync(storyHandoff);
   if (journaled) appendProgress(storyHandoff, line);
-  const extra = more?.({ storyWt, spec_dir, worktrees });
-  if (journaled || extra?.paths.length) {
-    const paths = [...(journaled ? [relative(storyWt, storyHandoff)] : []), ...(extra?.paths ?? [])];
+  const extra = storyWt ? more?.({ storyWt, spec_dir, worktrees }) : undefined;
+  if (storyWt && branch && (journaled || extra?.paths.length)) {
+    const paths = [...(journaled && storyHandoff ? [relative(storyWt, storyHandoff)] : []), ...(extra?.paths ?? [])];
     const message = extra?.message ?? (forced ? `norn: ${key} taken with --force by ${holder}` : `norn: ${key} taken by ${holder}`);
     const sha = await git.commit(storyWt, { message, trailers: { "Norn-Story": key, "Norn-Step": "take", "Norn-Tick": ulid(now) }, paths });
     const pushed = remote && sha ? await git.push(storyWt, remote, `refs/heads/${branch}:refs/heads/${branch}`) : null;
@@ -249,6 +327,9 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
     journal,
     // S12: the take receipt is in the machine dir, never committed or pushed (D8)
     receipt: record.receipt ? { file: record.receipt } : { file: null, note: record.note },
+    // T5 (gh-195 D10): the record taken over from its ref; T5a: why the step restarts, when it does
+    record: taken ? { ref: recordRef(key), sha: taken.sha, branch_commit: taken.branch_commit, unpacked: taken.unpacked } : null,
+    ...(record.restarted ? { restarted: record.restarted } : {}),
     worktrees,
     units,
     ...(problems.length ? { problems } : {}),

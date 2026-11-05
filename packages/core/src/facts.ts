@@ -123,6 +123,12 @@ export interface ActFailure {
   attempt: number;
   /** the session a failed delivery targeted, so the inbox can say how to reach it */
   session?: { runner: string; session_id: string; pane_id?: string };
+  /**
+   * gh-195 (08-F4): effect `record_push` — the record push was refused as stale (another checkout pushed
+   * `refs/norn/runs/<story>`); the sha it leased on (null = none). decide pushes again only once the
+   * record ref this checkout sees is another one; the inbox shows one Check item meanwhile.
+   */
+  lease?: string | null;
 }
 
 export interface UnitFacts {

@@ -201,15 +201,23 @@ describe("two clones hand a story over through git (T5, T6)", () => {
       ["gh-7", storyWt(B.root), 1],
       ["gh-7/01", sliceWt(B.root), 2],
     ]);
-    // S12 (gh-195/05): A's run state stayed on A's machine; B gets the branches and the handoff here, the
-    // record with gh-195/09–11 (B15, B22, B25): until then B has no unit cursor and no take receipt
-    expect(v.units.find((u) => u.unit === "gh-7")?.handoff).toBeDefined();
+    // gh-195/10 (B22): A's handoff pushed the record to its ref; B unpacked it into its machine dir
+    expect(v.units.find((u) => u.unit === "gh-7/01")).toMatchObject({ step: "implement", status: "parked" });
+    expect(v.units.find((u) => u.unit === "gh-7/01")?.handoff).toContain("use blue unless told otherwise");
     expect(readFileSync(join(sliceWt(B.root), "form.txt"), "utf8")).toBe("form v1\n");
     expect(readFileSync(join(sliceWt(B.root), ".norn-unit"), "utf8")).toContain("slice=gh-7/01");
     expect(readFileSync(join(sliceWt(B.root), ".env.norn"), "utf8")).toContain("NORN_SLOT=2");
     expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-7"])).not.toBe("");
 
+    // R10.1 (M8): the take is in the record — a `take` receipt on the story unit (in B's machine dir,
+    // never pushed: S12) and a trace event
+    const file = (r.value as { receipt: { file: string } }).receipt.file;
+    expect(file).toMatch(/^\d{4}-take\.json$/);
+    const rec = JSON.parse(readFileSync(join(storyRuns(B.root), "receipts", file), "utf8"));
+    expect(rec).toMatchObject({ kind: "take", by: "human", who: "bob@repo-b", previous_holder: null, previous_heartbeat_id: null, expired: false });
     expect(h.git(["ls-remote", "origin", "refs/heads/gh-7-add-login-form"]).split("\t")[0]).toBe(sh(B.root, ["rev-parse", "gh-7-add-login-form"]));
+    const trace = await B.norn("run", "list", "gh-7", "--events");
+    expect(JSON.stringify(trace.value)).toContain("take by bob@repo-b (claim was free)");
 
     // clone A now sees the claim held elsewhere and does nothing to the story (T7)
     step();
@@ -217,8 +225,7 @@ describe("two clones hand a story over through git (T5, T6)", () => {
     expect(a.decisions.filter((d) => d.unit.startsWith("gh-7"))).toEqual([{ unit: "gh-7", rule: "claim.other", kind: "noop", ok: true }]);
   });
 
-  // gh-195/10 (B22): B continues the slice once checkout unpacks the record from the ref
-  test.skip("clone B answers, briefs and continues the slice to its gate", async () => {
+  test("clone B answers, briefs and continues the slice to its gate", async () => {
     expect((await B.norn("story", "answer", "gh-7/01", "Blue.")).exit).toBe(0);
     step();
     // the story unit applies the take receipt (R10.1) alongside the slice's answer
@@ -257,12 +264,10 @@ describe("claim races (T3) and forced takes (T5)", () => {
     const winner = ra.exit === 0 ? "tester@box" : "carol@repo-c";
     expect((lost[0]?.value as { error: string }).error).toMatch(new RegExp(`^held by ${winner} since \\d{4}-`));
     expect((won[0]?.value as { taken_from: { holder: string; expired: boolean } }).taken_from).toMatchObject({ holder: "bob@repo-b", expired: true });
-    // R10.1: the winner's take receipt names the expired holder when the winner holds the story's run state
-    // (S12: only A does, until gh-195/10–11 hand the record over)
-    if (ra.exit === 0) {
-      const file = (won[0]?.value as { receipt: { file: string } }).receipt.file;
-      expect(JSON.parse(readFileSync(join(storyRuns(A.root), "receipts", file), "utf8"))).toMatchObject({ kind: "take", previous_holder: "bob@repo-b", expired: true });
-    }
+    // R10.1: the winner's take receipt names the expired holder
+    const winRoot = ra.exit === 0 ? A.root : C.root;
+    const file = (won[0]?.value as { receipt: { file: string } }).receipt.file;
+    expect(JSON.parse(readFileSync(join(storyRuns(winRoot), "receipts", file), "utf8"))).toMatchObject({ kind: "take", previous_holder: "bob@repo-b", expired: true });
   });
 
   test("before expiry a take needs --force; the forced take is journaled in the claim and the handoff", async () => {

@@ -42,6 +42,13 @@ export interface Advance {
   moved?: true;
 }
 
+/**
+ * T5a (gh-195 B24): why a takeover restarts the step — the same words in `norn story checkout`'s output,
+ * the take's log and the brief's "Why this attempt". `gone` is the record's `Norn-Branch-Commit`.
+ */
+export const branchRewrittenLine = (story: string, gone: string, step: string, attempt: number): string =>
+  `the branch of ${story} was rewritten since the record (${gone} is gone); restarting ${step} as attempt ${attempt}`;
+
 export interface Rejection {
   n: number;
   receipt_id: string;
@@ -174,7 +181,14 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
   if (r.kind === "take") {
     // R10.1: a takeover is a record, not a cursor move — applied at any cursor, like mode
     const from = r.previous_holder ? ` from ${r.previous_holder}${r.forced ? " (forced)" : r.expired ? " (expired)" : ""}` : "";
-    return { state: st, log: `taken by ${r.who ?? r.by}${from}` };
+    const log = `taken by ${r.who ?? r.by}${from}`;
+    // T5a (gh-195 B24): the record judged code that is gone — its step starts again as a new attempt,
+    // counters and history kept; only at the cursor the take was written at, never at `$done` or stuck
+    if (r.rewritten && r.step === st.step && r.attempt === st.attempt && st.status !== "stuck" && st.status !== "corrupt" && stepOf(wf, st.step)) {
+      const next = enterStep(st, wf, st.step, ctx.now);
+      return { state: next, log: `${log}; ${branchRewrittenLine(st.story, r.rewritten.gone, st.step, next.attempt)}`, advance: { from: st.step, outcome: "take", to: st.step } };
+    }
+    return { state: st, log };
   }
   if (st.status === "corrupt") return { reject: "unit is corrupt (S2)" };
   if (r.slice !== undefined && r.slice !== st.slice) return { reject: `receipt for unit ${r.slice ?? st.story}, not ${st.slice ?? st.story}` };

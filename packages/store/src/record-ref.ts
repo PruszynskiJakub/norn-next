@@ -113,7 +113,7 @@ async function writeRecordTree(root: string, story: RunStory): Promise<string | 
 }
 
 /** The `Norn-Branch-Commit` a record commit names; null = none (a story without a branch, B33). */
-async function branchCommitOf(root: string, sha: string): Promise<string | null> {
+export async function recordBranchCommit(root: string, sha: string): Promise<string | null> {
   const r = await git(root, ["log", "-1", "--format=%(trailers:key=Norn-Branch-Commit,valueonly)", sha]);
   return r.code === 0 ? r.stdout.trim() || null : null;
 }
@@ -140,7 +140,7 @@ export async function pushRecord(
 ): Promise<RecordPushResult> {
   const tree = await writeRecordTree(root, story);
   if (tree === null) return { ok: true, pushed: false, reason: "empty", sha: o.expected };
-  if (o.expected !== null && (await readLocalRef(root, `${o.expected}^{tree}`)) === tree && (await branchCommitOf(root, o.expected)) === o.branch_commit)
+  if (o.expected !== null && (await readLocalRef(root, `${o.expected}^{tree}`)) === tree && (await recordBranchCommit(root, o.expected)) === o.branch_commit)
     return { ok: true, pushed: false, reason: "unchanged", sha: o.expected };
   const trailers = [`Norn-Story: ${story.key}`, ...(o.branch_commit ? [`Norn-Branch-Commit: ${o.branch_commit}`] : []), `Norn-Holder: ${o.holder}`];
   const message = `norn: record ${story.key}\n\n${trailers.join("\n")}\n`;

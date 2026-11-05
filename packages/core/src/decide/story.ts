@@ -20,7 +20,7 @@ import type { Action, ClaimAction, UpdateStoryMirrorAction } from "../actions.ts
 import type { NumberedReceipt, StoryFacts, UnitFacts, UnitRef } from "../facts.ts";
 import { initialState } from "../apply.ts";
 import { sha256 } from "../hash.ts";
-import { bodyChangedItem } from "../inbox/items.ts";
+import { bodyChangedItem, RECORD_PUSH_EFFECT } from "../inbox/items.ts";
 import { issueProblem, mergedIntoBase, prProblem, roundFinished, storyFinished, storyUnit, WF_LABEL } from "../policy.ts";
 import type { RemoteIssue } from "../ports.ts";
 import { epoch, iso } from "../time.ts";
@@ -135,7 +135,8 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
  * record into the machine dir as it acts, so the push rides along with it. Under `local`, nothing (B11).
  * An action of this tick that pushes the record itself leaves no second push beside it: a story
  * cleaned up this tick (GR6, GR6b) is archived by that action (D15), and an `open-pr` pushes the
- * record before the PR (D5, B28).
+ * record before the PR (D5, B28). A push refused as stale (08-F4: another checkout pushed the ref)
+ * waits until the record ref this checkout sees is another one, rather than failing again every tick.
  */
 function pushRecord(ctx: Ctx, story: StoryFacts, ref: UnitRef): void {
   if ((ctx.config.record?.policy ?? "local") !== "remote" || !story.record) return;
@@ -143,6 +144,8 @@ function pushRecord(ctx: Ctx, story: StoryFacts, ref: UnitRef): void {
   const moved = ctx.decisions.some((d) => d.action.kind === "move_record" && d.action.unit?.story === story.key);
   if (!moved && (tree === null || tree === pushed?.tree)) return;
   if (ctx.decisions.some((d) => d.action.unit?.story === story.key && pushesRecordItself(d.action))) return;
+  const refused = storyUnit(story)?.act_failure;
+  if (refused?.effect === RECORD_PUSH_EFFECT && (refused.lease ?? null) === (pushed?.sha ?? null)) return;
   ctx.emit({ kind: "push_record", unit: ref, rule: "record.push", branch: story.branch, expected: pushed?.sha ?? null, holder: ctx.facts.machine.holder });
 }
 

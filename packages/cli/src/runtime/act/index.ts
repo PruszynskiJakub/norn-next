@@ -14,6 +14,7 @@ import {
   type ActFailure,
   type ActionResult,
   buildInbox,
+  RECORD_PUSH_EFFECT,
   isSideAction,
   isTailAction,
   type Decision,
@@ -113,8 +114,8 @@ export class Actor extends ActEnv {
    */
   private recordFailure(d: Decision, result: ActionResult): void {
     const a = d.action;
-    // gh-195 B14: a failed record push is owed, not a failure of the unit: the next tick pushes it
-    if (!a.unit || a.kind === "claim" || a.kind === "noop" || a.kind === "push_record") return;
+    if (a.kind === "push_record") return this.recordPushFailure(a, d.rule, result);
+    if (!a.unit || a.kind === "claim" || a.kind === "noop") return;
     const key = a.unit.key;
     const prev = this.failures[key];
     if (!result.ok) {
@@ -133,6 +134,27 @@ export class Actor extends ActEnv {
       delete this.failures[key];
       this.failuresChanged = true;
     }
+  }
+
+  /**
+   * gh-195 B14: a failed record push is owed, not a failure of the unit: the next tick pushes it. 08-F4:
+   * one refused as stale (another checkout pushed the ref) would fail the same way every tick, so it is
+   * remembered on the story unit with the lease it used (effect `record_push`): decide holds the push
+   * until the record ref here changes, and the inbox shows one Check item. A push that lands clears it.
+   */
+  private recordPushFailure(a: Extract<Action, { kind: "push_record" }>, rule: string, result: ActionResult): void {
+    const key = a.unit.key;
+    const prev = this.failures[key];
+    if (result.ok) {
+      if (prev?.effect !== RECORD_PUSH_EFFECT) return;
+      delete this.failures[key];
+      this.failuresChanged = true;
+      return;
+    }
+    if ((result.detail as { reason?: string } | undefined)?.reason !== "stale") return;
+    const st = this.written.get(key) ?? this.obs.units[key]?.state;
+    this.failures[key] = { effect: RECORD_PUSH_EFFECT, rule, reason: result.error ?? "record push refused as stale", at: this.nowIso(), tick_id: this.tick, step: st?.step ?? "?", attempt: st?.attempt ?? 1, lease: a.expected };
+    this.failuresChanged = true;
   }
 
   async perform(a: Action): Promise<ActionResult> {

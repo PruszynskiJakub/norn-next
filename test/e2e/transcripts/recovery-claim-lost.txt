@@ -139,6 +139,9 @@
   spawn repo-b $ git branch --no-track gh-9-add-search refs/remotes/origin/gh-9-add-search
   spawn repo-b $ git worktree add <dir>/repo-b-worktrees/gh-9-add-search gh-9-add-search
   spawn repo-b $ git rev-parse --path-format=absolute --git-common-dir
+  spawn repo-b $ git rev-parse --verify --quiet --end-of-options refs/remotes/origin/gh-9-add-search
+  spawn repo-b $ git ls-remote origin refs/norn/runs/gh-9
+  spawn repo-b $ git rev-parse --verify --quiet refs/norn/runs/gh-9
   spawn repo-b $ git for-each-ref "--format=%(refname) %(objectname)" refs/remotes/origin/gh-9/
   spawn repo-b-worktrees/gh-9-add-search $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-b-worktrees/gh-9-add-search $ git diff --name-only --diff-filter=U -z

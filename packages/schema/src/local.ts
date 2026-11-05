@@ -106,6 +106,8 @@ export const ActFailureEntry = Type.Object({
   step: Type.String(),
   attempt: Type.Number(),
   session: Type.Optional(Type.Object({ runner: Type.String(), session_id: Type.String(), pane_id: Type.Optional(Type.String()) })),
+  /** gh-195 (08-F4): a `record_push` refused as stale — the record ref sha it leased on (null = absent) */
+  lease: Type.Optional(Type.Union([Type.String(), Type.Null()])),
 });
 
 /** `failures.json`: unit key → last failed act effect (R4.3). */
