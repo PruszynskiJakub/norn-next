@@ -259,3 +259,48 @@ describe("checkout never replaces a local copy whole (gh-195 D11; 10-R3-F1, 11-S
     expect(await checkItems(s.key)).toEqual([expect.objectContaining({ id: `superseded:${s.key}:${(supersededOf(s.key)[0] as string).slice(s.key.length + 1)}`, title: `your record of ${s.key} was superseded when tester@box took it over (last local receipt ${last})` })]);
   });
 });
+
+describe("a --force takeover (AC1: 'or with --force'; review#1 F4)", () => {
+  withHarness();
+
+  test("under local: B forces gh-13 while A's claim is live; A's next tick sets its record aside with one Check item", async () => {
+    const s = await heldThenSilent(13, "forced", 0);
+    report(s.runs(h.root), "done");
+    const last = lastReceipt(s.runs(h.root));
+    const B = cloneOf(h, "b-f4", "bob");
+    expect((await B.norn("story", "checkout", s.key, "--force")).exit).toBe(0);
+    const before = remoteRefs();
+    h.clock.advance(10_000);
+    const t = await h.tick("--sync");
+    expect(t.decisions.filter((d) => d.unit === s.key).map((d) => `${d.rule} ${d.kind}${d.ok ? "" : " FAILED"}`)).toEqual(["record.superseded set_aside_record"]);
+    expect(supersededOf(s.key)).toHaveLength(1);
+    expect(remoteRefs()).toBe(before);
+    expect(await checkItems(s.key)).toEqual([
+      expect.objectContaining({ title: `your record of ${s.key} was superseded when bob@b-f4 took it over (last local receipt ${last})` }),
+    ]);
+  });
+
+  test("under remote with every receipt pushed: B forces gh-14; A's copy is on the ref and goes quietly, no Check item (the edge flagged in D11)", async () => {
+    h.config(`${CONFIG}record:\n  policy: remote\n`);
+    const key = "gh-14";
+    const spec = `.agents/specs/${key}-allpushed`;
+    const branch = `${key}-allpushed`;
+    const runs = () => runStateOf(join(`${h.root}-worktrees/${branch}`, spec));
+    h.remote.issues = [...h.remote.issues, issue(14, "allpushed", ["norn", "norn:wf:rv"])];
+    await h.tick("--sync");
+    await tickUntil(() => state(runs())?.status === "running");
+    // tick until a tick owes no record push: everything A has is on the ref
+    let quiet = false;
+    for (let i = 0; i < 6 && !quiet; i++) quiet = (await tick()).decisions.every((d) => !(d.unit === key && d.kind === "push_record"));
+    expect(quiet).toBe(true);
+    expect(remoteRef(recordRef(key))).toBeTruthy();
+    const B = cloneOf(h, "b-f4r", "bob");
+    expect((await B.norn("story", "checkout", key, "--force")).exit).toBe(0);
+    h.clock.advance(10_000);
+    const t = await h.tick("--sync");
+    expect(t.decisions.filter((d) => d.unit === key).map((d) => `${d.rule} ${d.kind}${d.ok ? "" : " FAILED"}`)).toEqual(["record.released set_aside_record"]);
+    expect(existsSync(storyRunStateOf(join(`${h.root}-worktrees/${branch}`, spec)))).toBe(false);
+    expect(supersededOf(key)).toEqual([]);
+    expect(await checkItems(key)).toEqual([]);
+  });
+});
