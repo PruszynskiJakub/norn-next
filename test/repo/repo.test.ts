@@ -1302,3 +1302,20 @@ describe("one resolver for a unit's handoff (gh-195 prefactor 2, B6, B39)", () =
     expect(keyedByRecord).toEqual([]);
   });
 });
+
+describe("superseded records replace unpushed runs and orphaned/ (gh-195 D11, B27, AC4)", () => {
+  test("no package source, golden case, rule case, shipped asset or generated reference names unpushed_runs, orphaned/ or work not in the record", () => {
+    const GONE = /unpushed_runs|unpushedRuns|UnpushedRuns|orphaned\/|copyToOrphaned|orphanedDir\b|work (?:on \S+ is )?not in the record/;
+    const scanned = [
+      ...files(PKGS).filter((p) => p.includes("/src/") || p.endsWith("/test/rule-cases.ts")),
+      ...readdirSync(join(PKGS, "core", "test", "golden")).map((n) => join(PKGS, "core", "test", "golden", n)),
+      join(ROOT, "docs", "reference.md"),
+    ];
+    const hits = scanned.flatMap((p) =>
+      readFileSync(p, "utf8")
+        .split("\n")
+        .flatMap((l, i) => (GONE.test(l) ? [`${relative(ROOT, p)}:${i + 1}: ${l.trim().slice(0, 120)}`] : [])),
+    );
+    expect(hits).toEqual([]);
+  });
+});
