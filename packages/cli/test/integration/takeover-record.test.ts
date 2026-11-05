@@ -333,12 +333,14 @@ describe("a story held only from its record (B33, 10-R3-F2)", () => {
     const t2 = await B.tick();
     expect(t2.decisions.filter((d) => d.unit === s.key && d.kind === "push_record")).toEqual([]);
 
-    // status on B shows the story it holds at review#2, as the record has it (the run its holder started)
+    // status on B: the story it holds at review#2 is not running — the run in its record belongs to the
+    // session on A, and nothing runs here until the story has a branch (review#1 S8)
     const status = await B.norn("status", "--json");
-    const groups = (status.value as { groups: Record<string, Array<{ story: string; title: string }>> }).groups;
-    expect(Object.values(groups).flat().filter((i) => i.story === s.key).map((i) => i.title)).toEqual(["review #2 (auto)"]);
-    const listed = ((await B.norn("story", "list", "--json")).value as { stories: Array<{ key: string; step: string; attempt: number; claim: { state: string } }> }).stories.find((x) => x.key === s.key);
-    expect(listed).toMatchObject({ step: "review", attempt: 2, claim: { state: "mine" } });
+    const groups = (status.value as { groups: Record<string, Array<{ story: string; title: string; command: string }>> }).groups;
+    const items = Object.entries(groups).flatMap(([g, list]) => list.filter((i) => i.story === s.key).map((i) => ({ group: g, title: i.title, command: i.command })));
+    expect(items).toEqual([{ group: "check", title: `review #2: held here from its record; ${s.key} has no branch, so nothing runs (B33)`, command: `norn story view ${s.key}` }]);
+    const listed = ((await B.norn("story", "list", "--json")).value as { stories: Array<{ key: string; step: string; attempt: number; branch: string | null; claim: { state: string } }> }).stories.find((x) => x.key === s.key);
+    expect(listed).toMatchObject({ step: "review", attempt: 2, branch: null, claim: { state: "mine" } });
 
     // handing it over pushes the record and releases the claim
     h.clock.advance(10_000);
@@ -346,7 +348,7 @@ describe("a story held only from its record (B33, 10-R3-F2)", () => {
     expect(back.exit).toBe(0);
     expect(remoteRef(claimRef(s.key))).toBeNull();
     const after = remoteRef(recordRef(s.key)) as string;
-    expect([pushed, sh(B.root, ["rev-parse", `${after}^`])]).toContain(pushed);
+    expect(after).toBe(pushed);
   });
 });
 

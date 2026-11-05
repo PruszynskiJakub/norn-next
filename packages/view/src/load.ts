@@ -454,7 +454,8 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       stories.push({
         ...base,
         slice: null,
-        branch: sf.branch,
+        // B33 (review#1 S8): a story held from its record alone has no branch
+        branch: sf.record_only ? null : sf.branch,
         pr: prView(prSeen[story.key]),
         notes: sf.notes ?? [],
         base_sync: baseSync(sf, storyUnit.receipts ?? [], config.base_branch ?? cachedDefaultBranch(opts.repoRoot) ?? "main"),

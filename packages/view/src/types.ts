@@ -104,8 +104,8 @@ export interface PrView {
 
 export interface StoryView extends UnitView {
   slice: null;
-  /** story branch (GR3) */
-  branch: string;
+  /** story branch (GR3); null for a story held from its record alone, which has none (B33) */
+  branch: string | null;
   /** the story PR as last seen here; null = none seen (or no sync yet) */
   pr: PrView | null;
   /** NT2: open notes of the story and its slices, in the order they were left */

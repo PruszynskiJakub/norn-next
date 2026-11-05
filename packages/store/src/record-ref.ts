@@ -301,8 +301,11 @@ export function stageRecordSync(root: string, sha: string, dest: string): Staged
  */
 export function stageEmptyRecord(dest: string): Extract<StagedRecord, { ok: true }> {
   const staging = join(dirname(dest), `.${basename(dest)}.unpack-${process.pid}`);
+  // review#1 S6: what a killed checkout left beside `dest` is swept first, and the staging folder is
+  // created exclusively, so a new round never starts from leftovers
   recoverPlace(dest);
-  mkdirSync(staging, { recursive: true });
+  mkdirSync(dirname(dest), { recursive: true });
+  mkdirSync(staging);
   return { ok: true, files: 0, dir: staging, place: () => placeStaged(staging, dest), discard: () => rmSync(staging, { recursive: true, force: true }) };
 }
 

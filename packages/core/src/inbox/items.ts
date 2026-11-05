@@ -604,6 +604,12 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
     ...extra,
   });
   const park = st.park;
+  // gh-195 B33 (review#1 S8): a story held here from its record alone has no branch, so nothing runs in
+  // it — a run its record names belongs to the previous holder's session, and nothing can start
+  if (story.record_only && (st.status === "running" || st.status === "ready"))
+    return item("check", `${st.step} #${st.attempt}: held here from its record; ${story.key} has no branch, so nothing runs (B33)`, cmd.storyView(key), st.updated_at, {
+      id: `record-only:${key}:${st.step}#${st.attempt}`,
+    });
   switch (st.status) {
     case "parked":
       if (park?.kind === "ask") return answerItem(uf, st, park, item);
