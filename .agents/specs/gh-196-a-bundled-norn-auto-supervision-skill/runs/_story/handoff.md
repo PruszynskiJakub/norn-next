@@ -21,7 +21,7 @@
 
 ## Goal
 
-Plan gh-196: seams, coverage, prefactoring and decisions for `norn-fsd-round`, `norn-fsd` and delegated recording, written into spec.md's Plan section.
+Implement gh-196 (quick): `--delegated --reason` recorded and shown apart (D1–D5), the `norn-fsd-round` and `norn-fsd` skills (D6, D7), command lint over bundled skills (prefactor), D8 docs.
 
 ## Progress
 
@@ -37,7 +37,15 @@ Plan gh-196: seams, coverage, prefactoring and decisions for `norn-fsd-round`, `
     - a Delegated section in story view, a count in status and a mark in run view.
 - Sidenote from the person (refine): file an auto-release workflow story.
 - plan#1 done: Plan for gh-196 agreed: seams S1 (cli harness: delegated commands → run view/story view/status --json) and S2 (skill texts + command lint) + person-judged QA delivery; prefactor: command lint over bundled skills; D1–D8 (--delegated flag on 5 commands, optional header delegated:true with by=human, reason in comment, refused in unit worktree, view section/count/mark, norn-fsd links norn-fsd-round).
+- implement#1 (quick round 2):
+  - schema: header `delegated: true` (optional), `comment` on answer and round receipts; JSON schema re-emitted.
+  - cli: `delegation()` in runtime/human.ts; `--delegated` on story approve/reject/answer, run rerun, story edit --workflow (round start only; slice switch/pre-start refused as usage). No reason → usage `reason_required`; in a unit worktree → refused `delegated_in_unit`. `story answer` and `story edit` gained `--reason`.
+  - view: StepRow `delegated: true` + reason "approve — delegated (supervisor): …"; timeline marks; StoryView/orient `delegated[]` over every round folder and slice; story view "## Delegated (N)" section; `status --json` `delegated: {story: n}` and a markdown line "gh-1 2 delegated".
+  - S1 test: packages/cli/test/integration/delegated.test.ts (7 tests: refusals, run list mark, round start, story view, status).
+  - S2: both SKILL.md in packages/cli/assets/skills/; assets tests check their terms; they are excluded from the craft-skill "unaware of norn" rule (they drive norn by design). Docs lint now checks every `norn …` command in bundled skills (existing ones were clean). `norn help` lists them under a "supervisors" group.
+  - Not done by hand: `.agents/skills/` copies (come from `norn init`/`upgrade`, D8). The view tests were written after the code (not seen red first); they would fail without it (fields absent).
+  - QA (person): one supervised delivery with norn-fsd, per the Plan.
 
 ## Resume
 
-Plan done; the next round (slicing) starts from spec.md's Plan.
+Implementation done and committed; the next step checks it (tests, review, QA).
