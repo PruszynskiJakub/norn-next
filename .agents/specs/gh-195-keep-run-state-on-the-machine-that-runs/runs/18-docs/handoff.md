@@ -51,6 +51,11 @@ Bring the rules, docs, docs lint and bundled skills in line with what gh-195 bui
   - [x] F5 concepts: run state on no branch / in no worktree; leaves the machine only as the record (body + glossary).
   - [x] F6 R3.2/T7b: done or dropped. F7 S4: stand-in Norn-Step start/release/take/drop. F8 concepts: remote pushes whenever the record changed. F9 recipes upgrade sentence (HEAD's spec folders, per story, validation/other-record failures, .gitattributes once any moved, pointer until removal reaches base). F10 .agents/workflows quick/reproduce (shipped copies don't have the sentence). F11 T7a/R2.3 "this machine" + D11 remote caveat. F12 AGENTS launchers per PATH. F13 retro: older records may lack rounds/ and hold handoff.md. F14 slug `[0-9]{2,3}-[a-z0-9-]+` + matcher cases. F15 test title.
 
+- Rework review#2 (implement #3), commit 5a13fa945, each against the code:
+  - [x] G1 S4: Norn-Step = cursor step; outside decide the cursor's step else `start` (lifecycle.ts:76) / `release` (release.ts:57); fixed `take` (checkout.ts:550), `drop` (close.ts:55,74,80), `$done` (lifecycle.ts:121,130); intake has none (policy.ts:184-185), GR6 base record only Story+Tick (lifecycle.ts:342).
+  - [x] G2 T5b, spec D10, restartStepOf JSDoc (apply.ts:60-67): lastBoundary needs Norn-Outcome (elsewhere.ts:109,118); Norn-Step fallback only when wf lacks the Norn-Next step; older-norn-only branch -> first step; one line in limitations.md.
+  - [x] G3 T9: run rerun --step/--reset refused story_not_local (run-rerun.ts:33-37). G4/G5 concepts: stale-refused push waits (decide/story.ts:184-185, act/index.ts:150-161); glossary "whenever it changed" (story.ts:181). G6 lint slug `[a-z0-9]+(?:-[a-z0-9]+)*` (ids.ts:150-160,182) + cases. G7 recipes: .gitattributes dropped with no run state (upgrade.ts:210-211); no remote base -> until staged. G8 R3.4 "files ... on disk". G9 AGENTS launcher hash of PATH and NORN_BIN (shim.ts:57-67).
+
 ### Flakes
 
 - Implement #1: none. Unit 1241/0; integration 857 pass, 0 fail, 0 skip; e2e 74/0.
