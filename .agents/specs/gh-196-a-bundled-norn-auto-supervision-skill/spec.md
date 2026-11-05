@@ -168,3 +168,88 @@ The supervisor decides gates and starts rounds on the person's behalf. norn reco
 - Supervising stories the person did not name, or several checkouts from one supervisor — one checkout, named stories only.
 
 ## Open questions
+
+## Plan
+
+### Seams
+
+- **S1 the cli, through the harness's commands and their `--json` output.** A supervisor's command (`story approve`, `story reject`, `story answer`, `run rerun`, `story edit --workflow`, each with `--delegated --reason`) is run on a harness repo, the next tick applies it, and the record is read back through `norn run view --json`, `norn story view --json` and `norn status --json` (and their markdown). Observes B21, B22, B23, B34 and the code side of B2 (a delegated command refused inside a unit worktree).
+  Prior art: the cli integration tests that run a person's command and read the views: `story-decision`, `run-rerun-cancel`, `round-folders` (round start on a finished round), `story-view`, `status`, `records`; the harness's `createHarness` with its fake remote and runner.
+- **S2 the bundled skill texts, through the shipped assets and the docs lint.** The asset tests read each shipped `SKILL.md` and check what it states; the command lint checks that every `norn …` command it prints exists with those flags. Observes B1 (shipped with the others) and the protocol items: B2–B20, B24–B33, B35–B45.
+  Prior art: the assets unit tests "exactly the skills of §16 are shipped", "the norn skill states the protocol and hard rules", "norn-review traces every Behaviour item…"; the docs lint "commands and flags the docs name exist (B35)". `norn init`, `doctor`, `upgrade` and `uninstall` already work from the shipped folder list, and their existing integration tests cover any skill in it.
+- **QA, a supervised delivery (verifier `person`).** The skill items cannot be proven by a test of the text alone: one small story in a throwaway repo, supervised end to end with `norn-fsd` by a real agent, judged by the person against the protocol (no forbidden command run, delegated decisions with reasons, one report). It is acceptance, not a seam: no test is written for it.
+
+### Coverage
+| Behaviour | Seam | Test kind (unit / integration / e2e) | Notes |
+|---|---|---|---|
+| B1 | S2 | unit | shipped list; init/doctor/upgrade generic over it (existing tests) |
+| B2 | S1 | integration | `--delegated` refused in a unit worktree; the skill's own refusal is S2 text, checked in QA |
+| B3 | S2 | unit | named stories only; QA |
+| B4 | S2 | unit | one supervisor per checkout, never replace the watch; QA |
+| B5 | S2 | unit | one foreground subagent per story on `story wait`; QA |
+| B6 | S2 | unit | only the supervisor speaks, story named; QA |
+| B7 | S2 | unit | `--json` reads only, no `norn status <story>` |
+| B8 | S2 | unit | heartbeat check from `status --json`, escalation text |
+| B9 | S2 | unit | never `watch`/`tick` |
+| B10 | S2 | unit | `story edit --auto`, never `brief`/`story start` |
+| B11 | S2 | unit | answer from spec/repo/issue with `--delegated --reason` |
+| B12 | S2 | unit | escalation shape, reply becomes `story answer` |
+| B13 | S2 | unit | one diagnosed rerun, then escalate |
+| B14 | S2 | unit | one `--reset` rerun, then escalate |
+| B15 | S2 | unit | `gh run rerun --failed` once |
+| B16 | S2 | unit | allowed and forbidden lists stated; command lint |
+| B17 | S2 | unit | exact command and the permission rule named |
+| B18 | S2 | unit | gate checks per gate kind; QA |
+| B19 | S2 | unit | `ready` only on green CI for the PR head, clean diff |
+| B20 | S2 | unit | PR state read before a gate |
+| B21 | S1 | integration | receipt marked delegated; `run view` shows it apart |
+| B22 | S1 | integration | story view section; status count |
+| B23 | S1 | integration | `--delegated` without `--reason` refused |
+| B24 | S2 | unit | merge/release/install/restart only when named |
+| B25 | S2 | unit | destructive git escalated |
+| B26 | S2 | unit | open spec questions and rules changes escalated |
+| B27 | S2 | unit | really stuck escalated with receipts |
+| B28 | S2 | unit | machine settings escalated |
+| B29 | S2 | unit | one question set, each escalation once |
+| B30 | S2 | unit | quiet while moving |
+| B31 | S2 | unit | refinement on the person's behalf once #197 exists |
+| B32 | S2 | unit | attended step escalated as the person's turn |
+| B33 | S2 | unit | round-picking guide in `norn-fsd` |
+| B34 | S1 | integration | round start recorded delegated with its reason |
+| B35 | S2 | unit | next round only on a finished round, never `--force` |
+| B36 | S2 | unit | closing and unknown workflows escalated |
+| B37 | S2 | unit | `norn-fsd-round` stops at the round's end |
+| B38 | S2 | unit | release only when named; never `/release-start` |
+| B39 | S2 | unit | `release`'s `ready` always the person's |
+| B40 | S2 | unit | the release, install, restart order |
+| B41 | S2 | unit | load treated as environment |
+| B42 | S2 | unit | rerun at the check, not implement |
+| B43 | S2 | unit | never run tests in a unit worktree |
+| B44 | S2 | unit | report fields; QA |
+| B45 | S2 | unit | unfinished stories in the report |
+
+### Prefactoring
+
+1. Extend the docs lint's command check to the bundled skill texts — the two new skills print many `norn …` commands (B16, B17, B12, B35); the lint then catches a wrong command or flag in them, and in the skills already shipped. Lands green on its own: any hit in an existing skill is fixed in the same change.
+
+### Implementation decisions
+
+- D1 **Delegated is a flag, `--delegated`, on the person's commands** (agreed with the person). `story approve`, `story reject`, `story answer`, `run rerun` and `story edit --workflow` take it. It beat an environment variable (invisible in each command, leaks into a person's shell) and a new `supervisor` actor (decide and the views branch on `by`, so it would touch decide, the goldens and every reader).
+- D2 **The receipt header gains an optional `delegated: true`; `by` stays `human`.** The person's authority is what the supervisor uses, so decide reads these receipts exactly as the person's: no decide change, no golden change. Additive: old receipts validate, old norns ignore nothing they need. It travels in the receipt, so a mailbox delivery (T9) carries it unchanged. The one place receipts for the person are built sets it, so every command above gets it the same way.
+- D3 **The reason lives in the receipt's `comment`.** approve, reject and unstick have it already; the `round` and `answer` receipts gain an optional `comment`, and `story edit --workflow` and `story answer` gain `--reason`. `--delegated` without a non-empty `--reason` is a usage error with `reason_required` (B23); without `--delegated` the reason stays optional where it is today.
+- D4 **A delegated command is refused inside a unit worktree** (exit `refused`), so a step agent cannot act as a supervisor even if it loaded the skill (B2, SK3).
+- D5 **The view collects a story's delegated decisions** across its rounds and slices: step, kind, round, unit, reason, when. `story view` shows them in a "Delegated" section (none → no section); `status` shows a count per story (`delegated` in `--json`, "N delegated" in markdown), never an inbox item (agreed with the person); `run view` and the trace timeline mark each such row "delegated (supervisor)" with its reason, and `--json` carries `delegated: true`.
+- D6 **`norn-fsd-round` holds the whole protocol; `norn-fsd` links to it** and adds only the round-picking guide (B33, the cheapest workflow that delivers safely, with the examples of B33) and the round start (B35). The subagent's brief is a template inside `norn-fsd-round`, so every subagent gets the same rules. Both say they run in the main checkout only and stop when `.norn-unit` is in the working directory.
+- D7 **The permission rule the skill names (B17)** is the agent's own allow rule for the delegated commands (Claude Code: `Bash(norn story approve:*)` and the like for each allowed command), given as text the person adds; the skill never edits settings itself (B28).
+- D8 **Docs and generated files**: the reference block (`docs:emit`) and the JSON schemas (`schema:emit`) are regenerated; the skills table in RULES.md (done in refine) and the user docs that list bundled skills name the two. The repo's `.agents/skills/` copies come from `norn init`/`upgrade`, never hand-edited.
+
+### Testing decisions
+
+A good test here runs the command a supervisor runs, on the harness, and reads the result the person reads (`--json` of the three views): never the receipt file or a view function directly. The skill texts are tested by what they state and by the commands they print being real, never by phrasing beyond the named terms (command names, flags, SK3's escalation classes, the report's fields). What may be faked: the remote, the runner, the notifier and the clock (the harness's fakes); nothing inside norn. The protocol's real behaviour is judged in QA by the person on one supervised delivery.
+
+### Risks
+
+- **The skill is only as good as an agent's reading of it.** Text tests prove it says the right things, not that an agent does them. The QA run is the real check; the slices should ship the skills early enough that the QA delivery can find gaps before review.
+- **Adding bundled skills holds running units on drift.** A unit worktree on the old skill set counts as drifted after an upgrade (gh-61 B22): existing behaviour, as when `norn-retro` was added, but worth saying in the PR.
+- **The command lint over existing skills may find old mistakes.** The prefactor fixes them; if there are many, they are their own slice.
+- **Permission classifiers differ per agent.** D7 names Claude Code's rule; other agents get the exact command to run instead (B17), not a rule.
