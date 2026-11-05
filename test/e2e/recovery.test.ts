@@ -146,7 +146,7 @@ describe("a claim lost mid-run (R1.2, R2.3)", () => {
     expect(existsSync(join(machineDir(A.root), "superseded", names[0] as string, round, "receipts", done))).toBe(true);
     const inbox = (await A.norn("status")).value as Inbox;
     expect(inbox.groups.check).toEqual([
-      expect.objectContaining({ id: `superseded:gh-9:${done.replace(/\.json$/, "")}`, story: "gh-9", title: `your record of gh-9 was superseded when bob@repo-b took it over (last local receipt ${done.replace(/\.json$/, "")})` }),
+      expect.objectContaining({ id: `superseded:gh-9:${(names[0] as string).slice("gh-9-".length)}`, story: "gh-9", title: `your record of gh-9 was superseded when bob@repo-b took it over (last local receipt ${done.replace(/\.json$/, "")})` }),
     ]);
     // nothing pushed: not the branch, not a record, no other ref
     expect(remoteHead()).toBe(head);

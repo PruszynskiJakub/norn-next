@@ -143,7 +143,7 @@ describe("a takeover without a release supersedes the old holder's record (B27, 
     expect(remoteRef(recordRef(s.key))).toBeNull();
 
     const title = `your record of ${s.key} was superseded when bob@b-ac1 took it over (last local receipt ${last})`;
-    expect(await checkItems(s.key)).toEqual([expect.objectContaining({ id: `superseded:${s.key}:${last}`, group: "check", title })]);
+    expect(await checkItems(s.key)).toEqual([expect.objectContaining({ id: `superseded:${s.key}:${(names[0] as string).slice(s.key.length + 1)}`, group: "check", title })]);
     // the next tick does it no more: one copy, one item
     h.clock.advance(10_000);
     await h.tick("--sync");
@@ -228,7 +228,7 @@ describe("checkout never replaces a local copy whole (gh-195 D11; 10-R3-F1, 11-S
     expect(placed.filter((x) => x.receipt.kind === "take").map((x) => (x.receipt as { previous_holder: string | null }).previous_holder)).toEqual([null, "tester@box"]);
     expect(placed.map((x) => x.file)).not.toContain(`${last}.json`);
     expect(sh(h.root, ["rev-parse", recordRef(s.key)])).toBe(newer);
-    expect(await checkItems(s.key)).toEqual([expect.objectContaining({ id: `superseded:${s.key}:${last}`, title: `your record of ${s.key} was superseded when bob@b-f1 took it over (last local receipt ${last})` })]);
+    expect(await checkItems(s.key)).toEqual([expect.objectContaining({ id: `superseded:${s.key}:${(supersededOf(s.key)[0] as string).slice(s.key.length + 1)}`, title: `your record of ${s.key} was superseded when bob@b-f1 took it over (last local receipt ${last})` })]);
     // A's next handoff pushes on top of B's record, never A's older copy
     h.clock.advance(10_000);
     await h.tick();
@@ -256,6 +256,6 @@ describe("checkout never replaces a local copy whole (gh-195 D11; 10-R3-F1, 11-S
     expect(readdirSync(copy)).toContain("_story");
     // the new round is in place: one take, record_lost
     expect(listReceipts(s.runs(h.root)).receipts.map((x) => x.receipt.kind)).toEqual(["take"]);
-    expect(await checkItems(s.key)).toEqual([expect.objectContaining({ id: `superseded:${s.key}:${last}`, title: `your record of ${s.key} was superseded when tester@box took it over (last local receipt ${last})` })]);
+    expect(await checkItems(s.key)).toEqual([expect.objectContaining({ id: `superseded:${s.key}:${(supersededOf(s.key)[0] as string).slice(s.key.length + 1)}`, title: `your record of ${s.key} was superseded when tester@box took it over (last local receipt ${last})` })]);
   });
 });

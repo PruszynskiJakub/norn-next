@@ -301,7 +301,7 @@ describe("superseded records (gh-195 D11, B27, R2.3)", () => {
     const inbox = buildInbox({ ...facts([s]), superseded }, CONFIG);
     expect(inbox.groups.check).toEqual([
       expect.objectContaining({
-        id: "superseded:gh-9:0035-done",
+        id: "superseded:gh-9:01JFFFFFFFFFFFFFFFFFFFFFFF",
         story: "gh-9",
         slice: null,
         title: "your record of gh-9 was superseded when ann@pc took it over (last local receipt 0035-done)",
@@ -310,6 +310,9 @@ describe("superseded records (gh-195 D11, B27, R2.3)", () => {
     // nothing else of a story held elsewhere is shown
     expect(inbox.pending).toBe(1);
     expect(buildInbox(facts([s]), CONFIG).pending).toBe(0);
+    // review#1 F6: two copies of one story with the same last receipt are two items
+    const twice = [...superseded, { ...superseded[0]!, name: "gh-9-01JGGGGGGGGGGGGGGGGGGGGGGG", dir: "/m/superseded/gh-9-01JGGGGGGGGGGGGGGGGGGGGGGG" }];
+    expect(buildInbox({ ...facts([s]), superseded: twice }, CONFIG).groups.check.map((i) => i.id)).toEqual(["superseded:gh-9:01JFFFFFFFFFFFFFFFFFFFFFFF", "superseded:gh-9:01JGGGGGGGGGGGGGGGGGGGGGGG"]);
   });
 });
 

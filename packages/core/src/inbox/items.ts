@@ -788,7 +788,8 @@ function supersededItems(facts: Facts): InboxItem[] {
   return (facts.superseded ?? []).map((c) => {
     const url = facts.stories.find((s) => s.key === c.story)?.frontmatter?.url;
     return {
-      id: `superseded:${c.story}:${c.last_receipt ?? c.name}`,
+      // review#1 F6: one id per copy, its ulid (two copies of one story may share a last receipt)
+      id: `superseded:${c.story}:${c.name.slice(c.story.length + 1)}`,
       group: "check" as const,
       story: c.story,
       slice: null,

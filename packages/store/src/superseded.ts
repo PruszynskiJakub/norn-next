@@ -13,12 +13,12 @@
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { type LocalSupersededFile, parseReceiptFileName, type RunStory, STORY_UNIT_DIR, ulidTime } from "@norn/schema";
-import { atomicWriteJson, isErrno } from "./fsx.ts";
+import { atomicWriteJson, isErrno, readText } from "./fsx.ts";
 import { git } from "./git.ts";
-import { readLocalJson } from "./local-json.ts";
+import { parseLocalJson } from "./local-json.ts";
 import { receiptsDir, supersededDir } from "./paths.ts";
 import { readRecordRef, recordTreeId } from "./record-ref.ts";
-import { runStateDirIn, storyRunStateDir } from "./run-state.ts";
+import { machineRunsDir, runStateDirIn, storyRunStateDir } from "./run-state.ts";
 
 /** D11: a local record of a story another heartbeat holds (`StoryFacts.local_record`). */
 export interface LocalRecordFacts {
@@ -88,6 +88,7 @@ async function pushedByMe(root: string, sha: string, tree: string, holder: strin
  * (holder unknown) and pruned the same way. Returns the folder.
  */
 export function setAsideRecord(root: string, story: RunStory, name: string, meta: LocalSupersededFile): string {
+  sweepDropped(root);
   const dest = join(supersededDir(root), name);
   mkdirSync(supersededDir(root), { recursive: true });
   renameSync(storyRunStateDir(root, story), dest);
@@ -100,6 +101,7 @@ export function setAsideRecord(root: string, story: RunStory, name: string, meta
  * release): renamed aside first (a dot-named folder is never read as a record), then deleted.
  */
 export function dropLocalRecord(root: string, story: RunStory, tag: string): void {
+  sweepDropped(root);
   const dir = storyRunStateDir(root, story);
   const aside = join(dirname(dir), `.${story.key}.drop-${tag}`);
   renameSync(dir, aside);
@@ -139,7 +141,7 @@ export function listSuperseded(root: string): SupersededCopy[] {
     const m = /^(.+)-([0-9A-HJKMNP-TV-Z]{26})$/.exec(name);
     if (!m) continue;
     const dir = join(supersededDir(root), name);
-    const meta = readLocalJson("local-superseded", join(dir, SUPERSEDED_FILE), null as unknown as LocalSupersededFile, root) as LocalSupersededFile | null;
+    const meta = readMeta(join(dir, SUPERSEDED_FILE));
     out.push({
       name,
       story: meta?.story ?? (m[1] as string),
@@ -155,8 +157,48 @@ export function listSuperseded(root: string): SupersededCopy[] {
 /** D11 (B27): delete the records set aside before `before` (ISO), as `norn tidy` ages the trace out; returns them (`dry`: only lists them). */
 export function pruneSuperseded(root: string, before: string, dry: boolean): SupersededCopy[] {
   const old = listSuperseded(root).filter((c) => c.at < before);
-  if (!dry) for (const c of old) dropFolder(c.dir);
+  if (!dry) {
+    sweepDropped(root);
+    for (const c of old) dropFolder(c.dir);
+  }
   return old;
+}
+
+/**
+ * review#1 F6: a copy's `superseded.json`, validated (S2); null when it is missing or not one — the copy
+ * is still listed, its holder unknown.
+ */
+function readMeta(file: string): LocalSupersededFile | null {
+  let raw: string | null;
+  try {
+    raw = readText(file);
+  } catch {
+    return null;
+  }
+  if (raw === null) return null;
+  const r = parseLocalJson("local-superseded", raw);
+  return r.ok ? r.value : null;
+}
+
+/**
+ * review#1 F6: what a crash between the rename aside and the delete left behind — `.<story>.drop-<tag>`
+ * beside the stories' run state, `.<name>.drop` under `superseded/` — is deleted by the next set-aside,
+ * quiet removal or tidy. Never read as a record (dot-named).
+ */
+export function sweepDropped(root: string): void {
+  for (const [dir, re] of [
+    [machineRunsDir(root), /^\..+\.drop-[^/]+$/],
+    [supersededDir(root), /^\..+\.drop$/],
+  ] as const) {
+    let names: string[];
+    try {
+      names = readdirSync(dir);
+    } catch (e) {
+      if (isErrno(e, "ENOENT")) continue;
+      throw e;
+    }
+    for (const n of names) if (re.test(n)) rmSync(join(dir, n), { recursive: true, force: true });
+  }
 }
 
 /** Rename aside, then delete: a folder half deleted is never listed. */
