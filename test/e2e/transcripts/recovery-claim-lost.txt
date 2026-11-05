@@ -44,10 +44,6 @@
   spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-9
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/inbox/gh-9/
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:2> "^<sha:1>" --
-  spawn repo-worktrees/gh-9-add-search $ git rev-parse --verify --quiet refs/remotes/origin/gh-9-add-search
-  spawn repo-worktrees/gh-9-add-search $ git merge-base HEAD refs/remotes/origin/main
-  spawn repo-worktrees/gh-9-add-search $ git diff --name-only --no-renames --diff-filter=AM <sha:1> -- .agents/specs/gh-9-add-search/runs/_story/
-  spawn repo-worktrees/gh-9-add-search $ git ls-files --others --exclude-standard -- .agents/specs/gh-9-add-search/runs/_story/
   spawn repo $ git log "--format=%H%x1f%s%x1f%ct%x1f%(trailers:only,unfold)%x1e" refs/remotes/origin/main..refs/heads/gh-9-add-search --
   spawn repo $ git rev-list --left-right --count <sha:2>...<sha:1> --
   spawn repo $ git merge-base <sha:2> <sha:1>
@@ -184,3 +180,40 @@
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
   spawn repo $ git hash-object -w --stdin
   spawn repo $ git push --porcelain --force-with-lease=refs/norn/claims/gh-9:<sha:3> origin <sha:6>:refs/norn/claims/gh-9
+> [A] norn tick --sync
+  spawn repo $ git rev-parse --path-format=absolute --git-common-dir
+  spawn repo $ git remote
+  spawn repo $ git worktree list --porcelain -z
+  spawn repo $ git fetch --quiet --no-tags origin +refs/heads/main:refs/remotes/origin/main
+  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
+  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
+  spawn repo $ git fetch --quiet --prune --no-tags origin "+refs/norn/claims/*:refs/norn/claims/*" "+refs/norn/inbox/*:refs/norn/inbox/*"
+  spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/
+  A.remote.listAssignedIssues norn
+  A.remote.findPullRequest gh-9-add-search
+  spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
+  spawn repo-worktrees/gh-9-add-search $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn repo-worktrees/gh-9-add-search $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn repo-worktrees/gh-9-add-search $ git log -1 "--format=%ct" HEAD
+  spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn repo-worktrees/gh-9-add-search $ git diff --name-only --diff-filter=U -z
+  spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-9
+  spawn repo $ git cat-file blob <sha:5>
+  spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/inbox/gh-9/
+  A.runner.paneState s-1
+  spawn repo $ git rev-parse --verify --quiet refs/norn/runs/gh-9
+  spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
+  - home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/receipts/0001-started.json
+  - home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/receipts/0002-started.json
+  - home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/receipts/0003-done.json
+  - home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/state.json
+  - home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/workflow.yaml
+> [A] norn status
+  spawn repo $ git rev-parse --path-format=absolute --git-common-dir
+  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
+  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
+  spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/runs/
+  spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-9
+  spawn repo $ git cat-file blob <sha:5>
+  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
+  spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/
