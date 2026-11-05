@@ -15,6 +15,10 @@ const result = await runCli(process.argv.slice(2), {
   signal: controller.signal,
   log: (line) => process.stderr.write(`${line}\n`),
 });
-if (result.stderr) process.stderr.write(result.stderr);
-process.stdout.write(result.stdout);
+// P8: exit only once stdout and stderr have flushed; exit does not wait for a pipe write
+// that has not drained, so a value over the 64 KiB pipe buffer would be cut off (gh-139)
+const flushed = (stream: NodeJS.WriteStream, text: string) =>
+  new Promise<void>((resolve) => (text ? stream.write(text, () => resolve()) : resolve()));
+await flushed(process.stderr, result.stderr ?? "");
+await flushed(process.stdout, result.stdout);
 process.exit(result.exit);
