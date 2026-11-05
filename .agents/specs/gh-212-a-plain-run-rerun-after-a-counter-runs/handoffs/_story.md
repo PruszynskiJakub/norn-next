@@ -12,6 +12,7 @@ When a counter runs out (W4), the way out norn offers is the exhausted edge's ta
 - RULES.md: W4 says what the park records and the way out offered; the CK table's `u` row carries the flags. Schema JSON re-emitted.
 - Tests: `apply.test.ts` (park.counter), `handoff-inbox.test.ts` (inbox command, nextCommand, rerunWarning), `cockpit.test.ts` (u argv), `run-rerun-cancel.test.ts` integration (gate rejected past `loop` max: status inbox command and the warning; 120s timeout, the flow takes ~30s).
 - Unit tier, type check and the run-rerun integration file are green; golden corpus untouched.
+- implement#1 done: Exhausted park records counter/max/outcome/target (ParkInfo.counter, W4); inbox, nextCommand and cockpit u offer run rerun --step <to> --reset <counter>; run rerun returns a warning when the counter is not reset. Unit, typecheck and run-rerun integration green.
 
 ## Resume
 
