@@ -55,7 +55,7 @@ Three separate concepts decide where a human is involved:
 | Concept | Where declared | Meaning |
 |---|---|---|
 | **Attended step** | `attended: true` on an agent step | The agent works *with* a person in the pane (refine, clarify, plan). Always started by a person. |
-| **Gate** | `type: gate` step | A person decides (`approve` / `reject` / `answer`); no agent. |
+| **Gate** | `type: gate` step | A person decides (`approve` / `reject` / `answer`), or a supervisor the person delegated to (SK3), recorded as delegated; never a step agent. |
 | **Mode** | per story | Who starts **unattended** agent steps: a person (`manual`) or the tick (`auto`). |
 
 **Mode** (repo default in config, stored per story, switchable with `norn story edit <story> --auto|--manual`):
@@ -65,7 +65,7 @@ Three separate concepts decide where a human is involved:
 | Unattended agent steps | Marked ready; a human opens any agent in the unit worktree (`norn story start <unit>` where the runner opens terminals, MO5), which runs `norn brief` | Tick starts the agent via the runner |
 | Attended agent steps | Wait for a human ("Your turn", `norn story start <unit>`) | Wait for a human ("Your turn", `norn story start <unit>`) |
 | `check`, `git` steps | Run automatically | Run automatically |
-| `gate` steps | Wait for a human | Wait for a human |
+| `gate` steps | Wait for a human (or a delegated supervisor, SK3) | Wait for a human (or a delegated supervisor, SK3) |
 | Hooks, receipts, claims, trace | Same | Same |
 
 "Semi-automatic" = auto mode plus gates and attended steps placed in the workflow.
@@ -216,7 +216,7 @@ Three sources of outcomes:
 | agent (unattended) | `stalled` | no hook, git or file activity for the configured window |
 | agent | `ask` (implicit) | pane/hook says waiting for input, no receipt (incl. permission prompts — inbox shows the question block, the command's first line and the options; the full screen only with `status --details` and in `run view --why`); unattended only |
 | check | `pass` / `fail` | exit code; timeout counts as `fail` with reason `timeout` |
-| gate | `approve` / `reject` | human receipt |
+| gate | `approve` / `reject` | human receipt, or delegated (SK3): marked as the supervisor's, with its reason |
 | gate (story unit) | `stale` | the unit waits at the gate and the story is stale against its base (BS7); only when the gate declares a `stale` route (BS6) |
 | git | `done` / `conflict` | command result (`update`: a dirty worktree or a diverged story branch parks the unit `$stuck` with the reason, BS3) |
 | slices | `done` / `stuck` | aggregate of slices; a story it parked `$stuck` is unstuck by norn back into the step once a slice can move again (a person unstuck one, or the slice files changed) |
@@ -271,7 +271,7 @@ Three sources of outcomes:
 ### 11.1 Rounds
 
 - RD1 A **round** is one workflow applied to a story, from its start step to `$done`. Each round has its own pinned workflow, cursor, attempt, counters and receipts; counters start at 0 in each round. Rounds share the story branch, worktree, PR, handoff and mode. `$done` ends a round; only GR6 and GR6b end the story. Slices run one workflow each and have no rounds.
-- RD2 `norn story edit <story> --workflow <name> [--at <step>]` on a story whose round is finished starts the next round at the workflow's start step, or at `--at`. It works whether or not the finished round left an open PR; a later round's `open-pr` updates that PR (GR9). The same workflow may run again as a new round.
+- RD2 `norn story edit <story> --workflow <name> [--at <step>]` (run by a person, or by a supervisor the person delegated to, recorded as delegated with its reason, SK3) on a story whose round is finished starts the next round at the workflow's start step, or at `--at`. It works whether or not the finished round left an open PR; a later round's `open-pr` updates that PR (GR9). The same workflow may run again as a new round.
 - RD3 On an unfinished round (running, parked or stuck), starting a round is refused unless `--force`, which ends the round (recorded in it as ended by the person, at its step) and starts the next in one journaled change. `--force` is refused while an agent runs a step of the round (`norn run cancel` first) and while any slice of the story is unfinished. On a finished round `--force` is accepted and behaves as without it.
 - RD4 `--at <step>` without `--workflow` moves the cursor within the current, unfinished round (S7); on a finished round it is refused, pointing to `--workflow`. Starting a round is refused, as `story edit` is, while another machine holds the claim (T9).
 - RD5 The issue's `norn:wf:<name>` label follows the current round (W9); visibility only.
@@ -315,7 +315,7 @@ The shipped workflows (sketches; `sync` and `update` are `git: update`, a confli
 
 - `triage`: `explore (agent, norn-triage: checks the issue still holds, posts a ## Triage issue comment with one recommendation, refinement | quick | reproduce | close, and sets the kind, risk and priority labels, GR11; outcome done) → $done`. The recommendation lives only in the comment, so the inbox item for the finished round stays generic.
 - `reproduce`: `reproduce (agent, norn-diagnose: seen as a user, then a red loop and the cause, no fix, posted as a ## Reproduce issue comment; reproduced | cannot_reproduce) → $done`.
-- `refinement`: `sync → refine (attended; done → plan, questions → clarify) → clarify (attended) → plan (attended) → $done`. No gate: starting the next round is the person's approval of the plan.
+- `refinement`: `sync → refine (attended; done → plan, questions → clarify) → clarify (attended) → plan (attended) → $done`. No gate: starting the next round is the person's approval of the plan (or a delegated supervisor's, SK3).
 - `story`: `sync → slice (done → approve-slices; replan → $stuck when spec.md has no Plan or the base no longer fits it) → approve-slices (gate) → slices → update → test (check) → qa → describe (writes pr.md, GR9) → open-pr (git) → ci (check: waits for the PR's checks) → ready (gate) → $done`; `human-qa` approve also goes to `describe`; `human-qa` and `ready` route `stale` back to `update` (counted, `stale_loop`), workflow fields `base: { stale: conflict, step: update }` (BS6–BS9). Rework found by story `test`/`qa`/`ci` goes to `implement` in the story worktree, counted. After `$done` the round is finished; the story waits for the observed PR merge (GR6) — a fact, not a gate — or for a person to start another round (RD2).
 - `slice`: as in the example above; no QA of its own.
 - `quick`: `sync → implement → update → test → review → describe → open-pr → ci → ready → $done`, in the story worktree (no `slices`, W8).
@@ -677,10 +677,13 @@ Single-purpose skills ported from ai-engine (the earlier norn): its skill files 
 | `norn-prototype` | Throwaway prototype that settles one design question with a person: a state model as one shareable HTML file (`LOGIC.md`), or radically different UI variants on one route switched by `?variant=` (`UI.md`). Committed on the branch being worked on, in prototype-named files that nothing in the product reaches (real files it edited go back as they were); the spec links its path next to the decision it settled, with the question and the verdict. Not a step: `norn-refine` and `norn-plan` offer it when a decision turns on look and feel or a state model hard to judge on paper, and only suggest it when no person is present. | — |
 | `norn-tdd` | Reference: red → green at agreed seams, good tests, mocking at boundaries (`tests.md`, `mocking.md`); refactoring stays out of the loop. | — |
 | `norn-codebase-design` | Reference: deep modules, interface, seam, adapter, depth (`DEEPENING.md`, `DESIGN-IT-TWICE.md`). | — |
+| `norn-fsd-round` | Supervisor protocol, never a step: in the main checkout, one supervisor per checkout and one foreground subagent per story the person names; takes each named story's current round to its end with norn's commands only (SK3), deciding gates as a delegated supervisor and escalating only what SK3 reserves for the person; one report at the end. | — |
+| `norn-fsd` | `norn-fsd-round` across rounds: when a round ends, judges the next workflow (the cheapest one that delivers safely) and starts it as a delegated decision with its reason; runs refinement on the person's behalf once it is unattended. | — |
 | `norn-retro` | Retrospective over one finished story, run by a person with an agent after its PR merges, never a step: reads the committed `runs/` of the story and each slice (counters, receipts, check logs, handoffs) and the local trace in the machine dir if present; ranks the friction (exhausted or high counters, repeated rejects, asks, stuck and lost sessions, `unverified`/`person` verdicts, environment check failures, recurring findings) and proposes one change per finding to a skill, workflow, config, contributor docs or the spec template, citing the receipt. Suggests only: answers in the session and writes or changes no file. | — |
 
 - SK1 `norn init` copies each bundled skill folder that is missing whole into `.agents/skills/`, and `norn upgrade` rewrites every bundled one to the running norn's copy (committed; always the bundled version, the change visible in `git diff`; gh-61: `init` leaves a drifted one alone and points at `upgrade`) and links it from each configured agent's skill folder (`.claude/skills/`, `.gemini/skills/`, `.opencode/skills/`; codex reads `.agents/skills/` itself). A repo customizes a skill by writing its own under another name and naming it in its workflow (W1). `doctor` reports missing, unlinked and drifted skills, and a drifted skill is a failed check (gh-61). A unit whose worktree holds a bundled skill that differs from the running norn's copy starts no agent step: the tick still runs its gates, checks, syncs and merges, the inbox names the fix (bring the base in, or `norn upgrade` in the main checkout), and `story start`, `story chat` and `brief` are refused. A unit worktree whose own repo file records a `norn_version` newer than the running norn (K8) is not compared: its skills belong to the version its branch moves to. Only bundled skills are compared; repo-local skills never are. W5 checks each step's skill against the skills its agent can see.
 - SK2 The `norn` skill must stay under ~80 lines; it never contains workflow logic or step names.
+- SK3 **Delegated supervision** (`norn-fsd-round`, `norn-fsd`). A person may delegate their gate decisions and round starts to a supervisor agent in the main checkout. It acts only through norn's commands (`story approve`, `story reject`, `story answer`, `story edit`, `run rerun`, and `run cancel` only right before rerunning a failed check at that check: a CI glitch, a failure on load or a suspected flake), never by running `brief`, `story start`, `tick` or `watch`, typing into a step pane or editing `runs/`, and always gives a reason. Each decision it makes is recorded as delegated, with its reason (a `run cancel` is a mechanical step recorded as the person's; the delegated rerun that follows carries the reason), and shown apart from the person's own in `status`, the story view and `run view` (G4); code still decides every next step (G2). It never decides, and escalates to the person: a merge, release, install or watch restart the person's request did not name; force pushes, branch deletion, `story checkout` and base conflicts from rewritten history or a stale intake; a spec question nothing written settles, and a change to this file; a unit stuck again after one diagnosed retry or a loop exhausted again after one rerun; machine settings; closing an issue; a workflow it does not know; and `release`'s `ready`.
 
 ## 17. Architecture
 

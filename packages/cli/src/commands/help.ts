@@ -40,7 +40,7 @@ export const HELP_GROUPS: ReadonlyArray<{ title: string; for: CommandFor; comman
 const UNLISTED = new Set(["help"]);
 
 /** How a bundled skill is used (§16): only an agent loads skills; some steps also need a person with it. */
-export type SkillFor = "protocol" | "step" | "attended" | "reference";
+export type SkillFor = "protocol" | "step" | "attended" | "reference" | "supervisor";
 
 /** Skill groups in print order; a skill missing here lands in "Other skills" (a step skill). */
 const SKILL_GROUPS: ReadonlyArray<{ title: string; for: SkillFor; skills: readonly string[] }> = [
@@ -48,6 +48,8 @@ const SKILL_GROUPS: ReadonlyArray<{ title: string; for: SkillFor; skills: readon
   { title: "step skills, the agent works alone", for: "step", skills: ["norn-implement", "norn-review", "norn-qa", "norn-merge", "norn-slice", "norn-pr", "norn-diagnose"] },
   { title: "step skills, a person works with the agent", for: "attended", skills: ["norn-refine", "norn-clarify", "norn-plan", "norn-interview", "norn-qa-person", "norn-prototype"] },
   { title: "references other skills read, never a step", for: "reference", skills: ["norn-tdd", "norn-codebase-design"] },
+  // gh-196 D6 (SK3): a person starts these in the main checkout; never a step
+  { title: "supervisors a person starts in the main checkout, never a step", for: "supervisor", skills: ["norn-fsd-round", "norn-fsd"] },
 ];
 
 /** Printed right under the title: an agent that runs `norn help` must not take the person's commands for its own. */

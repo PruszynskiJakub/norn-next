@@ -118,6 +118,9 @@ describe("before start", () => {
     await tick();
     refused(await h.norn("story", "edit", "gh-6", "--workflow", "nope"), "unknown_workflow");
     refused(await h.norn("story", "edit", "gh-6", "--workflow", "alt", "--at", "draft"), "not_started");
+    // gh-196 D3 (B34): --reason (with or without --delegated) is kept only on a round receipt; before start it is refused, never dropped
+    // P8: the unit's state says no, so a refusal with a code, not a usage error
+    for (const extra of [["--reason", "why"], ["--reason", "why", "--delegated"]]) refused(await h.norn("story", "edit", "gh-6", "--workflow", "alt", ...extra), "not_a_round_start");
     const r = await h.norn("story", "edit", "gh-6", "--workflow", "alt");
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ unit: "gh-6", workflow: "alt", previous: "gated", started: false, changed: true });
@@ -332,12 +335,13 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
     const deps = { ...h.deps, cwd: bRoot, env: { ...h.deps.env, NORN_HOME_DIR: bHome, USER: "colleague", NORN_MACHINE: "laptop" } };
     b = (...argv) => runChecked(argv, deps);
 
-    const r = await b("story", "approve", "gh-5", "--reason", "lgtm");
+    // gh-196 D2: a delegated decision goes through the mailbox like any other, its mark unchanged
+    const r = await b("story", "approve", "gh-5", "--reason", "lgtm", "--delegated");
     expect(r.exit).toBe(0);
     const v = r.value as Verb;
     expect(v.delivered).toMatchObject({ via: "mailbox", holder: "tester@box" });
     expect(v.delivered.ref).toMatch(/^refs\/norn\/inbox\/gh-5\/[0-9A-Z]{26}$/);
-    expect(v.receipt).toMatchObject({ kind: "approve", step: "review", attempt: 3, slice: null, who: "colleague@laptop", comment: "lgtm" });
+    expect(v.receipt).toMatchObject({ kind: "approve", step: "review", attempt: 3, slice: null, who: "colleague@laptop", comment: "lgtm", delegated: true });
     expect(h.git(["ls-remote", "origin", "refs/norn/inbox/*"])).toContain("refs/norn/inbox/gh-5/");
     // the same decision twice is refused before it reaches the mailbox
     refused(await b("story", "approve", "gh-5"), "already_recorded");
@@ -361,6 +365,9 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
     expect(h.git(["ls-remote", "origin", "refs/norn/inbox/*"])).toBe("");
     await tick();
     expect(h.state(runs5())).toMatchObject({ step: "$done", status: "done", last_outcome: { outcome: "approve", source: "human" } });
+    // D2: the imported receipt still carries delegated: true, so the holder's views show it apart
+    const v = (await h.norn("story", "view", "gh-5", "--json")).value as { delegated: Array<{ kind: string; step: string; reason: string }> };
+    expect(v.delegated.map((d) => [d.kind, d.step, d.reason])).toContainEqual(["approve", "review", "lgtm"]);
   });
 
   test("run view --why replays decide on the recorded snapshot and equals the recorded decision (O5)", async () => {

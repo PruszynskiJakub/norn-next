@@ -41,6 +41,7 @@ import {
   unitDir,
 } from "@norn/store";
 import type { Context } from "../context.ts";
+import { opt, type ParsedArgs } from "../command.ts";
 import { claimHeld, failure, refuse, usageError } from "../output.ts";
 import { parseUnitKey } from "./args.ts";
 import { gitRemote, type Observed, observe } from "./observe/index.ts";
@@ -192,6 +193,33 @@ export function started(t: Target): UnitState {
   if (t.state.status === "corrupt") throw refuse(`${t.key} is corrupt (S2)`, cmd.runView(t.key, { why: true }), "corrupt_unit");
   return t.state;
 }
+
+// ------------------------------------------------------------------ delegated decisions (gh-196)
+
+/** `--delegated` with its `--reason`: what the receipt carries, or nothing for the person's own decision. */
+export interface Delegation {
+  delegated: boolean;
+  reason: string | undefined;
+}
+
+/** The option definitions every delegatable verb takes (D1). */
+export const DELEGATED_OPTION = { delegated: { type: "boolean" } } as const;
+export const DELEGATED_HELP = { "--delegated": "a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason (SK3)" };
+
+/**
+ * gh-196 D1, D3, D4 (B2, B23, SK3): read `--delegated` and `--reason`. A delegated decision always
+ * carries a non-empty reason, and is refused inside a unit worktree: a step agent never supervises.
+ */
+export function delegation(ctx: Context, args: ParsedArgs, verb: string): Delegation {
+  const reason = opt.str(args, "reason")?.trim() || undefined;
+  const delegated = opt.bool(args, "delegated");
+  if (delegated && !reason) throw usageError(`${verb} --delegated: the reason is required`, `pass --reason "the evidence": norn ${verb} … --delegated --reason "…"`, "reason_required");
+  if (delegated && ctx.unit) throw refuse(`${verb} --delegated runs in the main checkout, never in a unit worktree (SK3)`, `run it from ${ctx.root}`, "delegated_in_unit");
+  return { delegated, reason };
+}
+
+/** The receipt fields of a delegation: `delegated: true` (D2) and the reason as `comment` (D3). */
+export const delegatedFields = (d: Delegation): { delegated?: true; comment?: string } => ({ ...(d.delegated ? { delegated: true as const } : {}), ...(d.reason ? { comment: d.reason } : {}) });
 
 // ------------------------------------------------------------------ receipts
 

@@ -20,7 +20,7 @@
  */
 import { parseDuration } from "@norn/schema";
 import { firstNotice, type InboxHistoryItem, inboxHistory } from "@norn/store";
-import { formatInbox, type ProjectView, stepTitle } from "@norn/view";
+import { delegatedCounts, formatDelegatedCounts, formatInbox, type ProjectView, stepTitle } from "@norn/view";
 import { defineCommand, opt, type ParsedArgs } from "../command.ts";
 import type { Context } from "../context.ts";
 import { rendered, usageError } from "../output.ts";
@@ -63,11 +63,16 @@ async function inbox(ctx: Context, args: ParsedArgs) {
   if (opt.str(args, "since") !== undefined) throw usageError("--since goes with --history", cmd.status({ since: "1d" }));
   const view = await projectView(ctx);
   const details = opt.bool(args, "details");
-  const text = formatInbox(view, { details, notes: opt.bool(args, "notes"), home: ctx.env.HOME });
-  if (details) return rendered(view.inbox, text);
+  // gh-196 D5 (B22): a count per story of what a supervisor decided on the person's behalf, never an inbox item
+  // gh-196 D5 (B22): `delegated_counts`, apart from story view's `delegated` decisions
+  const delegated_counts = delegatedCounts(view);
+  const text = `${formatInbox(view, { details, notes: opt.bool(args, "notes"), home: ctx.env.HOME })}${formatDelegatedCounts(delegated_counts)}`;
+  // gh-196 (B8, B9): the heartbeat as data, so a supervisor sees a missing watch before anything is in auto
+  const heartbeat = view.heartbeat;
+  if (details) return rendered({ ...view.inbox, delegated_counts, heartbeat }, text);
   // L1 (A7): an item's full text (an implicit ask's pane screen) only with --details
   const groups = Object.fromEntries(Object.entries(view.inbox.groups).map(([g, items]) => [g, items.map(({ full: _full, ...it }) => it)]));
-  return rendered({ ...view.inbox, groups }, text);
+  return rendered({ ...view.inbox, groups, delegated_counts, heartbeat }, text);
 }
 
 /** The orient workspaces' tokens and order; failures are ignored (presentation, HC13). */
