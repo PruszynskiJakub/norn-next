@@ -25,6 +25,9 @@ Fix gap 2 of gh-73: GR8's "issue body changed since refine" item never fired bec
 | Gap 1 / Wanted (before refine) | — | out of scope this round (spec) |
 - review#1 approve: Approve, no findings: refineFinished now accepts norn-refine (GR8); decide test covers the real skill name and a later round without refine still surfacing the body change. Gap 1 untouched per scope. Traceability table in handoff.
 
+- describe#1: wrote pr.md (summary diff of `refineFinished`, evidence from the decide test, two-way door, inbox blast radius). No QA evidence existed; end-to-end inbox check marked not shown, with how to check.
+- describe#1 done: pr.md written: refineFinished now matches norn-refine (GR8); evidence from the decide test (red before, green now); end-to-end inbox check not shown (no QA ran), with how to check; two-way door, inbox blast radius.
+
 ## Resume
 
-Review approved; nothing left in review. Next step is norn's to route.
+PR body is in pr.md; nothing left for describe.
