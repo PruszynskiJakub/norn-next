@@ -96,7 +96,7 @@ A unit's **run state** (`state.json`, the numbered receipts, the pinned workflow
 When the record has to leave the machine, norn packs the story's whole run state into one commit on the ref `refs/norn/runs/<story>` on the remote, which no branch and no normal clone carries. The team config's **record policy** (`record.policy`) says when:
 
 - `local` (the default): when the claim is released (`norn story handoff`, a clean `norn watch` exit, `norn story close`), each time the `open-pr` step opens or updates the PR (so the PR body can link QA evidence at that record commit), and once at the end, when the PR merges or the story closes without one.
-- `remote`: as well, whenever the record changed since its last push (so at least at every step boundary, right after the branch); a failed push is retried at the next tick. Another machine then sees the current step and attempt, and can take the story over with its record as last pushed even if the holder dies.
+- `remote`: as well, whenever the record changed since its last push (so at least at every step boundary, right after the branch); a push that fails is tried again at a later tick (one refused because another checkout pushed the ref waits until the ref this checkout sees changes). Another machine then sees the current step and attempt, and can take the story over with its record as last pushed even if the holder dies.
 
 A finished story's record stays on its ref, so `norn run list` and `norn run view` read it on any machine; the base branch never receives run state. Per-tick detail (the trace, locks and caches) stays in the machine dir too; `norn run view --why` reads it. A repository whose base branch still holds run state from an older norn is pointed to `norn upgrade`, which moves it into the refs ([Recipes: Roll out a new norn to a team](recipes.md#roll-out-a-new-norn-to-a-team)).
 
@@ -143,7 +143,7 @@ A repo without the key works as before; `doctor` and `status` hint to run `norn 
 | claim | A git ref that gives one checkout the right to drive a story. |
 | handoff | `handoffs/<unit>.md` in the spec folder, on the unit's branch: goal, progress and the next action, so anyone can continue. |
 | run state | A unit's state, receipts, pinned workflow, logs and evidence, kept in the checkout's machine dir (`~/.norn/repos/<id>/runs/`), never in a worktree or on a branch; it leaves the machine only as the record. |
-| record | A story's run state packed into one commit on `refs/norn/runs/<story>` on the remote: pushed on a claim release, by `open-pr`, at the end, and under `remote` at every boundary. |
+| record | A story's run state packed into one commit on `refs/norn/runs/<story>` on the remote: pushed on a claim release, by `open-pr`, at the end, and under `remote` whenever it changed. |
 | brief | What `norn brief` tells the agent of a step: where it is, the skill, the inputs and how to report. |
 | inbox | Everything that needs a person, with the command that resolves each item (`norn status`). |
 | tick | One pass of the heartbeat: observe, decide, act. |
