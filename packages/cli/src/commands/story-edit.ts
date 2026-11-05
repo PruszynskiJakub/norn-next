@@ -96,7 +96,8 @@ async function editWorkflow(ctx: Context, raw: string, name: string, at: string 
     // gh-71 D3 (B18): a new round is refused first while another clone holds the story's claim
     const round = !t.slice && !!t.state;
     // gh-196 D1: a supervisor delegates only a round start (B34); a slice switch or a pre-start choice stays the person's
-    if (d.delegated && !round) throw usageError("story edit --delegated: applies to a new round of a started story only", USAGE);
+    // review#1 F4: the reason lives only on the round receipt, so outside a round start it is refused, never dropped
+    if ((d.delegated || d.reason !== undefined) && !round) throw usageError("story edit --delegated/--reason: apply to a new round of a started story only", USAGE);
     const claim = round ? await refuseIfHeldElsewhere(ctx, t.story, "story edit") : undefined;
     const listed = Object.keys(obs.workflows).sort();
     const loaded = obs.workflows[name];

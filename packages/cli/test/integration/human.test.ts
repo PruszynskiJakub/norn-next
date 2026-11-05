@@ -118,6 +118,8 @@ describe("before start", () => {
     await tick();
     refused(await h.norn("story", "edit", "gh-6", "--workflow", "nope"), "unknown_workflow");
     refused(await h.norn("story", "edit", "gh-6", "--workflow", "alt", "--at", "draft"), "not_started");
+    // gh-196 review#1 F4: --reason (with or without --delegated) is kept only on a round receipt; before start it is a usage error, never dropped
+    for (const extra of [["--reason", "why"], ["--reason", "why", "--delegated"]]) expect((await h.norn("story", "edit", "gh-6", "--workflow", "alt", ...extra)).exit).toBe(2);
     const r = await h.norn("story", "edit", "gh-6", "--workflow", "alt");
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ unit: "gh-6", workflow: "alt", previous: "gated", started: false, changed: true });

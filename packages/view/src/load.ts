@@ -56,6 +56,14 @@ import {
 } from "@norn/store";
 import type { BaseSyncView, ClaimView, CounterView, DelegatedDecision, PrView, ProjectView, RecentDone, RunView, SliceView, StoryView, UnitView } from "./types.ts";
 
+/** An earlier round's receipts by folder: a finished round gets no new receipt (S7), so one read serves every load. */
+const EARLIER_ROUNDS = new Map<string, readonly NumberedReceipt[]>();
+function earlierRoundReceipts(path: string): readonly NumberedReceipt[] {
+  let receipts = EARLIER_ROUNDS.get(path);
+  if (!receipts) EARLIER_ROUNDS.set(path, (receipts = listReceipts(path).receipts));
+  return receipts;
+}
+
 /**
  * gh-196 D5 (B21, B22, B34): the decisions a supervisor made on the person's behalf, over every round of
  * the story unit (each round folder's receipts; a flat record is round 1) and its slices, oldest first.
@@ -70,7 +78,10 @@ function delegatedDecisions(story: StorySnapshot): DelegatedDecision[] {
     }
   };
   const rounds = storyRounds(story.path);
-  if (rounds.length) for (const rd of rounds) add(story.key, rd.n, listReceipts(rd.path).receipts);
+  const current = story.units[0];
+  // review#1 F5: the current round's receipts are in the snapshot already; an earlier round's never change (S7), so
+  // they are read once per folder, not on every refresh of `status --segment` (HC13)
+  if (rounds.length) for (const rd of rounds) add(story.key, rd.n, rd.path === current?.path ? (current.receipts ?? []) : earlierRoundReceipts(rd.path));
   else add(story.key, 1, story.units[0]?.receipts ?? []);
   for (const u of story.units.slice(1)) add(u.unit.key, null, u.receipts ?? []);
   return out.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));

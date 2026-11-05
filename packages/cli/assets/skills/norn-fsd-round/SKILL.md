@@ -1,7 +1,6 @@
 ---
 name: norn-fsd-round
 description: Supervise the stories a person names through their current norn round, unattended — one supervisor in the main checkout, one foreground subagent per story, norn's own commands only; decides gates and answers on the person's behalf as delegated decisions with reasons, escalates only what the person keeps, and ends with one report. Use when a person asks to supervise, deliver or babysit named norn stories to the end of their round. Never a workflow step.
-disable-model-invocation: true
 ---
 
 # Supervise named stories through their round
@@ -13,19 +12,19 @@ You supervise the stories the person named, in this checkout, until each one's c
 - **Main checkout only.** If the working directory or a parent holds a `.norn-unit` file, stop: "norn-fsd-round runs in the main checkout, never in a unit worktree." norn refuses `--delegated` there too.
 - **One supervisor per checkout.** If another supervisor runs here, stop and tell the person to add the stories to it. Never restart or replace a watch another session relies on (two claims were lost that way).
 - **Named stories only.** Supervise exactly the stories the request names; leave every other story in `norn status --json` alone. A `release` story only when the request names it (never run `/release-start`).
-- **The watch.** Read `norn status --json`. No heartbeat → one escalation: "No watch is running. Start it in its own terminal: `! norn watch`", then wait for the heartbeat. Never start one yourself; never run `norn watch` or `norn tick`. A heartbeat that goes stale later gets the same escalation, naming the stories that stopped moving.
+- **The watch.** Read `norn status --json`. A stale or missing heartbeat shows as an item in `groups.unblock` whose `id` starts with `heartbeat:`; when one is there → one escalation: "No watch is running. Start it in its own terminal: `! norn watch`", then wait for the heartbeat. Never start one yourself; never run `norn watch` or `norn tick`. A heartbeat that goes stale later gets the same escalation, naming the stories that stopped moving.
 
 ## Shape
 
 - You, the top-level supervisor, are the only one who talks to the person. Name the story in every message ("gh-201: …"); pass escalations on one at a time.
-- Start **one subagent per story**, with the brief below. Each loops in the **foreground** on `norn story wait <story> --until <status>` and returns to you only to escalate or to report. No background polling, no timers that expire.
+- Start **one subagent per story**, with the brief below. Each loops in the **foreground** on `norn story wait <story> --until gate --timeout 5m` and returns to you only to escalate or to report. `--until` takes one condition, so the timeout bounds how long an ask, a stuck unit or the round's end waits to be seen. No background polling, no timers that expire.
 - Read norn's JSON, never its text: `norn story view <story> --json`, `norn run view <unit> --json`, `norn run list <unit> --json`, `norn status --json`. Branch on fields; never grep markdown, and never pass a story to `norn status` (it takes none).
 
 ## Subagent brief (give it verbatim, with the story filled in)
 
 > Supervise <story> to the end of its current round, from the main checkout, with norn's commands only.
 > 1. Run `norn story edit <story> --auto` once. Never run `norn brief`, `norn story start`, `norn tick` or `norn watch`; never type into a step pane.
-> 2. Loop: `norn story wait <story> --until parked` in the foreground, then read `norn story view <story> --json` and act on what waits, by the rules of norn-fsd-round. Every decision you send carries `--delegated --reason "fsd: <evidence>"`.
+> 2. Loop: `norn story wait <story> --until gate --timeout 5m` in the foreground (exit 0: a gate waits; exit 7: five minutes passed), then read `norn story view <story> --json` either way and act on what waits (a gate, an ask, a stuck unit or the round's end) by the rules of the `norn-fsd-round` skill: load it first. Every decision you send carries `--delegated --reason "fsd: <evidence>"`.
 > 3. Return to the supervisor only with an escalation (one message, everything needed to answer) or with the report when the round ends.
 
 ## What you decide (delegated, always with `--delegated --reason`)

@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_CONFIG, type Workflow, outcomeEdge, validate } from "@norn/schema";
+import { parseWaitCondition } from "@norn/view";
 import { parse } from "yaml";
 import { type AssetsSources, assetsDir, resolveAssetsDir } from "../../src/runtime/assets.ts";
 
@@ -263,7 +264,7 @@ describe("skills", () => {
       // B2, B4, B3, B38: where and what it supervises
       ".norn-unit", "main checkout", "One supervisor per checkout", "Named stories only", "/release-start",
       // B8, B9: the watch is checked, never started
-      "No watch is running", "`! norn watch`", "heartbeat",
+      "No watch is running", "`! norn watch`", "heartbeat", "groups.unblock",
       // B5, B6, B7: one foreground subagent per story, one voice, JSON only
       "one subagent per story", "foreground", "norn story wait", "--json", "never grep markdown",
       // B10: auto mode, never a step's commands
@@ -290,6 +291,20 @@ describe("skills", () => {
     const text = readSkill("norn-fsd");
     const terms = ["norn-fsd-round", ".norn-unit", "`quick`", "`story`", "`reproduce`", "--workflow <name> --delegated --reason", "Never `--force`", "never on an unfinished round", "closing the issue", "rules file", "norn story start", "Never type into the pane"];
     expect(terms.filter((t) => !text.includes(t))).toEqual([]);
+  });
+
+  // gh-196 review#1 F2 (D6): norn-fsd's agent and every subagent load norn-fsd-round, so the model must be able to;
+  // norn-fsd stays person-only (B2 holds through the `.norn-unit` stop and the delegated_in_unit refusal)
+  test("norn-fsd-round can be loaded by an agent; norn-fsd is started by a person (D6)", () => {
+    expect(splitSkill(readSkill("norn-fsd-round")).meta["disable-model-invocation"]).toBeUndefined();
+    expect(splitSkill(readSkill("norn-fsd")).meta["disable-model-invocation"]).toBe(true);
+  });
+
+  // gh-196 review#1 F1 (B5): an agent runs the printed `norn story wait` as written, so every --until value must parse
+  test("every `--until` a bundled skill prints is a story wait condition (B5)", () => {
+    const values = readdirSync(SKILLS_DIR).flatMap((s) => [...readSkill(s).matchAll(/norn story wait \S+ --until (\S+?)[`\s]/g)].map((m) => [s, m[1] as string] as const));
+    expect(values.length).toBeGreaterThan(0);
+    expect(values.filter(([, v]) => !/^<[^>]+>$/.test(v) && parseWaitCondition(v) === null)).toEqual([]);
   });
 
   test("norn-review traces every Behaviour item and criterion to a test, and writes the table into the handoff (gh-169)", () => {

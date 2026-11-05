@@ -115,6 +115,12 @@ describe("delegated decisions are recorded apart from the person's (B21, B22, B3
     expect((await h.norn("run", "list", "gh-1")).stdout).toContain("delegated (supervisor)");
   });
 
+  test("run view marks the delegated approve in the trace with its reason (B21)", async () => {
+    const text = (await h.norn("run", "view", "gh-1")).stdout;
+    expect(text).toContain("review#1 (gate)");
+    expect(text).toContain("approve — delegated (supervisor): fsd: CI green on the head, clean diff");
+  });
+
   test("a new round started with --delegated --reason carries its reason (B34)", async () => {
     const r = await h.norn("story", "edit", "gh-1", "--workflow", "asks", "--delegated", "--reason", "fsd: one seam, no contract change");
     expect(r.exit).toBe(0);
