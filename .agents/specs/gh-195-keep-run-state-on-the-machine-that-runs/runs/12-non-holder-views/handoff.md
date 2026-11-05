@@ -14,6 +14,18 @@
 
 ## Goal
 
+Other machines see a story they do not hold: under `remote` step/attempt/counters from `refs/norn/runs/<story>`; under `local` claim, branch, last boundary, PR and where the record is ("record as of …" for a ref no longer kept current). The tick fetches only the record refs of stories held elsewhere; views fetch nothing (AC1–AC5).
+
 ## Progress
 
+- `packages/store/src/elsewhere.ts`: `heldElsewhereKeys` (local claim refs held by another heartbeat, story not in this checkout), `fetchElsewhere` (one `ls-remote` of record names + one fetch of `<story>-*` branches and the needed record refs; B30), `loadElsewhereStory` / `readStoryRecord` (spec from the remote-tracking branch, last `Norn-Step` boundary — the oldest one, the start commit, ends no step — record unpacked once per commit into `<machine dir>/record-cache/<story>/<sha>/` through `unpackRecord`).
+- observe: on a sync, fetches the elsewhere stories and their PRs (kept in `pr.json`, never in Facts: decide and the inbox are unchanged, so no golden or inbox-parity change).
+- view: `ProjectView.elsewhere: ElsewhereView[]`; `status` prints a "Held elsewhere" section; `story view` of such a story prints `formatElsewhere` (`--json` = the ElsewhereView).
+- human.ts `remoteTarget` no longer reads state.json from a remote branch: it fetches the one record ref and reads it from the record cache.
+- Test: `packages/cli/test/integration/non-holder-views.test.ts` (S1, two clones); red before the change (5/5 failed), green after.
+- Decision: "CI" in B18/AC3 — no port reports CI status (RemotePullRequest has none); the view shows the PR (number, state, draft, url). Flagged for review.
+- For slices 10–11 (08-F4): this fetch covers only stories held elsewhere, so the holder whose record ref another checkout pushed still fails its push silently; not surfaced here.
+
 ## Resume
+
+Run the integration and e2e tiers; regenerate transcripts/snapshots if the extra `for-each-ref refs/norn/claims/` per sync changes them; commit; `norn done done`.
