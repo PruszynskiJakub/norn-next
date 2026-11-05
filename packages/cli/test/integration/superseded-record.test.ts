@@ -11,7 +11,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { claimRef, recordRef, ulid } from "@norn/schema";
 import type { Inbox } from "@norn/core";
-import { appendReceipt, machineDir, readState, workflowsDir } from "@norn/store";
+import { acquireClaim, appendReceipt, heartbeatId, listReceipts, machineDir, newClaimBlob, readState, workflowsDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue, sh } from "../../../../test/support/harness.ts";
 import { cloneOf } from "../../../../test/support/clone.ts";
@@ -186,5 +186,69 @@ describe("a clean handoff leaves no superseded copy (B27, D11, B15)", () => {
     expect(existsSync(superseded()) ? readdirSync(superseded()) : []).toEqual([]);
     expect(await checkItems(s.key)).toEqual([]);
     expect(remoteRefs()).toBe(before);
+  });
+});
+
+describe("checkout never replaces a local copy whole (gh-195 D11; 10-R3-F1, 11-S2)", () => {
+  withHarness();
+
+  test("10-R3-F1: a checkout run again after one that claimed and never placed keeps no older own copy: it is set aside, the newer record placed, nothing stale pushed", async () => {
+    const s = await heldThenSilent(11, "rerun", 0);
+    expect((await h.norn("story", "handoff", s.key)).exit).toBe(0);
+    // A's own copy gains a receipt after the handoff: older than what B will push, and not on the ref
+    report(s.runs(h.root), "done");
+    const last = lastReceipt(s.runs(h.root));
+    const B = cloneOf(h, "b-f1", "bob");
+    h.clock.advance(10_000);
+    expect((await B.norn("story", "checkout", s.key)).exit).toBe(0);
+    h.clock.advance(10_000);
+    await B.tick();
+    expect((await B.norn("story", "handoff", s.key)).exit).toBe(0);
+    const newer = remoteRef(recordRef(s.key)) as string;
+    // A's earlier checkout took the claim and stopped before its record went into place
+    h.clock.advance(10_000);
+    const claimed = await acquireClaim(h.root, "origin", newClaimBlob({ story: s.key, holder: "tester@box", heartbeat_id: heartbeatId(h.root, h.clock.now()), now: h.clock.now(), lease: "10m" }), { now: h.clock.now() });
+    expect(claimed.ok).toBe(true);
+
+    const r = await h.norn("story", "checkout", s.key);
+    expect(r.exit).toBe(0);
+    const v = r.value as { record: { sha: string; unpacked: boolean } | null; superseded?: string };
+    expect(v.record).toMatchObject({ sha: newer, unpacked: true });
+    expect(supersededOf(s.key)).toHaveLength(1);
+    expect(v.superseded).toBe(join(superseded(), supersededOf(s.key)[0] as string));
+    // the placed record is B's (its take from a free claim, then A's re-take); A's late receipt is not in it
+    const placed = listReceipts(s.runs(h.root)).receipts;
+    expect(placed.filter((x) => x.receipt.kind === "take").map((x) => (x.receipt as { previous_holder: string | null }).previous_holder)).toEqual([null, "tester@box"]);
+    expect(placed.map((x) => x.file)).not.toContain(`${last}.json`);
+    expect(sh(h.root, ["rev-parse", recordRef(s.key)])).toBe(newer);
+    expect(await checkItems(s.key)).toEqual([expect.objectContaining({ id: `superseded:${s.key}:${last}`, title: `your record of ${s.key} was superseded when bob@b-f1 took it over (last local receipt ${last})` })]);
+    // A's next handoff pushes on top of B's record, never A's older copy
+    h.clock.advance(10_000);
+    await h.tick();
+    expect((await h.norn("story", "handoff", s.key)).exit).toBe(0);
+    const pushed = remoteRef(recordRef(s.key)) as string;
+    expect(sh(h.dir, ["--git-dir", h.remoteDir, "rev-list", pushed]).split("\n")).toContain(newer);
+  });
+
+  test("11-S2: on the lost-record path a non-holder's stale local copy is set aside as superseded, not replaced", async () => {
+    const s = await heldThenSilent(12, "lostagain", 0);
+    const last = lastReceipt(s.runs(h.root));
+    expire(s.key);
+    const B = cloneOf(h, "b-s2", "bob");
+    expect((await B.norn("story", "checkout", s.key)).exit).toBe(0);
+    // B goes silent too; A, which never ticked since, takes the story back with the record lost
+    const bClaim = JSON.parse(sh(h.dir, ["--git-dir", h.remoteDir, "cat-file", "-p", claimRef(s.key)])) as { expires_at: string };
+    h.clock.t = Date.parse(bClaim.expires_at) + 60_000;
+    const r = await h.norn("story", "checkout", s.key);
+    expect(r.exit).toBe(0);
+    const v = r.value as { record_lost: boolean; superseded?: string };
+    expect(v.record_lost).toBe(true);
+    expect(supersededOf(s.key)).toHaveLength(1);
+    const copy = v.superseded as string;
+    expect(copy).toBe(join(superseded(), supersededOf(s.key)[0] as string));
+    expect(readdirSync(copy)).toContain("_story");
+    // the new round is in place: one take, record_lost
+    expect(listReceipts(s.runs(h.root)).receipts.map((x) => x.receipt.kind)).toEqual(["take"]);
+    expect(await checkItems(s.key)).toEqual([expect.objectContaining({ id: `superseded:${s.key}:${last}`, title: `your record of ${s.key} was superseded when tester@box took it over (last local receipt ${last})` })]);
   });
 });

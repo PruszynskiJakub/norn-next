@@ -11,7 +11,10 @@
  *    since Y" unless `--force`.
  * 2. The story's record, `refs/norn/runs/<story>` alone (gh-195 D6): its objects fetched (no local ref
  *    yet) and staged beside its place in the machine dir with every file validated (S1, S2). A
- *    checkout that holds the claim and the run state already keeps its own (nothing staged).
+ *    checkout that holds the claim and the run state already keeps its own (nothing staged), but only
+ *    while its record ref is the remote's (10-R3-F1). A local copy not kept is never replaced whole: in
+ *    step 5 it is set aside as superseded (gh-195 D11), or removed quietly when it is a record this
+ *    machine pushed.
  * 3. The story and slice branches fetched; a local story branch that diverged from the remote one is
  *    refused (norn never resets work). The record's `Norn-Branch-Commit` is checked against the story
  *    branch head (T5a): an ancestor continues (B23), else the branch was rewritten (B24) and the step
@@ -79,6 +82,10 @@ import {
   setRecordRef,
   stageEmptyRecord,
   stageRecordSync,
+  dropLocalRecord,
+  localRecordOf,
+  recordHolder,
+  setAsideRecord,
   type StagedRecord,
   storyRunStateDir,
   WORKFLOW_EXT,
@@ -343,9 +350,22 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
   const forced = force && (cur.state === "other" || cur.state === "corrupt");
   const prev = cur.state === "none" || cur.state === "corrupt" ? null : cur.blob;
 
-  // ---- 2. the record, fetched and staged (review F1); the holder keeps its own run state
-  const keepLocal = mine && existsSync(storyRunStateDir(root, run));
-  const before = keepLocal ? await readRecordRef(root, key) : null;
+  // ---- 2. the record, fetched and staged (review F1); the holder keeps its own run state only when its
+  // record ref is the remote's (10-R3-F1): an older copy a crashed or failed checkout left beside a newer
+  // record is never kept, or its next push would put stale state over that record
+  const localCopy = existsSync(storyRunStateDir(root, run));
+  const ownRef = mine && localCopy ? await readRecordRef(root, key) : null;
+  const remoteSha =
+    mine && localCopy && remote
+      ? await remoteRecordSha(root, remote, key).catch((e: unknown) => {
+          throw failure(`cannot read ${recordRef(key)} on ${remote}: ${(e as Error).message}; nothing was taken`, `check the network, then ${again} again`, "network");
+        })
+      : (ownRef?.sha ?? null);
+  const keepLocal = mine && localCopy && (ownRef?.sha ?? null) === remoteSha;
+  const before = keepLocal ? ownRef : null;
+  // gh-195 D11 (B27; 10-R3-F1, 11-S2): a local copy not kept is never replaced whole: set aside as
+  // superseded once the take is in, or removed quietly when it is a record this machine pushed (on the ref)
+  const setAside = localCopy && !keepLocal ? await localRecordOf(root, run, holder) : null;
   const prepared = opts.record === false ? null : await prepareRecord(ctx, remote, run, keepLocal);
   // B33: a story without a branch is taken over from its record alone
   if (!branch && !prepared) throw refuse(`no story branch for ${key}${remote ? ` on ${remote}` : ""}`, `${cmd.sync()} (intake creates it) or check the story key`, "unknown_story");
@@ -410,7 +430,15 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
     const takeFacts = { previous_holder: prev?.holder ?? null, previous_heartbeat_id: prev?.heartbeat_id ?? null, expired, forced };
     appendTrace(root, traceEvent("take", now, { at: nowIso, unit: key, holder, heartbeat_id: hb, ...takeFacts }));
     let record: { receipt: string | null; note?: string };
+    let superseded: string | null = null;
     try {
+      if (setAside && (staged || lost) && existsSync(storyRunStateDir(root, run))) {
+        if (setAside.on_ref) dropLocalRecord(root, run, ulid(now));
+        else {
+          const by = (prepared ? await recordHolder(root, prepared.taken.sha) : null) ?? holder;
+          superseded = setAsideRecord(root, run, `${key}-${ulid(now)}`, { story: key, holder: by, last_receipt: setAside.last_receipt, superseded_at: nowIso });
+        }
+      }
       if (lost) {
         const fresh = stageEmptyRecord(storyRunStateDir(root, run));
         try {
@@ -526,6 +554,8 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
       record: taken ? { ref: recordRef(key), sha: taken.sha, branch_commit: taken.branch_commit, unpacked: taken.unpacked } : null,
       // B25 (D10): no record to take over: a new round from the branch
       record_lost: lost !== null,
+      // gh-195 D11 (B27): this checkout's own older copy, set aside rather than replaced (10-R3-F1, 11-S2)
+      ...(superseded ? { superseded } : {}),
       ...(lost ? { restarted: lost.line } : next.restarted ? { restarted: next.restarted } : {}),
       worktrees,
       units,

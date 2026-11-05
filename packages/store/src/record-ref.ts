@@ -118,6 +118,12 @@ export async function recordBranchCommit(root: string, sha: string): Promise<str
   return r.code === 0 ? r.stdout.trim() || null : null;
 }
 
+/** D2: the `Norn-Holder` a record commit names; null = none or unreadable. */
+export async function recordHolder(root: string, sha: string): Promise<string | null> {
+  const r = await git(root, ["log", "-1", "--format=%(trailers:key=Norn-Holder,valueonly)", sha]);
+  return r.code === 0 ? r.stdout.trim() || null : null;
+}
+
 export type RecordPushResult =
   | { ok: true; pushed: false; reason: "unchanged" | "empty"; sha: string | null }
   | { ok: true; pushed: true; sha: string; tree: string }
