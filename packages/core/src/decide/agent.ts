@@ -19,7 +19,7 @@ import { promptKeys } from "../prompt.ts";
 import type { RunnerCapabilities, SessionRef } from "../ports.ts";
 import { epoch } from "../time.ts";
 import { stepOf } from "../workflow.ts";
-import { applyCtx, commitFor, type Ctx, emitApplied, nextReceiptNumber, nornReceipt, synth, unitItem } from "./receipts.ts";
+import { applyCtx, commitFor, type Ctx, emitApplied, endedWith, nextReceiptNumber, nornReceipt, synth, unitItem } from "./receipts.ts";
 
 export function applyAction(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, receipts: readonly NumberedReceipt[], rule: string): void {
   const res = applyReceipts(st, receipts, applyCtx(ctx, wf));
@@ -67,7 +67,7 @@ export function applyAction(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: Unit
   const kill = moved && st.run?.session && state.run?.run_id !== st.run.run_id ? sessionRef(st.run) : null;
   const what = res.advance ? `${res.advance.from}.${res.advance.outcome} → ${res.advance.to}${res.advance.reset ? ` (reset ${res.advance.reset.join(", ")})` : ""}` : (res.log.at(-1) ?? "receipts");
   const applied = !res.applied.length ? "receipts.reject" : launch ? `${rule}.resume` : rule;
-  emitApplied(ctx, story, uf, applied, res, extra, { message: `norn: ${uf.unit.key} ${what}`, step: st.step }, { input, launch, kill, state });
+  emitApplied(ctx, story, uf, applied, res, extra, { message: `norn: ${uf.unit.key} ${what}`, step: st.step, ended: endedWith(res) }, { input, launch, kill, state });
 }
 
 function sessionRef(run: NonNullable<UnitState["run"]>): SessionRef {
@@ -299,7 +299,7 @@ function routeOutcome(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st0: UnitState
   receipt.route = routeOf(res) ?? "park";
   if (res.route === "nudge") receipt.counter = { name: "nudges", value: res.state.nudges_used, max: stepLimits(wf, step).nudges };
   if (res.route === "retry") receipt.counter = { name: "retries", value: res.state.retries_used, max: stepLimits(wf, step).retries };
-  const commit = commitFor(ctx, story, uf, `norn: ${ref.key} ${st.step} ${outcome} → ${receipt.route}`, st.step);
+  const commit = commitFor(ctx, story, uf, `norn: ${ref.key} ${st.step} ${outcome} → ${receipt.route}`, st.step, { ended: endedWith(res) });
   const snapshot = outcome === "silent" ? { transcript: rf?.transcript ?? null, cwd: cwd ?? "" } : null;
   const receipts: NewReceipt[] = [{ n, receipt }];
 

@@ -74,7 +74,7 @@ Keep only the names a reviewer needs to place the change.
 One entry per Behaviour item or acceptance criterion, in spec order.
 
 - A screenshot beats output; output beats a test name. For a visible change, link the before and after screenshots.
-- Link evidence files committed on the branch by their full URL on the branch. On GitHub an image renders inline as `![B2 after](https://github.com/<owner>/<repo>/blob/<branch>/<path>?raw=true)`.
+- Link an evidence file by its path in the story's record, `evidence/<unit>/<run_id>/<file>`, where `<unit>` is `_story` or the slice's `<nn>-<slug>`: `![B2 after](evidence/01-parser/01ABC/shot.png)`. You are told where each unit's evidence folders are. The evidence is not on the branch: when the PR is opened or updated, each such link is rewritten to the file's URL in the pushed record, where an image renders inline. Never link evidence by a local path or a branch URL.
 - For a test, show what it asserts in a line of pseudocode and that it failed before and passes now.
 - A criterion only a person could judge, or that could not be checked: say so and say how to check it. Never dress it up as passed.
 
@@ -87,4 +87,4 @@ Say low risk when it is low. A reviewer stops reading danger sections that alway
 
 ## 3. Check
 
-Read the body once as the reviewer: every claim traces to the diff or to evidence, every link points at a file that exists on the branch, and nothing in it is a guess.
+Read the body once as the reviewer: every claim traces to the diff or to evidence, every link points at a file that exists on the branch or in the record, and nothing in it is a guess.

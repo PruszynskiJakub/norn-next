@@ -8,12 +8,13 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { RunnerPort } from "@norn/core";
-import { ulid } from "@norn/schema";
-import { acquireTickLock, appendReceipt, readState, repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
+import type { Inbox, RunnerPort } from "@norn/core";
+import { STORY_UNIT_DIR, ulid, unitHandoffPath } from "@norn/schema";
+import { acquireTickLock, appendReceipt, handoffPath, readState, repoConfigPath, workflowsDir } from "@norn/store";
 import { type CliDeps, type CliResult, type TickReport } from "../../packages/cli/src/index.ts";
 import { createHarness, FakeInteraction, FakeRunner, type Harness, hostEnv, issue, sh } from "../support/harness.ts";
 import { runChecked } from "../support/harness.ts";
+import { runStateOf } from "../support/run-state.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -111,8 +112,8 @@ const kinds = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop" && 
 const SPEC = ".agents/specs/gh-7-add-login-form";
 const storyWt = (root: string) => `${root}-worktrees/gh-7-add-login-form`;
 const sliceWt = (root: string) => `${storyWt(root)}--01-form`;
-const storyRuns = (root: string) => storyUnitDir(join(storyWt(root), SPEC));
-const sliceRuns = (root: string) => join(sliceWt(root), SPEC, "runs/01-form");
+const storyRuns = (root: string) => runStateOf(join(storyWt(root), SPEC));
+const sliceRuns = (root: string) => runStateOf(join(sliceWt(root), SPEC), "01-form");
 const state = (dir: string) => {
   const r = readState(dir);
   return r.ok ? r.value : null;
@@ -174,7 +175,7 @@ describe("two clones hand a story over through git (T5, T6)", () => {
     expect(state(sliceRuns(h.root))).toMatchObject({ step: "implement", status: "parked", park: { kind: "ask" } });
 
     // the agent's Resume notes, not committed yet (S9: context for the next person)
-    const handoff = join(sliceRuns(h.root), "handoff.md");
+    const handoff = handoffPath(join(sliceWt(h.root), SPEC), "01-form"); // gh-195/07: handoffs/<unit>.md on the slice branch, apart from the run state
     h.write(handoff, `${readFileSync(handoff, "utf8")}\n## Resume\nForm done; use blue unless told otherwise.\n`);
   });
 
@@ -183,7 +184,7 @@ describe("two clones hand a story over through git (T5, T6)", () => {
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ story: "gh-7", released: true, pushed: ["gh-7-add-login-form", "gh-7/01-form"] });
     expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-7"])).toBe("");
-    expect(h.git(["show", `origin/gh-7/01-form:${SPEC}/runs/01-form/handoff.md`])).toContain("use blue");
+    expect(h.git(["show", `origin/gh-7/01-form:${SPEC}/${unitHandoffPath("01-form")}`])).toContain("use blue");
     // handed over, so a second handoff is refused
     expect((await A.norn("story", "handoff", "gh-7")).exit).toBe(3);
   });
@@ -200,6 +201,7 @@ describe("two clones hand a story over through git (T5, T6)", () => {
       ["gh-7", storyWt(B.root), 1],
       ["gh-7/01", sliceWt(B.root), 2],
     ]);
+    // gh-195/10 (B22): A's handoff pushed the record to its ref; B unpacked it into its machine dir
     expect(v.units.find((u) => u.unit === "gh-7/01")).toMatchObject({ step: "implement", status: "parked" });
     expect(v.units.find((u) => u.unit === "gh-7/01")?.handoff).toContain("use blue unless told otherwise");
     expect(readFileSync(join(sliceWt(B.root), "form.txt"), "utf8")).toBe("form v1\n");
@@ -207,20 +209,28 @@ describe("two clones hand a story over through git (T5, T6)", () => {
     expect(readFileSync(join(sliceWt(B.root), ".env.norn"), "utf8")).toContain("NORN_SLOT=2");
     expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-7"])).not.toBe("");
 
-    // R10.1 (M8): the take is in the record — a pushed `take` receipt on the story unit and a trace event
+    // R10.1 (M8): the take is in the record — a `take` receipt on the story unit (in B's machine dir,
+    // never pushed: S12) and a trace event
     const file = (r.value as { receipt: { file: string } }).receipt.file;
     expect(file).toMatch(/^\d{4}-take\.json$/);
-    expect(r.value).toMatchObject({ receipt: { pushed: true } });
     const rec = JSON.parse(readFileSync(join(storyRuns(B.root), "receipts", file), "utf8"));
     expect(rec).toMatchObject({ kind: "take", by: "human", who: "bob@repo-b", previous_holder: null, previous_heartbeat_id: null, expired: false });
+    // S12, D8: neither branch carries it, nor any run state, and under `local` no record push followed the take
+    for (const b of ["gh-7-add-login-form", "gh-7/01-form"]) expect(sh(B.root, ["ls-tree", "-r", "--name-only", b]).split("\n").filter((f) => f.endsWith("-take.json") || f.includes(`${SPEC}/runs/`))).toEqual([]);
+    expect(h.git(["ls-remote", "origin", "refs/norn/runs/gh-7"]).split("\t")[0]).toBe(sh(B.root, ["rev-parse", "refs/norn/runs/gh-7"]));
     expect(h.git(["ls-remote", "origin", "refs/heads/gh-7-add-login-form"]).split("\t")[0]).toBe(sh(B.root, ["rev-parse", "gh-7-add-login-form"]));
     const trace = await B.norn("run", "list", "gh-7", "--events");
     expect(JSON.stringify(trace.value)).toContain("take by bob@repo-b (claim was free)");
 
-    // clone A now sees the claim held elsewhere and does nothing to the story (T7)
+    // clone A now sees the claim held elsewhere: its copy of the record, handed over cleanly, goes
+    // quietly (gh-195 D11, B27), then it does nothing to the story (T7)
     step();
     const a = await A.tick("--sync");
-    expect(a.decisions.filter((d) => d.unit.startsWith("gh-7"))).toEqual([{ unit: "gh-7", rule: "claim.other", kind: "noop", ok: true }]);
+    expect(a.decisions.filter((d) => d.unit.startsWith("gh-7"))).toEqual([{ unit: "gh-7", rule: "record.released", kind: "set_aside_record", ok: true }]);
+    expect(((await A.norn("status")).value as Inbox).groups.check.filter((i) => i.story === "gh-7")).toEqual([]);
+    step();
+    const again = await A.tick("--sync");
+    expect(again.decisions.filter((d) => d.unit.startsWith("gh-7"))).toEqual([{ unit: "gh-7", rule: "claim.other", kind: "noop", ok: true }]);
   });
 
   test("clone B answers, briefs and continues the slice to its gate", async () => {
@@ -282,7 +292,7 @@ describe("claim races (T3) and forced takes (T5)", () => {
     const blob = sh(B.root, ["cat-file", "-p", "refs/norn/claims/gh-7"]);
     expect(JSON.parse(blob)).toMatchObject({ holder: "bob@repo-b", forced_from: v.claim.forced_from });
     sh(h.root, ["fetch", "-q", "origin"]);
-    expect(h.git(["show", `origin/gh-7-add-login-form:${SPEC}/runs/_story/handoff.md`])).toContain("take --force by bob@repo-b");
+    expect(h.git(["show", `origin/gh-7-add-login-form:${SPEC}/${unitHandoffPath(STORY_UNIT_DIR)}`])).toContain("take --force by bob@repo-b");
   });
 
   test("story close is refused on a story another machine holds, whether this checkout has it or not; nothing changes (B38)", async () => {

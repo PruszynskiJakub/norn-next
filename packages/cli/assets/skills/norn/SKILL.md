@@ -1,6 +1,6 @@
 ---
 name: norn
-description: The protocol for doing one norn step and reporting it. Use when a session starts with "Use the norn skill, then run `norn brief`", when the working directory contains a `.norn-unit` file, or when asked to pick up, continue or report norn work. Covers reading the brief, staying in scope, keeping handoff.md current, and reporting exactly once with `norn done`, `norn ask` or `norn stuck`.
+description: The protocol for doing one norn step and reporting it. Use when a session starts with "Use the norn skill, then run `norn brief`", when the working directory contains a `.norn-unit` file, or when asked to pick up, continue or report norn work. Covers reading the brief, staying in scope, keeping the unit's handoff current, and reporting exactly once with `norn done`, `norn ask` or `norn stuck`.
 ---
 
 # norn: one step, one report
@@ -18,11 +18,11 @@ The brief prints as markdown (`norn brief --json` for data). It gives:
 - **The skill to use**: load it and follow it for the craft. Extra instructions add to it.
 - **Inputs**: spec, slice file, diff range. Read them before you change anything.
 - **Rework**: when present, these points come before anything else.
-- **Context**: the written part of handoff.md and any answer to an earlier question. A Resume written by another step is left out; it is not your instruction.
+- **Context**: the unit's handoff and any answer to an earlier question. A Resume written by another step is left out; it is not your instruction.
 - **Finish with**: the outcomes you may report and what each one means, and the criteria to give a verdict on when a report is required.
 - **Limits**: deadline, nudges left, port slot.
 
-The brief is complete. Do not read again what it already gives you (handoff.md, `.norn-unit`, `.env.norn`), and do not survey the repository, `.agents/`, `.claude/` or the machine to find your bearings. Read the inputs, then only the code and docs your work touches, when you need them.
+The brief is complete. Do not read again what it already gives you (the handoff, `.norn-unit`, `.env.norn`), and do not survey the repository, `.agents/`, `.claude/` or the machine to find your bearings. Read the inputs, then only the code and docs your work touches, when you need them.
 
 ## 2. Work in scope
 
@@ -31,9 +31,9 @@ The brief is complete. Do not read again what it already gives you (handoff.md, 
 - Local commits are fine. norn commits what is left when you report, and only norn pushes.
 - When blocked, report it. Never wait silently.
 
-## 3. Keep handoff.md current
+## 3. Keep the handoff current
 
-The top block is generated: never edit it. Below it, keep three sections:
+The unit's handoff is `handoffs/<unit>.md` in the spec folder (`handoffs/_story.md` for the story, `handoffs/<nn>-<slug>.md` for a slice); the brief's Inputs name it. It is yours and the person's, prose only: the step's status is in the brief. Keep three sections:
 
 - **Goal**: what this step must achieve, in one or two lines.
 - **Progress**: milestones done, decisions and why, what was tried and failed.
@@ -64,5 +64,5 @@ After a report succeeds, **end your turn**. Do not keep working and do not repor
 - Of the norn commands, run only `brief`, `done`, `ask` and `stuck` (`norn help` marks them). Every other one (`story approve`, `story answer`, `run rerun`, `story start`, `tick`, …) is the person's: run one only when the person asks you to directly, never because a refusal, the brief or the inbox names it. Otherwise `norn ask`.
 - Never `git push`, and never switch branches or worktrees.
 - Never run a `gh` or `glab` command that changes the remote (creating, editing, commenting, labelling, closing, merging). Reading is fine.
-- Never edit anything under `runs/`, or the generated top of handoff.md. The repo's workflows (`.agents/workflows/`) and config (`.agents/norn.config.yaml`) are ordinary repo files: change them when the step asks for it. A running unit keeps its own pinned copy of its workflow, so the edit takes effect on later rounds, and norn validates a workflow before it runs it.
+- Never edit anything under `runs/` (norn's run state, kept outside the worktree). The repo's workflows (`.agents/workflows/`) and config (`.agents/norn.config.yaml`) are ordinary repo files: change them when the step asks for it. A running unit keeps its own pinned copy of its workflow, so the edit takes effect on later rounds, and norn validates a workflow before it runs it.
 - Never decide what comes next. Report the outcome; norn routes it.

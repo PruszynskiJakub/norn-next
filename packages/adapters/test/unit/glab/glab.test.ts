@@ -49,6 +49,14 @@ describe("glab adapter", () => {
     expect(await glab.getIssue(999)).toBeNull();
   });
 
+  test("pullRequestCi: the head pipeline's status as one state (gh-195 B18)", async () => {
+    expect(await glab.pullRequestCi(11)).toBe("success");
+    expect(await glab.pullRequestCi(12)).toBe("pending");
+    expect(await glab.pullRequestCi(13)).toBe("failure");
+    expect(await glab.pullRequestCi(14)).toBe("none");
+    expect(await glab.pullRequestCi(15)).toBe("pending");
+  });
+
   test("findPullRequest picks the latest MR", async () => {
     expect(await glab.findPullRequest("gl-3-add-login-page")).toEqual({
       number: 8,

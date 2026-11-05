@@ -57,6 +57,16 @@
                   "type": "string"
                 }
               }
+            },
+            "lease": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           }
         }

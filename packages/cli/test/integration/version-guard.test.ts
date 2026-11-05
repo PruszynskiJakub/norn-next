@@ -7,11 +7,12 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { localConfigPath, REPO_CONFIG_FILE, repoConfigPath, storyUnitDir, workflowsDir } from "@norn/store";
+import { localConfigPath, REPO_CONFIG_FILE, repoConfigPath, workflowsDir } from "@norn/store";
 import type { CliResult, TickReport } from "../../src/index.ts";
 import { COMMANDS, NOUNS } from "../../src/commands/index.ts";
 import { version as PACKAGE_VERSION } from "../../package.json";
 import { createHarness, type Harness, issue, runChecked } from "../../../../test/support/harness.ts";
+import { runStateOf } from "../../../../test/support/run-state.ts";
 
 setDefaultTimeout(30_000);
 
@@ -52,7 +53,7 @@ async function setUp(h: Harness, check = "true"): Promise<void> {
 }
 
 const worktree = (h: Harness, n: number, slug: string) => `${h.root}-worktrees/gh-${n}-${slug}`;
-const runsOf = (h: Harness, n: number, slug: string) => storyUnitDir(join(worktree(h, n, slug), `.agents/specs/gh-${n}-${slug}`));
+const runsOf = (h: Harness, n: number, slug: string) => runStateOf(join(worktree(h, n, slug), `.agents/specs/gh-${n}-${slug}`));
 const receipts = (dir: string) => (existsSync(join(dir, "receipts")) ? readdirSync(join(dir, "receipts")).sort() : []);
 
 async function tickUntil(h: Harness, pred: () => boolean, max = 10): Promise<void> {

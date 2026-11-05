@@ -18,7 +18,7 @@ A command a person runs that needs the tick lock (`norn story edit --workflow`, 
 |---|---|---|
 | `~/.norn/config.yaml` | this machine, and your defaults for every repository | machine: `max_agents`, `notify`, `trace.retain` · yours: `mode`, `agent`, `agents.<name>` |
 | `.agents/norn.config.local.yaml` (gitignored) | you, in this repository | `mode`, `agent`, `agents.<name>`: these override the user file |
-| `.agents/norn.config.yaml` (committed) | the team | `provider`, `base_branch`, `workflow`, `slice_workflow`, `norn_version` |
+| `.agents/norn.config.yaml` (committed) | the team | `provider`, `base_branch`, `workflow`, `slice_workflow`, `record.policy`, `norn_version` |
 | a workflow file | the workflow | top-level `mode`; `defaults:` with `deadline`, `nudges`, `retries`, `stalled` |
 
 For your keys the nearer file wins: local over user over built-in. Maps merge key by key; lists and scalars replace, so `agents: {claude: {model: …}}` keeps Claude's built-in `--permission-mode auto`, while setting `agents.claude.args` replaces that list, and `notify: {ntfy: <url>}` keeps OS notifications. A story's mode is, nearest first: the story's own (`norn story edit --auto|--manual`), its workflow's `mode`, the local file, the user file, then `manual`. A key in the wrong file, or one an older norn used, is refused with the file and key to use instead; `norn upgrade` rewrites old files. `norn config` lists every setting in effect and the file it came from; `norn config set <key> <value>` changes one in the file you name with `--user`, `--local` or `--repo`.
@@ -195,7 +195,7 @@ norn story checkout [<story>] [--force]
 
 ##### `norn story handoff`
 
-Hand a story over: push branches and handoff, then delete the claim
+Hand a story over: push branches, handoff and the record, then delete the claim
 
 ```sh
 norn story handoff [<story>]
@@ -411,7 +411,7 @@ norn sync
 
 ##### `norn tidy`
 
-Report or clean orphan worktrees, branches, stale leases, receipt reservations, runs/ work not in the record, Herdr panes of runs that reported done and trace days, hook files, briefings and transcripts older than trace.retain
+Report or clean orphan worktrees, branches, stale leases, receipt reservations, Herdr panes of runs that reported done, and trace days, hook files, briefings, transcripts, old session logs, cleared rejected mailbox receipts and records set aside as superseded older than trace.retain (D12, gh-195 D1, D11)
 
 ```sh
 norn tidy [--dry-run] [--retain <duration>]
@@ -535,6 +535,7 @@ norn help [--all] [<command> | <noun> [<verb>]]
 | `workflow` | team | string | `"triage"` |
 | `slice_workflow` | team | string | `"slice"` |
 | `norn_version` | team | string | `null` |
+| `record.policy` | team | `"local"` or `"remote"` | `"local"` |
 
 ### Shipped workflows
 

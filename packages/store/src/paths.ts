@@ -4,10 +4,10 @@
  * The checkout's machine-local files live outside it, in the machine dir (B5, D1).
  */
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
-import { LEGACY_SPEC_FILE, parseRoundDirName, parseSliceKey, recordHandoffPath, ROUNDS_DIR, RUNS_DIR, roundDirName, roundRecordPath, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName, unitRecordPath } from "@norn/schema";
+import { LEGACY_SPEC_FILE, parseSliceKey, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName, treeHandoffPath, unitHandoffPath } from "@norn/schema";
 
 /** gh-110 B1, B2 (D1): the committed repo config and workflows, relative to a root, as messages name them. */
 export const REPO_CONFIG_FILE = ".agents/norn.config.yaml";
@@ -128,8 +128,8 @@ export const machineDir = (root: string) => join(machineReposDir(machineHomeOf(r
 export const machineReposDir = (home: string) => join(home, "repos");
 /** D3: names the checkout a machine dir belongs to, so doctor can tell an orphan after a repo folder moved. */
 export const checkoutFilePath = (dir: string) => join(dir, "checkout.json");
-/** D9: the headless runner's default session log dir: machine-local, in the machine dir. */
-export const runnerLogDir = (root: string) => join(machineDir(root), "runs");
+/** D9, gh-195 D1: the headless runner's default session log dir, the machine dir's `sessions/` (`runs/` holds run state, S12). */
+export const runnerLogDir = (root: string) => join(machineDir(root), "sessions");
 /** Local tick lock (H1); in the machine dir. */
 export const tickLockPath = (root: string) => join(machineDir(root), "tick.lock");
 /** D6: where an older norn took the tick lock; `norn upgrade` takes it there. */
@@ -147,6 +147,12 @@ export const foreignCommitsPath = (root: string) => join(machineDir(root), "fore
 export const inboxOpenPath = (root: string) => join(machineDir(root), "inbox.json");
 export const baseFactsPath = (root: string) => join(machineDir(root), "base.json");
 export const noticesPath = (root: string) => join(machineDir(root), "notices.json");
+/** gh-195 D12 (B21): the mailbox receipts this checkout's ticks rejected, next to the notices */
+export const rejectedReceiptsPath = (root: string) => join(machineDir(root), "rejected.json");
+/** gh-195 D11 (B27): records set aside as superseded, `superseded/<story>-<ulid>/` in the machine dir */
+export const supersededDir = (root: string) => join(machineDir(root), "superseded");
+/** gh-195 13-R3-F2: the lock around a read-modify-write of `rejected.json` (a tick's keep, tidy's prune). */
+export const rejectedLockPath = (root: string) => join(machineDir(root), "rejected.lock");
 export const prFactsPath = (root: string) => join(machineDir(root), "pr.json");
 export const issueFactsPath = (root: string) => join(machineDir(root), "issue.json");
 /**
@@ -162,6 +168,8 @@ export function hookFilePath(root: string, unit: { story: string; slice?: string
 export const hookBackfillPath = (root: string) => join(machineDir(root), "hooks", "backfill.json");
 /** GR6: the base branch's `.agents/specs/` materialized per tree id (store/base.ts). */
 export const baseCacheDir = (root: string) => join(machineDir(root), "base");
+/** gh-195 D6, D7 (B29): finished stories' records unpacked from their archive ref, one folder per record commit (`archive/<story>/<commit>/`, record-ref.ts). */
+export const archiveCacheDir = (root: string, story: string) => join(machineDir(root), "archive", story);
 
 export const specsDir = (root: string) => join(root, SPECS_DIR);
 export const storyDir = (root: string, story: string, slug: string) => join(specsDir(root), storyDirName(story, slug));
@@ -177,75 +185,19 @@ export function storyFile(specDir: string): string {
 export const slicesDir = (specDir: string) => join(specDir, "slices");
 export const sliceFile = (specDir: string, nn: string, slug: string) => join(slicesDir(specDir), `${sliceDirName(nn, slug)}.md`);
 
-/** A spec folder's `runs/`, the parent of every unit's record folder. */
-export const specRunsDir = (specDir: string) => join(specDir, RUNS_DIR);
-/**
- * The resolver for a unit's record folder (gh-71 D2, B30, B36): a slice's `<spec folder>/runs/<nn>-<slug>`;
- * the story's current round `runs/_story/rounds/NN-<wf>` when the spec folder is absolute and has one, else
- * `runs/_story` (a flat record from an older norn, read as round 1, or a story not started). A repo-relative
- * spec folder is not looked at on disk and gets `runs/<unit>`. Every reader and writer goes through here.
- */
-export function unitDir(specDir: string, unit: string): string {
-  const base = join(specDir, unitRecordPath(unit));
-  // gh-71 D7 (B34, S5): while `runs/_story/state.json` is still flat the record is flat, even when a
-  // round.migrate that stopped partway left some entries in rounds/01-<wf>/: state moves last, so the
-  // next round.migrate finishes the move.
-  if (unit !== STORY_UNIT_DIR || !isAbsolute(specDir) || isFlatStoryRecord(specDir)) return base;
-  const round = currentRound(specDir);
-  return round ? join(base, ROUNDS_DIR, roundDirName(round.n, round.workflow)) : base;
-}
-export const storyUnitDir = (specDir: string) => unitDir(specDir, STORY_UNIT_DIR);
-/**
- * gh-71 D2 (B30): the story's current round, the highest-numbered `runs/_story/rounds/NN-<wf>/` under an
- * absolute spec folder that has its state; null = none (a flat record, read as round 1 (B36), or a story
- * not started). S5: a round folder is the record only once its state.json is written, so a round.start
- * that stopped after pinning the new round leaves the old round current and the round receipt unapplied.
- */
-export function currentRound(specDir: string): { n: number; workflow: string } | null {
-  const r = storyRounds(specDir).at(-1);
-  return r ? { n: r.n, workflow: r.workflow } : null;
-}
-/**
- * gh-71 B29, B30: every round folder `runs/_story/rounds/NN-<wf>/` under an absolute spec folder that has
- * its state, ascending by number, with its absolute path; [] for a flat record (read as round 1, B36) or
- * a story not started.
- */
-export function storyRounds(specDir: string): Array<{ n: number; workflow: string; path: string }> {
-  const out: Array<{ n: number; workflow: string; path: string }> = [];
-  const rounds = join(specDir, unitRecordPath(STORY_UNIT_DIR), ROUNDS_DIR);
-  try {
-    for (const d of readdirSync(rounds, { withFileTypes: true })) {
-      const r = d.isDirectory() && existsSync(join(rounds, d.name, "state.json")) ? parseRoundDirName(d.name) : null;
-      if (r) out.push({ ...r, path: join(rounds, d.name) });
-    }
-  } catch {
-    /* no rounds/ */
-  }
-  return out.sort((a, b) => a.n - b.n);
-}
-/** gh-71 B30: round `n`'s record folder under a spec folder (`runs/_story/rounds/NN-<wf>`). */
-export const roundDir = (specDir: string, n: number, workflow: string) => join(specDir, roundRecordPath(n, workflow));
-/**
- * Where a unit's record is written when it starts: a slice's own folder; for the story, its current
- * round, or round 01 of `workflow` when it has neither a round nor a flat record yet (gh-71 B30).
- */
-export function startDir(specDir: string, unit: string, workflow: string): string {
-  if (unit !== STORY_UNIT_DIR || currentRound(specDir) || isFlatStoryRecord(specDir)) return unitDir(specDir, unit);
-  return roundDir(specDir, 1, workflow);
-}
-/** gh-71 D7 (B34): a story record kept the old flat way, `runs/_story/state.json` directly in the folder. */
-export const isFlatStoryRecord = (specDir: string) => existsSync(join(specDir, unitRecordPath(STORY_UNIT_DIR), "state.json"));
 export const statePath = (ud: string) => join(ud, "state.json");
 export const pinnedWorkflowPath = (ud: string) => join(ud, "workflow.yaml");
 export const receiptsDir = (ud: string) => join(ud, "receipts");
 export const logPath = (ud: string, runId: string) => join(ud, "logs", `${runId}.log`);
 export const evidenceDir = (ud: string, runId: string) => join(ud, "evidence", runId);
-/** gh-71 B31: one handoff per story, `runs/_story/handoff.md`, above its round folders; a slice's in its own folder. */
-export const handoffPath = (ud: string) => recordHandoffPath(ud);
-/** What a commit of a unit's record stages: its record folder and its handoff (above the round folder for the story, gh-71 B31). */
-export const recordPaths = (ud: string) => (dirname(handoffPath(ud)) === ud ? [ud] : [ud, handoffPath(ud)]);
-/** R2.3: copies of runs/ files this checkout wrote but never got into the record. */
-export const orphanedDir = (ud: string) => join(ud, "orphaned");
+/**
+ * The resolver for a unit's handoff (gh-195 prefactor 2, B6, B39), keyed by the unit (`_story` or
+ * `<nn>-<slug>`), not by its record folder: `<spec folder>/handoffs/<unit>.md` (gh-195/07, D9). Every
+ * reader and writer of a handoff goes through here.
+ */
+export const handoffPath = (specDir: string, unit: string) => join(specDir, unitHandoffPath(unit));
+/** gh-195/07 (B34, D13 step 2): an older norn's handoff of `unit` in a tree's spec folder, `runs/<unit>/handoff.md`; only the record move reads it. */
+export const treeHandoffFile = (specDir: string, unit: string) => join(specDir, treeHandoffPath(unit));
 
 /** Worktree marker files (A3, K4). */
 export const unitMarkerPath = (worktree: string) => join(worktree, ".norn-unit");

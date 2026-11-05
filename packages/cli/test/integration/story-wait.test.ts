@@ -7,9 +7,10 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
 import { ExitCode } from "@norn/schema";
-import { storyUnitDir, workflowsDir } from "@norn/store";
+import { workflowsDir } from "@norn/store";
 import type { CliDeps, CliResult } from "../../src/index.ts";
 import { createHarness, type Harness, issue, runChecked } from "../../../../test/support/harness.ts";
+import { runStateOf } from "../../../../test/support/run-state.ts";
 
 setDefaultTimeout(30_000);
 
@@ -27,7 +28,7 @@ steps:
 `;
 
 let h: Harness;
-const runs = () => storyUnitDir(join(`${h.root}-worktrees/gh-1-pay-invoices`, ".agents/specs/gh-1-pay-invoices"));
+const runs = () => runStateOf(join(`${h.root}-worktrees/gh-1-pay-invoices`, ".agents/specs/gh-1-pay-invoices"));
 const tick = async () => {
   h.clock.advance(10_000);
   return h.tick();

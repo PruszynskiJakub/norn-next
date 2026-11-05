@@ -8,10 +8,11 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { TickTrace } from "@norn/schema";
-import { repoConfigPath, machineDir as machineDirOf, workflowsDir, storyUnitDir } from "@norn/store";
+import { repoConfigPath, machineDir as machineDirOf, workflowsDir } from "@norn/store";
 import { version } from "../../package.json";
 import { runCli } from "../../src/index.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
+import { runStateOf } from "../../../../test/support/run-state.ts";
 
 setDefaultTimeout(30_000);
 
@@ -36,7 +37,7 @@ mode: auto
 
 let h: Harness;
 const wt = () => `${h.root}-worktrees/gh-5-pay-invoices`;
-const runs = () => storyUnitDir(join(wt(), ".agents/specs/gh-5-pay-invoices"));
+const runs = () => runStateOf(join(wt(), ".agents/specs/gh-5-pay-invoices"));
 const machineDir = () => machineDirOf(h.root);
 const tick = async () => {
   h.clock.advance(10_000);

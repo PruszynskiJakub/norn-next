@@ -4,9 +4,10 @@
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
-import { repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
+import { repoConfigPath, workflowsDir } from "@norn/store";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";
+import { runStateOf } from "../../../../test/support/run-state.ts";
 
 // whole flows over real git, several ticks each
 setDefaultTimeout(30_000);
@@ -36,7 +37,7 @@ mode: manual
 let h: Harness;
 const spec = ".agents/specs/gh-7-count-items";
 const wt = () => `${h.root}-worktrees/gh-7-count-items`;
-const runs = () => storyUnitDir(join(wt(), spec));
+const runs = () => runStateOf(join(wt(), spec));
 const tick = async () => {
   h.clock.advance(10_000);
   return h.tick();

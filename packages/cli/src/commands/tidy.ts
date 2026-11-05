@@ -6,24 +6,25 @@
  *     when their commits are kept elsewhere (story branch, default branch, or the remote copy)
  *   - dead or unreadable leases in `~/.norn/leases/` (K3)
  *   - leftover `.NNNN.reserve` receipt reservations (S6) older than a minute
- *   - R2.3: runs/ work (receipts, state) of a story this checkout no longer holds that never reached
- *     the record — moved to `runs/<unit>/orphaned/<holder>-<file>` and committed on the local branch
- *     only, never pushed, so its receipt numbers are not reused
+ *   - gh-195 D11 (B27, T7a): records set aside as superseded (`superseded/<story>-<ulid>/` in the
+ *     machine dir) longer ago than the window, and their Check item with them
  *   - K7: with Herdr as the runner, the panes left by runs that reported done — the run's tab, or
  *     only its pane when the tab holds something else, and the workspace when nothing else is left
  *   - O7, D12: trace day pairs (day file and chunks file) dated before today minus the window
  *     (`--retain`, else `trace.retain`, default 14d, at least 14d: B23–B26); `trace/workflows/`
  *     is never pruned. Only tidy prunes the trace, never watch or a tick (B34).
  *   - D12, B28–B30: the hook files of units with no live run untouched within the window, and the
- *     briefings and transcripts of runs that are not live whose newest file is older than the window;
+ *     briefings, transcripts and old `runs/<run_id>.log` session logs (gh-195 D1) of runs that are not
+ *     live whose newest file is older than the window;
  *     never a live run's, nor `backfill.json`, the caches or the locks.
+ *   - gh-195 D12: rejected mailbox receipts (`rejected.json`) cleared and rejected before the window
  * Nothing with unique work is removed; such items are listed under `kept` with the reason.
  */
 import { readdirSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join } from "node:path";
 import { herdr } from "@norn/adapters";
 import { ulid } from "@norn/schema";
-import { copyToOrphaned, deleteTraceDays, deleteTracePaths, orphanedDir, reclaimLeases, receiptsDir, safeUnlink, traceDaysBefore, unitDir } from "@norn/store";
+import { deleteTraceDays, pruneRejectedReceipts, pruneSuperseded, rejectedReceiptsPath, deleteTracePaths, reclaimLeases, receiptsDir, safeUnlink, traceDaysBefore } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, usageError } from "../output.ts";
@@ -32,7 +33,7 @@ import { leaseLiveness } from "../runtime/leases.ts";
 import { type Observed, observe } from "../runtime/observe/index.ts";
 import { doneHerdrRuns, planHerdrTidy } from "../runtime/tidy-herdr.ts";
 import { checkRetain, MIN_TRACE_RETAIN, retainCutoffDay, unitTracesBefore } from "../runtime/trace-retention.ts";
-import { cmd } from "@norn/core";
+import { cmd, storyFinished } from "@norn/core";
 
 /** A reservation lives only while a receipt is being written; older ones are crash leftovers. */
 const RESERVE_STALE_MS = 60_000;
@@ -89,7 +90,7 @@ function retainWindow(ctx: Context, flag: string | undefined): { retain: string;
 export const tidyCommand = defineCommand({
   name: "tidy",
   version: "acts",
-  summary: "Report or clean orphan worktrees, branches, stale leases, receipt reservations (K5), runs/ work not in the record (R2.3), Herdr panes of runs that reported done (K7) and trace days, hook files, briefings and transcripts older than trace.retain (D12)",
+  summary: "Report or clean orphan worktrees, branches, stale leases, receipt reservations (K5), Herdr panes of runs that reported done (K7), and trace days, hook files, briefings, transcripts, old session logs, cleared rejected mailbox receipts and records set aside as superseded older than trace.retain (D12, gh-195 D1, D11)",
   usage: "norn tidy [--dry-run] [--retain <duration>]",
   options: { "dry-run": { type: "boolean" }, retain: { type: "string" } },
   async run(ctx, args) {
@@ -163,41 +164,6 @@ export const tidyCommand = defineCommand({
         }
       }
 
-      // ---- R2.3: runs/ work this checkout wrote for a story it no longer holds → orphaned/ (local only)
-      const orphaned: Array<{ story: string; unit: string; moved: Array<{ from: string; to: string }>; commit: string | null }> = [];
-      const holder = obs.facts.machine.holder;
-      for (const [story, units] of Object.entries(obs.unpushed)) {
-        for (const u of units) {
-          const record = unitDir(join(u.cwd, obs.stories[story]?.spec_dir ?? ""), u.dir);
-          const moved: Array<{ from: string; to: string }> = [];
-          for (const f of u.files) {
-            const src = join(u.cwd, f);
-            if (dry) {
-              moved.push({ from: f, to: relative(u.cwd, join(orphanedDir(record), `${holder}-${f.split("/").at(-1)}`)) });
-              continue;
-            }
-            const dest = copyToOrphaned(record, src, holder);
-            // back to the record's version of the path: the merge-base copy, or gone when it is new here
-            const inBase = await git.hasPath(u.cwd, u.base, f);
-            if (inBase) await git.checkoutPaths(u.cwd, u.base, [f]).catch(() => undefined);
-            else {
-              await git.untrack(u.cwd, [f]).catch(() => undefined);
-              safeUnlink(src);
-            }
-            if (dest) moved.push({ from: f, to: relative(u.cwd, dest) });
-          }
-          // committed on the local branch only — never pushed (R2.2: this checkout does not hold the claim)
-          const commit = dry
-            ? null
-            : await git.commit(u.cwd, {
-                message: `norn: ${u.unit} work not in the record moved to orphaned/`,
-                trailers: { "Norn-Story": story, ...(u.unit !== story ? { "Norn-Slice": u.unit } : {}), "Norn-Tick": obs.facts.tick_id },
-                paths: [relative(u.cwd, record)],
-              });
-          orphaned.push({ story, unit: u.unit, moved, commit });
-        }
-      }
-
       // ---- K7: Herdr panes of runs that reported done
       const cockpit = tidyHerdr(ctx);
       const herdrClosed = cockpit ? await tidyHerdrPanes(cockpit, obs, dry, kept) : null;
@@ -210,14 +176,22 @@ export const tidyCommand = defineCommand({
         deleteTraceDays(root, days);
         deleteTracePaths(root, [...hook_files.map((f) => f.file), ...runs.flatMap((r) => r.files)]);
       }
+      // gh-195 D12: cleared rejected mailbox receipts age out with the trace that also records them; an open
+      // one (its Check item still shown: no answer or approval since, story not finished) stays
+      const open = new Set(obs.facts.stories.filter((s) => !storyFinished(s)).flatMap((s) => (s.rejected_mailbox ?? []).map((r) => r.receipt_id)));
+      // review#1 F2: a rejected.json that cannot be pruned is one kept item; the rest of tidy goes on
+      const pruned = await pruneRejectedReceipts(root, new Date(ctx.clock.now() - window.ms).toISOString(), open, dry);
+      if (pruned.error) kept.push({ item: rejectedReceiptsPath(root), reason: pruned.error });
+      const rejected = pruned.removed.map((r) => r.receipt_id);
+      // gh-195 D11 (B27, T7a): records set aside as superseded go once older than the window; their Check item with them
+      const superseded = pruneSuperseded(root, new Date(ctx.clock.now() - window.ms).toISOString(), dry).map((c) => c.name);
       const bytes = [...days, ...hook_files, ...runs].reduce((n, d) => n + d.bytes, 0);
       const trace = { retain: window.retain, days, hook_files, runs, bytes };
 
       const verb = dry ? "would_remove" : "removed";
       return {
         dry_run: dry,
-        [verb]: { worktrees, stale_worktree_records: prunable, branches, leases, reserve_files: reserves, ...(herdrClosed ? { herdr: herdrClosed } : {}) },
-        [dry ? "would_orphan" : "orphaned"]: orphaned,
+        [verb]: { worktrees, stale_worktree_records: prunable, branches, leases, reserve_files: reserves, rejected_receipts: rejected, superseded, ...(herdrClosed ? { herdr: herdrClosed } : {}) },
         trace,
         kept,
       };

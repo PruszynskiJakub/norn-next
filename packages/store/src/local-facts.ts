@@ -9,14 +9,17 @@
  * tick's hook-file backfill (`backfillHooks`, D5).
  */
 import { existsSync, readdirSync } from "node:fs";
-import { type ActFailure, type FileError, hookWindowMs, type NumberedReceipt, openNotes, RE_ENTRY_KINDS, readyApproval, type StepRunFacts, type StoryFacts, storyWorktreePath } from "@norn/core";
-import { type HookFact, type LeaseFile, parseDuration, parseReceiptFileName, type ReceiptOf, type RunInfo, type UnitState } from "@norn/schema";
+import { type ActFailure, type FileError, hookWindowMs, type NumberedReceipt, openNotes, RE_ENTRY_KINDS, readyApproval, recordPushSlot, type StepRunFacts, type StoryFacts, storyWorktreePath } from "@norn/core";
+import { type HookFact, type LeaseFile, parseDuration, parseReceiptFileName, type ReceiptOf, type RejectedMailboxReceipt, type RunInfo, type UnitState } from "@norn/schema";
 import { type BaseFactsCache, type IssueFactsCache, type PrFactsCache, readBaseFacts, readIssueFacts, readPrFacts } from "./base.ts";
 import { readActFailures } from "./heartbeat.ts";
+import { readRejectedReceipts } from "./local.ts";
+import { listSuperseded, type SupersededCopy } from "./superseded.ts";
 import { type BackfillRun, backfillHookFiles } from "./hook-backfill.ts";
 import { type LeaseListing, type LeaseLiveness, listLeases } from "./leases.ts";
 import { receiptsDir } from "./paths.ts";
 import { readReceipt } from "./receipts.ts";
+import { localRecordRefs } from "./record-ref.ts";
 import { loadSnapshot, type RepoSnapshot, type StorySnapshot, type UnitSnapshot, withSliceWorktrees } from "./snapshot.ts";
 import { worktreeSkillsDrift } from "./skills.ts";
 import { readUnitHooks, unitHooksChangedAt } from "./trace.ts";
@@ -92,6 +95,12 @@ export interface LocalStory {
   notes?: StoryFacts["notes"];
   /** F35/C5: the story unit's ready approval (`readyApproval`) */
   ready?: { sha: string; at: string };
+  /** gh-195 (08-F4, review F2): the story's refused record push, from its own slot of failures.json (`StoryFacts.record_refused`) */
+  record_refused?: ActFailure;
+  /** gh-195 (review#2 F3): the local record ref's commit while the story unit has no run state (`StoryFacts.record_unplaced`) */
+  record_unplaced?: string;
+  /** gh-195 D12 (B21): mailbox receipts this checkout rejected that no later accepted answer or approval cleared */
+  rejected?: RejectedMailboxReceipt[];
 }
 
 export interface LocalFacts {
@@ -111,12 +120,14 @@ export interface LocalFacts {
    * B5); absent when no running version was given or the config failed to load.
    */
   norn?: { running: string; repo: string | null; skills_drift?: string[] };
+  /** gh-195 D11 (B27): records this checkout set aside as superseded (`Facts.superseded`) */
+  superseded: SupersededCopy[];
 }
 
 export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Promise<LocalFacts> {
   const now = opts.now;
   const includeApplied = opts.includeApplied;
-  const snapshot = loadSnapshot({ repoRoot: root, storyRoots: [...opts.storyWorktrees.values()], home: opts.home, env: opts.env, baseRef: opts.baseRef, includeApplied });
+  const snapshot = loadSnapshot({ repoRoot: root, storyRoots: [...opts.storyWorktrees].map(([story, path]) => ({ story, path })), home: opts.home, env: opts.env, baseRef: opts.baseRef, includeApplied });
   const leases = await listLeases(snapshot.home, opts.liveness).catch((e: unknown): LeaseListing => {
     if (!opts.reportLeaseErrors) throw e;
     return { live: [], dead: [], errors: [{ file: "leases", errors: [{ path: "", message: (e as Error).message }] } satisfies FileError] };
@@ -139,6 +150,7 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
     return story;
   });
   const failures = readActFailures(root);
+  const rejected = readRejectedReceipts(root);
 
   const placed = read.map((s) => {
     const conventional = storyWorktreePath(root, s.key, s.slug);
@@ -158,6 +170,7 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
   const unitHooks = readUnitHooks(root, hooked.map((u) => u.unit), starts.sort()[0] as string);
   const hooksOf = new Map(hooked.map((u, i) => [u, (unitHooks[i] ?? []).map((e) => e.fact)]));
   const drift = skillsDriftOf(opts);
+  let refs: Map<string, string> | undefined;
   const stories = placed.map(({ s, storyWt, units: us }): LocalStory => {
     const units = us.map(({ u, worktree }) => {
       const lu = localUnit(root, s, u, worktree, hooksOf.get(u) ?? [], live, failures);
@@ -167,13 +180,26 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
     });
     const ready = readyOf(s, s.units[0]);
     const notes = openNotes(s.units.map((u) => ({ unit: u.unit.key, receipts: receiptsOfKinds(s, u, ["done", "approve"]) })));
-    return { snapshot: s, worktree: storyWt, units, ...(notes.length ? { notes } : {}), ...(ready ? { ready } : {}) };
+    const refused = failures[recordPushSlot(s.key)];
+    // review#2 F3: a record ref here while the story unit has no run state — the record is not in place
+    const unplaced = !s.units[0]?.state ? (refs ??= localRecordRefs(root)).get(s.key) : undefined;
+    const open = openRejections(s, rejected);
+    return {
+      snapshot: s,
+      worktree: storyWt,
+      units,
+      ...(notes.length ? { notes } : {}),
+      ...(ready ? { ready } : {}),
+      ...(refused ? { record_refused: refused } : {}),
+      ...(unplaced ? { record_unplaced: unplaced } : {}),
+      ...(open.length ? { rejected: open } : {}),
+    };
   });
   // gh-61 D5, B12: the version the main checkout's team config records
   const mainDrift = drift(root);
   const norn =
     opts.running !== undefined && snapshot.config.ok ? { running: opts.running, repo: snapshot.config.config.norn_version ?? null, ...(mainDrift ? { skills_drift: mainDrift } : {}) } : undefined;
-  return { snapshot, stories, leases, failures, pr_seen: readPrFacts(root), issue_seen: readIssueFacts(root), base: readBaseFacts(root), ...(norn ? { norn } : {}) };
+  return { snapshot, stories, leases, failures, pr_seen: readPrFacts(root), issue_seen: readIssueFacts(root), base: readBaseFacts(root), ...(norn ? { norn } : {}), superseded: listSuperseded(root) };
 }
 
 /**
@@ -194,8 +220,10 @@ function skillsDriftOf(opts: LocalFactsOptions): (worktree: string) => string[] 
 
 function localUnit(root: string, story: StorySnapshot, u: UnitSnapshot, worktree: string | null, hooks: HookFact[], leases: LeaseFile[], failures: Record<string, ActFailure>): LocalUnit {
   const st = u.state;
-  // receipts display relative to the unit's worktree when it is there, else the story's checkout
-  const at = worktree && existsSync(worktree) ? worktree : story.root;
+  // S12 (gh-195/05): receipts in the machine dir display absolute; an older norn's record in a tree
+  // relative to the unit's worktree when it is there, else the story's checkout; gh-195/06: a record
+  // read from a unit worktree's branch (an older norn's), relative to that worktree
+  const at = u.tree_root ?? (!story.run_state.tree ? undefined : worktree && existsSync(worktree) ? worktree : story.root);
   const lo = st ? lastOutcomeReceipt(u.path, st, at) : null;
   const cursor = st ? cursorRuns(u.path, st, at) : null;
   const mine = leases.filter((l) => l.repo === root && l.story === u.unit.story && l.slice === u.unit.slice);
@@ -253,6 +281,23 @@ function unknownLaunch(unapplied: readonly NumberedReceipt[]): (NumberedReceipt 
   return last;
 }
 
+/**
+ * gh-195 D12 (B21): the story's rejected mailbox receipts still to show — those no answer or approval
+ * applied to a unit of the story since has cleared. "Since" is the holder's own receipt order: a receipt
+ * numbered past the unit's last one when the receipt was rejected (`seen`; a unit not seen then, any).
+ * A gate rejection does not clear it.
+ */
+function openRejections(story: StorySnapshot, rejected: readonly RejectedMailboxReceipt[]): RejectedMailboxReceipt[] {
+  const mine = rejected.filter((r) => r.story === story.key);
+  if (!mine.length) return [];
+  const accepted = story.units.flatMap((u) =>
+    receiptsOfKinds(story, u, ["answer", "approve"])
+      .filter((r) => r.n <= (u.state?.applied_through ?? 0))
+      .map((r) => ({ unit: u.unit.key, n: r.n })),
+  );
+  return mine.filter((x) => !accepted.some((r) => r.n > (x.seen[r.unit] ?? 0)));
+}
+
 /** Receipts of the given kinds in a unit's runs dir, ascending — read by file name, the others never opened. */
 export function receiptsOfKinds(story: StorySnapshot, u: UnitSnapshot, kinds: readonly string[]): NumberedReceipt[] {
   let names: string[];
@@ -275,7 +320,7 @@ export function receiptsOfKinds(story: StorySnapshot, u: UnitSnapshot, kinds: re
 }
 
 /** The receipt that produced `state.last_outcome`, scanning newest receipts first (B3 Rework). */
-function lastOutcomeReceipt(runsDir: string, state: UnitState, root: string): NumberedReceipt | null {
+function lastOutcomeReceipt(runsDir: string, state: UnitState, root: string | undefined): NumberedReceipt | null {
   const id = state.last_outcome?.receipt_id;
   if (!id) return null;
   let names: string[];
@@ -301,7 +346,7 @@ function lastOutcomeReceipt(runsDir: string, state: UnitState, root: string): Nu
  * R5.3 + R5.1: the unit's `started` / `classify` receipts at its cursor step/attempt (newest first,
  * stopping at the first of another cursor), and every session id its `started` receipts recorded.
  */
-function cursorRuns(runsDir: string, st: UnitState, root: string): CursorRuns {
+function cursorRuns(runsDir: string, st: UnitState, root: string | undefined): CursorRuns {
   const runs = new Map<string, { died: boolean }>();
   const sessions = new Set<string>();
   let names: string[];

@@ -94,6 +94,12 @@ function cases(): RuleCase[] {
 
   // ---- repo and claims
   out.push(c("dead lease files are reclaimed", "leases.reclaim", facts([], machine({ dead_lease_files: ["agent-1.json"] }))));
+  out.push(
+    c("a unit worktree lost its .norn-unit: act writes it back (gh-195/05, B2)", "worktree.marker", {
+      ...facts([story(SOLO_WF)]),
+      unmarked: [{ path: "/r-worktrees/gh-1-login", marker: { repo: "/r", story: "gh-1", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-1-login" } }],
+    }),
+  );
   out.push(c("an unreadable claim ref", "claim.corrupt", facts([story(SOLO_WF, {}, null, { claim: { state: "corrupt", sha: "c9", error: { file: "refs/norn/claims/gh-1", errors: [{ path: "", message: "invalid JSON" }] } } })])));
   out.push(c("a story file that failed validation", "story.corrupt", facts([story(SOLO_WF, {}, null, { frontmatter: null, frontmatter_error: { file: ".agents/specs/gh-1-login/story.md", errors: [{ path: "/id", message: "bad" }] } })])));
 
@@ -112,6 +118,14 @@ function cases(): RuleCase[] {
     out.push(c("an unreadable mailbox receipt", "mailbox.reject", facts([{ ...s, mailbox: [{ ref: "refs/norn/mailbox/gh-1/01JFFFFFFFFFFFFFFFFFFFFFFF", sha: "m1", id: "01JFFFFFFFFFFFFFFFFFFFFFFF", receipt: null, error: null }] }])));
   }
 
+  // ---- superseded records (gh-195 D11, B27, R2.3)
+  {
+    const s = story(SOLO_WF);
+    const other = { state: "other" as const, sha: "c2", blob: { ...(s.claim as Extract<StoryFacts["claim"], { state: "mine" }>).blob, holder: "ann@pc", heartbeat_id: OTHER_RUN } };
+    out.push(c("taken over without a release: the local record is set aside", "record.superseded", facts([{ ...s, claim: other, local_record: { last_receipt: "0003-done", on_ref: false } }])));
+    out.push(c("released cleanly: the local record on the ref is removed quietly", "record.released", facts([{ ...s, claim: other, local_record: { last_receipt: "0003-done", on_ref: true } }])));
+  }
+
   // ---- story start
   {
     const fresh = (wfName: string, uf: Partial<UnitFacts> = {}, sf: Partial<StoryFacts> = {}) => {
@@ -120,6 +134,10 @@ function cases(): RuleCase[] {
     };
     out.push(c("the story names a workflow that does not exist", "start.workflow_invalid", facts([fresh("nope")])));
     out.push(c("the story worktree is missing at start", "start.no_worktree", facts([fresh("solo", noWorktree, { worktree: null })])));
+    // gh-195/10 review#2 F3: a checkout cut short left the record on its ref but not in the machine dir
+    // gh-195/10 review#2 F1 (B33): a story held here from its record alone, nothing pending
+    out.push(c("a story held from its record without a branch", "story.record_only", facts([story(SOLO_WF, ready("implement"), null, { record_only: true, frontmatter: null, worktree: null })])));
+    out.push(c("the story's record ref is here but its run state is not", "start.record_unplaced", facts([fresh("solo", {}, { record_unplaced: "0123456789abcdef0123456789abcdef01234567" })])));
   }
 
   // ---- unit guards
@@ -132,6 +150,21 @@ function cases(): RuleCase[] {
   out.push(c("a rebase waits in the unit's worktree past the step's deadline", "unit.rebase_in_progress", facts([story(SOLO_WF, running("implement", 2 * HOUR), null, {}, { worktree: { ...worktree(STORY_WT), in_progress: { operation: "rebase", unmerged: ["X.txt"] } } })])));
   out.push(c("a ready unit whose cursor is $done", "unit.no_step", facts([story(SOLO_WF, ready("$done"))])));
   // gh-71 D7 (B34): a held story whose record is still flat moves into round 1 first
+  // gh-195/06 (B34, D13): run state an older norn left on a held unit's branch
+  const onBranch = { branch_record: { path: ".agents/specs/gh-1-login/runs", copy: ["_story"], holds: ["_story"] }, record: "_story" };
+  out.push(c("a held story's flat record still on its branch moves into round 1 of the machine dir", "record.move", facts([story(STORY_WF, { step: "slices" }, null, {}, onBranch)])));
+  out.push(
+    c("a story's branch run state waits out a merge in its worktree (H1)", "record.move_waits", facts([story(STORY_WF, { step: "slices" }, null, {}, { ...onBranch, worktree: { ...worktree(STORY_WT), in_progress: { operation: "merge", unmerged: [] } } })])),
+  );
+  // gh-195/08 (B10, D4): under record.policy remote, a held story whose record changed since the ref it last saw
+  out.push(
+    c(
+      "a held story's record changed under the remote policy: push it after the branch",
+      "record.push",
+      facts([{ ...story(SOLO_WF, running("implement", MIN)), record: { tree: "b".repeat(40), pushed: { sha: "c".repeat(40), tree: "a".repeat(40) } } }]),
+      { ...CONFIG, record: { policy: "remote" } },
+    ),
+  );
   out.push(c("a held story with a flat record", "round.migrate", facts([story(STORY_WF, { step: "slices" }, null, {}, { record: "runs/_story" })])));
   // gh-71 D5 (B35): an older norn's remote park on a finished round is dropped by the holder's tick
   out.push(c("a finished round an older norn parked for the issue", "remote.unpark_finished", facts([{ ...story(STORY_WF, { step: "$done", status: "stuck", park: { kind: "remote", reason: "remote: issue closed, unassigned or unlabelled", since: at() } }, null, {}, { record: "runs/_story/rounds/01-story" }), issue: null }])));

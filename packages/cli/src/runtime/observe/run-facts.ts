@@ -1,7 +1,7 @@
 /** observe: a unit's run facts — its run windows (C4), hook facts refined per agent (A2), the live or unknown run (R5.1, R5.3, B3). */
 import type { AgentAdapter, FileError, Ports, RunFacts, UnitFacts, WorktreeFacts } from "@norn/core";
-import type { HookFact } from "@norn/schema";
-import { type LocalUnit, liveRun, receiptsOfKinds, runHooks, type StorySnapshot, type UnitSnapshot, unitDir } from "@norn/store";
+import { type HookFact, treeStoryRunStatePath } from "@norn/schema";
+import { handoffPath, type LocalUnit, liveRun, receiptsOfKinds, runHooks, type StorySnapshot, type UnitSnapshot } from "@norn/store";
 import type { DatedCommit } from "./git-facts.ts";
 
 /** A2: each agent adapter's own pass over a run's hook facts (`refineHooks`), once per adapter name. */
@@ -57,9 +57,12 @@ export async function unitFacts(ports: Ports, story: StorySnapshot, lu: LocalUni
   const now = env.now;
   const u = lu.snapshot;
   const st = u.state;
-  const prefix = `${unitDir(story.spec_dir, u.unit.dir)}/`;
+  // gh-195 D8 (B5): norn's one file in the worktree is the unit's handoff; its run state is in the machine dir
+  // (S12). The agent's own files are not counted: they are dirty all through a live session, and
+  // recover.commit would commit them under it
+  const handoff = handoffPath(story.spec_dir, u.unit.dir);
   const dirty = worktree?.status ? [...worktree.status.staged, ...worktree.status.unstaged, ...worktree.status.untracked] : [];
-  const uncommitted = dirty.some((p) => p.startsWith(prefix));
+  const uncommitted = dirty.some((p) => p === handoff || (p.endsWith("/") && handoff.startsWith(p)));
 
   const cursor = lu.cursor;
   const unknown = lu.unknown_launch;
@@ -135,5 +138,23 @@ export async function unitFacts(ports: Ports, story: StorySnapshot, lu: LocalUni
     lease: lu.lease,
     uncommitted,
     ...(lu.step_runs ? { step_runs: lu.step_runs } : {}),
+    ...branchRecord(story, u, worktree),
   };
+}
+
+/**
+ * gh-195/06 (B34, D13): the run state an older norn left on the unit's own branch, as store read it from
+ * the worktree; or, when the worktree holds none of it any more, a removal of it git status still shows
+ * uncommitted (a move that stopped after deleting the files, or whose commit failed or was deferred):
+ * the move is not done until its commit lands, so the next move only finishes it (S1, S5).
+ */
+function branchRecord(story: StorySnapshot, u: UnitSnapshot, worktree: WorktreeFacts | null): Pick<UnitFacts, "branch_record"> {
+  if (u.branch_record) return { branch_record: structuredClone(u.branch_record) };
+  const st = worktree?.status;
+  if (!st) return {};
+  const path = treeStoryRunStatePath(story);
+  const left = [...st.staged, ...st.unstaged].filter((p) => p.startsWith(`${path}/`));
+  if (!left.length) return {};
+  const holds = [...new Set(left.map((p) => p.slice(path.length + 1).split("/")[0] as string))].sort();
+  return { branch_record: { path, copy: [], holds } };
 }

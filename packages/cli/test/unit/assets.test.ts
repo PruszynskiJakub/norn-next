@@ -207,6 +207,12 @@ describe("single-purpose workflows (W1, #136)", () => {
     expect(targets("story", "ci")).toEqual({ pass: "ready", fail: "implement" });
   });
 
+  test("story's describe step reads the record, not runs/ in the worktree, here and in this repo's copy (gh-195 D5, B28)", () => {
+    const local = parse(readFileSync(join(ASSETS, "..", "..", "..", ".agents", "workflows", "story.yaml"), "utf8")) as Workflow;
+    for (const w of [wf("story"), local]) expect(w.steps.describe).toMatchObject({ skill: "norn-pr", inputs: ["spec", "diff", "record"] });
+    expect(readSkill("norn-pr")).toContain("`evidence/<unit>/<run_id>/<file>`");
+  });
+
   test("slice has no QA: implement, test, review, integrate", () => {
     expect(types("slice")).toEqual({ implement: "agent", test: "check", review: "agent", integrate: "git", merge: "agent" });
     expect(targets("slice", "review")).toEqual({ approve: "integrate", changes_requested: "implement" });
@@ -253,7 +259,7 @@ describe("skills", () => {
 
   test("the norn skill states the protocol and hard rules", () => {
     const text = readSkill("norn");
-    for (const s of ["norn brief", "norn done", "norn ask", "norn stuck", "--handoff", "Do instead", "handoff.md", "Goal", "Progress", "Resume", "git push", "runs/", "gh", "glab"])
+    for (const s of ["norn brief", "norn done", "norn ask", "norn stuck", "--handoff", "Do instead", "handoffs/<unit>.md", "Goal", "Progress", "Resume", "git push", "runs/", "gh", "glab"])
       expect(text).toContain(s);
   });
 
@@ -286,8 +292,8 @@ describe("skills", () => {
       // B15, B41: a CI glitch and a load failure are rerun at their check too, after a cancel
       "Rerun at its check** (CI glitch, load, suspected flake)", "then rerun at its check (`--step ci`, below)", "then rerun at its check once (`--step <check>`, below)",
       "`norn run cancel` only right before a rerun at its check",
-      // B15, B41, B42 (gh-196 D6): norn's own runs/-only transition commits never count as newer work
-      "git log -1 --format=%cI <branch> -- . ':(exclude,glob)**/runs/**'",
+      // B15, B41, B42 (gh-196 D6): norn's own boundary commits (handoffs only, or empty: gh-195 S12) never count as newer work
+      "git log -1 --format=%cI <branch> -- . ':(exclude,glob)**/handoffs/**'",
       // B15: a hung run is cancelled on the forge first; a unit not yet running is cancelled once it runs
       "gh run cancel <id>", "`nothing_to_cancel`",
       // SK3: the cancel is a mechanical step; the delegated rerun after it carries the reason

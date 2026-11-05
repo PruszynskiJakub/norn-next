@@ -4,7 +4,7 @@
  */
 import { relative } from "node:path";
 import { type Receipt, type ReceiptOf, ulid } from "@norn/schema";
-import { appendReceipt, readHandoff, writeHandoffBody } from "@norn/store";
+import { appendReceipt, handoffProse, readText, writeHandoffBody } from "@norn/store";
 import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
 import { cmd, currentRun, implicitAskOpen, standingReport } from "@norn/core";
@@ -76,14 +76,14 @@ export function rejectProgress(r: Receipt): string {
 }
 
 /** The agent's milestone (O6): one line appended to the Progress section of handoff.md. */
-export function appendProgress(runsDir: string, line: string): void {
-  const cur = readHandoff(runsDir);
-  const body = cur?.body ?? "\n## Goal\n\n## Progress\n\n## Resume\n";
+export function appendProgress(handoffFile: string, line: string): void {
+  const raw = readText(handoffFile);
+  const body = raw === null ? "## Goal\n\n## Progress\n\n## Resume\n" : handoffProse(raw);
   const text = `- ${line.replace(/\s*\n\s*/g, " ").trim()}`;
   const lines = body.split("\n");
   const at = lines.findIndex((l) => /^##\s+Progress\s*$/.test(l));
   if (at < 0) {
-    writeHandoffBody(runsDir, `${body.replace(/\n*$/, "\n")}\n## Progress\n\n${text}\n`);
+    writeHandoffBody(handoffFile, `${body.replace(/\n*$/, "\n")}\n## Progress\n\n${text}\n`);
     return;
   }
   let end = lines.findIndex((l, i) => i > at && /^##\s/.test(l));
@@ -95,7 +95,7 @@ export function appendProgress(runsDir: string, line: string): void {
   // keep one blank line before the next section
   const next = insert + block.length;
   if (next < lines.length && (lines[next] ?? "").trim() !== "") lines.splice(next, 0, "");
-  writeHandoffBody(runsDir, lines.join("\n"));
+  writeHandoffBody(handoffFile, lines.join("\n"));
 }
 
 /** What every successful report answers (§9.3): the receipt, then "end your turn". */

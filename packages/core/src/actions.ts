@@ -7,6 +7,8 @@
  *   action. Decide emits it before every other action of the story; act performs it first and, if
  *   its CAS loses (the claim is gone or held by another heartbeat), skips every other action of
  *   that story this tick, reporting each as `skipped: claim lost` (R1.2). See decide's `isSideAction`.
+ * - Side action (gh-195 D4): a story's `push_record` does not occupy its unit's one action either;
+ *   act performs it after every other action of the tick (after the branch push, B10).
  * - Decide is pure and replayable: it uses `facts.now` for every timestamp and
  *   `deriveUlid(facts.tick_id, i)` (from @norn/schema) for every new id (receipt_id, run_id).
  * - Every action is a plain JSON value (it is written to the trace verbatim).
@@ -23,17 +25,21 @@
  *   its transitions in its `starts`.
  * - Traces written by an older norn carry `receipts: []`, `state: null`, `commit: null` on those three
  *   kinds and a `park` copy of `state.park` on `park`; `legacyAction` drops them so `norn run view --why` still
- *   compares an old recorded decision with its replay.
+ *   compares an old recorded decision with its replay. An older `round_migrate` (before gh-195/05, S12)
+ *   also carries a `commit` and names its folders from the spec folder (`<spec>/runs/_story…`):
+ *   `legacyAction` drops the commit and names them as decide does now (`runs/<story>/_story…`).
  */
 import type {
   ClaimBlob,
   GitAction,
   Receipt,
+  RejectedMailboxReceipt,
   StoryFrontmatter,
   UnitState,
 } from "@norn/schema";
+import { recordRunStatePath } from "@norn/schema";
 import type { Rejection } from "./apply.ts";
-import type { FileError, UnitRef } from "./facts.ts";
+import type { FileError, UnitRef, UnmarkedWorktree } from "./facts.ts";
 import type { InboxItem, PromptKey, RemoteIssue, SessionRef } from "./ports.ts";
 
 /** A receipt decide wants written, with its number (S6). */
@@ -52,6 +58,12 @@ export interface BoundaryCommit {
   trailers: Record<string, string>;
   /** push the branch after committing (only the claim holder, T7) */
   push: boolean;
+  /**
+   * gh-195 D17 (B18–B20): commit even when nothing changed — a story unit's boundary, so the story branch
+   * always carries the last boundary (`Norn-Outcome`, `Norn-Next`) a non-holder reads the step from.
+   * Absent = no commit without changes (a slice's boundary: no reader needs it).
+   */
+  allow_empty?: true;
 }
 
 /** State change carried by unit actions. */
@@ -139,7 +151,15 @@ export interface ApplyReceiptsAction extends UnitBase, Transition, Delivery {
   /** receipts refused (stale step/attempt T9, wrong kind for the step); act writes each to the trace as a `reject` event */
   rejected: Rejection[];
   /** edge taken, if the cursor moved */
-  advance: { from: string; outcome: string; to: string; counter?: { name: string; value: number; max: number }; reset?: string[] } | null;
+  advance: {
+    from: string;
+    outcome: string;
+    to: string;
+    counter?: { name: string; value: number; max: number };
+    reset?: string[];
+    /** gh-195 B18, B19: a person's receipt moved the cursor (workflow, unstick, update; `Advance.moved`): no step ended */
+    moved?: true;
+  } | null;
 }
 
 /** Start a unit: pin its workflow (S7), create the worktree, write the first state. */
@@ -279,6 +299,11 @@ export interface RejectReceiptAction extends UnitBase {
   reason: string;
   /** state with applied_through moved past a rejected numbered receipt */
   state: UnitState | null;
+  /**
+   * gh-195 D12 (B21): a rejected mailbox receipt to keep machine-local for its Check item, kept before the
+   * ref is deleted. Absent = none (a numbered receipt, or a mailbox blob that could not be read).
+   */
+  keep?: RejectedMailboxReceipt;
 }
 
 /** A unit file failed validation (S2): mark corrupt and surface it; never guess. */
@@ -354,16 +379,15 @@ export interface CloseStoryAction extends UnitBase {
 }
 
 /**
- * gh-71 D7 (B34): move a flat story record (`runs/_story/state.json` …) into its round 1 folder with
- * `git mv` — everything under `from` but `handoff.md` and `rounds/` — then commit and push (one commit).
+ * gh-71 D7 (B34): move a flat story record (`_story/state.json` …) into its round 1 folder — everything
+ * under `from` but `rounds/` — inside the machine dir (S12, gh-195/05): nothing to commit.
  */
 export interface RoundMigrateAction extends UnitBase {
   kind: "round_migrate";
-  /** worktree-relative `runs/_story` */
+  /** machine-dir-relative `runs/<story>/_story` */
   from: string;
-  /** worktree-relative `runs/_story/rounds/01-<workflow>` */
+  /** machine-dir-relative `runs/<story>/_story/rounds/01-<workflow>` */
   to: string;
-  commit: BoundaryCommit;
 }
 
 /**
@@ -417,6 +441,54 @@ export interface IntakeStoryAction extends RepoBase {
   commit: BoundaryCommit;
 }
 
+/**
+ * gh-195/06 (B34, D13): move the run state an older norn left on the unit's branch into the machine dir:
+ * copy each record in `copy` (`from` relative to the worktree, `to` to the machine dir; a flat record,
+ * RD7, goes to the story's round 1), validated and put in place atomically (S1, S2), skipping one the
+ * machine dir already holds (S5); then remove `path` but the handoffs from the worktree and commit that
+ * removal alone in `commit`, pushed.
+ */
+export interface MoveRecordAction extends UnitBase {
+  kind: "move_record";
+  /** `<spec folder>/runs`, relative to the worktree (`commit.cwd`) */
+  path: string;
+  /** each unit's folder (`_story`, `<nn>-<slug>`), where it is on the branch and where it goes */
+  copy: Array<{ unit: string; from: string; to: string }>;
+  commit: BoundaryCommit;
+}
+
+/**
+ * gh-195 D2, D4 (B10, B14): pack the story's record and push it to `refs/norn/runs/<story>` with a
+ * lease on `expected` (the sha observe saw; null = none yet). A side action of the story unit that act
+ * performs after every other action of the tick, so after the branch push; a tree unchanged from
+ * `expected`'s pushes nothing, and a failed push leaves the record owed for the next tick.
+ */
+export interface PushRecordAction extends UnitBase {
+  kind: "push_record";
+  /** the story branch; its pushed head is the commit's `Norn-Branch-Commit` */
+  branch: string;
+  expected: string | null;
+  /** `Norn-Holder`: the claim holder (`user@host`) */
+  holder: string;
+}
+
+/**
+ * gh-195 D11 (B27, T7a, R2.3): this checkout's own record of a story another heartbeat holds leaves its
+ * machine dir's `runs/<story>/`. `superseded`: taken over without a release — moved whole to
+ * `superseded/<name>/` (never pushed, never merged), shown as one Check item until `norn tidy` deletes it
+ * after `trace.retain`. null: released cleanly, the record already on the ref (B15) — removed quietly.
+ */
+export interface SetAsideRecordAction extends UnitBase {
+  kind: "set_aside_record";
+  superseded: { name: string; holder: string; last_receipt: string | null } | null;
+}
+
+/** gh-195/05 (B2): write back the `.norn-unit` of unit worktrees `git clean -fdx` took it from. */
+export interface RestoreMarkersAction extends RepoBase {
+  kind: "restore_markers";
+  worktrees: UnmarkedWorktree[];
+}
+
 /** Reclaim leases whose holder process is dead (K3). */
 export interface ReclaimLeasesAction extends RepoBase {
   kind: "reclaim_leases";
@@ -447,9 +519,12 @@ export type UnitAction =
   | CloseStoryAction
   | RoundMigrateAction
   | RoundStartAction
+  | MoveRecordAction
+  | SetAsideRecordAction
+  | PushRecordAction
   | NoopAction;
 
-export type RepoAction = IntakeStoryAction | ReclaimLeasesAction;
+export type RepoAction = IntakeStoryAction | ReclaimLeasesAction | RestoreMarkersAction;
 
 export type Action = UnitAction | RepoAction;
 
@@ -477,6 +552,16 @@ export function legacyAction(action: unknown): unknown {
     if (!empty) return action;
     const { receipts: _r, state: _s, commit: _c, ...rest } = a;
     return rest;
+  }
+  if (a.kind === "round_migrate" && "commit" in a) {
+    const { commit: _c, ...rest } = a;
+    const story = (a.unit as { story?: unknown } | undefined)?.story;
+    // `<spec>/runs/_story…` was the record from the spec folder; decide names it from the machine dir now
+    const moved = (p: unknown) => {
+      const m = typeof p === "string" && typeof story === "string" ? /^(.*)\/runs\/(_story(?:\/.*)?)$/.exec(p) : null;
+      return m ? recordRunStatePath({ key: story as string, spec_dir: m[1] as string }, m[2] as string) : p;
+    };
+    return { ...rest, from: moved(a.from), to: moved(a.to) };
   }
   if (a.kind === "park" && "park" in a) {
     const { park: _p, ...rest } = a;

@@ -2,8 +2,8 @@
  * ProjectView: the read model front ends consume (X1). Plain JSON — no functions,
  * Dates or Maps — so `norn story list --json`, a web cockpit and a Herdr pane share it.
  */
-import type { FileError, Inbox, InboxEntry, StoryNote } from "@norn/core";
-import type { LeaseKind, Mode, ParkKind, SliceStatus, StoryStatus, UnitStatus } from "@norn/schema";
+import type { FileError, Inbox, InboxEntry, PullRequestCi, StoryNote } from "@norn/core";
+import type { LeaseKind, Mode, ParkKind, ResolvedConfig, SliceStatus, StoryStatus, UnitStatus } from "@norn/schema";
 
 export interface CounterView {
   name: string;
@@ -125,8 +125,8 @@ export interface StoryView extends UnitView {
   slice: null;
   /** gh-196 D5: the story's delegated decisions over its rounds and slices, oldest first */
   delegated: DelegatedDecision[];
-  /** story branch (GR3) */
-  branch: string;
+  /** story branch (GR3); null for a story held from its record alone, which has none (B33) */
+  branch: string | null;
   /** the story PR as last seen here; null = none seen (or no sync yet) */
   pr: PrView | null;
   /** NT2: open notes of the story and its slices, in the order they were left */
@@ -217,8 +217,52 @@ export interface ProjectView {
   runs: RunView[];
   /** units finished within the last 24 h, newest first */
   recently_done: RecentDone[];
+  /** gh-195 D6 (B17–B19): stories another heartbeat holds that this checkout has no copy of */
+  elsewhere: ElsewhereView[];
   /** config, workflow or lease files that failed to read */
   errors: FileError[];
+}
+
+/** A unit's standing from a story's record ref (B17). */
+export interface RecordUnitView {
+  key: string;
+  slice: string | null;
+  step: string;
+  attempt: number;
+  status: string;
+  counters: CounterView[];
+}
+
+/**
+ * gh-195 D6 (B10, B13, B17–B19): a story held by another heartbeat, read from local refs only: its
+ * claim, the remote-tracking story branch and the record ref as the last tick fetched them. Data only
+ * (P8): `formatElsewhere` writes the sentences.
+ */
+export interface ElsewhereView {
+  key: string;
+  title: string;
+  url: string | null;
+  /** the claim's holder: the machine the run state is on */
+  holder: string;
+  /** the claim's last renewal (the holder's heartbeat) and expiry */
+  renewed_at: string;
+  expires_at: string;
+  expired: boolean;
+  /** the team's record policy as this checkout's config has it */
+  policy: ResolvedConfig["record"]["policy"];
+  branch: string | null;
+  /** the remote-tracking story branch's head */
+  head: { sha: string; subject: string; at: string } | null;
+  /** B18, B19: the step the story's last boundary commit ended; null = no boundary pushed yet */
+  last_boundary: string | null;
+  /**
+   * the record ref: its commit and time, and its units. `current`: kept current by the holder (the
+   * policy is `remote`); false = it shows the record as of `at` (B13). Null = no ref here.
+   */
+  record: { sha: string; at: string; holder: string | null; current: boolean; units: RecordUnitView[]; errors: FileError[] } | null;
+  pr: PrView | null;
+  /** B18: the CI state of the PR's head as the last sync saw it; null = not observed */
+  ci: PullRequestCi | null;
 }
 
 export type { Inbox, InboxEntry };
@@ -300,12 +344,14 @@ export interface UnitTraceSummary {
  * base branch in the machine dir (replaced when `origin/<base>` moves; `ref` is the live source).
  */
 export interface TraceRecords {
-  source: "worktree" | "checkout" | "base_cache";
+  /** gh-195/05 (S12): `machine` = the checkout's machine dir holds the run state (`root` its story folder) */
+  /** gh-195 D7, D16 (B29): `archive` = a finished story's record from its archive ref, unpacked into the machine dir's cache (`root`) */
+  source: "machine" | "worktree" | "checkout" | "archive";
   root: string;
-  /** checkout records identical to the base branch copy */
-  same_as_base?: boolean;
-  /** base_cache: the remote-tracking ref the copy was taken from */
+  /** archive: the record ref (`refs/norn/runs/<story>`) */
   ref?: string;
+  /** archive: the record commit read */
+  commit?: string;
 }
 
 /** `norn run list <unit>`: rows of the unit (and, for a story, its slices interleaved). */

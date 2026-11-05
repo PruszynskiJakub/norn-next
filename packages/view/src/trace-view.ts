@@ -4,10 +4,8 @@
  * worktrees — found as the project view finds them, `scanWorktrees` — and the whole trace of
  * that story). No writes, no network.
  */
-import { existsSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
-import { storyOf, type TraceEvent, type UnitState } from "@norn/schema";
-import { bindNornHome, defaultBaseRef, loadRounds, loadSnapshot, readTrace, scanWorktrees, type StorySnapshot, machineDir, type UnitSnapshot, withSliceWorktrees } from "@norn/store";
+import { recordRef, storyOf, type TraceEvent, type UnitState } from "@norn/schema";
+import { bindNornHome, loadRounds, loadSnapshot, readTrace, scanWorktrees, type StorySnapshot, machineDir, type UnitSnapshot, withSliceWorktrees } from "@norn/store";
 import { buildStepTimeline, mergeStoryTimeline } from "./steps.ts";
 import { TIMELINE_TYPES } from "./timeline.ts";
 import type { CriteriaSummary, RoundView, TraceRecords, TraceView, UnitTraceSummary } from "./types.ts";
@@ -24,27 +22,15 @@ export function criteriaSummary(events: readonly TraceEvent[], units: ReadonlySe
   return out.reports ? out : null;
 }
 
-function sameFile(a: string, b: string): boolean {
-  try {
-    return readFileSync(a).equals(readFileSync(b));
-  } catch {
-    return false;
-  }
-}
-
 /**
- * Where the unit's records are read from (F36). A story with no worktree is read from the cached
- * copy of `origin/<base>` (store/base.ts, `trace/base/<tree>/`, replaced when the base tree
- * moves). When the main checkout holds the very same records (it was pulled), its live path is
- * shown instead; otherwise the cache path is shown and flagged, with the ref to `git show`.
+ * Where the unit's records are read from (S12, gh-195 D7): the checkout's machine dir; a finished
+ * story's archive ref, unpacked into the machine dir's cache (the ref named, D16: never the base
+ * tree); or an older norn's run state still on a unit worktree's branch, before the tick moves it (B34).
  */
-function recordsOf(repoRoot: string, story: StorySnapshot, remote: string): { records: TraceRecords; runsDir: (u: UnitSnapshot) => string } {
-  if (!story.from_base) return { records: { source: story.root === repoRoot ? "checkout" : "worktree", root: story.root }, runsDir: (u) => u.path };
-  const live = (u: UnitSnapshot) => join(repoRoot, relative(story.root, u.path));
-  const pulled = story.units.every((u) => !existsSync(join(u.path, "state.json")) || sameFile(join(u.path, "state.json"), join(live(u), "state.json")));
-  if (pulled) return { records: { source: "checkout", root: repoRoot, same_as_base: true }, runsDir: live };
-  const ref = defaultBaseRef(repoRoot, remote) ?? undefined;
-  return { records: { source: "base_cache", root: story.root, ...(ref ? { ref } : {}) }, runsDir: (u) => u.path };
+function recordsOf(repoRoot: string, story: StorySnapshot): { records: TraceRecords; runsDir: (u: UnitSnapshot) => string } {
+  if (story.run_state.archive) return { records: { source: "archive", root: story.run_state.base, ref: recordRef(story.key), commit: story.run_state.archive }, runsDir: (u) => u.path };
+  if (!story.run_state.tree) return { records: { source: "machine", root: story.run_state.base }, runsDir: (u) => u.path };
+  return { records: { source: story.root === repoRoot ? "checkout" : "worktree", root: story.root }, runsDir: (u) => u.path };
 }
 
 export interface LoadTraceViewOptions {
@@ -135,7 +121,7 @@ export function loadTraceView(opts: LoadTraceViewOptions): TraceView | null {
   const story = withSliceWorktrees(read, (slice) => wts.slices.get(slice), { includeApplied: true });
   const { events } = readTrace(opts.repoRoot, { unit: storyKey, types: TIMELINE_TYPES });
   const tdir = machineDir(opts.repoRoot);
-  const { records, runsDir } = recordsOf(opts.repoRoot, story, snap.config.ok ? snap.config.config.git_remote : "origin");
+  const { records, runsDir } = recordsOf(opts.repoRoot, story);
 
   const build = (u: UnitSnapshot, evs: TraceEvent[] = events): TraceView => {
     const file = u.unit.slice ? story.slices.find((s) => s.key === u.unit.slice) : null;

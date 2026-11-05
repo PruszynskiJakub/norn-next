@@ -8,9 +8,10 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { cpSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join, relative } from "node:path";
 import { validate } from "@norn/schema";
-import { readTrace, repoConfigPath, workflowsDir, writeUnitMarker, storyUnitDir } from "@norn/store";
+import { readTrace, repoConfigPath, workflowsDir, writeUnitMarker } from "@norn/store";
 import type { CliResult } from "../../src/index.ts";
 import { createHarness, type Harness, issue, type LayoutPartName, layoutPlaces, oldNornDir, runChecked, sh, toNewLayout, toOldLayout } from "../../../../test/support/harness.ts";
+import { runStateOf } from "../../../../test/support/run-state.ts";
 
 setDefaultTimeout(60_000);
 
@@ -194,7 +195,7 @@ describe("a unit worktree's own old files are ignored (B21)", () => {
   const inWt = (cwd: string, ...argv: string[]) => runChecked(argv, { ...h.deps, cwd, env: env() });
 
   beforeAll(async () => {
-    const ready = (n: number, slug: string) => h.state(storyUnitDir(join(wtOf(n, slug), `.agents/specs/gh-${n}-${slug}`)))?.status === "ready";
+    const ready = (n: number, slug: string) => h.state(runStateOf(join(wtOf(n, slug), `.agents/specs/gh-${n}-${slug}`)))?.status === "ready";
     for (let i = 0; i < 10 && !(ready(9, "started-before") && ready(10, "asks-first")); i++) {
       h.clock.advance(10_000);
       await h.tick();

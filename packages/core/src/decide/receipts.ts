@@ -16,14 +16,18 @@ import type { Action, BoundaryCommit, Decision, Delivery, NewReceipt } from "../
 import { type ApplyResult, applyReceipts } from "../apply.ts";
 import type { Facts, NumberedReceipt, SliceFileFacts, StoryFacts, UnitFacts, UnitRef } from "../facts.ts";
 import { unitInboxItem } from "../inbox/items.ts";
-import { nornTrailers, unitWorktree } from "../policy.ts";
+import { nornTrailers, type StepEnd, unitWorktree } from "../policy.ts";
 import type { InboxItem } from "../ports.ts";
 import { iso } from "../time.ts";
 import type { RepoWorkflows } from "./index.ts";
 
-/** R1.1: a side action rides along with its unit's one action this tick — only a claim renewal. */
+/** R1.1: a side action rides along with its unit's one action this tick — a claim renewal, or a record push (gh-195 D4). */
 export function isSideAction(a: { kind: string; op?: unknown }): boolean {
-  return a.kind === "claim" && a.op === "renew";
+  return (a.kind === "claim" && a.op === "renew") || isTailAction(a);
+}
+/** gh-195 D4 (B10): a side action act performs after every other action of the tick: the record push. */
+export function isTailAction(a: { kind: string }): boolean {
+  return a.kind === "push_record";
 }
 
 export class Ctx {
@@ -108,7 +112,8 @@ export function unitBranch(story: StoryFacts, uf: UnitFacts | null): string {
 export const sliceFileOf = (story: StoryFacts, key: string): SliceFileFacts | undefined => story.slices.find((s) => s.key === key);
 
 /** S4: the trailers of a commit norn makes for a unit this tick (`nornTrailers`). */
-export const trailersFor = (ctx: Ctx, story: string, slice: string | null, step: string | null): Record<string, string> => nornTrailers(ctx.facts.tick_id, story, slice, step);
+export const trailersFor = (ctx: Ctx, story: string, slice: string | null, step: string | null, ended?: StepEnd): Record<string, string> =>
+  nornTrailers(ctx.facts.tick_id, story, slice, step, ended);
 
 /** A worktree act creates this tick (intake, slice start): the commit goes there, not to an observed one. */
 interface NewWorktree {
@@ -124,16 +129,31 @@ interface NewWorktree {
  * or in the worktree `fresh` that act creates first. `uf` null is the story unit without facts yet
  * (a story nobody started); `story` is only a key for a story intake creates.
  */
-export function commitFor(ctx: Ctx, story: StoryFacts | string, uf: null, message: string, step: string | null, fresh: NewWorktree): BoundaryCommit;
-export function commitFor(ctx: Ctx, story: StoryFacts, uf: UnitFacts | null, message: string, step: string | null): BoundaryCommit | null;
-export function commitFor(ctx: Ctx, story: StoryFacts | string, uf: UnitFacts | null, message: string, step: string | null, fresh?: NewWorktree): BoundaryCommit | null {
+export function commitFor(ctx: Ctx, story: StoryFacts | string, uf: null, message: string, step: string | null, o: { fresh: NewWorktree }): BoundaryCommit;
+export function commitFor(ctx: Ctx, story: StoryFacts, uf: UnitFacts | null, message: string, step: string | null, o?: { ended?: StepEnd | undefined }): BoundaryCommit | null;
+/** `o.fresh`: the worktree act creates first; `o.ended`: how the step ended (`endedWith`), its Norn-Outcome and Norn-Next. */
+export function commitFor(ctx: Ctx, story: StoryFacts | string, uf: UnitFacts | null, message: string, step: string | null, o: { fresh?: NewWorktree; ended?: StepEnd | undefined } = {}): BoundaryCommit | null {
   const key = typeof story === "string" ? story : story.key;
+  const fresh = o.fresh;
   if (fresh) return { cwd: fresh.path, branch: fresh.branch, message, trailers: trailersFor(ctx, key, fresh.slice, step), push: fresh.push };
   if (typeof story === "string") return null;
   const cwd = unitWorktree(story, uf);
   if (!cwd) return null;
-  return { cwd, branch: unitBranch(story, uf), message, trailers: trailersFor(ctx, key, uf?.unit.slice ?? null, step), push: true };
+  const slice = uf?.unit.slice ?? null;
+  // gh-195 D17: a story unit's boundary is committed even when nothing changed (the non-holder's last boundary)
+  return { cwd, branch: unitBranch(story, uf), message, trailers: trailersFor(ctx, key, slice, step, o.ended), push: true, ...(o.ended && slice === null ? { allow_empty: true as const } : {}) };
 }
+
+/**
+ * gh-195 B18, B19 (S4): the outcome that ended the step `res` left — a step's outcome whose edge took the
+ * cursor to another step — for the boundary commit's Norn-Outcome. None when no step ended: no advance,
+ * a person moving the cursor (`moved`: workflow switch, unstick, update), an edge back into the same step,
+ * or `$stuck`, which parks the step for an unstick to resume.
+ */
+export const endedWith = (res: Pick<ApplyResult, "advance">): StepEnd | undefined => {
+  const a = res.advance;
+  return a && !a.moved && a.from !== a.to && a.to !== "$stuck" ? { outcome: a.outcome, next: a.to } : undefined;
+};
 
 export function unitItem(ctx: Ctx, story: StoryFacts, uf: UnitFacts, state: UnitState): InboxItem | null {
   return unitInboxItem(story, { ...uf, state }, ctx.facts, ctx.config);
@@ -187,7 +207,7 @@ export function emitApplied(
   rule: string,
   res: ApplyResult,
   receipts: NewReceipt[],
-  commit: { message: string; step: string },
+  commit: { message: string; step: string; ended?: StepEnd | undefined },
   o: Partial<Delivery> & { state?: UnitState } = {},
 ): void {
   ctx.emit({
@@ -202,7 +222,7 @@ export function emitApplied(
     kill: o.kill ?? null,
     receipts,
     state: o.state ?? res.state,
-    commit: commitFor(ctx, story, uf, commit.message, commit.step),
+    commit: commitFor(ctx, story, uf, commit.message, commit.step, { ended: commit.ended }),
   });
 }
 

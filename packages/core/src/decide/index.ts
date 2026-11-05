@@ -31,7 +31,7 @@ import { commitFor, Ctx, isSideAction } from "./receipts.ts";
 import { decideStory } from "./story.ts";
 
 export { LAUNCH_PROMPT_MS } from "./agent.ts";
-export { isSideAction } from "./receipts.ts";
+export { isSideAction, isTailAction } from "./receipts.ts";
 
 /** A repo workflow as loaded by the caller: parsed + validated (W5) with the exact file text. */
 export interface LoadedWorkflow {
@@ -58,6 +58,8 @@ export function decide(facts: Facts, workflows: RepoWorkflows, config: ResolvedC
   const ctx = new Ctx(facts, workflows, config);
   const deadFiles = facts.machine.dead_lease_files ?? [];
   if (deadFiles.length) ctx.emit({ kind: "reclaim_leases", unit: null, rule: "leases.reclaim", files: [...deadFiles] });
+  // gh-195/05 (B2, H2): observe read these units by an inferred marker; act writes it back, traced
+  if (facts.unmarked?.length) ctx.emit({ kind: "restore_markers", unit: null, rule: "worktree.marker", worktrees: structuredClone(facts.unmarked) });
   for (const story of queueOrder(facts.stories)) decideStory(ctx, story);
   intake(ctx);
   return ctx.decisions;
@@ -110,7 +112,7 @@ function intake(ctx: Ctx): void {
       story_file: `${specDir(key, slug)}/${SPEC_FILE}`,
       frontmatter,
       body: issue.body,
-      commit: commitFor(ctx, key, null, `norn: intake ${key} ${issue.title}`, null, { path, branch, slice: null, push: false }),
+      commit: commitFor(ctx, key, null, `norn: intake ${key} ${issue.title}`, null, { fresh: { path, branch, slice: null, push: false } }),
     });
   }
 }

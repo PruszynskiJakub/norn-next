@@ -5,26 +5,31 @@
 import {
   type ClaimBlob,
   parseDuration,
+  type Receipt,
+  type RejectedMailboxReceipt,
   sliceBranch,
   SPEC_FILE,
   type StoryFrontmatter,
   type UnitState,
-  roundRecordPath,
+  roundRunStatePath,
+  runStatePath,
   STORY_UNIT_DIR,
+  normalRecord,
+  treeRunStatePath,
   unitRecordPath,
 } from "@norn/schema";
-import type { ClaimAction, UpdateStoryMirrorAction } from "../actions.ts";
+import type { Action, ClaimAction, UpdateStoryMirrorAction } from "../actions.ts";
 import type { NumberedReceipt, StoryFacts, UnitFacts, UnitRef } from "../facts.ts";
 import { initialState } from "../apply.ts";
 import { sha256 } from "../hash.ts";
 import { bodyChangedItem } from "../inbox/items.ts";
-import { issueProblem, mergedIntoBase, prProblem, roundFinished, storyFinished, storyUnit, WF_LABEL } from "../policy.ts";
+import { issueProblem, mergedIntoBase, prProblem, roundFinished, stepLabel, storyFinished, storyUnit, WF_LABEL } from "../policy.ts";
 import type { RemoteIssue } from "../ports.ts";
 import { epoch, iso } from "../time.ts";
 import { edgeOf, isStale, stepOf } from "../workflow.ts";
 import { applyAction, classifyRun, implicitAskResolved, launchUnknown, resolveImplicitAsk, startRun } from "./agent.ts";
-import { commitFor, type Ctx, gitBusy, nextReceiptNumber, park, rebasing, sliceFileOf, unitItem } from "./receipts.ts";
-import { baseOf, classifyNorn, recordOf, resumeSlices, runCheck, runGit, slicesCanResume, slicesStep, startStoryUnit, usableWorkflow } from "./steps.ts";
+import { commitFor, type Ctx, gitBusy, nextReceiptNumber, park, rebasing, sliceFileOf, unitBranch, unitItem } from "./receipts.ts";
+import { baseOf, classifyNorn, hasFlatRecord, recordOf, resumeSlices, runCheck, runGit, slicesCanResume, slicesStep, startStoryUnit, usableWorkflow } from "./steps.ts";
 import { cmd } from "../commands.ts";
 
 // ================================================================= story level
@@ -63,6 +68,8 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
   const { facts } = ctx;
 
   // ---- claims (T1–T6, T10): act only on stories this heartbeat holds
+  // gh-195 D11 (B27, R2.3): this checkout's own record of a story another heartbeat holds leaves runs/
+  if (story.local_record && (claim.state === "other" || (claim.state === "expired" && claim.blob.heartbeat_id !== ctx.heartbeat))) return setAsideRecord(ctx, story, ref, claim.blob.holder);
   if (claim.state === "other") return ctx.noop(ref, "claim.other", `held by ${claim.blob.holder} until ${claim.blob.expires_at}`);
   if (claim.state === "corrupt") return ctx.noop(ref, "claim.corrupt", `claim ref ${claim.sha} is unreadable`);
   if (claim.state === "none" || claim.state === "expired") {
@@ -95,6 +102,12 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
   if (facts.now >= renewAt)
     ctx.emit({ kind: "claim", unit: ref, rule: "claim.renew", op: "renew", expected: claim.sha, blob: claimBlob(ctx, story.key, claim.blob) });
 
+  if (story.record_only) {
+    recordOnly(ctx, story, ref);
+    // 10-R3-F2 (D4, B10): a story held from its record alone still owes its record under `remote`
+    return pushRecord(ctx, story, ref);
+  }
+
   // ---- story file corrupt: never touch anything of the story (S2)
   if (story.frontmatter_error || !story.frontmatter) {
     const errors = story.frontmatter_error ? [story.frontmatter_error] : [{ file: `${story.spec_dir}/${SPEC_FILE}`, errors: [{ path: "", message: "missing" }] }];
@@ -105,14 +118,13 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
   const fm = story.frontmatter;
   const halted = su?.state?.park?.kind === "remote";
 
+  moveRecords(ctx, story);
+
   // gh-71 D7 (B34): a held story whose record is still flat moves into round 1 before anything else —
   // never mid-rebase (H1), and never once its PR merged (the base keeps old records flat, B36)
-  if (!ctx.has(ref.key) && su?.state && su.record === unitRecordPath(STORY_UNIT_DIR) && !rebasing(su) && !mergedIntoBase(story, ctx.facts.repo.default_branch)) {
-    const commit = commitFor(ctx, story, su, `norn: ${story.key} record moved into round 1`, su.state.step);
-    if (commit) {
-      const from = `${story.spec_dir}/${unitRecordPath(STORY_UNIT_DIR)}`;
-      return ctx.emit({ kind: "round_migrate", unit: ref, rule: "round.migrate", from, to: `${story.spec_dir}/${roundRecordPath(1, su.state.workflow)}`, commit });
-    }
+  if (!ctx.has(ref.key) && su?.state && hasFlatRecord(su) && !rebasing(su) && !mergedIntoBase(story, ctx.facts.repo.default_branch)) {
+    const from = runStatePath(story, STORY_UNIT_DIR);
+    return ctx.emit({ kind: "round_migrate", unit: ref, rule: "round.migrate", from, to: roundRunStatePath(story, 1, su.state.workflow) });
   }
 
   if (!ctx.has(ref.key)) storyLifecycle(ctx, story, fm, su);
@@ -121,6 +133,100 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
   for (const uf of story.units) {
     if (ctx.has(uf.unit.key)) continue;
     decideUnit(ctx, story, uf, halted);
+  }
+  pushRecord(ctx, story, ref);
+}
+
+/**
+ * gh-195 D11 (B27, T7a): a local record whose tree this machine pushed to the story's ref went there with
+ * a clean release (B15): removed quietly. Any other was superseded by a takeover without a release: set
+ * aside under `superseded/<story>-<ulid>/`, never pushed, never merged, one Check item (R2.3).
+ */
+function setAsideRecord(ctx: Ctx, story: StoryFacts, ref: UnitRef, holder: string): void {
+  const local = story.local_record;
+  if (!local) return;
+  if (local.on_ref) return ctx.emit({ kind: "set_aside_record", unit: ref, rule: "record.released", superseded: null });
+  ctx.emit({ kind: "set_aside_record", unit: ref, rule: "record.superseded", superseded: { name: `${story.key}-${ctx.id()}`, holder, last_receipt: local.last_receipt } });
+}
+
+/**
+ * gh-195 B33 (review#2 F1): a story held here with its record in the machine dir and no branch (taken
+ * over from its record alone) goes on from that record: its claim is renewed above, its story unit's
+ * receipts applied (the take among them), never intaken again. Nothing runs in it until it has a
+ * branch to work on: no worktree, no session. Under `remote` its record is pushed as any held story's
+ * (`pushRecord`, without a `Norn-Branch-Commit`, B33).
+ */
+function recordOnly(ctx: Ctx, story: StoryFacts, ref: UnitRef): void {
+  if (ctx.has(ref.key)) return;
+  const su = storyUnit(story);
+  const st = su?.state;
+  if (su && st && su.workflow && st.status !== "corrupt" && !su.errors.length && su.unapplied.length) return applyAction(ctx, story, su, st, su.workflow, su.unapplied, "receipts.apply");
+  return ctx.noop(ref, "story.record_only", `held here from its record; ${story.key} has no branch (B33), so nothing runs until it has one`);
+}
+
+/**
+ * gh-195 D4 (B10–B12, B14, S11): under `record.policy: remote` (read at every tick, B12), the holder
+ * pushes the story's record once its tree differs from the one on the record ref it last saw, after
+ * the tick's branch pushes (a side action act performs last). A push that failed leaves the tree
+ * different, so the next tick pushes again (B14). A move off the branch this tick (B34, D13) brings the
+ * record into the machine dir as it acts, so the push rides along with it. Under `local`, nothing (B11).
+ * An action of this tick that pushes the record itself leaves no second push beside it: a story
+ * cleaned up this tick (GR6, GR6b) is archived by that action (D15), and an `open-pr` pushes the
+ * record before the PR (D5, B28). A push refused as stale (08-F4: another checkout pushed the ref)
+ * waits until the record ref this checkout sees is another one, rather than failing again every tick.
+ */
+function pushRecord(ctx: Ctx, story: StoryFacts, ref: UnitRef): void {
+  if ((ctx.config.record?.policy ?? "local") !== "remote" || !story.record) return;
+  const { tree, pushed } = story.record;
+  const moved = ctx.decisions.some((d) => d.action.kind === "move_record" && d.action.unit?.story === story.key);
+  if (!moved && (tree === null || tree === pushed?.tree)) return;
+  if (ctx.decisions.some((d) => d.action.unit?.story === story.key && pushesRecordItself(d.action))) return;
+  const refused = story.record_refused;
+  if (refused && (refused.lease ?? null) === (pushed?.sha ?? null)) return;
+  ctx.emit({ kind: "push_record", unit: ref, rule: "record.push", branch: story.branch, expected: pushed?.sha ?? null, holder: ctx.facts.machine.holder });
+}
+
+/** gh-195 D15, D5: an action that pushes the story's record itself — the archive of GR6/GR6b, or `open-pr`. */
+const pushesRecordItself = (a: Action): boolean =>
+  a.kind === "cleanup_merged_story" || a.kind === "close_story" || (a.kind === "run_git" && a.action === "open-pr");
+
+/**
+ * gh-195/06 (B34, D13): run state an older norn left on a held unit's branch moves into the machine dir
+ * before anything else is decided for the units it holds, one `move_record` per branch (the story's,
+ * each slice's): the units read from there were read from the branch, so nothing else may act on them
+ * this tick. A record whose files fail validation is not moved: the unit is marked corrupt (S2) and its
+ * branch keeps its runs/. Never mid-merge or mid-rebase (H1): the removal would land in that commit.
+ */
+function moveRecords(ctx: Ctx, story: StoryFacts): void {
+  for (const uf of story.units) {
+    const br = uf.branch_record;
+    if (!br || ctx.has(uf.unit.key)) continue;
+    const moving = br.copy.map((dir) => story.units.find((u) => u.unit.dir === dir)).filter((u): u is UnitFacts => !!u && u.unit.key !== uf.unit.key && !ctx.has(u.unit.key));
+    const busy = uf.worktree?.in_progress?.operation ?? (uf.worktree?.in_progress?.unmerged.length ? "a merge" : null);
+    const wait = (why: string) => {
+      for (const u of [uf, ...moving]) if (!u.errors.length && !ctx.has(u.unit.key)) ctx.noop(u.unit, "record.move_waits", why);
+    };
+    if (busy) {
+      wait(`${busy} in progress in ${uf.worktree?.path}: the run state on ${unitBranch(story, uf)} moves once it is concluded (H1)`);
+      continue;
+    }
+    // S2: decideUnit marks each broken unit corrupt; nothing moves off this branch while a unit with a
+    // folder on it is broken, even one read from elsewhere (its copy here may be the good one)
+    const bad = story.units.filter((u) => br.holds.includes(u.unit.dir) && u.errors.length);
+    if (bad.length) {
+      wait(`${bad.map((u) => u.unit.key).join(", ")} failed validation on ${unitBranch(story, uf)}: nothing moves (S2)`);
+      continue;
+    }
+    const copy = br.copy.map((dir) => {
+      const u = story.units.find((x) => x.unit.dir === dir);
+      // RD7: a flat story record lands in round 1 of its workflow
+      const flat = u?.state && hasFlatRecord(u) ? u.state : null;
+      return { unit: dir, from: treeRunStatePath(story, dir), to: flat ? roundRunStatePath(story, 1, flat.workflow) : runStatePath(story, dir) };
+    });
+    const commit = commitFor(ctx, story, uf, `norn: move ${uf.unit.key} run state off the branch`, uf.state?.step ?? null);
+    if (!commit) continue;
+    ctx.emit({ kind: "move_record", unit: uf.unit, rule: "record.move", path: br.path, copy, commit });
+    for (const u of moving) ctx.noop(u.unit, "record.move", `moving with ${uf.unit.key} off ${commit.branch}`);
   }
 }
 
@@ -247,12 +353,15 @@ function importMailbox(ctx: Ctx, story: StoryFacts): void {
   const item = (story.mailbox ?? [])[0];
   if (!item) return;
   const ref = storyRef(story);
-  const reject = (reason: string) => ctx.emit({ kind: "reject_receipt", unit: ref, rule: "mailbox.reject", source: { ref: item.ref, sha: item.sha }, reason, state: null });
-  if (!item.receipt) return reject(item.error ? `invalid receipt: ${item.error.errors.map((e) => e.message).join("; ")}` : "unreadable receipt");
   const r = item.receipt;
+  const reject = (reason: string) =>
+    ctx.emit({ kind: "reject_receipt", unit: ref, rule: "mailbox.reject", source: { ref: item.ref, sha: item.sha }, reason, state: null, ...(r ? { keep: keptRejection(ctx, story, r, reason) } : {}) });
+  if (!r) return reject(item.error ? `invalid receipt: ${item.error.errors.map((e) => e.message).join("; ")}` : "unreadable receipt");
   // gh-71 AC12: a receipt made in another round is stale even at the same step#attempt (the same workflow again)
   const otherRound = (u: UnitFacts) => r.round !== undefined && u.unit.slice === null && (u.state?.round ?? 1) !== r.round;
-  const atStep = (u: UnitFacts) => !!u.state && u.state.step === r.step && u.state.attempt === r.attempt && !u.errors.length;
+  // gh-195 B20: a receipt without an attempt (a non-holder's, for a `local` story) matches by step alone
+  const atStep = (u: UnitFacts) => !!u.state && u.state.step === r.step && (r.attempt === undefined || u.state.attempt === r.attempt) && !u.errors.length;
+  const at = stepLabel(r.step, r.attempt);
   const atCursor = (u: UnitFacts) => atStep(u) && !otherRound(u);
   let target: UnitFacts | undefined;
   if (r.slice !== undefined) {
@@ -262,23 +371,47 @@ function importMailbox(ctx: Ctx, story: StoryFacts): void {
     // gh-79 (H1): its cursor is read from a rewound state.json until the rebase is concluded; wait
     if (rebasing(unit)) return;
     if (atStep(unit) && otherRound(unit)) return reject(`stale: ${unit.unit.key} is in round ${unit.state?.round ?? 1}, the receipt was made in round ${r.round}`);
-    if (!atCursor(unit)) return reject(`stale: ${unit.unit.key} is not at ${r.step}#${r.attempt}`);
+    if (!atCursor(unit)) return reject(`stale: ${unit.unit.key} is not at ${at}`);
     target = unit;
   } else {
     if (story.units.some(rebasing)) return;
     const matches = story.units.filter(atCursor);
     target = matches.find((u) => u.state?.status === "parked" || u.state?.status === "stuck") ?? matches[0];
   }
-  if (!target || ctx.has(target.unit.key)) return target ? undefined : reject(`no unit at ${r.step}#${r.attempt}`);
+  if (!target || ctx.has(target.unit.key)) return target ? undefined : reject(`no unit at ${at}`);
   ctx.emit({
     kind: "import_mailbox",
     unit: target.unit,
     rule: "mailbox.import",
     refs: [{ ref: item.ref, sha: item.sha }],
-    receipts: [{ n: nextReceiptNumber(target), receipt: r }],
+    // a step-only receipt is copied with the attempt it matched, so the unit's receipts are all stamped (S6)
+    receipts: [{ n: nextReceiptNumber(target), receipt: r.attempt === undefined && target.state ? { ...r, attempt: target.state.attempt } : r }],
     state: null,
     commit: commitFor(ctx, story, target, `norn: ${target.unit.key} ${r.kind} from mailbox`, r.step),
   });
+}
+
+/**
+ * gh-195 D12 (B21): what the holder keeps of a mailbox receipt it rejects, for its Check item — who sent
+ * what for which step, the step the unit is at, and each unit's last receipt number now, so only an
+ * answer or approval numbered past it clears the item (the holder's own order, never the sender's clock).
+ */
+function keptRejection(ctx: Ctx, story: StoryFacts, r: Receipt, reason: string): RejectedMailboxReceipt {
+  const unit = story.units.find((u) => (r.slice === undefined ? u.unit.slice === null : u.unit.slice === r.slice));
+  return {
+    story: story.key,
+    unit: r.slice ?? story.key,
+    receipt_id: r.receipt_id,
+    kind: r.kind,
+    who: r.who ?? null,
+    step: r.step,
+    ...(r.attempt !== undefined ? { attempt: r.attempt } : {}),
+    at_step: unit?.state?.step ?? null,
+    reason,
+    rejected_at: ctx.nowIso,
+    // 13-R3-F1: what the holder has applied, never a receipt still waiting to be (it may be the answer that clears this)
+    seen: Object.fromEntries(story.units.map((u) => [u.unit.key, u.state?.applied_through ?? 0])),
+  };
 }
 
 // ================================================================= unit level
@@ -289,18 +422,24 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
   // against them and nothing is written there (a receipt numbered from the rewound state would
   // collide with a committed one once the rebase is aborted); the unit is held until it is concluded.
   // An exception to BS5.1, which still decides liveness and deadlines during a merge, cherry-pick or revert
-  if (rebasing(uf)) return ctx.noop(ref, "unit.rebase_in_progress", `rebase in progress in ${uf.worktree?.path}; runs/ rewound — held until it is concluded (H1)`);
+  if (rebasing(uf)) return ctx.noop(ref, "unit.rebase_in_progress", `rebase in progress in ${uf.worktree?.path} — held until it is concluded (H1)`);
   if (uf.errors.length) {
     if (uf.state?.status === "corrupt") return ctx.noop(ref, "unit.corrupt", "corrupt; never touched (S2)");
     const notify = unitItem(ctx, story, uf, uf.state as UnitState);
-    // S2: only the unit's own runs/ files mark its state corrupt, and only a state.json that reads
+    // S2: only the unit's own runs/ files mark its state corrupt, and only a state.json that reads —
+    // never one read from an older norn's branch (gh-195/06): nothing is written there
     const own = uf.errors.every((e) => e.file.includes(`/${unitRecordPath(ref.dir)}/`));
-    const mark_state = uf.state !== null && own && !uf.errors.some((e) => /(^|\/)state\.json$/.test(e.file));
+    const onBranch = story.units.some((u) => u.branch_record?.copy.includes(ref.dir));
+    const mark_state = uf.state !== null && own && !onBranch && !uf.errors.some((e) => /(^|\/)state\.json$/.test(e.file));
     return ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "unit.corrupt", errors: uf.errors, mark_state, notify });
   }
   const st = uf.state;
   if (!st) {
     if (ref.slice !== null) return ctx.noop(ref, "slice.not_started", "started by the story's slices step (W2)");
+    // review#2 F3 (S2): the story's record is on its ref here but not in the machine dir (a checkout cut
+    // short): never start it over, the checkout puts it in place
+    if (story.record_unplaced)
+      return ctx.noop(ref, "start.record_unplaced", `${story.key}'s record (${story.record_unplaced}) is not in place here; never started over — run ${cmd.storyCheckout(story.key)}`);
     return startStoryUnit(ctx, story, uf);
   }
   if (st.status === "corrupt") return ctx.noop(ref, "unit.corrupt", "corrupt; never touched (S2)");
@@ -438,7 +577,7 @@ function roundStart(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, n
     receipt_n: nr.n,
     ended,
     rejected,
-    round: { n, workflow: r.workflow, dir: `${story.spec_dir}/${roundRecordPath(n, r.workflow)}` },
+    round: { n, workflow: r.workflow, dir: roundRunStatePath(story, n, r.workflow) },
     workflow_source: loaded.source,
     state,
     commit: commitFor(ctx, story, uf, `norn: ${story.key} round ${n} (${r.workflow}) at ${r.to}`, state.step),

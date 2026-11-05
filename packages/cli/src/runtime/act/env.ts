@@ -9,24 +9,23 @@ import {
   type BoundaryCommit,
   type InboxItem,
   type NewReceipt,
-  renderHandoffStatus,
   type SessionRef,
   type UnitRef,
 } from "@norn/core";
 import type { ClaimBlob, UnitState } from "@norn/schema";
 import {
-  appendHandoffHeartbeat,
   appendTrace,
   listLeases,
   readActFailures,
   releaseLease,
-  writeHandoffHeader,
+  tidyHandoff,
   writeReceiptAt,
   writeState,
+  handoffPath,
   markNotified,
   readNotified,
   traceEvent,
-  unitDir,
+  runStateDir,
 } from "@norn/store";
 import type { Context } from "../../context.ts";
 import { syncRemoteBranch } from "../integrate.ts";
@@ -99,7 +98,8 @@ export class ActEnv {
     // a unit started this tick
     const s = this.storyLoc(unit.story);
     const root = s.worktree ?? s.root;
-    return { unit, story: unit.story, root, runsDir: unitDir(join(root, s.spec_dir), unit.dir), worktree: s.worktree, branch: s.branch, state: null, workflow: null };
+    const specDir = join(root, s.spec_dir);
+    return { unit, story: unit.story, root, runsDir: runStateDir(root, { key: unit.story, spec_dir: s.spec_dir }, unit.dir), handoffFile: handoffPath(specDir, unit.dir), worktree: s.worktree, branch: s.branch, state: null, workflow: null };
   }
 
   liveness() {
@@ -135,29 +135,23 @@ export class ActEnv {
     return out;
   }
 
-  /** Regenerate the handoff header (S9), add a heartbeat line (O6), commit with trailers (S4) and push (S8, T7). */
+  /** Tidy the unit's handoff (gh-195 D9: skeleton when new, an older norn's blocks gone, B6, B8), commit with trailers (S4) and push (S8, T7). */
   async commit(
     c: BoundaryCommit | null,
     unit: UnitRef | null,
     state: UnitState | null,
-    heartbeat: string | null,
     paths?: string[],
   ): Promise<{ sha: string | null; pushed: boolean | null; push_error?: string; deferred?: string; refused?: string } | null> {
     if (!c) return null;
     if (unit && state) {
       const loc = this.unitLoc(unit);
-      if (existsSync(loc.runsDir)) {
-        const header = renderHandoffStatus(state, { workflow: loc.workflow })
-          .split("\n")
-          .filter((l) => !l.startsWith("<!--"))
-          .join("\n");
-        writeHandoffHeader(loc.runsDir, header);
-        if (heartbeat) appendHandoffHeartbeat(loc.runsDir, `- ${heartbeat}`);
-      }
+      // B6: the status is printed by `brief` and `story checkout` (renderHandoffStatus), never written into the file
+      if (existsSync(loc.runsDir)) tidyHandoff(loc.handoffFile);
     }
     let sha: string | null;
     try {
-      sha = await this.git.commit(c.cwd, { message: c.message, trailers: c.trailers, ...(paths ? { paths } : {}) });
+      // gh-195 D17: decide asks for a story unit's boundary even when nothing changed (`allow_empty`)
+      sha = await this.git.commit(c.cwd, { message: c.message, trailers: c.trailers, ...(paths ? { paths } : {}), ...(c.allow_empty ? { allowEmpty: true } : {}) });
     } catch (e) {
       const code = (e as { code?: string }).code;
       // H1: an agent's merge or rebase is in progress in the worktree — norn's files wait there

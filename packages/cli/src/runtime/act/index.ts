@@ -14,19 +14,22 @@ import {
   type ActFailure,
   type ActionResult,
   buildInbox,
+  RECORD_PUSH_EFFECT,
+  recordPushSlot,
   isSideAction,
+  isTailAction,
   type Decision,
   type Facts,
   type InboxGroup,
 } from "@norn/core";
-import { deleteMailbox, reclaimLeases, writeActFailures, writeState } from "@norn/store";
+import { deleteMailbox, reclaimLeases, writeActFailures, writeState, writeUnitMarker } from "@norn/store";
 import { appendProgress, rejectProgress } from "../report.ts";
 import { ActEnv, QueueFull, claimLost } from "./env.ts";
 import { applyReceipts, startRun, nudge, retryFresh, classify } from "./session.ts";
 import { runCheck } from "./check.ts";
 import { runGit } from "./git-step.ts";
 import { startUnit, markDone, rejectReceipt, claim, renewAll, intake, mirror, cleanupMerged, closeClosedIssueStory,
-  roundMigrate, roundStart, retryRecords } from "./lifecycle.ts";
+  moveRecord, pushRecord, setAsideRecordAct, roundMigrate, roundStart, retryRecords } from "./lifecycle.ts";
 
 export interface ActRecord {
   decision: Decision;
@@ -54,17 +57,6 @@ function effectOf(a: Action): string {
   }
 }
 
-/**
- * O6: the handoff heartbeat for a park — the state's park, or, when an implicit ask took the
- * workflow's `ask` edge (no park in state), the ask itself.
- */
-function parkLine(a: Extract<Action, { kind: "park" }>): string {
-  const p = a.state.park;
-  if (p) return `${p.kind} — ${p.reason}`;
-  const ask = a.receipts.findLast((r) => r.receipt.kind === "ask")?.receipt;
-  return `ask — ${ask?.kind === "ask" ? ask.question : "?"}`;
-}
-
 export class Actor extends ActEnv {
   // ------------------------------------------------------------ dispatch
 
@@ -72,9 +64,11 @@ export class Actor extends ActEnv {
     const out: ActRecord[] = [];
     // R1.2: a story's renewal runs before its other actions; once it loses the CAS, nothing else of
     // that story is done this tick (R2.2: a checkout without the claim writes and pushes nothing)
-    const order = [...decisions.filter((d) => isSideAction(d.action)), ...decisions.filter((d) => !isSideAction(d.action))];
+    // gh-195 D4 (B10): a record push comes after everything else, so after the tick's branch pushes
+    const renewals = decisions.filter((d) => isSideAction(d.action) && !isTailAction(d.action));
+    const order = [...renewals, ...decisions.filter((d) => !isSideAction(d.action)), ...decisions.filter((d) => isTailAction(d.action))];
     const lost = new Set<string>();
-    const renewed = await this.renewals(order.filter((d) => isSideAction(d.action)));
+    const renewed = await this.renewals(renewals);
     for (const d of order) {
       const story = d.action.unit?.story;
       let result: ActionResult;
@@ -94,10 +88,11 @@ export class Actor extends ActEnv {
           counted = !(e instanceof QueueFull);
           result = e instanceof QueueFull ? { ok: false, error: e.message, detail: { queued: true } } : { ok: false, error: (e as Error).message };
         }
-      if (story && isSideAction(d.action) && !result.ok && claimLost(result)) lost.add(story);
+      if (story && isSideAction(d.action) && !isTailAction(d.action) && !result.ok && claimLost(result)) lost.add(story);
       if (counted) this.recordFailure(d, result);
       out.push({ decision: d, result });
     }
+    this.dropRecordPushSlots();
     if (this.failuresChanged) writeActFailures(this.root, this.failures);
     // the trace keeps decide's order
     return decisions.map((d) => out.find((r) => r.decision === d) as ActRecord);
@@ -121,6 +116,7 @@ export class Actor extends ActEnv {
    */
   private recordFailure(d: Decision, result: ActionResult): void {
     const a = d.action;
+    if (a.kind === "push_record") return this.recordPushFailure(a, d.rule, result);
     if (!a.unit || a.kind === "claim" || a.kind === "noop") return;
     const key = a.unit.key;
     const prev = this.failures[key];
@@ -140,6 +136,39 @@ export class Actor extends ActEnv {
       delete this.failures[key];
       this.failuresChanged = true;
     }
+  }
+
+  /**
+   * gh-195 B14: a failed record push is owed, not a failure of the unit: the next tick pushes it. 08-F4:
+   * one refused as stale (another checkout pushed the ref) would fail the same way every tick, so it is
+   * remembered with the lease it used (effect `record_push`) in the story's own slot, never the story
+   * unit's (review F2): decide holds the push until the record ref here changes, and the inbox shows one
+   * Check item. A push that lands, or one that fails another way (its lease was another, review#2 F6),
+   * clears it.
+   */
+  private recordPushFailure(a: Extract<Action, { kind: "push_record" }>, rule: string, result: ActionResult): void {
+    const key = recordPushSlot(a.unit.story);
+    const prev = this.failures[key];
+    if (result.ok || (result.detail as { reason?: string } | undefined)?.reason !== "stale") {
+      if (prev?.effect !== RECORD_PUSH_EFFECT) return;
+      delete this.failures[key];
+      this.failuresChanged = true;
+      return;
+    }
+    // the story unit's cursor when it was refused (the slot is the story's, not a unit's)
+    const st = this.written.get(a.unit.key) ?? this.obs.units[a.unit.key]?.state;
+    this.failures[key] = { effect: RECORD_PUSH_EFFECT, rule, reason: result.error ?? "record push refused as stale", at: this.nowIso(), tick_id: this.tick, step: st?.step ?? "?", attempt: st?.attempt ?? 1, lease: a.expected };
+    this.failuresChanged = true;
+  }
+
+  /** review F2: a refused record push is forgotten once the story is not held here under `remote` (observe reports no `record`). */
+  private dropRecordPushSlots(): void {
+    const observed = new Set(this.obs.facts.stories.filter((s) => s.record).map((s) => recordPushSlot(s.key)));
+    for (const [key, f] of Object.entries(this.failures))
+      if (f.effect === RECORD_PUSH_EFFECT && !observed.has(key)) {
+        delete this.failures[key];
+        this.failuresChanged = true;
+      }
   }
 
   async perform(a: Action): Promise<ActionResult> {
@@ -178,7 +207,7 @@ export class Actor extends ActEnv {
         this.writeReceipts(loc.runsDir, a.receipts);
         if (a.state) this.writeUnitState(a.unit, loc.runsDir, a.state);
         await this.notify(a.notify);
-        const committed = await this.commit(a.commit, a.unit, a.state, `${a.rule}: ${parkLine(a)}`);
+        const committed = await this.commit(a.commit, a.unit, a.state);
         return { ok: true, detail: committed };
       }
       case "mark_done":
@@ -186,7 +215,7 @@ export class Actor extends ActEnv {
       case "commit_push": {
         const loc = this.unitLoc(a.unit);
         const rel = relative(a.commit.cwd, loc.runsDir);
-        return { ok: true, detail: await this.commit(a.commit, a.unit, loc.state, null, [rel]) };
+        return { ok: true, detail: await this.commit(a.commit, a.unit, loc.state, [rel]) };
       }
       case "reject_receipt":
         return rejectReceipt(this, a);
@@ -206,8 +235,8 @@ export class Actor extends ActEnv {
         const loc = this.unitLoc(a.unit);
         this.writeReceipts(loc.runsDir, a.receipts);
         // a gate rejection is a milestone in handoff.md, as when it is written locally (O6)
-        for (const r of a.receipts) if (r.receipt.kind === "reject") appendProgress(loc.runsDir, rejectProgress(r.receipt));
-        const committed = await this.commit(a.commit, a.unit, loc.state, `${a.rule}: ${a.receipts.map((r) => r.receipt.kind).join(", ")}`);
+        for (const r of a.receipts) if (r.receipt.kind === "reject") appendProgress(loc.handoffFile, rejectProgress(r.receipt));
+        const committed = await this.commit(a.commit, a.unit, loc.state);
         const deleted: string[] = [];
         for (const r of a.refs) {
           const res = await deleteMailbox(this.root, this.obs.remote, r.ref, r.sha);
@@ -230,10 +259,20 @@ export class Actor extends ActEnv {
         return roundMigrate(this, a);
       case "round_start":
         return roundStart(this, a);
+      case "move_record":
+        return moveRecord(this, a);
+      case "set_aside_record":
+        return setAsideRecordAct(this, a);
+      case "push_record":
+        return pushRecord(this, a);
       case "noop":
         return { ok: true };
       case "intake_story":
         return intake(this, a);
+      case "restore_markers": {
+        for (const w of a.worktrees) writeUnitMarker(w.path, w.marker);
+        return { ok: true, detail: { restored: a.worktrees.map((w) => w.path) } };
+      }
       case "reclaim_leases": {
         const removed = await reclaimLeases(this.ctx.home, a.files, this.liveness());
         return { ok: true, detail: { removed } };

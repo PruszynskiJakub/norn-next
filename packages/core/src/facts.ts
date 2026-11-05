@@ -13,6 +13,7 @@ import type {
   LeaseFile,
   Mode,
   Receipt,
+  RejectedMailboxReceipt,
   ResolvedConfig,
   SchemaError,
   SliceFrontmatter,
@@ -20,7 +21,7 @@ import type {
   UnitState,
   Workflow,
 } from "@norn/schema";
-import type { GitInProgress, PaneState, RemoteIssue, RemotePullRequest, RunnerCapabilities, SessionRef, WorktreeStatus } from "./ports.ts";
+import type { GitInProgress, PaneState, PullRequestCi, RemoteIssue, RemotePullRequest, RunnerCapabilities, SessionRef, WorktreeStatus } from "./ports.ts";
 
 /** A file that failed to read or validate (S2). */
 export interface FileError {
@@ -123,6 +124,8 @@ export interface ActFailure {
   attempt: number;
   /** the session a failed delivery targeted, so the inbox can say how to reach it */
   session?: { runner: string; session_id: string; pane_id?: string };
+  /** gh-195 (08-F4): a record push refused as stale (`StoryFacts.record.refused`): the sha it leased on (null = none) */
+  lease?: string | null;
 }
 
 export interface UnitFacts {
@@ -156,7 +159,11 @@ export interface UnitFacts {
   run: RunFacts | null;
   /** this machine's lease for the unit's run, if any */
   lease: LeaseFile | null;
-  /** runs/<unit>/ or handoff.md have uncommitted changes (crash between write and commit) */
+  /**
+   * gh-195 D8 (B5): the unit's handoff has uncommitted changes (a crash between write and commit).
+   * Run state is in the machine dir, never in git (S12); the agent's own files are not counted, since
+   * they are dirty all through a live session.
+   */
   uncommitted: boolean;
   /** R5.3: runs of the cursor step/attempt with their hook activity; absent = not observed */
   step_runs?: StepRunFacts[];
@@ -175,6 +182,14 @@ export interface UnitFacts {
    * while it is non-empty (D6).
    */
   skills_drift?: string[];
+  /**
+   * gh-195/06 (B34, D13): run state an older norn left on this unit's own branch, in `path`
+   * (`<spec folder>/runs`, relative to the unit's worktree). `copy`: the units' folders there (`_story`,
+   * `<nn>-<slug>`) read as their run state, the machine dir holding none of it yet (their `state` and
+   * `errors` are the branch's); [] = only the removal is left. `holds`: every unit's folder there,
+   * copied or not (the removal takes them all). Absent = none.
+   */
+  branch_record?: { path: string; copy: string[]; holds: string[] };
 }
 
 export interface SliceFileFacts {
@@ -219,12 +234,32 @@ export interface ForeignCommit {
   branch: string;
 }
 
-/** R2.3: local runs/ work of one unit that is not in the record (the remote unit branch). */
-export interface UnpushedRuns {
-  /** unit key */
-  unit: string;
-  /** worktree-relative paths under `<spec_dir>/runs/<unit dir>/`, sorted */
-  files: string[];
+/**
+ * gh-195 D11 (B27, R2.3): this checkout's own record of a story another heartbeat holds, still in its
+ * machine dir's `runs/<story>/`.
+ */
+export interface LocalRecord {
+  /** its newest receipt, `NNNN-<kind>` (the story unit's, else a slice's); null = none */
+  last_receipt: string | null;
+  /**
+   * its tree is the tree of a record commit this machine pushed (`Norn-Holder`) in the history of the
+   * story's record ref here: everything in it is on the ref, as after a clean release (B15)
+   */
+  on_ref: boolean;
+}
+
+/** gh-195 D11 (B27, T7a): a record this checkout set aside as superseded, `<machine dir>/superseded/<name>/`. */
+export interface SupersededRecord {
+  /** `<story>-<ulid>` */
+  name: string;
+  story: string;
+  /** who held the claim when it was set aside; null = not recorded */
+  holder: string | null;
+  last_receipt: string | null;
+  /** ISO time it was set aside */
+  at: string;
+  /** absolute folder */
+  dir: string;
 }
 
 /**
@@ -251,6 +286,8 @@ export interface StoryBase {
 export interface StoryPrSeen {
   pr: RemotePullRequest | null;
   observed_at: number;
+  /** gh-195 B18: the CI state of the PR's head, observed only for a story another heartbeat holds; absent = not observed */
+  ci?: PullRequestCi;
 }
 
 /** gh-71 D5: a story issue observation (`null` = not visible to this checkout) and its time (ms epoch). */
@@ -322,11 +359,10 @@ export interface StoryFacts {
    */
   base_status?: StoryFrontmatter["status"] | null;
   /**
-   * R2.3: on a checkout that does not hold the claim, runs/ files (receipts, state) changed locally
-   * but not on the remote unit branch, per unit; paths are relative to the unit's worktree. Absent =
-   * none, held here, or not observed.
+   * gh-195 D11 (B27, R2.3): on a checkout whose story another heartbeat holds, its own record of the
+   * story still in its machine dir. Absent = none, held here, or not observed.
    */
-  unpushed_runs?: UnpushedRuns[];
+  local_record?: LocalRecord;
   /**
    * R3.1: an unclaimed new story — its local branch holds nothing beyond the intake commit: no
    * commit past the base ref, or one whose trailers are the story's intake (`isIntakeCommit`, never
@@ -336,10 +372,38 @@ export interface StoryFacts {
   /** BS1: the story branch against its base; absent = not observed (no story branch or base ref) */
   base?: StoryBase;
   /**
+   * gh-195 D4 (B10, B12): under `record.policy: remote`, on the checkout that holds the claim, the
+   * tree a pack of the story's run-state folder would write (`tree`, null = no file yet) and the record
+   * ref as this checkout last saw it (`pushed`: its commit and tree; null = none). Machine-local.
+   * Absent = not observed (another holder, or the policy is local).
+   */
+  record?: { tree: string | null; pushed: { sha: string; tree: string } | null };
+  /**
+   * gh-195 (08-F4, review F2): the last record push of this holder refused as stale (another checkout
+   * pushed the ref), kept machine-local in the story's own slot of `failures.json` apart from the story
+   * unit's act failure (`lease`: the sha it leased on, null = none); dropped by the tick once the claim
+   * is not here or the policy is `local`. While `record` is observed, decide pushes again only once the
+   * record ref here is another one; the inbox shows one Check item meanwhile. Absent = none.
+   */
+  record_refused?: ActFailure;
+  /**
+   * gh-195 (review#2 F3): this checkout has the story's record ref (`refs/norn/runs/<story>`, this commit)
+   * but its story unit has no run state: the record was not put in place (a checkout cut short). decide
+   * starts nothing over then. Absent = no such ref, or the story unit has run state.
+   */
+  record_unplaced?: string;
+  /** gh-195 B33 (review#2 F1): held here, read from its record in the machine dir alone — no branch, no spec in any tree */
+  record_only?: boolean;
+  /**
    * NT2/NT3: notes for a person from `done` receipts of any unit of the story that no story-level
    * gate `approve` acknowledged yet, oldest first. Absent = none (or not observed).
    */
   notes?: import("./criteria.ts").StoryNote[];
+  /**
+   * gh-195 D12 (B21): mailbox receipts this checkout's ticks rejected that no later accepted answer or
+   * approval of the story cleared, oldest first. Absent = none.
+   */
+  rejected_mailbox?: RejectedMailboxReceipt[];
   /** units: the story unit first, then slices ascending by nn */
   units: UnitFacts[];
   slices: SliceFileFacts[];
@@ -389,7 +453,27 @@ export interface Facts {
    * the running norn's (B19); absent = not observed.
    */
   norn?: { running: string; repo: string | null; skills_drift?: string[] };
+  /**
+   * gh-195 D16 (B29, B35): stories whose run state an older norn left in the base branch's tree (the
+   * main checkout's without a fetched base), ascending; never read, only pointed to `norn upgrade`.
+   * Absent = none.
+   */
+  base_run_state?: string[];
+  /** gh-195 D11 (B27, T7a): records this checkout set aside as superseded, by name. Absent = none. */
+  superseded?: SupersededRecord[];
   /** worktrees/branches with no matching unit (K5) */
   orphans: { worktrees: string[]; branches: string[] };
+  /**
+   * gh-195/05 (B2, H2): unit worktrees whose `.norn-unit` is gone (`git clean -fdx`), each with the
+   * marker observe inferred from its folder and branch and read the unit by; act writes it back
+   * (`restore_markers`). Observe writes nothing. Absent = none.
+   */
+  unmarked?: UnmarkedWorktree[];
+}
+
+/** A unit worktree without its `.norn-unit`, and the marker its folder and branch name (B2). */
+export interface UnmarkedWorktree {
+  path: string;
+  marker: { repo: string; story: string; slice: string | null; unit: string; spec_dir: string };
 }
 

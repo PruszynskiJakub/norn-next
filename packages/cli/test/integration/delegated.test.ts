@@ -6,9 +6,10 @@
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
-import { storyUnitDir, workflowsDir } from "@norn/store";
+import { workflowsDir } from "@norn/store";
 import type { CliDeps, CliResult } from "../../src/index.ts";
 import { createHarness, type Harness, issue, runChecked } from "../../../../test/support/harness.ts";
+import { runStateOf, storyRunStateOf } from "../../../../test/support/run-state.ts";
 
 setDefaultTimeout(30_000);
 
@@ -38,7 +39,9 @@ steps:
 let h: Harness;
 const SLUGS: Record<number, string> = { 1: "gh-1-pay-invoices", 2: "gh-2-send-receipts", 3: "gh-3-archive-invoices" };
 const wt = (n: number) => `${h.root}-worktrees/${SLUGS[n]}`;
-const runs = (n: number) => storyUnitDir(join(wt(n), `.agents/specs/${SLUGS[n]}`));
+const spec = (n: number) => join(wt(n), `.agents/specs/${SLUGS[n]}`);
+// gh-195 S12: a unit's run state is in the checkout's machine dir (the current round for the story)
+const runs = (n: number) => runStateOf(spec(n));
 const tick = async () => {
   h.clock.advance(10_000);
   return h.tick();
@@ -136,7 +139,7 @@ describe("delegated decisions are recorded apart from the person's (B21, B22, B3
   test("a new round started with --delegated --reason carries its reason (B34)", async () => {
     const r = await h.norn("story", "edit", "gh-1", "--workflow", "asks", "--delegated", "--reason", "fsd: one seam, no contract change");
     expect(r.exit).toBe(0);
-    await until(() => (h.state(join(wt(1), `.agents/specs/${SLUGS[1]}/runs/_story/rounds/02-asks`))?.round ?? 0) === 2);
+    await until(() => (h.state(join(storyRunStateOf(spec(1)), "_story/rounds/02-asks"))?.round ?? 0) === 2);
     // B34: the new round's heading in the step timeline carries the mark and the reason
     expect((await h.norn("run", "list", "gh-1")).stdout).toContain("round 2 · asks — delegated (supervisor): fsd: one seam, no contract change");
     expect((await h.norn("run", "list", "gh-1")).stdout).toContain("round 1 · gated · finished\n");
@@ -209,7 +212,7 @@ describe("a suspected flake goes back to its check, and a delegated reject (B42,
 
 describe("earlier rounds are read from their folders on each load (S2)", () => {
   test("a failing receipt in an earlier round is reported in story list's errors, never skipped", async () => {
-    const round1 = join(wt(1), `.agents/specs/${SLUGS[1]}/runs/_story/rounds/01-gated/receipts`);
+    const round1 = join(storyRunStateOf(spec(1)), "_story/rounds/01-gated/receipts");
     h.write(join(round1, "0099-approve.json"), "{ not json");
     const v = (await h.norn("story", "list", "--json")).value as { stories: Array<{ key: string; errors: Array<{ file: string }> }> };
     expect(v.stories.find((s) => s.key === "gh-1")?.errors.map((e) => e.file)).toContainEqual(expect.stringContaining("rounds/01-gated/receipts/0099-approve.json"));

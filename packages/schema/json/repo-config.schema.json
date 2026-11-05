@@ -46,6 +46,25 @@
       "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$",
       "description": "the norn version this repo needs, X.Y.Z (written by norn upgrade and norn init)",
       "type": "string"
+    },
+    "record": {
+      "additionalProperties": false,
+      "type": "object",
+      "properties": {
+        "policy": {
+          "description": "local (default): the record stays on the holder's machine between claim releases; remote: every step boundary pushes it to refs/norn/runs/<story>",
+          "anyOf": [
+            {
+              "const": "local",
+              "type": "string"
+            },
+            {
+              "const": "remote",
+              "type": "string"
+            }
+          ]
+        }
+      }
     }
   }
 }

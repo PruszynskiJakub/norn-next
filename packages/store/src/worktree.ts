@@ -3,9 +3,9 @@
  * marker, and the shared `info/exclude` entries that keep both out of commits.
  */
 import { readdirSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { SLOTS } from "@norn/schema";
-import { isSliceKey, isStoryKey, parseSliceFileName, parseSpecDirName, sliceDirName, sliceKey, storyDirName } from "@norn/schema";
+import { isSliceKey, isStoryKey, parseSliceFileName, parseSpecDirName, sliceDirName, sliceKey, specDir, STORY_UNIT_DIR, storyDirName } from "@norn/schema";
 import { atomicWrite, readText } from "./fsx.ts";
 import { git } from "./git.ts";
 import { envNornPath, unitMarkerPath } from "./paths.ts";
@@ -82,6 +82,25 @@ export interface UnitMarker {
 export function writeUnitMarker(worktree: string, m: UnitMarker): void {
   const lines = [`repo=${m.repo}`, `story=${m.story}`, `slice=${m.slice ?? ""}`, `unit=${m.unit}`, `spec_dir=${m.spec_dir}`];
   atomicWrite(unitMarkerPath(worktree), `${lines.join("\n")}\n`);
+}
+
+/**
+ * gh-195/05 (B2): the marker of a unit worktree of `repo` that lost it (`git clean -fdx` removes the
+ * ignored `.norn-unit`), from its folder name and checked-out branch, as norn made both: the story
+ * worktree `<repo>-worktrees/<id>-<slug>` on branch `<id>-<slug>`, a slice's `<story worktree>--<nn>-<slug>`
+ * on `<id>/<nn>-<slug>`. null when the folder is no unit worktree norn names so.
+ */
+export function inferUnitMarker(repo: string, path: string, branch: string | null): UnitMarker | null {
+  if (!branch || !path.startsWith(`${repo}-worktrees/`)) return null;
+  const name = basename(path);
+  const story = parseSpecDirName(branch);
+  if (story && name === branch) return { repo, story: story.story, slice: null, unit: STORY_UNIT_DIR, spec_dir: specDir(story.story, story.slug) };
+  const cut = name.indexOf("--");
+  const owner = cut > 0 ? parseSpecDirName(name.slice(0, cut)) : null;
+  const unit = cut > 0 ? name.slice(cut + 2) : "";
+  const nn = /^([0-9]{2,3})-[a-z0-9-]+$/.exec(unit)?.[1];
+  if (!owner || !nn || branch !== `${owner.story}/${unit}`) return null;
+  return { repo, story: owner.story, slice: sliceKey(owner.story, nn), unit, spec_dir: specDir(owner.story, owner.slug) };
 }
 
 /** null when absent; throws nothing — a malformed marker is returned as null with `exists`. */

@@ -6,12 +6,12 @@
  * Reuse: `const h = await createHarness(); await h.norn("init"); …; h.cleanup()`.
  */
 import { setDefaultTimeout } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { type Clock, type InboxItem, type LaunchSpec, type NotifierPort, type PaneState, type PromptKey, type RemoteIssue, type RemoteLabel, type RemotePort, type RemotePullRequest, type RunnerCapabilities, type RunnerPort, type RunnerSessionInfo, nameRemoved, type SessionRef } from "@norn/core";
-import { type Receipt, type UnitState, ulid } from "@norn/schema";
-import { appendReceipt, installSkills, linkSkills, machineDir, readState, repoConfigPath, spawnSyncCaptured, workflowsDir } from "@norn/store";
+import { basename, dirname, join } from "node:path";
+import { type Clock, type InboxItem, type LaunchSpec, type NotifierPort, type PaneState, type PromptKey, type PullRequestCi, type RemoteIssue, type RemoteLabel, type RemotePort, type RemotePullRequest, type RunnerCapabilities, type RunnerPort, type RunnerSessionInfo, nameRemoved, type SessionRef } from "@norn/core";
+import { parseSpecDirName, type Receipt, recordRef, ROUNDS_DIR, STORY_UNIT_DIR, type UnitState, ulid } from "@norn/schema";
+import { appendReceipt, bindNornHome, HANDOFF_HEADER_BEGIN, HANDOFF_HEADER_END, HANDOFF_LOG_BEGIN, HANDOFF_LOG_END, installSkills, linkSkills, machineDir, readState, repoConfigPath, handoffPath, runStateDir, spawnSyncCaptured, storyRunStateDir, treeHandoffFile, treeRecordCommit, treeRunStateDir, treeUnitRunStateDir, workflowsDir } from "@norn/store";
 import type { ProjectView } from "@norn/view";
 import { bundledSkills, type CliDeps, type CliResult, type Interaction, type InteractionChoice, runCli, runningVersion, type TickReport } from "../../packages/cli/src/index.ts";
 import { assetsDir } from "../../packages/cli/src/runtime/assets.ts";
@@ -66,6 +66,15 @@ export class FakeRemote implements RemotePort {
     this.calls.push(`pr? ${branch}`);
     return [...this.prs].reverse().find((p) => p.head === branch) ?? null;
   }
+  /** gh-195 B18: PR number → the CI state of its head; unset = none */
+  ci = new Map<number, PullRequestCi>();
+  /** set → `pullRequestCi` throws it */
+  ciError: Error | null = null;
+  async pullRequestCi(n: number) {
+    this.calls.push(`ci? ${n}`);
+    if (this.ciError) throw this.ciError;
+    return this.ci.get(n) ?? "none";
+  }
   async openDraftPullRequest(o: { head: string; base: string; title: string; body: string }) {
     this.calls.push(`pr+ ${o.head}`);
     const pr: RemotePullRequest = { number: 100 + this.prs.length, url: `https://github.com/o/r/pull/${100 + this.prs.length}`, state: "open", is_draft: true, head_sha: "", head: o.head, base_branch: o.base, merged_at: null };
@@ -90,6 +99,10 @@ export class FakeRemote implements RemotePort {
   async newIssueUrl(o: { labels: string[] }) {
     this.calls.push(`issue+? ${o.labels.join(",")}`);
     return `https://github.com/o/r/issues/new?labels=${encodeURIComponent(o.labels.join(","))}`;
+  }
+  async rawFileUrl(o: { commit: string; path: string }) {
+    this.calls.push(`raw ${o.commit} ${o.path}`);
+    return `https://github.com/o/r/blob/${o.commit}/${o.path.split("/").map(encodeURIComponent).join("/")}?raw=true`;
   }
   /** set → `replaceIssueLabel` throws it, changing nothing (B20) */
   labelError: Error | null = null;
@@ -328,6 +341,8 @@ export async function createHarness(opts: HarnessOptions = {}): Promise<Harness>
   sh(seed, ["commit", "-q", "-m", "init"]);
   sh(seed, ["push", "-q", remoteDir, "main"]);
   sh(dir, ["clone", "-q", remoteDir, root]);
+  // S12 (gh-195/05): the test names run state in the checkout's machine dir before any command binds it
+  bindNornHome(root, home);
   sh(root, ["config", "user.email", "t@example.com"]);
   sh(root, ["config", "user.name", "Tester"]);
 
@@ -440,6 +455,86 @@ export function toNewLayout(root: string): void {
     renameSync(old, now);
   }
   rmSync(oldNornDir(root), { recursive: true, force: true });
+}
+
+/**
+ * gh-195/06 (B34): a unit as an older norn left it: its run state moved from the machine dir back into
+ * `<spec folder>/runs/<unit>` in `worktree`, and its handoff from `handoffs/<unit>.md` to
+ * `runs/<unit>/handoff.md` under an older norn's generated header and heartbeat blocks (gh-195/07, B8),
+ * committed on the worktree's branch with norn's trailers, then pushed to `push` (a remote name) when given.
+ * - `flat`: the story's one round folded back into `_story/` itself, the record of a norn before rounds (RD7).
+ * - `broken`: a receipt that fails validation committed with it (S2).
+ * - `interrupted`: a move that stopped partway, its copy already in the machine dir: `"after copy"`
+ *   with runs/ still in the worktree, `"after removal"` with runs/ deleted from the worktree and the
+ *   handoff back at `handoffs/<unit>.md` but neither committed (S1).
+ */
+export function toBranchRunState(
+  worktree: string,
+  specDir: string,
+  unit: string,
+  opts: { flat?: boolean; push?: string; broken?: boolean; interrupted?: "after copy" | "after removal" } = {},
+): void {
+  const key = parseSpecDirName(basename(specDir))?.story;
+  if (!key) throw new Error(`not a spec folder: ${specDir}`);
+  const story = { key, spec_dir: specDir };
+  const machine = unit === STORY_UNIT_DIR ? join(storyRunStateDir(worktree, story), STORY_UNIT_DIR) : runStateDir(worktree, story, unit);
+  const tree = treeUnitRunStateDir(worktree, story, unit);
+  mkdirSync(tree, { recursive: true });
+  const rounds = unit === STORY_UNIT_DIR ? readdirSync(join(machine, ROUNDS_DIR)) : [];
+  if (opts.flat) {
+    if (rounds.length !== 1) throw new Error(`flat: ${unit} has ${rounds.length} rounds`);
+    cpSync(join(machine, ROUNDS_DIR, rounds[0] as string), tree, { recursive: true });
+  } else cpSync(machine, tree, { recursive: true });
+  const handoff = handoffPath(join(worktree, specDir), unit);
+  const prose = existsSync(handoff) ? readFileSync(handoff, "utf8") : null;
+  if (prose !== null) {
+    writeFileSync(treeHandoffFile(join(worktree, specDir), unit), `${olderNornHandoffBlocks(key, unit)}\n\n${prose}`);
+    rmSync(handoff);
+  }
+  if (opts.broken) {
+    const record = opts.flat || unit !== STORY_UNIT_DIR ? tree : join(tree, ROUNDS_DIR, rounds.at(-1) as string);
+    mkdirSync(join(record, "receipts"), { recursive: true });
+    writeFileSync(join(record, "receipts", "0099-done.json"), "{}\n");
+  }
+  if (!opts.interrupted) rmSync(machine, { recursive: true, force: true });
+  sh(worktree, ["add", "-A"]);
+  sh(worktree, ["commit", "-q", "-m", `norn: ${key} run state (older norn)`, "--trailer", `Norn-Story: ${key}`, "--trailer", "Norn-Tick: 01OLDERNORN0000000000000000"]);
+  if (opts.push) sh(worktree, ["push", "-q", "--force", opts.push, "HEAD"]);
+  if (opts.interrupted === "after removal") {
+    rmSync(treeRunStateDir(worktree, story), { recursive: true, force: true });
+    if (prose !== null) writeFileSync(handoff, prose);
+  }
+}
+
+/**
+ * gh-195 D14 (B35): what `norn upgrade` does to a finished story an older norn left on the base: the
+ * `<spec folder>/runs` subtree at `rev` in `root` packed as is by store's `treeRecordCommit` (the
+ * code `norn upgrade` packs with) and pushed to the story's archive ref on `remote`, nothing removed.
+ * Returns the record commit.
+ */
+export function archiveTreeRunState(root: string, rev: string, specDir: string, remote = "origin"): string {
+  const key = parseSpecDirName(basename(specDir))?.story;
+  if (!key) throw new Error(`not a spec folder: ${specDir}`);
+  const packed = treeRecordCommit(root, rev, { key, spec_dir: specDir }, { holder: "older-norn@machine", at: new Date(T0).toISOString() });
+  if (!packed.ok) throw new Error(`${specDir}: ${JSON.stringify(packed)}`);
+  sh(root, ["push", "-q", remote, `${packed.sha}:${recordRef(key)}`]);
+  return packed.sha;
+}
+
+/**
+ * gh-195 D16 (B35): finished stories as an older norn merged them into the base: the gh-1 fixture's
+ * spec, slices and `runs/` copied into each of `specDirs` in `root`, committed and pushed to `main`.
+ */
+export function toBaseRunState(root: string, specDirs: readonly string[], remote = "origin"): void {
+  for (const d of specDirs) cpSync(join(import.meta.dir, "../../packages/view/test/integration/fixtures/gh-1/spec"), join(root, d), { recursive: true });
+  sh(root, ["add", "-A"]);
+  sh(root, ["commit", "-q", "-m", "merge finished stories (older norn)"]);
+  sh(root, ["push", "-q", remote, "main"]);
+}
+
+/** The generated header and heartbeat blocks an older norn kept at the top of a unit's handoff (S9, O6; gone since gh-195/07). */
+export function olderNornHandoffBlocks(story: string, unit: string): string {
+  return [HANDOFF_HEADER_BEGIN, `- Story: ${story} · Unit: ${unit}`, "- Step: implement (attempt 1)", HANDOFF_HEADER_END, HANDOFF_LOG_BEGIN, "- story.start: story at implement", HANDOFF_LOG_END].join("\n");
 }
 
 /** What `norn init` does for skills (SK1), for setups that write their own config instead: `.agents/skills/` linked from Claude's folder. */

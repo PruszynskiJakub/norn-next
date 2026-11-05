@@ -2,20 +2,21 @@
  * Auto-mode recovery (R1–R3): two clones of one bare remote.
  *   - R1.2: a renewal that loses its CAS stops the story's other actions in that tick.
  *   - H5: the renewals due in a tick go out in one claim push; one lost among them fails alone.
- *   - R2.3: the checkout that lost the claim reports its unpushed receipt; `tidy` moves it to
- *     `orphaned/` on the local branch and pushes nothing.
+ *   - R2.3, T7a (gh-195 D11): the checkout that lost the claim sets its record aside as superseded in its
+ *     machine dir, pushes nothing and shows one Check item.
  *   - R3.1: the loser of an intake race removes its local intake.
  *   - R3.3: release refuses a push that is not a fast-forward and keeps the claim.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import type { Inbox, RunnerPort } from "@norn/core";
-import { repoConfigPath, setSpawnObserver, workflowsDir, storyUnitDir } from "@norn/store";
+import { machineDir, repoConfigPath, setSpawnObserver, storyRunStateDir, workflowsDir } from "@norn/store";
 import { type CliDeps, type CliResult, type TickReport } from "../../packages/cli/src/index.ts";
 import { createHarness, FakeRunner, type Harness, issue, sh } from "../support/harness.ts";
 import { runChecked } from "../support/harness.ts";
 import { expectTranscript, recordTranscript, type Transcript } from "../support/transcript.ts";
+import { runStateOf } from "../support/run-state.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -95,7 +96,7 @@ describe("a claim lost mid-run (R1.2, R2.3)", () => {
   let B: Clone;
   const SPEC = ".agents/specs/gh-9-add-search";
   const BRANCH = "gh-9-add-search";
-  const storyRuns = (root: string) => storyUnitDir(join(`${root}-worktrees/${BRANCH}`, SPEC));
+  const storyRuns = (root: string) => runStateOf(join(`${root}-worktrees/${BRANCH}`, SPEC));
   const step = (ms = 10_000) => h.clock.advance(ms);
   const remoteHead = () => h.git(["ls-remote", "origin", `refs/heads/${BRANCH}`]).split("\t")[0];
 
@@ -130,27 +131,26 @@ describe("a claim lost mid-run (R1.2, R2.3)", () => {
     expect(remoteHead()).toBe(head);
   });
 
-  test("R2.3: the non-holder reports its unpushed receipt; tidy moves it to orphaned/ locally and pushes nothing", async () => {
+  test("R2.3, T7a (gh-195 D11, B27): the non-holder sets its record aside as superseded, pushes nothing and shows one Check item", async () => {
     step();
-    const r = await A.tick("--sync");
-    expect(r.decisions.filter((d) => d.unit === "gh-9")).toEqual([{ unit: "gh-9", rule: "claim.other", kind: "noop", ok: true }]);
     const done = readdirSync(join(storyRuns(A.root), "receipts")).find((f) => f.endsWith("-done.json")) as string;
+    const round = relative(storyRunStateDir(A.root, { key: "gh-9", spec_dir: SPEC }), storyRuns(A.root));
+    const head = remoteHead();
+    const refs = sh(h.dir, ["ls-remote", h.remoteDir]);
+    const r = await A.tick("--sync");
+    expect(r.decisions.filter((d) => d.unit === "gh-9")).toEqual([{ unit: "gh-9", rule: "record.superseded", kind: "set_aside_record", ok: true }]);
+    // the whole record moved: runs/gh-9 gone, the copy under superseded/gh-9-<ulid>/ with A's done receipt
+    expect(existsSync(storyRunStateDir(A.root, { key: "gh-9", spec_dir: SPEC }))).toBe(false);
+    const names = readdirSync(join(machineDir(A.root), "superseded"));
+    expect(names).toEqual([expect.stringMatching(/^gh-9-[0-9A-HJKMNP-TV-Z]{26}$/)]);
+    expect(existsSync(join(machineDir(A.root), "superseded", names[0] as string, round, "receipts", done))).toBe(true);
     const inbox = (await A.norn("status")).value as Inbox;
     expect(inbox.groups.check).toEqual([
-      expect.objectContaining({ story: "gh-9", command: "norn tidy", title: `local work on gh-9 is not in the record (${done.replace(/\.json$/, "")}) — the story is now held by bob@repo-b` }),
+      expect.objectContaining({ id: `superseded:gh-9:${(names[0] as string).slice("gh-9-".length)}`, story: "gh-9", title: `your record of gh-9 was superseded when bob@repo-b took it over (last local receipt ${done.replace(/\.json$/, "")})` }),
     ]);
-
-    const head = remoteHead();
-    const t = await A.norn("tidy");
-    expect(t.exit).toBe(0);
-    const orphaned = `${SPEC}/runs/_story/rounds/01-solo/orphaned/tester@box-${done}`;
-    expect(t.value).toMatchObject({ orphaned: [{ story: "gh-9", unit: "gh-9", moved: [{ from: `${SPEC}/runs/_story/rounds/01-solo/receipts/${done}`, to: orphaned }], commit: expect.any(String) }] });
-    expect(existsSync(join(storyRuns(A.root), "receipts", done))).toBe(false);
-    expect(existsSync(join(`${A.root}-worktrees/${BRANCH}`, orphaned))).toBe(true);
-    // committed on the local branch only; the record is untouched
+    // nothing pushed: not the branch, not a record, no other ref
     expect(remoteHead()).toBe(head);
-    expect(sh(`${A.root}-worktrees/${BRANCH}`, ["status", "--porcelain"])).toBe("");
-    expect(((await A.norn("status")).value as Inbox).groups.check).toEqual([]);
+    expect(sh(h.dir, ["ls-remote", h.remoteDir])).toBe(refs);
   });
 
   test("effect transcript: spawns, port calls and runs/ files of both clones (refactor Phase 0.2)", () => {
@@ -162,7 +162,7 @@ describe("renewals due together go out in one push (H5, R1.2)", () => {
   let h: Harness;
   let A: Clone;
   const N = 3;
-  const storyRuns = (n: number) => storyUnitDir(join(`${h.root}-worktrees/gh-${n}-story-${n}`, `.agents/specs/gh-${n}-story-${n}`));
+  const storyRuns = (n: number) => runStateOf(join(`${h.root}-worktrees/gh-${n}-story-${n}`, `.agents/specs/gh-${n}-story-${n}`));
 
   beforeAll(async () => {
     h = await createHarness();

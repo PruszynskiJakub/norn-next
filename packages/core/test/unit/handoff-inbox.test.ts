@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { HEARTBEAT_BEGIN, collapseHeartbeat, renderHandoff, renderHandoffStatus, STATUS_BEGIN, STATUS_END } from "../../src/handoff.ts";
+import { renderHandoffStatus, renderHandoffWithStatus, STATUS_BEGIN } from "../../src/handoff.ts";
 import type { Decision } from "../../src/actions.ts";
 import { inboxChanges } from "../../src/inbox/history.ts";
 import { buildInbox } from "../../src/inbox/items.ts";
@@ -24,29 +24,13 @@ describe("handoff.md (S9, O6)", () => {
     expect(renderHandoffStatus(st, { workflow: SLICE_WF })).toMatchSnapshot();
   });
 
-  test("heartbeat repeats collapse into (×n) with the newest time", () => {
-    let lines: string[] = [];
-    lines = collapseHeartbeat(lines, { at: "t1", text: "implement: nudged (silent)" });
-    lines = collapseHeartbeat(lines, { at: "t2", text: "implement: nudged (silent)" });
-    lines = collapseHeartbeat(lines, { at: "t3", text: "implement: nudged (silent)" });
-    lines = collapseHeartbeat(lines, { at: "t4", text: "implement.done → test" });
-    expect(lines).toEqual(["- t3 implement: nudged (silent) (×3)", "- t4 implement.done → test"]);
-  });
-
-  test("renderHandoff replaces the status block, keeps agent sections, appends heartbeat lines", () => {
-    const first = renderHandoff(null, renderHandoffStatus(st), [{ at: "t1", text: "parked: ask" }]);
-    expect(first).toMatchSnapshot();
-    const edited = first.replace("## Progress\n", "## Progress\n- form renders\n");
-    const st2 = { ...st, status: "running" as const, park: null };
-    const second = renderHandoff(edited, renderHandoffStatus(st2), [{ at: "t2", text: "parked: ask" }, { at: "t3", text: "answered" }]);
-    expect(second).toContain("- form renders");
-    expect(second).toContain("- Status: running");
-    expect(second).not.toContain("Which DB?");
-    expect(second.split(STATUS_BEGIN)).toHaveLength(2);
-    expect(second.split(HEARTBEAT_BEGIN)).toHaveLength(2);
-    expect(second).toContain("- t2 parked: ask (×2)\n- t3 answered\n");
-    expect(renderHandoff("# Notes\n", renderHandoffStatus(st2))).toStartWith(`${STATUS_BEGIN}`);
-    expect(renderHandoff("# Notes\n", renderHandoffStatus(st2))).toContain(`${STATUS_END}\n\n# Notes\n`);
+  test("gh-195 D9 (B7): story checkout's text is the status, markers dropped, above the handoff's written part", () => {
+    const text = renderHandoffWithStatus(st, "## Goal\n\nform\n", { workflow: SLICE_WF });
+    expect(text).not.toContain(STATUS_BEGIN);
+    expect(text).toStartWith("- Story: gh-1 · Slice: gh-1/02\n- Workflow: slice · Step: review (attempt 2)\n");
+    expect(text).toContain("- Counters: conflict_loop 0/2, qa_loop 0/2, review_loop 2/3, test_loop 1/5\n- Last outcome: test.pass (classified, ");
+    expect(text).toEndWith("\n\n## Goal\n\nform\n");
+    expect(renderHandoffWithStatus(st, null)).toEndWith(`- Updated: ${st.updated_at}\n`);
   });
 });
 
@@ -308,23 +292,27 @@ describe("inbox history (O1, O4)", () => {
   });
 });
 
-describe("unpushed runs (R2.3)", () => {
-  test("a non-holder's local receipts are a Check item naming the holder, resolved by norn tidy", () => {
+describe("superseded records (gh-195 D11, B27, R2.3)", () => {
+  test("a record set aside as superseded is one Check item naming the new holder and its last receipt", () => {
     const s = storyFacts("gh-9", [unitFacts(storyUnit("gh-9"), STORY_WF, stateFor(storyUnit("gh-9"), STORY_WF))], {
       claim: { state: "other", sha: "x", blob: { version: 1, story: "gh-9", holder: "ann@pc", heartbeat_id: "01JEEEEEEEEEEEEEEEEEEEEEEE", acquired_at: at(), renewed_at: at(), expires_at: at(T0 + 600_000), last_tick_id: null } },
-      unpushed_runs: [{ unit: "gh-9", files: [".agents/specs/gh-9-login/runs/_story/receipts/0035-done.json", ".agents/specs/gh-9-login/runs/_story/state.json"] }],
     });
-    const inbox = buildInbox(facts([s]), CONFIG);
-    expect(inbox.groups.check).toHaveLength(1);
-    expect(inbox.groups.check[0]).toMatchObject({
-      id: expect.stringMatching(/^unpushed:gh-9:[0-9a-f]{12}$/),
-      story: "gh-9",
-      slice: null,
-      title: "local work on gh-9 is not in the record (0035-done) — the story is now held by ann@pc",
-      command: "norn tidy",
-    });
+    const superseded = [{ name: "gh-9-01JFFFFFFFFFFFFFFFFFFFFFFF", story: "gh-9", holder: "ann@pc", last_receipt: "0035-done", at: at(), dir: "/m/superseded/gh-9-01JFFFFFFFFFFFFFFFFFFFFFFF" }];
+    const inbox = buildInbox({ ...facts([s]), superseded }, CONFIG);
+    expect(inbox.groups.check).toEqual([
+      expect.objectContaining({
+        id: "superseded:gh-9:01JFFFFFFFFFFFFFFFFFFFFFFF",
+        story: "gh-9",
+        slice: null,
+        title: "your record of gh-9 was superseded when ann@pc took it over (last local receipt 0035-done)",
+      }),
+    ]);
     // nothing else of a story held elsewhere is shown
     expect(inbox.pending).toBe(1);
+    expect(buildInbox(facts([s]), CONFIG).pending).toBe(0);
+    // review#1 F6: two copies of one story with the same last receipt are two items
+    const twice = [...superseded, { ...superseded[0]!, name: "gh-9-01JGGGGGGGGGGGGGGGGGGGGGGG", dir: "/m/superseded/gh-9-01JGGGGGGGGGGGGGGGGGGGGGGG" }];
+    expect(buildInbox({ ...facts([s]), superseded: twice }, CONFIG).groups.check.map((i) => i.id)).toEqual(["superseded:gh-9:01JFFFFFFFFFFFFFFFFFFFFFFF", "superseded:gh-9:01JGGGGGGGGGGGGGGGGGGGGGGG"]);
   });
 });
 

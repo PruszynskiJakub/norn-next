@@ -17,14 +17,16 @@ import {
   receiptFileName,
   type StepInput,
   type UnitState,
+  unitHandoffPath,
   type Workflow,
-  recordHandoffPath,
 } from "@norn/schema";
 import type { NumberedReceipt, UnitRef } from "./facts.ts";
 import { effectiveMode } from "./policy.ts";
 import { epoch, iso } from "./time.ts";
 import { edgeOf, reportableOutcomes, stepOf } from "./workflow.ts";
 import { cmd } from "./commands.ts";
+import { handoffCounters, handoffLastOutcome } from "./handoff.ts";
+import { branchRewrittenLine, recordLostLine } from "./apply.ts";
 
 export interface BriefInput {
   unit: UnitRef;
@@ -52,6 +54,12 @@ export interface BriefInput {
   rulings?: readonly Ruling[];
   /** QV1: the unit's frontmatter `criteria` (slice file, or spec.md for the story unit), when the caller read them */
   criteria?: readonly Criterion[] | null;
+  /**
+   * gh-195 D5 (B28): for the `record` input, each unit of the story's record: its folder name in the
+   * record (`_story`, `<nn>-<slug>`) and its run-state folder in the machine dir (absolute; the story's
+   * current round for `_story`), when the caller listed them
+   */
+  record?: ReadonlyArray<{ unit: string; dir: string }>;
 }
 
 /**
@@ -82,7 +90,7 @@ export function storyRulings(units: ReadonlyArray<{ unit: string; receipts: read
       const comment = r.comment?.trim();
       if (!comment) continue;
       seen.add(r.receipt_id);
-      out.push({ unit: u.unit, step: r.step, attempt: r.attempt, decision: r.kind, by: r.who ?? null, at: r.at, comment, receipt_id: r.receipt_id, head_sha: r.head_sha ?? null });
+      out.push({ unit: u.unit, step: r.step, attempt: r.attempt ?? 1, decision: r.kind, by: r.who ?? null, at: r.at, comment, receipt_id: r.receipt_id, head_sha: r.head_sha ?? null });
     }
   return out.sort((a, b) => epoch(a.at) - epoch(b.at) || a.receipt_id.localeCompare(b.receipt_id));
 }
@@ -117,13 +125,18 @@ export interface BriefCheck {
 }
 
 export interface BriefJson {
-  where: { story: string; slice: string | null; step: string; attempt: number; mode: Mode; mode_note: string | null; attended: boolean; run_id: string | null };
+  /** gh-195 D9 (B7): `counters` and `last_outcome` are the status the handoff's generated header used to carry */
+  where: { story: string; slice: string | null; step: string; attempt: number; counters: string; last_outcome: string; mode: Mode; mode_note: string | null; attended: boolean; run_id: string | null };
   /** why this run is not a first entry of the step; null when it is, or when Rework already says why */
   history: {
     /** B2/C1: a session of this attempt ended without reporting; this is a fresh one */
     retry: { outcome: string; detail: string | null; at: string } | null;
     /** C2: an earlier attempt of this step reported on older code, and the outcomes recorded since */
     earlier: { attempt: number; outcome: string; since: string[] } | null;
+    /** T5a (gh-195 B24): a takeover restarted the step because the story branch was rewritten since the record */
+    rewritten?: { gone: string; head: string; line: string } | null;
+    /** gh-195 B25 (D10): a takeover found no record and started this round from the branch */
+    record_lost?: { holder: string | null; line: string } | null;
   } | null;
   work: { skill: string; instructions: string | null; description: string | null };
   inputs: Array<{ kind: string; label: string; ref: string }>;
@@ -219,6 +232,8 @@ function where(input: BriefInput, step: AgentStep): BriefJson["where"] {
     slice: st.slice,
     step: st.step,
     attempt: st.attempt,
+    counters: handoffCounters(st, input.workflow),
+    last_outcome: handoffLastOutcome(st),
     mode,
     mode_note: downgraded ? "auto requested, no runner; running manual" : null,
     attended: !!step.attended,
@@ -241,12 +256,18 @@ function inputs(input: BriefInput, step: AgentStep, rw: BriefJson["rework"]): Br
         return input.diff_range ? [{ kind: i, label: "Diff", ref: `git diff ${input.diff_range}` }] : [];
       case "handoff":
         // its text is already under Context: name the file to update, not one to read again
-        return [{ kind: i, label: "Handoff (text under Context; update it here)", ref: recordHandoffPath(p.unit_dir) }];
+        return [{ kind: i, label: "Handoff (text under Context; update it here)", ref: `${p.spec_dir}/${unitHandoffPath(input.unit.dir)}` }];
       // B6: point at Rework only when it holds something for this input
       case "last_check":
         return [{ kind: i, label: "Last failing check", ref: rw?.check ? "see Rework" : "none" }];
       case "last_findings":
         return [{ kind: i, label: "Last findings", ref: rw && (rw.findings || rw.report || rw.decision) ? "see Rework" : "none" }];
+      // gh-195 D5 (B28): run state is in the machine dir, not the worktree; evidence is linked by its record path
+      case "record":
+        return (input.record ?? []).flatMap((u) => [
+          { kind: i, label: `Receipts of ${u.unit} (QA criteria reports)`, ref: `${u.dir}/receipts/` },
+          { kind: i, label: `Evidence of ${u.unit}; link a file as evidence/${u.unit}/<run_id>/<file>`, ref: `${u.dir}/evidence/` },
+        ]);
     }
   });
 }
@@ -333,7 +354,19 @@ function history(input: BriefInput, rw: BriefJson["rework"]): BriefJson["history
   const idx = rw ? -1 : receipts.findLastIndex(({ receipt: r }) => r.kind === "done" && r.step === st.step && r.attempt !== st.attempt);
   const prev = receipts[idx]?.receipt;
   const earlier = prev?.kind === "done" ? { attempt: prev.attempt, outcome: prev.outcome, since: movesAfter(receipts, idx) } : null;
-  return retry || earlier ? { retry, earlier } : null;
+  // T5a (gh-195 B24): this attempt is the one a takeover started because the branch was rewritten —
+  // the last such take, with every receipt after it written at this cursor (review F3: the step it
+  // restarted may be another than the one it was written at)
+  const at = receipts.findLastIndex(({ receipt: r }) => r.kind === "take" && !!r.rewritten);
+  const take = at >= 0 && receipts.slice(at + 1).every(({ receipt: r }) => r.step === st.step && r.attempt === st.attempt) ? receipts[at]?.receipt : undefined;
+  const rewritten = take?.kind === "take" && take.rewritten ? { gone: take.rewritten.gone, head: take.rewritten.head, line: branchRewrittenLine(st.story, take.rewritten.gone, st.step, st.attempt) } : null;
+  // gh-195 B25: this attempt is the first of a round a takeover started from the branch with the record
+  // lost — the take written at this cursor, every receipt after it too
+  const lostAt = receipts.findLastIndex(({ receipt: r }) => r.kind === "take" && r.record_lost === true);
+  const lostTake = lostAt >= 0 && receipts.slice(lostAt).every(({ receipt: r }) => r.step === st.step && r.attempt === st.attempt) ? receipts[lostAt]?.receipt : undefined;
+  const record_lost = lostTake?.kind === "take" ? { holder: lostTake.previous_holder, line: recordLostLine(st.story, lostTake.previous_holder, st.step) } : null;
+  if (!retry && !earlier && !rewritten && !record_lost) return null;
+  return { retry, earlier, ...(rewritten ? { rewritten } : {}), ...(record_lost ? { record_lost } : {}) };
 }
 
 /**
@@ -550,6 +583,8 @@ function markdown(b: BriefJson): string {
   out.push(`- Story: ${w.story}`);
   if (w.slice) out.push(`- Slice: ${w.slice}`);
   out.push(`- Step: ${w.step} (attempt ${w.attempt})`);
+  out.push(`- Counters: ${w.counters}`);
+  out.push(`- Last outcome: ${w.last_outcome}`);
   out.push(`- Mode: ${w.mode}${w.mode_note ? ` (${w.mode_note})` : ""}${w.attended ? " · attended: work with the person in this session" : ""}`);
   if (w.run_id) out.push(`- Run: ${w.run_id}`);
   out.push("");
@@ -557,6 +592,16 @@ function markdown(b: BriefJson): string {
   const h = b.history;
   if (h) {
     out.push("## Why this attempt", "");
+    if (h.rewritten)
+      out.push(
+        `${h.rewritten.line[0]?.toUpperCase()}${h.rewritten.line.slice(1)}. The record judged code that is no longer on the branch: do this step again in full on the current HEAD (\`${h.rewritten.head.slice(0, 12)}\`).`,
+        "",
+      );
+    if (h.record_lost)
+      out.push(
+        `${h.record_lost.line[0]?.toUpperCase()}${h.record_lost.line.slice(1)}. This round's record starts here: nothing earlier attempts did is recorded, but their work may be on the branch. Before you start, check the branch for what is already done (\`git log\`, the handoff's Progress, the diff against the base) and build on it.`,
+        "",
+      );
     if (h.retry)
       out.push(
         `A previous session of this attempt ended without reporting (\`${h.retry.outcome}\`${h.retry.detail ? `: ${h.retry.detail}` : ""}). This is a fresh session: nothing it did counts as reported. Look at \`git status\`, \`git log\` and the handoff's Progress for partial work, then finish the step.`,

@@ -1,20 +1,15 @@
 /**
  * Shared plumbing of the human verbs (§15, O2): unit addressing (ID1), reading a unit's cursor
- * locally or from the pushed branch, receipt building, and delivery — locally under the claim
+ * locally or from the story's record ref (gh-195 D6), receipt building, and delivery — locally under the claim
  * (T8: acquired for this heartbeat when free) or through the mailbox when another heartbeat
  * holds it (T9). Views read through @norn/view only (X1).
  */
 import { isAbsolute, relative } from "node:path";
-import { cmd, type ClaimState, type StoryFacts, storyUnit, type UnitFacts } from "@norn/core";
+import { cmd, type ClaimState, stepLabel, type StoryFacts, storyUnit, type UnitFacts } from "@norn/core";
 import { loadProjectView, type ProjectView } from "@norn/view";
 import {
   type ClaimBlob,
-  parseSpecDirName,
   type Receipt,
-  SPECS_DIR,
-  parseRoundDirName,
-  ROUNDS_DIR,
-  STORY_UNIT_DIR,
   ulid,
   type UnitState,
   validate,
@@ -25,20 +20,19 @@ import {
   appendReceipt,
   type RemoteClaimRead,
   classifyClaim,
+  fetchElsewhere,
   fetchNornRefs,
+  lastBoundary,
+  type LastBoundary,
+  remoteStoryBranch,
+  readStoryRecord,
   heartbeatId,
   listMailbox,
   newClaimBlob,
-  parseWorkflowText,
   postMailbox,
   readClaim,
   recordedHeartbeatId,
   machineHolder,
-  pinnedWorkflowPath,
-  specRunsDir,
-  statePath,
-  roundDir,
-  unitDir,
 } from "@norn/store";
 import type { Context } from "../context.ts";
 import { opt, type ParsedArgs } from "../command.ts";
@@ -82,11 +76,28 @@ export interface Target {
   workflow: Workflow | null;
   /** absolute runs/<unit>/ in this checkout; null when read from the remote branch only */
   runsDir: string | null;
+  /** the unit's handoff in this checkout, from its own resolver (gh-195 prefactor 2); null with `runsDir` */
+  handoffFile: string | null;
   /** where the cursor was read from */
   source: "local" | "remote";
+  /**
+   * gh-195 B20: a `local` story another machine holds — the only cursor known here is the step its last
+   * boundary commit led to (`Norn-Next`); `state` is null. Only a mailbox verb that builds a step-only
+   * receipt (`stepOnly`) acts on it; the holder checks the receipt. Absent = none.
+   */
+  boundary?: LastBoundary & { next: string };
+  /**
+   * gh-195 B20: how the verb builds its step-only receipt (`stepOnlyReceipt`) — given to `resolveTarget`
+   * by a mailbox verb; its presence is what lets a `local` story held elsewhere resolve to its last
+   * boundary. Absent = the verb needs the cursor.
+   */
+  stepOnly?: StepOnlyBuild;
   obs: Observed | null;
   story_facts: StoryFacts | null;
 }
+
+/** gh-195 B20: a mailbox verb's step-only receipt for a unit, from the step its last boundary led to. */
+export type StepOnlyBuild = (t: Target, step: string) => Receipt;
 
 function localTarget(obs: Observed, story: StoryFacts, uf: UnitFacts): Target {
   return {
@@ -96,6 +107,7 @@ function localTarget(obs: Observed, story: StoryFacts, uf: UnitFacts): Target {
     state: uf.state,
     workflow: uf.workflow,
     runsDir: obs.units[uf.unit.key]?.runsDir ?? null,
+    handoffFile: obs.units[uf.unit.key]?.handoffFile ?? null,
     source: "local",
     obs,
     story_facts: story,
@@ -103,52 +115,30 @@ function localTarget(obs: Observed, story: StoryFacts, uf: UnitFacts): Target {
 }
 
 /**
- * The unit's cursor from the pushed branches (T7: the holder pushes at step boundaries):
- * a slice reads its slice branch first, then the story branch; the story unit its story branch.
+ * The unit's cursor as a non-holder knows it (gh-195 D6, B20): the one record ref and story branch this
+ * verb needs are fetched (a failed fetch refuses). Under `local` the story unit's cursor is the step its
+ * last boundary commit led to (`Norn-Next`), with no attempt — only for a verb that can send a step-only
+ * receipt (`stepOnly`). Otherwise (`remote`, a slice, no such boundary) it is read from the record ref's
+ * git objects (validated, S2); null when the ref holds no such unit. Run state is never on a branch (S12).
  */
-async function remoteTarget(ctx: Context, key: string): Promise<Target | null> {
+async function remoteTarget(ctx: Context, key: string, stepOnly: StepOnlyBuild | undefined): Promise<Target | null> {
   const remote = await gitRemote(ctx.git, ctx.root, ctx.config.git_remote);
   if (!remote) return null;
-  const root = ctx.root;
-  const git = ctx.git;
-  await git.fetch(root, remote, [], { quiet: true }).catch(() => undefined);
   const { story, slice } = parseUnitKey(key);
-  const refs = (await git.listRefs(root, `refs/remotes/${remote}/`).catch(() => [])).map((r) => r.ref);
-  const prefix = `refs/remotes/${remote}/`;
-  const storyRef = refs.find((r) => r.startsWith(prefix) && parseSpecDirName(r.slice(prefix.length))?.story === story);
-  if (!storyRef) return null;
-  const spec = `${SPECS_DIR}/${storyRef.slice(prefix.length)}`;
-  const candidates: Array<{ ref: string; dir: string; record?: string }> = [];
-  if (slice) {
-    const nn = slice.split("/")[1] as string;
-    const sliceRef = refs.find((r) => r.startsWith(`${prefix}${story}/${nn}-`));
-    if (sliceRef) candidates.push({ ref: sliceRef, dir: sliceRef.slice(`${prefix}${story}/`.length) });
-    const listed = (await git.lsTree(root, storyRef, `${specRunsDir(spec)}/`)) ?? [];
-    const dir = listed.find((d) => d.startsWith(`${nn}-`));
-    if (dir) candidates.push({ ref: storyRef, dir });
-  } else {
-    // gh-71 D2 (B30, B36): the story's current round, the highest-numbered rounds/NN-<wf>; a flat record is round 1
-    const rounds = ((await git.lsTree(root, storyRef, `${unitDir(spec, STORY_UNIT_DIR)}/${ROUNDS_DIR}/`)) ?? []).map(parseRoundDirName).filter((r) => r !== null);
-    const round = rounds.sort((a, b) => b.n - a.n)[0];
-    candidates.push({ ref: storyRef, dir: STORY_UNIT_DIR, ...(round ? { record: roundDir(spec, round.n, round.workflow) } : {}) });
+  // a verb never acts on a record it could not refresh (D6: it fetches the one story it needs)
+  await fetchElsewhere(ctx.root, remote, [story]).catch((e: Error) => {
+    throw failure(`cannot fetch the record of ${story}: ${e.message}`, "check the network and retry", "record_unreachable");
+  });
+  const base = { key, story, slice, runsDir: null, handoffFile: null, source: "remote" as const, obs: null, story_facts: null, ...(stepOnly ? { stepOnly } : {}) };
+  if (stepOnly && ctx.config.record.policy === "local") {
+    const branch = slice ? null : await remoteStoryBranch(ctx.root, remote, story);
+    const b = branch ? await lastBoundary(ctx.root, `refs/remotes/${remote}/${branch}`, story, null) : null;
+    if (b?.next) return { ...base, state: null, workflow: null, boundary: { ended: b.ended, next: b.next } };
   }
-  for (const c of candidates) {
-    const record = c.record ?? unitDir(spec, c.dir);
-    const raw = await git.show(root, c.ref, statePath(record));
-    if (raw === null) continue;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      continue;
-    }
-    const st = validate("state", parsed);
-    if (!st.ok) continue;
-    const wfText = await git.show(root, c.ref, pinnedWorkflowPath(record));
-    const wf = wfText === null ? null : parseWorkflowText(wfText, pinnedWorkflowPath(record));
-    return { key, story, slice, state: st.value, workflow: wf?.ok ? wf.value : null, runsDir: null, source: "remote", obs: null, story_facts: null };
-  }
-  return null;
+  const record = await readStoryRecord(ctx.root, story);
+  const u = record?.units.find((x) => x.key === key);
+  if (!u) return null;
+  return { ...base, state: u.state, workflow: u.workflow };
 }
 
 /** Observe this checkout without touching the network. */
@@ -159,9 +149,15 @@ function observeLocal(ctx: Context): Promise<Observed> {
 /**
  * Resolve the unit a verb acts on. A story key may stand for one of its slices when `pick`
  * matches the story unit's state nowhere but exactly one slice (e.g. `answer gh-7` while only
- * slice 02 asks). Falls back to the pushed branch when the story is not in this checkout.
+ * slice 02 asks). Falls back to the story's record ref when the story is not in this checkout, or — for a
+ * mailbox verb that can send a step-only receipt (`o.stepOnly`, gh-195 B20) — to its last boundary.
  */
-export async function resolveTarget(ctx: Context, raw: string, pick?: (st: UnitState) => boolean): Promise<Target> {
+export async function resolveTarget(ctx: Context, raw: string, pick?: (st: UnitState) => boolean, o: { stepOnly?: StepOnlyBuild } = {}): Promise<Target> {
+  const t = await findTarget(ctx, raw, pick, o.stepOnly);
+  return o.stepOnly ? { ...t, stepOnly: o.stepOnly } : t;
+}
+
+async function findTarget(ctx: Context, raw: string, pick: ((st: UnitState) => boolean) | undefined, stepOnly: StepOnlyBuild | undefined): Promise<Target> {
   const { key, story, slice } = parseUnitKey(raw);
   const obs = await observeLocal(ctx);
   const sf = obs.facts.stories.find((s) => s.key === story);
@@ -178,7 +174,7 @@ export async function resolveTarget(ctx: Context, raw: string, pick?: (st: UnitS
     }
     if (su) return localTarget(obs, sf, su);
   }
-  const remote = await remoteTarget(ctx, key);
+  const remote = await remoteTarget(ctx, key, stepOnly);
   if (remote) return remote;
   throw refuse(`unknown unit ${key}: not in this checkout or on the remote`, cmd.status(), "unknown_unit");
 }
@@ -227,7 +223,7 @@ type HumanKind = "answer" | "approve" | "reject" | "unstick" | "stuck" | "mode" 
 
 /** A human receipt at the unit's cursor (S6): step + attempt + slice (+ the story's round) so the tick routes it (T9). */
 export function humanReceipt<K extends HumanKind>(ctx: Context, t: Pick<Target, "slice">, st: UnitState, kind: K, body: Record<string, unknown>): Extract<Receipt, { kind: K }> {
-  const r = {
+  return validReceipt(kind, {
     kind,
     receipt_id: ulid(ctx.clock.now()),
     run_id: st.run?.run_id ?? null,
@@ -240,7 +236,22 @@ export function humanReceipt<K extends HumanKind>(ctx: Context, t: Pick<Target, 
     // gh-71 AC12 (T9): the story's round, so a mailbox receipt is not applied to a later round at the same cursor
     ...(t.slice === null ? { round: st.round ?? 1 } : {}),
     ...body,
-  };
+  });
+}
+
+/** gh-195 B20 (T9): the receipts a mailbox carries that may be stamped with a step only. */
+export type StepOnlyKind = "answer" | "approve" | "reject" | "unstick";
+
+/**
+ * gh-195 B20 (D17): a mailbox receipt a `local` non-holder makes from the step the story's last boundary
+ * led to: that step, and no attempt, run or round — the holder matches it by step alone (T9).
+ */
+export function stepOnlyReceipt<K extends StepOnlyKind>(ctx: Context, t: Pick<Target, "slice">, step: string, kind: K, body: Record<string, unknown>): Extract<Receipt, { kind: K }> {
+  return validReceipt(kind, { kind, receipt_id: ulid(ctx.clock.now()), run_id: null, step, at: ctx.clock.iso(), by: "human", who: machineHolder(ctx.env), slice: t.slice, ...body });
+}
+
+/** Validate a person's receipt (S6): a shape the schema refuses is a usage error. */
+function validReceipt<K extends HumanKind>(kind: K, r: Record<string, unknown>): Extract<Receipt, { kind: K }> {
   const v = validate("receipt", r);
   if (!v.ok) throw usageError(`invalid ${kind}: ${v.errors.map((e) => `${e.path || "/"} ${e.message}`).join("; ")}`, `norn ${kind === "reject" ? "approve" : kind} --help`);
   return v.value as Extract<Receipt, { kind: K }>;
@@ -350,7 +361,7 @@ async function refuseDuplicate(ctx: Context, t: Target, receipt: Receipt, holder
   if (!dup) return;
   const next = holder ? `wait for ${holder.holder}'s next tick to import it (T9)` : cmd.tick();
   throw refuse(
-    `${dup.receipt.kind} already recorded for ${receipt.step}#${receipt.attempt} (${dup.where}) and not applied yet`,
+    `${dup.receipt.kind} already recorded for ${stepLabel(receipt.step, receipt.attempt)} (${dup.where}) and not applied yet`,
     next,
     "already_recorded",
     { receipt_id: dup.receipt.receipt_id },
@@ -428,13 +439,22 @@ export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptio
 export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptions): Promise<HumanVerbResult | null>;
 export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptions): Promise<HumanVerbResult | null> {
   // T9: read the claim first — a non-holder's local copy may be stale, so when another heartbeat
-  // holds the story the cursor comes from the pushed branch before any precondition is checked
+  // holds the story the cursor comes from its record ref before any precondition is checked
   let claim = opts.claim ?? (opts.mailbox ? await claimFor(ctx, t.story) : null);
   let target = t;
-  if (opts.mailbox && t.source === "local" && claim && heldElsewhere(claim)) target = (await remoteTarget(ctx, t.key)) ?? t;
-  opts.check(target, started(target));
-  if (opts.noop?.(target, started(target))) return null;
-  let receipt = opts.build(target, started(target));
+  // gh-195 B20: a step-only receipt goes only through the mailbox
+  const stepOnly = opts.mailbox ? t.stepOnly : undefined;
+  if (opts.mailbox && t.source === "local" && claim && heldElsewhere(claim)) target = (await remoteTarget(ctx, t.key, stepOnly)) ?? t;
+  let receipt: Receipt;
+  if (target.boundary) {
+    // gh-195 B20: only the step is known here; the holder checks the receipt against its cursor (T9)
+    if (!stepOnly) throw refuse(`${t.key}'s run state is on the machine that holds it`, cmd.storyView(t.story), "story_not_local");
+    receipt = stepOnly(target, target.boundary.next);
+  } else {
+    opts.check(target, started(target));
+    if (opts.noop?.(target, started(target))) return null;
+    receipt = opts.build(target, started(target));
+  }
   let held: Route | null = null;
   if (opts.requireHolder) {
     claim ??= await claimFor(ctx, t.story);
@@ -449,9 +469,14 @@ export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptio
     opts.check(target, started(target));
     receipt = opts.build(target, started(target));
   }
-  if (opts.before) receipt = await opts.before(target, started(target), route, receipt);
+  if (opts.before && !target.boundary) receipt = await opts.before(target, started(target), route, receipt);
   const delivered = await deliver(ctx, target, route, receipt);
-  const next = route.via === "local" ? cmd.tick() : `${route.holder.holder}'s next tick imports it (T9)`;
+  const next =
+    route.via === "local"
+      ? cmd.tick()
+      : target.boundary
+        ? `sent to ${route.holder.holder}; the holder checks it against the step it is at (last boundary: ${target.boundary.ended} -> ${target.boundary.next})`
+        : `${route.holder.holder}'s next tick imports it (T9)`;
   return { unit: target.key, receipt, delivered, next };
 }
 

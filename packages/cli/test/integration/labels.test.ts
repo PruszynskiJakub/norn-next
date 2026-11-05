@@ -6,9 +6,10 @@
 import { describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { storyUnitDir, workflowsDir } from "@norn/store";
+import { workflowsDir } from "@norn/store";
 import { createHarness, type Harness, issue, runChecked, sh } from "../../../../test/support/harness.ts";
 import type { LabelsReport } from "../../src/runtime/labels.ts";
+import { runStateOf } from "../../../../test/support/run-state.ts";
 
 setDefaultTimeout(60_000);
 
@@ -237,7 +238,7 @@ describe("a tick never creates a label (GR10)", () => {
     try {
       sh(h.root, ["push", "-q", "origin", "main"]);
       h.remote.issues = [issue(7, "Seven")];
-      const runs = () => storyUnitDir(join(`${h.root}-worktrees/gh-7-seven`, ".agents/specs/gh-7-seven"));
+      const runs = () => runStateOf(join(`${h.root}-worktrees/gh-7-seven`, ".agents/specs/gh-7-seven"));
       for (let i = 0; i < 6 && !h.state(runs()); i++) await h.tick();
       expect(h.state(runs())).toMatchObject({ workflow: "triage" });
       h.remote.labels = h.remote.labels.filter((l) => l.name !== "norn:wf:reproduce");

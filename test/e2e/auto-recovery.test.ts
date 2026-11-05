@@ -13,10 +13,11 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Inbox, NUDGE_TEXT } from "@norn/core";
 import { type TickStartTrace, type UnitState, ulid } from "@norn/schema";
-import { appendHookTrace, appendTrace, heartbeatFilePath, readTrace, repoConfigPath, workflowsDir, writeState, storyUnitDir } from "@norn/store";
+import { appendHookTrace, appendTrace, heartbeatFilePath, readTrace, repoConfigPath, workflowsDir, writeState } from "@norn/store";
 import type { ProjectView } from "@norn/view";
 import type { TickReport } from "../../packages/cli/src/index.ts";
 import { createHarness, type Harness, issue } from "../support/harness.ts";
+import { runStateOf } from "../support/run-state.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -52,7 +53,7 @@ async function boot(h: Harness): Promise<void> {
 }
 
 const wt = (h: Harness) => `${h.root}-worktrees/gh-9-fix-the-bug`;
-const runs = (h: Harness) => storyUnitDir(join(wt(h), SPEC));
+const runs = (h: Harness) => runStateOf(join(wt(h), SPEC));
 
 /** Tick until the story unit's agent runs (intake → claim → start → launch). */
 async function untilRunning(h: Harness): Promise<UnitState> {
@@ -135,11 +136,6 @@ describe("R5: a launch norn did not see finish (acceptance 6)", () => {
   });
   afterAll(() => h.cleanup());
 
-  const commitRuns = () => {
-    h.git(["add", "-A"], wt(h));
-    h.git(["commit", "-q", "-m", "test: rewrite runs/"], wt(h));
-  };
-
   /** Undo the launch's state write and its session receipt: the crash between `started` and state. */
   function crashAfterStarted(before: UnitState): string {
     const dir = join(runs(h), "receipts");
@@ -150,7 +146,6 @@ describe("R5: a launch norn did not see finish (acceptance 6)", () => {
     expect(decided.session).toBeUndefined();
     Bun.spawnSync(["rm", join(dir, sessionReceipt)]);
     writeState(runs(h), before);
-    commitRuns();
     return decided.run_id;
   }
 
@@ -182,7 +177,6 @@ describe("R5: a launch norn did not see finish (acceptance 6)", () => {
     const st = h.state(runs(h)) as UnitState;
     const ready: UnitState = { ...st, step: "implement", status: "ready", run: null, attempt: 2, visits: { implement: 2 }, retries_used: 0, nudges_used: 0 };
     writeState(runs(h), ready);
-    commitRuns();
     h.clock.advance(10_000);
     expect(acted(await h.tick())).toEqual(["gh-9 agent.start"]);
     const runId = crashAfterStarted(ready);
@@ -203,7 +197,6 @@ describe("R5: a launch norn did not see finish (acceptance 6)", () => {
     const active = st.run?.run_id as string;
     // the person's answer left the step ready without a session (B2 fresh path) — but the run lives on
     writeState(runs(h), { ...st, status: "ready", run: null });
-    commitRuns();
     h.clock.advance(10_000);
     hook(h, active, "tool_use");
     h.clock.advance(1000);
@@ -290,9 +283,7 @@ describe("R7: a run from another machine (acceptance 10)", () => {
     expect(st.run).toMatchObject({ machine: "tester@box", heartbeat_id: expect.any(String) });
     // the run was launched by ann's heartbeat on her machine; this checkout holds the story now
     const foreign: UnitState = { ...st, run: { ...(st.run as NonNullable<UnitState["run"]>), machine: "ann@pc", heartbeat_id: "01JFFFFFFFFFFFFFFFFFFFFFFF", process: { pid: 999_999_99, pid_start: "gone" } } };
-    writeState(runs(h), foreign);
-    h.git(["add", "-A"], wt(h));
-    h.git(["commit", "-q", "-m", "foreign run"], wt(h));
+    writeState(runs(h), foreign); // S12: in the machine dir, nothing to commit
     h.runner.pane = { alive: false, state: "unknown", since: null };
     h.clock.advance(10_000);
     expect(rules(await h.tick())).toEqual(["gh-9 agent.running.foreign"]);

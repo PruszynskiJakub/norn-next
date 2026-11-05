@@ -5,8 +5,17 @@
  * worktree) it does that; otherwise, or with `--print`, it prints the start command. The agent's
  * `norn brief` starts the run, as when a person types the command (MO3); start records nothing itself.
  * Without a target a person picks from the units a person can start (B57).
+ * gh-195/05 (B3): a story worktree this checkout removed while it holds the story's claim is made again
+ * first (as `norn story checkout` makes it): its run state is in the machine dir (S12), so the unit goes
+ * on at the same step and attempt.
  */
+import { existsSync, readdirSync } from "node:fs";
 import { cmd, effectiveMode, startCommandFor, stepOf } from "@norn/core";
+import { parseSpecDirName } from "@norn/schema";
+import { heartbeatId, readLocalClaim } from "@norn/store";
+import type { Context } from "../context.ts";
+import { checkoutStory } from "../runtime/checkout.ts";
+import { waitForTickLock } from "../runtime/tick-lock.ts";
 import { defineCommand, opt } from "../command.ts";
 import { refuse } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
@@ -24,6 +33,16 @@ const startable: TargetRule = {
   },
 };
 
+/** B3: whether this heartbeat holds `story`'s claim and no story worktree of it is on disk. */
+async function worktreeGone(ctx: Context, story: string): Promise<boolean> {
+  // a claim norn cannot read is said, never taken for "no claim" (review F8)
+  const claim = await readLocalClaim(ctx.root, story);
+  if (claim.state !== "present" || claim.blob.heartbeat_id !== heartbeatId(ctx.root, ctx.clock.now())) return false;
+  const parent = `${ctx.root}-worktrees`;
+  const names = existsSync(parent) ? readdirSync(parent) : [];
+  return !names.some((n) => parseSpecDirName(n)?.story === story);
+}
+
 export const storyStartCommand = defineCommand({
   name: "story start",
   version: "acts",
@@ -34,6 +53,16 @@ export const storyStartCommand = defineCommand({
   positionals: { max: 1 },
   async run(ctx, args) {
     const raw = await targetKey(ctx, args.positionals[0], args.json === true, startable);
+    const story = parseUnitKey(raw).story;
+    if (await worktreeGone(ctx, story)) {
+      const lock = await waitForTickLock(ctx, "norn story start", `retry: ${cmd.storyStart(raw)}`);
+      try {
+        // the tick that held the lock may have remade it meanwhile
+        if (await worktreeGone(ctx, story)) await checkoutStory(ctx, story, false);
+      } finally {
+        lock.release();
+      }
+    }
     const t = await resolveTarget(ctx, parseUnitKey(raw).key);
     const sf = t.story_facts;
     const uf = sf?.units.find((u) => u.unit.key === t.key);

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Receipt, UnitState, Workflow } from "@norn/schema";
-import { type ApplyContext, applyReceipts, initialState } from "../../src/apply.ts";
+import { type ApplyContext, applyReceipts, initialState, restartStepOf } from "../../src/apply.ts";
 import { at, numbered, receipt, SLICE_WF, sliceUnit, SOLO_WF, STORY_WF, stateFor, storyUnit } from "../fixtures.ts";
 
 const ctx = (workflow: Workflow = SLICE_WF): ApplyContext => ({ workflow, now: at() });
@@ -196,5 +196,32 @@ describe("take receipts (R10.1)", () => {
     expect(r.state).toMatchObject({ status: "stuck", step: "implement", applied_through: 1 });
     expect(r.log).toEqual(["taken by bob@mac from ann@pc (expired)"]);
     expect(r.route).toBeNull();
+  });
+});
+
+describe("restartStepOf: the step a takeover with the record lost restarts (T5b, gh-195 B25)", () => {
+  const wf: Workflow = {
+    name: "rv",
+    start: "implement",
+    steps: {
+      implement: { type: "agent", skill: "norn-implement", outcomes: { done: { to: "review", means: "built" } } },
+      review: { type: "agent", skill: "norn-review", outcomes: { approve: { to: "$done", means: "good" }, rework: { to: "implement", means: "fix" } } },
+    },
+  } as Workflow;
+
+  test("the step the last boundary moved the cursor to (Norn-Next)", () => {
+    expect(restartStepOf(wf, { ended: "implement", next: "review" })).toBe("review");
+    expect(restartStepOf(wf, { ended: "review", next: "implement" })).toBe("implement");
+  });
+  test("a boundary an older norn made (no Norn-Next): the step it ended", () => {
+    expect(restartStepOf(wf, { ended: "review", next: null })).toBe("review");
+  });
+  test("a step the workflow does not have: the next candidate, then the first step", () => {
+    expect(restartStepOf(wf, { ended: "review", next: "qa" })).toBe("review");
+    expect(restartStepOf(wf, { ended: "plan", next: "qa" })).toBe("implement");
+    expect(restartStepOf(wf, { ended: "plan", next: null })).toBe("implement");
+  });
+  test("no boundary: the workflow's first step", () => {
+    expect(restartStepOf({ ...wf, start: "review" }, null)).toBe("review");
   });
 });

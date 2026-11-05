@@ -19,6 +19,7 @@ import {
   type TickTrace,
   type TraceEvent,
   assertValid,
+  RUNS_DIR,
   STORY_UNIT_DIR,
   ulid,
   ulidTime,
@@ -26,6 +27,7 @@ import {
 } from "@norn/schema";
 import { appendDurable, atomicWrite, isErrno, readText, safeUnlink } from "./fsx.ts";
 import { hookFilePath, machineDir } from "./paths.ts";
+import { oldRunnerLogDir } from "./run-state.ts";
 
 function eventTime(ev: TraceEvent): string {
   return ev.type === "hook" ? ev.fact.at : ev.at;
@@ -479,17 +481,20 @@ export function listHookFiles(root: string): HookFileEntry[] {
   return out;
 }
 
-/** One run's side files (B4, C4): its `briefings/<run>/` and `transcripts/<run>/`, their size and newest write. */
+/**
+ * One run's side files (B4, C4): its `briefings/<run>/` and `transcripts/<run>/`, and the session log an
+ * older norn's headless runner wrote at `runs/<run>.log` (gh-195 D1), their size and newest write.
+ */
 export interface RunTraceEntry {
   run_id: string;
-  /** trace-relative dirs, sorted */
+  /** trace-relative dirs (and an old session log file), sorted */
   files: string[];
   bytes: number;
   /** the newest file's mtime (the dir's own when it is empty) */
   newestMs: number;
 }
 
-/** D12: the runs that have briefings or transcripts, sorted by run id. */
+/** D12: the runs that have briefings, transcripts or an old session log, sorted by run id. */
 export function listRunTraces(root: string): RunTraceEntry[] {
   const runs = new Map<string, RunTraceEntry>();
   for (const kind of ["briefings", "transcripts"]) {
@@ -510,8 +515,22 @@ export function listRunTraces(root: string): RunTraceEntry[] {
       runs.set(run, e);
     }
   }
+  // gh-195 D1: session logs moved to `sessions/`; the ones an older norn left in `runs/` are pruned with their run
+  for (const name of listDir(oldRunnerLogDir(root))) {
+    const run = OLD_SESSION_LOG.exec(name)?.[1];
+    const st = run ? statOrNull(join(oldRunnerLogDir(root), name)) : null;
+    if (!run || !st?.isFile()) continue;
+    const e = runs.get(run) ?? { run_id: run, files: [], bytes: 0, newestMs: Number.NEGATIVE_INFINITY };
+    e.files.push(`${RUNS_DIR}/${name}`);
+    e.files.sort();
+    e.bytes += st.size;
+    e.newestMs = Math.max(e.newestMs, st.mtimeMs);
+    runs.set(run, e);
+  }
   return [...runs.values()].sort((a, b) => (a.run_id < b.run_id ? -1 : 1));
 }
+
+const OLD_SESSION_LOG = /^(.+)\.log$/;
 
 /** D12: delete these trace-relative files and dirs, then a story's `hooks/<story>/` left empty. */
 export function deleteTracePaths(root: string, rels: readonly string[]): void {

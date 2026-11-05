@@ -6,12 +6,13 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { TickTrace } from "@norn/schema";
-import { loadWorkflows, readTickInputs, readTrace, repoConfigPath, workflowsDir, storyUnitDir, handoffPath } from "@norn/store";
+import { STORY_UNIT_DIR, type TickTrace, unitHandoffPath } from "@norn/schema";
+import { loadWorkflows, readTickInputs, readTrace, repoConfigPath, workflowsDir, handoffPath } from "@norn/store";
 import type { TickReport } from "../../packages/cli/src/index.ts";
 import { decide } from "@norn/core";
 import { createHarness, type Harness, issue } from "../support/harness.ts";
 import { expectTranscript, recordTranscript, type Transcript } from "../support/transcript.ts";
+import { runStateOf } from "../support/run-state.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -74,10 +75,10 @@ beforeAll(async () => {
 afterAll(() => h.cleanup());
 
 describe("norn init", () => {
-  test("writes config, workflows, skills, hooks, .gitignore and .gitattributes; idempotent", async () => {
+  test("writes config, workflows, skills, hooks and .gitignore, no .gitattributes (gh-195 B37); idempotent", async () => {
     const r = await h.norn("init");
     expect(r.exit).toBe(0);
-    const v = r.value as { config: string; workflows: { created: string[] }; skills: { updated: string[]; unchanged: string[]; links: Array<{ agent: string; linked: string[] }> }; hooks: Array<{ changed: string[] }>; gitignore: string[]; gitattributes: string[] };
+    const v = r.value as { config: string; workflows: { created: string[] }; skills: { updated: string[]; unchanged: string[]; links: Array<{ agent: string; linked: string[] }> }; hooks: Array<{ changed: string[] }>; gitignore: string[] };
     expect(v.config).toBe("created");
     expect(v.workflows.created).toEqual(["quick.yaml", "refinement.yaml", "reproduce.yaml", "slice.yaml", "story.yaml", "triage.yaml"]);
     expect(v.skills.updated).toContain("norn");
@@ -91,12 +92,14 @@ describe("norn init", () => {
     expect(readFileSync(join(h.home, "config.yaml"), "utf8")).toStartWith("# yaml-language-server: $schema=config.schema.json\n");
     expect(readFileSync(join(h.root, ".agents/norn.config.yaml"), "utf8")).toStartWith("# yaml-language-server: $schema=norn.config.schema.json\n");
     const teamSchema = JSON.parse(readFileSync(join(h.root, ".agents/norn.config.schema.json"), "utf8")) as { properties: Record<string, unknown> };
-    expect(Object.keys(teamSchema.properties).sort()).toEqual(["$schema", "base_branch", "norn_version", "provider", "slice_workflow", "workflow"]);
-    expect(v.gitattributes).toEqual([".agents/specs/*/runs/** linguist-generated=true gitlab-generated=true"]);
+    expect(Object.keys(teamSchema.properties).sort()).toEqual(["$schema", "base_branch", "norn_version", "provider", "record", "slice_workflow", "workflow"]);
+    // gh-195 B37 (S10 retired): no runs/** line, and no .gitattributes created for norn alone
+    expect(existsSync(join(h.root, ".gitattributes"))).toBe(false);
+    expect(r.value).not.toHaveProperty("gitattributes");
     // nothing in the repo names a test command: the templates keep theirs, and init says so
     expect(r.value).toMatchObject({ remote: { provider: "gh", label: "norn", git_remote: "origin", url: h.remoteDir }, test_command: { command: "bun test", detected_from: null, set_in: ["quick.yaml", "slice.yaml", "story.yaml"] } });
     expect(r.stdout).toContain("Next steps\n  1. Set your test command:");
-    expect(r.stdout).toContain('`git add .agents .claude .gitignore .gitattributes && git commit -m "Set up norn" && git push`');
+    expect(r.stdout).toContain('`git add .agents .claude .gitignore && git commit -m "Set up norn" && git push`');
     expect(r.stdout).toContain("`gh issue create --label norn --assignee @me --title \"…\"`");
     // SK1: one copy in .agents/skills (whole folders), linked from the agent's skill folder
     expect(existsSync(join(h.root, ".agents/skills/norn-review/SMELLS.md"))).toBe(true);
@@ -110,7 +113,7 @@ describe("norn init", () => {
     expect(readFileSync(join(h.home, "config.yaml"), "utf8")).toBe("mode: auto\n");
     writeFileSync(join(h.home, "config.yaml"), "");
     expect(again.gitignore).toEqual([]);
-    expect(again.gitattributes).toEqual([]);
+    expect(existsSync(join(h.root, ".gitattributes"))).toBe(false);
     expect(again.hooks[0]?.changed).toEqual([]);
     expect(again.skills.updated).toEqual([]);
   });
@@ -242,8 +245,8 @@ describe("a story through the slice workflow", () => {
   const storyWt = () => `${h.root}-worktrees/gh-7-add-login-form`;
   const sliceWt = () => `${storyWt()}--01-form`;
   const spec = ".agents/specs/gh-7-add-login-form";
-  const storyRuns = () => storyUnitDir(join(storyWt(), spec));
-  const sliceRuns = () => join(sliceWt(), spec, "runs/01-form");
+  const storyRuns = () => runStateOf(join(storyWt(), spec));
+  const sliceRuns = () => runStateOf(join(sliceWt(), spec), "01-form");
   const step = (ms = 10_000) => h.clock.advance(ms);
   let transcript: Transcript;
   beforeAll(() => {
@@ -286,7 +289,8 @@ describe("a story through the slice workflow", () => {
     const st = h.state(storyRuns());
     expect(st).toMatchObject({ step: "plan", status: "ready", mode: "auto", workflow: "mini" });
     expect(h.read(join(storyRuns(), "workflow.yaml"))).toBe(MINI);
-    expect(h.read(handoffPath(storyRuns()))).toContain("Step: plan (attempt 1)");
+    // gh-195/07 (B6): the story's handoff starts as the skeleton, prose only; its status is in the brief
+    expect(h.read(handoffPath(join(storyWt(), spec), STORY_UNIT_DIR))).toBe("## Goal\n\n## Progress\n\n## Resume\n");
     expect(h.read(join(storyWt(), spec, "spec.md"))).toContain("status: active");
     expect(h.git(["ls-remote", "origin", "refs/heads/gh-7-add-login-form"])).not.toBe("");
   });
@@ -303,8 +307,10 @@ describe("a story through the slice workflow", () => {
     expect(st?.run?.session).toEqual({ runner: "fake", session_id: "s-1", pane_id: "p-1", reach: "fake attach p-1" });
     expect(readdirSync(join(storyRuns(), "receipts")).sort()).toEqual(["0001-started.json", "0002-started.json"]);
     expect(readdirSync(join(h.home, "leases")).sort()).toEqual(["agent-1.json", "slot-1.json"]);
-    // R2.1 (N6): the started receipts were committed and pushed in the launch tick
-    expect(h.git(["show", `origin/gh-7-add-login-form:${spec}/runs/_story/rounds/01-mini/receipts/0002-started.json`])).toContain('"session"');
+    // R2.1 (N6): the started receipt records the session; S12 (gh-195/05, B1): it stays in the machine dir, never on the branch
+    expect(h.read(join(storyRuns(), "receipts/0002-started.json"))).toContain('"session"');
+    expect(h.git(["ls-tree", "-r", "--name-only", "origin/gh-7-add-login-form", "--", `${spec}/runs`]).trim()).toBe("");
+    expect(h.git(["ls-tree", "-r", "--name-only", "origin/gh-7-add-login-form", "--", `${spec}/handoffs`]).trim()).toBe(`${spec}/${unitHandoffPath(STORY_UNIT_DIR)}`);
     // a live run with nothing new: no action (no recover.commit)
     step();
     expect(kinds(await h.tick())).toEqual([]);
@@ -352,7 +358,8 @@ describe("a story through the slice workflow", () => {
     step();
     expect(kinds(await h.tick())).toEqual(["gh-7/01 apply_receipts"]);
     expect(h.state(sliceRuns())).toMatchObject({ step: "implement", attempt: 2, counters: { test_loop: 1 } });
-    expect(h.git(["show", "--stat", "--format=", "HEAD"], sliceWt())).toContain(check.log.slice(5));
+    // S12 (gh-195/05, B5): the check log stays in the machine dir; the boundary commit carries the handoff only
+    expect(h.git(["show", "--stat", "--format=", "HEAD"], sliceWt())).not.toContain(check.log.slice(5));
   });
 
   test("rework passes the check; gate parks and notifies once (O3); approve → integrate (K6)", async () => {
@@ -381,6 +388,11 @@ describe("a story through the slice workflow", () => {
     expect(kinds(await h.tick())).toEqual(["gh-7/01 run_git"]);
     expect(h.git(["log", "--format=%s", "gh-7-add-login-form"])).toContain("norn: gh-7/01 implement.done → test");
     expect(existsSync(join(storyWt(), "pass.flag"))).toBe(true);
+    // gh-195/07 (B1, B39): the slice branch carries its handoff under handoffs/, and no runs/
+    h.git(["fetch", "-q", "origin"]);
+    const slice = h.git(["ls-tree", "-r", "--name-only", "origin/gh-7/01-form", "--", spec]).split("\n");
+    expect(slice).toContain(`${spec}/${unitHandoffPath("01-form")}`);
+    expect(slice.filter((p) => p.includes("/runs/"))).toEqual([]);
   });
 
   test("slice $done → cleanup (K5): final state on the story branch, worktree + branch removed, integrated", async () => {
@@ -393,7 +405,7 @@ describe("a story through the slice workflow", () => {
     expect(existsSync(sliceWt())).toBe(false);
     expect(h.git(["branch", "--list", "gh-7/01-form"])).toBe("");
     expect(h.read(join(storyWt(), spec, "slices/01-form.md"))).toContain("status: integrated");
-    expect(h.state(join(storyWt(), spec, "runs/01-form"))).toMatchObject({ step: "$done", status: "done" });
+    expect(h.state(runStateOf(join(storyWt(), spec), "01-form"))).toMatchObject({ step: "$done", status: "done" });
     expect(readdirSync(join(h.home, "leases")).sort()).toEqual(["slot-1.json"]);
   });
 
@@ -419,6 +431,15 @@ describe("a story through the slice workflow", () => {
       expect(replayed.map((d) => d.rule)).toEqual(t.decisions.map((d) => d.rule));
       expect(JSON.parse(JSON.stringify(replayed.map((d) => d.action)))).toEqual(t.decisions.map((d) => d.action));
     }
+  });
+
+  test("AC6 (gh-195 B1): the PR's changed files and every branch tree hold the code, the spec and the handoffs, and no runs/ path", () => {
+    h.git(["fetch", "-q", "--prune", "origin"]);
+    const changed = h.git(["diff", "--name-only", "origin/main...origin/gh-7-add-login-form"]).split("\n").filter(Boolean).sort();
+    expect(changed).toEqual(["form.txt", "pass.flag", `${spec}/${unitHandoffPath("01-form")}`, `${spec}/${unitHandoffPath(STORY_UNIT_DIR)}`, `${spec}/slices/01-form.md`, `${spec}/spec.md`].sort());
+    const branches = h.git(["for-each-ref", "--format=%(refname)", "refs/remotes/origin/"]).split("\n").filter((r) => r && !r.endsWith("/HEAD"));
+    expect(branches.length).toBeGreaterThan(0);
+    for (const ref of branches) expect(h.git(["ls-tree", "-r", "--name-only", ref]).split("\n").filter((p) => /(^|\/)runs\//.test(p))).toEqual([]);
   });
 
   test("effect transcript: spawns, port calls and runs/ files of the whole flow (refactor Phase 0.2)", () => {

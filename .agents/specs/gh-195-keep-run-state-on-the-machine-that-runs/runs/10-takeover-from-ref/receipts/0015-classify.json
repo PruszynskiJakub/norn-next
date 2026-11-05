@@ -1,0 +1,1 @@
+{"kind":"classify","receipt_id":"01M6NJZX7MJCZ7FP9K43K1NMH7","run_id":"01M6NJ27YZK2KY73058B6RJ29H","step":"implement","attempt":4,"at":"2026-11-05T10:10:09.269Z","by":"norn","who":"jakubpruszynski@mac","tick_id":"01M6NJZX7M0BNBSATKPS7702RB","outcome":"stalled","rule":"agent.stalled","route":"nudge","detail":"no activity for 15m","counter":{"name":"nudges","value":1,"max":2}}

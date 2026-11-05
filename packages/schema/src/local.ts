@@ -106,6 +106,8 @@ export const ActFailureEntry = Type.Object({
   step: Type.String(),
   attempt: Type.Number(),
   session: Type.Optional(Type.Object({ runner: Type.String(), session_id: Type.String(), pane_id: Type.Optional(Type.String()) })),
+  /** gh-195 (08-F4): a `record_push` refused as stale — the record ref sha it leased on (null = absent) */
+  lease: Type.Optional(Type.Union([Type.String(), Type.Null()])),
 });
 
 /** `failures.json`: unit key → last failed act effect (R4.3). */
@@ -145,7 +147,19 @@ export const PullRequestEntry = Type.Object({
 
 /** `pr.json`: story key → the story PR the last sync saw, with when (C1). */
 export const LocalPrFile = Type.Object(
-  { stories: Type.Optional(Type.Record(Type.String(), Type.Object({ pr: Nullable(PullRequestEntry), observed_at: Type.Number() }))) },
+  {
+    stories: Type.Optional(
+      Type.Record(
+        Type.String(),
+        Type.Object({
+          pr: Nullable(PullRequestEntry),
+          observed_at: Type.Number(),
+          /** gh-195 B18: the CI state of the PR's head, observed for a story held elsewhere (core `PullRequestCi`) */
+          ci: Type.Optional(Type.Union([Type.Literal("pending"), Type.Literal("success"), Type.Literal("failure"), Type.Literal("none")])),
+        }),
+      ),
+    ),
+  },
   id("local-pr", "norn story PRs seen (trace/pr.json)"),
 );
 export type LocalPrFile = Static<typeof LocalPrFile>;
@@ -194,6 +208,59 @@ export type LocalHookBackfillFile = Static<typeof LocalHookBackfillFile>;
 export const LocalNoticesFile = Type.Object({ shown: Type.Optional(Type.Array(Type.String())) }, id("local-notices", "norn one-time notices shown (trace/notices.json)"));
 export type LocalNoticesFile = Static<typeof LocalNoticesFile>;
 
+/**
+ * gh-195 D12 (B21, T9): one mailbox receipt this holder's tick rejected, kept next to the notices so a
+ * stale answer or approval shows as a Check item. It clears on its own: an answer or approval of the
+ * story accepted after it (in the holder's own receipt order, `seen`), or the story finished. `norn
+ * tidy` drops only cleared ones older than `trace.retain`; an open one stays.
+ */
+export const RejectedMailboxReceipt = Type.Object(
+  {
+    story: Type.String({ minLength: 1 }),
+    /** the unit the receipt was for: the story key or a slice key */
+    unit: Type.String({ minLength: 1 }),
+    receipt_id: Type.String({ minLength: 1 }),
+    kind: Type.String({ minLength: 1 }),
+    /** `user@machine` of the sender; null = not recorded */
+    who: Nullable(Type.String()),
+    /** the step (and attempt) the sender stamped */
+    step: Type.String({ minLength: 1 }),
+    attempt: Type.Optional(Type.Integer({ minimum: 1 })),
+    /** the step the unit was at when the receipt was rejected; null = no such unit */
+    at_step: Nullable(Type.String()),
+    reason: Type.String(),
+    /** ISO time of the rejecting tick */
+    rejected_at: Type.String({ minLength: 1 }),
+    /** each unit's last receipt number on the holder when it was rejected: a later answer or approval is numbered past it */
+    seen: Type.Record(Type.String(), Type.Integer({ minimum: 0 })),
+  },
+  { additionalProperties: false },
+);
+export type RejectedMailboxReceipt = Static<typeof RejectedMailboxReceipt>;
+
+/** `rejected.json` in the machine dir (gh-195 D12): the mailbox receipts this checkout's ticks rejected. */
+export const LocalRejectedFile = Type.Object({ receipts: Type.Array(RejectedMailboxReceipt) }, id("local-rejected", "norn mailbox receipts rejected on this checkout (<norn home>/repos/<id>/rejected.json)"));
+export type LocalRejectedFile = Static<typeof LocalRejectedFile>;
+
+/**
+ * gh-195 D11 (B27, T7a): `superseded.json` at the top of a record set aside in the machine dir's
+ * `superseded/<story>-<ulid>/`: whose takeover superseded it and the newest receipt it holds, for its
+ * Check item until `norn tidy` deletes it after `trace.retain`.
+ */
+export const LocalSupersededFile = Type.Object(
+  {
+    story: Type.String({ minLength: 1 }),
+    /** `user@machine` holding the claim when the record was set aside */
+    holder: Type.String({ minLength: 1 }),
+    /** the record's newest receipt, `NNNN-<kind>`; null = none */
+    last_receipt: Nullable(Type.String({ minLength: 1 })),
+    /** ISO time of the tick that set it aside */
+    superseded_at: Type.String({ minLength: 1 }),
+  },
+  { additionalProperties: false, ...id("local-superseded", "a norn record set aside as superseded (<norn home>/repos/<id>/superseded/<story>-<ulid>/superseded.json)") },
+);
+export type LocalSupersededFile = Static<typeof LocalSupersededFile>;
+
 /** A lock file (H1 tick lock, K6 integrate lock): the holder process and when it took the lock. */
 export const LocalLockFile = Type.Object(
   {
@@ -222,6 +289,8 @@ export const LOCAL_SCHEMA_NAMES = [
   "local-lock",
   "local-hook-backfill",
   "local-notices",
+  "local-rejected",
+  "local-superseded",
   "local-checkout",
 ] as const;
 export type LocalSchemaName = (typeof LOCAL_SCHEMA_NAMES)[number];

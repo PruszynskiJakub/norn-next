@@ -659,7 +659,6 @@
         "receipt_id",
         "run_id",
         "step",
-        "attempt",
         "at",
         "by",
         "answer"
@@ -781,7 +780,6 @@
         "receipt_id",
         "run_id",
         "step",
-        "attempt",
         "at",
         "by"
       ],
@@ -903,7 +901,6 @@
         "receipt_id",
         "run_id",
         "step",
-        "attempt",
         "at",
         "by"
       ],
@@ -1016,7 +1013,6 @@
         "receipt_id",
         "run_id",
         "step",
-        "attempt",
         "at",
         "by"
       ],
@@ -2093,6 +2089,27 @@
           "type": "boolean"
         },
         "forced": {
+          "type": "boolean"
+        },
+        "rewritten": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "gone",
+            "head"
+          ],
+          "properties": {
+            "gone": {
+              "pattern": "^[0-9a-f]{40,64}$",
+              "type": "string"
+            },
+            "head": {
+              "pattern": "^[0-9a-f]{40,64}$",
+              "type": "string"
+            }
+          }
+        },
+        "record_lost": {
           "type": "boolean"
         }
       }

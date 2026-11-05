@@ -55,12 +55,12 @@ cd your-repo
 norn init
 ```
 
-`norn init` writes the team config (`.agents/norn.config.yaml`, with the norn version the repo now needs), a commented user config (`~/.norn/config.yaml`) on a machine's first init, six workflows in `.agents/workflows/`, the agent skills and hooks, a JSON schema next to each config file for your editor, and its `.gitignore` and `.gitattributes` lines. On the remote it creates the labels norn uses (see [Concepts: Labels](docs/concepts.md#labels)); when it cannot, it says why and what to run. It reads your test command from your build files and ends with the next steps:
+`norn init` writes the team config (`.agents/norn.config.yaml`, with the norn version the repo now needs), a commented user config (`~/.norn/config.yaml`) on a machine's first init, six workflows in `.agents/workflows/`, the agent skills and hooks, a JSON schema next to each config file for your editor, and its `.gitignore` lines. On the remote it creates the labels norn uses (see [Concepts: Labels](docs/concepts.md#labels)); when it cannot, it says why and what to run. It reads your test command from your build files and ends with the next steps:
 
 ```console
 Next steps
   1. Check the test command `npm install && npm test` in the `test` steps of .agents/workflows/ (detected from package.json).
-  2. Commit and push the setup: `git add .agents .claude .gitignore .gitattributes && git commit -m "Set up norn" && git push`.
+  2. Commit and push the setup: `git add .agents .claude .gitignore && git commit -m "Set up norn" && git push`.
   3. Check this machine: `norn doctor`.
   4. Make a first story: an issue labelled `norn` and assigned to you, e.g. `gh issue create --label norn --assignee @me --title "…"`.
   5. Pick it up: `norn sync`, then `norn status` shows what needs you and the command for each item; `norn watch` keeps norn working.
@@ -89,7 +89,7 @@ norn status    # in another terminal: what needs you, with the command for each 
 2. The triage agent checks the issue against your code, posts its findings and one recommendation as an issue comment, and labels the issue's kind, risk and priority. The round ends there.
 3. You start the next round: `norn story edit gh-N --workflow quick` for a small change, `--workflow refinement` to agree a spec and plan with an agent first, then `--workflow story` to build it in slices.
 4. The workflow runs. Whenever an agent asks, a gate waits for your approval or something is stuck, the item appears in `norn status` with the command that resolves it (`norn story answer`, `norn story approve`, `norn run rerun`, …).
-5. A delivery workflow ends at a `ready` gate with a draft PR. Your last act is merging it.
+5. A delivery workflow ends at a `ready` gate with a draft PR. Your last act is merging it. The PR holds your code, the spec and the handoffs; norn's run state stays on your machine and is archived on a ref of its own, never on your base branch ([Concepts: What gets committed](docs/concepts.md#what-gets-committed-and-where-run-state-lives)).
 
 `norn help` lists every command and who runs it; `norn help <command>` shows one.
 

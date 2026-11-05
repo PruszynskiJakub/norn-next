@@ -835,14 +835,14 @@ describe("the new layout in product docs (gh-110 B3, B22)", () => {
     expect(id2).toContain("repos/<id>/");
   });
 
-  test("B3: the shipped norn skill puts only runs/ and the generated top of handoff.md off limits", () => {
+  test("B3: the shipped norn skill puts only runs/ off limits (gh-195/07: the handoff has no generated top)", () => {
     const skill = readFileSync(join(PKGS, "cli", "assets", "skills", "norn", "SKILL.md"), "utf8");
     const rules = section(skill, "Hard rules");
     const never = rules.split("\n").filter((l) => /\bnever edit\b/i.test(l));
     expect(never).toHaveLength(1);
     const offLimits = (never[0] as string).split(/\.\s/)[0] as string;
     expect([...offLimits.matchAll(CODE_SPAN)].map((m) => m[0])).toEqual(["`runs/`"]);
-    expect(offLimits).toContain("the generated top of handoff.md");
+    expect(offLimits).not.toContain("handoff");
     expect(rules).toContain("`.agents/workflows/`");
     expect(rules).toContain("`.agents/norn.config.yaml`");
   });
@@ -923,7 +923,6 @@ const JSON_PARSE_ALLOW: Record<string, [number, string]> = {
   "packages/cli/src/commands/hook.ts": [2, "tool output: hook payload on stdin, hook command stdout"],
   "packages/cli/src/commands/run-view.ts": [1, "clone: canonical JSON for the replay diff"],
   "packages/cli/src/runtime/detect.ts": [1, "file another tool owns: the repo's package.json"],
-  "packages/cli/src/runtime/human.ts": [1, "norn file: state.json from git show"],
   "packages/cli/src/runtime/tick.ts": [1, "clone: trace-safe copy of facts"],
 };
 
@@ -1080,6 +1079,168 @@ describe("one resolver for a unit's record folder (gh-71 D2, B30, B36)", () => {
   });
 });
 
+describe("the run-state resolver takes the checkout, the story and the unit (gh-195 prefactor 1, B2, B4)", () => {
+  /** The resolver: its pure half in schema (paths relative to a root), its on-disk half in store. */
+  const RESOLVER = ["packages/schema/src/ids.ts", "packages/store/src/run-state.ts"];
+  /** The record's names: the folder, the unit's and round's record paths, decide's observed record. */
+  const NAMES = String.raw`\b(?:RUNS_DIR|unitRecordPath|roundRecordPath|recordOf)\b|["'\x60]runs["'\x60/]`;
+  /** A spec folder: `spec_dir`, `specDir`, `specPath`, `spec`, as a name or a field. */
+  const SPEC = String.raw`\bspec(?:_dir|Dir|Path)?\b`;
+  /**
+   * A unit's run-state path built outside the resolver, matched over the whole source with comments
+   * removed (so a call wrapped over lines counts):
+   * - a template that joins something with the record's names (`${spec}/${unitRecordPath(…)}`), or a spec
+   *   folder with a record (`${story.spec_dir}/${recordOf(uf)}`, `${spec}/runs/…`);
+   * - a `join(…)` whose arguments name the record (`join(spec, RUNS_DIR)`);
+   * - a path taken relative to a spec folder (`relative(join(root, spec_dir), dir)`): a record's name;
+   * - a call of the resolver's spec-folder primitives (`unitDir(join(wt, spec_dir), unit)` and friends).
+   */
+  const TEMPLATE = new RegExp(String.raw`\$\{[^{}]*\}/(?:\$\{[^{}]*(?:${NAMES})|runs\b)|\$\{[^{}]*${SPEC}[^{}]*\}/\$\{[^{}]*\brecord`);
+  const RELATIVE = new RegExp(String.raw`\brelative\(\s*(?:join\([^()]*${SPEC}[^()]*\)|[\w.]*${SPEC})\s*,`);
+  const PRIMITIVE = /\b(?:unitDir|storyUnitDir|startDir|roundDir|specRunsDir|storyRounds|currentRound|isFlatStoryRecord)\s*\(/;
+
+  /** `src` with every comment blanked out (strings and templates kept, newlines kept for line numbers). */
+  function stripComments(src: string): string {
+    let out = "";
+    const stack: string[] = []; // open template literals / `${` braces
+    for (let i = 0; i < src.length; i++) {
+      const c = src[i] as string;
+      const top = stack.at(-1);
+      if (top === "`") {
+        out += c;
+        if (c === "\\") out += src[++i] ?? "";
+        else if (c === "`") stack.pop();
+        else if (c === "$" && src[i + 1] === "{") (out += src[++i]), stack.push("{");
+        continue;
+      }
+      if (c === "/" && src[i + 1] === "/") {
+        while (i < src.length && src[i] !== "\n") i++;
+        out += "\n";
+        continue;
+      }
+      if (c === "/" && src[i + 1] === "*") {
+        const end = src.indexOf("*/", i + 2);
+        const stop = end < 0 ? src.length : end + 2;
+        out += src.slice(i, stop).replace(/[^\n]/g, " ");
+        i = stop - 1;
+        continue;
+      }
+      if (c === '"' || c === "'") {
+        let j = i + 1;
+        while (j < src.length && src[j] !== c && src[j] !== "\n") j += src[j] === "\\" ? 2 : 1;
+        out += src.slice(i, j + 1);
+        i = j;
+        continue;
+      }
+      out += c;
+      if (c === "`") stack.push("`");
+      else if (c === "{" && stack.length) stack.push("{");
+      else if (c === "}" && top === "{") stack.pop();
+    }
+    return out;
+  }
+  /** The text of each balanced `join(…)` call's arguments, with where it starts. */
+  function joinCalls(src: string): Array<{ at: number; args: string }> {
+    const out: Array<{ at: number; args: string }> = [];
+    for (const m of src.matchAll(/\bjoin\(/g)) {
+      const start = (m.index ?? 0) + m[0].length;
+      let depth = 1;
+      let j = start;
+      while (j < src.length && depth) depth += src[j] === "(" ? 1 : src[j] === ")" ? -1 : 0, j++;
+      out.push({ at: m.index ?? 0, args: src.slice(start, j - 1) });
+    }
+    return out;
+  }
+  /** Line numbers (0-based) where `src` builds a unit's run-state path by hand. */
+  const builds = (src: string): number[] => {
+    const code = stripComments(src);
+    const lineOf = (at: number) => code.slice(0, at).split("\n").length - 1;
+    const at = new Set<number>();
+    for (const re of [TEMPLATE, RELATIVE, PRIMITIVE]) for (const m of code.matchAll(new RegExp(re.source, "g"))) at.add(lineOf(m.index ?? 0));
+    for (const j of joinCalls(code)) if (new RegExp(NAMES).test(j.args)) at.add(lineOf(j.at));
+    return [...at].sort((a, b) => a - b);
+  };
+
+  test("matcher: a spec folder joined with runs/ or a spec-folder primitive is a hit; the resolver's calls, comments and bare names are not", () => {
+    const src = [
+      "const a = `${story.spec_dir}/${unitRecordPath(unit)}`;",
+      "const b = join(specDir, RUNS_DIR);",
+      "const c = join(wt, spec_dir, roundRecordPath(1, wf));",
+      "const d = unitDir(join(wt, m.spec_dir), m.unit);",
+      "const e = startDir(join(wt, spec_dir), dir, wf);",
+      "const f = runStateDir(wt, { key, spec_dir }, dir);",
+      "const g = runStatePath(story, dir);",
+      "/** `unitDir(join(wt, spec_dir), unit)` in a doc comment */",
+      "const h = su.record === unitRecordPath(STORY_UNIT_DIR); // join(spec, RUNS_DIR)",
+      "export function readState(unitDir: string): void {}",
+    ].join("\n");
+    expect(builds(src)).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  test("matcher (review F1): a spec folder joined with decide's observed record is a hit; a record path through the resolver is not", () => {
+    const src = [
+      "log_path: `${story.spec_dir}/${recordOf(uf)}/logs/${run_id}.log`,",
+      "const p = `${s.spec_dir}/${uf.record}/state.json`;",
+      "const q = `${specDir}/runs/${dir}`;",
+      "log_path: `${recordRunStatePath(story, recordOf(uf))}/logs/${run_id}.log`,",
+      "const r = `${recordOf(uf)}/workflow.yaml`;",
+    ].join("\n");
+    expect(builds(src)).toEqual([0, 1, 2]);
+  });
+
+  test("matcher (review F2): a path taken relative to a spec folder is a hit; one relative to a root is not", () => {
+    const src = [
+      "record: relative(join(root, story.spec_dir), path),",
+      "const m = `${relative(join(wtPath, story.spec_dir), runsDir)}/workflow.yaml`;",
+      "const n = relative(s.specPath, s.runsDir);",
+      "spec_dir: relative(root, specPath),",
+      "record: runStateRecord(root, story, path),",
+    ].join("\n");
+    expect(builds(src)).toEqual([0, 1, 2]);
+  });
+
+  test("matcher (review F3): a join or a template wrapped over lines is a hit, at the line it starts; a comment over lines is not", () => {
+    const src = [
+      "const a = join(",
+      "  wt,",
+      "  RUNS_DIR,",
+      ");",
+      "const b = unitDir(",
+      "  spec, dir);",
+      "/*",
+      " * join(spec,",
+      " *   RUNS_DIR)",
+      " */",
+      "const c = `x ${y} // not a comment ${join(z,",
+      "  unitRecordPath(u))}`;",
+    ].join("\n");
+    expect(builds(src)).toEqual([0, 4, 10]);
+  });
+
+  test("matcher (S12, gh-195/05): the machine dir joined with runs/ is a hit; the resolver's machine-dir calls are not", () => {
+    const src = [
+      'const a = join(machineDir(root), "runs");',
+      "const b = join(machineDir(root), RUNS_DIR, story);",
+      "const c = `${machineDir(root)}/runs/${key}`;",
+      "const d = storyRunStateDir(root, story);",
+      "const e = runStateFile(root, a.log_path);",
+    ].join("\n");
+    expect(builds(src)).toEqual([0, 1, 2]);
+  });
+
+  test("no package source outside the resolver builds a unit's run-state path from a spec folder", () => {
+    const hits = files(PKGS)
+      .filter((p) => p.includes("/src/") && !RESOLVER.includes(relative(ROOT, p)))
+      .flatMap((p) => {
+        const src = readFileSync(p, "utf8");
+        const lines = src.split("\n");
+        // S12 (gh-195/05): the machine dir's `runs/` is run state too, so no exception remains
+        return builds(src).map((i) => `${relative(ROOT, p)}:${i + 1}: ${lines[i]?.trim()}`);
+      });
+    expect(hits).toEqual([]);
+  });
+});
+
 describe("the running version is a dependency (gh-61 B6, Prefactor 1)", () => {
   // only the default wiring reads the package version; every command takes `ctx.version`, so a test can run the CLI as any binary
   const WIRING = "packages/cli/src/context.ts";
@@ -1096,6 +1257,71 @@ describe("the running version is a dependency (gh-61 B6, Prefactor 1)", () => {
       .map((p) => relative(ROOT, p))
       .filter((p) => p !== WIRING && p !== "packages/cli/src/version.ts")
       .filter((p) => readsConstant(readFileSync(join(ROOT, p), "utf8")));
+    expect(hits).toEqual([]);
+  });
+});
+
+describe("one resolver for a unit's handoff (gh-195 prefactor 2, B6, B39)", () => {
+  /** Where a unit's handoff path may be named: the pure name in schema and store's path module. */
+  const RESOLVERS = ["packages/schema/src/ids.ts", "packages/store/src/paths.ts"];
+  /**
+   * A handoff path derived from a record folder: the bare `handoff.md` literal (`join(record, "handoff.md")`),
+   * the old record-keyed helpers, or a `dirname` of a handoff path (the story's handoff sat above its round folders).
+   */
+  const FROM_RECORD = /["'`/]handoff\.md["'`]|\brecordHandoffPath\b|\brecordPaths\b|\bdirname\([^)]*handoff/i;
+  const isComment = (line: string) => /^\s*(\*|\/\/|\/\*)/.test(line);
+  const fromRecord = (src: string) =>
+    src
+      .split("\n")
+      .map((l, i) => ({ l, i }))
+      .filter(({ l }) => !isComment(l) && FROM_RECORD.test(l));
+
+  test("matcher: a joined literal, the record-keyed helpers and a dirname of a handoff are hits; comments and the resolver are not", () => {
+    const src = [
+      'const a = join(runsDir, "handoff.md");',
+      "const b = `${record}/handoff.md`;",
+      "const c = recordHandoffPath(p.unit_dir);",
+      "const d = recordPaths(loc.runsDir);",
+      "const e = dirname(handoffPath(ud)) === ud;",
+      " * the story's `handoff.md` in a doc comment",
+      "// join(runsDir, 'handoff.md')",
+      "const f = handoffPath(specDir, unit.dir);",
+    ].join("\n");
+    expect(fromRecord(src).map(({ i }) => i)).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  test("no package source outside the resolvers derives a handoff path from a record folder", () => {
+    const hits = files(PKGS)
+      .filter((p) => p.includes("/src/") && !RESOLVERS.includes(relative(ROOT, p)))
+      .flatMap((p) => fromRecord(readFileSync(p, "utf8")).map(({ l, i }) => `${relative(ROOT, p)}:${i + 1}: ${l.trim()}`));
+    expect(hits).toEqual([]);
+  });
+
+  test("the resolvers key the handoff by the unit, never by a record folder", () => {
+    const keyedByRecord = RESOLVERS.filter((f) => /\brecordHandoffPath\b|\brecordPaths\b/.test(readFileSync(join(ROOT, f), "utf8")));
+    expect(keyedByRecord).toEqual([]);
+  });
+});
+
+describe("superseded records replace unpushed runs and orphaned/ (gh-195 D11, B27, AC4)", () => {
+  test("no package source, golden case, rule case, shipped asset, plugin, emitted schema or doc in the doc set but the rules names unpushed_runs, orphaned/ or work not in the record", () => {
+    const GONE = /unpushed_runs|unpushedRuns|UnpushedRuns|orphaned\/|copyToOrphaned|orphanedDir\b|work (?:on \S+ is )?not in the record/;
+    const scanned = [
+      ...files(PKGS).filter((p) => p.includes("/src/") || p.endsWith("/test/rule-cases.ts")),
+      ...readdirSync(join(PKGS, "core", "test", "golden")).map((n) => join(PKGS, "core", "test", "golden", n)),
+      join(ROOT, "docs", "reference.md"),
+      // the shipped assets (skills, workflows), the plugins and the emitted schemas a person or agent reads
+      ...textFiles(join(PKGS, "cli", "assets"), DOCS),
+      ...textFiles(join(ROOT, "plugins"), [...DOCS, ".toml", ".sh"]),
+      ...textFiles(join(PKGS, "schema", "json"), DOCS),
+      // and every doc but the rules file, whose T7a and R2.3 name what gh-195 replaced on purpose
+      ...allDocs(ROOT).filter((f) => !f.endsWith(RULES_FILE)),
+    ];
+    const hits = scanned.flatMap((p) =>
+      readFileSync(p, "utf8")
+        .split("\n")
+        .flatMap((l, i) => (GONE.test(l) ? [`${relative(ROOT, p)}:${i + 1}: ${l.trim().slice(0, 120)}`] : [])),
+    );
     expect(hits).toEqual([]);
   });
 });

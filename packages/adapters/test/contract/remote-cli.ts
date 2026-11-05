@@ -5,7 +5,7 @@
  * `--assignee`/`--label`/`--state`/`--draft` shows up as a contract failure. An unknown command throws.
  */
 import type { Exec, ExecResult } from "../../src/exec.ts";
-import type { RemoteLabel } from "@norn/core";
+import type { PullRequestCi, RemoteLabel } from "@norn/core";
 import type { SeedIssue } from "./remote.ts";
 
 interface Pr {
@@ -14,6 +14,8 @@ interface Pr {
   base: string;
   title: string;
   draft: boolean;
+  /** gh-195 B18: the CI state the provider reports for the PR's head */
+  ci?: PullRequestCi;
 }
 
 const ok = (v: unknown): ExecResult => ({ code: 0, stdout: typeof v === "string" ? v : JSON.stringify(v), stderr: "" });
@@ -41,6 +43,8 @@ export interface ScriptedRemote {
   /** from now on every label edit (label listings and creations included) exits non-zero, as an unreachable provider would */
   failLabelEdits(): void;
   seedLabels(labels: RemoteLabel[]): void;
+  /** gh-195 B18: the CI state of PR `number` from now on */
+  setCi(number: number, ci: PullRequestCi): void;
 }
 
 const unreachable = (bin: string): ExecResult => ({ code: 1, stdout: "", stderr: `${bin}: error connecting to the API: Could not resolve host` });
@@ -122,9 +126,19 @@ export function scriptedGh(login = "octocat"): ScriptedRemote {
       const p = prs.find((x) => argv[3] === `https://github.com/acme/app/pull/${x.number}`);
       return p ? ok(prJson(p)) : { code: 1, stdout: "", stderr: "no pull requests found" };
     }
+    if (a === "pr" && b === "checks" && flag(argv, "--json") === "bucket") {
+      // gh: exit 8 while a check is pending, 1 when one failed, JSON printed either way; no check at all exits 1
+      const p = prs.find((x) => x.number === Number(argv[3]));
+      if (!p) return { code: 1, stdout: "", stderr: `no pull requests found for branch "${argv[3]}"` };
+      const ci = p.ci ?? "none";
+      if (ci === "none") return { code: 1, stdout: "", stderr: `no checks reported on the '${p.head}' branch` };
+      const buckets = { success: ["pass", "skipping"], pending: ["pass", "pending"], failure: ["pass", "fail"] }[ci];
+      return { code: ci === "pending" ? 8 : ci === "failure" ? 1 : 0, stdout: JSON.stringify(buckets.map((bucket) => ({ bucket }))), stderr: "" };
+    }
     throw new Error(`scripted gh: unexpected call: ${argv.join(" ")}`);
   };
-  return { exec, seed: (s) => void (issues = s), failLabelEdits: () => void (labelEditsFail = true), seedLabels: (l) => void (labels = l) };
+  const setCi = (n: number, ci: PullRequestCi) => void prs.forEach((p) => p.number === n && (p.ci = ci));
+  return { exec, seed: (s) => void (issues = s), failLabelEdits: () => void (labelEditsFail = true), seedLabels: (l) => void (labels = l), setCi };
 }
 
 export function scriptedGlab(login = "tanuki"): ScriptedRemote {
@@ -201,9 +215,12 @@ export function scriptedGlab(login = "tanuki"): ScriptedRemote {
     }
     if (a === "mr" && b === "view") {
       const m = mrs.find((x) => x.number === Number(argv[3]));
-      return m ? ok(mrJson(m)) : { code: 1, stdout: "", stderr: "ERROR: 404 Not Found" };
+      // GitLab's MR object carries the head pipeline (null when none ran)
+      const status = { none: null, success: "success", pending: "running", failure: "failed" }[m?.ci ?? "none"];
+      return m ? ok({ ...mrJson(m), head_pipeline: status ? { id: 900 + m.number, status } : null }) : { code: 1, stdout: "", stderr: "ERROR: 404 Not Found" };
     }
     throw new Error(`scripted glab: unexpected call: ${argv.join(" ")}`);
   };
-  return { exec, seed: (s) => void (issues = s), failLabelEdits: () => void (labelEditsFail = true), seedLabels: (l) => void (labels = l) };
+  const setCi = (n: number, ci: PullRequestCi) => void mrs.forEach((m) => m.number === n && (m.ci = ci));
+  return { exec, seed: (s) => void (issues = s), failLabelEdits: () => void (labelEditsFail = true), seedLabels: (l) => void (labels = l), setCi };
 }

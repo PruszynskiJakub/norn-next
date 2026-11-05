@@ -8,13 +8,14 @@ import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync
 import { join, relative } from "node:path";
 import { git as gitAdapter } from "@norn/adapters";
 import { type StoryFrontmatter, ulid } from "@norn/schema";
-import { appendReceipt, leasesDir, machineDir, readState, repoConfigPath, safeUnlink, workflowsDir, writeStoryFile, storyUnitDir } from "@norn/store";
+import { appendReceipt, leasesDir, machineDir, readState, repoConfigPath, safeUnlink, workflowsDir, writeStoryFile } from "@norn/store";
 import { pluginLinkHint } from "../../src/commands/doctor.ts";
 import { assetsDir } from "../../src/runtime/assets.ts";
 import { markStoryOnBase } from "../../src/runtime/record.ts";
 import { type TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue, T0 } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";
+import { runStateOf } from "../../../../test/support/run-state.ts";
 
 // doctor reports repo files relative to the repo root.
 const relWorkflow = (name: string) => relative("/r", join(workflowsDir("/r"), `${name}.yaml`));
@@ -63,8 +64,8 @@ describe("max_agents holds across ticks when the runner reports no process (K1, 
       h.clock.advance(10_000);
       await h.tick();
     }
-    const runs1 = storyUnitDir(join(`${h.root}-worktrees/gh-1-first`, ".agents/specs/gh-1-first"));
-    const runs2 = storyUnitDir(join(`${h.root}-worktrees/gh-2-second`, ".agents/specs/gh-2-second"));
+    const runs1 = runStateOf(join(`${h.root}-worktrees/gh-1-first`, ".agents/specs/gh-1-first"));
+    const runs2 = runStateOf(join(`${h.root}-worktrees/gh-2-second`, ".agents/specs/gh-2-second"));
     expect(readState(runs1).ok && (readState(runs1) as { value: { status: string } }).value.status).toBe("running");
     expect(h.runner.launches).toHaveLength(1);
 
@@ -120,7 +121,7 @@ describe("orphans (K5): reported by every tick, cleaned by norn tidy", () => {
     const orphanWt = `${h.root}-worktrees/gh-97-gone`;
     h.git(["worktree", "add", "-q", "-b", "gh-97-gone", orphanWt, "main"]);
     // a leftover receipt reservation
-    const runs = join(storyUnitDir(join(`${h.root}-worktrees/gh-3-third`, ".agents/specs/gh-3-third")), "receipts");
+    const runs = join(runStateOf(join(`${h.root}-worktrees/gh-3-third`, ".agents/specs/gh-3-third")), "receipts");
     const reserve = join(runs, ".0042.reserve");
     h.write(reserve, "01KA0000000000000000000002");
     utimesSync(reserve, new Date(Date.now() - 120_000), new Date(Date.now() - 120_000));
@@ -854,6 +855,8 @@ describe("trace retention: norn tidy prunes old hook files, briefings and transc
   /** gh-3 merged 30 days ago, gh-4 touched two days ago, gh-9 live since 20 days ago; runs that ended 20 days ago and yesterday. */
   const stage = () => {
     for (const d of ["hooks", "briefings", "transcripts"]) rmSync(join(trace(), d), { recursive: true, force: true });
+    // S12: the machine dir's runs/ holds the live units' run state; only an older norn's session logs go
+    for (const n of existsSync(join(trace(), "runs")) ? readdirSync(join(trace(), "runs")) : []) if (n.endsWith(".log")) safeUnlink(join(trace(), "runs", n));
     for (const n of readdirSync(trace())) if (/^\d{4}-\d{2}-\d{2}(\.chunks)?\.jsonl$/.test(n)) safeUnlink(join(trace(), n)); // the ticks' day pairs, pruned by 08's tests
     put("hooks/gh-3/_story.jsonl", 30, "a".repeat(40));
     put("hooks/gh-3/01.jsonl", 30, "b".repeat(10));
@@ -886,7 +889,7 @@ describe("trace retention: norn tidy prunes old hook files, briefings and transc
       h.clock.advance(10_000);
       await h.tick();
     }
-    const st = readState(storyUnitDir(join(`${h.root}-worktrees/gh-9-ninth`, ".agents/specs/gh-9-ninth")));
+    const st = readState(runStateOf(join(`${h.root}-worktrees/gh-9-ninth`, ".agents/specs/gh-9-ninth")));
     if (!st.ok || st.value.status !== "running" || !st.value.run) throw new Error("gh-9 has no live run");
     liveRun = st.value.run.run_id;
     h.clock.advance(20 * DAY); // the live run started 20 days ago
@@ -937,5 +940,23 @@ describe("trace retention: norn tidy prunes old hook files, briefings and transc
     const again = await h.norn("tidy");
     expect(again.exit).toBe(0);
     expect((again.value as Tidy).trace).toEqual({ retain: "14d", days: [], hook_files: [], runs: [], bytes: 0 });
+  });
+
+  test("gh-195 B2: session logs an older norn left in the machine dir's runs/ go with their run once past the window; newer and live ones stay", async () => {
+    stage();
+    const OLD_LOG = ulid(T0 - 21 * DAY);
+    put(`runs/${OLD_LOG}.log`, 20, "e".repeat(25));
+    put(`runs/${RECENT}.log`, 1);
+    put(`runs/${liveRun}.log`, 20);
+    const dry = await h.norn("tidy", "--dry-run");
+    expect(dry.exit).toBe(0);
+    const old = { run_id: OLD_LOG, files: [`runs/${OLD_LOG}.log`], bytes: 25 };
+    expect((dry.value as Tidy).trace.runs).toEqual([...RUNS, old].sort((a, b) => (a.run_id < b.run_id ? -1 : 1)));
+    expect(exists(`runs/${OLD_LOG}.log`)).toBe(true);
+    const r = await h.norn("tidy");
+    expect((r.value as Tidy).trace.runs).toContainEqual(old);
+    expect(exists(`runs/${OLD_LOG}.log`)).toBe(false);
+    expect(exists(`runs/${RECENT}.log`)).toBe(true);
+    expect(exists(`runs/${liveRun}.log`)).toBe(true);
   });
 });

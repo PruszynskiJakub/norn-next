@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "$id": "https://norn.dev/schema/local-superseded.json",
+  "title": "a norn record set aside as superseded (<norn home>/repos/<id>/superseded/<story>-<ulid>/superseded.json)",
+  "type": "object",
+  "required": [
+    "story",
+    "holder",
+    "last_receipt",
+    "superseded_at"
+  ],
+  "properties": {
+    "story": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "holder": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "last_receipt": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "superseded_at": {
+      "minLength": 1,
+      "type": "string"
+    }
+  }
+}

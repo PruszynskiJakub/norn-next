@@ -9,6 +9,9 @@ import {
   type StoryFrontmatter,
   type UnitState,
   type Workflow,
+  recordRunStatePath,
+  normalRecord,
+  STORY_UNIT_DIR,
   unitRecordPath,
 } from "@norn/schema";
 import type { RunGitAction, WorktreeSpec } from "../actions.ts";
@@ -18,7 +21,7 @@ import type { SliceFileFacts, StoryFacts, UnitFacts, UnitRef } from "../facts.ts
 import { sha256 } from "../hash.ts";
 import { unitWorktree } from "../policy.ts";
 import { checkWorkflowLevel, stepOf, type UnitLevel } from "../workflow.ts";
-import { commitFor, type Ctx, emitApplied, nextReceiptNumber, nornReceipt, park, rebasing, synth, trailersFor, unitBranch } from "./receipts.ts";
+import { commitFor, type Ctx, emitApplied, endedWith, nextReceiptNumber, nornReceipt, park, rebasing, synth, trailersFor, unitBranch } from "./receipts.ts";
 
 // ---------------------------------------------------------------- start
 
@@ -60,10 +63,12 @@ export function usableWorkflow(ctx: Ctx, name: string, level: UnitLevel): { work
 
 // ---------------------------------------------------------------- check / git
 
-/** gh-71 D2: the unit's record folder relative to its spec folder, as observe resolved it. */
+/** gh-71 D2, gh-195 D7: the unit's record folder relative to the story's run-state folder, as observe resolved it. */
 export function recordOf(uf: UnitFacts): string {
-  return uf.record ?? unitRecordPath(uf.unit.dir);
+  return uf.record !== undefined ? normalRecord(uf.record) : unitRecordPath(uf.unit.dir);
 }
+/** gh-71 D7 (B34), RD7: the story unit's record is flat, `_story/state.json` directly in its folder (an older norn's). */
+export const hasFlatRecord = (uf: UnitFacts): boolean => uf.unit.slice === null && uf.record !== undefined && normalRecord(uf.record) === unitRecordPath(STORY_UNIT_DIR);
 
 export function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, command: string, timeout_ms: number): void {
   const ref = uf.unit;
@@ -85,7 +90,7 @@ export function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitSta
     cwd,
     timeout_ms,
     env,
-    log_path: `${story.spec_dir}/${recordOf(uf)}/logs/${run_id}.log`,
+    log_path: `${recordRunStatePath(story, recordOf(uf))}/logs/${run_id}.log`,
   });
 }
 
@@ -159,7 +164,7 @@ export function classifyNorn(
     snapshot: null,
     receipts: [nr],
     state: res.state,
-    commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${st.step} ${outcome} → ${receipt.route}`, st.step),
+    commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${st.step} ${outcome} → ${receipt.route}`, st.step, { ended: endedWith(res) }),
   });
 }
 
@@ -257,7 +262,7 @@ export function slicesStep(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitS
       slice_status: "active" as const,
       receipts: [],
       state,
-      commit: commitFor(ctx, story, null, `norn: start ${s.key} (${name})`, state.step, { path, branch, slice: s.key, push: true }),
+      commit: commitFor(ctx, story, null, `norn: start ${s.key} (${name})`, state.step, { fresh: { path, branch, slice: s.key, push: true } }),
     });
   }
   if (starts.length)

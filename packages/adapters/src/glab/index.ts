@@ -3,10 +3,10 @@
  * `glab` CLI's JSON output, run in the repository directory. Story key for issue iid n is
  * `gl-<n>` (§5.1); "pull request" in the port means merge request here.
  */
-import type { RemoteFactory, RemoteIssue, RemoteLabel, RemotePort, RemotePullRequest } from "@norn/core";
+import type { PullRequestCi, RemoteFactory, RemoteIssue, RemoteLabel, RemotePort, RemotePullRequest } from "@norn/core";
 import { storyKey } from "@norn/schema";
 import { NETWORK_TIMEOUT_MS } from "@norn/store";
-import { bunExec, okOrThrow, parseJson, portError, type Exec } from "../exec.ts";
+import { bunExec, encodePath, okOrThrow, parseJson, portError, type Exec } from "../exec.ts";
 
 export interface GlabOptions {
   /** repository checkout to run `glab` in */
@@ -48,6 +48,19 @@ interface GlMr {
   squash_commit_sha?: string | null;
   merged_by?: { username?: string } | null;
   merge_user?: { username?: string } | null;
+  /** the pipeline of the source branch's head (`mr view` only) */
+  head_pipeline?: { status?: string } | null;
+}
+
+/**
+ * gh-195 B18: a GitLab pipeline status as one CI state: `success`; `failed` or `canceled` → failure;
+ * `skipped` or no pipeline → none; every other status (created, pending, running, manual, …) → pending.
+ */
+export function ciOfPipeline(status: string | null | undefined): PullRequestCi {
+  if (!status || status === "skipped") return "none";
+  if (status === "success") return "success";
+  if (status === "failed" || status === "canceled") return "failure";
+  return "pending";
 }
 
 export function mapIssue(i: GlIssue): RemoteIssue {
@@ -123,6 +136,9 @@ export function createGlab(opts: GlabOptions): RemotePort {
       const latest = rows.reduce<GlMr | null>((a, m) => (a === null || m.iid > a.iid ? m : a), null);
       return latest ? mapMr(latest) : null;
     },
+    async pullRequestCi(number) {
+      return ciOfPipeline((await json<GlMr>(["mr", "view", String(number), ...repo, "--output", "json"])).head_pipeline?.status);
+    },
     async openDraftPullRequest({ head, base, title, body }) {
       const out = okOrThrow(
         await run(["mr", "create", ...repo, "--draft", "--source-branch", head, "--target-branch", base, "--title", title, "--description-file", "-", "--yes"], body),
@@ -153,6 +169,11 @@ export function createGlab(opts: GlabOptions): RemotePort {
       const { web_url } = await json<{ web_url: string }>(["repo", "view", ...(opts.repo ? [opts.repo] : []), "--output", "json"]);
       const action = `/label ${labels.map((l) => `~"${l}"`).join(" ")}`;
       return `${web_url}/-/issues/new?${new URLSearchParams({ "issue[description]": action })}`;
+    },
+    async rawFileUrl({ commit, path }) {
+      // gh-195 D5 (B28): GitLab serves a commit's file raw under `/-/raw/`
+      const { web_url } = await json<{ web_url: string }>(["repo", "view", ...(opts.repo ? [opts.repo] : []), "--output", "json"]);
+      return `${web_url}/-/raw/${commit}/${encodePath(path)}`;
     },
     async replaceIssueLabel(number, { remove, add }) {
       // B19: GitLab ignores a label to remove that the issue does not carry

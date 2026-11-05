@@ -50,6 +50,15 @@ describe("gh adapter", () => {
     expect(await gh.findPullRequest("gh-99-none")).toBeNull();
   });
 
+  test("pullRequestCi folds the checks' buckets into one state (gh-195 B18)", async () => {
+    expect(await gh.pullRequestCi(40)).toBe("success");
+    // gh exits 8 while a check is pending and 1 when one failed, printing the JSON either way
+    expect(await gh.pullRequestCi(41)).toBe("pending");
+    expect(await gh.pullRequestCi(43)).toBe("failure");
+    expect(await gh.pullRequestCi(44)).toBe("none");
+    expect(await gh.pullRequestCi(45).catch((e) => e.code)).toBe("gh_failed");
+  });
+
   test("openDraftPullRequest", async () => {
     const pr = await gh.openDraftPullRequest({ head: "gh-15-fix-crash-on-save", base: "main", title: "Fix crash on save", body: "Closes #15" });
     expect(pr).toMatchObject({ number: 41, state: "open", is_draft: true, head_sha: "c".repeat(40), head: "gh-15-fix-crash-on-save", base_branch: "main", merged_at: null });

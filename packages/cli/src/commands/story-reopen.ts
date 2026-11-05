@@ -9,10 +9,11 @@
  * Refused before anything changes (B42, exit 3): a story that is not closed; issue #N closed on the
  * remote; the story branch or a started slice's branch missing from the remote.
  */
+import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { cmd } from "@norn/core";
-import { parseStoryKey, STORY_UNIT_DIR, slugify, storyBranch } from "@norn/schema";
-import { appendReceipt, patchStoryFile, readState, storyFile, unitDir } from "@norn/store";
+import { parseStoryKey, recordRef, STORY_UNIT_DIR, slugify, storyBranch } from "@norn/schema";
+import { appendReceipt, fetchRecords, patchStoryFile, readRecordRef, readState, runStateDir, storyFile, storyRunStateDir, unpackRecord } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
 import { type CliFailure, failure, refuse } from "../output.ts";
@@ -62,6 +63,32 @@ async function noStoryBranch(ctx: Context, key: string): Promise<CliFailure> {
   return refuse(`${key}'s story branch ${branch} is missing from ${origin}`, `push ${branch} to ${origin}, then ${cmd.storyReopen(key)}`, "branch_missing");
 }
 
+/**
+ * gh-195 B32 (D6, D15): on a clone whose machine dir holds no run state of the story, its record is
+ * fetched from the archive ref `refs/norn/runs/<story>` alone and unpacked into the machine dir
+ * (hostile entries refused, every file validated, then renamed into place: S1, S2), so each unit is
+ * back where the close left it. A clone that holds the run state keeps its own; a record that does not
+ * unpack is refused with nothing changed.
+ */
+async function restoreRecord(ctx: Context, key: string, spec_dir: string): Promise<void> {
+  const dir = storyRunStateDir(ctx.root, { key, spec_dir });
+  if (existsSync(dir)) return;
+  const origin = await gitRemote(ctx.git, ctx.root, ctx.config.git_remote);
+  if (origin)
+    await fetchRecords(ctx.root, origin, [key]).catch((e: unknown) => {
+      throw failure(`cannot fetch ${recordRef(key)}: ${(e as Error).message}`, `retry: ${cmd.storyReopen(key)}`, "network");
+    });
+  const ref = await readRecordRef(ctx.root, key);
+  if (!ref) return;
+  const r = await unpackRecord(ctx.root, ref.sha, dir);
+  if (!r.ok)
+    throw failure(
+      `${recordRef(key)} at ${ref.sha} does not unpack: ${r.errors.map((e) => `${e.file}: ${e.errors.map((x) => x.message).join(", ")}`).join("; ")}`,
+      `fix or delete ${recordRef(key)} on ${origin ?? "this checkout"}, then ${cmd.storyReopen(key)}`,
+      "record_corrupt",
+    );
+}
+
 export const storyReopenCommand = defineCommand({
   name: "story reopen",
   version: "acts",
@@ -81,6 +108,7 @@ export const storyReopenCommand = defineCommand({
     const record = await restorable(ctx, key);
     const lock = await waitForTickLock(ctx, "norn story reopen", `retry: ${cmd.storyReopen(key)}`);
     try {
+      await restoreRecord(ctx, key, record.spec_dir);
       return await checkoutStory(ctx, key, false, ({ storyWt, spec_dir, worktrees }) => {
         const file = storyFile(join(storyWt, spec_dir));
         const p = patchStoryFile(file, { status: "active" }, storyWt);
@@ -90,15 +118,16 @@ export const storyReopenCommand = defineCommand({
         const stuck: string[] = [];
         for (const w of worktrees) {
           const slice = w.unit === key ? null : w.unit;
-          const runsDir = unitDir(join(w.path, spec_dir), slice ? w.branch.slice(key.length + 1) : STORY_UNIT_DIR);
+          const runsDir = runStateDir(w.path, { key, spec_dir }, slice ? w.branch.slice(key.length + 1) : STORY_UNIT_DIR);
           const st = readState(runsDir);
           if (!st.ok || st.value.status !== "running" || !st.value.run) continue;
-          const written = appendReceipt(runsDir, humanReceipt(ctx, { slice }, st.value, "stuck", { reason: REOPEN_REASON }));
-          if (!slice) paths.push(relative(storyWt, written.file));
+          // S12 (gh-195 D8): the stuck receipt stays in the machine dir, never in the reopen commit
+          appendReceipt(runsDir, humanReceipt(ctx, { slice }, st.value, "stuck", { reason: REOPEN_REASON }));
           stuck.push(w.unit);
         }
         return { paths, message: `norn: ${key} reopened`, value: { reopened: true, stuck } };
-      });
+        // B32: the record was restored above (a clone holding the run state keeps its own)
+      }, { record: false });
     } finally {
       lock.release();
     }

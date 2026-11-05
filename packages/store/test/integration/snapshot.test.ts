@@ -7,15 +7,15 @@ import {
   pinWorkflow,
   storyDir,
   storyFile,
-  storyUnitDir,
-  unitDir,
-  writeHandoffHeader,
+  tidyHandoff,
+  handoffPath,
   writeSliceFile,
   writeState,
   writeStoryFile,
   writeUnitMarker,
 } from "../../src/index.ts";
 import { AT, receipt, state, tmp, WORKFLOW_YAML } from "../helpers.ts";
+import { runStateOf } from "../../../../test/support/run-state.ts";
 
 function seed(root: string, title = "Fix login") {
   const spec = storyDir(root, "gh-12", "fix-login");
@@ -24,12 +24,12 @@ function seed(root: string, title = "Fix login") {
   }, "\nspec\n");
   writeSliceFile(join(spec, "slices/01-add-form.md"), { id: "gh-12/01", title: "Add form", depends_on: [], status: "active" }, "");
   writeSliceFile(join(spec, "slices/02-wire-api.md"), { id: "gh-12/02", title: "Wire", depends_on: ["gh-12/01"], status: "planned" }, "");
-  const u1 = unitDir(spec, "01-add-form");
+  const u1 = runStateOf(spec, "01-add-form");
   pinWorkflow(u1, WORKFLOW_YAML);
   appendReceipt(u1, receipt());
   appendReceipt(u1, receipt());
   writeState(u1, state({ applied_through: 1 }));
-  writeHandoffHeader(u1, "header");
+  tidyHandoff(handoffPath(spec, "01-add-form"));
   return spec;
 }
 
@@ -39,8 +39,8 @@ describe("loadSnapshot", () => {
     const home = tmp();
     const spec = seed(repo);
     // a corrupt story unit state
-    mkdirSync(storyUnitDir(spec), { recursive: true });
-    writeFileSync(join(storyUnitDir(spec), "state.json"), "{}");
+    mkdirSync(runStateOf(spec), { recursive: true });
+    writeFileSync(join(runStateOf(spec), "state.json"), "{}");
     // a folder that is not a spec
     mkdirSync(join(repo, ".agents/specs/notes"), { recursive: true });
 
@@ -55,12 +55,13 @@ describe("loadSnapshot", () => {
     expect(st.units.map((u) => u.unit.key)).toEqual(["gh-12", "gh-12/01", "gh-12/02"]);
     const [story, u1, u2] = st.units;
     expect(story?.state).toBeNull();
-    expect(story?.errors.map((e) => e.file)).toEqual([".agents/specs/gh-12-fix-login/runs/_story/state.json"]);
+    // S12: run state in the machine dir is named by its absolute path
+    expect(story?.errors.map((e) => e.file)).toEqual([join(runStateOf(spec), "state.json")]);
     expect(u1?.state?.applied_through).toBe(1);
     expect(u1?.unapplied.map((r) => r.n)).toEqual([2]);
     expect(u1?.receipts?.length).toBe(2);
     expect(u1?.workflow?.workflow.name).toBe("slice");
-    expect(u1?.handoff?.header).toBe("header");
+    expect(u1?.handoff?.body).toBe("## Goal\n\n## Progress\n\n## Resume\n");
     expect(u1?.errors).toEqual([]);
     expect(u2).toMatchObject({ state: null, workflow: null, unapplied: [], errors: [] });
   });
@@ -70,7 +71,7 @@ describe("loadSnapshot", () => {
     seed(repo, "Old title");
     const spec = seed(wt, "Worktree title");
     writeUnitMarker(wt, { repo, story: "gh-12", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-12-fix-login" });
-    writeFileSync(join(unitDir(spec, "01-add-form"), "workflow.yaml"), `${WORKFLOW_YAML}# edited\n`);
+    writeFileSync(join(runStateOf(spec, "01-add-form"), "workflow.yaml"), `${WORKFLOW_YAML}# edited\n`);
     const s = loadSnapshot({ repoRoot: repo, storyRoots: [wt], home: tmp() });
     expect(s.stories[0]?.frontmatter?.title).toBe("Worktree title");
     expect(s.stories[0]?.root).toBe(wt);

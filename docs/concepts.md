@@ -87,11 +87,22 @@ For example, an Approve item shows the gate's instruction and `norn story approv
 
 An agent that dies is classified `died` and retried; one that goes quiet is nudged; one that runs past its deadline is stopped. Each of these is bounded by a counter, and the last one lands in the inbox.
 
-## What gets committed
+## What gets committed, and where run state lives
 
-A unit's run state lives in its spec folder, under `runs/`: `state.json`, the numbered receipts, the pinned workflow, logs of failed checks, QA evidence and `handoff.md`. norn commits it with the agent's work at each step boundary and pushes the branch, so anyone can take a story over from any commit (`norn story checkout`). `runs/` is marked as generated, so GitHub and GitLab collapse it in the PR diff.
+A step boundary commits only the agent's work and the unit's handoff, `handoffs/<unit>.md` in the spec folder (`_story.md` for the story, `<nn>-<slug>.md` for a slice), and pushes the unit's branch. A story's PR holds the code, the spec and the handoffs, nothing of norn's own. A handoff is prose only (Goal, Progress, Resume): the status it used to carry (step, attempt, counters, last outcome) is printed by `norn brief` and `norn story checkout` above it. Each boundary commit carries trailers naming the story, slice and step; one that ends a step also names its outcome and the step it led to (`Norn-Outcome`, `Norn-Next`), which is what another machine reads as the story's last boundary.
 
-Per-tick detail (the trace, locks and caches) stays outside the repository, in one folder per checkout under `~/.norn/repos/`. `norn run list` and `norn run view --why` read it.
+A unit's **run state** (`state.json`, the numbered receipts, the pinned workflow, logs of failed checks and QA evidence) lives on the machine that runs the story, in the checkout's machine dir: `~/.norn/repos/<id>/runs/<story>/<unit>/`. It is in no worktree and on no branch, so removing a worktree or running `git clean -fdx` leaves the story where it was, and it leaves the machine only as the story's record, when norn pushes it to the record ref.
+
+When the record has to leave the machine, norn packs the story's whole run state into one commit on the ref `refs/norn/runs/<story>` on the remote, which no branch and no normal clone carries. The team config's **record policy** (`record.policy`) says when:
+
+- `local` (the default): when the claim is released (`norn story handoff`, a clean `norn watch` exit, `norn story close`), each time the `open-pr` step opens or updates the PR (so the PR body can link QA evidence at that record commit), and once at the end, when the PR merges or the story closes without one.
+- `remote`: as well, whenever the record changed since its last push (so at least at every step boundary, right after the branch); a push that fails is tried again at a later tick (one refused because another checkout pushed the ref waits until the ref this checkout sees changes). Another machine then sees the current step and attempt, and can take the story over with its record as last pushed even if the holder dies.
+
+A finished story's record stays on its ref, so `norn run list` and `norn run view` read it on any machine; the base branch never receives run state. Per-tick detail (the trace, locks and caches) stays in the machine dir too; `norn run view --why` reads it. A repository whose base branch still holds run state from an older norn is pointed to `norn upgrade`, which moves it into the refs ([Recipes: Roll out a new norn to a team](recipes.md#roll-out-a-new-norn-to-a-team)).
+
+On a machine that does not hold the story, `norn status` and `norn story view` show what that machine can know: under `remote`, the step, attempt and counters read from the ref; under `local`, the claim, the branch, the PR and its CI and the last boundary step, with a line saying whose machine holds the record. A ref no longer kept current is shown with its age ("record as of …"). An answer or approval sent from such a machine goes through the mailbox and is checked on the holder; one the holder turns away (the story moved on) shows there as a Check item.
+
+How handover and takeover work, with and without a record on the ref, is in [Recipes: Hand a story over](recipes.md#hand-a-story-over).
 
 ## Skills
 
@@ -101,7 +112,7 @@ A bundled skill (a `norn`-prefixed folder in `.agents/skills/`) that differs fro
 
 ## The repo's norn version
 
-The team config records **the repo's norn version** (`norn_version: X.Y.Z` in `.agents/norn.config.yaml`): the norn the repo was set up with or last upgraded to. A binary matches it when it is the same minor (before 1.0; the same major from 1.0 on) and at least that patch: a repo at `X.Y.Z` takes `X.Y.Z` and any later patch of `X.Y`, never an earlier patch, never another minor. A patch upgrade of the binary needs no commit; a new minor, which may change how norn reads the config, the workflows or `runs/`, needs `norn upgrade` and a commit.
+The team config records **the repo's norn version** (`norn_version: X.Y.Z` in `.agents/norn.config.yaml`): the norn the repo was set up with or last upgraded to. A binary matches it when it is the same minor (before 1.0; the same major from 1.0 on) and at least that patch: a repo at `X.Y.Z` takes `X.Y.Z` and any later patch of `X.Y`, never an earlier patch, never another minor. A patch upgrade of the binary needs no commit; a new minor, which may change how norn reads the config, the workflows or the run state, needs `norn upgrade` and a commit.
 
 The version is read from the main checkout's team config, so it changes for you when you pull the base branch, not before. With a binary that does not match:
 
@@ -117,7 +128,7 @@ A repo without the key works as before; `doctor` and `status` hint to run `norn 
 |---|---|
 | story | A remote issue (GitHub or GitLab) assigned to you with the label `norn`. One spec folder, one story branch, one story worktree, one draft PR. |
 | slice | A piece of a story with its own branch and worktree, merged back into the story. |
-| unit | A story or a slice: anything that runs a workflow and owns a `runs/<unit>/` folder. |
+| unit | A story or a slice: anything that runs a workflow and has its own run state and handoff. |
 | workflow | A YAML (or JSON) graph of steps, in `.agents/workflows/`. |
 | round | One workflow applied to a story, from its start step to `$done`. A story goes through one or more rounds; a slice runs one workflow. |
 | step | One node of a workflow: agent, check, git, gate or slices. |
@@ -131,7 +142,9 @@ A repo without the key works as before; `doctor` and `status` hint to run `norn 
 | mode | Who starts a story's unattended agent steps: a person (`manual`) or norn (`auto`). |
 | receipt | An immutable, numbered record of something that happened to a unit, written before its effect. |
 | claim | A git ref that gives one checkout the right to drive a story. |
-| handoff | `handoff.md` in a unit's `runs/`: goal, progress and the next action, so anyone can continue. |
+| handoff | `handoffs/<unit>.md` in the spec folder, on the unit's branch: goal, progress and the next action, so anyone can continue. |
+| run state | A unit's state, receipts, pinned workflow, logs and evidence, kept in the checkout's machine dir (`~/.norn/repos/<id>/runs/`), never in a worktree or on a branch; it leaves the machine only as the record. |
+| record | A story's run state packed into one commit on `refs/norn/runs/<story>` on the remote: pushed on a claim release, by `open-pr`, at the end, and under `remote` whenever it changed. |
 | brief | What `norn brief` tells the agent of a step: where it is, the skill, the inputs and how to report. |
 | inbox | Everything that needs a person, with the command that resolves each item (`norn status`). |
 | tick | One pass of the heartbeat: observe, decide, act. |

@@ -7,7 +7,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { cpSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { bindNornHome, machineDir } from "@norn/store";
+import { bindNornHome, machineDir, storyRunStateDir } from "@norn/store";
 import { formatStepTimeline, loadTraceView, type StepRow, type TraceView } from "../../src/index.ts";
 
 const FIX = join(import.meta.dir, "fixtures/gh-1");
@@ -21,8 +21,10 @@ afterEach(() => {
 function seed(opts: { trace?: boolean } = {}): string {
   const repo = mkdtempSync(join(tmpdir(), "norn-steps-"));
   dirs.push(repo);
-  cpSync(join(FIX, "spec"), join(repo, SPEC), { recursive: true });
+  // gh-195 D16: run state is read from the machine dir (S12), never from a tree's runs/
+  cpSync(join(FIX, "spec"), join(repo, SPEC), { recursive: true, filter: (src) => src !== join(FIX, "spec", "runs") });
   bindNornHome(repo, join(repo, ".home"));
+  cpSync(join(FIX, "spec", "runs"), storyRunStateDir(repo, { key: "gh-1", spec_dir: SPEC }), { recursive: true });
   if (opts.trace !== false) {
     mkdirSync(machineDir(repo), { recursive: true });
     cpSync(join(FIX, "trace.jsonl"), join(machineDir(repo), "2026-10-23.jsonl"));
@@ -77,7 +79,7 @@ describe("slice timeline (gh-1/03)", () => {
     expect(qa.outcome).toBe("partial");
     expect(qa.reason).toContain("AC6 (browser confirm/cancel) = person");
     expect(qa.reason?.length).toBeGreaterThan(300);
-    const runs = join(repo, SPEC, "runs/03-web-projects");
+    const runs = join(storyRunStateDir(repo, { key: "gh-1", spec_dir: SPEC }), "03-web-projects");
     expect(qa.paths.evidence).toEqual([join(runs, "evidence/01M5MSXDF3ZHFXQKG87Z847PKB")]);
     expect(qa.paths.receipts).toEqual([join(runs, "receipts/0006-started.json"), join(runs, "receipts/0007-done.json")]);
     for (const r of v.steps) for (const p of [...r.paths.receipts, ...r.paths.evidence, ...r.paths.logs, ...r.paths.briefings]) expect(p.startsWith("/")).toBe(true);
@@ -195,6 +197,6 @@ describe("story timeline (gh-1 with slices)", () => {
     expect(text).not.toContain("AC6 (browser confirm/cancel) = person: no browser here.");
     const full = formatStepTimeline(load(repo, "gh-1"), { full: true });
     expect(full).toContain("AC6 (browser confirm/cancel) = person: no browser here.");
-    expect(full).toContain(join(repo, SPEC, "runs/03-web-projects/evidence/01M5MSXDF3ZHFXQKG87Z847PKB"));
+    expect(full).toContain(join(storyRunStateDir(repo, { key: "gh-1", spec_dir: SPEC }), "03-web-projects/evidence/01M5MSXDF3ZHFXQKG87Z847PKB"));
   });
 });

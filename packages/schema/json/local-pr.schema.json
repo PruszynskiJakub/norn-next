@@ -88,6 +88,26 @@
             },
             "observed_at": {
               "type": "number"
+            },
+            "ci": {
+              "anyOf": [
+                {
+                  "const": "pending",
+                  "type": "string"
+                },
+                {
+                  "const": "success",
+                  "type": "string"
+                },
+                {
+                  "const": "failure",
+                  "type": "string"
+                },
+                {
+                  "const": "none",
+                  "type": "string"
+                }
+              ]
             }
           }
         }

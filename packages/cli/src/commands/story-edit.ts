@@ -100,7 +100,8 @@ async function editWorkflow(ctx: Context, raw: string, name: string, at: string 
     // P8: the unit's state says no, so this is a refusal, not a usage error
     if ((d.delegated || d.reason !== undefined) && !round)
       throw refuse(`--delegated/--reason apply only to a new round of a started story; ${t.key} is ${t.slice ? "a slice" : "not started"}`, cmd.storyEdit(t.key, { workflow: name }), "not_a_round_start");
-    const claim = round ? await refuseIfHeldElsewhere(ctx, t.story, "story edit") : undefined;
+    // gh-195 S12: a non-holder has no run state of the story, so a claim seen held elsewhere is checked first too
+    const claim = round || (!t.slice && sf.claim.state === "other") ? await refuseIfHeldElsewhere(ctx, t.story, "story edit") : undefined;
     const listed = Object.keys(obs.workflows).sort();
     const loaded = obs.workflows[name];
     if (!loaded) throw refuse(`no workflow '${name}' in ${WORKFLOWS_DIR}/`, cmd.storyEdit(t.key, { workflow: `<${listed.join("|")}>` }), "unknown_workflow");

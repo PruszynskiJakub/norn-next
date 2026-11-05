@@ -34,5 +34,8 @@ remoteContract("harness FakeRemote", () => {
     seedLabels(labels) {
       remote.labels = labels.map((l) => ({ ...l }));
     },
+    setCi(number, ci) {
+      remote.ci.set(number, ci);
+    },
   };
 });

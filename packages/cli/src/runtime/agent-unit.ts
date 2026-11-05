@@ -7,8 +7,8 @@ import { existsSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { AgentUnit, UnitRef } from "@norn/core";
 import { cmd, agentWorkRefusal, cursorStep, storyMode, storyWorktreePath } from "@norn/core";
-import { type Criterion, type Mode, type Receipt, type ResolvedConfig } from "@norn/schema";
-import { loadUnit, readPinnedWorkflow, readSliceFile, readState, readStoryFile, storyFile, type UnitMarker, unitDir } from "@norn/store";
+import { type Criterion, type Mode, type Receipt, type ResolvedConfig, STORY_UNIT_DIR } from "@norn/schema";
+import { loadUnit, readPinnedWorkflow, readSliceFile, readState, readStoryFile, storyFile, type UnitMarker, runStateDir } from "@norn/store";
 import { type Context, findUnitMarker, safeRealpath } from "../context.ts";
 import { corruptError, refuse } from "../output.ts";
 
@@ -21,6 +21,8 @@ export interface UnitSession extends AgentUnit {
   specPath: string;
   /** absolute runs/<unit>/ inside the worktree */
   runsDir: string;
+  /** the unit's handoff, from its own resolver (gh-195 prefactor 2) */
+  handoffFile: string;
 }
 
 const unitRefOf = (m: UnitMarker): UnitRef => ({ story: m.story, slice: m.slice, dir: m.unit, key: m.slice ?? m.story });
@@ -48,7 +50,7 @@ export function loadUnitSession(ctx: Context, verb: string, at?: { worktree: str
   const { worktree, marker } = at ?? requireWorktree(ctx, verb);
   const unit = unitRefOf(marker);
   const specPath = join(worktree, marker.spec_dir);
-  const snap = loadUnit(worktree, specPath, unit, { includeApplied: true });
+  const snap = loadUnit(worktree, { key: marker.story, spec_dir: marker.spec_dir }, unit, { includeApplied: true });
   if (snap.errors.length || snap.state?.status === "corrupt")
     throw corruptError(`unit ${unit.key} is corrupt (S2): ${snap.errors.map((e) => e.file).join(", ") || "state.json"}`, `stop and tell the person: ${cmd.runView(unit.key, { why: true })}`, snap.errors);
   if (!snap.state) throw refuse(`unit ${unit.key} has not started yet`, `${cmd.tick()} (or wait for the heartbeat), then run it again`, "not_started");
@@ -60,6 +62,7 @@ export function loadUnitSession(ctx: Context, verb: string, at?: { worktree: str
     unit,
     specPath,
     runsDir: snap.path,
+    handoffFile: snap.handoffFile,
     state: snap.state,
     workflow: snap.workflow.workflow,
     receipts: snap.receipts ?? [],
@@ -80,7 +83,7 @@ export function unitStoryMode(_ctx: Context, s: UnitSession, config: ResolvedCon
   if (s.unit.slice === null) return storyMode(s.state, s.workflow, config);
   const slug = basename(s.marker.spec_dir).slice(s.unit.story.length + 1);
   const wt = storyWorktreePath(s.root, s.unit.story, slug);
-  const dir = unitDir(join(existsSync(wt) ? wt : s.root, s.marker.spec_dir), "_story");
+  const dir = runStateDir(existsSync(wt) ? wt : s.root, { key: s.unit.story, spec_dir: s.marker.spec_dir }, STORY_UNIT_DIR);
   const st = readState(dir);
   const wf = readPinnedWorkflow(dir);
   return storyMode(st.ok ? st.value : null, wf.ok ? wf.value.workflow : null, config);

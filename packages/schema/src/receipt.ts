@@ -59,6 +59,15 @@ function receipt<K extends string, P extends TProperties>(kind: K, props: P) {
   return Type.Object({ kind: Type.Literal(kind), ...header, ...props }, { additionalProperties: false });
 }
 
+/**
+ * gh-195 B20 (T9): a receipt a person may send through the mailbox (answer, approve, reject, unstick).
+ * `attempt` is absent only when a non-holder made it for a `local` story: stamped with the step its last
+ * boundary led to (`Norn-Next`), the holder matches it by step alone.
+ */
+function mailboxReceipt<K extends string, P extends TProperties>(kind: K, props: P) {
+  return Type.Object({ kind: Type.Literal(kind), ...header, attempt: Type.Optional(PosInt), ...props }, { additionalProperties: false });
+}
+
 export const Finding = Type.Object(
   {
     id: Type.Optional(NonEmpty),
@@ -113,7 +122,7 @@ export const AskReceipt = receipt("ask", {
   screen: Type.Optional(NonEmpty),
 });
 export const StuckReceipt = receipt("stuck", { reason: NonEmpty });
-export const AnswerReceipt = receipt("answer", {
+export const AnswerReceipt = mailboxReceipt("answer", {
   answer: NonEmpty,
   /** receipt_id of the ask being answered */
   ask_receipt_id: Type.Optional(Ulid),
@@ -125,19 +134,19 @@ export const AnswerReceipt = receipt("answer", {
   /** gh-196 D3: why (`--reason`); the cli refuses `--delegated` without it (reason_required), the schema does not require it */
   comment: Type.Optional(Type.String()),
 });
-export const ApproveReceipt = receipt("approve", {
+export const ApproveReceipt = mailboxReceipt("approve", {
   comment: Type.Optional(Type.String()),
   /** The unit's branch head at the moment of `approve` (story unit: observe's `ready_head_sha`); the ruling's head (C2). */
   head_sha: Type.Optional(GitSha),
   /** NT3: open notes of the story listed at this story-level gate at `approve`; they leave the inbox */
   acknowledged_notes: Type.Optional(Type.Array(NoteId, { uniqueItems: true })),
 });
-export const RejectReceipt = receipt("reject", {
+export const RejectReceipt = mailboxReceipt("reject", {
   comment: Type.Optional(Type.String()),
   /** C2: the unit's branch head the person judged — a ruling is tied to it */
   head_sha: Type.Optional(GitSha),
 });
-export const UnstickReceipt = receipt("unstick", {
+export const UnstickReceipt = mailboxReceipt("unstick", {
   to: Type.Optional(StepName),
   reset: Type.Optional(Type.Array(CounterName, { uniqueItems: true })),
   comment: Type.Optional(Type.String()),
@@ -224,7 +233,8 @@ export const ClassifyReceipt = receipt("classify", {
 });
 /**
  * R10.1 (M8): a `norn story checkout` of the story, forced or not, recorded on the story unit. Informational:
- * applied at any cursor (like `mode`), it moves nothing; `norn run list` / `why` show it.
+ * applied at any cursor (like `mode`), it moves nothing, unless it says the branch was `rewritten` (T5a);
+ * `norn run list` / `why` show it.
  */
 export const TakeReceipt = receipt("take", {
   /** `user@machine` of the claim taken over; null when the claim was free */
@@ -234,6 +244,17 @@ export const TakeReceipt = receipt("take", {
   expired: Type.Boolean(),
   /** `take --force` over an unexpired or corrupt claim (T5) */
   forced: Type.Optional(Type.Boolean()),
+  /**
+   * T5a (gh-195 B24): the story branch was rewritten since the record (`gone`, its `Norn-Branch-Commit`,
+   * is not an ancestor of `head`): applied at the cursor it names, the step restarts as a new attempt
+   */
+  rewritten: Type.Optional(Type.Object({ gone: GitSha, head: GitSha }, { additionalProperties: false })),
+  /**
+   * gh-195 B25 (D10): no record to take over (no `refs/norn/runs/<story>`, none here): the take is the first
+   * receipt of a new round started from the branch, fresh counters; false on a takeover from a record.
+   * Absent on a take an older norn wrote.
+   */
+  record_lost: Type.Optional(Type.Boolean()),
 });
 /**
  * BS9: `norn story update-branch <story>` — a person sends the story unit back to its base-update step (from a

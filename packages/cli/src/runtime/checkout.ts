@@ -2,37 +2,100 @@
  * Story checkout (T5, M3): continue a story on this machine from git alone. The command is
  * `norn story checkout`; a later reopen restores through the same steps.
  *
- * 1. Claim by CAS (T3): free or expired → acquire; held by another heartbeat and unexpired →
- *    refused "held by X since Y" unless `--force`, which records `forced_from` in the claim blob
- *    and a heartbeat line in the story handoff, committed and pushed (journaled).
- * 2. Fetch the story branch and its slice branches; check them out into worktrees here with
- *    slots, `.env.norn` and `.norn-unit` (K4, A3). Local branches are only created or moved
- *    forward, never reset.
- * 3. Print each unit's cursor and `handoff.md` (S9). The next `norn tick` resumes from `runs/`.
+ * One transaction (gh-195/10 review#2): every check that needs the remote or can fail comes before
+ * the claim, and after the claim only local steps, the take receipt first — so a refusal takes
+ * nothing, and no failure leaves a held story a tick would start over or resume on a stale cursor.
+ *
+ * Before the claim (a refusal changes nothing here or on the remote):
+ * 1. The claim as on the remote (T3): held by another heartbeat and unexpired → refused "held by X
+ *    since Y" unless `--force`.
+ * 2. The story's record, `refs/norn/runs/<story>` alone (gh-195 D6): its objects fetched (no local ref
+ *    yet) and staged beside its place in the machine dir with every file validated (S1, S2). A
+ *    checkout that holds the claim and the run state already keeps its own (nothing staged), unless the
+ *    remote record continues from the one it last had: then its copy is older (10-R3-F1). A local copy not kept is never replaced whole: in
+ *    step 5 it is set aside as superseded (gh-195 D11), or removed quietly when it is a record this
+ *    machine pushed.
+ * 3. The story and slice branches fetched; a local story branch that diverged from the remote one is
+ *    refused (norn never resets work). The record's `Norn-Branch-Commit` is checked against the story
+ *    branch head (T5a): an ancestor continues (B23), else the branch was rewritten (B24) and the step
+ *    restarts as a new attempt, once per gone commit. A story without a branch skips it (B33).
+ *    No record at all — none on the ref, none of this checkout's own — for a story the branch shows
+ *    started: the record is lost (B25, B26; gh-195 D10). The new round is read off the branch head here:
+ *    the frontmatter's workflow (a missing or invalid one is refused) and the step its last boundary led to (`Norn-Next`).
+ * Then:
+ * 4. Claim by CAS (`--force` records `forced_from` in the claim blob); the remote record ref must
+ *    still be the one staged (review#2 F5: a still-running holder may have pushed): if it moved, the
+ *    claim is given back and the command refused.
+ * 5. Locally: the `take` trace event and receipt (R10.1, carrying the rewrite), written into the staged
+ *    record — with the record lost, into a new round staged empty: the workflow pinned from the branch,
+ *    the take (`record_lost`), the state at the restart step, attempt 1, counters at zero — then the record renamed into place and the local record ref set to it (the lease of this
+ *    checkout's next record push, 09-F4); then the worktrees with slots, `.env.norn` and `.norn-unit`
+ *    (K4, A3), local branches only created or moved forward. A forced take journals a Progress line in
+ *    the story handoff, committed and pushed.
+ * 6. Print each unit's cursor, and its status (S9) as the next tick will have it above its handoff's
+ *    written part (gh-195 D9, B7). The next `norn tick` resumes from the run state.
  */
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
-import { cmd, sliceWorktreePath, storyWorktreePath } from "@norn/core";
-import { ExitCode, type ReceiptOf, sliceBranch, specDir, STORY_UNIT_DIR, ulid } from "@norn/schema";
+import {
+  applyReceipts,
+  branchRewrittenLine,
+  checkWorkflowLevel,
+  cmd,
+  type GitPort,
+  initialState,
+  recordLostLine,
+  renderHandoffWithStatus,
+  restartStepOf,
+  rewriteRestart,
+  sliceWorktreePath,
+  storyWorktreePath,
+} from "@norn/core";
+import { ExitCode, type ReceiptOf, recordRef, type RunStory, sliceBranch, SPEC_FILE, specDir, STORY_UNIT_DIR, treeStoryRunStatePath, ulid, type UnitState, type Workflow } from "@norn/schema";
 import {
   acquireClaim,
-  appendHandoffHeartbeat,
   appendReceipt,
   appendTrace,
+  fetchRecordCommit,
   handoffPath,
+  listReceipts,
   loadStory,
+  parseStoryFile,
+  parseWorkflowText,
+  pinWorkflow,
   newClaimBlob,
+  readPinnedWorkflow,
   readState,
-  readText,
+  readHandoff,
   heartbeatId,
+  lastBoundary,
   writtenHere,
   machineHolder,
   traceEvent,
-  unitDir,
+  readRecordRef,
+  recordBranchCommit,
+  releaseClaim,
+  remoteRecordSha,
+  runStateDir,
+  runStateDirIn,
+  runStateStartDirIn,
+  setRecordRef,
+  stageEmptyRecord,
+  stageRecordSync,
+  dropLocalRecord,
+  localRecordOf,
+  recordHolder,
+  setAsideRecord,
+  type StagedRecord,
+  storyRunStateDir,
+  WORKFLOW_EXT,
+  WORKFLOWS_DIR,
+  writeState,
 } from "@norn/store";
 import type { Context } from "../context.ts";
 import { claimHeld, corruptError, failure, refuse, withExit } from "../output.ts";
 import { claimFor } from "./human.ts";
+import { appendProgress } from "./report.ts";
 import { leaseLiveness } from "./leases.ts";
 import { gitRemote } from "./observe/index.ts";
 import { equipWorktree, syncLocalBranch, type WorktreeTarget } from "./worktrees.ts";
@@ -52,15 +115,16 @@ export async function findStoryBranch(ctx: Context, key: string, remote: string 
   return local.sort()[0] ?? null;
 }
 
+type Rewritten = { gone: string; head: string };
+type TakeFacts = { holder: string; now: string; previous_holder: string | null; previous_heartbeat_id: string | null; expired: boolean; forced: boolean };
+
 /**
- * R10.1: write the `take` receipt on the story unit at its cursor (next free number). A story unit
- * not started yet has no cursor to put it on; the take is then only in the trace and the claim blob.
+ * R10.1: write the `take` receipt on the story unit at its cursor (next free number) in `runsDir` — the
+ * staged record (before it is placed) or the machine dir's. A story unit not started yet has no cursor
+ * to put it on; the take is then only in the trace and the claim blob.
  */
-function takeReceipt(
-  runsDir: string,
-  t: { holder: string; now: string; previous_holder: string | null; previous_heartbeat_id: string | null; expired: boolean; forced: boolean },
-): { receipt: string | null; note?: string } {
-  const st = readState(runsDir);
+function takeReceipt(runsDir: string, t: TakeFacts & { rewritten: Rewritten | null; record_lost: boolean }, at?: UnitState): { receipt: string | null; note?: string } {
+  const st = at ? { ok: true as const, value: at } : readState(runsDir);
   if (!st.ok) return { receipt: null, note: st.reason === "missing" ? "story unit not started; the take is in the trace" : "story state unreadable (S2); the take is in the trace" };
   const r: ReceiptOf<"take"> = {
     kind: "take",
@@ -75,9 +139,164 @@ function takeReceipt(
     previous_heartbeat_id: t.previous_heartbeat_id,
     expired: t.expired,
     ...(t.forced ? { forced: true } : {}),
+    ...(t.rewritten ? { rewritten: t.rewritten } : {}),
+    record_lost: t.record_lost,
   };
   const w = appendReceipt(runsDir, r);
   return { receipt: w.file.split("/").at(-1) as string };
+}
+
+/**
+ * T5a, B7 (review#2 F4, F7): the story unit as the next tick will have it — its receipts not applied yet,
+ * the take last, applied as the tick does (core `applyReceipts`) — and, when that take restarts the step,
+ * the line saying so. A pending `round` receipt is applied by the tick alone, and the receipts after it
+ * (the take among them) are rejected into the trace: the round it starts is fresh, nothing to restart.
+ */
+function nextCursor(runsDir: string, gone: string | null): { state: UnitState | null; restarted: string | null } {
+  const st = readState(runsDir);
+  const wf = readPinnedWorkflow(runsDir);
+  if (!st.ok) return { state: null, restarted: null };
+  const listed = listReceipts(runsDir, { after: st.value.applied_through });
+  if (!wf.ok || listed.errors.length || listed.receipts.some((r) => r.receipt.kind === "round")) return { state: st.value, restarted: null };
+  const ctx = { workflow: wf.value.workflow, now: st.value.updated_at };
+  const take = listed.receipts.at(-1);
+  const before = applyReceipts(st.value, listed.receipts.slice(0, -1), ctx).state;
+  const after = applyReceipts(before, take ? [take] : [], ctx).state;
+  const restarts = gone !== null && take?.receipt.kind === "take" && rewriteRestart(before, take.receipt, wf.value.workflow) !== null;
+  return { state: after, restarted: restarts && gone ? branchRewrittenLine(st.value.story, gone, after.step, after.attempt) : null };
+}
+
+/** What checkout takes of the story's record (T5, T5a). */
+interface TakenRecord {
+  /** the record commit on `refs/norn/runs/<story>` */
+  sha: string;
+  /** its `Norn-Branch-Commit`; null = recorded without a branch (B33) */
+  branch_commit: string | null;
+  /** unpacked into the machine dir (false: this checkout holds the claim and keeps its own run state) */
+  unpacked: boolean;
+}
+type Staged = Extract<StagedRecord, { ok: true }>;
+
+/**
+ * gh-195 D6, D10 (B22, B33; review F1, S2): before anything is taken, the story's record —
+ * `refs/norn/runs/<story>` fetched from `remote` alone (objects only, no local ref yet; without a remote
+ * this checkout's own ref) — and, unless `keepLocal`, staged beside its place with every file validated
+ * (S1, S2). Null = no record ref (gh-195/11). A record that cannot be fetched or does not validate is
+ * refused here, with no claim taken and nothing changed.
+ */
+async function prepareRecord(ctx: Context, remote: string | null, story: RunStory, keepLocal: boolean): Promise<{ taken: TakenRecord; staged: Staged | null } | null> {
+  const key = story.key;
+  const sha = remote
+    ? await fetchRecordCommit(ctx.root, remote, key).catch((e: unknown) => {
+        throw failure(`cannot fetch ${recordRef(key)}: ${(e as Error).message}; nothing was taken`, `check the network, then ${cmd.storyCheckout(key)} again`, "network");
+      })
+    : ((await readRecordRef(ctx.root, key))?.sha ?? null);
+  if (!sha) return null;
+  let staged: Staged | null = null;
+  if (!keepLocal) {
+    const r = stageRecordSync(ctx.root, sha, storyRunStateDir(ctx.root, story));
+    if (!r.ok)
+      throw failure(
+        `${recordRef(key)} at ${sha} does not unpack: ${r.errors.map((e) => `${e.file}: ${e.errors.map((x) => x.message).join(", ")}`).join("; ")}; nothing was taken`,
+        `fix or delete ${recordRef(key)} on ${remote ?? "this checkout"}, then ${cmd.storyCheckout(key)} again`,
+        "record_corrupt",
+      );
+    staged = r;
+  }
+  return { taken: { sha, branch_commit: await recordBranchCommit(ctx.root, sha), unpacked: !keepLocal }, staged };
+}
+
+/**
+ * T5a (B23, B24): the record's branch commit `gone` is gone when it is not here or not an ancestor of the
+ * story branch `head`. Once per gone commit (review#2 F2): a take of this record that already carries the
+ * same rewrite (a checkout retried after a failure, or run again by the holder) is not repeated.
+ */
+async function rewrittenSince(git: GitPort, root: string, gone: string | null, head: string | null, storyRuns: string): Promise<Rewritten | null> {
+  if (!gone || !head) return null; // B33: no branch, no check
+  if ((await git.revParse(root, `${gone}^{commit}`)) && (await git.isAncestor(root, gone, head))) return null;
+  const seen = listReceipts(storyRuns).receipts.some(({ receipt: r }) => r.kind === "take" && r.rewritten?.gone === gone);
+  return seen ? null : { gone, head };
+}
+
+/** What a takeover with the record lost starts (gh-195 D10): a new round read off the story branch head. */
+interface LostRecord {
+  workflow: { name: string; source: string; workflow: Workflow };
+  step: string;
+  /** the claim's holder the record was on; null when the claim was free */
+  holder: string | null;
+  line: string;
+}
+
+/**
+ * T5b (gh-195 B25, B26, D10): with no record to take over, the round a takeover starts from the branch `head`
+ * (`headRef`, its ref) — or null when there is nothing to restart: the story not started on the branch
+ * (its frontmatter not `active`: the tick starts it as any new story) or an older norn's run state still
+ * on the branch (the tick moves it off, B34). The frontmatter's workflow pinned fresh from the branch; a
+ * missing or invalid one refuses before anything is taken. The step: `restartStepOf` the story unit's
+ * last boundary on the branch (its `Norn-Next`, S4).
+ */
+async function lostRecord(git: GitPort, root: string, story: RunStory, branch: string, head: string, headRef: string, holder: string | null): Promise<LostRecord | null> {
+  const key = story.key;
+  const file = `${story.spec_dir}/${SPEC_FILE}`;
+  const raw = await git.show(root, head, file);
+  if (raw === null) return null;
+  const fm = parseStoryFile(raw, file);
+  // S2 (review#1 S3): a story file that fails validation is refused, never read as "not started"
+  if (!fm.ok)
+    throw corruptError(
+      `the record of ${key} is lost and ${file} on ${branch} ${fm.reason === "corrupt" ? `fails validation (${fm.error.errors.map((e) => e.message).join(", ")})` : "cannot be read"}; nothing was taken`,
+      `fix ${file} on ${branch}, then ${cmd.storyCheckout(key)} again`,
+      fm.reason === "corrupt" ? [fm.error] : undefined,
+    );
+  if (fm.value.frontmatter.status !== "active") return null;
+  if (await git.hasPath(root, head, treeStoryRunStatePath(story))) return null;
+  const name = fm.value.frontmatter.workflow;
+  const again = cmd.storyCheckout(key);
+  let found: { path: string; source: string } | null = null;
+  for (const ext of WORKFLOW_EXT) {
+    const path = `${WORKFLOWS_DIR}/${name}${ext}`;
+    const source = await git.show(root, head, path);
+    if (source !== null) {
+      found = { path, source };
+      break;
+    }
+  }
+  if (!found) throw refuse(`the record of ${key} is lost and ${branch} has no workflow '${name}' to restart it with; nothing was taken`, `add ${WORKFLOWS_DIR}/${name}.yaml to ${branch}, then ${again} again`, "workflow_invalid");
+  const parsed = parseWorkflowText(found.source, found.path);
+  const issues = parsed.ok ? checkWorkflowLevel(parsed.value, "story").map((i) => i.message) : [parsed.reason === "corrupt" ? parsed.error.errors.map((e) => e.message).join(", ") : parsed.reason];
+  if (!parsed.ok || issues.length || parsed.value.name !== name)
+    throw refuse(
+      `the record of ${key} is lost and workflow '${name}' on ${branch} is invalid (${issues.join("; ") || `its name is not '${name}'`}); nothing was taken`,
+      `fix ${found.path} on ${branch}, then ${again} again`,
+      "workflow_invalid",
+    );
+  const last = await lastBoundary(root, headRef, key, null, { strict: true }).catch((e: unknown) => {
+    throw failure(`the record of ${key} is lost and ${branch}'s boundaries cannot be read: ${(e as Error).message}; nothing was taken`, `check the repository, then ${again} again`, "git_failed");
+  });
+  const step = restartStepOf(parsed.value, last);
+  return { workflow: { name, source: found.source, workflow: parsed.value }, step, holder, line: recordLostLine(key, holder, step) };
+}
+
+/**
+ * gh-195 B25 (D10): the new round of a lost record, written into `base` (a story's run-state folder staged
+ * empty): its workflow pinned, the take receipt first (P6), then the state at the restart step — round 1
+ * of the record that starts here, attempt 1, counters at zero — last (S5). The tick applies the take.
+ */
+function writeLostRound(base: string, key: string, lost: LostRecord, take: TakeFacts & { rewritten: null; record_lost: true }): { receipt: string | null } {
+  const dir = runStateStartDirIn(base, STORY_UNIT_DIR, lost.workflow.name);
+  const pin = pinWorkflow(dir, lost.workflow.source);
+  const state = initialState({ unit: { story: key, slice: null, dir: STORY_UNIT_DIR, key }, workflow: lost.workflow.workflow, workflowName: lost.workflow.name, workflowHash: pin.hash, now: take.now, at: lost.step });
+  const r = takeReceipt(dir, take, state);
+  writeState(dir, state);
+  return r;
+}
+
+/** R3.3: a local branch that has commits its remote branch does not, and the other way round (norn never resets work). */
+async function divergedFrom(git: GitPort, root: string, branch: string, upstream: string): Promise<boolean> {
+  const cur = await git.readRef(root, `refs/heads/${branch}`);
+  const up = await git.readRef(root, upstream);
+  if (!cur || !up || cur === up) return false;
+  return !(await git.isAncestor(root, cur, up)) && !(await git.isAncestor(root, up, cur));
 }
 
 interface UnitView {
@@ -100,8 +319,12 @@ export type CheckoutRecord = (restored: { storyWt: string; spec_dir: string; wor
   value: Record<string, unknown>;
 };
 
-/** T5: claim `key` here (`force` takes a live claim over) and restore its worktrees from the pushed branches. */
-export async function checkoutStory(ctx: Context, key: string, force: boolean, more?: CheckoutRecord) {
+/**
+ * T5: claim `key` here (`force` takes a live claim over), restore its record from its ref and its
+ * worktrees from the pushed branches (the order is in the header). `record: false`: the caller restored
+ * the record itself (`story reopen`).
+ */
+export async function checkoutStory(ctx: Context, key: string, force: boolean, more?: CheckoutRecord, opts: { record?: boolean } = {}) {
   const root = ctx.root;
   const config = ctx.config;
   const ports = await ctx.ports();
@@ -109,13 +332,14 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
   const now = ctx.clock.now();
   const nowIso = ctx.clock.iso();
   const remote = await gitRemote(ctx.git, ctx.root, ctx.config.git_remote);
+  const again = cmd.storyCheckout(key);
+  const held = `the claim is held by you now; run ${again} again`;
 
   const branch = await findStoryBranch(ctx, key, remote);
-  if (!branch) throw refuse(`no story branch for ${key}${remote ? ` on ${remote}` : ""}`, `${cmd.sync()} (intake creates it) or check the story key`, "unknown_story");
-  const slug = branch.slice(key.length + 1);
-  const spec_dir = specDir(key, slug);
+  const spec_dir = branch ? specDir(key, branch.slice(key.length + 1)) : "";
+  const run = { key, spec_dir };
 
-  // ---- 1. claim (T3, T5)
+  // ---- 1. the claim as on the remote (T3, T5)
   const hb = heartbeatId(root, now);
   const holder = machineHolder(ctx.env);
   const cur = await claimFor(ctx, key, { remote, unreadable: (e) => failure(`cannot read the claim: ${e.message}`, "check the network, then retry", "network") });
@@ -125,129 +349,235 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
   const mine = writtenHere(cur, hb);
   const forced = force && (cur.state === "other" || cur.state === "corrupt");
   const prev = cur.state === "none" || cur.state === "corrupt" ? null : cur.blob;
-  const blob = newClaimBlob({
-    story: key,
-    holder,
-    heartbeat_id: hb,
-    now,
-    at: nowIso,
-    lease: config.claim.lease,
-    ...(mine && prev ? { acquired_at: prev.acquired_at } : {}),
-    ...(forced ? { forced_from: prev ? `${prev.holder} (heartbeat ${prev.heartbeat_id}, expires ${prev.expires_at})` : "corrupt claim" } : {}),
-  });
-  const claimed = await acquireClaim(root, remote, blob, { now, force: forced });
-  if (!claimed.ok) {
-    if (claimed.reason === "held") throw claimHeld(claimed.holder, `wait until ${claimed.holder.expires_at} or ${cmd.storyCheckout(key, { force: true })}`);
-    throw failure(`claim failed (${claimed.reason}): ${claimed.message}`, `retry: ${cmd.storyCheckout(key)}`, "claim_failed");
-  }
-  // R10.1 (M8, A17): every take is in the record — the trace event first; the `take` receipt on the
-  // story unit as soon as the story branch is checked out (it lives on that branch), before anything else
-  const expired = cur.state === "expired";
-  const takeFacts = { previous_holder: prev?.holder ?? null, previous_heartbeat_id: prev?.heartbeat_id ?? null, expired, forced };
-  appendTrace(root, traceEvent("take", now, { at: nowIso, unit: key, holder, heartbeat_id: hb, ...takeFacts }));
 
-  // ---- 2. branches → worktrees (T5, K4)
-  const problems: string[] = [];
-  if (remote) {
-    const f = await git
-      .fetch(root, remote, [`+refs/heads/${branch}:refs/remotes/${remote}/${branch}`, `+refs/heads/${key}/*:refs/remotes/${remote}/${key}/*`], { quiet: true })
-      .catch((e: unknown) => e as Error);
-    if (f instanceof Error) throw failure(`fetch failed: ${f.message}`, `retry: ${cmd.storyCheckout(key)} (the claim is held by you now)`, "network");
-  }
-  const wtByBranch = new Map((await git.worktreeList(root)).filter((w) => w.branch).map((w) => [w.branch as string, w.path]));
-  const equip = { root, home: ctx.home, config, now: nowIso, liveness: leaseLiveness((p) => ports.process.isAlive(p)) };
-  const worktrees: Array<{ unit: string; path: string; branch: string; local: string; created: boolean; slot: number | null }> = [];
-
-  const checkout = async (t: WorktreeTarget, unitKey: string): Promise<boolean> => {
-    const existing = wtByBranch.get(t.branch) ?? null;
-    const path = existing ?? t.path;
-    const synced = remote ? await syncLocalBranch(git, root, t.branch, `refs/remotes/${remote}/${t.branch}`, existing) : { ok: true as const, local: "up-to-date" as const };
-    if (!synced.ok) {
-      problems.push(`${unitKey}: ${synced.error}`);
-      return false;
+  // ---- 2. the record, fetched and staged (review F1); the holder keeps its own run state unless the
+  // remote record is newer than it (10-R3-F1), so an older copy a crashed or failed checkout left behind
+  // is never pushed over a newer record. Newer: the remote record continues from the record ref this
+  // checkout last had, or this checkout had none and the remote now has one (someone else pushed it:
+  // the copy here is set aside as superseded in step 5, never lost). A ref moved off the holder's line
+  // (08-F4: not a descendant of its own) is not newer: the holder's run state is kept, its next push on top.
+  const localCopy = existsSync(storyRunStateDir(root, run));
+  const ownRef = mine && localCopy ? await readRecordRef(root, key) : null;
+  const remoteSha =
+    mine && localCopy && remote
+      ? await fetchRecordCommit(root, remote, key).catch((e: unknown) => {
+          throw failure(`cannot fetch ${recordRef(key)}: ${(e as Error).message}; nothing was taken`, `check the network, then ${again} again`, "network");
+        })
+      : null;
+  const continues = async (own: string, theirs: string): Promise<boolean> => {
+    try {
+      return await git.isAncestor(root, own, theirs);
+    } catch (e) {
+      // a git failure is no answer: refused before the claim, never read as "not newer"
+      throw failure(`cannot tell whether ${recordRef(key)} on ${remote} continues from ${own.slice(0, 12)}: ${(e as Error).message}; nothing was taken`, `retry: ${again}`, "git_failed");
     }
-    let created = false;
-    if (!existsSync(path)) {
-      if (existing) await git.worktreePrune(root).catch(() => undefined);
-      await git.worktreeAdd(root, path, t.branch);
-      created = true;
-    }
-    const slot = await equipWorktree(equip, { ...t, path });
-    worktrees.push({ unit: unitKey, path, branch: t.branch, local: synced.local, created, slot });
-    return true;
   };
+  const newer = remoteSha !== null && remoteSha !== (ownRef?.sha ?? null) && (ownRef === null || (await continues(ownRef.sha, remoteSha)));
+  const keepLocal = mine && localCopy && !newer;
+  const before = keepLocal ? ownRef : null;
+  // gh-195 D11 (B27; 10-R3-F1, 11-S2): a local copy not kept is never replaced whole: set aside as
+  // superseded once the take is in, or removed quietly when it is a record this machine pushed (on the ref)
+  const setAside = localCopy && !keepLocal ? await localRecordOf(root, run, holder) : null;
+  const prepared = opts.record === false ? null : await prepareRecord(ctx, remote, run, keepLocal);
+  // B33: a story without a branch is taken over from its record alone
+  if (!branch && !prepared) throw refuse(`no story branch for ${key}${remote ? ` on ${remote}` : ""}`, `${cmd.sync()} (intake creates it) or check the story key`, "unknown_story");
+  const staged = prepared?.staged ?? null;
+  try {
+    // ---- 3. the branches, then the record's branch commit against the story branch (T5a)
+    if (remote && branch) {
+      const f = await git
+        .fetch(root, remote, [`+refs/heads/${branch}:refs/remotes/${remote}/${branch}`, `+refs/heads/${key}/*:refs/remotes/${remote}/${key}/*`], { quiet: true })
+        .catch((e: unknown) => e as Error);
+      if (f instanceof Error) throw failure(`fetch failed: ${f.message}; nothing was taken`, `check the network, then ${again} again`, "network");
+      if (await divergedFrom(git, root, branch, `refs/remotes/${remote}/${branch}`))
+        throw failure(`${branch} has diverged from ${remote}/${branch}; nothing was taken`, `reconcile ${branch} by hand (norn never resets work), then ${again} again`, "branch_diverged");
+    }
+    // the story branch as taken: the remote's, else the local one
+    const headRef = branch ? (remote ? `refs/remotes/${remote}/${branch}` : `refs/heads/${branch}`) : null;
+    // T5b (B25, B26, D10): no record on the ref and none of this checkout's own: the record may be lost
+    const maybeLost = !prepared && !keepLocal && opts.record !== false;
+    const head = headRef && (prepared || maybeLost) ? await git.revParse(root, headRef) : null;
+    // the story unit's run state the take goes into: the staged record, or the machine dir's
+    const storyRuns = staged ? runStateDirIn(staged.dir, STORY_UNIT_DIR) : runStateDir(root, run, STORY_UNIT_DIR);
+    // the holder's own run state matches the record it last pushed (its local ref before this checkout)
+    const gone = prepared ? (prepared.taken.unpacked ? prepared.taken.branch_commit : before ? await recordBranchCommit(root, before.sha) : null) : null;
+    const rewritten = await rewrittenSince(git, root, gone, head, storyRuns);
+    const lost = maybeLost && branch && headRef && head ? await lostRecord(git, root, run, branch, head, headRef, prev?.holder ?? null) : null;
 
-  const storyWt = wtByBranch.get(branch) ?? storyWorktreePath(root, key, slug);
-  if (!(await checkout({ path: storyWt, branch, story: key, slice: null, unit: STORY_UNIT_DIR, spec_dir }, key)))
-    throw failure(problems.join("; "), `fix the story branch, then ${cmd.storyCheckout(key)} again (the claim is held by you now)`, "branch_diverged", { claim: blob });
+    // ---- 4. claim by CAS, then the remote record ref must still be the one staged (review#2 F5)
+    const blob = newClaimBlob({
+      story: key,
+      holder,
+      heartbeat_id: hb,
+      now,
+      at: nowIso,
+      lease: config.claim.lease,
+      ...(mine && prev ? { acquired_at: prev.acquired_at } : {}),
+      ...(forced ? { forced_from: prev ? `${prev.holder} (heartbeat ${prev.heartbeat_id}, expires ${prev.expires_at})` : "corrupt claim" } : {}),
+    });
+    const claimed = await acquireClaim(root, remote, blob, { now, force: forced });
+    if (!claimed.ok) {
+      if (claimed.reason === "held") throw claimHeld(claimed.holder, `wait until ${claimed.holder.expires_at} or ${cmd.storyCheckout(key, { force: true })}`);
+      throw failure(`claim failed (${claimed.reason}): ${claimed.message}`, `retry: ${again}`, "claim_failed");
+    }
+    // review#1 S1: with the record lost, the ref must still be absent — a holder that pushed its record
+    // meanwhile (a handoff, a `remote` boundary) has a record no new round may hide
+    const expected = staged && prepared ? prepared.taken.sha : lost ? null : undefined;
+    if (remote && expected !== undefined) {
+      const now2 = await remoteRecordSha(root, remote, key).catch((e: unknown) => e as Error);
+      if (now2 !== expected) {
+        // a claim this checkout did not hold before goes back; its own stays
+        const back = mine ? null : await releaseClaim(root, remote, key, claimed.sha);
+        const why =
+          now2 instanceof Error
+            ? `cannot re-read ${recordRef(key)}: ${now2.message}`
+            : `${recordRef(key)} moved on ${remote} while the claim was taken (${expected ?? "none"} → ${now2 ?? "deleted"}): its holder may still be running`;
+        const gave = back === null ? "" : back.ok ? "; the claim was given back, nothing was taken" : `; the claim could not be given back (${back.message})`;
+        throw failure(`${why}${gave}`, `make sure the previous holder stopped, then ${again} again`, "record_moved");
+      }
+    }
 
-  const storyRuns = unitDir(join(storyWt, spec_dir), STORY_UNIT_DIR);
-  const record = takeReceipt(storyRuns, { holder, now: nowIso, ...takeFacts });
+    // ---- 5. locally: the take first (trace event, receipt into the record), then the record into place
+    const expired = cur.state === "expired";
+    const takeFacts = { previous_holder: prev?.holder ?? null, previous_heartbeat_id: prev?.heartbeat_id ?? null, expired, forced };
+    appendTrace(root, traceEvent("take", now, { at: nowIso, unit: key, holder, heartbeat_id: hb, ...takeFacts }));
+    let record: { receipt: string | null; note?: string };
+    let superseded: string | null = null;
+    try {
+      if (setAside && (staged || lost) && existsSync(storyRunStateDir(root, run))) {
+        if (setAside.on_ref) dropLocalRecord(root, run, ulid(now));
+        else {
+          const by = (prepared ? await recordHolder(root, prepared.taken.sha) : null) ?? holder;
+          superseded = setAsideRecord(root, run, `${key}-${ulid(now)}`, { story: key, holder: by, last_receipt: setAside.last_receipt, superseded_at: nowIso });
+        }
+      }
+      if (lost) {
+        const fresh = stageEmptyRecord(storyRunStateDir(root, run));
+        try {
+          record = writeLostRound(fresh.dir, key, lost, { holder, now: nowIso, ...takeFacts, rewritten: null, record_lost: true });
+          fresh.place();
+        } finally {
+          fresh.discard();
+        }
+      } else record = takeReceipt(storyRuns, { holder, now: nowIso, ...takeFacts, rewritten, record_lost: false });
+      staged?.place();
+      if (prepared) await setRecordRef(root, key, prepared.taken.sha);
+    } catch (e) {
+      throw failure(`cannot put the record of ${key} in place: ${(e as Error).message}`, held, "record_place_failed");
+    }
+    const taken = prepared?.taken ?? null;
+    const placedRuns = runStateDir(root, run, STORY_UNIT_DIR);
+    const next = nextCursor(placedRuns, rewritten?.gone ?? null);
 
-  const snapshot = loadStory(storyWt, join(storyWt, spec_dir));
-  const units: UnitView[] = [];
-  const view = (unit: string, wt: string | null, runsDir: string): UnitView => {
-    const st = readState(runsDir);
-    return {
-      unit,
-      worktree: wt,
-      step: st.ok ? st.value.step : null,
-      status: st.ok ? st.value.status : null,
-      park: st.ok ? (st.value.park ?? null) : null,
-      handoff: readText(handoffPath(runsDir)),
+    // ---- 5b. branches → worktrees (T5, K4)
+    const problems: string[] = [];
+    const wtByBranch = new Map((await git.worktreeList(root)).filter((w) => w.branch).map((w) => [w.branch as string, w.path]));
+    const equip = { root, home: ctx.home, config, now: nowIso, liveness: leaseLiveness((p) => ports.process.isAlive(p)) };
+    const worktrees: Array<{ unit: string; path: string; branch: string; local: string; created: boolean; slot: number | null }> = [];
+
+    const checkout = async (t: WorktreeTarget, unitKey: string): Promise<boolean> => {
+      const existing = wtByBranch.get(t.branch) ?? null;
+      const path = existing ?? t.path;
+      const synced = remote ? await syncLocalBranch(git, root, t.branch, `refs/remotes/${remote}/${t.branch}`, existing) : { ok: true as const, local: "up-to-date" as const };
+      if (!synced.ok) {
+        problems.push(`${unitKey}: ${synced.error}`);
+        return false;
+      }
+      let created = false;
+      if (!existsSync(path)) {
+        if (existing) await git.worktreePrune(root).catch(() => undefined);
+        await git.worktreeAdd(root, path, t.branch);
+        created = true;
+      }
+      const slot = await equipWorktree(equip, { ...t, path });
+      worktrees.push({ unit: unitKey, path, branch: t.branch, local: synced.local, created, slot });
+      return true;
     };
-  };
-  units.push(view(key, storyWt, storyRuns));
-  const sliceRefs = new Set(
-    (await git.listRefs(root, remote ? `refs/remotes/${remote}/${key}/` : `refs/heads/${key}/`)).map((r) => r.ref.replace(remote ? `refs/remotes/${remote}/` : "refs/heads/", "")),
-  );
-  for (const s of snapshot?.slices ?? []) {
-    const sb = sliceBranch(key, s.nn, s.slug);
-    const dir = `${s.nn}-${s.slug}`;
-    const status = s.frontmatter?.status;
-    let wt: string | null = null;
-    if (sliceRefs.has(sb) && status !== "integrated" && status !== "dropped") {
-      const path = wtByBranch.get(sb) ?? sliceWorktreePath(storyWt, s.nn, s.slug);
-      if (await checkout({ path, branch: sb, story: key, slice: s.key, unit: dir, spec_dir }, s.key)) wt = wtByBranch.get(sb) ?? path;
+
+    const storyWt = branch ? (wtByBranch.get(branch) ?? storyWorktreePath(root, key, branch.slice(key.length + 1))) : null;
+    if (branch && storyWt && !(await checkout({ path: storyWt, branch, story: key, slice: null, unit: STORY_UNIT_DIR, spec_dir }, key)))
+      throw failure(`${problems.join("; ")}; ${held}`, `fix the story branch, then ${again} again`, "branch_diverged", { claim: blob });
+
+    const snapshot = storyWt ? loadStory(storyWt, join(storyWt, spec_dir)) : null;
+    const units: UnitView[] = [];
+    const view = (unit: string, wt: string | null, runsDir: string, handoff: string | null, at?: UnitState | null): UnitView => {
+      const read = readState(runsDir);
+      const st = at ?? (read.ok ? read.value : null);
+      const wf = readPinnedWorkflow(runsDir);
+      const prose = handoff ? (readHandoff(handoff)?.body ?? null) : null;
+      return {
+        unit,
+        worktree: wt,
+        step: st ? st.step : null,
+        status: st ? st.status : null,
+        park: st ? (st.park ?? null) : null,
+        // B7: the status the handoff's generated header used to carry, above its written part
+        handoff: st ? renderHandoffWithStatus(st, prose, { workflow: wf.ok ? wf.value.workflow : null }) : prose,
+      };
+    };
+    const storyHandoff = storyWt ? handoffPath(join(storyWt, spec_dir), STORY_UNIT_DIR) : null;
+    // review#2 F7: the story unit as the next tick will have it (the take applied)
+    units.push(view(key, storyWt, placedRuns, storyHandoff, next.state));
+    const sliceRefs = new Set(
+      (await git.listRefs(root, remote ? `refs/remotes/${remote}/${key}/` : `refs/heads/${key}/`)).map((r) => r.ref.replace(remote ? `refs/remotes/${remote}/` : "refs/heads/", "")),
+    );
+    for (const s of snapshot?.slices ?? []) {
+      const sb = sliceBranch(key, s.nn, s.slug);
+      const dir = `${s.nn}-${s.slug}`;
+      const status = s.frontmatter?.status;
+      let wt: string | null = null;
+      if (storyWt && sliceRefs.has(sb) && status !== "integrated" && status !== "dropped") {
+        const path = wtByBranch.get(sb) ?? sliceWorktreePath(storyWt, s.nn, s.slug);
+        if (await checkout({ path, branch: sb, story: key, slice: s.key, unit: dir, spec_dir }, s.key)) wt = wtByBranch.get(sb) ?? path;
+      }
+      const runs = runStateDir(root, run, dir);
+      const handoffRoot = wt ?? storyWt;
+      if (existsSync(runs)) units.push(view(s.key, wt, runs, handoffRoot ? handoffPath(join(handoffRoot, spec_dir), dir) : null));
     }
-    const runs = unitDir(join(wt ?? storyWt, spec_dir), dir);
-    if (existsSync(runs)) units.push(view(s.key, wt, runs));
-  }
 
-  // ---- commit the take receipt (R10.1) and journal a forced take (T5): claim blob `forced_from` +
-  // a handoff heartbeat line, in the same commit, pushed (this heartbeat holds the claim now)
-  let journal: unknown = null;
-  let committed: { commit: string | null; pushed: boolean | null } | null = null;
-  const runsDir = storyRuns;
-  const line = forced ? `- ${nowIso} take --force by ${holder} from ${blob.forced_from}` : null;
-  if (line && existsSync(runsDir)) appendHandoffHeartbeat(runsDir, line);
-  const extra = more?.({ storyWt, spec_dir, worktrees });
-  if (record.receipt || (line && existsSync(runsDir)) || extra?.paths.length) {
-    const paths = [
-      ...(record.receipt ? [relative(storyWt, join(runsDir, "receipts", record.receipt))] : []),
-      ...(line ? [relative(storyWt, handoffPath(runsDir))] : []),
-      ...(extra?.paths ?? []),
-    ];
-    const message = extra?.message ?? (forced ? `norn: ${key} taken with --force by ${holder}` : `norn: ${key} taken by ${holder}`);
-    const sha = await git.commit(storyWt, { message, trailers: { "Norn-Story": key, "Norn-Step": "take", "Norn-Tick": ulid(now) }, paths });
-    const pushed = remote && sha ? await git.push(storyWt, remote, `refs/heads/${branch}:refs/heads/${branch}`) : null;
-    committed = { commit: sha, pushed: pushed ? pushed.ok : null };
-  }
-  if (line) journal = existsSync(runsDir) ? { line, ...committed } : { line, commit: null, note: "story unit not started; journaled in the claim blob (forced_from)" };
+    // ---- journal a forced take (T5): claim blob `forced_from` + a Progress line in the story's
+    // handoff (gh-195 B6: prose, no heartbeat block), committed and pushed; the take receipt stays in
+    // the machine dir (S12, D8)
+    let journal: unknown = null;
+    let committed: { commit: string | null; pushed: boolean | null } | null = null;
+    const line = forced ? `${nowIso} take --force by ${holder} from ${blob.forced_from}` : null;
+    const journaled = line !== null && storyHandoff !== null && existsSync(storyHandoff);
+    if (journaled) appendProgress(storyHandoff, line);
+    const extra = storyWt ? more?.({ storyWt, spec_dir, worktrees }) : undefined;
+    if (storyWt && branch && (journaled || extra?.paths.length)) {
+      const paths = [...(journaled && storyHandoff ? [relative(storyWt, storyHandoff)] : []), ...(extra?.paths ?? [])];
+      const message = extra?.message ?? (forced ? `norn: ${key} taken with --force by ${holder}` : `norn: ${key} taken by ${holder}`);
+      const sha = await git.commit(storyWt, { message, trailers: { "Norn-Story": key, "Norn-Step": "take", "Norn-Tick": ulid(now) }, paths });
+      const pushed = remote && sha ? await git.push(storyWt, remote, `refs/heads/${branch}:refs/heads/${branch}`) : null;
+      committed = { commit: sha, pushed: pushed ? pushed.ok : null };
+    }
+    if (line) journal = journaled ? { line, ...committed } : { line, commit: null, note: "story has no handoff yet; journaled in the claim blob (forced_from)" };
 
-  const value = {
-    story: key,
-    branch,
-    claim: { holder: blob.holder, heartbeat_id: blob.heartbeat_id, acquired_at: blob.acquired_at, expires_at: blob.expires_at, ...(blob.forced_from ? { forced_from: blob.forced_from } : {}) },
-    taken_from: prev && !mine ? { holder: prev.holder, since: prev.acquired_at, expires_at: prev.expires_at, expired: Date.parse(prev.expires_at) <= now } : null,
-    forced,
-    journal,
-    receipt: record.receipt ? { file: record.receipt, ...committed } : { file: null, note: record.note },
-    worktrees,
-    units,
-    ...(problems.length ? { problems } : {}),
-    ...extra?.value,
-    next: cmd.tick(),
-  };
-  return problems.length ? withExit(value, ExitCode.error) : value;
+    const value = {
+      story: key,
+      branch,
+      claim: { holder: blob.holder, heartbeat_id: blob.heartbeat_id, acquired_at: blob.acquired_at, expires_at: blob.expires_at, ...(blob.forced_from ? { forced_from: blob.forced_from } : {}) },
+      taken_from: prev && !mine ? { holder: prev.holder, since: prev.acquired_at, expires_at: prev.expires_at, expired: Date.parse(prev.expires_at) <= now } : null,
+      forced,
+      journal,
+      // S12: the take receipt is in the machine dir, never committed or pushed (D8)
+      receipt: record.receipt ? { file: record.receipt } : { file: null, note: record.note },
+      // T5 (gh-195 D10): the record taken over from its ref; T5a: why the step restarts, when it does
+      record: taken ? { ref: recordRef(key), sha: taken.sha, branch_commit: taken.branch_commit, unpacked: taken.unpacked } : null,
+      // B25 (D10): no record to take over: a new round from the branch
+      record_lost: lost !== null,
+      // gh-195 D11 (B27): this checkout's own older copy, set aside rather than replaced (10-R3-F1, 11-S2)
+      ...(superseded ? { superseded } : {}),
+      ...(lost ? { restarted: lost.line } : next.restarted ? { restarted: next.restarted } : {}),
+      worktrees,
+      units,
+      ...(problems.length ? { problems } : {}),
+      ...extra?.value,
+      next: cmd.tick(),
+    };
+    return problems.length ? withExit(value, ExitCode.error) : value;
+  } finally {
+    // a take refused before the record went into place leaves nothing staged
+    staged?.discard();
+  }
 }

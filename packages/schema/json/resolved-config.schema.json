@@ -19,7 +19,8 @@
     "notify",
     "interval",
     "claim",
-    "trace"
+    "trace",
+    "record"
   ],
   "properties": {
     "agent": {
@@ -198,6 +199,27 @@
         "retain": {
           "minLength": 1,
           "type": "string"
+        }
+      }
+    },
+    "record": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "policy"
+      ],
+      "properties": {
+        "policy": {
+          "anyOf": [
+            {
+              "const": "local",
+              "type": "string"
+            },
+            {
+              "const": "remote",
+              "type": "string"
+            }
+          ]
         }
       }
     }

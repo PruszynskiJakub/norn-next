@@ -67,12 +67,14 @@ export interface OrientReport {
   /** story worktree (or checkout) the spec was read from */
   root: string;
   spec: string;
-  branch: string;
+  /** null: held from its record alone, no branch (B33) */
+  branch: string | null;
   pr: PrView | null;
   /** the PR's state in one word; null when no PR was seen */
   pr_state: "draft" | "open" | "closed" | "merged" | null;
   /** `gh pr view <branch>` / `glab mr view <branch>` */
-  pr_command: string;
+  /** null without a branch */
+  pr_command: string | null;
   waiting: OrientItem[];
   running: OrientItem[];
   /** open notes grouped by unit, the unit with the newest note first */
@@ -144,7 +146,7 @@ export function orientReport(view: ProjectView, key: string, provider: RemotePro
     branch: story.branch,
     pr: story.pr,
     pr_state: prState(story.pr),
-    pr_command: prCommand(provider, story.branch),
+    pr_command: story.branch ? prCommand(provider, story.branch) : null,
     waiting: items.filter((i) => WAITING.includes(i.group)).map(toItem),
     running: items.filter((i) => i.group === "running").map(toItem),
     notes,
@@ -216,14 +218,14 @@ export function formatStoryView(r: OrientReport, now: number, o: { rules?: boole
   if (r.url) out.push(`- Issue: ${r.url}`);
   // gh-71 B28 (D10): the round and its workflow next to the step
   out.push(`- Story: ${r.unit.round ? `round ${r.unit.round} · ` : ""}${r.unit.workflow} · ${unitStanding(r.unit)} · ${r.mode} · ${r.claim}`);
-  out.push(`- Worktree: \`${r.root}\` · branch \`${r.branch}\``);
+  out.push(`- Worktree: \`${r.root}\` · ${r.branch ? `branch \`${r.branch}\`` : "no branch (held from its record, B33)"}`);
   out.push(`- Spec: \`${r.spec}\``, "");
   out.push("## Slices", "");
   if (r.slices.length === 0) out.push("No slices yet.");
   for (const s of r.slices) out.push(sliceLine(s));
   out.push("", "## Pull request", "");
   const seen = r.pr ? ` (seen ${formatAge(now - Date.parse(r.pr.seen_at))} ago)` : "";
-  out.push(`- ${prLine(r.pr)}${seen}`, `- Look: \`${r.pr_command}\`; open it in the browser: \`${cmd.storyView(r.story, { web: true })}\``, "");
+  out.push(`- ${prLine(r.pr)}${seen}`, `- Look: ${r.pr_command ? `\`${r.pr_command}\`` : "no PR without a branch"}; open it in the browser: \`${cmd.storyView(r.story, { web: true })}\``, "");
   out.push("## Waits for the person", "");
   if (r.waiting.length === 0) out.push("Nothing waits for the person.");
   for (const w of r.waiting) {

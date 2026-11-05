@@ -16,6 +16,8 @@ import {
   LocalInboxFile,
   LocalLockFile,
   LocalNoticesFile,
+  LocalRejectedFile,
+  LocalSupersededFile,
   LocalNotifiedFile,
   LocalIssueFile,
   LocalPrFile,
@@ -62,6 +64,8 @@ export const SCHEMAS = {
   "local-lock": LocalLockFile,
   "local-hook-backfill": LocalHookBackfillFile,
   "local-notices": LocalNoticesFile,
+  "local-rejected": LocalRejectedFile,
+  "local-superseded": LocalSupersededFile,
   "local-checkout": LocalCheckoutFile,
 } as const;
 export type SchemaName = keyof typeof SCHEMAS;

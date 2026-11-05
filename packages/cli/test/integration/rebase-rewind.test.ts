@@ -1,15 +1,17 @@
 /**
- * gh-79 (H1, S2, S5): a rebase stopped on conflicts in a story worktree rewinds `runs/` to an older
- * state.json. The tick must not read that as the live unit: no deadline classified against it, no
- * receipt or state.json written into it (commit deferred), so after `git rebase --abort` no stray
- * receipt collides with the committed one of the same number and the unit is not `corrupt`.
+ * gh-79 (H1, S2, S5): a rebase stopped on conflicts in a story worktree. An older norn kept `runs/` on the
+ * branch, so the rebase rewound it to an older state.json; S12 (gh-195/05, B2) keeps run state in the
+ * machine dir, so the rebase leaves it alone. The tick still holds the unit while the rebase is in
+ * progress (H1: nothing is written or committed through it), and after `git rebase --abort` the unit
+ * goes on where it was, not `corrupt`.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
+import { repoConfigPath, workflowsDir } from "@norn/store";
 import { type CliResult, runCli, type TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue, sh } from "../../../../test/support/harness.ts";
+import { runStateOf } from "../../../../test/support/run-state.ts";
 
 const RR = `name: rr
 start: first
@@ -35,7 +37,7 @@ setDefaultTimeout(30_000);
 
 let h: Harness;
 const wt = () => `${h.root}-worktrees/gh-1-add-widget`;
-const runs = () => storyUnitDir(join(wt(), ".agents/specs/gh-1-add-widget"));
+const runs = () => runStateOf(join(wt(), ".agents/specs/gh-1-add-widget"));
 const receipts = () => readdirSync(join(runs(), "receipts")).sort();
 const acted = (r: TickReport) => r.decisions.filter((d) => d.unit === "gh-1" && d.kind !== "noop" && d.rule !== "claim.renew").map((d) => `${d.rule}${d.ok ? "" : ` FAILED ${d.error}`}`);
 function inWt(...argv: string[]): Promise<CliResult> {
@@ -79,14 +81,14 @@ describe("gh-79: a tick mid-rebase", () => {
   });
   afterAll(() => h.cleanup());
 
-  test("mid-rebase the tick writes nothing into the rewound runs/", async () => {
+  test("mid-rebase the run state is not rewound, and the tick writes nothing", async () => {
     expect(() => sh(wt(), ["rebase", "old"])).toThrow(/conflict/i);
-    expect(h.state(runs())).toMatchObject({ step: "first", applied_through: 1 }); // rewound
+    expect(h.state(runs())).toMatchObject({ step: "second", applied_through: 2 }); // S12: not on the branch, so not rewound
     h.clock.advance(5 * 60_000); // first's 1m deadline (from the run's start) is long past
     const r = await h.tick();
     expect(acted(r)).toEqual([]);
     expect(r.decisions.find((d) => d.unit === "gh-1" && d.rule === "unit.rebase_in_progress")).toBeDefined();
-    expect(receipts()).toEqual(["0001-started.json"]);
+    expect(receipts()).toEqual(["0001-started.json", "0002-done.json"]);
   });
 
   test("after `git rebase --abort` the unit is not corrupt", async () => {

@@ -35,6 +35,50 @@ export interface Advance {
   counter?: { name: string; value: number; max: number };
   /** W4 (C3): counters reset to 0 by taking this edge (their `reset_on`), journaled with the advance */
   reset?: string[];
+  /**
+   * gh-195 B18, B19: a person's receipt moved the cursor (a workflow switch, an unstick, an update),
+   * not a step's outcome: no step ended, so its commit is no boundary (no `Norn-Outcome`). Absent = an outcome's edge.
+   */
+  moved?: true;
+}
+
+/**
+ * T5a (gh-195 B24): why a takeover restarts the step — the same words in `norn story checkout`'s output,
+ * the take's log and the brief's "Why this attempt". `gone` is the record's `Norn-Branch-Commit`.
+ */
+export const branchRewrittenLine = (story: string, gone: string, step: string, attempt: number): string =>
+  `the branch of ${story} was rewritten since the record (${gone} is gone); restarting ${step} as attempt ${attempt}`;
+
+/**
+ * gh-195 B25 (D10): what a takeover with the record lost says — in `norn story checkout`'s output, the
+ * take's log and the brief's "Why this attempt". `holder` is the claim's holder the record was on
+ * (null: the claim was free, its holder unknown).
+ */
+export const recordLostLine = (story: string, holder: string | null, step: string): string =>
+  `the run record of ${story} was on ${holder ?? "the machine that last held it"} and is lost; restarting ${step} from the branch`;
+
+/**
+ * T5b (gh-195 B25, D10): the step a takeover with the record lost restarts, from the story unit's last
+ * boundary commit on the branch (`last`, store `lastBoundary`: the newest with `Norn-Outcome`; its
+ * `Norn-Step` it ended and its `Norn-Next`): the step that boundary moved the cursor to when `wf` has it;
+ * else (`$done`, or another round's step) the step it ended when `wf` has that; else, or with no
+ * boundary (a branch only an older norn committed to: it wrote no `Norn-Outcome`), the workflow's first step.
+ */
+export function restartStepOf(wf: Workflow, last: { ended: string; next: string | null } | null): string {
+  for (const at of [last?.next, last?.ended]) if (at && stepOf(wf, at)) return at;
+  return wf.start;
+}
+
+/**
+ * T5a (gh-195 B24): what applying take receipt `r` at cursor `st` does about a rewritten branch.
+ * `restart`: the cursor is the one the record was written at, or one a session already ran in — it
+ * judged code that is gone, so the step is entered again as a new attempt. `fresh`: the record's own
+ * receipts just entered this attempt and nothing ran in it yet, so it is the restart as it is (review#2
+ * F4: attempts and visits count once, GR8). `null`: nothing to restart (no rewrite, `$done`, stuck).
+ */
+export function rewriteRestart(st: UnitState, r: Receipt, wf: Workflow): "restart" | "fresh" | null {
+  if (r.kind !== "take" || !r.rewritten || st.status === "stuck" || st.status === "corrupt" || stepOf(wf, st.step) === null) return null;
+  return (st.step === r.step && st.attempt === r.attempt) || st.run ? "restart" : "fresh";
 }
 
 export interface Rejection {
@@ -55,7 +99,7 @@ export interface ApplyResult {
   route: "nudge" | "retry" | null;
   /** answer text to type into the live session (B2), set when the last receipt was an answer */
   deliver: string | null;
-  /** one line per applied receipt, for handoff.md heartbeat lines (O6) */
+  /** one line per applied receipt, for the commit message (O6: never written into the handoff) */
   log: string[];
 }
 
@@ -169,7 +213,16 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
   if (r.kind === "take") {
     // R10.1: a takeover is a record, not a cursor move — applied at any cursor, like mode
     const from = r.previous_holder ? ` from ${r.previous_holder}${r.forced ? " (forced)" : r.expired ? " (expired)" : ""}` : "";
-    return { state: st, log: `taken by ${r.who ?? r.by}${from}` };
+    // gh-195 B25: a take whose record was lost already is the new round's first entry: nothing to move
+    const log = `taken by ${r.who ?? r.by}${from}${r.record_lost ? `; ${recordLostLine(st.story, r.previous_holder, r.step)}` : ""}`;
+    // T5a (gh-195 B24): the record judged code that is gone — the step the cursor is at when the take
+    // applies (after the record's own unapplied receipts, review F3) starts again as a new attempt,
+    // counters and history kept; never at `$done` or stuck (`rewriteRestart`)
+    const how = rewriteRestart(st, r, wf);
+    if (!how || !r.rewritten) return { state: st, log };
+    const next = how === "restart" ? enterStep(st, wf, st.step, ctx.now) : st;
+    const line = `${log}; ${branchRewrittenLine(st.story, r.rewritten.gone, next.step, next.attempt)}`;
+    return how === "restart" ? { state: next, log: line, advance: { from: st.step, outcome: "take", to: st.step } } : { state: next, log: line };
   }
   if (st.status === "corrupt") return { reject: "unit is corrupt (S2)" };
   if (r.slice !== undefined && r.slice !== st.slice) return { reject: `receipt for unit ${r.slice ?? st.story}, not ${st.slice ?? st.story}` };
@@ -183,7 +236,7 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
   if (r.kind === "workflow") {
     if (!stepOf(wf, r.to)) return { reject: `workflow ${r.name} has no step '${r.to}'` };
     const next = enterStep({ ...st, workflow: r.name, workflow_hash: r.to_hash }, wf, r.to, ctx.now);
-    return { state: next, log: `workflow → ${r.name} at ${r.to}`, advance: { from: st.step, outcome: "workflow", to: r.to } };
+    return { state: next, log: `workflow → ${r.name} at ${r.to}`, advance: { from: st.step, outcome: "workflow", to: r.to, moved: true } };
   }
   if (r.kind === "unstick") return unstick(st, r, ctx);
   if (!step) return { reject: `step '${st.step}' no longer exists (S7); use ${cmd.runRerun(undefined, { step: "<step>" })}` };
@@ -302,7 +355,7 @@ function unstick(st: UnitState, r: ReceiptOf<"unstick">, ctx: ApplyContext): Ste
   for (const c of r.reset ?? []) counters[c] = 0;
   const next = enterStep({ ...st, counters }, ctx.workflow, to, ctx.now);
   const resets = r.reset?.length ? ` (reset ${r.reset.join(", ")})` : "";
-  return { state: next, log: `unstick → ${to}${resets}`, advance: { from: st.step, outcome: "unstick", to } };
+  return { state: next, log: `unstick → ${to}${resets}`, advance: { from: st.step, outcome: "unstick", to, moved: true } };
 }
 
 /**
@@ -318,7 +371,7 @@ function updateFrom(st: UnitState, r: ReceiptOf<"update">, ctx: ApplyContext): S
   if (!waiting) return { reject: `unit is ${st.status}${st.park ? ` (${st.park.kind})` : ""}; update needs it done, at a gate, stuck or held by drifted skills` };
   if (!stepOf(ctx.workflow, r.to)) return { reject: `no step '${r.to}' in workflow ${ctx.workflow.name}` };
   const next = enterStep(st, ctx.workflow, r.to, ctx.now);
-  return { state: next, log: `update by ${r.who ?? r.by}: ${st.step} → ${r.to}`, advance: { from: st.step, outcome: "update", to: r.to } };
+  return { state: next, log: `update by ${r.who ?? r.by}: ${st.step} → ${r.to}`, advance: { from: st.step, outcome: "update", to: r.to, moved: true } };
 }
 
 /** Take the declared edge for `outcome` at the cursor (W3), counting it (W4). */

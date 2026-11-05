@@ -15,7 +15,7 @@ steps:
     instructions: >-
       The issue is mirrored in spec.md; read its comments too. First follow the report as a user, through
       the real interface (`bun packages/cli/src/main.ts …` after `bun install --frozen-lockfile`, never the installed
-      `norn`), and record what you saw. Run that dev build only in a throwaway git repo under $TMPDIR, never in this worktree: it is a live norn unit (NORN_HOME points at it) and a dev build would act on its runs/, claim and state.json. Then build a loop
+      `norn`), and record what you saw. Run that dev build only in a throwaway git repo under $TMPDIR, never in this worktree: it is a live norn unit (its .norn-unit marker) and a dev build run there would act on its claim and on its run state (state.json, receipts) in the checkout's machine dir. Then build a loop
       that goes red on that exact symptom, minimise it and confirm the cause. You are told not to fix:
       change no file, spec.md included, but the handoff.
       Post the findings as an issue comment that starts with `## Reproduce` (`## Reproduce (updated)` on a rerun):

@@ -7,10 +7,10 @@
  * every run is stored in the trace (B4) and linked from it by a `briefing` event (O4).
  */
 import { readdirSync } from "node:fs";
-import { basename, join, relative } from "node:path";
-import { cmd, currentRun, cursorStep, type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, standingReport, stepLimits, storyRulings, storyWorktreePath } from "@norn/core";
+import { basename, join } from "node:path";
+import { cmd, currentRun, cursorStep, type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, standingReport, stepLimits, storyRulings } from "@norn/core";
 import { type AgentStep, type ProcessIdentity, type ReceiptOf, storyBranch, ulid } from "@norn/schema";
-import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readText, readUnitHooks, writeBriefing, readRemoteCache, spawnSyncCaptured, storyFile, traceEvent, specRunsDir, unitDir } from "@norn/store";
+import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readText, readUnitHooks, writeBriefing, readRemoteCache, spawnSyncCaptured, storyFile, traceEvent, runStateDir, storyRunStateDir } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
@@ -116,27 +116,32 @@ function evidenceFiles(s: UnitSession): Record<string, string[]> {
 }
 
 /**
- * F28/O2: the story's gate rulings, from the receipts of every unit of the story this machine can
- * see — this worktree, the story worktree and each slice worktree beside it (a slice still running
- * keeps its live runs/ there, §7). The gate receipt is the record; renderBrief stays pure.
+ * F28/O2: the story's gate rulings, from the receipts of every unit of the story this machine holds
+ * (S12: all in the checkout's machine dir). The gate receipt is the record; renderBrief stays pure.
  */
 function rulings(s: UnitSession): Ruling[] {
-  const slug = s.marker.spec_dir.split("/").at(-1)?.slice(s.unit.story.length + 1) ?? "";
-  const storyWt = storyWorktreePath(s.root, s.unit.story, slug);
-  const specOf = (wt: string) => join(wt, s.marker.spec_dir);
-  const dirs = new Set<string>();
-  for (const wt of [s.worktree, storyWt])
-    try {
-      for (const d of readdirSync(specRunsDir(specOf(wt)), { withFileTypes: true })) if (d.isDirectory()) dirs.add(d.name);
-    } catch {
-      /* no runs/ here */
-    }
   const units: Array<{ unit: string; receipts: NumberedReceipt[] }> = [];
-  for (const dir of [...dirs].sort()) {
+  for (const { unit: dir, dir: path } of storyRecord(s)) {
     const unit = dir === "_story" ? s.unit.story : `${s.unit.story}/${dir.split("-")[0]}`;
-    for (const wt of new Set([s.worktree, storyWt, `${storyWt}--${dir}`])) units.push({ unit, receipts: listReceipts(unitDir(specOf(wt), dir)).receipts });
+    units.push({ unit, receipts: listReceipts(path).receipts });
   }
   return storyRulings(units);
+}
+
+/**
+ * Every unit of the story's record, its folder name and its run-state folder (the story's current
+ * round for `_story`). S12 (gh-195/05): every unit's run state of the story is in this checkout's
+ * machine dir, whichever worktree.
+ */
+function storyRecord(s: UnitSession): Array<{ unit: string; dir: string }> {
+  const run = { key: s.unit.story, spec_dir: s.marker.spec_dir };
+  const dirs = new Set<string>();
+  try {
+    for (const d of readdirSync(storyRunStateDir(s.root, run), { withFileTypes: true })) if (d.isDirectory() && !d.name.startsWith(".")) dirs.add(d.name);
+  } catch {
+    /* no run state yet */
+  }
+  return [...dirs].sort().map((unit) => ({ unit, dir: runStateDir(s.root, run, unit) }));
 }
 
 /** `<remote>/<base>` when the remote-tracking base exists, else the local base branch (solo). */
@@ -196,11 +201,11 @@ export const briefCommand = defineCommand({
         spec_dir: s.marker.spec_dir,
         story_file: `${s.marker.spec_dir}/${basename(storyFile(s.specPath))}`,
         slice_file: slicePath,
-        unit_dir: join(s.marker.spec_dir, relative(s.specPath, s.runsDir)),
+        unit_dir: s.runsDir,
       },
       diff_range: `${base}...HEAD`,
       // S9: the agent-written part only; the generated header and heartbeat are not for the agent
-      handoff: readHandoff(s.runsDir)?.body ?? null,
+      handoff: readHandoff(s.handoffFile)?.body ?? null,
       receipts: s.receipts,
       limits: {
         deadline: limits.deadline,
@@ -213,6 +218,7 @@ export const briefCommand = defineCommand({
       evidence_files: evidenceFiles(s),
       rulings: rulings(s),
       criteria: unitCriteria(s),
+      record: storyRecord(s),
       // QV5a: what this run's agent may `pass`
     });
     // B4: the exact briefing of every run, in the trace

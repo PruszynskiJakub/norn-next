@@ -29,13 +29,14 @@
  */
 import { cmd, criterionLine, decide, type Decision, legacyAction, type NumberedReceipt, type StoryFacts, type UnitFacts, unitDecision } from "@norn/core";
 import { ExitCode, isUlid, type Receipt, storyOf, type TickStartTrace, type TickTrace, type TickUnitRecord, ULID_PATTERN, ulidTime } from "@norn/schema";
-import { crashedTicksFor, decisionUnit, findCrashedTick, findTick, hasTraceDay, readTrace, type TickReader, tickReader } from "@norn/store";
+import { crashedTicksFor, decisionUnit, findCrashedTick, findTick, hasTraceDay, loadSnapshot, readTrace, type TickReader, tickReader } from "@norn/store";
 import { formatRunView, loadRunView } from "@norn/view";
 import { defineCommand, opt, type ParsedArgs } from "../command.ts";
 import type { Context } from "../context.ts";
 import { corruptError, refuse, rendered, usageError, withExit } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
 import { hasRun, targetKey } from "../runtime/target.ts";
+import { fetchArchived } from "../runtime/archive.ts";
 import { effectiveRetain } from "../runtime/trace-retention.ts";
 
 /** An action as compared with its replay; one an older norn recorded drops the fields since removed (O5). */
@@ -374,7 +375,12 @@ export const runViewCommand = defineCommand({
     const target = await targetKey(ctx, args.positionals[0], args.json === true, hasRun(ctx, "run view", cmd.runView));
     const runId = new RegExp(ULID_PATTERN).test(target);
     const key = runId ? target : parseUnitKey(target).key;
-    const run = loadRunView({ repoRoot: ctx.root, home: ctx.home, env: ctx.env, now: ctx.clock.now(), target: key });
+    const load = () => loadRunView({ repoRoot: ctx.root, home: ctx.home, env: ctx.env, now: ctx.clock.now(), target: key });
+    // gh-195 D6 (B29, B30): a finished story's record on a clone that has none is fetched from its
+    // archive ref — the unit's story, or for a run id not found here, each story this clone has no record of
+    if (!runId) await fetchArchived(ctx, [storyOf(key)]);
+    let run = load();
+    if (!run && runId && (await fetchArchived(ctx, loadSnapshot({ repoRoot: ctx.root, home: ctx.home, env: ctx.env }).stories.map((s) => s.key))).length) run = load();
     if (!run) throw refuse(runId ? `no run ${key} in the trace` : `${key} is unknown or has no run yet`, cmd.status(), runId ? "unknown_run" : "unknown_unit");
     return rendered(run, formatRunView(run));
   },

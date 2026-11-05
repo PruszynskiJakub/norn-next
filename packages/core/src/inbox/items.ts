@@ -8,13 +8,12 @@
  * F35, Q6), Unclaimed, Running, Notes (agents' notes for a person, NT2: information, not an
  * action), Recently done.
  */
-import { ATTENDED_WAIT, parseDuration, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
-import { cmd, NO_VERSION_HINT, nextCommand, skillsDriftHint, startAgentCommand, versionMismatch } from "../commands.ts";
+import { ATTENDED_WAIT, parseDuration, recordRef, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
+import { baseRunStateHint, cmd, NO_VERSION_HINT, nextCommand, skillsDriftHint, startAgentCommand, versionMismatch } from "../commands.ts";
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../criteria.ts";
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
-import { sha256 } from "../hash.ts";
-import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, heldBySkillsDrift, issueProblem, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
+import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, heldBySkillsDrift, issueProblem, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, stepLabel, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
 import { optionsLine } from "../prompt.ts";
 import { epoch, formatAge, iso } from "../time.ts";
 import { baseUpdateStep, edgeOf, edgesOf, isStale, stepOf } from "../workflow.ts";
@@ -155,6 +154,52 @@ function repoSkillsDriftItem(facts: Facts): InboxItem | null {
   };
 }
 
+/** gh-195 D16 (B29, B35): run state still in the base's tree — one repo-level Check item pointing to `norn upgrade`. */
+function baseRunStateItem(facts: Facts): InboxItem | null {
+  const stories = facts.base_run_state;
+  if (!stories?.length) return null;
+  return {
+    id: `base_run_state:*:${stories.join(",")}`,
+    group: "check",
+    story: "*",
+    slice: null,
+    step: null,
+    title: baseRunStateHint.text(facts.repo.default_branch, stories),
+    detail: stories.join(", "),
+    command: cmd.upgrade(),
+    since: iso(facts.now),
+  };
+}
+
+/**
+/** gh-195 (08-F4): the act failure effect of a record push refused as stale (`ActFailure.lease`) */
+export const RECORD_PUSH_EFFECT = "record_push";
+/** gh-195 (review F2): the machine-local failures slot of a story's refused record push, apart from every unit's */
+export const recordPushSlot = (story: string): string => `record:${story}`;
+
+/**
+ * gh-195 (08-F4): this checkout holds the story under `remote`, but its record push was refused as
+ * stale: another checkout pushed `refs/norn/runs/<story>`. One Check item, whatever the cursor, until a
+ * push lands (the tick drops it once the claim is not here or the policy is `local`, review F2);
+ * `norn story checkout` here fetches the ref (this checkout's run state kept), so the next push goes on top.
+ */
+function recordPushItem(story: StoryFacts): InboxItem | null {
+  const f = story.record_refused;
+  if (!f) return null;
+  return {
+    id: `record-push:${story.key}:${f.lease ?? "none"}`,
+    group: "check",
+    story: story.key,
+    slice: null,
+    step: null,
+    title: `record push to ${recordRef(story.key)} refused: another checkout pushed it since this one last saw it (${f.lease ? short(f.lease) : "none"}); pushes wait`,
+    detail: `${f.reason} · tick ${f.tick_id}`,
+    command: cmd.storyCheckout(story.key),
+    since: f.at,
+    ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
+  };
+}
+
 /**
  * R4.3: an action's effect failed for the unit (a nudge or answer not delivered, a launch or resume
  * that failed, a push refused) — an Unblock item until an effect of the same kind succeeds, the
@@ -270,7 +315,7 @@ function absFile(file: string, story: StoryFacts, uf: UnitFacts): string {
 /**
  * F21: what a gate judges — the report that led there (e.g. qa `partial`). `detail` names it by
  * receipt number; `full` (inbox `--details`, JSON) gives the receipt and its evidence folder as
- * absolute paths a person can open: the receipt lives in the unit's worktree, not the checkout
+ * absolute paths a person can open: the receipt lives in the machine dir (S12), not the checkout
  * the inbox is read from.
  */
 function judgedDetail(story: StoryFacts, uf: UnitFacts): { detail: string; full: string } | null {
@@ -558,6 +603,12 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
     ...extra,
   });
   const park = st.park;
+  // gh-195 B33 (review#1 S8): a story held here from its record alone has no branch, so nothing runs in
+  // it — a run its record names belongs to the previous holder's session, and nothing can start
+  if (story.record_only && (st.status === "running" || st.status === "ready"))
+    return item("check", `${st.step} #${st.attempt}: held here from its record; ${story.key} has no branch, so nothing runs (B33)`, cmd.storyView(key), st.updated_at, {
+      id: `record-only:${key}:${st.step}#${st.attempt}`,
+    });
   switch (st.status) {
     case "parked":
       if (park?.kind === "ask") return answerItem(uf, st, park, item);
@@ -729,36 +780,55 @@ function foreignCommitItems(story: StoryFacts): InboxItem[] {
 }
 
 /**
- * R2.3 (H5, A18): local runs/ work on a checkout that does not hold the claim — it is not in the
- * record and never will be (a non-holder never pushes, R2.2). One Check item per unit; `norn tidy`
- * moves the files to `runs/<unit>/orphaned/` on the local branch.
+ * gh-195 D11 (B27, T7a, R2.3): a record this checkout set aside when another checkout took the story
+ * over without a release — never pushed, never merged into the new holder's. One Check item each, until
+ * `norn tidy` deletes the copy after `trace.retain`.
  */
-function unpushedItems(story: StoryFacts, facts: Facts): InboxItem[] {
-  const c = story.claim;
-  const held = c.state === "other" || c.state === "expired" ? `the story is now held by ${c.blob.holder}${c.state === "expired" ? " (expired)" : ""}` : "the story is not claimed by this checkout";
-  const since = c.state === "other" ? c.blob.renewed_at : (story.frontmatter?.intake_at ?? iso(facts.now));
-  return (story.unpushed_runs ?? [])
-    .filter((u) => u.files.length)
-    .map((u) => {
-      const names = u.files.map((f) => f.split("/").at(-1) ?? f);
-      const receipts = u.files.filter((f) => f.includes("/receipts/")).map((f) => (f.split("/").at(-1) ?? f).replace(/\.json$/, ""));
-      const shown = (receipts.length ? receipts : names).slice(0, 3).join(", ") + ((receipts.length || names.length) > 3 ? ", …" : "");
-      return {
-        id: `unpushed:${u.unit}:${sha256(u.files.join("\n")).slice(0, 12)}`,
-        group: "check" as const,
-        story: story.key,
-        slice: u.unit === story.key ? null : u.unit,
-        step: null,
-        title: `local work on ${u.unit} is not in the record (${shown}) — ${held}`,
-        detail: u.files.join(" · "),
-        command: cmd.tidy(),
-        since,
-        ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
-      };
-    });
+function supersededItems(facts: Facts): InboxItem[] {
+  return (facts.superseded ?? []).map((c) => {
+    const url = facts.stories.find((s) => s.key === c.story)?.frontmatter?.url;
+    return {
+      // review#1 F6: one id per copy, its ulid (two copies of one story may share a last receipt)
+      id: `superseded:${c.story}:${c.name.slice(c.story.length + 1)}`,
+      group: "check" as const,
+      story: c.story,
+      slice: null,
+      step: null,
+      title: `your record of ${c.story} was superseded when ${c.holder ?? "another checkout"} took it over${c.last_receipt ? ` (last local receipt ${c.last_receipt})` : ""}`,
+      detail: `kept in ${c.dir} until norn tidy deletes it after trace.retain; nothing in it is pushed or merged`,
+      command: `ls -R ${c.dir}`,
+      since: c.at,
+      ...(url ? { url } : {}),
+    };
+  });
 }
 
-/** Build the whole inbox (O1). Stories held by another heartbeat are not shown (except R2.3 unpushed work). */
+/**
+ * gh-195 D12 (B21, T9): a mailbox receipt this holder's tick rejected, one Check item each, so a stale
+ * answer never vanishes silently. Gone once a later answer or approval of the story is accepted (observe
+ * leaves it out) or the story finishes; there is no dismiss command.
+ */
+function rejectedItems(story: StoryFacts): InboxItem[] {
+  if (storyFinished(story)) return [];
+  return (story.rejected_mailbox ?? []).map((r) => {
+    // the step the unit is at now (the story is held here), else where it was when the receipt was rejected
+    const now = story.units.find((u) => u.unit.key === r.unit)?.state?.step ?? r.at_step;
+    return {
+      id: `rejected:${r.receipt_id}`,
+      group: "check" as const,
+      story: story.key,
+      slice: r.unit === story.key ? null : r.unit,
+      step: null,
+      title: `${r.kind} from ${r.who ?? "another machine"} for ${r.unit} was rejected: ${now ? `${r.unit} is at ${now} now` : r.reason}`,
+      detail: `stamped for ${stepLabel(r.step, r.attempt)}; ${r.reason}`,
+      command: cmd.runList(r.unit),
+      since: r.rejected_at,
+      ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
+    };
+  });
+}
+
+/** Build the whole inbox (O1). Stories held by another heartbeat are not shown (their superseded records are, D11). */
 export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   const groups = Object.fromEntries(INBOX_GROUPS.map((g) => [g, [] as InboxEntry[]])) as Record<InboxGroup, InboxEntry[]>;
   // gh-71 B28: every item of a started story carries its round and the round's workflow
@@ -773,7 +843,6 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   };
   for (const story of facts.stories) {
     const claim = story.claim.state;
-    for (const it of unpushedItems(story, facts)) add(it);
     if (claim === "other") continue;
     if ((claim === "none" || claim === "expired") && isStarted(story) && !storyFinished(story)) {
       const since = story.claim.state === "expired" ? story.claim.blob.expires_at : (story.frontmatter?.intake_at ?? iso(facts.now));
@@ -816,6 +885,8 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
     add(retargetItem(story, facts.repo.default_branch));
     add(finishedRoundRemoteItem(story, config, facts.repo.default_branch));
     for (const it of foreignCommitItems(story)) add(it);
+    add(recordPushItem(story));
+    for (const it of rejectedItems(story)) add(it);
     for (const it of noteItems(story)) add(it);
     for (const uf of story.units) {
       add(unitInboxItem(story, uf, facts, config));
@@ -825,6 +896,8 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   add(heartbeatItem(facts, config));
   add(versionItem(facts));
   add(repoSkillsDriftItem(facts));
+  add(baseRunStateItem(facts));
+  for (const it of supersededItems(facts)) add(it);
   // gh-61 D7: the version item comes first, whatever its age
   const pinned = (it: InboxEntry) => (it.id.startsWith(VERSION_ITEM) ? 0 : 1);
   for (const g of INBOX_GROUPS) groups[g].sort((a, b) => pinned(a) - pinned(b) || epoch(a.since) - epoch(b.since) || a.id.localeCompare(b.id));

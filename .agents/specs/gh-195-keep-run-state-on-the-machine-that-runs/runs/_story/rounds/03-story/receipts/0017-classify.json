@@ -1,0 +1,1 @@
+{"kind":"classify","receipt_id":"01M6P7BNSJ1T5P094TWGT4BHSA","run_id":"01M6P7B413QXQHAE374Z09M1Y5","step":"open-pr","attempt":1,"at":"2026-11-05T16:06:06.386Z","by":"norn","who":"jakubpruszynski@mac","tick_id":"01M6P7B41374TNZBC4RVY5EWV1","outcome":"done","rule":"git.open-pr","detail":"draft PR #216 https://github.com/PruszynskiJakub/norn-next/pull/216","route":"ci"}

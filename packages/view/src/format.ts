@@ -5,7 +5,7 @@
 import { cmd, INBOX_ABOUT, INBOX_GROUPS, INBOX_TITLES, isVersionMismatchItem } from "@norn/core";
 import type { RunDetail } from "./run-view.ts";
 import { DELEGATED_MARK, oneLine } from "./timeline.ts";
-import type { InboxEntry, ProjectView, RoundView, SliceView, StepRow, StepWho, StoryView, TimelineEntry, TraceView, UnitView } from "./types.ts";
+import type { ElsewhereView, InboxEntry, ProjectView, RoundView, SliceView, StepRow, StepWho, StoryView, TimelineEntry, TraceView, UnitView } from "./types.ts";
 
 function counterText(u: UnitView): string {
   const used = u.counters.filter((c) => c.value > 0 || (c.max !== null && u.status !== "done"));
@@ -180,12 +180,61 @@ export function formatInbox(view: ProjectView, opts: { details?: boolean; home?:
     }
     out.push("");
   }
+  // gh-195 D6 (B17, B18): stories another machine holds, from local refs only
+  if (view.elsewhere?.length) {
+    out.push(`Held elsewhere (${view.elsewhere.length}) · on another machine`);
+    for (const e of view.elsewhere) out.push(`  ${e.key.padEnd(10)} ${e.title} · ${elsewhereStanding(e)}`, `      $ ${cmd.storyView(e.key)}`);
+    out.push("");
+  }
   if (!out.length && !view.stories.length) {
     // a fresh repo: point at the first story instead of a dead end
     return `Inbox empty — no stories yet.\nLabel an issue \`norn\` and assign it to yourself, then run \`${cmd.sync()}\`.\n`;
   }
   if (!out.length) return "Inbox empty — nothing needs you.\n";
   return `${out.join("\n").trimEnd()}\n`;
+}
+
+/** `2026-11-02 14:10` (UTC) from an ISO time. */
+const minute = (iso: string) => iso.slice(0, 16).replace("T", " ");
+
+/** `review_loop 0/3` */
+const counterLine = (c: { name: string; value: number; max: number | null }) => `${c.name} ${c.value}${c.max !== null ? `/${c.max}` : ""}`;
+
+/** The story unit's standing from its record (B17), else its last boundary (B18, B19). */
+function elsewhereStanding(e: ElsewhereView): string {
+  const u = e.record?.units.find((x) => x.slice === null);
+  if (u) {
+    const counters = u.counters.length ? ` [${u.counters.map(counterLine).join(", ")}]` : "";
+    const asOf = e.record && !e.record.current ? ` — record as of ${minute(e.record.at)}` : "";
+    return `held by ${e.holder} · Step: ${u.step} (attempt ${u.attempt})${counters}${asOf}`;
+  }
+  const ci = e.ci ? ` · CI: ${e.ci}` : "";
+  return `held by ${e.holder} · ${e.last_boundary ? `last boundary: ${e.last_boundary}` : "no boundary pushed yet"}${e.pr ? ` · PR #${e.pr.number}${ci}` : ""}`;
+}
+
+/**
+ * `norn story view` of a story another machine holds (gh-195 D6, B10, B13, B17–B19): the claim, the
+ * branch, the PR and its CI, then the step, attempt and counters from the record ref when it is here,
+ * or the last boundary step when it is not, and where the run state is.
+ */
+export function formatElsewhere(e: ElsewhereView): string {
+  const out = [`# ${e.key} — ${e.title}`, ""];
+  out.push(`- Held by: ${e.holder} (heartbeat ${minute(e.renewed_at)}, ${e.expired ? "expired" : "expires"} ${minute(e.expires_at)})`);
+  out.push(`- Branch: ${e.branch ?? "not fetched here"}${e.head ? ` at ${e.head.sha.slice(0, 7)} "${e.head.subject}" (${minute(e.head.at)})` : ""}`);
+  if (e.policy === "local" || !e.record) out.push(`- ${e.last_boundary ? `last boundary: ${e.last_boundary}` : "no boundary pushed yet"}`);
+  out.push(`- PR: ${e.pr ? `#${e.pr.number} ${e.pr.is_draft && e.pr.state === "open" ? "draft, open" : e.pr.state} — ${e.pr.url} (seen ${minute(e.pr.seen_at)})` : "none seen yet"}`);
+  if (e.pr) out.push(`- CI: ${e.ci ?? "not seen yet"}`);
+  const r = e.record;
+  if (r) {
+    out.push("", r.current ? `Record: ${r.sha.slice(0, 7)} (${minute(r.at)})` : `Record as of ${minute(r.at)}:`);
+    for (const u of r.units) out.push(`- ${u.key}: Step: ${u.step} (attempt ${u.attempt}), ${u.status}${u.counters.length ? ` · counters: ${u.counters.map(counterLine).join(", ")}` : ""}`);
+    for (const err of r.errors) out.push(`- failed validation (S2): ${err.file}: ${err.errors.map((x) => `${x.path || "/"} ${x.message}`).join("; ")}`);
+  }
+  const lines: string[] = [];
+  if (r && !r.current) lines.push(`record as of ${minute(r.at)} — ${e.key} now keeps its record on ${e.holder}'s machine`);
+  if (!r || !r.current) lines.push(`run state is on ${e.holder}'s machine — ask them to run ${cmd.storyHandoff(e.key)}, or take it over after the claim expires (${minute(e.expires_at)})`);
+  if (lines.length) out.push("", ...lines);
+  return `${out.join("\n")}\n`;
 }
 
 /** `norn run list <unit>` human mode: one line per timeline entry. */
@@ -260,10 +309,8 @@ export function formatStepTimeline(v: TraceView, opts: { full?: boolean } = {}):
     out.push(`criteria: ${c.reports} report(s) · ${c.verdicts.pass} pass · ${c.verdicts.fail} fail · ${c.verdicts.person} person · ${c.verdicts.unverified} unverified${c.unchecked_coverage ? ` · ${c.unchecked_coverage} without frontmatter criteria` : ""}`);
   }
   if (v.hidden_events) out.push(`(${v.hidden_events} no-op/claim-renew tick events hidden — --all shows them)`);
-  if (v.records?.source === "base_cache") {
-    const ref = v.records.ref?.replace(/^refs\/remotes\//, "") ?? "the base branch";
-    out.push(`records: no worktree — paths below are a cached copy of ${ref} (${v.records.root}), refreshed when ${ref} moves; \`git show ${ref}:<path>\` reads the live record`);
-  }
+  // gh-195 D7 (B29): a finished story's record, read from its archive ref
+  if (v.records?.source === "archive") out.push(`records: from ${v.records.ref} at ${v.records.commit?.slice(0, 12)} — paths below are its copy in ${v.records.root}`);
   out.push("");
   if (!v.steps.length) {
     out.push("No steps yet.");
