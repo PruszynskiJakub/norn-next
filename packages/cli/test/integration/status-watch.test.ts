@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { herdr } from "@norn/adapters";
 import { ulid } from "@norn/schema";
-import { appendHookTrace, readCockpitFile, } from "@norn/store";
+import { appendHookTrace, readCockpitFile } from "@norn/store";
 import type { CockpitModel } from "@norn/view";
 import { placeAgent } from "../../src/runtime/cockpit.ts";
 import { clampScroll, handleKey, initialState, parseKeys, previewLines, renderCockpit, type TuiState, withoutNotes } from "../../src/runtime/cockpit-tui.ts";

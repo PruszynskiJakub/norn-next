@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { NUDGE_TEXT } from "@norn/core";
 import { ulid } from "@norn/schema";
-import { appendHookTrace, appendReceipt, readTrace, repoConfigPath, workflowsDir, } from "@norn/store";
+import { appendHookTrace, appendReceipt, readTrace, repoConfigPath, workflowsDir } from "@norn/store";
 import { humanSummary, humanTickLines } from "../../src/commands/watch.ts";
 import { runShell, type TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";

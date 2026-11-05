@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { TickTrace } from "@norn/schema";
-import { repoConfigPath, machineDir as machineDirOf, workflowsDir, } from "@norn/store";
+import { repoConfigPath, machineDir as machineDirOf, workflowsDir } from "@norn/store";
 import { version } from "../../package.json";
 import { runCli } from "../../src/index.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";

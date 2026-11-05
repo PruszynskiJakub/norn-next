@@ -6,7 +6,7 @@
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
-import { repoConfigPath, workflowsDir, } from "@norn/store";
+import { repoConfigPath, workflowsDir } from "@norn/store";
 import { type CliResult } from "../../src/index.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";

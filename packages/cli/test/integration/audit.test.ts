@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ulid } from "@norn/schema";
-import { appendHookTrace, pendingRecordsPath, repoConfigPath, workflowsDir, } from "@norn/store";
+import { appendHookTrace, pendingRecordsPath, repoConfigPath, workflowsDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
 import { runStateOf } from "../../../../test/support/run-state.ts";

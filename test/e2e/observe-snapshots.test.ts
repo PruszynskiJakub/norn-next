@@ -8,7 +8,7 @@
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
-import { repoConfigPath, workflowsDir, } from "@norn/store";
+import { repoConfigPath, workflowsDir } from "@norn/store";
 import type { TickReport } from "../../packages/cli/src/index.ts";
 import { createHarness, type Harness, issue, sh } from "../support/harness.ts";
 import { observeNow } from "../support/observe-now.ts";

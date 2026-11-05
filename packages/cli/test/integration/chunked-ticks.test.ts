@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type TickTrace, ulid, validate } from "@norn/schema";
-import { appendHookTrace, appendTrace, readTickInputs, readTrace, sha256, machineDir, repoConfigPath, workflowsDir, writeTraceFile, } from "@norn/store";
+import { appendHookTrace, appendTrace, readTickInputs, readTrace, sha256, machineDir, repoConfigPath, workflowsDir, writeTraceFile } from "@norn/store";
 import { harvestGolden } from "../../../../test/support/golden-harvest.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
 import { observeNow } from "../../../../test/support/observe-now.ts";

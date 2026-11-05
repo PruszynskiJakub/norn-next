@@ -144,7 +144,7 @@ export function textNormaliser(dir: string): (text: string) => string {
   const tmpRe = new RegExp(`(?:${tmp.join("|")})/([\\w.-]*-)[A-Za-z0-9]{6}\\b`, "g");
   return (text: string): string => {
     // a checkout's machine dir `repos/<folder>-<8 hex of its common dir>` (ID2) differs per temp dir: S12 run state sits there
-    let t = dirNorm(text).replace(tmpRe, "<tmp>/$1<rand>").replace(/\brepos\/([\w.-]+?)-[0-9a-f]{8}\b/g, "repos/$1-<id>");
+    let t = dirNorm(text).replace(tmpRe, "<tmp>/$1<rand>").replace(/\brepos\/([\w.-]+)-[0-9a-f]{8}(?![\w.-])/g, "repos/$1-<id>");
     for (const m of t.match(SHA) ?? []) fullShas.add(m);
     t = t.replace(/\b[0-9a-f]{7,12}\b/g, (m) => {
       if (shorts.has(m)) return shorts.get(m) as string;

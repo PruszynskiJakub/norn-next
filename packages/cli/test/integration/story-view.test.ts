@@ -8,7 +8,7 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { readTrace, repoConfigPath, workflowsDir, } from "@norn/store";
+import { readTrace, repoConfigPath, workflowsDir } from "@norn/store";
 import type { OrientReport } from "@norn/view";
 import type { CliDeps, CliResult } from "../../src/index.ts";
 import { fakeHerdr } from "../../../../test/support/fake-herdr.ts";

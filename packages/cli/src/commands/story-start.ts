@@ -35,8 +35,9 @@ const startable: TargetRule = {
 
 /** B3: whether this heartbeat holds `story`'s claim and no story worktree of it is on disk. */
 async function worktreeGone(ctx: Context, story: string): Promise<boolean> {
-  const claim = await readLocalClaim(ctx.root, story).catch(() => null);
-  if (claim?.state !== "present" || claim.blob.heartbeat_id !== heartbeatId(ctx.root, ctx.clock.now())) return false;
+  // a claim norn cannot read is said, never taken for "no claim" (review F8)
+  const claim = await readLocalClaim(ctx.root, story);
+  if (claim.state !== "present" || claim.blob.heartbeat_id !== heartbeatId(ctx.root, ctx.clock.now())) return false;
   const parent = `${ctx.root}-worktrees`;
   const names = existsSync(parent) ? readdirSync(parent) : [];
   return !names.some((n) => parseSpecDirName(n)?.story === story);
@@ -56,7 +57,8 @@ export const storyStartCommand = defineCommand({
     if (await worktreeGone(ctx, story)) {
       const lock = await waitForTickLock(ctx, "norn story start", `retry: ${cmd.storyStart(raw)}`);
       try {
-        await checkoutStory(ctx, story, false);
+        // the tick that held the lock may have remade it meanwhile
+        if (await worktreeGone(ctx, story)) await checkoutStory(ctx, story, false);
       } finally {
         lock.release();
       }

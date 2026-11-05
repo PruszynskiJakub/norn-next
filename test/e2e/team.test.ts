@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { RunnerPort } from "@norn/core";
 import { ulid } from "@norn/schema";
-import { acquireTickLock, appendReceipt, readState, repoConfigPath, workflowsDir, } from "@norn/store";
+import { acquireTickLock, appendReceipt, readState, repoConfigPath, workflowsDir } from "@norn/store";
 import { type CliDeps, type CliResult, type TickReport } from "../../packages/cli/src/index.ts";
 import { createHarness, FakeInteraction, FakeRunner, type Harness, hostEnv, issue, sh } from "../support/harness.ts";
 import { runChecked } from "../support/harness.ts";

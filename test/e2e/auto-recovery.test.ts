@@ -13,7 +13,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Inbox, NUDGE_TEXT } from "@norn/core";
 import { type TickStartTrace, type UnitState, ulid } from "@norn/schema";
-import { appendHookTrace, appendTrace, heartbeatFilePath, readTrace, repoConfigPath, workflowsDir, writeState, } from "@norn/store";
+import { appendHookTrace, appendTrace, heartbeatFilePath, readTrace, repoConfigPath, workflowsDir, writeState } from "@norn/store";
 import type { ProjectView } from "@norn/view";
 import type { TickReport } from "../../packages/cli/src/index.ts";
 import { createHarness, type Harness, issue } from "../support/harness.ts";

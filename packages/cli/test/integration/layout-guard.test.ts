@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { cpSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join, relative } from "node:path";
 import { validate } from "@norn/schema";
-import { readTrace, repoConfigPath, workflowsDir, writeUnitMarker, } from "@norn/store";
+import { readTrace, repoConfigPath, workflowsDir, writeUnitMarker } from "@norn/store";
 import type { CliResult } from "../../src/index.ts";
 import { createHarness, type Harness, issue, type LayoutPartName, layoutPlaces, oldNornDir, runChecked, sh, toNewLayout, toOldLayout } from "../../../../test/support/harness.ts";
 import { runStateOf } from "../../../../test/support/run-state.ts";

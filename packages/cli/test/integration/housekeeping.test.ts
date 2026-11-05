@@ -8,7 +8,7 @@ import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync
 import { join, relative } from "node:path";
 import { git as gitAdapter } from "@norn/adapters";
 import { type StoryFrontmatter, ulid } from "@norn/schema";
-import { appendReceipt, leasesDir, machineDir, readState, repoConfigPath, safeUnlink, workflowsDir, writeStoryFile, } from "@norn/store";
+import { appendReceipt, leasesDir, machineDir, readState, repoConfigPath, safeUnlink, workflowsDir, writeStoryFile } from "@norn/store";
 import { pluginLinkHint } from "../../src/commands/doctor.ts";
 import { assetsDir } from "../../src/runtime/assets.ts";
 import { markStoryOnBase } from "../../src/runtime/record.ts";

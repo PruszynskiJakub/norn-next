@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { CriteriaTrace } from "@norn/schema";
-import { readTrace, repoConfigPath, workflowsDir, } from "@norn/store";
+import { readTrace, repoConfigPath, workflowsDir } from "@norn/store";
 import { type CliResult } from "../../src/index.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";

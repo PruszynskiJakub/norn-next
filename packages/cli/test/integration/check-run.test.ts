@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type CheckOrder, ulid } from "@norn/schema";
-import { acquireRunLease, leasesDir, listLeases, listReceipts, repoConfigPath, workflowsDir, } from "@norn/store";
+import { acquireRunLease, leasesDir, listLeases, listReceipts, repoConfigPath, workflowsDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
 import { runCheckOrder } from "../../src/runtime/act/check.ts";
 import { createHarness, type Harness, installBundledSkills, issue } from "../../../../test/support/harness.ts";

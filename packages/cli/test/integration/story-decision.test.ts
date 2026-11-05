@@ -8,7 +8,7 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { repoConfigPath, workflowsDir, } from "@norn/store";
+import { repoConfigPath, workflowsDir } from "@norn/store";
 import type { CliDeps, CliResult } from "../../src/index.ts";
 import { createHarness, FakeInteraction, type Harness, issue } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";

@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { join } from "node:path";
 import type { herdr } from "@norn/adapters";
 import { type Receipt, ulid } from "@norn/schema";
-import { appendReceipt, } from "@norn/store";
+import { appendReceipt } from "@norn/store";
 import { doneHerdrRuns } from "../../src/runtime/tidy-herdr.ts";
 import { spot } from "../herdr-spot.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
