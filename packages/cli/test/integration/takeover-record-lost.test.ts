@@ -8,13 +8,13 @@
  * for what is already done. Two clones of one bare remote (seam S1).
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { claimRef, recordRef, ulid } from "@norn/schema";
 import { appendReceipt, readState, workflowsDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue, sh } from "../../../../test/support/harness.ts";
-import { cloneOf } from "../../../../test/support/clone.ts";
+import { type Clone, cloneOf } from "../../../../test/support/clone.ts";
 import { runStateOf, storyRunStateOf } from "../../../../test/support/run-state.ts";
 
 setDefaultTimeout(120_000);
@@ -188,6 +188,21 @@ describe("checkout with the record lost starts a new round from the branch (B25,
     expect(state(s.runs(B.root))).toMatchObject({ step: "implement", attempt: 1, counters: { review_loop: 0 } });
   });
 
+  test("F1: A died at review (last boundary implement.done → review): B restarts review, not the workflow's first step", async () => {
+    const s = await heldThenSilent(15, "at-review", 0);
+    report(s.runs(h.root), "done");
+    await tickUntil(() => state(s.runs(h.root))?.step === "review" && state(s.runs(h.root))?.status === "running");
+    const next = sh(h.root, ["log", "-1", "--format=%(trailers:key=Norn-Next,valueonly)", "--grep=^Norn-Outcome: ", `refs/remotes/origin/${s.branch}`]).trim();
+    expect(next).toBe("review");
+    expire(s.key);
+    const B = cloneOf(h, "b-review", "bob");
+    const r = await B.norn("story", "checkout", s.key);
+    expect(r.exit).toBe(0);
+    expect(r.value).toMatchObject({ record_lost: true, restarted: `the run record of ${s.key} was on tester@box and is lost; restarting review from the branch` });
+    expect(state(s.runs(B.root))).toMatchObject({ step: "review", attempt: 1, visits: { review: 1 }, counters: { review_loop: 0 } });
+    expect(receiptsOf(s.runs(B.root), "take")).toEqual([expect.objectContaining({ step: "review", attempt: 1, record_lost: true })]);
+  });
+
   test("a live claim is still refused without --force; with --force the take is forced and the record lost", async () => {
     const s = await heldThenSilent(12, "forced", 1);
     const B = cloneOf(h, "b-force", "bob");
@@ -250,3 +265,93 @@ describe("a wiped machine dir on the holder recovers as any takeover (B26)", () 
   });
 });
 
+
+describe("a lost-record checkout that cannot start the round takes nothing (review#1 S1, S3–S5)", () => {
+  withHarness();
+
+  /** B's checkout was refused: no claim of B's on the remote, no run state on B. */
+  function nothingTaken(B: Clone, s: Held, r: { exit: number; value: unknown }, code: string) {
+    expect(r.exit).not.toBe(0);
+    expect(r.value).toMatchObject({ code });
+    const claim = remoteRef(claimRef(s.key));
+    if (claim) expect(sh(h.root, ["cat-file", "-p", claim])).not.toContain("bob@");
+    expect(existsSync(storyRunStateOf(join(B.root, s.spec)))).toBe(false);
+  }
+  /** Commit `edit` in A's story worktree and push the branch. */
+  function onBranch(s: Held, edit: (wt: string) => void) {
+    edit(s.wt(h.root));
+    sh(s.wt(h.root), ["add", "-A"]);
+    sh(s.wt(h.root), ["commit", "-q", "-m", "edit on the branch"]);
+    sh(s.wt(h.root), ["push", "-q", "origin", s.branch]);
+  }
+
+  test("S1: A's record lands on the remote while B takes the claim: B gives the claim back, starts no round, and A's record stays", async () => {
+    const s = await heldThenSilent(20, "raced", 1);
+    expire(s.key);
+    const B = cloneOf(h, "b-race", "bob");
+    // A's record (here any commit) is pushed the moment a claim for the story lands
+    const record = sh(h.root, ["rev-parse", "main"]);
+    const hook = join(h.remoteDir, "hooks", "post-receive");
+    writeFileSync(hook, `#!/bin/sh\nwhile read old new ref; do\n  if [ "$ref" = "${claimRef(s.key)}" ]; then git update-ref ${recordRef(s.key)} ${record}; fi\ndone\nexit 0\n`);
+    chmodSync(hook, 0o755);
+    let r;
+    try {
+      r = await B.norn("story", "checkout", s.key);
+    } finally {
+      rmSync(hook, { force: true });
+    }
+    nothingTaken(B, s, r, "record_moved");
+    expect((r.value as { error: string }).error).toContain("given back");
+    expect(remoteRef(recordRef(s.key))).toBe(record);
+  });
+
+  test("S3: a story file on the branch that does not parse is refused (S2), not read as not started", async () => {
+    const s = await heldThenSilent(21, "bad-spec", 0);
+    onBranch(s, (wt) => writeFileSync(join(wt, s.spec, "spec.md"), "---\nstatus: [unclosed\n---\n# broken\n"));
+    expire(s.key);
+    const B = cloneOf(h, "b-badspec", "bob");
+    nothingTaken(B, s, await B.norn("story", "checkout", s.key), "corrupt");
+  });
+
+  test("S5: no workflow file on the branch for the frontmatter's workflow: refused workflow_invalid, nothing taken", async () => {
+    const s = await heldThenSilent(22, "no-wf", 0);
+    onBranch(s, (wt) => rmSync(join(workflowsDir(wt), "rv.yaml")));
+    expire(s.key);
+    const B = cloneOf(h, "b-nowf", "bob");
+    const r = await B.norn("story", "checkout", s.key);
+    nothingTaken(B, s, r, "workflow_invalid");
+    expect((r.value as { error: string }).error).toContain("nothing was taken");
+  });
+
+  test("S5: an invalid workflow on the branch: refused workflow_invalid, nothing taken", async () => {
+    const s = await heldThenSilent(23, "bad-wf", 0);
+    onBranch(s, (wt) => writeFileSync(join(workflowsDir(wt), "rv.yaml"), "name: rv\nstart: nowhere\nsteps: {}\n"));
+    expire(s.key);
+    const B = cloneOf(h, "b-badwf", "bob");
+    nothingTaken(B, s, await B.norn("story", "checkout", s.key), "workflow_invalid");
+  });
+
+  test("S5: a story not started on the branch (frontmatter new): no record lost; B takes the claim and its tick starts the story", async () => {
+    const key = "gh-24";
+    const spec = `.agents/specs/${key}-not-started`;
+    h.remote.issues = [...h.remote.issues, issue(24, "not-started", ["norn", "norn:wf:rv"])];
+    await h.tick("--sync");
+    // A holds the claim, never started the story, then goes silent
+    for (let i = 0; i < 4 && !remoteRef(claimRef(key)); i++) await tick();
+    expect(remoteRef(claimRef(key))).toBeTruthy();
+    // its intake branch reached the remote (a person pushed it)
+    sh(`${h.root}-worktrees/${key}-not-started`, ["push", "-q", "origin", `${key}-not-started`]);
+    expect(sh(h.dir, ["--git-dir", h.remoteDir, "show", `${key}-not-started:${spec}/spec.md`])).toContain("status: new");
+    expect(state(runStateOf(join(`${h.root}-worktrees/${key}-not-started`, spec)))).toBeNull();
+    expire(key);
+    const B = cloneOf(h, "b-new", "bob");
+    const r = await B.norn("story", "checkout", key);
+    expect(r.exit).toBe(0);
+    expect(r.value).toMatchObject({ record: null, record_lost: false, receipt: { file: null } });
+    expect((r.value as { restarted?: string }).restarted).toBeUndefined();
+    h.clock.advance(10_000);
+    const t = await B.tick();
+    expect(t.decisions.filter((d) => d.unit === key).map((d) => d.rule)).toContain("story.start");
+    expect(state(runStateOf(join(`${B.root}-worktrees/${key}-not-started`, spec)))).toMatchObject({ step: "implement", attempt: 1 });
+  });
+});

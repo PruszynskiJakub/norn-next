@@ -102,11 +102,15 @@ export interface LastBoundary {
  * B18–B20 (S4): the story unit's last boundary commit — the newest commit on `ref` (past `base`, when
  * given) with `Norn-Story: <key>`, no `Norn-Slice` and a `Norn-Outcome`, which only a commit that ends a
  * step carries (not a start, a session start, a mirror, a wait for input or a round start). Null = no
- * boundary pushed yet.
+ * boundary pushed yet. `strict`: a failing `git log` throws instead of reading as no boundary
+ * (gh-195/11 review#1 S4: a takeover with the record lost must not restart at the first step on a guess).
  */
-export async function lastBoundary(root: string, ref: string, key: string, base: string | null): Promise<LastBoundary | null> {
+export async function lastBoundary(root: string, ref: string, key: string, base: string | null, opts: { strict?: boolean } = {}): Promise<LastBoundary | null> {
   const r = await git(root, ["log", "--format=%x1e%(trailers:only,unfold)", "--grep=^Norn-Outcome: ", ref, ...(base ? ["--not", base] : [])]);
-  if (r.code !== 0) return null;
+  if (r.code !== 0) {
+    if (opts.strict) throw new Error(`git log ${ref} failed: ${r.stderr.trim() || `exit ${r.code}`}`);
+    return null;
+  }
   for (const block of r.stdout.split("\x1e")) {
     const t = trailers(block);
     const one = (k: string) => t.find(([n]) => n === k)?.[1];

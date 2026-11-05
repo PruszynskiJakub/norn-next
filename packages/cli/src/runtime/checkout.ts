@@ -230,9 +230,18 @@ interface LostRecord {
  */
 async function lostRecord(git: GitPort, root: string, story: RunStory, branch: string, head: string, headRef: string, holder: string | null): Promise<LostRecord | null> {
   const key = story.key;
-  const raw = await git.show(root, head, `${story.spec_dir}/${SPEC_FILE}`);
-  const fm = raw === null ? null : parseStoryFile(raw, `${story.spec_dir}/${SPEC_FILE}`);
-  if (!fm?.ok || fm.value.frontmatter.status !== "active") return null;
+  const file = `${story.spec_dir}/${SPEC_FILE}`;
+  const raw = await git.show(root, head, file);
+  if (raw === null) return null;
+  const fm = parseStoryFile(raw, file);
+  // S2 (review#1 S3): a story file that fails validation is refused, never read as "not started"
+  if (!fm.ok)
+    throw corruptError(
+      `the record of ${key} is lost and ${file} on ${branch} ${fm.reason === "corrupt" ? `fails validation (${fm.error.errors.map((e) => e.message).join(", ")})` : "cannot be read"}; nothing was taken`,
+      `fix ${file} on ${branch}, then ${cmd.storyCheckout(key)} again`,
+      fm.reason === "corrupt" ? [fm.error] : undefined,
+    );
+  if (fm.value.frontmatter.status !== "active") return null;
   if (await git.hasPath(root, head, treeStoryRunStatePath(story))) return null;
   const name = fm.value.frontmatter.workflow;
   const again = cmd.storyCheckout(key);
@@ -254,7 +263,10 @@ async function lostRecord(git: GitPort, root: string, story: RunStory, branch: s
       `fix ${found.path} on ${branch}, then ${again} again`,
       "workflow_invalid",
     );
-  const step = restartStepOf(parsed.value, await lastBoundary(root, headRef, key, null));
+  const last = await lastBoundary(root, headRef, key, null, { strict: true }).catch((e: unknown) => {
+    throw failure(`the record of ${key} is lost and ${branch}'s boundaries cannot be read: ${(e as Error).message}; nothing was taken`, `check the repository, then ${again} again`, "git_failed");
+  });
+  const step = restartStepOf(parsed.value, last);
   return { workflow: { name, source: found.source, workflow: parsed.value }, step, holder, line: recordLostLine(key, holder, step) };
 }
 
@@ -348,16 +360,17 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
       if (await divergedFrom(git, root, branch, `refs/remotes/${remote}/${branch}`))
         throw failure(`${branch} has diverged from ${remote}/${branch}; nothing was taken`, `reconcile ${branch} by hand (norn never resets work), then ${again} again`, "branch_diverged");
     }
-    const head = branch && prepared ? await git.revParse(root, remote ? `refs/remotes/${remote}/${branch}` : `refs/heads/${branch}`) : null;
+    // the story branch as taken: the remote's, else the local one
+    const headRef = branch ? (remote ? `refs/remotes/${remote}/${branch}` : `refs/heads/${branch}`) : null;
+    // T5b (B25, B26, D10): no record on the ref and none of this checkout's own: the record may be lost
+    const maybeLost = !prepared && !keepLocal && opts.record !== false;
+    const head = headRef && (prepared || maybeLost) ? await git.revParse(root, headRef) : null;
     // the story unit's run state the take goes into: the staged record, or the machine dir's
     const storyRuns = staged ? runStateDirIn(staged.dir, STORY_UNIT_DIR) : runStateDir(root, run, STORY_UNIT_DIR);
     // the holder's own run state matches the record it last pushed (its local ref before this checkout)
     const gone = prepared ? (prepared.taken.unpacked ? prepared.taken.branch_commit : before ? await recordBranchCommit(root, before.sha) : null) : null;
     const rewritten = await rewrittenSince(git, root, gone, head, storyRuns);
-    // T5b (B25, B26, D10): no record on the ref and none of this checkout's own: the record is lost
-    const headRef = branch ? (remote ? `refs/remotes/${remote}/${branch}` : `refs/heads/${branch}`) : null;
-    const tip = !prepared && !keepLocal && opts.record !== false && branch && headRef ? await git.revParse(root, headRef) : null;
-    const lost = tip && branch && headRef ? await lostRecord(git, root, run, branch, tip, headRef, prev?.holder ?? null) : null;
+    const lost = maybeLost && branch && headRef && head ? await lostRecord(git, root, run, branch, head, headRef, prev?.holder ?? null) : null;
 
     // ---- 4. claim by CAS, then the remote record ref must still be the one staged (review#2 F5)
     const blob = newClaimBlob({
@@ -375,12 +388,18 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
       if (claimed.reason === "held") throw claimHeld(claimed.holder, `wait until ${claimed.holder.expires_at} or ${cmd.storyCheckout(key, { force: true })}`);
       throw failure(`claim failed (${claimed.reason}): ${claimed.message}`, `retry: ${again}`, "claim_failed");
     }
-    if (remote && staged && prepared) {
+    // review#1 S1: with the record lost, the ref must still be absent — a holder that pushed its record
+    // meanwhile (a handoff, a `remote` boundary) has a record no new round may hide
+    const expected = staged && prepared ? prepared.taken.sha : lost ? null : undefined;
+    if (remote && expected !== undefined) {
       const now2 = await remoteRecordSha(root, remote, key).catch((e: unknown) => e as Error);
-      if (now2 !== prepared.taken.sha) {
+      if (now2 !== expected) {
         // a claim this checkout did not hold before goes back; its own stays
         const back = mine ? null : await releaseClaim(root, remote, key, claimed.sha);
-        const why = now2 instanceof Error ? `cannot re-read ${recordRef(key)}: ${now2.message}` : `${recordRef(key)} moved on ${remote} while the claim was taken (${prepared.taken.sha} → ${now2 ?? "deleted"}): its holder may still be running`;
+        const why =
+          now2 instanceof Error
+            ? `cannot re-read ${recordRef(key)}: ${now2.message}`
+            : `${recordRef(key)} moved on ${remote} while the claim was taken (${expected ?? "none"} → ${now2 ?? "deleted"}): its holder may still be running`;
         const gave = back === null ? "" : back.ok ? "; the claim was given back, nothing was taken" : `; the claim could not be given back (${back.message})`;
         throw failure(`${why}${gave}`, `make sure the previous holder stopped, then ${again} again`, "record_moved");
       }
