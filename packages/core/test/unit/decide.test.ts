@@ -541,6 +541,16 @@ describe("mailbox (T9)", () => {
     f.mailbox = [{ ref: "refs/norn/inbox/gh-1/B", sha: "s", id: "B", receipt: { ...r, attempt: 5 }, error: null }];
     expect(only(facts([f]))).toMatchObject({ kind: "reject_receipt", reason: "no unit at ready#5" });
   });
+  test("gh-195 13-R3-F1 (D12): a kept rejection's `seen` is the unit's applied_through, never a receipt not yet applied", () => {
+    const f = storyAt("ready");
+    f.units[0]!.state = { ...f.units[0]!.state!, status: "parked", park: { kind: "gate", reason: "x", since: at() }, applied_through: 3 };
+    const r = receipt(f.units[0]!.state!, "approve", {}, "human");
+    // an approve already in the folder, numbered 4, applied only later
+    f.units[0]!.unapplied = [{ n: 4, file: "0004-approve.json", receipt: r }];
+    f.mailbox = [{ ref: "refs/norn/inbox/gh-1/B", sha: "s", id: "B", receipt: { ...r, receipt_id: "01JBBBBBBBBBBBBBBBBBBBBBBB", attempt: 5 }, error: null }];
+    const d = decide(facts([f]), WORKFLOWS, CONFIG).find((x) => x.action.kind === "reject_receipt");
+    expect(d?.action).toMatchObject({ kind: "reject_receipt", keep: { seen: { "gh-1": 3 } } });
+  });
   test("gh-71 B35 (AC12): a mailbox receipt made for round 1's cursor arriving after round 2 started is rejected as stale", () => {
     const f = storyAt("refine");
     f.units[0]!.state = { ...f.units[0]!.state!, round: 2 };

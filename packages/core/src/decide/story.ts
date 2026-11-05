@@ -395,7 +395,8 @@ function keptRejection(ctx: Ctx, story: StoryFacts, r: Receipt, reason: string):
     at_step: unit?.state?.step ?? null,
     reason,
     rejected_at: ctx.nowIso,
-    seen: Object.fromEntries(story.units.map((u) => [u.unit.key, nextReceiptNumber(u) - 1])),
+    // 13-R3-F1: what the holder has applied, never a receipt still waiting to be (it may be the answer that clears this)
+    seen: Object.fromEntries(story.units.map((u) => [u.unit.key, u.state?.applied_through ?? 0])),
   };
 }
 

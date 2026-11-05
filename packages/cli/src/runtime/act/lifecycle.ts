@@ -150,7 +150,7 @@ export async function rejectReceipt(act: ActEnv, a: Extract<Action, { kind: "rej
   if ("ref" in a.source) {
     // gh-195 D12 (P6): kept before the ref goes, so a failed keep leaves the receipt for the next tick
     // (kept once per receipt id); kept after, a failure would lose it for good
-    if (a.keep) addRejectedReceipt(act.root, a.keep);
+    if (a.keep) await addRejectedReceipt(act.root, a.keep);
     const res = await deleteMailbox(act.root, act.obs.remote, a.source.ref, a.source.sha);
     act.traceReject(a.unit.key, a.source.ref, a.reason, { sha: a.source.sha });
     return { ok: true, detail: { deleted: res.ok } };

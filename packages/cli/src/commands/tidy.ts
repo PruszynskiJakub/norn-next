@@ -216,7 +216,7 @@ export const tidyCommand = defineCommand({
       // gh-195 D12: cleared rejected mailbox receipts age out with the trace that also records them; an open
       // one (its Check item still shown: no answer or approval since, story not finished) stays
       const open = new Set(obs.facts.stories.filter((s) => !storyFinished(s)).flatMap((s) => (s.rejected_mailbox ?? []).map((r) => r.receipt_id)));
-      const rejected = pruneRejectedReceipts(root, new Date(ctx.clock.now() - window.ms).toISOString(), open, dry).map((r) => r.receipt_id);
+      const rejected = (await pruneRejectedReceipts(root, new Date(ctx.clock.now() - window.ms).toISOString(), open, dry)).map((r) => r.receipt_id);
       const bytes = [...days, ...hook_files, ...runs].reduce((n, d) => n + d.bytes, 0);
       const trace = { retain: window.retain, days, hook_files, runs, bytes };
 

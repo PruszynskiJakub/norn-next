@@ -149,6 +149,8 @@ export const baseFactsPath = (root: string) => join(machineDir(root), "base.json
 export const noticesPath = (root: string) => join(machineDir(root), "notices.json");
 /** gh-195 D12 (B21): the mailbox receipts this checkout's ticks rejected, next to the notices */
 export const rejectedReceiptsPath = (root: string) => join(machineDir(root), "rejected.json");
+/** gh-195 13-R3-F2: the lock around a read-modify-write of `rejected.json` (a tick's keep, tidy's prune). */
+export const rejectedLockPath = (root: string) => join(machineDir(root), "rejected.lock");
 export const prFactsPath = (root: string) => join(machineDir(root), "pr.json");
 export const issueFactsPath = (root: string) => join(machineDir(root), "issue.json");
 /**

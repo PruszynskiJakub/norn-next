@@ -15,10 +15,11 @@
  * empty through `readLocalJson`, never as a cast of what was there. Paths are in paths.ts.
  */
 import type { StoryFacts } from "@norn/core";
-import type { RejectedMailboxReceipt, StoryMerge } from "@norn/schema";
-import { atomicWriteJson } from "./fsx.ts";
+import { type RejectedMailboxReceipt, type StoryMerge, validate } from "@norn/schema";
+import { atomicWriteJson, readText } from "./fsx.ts";
+import { acquireLock } from "./lock.ts";
 import { readLocalJson } from "./local-json.ts";
-import { foreignCommitsPath, noticesPath, notifiedPath, pendingRecordsPath, rejectedReceiptsPath, remoteCachePath } from "./paths.ts";
+import { foreignCommitsPath, noticesPath, notifiedPath, pendingRecordsPath, rejectedLockPath, rejectedReceiptsPath, remoteCachePath } from "./paths.ts";
 import { appendTrace, traceEvent } from "./trace.ts";
 
 export interface RemoteCache {
@@ -66,29 +67,109 @@ export function firstNotice(root: string, id: string): boolean {
   return true;
 }
 
-/** gh-195 D12 (B21): the mailbox receipts this checkout's ticks rejected, oldest first. */
-export function readRejectedReceipts(root: string): RejectedMailboxReceipt[] {
-  return readLocalJson("local-rejected", rejectedReceiptsPath(root), { receipts: [] }, root).receipts;
+/**
+ * gh-195 D12 (B21), 13-R3-F2 (S2): `rejected.json` read entry by entry. A file that is not JSON or not
+ * `{ receipts: [...] }` is `ok: false`: it reads as no rejection and is never written over. An entry
+ * of the wrong shape is left out of `receipts` but kept in `raw`, so a later write keeps it as it was
+ * (reported by a `local_file` trace event, never dropped and never guessed).
+ */
+type RejectedFile = { ok: true; receipts: RejectedMailboxReceipt[]; raw: Array<{ entry: unknown; valid: RejectedMailboxReceipt | null }> } | { ok: false; message: string };
+
+function readRejectedFile(root: string): RejectedFile {
+  const path = rejectedReceiptsPath(root);
+  let text: string | null;
+  try {
+    text = readText(path);
+  } catch (e) {
+    return { ok: false, message: `${path}: ${(e as Error).message}` };
+  }
+  if (text === null) return { ok: true, receipts: [], raw: [] };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (e) {
+    traceRejectedFile(root, path, `invalid JSON: ${(e as Error).message}`);
+    return { ok: false, message: `${path}: invalid JSON: ${(e as Error).message}` };
+  }
+  const raw = (parsed as { receipts?: unknown } | null)?.receipts;
+  if (!Array.isArray(raw)) {
+    traceRejectedFile(root, path, "not { receipts: [...] }");
+    return { ok: false, message: `${path}: not { receipts: [...] }` };
+  }
+  const entries = raw.map((entry: unknown, i: number) => {
+    const v = validate("local-rejected", { receipts: [entry] });
+    if (!v.ok) traceRejectedFile(root, path, `receipts[${i}] has the wrong shape: ${v.errors.map((e) => `${e.path} ${e.message}`).join("; ")}`);
+    return { entry, valid: v.ok ? (v.value.receipts[0] as RejectedMailboxReceipt) : null };
+  });
+  return { ok: true, receipts: entries.flatMap((e) => (e.valid ? [e.valid] : [])), raw: entries };
 }
 
-/** gh-195 D12 (B21): keep one rejected mailbox receipt (once per receipt id). */
-export function addRejectedReceipt(root: string, entry: RejectedMailboxReceipt): void {
-  const all = readRejectedReceipts(root);
-  if (all.some((r) => r.receipt_id === entry.receipt_id)) return;
-  atomicWriteJson(rejectedReceiptsPath(root), { receipts: [...all, entry] });
+const tracedRejected = new Set<string>();
+function traceRejectedFile(root: string, file: string, message: string): void {
+  if (tracedRejected.has(`${file}\0${message}`)) return;
+  tracedRejected.add(`${file}\0${message}`);
+  try {
+    appendTrace(root, traceEvent("local_file", Date.now(), { file, schema: "local-rejected", reason: "wrong_shape", errors: [{ path: "", message }] }));
+  } catch {
+    // diagnostic only
+  }
+}
+
+/** gh-195 D12 (B21): the mailbox receipts this checkout's ticks rejected, oldest first (entries of the wrong shape left out, S2). */
+export function readRejectedReceipts(root: string): RejectedMailboxReceipt[] {
+  const f = readRejectedFile(root);
+  return f.ok ? f.receipts : [];
+}
+
+/**
+ * 13-R3-F2: run `f` holding `rejected.lock` in the machine dir, so a tick's keep and tidy's prune never
+ * interleave their read-modify-writes; waits up to `waitMs` for a live holder, then throws.
+ */
+async function withRejectedLock<T>(root: string, f: () => T, waitMs = 10_000): Promise<T> {
+  const until = Date.now() + waitMs;
+  for (;;) {
+    const lock = await acquireLock(rejectedLockPath(root), { note: "rejected.json" });
+    if (lock.ok) {
+      try {
+        return f();
+      } finally {
+        lock.release();
+      }
+    }
+    if (Date.now() >= until) throw new Error(`${rejectedLockPath(root)} is held by pid ${lock.holder.holder.pid}; retry`);
+    await new Promise((r) => setTimeout(r, 25));
+  }
+}
+
+/** The file as it was, unless it cannot be read as one (13-R3-F2, S2: never written over). */
+function rejectedForWrite(root: string): Extract<RejectedFile, { ok: true }> {
+  const f = readRejectedFile(root);
+  if (!f.ok) throw new Error(`${f.message}: rejected mailbox receipts are not written over (S2); fix or remove the file`);
+  return f;
+}
+
+/** gh-195 D12 (B21): keep one rejected mailbox receipt (once per receipt id), under the lock, keeping every other entry as it was. */
+export async function addRejectedReceipt(root: string, entry: RejectedMailboxReceipt): Promise<void> {
+  await withRejectedLock(root, () => {
+    const f = rejectedForWrite(root);
+    if (f.receipts.some((r) => r.receipt_id === entry.receipt_id)) return;
+    atomicWriteJson(rejectedReceiptsPath(root), { receipts: [...f.raw.map((e) => e.entry), entry] });
+  });
 }
 
 /**
  * gh-195 D12: drop the rejected mailbox receipts rejected before `before` (ISO) that are not `open` (by
  * receipt id: their Check item still shows), as `norn tidy` ages the trace out (`trace.retain`); returns
- * the ones dropped (`dry`: only lists them).
+ * the ones dropped (`dry`: only lists them). Under the lock; an entry of the wrong shape is kept (S2).
  */
-export function pruneRejectedReceipts(root: string, before: string, open: ReadonlySet<string>, dry: boolean): RejectedMailboxReceipt[] {
-  const all = readRejectedReceipts(root);
-  const drop = (r: RejectedMailboxReceipt) => r.rejected_at < before && !open.has(r.receipt_id);
-  const old = all.filter(drop);
-  if (old.length && !dry) atomicWriteJson(rejectedReceiptsPath(root), { receipts: all.filter((r) => !drop(r)) });
-  return old;
+export async function pruneRejectedReceipts(root: string, before: string, open: ReadonlySet<string>, dry: boolean): Promise<RejectedMailboxReceipt[]> {
+  return withRejectedLock(root, () => {
+    const f = rejectedForWrite(root);
+    const drop = (r: RejectedMailboxReceipt) => r.rejected_at < before && !open.has(r.receipt_id);
+    const old = f.receipts.filter(drop);
+    if (old.length && !dry) atomicWriteJson(rejectedReceiptsPath(root), { receipts: f.raw.filter((e) => !(e.valid && drop(e.valid))).map((e) => e.entry) });
+    return old;
+  });
 }
 
 /** GR6: a merged story whose `status: done` record on the base branch is still owed (deferred or failed). */
