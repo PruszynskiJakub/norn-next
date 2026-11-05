@@ -9,6 +9,7 @@ Add a short `REVIEW.md` at the repo root (what to skip, what counts as a failure
 - PR template: added `## Risk` and `## How to revert` after `## Tested`, before `Closes #`.
 - Docs-only change: no new test. `bun run test` (1258 pass) and `bun run typecheck` green.
 - Friction: the worktree had no `node_modules`; `bun run test` failed 64 tests and `tsc` was missing until `bun install`.
+- implement#1 done: Added REVIEW.md (skip list, failure kinds citing S1/P6/S5, finding format) and Risk / How to revert to the PR template. Style line names the type check and repo lints instead of Biome, which the repo does not have. Unit tier and typecheck green.
 
 ## Resume
 
