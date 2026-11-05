@@ -1,0 +1,1 @@
+{"kind":"started","receipt_id":"01M6P7XWYXRGJ3FVQ0SB1R0HX4","run_id":"01M6P7XWYXRGJ3FVQ0SB1R0HX3","step":"prepare","attempt":1,"at":"2026-11-05T16:16:03.549Z","by":"agent","who":"claude","how":"manual","agent":"claude","worktree":"/Users/jakubpruszynski/Projects/norn-worktrees/gh-217-release","process":{"pid":73224,"pid_start":"Wed Nov 4 09:17:48 2026"}}

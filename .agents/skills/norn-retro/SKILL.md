@@ -1,6 +1,6 @@
 ---
 name: norn-retro
-description: Run a retrospective over one finished story from its committed delivery record (per-unit state, numbered reports, check logs, handoffs) and this machine's local trace when present. Finds the friction, most severe first, and proposes one concrete change per finding (to a skill, a delivery definition, the config, the contributor docs or the spec template), each citing its evidence, as suggestions in your reply. Writes and changes no file. Use when a person asks for a retro or retrospective on a story, usually after its pull request merges.
+description: Run a retrospective over one finished story from its delivery record on the story's record ref on the remote (per-unit state, numbered reports, check logs), its handoffs and this machine's local trace when present. Finds the friction, most severe first, and proposes one concrete change per finding (to a skill, a delivery definition, the config, the contributor docs or the spec template), each citing its evidence, as suggestions in your reply. Writes and changes no file. Use when a person asks for a retro or retrospective on a story, usually after its pull request merges.
 disable-model-invocation: true
 ---
 
@@ -10,10 +10,11 @@ A person asks for this after a story's pull request merges. You read what the de
 
 ## 1. Read the record
 
-The person names the story: a key such as `gh-123`, or its folder `.agents/specs/<key>-<slug>/`. Ask if they did not. Read only: never edit anything under `runs/`, and run no command that changes the repository or the remote.
+The person names the story: a key such as `gh-123`, or its folder `.agents/specs/<key>-<slug>/`. Ask if they did not. Read only: never edit the delivery record, and run no command that changes the repository or the remote (fetching the story's record ref is reading).
 
 - **The spec**: `spec.md` (Behaviour items, Plan) and each `slices/<nn>-<slug>.md` (acceptance, frontmatter `criteria` with `id` and `verifier`).
-- **The delivery record**: one folder per unit under `runs/`, `runs/_story/` for the story and `runs/<nn>-<slug>/` for each slice. In each:
+- **The handoffs**: `handoffs/_story.md` for the story and `handoffs/<nn>-<slug>.md` for each slice in the spec folder: Goal, Progress (what was tried and failed) and Resume.
+- **The delivery record**: one commit on a ref of its own on the remote, named after the story and ending in `runs/<key>`, which no clone carries. Find it with `git ls-remote origin "refs/*/runs/<key>"`, fetch it with `git fetch origin <ref>:<ref>`, list it with `git ls-tree -r --name-only <ref>` and read a file with `git show <ref>:<path>`. On the machine that ran the story, the same folders are also in the delivery tool's folder for this checkout, under your home directory, in `runs/<key>/`. It holds one folder per unit: `_story/rounds/<NN>-<workflow>/` for each round of the story and `<nn>-<slug>/` for each slice. A record archived from an older version may lack `rounds/` (the story's state directly under `_story/`, read it as one round) and may still hold a `handoff.md` per unit; a story finished by an older version may still have it in the spec folder, under `runs/`. In each unit folder:
   - `state.json`: `counters` (name: times its loop was taken), `visits` (stage name: entries), `attempt`, `status`, `park` (`kind`, `reason`), `nudges_used`, `retries_used`.
   - `workflow.yaml`: the definition this unit ran, pinned when it began. Its `counters` give each `max`; each edge with a `counter` is a loop.
   - `receipts/NNNN-<kind>.json`: numbered reports in the order they happened, each with `step`, `attempt`, `at` and `by`. By `kind`:
@@ -26,7 +27,6 @@ The person names the story: a key such as `gh-123`, or its folder `.agents/specs
     - `classify`: how a stage ended, judged from facts rather than reported. `outcome` is `silent`, `died`, `timeout`, `stalled`, `conflict`, `stale` or `exhausted`, with `rule`, `detail`, `route` and `counter` (`name`, `value`, `max`); `snapshot.last_message` is what the agent said last before it went quiet.
   - `logs/<run_id>.log`: the full output of a failed check.
   - `evidence/<run_id>/`: what QA saw.
-  - `handoff.md`: a generated header, then Goal, Progress (what was tried and failed) and Resume.
 - **The local trace**, only on the machine that ran the story: `<YYYY-MM-DD>.jsonl` files in the delivery tool's folder for this checkout, under your home directory (named after the checkout's folder), one JSON object per line. It is not committed; when it is missing, say so in the report and work from the record alone. Keep the lines whose `unit` (or `fact.story`, `fact.slice`) is this story or one of its slices. By `type`:
   - `hook` with `fact.event: "permission_prompt"` and `fact.command`: commands that stopped for a permission prompt;
   - `reject` (`reason`): a report the tool refused;
@@ -37,7 +37,7 @@ The person names the story: a key such as `gh-123`, or its folder `.agents/specs
 
 ## 2. Find the friction
 
-Go through every unit. For each finding, keep the evidence as you go: the file and its number (`runs/02-invite-form/receipts/0014-reject.json`), or the trace file and line.
+Go through every unit. For each finding, keep the evidence as you go: the file and its number (`02-invite-form/receipts/0014-reject.json`), or the trace file and line.
 
 1. **Counters that ran high or ran out.** `counters` in `state.json` against `max` in the pinned `workflow.yaml`; a `classify` with `outcome: "exhausted"`; an `unstick` with `reset`. Read what sent the work back each time (the `findings`, the `reject` comment, the `check` output between loops). One cause behind most loops is the finding, not the count.
 2. **Repeated rejects.** Two or more `reject` at the same gate, or rejects in different slices whose `comment` says the same thing.
@@ -75,12 +75,12 @@ Never suggest a change without evidence in the record, and never two changes for
 
 ## 4. Give the suggestions
 
-Answer the person in this shape. Do not write it to a file, and do not apply any change, even one that looks obvious: they decide what to apply, and may ask you to afterwards. Cite evidence by its path under the story's folder `.agents/specs/<key>-<slug>/`. Quote evidence briefly and write `<REDACTED>` for any secret.
+Answer the person in this shape. Do not write it to a file, and do not apply any change, even one that looks obvious: they decide what to apply, and may ask you to afterwards. Cite a record file by its path in the record and a handoff by its path under the story's folder `.agents/specs/<key>-<slug>/`. Quote evidence briefly and write `<REDACTED>` for any secret.
 
 ```markdown
 # Retro: <key> <title>
 
-Read: `runs/_story/` and <n> slices. Trace: <present, dates | not on this machine>.
+Read: the record ref of <key> (<n> rounds, <n> slices). Trace: <present, dates | not on this machine>.
 
 ## Summary
 
@@ -91,7 +91,7 @@ Read: `runs/_story/` and <n> slices. Trace: <present, dates | not on this machin
 ### 1. <The friction, in one line>
 
 - **Cost**: <loops taken, times a person stepped in, sessions lost, time waited>
-- **Evidence**: `runs/02-invite-form/receipts/0014-reject.json` (comment: "…"), `runs/03-invite-list/receipts/0009-reject.json`
+- **Evidence**: `02-invite-form/receipts/0014-reject.json` (comment: "…"), `03-invite-list/receipts/0009-reject.json`
 - **Change**: <the one change: rule text, key and value, or command>
 - **File**: `<path>`
 
