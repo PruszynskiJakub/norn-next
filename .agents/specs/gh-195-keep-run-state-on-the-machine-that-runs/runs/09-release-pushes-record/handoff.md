@@ -30,6 +30,9 @@ Every claim release (`story handoff`, clean `watch` exit, `story close`) pushes 
 - Tests: packages/cli/test/integration/release-record.test.ts (post-receive hook logs the order the remote took updates; pre-receive hook rejects the record). docs:emit regenerated (handoff summary).
 - implement#1 done: Releases (story handoff, clean watch exit, story close incl. GR6b) push branches, then refs/norn/runs/<story>, then delete the claim; a rejected record push keeps the claim and removes nothing (exit 3, record_push_failed). No-branch story: no Norn-Branch-Commit. Tests: release-record.test.ts (AC1-AC4 + remote policy); story-reopen AC2 now expects the record ref kept; base-sync transcript rewritten (record push added only). Unit/integration/e2e green.
 
+- Implement #2 (rework, test.fail): packages/store/test/integration/record-ref.test.ts F1 (from slice 08) ran past the 20 s timeout under the parallel tier: 25 repos and one cat-file spawn per file. The `git config core.autocrlf input failed (1)` line was a git child killed when the timeout fired (spawnBounded reads a null exit code as 1, with empty stderr), not a shared config file: every repo is its own mkdtemp. Fix, in one commit touching only that test: one repo configured once, a fixed tree that covers each named case (CRLF, text the clean filter strips, exec bit, nesting, folder vs prefix files, non-ASCII, space, empty folder and symlink excluded), six seeded trees, one ls-tree per case checked against blob ids hashed in the test. The file now sets GIT_CONFIG_GLOBAL=/dev/null, GIT_CONFIG_NOSYSTEM and a commit identity for its duration. The file takes about 1.7 s. Removing --no-filters from the pack makes F1 fail, so it still catches that.
+- Flakes: none.
+
 ## Resume
 
 Committed; report `norn done done`. Next: review.
