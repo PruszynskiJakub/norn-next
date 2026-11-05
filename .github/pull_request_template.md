@@ -12,6 +12,14 @@ norn's open-pr step writes its own body; this template is for a PR opened by han
 
 <!-- How you know it works: the commands you ran and what you saw. -->
 
+## Risk
+
+<!-- What could break, for whom, and how far: a persisted format, a claim or lease, a write path (see REVIEW.md). -->
+
+## How to revert
+
+<!-- Is reverting the squash commit enough? Name anything it leaves behind: records written in a new format, refs, config. -->
+
 Closes #
 
 <!--
