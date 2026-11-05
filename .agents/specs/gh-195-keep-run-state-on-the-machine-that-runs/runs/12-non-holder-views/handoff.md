@@ -66,6 +66,7 @@ Other machines see a story they do not hold: under `remote` step/attempt/counter
 
 - Rework tiers: unit 1213 pass; integration 765 pass / 6 skip (run 1, before a one-line observe tweak), 758 pass / 6 skip / 7 fail (run 2, final code: human.test.ts "story edit --workflow starts the next round", 30 s timeouts under load); e2e 72 pass / 2 skip. Transcripts: only `Norn-Outcome` added to three boundary commits (slice-workflow).
 - Flakes (rework): `packages/cli/test/integration/human.test.ts` "gh-71 … starts the next round" — timed out (30 s) in the parallel tier, passed 3/3 isolated and in the earlier full run; this slice's code does not touch the round path.
+- implement#2 done: Rework review#1: F1 RemotePort.pullRequestCi (gh/glab+fixtures, FakeRemote, contract case) shown in story view + status; F9 boundary commits carry Norn-Outcome, last boundary = newest with it, walk bounded by base (golden: trailer only); F2/F3/F14 no record cache: views read the ref from git objects with shared entry/JSON checks, S2 errors reported; F4 fetch failures reported; F5 data-only view; F10 heartbeat-only; F11/F12 tests strengthened; F13 by cherry-picked afb441ddb. Note: RULES.md S4 should list Norn-Outcome (not edited). Flake: human.test round tests timed out once under load (3/3 alone).
 
 ## Resume
 
