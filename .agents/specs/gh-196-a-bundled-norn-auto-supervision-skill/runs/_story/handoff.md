@@ -5,7 +5,7 @@
 - Counters: base_conflict_loop 0/2, ci_loop 0/3, ready_loop 0/2, review_loop 0/3, stale_loop 0/10, sync_conflict_loop 0/2, test_loop 0/5
 - Last outcome: test.pass (classified, 2026-11-05T10:26:25.342Z)
 - Next: `norn run list gh-196`
-- Updated: 2026-11-05T10:31:09.364Z
+- Updated: 2026-11-05T10:32:09.366Z
 <!-- norn:header:end -->
 <!-- norn:heartbeat:begin — written by norn; do not edit -->
 - story.start: refinement at sync
@@ -21,6 +21,7 @@
 - receipts.apply: update.done → test
 - receipts.apply: test.pass → review
 - receipts.apply: applied 6
+- receipts.apply: applied 7
 <!-- norn:heartbeat:end -->
 
 ## Goal
