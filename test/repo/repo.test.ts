@@ -1304,7 +1304,7 @@ describe("one resolver for a unit's handoff (gh-195 prefactor 2, B6, B39)", () =
 });
 
 describe("superseded records replace unpushed runs and orphaned/ (gh-195 D11, B27, AC4)", () => {
-  test("no package source, golden case, rule case, shipped asset, plugin, emitted schema or doc but the rules names unpushed_runs, orphaned/ or work not in the record", () => {
+  test("no package source, golden case, rule case, shipped asset, plugin, emitted schema or doc in the doc set but the rules names unpushed_runs, orphaned/ or work not in the record", () => {
     const GONE = /unpushed_runs|unpushedRuns|UnpushedRuns|orphaned\/|copyToOrphaned|orphanedDir\b|work (?:on \S+ is )?not in the record/;
     const scanned = [
       ...files(PKGS).filter((p) => p.includes("/src/") || p.endsWith("/test/rule-cases.ts")),

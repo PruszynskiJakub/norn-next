@@ -63,7 +63,7 @@ describe("rules file (B23, B24, B27, B31)", () => {
 // ------------------------------------------------------------------------------------------- handoff
 
 /** gh-195 B39 (D9): a unit's handoff, `<spec folder>/handoffs/_story.md` or `handoffs/<nn>-<slug>.md`. */
-const UNIT_HANDOFF = /^\.agents\/specs\/[^/]+\/handoffs\/(?:_story|[0-9]{2,}-[^/]+)\.md$/;
+const UNIT_HANDOFF = /^\.agents\/specs\/[^/]+\/handoffs\/(?:_story|[0-9]{2,3}-[a-z0-9-]+)\.md$/;
 /** An older norn's handoff, `runs/<unit>/handoff.md` in a spec folder: moved to `handoffs/` at the unit's next boundary (B34). */
 const OLD_HANDOFF = /^\.agents\/specs\/[^/]+\/(?:.*\/)?runs\//;
 
@@ -81,6 +81,10 @@ describe("no stray handoff (B34, gh-195 B39)", () => {
     expect(strayHandoff(".agents/specs/gh-1-x/handoffs/_story.md")).toBe(false);
     expect(strayHandoff(".agents/specs/gh-1-x/handoffs/01-a.md")).toBe(false);
     expect(strayHandoff(".agents/specs/gh-1-x/handoffs/handoff.md")).toBe(true);
+    expect(strayHandoff(".agents/specs/gh-1-x/handoffs/1234-a.md")).toBe(true);
+    expect(strayHandoff(".agents/specs/gh-1-x/handoffs/01-.md")).toBe(true);
+    expect(strayHandoff(".agents/specs/gh-1-x/handoffs/01-Foo Bar.md")).toBe(true);
+    expect(strayHandoff(".agents/specs/gh-1-x/handoffs/101-a-b2.md")).toBe(false);
     expect(strayHandoff("docs/handoffs/_story.md")).toBe(true);
     expect(strayHandoff(".agents/specs/gh-1-x/handoff.md")).toBe(true);
     expect(strayHandoff(".agents/specs/gh-1-x/runs/_story/handoff.md")).toBe(false);

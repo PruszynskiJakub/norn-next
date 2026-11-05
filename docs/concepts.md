@@ -91,12 +91,12 @@ An agent that dies is classified `died` and retried; one that goes quiet is nudg
 
 A step boundary commits only the agent's work and the unit's handoff, `handoffs/<unit>.md` in the spec folder (`_story.md` for the story, `<nn>-<slug>.md` for a slice), and pushes the unit's branch. A story's PR holds the code, the spec and the handoffs, nothing of norn's own. A handoff is prose only (Goal, Progress, Resume): the status it used to carry (step, attempt, counters, last outcome) is printed by `norn brief` and `norn story checkout` above it. Each boundary commit carries trailers naming the story, slice and step; one that ends a step also names its outcome and the step it led to (`Norn-Outcome`, `Norn-Next`), which is what another machine reads as the story's last boundary.
 
-A unit's **run state** (`state.json`, the numbered receipts, the pinned workflow, logs of failed checks and QA evidence) lives on the machine that runs the story, in the checkout's machine dir: `~/.norn/repos/<id>/runs/<story>/<unit>/`. Nothing in a worktree or in git holds it, so removing a worktree or running `git clean -fdx` leaves the story where it was.
+A unit's **run state** (`state.json`, the numbered receipts, the pinned workflow, logs of failed checks and QA evidence) lives on the machine that runs the story, in the checkout's machine dir: `~/.norn/repos/<id>/runs/<story>/<unit>/`. It is in no worktree and on no branch, so removing a worktree or running `git clean -fdx` leaves the story where it was, and it leaves the machine only as the story's record, when norn pushes it to the record ref.
 
 When the record has to leave the machine, norn packs the story's whole run state into one commit on the ref `refs/norn/runs/<story>` on the remote, which no branch and no normal clone carries. The team config's **record policy** (`record.policy`) says when:
 
 - `local` (the default): when the claim is released (`norn story handoff`, a clean `norn watch` exit, `norn story close`), each time the `open-pr` step opens or updates the PR (so the PR body can link QA evidence at that record commit), and once at the end, when the PR merges or the story closes without one.
-- `remote`: at every step boundary as well, right after the branch. Another machine then always sees the current step and attempt, and can take the story over with its full record even if the holder dies.
+- `remote`: as well, whenever the record changed since its last push (so at least at every step boundary, right after the branch); a failed push is retried at the next tick. Another machine then sees the current step and attempt, and can take the story over with its record as last pushed even if the holder dies.
 
 A finished story's record stays on its ref, so `norn run list` and `norn run view` read it on any machine; the base branch never receives run state. Per-tick detail (the trace, locks and caches) stays in the machine dir too; `norn run view --why` reads it. A repository whose base branch still holds run state from an older norn is pointed to `norn upgrade`, which moves it into the refs ([Recipes: Roll out a new norn to a team](recipes.md#roll-out-a-new-norn-to-a-team)).
 
@@ -142,7 +142,7 @@ A repo without the key works as before; `doctor` and `status` hint to run `norn 
 | receipt | An immutable, numbered record of something that happened to a unit, written before its effect. |
 | claim | A git ref that gives one checkout the right to drive a story. |
 | handoff | `handoffs/<unit>.md` in the spec folder, on the unit's branch: goal, progress and the next action, so anyone can continue. |
-| run state | A unit's state, receipts, pinned workflow, logs and evidence, kept in the checkout's machine dir (`~/.norn/repos/<id>/runs/`), never in git. |
+| run state | A unit's state, receipts, pinned workflow, logs and evidence, kept in the checkout's machine dir (`~/.norn/repos/<id>/runs/`), never in a worktree or on a branch; it leaves the machine only as the record. |
 | record | A story's run state packed into one commit on `refs/norn/runs/<story>` on the remote: pushed on a claim release, by `open-pr`, at the end, and under `remote` at every boundary. |
 | brief | What `norn brief` tells the agent of a step: where it is, the skill, the inputs and how to report. |
 | inbox | Everything that needs a person, with the command that resolves each item (`norn status`). |

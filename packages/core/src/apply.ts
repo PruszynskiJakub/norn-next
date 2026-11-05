@@ -60,8 +60,9 @@ export const recordLostLine = (story: string, holder: string | null, step: strin
 /**
  * T5b (gh-195 B25, D10): the step a takeover with the record lost restarts, from the story unit's last
  * boundary commit on the branch (`last`: its `Norn-Step` it ended and its `Norn-Next`): the step that
- * boundary moved the cursor to; for a boundary an older norn made (no `Norn-Next`), the step it ended;
- * either only when `wf` has it (another round's workflow may not). No boundary: the workflow's first step.
+ * boundary moved the cursor to when `wf` has it; else the step it ended when `wf` has that (a boundary
+ * an older norn made has no `Norn-Next`; `$done` or another round's step is not in `wf`); else, or with
+ * no boundary, the workflow's first step.
  */
 export function restartStepOf(wf: Workflow, last: { ended: string; next: string | null } | null): string {
   for (const at of [last?.next, last?.ended]) if (at && stepOf(wf, at)) return at;

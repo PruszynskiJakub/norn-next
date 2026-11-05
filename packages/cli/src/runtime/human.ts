@@ -115,11 +115,10 @@ function localTarget(obs: Observed, story: StoryFacts, uf: UnitFacts): Target {
 
 /**
  * The unit's cursor as a non-holder knows it (gh-195 D6, B20): the one record ref and story branch this
- * verb needs are fetched (a failed fetch refuses). Under `remote` the cursor is read from the record
- * ref's git objects (validated, S2). Under `local` the story unit's cursor is the step its last boundary
- * commit led to (`Norn-Next`), with no attempt — only for a verb that can send a step-only receipt
- * (`stepOnly`); null when no boundary is pushed (or an older norn made it), or for a slice. Run state
- * is never on a branch (S12).
+ * verb needs are fetched (a failed fetch refuses). Under `local` the story unit's cursor is the step its
+ * last boundary commit led to (`Norn-Next`), with no attempt — only for a verb that can send a step-only
+ * receipt (`stepOnly`). Otherwise (`remote`, a slice, no such boundary) it is read from the record ref's
+ * git objects (validated, S2); null when the ref holds no such unit. Run state is never on a branch (S12).
  */
 async function remoteTarget(ctx: Context, key: string, stepOnly: StepOnlyBuild | undefined): Promise<Target | null> {
   const remote = await gitRemote(ctx.git, ctx.root, ctx.config.git_remote);

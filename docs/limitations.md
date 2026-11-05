@@ -25,7 +25,7 @@ Two-machine operation was only simulated on one Mac (`NORN_MACHINE`). Everything
 ## Gaps still open
 
 1. **Cross-machine handoff edges.**
-   - Under the `local` record policy, a holder that dies without releasing its claim loses the story's run record: a takeover restarts the last boundary's step from the branch with fresh counters (`record.policy: remote` pushes the record at every boundary instead).
+   - Under the `local` record policy, a holder that dies without releasing its claim loses everything in the run record since its last push (the last release, or the last time `open-pr` opened or updated the PR). A takeover then resumes from that older record on the ref; a story whose record was never pushed restarts the last boundary's step from the branch with fresh counters. `record.policy: remote` pushes the record whenever it changes instead.
    - After a `story checkout`, a foreign run parked on a prompt is never judged.
    - An approve followed by a merge within one tick leaves the archived record at the gate.
    - A merged story stays offered for `story checkout` on a checkout that once worked on it, and `norn tidy` does not remove leaked intake worktrees or slot leases.

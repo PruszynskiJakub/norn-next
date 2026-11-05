@@ -33,7 +33,7 @@ steps:
       the issue's latest `## Reproduce` comment: turn it into a failing test at the seam named there before
       changing any code, then fix the cause and cite the rule ids the fix enforces.
       Test your change with `bun packages/cli/src/main.ts …`, never the installed `norn`.
-      Run that dev build only in a throwaway git repo under $TMPDIR, never in this worktree: it is a live norn unit (NORN_HOME points at it) and a dev build would act on its runs/, claim and state.json.
+      Run that dev build only in a throwaway git repo under $TMPDIR, never in this worktree: it is a live norn unit (its .norn-unit marker) and a dev build run there would act on its claim and on its run state (state.json, receipts) in the checkout's machine dir.
       Run `bun run test` (the unit tier) after each change, and the type check; the integration tier runs in the `test` check and the e2e tier runs in CI, so do not run them before handing back.
     outcomes:
       done: { to: update, means: "the change is made; each behaviour change and rework point has a passing test" }
