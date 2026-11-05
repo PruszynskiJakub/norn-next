@@ -7,10 +7,11 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Receipt } from "@norn/schema";
-import { repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
+import { repoConfigPath, workflowsDir, } from "@norn/store";
 import { type CliDeps, type CliResult } from "../../src/index.ts";
 import { createHarness, FakeInteraction, type Harness, issue, sh } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";
+import { runStateOf } from "../../../../test/support/run-state.ts";
 
 setDefaultTimeout(30_000);
 
@@ -42,8 +43,8 @@ const spec5 = ".agents/specs/gh-5-pay-invoices";
 const spec6 = ".agents/specs/gh-6-export-report";
 const wt5 = () => `${h.root}-worktrees/gh-5-pay-invoices`;
 const wt6 = () => `${h.root}-worktrees/gh-6-export-report`;
-const runs5 = () => storyUnitDir(join(wt5(), spec5));
-const runs6 = () => storyUnitDir(join(wt6(), spec6));
+const runs5 = () => runStateOf(join(wt5(), spec5));
+const runs6 = () => runStateOf(join(wt6(), spec6));
 const tick = async () => {
   h.clock.advance(10_000);
   return h.tick();
@@ -182,7 +183,9 @@ describe("run cancel (B51–B53)", () => {
     const deps = { cwd: bRoot, env: { ...h.deps.env, NORN_HOME_DIR: bHome, USER: "colleague", NORN_MACHINE: "laptop" } };
     const killed = h.runner.killed.length;
     const r = await norn(deps, "run", "cancel", "gh-5");
-    refused(r, "not_holder", "norn story checkout gh-5");
+    // S12 (gh-195/05): the other clone has no run state of gh-5 (it is on this machine only), so it refuses
+    // before it gets to the claim; gh-195/12 shows it the story again from the claim and the branch
+    expect(r.exit).toBe(3);
     expect(h.runner.killed.length).toBe(killed);
     expect(h.state(runs5())).toMatchObject({ status: "running" });
   });

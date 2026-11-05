@@ -8,12 +8,13 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { cpSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { herdr } from "@norn/adapters";
-import { inboxOpenPath, installSkills, linkSkills, machineDir, pinnedWorkflowPath, repoConfigPath, storyUnitDir, workflowsDir } from "@norn/store";
+import { inboxOpenPath, installSkills, linkSkills, machineDir, pinnedWorkflowPath, repoConfigPath, workflowsDir } from "@norn/store";
 import { bundledSkills, type TickReport } from "../../packages/cli/src/index.ts";
 import { assetsDir } from "../../packages/cli/src/runtime/assets.ts";
 import { createHarness, type Harness, installBundledSkills, issue, sh } from "../support/harness.ts";
 import { runChecked } from "../support/harness.ts";
 import { expectTranscript, recordTranscript, type Transcript } from "../support/transcript.ts";
+import { runStateOf } from "../support/run-state.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -71,7 +72,7 @@ function siblingMerge(h: Harness, file: string, text: string, branch = "main"): 
 describe("base sync with real git", () => {
   let h: Harness;
   const wt = () => `${h.root}-worktrees/gh-7-add-login-form`;
-  const runs = () => storyUnitDir(join(wt(), ".agents/specs/gh-7-add-login-form"));
+  const runs = () => runStateOf(join(wt(), ".agents/specs/gh-7-add-login-form"));
   const step = () => h.clock.advance(10_000);
   const until = async (pred: () => boolean, label: string, max = 20) => {
     const seen: string[] = [];
@@ -218,7 +219,7 @@ describe("base sync with real git", () => {
 describe("BS3.3a (dogfood D4): a person's push to the branch of a $done story", () => {
   let h: Harness;
   const wt = () => `${h.root}-worktrees/gh-13-take-person-pushes`;
-  const runs = () => storyUnitDir(join(wt(), ".agents/specs/gh-13-take-person-pushes"));
+  const runs = () => runStateOf(join(wt(), ".agents/specs/gh-13-take-person-pushes"));
   const until = async (pred: () => boolean, label: string) => {
     const seen: string[] = [];
     for (let i = 0; i < 20 && !pred(); i++) {
@@ -276,7 +277,7 @@ describe("base_branch: develop (BS0, 7b)", () => {
 
   test("intake from develop, update merges develop, open-pr targets develop", async () => {
     const wt = `${h.root}-worktrees/gh-8-use-develop`;
-    const runs = () => storyUnitDir(join(wt, ".agents/specs/gh-8-use-develop"));
+    const runs = () => runStateOf(join(wt, ".agents/specs/gh-8-use-develop"));
     await h.tick();
     const sibling = siblingMerge(h, "d.txt", "d\n", "develop");
     siblingMerge(h, "m.txt", "m\n", "main"); // main moves too: never merged into the story
@@ -296,7 +297,7 @@ describe("base_branch: develop (BS0, 7b)", () => {
 describe("PR items between syncs and in the read model (C1), ready approval voided by norn update (C5)", () => {
   let h: Harness;
   const wt = () => `${h.root}-worktrees/gh-9-pay-by-card`;
-  const runs = () => storyUnitDir(join(wt(), ".agents/specs/gh-9-pay-by-card"));
+  const runs = () => runStateOf(join(wt(), ".agents/specs/gh-9-pay-by-card"));
   type View = { groups: Record<string, Array<{ id: string; command: string; detail?: string }>> };
   const view = async () => (await h.norn("status")).value as View;
   const ids = (v: View, group: string) => (v.groups[group] ?? []).map((i) => i.id);
@@ -411,7 +412,7 @@ describe("PR items between syncs and in the read model (C1), ready approval void
 describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge; done is verified", () => {
   let h: Harness;
   const wt = () => `${h.root}-worktrees/gh-11-merge-safely`;
-  const runs = () => storyUnitDir(join(wt(), ".agents/specs/gh-11-merge-safely"));
+  const runs = () => runStateOf(join(wt(), ".agents/specs/gh-11-merge-safely"));
   /** a Claude Code permission dialog in the agent's pane (as in prompts.test.ts) */
   const SCREEN = [" Bash command", "", " │ python3 fix.py", "╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌", " Do you want to proceed?", " ❯ 1. Yes", "   2. No", "", " Esc to cancel · Tab to amend"].join("\n");
   const inWt = (...argv: string[]) => runChecked(argv, { ...h.deps, cwd: wt() });
@@ -538,7 +539,7 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
 describe("BUG-2: an update conflict that exhausts base_conflict_loop, then run rerun --step resolve (BS5, W4)", () => {
   let h: Harness;
   const wt = () => `${h.root}-worktrees/gh-12-conflict-twice`;
-  const runs = () => storyUnitDir(join(wt(), ".agents/specs/gh-12-conflict-twice"));
+  const runs = () => runStateOf(join(wt(), ".agents/specs/gh-12-conflict-twice"));
   const inWt = (...argv: string[]) => runChecked(argv, { ...h.deps, cwd: wt() });
   const lastClassify = () => {
     const file = h.git(["ls-files", "--others", "--cached", "receipts"], runs()).split("\n").filter((f) => f.endsWith("-classify.json")).at(-1) as string;
@@ -630,7 +631,7 @@ counters: { reject_loop: { max: 3 }, stale_loop: { max: 3 } }
 `;
   let h: Harness;
   const wt = () => `${h.root}-worktrees/gh-7-add-login-form`;
-  const runs = () => storyUnitDir(join(wt(), ".agents/specs/gh-7-add-login-form"));
+  const runs = () => runStateOf(join(wt(), ".agents/specs/gh-7-add-login-form"));
   const skill = (root: string) => readFileSync(join(root, ".agents/skills/norn/SKILL.md"), "utf8");
   const until = async (pred: () => boolean, label: string, max = 20) => {
     const seen: string[] = [];

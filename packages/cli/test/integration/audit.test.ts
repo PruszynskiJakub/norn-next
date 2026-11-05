@@ -7,9 +7,10 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ulid } from "@norn/schema";
-import { appendHookTrace, pendingRecordsPath, repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
+import { appendHookTrace, pendingRecordsPath, repoConfigPath, workflowsDir, } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
+import { runStateOf } from "../../../../test/support/run-state.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -36,7 +37,7 @@ describe("audit: runtime", () => {
   let h: Harness;
   const wt = () => `${h.root}-worktrees/gh-4-audit-me`;
   const spec = ".agents/specs/gh-4-audit-me";
-  const runs = () => storyUnitDir(join(wt(), spec));
+  const runs = () => runStateOf(join(wt(), spec));
   const step = (ms = 10_000) => h.clock.advance(ms);
 
   beforeAll(async () => {

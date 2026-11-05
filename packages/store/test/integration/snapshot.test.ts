@@ -7,8 +7,6 @@ import {
   pinWorkflow,
   storyDir,
   storyFile,
-  storyUnitDir,
-  unitDir,
   writeHandoffHeader,
   handoffPath,
   writeSliceFile,
@@ -17,6 +15,7 @@ import {
   writeUnitMarker,
 } from "../../src/index.ts";
 import { AT, receipt, state, tmp, WORKFLOW_YAML } from "../helpers.ts";
+import { runStateOf } from "../../../../test/support/run-state.ts";
 
 function seed(root: string, title = "Fix login") {
   const spec = storyDir(root, "gh-12", "fix-login");
@@ -25,7 +24,7 @@ function seed(root: string, title = "Fix login") {
   }, "\nspec\n");
   writeSliceFile(join(spec, "slices/01-add-form.md"), { id: "gh-12/01", title: "Add form", depends_on: [], status: "active" }, "");
   writeSliceFile(join(spec, "slices/02-wire-api.md"), { id: "gh-12/02", title: "Wire", depends_on: ["gh-12/01"], status: "planned" }, "");
-  const u1 = unitDir(spec, "01-add-form");
+  const u1 = runStateOf(spec, "01-add-form");
   pinWorkflow(u1, WORKFLOW_YAML);
   appendReceipt(u1, receipt());
   appendReceipt(u1, receipt());
@@ -40,8 +39,8 @@ describe("loadSnapshot", () => {
     const home = tmp();
     const spec = seed(repo);
     // a corrupt story unit state
-    mkdirSync(storyUnitDir(spec), { recursive: true });
-    writeFileSync(join(storyUnitDir(spec), "state.json"), "{}");
+    mkdirSync(runStateOf(spec), { recursive: true });
+    writeFileSync(join(runStateOf(spec), "state.json"), "{}");
     // a folder that is not a spec
     mkdirSync(join(repo, ".agents/specs/notes"), { recursive: true });
 
@@ -71,7 +70,7 @@ describe("loadSnapshot", () => {
     seed(repo, "Old title");
     const spec = seed(wt, "Worktree title");
     writeUnitMarker(wt, { repo, story: "gh-12", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-12-fix-login" });
-    writeFileSync(join(unitDir(spec, "01-add-form"), "workflow.yaml"), `${WORKFLOW_YAML}# edited\n`);
+    writeFileSync(join(runStateOf(spec, "01-add-form"), "workflow.yaml"), `${WORKFLOW_YAML}# edited\n`);
     const s = loadSnapshot({ repoRoot: repo, storyRoots: [wt], home: tmp() });
     expect(s.stories[0]?.frontmatter?.title).toBe("Worktree title");
     expect(s.stories[0]?.root).toBe(wt);

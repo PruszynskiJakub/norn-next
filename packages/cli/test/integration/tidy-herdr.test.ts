@@ -7,18 +7,19 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { join } from "node:path";
 import type { herdr } from "@norn/adapters";
 import { type Receipt, ulid } from "@norn/schema";
-import { appendReceipt, storyUnitDir } from "@norn/store";
+import { appendReceipt, } from "@norn/store";
 import { doneHerdrRuns } from "../../src/runtime/tidy-herdr.ts";
 import { spot } from "../herdr-spot.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";
+import { runStateOf } from "../../../../test/support/run-state.ts";
 
 setDefaultTimeout(30_000);
 
 describe("norn tidy closes Herdr panes of runs that reported done (K7)", () => {
   let h: Harness;
   const wt = () => `${h.root}-worktrees/gh-3-third`;
-  const runsDir = () => storyUnitDir(join(wt(), ".agents/specs/gh-3-third"));
+  const runsDir = () => runStateOf(join(wt(), ".agents/specs/gh-3-third"));
 
   /** A fake Herdr: fixed panes, every close recorded. */
   function paneHerdr(panes: herdr.HerdrPaneSpot[]) {

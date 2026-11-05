@@ -7,11 +7,12 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { STORY_UNIT_DIR, type TickTrace } from "@norn/schema";
-import { loadWorkflows, readTickInputs, readTrace, repoConfigPath, workflowsDir, storyUnitDir, handoffPath } from "@norn/store";
+import { loadWorkflows, readTickInputs, readTrace, repoConfigPath, workflowsDir, handoffPath } from "@norn/store";
 import type { TickReport } from "../../packages/cli/src/index.ts";
 import { decide } from "@norn/core";
 import { createHarness, type Harness, issue } from "../support/harness.ts";
 import { expectTranscript, recordTranscript, type Transcript } from "../support/transcript.ts";
+import { runStateOf } from "../support/run-state.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -242,8 +243,8 @@ describe("a story through the slice workflow", () => {
   const storyWt = () => `${h.root}-worktrees/gh-7-add-login-form`;
   const sliceWt = () => `${storyWt()}--01-form`;
   const spec = ".agents/specs/gh-7-add-login-form";
-  const storyRuns = () => storyUnitDir(join(storyWt(), spec));
-  const sliceRuns = () => join(sliceWt(), spec, "runs/01-form");
+  const storyRuns = () => runStateOf(join(storyWt(), spec));
+  const sliceRuns = () => runStateOf(join(sliceWt(), spec), "01-form");
   const step = (ms = 10_000) => h.clock.advance(ms);
   let transcript: Transcript;
   beforeAll(() => {
@@ -393,7 +394,7 @@ describe("a story through the slice workflow", () => {
     expect(existsSync(sliceWt())).toBe(false);
     expect(h.git(["branch", "--list", "gh-7/01-form"])).toBe("");
     expect(h.read(join(storyWt(), spec, "slices/01-form.md"))).toContain("status: integrated");
-    expect(h.state(join(storyWt(), spec, "runs/01-form"))).toMatchObject({ step: "$done", status: "done" });
+    expect(h.state(runStateOf(join(storyWt(), spec), "01-form"))).toMatchObject({ step: "$done", status: "done" });
     expect(readdirSync(join(h.home, "leases")).sort()).toEqual(["slot-1.json"]);
   });
 

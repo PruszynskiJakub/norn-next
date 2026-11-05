@@ -6,10 +6,11 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
+import { repoConfigPath, workflowsDir, } from "@norn/store";
 import { type CliResult } from "../../src/index.ts";
 import { createHarness, FakeInteraction, type Harness, issue, sh } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";
+import { runStateOf, storyRunStateOf } from "../../../../test/support/run-state.ts";
 
 setDefaultTimeout(60_000);
 
@@ -53,8 +54,8 @@ const BRANCH = "gh-7-add-login-form";
 let h: Harness;
 const storyWt = () => `${h.root}-worktrees/${BRANCH}`;
 const sliceWt = (nn: string) => `${storyWt()}--${nn}`;
-const storyRuns = () => storyUnitDir(join(storyWt(), SPEC));
-const sliceRuns = (nn: string) => join(sliceWt(nn), SPEC, `runs/${nn}`);
+const storyRuns = () => runStateOf(join(storyWt(), SPEC));
+const sliceRuns = (nn: string) => runStateOf(join(sliceWt(nn), SPEC), nn);
 const tick = async () => {
   h.clock.advance(10_000);
   return h.tick();
@@ -263,7 +264,8 @@ steps:
   const TSPEC = `.agents/specs/${TBRANCH}`;
   let g: Harness;
   const wt = () => `${g.root}-worktrees/${TBRANCH}`;
-  const round = (n: string) => join(wt(), TSPEC, "runs/_story/rounds", n);
+  // S12: the story's rounds in the checkout's machine dir (named from the main checkout: the worktree goes away)
+  const round = (n: string) => join(storyRunStateOf(join(g.root, TSPEC)), "_story/rounds", n);
   const MAILBOX = "refs/norn/inbox/gh-8/01JAAAAAAAAAAAAAAAAAAAAAAA";
   const gtick = async () => {
     g.clock.advance(10_000);
@@ -309,7 +311,9 @@ steps:
     // the record is on the remote branch, marked closed
     g.git(["fetch", "-q", "origin"]);
     expect(g.git(["show", `origin/${TBRANCH}:${TSPEC}/spec.md`])).toContain("status: dropped");
-    expect(JSON.parse(g.git(["show", `origin/${TBRANCH}:${TSPEC}/runs/_story/rounds/01-tri/state.json`]))).toMatchObject({ step: "$done", status: "done" });
+    // gh-195/05 (B1, B2): the branch carries no run state; this machine keeps it in its machine dir
+    expect(g.git(["ls-tree", "-r", "--name-only", `origin/${TBRANCH}`, "--", `${TSPEC}/runs`]).trim()).toBe(`${TSPEC}/runs/_story/handoff.md`);
+    expect(g.state(round("01-tri"))).toMatchObject({ step: "$done", status: "done" });
     // this machine is cleaned up
     expect(existsSync(wt())).toBe(false);
     expect(g.git(["branch", "--list", TBRANCH])).toBe("");

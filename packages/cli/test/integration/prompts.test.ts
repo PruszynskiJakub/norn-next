@@ -19,12 +19,13 @@ import { join } from "node:path";
 import { herdr, proc } from "@norn/adapters";
 import { AUTO_PROMPT, type Inbox } from "@norn/core";
 import { type Receipt, type UnitState, ulid } from "@norn/schema";
-import { appendHookTrace, repoConfigPath, spawnSyncCaptured, storyUnitDir, workflowsDir } from "@norn/store";
+import { appendHookTrace, repoConfigPath, spawnSyncCaptured, workflowsDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
 import { withNornOnPath } from "../../src/runtime/shim.ts";
 import { runCli } from "../../src/index.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";
+import { runStateOf } from "../../../../test/support/run-state.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -60,7 +61,7 @@ const SCREEN = [
 
 const SPEC = ".agents/specs/gh-9-fix-the-bug";
 const wt = (h: Harness) => `${h.root}-worktrees/gh-9-fix-the-bug`;
-const runs = (h: Harness) => storyUnitDir(join(wt(h), SPEC));
+const runs = (h: Harness) => runStateOf(join(wt(h), SPEC));
 const acted = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop" && d.rule !== "claim.renew").map((d) => `${d.unit} ${d.rule}${d.ok ? "" : ` FAILED ${d.error}`}`);
 const receipts = (h: Harness): Receipt[] =>
   readdirSync(join(runs(h), "receipts"))

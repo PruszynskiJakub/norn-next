@@ -288,7 +288,7 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
   // against them and nothing is written there (a receipt numbered from the rewound state would
   // collide with a committed one once the rebase is aborted); the unit is held until it is concluded.
   // An exception to BS5.1, which still decides liveness and deadlines during a merge, cherry-pick or revert
-  if (rebasing(uf)) return ctx.noop(ref, "unit.rebase_in_progress", `rebase in progress in ${uf.worktree?.path}; runs/ rewound — held until it is concluded (H1)`);
+  if (rebasing(uf)) return ctx.noop(ref, "unit.rebase_in_progress", `rebase in progress in ${uf.worktree?.path} — held until it is concluded (H1)`);
   if (uf.errors.length) {
     if (uf.state?.status === "corrupt") return ctx.noop(ref, "unit.corrupt", "corrupt; never touched (S2)");
     const notify = unitItem(ctx, story, uf, uf.state as UnitState);

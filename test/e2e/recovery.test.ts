@@ -11,11 +11,12 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Inbox, RunnerPort } from "@norn/core";
-import { repoConfigPath, setSpawnObserver, workflowsDir, storyUnitDir } from "@norn/store";
+import { repoConfigPath, setSpawnObserver, workflowsDir, } from "@norn/store";
 import { type CliDeps, type CliResult, type TickReport } from "../../packages/cli/src/index.ts";
 import { createHarness, FakeRunner, type Harness, issue, sh } from "../support/harness.ts";
 import { runChecked } from "../support/harness.ts";
 import { expectTranscript, recordTranscript, type Transcript } from "../support/transcript.ts";
+import { runStateOf } from "../support/run-state.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -95,7 +96,7 @@ describe("a claim lost mid-run (R1.2, R2.3)", () => {
   let B: Clone;
   const SPEC = ".agents/specs/gh-9-add-search";
   const BRANCH = "gh-9-add-search";
-  const storyRuns = (root: string) => storyUnitDir(join(`${root}-worktrees/${BRANCH}`, SPEC));
+  const storyRuns = (root: string) => runStateOf(join(`${root}-worktrees/${BRANCH}`, SPEC));
   const step = (ms = 10_000) => h.clock.advance(ms);
   const remoteHead = () => h.git(["ls-remote", "origin", `refs/heads/${BRANCH}`]).split("\t")[0];
 
@@ -162,7 +163,7 @@ describe("renewals due together go out in one push (H5, R1.2)", () => {
   let h: Harness;
   let A: Clone;
   const N = 3;
-  const storyRuns = (n: number) => storyUnitDir(join(`${h.root}-worktrees/gh-${n}-story-${n}`, `.agents/specs/gh-${n}-story-${n}`));
+  const storyRuns = (n: number) => runStateOf(join(`${h.root}-worktrees/gh-${n}-story-${n}`, `.agents/specs/gh-${n}-story-${n}`));
 
   beforeAll(async () => {
     h = await createHarness();

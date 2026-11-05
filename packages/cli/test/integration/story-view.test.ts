@@ -8,12 +8,13 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { readTrace, repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
+import { readTrace, repoConfigPath, workflowsDir, } from "@norn/store";
 import type { OrientReport } from "@norn/view";
 import type { CliDeps, CliResult } from "../../src/index.ts";
 import { fakeHerdr } from "../../../../test/support/fake-herdr.ts";
 import { createHarness, FakeInteraction, type Harness, issue } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";
+import { runStateOf } from "../../../../test/support/run-state.ts";
 
 setDefaultTimeout(30_000);
 
@@ -47,8 +48,8 @@ let h: Harness;
 const spec = ".agents/specs/gh-2-split-work";
 const wt = () => `${h.root}-worktrees/gh-2-split-work`;
 const sliceWt = () => `${wt()}--01-first`;
-const storyRuns = () => storyUnitDir(join(wt(), spec));
-const sliceRuns = (nn: string) => join(`${wt()}--${nn}`, spec, `runs/${nn}`);
+const storyRuns = () => runStateOf(join(wt(), spec));
+const sliceRuns = (nn: string) => runStateOf(join(`${wt()}--${nn}`, spec), nn);
 const tick = async () => {
   h.clock.advance(10_000);
   return h.tick();

@@ -128,7 +128,7 @@ describe("run state lives in the checkout's machine dir, the handoff in the work
     expect(u.handoff?.header).toBe("story header");
     expect(existsSync(join(spec, "runs/_story/rounds"))).toBe(false);
   });
-  test("S2: a receipt failing validation is named from the machine dir and marks only its unit", () => {
+  test("S2: a receipt failing validation is named by its absolute path in the machine dir and marks only its unit", () => {
     const root = tmp();
     bindNornHome(root, tmp());
     const dir = runStateDir(root, story, "01-add-form");
@@ -137,7 +137,7 @@ describe("run state lives in the checkout's machine dir, the handoff in the work
     mkdirSync(join(dir, "receipts"), { recursive: true });
     writeFileSync(join(dir, "receipts/0001-done.json"), "{}");
     const u = loadUnit(root, story, { story: "gh-12", slice: "gh-12/01", dir: "01-add-form", key: "gh-12/01" });
-    expect(u.errors.map((e) => e.file)).toEqual(["runs/gh-12/01-add-form/receipts/0001-done.json"]);
+    expect(u.errors.map((e) => e.file)).toEqual([join(dir, "receipts/0001-done.json")]);
     expect(loadUnit(root, story, { story: "gh-12", slice: null, dir: "_story", key: "gh-12" }).errors).toEqual([]);
   });
 });

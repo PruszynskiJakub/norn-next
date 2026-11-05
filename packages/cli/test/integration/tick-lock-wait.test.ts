@@ -7,10 +7,11 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { acquireTickLock, storyUnitDir, tickLockPath, workflowsDir } from "@norn/store";
+import { acquireTickLock, tickLockPath, workflowsDir } from "@norn/store";
 import type { CliDeps } from "../../src/context.ts";
 import type { CliResult } from "../../src/index.ts";
 import { createHarness, type Harness, issue, runChecked } from "../../../../test/support/harness.ts";
+import { runStateOf } from "../../../../test/support/run-state.ts";
 
 setDefaultTimeout(30_000);
 
@@ -42,7 +43,7 @@ const WAIT_LINE = /^waiting for a running tick \(pid \d+, norn tick, since \d\d:
 let h: Harness;
 const spec6 = ".agents/specs/gh-6-export-report";
 const wt6 = () => `${h.root}-worktrees/gh-6-export-report`;
-const runs6 = () => storyUnitDir(join(wt6(), spec6));
+const runs6 = () => runStateOf(join(wt6(), spec6));
 const tick = async () => {
   h.clock.advance(10_000);
   return h.tick();

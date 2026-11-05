@@ -13,10 +13,11 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Inbox, NUDGE_TEXT } from "@norn/core";
 import { type TickStartTrace, type UnitState, ulid } from "@norn/schema";
-import { appendHookTrace, appendTrace, heartbeatFilePath, readTrace, repoConfigPath, workflowsDir, writeState, storyUnitDir } from "@norn/store";
+import { appendHookTrace, appendTrace, heartbeatFilePath, readTrace, repoConfigPath, workflowsDir, writeState, } from "@norn/store";
 import type { ProjectView } from "@norn/view";
 import type { TickReport } from "../../packages/cli/src/index.ts";
 import { createHarness, type Harness, issue } from "../support/harness.ts";
+import { runStateOf } from "../support/run-state.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -52,7 +53,7 @@ async function boot(h: Harness): Promise<void> {
 }
 
 const wt = (h: Harness) => `${h.root}-worktrees/gh-9-fix-the-bug`;
-const runs = (h: Harness) => storyUnitDir(join(wt(h), SPEC));
+const runs = (h: Harness) => runStateOf(join(wt(h), SPEC));
 
 /** Tick until the story unit's agent runs (intake → claim → start → launch). */
 async function untilRunning(h: Harness): Promise<UnitState> {

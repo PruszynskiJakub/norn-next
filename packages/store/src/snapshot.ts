@@ -18,7 +18,7 @@ import { type RunStory, SPEC_FILE, STORY_UNIT_DIR, type StoryFrontmatter, type U
 import { baseSpecsRoot, defaultBaseRef } from "./base.ts";
 import { type LoadedConfig, loadConfig, loadWorkflows, type WorkflowListing } from "./config.ts";
 import { readSliceFile, readStoryFile } from "./frontmatter.ts";
-import { isErrno } from "./fsx.ts";
+import { displayPath, isErrno } from "./fsx.ts";
 import { handoffPath, slicesDir, specsDir, storyFile } from "./paths.ts";
 import { runStateDirIn, runStateRoundsIn, runStateSource } from "./run-state.ts";
 import { listReceipts } from "./receipts.ts";
@@ -103,8 +103,8 @@ function files(path: string): string[] {
 export interface RunStateAt {
   /** the folder holding the story's units' run state */
   base: string;
-  /** the root a file error names a path from */
-  name: string;
+  /** the root a file error or a receipt names a path from; none = absolute (the machine dir, S12) */
+  name?: string;
   /** an older norn's record in a tree (gh-195/05), not the machine dir */
   tree: boolean;
 }
@@ -124,16 +124,16 @@ export function loadUnit(root: string, story: RunStory, unit: UnitRef, opts: { i
   const wf = readPinnedWorkflow(path, name);
   if (!wf.ok && wf.reason === "corrupt") errors.push(wf.error);
   const state = st.ok ? st.value : null;
-  const all = listReceipts(path, { root: name });
+  const all = listReceipts(path, name ? { root: name } : {});
   errors.push(...all.errors);
   const after = state?.applied_through ?? 0;
   // S7: `norn story edit --workflow --at` re-pins workflow.yaml right after journaling a workflow receipt;
   // until the tick applies it, the new pin matching that receipt's to_hash is expected.
   const switching = (hash: string) => all.receipts.some((r) => r.n > after && r.receipt.kind === "workflow" && r.receipt.to_hash === hash);
   if (state && wf.ok && state.workflow_hash !== wf.value.hash && !switching(wf.value.hash))
-    errors.push({ file: relative(name, join(path, "workflow.yaml")), errors: [{ path: "", message: "hash differs from state.workflow_hash" }] });
+    errors.push({ file: displayPath(join(path, "workflow.yaml"), name), errors: [{ path: "", message: "hash differs from state.workflow_hash" }] });
   if (st.ok && !wf.ok && wf.reason === "missing")
-    errors.push({ file: relative(name, join(path, "workflow.yaml")), errors: [{ path: "", message: "pinned workflow missing" }] });
+    errors.push({ file: displayPath(join(path, "workflow.yaml"), name), errors: [{ path: "", message: "pinned workflow missing" }] });
   return {
     unit,
     path,

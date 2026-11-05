@@ -9,9 +9,10 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { cpSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type { StoryFacts } from "@norn/core";
-import { baseCacheDir, baseSpecsRoot, defaultBaseRef, readTickInputs, readTrace, repoConfigPath, spawnSyncCaptured, storyUnitDir, workflowsDir } from "@norn/store";
+import { baseCacheDir, baseSpecsRoot, defaultBaseRef, readTickInputs, readTrace, repoConfigPath, spawnSyncCaptured, workflowsDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
+import { runStateOf } from "../../../../test/support/run-state.ts";
 
 // whole flows over real git, several ticks each: 5 s is too tight on a loaded machine (full suite)
 setDefaultTimeout(30_000);
@@ -90,7 +91,7 @@ describe("records: ready head, foreign commits, merged by ancestry, durable stat
   const branch = "gh-5-record-me";
   const wt = () => `${h.root}-worktrees/${branch}`;
   const spec = `.agents/specs/${branch}`;
-  const runs = () => storyUnitDir(join(wt(), spec));
+  const runs = () => runStateOf(join(wt(), spec));
   const step = (ms = 10_000) => h.clock.advance(ms);
   let readyHead = "";
 
@@ -174,7 +175,7 @@ describe("records: PR merge facts from the remote", () => {
   const branch = "gh-6-merge-facts";
   const wt = () => `${h.root}-worktrees/${branch}`;
   const spec = `.agents/specs/${branch}`;
-  const runs = () => storyUnitDir(join(wt(), spec));
+  const runs = () => runStateOf(join(wt(), spec));
 
   beforeAll(async () => {
     h = await createHarness();
@@ -208,7 +209,7 @@ describe("C4: an agent's commit while its unit is parked on an ask is not foreig
   let h: Harness;
   const branch = "gh-6-ask-and-commit";
   const wt = () => `${h.root}-worktrees/${branch}`;
-  const runs = () => storyUnitDir(join(wt(), `.agents/specs/${branch}`));
+  const runs = () => runStateOf(join(wt(), `.agents/specs/${branch}`));
   /** commit in the story worktree with the given committer/author date (git's own clock otherwise) */
   const commitAt = (file: string, message: string, date: string, name = "Agent") => {
     h.write(join(wt(), file), `${message}\n`);
@@ -287,7 +288,7 @@ steps:
   let h: Harness;
   const spec = ".agents/specs/gh-16-rounds-shown";
   const wt = () => `${h.root}-worktrees/gh-16-rounds-shown`;
-  const runs = () => storyUnitDir(join(wt(), spec));
+  const runs = () => runStateOf(join(wt(), spec));
   const header = () => h.read(join(wt(), spec, "runs/_story/handoff.md"));
   const next = () => {
     h.clock.advance(10_000);

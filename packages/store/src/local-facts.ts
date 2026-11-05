@@ -194,8 +194,9 @@ function skillsDriftOf(opts: LocalFactsOptions): (worktree: string) => string[] 
 
 function localUnit(root: string, story: StorySnapshot, u: UnitSnapshot, worktree: string | null, hooks: HookFact[], leases: LeaseFile[], failures: Record<string, ActFailure>): LocalUnit {
   const st = u.state;
-  // receipts display relative to the unit's worktree when it is there, else the story's checkout
-  const at = worktree && existsSync(worktree) ? worktree : story.root;
+  // S12 (gh-195/05): receipts in the machine dir display absolute; an older norn's record in a tree
+  // relative to the unit's worktree when it is there, else the story's checkout
+  const at = !story.run_state.tree ? undefined : worktree && existsSync(worktree) ? worktree : story.root;
   const lo = st ? lastOutcomeReceipt(u.path, st, at) : null;
   const cursor = st ? cursorRuns(u.path, st, at) : null;
   const mine = leases.filter((l) => l.repo === root && l.story === u.unit.story && l.slice === u.unit.slice);
@@ -275,7 +276,7 @@ export function receiptsOfKinds(story: StorySnapshot, u: UnitSnapshot, kinds: re
 }
 
 /** The receipt that produced `state.last_outcome`, scanning newest receipts first (B3 Rework). */
-function lastOutcomeReceipt(runsDir: string, state: UnitState, root: string): NumberedReceipt | null {
+function lastOutcomeReceipt(runsDir: string, state: UnitState, root: string | undefined): NumberedReceipt | null {
   const id = state.last_outcome?.receipt_id;
   if (!id) return null;
   let names: string[];
@@ -301,7 +302,7 @@ function lastOutcomeReceipt(runsDir: string, state: UnitState, root: string): Nu
  * R5.3 + R5.1: the unit's `started` / `classify` receipts at its cursor step/attempt (newest first,
  * stopping at the first of another cursor), and every session id its `started` receipts recorded.
  */
-function cursorRuns(runsDir: string, st: UnitState, root: string): CursorRuns {
+function cursorRuns(runsDir: string, st: UnitState, root: string | undefined): CursorRuns {
   const runs = new Map<string, { died: boolean }>();
   const sessions = new Set<string>();
   let names: string[];

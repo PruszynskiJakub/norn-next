@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { type Clock, type InboxItem, type LaunchSpec, type NotifierPort, type PaneState, type PromptKey, type RemoteIssue, type RemoteLabel, type RemotePort, type RemotePullRequest, type RunnerCapabilities, type RunnerPort, type RunnerSessionInfo, nameRemoved, type SessionRef } from "@norn/core";
 import { type Receipt, type UnitState, ulid } from "@norn/schema";
-import { appendReceipt, installSkills, linkSkills, machineDir, readState, repoConfigPath, spawnSyncCaptured, workflowsDir } from "@norn/store";
+import { appendReceipt, bindNornHome, installSkills, linkSkills, machineDir, readState, repoConfigPath, spawnSyncCaptured, workflowsDir } from "@norn/store";
 import type { ProjectView } from "@norn/view";
 import { bundledSkills, type CliDeps, type CliResult, type Interaction, type InteractionChoice, runCli, runningVersion, type TickReport } from "../../packages/cli/src/index.ts";
 import { assetsDir } from "../../packages/cli/src/runtime/assets.ts";
@@ -328,6 +328,8 @@ export async function createHarness(opts: HarnessOptions = {}): Promise<Harness>
   sh(seed, ["commit", "-q", "-m", "init"]);
   sh(seed, ["push", "-q", remoteDir, "main"]);
   sh(dir, ["clone", "-q", remoteDir, root]);
+  // S12 (gh-195/05): the test names run state in the checkout's machine dir before any command binds it
+  bindNornHome(root, home);
   sh(root, ["config", "user.email", "t@example.com"]);
   sh(root, ["config", "user.name", "Tester"]);
 

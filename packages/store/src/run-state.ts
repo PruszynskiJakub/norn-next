@@ -120,13 +120,13 @@ export const isFlatStoryRecord = (base: string) => existsSync(join(base, unitRec
  * gh-195/05: where a story's run state is read from — the machine dir of `checkout` (S12), or, for a
  * finished story an older norn recorded in a tree (`root` the main checkout or the base cache) and this
  * machine holds no run state of, that tree's `<spec folder>/runs` (until gh-195/16, D16). `name` is the
- * root a file error names a path from.
+ * root a file error or a receipt names a path from: the tree's root, or none (absolute) for the machine dir.
  */
-export function runStateSource(root: string, story: RunStory, opts: { checkout?: string; tree?: boolean } = {}): { base: string; name: string; tree: boolean } {
+export function runStateSource(root: string, story: RunStory, opts: { checkout?: string; tree?: boolean } = {}): { base: string; name?: string; tree: boolean } {
   const checkout = opts.checkout ?? root;
   const machine = storyRunStateDir(checkout, story);
   if (opts.tree && !existsSync(machine) && existsSync(treeRunStateDir(root, story))) return { base: treeRunStateDir(root, story), name: root, tree: true };
-  return { base: machine, name: machineDir(checkout), tree: false };
+  return { base: machine, tree: false };
 }
 /** A unit's run-state folder under a source's `base` (`runStateSource`). */
 export const runStateDirIn = (base: string, unit: string): string => unitDir(base, unit);

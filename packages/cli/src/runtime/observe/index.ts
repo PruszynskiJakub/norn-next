@@ -38,7 +38,9 @@ import {
   type PrFactsCache,
   readLocalClaim,
   readRemoteCache,
+  inferUnitMarker,
   readUnitMarker,
+  writeUnitMarker,
   traceForeignCommits,
   type UnpushedTarget,
   type UnpushedUnit,
@@ -142,13 +144,17 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   const wtList = await git.worktreeList(root).catch(() => []);
   for (const w of wtList) {
     if (w.path === root) continue;
-    const m = readUnitMarker(w.path);
-    if (!m.marker) {
+    let marker = readUnitMarker(w.path).marker;
+    // gh-195/05 (B2): a unit worktree whose marker `git clean -fdx` took gets it back from its folder and
+    // branch, so the unit is read again (its run state is in the machine dir, S12)
+    const inferred = marker ? null : inferUnitMarker(root, w.path, w.branch);
+    if (inferred) writeUnitMarker(w.path, (marker = inferred));
+    if (!marker) {
       if (w.path.startsWith(`${root}-worktrees/`)) orphanWts.push(w.path);
       continue;
     }
-    if (m.marker.slice === null) storyWts.set(m.marker.story, w.path);
-    else sliceWts.set(m.marker.slice, w.path);
+    if (marker.slice === null) storyWts.set(marker.story, w.path);
+    else sliceWts.set(marker.slice, w.path);
   }
 
   // ---- remote sync (GR1, H5): throttled; failures leave remote facts unobserved

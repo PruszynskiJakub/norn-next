@@ -15,8 +15,6 @@ import {
   sha256,
   storyDir,
   storyFile,
-  storyUnitDir,
-  unitDir,
   writeSliceFile,
   writeState,
   writeStoryFile,
@@ -25,6 +23,7 @@ import {
   markTick,
 } from "@norn/store";
 import { formatInbox, formatStatus, formatStoryView, formatTimeline, loadProjectView, loadTimelines, orientReport, prCommand } from "../../src/index.ts";
+import { runStateOf } from "../../../../test/support/run-state.ts";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -104,13 +103,13 @@ async function seed() {
   writeSliceFile(join(spec, "slices/03-docs.md"), { id: "gh-12/03", title: "Docs", depends_on: ["gh-12/02"], status: "planned" }, "");
 
   // story unit: parked on an ask
-  const su = storyUnitDir(spec);
+  const su = runStateOf(spec);
   pinWorkflow(su, WF);
   appendReceipt(su, receipt({ kind: "ask", receipt_id: ASK, question: "Which OAuth provider?", at: ago(40) }));
   writeState(su, state({ status: "parked", park: { kind: "ask", reason: "Which OAuth provider?", since: ago(40), receipt_id: ASK }, applied_through: 1, mode: "auto" }));
 
   // slice 01: running, second attempt, counter used
-  const u1 = unitDir(spec, "01-add-form");
+  const u1 = runStateOf(spec, "01-add-form");
   pinWorkflow(u1, WF);
   appendReceipt(u1, receipt({ kind: "check", step: "test", outcome: "fail", command: "bun test", exit_code: 1, duration_ms: 2300, output_tail: "x", at: ago(50) }));
   appendReceipt(u1, receipt({ kind: "started", run_id: RUN, attempt: 2, how: "auto", agent: "claude", worktree: "/w", at: ago(30) }));
@@ -129,7 +128,7 @@ async function seed() {
   );
 
   // slice 02: done an hour ago
-  const u2 = unitDir(spec, "02-wire-api");
+  const u2 = runStateOf(spec, "02-wire-api");
   pinWorkflow(u2, WF);
   writeState(u2, state({ slice: "gh-12/02", unit_dir: "02-wire-api", step: "$done", status: "done", updated_at: ago(60) }));
 
@@ -299,7 +298,7 @@ describe("loadProjectView", () => {
 
   test("corrupt state is reported, not guessed (S2)", async () => {
     const { repo, home } = await seed();
-    writeFileSync(join(unitDir(storyDir(repo, "gh-12", "fix-login"), "02-wire-api"), "state.json"), "{}");
+    writeFileSync(join(runStateOf(storyDir(repo, "gh-12", "fix-login"), "02-wire-api"), "state.json"), "{}");
     const v = await loadProjectView({ repoRoot: repo, home, now: NOW, holder: "me@box", liveness: () => true, env: {} });
     const s2 = v.stories[0]?.slices[1];
     expect(s2?.status).toBe("corrupt");
@@ -334,7 +333,8 @@ describe("loadProjectView", () => {
     writeUnitMarker(wt, { repo, story: "gh-7", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-7-thing" });
     // the slice's worktree folder keeps the slug it was cut with; its marker names the slice
     const sliceWt = `${wt}--01-form`;
-    const u1 = unitDir(storyDir(sliceWt, "gh-7", "thing"), "01-login-form");
+    // S12: run state is the checkout's, whichever worktree (these fixture folders are no git checkout: named from the story's)
+    const u1 = runStateOf(spec, "01-login-form");
     pinWorkflow(u1, WF);
     writeState(u1, state({ story: "gh-7", slice: "gh-7/01", unit_dir: "01-login-form", status: "parked", park: { kind: "stuck", reason: "blocked", since: ago(3), receipt_id: ASK } }));
     writeUnitMarker(sliceWt, { repo, story: "gh-7", slice: "gh-7/01", unit: "01-login-form", spec_dir: ".agents/specs/gh-7-thing" });
@@ -369,7 +369,7 @@ describe("orient", () => {
   /** seed + a done report with notes on slice 02, and the story PR as a sync saw it */
   async function seedOrient() {
     const seeded = await seed();
-    const u2 = unitDir(storyDir(seeded.repo, "gh-12", "fix-login"), "02-wire-api");
+    const u2 = runStateOf(storyDir(seeded.repo, "gh-12", "fix-login"), "02-wire-api");
     appendReceipt(u2, receipt({ kind: "done", outcome: "done", handoff: "wired", at: ago(70), notes: [{ text: "retries are capped at 3; confirm" }, { text: "renamed fetchUser\nto loadUser", criterion: "AC2" }] }));
     writePrFacts(seeded.repo, { "gh-12": { pr: { number: 7, url: "https://x/pull/7", state: "open", is_draft: true, head_sha: "" }, observed_at: NOW - 3_600_000 } });
     return loadProjectView({ repoRoot: seeded.repo, home: seeded.home, now: NOW, holder: "me@box", liveness: () => true, env: {} });

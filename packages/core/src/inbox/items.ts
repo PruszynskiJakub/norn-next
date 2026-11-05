@@ -270,7 +270,7 @@ function absFile(file: string, story: StoryFacts, uf: UnitFacts): string {
 /**
  * F21: what a gate judges — the report that led there (e.g. qa `partial`). `detail` names it by
  * receipt number; `full` (inbox `--details`, JSON) gives the receipt and its evidence folder as
- * absolute paths a person can open: the receipt lives in the unit's worktree, not the checkout
+ * absolute paths a person can open: the receipt lives in the machine dir (S12), not the checkout
  * the inbox is read from.
  */
 function judgedDetail(story: StoryFacts, uf: UnitFacts): { detail: string; full: string } | null {

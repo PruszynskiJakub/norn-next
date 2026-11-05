@@ -8,10 +8,11 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { repoConfigPath, workflowsDir, storyUnitDir } from "@norn/store";
+import { repoConfigPath, workflowsDir, } from "@norn/store";
 import type { CliDeps, CliResult } from "../../src/index.ts";
 import { createHarness, FakeInteraction, type Harness, issue } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";
+import { runStateOf } from "../../../../test/support/run-state.ts";
 
 setDefaultTimeout(30_000);
 
@@ -58,9 +59,9 @@ mode: auto
 let h: Harness;
 const SLUGS: Record<number, string> = { 1: "gh-1-pay-invoices", 2: "gh-2-send-receipts", 3: "gh-3-pick-an-api", 4: "gh-4-split-work" };
 const wt = (n: number) => `${h.root}-worktrees/${SLUGS[n]}`;
-const runs = (n: number) => storyUnitDir(join(wt(n), `.agents/specs/${SLUGS[n]}`));
+const runs = (n: number) => runStateOf(join(wt(n), `.agents/specs/${SLUGS[n]}`));
 const sliceWt = () => `${wt(4)}--01-part`;
-const sliceRuns = () => join(sliceWt(), `.agents/specs/${SLUGS[4]}/runs/01-part`);
+const sliceRuns = () => runStateOf(join(sliceWt(), `.agents/specs/${SLUGS[4]}`), "01-part");
 const receipts = (dir: string) => readdirSync(join(dir, "receipts")).sort();
 const tick = async () => {
   h.clock.advance(10_000);
