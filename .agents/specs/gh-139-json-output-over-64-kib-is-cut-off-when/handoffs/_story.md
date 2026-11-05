@@ -22,6 +22,9 @@ stdout carries the whole value through a pipe, past the 64 KiB pipe buffer, so `
 | Where: `watch` and signal path exit the same way | review (by reading) | `watch` returns through the same flushed path in main.ts; the second-signal hard stop writes nothing (no output to lose) |
 - review#1 approve: Approve: main.ts waits for stderr/stdout write callbacks before exit; verified old 65536 vs new 100237 bytes through a pipe, early-closing reader does not hang; stdout-pipe.test.ts proves it. One nit (test runs source, not built binary).
 
+- describe#1: wrote pr.md (summary diff of the exit path, before/after byte counts, test, two-way door, low blast radius).
+- describe#1 done: pr.md written: summary diff of main.ts exit path, before/after (65536 vs 100237 bytes through a pipe), stdout-pipe test red→green, two-way door, low blast radius.
+
 ## Resume
 
-Review approved; next is whatever norn routes after review (no action for this step).
+PR body is in pr.md; nothing left for describe.
