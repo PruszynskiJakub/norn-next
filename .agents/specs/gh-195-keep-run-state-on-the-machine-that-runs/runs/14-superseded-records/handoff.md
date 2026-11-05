@@ -37,6 +37,24 @@ Slice 14 (B27, D11): after a takeover without a release the old holder's tick se
 - Flakes: none seen.
 - implement#1 done: B27/D11: takeover without release -> old holder's tick sets runs/<story> aside under <machine dir>/superseded/<story>-<ulid>/ (record.superseded, Check item superseded:<story>:<last receipt>, tidy prunes after trace.retain); clean release (copy's tree pushed by this machine on the record ref) -> removed quietly (record.released). unpushed_runs/orphaned/ removed everywhere. Carried: 10-R3-F1 (holder keeps its copy unless the remote record continues from its own; else set aside), 11-S2 (lost-record path sets stale copy aside), 13-R3-F1 (seen = applied_through), 13-R3-F2 (rejected.json under rejected.lock, per-entry read, never overwritten). recovery R2.3 skip replaced. Unit 1240/0, integration 852/0/0 skip, e2e 74/0; takeover-record-lost 10x green.
 
+### review#1 (changes_requested)
+
+| Item | Verifier | Proven by |
+| --- | --- | --- |
+| B27 / AC1 | test | `packages/cli/test/integration/superseded-record.test.ts` › "AC1, AC2: after B takes gh-9 over on expiry…"; `test/e2e/recovery.test.ts` › "R2.3, T7a (gh-195 D11, B27)…" (expiry only; no --force variant, F4) |
+| B27 / AC2 | test | `superseded-record.test.ts` › "AC1, AC2: …" (tidy young/old, Check item gone) |
+| B27 / AC3 | test | `superseded-record.test.ts` › "AC3: after A's story handoff…"; `test/e2e/team.test.ts` (record.released, then claim.other) |
+| B27 / AC4 | test | `packages/core/test/rule-cases.ts` (record.superseded, record.released) + golden; the tidy summary and reference.md still name the removed clean-up (F1) |
+| 10-R3-F1 | test | `superseded-record.test.ts` › "10-R3-F1: …" |
+| 11-S2 | test | `superseded-record.test.ts` › "11-S2: …" |
+| 13-R3-F1 | test | `packages/core/test/unit/decide.test.ts` › "gh-195 13-R3-F1 (D12)…" |
+| 13-R3-F2 | test | `packages/store/test/integration/rejected-file.test.ts` |
+
+- Blocking: F1. `packages/cli/src/commands/tidy.ts:93` and `docs/reference.md:406` still say "runs/ work not in the record (R2.3)" and do not name the superseded prune. Minor: F2 (a malformed rejected.json aborts tidy after its removals, dry run included), F3 (the comment at checkout.ts:352 disagrees with the no-ref rule, plus a silent catch), F4 (AC1 --force not tested). Nits: F5, F6.
+- Verified sound: the clean-release test proves "all pushed" (the local ref moves only after a successful CAS; any later receipt changes the tree); observe is effect-free; a kept copy pushes with a lease, so it never goes over a newer record; no story-added skips; the R2.3 skip is replaced by a stronger assertion.
+- Tests run: unit 1240/0; typecheck green; superseded-record + rejected-file 7/0; e2e recovery 14/0, team pass.
+- Flakes: none.
+
 ## Resume
 
-Done; reported with `norn done done`. Open for the person: RULES T7a/R2.3 still read "any local copy is superseded" (slice 18 or refinement amends them).
+Rework F1: fix tidy's summary, then run `bun run docs:emit`. Then the minors F2–F4 at the implementer's judgement. Open for the person: RULES T7a/R2.3 (slice 18).
