@@ -129,6 +129,13 @@ describe("cockpitModel", () => {
     expect(row(rows, "approve:gh-4")?.actions.find((a) => a.id === "reject")?.effect).toEqual({ kind: "verb", argv: ["story", "reject", "gh-4", "--reason", "{input}"] });
     // B48: unstick is gone; a stuck unit is rerun
     expect(row(rows, "unblock:gh-5")?.actions.find((a) => a.id === "unstick")?.effect).toEqual({ kind: "verb", argv: ["run", "rerun", "gh-5"] });
+    // gh-212: a run-out counter's way out keeps the item's --step and --reset
+    const counted = view();
+    counted.inbox.groups.unblock = [entry("unblock", "gh-5", { command: "norn run rerun gh-5 --step implement --reset review_loop" })];
+    expect(row(cockpitModel(counted, { places: true, provider: "gh" }).rows, "unblock:gh-5")?.actions.find((a) => a.id === "unstick")?.effect).toEqual({
+      kind: "verb",
+      argv: ["run", "rerun", "gh-5", "--step", "implement", "--reset", "review_loop"],
+    });
     expect(row(rows, "approve:gh-4")?.actions.find((a) => a.id === "pr")?.effect).toEqual({ kind: "link", url: "https://github.com/o/r/pull/7" });
     expect(row(rows, "attended:gh-2")?.actions[1]?.effect).toEqual({ kind: "place", place: "agent", story: "gh-2", reach: { worktree: "/repo-worktrees/gh-2-x", agent_session_id: "s2", pane_id: null } });
     expect(row(rows, "story:gh-6")?.actions[0]?.effect).toEqual({ kind: "place", place: "orient", story: "gh-6" });

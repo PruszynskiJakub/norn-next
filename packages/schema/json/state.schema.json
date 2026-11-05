@@ -224,6 +224,34 @@
             "screen": {
               "minLength": 1,
               "type": "string"
+            },
+            "counter": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "name",
+                "max",
+                "outcome",
+                "to"
+              ],
+              "properties": {
+                "name": {
+                  "pattern": "^[a-z][a-z0-9_-]*$",
+                  "type": "string"
+                },
+                "max": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "outcome": {
+                  "pattern": "^[a-z][a-z0-9_-]*$",
+                  "type": "string"
+                },
+                "to": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              }
             }
           }
         },

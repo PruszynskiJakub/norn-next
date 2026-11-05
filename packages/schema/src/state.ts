@@ -73,6 +73,14 @@ export const ParkInfo = Type.Object(
     choice: Type.Optional(PromptChoice),
     /** L1 (A7): the full pane text of the prompt — shown by `inbox --details` and `why`, not in titles */
     screen: Type.Optional(NonEmpty),
+    /**
+     * W4 (gh-212): an `exhausted` park from a counted edge: the counter that ran out, the outcome whose
+     * edge it guards and that edge's target — so the way out (`run rerun --step <to> --reset <counter>`)
+     * is read from state, never parsed from `reason`
+     */
+    counter: Type.Optional(
+      Type.Object({ name: CounterName, max: NonNegInt, outcome: OutcomeName, to: NonEmpty }, { additionalProperties: false }),
+    ),
   },
   { additionalProperties: false },
 );

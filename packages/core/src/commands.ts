@@ -39,17 +39,40 @@ export function nextCommand(unitKey: string, state: UnitState | null, start?: st
     case "corrupt":
       return cmd.runView(unitKey, { why: true });
     case "stuck":
-      return cmd.runRerun(unitKey);
+      return unstickCommand(unitKey, state);
     case "parked":
       if (state.park?.kind === "ask") return cmd.storyAnswer(unitKey);
       if (state.park?.kind === "gate") return cmd.storyApprove(unitKey);
       if (state.park?.kind === "attended") return start ?? cmd.brief();
-      return cmd.runRerun(unitKey);
+      return unstickCommand(unitKey, state);
     case "ready":
       return start ?? cmd.brief();
     case "running":
       return cmd.runList(unitKey);
   }
+}
+
+/**
+ * The way out of a stuck or parked unit (O1, W4). A counter that ran out (gh-212) leads to the target of
+ * the edge it guards with that counter reset: a plain rerun would restart the same step, and the same
+ * outcome would exhaust the counter again. A reserved target (`$done`, `$stuck`) is no step to move to,
+ * so the step reruns with the counter reset.
+ */
+export function unstickCommand(unitKey: string, state: Pick<UnitState, "park">): string {
+  const c = state.park?.kind === "exhausted" ? state.park.counter : undefined;
+  if (!c) return cmd.runRerun(unitKey);
+  return cmd.runRerun(unitKey, { ...(c.to.startsWith("$") ? {} : { step: c.to }), reset: c.name });
+}
+
+/**
+ * gh-212 (W4): a rerun of a unit stuck on a run-out counter that leaves the counter at its max warns:
+ * the edge it guards stays closed, so the same outcome ends stuck again (a plain rerun of the same step
+ * on unchanged code most likely does). Null when nothing to warn about.
+ */
+export function rerunWarning(unitKey: string, state: Pick<UnitState, "park" | "step">, o: { reset: readonly string[] }): string | null {
+  const c = state.park?.kind === "exhausted" ? state.park.counter : undefined;
+  if (!c || o.reset.includes(c.name)) return null;
+  return `${c.name} ran out (${c.max}/${c.max}) at ${state.step}.${c.outcome} and is not reset: if ${state.step} ends ${c.outcome} again, the unit is stuck again. To act on ${c.outcome}: ${unstickCommand(unitKey, state)}`;
 }
 
 const norn = (...parts: (string | false | null | undefined)[]) => ["norn", ...parts.filter((p): p is string => !!p)].join(" ");
