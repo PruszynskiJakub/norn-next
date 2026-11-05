@@ -54,6 +54,16 @@ Other machines see a story they do not hold: under `remote` step/attempt/counter
 - Flakes: none new in this review's runs.
 - review#1 changes_requested: Review #1: 3 blocking — F1 CI missing from non-holder view (B18/AC3; add RemotePort CI read + gh/glab/FakeRemote/contract), F9 lastBoundary treats mirror/waits-for-input/started commits as boundaries (B18/B19), F13 store record-ref F1 property test times out (real failure; bound it, 10 isolated + 3 full-tier runs). Minor: cache written by view and never tidied, swallowed fetch errors, prose in --json where[], heldElsewhereKeys scope, weak AC5/AC3 tests, two record caches vs slice 16.
 
+
+### Rework (review#1)
+
+- F1 (CI): new `RemotePort.pullRequestCi(number)` → `pending|success|failure|none` (core `PullRequestCi`): gh `pr checks --json bucket` (exit 8 pending / 1 failed with JSON, "no checks reported" = none), glab `mr view` `head_pipeline.status`; recorded fixtures + unit tests; FakeRemote `ci` map; contract case "pullRequestCi: none, pending, failure and success" run against scripted gh/glab and FakeRemote. Observe stores it with the PR seen for stories held elsewhere (`pr.json` gains optional `ci`; schema emitted). ElsewhereView `ci`; story view prints `CI: <state>`, status `PR #N · CI: <state>`; AC3 asserts both.
+- F9: boundary commits now carry `Norn-Outcome: <outcome>` (S4 `nornTrailers`; set by `endedWith(res)` only when the outcome moved the cursor: apply_receipts and classify). lastBoundary = newest story-unit commit with `Norn-Outcome`, walked `--not <base>` with `--grep`. Golden `--update`: 14 cases, the only change is the added trailer (checked mechanically). Tests: mirror + ask commits after a boundary (F9) and before any boundary (AC4). With run state off the branch, session-start and park commits are only made when there is work to commit, so the start commit is often absent; nothing depends on it now. NOTE for a person: RULES.md S4 still lists four trailers; `Norn-Outcome` should be added there through refinement/quick (not edited here).
+- F2/F3/F14: record-cache removed. Views read the record from git objects into memory (`readRecordObjects` in record-ref.ts), sharing the entry checks (`recordEntries`) and JSON checks (`jsonErrors`) with `unpackRecord`; state/receipt/workflow failures are reported in `record.errors` (S2), not skipped. AC5 asserts the machine dir is unchanged (files + mtimes) after two views.
+- F4: observe records a failed targeted fetch in the sync report and `remote.json` last_error (issues kept); `heldElsewhereKeys` failure in the view lands in `view.errors`; `remoteTarget` refuses (`record_unreachable`) instead of acting on a stale record.
+- F5: `where` removed; sentences built in `formatElsewhere`. F6: walk bounded. F7/F8 fixed. F10: heartbeat-only (same user@host other clone counts; test); a claim is the open-story signal (claims go at GR6/GR6b). F11: gh-10 has a remote ref, claim times from the bare remote, status asserted for AC3, config switch pushed and pulled. F12: test that `story answer` on B reads the cursor from the record (`review#1`).
+- F13: cherry-picked afb441ddb (shared fix from slice 09).
+
 ## Resume
 
-Review #1 requested changes: rework F1, F9, F13 first (findings in the review receipt), then the minor ones worth it.
+Run integration and e2e; regenerate transcripts if needed; commit; `norn done done`.
