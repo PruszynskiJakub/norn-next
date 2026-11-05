@@ -14,6 +14,17 @@
 
 ## Goal
 
+`norn story checkout` takes a story over from its record ref (B22–B24, B33, T5, T5a), plus carried items 09-F4/15-F6 (local record ref = unpacked record), 08-F4 (stale record lease = one Check item, no retry loop), and the team.test clone-B restore.
+
 ## Progress
 
+- checkout (packages/cli/src/runtime/checkout.ts): fetches `refs/norn/runs/<story>` alone (`fetchRecords`, into the same local ref: 09-F4), unpacks it into the machine dir (`unpackRecord`) unless this checkout already holds the claim and the run state (story start / re-checkout keep theirs); `Norn-Branch-Commit` (new store export `recordBranchCommit`) vs story branch head: ancestor → continue; not (or missing) → take receipt gets `rewritten: {gone, head}`; no branch → no check, no worktrees (B33). Output gains `record` and `restarted`. `story reopen` passes `{ record: false }` (it restores the record itself, B32).
+- schema: TakeReceipt `rewritten` (optional); ActFailureEntry `lease` (optional). JSON schemas re-emitted.
+- core apply: a take with `rewritten` at its cursor re-enters the step (new attempt, counters/history kept). brief history gains `rewritten` with the same line (`branchRewrittenLine`, core/apply.ts) under "Why this attempt".
+- 08-F4: act records a push_record refused as `stale` as the story unit's act failure (effect `record_push`, `lease`); decide holds push_record while the local record ref is still that lease; inbox shows one Check item `record-push:<story>:<lease>` with `norn story checkout <story>` (which refetches the ref, keeps local run state, so the next push goes on top); a successful push clears it.
+- Tests: packages/cli/test/integration/takeover-record.test.ts (AC1–AC4 + stale lease). test/e2e/team.test.ts: removed the `.skip` on "clone B answers…", restored B's unit cursor/handoff, take receipt and trace checks, and the race winner's take receipt check (unconditional). Nothing of team clone B left for slice 11.
+- golden --update: 0 cases changed.
+
 ## Resume
+
+Run full integration + e2e tiers, then `norn done done`.
