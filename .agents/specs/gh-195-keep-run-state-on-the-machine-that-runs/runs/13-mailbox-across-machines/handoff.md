@@ -28,8 +28,13 @@ B20, B21: a non-holder's mailbox receipt is stamped from the last boundary (loca
 - B21: act `rejectReceipt` keeps a rejected mailbox receipt in `<machine dir>/rejected.json` (schema `local-rejected`); `loadLocalFacts` gives `StoryFacts.rejected_mailbox` (dropping ones a later applied answer/approve/reject cleared), shared by observe and the view (parity); `buildInbox` adds a Check item `rejected:<receipt_id>` unless the story finished.
 - story edit: a claim seen held elsewhere is checked first even with no local run state (restored block, gh-71 B18).
 - Tests: new packages/cli/test/integration/mailbox-across-machines.test.ts (AC1–AC4); restored human.test mailbox block, 45/45 pass. Changed in it: the stale-local-copy setup (reset to the `work.unstick` commit, which no longer exists, and the assertion on B's local state.json) became "B has no run state of gh-5" (S12); the receipt expectation `attempt: 3` became no attempt plus the reply text (B20 AC1); "nothing written locally" checks B's run-state folder does not exist instead of comparing its receipts listing.
-- Golden: `--update` added only `Norn-Next` to 10 cases (checked by stripping it: identical).
+- Golden: `--update` added only `Norn-Next` to 10 cases (checked by stripping it: identical); `bun run golden` harvested 2 cases (mailbox.reject).
+- Transcripts rewritten (slice-workflow, base-sync): the empty boundary commits with `--allow-empty` and `Norn-Next` appear, shas renumbered. Observe snapshots unchanged.
+- Tiers: unit 1221 pass; integration 810 pass / 3 skip (environment skips: zombie, lsof) / 0 fail; e2e 72 pass / 2 skip (team clone B → slices 10–11, recovery R2.3 → 14) / 0 fail.
+- Flakes: none seen.
+- Friction: norn's own `implement timeout → nudge` commits swept the uncommitted work in progress into two norn commits (92a73a97b, 04817140b).
+
 
 ## Resume
 
-Run integration + e2e tiers; regenerate transcripts (NORN_TRANSCRIPT_UPDATE=1) and snapshots if the empty boundary commits / Norn-Next changed them; `bun run golden` harvest; then `norn done done`.
+Done: reported `norn done done`. Next is the slice's test check.
