@@ -33,6 +33,20 @@ Handoffs move to `<spec>/handoffs/<unit>.md`, prose only; status printed by `bri
 - Tiers: unit 1208 pass; integration 732 pass, 9 skip (6 human mailbox describe.skip, 3 env-gated zombie skipIf under load); e2e 72 pass, 2 skip (allowed).
 - implement#1 done: Handoffs at <spec>/handoffs/<unit>.md, prose only (tidyHandoff: skeleton when new, older blocks stripped once; no header/heartbeat writes). brief shows counters + last outcome; story checkout prints status above each handoff. The run-state move takes runs/<unit>/handoff.md to handoffs/ stripped, in the same commit. New handoffs-folder integration test (AC1-AC4), run-state-move AC5, slice-workflow e2e AC6. Transcripts/snapshots/brief snapshots regenerated; golden unchanged (+1 harvested). Docs lint left to slice 18 per its note. unit 1208/0, integration 732 pass 9 skip, e2e 72 pass 2 skip.
 
+- review#1: approve. Traceability:
+
+| Item | Verifier | Proven by |
+| --- | --- | --- |
+| B39 / AC1 | test | `packages/cli/test/integration/handoffs-folder.test.ts` › "AC1, AC2: the first session commits the skeleton…" and › "AC1: the story's handoff is on the story branch, the slice's on the slice branch…"; one file across rounds: `human.test.ts` › gh-71 round edit (handoffPath = handoffs/_story.md, sections kept) |
+| B6 / AC2 | test | `handoffs-folder.test.ts` › "AC2: an edited handoff is in the boundary commit as written; a boundary that did not edit it leaves it out…"; `markdown-unit.test.ts` › "tidyHandoff …" |
+| B7 / AC3 | test | `handoffs-folder.test.ts` › "AC3 (B7): at review attempt 2, `norn brief` and `norn story checkout` print…" |
+| B8 / AC4 | test | `handoffs-folder.test.ts` › "AC4 (B8): an older norn's header and heartbeat blocks are gone…" |
+| B39, B34 / AC5 | test | `run-state-move.test.ts` › "AC1: gh-9's runs/ on its branch moves into the machine dir in one pushed commit…" (A handoffs/_story.md, prose == old prose, D runs/_story/handoff.md, one commit) |
+| B1 / AC6 | test | `test/e2e/slice-workflow.test.ts` › "AC6 (gh-195 B1): the PR's changed files and every branch tree…" |
+
+- review#1 checks: (a) base-sync with the three `noteInHandoff` lines removed: BS3.3a sees a fast-forward adopt (no divergence to merge), C5 sees no norn commit after the approval, BS5.2 still holds the push but HEAD~1 is not the merge; so the notes only restore the precondition each rule is about (a norn commit of its own), assertions unchanged, not a loosening. Branch pushes still run at every boundary (ActEnv.commit pushes even when the commit is empty; transcripts lose only empty-commit spawns, every branch push line kept), so S8/GR4 hold; claims are refs, untouched. (b) tidyHandoff runs in act (ActEnv.commit), not observe. (c) move pathspec: spec folder minus every entry but runs/ and handoffs/, so no agent code or other spec folders. (d) checkout/brief JSON have no schema; field additive. (f) slice 18 says the docs lint changes there, "not before". (g) diff adds no skip.
+- review#1 tests: unit 1208 pass; typecheck clean; e2e 72 pass 2 skip; integration from test#1 pass. Flakes: none.
+
 ## Resume
 
-Review the slice diff (implement done).
+Review approved; next is the workflow's next step for gh-195/07.
