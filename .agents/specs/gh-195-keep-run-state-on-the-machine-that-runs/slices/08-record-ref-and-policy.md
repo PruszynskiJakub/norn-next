@@ -1,8 +1,8 @@
 ---
 id: gh-195/08
 title: The record ref and the record policy
-depends_on: [gh-195/05, gh-195/06]
-status: planned
+depends_on: [ gh-195/05, gh-195/06 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
