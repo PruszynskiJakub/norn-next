@@ -12,7 +12,7 @@
  * `(root, story, unit)` functions.
  */
 import { type Dirent, existsSync, readdirSync } from "node:fs";
-import { join, relative } from "node:path";
+import { basename, join, relative } from "node:path";
 import {
   parseRoundDirName,
   ROUNDS_DIR,
@@ -28,6 +28,7 @@ import {
 } from "@norn/schema";
 import { isErrno } from "./fsx.ts";
 import { machineDir } from "./paths.ts";
+import { archivedRecordDir } from "./record-ref.ts";
 
 /** S12: the machine dir's `runs/`, holding every story's run state of the checkout `root` belongs to. */
 export const machineRunsDir = (root: string): string => join(machineDir(root), RUNS_DIR);
@@ -48,8 +49,9 @@ export const runStateStartDir = (root: string, story: RunStory, unit: string, wo
  */
 export const runStateRecord = (root: string, story: RunStory, dir: string): string => relative(storyRunStateDir(root, story), dir);
 /**
- * gh-195/05: the folder of an older norn's tree (`root` a checkout or the base cache) that held a story's
- * records, `<spec folder>/runs`: finished stories are read from there until gh-195/16 (D16).
+ * gh-195/05: the folder of an older norn's tree that held a story's records, `<spec folder>/runs`:
+ * read only from a unit worktree's branch, to move it off (B34, D13); on a base or checkout tree it is
+ * never read, only noticed (`baseRunStateStories`, D16).
  */
 export const treeRunStateDir = (root: string, story: RunStory): string => join(root, treeStoryRunStatePath(story));
 /**
@@ -141,15 +143,25 @@ export function startDir(base: string, unit: string, workflow: string): string {
 export const isFlatStoryRecord = (base: string) => existsSync(join(base, unitRecordPath(STORY_UNIT_DIR), "state.json"));
 
 /**
- * gh-195/05: where a story's run state is read from — the machine dir of `checkout` (S12), or, for a
- * finished story an older norn recorded in a tree (`root` the main checkout or the base cache) and this
- * machine holds no run state of, that tree's `<spec folder>/runs` (until gh-195/16, D16). `name` is the
- * root a file error or a receipt names a path from: the tree's root, or none (absolute) for the machine dir.
+ * gh-195/05, D7, D16 (B29): where a story's run state is read from — the machine dir of `checkout`
+ * (S12), or, for a finished story this machine holds no run state of, the record on its archive ref
+ * here (`archive`: the checkout's archive refs, `localRecordRefs`, read only when needed), unpacked into the machine dir's cache (`archivedRecordDir`). Never an older norn's
+ * `<spec folder>/runs` in a base or checkout tree: a repository still holding those is pointed to
+ * `norn upgrade` instead (`baseRunStateStories`). `name` is the root a file error or a receipt names a
+ * path from: none (absolute) for both.
  */
-export function runStateSource(root: string, story: RunStory, opts: { checkout?: string; tree?: boolean } = {}): { base: string; name?: string; tree: boolean } {
+export function runStateSource(
+  root: string,
+  story: RunStory,
+  opts: { checkout?: string; archive?: () => ReadonlyMap<string, string> } = {},
+): { base: string; name?: string; tree: boolean; archive?: string } {
   const checkout = opts.checkout ?? root;
   const machine = storyRunStateDir(checkout, story);
-  if (opts.tree && !existsSync(machine) && existsSync(treeRunStateDir(root, story))) return { base: treeRunStateDir(root, story), name: root, tree: true };
+  const sha = opts.archive && !existsSync(machine) ? opts.archive().get(story.key) : undefined;
+  if (sha) {
+    const dir = archivedRecordDir(checkout, story.key, sha);
+    if (dir) return { base: dir, tree: false, archive: basename(dir) };
+  }
   return { base: machine, tree: false };
 }
 /** A unit's run-state folder under a source's `base` (`runStateSource`). */

@@ -9,7 +9,7 @@
  * action), Recently done.
  */
 import { ATTENDED_WAIT, parseDuration, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
-import { cmd, NO_VERSION_HINT, nextCommand, skillsDriftHint, startAgentCommand, versionMismatch } from "../commands.ts";
+import { baseRunStateHint, cmd, NO_VERSION_HINT, nextCommand, skillsDriftHint, startAgentCommand, versionMismatch } from "../commands.ts";
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../criteria.ts";
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
@@ -150,6 +150,23 @@ function repoSkillsDriftItem(facts: Facts): InboxItem | null {
     step: null,
     title: skillsDriftHint.repo(v.running),
     detail: v.skills_drift.join(", "),
+    command: cmd.upgrade(),
+    since: iso(facts.now),
+  };
+}
+
+/** gh-195 D16 (B29, B35): run state still in the base's tree — one repo-level Check item pointing to `norn upgrade`. */
+function baseRunStateItem(facts: Facts): InboxItem | null {
+  const stories = facts.base_run_state;
+  if (!stories?.length) return null;
+  return {
+    id: `base_run_state:*:${stories.join(",")}`,
+    group: "check",
+    story: "*",
+    slice: null,
+    step: null,
+    title: baseRunStateHint.text(facts.repo.default_branch, stories),
+    detail: stories.join(", "),
     command: cmd.upgrade(),
     since: iso(facts.now),
   };
@@ -825,6 +842,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   add(heartbeatItem(facts, config));
   add(versionItem(facts));
   add(repoSkillsDriftItem(facts));
+  add(baseRunStateItem(facts));
   // gh-61 D7: the version item comes first, whatever its age
   const pinned = (it: InboxEntry) => (it.id.startsWith(VERSION_ITEM) ? 0 : 1);
   for (const g of INBOX_GROUPS) groups[g].sort((a, b) => pinned(a) - pinned(b) || epoch(a.since) - epoch(b.since) || a.id.localeCompare(b.id));

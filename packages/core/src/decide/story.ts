@@ -132,13 +132,16 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
  * pushes the story's record once its tree differs from the one on the record ref it last saw, after
  * the tick's branch pushes (a side action act performs last). A push that failed leaves the tree
  * different, so the next tick pushes again (B14). A move off the branch this tick (B34, D13) brings the
- * record into the machine dir as it acts, so the push rides along with it. Under `local`, nothing (B11).
+ * record into the machine dir as it acts, so the push rides along with it. A story cleaned up this tick
+ * (GR6, GR6b) is archived by that action instead (D15). Under `local`, nothing (B11).
  */
 function pushRecord(ctx: Ctx, story: StoryFacts, ref: UnitRef): void {
   if ((ctx.config.record?.policy ?? "local") !== "remote" || !story.record) return;
   const { tree, pushed } = story.record;
   const moved = ctx.decisions.some((d) => d.action.kind === "move_record" && d.action.unit?.story === story.key);
-  if (!moved && (tree === null || tree === pushed?.tree)) return;
+  // gh-195 D15 (B29): a story cleaned up this tick (GR6, GR6b) has its final record archived by that action
+  const archived = ctx.decisions.some((d) => (d.action.kind === "cleanup_merged_story" || d.action.kind === "close_story") && d.action.unit?.story === story.key);
+  if (archived || (!moved && (tree === null || tree === pushed?.tree))) return;
   ctx.emit({ kind: "push_record", unit: ref, rule: "record.push", branch: story.branch, expected: pushed?.sha ?? null, holder: ctx.facts.machine.holder });
 }
 

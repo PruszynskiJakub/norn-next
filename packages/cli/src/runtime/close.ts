@@ -12,9 +12,10 @@
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { StoryFacts } from "@norn/core";
-import { listLeases, patchStoryFile, releaseClaim, releaseLease, storyFile } from "@norn/store";
+import { recordRef } from "@norn/schema";
+import { listLeases, patchStoryFile, pushRecord, readRecordRef, type RecordPushResult, releaseClaim, releaseLease, storyFile } from "@norn/store";
+import { refuse } from "../output.ts";
 import type { Observed } from "./observe/index.ts";
-import { pushReleaseRecord } from "./release.ts";
 
 export interface StoryClosed {
   ok: true;
@@ -36,7 +37,7 @@ export interface StoryClosed {
 export type StoryCloseFailure =
   | { ok: false; reason: "spec_corrupt"; story: string; file: string; message: string; committed: string[] }
   | { ok: false; reason: "push_failed"; story: string; branch: string; push_reason: string; message: string; pushed: string[] }
-  | { ok: false; reason: "record_push_failed"; story: string; message: string; pushed: string[] };
+  | { ok: false; reason: "record_push_failed"; story: string; ref: string; push_reason: string; message: string; pushed: string[] };
 
 export interface CloseStoryOptions {
   /** the norn home whose lease files are released */
@@ -90,9 +91,10 @@ export async function closeStory(obs: Observed, story: StoryFacts, opts: CloseSt
     }
   }
 
-  // 3b. the record before the claim goes (B15); a rejected push removes nothing (B16)
-  const rec = await pushReleaseRecord(obs, story);
-  if (!rec.ok) return { ok: false, reason: "record_push_failed", story: key, message: rec.error, pushed };
+  // 3b. gh-195 D15 (B29): the final record on its archive ref, its `Norn-Branch-Commit` the story branch
+  // as pushed; a failed push stops here with everything still in place
+  const record = await pushHeldRecord(obs, key, loc?.branch ?? null);
+  if (!record.ok) return { ok: false, reason: "record_push_failed", story: key, ref: recordRef(key), push_reason: record.reason, message: record.message, pushed };
 
   // 4. clean up this machine
   const removed: string[] = [];
@@ -132,3 +134,29 @@ export async function closeStory(obs: Observed, story: StoryFacts, opts: CloseSt
     record: obs.remote && loc ? `${obs.remote}/${loc.branch}` : (loc?.branch ?? null),
   };
 }
+
+/**
+ * gh-195 D4, D15 (B15, B16, B29, B33): push the story's record to `refs/norn/runs/<story>` with a lease
+ * on the sha this checkout last saw (D2), its `Norn-Branch-Commit` the story branch as the remote has
+ * it (the local one without a remote; none without a branch, B33). The one push every claim release
+ * (`story handoff`, a clean `watch` exit: runtime/release.ts) and every cleanup (GR6
+ * `cleanup_merged_story`; closing, `closeStory`: GR6b and `story close`) makes after the branches and
+ * before the claim or anything else goes; an unchanged or empty record pushes nothing. Once pushed,
+ * the local ref and the local run-state folder pack to the same tree: a clean release (gh-195/14).
+ */
+export async function pushHeldRecord(obs: Observed, key: string, branch: string | null): Promise<RecordPushResult & { branch_commit: string | null }> {
+  const git = obs.ports.git;
+  const loc = obs.stories[key];
+  const remoteHead = branch && obs.remote ? await git.revParse(obs.root, `refs/remotes/${obs.remote}/${branch}`) : null;
+  const head = remoteHead ?? (branch ? await git.revParse(obs.root, `refs/heads/${branch}`) : null);
+  const expected = (await readRecordRef(obs.root, key))?.sha ?? null;
+  const spec_dir = loc?.spec_dir ?? obs.facts.stories.find((s) => s.key === key)?.spec_dir ?? "";
+  const r = await pushRecord(obs.root, obs.remote, { key, spec_dir }, { expected, holder: obs.facts.machine.holder, branch_commit: head, at: new Date(obs.facts.now).toISOString() });
+  return { ...r, branch_commit: head };
+}
+
+/** B16: why a record push failed, the same words for every release and cleanup. */
+export const recordPushError = (key: string, reason: string, message: string): string => `record push to ${recordRef(key)} failed (${reason}): ${message}`;
+
+/** B16: the one refusal (exit 3) of a command whose record push failed; nothing was released or removed. */
+export const recordPushRefused = (error: string, retry: string, pushed: string[]) => refuse(error, `check the remote, then run ${retry} again`, "record_push_failed", { pushed });

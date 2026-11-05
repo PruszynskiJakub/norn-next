@@ -17,7 +17,7 @@ import { acquireClaim, newClaimBlob, scanWorktrees, writtenHere } from "@norn/st
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { failure, refuse } from "../output.ts";
-import { closeStory } from "../runtime/close.ts";
+import { closeStory, recordPushError, recordPushRefused } from "../runtime/close.ts";
 import { isClosed, pushedStory } from "../runtime/closed.ts";
 import { claimFor } from "../runtime/human.ts";
 import type { Observed } from "../runtime/observe/index.ts";
@@ -84,7 +84,7 @@ export const storyCloseCommand = defineCommand({
       const r = await closeStory(obs, story, { home: ctx.home, claimSha });
       if (!r.ok && r.reason === "spec_corrupt") throw failure(`cannot mark ${r.file} dropped: ${r.message}`, `fix spec.md, then ${cmd.storyClose(key)} again`, "story_corrupt");
       if (!r.ok && r.reason === "record_push_failed")
-        throw refuse(r.message, `check the remote, then run ${cmd.storyClose(key, { yes: true })} again; nothing was removed`, "record_push_failed", { pushed: r.pushed });
+        throw recordPushRefused(recordPushError(key, r.push_reason, r.message), cmd.storyClose(key, { yes: true }), r.pushed);
       if (!r.ok)
         throw failure(`push ${r.branch} failed (${r.push_reason}): ${r.message}`, `fix the push problem, then ${cmd.storyClose(key, { yes: true })} again; nothing was removed`, "push_failed", { pushed: r.pushed });
       const { ok: _ok, story: _story, branches_kept, record, ...effects } = r;

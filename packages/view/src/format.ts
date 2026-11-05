@@ -246,10 +246,8 @@ export function formatStepTimeline(v: TraceView, opts: { full?: boolean } = {}):
     out.push(`criteria: ${c.reports} report(s) · ${c.verdicts.pass} pass · ${c.verdicts.fail} fail · ${c.verdicts.person} person · ${c.verdicts.unverified} unverified${c.unchecked_coverage ? ` · ${c.unchecked_coverage} without frontmatter criteria` : ""}`);
   }
   if (v.hidden_events) out.push(`(${v.hidden_events} no-op/claim-renew tick events hidden — --all shows them)`);
-  if (v.records?.source === "base_cache") {
-    const ref = v.records.ref?.replace(/^refs\/remotes\//, "") ?? "the base branch";
-    out.push(`records: no worktree — paths below are a cached copy of ${ref} (${v.records.root}), refreshed when ${ref} moves; \`git show ${ref}:<path>\` reads the live record`);
-  }
+  // gh-195 D7 (B29): a finished story's record, read from its archive ref
+  if (v.records?.source === "archive") out.push(`records: from ${v.records.ref} at ${v.records.commit?.slice(0, 12)} — paths below are its copy in ${v.records.root}`);
   out.push("");
   if (!v.steps.length) {
     out.push("No steps yet.");

@@ -318,10 +318,10 @@ steps:
     // this machine is cleaned up
     expect(existsSync(wt())).toBe(false);
     expect(g.git(["branch", "--list", TBRANCH])).toBe("");
-    // gh-195/09 (B15): claim and mailbox refs are gone; the record went to its ref before the claim, and stays (B31)
-    expect(g.git(["for-each-ref", "--format=%(refname)", "refs/norn/"])).toBe(recordRef("gh-8"));
-    expect(g.git(["ls-remote", "origin", "refs/norn/*"]).split("\t")[1]).toBe(recordRef("gh-8"));
-    expect(g.git(["ls-remote", "origin", "refs/norn/*"]).split("\t")[0]).toBe(g.git(["rev-parse", recordRef("gh-8")]));
+    // gh-195 B29, B31: only the archive ref is left, holding the final record
+    expect(g.git(["for-each-ref", "--format=%(refname)", "refs/norn/"])).toBe("refs/norn/runs/gh-8");
+    expect(g.git(["ls-remote", "origin", "refs/norn/*"]).split("\n").map((l) => l.split("\t")[1])).toEqual(["refs/norn/runs/gh-8"]);
+    expect(g.git(["ls-remote", "origin", recordRef("gh-8")]).split("\t")[0]).toBe(g.git(["rev-parse", recordRef("gh-8")]));
     const inbox = (await g.norn("status", "--json")).value as Inbox;
     expect(Object.values(inbox.groups).flat().filter((x) => x.story === "gh-8")).toEqual([]);
     // the next ticks leave it closed

@@ -1,8 +1,8 @@
 ---
 id: gh-195/17
 title: norn upgrade moves the base's run state into archive refs
-depends_on: [gh-195/16]
-status: planned
+depends_on: [ gh-195/16 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }

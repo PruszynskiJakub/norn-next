@@ -386,6 +386,8 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     // R5.5: this tick is the checkout's heartbeat
     heartbeat: { last_tick_at: now },
     ...(local.norn ? { norn: local.norn } : {}),
+    // gh-195 D16: run state an older norn left on the base, pointed to `norn upgrade`
+    ...(local.snapshot.base_run_state.length ? { base_run_state: local.snapshot.base_run_state } : {}),
     orphans: { worktrees: orphanWts.sort(), branches: orphanBranches },
     ...(unmarked.length ? { unmarked } : {}),
   };

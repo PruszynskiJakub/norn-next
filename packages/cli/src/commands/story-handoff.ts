@@ -8,6 +8,7 @@
 import { cmd } from "@norn/core";
 import { defineCommand } from "../command.ts";
 import { claimHeld, failure, refuse, rendered } from "../output.ts";
+import { recordPushRefused } from "../runtime/close.ts";
 import { heldHere, releaseStory, withStory } from "../runtime/release.ts";
 import { aStory, resolveStory } from "../runtime/target.ts";
 
@@ -28,7 +29,7 @@ export const storyHandoffCommand = defineCommand({
       }
       const r = await releaseStory(obs, story);
       // B16: the remote refused the record, so the claim is kept and nothing deleted
-      if (!r.ok && r.failed === "record") throw refuse(r.error ?? "record push failed", `check the remote, then run ${cmd.storyHandoff(key)} again`, "record_push_failed", { pushed: r.pushed });
+      if (!r.ok && r.failed === "record") throw recordPushRefused(r.error ?? "record push failed", cmd.storyHandoff(key), r.pushed);
       if (!r.ok) throw failure(`handoff failed: ${r.error}`, `fix the push problem, then ${cmd.storyHandoff(key)} (the claim is kept until the branches are pushed)`, "release_failed", { pushed: r.pushed });
       const record = r.record ?? null;
       const value = { story: key, released: true, pushed: r.pushed, record, remote: obs.remote, next: `${cmd.storyCheckout(key)} (on the other machine)` };

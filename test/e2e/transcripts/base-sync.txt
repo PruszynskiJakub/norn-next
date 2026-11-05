@@ -1012,6 +1012,14 @@
   spawn repo $ git merge-base <sha:9> <sha:15>
   spawn repo $ git merge-tree --write-tree --name-only --no-messages <sha:9> <sha:15>
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
+  spawn repo $ git rev-parse --verify --quiet --end-of-options refs/remotes/origin/gh-7-add-login-form
+  spawn repo $ git rev-parse --verify --quiet refs/norn/runs/gh-7
+  spawn repo $ git hash-object -w --no-filters --stdin-paths
+  spawn repo $ git update-index --add --index-info
+  spawn repo $ git write-tree
+  spawn repo $ git commit-tree <sha:14>
+  spawn repo $ git push --porcelain --force-with-lease=refs/norn/runs/gh-7: origin <sha:15>:refs/norn/runs/gh-7
+  spawn repo $ git update-ref refs/norn/runs/gh-7 <sha:15>
   spawn repo $ git worktree remove --force <dir>/repo-worktrees/gh-7-add-login-form
   spawn repo $ git show-ref --verify --quiet refs/heads/gh-7-add-login-form
   spawn repo $ git branch -D gh-7-add-login-form

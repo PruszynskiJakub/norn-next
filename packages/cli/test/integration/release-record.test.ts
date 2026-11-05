@@ -35,6 +35,14 @@ steps:
     skill: norn-implement
     outcomes: { done: { to: $done, means: "tests pass" } }
 `;
+const SOLO = `name: solo
+start: implement
+steps:
+  implement:
+    type: agent
+    skill: norn-implement
+    outcomes: { done: { to: $done, means: "built" } }
+`;
 const CONFIG = "provider: gh\nworkflow: mini\nmode: auto\n";
 
 let h: Harness;
@@ -107,11 +115,11 @@ function rejectRecord(story: string): () => void {
 }
 
 /** A mini story with its plan session started (held here, run state in the machine dir). */
-async function storyAt(n: number, slug: string) {
+async function storyAt(n: number, slug: string, labels?: string[]) {
   const spec = `.agents/specs/gh-${n}-${slug}`;
   const wt = `${h.root}-worktrees/gh-${n}-${slug}`;
   const runs = () => runStateOf(join(wt, spec));
-  h.remote.issues = [...h.remote.issues, issue(n, slug)];
+  h.remote.issues = [...h.remote.issues, issue(n, slug, labels)];
   await h.tick("--sync");
   await tickUntil(() => state(runs())?.status === "running");
   return { key: `gh-${n}`, spec, wt, branch: `gh-${n}-${slug}`, runs, record: () => storyRunStateOf(join(wt, spec)) };
@@ -123,6 +131,7 @@ beforeAll(async () => {
   h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "mini.yaml"), MINI);
   h.write(join(workflowsDir(h.root), "slice.yaml"), SLICE);
+  h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);
   h.git(["push", "-q", "origin", "main"]);
@@ -288,5 +297,33 @@ describe("a story with no branch is handed over all the same (B33)", () => {
     expect(rec.files).toEqual(filesOf(record));
     expect(remoteRef(claimRef("gh-12"))).toBeNull();
     expect(r.stdout).toContain(`handed over gh-12: record at ${rec.sha}, with no story branch`);
+  });
+});
+
+describe("under remote, the tick that closes a story pushes its record once (review 09-F2)", () => {
+  test("GR6b: a record changed since its last push goes out with close_story alone, never also as push_record", async () => {
+    h.config(`${CONFIG}record:\n  policy: remote\n`);
+    try {
+      const s = await storyAt(15, "closed-issue", ["norn", "norn:wf:solo"]);
+      report(s.runs(), { outcome: "done", handoff: "built" });
+      await tickUntil(() => state(s.runs())?.status === "done");
+      await tick(); // the boundary's record push
+      const before = remoteRef(recordRef("gh-15"));
+      expect(before).not.toBeNull();
+      // the record moved on since that push, so a remote boundary would owe a push_record this tick
+      h.write(join(s.record(), "_story", "notes.txt"), "last words\n");
+      const i = h.remote.issues.find((x) => x.number === 15);
+      if (!i) throw new Error("no issue");
+      i.state = "closed";
+      h.clock.advance(10_000);
+      const r = (await h.norn("sync")).value as TickReport;
+      expect(r.decisions.filter((d) => d.unit === "gh-15" && d.kind !== "noop" && d.rule !== "claim.renew").map((d) => `${d.kind} ${d.ok}`)).toEqual(["close_story true"]);
+      const rec = recordOnRemote("gh-15");
+      expect(rec.sha).not.toBe(before);
+      expect(rec.files).toContain("_story/notes.txt");
+      expect(existsSync(s.wt)).toBe(false);
+    } finally {
+      h.config(CONFIG);
+    }
   });
 });
