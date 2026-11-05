@@ -32,6 +32,8 @@ import {
 } from "@norn/core";
 import { DEFAULT_CONFIG, type HookFact, type Mode, type ResolvedConfig, sliceBranch, storyBranch, type Workflow } from "@norn/schema";
 import {
+  listReceipts,
+  storyRounds,
   cachedDefaultBranch,
   classifyClaim,
   defaultBaseRef,
@@ -52,7 +54,27 @@ import {
   type UnpushedTarget,
   unpushedRuns,
 } from "@norn/store";
-import type { BaseSyncView, ClaimView, CounterView, PrView, ProjectView, RecentDone, RunView, SliceView, StoryView, UnitView } from "./types.ts";
+import type { BaseSyncView, ClaimView, CounterView, DelegatedDecision, PrView, ProjectView, RecentDone, RunView, SliceView, StoryView, UnitView } from "./types.ts";
+
+/**
+ * gh-196 D5 (B21, B22, B34): the decisions a supervisor made on the person's behalf, over every round of
+ * the story unit (each round folder's receipts; a flat record is round 1) and its slices, oldest first.
+ */
+function delegatedDecisions(story: StorySnapshot): DelegatedDecision[] {
+  const out: DelegatedDecision[] = [];
+  const add = (unit: string, round: number | null, receipts: readonly NumberedReceipt[]) => {
+    for (const { receipt: r } of receipts) {
+      if (!r.delegated) continue;
+      const reason = "comment" in r && typeof r.comment === "string" ? r.comment : "";
+      out.push({ unit, round, step: r.step, kind: r.kind, ...(r.kind === "round" ? { workflow: r.workflow } : {}), reason, at: r.at, who: r.who ?? null });
+    }
+  };
+  const rounds = storyRounds(story.path);
+  if (rounds.length) for (const rd of rounds) add(story.key, rd.n, listReceipts(rd.path).receipts);
+  else add(story.key, 1, story.units[0]?.receipts ?? []);
+  for (const u of story.units.slice(1)) add(u.unit.key, null, u.receipts ?? []);
+  return out.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+}
 
 export interface LoadProjectViewOptions {
   repoRoot: string;
@@ -411,6 +433,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
         branch: sf.branch,
         pr: prView(prSeen[story.key]),
         notes: sf.notes ?? [],
+        delegated: delegatedDecisions(story),
         base_sync: baseSync(sf, storyUnit.receipts ?? [], config.base_branch ?? cachedDefaultBranch(opts.repoRoot) ?? "main"),
         story_status: story.frontmatter?.status ?? null,
         spec_dir: story.spec_dir,

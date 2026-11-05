@@ -28,10 +28,10 @@ import type { Context } from "../context.ts";
 import { claimHeld, failure, refuse, usageError } from "../output.ts";
 import { waitForTickLock } from "../runtime/tick-lock.ts";
 import { parseUnitKey } from "../runtime/args.ts";
-import { humanReceipt, refuseIfHeldElsewhere, resolveTarget, runHumanVerb } from "../runtime/human.ts";
+import { DELEGATED_HELP, DELEGATED_OPTION, type Delegation, delegatedFields, delegation, humanReceipt, refuseIfHeldElsewhere, resolveTarget, runHumanVerb } from "../runtime/human.ts";
 import { targetKey, type TargetRule } from "../runtime/target.ts";
 
-const USAGE = "norn story edit [<story|slice>] --auto|--manual | --workflow <name> [--at <step>] [--force] | --at <step>";
+const USAGE = 'norn story edit [<story|slice>] --auto|--manual | --workflow <name> [--at <step>] [--force] [--reason "…" --delegated] | --at <step>';
 
 /** The units an edit applies to: not finished; a mode edit only the story units. */
 const editable = (verb: "mode" | "workflow"): TargetRule => ({
@@ -85,7 +85,7 @@ function refuseWhileWorking(story: StoryFacts, st: UnitState): void {
   if (open) throw refuse(`slice ${open.key} is not finished; finish or drop it first`, cmd.storyView(open.key), "slice_unfinished");
 }
 
-async function editWorkflow(ctx: Context, raw: string, name: string, at: string | undefined, force: boolean) {
+async function editWorkflow(ctx: Context, raw: string, name: string, at: string | undefined, force: boolean, d: Delegation) {
   const key = parseUnitKey(raw);
   const lock = await waitForTickLock(ctx, "norn story edit --workflow", "retry when it finishes");
   try {
@@ -95,6 +95,8 @@ async function editWorkflow(ctx: Context, raw: string, name: string, at: string 
     if (!obs || !sf) throw refuse(`${t.story} is not in this checkout`, cmd.storyCheckout(t.story), "story_not_local");
     // gh-71 D3 (B18): a new round is refused first while another clone holds the story's claim
     const round = !t.slice && !!t.state;
+    // gh-196 D1: a supervisor delegates only a round start (B34); a slice switch or a pre-start choice stays the person's
+    if (d.delegated && !round) throw usageError("story edit --delegated: applies to a new round of a started story only", USAGE);
     const claim = round ? await refuseIfHeldElsewhere(ctx, t.story, "story edit") : undefined;
     const listed = Object.keys(obs.workflows).sort();
     const loaded = obs.workflows[name];
@@ -143,7 +145,7 @@ async function editWorkflow(ctx: Context, raw: string, name: string, at: string 
         },
         // gh-71 D1 (P6, S5): only the receipt; the next tick ends the round and starts the next one.
         // B14: `--force` on a finished round is the same edit as without it
-        build: (t, st) => humanReceipt(ctx, t, st, "round", { workflow: name, workflow_hash: toHash, to, forced: !roundFinished(st), left_at: st.step }),
+        build: (t, st) => humanReceipt(ctx, t, st, "round", { workflow: name, workflow_hash: toHash, to, forced: !roundFinished(st), left_at: st.step, ...delegatedFields(d) }),
       });
       return { unit: t.key, workflow: name, previous: t.state.workflow, started: true, round: (t.state.round ?? 1) + 1, to, receipt: out.receipt, delivered: out.delivered, next: out.next };
     }
@@ -213,8 +215,10 @@ export const storyEditCommand = defineCommand({
     "--workflow <name>": "the unit's workflow: set before it starts; on a started story, the next round's; on a started slice, switched with --at",
     "--at <step>": "with --workflow: the step the new round (story) or the switched slice lands on (S7); alone: move the current round's cursor to that step",
     "--force": "with --workflow on a story (not a slice): end its unfinished round (recorded as ended by you) and start the new one",
+    '--reason "…"': "with --workflow on a started story: why this workflow, kept on the round receipt",
+    ...DELEGATED_HELP,
   },
-  options: { auto: { type: "boolean" }, manual: { type: "boolean" }, workflow: { type: "string" }, at: { type: "string" }, force: { type: "boolean" } },
+  options: { auto: { type: "boolean" }, manual: { type: "boolean" }, workflow: { type: "string" }, at: { type: "string" }, force: { type: "boolean" }, reason: { type: "string" }, ...DELEGATED_OPTION },
   positionals: { max: 1 },
   async run(ctx, args) {
     const auto = opt.bool(args, "auto");
@@ -225,11 +229,13 @@ export const storyEditCommand = defineCommand({
     if (auto && manual) throw usageError("story edit: --auto and --manual exclude each other", USAGE);
     if ((auto || manual) && (workflow !== undefined || at !== undefined)) throw usageError("story edit: change the mode or the workflow, one at a time", USAGE);
     if (force && workflow === undefined) throw usageError("story edit: --force needs --workflow", USAGE);
+    if ((opt.bool(args, "delegated") || opt.str(args, "reason") !== undefined) && workflow === undefined) throw usageError("story edit: --delegated and --reason go with --workflow", USAGE);
+    const d = delegation(ctx, args, "story edit");
     if (!auto && !manual && workflow === undefined && at === undefined) throw usageError("story edit: nothing to change (pass --auto, --manual, --workflow <name> or --at <step>)", USAGE);
     const raw = await targetKey(ctx, args.positionals[0], args.json === true, editable(auto || manual ? "mode" : "workflow"));
     // gh-71 RD3: --force ends a story's round; a slice switches in place (D4) and has no round to end
     if (force && parseUnitKey(raw).slice !== null) throw usageError("story edit: --force applies to a story, not a slice", USAGE);
-    if (workflow !== undefined) return editWorkflow(ctx, raw, workflow, at, force);
+    if (workflow !== undefined) return editWorkflow(ctx, raw, workflow, at, force, d);
     // gh-71 B15 (D3): --at alone moves the cursor inside the current round
     if (at !== undefined) return moveCursor(ctx, raw, at);
     return editMode(ctx, raw, auto ? "auto" : "manual");

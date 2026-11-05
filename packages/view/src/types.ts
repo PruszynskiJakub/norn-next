@@ -102,8 +102,26 @@ export interface PrView {
   seen_at: string;
 }
 
+/** gh-196 D5 (B21, B22, B34): a decision a supervisor made on the person's behalf (a `delegated` receipt). */
+export interface DelegatedDecision {
+  /** story or slice key */
+  unit: string;
+  /** the story round it was made in (story unit); null for a slice */
+  round: number | null;
+  step: string;
+  /** approve, reject, answer, unstick (rerun) or round (a new round) */
+  kind: string;
+  /** the workflow of the round it started (kind round) */
+  workflow?: string;
+  reason: string;
+  at: string;
+  who: string | null;
+}
+
 export interface StoryView extends UnitView {
   slice: null;
+  /** gh-196 D5: the story's delegated decisions over its rounds and slices, oldest first */
+  delegated: DelegatedDecision[];
   /** story branch (GR3) */
   branch: string;
   /** the story PR as last seen here; null = none seen (or no sync yet) */
@@ -233,6 +251,8 @@ export interface StepRow {
   who: StepWho[];
   /** full reason text: handoff, check result, gate comment, classify detail */
   reason: string | null;
+  /** gh-196 D5 (B21): a person's decision in this row was made by a supervisor on their behalf */
+  delegated?: true;
   /** time a person was waited on: the whole step for gates, ask → answer otherwise */
   wait_ms: number;
   paths: { receipts: string[]; evidence: string[]; logs: string[]; briefings: string[] };

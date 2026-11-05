@@ -41,6 +41,7 @@ function story(n: number, title: string, over: Partial<StoryView> = {}): StoryVi
     branch: `${key}-x`,
     pr: null,
     notes: [],
+    delegated: [],
     base_sync: null,
     story_status: "active",
     spec_dir: `.agents/specs/${key}-x`,

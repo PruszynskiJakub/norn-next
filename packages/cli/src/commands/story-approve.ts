@@ -7,9 +7,9 @@
 import { cmd, nextCommand, stepOf } from "@norn/core";
 import { isGitSha, type UnitState } from "@norn/schema";
 import type { Context } from "../context.ts";
-import { defineCommand, opt, type ParsedArgs } from "../command.ts";
+import { defineCommand, type ParsedArgs } from "../command.ts";
 import { refuse, usageError } from "../output.ts";
-import { at, humanReceipt, resolveTarget, runHumanVerb, type Target } from "../runtime/human.ts";
+import { at, DELEGATED_HELP, DELEGATED_OPTION, delegatedFields, delegation, humanReceipt, resolveTarget, runHumanVerb, type Target } from "../runtime/human.ts";
 import { appendProgress, rejectProgress } from "../runtime/report.ts";
 import { parkedOn, targetKey } from "../runtime/target.ts";
 
@@ -40,7 +40,8 @@ async function unitHead(ctx: Context, t: Target): Promise<string | null> {
 /** Decide the gate: the receipt, and for a rejection the milestone in handoff.md (O6). */
 async function decideGate(ctx: Context, args: ParsedArgs, kind: "approve" | "reject") {
   const verb = `story ${kind}`;
-  const reason = opt.str(args, "reason")?.trim();
+  const d = delegation(ctx, args, verb);
+  const reason = d.reason;
   // B26 (B3): the agent sent back gets only what the reason says, so a rejection needs one
   if (kind === "reject" && !reason) throw usageError("story reject: the reason is required", 'pass --reason "what failed": norn story reject <unit> --reason "…"', "reason_required");
   const key = await targetKey(ctx, args.positionals[0], args.json === true, parkedOn("gate", verb, "Nothing waits at a gate", (k) => (kind === "reject" ? cmd.storyReject(k) : cmd.storyApprove(k))));
@@ -61,7 +62,7 @@ async function decideGate(ctx: Context, args: ParsedArgs, kind: "approve" | "rej
         );
     },
     build: (t, st) =>
-      humanReceipt(ctx, t, st, kind, { ...(reason ? { comment: reason } : {}), ...(head ? { head_sha: head } : {}), ...(acknowledged.length ? { acknowledged_notes: acknowledged } : {}) }),
+      humanReceipt(ctx, t, st, kind, { ...delegatedFields(d), ...(head ? { head_sha: head } : {}), ...(acknowledged.length ? { acknowledged_notes: acknowledged } : {}) }),
   });
   // the rejection is a milestone of the unit, like `done` (O6): the next brief's Context carries it;
   // through the mailbox the holder's tick appends it when it imports the receipt (T9)
@@ -73,9 +74,9 @@ export const storyApproveCommand = defineCommand({
   name: "story approve",
   version: "acts",
   summary: "Approve the gate a unit waits at (B25, O2)",
-  usage: 'norn story approve [<story|slice>] [--reason "…"]',
-  optionHelp: { "--reason <text>": "a comment kept on the approve receipt" },
-  options: { reason: { type: "string" } },
+  usage: 'norn story approve [<story|slice>] [--reason "…"] [--delegated]',
+  optionHelp: { "--reason <text>": "a comment kept on the approve receipt", ...DELEGATED_HELP },
+  options: { reason: { type: "string" }, ...DELEGATED_OPTION },
   positionals: { max: 1 },
   run: (ctx, args) => decideGate(ctx, args, "approve"),
 });
@@ -84,9 +85,9 @@ export const storyRejectCommand = defineCommand({
   name: "story reject",
   version: "acts",
   summary: "Reject the gate a unit waits at, with the reason the next attempt gets (B26, O2)",
-  usage: 'norn story reject [<story|slice>] --reason "…"',
-  optionHelp: { "--reason <text>": "required: what failed; the agent sent back gets it" },
-  options: { reason: { type: "string" } },
+  usage: 'norn story reject [<story|slice>] --reason "…" [--delegated]',
+  optionHelp: { "--reason <text>": "required: what failed; the agent sent back gets it", ...DELEGATED_HELP },
+  options: { reason: { type: "string" }, ...DELEGATED_OPTION },
   positionals: { max: 1 },
   run: (ctx, args) => decideGate(ctx, args, "reject"),
 });

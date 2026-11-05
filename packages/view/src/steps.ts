@@ -8,7 +8,7 @@ import type { NumberedReceipt } from "@norn/core";
 import { stepOf } from "@norn/core";
 import type { Receipt, TraceEvent, UnitState, Workflow } from "@norn/schema";
 import { isAbsolute, join } from "node:path";
-import { receiptSummary, traceEntries } from "./timeline.ts";
+import { delegatedMark, receiptSummary, traceEntries } from "./timeline.ts";
 import type { StepRow, StepTotals, StepType, StepWho, TimelineEntry, TraceView, UnitTraceSummary } from "./types.ts";
 
 export interface StepTimelineInput {
@@ -189,7 +189,7 @@ function reasonOf(receipts: NumberedReceipt[]): string | null {
         break;
       case "approve":
       case "reject":
-        parts.push(`${r.kind}${r.comment ? `: ${r.comment}` : ""}`);
+        parts.push(`${r.kind}${delegatedMark(r)}${r.comment ? `: ${r.comment}` : ""}`);
         break;
       case "stuck":
         parts.push(`stuck: ${r.reason}`);
@@ -198,9 +198,10 @@ function reasonOf(receipts: NumberedReceipt[]): string | null {
         parts.push(`ask: ${r.question}`);
         break;
       case "answer":
-        parts.push(`answer: ${r.answer}`);
+        parts.push(`answer${delegatedMark(r)}: ${r.answer}${r.comment ? ` (${r.comment})` : ""}`);
         break;
       case "unstick":
+      case "round":
       case "mode":
       case "workflow":
         parts.push(receiptSummary(r));
@@ -374,6 +375,7 @@ export function buildStepTimeline(input: StepTimelineInput, opts: StepTimelineOp
       counter: s.counter,
       who: whoOf(s.receipts),
       reason: reasonOf(s.receipts),
+      ...(s.receipts.some((nr) => nr.receipt.delegated) ? { delegated: true as const } : {}),
       wait_ms: wait,
       paths: {
         receipts: s.receipts.map((nr) => abs(input.runs_dir, `receipts/${nr.file.split("/").at(-1)}`)),

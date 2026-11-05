@@ -47,6 +47,11 @@ const header = {
    * (absent = not recorded); a mailbox receipt for another round than the story's is stale.
    */
   round: Type.Optional(PosInt),
+  /**
+   * gh-196 D2 (B21, SK3): a person's receipt a supervisor sent on the person's behalf (`--delegated`);
+   * `by` stays `human`, so decide reads it as the person's. Absent = the person's own.
+   */
+  delegated: Type.Optional(Type.Literal(true)),
 };
 
 function receipt<K extends string, P extends TProperties>(kind: K, props: P) {
@@ -116,6 +121,8 @@ export const AnswerReceipt = receipt("answer", {
    * receipt, so the tick does not deliver it again. (`by: "agent"` answers, R6.1, are never delivered.)
    */
   delivered: Type.Optional(Type.Boolean()),
+  /** gh-196 D3: why (`--reason`); required with `delegated` */
+  comment: Type.Optional(Type.String()),
 });
 export const ApproveReceipt = receipt("approve", {
   comment: Type.Optional(Type.String()),
@@ -264,6 +271,8 @@ export const RoundReceipt = receipt("round", {
   forced: Type.Boolean(),
   /** the step the old round is left at */
   left_at: Type.Union([StepName, Type.Literal("$done"), Type.Literal("$stuck")]),
+  /** gh-196 D3 (B34): why this workflow (`--reason`); required with `delegated` */
+  comment: Type.Optional(Type.String()),
 });
 
 export const Receipt = TaggedUnion(
