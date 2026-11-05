@@ -136,6 +136,32 @@ Implement gh-196 (quick): `--delegated --reason` recorded and shown apart (D1–
   | QA delivery | person | QA (person): one supervised delivery with norn-fsd, per the Plan |
 - review#2 changes_requested: review#2: review#1 F1–F6 fixed; D1–D5 code sound. Blocking: F1 skill's watch check can't see a missing watch before stories are in auto (heartbeatDown needs an auto unit), B8/B9; F2 flake rerun --step on a unit back at implement is refused (running) and run cancel is forbidden, B42; F3 view/load.ts earlier-rounds cache races with the snapshot, never invalidates, drops receipt errors; F4 B6/B27/B31/B40 UNTRACED at S2. Minor: run view round mark + delegated reject/rerun untested, no CI-for-head command. Table in handoff.
 
+- implement#3 (review#2 rework), each point red first:
+  - F1 (B8, B9): `status --json` now carries `heartbeat` (the view's HeartbeatView) with a new `up` field: a tick ran here within 3 × interval, whatever mode the stories are in (core `heartbeatUp`); `down` keeps its inbox meaning. The skill reads `heartbeat.up` before start, and each subagent after every wait. Test: delegated.test.ts › "heartbeat.up says whether a watch ticks here, before any story is in auto…" (fresh harness: never ticked → false, a tick → true, stale → false; `down` stays false throughout).
+  - F2 (B42): norn already accepts `run cancel` → (tick parks it stuck) → `run rerun --step <check> --delegated --reason`; no code change, a running unit stays refused (B50). The skill names that sequence, only while the branch has no commit newer than the check receipt, and allows `norn run cancel` only right before a suspected-flake rerun. Test: delegated.test.ts › "cancel the running unit, then run rerun --step --delegated --reason moves it…" (also a delegated rerun in story view, review#2 F5).
+  - F3: dropped the EARLIER_ROUNDS cache; load.ts reads rounds with store `loadRounds` (current round from the snapshot) on each load, and an earlier round's failing file goes into the story's errors (S2). Test: delegated.test.ts › "a failing receipt in an earlier round is reported in story list's errors" (red with the errors line removed).
+  - F4: assets terms for B6 ("only one who talks to the person", "Name the story in every message"), B12 ("without `--delegated`: it is their answer"), B27 ("Stuck again at the same step → escalate with the receipts", "Exhausted again → escalate"), B36 ("a workflow the skill does not know"; norn-fsd "a repo-local workflow the skill does not know"), B40 (the approve → merge/publish → install → pull → restart order), B31 (norn-fsd "Refinement on the person's behalf", "one question set", "approve the plan yourself").
+  - F5 (B34): `run list` heads a round a supervisor started with "round 2 · asks — delegated (supervisor): <reason>" (RoundView `delegated`, from the round receipt in the previous round's record; it showed nowhere before). Test: delegated.test.ts › "a new round started with --delegated --reason carries its reason". Delegated reject not run in a test: it shares story-approve.ts's path with the tested approve.
+  - F6 (B19): the skill reads `gh pr view <branch> --json state,headRefOid,statusCheckRollup` and `gh run list --branch <branch> --json headSha,conclusion`; terms asserted.
+  - F8: one `decisionSuffix(r)` in timeline.ts used by timeline and steps; `DelegatedDecision.kind` typed `DelegatedKind`. F7 (schema `comment` with `delegated`) left: the cli refuses a delegated command without a reason (reason_required).
+  - Unit tier, typecheck green; delegated, human, run-rerun-cancel, round-folders, status, status-watch integration files green.
+
+  | Item | Verifier | Proven by |
+  | --- | --- | --- |
+  | B1 | test | assets › "exactly the skills of §16 are shipped" |
+  | B2 | test | delegated.test.ts › "a delegated command inside a unit worktree is refused…"; assets › "norn-fsd-round states the supervisor protocol" (`.norn-unit`) |
+  | B3–B7 | test | assets › "norn-fsd-round states the supervisor protocol"; assets › "every `--until` … is a story wait condition (B5)" |
+  | B8, B9 | test | delegated.test.ts › "heartbeat.up says whether a watch ticks here…"; assets › same (`heartbeat.up`, "after every wait", "stopped moving") |
+  | B10–B20 | test | assets › "norn-fsd-round states the supervisor protocol"; `test/repo/docs.test.ts` › bundled skills' norn commands exist |
+  | B21 | test | delegated.test.ts › "run list marks the gate row delegated…", "run view marks the delegated approve…", the flake rerun test |
+  | B22, B23 | test | delegated.test.ts › story view / status / reason_required tests |
+  | B24–B30 | test | assets › "norn-fsd-round states the supervisor protocol" |
+  | B31–B33, B35, B36 | test | assets › "norn-fsd links norn-fsd-round…" |
+  | B34 | test | delegated.test.ts › "a new round started with --delegated --reason carries its reason" (round heading) + story view test |
+  | B37–B41, B43–B45 | test | assets › "norn-fsd-round states the supervisor protocol" |
+  | B42 | test | delegated.test.ts › "cancel the running unit, then run rerun --step --delegated…"; assets › same (`norn run cancel <unit>`, `--step <check> --delegated --reason`) |
+  | QA delivery | person | QA (person): one supervised delivery with norn-fsd, per the Plan |
+
 ## Resume
 
-Review#2 requested changes; implement reworks F1–F4 (findings file passed with the report), then minors. QA (person) remains one supervised delivery with norn-fsd, per the Plan.
+implement#3 reworked review#2's F1–F6 and F8 (see Progress). Next: review of this round's diff; QA (person) remains one supervised delivery with norn-fsd, per the Plan.

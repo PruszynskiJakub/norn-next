@@ -284,7 +284,7 @@ export function formatStepTimeline(v: TraceView, opts: { full?: boolean } = {}):
   for (const rd of v.rounds ?? []) {
     const rows = v.steps.flatMap((r, i) => ((r.round ?? 1) === rd.n ? [i] : []));
     if (!rows.length) continue;
-    out.push(`round ${rd.n} · ${rd.workflow}${roundEndText(rd)}`);
+    out.push(`round ${rd.n} · ${rd.workflow}${roundEndText(rd)}${rd.delegated !== undefined ? ` — delegated (supervisor): ${rd.delegated}` : ""}`);
     rows.forEach(row);
   }
   return `${out.join("\n")}\n`;

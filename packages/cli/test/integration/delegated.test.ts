@@ -125,6 +125,9 @@ describe("delegated decisions are recorded apart from the person's (B21, B22, B3
     const r = await h.norn("story", "edit", "gh-1", "--workflow", "asks", "--delegated", "--reason", "fsd: one seam, no contract change");
     expect(r.exit).toBe(0);
     await until(() => (h.state(join(wt(1), `.agents/specs/${SLUGS[1]}/runs/_story/rounds/02-asks`))?.round ?? 0) === 2);
+    // review#2 F5 (B34): the new round's heading in the step timeline carries the mark and the reason
+    expect((await h.norn("run", "list", "gh-1")).stdout).toContain("round 2 · asks — delegated (supervisor): fsd: one seam, no contract change");
+    expect((await h.norn("run", "list", "gh-1")).stdout).toContain("round 1 · gated · finished\n");
   });
 
   test("story view lists every delegated decision over the rounds in a Delegated section; none → no section (B22)", async () => {
@@ -144,5 +147,49 @@ describe("delegated decisions are recorded apart from the person's (B21, B22, B3
     const s = await h.norn("status", "--json");
     expect((s.value as { delegated: Record<string, number> }).delegated).toEqual({ "gh-1": 2, "gh-2": 1 });
     expect((await h.norn("status")).stdout).toContain("gh-1 2 delegated");
+  });
+});
+
+describe("the supervisor's watch check reads status --json (B8, B9)", () => {
+  test("heartbeat.up says whether a watch ticks here, before any story is in auto: never ticked → false, a tick → true, stale → false", async () => {
+    const fresh = await createHarness();
+    try {
+      expect((await fresh.norn("init")).exit).toBe(0);
+      type Hb = { heartbeat: { up: boolean; down: boolean; last_tick_at: string | null } };
+      const hb = async () => ((await fresh.norn("status", "--json")).value as Hb).heartbeat;
+      // nothing is in auto: the inbox's heartbeat item (down) cannot fire, up still tells the truth
+      expect(await hb()).toMatchObject({ up: false, down: false, last_tick_at: null });
+      await fresh.tick();
+      expect(await hb()).toMatchObject({ up: true, down: false });
+      fresh.clock.advance(60 * 60_000);
+      expect(await hb()).toMatchObject({ up: false, down: false });
+    } finally {
+      fresh.cleanup();
+    }
+  });
+});
+
+describe("a suspected flake goes back to its check, and a delegated reject (B42, B21)", () => {
+  test("cancel the running unit, then run rerun --step --delegated --reason moves it; the rerun is marked delegated", async () => {
+    // gh-2 is running `work` after its delegated answer, as a unit sent back to implement is
+    expect(h.state(runs(2))?.status).toBe("running");
+    expect((await h.norn("run", "rerun", "gh-2", "--step", "work", "--delegated", "--reason", "fsd: x")).exit).toBe(3);
+    expect((await h.norn("run", "cancel", "gh-2")).exit).toBe(0);
+    await until(() => h.state(runs(2))?.status === "stuck");
+    const r = await h.norn("run", "rerun", "gh-2", "--step", "work", "--delegated", "--reason", "fsd: suspected flake: CI green on the same head");
+    expect(r.exit).toBe(0);
+    expect((r.value as { receipt: { delegated?: true; comment?: string } }).receipt).toMatchObject({ delegated: true });
+    await until(() => h.state(runs(2))?.status === "running");
+    const v = (await h.norn("story", "view", "gh-2", "--json")).value as { delegated: Delegated[] };
+    expect(v.delegated.map((d) => [d.kind, d.reason])).toContainEqual(["unstick", "fsd: suspected flake: CI green on the same head"]);
+  });
+});
+
+describe("earlier rounds are read from their folders on each load (review#2 F3, S2)", () => {
+  test("a failing receipt in an earlier round is reported in story list's errors, never skipped", async () => {
+    const round1 = join(wt(1), `.agents/specs/${SLUGS[1]}/runs/_story/rounds/01-gated/receipts`);
+    h.write(join(round1, "0099-approve.json"), "{ not json");
+    const v = (await h.norn("story", "list", "--json")).value as { stories: Array<{ key: string; errors: Array<{ file: string }> }> };
+    expect(v.stories.find((s) => s.key === "gh-1")?.errors.map((e) => e.file)).toContainEqual(expect.stringContaining("rounds/01-gated/receipts/0099-approve.json"));
   });
 });

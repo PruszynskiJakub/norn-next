@@ -8,7 +8,7 @@ import type { NumberedReceipt } from "@norn/core";
 import { stepOf } from "@norn/core";
 import type { Receipt, TraceEvent, UnitState, Workflow } from "@norn/schema";
 import { isAbsolute, join } from "node:path";
-import { delegatedMark, receiptSummary, traceEntries } from "./timeline.ts";
+import { decisionSuffix, delegatedMark, receiptSummary, traceEntries } from "./timeline.ts";
 import type { StepRow, StepTotals, StepType, StepWho, TimelineEntry, TraceView, UnitTraceSummary } from "./types.ts";
 
 export interface StepTimelineInput {
@@ -189,7 +189,7 @@ function reasonOf(receipts: NumberedReceipt[]): string | null {
         break;
       case "approve":
       case "reject":
-        parts.push(`${r.kind}${delegatedMark(r)}${r.comment ? `: ${r.comment}` : ""}`);
+        parts.push(`${r.kind}${decisionSuffix(r)}`);
         break;
       case "stuck":
         parts.push(`stuck: ${r.reason}`);

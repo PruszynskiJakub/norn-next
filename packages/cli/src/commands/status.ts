@@ -69,10 +69,12 @@ async function inbox(ctx: Context, args: ParsedArgs) {
     ? `\nDelegated by a supervisor: ${Object.entries(delegated).map(([k, n]) => `${k} ${n} delegated`).join(" · ")} — review with \`${cmd.storyView("<story>")}\`\n`
     : "";
   const text = `${formatInbox(view, { details, notes: opt.bool(args, "notes"), home: ctx.env.HOME })}${delegatedLine}`;
-  if (details) return rendered({ ...view.inbox, delegated }, text);
+  // gh-196 (B8, B9): the heartbeat as data, so a supervisor sees a missing watch before anything is in auto
+  const heartbeat = view.heartbeat;
+  if (details) return rendered({ ...view.inbox, delegated, heartbeat }, text);
   // L1 (A7): an item's full text (an implicit ask's pane screen) only with --details
   const groups = Object.fromEntries(Object.entries(view.inbox.groups).map(([g, items]) => [g, items.map(({ full: _full, ...it }) => it)]));
-  return rendered({ ...view.inbox, groups, delegated }, text);
+  return rendered({ ...view.inbox, groups, delegated, heartbeat }, text);
 }
 
 /** The orient workspaces' tokens and order; failures are ignored (presentation, HC13). */

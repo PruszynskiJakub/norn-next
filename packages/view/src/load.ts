@@ -17,6 +17,7 @@ import {
   type FileError,
   formatAge,
   heartbeatDown,
+  heartbeatUp,
   nextCommand,
   type NumberedReceipt,
   RECENT_MS,
@@ -32,8 +33,6 @@ import {
 } from "@norn/core";
 import { DEFAULT_CONFIG, type HookFact, type Mode, type ResolvedConfig, sliceBranch, storyBranch, type Workflow } from "@norn/schema";
 import {
-  listReceipts,
-  storyRounds,
   cachedDefaultBranch,
   classifyClaim,
   defaultBaseRef,
@@ -43,6 +42,7 @@ import {
   type LocalUnit,
   bindNornHome,
   loadLocalFacts,
+  loadRounds,
   machineHolder,
   onlyNornCommitsSince,
   readEnvNorn,
@@ -54,37 +54,33 @@ import {
   type UnpushedTarget,
   unpushedRuns,
 } from "@norn/store";
-import type { BaseSyncView, ClaimView, CounterView, DelegatedDecision, PrView, ProjectView, RecentDone, RunView, SliceView, StoryView, UnitView } from "./types.ts";
+import type { BaseSyncView, ClaimView, CounterView, DelegatedDecision, DelegatedKind, PrView, ProjectView, RecentDone, RunView, SliceView, StoryView, UnitView } from "./types.ts";
 
-/** An earlier round's receipts by folder: a finished round gets no new receipt (S7), so one read serves every load. */
-const EARLIER_ROUNDS = new Map<string, readonly NumberedReceipt[]>();
-function earlierRoundReceipts(path: string): readonly NumberedReceipt[] {
-  let receipts = EARLIER_ROUNDS.get(path);
-  if (!receipts) EARLIER_ROUNDS.set(path, (receipts = listReceipts(path).receipts));
-  return receipts;
-}
+const DELEGATED_KINDS: readonly string[] = ["approve", "reject", "answer", "unstick", "round"] satisfies DelegatedKind[];
+const isDelegatedKind = (k: string): k is DelegatedKind => DELEGATED_KINDS.includes(k);
 
 /**
  * gh-196 D5 (B21, B22, B34): the decisions a supervisor made on the person's behalf, over every round of
- * the story unit (each round folder's receipts; a flat record is round 1) and its slices, oldest first.
+ * the story unit (store `loadRounds`: the current round from the snapshot, each earlier round read from
+ * its folder) and its slices, oldest first. An earlier round's failing file is reported, never skipped (S2).
  */
-function delegatedDecisions(story: StorySnapshot): DelegatedDecision[] {
-  const out: DelegatedDecision[] = [];
+function delegatedDecisions(story: StorySnapshot): { decisions: DelegatedDecision[]; errors: FileError[] } {
+  const decisions: DelegatedDecision[] = [];
+  const errors: FileError[] = [];
   const add = (unit: string, round: number | null, receipts: readonly NumberedReceipt[]) => {
     for (const { receipt: r } of receipts) {
-      if (!r.delegated) continue;
+      if (!r.delegated || !isDelegatedKind(r.kind)) continue;
       const reason = "comment" in r && typeof r.comment === "string" ? r.comment : "";
-      out.push({ unit, round, step: r.step, kind: r.kind, ...(r.kind === "round" ? { workflow: r.workflow } : {}), reason, at: r.at, who: r.who ?? null });
+      decisions.push({ unit, round, step: r.step, kind: r.kind, ...(r.kind === "round" ? { workflow: r.workflow } : {}), reason, at: r.at, who: r.who ?? null });
     }
   };
-  const rounds = storyRounds(story.path);
   const current = story.units[0];
-  // review#1 F5: the current round's receipts are in the snapshot already; an earlier round's never change (S7), so
-  // they are read once per folder, not on every refresh of `status --segment` (HC13)
-  if (rounds.length) for (const rd of rounds) add(story.key, rd.n, rd.path === current?.path ? (current.receipts ?? []) : earlierRoundReceipts(rd.path));
-  else add(story.key, 1, story.units[0]?.receipts ?? []);
+  for (const rd of loadRounds(story, { includeApplied: true })) {
+    add(story.key, rd.n, rd.unit.receipts ?? []);
+    if (rd.unit !== current) errors.push(...rd.unit.errors);
+  }
   for (const u of story.units.slice(1)) add(u.unit.key, null, u.receipts ?? []);
-  return out.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  return { decisions: decisions.sort((a, b) => Date.parse(a.at) - Date.parse(b.at)), errors };
 }
 
 export interface LoadProjectViewOptions {
@@ -438,19 +434,20 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
           errors: file?.error ? [file.error, ...v.errors] : v.errors,
         };
       });
+      const delegated = delegatedDecisions(story);
       stories.push({
         ...base,
         slice: null,
         branch: sf.branch,
         pr: prView(prSeen[story.key]),
         notes: sf.notes ?? [],
-        delegated: delegatedDecisions(story),
+        delegated: delegated.decisions,
         base_sync: baseSync(sf, storyUnit.receipts ?? [], config.base_branch ?? cachedDefaultBranch(opts.repoRoot) ?? "main"),
         story_status: story.frontmatter?.status ?? null,
         spec_dir: story.spec_dir,
         root: story.root,
         slices,
-        errors: story.frontmatter_error ? [story.frontmatter_error, ...base.errors] : base.errors,
+        errors: [...(story.frontmatter_error ? [story.frontmatter_error] : []), ...base.errors, ...delegated.errors],
       });
     });
   });
@@ -476,7 +473,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   const down = heartbeatDown(facts, config);
   ctx.heartbeatDown = !!down;
   for (const build of views) build();
-  const heartbeat = { holder, last_tick_at: lastTick === null ? null : new Date(lastTick).toISOString(), age: lastTick === null ? null : formatAge(now - lastTick), down: !!down };
+  const heartbeat = { holder, last_tick_at: lastTick === null ? null : new Date(lastTick).toISOString(), age: lastTick === null ? null : formatAge(now - lastTick), down: !!down, up: heartbeatUp(facts, config) };
 
   const recently_done: RecentDone[] = stories
     .flatMap((s) => [s, ...s.slices])

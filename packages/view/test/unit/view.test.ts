@@ -49,7 +49,7 @@ describe("formatters", () => {
       repo: "",
       holder: "",
       runner: null,
-      heartbeat: { holder: "", last_tick_at: null, age: null, down: false },
+      heartbeat: { holder: "", last_tick_at: null, age: null, down: false, up: false },
       stories: [],
       inbox: { at: "", pending: 0, groups: { your_turn: [], answer: [], approve: [], unblock: [], check: [], unclaimed: [], running: [], notes: [], recently_done: [] } },
       runs: [],

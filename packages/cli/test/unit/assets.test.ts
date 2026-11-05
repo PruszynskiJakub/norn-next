@@ -263,22 +263,26 @@ describe("skills", () => {
     const terms = [
       // B2, B4, B3, B38: where and what it supervises
       ".norn-unit", "main checkout", "One supervisor per checkout", "Named stories only", "/release-start",
-      // B8, B9: the watch is checked, never started
-      "No watch is running", "`! norn watch`", "heartbeat", "groups.unblock",
-      // B5, B6, B7: one foreground subagent per story, one voice, JSON only
-      "one subagent per story", "foreground", "norn story wait", "--json", "never grep markdown",
+      // B8, B9: the watch is checked by `status --json`'s heartbeat.up (true or false whatever mode the stories are
+      // in, review#2 F1) before start and after every wait, never started
+      "No watch is running", "`! norn watch`", "`heartbeat.up`", "after every wait", "stopped moving",
+      // B5, B6, B7: one foreground subagent per story, one voice naming the story, JSON only
+      "one subagent per story", "foreground", "norn story wait", "only one who talks to the person", "Name the story in every message", "--json", "never grep markdown",
       // B10: auto mode, never a step's commands
       "norn story edit <story> --auto", "norn brief", "norn story start",
-      // B11–B14, B18, B23: delegated decisions with reasons
-      "--delegated --reason", "norn story answer", "norn story approve", "norn story reject", "norn run rerun", "--reset",
-      // B15, B19, B20: CI and the PR
-      "gh run rerun --failed", "exact head", "runs/", "handoff.md", "PR's state",
+      // B11–B14, B18, B23: delegated decisions with reasons; B12: the person's reply is their own answer
+      "--delegated --reason", "norn story answer", "norn story approve", "norn story reject", "norn run rerun", "--reset", "without `--delegated`: it is their answer",
+      // B15, B19, B20: CI and the PR; B19 reads the checks of the exact head (review#2 F6)
+      "gh run rerun --failed", "exact head", "statusCheckRollup", "headRefOid", "runs/", "handoff.md", "PR's state",
       // B16, B17: allowed, forbidden, permission rule
       "Allowed:", "Forbidden:", "norn tick", "norn run cancel", "--force", "norn story checkout", "Bash(norn story approve:*)",
-      // B24–B30, B39, B40: escalations
-      "merge", "force pushes", "rules file", "max_agents", "closing an issue", "`release`'s `ready`", "question set", "sent once", "quiet",
-      // B41–B43: load and flakes
-      "reason: timeout", "load", "suspected flake", "never run tests in a unit worktree",
+      // B24–B30, B39: escalations; B27: stuck or exhausted again, with the receipts; B36: an unknown workflow
+      "merge", "force pushes", "rules file", "max_agents", "closing an issue", "a workflow the skill does not know", "`release`'s `ready`", "question set", "sent once", "quiet",
+      "Stuck again at the same step → escalate with the receipts", "Exhausted again → escalate",
+      // B40: release, install and restart in that order
+      "approve on their answer → wait for the merge and the publish → install → pull → restart the watch and the cockpit",
+      // B41–B43: load and flakes; B42: a running unit is cancelled first (rerun refuses it), then rerun at its check
+      "reason: timeout", "load", "suspected flake", "never run tests in a unit worktree", "`norn run cancel <unit>`", "--step <check> --delegated --reason",
       // B37: stops at the round's end
       "Never start another round",
       // B44, B45: the report
@@ -289,7 +293,13 @@ describe("skills", () => {
 
   test("norn-fsd links norn-fsd-round and adds the round choice and the round start (B31–B36, D6)", () => {
     const text = readSkill("norn-fsd");
-    const terms = ["norn-fsd-round", ".norn-unit", "`quick`", "`story`", "`reproduce`", "--workflow <name> --delegated --reason", "Never `--force`", "never on an unfinished round", "closing the issue", "rules file", "norn story start", "Never type into the pane"];
+    const terms = [
+      "norn-fsd-round", ".norn-unit", "`quick`", "`story`", "`reproduce`", "--workflow <name> --delegated --reason", "Never `--force`", "never on an unfinished round", "closing the issue", "rules file",
+      // B31: refinement without the person: asks answered, the rest as one question set, the plan approved
+      "Refinement on the person's behalf", "one question set", "approve the plan yourself",
+      // B32: an attended step is the person's turn; B36: a workflow the skill does not know is a suggestion
+      "norn story start", "Never type into the pane", "a repo-local workflow the skill does not know",
+    ];
     expect(terms.filter((t) => !text.includes(t))).toEqual([]);
   });
 

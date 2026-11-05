@@ -18,6 +18,8 @@ function cut(text: string, max: number): string {
 
 /** gh-196 D5 (B21): how a receipt a supervisor sent on the person's behalf is marked. */
 export const delegatedMark = (r: Receipt): string => (r.delegated ? " — delegated (supervisor)" : "");
+/** A decision's tail: its delegated mark, then its reason (`--reason`) when it has one. */
+export const decisionSuffix = (r: Receipt & { comment?: string }): string => `${delegatedMark(r)}${r.comment ? `: ${r.comment}` : ""}`;
 
 const at = (r: Receipt) => `${r.step}#${r.attempt}`;
 
@@ -36,12 +38,12 @@ export function receiptSummary(r: Receipt, max = MAX): string {
     case "answer":
       return oneLine(`answer${delegatedMark(r)}: ${r.answer}${r.comment ? ` (${r.comment})` : ""}`);
     case "approve":
-      return oneLine(`approve ${r.step}${delegatedMark(r)}${r.comment ? `: ${r.comment}` : ""}`);
+      return oneLine(`approve ${r.step}${decisionSuffix(r)}`);
     case "reject":
-      return oneLine(`reject ${r.step}${delegatedMark(r)}${r.comment ? `: ${r.comment}` : ""}`);
+      return oneLine(`reject ${r.step}${decisionSuffix(r)}`);
     case "unstick": {
       const parts = [r.to ? `to ${r.to}` : null, r.reset?.length ? `reset ${r.reset.join(", ")}` : null].filter(Boolean);
-      return oneLine(`unstick${parts.length ? ` ${parts.join(", ")}` : ""}${delegatedMark(r)}${r.comment ? `: ${r.comment}` : ""}`);
+      return oneLine(`unstick${parts.length ? ` ${parts.join(", ")}` : ""}${decisionSuffix(r)}`);
     }
     case "mode":
       return `mode ${r.previous} → ${r.mode}`;
@@ -62,7 +64,7 @@ export function receiptSummary(r: Receipt, max = MAX): string {
     case "update":
       return oneLine(`update by ${r.who ?? r.by}: ${r.from} → ${r.to} (BS9)`);
     case "round":
-      return oneLine(`new round by ${r.who ?? r.by}: ${r.workflow} at ${r.to}${r.forced ? " (forced)" : ""}${delegatedMark(r)}${r.comment ? `: ${r.comment}` : ""}`);
+      return oneLine(`new round by ${r.who ?? r.by}: ${r.workflow} at ${r.to}${r.forced ? " (forced)" : ""}${decisionSuffix(r)}`);
   }
 }
 

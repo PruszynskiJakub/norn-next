@@ -76,7 +76,7 @@ function view(): ProjectView {
     repo: "/repo",
     holder: "me@box",
     runner: "herdr",
-    heartbeat: { holder: "me@box", last_tick_at: AT, age: "0s", down: false },
+    heartbeat: { holder: "me@box", last_tick_at: AT, age: "0s", down: false, up: true },
     stories: [
       story("gh-1"),
       story("gh-2"),

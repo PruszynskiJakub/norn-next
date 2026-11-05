@@ -103,6 +103,9 @@ export interface PrView {
 }
 
 /** gh-196 D5 (B21, B22, B34): a decision a supervisor made on the person's behalf (a `delegated` receipt). */
+/** gh-196 D1: the receipt kinds a `--delegated` command writes (approve, reject, answer, run rerun, a new round). */
+export type DelegatedKind = "approve" | "reject" | "answer" | "unstick" | "round";
+
 export interface DelegatedDecision {
   /** story or slice key */
   unit: string;
@@ -110,7 +113,7 @@ export interface DelegatedDecision {
   round: number | null;
   step: string;
   /** approve, reject, answer, unstick (rerun) or round (a new round) */
-  kind: string;
+  kind: DelegatedKind;
   /** the workflow of the round it started (kind round) */
   workflow?: string;
   reason: string;
@@ -173,6 +176,11 @@ export interface HeartbeatView {
   age: string | null;
   /** older than 3 × watch interval (or never) while a held story has a unit in auto mode */
   down: boolean;
+  /**
+   * gh-196 (B8, B9): a tick ran here within 3 × watch interval, whatever mode the stories are in:
+   * a supervisor checks the watch before any story is in auto, where `down` cannot fire yet
+   */
+  up: boolean;
 }
 
 export type TimelineSource = "receipt" | "tick" | "hook" | "reject" | "briefing" | "foreign" | "take" | "criteria";
@@ -315,6 +323,8 @@ export interface RoundView {
   workflow: string;
   /** how it ended: finished by its workflow (`at: $done`) or by the person with `--force` at a step; null = the round under way */
   ended: { by: "workflow" | "person"; at: string } | null;
+  /** gh-196 D5 (B34): the reason of a supervisor's `--delegated` decision that started this round; absent = the person's own */
+  delegated?: string;
 }
 
 export interface TraceView extends UnitTraceSummary {
