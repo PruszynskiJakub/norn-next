@@ -35,6 +35,22 @@ GR6/GR6b push the final record to `refs/norn/runs/<story>` before cleanup; `run 
 - packages/store/test/integration/record-ref.test.ts "F1" (25 git repos in one test, 20 s timeout) timed out in the tier and in 1 of 3 isolated runs at load average ~90 (parallel slices); untouched code (pack); passed in the second full tier run.
 - implement#1 done: AC1-AC6 covered by packages/cli/test/integration/archive-ref.test.ts. GR6 and GR6b/story close push the final record to refs/norn/runs/<story> (one push, archiveStoryRecord in runtime/close.ts) before any cleanup; a failed push leaves the cleanup owed. run list/run view/story reopen fetch that one ref on a fresh clone; reads go through a per-commit cache in the machine dir. tidy leaves the refs alone. The base-tree runs/ reader is deleted (D16); norn status shows a base_run_state Check item and doctor fails a run_state check pointing to norn upgrade. base-sync transcript rewritten (archive push). Tiers: unit 1211/0, integration 760 pass 6 skip, e2e 72 pass 2 skip. At merge, reconcile with slice 09's closeStory push.
 
+### Review #1 (approve, no blocking findings)
+
+| Item | Verifier | Proven by |
+| --- | --- | --- |
+| B29 / AC1 | test | `packages/cli/test/integration/archive-ref.test.ts` › "AC1: a rejected archive push leaves the cleanup owed; the next tick pushes the ref, then cleans up; the base gains no run state" |
+| B29, B30 / AC2 | test | `packages/cli/test/integration/archive-ref.test.ts` › "AC2: a fresh clone carries no archive ref; run list and run view fetch refs/norn/runs/gh-9 alone and list every round and step" |
+| B29 / AC3 | test | `packages/cli/test/integration/archive-ref.test.ts` › "AC3: the tick closing it pushes the final record to the ref first; the base gains no run state" |
+| B31 / AC4 | test | `packages/cli/test/integration/archive-ref.test.ts` › "AC4: tidy neither lists nor deletes an archive ref, here or on the remote" |
+| B32 / AC5 | test | `packages/cli/test/integration/archive-ref.test.ts` › "AC5: with the issue reopened, story reopen on another clone unpacks the record: gh-10 is at its last round's $done" |
+| B29, B35 / AC6 | test | `packages/cli/test/integration/archive-ref.test.ts` › "AC6: run list is empty for it, status shows one item and doctor one failed check; once removed from the base, neither" |
+
+- Checked: archive push precedes every removal (lifecycle.ts cleanupMerged, close.ts step 3b); failure returns before `act.cleaned`/removals, retried once per tick (no tight loop). No base/main-checkout reader of `runs/` left (D16): `treeRunState*` only in `baseRunStateStories` (notice) and the B34 branch move. Modified tests not loosened; no new skip/todo/failing.
+- Tests run by review: unit 1211 pass / 0 fail; typecheck green; archive-ref, records, story-reopen, round-folders integration 36 pass / 0 fail. test#1 (all tiers) passed on this head.
+- Minor findings (see findings file): corrupt archive record reads as empty and is re-unpacked each snapshot; archive cache write from a reader can throw/race; stale trace-view "no writes" comment; AC2 run view rounds/steps unasserted; GR6b record_push_failed untested; AC6 doctor exit after removal unasserted; run view miss fetches for unfinished stories; base name mismatch inbox vs doctor; run-state/record-ref import cycle.
+- Merge notes: slice 09 also pushes the record in closeStory (keep one push); slice 12's second unpack cache to be removed in favour of `archivedRecordDir`.
+
 ## Resume
 
 Done: reported `norn done done`. Next step is review; at merge reconcile closeStory's record push with slice 09 (keep one push, its `record_push_failed`).
