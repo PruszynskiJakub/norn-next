@@ -57,6 +57,12 @@ export interface BoundaryCommit {
   trailers: Record<string, string>;
   /** push the branch after committing (only the claim holder, T7) */
   push: boolean;
+  /**
+   * gh-195 D17 (B18–B20): commit even when nothing changed — a story unit's boundary, so the story branch
+   * always carries the last boundary (`Norn-Outcome`, `Norn-Next`) a non-holder reads the step from.
+   * Absent = no commit without changes (a slice's boundary: no reader needs it).
+   */
+  allow_empty?: true;
 }
 
 /** State change carried by unit actions. */

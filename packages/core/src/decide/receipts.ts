@@ -139,7 +139,9 @@ export function commitFor(ctx: Ctx, story: StoryFacts | string, uf: UnitFacts | 
   if (typeof story === "string") return null;
   const cwd = unitWorktree(story, uf);
   if (!cwd) return null;
-  return { cwd, branch: unitBranch(story, uf), message, trailers: trailersFor(ctx, key, uf?.unit.slice ?? null, step, o.ended), push: true };
+  const slice = uf?.unit.slice ?? null;
+  // gh-195 D17: a story unit's boundary is committed even when nothing changed (the non-holder's last boundary)
+  return { cwd, branch: unitBranch(story, uf), message, trailers: trailersFor(ctx, key, slice, step, o.ended), push: true, ...(o.ended && slice === null ? { allow_empty: true as const } : {}) };
 }
 
 /**
