@@ -324,7 +324,7 @@ export interface RoundView {
   /** how it ended: finished by its workflow (`at: $done`) or by the person with `--force` at a step; null = the round under way */
   ended: { by: "workflow" | "person"; at: string } | null;
   /** gh-196 D5 (B34): the reason of a supervisor's `--delegated` decision that started this round; absent = the person's own */
-  delegated?: string;
+  delegated_reason?: string;
 }
 
 export interface TraceView extends UnitTraceSummary {

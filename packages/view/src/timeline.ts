@@ -21,6 +21,8 @@ export const DELEGATED_MARK = "delegated (supervisor)";
 export const delegatedMark = (r: Receipt): string => (r.delegated ? ` — ${DELEGATED_MARK}` : "");
 /** A decision's tail: its delegated mark, then its reason (`--reason`) when it has one. */
 export const decisionSuffix = (r: Receipt & { comment?: string }): string => `${delegatedMark(r)}${r.comment ? `: ${r.comment}` : ""}`;
+/** An answer receipt's line: its delegated mark, the answer, then its reason in brackets (one text for timeline and steps). */
+export const answerText = (r: Extract<Receipt, { kind: "answer" }>): string => `answer${delegatedMark(r)}: ${r.answer}${r.comment ? ` (${r.comment})` : ""}`;
 
 const at = (r: Receipt) => `${r.step}#${r.attempt}`;
 
@@ -37,7 +39,7 @@ export function receiptSummary(r: Receipt, max = MAX): string {
     case "stuck":
       return oneLine(`stuck at ${at(r)}: ${r.reason}`);
     case "answer":
-      return oneLine(`answer${delegatedMark(r)}: ${r.answer}${r.comment ? ` (${r.comment})` : ""}`);
+      return oneLine(answerText(r));
     case "approve":
       return oneLine(`approve ${r.step}${decisionSuffix(r)}`);
     case "reject":

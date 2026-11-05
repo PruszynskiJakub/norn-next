@@ -97,7 +97,9 @@ async function editWorkflow(ctx: Context, raw: string, name: string, at: string 
     const round = !t.slice && !!t.state;
     // gh-196 D1: a supervisor delegates only a round start (B34); a slice switch or a pre-start choice stays the person's
     // review#1 F4: the reason lives only on the round receipt, so outside a round start it is refused, never dropped
-    if ((d.delegated || d.reason !== undefined) && !round) throw usageError("story edit --delegated/--reason: apply to a new round of a started story only", USAGE);
+    // review#7 F5 (P8): the unit's state says no, so this is a refusal, not a usage error
+    if ((d.delegated || d.reason !== undefined) && !round)
+      throw refuse(`--delegated/--reason apply only to a new round of a started story; ${t.key} is ${t.slice ? "a slice" : "not started"}`, cmd.storyEdit(t.key, { workflow: name }), "not_a_round_start");
     const claim = round ? await refuseIfHeldElsewhere(ctx, t.story, "story edit") : undefined;
     const listed = Object.keys(obs.workflows).sort();
     const loaded = obs.workflows[name];

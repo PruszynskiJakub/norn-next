@@ -142,7 +142,7 @@ describe("delegated decisions are recorded apart from the person's (B21, B22, B3
     expect((await h.norn("run", "list", "gh-1")).stdout).toContain("round 1 · gated · finished\n");
     // review#3 F4 (B34): run view shows the round start's reason too
     expect((await h.norn("run", "view", "gh-1")).stdout).toContain("round    2 · asks — delegated (supervisor): fsd: one seam, no contract change");
-    expect(((await h.norn("run", "view", "gh-1", "--json")).value as { delegated_round?: { delegated?: string } }).delegated_round?.delegated).toBe("fsd: one seam, no contract change");
+    expect(((await h.norn("run", "view", "gh-1", "--json")).value as { delegated_round?: { delegated_reason?: string } }).delegated_round?.delegated_reason).toBe("fsd: one seam, no contract change");
   });
 
   test("story view lists every delegated decision over the rounds in a Delegated section; none → no section (B22)", async () => {
@@ -163,7 +163,7 @@ describe("delegated decisions are recorded apart from the person's (B21, B22, B3
 
   test("status counts delegated decisions per story, never as an inbox item (B22)", async () => {
     const s = await h.norn("status", "--json");
-    expect((s.value as { delegated: Record<string, number> }).delegated).toEqual({ "gh-1": 2, "gh-2": 1 });
+    expect((s.value as { delegated_counts: Record<string, number> }).delegated_counts).toEqual({ "gh-1": 2, "gh-2": 1 });
     expect((await h.norn("status")).stdout).toContain("gh-1 2 delegated");
     // review#3 F4 (D5): a delegated decision is never an inbox item
     const inbox = JSON.stringify((s.value as { groups: unknown }).groups);
@@ -213,5 +213,24 @@ describe("earlier rounds are read from their folders on each load (review#2 F3, 
     h.write(join(round1, "0099-approve.json"), "{ not json");
     const v = (await h.norn("story", "list", "--json")).value as { stories: Array<{ key: string; errors: Array<{ file: string }> }> };
     expect(v.stories.find((s) => s.key === "gh-1")?.errors.map((e) => e.file)).toContainEqual(expect.stringContaining("rounds/01-gated/receipts/0099-approve.json"));
+  });
+});
+
+describe("a delegated reject (B21, review#7 F4)", () => {
+  test("reject --delegated --reason sends the unit back as the person's would, marked in run list and listed in story view", async () => {
+    h.remote.issues = [...h.remote.issues, issue(4, "Refund invoices")];
+    SLUGS[4] = "gh-4-refund-invoices";
+    await h.tick("--sync");
+    await until(() => h.state(runs(4))?.status === "running");
+    h.report(runs(4), "done", { outcome: "done", handoff: "ready" });
+    await until(() => h.state(runs(4))?.park?.kind === "gate");
+    expect((await h.norn("story", "reject", "gh-4", "--delegated", "--reason", "fsd: B3 is not covered by a test")).exit).toBe(0);
+    await until(() => h.state(runs(4))?.step === "work" && h.state(runs(4))?.status === "running");
+    const rows = ((await h.norn("run", "list", "gh-4", "--json")).value as { steps: Array<{ step: string; delegated?: true; reason?: string }> }).steps;
+    const gate = rows.find((s) => s.step === "review");
+    expect(gate?.delegated).toBe(true);
+    expect(gate?.reason).toContain("fsd: B3 is not covered by a test");
+    const v = (await h.norn("story", "view", "gh-4", "--json")).value as { delegated: Delegated[] };
+    expect(v.delegated.map((d) => [d.kind, d.step, d.reason])).toEqual([["reject", "review", "fsd: B3 is not covered by a test"]]);
   });
 });

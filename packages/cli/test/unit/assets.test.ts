@@ -283,6 +283,11 @@ describe("skills", () => {
       "approve on their answer → wait for the merge and the publish → install → pull → restart the watch and the cockpit",
       // B41–B43: load and flakes; B42: a running unit is cancelled first (rerun refuses it), then rerun at its check
       "reason: timeout", "the load is far above the core count", "suspected flake", "never run tests in a unit worktree", "`norn run cancel <unit>`", "--step <check> --delegated --reason",
+      // B15, B41 (review#7 F1, F2): a CI glitch and a load failure are rerun at their check too, after a cancel
+      "Rerun at its check** (CI glitch, load, suspected flake)", "then rerun at its check (`--step ci`, below)", "then rerun at its check once (`--step <check>`, below)",
+      "`norn run cancel` only right before a rerun at its check",
+      // B24, B40 (review#7 F3): a merge and a watch restart the request named are allowed
+      "when the request named them, `gh pr merge --squash`", "(unless the request named a watch restart)",
       // B37: stops at the round's end; B13, B27 (review#3 F1): a stuck unit does not end the round (RD1, W7)
       "Never start another round", "The round ends at `$done`", "A stuck unit does not end the round",
       // B19, B20, B39 (review#3 F2): a gate left parked on purpose is never waited on with `--until gate` (it returns at once)

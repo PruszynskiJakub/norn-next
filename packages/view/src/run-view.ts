@@ -25,7 +25,7 @@ const lastRun = (r: StepRow) => r.who.findLast((w) => w.run_id)?.run_id ?? null;
 
 function detail(view: TraceView, row: StepRow, runId: string | null): RunDetail {
   const round = view.rounds?.find((rd) => rd.n === (row.round ?? 1));
-  return { ...row, story: view.story, run_id: runId, ...(round?.delegated !== undefined ? { delegated_round: round } : {}) };
+  return { ...row, story: view.story, run_id: runId, ...(round?.delegated_reason !== undefined ? { delegated_round: round } : {}) };
 }
 
 /** null when the unit or the run is unknown, or the unit has no run yet. */

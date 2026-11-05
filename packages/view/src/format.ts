@@ -133,6 +133,17 @@ export function stepTitle(step: string | null | undefined, title: string): strin
   return named ? title : `${step}: ${title}`;
 }
 
+/** gh-196 D5 (B22): a count per story of what a supervisor decided on the person's behalf; never an inbox item. */
+export const delegatedCounts = (view: ProjectView): Record<string, number> =>
+  Object.fromEntries(view.stories.filter((s) => s.delegated.length).map((s) => [s.key, s.delegated.length]));
+
+/** The status line under the inbox for {@link delegatedCounts}; empty when no story has one. */
+export function formatDelegatedCounts(counts: Record<string, number>): string {
+  const entries = Object.entries(counts);
+  if (!entries.length) return "";
+  return `\nDelegated by a supervisor: ${entries.map(([k, n]) => `${k} ${n} delegated`).join(" · ")} — review with \`${cmd.storyView("<story>")}\`\n`;
+}
+
 /**
  * `norn status` human mode: groups in O1 order, each item with reason, age and command; `details` adds
  * full texts (L1). With `home`, paths under it print as `~/…` (the JSON keeps them absolute).
@@ -287,7 +298,7 @@ export function formatStepTimeline(v: TraceView, opts: { full?: boolean } = {}):
   for (const rd of v.rounds ?? []) {
     const rows = v.steps.flatMap((r, i) => ((r.round ?? 1) === rd.n ? [i] : []));
     if (!rows.length) continue;
-    out.push(`round ${rd.n} · ${rd.workflow}${roundEndText(rd)}${delegatedText(rd.delegated)}`);
+    out.push(`round ${rd.n} · ${rd.workflow}${roundEndText(rd)}${delegatedText(rd.delegated_reason)}`);
     rows.forEach(row);
   }
   return `${out.join("\n")}\n`;
@@ -301,7 +312,7 @@ export function formatStepTimeline(v: TraceView, opts: { full?: boolean } = {}):
 export function formatRunView(r: RunDetail): string {
   const out = [`${r.unit} · ${r.step}#${r.attempt} (${r.type}${r.attended ? ", attended" : ""})`, ""];
   const field = (k: string, v: string) => out.push(`${k.padEnd(9)}${v}`);
-  if (r.delegated_round) field("round", `${r.delegated_round.n} · ${r.delegated_round.workflow}${delegatedText(r.delegated_round.delegated)}`);
+  if (r.delegated_round) field("round", `${r.delegated_round.n} · ${r.delegated_round.workflow}${delegatedText(r.delegated_round.delegated_reason)}`);
   field("run", r.run_id ?? "-");
   field("outcome", r.open ? "(in step)" : `${outcomeText(r)}${r.to ? ` → ${r.to}` : ""}`);
   field("entered", r.entered_at ?? "-");
