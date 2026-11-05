@@ -198,6 +198,24 @@ Implement gh-196 (quick): `--delegated --reason` recorded and shown apart (D1–
   | QA delivery | person | QA (person): one supervised delivery with norn-fsd, per the Plan |
 - review#3 changes_requested: review#3: review#2 fixes hold, D1–D5 code sound and traced, tests green. Blocking (skill text): F1 norn-fsd-round says the round ends at $stuck (contradicts B13/B27, RD1); F2 the --until gate wait returns at once on a gate the skill leaves parked (B19/B20/B39), busy-loop. Minor: run cancel not in SK3/B16, B21/B22 negatives + B34 run view unasserted, schema comment-with-delegated unenforced, per-load round reads, 'supervisor' undefined in concepts.md. Table in handoff.
 
+- implement#4 (review#3 rework), each point red first:
+  - F1 (B13, B27; RD1, W7): "When the round ends" now says the round ends at `$done` only; a stuck unit gets its one diagnosed rerun and a second stuck at the same step is escalated (the subagent returns with the escalation, not a report). Test: assets terms "The round ends at `$done`", "A stuck unit does not end the round", and `not.toMatch(/round ends at[^.\n]*\$stuck/)`.
+  - F2 (B19, B20, B39): new Shape rule "Never loop on `--until gate` while you leave a gate parked": a merged PR → `norn story wait <story> --until done --timeout 5m`; a new CI run → `gh run watch <run-id> --exit-status`; an escalation → the subagent has returned (brief step 3: it stops, the supervisor starts it again once the reply is sent). The PR-merged and older-head lines point at these. Terms asserted; the `--until` parse test covers `done`.
+  - F3: SK3 (RULES.md) and spec B16's example name `run cancel` only right before a suspected-flake rerun.
+  - F4: delegated.test.ts gains gh-3 (the person's own approve): no mark in run list/run view, no Delegated section in story view, absent from status's count; status `groups` never carry a delegated item (D5). B34 in `run view`: RunDetail gains `delegated_round` (the row's round when a supervisor started it) and run view prints `round    2 · asks — delegated (supervisor): <reason>` (was red: run view had no round). Asset terms tightened: B24 full sentence, B41 "the load is far above the core count", B33 norn-fsd's picking rules.
+  - F5: schema comments reworded (the cli refuses `--delegated` without a reason; the schema does not require it). F6: accepted with a comment at load.ts (few rounds per story; a cache went stale in review#2). F7: `supervisor` in docs/concepts.md's glossary (gate row too).
+  - F8 nits: one `DELEGATED_MARK` + `delegatedText` used by the round heading and run view; DelegatedKind JSDoc unstacked. Left: status.ts's delegated line outside formatInbox (it is not an inbox item, D5), story-edit's double check.
+  - Unit tier (1174) + typecheck green; delegated.test.ts 12 pass.
+
+  | Item | Verifier | Proven by |
+  | --- | --- | --- |
+  | B13, B27 | test | assets › "norn-fsd-round states the supervisor protocol" (round end terms + no `$stuck` in the round-end sentence) |
+  | B19, B20, B39 | test | assets › same ("Never loop on `--until gate`…", `--until done --timeout 5m`, `gh run watch`); assets › `--until` parse test |
+  | B21 | test | delegated.test.ts › "the person's own approve (no --delegated) shows no mark…" + the delegated mark tests |
+  | B22, D5 | test | delegated.test.ts › story view (gh-3 none, no section), status (no gh-3, no inbox item) |
+  | B34 | test | delegated.test.ts › "a new round started with --delegated --reason…" (run list heading, run view `round` line, `--json` delegated_round) |
+  | other items | test/person | as in review#3's table |
+
 ## Resume
 
-review#3 requested changes: fix F1 (round ends only at `$done`; a stuck unit gets the one diagnosed rerun) and F2 (a wait that does not return at once while a gate is deliberately left parked — e.g. a plain timeout wait or `--until merged`/`step=` — with an asset term pinning it), then the minors; QA (person) remains one supervised delivery with norn-fsd.
+implement#4 done: review#3's F1–F8 addressed (see Progress). Next: the `test` check, then review. QA (person) remains one supervised delivery with norn-fsd.

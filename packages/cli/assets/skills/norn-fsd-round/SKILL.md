@@ -18,6 +18,7 @@ You supervise the stories the person named, in this checkout, until each one's c
 
 - You, the top-level supervisor, are the only one who talks to the person. Name the story in every message ("gh-201: …"); pass escalations on one at a time.
 - Start **one subagent per story**, with the brief below. Each loops in the **foreground** on `norn story wait <story> --until gate --timeout 5m` and returns to you only to escalate or to report. `--until` takes one condition, so the timeout bounds how long an ask, a stuck unit or the round's end waits to be seen. No background polling, no timers that expire.
+- **Never loop on `--until gate` while you leave a gate parked** on purpose: it returns at once while that gate waits. Wait on what the gate waits for instead: a PR the person merged → `norn story wait <story> --until done --timeout 5m`; a new CI run on the PR's head → `gh run watch <run-id> --exit-status`; the person's answer to an escalation → nothing, the subagent has returned to you (see the brief). Then go back to the `--until gate` loop.
 - Read norn's JSON, never its text: `norn story view <story> --json`, `norn run view <unit> --json`, `norn run list <unit> --json`, `norn status --json`. Branch on fields; never grep markdown, and never pass a story to `norn status` (it takes none).
 
 ## Subagent brief (give it verbatim, with the story filled in)
@@ -25,14 +26,14 @@ You supervise the stories the person named, in this checkout, until each one's c
 > Supervise <story> to the end of its current round, from the main checkout, with norn's commands only.
 > 1. Run `norn story edit <story> --auto` once. Never run `norn brief`, `norn story start`, `norn tick` or `norn watch`; never type into a step pane.
 > 2. Loop: `norn story wait <story> --until gate --timeout 5m` in the foreground (exit 0: a gate waits; exit 7: five minutes passed), then, after every wait, read `heartbeat.up` from `norn status --json` (false → escalate "No watch is running") and `norn story view <story> --json`, and act on what waits (a gate, an ask, a stuck unit or the round's end) by the rules of the `norn-fsd-round` skill: load it first. Every decision you send carries `--delegated --reason "fsd: <evidence>"`.
-> 3. Return to the supervisor only with an escalation (one message, everything needed to answer) or with the report when the round ends.
+> 3. Return to the supervisor only with an escalation (one message, everything needed to answer) or with the report when the round ends. After an escalation you stop; once the person's reply has been sent, the supervisor starts you again with this brief.
 
 ## What you decide (delegated, always with `--delegated --reason`)
 
 - **Asks** the spec, the repo or the issue settle: `norn story answer <unit> "<answer>" --delegated --reason "fsd: spec B4 says …"`. A permission prompt the step plainly needs: its option number.
 - **Gates**: read what the gate judges (slice files against the spec's Behaviour items, the plan, the diff, the PR) and run `norn story approve <unit> --delegated --reason "…"` or `norn story reject <unit> --delegated --reason "…"`. The reason names the evidence: Behaviour items, the CI run, the merge danger.
-- **Before any gate, read the PR's state** (`gh pr view <branch> --json state,headRefOid,statusCheckRollup`). A PR the person merged → wait for the story to end; never approve or reject it.
-- **`ready`** only on green CI for the exact head the PR shows and a clean diff (no `runs/` file, no stray `handoff.md`, `gh pr diff <branch> --name-only`). Every check in `statusCheckRollup` must have passed and belong to `headRefOid` (`gh run list --branch <branch> --json headSha,conclusion` names each run's head). CI green on an older head → wait for the new run. A `runs/` file in the diff → escalate.
+- **Before any gate, read the PR's state** (`gh pr view <branch> --json state,headRefOid,statusCheckRollup`). A PR the person merged → wait for the story to end (`--until done`, not `--until gate`); never approve or reject it.
+- **`ready`** only on green CI for the exact head the PR shows and a clean diff (no `runs/` file, no stray `handoff.md`, `gh pr diff <branch> --name-only`). Every check in `statusCheckRollup` must have passed and belong to `headRefOid` (`gh run list --branch <branch> --json headSha,conclusion` names each run's head). CI green on an older head → wait for the new run (`gh run watch`), not on the gate. A `runs/` file in the diff → escalate.
 - **Stuck once**: read `norn run view <unit> --why --json` and the handoff, find the cause, then `norn run rerun <unit> --delegated --reason "fsd: …"` once. Stuck again at the same step → escalate with the receipts.
 - **Loop exhausted once**: `norn run rerun <unit> --step <step> --reset <counter> --delegated --reason "fsd: …"` once. Exhausted again → escalate with each round's findings.
 - **CI run hung or cancelled**: `gh run rerun --failed <id>` once, then wait on the `ci` check as usual.
@@ -62,7 +63,7 @@ Escalate, never act:
 
 ## When the round ends
 
-The round ends at `$done` or `$stuck`; for `story` and `quick`, once `ready` has its `approve` (and the merge, when the request named it). Then the subagent reports and stops. Never start another round: that is `norn-fsd`.
+The round ends at `$done`; for `story` and `quick`, once `ready` has its `approve` (and the merge, when the request named it). Then the subagent reports and stops. A stuck unit does not end the round: it gets its one diagnosed rerun (Stuck once), and only a second stuck at the same step is escalated; the subagent then returns with that escalation, not a report. Never start another round: that is `norn-fsd`.
 
 ## The report
 

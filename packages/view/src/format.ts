@@ -4,7 +4,7 @@
  */
 import { cmd, INBOX_ABOUT, INBOX_GROUPS, INBOX_TITLES, isVersionMismatchItem } from "@norn/core";
 import type { RunDetail } from "./run-view.ts";
-import { oneLine } from "./timeline.ts";
+import { DELEGATED_MARK, oneLine } from "./timeline.ts";
 import type { InboxEntry, ProjectView, RoundView, SliceView, StepRow, StepWho, StoryView, TimelineEntry, TraceView, UnitView } from "./types.ts";
 
 function counterText(u: UnitView): string {
@@ -222,6 +222,9 @@ function outcomeText(r: StepRow): string {
  * entered, left, duration, outcome, who — with the reason beneath (cut to one line unless
  * `full`) and absolute evidence / log paths. Slice rows of a story are indented.
  */
+/** gh-196 D5 (B21, B34): the mark of a supervisor's decision, with its reason; nothing for the person's own. */
+export const delegatedText = (reason: string | undefined): string => (reason === undefined ? "" : ` — ${DELEGATED_MARK}: ${reason}`);
+
 /** gh-71 B29, B32: ` · finished`, ` · ended by the person at <step>`, or nothing while the round is under way. */
 function roundEndText(r: RoundView): string {
   if (!r.ended) return "";
@@ -284,7 +287,7 @@ export function formatStepTimeline(v: TraceView, opts: { full?: boolean } = {}):
   for (const rd of v.rounds ?? []) {
     const rows = v.steps.flatMap((r, i) => ((r.round ?? 1) === rd.n ? [i] : []));
     if (!rows.length) continue;
-    out.push(`round ${rd.n} · ${rd.workflow}${roundEndText(rd)}${rd.delegated !== undefined ? ` — delegated (supervisor): ${rd.delegated}` : ""}`);
+    out.push(`round ${rd.n} · ${rd.workflow}${roundEndText(rd)}${delegatedText(rd.delegated)}`);
     rows.forEach(row);
   }
   return `${out.join("\n")}\n`;
@@ -298,6 +301,7 @@ export function formatStepTimeline(v: TraceView, opts: { full?: boolean } = {}):
 export function formatRunView(r: RunDetail): string {
   const out = [`${r.unit} · ${r.step}#${r.attempt} (${r.type}${r.attended ? ", attended" : ""})`, ""];
   const field = (k: string, v: string) => out.push(`${k.padEnd(9)}${v}`);
+  if (r.delegated_round) field("round", `${r.delegated_round.n} · ${r.delegated_round.workflow}${delegatedText(r.delegated_round.delegated)}`);
   field("run", r.run_id ?? "-");
   field("outcome", r.open ? "(in step)" : `${outcomeText(r)}${r.to ? ` → ${r.to}` : ""}`);
   field("entered", r.entered_at ?? "-");

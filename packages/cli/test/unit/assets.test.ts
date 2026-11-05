@@ -277,24 +277,28 @@ describe("skills", () => {
       // B16, B17: allowed, forbidden, permission rule
       "Allowed:", "Forbidden:", "norn tick", "norn run cancel", "--force", "norn story checkout", "Bash(norn story approve:*)",
       // B24–B30, B39: escalations; B27: stuck or exhausted again, with the receipts; B36: an unknown workflow
-      "merge", "force pushes", "rules file", "max_agents", "closing an issue", "a workflow the skill does not know", "`release`'s `ready`", "question set", "sent once", "quiet",
+      "a merge, a release, an install or a watch restart the request did not name", "force pushes", "rules file", "max_agents", "closing an issue", "a workflow the skill does not know", "`release`'s `ready`", "question set", "sent once", "quiet",
       "Stuck again at the same step → escalate with the receipts", "Exhausted again → escalate",
       // B40: release, install and restart in that order
       "approve on their answer → wait for the merge and the publish → install → pull → restart the watch and the cockpit",
       // B41–B43: load and flakes; B42: a running unit is cancelled first (rerun refuses it), then rerun at its check
-      "reason: timeout", "load", "suspected flake", "never run tests in a unit worktree", "`norn run cancel <unit>`", "--step <check> --delegated --reason",
-      // B37: stops at the round's end
-      "Never start another round",
+      "reason: timeout", "the load is far above the core count", "suspected flake", "never run tests in a unit worktree", "`norn run cancel <unit>`", "--step <check> --delegated --reason",
+      // B37: stops at the round's end; B13, B27 (review#3 F1): a stuck unit does not end the round (RD1, W7)
+      "Never start another round", "The round ends at `$done`", "A stuck unit does not end the round",
+      // B19, B20, B39 (review#3 F2): a gate left parked on purpose is never waited on with `--until gate` (it returns at once)
+      "Never loop on `--until gate` while you leave a gate parked", "norn story wait <story> --until done --timeout 5m", "gh run watch <run-id> --exit-status",
       // B44, B45: the report
       "One report", "delegated decisions with their reasons", "suspected flakes", "waiting: your answer to",
     ];
     expect(terms.filter((t) => !text.includes(t))).toEqual([]);
+    // review#3 F1: `$stuck` parks a unit for its one diagnosed rerun; it never ends a round
+    expect(text).not.toMatch(/round ends at[^.\n]*\$stuck/);
   });
 
   test("norn-fsd links norn-fsd-round and adds the round choice and the round start (B31–B36, D6)", () => {
     const text = readSkill("norn-fsd");
     const terms = [
-      "norn-fsd-round", ".norn-unit", "`quick`", "`story`", "`reproduce`", "--workflow <name> --delegated --reason", "Never `--force`", "never on an unfinished round", "closing the issue", "rules file",
+      "norn-fsd-round", ".norn-unit", "`quick`", "`story`", "`reproduce`", "Pick the cheapest workflow that delivers safely", "one seam and no new contract → `quick`", "a new contract → `story`", "--workflow <name> --delegated --reason", "Never `--force`", "never on an unfinished round", "closing the issue", "rules file",
       // B31: refinement without the person: asks answered, the rest as one question set, the plan approved
       "Refinement on the person's behalf", "one question set", "approve the plan yourself",
       // B32: an attended step is the person's turn; B36: a workflow the skill does not know is a suggestion

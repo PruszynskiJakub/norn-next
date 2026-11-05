@@ -102,10 +102,10 @@ export interface PrView {
   seen_at: string;
 }
 
-/** gh-196 D5 (B21, B22, B34): a decision a supervisor made on the person's behalf (a `delegated` receipt). */
 /** gh-196 D1: the receipt kinds a `--delegated` command writes (approve, reject, answer, run rerun, a new round). */
 export type DelegatedKind = "approve" | "reject" | "answer" | "unstick" | "round";
 
+/** gh-196 D5 (B21, B22, B34): a decision a supervisor made on the person's behalf (a `delegated` receipt). */
 export interface DelegatedDecision {
   /** story or slice key */
   unit: string;

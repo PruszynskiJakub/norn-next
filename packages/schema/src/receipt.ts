@@ -121,7 +121,7 @@ export const AnswerReceipt = receipt("answer", {
    * receipt, so the tick does not deliver it again. (`by: "agent"` answers, R6.1, are never delivered.)
    */
   delivered: Type.Optional(Type.Boolean()),
-  /** gh-196 D3: why (`--reason`); required with `delegated` */
+  /** gh-196 D3: why (`--reason`); the cli refuses `--delegated` without it (reason_required), the schema does not require it */
   comment: Type.Optional(Type.String()),
 });
 export const ApproveReceipt = receipt("approve", {
