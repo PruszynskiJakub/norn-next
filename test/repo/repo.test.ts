@@ -397,24 +397,23 @@ describe("test layout (AGENTS.md)", () => {
     (Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", `${wf}.yaml`), "utf8")) as { steps: Record<string, Step> }).steps;
   const DELIVERY = ["quick", "story", "slice"];
 
-  test("AC2 (B8): the test check of quick, story and slice runs unit, then integration, then the type check, in 15 m", () => {
+  const UNIT_INTEGRATION = "bun install --frozen-lockfile && bun run test && bun run test:integration && bun run typecheck";
+  const UNIT_ONLY = "bun install --frozen-lockfile && bun run test && bun run typecheck";
+
+  test("AC2 (B8): the test check of quick and story runs unit, then integration, then the type check; slice's runs unit and the type check only (gh-214), all in 15 m", () => {
     const checks = DELIVERY.map((wf) => ({ wf, run: workflowSteps(wf).test?.run, timeout: workflowSteps(wf).test?.timeout }));
     expect(checks).toEqual(
-      DELIVERY.map((wf) => ({
-        wf,
-        run: "bun install --frozen-lockfile && bun run test && bun run test:integration && bun run typecheck",
-        timeout: "15m",
-      })),
+      DELIVERY.map((wf) => ({ wf, run: wf === "slice" ? UNIT_ONLY : UNIT_INTEGRATION, timeout: "15m" })),
     );
   });
 
-  test("AC3 (B9): the implement step of quick, story and slice names bun run test as the loop, integration in the test check and e2e in CI", () => {
+  test("AC3 (B9): the implement step of quick, story and slice names bun run test as the loop, integration in the (story's) test check and e2e in CI", () => {
     const says = DELIVERY.map((wf) => {
       const text = workflowSteps(wf).implement?.instructions ?? "";
       return {
         wf,
         loop: /`bun run test`[^.]*after each change/.test(text),
-        integration: /integration tier runs in the `test` check/.test(text),
+        integration: (wf === "slice" ? /integration tier runs in the story's `test` check/ : /integration tier runs in the `test` check/).test(text),
         e2e: /e2e (tier )?(runs )?in CI/.test(text),
       };
     });
