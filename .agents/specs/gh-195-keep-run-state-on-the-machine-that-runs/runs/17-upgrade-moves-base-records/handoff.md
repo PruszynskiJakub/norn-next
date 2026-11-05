@@ -24,7 +24,11 @@
 - harness: `archiveTreeRunState` now uses `treeRecordCommit`; new `toBaseRunState` (gh-1 fixture into several spec folders, pushed).
 - Tests: `packages/cli/test/integration/upgrade-records.test.ts` (AC1–AC4 + S2); expectations in upgrade, upgrade-version and e2e slice-workflow updated for `run_state` / no `.gitattributes`.
 - Decision: removal is staged, not committed (spec B35, LY3).
+- A `pre-receive` hook refuses the whole batch push, so a ref the batch rejected is retried alone (AC3); an unreadable remote pushes and removes nothing.
+- Cherry-picked afb441ddb (record-ref F1 test fix from slice 09).
+- Tiers: unit 1211 pass; integration 766 pass / 6 skip (pre-existing: human mailbox, zombie/lsof guards); e2e 72 pass / 2 skip (recovery R2.3, team clone B). No golden, transcript, snapshot or docs:emit change needed (decide, commands and flags unchanged).
+- Flakes: none.
 
 ## Resume
 
-Run the full integration and e2e tiers, then `norn done done`.
+Done; review next.
