@@ -215,6 +215,9 @@ describe("two clones hand a story over through git (T5, T6)", () => {
     expect(file).toMatch(/^\d{4}-take\.json$/);
     const rec = JSON.parse(readFileSync(join(storyRuns(B.root), "receipts", file), "utf8"));
     expect(rec).toMatchObject({ kind: "take", by: "human", who: "bob@repo-b", previous_holder: null, previous_heartbeat_id: null, expired: false });
+    // S12, D8: neither branch carries it, nor any run state, and under `local` no record push followed the take
+    for (const b of ["gh-7-add-login-form", "gh-7/01-form"]) expect(sh(B.root, ["ls-tree", "-r", "--name-only", b]).split("\n").filter((f) => f.endsWith("-take.json") || f.includes(`${SPEC}/runs/`))).toEqual([]);
+    expect(h.git(["ls-remote", "origin", "refs/norn/runs/gh-7"]).split("\t")[0]).toBe(sh(B.root, ["rev-parse", "refs/norn/runs/gh-7"]));
     expect(h.git(["ls-remote", "origin", "refs/heads/gh-7-add-login-form"]).split("\t")[0]).toBe(sh(B.root, ["rev-parse", "gh-7-add-login-form"]));
     const trace = await B.norn("run", "list", "gh-7", "--events");
     expect(JSON.stringify(trace.value)).toContain("take by bob@repo-b (claim was free)");

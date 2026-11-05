@@ -179,15 +179,18 @@ function baseRunStateItem(facts: Facts): InboxItem | null {
  */
 /** gh-195 (08-F4): the act failure effect of a record push refused as stale (`ActFailure.lease`) */
 export const RECORD_PUSH_EFFECT = "record_push";
+/** gh-195 (review F2): the machine-local failures slot of a story's refused record push, apart from every unit's */
+export const recordPushSlot = (story: string): string => `record:${story}`;
 
 /**
- * gh-195 (08-F4): this checkout holds the story, but its record push was refused as stale: another
- * checkout pushed `refs/norn/runs/<story>`. One Check item, whatever the cursor, until a push lands;
+ * gh-195 (08-F4): this checkout holds the story under `remote`, but its record push was refused as
+ * stale: another checkout pushed `refs/norn/runs/<story>`. One Check item, whatever the cursor, until a
+ * push lands (observe reports it only while the claim is here and the policy remote, review F2);
  * `norn story checkout` here fetches the ref (this checkout's run state kept), so the next push goes on top.
  */
 function recordPushItem(story: StoryFacts): InboxItem | null {
-  const f = storyUnit(story)?.act_failure;
-  if (f?.effect !== RECORD_PUSH_EFFECT || (story.claim.state !== "mine" && story.claim.state !== "expired")) return null;
+  const f = story.record_refused;
+  if (!f) return null;
   return {
     id: `record-push:${story.key}:${f.lease ?? "none"}`,
     group: "check",
@@ -205,7 +208,6 @@ function recordPushItem(story: StoryFacts): InboxItem | null {
 export function actFailureItem(story: StoryFacts, uf: UnitFacts): InboxItem | null {
   const f = uf.act_failure;
   const st = uf.state;
-  if (f?.effect === RECORD_PUSH_EFFECT) return null; // recordPushItem
   // H1: a refused commit is owed even by a finished unit (its `$done` state is not on record yet)
   if (!f || !st || (st.status === "done" && f.effect !== "commit") || st.status === "corrupt" || f.step !== st.step || f.attempt !== st.attempt) return null;
   // R6.3: an answer that did not reach its prompt is told on the Answer item itself (answerItem)

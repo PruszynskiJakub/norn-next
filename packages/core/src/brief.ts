@@ -352,8 +352,11 @@ function history(input: BriefInput, rw: BriefJson["rework"]): BriefJson["history
   const idx = rw ? -1 : receipts.findLastIndex(({ receipt: r }) => r.kind === "done" && r.step === st.step && r.attempt !== st.attempt);
   const prev = receipts[idx]?.receipt;
   const earlier = prev?.kind === "done" ? { attempt: prev.attempt, outcome: prev.outcome, since: movesAfter(receipts, idx) } : null;
-  // T5a (gh-195 B24): this attempt is the one a takeover started because the branch was rewritten
-  const take = receipts.findLast(({ receipt: r }) => r.kind === "take" && !!r.rewritten && r.step === st.step && r.attempt + 1 === st.attempt)?.receipt;
+  // T5a (gh-195 B24): this attempt is the one a takeover started because the branch was rewritten —
+  // the last such take, with every receipt after it written at this cursor (review F3: the step it
+  // restarted may be another than the one it was written at)
+  const at = receipts.findLastIndex(({ receipt: r }) => r.kind === "take" && !!r.rewritten);
+  const take = at >= 0 && receipts.slice(at + 1).every(({ receipt: r }) => r.step === st.step && r.attempt === st.attempt) ? receipts[at]?.receipt : undefined;
   const rewritten = take?.kind === "take" && take.rewritten ? { gone: take.rewritten.gone, head: take.rewritten.head, line: branchRewrittenLine(st.story, take.rewritten.gone, st.step, st.attempt) } : null;
   if (!retry && !earlier && !rewritten) return null;
   return rewritten ? { retry, earlier, rewritten } : { retry, earlier };

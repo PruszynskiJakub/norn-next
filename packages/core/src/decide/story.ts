@@ -20,7 +20,7 @@ import type { Action, ClaimAction, UpdateStoryMirrorAction } from "../actions.ts
 import type { NumberedReceipt, StoryFacts, UnitFacts, UnitRef } from "../facts.ts";
 import { initialState } from "../apply.ts";
 import { sha256 } from "../hash.ts";
-import { bodyChangedItem, RECORD_PUSH_EFFECT } from "../inbox/items.ts";
+import { bodyChangedItem } from "../inbox/items.ts";
 import { issueProblem, mergedIntoBase, prProblem, roundFinished, storyFinished, storyUnit, WF_LABEL } from "../policy.ts";
 import type { RemoteIssue } from "../ports.ts";
 import { epoch, iso } from "../time.ts";
@@ -144,8 +144,8 @@ function pushRecord(ctx: Ctx, story: StoryFacts, ref: UnitRef): void {
   const moved = ctx.decisions.some((d) => d.action.kind === "move_record" && d.action.unit?.story === story.key);
   if (!moved && (tree === null || tree === pushed?.tree)) return;
   if (ctx.decisions.some((d) => d.action.unit?.story === story.key && pushesRecordItself(d.action))) return;
-  const refused = storyUnit(story)?.act_failure;
-  if (refused?.effect === RECORD_PUSH_EFFECT && (refused.lease ?? null) === (pushed?.sha ?? null)) return;
+  const refused = story.record_refused;
+  if (refused && (refused.lease ?? null) === (pushed?.sha ?? null)) return;
   ctx.emit({ kind: "push_record", unit: ref, rule: "record.push", branch: story.branch, expected: pushed?.sha ?? null, holder: ctx.facts.machine.holder });
 }
 

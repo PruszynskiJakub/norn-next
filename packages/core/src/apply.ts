@@ -49,6 +49,10 @@ export interface Advance {
 export const branchRewrittenLine = (story: string, gone: string, step: string, attempt: number): string =>
   `the branch of ${story} was rewritten since the record (${gone} is gone); restarting ${step} as attempt ${attempt}`;
 
+/** T5a: does applying take receipt `r` at cursor `st` restart the step (the branch was rewritten, the step can be entered again)? */
+export const rewriteRestarts = (st: UnitState, r: Receipt, wf: Workflow): boolean =>
+  r.kind === "take" && !!r.rewritten && st.status !== "stuck" && st.status !== "corrupt" && stepOf(wf, st.step) !== null;
+
 export interface Rejection {
   n: number;
   receipt_id: string;
@@ -182,9 +186,10 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
     // R10.1: a takeover is a record, not a cursor move — applied at any cursor, like mode
     const from = r.previous_holder ? ` from ${r.previous_holder}${r.forced ? " (forced)" : r.expired ? " (expired)" : ""}` : "";
     const log = `taken by ${r.who ?? r.by}${from}`;
-    // T5a (gh-195 B24): the record judged code that is gone — its step starts again as a new attempt,
-    // counters and history kept; only at the cursor the take was written at, never at `$done` or stuck
-    if (r.rewritten && r.step === st.step && r.attempt === st.attempt && st.status !== "stuck" && st.status !== "corrupt" && stepOf(wf, st.step)) {
+    // T5a (gh-195 B24): the record judged code that is gone — the step the cursor is at when the take
+    // applies (after the record's own unapplied receipts, review F3) starts again as a new attempt,
+    // counters and history kept; never at `$done` or stuck
+    if (r.rewritten && rewriteRestarts(st, r, wf)) {
       const next = enterStep(st, wf, st.step, ctx.now);
       return { state: next, log: `${log}; ${branchRewrittenLine(st.story, r.rewritten.gone, st.step, next.attempt)}`, advance: { from: st.step, outcome: "take", to: st.step } };
     }

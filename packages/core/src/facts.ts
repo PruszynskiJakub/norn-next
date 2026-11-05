@@ -123,11 +123,7 @@ export interface ActFailure {
   attempt: number;
   /** the session a failed delivery targeted, so the inbox can say how to reach it */
   session?: { runner: string; session_id: string; pane_id?: string };
-  /**
-   * gh-195 (08-F4): effect `record_push` — the record push was refused as stale (another checkout pushed
-   * `refs/norn/runs/<story>`); the sha it leased on (null = none). decide pushes again only once the
-   * record ref this checkout sees is another one; the inbox shows one Check item meanwhile.
-   */
+  /** gh-195 (08-F4): a record push refused as stale (`StoryFacts.record.refused`): the sha it leased on (null = none) */
   lease?: string | null;
 }
 
@@ -362,6 +358,14 @@ export interface StoryFacts {
    * Absent = not observed (another holder, or the policy is local).
    */
   record?: { tree: string | null; pushed: { sha: string; tree: string } | null };
+  /**
+   * gh-195 (08-F4, review F2): the last record push of this holder refused as stale (another checkout
+   * pushed the ref), kept machine-local in the story's own slot of `failures.json` apart from the story
+   * unit's act failure (`lease`: the sha it leased on, null = none); dropped by the tick once the claim
+   * is not here or the policy is `local`. While `record` is observed, decide pushes again only once the
+   * record ref here is another one; the inbox shows one Check item meanwhile. Absent = none.
+   */
+  record_refused?: ActFailure;
   /**
    * NT2/NT3: notes for a person from `done` receipts of any unit of the story that no story-level
    * gate `approve` acknowledged yet, oldest first. Absent = none (or not observed).

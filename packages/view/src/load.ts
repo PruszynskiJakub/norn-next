@@ -392,6 +392,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       ...(unpushed[i]?.length ? { unpushed_runs: unpushed[i] } : {}),
       // NT2/NT3: open notes of the story (loadLocalFacts, as observe)
       ...(ls.notes ? { notes: ls.notes } : {}),
+      ...(ls.record_refused ? { record_refused: ls.record_refused } : {}),
       // BS1: the last base measurement of this checkout's ticks (stale items, merge-item detail)
       ...(local.base[story.key] && !finished ? { base: local.base[story.key] } : {}),
     };

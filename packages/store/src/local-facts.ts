@@ -9,7 +9,7 @@
  * tick's hook-file backfill (`backfillHooks`, D5).
  */
 import { existsSync, readdirSync } from "node:fs";
-import { type ActFailure, type FileError, hookWindowMs, type NumberedReceipt, openNotes, RE_ENTRY_KINDS, readyApproval, type StepRunFacts, type StoryFacts, storyWorktreePath } from "@norn/core";
+import { type ActFailure, type FileError, hookWindowMs, type NumberedReceipt, openNotes, RE_ENTRY_KINDS, readyApproval, recordPushSlot, type StepRunFacts, type StoryFacts, storyWorktreePath } from "@norn/core";
 import { type HookFact, type LeaseFile, parseDuration, parseReceiptFileName, type ReceiptOf, type RunInfo, type UnitState } from "@norn/schema";
 import { type BaseFactsCache, type IssueFactsCache, type PrFactsCache, readBaseFacts, readIssueFacts, readPrFacts } from "./base.ts";
 import { readActFailures } from "./heartbeat.ts";
@@ -92,6 +92,8 @@ export interface LocalStory {
   notes?: StoryFacts["notes"];
   /** F35/C5: the story unit's ready approval (`readyApproval`) */
   ready?: { sha: string; at: string };
+  /** gh-195 (08-F4, review F2): the story's refused record push, from its own slot of failures.json (`StoryFacts.record_refused`) */
+  record_refused?: ActFailure;
 }
 
 export interface LocalFacts {
@@ -167,7 +169,8 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
     });
     const ready = readyOf(s, s.units[0]);
     const notes = openNotes(s.units.map((u) => ({ unit: u.unit.key, receipts: receiptsOfKinds(s, u, ["done", "approve"]) })));
-    return { snapshot: s, worktree: storyWt, units, ...(notes.length ? { notes } : {}), ...(ready ? { ready } : {}) };
+    const refused = failures[recordPushSlot(s.key)];
+    return { snapshot: s, worktree: storyWt, units, ...(notes.length ? { notes } : {}), ...(ready ? { ready } : {}), ...(refused ? { record_refused: refused } : {}) };
   });
   // gh-61 D5, B12: the version the main checkout's team config records
   const mainDrift = drift(root);

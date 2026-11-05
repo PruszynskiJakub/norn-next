@@ -15,6 +15,7 @@ import {
   type ActionResult,
   buildInbox,
   RECORD_PUSH_EFFECT,
+  recordPushSlot,
   isSideAction,
   isTailAction,
   type Decision,
@@ -91,6 +92,7 @@ export class Actor extends ActEnv {
       if (counted) this.recordFailure(d, result);
       out.push({ decision: d, result });
     }
+    this.dropRecordPushSlots();
     if (this.failuresChanged) writeActFailures(this.root, this.failures);
     // the trace keeps decide's order
     return decisions.map((d) => out.find((r) => r.decision === d) as ActRecord);
@@ -139,11 +141,12 @@ export class Actor extends ActEnv {
   /**
    * gh-195 B14: a failed record push is owed, not a failure of the unit: the next tick pushes it. 08-F4:
    * one refused as stale (another checkout pushed the ref) would fail the same way every tick, so it is
-   * remembered on the story unit with the lease it used (effect `record_push`): decide holds the push
-   * until the record ref here changes, and the inbox shows one Check item. A push that lands clears it.
+   * remembered with the lease it used (effect `record_push`) in the story's own slot, never the story
+   * unit's (review F2): decide holds the push until the record ref here changes, and the inbox shows one
+   * Check item. A push that lands clears it.
    */
   private recordPushFailure(a: Extract<Action, { kind: "push_record" }>, rule: string, result: ActionResult): void {
-    const key = a.unit.key;
+    const key = recordPushSlot(a.unit.story);
     const prev = this.failures[key];
     if (result.ok) {
       if (prev?.effect !== RECORD_PUSH_EFFECT) return;
@@ -155,6 +158,16 @@ export class Actor extends ActEnv {
     const st = this.written.get(key) ?? this.obs.units[key]?.state;
     this.failures[key] = { effect: RECORD_PUSH_EFFECT, rule, reason: result.error ?? "record push refused as stale", at: this.nowIso(), tick_id: this.tick, step: st?.step ?? "?", attempt: st?.attempt ?? 1, lease: a.expected };
     this.failuresChanged = true;
+  }
+
+  /** review F2: a refused record push is forgotten once the story is not held here under `remote` (observe reports no `record`). */
+  private dropRecordPushSlots(): void {
+    const observed = new Set(this.obs.facts.stories.filter((s) => s.record).map((s) => recordPushSlot(s.key)));
+    for (const [key, f] of Object.entries(this.failures))
+      if (f.effect === RECORD_PUSH_EFFECT && !observed.has(key)) {
+        delete this.failures[key];
+        this.failuresChanged = true;
+      }
   }
 
   async perform(a: Action): Promise<ActionResult> {

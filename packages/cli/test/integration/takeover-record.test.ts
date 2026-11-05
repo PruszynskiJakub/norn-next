@@ -7,11 +7,11 @@
  * stale record lease (another checkout pushed the ref) is one Check item, never a push every tick.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { RunnerPort } from "@norn/core";
-import { recordRef, STORY_UNIT_DIR, ulid } from "@norn/schema";
-import { appendReceipt, bindNornHome, handoffPath, readState, repoConfigPath, workflowsDir } from "@norn/store";
+import { claimRef, recordRef, STORY_UNIT_DIR, ulid } from "@norn/schema";
+import { appendReceipt, bindNornHome, handoffPath, machineDir, readState, repoConfigPath, workflowsDir } from "@norn/store";
 import type { CliDeps, CliResult, TickReport } from "../../src/index.ts";
 import { createHarness, FakeRunner, type Harness, hostEnv, issue, runChecked, sh } from "../../../../test/support/harness.ts";
 import { runStateOf, storyRunStateOf } from "../../../../test/support/run-state.ts";
@@ -111,8 +111,19 @@ function filesOf(dir: string): string[] {
 }
 const remoteFiles = (sha: string) => sh(h.dir, ["--git-dir", h.remoteDir, "ls-tree", "-r", "--name-only", sha]).split("\n").filter(Boolean).sort();
 
+/** Force-push the story branch with its tip replaced by another commit on the same parent; returns the commit gone. */
+function rewriteBranch(s: { wt: (root: string) => string; branch: string }): string {
+  const gone = remoteRef(`refs/heads/${s.branch}`) as string;
+  sh(s.wt(h.root), ["reset", "-q", "--hard", "HEAD~1"]);
+  h.write(join(s.wt(h.root), "rewrite.txt"), "history rewritten\n");
+  sh(s.wt(h.root), ["add", "rewrite.txt"]);
+  sh(s.wt(h.root), ["commit", "-q", "-m", "rewritten tip"]);
+  sh(s.wt(h.root), ["push", "-q", "-f", "origin", s.branch]);
+  return gone;
+}
+
 /** A story on clone A at review attempt 2 (one rework round: `review_loop` 1), then handed over by A. */
-async function handedOverAtReview2(n: number, slug: string) {
+async function handedOverAtReview2(n: number, slug: string, beforeHandoff?: (runs: string) => void) {
   const key = `gh-${n}`;
   const spec = `.agents/specs/${key}-${slug}`;
   const branch = `${key}-${slug}`;
@@ -130,6 +141,7 @@ async function handedOverAtReview2(n: number, slug: string) {
   expect(state(runs(h.root))).toMatchObject({ step: "review", attempt: 2, counters: { review_loop: 1 } });
   const handoff = handoffPath(join(wt(h.root), spec), STORY_UNIT_DIR);
   h.write(handoff, `${existsSync(handoff) ? readFileSync(handoff, "utf8") : ""}\n## Resume\nReview the parser again.\n`);
+  beforeHandoff?.(runs(h.root));
   const r = await h.norn("story", "handoff", key);
   expect(r.exit).toBe(0);
   const sha = remoteRef(recordRef(key)) as string;
@@ -210,13 +222,7 @@ describe("checkout unpacks the record from the ref and continues (B22, T5)", () 
 
   test("AC3: a force-pushed story branch: the record is kept, review restarts as attempt 3 with the reason in checkout and the brief (B24, T5a)", async () => {
     const s = await handedOverAtReview2(11, "rewritten");
-    const gone = remoteRef(`refs/heads/${s.branch}`) as string;
-    // rewrite the branch: its tip replaced by another commit on the same parent
-    sh(s.wt(h.root), ["reset", "-q", "--hard", "HEAD~1"]);
-    h.write(join(s.wt(h.root), "rewrite.txt"), "history rewritten\n");
-    sh(s.wt(h.root), ["add", "rewrite.txt"]);
-    sh(s.wt(h.root), ["commit", "-q", "-m", "rewritten tip"]);
-    sh(s.wt(h.root), ["push", "-q", "-f", "origin", s.branch]);
+    const gone = rewriteBranch(s);
     const head = remoteRef(`refs/heads/${s.branch}`) as string;
     const B = cloneOf("b-ac3", "bob");
 
@@ -246,6 +252,24 @@ describe("checkout unpacks the record from the ref and continues (B22, T5)", () 
     expect(json.value).toMatchObject({ brief: { where: { step: "review", attempt: 3 }, history: { rewritten: { gone, head, line } } } });
   });
 
+  test("AC3: a record whose unapplied receipts move the cursor first: the step the cursor reaches restarts, and the brief says why (review F3)", async () => {
+    // review#2 reported `rework` just before the handoff: the record carries it unapplied
+    const s = await handedOverAtReview2(17, "moved-first", (runs) => report(runs, "rework"));
+    const gone = rewriteBranch(s);
+    const B = cloneOf("b-ac3b", "bob");
+    h.clock.advance(10_000);
+    const r = await B.norn("story", "checkout", s.key);
+    expect(r.exit).toBe(0);
+    // the rework takes review#2 to implement#3; the take then restarts implement as attempt 4
+    const line = `the branch of ${s.key} was rewritten since the record (${gone} is gone); restarting implement as attempt 4`;
+    expect(r.value).toMatchObject({ restarted: line });
+    h.clock.advance(10_000);
+    await B.tick();
+    expect(state(s.runs(B.root))).toMatchObject({ step: "implement", attempt: 4, counters: { review_loop: 2 } });
+    const brief = await B.at(s.wt(B.root), "brief", "--json");
+    expect(brief.value).toMatchObject({ brief: { where: { step: "implement", attempt: 4 }, history: { rewritten: { gone, line } } } });
+  });
+
   test("AC4: a story whose branch is gone: checkout unpacks the record without the ancestry check and continues (B33)", async () => {
     const s = await handedOverAtReview2(12, "branchless");
     sh(h.root, ["push", "-q", "origin", `:refs/heads/${s.branch}`]);
@@ -266,6 +290,61 @@ describe("checkout unpacks the record from the ref and continues (B22, T5)", () 
     expect(filesOf(dir).filter((f) => !f.endsWith("-take.json"))).toEqual(remoteFiles(s.sha));
     expect(state(runStateOf(join(B.root, s.spec)))).toMatchObject({ step: "review", attempt: 2, counters: { review_loop: 1 } });
     expect(localRef(B.root, recordRef(s.key))).toBe(s.sha);
+  });
+});
+
+/** A record commit on the remote's ref whose story state.json is not JSON; returns it and the blob's sha. */
+function badRecord(key: string): { commit: string; blob: string } {
+  const blob = sh(h.root, ["hash-object", "-w", "--stdin"], "{ not json");
+  const t1 = sh(h.root, ["mktree"], `100644 blob ${blob}\tstate.json\n`);
+  const t2 = sh(h.root, ["mktree"], `040000 tree ${t1}\t01-rv\n`);
+  const t3 = sh(h.root, ["mktree"], `040000 tree ${t2}\trounds\n`);
+  const t4 = sh(h.root, ["mktree"], `040000 tree ${t3}\t${STORY_UNIT_DIR}\n`);
+  const commit = sh(h.root, ["commit-tree", t4, "-m", "bad record"]);
+  sh(h.root, ["push", "-q", "-f", "origin", `${commit}:${recordRef(key)}`]);
+  return { commit, blob };
+}
+
+describe("a record checkout cannot take takes nothing: no claim, no worktree, no run state (review F1, S2)", () => {
+  async function expectNothingTaken(B: Clone, s: Awaited<ReturnType<typeof handedOverAtReview2>>, r: CliResult, code: string) {
+    expect(r.exit).not.toBe(0);
+    expect(r.value).toMatchObject({ code });
+    expect((r.value as { do_instead: string }).do_instead).toContain(`norn story checkout ${s.key}`);
+    expect(remoteRef(claimRef(s.key))).toBeNull();
+    expect(localRef(B.root, claimRef(s.key))).toBeNull();
+    expect(existsSync(s.wt(B.root))).toBe(false);
+    expect(existsSync(storyRunStateOf(join(B.root, s.spec)))).toBe(false);
+    expect(localRef(B.root, recordRef(s.key))).toBeNull();
+    // the next tick does not start the story over
+    for (let i = 0; i < 3; i++) {
+      h.clock.advance(10_000);
+      const t = await B.tick();
+      // the open issue is seen (intake leaves the pushed branch as it is); nothing claims or starts it
+      expect(t.decisions.filter((d) => d.unit.startsWith(s.key) && ["claim", "start_unit", "start_run", "push_record"].includes(d.kind))).toEqual([]);
+    }
+    expect(remoteRef(claimRef(s.key))).toBeNull();
+    expect(existsSync(storyRunStateOf(join(B.root, s.spec)))).toBe(false);
+  }
+
+  test("a record that fails validation is refused before the claim", async () => {
+    const s = await handedOverAtReview2(15, "corrupt-record");
+    badRecord(s.key);
+    const B = cloneOf("b-corrupt", "bob");
+    h.clock.advance(10_000);
+    const r = await B.norn("story", "checkout", s.key);
+    await expectNothingTaken(B, s, r, "record_corrupt");
+    expect((r.value as { error: string }).error).toContain("invalid JSON");
+  });
+
+  test("a record that cannot be fetched is refused before the claim", async () => {
+    const s = await handedOverAtReview2(16, "unfetchable-record");
+    const B = cloneOf("b-nofetch", "bob");
+    // the remote lists the ref but cannot send it: one of its objects is gone from the bare repo
+    const { blob } = badRecord(s.key);
+    rmSync(join(h.remoteDir, "objects", blob.slice(0, 2), blob.slice(2)));
+    h.clock.advance(10_000);
+    const r = await B.norn("story", "checkout", s.key);
+    await expectNothingTaken(B, s, r, "network");
   });
 });
 
@@ -303,6 +382,22 @@ describe("a record lease another checkout broke is one Check item, not a push ev
       const t = await B.tick();
       expect(t.decisions.filter((d) => d.unit === s.key && d.kind === "push_record")).toEqual([]);
     }
+    expect(await inbox()).toHaveLength(1);
+    // the refusal is the story's own slot, not the story unit's act failure (review F2)
+    const failures = () => JSON.parse(readFileSync(join(machineDir(B.root), "failures.json"), "utf8")).units as Record<string, { effect: string }>;
+    expect(Object.keys(failures())).toContain(`record:${s.key}`);
+    expect(failures()[s.key]).toBeUndefined();
+
+    // back to local: the refusal is forgotten (no item, no hold); remote again: the push is tried once more
+    h.write(repoConfigPath(B.root), "provider: gh\nworkflow: rv\n");
+    h.clock.advance(10_000);
+    await B.tick();
+    expect(await inbox()).toEqual([]);
+    expect(failures()[`record:${s.key}`]).toBeUndefined();
+    h.write(repoConfigPath(B.root), "provider: gh\nworkflow: rv\nrecord:\n  policy: remote\n");
+    h.clock.advance(10_000);
+    const retried = await B.tick();
+    expect(retried.decisions.filter((d) => d.unit === s.key && d.kind === "push_record").map((d) => d.ok)).toEqual([false]);
     expect(await inbox()).toHaveLength(1);
 
     // the do_instead: checkout on the holder fetches the ref (its run state kept) and the next push goes on top
