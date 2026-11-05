@@ -100,6 +100,26 @@ describe("refusals", () => {
     expect(r.exit).toBe(3);
     expect(r.value).toMatchObject({ code: "delegated_in_unit" });
   });
+
+  test("gh-224: a step agent's plain approve or reject in a unit worktree is refused, never recorded as the person's (§6, SK3)", async () => {
+    const agent = { cwd: wt(1), env: { ...h.deps.env, NORN_RUN: "01J0000000000000000000000" } };
+    for (const argv of [
+      ["story", "approve", "gh-1"],
+      ["story", "approve"],
+      ["story", "reject", "gh-1", "--reason", "not good enough"],
+    ]) {
+      const r = await norn(agent, ...argv);
+      expect([argv, r.exit, (r.value as { code?: string }).code]).toEqual([argv, 3, "gate_by_agent"]);
+      expect((r.value as { do_instead: string }).do_instead).toContain("main checkout");
+    }
+    expect(h.state(runs(1))?.park?.kind).toBe("gate");
+  });
+
+  test("gh-224: a person in a unit worktree (no NORN_RUN) is not refused as an agent", async () => {
+    // gh-2 waits at an ask, not a gate: the person's command gets past the agent check to not_at_gate
+    const r = await norn({ cwd: wt(2) }, "story", "approve", "gh-2");
+    expect([r.exit, (r.value as { code?: string }).code]).toEqual([3, "not_at_gate"]);
+  });
 });
 
 describe("delegated decisions are recorded apart from the person's (B21, B22, B34)", () => {

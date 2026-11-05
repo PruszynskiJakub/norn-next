@@ -41,6 +41,13 @@ async function unitHead(ctx: Context, t: Target): Promise<string | null> {
 async function decideGate(ctx: Context, args: ParsedArgs, kind: "approve" | "reject") {
   const verb = `story ${kind}`;
   const d = delegation(ctx, args, verb);
+  // §6 gate row, SK3: a step agent never decides a gate, delegated or not; a person in the worktree may
+  if (ctx.unit && ctx.env.NORN_RUN)
+    throw refuse(
+      `${verb} from a step agent is refused: a gate is decided by the person, never a step agent (SK3)`,
+      `gates are decided by the person, or by a supervisor in the main checkout (${ctx.root}); report this step's outcome instead`,
+      "gate_by_agent",
+    );
   const reason = d.reason;
   // B26 (B3): the agent sent back gets only what the reason says, so a rejection needs one
   if (kind === "reject" && !reason) throw usageError("story reject: the reason is required", 'pass --reason "what failed": norn story reject <unit> --reason "…"', "reason_required");
