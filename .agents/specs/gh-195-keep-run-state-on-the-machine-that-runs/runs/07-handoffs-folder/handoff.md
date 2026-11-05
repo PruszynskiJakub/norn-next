@@ -14,6 +14,21 @@
 
 ## Goal
 
+Handoffs move to `<spec>/handoffs/<unit>.md`, prose only; status printed by `brief` and `story checkout`; no `runs/` on any branch or PR (AC1-AC6).
+
 ## Progress
 
+- Resolver: `unitHandoffPath` (schema ids.ts) now `handoffs/<unit>.md`; `treeHandoffPath`/`treeHandoffFile` name an older norn's `runs/<unit>/handoff.md` for the move only.
+- Store: `writeHandoffHeader`/`appendHandoffHeartbeat` gone; `tidyHandoff` (skeleton when new, an older norn's blocks stripped once, else untouched) runs before each unit boundary commit (env.ts `commit`, its heartbeat param removed); `handoffProse`; `writeHandoffBody` writes prose only.
+- No heartbeat lines anywhere: session snapshot line dropped; forced take journaled as a Progress line (`appendProgress`), still committed and pushed.
+- Brief: "Where you are" gains `Counters` and `Last outcome` (json `where.counters`, `where.last_outcome`); `story checkout` units' `handoff` = status block (markers dropped, `renderHandoffWithStatus`) above the written part. Dead core `renderHandoff`/`collapseHeartbeat` removed.
+- Move (slice 06): `treeRunStateFiles` includes old handoffs; `moveTreeHandoffs` writes `handoffs/<unit>.md` stripped, in the same move commit; commit pathspec is the spec folder with every entry but `runs/` and `handoffs/` excluded (a move whose commit failed after staging leaves no `runs/` for `git add` to match).
+- Harness `toBranchRunState` puts the handoff back under runs/ with an older norn's blocks (`olderNornHandoffBlocks`).
+- Tests: new `packages/cli/test/integration/handoffs-folder.test.ts` (AC1-AC4), run-state-move (AC5), slice-workflow e2e AC6 test + slice branch check. Updated path assertions in round-folders, run-state-machine-dir, human, records, story-reopen, tick-lock-wait, team, base-sync (three tests now give norn's boundary commit a handoff note to carry, since norn no longer rewrites the handoff each boundary).
+- Regenerated: brief snapshots, 3 transcripts (fewer commits/pushes, handoff path), 3 observe snapshots (`ahead` 5 -> 4: one fewer norn commit). golden --update: 0 changed; golden harvest added 1 case (agent.timeout.surface, unrelated under-covered rule).
+- Not done here (slice 18 says the docs lint's handoff check changes there, "not before"): docs lint and docs/concepts.md, RULES O6/W4 heartbeat wording.
+- Tiers: unit 1208 pass; integration 732 pass, 9 skip (6 human mailbox describe.skip, 3 env-gated zombie skipIf under load); e2e 72 pass, 2 skip (allowed).
+
 ## Resume
+
+Review the slice diff (implement done).

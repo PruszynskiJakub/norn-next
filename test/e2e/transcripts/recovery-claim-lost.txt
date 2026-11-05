@@ -79,14 +79,12 @@
   spawn repo-worktrees/gh-9-add-search $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-9" --trailer "Norn-Step: implement" --trailer "Norn-Tick: <ulid:2>"
   spawn repo-worktrees/gh-9-add-search $ git rev-parse HEAD
   spawn repo-worktrees/gh-9-add-search $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-9-add-search --not --remotes=origin --
-  spawn repo-worktrees/gh-9-add-search $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-9-add-search -- .agents/specs/gh-9-add-search/runs/_story/handoff.md .agents/specs/gh-9-add-search/spec.md
+  spawn repo-worktrees/gh-9-add-search $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-9-add-search -- .agents/specs/gh-9-add-search/handoffs/_story.md .agents/specs/gh-9-add-search/spec.md
   spawn repo-worktrees/gh-9-add-search $ git push --porcelain origin refs/heads/gh-9-add-search:refs/heads/gh-9-add-search
   + home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/state.json
       {"version":1,"story":"gh-9","slice":null,"unit_dir":"_story","workflow":"solo","workflow_hash":"51d9743b83bdefcffc2af22c467294a98d957b6a7fca5a1ede44a62a468c618e","step":"implement","attempt":1,"visits":{"implement":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":0,"run":null,"last_outcome":null,"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:2>","mode":"auto"}
   + home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/workflow.yaml
       text 8 lines, normalised sha256 51d9743b83bd
-  + repo-worktrees/gh-9-add-search/.agents/specs/gh-9-add-search/runs/_story/handoff.md
-      text 19 lines, normalised sha256 1230ec8e33b9
 > [A] norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -109,22 +107,16 @@
   A.runner.launch title="gh-9 implement" cwd=<dir>/repo-worktrees/gh-9-add-search argv=["<dir>/home/launch/<hash:1>.sh","claude","--permission-mode","auto","--","Use the norn skill, then run `norn brief`."] env={"NORN_BIN":"<dir>/home/bin/norn","NORN_HOME":"<dir>/repo","NORN_RUN":"<ulid:3>","NORN_SLOT":"1","NORN_STORY":"gh-9"}
   spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-worktrees/gh-9-add-search $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-9-add-search $ git add -A -- .agents/specs/gh-9-add-search/runs/_story/handoff.md
-  spawn repo-worktrees/gh-9-add-search $ git diff --cached --quiet -- .agents/specs/gh-9-add-search/runs/_story/handoff.md
-  spawn repo-worktrees/gh-9-add-search $ git diff --cached -U0 --no-color --no-ext-diff -- .agents/specs/gh-9-add-search/runs/_story/handoff.md
-  spawn repo-worktrees/gh-9-add-search $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-9" --trailer "Norn-Step: implement" --trailer "Norn-Tick: <ulid:4>" -- .agents/specs/gh-9-add-search/runs/_story/handoff.md
-  spawn repo-worktrees/gh-9-add-search $ git rev-parse HEAD
+  spawn repo-worktrees/gh-9-add-search $ git add -A -- .agents/specs/gh-9-add-search/handoffs/_story.md
+  spawn repo-worktrees/gh-9-add-search $ git diff --cached --quiet -- .agents/specs/gh-9-add-search/handoffs/_story.md
   spawn repo-worktrees/gh-9-add-search $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-9-add-search --not --remotes=origin --
-  spawn repo-worktrees/gh-9-add-search $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-9-add-search -- .agents/specs/gh-9-add-search/runs/_story/handoff.md
   spawn repo-worktrees/gh-9-add-search $ git push --porcelain origin refs/heads/gh-9-add-search:refs/heads/gh-9-add-search
   + home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/receipts/0001-started.json
-      {"kind":"started","receipt_id":"<ulid:5>","run_id":"<ulid:3>","step":"implement","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:4>","how":"auto","agent":"claude","worktree":"<dir>/repo-worktrees/gh-9-add-search","machine":"tester@box","heartbeat_id":"<ulid:6>"}
+      {"kind":"started","receipt_id":"<ulid:4>","run_id":"<ulid:3>","step":"implement","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:5>","how":"auto","agent":"claude","worktree":"<dir>/repo-worktrees/gh-9-add-search","machine":"tester@box","heartbeat_id":"<ulid:6>"}
   + home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/receipts/0002-started.json
-      {"kind":"started","receipt_id":"<ulid:7>","run_id":"<ulid:3>","step":"implement","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:4>","how":"auto","agent":"claude","worktree":"<dir>/repo-worktrees/gh-9-add-search","machine":"tester@box","heartbeat_id":"<ulid:6>","session":{"runner":"fake","session_id":"s-1","pane_id":"p-1","reach":"fake attach p-1"}}
+      {"kind":"started","receipt_id":"<ulid:7>","run_id":"<ulid:3>","step":"implement","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:5>","how":"auto","agent":"claude","worktree":"<dir>/repo-worktrees/gh-9-add-search","machine":"tester@box","heartbeat_id":"<ulid:6>","session":{"runner":"fake","session_id":"s-1","pane_id":"p-1","reach":"fake attach p-1"}}
   ~ home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/state.json
-      {"version":1,"story":"gh-9","slice":null,"unit_dir":"_story","workflow":"solo","workflow_hash":"51d9743b83bdefcffc2af22c467294a98d957b6a7fca5a1ede44a62a468c618e","step":"implement","attempt":1,"visits":{"implement":1},"step_entered_at":"<time>","status":"running","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":2,"run":{"run_id":"<ulid:3>","step":"implement","attempt":1,"started_at":"<time>","how":"auto","agent":"claude","session":{"runner":"fake","session_id":"s-1","pane_id":"p-1","reach":"fake attach p-1"},"machine":"tester@box","heartbeat_id":"<ulid:6>"},"last_outcome":null,"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:4>","mode":"auto"}
-  ~ repo-worktrees/gh-9-add-search/.agents/specs/gh-9-add-search/runs/_story/handoff.md
-      text 20 lines, normalised sha256 2a91fa8cbe25
+      {"version":1,"story":"gh-9","slice":null,"unit_dir":"_story","workflow":"solo","workflow_hash":"51d9743b83bdefcffc2af22c467294a98d957b6a7fca5a1ede44a62a468c618e","step":"implement","attempt":1,"visits":{"implement":1},"step_entered_at":"<time>","status":"running","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":2,"run":{"run_id":"<ulid:3>","step":"implement","attempt":1,"started_at":"<time>","how":"auto","agent":"claude","session":{"runner":"fake","session_id":"s-1","pane_id":"p-1","reach":"fake attach p-1"},"machine":"tester@box","heartbeat_id":"<ulid:6>"},"last_outcome":null,"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:5>","mode":"auto"}
 > [repo-b] norn story checkout gh-9 --force
   spawn repo-b $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo-b $ git remote
@@ -149,14 +141,12 @@
   spawn repo-b $ git for-each-ref "--format=%(refname) %(objectname)" refs/remotes/origin/gh-9/
   spawn repo-b-worktrees/gh-9-add-search $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-b-worktrees/gh-9-add-search $ git diff --name-only --diff-filter=U -z
-  spawn repo-b-worktrees/gh-9-add-search $ git add -A -- .agents/specs/gh-9-add-search/runs/_story/handoff.md
-  spawn repo-b-worktrees/gh-9-add-search $ git diff --cached --quiet -- .agents/specs/gh-9-add-search/runs/_story/handoff.md
-  spawn repo-b-worktrees/gh-9-add-search $ git diff --cached -U0 --no-color --no-ext-diff -- .agents/specs/gh-9-add-search/runs/_story/handoff.md
-  spawn repo-b-worktrees/gh-9-add-search $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-9" --trailer "Norn-Step: take" --trailer "Norn-Tick: <ulid:8>" -- .agents/specs/gh-9-add-search/runs/_story/handoff.md
+  spawn repo-b-worktrees/gh-9-add-search $ git add -A -- .agents/specs/gh-9-add-search/handoffs/_story.md
+  spawn repo-b-worktrees/gh-9-add-search $ git diff --cached --quiet -- .agents/specs/gh-9-add-search/handoffs/_story.md
+  spawn repo-b-worktrees/gh-9-add-search $ git diff --cached -U0 --no-color --no-ext-diff -- .agents/specs/gh-9-add-search/handoffs/_story.md
+  spawn repo-b-worktrees/gh-9-add-search $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-9" --trailer "Norn-Step: take" --trailer "Norn-Tick: <ulid:8>" -- .agents/specs/gh-9-add-search/handoffs/_story.md
   spawn repo-b-worktrees/gh-9-add-search $ git rev-parse HEAD
   spawn repo-b-worktrees/gh-9-add-search $ git push --porcelain origin refs/heads/gh-9-add-search:refs/heads/gh-9-add-search
-  + repo-b-worktrees/gh-9-add-search/.agents/specs/gh-9-add-search/runs/_story/handoff.md
-      text 21 lines, normalised sha256 15b938fb8b06
 > [A] norn tick --offline
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -173,8 +163,6 @@
   spawn repo $ git cat-file blob <sha:3>
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/inbox/gh-9/
   A.runner.paneState s-1
-  spawn repo $ git rev-list --left-right --count <sha:6>...<sha:1> --
-  spawn repo $ git merge-base <sha:6> <sha:1>
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
   spawn repo $ git hash-object -w --stdin
-  spawn repo $ git push --porcelain --force-with-lease=refs/norn/claims/gh-9:<sha:3> origin <sha:7>:refs/norn/claims/gh-9
+  spawn repo $ git push --porcelain --force-with-lease=refs/norn/claims/gh-9:<sha:3> origin <sha:6>:refs/norn/claims/gh-9

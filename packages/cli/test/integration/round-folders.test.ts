@@ -1,13 +1,14 @@
 /**
  * gh-71 B30, B31, B34 (D2, D7): the story's record lives in `_story/rounds/01-<workflow>/` of its run state,
- * in the checkout's machine dir (S12, gh-195/05), with one `runs/_story/handoff.md` in the worktree; a story
+ * in the checkout's machine dir (S12, gh-195/05), with one story handoff in the worktree (`handoffs/_story.md`, gh-195/07); a story
  * whose record is still flat is moved there by its holder's first tick, with nothing committed, and goes on
  * where it was.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { cpSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { repoConfigPath, workflowsDir } from "@norn/store";
+import { STORY_UNIT_DIR, unitHandoffPath } from "@norn/schema";
+import { handoffPath, repoConfigPath, workflowsDir } from "@norn/store";
 import type { CliResult } from "../../src/index.ts";
 import { createHarness, type Harness, issue, runChecked } from "../../../../test/support/harness.ts";
 import { runStateOf, storyRunStateOf } from "../../../../test/support/run-state.ts";
@@ -40,8 +41,8 @@ const spec = `.agents/specs/${BRANCH}`;
 const wt = () => `${h.root}-worktrees/${BRANCH}`;
 /** S12: the story unit's run state, in the machine dir */
 const story = () => join(storyRunStateOf(join(wt(), spec)), "_story");
-/** the story's handoff, in the worktree (gh-195/05) */
-const handoff = () => join(wt(), spec, "runs", "_story", "handoff.md");
+/** the story's handoff, in the worktree (gh-195/07: `handoffs/_story.md`) */
+const handoff = () => handoffPath(join(wt(), spec), STORY_UNIT_DIR);
 const round1 = () => join(story(), "rounds", "01-duo");
 const inWt = (...argv: string[]): Promise<CliResult> => {
   const env: Record<string, string | undefined> = { ...h.deps.env, NORN_AGENT_PID: String(process.pid) };
@@ -73,12 +74,12 @@ afterAll(() => h.cleanup());
 describe("a new story's record is round 1 (B30, B31)", () => {
   let runId = "";
 
-  test("AC1: state, pinned workflow, receipts from 0001 and evidence sit in rounds/01-duo/ of the machine dir; the worktree's runs/_story holds only handoff.md", async () => {
+  test("AC1: state, pinned workflow, receipts from 0001 and evidence sit in rounds/01-duo/ of the machine dir; the worktree and the branch hold no runs/, only the story's handoff", async () => {
     await tickUntil(() => h.state(round1())?.step === "implement");
     const brief = await inWt("brief", "--json");
     expect(brief.exit).toBe(0);
     runId = (brief.value as { run_id: string }).run_id;
-    expect((brief.value as { brief: { inputs: Array<{ kind: string; ref: string }> } }).brief.inputs).toContainEqual(expect.objectContaining({ ref: `${spec}/runs/_story/handoff.md` }));
+    expect((brief.value as { brief: { inputs: Array<{ kind: string; ref: string }> } }).brief.inputs).toContainEqual(expect.objectContaining({ ref: `${spec}/${unitHandoffPath(STORY_UNIT_DIR)}` }));
     const ev = join(h.root, "..", "ev-ac1");
     mkdirSync(ev, { recursive: true });
     writeFileSync(join(ev, "AC1.md"), "seen\n");
@@ -91,12 +92,12 @@ describe("a new story's record is round 1 (B30, B31)", () => {
     expect(ls(join(round1(), "receipts"))[0]).toStartWith("0001-");
     expect(ls(join(round1(), "evidence", runId))).toEqual(["AC1.md"]);
     expect(h.state(round1())).toMatchObject({ workflow: "duo", step: "review" });
-    // gh-195/05 (B2): the worktree and the pushed branch hold only the handoff
-    expect(ls(join(wt(), spec, "runs", "_story"))).toEqual(["handoff.md"]);
-    expect(git("ls-tree", "--name-only", `origin/${BRANCH}:${spec}/runs/_story`).split("\n")).toEqual(["handoff.md"]);
+    // gh-195/05 (B2), gh-195/07 (B39): the worktree and the pushed branch hold the handoff, and no runs/
+    expect(existsSync(join(wt(), spec, "runs"))).toBe(false);
+    expect(git("ls-tree", "-r", "--name-only", `origin/${BRANCH}`, "--", spec).split("\n")).toEqual([`${spec}/${unitHandoffPath(STORY_UNIT_DIR)}`, `${spec}/spec.md`]);
   });
 
-  test("AC2: the handoff is runs/_story/handoff.md, and its Goal / Progress / Resume survive the step's report", async () => {
+  test("AC2: the handoff is handoffs/_story.md, and its Goal / Progress / Resume survive the step's report", async () => {
     const file = handoff();
     const before = h.read(file);
     const body = before.replace(/## Goal\n[\s\S]*$/, "## Goal\nShip the round thing.\n\n## Progress\n- first milestone\n\n## Resume\nRun the review.\n");

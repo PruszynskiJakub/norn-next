@@ -4,26 +4,27 @@
  *
  * 1. Claim by CAS (T3): free or expired → acquire; held by another heartbeat and unexpired →
  *    refused "held by X since Y" unless `--force`, which records `forced_from` in the claim blob
- *    and a heartbeat line in the story handoff, committed and pushed (journaled).
+ *    and a Progress line in the story handoff, committed and pushed (journaled).
  * 2. Fetch the story branch and its slice branches; check them out into worktrees here with
  *    slots, `.env.norn` and `.norn-unit` (K4, A3). Local branches are only created or moved
  *    forward, never reset.
- * 3. Print each unit's cursor and `handoff.md` (S9). The next `norn tick` resumes from `runs/`.
+ * 3. Print each unit's cursor, and its status (S9, rendered from state.json) above its handoff's
+ *    written part (gh-195 D9, B7). The next `norn tick` resumes from the run state.
  */
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
-import { cmd, sliceWorktreePath, storyWorktreePath } from "@norn/core";
+import { cmd, renderHandoffWithStatus, sliceWorktreePath, storyWorktreePath } from "@norn/core";
 import { ExitCode, type ReceiptOf, sliceBranch, specDir, STORY_UNIT_DIR, ulid } from "@norn/schema";
 import {
   acquireClaim,
-  appendHandoffHeartbeat,
   appendReceipt,
   appendTrace,
   handoffPath,
   loadStory,
   newClaimBlob,
+  readPinnedWorkflow,
   readState,
-  readText,
+  readHandoff,
   heartbeatId,
   writtenHere,
   machineHolder,
@@ -33,6 +34,7 @@ import {
 import type { Context } from "../context.ts";
 import { claimHeld, corruptError, failure, refuse, withExit } from "../output.ts";
 import { claimFor } from "./human.ts";
+import { appendProgress } from "./report.ts";
 import { leaseLiveness } from "./leases.ts";
 import { gitRemote } from "./observe/index.ts";
 import { equipWorktree, syncLocalBranch, type WorktreeTarget } from "./worktrees.ts";
@@ -189,13 +191,16 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
   const units: UnitView[] = [];
   const view = (unit: string, wt: string | null, runsDir: string, handoff: string): UnitView => {
     const st = readState(runsDir);
+    const wf = readPinnedWorkflow(runsDir);
+    const prose = readHandoff(handoff)?.body ?? null;
     return {
       unit,
       worktree: wt,
       step: st.ok ? st.value.step : null,
       status: st.ok ? st.value.status : null,
       park: st.ok ? (st.value.park ?? null) : null,
-      handoff: readText(handoff),
+      // B7: the status the handoff's generated header used to carry, above its written part
+      handoff: st.ok ? renderHandoffWithStatus(st.value, prose, { workflow: wf.ok ? wf.value.workflow : null }) : prose,
     };
   };
   const storyHandoff = handoffPath(join(storyWt, spec_dir), STORY_UNIT_DIR);
@@ -217,14 +222,14 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
   }
 
   // ---- commit the take receipt (R10.1) and journal a forced take (T5): claim blob `forced_from` +
-  // a handoff heartbeat line, in the same commit, pushed (this heartbeat holds the claim now)
+  // a Progress line in the story's handoff (gh-195 B6: prose, no heartbeat block), in the same commit, pushed
   let journal: unknown = null;
   let committed: { commit: string | null; pushed: boolean | null } | null = null;
-  const line = forced ? `- ${nowIso} take --force by ${holder} from ${blob.forced_from}` : null;
+  const line = forced ? `${nowIso} take --force by ${holder} from ${blob.forced_from}` : null;
   // gh-195/05 (S12): the forced take is journaled in the story's handoff when the branch has one (its run
   // state may be on another machine), and the take receipt stays in the machine dir (D8)
   const journaled = line !== null && existsSync(storyHandoff);
-  if (journaled) appendHandoffHeartbeat(storyHandoff, line);
+  if (journaled) appendProgress(storyHandoff, line);
   const extra = more?.({ storyWt, spec_dir, worktrees });
   if (journaled || extra?.paths.length) {
     const paths = [...(journaled ? [relative(storyWt, storyHandoff)] : []), ...(extra?.paths ?? [])];

@@ -79,7 +79,7 @@
   "stories": [
     {
       "base": {
-        "ahead": 5,
+        "ahead": 4,
         "behind": 0,
         "conflicts": [],
         "head": "<sha:1>",

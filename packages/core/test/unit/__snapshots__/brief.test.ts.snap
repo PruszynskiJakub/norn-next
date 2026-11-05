@@ -8,6 +8,8 @@ exports[`renderBrief (B3) first run of implement 1`] = `
 - Story: gh-1
 - Slice: gh-1/02
 - Step: implement (attempt 1)
+- Counters: conflict_loop 0/2, qa_loop 0/2, review_loop 0/3, test_loop 0/5
+- Last outcome: none
 - Mode: auto
 
 ## Your work
@@ -18,7 +20,7 @@ Use the \`implement\` skill.
 
 - Story spec: \`.agents/specs/gh-1-login/story.md\`
 - Slice: \`.agents/specs/gh-1-login/slices/02-form.md\`
-- Handoff (text under Context; update it here): \`.agents/specs/gh-1-login/runs/02-form/handoff.md\`
+- Handoff (text under Context; update it here): \`.agents/specs/gh-1-login/handoffs/02-form.md\`
 
 ## Context
 
@@ -49,6 +51,8 @@ exports[`renderBrief (B3) the step's description and instructions follow the ski
 - Story: gh-1
 - Slice: gh-1/02
 - Step: implement (attempt 1)
+- Counters: conflict_loop 0/2, qa_loop 0/2, review_loop 0/3, test_loop 0/5
+- Last outcome: none
 - Mode: auto
 
 ## Your work
@@ -63,7 +67,7 @@ Base mode: merge the base commit named in Rework; never rebase.
 
 - Story spec: \`.agents/specs/gh-1-login/story.md\`
 - Slice: \`.agents/specs/gh-1-login/slices/02-form.md\`
-- Handoff (text under Context; update it here): \`.agents/specs/gh-1-login/runs/02-form/handoff.md\`
+- Handoff (text under Context; update it here): \`.agents/specs/gh-1-login/handoffs/02-form.md\`
 
 ## Context
 
@@ -94,6 +98,8 @@ exports[`renderBrief (B3) rework after a failing check shows the output tail and
 - Story: gh-1
 - Slice: gh-1/02
 - Step: implement (attempt 2)
+- Counters: conflict_loop 0/2, qa_loop 0/2, review_loop 0/3, test_loop 1/5
+- Last outcome: test.fail (classified, 2026-10-23T10:00:00.000Z)
 - Mode: auto
 
 ## Your work
@@ -104,7 +110,7 @@ Use the \`implement\` skill.
 
 - Story spec: \`.agents/specs/gh-1-login/story.md\`
 - Slice: \`.agents/specs/gh-1-login/slices/02-form.md\`
-- Handoff (text under Context; update it here): \`.agents/specs/gh-1-login/runs/02-form/handoff.md\`
+- Handoff (text under Context; update it here): \`.agents/specs/gh-1-login/handoffs/02-form.md\`
 
 ## Rework
 
@@ -155,6 +161,8 @@ exports[`renderBrief (B3) rework after review findings lists them 1`] = `
 - Story: gh-1
 - Slice: gh-1/02
 - Step: implement (attempt 2)
+- Counters: conflict_loop 0/2, qa_loop 0/2, review_loop 1/3, test_loop 0/5
+- Last outcome: review.changes_requested (reported, 2026-10-23T10:00:00.000Z)
 - Mode: auto
 
 ## Your work
@@ -165,7 +173,7 @@ Use the \`implement\` skill.
 
 - Story spec: \`.agents/specs/gh-1-login/story.md\`
 - Slice: \`.agents/specs/gh-1-login/slices/02-form.md\`
-- Handoff (text under Context; update it here): \`.agents/specs/gh-1-login/runs/02-form/handoff.md\`
+- Handoff (text under Context; update it here): \`.agents/specs/gh-1-login/handoffs/02-form.md\`
 
 ## Rework
 
@@ -212,6 +220,8 @@ exports[`renderBrief (B3) attended step with answers in context, manual downgrad
 
 - Story: gh-1
 - Step: refine (attempt 1)
+- Counters: fix_loop 0/2
+- Last outcome: refine.ask (reported, 2026-10-23T10:00:00.000Z)
 - Mode: manual · attended: work with the person in this session
 - Run: 01JDDDDDDDDDDDDDDDDDDDDDDD
 
@@ -222,7 +232,7 @@ Use the \`refine\` skill.
 ## Inputs
 
 - Story spec: \`.agents/specs/gh-1-login/story.md\`
-- Handoff (text under Context; update it here): \`.agents/specs/gh-1-login/runs/_story/handoff.md\`
+- Handoff (text under Context; update it here): \`.agents/specs/gh-1-login/handoffs/_story.md\`
 
 ## Context
 
@@ -257,6 +267,8 @@ exports[`Rework only when sent back (B3, B6, W4) qa.fail without findings: the h
 - Story: gh-1
 - Slice: gh-1/02
 - Step: implement (attempt 2)
+- Counters: conflict_loop 0/2, qa_loop 1/2, review_loop 0/3, test_loop 0/5
+- Last outcome: qa.fail (reported, 2026-10-23T10:00:00.000Z)
 - Mode: auto
 
 ## Your work
@@ -310,6 +322,8 @@ exports[`Rework only when sent back (B3, B6, W4) qa.fail with findings: criterio
 - Story: gh-1
 - Slice: gh-1/02
 - Step: implement (attempt 2)
+- Counters: conflict_loop 0/2, qa_loop 1/2, review_loop 0/3, test_loop 0/5
+- Last outcome: qa.fail (reported, 2026-10-23T10:00:00.000Z)
 - Mode: auto
 
 ## Your work
@@ -367,6 +381,8 @@ exports[`Rework only when sent back (B3, B6, W4) gate reject with a comment: the
 - Story: gh-1
 - Slice: gh-1/02
 - Step: implement (attempt 2)
+- Counters: conflict_loop 0/2, qa_loop 1/2, review_loop 0/3, test_loop 0/5
+- Last outcome: human-qa.reject (human, 2026-10-23T10:00:00.000Z)
 - Mode: auto
 
 ## Your work
@@ -424,6 +440,8 @@ exports[`Rework only when sent back (B3, B6, W4) gate reject without a comment s
 - Story: gh-1
 - Slice: gh-1/02
 - Step: implement (attempt 2)
+- Counters: conflict_loop 0/2, qa_loop 1/2, review_loop 0/3, test_loop 0/5
+- Last outcome: human-qa.reject (human, 2026-10-23T10:00:00.000Z)
 - Mode: auto
 
 ## Your work
@@ -480,6 +498,8 @@ exports[`Rework only when sent back (B3, B6, W4) review.approve → qa is forwar
 - Story: gh-1
 - Slice: gh-1/02
 - Step: qa (attempt 1)
+- Counters: conflict_loop 0/2, qa_loop 0/2, review_loop 0/3, test_loop 0/5
+- Last outcome: review.approve (reported, 2026-10-23T10:00:00.000Z)
 - Mode: auto
 
 ## Your work
@@ -490,7 +510,7 @@ Use the \`qa\` skill.
 
 - Story spec: \`.agents/specs/gh-1-login/story.md\`
 - Slice: \`.agents/specs/gh-1-login/slices/02-form.md\`
-- Handoff (text under Context; update it here): \`.agents/specs/gh-1-login/runs/02-form/handoff.md\`
+- Handoff (text under Context; update it here): \`.agents/specs/gh-1-login/handoffs/02-form.md\`
 
 ## Context
 
@@ -529,6 +549,8 @@ exports[`Rework only when sent back (B3, B6, W4) integrate conflict → merge: t
 - Story: gh-1
 - Slice: gh-1/02
 - Step: merge (attempt 1)
+- Counters: conflict_loop 1/2, qa_loop 0/2, review_loop 0/3, test_loop 0/5
+- Last outcome: integrate.conflict (classified, 2026-10-23T10:00:00.000Z)
 - Mode: auto
 
 ## Your work
@@ -539,7 +561,7 @@ Use the \`merge\` skill.
 
 - Story spec: \`.agents/specs/gh-1-login/story.md\`
 - Slice: \`.agents/specs/gh-1-login/slices/02-form.md\`
-- Handoff (text under Context; update it here): \`.agents/specs/gh-1-login/runs/02-form/handoff.md\`
+- Handoff (text under Context; update it here): \`.agents/specs/gh-1-login/handoffs/02-form.md\`
 
 ## Rework
 
@@ -570,6 +592,56 @@ Then end your turn. Never edit \`runs/\`; never push.
 "
 `;
 
+exports[`Checks since the last report (B3, gh-170) review after a passing check lists it: step, command, outcome, duration and where its output is 1`] = `
+"# norn brief — gh-1/02 · review #1
+
+## Where you are
+
+- Story: gh-1
+- Slice: gh-1/02
+- Step: review (attempt 1)
+- Counters: conflict_loop 0/2, qa_loop 0/2, review_loop 0/3, test_loop 0/5
+- Last outcome: test.pass (classified, 2026-10-23T10:00:00.000Z)
+- Mode: auto
+
+## Your work
+
+Use the \`review\` skill.
+
+## Inputs
+
+- Story spec: \`.agents/specs/gh-1-login/story.md\`
+- Slice: \`.agents/specs/gh-1-login/slices/02-form.md\`
+- Handoff (text under Context; update it here): \`.agents/specs/gh-1-login/handoffs/02-form.md\`
+
+## Checks since the last report
+
+These checks ran on the code since implement#1 reported; nothing else has run on it yet.
+
+- test#1 \`pass\` in 1m 23s — \`bun test\` — output: \`/r-worktrees/gh-1-login--02-form/.agents/specs/gh-1-login/runs/02-form/receipts/0003-check.json\`
+
+## Context
+
+No handoff yet — you are the first run of this unit.
+
+## Finish with exactly one of
+
+- \`norn done approve --handoff "…"\` — all criteria met, no blocking findings
+- \`norn done changes_requested --handoff "…"\` — blocking findings in the receipt
+- \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
+- \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
+
+Then end your turn. Never edit \`runs/\`; never push.
+
+## Limits
+
+- Deadline: 60m (until 2026-10-23T11:00:00.000Z)
+- Nudges left: 2
+- Fresh-session retries left: 1
+- Port slot: 3 (PORT_BASE=4030)
+"
+`;
+
 exports[`Re-entry, fresh sessions, handoff and criteria (B2, C2, QV1) a second qa after the code changed: why this attempt, earlier qa is history, review's Resume dropped 1`] = `
 "# norn brief — gh-1/02 · qa #2
 
@@ -578,6 +650,8 @@ exports[`Re-entry, fresh sessions, handoff and criteria (B2, C2, QV1) a second q
 - Story: gh-1
 - Slice: gh-1/02
 - Step: qa (attempt 2)
+- Counters: conflict_loop 0/2, qa_loop 1/2, review_loop 0/3, test_loop 0/5
+- Last outcome: qa.died (classified, 2026-10-23T10:00:00.000Z)
 - Mode: auto
 
 ## Why this attempt
@@ -594,7 +668,7 @@ Use the \`qa\` skill.
 
 - Story spec: \`.agents/specs/gh-1-login/story.md\`
 - Slice: \`.agents/specs/gh-1-login/slices/02-form.md\`
-- Handoff (text under Context; update it here): \`.agents/specs/gh-1-login/runs/02-form/handoff.md\`
+- Handoff (text under Context; update it here): \`.agents/specs/gh-1-login/handoffs/02-form.md\`
 
 ## Context
 
@@ -649,6 +723,8 @@ exports[`golden replays (norn-sandbox-todoist) gh-1 story: qa.fail with handoff 
 
 - Story: gh-1
 - Step: implement (attempt 1)
+- Counters: plan_loop 0/3, qa_loop 1/2, ready_loop 0/2, test_loop 0/5
+- Last outcome: qa.fail (reported, 2026-10-23T16:49:03.542Z)
 - Mode: manual
 
 ## Your work
@@ -658,7 +734,7 @@ Use the \`implement\` skill.
 ## Inputs
 
 - Story spec: \`.agents/specs/gh-1-projects-and-items/story.md\`
-- Handoff (text under Context; update it here): \`.agents/specs/gh-1-projects-and-items/runs/_story/handoff.md\`
+- Handoff (text under Context; update it here): \`.agents/specs/gh-1-projects-and-items/handoffs/_story.md\`
 - Last failing check: \`none\`
 - Last findings: \`see Rework\`
 
@@ -742,6 +818,8 @@ exports[`golden replays (norn-sandbox-todoist) gh-2/03: human-qa.reject → impl
 - Story: gh-2
 - Slice: gh-2/03
 - Step: implement (attempt 2)
+- Counters: conflict_loop 0/2, qa_loop 1/2, review_loop 0/3, test_loop 0/5
+- Last outcome: human-qa.reject (human, 2026-10-23T17:29:55.205Z)
 - Mode: manual
 
 ## Your work
@@ -752,7 +830,7 @@ Use the \`implement\` skill.
 
 - Slice: \`.agents/specs/gh-2-due-dates-with-today-and-upcoming-views/slices/03-due-dates-in-project-lists.md\`
 - Story spec: \`.agents/specs/gh-2-due-dates-with-today-and-upcoming-views/story.md\`
-- Handoff (text under Context; update it here): \`.agents/specs/gh-2-due-dates-with-today-and-upcoming-views/runs/03-due-dates-in-project-lists/handoff.md\`
+- Handoff (text under Context; update it here): \`.agents/specs/gh-2-due-dates-with-today-and-upcoming-views/handoffs/03-due-dates-in-project-lists.md\`
 - Last failing check: \`none\`
 - Last findings: \`see Rework\`
 
@@ -797,54 +875,6 @@ Then end your turn. Never edit \`runs/\`; never push.
 ## Limits
 
 - Deadline: 60m (until 2026-10-23T18:29:55.205Z)
-- Nudges left: 2
-- Fresh-session retries left: 1
-- Port slot: 3 (PORT_BASE=4030)
-"
-`;
-
-exports[`Checks since the last report (B3, gh-170) review after a passing check lists it: step, command, outcome, duration and where its output is 1`] = `
-"# norn brief — gh-1/02 · review #1
-
-## Where you are
-
-- Story: gh-1
-- Slice: gh-1/02
-- Step: review (attempt 1)
-- Mode: auto
-
-## Your work
-
-Use the \`review\` skill.
-
-## Inputs
-
-- Story spec: \`.agents/specs/gh-1-login/story.md\`
-- Slice: \`.agents/specs/gh-1-login/slices/02-form.md\`
-- Handoff (text under Context; update it here): \`.agents/specs/gh-1-login/runs/02-form/handoff.md\`
-
-## Checks since the last report
-
-These checks ran on the code since implement#1 reported; nothing else has run on it yet.
-
-- test#1 \`pass\` in 1m 23s — \`bun test\` — output: \`/r-worktrees/gh-1-login--02-form/.agents/specs/gh-1-login/runs/02-form/receipts/0003-check.json\`
-
-## Context
-
-No handoff yet — you are the first run of this unit.
-
-## Finish with exactly one of
-
-- \`norn done approve --handoff "…"\` — all criteria met, no blocking findings
-- \`norn done changes_requested --handoff "…"\` — blocking findings in the receipt
-- \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
-- \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
-
-Then end your turn. Never edit \`runs/\`; never push.
-
-## Limits
-
-- Deadline: 60m (until 2026-10-23T11:00:00.000Z)
 - Nudges left: 2
 - Fresh-session retries left: 1
 - Port slot: 3 (PORT_BASE=4030)

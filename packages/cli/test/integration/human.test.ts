@@ -467,8 +467,9 @@ describe("a slice gate in its own worktree (X1: views read slice runs from the m
     h.report(storyRuns(), "done", { outcome: "done", handoff: "one slice" });
     for (let i = 0; i < 6 && h.state(sliceRuns())?.status !== "parked"; i++) await tick();
     expect(h.state(sliceRuns())).toMatchObject({ slice: "gh-8/01", step: "qa", status: "parked", park: { kind: "gate" } });
-    // S12: one copy, in the machine dir: the slice worktree's runs/ holds only its handoff
-    expect(readdirSync(join(sliceWt(), spec8, "runs/01-part"))).toEqual(["handoff.md"]);
+    // S12: one copy, in the machine dir: the slice worktree holds no runs/, only its handoff (gh-195/07)
+    expect(existsSync(join(sliceWt(), spec8, "runs"))).toBe(false);
+    expect(existsSync(handoffPath(join(sliceWt(), spec8), "01-part"))).toBe(true);
   });
 
   test("story list and status show the gate read from the slice worktree", async () => {
@@ -789,7 +790,7 @@ describe("gh-71 B1, B3–B10, B17, B30, B31: norn story edit --workflow starts t
     expect(t.read(join(wt(), spec, "spec.md"))).toContain("workflow: story");
     // B31: one handoff, the person's sections kept
     const handoff = t.read(handoffPath(join(wt(), spec), STORY_UNIT_DIR));
-    expect(handoffPath(join(wt(), spec), STORY_UNIT_DIR)).toBe(join(wt(), spec, "runs/_story/handoff.md"));
+    expect(handoffPath(join(wt(), spec), STORY_UNIT_DIR)).toBe(join(wt(), spec, "handoffs/_story.md"));
     expect(handoff).toContain("## Goal\nDeliver it.");
     expect(handoff).toContain("## Resume\nRefine the spec.");
     // B6: Your turn for refine

@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
-import { LEGACY_SPEC_FILE, parseSliceKey, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName, unitHandoffPath } from "@norn/schema";
+import { LEGACY_SPEC_FILE, parseSliceKey, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName, treeHandoffPath, unitHandoffPath } from "@norn/schema";
 
 /** gh-110 B1, B2 (D1): the committed repo config and workflows, relative to a root, as messages name them. */
 export const REPO_CONFIG_FILE = ".agents/norn.config.yaml";
@@ -184,10 +184,12 @@ export const logPath = (ud: string, runId: string) => join(ud, "logs", `${runId}
 export const evidenceDir = (ud: string, runId: string) => join(ud, "evidence", runId);
 /**
  * The resolver for a unit's handoff (gh-195 prefactor 2, B6, B39), keyed by the unit (`_story` or
- * `<nn>-<slug>`), not by its record folder: the story's one `runs/_story/handoff.md` above its round
- * folders (gh-71 B31), a slice's in its own folder. Every reader and writer of a handoff goes through here.
+ * `<nn>-<slug>`), not by its record folder: `<spec folder>/handoffs/<unit>.md` (gh-195/07, D9). Every
+ * reader and writer of a handoff goes through here.
  */
 export const handoffPath = (specDir: string, unit: string) => join(specDir, unitHandoffPath(unit));
+/** gh-195/07 (B34, D13 step 2): an older norn's handoff of `unit` in a tree's spec folder, `runs/<unit>/handoff.md`; only the record move reads it. */
+export const treeHandoffFile = (specDir: string, unit: string) => join(specDir, treeHandoffPath(unit));
 /** R2.3: copies of runs/ files this checkout wrote but never got into the record. */
 export const orphanedDir = (ud: string) => join(ud, "orphaned");
 

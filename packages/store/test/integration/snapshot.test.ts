@@ -7,7 +7,7 @@ import {
   pinWorkflow,
   storyDir,
   storyFile,
-  writeHandoffHeader,
+  tidyHandoff,
   handoffPath,
   writeSliceFile,
   writeState,
@@ -29,7 +29,7 @@ function seed(root: string, title = "Fix login") {
   appendReceipt(u1, receipt());
   appendReceipt(u1, receipt());
   writeState(u1, state({ applied_through: 1 }));
-  writeHandoffHeader(handoffPath(spec, "01-add-form"), "header");
+  tidyHandoff(handoffPath(spec, "01-add-form"));
   return spec;
 }
 
@@ -61,7 +61,7 @@ describe("loadSnapshot", () => {
     expect(u1?.unapplied.map((r) => r.n)).toEqual([2]);
     expect(u1?.receipts?.length).toBe(2);
     expect(u1?.workflow?.workflow.name).toBe("slice");
-    expect(u1?.handoff?.header).toBe("header");
+    expect(u1?.handoff?.body).toBe("## Goal\n\n## Progress\n\n## Resume\n");
     expect(u1?.errors).toEqual([]);
     expect(u2).toMatchObject({ state: null, workflow: null, unapplied: [], errors: [] });
   });

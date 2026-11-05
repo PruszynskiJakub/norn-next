@@ -27,7 +27,7 @@ import {
   unitRecordPath,
 } from "@norn/schema";
 import { isErrno } from "./fsx.ts";
-import { handoffPath, machineDir } from "./paths.ts";
+import { machineDir } from "./paths.ts";
 
 /** S12: the machine dir's `runs/`, holding every story's run state of the checkout `root` belongs to. */
 export const machineRunsDir = (root: string): string => join(machineDir(root), RUNS_DIR);
@@ -54,8 +54,8 @@ export const runStateRecord = (root: string, story: RunStory, dir: string): stri
 export const treeRunStateDir = (root: string, story: RunStory): string => join(root, treeStoryRunStatePath(story));
 /**
  * gh-195/06 (B34, D13): the run-state files an older norn left in the tree of `root` (a unit worktree:
- * `<spec folder>/runs/`, on its branch), absolute and sorted: every file there but the units' handoffs,
- * which stay there until gh-195/07. [] = none.
+ * `<spec folder>/runs/`, on its branch), absolute and sorted: every file there, the units' old handoffs
+ * included (gh-195/07: they move to `handoffs/` with the rest's removal, D13 step 2). [] = none.
  */
 export function treeRunStateFiles(root: string, story: RunStory): string[] {
   const base = treeRunStateDir(root, story);
@@ -68,17 +68,15 @@ export function treeRunStateFiles(root: string, story: RunStory): string[] {
       throw e;
     }
   };
-  const top = entries(base);
-  const keep = new Set(top.filter((d) => d.isDirectory()).map((d) => handoffPath(join(root, story.spec_dir), d.name)));
   const out: string[] = [];
   const walk = (dir: string, list: Dirent[]) => {
     for (const d of list) {
       const p = join(dir, d.name);
       if (d.isDirectory()) walk(p, entries(p));
-      else if (!keep.has(p)) out.push(p);
+      else out.push(p);
     }
   };
-  walk(base, top);
+  walk(base, entries(base));
   return out.sort();
 }
 /** gh-195/05: a unit's folder in an older norn's tree (`<spec folder>/runs/<unit>`, R2.3's `orphaned/` copies of what it left there). */

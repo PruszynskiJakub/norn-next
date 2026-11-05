@@ -9,8 +9,8 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { RunnerPort } from "@norn/core";
-import { ulid } from "@norn/schema";
-import { acquireTickLock, appendReceipt, readState, repoConfigPath, workflowsDir } from "@norn/store";
+import { STORY_UNIT_DIR, ulid, unitHandoffPath } from "@norn/schema";
+import { acquireTickLock, appendReceipt, handoffPath, readState, repoConfigPath, workflowsDir } from "@norn/store";
 import { type CliDeps, type CliResult, type TickReport } from "../../packages/cli/src/index.ts";
 import { createHarness, FakeInteraction, FakeRunner, type Harness, hostEnv, issue, sh } from "../support/harness.ts";
 import { runChecked } from "../support/harness.ts";
@@ -175,7 +175,7 @@ describe("two clones hand a story over through git (T5, T6)", () => {
     expect(state(sliceRuns(h.root))).toMatchObject({ step: "implement", status: "parked", park: { kind: "ask" } });
 
     // the agent's Resume notes, not committed yet (S9: context for the next person)
-    const handoff = join(sliceWt(h.root), SPEC, "runs/01-form/handoff.md"); // gh-195/05: in the worktree, apart from the run state
+    const handoff = handoffPath(join(sliceWt(h.root), SPEC), "01-form"); // gh-195/07: handoffs/<unit>.md on the slice branch, apart from the run state
     h.write(handoff, `${readFileSync(handoff, "utf8")}\n## Resume\nForm done; use blue unless told otherwise.\n`);
   });
 
@@ -184,7 +184,7 @@ describe("two clones hand a story over through git (T5, T6)", () => {
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ story: "gh-7", released: true, pushed: ["gh-7-add-login-form", "gh-7/01-form"] });
     expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-7"])).toBe("");
-    expect(h.git(["show", `origin/gh-7/01-form:${SPEC}/runs/01-form/handoff.md`])).toContain("use blue");
+    expect(h.git(["show", `origin/gh-7/01-form:${SPEC}/${unitHandoffPath("01-form")}`])).toContain("use blue");
     // handed over, so a second handoff is refused
     expect((await A.norn("story", "handoff", "gh-7")).exit).toBe(3);
   });
@@ -279,7 +279,7 @@ describe("claim races (T3) and forced takes (T5)", () => {
     const blob = sh(B.root, ["cat-file", "-p", "refs/norn/claims/gh-7"]);
     expect(JSON.parse(blob)).toMatchObject({ holder: "bob@repo-b", forced_from: v.claim.forced_from });
     sh(h.root, ["fetch", "-q", "origin"]);
-    expect(h.git(["show", `origin/gh-7-add-login-form:${SPEC}/runs/_story/handoff.md`])).toContain("take --force by bob@repo-b");
+    expect(h.git(["show", `origin/gh-7-add-login-form:${SPEC}/${unitHandoffPath(STORY_UNIT_DIR)}`])).toContain("take --force by bob@repo-b");
   });
 
   test("story close is refused on a story another machine holds, whether this checkout has it or not; nothing changes (B38)", async () => {

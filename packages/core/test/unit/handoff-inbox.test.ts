@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { HEARTBEAT_BEGIN, collapseHeartbeat, renderHandoff, renderHandoffStatus, STATUS_BEGIN, STATUS_END } from "../../src/handoff.ts";
+import { renderHandoffStatus, renderHandoffWithStatus, STATUS_BEGIN } from "../../src/handoff.ts";
 import type { Decision } from "../../src/actions.ts";
 import { inboxChanges } from "../../src/inbox/history.ts";
 import { buildInbox } from "../../src/inbox/items.ts";
@@ -24,29 +24,13 @@ describe("handoff.md (S9, O6)", () => {
     expect(renderHandoffStatus(st, { workflow: SLICE_WF })).toMatchSnapshot();
   });
 
-  test("heartbeat repeats collapse into (×n) with the newest time", () => {
-    let lines: string[] = [];
-    lines = collapseHeartbeat(lines, { at: "t1", text: "implement: nudged (silent)" });
-    lines = collapseHeartbeat(lines, { at: "t2", text: "implement: nudged (silent)" });
-    lines = collapseHeartbeat(lines, { at: "t3", text: "implement: nudged (silent)" });
-    lines = collapseHeartbeat(lines, { at: "t4", text: "implement.done → test" });
-    expect(lines).toEqual(["- t3 implement: nudged (silent) (×3)", "- t4 implement.done → test"]);
-  });
-
-  test("renderHandoff replaces the status block, keeps agent sections, appends heartbeat lines", () => {
-    const first = renderHandoff(null, renderHandoffStatus(st), [{ at: "t1", text: "parked: ask" }]);
-    expect(first).toMatchSnapshot();
-    const edited = first.replace("## Progress\n", "## Progress\n- form renders\n");
-    const st2 = { ...st, status: "running" as const, park: null };
-    const second = renderHandoff(edited, renderHandoffStatus(st2), [{ at: "t2", text: "parked: ask" }, { at: "t3", text: "answered" }]);
-    expect(second).toContain("- form renders");
-    expect(second).toContain("- Status: running");
-    expect(second).not.toContain("Which DB?");
-    expect(second.split(STATUS_BEGIN)).toHaveLength(2);
-    expect(second.split(HEARTBEAT_BEGIN)).toHaveLength(2);
-    expect(second).toContain("- t2 parked: ask (×2)\n- t3 answered\n");
-    expect(renderHandoff("# Notes\n", renderHandoffStatus(st2))).toStartWith(`${STATUS_BEGIN}`);
-    expect(renderHandoff("# Notes\n", renderHandoffStatus(st2))).toContain(`${STATUS_END}\n\n# Notes\n`);
+  test("gh-195 D9 (B7): story checkout's text is the status, markers dropped, above the handoff's written part", () => {
+    const text = renderHandoffWithStatus(st, "## Goal\n\nform\n", { workflow: SLICE_WF });
+    expect(text).not.toContain(STATUS_BEGIN);
+    expect(text).toStartWith("- Story: gh-1 · Slice: gh-1/02\n- Workflow: slice · Step: review (attempt 2)\n");
+    expect(text).toContain("- Counters: conflict_loop 0/2, qa_loop 0/2, review_loop 2/3, test_loop 1/5\n- Last outcome: test.pass (classified, ");
+    expect(text).toEndWith("\n\n## Goal\n\nform\n");
+    expect(renderHandoffWithStatus(st, null)).toEndWith(`- Updated: ${st.updated_at}\n`);
   });
 });
 

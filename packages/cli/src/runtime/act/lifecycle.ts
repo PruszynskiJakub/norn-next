@@ -2,7 +2,7 @@
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { cmd, type Action, type ActionResult, nornTrailers, type UnitRef, type WorktreeSpec } from "@norn/core";
-import { type ClaimBlob, parseDuration, ROUNDS_DIR, STORY_UNIT_DIR } from "@norn/schema";
+import { type ClaimBlob, HANDOFFS_DIR, parseDuration, ROUNDS_DIR, RUNS_DIR, STORY_UNIT_DIR } from "@norn/schema";
 import {
   acquireClaim,
   type ClaimWriteResult,
@@ -22,7 +22,9 @@ import {
   writePendingRecords,
   moveFile,
   copyTreeRecord,
+  moveTreeHandoffs,
   handoffPath,
+  treeHandoffFile,
   removeTreeRunState,
   runStateFile,
   runStateRecord,
@@ -98,7 +100,7 @@ export async function startUnit(act: ActEnv, a: Extract<Action, { kind: "start_u
     const r = patchStoryFile(storyFile(join(wtPath, story.spec_dir)), { status: "active" }, wtPath);
     detail.story_status = r.ok ? "active" : r.reason;
   }
-  detail.commit = await act.commit(a.commit, a.unit, a.state, `${a.rule}: ${a.workflow} at ${a.state?.step ?? "?"}`);
+  detail.commit = await act.commit(a.commit, a.unit, a.state);
   return { ok: true, detail };
 }
 
@@ -124,7 +126,6 @@ export async function markDone(act: ActEnv, a: Extract<Action, { kind: "mark_don
       { cwd: storyWt, branch: story.branch, message: `norn: ${a.unit.key} ${a.slice_status}`, trailers: nornTrailers(act.tick, a.unit.story, a.unit.slice, "$done"), push: true },
       null,
       null,
-      null,
       [relative(storyWt, file)],
     );
   }
@@ -139,7 +140,7 @@ export async function markDone(act: ActEnv, a: Extract<Action, { kind: "mark_don
     await act.git.deleteBranch(act.root, b, { force: true });
     detail.branch_deleted = b;
   } else if (a.cleanup.branch_kept) detail.branch_kept = a.cleanup.branch_kept;
-  if (a.commit) detail.unit_commit = await act.commit(a.commit, a.unit, a.state, `${a.rule}`);
+  if (a.commit) detail.unit_commit = await act.commit(a.commit, a.unit, a.state);
   return { ok: true, detail };
 }
 
@@ -231,7 +232,7 @@ export async function intake(act: ActEnv, a: Extract<Action, { kind: "intake_sto
   const file = join(a.worktree.path, a.story_file);
   const written = !existsSync(storyFile(dirname(file)));
   if (written) writeStoryFile(file, a.frontmatter, a.body.endsWith("\n") || !a.body ? `\n${a.body}` : `\n${a.body}\n`);
-  const committed = await act.commit(a.commit, null, null, null);
+  const committed = await act.commit(a.commit, null, null);
   return { ok: true, detail: { worktree: a.worktree.path, ...wt, story_file: written ? a.story_file : "exists", ...committed } };
 }
 
@@ -241,7 +242,7 @@ export async function mirror(act: ActEnv, a: Extract<Action, { kind: "update_sto
   const r = patchStoryFile(storyFile(join(story.worktree, story.spec_dir)), a.fields, story.worktree);
   if (!r.ok) throw new Error(`cannot update spec.md: ${r.reason}`);
   await act.notify(a.notify);
-  return { ok: true, detail: await act.commit(a.commit, null, null, null) };
+  return { ok: true, detail: await act.commit(a.commit, null, null) };
 }
 
 export async function cleanupMerged(act: ActEnv, a: Extract<Action, { kind: "cleanup_merged_story" }>): Promise<ActionResult> {
@@ -366,14 +367,28 @@ export async function moveRecord(act: ActEnv, a: Extract<Action, { kind: "move_r
   // H1: a merge or rebase begun since observe: nothing is removed under it
   const busy = await act.git.inProgress(wt);
   if (busy.operation || busy.unmerged.length) return { ok: false, error: `${busy.operation ?? "a merge"} in progress in ${wt}: the move waits until it is concluded (H1)` };
-  const copied = a.copy.filter((c) => copyTreeRecord(join(wt, c.from), runStateFile(act.root, c.to), handoffPath(join(wt, story.spec_dir), c.unit))).map((c) => c.to);
+  const copied = a.copy.filter((c) => copyTreeRecord(join(wt, c.from), runStateFile(act.root, c.to), treeHandoffFile(join(wt, story.spec_dir), c.unit))).map((c) => c.to);
+  // gh-195/07 (D13 step 2, B8): the old handoffs move to handoffs/, prose only, in the same commit
+  const handoffs = moveTreeHandoffs(wt, story).map((f) => relative(wt, f));
   const removed = removeTreeRunState(wt, story);
-  // only the removal: an agent's work and the handoffs stay out of the move commit
-  const committed = await act.commit(a.commit, null, null, null, [a.path, `:(exclude)${handoffPath(story.spec_dir, "*")}`]);
-  const detail = { copied, removed: removed.length, ...committed };
+  const committed = await act.commit(a.commit, null, null, await movePaths(act, wt, story.spec_dir));
+  const detail = { copied, handoffs, removed: removed.length, ...committed };
   const notDone = committed?.deferred ?? committed?.refused;
   if (notDone) return { ok: false, error: `the removal of ${a.path} is not committed: ${notDone}`, detail };
   return { ok: true, detail };
+}
+
+/**
+ * The pathspec of a move commit: the spec folder's `runs/` and `handoffs/` (moved now, or by a move that
+ * stopped before its commit, S1), every other entry of it excluded, so an agent's work stays out. The spec
+ * folder, not `runs/` itself, is what it names: a move whose commit failed after staging left no `runs/`
+ * for git to match.
+ */
+async function movePaths(act: ActEnv, wt: string, specDir: string): Promise<string[]> {
+  const here = existsSync(join(wt, specDir)) ? readdirSync(join(wt, specDir)) : [];
+  const committed = (await act.git.lsTree(wt, "HEAD", specDir)) ?? [];
+  const others = [...new Set([...here, ...committed])].filter((n) => n !== RUNS_DIR && n !== HANDOFFS_DIR).sort();
+  return [specDir, ...others.map((n) => `:(exclude)${specDir}/${n}`)];
 }
 
 /** Move one record entry to the round; into a folder already there (an earlier move that stopped partway), child by child. */
@@ -410,7 +425,7 @@ export async function roundStart(act: ActEnv, a: Extract<Action, { kind: "round_
   writeState(oldDir, a.ended);
   for (const r of a.rejected) act.traceReject(a.unit.key, `receipt ${r.n}`, r.reason, { receipt_id: r.receipt_id });
   const fm = patchStoryFile(storyFile(join(wt, story.spec_dir)), { workflow: a.round.workflow }, wt);
-  const commit = await act.commit(a.commit, a.unit, a.state, `${a.rule}: round ${a.round.n} ${a.round.workflow} at ${a.state.step}`);
+  const commit = await act.commit(a.commit, a.unit, a.state);
   const label = await swapRoundLabel(act, a.label);
   return { ok: true, detail: { round: a.round, story_file: fm.ok ? "updated" : fm.reason, commit, ...(label.swapped ? { label: a.label } : {}) }, ...(label.warning ? { warnings: [label.warning] } : {}) };
 }

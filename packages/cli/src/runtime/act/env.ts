@@ -9,18 +9,16 @@ import {
   type BoundaryCommit,
   type InboxItem,
   type NewReceipt,
-  renderHandoffStatus,
   type SessionRef,
   type UnitRef,
 } from "@norn/core";
 import type { ClaimBlob, UnitState } from "@norn/schema";
 import {
-  appendHandoffHeartbeat,
   appendTrace,
   listLeases,
   readActFailures,
   releaseLease,
-  writeHandoffHeader,
+  tidyHandoff,
   writeReceiptAt,
   writeState,
   handoffPath,
@@ -137,25 +135,18 @@ export class ActEnv {
     return out;
   }
 
-  /** Regenerate the handoff header (S9), add a heartbeat line (O6), commit with trailers (S4) and push (S8, T7). */
+  /** Tidy the unit's handoff (gh-195 D9: skeleton when new, an older norn's blocks gone, B6, B8), commit with trailers (S4) and push (S8, T7). */
   async commit(
     c: BoundaryCommit | null,
     unit: UnitRef | null,
     state: UnitState | null,
-    heartbeat: string | null,
     paths?: string[],
   ): Promise<{ sha: string | null; pushed: boolean | null; push_error?: string; deferred?: string; refused?: string } | null> {
     if (!c) return null;
     if (unit && state) {
       const loc = this.unitLoc(unit);
-      if (existsSync(loc.runsDir)) {
-        const header = renderHandoffStatus(state, { workflow: loc.workflow })
-          .split("\n")
-          .filter((l) => !l.startsWith("<!--"))
-          .join("\n");
-        writeHandoffHeader(loc.handoffFile, header);
-        if (heartbeat) appendHandoffHeartbeat(loc.handoffFile, `- ${heartbeat}`);
-      }
+      // B6: the status is printed by `brief` and `story checkout` (renderHandoffStatus), never written into the file
+      if (existsSync(loc.runsDir)) tidyHandoff(loc.handoffFile);
     }
     let sha: string | null;
     try {

@@ -153,7 +153,7 @@ function branchRecord(story: StorySnapshot, u: UnitSnapshot, worktree: WorktreeF
   const st = worktree?.status;
   if (!st) return {};
   const path = treeStoryRunStatePath(story);
-  const left = [...st.staged, ...st.unstaged].filter((p) => p.startsWith(`${path}/`) && p !== handoffPath(story.spec_dir, p.slice(path.length + 1).split("/")[0] as string));
+  const left = [...st.staged, ...st.unstaged].filter((p) => p.startsWith(`${path}/`));
   if (!left.length) return {};
   const holds = [...new Set(left.map((p) => p.slice(path.length + 1).split("/")[0] as string))].sort();
   return { branch_record: { path, copy: [], holds } };

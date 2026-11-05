@@ -54,17 +54,6 @@ function effectOf(a: Action): string {
   }
 }
 
-/**
- * O6: the handoff heartbeat for a park — the state's park, or, when an implicit ask took the
- * workflow's `ask` edge (no park in state), the ask itself.
- */
-function parkLine(a: Extract<Action, { kind: "park" }>): string {
-  const p = a.state.park;
-  if (p) return `${p.kind} — ${p.reason}`;
-  const ask = a.receipts.findLast((r) => r.receipt.kind === "ask")?.receipt;
-  return `ask — ${ask?.kind === "ask" ? ask.question : "?"}`;
-}
-
 export class Actor extends ActEnv {
   // ------------------------------------------------------------ dispatch
 
@@ -178,7 +167,7 @@ export class Actor extends ActEnv {
         this.writeReceipts(loc.runsDir, a.receipts);
         if (a.state) this.writeUnitState(a.unit, loc.runsDir, a.state);
         await this.notify(a.notify);
-        const committed = await this.commit(a.commit, a.unit, a.state, `${a.rule}: ${parkLine(a)}`);
+        const committed = await this.commit(a.commit, a.unit, a.state);
         return { ok: true, detail: committed };
       }
       case "mark_done":
@@ -186,7 +175,7 @@ export class Actor extends ActEnv {
       case "commit_push": {
         const loc = this.unitLoc(a.unit);
         const rel = relative(a.commit.cwd, loc.runsDir);
-        return { ok: true, detail: await this.commit(a.commit, a.unit, loc.state, null, [rel]) };
+        return { ok: true, detail: await this.commit(a.commit, a.unit, loc.state, [rel]) };
       }
       case "reject_receipt":
         return rejectReceipt(this, a);
@@ -207,7 +196,7 @@ export class Actor extends ActEnv {
         this.writeReceipts(loc.runsDir, a.receipts);
         // a gate rejection is a milestone in handoff.md, as when it is written locally (O6)
         for (const r of a.receipts) if (r.receipt.kind === "reject") appendProgress(loc.handoffFile, rejectProgress(r.receipt));
-        const committed = await this.commit(a.commit, a.unit, loc.state, `${a.rule}: ${a.receipts.map((r) => r.receipt.kind).join(", ")}`);
+        const committed = await this.commit(a.commit, a.unit, loc.state);
         const deleted: string[] = [];
         for (const r of a.refs) {
           const res = await deleteMailbox(this.root, this.obs.remote, r.ref, r.sha);

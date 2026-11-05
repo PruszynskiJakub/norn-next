@@ -25,6 +25,7 @@ import { effectiveMode } from "./policy.ts";
 import { epoch, iso } from "./time.ts";
 import { edgeOf, reportableOutcomes, stepOf } from "./workflow.ts";
 import { cmd } from "./commands.ts";
+import { handoffCounters, handoffLastOutcome } from "./handoff.ts";
 
 export interface BriefInput {
   unit: UnitRef;
@@ -117,7 +118,8 @@ export interface BriefCheck {
 }
 
 export interface BriefJson {
-  where: { story: string; slice: string | null; step: string; attempt: number; mode: Mode; mode_note: string | null; attended: boolean; run_id: string | null };
+  /** gh-195 D9 (B7): `counters` and `last_outcome` are the status the handoff's generated header used to carry */
+  where: { story: string; slice: string | null; step: string; attempt: number; counters: string; last_outcome: string; mode: Mode; mode_note: string | null; attended: boolean; run_id: string | null };
   /** why this run is not a first entry of the step; null when it is, or when Rework already says why */
   history: {
     /** B2/C1: a session of this attempt ended without reporting; this is a fresh one */
@@ -219,6 +221,8 @@ function where(input: BriefInput, step: AgentStep): BriefJson["where"] {
     slice: st.slice,
     step: st.step,
     attempt: st.attempt,
+    counters: handoffCounters(st, input.workflow),
+    last_outcome: handoffLastOutcome(st),
     mode,
     mode_note: downgraded ? "auto requested, no runner; running manual" : null,
     attended: !!step.attended,
@@ -550,6 +554,8 @@ function markdown(b: BriefJson): string {
   out.push(`- Story: ${w.story}`);
   if (w.slice) out.push(`- Slice: ${w.slice}`);
   out.push(`- Step: ${w.step} (attempt ${w.attempt})`);
+  out.push(`- Counters: ${w.counters}`);
+  out.push(`- Last outcome: ${w.last_outcome}`);
   out.push(`- Mode: ${w.mode}${w.mode_note ? ` (${w.mode_note})` : ""}${w.attended ? " · attended: work with the person in this session" : ""}`);
   if (w.run_id) out.push(`- Run: ${w.run_id}`);
   out.push("");
