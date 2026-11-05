@@ -27,7 +27,7 @@ import { epoch, iso } from "../time.ts";
 import { edgeOf, isStale, stepOf } from "../workflow.ts";
 import { applyAction, classifyRun, implicitAskResolved, launchUnknown, resolveImplicitAsk, startRun } from "./agent.ts";
 import { commitFor, type Ctx, gitBusy, nextReceiptNumber, park, rebasing, sliceFileOf, unitBranch, unitItem } from "./receipts.ts";
-import { baseOf, classifyNorn, recordOf, resumeSlices, runCheck, runGit, slicesCanResume, slicesStep, startStoryUnit, usableWorkflow } from "./steps.ts";
+import { baseOf, classifyNorn, hasFlatRecord, recordOf, resumeSlices, runCheck, runGit, slicesCanResume, slicesStep, startStoryUnit, usableWorkflow } from "./steps.ts";
 import { cmd } from "../commands.ts";
 
 // ================================================================= story level
@@ -112,7 +112,7 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
 
   // gh-71 D7 (B34): a held story whose record is still flat moves into round 1 before anything else —
   // never mid-rebase (H1), and never once its PR merged (the base keeps old records flat, B36)
-  if (!ctx.has(ref.key) && su?.state && su.record !== undefined && normalRecord(su.record) === unitRecordPath(STORY_UNIT_DIR) && !rebasing(su) && !mergedIntoBase(story, ctx.facts.repo.default_branch)) {
+  if (!ctx.has(ref.key) && su?.state && hasFlatRecord(su) && !rebasing(su) && !mergedIntoBase(story, ctx.facts.repo.default_branch)) {
     const from = runStatePath(story, STORY_UNIT_DIR);
     return ctx.emit({ kind: "round_migrate", unit: ref, rule: "round.migrate", from, to: roundRunStatePath(story, 1, su.state.workflow) });
   }
@@ -146,8 +146,9 @@ function moveRecords(ctx: Ctx, story: StoryFacts): void {
       wait(`${busy} in progress in ${uf.worktree?.path}: the run state on ${unitBranch(story, uf)} moves once it is concluded (H1)`);
       continue;
     }
-    const bad = [uf, ...moving].filter((u) => br.copy.includes(u.unit.dir) && u.errors.length);
-    // S2: decideUnit marks each broken unit corrupt; nothing moves off this branch
+    // S2: decideUnit marks each broken unit corrupt; nothing moves off this branch while a unit with a
+    // folder on it is broken, even one read from elsewhere (its copy here may be the good one)
+    const bad = story.units.filter((u) => br.holds.includes(u.unit.dir) && u.errors.length);
     if (bad.length) {
       wait(`${bad.map((u) => u.unit.key).join(", ")} failed validation on ${unitBranch(story, uf)}: nothing moves (S2)`);
       continue;
@@ -155,8 +156,8 @@ function moveRecords(ctx: Ctx, story: StoryFacts): void {
     const copy = br.copy.map((dir) => {
       const u = story.units.find((x) => x.unit.dir === dir);
       // RD7: a flat story record lands in round 1 of its workflow
-      const flat = dir === STORY_UNIT_DIR && u?.state && u.record !== undefined && normalRecord(u.record) === unitRecordPath(STORY_UNIT_DIR);
-      return { unit: dir, from: treeRunStatePath(story, dir), to: flat && u?.state ? roundRunStatePath(story, 1, u.state.workflow) : runStatePath(story, dir) };
+      const flat = u?.state && hasFlatRecord(u) ? u.state : null;
+      return { unit: dir, from: treeRunStatePath(story, dir), to: flat ? roundRunStatePath(story, 1, flat.workflow) : runStatePath(story, dir) };
     });
     const commit = commitFor(ctx, story, uf, `norn: move ${uf.unit.key} run state off the branch`, uf.state?.step ?? null);
     if (!commit) continue;

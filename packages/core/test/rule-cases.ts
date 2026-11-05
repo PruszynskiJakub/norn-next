@@ -139,7 +139,7 @@ function cases(): RuleCase[] {
   out.push(c("a ready unit whose cursor is $done", "unit.no_step", facts([story(SOLO_WF, ready("$done"))])));
   // gh-71 D7 (B34): a held story whose record is still flat moves into round 1 first
   // gh-195/06 (B34, D13): run state an older norn left on a held unit's branch
-  const onBranch = { branch_record: { path: ".agents/specs/gh-1-login/runs", copy: ["_story"] }, record: "_story" };
+  const onBranch = { branch_record: { path: ".agents/specs/gh-1-login/runs", copy: ["_story"], holds: ["_story"] }, record: "_story" };
   out.push(c("a held story's flat record still on its branch moves into round 1 of the machine dir", "record.move", facts([story(STORY_WF, { step: "slices" }, null, {}, onBranch)])));
   out.push(
     c("a story's branch run state waits out a merge in its worktree (H1)", "record.move_waits", facts([story(STORY_WF, { step: "slices" }, null, {}, { ...onBranch, worktree: { ...worktree(STORY_WT), in_progress: { operation: "merge", unmerged: [] } } })])),

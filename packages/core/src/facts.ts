@@ -183,9 +183,10 @@ export interface UnitFacts {
    * gh-195/06 (B34, D13): run state an older norn left on this unit's own branch, in `path`
    * (`<spec folder>/runs`, relative to the unit's worktree). `copy`: the units' folders there (`_story`,
    * `<nn>-<slug>`) read as their run state, the machine dir holding none of it yet (their `state` and
-   * `errors` are the branch's); [] = only the removal is left. Absent = none.
+   * `errors` are the branch's); [] = only the removal is left. `holds`: every unit's folder there,
+   * copied or not (the removal takes them all). Absent = none.
    */
-  branch_record?: { path: string; copy: string[] };
+  branch_record?: { path: string; copy: string[]; holds: string[] };
 }
 
 export interface SliceFileFacts {

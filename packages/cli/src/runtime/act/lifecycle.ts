@@ -356,16 +356,24 @@ export async function roundMigrate(act: ActEnv, a: Extract<Action, { kind: "roun
  * in place atomically, one the machine dir already holds skipped (a move that stopped after the copy,
  * S5) — then remove the branch's run state but the handoffs from the worktree and commit that removal
  * alone, pushed. A copy that fails removes nothing (S2); state was never in git, so nothing is
- * written past the copies.
+ * written past the copies. The move is done only once its commit lands: a commit that fails, or that a
+ * merge or rebase defers (H1), fails the action, and the next tick finishes the removal (observe sees
+ * it uncommitted, S1).
  */
 export async function moveRecord(act: ActEnv, a: Extract<Action, { kind: "move_record" }>): Promise<ActionResult> {
   const wt = a.commit.cwd;
   const story = act.storyLoc(a.unit.story);
+  // H1: a merge or rebase begun since observe: nothing is removed under it
+  const busy = await act.git.inProgress(wt);
+  if (busy.operation || busy.unmerged.length) return { ok: false, error: `${busy.operation ?? "a merge"} in progress in ${wt}: the move waits until it is concluded (H1)` };
   const copied = a.copy.filter((c) => copyTreeRecord(join(wt, c.from), runStateFile(act.root, c.to), handoffPath(join(wt, story.spec_dir), c.unit))).map((c) => c.to);
   const removed = removeTreeRunState(wt, story);
   // only the removal: an agent's work and the handoffs stay out of the move commit
   const committed = await act.commit(a.commit, null, null, null, [a.path, `:(exclude)${handoffPath(story.spec_dir, "*")}`]);
-  return { ok: true, detail: { copied, removed: removed.length, ...committed } };
+  const detail = { copied, removed: removed.length, ...committed };
+  const notDone = committed?.deferred ?? committed?.refused;
+  if (notDone) return { ok: false, error: `the removal of ${a.path} is not committed: ${notDone}`, detail };
+  return { ok: true, detail };
 }
 
 /** Move one record entry to the round; into a folder already there (an earlier move that stopped partway), child by child. */

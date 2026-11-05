@@ -11,6 +11,7 @@ import {
   type Workflow,
   recordRunStatePath,
   normalRecord,
+  STORY_UNIT_DIR,
   unitRecordPath,
 } from "@norn/schema";
 import type { RunGitAction, WorktreeSpec } from "../actions.ts";
@@ -66,6 +67,8 @@ export function usableWorkflow(ctx: Ctx, name: string, level: UnitLevel): { work
 export function recordOf(uf: UnitFacts): string {
   return uf.record !== undefined ? normalRecord(uf.record) : unitRecordPath(uf.unit.dir);
 }
+/** gh-71 D7 (B34), RD7: the story unit's record is flat, `_story/state.json` directly in its folder (an older norn's). */
+export const hasFlatRecord = (uf: UnitFacts): boolean => uf.unit.slice === null && uf.record !== undefined && normalRecord(uf.record) === unitRecordPath(STORY_UNIT_DIR);
 
 export function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, command: string, timeout_ms: number): void {
   const ref = uf.unit;

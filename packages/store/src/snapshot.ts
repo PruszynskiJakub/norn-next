@@ -65,6 +65,8 @@ export interface BranchRecord {
    * stopped after the copy): only the removal is left.
    */
   copy: string[];
+  /** every unit's folder there, copied or not: the removal takes them all */
+  holds: string[];
 }
 
 export interface StorySnapshot {
@@ -187,7 +189,8 @@ function readUnit(root: string, story: RunStory, unit: UnitRef, opts: { includeA
 function withBranchRecord(root: string, story: RunStory, owner: UnitSnapshot, units: readonly UnitSnapshot[]): UnitSnapshot {
   const { branch_record: _, ...rest } = owner;
   if (!treeRunStateFiles(root, story).length) return rest;
-  return { ...rest, branch_record: { path: treeStoryRunStatePath(story), copy: units.filter((u) => u.tree_root === root).map((u) => u.unit.dir) } };
+  const copy = units.filter((u) => u.tree_root === root).map((u) => u.unit.dir);
+  return { ...rest, branch_record: { path: treeStoryRunStatePath(story), copy, holds: dirs(treeRunStateDir(root, story)) } };
 }
 
 /**
@@ -271,7 +274,8 @@ function loadStories(root: string, opts: { includeApplied?: boolean; only?: stri
   const out: StorySnapshot[] = [];
   for (const d of dirs(specsDir(root))) {
     if (opts.only !== undefined && parseSpecDirName(d)?.story !== opts.only) continue;
-    const s = loadStory(root, join(specsDir(root), d), { ...(opts.includeApplied ? { includeApplied: true } : {}), ...(opts.checkout ? { checkout: opts.checkout } : {}), ...(opts.tree ? { tree: true } : {}), ...(opts.branch ? { branch: true } : {}) });
+    const { only: _, ...read } = opts;
+    const s = loadStory(root, join(specsDir(root), d), read);
     if (s) out.push(s);
   }
   return out;

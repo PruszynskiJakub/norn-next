@@ -11,7 +11,7 @@
  * units (`storyRunStateDir`); tests use them to name a fixture's files, package sources use the
  * `(root, story, unit)` functions.
  */
-import { existsSync, readdirSync } from "node:fs";
+import { type Dirent, existsSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import {
   parseRoundDirName,
@@ -26,6 +26,7 @@ import {
   treeStoryRunStatePath,
   unitRecordPath,
 } from "@norn/schema";
+import { isErrno } from "./fsx.ts";
 import { handoffPath, machineDir } from "./paths.ts";
 
 /** S12: the machine dir's `runs/`, holding every story's run state of the checkout `root` belongs to. */
@@ -58,27 +59,26 @@ export const treeRunStateDir = (root: string, story: RunStory): string => join(r
  */
 export function treeRunStateFiles(root: string, story: RunStory): string[] {
   const base = treeRunStateDir(root, story);
-  const keep = new Set<string>();
-  const out: string[] = [];
-  const walk = (dir: string) => {
-    let names: import("node:fs").Dirent[];
+  const entries = (dir: string): Dirent[] => {
     try {
-      names = readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
+      return readdirSync(dir, { withFileTypes: true });
+    } catch (e) {
+      // no runs/ there; anything else (EACCES, ENOTDIR) is no answer and surfaces
+      if (isErrno(e, "ENOENT")) return [];
+      throw e;
     }
-    for (const d of names) {
+  };
+  const top = entries(base);
+  const keep = new Set(top.filter((d) => d.isDirectory()).map((d) => handoffPath(join(root, story.spec_dir), d.name)));
+  const out: string[] = [];
+  const walk = (dir: string, list: Dirent[]) => {
+    for (const d of list) {
       const p = join(dir, d.name);
-      if (d.isDirectory()) walk(p);
+      if (d.isDirectory()) walk(p, entries(p));
       else if (!keep.has(p)) out.push(p);
     }
   };
-  try {
-    for (const d of readdirSync(base, { withFileTypes: true })) if (d.isDirectory()) keep.add(handoffPath(join(root, story.spec_dir), d.name));
-  } catch {
-    return [];
-  }
-  walk(base);
+  walk(base, top);
   return out.sort();
 }
 /** gh-195/05: a unit's folder in an older norn's tree (`<spec folder>/runs/<unit>`, R2.3's `orphaned/` copies of what it left there). */

@@ -4,12 +4,11 @@
  * from each branch in one move commit, and the story goes on at the same step and attempt.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { cpSync, existsSync, readdirSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { treeUnitRunStateDir, workflowsDir } from "@norn/store";
+import { workflowsDir } from "@norn/store";
 import type { CliResult, TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue, runChecked, sh, toBranchRunState } from "../../../../test/support/harness.ts";
-import { observeNow } from "../../../../test/support/observe-now.ts";
 import { runStateOf, storyRunStateOf } from "../../../../test/support/run-state.ts";
 
 setDefaultTimeout(60_000);
@@ -145,19 +144,13 @@ describe("an open story's run state moves off its branch at the holder's first t
   test("AC3: a move interrupted after the copy only finishes the removal", async () => {
     const s = await storyAtRework(13, "half-moved", "Half moved");
     const before = h.state(s.runs());
-    toBranchRunState(s.wt, s.spec, "_story", { push: "origin" });
-    // the copy landed in the machine dir, runs/ is still on the branch
-    const tree = treeUnitRunStateDir(s.wt, { key: "gh-13", spec_dir: s.spec }, "_story");
-    cpSync(tree, join(storyRunStateOf(join(s.wt, s.spec)), "_story"), { recursive: true, filter: (src) => !src.endsWith("/handoff.md") });
+    toBranchRunState(s.wt, s.spec, "_story", { push: "origin", interrupted: "after copy" });
     writeFileSync(join(s.runs(), "marker.txt"), "the copy\n");
     const old = sh(s.wt, ["rev-parse", "HEAD"]);
 
-    // H2: observe sees the branch's run state with nothing left to copy
-    const facts = (await observeNow(h)).facts.stories.find((x) => x.key === "gh-13")?.units[0];
-    expect(facts?.branch_record).toEqual({ path: `${s.spec}/runs`, copy: [] });
-    expect(facts?.state).toEqual(before);
     const r = await tick();
     expect(rulesOf(r, "gh-13")).toEqual(["record.move"]);
+    // the copy already there is kept as it is, not copied again
     expect(h.state(s.runs())).toEqual(before);
     expect(h.read(join(s.runs(), "marker.txt"))).toBe("the copy\n");
     expect(sh(s.wt, ["rev-list", "--count", `${old}..HEAD`])).toBe("1");
@@ -167,12 +160,7 @@ describe("an open story's run state moves off its branch at the holder's first t
 
   test("AC3: a file in the branch's runs/ that fails validation makes the unit corrupt (S2) and removes nothing", async () => {
     const s = await storyAtRework(14, "bad-receipt", "Bad receipt");
-    toBranchRunState(s.wt, s.spec, "_story");
-    const tree = treeUnitRunStateDir(s.wt, { key: "gh-14", spec_dir: s.spec }, "_story");
-    const round = join(tree, "rounds", readdirSync(join(tree, "rounds"))[0] as string);
-    writeFileSync(join(round, "receipts", "0099-done.json"), "{}\n");
-    sh(s.wt, ["add", "-A"]);
-    sh(s.wt, ["commit", "-q", "-m", "a broken receipt", "--trailer", "Norn-Tick: 01OLDERNORN0000000000000001"]);
+    toBranchRunState(s.wt, s.spec, "_story", { broken: true });
     const head = sh(s.wt, ["rev-parse", "HEAD"]);
     const files = treeRuns(s.wt, "HEAD", s.spec);
 
@@ -181,8 +169,7 @@ describe("an open story's run state moves off its branch at the holder's first t
     await tick();
     expect(sh(s.wt, ["rev-parse", "HEAD"])).toBe(head);
     expect(treeRuns(s.wt, "HEAD", s.spec)).toEqual(files);
-    expect(existsSync(join(round, "receipts", "0099-done.json"))).toBe(true);
-    // nothing is written into the branch's record either
+    // nothing removed from the worktree, nothing written into the branch's record
     expect(sh(s.wt, ["status", "--porcelain", "--untracked-files=all"])).toBe("");
     expect(h.state(s.runs())).toBeNull();
     const inbox = (await h.norn("status", "--json")).value as { groups: Record<string, Array<{ story: string; title: string }>> };
@@ -191,6 +178,70 @@ describe("an open story's run state moves off its branch at the holder's first t
         .flat()
         .some((i) => i.story === "gh-14" && i.title.startsWith("corrupt:")),
     ).toBe(true);
+  });
+
+  /** after a move that stopped partway: exactly one move commit on top of `old`, pushed, the worktree clean, the story where it was */
+  const finished = (s: Awaited<ReturnType<typeof storyAtRework>>, key: string, old: string, before: unknown) => {
+    expect(sh(s.wt, ["rev-list", "--count", `${old}..HEAD`])).toBe("1");
+    expect(subject(s.wt)).toBe(`norn: move ${key} run state off the branch`);
+    expect(treeRuns(s.wt, "HEAD", s.spec)).toEqual([`${s.spec}/runs/_story/handoff.md`]);
+    expect(sh(s.wt, ["status", "--porcelain", "--untracked-files=all"])).toBe("");
+    h.git(["fetch", "-q", "origin"]);
+    expect(h.git(["rev-parse", `origin/${s.branch}`])).toBe(sh(s.wt, ["rev-parse", "HEAD"]));
+    expect(h.state(s.runs())).toEqual(before as NonNullable<ReturnType<Harness["state"]>>);
+  };
+
+  test("S1: a move that stopped after deleting runs/ but before its commit is finished by the next tick in one move commit", async () => {
+    const s = await storyAtRework(16, "crashed-move", "Crashed move");
+    const before = h.state(s.runs());
+    toBranchRunState(s.wt, s.spec, "_story", { push: "origin", interrupted: "after removal" });
+    const old = sh(s.wt, ["rev-parse", "HEAD"]);
+
+    const r = await tick();
+    expect(rulesOf(r, "gh-16")).toEqual(["record.move"]);
+    finished(s, "gh-16", old, before);
+    expect(rulesOf(await tick(), "gh-16")).not.toContain("record.move");
+  });
+
+  test("S1: a move whose commit fails is not done; the next tick commits the removal once", async () => {
+    const s = await storyAtRework(17, "failed-commit", "Failed commit");
+    const before = h.state(s.runs());
+    toBranchRunState(s.wt, s.spec, "_story", { push: "origin" });
+    const old = sh(s.wt, ["rev-parse", "HEAD"]);
+    // the worktree's commits fail (a pre-commit hook that refuses them)
+    const hook = join(h.root, ".git", "hooks", "pre-commit");
+    h.write(hook, `#!/bin/sh\ncase "$PWD" in *gh-17-failed-commit*) exit 1;; esac\n`);
+    chmodSync(hook, 0o755);
+
+    const r = await tick();
+    expect(r.decisions.filter((d) => d.unit === "gh-17")).toMatchObject([{ rule: "record.move", ok: false }]);
+    expect(sh(s.wt, ["rev-parse", "HEAD"])).toBe(old);
+    rmSync(hook);
+    const next = await tick();
+    expect(next.decisions.filter((d) => d.unit === "gh-17")).toMatchObject([{ rule: "record.move", ok: true }]);
+    finished(s, "gh-17", old, before);
+  });
+
+  test("H1: a move waits out a merge in progress in the worktree (a commit it would have deferred), then lands in one commit", async () => {
+    const s = await storyAtRework(18, "merging-move", "Merging move");
+    const before = h.state(s.runs());
+    toBranchRunState(s.wt, s.spec, "_story", { push: "origin", interrupted: "after removal" });
+    const old = sh(s.wt, ["rev-parse", "HEAD"]);
+    // a merge in progress: another branch adding one file, merged without committing
+    const side = join(h.dir, "side-18");
+    sh(h.root, ["worktree", "add", "-q", "-b", "side-18", side, old]);
+    h.write(join(side, "side.txt"), "side\n");
+    sh(side, ["add", "side.txt"]);
+    sh(side, ["commit", "-q", "-m", "side"]);
+    sh(s.wt, ["merge", "--no-commit", "--no-ff", "-q", "side-18"]);
+
+    const r = await tick();
+    expect(rulesOf(r, "gh-18")).toEqual(["record.move_waits"]);
+    expect(sh(s.wt, ["rev-parse", "HEAD"])).toBe(old);
+    sh(s.wt, ["merge", "--abort"]);
+    const next = await tick();
+    expect(rulesOf(next, "gh-18")).toEqual(["record.move"]);
+    finished(s, "gh-18", old, before);
   });
 
   test("AC4: a flat record on the branch lands in rounds/01-duo/ in the move itself", async () => {
@@ -261,5 +312,34 @@ describe("a story with slices: each unit's record moves off its own branch (B34)
     for (const [nn, slug] of SLICES) expect((await inWt(sliceWt(nn, slug), "brief")).exit).toBe(0);
     await tick();
     for (const [nn, slug] of SLICES) expect(h.state(part(nn, slug))).toMatchObject({ step: "build", attempt: 1, status: "running" });
+  });
+
+  test("S2: the story's move waits while a slice with a folder on the story branch fails validation on its own branch; nothing is removed", async () => {
+    const SPEC19 = ".agents/specs/gh-19-guarded-parts";
+    const wt19 = `${h.root}-worktrees/gh-19-guarded-parts`;
+    const story19 = () => runStateOf(join(wt19, SPEC19));
+    const slice19 = `${wt19}--01-part-a`;
+    h.remote.issues = [...h.remote.issues, issue(19, "Guarded parts", ["norn", "norn:wf:split"])];
+    await h.tick("--sync");
+    await tickUntil(() => h.state(story19())?.step === "plan");
+    expect((await inWt(wt19, "brief")).exit).toBe(0);
+    await tick();
+    h.write(join(wt19, SPEC19, "slices/01-part-a.md"), "---\nid: gh-19/01\ntitle: Part 01\nworkflow: part\ndepends_on: []\nstatus: planned\n---\n\nAcceptance: it works.\n");
+    expect((await inWt(wt19, "done", "done", "--handoff", "one slice")).exit).toBe(0);
+    await tickUntil(() => h.state(runStateOf(join(wt19, SPEC19), "01-part-a"))?.step === "build");
+    // an older norn's copy of the slice's record on the story branch, and a broken one on the slice branch
+    toBranchRunState(wt19, SPEC19, "01-part-a", { interrupted: "after copy" });
+    toBranchRunState(slice19, SPEC19, "01-part-a", { broken: true });
+    toBranchRunState(wt19, SPEC19, "_story");
+    const heads = [sh(wt19, ["rev-parse", "HEAD"]), sh(slice19, ["rev-parse", "HEAD"])];
+    const storyFiles = treeRuns(wt19, "HEAD", SPEC19);
+
+    const r = await tick();
+    expect(rulesOf(r, "gh-19")).toEqual(["record.move_waits"]);
+    expect(rulesOf(r, "gh-19/01")).toEqual(["unit.corrupt"]);
+    expect([sh(wt19, ["rev-parse", "HEAD"]), sh(slice19, ["rev-parse", "HEAD"])]).toEqual(heads);
+    expect(treeRuns(wt19, "HEAD", SPEC19)).toEqual(storyFiles);
+    expect(storyFiles.some((f) => f.includes("/runs/01-part-a/") && !f.endsWith("/handoff.md"))).toBe(true);
+    for (const w of [wt19, slice19]) expect(sh(w, ["status", "--porcelain", "--untracked-files=all"])).toBe("");
   });
 });

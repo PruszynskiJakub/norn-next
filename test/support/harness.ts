@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { type Clock, type InboxItem, type LaunchSpec, type NotifierPort, type PaneState, type PromptKey, type RemoteIssue, type RemoteLabel, type RemotePort, type RemotePullRequest, type RunnerCapabilities, type RunnerPort, type RunnerSessionInfo, nameRemoved, type SessionRef } from "@norn/core";
 import { parseSpecDirName, type Receipt, ROUNDS_DIR, STORY_UNIT_DIR, type UnitState, ulid } from "@norn/schema";
-import { appendReceipt, bindNornHome, installSkills, linkSkills, machineDir, readState, repoConfigPath, runStateDir, spawnSyncCaptured, storyRunStateDir, treeUnitRunStateDir, workflowsDir } from "@norn/store";
+import { appendReceipt, bindNornHome, installSkills, linkSkills, machineDir, readState, repoConfigPath, handoffPath, runStateDir, spawnSyncCaptured, storyRunStateDir, treeRunStateDir, treeUnitRunStateDir, workflowsDir } from "@norn/store";
 import type { ProjectView } from "@norn/view";
 import { bundledSkills, type CliDeps, type CliResult, type Interaction, type InteractionChoice, runCli, runningVersion, type TickReport } from "../../packages/cli/src/index.ts";
 import { assetsDir } from "../../packages/cli/src/runtime/assets.ts";
@@ -447,25 +447,44 @@ export function toNewLayout(root: string): void {
 /**
  * gh-195/06 (B34): a unit as an older norn left it: its run state moved from the machine dir back into
  * `<spec folder>/runs/<unit>` in `worktree` (next to its handoff) and committed on the worktree's
- * branch with norn's trailers, then pushed to `push` (a remote name) when given. `flat`: the story's one
- * round folded back into `_story/` itself, the record of a norn before rounds (RD7).
+ * branch with norn's trailers, then pushed to `push` (a remote name) when given.
+ * - `flat`: the story's one round folded back into `_story/` itself, the record of a norn before rounds (RD7).
+ * - `broken`: a receipt that fails validation committed with it (S2).
+ * - `interrupted`: a move that stopped partway, its copy already in the machine dir: `"after copy"`
+ *   with runs/ still in the worktree, `"after removal"` with runs/ deleted from the worktree but the
+ *   removal not committed (S1).
  */
-export function toBranchRunState(worktree: string, specDir: string, unit: string, opts: { flat?: boolean; push?: string } = {}): void {
+export function toBranchRunState(
+  worktree: string,
+  specDir: string,
+  unit: string,
+  opts: { flat?: boolean; push?: string; broken?: boolean; interrupted?: "after copy" | "after removal" } = {},
+): void {
   const key = parseSpecDirName(basename(specDir))?.story;
   if (!key) throw new Error(`not a spec folder: ${specDir}`);
   const story = { key, spec_dir: specDir };
   const machine = unit === STORY_UNIT_DIR ? join(storyRunStateDir(worktree, story), STORY_UNIT_DIR) : runStateDir(worktree, story, unit);
   const tree = treeUnitRunStateDir(worktree, story, unit);
   mkdirSync(tree, { recursive: true });
+  const rounds = unit === STORY_UNIT_DIR ? readdirSync(join(machine, ROUNDS_DIR)) : [];
   if (opts.flat) {
-    const rounds = readdirSync(join(machine, ROUNDS_DIR));
     if (rounds.length !== 1) throw new Error(`flat: ${unit} has ${rounds.length} rounds`);
     cpSync(join(machine, ROUNDS_DIR, rounds[0] as string), tree, { recursive: true });
   } else cpSync(machine, tree, { recursive: true });
-  rmSync(machine, { recursive: true, force: true });
+  if (opts.broken) {
+    const record = opts.flat || unit !== STORY_UNIT_DIR ? tree : join(tree, ROUNDS_DIR, rounds.at(-1) as string);
+    mkdirSync(join(record, "receipts"), { recursive: true });
+    writeFileSync(join(record, "receipts", "0099-done.json"), "{}\n");
+  }
+  if (!opts.interrupted) rmSync(machine, { recursive: true, force: true });
   sh(worktree, ["add", "-A"]);
   sh(worktree, ["commit", "-q", "-m", `norn: ${key} run state (older norn)`, "--trailer", `Norn-Story: ${key}`, "--trailer", "Norn-Tick: 01OLDERNORN0000000000000000"]);
   if (opts.push) sh(worktree, ["push", "-q", "--force", opts.push, "HEAD"]);
+  if (opts.interrupted === "after removal") {
+    const handoffs = new Set(readdirSync(treeRunStateDir(worktree, story)).map((d) => handoffPath(join(worktree, specDir), d)));
+    const files = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((d) => (d.isDirectory() ? files(join(dir, d.name)) : [join(dir, d.name)]));
+    for (const f of files(treeRunStateDir(worktree, story))) if (!handoffs.has(f)) rmSync(f);
+  }
 }
 
 /** What `norn init` does for skills (SK1), for setups that write their own config instead: `.agents/skills/` linked from Claude's folder. */
