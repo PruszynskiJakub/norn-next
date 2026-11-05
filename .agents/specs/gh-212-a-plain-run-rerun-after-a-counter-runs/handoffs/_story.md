@@ -26,7 +26,9 @@ When a counter runs out (W4), the way out norn offers is the exhausted edge's ta
 
 - Review findings: none blocking; F1 minor: `docs/recipes.md:40` still says a counter at its max shows a plain `norn run rerun <unit>`.
 - review#1 approve: Approve: ParkInfo.counter recorded on an exhausted counted edge; inbox/nextCommand/cockpit u offer run rerun --step <to> --reset <counter>; run rerun warns when the counter stays at max. All Wanted items traced to tests; checks green. One minor: docs/recipes.md:40 still shows the plain rerun for a counter at its max.
+- describe#1: wrote `pr.md` (summary diff, evidence from the unit/integration tests since the quick round has no QA, merge danger: two-way except an older norn would mark a unit with `park.counter` corrupt).
+- describe#1 done: pr.md written: summary diff of park.counter and the way out, evidence from the new unit and integration tests (no QA in quick), merge danger: two-way except older norn would mark a state with park.counter corrupt; notes docs/recipes.md:40 gap.
 
 ## Resume
 
-Review approved; next is the workflow's following step. Optional: update `docs/recipes.md:40` for the new way out (F1, minor).
+PR body is in `pr.md`; next is the workflow's following step. Optional: update `docs/recipes.md:40` for the new way out (F1, minor).
