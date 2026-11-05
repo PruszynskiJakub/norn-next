@@ -86,6 +86,16 @@ Spec and Standards ran in parallel subagents; blocking points verified by hand (
 - Tests: unit 1216 pass; typecheck clean; e2e team/base-sync/recovery/observe-snapshots/slice-workflow 61 pass / 1 skip (R2.3); takeover-record.test.ts 8 pass. Skips: human.test mailbox (→13), recovery R2.3 (→14), conditional zombie contract. Flakes: none.
 - review#2 changes_requested: Review#1 F1–F5 fixed. Blocking: F1 AC4 'continues' fails, because B's first tick re-intakes a branchless checked-out story (intake_story, new local branch; reproduced). F2: the record is placed before the branch fetch/branch_diverged and the take receipt, so a retry keeps the local copy and loses the rewritten restart (T5a). Minor: crash-window guard, double attempt bump, fetch before claim CAS; nits.
 
+### implement#3 (review#2 changes_requested)
+
+- Checkout is one transaction (runtime/checkout.ts header): before the claim — claim read, record fetched (objects only) and staged + validated, story/slice branches fetched, local story branch divergence refused ("nothing was taken"), the record's Norn-Branch-Commit checked against the head (rewrite decided). Then claim CAS, then the remote record ref re-read (`remoteRecordSha`): moved → claim given back, `record_moved` (F5). Then locally: take trace + take receipt written into the staged record first, `place()`, `setRecordRef`, worktrees; errors after the claim say it is held and to run checkout again.
+- F2: keepLocal (holder re-checkout) re-runs the rewrite check against the record its run state last matched (its local ref before this checkout); once per gone commit (a take with the same `rewritten.gone` already in the run state is not repeated). Test: rewrite + diverged local branch → refused, nothing taken; reconciled → restarts review#3; third checkout no second restart.
+- F1 (B33): store snapshot adds `record_only` stories (held here by local claim heartbeat, run state in the machine dir, no spec in any tree); decide: claim renewal as usual, story unit receipts applied, else noop `story.record_only`; never intaken. AC4 extended with ticks; new case with a record without Norn-Branch-Commit.
+- F3: `StoryFacts.record_unplaced` (local record ref but no story-unit state) → decide noop `start.record_unplaced` instead of start_unit (rule case added). `place()` puts the old folder aside under a fixed name; the next stage restores it after a crash and drops leftover `.unpack-*` folders.
+- F4: core `rewriteRestart`: a cursor the record's own receipts just entered (nothing ran) is the restart as is — no second enterStep (test: implement#3, not #4). Checkout's `nextCursor` predicts like the tick; a pending `round` receipt → no restart predicted (round.start rejects the take; the new round is fresh).
+- F6: refused-push slot cleared on a non-stale result too; step/attempt from the story unit; doc comments fixed; head only resolved with a record. F7: printed story status is the predicted one (after the take); known limit recorded in the slice Notes.
+- takeover-record.test.ts: one harness per describe (A keeps a worktree and slot per story; 9 slots).
+
 ## Resume
 
 Fix F1 (a held branchless story must not be re-intaken; extend AC4 with a tick) and F2 (decide the rewrite and write the take receipt before anything after the claim can fail; test diverged-local-branch retry). Then the minor ones if cheap.
