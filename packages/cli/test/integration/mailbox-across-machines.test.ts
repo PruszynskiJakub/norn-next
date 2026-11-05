@@ -201,6 +201,48 @@ describe("under local (B20)", () => {
   });
 });
 
+describe("under local, what needs the holder's run state (B20, F1, F2)", () => {
+  let gh25: Awaited<ReturnType<typeof atReadyGate>>;
+
+  test("a verb that cannot go through the mailbox keeps its refusal on a non-holder: no step-only receipt", async () => {
+    gh25 = await atReadyGate(25, "not-here");
+    const before = mailbox("gh-25");
+    const refusals: Array<[string[], string]> = [
+      [["story", "update-branch", "gh-25"], "unknown_unit"],
+      [["run", "cancel", "gh-25"], "not_holder"],
+      [["story", "edit", "gh-25", "--auto"], "unknown_unit"],
+      [["story", "edit", "gh-25", "--workflow", "quad"], "unknown_unit"],
+    ];
+    for (const [argv, code] of refusals) {
+      const r = await B.norn(...argv, "--json");
+      expect({ argv, exit: r.exit, code: (r.value as { code?: string }).code }).toEqual({ argv, exit: 3, code });
+    }
+    expect(mailbox("gh-25")).toBe(before);
+  });
+
+  test("run rerun --step or --reset from a non-holder is refused: the pinned workflow is on the holder", async () => {
+    for (const argv of [["--step", "nosuch"], ["--step", "implement"], ["--reset", "review_loop"]]) {
+      const r = await B.norn("run", "rerun", "gh-25", ...argv, "--json");
+      expect(r.exit).toBe(3);
+      expect(r.value).toMatchObject({ code: "story_not_local", error: expect.stringContaining("pinned workflow is on the machine that holds it") });
+    }
+    expect(mailbox("gh-25")).toBe("");
+  });
+
+  test("a plain run rerun goes step-only through the mailbox; the holder applies it at that step", async () => {
+    const r = await B.norn("run", "rerun", "gh-25", "--reason", "try again", "--json");
+    expect(r.exit).toBe(0);
+    const v = r.value as Verb;
+    expect(v.receipt).toMatchObject({ kind: "unstick", step: "ready", comment: "try again" });
+    expect(v.receipt).not.toHaveProperty("attempt");
+    expect(v.receipt).not.toHaveProperty("to");
+    await tick("--sync");
+    await tick();
+    expect(h.state(gh25.runs())).toMatchObject({ step: "ready", attempt: 2, status: "parked", park: { kind: "gate" } });
+    expect(await checkItems("gh-25")).toEqual([]);
+  });
+});
+
 describe("a receipt the holder rejects (B21)", () => {
   let gh23: Awaited<ReturnType<typeof askingAtReview>>;
   let gh24: Awaited<ReturnType<typeof askingAtReview>>;
