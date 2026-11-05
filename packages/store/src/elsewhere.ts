@@ -116,32 +116,6 @@ export async function lastBoundary(root: string, ref: string, key: string, base:
   return null;
 }
 
-/** One commit norn made for a story's story unit at a step (S4): its `Norn-Step`, and the `Norn-Outcome` (and `Norn-Next`) of one that ended the step. */
-export interface StoryStepCommit {
-  step: string;
-  outcome: string | null;
-  /** gh-195/13: the step the boundary took the cursor to, when the commit names it */
-  next: string | null;
-}
-
-/**
- * gh-195/11 (B25, D10): the story unit's commits on `ref` that carry a `Norn-Step` — `Norn-Story: <key>`,
- * no `Norn-Slice` — newest first, read off their trailers (never the subject). What a takeover with the
- * record lost restarts from: the branch alone. [] = none (or `ref` unreadable).
- */
-export async function storyStepCommits(root: string, ref: string, key: string): Promise<StoryStepCommit[]> {
-  const r = await git(root, ["log", "--format=%x1e%(trailers:only,unfold)", "--grep=^Norn-Step: ", ref]);
-  if (r.code !== 0) return [];
-  const out: StoryStepCommit[] = [];
-  for (const block of r.stdout.split("\x1e")) {
-    const t = trailers(block);
-    const one = (k: string) => t.find(([n]) => n === k)?.[1];
-    const step = one("Norn-Step");
-    if (one("Norn-Story") === key && one("Norn-Slice") === undefined && step) out.push({ step, outcome: one("Norn-Outcome") ?? null, next: one("Norn-Next") ?? null });
-  }
-  return out;
-}
-
 /** The story's record as the local ref `refs/norn/runs/<story>` has it, read into memory; null = no ref here. */
 export async function readStoryRecord(root: string, key: string): Promise<RecordRead | null> {
   const rec = await git(root, ["rev-parse", "--verify", "--quiet", `${recordRef(key)}^{commit}`]);

@@ -1096,7 +1096,7 @@
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/remotes/origin/gh-7/
   exit 0
   + home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/receipts/0018-take.json
-      {"kind":"take","receipt_id":"<ulid:58>","run_id":null,"step":"$done","attempt":3,"at":"<time>","by":"human","who":"tester@box","previous_holder":null,"previous_heartbeat_id":null,"expired":false}
+      {"kind":"take","receipt_id":"<ulid:58>","run_id":null,"step":"$done","attempt":3,"at":"<time>","by":"human","who":"tester@box","previous_holder":null,"previous_heartbeat_id":null,"expired":false,"record_lost":false}
 > norn tick --sync
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote

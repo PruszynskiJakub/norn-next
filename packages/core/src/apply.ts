@@ -58,17 +58,13 @@ export const recordLostLine = (story: string, holder: string | null, step: strin
   `the run record of ${story} was on ${holder ?? "the machine that last held it"} and is lost; restarting ${step} from the branch`;
 
 /**
- * T5b (gh-195 B25, D10): the step a takeover with the record lost restarts, from the story unit's commits on
- * the branch (newest first, `Norn-Step` with the `Norn-Outcome`/`Norn-Next` of a boundary): the step the
- * newest of them left the cursor at — a boundary's `Norn-Next`, else the step its outcome's edge leads to
- * in `wf`; a commit made at a step, that step — skipping any that name no step of `wf` (another round's
- * workflow, `$done`, the take's journal). None: the workflow's first step.
+ * T5b (gh-195 B25, D10): the step a takeover with the record lost restarts, from the story unit's last
+ * boundary commit on the branch (`last`: its `Norn-Step` it ended and its `Norn-Next`): the step that
+ * boundary moved the cursor to; for a boundary an older norn made (no `Norn-Next`), the step it ended;
+ * either only when `wf` has it (another round's workflow may not). No boundary: the workflow's first step.
  */
-export function restartStepOf(wf: Workflow, commits: ReadonlyArray<{ step: string; outcome: string | null; next: string | null }>): string {
-  for (const c of commits) {
-    const at = c.next ?? (c.outcome !== null ? (edgeOf(wf, c.step, c.outcome)?.to ?? null) : c.step);
-    if (at !== null && stepOf(wf, at)) return at;
-  }
+export function restartStepOf(wf: Workflow, last: { ended: string; next: string | null } | null): string {
+  for (const at of [last?.next, last?.ended]) if (at && stepOf(wf, at)) return at;
   return wf.start;
 }
 

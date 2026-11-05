@@ -18,7 +18,7 @@
  *    restarts as a new attempt, once per gone commit. A story without a branch skips it (B33).
  *    No record at all — none on the ref, none of this checkout's own — for a story the branch shows
  *    started: the record is lost (B25, B26; gh-195 D10). The new round is read off the branch head here:
- *    the frontmatter's workflow (a missing or invalid one is refused) and the step its last commits name.
+ *    the frontmatter's workflow (a missing or invalid one is refused) and the step its last boundary led to (`Norn-Next`).
  * Then:
  * 4. Claim by CAS (`--force` records `forced_from` in the claim blob); the remote record ref must
  *    still be the one staged (review#2 F5: a still-running holder may have pushed): if it moved, the
@@ -65,6 +65,7 @@ import {
   readState,
   readHandoff,
   heartbeatId,
+  lastBoundary,
   writtenHere,
   machineHolder,
   traceEvent,
@@ -80,7 +81,6 @@ import {
   stageRecordSync,
   type StagedRecord,
   storyRunStateDir,
-  storyStepCommits,
   WORKFLOW_EXT,
   WORKFLOWS_DIR,
   writeState,
@@ -226,7 +226,7 @@ interface LostRecord {
  * (its frontmatter not `active`: the tick starts it as any new story) or an older norn's run state still
  * on the branch (the tick moves it off, B34). The frontmatter's workflow pinned fresh from the branch; a
  * missing or invalid one refuses before anything is taken. The step: `restartStepOf` the story unit's
- * commits on the branch.
+ * last boundary on the branch (its `Norn-Next`, S4).
  */
 async function lostRecord(git: GitPort, root: string, story: RunStory, branch: string, head: string, headRef: string, holder: string | null): Promise<LostRecord | null> {
   const key = story.key;
@@ -254,7 +254,7 @@ async function lostRecord(git: GitPort, root: string, story: RunStory, branch: s
       `fix ${found.path} on ${branch}, then ${again} again`,
       "workflow_invalid",
     );
-  const step = restartStepOf(parsed.value, await storyStepCommits(root, headRef, key));
+  const step = restartStepOf(parsed.value, await lastBoundary(root, headRef, key, null));
   return { workflow: { name, source: found.source, workflow: parsed.value }, step, holder, line: recordLostLine(key, holder, step) };
 }
 
