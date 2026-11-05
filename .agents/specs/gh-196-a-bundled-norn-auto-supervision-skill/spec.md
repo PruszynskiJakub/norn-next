@@ -8,7 +8,7 @@ title: A bundled norn-auto-supervision skill that drives stories from intake to 
 assignee: PruszynskiJakub
 labels:
   - norn
-  - norn:wf:refinement
+  - norn:wf:quick
 workflow: quick
 status: active
 intake_at: 2026-11-05T09:19:57.086Z
