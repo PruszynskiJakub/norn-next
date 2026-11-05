@@ -20,6 +20,9 @@ Add a short `REVIEW.md` at the repo root (what to skip, what counts as a failure
 | W4 PR template Risk and How to revert | agent | QA (agent): `.github/pull_request_template.md` |
 - review#1 approve: REVIEW.md and PR template Risk / How to revert meet the spec; no blocking findings. Minor: style line names the repo lints, not Biome (absent).
 
+- describe#1: pr.md written (summary with file tree, evidence W1–W4 by reading, two-way door, blast radius none; notes the Biome deviation).
+- describe#1 done: pr.md written: summary with file tree, W1–W4 evidence by reading (docs-only), Biome deviation noted, two-way door, blast radius none.
+
 ## Resume
 
-Review approved; nothing left for review. Person may confirm the Biome wording (F1, minor).
+Nothing left for describe; pr.md is current.
