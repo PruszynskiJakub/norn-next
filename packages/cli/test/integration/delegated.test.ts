@@ -106,7 +106,7 @@ describe("delegated decisions are recorded apart from the person's (B21, B22, B3
     await until(() => h.state(runs(1))?.step === "$done" && h.state(runs(2))?.status === "running");
   });
 
-  test("the person's own approve (no --delegated) shows no mark in run list or run view (B21, review#3 F4)", async () => {
+  test("the person's own approve (no --delegated) shows no mark in run list or run view (B21)", async () => {
     expect((await h.norn("story", "approve", "gh-3")).exit).toBe(0);
     await until(() => h.state(runs(3))?.step === "$done");
     const rows = ((await h.norn("run", "list", "gh-3", "--json")).value as { steps: Array<{ step: string; reason: string | null; delegated?: true }> }).steps;
@@ -137,10 +137,10 @@ describe("delegated decisions are recorded apart from the person's (B21, B22, B3
     const r = await h.norn("story", "edit", "gh-1", "--workflow", "asks", "--delegated", "--reason", "fsd: one seam, no contract change");
     expect(r.exit).toBe(0);
     await until(() => (h.state(join(wt(1), `.agents/specs/${SLUGS[1]}/runs/_story/rounds/02-asks`))?.round ?? 0) === 2);
-    // review#2 F5 (B34): the new round's heading in the step timeline carries the mark and the reason
+    // B34: the new round's heading in the step timeline carries the mark and the reason
     expect((await h.norn("run", "list", "gh-1")).stdout).toContain("round 2 · asks — delegated (supervisor): fsd: one seam, no contract change");
     expect((await h.norn("run", "list", "gh-1")).stdout).toContain("round 1 · gated · finished\n");
-    // review#3 F4 (B34): run view shows the round start's reason too
+    // B34: run view shows the round start's reason too
     expect((await h.norn("run", "view", "gh-1")).stdout).toContain("round    2 · asks — delegated (supervisor): fsd: one seam, no contract change");
     expect(((await h.norn("run", "view", "gh-1", "--json")).value as { delegated_round?: { delegated_reason?: string } }).delegated_round?.delegated_reason).toBe("fsd: one seam, no contract change");
   });
@@ -156,7 +156,7 @@ describe("delegated decisions are recorded apart from the person's (B21, B22, B3
     expect(text).toContain("round asks — fsd: one seam, no contract change");
     const two = (await h.norn("story", "view", "gh-2", "--json")).value as { delegated: Delegated[] };
     expect(two.delegated.map((d) => [d.kind, d.reason])).toEqual([["answer", "fsd: spec B4 says the flag goes"]]);
-    // review#3 F4: a story with only the person's own decisions has none and no section
+    // a story with only the person's own decisions has none and no section
     expect(((await h.norn("story", "view", "gh-3", "--json")).value as { delegated: Delegated[] }).delegated).toEqual([]);
     expect((await h.norn("story", "view", "gh-3")).stdout).not.toContain("## Delegated");
   });
@@ -165,7 +165,7 @@ describe("delegated decisions are recorded apart from the person's (B21, B22, B3
     const s = await h.norn("status", "--json");
     expect((s.value as { delegated_counts: Record<string, number> }).delegated_counts).toEqual({ "gh-1": 2, "gh-2": 1 });
     expect((await h.norn("status")).stdout).toContain("gh-1 2 delegated");
-    // review#3 F4 (D5): a delegated decision is never an inbox item
+    // D5: a delegated decision is never an inbox item
     const inbox = JSON.stringify((s.value as { groups: unknown }).groups);
     expect(inbox).not.toContain("delegated");
     expect(inbox).not.toContain("fsd:");
@@ -207,7 +207,7 @@ describe("a suspected flake goes back to its check, and a delegated reject (B42,
   });
 });
 
-describe("earlier rounds are read from their folders on each load (review#2 F3, S2)", () => {
+describe("earlier rounds are read from their folders on each load (S2)", () => {
   test("a failing receipt in an earlier round is reported in story list's errors, never skipped", async () => {
     const round1 = join(wt(1), `.agents/specs/${SLUGS[1]}/runs/_story/rounds/01-gated/receipts`);
     h.write(join(round1, "0099-approve.json"), "{ not json");
@@ -216,7 +216,7 @@ describe("earlier rounds are read from their folders on each load (review#2 F3, 
   });
 });
 
-describe("a delegated reject (B21, review#7 F4)", () => {
+describe("a delegated reject (B21)", () => {
   test("reject --delegated --reason sends the unit back as the person's would, marked in run list and listed in story view", async () => {
     h.remote.issues = [...h.remote.issues, issue(4, "Refund invoices")];
     SLUGS[4] = "gh-4-refund-invoices";

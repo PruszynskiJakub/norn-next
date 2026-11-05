@@ -434,8 +434,8 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
           errors: file?.error ? [file.error, ...v.errors] : v.errors,
         };
       });
-      // gh-196 review#3: reads each earlier round's receipts on every load, `status --segment` included (HC13);
-      // accepted: a story has few rounds, and a cache across loads went stale (review#2 F3)
+      // gh-196 D5 (B22): reads each earlier round's receipts on every load, `status --segment` included (HC13);
+      // accepted: a story has few rounds, and a cache across loads went stale
       const delegated = delegatedDecisions(story);
       stories.push({
         ...base,

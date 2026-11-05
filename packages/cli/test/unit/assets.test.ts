@@ -264,7 +264,7 @@ describe("skills", () => {
       // B2, B4, B3, B38: where and what it supervises
       ".norn-unit", "main checkout", "One supervisor per checkout", "Named stories only", "/release-start",
       // B8, B9: the watch is checked by `status --json`'s heartbeat.up (true or false whatever mode the stories are
-      // in, review#2 F1) before start and after every wait, never started
+      // in) before start and after every wait, never started
       "No watch is running", "`! norn watch`", "`heartbeat.up`", "after every wait", "stopped moving",
       // B5, B6, B7: one foreground subagent per story, one voice naming the story, JSON only
       "one subagent per story", "foreground", "norn story wait", "only one who talks to the person", "Name the story in every message", "--json", "never grep markdown",
@@ -272,7 +272,7 @@ describe("skills", () => {
       "norn story edit <story> --auto", "norn brief", "norn story start",
       // B11–B14, B18, B23: delegated decisions with reasons; B12: the person's reply is their own answer
       "--delegated --reason", "norn story answer", "norn story approve", "norn story reject", "norn run rerun", "--reset", "without `--delegated`: it is their answer",
-      // B15, B19, B20: CI and the PR; B19 reads the checks of the exact head (review#2 F6)
+      // B15, B19, B20: CI and the PR; B19 reads the checks of the exact head
       "gh run rerun --failed", "exact head", "statusCheckRollup", "headRefOid", "runs/", "handoff.md", "PR's state",
       // B16, B17: allowed, forbidden, permission rule
       "Allowed:", "Forbidden:", "norn tick", "norn run cancel", "--force", "norn story checkout", "Bash(norn story approve:*)",
@@ -283,21 +283,31 @@ describe("skills", () => {
       "approve on their answer → wait for the merge and the publish → install → pull → restart the watch and the cockpit",
       // B41–B43: load and flakes; B42: a running unit is cancelled first (rerun refuses it), then rerun at its check
       "reason: timeout", "the load is far above the core count", "suspected flake", "never run tests in a unit worktree", "`norn run cancel <unit>`", "--step <check> --delegated --reason",
-      // B15, B41 (review#7 F1, F2): a CI glitch and a load failure are rerun at their check too, after a cancel
+      // B15, B41: a CI glitch and a load failure are rerun at their check too, after a cancel
       "Rerun at its check** (CI glitch, load, suspected flake)", "then rerun at its check (`--step ci`, below)", "then rerun at its check once (`--step <check>`, below)",
       "`norn run cancel` only right before a rerun at its check",
-      // B24, B40 (review#7 F3): a merge and a watch restart the request named are allowed
+      // B15, B41, B42 (gh-196 D6): norn's own runs/-only transition commits never count as newer work
+      "git log -1 --format=%cI <branch> -- . ':(exclude,glob)**/runs/**'",
+      // B15: a hung run is cancelled on the forge first; a unit not yet running is cancelled once it runs
+      "gh run cancel <id>", "`nothing_to_cancel`",
+      // SK3: the cancel is a mechanical step; the delegated rerun after it carries the reason
+      "the delegated rerun that follows carries the reason",
+      // B7, B11: JSON only and no story passed to status; a permission prompt answered by its option number
+      "never pass a story to `norn status`", "its option number",
+      // B24, B40: a merge and a watch restart the request named are allowed
       "when the request named them, `gh pr merge --squash`", "(unless the request named a watch restart)",
-      // B37: stops at the round's end; B13, B27 (review#3 F1): a stuck unit does not end the round (RD1, W7)
+      // B37: stops at the round's end; B13, B27: a stuck unit does not end the round (RD1, W7)
       "Never start another round", "The round ends at `$done`", "A stuck unit does not end the round",
-      // B19, B20, B39 (review#3 F2): a gate left parked on purpose is never waited on with `--until gate` (it returns at once)
+      // B19, B20, B39: a gate left parked on purpose is never waited on with `--until gate` (it returns at once)
       "Never loop on `--until gate` while you leave a gate parked", "norn story wait <story> --until merged --timeout 5m", "(`--until merged`, not `--until gate`)", "gh run watch <run-id> --exit-status",
       // B44, B45: the report
       "One report", "delegated decisions with their reasons", "suspected flakes", "waiting: your answer to",
     ];
     expect(terms.filter((t) => !text.includes(t))).toEqual([]);
-    // review#3 F1: `$stuck` parks a unit for its one diagnosed rerun; it never ends a round
+    // `$stuck` parks a unit for its one diagnosed rerun; it never ends a round
     expect(text).not.toMatch(/round ends at[^.\n]*\$stuck/);
+    // the shipped text names no spec ids and no story of this repo
+    expect(text).not.toMatch(/\(B\d+[,)–]|claims were lost/);
   });
 
   test("norn-fsd links norn-fsd-round and adds the round choice and the round start (B31–B36, D6)", () => {
@@ -312,14 +322,14 @@ describe("skills", () => {
     expect(terms.filter((t) => !text.includes(t))).toEqual([]);
   });
 
-  // gh-196 review#1 F2 (D6): norn-fsd's agent and every subagent load norn-fsd-round, so the model must be able to;
+  // gh-196 D6: norn-fsd's agent and every subagent load norn-fsd-round, so the model must be able to;
   // norn-fsd stays person-only (B2 holds through the `.norn-unit` stop and the delegated_in_unit refusal)
   test("norn-fsd-round can be loaded by an agent; norn-fsd is started by a person (D6)", () => {
     expect(splitSkill(readSkill("norn-fsd-round")).meta["disable-model-invocation"]).toBeUndefined();
     expect(splitSkill(readSkill("norn-fsd")).meta["disable-model-invocation"]).toBe(true);
   });
 
-  // gh-196 review#1 F1 (B5): an agent runs the printed `norn story wait` as written, so every --until value must parse
+  // gh-196 B5: an agent runs the printed `norn story wait` as written, so every --until value must parse
   test("every `--until` a bundled skill prints is a story wait condition (B5)", () => {
     const values = readdirSync(SKILLS_DIR).flatMap((s) => [...readSkill(s).matchAll(/norn story wait \S+ --until (\S+?)[`\s]/g)].map((m) => [s, m[1] as string] as const));
     expect(values.length).toBeGreaterThan(0);

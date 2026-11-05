@@ -118,8 +118,8 @@ describe("before start", () => {
     await tick();
     refused(await h.norn("story", "edit", "gh-6", "--workflow", "nope"), "unknown_workflow");
     refused(await h.norn("story", "edit", "gh-6", "--workflow", "alt", "--at", "draft"), "not_started");
-    // gh-196 review#1 F4: --reason (with or without --delegated) is kept only on a round receipt; before start it is refused, never dropped
-    // review#7 F5 (P8): the unit's state says no, so a refusal with a code, not a usage error
+    // gh-196 D3 (B34): --reason (with or without --delegated) is kept only on a round receipt; before start it is refused, never dropped
+    // P8: the unit's state says no, so a refusal with a code, not a usage error
     for (const extra of [["--reason", "why"], ["--reason", "why", "--delegated"]]) refused(await h.norn("story", "edit", "gh-6", "--workflow", "alt", ...extra), "not_a_round_start");
     const r = await h.norn("story", "edit", "gh-6", "--workflow", "alt");
     expect(r.exit).toBe(0);
@@ -335,7 +335,7 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
     const deps = { ...h.deps, cwd: bRoot, env: { ...h.deps.env, NORN_HOME_DIR: bHome, USER: "colleague", NORN_MACHINE: "laptop" } };
     b = (...argv) => runChecked(argv, deps);
 
-    // gh-196 D2 (review#7 F4): a delegated decision goes through the mailbox like any other, its mark unchanged
+    // gh-196 D2: a delegated decision goes through the mailbox like any other, its mark unchanged
     const r = await b("story", "approve", "gh-5", "--reason", "lgtm", "--delegated");
     expect(r.exit).toBe(0);
     const v = r.value as Verb;

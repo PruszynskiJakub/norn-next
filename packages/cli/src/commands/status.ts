@@ -64,7 +64,7 @@ async function inbox(ctx: Context, args: ParsedArgs) {
   const view = await projectView(ctx);
   const details = opt.bool(args, "details");
   // gh-196 D5 (B22): a count per story of what a supervisor decided on the person's behalf, never an inbox item
-  // review#7 F6: `delegated_counts`, apart from story view's `delegated` decisions
+  // gh-196 D5 (B22): `delegated_counts`, apart from story view's `delegated` decisions
   const delegated_counts = delegatedCounts(view);
   const text = `${formatInbox(view, { details, notes: opt.bool(args, "notes"), home: ctx.env.HOME })}${formatDelegatedCounts(delegated_counts)}`;
   // gh-196 (B8, B9): the heartbeat as data, so a supervisor sees a missing watch before anything is in auto
