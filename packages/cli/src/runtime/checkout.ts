@@ -11,8 +11,8 @@
  *    since Y" unless `--force`.
  * 2. The story's record, `refs/norn/runs/<story>` alone (gh-195 D6): its objects fetched (no local ref
  *    yet) and staged beside its place in the machine dir with every file validated (S1, S2). A
- *    checkout that holds the claim and the run state already keeps its own (nothing staged), but only
- *    while its record ref is the remote's (10-R3-F1). A local copy not kept is never replaced whole: in
+ *    checkout that holds the claim and the run state already keeps its own (nothing staged), unless the
+ *    remote record continues from the one it last had: then its copy is older (10-R3-F1). A local copy not kept is never replaced whole: in
  *    step 5 it is set aside as superseded (gh-195 D11), or removed quietly when it is a record this
  *    machine pushed.
  * 3. The story and slice branches fetched; a local story branch that diverged from the remote one is
@@ -350,18 +350,21 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
   const forced = force && (cur.state === "other" || cur.state === "corrupt");
   const prev = cur.state === "none" || cur.state === "corrupt" ? null : cur.blob;
 
-  // ---- 2. the record, fetched and staged (review F1); the holder keeps its own run state only when its
-  // record ref is the remote's (10-R3-F1): an older copy a crashed or failed checkout left beside a newer
-  // record is never kept, or its next push would put stale state over that record
+  // ---- 2. the record, fetched and staged (review F1); the holder keeps its own run state unless the
+  // remote record is newer than it — one that continues from the record this checkout last had (or any,
+  // when it had none) — which an older copy a crashed or failed checkout left behind must never be pushed
+  // over (10-R3-F1). A ref someone moved elsewhere under the holder (08-F4) is not newer: the holder's
+  // run state is kept and its next push goes on top.
   const localCopy = existsSync(storyRunStateDir(root, run));
   const ownRef = mine && localCopy ? await readRecordRef(root, key) : null;
   const remoteSha =
     mine && localCopy && remote
-      ? await remoteRecordSha(root, remote, key).catch((e: unknown) => {
-          throw failure(`cannot read ${recordRef(key)} on ${remote}: ${(e as Error).message}; nothing was taken`, `check the network, then ${again} again`, "network");
+      ? await fetchRecordCommit(root, remote, key).catch((e: unknown) => {
+          throw failure(`cannot fetch ${recordRef(key)}: ${(e as Error).message}; nothing was taken`, `check the network, then ${again} again`, "network");
         })
-      : (ownRef?.sha ?? null);
-  const keepLocal = mine && localCopy && (ownRef?.sha ?? null) === remoteSha;
+      : null;
+  const newer = remoteSha !== null && remoteSha !== (ownRef?.sha ?? null) && (ownRef === null || (await git.isAncestor(root, ownRef.sha, remoteSha).catch(() => false)));
+  const keepLocal = mine && localCopy && !newer;
   const before = keepLocal ? ownRef : null;
   // gh-195 D11 (B27; 10-R3-F1, 11-S2): a local copy not kept is never replaced whole: set aside as
   // superseded once the take is in, or removed quietly when it is a record this machine pushed (on the ref)
