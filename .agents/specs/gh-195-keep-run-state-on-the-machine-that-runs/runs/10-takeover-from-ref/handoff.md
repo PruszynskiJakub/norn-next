@@ -48,6 +48,14 @@
   Tests in review: unit 1216 pass, typecheck clean, e2e team/base-sync/recovery/observe-snapshots/slice-workflow 61 pass / 1 skip (R2.3) / 0 fail. Remaining skips: human.test mailbox (→13), recovery R2.3 (→14), the conditional zombie contract skip (pre-existing). Flakes: none.
 - review#1 changes_requested: AC1–AC4 met and tested; blocking F1: checkout takes the claim and worktrees before fetching/unpacking the record, so a failed fetch or a corrupt record leaves the claim held with no run state and the next tick starts the story over (S2, B22), untested. Minor F2 (record_push shares the story unit's failures slot), F3 (restart skipped if unapplied receipts move the cursor); nits F4, F5.
 
+### implement#2 (review#1 changes_requested)
+
+- F1: checkout now fetches the record's objects without a ref (store `fetchRecordCommit`) and stages + validates it (store `stageRecordSync`, the checks of `unpackRecord` with the rename left to the caller) BEFORE the claim. A fetch failure (`network`) or a record that does not validate (`record_corrupt`) refuses with "nothing was taken": no claim, no worktree, no run state, local record ref unchanged; the next ticks claim/start nothing. After the claim lands: staged record placed, then `setRecordRef` (09-F4). Tests: corrupt ref and unfetchable ref (blob deleted from the bare remote).
+- F2: a stale record push lives in its own slot `record:<story>` of failures.json (core `recordPushSlot`), surfaced as `StoryFacts.record_refused` by store's local facts (so `norn status` and observe agree); the tick drops the slot when the story is not held here under `remote`. Test: policy to local clears it, back to remote retries once.
+- F3: a rewritten take restarts the step the cursor is at when the take applies (after the record's unapplied receipts; core `rewriteRestarts`); checkout predicts the line with core `applyReceipts`; the brief keys on the last rewritten take with every later receipt at the cursor. Test: unapplied `rework` in the record → implement#4.
+- F4: one fetch for a branchless story. F5: team.test asserts neither branch holds the take receipt or run state, and no record push followed the take.
+- Transcripts base-sync and recovery-claim-lost rewritten again (record fetch moved before the claim, `update-ref` after).
+
 ## Resume
 
-Fix F1 first: fetch and validate the record before the claim (or release the claim on a record failure) and add failure-path tests (corrupt ref, failed ref fetch, then B.tick() must not start_unit). Then F2/F3 if cheap.
+Golden harvest, full integration + e2e, commit, `norn done done`.
