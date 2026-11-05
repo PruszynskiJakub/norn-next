@@ -22,8 +22,10 @@ Every claim release (`story handoff`, clean `watch` exit, `story close`) pushes 
 - `story handoff` is now a markdown command: "handed over <story>: record at <commit>, matches story branch <sha>" (or "with no story branch", B33); a record failure refuses with exit 3, `record_push_failed`, do_instead "check the remote, then run norn story handoff <story> again". `story close` refuses the same way. `watch` exit prints "Could not release …; the claim is kept".
 - store `pushRecord`: a tree unchanged from the last push is pushed again when the branch commit moved (the release's handoff commit), so the record always names the branch as pushed.
 - State left for gh-195/14: after a clean release the local `refs/norn/runs/<story>` equals the remote's and its tree equals the local run-state folder's (`recordTreeId`); the local copy is not removed here.
+- GR6b `close_story` goes through `closeStory`, so it now leaves the record ref (B31): story-reopen.test AC2 now expects exactly `refs/norn/runs/gh-8` under refs/norn (claim and mailbox gone). base-sync effect transcript rewritten: the only change is the record push between the branch push and the claim deletion (rest is sha renumbering). Golden untouched (decide unchanged).
+- Tiers: unit 1211 pass; integration 762 pass / 6 skip (pre-existing) / 0 fail; e2e 72 pass / 2 skip (allowed) / 0 fail. Flakes: none.
 - Tests: packages/cli/test/integration/release-record.test.ts (post-receive hook logs the order the remote took updates; pre-receive hook rejects the record). docs:emit regenerated (handoff summary).
 
 ## Resume
 
-Run the integration and e2e tiers; if green, commit and `norn done done`.
+Committed; report `norn done done`. Next: review.
