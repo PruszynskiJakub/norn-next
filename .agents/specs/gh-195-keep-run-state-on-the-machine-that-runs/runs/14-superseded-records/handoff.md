@@ -14,6 +14,19 @@
 
 ## Goal
 
+Slice 14 (B27, D11): after a takeover without a release the old holder's tick sets its record aside as superseded (one Check item, tidy deletes it after trace.retain); after a clean release the copy is removed quietly; `unpushed_runs` and `orphaned/` gone. Plus carried items 10-R3-F1, 11-S2, 13-R3-F1, 13-R3-F2 and the recovery R2.3 skip.
+
 ## Progress
 
+- 13-R3-F1: a kept rejection's `seen` is each unit's `applied_through` (decide test).
+- 13-R3-F2: `rejected.json` read-modify-writes under `rejected.lock` in the machine dir (tick keep and tidy prune); read entry by entry: an entry of the wrong shape is left out of the read but kept by every write; a file that is not `{receipts: [...]}` is never written over (the keep fails, act reports it). Tests: packages/store/test/integration/rejected-file.test.ts.
+- B27/D11: observe reports `StoryFacts.local_record {last_receipt, on_ref}` for a story another heartbeat holds; decide emits `set_aside_record` (`record.superseded` → `superseded/<story>-<ulid>/` + `superseded.json`; `record.released` → removed quietly); act renames (S1). `Facts.superseded` (loadLocalFacts, so status and observe agree) → Check item `superseded:<story>:<last receipt>`; `norn tidy` prunes copies older than trace.retain (`removed.superseded`). New schema `local-superseded` (emitted).
+- Decision (durable facts, not timing): "released cleanly" = the local copy's tree is the tree of a record commit in the local record ref's history whose `Norn-Holder` is this machine (a release pushes the record before the claim goes, B15). Edge: under `remote`, a takeover without a release when every receipt had already been pushed also reads as on the ref and is removed quietly (nothing of the old holder's is missing from the record). Clean `watch` exit and `story close` go the same way (same push).
+- 10-R3-F1 / 11-S2: checkout keeps the holder's own copy only when its local record ref equals the remote's; any local copy not kept is set aside as superseded before the fetched record / new round is placed (removed quietly when it is a record this machine pushed). Output gains `superseded`.
+- Removed: store/unpushed.ts, copyToOrphaned/orphanedDir, `unpushed_runs`, its inbox item, tidy's orphaned/ step, the golden case naming it (recovery-6865ace13238). Rule cases for record.superseded / record.released.
+- test/e2e/recovery.test.ts R2.3 skip replaced by the superseded behaviour; transcript recovery-claim-lost rewritten (unpushedRuns spawns gone, the record's files leave runs/).
+- Tests: packages/cli/test/integration/superseded-record.test.ts (AC1–AC3, 10-R3-F1, 11-S2).
+
 ## Resume
+
+Run the integration and e2e tiers, `bun run golden` (harvest), 10 isolated runs of takeover-record-lost.test.ts, then report with `norn done done`.
