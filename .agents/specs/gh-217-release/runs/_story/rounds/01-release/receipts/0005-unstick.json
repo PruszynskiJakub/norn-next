@@ -1,1 +1,0 @@
-{"kind":"unstick","receipt_id":"01M6P8JZVP6SBMHEJ4DGMPQRJG","run_id":null,"step":"ci","attempt":1,"at":"2026-11-05T16:27:34.646Z","by":"human","who":"jakubpruszynski@mac","slice":null,"round":1,"to":"ci","comment":"first CI run was cancelled by a second push; latest run green"}

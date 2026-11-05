@@ -1,1 +1,0 @@
-{"kind":"unstick","receipt_id":"01M6P79HA091THA4B3D4AFQ80Q","run_id":"01M6P73642XDAYKM7DAXZEPHAE","step":"implement","attempt":1,"at":"2026-11-05T16:04:56.257Z","by":"human","who":"jakubpruszynski@mac","slice":null,"round":3,"to":"open-pr","comment":"Person asked to skip to ready and merge; test check failed only on load timeouts from an orphaned test worker."}

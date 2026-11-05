@@ -1,1 +1,0 @@
-{"kind":"classify","receipt_id":"01M6NEEAR7DZZME8NS6G0KDTJ0","run_id":"01M6N99DMM7DF46GGP3XVNXQ4G","step":"implement","attempt":1,"at":"2026-11-05T08:50:38.985Z","by":"norn","who":"jakubpruszynski@mac","tick_id":"01M6NEEAR73V3TY9RJDBR48NZT","outcome":"timeout","rule":"agent.timeout","route":"$stuck","detail":"deadline 60m passed"}

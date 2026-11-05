@@ -1,1 +1,0 @@
-{"kind":"classify","receipt_id":"01M6NVVQVN8H669BWKFK1EP78J","run_id":"01M6NRD19G3VFAXHZNR7PNZE2A","step":"implement","attempt":1,"at":"2026-11-05T12:45:09.878Z","by":"norn","who":"jakubpruszynski@mac","tick_id":"01M6NVVQVNF3QQBJ1Q4RC7TSJQ","outcome":"timeout","rule":"agent.timeout","route":"nudge","detail":"deadline 60m passed","counter":{"name":"nudges","value":1,"max":2}}

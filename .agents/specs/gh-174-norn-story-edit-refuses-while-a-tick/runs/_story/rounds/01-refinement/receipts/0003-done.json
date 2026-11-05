@@ -1,1 +1,0 @@
-{"kind":"done","receipt_id":"01M6GMGYYRD68A128J9Z1574HT","run_id":"01M6GKN9XVCXZFPG55AG7MJVXS","step":"refine","attempt":1,"at":"2026-11-03T12:00:44.504Z","by":"agent","who":"claude","outcome":"done","handoff":"Spec B1–B16: person commands needing the tick lock wait up to 60s (stderr line) instead of refusing; migrate and tick unchanged; H1 amended; no open questions."}

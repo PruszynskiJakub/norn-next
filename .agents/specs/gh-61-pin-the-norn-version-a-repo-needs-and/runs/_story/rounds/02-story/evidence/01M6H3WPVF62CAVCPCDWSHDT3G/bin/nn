@@ -1,2 +1,0 @@
-#!/bin/zsh
-exec env -u NORN_STORY -u NORN_RUN -u NORN_BIN -u NORN_SLOT -u NORN_HOME -u HERDR_SESSION -u HERDR_SOCKET_PATH -u HERDR_ENV NORN_HOME_DIR=/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh61/home bun /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa-gh61/bin/nv.ts "$@"

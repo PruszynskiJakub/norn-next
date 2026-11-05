@@ -1,4 +1,0 @@
-+   "packages/store/test/qa-probe.test.ts",
-(fail) test layout (AGENTS.md) > gh-118 B17: every test file of store, adapters and view sits under test/unit/ or test/integration/ [4.60ms]
- 48 pass
- 1 fail

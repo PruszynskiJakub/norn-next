@@ -1,1 +1,0 @@
-{"kind":"done","receipt_id":"01M6GHGJJK08A9KQB0AA30NS1M","run_id":"01M6GHFB7XC18YSYK847KK34W6","step":"describe","attempt":1,"at":"2026-11-03T11:08:06.099Z","by":"agent","who":"claude","outcome":"done","handoff":"pr.md written: AGENTS.md commit rule, test/support pointer and Gotchas section; evidence per Wanted item; two-way door, no blast radius."}
