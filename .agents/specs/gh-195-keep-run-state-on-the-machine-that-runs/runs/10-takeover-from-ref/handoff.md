@@ -100,6 +100,10 @@ Spec and Standards ran in parallel subagents; blocking points verified by hand (
 - takeover-record.test.ts: one harness per describe (A keeps a worktree and slot per story; 9 slots).
 - implement#3 done: Review#2 F1–F7 addressed. Checkout is one transaction: before the claim the record is fetched+validated, branches fetched, diverged local story branch refused, rewrite decided; after the claim the remote record ref is re-read (moved → claim given back, record_moved), then the take receipt goes into the staged record, the record is placed, local ref set, worktrees. Holder re-checkout re-runs the rewrite check once per gone commit. Branchless held stories are read from the record (record_only) and continue without intake. record_unplaced guard stops start-over. Fresh attempt entered by the record's receipts is the restart (no double bump); checkout prints the predicted cursor. place() crash-safe. Slot nits fixed; known limit in slice Notes. All tiers green.
 
+### Flakes
+
+- packages/cli/test/integration/takeover-record.test.ts, "a record that cannot be fetched is refused before the claim": test check #3 failed with ENOENT at `rmSync(join(h.remoteDir, "objects", blob.slice(0, 2), blob.slice(2)))` (log runs/10-takeover-from-ref/logs/01M6NHFCD7VZZP9K02BEAG4CED.log); the file alone passed 3/3 runs × 11/11 tests. Root cause: test fragility — under the parallel tier the pushed objects can land in a pack (receive.unpackLimit / auto-gc), so there is no loose object file to delete. Fix (implement#4): the unfetchable record is built in the bare remote itself — `mktree --missing` over a blob it never had, `commit-tree`, `update-ref` — with the precondition asserted (the ref lists that commit, `cat-file -e` of the blob fails); no loose/packed dependence.
+
 ## Resume
 
 Fix F1 (a held branchless story must not be re-intaken; extend AC4 with a tick) and F2 (decide the rewrite and write the take receipt before anything after the claim can fail; test diverged-local-branch retry). Then the minor ones if cheap.
