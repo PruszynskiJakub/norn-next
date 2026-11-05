@@ -1,0 +1,1 @@
+{"kind":"done","receipt_id":"01M6PB4AZRKX0Y5YGQC668214K","run_id":"01M6PB3DZAPH12H8P4WBAKMYNB","step":"describe","attempt":1,"at":"2026-11-05T17:12:00.249Z","by":"agent","who":"claude","outcome":"done","handoff":"pr.md written: summary diff of main.ts exit path, before/after (65536 vs 100237 bytes through a pipe), stdout-pipe test red→green, two-way door, low blast radius."}
