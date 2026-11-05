@@ -5,6 +5,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
+import { SLICE_NN_PATTERN } from "@norn/schema";
 import { allDocs, CODE_SPAN, RULES_FILE, textFiles, URL, userDocs } from "../support/docs.ts";
 
 const ROOT = join(import.meta.dir, "..", "..");
@@ -63,7 +64,9 @@ describe("rules file (B23, B24, B27, B31)", () => {
 // ------------------------------------------------------------------------------------------- handoff
 
 /** gh-195 B39 (D9): a unit's handoff, `<spec folder>/handoffs/_story.md` or `handoffs/<nn>-<slug>.md`. */
-const UNIT_HANDOFF = /^\.agents\/specs\/[^/]+\/handoffs\/(?:_story|[0-9]{2,3}-[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
+/** The slice number part of a slice handoff's name, from the schema's own pattern (`^[0-9]{2,3}$` today). */
+const SLICE_NN = SLICE_NN_PATTERN.replace(/^\^|\$$/g, "");
+const UNIT_HANDOFF = new RegExp(`^\\.agents/specs/[^/]+/handoffs/(?:_story|${SLICE_NN}-[a-z0-9]+(?:-[a-z0-9]+)*)\\.md$`);
 /** An older norn's handoff, `runs/<unit>/handoff.md` in a spec folder: moved to `handoffs/` at the unit's next boundary (B34). */
 const OLD_HANDOFF = /^\.agents\/specs\/[^/]+\/(?:.*\/)?runs\//;
 
