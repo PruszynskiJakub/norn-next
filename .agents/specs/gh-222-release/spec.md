@@ -4,7 +4,7 @@ slug: release
 provider: gh
 number: 222
 url: https://github.com/PruszynskiJakub/norn-next/issues/222
-title: Release
+title: Release 0.21.1
 assignee: PruszynskiJakub
 labels:
   - norn
