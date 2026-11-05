@@ -5,7 +5,7 @@
 import type { RemoteFactory, RemoteIssue, RemoteLabel, RemotePort, RemotePullRequest } from "@norn/core";
 import { storyKey } from "@norn/schema";
 import { NETWORK_TIMEOUT_MS } from "@norn/store";
-import { bunExec, okOrThrow, parseJson, portError, type Exec } from "../exec.ts";
+import { bunExec, encodePath, okOrThrow, parseJson, portError, type Exec } from "../exec.ts";
 
 export interface GhOptions {
   /** repository checkout to run `gh` in */
@@ -147,6 +147,11 @@ export function createGh(opts: GhOptions): RemotePort {
       // B23
       const { url } = await json<{ url: string }>(["repo", "view", ...(opts.repo ? [opts.repo] : []), "--json", "url"]);
       return `${url}/issues/new?labels=${encodeURIComponent(labels.join(","))}`;
+    },
+    async rawFileUrl({ commit, path }) {
+      // gh-195 D5 (B28): `blob/…?raw=true` redirects to the raw file, which GitHub renders inline
+      const { url } = await json<{ url: string }>(["repo", "view", ...(opts.repo ? [opts.repo] : []), "--json", "url"]);
+      return `${url}/blob/${commit}/${encodePath(path)}?raw=true`;
     },
     async replaceIssueLabel(number, { remove, add }) {
       // B19: gh refuses `--remove-label` for a label the repository lacks, so remove only one the issue carries

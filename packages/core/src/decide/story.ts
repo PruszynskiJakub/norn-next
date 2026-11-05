@@ -16,7 +16,7 @@ import {
   treeRunStatePath,
   unitRecordPath,
 } from "@norn/schema";
-import type { ClaimAction, UpdateStoryMirrorAction } from "../actions.ts";
+import type { Action, ClaimAction, UpdateStoryMirrorAction } from "../actions.ts";
 import type { NumberedReceipt, StoryFacts, UnitFacts, UnitRef } from "../facts.ts";
 import { initialState } from "../apply.ts";
 import { sha256 } from "../hash.ts";
@@ -132,18 +132,23 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
  * pushes the story's record once its tree differs from the one on the record ref it last saw, after
  * the tick's branch pushes (a side action act performs last). A push that failed leaves the tree
  * different, so the next tick pushes again (B14). A move off the branch this tick (B34, D13) brings the
- * record into the machine dir as it acts, so the push rides along with it. A story cleaned up this tick
- * (GR6, GR6b) is archived by that action instead (D15). Under `local`, nothing (B11).
+ * record into the machine dir as it acts, so the push rides along with it. Under `local`, nothing (B11).
+ * An action of this tick that pushes the record itself leaves no second push beside it: a story
+ * cleaned up this tick (GR6, GR6b) is archived by that action (D15), and an `open-pr` pushes the
+ * record before the PR (D5, B28).
  */
 function pushRecord(ctx: Ctx, story: StoryFacts, ref: UnitRef): void {
   if ((ctx.config.record?.policy ?? "local") !== "remote" || !story.record) return;
   const { tree, pushed } = story.record;
   const moved = ctx.decisions.some((d) => d.action.kind === "move_record" && d.action.unit?.story === story.key);
-  // gh-195 D15 (B29): a story cleaned up this tick (GR6, GR6b) has its final record archived by that action
-  const archived = ctx.decisions.some((d) => (d.action.kind === "cleanup_merged_story" || d.action.kind === "close_story") && d.action.unit?.story === story.key);
-  if (archived || (!moved && (tree === null || tree === pushed?.tree))) return;
+  if (!moved && (tree === null || tree === pushed?.tree)) return;
+  if (ctx.decisions.some((d) => d.action.unit?.story === story.key && pushesRecordItself(d.action))) return;
   ctx.emit({ kind: "push_record", unit: ref, rule: "record.push", branch: story.branch, expected: pushed?.sha ?? null, holder: ctx.facts.machine.holder });
 }
+
+/** gh-195 D15, D5: an action that pushes the story's record itself — the archive of GR6/GR6b, or `open-pr`. */
+const pushesRecordItself = (a: Action): boolean =>
+  a.kind === "cleanup_merged_story" || a.kind === "close_story" || (a.kind === "run_git" && a.action === "open-pr");
 
 /**
  * gh-195/06 (B34, D13): run state an older norn left on a held unit's branch moves into the machine dir

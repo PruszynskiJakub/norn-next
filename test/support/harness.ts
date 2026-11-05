@@ -91,6 +91,10 @@ export class FakeRemote implements RemotePort {
     this.calls.push(`issue+? ${o.labels.join(",")}`);
     return `https://github.com/o/r/issues/new?labels=${encodeURIComponent(o.labels.join(","))}`;
   }
+  async rawFileUrl(o: { commit: string; path: string }) {
+    this.calls.push(`raw ${o.commit} ${o.path}`);
+    return `https://github.com/o/r/blob/${o.commit}/${o.path.split("/").map(encodeURIComponent).join("/")}?raw=true`;
+  }
   /** set → `replaceIssueLabel` throws it, changing nothing (B20) */
   labelError: Error | null = null;
   async replaceIssueLabel(n: number, o: { remove: string; add: string }) {

@@ -16,6 +16,7 @@ export type RemoteContractTest =
   | "findPullRequest picks the newest of a branch's PRs"
   | "createIssue opens an issue with the labels and assignee, which intake then lists (B18)"
   | "newIssueUrl: the remote's new-issue page with the labels filled in (B23)"
+  | "rawFileUrl: a commit's file served raw, its path segments encoded (gh-195 B28)"
   | "replaceIssueLabel swaps one label for another (B19)"
   | "replaceIssueLabel adds the new label when the old one is not on the issue (B19)"
   | "replaceIssueLabel rejects with a PortError when the provider fails, changing nothing (B20)"
@@ -149,6 +150,16 @@ export function remoteContract(name: string, make: () => RemoteSubject, opts: Co
       expect(page).toContain("issues/new");
       expect(page).toContain("norn:wf:spec");
       expect(page).toMatch(/\bnorn\b(?!:)/);
+      expect((await port.listAssignedIssues({ label: "norn" })).map((i) => i.number)).toEqual([1]); // nothing created
+    });
+
+    t("rawFileUrl: a commit's file served raw, its path segments encoded (gh-195 B28)", async () => {
+      const { port } = await seeded();
+      const commit = "0123456789abcdef0123456789abcdef01234567";
+      const url = await port.rawFileUrl({ commit, path: "_story/rounds/01-story/evidence/01ABC/after shot.png" });
+      expect(url).toStartWith("https://");
+      expect(url).toContain(`/${commit}/_story/rounds/01-story/evidence/01ABC/after%20shot.png`);
+      expect(url).toMatch(port.provider === "gh" ? /\/blob\/[0-9a-f]{40}\/.*\?raw=true$/ : /\/-\/raw\/[0-9a-f]{40}\/[^?]*$/);
       expect((await port.listAssignedIssues({ label: "norn" })).map((i) => i.number)).toEqual([1]); // nothing created
     });
 

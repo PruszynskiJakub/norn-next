@@ -58,6 +58,9 @@ class AdapterError extends Error implements PortError {
 }
 
 /** Typed failure for port methods (ports.ts: "throw PortError"): stable `code`, `retryable` for transient failures. */
+/** A repository path for a URL: each segment URL-encoded, the slashes kept (gh-195 B28). */
+export const encodePath = (path: string): string => path.split("/").map(encodeURIComponent).join("/");
+
 export function portError(code: string, message: string, retryable = false): PortError {
   return new AdapterError(code, message, retryable);
 }

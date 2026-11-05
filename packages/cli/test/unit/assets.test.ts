@@ -202,6 +202,12 @@ describe("single-purpose workflows (W1, #136)", () => {
     expect(targets("story", "ci")).toEqual({ pass: "ready", fail: "implement" });
   });
 
+  test("story's describe step reads the record, not runs/ in the worktree, here and in this repo's copy (gh-195 D5, B28)", () => {
+    const local = parse(readFileSync(join(ASSETS, "..", "..", "..", ".agents", "workflows", "story.yaml"), "utf8")) as Workflow;
+    for (const w of [wf("story"), local]) expect(w.steps.describe).toMatchObject({ skill: "norn-pr", inputs: ["spec", "diff", "record"] });
+    expect(readSkill("norn-pr")).toContain("`evidence/<unit>/<run_id>/<file>`");
+  });
+
   test("slice has no QA: implement, test, review, integrate", () => {
     expect(types("slice")).toEqual({ implement: "agent", test: "check", review: "agent", integrate: "git", merge: "agent" });
     expect(targets("slice", "review")).toEqual({ approve: "integrate", changes_requested: "implement" });

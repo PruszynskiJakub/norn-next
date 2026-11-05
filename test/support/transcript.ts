@@ -68,6 +68,7 @@ const REMOTE_CALLS: Record<string, (...a: never[]) => string> = {
   editPullRequestBody: (n: number) => `editPullRequestBody ${n}`,
   createIssue: (o: { title: string; labels: string[] }) => `createIssue ${JSON.stringify(o.title)} ${o.labels.join(",")}`,
   newIssueUrl: (o: { labels: string[] }) => `newIssueUrl ${o.labels.join(",")}`,
+  rawFileUrl: (o: { path: string }) => `rawFileUrl ${o.path}`,
   replaceIssueLabel: (n: number, o: { remove: string; add: string }) => `replaceIssueLabel ${n} -${o.remove} +${o.add}`,
 };
 const NOTIFIER_CALLS: Record<string, (...a: never[]) => string> = {

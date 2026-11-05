@@ -120,20 +120,28 @@ function evidenceFiles(s: UnitSession): Record<string, string[]> {
  * (S12: all in the checkout's machine dir). The gate receipt is the record; renderBrief stays pure.
  */
 function rulings(s: UnitSession): Ruling[] {
+  const units: Array<{ unit: string; receipts: NumberedReceipt[] }> = [];
+  for (const { unit: dir, dir: path } of storyRecord(s)) {
+    const unit = dir === "_story" ? s.unit.story : `${s.unit.story}/${dir.split("-")[0]}`;
+    units.push({ unit, receipts: listReceipts(path).receipts });
+  }
+  return storyRulings(units);
+}
+
+/**
+ * Every unit of the story's record, its folder name and its run-state folder (the story's current
+ * round for `_story`). S12 (gh-195/05): every unit's run state of the story is in this checkout's
+ * machine dir, whichever worktree.
+ */
+function storyRecord(s: UnitSession): Array<{ unit: string; dir: string }> {
   const run = { key: s.unit.story, spec_dir: s.marker.spec_dir };
-  // S12 (gh-195/05): every unit's run state of the story is in this checkout's machine dir, whichever worktree
   const dirs = new Set<string>();
   try {
-    for (const d of readdirSync(storyRunStateDir(s.root, run), { withFileTypes: true })) if (d.isDirectory()) dirs.add(d.name);
+    for (const d of readdirSync(storyRunStateDir(s.root, run), { withFileTypes: true })) if (d.isDirectory() && !d.name.startsWith(".")) dirs.add(d.name);
   } catch {
     /* no run state yet */
   }
-  const units: Array<{ unit: string; receipts: NumberedReceipt[] }> = [];
-  for (const dir of [...dirs].sort()) {
-    const unit = dir === "_story" ? s.unit.story : `${s.unit.story}/${dir.split("-")[0]}`;
-    units.push({ unit, receipts: listReceipts(runStateDir(s.root, run, dir)).receipts });
-  }
-  return storyRulings(units);
+  return [...dirs].sort().map((unit) => ({ unit, dir: runStateDir(s.root, run, unit) }));
 }
 
 /** `<remote>/<base>` when the remote-tracking base exists, else the local base branch (solo). */
@@ -210,6 +218,7 @@ export const briefCommand = defineCommand({
       evidence_files: evidenceFiles(s),
       rulings: rulings(s),
       criteria: unitCriteria(s),
+      record: storyRecord(s),
       // QV5a: what this run's agent may `pass`
     });
     // B4: the exact briefing of every run, in the trace
