@@ -8,7 +8,7 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { RunnerPort } from "@norn/core";
+import type { Inbox, RunnerPort } from "@norn/core";
 import { STORY_UNIT_DIR, ulid, unitHandoffPath } from "@norn/schema";
 import { acquireTickLock, appendReceipt, handoffPath, readState, repoConfigPath, workflowsDir } from "@norn/store";
 import { type CliDeps, type CliResult, type TickReport } from "../../packages/cli/src/index.ts";
@@ -222,10 +222,15 @@ describe("two clones hand a story over through git (T5, T6)", () => {
     const trace = await B.norn("run", "list", "gh-7", "--events");
     expect(JSON.stringify(trace.value)).toContain("take by bob@repo-b (claim was free)");
 
-    // clone A now sees the claim held elsewhere and does nothing to the story (T7)
+    // clone A now sees the claim held elsewhere: its copy of the record, handed over cleanly, goes
+    // quietly (gh-195 D11, B27), then it does nothing to the story (T7)
     step();
     const a = await A.tick("--sync");
-    expect(a.decisions.filter((d) => d.unit.startsWith("gh-7"))).toEqual([{ unit: "gh-7", rule: "claim.other", kind: "noop", ok: true }]);
+    expect(a.decisions.filter((d) => d.unit.startsWith("gh-7"))).toEqual([{ unit: "gh-7", rule: "record.released", kind: "set_aside_record", ok: true }]);
+    expect(((await A.norn("status")).value as Inbox).groups.check.filter((i) => i.story === "gh-7")).toEqual([]);
+    step();
+    const again = await A.tick("--sync");
+    expect(again.decisions.filter((d) => d.unit.startsWith("gh-7"))).toEqual([{ unit: "gh-7", rule: "claim.other", kind: "noop", ok: true }]);
   });
 
   test("clone B answers, briefs and continues the slice to its gate", async () => {
