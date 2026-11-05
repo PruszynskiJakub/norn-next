@@ -22,6 +22,7 @@ import { displayPath, isErrno } from "./fsx.ts";
 import { handoffPath, slicesDir, specsDir, statePath, storyFile } from "./paths.ts";
 import { runStateDirIn, runStateRoundsIn, runStateSource, treeRunStateDir, treeRunStateFiles } from "./run-state.ts";
 import { listReceipts } from "./receipts.ts";
+import { localRecordRefs } from "./record-ref.ts";
 import { type Handoff, type PinnedWorkflow, readHandoff, readPinnedWorkflow, readState } from "./unit.ts";
 import { readUnitMarker } from "./worktree.ts";
 
@@ -102,6 +103,26 @@ export interface RepoSnapshot {
   config: LoadedConfig;
   workflows: WorkflowListing;
   stories: StorySnapshot[];
+  /**
+   * gh-195 D16 (B29, B35): stories whose run state an older norn left in the base's tree (the fetched
+   * base branch, the main checkout without one), never read: `norn upgrade` moves it to archive refs.
+   * Ascending; [] = none.
+   */
+  base_run_state: string[];
+}
+
+/**
+ * gh-195 D16 (B35): the stories whose spec folder in the tree `root` (the base cache, or a checkout)
+ * still holds `runs/` from an older norn, by key, ascending. The one place that notices them: once the
+ * removal `norn upgrade` stages is committed (gh-195/17), it finds none.
+ */
+export function baseRunStateStories(root: string): string[] {
+  const out: string[] = [];
+  for (const d of dirs(specsDir(root))) {
+    const m = parseSpecDirName(d);
+    if (m && treeRunStateFiles(root, { key: m.story, spec_dir: relative(root, join(specsDir(root), d)) }).length) out.push(m.story);
+  }
+  return out.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
 function dirs(path: string): string[] {
@@ -129,8 +150,10 @@ export interface RunStateAt {
   base: string;
   /** the root a file error or a receipt names a path from; none = absolute (the machine dir, S12) */
   name?: string;
-  /** an older norn's record in a tree (gh-195/05), not the machine dir */
+  /** an older norn's record in a unit worktree's branch tree (gh-195/06), not the machine dir */
   tree: boolean;
+  /** gh-195 D7 (B29): the archive ref's record commit this finished story's run state was unpacked from; absent = not the archive */
+  archive?: string;
 }
 
 /**
@@ -208,10 +231,10 @@ export function loadRounds(story: StorySnapshot, opts: { includeApplied?: boolea
 
 /**
  * Read one spec folder (spec.md, slices/) and its units' run state (S12: in the machine dir of
- * `checkout`, default `root`; `tree`: or, when this machine holds none, an older norn's record in the
- * tree, gh-195/05).
+ * `checkout`, default `root`; `archive`: or, for a finished story this machine holds none of, the
+ * record on its archive ref here, gh-195 D7, D16).
  */
-export function loadStory(root: string, specPath: string, opts: { includeApplied?: boolean; checkout?: string; tree?: boolean; branch?: boolean } = {}): StorySnapshot | null {
+export function loadStory(root: string, specPath: string, opts: { includeApplied?: boolean; checkout?: string; archive?: () => ReadonlyMap<string, string>; branch?: boolean } = {}): StorySnapshot | null {
   const name = specPath.split("/").at(-1) ?? "";
   const m = parseSpecDirName(name);
   if (!m) return null;
@@ -240,7 +263,9 @@ export function loadStory(root: string, specPath: string, opts: { includeApplied
 
   const run: RunStory = { key, spec_dir: relative(root, specPath) };
   const checkout = opts.checkout ?? root;
-  const at = runStateSource(root, run, { checkout, ...(opts.tree ? { tree: true } : {}) });
+  // D7, D16 (B29): only a finished story's record is read from its archive ref, never written there
+  const finished = story.ok && (story.value.frontmatter.status === "done" || story.value.frontmatter.status === "dropped");
+  const at = runStateSource(root, run, { checkout, ...(opts.archive && finished ? { archive: opts.archive } : {}) });
   const unitOpts = opts.includeApplied ? { includeApplied: true } : {};
   // gh-195/06 (B34): a story worktree's branch may still hold an older norn's run state
   const branch = !!opts.branch;
@@ -270,7 +295,7 @@ export function loadStory(root: string, specPath: string, opts: { includeApplied
 }
 
 /** Every story under `<root>/.agents/specs/` (only `only`'s spec folder when given). */
-function loadStories(root: string, opts: { includeApplied?: boolean; only?: string; checkout?: string; tree?: boolean; branch?: boolean } = {}): StorySnapshot[] {
+function loadStories(root: string, opts: { includeApplied?: boolean; only?: string; checkout?: string; archive?: () => ReadonlyMap<string, string>; branch?: boolean } = {}): StorySnapshot[] {
   const out: StorySnapshot[] = [];
   for (const d of dirs(specsDir(root))) {
     if (opts.only !== undefined && parseSpecDirName(d)?.story !== opts.only) continue;
@@ -311,14 +336,18 @@ export function loadSnapshot(opts: {
     for (const s of loadStories(root, { includeApplied: opts.includeApplied, only: m.story, branch: true })) if (!seen.has(s.key)) seen.set(s.key, s);
   }
   const base = new Map<string, StorySnapshot>();
-  // gh-195/05: the base cache is no checkout: its stories' run state is the repo's machine dir, or the base tree's record of an older norn
-  if (baseRoot) for (const s of loadStories(baseRoot, { includeApplied: opts.includeApplied, checkout: opts.repoRoot, tree: true })) base.set(s.key, s);
+  // gh-195/05: the base cache is no checkout: its stories' run state is the repo's machine dir, or a
+  // finished story's archive ref (D7, D16: never the base tree's runs/ of an older norn)
+  // D7: the archive refs are listed only once a finished story without run state here needs them
+  let refs: Map<string, string> | undefined;
+  const archive = () => (refs ??= localRecordRefs(opts.repoRoot));
+  if (baseRoot) for (const s of loadStories(baseRoot, { includeApplied: opts.includeApplied, checkout: opts.repoRoot, archive })) base.set(s.key, s);
   for (const [key, s] of base) if (!seen.has(key)) seen.set(key, { ...s, from_base: true });
-  for (const s of loadStories(opts.repoRoot, { includeApplied: opts.includeApplied, tree: true })) if (!seen.has(s.key)) seen.set(s.key, s);
+  for (const s of loadStories(opts.repoRoot, { includeApplied: opts.includeApplied, archive })) if (!seen.has(s.key)) seen.set(s.key, s);
   const stories = [...seen.values()]
     .map((s) => (baseRoot ? { ...s, base_status: base.get(s.key)?.frontmatter?.status ?? null } : s))
     .sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }));
-  return { root: opts.repoRoot, home: config.home, config, workflows, stories };
+  return { root: opts.repoRoot, home: config.home, config, workflows, stories, base_run_state: baseRunStateStories(baseRoot ?? opts.repoRoot) };
 }
 
 /**

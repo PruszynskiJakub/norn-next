@@ -2,7 +2,7 @@
 id: gh-195/09
 title: A claim release pushes the record first, or releases nothing
 depends_on: [ gh-195/08 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }

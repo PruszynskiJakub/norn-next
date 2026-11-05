@@ -139,7 +139,7 @@ describe("norn upgrade with nothing to do changes nothing (B15)", () => {
       expect(porcelain(h)).toBe("");
       expect(snapshot(h, true)).toEqual(before);
       const json = await upgradeAs(h, "0.19.0", "--json");
-      expect(json.value).toEqual({ moves: [], config: { changed: [], renamed: [], removed: [] }, norn_version: { from: "0.19.0", to: "0.19.0", changed: false }, skills: { updated: [], linked: [] }, staged: [], commit: null, labels: expect.objectContaining({ checked: true, created: [] }) });
+      expect(json.value).toEqual({ moves: [], config: { changed: [], renamed: [], removed: [] }, norn_version: { from: "0.19.0", to: "0.19.0", changed: false }, skills: { updated: [], linked: [] }, run_state: [], staged: [], commit: null, labels: expect.objectContaining({ checked: true, created: [] }) });
     } finally {
       h.cleanup();
     }

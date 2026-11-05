@@ -64,10 +64,12 @@ const REMOTE_CALLS: Record<string, (...a: never[]) => string> = {
   assignIssue: (n: number, assignee: string) => `assignIssue ${n} ${assignee}`,
   getIssue: (n: number) => `getIssue ${n}`,
   findPullRequest: (branch: string) => `findPullRequest ${branch}`,
+  pullRequestCi: (n: number) => `pullRequestCi ${n}`,
   openDraftPullRequest: (o: { head: string; base: string; title: string }) => `openDraftPullRequest ${o.head} → ${o.base} ${JSON.stringify(o.title)}`,
   editPullRequestBody: (n: number) => `editPullRequestBody ${n}`,
   createIssue: (o: { title: string; labels: string[] }) => `createIssue ${JSON.stringify(o.title)} ${o.labels.join(",")}`,
   newIssueUrl: (o: { labels: string[] }) => `newIssueUrl ${o.labels.join(",")}`,
+  rawFileUrl: (o: { path: string }) => `rawFileUrl ${o.path}`,
   replaceIssueLabel: (n: number, o: { remove: string; add: string }) => `replaceIssueLabel ${n} -${o.remove} +${o.add}`,
 };
 const NOTIFIER_CALLS: Record<string, (...a: never[]) => string> = {

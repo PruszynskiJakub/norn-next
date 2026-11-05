@@ -90,7 +90,7 @@ steps:
   describe:
     type: agent
     skill: norn-pr
-    inputs: [spec, diff, { file: runs/, label: "QA criteria reports and evidence (receipts/ and evidence/ of each unit)" }]
+    inputs: [spec, diff, record]
     instructions: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
     outcomes:
       done: { to: open-pr, means: "pr.md describes the branch as it is now: summary, evidence, merge danger" }

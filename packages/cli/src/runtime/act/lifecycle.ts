@@ -32,7 +32,7 @@ import {
   runStateStartDir,
   writeState,
 } from "@norn/store";
-import { closeStory } from "../close.ts";
+import { closeStory, pushHeldRecord, recordPushError } from "../close.ts";
 import { integrate } from "../integrate.ts";
 import { markStoryOnBase, mergeFacts, type RecordResult } from "../record.ts";
 import { equipWorktree } from "../worktrees.ts";
@@ -246,8 +246,22 @@ export async function mirror(act: ActEnv, a: Extract<Action, { kind: "update_sto
   return { ok: true, detail: await act.commit(a.commit, null, null) };
 }
 
+/** gh-195 D15 (B29): GR6's archive push (`pushHeldRecord`, the one closing and every claim release make too) before any cleanup; a failure says why the cleanup waits. */
+async function archiveRecord(act: ActEnv, key: string): Promise<{ archive: Record<string, unknown> } | { error: string; detail: Record<string, unknown> }> {
+  const branch = act.obs.facts.stories.find((s) => s.key === key)?.branch ?? null;
+  const r = await pushHeldRecord(act.obs, key, branch);
+  if (r.ok) return { archive: { ref: recordRef(key), ...r } };
+  return {
+    error: `archive ${recordRef(key)} on ${act.obs.remote ?? "this checkout"} failed (${r.reason}): ${r.message}; nothing was cleaned up, the next tick tries again (D15)`,
+    detail: { archive: { ref: recordRef(key), reason: r.reason, message: r.message } },
+  };
+}
+
 export async function cleanupMerged(act: ActEnv, a: Extract<Action, { kind: "cleanup_merged_story" }>): Promise<ActionResult> {
-  const detail: Record<string, unknown> = {};
+  // D15 (B29): the final record is on its archive ref before anything is removed; a failed push leaves the cleanup owed
+  const archived = await archiveRecord(act, a.unit.story);
+  if ("error" in archived) return { ok: false, error: archived.error, detail: archived.detail };
+  const detail: Record<string, unknown> = { ...archived };
   const errors: string[] = [];
   act.cleaned.add(a.unit.story);
   const tryDo = async (what: string, f: () => Promise<unknown>) => {
@@ -291,8 +305,17 @@ export async function closeClosedIssueStory(act: ActEnv, a: Extract<Action, { ki
   const story = act.obs.facts.stories.find((s) => s.key === key);
   const claimSha = act.claimed.get(key)?.sha ?? (story?.claim.state === "mine" ? story.claim.sha : null);
   if (!story || !claimSha) throw new Error(`${key} is not held here; nothing closed`);
+  // D15 (B29): closeStory pushes the final record to its archive ref before it removes anything
   const r = await closeStory(act.obs, story, { home: act.ctx.home, claimSha });
-  if (!r.ok) return { ok: false, error: r.reason === "push_failed" ? `push ${r.branch} failed (${r.push_reason}): ${r.message}; nothing was removed` : `cannot mark ${r.file} dropped: ${r.message}`, detail: r };
+  if (!r.ok) {
+    const error =
+      r.reason === "push_failed"
+        ? `push ${r.branch} failed (${r.push_reason}): ${r.message}; nothing was removed`
+        : r.reason === "record_push_failed"
+          ? `${recordPushError(key, r.push_reason, r.message)}; nothing was removed, the next tick tries again (D15)`
+          : `cannot mark ${r.file} dropped: ${r.message}`;
+    return { ok: false, error, detail: r };
+  }
   act.cleaned.add(key);
   const deleted: string[] = [];
   for (const m of a.refs) if ((await deleteMailbox(act.root, act.obs.remote, m.ref, m.sha)).ok) deleted.push(m.ref);

@@ -477,6 +477,8 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     stories: storyFacts,
     heartbeat: { last_tick_at: lastTick },
     ...(local.norn ? { norn: local.norn } : {}),
+    // gh-195 D16: run state an older norn left on the base, pointed to `norn upgrade`
+    ...(local.snapshot.base_run_state.length ? { base_run_state: local.snapshot.base_run_state } : {}),
     orphans: { worktrees: [], branches: [] },
   };
   // R5.5 (N3): is this checkout's heartbeat down while it holds auto work?

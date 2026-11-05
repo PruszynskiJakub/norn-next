@@ -410,6 +410,12 @@ export interface Facts {
    * the running norn's (B19); absent = not observed.
    */
   norn?: { running: string; repo: string | null; skills_drift?: string[] };
+  /**
+   * gh-195 D16 (B29, B35): stories whose run state an older norn left in the base branch's tree (the
+   * main checkout's without a fetched base), ascending; never read, only pointed to `norn upgrade`.
+   * Absent = none.
+   */
+  base_run_state?: string[];
   /** worktrees/branches with no matching unit (K5) */
   orphans: { worktrees: string[]; branches: string[] };
   /**

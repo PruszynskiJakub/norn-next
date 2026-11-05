@@ -1,6 +1,9 @@
 /**
- * Claim release (T6): push the story and slice branches first, then delete the claim ref by
- * CAS. Only by the heartbeat holding the claim, and only fast-forward pushes (R3.3). Edited handoff.md files are committed first. Used by a clean `watch` exit and `norn story handoff` (B34).
+ * Claim release (T6): push the story and slice branches first, then the story's record to its ref
+ * (gh-195 B15, under either policy), then delete the claim ref by CAS. Only by the heartbeat holding
+ * the claim, and only fast-forward pushes (R3.3). Edited handoff.md files are committed first. A failed
+ * record push releases nothing (B16). Used by a clean `watch` exit and `norn story handoff` (B34);
+ * `norn story close` and GR6/GR6b make the same push (`pushHeldRecord`, runtime/close.ts).
  */
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -9,6 +12,7 @@ import { ulid } from "@norn/schema";
 import { releaseClaim, writtenHere } from "@norn/store";
 import type { Context } from "../context.ts";
 import { refuse } from "../output.ts";
+import { pushHeldRecord, recordPushError } from "./close.ts";
 import { waitForTickLock } from "./tick-lock.ts";
 import { type Observed, observe } from "./observe/index.ts";
 
@@ -29,6 +33,10 @@ export interface ReleaseResult {
   story: string;
   ok: boolean;
   pushed: string[];
+  /** the record on the story's ref once released: its commit and the story branch commit it matches (null: no branch, B33); null: no run state */
+  record?: { sha: string; branch_commit: string | null } | null;
+  /** `record`: the record push failed, so the claim is kept (B16) */
+  failed?: "record";
   error?: string;
 }
 
@@ -81,8 +89,12 @@ export async function releaseStory(obs: Observed, story: StoryFacts): Promise<Re
       pushed.push(b.branch);
     }
   }
+  // B15, B16: the record goes before the claim; a failed push keeps the claim and deletes nothing
+  const rec = await pushHeldRecord(obs, story.key, obs.stories[story.key]?.branch ?? story.branch);
+  if (!rec.ok) return { story: story.key, ok: false, pushed, failed: "record", error: `${recordPushError(story.key, rec.reason, rec.message)}; the claim is kept` };
+  const record = rec.sha === null ? null : { sha: rec.sha, branch_commit: rec.branch_commit };
   const r = await releaseClaim(obs.root, obs.remote, story.key, sha);
-  return r.ok ? { story: story.key, ok: true, pushed } : { story: story.key, ok: false, pushed, error: r.message };
+  return r.ok ? { story: story.key, ok: true, pushed, record } : { story: story.key, ok: false, pushed, record, error: r.message };
 }
 
 /** R3.3: is local `branch` a fast-forward of the remote one (fetched now; absent remotely counts)? */

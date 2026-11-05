@@ -330,6 +330,15 @@ describe("check, git, gate steps (W2)", () => {
     const withPr = storyAt("open-pr", { pr: { number: 7, url: "u", state: "open", is_draft: true, head_sha: "", head: "gh-1-login", base_branch: "main", merged_at: null } });
     expect(only(facts([withPr]))).toMatchObject({ kind: "run_git", action: "open-pr", pr });
   });
+  test("gh-195 D4, D5, D15: under remote, an owed record is pushed by push_record, unless an action of the tick pushes it itself (open-pr, a merged PR's cleanup)", () => {
+    const remote = { ...CONFIG, record: { policy: "remote" as const } };
+    const owed = { record: { tree: "b".repeat(40), pushed: { sha: "c".repeat(40), tree: "a".repeat(40) } } };
+    const kindsOf = (s: StoryFacts) => decide(facts([s]), WORKFLOWS, remote).map((d) => `${d.unit} ${d.action.kind} ${d.rule}`);
+    expect(kindsOf(storyAt("test", owed))).toContain("gh-1 push_record record.push");
+    expect(kindsOf(storyAt("open-pr", owed))).toEqual(["gh-1 run_git git.open-pr"]);
+    const merged = solo({}, null, { ...owed, pr: { number: 9, url: "u", state: "merged", is_draft: false, head_sha: "abc", head: "gh-1-login", base_branch: "main", merged_at: at() } });
+    expect(kindsOf(merged)).toEqual(["gh-1 cleanup_merged_story remote.pr_merged"]);
+  });
   test("integrate is serialized per story (K6)", () => {
     const f = storyAt("slices", {}, [
       { nn: "01", state: { step: "integrate", visits: { integrate: 1 } } },

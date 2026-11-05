@@ -14,9 +14,10 @@ import { type Dirent, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileS
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import type { FileError } from "@norn/core";
-import { parseRoundDirName, ROUNDS_DIR, type RunStory, recordRef, STORY_UNIT_DIR, type UnitState, validate, type Workflow } from "@norn/schema";
+import { parseRoundDirName, parseSpecDirName, RECORD_REF_PREFIX, ROUNDS_DIR, type RunStory, recordRef, SPECS_DIR, STORY_UNIT_DIR, treeStoryRunStatePath, type UnitState, validate, type Workflow } from "@norn/schema";
 import { fsyncTree, isErrno } from "./fsx.ts";
-import { casRef, git, gitOk, gitSync, readLocalRef } from "./git.ts";
+import { archiveCacheDir } from "./paths.ts";
+import { casRef, casRefs, git, gitOk, gitSync, readLocalRef } from "./git.ts";
 import { recordErrors } from "./record-move.ts";
 import { storyRunStateDir } from "./run-state.ts";
 import { parseWorkflowText } from "./unit.ts";
@@ -111,6 +112,12 @@ async function writeRecordTree(root: string, story: RunStory): Promise<string | 
   }
 }
 
+/** The `Norn-Branch-Commit` a record commit names; null = none (a story without a branch, B33). */
+async function branchCommitOf(root: string, sha: string): Promise<string | null> {
+  const r = await git(root, ["log", "-1", "--format=%(trailers:key=Norn-Branch-Commit,valueonly)", sha]);
+  return r.code === 0 ? r.stdout.trim() || null : null;
+}
+
 export type RecordPushResult =
   | { ok: true; pushed: false; reason: "unchanged" | "empty"; sha: string | null }
   | { ok: true; pushed: true; sha: string; tree: string }
@@ -120,8 +127,10 @@ export type RecordPushResult =
  * D2 (B10, B14): pack the story's record and push it to `refs/norn/runs/<story>` with a lease on
  * `expected` (the sha this checkout last saw; null = the ref must not exist), its parent that commit.
  * Trailers `Norn-Story`, `Norn-Branch-Commit` (when the story has a branch, B33) and `Norn-Holder`; the
- * commit time is `at` (what "record as of" shows, B13). A tree unchanged from `expected`'s pushes
- * nothing. Without a remote the local ref is the record (solo).
+ * commit time is `at` (what "record as of" shows, B13). A tree unchanged from `expected`'s, matching
+ * the same branch commit, pushes nothing; the same tree for a branch that moved on (a release's
+ * handoff commit, gh-195/09) is pushed again, so the record names the branch as pushed. Without a
+ * remote the local ref is the record (solo).
  */
 export async function pushRecord(
   root: string,
@@ -131,7 +140,8 @@ export async function pushRecord(
 ): Promise<RecordPushResult> {
   const tree = await writeRecordTree(root, story);
   if (tree === null) return { ok: true, pushed: false, reason: "empty", sha: o.expected };
-  if (o.expected !== null && (await readLocalRef(root, `${o.expected}^{tree}`)) === tree) return { ok: true, pushed: false, reason: "unchanged", sha: o.expected };
+  if (o.expected !== null && (await readLocalRef(root, `${o.expected}^{tree}`)) === tree && (await branchCommitOf(root, o.expected)) === o.branch_commit)
+    return { ok: true, pushed: false, reason: "unchanged", sha: o.expected };
   const trailers = [`Norn-Story: ${story.key}`, ...(o.branch_commit ? [`Norn-Branch-Commit: ${o.branch_commit}`] : []), `Norn-Holder: ${o.holder}`];
   const message = `norn: record ${story.key}\n\n${trailers.join("\n")}\n`;
   const env = { GIT_AUTHOR_DATE: o.at, GIT_COMMITTER_DATE: o.at };
@@ -143,15 +153,6 @@ export async function pushRecord(
   return r.ok ? { ok: true, pushed: true, sha, tree } : r;
 }
 
-/**
- * D3 (S1, S2): extract the record commit `sha` into `dest` (a story's run-state folder). Every entry
- * must be a plain file (mode 100644 or 100755) whose path stays inside `dest`: an absolute path, an
- * empty, `.` or `..` segment, a symlink or a submodule is refused before anything is written (review
- * F2), since a record may come from another machine. The files are written into a temp folder beside
- * `dest`; every JSON file must parse, and each state, pinned workflow and receipt must pass its schema.
- * Only then is the temp folder renamed into place, replacing `dest` whole (review F3). A record that
- * fails puts nothing in place: its errors are returned instead.
- */
 /** A record commit's tree entry that may be written: a plain file whose path stays inside the record. */
 interface RecordEntry {
   path: string;
@@ -162,13 +163,16 @@ interface RecordEntry {
  * D3 (review F2): the entries of the record commit `sha`, checked before anything is read or written —
  * every entry must be a plain file (mode 100644 or 100755) whose path stays inside `base` (the folder
  * it would land in): an absolute path, an empty, `.` or `..` segment, a symlink or a submodule is
- * refused, since a record may come from another machine. `fail` names a refused entry's file.
+ * refused, since a record may come from another machine. `fail` names a refused entry's file. One set
+ * of checks for an unpack (`unpackRecordSync`) and for a read into memory (`readRecordObjects`).
  */
-async function recordEntries(root: string, sha: string, base: string, fail: (path: string, message: string) => FileError): Promise<{ entries: RecordEntry[]; refused: FileError[] }> {
+function recordEntries(root: string, sha: string, base: string, fail: (path: string, message: string) => FileError): { entries: RecordEntry[]; refused: FileError[] } {
   const entries: RecordEntry[] = [];
   const refused: FileError[] = [];
   // -z: a name with a tab or a newline is read whole; the path is what follows the first tab
-  for (const line of (await gitOk(root, ["ls-tree", "-r", "-z", "--full-tree", sha])).split("\0").filter(Boolean)) {
+  const ls = gitSync(root, ["ls-tree", "-r", "-z", "--full-tree", sha]);
+  if (ls.code !== 0) return { entries, refused: [fail("", `git ls-tree ${sha} failed: ${ls.stderr.trim()}`)] };
+  for (const line of ls.stdout.toString("utf8").split("\0").filter(Boolean)) {
     const tab = line.indexOf("\t");
     const [mode, type, blob] = line.slice(0, tab).split(" ") as [string, string, string];
     const path = line.slice(tab + 1);
@@ -180,7 +184,7 @@ async function recordEntries(root: string, sha: string, base: string, fail: (pat
   return { entries, refused };
 }
 
-/** D3 (S2): every JSON file of a record must parse; `fail` names the file. */
+/** D3 (S2): every JSON file of a record must parse; `fail` names the file. Shared by the unpack and the read into memory. */
 function jsonErrors(files: ReadonlyArray<{ path: string; text: string }>, fail: (path: string, message: string) => FileError): FileError[] {
   const errors: FileError[] = [];
   for (const f of files.filter((x) => x.path.endsWith(".json")))
@@ -193,16 +197,25 @@ function jsonErrors(files: ReadonlyArray<{ path: string; text: string }>, fail: 
 }
 
 /**
- * D3 (S1, S2): extract the record commit `sha` into `dest` (a story's run-state folder). Its entries
- * are checked first (`recordEntries`); the files are written into a temp folder beside `dest`; every
- * JSON file must parse, and each state, pinned workflow and receipt must pass its schema. Only then is
- * the temp folder renamed into place, replacing `dest` whole (review F3). A record that fails puts
- * nothing in place: its errors are returned instead.
+ * D3 (S1, S2): extract the record commit `sha` into `dest` (a story's run-state folder). Every entry
+ * must be a plain file (mode 100644 or 100755) whose path stays inside `dest`: an absolute path, an
+ * empty, `.` or `..` segment, a symlink or a submodule is refused before anything is written (review
+ * F2), since a record may come from another machine. The files are written into a temp folder beside
+ * `dest`; every JSON file must parse, and each state, pinned workflow and receipt must pass its schema.
+ * Only then is the temp folder renamed into place, replacing `dest` whole (review F3). A record that
+ * fails puts nothing in place: its errors are returned instead.
  */
-export async function unpackRecord(root: string, sha: string, dest: string): Promise<{ ok: true; files: number } | { ok: false; errors: FileError[] }> {
+export async function unpackRecord(root: string, sha: string, dest: string): Promise<UnpackResult> {
+  return unpackRecordSync(root, sha, dest);
+}
+
+export type UnpackResult = { ok: true; files: number } | { ok: false; errors: FileError[] };
+
+/** `unpackRecord` for a synchronous reader (the snapshot's archive cache, gh-195/16): the same checks and the same rename into place. */
+export function unpackRecordSync(root: string, sha: string, dest: string): UnpackResult {
   const staging = join(dirname(dest), `.${basename(dest)}.unpack-${process.pid}`);
   const fail = (path: string, message: string): FileError => ({ file: join(dest, path), errors: [{ path: "", message }] });
-  const { entries, refused } = await recordEntries(root, sha, staging, fail);
+  const { entries, refused } = recordEntries(root, sha, staging, fail);
   if (refused.length) return { ok: false, errors: refused };
   rmSync(staging, { recursive: true, force: true });
   try {
@@ -247,6 +260,175 @@ export async function unpackRecord(root: string, sha: string, dest: string): Pro
   }
 }
 
+/** gh-195 D7: story key → record commit of every archive ref this checkout has (one `for-each-ref`, local only). */
+export function localRecordRefs(root: string): Map<string, string> {
+  const r = gitSync(root, ["for-each-ref", "--format=%(objectname) %(refname)", RECORD_REF_PREFIX]);
+  const out = new Map<string, string>();
+  if (r.code !== 0) return out;
+  for (const line of r.stdout.toString().split("\n").filter(Boolean)) {
+    const [sha, ref] = line.split(" ") as [string, string];
+    out.set(ref.slice(RECORD_REF_PREFIX.length), sha);
+  }
+  return out;
+}
+
+/**
+ * gh-195 D6, D7, D16 (B29, B30): the folder holding a finished story's record as its archive ref
+ * `refs/norn/runs/<story>` has it here (local refs only: never the network, H2), unpacked once per
+ * record commit into the machine dir's `archive/<story>/<commit>/` (`unpackRecordSync`: hostile
+ * entries refused, every file validated, renamed into place), older commits' copies dropped. Null when
+ * there is no such ref here, or its record does not unpack (nothing is guessed, S2). Read-only input.
+ */
+export function archivedRecordDir(root: string, story: string, sha: string | undefined = localRecordRefs(root).get(story)): string | null {
+  if (!sha || !/^[0-9a-f]{40,64}$/.test(sha)) return null;
+  const cache = archiveCacheDir(root, story);
+  const dir = join(cache, sha);
+  if (existsSync(dir)) return dir;
+  mkdirSync(cache, { recursive: true });
+  if (!unpackRecordSync(root, sha, dir).ok) return null;
+  for (const n of readdirSync(cache)) if (n !== sha && !n.startsWith(".")) rmSync(join(cache, n), { recursive: true, force: true });
+  return dir;
+}
+
+/**
+ * gh-195 D6 (B29, B30): fetch the archive refs of `stories` alone from `remote` into the same local
+ * refs, for a command that needs those stories' records (`run list`, `run view`, `story reopen`); a
+ * story the remote has no ref of is skipped. Returns the refs fetched; never touches another ref.
+ */
+export async function fetchRecords(root: string, remote: string, stories: readonly string[]): Promise<string[]> {
+  if (!stories.length) return [];
+  const wanted = new Set(stories.map(recordRef));
+  const listed = await git(root, ["ls-remote", remote, ...wanted]);
+  if (listed.code !== 0) throw new Error(`git ls-remote ${remote} failed: ${listed.stderr.trim()}`);
+  const refs = listed.stdout
+    .split("\n")
+    .map((l) => l.split("\t")[1]?.trim())
+    .filter((ref): ref is string => !!ref && wanted.has(ref));
+  if (!refs.length) return [];
+  const f = await git(root, ["fetch", "--quiet", "--no-tags", remote, ...refs.map((ref) => `+${ref}:${ref}`)]);
+  if (f.code !== 0) throw new Error(`git fetch ${remote} failed: ${f.stderr.trim()}`);
+  return refs;
+}
+
+/** Why a tree's run state could not be packed: no such folder at the rev, git failing, or a record that fails validation (S2). */
+export type TreeRecordFailure = { kind: "missing" | "git"; message: string } | { kind: "invalid"; errors: FileError[] };
+
+/**
+ * gh-195 D14 (B35): the record commit of a finished story's run state an older norn left in the tree
+ * at `rev`: the `<spec folder>/runs` subtree committed as is (`commit-tree`, no unpacking, no parent),
+ * with the `Norn-Story` and `Norn-Holder` trailers and commit time `at`. Its files are checked the way
+ * an unpack checks them (S2: a temp copy, discarded): a record that fails is not packed.
+ */
+export function treeRecordCommit(root: string, rev: string, story: RunStory, o: { holder: string; at: string }): { ok: true; sha: string; tree: string } | ({ ok: false } & TreeRecordFailure) {
+  const path = treeStoryRunStatePath(story);
+  const t = gitSync(root, ["rev-parse", "--verify", "-q", `${rev}:${path}`]);
+  if (t.code !== 0) return { ok: false, kind: "missing", message: `no ${path} at ${rev}` };
+  const tree = t.stdout.toString().trim();
+  const message = `norn: record ${story.key}\n\nNorn-Story: ${story.key}\nNorn-Holder: ${o.holder}\n`;
+  const c = gitSync(root, ["commit-tree", tree], new TextEncoder().encode(message), { env: { GIT_AUTHOR_DATE: o.at, GIT_COMMITTER_DATE: o.at } });
+  if (c.code !== 0) return { ok: false, kind: "git", message: `git commit-tree failed: ${c.stderr.trim()}` };
+  const sha = c.stdout.toString().trim();
+  const check = mkdtempSync(join(tmpdir(), "norn-record-check-"));
+  try {
+    const u = unpackRecordSync(root, sha, join(check, "record"));
+    if (!u.ok) return { ok: false, kind: "invalid", errors: u.errors.map((e) => ({ ...e, file: e.file.replace(join(check, "record"), join(root, path)) })) };
+  } finally {
+    rmSync(check, { recursive: true, force: true });
+  }
+  return { ok: true, sha, tree };
+}
+
+export type BaseRecordOutcome =
+  | { story: string; path: string; done: "pushed" | "already archived"; ref: string; sha: string }
+  | { story: string; path: string; done: "failed"; ref: string; reason: string };
+
+/** One outcome of `archiveBaseRunState`; a reason is kept to one line (git's stderr spans several). */
+function outcome(s: RunStory, r: { done: "pushed" | "already archived"; sha: string } | { done: "failed"; reason: string }): BaseRecordOutcome {
+  const at = { story: s.key, path: treeStoryRunStatePath(s), ref: recordRef(s.key) };
+  return r.done === "failed" ? { ...at, done: "failed", reason: r.reason.trim().split(/\s*\n\s*/).join("; ") } : { ...at, ...r };
+}
+
+function packFailure(f: TreeRecordFailure): string {
+  if (f.kind !== "invalid") return f.message;
+  return `its record fails validation: ${f.errors.map((e) => `${e.file}: ${e.errors.map((x) => x.message).join("; ")}`).join(", ")}`;
+}
+
+/** The finished stories whose `<spec folder>/runs` is in `HEAD` and still in the index (a staged removal is done), ascending. */
+function baseRunStateInIndex(root: string): RunStory[] {
+  const ls = gitSync(root, ["ls-tree", "-d", "-z", "--name-only", "HEAD", `${SPECS_DIR}/`]);
+  if (ls.code !== 0) return [];
+  const out: RunStory[] = [];
+  for (const dir of ls.stdout.toString("utf8").split("\0").filter(Boolean)) {
+    const m = parseSpecDirName(basename(dir));
+    if (!m) continue;
+    const story = { key: m.story, spec_dir: dir };
+    const path = treeStoryRunStatePath(story);
+    if (gitSync(root, ["rev-parse", "--verify", "-q", `HEAD:${path}`]).code !== 0) continue;
+    const indexed = gitSync(root, ["ls-files", "-z", "--", path]);
+    if (indexed.code === 0 && indexed.stdout.length) out.push(story);
+  }
+  return out.sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }));
+}
+
+/**
+ * Push each packed record to its ref on `remote`: one batch with a lease of "absent" each (`casRefs`),
+ * then each ref the batch rejected again alone, since a remote hook (`pre-receive`) refuses a whole
+ * push for one ref (B36).
+ */
+async function pushNewRecords(root: string, remote: string, packed: ReadonlyArray<{ story: RunStory; sha: string }>): Promise<BaseRecordOutcome[]> {
+  const results = await casRefs(root, remote, packed.map((p) => ({ ref: recordRef(p.story.key), sha: p.sha, expected: null })));
+  if (packed.length > 1)
+    for (const [i, p] of packed.entries()) if (results[i] && !results[i].ok && results[i].reason === "rejected") results[i] = await casRef(root, remote, recordRef(p.story.key), p.sha, null);
+  return packed.map((p, i) => {
+    const r = results[i];
+    return r?.ok ? outcome(p.story, { done: "pushed", sha: p.sha }) : outcome(p.story, { done: "failed", reason: `the push of ${recordRef(p.story.key)} failed (${r?.reason ?? "other"}): ${r && !r.ok ? r.message : ""}` });
+  });
+}
+
+/**
+ * gh-195 D14 (B35, B36; P6, GR6c, S1, S2): move every finished story's run state an older norn left in
+ * the main checkout's tree into its archive ref on `remote`. Each story (`baseRunStateInIndex`) is
+ * packed from `HEAD` (`treeRecordCommit`); a ref the remote already has with the same tree is a rerun
+ * after an interruption, and nothing is pushed for it; the rest go out by `pushNewRecords`. Only then
+ * is the removal of each archived story's `runs/` staged (`git rm`, refused for files changed since
+ * `HEAD`). A story whose record fails validation, whose push is rejected, or whose ref holds another
+ * record keeps its run state in the tree, unstaged, with the reason; with no remote, or one that
+ * cannot be read, every story does (the record must be on a remote before its removal), and no ref is
+ * written. Ascending by story.
+ */
+export async function archiveBaseRunState(root: string, remote: string | null, o: { holder: string; at: string }): Promise<BaseRecordOutcome[]> {
+  const stories = baseRunStateInIndex(root);
+  if (!stories.length) return [];
+  const all = (reason: string) => stories.map((s) => outcome(s, { done: "failed", reason }));
+  if (remote === null) return all("no git remote to push its archive ref to: the run state stays in the tree until one is configured");
+  let fetched: Set<string>;
+  try {
+    fetched = new Set(await fetchRecords(root, remote, stories.map((s) => s.key)));
+  } catch (e) {
+    return all(`the remote's archive refs could not be read: ${(e as Error).message}`);
+  }
+  const local = localRecordRefs(root);
+  const out = new Map<string, BaseRecordOutcome>();
+  const fresh: Array<{ story: RunStory; sha: string }> = [];
+  for (const s of stories) {
+    const packed = treeRecordCommit(root, "HEAD", s, o);
+    const have = fetched.has(recordRef(s.key)) ? local.get(s.key) : undefined;
+    if (!packed.ok) out.set(s.key, outcome(s, { done: "failed", reason: packFailure(packed) }));
+    else if (have === undefined) fresh.push({ story: s, sha: packed.sha });
+    else if ((await readLocalRef(root, `${have}^{tree}`)) === packed.tree) out.set(s.key, outcome(s, { done: "already archived", sha: have }));
+    else out.set(s.key, outcome(s, { done: "failed", reason: `${recordRef(s.key)} already holds another record (${have.slice(0, 12)})` }));
+  }
+  for (const r of await pushNewRecords(root, remote, fresh)) out.set(r.story, r);
+  // P6: every ref is on the remote before any removal is staged
+  for (const s of stories) {
+    const r = out.get(s.key) as BaseRecordOutcome;
+    if (r.done === "failed") continue;
+    const rm = await git(root, ["rm", "-r", "-q", "--", r.path]);
+    if (rm.code !== 0) out.set(s.key, outcome(s, { done: "failed", reason: `its archive ref is on the remote, but git rm refused: ${rm.stderr}` }));
+  }
+  return stories.map((s) => out.get(s.key) as BaseRecordOutcome);
+}
+
 /** A unit of a record read from git objects: its key and its validated state and pinned workflow. */
 export interface RecordObjectUnit {
   key: string;
@@ -266,7 +448,7 @@ export interface RecordObjectUnit {
 export async function readRecordObjects(root: string, story: string, sha: string): Promise<{ units: RecordObjectUnit[]; errors: FileError[] }> {
   const name = (path: string) => `${recordRef(story)}:${path}`;
   const fail = (path: string, message: string): FileError => ({ file: name(path), errors: [{ path: "", message }] });
-  const { entries, refused } = await recordEntries(root, sha, "/record", fail);
+  const { entries, refused } = recordEntries(root, sha, "/record", fail);
   if (refused.length) return { units: [], errors: refused };
   // the text files a reader needs: states, pinned workflows, receipts (never evidence or logs)
   const wanted = entries.filter((e) => /(^|\/)(state\.json|workflow\.yaml)$/.test(e.path) || /(^|\/)receipts\/[^/]+\.json$/.test(e.path));

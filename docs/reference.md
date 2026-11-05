@@ -188,7 +188,7 @@ norn story checkout [<story>] [--force]
 
 ##### `norn story handoff`
 
-Hand a story over: push branches and handoff, then delete the claim
+Hand a story over: push branches, handoff and the record, then delete the claim
 
 ```sh
 norn story handoff [<story>]

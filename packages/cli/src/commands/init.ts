@@ -2,7 +2,7 @@
  * `norn init` (A1, SK1, W1): repo config from the template if absent, workflow examples if
  * absent, the bundled skills into `.agents/skills/` (whole folders, the bundled version) linked
  * from each configured agent's skill folder, agent hooks (norn-owned, updated in place),
- * machine-local paths in .gitignore, and `runs/` marked generated in .gitattributes. Idempotent: re-running updates norn-owned files only.
+ * and machine-local paths in .gitignore (gh-195 B37: S10 is retired, so no `.gitattributes` line). Idempotent: re-running updates norn-owned files only.
  * gh-61 B1, B28 (D10): `norn_version` is recorded only in a repo that has none; on a repo set up
  * for another version, a differing bundled skill is left as it is and `norn upgrade` named instead.
  * Workflows created now get the repo's test command when its build files name one (`runtime/detect.ts`).
@@ -36,21 +36,6 @@ function ensureGitignore(root: string): string[] {
 }
 
 /**
- * S10: `runs/` is committed machine state (§7.1, S8); marking it generated makes GitHub and GitLab
- * collapse it in PR diffs, so a review shows the work, not the receipts.
- */
-const GENERATED = [".agents/specs/*/runs/** linguist-generated=true gitlab-generated=true"];
-
-function ensureGitattributes(root: string): string[] {
-  const path = join(root, ".gitattributes");
-  const text = readText(path) ?? "";
-  const lines = text.split("\n").map((l) => l.trim());
-  const missing = GENERATED.filter((p) => !lines.includes(p));
-  if (missing.length) atomicWrite(path, `${text}${text && !text.endsWith("\n") ? "\n" : ""}# norn (machine state, collapsed in diffs)\n${missing.join("\n")}\n`);
-  return missing;
-}
-
-/**
  * R8.1: installed hooks run `$NORN_BIN` when set — the norn that launched the agent (act exports
  * it) — else the `norn` on PATH. Hooks run through `sh -c`, which expands it.
  */
@@ -79,7 +64,6 @@ export interface InitReport {
   hooks: Array<{ agent: string; tier: string; changed: string[] }>;
   hook_command: string;
   gitignore: string[];
-  gitattributes: string[];
   /** the git remote norn pushes to; `url: null` when the repository has none (nothing can sync or push) */
   remote: { provider: string; label: string; git_remote: string; url: string | null };
   /** the `test` check command written into the workflows created now (null when none were created) */
@@ -115,8 +99,7 @@ function formatInit(r: InitReport): string {
   for (const h of r.hooks) row("hooks", `${h.agent}: ${h.tier === "none" ? "none (adapter has no hooks)" : h.changed.length ? `installed in ${h.changed.map(rel).join(", ")}` : "up to date"}`);
   row("hook command", r.hook_command);
   row(".gitignore", r.gitignore.length ? `added ${r.gitignore.join(", ")}` : "up to date");
-  row(".gitattributes", r.gitattributes.length ? `added ${r.gitattributes.join(", ")}` : "up to date");
-  const changed = r.config === "created" || r.norn_version.recorded || r.schemas.some((p) => p.startsWith(r.root)) || r.workflows.created.length || sk.updated.length || sk.links.some((l) => l.linked.length) || r.hooks.some((h) => h.changed.length) || r.gitignore.length || r.gitattributes.length;
+  const changed = r.config === "created" || r.norn_version.recorded || r.schemas.some((p) => p.startsWith(r.root)) || r.workflows.created.length || sk.updated.length || sk.links.some((l) => l.linked.length) || r.hooks.some((h) => h.changed.length) || r.gitignore.length;
   if (r.test_command) row("test command", `${r.test_command.command} (${r.test_command.detected_from ? `from ${r.test_command.detected_from}` : "not detected: the template's default"})`);
   row("remote", r.remote.url ? `${r.remote.git_remote} → ${r.remote.url}` : `no git remote named ${r.remote.git_remote}`);
   // B15, B29: the labels line says what norn did on the remote, or what to run
@@ -143,7 +126,7 @@ function nextSteps(r: InitReport, changed: boolean): string[] {
   if (changed) {
     // each agent folder whole (`.claude`, not `.claude/settings.json`): skills and hooks live there
     const top = (p: string) => rel(p).split("/")[0] as string;
-    const paths = [".agents", ...r.skills.links.map((l) => top(l.dir)), ...r.hooks.flatMap((h) => h.changed.map(top)), ...(r.gitignore.length ? [".gitignore"] : []), ...(r.gitattributes.length ? [".gitattributes"] : [])];
+    const paths = [".agents", ...r.skills.links.map((l) => top(l.dir)), ...r.hooks.flatMap((h) => h.changed.map(top)), ...(r.gitignore.length ? [".gitignore"] : [])];
     steps.push(`Commit and push the setup: \`git add ${[...new Set(paths)].join(" ")} && git commit -m "Set up norn" && git push\`.`);
   }
   steps.push(`Check this machine: \`${cmd.doctor()}\`.`);
@@ -234,7 +217,7 @@ export const initCommand = defineCommand({
     const url = gitRemoteUrl(root, ctx.config.git_remote);
     // GR10: after every file is in place, so the workflows (and the skills they name) are the repo's
     const labels = await remoteLabels({ remote: ports.remote, gitRemoteUrl: url, intake: ctx.config.label, workflows: checkedRepoWorkflows(loadWorkflows(root), root, ctx.config, ports.agents), create: true });
-    const report: InitReport = { root, config, user_config, schemas, workflows, skills, hooks, hook_command: command, gitignore: ensureGitignore(root), gitattributes: ensureGitattributes(root), remote: { provider: ctx.config.provider, label: ctx.config.label, git_remote: ctx.config.git_remote, url }, test_command, norn_version: { repo: repoVersion, running: ctx.version, recorded, skills_kept }, labels };
+    const report: InitReport = { root, config, user_config, schemas, workflows, skills, hooks, hook_command: command, gitignore: ensureGitignore(root), remote: { provider: ctx.config.provider, label: ctx.config.label, git_remote: ctx.config.git_remote, url }, test_command, norn_version: { repo: repoVersion, running: ctx.version, recorded, skills_kept }, labels };
     return rendered(report, formatInit(report));
   },
 });

@@ -125,6 +125,15 @@ Other machines see a story they do not hold: under `remote` step/attempt/counter
 - Tests (review #3): unit 1213 pass; typecheck clean; non-holder-views, record-objects, record-ref and contract-fakes: 43 pass. No flakes in these runs.
 - review#3 approve: Review #3: F15-F18 resolved (Norn-Outcome only when a step ends; moved advances, same-step and $stuck carry none; golden 4 cases trailer-only; CI read isolated; cat-file missing handled; commitFor options). All ACs proven. One nit F19: Action.advance type lacks moved.
 
+
+### Merge (integrate.conflict)
+
+- Merged the story branch (slices 09, 15, 16, 17) into the slice, `--no-ff`. Conflicts: `packages/store/src/record-ref.ts` and `test/support/harness.ts` imports.
+- record-ref.ts: one set of entry checks (`recordEntries`, now sync on `gitSync`) and JSON checks (`jsonErrors`) shared by 16's `unpackRecordSync` (and so `unpackRecord`, `archivedRecordDir`, `treeRecordCommit`) and this slice's `readRecordObjects`; 16's archive cache is the only unpack cache.
+- RemotePort carries both `rawFileUrl` (15) and `pullRequestCi`; transcript call map gained `pullRequestCi`. F19: `moved?: true` declared on the advance in actions.ts.
+- No commit path added by 09/15/16/17 ends a step (close, release, integrate, take commits are not boundaries; open-pr's outcome goes through `endedWith`). Golden `--update`: 0 of 126 changed; transcripts unchanged.
+- Tiers after the merge: unit 1218 pass; integration 801 pass / 6 skip; e2e 72 pass / 2 skip.
+
 ## Resume
 
-Review #3 approved; next is the workflow's next step. F19 (a nit) is optional.
+Merge committed; `norn done done` for the merge step.

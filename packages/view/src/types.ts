@@ -317,12 +317,13 @@ export interface UnitTraceSummary {
  */
 export interface TraceRecords {
   /** gh-195/05 (S12): `machine` = the checkout's machine dir holds the run state (`root` its story folder) */
-  source: "machine" | "worktree" | "checkout" | "base_cache";
+  /** gh-195 D7, D16 (B29): `archive` = a finished story's record from its archive ref, unpacked into the machine dir's cache (`root`) */
+  source: "machine" | "worktree" | "checkout" | "archive";
   root: string;
-  /** checkout records identical to the base branch copy */
-  same_as_base?: boolean;
-  /** base_cache: the remote-tracking ref the copy was taken from */
+  /** archive: the record ref (`refs/norn/runs/<story>`) */
   ref?: string;
+  /** archive: the record commit read */
+  commit?: string;
 }
 
 /** `norn run list <unit>`: rows of the unit (and, for a story, its slices interleaved). */

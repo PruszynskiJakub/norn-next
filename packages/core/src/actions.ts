@@ -144,7 +144,15 @@ export interface ApplyReceiptsAction extends UnitBase, Transition, Delivery {
   /** receipts refused (stale step/attempt T9, wrong kind for the step); act writes each to the trace as a `reject` event */
   rejected: Rejection[];
   /** edge taken, if the cursor moved */
-  advance: { from: string; outcome: string; to: string; counter?: { name: string; value: number; max: number }; reset?: string[] } | null;
+  advance: {
+    from: string;
+    outcome: string;
+    to: string;
+    counter?: { name: string; value: number; max: number };
+    reset?: string[];
+    /** gh-195 B18, B19: a person's receipt moved the cursor (workflow, unstick, update; `Advance.moved`): no step ended */
+    moved?: true;
+  } | null;
 }
 
 /** Start a unit: pin its workflow (S7), create the worktree, write the first state. */

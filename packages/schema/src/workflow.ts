@@ -42,7 +42,11 @@ function fixedOutcomes<const K extends string>(keys: readonly K[]) {
   return Type.Object(props, { minProperties: 1, additionalProperties: false });
 }
 
-/** Named input kinds of an agent step (B3, B6). `{ file }` is relative to the spec folder. */
+/**
+ * Named input kinds of an agent step (B3, B6). `{ file }` is relative to the spec folder. `record`
+ * (gh-195 D5, B28): each unit's receipts and evidence folders in the machine dir, and the record path
+ * to link evidence by.
+ */
 export const InputKind = Type.Union([
   Type.Literal("spec"),
   Type.Literal("slice"),
@@ -51,6 +55,7 @@ export const InputKind = Type.Union([
   Type.Literal("handoff"),
   Type.Literal("last_check"),
   Type.Literal("last_findings"),
+  Type.Literal("record"),
 ]);
 export type InputKind = Static<typeof InputKind>;
 export const StepInput = Type.Union([

@@ -53,6 +53,12 @@ export interface BriefInput {
   rulings?: readonly Ruling[];
   /** QV1: the unit's frontmatter `criteria` (slice file, or spec.md for the story unit), when the caller read them */
   criteria?: readonly Criterion[] | null;
+  /**
+   * gh-195 D5 (B28): for the `record` input, each unit of the story's record: its folder name in the
+   * record (`_story`, `<nn>-<slug>`) and its run-state folder in the machine dir (absolute; the story's
+   * current round for `_story`), when the caller listed them
+   */
+  record?: ReadonlyArray<{ unit: string; dir: string }>;
 }
 
 /**
@@ -251,6 +257,12 @@ function inputs(input: BriefInput, step: AgentStep, rw: BriefJson["rework"]): Br
         return [{ kind: i, label: "Last failing check", ref: rw?.check ? "see Rework" : "none" }];
       case "last_findings":
         return [{ kind: i, label: "Last findings", ref: rw && (rw.findings || rw.report || rw.decision) ? "see Rework" : "none" }];
+      // gh-195 D5 (B28): run state is in the machine dir, not the worktree; evidence is linked by its record path
+      case "record":
+        return (input.record ?? []).flatMap((u) => [
+          { kind: i, label: `Receipts of ${u.unit} (QA criteria reports)`, ref: `${u.dir}/receipts/` },
+          { kind: i, label: `Evidence of ${u.unit}; link a file as evidence/${u.unit}/<run_id>/<file>`, ref: `${u.dir}/evidence/` },
+        ]);
     }
   });
 }
