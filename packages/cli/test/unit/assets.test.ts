@@ -31,8 +31,12 @@ const SKILLS = [
   "norn-codebase-design",
   "norn-prototype",
   "norn-retro",
+  "norn-fsd-round",
+  "norn-fsd",
 ];
-const CRAFT = SKILLS.filter((s) => s !== "norn");
+/** gh-196 D6: the supervisor skills drive norn's own commands from the main checkout (SK3), so like `norn` they know norn */
+const SUPERVISOR = ["norn-fsd-round", "norn-fsd"];
+const CRAFT = SKILLS.filter((s) => s !== "norn" && !SUPERVISOR.includes(s));
 
 const readSkill = (name: string) => readFileSync(join(SKILLS_DIR, name, "SKILL.md"), "utf8");
 const workflowFiles = readdirSync(WORKFLOWS_DIR).filter((f) => /\.(ya?ml|json)$/.test(f));
@@ -250,6 +254,42 @@ describe("skills", () => {
     const text = readSkill("norn");
     for (const s of ["norn brief", "norn done", "norn ask", "norn stuck", "--handoff", "Do instead", "handoff.md", "Goal", "Progress", "Resume", "git push", "runs/", "gh", "glab"])
       expect(text).toContain(s);
+  });
+
+  // gh-196 S2: the supervisor protocol states its terms (SK3); the command lint checks every command it prints
+  test("norn-fsd-round states the supervisor protocol (B2–B32, B35–B45, SK3)", () => {
+    const text = readSkill("norn-fsd-round");
+    const terms = [
+      // B2, B4, B3, B38: where and what it supervises
+      ".norn-unit", "main checkout", "One supervisor per checkout", "Named stories only", "/release-start",
+      // B8, B9: the watch is checked, never started
+      "No watch is running", "`! norn watch`", "heartbeat",
+      // B5, B6, B7: one foreground subagent per story, one voice, JSON only
+      "one subagent per story", "foreground", "norn story wait", "--json", "never grep markdown",
+      // B10: auto mode, never a step's commands
+      "norn story edit <story> --auto", "norn brief", "norn story start",
+      // B11–B14, B18, B23: delegated decisions with reasons
+      "--delegated --reason", "norn story answer", "norn story approve", "norn story reject", "norn run rerun", "--reset",
+      // B15, B19, B20: CI and the PR
+      "gh run rerun --failed", "exact head", "runs/", "handoff.md", "PR's state",
+      // B16, B17: allowed, forbidden, permission rule
+      "Allowed:", "Forbidden:", "norn tick", "norn run cancel", "--force", "norn story checkout", "Bash(norn story approve:*)",
+      // B24–B30, B39, B40: escalations
+      "merge", "force pushes", "rules file", "max_agents", "closing an issue", "`release`'s `ready`", "question set", "sent once", "quiet",
+      // B41–B43: load and flakes
+      "reason: timeout", "load", "suspected flake", "never run tests in a unit worktree",
+      // B37: stops at the round's end
+      "Never start another round",
+      // B44, B45: the report
+      "One report", "delegated decisions with their reasons", "suspected flakes", "waiting: your answer to",
+    ];
+    expect(terms.filter((t) => !text.includes(t))).toEqual([]);
+  });
+
+  test("norn-fsd links norn-fsd-round and adds the round choice and the round start (B31–B36, D6)", () => {
+    const text = readSkill("norn-fsd");
+    const terms = ["norn-fsd-round", ".norn-unit", "`quick`", "`story`", "`reproduce`", "--workflow <name> --delegated --reason", "Never `--force`", "never on an unfinished round", "closing the issue", "rules file", "norn story start", "Never type into the pane"];
+    expect(terms.filter((t) => !text.includes(t))).toEqual([]);
   });
 
   test("norn-review traces every Behaviour item and criterion to a test, and writes the table into the handoff (gh-169)", () => {
