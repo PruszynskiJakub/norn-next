@@ -71,6 +71,26 @@ Other machines see a story they do not hold: under `remote` step/attempt/counter
 - Flakes (rework): `packages/cli/test/integration/human.test.ts` "gh-71 … starts the next round" — timed out (30 s) in the parallel tier, passed 3/3 isolated and in the earlier full run; this slice's code does not touch the round path.
 - implement#2 done: Rework review#1: F1 RemotePort.pullRequestCi (gh/glab+fixtures, FakeRemote, contract case) shown in story view + status; F9 boundary commits carry Norn-Outcome, last boundary = newest with it, walk bounded by base (golden: trailer only); F2/F3/F14 no record cache: views read the ref from git objects with shared entry/JSON checks, S2 errors reported; F4 fetch failures reported; F5 data-only view; F10 heartbeat-only; F11/F12 tests strengthened; F13 by cherry-picked afb441ddb. Note: RULES.md S4 should list Norn-Outcome (not edited). Flake: human.test round tests timed out once under load (3/3 alone).
 
+
+### Review #2 (changes_requested)
+
+| Item | Verifier | Proven by |
+| --- | --- | --- |
+| B17 / B10 / AC1 | test | `packages/cli/test/integration/non-holder-views.test.ts` › "AC1: A finishes implement, B ticks: …" |
+| B13 / AC2 | test | `non-holder-views.test.ts` › "AC2: after the team switches remote → local, …" |
+| B18 / AC3 | test | `non-holder-views.test.ts` › "AC3: a boundary for implement and a PR with CI: …" and "F9: a mirror and an ask commit after the boundary do not move it" (unstick not covered: F15); CI port: `remoteContract` › "pullRequestCi: none, pending, failure and success …" (gh, glab, FakeRemote) |
+| B19 / AC4 | test | `non-holder-views.test.ts` › "AC4: no boundary commit yet (the start, a mirror and an ask commit are none) …" |
+| B30 / AC5 | test | `non-holder-views.test.ts` › "AC5: gh-9 held by A, gh-10 held by B with a ref, a closed gh-4 with a ref: …" |
+
+- Review #1's F1–F14 are resolved (F10 is accepted: judging by heartbeat is right, and claims go at GR6/GR6b).
+- Blocking F15: `endedWith` (packages/core/src/decide/receipts.ts:144) sets Norn-Outcome on same-step advances, e.g. `implement.unstick → implement` in two golden cases. A resumed step then reads as "last boundary: implement".
+- Minor: F16, a CI read failure fails the whole sync (observe/index.ts:219); F17, `cat-file --batch` `missing` replies are misparsed (record-ref.ts:280).
+- Nit: F18, commitFor's positional `fresh?: undefined`.
+- Not blocking: the S4 rule text for Norn-Outcome is routed to slice 18.
+- Tests (review #2): unit 1213 pass; typecheck clean; non-holder-views, contract, contract-fakes and record-ref files: 122 pass; record-ref.test.ts 5/5 isolated (~3.5 s each).
+- Flakes: `packages/cli/test/integration/human.test.ts` (gh-71 "story edit --workflow starts the next round" timeouts in the parallel tier) passed 3/3 isolated (39 pass / 6 skip, none new). It is a flake (load).
+- review#2 changes_requested: Review #2: F1-F14 resolved. 1 blocking — F15 endedWith sets Norn-Outcome on same-step advances (implement.unstick → implement in golden), so a resumed step shows as last boundary (B18/B19). Minor: F16 CI read failure fails whole sync; F17 cat-file --batch missing reply misparsed. Nit F18. human.test flake confirmed 3/3 isolated.
+
 ## Resume
 
-Reported `norn done done`; next is the test check, then review#2.
+Review #2 requested changes: fix F15 first (Norn-Outcome only when the cursor moves to another step; add tests; re-run golden --update), then F16 and F17 if worth it.
