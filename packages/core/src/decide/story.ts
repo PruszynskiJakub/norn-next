@@ -315,12 +315,15 @@ function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: U
 /** gh-71 D3/D5: a slice that is neither integrated nor dropped (an unreadable file counts as unfinished). */
 const sliceUnfinished = (s: StoryFacts["slices"][number]): boolean => s.frontmatter?.status !== "integrated" && s.frontmatter?.status !== "dropped";
 
-/** GR8: the story unit has left a step whose skill is `refine` (cursor elsewhere, or re-entered later). */
+/** GR8: a refine step's skill, under the bundled name every shipped workflow uses (`norn-refine`) or the bare one (gh-73). */
+const REFINE_SKILLS = new Set(["refine", "norn-refine"]);
+
+/** GR8: the story unit has left a refine step (cursor elsewhere, or re-entered later). */
 function refineFinished(uf: UnitFacts | null): boolean {
   const st = uf?.state;
   const wf = uf?.workflow;
   if (!st || !wf) return false;
-  return Object.entries(wf.steps).some(([name, step]) => step.type === "agent" && step.skill === "refine" && ((st.visits[name] ?? 0) >= 2 || ((st.visits[name] ?? 0) >= 1 && st.step !== name)));
+  return Object.entries(wf.steps).some(([name, step]) => step.type === "agent" && REFINE_SKILLS.has(step.skill) && ((st.visits[name] ?? 0) >= 2 || ((st.visits[name] ?? 0) >= 1 && st.step !== name)));
 }
 
 function mirror(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: UnitFacts | null, issue: RemoteIssue): void {

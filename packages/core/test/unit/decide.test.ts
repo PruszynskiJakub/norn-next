@@ -757,6 +757,21 @@ describe("audit fixes", () => {
     atRefine.units[0]!.state = { ...atRefine.units[0]!.state!, status: "parked", park: { kind: "attended", reason: "x", since: at() } };
     expect(kinds(facts([atRefine]))[0]).not.toContain("update_story_mirror");
   });
+
+  test("GR8 (gh-73): a refine step on the bundled skill `norn-refine` records refined_body_hash too", () => {
+    // every shipped workflow names the skill `norn-refine` (refinement.yaml), never bare `refine`
+    const wf: Workflow = { ...STORY_WF, steps: { ...STORY_WF.steps, refine: { ...(STORY_WF.steps.refine as AgentStep), skill: "norn-refine" } } };
+    const f = storyAt("slices", {}, [{ nn: "01", state: { status: "running" } }]);
+    f.units[0]!.workflow = wf;
+    f.units[0]!.state = { ...f.units[0]!.state!, visits: { refine: 1, slices: 1 } };
+    expect(only(facts([f]))).toMatchObject({ kind: "update_story_mirror", rule: "remote.mirror.refined", fields: { refined_body_hash: sha256("body") } });
+    // a later round on a workflow without a refine step keeps the recorded hash: the body change still surfaces
+    const later = storyAt("slices", {}, [{ nn: "01", state: { status: "running" } }]);
+    later.issue = { ...later.issue!, body: "new body" };
+    later.units[0]!.workflow = { ...wf, steps: Object.fromEntries(Object.entries(wf.steps).filter(([n]) => n !== "refine")), start: "slices" };
+    later.frontmatter = { ...later.frontmatter!, refined_body_hash: sha256("body") };
+    expect(only(facts([later]))).toMatchObject({ kind: "update_story_mirror", fields: { body_hash: sha256("new body") }, notify: { title: "issue body changed since refine" } });
+  });
 });
 
 describe("commit trailers (S4, R3.1)", () => {
