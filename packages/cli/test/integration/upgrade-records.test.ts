@@ -28,11 +28,11 @@ let h: Harness;
 afterEach(() => h?.cleanup());
 
 /** A repo set up by norn, with three finished stories' run state in main's tree and the S10 line, pushed. */
-async function olderBase(): Promise<Harness> {
+async function olderBase(attributes: string | null = OLD_ATTRIBUTES): Promise<Harness> {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
   h.config(CONFIG);
-  h.write(join(h.root, ".gitattributes"), OLD_ATTRIBUTES);
+  if (attributes !== null) h.write(join(h.root, ".gitattributes"), attributes);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);
   h.git(["push", "-q", "origin", "main"]);
@@ -80,7 +80,9 @@ describe("norn upgrade moves the base's run state into archive refs (B35)", () =
     expect(list.split("\n").filter((l) => l.startsWith("round "))).toEqual(["round 1 · story · finished"]);
 
     // gh-195/16 AC6: once the removal is committed (and pushed), neither doctor nor status points to upgrade
+    await h.norn("sync");
     expect((await h.norn("doctor", "--repo", "--json")).value).toMatchObject({ repo: { run_state: { ok: false } } });
+    expect(await statusItems()).toHaveLength(1);
     h.git(["commit", "-q", "-m", "Move norn run state to archive refs (norn upgrade)"]);
     h.git(["push", "-q", "origin", "main"]);
     await h.norn("sync");
@@ -126,6 +128,9 @@ describe("a rejected ref push removes nothing for that story (B36)", () => {
       const v = r.value as Upgraded;
       expect(v.run_state.map((s) => `${s.story} ${s.done}`)).toEqual(["gh-1 pushed", "gh-4 failed", "gh-7 pushed"]);
       expect(v.run_state[1]?.reason).toContain(recordRef("gh-4"));
+      // the remote's own reason, on one line
+      expect(v.run_state[1]?.reason).toContain("archive refused");
+      expect(v.run_state[1]?.reason).not.toContain("\n");
       expect(remoteSha(recordRef("gh-4"))).toBeNull();
       expect(existsSync(join(h.root, SPEC(4), "runs/_story/state.json"))).toBe(true);
       const staged = stagedPaths();
@@ -158,6 +163,79 @@ describe("a rejected ref push removes nothing for that story (B36)", () => {
     expect(v.run_state[1]?.reason).toContain("0099-done.json");
     expect(remoteSha(recordRef("gh-4"))).toBeNull();
     expect(stagedPaths().some((p) => p.startsWith(`${SPEC(4)}/`))).toBe(false);
+  });
+});
+
+describe("upgrade removes nothing whose record is not on the remote (B36, P6)", () => {
+  test("an unreadable remote: every story named, no ref, nothing staged, the .gitattributes line kept and no run-state commit offered", async () => {
+    await olderBase();
+    h.git(["remote", "set-url", "origin", join(h.root, "..", "gone.git")]);
+    const r = await h.norn("upgrade", "--json");
+    expect(r.exit).toBe(0);
+    const v = r.value as Upgraded;
+    expect(v.run_state.map((s) => `${s.story} ${s.done}`)).toEqual(["gh-1 failed", "gh-4 failed", "gh-7 failed"]);
+    expect(v.run_state[0]?.reason).toContain("could not be read");
+    expect(STORIES.map((n) => remoteSha(recordRef(`gh-${n}`)))).toEqual([null, null, null]);
+    // the version part still stages norn_version; nothing of the run state or .gitattributes
+    expect(stagedPaths().filter((p) => p.includes("/runs/") || p === ".gitattributes")).toEqual([]);
+    expect(readFileSync(join(h.root, ".gitattributes"), "utf8")).toBe(OLD_ATTRIBUTES);
+    expect(v.commit ?? "").not.toContain("archive refs");
+  });
+
+  test("no git remote: nothing is packed locally or removed, and the reason says so", async () => {
+    await olderBase();
+    h.git(["remote", "remove", "origin"]);
+    const v = (await h.norn("upgrade", "--json")).value as Upgraded;
+    expect(v.run_state.map((s) => `${s.story} ${s.done}`)).toEqual(["gh-1 failed", "gh-4 failed", "gh-7 failed"]);
+    expect(v.run_state[0]?.reason).toContain("no git remote");
+    expect(h.git(["for-each-ref", "refs/norn/runs/"]).trim()).toBe("");
+    // the version part still stages norn_version; nothing of the run state or .gitattributes
+    expect(stagedPaths().filter((p) => p.includes("/runs/") || p === ".gitattributes")).toEqual([]);
+    expect((await h.norn("upgrade")).stdout).not.toContain("pushed");
+  });
+
+  test("a remote ref that holds another record: that story keeps its run state, unstaged, the others move", async () => {
+    await olderBase();
+    const other = h.git(["commit-tree", h.git(["rev-parse", `HEAD:${SPEC(4)}/slices`]).trim(), "-m", "another record"]).trim();
+    h.git(["push", "-q", "origin", `${other}:${recordRef("gh-4")}`]);
+    const v = (await h.norn("upgrade", "--json")).value as Upgraded;
+    expect(v.run_state.map((s) => `${s.story} ${s.done}`)).toEqual(["gh-1 pushed", "gh-4 failed", "gh-7 pushed"]);
+    expect(v.run_state[1]?.reason).toContain("another record");
+    expect(remoteSha(recordRef("gh-4"))).toBe(other);
+    expect(stagedPaths().some((p) => p.startsWith(`${SPEC(4)}/`))).toBe(false);
+  });
+});
+
+describe("the .gitattributes line (S10 retired, B35)", () => {
+  test("a tracked file left with only norn's lines is deleted and its deletion staged", async () => {
+    await olderBase(OLD_ATTRIBUTES.replace("*.png binary\n", ""));
+    const v = (await h.norn("upgrade", "--json")).value as Upgraded;
+    expect(existsSync(join(h.root, ".gitattributes"))).toBe(false);
+    expect(h.git(["diff", "--cached", "--name-status", "--", ".gitattributes"]).trim()).toBe("D\t.gitattributes");
+    expect(v.staged).toContain(".gitattributes");
+  });
+
+  test("an untracked file with only norn's lines: removed, nothing staged for it, and upgrade still reports", async () => {
+    await olderBase(null);
+    h.write(join(h.root, ".gitattributes"), OLD_ATTRIBUTES.replace("*.png binary\n", ""));
+    const r = await h.norn("upgrade", "--json");
+    expect(r.exit).toBe(0);
+    const v = r.value as Upgraded;
+    expect(v.run_state.map((s) => s.done)).toEqual(["pushed", "pushed", "pushed"]);
+    expect(existsSync(join(h.root, ".gitattributes"))).toBe(false);
+    expect(v.staged).not.toContain(".gitattributes");
+    expect(stagedPaths()).not.toContain(".gitattributes");
+  });
+
+  test("an untracked file with the person's lines: edited, never staged, and said so", async () => {
+    await olderBase(null);
+    h.write(join(h.root, ".gitattributes"), OLD_ATTRIBUTES);
+    const v = (await h.norn("upgrade", "--json")).value as Upgraded;
+    expect(readFileSync(join(h.root, ".gitattributes"), "utf8")).toBe("*.png binary\n");
+    expect(v.staged).not.toContain(".gitattributes");
+    expect(stagedPaths()).not.toContain(".gitattributes");
+    expect(h.git(["status", "--porcelain", "--", ".gitattributes"]).trim()).toBe("?? .gitattributes");
+    expect(v).toMatchObject({ gitattributes: "untracked" });
   });
 });
 

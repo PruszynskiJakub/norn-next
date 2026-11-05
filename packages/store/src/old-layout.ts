@@ -5,6 +5,7 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, renameSync, rmdirSync, rmSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { atomicWrite, isErrno, readText } from "./fsx.ts";
+import { gitSync } from "./git.ts";
 import { ensureCheckoutFile } from "./machine-dir.ts";
 import { machineDir, OLD_NORN_DIR, OLD_TRACE_DIR, OLD_WORKFLOWS_DIR, oldTickLockPath } from "./paths.ts";
 
@@ -65,18 +66,21 @@ export const OLD_RUNS_ATTRIBUTE_LINES = ["# norn (machine state, collapsed in di
 
 /**
  * gh-195 S10 (retired, B35): drop an older norn's `runs/**` line (and its comment) from `.gitattributes`,
- * the person's lines kept; a file left with nothing in it is deleted. True when the file changed.
+ * the person's lines kept; a file left with nothing in it is deleted. `changed` when the file changed,
+ * `tracked` when git tracks it (only then may the change be staged: an untracked file never is).
  */
-export function dropRunsAttribute(root: string): boolean {
+export function dropRunsAttribute(root: string): { changed: boolean; tracked: boolean } {
   const path = join(root, ".gitattributes");
   const text = readText(path);
-  if (text === null) return false;
+  if (text === null) return { changed: false, tracked: false };
   const lines = text.split("\n");
   const kept = lines.filter((l) => !OLD_RUNS_ATTRIBUTE_LINES.includes(l.trim()));
-  if (kept.length === lines.length) return false;
+  if (kept.length === lines.length) return { changed: false, tracked: false };
+  const ls = gitSync(root, ["ls-files", "-z", "--", ".gitattributes"]);
+  const tracked = ls.code === 0 && ls.stdout.length > 0;
   if (kept.every((l) => l.trim() === "")) rmSync(path);
   else atomicWrite(path, kept.join("\n"));
-  return true;
+  return { changed: true, tracked };
 }
 
 /** Remove the old layout's folders once they are empty (the lock already dropped). */

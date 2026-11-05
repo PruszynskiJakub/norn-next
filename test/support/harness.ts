@@ -507,7 +507,7 @@ export function archiveTreeRunState(root: string, rev: string, specDir: string, 
   const key = parseSpecDirName(basename(specDir))?.story;
   if (!key) throw new Error(`not a spec folder: ${specDir}`);
   const packed = treeRecordCommit(root, rev, { key, spec_dir: specDir }, { holder: "older-norn@machine", at: new Date(T0).toISOString() });
-  if (!packed.ok) throw new Error(`${specDir}: ${JSON.stringify(packed.errors)}`);
+  if (!packed.ok) throw new Error(`${specDir}: ${JSON.stringify(packed)}`);
   sh(root, ["push", "-q", remote, `${packed.sha}:${recordRef(key)}`]);
   return packed.sha;
 }
