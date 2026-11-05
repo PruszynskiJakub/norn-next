@@ -10,7 +10,16 @@ Add a short `REVIEW.md` at the repo root (what to skip, what counts as a failure
 - Docs-only change: no new test. `bun run test` (1258 pass) and `bun run typecheck` green.
 - Friction: the worktree had no `node_modules`; `bun run test` failed 64 tests and `tsc` was missing until `bun install`.
 - implement#1 done: Added REVIEW.md (skip list, failure kinds citing S1/P6/S5, finding format) and Risk / How to revert to the PR template. Style line names the type check and repo lints instead of Biome, which the repo does not have. Unit tier and typecheck green.
+- review#1: approve. Traceability (docs-only; checked by reading the diff, no test expected):
+
+| Item | Verifier | Proven by |
+| --- | --- | --- |
+| W1 REVIEW.md skip list (5 paths) | agent | QA (agent): `REVIEW.md` § Skip, all paths exist |
+| W2 failure kinds (format, race, S1, core IO) | agent | QA (agent): `REVIEW.md` § What counts as a failure |
+| W3 no style nits; file and line per finding | agent | QA (agent): `REVIEW.md` § How to write a finding (names lints, not Biome: repo has none) |
+| W4 PR template Risk and How to revert | agent | QA (agent): `.github/pull_request_template.md` |
+- review#1 approve: REVIEW.md and PR template Risk / How to revert meet the spec; no blocking findings. Minor: style line names the repo lints, not Biome (absent).
 
 ## Resume
 
-Nothing left for implement; next is review of the diff.
+Review approved; nothing left for review. Person may confirm the Biome wording (F1, minor).
