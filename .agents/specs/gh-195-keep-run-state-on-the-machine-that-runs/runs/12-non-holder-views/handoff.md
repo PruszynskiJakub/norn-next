@@ -103,4 +103,4 @@ Other machines see a story they do not hold: under `remote` step/attempt/counter
 
 ## Resume
 
-Run integration and e2e; regenerate transcripts if they change; commit; `norn done done`.
+Reported `norn done done` after integration 768 pass / 6 skip and e2e 72 pass / 2 skip (transcripts unchanged); next is the test check, then review#3.
