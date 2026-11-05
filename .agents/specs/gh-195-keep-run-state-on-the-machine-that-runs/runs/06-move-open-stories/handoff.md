@@ -14,6 +14,19 @@
 
 ## Goal
 
+An open story whose branches still hold `runs/` from an older norn moves each unit's record into the holder's machine dir at its first tick, removes it from each branch in one pushed commit, and goes on at the same step and attempt (B34, D13 steps 1, 3, 4; AC1–AC4).
+
 ## Progress
 
+- Observe (store snapshot, effect-free, H2): a story worktree (and each slice worktree) whose tree still holds run-state files in `<spec>/runs/` (`treeRunStateFiles`: everything but the units' handoffs) gives its unit a `branch_record {path, copy}`; units the machine dir holds no state of but that tree does are read from the tree (`tree_root`), so their state and errors are the branch's. `copy` = the units read from that worktree's tree ([] = an interrupted move: only the removal left). A slice's record on the story branch moves with the story unless the slice's own worktree reads it.
+- Decide (`moveRecords` in decide/story.ts, before round.migrate): one `move_record` per branch (rule `record.move`; the other units it copies get a `record.move` noop). A flat `_story` record goes to `rounds/01-<wf>` (`roundRunStatePath`). `record.move_waits` when the worktree is mid-merge/rebase (H1) or a record to move failed validation (S2: decideUnit marks the broken unit corrupt, never writing `status: corrupt` into a branch-read record; nothing moves).
+- Act (`moveRecord`, act/lifecycle.ts; store `record-move.ts`): `copyTreeRecord` stages each record beside its target without the handoff, validates every state/workflow/receipt (`recordErrors`), then `atomicCopyDir`; skips a target that already has state.json (resumable, AC3). Then `removeTreeRunState` (handoffs kept, empty folders pruned) and one commit of that path only (handoffs excluded by pathspec) "norn: move <unit> run state off the branch", pushed.
+- Tests: `packages/cli/test/integration/run-state-move.test.ts` (AC1 gh-9 at implement attempt 2 / review_loop 1; AC3 interrupted copy and a broken receipt; AC4 flat; AC2 story + two slices). Fixture helper `toBranchRunState` in test/support/harness.ts. Hand-built rule cases for `record.move` and `record.move_waits` (packages/core/test/rule-cases.ts).
+- Golden: `golden --update` 0 of 117 changed (and 0 of 119 after); `bun run golden` added 2 harvested cases (run-state-move-80f5f3cf87f4: record.move with a copy; run-state-move-48bb90e87146: record.move with copy []). Transcripts and observe snapshots: untouched (no older-layout story in those flows).
+- Out of scope, untouched: the handoff's move (gh-195/07), the ref push under `remote` (gh-195/08), finished stories on the base (gh-195/17). The three story-carried skips are as they were.
+- Flakes: none so far.
+- Note for later: an interruption between deleting the files and the commit (a crash in that window) leaves the deletions unstaged; the next boundary commit (`git add -A`) carries them instead of a separate move commit.
+
 ## Resume
+
+Run the integration and e2e tiers; if green, report `norn done done`.
