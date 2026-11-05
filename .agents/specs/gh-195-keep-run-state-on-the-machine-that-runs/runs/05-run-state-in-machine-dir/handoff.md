@@ -66,7 +66,10 @@ Traceability (T = `packages/cli/test/integration/run-state-machine-dir.test.ts`)
 - F5: new test "AC5: a tick while a detached check run is writing its receipt…": gh-12's check blocks on a file; ticks taken without waiting see `check.running`; with the receipt's reservation taken and half-written temp receipt and state.json left (S1 crash leftovers) a tick still waits, not corrupt; the check finishes, its receipt is in the machine dir with state.json not past it; the next tick applies it once (applied_through = its number, `$done` pass), a later tick neither re-applies nor re-runs it.
 - F9: AC6 asserts every S4 trailer (Norn-Story, Norn-Step, Norn-Tick, no Norn-Slice). Counters/attempt-via-status left as they were (time).
 - F6/F7: left as noted (name them in the PR; B34 flat tests are mechanics only until gh-195/06). F10 stays until gh-195/10–11.
-- Golden `--update`: 0 of 113 changed.
+- F8: story start reads the claim without swallowing a git error and checks again under the tick lock before it remakes the worktree; the self-take receipt from checkoutStory stays (not avoidable cheaply). F12: trailing-comma imports fixed in 22 files; the transcript normaliser's machine-dir id regex is greedy and anchored to the segment end. F11: handoff path via store's `handoffPath`.
+- Golden `--update`: 0 of 113 changed. `bun run golden` added 4 harvested cases (housekeeping-e2cb22d328bf and run-state-machine-dir-d12b979486b3 bring `worktree.marker`; two story-reopen cases). Transcripts and observe snapshots unchanged (no diff).
+- Tiers at the end: unit 1202 pass; integration 718 pass / 9 skip / 0 fail (story-added: the 6 tests of human.test "mailbox (T9)…" → gh-195/13; the other 3 are not story-added); e2e 71 pass / 2 skip / 0 fail (recovery R2.3 → 14, team clone B → 10–11). The run-cancel loosening is gone.
+- Flakes: none.
 - Friction: the `implement#2 started` commit (released norn) swept my uncommitted F1 edit (run-cancel.ts and its test) into norn's own commit 232519cab.
 
 ## Resume
