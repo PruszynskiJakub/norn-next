@@ -1,8 +1,8 @@
 ---
 id: gh-195/07
 title: Handoffs move to handoffs/<unit>.md, prose only
-depends_on: [gh-195/02, gh-195/05, gh-195/06]
-status: planned
+depends_on: [ gh-195/02, gh-195/05, gh-195/06 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
