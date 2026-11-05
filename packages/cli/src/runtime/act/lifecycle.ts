@@ -206,7 +206,7 @@ function claimed(act: ActEnv, a: Extract<Action, { kind: "claim" }>, r: ClaimWri
 /**
  * R3.1: after losing `claim.acquire.intake`, remove what decide said holds nothing beyond the
  * intake (`lost_intake.drop`): the story worktree, its local branch (and the spec folder in it) and
- * its slot. Otherwise keep everything; observe then reports the local work (R2.3).
+ * its slot. Otherwise keep everything: the branch and worktree stay for a person to look at.
  */
 async function dropLostIntake(act: ActEnv, story: string, lost: Extract<Action, { kind: "claim" }>["lost_intake"]): Promise<{ removed: string[] } | { kept: string }> {
   if (!lost) return { kept: "not decided: the intake branch was not observed" };

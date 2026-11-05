@@ -90,7 +90,7 @@ function retainWindow(ctx: Context, flag: string | undefined): { retain: string;
 export const tidyCommand = defineCommand({
   name: "tidy",
   version: "acts",
-  summary: "Report or clean orphan worktrees, branches, stale leases, receipt reservations (K5), runs/ work not in the record (R2.3), Herdr panes of runs that reported done (K7) and trace days, hook files, briefings, transcripts and old session logs older than trace.retain (D12, gh-195 D1)",
+  summary: "Report or clean orphan worktrees, branches, stale leases, receipt reservations (K5), Herdr panes of runs that reported done (K7), and trace days, hook files, briefings, transcripts, old session logs, cleared rejected mailbox receipts and records set aside as superseded older than trace.retain (D12, gh-195 D1, D11)",
   usage: "norn tidy [--dry-run] [--retain <duration>]",
   options: { "dry-run": { type: "boolean" }, retain: { type: "string" } },
   async run(ctx, args) {

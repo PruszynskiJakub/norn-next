@@ -125,7 +125,6 @@ export interface Observed {
   stories: Record<string, StoryLoc>;
   units: Record<string, UnitLoc>;
   sync: SyncReport;
-  /** R2.3: per story not held here, local runs/ work not on the remote (facts carry `{unit, files}`) */
 }
 
 // ------------------------------------------------------------ observe
