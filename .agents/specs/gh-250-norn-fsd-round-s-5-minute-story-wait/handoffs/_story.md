@@ -21,7 +21,9 @@ Make `norn-fsd-round`'s waits fit a harness that backgrounds long foreground com
 | Wanted: run norn and gh directly, never through a script or in the background | test | `packages/cli/test/unit/assets.test.ts` › fsd-round terms test ("never through a script or in the background") |
 | Wanted: exit 7 worded "the timeout passed" | test | `packages/cli/test/unit/assets.test.ts` › fsd-round terms test ("exit 7: the timeout passed", no "five minutes") |
 - review#1 approve: Approve, no findings: fsd-round waits at 160s/178s Bash/timeout 170 gh run watch, direct commands only, exit 7 'the timeout passed'; every Wanted item asserted in assets.test.ts
+- describe#1: wrote pr.md (summary diff of the waits, evidence per Wanted item from the assets test, two-way door, low blast radius; real fsd round not observed).
+- describe#1 done: pr.md: waits at 160s/178s Bash/timeout 170 gh run watch, direct commands only, exit 7 'the timeout passed'; evidence from assets test; two-way door, low risk
 
 ## Resume
 
-Review approved; next is whatever the workflow routes after review (QA/PR).
+pr.md is written for the branch as it is; next is whatever norn routes after describe.
