@@ -24,10 +24,11 @@ One command retries a check that failed on a glitch on unchanged code, and `run 
 Minor findings (not blocking): `run view` now runs a local observe on every call (F1); the `code_changed: null` branch and the markdown line are untested (F2).
 
 - describe#1: PR body written to `pr.md` in the spec folder (summary diff of the rerun/run view shape, evidence W1–W5 from the tests with F2 marked not shown, two-way door, F1 in the blast radius).
+- resolve#2: merged main c207e7c01 (#247 simplify bypass). Conflicts: `run-rerun.ts`, where main renamed the local `blocked` to core's `rerunnable` and the O2a retry check now uses `rerunnable`; `policy.ts` imports kept both sides (`isClosedStatus` + `HANDOFFS_DIR`/`RUNS_DIR`/`SPECS_DIR`). Unit tier, typecheck and integration tier are green.
 
 ### Resume
 
-PR body is in `pr.md`. Next: the steps after describe, as norn routes them.
+The merge is committed. Next: the steps after resolve, as norn routes them.
 
 ## Progress
 
