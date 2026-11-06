@@ -264,6 +264,10 @@ async function archiveRecord(act: ActEnv, key: string): Promise<{ archive: Recor
 }
 
 export async function cleanupMerged(act: ActEnv, a: Extract<Action, { kind: "cleanup_merged_story" }>): Promise<ActionResult> {
+  // GR6 (gh-88): the merge is the final outcome; each unfinished unit is recorded done first, so the
+  // archive below carries it and nothing parked at merge time stays in the inbox. A failed archive
+  // leaves the cleanup owed: the next tick decides it again and writes the same states.
+  for (const f of a.finish) act.writeUnitState(f.unit, act.unitLoc(f.unit).runsDir, f.state);
   // D15 (B29): the final record is on its archive ref before anything is removed; a failed push leaves the cleanup owed
   const archived = await archiveRecord(act, a.unit.story);
   if ("error" in archived) return { ok: false, error: archived.error, detail: archived.detail };

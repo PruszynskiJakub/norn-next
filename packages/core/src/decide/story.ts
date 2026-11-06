@@ -244,6 +244,21 @@ function claimBlob(ctx: Ctx, story: string, prev: ClaimBlob | null): ClaimBlob {
   };
 }
 
+/**
+ * GR6 (gh-88): a merged PR is the story's final outcome, so every unit not yet done is recorded done
+ * with the cleanup: a gate, ask or stuck still open at merge time is moot and leaves nothing in the
+ * inbox, and `story wait --until done` returns. A unit whose files failed validation stays as it is (S2).
+ */
+function finishMerged(ctx: Ctx, story: StoryFacts): Array<{ unit: UnitRef; state: UnitState }> {
+  const out: Array<{ unit: UnitRef; state: UnitState }> = [];
+  for (const u of story.units) {
+    const st = u.state;
+    if (!st || u.errors.length || st.status === "done") continue;
+    out.push({ unit: u.unit, state: { ...st, status: "done", park: null, run: null, updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id } });
+  }
+  return out;
+}
+
 /** GR6 merged → cleanup; GR6b issue closed on a finished round → close; GR7 closed/unassigned/unlabelled → park "remote: …" (a finished round: PR only, gh-71 D5); GR8 mirror + body change. */
 function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: UnitFacts | null): void {
   const ref = storyRef(story);
@@ -263,6 +278,7 @@ function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: U
       remote_branches: sliceBranches,
       refs: [`refs/norn/claims/${story.key}`, ...(story.mailbox ?? []).map((m) => m.ref)],
       story_status: "done",
+      finish: finishMerged(ctx, story),
     });
   }
   // gh-79 (H1, S5): mid-rebase the story unit's state.json and story.md are a rewound copy; a park or

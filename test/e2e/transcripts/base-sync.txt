@@ -1179,6 +1179,8 @@
   spawn repo $ git update-ref refs/remotes/origin/main <sha:56>
   spawn repo $ git worktree remove --force <tmp>/norn-record-<rand>/wt
   spawn repo $ git worktree prune
+  ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/state.json
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"$done","attempt":3,"visits":{"update":4,"test":3,"open-pr":3,"ready":3,"resolve":1},"step_entered_at":"<time>","status":"done","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":17,"run":null,"last_outcome":{"step":"ready","outcome":"approve","source":"human","at":"<time>","receipt_id":"<ulid:56>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:60>","mode":"auto"}
 > norn story update-branch gh-7
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
