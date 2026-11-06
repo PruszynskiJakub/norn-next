@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { type Clock, type InboxItem, type LaunchSpec, type NotifierPort, type PaneState, type PromptKey, type PullRequestCi, type RemoteIssue, type RemoteLabel, type RemotePort, type RemotePullRequest, type RunnerCapabilities, type RunnerPort, type RunnerSessionInfo, nameRemoved, type SessionRef } from "@norn/core";
 import { parseSpecDirName, type Receipt, recordRef, ROUNDS_DIR, STORY_UNIT_DIR, type UnitState, ulid } from "@norn/schema";
+import { spawnSyncTimeoutMs } from "./spawn-sync-bound.ts";
 import { appendReceipt, bindNornHome, HANDOFF_HEADER_BEGIN, HANDOFF_HEADER_END, HANDOFF_LOG_BEGIN, HANDOFF_LOG_END, installSkills, linkSkills, machineDir, readState, repoConfigPath, handoffPath, runStateDir, spawnSyncCaptured, storyRunStateDir, treeHandoffFile, treeRecordCommit, treeRunStateDir, treeUnitRunStateDir, workflowsDir } from "@norn/store";
 import type { ProjectView } from "@norn/view";
 import { bundledSkills, type CliDeps, type CliResult, type Interaction, type InteractionChoice, runCli, runningVersion, type TickReport } from "../../packages/cli/src/index.ts";
@@ -259,7 +260,10 @@ export const hostEnv = () => ({ ...Object.fromEntries(Object.entries(process.env
 
 export function sh(cwd: string, args: string[], input?: string): string {
   // not Bun.spawnSync with pipes: under load it now and then returns exit 0 with an empty stdout (spawnSyncCaptured)
-  const r = spawnSyncCaptured(["git", ...args], { cwd, ...(input === undefined ? {} : { stdin: new TextEncoder().encode(input) }) });
+  // gh-215: bounded like every spawnSync in the spawning tiers (spawn-sync-bound.ts), with a message naming the call
+  const timeoutMs = spawnSyncTimeoutMs();
+  const r = spawnSyncCaptured(["git", ...args], { cwd, timeoutMs, ...(input === undefined ? {} : { stdin: new TextEncoder().encode(input) }) });
+  if (r.exitedDueToTimeout) throw new Error(`git ${args.join(" ")} (${cwd}): timed out after ${timeoutMs} ms (killed)`);
   if (r.exitCode !== 0) throw new Error(`git ${args.join(" ")} (${cwd}): ${r.stderr.toString()}`);
   return r.stdout.toString().trim();
 }
